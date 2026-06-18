@@ -358,6 +358,67 @@ footer{background:var(--navy);padding:56px 0 26px}
 .fig{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:rgba(255,255,255,.32);border:1px solid rgba(255,255,255,.1);padding:6px 14px;border-radius:8px;cursor:none;transition:all .2s}
 .fig:hover{color:#fff;border-color:rgba(255,255,255,.3)}
 
+
+/* TICKER LANZAMIENTO */
+.ticker{background:var(--g);color:#fff;text-align:center;padding:9px 20px;font-size:13px;font-weight:600;letter-spacing:.3px;position:relative;z-index:201}
+.ticker a{color:var(--gn);text-decoration:underline;cursor:none}
+.ticker-close{position:absolute;right:16px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:none;line-height:1}
+.ticker-close:hover{color:#fff}
+
+/* WAITLIST MODAL */
+.wl-modal{position:fixed;inset:0;z-index:800;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(10,22,40,.7);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .3s}
+.wl-modal.open{opacity:1;pointer-events:all}
+.wl-box{background:#fff;border-radius:var(--rl);padding:36px;max-width:480px;width:100%;position:relative;transform:translateY(20px);transition:transform .3s var(--ease)}
+.wl-modal.open .wl-box{transform:none}
+.wl-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;color:var(--mu);cursor:none;line-height:1}
+.wl-close:hover{color:var(--navy)}
+.wl-tag{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gm);margin-bottom:10px}
+.wl-title{font-family:"Bricolage Grotesque",sans-serif;font-size:24px;font-weight:700;margin-bottom:8px;color:var(--navy)}
+.wl-sub{font-size:14px;color:var(--mu);margin-bottom:20px;line-height:1.6}
+
+/* FAQ */
+.faq-item{border-bottom:1px solid var(--bd);padding:0}
+.faq-q{width:100%;text-align:left;background:none;border:none;padding:20px 0;font-family:"Bricolage Grotesque",sans-serif;font-size:16px;font-weight:600;color:var(--navy);cursor:none;display:flex;justify-content:space-between;align-items:center;gap:16px;line-height:1.4}
+.faq-q:hover{color:var(--g)}
+.faq-ic{font-size:20px;color:var(--gm);flex-shrink:0;transition:transform .25s}
+.faq-item.open .faq-ic{transform:rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .35s var(--ease)}
+.faq-item.open .faq-a{max-height:400px}
+.faq-a-inner{padding:0 0 20px;font-size:15px;color:var(--mu);line-height:1.75}
+.faq-a-inner a{color:var(--g);text-decoration:underline}
+
+/* MEMBERSHIP CARD */
+.mcard{background:linear-gradient(135deg,var(--navy) 0%,#0d2040 60%,#16402A 100%);border-radius:16px;padding:28px;color:#fff;max-width:340px;position:relative;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,.2)}
+.mcard::before{content:"";position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(46,125,79,.15)}
+.mcard::after{content:"";position:absolute;bottom:-30px;left:-20px;width:120px;height:120px;border-radius:50%;background:rgba(74,222,128,.06)}
+.mcard-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
+.mcard-logo{font-family:"Bricolage Grotesque",sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.8)}
+.mcard-logo em{font-style:normal;color:var(--gn)}
+.mcard-level{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:rgba(74,222,128,.15);color:var(--gn);padding:4px 10px;border-radius:20px}
+.mcard-name{font-family:"Bricolage Grotesque",sans-serif;font-size:22px;font-weight:700;margin-bottom:4px}
+.mcard-code{font-size:13px;color:rgba(255,255,255,.5);font-family:monospace;letter-spacing:.1em}
+.mcard-bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px}
+.mcard-valid-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);margin-bottom:3px}
+.mcard-valid{font-size:13px;font-weight:600}
+.mcard-icon{font-size:32px}
+
+/* HUB FORM */
+.hub-hero{background:linear-gradient(135deg,var(--navy) 0%,#0d1f38 100%);padding:72px 0 52px}
+.form-section{background:var(--cream);border-radius:var(--rl);padding:24px;margin-bottom:20px}
+.form-section-title{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gm);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.check-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.check-item{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--navy);cursor:none}
+.check-item input{accent-color:var(--g);cursor:none;width:15px;height:15px}
+.radio-group{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.radio-item{display:flex;align-items:center;gap:7px;font-size:14px;cursor:none}
+.radio-item input{accent-color:var(--g);cursor:none}
+.preap-box{display:none;margin-top:12px}
+.preap-box.show{display:block}
+
+/* 404 PAGE */
+.page-404{min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px}
+.e404-num{font-family:"Bricolage Grotesque",sans-serif;font-size:120px;font-weight:800;color:var(--gl);line-height:1;margin-bottom:8px}
+
 /* RESPONSIVE */
 @media(max-width:900px){.gratitud-flow{grid-template-columns:1fr;gap:14px}.gf-arrow{padding:0;transform:rotate(90deg)}.mem6-grid{grid-template-columns:1fr 1fr}.dir-grid{grid-template-columns:1fr}}
 @media(max-width:768px){
@@ -450,6 +511,38 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 </head>
 <body>
 
+<!-- TICKER LANZAMIENTO -->
+<div class="ticker" id="ticker">
+  🚀 Lanzamiento oficial Give&Grow — <strong>julio / agosto 2026</strong> · Medellín &nbsp;·&nbsp; <a onclick="openWL()" style="cursor:none">Reserva tu lugar</a>
+  <button class="ticker-close" onclick="document.getElementById('ticker').style.display='none'">×</button>
+</div>
+
+<!-- WAITLIST MODAL -->
+<div class="wl-modal" id="wl-modal" onclick="if(event.target===this)closeWL()">
+  <div class="wl-box">
+    <button class="wl-close" onclick="closeWL()">×</button>
+    <div class="wl-tag">Lanzamiento 2026</div>
+    <div class="wl-title">Reserva tu lugar en el evento</div>
+    <div class="wl-sub">Sé de los primeros en conocer Give&Grow en persona. Te contactamos con los detalles del evento cuando estén confirmados.</div>
+    <form action="https://formspree.io/f/maqzzlwe" method="POST">
+      <div class="ff"><label>Nombre completo *</label><input type="text" name="nombre_lista_espera" placeholder="Tu nombre" required></div>
+      <div class="ff"><label>Correo electrónico *</label><input type="email" name="email_lista_espera" placeholder="tu@correo.com" required></div>
+      <div class="ff"><label>¿Cómo quieres participar?</label>
+        <select name="tipo_lista_espera">
+          <option>Donante individual</option>
+          <option>Empresa / RSE</option>
+          <option>Fundación aliada</option>
+          <option>Voluntario</option>
+          <option>Prensa / Medios</option>
+          <option>Otro</option>
+        </select>
+      </div>
+      <input type="hidden" name="_subject" value="Lista de espera — Lanzamiento Give&Grow">
+      <button type="submit" class="sub">Reservar mi lugar →</button>
+    </form>
+  </div>
+</div>
+
 <div id="cd"></div><div id="cr"></div>
 
 <!-- LOADER -->
@@ -471,6 +564,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
     <span class="nl" onclick="go('donar')">Apoyar</span>
     <span class="nl" onclick="go('transparencia')">Transparencia</span>
     <span class="nl" onclick="go('contacto')">Contacto</span>
+    <span class="nl" onclick="go('hub-apply')">Aplicar al Hub</span>
     <button class="ndon" onclick="go('donar')">Donar ahora</button>
   </div>
   <button class="hbg-btn" id="hbg-btn" onclick="toggleMenu()" aria-label="Menú"><span></span><span></span><span></span></button>
@@ -979,14 +1073,294 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
   </section>
 </div>
 
+<!-- ═══════════ FAQ ═══════════ -->
+<div class="page" id="page-faq">
+  <div style="height:80px;background:var(--navy)"></div>
+  <section class="sec" style="padding-top:60px">
+    <div class="wrap">
+      <div class="ey rv">Preguntas frecuentes</div>
+      <h1 class="stit rv d1" style="max-width:600px">Todo lo que necesitas saber sobre Give&Grow</h1>
+      <div style="margin-top:48px;max-width:720px">
+
+        <div class="faq-item rv d1">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Qué es Give&Grow International?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Es una fundación colombiana (ESAL, NIT 901.948.930-2) del Régimen Tributario Especial que conecta generosidad con necesidad de forma estratégica. Operamos el Compassion Hub en Medellín — un centro de acopio y gestión de alianzas — y el Programa de Gratitud, una red de empresas aliadas con beneficios exclusivos para donantes y voluntarios.</div></div>
+        </div>
+
+        <div class="faq-item rv d2">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Mi donación tiene beneficio tributario?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Sí. Las donaciones realizadas por sistema financiero a Give&Grow dan derecho a un <strong>descuento del 25% del valor donado sobre el impuesto de renta a cargo</strong>, conforme al Artículo 257 del Estatuto Tributario colombiano. Esto no es una deducción de la base gravable — se descuenta directamente del impuesto. Ejemplo: si donas $4.000.000 COP, tu impuesto se reduce en $1.000.000 COP.</div></div>
+        </div>
+
+        <div class="faq-item rv d3">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Cómo puedo donar?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Realizas una transferencia a la Cuenta de Ahorros Bancolombia No. 31000009221 a nombre de Fundación Give&Grow International (NIT 901.948.930-2). Luego envías el comprobante a sebas@thegiveandgrowproject.org y recibas tu certificado de donación y tu credencial de membresía en máximo 24 horas. Próximamente habilitaremos pagos con tarjeta y PSE a través de Wompi.</div></div>
+        </div>
+
+        <div class="faq-item rv d4">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Qué es el Programa de Gratitud?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Es una red de empresas aliadas que ofrecen descuentos exclusivos a todos los miembros activos de Give&Grow — desde el primer nivel de membresía. Las empresas ganan visibilidad y posicionamiento como negocios con propósito social. Los miembros acceden a beneficios en gastronomía, moda, belleza y bienestar, entre otras categorías. Es el "Dar para crecer" en lo más literal.</div></div>
+        </div>
+
+        <div class="faq-item rv d5">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Qué es el Compassion Hub?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Es el brazo operativo de Give&Grow en campo. Funciona en un espacio de 100m² en El Poblado, Medellín, con tres rutas activas: <strong>R1 Alianzas</strong> (apoyo estratégico a fundaciones), <strong>R2 Gestión de Donaciones</strong> (centro de acopio con trazabilidad completa), y <strong>R4 Impact Journey</strong> (voluntariado corporativo en doble vía). Todas las donaciones pasan por el Hub con acta de entrada, clasificación y acta de salida hacia las fundaciones aliadas.</div></div>
+        </div>
+
+        <div class="faq-item rv d6">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Cómo puede una empresa hacer RSE con Give&Grow?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Tienes tres niveles: <strong>Aliado Semilla</strong> desde $2M COP/año (donación + voluntariado + certificado Art. 257 ET), <strong>Impact Partner</strong> desde $8M COP/año (incluye Impact Journey para tu equipo), y <strong>Alianza Estratégica</strong> desde $25M COP/año (co-creación de programas, naming, reportes GRI). Escríbenos a sebas@thegiveandgrowproject.org para armar tu propuesta a medida.</div></div>
+        </div>
+
+        <div class="faq-item rv d1">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Qué es el Impact Journey?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Es una experiencia de voluntariado corporativo en doble vía: tu equipo va al campo con comunidades aliadas verificadas, y líderes comunitarios visitan espacios empresariales. Cada participante recibe un reporte individual de impacto. Está disponible para empresas desde el nivel Impact Partner RSE o como servicio independiente. Escríbenos para coordinar la logística.</div></div>
+        </div>
+
+        <div class="faq-item rv d2">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Mi fundación puede aliarse con el Hub?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Sí. Give&Grow tiene 25 fundaciones preaprobadas y recibe nuevas aplicaciones de forma continua. El proceso incluye una visita de contexto, diligenciamiento del formulario de aplicación, firma de convenio y acceso a las rutas del Hub. Puedes aplicar directamente desde la sección <a onclick="go('hub-apply')" style="cursor:none">Aplicar al Hub</a>.</div></div>
+        </div>
+
+        <div class="faq-item rv d3">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Cómo sé que mi donación llegó a quien debe llegar?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Todas las donaciones pasan por el Hub con trazabilidad completa: acta de recepción con valoración y fotografía, clasificación por tipo de necesidad, y acta de entrega firmada por la fundación aliada receptora. Como donante recibes un reporte fotográfico mensual. Nada sale del Hub sin documentación.</div></div>
+        </div>
+
+        <div class="faq-item rv d4">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Cómo puedo ser voluntario?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Aceptamos voluntariado de habilidades profesionales: médicos, odontólogos, abogados, contadores, desarrolladores, docentes y más. Contáctanos en sebas@thegiveandgrowproject.org o por WhatsApp al +57 315 330 5028 indicando tu área de expertise y disponibilidad. Los voluntarios también acceden al Programa de Gratitud con membresía activa.</div></div>
+        </div>
+
+        <div class="faq-item rv d5">
+          <button class="faq-q" onclick="toggleFAQ(this)">¿Dónde puedo ver la información financiera y legal de la fundación?<span class="faq-ic">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">En la sección <a onclick="go('transparencia')" style="cursor:none">Transparencia Legal</a> de este sitio, conforme al Art. 364-5 del Estatuto Tributario. Incluye razón social, NIT, Representante Legal, Revisora Fiscal, régimen tributario, objeto social y beneficio tributario para donantes. Los estados financieros y el informe de gestión están disponibles previa solicitud a sebas@thegiveandgrowproject.org.</div></div>
+        </div>
+
+      </div>
+      <div style="margin-top:48px;background:var(--gl);border-radius:var(--rl);padding:24px;max-width:720px" class="rv">
+        <div style="font-size:15px;font-weight:600;margin-bottom:6px">¿No encontraste lo que buscabas?</div>
+        <div style="font-size:14px;color:var(--mu);margin-bottom:14px">Escríbenos directamente — respondemos en menos de 24 horas.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-g" href="https://wa.me/573153305028" target="_blank">WhatsApp</a>
+          <a class="btn btn-o" onclick="go('contacto')">Formulario de contacto</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════ PRIVACIDAD ═══════════ -->
+<div class="page" id="page-privacidad">
+  <div style="height:80px;background:var(--navy)"></div>
+  <section class="sec" style="padding-top:60px">
+    <div class="wrap" style="max-width:760px">
+      <div class="ey rv">Legal</div>
+      <h1 class="stit rv d1">Política de Privacidad y Tratamiento de Datos Personales</h1>
+      <p style="color:var(--mu);font-size:14px;margin-top:10px" class="rv d2">Fundación Give&Grow International · NIT 901.948.930-2 · Versión 1.0 · Junio 2026</p>
+
+      <div style="margin-top:40px;display:flex;flex-direction:column;gap:28px">
+
+        <div class="rv">
+          <h2 style="font-size:18px;margin-bottom:10px;color:var(--g)">1. Responsable del tratamiento</h2>
+          <p style="font-size:15px;color:var(--mu);line-height:1.8">La Fundación Give&Grow International (NIT 901.948.930-2), con domicilio en Carrera 82A #9A Sur 28, Medellín, Antioquia, Colombia, correo electrónico sebas@thegiveandgrowproject.org y teléfono +57 315 330 5028, actúa como responsable del tratamiento de los datos personales recopilados a través del sitio web thegiveandgrowproject.org.</p>
+        </div>
+
+        <div class="rv">
+          <h2 style="font-size:18px;margin-bottom:10px;color:var(--g)">2. Marco legal</h2>
+          <p style="font-size:15px;color:var(--mu);line-height:1.8">Esta política se rige por la Ley Estatutaria 1581 de 2012, el Decreto 1377 de 2013, el Decreto 1074 de 2015 y las normas que los modifiquen o complementen, referentes a la protección de datos personales en Colombia (Habeas Data).</p>
+        </div>
+
+        <div class="rv">
+          <h2 style="font-size:18px;margin-bottom:10px;color:var(--g)">3. Datos que recopilamos</h2>
+          <p style="font-size:15px;color:var(--mu);line-height:1.8;margin-bottom:10px">Recopilamos los siguientes datos según la interacción:</p>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:8px">
+            <li style="font-size:14px;color:var(--mu);display:flex;gap:8px"><span style="color:var(--g);font-weight:700;flex-shrink:0">→</span><span><strong>Formulario de contacto y listas de espera:</strong> nombre completo, correo electrónico, empresa u organización, tipo de vinculación y mensaje. Procesado por Formspree (formspree.io).</span></li>
+            <li style="font-size:14px;color:var(--mu);display:flex;gap:8px"><span style="color:var(--g);font-weight:700;flex-shrink:0">→</span><span><strong>Verificador de membresías:</strong> código de membresía ingresado manualmente por el usuario.</span></li>
+            <li style="font-size:14px;color:var(--mu);display:flex;gap:8px"><span style="color:var(--g);font-weight:700;flex-shrink:0">→</span><span><strong>Datos de navegación:</strong> dirección IP (anonimizada), páginas visitadas, tiempo de sesión y dispositivo, recopilados por Google Analytics 4 (ID: G-QR9KL9G3YJ).</span></li>
+            <li style="font-size:14px;color:var(--mu);display:flex;gap:8px"><span style="color:var(--g);font-weight:700;flex-shrink:0">→</span><span><strong>Formulario de aplicación al Hub:</strong> datos de la organización solicitante, información del Representante Legal y descripción de programas sociales.</span></li>
+          </ul>
+        </div>
+
+        <div class="rv">
+          <h2 style="font-size:18px;margin-bottom:10px;color:var(--g)">4. Finalidad del tratamiento</h2>
+          <p style="font-size:15px;color:var(--mu);line-height:1.8">Los datos se usan exclusivamente para: responder solicitudes de contacto, gestionar membresías y donaciones, procesar aplicaciones de fundaciones al Compassion Hub, analizar el tráfico del sitio web para mejorar la experiencia, y comunicar novedades de la fundación a quienes lo han solicitado expresamente.</p>
+        </div>
+
+        <div class="rv">
+          <h2 style="font-size:18px;margin-bottom:10px;color:var(--g)">5. Terceros que procesan datos</h2>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:8px">
+            <li style="font-size:14px;color:var(--mu);display:flex;gap:8px"><span style="color:var(--g);font-weight:700;flex-shrink:0">→</span><span><strong>Formspree Inc.</strong> — procesamiento de formularios (formspree.io · Política de privacidad disponible en su sitio)</span></li>
+            <li style="font-size:14px;color:var(--mu);display:flex;gap:8px"><span style="color:var(--g);font-weight:700;flex-shrink:0">→</span><span><strong>Google LLC</strong> — Google Analytics 4 para análisis de tráfico (analytics.google.com)</span></li>
+            <li style="font-size:14px;color:var(--mu);display:flex;gap:8px"><span style="color:var(--g);font-weight:700;flex-shrink:0">→</span><span><strong>Cloudflare Inc.</strong> — alojamiento y protección del sitio web (cloudflare.com)</span></li>
+          </ul>
+        </div>
+
+        <div class="rv">
+          <h2 style="font-size:18px;margin-bottom:10px;color:var(--g)">6. Derechos del titular</h2>
+          <p style="font-size:15px;color:var(--mu);line-height:1.8">Conforme a la Ley 1581 de 2012, usted tiene derecho a conocer, actualizar, rectificar y suprimir sus datos personales, así como a revocar la autorización otorgada para su tratamiento. Para ejercer estos derechos, escríbanos a <strong>sebas@thegiveandgrowproject.org</strong> con el asunto "Habeas Data". Responderemos en un plazo máximo de diez (10) días hábiles.</p>
+        </div>
+
+        <div class="rv">
+          <h2 style="font-size:18px;margin-bottom:10px;color:var(--g)">7. Seguridad</h2>
+          <p style="font-size:15px;color:var(--mu);line-height:1.8">El sitio opera bajo protocolo HTTPS con certificado SSL provisto por Cloudflare. Los datos de formularios son transmitidos de forma cifrada. No almacenamos números de tarjetas de crédito ni contraseñas.</p>
+        </div>
+
+        <div class="rv">
+          <h2 style="font-size:18px;margin-bottom:10px;color:var(--g)">8. Vigencia</h2>
+          <p style="font-size:15px;color:var(--mu);line-height:1.8">Los datos se conservan por el tiempo necesario para cumplir con la finalidad del tratamiento y las obligaciones legales aplicables. Esta política puede ser actualizada; la versión vigente siempre estará disponible en esta página.</p>
+        </div>
+
+        <div style="background:var(--gl);border-radius:var(--r);padding:16px 20px;font-size:14px;color:var(--g)" class="rv">
+          Para consultas sobre privacidad: <strong>sebas@thegiveandgrowproject.org</strong> · +57 315 330 5028 · Medellín, Colombia
+        </div>
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════ HUB APPLY ═══════════ -->
+<div class="page" id="page-hub-apply">
+  <div class="hub-hero">
+    <div class="wrap">
+      <div class="ey eyw rv">Compassion Hub</div>
+      <h1 class="stit rv d1" style="color:#fff;font-size:clamp(28px,5vw,54px);max-width:640px">Formulario de Aplicación al Hub</h1>
+      <p style="color:rgba(255,255,255,.55);font-size:16px;max-width:480px;line-height:1.75;margin-top:14px" class="rv d2">Para fundaciones preaprobadas y nuevas organizaciones que quieren unirse al ecosistema Give&Grow. Revisamos cada aplicación en 5-10 días hábiles.</p>
+    </div>
+  </div>
+  <section class="sec">
+    <div class="wrap" style="max-width:760px">
+      <form action="https://formspree.io/f/maqzzlwe" method="POST">
+        <input type="hidden" name="_subject" value="Aplicación al Hub — Nueva Fundación">
+
+        <div class="form-section rv">
+          <div class="form-section-title">🏛️ Información legal de la organización</div>
+          <div class="g2" style="gap:16px">
+            <div class="ff"><label>Nombre de la fundación / organización *</label><input type="text" name="nombre_org" placeholder="Fundación Ejemplo" required></div>
+            <div class="ff"><label>NIT / Identificación *</label><input type="text" name="nit_org" placeholder="900.000.000-0" required></div>
+            <div class="ff"><label>Tipo de entidad *</label>
+              <select name="tipo_entidad" required>
+                <option value="">Selecciona</option>
+                <option>Fundación</option>
+                <option>Corporación / Asociación</option>
+                <option>ONG</option>
+                <option>Colectivo</option>
+                <option>Otra</option>
+              </select>
+            </div>
+            <div class="ff"><label>Año de fundación *</label><input type="number" name="año_fundacion" placeholder="2018" min="1900" max="2026" required></div>
+            <div class="ff" style="grid-column:1/-1"><label>Número de personería jurídica</label><input type="text" name="personeria" placeholder="Número de inscripción o resolución"></div>
+          </div>
+        </div>
+
+        <div class="form-section rv d1">
+          <div class="form-section-title">👤 Representante Legal</div>
+          <div class="g2" style="gap:16px">
+            <div class="ff"><label>Nombre completo *</label><input type="text" name="rl_nombre" placeholder="Nombre Apellido" required></div>
+            <div class="ff"><label>Cédula de ciudadanía *</label><input type="text" name="rl_cc" placeholder="1.000.000.000" required></div>
+            <div class="ff"><label>Correo electrónico *</label><input type="email" name="rl_email" placeholder="contacto@fundacion.org" required></div>
+            <div class="ff"><label>Teléfono / WhatsApp *</label><input type="tel" name="rl_tel" placeholder="+57 300 000 0000" required></div>
+          </div>
+        </div>
+
+        <div class="form-section rv d2">
+          <div class="form-section-title">📍 Cobertura geográfica</div>
+          <div class="g2" style="gap:16px">
+            <div class="ff"><label>Ciudad / Municipio principal de operación *</label><input type="text" name="ciudad" placeholder="Medellín" required></div>
+            <div class="ff"><label>Departamento *</label><input type="text" name="departamento" placeholder="Antioquia" required></div>
+            <div class="ff" style="grid-column:1/-1"><label>Otras zonas o municipios de operación</label><input type="text" name="otras_zonas" placeholder="Ej: Turbo, Quibdó, zonas rurales del Urabá"></div>
+          </div>
+        </div>
+
+        <div class="form-section rv d3">
+          <div class="form-section-title">🎯 Poblaciones que atienden</div>
+          <p style="font-size:13px;color:var(--mu);margin-bottom:10px">Selecciona todas las que apliquen</p>
+          <div class="check-grid">
+            <label class="check-item"><input type="checkbox" name="pob_ninez" value="Niñez en riesgo">Niñez en riesgo</label>
+            <label class="check-item"><input type="checkbox" name="pob_indigenas" value="Comunidades indígenas">Comunidades indígenas</label>
+            <label class="check-item"><input type="checkbox" name="pob_campesinos" value="Comunidades campesinas">Comunidades campesinas</label>
+            <label class="check-item"><input type="checkbox" name="pob_calle" value="Personas en situación de calle">Personas en situación de calle</label>
+            <label class="check-item"><input type="checkbox" name="pob_adultos" value="Adultos mayores">Adultos mayores</label>
+            <label class="check-item"><input type="checkbox" name="pob_animales" value="Animales en maltrato">Animales en maltrato</label>
+            <label class="check-item"><input type="checkbox" name="pob_rehab" value="Rehabilitación">Personas en rehabilitación</label>
+            <label class="check-item"><input type="checkbox" name="pob_ppl" value="Personas privadas de libertad">Personas privadas de libertad</label>
+          </div>
+          <div class="ff" style="margin-top:14px"><label>Número aproximado de beneficiarios activos *</label>
+            <select name="num_beneficiarios" required>
+              <option value="">Selecciona rango</option>
+              <option>1 - 50 personas</option>
+              <option>51 - 200 personas</option>
+              <option>201 - 500 personas</option>
+              <option>501 - 1.000 personas</option>
+              <option>Más de 1.000 personas</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section rv d4">
+          <div class="form-section-title">🔗 Rutas del Hub de interés</div>
+          <p style="font-size:13px;color:var(--mu);margin-bottom:10px">¿A cuáles rutas quieren acceder?</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <label class="check-item"><input type="checkbox" name="ruta_r1" value="R1 Alianzas">R1 — Alianzas con Fundaciones (apoyo estratégico y logístico)</label>
+            <label class="check-item"><input type="checkbox" name="ruta_r2" value="R2 Donaciones">R2 — Gestión de Donaciones (recepción y distribución con trazabilidad)</label>
+            <label class="check-item"><input type="checkbox" name="ruta_r4" value="R4 Impact Journey">R4 — Impact Journey (voluntariado corporativo en sus comunidades)</label>
+          </div>
+        </div>
+
+        <div class="form-section rv d5">
+          <div class="form-section-title">💡 Su organización</div>
+          <div class="ff"><label>Descríbanos brevemente un programa activo *</label><textarea name="programa_activo" placeholder="Nombre del programa, qué hace, a quién beneficia y cómo opera..." required style="min-height:110px"></textarea></div>
+          <div class="ff"><label>¿Qué necesitan de Give&Grow? *</label><textarea name="necesidades" placeholder="Recursos, logística, conexiones, capacitación..." required></textarea></div>
+          <div class="ff"><label>¿Qué pueden aportar al ecosistema?</label><textarea name="aportes" placeholder="Espacios, conocimiento, redes, voluntarios especializados..."></textarea></div>
+        </div>
+
+        <div class="form-section rv d6">
+          <div class="form-section-title">✅ Datos de aplicación</div>
+          <div class="ff"><label>¿Son una de las 25 fundaciones preaprobadas? *</label>
+            <div class="radio-group">
+              <label class="radio-item"><input type="radio" name="preaprobada" value="si" onchange="document.getElementById('preap-code').classList.add('show')"> Sí</label>
+              <label class="radio-item"><input type="radio" name="preaprobada" value="no" onchange="document.getElementById('preap-code').classList.remove('show')" checked> No</label>
+            </div>
+            <div class="preap-box" id="preap-code">
+              <div class="ff" style="margin-top:0"><label>Código de preaprobación</label><input type="text" name="codigo_preap" placeholder="Código que recibiste"></div>
+            </div>
+          </div>
+          <div class="ff"><label>¿Cómo conocieron a Give&Grow?</label>
+            <select name="como_conocio">
+              <option>Redes sociales</option>
+              <option>Recomendación de otra fundación</option>
+              <option>Evento o conferencia</option>
+              <option>Búsqueda en internet</option>
+              <option>Contacto directo del equipo Give&Grow</option>
+              <option>Otro</option>
+            </select>
+          </div>
+          <div style="background:var(--amberl);border-radius:var(--r);padding:13px 16px;font-size:13px;color:var(--amber);margin-top:8px">
+            📎 <strong>Documentos requeridos:</strong> Envía por correo a sebas@thegiveandgrowproject.org — Personería Jurídica vigente + RUT de la organización. Asunto: "Documentos aplicación Hub - [Nombre de tu fundación]"
+          </div>
+        </div>
+
+        <div class="rv" style="text-align:center;margin-top:8px">
+          <button type="submit" class="sub" style="max-width:360px;margin:0 auto">Enviar aplicación →</button>
+          <p style="font-size:12px;color:var(--mu);margin-top:12px">Revisamos cada aplicación en 5-10 días hábiles. Te contactaremos al correo registrado para coordinar la visita de contexto.</p>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+
 <!-- FOOTER -->
 <footer>
   <div class="wrap">
     <div class="fg">
       <div><div class="fl">Give<em>&</em>Grow International</div><div class="ftag">Dar para crecer,<br>crecer para dar más.</div><div class="fnit">NIT 901.948.930-2 · ESAL · Régimen Tributario Especial<br>Medellín, Antioquia, Colombia · 2025</div></div>
       <div><div class="fth">Páginas</div><div class="flink" onclick="go('inicio')">Inicio</div><div class="flink" onclick="go('quees')">¿Qué es Give&Grow?</div><div class="flink" onclick="go('hub')">Compassion Hub</div><div class="flink" onclick="go('gratitud')">Programa de Gratitud</div></div>
-      <div><div class="fth">Apoyar</div><div class="flink" onclick="go('donar')">Donar ahora</div><div class="flink" onclick="go('donar')">RSE Corporativa</div><div class="flink" onclick="go('donar')">Voluntariado</div><div class="flink" onclick="go('donar')">Membresía de Honor</div></div>
-      <div><div class="fth">Legal y Contacto</div><div class="flink" onclick="go('transparencia')">Transparencia Legal</div><div class="flink" onclick="go('contacto')">Contacto</div><div class="flink">sebas@thegiveandgrowproject.org</div><div class="flink">+57 315 330 5028</div></div>
+      <div><div class="fth">Apoyar</div><div class="flink" onclick="go('donar')">Donar ahora</div><div class="flink" onclick="go('donar')">RSE Corporativa</div><div class="flink" onclick="go('donar')">Voluntariado</div><div class="flink" onclick="go('donar')">Membresía de Honor</div>
+<div class="flink" onclick="go('hub-apply')">Aplicar al Hub</div></div>
+      <div><div class="fth">Legal y Contacto</div><div class="flink" onclick="go('transparencia')">Transparencia Legal</div>
+<div class="flink" onclick="go('privacidad')">Política de Privacidad</div>
+<div class="flink" onclick="go('faq')">Preguntas Frecuentes</div><div class="flink" onclick="go('contacto')">Contacto</div><div class="flink">sebas@thegiveandgrowproject.org</div><div class="flink">+57 315 330 5028</div></div>
     </div>
     <div class="fbot"><div class="fco">© 2025 Fundación Give&Grow International · Todos los derechos reservados</div><a class="fig" href="https://instagram.com/thegiveandgrowproject" target="_blank">📸 @thegiveandgrowproject</a></div>
   </div>
@@ -1110,7 +1484,20 @@ function verificar(){
   const m=MEMBERS[code];
   if(m&&m.active){
     result.className="ver-result ok";result.style.display="block";
-    result.innerHTML=`<strong style="color:var(--g)">✅ MIEMBRO ACTIVO</strong><br><strong>Nombre:</strong> ${m.name}<br><strong>Nivel:</strong> ${m.tier}<br><strong>Válido hasta:</strong> ${m.valid}<br><strong>Descuento aplicable:</strong> El definido por tu empresa`;
+    result.innerHTML=`
+      <div class="mcard" style="margin:0 auto 16px">
+        <div class="mcard-top">
+          <div class="mcard-logo">Give<em>&</em>Grow</div>
+          <div class="mcard-level">${m.tier}</div>
+        </div>
+        <div class="mcard-name">${m.name}</div>
+        <div class="mcard-code">${code}</div>
+        <div class="mcard-bottom">
+          <div><div class="mcard-valid-label">Válido hasta</div><div class="mcard-valid">${m.valid}</div></div>
+          <div class="mcard-icon">✅</div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:13px;color:var(--g);font-weight:600">Miembro activo — Descuento Programa de Gratitud aplicable</div>`;
   }else{
     result.className="ver-result err";result.style.display="block";
     result.innerHTML=`<strong style="color:#e74c3c">❌ MEMBRESÍA NO ENCONTRADA</strong><br>El código <strong>${code}</strong> no corresponde a un miembro activo.<br>Consulta con el cliente o escribe a sebas@thegiveandgrowproject.org`;
@@ -1124,6 +1511,19 @@ setTimeout(()=>{
     setTimeout(()=>el.classList.add("in"),1300+i*65);
   });
 },80);
+
+
+/* TICKER + WAITLIST */
+function openWL(){document.getElementById("wl-modal").classList.add("open");document.body.style.overflow="hidden"}
+function closeWL(){document.getElementById("wl-modal").classList.remove("open");document.body.style.overflow=""}
+
+/* FAQ */
+function toggleFAQ(btn){
+  const item=btn.parentElement;
+  const wasOpen=item.classList.contains("open");
+  document.querySelectorAll(".faq-item.open").forEach(i=>i.classList.remove("open"));
+  if(!wasOpen)item.classList.add("open");
+}
 
 /* HAMBURGER */
 function toggleMenu(){
