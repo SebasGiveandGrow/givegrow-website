@@ -401,6 +401,42 @@ footer{background:var(--navy);padding:56px 0 26px}
 .qr-box canvas,#qrcode canvas,#qrcode img{border-radius:8px;margin:0 auto}
 .qr-label{font-size:12px;color:var(--mu);margin-top:10px}
 
+
+/* HUB EXPANDIDO */
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:40px;align-items:start}
+.island-vis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:32px 0;position:relative}
+.island{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:var(--rl);padding:18px 12px;text-align:center;transition:all .2s}
+.island-icon{font-size:24px;margin-bottom:8px}
+.island-name{font-size:12px;font-weight:600;color:rgba(255,255,255,.6);margin-bottom:4px}
+.island-tag{font-size:11px;color:rgba(255,255,255,.3)}
+.island.bridge{background:rgba(31,92,56,.3);border-color:var(--gm);transform:scale(1.05)}
+.island.bridge .island-name{color:var(--gn)}
+.hub-model{display:grid;grid-template-columns:1fr 80px 1fr;gap:0;align-items:center;margin:36px 0}
+.hub-col{display:flex;flex-direction:column;gap:10px}
+.hub-center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.hub-arrow{font-size:22px;color:var(--gm);text-align:center}
+.hub-circle{width:72px;height:72px;background:var(--g);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 0 28px rgba(46,125,79,.4)}
+.hub-item{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px;font-size:13px;font-weight:500;color:rgba(255,255,255,.75);display:flex;align-items:center;gap:8px}
+.hub-item em{font-style:normal;font-size:16px}
+.data-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}
+.data-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--rl);padding:22px;text-align:center}
+.data-num{font-family:"Bricolage Grotesque",sans-serif;font-size:42px;font-weight:800;color:var(--gn);line-height:1;margin-bottom:8px}
+.data-label{font-size:13px;color:rgba(255,255,255,.55);line-height:1.5}
+.data-src{font-size:11px;color:rgba(255,255,255,.2);margin-top:4px}
+.method-steps{display:flex;flex-direction:column;gap:0;margin-top:36px;max-width:700px}
+.method-step{display:grid;grid-template-columns:52px 1fr;gap:20px;padding:20px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.method-step:last-child{border:none}
+.method-step-num{width:52px;height:52px;border-radius:50%;border:2px solid var(--gm);color:var(--gn);font-family:"Bricolage Grotesque",sans-serif;font-size:18px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.method-step-title{font-size:16px;font-weight:700;color:#fff;margin-bottom:6px}
+.method-step-body{font-size:14px;color:rgba(255,255,255,.55);line-height:1.7}
+
+@media(max-width:768px){
+  .problem-grid,.hub-model{grid-template-columns:1fr}
+  .island-vis{grid-template-columns:1fr 1fr}
+  .data-grid{grid-template-columns:1fr 1fr}
+  .hub-arrow{transform:rotate(90deg)}
+}
+
 /* RUTA CARDS */
 .ruta-card{background:#fff;border:1px solid var(--bd);border-radius:var(--rl);padding:24px;margin-bottom:12px;transition:border-color .2s}
 .ruta-card.activa{border-color:var(--gm);background:var(--gl)}
@@ -819,43 +855,205 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 <!-- ═══════════ HUB ═══════════ -->
 <div class="page" id="page-hub">
   <div style="height:80px;background:var(--navy)"></div>
+
+  <!-- HERO -->
   <section class="sec sec-d" style="padding-top:52px">
     <div class="wrap">
       <div class="ey eyw rv">Modelo operativo</div>
-      <h1 class="stit rv d1" style="color:#fff;font-size:clamp(28px,5vw,54px);max-width:700px">Compassion Hub — 3 Rutas Activas</h1>
-      <p style="color:rgba(255,255,255,.5);font-size:17px;max-width:480px;line-height:1.7;margin-top:16px" class="rv d2">Cadena de valor desde la necesidad más urgente hasta la autonomía económica.</p>
+      <h1 class="stit rv d1" style="color:#fff;font-size:clamp(28px,5vw,58px);max-width:720px">Compassion Hub — el puente que faltaba</h1>
+      <p style="color:rgba(255,255,255,.55);font-size:17px;max-width:540px;line-height:1.75;margin-top:16px" class="rv d2">Una infraestructura compartida de logística, alianzas y trazabilidad que permite a múltiples fundaciones operar con más alcance sin necesitar más estructura propia.</p>
+
+      <!-- DATA RÁPIDA -->
+      <div class="data-grid rv d3">
+        <div class="data-card"><div class="data-num">3</div><div class="data-label">Rutas activas hoy en El Poblado, Medellín</div></div>
+        <div class="data-card"><div class="data-num">25</div><div class="data-label">Fundaciones preaprobadas para el ecosistema</div></div>
+        <div class="data-card"><div class="data-num">8</div><div class="data-label">Poblaciones vulnerables en simultáneo</div></div>
+      </div>
     </div>
   </section>
+
+  <!-- EL PROBLEMA -->
+  <section class="sec sec-d" style="padding-top:64px;border-top:1px solid rgba(255,255,255,.06)">
+    <div class="wrap">
+      <div class="ey eyw rv">El problema que resolvemos</div>
+      <h2 class="stit rv d1" style="color:#fff;max-width:640px">El sector social en Colombia opera como archipiélago</h2>
+      <div class="problem-grid">
+        <div class="rv d2">
+          <p style="color:rgba(255,255,255,.6);font-size:16px;line-height:1.8;margin-bottom:20px">Colombia tiene miles de fundaciones y organizaciones sociales. Muchas hacen un trabajo extraordinario. Pero la gran mayoría opera en <strong style="color:#fff">total aislamiento</strong>: sin coordinación entre ellas, sin infraestructura compartida, compitiendo por los mismos recursos, atendiendo a veces las mismas personas mientras otras poblaciones quedan sin atención.</p>
+          <p style="color:rgba(255,255,255,.5);font-size:15px;line-height:1.8">Una fundación pequeña que atiende adultos mayores en Bello no sabe que a 12 kilómetros hay una donación de alimentos que nadie recogió. Otra que trabaja con comunidades indígenas no tiene cómo acceder a voluntarios especializados que están disponibles en la ciudad. Los recursos y las necesidades existen, pero no se encuentran.</p>
+        </div>
+        <div class="rv d3">
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:var(--rl);padding:24px">
+            <div style="font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:20px">El resultado del aislamiento</div>
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;gap:12px"><div style="color:#ef4444;font-size:18px;flex-shrink:0">✗</div><div style="font-size:14px;color:rgba(255,255,255,.6)"><strong style="color:rgba(255,255,255,.85)">Duplicación de esfuerzos.</strong> Varias fundaciones atienden las mismas zonas mientras otras quedan sin cobertura.</div></div>
+              <div style="display:flex;gap:12px"><div style="color:#ef4444;font-size:18px;flex-shrink:0">✗</div><div style="font-size:14px;color:rgba(255,255,255,.6)"><strong style="color:rgba(255,255,255,.85)">Recursos perdidos.</strong> Donaciones que no llegan a su destino por falta de canales confiables y verificados.</div></div>
+              <div style="display:flex;gap:12px"><div style="color:#ef4444;font-size:18px;flex-shrink:0">✗</div><div style="font-size:14px;color:rgba(255,255,255,.6)"><strong style="color:rgba(255,255,255,.85)">Sin escala.</strong> Cada organización carga sola con la logística, la contabilidad y la rendición de cuentas.</div></div>
+              <div style="display:flex;gap:12px"><div style="color:#ef4444;font-size:18px;flex-shrink:0">✗</div><div style="font-size:14px;color:rgba(255,255,255,.6)"><strong style="color:rgba(255,255,255,.85)">Desconfianza del donante.</strong> Sin trazabilidad, quienes quieren dar no saben si su aporte realmente llegó.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEORÍA DE LAS ISLAS -->
+  <section class="sec sec-d" style="padding-top:64px;border-top:1px solid rgba(255,255,255,.06)">
+    <div class="wrap">
+      <div class="ey eyw rv">La teoría de las islas</div>
+      <h2 class="stit rv d1" style="color:#fff;max-width:680px">Cada fundación es una isla. El Hub es el puente.</h2>
+      <p style="color:rgba(255,255,255,.55);font-size:16px;max-width:600px;line-height:1.8;margin-top:16px" class="rv d2">Imaginá el mapa del sector social como un archipiélago. Cada isla tiene su propia cultura, su propia misión, sus propios beneficiarios. Son islas valiosas. El problema no son las islas — es la ausencia de puentes entre ellas y entre ellas y quienes quieren apoyarlas.</p>
+
+      <div class="island-vis rv d3">
+        <div class="island"><div class="island-icon">🏡</div><div class="island-name">Fundación A</div><div class="island-tag">Niñez · Bello</div></div>
+        <div class="island"><div class="island-icon">🌿</div><div class="island-name">Fundación B</div><div class="island-tag">Indígenas · Urabá</div></div>
+        <div class="island bridge"><div class="island-icon">🌉</div><div class="island-name">Give&Grow Hub</div><div class="island-tag">El puente</div></div>
+        <div class="island"><div class="island-icon">👴</div><div class="island-name">Fundación C</div><div class="island-tag">Adultos · Itagüí</div></div>
+        <div class="island"><div class="island-icon">🐾</div><div class="island-name">Fundación D</div><div class="island-tag">Animales · Envigado</div></div>
+        <div class="island"><div class="island-icon">🔄</div><div class="island-name">Fundación E</div><div class="island-tag">Rehab · Medellín</div></div>
+        <div class="island"><div class="island-icon">🏠</div><div class="island-name">Fundación F</div><div class="island-tag">Calle · Centro</div></div>
+        <div class="island"><div class="island-icon">🌾</div><div class="island-name">Fundación G</div><div class="island-tag">Campesinos · Sur</div></div>
+      </div>
+
+      <p style="color:rgba(255,255,255,.45);font-size:14px;max-width:620px;line-height:1.75" class="rv d4">El Hub no reemplaza ninguna isla. No les dice cómo trabajar. Les da lo que les falta: logística compartida, acceso a donaciones clasificadas, visibilidad ante donantes corporativos, y la capacidad de rendir cuentas con estándares que individualmente no podrían sostener.</p>
+    </div>
+  </section>
+
+  <!-- EL MODELO -->
+  <section class="sec sec-d" style="padding-top:64px;border-top:1px solid rgba(255,255,255,.06)">
+    <div class="wrap">
+      <div class="ey eyw rv">Cómo funciona el modelo</div>
+      <h2 class="stit rv d1" style="color:#fff;max-width:620px">Hub and Spoke — infraestructura central, impacto distribuido</h2>
+      <div class="hub-model rv d2">
+        <div class="hub-col">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px;text-align:center">Recursos que entran</div>
+          <div class="hub-item"><em>💰</em>Donaciones en dinero</div>
+          <div class="hub-item"><em>📦</em>Donaciones en especie</div>
+          <div class="hub-item"><em>🏢</em>Inversión RSE empresas</div>
+          <div class="hub-item"><em>💪</em>Voluntariado especializado</div>
+          <div class="hub-item"><em>🤝</em>Alianzas estratégicas</div>
+        </div>
+        <div class="hub-center">
+          <div class="hub-arrow">→</div>
+          <div class="hub-circle">🏗️</div>
+          <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:13px;font-weight:700;color:var(--gn);text-align:center;margin-top:6px">Compassion Hub</div>
+          <div class="hub-arrow">→</div>
+        </div>
+        <div class="hub-col">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px;text-align:center">Lo que llega al campo</div>
+          <div class="hub-item"><em>✅</em>Recursos clasificados y verificados</div>
+          <div class="hub-item"><em>📋</em>Actas de entrega con trazabilidad</div>
+          <div class="hub-item"><em>🎯</em>Matching con necesidades reales</div>
+          <div class="hub-item"><em>📊</em>Capacidad de rendir cuentas</div>
+          <div class="hub-item"><em>📸</em>Reporte fotográfico al donante</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- METODOLOGÍA -->
+  <section class="sec sec-d" style="padding-top:64px;border-top:1px solid rgba(255,255,255,.06)">
+    <div class="wrap">
+      <div class="ey eyw rv">La metodología</div>
+      <h2 class="stit rv d1" style="color:#fff;max-width:600px">Un proceso estandarizado que elimina la incertidumbre</h2>
+      <div class="method-steps">
+        <div class="method-step rv d1">
+          <div class="method-step-num">01</div>
+          <div><div class="method-step-title">Visita de contexto</div><div class="method-step-body">Antes de cualquier alianza, visitamos a la fundación en campo. Verificamos su trabajo, su territorio, sus beneficiarios reales y sus capacidades. Sin visita, no hay convenio.</div></div>
+        </div>
+        <div class="method-step rv d2">
+          <div class="method-step-num">02</div>
+          <div><div class="method-step-title">Perfilamiento y onboarding</div><div class="method-step-body">Formulario digital de ingreso, creación de perfil en el sistema, firma del convenio de alianza con derechos y responsabilidades claramente definidos para ambas partes.</div></div>
+        </div>
+        <div class="method-step rv d3">
+          <div class="method-step-num">03</div>
+          <div><div class="method-step-title">Gestión activa de necesidades</div><div class="method-step-body">La fundación aliada reporta sus necesidades activas. El Hub las registra, prioriza y hace matching con los recursos disponibles en el centro de acopio.</div></div>
+        </div>
+        <div class="method-step rv d4">
+          <div class="method-step-num">04</div>
+          <div><div class="method-step-title">Clasificación, empaque y entrega</div><div class="method-step-body">Cada recurso que entra al Hub es valorado, fotografiado y clasificado. La entrega a la fundación aliada se hace con acta firmada por ambas partes. Todo queda documentado.</div></div>
+        </div>
+        <div class="method-step rv d5">
+          <div class="method-step-num">05</div>
+          <div><div class="method-step-title">Reporte y rendición de cuentas</div><div class="method-step-body">La fundación aliada envía evidencia fotográfica mensual del impacto generado. Give&Grow compila y envía el reporte al donante original. El círculo se cierra con trazabilidad completa.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- POR QUÉ FUNCIONA -->
+  <section class="sec sec-d" style="padding-top:64px;border-top:1px solid rgba(255,255,255,.06)">
+    <div class="wrap">
+      <div class="ey eyw rv">Por qué funciona</div>
+      <h2 class="stit rv d1" style="color:#fff;max-width:620px">El Hub reduce la fricción en cada punto del proceso</h2>
+      <p style="color:rgba(255,255,255,.5);font-size:15px;max-width:580px;line-height:1.8;margin-top:16px;margin-bottom:36px" class="rv d2">Un donante individual no puede visitar 25 fundaciones para saber a cuál confiarle su plata. Una empresa no puede auditar el impacto de cada organización que apoya. Una fundación pequeña no puede sostener un equipo de logística, comunicaciones y cumplimiento tributario. El Hub resuelve los tres problemas al mismo tiempo.</p>
+      <div class="g3 rv d3">
+        <div class="card card-dk" style="padding:24px">
+          <div style="font-size:28px;margin-bottom:12px">🎯</div>
+          <h3 style="font-size:16px;color:#fff;margin-bottom:8px">Para el donante</h3>
+          <p style="font-size:14px;color:rgba(255,255,255,.5);line-height:1.7">Un solo canal verificado. Trazabilidad garantizada. Certificado tributario. Sin necesidad de investigar fundación por fundación.</p>
+        </div>
+        <div class="card card-dk" style="padding:24px">
+          <div style="font-size:28px;margin-bottom:12px">🏢</div>
+          <h3 style="font-size:16px;color:#fff;margin-bottom:8px">Para la empresa</h3>
+          <p style="font-size:14px;color:rgba(255,255,255,.5);line-height:1.7">Reportes de impacto listos para presentar a la junta. Impact Journey para el equipo. Un solo punto de contacto para múltiples causas.</p>
+        </div>
+        <div class="card card-dk" style="padding:24px">
+          <div style="font-size:28px;margin-bottom:12px">🤝</div>
+          <h3 style="font-size:16px;color:#fff;margin-bottom:8px">Para la fundación aliada</h3>
+          <p style="font-size:14px;color:rgba(255,255,255,.5);line-height:1.7">Acceso a recursos que sola no conseguiría. Infraestructura compartida. Respaldo institucional. Más tiempo para el trabajo real en campo.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOTO BANNER -->
   <div class="photo-banner" id="pb2"><div class="pb-ov"></div><div class="pb-content"><div class="pb-text"><h3>En campo desde el día uno</h3><p>El Hub opera en El Poblado, Medellín. Esta es la realidad que apoyamos directamente.</p></div></div></div>
+
+  <!-- 5 RUTAS -->
   <section class="sec">
     <div class="wrap">
-      <div class="card card-gl rv" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px"><div><div class="ey" style="margin-bottom:8px">Ruta 01</div><h3 style="font-size:22px">Alianzas con Fundaciones</h3></div><span class="badge bon" style="padding:6px 14px;white-space:nowrap"><span class="bdot"></span>Operativa</span></div><p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">Apoyo logístico, financiero y estratégico que amplía el alcance de organizaciones en campo sin duplicar costos.</p><ul class="ck"><li>Verificación y onboarding con protocolo formal y convenio</li><li>Matching de recursos con necesidades activas</li><li>Apoyo logístico en recepción y distribución</li><li>Actas de entrega con trazabilidad física completa</li></ul></div>
-      <div class="card card-gl rv d1" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px"><div><div class="ey" style="margin-bottom:8px">Ruta 02</div><h3 style="font-size:22px">Gestión de Donaciones</h3></div><span class="badge bon" style="padding:6px 14px;white-space:nowrap"><span class="bdot"></span>Operativa</span></div><p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">Centro de acopio en El Poblado (100m²). Trazabilidad completa de origen a destino final.</p><ul class="ck"><li>Alimentos, ropa, aseo, material educativo, tecnología</li><li>Acta de recepción con valoración y fotografía</li><li>Distribución a fundaciones aliadas con acta firmada</li><li>Certificado de donación con descuento tributario (Art. 257 ET)</li></ul></div>
-      <div class="card card-gl rv d2" style="margin-bottom:14px;border-color:rgba(26,115,232,.3)"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px"><div><div class="ey" style="margin-bottom:8px">Ruta 04 — Activada 2026</div><h3 style="font-size:22px">Impact Journey</h3></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span class="badge bon" style="padding:6px 14px;white-space:nowrap"><span class="bdot"></span>Operativa</span><span class="badge bnew" style="white-space:nowrap">Nuevo 2026</span></div></div><p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">Voluntariado en doble vía. Empresas al campo, comunidades al mundo empresarial. Reporte individual de impacto para cada participante.</p><ul class="ck"><li>Experiencias estructuradas en comunidades aliadas verificadas</li><li>Visitas de líderes comunitarios a espacios empresariales</li><li>Reporte individual de impacto por jornada</li><li>Integrado con nivel Impact Partner RSE</li></ul></div>
+      <div class="ey rv">Las 5 rutas del Hub</div>
+      <h2 class="stit rv d1" style="max-width:600px">De la urgencia inmediata a la autonomía económica</h2>
+      <p style="color:var(--mu);font-size:15px;max-width:560px;line-height:1.75;margin-top:12px;margin-bottom:36px" class="rv d2">Las 5 rutas forman una cadena de valor completa. No son independientes — se potencian mutuamente y juntas crean el ecosistema.</p>
+
+      <div class="card card-gl rv" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px"><div><div class="ey" style="margin-bottom:8px">Ruta 01</div><h3 style="font-size:22px">Alianzas con Fundaciones</h3></div><span class="badge bon" style="padding:6px 14px;white-space:nowrap"><span class="bdot"></span>Operativa</span></div><p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">El corazón del modelo. Verificamos, onboardeamos y acompañamos fundaciones en campo para que accedan a los recursos del Hub con trazabilidad completa.</p><ul class="ck"><li>Visita de contexto antes de cualquier convenio</li><li>Perfilamiento digital y firma de convenio bilateral</li><li>Matching de necesidades activas con recursos disponibles</li><li>Acompañamiento continuo y métricas de impacto</li></ul></div>
+
+      <div class="card card-gl rv d1" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px"><div><div class="ey" style="margin-bottom:8px">Ruta 02</div><h3 style="font-size:22px">Gestión de Donaciones</h3></div><span class="badge bon" style="padding:6px 14px;white-space:nowrap"><span class="bdot"></span>Operativa</span></div><p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">Centro de acopio en El Poblado (100m²). Cada donación — en especie o en dinero — pasa por un proceso documentado de ingreso, clasificación y distribución.</p><ul class="ck"><li>Alimentos, ropa, aseo, material educativo y tecnología</li><li>Acta de recepción con valoración, peso y fotografía</li><li>Distribución a fundaciones aliadas con acta firmada</li><li>Certificado de donación con descuento tributario (Art. 257 ET)</li></ul></div>
+
+      <div class="card card-gl rv d2" style="margin-bottom:12px;border-color:rgba(26,115,232,.3)"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px"><div><div class="ey" style="margin-bottom:8px">Ruta 04 — Activada 2026</div><h3 style="font-size:22px">Impact Journey</h3></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span class="badge bon" style="padding:6px 14px;white-space:nowrap"><span class="bdot"></span>Operativa</span><span class="badge bnew" style="white-space:nowrap">Nuevo 2026</span></div></div><p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">Voluntariado en doble vía que convierte la RSE empresarial en empatía real. El equipo va al campo. Líderes comunitarios visitan la empresa. La distancia entre mundos se reduce.</p><ul class="ck"><li>Experiencias estructuradas en comunidades aliadas verificadas</li><li>Visitas de líderes comunitarios a espacios empresariales</li><li>Reporte individual de impacto por participante</li><li>Disponible para empresas desde nivel Impact Partner RSE</li></ul></div>
+
       <div class="card rv d3" style="opacity:.85;margin-bottom:12px;border-color:rgba(31,92,56,.2)">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px">
           <div><div class="ey" style="margin-bottom:8px">Ruta 03</div><h3 style="font-size:22px">Social Grow</h3></div>
           <span class="badge bsoon" style="padding:6px 14px;white-space:nowrap">Próximamente</span>
         </div>
-        <p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">Formación laboral, emprendimiento comunitario y educación financiera para comunidades vulnerables. La ruta que convierte la asistencia en autonomía.</p>
-        <ul class="ck"><li>Formación en habilidades laborales y oficios</li><li>Acompañamiento a proyectos de emprendimiento comunitario</li><li>Talleres de educación financiera básica</li><li>Alianzas con el sector privado para prácticas y empleo formal</li></ul>
+        <p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">Formación laboral, emprendimiento comunitario y educación financiera. La ruta que convierte la asistencia en autonomía.</p>
+        <ul class="ck"><li>Formación en habilidades laborales y oficios con demanda real</li><li>Acompañamiento a proyectos de emprendimiento comunitario</li><li>Talleres de educación financiera básica</li><li>Alianzas con el sector privado para prácticas y empleo formal</li></ul>
         <div style="background:var(--sand);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:13px;color:var(--mu)">⏳ En diseño — pendiente de alianza con socios formativos</div>
       </div>
+
       <div class="card rv d4" style="opacity:.65;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px">
           <div><div class="ey" style="margin-bottom:8px">Ruta 05</div><h3 style="font-size:22px">Conexión Laboral</h3></div>
           <span class="badge bfut" style="padding:6px 14px;white-space:nowrap">Fase futura</span>
         </div>
-        <p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">El eslabón más complejo y de mayor impacto: 12 a 18 meses de acompañamiento integral para la reintegración social y laboral de poblaciones en situaciones de vulnerabilidad extrema.</p>
-        <ul class="ck"><li>Perfilamiento individual y plan de reintegración personalizado</li><li>Acompañamiento psicosocial continuo durante todo el proceso</li><li>Conexión con empleadores comprometidos con la inclusión laboral</li><li>Seguimiento post-vinculación durante 6 meses adicionales</li></ul>
-        <div style="background:var(--amberl);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:13px;color:var(--amber)">🔮 Esta ruta requiere ImpactOS completamente operativo — Fase 3 del roadmap tecnológico</div>
+        <p style="font-size:15px;color:var(--mu);line-height:1.7;margin-bottom:14px">El eslabón de mayor impacto: 12 a 18 meses de acompañamiento integral para la reintegración social y laboral de poblaciones en vulnerabilidad extrema.</p>
+        <ul class="ck"><li>Perfilamiento individual y plan de reintegración personalizado</li><li>Acompañamiento psicosocial continuo</li><li>Conexión con empleadores comprometidos con la inclusión</li><li>Seguimiento post-vinculación durante 6 meses adicionales</li></ul>
+        <div style="background:var(--amberl);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:13px;color:var(--amber)">🔮 Requiere ImpactOS operativo — Fase 3 del roadmap tecnológico</div>
+      </div>
+
+      <div style="margin-top:32px;text-align:center" class="rv d5">
+        <a class="btn btn-g arr" onclick="go('hub-apply')">Aplicar al Hub como fundación</a>
       </div>
     </div>
   </section>
+
+  <!-- POBLACIONES -->
   <section class="sec sec-d">
     <div class="wrap">
       <div class="ey eyw rv">Poblaciones</div><h2 class="stit rv d1" style="color:#fff;margin-bottom:36px">8 comunidades, un ecosistema</h2>
-      <div class="pgrid"><div class="pop rv d1"><div class="pi">👧</div><div class="pl">Niñez en riesgo</div></div><div class="pop rv d2"><div class="pi">🌿</div><div class="pl">Comunidades indígenas</div></div><div class="pop rv d3"><div class="pi">🌾</div><div class="pl">Comunidades campesinas</div></div><div class="pop rv d4"><div class="pi">🏠</div><div class="pl">Personas en calle</div></div><div class="pop rv d1"><div class="pi">👴</div><div class="pl">Adultos mayores</div></div><div class="pop rv d2"><div class="pi">🐾</div><div class="pl">Animales en maltrato</div></div><div class="pop rv d3"><div class="pi">🔄</div><div class="pl">Rehabilitación</div></div><div class="pop rv d4"><div class="pi">⚖️</div><div class="pl">Privados de libertad</div></div></div>
+      <div class="pgrid"><div class="pop rv d1"><div class="pi">👧</div><div class="pl">Niñez en riesgo</div></div><div class="pop rv d2"><div class="pi">🌿</div><div class="pl">Comunidades indígenas</div></div><div class="pop rv d3"><div class="pi">🌾</div><div class="pl">Comunidades campesinas</div></div><div class="pop rv d4"><div class="pi">🏠</div><div class="pl">Personas en situación de calle</div></div><div class="pop rv d1"><div class="pi">👴</div><div class="pl">Adultos mayores</div></div><div class="pop rv d2"><div class="pi">🐾</div><div class="pl">Animales en maltrato</div></div><div class="pop rv d3"><div class="pi">🔄</div><div class="pl">Personas en rehabilitación</div></div><div class="pop rv d4"><div class="pi">⚖️</div><div class="pl">Personas privadas de libertad</div></div></div>
     </div>
   </section>
 </div>
