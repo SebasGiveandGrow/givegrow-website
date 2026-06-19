@@ -584,70 +584,6 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 .manif-text-col .manif-author-text{font-size:12px;color:var(--mu);font-weight:500}
 @media(max-width:900px){.manif-grid{grid-template-columns:1fr!important;gap:28px}.manif-photo-wrap{height:240px}}
 
-/* CALCULADORA v2 */
-.calc-tabs{display:flex;gap:8px;margin:28px 0 20px}
-.calc-tab{padding:10px 22px;border-radius:40px;border:1.5px solid var(--bd);background:#fff;font-size:14px;font-weight:600;color:var(--mu);cursor:pointer;transition:all .2s}
-.calc-tab.active{background:var(--g);color:#fff;border-color:var(--g)}
-.calc-controls{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:22px}
-.calc-ctrl-group{display:flex;align-items:center;gap:10px}
-.calc-ctrl-label{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.4)}
-.calc-toggle{display:flex;background:rgba(255,255,255,.08);border-radius:40px;padding:3px;gap:2px}
-.calc-toggle-btn{border:none;padding:5px 14px;border-radius:40px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:rgba(255,255,255,.5);transition:all .2s}
-.calc-toggle-btn.active{background:var(--g);color:#fff}
-.calc-cats{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
-.calc-cat{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;border-radius:var(--r);border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.5);cursor:pointer;font-size:11px;font-weight:600;transition:all .2s;min-width:64px}
-.calc-cat span{font-size:10px;text-transform:uppercase;letter-spacing:.3px}
-.calc-cat:first-child{font-size:18px}
-.calc-cat.active{border-color:var(--gm);background:rgba(74,222,128,.12);color:var(--gn)}
-.calc-quick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;justify-content:center}
-.calc-quick-btn{padding:5px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:rgba(255,255,255,.6);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s}
-.calc-quick-btn:hover{background:rgba(255,255,255,.12);color:#fff}
-@media(max-width:600px){.calc-controls{gap:12px}.calc-cats{gap:6px}.calc-cat{padding:8px 10px;min-width:54px}}
-
-/* CALC DARK THEME FIXES */
-.dark-calc .co-label{color:rgba(255,255,255,.5)!important}
-.dark-calc .co-value{color:#fff!important;font-size:22px;font-weight:700;margin:8px 0 4px}
-.dark-calc .co-sub{color:rgba(255,255,255,.4)!important;font-size:12px}
-.dark-calc .calc-label{color:rgba(255,255,255,.5)!important}
-.dark-calc label{color:rgba(255,255,255,.6)!important}
-.dark-calc p{color:rgba(255,255,255,.6)!important}
-.dark-calc h2,.dark-calc h3{color:#fff!important}
-.dark-calc #membership-card{background:rgba(255,255,255,.05)!important;border-color:rgba(255,255,255,.1)!important}
-.dark-calc #m-name{color:#fff!important}
-.dark-calc #m-sub{color:rgba(255,255,255,.45)!important}
-.dark-calc #m-icon{font-size:28px}
-.dark-calc #annual-view{color:rgba(255,255,255,.7)!important}
-.dark-calc #calc-range-hint{color:rgba(255,255,255,.3)!important}
-.dark-calc .calc-quick-btn{border-color:rgba(255,255,255,.15)!important;background:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.65)!important}
-.dark-calc .calc-quick-btn:hover{background:rgba(255,255,255,.15)!important;color:#fff!important}
-.dark-calc input{color:#fff!important;caret-color:#fff}
-#calc-display{color:#fff!important}
-#rate-note{color:rgba(255,255,255,.4)!important}
-.calc-ctrl-label{color:rgba(255,255,255,.45)!important;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
-
-/* GALERÍA DE CAMPO */
-.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:36px}
-.gallery-item{border-radius:var(--r);overflow:hidden;cursor:pointer;position:relative;aspect-ratio:1;background:var(--cream)}
-.gallery-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s var(--ease)}
-.gallery-item:hover img{transform:scale(1.05)}
-.gallery-overlay{position:absolute;inset:0;background:rgba(10,22,40,.4);opacity:0;transition:opacity .25s;display:flex;align-items:flex-end;padding:14px}
-.gallery-item:hover .gallery-overlay{opacity:1}
-.gallery-caption{font-size:12px;font-weight:600;color:#fff;line-height:1.4}
-.gallery-cat{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--gn);margin-bottom:3px}
-/* LIGHTBOX */
-.lightbox{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.95);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}
-.lightbox.open{opacity:1;pointer-events:all}
-.lb-img{max-width:90vw;max-height:85vh;object-fit:contain;border-radius:8px;user-select:none}
-.lb-close{position:absolute;top:20px;right:24px;font-size:28px;color:rgba(255,255,255,.7);cursor:pointer;background:none;border:none;line-height:1;padding:4px 8px}
-.lb-close:hover{color:#fff}
-.lb-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.1);border:none;color:#fff;font-size:24px;width:48px;height:48px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
-.lb-nav:hover{background:rgba(255,255,255,.25)}
-.lb-prev{left:20px}
-.lb-next{right:20px}
-.lb-caption{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,.8);font-size:13px;max-width:500px;background:rgba(0,0,0,.5);padding:8px 16px;border-radius:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lb-counter{position:absolute;top:22px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font-size:12px}
-@media(max-width:600px){.gallery-grid{grid-template-columns:1fr 1fr}}
-
 /* MAPA */
 #map-aliados{height:440px;border-radius:var(--rl);overflow:hidden;border:1px solid var(--bd);margin-top:28px}
 .map-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:var(--mu)}
@@ -1380,6 +1316,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
   <section class="sec">
     <div class="wrap">
       <!-- CALCULADORA v2 -->
+      <div class="calc-section-wrap">
       <div class="ey rv">Calculadora de impacto</div>
       <h2 class="stit rv d1" style="max-width:560px">¿Cuánto impacto genera tu aporte?</h2>
       <p class="slead rv d2">Ajusta el monto y la categoría. Ve el impacto real en números concretos.</p>
@@ -1421,9 +1358,9 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
         </div>
 
         <!-- AMOUNT DISPLAY -->
-        <div style="text-align:center;margin:24px 0 8px">
-          <div id="calc-display" style="font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(36px,6vw,64px);font-weight:800;color:#fff;line-height:1">$25.000 COP</div>
-          <div id="rate-note" style="font-size:12px;color:rgba(255,255,255,.35);margin-top:6px;display:none">Tasa referencial: 1 USD ≈ $4.200 COP</div>
+        <div class="calc-amount-display">
+          <div id="calc-display">$25.000 COP</div>
+          <div id="rate-note" style="display:none">Tasa referencial: 1 USD ≈ $4.200 COP</div>
         </div>
 
         <!-- SLIDER -->
@@ -1491,16 +1428,16 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
         <div class="g2" style="gap:20px;margin-bottom:20px">
           <div class="ff" style="--fbc:#1a2a40;--fbc2:rgba(255,255,255,.1)">
-            <label style="color:rgba(255,255,255,.6);font-size:13px">Presupuesto RSE anual (COP)</label>
+            <label style="color:var(--mu);font-size:13px">Presupuesto RSE anual (COP)</label>
             <input type="number" id="emp-budget" placeholder="Ej: 10.000.000" min="500000" step="500000"
               oninput="calcEmpresa()"
-              style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:8px;padding:10px 14px;font-size:15px;width:100%">
+              style="background:#fff;border:1px solid var(--bd);color:var(--navy);border-radius:8px;padding:10px 14px;font-size:15px;width:100%">
           </div>
           <div class="ff">
-            <label style="color:rgba(255,255,255,.6);font-size:13px">Empleados para Impact Journey</label>
+            <label style="color:var(--mu);font-size:13px">Empleados para Impact Journey</label>
             <input type="number" id="emp-team" placeholder="Ej: 10" min="1" max="200" step="1"
               oninput="calcEmpresa()"
-              style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:8px;padding:10px 14px;font-size:15px;width:100%">
+              style="background:#fff;border:1px solid var(--bd);color:var(--navy);border-radius:8px;padding:10px 14px;font-size:15px;width:100%">
           </div>
         </div>
 
@@ -1522,7 +1459,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
               <div class="co-sub">jornadas Impact Journey disponibles</div>
             </div>
           </div>
-          <div id="emp-detail" style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:var(--r);padding:14px 18px;font-size:14px;color:rgba(255,255,255,.7);line-height:1.7"></div>
+          <div id="emp-detail" style="background:var(--gl);border:1px solid rgba(46,125,79,.2);border-radius:var(--r);padding:14px 18px;font-size:14px;color:rgba(255,255,255,.7);line-height:1.7"></div>
         </div>
 
         <div style="margin-top:20px;text-align:center">
@@ -1530,6 +1467,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
         </div>
       </div>
 
+      </div>
       <p style="font-size:12px;color:var(--mu);margin-top:16px;text-align:center">* Cálculos referenciales. El beneficio tributario aplica para personas jurídicas y naturales con declaración de renta. Consulta con tu contador.</p>
     </div>
   </section>
