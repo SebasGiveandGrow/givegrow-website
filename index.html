@@ -1984,35 +1984,7 @@ function calcImpact(v){
   if(v<=99) return {val:Math.round(v/5)+" kits",sub:"de aseo + canasta para "+(Math.round(v/25))+" familias"};
   return {val:Math.round(v/50)+" personas",sub:"con apoyo mensual completo (nutrición + aseo)"};
 }
-function calcUpdate(){
-  const v=+document.getElementById("calc-slider").value;
-  if(CURR==='USD'){
-    document.getElementById("calc-display").textContent="USD "+v;
-    document.getElementById("co-tax").textContent="USD "+(v*0.25).toFixed(2);
-    document.getElementById("co-net").textContent="USD "+(v*0.75).toFixed(2);
-  } else {
-    var cop=v*USD_RATE;
-    document.getElementById("calc-display").textContent="$"+Math.round(cop).toLocaleString("es-CO")+" COP";
-    document.getElementById("co-tax").textContent="$"+Math.round(cop*0.25).toLocaleString("es-CO")+" COP";
-    document.getElementById("co-net").textContent="$"+Math.round(cop*0.75).toLocaleString("es-CO")+" COP";
-  }
-  const imp=calcImpact(v);
-  document.getElementById("co-impact").textContent=imp.val;
-  document.getElementById("co-impact-sub").textContent=imp.sub;
-  let icon,name,sub;
-  if(v>=100){icon="🌲";name="Membresía Bosque";sub="Reportes · Reuniones directivas · Gratitud completo";}
-  else if(v>=50){icon="🌳";name="Membresía Árbol";sub="Eventos · Certificado personalizado · Gratitud completo";}
-  else if(v>=25){icon="🌿";name="Membresía Retoño";sub="Beneficios extendidos · Programa de Gratitud";}
-  else{icon="🌱";name="Membresía Semilla";sub="Acceso al Programa de Gratitud · Boletines";}
-  document.getElementById("ctb-icon").textContent=icon;
-  document.getElementById("ctb-name").textContent=name;
-  document.getElementById("ctb-sub").textContent=sub;
-  const pct=(v-1)/199*100;
-  document.getElementById("calc-slider").style.background=`linear-gradient(to right,var(--g) ${pct}%,var(--bd) ${pct}%)`;
-  const gb=document.getElementById("gratitud-box");
-  const estSaving=Math.round(v*0.1*3);
-  gb.innerHTML=`⭐ <strong>Programa de Gratitud activo</strong> — Descuentos exclusivos en gastronomía, moda, belleza y bienestar. Si consumes USD ${Math.round(v*3)}/mes en empresas aliadas, podrías recuperar ~USD ${estSaving} adicionales. <span style="font-size:11px;opacity:.7">*Estimado basado en datos DANE Colombia 2025</span>`;
-}
+
 calcUpdate();
 
 /* VERIFIER */
@@ -2158,23 +2130,9 @@ function downloadQR(){
 var CURR = 'COP';
 var USD_RATE = 4200;
 
-function setCurrency(c){
-  CURR = c;
-  document.getElementById('btn-cop').style.background = c==='COP' ? 'var(--g)' : 'transparent';
-  document.getElementById('btn-cop').style.color = c==='COP' ? '#fff' : 'var(--mu)';
-  document.getElementById('btn-usd').style.background = c==='USD' ? 'var(--g)' : 'transparent';
-  document.getElementById('btn-usd').style.color = c==='USD' ? '#fff' : 'var(--mu)';
-  document.getElementById('rate-note').style.display = c==='USD' ? 'block' : 'none';
-  calcImpact();
-}
 
-//function fmtCurr(cop){
-  if(CURR==='USD'){
-    var usd = cop / USD_RATE;
-    return 'USD ' + (usd < 10 ? usd.toFixed(2) : Math.round(usd).toLocaleString('es-CO'));
-  }
-  return '$' + Math.round(cop).toLocaleString('es-CO') + ' COP';
-}
+
+
 
 /* CALCULADORA v2 */
 var CURR='COP', FREQ='mensual', CAT='general', USD_RATE=4200;
