@@ -1,0 +1,12 @@
+/*
+  Cache-Control: no-cache, must-revalidate
+  X-Content-Type-Options: nosniff
+
+/*.html
+  Cache-Control: no-store, must-revalidate
+
+/sitemap.xml
+  Cache-Control: max-age=86400
+
+/*.json
+  Cache-Control: no-store, must-revalidate
