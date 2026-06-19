@@ -562,6 +562,26 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
   cursor:none;margin-top:16px;transition:background .2s;border:none}
 .mm-don:hover{background:var(--gm)}
 @media(max-width:860px){.hbg-btn{display:flex}.nlinks .nl,.ndon{display:none}}
+
+/* MANIFIESTO DOS COLUMNAS */
+.manif-grid{display:grid;grid-template-columns:420px 1fr;gap:64px;align-items:center}
+.manif-photo-wrap{border-radius:var(--rl);overflow:hidden;height:520px}
+.manif-photo-wrap img{width:100%;height:100%;object-fit:cover;object-position:center 20%}
+.manif-text-col{display:flex;flex-direction:column}
+.manif-text-col .manif-tag{font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--gm);display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.manif-text-col .manif-tag::before{content:"";width:24px;height:2px;background:var(--gm);border-radius:2px}
+.manif-text-col .manif-intro{font-family:"Bricolage Grotesque",sans-serif;font-size:clamp(18px,2.2vw,26px);font-weight:700;color:#fff;line-height:1.3;margin-bottom:22px;letter-spacing:-.02em}
+.manif-text-col .manif-p{font-size:clamp(13px,1.1vw,15px);color:rgba(255,255,255,.65);line-height:1.85;margin-bottom:14px}
+.manif-text-col .manif-p:last-of-type{margin-bottom:0}
+.manif-text-col .manif-p strong{color:rgba(255,255,255,.9);font-weight:600}
+.manif-text-col .manif-p.highlight{font-size:clamp(14px,1.3vw,17px);color:rgba(255,255,255,.88);font-style:italic;border-left:2px solid var(--gm);padding-left:16px;margin:2px 0 14px}
+.manif-text-col .manif-tagline{margin-top:20px;padding-top:18px;border-top:1px solid rgba(255,255,255,.1)}
+.manif-text-col .manif-tagline-text{font-family:"Fraunces",serif;font-style:italic;font-weight:300;font-size:clamp(16px,1.6vw,21px);color:#fff;line-height:1.3;margin-bottom:4px}
+.manif-text-col .manif-tagline-sub{font-size:12px;color:rgba(255,255,255,.4)}
+.manif-text-col .manif-author{margin-top:16px;display:flex;align-items:center;gap:12px}
+.manif-text-col .manif-author-line{width:28px;height:1px;background:rgba(255,255,255,.25)}
+.manif-text-col .manif-author-text{font-size:12px;color:rgba(255,255,255,.4);font-weight:500}
+@media(max-width:900px){.manif-grid{grid-template-columns:1fr!important;gap:28px}.manif-photo-wrap{height:240px}}
 </style>
 <script type="application/ld+json">
 {
@@ -803,21 +823,37 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
   <section class="manifiesto">
     <div class="wrap">
-      <div class="manif-inner">
-        <div class="manif-tag rv">Nuestra razón de existir</div>
-        <h2 class="manif-intro rv d1">La primera vez que llegué a una comunidad de difícil acceso entendí algo que no esperaba.</h2>
-        <div class="manif-body">
-          <p class="manif-p rv d2">No llegué con la respuesta. Llegué con la pregunta correcta.</p>
-          <p class="manif-p rv d3">Vi comida desperdiciarse mientras a pocas horas personas aguantaban hambre. No por falta de comida en el mundo — sino por <strong>falta de puentes que conecten lo que sobra con lo que falta</strong>. Y eso no aplica solo para la comida. Aplica para todo: ropa, medicinas, tiempo, conocimiento, oportunidades, dinero.</p>
-          <p class="manif-p rv d4">Lo que descubrí en campo es que la bondad existe. El interés en ayudar existe. Los recursos existen. Lo que falta es el trabajo colectivo, la estructura clara, los sistemas transparentes y las experiencias positivas que no solo permitan ayudar — sino que <strong>inspiren a querer hacerlo cada vez más</strong>.</p>
-          <p class="manif-p rv d5">El sector social colombiano tiene fundaciones extraordinarias trabajando en silencio. Tienen el propósito, el equipo y la relación con las comunidades. Lo que muchas no tienen es la logística, la trazabilidad y la capacidad de rendir cuentas que individualmente no pueden sostener.</p>
-          <p class="manif-p highlight rv">Give&Grow nació para ser ese puente.</p>
-          <p class="manif-p rv d2">Para atacar el desconocimiento, las malas prácticas y los prejuicios que frenan el dar. Para construir transparencia, buenas experiencias, innovación y el máximo aprovechamiento de todo lo que existe.</p>
-          <div class="manif-tagline rv d3">
+      <div class="manif-grid">
+
+        <!-- LEFT: FOTO -->
+        <div class="manif-photo-col rv d1">
+          <div class="manif-photo-wrap">
+            <img id="manif-img" src="" alt="Juan Sebastián Navarro Osorio en campo — La Guajira, Colombia" style="width:100%;height:100%;object-fit:cover;object-position:center 20%;border-radius:var(--rl);display:block">
+          </div>
+        </div>
+
+        <!-- RIGHT: TEXTO -->
+        <div class="manif-text-col rv d2">
+          <div class="manif-tag">Nuestra razón de existir</div>
+          <h2 class="manif-intro">La primera vez que llegué a una comunidad de difícil acceso entendí algo que no esperaba.</h2>
+
+          <p class="manif-p">No llegué con la respuesta. Llegué con la pregunta correcta.</p>
+
+          <p class="manif-p">Vi comida desperdiciarse mientras a pocas horas personas aguantaban hambre. No por falta de comida en el mundo — sino por <strong>falta de puentes que conecten lo que sobra con lo que falta</strong>. Y eso no aplica solo para la comida. Aplica para todo: ropa, medicinas, tiempo, conocimiento, oportunidades, dinero.</p>
+
+          <p class="manif-p">Lo que descubrí en campo es que la bondad existe. El interés en ayudar existe. Los recursos existen. Lo que falta es el trabajo colectivo, la estructura clara, los sistemas transparentes y las experiencias positivas que no solo permitan ayudar — sino que <strong>inspiren a querer hacerlo cada vez más</strong>.</p>
+
+          <p class="manif-p">El sector social colombiano tiene fundaciones extraordinarias trabajando en silencio. Tienen el propósito, el equipo y la relación con las comunidades. Lo que muchas no tienen es la logística, la trazabilidad y la capacidad de rendir cuentas que individualmente no pueden sostener.</p>
+
+          <p class="manif-p highlight">Give&amp;Grow nació para ser ese puente.</p>
+
+          <p class="manif-p">Para atacar el desconocimiento, las malas prácticas y los prejuicios que frenan el dar. Para construir transparencia, buenas experiencias, innovación y el máximo aprovechamiento de todo lo que existe.</p>
+
+          <div class="manif-tagline">
             <div class="manif-tagline-text">Dar para crecer, crecer para dar más.</div>
             <div class="manif-tagline-sub">No es un slogan. Es la razón por la que hacemos esto.</div>
           </div>
-          <div class="manif-author rv d4">
+          <div class="manif-author">
             <div class="manif-author-line"></div>
             <div class="manif-author-text">Juan Sebastián Navarro Osorio · Fundador</div>
           </div>
@@ -882,30 +918,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       </div>
     </div>
   </section>
-  <section class="manifiesto">
-    <div class="wrap">
-      <div class="manif-inner">
-        <div class="manif-tag rv">Nuestra razón de existir</div>
-        <h2 class="manif-intro rv d1">La primera vez que llegué a una comunidad de difícil acceso entendí algo que no esperaba.</h2>
-        <div class="manif-body">
-          <p class="manif-p rv d2">No llegué con la respuesta. Llegué con la pregunta correcta.</p>
-          <p class="manif-p rv d3">Vi comida desperdiciarse mientras a pocas horas personas aguantaban hambre. No por falta de comida en el mundo — sino por <strong>falta de puentes que conecten lo que sobra con lo que falta</strong>. Y eso no aplica solo para la comida. Aplica para todo: ropa, medicinas, tiempo, conocimiento, oportunidades, dinero.</p>
-          <p class="manif-p rv d4">Lo que descubrí en campo es que la bondad existe. El interés en ayudar existe. Los recursos existen. Lo que falta es el trabajo colectivo, la estructura clara, los sistemas transparentes y las experiencias positivas que no solo permitan ayudar — sino que <strong>inspiren a querer hacerlo cada vez más</strong>.</p>
-          <p class="manif-p rv d5">El sector social colombiano tiene fundaciones extraordinarias trabajando en silencio. Tienen el propósito, el equipo y la relación con las comunidades. Lo que muchas no tienen es la logística, la trazabilidad y la capacidad de rendir cuentas que individualmente no pueden sostener.</p>
-          <p class="manif-p highlight rv">Give&Grow nació para ser ese puente.</p>
-          <p class="manif-p rv d2">Para atacar el desconocimiento, las malas prácticas y los prejuicios que frenan el dar. Para construir transparencia, buenas experiencias, innovación y el máximo aprovechamiento de todo lo que existe.</p>
-          <div class="manif-tagline rv d3">
-            <div class="manif-tagline-text">Dar para crecer, crecer para dar más.</div>
-            <div class="manif-tagline-sub">No es un slogan. Es la razón por la que hacemos esto.</div>
-          </div>
-          <div class="manif-author rv d4">
-            <div class="manif-author-line"></div>
-            <div class="manif-author-text">Juan Sebastián Navarro Osorio · Fundador</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+  
 
 
   <section class="founder-section">
@@ -1846,6 +1859,11 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{
     document.getElementById("ldr").classList.add("out");
     heroStart();rvSetup();counterInit();setPhotos();loadStats();loadBlog();
+    setTimeout(function(){
+      var fi=document.querySelector('.founder-section img');
+      var mi=document.getElementById('manif-img');
+      if(fi&&mi&&fi.src){mi.src=fi.src;}
+    },100);
   },1200);
 });
 
