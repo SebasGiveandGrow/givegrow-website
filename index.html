@@ -2533,7 +2533,7 @@ function initMap(){
   if(mapInstance) return;
   var el = document.getElementById('map-aliados');
   if(!el || !window.L) return;
-  mapInstance = L.map('map-aliados').setView([7.5,−74.0],6);
+  mapInstance = L.map('map-aliados').setView([7.5,-74.0],6);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     attribution:'© OpenStreetMap',maxZoom:18
   }).addTo(mapInstance);
@@ -2563,26 +2563,27 @@ function filterMap(type, btn){
   renderMapMarkers();
 }
 
-/* Init all on page show */
-var _origGo = window.go;
-window.go = function(page){
-  _origGo(page);
-  if(page==='galeria') setTimeout(initGallery, 100);
-  if(page==='mapa'){
+/* Init gallery/map on page navigation */
+document.addEventListener('click', function(e){
+  var link = e.target.closest('[onclick]');
+  if(!link) return;
+  var onclick = link.getAttribute('onclick')||'';
+  if(onclick.includes("'galeria'")) setTimeout(initGallery, 200);
+  if(onclick.includes("'mapa'")){
     setTimeout(function(){
       if(!window.L){
-        var s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        s.onload=initMap;
-        document.head.appendChild(s);
         var css=document.createElement('link');
         css.rel='stylesheet';
         css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         document.head.appendChild(css);
-      } else initMap();
-    }, 100);
+        var s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+        s.onload=initMap;
+        document.head.appendChild(s);
+      } else { setTimeout(initMap,100); }
+    }, 200);
   }
-};
+});
 </script>
 </body>
 </html>
