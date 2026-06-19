@@ -582,6 +582,26 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 .manif-text-col .manif-author-line{width:28px;height:1px;background:var(--bd)}
 .manif-text-col .manif-author-text{font-size:12px;color:var(--mu);font-weight:500}
 @media(max-width:900px){.manif-grid{grid-template-columns:1fr!important;gap:28px}.manif-photo-wrap{height:240px}}
+
+/* CALCULADORA v2 */
+.calc-tabs{display:flex;gap:8px;margin:28px 0 20px}
+.calc-tab{padding:10px 22px;border-radius:40px;border:1.5px solid var(--bd);background:#fff;font-size:14px;font-weight:600;color:var(--mu);cursor:pointer;transition:all .2s}
+.calc-tab.active{background:var(--g);color:#fff;border-color:var(--g)}
+.calc-controls{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+.calc-ctrl-group{display:flex;align-items:center;gap:10px}
+.calc-ctrl-label{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.4)}
+.calc-toggle{display:flex;background:rgba(255,255,255,.08);border-radius:40px;padding:3px;gap:2px}
+.calc-toggle-btn{border:none;padding:5px 14px;border-radius:40px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:rgba(255,255,255,.5);transition:all .2s}
+.calc-toggle-btn.active{background:var(--g);color:#fff}
+.calc-cats{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.calc-cat{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;border-radius:var(--r);border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.5);cursor:pointer;font-size:11px;font-weight:600;transition:all .2s;min-width:64px}
+.calc-cat span{font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+.calc-cat:first-child{font-size:18px}
+.calc-cat.active{border-color:var(--gm);background:rgba(74,222,128,.12);color:var(--gn)}
+.calc-quick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;justify-content:center}
+.calc-quick-btn{padding:5px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:rgba(255,255,255,.6);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s}
+.calc-quick-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+@media(max-width:600px){.calc-controls{gap:12px}.calc-cats{gap:6px}.calc-cat{padding:8px 10px;min-width:54px}}
 </style>
 <script type="application/ld+json">
 {
@@ -1292,125 +1312,158 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
   <section class="sec">
     <div class="wrap">
-      <!-- CALCULADORA COMBINADA -->
+      <!-- CALCULADORA v2 -->
       <div class="ey rv">Calculadora de impacto</div>
-      <!-- CURRENCY TOGGLE -->
-      <div class="rv" style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-        <span style="font-size:14px;font-weight:600;color:var(--mu)">Moneda:</span>
-        <div style="display:flex;background:var(--cream);border-radius:40px;padding:3px;border:1px solid var(--bd)">
-          <button id="btn-cop" onclick="setCurrency('COP')" style="border:none;padding:6px 16px;border-radius:40px;font-size:13px;font-weight:700;cursor:pointer;background:var(--g);color:#fff;transition:all .2s">COP</button>
-          <button id="btn-usd" onclick="setCurrency('USD')" style="border:none;padding:6px 16px;border-radius:40px;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--mu);transition:all .2s">USD</button>
-        </div>
-        <span id="rate-note" style="font-size:12px;color:var(--mu);display:none">Tasa referencial: 1 USD ≈ $4.200 COP</span>
-      </div>
-      <h2 class="stit rv d1" style="margin-bottom:8px">¿Cuánto quieres donar?</h2>
-      <p style="color:var(--mu);font-size:14px;margin-bottom:28px" class="rv d2">Mueve el slider y ve tu beneficio tributario, impacto real y membresía desbloqueada en tiempo real.</p>
+      <h2 class="stit rv d1" style="max-width:560px">¿Cuánto impacto genera tu aporte?</h2>
+      <p class="slead rv d2">Ajusta el monto y la categoría. Ve el impacto real en números concretos.</p>
 
-      <div class="calc-wrap rv d3">
-        <div class="calc-label">Donación mensual (USD) <span id="calc-display">$25</span></div>
-        <input type="range" class="calc-slider" id="calc-slider" min="1" max="200" value="25" oninput="calcUpdate()">
+      <!-- TABS: Individual / Empresas -->
+      <div class="calc-tabs rv d3">
+        <button class="calc-tab active" id="tab-ind" onclick="switchCalcTab('individual')">👤 Individual</button>
+        <button class="calc-tab" id="tab-emp" onclick="switchCalcTab('empresa')">🏢 Empresa RSE</button>
+      </div>
+
+      <!-- ══════ CALCULADORA INDIVIDUAL ══════ -->
+      <div id="calc-individual" class="dark-calc rv d4">
+
+        <!-- CURRENCY + FREQUENCY -->
+        <div class="calc-controls">
+          <div class="calc-ctrl-group">
+            <span class="calc-ctrl-label">Moneda</span>
+            <div class="calc-toggle">
+              <button id="btn-cop" class="calc-toggle-btn active" onclick="setCurrency('COP')">COP</button>
+              <button id="btn-usd" class="calc-toggle-btn" onclick="setCurrency('USD')">USD</button>
+            </div>
+          </div>
+          <div class="calc-ctrl-group">
+            <span class="calc-ctrl-label">Frecuencia</span>
+            <div class="calc-toggle">
+              <button id="btn-monthly" class="calc-toggle-btn active" onclick="setFreq('mensual')">Mensual</button>
+              <button id="btn-annual" class="calc-toggle-btn" onclick="setFreq('anual')">Anual</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CATEGORY SELECTOR -->
+        <div class="calc-cats">
+          <button class="calc-cat active" data-cat="general" onclick="setCat(this,'general')">🌱<span>General</span></button>
+          <button class="calc-cat" data-cat="alimentos" onclick="setCat(this,'alimentos')">🍽️<span>Alimentación</span></button>
+          <button class="calc-cat" data-cat="salud" onclick="setCat(this,'salud')">🏥<span>Salud</span></button>
+          <button class="calc-cat" data-cat="educacion" onclick="setCat(this,'educacion')">📚<span>Educación</span></button>
+          <button class="calc-cat" data-cat="materiales" onclick="setCat(this,'materiales')">👕<span>Materiales</span></button>
+        </div>
+
+        <!-- AMOUNT DISPLAY -->
+        <div style="text-align:center;margin:24px 0 8px">
+          <div id="calc-display" style="font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(36px,6vw,64px);font-weight:800;color:#fff;line-height:1">$25.000 COP</div>
+          <div id="rate-note" style="font-size:12px;color:rgba(255,255,255,.35);margin-top:6px;display:none">Tasa referencial: 1 USD ≈ $4.200 COP</div>
+        </div>
+
+        <!-- SLIDER -->
+        <input type="range" id="calc-slider" min="0" max="100" value="25" step="1"
+          class="calc-slider" oninput="calcUpdate()">
+        <div id="calc-range-hint" style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.3);margin-top:-16px;margin-bottom:20px">
+          <span id="range-min">$5.000 COP</span>
+          <span id="range-max">$20.000.000 COP</span>
+        </div>
+
+        <!-- QUICK AMOUNTS -->
+        <div class="calc-quick" id="quick-btns">
+          <button onclick="setQuick(0.15)" class="calc-quick-btn">$25K</button>
+          <button onclick="setQuick(0.30)" class="calc-quick-btn">$100K</button>
+          <button onclick="setQuick(0.50)" class="calc-quick-btn">$500K</button>
+          <button onclick="setQuick(0.70)" class="calc-quick-btn">$1M</button>
+          <button onclick="setQuick(0.85)" class="calc-quick-btn">$5M</button>
+          <button onclick="setQuick(1.0)" class="calc-quick-btn">$20M</button>
+        </div>
+
+        <!-- OUTPUTS -->
         <div class="calc-outputs">
           <div class="calc-out">
             <div class="co-label">Ahorro tributario</div>
-            <div class="co-value" id="co-tax">$6.25</div>
-            <div class="co-sub">25% sobre impuesto de renta · Art. 257 ET</div>
+            <div class="co-value" id="co-tax">$6.250 COP</div>
+            <div class="co-sub">25% · Art. 257 ET</div>
           </div>
           <div class="calc-out">
             <div class="co-label">Costo neto real</div>
-            <div class="co-value" id="co-net">$18.75</div>
+            <div class="co-value" id="co-net">$18.750 COP</div>
             <div class="co-sub">Lo que realmente sale de tu bolsillo</div>
           </div>
           <div class="calc-out">
-            <div class="co-label">Impacto estimado</div>
-            <div class="co-value" id="co-impact">~5 kg</div>
-            <div class="co-sub" id="co-impact-sub">de alimentos distribuidos este mes</div>
+            <div class="co-label" id="co-impact-label">Impacto estimado</div>
+            <div class="co-value" id="co-impact">~200 platos</div>
+            <div class="co-sub" id="co-impact-sub">de comida en comunidades vulnerables</div>
           </div>
         </div>
-        <div class="calc-tier-box">
-          <div class="ctb-icon" id="ctb-icon">🌿</div>
+
+        <!-- ANNUAL VIEW -->
+        <div id="annual-view" style="display:none;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:var(--r);padding:14px 18px;margin-top:12px;font-size:14px;color:rgba(255,255,255,.7);line-height:1.6">
+          <strong style="color:var(--gn)">Proyección anual:</strong> En 12 meses habrás aportado <strong id="annual-total" style="color:#fff">$300.000 COP</strong> y generado <strong id="annual-impact" style="color:#fff">~2.400 platos de comida</strong> con un ahorro tributario acumulado de <strong id="annual-tax" style="color:#fff">$75.000 COP</strong>.
+        </div>
+
+        <!-- MEMBERSHIP BADGE -->
+        <div id="membership-card" style="margin-top:20px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:14px">
+          <div id="m-icon" style="font-size:28px">🌱</div>
           <div>
-            <div class="ctb-name" id="ctb-name">Membresía Retoño</div>
-            <div class="ctb-sub" id="ctb-sub">Acceso al Programa de Gratitud · Descuentos exclusivos en empresas aliadas</div>
+            <div id="m-name" style="font-size:15px;font-weight:700;color:#fff">Membresía Semilla</div>
+            <div id="m-sub" style="font-size:12px;color:rgba(255,255,255,.45)">Acceso al Programa de Gratitud</div>
           </div>
         </div>
-        <div class="gratitud-preview" id="gratitud-box">
-          ⭐ <strong>Programa de Gratitud activo</strong> — Con este nivel accedes a descuentos exclusivos en gastronomía, moda, belleza y bienestar. Si consumes $150.000/mes en empresas aliadas, puedes recuperar ~$15.000 adicionales.
+
+        <div style="margin-top:20px;text-align:center">
+          <a class="btn btn-g arr" onclick="go('donar')">Hacer mi aporte →</a>
         </div>
       </div>
 
-      <div class="dtabs rv d4">
-        <div class="dt on" onclick="dtab('ind',this)">Donante individual</div>
-        <div class="dt" onclick="dtab('rse',this)">Empresa RSE</div>
-        <div class="dt" onclick="dtab('vol',this)">Voluntario</div>
-      </div>
+      <!-- ══════ CALCULADORA EMPRESAS ══════ -->
+      <div id="calc-empresa" class="dark-calc rv" style="display:none">
+        <div style="margin-bottom:24px">
+          <div class="ey" style="margin-bottom:8px">Simulador RSE</div>
+          <p style="font-size:14px;color:rgba(255,255,255,.6);line-height:1.7">¿Cuánto impacto puede generar tu empresa? Ingresa el presupuesto anual y tu equipo potencial para el Impact Journey.</p>
+        </div>
 
-      <!-- INDIVIDUAL -->
-      <div class="dp on" id="dp-ind">
-        <div class="g2" style="gap:48px;align-items:start">
-          <div>
-            <h2 style="font-size:20px;margin-bottom:6px">Donación directa — Bancolombia</h2>
-            <p style="color:var(--mu);font-size:14px;margin-bottom:20px">Envía el comprobante a sebas@thegiveandgrowproject.org para recibir tu certificado y tu credencial de membresía.</p>
-            <div class="bcard">
-              <div class="btit">Transferencia bancaria</div>
-              <div class="bname">Fundación Give&Grow International</div>
-              <div class="bgrid">
-                <div class="bk"><div class="bkl">Banco</div><div class="bkv">Bancolombia</div></div>
-                <div class="bk"><div class="bkl">Tipo</div><div class="bkv">Cuenta de Ahorros</div></div>
-                <div class="bk"><div class="bkl">Número</div><div class="bkv">31000009221</div></div>
-                <div class="bk"><div class="bkl">NIT</div><div class="bkv">901.948.930-2</div></div>
-                <div class="bk" style="grid-column:1/-1"><div class="bkl">Concepto</div><div class="bkv">Donación + tu nombre completo</div></div>
-              </div>
+        <div class="g2" style="gap:20px;margin-bottom:20px">
+          <div class="ff" style="--fbc:#1a2a40;--fbc2:rgba(255,255,255,.1)">
+            <label style="color:rgba(255,255,255,.6);font-size:13px">Presupuesto RSE anual (COP)</label>
+            <input type="number" id="emp-budget" placeholder="Ej: 10.000.000" min="500000" step="500000"
+              oninput="calcEmpresa()"
+              style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:8px;padding:10px 14px;font-size:15px;width:100%">
+          </div>
+          <div class="ff">
+            <label style="color:rgba(255,255,255,.6);font-size:13px">Empleados para Impact Journey</label>
+            <input type="number" id="emp-team" placeholder="Ej: 10" min="1" max="200" step="1"
+              oninput="calcEmpresa()"
+              style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:8px;padding:10px 14px;font-size:15px;width:100%">
+          </div>
+        </div>
+
+        <div id="emp-result" style="display:none">
+          <div class="calc-outputs" style="margin-bottom:16px">
+            <div class="calc-out">
+              <div class="co-label">Paquete RSE</div>
+              <div class="co-value" id="emp-package" style="font-size:16px">Impact Partner</div>
+              <div class="co-sub" id="emp-package-sub">Desde $8M COP/año</div>
             </div>
-            
-      <!-- POST-DONATION FLOW -->
-      <div class="rv" style="margin-top:40px">
-        <div class="ey" style="margin-bottom:12px">¿Qué pasa después de donar?</div>
-        <h3 style="font-size:20px;margin-bottom:6px">Tu donación en 5 pasos</h3>
-        <p style="font-size:14px;color:var(--mu);margin-bottom:24px">Desde que transferís hasta que recibís el reporte de impacto.</p>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px" class="postdon-grid">
-          <div style="text-align:center;padding:16px 8px;background:var(--cream);border-radius:10px"><div style="font-size:22px;margin-bottom:8px">💸</div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">1. Transferís</div><div style="font-size:11px;color:var(--mu)">Por Bancolombia y nos enviás el comprobante</div></div>
-          <div style="text-align:center;padding:16px 8px;background:var(--cream);border-radius:10px"><div style="font-size:22px;margin-bottom:8px">✅</div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">2. Confirmamos</div><div style="font-size:11px;color:var(--mu)">En menos de 24 horas te respondemos</div></div>
-          <div style="text-align:center;padding:16px 8px;background:var(--gl);border-radius:10px;border:1px solid rgba(31,92,56,.2)"><div style="font-size:22px;margin-bottom:8px">🪪</div><div style="font-size:12px;font-weight:700;color:var(--g);margin-bottom:4px">3. Tu credencial</div><div style="font-size:11px;color:var(--mu)">Recibís tu credencial digital + acceso al Programa de Gratitud</div></div>
-          <div style="text-align:center;padding:16px 8px;background:var(--cream);border-radius:10px"><div style="font-size:22px;margin-bottom:8px">📜</div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">4. Certificado</div><div style="font-size:11px;color:var(--mu)">Certificado tributario Art. 257 ET para tu declaración</div></div>
-          <div style="text-align:center;padding:16px 8px;background:var(--cream);border-radius:10px"><div style="font-size:22px;margin-bottom:8px">📸</div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">5. Reporte mensual</div><div style="font-size:11px;color:var(--mu)">Foto del impacto real de tu donación cada mes</div></div>
-        </div>
-      </div>
-
-      <div class="taxbox">🟢 <strong>Art. 257 ET:</strong> Descuento del 25% del valor donado sobre el impuesto de renta a cargo. Donación por sistema financiero obligatoria para acceder al beneficio.</div>
-          </div>
-          <div>
-            <h2 style="font-size:18px;margin-bottom:14px">Los 6 niveles de membresía</h2>
-            <div class="mem6-grid">
-              <div class="mem6-card"><div class="mem6-icon">🌱</div><div class="mem6-name">Semilla</div><div class="mem6-condition">USD 1–24/mes</div><ul class="mem6-benefits"><li>Acceso al Programa de Gratitud</li><li>Boletines de impacto</li><li>Certificado tributario</li></ul></div>
-              <div class="mem6-card active"><div class="mem6-icon">🌿</div><div class="mem6-name">Retoño</div><div class="mem6-condition">USD 25–49/mes</div><ul class="mem6-benefits"><li>Todo Semilla +</li><li>Beneficios extendidos Gratitud</li><li>10% dto. HopeMarket (fase 2)</li></ul></div>
-              <div class="mem6-card"><div class="mem6-icon">🌳</div><div class="mem6-name">Árbol</div><div class="mem6-condition">USD 50–99/mes</div><ul class="mem6-benefits"><li>Todo Retoño +</li><li>Invitaciones a eventos</li><li>Certificado personalizado</li></ul></div>
-              <div class="mem6-card"><div class="mem6-icon">🌲</div><div class="mem6-name">Bosque</div><div class="mem6-condition">USD 100+/mes</div><ul class="mem6-benefits"><li>Todo Árbol +</li><li>Reportes detallados</li><li>Reuniones directivas</li></ul></div>
-              <div class="mem6-card temporal"><div class="mem6-icon">🕐</div><div class="mem6-name">Temporal</div><div class="mem6-condition">Donación única · 1 año · Sujeta a revisión</div><ul class="mem6-benefits"><li>Acceso anual completo</li><li>Todos los beneficios del nivel correspondiente</li><li>Renovación evaluada por Give&Grow</li></ul><div class="mem6-tag"><span class="badge" style="background:var(--amberl);color:var(--amber);font-size:10px">A definir</span></div></div>
-              <div class="mem6-card honor"><div class="mem6-icon">⭐</div><div class="mem6-name">Membresía de Honor</div><div class="mem6-condition">Por invitación del Representante Legal</div><ul class="mem6-benefits"><li>Acceso permanente y vitalicio</li><li>Todos los beneficios de Bosque</li><li>Reconocimiento especial en el ecosistema</li><li>Invitación a eventos exclusivos</li></ul><div class="mem6-tag"><span class="badge" style="background:var(--honorl);color:var(--honor);font-size:10px">Invitación</span></div></div>
+            <div class="calc-out">
+              <div class="co-label">Costo real post-Art. 257</div>
+              <div class="co-value" id="emp-net">$7.500.000</div>
+              <div class="co-sub">25% descuento en impuesto de renta</div>
+            </div>
+            <div class="calc-out">
+              <div class="co-label">Empleados en campo</div>
+              <div class="co-value" id="emp-journeys">10</div>
+              <div class="co-sub">jornadas Impact Journey disponibles</div>
             </div>
           </div>
+          <div id="emp-detail" style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:var(--r);padding:14px 18px;font-size:14px;color:rgba(255,255,255,.7);line-height:1.7"></div>
+        </div>
+
+        <div style="margin-top:20px;text-align:center">
+          <a class="btn btn-g arr" href="mailto:sebas@thegiveandgrowproject.org?subject=Interés RSE Give%26Grow">Hablar con nosotros →</a>
         </div>
       </div>
 
-      <!-- RSE -->
-      <div class="dp" id="dp-rse">
-        <h2 style="font-size:20px;margin-bottom:6px">RSE Corporativa — 3 niveles</h2>
-        <p style="color:var(--mu);font-size:14px;margin-bottom:28px">Transforma tu presupuesto de RSE en evidencia medible. Certificado tributario en todos los niveles.</p>
-        <div class="rse-g">
-          <div class="rse"><div class="ey">Aliado Semilla</div><div class="rsep">$2M COP/año</div><div class="rsed">La entrada más accesible.</div><ul class="ck"><li>Donación + voluntariado</li><li>Certificado Art. 257 ET</li><li>Reconocimiento en web</li><li>Reporte semestral</li></ul></div>
-          <div class="rse hi"><div class="ey">Impact Partner</div><div class="rsep">$8M COP/año</div><div class="rsed">Incluye Impact Journey para tu equipo.</div><ul class="ck"><li>Todo Semilla +</li><li>Voluntariado trimestral</li><li>Impact Journey</li><li>Dashboard RSE (fase 2)</li></ul></div>
-          <div class="rse"><div class="ey">Alianza Estratégica</div><div class="rsep">$25M COP/año</div><div class="rsed">Co-creación de programas a medida.</div><ul class="ck"><li>Todo Impact Partner +</li><li>Naming de proyectos</li><li>Reportes GRI-ready</li><li>Co-branding en campo</li></ul></div>
-        </div>
-        <div class="taxbox" style="margin-top:22px">🟢 <strong>Beneficio fiscal:</strong> El 25% del valor donado se descuenta del impuesto a cargo (Art. 257 ET). Ejemplo: $4M donados → $1M de descuento → pagas $3M menos a la DIAN.</div>
-      </div>
-
-      <!-- VOLUNTARIO -->
-      <div class="dp" id="dp-vol">
-        <h2 style="font-size:20px;margin-bottom:6px">Banco de Tiempo y Habilidades</h2>
-        <p style="color:var(--mu);font-size:14px;margin-bottom:28px">Tu expertise conectado con quienes más lo necesitan.</p>
-        <div class="g4"><div class="card"><div style="font-size:30px;margin-bottom:12px">⚕️</div><h3 style="font-size:15px;margin-bottom:7px">Salud</h3><p style="font-size:13px;color:var(--mu)">Médicos, odontólogos, psicólogos para brigadas.</p></div><div class="card"><div style="font-size:30px;margin-bottom:12px">⚖️</div><h3 style="font-size:15px;margin-bottom:7px">Legal</h3><p style="font-size:13px;color:var(--mu)">Abogados y contadores para fundaciones aliadas.</p></div><div class="card"><div style="font-size:30px;margin-bottom:12px">💻</div><h3 style="font-size:15px;margin-bottom:7px">Tecnología</h3><p style="font-size:13px;color:var(--mu)">Desarrolladores y diseñadores.</p></div><div class="card"><div style="font-size:30px;margin-bottom:12px">🎓</div><h3 style="font-size:15px;margin-bottom:7px">Educación</h3><p style="font-size:13px;color:var(--mu)">Docentes y mentores comunitarios.</p></div></div>
-        <div class="taxbox" style="margin-top:22px">ℹ️ Los certificados de voluntariado son de reconocimiento institucional. Los servicios no otorgan el descuento del Art. 257 ET.</div>
-      </div>
+      <p style="font-size:12px;color:var(--mu);margin-top:16px;text-align:center">* Cálculos referenciales. El beneficio tributario aplica para personas jurídicas y naturales con declaración de renta. Consulta con tu contador.</p>
     </div>
   </section>
 </div>
@@ -2101,7 +2154,7 @@ function downloadQR(){
   link.click();
 }
 
-/* CURRENCY TOGGLE */
+
 var CURR = 'COP';
 var USD_RATE = 4200;
 
@@ -2115,12 +2168,203 @@ function setCurrency(c){
   calcImpact();
 }
 
-function fmtCurr(cop){
+//function fmtCurr(cop){
   if(CURR==='USD'){
     var usd = cop / USD_RATE;
     return 'USD ' + (usd < 10 ? usd.toFixed(2) : Math.round(usd).toLocaleString('es-CO'));
   }
   return '$' + Math.round(cop).toLocaleString('es-CO') + ' COP';
+}
+
+/* CALCULADORA v2 */
+var CURR='COP', FREQ='mensual', CAT='general', USD_RATE=4200;
+
+// Logarithmic slider: position 0-100 → real value
+function sliderToVal(pos){
+  var copMin=5000, copMax=20000000, usdMin=1, usdMax=5000;
+  if(CURR==='COP'){
+    return Math.round(copMin*Math.pow(copMax/copMin, pos/100));
+  } else {
+    return Math.round(usdMin*Math.pow(usdMax/usdMin, pos/100));
+  }
+}
+
+function valToSlider(val){
+  var copMin=5000, copMax=20000000, usdMin=1, usdMax=5000;
+  if(CURR==='COP'){
+    return Math.round(Math.log(val/copMin)/Math.log(copMax/copMin)*100);
+  } else {
+    return Math.round(Math.log(val/usdMin)/Math.log(usdMax/usdMin)*100);
+  }
+}
+
+function fmtMoney(cop){
+  if(CURR==='USD'){
+    var usd=cop/USD_RATE;
+    return 'USD '+(usd<10?usd.toFixed(2):Math.round(usd).toLocaleString('es-CO'));
+  }
+  return '$'+Math.round(cop).toLocaleString('es-CO')+' COP';
+}
+
+function fmtShort(cop){
+  if(CURR==='USD'){
+    var usd=cop/USD_RATE;
+    return 'USD '+(usd>=1000?(usd/1000).toFixed(1)+'K':Math.round(usd));
+  }
+  if(cop>=1000000) return '$'+(cop/1000000).toFixed(1)+'M';
+  if(cop>=1000) return '$'+(cop/1000).toFixed(0)+'K';
+  return '$'+cop;
+}
+
+function calcImpactByCat(usdVal, cat){
+  var cop=usdVal*USD_RATE;
+  if(cat==='alimentos'||cat==='general'){
+    if(usdVal<2) return {val:'~'+(usdVal*8*USD_RATE/USD_RATE).toFixed(0)+' platos',sub:'de arroz, lentejas o pasta en comunidades vulnerables'};
+    if(usdVal<10) return {val:Math.round(usdVal*8)+' platos',sub:'de comida — '+Math.round(usdVal*0.7)+' días de nutrición para 1 persona'};
+    if(usdVal<30) return {val:Math.round(usdVal/1.1)+' días',sub:'de apoyo nutricional completo para 1 persona'};
+    if(usdVal<100) return {val:'~'+Math.round(usdVal/25)+' canastas',sub:'familiares (familia de 4 personas por semana)'};
+    if(usdVal<500) return {val:Math.round(usdVal/50)+' pers.',sub:'con apoyo nutricional mensual completo'};
+    return {val:Math.round(usdVal/100)+' familias',sub:'con programa nutricional completo por 2 meses'};
+  }
+  if(cat==='salud'){
+    if(usdVal<5) return {val:Math.round(usdVal*3)+' consultas',sub:'médicas básicas en brigadas comunitarias'};
+    if(usdVal<20) return {val:Math.round(usdVal*2)+' consultas',sub:'+ medicamentos esenciales para 1 persona'};
+    if(usdVal<60) return {val:Math.round(usdVal/5)+' jornadas',sub:'odontológicas o de salud visual preventiva'};
+    if(usdVal<200) return {val:Math.round(usdVal/20)+' personas',sub:'con atención médica integral (diagnóstico + tratamiento)'};
+    return {val:Math.round(usdVal/50)+' familias',sub:'con acceso a salud preventiva completa por 1 mes'};
+  }
+  if(cat==='educacion'){
+    if(usdVal<5) return {val:Math.round(usdVal*4)+' kits',sub:'escolares básicos (cuadernos, lapiceros, regla)'};
+    if(usdVal<20) return {val:Math.round(usdVal*2)+' horas',sub:'de tutoría personalizada para niños en riesgo'};
+    if(usdVal<60) return {val:Math.round(usdVal/5)+' talleres',sub:'de formación técnica o habilidades laborales'};
+    if(usdVal<200) return {val:Math.round(usdVal/15)+' estudiantes',sub:'con materiales educativos completos por 1 semestre'};
+    return {val:Math.round(usdVal/40)+' jóvenes',sub:'en programa de formación laboral completo'};
+  }
+  if(cat==='materiales'){
+    if(usdVal<5) return {val:Math.round(usdVal*3)+' kits',sub:'de higiene personal básica (jabón, pasta, cepillo)'};
+    if(usdVal<20) return {val:Math.round(usdVal*1.5)+' dotaciones',sub:'de ropa y calzado para 1 persona'};
+    if(usdVal<60) return {val:Math.round(usdVal/6)+' kits',sub:'completos de aseo del hogar + ropa para 1 familia'};
+    if(usdVal<200) return {val:Math.round(usdVal/20)+' familias',sub:'con dotación completa (ropa, aseo, colchonetas, utensilios)'};
+    return {val:Math.round(usdVal/40)+' hogares',sub:'equipados completamente (mobiliario básico + textiles)'};
+  }
+  return {val:'~'+Math.round(usdVal*8)+' platos',sub:'de comida u otros recursos según necesidad'};
+}
+
+function calcUpdate(){
+  var pos=+document.getElementById('calc-slider').value;
+  var copVal=sliderToVal(pos);
+  var usdVal=(CURR==='USD')?copVal:copVal/USD_RATE;
+  var dispVal=copVal;
+
+  document.getElementById('calc-display').textContent=fmtMoney(dispVal);
+
+  var tax=dispVal*0.25, net=dispVal*0.75;
+  document.getElementById('co-tax').textContent=fmtMoney(tax);
+  document.getElementById('co-net').textContent=fmtMoney(net);
+
+  var imp=calcImpactByCat(usdVal,CAT);
+  document.getElementById('co-impact').textContent=imp.val;
+  document.getElementById('co-impact-sub').textContent=imp.sub;
+
+  // Annual view
+  if(FREQ==='anual'){
+    var annual=dispVal*12;
+    document.getElementById('annual-view').style.display='block';
+    document.getElementById('annual-total').textContent=fmtMoney(annual);
+    document.getElementById('annual-tax').textContent=fmtMoney(annual*0.25);
+    var annImp=calcImpactByCat(usdVal*12,CAT);
+    document.getElementById('annual-impact').textContent=annImp.val;
+  } else {
+    document.getElementById('annual-view').style.display='none';
+  }
+
+  // Membership (based on USD)
+  var icons=[['🌲','Membresía Bosque','Reportes personalizados · Reuniones directivas · Gratitud completo'],
+    ['🌳','Membresía Árbol','Eventos exclusivos · Certificado personalizado · Gratitud completo'],
+    ['🌿','Membresía Retoño','Beneficios extendidos · Programa de Gratitud completo'],
+    ['🌱','Membresía Semilla','Acceso al Programa de Gratitud']];
+  var mi=usdVal>=100?0:usdVal>=50?1:usdVal>=25?2:3;
+  document.getElementById('m-icon').textContent=icons[mi][0];
+  document.getElementById('m-name').textContent=icons[mi][1];
+  document.getElementById('m-sub').textContent=icons[mi][2];
+
+  // Slider gradient
+  var sl=document.getElementById('calc-slider');
+  sl.style.background='linear-gradient(to right,var(--g) '+pos+'%,rgba(255,255,255,.15) '+pos+'%)';
+
+  // Quick buttons label update
+  updateQuickBtns();
+}
+
+function updateRangeHints(){
+  var minV=CURR==='COP'?'$5.000 COP':'USD 1';
+  var maxV=CURR==='COP'?'$20.000.000 COP':'USD 5.000';
+  document.getElementById('range-min').textContent=minV;
+  document.getElementById('range-max').textContent=maxV;
+}
+
+function updateQuickBtns(){
+  var positions=[0.15,0.30,0.50,0.70,0.85,1.0];
+  var btns=document.querySelectorAll('.calc-quick-btn');
+  btns.forEach(function(btn,i){
+    var cop=sliderToVal(positions[i]*100);
+    btn.textContent=fmtShort(cop);
+  });
+}
+
+function setQuick(pos){
+  document.getElementById('calc-slider').value=pos*100;
+  calcUpdate();
+}
+
+function setCurrency(c){
+  CURR=c;
+  document.getElementById('btn-cop').classList.toggle('active',c==='COP');
+  document.getElementById('btn-usd').classList.toggle('active',c==='USD');
+  document.getElementById('rate-note').style.display=c==='USD'?'block':'none';
+  document.getElementById('calc-slider').value=25;
+  updateRangeHints();
+  calcUpdate();
+}
+
+function setFreq(f){
+  FREQ=f;
+  document.getElementById('btn-monthly').classList.toggle('active',f==='mensual');
+  document.getElementById('btn-annual').classList.toggle('active',f==='anual');
+  calcUpdate();
+}
+
+function setCat(el,cat){
+  CAT=cat;
+  document.querySelectorAll('.calc-cat').forEach(function(b){b.classList.remove('active');});
+  el.classList.add('active');
+  var labels={general:'Impacto estimado',alimentos:'🍽️ Alimentación',salud:'🏥 Salud',educacion:'📚 Educación',materiales:'👕 Materiales'};
+  document.getElementById('co-impact-label').textContent=labels[cat]||'Impacto estimado';
+  calcUpdate();
+}
+
+function switchCalcTab(t){
+  document.getElementById('calc-individual').style.display=t==='individual'?'block':'none';
+  document.getElementById('calc-empresa').style.display=t==='empresa'?'block':'none';
+  document.getElementById('tab-ind').classList.toggle('active',t==='individual');
+  document.getElementById('tab-emp').classList.toggle('active',t==='empresa');
+}
+
+function calcEmpresa(){
+  var budget=+document.getElementById('emp-budget').value||0;
+  var team=+document.getElementById('emp-team').value||0;
+  if(!budget) return;
+  document.getElementById('emp-result').style.display='block';
+  var net=budget*0.75;
+  var pkg,pkgSub,detail;
+  if(budget>=25000000){pkg='🌟 Alianza Estratégica';pkgSub='Desde $25M COP/año';detail='Co-creación de programas sociales · Naming rights en eventos · Reportes GRI · Todos los empleados en Impact Journey · Visibilidad premium en sitio y eventos';}
+  else if(budget>=8000000){pkg='⭐ Impact Partner';pkgSub='Desde $8M COP/año';detail='Incluye Impact Journey para tu equipo · Reporte de impacto por empleado · Certificado RSE · Visibilidad en directorio de aliados · Acceso preferencial a eventos Give&Grow';}
+  else {pkg='🤝 Aliado Semilla';pkgSub='Desde $500K COP/año';detail='Donación con trazabilidad · Certificado Art. 257 ET · Mención en directorio digital · Acceso al Programa de Gratitud para empleados participantes';}
+  document.getElementById('emp-package').textContent=pkg;
+  document.getElementById('emp-package-sub').textContent=pkgSub;
+  document.getElementById('emp-net').textContent='$'+Math.round(net).toLocaleString('es-CO')+' COP';
+  document.getElementById('emp-journeys').textContent=Math.min(team,budget>=8000000?team:Math.floor(budget/500000));
+  document.getElementById('emp-detail').innerHTML='<strong style="color:var(--gn)">Incluye:</strong> '+detail;
 }
 </script>
 </body>
