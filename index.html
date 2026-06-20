@@ -537,7 +537,7 @@ footer{background:var(--navy);padding:56px 0 26px}
   .g2,.g3,.g4,.trgrid,.fg,.rse-g{grid-template-columns:1fr}
   .pgrid{grid-template-columns:1fr 1fr}.srow{grid-template-columns:1fr 1fr}
   .stat:nth-child(2){border-right:none}.drow{grid-template-columns:1fr 1fr}
-  .nlinks .nl{display:none}.calc-outputs{grid-template-columns:1fr}
+  .nlinks .nl{display:none}
   .mem6-grid{grid-template-columns:1fr}.photo-banner{height:220px}
   #wa-btn{bottom:20px;right:20px;width:50px;height:50px}
 }
@@ -602,6 +602,51 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 #alma-msgs::-webkit-scrollbar{width:4px}
 #alma-msgs::-webkit-scrollbar-track{background:transparent}
 #alma-msgs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+
+/* ── CALCULADORA NUEVA (cc-*) ── */
+.calc-card{background:#fff;border:1.5px solid var(--bd);border-radius:var(--rl);overflow:hidden;margin-top:28px}
+.cc-tabs{display:flex;border-bottom:1.5px solid var(--bd);background:#fafaf8}
+.cc-tab{flex:1;padding:14px 20px;border:none;border-bottom:3px solid transparent;margin-bottom:-1.5px;background:transparent;font-size:14px;font-weight:600;color:var(--mu);cursor:pointer;transition:all .2s}
+.cc-tab.active{color:var(--g);border-bottom-color:var(--g);background:#fff}
+.cc-body{padding:24px 28px}
+.cc-ctrl-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+.cc-ctrl-group{display:flex;align-items:center;gap:8px}
+.cc-ctrl-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mu)}
+.cc-toggle{display:flex;background:#f1f1ef;border-radius:8px;padding:3px;gap:2px}
+.cc-toggle-btn{border:none;padding:5px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--mu);transition:all .18s}
+.cc-toggle-btn.active{background:#fff;color:var(--g);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.cc-cats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.cc-cat{padding:7px 14px;border-radius:20px;border:1.5px solid var(--bd);background:#fff;color:var(--mu);cursor:pointer;font-size:13px;font-weight:600;transition:all .18s}
+.cc-cat:hover{border-color:var(--gm);color:var(--g)}
+.cc-cat.active{border-color:var(--g);background:var(--gl);color:var(--g)}
+.cc-amount-box{text-align:center;margin:4px 0 8px;padding:16px 0 4px}
+#calc-display{font-family:"Bricolage Grotesque",sans-serif;font-size:clamp(28px,5.5vw,54px);font-weight:800;color:var(--navy);line-height:1}
+.cc-slider{width:100%;height:5px;border-radius:3px;outline:none;cursor:pointer;margin:16px 0 4px;-webkit-appearance:none;appearance:none;background:linear-gradient(to right,var(--g) 25%,#e5e7eb 25%)}
+.cc-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:2.5px solid var(--g);box-shadow:0 2px 8px rgba(46,125,79,.25);cursor:pointer}
+.cc-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:2.5px solid var(--g);cursor:pointer}
+.cc-range-hints{display:flex;justify-content:space-between;font-size:11px;color:var(--mu);margin-bottom:14px}
+.cc-quick{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:20px}
+.cc-quick-btn{padding:4px 12px;border-radius:16px;border:1px solid var(--bd);background:#fafaf8;color:var(--mu);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.cc-quick-btn:hover{border-color:var(--g);color:var(--g)}
+.cc-outputs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.cc-out{background:#fafaf8;border:1px solid var(--bd);border-radius:10px;padding:14px 12px;text-align:center}
+.cc-out-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mu);margin-bottom:6px}
+.cc-out-value{font-family:"Bricolage Grotesque",sans-serif;font-size:17px;font-weight:800;color:var(--g);margin-bottom:3px;line-height:1.2}
+.cc-out-sub{font-size:10px;color:var(--mu);line-height:1.4}
+.cc-annual{background:rgba(46,125,79,.06);border:1px solid rgba(46,125,79,.15);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:var(--mu);line-height:1.7}
+.cc-annual strong{color:var(--navy)}
+.cc-badge{background:#fafaf8;border:1.5px solid var(--bd);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.cc-emp-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.cc-emp-label{display:block;font-size:12px;font-weight:600;color:var(--mu);margin-bottom:6px}
+.cc-emp-input{width:100%;border:1.5px solid var(--bd);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--navy);background:#fafaf8;outline:none;box-sizing:border-box;font-family:inherit;transition:border-color .18s}
+.cc-emp-input:focus{border-color:var(--g)}
+@media(max-width:640px){
+  .cc-outputs{grid-template-columns:1fr 1fr}
+  .cc-outputs .cc-out:last-child{grid-column:1/-1}
+  .cc-emp-row{grid-template-columns:1fr}
+  .cc-ctrl-row{gap:10px}
+  .cc-body{padding:18px}
+}
 </style>
 <script type="application/ld+json">
 {
@@ -1315,160 +1360,145 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
   <section class="sec">
     <div class="wrap">
-      <!-- CALCULADORA v2 -->
-      <div class="calc-section-wrap">
       <div class="ey rv">Calculadora de impacto</div>
-      <h2 class="stit rv d1" style="max-width:560px">¿Cuánto impacto genera tu aporte?</h2>
+      <h2 class="stit rv d1">¿Cuánto impacto genera tu aporte?</h2>
       <p class="slead rv d2">Ajusta el monto y la categoría. Ve el impacto real en números concretos.</p>
 
-      <!-- TABS: Individual / Empresas -->
-      <div class="calc-tabs rv d3">
-        <button class="calc-tab active" id="tab-ind" onclick="switchCalcTab('individual')">👤 Individual</button>
-        <button class="calc-tab" id="tab-emp" onclick="switchCalcTab('empresa')">🏢 Empresa RSE</button>
-      </div>
+      <div class="calc-card rv d3">
 
-      <!-- ══════ CALCULADORA INDIVIDUAL ══════ -->
-      <div id="calc-individual" class="dark-calc" style="background:#0A1628">
+        <!-- TABS -->
+        <div class="cc-tabs">
+          <button class="cc-tab active" id="tab-ind" onclick="switchCalcTab('individual')">👤&nbsp; Individual</button>
+          <button class="cc-tab" id="tab-emp" onclick="switchCalcTab('empresa')">🏢&nbsp; Empresa RSE</button>
+        </div>
 
-        <!-- CURRENCY + FREQUENCY -->
-        <div class="calc-controls">
-          <div class="calc-ctrl-group">
-            <span class="calc-ctrl-label">Moneda</span>
-            <div class="calc-toggle">
-              <button id="btn-cop" class="calc-toggle-btn active" onclick="setCurrency('COP')">COP</button>
-              <button id="btn-usd" class="calc-toggle-btn" onclick="setCurrency('USD')">USD</button>
+        <!-- ──── INDIVIDUAL ──── -->
+        <div id="calc-individual" class="cc-body">
+
+          <div class="cc-ctrl-row">
+            <div class="cc-ctrl-group">
+              <span class="cc-ctrl-lbl">Moneda</span>
+              <div class="cc-toggle">
+                <button id="btn-cop" class="cc-toggle-btn active" onclick="setCurrency('COP')">COP</button>
+                <button id="btn-usd" class="cc-toggle-btn" onclick="setCurrency('USD')">USD</button>
+              </div>
+            </div>
+            <div class="cc-ctrl-group">
+              <span class="cc-ctrl-lbl">Frecuencia</span>
+              <div class="cc-toggle">
+                <button id="btn-monthly" class="cc-toggle-btn active" onclick="setFreq('mensual')">Mensual</button>
+                <button id="btn-annual" class="cc-toggle-btn" onclick="setFreq('anual')">Anual</button>
+              </div>
             </div>
           </div>
-          <div class="calc-ctrl-group">
-            <span class="calc-ctrl-label">Frecuencia</span>
-            <div class="calc-toggle">
-              <button id="btn-monthly" class="calc-toggle-btn active" onclick="setFreq('mensual')">Mensual</button>
-              <button id="btn-annual" class="calc-toggle-btn" onclick="setFreq('anual')">Anual</button>
+
+          <div class="cc-cats">
+            <button class="cc-cat active" onclick="setCat(this,'general')">🌱 General</button>
+            <button class="cc-cat" onclick="setCat(this,'alimentos')">🍽️ Alimentación</button>
+            <button class="cc-cat" onclick="setCat(this,'salud')">🏥 Salud</button>
+            <button class="cc-cat" onclick="setCat(this,'educacion')">📚 Educación</button>
+            <button class="cc-cat" onclick="setCat(this,'materiales')">👕 Materiales</button>
+          </div>
+
+          <div class="cc-amount-box">
+            <div id="calc-display">$25.000 COP</div>
+            <div id="rate-note" style="display:none;font-size:12px;color:var(--mu);margin-top:4px">Tasa referencial: 1 USD ≈ $4.200 COP</div>
+          </div>
+
+          <input type="range" id="calc-slider" min="0" max="100" value="25" step="1"
+            class="cc-slider" oninput="calcUpdate()">
+          <div class="cc-range-hints">
+            <span id="range-min">$5.000 COP</span>
+            <span id="range-max">$20.000.000 COP</span>
+          </div>
+
+          <div class="cc-quick" id="quick-btns">
+            <button onclick="setQuick(0.15)" class="cc-quick-btn">$25K</button>
+            <button onclick="setQuick(0.30)" class="cc-quick-btn">$100K</button>
+            <button onclick="setQuick(0.50)" class="cc-quick-btn">$500K</button>
+            <button onclick="setQuick(0.70)" class="cc-quick-btn">$1M</button>
+            <button onclick="setQuick(0.85)" class="cc-quick-btn">$5M</button>
+            <button onclick="setQuick(1.0)"  class="cc-quick-btn">$20M</button>
+          </div>
+
+          <div class="cc-outputs">
+            <div class="cc-out">
+              <div class="cc-out-label">Ahorro tributario</div>
+              <div class="cc-out-value" id="co-tax">$6.250 COP</div>
+              <div class="cc-out-sub">25% · Art. 257 ET</div>
+            </div>
+            <div class="cc-out">
+              <div class="cc-out-label">Costo neto real</div>
+              <div class="cc-out-value" id="co-net">$18.750 COP</div>
+              <div class="cc-out-sub">Lo que sale de tu bolsillo</div>
+            </div>
+            <div class="cc-out">
+              <div class="cc-out-label" id="co-impact-label">Impacto estimado</div>
+              <div class="cc-out-value" id="co-impact">~200 platos</div>
+              <div class="cc-out-sub" id="co-impact-sub">de comida en comunidades</div>
             </div>
           </div>
-        </div>
 
-        <!-- CATEGORY SELECTOR -->
-        <div class="calc-cats">
-          <button class="calc-cat active" data-cat="general" onclick="setCat(this,'general')">🌱<span>General</span></button>
-          <button class="calc-cat" data-cat="alimentos" onclick="setCat(this,'alimentos')">🍽️<span>Alimentación</span></button>
-          <button class="calc-cat" data-cat="salud" onclick="setCat(this,'salud')">🏥<span>Salud</span></button>
-          <button class="calc-cat" data-cat="educacion" onclick="setCat(this,'educacion')">📚<span>Educación</span></button>
-          <button class="calc-cat" data-cat="materiales" onclick="setCat(this,'materiales')">👕<span>Materiales</span></button>
-        </div>
-
-        <!-- AMOUNT DISPLAY -->
-        <div class="calc-amount-display">
-          <div id="calc-display">$25.000 COP</div>
-          <div id="rate-note" style="display:none">Tasa referencial: 1 USD ≈ $4.200 COP</div>
-        </div>
-
-        <!-- SLIDER -->
-        <input type="range" id="calc-slider" min="0" max="100" value="25" step="1"
-          class="calc-slider" oninput="calcUpdate()">
-        <div id="calc-range-hint" style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.3);margin-top:-16px;margin-bottom:20px">
-          <span id="range-min">$5.000 COP</span>
-          <span id="range-max">$20.000.000 COP</span>
-        </div>
-
-        <!-- QUICK AMOUNTS -->
-        <div class="calc-quick" id="quick-btns">
-          <button onclick="setQuick(0.15)" class="calc-quick-btn">$25K</button>
-          <button onclick="setQuick(0.30)" class="calc-quick-btn">$100K</button>
-          <button onclick="setQuick(0.50)" class="calc-quick-btn">$500K</button>
-          <button onclick="setQuick(0.70)" class="calc-quick-btn">$1M</button>
-          <button onclick="setQuick(0.85)" class="calc-quick-btn">$5M</button>
-          <button onclick="setQuick(1.0)" class="calc-quick-btn">$20M</button>
-        </div>
-
-        <!-- OUTPUTS -->
-        <div class="calc-outputs">
-          <div class="calc-out">
-            <div class="co-label">Ahorro tributario</div>
-            <div class="co-value" id="co-tax">$6.250 COP</div>
-            <div class="co-sub">25% · Art. 257 ET</div>
+          <div id="annual-view" class="cc-annual" style="display:none">
+            <strong>Proyección anual —</strong> En 12 meses habrás aportado <strong id="annual-total">$300.000</strong>, generado <strong id="annual-impact">~2.400 platos</strong> y ahorrado <strong id="annual-tax">$75.000</strong> en impuesto.
           </div>
-          <div class="calc-out">
-            <div class="co-label">Costo neto real</div>
-            <div class="co-value" id="co-net">$18.750 COP</div>
-            <div class="co-sub">Lo que realmente sale de tu bolsillo</div>
-          </div>
-          <div class="calc-out">
-            <div class="co-label" id="co-impact-label">Impacto estimado</div>
-            <div class="co-value" id="co-impact">~200 platos</div>
-            <div class="co-sub" id="co-impact-sub">de comida en comunidades vulnerables</div>
-          </div>
-        </div>
 
-        <!-- ANNUAL VIEW -->
-        <div id="annual-view" style="display:none;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:var(--r);padding:14px 18px;margin-top:12px;font-size:14px;color:rgba(255,255,255,.7);line-height:1.6">
-          <strong style="color:var(--gn)">Proyección anual:</strong> En 12 meses habrás aportado <strong id="annual-total" style="color:#fff">$300.000 COP</strong> y generado <strong id="annual-impact" style="color:#fff">~2.400 platos de comida</strong> con un ahorro tributario acumulado de <strong id="annual-tax" style="color:#fff">$75.000 COP</strong>.
-        </div>
-
-        <!-- MEMBERSHIP BADGE -->
-        <div id="membership-card" style="margin-top:20px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:14px">
-          <div id="m-icon" style="font-size:28px">🌱</div>
-          <div>
-            <div id="m-name" style="font-size:15px;font-weight:700;color:#fff">Membresía Semilla</div>
-            <div id="m-sub" style="font-size:12px;color:rgba(255,255,255,.45)">Acceso al Programa de Gratitud</div>
-          </div>
-        </div>
-
-        <div style="margin-top:20px;text-align:center">
-          <a class="btn btn-g arr" onclick="go('donar')">Hacer mi aporte →</a>
-        </div>
-      </div>
-
-      <!-- ══════ CALCULADORA EMPRESAS ══════ -->
-      <div id="calc-empresa" class="dark-calc" style="display:none">
-        <div style="margin-bottom:24px">
-          <div class="ey" style="margin-bottom:8px">Simulador RSE</div>
-          <p style="font-size:14px;color:rgba(255,255,255,.6);line-height:1.7">¿Cuánto impacto puede generar tu empresa? Ingresa el presupuesto anual y tu equipo potencial para el Impact Journey.</p>
-        </div>
-
-        <div class="g2" style="gap:20px;margin-bottom:20px">
-          <div class="ff" style="--fbc:#1a2a40;--fbc2:rgba(255,255,255,.1)">
-            <label style="color:var(--mu);font-size:13px">Presupuesto RSE anual (COP)</label>
-            <input type="number" id="emp-budget" placeholder="Ej: 10.000.000" min="500000" step="500000"
-              oninput="calcEmpresa()"
-              style="background:#fff;border:1px solid var(--bd);color:var(--navy);border-radius:8px;padding:10px 14px;font-size:15px;width:100%">
-          </div>
-          <div class="ff">
-            <label style="color:var(--mu);font-size:13px">Empleados para Impact Journey</label>
-            <input type="number" id="emp-team" placeholder="Ej: 10" min="1" max="200" step="1"
-              oninput="calcEmpresa()"
-              style="background:#fff;border:1px solid var(--bd);color:var(--navy);border-radius:8px;padding:10px 14px;font-size:15px;width:100%">
-          </div>
-        </div>
-
-        <div id="emp-result" style="display:none">
-          <div class="calc-outputs" style="margin-bottom:16px">
-            <div class="calc-out">
-              <div class="co-label">Paquete RSE</div>
-              <div class="co-value" id="emp-package" style="font-size:16px">Impact Partner</div>
-              <div class="co-sub" id="emp-package-sub">Desde $8M COP/año</div>
-            </div>
-            <div class="calc-out">
-              <div class="co-label">Costo real post-Art. 257</div>
-              <div class="co-value" id="emp-net">$7.500.000</div>
-              <div class="co-sub">25% descuento en impuesto de renta</div>
-            </div>
-            <div class="calc-out">
-              <div class="co-label">Empleados en campo</div>
-              <div class="co-value" id="emp-journeys">10</div>
-              <div class="co-sub">jornadas Impact Journey disponibles</div>
+          <div class="cc-badge">
+            <div id="m-icon" style="font-size:24px">🌱</div>
+            <div>
+              <div id="m-name" style="font-size:14px;font-weight:700;color:var(--navy)">Membresía Semilla</div>
+              <div id="m-sub" style="font-size:12px;color:var(--mu)">Acceso al Programa de Gratitud</div>
             </div>
           </div>
-          <div id="emp-detail" style="background:var(--gl);border:1px solid rgba(46,125,79,.2);border-radius:var(--r);padding:14px 18px;font-size:14px;color:rgba(255,255,255,.7);line-height:1.7"></div>
+
+          <div style="text-align:center;margin-top:8px">
+            <a class="btn btn-g" onclick="go('donar')">Hacer mi aporte</a>
+          </div>
         </div>
 
-        <div style="margin-top:20px;text-align:center">
-          <a class="btn btn-g arr" href="mailto:sebas@thegiveandgrowproject.org?subject=Interés RSE Give%26Grow">Hablar con nosotros →</a>
+        <!-- ──── EMPRESA RSE ──── -->
+        <div id="calc-empresa" class="cc-body" style="display:none">
+          <p style="font-size:14px;color:var(--mu);line-height:1.7;margin-bottom:20px">Calcula el impacto y los beneficios tributarios de la inversión social de tu empresa.</p>
+
+          <div class="cc-emp-row">
+            <div>
+              <label class="cc-emp-label">Presupuesto RSE anual (COP)</label>
+              <input type="number" id="emp-budget" class="cc-emp-input" placeholder="Ej: 10.000.000" oninput="calcEmpresa()">
+            </div>
+            <div>
+              <label class="cc-emp-label">Empleados para Impact Journey</label>
+              <input type="number" id="emp-team" class="cc-emp-input" placeholder="Ej: 10" oninput="calcEmpresa()">
+            </div>
+          </div>
+
+          <div id="emp-result" style="display:none">
+            <div class="cc-outputs" style="margin-bottom:12px">
+              <div class="cc-out">
+                <div class="cc-out-label">Paquete RSE</div>
+                <div class="cc-out-value" id="emp-package" style="font-size:14px">Impact Partner</div>
+                <div class="cc-out-sub" id="emp-package-sub">Desde $8M COP/año</div>
+              </div>
+              <div class="cc-out">
+                <div class="cc-out-label">Costo real (Art. 257)</div>
+                <div class="cc-out-value" id="emp-net">$7.500.000</div>
+                <div class="cc-out-sub">25% desc. impuesto de renta</div>
+              </div>
+              <div class="cc-out">
+                <div class="cc-out-label">Empleados en campo</div>
+                <div class="cc-out-value" id="emp-journeys">10</div>
+                <div class="cc-out-sub">jornadas Impact Journey</div>
+              </div>
+            </div>
+            <div id="emp-detail" class="cc-annual" style="font-size:13px"></div>
+          </div>
+
+          <div style="text-align:center;margin-top:20px">
+            <a class="btn btn-g" href="mailto:sebas@thegiveandgrowproject.org?subject=Interés RSE Give%26Grow">Hablar con nosotros</a>
+          </div>
         </div>
-      </div>
 
       </div>
-      <p style="font-size:12px;color:var(--mu);margin-top:16px;text-align:center">* Cálculos referenciales. El beneficio tributario aplica para personas jurídicas y naturales con declaración de renta. Consulta con tu contador.</p>
+      <p style="font-size:12px;color:var(--mu);margin-top:14px;text-align:center">* Cálculos referenciales. El beneficio tributario aplica para declarantes de renta. Consulta con tu contador.</p>
     </div>
   </section>
 </div>
@@ -2361,7 +2391,7 @@ function calcUpdate(){
 
   // Slider gradient
   var sl=document.getElementById('calc-slider');
-  sl.style.background='linear-gradient(to right,var(--g) '+pos+'%,rgba(255,255,255,.15) '+pos+'%)';
+  sl.style.background='linear-gradient(to right,var(--g) '+pos+'%,#e5e7eb '+pos+'%)';
 
   // Quick buttons label update
   updateQuickBtns();
@@ -2376,7 +2406,7 @@ function updateRangeHints(){
 
 function updateQuickBtns(){
   var positions=[0.15,0.30,0.50,0.70,0.85,1.0];
-  var btns=document.querySelectorAll('.calc-quick-btn');
+  var btns=document.querySelectorAll('.cc-quick-btn');
   btns.forEach(function(btn,i){
     var cop=sliderToVal(positions[i]*100);
     btn.textContent=fmtShort(cop);
@@ -2634,7 +2664,7 @@ async function almaSubmit(){
   var respEl = almaBubble('alma', '<span class="alma-thinking">ALMA está pensando...</span>');
 
   try {
-    var res = await fetch('https://api.anthropic.com/v1/messages',{
+    var res = await fetch('/api/alma',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
