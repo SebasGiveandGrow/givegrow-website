@@ -1,1 +1,0 @@
-export default { async fetch(req, env) { return env.ASSETS ? env.ASSETS.fetch(req) : new Response("OK"); } };
