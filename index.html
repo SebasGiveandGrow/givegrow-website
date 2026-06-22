@@ -2664,7 +2664,7 @@ async function almaSubmit(){
   var respEl = almaBubble('alma', '<span class="alma-thinking">ALMA está pensando...</span>');
 
   try {
-    var res = await fetch('/api/alma',{
+    var res = await fetch('https://givegrow-alma.sebas-4af.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
