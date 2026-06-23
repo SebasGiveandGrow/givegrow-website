@@ -749,6 +749,45 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 .nl-ddi:hover{background:var(--gl);color:var(--g)}
 .nl-ddi-icon{font-size:15px;flex-shrink:0}
 @media(max-width:1024px){.nl-wrap .nl-dd{display:none}}
+
+/* NEWSLETTER */
+.nl-form-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.nl-input{flex:1;min-width:180px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:12px 16px;color:#fff;font-size:14px;outline:none;font-family:inherit}
+.nl-input::placeholder{color:rgba(255,255,255,.4)}
+.nl-input:focus{border-color:var(--gm)}
+.nl-btn{background:var(--g);border:none;border-radius:8px;padding:12px 22px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;transition:opacity .2s;font-family:inherit}
+.nl-btn:hover{opacity:.88}
+@media(max-width:560px){.nl-form-row{flex-direction:column}.nl-input,.nl-btn{width:100%;box-sizing:border-box}}
+
+/* TESTIMONIALS */
+.testi-card{background:#fff;border-radius:var(--rl);padding:28px;border:1px solid var(--bd);position:relative;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.testi-quote{font-family:"Fraunces",serif;font-size:64px;color:var(--gm);line-height:.8;margin-bottom:12px;opacity:.6}
+.testi-text{font-size:15px;color:var(--mu);line-height:1.75;margin-bottom:20px;font-style:italic}
+.testi-author{display:flex;align-items:center;gap:12px}
+.testi-avatar{width:40px;height:40px;border-radius:50%;background:var(--gl);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.testi-name{font-size:14px;font-weight:700;color:var(--navy)}
+.testi-role{font-size:12px;color:var(--mu);margin-top:2px}
+
+/* ALIADOS */
+.aliados-row{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;align-items:center}
+.aliado-logo{background:#fff;border:1.5px solid var(--bd);border-radius:10px;padding:12px 20px;font-size:12px;font-weight:700;color:var(--mu);text-align:center;line-height:1.4;min-width:120px;transition:border-color .2s}
+.aliado-logo:hover{border-color:var(--gm);color:var(--g)}
+
+/* HERO PATHS IMPROVED */
+.hero-path{background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.2);border-radius:16px;padding:20px 24px;cursor:pointer;text-align:center;transition:all .25s;min-width:160px;text-decoration:none;display:block}
+.hero-path:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.5);transform:translateY(-4px);box-shadow:0 12px 28px rgba(0,0,0,.25)}
+.hero-path-icon{font-size:30px;margin-bottom:10px;display:block}
+.hero-path-title{font-size:15px;font-weight:700;color:#fff;display:block}
+.hero-path-sub{font-size:11px;color:rgba(255,255,255,.55);margin-top:4px;display:block}
+.hero-paths{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:32px}
+
+/* CALC EXTRA POLISH */
+.cc-amount-box::after{content:"";position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--g),var(--gm),var(--g));border-radius:0 0 12px 12px}
+.cc-out:first-child{border-top-color:var(--g)}
+.cc-out:nth-child(2){border-top-color:#2563eb}
+.cc-out:last-child{border-top-color:#7c3aed}
+.cc-out:nth-child(2) .cc-out-value{color:#2563eb}
+.cc-out:last-child .cc-out-value{color:#7c3aed}
 </style>
 <script type="application/ld+json">
 {
@@ -1040,6 +1079,20 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
         <div class="pop rv d2"><div class="pi">🐾</div><div class="pl">Animales en maltrato</div></div>
         <div class="pop rv d3"><div class="pi">🔄</div><div class="pl">Personas en rehabilitación</div></div>
         <div class="pop rv d4"><div class="pi">⚖️</div><div class="pl">Personas privadas de libertad</div></div>
+      </div>
+    </div>
+  </section>
+
+  
+  <!-- ALIADOS -->
+  <section class="sec" style="padding:40px 0;border-top:1px solid var(--bd)">
+    <div class="wrap" style="text-align:center">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mu);margin-bottom:24px" class="rv">Con el respaldo de</div>
+      <div class="aliados-row rv d2">
+        <div class="aliado-logo">Bancolombia</div>
+        <div class="aliado-logo">Compartamos<br>con Colombia</div>
+        <div class="aliado-logo">Cámara de Comercio<br>Medellín</div>
+        <div class="aliado-logo">+ 25 Fundaciones<br>preaprobadas</div>
       </div>
     </div>
   </section>
@@ -2509,6 +2562,71 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
     </div>
   </section>
 </div>
+
+
+  <!-- TESTIMONIOS -->
+  <section class="sec" style="background:var(--cream)">
+    <div class="wrap">
+      <div class="ey rv" style="text-align:center;justify-content:center">Lo que dicen</div>
+      <h2 class="stit rv d1" style="text-align:center;max-width:500px;margin-left:auto;margin-right:auto">Voces del campo y la ciudad</h2>
+
+      <div class="g3 rv d3" style="margin-top:36px">
+        <div class="testi-card">
+          <div class="testi-quote">"</div>
+          <p class="testi-text">Give&Grow llegó a nuestra comunidad con algo que pocas organizaciones traen: transparencia. Sabemos exactamente qué se dona, cuándo y cómo nos llega.</p>
+          <div class="testi-author">
+            <div class="testi-avatar">🤝</div>
+            <div>
+              <div class="testi-name">Líder comunitaria</div>
+              <div class="testi-role">La Guajira, Colombia</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="testi-card">
+          <div class="testi-quote">"</div>
+          <p class="testi-text">Como donante, por primera vez recibí fotos reales de lo que generé. No un email genérico — sino evidencia concreta de que mi aporte llegó a alguien real.</p>
+          <div class="testi-author">
+            <div class="testi-avatar">❤️</div>
+            <div>
+              <div class="testi-name">Donante activo</div>
+              <div class="testi-role">Medellín, Colombia</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="testi-card">
+          <div class="testi-quote">"</div>
+          <p class="testi-text">El Impact Journey transformó a nuestro equipo. Volvieron con una perspectiva diferente del país y del rol que una empresa puede jugar en él.</p>
+          <div class="testi-author">
+            <div class="testi-avatar">🏢</div>
+            <div>
+              <div class="testi-name">Directora de Sostenibilidad</div>
+              <div class="testi-role">Empresa aliada, Medellín</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NEWSLETTER / LISTA DE ESPERA -->
+  <section class="sec" style="background:var(--navy);padding:60px 0">
+    <div class="wrap" style="max-width:620px;text-align:center">
+      <div class="ey eyw rv" style="justify-content:center">Lanzamiento · Julio 2026 · Medellín</div>
+      <h2 class="stit rv d1" style="color:#fff;font-size:clamp(24px,3.5vw,38px)">Sé parte del lanzamiento de Give&Grow</h2>
+      <p class="rv d2" style="color:rgba(255,255,255,.6);font-size:16px;max-width:480px;margin:0 auto 28px;line-height:1.7">Déjanos tu correo y serás el primero en saber la fecha, el lugar y cómo participar.</p>
+      <form action="https://formspree.io/f/maqzzlwe" method="POST" class="nl-form rv d3">
+        <input type="hidden" name="_subject" value="Nueva suscripción lista de lanzamiento Give&Grow">
+        <div class="nl-form-row">
+          <input type="text" name="nombre" placeholder="Tu nombre" required class="nl-input">
+          <input type="email" name="email" placeholder="Tu correo" required class="nl-input">
+          <button type="submit" class="nl-btn">Quiero participar →</button>
+        </div>
+        <p style="font-size:12px;color:rgba(255,255,255,.3);margin-top:12px">Sin spam. Solo te escribimos cuando hay algo importante.</p>
+      </form>
+    </div>
+  </section>
 
 <!-- FOOTER -->
 <footer>
