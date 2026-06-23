@@ -796,7 +796,12 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
     <span class="nl" onclick="go('galeria')" id="nl-galeria">Galería</span>
     <span class="nl" onclick="go('mapa')" id="nl-mapa">Mapa</span>
     <span class="nl" onclick="go('alma')" id="nl-alma">ALMA</span>
-    <button class="ndon" onclick="go('donar')">Donar ahora</button>
+    <button class="ndon" id="nb-donar" onclick="go('donar')">Donar ahora</button>
+  </div>
+  <div class="lang-sw">
+    <button id="lbtn-es" class="lbtn active" onclick="setLang('es')">ES</button>
+    <span class="lsep">|</span>
+    <button id="lbtn-en" class="lbtn" onclick="setLang('en')">EN</button>
   </div>
   <button class="hbg-btn" id="hbg-btn" onclick="toggleMenu()" aria-label="Menú"><span></span><span></span><span></span></button>
 </nav>
@@ -2804,6 +2809,14 @@ var T = {
   /* ALMA */
   'alma-title': {es:'ALMA — Asistente de Labor Misional y Alianzas', en:'ALMA — Missional Labor and Alliance Assistant'},
   'alma-sub':   {es:'Pregúntale a ALMA cualquier cosa sobre Give&Grow, el Hub, las donaciones, el Programa de Gratitud o cómo vincularte.', en:'Ask ALMA anything about Give&Grow, the Hub, donations, the Gratitude Program, or how to get involved.'},
+  /* DONAR PAGE */
+  'nb-donar':   {es:'Donar ahora', en:'Donate now'},
+  'don-bank-title': {es:'Transferencia bancaria Bancolombia', en:'Bancolombia bank transfer'},
+  'don-cta-label': {es:'Haz tu primera donación', en:'Make your first donation'},
+  'don-p':      {es:'Tu donación llega a comunidades reales con trazabilidad completa. Tú ves exactamente cómo impacta. Y el Estado te devuelve el 25% como descuento en renta.', en:'Your donation reaches real communities with full traceability. You see exactly how it impacts. And you receive a 25% tax credit on your income tax.'},
+  /* CALC */
+  'calc-ey':    {es:'Calculadora de impacto', en:'Impact calculator'},
+  'calc-h2':    {es:'¿Cuánto impacto genera tu aporte?', en:'How much impact does your contribution generate?'},
 };
 
 function setLang(l) {
