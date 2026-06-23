@@ -711,8 +711,8 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
 /* LANGUAGE TOGGLE */
 .lang-sw{display:flex;align-items:center;gap:4px;margin-left:8px}
-.lbtn{border:none;background:none;font-size:12px;font-weight:600;cursor:pointer;padding:4px 6px;border-radius:4px;color:rgba(255,255,255,.5);transition:all .18s}
-.lbtn.active{color:#fff;background:rgba(255,255,255,.12)}
+.lbtn{border:none;background:none;font-size:12px;font-weight:700;cursor:pointer;padding:5px 8px;border-radius:4px;color:rgba(255,255,255,.5);transition:all .18s;letter-spacing:.2px}
+.lbtn.active{color:#fff;background:rgba(255,255,255,.18);transform:none}
 .lsep{color:rgba(255,255,255,.25);font-size:12px}
 </style>
 <script type="application/ld+json">
@@ -838,11 +838,6 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
     <span class="nl" onclick="go('impacto')" id="nl-impacto">Impacto</span>
     <span class="nl" onclick="go('alma')" id="nl-alma">ALMA</span>
     <button class="ndon" id="nb-donar" onclick="go('donar')">Donar ahora</button>
-  </div>
-  <div class="lang-sw">
-    <button id="lbtn-es" class="lbtn active" onclick="setLang('es')">ES</button>
-    <span class="lsep">|</span>
-    <button id="lbtn-en" class="lbtn" onclick="setLang('en')">EN</button>
   </div>
   <div class="lang-sw">
     <button id="lbtn-es" class="lbtn active" onclick="setLang('es')">ES</button>
@@ -2913,7 +2908,7 @@ function initGallery(){
   if(!g) return;
   g.innerHTML = GALLERY_ITEMS.map(function(item, i){
     return '<div class="gallery-item" onclick="openLB('+i+')">'
-      +'<img src="'+item.src+'" alt="'+item.caption+'" loading="lazy">'
+      +'<img src="'+item.src+'" alt="'+item.caption+'" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23eef5ee' width='400' height='300'/%3E%3Ctext x='200' y='160' text-anchor='middle' fill='%232e7d4f' font-size='13' font-family='sans-serif'%3EFoto pronto%3C/text%3E%3C/svg%3E'">'
       +'<div class="gallery-overlay">'
       +'<div><div class="gallery-cat">'+item.cat+' · '+item.year+'</div>'
       +'<div class="gallery-caption">'+item.caption+'</div></div>'
@@ -3100,7 +3095,7 @@ async function almaSubmit(){
     } else {
       answer = 'Error inesperado: '+JSON.stringify(data).substring(0,200);
     }
-    respEl.innerHTML = answer.replace(/\n/g,'<br>');
+    respEl.innerHTML = almaFmt((data.content&&data.content[0])?data.content[0].text:(data.error?"Error: "+data.error.message:"Error: respuesta inesperada"));
     almaHistory.push({role:'assistant',content:answer});
     if(almaHistory.length > 20) almaHistory = almaHistory.slice(-16);
   } catch(e) {
@@ -3269,6 +3264,19 @@ function setLang(l) {
   });
   // Update HTML lang attribute
   document.documentElement.lang = l;
+}
+
+function almaFmt(t){
+  if(!t)return'';
+  return t
+    .replace(/^### (.+)$/gm,'<h4 style="font-size:14px;font-weight:700;color:var(--navy);margin:12px 0 5px;padding-bottom:3px;border-bottom:1px solid var(--bd)">$1</h4>')
+    .replace(/^## (.+)$/gm,'<h3 style="font-size:16px;font-weight:700;color:var(--navy);margin:14px 0 6px">$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong style="color:var(--navy)">$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^- (.+)$/gm,'<div style="display:flex;gap:7px;margin:3px 0;line-height:1.6"><span style="color:var(--g);font-weight:700;flex-shrink:0">&#8226;</span><span>$1</span></div>')
+    .replace(/^(\d+)\. (.+)$/gm,'<div style="display:flex;gap:7px;margin:3px 0;line-height:1.6"><span style="color:var(--g);font-weight:700;flex-shrink:0;min-width:16px">$1.</span><span>$2</span></div>')
+    .replace(/\n\n/g,'<div style="height:8px"></div>')
+    .replace(/\n/g,'<br>');
 }
 </script>
 </body>
