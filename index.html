@@ -73,7 +73,7 @@ body.ch #cd{transform:translate(-50%,-50%) scale(0)}
 #wa-btn:hover + #wa-tooltip{opacity:1}
 
 /* NAV */
-nav{position:fixed;inset:0 0 auto;z-index:200;padding:18px 40px;display:flex;align-items:center;justify-content:space-between;transition:background .3s,border-color .3s,padding .3s}
+nav{position:fixed;inset:0 0 auto;z-index:200;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:background .3s,border-color .3s,padding .3s}
 nav.sol{background:rgba(255,255,255,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--bd);padding:13px 40px}
 .nlogo{font-family:"Bricolage Grotesque",sans-serif;font-size:15px;font-weight:700;cursor:none;transition:opacity .2s;color:var(--navy)}
 .nlogo:hover{opacity:.7}
@@ -82,7 +82,7 @@ nav.dk .nlogo{color:rgba(255,255,255,.9)}
 nav.dk:not(.sol) .nlogo em{color:var(--gn)}
 nav.dk.sol .nlogo{color:var(--navy)}
 nav.dk.sol .nlogo em{color:var(--gm)}
-.nlinks{display:flex;align-items:center;gap:2px}
+.nlinks{display:flex;align-items:center;gap:2px;flex:1;justify-content:flex-end}
 .nl{font-size:13px;font-weight:500;padding:6px 10px;border-radius:7px;cursor:none;color:var(--mu);transition:color .15s,background .15s}
 .nl:hover{color:var(--navy);background:rgba(0,0,0,.04)}
 nav.dk:not(.sol) .nl{color:rgba(255,255,255,.6)}
@@ -768,10 +768,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 .testi-name{font-size:14px;font-weight:700;color:var(--navy)}
 .testi-role{font-size:12px;color:var(--mu);margin-top:2px}
 
-/* ALIADOS */
-.aliados-row{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;align-items:center}
-.aliado-logo{background:#fff;border:1.5px solid var(--bd);border-radius:10px;padding:12px 20px;font-size:12px;font-weight:700;color:var(--mu);text-align:center;line-height:1.4;min-width:120px;transition:border-color .2s}
-.aliado-logo:hover{border-color:var(--gm);color:var(--g)}
+
 
 /* HERO PATHS IMPROVED */
 .hero-path{background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.2);border-radius:16px;padding:20px 24px;cursor:pointer;text-align:center;transition:all .25s;min-width:160px;text-decoration:none;display:block}
@@ -982,18 +979,18 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       <div class="hero-paths" id="hbtns">
         <a class="hero-path" onclick="go('donar')">
           <div class="hero-path-icon">🤝</div>
-          <div class="hero-path-title">Quiero donar</div>
-          <div class="hero-path-sub">Como persona natural</div>
+          <div class="hero-path-title" id="hpath-don-t">Quiero donar</div>
+          <div class="hero-path-sub" id="hpath-don-s">Como persona natural</div>
         </a>
         <a class="hero-path" onclick="go('empresas')">
           <div class="hero-path-icon">🏢</div>
-          <div class="hero-path-title">RSE empresarial</div>
-          <div class="hero-path-sub">Para mi empresa</div>
+          <div class="hero-path-title" id="hpath-emp-t">RSE empresarial</div>
+          <div class="hero-path-sub" id="hpath-emp-s">Para mi empresa</div>
         </a>
         <a class="hero-path" onclick="go('fundaciones')">
           <div class="hero-path-icon">🤲</div>
-          <div class="hero-path-title">Somos fundación</div>
-          <div class="hero-path-sub">Quiero unirme al Hub</div>
+          <div class="hero-path-title" id="hpath-fun-t">Somos fundación</div>
+          <div class="hero-path-sub" id="hpath-fun-s">Quiero unirme al Hub</div>
         </a>
       </div>
     </div>
@@ -1084,19 +1081,6 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
   </section>
 
   
-  <!-- ALIADOS -->
-  <section class="sec" style="padding:40px 0;border-top:1px solid var(--bd)">
-    <div class="wrap" style="text-align:center">
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mu);margin-bottom:24px" class="rv">Con el respaldo de</div>
-      <div class="aliados-row rv d2">
-        <div class="aliado-logo">Bancolombia</div>
-        <div class="aliado-logo">Compartamos<br>con Colombia</div>
-        <div class="aliado-logo">Cámara de Comercio<br>Medellín</div>
-        <div class="aliado-logo">+ 25 Fundaciones<br>preaprobadas</div>
-      </div>
-    </div>
-  </section>
-
   <section class="manifiesto" style="background:var(--cream)">
     <div class="wrap">
       <div class="manif-grid">
@@ -1668,9 +1652,9 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
   <section class="sec">
     <div class="wrap">
-      <div class="ey rv">Calculadora de impacto</div>
-      <h2 class="stit rv d1">¿Cuánto impacto genera tu aporte?</h2>
-      <p class="slead rv d2">Ajusta el monto y la categoría. Ve el impacto real en números concretos.</p>
+      <div class="ey rv" id="calc-ey">Calculadora de impacto</div>
+      <h2 class="stit rv d1" id="calc-h2">¿Cuánto impacto genera tu aporte?</h2>
+      <p class="slead rv d2" id="calc-p">Ajusta el monto y la categoría. Ve el impacto real en números concretos.</p>
 
       <div class="calc-card rv d3">
 
@@ -1708,7 +1692,19 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
             <button class="cc-cat" onclick="setCat(this,'materiales')">👕 Materiales</button>
           </div>
 
-          <div class="cc-amount-box">
+          <div style="margin-bottom:10px">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mu);display:block;margin-bottom:6px">O ingresa un monto exacto:</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" id="calc-manual-input" placeholder="Ej: 50000"
+              min="0" step="1000"
+              oninput="setManualAmt(this.value)"
+              style="flex:1;border:1.5px solid var(--bd);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--navy);background:#fff;outline:none;font-family:inherit;transition:border-color .2s"
+              onfocus="this.style.borderColor='var(--g)'"
+              onblur="this.style.borderColor='var(--bd)'">
+            <span id="calc-manual-lbl" style="font-size:13px;font-weight:700;color:var(--mu);flex-shrink:0;min-width:32px">COP</span>
+          </div>
+        </div>
+        <div class="cc-amount-box">
             <div id="calc-display">$25.000 COP</div>
             <div id="rate-note" style="display:none;font-size:12px;color:var(--mu);margin-top:4px">Tasa referencial: 1 USD ≈ $4.200 COP</div>
           </div>
@@ -2613,15 +2609,15 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
   <!-- NEWSLETTER / LISTA DE ESPERA -->
   <section class="sec" style="background:var(--navy);padding:60px 0">
     <div class="wrap" style="max-width:620px;text-align:center">
-      <div class="ey eyw rv" style="justify-content:center">Lanzamiento · Julio 2026 · Medellín</div>
-      <h2 class="stit rv d1" style="color:#fff;font-size:clamp(24px,3.5vw,38px)">Sé parte del lanzamiento de Give&Grow</h2>
+      <div class="ey eyw rv" id="nl-ey" style="justify-content:center">Lanzamiento · Julio 2026 · Medellín</div>
+      <h2 class="stit rv d1" id="nl-h2" style="color:#fff;font-size:clamp(24px,3.5vw,38px)">Sé parte del lanzamiento de Give&Grow</h2>
       <p class="rv d2" style="color:rgba(255,255,255,.6);font-size:16px;max-width:480px;margin:0 auto 28px;line-height:1.7">Déjanos tu correo y serás el primero en saber la fecha, el lugar y cómo participar.</p>
       <form action="https://formspree.io/f/maqzzlwe" method="POST" class="nl-form rv d3">
         <input type="hidden" name="_subject" value="Nueva suscripción lista de lanzamiento Give&Grow">
         <div class="nl-form-row">
           <input type="text" name="nombre" placeholder="Tu nombre" required class="nl-input">
           <input type="email" name="email" placeholder="Tu correo" required class="nl-input">
-          <button type="submit" class="nl-btn">Quiero participar →</button>
+          <button type="submit" class="nl-btn" id="nl-btn">Quiero participar →</button>
         </div>
         <p style="font-size:12px;color:rgba(255,255,255,.3);margin-top:12px">Sin spam. Solo te escribimos cuando hay algo importante.</p>
       </form>
@@ -2907,22 +2903,22 @@ function valToSlider(val){
   }
 }
 
-function fmtMoney(cop){
+function fmtMoney(val){
+  /* val is already in current currency (USD or COP) */
   if(CURR==='USD'){
-    var usd=cop/USD_RATE;
-    return 'USD '+(usd<10?usd.toFixed(2):Math.round(usd).toLocaleString('es-CO'));
+    return 'USD '+(val<10?val.toFixed(2):Math.round(val).toLocaleString('es-CO'));
   }
-  return '$'+Math.round(cop).toLocaleString('es-CO')+' COP';
+  return '$'+Math.round(val).toLocaleString('es-CO')+' COP';
 }
 
-function fmtShort(cop){
+function fmtShort(val){
+  /* val is already in current currency */
   if(CURR==='USD'){
-    var usd=cop/USD_RATE;
-    return 'USD '+(usd>=1000?(usd/1000).toFixed(1)+'K':Math.round(usd));
+    return 'USD '+(val>=1000?(val/1000).toFixed(1)+'K':Math.round(val));
   }
-  if(cop>=1000000) return '$'+(cop/1000000).toFixed(1)+'M';
-  if(cop>=1000) return '$'+(cop/1000).toFixed(0)+'K';
-  return '$'+cop;
+  if(val>=1000000) return '$'+(val/1000000).toFixed(1)+'M';
+  if(val>=1000) return '$'+(val/1000).toFixed(0)+'K';
+  return '$'+Math.round(val);
 }
 
 function calcImpactByCat(usdVal, cat){
@@ -3031,6 +3027,8 @@ function setCurrency(c){
   document.getElementById('btn-cop').classList.toggle('active',c==='COP');
   document.getElementById('btn-usd').classList.toggle('active',c==='USD');
   document.getElementById('rate-note').style.display=c==='USD'?'block':'none';
+  var ml=document.getElementById('calc-manual-lbl');if(ml)ml.textContent=c;
+  var mi=document.getElementById('calc-manual-input');if(mi)mi.value='';
   document.getElementById('calc-slider').value=25;
   updateRangeHints();
   calcUpdate();
@@ -3078,10 +3076,10 @@ function calcEmpresa(){
 
 /* GALLERY + LIGHTBOX */
 var GALLERY_ITEMS = [
-  {src:'/img/campo_01.jpg',caption:'La Guajira, junio 2024 — Jornada de campo',cat:'La Guajira',year:'2024'},
-  {src:'/img/campo_02.jpg',caption:'Primera visita 2023 — Trabajo comunitario',cat:'Campo',year:'2023'},
-  {src:'/img/campo_03.jpg',caption:'Septiembre 2023 — Comunidad rural',cat:'Campo',year:'2023'},
-  {src:'/img/campo_04.jpg',caption:'Comunidad 2024 — Apoyo comunitario',cat:'Comunidad',year:'2024'},
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_01.jpg',caption:'La Guajira, junio 2024 — Jornada de campo',cat:'La Guajira',year:'2024'},
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_02.jpg',caption:'Primera visita 2023 — Trabajo comunitario',cat:'Campo',year:'2023'},
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_03.jpg',caption:'Septiembre 2023 — Comunidad rural',cat:'Campo',year:'2023'},
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_04.jpg',caption:'Comunidad 2024 — Apoyo comunitario',cat:'Comunidad',year:'2024'},
   {src:'https://drive.google.com/thumbnail?id=13adwbnJheItNzlbJpZRZBAEW8FsFu29g&sz=w800',caption:'La Guajira, enero 2025 — 50+ niños Wayuu',cat:'La Guajira',year:'2025'},
   {src:'https://drive.google.com/thumbnail?id=1D4MwWsnTV4GCtSEL-5h-O1vrIkvk7LbM&sz=w800',caption:'La Guajira, junio 2024 — Sebas con comunidad',cat:'La Guajira',year:'2024'}
 ];
@@ -3429,6 +3427,66 @@ var T = {
   /* ALMA */
   'alma-title': {es:'ALMA — Asistente de Labor Misional y Alianzas', en:'ALMA — Missional Labor and Alliance Assistant'},
   'alma-sub':   {es:'Pregúntale a ALMA cualquier cosa sobre Give&Grow, el Hub, las donaciones, el Programa de Gratitud o cómo vincularte.', en:'Ask ALMA anything about Give&Grow, the Hub, donations, the Gratitude Program, or how to get involved.'},
+  /* ── COMPLETE TRANSLATIONS ── */
+  /* Nav */
+  'nl-origen':   {es:'El Origen', en:'Our Origin'},
+  'nl-hub':      {es:'El Hub', en:'The Hub'},
+  'nl-empresas': {es:'Empresas', en:'Companies'},
+  'nl-fundaciones':{es:'Fundaciones', en:'Foundations'},
+  'nl-gratitud': {es:'Gratitud', en:'Gratitude'},
+  'nl-impacto':  {es:'Impacto', en:'Impact'},
+  'nl-alma':     {es:'ALMA', en:'ALMA'},
+  'nb-donar':    {es:'Donar ahora', en:'Donate now'},
+
+  /* Home hero */
+  'htxt':        {es:'Dar para crecer,<br>crecer para dar más.', en:'Give to grow,<br>grow to give more.'},
+  'hsub':        {es:'Conectamos generosidad con necesidad de forma estratégica y sostenible. No reemplazamos — amplificamos. Y aquí, quien da también crece.', en:'We connect generosity with need strategically and sustainably. We do not replace — we amplify. And here, those who give also grow.'},
+
+  /* Hero path buttons */
+  'hpath-don-t': {es:'Quiero donar', en:'I want to donate'},
+  'hpath-don-s': {es:'Como persona natural', en:'As an individual'},
+  'hpath-emp-t': {es:'RSE empresarial', en:'Corporate CSR'},
+  'hpath-emp-s': {es:'Para mi empresa', en:'For my company'},
+  'hpath-fun-t': {es:'Somos fundación', en:'We are a foundation'},
+  'hpath-fun-s': {es:'Quiero unirme al Hub', en:'I want to join the Hub'},
+
+  /* Section labels */
+  'ey-manif':    {es:'Nuestra razón de existir', en:'Our reason to exist'},
+  'ey-hub':      {es:'El corazón del modelo', en:'The heart of the model'},
+  'ey-origen':   {es:'El fundador', en:'The founder'},
+  'ey-donar':    {es:'Haz tu primera donación', en:'Make your first donation'},
+  'ey-empresas': {es:'Empresas RSE', en:'Corporate CSR'},
+  'ey-impacto':  {es:'Evidencia real', en:'Real evidence'},
+  'ey-alma-pg':  {es:'ImpactOS', en:'ImpactOS'},
+  'ey-gratitud': {es:'Para quienes apoyan Give&Grow', en:'For those who support Give&Grow'},
+
+  /* Main titles */
+  'don-h1':      {es:'Aquí quien da,<br>también crece.', en:'Here, those who give<br>also grow.'},
+  'don-p':       {es:'Tu donación llega a comunidades reales con trazabilidad completa. Tú ves exactamente cómo impacta. Y el Estado te devuelve el 25% como descuento en renta.', en:'Your donation reaches real communities with full traceability. You see exactly how it impacts. And the government gives you a 25% tax credit.'},
+  'hub-h1':      {es:'El Compassion Hub', en:'The Compassion Hub'},
+  'origen-h1':   {es:'La historia detrás de Give&Grow', en:'The story behind Give&Grow'},
+  'empresas-h1': {es:'Haz que tu empresa<br>sea parte del cambio.', en:'Make your company<br>part of the change.'},
+  'impacto-h1':  {es:'Nuestro trabajo, en imágenes, mapas y palabras.', en:'Our work, in photos, maps and words.'},
+  'alma-h1':     {es:'ALMA — Asistente de Labor Misional y Alianzas', en:'ALMA — Missional Labor & Alliance Assistant'},
+  'alma-sub':    {es:'Pregúntale a ALMA cualquier cosa sobre Give&Grow, el Hub, las donaciones, el Programa de Gratitud o cómo vincularte.', en:'Ask ALMA anything about Give&Grow, the Hub, donations, the Gratitude Program, or how to get involved.'},
+
+  /* Calculator */
+  'calc-ey':     {es:'Calculadora de impacto', en:'Impact calculator'},
+  'calc-h2':     {es:'¿Cuánto impacto genera tu aporte?', en:'How much impact does your contribution generate?'},
+  'calc-p':      {es:'Ajusta el monto y la categoría. Ve el impacto real en números concretos.', en:'Adjust the amount and category. See real impact in concrete numbers.'},
+
+  /* Newsletter */
+  'nl-ey':       {es:'Lanzamiento · Julio 2026 · Medellín', en:'Launch · July 2026 · Medellín'},
+  'nl-h2':       {es:'Sé parte del lanzamiento de Give&Grow', en:'Be part of the Give&Grow launch'},
+  'nl-p':        {es:'Déjanos tu correo y serás el primero en saber la fecha, el lugar y cómo participar.', en:'Leave us your email and be the first to know the date, venue and how to participate.'},
+  'nl-btn':      {es:'Quiero participar →', en:'I want to participate →'},
+
+  /* Donar bank */
+  'don-bank-title': {es:'Transferencia bancaria Bancolombia', en:'Bancolombia bank transfer'},
+
+  /* Gratitud */
+  'grat-h1':     {es:'Programa de Gratitud', en:'Gratitude Program'},
+
   /* DONAR PAGE */
   'nb-donar':   {es:'Donar ahora', en:'Donate now'},
   'don-bank-title': {es:'Transferencia bancaria Bancolombia', en:'Bancolombia bank transfer'},
@@ -3441,15 +3499,21 @@ var T = {
 
 function setLang(l) {
   LANG = l;
-  document.getElementById('lbtn-es').classList.toggle('active', l==='es');
-  document.getElementById('lbtn-en').classList.toggle('active', l==='en');
+  var esBtn = document.getElementById('lbtn-es');
+  var enBtn = document.getElementById('lbtn-en');
+  if(esBtn) esBtn.classList.toggle('active', l==='es');
+  if(enBtn) enBtn.classList.toggle('active', l==='en');
+  // ID-based translations
   Object.keys(T).forEach(function(id) {
     var el = document.getElementById(id) || document.querySelector('[data-i18n="'+id+'"]');
-    if (el && T[id][l] !== undefined) {
+    if (el && T[id] && T[id][l] !== undefined) {
       el.innerHTML = T[id][l];
     }
   });
-  // Update HTML lang attribute
+  // data-es/data-en attribute translations
+  document.querySelectorAll('[data-es]').forEach(function(el) {
+    if (el.dataset && el.dataset[l]) el.innerHTML = el.dataset[l];
+  });
   document.documentElement.lang = l;
 }
 
@@ -3464,6 +3528,22 @@ function almaFmt(t){
     .replace(/^(\d+)\. (.+)$/gm,'<div style="display:flex;gap:7px;margin:3px 0;line-height:1.6"><span style="color:var(--g);font-weight:700;flex-shrink:0;min-width:16px">$1.</span><span>$2</span></div>')
     .replace(/\n\n/g,'<div style="height:8px"></div>')
     .replace(/\n/g,'<br>');
+}
+
+function setManualAmt(val) {
+  val = parseFloat(val);
+  if (!val || val <= 0) return;
+  var copMin=5000,copMax=20000000,usdMin=1,usdMax=5000;
+  var pos;
+  if (CURR === 'COP') {
+    val = Math.max(copMin, Math.min(copMax, val));
+    pos = Math.round(Math.log(val/copMin) / Math.log(copMax/copMin) * 100);
+  } else {
+    val = Math.max(usdMin, Math.min(usdMax, val));
+    pos = Math.round(Math.log(val/usdMin) / Math.log(usdMax/usdMin) * 100);
+  }
+  var sl = document.getElementById('calc-slider');
+  if (sl) { sl.value = pos; calcUpdate(); }
 }
 </script>
 </body>
