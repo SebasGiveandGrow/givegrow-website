@@ -714,6 +714,41 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 .lbtn{border:none;background:none;font-size:12px;font-weight:700;cursor:pointer;padding:5px 8px;border-radius:4px;color:rgba(255,255,255,.5);transition:all .18s;letter-spacing:.2px}
 .lbtn.active{color:#fff;background:rgba(255,255,255,.18);transform:none}
 .lsep{color:rgba(255,255,255,.25);font-size:12px}
+
+/* NAV DROPDOWNS */
+.nl-wrap{position:relative;display:inline-block}
+.nl-wrap > .nl{display:flex;align-items:center;gap:4px;cursor:pointer}
+.nl-wrap > .nl::after{content:"▾";font-size:9px;opacity:.6;margin-top:1px;transition:transform .2s}
+.nl-wrap:hover > .nl::after{transform:rotate(180deg)}
+.nl-dd{
+  position:absolute;top:calc(100% + 8px);left:50%;
+  transform:translateX(-50%);
+  background:#fff;border-radius:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,.12),0 0 0 1px rgba(0,0,0,.05);
+  padding:6px;min-width:200px;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .18s,transform .18s;
+  transform:translateX(-50%) translateY(6px);
+  z-index:200;
+}
+.nl-wrap:hover .nl-dd{
+  opacity:1;visibility:visible;pointer-events:all;
+  transform:translateX(-50%) translateY(0);
+}
+.nl-dd::before{
+  content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-bottom-color:#fff;
+  border-top:none;filter:drop-shadow(0 -2px 1px rgba(0,0,0,.05));
+}
+.nl-ddi{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 12px;border-radius:8px;
+  font-size:13px;font-weight:600;color:var(--navy);
+  cursor:pointer;transition:background .15s;white-space:nowrap;
+}
+.nl-ddi:hover{background:var(--gl);color:var(--g)}
+.nl-ddi-icon{font-size:15px;flex-shrink:0}
+@media(max-width:1024px){.nl-wrap .nl-dd{display:none}}
 </style>
 <script type="application/ld+json">
 {
@@ -830,13 +865,52 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 <nav id="nav" class="dk">
   <div class="nlogo" onclick="go('inicio')">Give<em>&</em>Grow International</div>
   <div class="nlinks">
-    <span class="nl" onclick="go('origen')" id="nl-origen">El Origen</span>
-    <span class="nl" onclick="go('hub')" id="nl-hub">El Hub</span>
-    <span class="nl" onclick="go('empresas')" id="nl-empresas">Empresas</span>
-    <span class="nl" onclick="go('fundaciones')" id="nl-fundaciones">Fundaciones</span>
-    <span class="nl" onclick="go('gratitud')" id="nl-gratitud">Gratitud</span>
-    <span class="nl" onclick="go('impacto')" id="nl-impacto">Impacto</span>
+
+    <div class="nl-wrap">
+      <span class="nl" onclick="go('origen')" id="nl-origen">El Origen</span>
+      <div class="nl-dd">
+        <div class="nl-ddi" onclick="go('origen')"><span class="nl-ddi-icon">📖</span>La historia</div>
+        <div class="nl-ddi" onclick="go('hub')"><span class="nl-ddi-icon">💡</span>La idea detrás</div>
+      </div>
+    </div>
+
+    <div class="nl-wrap">
+      <span class="nl" onclick="go('hub')" id="nl-hub">El Hub</span>
+      <div class="nl-dd">
+        <div class="nl-ddi" onclick="go('hub')"><span class="nl-ddi-icon">🏠</span>Compassion Hub</div>
+        <div class="nl-ddi" onclick="go('hub')"><span class="nl-ddi-icon">🔀</span>Las 5 rutas</div>
+        <div class="nl-ddi" onclick="go('fundaciones')"><span class="nl-ddi-icon">🤲</span>Para fundaciones</div>
+      </div>
+    </div>
+
+    <div class="nl-wrap">
+      <span class="nl" onclick="go('empresas')" id="nl-empresas">Empresas</span>
+      <div class="nl-dd">
+        <div class="nl-ddi" onclick="go('empresas')"><span class="nl-ddi-icon">📦</span>Paquetes RSE</div>
+        <div class="nl-ddi" onclick="go('empresas')"><span class="nl-ddi-icon">🚌</span>Impact Journey</div>
+        <div class="nl-ddi" onclick="go('empresas')"><span class="nl-ddi-icon">🧮</span>Simulador</div>
+      </div>
+    </div>
+
+    <div class="nl-wrap">
+      <span class="nl" onclick="go('gratitud')" id="nl-gratitud">Gratitud</span>
+      <div class="nl-dd">
+        <div class="nl-ddi" onclick="go('gratitud')"><span class="nl-ddi-icon">🎁</span>Beneficios</div>
+        <div class="nl-ddi" onclick="go('gratitud')"><span class="nl-ddi-icon">🏪</span>Directorio</div>
+      </div>
+    </div>
+
+    <div class="nl-wrap">
+      <span class="nl" onclick="go('impacto')" id="nl-impacto">Impacto</span>
+      <div class="nl-dd">
+        <div class="nl-ddi" onclick="go('impacto')"><span class="nl-ddi-icon">📸</span>Galería de campo</div>
+        <div class="nl-ddi" onclick="go('impacto')"><span class="nl-ddi-icon">🗺️</span>Mapa de aliados</div>
+        <div class="nl-ddi" onclick="go('impacto')"><span class="nl-ddi-icon">📖</span>Blog del campo</div>
+      </div>
+    </div>
+
     <span class="nl" onclick="go('alma')" id="nl-alma">ALMA</span>
+
     <button class="ndon" id="nb-donar" onclick="go('donar')">Donar ahora</button>
   </div>
   <div class="lang-sw">
