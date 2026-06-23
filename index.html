@@ -603,6 +603,51 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 #alma-msgs::-webkit-scrollbar-track{background:transparent}
 #alma-msgs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
 
+
+/* ══ IMPACTO ACCORDION ══ */
+.impacto-section{border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;margin-bottom:12px}
+.impacto-toggle{width:100%;padding:18px 22px;background:#fff;border:none;font-size:16px;font-weight:700;color:var(--navy);cursor:pointer;display:flex;justify-content:space-between;align-items:center;text-align:left;transition:background .2s}
+.impacto-toggle:hover{background:var(--gl)}
+.impacto-arrow{font-size:13px;color:var(--g);transition:transform .25s}
+.impacto-arrow.open{transform:rotate(180deg)}
+.impacto-body{padding:20px 22px;border-top:1px solid var(--bd);background:#fafaf8}
+
+/* ══ EMPRESAS PAGE ══ */
+.emp-pkgs{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:36px}
+.emp-pkg{background:#fff;border:1.5px solid var(--bd);border-radius:var(--rl);padding:28px 24px;text-align:center;position:relative;display:flex;flex-direction:column;gap:12px}
+.emp-pkg.featured{border-color:var(--g);box-shadow:0 8px 32px rgba(46,125,79,.12)}
+.emp-pkg-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mu);background:var(--cream);border-radius:20px;padding:4px 12px;display:inline-block}
+.featured-tag{color:var(--g)!important;background:var(--gl)!important}
+.emp-pkg-icon{font-size:36px}
+.emp-pkg-name{font-size:20px;font-weight:800;color:var(--navy)}
+.emp-pkg-price{font-size:14px;color:var(--mu)}
+.emp-pkg-price strong{color:var(--navy);font-size:16px}
+.emp-pkg-net{font-size:12px;color:var(--g);font-weight:600;background:var(--gl);padding:4px 10px;border-radius:8px}
+.emp-pkg-list{text-align:left;font-size:13px;color:var(--mu);line-height:1.9;list-style:none;padding:0;margin:0;flex:1}
+.ij-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:var(--rl);padding:24px;text-align:center}
+.ij-title{font-size:17px;font-weight:700;color:#fff;margin-bottom:10px}
+.ij-text{font-size:14px;color:rgba(255,255,255,.6);line-height:1.7}
+@media(max-width:768px){.emp-pkgs{grid-template-columns:1fr}}
+
+/* ══ HERO 3 PATHS ══ */
+.hero-paths{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px}
+.hero-path{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);border-radius:14px;padding:18px 22px;cursor:pointer;text-align:center;transition:all .2s;min-width:160px;text-decoration:none}
+.hero-path:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4);transform:translateY(-2px)}
+.hero-path-icon{font-size:28px;margin-bottom:8px}
+.hero-path-title{font-size:14px;font-weight:700;color:#fff}
+.hero-path-sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:3px}
+
+/* ══ PAYMENT OPTIONS ══ */
+.payment-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+.pay-opt{border:1.5px solid var(--bd);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:#fff}
+.pay-opt:hover{border-color:var(--g);box-shadow:0 4px 12px rgba(46,125,79,.1)}
+.pay-opt.active{border-color:var(--g);background:var(--gl)}
+.pay-opt-icon{font-size:28px;margin-bottom:8px}
+.pay-opt-name{font-size:13px;font-weight:700;color:var(--navy)}
+.pay-opt-sub{font-size:11px;color:var(--mu);margin-top:3px}
+.pay-detail{border-top:1px solid var(--bd);padding-top:20px;margin-top:4px}
+@media(max-width:500px){.payment-grid{grid-template-columns:1fr}}
+
 /* BANK INFO SECTION */
 .don-bank-wrap{background:var(--gl);border:1.5px solid rgba(46,125,79,.2);border-radius:var(--rl);padding:28px;margin-bottom:0}
 .don-bank-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:22px;flex-wrap:wrap}
@@ -785,18 +830,19 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 <nav id="nav" class="dk">
   <div class="nlogo" onclick="go('inicio')">Give<em>&</em>Grow International</div>
   <div class="nlinks">
-    <span class="nl" onclick="go('quees')" id="nl-quees">¿Qué es?</span>
-    <span class="nl" onclick="go('hub')" id="nl-hub">Hub</span>
-    <span class="nl" onclick="go('gratitud')" id="nl-gratitud">Programa de Gratitud</span>
-    <span class="nl" onclick="go('donar')" id="nl-donar">Apoyar</span>
-    <span class="nl" onclick="go('transparencia')" id="nl-transp">Transparencia</span>
-    <span class="nl" onclick="go('contacto')" id="nl-contacto">Contacto</span>
-    <span class="nl" onclick="go('hub-apply')" id="nl-apply">Aplicar al Hub</span>
-    <span class="nl" onclick="go('blog')" id="nl-blog">Blog</span>
-    <span class="nl" onclick="go('galeria')" id="nl-galeria">Galería</span>
-    <span class="nl" onclick="go('mapa')" id="nl-mapa">Mapa</span>
+    <span class="nl" onclick="go('origen')" id="nl-origen">El Origen</span>
+    <span class="nl" onclick="go('hub')" id="nl-hub">El Hub</span>
+    <span class="nl" onclick="go('empresas')" id="nl-empresas">Empresas</span>
+    <span class="nl" onclick="go('fundaciones')" id="nl-fundaciones">Fundaciones</span>
+    <span class="nl" onclick="go('gratitud')" id="nl-gratitud">Gratitud</span>
+    <span class="nl" onclick="go('impacto')" id="nl-impacto">Impacto</span>
     <span class="nl" onclick="go('alma')" id="nl-alma">ALMA</span>
     <button class="ndon" id="nb-donar" onclick="go('donar')">Donar ahora</button>
+  </div>
+  <div class="lang-sw">
+    <button id="lbtn-es" class="lbtn active" onclick="setLang('es')">ES</button>
+    <span class="lsep">|</span>
+    <button id="lbtn-en" class="lbtn" onclick="setLang('en')">EN</button>
   </div>
   <div class="lang-sw">
     <button id="lbtn-es" class="lbtn active" onclick="setLang('es')">ES</button>
@@ -807,7 +853,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 </nav>
 <!-- MOBILE MENU -->
 <div class="mob-menu" id="mob-menu">
-  <div class="mm-link" onclick="go('quees');closeMenu()">¿Qué es?</div>
+  <div class="mm-link" onclick="go('origen');closeMenu()">¿Qué es?</div>
   <div class="mm-link" onclick="go('hub');closeMenu()">Compassion Hub</div>
   <div class="mm-link" onclick="go('gratitud');closeMenu()">Programa de Gratitud</div>
   <div class="mm-link" onclick="go('donar');closeMenu()">Cómo apoyar</div>
@@ -825,9 +871,22 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       <div class="htag"><span class="hdot"></span>Medellín, Colombia · ESAL · NIT 901.948.930-2</div>
       <h1 id="htxt" style="font-family:'Fraunces',serif;font-style:italic;font-weight:300;font-size:clamp(52px,8.5vw,108px);color:#fff;line-height:1.07"></h1>
       <p class="hsub" id="hsub">Conectamos generosidad con necesidad de forma estratégica y sostenible. No reemplazamos — amplificamos. Y aquí, quien da también crece.</p>
-      <div class="hbtns" id="hbtns">
-        <a class="btn btn-wo arr" onclick="go('donar')">Quiero apoyar</a>
-        <a class="btn btn-wo" style="background:rgba(255,255,255,.1)" onclick="go('gratitud')">Programa de Gratitud</a>
+      <div class="hero-paths" id="hbtns">
+        <a class="hero-path" onclick="go('donar')">
+          <div class="hero-path-icon">🤝</div>
+          <div class="hero-path-title">Quiero donar</div>
+          <div class="hero-path-sub">Como persona natural</div>
+        </a>
+        <a class="hero-path" onclick="go('empresas')">
+          <div class="hero-path-icon">🏢</div>
+          <div class="hero-path-title">RSE empresarial</div>
+          <div class="hero-path-sub">Para mi empresa</div>
+        </a>
+        <a class="hero-path" onclick="go('fundaciones')">
+          <div class="hero-path-icon">🤲</div>
+          <div class="hero-path-title">Somos fundación</div>
+          <div class="hero-path-sub">Quiero unirme al Hub</div>
+        </a>
       </div>
     </div>
     <div class="hscrl"><div class="hsl"></div>Scroll</div>
@@ -971,7 +1030,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 </div>
 
 <!-- ═══════════ QUÉ ES ═══════════ -->
-<div class="page" id="page-quees">
+<div class="page" id="page-origen">
   <div style="height:80px;background:var(--navy)"></div>
   <section class="sec sec-d" style="padding-top:52px">
     <div class="wrap">
@@ -1245,7 +1304,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       </div>
 
       <div style="margin-top:32px;text-align:center" class="rv d5">
-        <a class="btn btn-g arr" onclick="go('hub-apply')">Aplicar al Hub como fundación</a>
+        <a class="btn btn-g arr" onclick="go('fundaciones')">Aplicar al Hub como fundación</a>
       </div>
     </div>
   </section>
@@ -1391,11 +1450,30 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       <div class="don-bank-wrap rv">
         <div class="don-bank-header">
           <div>
-            <div class="ey">Cómo donar</div>
-            <h2 style="font-size:clamp(20px,2.5vw,28px);font-weight:700;color:var(--navy);margin:6px 0 4px">Transferencia bancaria Bancolombia</h2>
-            <p style="font-size:14px;color:var(--mu)">Rápido, seguro y con trazabilidad completa desde el primer día.</p>
+            <div class="ey">Formas de donar</div>
+            <h2 style="font-size:clamp(20px,2.5vw,28px);font-weight:700;color:var(--navy);margin:6px 0 4px">Elige cómo quieres apoyar</h2>
+            <p style="font-size:14px;color:var(--mu)">Todas las opciones incluyen certificado tributario Art. 257 ET y trazabilidad completa.</p>
           </div>
           <div class="don-bank-badge">Art. 257 ET<br><span>25% menos en impuestos</span></div>
+        </div>
+
+        <!-- PAYMENT METHOD SELECTOR -->
+        <div class="payment-grid">
+          <div class="pay-opt active" onclick="showPayMethod('bancolombia',this)">
+            <div class="pay-opt-icon">🏦</div>
+            <div class="pay-opt-name">Bancolombia</div>
+            <div class="pay-opt-sub">Transferencia PSE</div>
+          </div>
+          <div class="pay-opt" onclick="showPayMethod('paypal',this)">
+            <div class="pay-opt-icon">🌐</div>
+            <div class="pay-opt-name">PayPal</div>
+            <div class="pay-opt-sub">Internacional · USD</div>
+          </div>
+          <div class="pay-opt" onclick="showPayMethod('mercadopago',this)">
+            <div class="pay-opt-icon">💳</div>
+            <div class="pay-opt-name">MercadoPago</div>
+            <div class="pay-opt-sub">Tarjeta · PSE · Efecty</div>
+          </div>
         </div>
 
         <div class="don-bank-grid">
@@ -1425,9 +1503,41 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
           </div>
         </div>
 
-        <div class="don-bank-next">
-          <div style="font-weight:700;color:var(--navy);margin-bottom:8px">Después de transferir:</div>
-          <p style="font-size:14px;color:var(--mu);margin:0">Envía el comprobante a <a href="mailto:sebas@thegiveandgrowproject.org" style="color:var(--g);font-weight:600">sebas@thegiveandgrowproject.org</a> o al WhatsApp <a href="https://wa.me/573153305028" style="color:var(--g);font-weight:600">+57 315 330 5028</a>. En menos de 24 horas recibes tu confirmación, credencial digital y certificado tributario.</p>
+        <!-- BANCOLOMBIA DETAIL -->
+        <div id="pay-bancolombia" class="pay-detail">
+          <div class="don-bank-grid">
+            <div class="don-bank-item"><div class="don-bank-label">Banco</div><div class="don-bank-value">Bancolombia</div></div>
+            <div class="don-bank-item"><div class="don-bank-label">Número de cuenta</div><div class="don-bank-value" style="cursor:pointer" onclick="copyAccount()" title="Clic para copiar" id="account-num">310 000 09221 <span style="font-size:11px;color:var(--g)">📋</span></div></div>
+            <div class="don-bank-item"><div class="don-bank-label">Tipo</div><div class="don-bank-value">Ahorros</div></div>
+            <div class="don-bank-item"><div class="don-bank-label">NIT</div><div class="don-bank-value">901.948.930-2</div></div>
+            <div class="don-bank-item" style="grid-column:1/-1"><div class="don-bank-label">Titular</div><div class="don-bank-value">Fundación Give&Grow International</div></div>
+            <div class="don-bank-item" style="grid-column:1/-1"><div class="don-bank-label">Concepto</div><div class="don-bank-value" style="color:var(--g)">Donación + tu nombre completo</div></div>
+          </div>
+          <div class="don-bank-next" style="margin-top:12px">
+            <p style="font-size:14px;color:var(--mu);margin:0">Luego envía el comprobante a <a href="mailto:sebas@thegiveandgrowproject.org" style="color:var(--g);font-weight:600">sebas@thegiveandgrowproject.org</a> o por WhatsApp <a href="https://wa.me/573153305028" style="color:var(--g);font-weight:600">+57 315 330 5028</a>.</p>
+          </div>
+        </div>
+
+        <!-- PAYPAL DETAIL -->
+        <div id="pay-paypal" class="pay-detail" style="display:none">
+          <div style="background:#f8faff;border-radius:10px;padding:20px;border:1px solid #c8d8f0;text-align:center">
+            <div style="font-size:32px;margin-bottom:12px">🌐</div>
+            <div style="font-weight:700;color:var(--navy);font-size:16px;margin-bottom:8px">Donar con PayPal</div>
+            <p style="font-size:13px;color:var(--mu);margin-bottom:16px;line-height:1.6">Acepta tarjetas de crédito internacionales y saldo PayPal. Ideal para donantes en el exterior.</p>
+            <a href="https://paypal.me/GiveGrowColombia" target="_blank" class="btn btn-g" style="margin:0 auto;display:inline-flex">Donar con PayPal →</a>
+            <p style="font-size:11px;color:var(--mu);margin-top:12px">Después de donar, escríbenos para enviarte tu certificado tributario.</p>
+          </div>
+        </div>
+
+        <!-- MERCADOPAGO DETAIL -->
+        <div id="pay-mercadopago" class="pay-detail" style="display:none">
+          <div style="background:#f0f8ff;border-radius:10px;padding:20px;border:1px solid #b8d4f0;text-align:center">
+            <div style="font-size:32px;margin-bottom:12px">💳</div>
+            <div style="font-weight:700;color:var(--navy);font-size:16px;margin-bottom:8px">Donar con MercadoPago</div>
+            <p style="font-size:13px;color:var(--mu);margin-bottom:16px;line-height:1.6">Acepta Visa, Mastercard, PSE y pago en efectivo (Efecty, Baloto). Rápido y seguro.</p>
+            <a href="https://mpago.la/givegrow" target="_blank" class="btn btn-g" style="margin:0 auto;display:inline-flex">Donar con MercadoPago →</a>
+            <p style="font-size:11px;color:var(--mu);margin-top:12px">Recibirás confirmación automática. También te enviaremos el certificado tributario por correo.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -1797,7 +1907,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 </div>
 
 <!-- ═══════════ HUB APPLY ═══════════ -->
-<div class="page" id="page-hub-apply">
+<div class="page" id="page-fundaciones">
   <div class="hub-hero">
     <div class="wrap">
       <div class="ey eyw rv">Compassion Hub</div>
@@ -2096,14 +2206,245 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
   </section>
 </div>
 
+
+<!-- ═══════════ EMPRESAS ═══════════ -->
+<div class="page" id="page-empresas">
+  <div style="height:80px;background:var(--navy)"></div>
+  <div class="don-hero" style="min-height:320px">
+    <div class="ey eyw rv" style="justify-content:center">Empresas RSE</div>
+    <h1 class="rv d1" style="max-width:600px">Haz que tu empresa<br>sea parte del cambio.</h1>
+    <p class="rv d2" style="max-width:520px">Impacto medible, experiencias reales para tu equipo y beneficio tributario del 25%. Give&Grow es el puente entre tu empresa y las comunidades que necesitan más.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:12px" class="rv d3">
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgba(255,255,255,.75)">✅ <span>25% descuento renta (Art. 257 ET)</span></div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgba(255,255,255,.75)">✅ <span>Impact Journey para tu equipo</span></div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgba(255,255,255,.75)">✅ <span>Reportes GRI verificados</span></div>
+    </div>
+  </div>
+
+  <!-- PAQUETES RSE -->
+  <section class="sec">
+    <div class="wrap">
+      <div class="ey rv">Paquetes RSE</div>
+      <h2 class="stit rv d1">Elige el nivel que corresponde a tu empresa</h2>
+      <p class="slead rv d2">Todos los paquetes incluyen trazabilidad completa, certificado tributario y visibilidad como empresa con propósito.</p>
+
+      <div class="emp-pkgs rv d3">
+
+        <div class="emp-pkg">
+          <div class="emp-pkg-tag">Entrada</div>
+          <div class="emp-pkg-icon">🤝</div>
+          <div class="emp-pkg-name">Aliado Semilla</div>
+          <div class="emp-pkg-price">Desde <strong>$500.000 COP</strong>/año</div>
+          <div class="emp-pkg-net">Costo real: ~$375.000 COP</div>
+          <ul class="emp-pkg-list">
+            <li>✓ Donación con trazabilidad completa</li>
+            <li>✓ Certificado Art. 257 ET</li>
+            <li>✓ Mención en directorio digital</li>
+            <li>✓ Acceso Programa de Gratitud</li>
+          </ul>
+          <a class="btn btn-o" href="mailto:sebas@thegiveandgrowproject.org?subject=Interés Aliado Semilla">Comenzar</a>
+        </div>
+
+        <div class="emp-pkg featured">
+          <div class="emp-pkg-tag featured-tag">Más popular</div>
+          <div class="emp-pkg-icon">⭐</div>
+          <div class="emp-pkg-name">Impact Partner</div>
+          <div class="emp-pkg-price">Desde <strong>$8.000.000 COP</strong>/año</div>
+          <div class="emp-pkg-net">Costo real: ~$6.000.000 COP</div>
+          <ul class="emp-pkg-list">
+            <li>✓ Todo de Aliado Semilla</li>
+            <li>✓ Impact Journey para tu equipo</li>
+            <li>✓ Reporte de impacto por empleado</li>
+            <li>✓ Certificado RSE personalizado</li>
+            <li>✓ Visibilidad en eventos Give&Grow</li>
+          </ul>
+          <a class="btn btn-g" href="mailto:sebas@thegiveandgrowproject.org?subject=Interés Impact Partner">Hablar con nosotros</a>
+        </div>
+
+        <div class="emp-pkg">
+          <div class="emp-pkg-tag">Premium</div>
+          <div class="emp-pkg-icon">🌟</div>
+          <div class="emp-pkg-name">Alianza Estratégica</div>
+          <div class="emp-pkg-price">Desde <strong>$25.000.000 COP</strong>/año</div>
+          <div class="emp-pkg-net">Costo real: ~$18.750.000 COP</div>
+          <ul class="emp-pkg-list">
+            <li>✓ Todo de Impact Partner</li>
+            <li>✓ Co-creación de programas</li>
+            <li>✓ Naming rights en eventos</li>
+            <li>✓ Reportes GRI completos</li>
+            <li>✓ Acceso a mesa directiva</li>
+          </ul>
+          <a class="btn btn-o" href="mailto:sebas@thegiveandgrowproject.org?subject=Interés Alianza Estratégica">Contactar</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- IMPACT JOURNEY -->
+  <section class="sec" style="background:var(--navy);color:#fff">
+    <div class="wrap">
+      <div class="ey eyw rv">El corazón del paquete empresarial</div>
+      <h2 class="stit rv d1" style="color:#fff;max-width:580px">Impact Journey: tu equipo en campo</h2>
+      <p class="slead rv d2" style="color:rgba(255,255,255,.65);max-width:560px">No es turismo social. Es una experiencia transformadora que conecta a tu equipo con realidades que cambian perspectivas, fortalecen equipos y construyen líderes más humanos.</p>
+
+      <div class="g3 rv d3" style="margin-top:36px">
+        <div class="ij-card">
+          <div style="font-size:32px;margin-bottom:12px">🚌</div>
+          <div class="ij-title">Viajan al campo</div>
+          <p class="ij-text">Tu equipo visita las comunidades donde opera Give&Grow. Ven el impacto real, conocen a las personas, y trabajan junto a ellas.</p>
+        </div>
+        <div class="ij-card">
+          <div style="font-size:32px;margin-bottom:12px">🤝</div>
+          <div class="ij-title">Trabajan junto</div>
+          <p class="ij-text">No van a observar — van a hacer. Desde jornadas de aseo y distribución de alimentos hasta talleres de formación con la comunidad.</p>
+        </div>
+        <div class="ij-card">
+          <div style="font-size:32px;margin-bottom:12px">📊</div>
+          <div class="ij-title">Reportan el impacto</div>
+          <p class="ij-text">Cada empleado recibe un reporte de su impacto personal. La empresa recibe el consolidado para su reporte de sostenibilidad GRI.</p>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:36px" class="rv">
+        <a class="btn btn-g" href="mailto:sebas@thegiveandgrowproject.org?subject=Quiero saber más del Impact Journey" style="background:#fff;color:var(--navy)">Diseñar un Impact Journey para mi empresa</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CALCULADORA RSE -->
+  <section class="sec">
+    <div class="wrap">
+      <div class="ey rv">Simula tu inversión</div>
+      <h2 class="stit rv d1">¿Cuánto inviertes y cuánto recuperas?</h2>
+      <div class="calc-card rv d3" style="max-width:640px;margin:28px auto 0">
+        <div class="cc-body">
+          <p style="font-size:14px;color:var(--mu);margin-bottom:20px;line-height:1.7">Ingresa tu presupuesto RSE anual y el número de empleados para el Impact Journey.</p>
+          <div class="cc-emp-row">
+            <div>
+              <label class="cc-emp-label">Presupuesto RSE anual (COP)</label>
+              <input type="number" id="emp2-budget" class="cc-emp-input" placeholder="Ej: 10.000.000" oninput="calcEmp2()">
+            </div>
+            <div>
+              <label class="cc-emp-label">Empleados para Impact Journey</label>
+              <input type="number" id="emp2-team" class="cc-emp-input" placeholder="Ej: 10" oninput="calcEmp2()">
+            </div>
+          </div>
+          <div id="emp2-result" style="display:none">
+            <div class="cc-outputs" style="margin-bottom:12px">
+              <div class="cc-out"><div class="cc-out-label">Paquete</div><div class="cc-out-value" id="emp2-pkg" style="font-size:14px">—</div><div class="cc-out-sub" id="emp2-pkg-sub">—</div></div>
+              <div class="cc-out"><div class="cc-out-label">Costo real</div><div class="cc-out-value" id="emp2-net">—</div><div class="cc-out-sub">Post Art. 257 ET</div></div>
+              <div class="cc-out"><div class="cc-out-label">Jornadas Impact</div><div class="cc-out-value" id="emp2-j">—</div><div class="cc-out-sub">empleados en campo</div></div>
+            </div>
+            <div id="emp2-detail" class="cc-annual"></div>
+          </div>
+          <div style="text-align:center;margin-top:16px">
+            <a class="btn btn-g" href="mailto:sebas@thegiveandgrowproject.org?subject=Quiero conocer más del RSE Give%26Grow">Hablar con el equipo</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+
+<!-- ═══════════ IMPACTO ═══════════ -->
+<div class="page" id="page-impacto">
+  <div style="height:80px;background:var(--navy)"></div>
+  <section class="sec" style="padding-top:60px">
+    <div class="wrap">
+      <div class="ey rv">Evidencia real</div>
+      <h1 class="stit rv d1" style="max-width:560px">Nuestro trabajo, en imágenes, mapas y palabras.</h1>
+      <p class="slead rv d2">Casi 4 años en campo documentados. Aquí no hay promesas — hay registros.</p>
+
+      <!-- STATS ROW -->
+      <div class="g4 rv d3" style="margin:36px 0 40px">
+        <div style="text-align:center">
+          <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;color:var(--g)" data-count="true" id="stat-anos">4</div>
+          <div style="font-size:13px;color:var(--mu);margin-top:4px">Años en campo</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;color:var(--g)">8</div>
+          <div style="font-size:13px;color:var(--mu);margin-top:4px">Poblaciones</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;color:var(--g)" id="stat-fund-imp">25+</div>
+          <div style="font-size:13px;color:var(--mu);margin-top:4px">Fundaciones preaprobadas</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;color:var(--g)">5</div>
+          <div style="font-size:13px;color:var(--mu);margin-top:4px">Rutas activas</div>
+        </div>
+      </div>
+
+      <!-- ACCORDION: GALERÍA -->
+      <div class="impacto-section rv">
+        <button class="impacto-toggle" onclick="toggleImpacto('ig')">
+          <span>📸 Galería de campo</span>
+          <span class="impacto-arrow" id="ia-ig">▼</span>
+        </button>
+        <div class="impacto-body" id="ib-ig" style="display:none">
+          <p style="font-size:14px;color:var(--mu);margin-bottom:20px">Fotografías reales de comunidades, jornadas y momentos que dieron origen a Give&Grow.</p>
+          <div class="gallery-grid" id="gallery-grid-imp"></div>
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              var gg = document.getElementById('gallery-grid-imp');
+              if(gg && typeof GALLERY_ITEMS !== 'undefined'){
+                gg.innerHTML = GALLERY_ITEMS.map(function(item,i){
+                  return '<div class="gallery-item" onclick="openLB('+i+')"><img src="'+item.src+'" alt="'+item.caption+'" loading="lazy"><div class="gallery-overlay"><div><div class="gallery-cat">'+item.cat+' · '+item.year+'</div><div class="gallery-caption">'+item.caption+'</div></div></div></div>';
+                }).join('');
+              }
+            });
+          </script>
+        </div>
+      </div>
+
+      <!-- ACCORDION: MAPA -->
+      <div class="impacto-section rv d2">
+        <button class="impacto-toggle" onclick="toggleImpacto('im')">
+          <span>🗺️ Mapa de aliados y comunidades</span>
+          <span class="impacto-arrow" id="ia-im">▼</span>
+        </button>
+        <div class="impacto-body" id="ib-im" style="display:none">
+          <div class="map-filters" style="margin-bottom:12px">
+            <button class="map-filter-btn active" onclick="filterMap('all',this)">Todos</button>
+            <button class="map-filter-btn" onclick="filterMap('hub',this)">Hub</button>
+            <button class="map-filter-btn" onclick="filterMap('foundation',this)">Fundaciones</button>
+            <button class="map-filter-btn" onclick="filterMap('community',this)">Comunidades</button>
+            <button class="map-filter-btn" onclick="filterMap('company',this)">Empresas</button>
+          </div>
+          <div id="map-aliados-imp" style="height:380px;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)"></div>
+          <div class="map-legend" style="margin-top:12px">
+            <div class="map-leg-item"><div class="map-dot" style="background:#2e7d4f"></div>Hub</div>
+            <div class="map-leg-item"><div class="map-dot" style="background:#1565C0"></div>Fundaciones</div>
+            <div class="map-leg-item"><div class="map-dot" style="background:#E65100"></div>Comunidades</div>
+            <div class="map-leg-item"><div class="map-dot" style="background:#6A1B9A"></div>Empresas</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCORDION: BLOG -->
+      <div class="impacto-section rv d3">
+        <button class="impacto-toggle" onclick="toggleImpacto('ib')">
+          <span>📖 Blog del campo</span>
+          <span class="impacto-arrow" id="ia-ib">▼</span>
+        </button>
+        <div class="impacto-body" id="ib-ib" style="display:none">
+          <div id="blog-list-imp" class="blog-grid"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+
 <!-- FOOTER -->
 <footer>
   <div class="wrap">
     <div class="fg">
       <div><div class="fl">Give<em>&</em>Grow International</div><div class="ftag">Dar para crecer,<br>crecer para dar más.</div><div class="fnit">NIT 901.948.930-2 · ESAL · Régimen Tributario Especial<br>Medellín, Antioquia, Colombia · 2025</div></div>
-      <div><div class="fth">Páginas</div><div class="flink" onclick="go('inicio')">Inicio</div><div class="flink" onclick="go('quees')">¿Qué es Give&Grow?</div><div class="flink" onclick="go('hub')">Compassion Hub</div><div class="flink" onclick="go('gratitud')">Programa de Gratitud</div></div>
+      <div><div class="fth">Páginas</div><div class="flink" onclick="go('inicio')">Inicio</div><div class="flink" onclick="go('origen')">El Origen</div><div class="flink" onclick="go('hub')">Compassion Hub</div><div class="flink" onclick="go('gratitud')">Programa de Gratitud</div></div>
       <div><div class="fth">Apoyar</div><div class="flink" onclick="go('donar')">Donar ahora</div><div class="flink" onclick="go('donar')">RSE Corporativa</div><div class="flink" onclick="go('donar')">Voluntariado</div><div class="flink" onclick="go('donar')">Membresía de Honor</div>
-<div class="flink" onclick="go('hub-apply')">Aplicar al Hub</div>
+<div class="flink" onclick="go('fundaciones')">Fundaciones</div>
 <div class="flink" onclick="go('blog')">Blog de campo</div>
 <div class="flink" onclick="go('galeria')">Galería de campo</div>
 <div class="flink" onclick="go('mapa')">Mapa de aliados</div></div>
@@ -2769,6 +3110,103 @@ async function almaSubmit(){
   almaTyping=false;
   document.getElementById('alma-btn').style.opacity='1';
   document.getElementById('alma-msgs').scrollTop = 99999;
+}
+
+
+/* PAYMENT METHOD TOGGLE */
+function showPayMethod(method, btn) {
+  document.querySelectorAll('.pay-opt').forEach(function(el){ el.classList.remove('active'); });
+  btn.classList.add('active');
+  ['bancolombia','paypal','mercadopago'].forEach(function(m){
+    var el = document.getElementById('pay-' + m);
+    if(el) el.style.display = m === method ? 'block' : 'none';
+  });
+}
+
+/* IMPACTO ACCORDION */
+function toggleImpacto(id) {
+  var body = document.getElementById('ib-' + id);
+  var arrow = document.getElementById('ia-' + id);
+  var isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if(arrow) arrow.classList.toggle('open', !isOpen);
+  // Init map/gallery when opened
+  if(!isOpen && id === 'im') {
+    setTimeout(function(){
+      if(!window.L){
+        var css=document.createElement('link');css.rel='stylesheet';
+        css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+        document.head.appendChild(css);
+        var s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+        s.onload=function(){ initMapById('map-aliados-imp'); };
+        document.head.appendChild(s);
+      } else { initMapById('map-aliados-imp'); }
+    }, 150);
+  }
+  if(!isOpen && id === 'ig') {
+    setTimeout(function(){
+      var gg = document.getElementById('gallery-grid-imp');
+      if(gg && typeof GALLERY_ITEMS !== 'undefined' && !gg.children.length){
+        gg.innerHTML = GALLERY_ITEMS.map(function(item,i){
+          return '<div class="gallery-item" onclick="openLB('+i+')"><img src="'+item.src+'" alt="'+item.caption+'" loading="lazy"><div class="gallery-overlay"><div><div class="gallery-cat">'+item.cat+' · '+item.year+'</div><div class="gallery-caption">'+item.caption+'</div></div></div></div>';
+        }).join('');
+      }
+    }, 100);
+  }
+  if(!isOpen && id === 'ib') {
+    setTimeout(function(){
+      var bl = document.getElementById('blog-list-imp');
+      if(bl && !bl.children.length) loadBlogInto('blog-list-imp');
+    }, 100);
+  }
+}
+
+function initMapById(elId) {
+  var el = document.getElementById(elId);
+  if(!el || el._mapInit) return;
+  el._mapInit = true;
+  var m = L.map(elId).setView([7.5,-74.0],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(m);
+  var data = [
+    {lat:6.2006,lng:-75.5748,type:'hub',name:'Compassion Hub',desc:'El Poblado, Medellín',color:'#2e7d4f'},
+    {lat:11.5444,lng:-72.9072,type:'community',name:'Comunidades La Guajira',desc:'Resguardos Wayuu',color:'#E65100'},
+    {lat:6.2833,lng:-75.5624,type:'community',name:'Comunas Medellín',desc:'Comunidades vulnerables',color:'#E65100'},
+    {lat:6.2518,lng:-75.5636,type:'company',name:'Empresas Aliadas',desc:'El Poblado',color:'#6A1B9A'},
+  ];
+  data.forEach(function(d){
+    var icon = L.divIcon({html:'<div style="width:12px;height:12px;border-radius:50%;background:'+d.color+';border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',iconSize:[12,12],iconAnchor:[6,6],className:''});
+    L.marker([d.lat,d.lng],{icon:icon}).addTo(m).bindPopup('<strong>'+d.name+'</strong><br><span style="font-size:12px;color:#555">'+d.desc+'</span>');
+  });
+}
+
+function loadBlogInto(elId) {
+  var el = document.getElementById(elId);
+  if(!el) return;
+  fetch('/blog.json').then(function(r){return r.json();}).then(function(d){
+    if(!d.entries) return;
+    el.innerHTML = d.entries.map(function(e){
+      return '<div class="blog-card"><div class="blog-date">'+e.date+'</div><h3 class="blog-title">'+e.title+'</h3><p class="blog-excerpt">'+e.excerpt+'</p><a class="blog-more" href="#">Leer más →</a></div>';
+    }).join('');
+  }).catch(function(){el.innerHTML='<p style="color:var(--mu);font-size:14px">Próximamente...</p>';});
+}
+
+/* EMPRESA CALC 2 */
+function calcEmp2(){
+  var budget=+document.getElementById('emp2-budget').value||0;
+  var team=+document.getElementById('emp2-team').value||0;
+  if(!budget) return;
+  document.getElementById('emp2-result').style.display='block';
+  var net=budget*0.75;
+  var pkg,pkgSub,detail;
+  if(budget>=25000000){pkg='🌟 Alianza Estratégica';pkgSub='Desde $25M COP';detail='Co-creación · Naming rights · Reportes GRI · Acceso directiva';}
+  else if(budget>=8000000){pkg='⭐ Impact Partner';pkgSub='Desde $8M COP';detail='Impact Journey para tu equipo · Reporte por empleado · Certificado RSE';}
+  else{pkg='🤝 Aliado Semilla';pkgSub='Desde $500K COP';detail='Donación con trazabilidad · Certificado Art. 257 ET · Mención digital';}
+  document.getElementById('emp2-pkg').textContent=pkg;
+  document.getElementById('emp2-pkg-sub').textContent=pkgSub;
+  document.getElementById('emp2-net').textContent='$'+Math.round(net).toLocaleString('es-CO')+' COP';
+  document.getElementById('emp2-j').textContent=Math.min(team,budget>=8000000?team:Math.floor(budget/500000));
+  document.getElementById('emp2-detail').innerHTML='<strong style="color:var(--navy)">Incluye:</strong> '+detail;
 }
 
 function copyAccount(){
