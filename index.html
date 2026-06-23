@@ -97,7 +97,7 @@ nav.dk:not(.sol) .nl:hover{color:#fff;background:rgba(255,255,255,.1)}
 
 /* UTILS */
 .wrap{max-width:1120px;margin:0 auto;padding:0 40px}
-.sec{padding:104px 0}.sec-d{background:var(--navy)}.sec-c{background:var(--cream)}.sec-g{background:var(--g)}
+.sec{padding:72px 0}.sec-d{background:var(--navy)}.sec-c{background:var(--cream)}.sec-g{background:var(--g)}
 .ey{font-family:"Bricolage Grotesque",sans-serif;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--gm);display:flex;align-items:center;gap:10px;margin-bottom:16px}
 .ey::before{content:"";width:18px;height:2px;background:currentColor;border-radius:2px}
 .eyw{color:var(--gn)}.eyw::before{background:var(--gn)}
@@ -785,6 +785,48 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 .cc-out:last-child{border-top-color:#7c3aed}
 .cc-out:nth-child(2) .cc-out-value{color:#2563eb}
 .cc-out:last-child .cc-out-value{color:#7c3aed}
+
+/* ══ GALERÍA ══ */
+.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:24px}
+.gallery-item{border-radius:10px;overflow:hidden;cursor:pointer;position:relative;aspect-ratio:4/3;background:var(--gl)}
+.gallery-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
+.gallery-item:hover img{transform:scale(1.06)}
+.gallery-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(10,22,40,.7) 0%,transparent 55%);opacity:0;transition:opacity .25s;display:flex;align-items:flex-end;padding:12px}
+.gallery-item:hover .gallery-overlay{opacity:1}
+.gallery-caption{font-size:12px;font-weight:600;color:#fff;line-height:1.3}
+.gallery-cat{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.7);margin-bottom:3px}
+/* LIGHTBOX */
+.lightbox{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}
+.lightbox.open{opacity:1;pointer-events:all}
+.lb-img{max-width:88vw;max-height:82vh;object-fit:contain;border-radius:8px}
+.lb-close{position:absolute;top:20px;right:24px;font-size:28px;color:rgba(255,255,255,.7);cursor:pointer;background:none;border:none;line-height:1;padding:4px 8px;transition:color .15s}
+.lb-close:hover{color:#fff}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:24px;width:46px;height:46px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.lb-nav:hover{background:rgba(255,255,255,.25)}
+.lb-prev{left:16px}.lb-next{right:16px}
+.lb-caption{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.85);font-size:13px;max-width:500px;background:rgba(0,0,0,.5);padding:7px 16px;border-radius:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-counter{position:absolute;top:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font-size:12px}
+@media(max-width:640px){.gallery-grid{grid-template-columns:1fr 1fr}}
+
+/* RSE EXPLANATION */
+.rse-explain-wrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:0}
+.rse-law-box{background:var(--cream);border-radius:var(--rl);padding:28px;border:1px solid var(--bd);display:flex;gap:16px}
+.rse-law-icon{font-size:36px;flex-shrink:0}
+.rse-law-title{font-size:17px;font-weight:700;color:var(--navy);margin-bottom:10px}
+.rse-law-text{font-size:14px;color:var(--mu);line-height:1.7;margin-bottom:16px}
+.rse-benefit-highlight{background:#fff;border-radius:10px;padding:14px;border:1.5px solid var(--gm);display:flex;align-items:center;gap:14px}
+.rse-benefit-number{font-family:"Bricolage Grotesque",sans-serif;font-size:42px;font-weight:800;color:var(--g);flex-shrink:0;line-height:1}
+.rse-givegrow-box{background:var(--navy);border-radius:var(--rl);padding:28px}
+.rse-gg-title{font-size:17px;font-weight:700;color:#fff;margin-bottom:18px}
+.rse-features{display:flex;flex-direction:column;gap:14px}
+.rse-feat{display:flex;gap:12px;align-items:flex-start}
+.rse-feat-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.rse-feat strong{font-size:14px;color:#fff;display:block;margin-bottom:2px}
+.rse-feat p{font-size:13px;color:rgba(255,255,255,.6);line-height:1.6;margin:0}
+@media(max-width:768px){.rse-explain-wrap{grid-template-columns:1fr}}
+
+/* FOOTER FIX */
+.footer{padding:52px 0 32px}
 </style>
 <script type="application/ld+json">
 {
@@ -1712,7 +1754,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
           <input type="range" id="calc-slider" min="0" max="100" value="25" step="1"
             class="cc-slider" oninput="calcUpdate()">
           <div class="cc-range-hints">
-            <span id="range-min">$5.000 COP</span>
+            <span id="range-min">$25.000 COP</span>
             <span id="range-max">$20.000.000 COP</span>
           </div>
 
@@ -2339,6 +2381,40 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
     </div>
   </div>
 
+  <!-- QUÉ ES RSE -->
+  <section class="sec" style="padding-top:0;padding-bottom:52px">
+    <div class="wrap">
+      <div class="rse-explain-wrap">
+
+        <div class="rse-law-box">
+          <div class="rse-law-icon">⚖️</div>
+          <div>
+            <div class="rse-law-title">¿Qué es la RSE según la Ley colombiana?</div>
+            <p class="rse-law-text">La Responsabilidad Social Empresarial (RSE) es el compromiso voluntario de las empresas con el desarrollo sostenible y el bienestar de las comunidades donde operan. En Colombia, el <strong>Artículo 257 del Estatuto Tributario</strong> convierte ese compromiso en un incentivo concreto:</p>
+            <div class="rse-benefit-highlight">
+              <div class="rse-benefit-number">25%</div>
+              <div>
+                <div style="font-weight:700;color:var(--navy);font-size:15px">Descuento directo en impuesto de renta</div>
+                <div style="font-size:13px;color:var(--mu);margin-top:3px">No es deducción de base gravable — es un descuento que sale directamente del impuesto a pagar. <strong>$10.000.000 donados = $2.500.000 menos en tu declaración.</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rse-givegrow-box">
+          <div class="rse-gg-title">¿Por qué hacerlo con Give&Grow?</div>
+          <div class="rse-features">
+            <div class="rse-feat"><span class="rse-feat-icon">📊</span><div><strong>Trazabilidad completa</strong><p>Sabes exactamente a qué comunidad llegó tu inversión, con reportes fotográficos verificados.</p></div></div>
+            <div class="rse-feat"><span class="rse-feat-icon">🚌</span><div><strong>Impact Journey para tu equipo</strong><p>Tus empleados van al campo, trabajan junto a las comunidades y regresan transformados.</p></div></div>
+            <div class="rse-feat"><span class="rse-feat-icon">📋</span><div><strong>Reportes GRI y certificados</strong><p>Documentación lista para tus informes de sostenibilidad, stakeholders e inversionistas.</p></div></div>
+            <div class="rse-feat"><span class="rse-feat-icon">🌱</span><div><strong>Visibilidad como empresa con propósito</strong><p>Presencia en el directorio Give&Grow y en todos nuestros eventos y publicaciones.</p></div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
   <!-- PAQUETES RSE -->
   <section class="sec">
     <div class="wrap">
@@ -2497,7 +2573,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       <!-- ACCORDION: GALERÍA -->
       <div class="impacto-section rv">
         <button class="impacto-toggle" onclick="toggleImpacto('ig')">
-          <span>📸 Galería de campo</span>
+          <span class="imp-toggle-text">📸 Galería de campo</span>
           <span class="impacto-arrow" id="ia-ig">▼</span>
         </button>
         <div class="impacto-body" id="ib-ig" style="display:none">
@@ -2523,7 +2599,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       <!-- ACCORDION: MAPA -->
       <div class="impacto-section rv d2">
         <button class="impacto-toggle" onclick="toggleImpacto('im')">
-          <span>🗺️ Mapa de aliados y comunidades</span>
+          <span class="imp-toggle-text">🗺️ Mapa de aliados y comunidades</span>
           <span class="impacto-arrow" id="ia-im">▼</span>
         </button>
         <div class="impacto-body" id="ib-im" style="display:none">
@@ -2547,7 +2623,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       <!-- ACCORDION: BLOG -->
       <div class="impacto-section rv d3">
         <button class="impacto-toggle" onclick="toggleImpacto('ib')">
-          <span>📖 Blog del campo</span>
+          <span class="imp-toggle-text">📖 Blog del campo</span>
           <span class="impacto-arrow" id="ia-ib">▼</span>
         </button>
         <div class="impacto-body" id="ib-ib" style="display:none">
@@ -2886,7 +2962,7 @@ var CURR='COP', FREQ='mensual', CAT='general', USD_RATE=4200;
 
 // Logarithmic slider: position 0-100 → real value
 function sliderToVal(pos){
-  var copMin=5000, copMax=20000000, usdMin=1, usdMax=5000;
+  var copMin=5000, copMax=20000000, usdMin=1, usdMax=25000;
   if(CURR==='COP'){
     return Math.round(copMin*Math.pow(copMax/copMin, pos/100));
   } else {
@@ -2895,7 +2971,7 @@ function sliderToVal(pos){
 }
 
 function valToSlider(val){
-  var copMin=5000, copMax=20000000, usdMin=1, usdMax=5000;
+  var copMin=5000, copMax=20000000, usdMin=1, usdMax=25000;
   if(CURR==='COP'){
     return Math.round(Math.log(val/copMin)/Math.log(copMax/copMin)*100);
   } else {
@@ -3003,7 +3079,7 @@ function calcUpdate(){
 
 function updateRangeHints(){
   var minV=CURR==='COP'?'$5.000 COP':'USD 1';
-  var maxV=CURR==='COP'?'$20.000.000 COP':'USD 5.000';
+  var maxV=CURR==='COP'?'$20.000.000 COP':'USD 25.000';
   document.getElementById('range-min').textContent=minV;
   document.getElementById('range-max').textContent=maxV;
 }
@@ -3497,25 +3573,163 @@ var T = {
   'calc-h2':    {es:'¿Cuánto impacto genera tu aporte?', en:'How much impact does your contribution generate?'},
 };
 
+/* ═══ COMPREHENSIVE TRANSLATION ═══
+   Maps exact Spanish innerHTML → English
+   Applied to ALL elements with matching text
+*/
+var FULL_EN = {
+  /* NAV */
+  'El Origen': 'Our Origin',
+  'El Hub': 'The Hub',
+  'Empresas': 'Companies',
+  'Fundaciones': 'Foundations',
+  'Gratitud': 'Gratitude',
+  'Impacto': 'Impact',
+  'ALMA': 'ALMA',
+  'Donar ahora': 'Donate now',
+
+  /* HOME */
+  'Medellín, Colombia · ESAL · NIT 901.948.930-2': 'Medellín, Colombia · ESAL · NIT 901.948.930-2',
+  'Conectamos generosidad con necesidad de forma estratégica y sostenible. No reemplazamos — amplificamos. Y aquí, quien da también crece.':
+    'We connect generosity with need strategically and sustainably. We don\'t replace — we amplify. And here, those who give also grow.',
+  'Quiero donar': 'I want to donate',
+  'Como persona natural': 'As an individual',
+  'RSE empresarial': 'Corporate CSR',
+  'Para mi empresa': 'For my company',
+  'Somos fundación': 'We are a foundation',
+  'Quiero unirme al Hub': 'I want to join the Hub',
+
+  /* SECTION LABELS (ey) */
+  'Nuestra razón de existir': 'Our reason to exist',
+  'El corazón del modelo': 'The heart of our model',
+  'El fundador': 'The founder',
+  'Desde el campo': 'From the field',
+  'Para quienes apoyan Give&amp;Grow': 'For those who support Give&Grow',
+  'Haz tu primera donación': 'Make your first donation',
+  'Formas de donar': 'Ways to donate',
+  'Empresas RSE': 'Corporate CSR',
+  'Paquetes RSE': 'CSR Packages',
+  'El corazón del paquete empresarial': 'The heart of the corporate package',
+  'Simula tu inversión': 'Simulate your investment',
+  'Evidencia real': 'Real evidence',
+  'ImpactOS': 'ImpactOS',
+  'Cómo donar': 'How to donate',
+  'Lanzamiento · Julio 2026 · Medellín': 'Launch · July 2026 · Medellín',
+  'Lo que dicen': 'What they say',
+  'Con el respaldo de': 'Backed by',
+
+  /* MAIN TITLES (stit/h1/h2) */
+  'La primera vez que llegué a una comunidad de difícil acceso entendí algo que no esperaba.':
+    'The first time I arrived at a hard-to-reach community, I understood something I didn\'t expect.',
+  'La historia detrás de Give&amp;Grow': 'The story behind Give&Grow',
+  '¿Cuánto impacto genera tu aporte?': 'How much impact does your contribution generate?',
+  'Haz que tu empresa<br>sea parte del cambio.': 'Make your company<br>part of the change.',
+  'Elige el nivel que corresponde a tu empresa': 'Choose the right level for your company',
+  'Todos los paquetes incluyen trazabilidad completa, certificado tributario y visibilidad como empresa con propósito.':
+    'All packages include full traceability, a tax certificate, and visibility as a purpose-driven company.',
+  'Impact Journey: tu equipo en campo': 'Impact Journey: your team in the field',
+  '¿Cuánto inviertes y cuánto recuperas?': 'How much do you invest and how much do you recover?',
+  'Aquí quien da,<br>también crece.': 'Here, those who give<br>also grow.',
+  'Elige cómo quieres apoyar': 'Choose how you want to support us',
+  'Sé parte del lanzamiento de Give&amp;Grow': 'Be part of the Give&Grow launch',
+  'Voces del campo y la ciudad': 'Voices from the field and the city',
+  'Nuestro trabajo, en imágenes, mapas y palabras.': 'Our work, in photos, maps and words.',
+  'ALMA — Asistente de Labor Misional y Alianzas': 'ALMA — Missional Labor & Alliance Assistant',
+  'Casi 4 años en comunidades reales': 'Almost 4 years in real communities',
+  'Nuestro trabajo en números': 'Our work in numbers',
+
+  /* DESCRIPTIONS (slead) */
+  'Ajusta el monto y la categoría. Ve el impacto real en números concretos.':
+    'Adjust the amount and category. See real impact in concrete numbers.',
+  'Impacto medible, experiencias reales para tu equipo y beneficio tributario del 25%. Give&amp;Grow es el puente entre tu empresa y las comunidades que necesitan más.':
+    'Measurable impact, real experiences for your team, and a 25% tax benefit. Give&Grow is the bridge between your company and the communities that need it most.',
+  'Tu donación llega a comunidades reales con trazabilidad completa. Tú ves exactamente cómo impacta. Y el Estado te devuelve el 25% como descuento en renta.':
+    'Your donation reaches real communities with full traceability. You see exactly how it impacts. The government gives you a 25% tax credit.',
+  'Calcula el impacto y los beneficios tributarios de la inversión social de tu empresa.':
+    'Calculate the impact and tax benefits of your company\'s social investment.',
+  'Fotografías reales de comunidades, actividades y momentos que dieron origen a Give&amp;Grow.':
+    'Real photos of communities, activities, and moments that gave rise to Give&Grow.',
+  'Pregúntale a ALMA cualquier cosa sobre Give&amp;Grow, el Hub, las donaciones, el Programa de Gratitud o cómo vincularte.':
+    'Ask ALMA anything about Give&Grow, the Hub, donations, the Gratitude Program, or how to get involved.',
+  'Casi 4 años de trabajo en comunidades reales, documentados.':
+    'Almost 4 years of work in real communities, documented.',
+  'Déjanos tu correo y serás el primero en saber la fecha, el lugar y cómo participar.':
+    'Leave us your email and be the first to know the date, venue and how to participate.',
+
+  /* BUTTONS */
+  'Hablar con nosotros': 'Talk to us',
+  'Diseñar un Impact Journey para mi empresa': 'Design an Impact Journey for my company',
+  'Quiero participar →': 'I want to participate →',
+  'Comenzar': 'Get started',
+  'Hablar con el equipo': 'Talk to the team',
+  'Ver el Hub': 'See the Hub',
+
+  /* HUB page */
+  'El Compassion Hub': 'The Compassion Hub',
+  '5 rutas de impacto que trabajan juntas': '5 impact routes working together',
+
+  /* Gratitud page */
+  'Programa de Gratitud': 'Gratitude Program',
+
+  /* Testimonials */
+  'Give&amp;Grow llegó a nuestra comunidad con algo que pocas organizaciones traen: transparencia. Sabemos exactamente qué se dona, cuándo y cómo nos llega.':
+    'Give&Grow came to our community with something few organizations bring: transparency. We know exactly what is donated, when and how it reaches us.',
+  'Como donante, por primera vez recibí fotos reales de lo que generé. No un email genérico — sino evidencia concreta de que mi aporte llegó a alguien real.':
+    'As a donor, for the first time I received real photos of what I generated. Not a generic email — but concrete evidence that my contribution reached a real person.',
+  'El Impact Journey transformó a nuestro equipo. Volvieron con una perspectiva diferente del país y del rol que una empresa puede jugar en él.':
+    'The Impact Journey transformed our team. They came back with a different perspective on the country and the role a company can play in it.',
+  'Líder comunitaria': 'Community leader',
+  'La Guajira, Colombia': 'La Guajira, Colombia',
+  'Donante activo': 'Active donor',
+  'Medellín, Colombia': 'Medellín, Colombia',
+  'Directora de Sostenibilidad': 'Sustainability Director',
+  'Empresa aliada, Medellín': 'Partner company, Medellín',
+};
+
+var _originalTexts = {};
+
 function setLang(l) {
   LANG = l;
   var esBtn = document.getElementById('lbtn-es');
   var enBtn = document.getElementById('lbtn-en');
   if(esBtn) esBtn.classList.toggle('active', l==='es');
   if(enBtn) enBtn.classList.toggle('active', l==='en');
-  // ID-based translations
-  Object.keys(T).forEach(function(id) {
-    var el = document.getElementById(id) || document.querySelector('[data-i18n="'+id+'"]');
-    if (el && T[id] && T[id][l] !== undefined) {
-      el.innerHTML = T[id][l];
-    }
-  });
-  // data-es/data-en attribute translations
-  document.querySelectorAll('[data-es]').forEach(function(el) {
-    if (el.dataset && el.dataset[l]) el.innerHTML = el.dataset[l];
-  });
+
+  if (l === 'en') {
+    /* Translate all matching elements */
+    var selectors = '.ey,.stit,.slead,h1,h2,h3,.htag,.nl,.ndon,button.ndon,.hero-path-title,.hero-path-sub,.testi-text,.testi-name,.testi-role,.cc-ctrl-lbl,.don-bank-title,.nl-btn,.imp-toggle-text';
+    document.querySelectorAll(selectors).forEach(function(el) {
+      var orig = el.innerHTML.trim();
+      if (FULL_EN[orig] !== undefined) {
+        if (!el.getAttribute('data-orig')) el.setAttribute('data-orig', orig);
+        el.innerHTML = FULL_EN[orig];
+      }
+    });
+    /* Also translate the T-object IDs */
+    Object.keys(T).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && T[id] && T[id].en !== undefined) {
+        if (!el.getAttribute('data-orig')) el.setAttribute('data-orig', el.innerHTML);
+        el.innerHTML = T[id].en;
+      }
+    });
+  } else {
+    /* Restore all to Spanish */
+    document.querySelectorAll('[data-orig]').forEach(function(el) {
+      el.innerHTML = el.getAttribute('data-orig');
+      el.removeAttribute('data-orig');
+    });
+    /* Restore T-object IDs */
+    Object.keys(T).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && T[id] && T[id].es !== undefined) {
+        el.innerHTML = T[id].es;
+      }
+    });
+  }
   document.documentElement.lang = l;
 }
+
 
 function almaFmt(t){
   if(!t)return'';
@@ -3530,20 +3744,51 @@ function almaFmt(t){
     .replace(/\n/g,'<br>');
 }
 
-function setManualAmt(val) {
-  val = parseFloat(val);
+function setManualAmt(rawVal) {
+  var val = parseFloat(rawVal);
   if (!val || val <= 0) return;
-  var copMin=5000,copMax=20000000,usdMin=1,usdMax=5000;
-  var pos;
+  var copMin=5000,copMax=20000000,usdMin=1,usdMax=25000;
+  var pos, displayVal;
   if (CURR === 'COP') {
     val = Math.max(copMin, Math.min(copMax, val));
     pos = Math.round(Math.log(val/copMin) / Math.log(copMax/copMin) * 100);
+    displayVal = val;
   } else {
     val = Math.max(usdMin, Math.min(usdMax, val));
     pos = Math.round(Math.log(val/usdMin) / Math.log(usdMax/usdMin) * 100);
+    displayVal = val;
   }
   var sl = document.getElementById('calc-slider');
-  if (sl) { sl.value = pos; calcUpdate(); }
+  if (!sl) return;
+  sl.value = pos;
+  /* Override display with exact typed value (avoid log precision drift) */
+  var disp = document.getElementById('calc-display');
+  if (disp) disp.textContent = fmtMoney(displayVal);
+  /* Calc tax + net based on exact value */
+  var tax = displayVal * 0.25, net = displayVal * 0.75;
+  var taxEl = document.getElementById('co-tax');
+  var netEl = document.getElementById('co-net');
+  if (taxEl) taxEl.textContent = fmtMoney(tax);
+  if (netEl) netEl.textContent = fmtMoney(net);
+  /* Impact based on exact USD value */
+  var usdVal = (CURR==='USD') ? displayVal : displayVal/USD_RATE;
+  var imp = calcImpactByCat(usdVal, CAT);
+  var impEl = document.getElementById('co-impact');
+  var impSub = document.getElementById('co-impact-sub');
+  if (impEl) impEl.textContent = imp.val;
+  if (impSub) impSub.textContent = imp.sub;
+  /* Update slider gradient */
+  sl.style.background = 'linear-gradient(to right,var(--g) '+pos+'%,#e5e7eb '+pos+'%)';
+  /* Membership */
+  var icons=[['🌲','Membresía Bosque','Reportes · Reuniones · Gratitud completo'],
+    ['🌳','Membresía Árbol','Eventos · Certificado · Gratitud completo'],
+    ['🌿','Membresía Retoño','Beneficios extendidos · Gratitud'],
+    ['🌱','Membresía Semilla','Acceso al Programa de Gratitud']];
+  var mi = usdVal>=100?0:usdVal>=50?1:usdVal>=25?2:3;
+  var mIcon=document.getElementById('m-icon'),mName=document.getElementById('m-name'),mSub=document.getElementById('m-sub');
+  if(mIcon)mIcon.textContent=icons[mi][0];
+  if(mName)mName.textContent=icons[mi][1];
+  if(mSub)mSub.textContent=icons[mi][2];
 }
 </script>
 </body>
