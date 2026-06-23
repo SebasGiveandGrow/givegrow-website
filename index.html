@@ -97,7 +97,7 @@ nav.dk:not(.sol) .nl:hover{color:#fff;background:rgba(255,255,255,.1)}
 
 /* UTILS */
 .wrap{max-width:1120px;margin:0 auto;padding:0 40px}
-.sec{padding:72px 0}.sec-d{background:var(--navy)}.sec-c{background:var(--cream)}.sec-g{background:var(--g)}
+.sec{padding:60px 0}.sec-d{background:var(--navy)}.sec-c{background:var(--cream)}.sec-g{background:var(--g)}
 .ey{font-family:"Bricolage Grotesque",sans-serif;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--gm);display:flex;align-items:center;gap:10px;margin-bottom:16px}
 .ey::before{content:"";width:18px;height:2px;background:currentColor;border-radius:2px}
 .eyw{color:var(--gn)}.eyw::before{background:var(--gn)}
@@ -827,6 +827,10 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
 /* FOOTER FIX */
 .footer{padding:52px 0 32px}
+
+/* FIX EMPTY SPACE BOTTOM */
+.page > section:last-of-type{padding-bottom:60px}
+body{overflow-x:hidden}
 </style>
 <script type="application/ld+json">
 {
@@ -1004,7 +1008,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
   <div class="mm-link" onclick="go('hub');closeMenu()">Compassion Hub</div>
   <div class="mm-link" onclick="go('gratitud');closeMenu()">Programa de Gratitud</div>
   <div class="mm-link" onclick="go('donar');closeMenu()">Cómo apoyar</div>
-  <div class="mm-link" onclick="go('transparencia');closeMenu()">Transparencia</div>
+  <div class="mm-link" onclick="go('transparencia');closeMenu()" style="font-weight:700">Transparencia</div>
   <div class="mm-link" onclick="go('contacto');closeMenu()">Contacto</div>
   <button class="mm-don" onclick="go('donar');closeMenu()">Donar ahora</button>
 </div>
@@ -2198,7 +2202,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
 
 <!-- ═══════════ BLOG ═══════════ -->
-<div class="page" id="page-blog">
+<div class="page" id="page-blog-old" style="display:none">
   <div style="height:80px;background:var(--navy)"></div>
   <section class="sec" style="padding-top:60px">
     <div class="wrap">
@@ -2262,7 +2266,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 
 
 <!-- ═══════════ GALERÍA ═══════════ -->
-<div class="page" id="page-galeria">
+<div class="page" id="page-galeria-old" style="display:none">
   <div style="height:80px;background:var(--navy)"></div>
   <section class="sec" style="padding-top:60px">
     <div class="wrap">
@@ -2293,7 +2297,7 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
 </div>
 
 <!-- ═══════════ MAPA ═══════════ -->
-<div class="page" id="page-mapa">
+<div class="page" id="page-mapa-old" style="display:none">
   <div style="height:80px;background:var(--navy)"></div>
   <section class="sec" style="padding-top:60px">
     <div class="wrap">
@@ -2699,7 +2703,6 @@ nav.dk:not(.sol) .hbg-btn span{background:rgba(255,255,255,.85)}
       </form>
     </div>
   </section>
-
 <!-- FOOTER -->
 <footer>
   <div class="wrap">
@@ -3152,12 +3155,13 @@ function calcEmpresa(){
 
 /* GALLERY + LIGHTBOX */
 var GALLERY_ITEMS = [
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/benef_01.jpg',caption:'Comunidad indígena — niña recibiendo alimentos, La Guajira 2025',cat:'Beneficiarios',year:'2025'},
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/benef_02.jpg',caption:'Jornada con adultos mayores — Comunidad rural 2025',cat:'Beneficiarios',year:'2025'},
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/benef_03.jpg',caption:'Niños Wayuu en La Guajira — Octubre 2025',cat:'La Guajira',year:'2025'},
   {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_01.jpg',caption:'La Guajira, junio 2024 — Jornada de campo',cat:'La Guajira',year:'2024'},
-  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_02.jpg',caption:'Primera visita 2023 — Trabajo comunitario',cat:'Campo',year:'2023'},
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_02.jpg',caption:'Primera visita 2023 — Comunidad vulnerable',cat:'Campo',year:'2023'},
   {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_03.jpg',caption:'Septiembre 2023 — Comunidad rural',cat:'Campo',year:'2023'},
-  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_04.jpg',caption:'Comunidad 2024 — Apoyo comunitario',cat:'Comunidad',year:'2024'},
-  {src:'https://drive.google.com/thumbnail?id=13adwbnJheItNzlbJpZRZBAEW8FsFu29g&sz=w800',caption:'La Guajira, enero 2025 — 50+ niños Wayuu',cat:'La Guajira',year:'2025'},
-  {src:'https://drive.google.com/thumbnail?id=1D4MwWsnTV4GCtSEL-5h-O1vrIkvk7LbM&sz=w800',caption:'La Guajira, junio 2024 — Sebas con comunidad',cat:'La Guajira',year:'2024'}
+  {src:'https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/campo_04.jpg',caption:'Comunidad 2024 — Apoyo comunitario',cat:'Comunidad',year:'2024'}
 ];
 var lbIdx = 0;
 
