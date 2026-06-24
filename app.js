@@ -1,0 +1,586 @@
+/* ===== Give&Grow International - app.js (rebuild v4) ===== */
+"use strict";
+
+/* ---------- I18N ---------- */
+var I18N = {
+  es: {
+    "nav.donar":"Donar","nav.empresas":"Empresas","nav.fundaciones":"Fundaciones",
+    "nav.hub":"Compassion Hub","nav.gratitud":"Programa de Gratitud","nav.impacto":"Impacto",
+    "nav.origen":"Origen","nav.alma":"ALMA","nav.transp":"Transparencia","nav.contacto":"Contacto","nav.faq":"FAQ",
+    "nav.conocenos":"Conocenos",
+    "hero.eyebrow":"Medellin, Colombia - ESAL - NIT 901.948.930-2",
+    "hero.title":"Dar para crecer, crecer para dar mas.",
+    "hero.lead":"Conectamos generosidad con necesidad de forma estrategica y sostenible. No reemplazamos a las fundaciones, las amplificamos. Y aqui, quien da tambien crece.",
+    "path.donar.t":"Quiero donar","path.donar.s":"Como persona natural",
+    "path.emp.t":"RSE empresarial","path.emp.s":"Para mi empresa",
+    "path.fund.t":"Somos fundacion","path.fund.s":"Unirme al Hub",
+    "stat.rutas":"Rutas activas","stat.pobl":"Poblaciones impactadas","stat.traz":"Trazabilidad","stat.fund":"Fundada en Medellin",
+    "model.ey":"El modelo","model.t":"El sector social opera fragmentado. Somos el puente.",
+    "model.p":"Potenciamos fundaciones en campo, conectamos donantes con causas verificadas y creamos un ecosistema donde dar tiene beneficios reales para quien contribuye.",
+    "model.btn":"Ver el Compassion Hub",
+    "feat.hub.t":"Compassion Hub","feat.hub.p":"Centro operativo de 100m2 en El Poblado. Cinco rutas que conectan alianzas, donaciones e impacto medible.","feat.hub.tag":"Activo hoy",
+    "feat.grat.t":"Programa de Gratitud","feat.grat.p":"Red de empresas aliadas con descuentos exclusivos para todos los miembros activos.","feat.grat.tag":"Nuevo",
+    "feat.tax.t":"Beneficio tributario","feat.tax.p":"Descuento del 25% sobre el impuesto de renta a cargo (Art. 257 ET) por cada donacion via sistema financiero.","feat.tax.tag":"Para donantes",
+    "traz.ey":"Como funciona","traz.t":"Trazabilidad completa, de principio a fin.",
+    "traz.1.t":"Visita de contexto","traz.1.p":"Conocemos a la fundacion y la comunidad en terreno.",
+    "traz.2.t":"Onboarding","traz.2.p":"Perfil digital y convenio firmado entre las partes.",
+    "traz.3.t":"Gestion de necesidades","traz.3.p":"Conectamos la necesidad concreta con el donante adecuado.",
+    "traz.4.t":"Entrega con acta","traz.4.p":"Cada entrega queda documentada y verificada.",
+    "traz.5.t":"Reporte fotografico","traz.5.p":"El donante recibe evidencia mensual del impacto real.",
+    "comm.ey":"Comunidades reales","comm.t":"Impacto medible. Personas reales.",
+
+    "origen.ey":"Nuestro origen","origen.t":"Casi cuatro anos en terreno antes de fundar nada.",
+    "origen.p1":"Give&Grow International nace de la experiencia de campo de Juan Sebastian Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellin. Casi cuatro anos trabajando donde el acceso es dificil y la confianza se gana caminando.",
+    "origen.p2":"La fundacion se constituyo el 19 de mayo de 2025 en El Poblado, Medellin, como Entidad Sin Animo de Lucro (ESAL) bajo el Regimen Tributario Especial. El proposito: que la generosidad llegue a donde mas se necesita, con trazabilidad y sin intermediarios opacos.",
+
+    "hub.ey":"Compassion Hub","hub.t":"Cinco rutas. Un solo proposito.",
+    "hub.lead":"El centro operativo donde alianzas, donaciones e impacto se encuentran. Un espacio de 100m2 en El Poblado, Medellin.",
+    "hub.r1.t":"R1 - Alianzas con Fundaciones","hub.r1.p":"Red de fundaciones preaprobadas que reciben apoyo y, en algunos casos, contribuyen servicios al Hub.",
+    "hub.r2.t":"R2 - Gestion de Donaciones","hub.r2.p":"Donaciones en especie y monetarias, gestionadas con trazabilidad completa.",
+    "hub.r3.t":"R3 - Social Grow","hub.r3.p":"Formacion y fortalecimiento de capacidades para las fundaciones aliadas.",
+    "hub.r4.t":"R4 - Impact Journey","hub.r4.p":"Experiencias que llevan a donantes y equipos al campo, con comunidades reales.",
+    "hub.r5.t":"R5 - Conexion Laboral","hub.r5.p":"Puente hacia oportunidades de empleo para poblaciones vulnerables.",
+    "hub.pob.t":"Ocho poblaciones que acompanamos",
+    "hub.pob.list":"Ninez en riesgo - Comunidades indigenas - Comunidades campesinas - Personas en situacion de calle - Adultos mayores - Animales en maltrato - Personas en rehabilitacion - Personas privadas de la libertad",
+
+    "emp.ey":"RSE empresarial","emp.t":"Tu empresa, con proposito y trazabilidad.",
+    "emp.lead":"Tres formas de aliarte. Cada una con beneficio tributario y reporte verificable.",
+    "emp.p1.t":"Aliado Semilla","emp.p1.price":"Desde $500.000 COP / ano","emp.p1.p":"Donacion mas certificado tributario y reconocimiento como negocio con proposito.",
+    "emp.p2.t":"Impact Partner","emp.p2.price":"Desde $8.000.000 COP / ano","emp.p2.p":"Incluye un Impact Journey para tu equipo: un dia en campo con comunidades reales.",
+    "emp.p3.t":"Alianza Estrategica","emp.p3.price":"Desde $25.000.000 COP / ano","emp.p3.p":"Co-creacion, naming de ruta o programa y reportes alineados a estandar GRI.",
+    "emp.sim.t":"Simula tu inversion social",
+    "emp.sim.budget":"Presupuesto anual (COP)","emp.sim.team":"Personas del equipo",
+    "emp.sim.pkg":"Paquete sugerido","emp.sim.net":"Costo neto despues de beneficio","emp.sim.journey":"Impact Journey",
+
+    "fund.ey":"Para fundaciones","fund.t":"Aplica al Compassion Hub.",
+    "fund.lead":"Mas de 25 fundaciones preaprobadas. Compartamos con Colombia es aliada formal que aporta formacion al Hub.",
+    "fund.req.t":"Que buscamos","fund.req.p":"Fundaciones legalmente constituidas, con trabajo verificable en campo y disposicion a la trazabilidad.",
+    "fund.give.t":"Aliadas que aportan","fund.give.p":"Un modelo novedoso: algunas fundaciones contribuyen servicios al Hub en lugar de solo recibir.",
+    "fund.proto.t":"Protocolo de cumplimiento","fund.proto.p":"Faltas leves van a revision de comite con tres oportunidades; faltas gravisimas, como el mal uso de fondos, implican expulsion inmediata y accion legal.",
+    "fund.btn":"Quiero aplicar",
+
+    "grat.ey":"Programa de Gratitud","grat.t":"Quien da, tambien recibe.",
+    "grat.lead":"Una red de empresas aliadas que ofrecen beneficios exclusivos a todos los miembros activos, desde el primer nivel.",
+    "grat.cat":"Gastronomia - Moda - Belleza - Bienestar - Odontologia",
+    "grat.how.t":"Como funciona","grat.how.p":"Donas, recibes tu credencial digital de miembro y la presentas en los comercios aliados para acceder a los beneficios.",
+
+    "imp.ey":"Impacto","imp.t":"Lo que hacemos, en imagenes y datos.",
+    "imp.tab.gal":"Galeria","imp.tab.map":"Mapa","imp.tab.blog":"Historias",
+
+    "alma.ey":"Asistente IA","alma.t":"Conversa con ALMA.",
+    "alma.lead":"ALMA (Asistente de Labor Misional y Alianzas) responde tus dudas sobre donaciones, alianzas y el Compassion Hub.",
+    "alma.placeholder":"Escribe tu pregunta...","alma.send":"Enviar",
+    "alma.hello":"Hola, soy ALMA. Puedo contarte como donar, los beneficios tributarios, las membresias o como aplica tu fundacion al Hub. En que te ayudo?",
+
+    "donar.ey":"Donar","donar.t":"Tu donacion, con destino claro.",
+    "donar.lead":"Calcula tu impacto y tu beneficio tributario, luego elige como aportar.",
+    "calc.tab.ind":"Persona","calc.tab.emp":"Empresa",
+    "calc.tax":"Beneficio tributario (25%)","calc.net":"Costo neto de tu donacion","calc.annual":"Equivalente anual",
+    "pay.t":"Como aportar",
+    "pay.tab.banco":"Bancolombia","pay.tab.paypal":"PayPal","pay.tab.mp":"MercadoPago",
+    "pay.banco.note":"Transfiere y envia el comprobante a sebas@thegiveandgrowproject.org. En 24h recibes tu credencial de miembro y tu certificado tributario.",
+    "pay.bank":"Banco","pay.acc":"Cuenta de Ahorros","pay.holder":"Titular","pay.nit":"NIT","copy":"Copiar","copied":"Copiado",
+    "pay.paypal.note":"Para donaciones internacionales en USD. Escribenos y te enviamos el enlace de PayPal.",
+    "pay.mp.note":"Paga con tarjeta o PSE via MercadoPago. Solicita el enlace por WhatsApp o correo.","pay.wompi":"Proximamente: pagos con tarjeta y PSE via Wompi.",
+
+    "transp.ey":"Transparencia","transp.t":"Nada que esconder.",
+    "transp.p1":"Somos una ESAL bajo Regimen Tributario Especial (Codigo 04 ante la DIAN), NIT 901.948.930-2. Nuestros estados financieros son firmados por la Revisora Fiscal, Manuela Londono Arboleda (T.P. 244894-T).",
+    "transp.p2":"Cada donacion es trazable: confirmacion en 24h, certificado tributario y reportes fotograficos mensuales del impacto.",
+    "transp.list.t":"Datos de la entidad",
+
+    "contacto.ey":"Contacto","contacto.t":"Hablemos.",
+    "form.name":"Nombre","form.email":"Correo","form.msg":"Mensaje","form.send":"Enviar mensaje",
+    "contacto.email":"Correo","contacto.phone":"WhatsApp","contacto.loc":"Ubicacion",
+
+    "faq.ey":"Preguntas frecuentes","faq.t":"Lo que mas nos preguntan.",
+    "faq.q1":"Como hago una donacion?","faq.a1":"Transfiere a la Cuenta de Ahorros Bancolombia No. 31000009221 a nombre de Fundacion Give&Grow International (NIT 901.948.930-2). Envia el comprobante a sebas@thegiveandgrowproject.org y en maximo 24 horas recibes tu certificado de donacion y tu credencial de membresia. Proximamente habilitaremos tarjeta y PSE via Wompi.",
+    "faq.q2":"Que es el Programa de Gratitud?","faq.a2":"Es una red de empresas aliadas que ofrecen descuentos exclusivos a todos los miembros activos, desde el primer nivel de membresia. Las empresas ganan visibilidad como negocios con proposito y los miembros acceden a beneficios en gastronomia, moda, belleza, bienestar y odontologia.",
+    "faq.q3":"Como funciona el beneficio tributario?","faq.a3":"Por cada donacion realizada a traves del sistema financiero accedes a un descuento del 25% sobre el impuesto de renta a cargo (Art. 257 ET). Por ejemplo, $4.000.000 COP donados equivalen a $1.000.000 COP menos en tu impuesto.",
+    "faq.q4":"Puedo ser voluntario?","faq.a4":"Aceptamos voluntariado de habilidades profesionales: medicos, odontologos, abogados, contadores, desarrolladores, docentes y mas. Escribenos a sebas@thegiveandgrowproject.org o por WhatsApp al +57 315 330 5028 indicando tu area y disponibilidad.",
+    "faq.q5":"Mi fundacion puede aplicar al Hub?","faq.a5":"Si. Buscamos fundaciones legalmente constituidas, con trabajo verificable en campo y disposicion a la trazabilidad. Algunas aliadas, como Compartamos con Colombia, contribuyen servicios al Hub en lugar de solo recibir.",
+
+    "foot.tagline":"Dar para crecer, crecer para dar mas.",
+    "foot.explore":"Explorar","foot.legal":"Entidad","foot.rights":"Todos los derechos reservados."
+  },
+  en: {
+    "nav.donar":"Donate","nav.empresas":"Companies","nav.fundaciones":"Foundations",
+    "nav.hub":"Compassion Hub","nav.gratitud":"Gratitude Program","nav.impacto":"Impact",
+    "nav.origen":"Origin","nav.alma":"ALMA","nav.transp":"Transparency","nav.contacto":"Contact","nav.faq":"FAQ",
+    "nav.conocenos":"About",
+    "hero.eyebrow":"Medellin, Colombia - Nonprofit - NIT 901.948.930-2",
+    "hero.title":"Give to grow, grow to give more.",
+    "hero.lead":"We connect generosity with need in a strategic, sustainable way. We do not replace foundations, we amplify them. And here, those who give also grow.",
+    "path.donar.t":"I want to donate","path.donar.s":"As an individual",
+    "path.emp.t":"Corporate CSR","path.emp.s":"For my company",
+    "path.fund.t":"We are a foundation","path.fund.s":"Join the Hub",
+    "stat.rutas":"Active routes","stat.pobl":"Populations served","stat.traz":"Traceability","stat.fund":"Founded in Medellin",
+    "model.ey":"The model","model.t":"The social sector is fragmented. We are the bridge.",
+    "model.p":"We strengthen foundations in the field, connect donors with verified causes and build an ecosystem where giving brings real benefits to those who contribute.",
+    "model.btn":"See the Compassion Hub",
+    "feat.hub.t":"Compassion Hub","feat.hub.p":"A 100m2 operations center in El Poblado. Five routes linking alliances, donations and measurable impact.","feat.hub.tag":"Live now",
+    "feat.grat.t":"Gratitude Program","feat.grat.p":"A network of partner businesses offering exclusive discounts to every active member.","feat.grat.tag":"New",
+    "feat.tax.t":"Tax benefit","feat.tax.p":"A 25% credit on income tax due (Art. 257 ET) for every donation made through the financial system.","feat.tax.tag":"For donors",
+    "traz.ey":"How it works","traz.t":"Full traceability, end to end.",
+    "traz.1.t":"Context visit","traz.1.p":"We meet the foundation and the community on the ground.",
+    "traz.2.t":"Onboarding","traz.2.p":"Digital profile and signed agreement between the parties.",
+    "traz.3.t":"Needs management","traz.3.p":"We match the specific need with the right donor.",
+    "traz.4.t":"Delivery with record","traz.4.p":"Every delivery is documented and verified.",
+    "traz.5.t":"Photo report","traz.5.p":"Donors receive monthly evidence of real impact.",
+    "comm.ey":"Real communities","comm.t":"Measurable impact. Real people.",
+
+    "origen.ey":"Our origin","origen.t":"Almost four years in the field before founding anything.",
+    "origen.p1":"Give&Grow International grew out of Juan Sebastian Navarro Osorio's field work in La Guajira, the Sierra Nevada and the comunas of Medellin. Nearly four years working where access is hard and trust is earned on foot.",
+    "origen.p2":"The foundation was constituted on May 19, 2025 in El Poblado, Medellin, as a nonprofit under the Special Tax Regime. The purpose: that generosity reaches where it is needed most, with traceability and no opaque intermediaries.",
+
+    "hub.ey":"Compassion Hub","hub.t":"Five routes. One purpose.",
+    "hub.lead":"The operations center where alliances, donations and impact meet. A 100m2 space in El Poblado, Medellin.",
+    "hub.r1.t":"R1 - Foundation Alliances","hub.r1.p":"A network of pre-approved foundations that receive support and, in some cases, contribute services to the Hub.",
+    "hub.r2.t":"R2 - Donation Management","hub.r2.p":"In-kind and monetary donations, managed with full traceability.",
+    "hub.r3.t":"R3 - Social Grow","hub.r3.p":"Training and capacity building for partner foundations.",
+    "hub.r4.t":"R4 - Impact Journey","hub.r4.p":"Experiences that take donors and teams to the field with real communities.",
+    "hub.r5.t":"R5 - Job Connection","hub.r5.p":"A bridge to employment opportunities for vulnerable populations.",
+    "hub.pob.t":"Eight populations we accompany",
+    "hub.pob.list":"Children at risk - Indigenous communities - Rural communities - People living on the street - Older adults - Abused animals - People in rehabilitation - Incarcerated people",
+
+    "emp.ey":"Corporate CSR","emp.t":"Your company, with purpose and traceability.",
+    "emp.lead":"Three ways to partner. Each with a tax benefit and a verifiable report.",
+    "emp.p1.t":"Seed Partner","emp.p1.price":"From $500,000 COP / year","emp.p1.p":"Donation plus tax certificate and recognition as a purpose-driven business.",
+    "emp.p2.t":"Impact Partner","emp.p2.price":"From $8,000,000 COP / year","emp.p2.p":"Includes an Impact Journey for your team: a day in the field with real communities.",
+    "emp.p3.t":"Strategic Alliance","emp.p3.price":"From $25,000,000 COP / year","emp.p3.p":"Co-creation, route or program naming and GRI-aligned reporting.",
+    "emp.sim.t":"Simulate your social investment",
+    "emp.sim.budget":"Annual budget (COP)","emp.sim.team":"Team members",
+    "emp.sim.pkg":"Suggested package","emp.sim.net":"Net cost after benefit","emp.sim.journey":"Impact Journey",
+
+    "fund.ey":"For foundations","fund.t":"Apply to the Compassion Hub.",
+    "fund.lead":"More than 25 pre-approved foundations. Compartamos con Colombia is a formal partner that contributes training to the Hub.",
+    "fund.req.t":"What we look for","fund.req.p":"Legally constituted foundations, with verifiable field work and a willingness to embrace traceability.",
+    "fund.give.t":"Partners that contribute","fund.give.p":"A novel model: some foundations contribute services to the Hub instead of only receiving.",
+    "fund.proto.t":"Compliance protocol","fund.proto.p":"Minor breaches go to committee review with three chances; the most serious, such as misuse of funds, mean immediate expulsion and legal action.",
+    "fund.btn":"I want to apply",
+
+    "grat.ey":"Gratitude Program","grat.t":"Those who give, also receive.",
+    "grat.lead":"A network of partner businesses offering exclusive benefits to every active member, from the first tier.",
+    "grat.cat":"Dining - Fashion - Beauty - Wellness - Dental",
+    "grat.how.t":"How it works","grat.how.p":"You donate, receive your digital member credential and present it at partner businesses to access the benefits.",
+
+    "imp.ey":"Impact","imp.t":"What we do, in images and data.",
+    "imp.tab.gal":"Gallery","imp.tab.map":"Map","imp.tab.blog":"Stories",
+
+    "alma.ey":"AI assistant","alma.t":"Chat with ALMA.",
+    "alma.lead":"ALMA answers your questions about donations, partnerships and the Compassion Hub.",
+    "alma.placeholder":"Type your question...","alma.send":"Send",
+    "alma.hello":"Hi, I am ALMA. I can tell you how to donate, the tax benefits, the memberships or how your foundation applies to the Hub. How can I help?",
+
+    "donar.ey":"Donate","donar.t":"Your donation, with a clear destination.",
+    "donar.lead":"Estimate your impact and tax benefit, then choose how to give.",
+    "calc.tab.ind":"Individual","calc.tab.emp":"Company",
+    "calc.tax":"Tax benefit (25%)","calc.net":"Net cost of your donation","calc.annual":"Annual equivalent",
+    "pay.t":"How to give",
+    "pay.tab.banco":"Bancolombia","pay.tab.paypal":"PayPal","pay.tab.mp":"MercadoPago",
+    "pay.banco.note":"Transfer and send the receipt to sebas@thegiveandgrowproject.org. Within 24h you receive your member credential and tax certificate.",
+    "pay.bank":"Bank","pay.acc":"Savings account","pay.holder":"Account holder","pay.nit":"Tax ID","copy":"Copy","copied":"Copied",
+    "pay.paypal.note":"For international donations in USD. Write to us and we will send the PayPal link.",
+    "pay.mp.note":"Pay by card or PSE via MercadoPago. Request the link by WhatsApp or email.","pay.wompi":"Coming soon: card and PSE payments via Wompi.",
+
+    "transp.ey":"Transparency","transp.t":"Nothing to hide.",
+    "transp.p1":"We are a nonprofit under the Special Tax Regime (Code 04 with the DIAN), Tax ID 901.948.930-2. Our financial statements are signed by the Statutory Auditor, Manuela Londono Arboleda (License 244894-T).",
+    "transp.p2":"Every donation is traceable: confirmation within 24h, tax certificate and monthly photographic impact reports.",
+    "transp.list.t":"Entity details",
+
+    "contacto.ey":"Contact","contacto.t":"Let us talk.",
+    "form.name":"Name","form.email":"Email","form.msg":"Message","form.send":"Send message",
+    "contacto.email":"Email","contacto.phone":"WhatsApp","contacto.loc":"Location",
+
+    "faq.ey":"Frequently asked","faq.t":"What people ask most.",
+    "faq.q1":"How do I make a donation?","faq.a1":"Transfer to Bancolombia Savings Account No. 31000009221 under Fundacion Give&Grow International (NIT 901.948.930-2). Send the receipt to sebas@thegiveandgrowproject.org and within 24 hours you receive your donation certificate and membership credential. Card and PSE via Wompi are coming soon.",
+    "faq.q2":"What is the Gratitude Program?","faq.a2":"A network of partner businesses offering exclusive discounts to every active member, from the first membership tier. Businesses gain visibility as purpose-driven, and members access benefits in dining, fashion, beauty, wellness and dental care.",
+    "faq.q3":"How does the tax benefit work?","faq.a3":"For every donation made through the financial system you access a 25% credit on income tax due (Art. 257 ET). For example, $4,000,000 COP donated equals $1,000,000 COP less in tax.",
+    "faq.q4":"Can I volunteer?","faq.a4":"We welcome skilled volunteering: doctors, dentists, lawyers, accountants, developers, teachers and more. Write to sebas@thegiveandgrowproject.org or WhatsApp +57 315 330 5028 with your area and availability.",
+    "faq.q5":"Can my foundation apply to the Hub?","faq.a5":"Yes. We look for legally constituted foundations with verifiable field work and a willingness to embrace traceability. Some partners, like Compartamos con Colombia, contribute services to the Hub instead of only receiving.",
+
+    "foot.tagline":"Give to grow, grow to give more.",
+    "foot.explore":"Explore","foot.legal":"Entity","foot.rights":"All rights reserved."
+  }
+};
+
+var lang = "es";
+function t(k){ return (I18N[lang] && I18N[lang][k]) || (I18N.es[k]) || k; }
+
+function setLang(l){
+  lang = (l === "en") ? "en" : "es";
+  document.documentElement.lang = lang;
+  var nodes = document.querySelectorAll("[data-i18n]");
+  for (var i=0;i<nodes.length;i++){
+    var k = nodes[i].getAttribute("data-i18n");
+    var val = t(k);
+    if (nodes[i].hasAttribute("data-i18n-attr")){
+      nodes[i].setAttribute(nodes[i].getAttribute("data-i18n-attr"), val);
+    } else {
+      nodes[i].textContent = val;
+    }
+  }
+  var on = lang;
+  ["lang-es","dlang-es"].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("on",on==="es");});
+  ["lang-en","dlang-en"].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("on",on==="en");});
+  calcUpdate();
+}
+
+/* ---------- SPA routing ---------- */
+function go(id){
+  var pages = document.querySelectorAll(".page");
+  for (var i=0;i<pages.length;i++) pages[i].classList.remove("active");
+  var target = document.getElementById("page-"+id) || document.getElementById("page-inicio");
+  target.classList.add("active");
+  if (location.hash !== "#"+id) history.replaceState(null,"","#"+id);
+  window.scrollTo(0,0);
+  closeDrawer();
+  initReveal();
+  animateCounters();
+  if (id === "impacto") { /* lazy content handled on tab click */ }
+  return false;
+}
+
+/* ---------- nav scroll + drawer ---------- */
+function onScroll(){
+  var n = document.getElementById("nav");
+  if (!n) return;
+  n.classList.toggle("sol", window.scrollY > 30);
+}
+function toggleDrawer(){ document.getElementById("nav-mobile").classList.toggle("open"); }
+function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); }
+
+/* ---------- reveal ---------- */
+var revObserver;
+function initReveal(){
+  if (!revObserver){
+    revObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("in"); revObserver.unobserve(e.target);} });
+    },{threshold:0.12});
+  }
+  document.querySelectorAll(".page.active .rv:not(.in)").forEach(function(el){ revObserver.observe(el); });
+}
+
+/* ---------- counters ---------- */
+function animateCounters(){
+  document.querySelectorAll(".page.active [data-count]").forEach(function(el){
+    if (el.dataset.done) return;
+    el.dataset.done = "1";
+    var target = parseInt(el.getAttribute("data-count"),10);
+    var suffix = el.getAttribute("data-suffix") || "";
+    var start = null, dur = 1100;
+    function step(ts){
+      if (!start) start = ts;
+      var p = Math.min((ts-start)/dur,1);
+      el.textContent = Math.floor(p*target) + suffix;
+      if (p<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+/* ---------- calculator ---------- */
+var calc = { cur:"COP", freq:"m", val:200000, mode:"ind" };
+var USD_RATE = 4200;
+var TIERS = [
+  {min:1,  ic:"\uD83C\uDF31", es:"Semilla", en:"Seed"},
+  {min:25, ic:"\uD83C\uDF3F", es:"Retono",  en:"Sprout"},
+  {min:50, ic:"\uD83C\uDF33", es:"Arbol",   en:"Tree"},
+  {min:100,ic:"\uD83C\uDF32", es:"Bosque",  en:"Forest"}
+];
+function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
+function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
+
+function setCur(c){
+  calc.cur = c;
+  document.getElementById("cur-cop").classList.toggle("on", c==="COP");
+  document.getElementById("cur-usd").classList.toggle("on", c==="USD");
+  document.getElementById("calc-rate").textContent = (c==="USD") ? "1 USD = $4.200 COP " + (lang==="en"?"(reference)":"(referencia)") : "";
+  calcUpdate();
+}
+function setFreq(f){
+  calc.freq = f;
+  document.getElementById("freq-m").classList.toggle("on", f==="m");
+  document.getElementById("freq-a").classList.toggle("on", f==="a");
+  calcUpdate();
+}
+function setCalcMode(m){
+  calc.mode = m;
+  document.getElementById("ctab-ind").classList.toggle("on", m==="ind");
+  document.getElementById("ctab-emp").classList.toggle("on", m==="emp");
+}
+function setQuick(cop){
+  calc.val = cop;
+  syncSlider();
+  calcUpdate();
+}
+function sliderToVal(p){
+  var minC = 5000, maxC = 20000000;
+  var v = minC * Math.pow(maxC/minC, p/100);
+  return Math.round(v/1000)*1000;
+}
+function valToSlider(cop){
+  var minC = 5000, maxC = 20000000;
+  cop = Math.max(minC, Math.min(maxC, cop));
+  return 100 * Math.log(cop/minC) / Math.log(maxC/minC);
+}
+function onSlider(p){
+  calc.val = sliderToVal(parseFloat(p));
+  calcUpdate();
+}
+function onManual(raw){
+  var n = parseInt(String(raw).replace(/[^0-9]/g,""),10) || 0;
+  if (calc.cur === "USD") n = n * USD_RATE;
+  calc.val = n;
+  syncSlider();
+  calcUpdate();
+}
+function syncSlider(){
+  var s = document.getElementById("calc-slider");
+  if (s) s.value = valToSlider(calc.val);
+}
+function calcUpdate(){
+  var cop = calc.val;
+  var displayN = (calc.cur === "USD") ? cop / USD_RATE : cop;
+  var disp = document.getElementById("calc-display");
+  if (disp) disp.textContent = (calc.cur === "USD") ? fmtUSD(displayN) : fmtCOP(displayN);
+
+  var tax = cop * 0.25;
+  var net = cop - tax;
+  var annual = (calc.freq === "m") ? cop * 12 : cop;
+
+  setText("co-tax", (calc.cur==="USD")? fmtUSD(tax/USD_RATE) : fmtCOP(tax));
+  setText("co-net", (calc.cur==="USD")? fmtUSD(net/USD_RATE) : fmtCOP(net));
+  setText("calc-annual", (calc.cur==="USD")? fmtUSD(annual/USD_RATE) : fmtCOP(annual));
+
+  var usdMonthly = (calc.freq==="m") ? cop/USD_RATE : (cop/12)/USD_RATE;
+  var tier = TIERS[0];
+  for (var i=0;i<TIERS.length;i++){ if (usdMonthly >= TIERS[i].min) tier = TIERS[i]; }
+  setText("m-ic", tier.ic);
+  setText("m-name", tier[lang] || tier.es);
+  setText("m-sub", (lang==="en")?("~ " + Math.round(usdMonthly) + " USD / month"):("~ " + Math.round(usdMonthly) + " USD / mes"));
+}
+function setText(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+
+/* ---------- RSE simulator ---------- */
+function empSim(){
+  var budget = parseInt((document.getElementById("ce-budget").value||"0").replace(/[^0-9]/g,""),10)||0;
+  var team = parseInt(document.getElementById("ce-team").value||"0",10)||0;
+  var pkg, journey;
+  if (budget >= 25000000){ pkg = (lang==="en")?"Strategic Alliance":"Alianza Estrategica"; journey = (lang==="en")?"Included + co-creation":"Incluido + co-creacion"; }
+  else if (budget >= 8000000){ pkg = "Impact Partner"; journey = (lang==="en")?("Included for up to "+team+" people"):("Incluido para hasta "+team+" personas"); }
+  else { pkg = (lang==="en")?"Seed Partner":"Aliado Semilla"; journey = (lang==="en")?"Not included":"No incluido"; }
+  setText("ce-pkg", pkg);
+  setText("ce-journey", journey);
+  setText("ce-net", fmtCOP(budget*0.75));
+}
+
+/* ---------- payments ---------- */
+function payMethod(m){
+  ["banco","paypal","mp"].forEach(function(x){
+    var tab = document.getElementById("paytab-"+x);
+    var pan = document.getElementById("pay-"+x);
+    if (tab) tab.classList.toggle("on", x===m);
+    if (pan) pan.classList.toggle("on", x===m);
+  });
+}
+function copyAccount(){
+  var txt = "31000009221";
+  if (navigator.clipboard) navigator.clipboard.writeText(txt);
+  var lbl = document.getElementById("copy-label");
+  if (lbl){ lbl.textContent = t("copied"); setTimeout(function(){ lbl.textContent = t("copy"); }, 1600); }
+}
+
+/* ---------- gallery + lightbox ---------- */
+var IMG_BASE = "https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/";
+var GALLERY = [
+  {f:"benef_01.jpg", es:"Comunidad acompanada en terreno", en:"Community accompanied in the field"},
+  {f:"benef_02.jpg", es:"Entrega documentada con acta", en:"Delivery documented with a record"},
+  {f:"benef_03.jpg", es:"Impacto medible, personas reales", en:"Measurable impact, real people"},
+  {f:"campo_01.jpg", es:"Trabajo de campo en La Guajira", en:"Field work in La Guajira"},
+  {f:"campo_02.jpg", es:"Sierra Nevada de Santa Marta", en:"Sierra Nevada de Santa Marta"},
+  {f:"campo_03.jpg", es:"Comunas de Medellin", en:"Comunas of Medellin"},
+  {f:"campo_04.jpg", es:"Acompanamiento continuo", en:"Continuous accompaniment"}
+];
+var lbIndex = 0;
+function initGallery(){
+  var g = document.getElementById("gallery");
+  if (!g || g.dataset.done) return;
+  g.dataset.done = "1";
+  GALLERY.forEach(function(item, i){
+    var img = document.createElement("img");
+    img.src = IMG_BASE + item.f;
+    img.alt = item[lang] || item.es;
+    img.loading = "lazy";
+    img.addEventListener("click", function(){ openLightbox(i); });
+    g.appendChild(img);
+  });
+}
+function openLightbox(i){
+  lbIndex = i;
+  var item = GALLERY[i];
+  document.getElementById("lb-img").src = IMG_BASE + item.f;
+  document.getElementById("lb-cap").textContent = item[lang] || item.es;
+  document.getElementById("lb-count").textContent = (i+1) + " / " + GALLERY.length;
+  document.getElementById("lightbox").classList.add("on");
+}
+function closeLightbox(){ document.getElementById("lightbox").classList.remove("on"); }
+function lbStep(d){ openLightbox((lbIndex + d + GALLERY.length) % GALLERY.length); }
+
+/* ---------- impacto tabs (lazy) ---------- */
+function accTab(name){
+  ["gal","map","blog"].forEach(function(x){
+    var tab = document.getElementById("acctab-"+x);
+    var pan = document.getElementById("acc-"+x);
+    if (tab) tab.classList.toggle("on", x===name);
+    if (pan) pan.classList.toggle("on", x===name);
+  });
+  if (name==="gal") initGallery();
+  if (name==="map") initMap();
+  if (name==="blog") initBlog();
+}
+function initMap(){
+  var box = document.getElementById("map-box");
+  if (!box || box.dataset.done) return;
+  box.dataset.done = "1";
+  function build(){
+    var map = L.map("map-box").setView([6.2088, -75.5648], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"OpenStreetMap"}).addTo(map);
+    L.marker([6.2088, -75.5648]).addTo(map).bindPopup("Compassion Hub - El Poblado, Medellin");
+  }
+  if (window.L){ build(); return; }
+  var css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+  document.head.appendChild(css);
+  var s = document.createElement("script");
+  s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+  s.onload = build;
+  document.body.appendChild(s);
+}
+var BLOG = [
+  {es:"Por que la trazabilidad lo cambia todo", en:"Why traceability changes everything", d:"2026-05", t:"60s"},
+  {es:"Compassion Hub: el primer ano", en:"Compassion Hub: the first year", d:"2026-04", t:"3 min"},
+  {es:"Dar para crecer, en la practica", en:"Give to grow, in practice", d:"2026-03", t:"2 min"}
+];
+function initBlog(){
+  var grid = document.getElementById("blog-grid");
+  if (!grid || grid.dataset.done) return;
+  grid.dataset.done = "1";
+  BLOG.forEach(function(b){
+    var card = document.createElement("div");
+    card.className = "card rv";
+    var h = document.createElement("h3"); h.textContent = b[lang] || b.es;
+    var p = document.createElement("p"); p.className="mu"; p.textContent = b.d + " - " + b.t;
+    card.appendChild(h); card.appendChild(p);
+    grid.appendChild(card);
+  });
+  initReveal();
+}
+
+/* ---------- FAQ ---------- */
+function toggleFaq(btn){
+  var item = btn.parentElement;
+  var ans = item.querySelector(".faq-a");
+  var open = item.classList.toggle("open");
+  ans.style.maxHeight = open ? (ans.scrollHeight + "px") : "0";
+}
+
+/* ---------- ALMA chat ---------- */
+var ALMA_SYS = `Eres ALMA (Asistente de Labor Misional y Alianzas), la IA de Fundacion Give&Grow International. Respondes de forma clara, calida y concisa. Maximo 3 parrafos por respuesta. No uses listas extensas. Responde en el idioma del usuario.
+
+GIVE&GROW: Fundacion colombiana ESAL (NIT 901.948.930-2, RTE Codigo 04 DIAN). Fundada el 19 de mayo de 2025 en El Poblado, Medellin. Fundador: Juan Sebastian Navarro Osorio, casi 4 anos de trabajo en zonas de dificil acceso (La Guajira, Sierra Nevada, Medellin). Tagline: "Dar para crecer, crecer para dar mas". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
+
+MISION: Conectar generosidad con necesidad de forma estrategica y con trazabilidad completa. No reemplazamos fundaciones, las amplificamos.
+
+COMPASSION HUB: Centro de 100m2 en El Poblado. 5 rutas: R1 Alianzas con Fundaciones, R2 Gestion de Donaciones, R3 Social Grow, R4 Impact Journey, R5 Conexion Laboral. Proceso: visita de contexto, onboarding, gestion de necesidades, entrega con acta, reporte fotografico al donante.
+
+DONACIONES: Transferencia a Bancolombia Cuenta de Ahorros 31000009221 (NIT 901.948.930-2). Enviar comprobante a sebas@thegiveandgrowproject.org. El donante recibe en 24h confirmacion, credencial digital y certificado tributario, mas reportes fotograficos mensuales.
+
+BENEFICIO TRIBUTARIO: 25% de descuento sobre el impuesto de renta a cargo (Art. 257 ET). Ejemplo: 4.000.000 COP donados = 1.000.000 COP menos de impuesto.
+
+MEMBRESIAS: Semilla (USD 1-24/mes), Retono (USD 25-49), Arbol (USD 50-99), Bosque (USD 100+), Temporal (donacion unica), Honor (invitacion).
+
+PROGRAMA DE GRATITUD: Red de empresas aliadas con descuentos exclusivos para todos los miembros activos. Categorias: gastronomia, moda, belleza, bienestar, odontologia.
+
+RSE EMPRESARIAL: 3 paquetes. Aliado Semilla (desde 500K COP/ano), Impact Partner (desde 8M COP/ano, incluye Impact Journey para el equipo), Alianza Estrategica (desde 25M COP/ano, co-creacion y reportes GRI).
+
+POBLACIONES (8): ninez en riesgo, comunidades indigenas, comunidades campesinas, personas en situacion de calle, adultos mayores, animales en maltrato, personas en rehabilitacion, personas privadas de la libertad.
+
+Mas de 25 fundaciones preaprobadas. Compartamos con Colombia es aliada formal.`;
+
+var almaHistory = [];
+function almaFmt(text){
+  var safe = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  var paras = safe.split(/\n{2,}/).map(function(p){ return "<p>" + p.replace(/\n/g,"<br>") + "</p>"; });
+  return paras.join("");
+}
+function almaPush(role, html){
+  var box = document.getElementById("alma-msgs");
+  var div = document.createElement("div");
+  div.className = "amsg " + (role==="you" ? "you" : "bot");
+  div.innerHTML = html;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  return div;
+}
+function almaSend(){
+  var input = document.getElementById("alma-input");
+  var text = (input.value||"").trim();
+  if (!text) return;
+  input.value = "";
+  almaPush("you", almaFmt(text));
+  almaHistory.push({role:"user", content:text});
+  var thinking = almaPush("bot", "<p>...</p>");
+  fetch("https://givegrow-alma.sebas-4af.workers.dev", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ system: ALMA_SYS, messages: almaHistory })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    var reply = (data.content && data.content[0]) ? data.content[0].text
+      : (data.error ? ("Error: " + data.error.message) : "Error: respuesta inesperada");
+    thinking.innerHTML = almaFmt(reply);
+    almaHistory.push({role:"assistant", content:reply});
+    document.getElementById("alma-msgs").scrollTop = 99999;
+  })
+  .catch(function(){
+    thinking.innerHTML = almaFmt(lang==="en"
+      ? "Sorry, I could not connect right now. Write to sebas@thegiveandgrowproject.org."
+      : "Lo siento, no pude conectarme ahora. Escribe a sebas@thegiveandgrowproject.org.");
+  });
+}
+
+/* ---------- init ---------- */
+function init(){
+  // language
+  setLang("es");
+  // routing from hash
+  var hash = location.hash.replace("#","") || "inicio";
+  go(hash);
+  // nav scroll
+  window.addEventListener("scroll", onScroll, {passive:true});
+  onScroll();
+  // slider initial
+  syncSlider();
+  setCur("COP");
+  setFreq("m");
+  setCalcMode("ind");
+  calcUpdate();
+  // ALMA greeting
+  var amsgs = document.getElementById("alma-msgs");
+  if (amsgs && !amsgs.dataset.done){ amsgs.dataset.done="1"; almaPush("bot", almaFmt(t("alma.hello"))); }
+  // alma enter key
+  var ainput = document.getElementById("alma-input");
+  if (ainput) ainput.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); almaSend(); } });
+  // lightbox keys
+  document.addEventListener("keydown", function(e){
+    if (!document.getElementById("lightbox").classList.contains("on")) return;
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowRight") lbStep(1);
+    if (e.key === "ArrowLeft") lbStep(-1);
+  });
+  initReveal();
+  animateCounters();
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+else init();
