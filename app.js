@@ -170,11 +170,12 @@ var I18N = {
     "transp.verify.p":"Nuestro Certificado de Existencia y Representación Legal es público. Puedes consultar la entidad en el RUES con el NIT 901.948.930-2.",
     "transp.verify.btn":"Consultar en el RUES",
     "transp.docs.t":"Documentos públicos",
-    "transp.docs.p":"Disponibles a solicitud por correo:",
+    "transp.docs.p":"Descarga los disponibles; el resto, a solicitud por correo:",
     "transp.docs.1":"Certificado de Existencia y Representación Legal",
     "transp.docs.2":"Registro Único Tributario (RUT)",
-    "transp.docs.3":"Estados financieros y notas",
+    "transp.docs.3":"Estados financieros 2025 (PDF)",
     "transp.docs.4":"Declaración de renta (Formulario 110)",
+    "transp.docs.5":"Informe de gestión 2025 (PDF)",
     "transp.docs.btn":"Solicitar documentos",
     "contacto.ey":"Contacto",
     "contacto.t":"Hablemos.",
@@ -395,11 +396,12 @@ var I18N = {
     "transp.verify.p":"Our Certificate of Existence and Legal Representation is public. You can look up the entity in RUES using NIT 901.948.930-2.",
     "transp.verify.btn":"Look up in RUES",
     "transp.docs.t":"Public documents",
-    "transp.docs.p":"Available on request by email:",
+    "transp.docs.p":"Download the available ones; the rest on request by email:",
     "transp.docs.1":"Certificate of Existence and Legal Representation",
     "transp.docs.2":"Tax Registry (RUT)",
-    "transp.docs.3":"Financial statements and notes",
+    "transp.docs.3":"2025 financial statements (PDF)",
     "transp.docs.4":"Income tax return (Form 110)",
+    "transp.docs.5":"2025 management report (PDF)",
     "transp.docs.btn":"Request documents",
     "contacto.ey":"Contact",
     "contacto.t":"Let us talk.",
@@ -642,10 +644,23 @@ function copyAccount(){
   if (lbl){ lbl.textContent = t("copied"); setTimeout(function(){ lbl.textContent = t("copy"); }, 1600); }
 }
 
+function formSend(){
+  var g=function(id){var el=document.getElementById(id);return el?(el.value||"").trim():"";};
+  var n=g("cf-name"), e=g("cf-email"), m=g("cf-msg");
+  var note=document.getElementById("cf-note");
+  var es=(typeof lang!=="undefined" && lang==="es");
+  function show(t,ok){ if(!note)return; note.style.display="block"; note.style.color= ok?"var(--g)":"#b00020"; note.textContent=t; }
+  if(!e || !m){ show(es?"Escribe tu correo y un mensaje, por favor.":"Please enter your email and a message.", false); return; }
+  var subject=encodeURIComponent((es?"Contacto web — ":"Web contact — ")+(n||e));
+  var body=encodeURIComponent((es?"Nombre: ":"Name: ")+n+"\n"+(es?"Correo: ":"Email: ")+e+"\n\n"+m);
+  window.location.href="mailto:sebas@thegiveandgrowproject.org?subject="+subject+"&body="+body;
+  show(es?"Abrimos tu app de correo con el mensaje listo para enviar.":"We opened your email app with the message ready to send.", true);
+}
+
 /* ---------- gallery + lightbox ---------- */
 var IMG_BASE = "https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/";
 var GALLERY = [
-  {f:"benef_01.jpg", es:"Comunidad acompanada en terreno", en:"Community accompanied in the field"},
+  {f:"benef_01.jpg", es:"Comunidad acompañada en terreno", en:"Community accompanied in the field"},
   {f:"benef_02.jpg", es:"Entrega documentada con acta", en:"Delivery documented with a record"},
   {f:"benef_03.jpg", es:"Impacto medible, personas reales", en:"Measurable impact, real people"},
   {f:"campo_01.jpg", es:"Trabajo de campo en La Guajira", en:"Field work in La Guajira"},

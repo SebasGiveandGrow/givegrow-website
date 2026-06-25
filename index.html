@@ -19,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=20260625">
+<link rel="stylesheet" href="/styles.css?v=20260625b">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/benef_03.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -456,9 +456,10 @@
           <h3 data-i18n="transp.docs.t">Documentos públicos</h3>
           <p data-i18n="transp.docs.p"></p>
           <ul style="margin:10px 0 16px 18px;color:var(--mu);font-size:15px">
+            <li><a href="/docs/estados-financieros-2025.pdf" target="_blank" rel="noopener" style="color:var(--g);font-weight:600" data-i18n="transp.docs.3"></a></li>
+            <li><a href="/docs/informe-gestion-2025.pdf" target="_blank" rel="noopener" style="color:var(--g);font-weight:600" data-i18n="transp.docs.5"></a></li>
             <li data-i18n="transp.docs.1"></li>
             <li data-i18n="transp.docs.2"></li>
-            <li data-i18n="transp.docs.3"></li>
             <li data-i18n="transp.docs.4"></li>
           </ul>
           <a class="btn btn-o" href="mailto:sebas@thegiveandgrowproject.org?subject=Solicitud%20de%20documentos" data-i18n="transp.docs.btn">Solicitar documentos</a>
@@ -476,10 +477,11 @@
       <h2 class="h-sec rv" data-i18n="contacto.t">Hablemos.</h2>
       <div class="grid g2 rv d1" style="margin-top:26px">
         <div>
-          <div class="field"><label data-i18n="form.name">Nombre</label><input type="text"></div>
-          <div class="field"><label data-i18n="form.email">Correo</label><input type="email"></div>
-          <div class="field"><label data-i18n="form.msg">Mensaje</label><textarea rows="4"></textarea></div>
-          <a class="btn btn-g" href="mailto:sebas@thegiveandgrowproject.org" data-i18n="form.send">Enviar mensaje</a>
+          <div class="field"><label data-i18n="form.name">Nombre</label><input type="text" id="cf-name"></div>
+          <div class="field"><label data-i18n="form.email">Correo</label><input type="email" id="cf-email"></div>
+          <div class="field"><label data-i18n="form.msg">Mensaje</label><textarea rows="4" id="cf-msg"></textarea></div>
+          <button type="button" class="btn btn-g" onclick="formSend()" data-i18n="form.send">Enviar mensaje</button>
+          <p id="cf-note" style="margin-top:12px;font-size:14px;display:none"></p>
         </div>
         <div class="card">
           <p><strong data-i18n="contacto.email">Correo</strong><br>sebas@thegiveandgrowproject.org</p>
@@ -552,6 +554,9 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=20260625"></script>
+<script src="/app.js?v=20260625b"></script>
+<!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
+<script>window.CF_BEACON_TOKEN="";</script>
+<script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
 </body>
 </html>
