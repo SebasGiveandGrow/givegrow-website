@@ -19,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css?v=20260625">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/benef_03.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -151,6 +151,18 @@
       </div>
     </div>
   </section>
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="vis.ey">Hacia dónde vamos</span>
+      <h2 class="h-sec rv" data-i18n="vis.t">Que dar sea transparente, medible y mutuo.</h2>
+      <p class="lead rv d1" data-i18n="vis.p"></p>
+      <div class="grid g3 rv d2" style="margin-top:30px">
+        <div class="card"><h3 data-i18n="vis.1.t">Impacto verificable</h3><p data-i18n="vis.1.p"></p></div>
+        <div class="card"><h3 data-i18n="vis.2.t">Fundaciones más fuertes</h3><p data-i18n="vis.2.p"></p></div>
+        <div class="card"><h3 data-i18n="vis.3.t">Generosidad que crece</h3><p data-i18n="vis.3.p"></p></div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <!-- ============ ORIGEN ============ -->
@@ -274,6 +286,12 @@
       <div class="alma">
         <div class="alma-head"><span class="dot"></span><strong>ALMA</strong></div>
         <div id="alma-msgs"></div>
+        <div class="alma-chips" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px 0">
+          <button type="button" onclick="almaAsk(this.textContent)" data-i18n="alma.chip1" style="padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">¿Cómo dono?</button>
+          <button type="button" onclick="almaAsk(this.textContent)" data-i18n="alma.chip2" style="padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">Beneficio tributario</button>
+          <button type="button" onclick="almaAsk(this.textContent)" data-i18n="alma.chip3" style="padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">Aliar mi empresa</button>
+          <button type="button" onclick="almaAsk(this.textContent)" data-i18n="alma.chip4" style="padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">¿Aplica mi fundación?</button>
+        </div>
         <div class="alma-in">
           <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder" placeholder="Escribe tu pregunta...">
           <button class="alma-send" onclick="almaSend()" data-i18n="alma.send">Enviar</button>
@@ -534,6 +552,6 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js"></script>
+<script src="/app.js?v=20260625"></script>
 </body>
 </html>

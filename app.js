@@ -214,6 +214,19 @@ var I18N = {
     "impactos.eco.t":"Cómo se conecta",
     "impactos.eco.p":"Give&Grow es el ecosistema; ImpactOS, su plataforma; ALMA, la inteligencia que las une. Hoy ALMA responde tus preguntas; mañana será tu puerta de entrada a todo el ecosistema.",
     "impactos.soon":"En construcción · fase inicial",
+    "alma.chip1":"¿Cómo dono?",
+    "alma.chip2":"Beneficio tributario",
+    "alma.chip3":"Aliar mi empresa",
+    "alma.chip4":"¿Aplica mi fundación?",
+    "vis.ey":"Hacia dónde vamos",
+    "vis.t":"Que dar sea transparente, medible y mutuo.",
+    "vis.p":"Nuestra meta es construir la red de impacto social más confiable de Colombia: que cada aporte transforme una vida con trazabilidad total y que, al hacerlo, también haga crecer a quien da. Empezamos en Medellín; el horizonte es Latinoamérica.",
+    "vis.1.t":"Impacto verificable",
+    "vis.1.p":"Que cada donación tenga destino, evidencia y un resultado medible, no promesas.",
+    "vis.2.t":"Fundaciones más fuertes",
+    "vis.2.p":"Amplificar a quienes ya trabajan en campo, reduciendo costos y multiplicando su alcance.",
+    "vis.3.t":"Generosidad que crece",
+    "vis.3.p":"Un modelo donde dar deja una huella real y, a la vez, beneficios para quien contribuye.",
   },
   en: {
     "nav.donar":"Donate",
@@ -426,6 +439,19 @@ var I18N = {
     "impactos.eco.t":"How it connects",
     "impactos.eco.p":"Give&Grow is the ecosystem; ImpactOS, its platform; ALMA, the intelligence that links them. Today ALMA answers your questions; tomorrow it will be your gateway to the whole ecosystem.",
     "impactos.soon":"In progress · early phase",
+    "alma.chip1":"How do I donate?",
+    "alma.chip2":"Tax benefit",
+    "alma.chip3":"Partner my company",
+    "alma.chip4":"Can my foundation apply?",
+    "vis.ey":"Where we're heading",
+    "vis.t":"Make giving transparent, measurable and mutual.",
+    "vis.p":"Our goal is to build Colombia's most trusted social-impact network: every gift transforming a life with full traceability and, in doing so, helping the giver grow too. We start in Medellin; the horizon is Latin America.",
+    "vis.1.t":"Verifiable impact",
+    "vis.1.p":"Every donation with a destination, evidence and a measurable result, not promises.",
+    "vis.2.t":"Stronger foundations",
+    "vis.2.p":"Amplify those already working in the field, cutting costs and multiplying their reach.",
+    "vis.3.t":"Generosity that grows",
+    "vis.3.p":"A model where giving leaves a real mark and, at the same time, benefits the giver.",
   }
 };
 
@@ -750,6 +776,7 @@ function almaPush(role, html){
   box.scrollTop = box.scrollHeight;
   return div;
 }
+function almaAsk(t){ var i=document.getElementById("alma-input"); if(!i) return; i.value=(t||"").trim(); almaSend(); }
 function almaSend(){
   var input = document.getElementById("alma-input");
   var text = (input.value||"").trim();
