@@ -109,6 +109,7 @@ var I18N = {
     "alma.t":"Conversa con ALMA.",
     "alma.lead":"ALMA (Asistente de Labor Misional y Alianzas) responde tus dudas sobre donaciones, alianzas y el HUB SOCIAL.",
     "alma.placeholder":"Escribe tu pregunta...",
+    "hero.imgalt":"Comunidad acompañada por Give&Grow en terreno",
     "alma.send":"Enviar",
     "alma.hello":"Hola, soy ALMA. Puedo contarte cómo donar, los beneficios tributarios, las membresías o cómo aplica tu fundación al Hub. ¿En qué te ayudo?",
     "donar.ey":"Donar",
@@ -242,7 +243,7 @@ var I18N = {
     "nav.contacto":"Contact",
     "nav.faq":"FAQ",
     "nav.conocenos":"About",
-    "hero.eyebrow":"Medellin, Colombia - Nonprofit - NIT 901.948.930-2",
+    "hero.eyebrow":"Medellín, Colombia - Nonprofit - NIT 901.948.930-2",
     "hero.title":"Give to grow, grow to give more.",
     "hero.lead":"We connect generosity with need in a strategic, sustainable way. We do not replace foundations, we amplify them. And here, those who give also grow.",
     "path.donar.t":"I want to donate",
@@ -254,7 +255,7 @@ var I18N = {
     "stat.rutas":"Active routes",
     "stat.pobl":"Populations served",
     "stat.traz":"Traceability",
-    "stat.fund":"Founded in Medellin",
+    "stat.fund":"Founded in Medellín",
     "model.ey":"The model",
     "model.t":"The social sector is fragmented. We are the bridge.",
     "model.p":"We strengthen foundations in the field, connect donors with verified causes and build an ecosystem where giving brings real benefits to those who contribute.",
@@ -284,11 +285,11 @@ var I18N = {
     "comm.t":"Measurable impact. Real people.",
     "origen.ey":"Our origin",
     "origen.t":"Almost four years in the field before founding anything.",
-    "origen.p1":"Give&Grow International grew out of Juan Sebastian Navarro Osorio's field work in La Guajira, the Sierra Nevada and the comunas of Medellin. Nearly four years working where access is hard and trust is earned on foot.",
-    "origen.p2":"The foundation was constituted on May 19, 2025 in El Poblado, Medellin, as a nonprofit under the Special Tax Regime. The purpose: that generosity reaches where it is needed most, with traceability and no opaque intermediaries.",
+    "origen.p1":"Give&Grow International grew out of Juan Sebastián Navarro Osorio's field work in La Guajira, the Sierra Nevada and the comunas of Medellín. Nearly four years working where access is hard and trust is earned on foot.",
+    "origen.p2":"The foundation was constituted on May 19, 2025 in El Poblado, Medellín, as a nonprofit under the Special Tax Regime. The purpose: that generosity reaches where it is needed most, with traceability and no opaque intermediaries.",
     "hub.ey":"Social Hub",
     "hub.t":"Five routes. One purpose.",
-    "hub.lead":"The operations center where alliances, donations and impact meet. A 100m2 space in El Poblado, Medellin.",
+    "hub.lead":"The operations center where alliances, donations and impact meet. A 100m2 space in El Poblado, Medellín.",
     "hub.r1.t":"R1 - Foundation Alliances",
     "hub.r1.p":"A network of pre-approved foundations that receive support and, in some cases, contribute services to the Hub.",
     "hub.r2.t":"R2 - Donation Management",
@@ -335,6 +336,7 @@ var I18N = {
     "alma.t":"Chat with ALMA.",
     "alma.lead":"ALMA answers your questions about donations, partnerships and the Social Hub.",
     "alma.placeholder":"Type your question...",
+    "hero.imgalt":"Community accompanied by Give&Grow in the field",
     "alma.send":"Send",
     "alma.hello":"Hi, I am ALMA. I can tell you how to donate, the tax benefits, the memberships or how your foundation applies to the Hub. How can I help?",
     "donar.ey":"Donate",
@@ -447,7 +449,7 @@ var I18N = {
     "alma.chip4":"Can my foundation apply?",
     "vis.ey":"Where we're heading",
     "vis.t":"Make giving transparent, measurable and mutual.",
-    "vis.p":"Our goal is to build Colombia's most trusted social-impact network: every gift transforming a life with full traceability and, in doing so, helping the giver grow too. We start in Medellin; the horizon is Latin America.",
+    "vis.p":"Our goal is to build Colombia's most trusted social-impact network: every gift transforming a life with full traceability and, in doing so, helping the giver grow too. We start in Medellín; the horizon is Latin America.",
     "vis.1.t":"Verifiable impact",
     "vis.1.p":"Every donation with a destination, evidence and a measurable result, not promises.",
     "vis.2.t":"Stronger foundations",
@@ -665,8 +667,8 @@ var GALLERY = [
   {f:"benef_03.jpg", es:"Impacto medible, personas reales", en:"Measurable impact, real people"},
   {f:"campo_01.jpg", es:"Trabajo de campo en La Guajira", en:"Field work in La Guajira"},
   {f:"campo_02.jpg", es:"Sierra Nevada de Santa Marta", en:"Sierra Nevada de Santa Marta"},
-  {f:"campo_03.jpg", es:"Comunas de Medellin", en:"Comunas of Medellin"},
-  {f:"campo_04.jpg", es:"Acompanamiento continuo", en:"Continuous accompaniment"}
+  {f:"campo_03.jpg", es:"Comunas de Medellín", en:"Comunas of Medellín"},
+  {f:"campo_04.jpg", es:"Acompañamiento continuo", en:"Continuous accompaniment"}
 ];
 var lbIndex = 0;
 function initGallery(){
@@ -712,7 +714,7 @@ function initMap(){
   function build(){
     var map = L.map("map-box").setView([6.2088, -75.5648], 12);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"OpenStreetMap"}).addTo(map);
-    L.marker([6.2088, -75.5648]).addTo(map).bindPopup("HUB SOCIAL - El Poblado, Medellin");
+    L.marker([6.2088, -75.5648]).addTo(map).bindPopup("HUB SOCIAL - El Poblado, Medellín");
   }
   if (window.L){ build(); return; }
   var css = document.createElement("link");
