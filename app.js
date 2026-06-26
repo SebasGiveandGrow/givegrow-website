@@ -812,9 +812,32 @@ Más de 25 fundaciones preaprobadas. Compartamos con Colombia es aliada formal.`
 
 var almaHistory = [];
 function almaFmt(text){
-  var safe = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  var paras = safe.split(/\n{2,}/).map(function(p){ return "<p>" + p.replace(/\n/g,"<br>") + "</p>"; });
-  return paras.join("");
+  var s = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  // links [label](url)
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, function(m,l,u){ return '<a href="'+u+'" target="_blank" rel="noopener">'+l+'</a>'; });
+  // bare http(s) urls
+  s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, function(m,pre,u){ return pre+'<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>'; });
+  // bold
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  var lines = s.split(/\n/), out = [], i = 0;
+  function inline(t){ return t; }
+  while (i < lines.length){
+    if (/^\s*[-*]\s+/.test(lines[i])){
+      var ul = [];
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])){ ul.push("<li>"+lines[i].replace(/^\s*[-*]\s+/,"")+"</li>"); i++; }
+      out.push("<ul>"+ul.join("")+"</ul>"); continue;
+    }
+    if (/^\s*\d+\.\s+/.test(lines[i])){
+      var ol = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])){ ol.push("<li>"+lines[i].replace(/^\s*\d+\.\s+/,"")+"</li>"); i++; }
+      out.push("<ol>"+ol.join("")+"</ol>"); continue;
+    }
+    if (/^\s*$/.test(lines[i])){ i++; continue; }
+    var para = [];
+    while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^\s*[-*]\s+/.test(lines[i]) && !/^\s*\d+\.\s+/.test(lines[i])){ para.push(lines[i]); i++; }
+    out.push("<p>"+para.join("<br>")+"</p>");
+  }
+  return out.join("");
 }
 function almaPush(role, html){
   var box = document.getElementById("alma-msgs");
@@ -825,15 +848,24 @@ function almaPush(role, html){
   box.scrollTop = box.scrollHeight;
   return div;
 }
+var almaBusy = false;
+function almaSetBusy(b){
+  almaBusy = b;
+  var inp = document.getElementById("alma-input"), btn = document.getElementById("alma-send");
+  if (inp) inp.disabled = b;
+  if (btn){ btn.disabled = b; btn.style.opacity = b ? "0.6" : ""; }
+}
 function almaAsk(t){ var i=document.getElementById("alma-input"); if(!i) return; i.value=(t||"").trim(); almaSend(); }
 function almaSend(){
+  if (almaBusy) return;
   var input = document.getElementById("alma-input");
   var text = (input.value||"").trim();
   if (!text) return;
   input.value = "";
   almaPush("you", almaFmt(text));
   almaHistory.push({role:"user", content:text});
-  var thinking = almaPush("bot", "<p>...</p>");
+  var thinking = almaPush("bot", '<span class="alma-typing" aria-label="Escribiendo"><i></i><i></i><i></i></span>');
+  almaSetBusy(true);
   fetch("https://givegrow-alma.sebas-4af.workers.dev", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -851,7 +883,8 @@ function almaSend(){
     thinking.innerHTML = almaFmt(lang==="en"
       ? "Sorry, I could not connect right now. Write to sebas@thegiveandgrowproject.org."
       : "Lo siento, no pude conectarme ahora. Escribe a sebas@thegiveandgrowproject.org.");
-  });
+  })
+  .then(function(){ almaSetBusy(false); var inp = document.getElementById("alma-input"); if (inp) inp.focus(); });
 }
 
 /* ---------- init ---------- */
