@@ -6,6 +6,7 @@
 <link rel="canonical" href="https://www.thegiveandgrowproject.org">
 <link rel="preload" as="image" href="/img/benef_03.jpg" fetchpriority="high">
 <title>Give&Grow International - Dar para crecer, crecer para dar más</title>
+<meta name="robots" content="index, follow">
 <meta name="description" content="Fundación Give&Grow International - NIT 901.948.930-2 - ESAL - Régimen Tributario Especial - Medellín, Colombia. Conectamos generosidad con necesidad, con trazabilidad completa.">
 <meta property="og:title" content="Give&Grow International">
 <meta property="og:description" content="Dar para crecer, crecer para dar más. Medellín, Colombia.">
@@ -20,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=20260625e">
+<link rel="stylesheet" href="/styles.css?v=20260625f">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/benef_03.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -59,7 +60,7 @@
         <button id="lang-es" class="on" onclick="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
         <button id="lang-en" onclick="setLang('en')" aria-label="Switch language to English">EN</button>
       </div>
-      <button class="burger" aria-label="menu" onclick="toggleDrawer()">&#9776;</button>
+      <button class="burger" aria-label="Menú" aria-expanded="false" onclick="toggleDrawer()">&#9776;</button>
     </div>
   </div>
 </nav>
@@ -507,11 +508,11 @@
       <div class="center"><span class="ey rv" data-i18n="faq.ey">Preguntas frecuentes</span>
       <h2 class="h-sec rv" data-i18n="faq.t" style="margin-left:auto;margin-right:auto"></h2></div>
       <div class="faq rv d1">
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)"><span data-i18n="faq.q1"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a1"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)"><span data-i18n="faq.q2"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a2"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)"><span data-i18n="faq.q3"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a3"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)"><span data-i18n="faq.q4"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a4"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)"><span data-i18n="faq.q5"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a5"></div></div></div>
+        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q1"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a1"></div></div></div>
+        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q2"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a2"></div></div></div>
+        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q3"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a3"></div></div></div>
+        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q4"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a4"></div></div></div>
+        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q5"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a5"></div></div></div>
       </div>
     </div>
   </section>
@@ -561,7 +562,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=20260625e"></script>
+<script src="/app.js?v=20260625f"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

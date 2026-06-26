@@ -534,8 +534,8 @@ function onScroll(){
   if (!n) return;
   n.classList.toggle("sol", window.scrollY > 30);
 }
-function toggleDrawer(){ document.getElementById("nav-mobile").classList.toggle("open"); }
-function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); }
+function toggleDrawer(){ var d=document.getElementById("nav-mobile"); var open=d.classList.toggle("open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded", open?"true":"false"); }
+function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded","false"); }
 
 /* ---------- reveal ---------- */
 var revObserver;
@@ -783,6 +783,7 @@ function toggleFaq(btn){
   var ans = item.querySelector(".faq-a");
   var open = item.classList.toggle("open");
   ans.style.maxHeight = open ? (ans.scrollHeight + "px") : "0";
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
 /* ---------- ALMA chat ---------- */
@@ -912,6 +913,7 @@ function init(){
   if (ainput) ainput.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); almaSend(); } });
   // lightbox keys
   document.addEventListener("keydown", function(e){
+    if (e.key === "Escape"){ var dm=document.getElementById("nav-mobile"); if(dm && dm.classList.contains("open")){ closeDrawer(); return; } }
     if (!document.getElementById("lightbox").classList.contains("on")) return;
     if (e.key === "Escape") closeLightbox();
     if (e.key === "ArrowRight") lbStep(1);
