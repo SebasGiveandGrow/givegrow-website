@@ -110,6 +110,7 @@ var I18N = {
     "alma.lead":"ALMA (Asistente de Labor Misional y Alianzas) responde tus dudas sobre donaciones, alianzas y el HUB SOCIAL.",
     "alma.placeholder":"Escribe tu pregunta...",
     "hero.imgalt":"Comunidad acompañada por Give&Grow en terreno",
+    "a11y.skip":"Saltar al contenido",
     "alma.send":"Enviar",
     "alma.hello":"Hola, soy ALMA. Puedo contarte cómo donar, los beneficios tributarios, las membresías o cómo aplica tu fundación al Hub. ¿En qué te ayudo?",
     "donar.ey":"Donar",
@@ -337,6 +338,7 @@ var I18N = {
     "alma.lead":"ALMA answers your questions about donations, partnerships and the Social Hub.",
     "alma.placeholder":"Type your question...",
     "hero.imgalt":"Community accompanied by Give&Grow in the field",
+    "a11y.skip":"Skip to content",
     "alma.send":"Send",
     "alma.hello":"Hi, I am ALMA. I can tell you how to donate, the tax benefits, the memberships or how your foundation applies to the Hub. How can I help?",
     "donar.ey":"Donate",
@@ -462,6 +464,33 @@ var I18N = {
 var lang = "es";
 function t(k){ return (I18N[lang] && I18N[lang][k]) || (I18N.es[k]) || k; }
 
+var currentRoute = "inicio";
+var ROUTE_META = {
+  inicio:{t:{es:"Give&Grow International — Dar para crecer, crecer para dar más",en:"Give&Grow International — Give to grow, grow to give more"},d:{es:"Conectamos generosidad con necesidad en Colombia, con trazabilidad completa. Fundación sin ánimo de lucro en Medellín.",en:"We connect generosity with need in Colombia, with full traceability. A nonprofit foundation based in Medellín."}},
+  origen:{t:{es:"Nuestro origen · Give&Grow International",en:"Our origin · Give&Grow International"},d:{es:"Cómo nació Give&Grow: del trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín a una fundación con propósito.",en:"How Give&Grow began: from field work in La Guajira, the Sierra Nevada and Medellín's comunas to a foundation with purpose."}},
+  hub:{t:{es:"HUB SOCIAL · Give&Grow International",en:"Social Hub · Give&Grow International"},d:{es:"El centro operativo donde se encuentran alianzas, donaciones e impacto. Un espacio de 100m² en El Poblado, Medellín.",en:"The operations center where alliances, donations and impact meet. A 100m² space in El Poblado, Medellín."}},
+  empresas:{t:{es:"Empresas y RSE · Give&Grow International",en:"Companies & CSR · Give&Grow International"},d:{es:"Convierte la responsabilidad social de tu empresa en impacto medible y trazable, con beneficios tributarios.",en:"Turn your company's social responsibility into measurable, traceable impact, with tax benefits."}},
+  fundaciones:{t:{es:"Para fundaciones · Give&Grow International",en:"For foundations · Give&Grow International"},d:{es:"Suma tu fundación al HUB SOCIAL: recibe herramientas y donaciones de forma gratuita, transparente y trazable.",en:"Bring your foundation to the Social Hub: receive tools and donations for free, transparently and traceably."}},
+  gratitud:{t:{es:"Programa de Gratitud · Give&Grow International",en:"Gratitude Program · Give&Grow International"},d:{es:"Beneficios y reconocimientos para quienes hacen posible el impacto: donantes, aliados y empresas.",en:"Benefits and recognition for those who make impact possible: donors, allies and companies."}},
+  impacto:{t:{es:"Impacto y evidencia · Give&Grow International",en:"Impact & evidence · Give&Grow International"},d:{es:"Evidencia real del trabajo en terreno: fotografías, trazabilidad y resultados de las comunidades que acompañamos.",en:"Real evidence from the field: photos, traceability and results from the communities we support."}},
+  alma:{t:{es:"ALMA, asistente con IA · Give&Grow International",en:"ALMA, AI assistant · Give&Grow International"},d:{es:"Conversa con ALMA, la asistente con inteligencia artificial de Give&Grow. Resuelve tus dudas sobre donar, aliarte o aplicar.",en:"Chat with ALMA, Give&Grow's AI assistant. Get answers about donating, partnering or applying."}},
+  donar:{t:{es:"Donar · Give&Grow International",en:"Donate · Give&Grow International"},d:{es:"Haz tu donación a Give&Grow con trazabilidad completa y beneficio tributario. Cada aporte transforma una vida.",en:"Donate to Give&Grow with full traceability and a tax benefit. Every gift transforms a life."}},
+  transparencia:{t:{es:"Transparencia · Give&Grow International",en:"Transparency · Give&Grow International"},d:{es:"Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International.",en:"Official registration, governance, financial statements and public documents of Give&Grow International."}},
+  contacto:{t:{es:"Contacto · Give&Grow International",en:"Contact · Give&Grow International"},d:{es:"Escríbenos para donar, aliar tu empresa o sumar tu fundación al HUB SOCIAL. Medellín, Colombia.",en:"Reach out to donate, partner your company or join your foundation to the Social Hub. Medellín, Colombia."}},
+  faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}}
+};
+function setMetaTag(attr,key,val){ var el=document.querySelector("meta["+attr+"='"+key+"']"); if(el) el.setAttribute("content",val); }
+function applyRouteMeta(id){
+  var m = ROUTE_META[id] || ROUTE_META.inicio;
+  var ti = m.t[lang]||m.t.es, de = m.d[lang]||m.d.es;
+  document.title = ti;
+  setMetaTag("name","description",de);
+  setMetaTag("property","og:title",ti);
+  setMetaTag("property","og:description",de);
+  setMetaTag("property","og:url","https://www.thegiveandgrowproject.org/#"+id);
+  setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
+}
+
 function setLang(l){
   lang = (l === "en") ? "en" : "es";
   document.documentElement.lang = lang;
@@ -478,21 +507,24 @@ function setLang(l){
   var on = lang;
   ["lang-es","dlang-es"].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("on",on==="es");});
   ["lang-en","dlang-en"].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("on",on==="en");});
+  applyRouteMeta(currentRoute);
   calcUpdate();
 }
 
 /* ---------- SPA routing ---------- */
-function go(id){
+function go(id, fromPop){
   var pages = document.querySelectorAll(".page");
   for (var i=0;i<pages.length;i++) pages[i].classList.remove("active");
-  var target = document.getElementById("page-"+id) || document.getElementById("page-inicio");
+  var target = document.getElementById("page-"+id);
+  if (!target){ id = "inicio"; target = document.getElementById("page-inicio"); }
   target.classList.add("active");
-  if (location.hash !== "#"+id) history.replaceState(null,"","#"+id);
+  currentRoute = id;
+  if (location.hash !== "#"+id) history[fromPop ? "replaceState" : "pushState"](null,"","#"+id);
+  applyRouteMeta(id);
   window.scrollTo(0,0);
   closeDrawer();
   initReveal();
   animateCounters();
-  if (id === "impacto") { /* lazy content handled on tab click */ }
   return false;
 }
 
@@ -660,7 +692,7 @@ function formSend(){
 }
 
 /* ---------- gallery + lightbox ---------- */
-var IMG_BASE = "https://raw.githubusercontent.com/SebasGiveandGrow/givegrow-website/main/img/";
+var IMG_BASE = "/img/";
 var GALLERY = [
   {f:"benef_01.jpg", es:"Comunidad acompañada en terreno", en:"Community accompanied in the field"},
   {f:"benef_02.jpg", es:"Entrega documentada con acta", en:"Delivery documented with a record"},
@@ -828,7 +860,8 @@ function init(){
   setLang("es");
   // routing from hash
   var hash = location.hash.replace("#","") || "inicio";
-  go(hash);
+  go(hash, true);
+  window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||"inicio"; go(h, true); });
   // nav scroll
   window.addEventListener("scroll", onScroll, {passive:true});
   onScroll();
