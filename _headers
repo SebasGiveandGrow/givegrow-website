@@ -8,8 +8,17 @@
 /*.html
   Cache-Control: no-store, must-revalidate
 
+/*.json
+  Cache-Control: no-store, must-revalidate
+
 /sitemap.xml
   Cache-Control: max-age=86400
 
-/*.json
-  Cache-Control: no-store, must-revalidate
+/img/*
+  Cache-Control: public, max-age=604800
+
+/docs/*
+  Cache-Control: public, max-age=86400
+
+/favicon.svg
+  Cache-Control: public, max-age=2592000
