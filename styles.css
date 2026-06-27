@@ -280,3 +280,5 @@ footer a:hover{color:var(--gn)}
 
 #m-ic{display:inline-flex;align-items:center}
 #m-ic .ic-svg{width:30px;height:30px;color:var(--g)}
+
+.origen-img{width:100%;border-radius:var(--rl);max-height:440px;object-fit:cover;display:block}

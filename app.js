@@ -393,6 +393,18 @@ var I18N = {
     "start.vol.btn":"Escríbenos →",
     "calc.impact":"Tu impacto",
     "calc.impact.note":"Equivalencia aproximada, según datos de las fundaciones del Hub.",
+    "origen.imgalt":"Trabajo de campo de Give&Grow en La Guajira",
+    "origen.tl.ey":"El recorrido",
+    "origen.tl.t":"De caminar el territorio a fundar una red.",
+    "origen.ms1.t":"Años en terreno",
+    "origen.ms1.p":"Casi cuatro años de trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín, donde la confianza se gana caminando.",
+    "origen.ms2.t":"Abril 2025 · Nace Give&Grow",
+    "origen.ms2.p":"La experiencia se formaliza: se constituye como Entidad Sin Ánimo de Lucro en Medellín.",
+    "origen.ms3.t":"Mayo 2025 · Registro oficial",
+    "origen.ms3.p":"Queda inscrita ante la Cámara de Comercio, bajo el Régimen Tributario Especial.",
+    "origen.ms4.t":"Hoy · El HUB SOCIAL",
+    "origen.ms4.p":"Operamos el Hub Social y construimos ImpactOS para multiplicar el impacto con trazabilidad.",
+    "origen.cta.btn":"Ver el HUB SOCIAL",
   },
   en: {
     "nav.donar":"Donate",
@@ -784,6 +796,18 @@ var I18N = {
     "start.vol.btn":"Write to us →",
     "calc.impact":"Your impact",
     "calc.impact.note":"Approximate equivalence, based on data from the Hub's foundations.",
+    "origen.imgalt":"Give&Grow field work in La Guajira",
+    "origen.tl.ey":"The journey",
+    "origen.tl.t":"From walking the territory to founding a network.",
+    "origen.ms1.t":"Years in the field",
+    "origen.ms1.p":"Nearly four years of field work in La Guajira, the Sierra Nevada and Medellín's comunas, where trust is earned by showing up.",
+    "origen.ms2.t":"April 2025 · Give&Grow is born",
+    "origen.ms2.p":"The experience becomes formal: incorporated as a nonprofit (ESAL) in Medellín.",
+    "origen.ms3.t":"May 2025 · Official registration",
+    "origen.ms3.p":"Registered with the Chamber of Commerce, under the Special Tax Regime.",
+    "origen.ms4.t":"Today · The HUB SOCIAL",
+    "origen.ms4.p":"We run the Social Hub and are building ImpactOS to multiply impact with traceability.",
+    "origen.cta.btn":"See the HUB SOCIAL",
   }
 };
 
@@ -818,6 +842,11 @@ function applyRouteMeta(id){
   setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
 }
 
+function renderPobChips(){
+  var el=document.getElementById("hub-pob"); if(!el) return;
+  var items=(t("hub.pob.list")||"").split(" - ");
+  el.innerHTML = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
+}
 function setLang(l){
   lang = (l === "en") ? "en" : "es";
   document.documentElement.lang = lang;
@@ -834,6 +863,7 @@ function setLang(l){
   var on = lang;
   ["lang-es","dlang-es"].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("on",on==="es");});
   ["lang-en","dlang-en"].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("on",on==="en");});
+  renderPobChips();
   applyRouteMeta(currentRoute);
   calcUpdate();
 }
