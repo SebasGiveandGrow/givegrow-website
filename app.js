@@ -391,6 +391,8 @@ var I18N = {
     "start.vol.t":"Quiero ayudar",
     "start.vol.p":"Suma tu tiempo o talento al equipo que está construyendo todo esto.",
     "start.vol.btn":"Escríbenos →",
+    "calc.impact":"Tu impacto",
+    "calc.impact.note":"Equivalencia aproximada, según datos de las fundaciones del Hub.",
   },
   en: {
     "nav.donar":"Donate",
@@ -780,6 +782,8 @@ var I18N = {
     "start.vol.t":"I want to help",
     "start.vol.p":"Add your time or talent to the team building all of this.",
     "start.vol.btn":"Write to us →",
+    "calc.impact":"Your impact",
+    "calc.impact.note":"Approximate equivalence, based on data from the Hub's foundations.",
   }
 };
 
@@ -893,11 +897,14 @@ function animateCounters(){
 var calc = { cur:"COP", freq:"m", val:200000, mode:"ind" };
 var USD_RATE = 4200;
 var TIERS = [
-  {min:1,  ic:"\uD83C\uDF31", es:"Semilla", en:"Seed"},
-  {min:25, ic:"\uD83C\uDF3F", es:"Retoño",  en:"Sprout"},
-  {min:50, ic:"\uD83C\uDF33", es:"Árbol",   en:"Tree"},
-  {min:100,ic:"\uD83C\uDF32", es:"Bosque",  en:"Forest"}
+  {min:1,  svg:'<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c-.6-3-3.2-4.6-6.3-4 .3 3 2.6 4.8 6.3 4z"/></svg>', es:"Semilla", en:"Seed"},
+  {min:25, svg:'<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 15c-.6-2.6-3-4-6-3.4.3 2.7 2.6 4.2 6 3.4z"/><path d="M12 13c.6-2.6 3-4 6-3.4-.3 2.7-2.6 4.2-6 3.4z"/></svg>', es:"Retoño",  en:"Sprout"},
+  {min:50, svg:'<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><circle cx="12" cy="9.5" r="6"/></svg>', es:"Árbol",   en:"Tree"},
+  {min:100,svg:'<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 22v-3M17 22v-3M12 22v-4"/><circle cx="7" cy="13" r="4"/><circle cx="17" cy="13" r="4"/><circle cx="12" cy="9" r="4.5"/></svg>', es:"Bosque",  en:"Forest"}
 ];
+/* Equivalencias de impacto: se llenan con costos REALES de las fundaciones del Hub.
+   Cada item: {es:"mercado familiar", en:"family grocery kit", cop:50000}. Vacío = línea oculta. */
+var IMPACT_UNITS = [];
 function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
 function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 
@@ -966,7 +973,15 @@ function calcUpdate(){
   var usdMonthly = (calc.freq==="m") ? cop/USD_RATE : (cop/12)/USD_RATE;
   var tier = TIERS[0];
   for (var i=0;i<TIERS.length;i++){ if (usdMonthly >= TIERS[i].min) tier = TIERS[i]; }
-  setText("m-ic", tier.ic);
+  var mic=document.getElementById("m-ic"); if(mic) mic.innerHTML = tier.svg;
+  var irow=document.getElementById("co-impact-row"), iout=document.getElementById("co-impact"), inote=document.getElementById("calc-impact-note");
+  if (irow && iout){
+    if (IMPACT_UNITS.length){
+      var u=IMPACT_UNITS[0], n=Math.floor(cop / u.cop);
+      if (n>=1){ iout.textContent = "\u2248 "+n+" "+(u[lang]||u.es); irow.style.display=""; if(inote) inote.style.display=""; }
+      else { irow.style.display="none"; if(inote) inote.style.display="none"; }
+    } else { irow.style.display="none"; if(inote) inote.style.display="none"; }
+  }
   setText("m-name", tier[lang] || tier.es);
   setText("m-sub", (lang==="en")?("~ " + Math.round(usdMonthly) + " USD / month"):("~ " + Math.round(usdMonthly) + " USD / mes"));
 }

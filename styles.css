@@ -277,3 +277,6 @@ footer a:hover{color:var(--gn)}
 
 .card-link{display:inline-block;margin-top:14px;color:var(--g);font-weight:700;font-size:14px;text-decoration:none}
 .card-link:hover{text-decoration:underline}
+
+#m-ic{display:inline-flex;align-items:center}
+#m-ic .ic-svg{width:30px;height:30px;color:var(--g)}
