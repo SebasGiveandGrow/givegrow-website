@@ -101,7 +101,7 @@ var I18N = {
     "grat.how.t":"Como funciona",
     "grat.how.p":"Donas, recibes tu credencial digital de miembro y la presentas en los comercios aliados para acceder a los beneficios.",
     "imp.ey":"Impacto",
-    "imp.t":"Lo que hacemos, en imágenes y datos.",
+    "imp.t":"Evidencia, no promesas.",
     "imp.tab.gal":"Galería",
     "imp.tab.map":"Mapa",
     "imp.tab.blog":"Historias",
@@ -366,6 +366,17 @@ var I18N = {
     "grat.cta.t":"Empieza a recibir.",
     "grat.cta.mem":"Quiero ser miembro",
     "grat.cta.biz":"Quiero ser comercio aliado",
+    "imp.lead":"Somos una fundación joven y transparente: en lugar de cifras infladas, te mostramos lo que sí podemos probar — el trabajo en campo, las rutas donde operamos y cómo documentamos cada entrega.",
+    "imp.pr1.t":"Fotografías reales",
+    "imp.pr1.p":"Cada imagen es de nuestro trabajo en terreno. Sin bancos de fotos ni montajes.",
+    "imp.pr2.t":"Rutas en territorio",
+    "imp.pr2.p":"Operamos en La Guajira, la Sierra Nevada y las comunas de Medellín. Mira dónde llegamos.",
+    "imp.pr3.t":"Acta por entrega",
+    "imp.pr3.p":"Cada donación entregada queda documentada con acta y reporte fotográfico para el donante.",
+    "imp.ev.ey":"La evidencia",
+    "imp.ev.t":"Compruébalo tú mismo.",
+    "imp.soon.t":"Estamos documentando las primeras historias.",
+    "imp.soon.p":"A medida que el Hub Social crece, este espacio se llenará de historias reales del terreno — sin inventar nada. Síguenos para no perdértelas.",
   },
   en: {
     "nav.donar":"Donate",
@@ -465,7 +476,7 @@ var I18N = {
     "grat.how.t":"How it works",
     "grat.how.p":"You donate, receive your digital member credential and present it at partner businesses to access the benefits.",
     "imp.ey":"Impact",
-    "imp.t":"What we do, in images and data.",
+    "imp.t":"Evidence, not promises.",
     "imp.tab.gal":"Gallery",
     "imp.tab.map":"Map",
     "imp.tab.blog":"Stories",
@@ -730,6 +741,17 @@ var I18N = {
     "grat.cta.t":"Start receiving.",
     "grat.cta.mem":"Become a member",
     "grat.cta.biz":"Become a partner business",
+    "imp.lead":"We're a young, transparent foundation: instead of inflated figures, we show you what we can actually prove — the field work, the routes where we operate, and how we document every delivery.",
+    "imp.pr1.t":"Real photographs",
+    "imp.pr1.p":"Every image is from our work in the field. No stock photos, no staging.",
+    "imp.pr2.t":"Routes on the ground",
+    "imp.pr2.p":"We operate in La Guajira, the Sierra Nevada and Medellín's comunas. See where we reach.",
+    "imp.pr3.t":"A record per delivery",
+    "imp.pr3.p":"Every delivered donation is documented with a record and a photo report for the donor.",
+    "imp.ev.ey":"The evidence",
+    "imp.ev.t":"See it for yourself.",
+    "imp.soon.t":"We're documenting the first stories.",
+    "imp.soon.p":"As the Social Hub grows, this space will fill with real stories from the field — nothing invented. Follow us so you don't miss them.",
   }
 };
 
@@ -1030,23 +1052,18 @@ function initMap(){
   s.onload = build;
   document.body.appendChild(s);
 }
-var BLOG = [
-  {es:"Por que la trazabilidad lo cambia todo", en:"Why traceability changes everything", d:"2026-05", t:"60s"},
-  {es:"HUB SOCIAL: el primer ano", en:"Social Hub: the first year", d:"2026-04", t:"3 min"},
-  {es:"Dar para crecer, en la practica", en:"Give to grow, in practice", d:"2026-03", t:"2 min"}
-];
+/* Historias: estado honesto hasta tener contenido real */
 function initBlog(){
   var grid = document.getElementById("blog-grid");
   if (!grid || grid.dataset.done) return;
   grid.dataset.done = "1";
-  BLOG.forEach(function(b){
-    var card = document.createElement("div");
-    card.className = "card rv";
-    var h = document.createElement("h3"); h.textContent = b[lang] || b.es;
-    var p = document.createElement("p"); p.className="mu"; p.textContent = b.d + " - " + b.t;
-    card.appendChild(h); card.appendChild(p);
-    grid.appendChild(card);
-  });
+  var card = document.createElement("div");
+  card.className = "card rv";
+  card.style.textAlign = "center";
+  var h = document.createElement("h3"); h.textContent = t("imp.soon.t");
+  var p = document.createElement("p"); p.className = "mu"; p.style.marginTop = "8px"; p.textContent = t("imp.soon.p");
+  card.appendChild(h); card.appendChild(p);
+  grid.appendChild(card);
   initReveal();
 }
 
