@@ -34,7 +34,7 @@ var I18N = {
     "model.p":"Potenciamos fundaciones en campo, conectamos donantes con causas verificadas y creamos un ecosistema donde dar tiene beneficios reales para quien contribuye.",
     "model.btn":"Ver el HUB SOCIAL",
     "feat.hub.t":"HUB SOCIAL",
-    "feat.hub.p":"Centro operativo de 100m2 en El Poblado. Cinco rutas que conectan alianzas, donaciones e impacto medible.",
+    "feat.hub.p":"Centro operativo en Medellín. Cinco rutas que conectan alianzas, donaciones e impacto medible.",
     "feat.hub.tag":"Activo hoy",
     "feat.grat.t":"Programa de Gratitud",
     "feat.grat.p":"Red de empresas aliadas con descuentos exclusivos para todos los miembros activos.",
@@ -59,10 +59,10 @@ var I18N = {
     "origen.ey":"Nuestro origen",
     "origen.t":"Casi cuatro años en terreno antes de fundar nada.",
     "origen.p1":"Give&Grow International nace de la experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín. Casi cuatro años trabajando donde el acceso es difícil y la confianza se gana caminando.",
-    "origen.p2":"La fundación se constituyó el 19 de mayo de 2025 en El Poblado, Medellín, como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: que la generosidad llegue a donde más se necesita, con trazabilidad y sin intermediarios opacos.",
+    "origen.p2":"La fundación se constituyó el 19 de mayo de 2025 en Medellín, como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: que la generosidad llegue a donde más se necesita, con trazabilidad y sin intermediarios opacos.",
     "hub.ey":"HUB SOCIAL",
     "hub.t":"Cinco rutas. Un solo propósito.",
-    "hub.lead":"El centro operativo donde alianzas, donaciones e impacto se encuentran. Un espacio de 100m2 en El Poblado, Medellín.",
+    "hub.lead":"El centro operativo donde alianzas, donaciones e impacto se encuentran. En Medellín.",
     "hub.r1.t":"R1 - Alianzas con Fundaciones",
     "hub.r1.p":"Red de fundaciones preaprobadas que reciben apoyo y, en algunos casos, contribuyen servicios al Hub.",
     "hub.r2.t":"R2 - Gestión de Donaciones",
@@ -125,7 +125,7 @@ var I18N = {
     "pay.tab.banco":"Bancolombia",
     "pay.tab.paypal":"PayPal",
     "pay.tab.mp":"MercadoPago",
-    "pay.banco.note":"Transfiere y envía el comprobante a sebas@thegiveandgrowproject.org. En 24h recibes tu credencial de miembro y tu certificado tributario.",
+    "pay.banco.note":"Transfiere y envía el comprobante a contabilidad@thegiveandgrowproject.org. En 24h recibes tu credencial de miembro y tu certificado tributario.",
     "pay.bank":"Banco",
     "pay.acc":"Cuenta de Ahorros",
     "pay.holder":"Titular",
@@ -191,7 +191,7 @@ var I18N = {
     "faq.ey":"Preguntas frecuentes",
     "faq.t":"Lo que más nos preguntan.",
     "faq.q1":"¿Cómo hago una donación?",
-    "faq.a1":"Transfiere a la Cuenta de Ahorros Bancolombia No. 31000009221 a nombre de Fundación Give&Grow International (NIT 901.948.930-2). Envía el comprobante a sebas@thegiveandgrowproject.org y en máximo 24 horas recibes tu certificado de donación y tu credencial de membresía. Próximamente habilitaremos tarjeta y PSE vía Wompi.",
+    "faq.a1":"Transfiere a la Cuenta de Ahorros Bancolombia No. 31000009221 a nombre de Fundación Give&Grow International (NIT 901.948.930-2). Envía el comprobante a contabilidad@thegiveandgrowproject.org y en máximo 24 horas recibes tu certificado de donación y tu credencial de membresía. Próximamente habilitaremos tarjeta y PSE vía Wompi.",
     "faq.q2":"¿Qué es el Programa de Gratitud?",
     "faq.a2":"Es una red de empresas aliadas que ofrecen descuentos exclusivos a todos los miembros activos, desde el primer nivel de membresía. Las empresas ganan visibilidad como negocios con propósito y los miembros acceden a beneficios en gastronomía, moda, belleza, bienestar y odontología.",
     "faq.q3":"¿Cómo funciona el beneficio tributario?",
@@ -419,6 +419,17 @@ var I18N = {
     "fund.s5.p":"Tu fundación entra a la red y empieza a recibir donaciones, herramientas y acompañamiento.",
     "fund.free.t":"Sin costo. Sin intermediarios opacos.",
     "fund.free.p":"Vincularte al HUB SOCIAL es y será siempre gratuito. Solo te pedimos una cosa a cambio: trazabilidad, que cada apoyo llegue documentado a quien lo necesita.",
+    "hub.aliadas.ey":"Fundaciones aliadas",
+    "hub.aliadas.t":"Las primeras del muro.",
+    "hub.aliadas.lead":"El Muro de Héroes empieza aquí: fundaciones reales, verificadas y en territorio. Esta es la primera.",
+    "ndf.chip.sector":"Niñez y adolescencia",
+    "ndf.chip.loc":"Medellín · Manrique, La Honda",
+    "ndf.chip.since":"Desde 2020",
+    "ndf.desc":"Brinda bienestar y educación a niños y jóvenes de las comunidades más vulnerables de Medellín. Proyecto en proceso de constitución.",
+    "ndf.prog1":"Chefs del Futuro · ~100 niños/día",
+    "ndf.prog2":"Borboletas · 30 niños · 3×/sem",
+    "ndf.web":"ninosdelfuturo.com →",
+    "ndf.ig":"@ninosdelfuturo →",
   },
   en: {
     "nav.donar":"Donate",
@@ -451,7 +462,7 @@ var I18N = {
     "model.p":"We strengthen foundations in the field, connect donors with verified causes and build an ecosystem where giving brings real benefits to those who contribute.",
     "model.btn":"See the Social Hub",
     "feat.hub.t":"Social Hub",
-    "feat.hub.p":"A 100m2 operations center in El Poblado. Five routes linking alliances, donations and measurable impact.",
+    "feat.hub.p":"An operations center in Medellín. Five routes linking alliances, donations and measurable impact.",
     "feat.hub.tag":"Live now",
     "feat.grat.t":"Gratitude Program",
     "feat.grat.p":"A network of partner businesses offering exclusive discounts to every active member.",
@@ -476,10 +487,10 @@ var I18N = {
     "origen.ey":"Our origin",
     "origen.t":"Almost four years in the field before founding anything.",
     "origen.p1":"Give&Grow International grew out of Juan Sebastián Navarro Osorio's field work in La Guajira, the Sierra Nevada and the comunas of Medellín. Nearly four years working where access is hard and trust is earned on foot.",
-    "origen.p2":"The foundation was constituted on May 19, 2025 in El Poblado, Medellín, as a nonprofit under the Special Tax Regime. The purpose: that generosity reaches where it is needed most, with traceability and no opaque intermediaries.",
+    "origen.p2":"The foundation was constituted on May 19, 2025 in Medellín, as a nonprofit under the Special Tax Regime. The purpose: that generosity reaches where it is needed most, with traceability and no opaque intermediaries.",
     "hub.ey":"Social Hub",
     "hub.t":"Five routes. One purpose.",
-    "hub.lead":"The operations center where alliances, donations and impact meet. A 100m2 space in El Poblado, Medellín.",
+    "hub.lead":"The operations center where alliances, donations and impact meet. In Medellín.",
     "hub.r1.t":"R1 - Foundation Alliances",
     "hub.r1.p":"A network of pre-approved foundations that receive support and, in some cases, contribute services to the Hub.",
     "hub.r2.t":"R2 - Donation Management",
@@ -542,7 +553,7 @@ var I18N = {
     "pay.tab.banco":"Bancolombia",
     "pay.tab.paypal":"PayPal",
     "pay.tab.mp":"MercadoPago",
-    "pay.banco.note":"Transfer and send the receipt to sebas@thegiveandgrowproject.org. Within 24h you receive your member credential and tax certificate.",
+    "pay.banco.note":"Transfer and send the receipt to contabilidad@thegiveandgrowproject.org. Within 24h you receive your member credential and tax certificate.",
     "pay.bank":"Bank",
     "pay.acc":"Savings account",
     "pay.holder":"Account holder",
@@ -608,7 +619,7 @@ var I18N = {
     "faq.ey":"Frequently asked",
     "faq.t":"What people ask most.",
     "faq.q1":"How do I make a donation?",
-    "faq.a1":"Transfer to Bancolombia Savings Account No. 31000009221 under Fundacion Give&Grow International (NIT 901.948.930-2). Send the receipt to sebas@thegiveandgrowproject.org and within 24 hours you receive your donation certificate and membership credential. Card and PSE via Wompi are coming soon.",
+    "faq.a1":"Transfer to Bancolombia Savings Account No. 31000009221 under Fundacion Give&Grow International (NIT 901.948.930-2). Send the receipt to contabilidad@thegiveandgrowproject.org and within 24 hours you receive your donation certificate and membership credential. Card and PSE via Wompi are coming soon.",
     "faq.q2":"What is the Gratitude Program?",
     "faq.a2":"A network of partner businesses offering exclusive discounts to every active member, from the first membership tier. Businesses gain visibility as purpose-driven, and members access benefits in dining, fashion, beauty, wellness and dental care.",
     "faq.q3":"How does the tax benefit work?",
@@ -836,6 +847,17 @@ var I18N = {
     "fund.s5.p":"Your foundation enters the network and begins receiving donations, tools and support.",
     "fund.free.t":"No cost. No opaque intermediaries.",
     "fund.free.p":"Joining the HUB SOCIAL is and will always be free. We only ask one thing in return: traceability, that every bit of support reaches those who need it, documented.",
+    "hub.aliadas.ey":"Allied foundations",
+    "hub.aliadas.t":"The first on the wall.",
+    "hub.aliadas.lead":"The Heroes Wall starts here: real, verified foundations working on the ground. This is the first.",
+    "ndf.chip.sector":"Children & youth",
+    "ndf.chip.loc":"Medellín · Manrique, La Honda",
+    "ndf.chip.since":"Since 2020",
+    "ndf.desc":"Provides wellbeing and education to children and youth in Medellín's most vulnerable communities. Currently in the process of formal constitution.",
+    "ndf.prog1":"Chefs del Futuro · ~100 kids/day",
+    "ndf.prog2":"Borboletas · 30 kids · 3×/wk",
+    "ndf.web":"ninosdelfuturo.com →",
+    "ndf.ig":"@ninosdelfuturo →",
   }
 };
 
@@ -846,7 +868,7 @@ var currentRoute = "inicio";
 var ROUTE_META = {
   inicio:{t:{es:"Give&Grow International — Dar para crecer, crecer para dar más",en:"Give&Grow International — Give to grow, grow to give more"},d:{es:"Conectamos generosidad con necesidad en Colombia, con trazabilidad completa. Fundación sin ánimo de lucro en Medellín.",en:"We connect generosity with need in Colombia, with full traceability. A nonprofit foundation based in Medellín."}},
   origen:{t:{es:"Nuestro origen · Give&Grow International",en:"Our origin · Give&Grow International"},d:{es:"Cómo nació Give&Grow: del trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín a una fundación con propósito.",en:"How Give&Grow began: from field work in La Guajira, the Sierra Nevada and Medellín's comunas to a foundation with purpose."}},
-  hub:{t:{es:"HUB SOCIAL · Give&Grow International",en:"Social Hub · Give&Grow International"},d:{es:"El centro operativo donde se encuentran alianzas, donaciones e impacto. Un espacio de 100m² en El Poblado, Medellín.",en:"The operations center where alliances, donations and impact meet. A 100m² space in El Poblado, Medellín."}},
+  hub:{t:{es:"HUB SOCIAL · Give&Grow International",en:"Social Hub · Give&Grow International"},d:{es:"El centro operativo donde se encuentran alianzas, donaciones e impacto. En Medellín.",en:"The operations center where alliances, donations and impact meet. In Medellín."}},
   empresas:{t:{es:"Empresas y RSE · Give&Grow International",en:"Companies & CSR · Give&Grow International"},d:{es:"Convierte la responsabilidad social de tu empresa en impacto medible y trazable, con beneficios tributarios.",en:"Turn your company's social responsibility into measurable, traceable impact, with tax benefits."}},
   fundaciones:{t:{es:"Para fundaciones · Give&Grow International",en:"For foundations · Give&Grow International"},d:{es:"Suma tu fundación al HUB SOCIAL: recibe herramientas y donaciones de forma gratuita, transparente y trazable.",en:"Bring your foundation to the Social Hub: receive tools and donations for free, transparently and traceably."}},
   gratitud:{t:{es:"Programa de Gratitud · Give&Grow International",en:"Gratitude Program · Give&Grow International"},d:{es:"Beneficios y reconocimientos para quienes hacen posible el impacto: donantes, aliados y empresas.",en:"Benefits and recognition for those who make impact possible: donors, allies and companies."}},
@@ -962,7 +984,9 @@ var TIERS = [
 ];
 /* Equivalencias de impacto: se llenan con costos REALES de las fundaciones del Hub.
    Cada item: {es:"mercado familiar", en:"family grocery kit", cop:50000}. Vacío = línea oculta. */
-var IMPACT_UNITS = [];
+var IMPACT_UNITS = [
+  { es:"plato de comida", en:"plate of food", cop:4000 }
+];
 function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
 function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 
@@ -1142,7 +1166,7 @@ function initMap(){
   function build(){
     var map = L.map("map-box").setView([6.2088, -75.5648], 12);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"OpenStreetMap"}).addTo(map);
-    L.marker([6.2088, -75.5648]).addTo(map).bindPopup("HUB SOCIAL - El Poblado, Medellín");
+    L.marker([6.2088, -75.5648]).addTo(map).bindPopup("HUB SOCIAL - Medellín");
   }
   if (window.L){ build(); return; }
   var css = document.createElement("link");
@@ -1180,15 +1204,15 @@ function toggleFaq(btn){
 /* ---------- ALMA chat ---------- */
 var ALMA_SYS = `Eres ALMA (Asistente de Labor Misional y Alianzas), la IA de Fundación Give&Grow International. Respondes de forma clara, cálida y concisa. Máximo 3 párrafos por respuesta. No uses listas extensas. Responde en el idioma del usuario.
 
-GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Fundada el 19 de mayo de 2025 en El Poblado, Medellín. Fundador: Juan Sebastián Navarro Osorio, casi 4 años de trabajo en zonas de difícil acceso (La Guajira, Sierra Nevada, Medellín). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
+GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Fundada el 19 de mayo de 2025 en Medellín. Fundador: Juan Sebastián Navarro Osorio, casi 4 años de trabajo en zonas de difícil acceso (La Guajira, Sierra Nevada, Medellín). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
 
 MISIÓN: Conectar generosidad con necesidad de forma estratégica y con trazabilidad completa. No reemplazamos fundaciones, las amplificamos.
 
 IMPACTOS Y ALMA: ImpactOS es el sistema operativo de Give&Grow (la plataforma digital del ecosistema). ALMA es su interfaz inteligente. Give&Grow es el ecosistema completo. ALMA es a Give&Grow lo que Siri es al iPhone.
 
-HUB SOCIAL: Centro de 100m2 en El Poblado. 5 rutas: R1 Alianzas con Fundaciones, R2 Gestión de Donaciones, R3 Social Grow, R4 Impact Journey, R5 Conexión Laboral. Proceso: visita de contexto, onboarding, gestión de necesidades, entrega con acta, reporte fotográfico al donante.
+HUB SOCIAL: Centro operativo en Medellín. 5 rutas: R1 Alianzas con Fundaciones, R2 Gestión de Donaciones, R3 Social Grow, R4 Impact Journey, R5 Conexión Laboral. Proceso: visita de contexto, onboarding, gestión de necesidades, entrega con acta, reporte fotográfico al donante.
 
-DONACIONES: Transferencia a Bancolombia Cuenta de Ahorros 31000009221 (NIT 901.948.930-2). Enviar comprobante a sebas@thegiveandgrowproject.org. El donante recibe en 24h confirmación, credencial digital y certificado tributario, más reportes fotográficos mensuales.
+DONACIONES: Transferencia a Bancolombia Cuenta de Ahorros 31000009221 (NIT 901.948.930-2). Enviar comprobante a contabilidad@thegiveandgrowproject.org. El donante recibe en 24h confirmación, credencial digital y certificado tributario, más reportes fotográficos mensuales.
 
 BENEFICIO TRIBUTARIO: 25% de descuento sobre el impuesto de renta a cargo (Art. 257 ET). Ejemplo: 4.000.000 COP donados = 1.000.000 COP menos de impuesto.
 
