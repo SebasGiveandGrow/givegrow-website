@@ -1,0 +1,33 @@
+# .clauderules — Give&Grow
+
+Reglas permanentes para cualquier asistente que trabaje en este repositorio.
+Léelas junto con `DESIGN_SYSTEM.md` y `SESSION_HANDOFF.md` antes de tocar código.
+
+## No negociable
+- **Nunca tumbar el sitio.** Verificar render antes y después de cada deploy.
+- **Cero emojis.** Todo ícono es SVG line-art (`class="ic-svg"`, viewBox 24, `stroke="currentColor"`).
+- **Paridad i18n ES = EN** exacta, siempre. Toda clave `data-i18n` existe en ambos idiomas.
+- **Evidencia, no promesas.** No inventar métricas, testimonios ni logos. Estado vacío honesto donde no haya contenido real.
+- **Consentimiento antes de publicar** logo/nombre/fotos de terceros (verificar en el registro del formulario).
+- No romper el tagline "Dar para crecer, crecer para dar más." ni renombrar el "HUB SOCIAL".
+
+## Arquitectura
+- SPA: `index.html` + `app.js` + `styles.css` en Cloudflare Workers (repo `SebasGiveandGrow/givegrow-website`, rama `main`).
+- Working dir de build: `/home/claude/build/` (espejo de producción).
+- Deploy: **GitHub Trees API** (commit atómico con `base_tree`).
+
+## Convenciones de código
+- Tarjetas: `.card` + badge `.ic`; enlaces `.card-link` (verde, con `→`).
+- Pasos: `.steps > .step > .step-n` (número solo en el círculo, no en el título).
+- Chips: `.eco-row > .eco-chip`.
+- Secciones: alternar blanco / `.cream` / `.band`.
+- i18n: `I18N{es,en}` + `t(key)` + `setLang()` sobre `[data-i18n]`/`[data-i18n-attr]`.
+- Calculadora: equivalencias en `IMPACT_UNITS` (`{es,en,cop}`); vacío = oculto; siempre "≈ aprox." + fuente; solo costos reales/defendibles.
+
+## Checklist antes de cada deploy
+1. `node --check app.js`
+2. Paridad i18n (ES == EN, sin claves huérfanas)
+3. Balance de tags (`main/section/div/svg`)
+4. Render headless Playwright sin `pageerror` (forzar `.rv`→`.in`)
+5. Bump `?v=YYYYMMDDx` en `app.js`/`styles.css`
+6. Verificar en `raw.githubusercontent.com/<commit>/<path>`
