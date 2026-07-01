@@ -121,6 +121,9 @@ var I18N = {
     "calc.tax":"Beneficio tributario (25%)",
     "calc.net":"Costo neto de tu donación",
     "calc.annual":"Equivalente anual",
+    "calc.freq.m":"Mensual",
+    "calc.freq.a":"Anual",
+    "calc.freq.u":"Único",
     "pay.t":"Cómo aportar",
     "pay.tab.banco":"Bancolombia",
     "pay.tab.paypal":"PayPal",
@@ -550,6 +553,9 @@ var I18N = {
     "calc.tax":"Tax benefit (25%)",
     "calc.net":"Net cost of your donation",
     "calc.annual":"Annual equivalent",
+    "calc.freq.m":"Monthly",
+    "calc.freq.a":"Annual",
+    "calc.freq.u":"One-time",
     "pay.t":"How to give",
     "pay.tab.banco":"Bancolombia",
     "pay.tab.paypal":"PayPal",
@@ -1003,6 +1009,7 @@ function setFreq(f){
   calc.freq = f;
   document.getElementById("freq-m").classList.toggle("on", f==="m");
   document.getElementById("freq-a").classList.toggle("on", f==="a");
+  var fu=document.getElementById("freq-u"); if(fu) fu.classList.toggle("on", f==="u");
   calcUpdate();
 }
 function setCalcMode(m){
@@ -1053,6 +1060,10 @@ function calcUpdate(){
   setText("co-tax", (calc.cur==="USD")? fmtUSD(tax/USD_RATE) : fmtCOP(tax));
   setText("co-net", (calc.cur==="USD")? fmtUSD(net/USD_RATE) : fmtCOP(net));
   setText("calc-annual", (calc.cur==="USD")? fmtUSD(annual/USD_RATE) : fmtCOP(annual));
+
+  var isOnce = (calc.freq === "u");
+  var arow=document.getElementById("calc-annual-row"); if(arow) arow.style.display = isOnce ? "none" : "";
+  var mblock=document.getElementById("calc-member"); if(mblock) mblock.style.display = isOnce ? "none" : "";
 
   var usdMonthly = (calc.freq==="m") ? cop/USD_RATE : (cop/12)/USD_RATE;
   var tier = TIERS[0];

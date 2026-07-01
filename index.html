@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=20260701b">
+<link rel="stylesheet" href="/styles.css?v=20260701c">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/benef_03.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -598,15 +598,16 @@
           <button class="qbtn" onclick="setQuick(20000000)">$20M</button>
         </div>
         <div class="cur-toggle">
-          <button id="freq-m" class="on" onclick="setFreq('m')">Mensual</button>
-          <button id="freq-a" onclick="setFreq('a')">Anual</button>
+          <button id="freq-m" class="on" onclick="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
+          <button id="freq-a" onclick="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
+          <button id="freq-u" onclick="setFreq('u')" data-i18n="calc.freq.u">Único</button>
         </div>
         <div class="calc-out">
           <div class="calc-row"><span data-i18n="calc.tax">Beneficio tributario (25%)</span><b id="co-tax">-</b></div>
           <div class="calc-row"><span data-i18n="calc.net">Costo neto de tu donacion</span><b id="co-net">-</b></div>
-          <div class="calc-row"><span data-i18n="calc.annual">Equivalente anual</span><b id="calc-annual">-</b></div>
+          <div class="calc-row" id="calc-annual-row"><span data-i18n="calc.annual">Equivalente anual</span><b id="calc-annual">-</b></div>
           <div class="calc-row" id="co-impact-row" style="display:none"><span data-i18n="calc.impact">Tu impacto</span><b id="co-impact">-</b></div>
-          <div class="member"><span id="m-ic"></span><div><div id="m-name">Semilla</div><div id="m-sub">-</div></div></div>
+          <div class="member" id="calc-member"><span id="m-ic"></span><div><div id="m-name">Semilla</div><div id="m-sub">-</div></div></div>
           <p class="mu" id="calc-impact-note" style="display:none;font-size:13px;margin-top:10px" data-i18n="calc.impact.note"></p>
         </div>
       </div>
@@ -861,7 +862,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=20260701b"></script>
+<script src="/app.js?v=20260701c"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
