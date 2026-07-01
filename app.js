@@ -991,9 +991,10 @@ var TIERS = [
   {min:100,svg:'<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 22v-3M17 22v-3M12 22v-4"/><circle cx="7" cy="13" r="4"/><circle cx="17" cy="13" r="4"/><circle cx="12" cy="9" r="4.5"/></svg>', es:"Bosque",  en:"Forest"}
 ];
 /* Equivalencias de impacto: se llenan con costos REALES de las fundaciones del Hub.
-   Cada item: {es:"mercado familiar", en:"family grocery kit", cop:50000}. Vacío = línea oculta. */
+   Cada item: {es, esPl, en, enPl, cop} (singular/plural + costo COP de UNA unidad). Vacío = línea oculta.
+   A futuro: con >1 unidad con costo defendible, añadir un selector de tipo de impacto (comida, resguardo, refugio, etc.). */
 var IMPACT_UNITS = [
-  { es:"plato de comida", en:"plate of food", cop:4000 }
+  { es:"plato de comida", esPl:"platos de comida", en:"plate of food", enPl:"plates of food", cop:4000 }
 ];
 function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
 function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
@@ -1073,7 +1074,10 @@ function calcUpdate(){
   if (irow && iout){
     if (IMPACT_UNITS.length){
       var u=IMPACT_UNITS[0], n=Math.floor(cop / u.cop);
-      if (n>=1){ iout.textContent = "\u2248 "+n+" "+(u[lang]||u.es); irow.style.display=""; if(inote) inote.style.display=""; }
+      if (n>=1){
+        var uLabel = (lang==="en") ? (n===1 ? u.en : (u.enPl||u.en)) : (n===1 ? u.es : (u.esPl||u.es));
+        iout.textContent = "\u2248 "+n+" "+uLabel; irow.style.display=""; if(inote) inote.style.display="";
+      }
       else { irow.style.display="none"; if(inote) inote.style.display="none"; }
     } else { irow.style.display="none"; if(inote) inote.style.display="none"; }
   }
