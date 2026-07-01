@@ -430,6 +430,7 @@ var I18N = {
     "ndf.prog2":"Borboletas · 30 niños · 3×/sem",
     "ndf.web":"ninosdelfuturo.com →",
     "ndf.ig":"@ninosdelfuturo →",
+    "ndf.logo.alt":"Logo de Fundación Niños del Futuro",
   },
   en: {
     "nav.donar":"Donate",
@@ -858,6 +859,7 @@ var I18N = {
     "ndf.prog2":"Borboletas · 30 kids · 3×/wk",
     "ndf.web":"ninosdelfuturo.com →",
     "ndf.ig":"@ninosdelfuturo →",
+    "ndf.logo.alt":"Fundación Niños del Futuro logo",
   }
 };
 
