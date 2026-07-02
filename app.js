@@ -25,7 +25,7 @@ var I18N = {
     "path.emp.s":"Para mi empresa",
     "path.fund.t":"Somos fundación",
     "path.fund.s":"Unirme al Hub",
-    "stat.rutas":"Rutas activas",
+    "stat.rutas":"Rutas del modelo",
     "stat.pobl":"Poblaciones impactadas",
     "stat.traz":"Trazabilidad",
     "stat.fund":"Año de fundación",
@@ -222,6 +222,7 @@ var I18N = {
     "map.leg.hub":"HUB SOCIAL",
     "map.area.med":"Medellín · centro operativo",
     "net.ey":"La red",
+    "hero.impact":"{a} al mes se convierten en {x} — con acta y foto.",
     "net.t":"Quiénes forman la red hoy.",
     "net.p":"Cada punto del mapa, con nombre propio. Aquí solo aparecen vínculos confirmados: la red crece con evidencia.",
     "net.next":"Tu fundación o empresa puede ser el siguiente punto en el mapa.",
@@ -558,8 +559,8 @@ function setLang(l){
     var vt = document.startViewTransition && window.matchMedia &&
              !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
              typeof lang !== "undefined" && lang && lang !== next;
-    if (vt){ document.startViewTransition(function(){ applyLang(l); renderWall(); }); }
-    else { applyLang(l); renderWall(); }
+    if (vt){ document.startViewTransition(function(){ applyLang(l); renderWall(); renderHeroImpact(); }); }
+    else { applyLang(l); renderWall(); renderHeroImpact(); }
   });
 }
 function applyLang(l){
@@ -867,6 +868,21 @@ function loadPartners(){
     .catch(function(){ PARTNERS_DATA = PARTNERS_FALLBACK; return PARTNERS_DATA; });
 }
 var NET_COLORS = { foundation:"#1F5C38", company:"#B4690E", hub:"#0A2A5E" };
+function renderHeroImpact(){
+  var el = document.getElementById("hero-impact"); if (!el) return;
+  loadPartners().then(function(){
+    var u = activeImpactUnit(); if (!u){ el.hidden = true; return; }
+    var n = Math.floor(20000 / u.cop);
+    var label = (lang==="en") ? (n===1?u.en:(u.enPl||u.en)) : (n===1?u.es:(u.esPl||u.es));
+    var amount = (lang==="en") ? "$20,000 COP" : "$20.000";
+    el.innerHTML = t("hero.impact").replace("{a}","<b>"+amount+"</b>").replace("{x}","<b>"+n+" "+label+"</b>");
+    el.hidden = false;
+  });
+}
+function initIconDraw(){
+  var shapes = document.querySelectorAll(".ic-svg path, .ic-svg circle, .ic-svg rect, .ic-svg line, .ic-svg polyline, .ic-svg polygon");
+  for (var i=0;i<shapes.length;i++) shapes[i].setAttribute("pathLength","1");
+}
 function renderWall(){
   var el = document.getElementById("net-wall"); if (!el) return;
   loadPartners().then(function(list){
@@ -1090,3 +1106,4 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 loadPartners();
 if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
+initIconDraw();
