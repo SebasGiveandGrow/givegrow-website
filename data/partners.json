@@ -1,0 +1,39 @@
+{
+  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora.",
+  "partners": [
+    {
+      "id": "hub-medellin",
+      "name": "HUB SOCIAL Give&Grow",
+      "type": "hub",
+      "lat": 6.2442,
+      "lng": -75.5812,
+      "area": {
+        "es": "Medellín · centro operativo",
+        "en": "Medellín · operations center"
+      }
+    },
+    {
+      "id": "ndf",
+      "name": "Fundación Niños del Futuro",
+      "type": "foundation",
+      "lat": 6.2925,
+      "lng": -75.5375,
+      "area": {
+        "es": "Manrique · La Honda, Medellín",
+        "en": "Manrique · La Honda, Medellín"
+      },
+      "url": "https://ninosdelfuturo.com",
+      "instagram": "https://www.instagram.com/ninos.del.futuro",
+      "impactUnits": [
+        {
+          "id": "ndf-plato",
+          "cop": 4000,
+          "es": "plato de comida",
+          "esPl": "platos de comida",
+          "en": "plate of food",
+          "enPl": "plates of food"
+        }
+      ]
+    }
+  ]
+}

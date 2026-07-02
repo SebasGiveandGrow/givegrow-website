@@ -1026,6 +1026,13 @@ function renderPobChips(){
   el.innerHTML = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
 }
 function setLang(l){
+  var next = (l === "en") ? "en" : "es";
+  var vt = document.startViewTransition && window.matchMedia &&
+           !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+           typeof lang !== "undefined" && lang && lang !== next;
+  if (vt){ document.startViewTransition(function(){ applyLang(l); }); } else { applyLang(l); }
+}
+function applyLang(l){
   lang = (l === "en") ? "en" : "es";
   document.documentElement.lang = lang;
   var nodes = document.querySelectorAll("[data-i18n]");
@@ -1308,10 +1315,27 @@ function accTab(name){
 }
 /* Red en el mapa: cada fundación/empresa aliada se agrega a PARTNERS.
    type: "foundation" | "company" | "hub". Coordenadas a nivel de zona/barrio (nunca direcciones privadas). */
-var PARTNERS = [
+var PARTNERS_FALLBACK = [
   { name:"HUB SOCIAL Give&Grow", type:"hub", lat:6.2442, lng:-75.5812, areaKey:"map.area.med" },
   { name:"Fundación Niños del Futuro", type:"foundation", lat:6.2925, lng:-75.5375, areaKey:"map.area.ndf", url:"https://ninosdelfuturo.com" }
 ];
+var PARTNERS_DATA = null;
+function loadPartners(){
+  if (PARTNERS_DATA) return Promise.resolve(PARTNERS_DATA);
+  return fetch("/data/partners.json")
+    .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+    .then(function(j){
+      PARTNERS_DATA = (j && j.partners && j.partners.length) ? j.partners : PARTNERS_FALLBACK;
+      var units=[];
+      for (var i=0;i<PARTNERS_DATA.length;i++){
+        var p=PARTNERS_DATA[i], us=p.impactUnits||[];
+        for (var k=0;k<us.length;k++){ us[k].partner=p.name; units.push(us[k]); }
+      }
+      if (units.length){ IMPACT_UNITS = units; try{ calcUpdate(); }catch(e){} }
+      return PARTNERS_DATA;
+    })
+    .catch(function(){ PARTNERS_DATA = PARTNERS_FALLBACK; return PARTNERS_DATA; });
+}
 function initMap(){
   var box = document.getElementById("map-box");
   if (!box || box.dataset.done) return;
@@ -1319,14 +1343,15 @@ function initMap(){
   function pin(tp){
     return L.divIcon({ className:"", html:'<span class="gg-pin gg-pin-'+tp+'"></span>', iconSize:[24,32], iconAnchor:[12,30], popupAnchor:[0,-26] });
   }
-  function build(){
+  function build(list){
     var map = L.map("map-box",{scrollWheelZoom:false}).setView([6.2442,-75.5812], 12);
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
       {subdomains:"abcd", maxZoom:19, attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(map);
     var bounds=[];
-    for (var i=0;i<PARTNERS.length;i++){
-      var pt=PARTNERS[i];
-      var html="<b>"+pt.name+"</b>"+(pt.areaKey?("<br>"+t(pt.areaKey)):"")+
+    for (var i=0;i<list.length;i++){
+      var pt=list[i];
+      var area = pt.area ? (pt.area[lang]||pt.area.es||"") : (pt.areaKey ? t(pt.areaKey) : "");
+      var html="<b>"+pt.name+"</b>"+(area?("<br>"+area):"")+
         (pt.url?('<br><a href="'+pt.url+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>"):"");
       L.marker([pt.lat,pt.lng],{icon:pin(pt.type)}).addTo(map).bindPopup(html);
       bounds.push([pt.lat,pt.lng]);
@@ -1342,13 +1367,14 @@ function initMap(){
     };
     legend.addTo(map);
   }
-  if (window.L){ build(); return; }
+  function start(){ loadPartners().then(build); }
+  if (window.L){ start(); return; }
   var css = document.createElement("link");
   css.rel = "stylesheet"; css.href = "/vendor/leaflet/leaflet.css";
   document.head.appendChild(css);
   var s = document.createElement("script");
   s.src = "/vendor/leaflet/leaflet.js";
-  s.onload = build;
+  s.onload = start;
   document.body.appendChild(s);
 }
 /* Historias: estado honesto hasta tener contenido real */
@@ -1513,3 +1539,4 @@ function init(){
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
+loadPartners();
