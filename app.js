@@ -213,6 +213,15 @@ var I18N = {
     "faq.a9":"Con evidencia, no promesas. Cada aporte sigue nuestra trazabilidad: acta de recepción con foto, acta de entrega firmada por quien recibe, reporte fotográfico y certificado de donación. Te contamos a dónde llegó y a quién ayudó.",
     "faq.q10":"¿Qué son ImpactOS y ALMA?",
     "faq.a10":"ImpactOS es el sistema con el que damos trazabilidad y visibilidad al impacto del Hub. ALMA es la asistente que responde tus dudas sobre la fundación aquí en el sitio. Ambos están en construcción y crecen con la red.",
+    "ndf.badge":"Proyecto comunitario de base",
+    "faq.cta.emp":"Explora las alianzas empresariales →",
+    "faq.cta.fund":"Vincula tu fundación al Hub →",
+    "map.visit":"Ver sitio web",
+    "map.leg.f":"Fundaciones aliadas",
+    "map.leg.c":"Empresas aliadas · próximamente",
+    "map.leg.hub":"HUB SOCIAL",
+    "map.area.med":"Medellín · centro operativo",
+    "map.area.ndf":"Manrique · La Honda, Medellín",
     "transp.funds.ey":"A dónde va tu aporte",
     "transp.funds.t":"Tu aporte, con destino claro.",
     "transp.funds.p":"Somos una fundación joven y transparente: hoy buena parte del apoyo llega en especie (Ruta 2), y el destino de cada aporte se respalda con actas, fotos y reportes. Estos son nuestros principios y nuestro compromiso.",
@@ -696,6 +705,15 @@ var I18N = {
     "faq.a9":"Evidence, not promises. Every gift follows our traceability: a reception record with a photo, a delivery record signed by the recipient, a photographic report and a donation certificate. We tell you where it landed and who it helped.",
     "faq.q10":"What are ImpactOS and ALMA?",
     "faq.a10":"ImpactOS is the system we use to bring traceability and visibility to the Hub impact. ALMA is the assistant that answers your questions about the foundation here on the site. Both are under construction and grow with the network.",
+    "ndf.badge":"Grassroots community project",
+    "faq.cta.emp":"Explore business alliances →",
+    "faq.cta.fund":"Bring your foundation into the Hub →",
+    "map.visit":"Visit website",
+    "map.leg.f":"Partner foundations",
+    "map.leg.c":"Partner businesses · coming soon",
+    "map.leg.hub":"SOCIAL HUB",
+    "map.area.med":"Medellín · operations center",
+    "map.area.ndf":"Manrique · La Honda, Medellín",
     "transp.funds.ey":"Where your gift goes",
     "transp.funds.t":"Your gift, with a clear destination.",
     "transp.funds.p":"We are a young, transparent foundation: today much of the support arrives in kind (Route 2), and the destination of every gift is backed by records, photos and reports. These are our principles and our commitment.",
@@ -1096,8 +1114,16 @@ var TIERS = [
    Cada item: {es, esPl, en, enPl, cop} (singular/plural + costo COP de UNA unidad). Vacío = línea oculta.
    A futuro: con >1 unidad con costo defendible, añadir un selector de tipo de impacto (comida, resguardo, refugio, etc.). */
 var IMPACT_UNITS = [
-  { es:"plato de comida", esPl:"platos de comida", en:"plate of food", enPl:"plates of food", cop:4000 }
+  { id:"ndf-plato", partner:"Fundación Niños del Futuro", cop:4000,
+    es:"plato de comida", esPl:"platos de comida", en:"plate of food", enPl:"plates of food" }
+  /* Futuro: { id:"x-kit", partner:"...", cop:NNNN, es:"kit escolar", esPl:"kits escolares", en:"school kit", enPl:"school kits" } */
 ];
+function activeImpactUnit(){
+  if (!IMPACT_UNITS.length) return null;
+  for (var i=0;i<IMPACT_UNITS.length;i++){ if (IMPACT_UNITS[i].id===calc.impactId) return IMPACT_UNITS[i]; }
+  return IMPACT_UNITS[0];
+}
+function setImpactUnit(id){ calc.impactId = id; calcUpdate(); }
 function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
 function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 
@@ -1175,8 +1201,9 @@ function calcUpdate(){
   var mic=document.getElementById("m-ic"); if(mic) mic.innerHTML = tier.svg;
   var irow=document.getElementById("co-impact-row"), iout=document.getElementById("co-impact"), inote=document.getElementById("calc-impact-note");
   if (irow && iout){
-    if (IMPACT_UNITS.length){
-      var u=IMPACT_UNITS[0], n=Math.floor(cop / u.cop);
+    var u = activeImpactUnit();
+    if (u){
+      var n = Math.floor(cop / u.cop);
       if (n>=1){
         var uLabel = (lang==="en") ? (n===1 ? u.en : (u.enPl||u.en)) : (n===1 ? u.es : (u.esPl||u.es));
         iout.textContent = "\u2248 "+n+" "+uLabel; irow.style.display=""; if(inote) inote.style.display="";
@@ -1279,21 +1306,48 @@ function accTab(name){
   if (name==="map") initMap();
   if (name==="blog") initBlog();
 }
+/* Red en el mapa: cada fundación/empresa aliada se agrega a PARTNERS.
+   type: "foundation" | "company" | "hub". Coordenadas a nivel de zona/barrio (nunca direcciones privadas). */
+var PARTNERS = [
+  { name:"HUB SOCIAL Give&Grow", type:"hub", lat:6.2442, lng:-75.5812, areaKey:"map.area.med" },
+  { name:"Fundación Niños del Futuro", type:"foundation", lat:6.2925, lng:-75.5375, areaKey:"map.area.ndf", url:"https://ninosdelfuturo.com" }
+];
 function initMap(){
   var box = document.getElementById("map-box");
   if (!box || box.dataset.done) return;
   box.dataset.done = "1";
+  function pin(tp){
+    return L.divIcon({ className:"", html:'<span class="gg-pin gg-pin-'+tp+'"></span>', iconSize:[24,32], iconAnchor:[12,30], popupAnchor:[0,-26] });
+  }
   function build(){
-    var map = L.map("map-box").setView([6.2088, -75.5648], 12);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"OpenStreetMap"}).addTo(map);
-    L.marker([6.2088, -75.5648]).addTo(map).bindPopup("HUB SOCIAL - Medellín");
+    var map = L.map("map-box",{scrollWheelZoom:false}).setView([6.2442,-75.5812], 12);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      {subdomains:"abcd", maxZoom:19, attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(map);
+    var bounds=[];
+    for (var i=0;i<PARTNERS.length;i++){
+      var pt=PARTNERS[i];
+      var html="<b>"+pt.name+"</b>"+(pt.areaKey?("<br>"+t(pt.areaKey)):"")+
+        (pt.url?('<br><a href="'+pt.url+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>"):"");
+      L.marker([pt.lat,pt.lng],{icon:pin(pt.type)}).addTo(map).bindPopup(html);
+      bounds.push([pt.lat,pt.lng]);
+    }
+    if (bounds.length>1) map.fitBounds(bounds,{padding:[42,42]});
+    var legend=L.control({position:"bottomleft"});
+    legend.onAdd=function(){
+      var d=L.DomUtil.create("div","map-legend");
+      d.innerHTML='<span><i class="gg-dot" style="background:#1F5C38"></i>'+t("map.leg.f")+"</span>"
+                 +'<span><i class="gg-dot" style="background:#B4690E"></i>'+t("map.leg.c")+"</span>"
+                 +'<span><i class="gg-dot" style="background:#0A2A5E"></i>'+t("map.leg.hub")+"</span>";
+      return d;
+    };
+    legend.addTo(map);
   }
   if (window.L){ build(); return; }
   var css = document.createElement("link");
-  css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+  css.rel = "stylesheet"; css.href = "/vendor/leaflet/leaflet.css";
   document.head.appendChild(css);
   var s = document.createElement("script");
-  s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+  s.src = "/vendor/leaflet/leaflet.js";
   s.onload = build;
   document.body.appendChild(s);
 }
