@@ -109,7 +109,7 @@ section{padding:72px 0}
 .tier-ben{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:7px}
 .tier-ben li{position:relative;padding-left:20px;font-size:13.5px;color:var(--mu);line-height:1.45}
 .tier-ben li::before{content:"";position:absolute;left:2px;top:6px;width:7px;height:7px;border-radius:50%;background:#fff;border:2px solid var(--g)}
-.cta-note{font-size:13px;color:var(--mu);max-width:520px;margin:14px auto 0}
+.cta-note{font-size:13px;color:var(--mu);max-width:480px;margin:22px auto 0;line-height:1.5}
 .card .ic{width:46px;height:46px;border-radius:12px;background:var(--gl);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
 .partner-logo{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border:1px solid var(--bd);border-radius:14px;background:#fff;margin-bottom:14px}
 .partner-logo img{display:block;width:auto;height:auto;max-width:200px;max-height:88px}
@@ -126,6 +126,7 @@ section{padding:72px 0}
 .steps{counter-reset:s;display:grid;gap:18px}
 .step{display:flex;gap:18px;align-items:flex-start}
 .step::before{counter-increment:s;content:counter(s);flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:var(--g);color:#fff;font-family:"Bricolage Grotesque";font-weight:800;display:flex;align-items:center;justify-content:center}
+.step-n{display:none}
 .step h4{font-size:17px;margin-bottom:3px}
 .step p{font-size:14px;color:var(--mu)}
 
