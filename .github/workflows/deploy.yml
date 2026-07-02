@@ -12,6 +12,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate site (syntax, i18n parity, structure)
+        run: node scripts/validate.mjs
+
       - name: Install Wrangler
         run: npm install -g wrangler@latest
 
