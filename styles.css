@@ -344,3 +344,25 @@ footer a:hover{color:var(--gn)}
 .hero-impact{display:inline-flex;align-items:center;gap:8px;margin:-16px 0 30px;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,.13);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:14px;color:rgba(255,255,255,.95);border:1px solid rgba(255,255,255,.18)}
 .hero-impact b{color:var(--gn);font-weight:700}
 @media (prefers-reduced-motion:reduce){.card:hover .ic-svg *,.path:hover .ic-svg *{animation:none}.stats .stat:hover{transform:none}}
+.btn-nav{background:var(--g);color:#fff;padding:9px 20px;border-radius:999px;font-weight:700;font-size:14px;white-space:nowrap;transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
+.btn-nav:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(31,92,56,.35)}
+@media (max-width:600px){.btn-nav{padding:8px 14px;font-size:13px}}
+.mnav-g{display:block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--g);font-weight:800;margin:16px 0 4px}
+.pcard{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--bd);border-radius:var(--rl);padding:16px 18px;transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
+.pcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(10,42,94,.08)}
+.pcard-logo{width:56px;height:56px;object-fit:cover;border-radius:12px;border:1px solid var(--bd);flex:0 0 auto}
+.pcard-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pcard-body b{font-family:"Bricolage Grotesque",sans-serif;font-size:15.5px;color:var(--navy);line-height:1.25}
+.pcard-body .mu{font-size:12.5px}
+.pcard-go{margin-left:auto;color:var(--g);font-weight:700;transition:transform .25s var(--ease)}
+.pcard:hover .pcard-go{transform:translateX(4px)}
+.ficha-head{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:18px}
+.ficha-logo{width:110px;height:110px;object-fit:cover;border-radius:18px;border:1px solid var(--bd);background:#fff}
+.ficha-name{font-size:clamp(26px,4vw,40px);margin:0 0 8px}
+.ficha-impact{border-left:4px solid var(--g)}
+.ficha-cta-btn{display:inline-block;margin-top:14px;background:var(--g);color:#fff;padding:12px 26px;border-radius:999px;font-weight:700}
+.cta-box{position:relative;overflow:hidden}
+.cta-box>*{position:relative;z-index:1}
+.cta-box::before{content:"";position:absolute;inset:-40%;z-index:0;background:radial-gradient(40% 55% at 30% 30%,rgba(31,92,56,.10),transparent 60%),radial-gradient(35% 50% at 75% 65%,rgba(10,42,94,.08),transparent 60%),radial-gradient(30% 45% at 60% 20%,rgba(180,105,14,.06),transparent 60%);animation:mesh 16s ease-in-out infinite alternate;pointer-events:none}
+@keyframes mesh{from{transform:translate3d(-2%,-2%,0) rotate(0)}to{transform:translate3d(2%,3%,0) rotate(4deg)}}
+@media (prefers-reduced-motion:reduce){.cta-box::before{animation:none}}

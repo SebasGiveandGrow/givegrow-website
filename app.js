@@ -222,6 +222,17 @@ var I18N = {
     "map.leg.hub":"HUB SOCIAL",
     "map.area.med":"Medellín · centro operativo",
     "net.ey":"La red",
+    "nav.g.hub":"El Hub","nav.g.sumate":"Súmate","nav.g.nosotros":"Nosotros","nav.cta":"Donar","nav.faq":"FAQ",
+    "ficha.back":"Volver al Hub",
+    "ficha.lider":"Dirige",
+    "ficha.prog.t":"Programas en marcha",
+    "ficha.imp.t":"Tu aporte aquí, en concreto",
+    "ficha.imp.p":"{c} = 1 {u}. Por ejemplo, $20.000 se convierten en {x}, entregados con acta y foto.",
+    "ficha.hub.t":"Cómo la fortalece el Hub",
+    "ficha.web":"Ver sitio web",
+    "ficha.cta.t":"Dona con destino a esta fundación.",
+    "ficha.cta.p":"Puedes dirigir tu aporte a esta fundación al donar, con trazabilidad completa de principio a fin.",
+    "ficha.cta.btn":"Donar ahora",
     "hero.impact":"{a} al mes se convierten en {x} — con acta y foto.",
     "net.t":"Quiénes forman la red hoy.",
     "net.p":"Cada punto del mapa, con nombre propio. Aquí solo aparecen vínculos confirmados: la red crece con evidencia.",
@@ -541,6 +552,10 @@ function renderPobChips(){
   var items=(t("hub.pob.list")||"").split(" - ");
   el.innerHTML = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
 }
+function postLang(l){
+  applyLang(l); renderWall(); renderHeroImpact(); renderAliadas();
+  if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
+}
 var I18N_LOADING = null;
 function ensureLang(next){
   if (next !== "en" || I18N.en) return Promise.resolve();
@@ -559,8 +574,8 @@ function setLang(l){
     var vt = document.startViewTransition && window.matchMedia &&
              !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
              typeof lang !== "undefined" && lang && lang !== next;
-    if (vt){ document.startViewTransition(function(){ applyLang(l); renderWall(); renderHeroImpact(); }); }
-    else { applyLang(l); renderWall(); renderHeroImpact(); }
+    if (vt){ document.startViewTransition(function(){ postLang(l); }); }
+    else { postLang(l); }
   });
 }
 function applyLang(l){
@@ -589,6 +604,10 @@ function go(id, fromPop){
   var pages = document.querySelectorAll(".page");
   for (var i=0;i<pages.length;i++) pages[i].classList.remove("active");
   var target = document.getElementById("page-"+id);
+  if (!target && id.indexOf("fundacion/")===0){
+    target = document.getElementById("page-ficha");
+    if (target) renderFicha(id.split("/")[1]);
+  }
   if (!target){ id = "inicio"; target = document.getElementById("page-inicio"); }
   target.classList.add("active");
   currentRoute = id;
@@ -898,6 +917,72 @@ function renderWall(){
             + '</div>';
     }
     html += '<div class="card card-empty"><p>'+t("net.next")+'</p></div>';
+    el.innerHTML = html;
+  });
+}
+function renderAliadas(){
+  var el = document.getElementById("aliadas-grid"); if (!el) return;
+  loadPartners().then(function(list){
+    var html = "";
+    for (var i=0;i<list.length;i++){
+      var p = list[i]; if (p.type !== "foundation") continue;
+      var area = p.area ? (p.area[lang]||p.area.es||"") : "";
+      var pob = p.poblacion ? (p.poblacion[lang]||p.poblacion.es||"") : "";
+      html += '<a class="pcard" href="#fundacion/'+p.id+'" onclick="return go(\'fundacion/'+p.id+'\')">'
+            + (p.logo ? '<img class="pcard-logo" src="'+p.logo+'" alt="" loading="lazy">' : '')
+            + '<span class="pcard-body"><b>'+p.name+'</b>'
+            + '<span class="mu">'+pob+(pob&&area?" · ":"")+area+'</span></span>'
+            + '<span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
+    }
+    html += '<div class="card card-empty"><h3>'+t("hub.aliadas.soon.t")+'</h3><p>'+t("hub.aliadas.soon.p")+'</p></div>';
+    el.innerHTML = html;
+  });
+}
+function renderFicha(fid){
+  var el = document.getElementById("ficha-body"); if (!el) return;
+  loadPartners().then(function(list){
+    var p = null;
+    for (var i=0;i<list.length;i++){ if (list[i].id === fid){ p = list[i]; break; } }
+    if (!p){ go("hub"); return; }
+    var pr = p.profile || {};
+    var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
+    var area = pick(p.area), pob = pick(p.poblacion), badge = pick(pr.badge),
+        years = pick(pr.years), about = pick(pr.about), hubTxt = pick(pr.hub);
+    var u = (p.impactUnits && p.impactUnits[0]) || null;
+    var html = '<a class="card-link" href="#hub" onclick="return go(\'hub\')">&larr; '+t("ficha.back")+'</a>'
+      + '<div class="ficha-head">'
+      + (p.logo ? '<img class="ficha-logo" src="'+p.logo+'" alt="">' : '')
+      + '<div><h1 class="ficha-name">'+p.name+'</h1>'
+      + (badge ? '<span class="tag">'+badge+'</span>' : '')
+      + '<div class="eco-row" style="margin-top:12px">'
+      + (area ? '<span class="eco-chip">'+area+'</span>' : '')
+      + (pob ? '<span class="eco-chip">'+pob+'</span>' : '')
+      + (years ? '<span class="eco-chip">'+years+'</span>' : '')
+      + (pr.leader ? '<span class="eco-chip">'+t("ficha.lider")+': '+pr.leader+'</span>' : '')
+      + '</div></div></div>'
+      + (about ? '<p class="lead" style="margin-top:22px;max-width:70ch">'+about+'</p>' : '');
+    if (pr.programs && pr.programs.length){
+      html += '<h3 style="margin-top:34px">'+t("ficha.prog.t")+'</h3><div class="grid g2" style="margin-top:16px">';
+      for (var k=0;k<pr.programs.length;k++){
+        var g = pr.programs[k];
+        html += '<div class="card"><h3>'+g.name+'</h3><p>'+((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
+      }
+      html += '</div>';
+    }
+    if (u){
+      var n = Math.floor(20000/u.cop);
+      var cop = u.cop.toLocaleString(lang==="en"?"en-US":"es-CO");
+      html += '<div class="card ficha-impact" style="margin-top:26px"><h3>'+t("ficha.imp.t")+'</h3><p>'
+        + t("ficha.imp.p").replace("{c}","<b>$"+cop+"</b>").replace("{u}",(u[lang]||u.es)).replace("{x}","<b>"+n+" "+((n===1?(u[lang]||u.es):(u[lang+"Pl"]||u.esPl)))+"</b>")
+        + '</p></div>';
+    }
+    if (hubTxt) html += '<h3 style="margin-top:34px">'+t("ficha.hub.t")+'</h3><p style="max-width:70ch">'+hubTxt+'</p>';
+    html += '<div class="eco-row" style="margin-top:26px">'
+      + (p.url ? '<a class="card-link" href="'+p.url+'" target="_blank" rel="noopener">'+t("ficha.web")+'</a>' : '')
+      + (p.instagram ? '<a class="card-link" style="margin-left:18px" href="'+p.instagram+'" target="_blank" rel="noopener">Instagram</a>' : '')
+      + '</div>'
+      + '<div class="cta-box" style="margin-top:36px"><h2>'+t("ficha.cta.t")+'</h2><p class="mu">'+t("ficha.cta.p")+'</p>'
+      + '<a class="ficha-cta-btn" href="#donar" onclick="return go(\'donar\')">'+t("ficha.cta.btn")+'</a></div>';
     el.innerHTML = html;
   });
 }

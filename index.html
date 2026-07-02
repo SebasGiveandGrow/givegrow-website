@@ -24,7 +24,7 @@
 <meta name="theme-color" content="#1F5C38">
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=456c1daf">
+<link rel="stylesheet" href="/styles.css?v=5e2f5c6f">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/benef_03.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -42,24 +42,36 @@
   <div class="nav-in">
     <a class="nlogo" href="#inicio" onclick="return go('inicio')">Give<em>&</em>Grow</a>
     <div class="nlinks">
-      <a class="nlink" href="#donar" onclick="return go('donar')" data-i18n="nav.donar">Donar</a>
-      <a class="nlink" href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
-      <a class="nlink" href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
       <div class="ndrop">
-        <a class="nlink" href="#hub" onclick="return go('hub')" data-i18n="nav.conocenos" aria-haspopup="menu">Conócenos</a>
+        <a class="nlink" href="#hub" onclick="return go('hub')" data-i18n="nav.g.hub" aria-haspopup="menu">El Hub</a>
         <div class="ndrop-menu">
           <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
-          <a href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
           <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
-          <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
           <a href="#alma" onclick="return go('alma')" data-i18n="nav.alma">ALMA</a>
-          <a href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
         </div>
       </div>
-      <a class="nlink" href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
-      <a class="nlink" href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
+      <div class="ndrop">
+        <a class="nlink" href="#donar" onclick="return go('donar')" data-i18n="nav.g.sumate" aria-haspopup="menu">Súmate</a>
+        <div class="ndrop-menu">
+          <a href="#donar" onclick="return go('donar')" data-i18n="nav.donar">Donar</a>
+          <a href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
+          <a href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
+          <a href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
+          <a href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
+        </div>
+      </div>
+      <div class="ndrop">
+        <a class="nlink" href="#origen" onclick="return go('origen')" data-i18n="nav.g.nosotros" aria-haspopup="menu">Nosotros</a>
+        <div class="ndrop-menu">
+          <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
+          <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
+          <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
+          <a href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
+        </div>
+      </div>
     </div>
     <div class="nav-actions">
+      <a class="btn-nav" href="#donar" onclick="return go('donar')" data-i18n="nav.cta">Donar</a>
       <div class="lang">
         <button id="lang-es" class="on" onclick="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
         <button id="lang-en" onclick="setLang('en')" aria-label="Switch language to English">EN</button>
@@ -69,16 +81,20 @@
   </div>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
+  <span class="mnav-g" data-i18n="nav.g.hub">El Hub</span>
+  <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
+  <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
+  <a href="#alma" onclick="return go('alma')" data-i18n="nav.alma">ALMA</a>
+  <span class="mnav-g" data-i18n="nav.g.sumate">Súmate</span>
   <a href="#donar" onclick="return go('donar')" data-i18n="nav.donar">Donar</a>
+  <a href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
   <a href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
   <a href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
-  <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
   <a href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
-  <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
+  <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
   <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
-  <a href="#alma" onclick="return go('alma')" data-i18n="nav.alma">ALMA</a>
-          <a href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
   <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
+  <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
   <a href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
 </div>
 
@@ -248,30 +264,7 @@
       <span class="ey rv" data-i18n="hub.aliadas.ey">Fundaciones aliadas</span>
       <h2 class="h-sec rv" data-i18n="hub.aliadas.t">Las primeras del muro.</h2>
       <p class="lead rv d1" data-i18n="hub.aliadas.lead"></p>
-      <div class="grid g2 rv d2" style="margin-top:30px">
-        <div class="card">
-          <div class="partner-logo"><img src="/img/ndf_logo.jpg?v=20260701b" alt="Logo de Fundación Niños del Futuro" data-i18n="ndf.logo.alt" data-i18n-attr="alt" loading="lazy" width="200" height="142"></div>
-          <h3 style="margin-top:14px">Fundación Niños Del Futuro</h3>
-          <span class="tag" data-i18n="ndf.badge"></span>
-          <div class="eco-row" style="margin:10px 0 4px">
-            <span class="eco-chip" data-i18n="ndf.chip.sector"></span>
-            <span class="eco-chip" data-i18n="ndf.chip.loc"></span>
-            <span class="eco-chip" data-i18n="ndf.chip.since"></span>
-          </div>
-          <p data-i18n="ndf.desc"></p>
-          <div class="eco-row" style="margin-top:10px">
-            <span class="eco-chip" data-i18n="ndf.prog1"></span>
-            <span class="eco-chip" data-i18n="ndf.prog2"></span>
-          </div>
-          <p style="margin-top:14px"><a class="card-link" href="https://ninosdelfuturo.com" target="_blank" rel="noopener" data-i18n="ndf.web"></a></p>
-          <a class="card-link" href="https://www.instagram.com/ninos.del.futuro" target="_blank" rel="noopener" data-i18n="ndf.ig"></a>
-        </div>
-        <div class="card card-empty">
-          <div class="ic" aria-hidden="true"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></div>
-          <h3 data-i18n="hub.aliadas.soon.t">Próximamente más fundaciones</h3>
-          <p data-i18n="hub.aliadas.soon.p"></p>
-        </div>
-      </div>
+      <div id="aliadas-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
     </div>
   </section>
 </main>
@@ -464,6 +457,12 @@
       <p class="lead rv d1" data-i18n="net.p"></p>
       <div id="net-wall" class="grid g3 rv d2" style="margin-top:26px"></div>
     </div>
+  </section>
+</main>
+
+<main id="page-ficha" class="page">
+  <section>
+    <div class="wrap" id="ficha-body"></div>
   </section>
 </main>
 
@@ -909,7 +908,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=b6eeb68c"></script>
+<script src="/app.js?v=7a6e1421"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

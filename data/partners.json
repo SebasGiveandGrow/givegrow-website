@@ -33,7 +33,47 @@
           "en": "plate of food",
           "enPl": "plates of food"
         }
-      ]
+      ],
+      "logo": "/img/ndf_logo.jpg",
+      "poblacion": {
+        "es": "≈130 niños y niñas",
+        "en": "≈130 children"
+      },
+      "profile": {
+        "badge": {
+          "es": "Proyecto comunitario de base",
+          "en": "Grassroots community project"
+        },
+        "leader": "Francisco Grijalba",
+        "years": {
+          "es": "5+ años en territorio",
+          "en": "5+ years on the ground"
+        },
+        "about": {
+          "es": "Fundación comunitaria dirigida por Francisco Grijalba en el sector de La Honda (Manrique, Medellín), con más de cinco años sirviendo a su comunidad. Es la primera fundación aliada del HUB SOCIAL: Give&Grow no reemplaza su labor, la fortalece.",
+          "en": "A community foundation led by Francisco Grijalba in the La Honda area (Manrique, Medellín), with over five years serving its community. It is the Social Hub's first partner foundation: Give&Grow does not replace its work, it strengthens it."
+        },
+        "programs": [
+          {
+            "name": "Chefs del Futuro",
+            "desc": {
+              "es": "Alimentación diaria: cerca de 100 niños y niñas reciben almuerzo cada día.",
+              "en": "Daily nutrition: around 100 children receive lunch every day."
+            }
+          },
+          {
+            "name": "Borboletas",
+            "desc": {
+              "es": "Acompañamiento a 30 niñas y niños, tres veces por semana.",
+              "en": "Support for 30 children, three times a week."
+            }
+          }
+        ],
+        "hub": {
+          "es": "A través de la Ruta 1 (alianzas) recibe logística y visibilidad, y por la Ruta 2 (gestión de donaciones) canaliza aportes en especie y monetarios con trazabilidad completa: acta de recepción, entrega firmada, reporte fotográfico y certificado.",
+          "en": "Through Route 1 (alliances) it receives logistics and visibility, and through Route 2 (donation management) it channels in-kind and monetary gifts with full traceability: reception record, signed delivery, photo report and certificate."
+        }
+      }
     }
   ]
 }
