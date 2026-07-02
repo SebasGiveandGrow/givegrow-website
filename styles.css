@@ -1,3 +1,6 @@
+@font-face{font-family:"Bricolage Grotesque";font-style:normal;font-weight:200 800;font-display:swap;src:url("/vendor/fonts/bricolage-latin.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url("/vendor/fonts/inter-latin.woff2") format("woff2")}
+@font-face{font-family:"Fraunces";font-style:italic;font-weight:100 900;font-display:swap;src:url("/vendor/fonts/fraunces-italic-latin.woff2") format("woff2")}
 /* ===== Give&Grow International - design system (rebuild v4) ===== */
 :root{
   --g:#1F5C38;--gm:#2E7D4F;--gl:#E8F5EC;--gn:#4ade80;--gd:#16402A;
@@ -314,3 +317,14 @@ footer a:hover{color:var(--gn)}
 .origen-img{width:100%;border-radius:var(--rl);max-height:440px;object-fit:cover;display:block}
 
 @media(max-width:600px){.g2,.g3{grid-template-columns:1fr}}
+
+.net-card{position:relative}
+.net-dot{position:absolute;top:20px;right:20px;width:10px;height:10px;border-radius:50%}
+#page-origen .steps{position:relative}
+#page-origen .steps::before{content:"";position:absolute;left:20px;top:12px;bottom:12px;width:2px;background:linear-gradient(180deg,var(--g) 0%,var(--bd) 100%)}
+#page-origen .step{position:relative}
+@supports (animation-timeline: view()){
+  #page-origen .step{animation:msIn both;animation-timeline:view();animation-range:entry 5% entry 45%}
+}
+@keyframes msIn{from{opacity:.2;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#page-origen .step{animation:none!important}}
