@@ -1,54 +1,33 @@
 # Informe de Cierre de Sesión — Give&Grow
 
-_Última actualización: 27/06/2026. Sitio: https://www.thegiveandgrowproject.org — repo `SebasGiveandGrow/givegrow-website` (rama `main`)._
+_Última actualización: 02/07/2026. Sitio: https://www.thegiveandgrowproject.org — repo `SebasGiveandGrow/givegrow-website` (rama `main`)._
 
-## 1. Resumen de Estado
+## 1. Completado y desplegado en esta sesión (14 commits, CI + Cloudflare en verde)
 
-### Completado y desplegado (todo en `main`, Actions en verde)
-- **Empresas** desarrollada a fondo (por qué aliarte, 3 niveles, cómo funciona en 4 pasos, puente a Gratitud) — commit `473611e2`
-- **Gratitud** desarrollada (dos caras miembro/comercio, 5 categorías en chips, 3 pasos, CTA doble) — `473611e2`
-- **Impacto** reencuadrada honesta ("Evidencia, no promesas" + 3 pruebas; historias inventadas → estado honesto) — `4e36d541`
-- **Inicio**: sección "¿Por dónde empiezo?" con 4 recorridos (donante/empresa/fundación/voluntario) — `1dff2eb5`
-- **Calculadora** pulida: íconos SVG botánicos (último emoji eliminado) + andamiaje de equivalencias `IMPACT_UNITS` — `8a049cda`
-- **Origen** enriquecida (foto de campo + línea de tiempo + CTA); **Hub** con poblaciones en chips — `14fe7ad7`
-- **Fundaciones** ampliada (íconos + "El proceso" en 5 pasos + franja "sin costo") — `3b336b19`
-- **Formulario Hub** finalizado y publicado; **primer registro recibido** (Niños del Futuro NDF)
+**Contenido y conversión**
+- `b2be9b87` Logo real de NDF en tarjeta · `ac7b5350` Calculadora con aporte único · `f2fc82fc` contabilidad@ + pluralización de impacto · `a9bec272` FAQ del HUB · `468e55fb` pulido de auditoría (responsive, a11y, sin "Medellín" en marketing)
+- `b8e3a621` **Membresías**: precios COP+USD (20k/50k/120k/250k), beneficios escalonados honestos (sin Hope Market/sorteos = fase 2), Gratitud desde Retoño como beneficio voluntario de terceros, umbrales de calculadora en COP, política de cancelación (contabilidad@)
+- `5df764e1` **Fondos** en Transparencia (híbrido + compromiso ≥80/≤10/≤10 etiquetado como compromiso, pendiente aval consejo/Manuela) · 5 rutas con ejemplos reales/futuros · Origen con hitos documentados (19-may-2025 Cámara; 2026 aliadas+Impact Journey) · FAQ a 10 preguntas (visible+JSON-LD) · sección "Pago seguro" lista para Wompi
 
-### Pendiente inmediato (empezado, sin terminar): Integrar NDF al Hub
-Datos verificados. **Consentimientos SÍ otorgados** (publicación de logo/nombre + uso de imagen). Falta:
-- **Encender la calculadora** con el dato real: `IMPACT_UNITS=[{es:"plato de comida", en:"plate of food", cop:4000}]` (fuente: $4.000/plato, basado en facturas reales)
-- **Localizar y hostear el logo** (carpeta "Niños del Futuro" en Drive; la columna Logo del form vino vacía) → commit a `/img/`
-- **Construir la tarjeta de fundación** + sección "Fundaciones aliadas" en la página Hub (primer ladrillo del Heroes Wall)
+**Infraestructura, seguridad y datos**
+- `c94394a9` Fix números duplicados en pasos (`.step-n` oculto) + HSTS + CSP report-only
+- `7b4d3df9` Mapa rediseñado (CARTO Positron, pines CSS por tipo, leyenda, fitBounds) + **Leaflet auto-alojado** en `/vendor/leaflet` + **CSP en firme** sin unpkg
+- `05afae10` **`data/partners.json` fuente única** (mapa + calculadora) + transición nativa de idioma (View Transitions) + skeleton del mapa + **cache-busting por hash** + fix Instagram (`instagram.com/ninos.del.futuro`)
+- `fceed867` **Fuentes variable auto-alojadas** (`/vendor/fonts`, cero Google CDN; CSP style/font = 'self') + **EN perezoso** (`/i18n/en.json`, app.js −32%) + muro "La red" + timeline scroll-driven en Origen + `scripts/validate.mjs`
+- `0dbd9aee` **Gate de CI**: validate.mjs corre en Actions antes de cada deploy
+- `e4e8f508` Iconos SVG draw-on-hover + 5 rutas como recorrido horizontal + chip de impacto en hero + stats bento + "Rutas del modelo"
+- `5766a80a` **Nav 3 grupos** (El Hub/Súmate/Nosotros) + botón Donar fijo + drawer agrupado + FAQ al menú + **mini-tarjetas de aliadas** + **ficha dinámica `#fundacion/<id>`** (perfil NDF completo desde partners.json) + mesh gradient en CTAs
 
-### Pendiente de la lista (no iniciado)
-- Enriquecer **FAQ** (hoy solo 5 preguntas)
-- **Pulir detalles estéticos** (tarjetas "features" del Inicio: tag+ícono apretados; accesos del hero)
-- Revisar a fondo **Transparencia** y **Membresías**
+## 2. Pendientes (próxima sesión)
+1. **Tarjeta aliada**: mejorar proporción/visual del logo en `.pcard-logo` (hoy 56px crop; usar `object-fit:contain` + padding).
+2. **Imágenes de Instagram en la ficha**: la API de IG requiere cuenta business + app review (frágil). Recomendado: galería curada auto-alojada (`gallery[]` en partners.json) con consentimiento — mismo resultado, cero dependencia.
+3. **Cuestionario de fundaciones**: Google Form espejo del esquema `profile{}` de partners.json (líder, año, zona, población, programas+cifras, unidad de impacto+costo real, links, logo, fotos con consentimiento firmado).
+4. Capa fotográfica (usuario subirá fotos elegidas AL CHAT — Drive no da preview/transfer viable de binarios grandes). Carpeta Drive: "Fotos Diseño Web CLAUDE" (35 fotos + 13 videos).
+5. Modo oscuro (tokens ya decididos: fondo #0F1613, superficie #1A231D, texto #EFEDE6, primario #6FB08D) — sesión dedicada.
+6. **#14** delegación de eventos (~70 onclick inline → data-action) para retirar `'unsafe-inline'` del CSP.
+7. ROUTE_META + OG por ficha; ALMA alimentada por partners.json; selector de impacto (#11) al existir 2ª unidad.
+8. Wompi: al aprobar la cuenta, usuario envía **llave pública** + links/planes por nivel → cablear botones + dominios Wompi al CSP.
+9. Aval de Manuela/consejo: % de fondos y encuadre Art. 257 de Gratitud.
 
-### Datos verificados de NDF (para la tarjeta)
-- Nombre comercial: **Fundación Niños Del Futuro** · Director: Francisco Grijalba
-- Medellín (Manrique, La Honda) · desde **2020** · sector **Niñez y adolescencia**
-- IG **@ninosdelfuturo** · web **ninosdelfuturo.com** · color marca **Azul**
-- Misión (ES): _"Brindar bienestar y educación a los niños y jóvenes de las comunidades más vulnerables."_
-- Programas: **Chefs del Futuro** (~100 niños/día) y **Borboletas** (30 niños, 3×/sem)
-- **NIT 000 / en proceso de constitución** → no publicar como ESAL formal
-- La _frase corta_ la escribieron en inglés — crear versión ES.
-
-## 2. Prompt para el nuevo chat
-
-> Continúo el desarrollo del sitio de la Fundación Give&Grow International (SPA en Cloudflare Workers, repo `SebasGiveandGrow/givegrow-website`). El sitio es `index.html` + `app.js` + `styles.css`, i18n ES/EN con paridad (415/415 claves), deploy vía GitHub Trees API. Regla de oro: verificar render headless antes y después de cada deploy; nunca romper la paridad i18n; nada de emojis (solo íconos SVG line-art); "evidencia, no promesas" (no inventar métricas). Lee primero `SESSION_HANDOFF.md`, `DESIGN_SYSTEM.md` y `.clauderules` en la raíz del repo.
->
-> **Tarea inmediata:** Integrar la primera fundación aliada, **Niños del Futuro (NDF)**, al Hub (datos y consentimientos ya verificados en la hoja de respuestas del formulario en Drive): (1) encender la calculadora agregando `IMPACT_UNITS=[{es:"plato de comida",en:"plate of food",cop:4000}]` en `app.js`; (2) traer el logo de NDF desde la carpeta "Niños del Futuro" en Drive y hostearlo en `/img/`; (3) crear una sección "Fundaciones aliadas" en la página Hub con la tarjeta de NDF (logo, nombre, frase, sector, ubicación, enlaces IG/web), diseñada para crecer (inicio del Heroes Wall).
->
-> **Luego:** enriquecer FAQ, pulir detalles estéticos (tarjetas "features" del Inicio, accesos del hero), revisar a fondo Transparencia y Membresías.
-
-## 3. Recursos clave (Drive / repo)
-- Hoja de respuestas del formulario: `1ZchdL8zaJroqdrwGSlDo2LCNTeQkVTjBF6LaNTer3VY`
-- Logo NDF: en carpeta **"Niños del Futuro"** (pendiente localizar fileId)
-- Working dir de build: `/home/claude/build/` (espejo byte a byte de producción tras cada deploy)
-- Último commit desplegado antes de este handoff: `3b336b19`
-
-## 4. Archivos modificados en la sesión
-- `index.html` — todas las páginas tocadas. Versión de assets actual: `?v=20260626i`
-- `app.js` — i18n ES/EN (415/415), `renderPobChips()`, `initBlog()` honesto, `TIERS` con SVG, `IMPACT_UNITS` (vacío, listo para NDF), lógica de equivalencia en `calcUpdate()`
-- `styles.css` — `.card-link`, `.origen-img`, `#m-ic .ic-svg`
+## 3. Prompt para el nuevo chat
+> Continúo el sitio de Give&Grow (SPA en Cloudflare Workers, repo `SebasGiveandGrow/givegrow-website`). Lee primero `SESSION_HANDOFF.md`, `.clauderules` y `DESIGN_SYSTEM.md` en la raíz. Arquitectura: `index.html` + `app.js` (ES embebido) + `/i18n/en.json` (EN perezoso) + `data/partners.json` (fuente única de la red) + `/vendor` (Leaflet y fuentes auto-alojadas). Valida con `node scripts/validate.mjs` y render headless Playwright antes de cada deploy (Trees API, versionado por hash). Reglas de oro: paridad i18n exacta, cero emojis (SVG line-art), "evidencia, no promesas", CSP en firme (no añadir orígenes sin editar `_headers`).

@@ -18,16 +18,16 @@ Léelas junto con `DESIGN_SYSTEM.md` y `SESSION_HANDOFF.md` antes de tocar códi
 
 ## Convenciones de código
 - Tarjetas: `.card` + badge `.ic`; enlaces `.card-link` (verde, con `→`).
-- Pasos: `.steps > .step > .step-n` (número solo en el círculo, no en el título).
+- Pasos: `.steps > .step` (el número lo pinta el contador CSS; `.step-n` está oculto — no añadir números manuales).
 - Chips: `.eco-row > .eco-chip`.
 - Secciones: alternar blanco / `.cream` / `.band`.
-- i18n: `I18N{es,en}` + `t(key)` + `setLang()` sobre `[data-i18n]`/`[data-i18n-attr]`.
-- Calculadora: equivalencias en `IMPACT_UNITS` (`{es,en,cop}`); vacío = oculto; siempre "≈ aprox." + fuente; solo costos reales/defendibles.
+- i18n: ES embebido en `app.js` (`I18N.es`); **EN vive en `/i18n/en.json`** (carga perezosa vía `ensureLang`). `t(key)` + `setLang()` sobre `[data-i18n]`/`[data-i18n-attr]`. Toda clave nueva se agrega en ambos lados.
+- Calculadora: `IMPACT_UNITS` indexable (`{id,partner,cop,es,esPl,en,enPl}`) poblado desde `data/partners.json`; vacío = oculto; siempre "≈" + costos reales.
+- **`data/partners.json` es la fuente única de la red**: mapa, muro "La red", mini-tarjetas de aliadas, fichas `#fundacion/<id>` y unidades de la calculadora. Alta de aliado = un objeto ahí, nunca HTML.
+- Terceros auto-alojados en `/vendor` (Leaflet, fuentes). **CSP en firme**: cualquier recurso externo nuevo exige actualizar `_headers` o el sitio lo bloquea.
 
 ## Checklist antes de cada deploy
-1. `node --check app.js`
-2. Paridad i18n (ES == EN, sin claves huérfanas)
-3. Balance de tags (`main/section/div/svg`)
-4. Render headless Playwright sin `pageerror` (forzar `.rv`→`.in`)
-5. Bump `?v=YYYYMMDDx` en `app.js`/`styles.css`
-6. Verificar en `raw.githubusercontent.com/<commit>/<path>`
+1. `node scripts/validate.mjs` (sintaxis, paridad ES↔en.json, cobertura data-i18n, JSONs, tags) — el mismo gate corre en CI antes del deploy de Cloudflare
+2. Render headless Playwright sin `pageerror` (forzar `.rv`→`.in`; probar ES y EN — el cambio de idioma es asíncrono)
+3. **Versionado por hash**: el script de deploy calcula sha1-8 de `app.js`/`styles.css` y reescribe `?v=` (no hay bump manual)
+4. Verificar en `raw.githubusercontent.com/<commit>/<path>` + run de Actions en verde
