@@ -366,3 +366,26 @@ footer a:hover{color:var(--gn)}
 .cta-box::before{content:"";position:absolute;inset:-40%;z-index:0;background:radial-gradient(40% 55% at 30% 30%,rgba(31,92,56,.10),transparent 60%),radial-gradient(35% 50% at 75% 65%,rgba(10,42,94,.08),transparent 60%),radial-gradient(30% 45% at 60% 20%,rgba(180,105,14,.06),transparent 60%);animation:mesh 16s ease-in-out infinite alternate;pointer-events:none}
 @keyframes mesh{from{transform:translate3d(-2%,-2%,0) rotate(0)}to{transform:translate3d(2%,3%,0) rotate(4deg)}}
 @media (prefers-reduced-motion:reduce){.cta-box::before{animation:none}}
+
+/* ---------- Galería de ficha (curada, auto-alojada) ---------- */
+.gal-strip{display:flex;gap:14px;overflow-x:auto;padding:16px 2px 18px;margin-top:14px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.gal-item{flex:0 0 auto;width:min(300px,72vw);aspect-ratio:4/3;padding:0;border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;background:#fff;cursor:zoom-in;scroll-snap-align:start;transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
+.gal-item:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.gal-item img{width:100%;height:100%;object-fit:cover;display:block}
+.gal-empty{margin-top:14px;max-width:70ch}
+.gal-lb{border:none;border-radius:var(--rl);padding:0;background:transparent;max-width:min(960px,92vw);overflow:visible;margin:auto;width:fit-content;position:fixed;inset:0}
+.gal-lb::backdrop{background:rgba(10,22,40,.82);backdrop-filter:blur(3px)}
+.gal-lb-fig{margin:0;background:#fff;border-radius:var(--rl);overflow:hidden;box-shadow:var(--shadow-lg)}
+.gal-lb-fig img{display:block;max-width:100%;max-height:76vh;margin:0 auto}
+.gal-lb-fig figcaption{padding:12px 18px;font-size:13.5px}
+.gal-lb-fig figcaption:empty{display:none}
+.gal-lb-btn{position:absolute;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;border:1px solid var(--bd);background:#fff;color:var(--navy);cursor:pointer;box-shadow:var(--shadow);z-index:2}
+.gal-lb-btn .ic-svg{width:22px;height:22px}
+.gal-lb-x{top:-16px;right:-16px}
+.gal-lb-prev{left:-16px;top:50%;transform:translateY(-50%)}
+.gal-lb-next{right:-16px;top:50%;transform:translateY(-50%)}
+@media (max-width:640px){
+  .gal-lb-x{top:-52px;right:2px}
+  .gal-lb-prev{left:2px;top:auto;bottom:-56px;transform:none}
+  .gal-lb-next{right:2px;top:auto;bottom:-56px;transform:none}
+}

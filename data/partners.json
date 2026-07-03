@@ -1,5 +1,5 @@
 {
-  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora.",
+  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}; solo se publica material con consentimiento registrado.",
   "partners": [
     {
       "id": "hub-medellin",
@@ -35,6 +35,7 @@
         }
       ],
       "logo": "/img/ndf_logo.jpg",
+      "gallery": [],
       "poblacion": {
         "es": "≈130 niños y niñas",
         "en": "≈130 children"

@@ -513,6 +513,12 @@ var I18N = {
     "ndf.web":"ninosdelfuturo.com →",
     "ndf.ig":"@ninosdelfuturo →",
     "ndf.logo.alt":"Logo de Fundación Niños del Futuro",
+    "ficha.gal.t":"Galería",
+    "ficha.gal.empty":"Galería en preparación: publicaremos fotografías reales del trabajo en campo, con autorización expresa de la fundación.",
+    "ficha.gal.open":"Ampliar fotografía",
+    "ficha.gal.close":"Cerrar",
+    "ficha.gal.prev":"Fotografía anterior",
+    "ficha.gal.next":"Fotografía siguiente",
   }
 };
 
@@ -969,6 +975,22 @@ function renderFicha(fid){
       }
       html += '</div>';
     }
+    /* Galería curada auto-alojada (consentimiento verificado en canShowGallery) */
+    if (p.type === "foundation"){
+      html += '<h3 style="margin-top:34px">'+t("ficha.gal.t")+'</h3>';
+      var gal = (canShowGallery(p) && p.gallery && p.gallery.length) ? p.gallery : null;
+      if (gal){
+        html += '<div class="gal-strip" role="list">';
+        for (var gi=0; gi<gal.length; gi++){
+          var ph = gal[gi], alt = (ph.alt && (ph.alt[lang]||ph.alt.es)) || "";
+          html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" onclick="openLightbox(\''+p.id+'\','+gi+')">'
+                + '<img src="'+ph.src+'" alt="'+alt.replace(/"/g,"&quot;")+'" loading="lazy"></button>';
+        }
+        html += '</div>';
+      } else {
+        html += '<div class="card card-empty gal-empty"><p>'+t("ficha.gal.empty")+'</p></div>';
+      }
+    }
     if (u){
       var n = Math.floor(20000/u.cop);
       var cop = u.cop.toLocaleString(lang==="en"?"en-US":"es-CO");
@@ -985,6 +1007,56 @@ function renderFicha(fid){
       + '<a class="ficha-cta-btn" href="#donar" onclick="return go(\'donar\')">'+t("ficha.cta.btn")+'</a></div>';
     el.innerHTML = html;
   });
+}
+/* Consentimiento: hook (Tarea 6 lo conecta al bloque consent{} de partners.json) */
+function canShowGallery(p){ return true; }
+/* Lightbox nativo con <dialog>: sin librerías, accesible, ESC cierra */
+var LB = { list:null, ix:0 };
+function ensureLightbox(){
+  var d = document.getElementById("gal-lb");
+  if (d) return d;
+  d = document.createElement("dialog");
+  d.id = "gal-lb"; d.className = "gal-lb";
+  d.innerHTML = '<button type="button" class="gal-lb-btn gal-lb-x" aria-label="'+t("ficha.gal.close")+'" onclick="closeLightbox()">'
+    + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>'
+    + '<button type="button" class="gal-lb-btn gal-lb-prev" aria-label="'+t("ficha.gal.prev")+'" onclick="stepLightbox(-1)">'
+    + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="14 6 8 12 14 18"/></svg></button>'
+    + '<figure class="gal-lb-fig"><img id="gal-lb-img" alt=""><figcaption id="gal-lb-cap" class="mu"></figcaption></figure>'
+    + '<button type="button" class="gal-lb-btn gal-lb-next" aria-label="'+t("ficha.gal.next")+'" onclick="stepLightbox(1)">'
+    + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="10 6 16 12 10 18"/></svg></button>';
+  d.addEventListener("click", function(e){ if (e.target === d) closeLightbox(); });
+  document.body.appendChild(d);
+  return d;
+}
+function openLightbox(pid, ix){
+  loadPartners().then(function(list){
+    var p = null;
+    for (var i=0;i<list.length;i++){ if (list[i].id === pid){ p = list[i]; break; } }
+    if (!p || !canShowGallery(p) || !p.gallery || !p.gallery.length) return;
+    LB.list = p.gallery; LB.ix = ix || 0;
+    var d = ensureLightbox();
+    paintLightbox();
+    if (!d.open) d.showModal();
+  });
+}
+function paintLightbox(){
+  var ph = LB.list[LB.ix]; if (!ph) return;
+  var alt = (ph.alt && (ph.alt[lang]||ph.alt.es)) || "";
+  var img = document.getElementById("gal-lb-img");
+  img.src = ph.src; img.alt = alt;
+  document.getElementById("gal-lb-cap").textContent = alt;
+  var multi = LB.list.length > 1;
+  document.querySelector(".gal-lb-prev").style.display = multi ? "" : "none";
+  document.querySelector(".gal-lb-next").style.display = multi ? "" : "none";
+}
+function stepLightbox(d){
+  if (!LB.list) return;
+  LB.ix = (LB.ix + d + LB.list.length) % LB.list.length;
+  paintLightbox();
+}
+function closeLightbox(){
+  var d = document.getElementById("gal-lb");
+  if (d && d.open) d.close();
 }
 function initMap(){
   var box = document.getElementById("map-box");
