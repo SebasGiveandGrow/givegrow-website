@@ -519,6 +519,8 @@ var I18N = {
     "ficha.gal.close":"Cerrar",
     "ficha.gal.prev":"Fotografía anterior",
     "ficha.gal.next":"Fotografía siguiente",
+    "ficha.share":"Compartir ficha",
+    "ficha.share.copied":"Enlace copiado",
   }
 };
 
@@ -542,7 +544,17 @@ var ROUTE_META = {
   faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}}
 };
 function setMetaTag(attr,key,val){ var el=document.querySelector("meta["+attr+"='"+key+"']"); if(el) el.setAttribute("content",val); }
+var OG_IMG_DEFAULT = "https://www.thegiveandgrowproject.org/img/og.jpg";
 function applyRouteMeta(id){
+  if (id.indexOf("fundacion/")===0){
+    var pid = id.split("/")[1];
+    if (PARTNERS_DATA){
+      for (var i=0;i<PARTNERS_DATA.length;i++){
+        if (PARTNERS_DATA[i].id===pid){ applyFichaMeta(PARTNERS_DATA[i]); return; }
+      }
+    }
+    return; /* renderFicha la aplica cuando cargan los datos */
+  }
   var m = ROUTE_META[id] || ROUTE_META.inicio;
   var ti = m.t[lang]||m.t.es, de = m.d[lang]||m.d.es;
   document.title = ti;
@@ -551,6 +563,34 @@ function applyRouteMeta(id){
   setMetaTag("property","og:description",de);
   setMetaTag("property","og:url","https://www.thegiveandgrowproject.org/#"+id);
   setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
+  setMetaTag("property","og:image", OG_IMG_DEFAULT);
+  setMetaTag("name","twitter:image", OG_IMG_DEFAULT);
+}
+function applyFichaMeta(p){
+  var pr = p.profile || {};
+  var ti = p.name + " · Give&Grow International";
+  var de = pr.about ? (pr.about[lang]||pr.about.es||"") : "";
+  if (de.length > 155) de = de.slice(0,152).replace(/\s+\S*$/,"") + "…";
+  var img = (p.logo && canShowLogo(p)) ? ("https://www.thegiveandgrowproject.org"+p.logo) : OG_IMG_DEFAULT;
+  document.title = ti;
+  setMetaTag("name","description",de);
+  setMetaTag("property","og:title",ti);
+  setMetaTag("property","og:description",de);
+  setMetaTag("property","og:url","https://www.thegiveandgrowproject.org/f/"+p.id);
+  setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
+  setMetaTag("property","og:image", img);
+  setMetaTag("name","twitter:image", img);
+}
+function shareFicha(pid){
+  var url = "https://www.thegiveandgrowproject.org/f/"+pid;
+  if (navigator.share){ navigator.share({url:url}).catch(function(){}); return false; }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){
+      var b = document.getElementById("ficha-share");
+      if (b){ var o = b.textContent; b.textContent = t("ficha.share.copied"); setTimeout(function(){ b.textContent = o; },1800); }
+    });
+  }
+  return false;
 }
 
 function renderPobChips(){
@@ -935,7 +975,7 @@ function renderAliadas(){
       var area = p.area ? (p.area[lang]||p.area.es||"") : "";
       var pob = p.poblacion ? (p.poblacion[lang]||p.poblacion.es||"") : "";
       html += '<a class="pcard" href="#fundacion/'+p.id+'" onclick="return go(\'fundacion/'+p.id+'\')">'
-            + (p.logo ? '<img class="pcard-logo" src="'+p.logo+'" alt="" loading="lazy">' : '')
+            + ((p.logo && canShowLogo(p)) ? '<img class="pcard-logo" src="'+p.logo+'" alt="" loading="lazy">' : '')
             + '<span class="pcard-body"><b>'+p.name+'</b>'
             + '<span class="mu">'+pob+(pob&&area?" · ":"")+area+'</span></span>'
             + '<span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
@@ -950,6 +990,7 @@ function renderFicha(fid){
     var p = null;
     for (var i=0;i<list.length;i++){ if (list[i].id === fid){ p = list[i]; break; } }
     if (!p){ go("hub"); return; }
+    applyFichaMeta(p);
     var pr = p.profile || {};
     var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
     var area = pick(p.area), pob = pick(p.poblacion), badge = pick(pr.badge),
@@ -957,7 +998,7 @@ function renderFicha(fid){
     var u = (p.impactUnits && p.impactUnits[0]) || null;
     var html = '<a class="card-link" href="#hub" onclick="return go(\'hub\')">&larr; '+t("ficha.back")+'</a>'
       + '<div class="ficha-head">'
-      + (p.logo ? '<img class="ficha-logo" src="'+p.logo+'" alt="">' : '')
+      + ((p.logo && canShowLogo(p)) ? '<img class="ficha-logo" src="'+p.logo+'" alt="">' : '')
       + '<div><h1 class="ficha-name">'+p.name+'</h1>'
       + (badge ? '<span class="tag">'+badge+'</span>' : '')
       + '<div class="eco-row" style="margin-top:12px">'
@@ -1002,6 +1043,7 @@ function renderFicha(fid){
     html += '<div class="eco-row" style="margin-top:26px">'
       + (p.url ? '<a class="card-link" href="'+p.url+'" target="_blank" rel="noopener">'+t("ficha.web")+'</a>' : '')
       + (p.instagram ? '<a class="card-link" style="margin-left:18px" href="'+p.instagram+'" target="_blank" rel="noopener">Instagram</a>' : '')
+      + '<button type="button" id="ficha-share" class="card-link ficha-share" onclick="return shareFicha(\''+p.id+'\')">'+t("ficha.share")+'</button>'
       + '</div>'
       + '<div class="cta-box" style="margin-top:36px"><h2>'+t("ficha.cta.t")+'</h2><p class="mu">'+t("ficha.cta.p")+'</p>'
       + '<a class="ficha-cta-btn" href="#donar" onclick="return go(\'donar\')">'+t("ficha.cta.btn")+'</a></div>';
@@ -1009,7 +1051,14 @@ function renderFicha(fid){
   });
 }
 /* Consentimiento: hook (Tarea 6 lo conecta al bloque consent{} de partners.json) */
-function canShowGallery(p){ return true; }
+function canShowGallery(p){
+  if (p.type === "hub") return true;
+  return !!(p.consent && p.consent.photos === true);
+}
+function canShowLogo(p){
+  if (p.type === "hub") return true;
+  return !!(p.consent && p.consent.logo === true);
+}
 /* Lightbox nativo con <dialog>: sin librerías, accesible, ESC cierra */
 var LB = { list:null, ix:0 };
 function ensureLightbox(){

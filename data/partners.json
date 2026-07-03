@@ -1,5 +1,5 @@
 {
-  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}; solo se publica material con consentimiento registrado.",
+  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}. consent{} = registro de autorizaciones {name, logo, photos: bool; minorsImageProtected; grantedBy; date: YYYY-MM-DD; source}: el logo solo se renderiza si consent.logo===true y la galería solo si consent.photos===true (hub exento). Sin consentimiento registrado no se publica material de terceros.",
   "partners": [
     {
       "id": "hub-medellin",
@@ -36,6 +36,15 @@
       ],
       "logo": "/img/ndf_logo.jpg",
       "gallery": [],
+      "consent": {
+        "name": true,
+        "logo": true,
+        "photos": false,
+        "minorsImageProtected": "pendiente",
+        "grantedBy": "Francisco Grijalba",
+        "date": null,
+        "source": "Autorización previa registrada por Give&Grow (logo y nombre ya publicados); pendiente formalizar fecha y fotos con el cuestionario de ingreso"
+      },
       "poblacion": {
         "es": "≈130 niños y niñas",
         "en": "≈130 children"

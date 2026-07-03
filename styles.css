@@ -389,3 +389,4 @@ footer a:hover{color:var(--gn)}
   .gal-lb-prev{left:2px;top:auto;bottom:-56px;transform:none}
   .gal-lb-next{right:2px;top:auto;bottom:-56px;transform:none}
 }
+.ficha-share{background:none;border:none;cursor:pointer;font:inherit;padding:0;margin-left:18px}
