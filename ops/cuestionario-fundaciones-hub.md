@@ -127,9 +127,9 @@ _Opción múltiple · obligatoria_: Facturas de compra recientes · Cuentas de m
 **5.3b** Si quieres, explica cómo calculan ese costo
 _Párrafo_
 
-**5.3c** Adjunta un soporte del costo (factura, cuenta de mercado o presupuesto)
-_Carga de archivo · PDF o imagen · máx. 3 archivos_
-Texto de ayuda: "Es para nuestro archivo interno de evidencia; no se publica."
+**5.3c** Comparte el soporte del costo (factura, cuenta de mercado o presupuesto)
+_Párrafo_ · Nota: la API de Forms no permite crear "Subir archivo" por script; se pide enlace de Drive/Dropbox o envío por WhatsApp. Si se prefiere el botón nativo de carga, añadirlo a mano tras crear el Form.
+Texto de ayuda: "Pega un enlace de Google Drive o Dropbox con acceso para ver, o escribe 'lo enviaré por WhatsApp'. Es para nuestro archivo interno de evidencia; no se publica."
 
 **5.4** ¿Hay una segunda unidad de impacto que quieran ofrecer a los donantes?
 _Respuesta corta_ · Mismo formato: unidad (singular/plural) + costo COP + cómo se documenta.
@@ -147,9 +147,9 @@ _Respuesta corta_ · Ej.: "https://www.instagram.com/ninos.del.futuro"
 **6.3** Otras redes (Facebook, YouTube, TikTok)
 _Párrafo_
 
-**6.4** Sube el logo de la fundación en la mejor resolución que tengan *
-_Carga de archivo · obligatoria · PNG/JPG/SVG · máx. 2 archivos_
-Texto de ayuda: "Ideal: fondo transparente (PNG) o fondo blanco, mínimo 480 px en su lado más corto."
+**6.4** Comparte el logo de la fundación en la mejor resolución que tengan *
+_Respuesta corta · obligatoria_ · Nota: misma limitación de la API; enlace o WhatsApp, con opción de convertirla a "Subir archivo" a mano.
+Texto de ayuda: "Pega un enlace de Google Drive o Dropbox con acceso para ver, o escribe 'lo enviaré por WhatsApp'. Ideal: fondo transparente (PNG) o blanco, mínimo 480 px en su lado más corto."
 
 **6.5** ¿Tienen fotos de su trabajo que quieran mostrar en su perfil del sitio?
 _Opción múltiple_: Sí, las enviaremos · Sí, están en nuestro Instagram (autorizamos tomarlas de ahí) · Aún no

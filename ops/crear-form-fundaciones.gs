@@ -58,12 +58,11 @@ function crearFormularioFundaciones() {
     if (ayuda) pb.setHelpText(ayuda);
     return pb;
   }
-  function archivo(titulo, ayuda, maxFiles, req) {
-    var it = form.addFileUploadItem().setTitle(titulo).setRequired(!!req);
-    if (ayuda) it.setHelpText(ayuda);
-    it.setMaxFiles(maxFiles || 2);
-    return it;
-  }
+  // NOTA: la API de Apps Script NO permite crear preguntas de "Subir archivo"
+  // (addFileUploadItem no existe en FormApp). Las preguntas 5.3c y 6.4 piden
+  // un enlace o envío por WhatsApp. Si prefieres el botón nativo de carga,
+  // añádelo a mano en la interfaz de Forms después de crear el formulario:
+  // (+) Añadir pregunta → tipo "Subir archivo".
 
   // === SECCIÓN 1 · Identificación ==========================================
   seccion('1 · Identificación',
@@ -159,8 +158,9 @@ function crearFormularioFundaciones() {
     'Sin soporte real no publicamos la unidad en la calculadora (evidencia, no promesas).', true);
 
   parrafo('5.3b Si quieres, explica cómo calculan ese costo', null, false);
-  archivo('5.3c Adjunta un soporte del costo (factura, cuenta de mercado o presupuesto)',
-    'Para nuestro archivo interno de evidencia; no se publica. PDF o imagen.', 3, false);
+  parrafo('5.3c Comparte el soporte del costo (factura, cuenta de mercado o presupuesto)',
+    'Pega un enlace de Google Drive o Dropbox con acceso para ver, o escribe ' +
+    '"lo enviaré por WhatsApp". Es para nuestro archivo interno de evidencia; no se publica.', false);
 
   parrafo('5.4 ¿Hay una segunda unidad de impacto que quieran ofrecer a los donantes?',
     'Mismo formato: unidad (singular/plural) + costo en COP + cómo se documenta.', false);
@@ -176,9 +176,10 @@ function crearFormularioFundaciones() {
     'Ej.: https://www.instagram.com/ninos.del.futuro', false);
   parrafo('6.3 Otras redes (Facebook, YouTube, TikTok)', null, false);
 
-  archivo('6.4 Sube el logo de la fundación en la mejor resolución que tengan',
-    'Ideal: fondo transparente (PNG) o fondo blanco, mínimo 480 px en su lado más corto. PNG/JPG/SVG.',
-    2, true);
+  texto('6.4 Comparte el logo de la fundación en la mejor resolución que tengan',
+    'Pega un enlace de Google Drive o Dropbox con acceso para ver, o escribe ' +
+    '"lo enviaré por WhatsApp". Ideal: fondo transparente (PNG) o blanco, mínimo 480 px ' +
+    'en su lado más corto.', true);
 
   opcion('6.5 ¿Tienen fotos de su trabajo que quieran mostrar en su perfil del sitio?',
     ['Sí, las enviaremos', 'Sí, están en nuestro Instagram (autorizamos tomarlas de ahí)', 'Aún no'],
