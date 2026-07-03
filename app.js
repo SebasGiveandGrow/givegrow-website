@@ -994,7 +994,8 @@ function renderFicha(fid){
     var pr = p.profile || {};
     var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
     var area = pick(p.area), pob = pick(p.poblacion), badge = pick(pr.badge),
-        years = pick(pr.years), about = pick(pr.about), hubTxt = pick(pr.hub);
+        years = pick(pr.years), about = pick(pr.about), hubTxt = pick(pr.hub),
+        quote = pick(pr.quote);
     var u = (p.impactUnits && p.impactUnits[0]) || null;
     var html = '<a class="card-link" href="#hub" onclick="return go(\'hub\')">&larr; '+t("ficha.back")+'</a>'
       + '<div class="ficha-head">'
@@ -1007,7 +1008,8 @@ function renderFicha(fid){
       + (years ? '<span class="eco-chip">'+years+'</span>' : '')
       + (pr.leader ? '<span class="eco-chip">'+t("ficha.lider")+': '+pr.leader+'</span>' : '')
       + '</div></div></div>'
-      + (about ? '<p class="lead" style="margin-top:22px;max-width:70ch">'+about+'</p>' : '');
+      + (about ? '<p class="lead" style="margin-top:22px;max-width:70ch">'+about+'</p>' : '')
+      + (quote ? '<blockquote class="ficha-quote">'+quote+'</blockquote>' : '');
     if (pr.programs && pr.programs.length){
       html += '<h3 style="margin-top:34px">'+t("ficha.prog.t")+'</h3><div class="grid g2" style="margin-top:16px">';
       for (var k=0;k<pr.programs.length;k++){

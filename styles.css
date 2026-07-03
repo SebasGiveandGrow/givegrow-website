@@ -390,3 +390,18 @@ footer a:hover{color:var(--gn)}
   .gal-lb-next{right:2px;top:auto;bottom:-56px;transform:none}
 }
 .ficha-share{background:none;border:none;cursor:pointer;font:inherit;padding:0;margin-left:18px}
+
+/* Frase de la fundación (profile.quote, llega con el cuestionario) */
+.ficha-quote{margin:26px 0 0;padding:4px 0 4px 22px;border-left:3px solid var(--g);font-family:"Fraunces",serif;font-size:21px;line-height:1.4;color:var(--navy);max-width:56ch}
+
+/* ---------- Modo oscuro: terreno preparado, NO activo ----------
+   Tokens decididos (handoff): fondo #0F1613, superficie #1A231D,
+   texto #EFEDE6, primario #6FB08D. Este bloque es inerte hasta que
+   exista el toggle que ponga data-theme="dark" en <html> (sesión
+   dedicada: variables de superficie en todo el CSS + contrastes). */
+html[data-theme="dark"]{
+  --dm-bg:#0F1613;
+  --dm-surface:#1A231D;
+  --dm-ink:#EFEDE6;
+  --dm-g:#6FB08D;
+}
