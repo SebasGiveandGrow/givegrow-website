@@ -350,14 +350,14 @@ footer a:hover{color:var(--gn)}
 .mnav-g{display:block;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--g);font-weight:800;margin:16px 0 4px}
 .pcard{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--bd);border-radius:var(--rl);padding:16px 18px;transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
 .pcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(10,42,94,.08)}
-.pcard-logo{width:56px;height:56px;object-fit:cover;border-radius:12px;border:1px solid var(--bd);flex:0 0 auto}
+.pcard-logo{width:56px;height:56px;object-fit:contain;background:#fff;padding:5px;box-sizing:border-box;border-radius:12px;border:1px solid var(--bd);flex:0 0 auto}
 .pcard-body{display:flex;flex-direction:column;gap:2px;min-width:0}
 .pcard-body b{font-family:"Bricolage Grotesque",sans-serif;font-size:15.5px;color:var(--navy);line-height:1.25}
 .pcard-body .mu{font-size:12.5px}
 .pcard-go{margin-left:auto;color:var(--g);font-weight:700;transition:transform .25s var(--ease)}
 .pcard:hover .pcard-go{transform:translateX(4px)}
 .ficha-head{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:18px}
-.ficha-logo{width:110px;height:110px;object-fit:cover;border-radius:18px;border:1px solid var(--bd);background:#fff}
+.ficha-logo{width:110px;height:110px;object-fit:contain;padding:10px;box-sizing:border-box;border-radius:18px;border:1px solid var(--bd);background:#fff}
 .ficha-name{font-size:clamp(26px,4vw,40px);margin:0 0 8px}
 .ficha-impact{border-left:4px solid var(--g)}
 .ficha-cta-btn{display:inline-block;margin-top:14px;background:var(--g);color:#fff;padding:12px 26px;border-radius:999px;font-weight:700}
