@@ -39,9 +39,12 @@ nav.sol{background:rgba(255,255,255,.96);backdrop-filter:blur(12px);box-shadow:0
 .nlinks{display:flex;align-items:center;gap:6px}
 .nlink{position:relative;padding:8px 12px;border-radius:8px;font-size:14px;font-weight:600;color:var(--navy);transition:background .15s,color .15s}
 .nlink:hover{background:var(--gl);color:var(--g)}
+.ndrop-t{background:none;border:0;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px}
+.ndrop-t::after{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-1px);transition:transform .18s var(--ease);opacity:.65}
+.ndrop-t[aria-expanded="true"]::after{transform:rotate(-135deg) translateY(-1px)}
 .ndrop{position:relative}
 .ndrop-menu{position:absolute;top:100%;left:0;min-width:220px;background:#fff;border:1px solid var(--bd);border-radius:var(--r);box-shadow:var(--shadow-lg);padding:8px;opacity:0;visibility:hidden;transform:translateY(8px);transition:all .18s var(--ease)}
-.ndrop:hover .ndrop-menu,.ndrop:focus-within .ndrop-menu{opacity:1;visibility:visible;transform:none}
+.ndrop:hover .ndrop-menu,.ndrop:focus-within .ndrop-menu,.ndrop.open .ndrop-menu{opacity:1;visibility:visible;transform:none}
 .ndrop-menu a{display:block;padding:9px 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--navy)}
 .ndrop-menu a:hover{background:var(--gl);color:var(--g)}
 .nav-actions{display:flex;align-items:center;gap:10px}
@@ -266,6 +269,10 @@ footer a:hover{color:var(--gn)}
 .wa svg{width:28px;height:28px;fill:#fff}
 
 /* ===== responsive ===== */
+@media(max-width:1024px){
+  .nlinks{display:none}
+  .burger{display:flex;align-items:center;justify-content:center}
+}
 @media(max-width:880px){
   .nlinks{display:none}
   .burger{display:flex;align-items:center;justify-content:center}

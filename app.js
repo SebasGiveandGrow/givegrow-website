@@ -26,7 +26,7 @@ var I18N = {
     "path.fund.t":"Somos fundación",
     "path.fund.s":"Unirme al Hub",
     "stat.rutas":"Rutas del modelo",
-    "stat.pobl":"Poblaciones impactadas",
+    "stat.pobl":"Poblaciones que buscamos alcanzar",
     "stat.traz":"Trazabilidad",
     "stat.fund":"Año de fundación",
     "model.ey":"El modelo",
@@ -57,9 +57,9 @@ var I18N = {
     "comm.ey":"Comunidades reales",
     "comm.t":"Impacto medible. Personas reales.",
     "origen.ey":"Nuestro origen",
-    "origen.t":"Casi cuatro años en terreno antes de fundar nada.",
-    "origen.p1":"Give&Grow International nace de la experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín. Casi cuatro años trabajando donde el acceso es difícil y la confianza se gana caminando.",
-    "origen.p2":"La fundación se constituyó el 19 de mayo de 2025 en Medellín, como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: que la generosidad llegue a donde más se necesita, con trazabilidad y sin intermediarios opacos.",
+    "origen.t":"Todo empezó con una tonelada de comida.",
+    "origen.p1":"Tras semanas de gestión, una campaña alcanzó su meta: una tonelada de alimento para entregar a una fundación. Pero al llegar, la fundación no tenía cómo almacenar ni repartir todo ese alimento. Casi la mitad se perdió. Ver esa comida desperdiciarse —comida que a pocas cuadras alguien necesitaba— dejó una pregunta que no soltó al fundador: ¿cómo cierro la brecha entre los recursos y la necesidad, con lo que tengo a la mano?",
+    "origen.p2":"Esa pregunta se volvió método. Give&Grow International nace de casi cuatro años de experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín, y se constituye el 19 de mayo de 2025 en Medellín como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: restaurar la confianza en el acto de dar, con trazabilidad y sin intermediarios opacos.",
     "hub.ey":"HUB SOCIAL",
     "hub.t":"Cinco rutas. Un solo propósito.",
     "hub.lead":"El centro operativo donde alianzas, donaciones e impacto se encuentran.",
@@ -73,20 +73,21 @@ var I18N = {
     "hub.r4.p":"Experiencias que llevan a donantes y equipos aliados al campo, con comunidades reales y un reporte de impacto. Se activa en 2026.",
     "hub.r5.t":"R5 - Conexión Laboral",
     "hub.r5.p":"Puente hacia el empleo para poblaciones vulnerables. Fase futura. Ejemplo: acompañamiento de 12 a 18 meses a una persona saliendo de reclusión, conectada con formación (R3) y empleo (R4).",
-    "hub.pob.t":"Ocho poblaciones que acompañamos",
+    "hub.pob.t":"Las poblaciones que queremos alcanzar",
+    "hub.pob.note":"Nuestra misión apunta a impactar todo tipo de población vulnerable a través de las fundaciones que se suman al HUB. Estas son las que hoy guían nuestro objeto social; la cobertura real crece con cada aliada que entra con trabajo y evidencia.",
     "hub.pob.list":"Niñez en riesgo - Comunidades indígenas - Comunidades campesinas - Personas en situación de calle - Adultos mayores - Animales en maltrato - Personas en rehabilitación - Personas privadas de la libertad",
     "emp.ey":"RSE empresarial",
     "emp.t":"Tu empresa, con propósito y trazabilidad.",
     "emp.lead":"Tres formas de aliarte. Cada una con beneficio tributario y reporte verificable.",
-    "emp.p1.t":"Aliado Semilla",
-    "emp.p1.p":"Donación más certificado tributario y reconocimiento como negocio con propósito.",
-    "emp.p2.t":"Impact Partner",
-    "emp.p2.p":"Incluye un Impact Journey para tu equipo: un día en campo con comunidades reales.",
-    "emp.p3.t":"Alianza Estratégica",
-    "emp.p3.p":"Co-creación, naming de ruta o programa y reportes alineados al estándar GRI.",
+    "emp.p1.t":"Padrinazgo de Impacto",
+    "emp.p1.p":"Defines un presupuesto y, con la Calculadora de Impacto, lo traduces en unidades reales y verificables. Recibes certificado de donación y reporte de impacto con evidencia.",
+    "emp.p2.t":"Impact Journey",
+    "emp.p2.p":"Voluntariado corporativo en doble vía (Ruta 4, ya operativa): tu equipo vive la realidad de las comunidades que apoya. Una jornada con propósito, no de marketing.",
+    "emp.p3.t":"Alianza a medida",
+    "emp.p3.p":"Un canal abierto para co-crear juntos programas, campañas o formas de cooperación ajustadas a la realidad de tu empresa.",
     "fund.ey":"Para fundaciones",
     "fund.t":"Aplica al HUB SOCIAL.",
-    "fund.lead":"Más de 25 fundaciones preaprobadas. Compartamos con Colombia es aliada formal que aporta formación al Hub.",
+    "fund.lead":"Más de 25 fundaciones preaprobadas en nuestra red de espera: su vinculación formal se confirma una a una, con verificación y evidencia.",
     "fund.req.t":"Qué buscamos",
     "fund.req.p":"Fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad.",
     "fund.give.t":"Aliadas que aportan",
@@ -202,7 +203,7 @@ var I18N = {
     "faq.q4":"¿Puedo ser voluntario?",
     "faq.a4":"Aceptamos voluntariado de habilidades profesionales: médicos, odontólogos, abogados, contadores, desarrolladores, docentes y más. Escríbenos a sebas@thegiveandgrowproject.org o por WhatsApp al +57 315 330 5028 indicando tu área y disponibilidad.",
     "faq.q5":"¿Mi fundación puede aplicar al Hub?",
-    "faq.a5":"Sí. Buscamos fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad. Algunas aliadas, como Compartamos con Colombia, contribuyen servicios al Hub en lugar de solo recibir.",
+    "faq.a5":"Sí. Buscamos fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad. Algunas aliadas contribuyen servicios al Hub en lugar de solo recibir.",
     "faq.q6":"¿Qué hace único al HUB SOCIAL?",
     "grat.cats.note":"Estamos sumando comercios aliados; estas son las categorías que priorizamos. Los beneficios concretos se anuncian a medida que se confirman.",
     "faq.q7":"¿Puedo hacer un aporte único en lugar de mensual?",
@@ -247,10 +248,10 @@ var I18N = {
     "transp.funds.model.t":"Fondo común, con opción de dirigir",
     "transp.funds.model.p":"Por defecto tu aporte va a un fondo común que asignamos a la necesidad más urgente. Si lo prefieres, puedes dirigirlo a una fundación o ruta específica.",
     "transp.funds.commit.t":"Nuestro compromiso",
-    "transp.funds.a":"Mínimo 80% directo a la misión: fundaciones, comunidades y logística de entrega.",
-    "transp.funds.b":"Máximo 10% a la operación del Hub: bodega, transporte, verificación y trazabilidad.",
-    "transp.funds.c":"Máximo 10% a administración.",
-    "transp.funds.note":"Es un compromiso público, en proceso de formalización con nuestra Revisora Fiscal y el consejo. No inflamos cifras: lo publicaremos con respaldo.",
+    "transp.funds.a":"La mayor parte de cada aporte va directo a la misión: fundaciones, comunidades y logística de entrega.",
+    "transp.funds.b":"Una parte acotada sostiene la operación del Hub: bodega, transporte, verificación y trazabilidad.",
+    "transp.funds.c":"La administración se mantiene al mínimo indispensable.",
+    "transp.funds.note":"Estamos definiendo el marco exacto de asignación —qué proporción va a la misión, a la operación y a la administración— junto con nuestra Revisora Fiscal y el consejo. Publicaremos las cifras precisas solo cuando estén validadas: evidencia, no promesas.",
     "pay.how.ey":"Pago seguro",
     "pay.how.t":"Cómo pagar tu membresía, paso a paso.",
     "pay.how.p":"Tu seguridad primero. Así puedes aportar hoy, y así funcionará el pago automático cuando habilitemos Wompi.",
@@ -365,15 +366,15 @@ var I18N = {
     "membres.t1.b1":"Boletín de impacto con historias reales",
     "membres.t1.b2":"Certificado tributario (Art. 257 ET)",
     "membres.t1.b3":"Reconocimiento en web y redes",
-    "membres.t2.price":"$50.000","membres.t2.priceu":"/ mes · ≈US$12","membres.t2.more":"Todo lo de Semilla, y además:",
+    "membres.t2.price":"$50.000","membres.t2.priceu":"/ mes · ≈US$15","membres.t2.more":"Todo lo de Semilla, y además:",
     "membres.t2.b1":"Acceso al Programa de Gratitud",
     "membres.t2.b2":"Certificado de agradecimiento personalizado",
     "membres.t2.b3":"Contenido especial de voluntariado e impacto",
-    "membres.t3.price":"$120.000","membres.t3.priceu":"/ mes · ≈US$29","membres.t3.more":"Todo lo de Retoño, y además:",
+    "membres.t3.price":"$120.000","membres.t3.priceu":"/ mes · ≈US$35","membres.t3.more":"Todo lo de Retoño, y además:",
     "membres.t3.b1":"Invitación a eventos y sesiones en vivo",
     "membres.t3.b2":"Acceso prioritario a Impact Journey",
     "membres.t3.b3":"Certificado de impacto personalizado",
-    "membres.t4.price":"$250.000+","membres.t4.priceu":"/ mes · ≈US$60+","membres.t4.more":"Todo lo de Árbol, y además:",
+    "membres.t4.price":"$250.000+","membres.t4.priceu":"/ mes · ≈US$75+","membres.t4.more":"Todo lo de Árbol, y además:",
     "membres.t4.b1":"Reportes de impacto detallados",
     "membres.t4.b2":"Reunión con el equipo directivo",
     "membres.t4.b3":"Membresía honorífica y liderazgo en la comunidad",
@@ -482,8 +483,8 @@ var I18N = {
     "origen.ms2.p":"La experiencia se formaliza: se constituye como Entidad Sin Ánimo de Lucro en Medellín.",
     "origen.ms3.t":"19 mayo 2025 · Registro en Cámara",
     "origen.ms3.p":"Queda inscrita ante la Cámara de Comercio de Medellín, bajo el Régimen Tributario Especial. En 2025 arranca el primer período operativo.",
-    "origen.ms4.t":"2026 · Primeras aliadas e Impact Journey",
-    "origen.ms4.p":"Sumamos las primeras fundaciones aliadas al Muro de Héroes y activamos Impact Journey, mientras construimos ImpactOS para dar trazabilidad al impacto.",
+    "origen.ms4.t":"2026 · Primera aliada e Impact Journey",
+    "origen.ms4.p":"Sumamos la primera fundación aliada al Muro de Héroes y activamos Impact Journey, mientras construimos ImpactOS para dar trazabilidad al impacto.",
     "origen.cta.btn":"Ver el HUB SOCIAL",
     "fund.proc.ey":"El proceso",
     "fund.proc.t":"De la aplicación a la vinculación.",
@@ -673,6 +674,16 @@ function onScroll(){
   n.classList.toggle("sol", window.scrollY > 30);
 }
 function toggleDrawer(){ var d=document.getElementById("nav-mobile"); var open=d.classList.toggle("open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded", open?"true":"false"); }
+function toggleDrop(btn){
+  var drop=btn.parentNode; var isOpen=drop.classList.contains("open");
+  document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); });
+  if(!isOpen){ drop.classList.add("open"); btn.setAttribute("aria-expanded","true"); }
+  return false;
+}
+document.addEventListener("click", function(e){
+  if(!e.target.closest(".ndrop")) document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); });
+});
+document.addEventListener("keydown", function(e){ if(e.key==="Escape") document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); }); });
 function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded","false"); }
 
 /* ---------- reveal ---------- */
@@ -1193,11 +1204,11 @@ MEMBRESÍAS: Semilla, Retoño, Árbol y Bosque (niveles crecientes de aporte men
 
 PROGRAMA DE GRATITUD: Red de empresas aliadas con descuentos exclusivos para todos los miembros activos. Categorías: gastronomía, moda, belleza, bienestar, odontología.
 
-RSE EMPRESARIAL: 3 formas de aliarse según el alcance: Aliado Semilla, Impact Partner (incluye Impact Journey para el equipo) y Alianza Estratégica (co-creación y reportes GRI). El aporte se define a la medida de cada empresa; invita a escribir para una propuesta personalizada.
+RSE EMPRESARIAL: 3 puertas cumplibles hoy: Padrinazgo de Impacto (presupuesto traducido a unidades reales con certificado y reporte), Impact Journey (voluntariado corporativo en doble vía, Ruta 4) y Alianza a medida (co-creación de programas). El aporte se define a la medida de cada empresa; invita a escribir para una propuesta personalizada.
 
-POBLACIONES (8): niñez en riesgo, comunidades indígenas, comunidades campesinas, personas en situación de calle, adultos mayores, animales en maltrato, personas en rehabilitación, personas privadas de la libertad.
+POBLACIONES OBJETIVO: la misión busca impactar todo tipo de población vulnerable a través de las fundaciones del HUB. Las que hoy guían el objeto social: niñez en riesgo, comunidades indígenas, comunidades campesinas, personas en situación de calle, adultos mayores, animales en maltrato, personas en rehabilitación, personas privadas de la libertad. La cobertura real crece con cada aliada verificada.
 
-Más de 25 fundaciones preaprobadas. Compartamos con Colombia es aliada formal.`;
+Más de 25 fundaciones preaprobadas en la red de espera; la vinculación formal se confirma una a una con verificación. Hoy el muro muestra las aliadas ya verificadas.`;
 
 var almaHistory = [];
 function almaFmt(text){

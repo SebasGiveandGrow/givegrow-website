@@ -43,25 +43,19 @@
     <a class="nlogo" href="#inicio" onclick="return go('inicio')">Give<em>&</em>Grow</a>
     <div class="nlinks">
       <div class="ndrop">
-        <a class="nlink" href="#hub" onclick="return go('hub')" data-i18n="nav.g.hub" aria-haspopup="menu">El Hub</a>
+        <button class="nlink ndrop-t" type="button" data-i18n="nav.g.hub" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">El Hub</button>
         <div class="ndrop-menu">
           <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
           <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
           <a href="#alma" onclick="return go('alma')" data-i18n="nav.alma">ALMA</a>
         </div>
       </div>
+      <a class="nlink" href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
+      <a class="nlink" href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
+      <a class="nlink" href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
+      <a class="nlink" href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
       <div class="ndrop">
-        <a class="nlink" href="#donar" onclick="return go('donar')" data-i18n="nav.g.sumate" aria-haspopup="menu">Súmate</a>
-        <div class="ndrop-menu">
-          <a href="#donar" onclick="return go('donar')" data-i18n="nav.donar">Donar</a>
-          <a href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
-          <a href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
-          <a href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
-          <a href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
-        </div>
-      </div>
-      <div class="ndrop">
-        <a class="nlink" href="#origen" onclick="return go('origen')" data-i18n="nav.g.nosotros" aria-haspopup="menu">Nosotros</a>
+        <button class="nlink ndrop-t" type="button" data-i18n="nav.g.nosotros" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Nosotros</button>
         <div class="ndrop-menu">
           <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
           <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
@@ -255,8 +249,9 @@
   </section>
   <section class="cream">
     <div class="wrap prose">
-      <h3 class="rv" data-i18n="hub.pob.t">Ocho poblaciones que acompañamos</h3>
-      <div class="eco-row rv d1" id="hub-pob" style="margin-top:18px"></div>
+      <h3 class="rv" data-i18n="hub.pob.t">Las poblaciones que queremos alcanzar</h3>
+      <p class="rv d1" data-i18n="hub.pob.note" style="margin-top:12px;max-width:60ch">Nuestra misión apunta a impactar todo tipo de población vulnerable a través de las fundaciones que se suman al HUB. Estas son las que hoy guían nuestro objeto social; la cobertura real crece con cada aliada que entra con trabajo y evidencia.</p>
+      <div class="eco-row rv d2" id="hub-pob" style="margin-top:18px"></div>
     </div>
   </section>
   <section>
