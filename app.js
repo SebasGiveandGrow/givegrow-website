@@ -111,6 +111,10 @@ var I18N = {
     "alma.lead":"ALMA (Asistente de Labor Misional y Alianzas) responde tus dudas sobre donaciones, alianzas y el HUB SOCIAL.",
     "alma.placeholder":"Escribe tu pregunta...",
     "hero.imgalt":"Niña wayuu en su comunidad de La Guajira, acompañada por Give&Grow",
+    "banner.ey":"La Guajira · Enero 2025",
+    "banner.quote":"Esto también es evidencia.",
+    "banner.link":"Ver más evidencia",
+    "banner.imgalt":"Padre e hijo juegan fútbol en su comunidad wayuu, con un balón entregado en jornada",
     "theme.auto":"Tema: automático según la hora. Clic para modo claro",
     "theme.light":"Tema: claro. Clic para modo oscuro",
     "theme.dark":"Tema: oscuro. Clic para modo automático",
@@ -923,6 +927,17 @@ function openLightbox(i){
 }
 function closeLightbox(){ document.getElementById("lightbox").classList.remove("on"); }
 function lbStep(d){ openLightbox((lbIndex + d + GALLERY.length) % GALLERY.length); }
+document.addEventListener("keydown", function(e){
+  var lb = document.getElementById("lightbox");
+  if (!lb || !lb.classList.contains("on")) return;
+  if (e.key === "Escape") closeLightbox();
+  else if (e.key === "ArrowLeft") lbStep(-1);
+  else if (e.key === "ArrowRight") lbStep(1);
+});
+document.addEventListener("click", function(e){
+  var lb = document.getElementById("lightbox");
+  if (lb && lb.classList.contains("on") && e.target === lb) closeLightbox();
+});
 
 /* ---------- impacto tabs (lazy) ---------- */
 function accTab(name){
@@ -1095,14 +1110,14 @@ function ensureLightbox(){
   if (d) return d;
   d = document.createElement("dialog");
   d.id = "gal-lb"; d.className = "gal-lb";
-  d.innerHTML = '<button type="button" class="gal-lb-btn gal-lb-x" aria-label="'+t("ficha.gal.close")+'" onclick="closeLightbox()">'
+  d.innerHTML = '<button type="button" class="gal-lb-btn gal-lb-x" aria-label="'+t("ficha.gal.close")+'" onclick="closeGalLb()">'
     + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>'
     + '<button type="button" class="gal-lb-btn gal-lb-prev" aria-label="'+t("ficha.gal.prev")+'" onclick="stepLightbox(-1)">'
     + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="14 6 8 12 14 18"/></svg></button>'
     + '<figure class="gal-lb-fig"><img id="gal-lb-img" alt=""><figcaption id="gal-lb-cap" class="mu"></figcaption></figure>'
     + '<button type="button" class="gal-lb-btn gal-lb-next" aria-label="'+t("ficha.gal.next")+'" onclick="stepLightbox(1)">'
     + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="10 6 16 12 10 18"/></svg></button>';
-  d.addEventListener("click", function(e){ if (e.target === d) closeLightbox(); });
+  d.addEventListener("click", function(e){ if (e.target === d) closeGalLb(); });
   document.body.appendChild(d);
   return d;
 }
@@ -1132,7 +1147,7 @@ function stepLightbox(d){
   LB.ix = (LB.ix + d + LB.list.length) % LB.list.length;
   paintLightbox();
 }
-function closeLightbox(){
+function closeGalLb(){
   var d = document.getElementById("gal-lb");
   if (d && d.open) d.close();
 }
@@ -1330,7 +1345,7 @@ function init(){
   document.addEventListener("keydown", function(e){
     if (e.key === "Escape"){ var dm=document.getElementById("nav-mobile"); if(dm && dm.classList.contains("open")){ closeDrawer(); return; } }
     if (!document.getElementById("lightbox").classList.contains("on")) return;
-    if (e.key === "Escape") closeLightbox();
+    if (e.key === "Escape") closeGalLb();
     if (e.key === "ArrowRight") lbStep(1);
     if (e.key === "ArrowLeft") lbStep(-1);
   });
