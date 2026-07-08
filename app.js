@@ -110,7 +110,10 @@ var I18N = {
     "alma.t":"Conversa con ALMA.",
     "alma.lead":"ALMA (Asistente de Labor Misional y Alianzas) responde tus dudas sobre donaciones, alianzas y el HUB SOCIAL.",
     "alma.placeholder":"Escribe tu pregunta...",
-    "hero.imgalt":"Comunidad acompañada por Give&Grow en terreno",
+    "hero.imgalt":"Niña wayuu en su comunidad de La Guajira, acompañada por Give&Grow",
+    "theme.auto":"Tema: automático según la hora. Clic para modo claro",
+    "theme.light":"Tema: claro. Clic para modo oscuro",
+    "theme.dark":"Tema: oscuro. Clic para modo automático",
     "a11y.skip":"Saltar al contenido",
     "alma.send":"Enviar",
     "alma.hello":"Hola, soy ALMA. Puedo contarte cómo donar, los beneficios tributarios, las membresías o cómo aplica tu fundación al Hub. ¿En qué te ayudo?",
@@ -474,7 +477,7 @@ var I18N = {
     "start.vol.btn":"Escríbenos →",
     "calc.impact":"Tu impacto",
     "calc.impact.note":"Equivalencia aproximada, según datos de las fundaciones del Hub.",
-    "origen.imgalt":"Trabajo de campo de Give&Grow en La Guajira",
+    "origen.imgalt":"Abuela y nieta wayuu bajo una enramada en La Guajira",
     "origen.tl.ey":"El recorrido",
     "origen.tl.t":"De caminar el territorio a fundar una red.",
     "origen.ms1.t":"Años en terreno",
@@ -881,7 +884,20 @@ var GALLERY = [
   {f:"campo_01.jpg", es:"Trabajo de campo en La Guajira", en:"Field work in La Guajira"},
   {f:"campo_02.jpg", es:"Sierra Nevada de Santa Marta", en:"Sierra Nevada de Santa Marta"},
   {f:"campo_03.jpg", es:"Comunas de Medellín", en:"Comunas of Medellín"},
-  {f:"campo_04.jpg", es:"Acompañamiento continuo", en:"Continuous accompaniment"}
+  {f:"campo_04.jpg", es:"Acompañamiento continuo", en:"Continuous accompaniment"},
+  {f:"jornadas/guajira_nina_naranja.webp", es:"La Guajira, enero 2025", en:"La Guajira, January 2025"},
+  {f:"jornadas/guajira_abuela.webp", es:"Tres generaciones bajo la enramada", en:"Three generations under the enramada"},
+  {f:"jornadas/guajira_retrato_azul.webp", es:"Niñez wayuu, Alta Guajira", en:"Wayuu childhood, Alta Guajira"},
+  {f:"jornadas/guajira_futbol.webp", es:"El juego también es acompañamiento", en:"Play is also accompaniment"},
+  {f:"jornadas/guajira_sonrisa.webp", es:"Alegría documentada, no prometida", en:"Joy documented, not promised"},
+  {f:"jornadas/guajira_hermanas.webp", es:"Hermanas en la jornada de enero", en:"Sisters at the January outreach"},
+  {f:"jornadas/guajira_panoleta.webp", es:"Jornada de juguetes, La Guajira", en:"Toy drive day, La Guajira"},
+  {f:"jornadas/guajira_atardecer.webp", es:"Atardecer en jornada comunitaria", en:"Sunset during a community day"},
+  {f:"jornadas/guajira_bebe.webp", es:"Entrega de leche en jornada wayuu", en:"Milk delivery on a Wayuu outreach day"},
+  {f:"jornadas/guajira_territorio.webp", es:"Territorio wayuu, Alta Guajira", en:"Wayuu territory, Alta Guajira"},
+  {f:"jornadas/guajira_jornada.webp", es:"Equipo y comunidad, jornada wayuu", en:"Team and community, Wayuu outreach day"},
+  {f:"jornadas/mayores_manos.webp", es:"Visita a hogar de adultos mayores (2023)", en:"Visit to an elders\u2019 home (2023)"},
+  {f:"jornadas/mayores_alegria.webp", es:"La alegría también se entrega", en:"Joy is also delivered"}
 ];
 var lbIndex = 0;
 function initGallery(){
@@ -1326,3 +1342,47 @@ else init();
 loadPartners();
 if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
+
+/* ---------- tema día/noche: automático por reloj + preferencia manual ---------- */
+var THEME_KEY = "gg-theme";
+var themeTimer = null;
+function themeStored(){ try { var s = localStorage.getItem(THEME_KEY); return (s==="light"||s==="dark") ? s : "auto"; } catch(e){ return "auto"; } }
+function themeStore(m){ try { if (m==="auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, m); } catch(e){} }
+function themeByClock(){ var h = new Date().getHours(); return (h>=6 && h<18) ? "light" : "dark"; }
+function themeResolve(m){ return m==="auto" ? themeByClock() : m; }
+function themeApply(mode, anim){
+  var root = document.documentElement;
+  var res = themeResolve(mode);
+  if (anim && !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)){
+    root.classList.add("theming");
+    setTimeout(function(){ root.classList.remove("theming"); }, 380);
+  }
+  root.setAttribute("data-theme", res);
+  var mc = document.querySelector('meta[name="theme-color"]');
+  if (mc) mc.setAttribute("content", res==="dark" ? "#0F1613" : "#1F5C38");
+  var b = document.getElementById("theme-btn");
+  if (b){
+    b.setAttribute("data-mode", mode);
+    var k = mode==="auto" ? "theme.auto" : (mode==="light" ? "theme.light" : "theme.dark");
+    b.setAttribute("data-i18n", k);
+    b.setAttribute("data-i18n-attr", "aria-label");
+    var label = t(k);
+    b.setAttribute("aria-label", label);
+    b.setAttribute("title", label);
+  }
+  if (themeTimer){ clearInterval(themeTimer); themeTimer = null; }
+  if (mode==="auto"){
+    themeTimer = setInterval(function(){
+      var cur = document.documentElement.getAttribute("data-theme");
+      var want = themeByClock();
+      if (cur !== want) themeApply("auto", true);
+    }, 60000);
+  }
+}
+function themeCycle(){
+  var order = ["auto","light","dark"];
+  var next = order[(order.indexOf(themeStored()) + 1) % order.length];
+  themeStore(next);
+  themeApply(next, true);
+}
+themeApply(themeStored(), false);

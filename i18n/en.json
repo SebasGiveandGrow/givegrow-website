@@ -104,7 +104,7 @@
   "alma.t": "Chat with ALMA.",
   "alma.lead": "ALMA answers your questions about donations, partnerships and the Social Hub.",
   "alma.placeholder": "Type your question...",
-  "hero.imgalt": "Community accompanied by Give&Grow in the field",
+  "hero.imgalt": "Wayuu girl in her community in La Guajira, accompanied by Give&Grow",
   "a11y.skip": "Skip to content",
   "alma.send": "Send",
   "alma.hello": "Hi, I am ALMA. I can tell you how to donate, the tax benefits, the memberships or how your foundation applies to the Hub. How can I help?",
@@ -463,7 +463,7 @@
   "start.vol.btn": "Write to us →",
   "calc.impact": "Your impact",
   "calc.impact.note": "Approximate equivalence, based on data from the Hub's foundations.",
-  "origen.imgalt": "Give&Grow field work in La Guajira",
+  "origen.imgalt": "Wayuu grandmother and granddaughter under an enramada in La Guajira",
   "origen.tl.ey": "The journey",
   "origen.tl.t": "From walking the territory to founding a network.",
   "origen.ms1.t": "Years in the field",
@@ -526,5 +526,8 @@
   "ficha.gal.next": "Next photo",
   "ficha.share": "Share profile",
   "ficha.share.copied": "Link copied",
-  "hub.pob.note": "Our mission aims to impact every kind of vulnerable population through the foundations that join the HUB. These are the ones that guide our social mission today; real coverage grows with each partner that joins, with work and evidence."
+  "hub.pob.note": "Our mission aims to impact every kind of vulnerable population through the foundations that join the HUB. These are the ones that guide our social mission today; real coverage grows with each partner that joins, with work and evidence.",
+  "theme.auto": "Theme: automatic by time of day. Click for light mode",
+  "theme.light": "Theme: light. Click for dark mode",
+  "theme.dark": "Theme: dark. Click for automatic"
 }

@@ -1,0 +1,35 @@
+{
+  "_doc": "Registro de consentimientos de medios publicados — Fundación Give&Grow International (Ley 1581 de 2012). Este registro NO contiene nombres de las personas retratadas por tratarse de un repositorio público; la documentación de soporte (autorizaciones de padres/acudientes y avales comunitarios) reposa en el archivo físico y digital privado de la fundación bajo custodia del representante legal.",
+  "responsable_custodia": "Representante legal — Fundación Give&Grow International",
+  "contacto_habeas_data": "sebas@thegiveandgrowproject.org",
+  "ultima_actualizacion": "2026-07-08",
+  "jornadas": [
+    {
+      "id": "mayores-2023-05",
+      "descripcion": "Visita a hogar de adultos mayores",
+      "fecha": "2023-05-13",
+      "consentimiento": "confirmado por representante legal — jornada con autorización del hogar",
+      "archivos": ["mayores_manos.webp", "mayores_alegria.webp"]
+    },
+    {
+      "id": "guajira-2025-01",
+      "descripcion": "Jornada con comunidades wayuu, Alta Guajira (entregas de alimentos, leche y juguetes)",
+      "fecha": "2025-01-23/28",
+      "consentimiento": "confirmado por representante legal — autorizaciones de la jornada en archivo de la fundación",
+      "archivos": [
+        "guajira_nina_naranja.webp", "hero_nina_naranja_800.webp", "hero_nina_naranja_1400.webp", "hero_nina_naranja_2000.webp", "hero_nina_naranja_1400.jpg",
+        "guajira_abuela.webp", "guajira_retrato_azul.webp", "guajira_futbol.webp",
+        "guajira_sonrisa.webp", "guajira_hermanas.webp", "guajira_panoleta.webp",
+        "guajira_atardecer.webp", "guajira_bebe.webp", "guajira_territorio.webp", "guajira_jornada.webp"
+      ]
+    },
+    {
+      "id": "sierra-2025-09",
+      "descripcion": "Jornada en la Sierra Nevada de Santa Marta (videos; aún no publicados en el sitio)",
+      "fecha": "2025-09-01/03",
+      "consentimiento": "confirmado por representante legal — pendiente publicar",
+      "archivos": ["sierra_sendero", "sierra_aula", "sierra_cancha", "sierra_escuela"]
+    }
+  ],
+  "regla": "Ningún medio con rostros identificables se publica sin entrada en este registro. Al retirar un consentimiento, el medio se elimina del sitio y del repositorio en el siguiente deploy."
+}
