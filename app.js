@@ -690,7 +690,15 @@ function toggleDrop(btn){
 document.addEventListener("click", function(e){
   if(!e.target.closest(".ndrop")) document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); });
 });
-document.addEventListener("keydown", function(e){ if(e.key==="Escape") document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); }); });
+document.addEventListener("keydown", function(e){
+  if(e.key==="Escape") document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); });
+  var lb = document.getElementById("lightbox");
+  if (lb && lb.classList.contains("on")){
+    if (e.key==="Escape") closeLightbox();
+    else if (e.key==="ArrowLeft") lbStep(-1);
+    else if (e.key==="ArrowRight") lbStep(1);
+  }
+});
 function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded","false"); }
 
 /* ---------- reveal ---------- */
@@ -913,20 +921,22 @@ function initGallery(){
     img.src = IMG_BASE + item.f;
     img.alt = item[lang] || item.es;
     img.loading = "lazy";
-    img.addEventListener("click", function(){ openLightbox(i); });
+    img.addEventListener("click", function(){ openGalleryLightbox(i); });
     g.appendChild(img);
   });
 }
-function openLightbox(i){
+function openGalleryLightbox(i){
   lbIndex = i;
   var item = GALLERY[i];
-  document.getElementById("lb-img").src = IMG_BASE + item.f;
+  var im = document.getElementById("lb-img");
+  im.src = IMG_BASE + item.f;
+  im.alt = item[lang] || item.es;
   document.getElementById("lb-cap").textContent = item[lang] || item.es;
   document.getElementById("lb-count").textContent = (i+1) + " / " + GALLERY.length;
   document.getElementById("lightbox").classList.add("on");
 }
 function closeLightbox(){ document.getElementById("lightbox").classList.remove("on"); }
-function lbStep(d){ openLightbox((lbIndex + d + GALLERY.length) % GALLERY.length); }
+function lbStep(d){ openGalleryLightbox((lbIndex + d + GALLERY.length) % GALLERY.length); }
 document.addEventListener("keydown", function(e){
   var lb = document.getElementById("lightbox");
   if (!lb || !lb.classList.contains("on")) return;
