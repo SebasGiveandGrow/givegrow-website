@@ -46,15 +46,6 @@
     <a class="nlogo" href="#inicio" onclick="return go('inicio')">Give<em>&</em>Grow</a>
     <div class="nlinks">
       <div class="ndrop">
-        <button class="nlink ndrop-t" type="button" data-i18n="nav.g.nosotros" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Nosotros</button>
-        <div class="ndrop-menu">
-          <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
-          <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
-          <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
-          <a href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
-        </div>
-      </div>
-      <div class="ndrop">
         <button class="nlink ndrop-t" type="button" data-i18n="nav.g.hub" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">El Hub</button>
         <div class="ndrop-menu">
           <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
@@ -66,6 +57,15 @@
       <a class="nlink" href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
       <a class="nlink" href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
       <a class="nlink" href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
+      <div class="ndrop">
+        <button class="nlink ndrop-t" type="button" data-i18n="nav.g.nosotros" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Nosotros</button>
+        <div class="ndrop-menu">
+          <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
+          <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
+          <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
+          <a href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
+        </div>
+      </div>
     </div>
     <div class="nav-actions">
       <a class="btn-nav" href="#donar" onclick="return go('donar')" data-i18n="nav.cta">Donar</a>
@@ -83,11 +83,6 @@
   </div>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
-  <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
-  <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
-  <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
-  <a href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
   <span class="mnav-g" data-i18n="nav.g.hub">El Hub</span>
   <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
   <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
@@ -98,6 +93,11 @@
   <a href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
   <a href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
   <a href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
+  <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
+  <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
+  <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
+  <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
+  <a href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
 </div>
 
 <!-- ============ INICIO ============ -->
@@ -259,7 +259,26 @@
 <main id="page-hub" class="page">
   <section>
     <div class="wrap">
-      <span class="ey rv" data-i18n="hub.ey">HUB SOCIAL</span>
+      <span class="ey rv" data-i18n="hub.intro.ey">El HUB SOCIAL</span>
+      <h2 class="h-sec rv" data-i18n="hub.intro.t">¿Qué es un HUB?</h2>
+      <div class="prose rv d1" style="margin-top:16px">
+        <p data-i18n="hub.intro.p1"></p>
+        <h3 style="margin-top:26px" data-i18n="hub.intro.t2">Entonces, ¿qué es el HUB SOCIAL de Give&amp;Grow?</h3>
+        <p data-i18n="hub.intro.p2"></p>
+      </div>
+    </div>
+  </section>
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="hub.found.ey">Fundaciones del HUB</span>
+      <h2 class="h-sec rv" data-i18n="hub.found.t">Quiénes forman la red hoy</h2>
+      <p class="lead rv d1" data-i18n="hub.found.p"></p>
+      <div id="aliadas-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
+    </div>
+  </section>
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="hub.routes.ey">Cómo operamos</span>
       <h2 class="h-sec rv" data-i18n="hub.t">Cinco rutas. Un solo propósito.</h2>
       <p class="lead rv d1" data-i18n="hub.lead"></p>
       <div class="routes rv d2" style="margin-top:30px">
@@ -280,10 +299,6 @@
   </section>
   <section>
     <div class="wrap">
-      <span class="ey rv" data-i18n="hub.aliadas.ey">Fundaciones aliadas</span>
-      <h2 class="h-sec rv" data-i18n="hub.aliadas.t">Las primeras del muro.</h2>
-      <p class="lead rv d1" data-i18n="hub.aliadas.lead"></p>
-      <div id="aliadas-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
       <div class="cta-box rv">
         <h3 data-i18n="hub.cta.t"></h3>
         <p data-i18n="hub.cta.p"></p>
@@ -972,7 +987,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=9a23dd7d"></script>
+<script src="/app.js?v=0e902afd"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

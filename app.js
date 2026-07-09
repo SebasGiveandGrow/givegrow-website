@@ -60,6 +60,15 @@ var I18N = {
     "origen.t":"Todo empezó con una tonelada de comida.",
     "origen.p1":"Tras semanas de gestión, una campaña alcanzó su meta: una tonelada de alimento para entregar a una fundación. Pero al llegar, la fundación no tenía cómo almacenar ni repartir todo ese alimento. Casi la mitad se perdió. Ver esa comida desperdiciarse —comida que a pocas cuadras alguien necesitaba— dejó una pregunta que no soltó al fundador: ¿cómo cierro la brecha entre los recursos y la necesidad, con lo que tengo a la mano?",
     "origen.p2":"Esa pregunta se volvió método. Give&Grow International nace de casi cuatro años de experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín, y se constituye el 19 de mayo de 2025 en Medellín como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: restaurar la confianza en el acto de dar, con trazabilidad y sin intermediarios opacos.",
+    "hub.intro.ey":"El HUB SOCIAL",
+    "hub.intro.t":"¿Qué es un HUB?",
+    "hub.intro.p1":"Un HUB es un punto de encuentro: un lugar donde se conectan personas, recursos y capacidades que por separado no se encontrarían. No reemplaza a quienes ya trabajan; los articula para que su esfuerzo llegue más lejos.",
+    "hub.intro.t2":"Entonces, ¿qué es el HUB SOCIAL de Give&Grow?",
+    "hub.intro.p2":"Es nuestro motor operativo en terreno: el puente que conecta la generosidad de donantes y empresas con fundaciones de base verificadas, de forma trazable y sostenible. Aquí, quien da también crece, y cada aporte llega con evidencia: acta, foto y factura.",
+    "hub.found.ey":"Fundaciones del HUB",
+    "hub.found.t":"Quiénes forman la red hoy",
+    "hub.found.p":"Empezamos con una fundación aliada y una red en proceso de vinculación formal. Cada una entra una a una, con verificación y convenio — sin nombres ni cifras infladas.",
+    "hub.routes.ey":"Cómo operamos",
     "hub.ey":"HUB SOCIAL",
     "hub.t":"Cinco rutas. Un solo propósito.",
     "hub.lead":"El centro operativo donde alianzas, donaciones e impacto se encuentran.",
@@ -1025,7 +1034,10 @@ var GALLERY = [
   {f:"jornadas/guajira_bebe.webp", es:"Entrega de leche en jornada wayuu", en:"Milk delivery on a Wayuu outreach day"},
   {f:"jornadas/guajira_territorio.webp", es:"Territorio wayuu, Alta Guajira", en:"Wayuu territory, Alta Guajira"},
   {f:"jornadas/guajira_jornada.webp", es:"Equipo y comunidad, jornada wayuu", en:"Team and community, Wayuu outreach day"},
-  {f:"jornadas/mayores_manos.webp", es:"Visita a hogar de adultos mayores (2023)", en:"Visit to an elders\u2019 home (2023)"},
+  {f:"jornadas/baile_flow_escenario.webp", es:"Flow Callejero en tarima (NDF)", en:"Flow Callejero on stage (NDF)"},
+  {f:"jornadas/baile_presentacion.webp", es:"Presentación del Proyecto de Baile (NDF)", en:"Dance Project performance (NDF)"},
+  {f:"jornadas/baile_grupo_estudio.webp", es:"Proyecto de Baile en el estudio (NDF)", en:"Dance Project at the studio (NDF)"},
+  {f:"jornadas/mayores_manos.webp", es:"Visita a hogar de adultos mayores (2023)", en:"Visit to an elders’ home (2023)"},
   {f:"jornadas/mayores_alegria.webp", es:"La alegría también se entrega", en:"Joy is also delivered"}
 ];
 var lbIndex = 0;

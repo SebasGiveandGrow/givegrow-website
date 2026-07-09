@@ -558,5 +558,14 @@
   "don.cta.b2": "Write to us",
   "calc.dest.lbl": "Where does your contribution go?",
   "calc.note.lbl": "Leave a message or dedication (optional)",
-  "calc.note.ph": "Your message travels with your donation and appears on your receipt."
+  "calc.note.ph": "Your message travels with your donation and appears on your receipt.",
+  "hub.intro.ey": "THE SOCIAL HUB",
+  "hub.intro.t": "What is a Hub?",
+  "hub.intro.p1": "A Hub is a meeting point: a place where people, resources and capabilities that would otherwise never meet get connected. It does not replace those already doing the work; it links them so their effort reaches further.",
+  "hub.intro.t2": "So, what is Give&Grow's Social Hub?",
+  "hub.intro.p2": "It is our on-the-ground engine: the bridge connecting the generosity of donors and companies with verified grassroots foundations, in a traceable and sustainable way. Here, those who give also grow, and every contribution arrives with evidence: records, photos and invoices.",
+  "hub.found.ey": "Hub foundations",
+  "hub.found.t": "Who makes up the network today",
+  "hub.found.p": "We begin with one partner foundation and a network in the process of formal onboarding. Each one joins one at a time, with verification and an agreement — no inflated names or figures.",
+  "hub.routes.ey": "How we operate"
 }
