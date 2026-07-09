@@ -1,89 +1,138 @@
 {
-  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}. consent{} = registro de autorizaciones {name, logo, photos: bool; minorsImageProtected; grantedBy; date: YYYY-MM-DD; source}: el logo solo se renderiza si consent.logo===true y la galería solo si consent.photos===true (hub exento). Sin consentimiento registrado no se publica material de terceros.",
-  "partners": [
+ "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}. consent{} = registro de autorizaciones {name, logo, photos: bool; minorsImageProtected; grantedBy; date: YYYY-MM-DD; source}: el logo solo se renderiza si consent.logo===true y la galería solo si consent.photos===true (hub exento). Sin consentimiento registrado no se publica material de terceros.",
+ "partners": [
+  {
+   "id": "hub-medellin",
+   "name": "HUB SOCIAL Give&Grow",
+   "type": "hub",
+   "lat": 6.2442,
+   "lng": -75.5812,
+   "area": {
+    "es": "Medellín · centro operativo",
+    "en": "Medellín · operations center"
+   }
+  },
+  {
+   "id": "ndf",
+   "name": "Fundación Niños del Futuro",
+   "type": "foundation",
+   "lat": 6.2925,
+   "lng": -75.5375,
+   "area": {
+    "es": "Manrique · La Honda, Medellín",
+    "en": "Manrique · La Honda, Medellín"
+   },
+   "url": "https://ninosdelfuturo.com",
+   "instagram": "https://www.instagram.com/ninos.del.futuro",
+   "impactUnits": [
     {
-      "id": "hub-medellin",
-      "name": "HUB SOCIAL Give&Grow",
-      "type": "hub",
-      "lat": 6.2442,
-      "lng": -75.5812,
-      "area": {
-        "es": "Medellín · centro operativo",
-        "en": "Medellín · operations center"
-      }
+     "id": "ndf-plato",
+     "cop": 4000,
+     "es": "plato de comida",
+     "esPl": "platos de comida",
+     "en": "plate of food",
+     "enPl": "plates of food"
+    }
+   ],
+   "logo": "/img/ndf_logo.jpg",
+   "gallery": [
+    {
+     "src": "/img/jornadas/baile_flow_escenario.webp",
+     "alt": {
+      "es": "Flow Callejero en presentación sobre tarima",
+      "en": "Flow Callejero performing on stage"
+     }
     },
     {
-      "id": "ndf",
-      "name": "Fundación Niños del Futuro",
-      "type": "foundation",
-      "lat": 6.2925,
-      "lng": -75.5375,
-      "area": {
-        "es": "Manrique · La Honda, Medellín",
-        "en": "Manrique · La Honda, Medellín"
-      },
-      "url": "https://ninosdelfuturo.com",
-      "instagram": "https://www.instagram.com/ninos.del.futuro",
-      "impactUnits": [
-        {
-          "id": "ndf-plato",
-          "cop": 4000,
-          "es": "plato de comida",
-          "esPl": "platos de comida",
-          "en": "plate of food",
-          "enPl": "plates of food"
-        }
-      ],
-      "logo": "/img/ndf_logo.jpg",
-      "gallery": [],
-      "consent": {
-        "name": true,
-        "logo": true,
-        "photos": false,
-        "minorsImageProtected": "pendiente",
-        "grantedBy": "Francisco Grijalba",
-        "date": null,
-        "source": "Autorización previa registrada por Give&Grow (logo y nombre ya publicados); pendiente formalizar fecha y fotos con el cuestionario de ingreso"
-      },
-      "poblacion": {
-        "es": "≈130 niños y niñas",
-        "en": "≈130 children"
-      },
-      "profile": {
-        "badge": {
-          "es": "Proyecto comunitario de base",
-          "en": "Grassroots community project"
-        },
-        "leader": "Francisco Grijalba",
-        "years": {
-          "es": "5+ años en territorio",
-          "en": "5+ years on the ground"
-        },
-        "about": {
-          "es": "Fundación comunitaria dirigida por Francisco Grijalba en el sector de La Honda (Manrique, Medellín), con más de cinco años sirviendo a su comunidad. Es la primera fundación aliada del HUB SOCIAL: Give&Grow no reemplaza su labor, la fortalece.",
-          "en": "A community foundation led by Francisco Grijalba in the La Honda area (Manrique, Medellín), with over five years serving its community. It is the Social Hub's first partner foundation: Give&Grow does not replace its work, it strengthens it."
-        },
-        "programs": [
-          {
-            "name": "Chefs del Futuro",
-            "desc": {
-              "es": "Alimentación diaria: cerca de 100 niños y niñas reciben almuerzo cada día.",
-              "en": "Daily nutrition: around 100 children receive lunch every day."
-            }
-          },
-          {
-            "name": "Borboletas",
-            "desc": {
-              "es": "Acompañamiento a 30 niñas y niños, tres veces por semana.",
-              "en": "Support for 30 children, three times a week."
-            }
-          }
-        ],
-        "hub": {
-          "es": "A través de la Ruta 1 (alianzas) recibe logística y visibilidad, y por la Ruta 2 (gestión de donaciones) canaliza aportes en especie y monetarios con trazabilidad completa: acta de recepción, entrega firmada, reporte fotográfico y certificado.",
-          "en": "Through Route 1 (alliances) it receives logistics and visibility, and through Route 2 (donation management) it channels in-kind and monetary gifts with full traceability: reception record, signed delivery, photo report and certificate."
-        }
-      }
+     "src": "/img/jornadas/baile_presentacion.webp",
+     "alt": {
+      "es": "Presentación del Proyecto de Baile en cancha comunitaria",
+      "en": "Dance Project performance at a community court"
+     }
+    },
+    {
+     "src": "/img/jornadas/baile_grupo_estudio.webp",
+     "alt": {
+      "es": "Grupo del Proyecto de Baile en el estudio",
+      "en": "Dance Project group at the studio"
+     }
+    },
+    {
+     "src": "/img/jornadas/baile_retrato.webp",
+     "alt": {
+      "es": "Integrante de Flow Callejero",
+      "en": "Flow Callejero member"
+     }
     }
-  ]
+   ],
+   "consent": {
+    "name": true,
+    "logo": true,
+    "photos": true,
+    "minorsImageProtected": "pendiente",
+    "grantedBy": "Francisco Grijalba",
+    "date": null,
+    "source": "Nombre y logo ya publicados con autorización previa; galería de baile publicada con consentimiento de jornadas confirmado por el representante legal de Give&Grow (2026-07). Fecha formal del cuestionario de ingreso pendiente."
+   },
+   "poblacion": {
+    "es": "≈130 niñas y niños",
+    "en": "≈130 children"
+   },
+   "profile": {
+    "badge": {
+     "es": "Proyecto comunitario de base",
+     "en": "Grassroots community project"
+    },
+    "leader": "Francisco Grijalba",
+    "years": {
+     "es": "5+ años en territorio",
+     "en": "5+ years on the ground"
+    },
+    "about": {
+     "es": "Fundación comunitaria dirigida por Francisco Grijalba en el sector de La Honda (Manrique, Medellín), con más de cinco años sirviendo a su comunidad. Es la primera fundación aliada del HUB SOCIAL: Give&Grow no reemplaza su labor, la fortalece. Su proyecto principal es el Proyecto de Baile, que usa la danza como herramienta de transformación social y está liderado de forma voluntaria por Jagoda Cwiklik, bailarina radicada en Medellín.",
+     "en": "A community foundation led by Francisco Grijalba in the La Honda area (Manrique, Medellín), with over five years serving its community. It is the Social Hub's first partner foundation: Give&Grow does not replace its work, it strengthens it. Its flagship initiative is the Dance Project, which uses dance as a tool for social transformation, led on a volunteer basis by Jagoda Cwiklik, a dancer based in Medellín."
+    },
+    "programs": [
+     {
+      "name": "Chefs del Futuro",
+      "desc": {
+       "es": "Alimentación diaria: cerca de 100 niños y niñas reciben almuerzo cada día.",
+       "en": "Daily nutrition: around 100 children receive lunch every day."
+      }
+     },
+     {
+      "name": "Borboletas",
+      "logo": "/img/partners/borboletas.png",
+      "desc": {
+       "es": "Grupo de iniciación del Proyecto de Baile: más de 30 niñas y niños de 6 a 12 años descubren la danza como herramienta de crecimiento personal, disciplina y confianza.",
+       "en": "The Dance Project's entry group: over 30 children aged 6–12 discover dance as a tool for personal growth, discipline and confidence."
+      }
+     },
+     {
+      "name": "Flow Callejero",
+      "logo": "/img/partners/flow_callejero.png",
+      "desc": {
+       "es": "Grupo juvenil de proyección artística: cerca de 14 adolescentes desde los 13 años representan a la fundación en presentaciones y competencias, formándose como líderes positivos de su comunidad.",
+       "en": "The youth performance group: around 14 teens aged 13+ represent the foundation at shows and competitions, growing as positive community leaders."
+      }
+     },
+     {
+      "name": "Becas",
+      "desc": {
+       "es": "Formación profesional para 7 niños y jóvenes con talento y compromiso, en las academias Move Danza y Elements, incluyendo transporte seguro desde sus hogares.",
+       "en": "Professional training for 7 committed, talented children and youth at the Move Danza and Elements academies, including safe transport from their homes."
+      }
+     }
+    ],
+    "hub": {
+     "es": "A través de la Ruta 1 (alianzas) recibe logística y visibilidad, y por la Ruta 2 (gestión de donaciones) canaliza aportes en especie y monetarios con trazabilidad completa: acta de recepción, entrega firmada, reporte fotográfico y certificado.",
+     "en": "Through Route 1 (alliances) it receives logistics and visibility, and through Route 2 (donation management) it channels in-kind and monetary gifts with full traceability: reception record, signed delivery, photo report and certificate."
+    },
+    "quote": {
+     "es": "Más allá de enseñar a bailar, buscamos generar oportunidades y transformar vidas.",
+     "en": "Beyond teaching dance, we aim to create opportunities and transform lives."
+    }
+   }
+  }
+ ]
 }

@@ -472,3 +472,9 @@ html[data-theme="dark"] .alma-fab{background:var(--acc);color:#0F1613;box-shadow
 .cta-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px}
 .hero-tour{display:inline-block;margin-top:22px;font-size:14px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:.2px;border-bottom:1px dashed rgba(255,255,255,.4);padding-bottom:2px;transition:color .15s,border-color .15s}
 .hero-tour:hover{color:#fff;border-color:#fff}
+
+/* ---------- logos de programas en ficha de fundación ---------- */
+.prog-card{display:flex;flex-direction:column}
+.prog-logo{display:flex;align-items:center;justify-content:center;height:76px;margin:-4px 0 12px;padding:10px;border-radius:12px;background:#111;border:1px solid var(--bd)}
+.prog-logo img{max-height:100%;max-width:80%;object-fit:contain}
+html[data-theme="dark"] .prog-logo{background:#000}

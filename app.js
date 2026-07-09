@@ -1089,7 +1089,8 @@ function renderFicha(fid){
       html += '<h3 style="margin-top:34px">'+t("ficha.prog.t")+'</h3><div class="grid g2" style="margin-top:16px">';
       for (var k=0;k<pr.programs.length;k++){
         var g = pr.programs[k];
-        html += '<div class="card"><h3>'+g.name+'</h3><p>'+((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
+        var gLogo = g.logo ? '<div class="prog-logo"><img src="'+g.logo+'" alt="'+g.name+'" loading="lazy"></div>' : '';
+        html += '<div class="card prog-card">'+gLogo+'<h3>'+g.name+'</h3><p>'+((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
       }
       html += '</div>';
     }
