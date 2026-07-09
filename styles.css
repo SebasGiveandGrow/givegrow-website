@@ -467,3 +467,8 @@ html[data-theme="dark"] .alma-fab{background:var(--acc);color:#0F1613;box-shadow
 .j-next{font-size:15px;font-weight:800;color:var(--acc)}
 .j-next:hover{text-decoration:underline}
 @media(max-width:600px){.journey{flex-direction:column;align-items:flex-start;gap:10px}}
+
+/* ---------- cierres de página y "empieza aquí" ---------- */
+.cta-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.hero-tour{display:inline-block;margin-top:22px;font-size:14px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:.2px;border-bottom:1px dashed rgba(255,255,255,.4);padding-bottom:2px;transition:color .15s,border-color .15s}
+.hero-tour:hover{color:#fff;border-color:#fff}

@@ -538,5 +538,22 @@
   "journey.t": "The journey",
   "journey.next": "Next",
   "journey.done": "Journey complete. Thank you for getting to know us from start to finish.",
-  "nav.inicio": "Home"
+  "nav.inicio": "Home",
+  "hero.tour": "First time here? Take the full journey",
+  "hub.cta.t": "The Hub grows with every ally.",
+  "hub.cta.p": "If you lead a foundation, this bridge is for you. And if you want to strengthen the network, your contribution makes it grow.",
+  "hub.cta.b1": "Apply to the Hub",
+  "hub.cta.b2": "I want to donate",
+  "imp.cta.t": "The evidence grows with you.",
+  "imp.cta.p": "Every contribution becomes one more verifiable data point: a meal, a kit, an outreach day with records and photos.",
+  "imp.cta.b1": "Donate now",
+  "imp.cta.b2": "See memberships",
+  "faq.cta2.t": "Still have a question?",
+  "faq.cta2.p": "ALMA answers instantly, or write to us directly — a real person replies.",
+  "faq.cta2.b1": "Talk to ALMA",
+  "faq.cta2.b2": "Go to contact",
+  "don.cta.t": "Doubts before taking the step?",
+  "don.cta.p": "That is normal. Ask anything you need — that is what ALMA and our team are here for.",
+  "don.cta.b1": "Talk to ALMA",
+  "don.cta.b2": "Write to us"
 }

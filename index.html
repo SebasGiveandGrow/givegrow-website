@@ -27,7 +27,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=613d1613">
+<link rel="stylesheet" href="/styles.css?v=4f7fed58">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/benef_03.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -129,6 +129,7 @@
           <p data-i18n="path.fund.s">Unirme al Hub</p>
         </a>
       </div>
+      <a class="hero-tour rv d3" href="#origen" onclick="return go('origen')"><span data-i18n="hero.tour">¿Primera vez aquí? Haz el recorrido completo</span> &rarr;</a>
     </div>
   </section>
 
@@ -283,6 +284,14 @@
       <h2 class="h-sec rv" data-i18n="hub.aliadas.t">Las primeras del muro.</h2>
       <p class="lead rv d1" data-i18n="hub.aliadas.lead"></p>
       <div id="aliadas-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
+      <div class="cta-box rv">
+        <h3 data-i18n="hub.cta.t"></h3>
+        <p data-i18n="hub.cta.p"></p>
+        <div class="cta-actions">
+          <a class="btn btn-g" href="#fundaciones" onclick="return go('fundaciones')" data-i18n="hub.cta.b1">Quiero aplicar al Hub</a>
+          <a class="btn btn-o" href="#donar" onclick="return go('donar')" data-i18n="hub.cta.b2">Quiero donar</a>
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -474,6 +483,14 @@
       <h2 class="h-sec rv" data-i18n="net.t">Quiénes forman la red hoy.</h2>
       <p class="lead rv d1" data-i18n="net.p"></p>
       <div id="net-wall" class="grid g3 rv d2" style="margin-top:26px"></div>
+      <div class="cta-box rv">
+        <h3 data-i18n="imp.cta.t"></h3>
+        <p data-i18n="imp.cta.p"></p>
+        <div class="cta-actions">
+          <a class="btn btn-g" href="#donar" onclick="return go('donar')" data-i18n="imp.cta.b1">Donar ahora</a>
+          <a class="btn btn-o" href="#membresias" onclick="return go('membresias')" data-i18n="imp.cta.b2">Ver membresías</a>
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -676,6 +693,14 @@
         <div class="step"><div><h4 data-i18n="pay.how.s3.t"></h4><p data-i18n="pay.how.s3.p"></p></div></div>
       </div>
       <div class="card rv d2" style="margin-top:24px"><h3 data-i18n="pay.how.sec.t"></h3><p data-i18n="pay.how.sec.p"></p></div>
+      <div class="cta-box rv">
+        <h3 data-i18n="don.cta.t"></h3>
+        <p data-i18n="don.cta.p"></p>
+        <div class="cta-actions">
+          <a class="btn btn-o" href="#alma" onclick="return go('alma')" data-i18n="don.cta.b1">Hablar con ALMA</a>
+          <a class="btn btn-o" href="#contacto" onclick="return go('contacto')" data-i18n="don.cta.b2">Escribirnos</a>
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -824,6 +849,14 @@
         <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q9"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a9"></div><a class="faq-cta" href="#empresas" data-i18n="faq.cta.emp"></a></div></div>
         <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q10"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a10"></div></div></div>
       </div>
+      <div class="cta-box rv">
+        <h3 data-i18n="faq.cta2.t"></h3>
+        <p data-i18n="faq.cta2.p"></p>
+        <div class="cta-actions">
+          <a class="btn btn-g" href="#alma" onclick="return go('alma')" data-i18n="faq.cta2.b1">Hablar con ALMA</a>
+          <a class="btn btn-o" href="#contacto" onclick="return go('contacto')" data-i18n="faq.cta2.b2">Ir a contacto</a>
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -930,7 +963,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=c9d9a6b5"></script>
+<script src="/app.js?v=54f5348b"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
