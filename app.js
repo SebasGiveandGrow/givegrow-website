@@ -1013,7 +1013,6 @@ var GALLERY = [
   {f:"benef_02.jpg", es:"Entrega documentada con acta", en:"Delivery documented with a record"},
   {f:"benef_03.jpg", es:"Impacto medible, personas reales", en:"Measurable impact, real people"},
   {f:"campo_01.jpg", es:"Trabajo de campo en La Guajira", en:"Field work in La Guajira"},
-  {f:"campo_03.jpg", es:"Comunas de Medellín", en:"Comunas of Medellín"},
   {f:"campo_04.jpg", es:"Acompañamiento continuo", en:"Continuous accompaniment"},
   {f:"jornadas/guajira_nina_naranja.webp", es:"La Guajira, enero 2025", en:"La Guajira, January 2025"},
   {f:"jornadas/guajira_abuela.webp", es:"Tres generaciones bajo la enramada", en:"Three generations under the enramada"},
