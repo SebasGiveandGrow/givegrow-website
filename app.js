@@ -115,6 +115,11 @@ var I18N = {
     "banner.quote":"Esto también es evidencia.",
     "banner.link":"Ver más evidencia",
     "banner.imgalt":"Niña wayuu a contraluz durante una jornada al atardecer en la Alta Guajira",
+    "alma.fab":"Habla con ALMA, nuestra asistente",
+    "journey.t":"El recorrido",
+    "journey.next":"Siguiente",
+    "journey.done":"Recorrido completo. Gracias por conocernos de principio a fin.",
+    "nav.inicio":"Inicio",
     "theme.auto":"Tema: automático según la hora. Clic para modo claro",
     "theme.light":"Tema: claro. Clic para modo oscuro",
     "theme.dark":"Tema: oscuro. Clic para modo automático",
@@ -667,6 +672,7 @@ function go(id, fromPop){
   currentRoute = id;
   if (location.hash !== "#"+id) history[fromPop ? "replaceState" : "pushState"](null,"","#"+id);
   applyRouteMeta(id);
+  renderJourney(id);
   window.scrollTo(0,0);
   closeDrawer();
   initReveal();
@@ -1411,3 +1417,31 @@ function themeCycle(){
   themeApply(next, true);
 }
 themeApply(themeStored(), false);
+
+/* ---------- barra de recorrido: la fundación de 0 a 100 ---------- */
+var JOURNEY = ["inicio","origen","hub","impacto","fundaciones","empresas","membresias","gratitud","transparencia","faq","contacto","donar"];
+var JOURNEY_KEYS = {inicio:"nav.inicio",origen:"nav.origen",hub:"nav.hub",impacto:"nav.impacto",fundaciones:"nav.fundaciones",empresas:"nav.empresas",membresias:"nav.membres",gratitud:"nav.gratitud",transparencia:"nav.transp",faq:"nav.faq",contacto:"nav.contacto",donar:"nav.donar"};
+function renderJourney(id){
+  var bar = document.getElementById("journey-nav");
+  var idx = JOURNEY.indexOf(id);
+  if (idx === -1){ if (bar) bar.style.display = "none"; return; }
+  if (!bar){
+    bar = document.createElement("div");
+    bar.id = "journey-nav";
+    bar.className = "wrap";
+  }
+  bar.style.display = "";
+  var prev = idx > 0 ? JOURNEY[idx-1] : null;
+  var next = idx < JOURNEY.length-1 ? JOURNEY[idx+1] : null;
+  var html = '<div class="journey"><span class="j-meta"><span data-i18n="journey.t">El recorrido</span> · ' + (idx+1) + '/' + JOURNEY.length + '</span><div class="j-links">';
+  if (prev) html += '<a class="j-prev" href="#'+prev+'" onclick="return go(\''+prev+'\')">&larr; <span data-i18n="'+JOURNEY_KEYS[prev]+'"></span></a>';
+  if (next) html += '<a class="j-next" href="#'+next+'" onclick="return go(\''+next+'\')"><span data-i18n="journey.next">Siguiente</span>: <span data-i18n="'+JOURNEY_KEYS[next]+'"></span> &rarr;</a>';
+  else html += '<span class="j-prev" data-i18n="journey.done">Recorrido completo.</span>';
+  html += '</div></div>';
+  bar.innerHTML = html;
+  var page = document.getElementById("page-"+id);
+  if (page) page.appendChild(bar);
+  var nodes = bar.querySelectorAll("[data-i18n]");
+  for (var i=0;i<nodes.length;i++){ nodes[i].textContent = t(nodes[i].getAttribute("data-i18n")); }
+}
+renderJourney(currentRoute || "inicio");

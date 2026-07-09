@@ -451,3 +451,19 @@ html.theming .band, html.theming section, html.theming .nav-mobile{
 .fb-link{display:inline-flex;align-items:center;gap:8px;color:rgba(255,255,255,.92);font-weight:700;font-size:14.5px;border-bottom:1.5px solid rgba(255,255,255,.4);padding-bottom:2px;transition:border-color .15s,color .15s}
 .fb-link:hover{color:var(--gn);border-color:var(--gn)}
 @media(max-width:640px){.foto-banner{min-height:68vh}.fb-in{padding-bottom:38px}}
+
+/* ---------- botón flotante ALMA ---------- */
+.alma-fab{position:fixed;bottom:92px;right:24px;z-index:400;display:flex;align-items:center;gap:8px;padding:0 18px;height:44px;border-radius:999px;background:var(--g);color:#fff;font-weight:800;font-size:14px;letter-spacing:.4px;box-shadow:0 4px 16px rgba(31,92,56,.35);transition:transform .2s var(--ease),background .2s}
+.alma-fab:hover{transform:scale(1.06);background:var(--gh)}
+.alma-fab svg{width:20px;height:20px}
+html[data-theme="dark"] .alma-fab{background:var(--acc);color:#0F1613;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+
+/* ---------- barra de recorrido (0 a 100) ---------- */
+.journey{margin-top:56px;border-top:1px solid var(--bd);padding:22px 0 6px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.j-meta{font-size:11.5px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--mu)}
+.j-links{display:flex;align-items:center;gap:22px}
+.j-prev{font-size:14px;font-weight:600;color:var(--mu);transition:color .15s}
+.j-prev:hover{color:var(--ink)}
+.j-next{font-size:15px;font-weight:800;color:var(--acc)}
+.j-next:hover{text-decoration:underline}
+@media(max-width:600px){.journey{flex-direction:column;align-items:flex-start;gap:10px}}
