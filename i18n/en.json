@@ -555,5 +555,8 @@
   "don.cta.t": "Doubts before taking the step?",
   "don.cta.p": "That is normal. Ask anything you need — that is what ALMA and our team are here for.",
   "don.cta.b1": "Talk to ALMA",
-  "don.cta.b2": "Write to us"
+  "don.cta.b2": "Write to us",
+  "calc.dest.lbl": "Where does your contribution go?",
+  "calc.note.lbl": "Leave a message or dedication (optional)",
+  "calc.note.ph": "Your message travels with your donation and appears on your receipt."
 }

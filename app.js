@@ -501,6 +501,9 @@ var I18N = {
     "start.vol.t":"Quiero ayudar",
     "start.vol.p":"Suma tu tiempo o talento al equipo que está construyendo todo esto.",
     "start.vol.btn":"Escríbenos →",
+    "calc.dest.lbl":"¿A dónde va tu aporte?",
+    "calc.note.lbl":"Deja un mensaje o dedicatoria (opcional)",
+    "calc.note.ph":"Tu mensaje viajará con tu donación y aparecerá en tu recibo.",
     "calc.impact":"Tu impacto",
     "calc.impact.note":"Equivalencia aproximada, según datos de las fundaciones del Hub.",
     "origen.imgalt":"Abuela y nieta wayuu bajo una enramada en La Guajira",
@@ -630,6 +633,7 @@ function renderPobChips(){
 }
 function postLang(l){
   applyLang(l); renderWall(); renderHeroImpact(); renderAliadas();
+  try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
 }
 var I18N_LOADING = null;
@@ -754,7 +758,7 @@ function animateCounters(){
 }
 
 /* ---------- calculator ---------- */
-var calc = { cur:"COP", freq:"m", val:200000, mode:"ind" };
+var calc = { cur:"COP", freq:"m", val:200000, mode:"ind", partnerId:"", projectId:"general", note:"" };
 var USD_RATE = 4200;
 var TIERS = [
   {min:0,  svg:'<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c-.6-3-3.2-4.6-6.3-4 .3 3 2.6 4.8 6.3 4z"/></svg>', es:"Semilla", en:"Seed"},
@@ -772,10 +776,69 @@ var IMPACT_UNITS = [
 ];
 function activeImpactUnit(){
   if (!IMPACT_UNITS.length) return null;
-  for (var i=0;i<IMPACT_UNITS.length;i++){ if (IMPACT_UNITS[i].id===calc.impactId) return IMPACT_UNITS[i]; }
+  // Si hay un proyecto elegido con unidad propia, esa manda.
+  if (calc.projectId && calc.projectId !== "general"){
+    for (var i=0;i<IMPACT_UNITS.length;i++){ if (IMPACT_UNITS[i].id===calc.projectId) return IMPACT_UNITS[i]; }
+  }
+  // "Donde más se necesite" (fondo): usa la primera unidad como equivalencia de referencia.
   return IMPACT_UNITS[0];
 }
-function setImpactUnit(id){ calc.impactId = id; calcUpdate(); }
+function setImpactUnit(id){ calc.projectId = id; calcUpdate(); }
+
+/* Construye el selector fundación → proyecto a partir de partners.json.
+   Cada <option> lleva el id de la unidad de impacto (o 'general' para el fondo). */
+function buildProjectSelect(){
+  var sel = document.getElementById("calc-project");
+  if (!sel) return;
+  var partners = (PARTNERS_DATA || PARTNERS_FALLBACK).filter(function(p){ return p.type==="foundation" && p.impactUnits && p.impactUnits.length; });
+  var html = '<option value="general" data-partner="">'+(lang==="en"?"Where it's needed most (general fund)":"Donde más se necesite (fondo general)")+'</option>';
+  for (var i=0;i<partners.length;i++){
+    var p = partners[i];
+    html += '<optgroup label="'+p.name+'">';
+    for (var k=0;k<p.impactUnits.length;k++){
+      var u = p.impactUnits[k];
+      var label = u.project ? u.project : (u[lang]||u.es);
+      html += '<option value="'+u.id+'" data-partner="'+p.id+'">'+label+'</option>';
+    }
+    html += '</optgroup>';
+  }
+  sel.innerHTML = html;
+  sel.value = calc.projectId || "general";
+}
+function setProject(unitId){
+  calc.projectId = unitId;
+  var sel = document.getElementById("calc-project");
+  if (sel){ var opt = sel.options[sel.selectedIndex]; calc.partnerId = opt ? (opt.getAttribute("data-partner")||"") : ""; }
+  calcUpdate();
+}
+function onNote(v){
+  calc.note = String(v).slice(0,280);
+  setText("calc-msg-count", calc.note.length);
+}
+
+/* Borrador de donación: reúne todo lo que el donante eligió en la calculadora.
+   Es la fuente única que consumirán (a) el motor de recibos y (b) el registro
+   en base de datos, el día que el gateway de pago quede confirmado y conectado.
+   Modo: 'dirigida' si eligió un proyecto; 'fondo' si eligió "donde más se necesite". */
+function buildDonationDraft(){
+  var u = activeImpactUnit();
+  var dirigida = !!(calc.projectId && calc.projectId !== "general");
+  var monthlyCop = (calc.freq==="a") ? calc.val/12 : calc.val;
+  return {
+    montoCOP: calc.val,
+    moneda: calc.cur,
+    frecuencia: calc.freq,                 // m | a | u
+    modo: dirigida ? "dirigida" : "fondo",
+    partnerId: dirigida ? (calc.partnerId||"") : "",
+    proyecto: dirigida ? (u && (u.project || u.es)) : "",
+    unidadId: dirigida ? calc.projectId : "",
+    nota: calc.note || "",
+    beneficioTributarioCOP: Math.round(calc.val*0.25),
+    nivel: (function(){ var tt=TIERS[0]; for(var i=0;i<TIERS.length;i++){ if(monthlyCop>=TIERS[i].min) tt=TIERS[i]; } return tt.es; })()
+  };
+}
+/* Disponible para el futuro flujo de pago/recibo sin reescribir la captura. */
+window.ggDonationDraft = buildDonationDraft;
 function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
 function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 
@@ -858,7 +921,16 @@ function calcUpdate(){
       var n = Math.floor(cop / u.cop);
       if (n>=1){
         var uLabel = (lang==="en") ? (n===1 ? u.en : (u.enPl||u.en)) : (n===1 ? u.es : (u.esPl||u.es));
-        iout.textContent = "\u2248 "+n+" "+uLabel; irow.style.display=""; if(inote) inote.style.display="";
+        iout.textContent = "\u2248 "+n+" "+uLabel; irow.style.display=""; if(inote){
+          inote.style.display="";
+          if (calc.projectId && calc.projectId!=="general"){
+            inote.textContent = (lang==="en")
+              ? "Directed donation: your contribution goes to this project, with records and photos."
+              : "Donación dirigida: tu aporte va a este proyecto, con acta y foto.";
+          } else {
+            inote.textContent = t("calc.impact.note");
+          }
+        }
       }
       else { irow.style.display="none"; if(inote) inote.style.display="none"; }
     } else { irow.style.display="none"; if(inote) inote.style.display="none"; }
@@ -1003,6 +1075,7 @@ function loadPartners(){
         for (var k=0;k<us.length;k++){ us[k].partner=p.name; units.push(us[k]); }
       }
       if (units.length){ IMPACT_UNITS = units; try{ calcUpdate(); }catch(e){} }
+      try{ buildProjectSelect(); }catch(e){}
       return PARTNERS_DATA;
     })
     .catch(function(){ PARTNERS_DATA = PARTNERS_FALLBACK; return PARTNERS_DATA; });

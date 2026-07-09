@@ -27,7 +27,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=74e728f1">
+<link rel="stylesheet" href="/styles.css?v=803d8349">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/benef_03.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -633,6 +633,10 @@
           <button id="cur-cop" class="on" onclick="setCur('COP')">COP</button>
           <button id="cur-usd" onclick="setCur('USD')">USD</button>
         </div>
+        <div class="calc-dest">
+          <label class="calc-dest-lbl" for="calc-project" data-i18n="calc.dest.lbl">¿A dónde va tu aporte?</label>
+          <select id="calc-project" class="calc-select" onchange="setProject(this.value)"></select>
+        </div>
         <div class="calc-amount"><div id="calc-display">$200.000</div></div>
         <input id="calc-manual" type="text" placeholder="0" oninput="onManual(this.value)">
         <div id="calc-rate"></div>
@@ -658,6 +662,11 @@
           <div class="calc-row" id="co-impact-row" style="display:none"><span data-i18n="calc.impact">Tu impacto</span><b id="co-impact">-</b></div>
           <div class="member" id="calc-member"><span id="m-ic"></span><div><div id="m-name">Semilla</div><div id="m-sub">-</div></div></div>
           <p class="mu" id="calc-impact-note" style="display:none;font-size:13px;margin-top:10px" data-i18n="calc.impact.note"></p>
+          <div class="calc-note">
+            <label for="calc-msg" data-i18n="calc.note.lbl">Deja un mensaje o dedicatoria (opcional)</label>
+            <textarea id="calc-msg" rows="2" maxlength="280" oninput="onNote(this.value)" data-i18n="calc.note.ph" data-i18n-attr="placeholder" placeholder="Tu mensaje viajará con tu donación y aparecerá en tu recibo."></textarea>
+            <span class="calc-note-count"><span id="calc-msg-count">0</span>/280</span>
+          </div>
         </div>
       </div>
     </div>
@@ -963,7 +972,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=075adc0f"></script>
+<script src="/app.js?v=70c8a9a2"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

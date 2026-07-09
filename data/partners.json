@@ -28,10 +28,38 @@
     {
      "id": "ndf-plato",
      "cop": 4000,
+     "project": "Chefs del Futuro",
      "es": "plato de comida",
      "esPl": "platos de comida",
      "en": "plate of food",
      "enPl": "plates of food"
+    },
+    {
+     "id": "ndf-borboletas",
+     "cop": 300000,
+     "project": "Borboletas",
+     "es": "mes de baile para una niña o niño (Borboletas)",
+     "esPl": "meses de baile (Borboletas)",
+     "en": "month of dance for a child (Borboletas)",
+     "enPl": "months of dance (Borboletas)"
+    },
+    {
+     "id": "ndf-flow",
+     "cop": 300000,
+     "project": "Flow Callejero",
+     "es": "mes de formación para un adolescente (Flow Callejero)",
+     "esPl": "meses de formación (Flow Callejero)",
+     "en": "month of training for a teen (Flow Callejero)",
+     "enPl": "months of training (Flow Callejero)"
+    },
+    {
+     "id": "ndf-beca",
+     "cop": 450000,
+     "project": "Becas",
+     "es": "mes de beca en academia profesional",
+     "esPl": "meses de beca en academia profesional",
+     "en": "month of professional-academy scholarship",
+     "enPl": "months of professional-academy scholarship"
     }
    ],
    "logo": "/img/ndf_logo.jpg",
