@@ -919,20 +919,33 @@ function calcUpdate(){
     var u = activeImpactUnit();
     if (u){
       var n = Math.floor(cop / u.cop);
+      var uSingular = (lang==="en") ? u.en : u.es;
+      var uLabel = (lang==="en") ? (n===1 ? u.en : (u.enPl||u.en)) : (n===1 ? u.es : (u.esPl||u.es));
+      var dirigida = (calc.projectId && calc.projectId!=="general");
       if (n>=1){
-        var uLabel = (lang==="en") ? (n===1 ? u.en : (u.enPl||u.en)) : (n===1 ? u.es : (u.esPl||u.es));
-        iout.textContent = "\u2248 "+n+" "+uLabel; irow.style.display=""; if(inote){
+        // Alcanza al menos una unidad: conteo normal.
+        iout.textContent = "\u2248 "+n+" "+uLabel; irow.style.display="";
+        if(inote){
           inote.style.display="";
-          if (calc.projectId && calc.projectId!=="general"){
-            inote.textContent = (lang==="en")
-              ? "Directed donation: your contribution goes to this project, with records and photos."
-              : "Donación dirigida: tu aporte va a este proyecto, con acta y foto.";
-          } else {
-            inote.textContent = t("calc.impact.note");
-          }
+          inote.textContent = dirigida
+            ? ((lang==="en") ? "Directed donation: your contribution goes to this project, with records and photos."
+                             : "Donación dirigida: tu aporte va a este proyecto, con acta y foto.")
+            : t("calc.impact.note");
         }
+      } else if (dirigida) {
+        // No alcanza una unidad todavía: mostrar cuánto cuesta UNA completa (piso educativo).
+        iout.textContent = fmtCOP(u.cop) + ((lang==="en") ? " = 1 "+uSingular : " = 1 "+uSingular);
+        irow.style.display="";
+        if(inote){
+          inote.style.display="";
+          inote.textContent = (lang==="en")
+            ? "This is the cost of one full unit. Reach it and your donation covers a complete month."
+            : "Este es el costo de una unidad completa. Alcánzalo y tu donación cubre un mes entero.";
+        }
+      } else {
+        // Fondo general por debajo de la unidad de referencia: ocultar para no mostrar "0".
+        irow.style.display="none"; if(inote) inote.style.display="none";
       }
-      else { irow.style.display="none"; if(inote) inote.style.display="none"; }
     } else { irow.style.display="none"; if(inote) inote.style.display="none"; }
   }
   setText("m-name", tier[lang] || tier.es);
