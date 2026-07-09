@@ -927,10 +927,21 @@ function calcUpdate(){
         iout.textContent = "\u2248 "+n+" "+uLabel; irow.style.display="";
         if(inote){
           inote.style.display="";
-          inote.textContent = dirigida
+          // Lectura agregada para unidades mensuales: 12 -> años, 6 -> semestres.
+          var agg = "";
+          if (u.monthly){
+            if (n>=12 && u.aggAnual){
+              var ny=Math.floor(n/12), yl=(ny===1)?(u.aggAnual[lang]||u.aggAnual.es):((u.aggAnualPl&&(u.aggAnualPl[lang]||u.aggAnualPl.es))||u.aggAnual[lang]||u.aggAnual.es);
+              agg=(lang==="en")?(" — equal to "+ny+" "+yl):(" — equivale a "+ny+" "+yl);
+            } else if (n>=6 && u.aggSemestral){
+              var ns=Math.floor(n/6), sl=(ns===1)?(u.aggSemestral[lang]||u.aggSemestral.es):((u.aggSemestralPl&&(u.aggSemestralPl[lang]||u.aggSemestralPl.es))||u.aggSemestral[lang]||u.aggSemestral.es);
+              agg=(lang==="en")?(" — equal to "+ns+" "+sl):(" — equivale a "+ns+" "+sl);
+            }
+          }
+          inote.textContent = (dirigida
             ? ((lang==="en") ? "Directed donation: your contribution goes to this project, with records and photos."
                              : "Donación dirigida: tu aporte va a este proyecto, con acta y foto.")
-            : t("calc.impact.note");
+            : t("calc.impact.note")) + agg;
         }
       } else if (dirigida) {
         // No alcanza una unidad todavía: mostrar cuánto cuesta UNA completa (piso educativo).
@@ -1002,7 +1013,6 @@ var GALLERY = [
   {f:"benef_02.jpg", es:"Entrega documentada con acta", en:"Delivery documented with a record"},
   {f:"benef_03.jpg", es:"Impacto medible, personas reales", en:"Measurable impact, real people"},
   {f:"campo_01.jpg", es:"Trabajo de campo en La Guajira", en:"Field work in La Guajira"},
-  {f:"campo_02.jpg", es:"Sierra Nevada de Santa Marta", en:"Sierra Nevada de Santa Marta"},
   {f:"campo_03.jpg", es:"Comunas de Medellín", en:"Comunas of Medellín"},
   {f:"campo_04.jpg", es:"Acompañamiento continuo", en:"Continuous accompaniment"},
   {f:"jornadas/guajira_nina_naranja.webp", es:"La Guajira, enero 2025", en:"La Guajira, January 2025"},

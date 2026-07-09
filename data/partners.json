@@ -41,7 +41,24 @@
      "es": "mes de baile para una niña o niño (Borboletas)",
      "esPl": "meses de baile (Borboletas)",
      "en": "month of dance for a child (Borboletas)",
-     "enPl": "months of dance (Borboletas)"
+     "enPl": "months of dance (Borboletas)",
+     "monthly": true,
+     "aggSemestral": {
+      "es": "semestre de baile",
+      "en": "semester of dance"
+     },
+     "aggAnual": {
+      "es": "año de baile",
+      "en": "year of dance"
+     },
+     "aggSemestralPl": {
+      "es": "semestres de baile",
+      "en": "semesters of dance"
+     },
+     "aggAnualPl": {
+      "es": "años de baile",
+      "en": "years of dance"
+     }
     },
     {
      "id": "ndf-flow",
@@ -50,16 +67,50 @@
      "es": "mes de formación para un adolescente (Flow Callejero)",
      "esPl": "meses de formación (Flow Callejero)",
      "en": "month of training for a teen (Flow Callejero)",
-     "enPl": "months of training (Flow Callejero)"
+     "enPl": "months of training (Flow Callejero)",
+     "monthly": true,
+     "aggSemestral": {
+      "es": "semestre de baile",
+      "en": "semester of dance"
+     },
+     "aggAnual": {
+      "es": "año de baile",
+      "en": "year of dance"
+     },
+     "aggSemestralPl": {
+      "es": "semestres de baile",
+      "en": "semesters of dance"
+     },
+     "aggAnualPl": {
+      "es": "años de baile",
+      "en": "years of dance"
+     }
     },
     {
      "id": "ndf-beca",
      "cop": 300000,
      "project": "Becas",
-     "es": "mes de beca en academia profesional",
-     "esPl": "meses de beca en academia profesional",
-     "en": "month of professional-academy scholarship",
-     "enPl": "months of professional-academy scholarship"
+     "es": "beca mensual de baile",
+     "esPl": "becas mensuales de baile",
+     "en": "monthly dance scholarship",
+     "enPl": "monthly dance scholarships",
+     "monthly": true,
+     "aggSemestral": {
+      "es": "beca semestral",
+      "en": "semester scholarship"
+     },
+     "aggAnual": {
+      "es": "beca anual",
+      "en": "annual scholarship"
+     },
+     "aggSemestralPl": {
+      "es": "becas semestrales",
+      "en": "semester scholarships"
+     },
+     "aggAnualPl": {
+      "es": "becas anuales",
+      "en": "annual scholarships"
+     }
     }
    ],
    "logo": "/img/ndf_logo.jpg",
