@@ -1,6 +1,44 @@
 {
- "actualizado": "2026-07-09T01:39:52.698Z",
- "donaciones": [],
+ "actualizado": "2026-07-09T14:11:33.036Z",
+ "donaciones": [
+  {
+   "guia": "GG-2026-000001",
+   "fecha": "2026-07-08",
+   "tipo": "dinero",
+   "modo": "fondo",
+   "destino": "fondo-2026-07",
+   "desc": "Aporte al fondo general",
+   "estado": "recibida",
+   "entrega": ""
+  },
+  {
+   "guia": "GG-2026-000002",
+   "fecha": "2026-07-08",
+   "tipo": "especie",
+   "modo": "dirigida",
+   "destino": "ndf",
+   "desc": "3 cajas de ropa infantil",
+   "estado": "en_distribucion",
+   "entrega": ""
+  },
+  {
+   "guia": "GG-2026-000003",
+   "fecha": "2026-07-09",
+   "tipo": "especie",
+   "modo": "",
+   "destino": "",
+   "desc": "",
+   "estado": "recibida",
+   "entrega": ""
+  }
+ ],
  "entregas": [],
- "fondos": []
+ "fondos": [
+  {
+   "id": "fondo-2026-07",
+   "periodo": "2026-07-01T07:00:00.000Z",
+   "estado": "abierto",
+   "resumen": "Alimentación y kits en comunidades acompañadas"
+  }
+ ]
 }
