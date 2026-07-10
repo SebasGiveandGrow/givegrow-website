@@ -579,5 +579,7 @@
   "e404.t": "This page doesn't exist (yet)",
   "e404.p": "The link you followed doesn't lead anywhere in our ecosystem. But every path here leads to something that does matter.",
   "e404.home": "Back to home",
-  "e404.hub": "Discover the Hub"
+  "e404.hub": "Discover the Hub",
+  "hub.aliadas.soon.t": "More foundations on the way",
+  "hub.aliadas.soon.p": "Each partner joins one at a time, with verification and an agreement. We grow with evidence, not promises."
 }

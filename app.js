@@ -29,6 +29,8 @@ var I18N = {
     "stat.pobl":"Poblaciones que buscamos alcanzar",
     "stat.traz":"Trazabilidad",
     "stat.fund":"Año de fundación",
+    "hub.aliadas.soon.t":"Más fundaciones en camino",
+    "hub.aliadas.soon.p":"Cada aliada entra una a una, con verificación y convenio. Estamos sumando con evidencia, no con promesas.",
     "home.hub.ey":"Nuestro valor diferencial",
     "home.hub.t":"El HUB SOCIAL: tu donación con nombre y evidencia",
     "home.hub.p":"No somos otra fundación pidiendo donaciones. Somos el puente que conecta tu generosidad con fundaciones de base verificadas — y te devuelve la prueba de lo que pasó. Cada aporte se rastrea de principio a fin.",

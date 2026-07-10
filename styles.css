@@ -563,3 +563,13 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 /* chips de sugerencia de ALMA (migrado de estilos inline) */
 .alma-chip{padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:var(--surface,#fff);font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:background .15s,border-color .15s}
 .alma-chip:hover{background:var(--gl);border-color:var(--gn)}
+
+/* ===== flotantes en móvil: ALMA y WhatsApp no deben chocar ni tapar contenido ===== */
+@media(max-width:768px){
+  /* WhatsApp abajo derecha (círculo) */
+  .wa{bottom:18px;right:18px;width:52px;height:52px}
+  /* ALMA pasa a círculo abajo IZQUIERDA, sin texto, para no encimarse */
+  .alma-fab{bottom:18px;left:18px;right:auto;width:52px;height:52px;padding:0;border-radius:50%;justify-content:center;gap:0}
+  .alma-fab span{display:none}
+  .alma-fab svg{width:24px;height:24px}
+}
