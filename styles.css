@@ -43,7 +43,7 @@ nav.sol{background:var(--nav-bg);backdrop-filter:blur(12px);box-shadow:0 1px 0 v
 .nlogo{font-family:"Bricolage Grotesque",sans-serif;font-size:16px;font-weight:800;color:var(--ink)}
 .nlogo em{font-style:normal;color:var(--gm)}
 .nlinks{display:flex;align-items:center;gap:6px}
-.nlink{position:relative;padding:8px 12px;border-radius:8px;font-size:14px;font-weight:600;color:var(--ink);transition:background .15s,color .15s}
+.nlink{position:relative;padding:8px 11px;border-radius:8px;font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap;transition:background .15s,color .15s}
 .nlink:hover{background:var(--gl);color:var(--acc)}
 .ndrop-t{background:none;border:0;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px}
 .ndrop-t::after{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-1px);transition:transform .18s var(--ease);opacity:.65}
@@ -333,7 +333,7 @@ footer a:hover{color:var(--gn)}
 #m-ic{display:inline-flex;align-items:center}
 #m-ic .ic-svg{width:30px;height:30px;color:var(--acc)}
 
-.origen-img{width:100%;border-radius:var(--rl);aspect-ratio:16/10;max-height:560px;object-fit:cover;object-position:50% 42%;display:block}
+.origen-img{width:100%;border-radius:var(--rl);height:clamp(280px,46vh,440px);object-fit:cover;object-position:50% 38%;display:block}
 
 @media(max-width:600px){.g2,.g3{grid-template-columns:1fr}}
 
@@ -436,15 +436,16 @@ html.theming .band, html.theming section, html.theming .nav-mobile{
 
 /* ---------- Toggle día/noche (reloj) ---------- */
 .theme-toggle{display:inline-flex;align-items:center;gap:7px;border:none;background:none;cursor:pointer;padding:4px 2px;color:var(--ink)}
-.tt-track{position:relative;width:52px;height:26px;border-radius:999px;background:var(--bg2,rgba(0,0,0,.08));border:1px solid var(--bd);display:flex;align-items:center;transition:background .3s}
+.tt-track{position:relative;width:46px;height:24px;border-radius:999px;background:var(--bg2,rgba(0,0,0,.08));border:1px solid var(--bd);display:flex;align-items:center;transition:background .3s}
 .tt-track svg{width:14px;height:14px;position:absolute;top:50%;transform:translateY(-50%);transition:opacity .3s;pointer-events:none}
-.tt-sun{left:7px;color:#E8A33D;opacity:1}
-.tt-moon{right:7px;color:#6FB08D;opacity:.35}
-.tt-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .3s cubic-bezier(.4,0,.2,1)}
-.tt-auto{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--acc);opacity:0;transition:opacity .2s}
+.tt-sun{left:6px;color:#E8A33D;opacity:1}
+.tt-moon{right:6px;color:#6FB08D;opacity:.35}
+.tt-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.tt-auto{display:none}
+.theme-toggle[data-mode="auto"] .tt-knob::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--acc)}
 /* estado oscuro: perilla a la derecha, luna activa */
 html[data-theme="dark"] .tt-track{background:rgba(255,255,255,.12)}
-html[data-theme="dark"] .tt-knob{transform:translateX(26px)}
+html[data-theme="dark"] .tt-knob{transform:translateX(22px)}
 html[data-theme="dark"] .tt-sun{opacity:.35}
 html[data-theme="dark"] .tt-moon{opacity:1}
 /* modo auto: muestra la etiqueta "auto" y un borde de acento sutil */
@@ -510,3 +511,11 @@ html[data-theme="dark"] .prog-logo{background:#000}
 .skip-link{position:absolute;left:-9999px;top:0;z-index:1000;background:var(--g);color:#fff;font-weight:700;padding:10px 18px;border-radius:0 0 10px 0}
 .skip-link:focus{left:0}
 main.page:focus{outline:none}
+
+/* nav compacto en anchos intermedios: evita quiebres y desproporción */
+@media(max-width:1360px){
+  .nlink{padding:8px 8px;font-size:13.5px}
+  .nlinks{gap:2px}
+  .nav-actions{gap:8px}
+  .btn-nav{padding:8px 16px}
+}
