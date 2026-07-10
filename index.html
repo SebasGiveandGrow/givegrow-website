@@ -27,7 +27,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=54504db9">
+<link rel="stylesheet" href="/styles.css?v=b6c71047">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -104,6 +104,20 @@
 </div>
 
 <!-- ============ INICIO ============ -->
+<main id="page-e404" class="page">
+  <section class="e404-sec">
+    <div class="wrap e404-wrap">
+      <div class="e404-code" aria-hidden="true">404</div>
+      <h1 class="e404-title" data-i18n="e404.t">Esta página no existe (todavía)</h1>
+      <p class="e404-lead" data-i18n="e404.p">El enlace que seguiste no lleva a ningún lugar de nuestro ecosistema. Pero cada camino aquí lleva a algo que sí importa.</p>
+      <div class="e404-actions">
+        <a class="btn btn-g" href="#inicio" onclick="return go('inicio')" data-i18n="e404.home">Volver al inicio</a>
+        <a class="btn btn-o" href="#hub" onclick="return go('hub')" data-i18n="e404.hub">Conocer el HUB</a>
+      </div>
+    </div>
+  </section>
+</main>
+
 <main id="page-inicio" class="page active">
   <section class="hero">
     <div class="hero-bg"><picture>
@@ -142,6 +156,40 @@
       <div class="stat rv d1"><div class="num" data-count="8">8</div><div class="lab" data-i18n="stat.pobl">Poblaciones impactadas</div></div>
       <div class="stat rv d2"><div class="num" data-count="100" data-suffix="%">100%</div><div class="lab" data-i18n="stat.traz">Trazabilidad</div></div>
       <div class="stat rv d3"><div class="num">2025</div><div class="lab" data-i18n="stat.fund">Fundada en Medellín</div></div>
+    </div>
+  </section>
+
+  <section class="home-hub">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="home.hub.ey">Nuestro valor diferencial</span>
+      <h2 class="h-sec rv" data-i18n="home.hub.t">El HUB SOCIAL: tu donación con nombre y evidencia</h2>
+      <p class="lead rv d1" data-i18n="home.hub.p"></p>
+      <div class="hub-flow rv d2">
+        <div class="hf-step">
+          <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></div>
+          <h3 data-i18n="home.hub.s1t">Tú das</h3>
+          <p data-i18n="home.hub.s1p"></p>
+        </div>
+        <div class="hf-arrow" aria-hidden="true">&rarr;</div>
+        <div class="hf-step hf-hub">
+          <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19"/></svg></div>
+          <h3 data-i18n="home.hub.s2t">El HUB conecta</h3>
+          <p data-i18n="home.hub.s2p"></p>
+        </div>
+        <div class="hf-arrow" aria-hidden="true">&rarr;</div>
+        <div class="hf-step">
+          <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>
+          <h3 data-i18n="home.hub.s3t">La fundación entrega</h3>
+          <p data-i18n="home.hub.s3p"></p>
+        </div>
+        <div class="hf-arrow hf-back" aria-hidden="true">&larr;</div>
+        <div class="hf-step hf-ev">
+          <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+          <h3 data-i18n="home.hub.s4t">Recibes la evidencia</h3>
+          <p data-i18n="home.hub.s4p"></p>
+        </div>
+      </div>
+      <a class="btn btn-g rv d3" href="#hub" onclick="return go('hub')" data-i18n="home.hub.btn">Conoce cómo funciona el HUB</a>
     </div>
   </section>
 
@@ -991,7 +1039,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=cfa49e47"></script>
+<script src="/app.js?v=c1359248"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

@@ -29,6 +29,14 @@ var I18N = {
     "stat.pobl":"Poblaciones que buscamos alcanzar",
     "stat.traz":"Trazabilidad",
     "stat.fund":"Año de fundación",
+    "home.hub.ey":"Nuestro valor diferencial",
+    "home.hub.t":"El HUB SOCIAL: tu donación con nombre y evidencia",
+    "home.hub.p":"No somos otra fundación pidiendo donaciones. Somos el puente que conecta tu generosidad con fundaciones de base verificadas — y te devuelve la prueba de lo que pasó. Cada aporte se rastrea de principio a fin.",
+    "home.hub.s1t":"Tú das","home.hub.s1p":"Eliges a dónde va tu aporte, con total claridad.",
+    "home.hub.s2t":"El HUB conecta","home.hub.s2p":"Verificamos y canalizamos a una fundación de base real.",
+    "home.hub.s3t":"La fundación entrega","home.hub.s3p":"El apoyo llega a la comunidad, con acta y registro.",
+    "home.hub.s4t":"Recibes la evidencia","home.hub.s4p":"Foto, factura y trazabilidad de vuelta. No promesas.",
+    "home.hub.btn":"Conoce cómo funciona el HUB",
     "model.ey":"El modelo",
     "model.t":"El sector social opera fragmentado. Somos el puente.",
     "model.p":"Potenciamos fundaciones en campo, conectamos donantes con causas verificadas y creamos un ecosistema donde dar tiene beneficios reales para quien contribuye.",
@@ -60,6 +68,9 @@ var I18N = {
     "origen.t":"Todo empezó con una tonelada de comida.",
     "origen.p1":"Tras semanas de gestión, una campaña alcanzó su meta: una tonelada de alimento para entregar a una fundación. Pero al llegar, la fundación no tenía cómo almacenar ni repartir todo ese alimento. Casi la mitad se perdió. Ver esa comida desperdiciarse —comida que a pocas cuadras alguien necesitaba— dejó una pregunta que no soltó al fundador: ¿cómo cierro la brecha entre los recursos y la necesidad, con lo que tengo a la mano?",
     "origen.p2":"Esa pregunta se volvió método. Give&Grow International nace de casi cuatro años de experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín, y se constituye el 19 de mayo de 2025 en Medellín como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: restaurar la confianza en el acto de dar, con trazabilidad y sin intermediarios opacos.",
+    "e404.t":"Esta página no existe (todavía)",
+    "e404.p":"El enlace que seguiste no lleva a ningún lugar de nuestro ecosistema. Pero cada camino aquí lleva a algo que sí importa.",
+    "e404.home":"Volver al inicio","e404.hub":"Conocer el HUB",
     "a11y.skip":"Saltar al contenido",
     "hub.intro.ey":"El HUB SOCIAL",
     "hub.intro.t":"¿Qué es un HUB?",
@@ -694,6 +705,7 @@ function go(id, fromPop){
     target = document.getElementById("page-ficha");
     if (target) renderFicha(id.split("/")[1]);
   }
+  if (!target){ id = "e404"; target = document.getElementById("page-e404"); }
   if (!target){ id = "inicio"; target = document.getElementById("page-inicio"); }
   target.classList.add("active");
   currentRoute = id;

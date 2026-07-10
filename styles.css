@@ -519,3 +519,43 @@ main.page:focus{outline:none}
   .nav-actions{gap:8px}
   .btn-nav{padding:8px 16px}
 }
+
+/* ============ sección HUB en inicio (protagonismo del valor diferencial) ============ */
+.home-hub{background:linear-gradient(180deg,var(--gd) 0%,var(--g) 100%);color:#fff}
+.home-hub .ey{color:var(--gn)}
+.home-hub .h-sec{color:#fff;max-width:20ch}
+.home-hub .lead{color:rgba(255,255,255,.85);max-width:60ch}
+.hub-flow{display:flex;align-items:stretch;gap:12px;margin:34px 0 30px;flex-wrap:wrap}
+.hf-step{flex:1;min-width:200px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:22px 18px;transition:transform .25s,background .25s}
+.hf-step:hover{transform:translateY(-4px);background:rgba(255,255,255,.1)}
+.hf-hub{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.4)}
+.hf-ev{background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.3)}
+.hf-ic{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;margin-bottom:14px;color:var(--gn)}
+.hf-ic svg{width:24px;height:24px}
+.hf-step h3{font-size:16px;font-weight:700;margin:0 0 6px;color:#fff}
+.hf-step p{font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.8);margin:0}
+.hf-arrow{display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--gn);flex:0 0 auto;font-weight:700}
+.hf-back{color:rgba(255,255,255,.4)}
+.home-hub .btn-g{background:var(--gn);color:var(--gd);font-weight:700}
+.home-hub .btn-g:hover{background:#fff}
+@media(max-width:860px){
+  .hub-flow{flex-direction:column;gap:8px}
+  .hf-arrow{transform:rotate(90deg);padding:2px 0}
+  .hf-step{min-width:0}
+}
+
+/* ============ estados de foco visibles (accesibilidad de teclado) ============ */
+a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus-visible{
+  outline:3px solid var(--gn);outline-offset:2px;border-radius:6px}
+.btn:focus-visible,.btn-g:focus-visible,.btn-o:focus-visible{outline-offset:3px}
+.theme-toggle:focus-visible{outline:3px solid var(--gn);outline-offset:3px}
+.nlink:focus-visible{outline:2px solid var(--gn);outline-offset:2px}
+
+/* ============ página 404 con marca ============ */
+.e404-sec{min-height:66vh;display:flex;align-items:center}
+.e404-wrap{text-align:center;max-width:52ch;margin:0 auto}
+.e404-code{font-family:var(--font-display,inherit);font-size:clamp(90px,18vw,180px);font-weight:800;line-height:1;color:var(--gl);letter-spacing:-2px}
+html[data-theme="dark"] .e404-code{color:var(--gd)}
+.e404-title{font-size:clamp(26px,4vw,38px);margin:8px 0 14px}
+.e404-lead{color:var(--ink-soft);font-size:16px;line-height:1.6;margin:0 auto 26px}
+.e404-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}

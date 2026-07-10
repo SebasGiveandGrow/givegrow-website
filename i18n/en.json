@@ -563,5 +563,21 @@
   "hub.found.t": "Who makes up the network today",
   "hub.found.p": "We begin with one partner foundation and a network in the process of formal onboarding. Each one joins one at a time, with verification and an agreement — no inflated names or figures.",
   "hub.routes.ey": "How we operate",
-  "calc.tax.legal": "The 25% discount (Art. 257 ET) applies under the terms, requirements and limits set by law; whether it applies depends on each donor's tax situation."
+  "calc.tax.legal": "The 25% discount (Art. 257 ET) applies under the terms, requirements and limits set by law; whether it applies depends on each donor's tax situation.",
+  "home.hub.ey": "What sets us apart",
+  "home.hub.t": "The Social Hub: your donation with a name and evidence",
+  "home.hub.p": "We are not another foundation asking for donations. We are the bridge that connects your generosity with verified grassroots foundations — and returns the proof of what happened. Every contribution is traced end to end.",
+  "home.hub.s1t": "You give",
+  "home.hub.s1p": "You choose where your contribution goes, with full clarity.",
+  "home.hub.s2t": "The Hub connects",
+  "home.hub.s2p": "We verify and channel it to a real grassroots foundation.",
+  "home.hub.s3t": "The foundation delivers",
+  "home.hub.s3p": "Support reaches the community, with records and documentation.",
+  "home.hub.s4t": "You get the evidence",
+  "home.hub.s4p": "Photo, invoice and traceability back to you. Not promises.",
+  "home.hub.btn": "See how the Hub works",
+  "e404.t": "This page doesn't exist (yet)",
+  "e404.p": "The link you followed doesn't lead anywhere in our ecosystem. But every path here leads to something that does matter.",
+  "e404.home": "Back to home",
+  "e404.hub": "Discover the Hub"
 }
