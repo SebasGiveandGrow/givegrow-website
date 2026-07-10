@@ -333,7 +333,7 @@ footer a:hover{color:var(--gn)}
 #m-ic{display:inline-flex;align-items:center}
 #m-ic .ic-svg{width:30px;height:30px;color:var(--acc)}
 
-.origen-img{width:100%;border-radius:var(--rl);height:clamp(280px,46vh,440px);object-fit:cover;object-position:50% 38%;display:block}
+.origen-img{width:100%;border-radius:var(--rl);aspect-ratio:16/9;max-height:520px;object-fit:cover;object-position:50% 45%;display:block}
 
 @media(max-width:600px){.g2,.g3{grid-template-columns:1fr}}
 

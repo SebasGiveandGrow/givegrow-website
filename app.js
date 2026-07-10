@@ -517,7 +517,7 @@ var I18N = {
     "calc.note.ph":"Tu mensaje viajará con tu donación y aparecerá en tu recibo.",
     "calc.impact":"Tu impacto",
     "calc.impact.note":"Equivalencia aproximada, según datos de las fundaciones del Hub.",
-    "origen.imgalt":"Abuela y nieta wayuu bajo una enramada en La Guajira",
+    "origen.imgalt":"El fundador con la comunidad de niños y niñas en una jornada en La Guajira",
     "origen.tl.ey":"El recorrido",
     "origen.tl.t":"De caminar el territorio a fundar una red.",
     "origen.ms1.t":"Años en terreno",
