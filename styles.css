@@ -333,7 +333,7 @@ footer a:hover{color:var(--gn)}
 #m-ic{display:inline-flex;align-items:center}
 #m-ic .ic-svg{width:30px;height:30px;color:var(--acc)}
 
-.origen-img{width:100%;border-radius:var(--rl);max-height:500px;object-fit:cover;object-position:50% 28%;display:block}
+.origen-img{width:100%;border-radius:var(--rl);aspect-ratio:16/10;max-height:560px;object-fit:cover;object-position:50% 42%;display:block}
 
 @media(max-width:600px){.g2,.g3{grid-template-columns:1fr}}
 
@@ -435,11 +435,21 @@ html.theming .band, html.theming section, html.theming .nav-mobile{
 }
 
 /* ---------- Toggle día/noche (reloj) ---------- */
-.theme-btn{width:38px;height:34px;border:1px solid var(--bd);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;color:var(--ink);position:relative;transition:border-color .15s,color .15s}
-.theme-btn:hover{border-color:var(--acc);color:var(--acc)}
-.theme-btn svg{width:17px;height:17px}
-.theme-btn .auto-dot{position:absolute;top:3px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--acc);opacity:0;transition:opacity .15s}
-.theme-btn[data-mode="auto"] .auto-dot{opacity:1}
+.theme-toggle{display:inline-flex;align-items:center;gap:7px;border:none;background:none;cursor:pointer;padding:4px 2px;color:var(--ink)}
+.tt-track{position:relative;width:52px;height:26px;border-radius:999px;background:var(--bg2,rgba(0,0,0,.08));border:1px solid var(--bd);display:flex;align-items:center;transition:background .3s}
+.tt-track svg{width:14px;height:14px;position:absolute;top:50%;transform:translateY(-50%);transition:opacity .3s;pointer-events:none}
+.tt-sun{left:7px;color:#E8A33D;opacity:1}
+.tt-moon{right:7px;color:#6FB08D;opacity:.35}
+.tt-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.tt-auto{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--acc);opacity:0;transition:opacity .2s}
+/* estado oscuro: perilla a la derecha, luna activa */
+html[data-theme="dark"] .tt-track{background:rgba(255,255,255,.12)}
+html[data-theme="dark"] .tt-knob{transform:translateX(26px)}
+html[data-theme="dark"] .tt-sun{opacity:.35}
+html[data-theme="dark"] .tt-moon{opacity:1}
+/* modo auto: muestra la etiqueta "auto" y un borde de acento sutil */
+.theme-toggle[data-mode="auto"] .tt-auto{opacity:1}
+.theme-toggle[data-mode="auto"] .tt-track{border-color:var(--acc)}
 
 /* ---------- Foto-banner editorial (pausa fotográfica) ---------- */
 .foto-banner{position:relative;padding:0;min-height:56vh;display:flex;align-items:flex-end;overflow:hidden}
@@ -492,3 +502,6 @@ html[data-theme="dark"] .prog-logo{background:#000}
 .calc-note textarea::placeholder{color:rgba(255,255,255,.4)}
 .calc-note textarea:focus{outline:none;border-color:rgba(255,255,255,.5)}
 .calc-note-count{display:block;text-align:right;font-size:11px;color:rgba(255,255,255,.45);margin-top:4px}
+
+/* nota legal pequeña bajo el beneficio tributario */
+.calc-legal{font-size:11px;line-height:1.5;color:rgba(255,255,255,.55);margin:2px 0 8px;max-width:52ch}

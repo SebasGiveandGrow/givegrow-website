@@ -27,7 +27,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=803d8349">
+<link rel="stylesheet" href="/styles.css?v=a308b243">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/benef_03.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -69,10 +69,13 @@
     </div>
     <div class="nav-actions">
       <a class="btn-nav" href="#donar" onclick="return go('donar')" data-i18n="nav.cta">Donar</a>
-      <button id="theme-btn" class="theme-btn" data-mode="auto" onclick="themeCycle()" aria-label="Tema: automático según la hora" title="Tema: automático según la hora">
-        <svg class="i-sun ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="7" y2="7"/><line x1="17" y1="17" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="7" y2="17"/><line x1="17" y1="7" x2="19.1" y2="4.9"/></svg>
-        <svg class="i-moon ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-        <span class="auto-dot" aria-hidden="true"></span>
+      <button id="theme-btn" class="theme-toggle" data-mode="auto" onclick="themeCycle()" role="switch" aria-label="Cambiar tema claro u oscuro" title="Tema">
+        <span class="tt-track">
+          <svg class="tt-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="7" y2="7"/><line x1="17" y1="17" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="7" y2="17"/><line x1="17" y1="7" x2="19.1" y2="4.9"/></svg>
+          <svg class="tt-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <span class="tt-knob"></span>
+        </span>
+        <span class="tt-auto" aria-hidden="true">auto</span>
       </button>
       <div class="lang">
         <button id="lang-es" class="on" onclick="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
@@ -672,6 +675,7 @@
         </div>
         <div class="calc-out">
           <div class="calc-row"><span data-i18n="calc.tax">Beneficio tributario (25%)</span><b id="co-tax">-</b></div>
+          <p class="calc-legal" data-i18n="calc.tax.legal"></p>
           <div class="calc-row"><span data-i18n="calc.net">Costo neto de tu donación</span><b id="co-net">-</b></div>
           <div class="calc-row" id="calc-annual-row"><span data-i18n="calc.annual">Equivalente anual</span><b id="calc-annual">-</b></div>
           <div class="calc-row" id="co-impact-row" style="display:none"><span data-i18n="calc.impact">Tu impacto</span><b id="co-impact">-</b></div>
@@ -987,7 +991,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=0e902afd"></script>
+<script src="/app.js?v=4def1901"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

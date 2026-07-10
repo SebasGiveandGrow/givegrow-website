@@ -35,7 +35,7 @@
   "feat.grat.p": "A network of partner businesses offering exclusive discounts to every active member.",
   "feat.grat.tag": "New",
   "feat.tax.t": "Tax benefit",
-  "feat.tax.p": "A 25% credit on income tax due (Art. 257 ET) for every donation made through the financial system.",
+  "feat.tax.p": "A 25% discount on income tax owed (Art. 257 ET) for each donation made through the financial system, under the terms and limits set by law.",
   "feat.tax.tag": "For donors",
   "traz.ey": "How it works",
   "traz.t": "Full traceability, end to end.",
@@ -567,5 +567,6 @@
   "hub.found.ey": "Hub foundations",
   "hub.found.t": "Who makes up the network today",
   "hub.found.p": "We begin with one partner foundation and a network in the process of formal onboarding. Each one joins one at a time, with verification and an agreement — no inflated names or figures.",
-  "hub.routes.ey": "How we operate"
+  "hub.routes.ey": "How we operate",
+  "calc.tax.legal": "The 25% discount (Art. 257 ET) applies under the terms, requirements and limits set by law; whether it applies depends on each donor's tax situation."
 }
