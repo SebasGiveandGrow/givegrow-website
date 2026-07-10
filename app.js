@@ -60,6 +60,7 @@ var I18N = {
     "origen.t":"Todo empezó con una tonelada de comida.",
     "origen.p1":"Tras semanas de gestión, una campaña alcanzó su meta: una tonelada de alimento para entregar a una fundación. Pero al llegar, la fundación no tenía cómo almacenar ni repartir todo ese alimento. Casi la mitad se perdió. Ver esa comida desperdiciarse —comida que a pocas cuadras alguien necesitaba— dejó una pregunta que no soltó al fundador: ¿cómo cierro la brecha entre los recursos y la necesidad, con lo que tengo a la mano?",
     "origen.p2":"Esa pregunta se volvió método. Give&Grow International nace de casi cuatro años de experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín, y se constituye el 19 de mayo de 2025 en Medellín como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: restaurar la confianza en el acto de dar, con trazabilidad y sin intermediarios opacos.",
+    "a11y.skip":"Saltar al contenido",
     "hub.intro.ey":"El HUB SOCIAL",
     "hub.intro.t":"¿Qué es un HUB?",
     "hub.intro.p1":"Un HUB es un punto de encuentro: un lugar donde se conectan personas, recursos y capacidades que por separado no se encontrarían. No reemplaza a quienes ya trabajan; los articula para que su esfuerzo llegue más lejos.",
@@ -542,11 +543,6 @@ var I18N = {
     "fund.s5.p":"Tu fundación entra a la red y empieza a recibir donaciones, herramientas y acompañamiento.",
     "fund.free.t":"Sin costo. Sin intermediarios opacos.",
     "fund.free.p":"Vincularte al HUB SOCIAL es y será siempre gratuito. Solo te pedimos una cosa a cambio: trazabilidad, que cada apoyo llegue documentado a quien lo necesita.",
-    "hub.aliadas.ey":"Fundaciones aliadas",
-    "hub.aliadas.t":"Las primeras del muro.",
-    "hub.aliadas.lead":"El Muro de Héroes empieza aquí: fundaciones reales, verificadas y en territorio. Esta es la primera.",
-    "hub.aliadas.soon.t":"Próximamente más fundaciones",
-    "hub.aliadas.soon.p":"Estamos verificando nuevas fundaciones aliadas, con consentimiento y trabajo comprobable en campo. El muro apenas empieza.",
     "ndf.chip.sector":"Niñez y adolescencia",
     "ndf.chip.loc":"Medellín · Manrique, La Honda",
     "ndf.chip.since":"Desde 2020",
@@ -1571,3 +1567,10 @@ function renderJourney(id){
   for (var i=0;i<nodes.length;i++){ nodes[i].textContent = t(nodes[i].getAttribute("data-i18n")); }
 }
 renderJourney(currentRoute || "inicio");
+
+/* ---------- accesibilidad: saltar al contenido ---------- */
+function skipToContent(){
+  var page = document.querySelector("main.page.active") || document.querySelector("main");
+  if (page){ page.setAttribute("tabindex","-1"); page.focus(); page.scrollIntoView(); }
+  return false;
+}

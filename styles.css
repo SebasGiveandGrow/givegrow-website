@@ -505,3 +505,8 @@ html[data-theme="dark"] .prog-logo{background:#000}
 
 /* nota legal pequeña bajo el beneficio tributario */
 .calc-legal{font-size:11px;line-height:1.5;color:rgba(255,255,255,.55);margin:2px 0 8px;max-width:52ch}
+
+/* skip link accesible: invisible hasta recibir foco de teclado */
+.skip-link{position:absolute;left:-9999px;top:0;z-index:1000;background:var(--g);color:#fff;font-weight:700;padding:10px 18px;border-radius:0 0 10px 0}
+.skip-link:focus{left:0}
+main.page:focus{outline:none}

@@ -1,0 +1,5 @@
+Contact: mailto:sebas@thegiveandgrowproject.org
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: es, en
+Canonical: https://www.thegiveandgrowproject.org/.well-known/security.txt
+Policy: https://www.thegiveandgrowproject.org/#transparencia
