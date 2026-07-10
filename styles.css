@@ -37,7 +37,7 @@ img{display:block;max-width:100%;object-fit:cover}
 :focus-visible{outline:3px solid var(--gm);outline-offset:2px;border-radius:4px}
 
 /* ===== NAV ===== */
-nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:14px 0;transition:background .3s,box-shadow .3s}
+nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:14px 0;padding-top:calc(14px + env(safe-area-inset-top));transition:background .3s,box-shadow .3s}
 nav.sol{background:var(--nav-bg);backdrop-filter:blur(12px);box-shadow:0 1px 0 var(--bd)}
 .nav-in{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .nlogo{font-family:"Bricolage Grotesque",sans-serif;font-size:16px;font-weight:800;color:var(--ink)}
@@ -70,7 +70,7 @@ nav.sol{background:var(--nav-bg);backdrop-filter:blur(12px);box-shadow:0 1px 0 v
 .btn-w:hover{border-color:var(--acc);color:var(--acc)}
 
 /* ===== PAGES ===== */
-.page{display:none;padding-top:78px}
+.page{display:none;padding-top:calc(78px + env(safe-area-inset-top))}
 .page.active{display:block}
 section{padding:72px 0}
 .ey{display:inline-block;font-size:12px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--acc-2);margin-bottom:14px}
@@ -282,7 +282,7 @@ footer a:hover{color:var(--gn)}
 @media(max-width:880px){
   .nlinks{display:none}
   .burger{display:flex;align-items:center;justify-content:center}
-  .nav-mobile{display:none;position:fixed;inset:78px 0 0 0;background:var(--surface);border-bottom:1px solid var(--bd);padding:14px 24px calc(24px + env(safe-area-inset-bottom));flex-direction:column;gap:4px;z-index:199;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .nav-mobile{display:none;position:fixed;inset:calc(78px + env(safe-area-inset-top)) 0 0 0;background:var(--surface);border-bottom:1px solid var(--bd);padding:14px 24px calc(24px + env(safe-area-inset-bottom));flex-direction:column;gap:4px;z-index:199;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .nav-mobile.open{display:flex}
   .nav-mobile a{padding:12px;border-radius:8px;font-weight:600}
   .nav-mobile a:hover{background:var(--gl)}
