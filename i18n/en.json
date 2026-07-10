@@ -608,5 +608,18 @@
   "track.ng.mailbody": "Hello, I made a donation with the email {email} and would like to request my tracking number. Thank you.",
   "track.cta.t": "Already donated? Follow your donation",
   "track.cta.p": "With your tracking number you can see where your contribution stands, all the way to the delivery evidence.",
-  "track.cta.btn": "Track my donation"
+  "track.cta.btn": "Track my donation",
+  "live.donaciones": "Donations registered",
+  "live.entregas": "Deliveries with evidence",
+  "live.trazable": "Each one, traceable",
+  "live.note": "Real numbers, updated from our registry. We start with what we can prove.",
+  "alma.c.donar1": "What payment methods are there?",
+  "alma.c.track": "How do I track my donation?",
+  "alma.c.membresia": "What memberships are there?",
+  "alma.c.padrinazgo": "What is Impact Sponsorship?",
+  "alma.c.rse": "CSR options for my company",
+  "alma.c.gratitud": "What is the Gratitude Program?",
+  "alma.c.hub1": "How does the Hub work?",
+  "alma.c.rutas": "What are the 5 routes?",
+  "alma.c.evidencia": "How do you ensure traceability?"
 }

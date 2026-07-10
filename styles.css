@@ -621,3 +621,12 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .track-cta h3{margin:0 0 4px;color:var(--gd)}
 .track-cta p{margin:0;font-size:14px;color:var(--ink-soft);max-width:46ch}
 .track-cta .btn{flex:0 0 auto}
+
+/* ============ contadores en vivo ============ */
+.live-stats{display:flex;gap:16px;margin-top:34px;flex-wrap:wrap}
+.live-stat{flex:1;min-width:150px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:20px}
+.live-num{font-size:40px;font-weight:800;line-height:1;color:var(--gn);font-family:var(--font-display,inherit)}
+.live-track{font-size:28px;letter-spacing:1px}
+.live-lab{font-size:13px;color:rgba(255,255,255,.75);margin-top:8px;font-weight:600}
+.live-note{margin-top:14px;font-size:12.5px;color:rgba(255,255,255,.55);max-width:60ch}
+@media(max-width:600px){.live-stat{min-width:0;flex:1 1 100%}}

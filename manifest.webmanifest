@@ -1,0 +1,15 @@
+{
+  "name": "Give&Grow International",
+  "short_name": "Give&Grow",
+  "description": "Dar para crecer, crecer para dar más. Conectamos generosidad con necesidad, con trazabilidad real.",
+  "start_url": "/?utm_source=pwa",
+  "display": "standalone",
+  "background_color": "#0F1613",
+  "theme_color": "#1F5C38",
+  "lang": "es",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/img/og.jpg", "sizes": "1200x630", "type": "image/jpeg", "purpose": "any" }
+  ]
+}

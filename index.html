@@ -22,12 +22,17 @@
 <meta property="og:image:alt" content="Give&amp;Grow International — Dar para crecer, crecer para dar más">
 <meta name="twitter:image" content="https://www.thegiveandgrowproject.org/img/og.jpg">
 <meta name="theme-color" content="#1F5C38">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Give&Grow">
+<link rel="apple-touch-icon" href="/favicon.svg">
 <script>/* tema antes del primer render: preferencia guardada o reloj local (día 6–18h) */
 (function(){var t="light";try{var s=localStorage.getItem("gg-theme");if(s==="light"||s==="dark"){t=s}else{var h=new Date().getHours();t=(h>=6&&h<18)?"light":"dark"}}catch(e){}document.documentElement.setAttribute("data-theme",t);if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","#0F1613")}})();
 </script>
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=4df42a2e">
+<link rel="stylesheet" href="/styles.css?v=e485ab33">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -190,6 +195,21 @@
         </div>
       </div>
       <a class="btn btn-g rv d3" href="#hub" onclick="return go('hub')" data-i18n="home.hub.btn">Conoce cómo funciona el HUB</a>
+      <div class="live-stats rv d3" id="live-stats" aria-live="polite">
+        <div class="live-stat">
+          <div class="live-num" data-count="0" id="ls-donaciones">0</div>
+          <div class="live-lab" data-i18n="live.donaciones">Donaciones registradas</div>
+        </div>
+        <div class="live-stat">
+          <div class="live-num" data-count="0" id="ls-entregas">0</div>
+          <div class="live-lab" data-i18n="live.entregas">Entregas con evidencia</div>
+        </div>
+        <div class="live-stat">
+          <div class="live-num live-track" id="ls-track">GG</div>
+          <div class="live-lab" data-i18n="live.trazable">Cada una, rastreable</div>
+        </div>
+      </div>
+      <p class="live-note rv d3" data-i18n="live.note">Números reales, actualizados desde nuestro registro. Empezamos con lo que podemos probar.</p>
     </div>
   </section>
 
@@ -579,12 +599,7 @@
       <div class="alma">
         <div class="alma-head"><span class="dot"></span><strong>ALMA</strong></div>
         <div id="alma-msgs"></div>
-        <div class="alma-chips" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px 0">
-          <button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="alma.chip1">¿Cómo dono?</button>
-          <button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="alma.chip2">Beneficio tributario</button>
-          <button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="alma.chip3">Aliar mi empresa</button>
-          <button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="alma.chip4">¿Aplica mi fundación?</button>
-        </div>
+        <div class="alma-chips" id="alma-chips" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px 0"></div>
         <div class="alma-in">
           <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder" placeholder="Escribe tu pregunta...">
           <button id="alma-send" class="alma-send" onclick="almaSend()" data-i18n="alma.send">Enviar</button>
@@ -1072,7 +1087,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=04b607d6"></script>
+<script src="/app.js?v=3f2044d6"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

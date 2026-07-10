@@ -73,6 +73,10 @@ var I18N = {
     "e404.t":"Esta página no existe (todavía)",
     "e404.p":"El enlace que seguiste no lleva a ningún lugar de nuestro ecosistema. Pero cada camino aquí lleva a algo que sí importa.",
     "e404.home":"Volver al inicio","e404.hub":"Conocer el HUB",
+    "live.donaciones":"Donaciones registradas",
+    "live.entregas":"Entregas con evidencia",
+    "live.trazable":"Cada una, rastreable",
+    "live.note":"Números reales, actualizados desde nuestro registro. Empezamos con lo que podemos probar.",
     "track.cta.t":"¿Ya donaste? Sigue tu donación",
     "track.cta.p":"Con tu número de guía puedes ver en qué punto va tu aporte, hasta la evidencia de entrega.",
     "track.cta.btn":"Rastrear mi donación",
@@ -362,6 +366,15 @@ var I18N = {
     "impactos.eco.p":"Give&Grow es el ecosistema; ImpactOS, su plataforma; ALMA, la inteligencia que las une. Hoy ALMA responde tus preguntas; mañana será tu puerta de entrada a todo el ecosistema.",
     "impactos.soon":"En construcción · fase inicial",
     "alma.chip1":"¿Cómo dono?",
+    "alma.c.donar1":"¿Qué métodos de pago hay?",
+    "alma.c.track":"¿Cómo rastreo mi donación?",
+    "alma.c.membresia":"¿Qué membresías hay?",
+    "alma.c.padrinazgo":"¿Qué es el Padrinazgo de Impacto?",
+    "alma.c.rse":"Opciones de RSE para mi empresa",
+    "alma.c.gratitud":"¿Qué es el Programa de Gratitud?",
+    "alma.c.hub1":"¿Cómo funciona el HUB?",
+    "alma.c.rutas":"¿Cuáles son las 5 rutas?",
+    "alma.c.evidencia":"¿Cómo garantizan la trazabilidad?",
     "alma.chip2":"Beneficio tributario",
     "alma.chip3":"Aliar mi empresa",
     "alma.chip4":"¿Aplica mi fundación?",
@@ -727,6 +740,7 @@ function applyLang(l){
 
 /* ---------- SPA routing ---------- */
 function go(id, fromPop){
+  if (id==="alma" && currentRoute!=="alma") almaFromRoute = currentRoute;
   var pages = document.querySelectorAll(".page");
   for (var i=0;i<pages.length;i++) pages[i].classList.remove("active");
   var target = document.getElementById("page-"+id);
@@ -745,6 +759,8 @@ function go(id, fromPop){
   closeDrawer();
   initReveal();
   animateCounters();
+  if (id==="inicio") updateLiveStats();
+  if (id==="alma") renderAlmaChips();
   return false;
 }
 
@@ -1534,6 +1550,7 @@ function init(){
   });
   initReveal();
   animateCounters();
+  if (currentRoute==="inicio") updateLiveStats();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
@@ -1713,4 +1730,42 @@ function trackNoGuideSend(){
   var body = encodeURIComponent(t("track.ng.mailbody").replace("{email}", email));
   window.location.href = "mailto:contabilidad@thegiveandgrowproject.org?subject="+subject+"&body="+body;
   note.style.display=""; note.style.color="var(--g)"; note.textContent = t("track.ng.sent");
+}
+
+/* ============ contadores en vivo (leen del inventario real) ============ */
+function updateLiveStats(){
+  loadInventory().then(function(inv){
+    if (!inv) return;
+    var don = (inv.donaciones||[]).length;
+    var ent = (inv.donaciones||[]).filter(function(d){ return d.estado==="entregada"; }).length
+            + (inv.entregas||[]).length;
+    var elD = document.getElementById("ls-donaciones");
+    var elE = document.getElementById("ls-entregas");
+    if (elD){ elD.setAttribute("data-count", don); }
+    if (elE){ elE.setAttribute("data-count", ent); }
+    // Re-disparar la animación si la sección está visible
+    try{ animateCounters(); }catch(e){}
+  });
+}
+
+/* ============ ALMA contextual: chips según la página de origen ============ */
+var almaFromRoute = "inicio";
+var ALMA_CHIPS = {
+  "default":     ["alma.chip1","alma.chip2","alma.chip3","alma.chip4"],
+  "donar":       ["alma.c.donar1","alma.chip2","alma.c.track","alma.c.membresia"],
+  "empresas":    ["alma.c.padrinazgo","alma.chip3","alma.c.rse","alma.chip2"],
+  "membresias":  ["alma.c.membresia","alma.c.donar1","alma.chip2","alma.c.gratitud"],
+  "hub":         ["alma.chip4","alma.c.hub1","alma.c.rutas","alma.chip1"],
+  "fundaciones": ["alma.chip4","alma.c.hub1","alma.c.donar1","alma.chip1"],
+  "gratitud":    ["alma.c.gratitud","alma.c.membresia","alma.chip3","alma.chip1"],
+  "rastrea":     ["alma.c.track","alma.chip1","alma.c.donar1","alma.chip2"],
+  "transparencia":["alma.c.evidencia","alma.chip1","alma.chip2","alma.chip4"]
+};
+function renderAlmaChips(){
+  var box = document.getElementById("alma-chips");
+  if (!box) return;
+  var keys = ALMA_CHIPS[almaFromRoute] || ALMA_CHIPS["default"];
+  box.innerHTML = keys.map(function(k){
+    return '<button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="'+k+'">'+t(k)+'</button>';
+  }).join("");
 }
