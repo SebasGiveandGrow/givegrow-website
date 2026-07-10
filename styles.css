@@ -282,10 +282,12 @@ footer a:hover{color:var(--gn)}
 @media(max-width:880px){
   .nlinks{display:none}
   .burger{display:flex;align-items:center;justify-content:center}
-  .nav-mobile{display:none;position:fixed;inset:78px 0 auto 0;background:var(--surface);border-bottom:1px solid var(--bd);padding:14px 24px;flex-direction:column;gap:4px;z-index:199}
+  .nav-mobile{display:none;position:fixed;inset:78px 0 0 0;background:var(--surface);border-bottom:1px solid var(--bd);padding:14px 24px calc(24px + env(safe-area-inset-bottom));flex-direction:column;gap:4px;z-index:199;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .nav-mobile.open{display:flex}
   .nav-mobile a{padding:12px;border-radius:8px;font-weight:600}
   .nav-mobile a:hover{background:var(--gl)}
+  /* con el menú abierto, ocultar flotantes para que no tapen los ítems */
+  body.menu-open .wa, body.menu-open .alma-fab{display:none!important}
   .paths,.gallery,#blog-grid{grid-template-columns:1fr}
   .g2,.g3{grid-template-columns:repeat(2,1fr)}
   .stats{grid-template-columns:repeat(2,1fr)}

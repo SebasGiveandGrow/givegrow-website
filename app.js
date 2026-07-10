@@ -770,7 +770,7 @@ function onScroll(){
   if (!n) return;
   n.classList.toggle("sol", window.scrollY > 30);
 }
-function toggleDrawer(){ var d=document.getElementById("nav-mobile"); var open=d.classList.toggle("open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded", open?"true":"false"); }
+function toggleDrawer(){ var d=document.getElementById("nav-mobile"); var open=d.classList.toggle("open"); document.body.classList.toggle("menu-open", open); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded", open?"true":"false"); }
 function toggleDrop(btn){
   var drop=btn.parentNode; var isOpen=drop.classList.contains("open");
   document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); });
@@ -789,7 +789,7 @@ document.addEventListener("keydown", function(e){
     else if (e.key==="ArrowRight") lbStep(1);
   }
 });
-function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded","false"); }
+function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); document.body.classList.remove("menu-open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded","false"); }
 
 /* ---------- reveal ---------- */
 var revObserver;
