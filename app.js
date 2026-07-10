@@ -1056,9 +1056,13 @@ function initGallery(){
   g.dataset.done = "1";
   GALLERY.forEach(function(item, i){
     var img = document.createElement("img");
-    img.src = IMG_BASE + item.f;
+    // Miniatura ligera (400px) para la grilla; la imagen completa se carga en el lightbox.
+    var thumb = item.f.indexOf("jornadas/")===0 ? item.f.replace("jornadas/","jornadas/thumb/") : item.f;
+    img.src = IMG_BASE + thumb;
     img.alt = item[lang] || item.es;
     img.loading = "lazy";
+    img.decoding = "async";
+    img.width = 400; img.height = 300;
     img.addEventListener("click", function(){ openGalleryLightbox(i); });
     g.appendChild(img);
   });

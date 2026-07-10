@@ -165,25 +165,25 @@
       <h2 class="h-sec rv" data-i18n="home.hub.t">El HUB SOCIAL: tu donación con nombre y evidencia</h2>
       <p class="lead rv d1" data-i18n="home.hub.p"></p>
       <div class="hub-flow rv d2">
-        <div class="hf-step">
+        <div class="hf-step rv">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></div>
           <h3 data-i18n="home.hub.s1t">Tú das</h3>
           <p data-i18n="home.hub.s1p"></p>
         </div>
         <div class="hf-arrow" aria-hidden="true">&rarr;</div>
-        <div class="hf-step hf-hub">
+        <div class="hf-step hf-hub rv d1">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19"/></svg></div>
           <h3 data-i18n="home.hub.s2t">El HUB conecta</h3>
           <p data-i18n="home.hub.s2p"></p>
         </div>
         <div class="hf-arrow" aria-hidden="true">&rarr;</div>
-        <div class="hf-step">
+        <div class="hf-step rv d2">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>
           <h3 data-i18n="home.hub.s3t">La fundación entrega</h3>
           <p data-i18n="home.hub.s3p"></p>
         </div>
         <div class="hf-arrow hf-back" aria-hidden="true">&larr;</div>
-        <div class="hf-step hf-ev">
+        <div class="hf-step hf-ev rv d3">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
           <h3 data-i18n="home.hub.s4t">Recibes la evidencia</h3>
           <p data-i18n="home.hub.s4p"></p>
@@ -580,10 +580,10 @@
         <div class="alma-head"><span class="dot"></span><strong>ALMA</strong></div>
         <div id="alma-msgs"></div>
         <div class="alma-chips" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px 0">
-          <button type="button" onclick="almaAsk(this.textContent)" data-i18n="alma.chip1" style="padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">¿Cómo dono?</button>
-          <button type="button" onclick="almaAsk(this.textContent)" data-i18n="alma.chip2" style="padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">Beneficio tributario</button>
-          <button type="button" onclick="almaAsk(this.textContent)" data-i18n="alma.chip3" style="padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">Aliar mi empresa</button>
-          <button type="button" onclick="almaAsk(this.textContent)" data-i18n="alma.chip4" style="padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">¿Aplica mi fundación?</button>
+          <button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="alma.chip1">¿Cómo dono?</button>
+          <button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="alma.chip2">Beneficio tributario</button>
+          <button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="alma.chip3">Aliar mi empresa</button>
+          <button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="alma.chip4">¿Aplica mi fundación?</button>
         </div>
         <div class="alma-in">
           <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder" placeholder="Escribe tu pregunta...">

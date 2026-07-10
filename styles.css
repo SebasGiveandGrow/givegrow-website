@@ -559,3 +559,7 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .e404-title{font-size:clamp(26px,4vw,38px);margin:8px 0 14px}
 .e404-lead{color:var(--ink-soft);font-size:16px;line-height:1.6;margin:0 auto 26px}
 .e404-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+/* chips de sugerencia de ALMA (migrado de estilos inline) */
+.alma-chip{padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:var(--surface,#fff);font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:background .15s,border-color .15s}
+.alma-chip:hover{background:var(--gl);border-color:var(--gn)}
