@@ -73,6 +73,33 @@ var I18N = {
     "e404.t":"Esta página no existe (todavía)",
     "e404.p":"El enlace que seguiste no lleva a ningún lugar de nuestro ecosistema. Pero cada camino aquí lleva a algo que sí importa.",
     "e404.home":"Volver al inicio","e404.hub":"Conocer el HUB",
+    "track.cta.t":"¿Ya donaste? Sigue tu donación",
+    "track.cta.p":"Con tu número de guía puedes ver en qué punto va tu aporte, hasta la evidencia de entrega.",
+    "track.cta.btn":"Rastrear mi donación",
+    "track.ey":"Trazabilidad real",
+    "track.t":"Rastrea tu donación",
+    "track.lead":"Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.",
+    "track.ph":"GG-2026-000001",
+    "track.btn":"Rastrear",
+    "track.noguide":"No tengo mi guía",
+    "track.loading":"Buscando tu donación…",
+    "track.err.load":"No pudimos cargar la información en este momento. Intenta de nuevo en un momento.",
+    "track.nf.t":"No encontramos esa guía",
+    "track.nf.p":"No hay ninguna donación con la guía {guia}. Revisa que esté bien escrita (formato GG-AAAA-000000) o solicita que te la reenviemos.",
+    "track.since":"Registrada el",
+    "track.type.dinero":"Donación en dinero",
+    "track.type.especie":"Donación en especie",
+    "track.mode.fondo":"Fondo general",
+    "track.mode.dirigida":"Donación dirigida",
+    "track.delivered.t":"Entregada con evidencia",
+    "track.foot":"Cada cambio de estado queda registrado. Cuando tu donación se entregue, aquí verás el acta y el reporte.",
+    "track.ng.t":"Te reenviamos tu guía",
+    "track.ng.p":"Escribe el correo con el que hiciste tu donación y te enviaremos tu número de guía para que puedas rastrearla.",
+    "track.ng.btn":"Solicitar mi guía",
+    "track.ng.invalid":"Escribe un correo válido, por favor.",
+    "track.ng.sent":"Abrimos tu correo con la solicitud lista para enviar. Te responderemos con tu guía.",
+    "track.ng.mailsubj":"Solicitud de guía de donación",
+    "track.ng.mailbody":"Hola, hice una donación con el correo {email} y quiero solicitar mi número de guía para rastrearla. Gracias.",
     "a11y.skip":"Saltar al contenido",
     "hub.intro.ey":"El HUB SOCIAL",
     "hub.intro.t":"¿Qué es un HUB?",
@@ -1591,4 +1618,99 @@ function skipToContent(){
   var page = document.querySelector("main.page.active") || document.querySelector("main");
   if (page){ page.setAttribute("tabindex","-1"); page.focus(); page.scrollIntoView(); }
   return false;
+}
+
+/* ============ Rastrea tu donación ============ */
+function escapeHtml(text){
+  return String(text==null?"":text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+var INVENTORY_DATA = null;
+function loadInventory(){
+  if (INVENTORY_DATA) return Promise.resolve(INVENTORY_DATA);
+  return fetch("/data/inventario.json")
+    .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+    .then(function(j){ INVENTORY_DATA = j; return j; })
+    .catch(function(){ return null; });
+}
+/* Estados públicos y su orden en la línea de tiempo */
+var TRACK_STEPS = ["recibida","en_distribucion","entregada"];
+var TRACK_LABELS = {
+  recibida:      {es:"Recibida", en:"Received"},
+  en_distribucion:{es:"En distribución", en:"In distribution"},
+  entregada:     {es:"Entregada", en:"Delivered"}
+};
+function normalizeGuide(s){
+  return String(s||"").toUpperCase().replace(/\s+/g,"").trim();
+}
+function trackSearch(){
+  var inp = document.getElementById("track-input");
+  var box = document.getElementById("track-result");
+  var ng  = document.getElementById("track-noguide-box");
+  if (ng) ng.style.display = "none";
+  var guide = normalizeGuide(inp && inp.value);
+  if (!guide){ if(inp) inp.focus(); return; }
+  box.style.display = "";
+  box.innerHTML = '<p class="track-loading">'+t("track.loading")+'</p>';
+  loadInventory().then(function(inv){
+    if (!inv || !inv.donaciones){ box.innerHTML = '<p class="track-error">'+t("track.err.load")+'</p>'; return; }
+    var d = null;
+    for (var i=0;i<inv.donaciones.length;i++){ if (normalizeGuide(inv.donaciones[i].guia)===guide){ d = inv.donaciones[i]; break; } }
+    if (!d){ box.innerHTML = trackNotFound(guide); return; }
+    box.innerHTML = trackRender(d);
+  });
+}
+function trackNotFound(guide){
+  return '<div class="track-card track-nf">'
+    + '<h3>'+t("track.nf.t")+'</h3>'
+    + '<p>'+t("track.nf.p").replace("{guia}", "<b>"+escapeHtml(guide)+"</b>")+'</p>'
+    + '<button type="button" class="track-noguide" onclick="trackNoGuide()">'+t("track.noguide")+'</button>'
+    + '</div>';
+}
+function trackRender(d){
+  var estado = d.estado || "recibida";
+  var idx = TRACK_STEPS.indexOf(estado);
+  if (idx<0) idx = 0;
+  var pasos = "";
+  for (var i=0;i<TRACK_STEPS.length;i++){
+    var s = TRACK_STEPS[i];
+    var cls = i<idx ? "done" : (i===idx ? "current" : "pending");
+    var lab = TRACK_LABELS[s][lang] || TRACK_LABELS[s].es;
+    pasos += '<div class="tl-step '+cls+'">'
+          +  '<span class="tl-dot" aria-hidden="true"></span>'
+          +  '<span class="tl-label">'+lab+'</span></div>';
+  }
+  var tipo = (d.tipo==="especie") ? t("track.type.especie") : t("track.type.dinero");
+  var modo = (d.modo==="dirigida") ? t("track.mode.dirigida") : t("track.mode.fondo");
+  var desc = d.desc ? escapeHtml(d.desc) : "";
+  var entrega = "";
+  if (estado==="entregada" && d.entrega){
+    entrega = '<div class="track-ev"><span class="track-ev-ic" aria-hidden="true">✓</span><div><b>'+t("track.delivered.t")+'</b><p>'+escapeHtml(d.entrega)+'</p></div></div>';
+  }
+  return '<div class="track-card">'
+    + '<div class="track-head"><div><span class="track-guide">'+escapeHtml(d.guia)+'</span>'
+    + '<span class="track-date">'+t("track.since")+' '+escapeHtml(d.fecha||"")+'</span></div>'
+    + '<span class="track-badge track-badge-'+estado+'">'+(TRACK_LABELS[estado]?(TRACK_LABELS[estado][lang]||TRACK_LABELS[estado].es):estado)+'</span></div>'
+    + '<div class="track-timeline">'+pasos+'</div>'
+    + '<div class="track-meta"><span>'+tipo+'</span><span>·</span><span>'+modo+'</span>'+(desc?'<span>·</span><span>'+desc+'</span>':'')+'</div>'
+    + entrega
+    + '<p class="track-foot">'+t("track.foot")+'</p>'
+    + '</div>';
+}
+function trackNoGuide(){
+  var ng = document.getElementById("track-noguide-box");
+  var box = document.getElementById("track-result");
+  if (box) box.style.display = "none";
+  if (ng){ ng.style.display = ""; ng.scrollIntoView({behavior:"smooth", block:"center"}); }
+}
+function trackNoGuideSend(){
+  var email = (document.getElementById("track-ng-email").value||"").trim();
+  var note = document.getElementById("track-ng-note");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    note.style.display=""; note.style.color="var(--err,#c0392b)"; note.textContent = t("track.ng.invalid"); return;
+  }
+  // Puente humano: abre correo prellenado a contabilidad para que Sebas responda con la guía.
+  var subject = encodeURIComponent(t("track.ng.mailsubj"));
+  var body = encodeURIComponent(t("track.ng.mailbody").replace("{email}", email));
+  window.location.href = "mailto:contabilidad@thegiveandgrowproject.org?subject="+subject+"&body="+body;
+  note.style.display=""; note.style.color="var(--g)"; note.textContent = t("track.ng.sent");
 }

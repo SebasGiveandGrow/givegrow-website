@@ -27,7 +27,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=a38c1582">
+<link rel="stylesheet" href="/styles.css?v=4df42a2e">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -769,6 +769,13 @@
         <div class="step"><div><h4 data-i18n="pay.how.s3.t"></h4><p data-i18n="pay.how.s3.p"></p></div></div>
       </div>
       <div class="card rv d2" style="margin-top:24px"><h3 data-i18n="pay.how.sec.t"></h3><p data-i18n="pay.how.sec.p"></p></div>
+      <div class="track-cta rv d2">
+        <div>
+          <h3 data-i18n="track.cta.t">¿Ya donaste? Sigue tu donación</h3>
+          <p data-i18n="track.cta.p">Con tu número de guía puedes ver en qué punto va tu aporte, hasta la evidencia de entrega.</p>
+        </div>
+        <a class="btn btn-g" href="#rastrea" onclick="return go('rastrea')" data-i18n="track.cta.btn">Rastrear mi donación</a>
+      </div>
       <div class="cta-box rv">
         <h3 data-i18n="don.cta.t"></h3>
         <p data-i18n="don.cta.p"></p>
@@ -907,6 +914,31 @@
   </section>
 </main>
 
+<main id="page-rastrea" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="track.ey">Trazabilidad real</span>
+      <h2 class="h-sec rv" data-i18n="track.t">Rastrea tu donación</h2>
+      <p class="lead rv d1" data-i18n="track.lead">Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.</p>
+      <div class="track-box rv d2">
+        <div class="track-search">
+          <input type="text" id="track-input" placeholder="GG-2026-000001" data-i18n="track.ph" data-i18n-attr="placeholder" onkeydown="if(event.key==='Enter')trackSearch()" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn btn-g" onclick="trackSearch()" data-i18n="track.btn">Rastrear</button>
+        </div>
+        <button type="button" class="track-noguide" onclick="trackNoGuide()" data-i18n="track.noguide">No tengo mi guía</button>
+      </div>
+      <div id="track-result" class="track-result" style="display:none"></div>
+      <div id="track-noguide-box" class="track-noguide-box" style="display:none">
+        <h3 data-i18n="track.ng.t">Te reenviamos tu guía</h3>
+        <p data-i18n="track.ng.p">Escribe el correo con el que hiciste tu donación y te enviaremos tu número de guía para que puedas rastrearla.</p>
+        <div class="field"><label data-i18n="form.email">Correo</label><input type="email" id="track-ng-email" autocomplete="email"></div>
+        <button type="button" class="btn btn-g" onclick="trackNoGuideSend()" data-i18n="track.ng.btn">Solicitar mi guía</button>
+        <p id="track-ng-note" style="margin-top:12px;font-size:14px;display:none"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
 <!-- ============ FAQ ============ -->
 <main id="page-faq" class="page">
   <section>
@@ -1003,6 +1035,7 @@
         <h4 data-i18n="foot.explore">Explorar</h4>
         <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
         <a href="#donar" onclick="return go('donar')" data-i18n="nav.donar">Donar</a>
+        <a href="#rastrea" onclick="return go('rastrea')" data-i18n="track.t">Rastrea tu donación</a>
         <a href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
         <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
       </div>
@@ -1039,7 +1072,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=0b2dd16c"></script>
+<script src="/app.js?v=04b607d6"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
