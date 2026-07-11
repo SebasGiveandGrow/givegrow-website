@@ -47,8 +47,15 @@
       },
       "consent": {
         "logo": true,
-        "name": true
-      }
+        "name": true,
+        "photos": false
+      },
+      "about": {
+        "es": "",
+        "en": ""
+      },
+      "gallery": [],
+      "comunidad": []
     }
   ]
 }

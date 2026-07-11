@@ -678,3 +678,11 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .grat-empty{text-align:center;max-width:52ch;margin:26px auto 0;padding:32px;background:var(--cream);border:1px dashed var(--bd);border-radius:16px}
 .grat-empty p{color:var(--ink-soft);margin:0 0 18px}
 html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
+
+/* ============ tarjeta de comercio clickeable + ficha ============ */
+.grat-card-link{display:block;text-decoration:none;color:inherit;cursor:pointer}
+.grat-card-link h3{color:var(--ink)}
+.grat-card-more{display:inline-block;margin-top:14px;font-size:13px;font-weight:700;color:var(--g)}
+.grat-card-link:hover .grat-card-more{text-decoration:underline}
+/* logo de comercio en la ficha: fondo claro (logos suelen ser oscuros) */
+.ficha-logo-light{background:#fff;border:1px solid var(--bd);object-fit:contain;padding:6px}

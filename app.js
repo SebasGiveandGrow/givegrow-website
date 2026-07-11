@@ -343,6 +343,14 @@ var I18N = {
     "grat.card.nivel":"Desde nivel",
     "grat.card.redime":"Cómo redimir",
     "grat.card.cond":"Condiciones",
+    "grat.card.more":"Ver más",
+    "com.back":"Volver al Programa de Gratitud",
+    "com.aliado":"Comercio aliado",
+    "com.benefit.t":"Beneficio para miembros",
+    "com.gal.t":"Su trabajo",
+    "com.cta.t":"Disfruta este beneficio",
+    "com.cta.p":"Este beneficio es para los miembros de Give&Grow. Hazte miembro y accede a esta y otras alianzas.",
+    "com.cta.btn":"Quiero ser miembro",
     "faq.q7":"¿Puedo hacer un aporte único en lugar de mensual?",
     "faq.a7":"Sí. En la calculadora puedes elegir Único para una donación puntual, o Mensual/Anual si prefieres un aporte recurrente. En todos los casos recibes tu certificado de donación y el beneficio tributario del Art. 257 ET.",
     "faq.q8":"¿Puedo donar desde el exterior?",
@@ -747,6 +755,7 @@ function postLang(l){
   applyLang(l); renderWall(); renderHeroImpact(); renderAliadas();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
+  if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
 }
 var I18N_LOADING = null;
 function ensureLang(next){
@@ -1920,16 +1929,91 @@ function renderGratitudComercios(){
       var nameHtml = link
         ? '<a href="'+escapeHtml(link)+'" target="_blank" rel="noopener">'+escapeHtml(c.name)+'</a>'
         : escapeHtml(c.name);
-      return '<article class="grat-card">'
+      return '<a class="grat-card grat-card-link" href="#comercio/'+c.id+'" onclick="return go(\'comercio/'+c.id+'\')">'
         + '<div class="grat-card-head">'+head
-        + '<div><h3>'+nameHtml+'</h3>'
+        + '<div><h3>'+escapeHtml(c.name)+'</h3>'
         + '<span class="grat-cat">'+escapeHtml(catLabel)+(c.ciudad?' · '+escapeHtml(c.ciudad):'')+'</span></div></div>'
         + (ben ? '<p class="grat-benefit">'+escapeHtml(ben)+'</p>' : '')
         + '<dl class="grat-meta">'
         + (c.nivelDesde ? '<div><dt>'+t("grat.card.nivel")+'</dt><dd>'+escapeHtml(c.nivelDesde)+'</dd></div>' : '')
         + (redime ? '<div><dt>'+t("grat.card.redime")+'</dt><dd>'+escapeHtml(redime)+'</dd></div>' : '')
-        + (cond ? '<div><dt>'+t("grat.card.cond")+'</dt><dd>'+escapeHtml(cond)+'</dd></div>' : '')
-        + '</dl></article>';
+        + '</dl>'
+        + '<span class="grat-card-more">'+t("grat.card.more")+' &rarr;</span>'
+        + '</a>';
     }).join("");
+  });
+}
+
+/* ============ Ficha de comercio aliado (informativa) ============ */
+function renderComercio(cid){
+  var el = document.getElementById("comercio-body"); if (!el) return;
+  loadGratitud().then(function(data){
+    var c = null;
+    var comercios = (data && data.comercios) || [];
+    for (var i=0;i<comercios.length;i++){ if (comercios[i].id === cid && comercios[i].status === "activa"){ c = comercios[i]; break; } }
+    if (!c){ go("gratitud"); return; }
+    var cats = (data && data.categorias) || {};
+    var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
+    var catLabel = cats[c.categoria] ? pick(cats[c.categoria]) : "";
+    var about = pick(c.about), ben = pick(c.beneficio), cond = pick(c.condiciones), redime = pick(c.redime);
+    var showLogo = c.logo && c.consent && c.consent.logo;
+
+    var html = '<a class="card-link" href="#gratitud" onclick="return go(\'gratitud\')">&larr; '+t("com.back")+'</a>'
+      + '<div class="ficha-head">'
+      + (showLogo ? '<img class="ficha-logo ficha-logo-light" src="'+escapeHtml(c.logo)+'" alt="'+escapeHtml(c.name)+'">' : '')
+      + '<div><h1 class="ficha-name">'+escapeHtml(c.name)+'</h1>'
+      + '<div class="eco-row" style="margin-top:12px">'
+      + (catLabel ? '<span class="eco-chip">'+escapeHtml(catLabel)+'</span>' : '')
+      + (c.ciudad ? '<span class="eco-chip">'+escapeHtml(c.ciudad)+'</span>' : '')
+      + '<span class="eco-chip">'+t("com.aliado")+'</span>'
+      + '</div></div></div>';
+
+    if (about) html += '<p class="lead" style="margin-top:22px;max-width:70ch">'+escapeHtml(about)+'</p>';
+
+    /* Beneficio para miembros */
+    html += '<div class="card ficha-impact" style="margin-top:26px"><h3>'+t("com.benefit.t")+'</h3>'
+      + (ben ? '<p class="grat-benefit" style="margin-top:10px">'+escapeHtml(ben)+'</p>' : '')
+      + '<dl class="grat-meta" style="margin-top:14px">'
+      + (c.nivelDesde ? '<div><dt>'+t("grat.card.nivel")+'</dt><dd>'+escapeHtml(c.nivelDesde)+'</dd></div>' : '')
+      + (redime ? '<div><dt>'+t("grat.card.redime")+'</dt><dd>'+escapeHtml(redime)+'</dd></div>' : '')
+      + (cond ? '<div><dt>'+t("grat.card.cond")+'</dt><dd>'+escapeHtml(cond)+'</dd></div>' : '')
+      + '</dl></div>';
+
+    /* Galería (solo con consentimiento explícito de fotos) */
+    var gal = (c.consent && c.consent.photos && c.gallery && c.gallery.length) ? c.gallery : null;
+    if (gal){
+      html += '<h3 style="margin-top:34px">'+t("com.gal.t")+'</h3><div class="gal-strip" role="list">';
+      for (var gi=0; gi<gal.length; gi++){
+        var ph = gal[gi], alt = pick(ph.alt);
+        html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" onclick="openComercioLb(\''+c.id+'\','+gi+')">'
+              + '<img src="'+escapeHtml(ph.src)+'" alt="'+escapeHtml(alt)+'" loading="lazy"></button>';
+      }
+      html += '</div>';
+    }
+
+    /* Redes y compartir */
+    html += '<div class="eco-row" style="margin-top:30px">'
+      + (c.web ? '<a class="card-link" href="'+escapeHtml(c.web)+'" target="_blank" rel="noopener">'+t("ficha.web")+'</a>' : '')
+      + (c.instagram ? '<a class="card-link" style="margin-left:18px" href="'+escapeHtml(c.instagram)+'" target="_blank" rel="noopener">Instagram</a>' : '')
+      + '</div>';
+
+    /* CTA: hacerse miembro (NO donar; la empresa ofrece, el miembro disfruta) */
+    html += '<div class="cta-box" style="margin-top:36px"><h2>'+t("com.cta.t")+'</h2><p class="mu">'+t("com.cta.p")+'</p>'
+      + '<a class="ficha-cta-btn" href="#membresias" onclick="return go(\'membresias\')">'+t("com.cta.btn")+'</a></div>';
+
+    el.innerHTML = html;
+  });
+}
+/* Lightbox de galería de comercio (reutiliza el LB nativo de fundaciones) */
+function openComercioLb(cid, ix){
+  loadGratitud().then(function(data){
+    var comercios = (data && data.comercios) || [];
+    var c = null;
+    for (var i=0;i<comercios.length;i++){ if (comercios[i].id === cid){ c = comercios[i]; break; } }
+    if (!c || !c.gallery || !c.gallery.length) return;
+    LB.list = c.gallery; LB.ix = ix || 0;
+    var d = ensureLightbox();
+    paintLightbox();
+    if (!d.open) d.showModal();
   });
 }
