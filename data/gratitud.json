@@ -1,5 +1,5 @@
 {
-  "_doc": "Comercios aliados del Programa de Gratitud. Un comercio SOLO aparece en el sitio si status === 'activa' (convenio firmado). Mientras 'borrador', queda preparado pero invisible. Igual criterio que las fundaciones del HUB: evidencia, no promesas.",
+  "_doc": "Comercios aliados del Programa de Gratitud. Un comercio SOLO aparece en el sitio si status === 'activa' (convenio firmado). Mientras 'borrador', queda preparado pero invisible. Igual criterio que las fundaciones del HUB: evidencia, no promesas. NOTA: Kore está temporalmente en 'activa' para VISTA PREVIA de diseño; volver a 'borrador' hasta que firme el convenio.",
   "categorias": {
     "gastronomia": { "es": "Gastronomía", "en": "Food & Drink" },
     "moda": { "es": "Moda", "en": "Fashion" },
@@ -10,27 +10,27 @@
   "comercios": [
     {
       "id": "kore-makeup",
-      "status": "borrador",
-      "name": "Kore makeup",
+      "status": "activa",
+      "name": "Kore Makeup Academy",
       "categoria": "belleza",
       "ciudad": "Envigado",
-      "logo": "",
+      "logo": "/img/partners/kore-makeup.png",
       "instagram": "https://instagram.com/koremakeup",
       "web": "",
       "beneficio": {
-        "es": "",
-        "en": ""
+        "es": "Descuento especial en cursos y servicios de maquillaje para miembros Give&Grow",
+        "en": "Special discount on makeup courses and services for Give&Grow members"
       },
-      "nivelDesde": "",
+      "nivelDesde": "Retoño en adelante",
       "condiciones": {
-        "es": "",
-        "en": ""
+        "es": "Vigencia sujeta a disponibilidad. Presentar credencial digital vigente.",
+        "en": "Subject to availability. Present valid digital membership."
       },
       "redime": {
-        "es": "",
-        "en": ""
+        "es": "Mostrando la credencial digital de miembro al agendar",
+        "en": "By showing your digital membership when booking"
       },
-      "consent": { "logo": false, "name": true }
+      "consent": { "logo": true, "name": true }
     }
   ]
 }

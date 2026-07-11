@@ -664,7 +664,7 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .grat-card{background:var(--surface);border:1px solid var(--bd);border-radius:16px;padding:22px;transition:transform .2s,box-shadow .2s}
 .grat-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
 .grat-card-head{display:flex;gap:14px;align-items:center;margin-bottom:14px}
-.grat-logo{width:56px;height:56px;border-radius:12px;object-fit:contain;background:#111;flex:0 0 auto}
+.grat-logo{width:56px;height:56px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid var(--bd);flex:0 0 auto}
 .grat-logo-ph{display:flex;align-items:center;justify-content:center;background:var(--gl);color:var(--g);font-size:24px;font-weight:800}
 .grat-card-head h3{margin:0;font-size:17px}
 .grat-card-head h3 a{color:var(--ink);text-decoration:none}
