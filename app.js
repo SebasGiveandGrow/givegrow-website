@@ -1817,7 +1817,7 @@ function renderAlmaChips(){
 
 /* ============ Formulario "Quiero ser aliado" ============ */
 /* URL del Apps Script desplegado como aplicación web. Se cablea tras la instalación. */
-var ALLY_ENDPOINT = "";
+var ALLY_ENDPOINT = "https://script.google.com/macros/s/AKfycbxAe-N5E1qKwbSXrkGtM_zQi49HDtmGodhIjolw3dnTc35SaE_a6b6ZvDkPpX07Nmi0Ng/exec";
 function allyToggleGrat(){
   var on = document.getElementById("mod-gratitud").checked;
   document.getElementById("ally-gratbox").style.display = on ? "" : "none";
@@ -1853,6 +1853,7 @@ function allySubmit(ev){
   allyMsg(note, t("ally.sending"), true);
   fetch(ALLY_ENDPOINT, {
     method:"POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(payload)
   }).then(function(r){ return r.json().catch(function(){ return {ok:r.ok}; }); })
     .then(function(res){
