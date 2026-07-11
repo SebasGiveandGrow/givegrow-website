@@ -666,5 +666,13 @@
   "ally.ok": "We got your request! We sent you a confirmation email and you'll soon receive the Framework Agreement to sign.",
   "ally.err.aut": "To continue, check the three required authorizations.",
   "ally.err.send": "We couldn't send your request. Please try again or write to contabilidad@thegiveandgrowproject.org.",
-  "ally.err.config": "The form is still being set up. Please write to contabilidad@thegiveandgrowproject.org."
+  "ally.err.config": "The form is still being set up. Please write to contabilidad@thegiveandgrowproject.org.",
+  "grat.biz.ey": "Partner businesses",
+  "grat.biz.t": "Who already offers benefits",
+  "grat.biz.lead": "Each business joins with a signed agreement, one at a time. Here you'll see the real benefits, with clear conditions.",
+  "grat.biz.empty": "We're adding the first partner businesses. Very soon you'll see their benefits here — with evidence, not promises.",
+  "grat.biz.cta": "Have a business? Partner with us",
+  "grat.card.nivel": "From level",
+  "grat.card.redime": "How to redeem",
+  "grat.card.cond": "Conditions"
 }

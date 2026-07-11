@@ -1,0 +1,36 @@
+{
+  "_doc": "Comercios aliados del Programa de Gratitud. Un comercio SOLO aparece en el sitio si status === 'activa' (convenio firmado). Mientras 'borrador', queda preparado pero invisible. Igual criterio que las fundaciones del HUB: evidencia, no promesas.",
+  "categorias": {
+    "gastronomia": { "es": "Gastronomía", "en": "Food & Drink" },
+    "moda": { "es": "Moda", "en": "Fashion" },
+    "belleza": { "es": "Belleza", "en": "Beauty" },
+    "bienestar": { "es": "Bienestar", "en": "Wellness" },
+    "odontologia": { "es": "Odontología", "en": "Dentistry" }
+  },
+  "comercios": [
+    {
+      "id": "kore-makeup",
+      "status": "borrador",
+      "name": "Kore makeup",
+      "categoria": "belleza",
+      "ciudad": "Envigado",
+      "logo": "",
+      "instagram": "https://instagram.com/koremakeup",
+      "web": "",
+      "beneficio": {
+        "es": "",
+        "en": ""
+      },
+      "nivelDesde": "",
+      "condiciones": {
+        "es": "",
+        "en": ""
+      },
+      "redime": {
+        "es": "",
+        "en": ""
+      },
+      "consent": { "logo": false, "name": true }
+    }
+  ]
+}

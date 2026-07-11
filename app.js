@@ -335,6 +335,14 @@ var I18N = {
     "faq.a5":"Sí. Buscamos fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad. Algunas aliadas contribuyen servicios al Hub en lugar de solo recibir.",
     "faq.q6":"¿Qué hace único al HUB SOCIAL?",
     "grat.cats.note":"Estamos sumando comercios aliados; estas son las categorías que priorizamos. Los beneficios concretos se anuncian a medida que se confirman.",
+    "grat.biz.ey":"Comercios aliados",
+    "grat.biz.t":"Quiénes ya ofrecen beneficios",
+    "grat.biz.lead":"Cada comercio entra con convenio firmado, uno a uno. Aquí verás los beneficios reales, con condiciones claras.",
+    "grat.biz.empty":"Estamos sumando los primeros comercios aliados. Muy pronto verás aquí sus beneficios — con evidencia, no promesas.",
+    "grat.biz.cta":"¿Tienes un negocio? Alíate",
+    "grat.card.nivel":"Desde nivel",
+    "grat.card.redime":"Cómo redimir",
+    "grat.card.cond":"Condiciones",
     "faq.q7":"¿Puedo hacer un aporte único en lugar de mensual?",
     "faq.a7":"Sí. En la calculadora puedes elegir Único para una donación puntual, o Mensual/Anual si prefieres un aporte recurrente. En todos los casos recibes tu certificado de donación y el beneficio tributario del Art. 257 ET.",
     "faq.q8":"¿Puedo donar desde el exterior?",
@@ -806,6 +814,7 @@ function go(id, fromPop){
   animateCounters();
   if (id==="inicio") updateLiveStats();
   if (id==="alma") renderAlmaChips();
+  if (id==="gratitud") renderGratitudComercios();
   return false;
 }
 
@@ -1873,4 +1882,54 @@ function allyMsg(el, msg, ok){
   el.style.display = ""; el.textContent = msg;
   el.style.color = ok ? "var(--g)" : "var(--err,#c0392b)";
   return false;
+}
+
+/* ============ Programa de Gratitud: comercios aliados ============ */
+var GRATITUD_DATA = null;
+function loadGratitud(){
+  if (GRATITUD_DATA) return Promise.resolve(GRATITUD_DATA);
+  return fetch("/data/gratitud.json")
+    .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+    .then(function(j){ GRATITUD_DATA = j; return j; })
+    .catch(function(){ return null; });
+}
+function renderGratitudComercios(){
+  var grid = document.getElementById("grat-grid");
+  var empty = document.getElementById("grat-empty");
+  if (!grid) return;
+  loadGratitud().then(function(data){
+    // Solo comercios con convenio firmado (status "activa")
+    var activos = (data && data.comercios || []).filter(function(c){ return c.status === "activa"; });
+    if (!activos.length){
+      grid.innerHTML = "";
+      if (empty) empty.style.display = "";
+      return;
+    }
+    if (empty) empty.style.display = "none";
+    var cats = (data && data.categorias) || {};
+    grid.innerHTML = activos.map(function(c){
+      var catLabel = cats[c.categoria] ? (cats[c.categoria][lang] || cats[c.categoria].es) : "";
+      var ben = c.beneficio ? (c.beneficio[lang] || c.beneficio.es || "") : "";
+      var cond = c.condiciones ? (c.condiciones[lang] || c.condiciones.es || "") : "";
+      var redime = c.redime ? (c.redime[lang] || c.redime.es || "") : "";
+      var showLogo = c.logo && c.consent && c.consent.logo;
+      var head = showLogo
+        ? '<img class="grat-logo" src="'+escapeHtml(c.logo)+'" alt="'+escapeHtml(c.name)+'" loading="lazy">'
+        : '<div class="grat-logo grat-logo-ph" aria-hidden="true">'+escapeHtml((c.name||"?").charAt(0))+'</div>';
+      var link = c.instagram || c.web || "";
+      var nameHtml = link
+        ? '<a href="'+escapeHtml(link)+'" target="_blank" rel="noopener">'+escapeHtml(c.name)+'</a>'
+        : escapeHtml(c.name);
+      return '<article class="grat-card">'
+        + '<div class="grat-card-head">'+head
+        + '<div><h3>'+nameHtml+'</h3>'
+        + '<span class="grat-cat">'+escapeHtml(catLabel)+(c.ciudad?' · '+escapeHtml(c.ciudad):'')+'</span></div></div>'
+        + (ben ? '<p class="grat-benefit">'+escapeHtml(ben)+'</p>' : '')
+        + '<dl class="grat-meta">'
+        + (c.nivelDesde ? '<div><dt>'+t("grat.card.nivel")+'</dt><dd>'+escapeHtml(c.nivelDesde)+'</dd></div>' : '')
+        + (redime ? '<div><dt>'+t("grat.card.redime")+'</dt><dd>'+escapeHtml(redime)+'</dd></div>' : '')
+        + (cond ? '<div><dt>'+t("grat.card.cond")+'</dt><dd>'+escapeHtml(cond)+'</dd></div>' : '')
+        + '</dl></article>';
+    }).join("");
+  });
 }
