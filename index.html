@@ -32,7 +32,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=21f493e6">
+<link rel="stylesheet" href="/styles.css?v=8ce2c7ad">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -439,7 +439,7 @@
     <div class="wrap center">
       <h3 class="rv" data-i18n="emp.cta.t" style="margin-bottom:14px">Hablemos de tu alianza</h3>
       <p class="lead rv d1" data-i18n="emp.cta.p" style="margin-left:auto;margin-right:auto"></p>
-      <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="#contacto" onclick="return go('contacto')" data-i18n="emp.cta.btn">Quiero conversar</a></div>
+      <div class="rv d2" style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn-w" href="#aliados" onclick="return go('aliados')" data-i18n="ally.t">Quiero ser aliado</a><a class="btn btn-o" href="#contacto" onclick="return go('contacto')" data-i18n="emp.cta.btn">Quiero conversar</a></div>
     </div>
   </section>
 </main>
@@ -529,7 +529,7 @@
       <h3 class="rv" data-i18n="grat.cta.t" style="margin-bottom:18px">Empieza a recibir.</h3>
       <div class="rv d1" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
         <a class="btn btn-w" href="#membresias" onclick="return go('membresias')" data-i18n="grat.cta.mem">Quiero ser miembro</a>
-        <a class="btn btn-w" href="#contacto" onclick="return go('contacto')" data-i18n="grat.cta.biz">Quiero ser comercio aliado</a>
+        <a class="btn btn-w" href="#aliados" onclick="return go('aliados')" data-i18n="grat.cta.biz">Quiero ser comercio aliado</a>
       </div>
     </div>
   </section>
@@ -954,6 +954,68 @@
   </section>
 </main>
 
+<main id="page-aliados" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ally.ey">Alianza empresarial</span>
+      <h2 class="h-sec rv" data-i18n="ally.t">Quiero ser aliado</h2>
+      <p class="lead rv d1" data-i18n="ally.lead">Tu empresa puede apoyar el impacto de la forma que elija — sin costo, sin exclusividad, y con reconocimiento. Cuéntanos y te enviaremos el Convenio Marco de Alianza para revisar y firmar.</p>
+
+      <form id="ally-form" class="ally-form rv d2" onsubmit="return allySubmit(event)">
+        <h3 class="ally-sec" data-i18n="ally.s.empresa">Datos de la empresa</h3>
+        <div class="ally-grid">
+          <div class="field"><label data-i18n="ally.f.razon">Razón social o nombre del emprendimiento *</label><input type="text" id="ally-razon" required></div>
+          <div class="field"><label data-i18n="ally.f.nit">NIT o documento</label><input type="text" id="ally-nit"></div>
+          <div class="field"><label data-i18n="ally.f.rep">Representante legal</label><input type="text" id="ally-rep"></div>
+          <div class="field"><label data-i18n="ally.f.cedula">Cédula del representante</label><input type="text" id="ally-cedula"></div>
+          <div class="field"><label data-i18n="ally.f.contacto">Contacto (nombre y cargo)</label><input type="text" id="ally-contacto"></div>
+          <div class="field"><label data-i18n="ally.f.correo">Correo *</label><input type="email" id="ally-correo" required autocomplete="email"></div>
+          <div class="field"><label data-i18n="ally.f.tel">Teléfono</label><input type="tel" id="ally-tel"></div>
+          <div class="field"><label data-i18n="ally.f.ciudad">Ciudad</label><input type="text" id="ally-ciudad"></div>
+          <div class="field ally-wide"><label data-i18n="ally.f.dir">Dirección</label><input type="text" id="ally-dir"></div>
+          <div class="field ally-wide"><label data-i18n="ally.f.web">Sitio web o Instagram</label><input type="text" id="ally-web" placeholder="@tu_empresa"></div>
+        </div>
+
+        <h3 class="ally-sec" data-i18n="ally.s.mods">¿Cómo quieres apoyar? (elige una o varias)</h3>
+        <div class="ally-mods">
+          <label class="ally-check"><input type="checkbox" id="mod-donacion"><span><b data-i18n="ally.m.don.t">Donación</b><small data-i18n="ally.m.don.p">En dinero o en especie, con certificado.</small></span></label>
+          <label class="ally-check"><input type="checkbox" id="mod-rse"><span><b data-i18n="ally.m.rse.t">RSE</b><small data-i18n="ally.m.rse.p">Canaliza tu responsabilidad social con impacto medible.</small></span></label>
+          <label class="ally-check" onclick="setTimeout(allyToggleGrat,0)"><input type="checkbox" id="mod-gratitud"><span><b data-i18n="ally.m.grat.t">Programa de Gratitud</b><small data-i18n="ally.m.grat.p">Ofrece un beneficio a la comunidad de la fundación.</small></span></label>
+          <label class="ally-check" onclick="setTimeout(allyToggleServ,0)"><input type="checkbox" id="mod-servicios"><span><b data-i18n="ally.m.serv.t">Servicios</b><small data-i18n="ally.m.serv.p">Gratuitos o con beneficio para población vulnerable.</small></span></label>
+          <label class="ally-check"><input type="checkbox" id="mod-voluntariado"><span><b data-i18n="ally.m.vol.t">Voluntariado corporativo</b><small data-i18n="ally.m.vol.p">Tus colaboradores participan en las actividades.</small></span></label>
+          <label class="ally-check"><input type="checkbox" id="mod-difusion"><span><b data-i18n="ally.m.dif.t">Difusión</b><small data-i18n="ally.m.dif.p">Das a conocer la labor en tus canales.</small></span></label>
+        </div>
+
+        <div id="ally-gratbox" class="ally-cond" style="display:none">
+          <h3 class="ally-sec" data-i18n="ally.s.ficha">Ficha del Beneficio (Programa de Gratitud)</h3>
+          <div class="ally-grid">
+            <div class="field ally-wide"><label data-i18n="ally.f.ben">¿Qué beneficio ofreces?</label><input type="text" id="ally-ben" placeholder="Ej. 15% de descuento, un postre de cortesía…"></div>
+            <div class="field"><label data-i18n="ally.f.nivel">¿Desde qué nivel de membresía?</label><input type="text" id="ally-nivel" placeholder="Ej. Retoño en adelante"></div>
+            <div class="field"><label data-i18n="ally.f.redime">¿Cómo se redime?</label><input type="text" id="ally-redime" placeholder="Ej. mostrando la credencial digital"></div>
+            <div class="field ally-wide"><label data-i18n="ally.f.cond">Condiciones o vigencia</label><input type="text" id="ally-cond"></div>
+          </div>
+        </div>
+
+        <div id="ally-servbox" class="ally-cond" style="display:none">
+          <h3 class="ally-sec" data-i18n="ally.s.serv">Servicio para población vulnerable</h3>
+          <div class="field ally-wide"><label data-i18n="ally.f.servdet">Describe el servicio</label><input type="text" id="ally-servdet"></div>
+        </div>
+
+        <h3 class="ally-sec" data-i18n="ally.s.aut">Autorizaciones (requeridas)</h3>
+        <div class="ally-auts">
+          <label class="ally-check"><input type="checkbox" id="aut-marca" required><span data-i18n="ally.a.marca">Autorizo mostrar públicamente el nombre, logo y redes de mi empresa para difundir la alianza.</span></label>
+          <label class="ally-check"><input type="checkbox" id="aut-datos" required><span data-i18n="ally.a.datos">Autorizo el tratamiento de los datos conforme a la Ley 1581 de 2012.</span></label>
+          <label class="ally-check"><input type="checkbox" id="aut-licitud" required><span data-i18n="ally.a.licitud">Declaro que la información es veraz y que los recursos y la actividad son de origen lícito.</span></label>
+        </div>
+
+        <button type="submit" class="btn btn-g ally-submit" id="ally-btn" data-i18n="ally.submit">Enviar solicitud</button>
+        <p id="ally-note" class="ally-msg" style="display:none"></p>
+        <p class="ally-legal" data-i18n="ally.legal">Enviar esta solicitud no constituye la alianza. La alianza se perfecciona con la firma del Convenio Marco, que te enviaremos a tu correo.</p>
+      </form>
+    </div>
+  </section>
+</main>
+
 <!-- ============ FAQ ============ -->
 <main id="page-faq" class="page">
   <section>
@@ -1051,6 +1113,7 @@
         <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
         <a href="#donar" onclick="return go('donar')" data-i18n="nav.donar">Donar</a>
         <a href="#rastrea" onclick="return go('rastrea')" data-i18n="track.t">Rastrea tu donación</a>
+        <a href="#aliados" onclick="return go('aliados')" data-i18n="ally.t">Quiero ser aliado</a>
         <a href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
         <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
       </div>
@@ -1087,7 +1150,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=f03005e1"></script>
+<script src="/app.js?v=2d2d83d5"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

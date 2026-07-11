@@ -632,3 +632,29 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .live-lab{font-size:13px;color:rgba(255,255,255,.75);margin-top:8px;font-weight:600}
 .live-note{margin-top:14px;font-size:12.5px;color:rgba(255,255,255,.55);max-width:60ch}
 @media(max-width:600px){.live-stat{min-width:0;flex:1 1 100%}}
+
+/* ============ formulario "Quiero ser aliado" ============ */
+.ally-form{max-width:760px;margin-top:28px}
+.ally-sec{font-size:16px;font-weight:700;margin:28px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--bd)}
+.ally-sec:first-child{margin-top:0}
+.ally-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ally-wide{grid-column:1 / -1}
+.ally-form .field{display:flex;flex-direction:column;gap:6px}
+.ally-form label{font-size:13px;font-weight:600;color:var(--ink-soft)}
+.ally-form input[type=text],.ally-form input[type=email],.ally-form input[type=tel]{padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;background:var(--surface);color:var(--ink)}
+.ally-form input:focus{outline:none;border-color:var(--g)}
+.ally-mods{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ally-check{display:flex;gap:11px;align-items:flex-start;padding:14px;border:1.5px solid var(--bd);border-radius:12px;cursor:pointer;transition:border-color .15s,background .15s}
+.ally-check:hover{border-color:var(--gm)}
+.ally-check input{margin-top:3px;flex:0 0 auto;width:18px;height:18px;accent-color:var(--g)}
+.ally-check span{display:flex;flex-direction:column;gap:2px}
+.ally-check b{font-size:14.5px;color:var(--ink)}
+.ally-check small{font-size:12.5px;color:var(--mu);line-height:1.4}
+.ally-cond{margin-top:8px;padding:18px;background:var(--gl);border-radius:14px}
+.ally-cond .ally-sec{margin-top:0;border-color:rgba(31,92,56,.2)}
+.ally-auts{display:flex;flex-direction:column;gap:10px}
+.ally-auts .ally-check span{font-size:13.5px;color:var(--ink-soft);line-height:1.45}
+.ally-submit{margin-top:24px;width:100%;padding:15px}
+.ally-msg{margin-top:14px;font-size:14.5px;font-weight:600;text-align:center}
+.ally-legal{margin-top:14px;font-size:12.5px;color:var(--mu);line-height:1.5;text-align:center}
+@media(max-width:640px){.ally-grid,.ally-mods{grid-template-columns:1fr}}

@@ -80,6 +80,51 @@ var I18N = {
     "track.cta.t":"¿Ya donaste? Sigue tu donación",
     "track.cta.p":"Con tu número de guía puedes ver en qué punto va tu aporte, hasta la evidencia de entrega.",
     "track.cta.btn":"Rastrear mi donación",
+    "ally.ey":"Alianza empresarial",
+    "ally.t":"Quiero ser aliado",
+    "ally.lead":"Tu empresa puede apoyar el impacto de la forma que elija — sin costo, sin exclusividad, y con reconocimiento. Cuéntanos y te enviaremos el Convenio Marco de Alianza para revisar y firmar.",
+    "ally.s.empresa":"Datos de la empresa",
+    "ally.f.razon":"Razón social o nombre del emprendimiento *",
+    "ally.f.nit":"NIT o documento",
+    "ally.f.rep":"Representante legal",
+    "ally.f.cedula":"Cédula del representante",
+    "ally.f.contacto":"Contacto (nombre y cargo)",
+    "ally.f.correo":"Correo *",
+    "ally.f.tel":"Teléfono",
+    "ally.f.ciudad":"Ciudad",
+    "ally.f.dir":"Dirección",
+    "ally.f.web":"Sitio web o Instagram",
+    "ally.s.mods":"¿Cómo quieres apoyar? (elige una o varias)",
+    "ally.m.don.t":"Donación",
+    "ally.m.don.p":"En dinero o en especie, con certificado.",
+    "ally.m.rse.t":"RSE",
+    "ally.m.rse.p":"Canaliza tu responsabilidad social con impacto medible.",
+    "ally.m.grat.t":"Programa de Gratitud",
+    "ally.m.grat.p":"Ofrece un beneficio a la comunidad de la fundación.",
+    "ally.m.serv.t":"Servicios",
+    "ally.m.serv.p":"Gratuitos o con beneficio para población vulnerable.",
+    "ally.m.vol.t":"Voluntariado corporativo",
+    "ally.m.vol.p":"Tus colaboradores participan en las actividades.",
+    "ally.m.dif.t":"Difusión",
+    "ally.m.dif.p":"Das a conocer la labor en tus canales.",
+    "ally.s.ficha":"Ficha del Beneficio (Programa de Gratitud)",
+    "ally.f.ben":"¿Qué beneficio ofreces?",
+    "ally.f.nivel":"¿Desde qué nivel de membresía?",
+    "ally.f.redime":"¿Cómo se redime?",
+    "ally.f.cond":"Condiciones o vigencia",
+    "ally.s.serv":"Servicio para población vulnerable",
+    "ally.f.servdet":"Describe el servicio",
+    "ally.s.aut":"Autorizaciones (requeridas)",
+    "ally.a.marca":"Autorizo mostrar públicamente el nombre, logo y redes de mi empresa para difundir la alianza.",
+    "ally.a.datos":"Autorizo el tratamiento de los datos conforme a la Ley 1581 de 2012.",
+    "ally.a.licitud":"Declaro que la información es veraz y que los recursos y la actividad son de origen lícito.",
+    "ally.submit":"Enviar solicitud",
+    "ally.legal":"Enviar esta solicitud no constituye la alianza. La alianza se perfecciona con la firma del Convenio Marco, que te enviaremos a tu correo.",
+    "ally.sending":"Enviando tu solicitud…",
+    "ally.ok":"¡Recibimos tu solicitud! Te enviamos un correo de confirmación y pronto recibirás el Convenio Marco para firmar.",
+    "ally.err.aut":"Para continuar, marca las tres autorizaciones requeridas.",
+    "ally.err.send":"No pudimos enviar tu solicitud. Intenta de nuevo o escríbenos a contabilidad@thegiveandgrowproject.org.",
+    "ally.err.config":"El formulario aún se está configurando. Escríbenos a contabilidad@thegiveandgrowproject.org.",
     "track.ey":"Trazabilidad real",
     "track.t":"Rastrea tu donación",
     "track.lead":"Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.",
@@ -1768,4 +1813,63 @@ function renderAlmaChips(){
   box.innerHTML = keys.map(function(k){
     return '<button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="'+k+'">'+t(k)+'</button>';
   }).join("");
+}
+
+/* ============ Formulario "Quiero ser aliado" ============ */
+/* URL del Apps Script desplegado como aplicación web. Se cablea tras la instalación. */
+var ALLY_ENDPOINT = "";
+function allyToggleGrat(){
+  var on = document.getElementById("mod-gratitud").checked;
+  document.getElementById("ally-gratbox").style.display = on ? "" : "none";
+}
+function allyToggleServ(){
+  var on = document.getElementById("mod-servicios").checked;
+  document.getElementById("ally-servbox").style.display = on ? "" : "none";
+}
+function allySubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("ally-note");
+  var btn = document.getElementById("ally-btn");
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
+
+  if (!chk("aut-marca") || !chk("aut-datos") || !chk("aut-licitud")){
+    return allyMsg(note, t("ally.err.aut"), false);
+  }
+  var payload = {
+    razon:val("ally-razon"), nit:val("ally-nit"), representante:val("ally-rep"), cedula:val("ally-cedula"),
+    contacto:val("ally-contacto"), correo:val("ally-correo"), telefono:val("ally-tel"),
+    ciudad:val("ally-ciudad"), direccion:val("ally-dir"), web:val("ally-web"),
+    modDonacion:chk("mod-donacion"), modRse:chk("mod-rse"), modGratitud:chk("mod-gratitud"),
+    modServicios:chk("mod-servicios"), modVoluntariado:chk("mod-voluntariado"), modDifusion:chk("mod-difusion"),
+    benBeneficio:val("ally-ben"), benNivel:val("ally-nivel"), benCondiciones:val("ally-cond"), benRedime:val("ally-redime"),
+    servDetalle:val("ally-servdet"),
+    autMarca:chk("aut-marca"), autDatos:chk("aut-datos"), autLicitud:chk("aut-licitud")
+  };
+  if (!ALLY_ENDPOINT){
+    return allyMsg(note, t("ally.err.config"), false);
+  }
+  btn.disabled = true;
+  allyMsg(note, t("ally.sending"), true);
+  fetch(ALLY_ENDPOINT, {
+    method:"POST",
+    body: JSON.stringify(payload)
+  }).then(function(r){ return r.json().catch(function(){ return {ok:r.ok}; }); })
+    .then(function(res){
+      if (res && res.ok){
+        document.getElementById("ally-form").reset();
+        allyToggleGrat(); allyToggleServ();
+        allyMsg(note, t("ally.ok"), true);
+      } else {
+        btn.disabled = false;
+        allyMsg(note, t("ally.err.send"), false);
+      }
+    })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("ally.err.send"), false); });
+  return false;
+}
+function allyMsg(el, msg, ok){
+  el.style.display = ""; el.textContent = msg;
+  el.style.color = ok ? "var(--g)" : "var(--err,#c0392b)";
+  return false;
 }
