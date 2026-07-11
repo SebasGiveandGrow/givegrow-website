@@ -1,11 +1,26 @@
 {
-  "_doc": "Comercios aliados del Programa de Gratitud. Un comercio SOLO aparece en el sitio si status === 'activa' (convenio firmado). Mientras 'borrador', queda preparado pero invisible. Igual criterio que las fundaciones del HUB: evidencia, no promesas. NOTA: Kore está temporalmente en 'activa' para VISTA PREVIA de diseño; volver a 'borrador' hasta que firme el convenio.",
+  "_doc": "Comercios aliados del Programa de Gratitud. Un comercio SOLO aparece si status==='activa'. 'borrador' queda preparado pero invisible. Mismo criterio que las fundaciones del HUB: evidencia, no promesas. PENDIENTE Kore: (1) reemplazar textos de beneficio/condiciones/redencion por los reales que defina Sebas; (2) confirmar convenio firmado. Visible por decision de Sebas.",
   "categorias": {
-    "gastronomia": { "es": "Gastronomía", "en": "Food & Drink" },
-    "moda": { "es": "Moda", "en": "Fashion" },
-    "belleza": { "es": "Belleza", "en": "Beauty" },
-    "bienestar": { "es": "Bienestar", "en": "Wellness" },
-    "odontologia": { "es": "Odontología", "en": "Dentistry" }
+    "gastronomia": {
+      "es": "Gastronomía",
+      "en": "Food & Drink"
+    },
+    "moda": {
+      "es": "Moda",
+      "en": "Fashion"
+    },
+    "belleza": {
+      "es": "Belleza",
+      "en": "Beauty"
+    },
+    "bienestar": {
+      "es": "Bienestar",
+      "en": "Wellness"
+    },
+    "odontologia": {
+      "es": "Odontología",
+      "en": "Dentistry"
+    }
   },
   "comercios": [
     {
@@ -30,7 +45,10 @@
         "es": "Mostrando la credencial digital de miembro al agendar",
         "en": "By showing your digital membership when booking"
       },
-      "consent": { "logo": true, "name": true }
+      "consent": {
+        "logo": true,
+        "name": true
+      }
     }
   ]
 }
