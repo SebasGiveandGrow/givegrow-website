@@ -577,6 +577,7 @@ var I18N = {
     "emp.grat.t":"Tu marca, en la red del Programa de Gratitud.",
     "emp.grat.p":"Como empresa aliada puedes sumarte al Programa de Gratitud y llegar a nuestra comunidad de miembros con beneficios — ganando clientes mientras aportas.",
     "emp.grat.btn":"Ver Programa de Gratitud",
+    "emp.grat.btn2":"Ver comercios aliados",
     "grat.you.ey":"Para todos",
     "grat.you.t":"Dos caras de la misma gratitud.",
     "grat.you.mem.t":"Si eres miembro",
@@ -809,6 +810,10 @@ function go(id, fromPop){
   if (!target && id.indexOf("fundacion/")===0){
     target = document.getElementById("page-ficha");
     if (target) renderFicha(id.split("/")[1]);
+  }
+  if (!target && id.indexOf("comercio/")===0){
+    target = document.getElementById("page-comercio");
+    if (target) renderComercio(id.split("/")[1]);
   }
   if (!target){ id = "e404"; target = document.getElementById("page-e404"); }
   if (!target){ id = "inicio"; target = document.getElementById("page-inicio"); }
@@ -2016,4 +2021,14 @@ function openComercioLb(cid, ix){
     paintLightbox();
     if (!d.open) d.showModal();
   });
+}
+
+/* Ir a Gratitud y desplazarse a la sección de comercios aliados */
+function goComercios(){
+  go("gratitud");
+  setTimeout(function(){
+    var sec = document.getElementById("grat-comercios-sec");
+    if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 120);
+  return false;
 }
