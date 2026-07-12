@@ -17,7 +17,9 @@
  */
 
 var SHEET_ID = "1x9vF3PN1qGCX9h8ffXg_l6_9YILeSu4HLR91l2yJnlg";
-var NOTIFY_EMAIL = "contabilidad@thegiveandgrowproject.org";
+// Notificaciones a Gmail externo: el dominio propio rebota por politica DMARC
+// (error 550 5.7.26). NO cambiar a @thegiveandgrowproject.org sin arreglar DNS.
+var NOTIFY_EMAIL = "fundaciongiveandgrow@gmail.com";
 var TAB = "Solicitudes";
 
 var HEADERS = [
@@ -28,7 +30,8 @@ var HEADERS = [
   "A. Donacion", "B. RSE", "C. Gratitud", "D. Servicios", "E. Voluntariado", "F. Difusion",
   "Ficha beneficio (Gratitud)", "Nivel desde", "Condiciones", "Como se redime",
   "Detalle servicio (D)",
-  "Autoriza marca", "Autoriza datos (1581)", "Declara licitud"
+  "Autoriza marca", "Autoriza datos (1581)", "Declara licitud",
+  "Descripcion del negocio"
 ];
 
 function doPost(e){
@@ -63,7 +66,8 @@ function doPost(e){
       yes(d.modDonacion), yes(d.modRse), yes(d.modGratitud), yes(d.modServicios), yes(d.modVoluntariado), yes(d.modDifusion),
       s(d.benBeneficio), s(d.benNivel), s(d.benCondiciones), s(d.benRedime),
       s(d.servDetalle),
-      yes(d.autMarca), yes(d.autDatos), yes(d.autLicitud)
+      yes(d.autMarca), yes(d.autDatos), yes(d.autLicitud),
+      s(d.descripcion)
     ];
     sh.appendRow(row);
 
@@ -78,6 +82,7 @@ function doPost(e){
       + "Empresa: " + s(d.razon) + "\n"
       + "Contacto: " + s(d.contacto) + " - " + s(d.correo) + " - " + s(d.telefono) + "\n"
       + "Ciudad: " + s(d.ciudad) + "\n"
+      + "Descripcion (en sus palabras): " + (s(d.descripcion) || "(no la incluyeron)") + "\n"
       + "Modalidades elegidas: " + (mods.join(", ") || "(ninguna marcada)") + "\n";
     if (d.modGratitud){
       resumen += "\nFicha del Beneficio (Gratitud):\n"

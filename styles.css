@@ -643,6 +643,8 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .ally-form label{font-size:13px;font-weight:600;color:var(--ink-soft)}
 .ally-form input[type=text],.ally-form input[type=email],.ally-form input[type=tel]{padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;background:var(--surface);color:var(--ink)}
 .ally-form input:focus{outline:none;border-color:var(--g)}
+.ally-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;font-family:inherit;background:var(--surface);color:var(--ink);resize:vertical;min-height:96px;box-sizing:border-box}
+.ally-form textarea:focus{outline:none;border-color:var(--g)}
 .ally-mods{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ally-check{display:flex;gap:11px;align-items:flex-start;padding:14px;border:1.5px solid var(--bd);border-radius:12px;cursor:pointer;transition:border-color .15s,background .15s}
 .ally-check:hover{border-color:var(--gm)}

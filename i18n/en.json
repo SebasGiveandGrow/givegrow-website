@@ -636,6 +636,7 @@
   "ally.f.ciudad": "City",
   "ally.f.dir": "Address",
   "ally.f.web": "Website or Instagram",
+  "ally.f.desc": "Business description (in your own words)",
   "ally.s.mods": "How do you want to support? (choose one or more)",
   "ally.m.don.t": "Donation",
   "ally.m.don.p": "In cash or in kind, with a certificate.",

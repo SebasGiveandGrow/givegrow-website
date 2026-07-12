@@ -94,6 +94,7 @@ var I18N = {
     "ally.f.ciudad":"Ciudad",
     "ally.f.dir":"Dirección",
     "ally.f.web":"Sitio web o Instagram",
+    "ally.f.desc":"Descripción del negocio (en tus propias palabras)",
     "ally.s.mods":"¿Cómo quieres apoyar? (elige una o varias)",
     "ally.m.don.t":"Donación",
     "ally.m.don.p":"En dinero o en especie, con certificado.",
@@ -1862,7 +1863,7 @@ function allySubmit(ev){
   var payload = {
     razon:val("ally-razon"), nit:val("ally-nit"), representante:val("ally-rep"), cedula:val("ally-cedula"),
     contacto:val("ally-contacto"), correo:val("ally-correo"), telefono:val("ally-tel"),
-    ciudad:val("ally-ciudad"), direccion:val("ally-dir"), web:val("ally-web"),
+    ciudad:val("ally-ciudad"), direccion:val("ally-dir"), web:val("ally-web"), descripcion:val("ally-desc"),
     modDonacion:chk("mod-donacion"), modRse:chk("mod-rse"), modGratitud:chk("mod-gratitud"),
     modServicios:chk("mod-servicios"), modVoluntariado:chk("mod-voluntariado"), modDifusion:chk("mod-difusion"),
     benBeneficio:val("ally-ben"), benNivel:val("ally-nivel"), benCondiciones:val("ally-cond"), benRedime:val("ally-redime"),
