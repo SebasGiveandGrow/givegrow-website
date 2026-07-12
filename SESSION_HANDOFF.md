@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "aliados + Programa de Gratitud" (jul 2026)
+> Última actualización: sesión "campo descripción del negocio" (jul 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -8,7 +8,33 @@
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
 
-## Lo que se hizo en esta sesión
+## Lo que se hizo en esta sesión (campo descripción del negocio)
+Commit `3e198d05` (Actions success). Objetivo: que las empresas den su PROPIA
+descripción en el formulario de aliados (decisión previa: no inventarla nosotros).
+
+1. **Campo "Descripción del negocio"** en formulario #aliados — DESPLEGADO.
+   - `index.html`: `<textarea id="ally-desc">` a lo ancho, al final de "Datos de la
+     empresa". Clave i18n `ally.f.desc`. Placeholder ES fijo (patrón del form: labels
+     i18n, placeholders hardcoded ES — misma limitación de todos los campos).
+   - `app.js`: `payload.descripcion = val("ally-desc")` + clave i18n ES.
+   - `i18n/en.json`: `ally.f.desc` → paridad 686/686.
+   - `styles.css`: regla `.ally-form textarea` con tokens existentes
+     (--surface/--ink/--bd/--g) para sostener modo noche.
+   - **Campo OPCIONAL** (sin `required`). Para hacerlo obligatorio: añadir `required`
+     al `<textarea>` y sumar `ally-desc` al chequeo de allySubmit. Decisión de Sebas
+     pendiente (se dejó opcional para no fricción; la ficha solo se arma para aliados
+     activos del Programa de Gratitud, donde se puede exigir en ese momento).
+
+2. **`ops/aliados-formulario.gs` sincronizado** con nueva columna + fix.
+   - Columna "Descripcion del negocio" añadida al FINAL de HEADERS y de `row`
+     (a propósito: insertarla en medio desalinearía las filas ya existentes, ej. Kore).
+   - Descripción añadida al correo de notificación (bloque de empresa).
+   - **DISCREPANCIA RESUELTA EN REPO:** la copia del repo tenía
+     `NOTIFY_EMAIL = "contabilidad@..."` (estado PRE-fix DMARC). Se sincronizó a
+     `fundaciongiveandgrow@gmail.com` para reflejar el script vivo. La copia del repo
+     estaba desactualizada; ahora coincide con la corrección DMARC.
+
+## Sesión anterior (aliados + Programa de Gratitud)
 1. **Formulario "Quiero ser aliado"** (#aliados) — 100% OPERATIVO.
    - Apps Script en `ops/aliados-formulario.gs`. Escribe a la hoja "Empresas
      Aliadas — Give&Grow" (SHEET_ID 1x9vF3PN1qGCX9h8ffXg_l6_9YILeSu4HLR91l2yJnlg,
@@ -47,14 +73,23 @@
      públicos. PENDIENTE: reemplazar por los reales que dé Kore.
 
 ## PENDIENTES (prioridad)
+- [ ] **ACCIÓN MANUAL — Apps Script aliados:** pegar el nuevo `ops/aliados-
+      formulario.gs` en el editor de Apps Script y **publicar VERSIÓN NUEVA**
+      (Implementar → Administrar implementaciones → lápiz → Versión nueva). Si no,
+      la app web sigue con el código viejo y la columna/descripción NO se guardan.
+- [ ] **ACCIÓN MANUAL — hoja de cálculo:** añadir a mano el encabezado
+      "Descripcion del negocio" en la última columna de la pestaña "Solicitudes".
+      El script NO reescribe encabezados en hoja con datos, así que la columna nueva
+      llega sin título hasta que se ponga manualmente.
+- [ ] **Confirmar visualmente** el textarea nuevo en #aliados (día y NOCHE).
+- [ ] **Decisión Sebas:** ¿campo descripción obligatorio u opcional? (hoy opcional).
+- [ ] **Verificar** que el `NOTIFY_EMAIL` del script vivo sí es el Gmail (se asumió
+      por el handoff; la copia del repo estaba desactualizada y ya se corrigió).
 - [ ] **Textos reales de Kore**: beneficio, nivelDesde, redime, condiciones
       (hoy son de ejemplo y están públicos). Editar en data/gratitud.json.
 - [ ] **Convenio firmado de Kore** (dijo que firma en breve).
 - [ ] **about + fotos de Kore**: los aporta la empresa. about/gallery vacíos.
       consent.photos=false hasta que autorice fotos.
-- [ ] **Añadir campo "descripción del negocio" al formulario de aliados**
-      (decisión: las empresas deben dar su propia descripción, no inventarla).
-      Sugerido por Claude, aprobado por Sebas, aún NO implementado.
 - [ ] **Sección FUTURA "lo que hacen por la comunidad"** (experiencias/
       servicios/productos): campo `comunidad` reservado en gratitud.json.
       Diseñar a fondo con contenido real. NO implementar aún.
@@ -91,8 +126,12 @@
 - Validación: `node scripts/validate.mjs` (paridad, sintaxis, tags, cobertura).
 
 ## VERIFICADO AL CIERRE
-- page-comercio en index.html: ✓ (1)
-- bloque comercio en go(): ✓
-- Kore status: activa ✓
-- Deploy ec0f182 success (fix 404 real).
-- FALTA que Sebas confirme visualmente que la ficha de Kore abre sin 404.
+- Campo ally-desc en index.html: ✓
+- payload.descripcion + i18n ally.f.desc (ES): ✓
+- ally.f.desc en en.json (paridad 686/686): ✓
+- .ally-form textarea en styles.css (tokens, modo noche): ✓
+- validate.mjs: TODO OK (sintaxis, paridad, cobertura, JSON, tags).
+- Cache-bust actualizado: styles 0a072653, app 1c51e738.
+- Deploy 3e198d05 Actions success.
+- PENDIENTE Sebas: pegar+reimplementar .gs, encabezado manual en hoja,
+  confirmación visual del textarea (día/noche), decisión obligatorio/opcional.
