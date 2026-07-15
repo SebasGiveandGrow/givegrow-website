@@ -8,6 +8,27 @@
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
 
+## Fase 2 en curso + nota sobre logo de Conciencia
+- **Fase 2a DESPLEGADA (commit `a3c030ed`):** "cupón institucional" del beneficio en la
+  ficha de comercio. `.benefit-coupon` (app.js render + styles.css): eyebrow, beneficio en
+  tipografía display, nivel como sello (pill), divisor perforado, redención/condiciones en
+  letra de documento. Tokens existentes, día/noche. Reemplaza la tarjeta plana
+  `.card.ficha-impact`+`.grat-benefit`+`.grat-meta` SOLO en la ficha de comercio (esas
+  clases siguen usándose en las mini-cards del grid, no se tocaron). Kore aún con textos de
+  beneficio de ejemplo → el cupón queda listo para el contenido real.
+- **Fase 2b PENDIENTE:** comercios en el mapa. gratitud.json NO tiene aún `direccion`/`coords`.
+  Para comercios la dirección es PÚBLICA y deseada (distinto de fundaciones). Falta: añadir
+  soporte de marcador `type:"company"` en el mapa (el código ya lo contempla), y `direccion`
+  + `coords` de Kore (buscar dirección pública de Kore Makeup Academy, Envigado, o que la dé
+  Sebas). Luego dirección visible en ficha + enlace a Google Maps.
+- **LOGO de Conciencia — límite de herramientas:** el binario vive en Drive; moverlo al repo
+  exige pasar ~146KB base64 por el contexto de Claude, lo que corrompería el PNG (no es
+  fiable copiarlo a mano), y bash no puede alcanzar Drive (fuera del allowlist de red). Vía
+  fiable: Sebas ADJUNTA el logo (y luego las fotos de Kore) en el chat → caen en
+  /mnt/user-data/uploads y Claude los optimiza (WebP) y los aloja de punta a punta. Estado
+  actual: consent.logo=true, logo=null, render protegido (sin imagen rota). Al recibir el
+  archivo: subir /img/conciencia_logo.png y poner "logo":"/img/conciencia_logo.png".
+
 ## Alta de Fundación Conciencia al HUB (esta sesión)
 Commit `6ab8194e` (deploy success). Tercera fundación de la red `partners.json`.
 Datos tomados del formulario ANTERIOR "Aplicación al Hub Social (respuestas)"
