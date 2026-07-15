@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "campo descripción del negocio" (jul 2026)
+> Última actualización: sesión "Fase 1 UX + roadmap tarjetas/menú" (jul 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -8,7 +8,53 @@
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
 
-## Lo que se hizo en esta sesión (campo descripción del negocio)
+## Lo que se hizo en esta sesión (Fase 1 UX + roadmap)
+Commit `089435e1` (Actions success). Lluvia de ideas con Sebas → plan de 4 fases.
+
+**Fase 1 DESPLEGADA (arreglos sin assets):**
+1. **Lightbox galería "Compruébalo tú mismo" avanzaba de 3 en 3 POR TECLADO.**
+   Causa: 3 listeners `keydown` sobre `#lightbox` (app.js ~L852, ~L1196, ~L1613);
+   dos duplicados + uno muerto mal condicionado (gateaba `#lightbox` pero llamaba
+   `closeGalLb`). Fix: dejar SOLO el listener L1196 como autoridad; L852 conserva
+   el Escape del dropdown, L1613 conserva el Escape del drawer móvil. Botones en
+   pantalla siempre avanzaron de a 1. (Ficha lb `gal-lb` nunca tuvo teclado real;
+   usa botones + Escape nativo de <dialog>. Mejora futura opcional.)
+2. **Contraste modo DÍA (noche ya pasaba AA con holgura):** `--mu` #6B7280→#5C636F
+   (fallaba 4.41 sobre crema; ahora ≥5.0 en blanco/crema/sand). `--amber`
+   #C97200→#A84D00 (badge .tag.new sobre amberl: 3.24→5.13). Tokens de noche
+   intactos. OJO: `--gn` NO se tocó — solo se usa sobre fondos oscuros (hero/calc/
+   home-hub/footer); su "fallo sobre blanco" era hipotético, no real.
+3. **Footer:** añadido `contabilidad@thegiveandgrowproject.org` en columna Entidad.
+
+**ROADMAP acordado (fases siguientes):**
+- **Fase 2 — Ficha de comercio enriquecida.** (a) "Cupón institucional" del
+  beneficio (tipografía display, nivel orgánico Retoño→, cómo se redime, condiciones
+  estilo ledger) = elemento firma de la ficha. (b) Comercios en el mapa Leaflet:
+  el código YA soporta `type:"company"` (comentado, nunca usado); marcador propio +
+  `direccion` y `coords` en gratitud.json; dirección EXACTA visible (un comercio
+  quiere ser hallado; distinto de fundaciones que usan zona por privacidad). (c)
+  Galería CURADA self-hosted en /img/gratitud/<id>/ — NO embeber Instagram (CSP
+  estricta `default-src 'self'`; API IG frágil/deprecada). Enlace prominente a @IG sí.
+  Sebas va a PEDIR las fotos a Kore. (d) Sección `comunidad` (campo ya reservado en
+  gratitud.json): nace con contenido real, no vacía.
+  → BLOQUEADO por fotos con consentimiento (Ley 1581: impacto/beneficiarios/menores
+    exige consentimiento documentado; producto/local de Kore = permiso del negocio).
+  → Flujo de imágenes acordado: Sebas las sube por el chat; Claude optimiza (WebP +
+    thumbs), nombra por convención y despliega. Por foto: pie, sección, consentimiento.
+  → Arrancar Fase 2 por cupón + mapa (no dependen de fotos) mientras Sebas reúne fotos.
+- **Fase 3 — Identidad tipográfica: cargar Unbounded self-hosted** (hoy el sitio
+  usa Bricolage Grotesque en display = etapa ANTERIOR de marca; Unbounded es la
+  dirección institucional aprobada). Vía npm @fontsource/unbounda (Google Fonts
+  bloqueado por CSP/red). Migrar roles display, sign-off visual por sección día/noche.
+- **Fase 4 — Reestructura de menú (Opción B, por audiencia, HUB SOCIAL visible).**
+  PENDIENTE visto bueno de Sebas del árbol. Propuesta (6→5 ítems + Donar):
+  `HUB SOCIAL · Fundaciones · Empresas▾(Empresas/Gratitud/Aliado) ·
+   Membresías▾(Membresías/Calcular aporte/Rastreo) · Nosotros▾(Origen/Impacto/
+   Transparencia/FAQ/Contacto) · [Donar]`. Micro-decisiones abiertas: ¿Impacto en
+  Nosotros o visible?; ALMA quitado del nav (tiene FAB) ¿ok?; nombre grupo donantes.
+  Al construir: tocar nav desktop + hamburguesa móvil + i18n de grupos nuevos.
+
+## Sesión anterior (campo descripción del negocio)
 Commit `3e198d05` (Actions success). Objetivo: que las empresas den su PROPIA
 descripción en el formulario de aliados (decisión previa: no inventarla nosotros).
 
