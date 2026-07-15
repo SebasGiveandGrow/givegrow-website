@@ -29,6 +29,24 @@ Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
 PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
 (Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
 
+## Kore coords exactas + Fase 3 (tipografía Unbounded)
+- **Coords de Kore corregidas** (commit `24ae69de`). El pin estaba ~500m desviado (usé centro
+  de Envigado). Vía Google Places (tool places_search): lat 6.174531, lng -75.584507,
+  place_id ChIJQc4o40JWnA0RQQd0fAzbj3k. Dirección de texto ya era correcta.
+- **Fase 3 DESPLEGADA (commit `61a54c84`) — Unbounded self-hosted.**
+  - vendor/fonts/unbounded-latin.woff2 (variable 200–900, 50KB, OFL, vía npm @fontsource-
+    variable/unbounded). Google Fonts sigue bloqueado por CSP; font-src 'self' cubre el self-host.
+  - HALLAZGO: `--font-display` nunca estaba definido → .e404-code/.live-num/.bc-benefit
+    heredaban Inter (no display). Ahora `--font-display:"Unbounded","Bricolage Grotesque",sans`.
+  - Unbounded "CON MODERACIÓN" (regla del skill): SOLO h1/h2 (titulares) + #calc-display
+    (cifra clave) + los que ya usaban --font-display. h3/h4 y piezas pequeñas (.nlogo wordmark,
+    precios .tier-price b, pasos .step, #m-name, .pcard-body b) SIGUEN en Bricolage a propósito.
+  - index.html: preload Unbounded en vez de Bricolage (H1 del hero es above-fold / LCP).
+  - h1/h2 ajustados: line-height 1.08, letter-spacing -.01em (Unbounded es ancha; menos tracking
+    negativo que Bricolage). PENDIENTE sign-off visual: Unbounded es display ancha → revisar que
+    el H1 del hero no desborde en móvil, y decidir si nlogo/precios/h3 migran también y si el
+    peso de titulares baja a 600. Bricolage sigue cargada (fallback + h3/h4).
+
 ## Fase 2 en curso + nota sobre logo de Conciencia (histórico)
 - **Fase 2a DESPLEGADA (commit `a3c030ed`):** "cupón institucional" del beneficio en la
   ficha de comercio. `.benefit-coupon` (app.js render + styles.css): eyebrow, beneficio en
