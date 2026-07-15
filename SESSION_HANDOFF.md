@@ -8,7 +8,28 @@
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
 
-## Fase 2 en curso + nota sobre logo de Conciencia
+## Cierre de tanda: logo Conciencia + Kore en mapa + ocultar 2 bloques
+Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
+- **Logo de Conciencia ALOJADO.** Sebas lo adjuntó por el chat (flujo previsto). Optimizado
+  a /img/conciencia_logo.png (512px, PNG paleta 48 colores, 13KB, transparencia ok);
+  partners.json logo path seteado (consent.logo ya era true). Ficha ya muestra el logo.
+- **Fase 2b HECHA — Kore en el mapa.** gratitud.json: Kore con `direccion`
+  ("Dg. 33 #32A Sur 34, Zona 9, Envigado, Antioquia") + `coords` {lat 6.1701, lng -75.5905}
+  (ZONA APROX. de Envigado; la precisión real la da el enlace a Google Maps). app.js: el mapa
+  ahora une partners + comercios activos con coords (marcador `company` ámbar, ya existía el
+  CSS .gg-pin-company). Popup de comercio: enlace a ficha (`go('comercio/id')`) + Google Maps.
+  Ficha de comercio: línea de dirección + "Cómo llegar" (Maps). i18n: quitado "próximamente"
+  de map.leg.c; nuevas map.biz/com.maps (688/688).
+- **OCULTAS por decisión de Sebas (comentadas en index.html, restaurables):**
+  (1) bloque de stats de zona del inicio (5 Rutas / 8 Poblaciones / 100% Trazabilidad /
+  2025) — "para el futuro"; (2) contadores de donaciones/entregas en vivo (#live-stats +
+  live-note) — "hasta tener más datos". JS null-safe (updateLiveStats guarda); claves i18n
+  (stat.*, live.*) conservadas en ambos diccionarios.
+
+PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
+(Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
+
+## Fase 2 en curso + nota sobre logo de Conciencia (histórico)
 - **Fase 2a DESPLEGADA (commit `a3c030ed`):** "cupón institucional" del beneficio en la
   ficha de comercio. `.benefit-coupon` (app.js render + styles.css): eyebrow, beneficio en
   tipografía display, nivel como sello (pill), divisor perforado, redención/condiciones en
