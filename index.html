@@ -32,7 +32,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=5d6d4b78">
+<link rel="stylesheet" href="/styles.css?v=468144f3">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -155,6 +155,7 @@
     </div>
   </section>
 
+  <!-- OCULTO por decisión de Sebas: bloque de stats de zona (Rutas/Poblaciones/Trazabilidad/Año). Se retoma en el futuro cuando haya datos. Claves i18n (stat.*) se conservan.
   <section>
     <div class="wrap stats">
       <div class="stat rv"><div class="num" data-count="5">5</div><div class="lab" data-i18n="stat.rutas">Rutas del modelo</div></div>
@@ -163,6 +164,7 @@
       <div class="stat rv d3"><div class="num">2025</div><div class="lab" data-i18n="stat.fund">Fundada en Medellín</div></div>
     </div>
   </section>
+  -->
 
   <section class="home-hub">
     <div class="wrap">
@@ -195,6 +197,7 @@
         </div>
       </div>
       <a class="btn btn-g rv d3" href="#hub" onclick="return go('hub')" data-i18n="home.hub.btn">Conoce cómo funciona el HUB</a>
+      <!-- OCULTO por decisión de Sebas: contadores de donaciones/entregas en vivo. Se retoma cuando haya más datos. JS (updateLiveStats) es null-safe; claves i18n (live.*) se conservan.
       <div class="live-stats rv d3" id="live-stats" aria-live="polite">
         <div class="live-stat">
           <div class="live-num" data-count="0" id="ls-donaciones">0</div>
@@ -210,6 +213,7 @@
         </div>
       </div>
       <p class="live-note rv d3" data-i18n="live.note">Números reales, actualizados desde nuestro registro. Empezamos con lo que podemos probar.</p>
+      -->
     </div>
   </section>
 
@@ -1171,7 +1175,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=605b7cc1"></script>
+<script src="/app.js?v=064a64e9"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

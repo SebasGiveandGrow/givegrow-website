@@ -29,6 +29,11 @@
       "name": "Kore Makeup Academy",
       "categoria": "belleza",
       "ciudad": "Envigado",
+      "direccion": "Dg. 33 #32A Sur 34, Zona 9, Envigado, Antioquia",
+      "coords": {
+        "lat": 6.1701,
+        "lng": -75.5905
+      },
       "logo": "/img/partners/kore-makeup.png",
       "instagram": "https://instagram.com/koremakeup",
       "web": "",

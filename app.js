@@ -365,8 +365,10 @@ var I18N = {
     "faq.cta.fund":"Vincula tu fundación al Hub →",
     "map.visit":"Ver sitio web",
     "map.leg.f":"Fundaciones aliadas",
-    "map.leg.c":"Empresas aliadas · próximamente",
+    "map.leg.c":"Empresas aliadas",
     "map.leg.hub":"HUB SOCIAL",
+    "map.biz":"Ver beneficio",
+    "com.maps":"Cómo llegar",
     "map.area.med":"Medellín · centro operativo",
     "net.ey":"La red",
     "nav.g.hub":"El Hub","nav.g.sumate":"Súmate","nav.g.nosotros":"Nosotros","nav.cta":"Donar","nav.faq":"FAQ",
@@ -1428,8 +1430,14 @@ function initMap(){
     for (var i=0;i<list.length;i++){
       var pt=list[i];
       var area = pt.area ? (pt.area[lang]||pt.area.es||"") : (pt.areaKey ? t(pt.areaKey) : "");
-      var html="<b>"+pt.name+"</b>"+(area?("<br>"+area):"")+
-        (pt.url?('<br><a href="'+pt.url+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>"):"");
+      var html="<b>"+pt.name+"</b>"+(area?("<br>"+area):"");
+      if (pt.type==="company"){
+        if (pt.direccion) html += "<br>"+pt.direccion;
+        html += '<br><a href="'+pt.ficha+'" onclick="return go(\'comercio/'+pt.id+'\')">'+t("map.biz")+"</a>";
+        if (pt.direccion) html += ' &middot; <a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(pt.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+"</a>";
+      } else if (pt.url){
+        html += '<br><a href="'+pt.url+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>";
+      }
       L.marker([pt.lat,pt.lng],{icon:pin(pt.type)}).addTo(map).bindPopup(html);
       bounds.push([pt.lat,pt.lng]);
     }
@@ -1444,7 +1452,20 @@ function initMap(){
     };
     legend.addTo(map);
   }
-  function start(){ loadPartners().then(build); }
+  function start(){
+    Promise.all([loadPartners(), loadGratitud()]).then(function(res){
+      var list = (res[0] || []).slice();
+      var comercios = (res[1] && res[1].comercios) || [];
+      for (var i=0;i<comercios.length;i++){
+        var c = comercios[i];
+        if (c.status==="activa" && c.coords && typeof c.coords.lat==="number" && typeof c.coords.lng==="number"){
+          list.push({ id:c.id, name:c.name, type:"company", lat:c.coords.lat, lng:c.coords.lng,
+            area:{es:c.ciudad||"", en:c.ciudad||""}, ficha:"#comercio/"+c.id, direccion:c.direccion||"" });
+        }
+      }
+      build(list);
+    });
+  }
   if (window.L){ start(); return; }
   var css = document.createElement("link");
   css.rel = "stylesheet"; css.href = "/vendor/leaflet/leaflet.css";
@@ -1963,6 +1984,9 @@ function renderComercio(cid){
       + (c.ciudad ? '<span class="eco-chip">'+escapeHtml(c.ciudad)+'</span>' : '')
       + '<span class="eco-chip">'+t("com.aliado")+'</span>'
       + '</div></div></div>';
+
+    if (c.direccion) html += '<p class="com-address">'+escapeHtml(c.direccion)
+      + ' · <a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+'</a></p>';
 
     if (about) html += '<p class="lead" style="margin-top:22px;max-width:70ch">'+escapeHtml(about)+'</p>';
 

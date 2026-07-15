@@ -689,6 +689,7 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .bc-terms{margin:0;padding:22px 30px 26px 34px;display:grid;gap:16px}
 .bc-terms dt{font-size:11.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mu);margin-bottom:4px}
 .bc-terms dd{margin:0;font-size:14.5px;color:var(--ink-soft);line-height:1.5}
+.com-address{margin-top:14px;font-size:14.5px;color:var(--mu)}
 .grat-empty{text-align:center;max-width:52ch;margin:26px auto 0;padding:32px;background:var(--cream);border:1px dashed var(--bd);border-radius:16px}
 .grat-empty p{color:var(--ink-soft);margin:0 0 18px}
 html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
