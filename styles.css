@@ -1,4 +1,5 @@
 @font-face{font-family:"Bricolage Grotesque";font-style:normal;font-weight:200 800;font-display:swap;src:url("/vendor/fonts/bricolage-latin.woff2") format("woff2")}
+@font-face{font-family:"Unbounded";font-style:normal;font-weight:200 900;font-display:swap;src:url("/vendor/fonts/unbounded-latin.woff2") format("woff2")}
 @font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url("/vendor/fonts/inter-latin.woff2") format("woff2")}
 @font-face{font-family:"Fraunces";font-style:italic;font-weight:100 900;font-display:swap;src:url("/vendor/fonts/fraunces-italic-latin.woff2") format("woff2")}
 /* ===== Give&Grow International - design system (rebuild v4) ===== */
@@ -14,6 +15,7 @@
   --shadow:0 2px 8px rgba(0,0,0,.06);
   --shadow-lg:0 10px 30px rgba(0,0,0,.10);
   --maxw:1120px;
+  --font-display:"Unbounded","Bricolage Grotesque",sans-serif;
   /* tokens semánticos de tema (día por defecto) */
   --bg:#fff;--surface:#fff;--surface-2:var(--cream);
   --ink:#0A1628;--ink-soft:#374151;
@@ -24,7 +26,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:16px;scroll-behavior:smooth}
 body{font-family:"Inter",system-ui,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;line-height:1.6;overflow-x:hidden}
-h1,h2,h3,h4{font-family:"Bricolage Grotesque",sans-serif;line-height:1.1;letter-spacing:-.02em;font-weight:700}
+h1,h2{font-family:var(--font-display);line-height:1.08;letter-spacing:-.01em;font-weight:700}
+h3,h4{font-family:"Bricolage Grotesque",sans-serif;line-height:1.1;letter-spacing:-.02em;font-weight:700}
 em.fr{font-family:"Fraunces",serif;font-style:italic;font-weight:400}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;cursor:pointer;border:none;background:none}
@@ -165,7 +168,7 @@ section{padding:72px 0}
 .cur-toggle button{padding:5px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);font-size:13px;font-weight:700}
 .cur-toggle button.on{background:#fff;color:var(--navy)}
 .calc-amount{text-align:center;margin-bottom:6px}
-#calc-display{font-family:"Bricolage Grotesque";font-size:42px;font-weight:800;color:var(--gn)}
+#calc-display{font-family:var(--font-display);font-size:42px;font-weight:800;color:var(--gn)}
 #calc-manual{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:10px;padding:10px;text-align:center;font-size:16px;margin:6px 0 4px}
 #calc-rate{font-size:12px;color:rgba(255,255,255,.45);text-align:center;margin-bottom:16px;min-height:16px}
 input[type=range]{width:100%;accent-color:var(--gn);margin:8px 0 4px}
