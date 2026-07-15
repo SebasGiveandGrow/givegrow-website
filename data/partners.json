@@ -1,217 +1,311 @@
 {
- "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}. consent{} = registro de autorizaciones {name, logo, photos: bool; minorsImageProtected; grantedBy; date: YYYY-MM-DD; source}: el logo solo se renderiza si consent.logo===true y la galería solo si consent.photos===true (hub exento). Sin consentimiento registrado no se publica material de terceros.",
- "partners": [
-  {
-   "id": "hub-medellin",
-   "name": "HUB SOCIAL Give&Grow",
-   "type": "hub",
-   "lat": 6.2442,
-   "lng": -75.5812,
-   "area": {
-    "es": "Medellín · centro operativo",
-    "en": "Medellín · operations center"
-   }
-  },
-  {
-   "id": "ndf",
-   "name": "Fundación Niños del Futuro",
-   "type": "foundation",
-   "lat": 6.2925,
-   "lng": -75.5375,
-   "area": {
-    "es": "Manrique · La Honda, Medellín",
-    "en": "Manrique · La Honda, Medellín"
-   },
-   "url": "https://ninosdelfuturo.com",
-   "instagram": "https://www.instagram.com/ninos.del.futuro",
-   "impactUnits": [
+  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}. consent{} = registro de autorizaciones {name, logo, photos: bool; minorsImageProtected; grantedBy; date: YYYY-MM-DD; source}: el logo solo se renderiza si consent.logo===true y la galería solo si consent.photos===true (hub exento). Sin consentimiento registrado no se publica material de terceros.",
+  "partners": [
     {
-     "id": "ndf-plato",
-     "cop": 4000,
-     "project": "Chefs del Futuro",
-     "es": "plato de comida",
-     "esPl": "platos de comida",
-     "en": "plate of food",
-     "enPl": "plates of food"
+      "id": "hub-medellin",
+      "name": "HUB SOCIAL Give&Grow",
+      "type": "hub",
+      "lat": 6.2442,
+      "lng": -75.5812,
+      "area": {
+        "es": "Medellín · centro operativo",
+        "en": "Medellín · operations center"
+      }
     },
     {
-     "id": "ndf-borboletas",
-     "cop": 300000,
-     "project": "Borboletas",
-     "es": "mes de baile para una niña o niño (Borboletas)",
-     "esPl": "meses de baile (Borboletas)",
-     "en": "month of dance for a child (Borboletas)",
-     "enPl": "months of dance (Borboletas)",
-     "monthly": true,
-     "aggSemestral": {
-      "es": "semestre de baile",
-      "en": "semester of dance"
-     },
-     "aggAnual": {
-      "es": "año de baile",
-      "en": "year of dance"
-     },
-     "aggSemestralPl": {
-      "es": "semestres de baile",
-      "en": "semesters of dance"
-     },
-     "aggAnualPl": {
-      "es": "años de baile",
-      "en": "years of dance"
-     }
+      "id": "ndf",
+      "name": "Fundación Niños del Futuro",
+      "type": "foundation",
+      "lat": 6.2925,
+      "lng": -75.5375,
+      "area": {
+        "es": "Manrique · La Honda, Medellín",
+        "en": "Manrique · La Honda, Medellín"
+      },
+      "url": "https://ninosdelfuturo.com",
+      "instagram": "https://www.instagram.com/ninos.del.futuro",
+      "impactUnits": [
+        {
+          "id": "ndf-plato",
+          "cop": 4000,
+          "project": "Chefs del Futuro",
+          "es": "plato de comida",
+          "esPl": "platos de comida",
+          "en": "plate of food",
+          "enPl": "plates of food"
+        },
+        {
+          "id": "ndf-borboletas",
+          "cop": 300000,
+          "project": "Borboletas",
+          "es": "mes de baile para una niña o niño (Borboletas)",
+          "esPl": "meses de baile (Borboletas)",
+          "en": "month of dance for a child (Borboletas)",
+          "enPl": "months of dance (Borboletas)",
+          "monthly": true,
+          "aggSemestral": {
+            "es": "semestre de baile",
+            "en": "semester of dance"
+          },
+          "aggAnual": {
+            "es": "año de baile",
+            "en": "year of dance"
+          },
+          "aggSemestralPl": {
+            "es": "semestres de baile",
+            "en": "semesters of dance"
+          },
+          "aggAnualPl": {
+            "es": "años de baile",
+            "en": "years of dance"
+          }
+        },
+        {
+          "id": "ndf-flow",
+          "cop": 300000,
+          "project": "Flow Callejero",
+          "es": "mes de formación para un adolescente (Flow Callejero)",
+          "esPl": "meses de formación (Flow Callejero)",
+          "en": "month of training for a teen (Flow Callejero)",
+          "enPl": "months of training (Flow Callejero)",
+          "monthly": true,
+          "aggSemestral": {
+            "es": "semestre de baile",
+            "en": "semester of dance"
+          },
+          "aggAnual": {
+            "es": "año de baile",
+            "en": "year of dance"
+          },
+          "aggSemestralPl": {
+            "es": "semestres de baile",
+            "en": "semesters of dance"
+          },
+          "aggAnualPl": {
+            "es": "años de baile",
+            "en": "years of dance"
+          }
+        },
+        {
+          "id": "ndf-beca",
+          "cop": 300000,
+          "project": "Becas",
+          "es": "beca mensual de baile",
+          "esPl": "becas mensuales de baile",
+          "en": "monthly dance scholarship",
+          "enPl": "monthly dance scholarships",
+          "monthly": true,
+          "aggSemestral": {
+            "es": "beca semestral",
+            "en": "semester scholarship"
+          },
+          "aggAnual": {
+            "es": "beca anual",
+            "en": "annual scholarship"
+          },
+          "aggSemestralPl": {
+            "es": "becas semestrales",
+            "en": "semester scholarships"
+          },
+          "aggAnualPl": {
+            "es": "becas anuales",
+            "en": "annual scholarships"
+          }
+        }
+      ],
+      "logo": "/img/ndf_logo.jpg",
+      "gallery": [
+        {
+          "src": "/img/jornadas/baile_flow_escenario.webp",
+          "alt": {
+            "es": "Flow Callejero en presentación sobre tarima",
+            "en": "Flow Callejero performing on stage"
+          }
+        },
+        {
+          "src": "/img/jornadas/baile_presentacion.webp",
+          "alt": {
+            "es": "Presentación del Proyecto de Baile en cancha comunitaria",
+            "en": "Dance Project performance at a community court"
+          }
+        },
+        {
+          "src": "/img/jornadas/baile_grupo_estudio.webp",
+          "alt": {
+            "es": "Grupo del Proyecto de Baile en el estudio",
+            "en": "Dance Project group at the studio"
+          }
+        },
+        {
+          "src": "/img/jornadas/baile_retrato.webp",
+          "alt": {
+            "es": "Integrante de Flow Callejero",
+            "en": "Flow Callejero member"
+          }
+        }
+      ],
+      "consent": {
+        "name": true,
+        "logo": true,
+        "photos": true,
+        "minorsImageProtected": "pendiente",
+        "grantedBy": "Francisco Grijalba",
+        "date": null,
+        "source": "Nombre y logo ya publicados con autorización previa; galería de baile publicada con consentimiento de jornadas confirmado por el representante legal de Give&Grow (2026-07). Fecha formal del cuestionario de ingreso pendiente."
+      },
+      "poblacion": {
+        "es": "≈130 niñas y niños",
+        "en": "≈130 children"
+      },
+      "profile": {
+        "badge": {
+          "es": "Proyecto comunitario de base",
+          "en": "Grassroots community project"
+        },
+        "leader": "Francisco Grijalba",
+        "years": {
+          "es": "5+ años en territorio",
+          "en": "5+ years on the ground"
+        },
+        "about": {
+          "es": "Fundación comunitaria dirigida por Francisco Grijalba en el sector de La Honda (Manrique, Medellín), con más de cinco años sirviendo a su comunidad. Es la primera fundación aliada del HUB SOCIAL: Give&Grow no reemplaza su labor, la fortalece. Su proyecto principal es el Proyecto de Baile, que usa la danza como herramienta de transformación social y está liderado de forma voluntaria por Jagoda Cwiklik, bailarina radicada en Medellín.",
+          "en": "A community foundation led by Francisco Grijalba in the La Honda area (Manrique, Medellín), with over five years serving its community. It is the Social Hub's first partner foundation: Give&Grow does not replace its work, it strengthens it. Its flagship initiative is the Dance Project, which uses dance as a tool for social transformation, led on a volunteer basis by Jagoda Cwiklik, a dancer based in Medellín."
+        },
+        "programs": [
+          {
+            "name": "Chefs del Futuro",
+            "desc": {
+              "es": "Alimentación diaria: cerca de 100 niños y niñas reciben almuerzo cada día.",
+              "en": "Daily nutrition: around 100 children receive lunch every day."
+            }
+          },
+          {
+            "name": "Borboletas",
+            "logo": "/img/partners/borboletas.png",
+            "desc": {
+              "es": "Grupo de iniciación del Proyecto de Baile: más de 30 niñas y niños de 6 a 12 años descubren la danza como herramienta de crecimiento personal, disciplina y confianza.",
+              "en": "The Dance Project's entry group: over 30 children aged 6–12 discover dance as a tool for personal growth, discipline and confidence."
+            }
+          },
+          {
+            "name": "Flow Callejero",
+            "logo": "/img/partners/flow_callejero.png",
+            "desc": {
+              "es": "Grupo juvenil de proyección artística: cerca de 14 adolescentes desde los 13 años representan a la fundación en presentaciones y competencias, formándose como líderes positivos de su comunidad.",
+              "en": "The youth performance group: around 14 teens aged 13+ represent the foundation at shows and competitions, growing as positive community leaders."
+            }
+          },
+          {
+            "name": "Becas",
+            "desc": {
+              "es": "Formación profesional para 7 niños y jóvenes con talento y compromiso, en las academias Move Danza y Elements, incluyendo transporte seguro desde sus hogares.",
+              "en": "Professional training for 7 committed, talented children and youth at the Move Danza and Elements academies, including safe transport from their homes."
+            }
+          }
+        ],
+        "hub": {
+          "es": "A través de la Ruta 1 (alianzas) recibe logística y visibilidad, y por la Ruta 2 (gestión de donaciones) canaliza aportes en especie y monetarios con trazabilidad completa: acta de recepción, entrega firmada, reporte fotográfico y certificado.",
+          "en": "Through Route 1 (alliances) it receives logistics and visibility, and through Route 2 (donation management) it channels in-kind and monetary gifts with full traceability: reception record, signed delivery, photo report and certificate."
+        },
+        "quote": {
+          "es": "Más allá de enseñar a bailar, buscamos generar oportunidades y transformar vidas.",
+          "en": "Beyond teaching dance, we aim to create opportunities and transform lives."
+        }
+      }
     },
     {
-     "id": "ndf-flow",
-     "cop": 300000,
-     "project": "Flow Callejero",
-     "es": "mes de formación para un adolescente (Flow Callejero)",
-     "esPl": "meses de formación (Flow Callejero)",
-     "en": "month of training for a teen (Flow Callejero)",
-     "enPl": "months of training (Flow Callejero)",
-     "monthly": true,
-     "aggSemestral": {
-      "es": "semestre de baile",
-      "en": "semester of dance"
-     },
-     "aggAnual": {
-      "es": "año de baile",
-      "en": "year of dance"
-     },
-     "aggSemestralPl": {
-      "es": "semestres de baile",
-      "en": "semesters of dance"
-     },
-     "aggAnualPl": {
-      "es": "años de baile",
-      "en": "years of dance"
-     }
-    },
-    {
-     "id": "ndf-beca",
-     "cop": 300000,
-     "project": "Becas",
-     "es": "beca mensual de baile",
-     "esPl": "becas mensuales de baile",
-     "en": "monthly dance scholarship",
-     "enPl": "monthly dance scholarships",
-     "monthly": true,
-     "aggSemestral": {
-      "es": "beca semestral",
-      "en": "semester scholarship"
-     },
-     "aggAnual": {
-      "es": "beca anual",
-      "en": "annual scholarship"
-     },
-     "aggSemestralPl": {
-      "es": "becas semestrales",
-      "en": "semester scholarships"
-     },
-     "aggAnualPl": {
-      "es": "becas anuales",
-      "en": "annual scholarships"
-     }
+      "id": "conciencia",
+      "name": "Fundación Conciencia",
+      "type": "foundation",
+      "lat": 6.313,
+      "lng": -75.585,
+      "area": {
+        "es": "Nueva Jerusalén, Medellín · Córdoba",
+        "en": "Nueva Jerusalén, Medellín · Córdoba"
+      },
+      "url": "https://www.fundacionconcienciaparalapaz.org/",
+      "instagram": "https://www.instagram.com/fundacion_conciencia",
+      "impactUnits": [
+        {
+          "id": "conciencia-almuerzo",
+          "cop": 3200,
+          "project": "Uno Menos con Hambre",
+          "es": "ración de almuerzo",
+          "esPl": "raciones de almuerzo",
+          "en": "meal ration",
+          "enPl": "meal rations"
+        },
+        {
+          "id": "conciencia-mercado",
+          "cop": 150000,
+          "project": "Mercado familiar",
+          "es": "mercado familiar para un mes",
+          "esPl": "mercados familiares para un mes",
+          "en": "monthly grocery kit for a family",
+          "enPl": "monthly grocery kits for families"
+        }
+      ],
+      "logo": null,
+      "gallery": [],
+      "consent": {
+        "name": true,
+        "logo": true,
+        "photos": false,
+        "minorsImageProtected": "pendiente",
+        "grantedBy": "Lina Marcela Cardona Arango",
+        "date": "2026-07-09",
+        "source": "Formulario de aplicación al HUB (formulario anterior), 2026-07-09. Autorizó publicación de nombre, logo, descripción y enlaces. No adjuntó fotografías; galería y protección de imagen de menores pendientes."
+      },
+      "poblacion": {
+        "es": "≈450 niñas, niños y adolescentes",
+        "en": "≈450 children and adolescents"
+      },
+      "profile": {
+        "badge": {
+          "es": "Fundación constituida · educación y seguridad alimentaria",
+          "en": "Registered nonprofit · education & food security"
+        },
+        "leader": "Lina Marcela Cardona Arango",
+        "years": {
+          "es": "Desde 2008 · 15+ años en territorio",
+          "en": "Since 2008 · 15+ years on the ground"
+        },
+        "about": {
+          "es": "Fundación Conciencia formación para la paz es una entidad sin ánimo de lucro constituida en 2008, con certificado de Cámara de Comercio vigente y RUT actualizado. Acompaña a niñez, adolescencia y comunidades en condición de vulnerabilidad en el sector de Nueva Jerusalén (Medellín) y en los municipios de Valencia y La Apartada (Córdoba), tomando la educación como herramienta para la construcción de paz. Según la información entregada por la fundación en su solicitud de ingreso al HUB, atiende cerca de 450 niñas, niños y adolescentes de forma directa.",
+          "en": "Fundación Conciencia formación para la paz is a nonprofit registered in 2008, with a current Chamber of Commerce certificate and up-to-date tax registration (RUT). It works with children, adolescents and vulnerable communities in the Nueva Jerusalén area (Medellín) and in the municipalities of Valencia and La Apartada (Córdoba), using education as a tool for peace-building. According to the information the foundation provided in its Hub application, it serves around 450 children and adolescents directly."
+        },
+        "programs": [
+          {
+            "name": "Uno Menos con Hambre",
+            "desc": {
+              "es": "Comedores comunitarios de seguridad alimentaria en tres sedes (Nueva Jerusalén en Antioquia; Valencia y La Apartada en Córdoba). La fundación reporta más de 9.000 raciones alimentarias al mes y cerca de 450 niñas, niños y adolescentes beneficiarios directos.",
+              "en": "Community canteens for food security across three sites (Nueva Jerusalén in Antioquia; Valencia and La Apartada in Córdoba). The foundation reports over 9,000 meal rations per month and around 450 children and adolescents as direct beneficiaries."
+            }
+          },
+          {
+            "name": "AgroConciencia",
+            "desc": {
+              "es": "Desarrollo productivo y sostenibilidad: huertas urbanas, cultivo de setas, avicultura e hidroponía, orientados a la seguridad alimentaria, el emprendimiento comunitario y la generación de ingresos.",
+              "en": "Productive development and sustainability: urban gardens, mushroom cultivation, poultry and hydroponics, aimed at food security, community entrepreneurship and income generation."
+            }
+          },
+          {
+            "name": "Aprender para Emprender",
+            "desc": {
+              "es": "Formación para la vida y el trabajo: alfabetización, informática, inglés, cocina, artes y emprendimiento, para desarrollar habilidades y abrir oportunidades.",
+              "en": "Training for life and work: literacy, computing, English, cooking, arts and entrepreneurship, to build skills and open opportunities."
+            }
+          }
+        ],
+        "hub": {
+          "es": "A través del HUB SOCIAL, Give&Grow acompaña a la fundación con visibilidad y gestión de donaciones con trazabilidad: acta de recepción, entrega firmada por quien recibe, reporte fotográfico y certificado. Give&Grow no reemplaza su labor, la fortalece.",
+          "en": "Through the Social Hub, Give&Grow supports the foundation with visibility and donation management with full traceability: reception record, delivery signed by the recipient, photo report and certificate. Give&Grow does not replace its work, it strengthens it."
+        },
+        "quote": {
+          "es": "Una escuela de formación para la paz.",
+          "en": "A school of formation for peace."
+        }
+      }
     }
-   ],
-   "logo": "/img/ndf_logo.jpg",
-   "gallery": [
-    {
-     "src": "/img/jornadas/baile_flow_escenario.webp",
-     "alt": {
-      "es": "Flow Callejero en presentación sobre tarima",
-      "en": "Flow Callejero performing on stage"
-     }
-    },
-    {
-     "src": "/img/jornadas/baile_presentacion.webp",
-     "alt": {
-      "es": "Presentación del Proyecto de Baile en cancha comunitaria",
-      "en": "Dance Project performance at a community court"
-     }
-    },
-    {
-     "src": "/img/jornadas/baile_grupo_estudio.webp",
-     "alt": {
-      "es": "Grupo del Proyecto de Baile en el estudio",
-      "en": "Dance Project group at the studio"
-     }
-    },
-    {
-     "src": "/img/jornadas/baile_retrato.webp",
-     "alt": {
-      "es": "Integrante de Flow Callejero",
-      "en": "Flow Callejero member"
-     }
-    }
-   ],
-   "consent": {
-    "name": true,
-    "logo": true,
-    "photos": true,
-    "minorsImageProtected": "pendiente",
-    "grantedBy": "Francisco Grijalba",
-    "date": null,
-    "source": "Nombre y logo ya publicados con autorización previa; galería de baile publicada con consentimiento de jornadas confirmado por el representante legal de Give&Grow (2026-07). Fecha formal del cuestionario de ingreso pendiente."
-   },
-   "poblacion": {
-    "es": "≈130 niñas y niños",
-    "en": "≈130 children"
-   },
-   "profile": {
-    "badge": {
-     "es": "Proyecto comunitario de base",
-     "en": "Grassroots community project"
-    },
-    "leader": "Francisco Grijalba",
-    "years": {
-     "es": "5+ años en territorio",
-     "en": "5+ years on the ground"
-    },
-    "about": {
-     "es": "Fundación comunitaria dirigida por Francisco Grijalba en el sector de La Honda (Manrique, Medellín), con más de cinco años sirviendo a su comunidad. Es la primera fundación aliada del HUB SOCIAL: Give&Grow no reemplaza su labor, la fortalece. Su proyecto principal es el Proyecto de Baile, que usa la danza como herramienta de transformación social y está liderado de forma voluntaria por Jagoda Cwiklik, bailarina radicada en Medellín.",
-     "en": "A community foundation led by Francisco Grijalba in the La Honda area (Manrique, Medellín), with over five years serving its community. It is the Social Hub's first partner foundation: Give&Grow does not replace its work, it strengthens it. Its flagship initiative is the Dance Project, which uses dance as a tool for social transformation, led on a volunteer basis by Jagoda Cwiklik, a dancer based in Medellín."
-    },
-    "programs": [
-     {
-      "name": "Chefs del Futuro",
-      "desc": {
-       "es": "Alimentación diaria: cerca de 100 niños y niñas reciben almuerzo cada día.",
-       "en": "Daily nutrition: around 100 children receive lunch every day."
-      }
-     },
-     {
-      "name": "Borboletas",
-      "logo": "/img/partners/borboletas.png",
-      "desc": {
-       "es": "Grupo de iniciación del Proyecto de Baile: más de 30 niñas y niños de 6 a 12 años descubren la danza como herramienta de crecimiento personal, disciplina y confianza.",
-       "en": "The Dance Project's entry group: over 30 children aged 6–12 discover dance as a tool for personal growth, discipline and confidence."
-      }
-     },
-     {
-      "name": "Flow Callejero",
-      "logo": "/img/partners/flow_callejero.png",
-      "desc": {
-       "es": "Grupo juvenil de proyección artística: cerca de 14 adolescentes desde los 13 años representan a la fundación en presentaciones y competencias, formándose como líderes positivos de su comunidad.",
-       "en": "The youth performance group: around 14 teens aged 13+ represent the foundation at shows and competitions, growing as positive community leaders."
-      }
-     },
-     {
-      "name": "Becas",
-      "desc": {
-       "es": "Formación profesional para 7 niños y jóvenes con talento y compromiso, en las academias Move Danza y Elements, incluyendo transporte seguro desde sus hogares.",
-       "en": "Professional training for 7 committed, talented children and youth at the Move Danza and Elements academies, including safe transport from their homes."
-      }
-     }
-    ],
-    "hub": {
-     "es": "A través de la Ruta 1 (alianzas) recibe logística y visibilidad, y por la Ruta 2 (gestión de donaciones) canaliza aportes en especie y monetarios con trazabilidad completa: acta de recepción, entrega firmada, reporte fotográfico y certificado.",
-     "en": "Through Route 1 (alliances) it receives logistics and visibility, and through Route 2 (donation management) it channels in-kind and monetary gifts with full traceability: reception record, signed delivery, photo report and certificate."
-    },
-    "quote": {
-     "es": "Más allá de enseñar a bailar, buscamos generar oportunidades y transformar vidas.",
-     "en": "Beyond teaching dance, we aim to create opportunities and transform lives."
-    }
-   }
-  }
- ]
+  ]
 }
