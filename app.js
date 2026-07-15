@@ -1966,14 +1966,19 @@ function renderComercio(cid){
 
     if (about) html += '<p class="lead" style="margin-top:22px;max-width:70ch">'+escapeHtml(about)+'</p>';
 
-    /* Beneficio para miembros */
-    html += '<div class="card ficha-impact" style="margin-top:26px"><h3>'+t("com.benefit.t")+'</h3>'
-      + (ben ? '<p class="grat-benefit" style="margin-top:10px">'+escapeHtml(ben)+'</p>' : '')
-      + '<dl class="grat-meta" style="margin-top:14px">'
-      + (c.nivelDesde ? '<div><dt>'+t("grat.card.nivel")+'</dt><dd>'+escapeHtml(c.nivelDesde)+'</dd></div>' : '')
-      + (redime ? '<div><dt>'+t("grat.card.redime")+'</dt><dd>'+escapeHtml(redime)+'</dd></div>' : '')
-      + (cond ? '<div><dt>'+t("grat.card.cond")+'</dt><dd>'+escapeHtml(cond)+'</dd></div>' : '')
-      + '</dl></div>';
+    /* Beneficio para miembros — cupón institucional (elemento firma de la ficha) */
+    html += '<div class="benefit-coupon"><div class="bc-main">'
+      + '<span class="bc-eyebrow">'+t("com.benefit.t")+'</span>'
+      + (ben ? '<p class="bc-benefit">'+escapeHtml(ben)+'</p>' : '')
+      + (c.nivelDesde ? '<span class="bc-level">'+t("grat.card.nivel")+' · '+escapeHtml(c.nivelDesde)+'</span>' : '')
+      + '</div>';
+    if (redime || cond){
+      html += '<div class="bc-perf" aria-hidden="true"></div><dl class="bc-terms">'
+        + (redime ? '<div><dt>'+t("grat.card.redime")+'</dt><dd>'+escapeHtml(redime)+'</dd></div>' : '')
+        + (cond ? '<div><dt>'+t("grat.card.cond")+'</dt><dd>'+escapeHtml(cond)+'</dd></div>' : '')
+        + '</dl>';
+    }
+    html += '</div>';
 
     /* Galería (solo con consentimiento explícito de fotos) */
     var gal = (c.consent && c.consent.photos && c.gallery && c.gallery.length) ? c.gallery : null;
