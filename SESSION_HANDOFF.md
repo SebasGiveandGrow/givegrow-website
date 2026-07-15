@@ -8,6 +8,36 @@
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
 
+## Alta de Fundación Conciencia al HUB (esta sesión)
+Commit `6ab8194e` (deploy success). Tercera fundación de la red `partners.json`.
+Datos tomados del formulario ANTERIOR "Aplicación al Hub Social (respuestas)"
+(Drive id 1ZchdL8...), fila del 2026-07-09; Conciencia respondió antes del form nuevo.
+
+- **Fundación Conciencia formación para la paz** (NIT 900229688-6). ESAL CONSTITUIDA
+  (2008), Cámara de Comercio VIGENTE y RUT — estándar legal más fuerte que NDF
+  ("en proceso de constitución").
+- Rep. legal: Lina Marcela Cardona Arango. Contacto form: proyectosconciencia@gmail.com
+  / fundacionconcienciaparalapaz@gmail.com. Web: fundacionconcienciaparalapaz.org.
+  IG: @fundacion_conciencia. Referida por Andrea Lopera / Sebastián.
+- Territorio: comedores en Nueva Jerusalén (Medellín) + Valencia y La Apartada (Córdoba).
+- 2 unidades de impacto (calculadora): ración de almuerzo COP 3.200; mercado familiar
+  mensual COP 150.000 (ambas "de facturas reales" según el form). La 3ª unidad del form
+  venía ilegible ("50 Familias Terapia 350 NNA") → NO se usó (evidencia, no promesas).
+- 3 programas: Uno Menos con Hambre / AgroConciencia / Aprender para Emprender.
+- Cifras (450 directos, +9.000 raciones/mes) redactadas como REPORTADAS por la fundación,
+  no verificadas en terreno aún.
+
+PENDIENTES Conciencia:
+- [ ] **Alojar el binario del logo.** Autorizaron logo (consent.logo=true) y el PNG está
+      en Drive (id 10xcGvOnXxg2v3PQllJKR384OKd4Xth_U, ~107KB). NO se alojó aún para no
+      corromperlo copiando ~146KB base64 a mano. Con logo:null + render protegido, la
+      ficha NO muestra imagen rota. Al alojar: subir /img/conciencia_logo.png y poner
+      "logo":"/img/conciencia_logo.png".
+- [ ] **Confirmar coordenadas.** Puestas a NIVEL DE ZONA aprox. (lat 6.313, lng -75.585 =
+      Nueva Jerusalén, borde NO Medellín–Bello, sobre barrio París). Confirmar/ajustar.
+- [ ] Fotos: no adjuntaron; gallery vacía; minorsImageProtected "pendiente".
+- [ ] Verificación en terreno de las cifras reportadas (opcional, según proceso HUB).
+
 ## Lo que se hizo en esta sesión (Fase 1 UX + roadmap)
 Commit `089435e1` (Actions success). Lluvia de ideas con Sebas → plan de 4 fases.
 
