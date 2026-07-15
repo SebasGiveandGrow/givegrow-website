@@ -851,12 +851,6 @@ document.addEventListener("click", function(e){
 });
 document.addEventListener("keydown", function(e){
   if(e.key==="Escape") document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); });
-  var lb = document.getElementById("lightbox");
-  if (lb && lb.classList.contains("on")){
-    if (e.key==="Escape") closeLightbox();
-    else if (e.key==="ArrowLeft") lbStep(-1);
-    else if (e.key==="ArrowRight") lbStep(1);
-  }
 });
 function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); document.body.classList.remove("menu-open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded","false"); }
 
@@ -1612,10 +1606,6 @@ function init(){
   // lightbox keys
   document.addEventListener("keydown", function(e){
     if (e.key === "Escape"){ var dm=document.getElementById("nav-mobile"); if(dm && dm.classList.contains("open")){ closeDrawer(); return; } }
-    if (!document.getElementById("lightbox").classList.contains("on")) return;
-    if (e.key === "Escape") closeGalLb();
-    if (e.key === "ArrowRight") lbStep(1);
-    if (e.key === "ArrowLeft") lbStep(-1);
   });
   initReveal();
   animateCounters();
