@@ -29,6 +29,25 @@ Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
 PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
 (Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
 
+## Maqueta v5 Etapa 1 aprobada en dirección + 2 reglas permanentes (Sebas)
+- **Maqueta v5 Etapa 1**: entregada como HTML standalone (outputs/givegrow-v5-maqueta-
+  etapa1.html) con toggle día/noche. Sebas: "Me gusta". Dirección aprobada (papel hueso día /
+  verde-negro noche, navy→verde-tinta unificado, reglas finas en vez de tarjetas, escala
+  editorial, cifra monumental de red, Transparencia libro mayor). Unbounded para títulos
+  CONFIRMADA como display de marca. PENDIENTE: su "sí, despliega" para llevar Etapa 1 a
+  producción (token funciona).
+- **REGLA PERMANENTE — Transparencia sin datos financieros sensibles hasta el cierre 2025.**
+  Decisión de Sebas: NO publicar ingresos/gastos/totales (ni ceros) antes del cierre anual.
+  La sección Transparencia muestra solo lo verificable hoy (fundaciones/comercios/entregas)
+  + "Estado financiero 2025: cierre en curso". El estado financiero completo se publica al
+  cierre de 2025. Aplicar esto en el rediseño de la página real, no solo en la maqueta.
+- **REGLA PERMANENTE — derechos de imagen.** Fotos subidas por LAS FUNDACIONES = propiedad
+  de ellas, uso SOLO con su consentimiento (protección de imagen de menores, Ley 1581).
+  Imágenes que SEBAS adjunta para construir la web = uso libre. Mantener la página muy
+  visual apoyándose en fotografía; poblar bandas/galerías con imágenes de uso libre de Sebas
+  + fotos de fundaciones ya consentidas. NUNCA meter rostros/menores en artefactos
+  descargables sin consentimiento.
+
 ## DIAGNÓSTICO VISUAL "REDISEÑO v5" (acordado con Sebas, PENDIENTE de ejecutar)
 Diagnóstico honesto: sitio bien construido pero genérico — identidad aprobada aplicada ~25%.
 5 síntomas: (1) card-itis (todo en tarjetas redondeadas; el lenguaje editorial pide reglas
