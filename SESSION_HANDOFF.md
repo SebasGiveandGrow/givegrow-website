@@ -29,6 +29,28 @@ Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
 PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
 (Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
 
+## Fase 4 (menú Opción B) + fix calculadora — ROADMAP COMPLETO
+Commit `4c34658b` (deploy success). Con esto, las 4 fases del roadmap están hechas.
+- **Menú reestructurado por audiencia (Opción B), aprobado por Sebas.** Desktop:
+  `HUB SOCIAL · Fundaciones · Empresas▾(Empresas/Gratitud/Quiero ser aliado) ·
+   Membresías▾(Membresías/Calcular mi aporte→#donar/Rastrea tu donación→#rastrea) ·
+   Nosotros▾(Origen/Impacto/Transparencia/FAQ/Contacto) · [Donar]`. HUB SOCIAL y
+   Fundaciones visibles directos. ALMA SALE del nav (sigue accesible por su FAB + CTAs en
+   Donar/FAQ). Drawer móvil espejado con headers mnav-g. Reusa claves i18n existentes
+   (ally.t, track.t, membres.cta.btn); 688/688, sin claves nuevas. Rutas: aliado=#aliados,
+   rastreo=#rastrea (NO #track). Claves nav.g.hub/nav.g.sumate/nav.alma quedan definidas
+   pero sin uso (inofensivo). Nota: triggers "Empresas"/"Membresías" repiten el nombre de
+   su primer ítem (patrón mega-menú); si molesta, relabelar.
+- **Fix desborde calculadora.** `#calc-display` pasó de 42px fijo a
+  `clamp(22px,7vw,42px)` + letter-spacing -.01em + white-space:nowrap. Con Unbounded
+  (más ancha) los montos de 8 cifras ($20.000.000) se salían en móvil. Ahora escala.
+
+ESTADO ROADMAP: Fase 1 (UX/contraste) ✓ · Fase 2 (ficha comercio: cupón ✓, mapa ✓, galería/
+comunidad pendientes de fotos) · Fase 3 (Unbounded) ✓ · Fase 4 (menú) ✓.
+Pendientes vivos: fotos de Kore (galería + comunidad) con consentimiento; textos reales de
+beneficio de Kore; sign-off visual de Unbounded (peso titulares, nlogo/precios/h3); convenio
+Kore firmado. Decisiones micro del menú abiertas por si Sebas quiere afinar.
+
 ## Kore coords exactas + Fase 3 (tipografía Unbounded)
 - **Coords de Kore corregidas** (commit `24ae69de`). El pin estaba ~500m desviado (usé centro
   de Envigado). Vía Google Places (tool places_search): lat 6.174531, lng -75.584507,
