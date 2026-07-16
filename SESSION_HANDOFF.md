@@ -29,6 +29,33 @@ Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
 PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
 (Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
 
+## Rediseño v5 Etapa 1 DESPLEGADO + auditoría de seguridad completa
+Sebas: "quita Estado financiero 2025 y ejecuta directamente, no me muestres". Aprobó
+desplegar a producción sin preview. Dos commits separados:
+- **Seguridad `efed197a`** — auditoría XSS completa de TODOS los sinks innerHTML. Además de
+  A1 (renderFicha/mapa, ya en prod), se hallaron y cerraron 3 huecos más: renderWall
+  (muro: p.name/area/url), renderAliadas (grid fundaciones: id/logo/name/pob/area) y el
+  <select> de la calculadora (optgroup p.name + option label + ids). trackNotFound ya
+  escapaba input de usuario; almaFmt escapa <>& antes de formatear. Verificado que todo el
+  trabajo previo (A1-A4, mini-calc, filtros mapa, Kore coords, Conciencia logo, calc clamp,
+  menú B, Unbounded) está en main.
+- **Etapa 1 `0d3aa121`** — "papel y familia" por cascada de tokens (día): --bg papel hueso
+  #F3EFE6, --surface #FBF8F1, --ink cálido #191813, --ink-soft #47443B, --bd hairline cálido
+  #DAD3C3; UNIFICACIÓN navy→verde profundo (--navy #0E2118 → calc/footer/ALMA/banda dejan el
+  azul marino); radios --rl 18→13 y calc/alma 24→16. Modo noche INTACTO (su propio --navy
+  verde). Whites hardcodeados = tiles de logo (legítimos). Reversible (token-level).
+- **Transparencia real: YA cumple la regla** — no expone cifras de ingresos/gastos, es por
+  principios ("publicaremos cifras solo cuando estén validadas") + obligaciones legales.
+  No había dato sensible que quitar. La fila "Estado financiero 2025" era solo de la maqueta
+  (ya eliminada).
+
+PENDIENTE (crítico): **verificación visual de Sebas** de la Etapa 1 en producción, día y
+noche — Claude NO puede renderizar. Si algo se ve mal, es revert de 1 commit o ajuste de 1
+token. NO hecho a propósito (riesgo ciego): conversión tarjetas→reglas finas en secciones
+piloto (Transparencia/Membresías) — es el siguiente increment, hacerlo tras su sign-off del
+papel. E2 (escala tipográfica, cifra monumental) y E3 (foto a sangre, ledger, recorrido)
+siguen pendientes.
+
 ## Maqueta v5 Etapa 1 aprobada en dirección + 2 reglas permanentes (Sebas)
 - **Maqueta v5 Etapa 1**: entregada como HTML standalone (outputs/givegrow-v5-maqueta-
   etapa1.html) con toggle día/noche. Sebas: "Me gusta". Dirección aprobada (papel hueso día /
