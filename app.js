@@ -11,11 +11,9 @@ var I18N = {
     "nav.gratitud":"Programa de Gratitud",
     "nav.impacto":"Impacto",
     "nav.origen":"Origen",
-    "nav.alma":"ALMA · ImpactOS",
     "nav.transp":"Transparencia",
     "nav.contacto":"Contacto",
     "nav.faq":"FAQ",
-    "nav.conocenos":"Conócenos",
     "hero.eyebrow":"Colombia · ESAL · NIT 901.948.930-2",
     "hero.title":"Dar para crecer, crecer para dar más.",
     "hero.lead":"Conectamos generosidad con necesidad de forma estratégica y sostenible. No reemplazamos a las fundaciones, las amplificamos. Y aquí, quien da también crece.",
@@ -64,8 +62,6 @@ var I18N = {
     "traz.4.p":"Cada entrega queda documentada y verificada.",
     "traz.5.t":"Reporte fotográfico",
     "traz.5.p":"El donante recibe evidencia mensual del impacto real.",
-    "comm.ey":"Comunidades reales",
-    "comm.t":"Impacto medible. Personas reales.",
     "origen.ey":"Nuestro origen",
     "origen.t":"Todo empezó con una tonelada de comida.",
     "origen.p1":"Tras semanas de gestión, una campaña alcanzó su meta: una tonelada de alimento para entregar a una fundación. Pero al llegar, la fundación no tenía cómo almacenar ni repartir todo ese alimento. Casi la mitad se perdió. Ver esa comida desperdiciarse —comida que a pocas cuadras alguien necesitaba— dejó una pregunta que no soltó al fundador: ¿cómo cierro la brecha entre los recursos y la necesidad, con lo que tengo a la mano?",
@@ -160,7 +156,6 @@ var I18N = {
     "hub.found.t":"Quiénes forman la red hoy",
     "hub.found.p":"Empezamos con una fundación aliada y una red en proceso de vinculación formal. Cada una entra una a una, con verificación y convenio — sin nombres ni cifras infladas.",
     "hub.routes.ey":"Cómo operamos",
-    "hub.ey":"HUB SOCIAL",
     "hub.t":"Cinco rutas. Un solo propósito.",
     "hub.lead":"El centro operativo donde alianzas, donaciones e impacto se encuentran.",
     "hub.r1.t":"R1 - Alianzas con Fundaciones",
@@ -198,9 +193,6 @@ var I18N = {
     "grat.ey":"Programa de Gratitud",
     "grat.t":"Quien da, también recibe.",
     "grat.lead":"Una red de empresas aliadas que ofrecen beneficios voluntarios a los miembros activos, desde el nivel Retoño.",
-    "grat.cat":"Gastronomía - Moda - Belleza - Bienestar - Odontología",
-    "grat.how.t":"Como funciona",
-    "grat.how.p":"Donas, recibes tu credencial digital de miembro y la presentas en los comercios aliados para acceder a los beneficios.",
     "imp.ey":"Impacto",
     "imp.t":"Evidencia, no promesas.",
     "imp.tab.gal":"Galería",
@@ -371,7 +363,7 @@ var I18N = {
     "com.maps":"Cómo llegar",
     "map.area.med":"Medellín · centro operativo",
     "net.ey":"La red",
-    "nav.g.hub":"El Hub","nav.g.sumate":"Súmate","nav.g.nosotros":"Nosotros","nav.cta":"Donar","nav.faq":"FAQ",
+    "nav.g.nosotros":"Nosotros","nav.cta":"Donar","nav.faq":"FAQ",
     "ficha.back":"Volver al Hub",
     "ficha.lider":"Dirige",
     "ficha.prog.t":"Programas en marcha",
@@ -1245,7 +1237,7 @@ function renderHeroImpact(){
     var n = Math.floor(20000 / u.cop);
     var label = (lang==="en") ? (n===1?u.en:(u.enPl||u.en)) : (n===1?u.es:(u.esPl||u.es));
     var amount = (lang==="en") ? "$20,000 COP" : "$20.000";
-    el.innerHTML = t("hero.impact").replace("{a}","<b>"+amount+"</b>").replace("{x}","<b>"+n+" "+label+"</b>");
+    el.innerHTML = t("hero.impact").replace("{a}","<b>"+amount+"</b>").replace("{x}","<b>"+n+" "+escapeHtml(label)+"</b>");
     el.hidden = false;
   });
 }
@@ -1297,21 +1289,22 @@ function renderFicha(fid){
     if (!p){ go("hub"); return; }
     applyFichaMeta(p);
     var pr = p.profile || {};
-    var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
+    var esc = escapeHtml;
+    var pick = function(o){ return o ? esc(o[lang]||o.es||"") : ""; };
     var area = pick(p.area), pob = pick(p.poblacion), badge = pick(pr.badge),
         years = pick(pr.years), about = pick(pr.about), hubTxt = pick(pr.hub),
         quote = pick(pr.quote);
     var u = (p.impactUnits && p.impactUnits[0]) || null;
     var html = '<a class="card-link" href="#hub" onclick="return go(\'hub\')">&larr; '+t("ficha.back")+'</a>'
       + '<div class="ficha-head">'
-      + ((p.logo && canShowLogo(p)) ? '<img class="ficha-logo" src="'+p.logo+'" alt="">' : '')
-      + '<div><h1 class="ficha-name">'+p.name+'</h1>'
+      + ((p.logo && canShowLogo(p)) ? '<img class="ficha-logo" src="'+esc(p.logo)+'" alt="">' : '')
+      + '<div><h1 class="ficha-name">'+esc(p.name)+'</h1>'
       + (badge ? '<span class="tag">'+badge+'</span>' : '')
       + '<div class="eco-row" style="margin-top:12px">'
       + (area ? '<span class="eco-chip">'+area+'</span>' : '')
       + (pob ? '<span class="eco-chip">'+pob+'</span>' : '')
       + (years ? '<span class="eco-chip">'+years+'</span>' : '')
-      + (pr.leader ? '<span class="eco-chip">'+t("ficha.lider")+': '+pr.leader+'</span>' : '')
+      + (pr.leader ? '<span class="eco-chip">'+t("ficha.lider")+': '+esc(pr.leader)+'</span>' : '')
       + '</div></div></div>'
       + (about ? '<p class="lead" style="margin-top:22px;max-width:70ch">'+about+'</p>' : '')
       + (quote ? '<blockquote class="ficha-quote">'+quote+'</blockquote>' : '');
@@ -1319,8 +1312,8 @@ function renderFicha(fid){
       html += '<h3 style="margin-top:34px">'+t("ficha.prog.t")+'</h3><div class="grid g2" style="margin-top:16px">';
       for (var k=0;k<pr.programs.length;k++){
         var g = pr.programs[k];
-        var gLogo = g.logo ? '<div class="prog-logo"><img src="'+g.logo+'" alt="'+g.name+'" loading="lazy"></div>' : '';
-        html += '<div class="card prog-card">'+gLogo+'<h3>'+g.name+'</h3><p>'+((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
+        var gLogo = g.logo ? '<div class="prog-logo"><img src="'+esc(g.logo)+'" alt="'+esc(g.name)+'" loading="lazy"></div>' : '';
+        html += '<div class="card prog-card">'+gLogo+'<h3>'+esc(g.name)+'</h3><p>'+esc((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
       }
       html += '</div>';
     }
@@ -1332,8 +1325,8 @@ function renderFicha(fid){
         html += '<div class="gal-strip" role="list">';
         for (var gi=0; gi<gal.length; gi++){
           var ph = gal[gi], alt = (ph.alt && (ph.alt[lang]||ph.alt.es)) || "";
-          html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" onclick="openLightbox(\''+p.id+'\','+gi+')">'
-                + '<img src="'+ph.src+'" alt="'+alt.replace(/"/g,"&quot;")+'" loading="lazy"></button>';
+          html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" onclick="openLightbox(\''+esc(p.id)+'\','+gi+')">'
+                + '<img src="'+esc(ph.src)+'" alt="'+esc(alt)+'" loading="lazy"></button>';
         }
         html += '</div>';
       } else {
@@ -1344,14 +1337,14 @@ function renderFicha(fid){
       var n = Math.floor(20000/u.cop);
       var cop = u.cop.toLocaleString(lang==="en"?"en-US":"es-CO");
       html += '<div class="card ficha-impact" style="margin-top:26px"><h3>'+t("ficha.imp.t")+'</h3><p>'
-        + t("ficha.imp.p").replace("{c}","<b>$"+cop+"</b>").replace("{u}",(u[lang]||u.es)).replace("{x}","<b>"+n+" "+((n===1?(u[lang]||u.es):(u[lang+"Pl"]||u.esPl)))+"</b>")
+        + t("ficha.imp.p").replace("{c}","<b>$"+cop+"</b>").replace("{u}",esc(u[lang]||u.es)).replace("{x}","<b>"+n+" "+esc(n===1?(u[lang]||u.es):(u[lang+"Pl"]||u.esPl))+"</b>")
         + '</p></div>';
     }
     if (hubTxt) html += '<h3 style="margin-top:34px">'+t("ficha.hub.t")+'</h3><p style="max-width:70ch">'+hubTxt+'</p>';
     html += '<div class="eco-row" style="margin-top:26px">'
-      + (p.url ? '<a class="card-link" href="'+p.url+'" target="_blank" rel="noopener">'+t("ficha.web")+'</a>' : '')
-      + (p.instagram ? '<a class="card-link" style="margin-left:18px" href="'+p.instagram+'" target="_blank" rel="noopener">Instagram</a>' : '')
-      + '<button type="button" id="ficha-share" class="card-link ficha-share" onclick="return shareFicha(\''+p.id+'\')">'+t("ficha.share")+'</button>'
+      + (p.url ? '<a class="card-link" href="'+esc(p.url)+'" target="_blank" rel="noopener">'+t("ficha.web")+'</a>' : '')
+      + (p.instagram ? '<a class="card-link" style="margin-left:18px" href="'+esc(p.instagram)+'" target="_blank" rel="noopener">Instagram</a>' : '')
+      + '<button type="button" id="ficha-share" class="card-link ficha-share" onclick="return shareFicha(\''+esc(p.id)+'\')">'+t("ficha.share")+'</button>'
       + '</div>'
       + '<div class="cta-box" style="margin-top:36px"><h2>'+t("ficha.cta.t")+'</h2><p class="mu">'+t("ficha.cta.p")+'</p>'
       + '<a class="ficha-cta-btn" href="#donar" onclick="return go(\'donar\')">'+t("ficha.cta.btn")+'</a></div>';
@@ -1430,13 +1423,13 @@ function initMap(){
     for (var i=0;i<list.length;i++){
       var pt=list[i];
       var area = pt.area ? (pt.area[lang]||pt.area.es||"") : (pt.areaKey ? t(pt.areaKey) : "");
-      var html="<b>"+pt.name+"</b>"+(area?("<br>"+area):"");
+      var html="<b>"+escapeHtml(pt.name)+"</b>"+(area?("<br>"+escapeHtml(area)):"");
       if (pt.type==="company"){
-        if (pt.direccion) html += "<br>"+pt.direccion;
-        html += '<br><a href="'+pt.ficha+'" onclick="return go(\'comercio/'+pt.id+'\')">'+t("map.biz")+"</a>";
+        if (pt.direccion) html += "<br>"+escapeHtml(pt.direccion);
+        html += '<br><a href="'+escapeHtml(pt.ficha)+'" onclick="return go(\'comercio/'+escapeHtml(pt.id)+'\')">'+t("map.biz")+"</a>";
         if (pt.direccion) html += ' &middot; <a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(pt.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+"</a>";
       } else if (pt.url){
-        html += '<br><a href="'+pt.url+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>";
+        html += '<br><a href="'+escapeHtml(pt.url)+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>";
       }
       L.marker([pt.lat,pt.lng],{icon:pin(pt.type)}).addTo(map).bindPopup(html);
       bounds.push([pt.lat,pt.lng]);
