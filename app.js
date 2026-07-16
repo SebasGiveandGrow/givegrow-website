@@ -359,6 +359,8 @@ var I18N = {
     "map.leg.f":"Fundaciones aliadas",
     "map.leg.c":"Empresas aliadas",
     "map.leg.hub":"HUB SOCIAL",
+    "map.f.all":"Toda la red",
+    "map.sum":"Hoy la red reúne {f} fundaciones, {c} comercio(s) aliado(s) y {h} HUB. Crece una alianza a la vez.",
     "map.biz":"Ver beneficio",
     "com.maps":"Cómo llegar",
     "map.area.med":"Medellín · centro operativo",
@@ -368,7 +370,8 @@ var I18N = {
     "ficha.lider":"Dirige",
     "ficha.prog.t":"Programas en marcha",
     "ficha.imp.t":"Tu aporte aquí, en concreto",
-    "ficha.imp.p":"{c} = 1 {u}. Por ejemplo, $20.000 se convierten en {x}, entregados con acta y foto.",
+    "ficha.imp.calc":"Con {a} aquí logras aproximadamente {x}.",
+    "ficha.imp.min":"Elige un monto para ver el impacto equivalente.",
     "ficha.hub.t":"Cómo la fortalece el Hub",
     "ficha.web":"Ver sitio web",
     "ficha.cta.t":"Dona con destino a esta fundación.",
@@ -1334,11 +1337,13 @@ function renderFicha(fid){
       }
     }
     if (u){
-      var n = Math.floor(20000/u.cop);
-      var cop = u.cop.toLocaleString(lang==="en"?"en-US":"es-CO");
-      html += '<div class="card ficha-impact" style="margin-top:26px"><h3>'+t("ficha.imp.t")+'</h3><p>'
-        + t("ficha.imp.p").replace("{c}","<b>$"+cop+"</b>").replace("{u}",esc(u[lang]||u.es)).replace("{x}","<b>"+n+" "+esc(n===1?(u[lang]||u.es):(u[lang+"Pl"]||u.esPl))+"</b>")
-        + '</p></div>';
+      var qs = [10000, 20000, 50000, 100000];
+      var chips = qs.map(function(q,qi){
+        return '<button type="button" class="fimp-q'+(qi===1?' on':'')+'" data-cop="'+q+'" onclick="fichaImpCalc(this,\''+esc(p.id)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
+      }).join('');
+      html += '<div class="card ficha-impact" style="margin-top:26px"><h3>'+t("ficha.imp.t")+'</h3>'
+        + '<div class="fimp-row">'+chips+'</div>'
+        + '<p id="fimp-out" data-fid="'+esc(p.id)+'"></p></div>';
     }
     if (hubTxt) html += '<h3 style="margin-top:34px">'+t("ficha.hub.t")+'</h3><p style="max-width:70ch">'+hubTxt+'</p>';
     html += '<div class="eco-row" style="margin-top:26px">'
@@ -1349,6 +1354,8 @@ function renderFicha(fid){
       + '<div class="cta-box" style="margin-top:36px"><h2>'+t("ficha.cta.t")+'</h2><p class="mu">'+t("ficha.cta.p")+'</p>'
       + '<a class="ficha-cta-btn" href="#donar" onclick="return go(\'donar\')">'+t("ficha.cta.btn")+'</a></div>';
     el.innerHTML = html;
+    var q0 = el.querySelector(".fimp-q.on");
+    if (q0) fichaImpCalc(q0, p.id);
   });
 }
 /* Consentimiento: hook (Tarea 6 lo conecta al bloque consent{} de partners.json) */
@@ -1419,6 +1426,8 @@ function initMap(){
     var map = L.map("map-box",{scrollWheelZoom:false}).setView([6.2442,-75.5812], 12);
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
       {subdomains:"abcd", maxZoom:19, attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(map);
+    var layers = { foundation:L.layerGroup(), company:L.layerGroup(), hub:L.layerGroup() };
+    var counts = { foundation:0, company:0, hub:0 };
     var bounds=[];
     for (var i=0;i<list.length;i++){
       var pt=list[i];
@@ -1431,9 +1440,12 @@ function initMap(){
       } else if (pt.url){
         html += '<br><a href="'+escapeHtml(pt.url)+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>";
       }
-      L.marker([pt.lat,pt.lng],{icon:pin(pt.type)}).addTo(map).bindPopup(html);
+      var lay = layers[pt.type] || layers.foundation;
+      L.marker([pt.lat,pt.lng],{icon:pin(pt.type)}).addTo(lay).bindPopup(html);
+      if (counts[pt.type]!=null) counts[pt.type]++;
       bounds.push([pt.lat,pt.lng]);
     }
+    for (var ty in layers) layers[ty].addTo(map);
     if (bounds.length>1) map.fitBounds(bounds,{padding:[42,42]});
     var legend=L.control({position:"bottomleft"});
     legend.onAdd=function(){
@@ -1444,6 +1456,35 @@ function initMap(){
       return d;
     };
     legend.addTo(map);
+    /* Filtros de red + resumen honesto (calculado de los datos reales) */
+    var fbox = document.getElementById("map-filters");
+    if (fbox){
+      var FILTERS = [
+        {k:"all", key:"map.f.all"},
+        {k:"foundation", key:"map.leg.f"},
+        {k:"company", key:"map.leg.c"}
+      ];
+      fbox.innerHTML = FILTERS.map(function(f,fi){
+        return '<button type="button" class="map-fchip'+(fi===0?' on':'')+'" data-k="'+f.k+'" data-i18n="'+f.key+'">'+t(f.key)+'</button>';
+      }).join('');
+      fbox.querySelectorAll(".map-fchip").forEach(function(b){
+        b.addEventListener("click", function(){
+          fbox.querySelectorAll(".map-fchip").forEach(function(x){ x.classList.toggle("on", x===b); });
+          var k=b.dataset.k;
+          for (var ty in layers){
+            var show = (k==="all") || (ty===k) || (ty==="hub"); /* el HUB siempre visible: es el centro de la red */
+            if (show) layers[ty].addTo(map); else map.removeLayer(layers[ty]);
+          }
+        });
+      });
+    }
+    var sumEl = document.getElementById("map-summary");
+    if (sumEl){
+      sumEl.textContent = t("map.sum")
+        .replace("{f}", counts.foundation)
+        .replace("{c}", counts.company)
+        .replace("{h}", counts.hub);
+    }
   }
   function start(){
     Promise.all([loadPartners(), loadGratitud()]).then(function(res){
@@ -1713,6 +1754,27 @@ function skipToContent(){
 /* ============ Rastrea tu donación ============ */
 function escapeHtml(text){
   return String(text==null?"":text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+/* Mini-calculadora de impacto en la ficha de fundación (usa impactUnits reales) */
+function fichaImpCalc(btn, fid){
+  var out = document.getElementById("fimp-out"); if (!out) return;
+  var cop = parseInt(btn && btn.dataset ? btn.dataset.cop : 20000, 10) || 20000;
+  document.querySelectorAll(".fimp-q").forEach(function(b){ b.classList.toggle("on", b===btn); });
+  loadPartners().then(function(list){
+    var p=null; for (var i=0;i<list.length;i++){ if(list[i].id===fid){ p=list[i]; break; } }
+    if (!p || !p.impactUnits || !p.impactUnits.length){ out.textContent=""; return; }
+    var parts = [];
+    for (var k=0;k<p.impactUnits.length;k++){
+      var u=p.impactUnits[k], n=Math.floor(cop/u.cop);
+      if (n<1) continue;
+      var label = (n===1) ? (u[lang]||u.es) : (u[lang+"Pl"]||u.esPl||u.es);
+      parts.push("<b>"+n+" "+escapeHtml(label)+"</b>");
+    }
+    var amount = "$"+cop.toLocaleString(lang==="en"?"en-US":"es-CO");
+    out.innerHTML = parts.length
+      ? t("ficha.imp.calc").replace("{a}","<b>"+amount+"</b>").replace("{x}",parts.join(" · "))
+      : t("ficha.imp.min");
+  });
 }
 var INVENTORY_DATA = null;
 function loadInventory(){

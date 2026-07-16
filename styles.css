@@ -704,3 +704,14 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 .grat-card-link:hover .grat-card-more{text-decoration:underline}
 /* logo de comercio en la ficha: fondo claro (logos suelen ser oscuros) */
 .ficha-logo-light{background:#fff;border:1px solid var(--bd);object-fit:contain;padding:6px}
+/* Mini-calculadora de impacto en ficha de fundación */
+.fimp-row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 12px}
+.fimp-q{padding:8px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--surface);color:var(--ink-soft);font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
+.fimp-q.on{background:var(--g);border-color:var(--g);color:#fff}
+#fimp-out{margin:4px 0 0;font-size:15.5px;color:var(--ink-soft);line-height:1.5}
+#fimp-out b{color:var(--acc)}
+/* Filtros y resumen del mapa de red */
+.map-filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.map-fchip{padding:8px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--surface);color:var(--ink-soft);font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
+.map-fchip.on{background:var(--g);border-color:var(--g);color:#fff}
+.map-summary{margin:14px 0 0;font-size:14.5px;color:var(--mu)}
