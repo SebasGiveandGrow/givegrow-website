@@ -32,7 +32,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=d4291ca1">
+<link rel="stylesheet" href="/styles.css?v=10eca2c7">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -51,22 +51,29 @@
   <div class="nav-in">
     <a class="nlogo" href="#inicio" onclick="return go('inicio')">Give<em>&</em>Grow</a>
     <div class="nlinks">
+      <a class="nlink" href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
+      <a class="nlink" href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
       <div class="ndrop">
-        <button class="nlink ndrop-t" type="button" data-i18n="nav.g.hub" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">El Hub</button>
+        <button class="nlink ndrop-t" type="button" data-i18n="nav.empresas" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Empresas</button>
         <div class="ndrop-menu">
-          <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
-          <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
-          <a href="#alma" onclick="return go('alma')" data-i18n="nav.alma">ALMA</a>
+          <a href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
+          <a href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
+          <a href="#aliados" onclick="return go('aliados')" data-i18n="ally.t">Quiero ser aliado</a>
         </div>
       </div>
-      <a class="nlink" href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
-      <a class="nlink" href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
-      <a class="nlink" href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
-      <a class="nlink" href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
+      <div class="ndrop">
+        <button class="nlink ndrop-t" type="button" data-i18n="nav.membres" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Membresías</button>
+        <div class="ndrop-menu">
+          <a href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
+          <a href="#donar" onclick="return go('donar')" data-i18n="membres.cta.btn">Calcular mi aporte</a>
+          <a href="#rastrea" onclick="return go('rastrea')" data-i18n="track.t">Rastrea tu donación</a>
+        </div>
+      </div>
       <div class="ndrop">
         <button class="nlink ndrop-t" type="button" data-i18n="nav.g.nosotros" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Nosotros</button>
         <div class="ndrop-menu">
           <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
+          <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
           <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
           <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
           <a href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
@@ -91,18 +98,19 @@
   </div>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <span class="mnav-g" data-i18n="nav.g.hub">El Hub</span>
   <a href="#hub" onclick="return go('hub')" data-i18n="nav.hub">HUB SOCIAL</a>
-  <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
-  <a href="#alma" onclick="return go('alma')" data-i18n="nav.alma">ALMA</a>
-  <span class="mnav-g" data-i18n="nav.g.sumate">Súmate</span>
-  <a href="#donar" onclick="return go('donar')" data-i18n="nav.donar">Donar</a>
-  <a href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
-  <a href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
   <a href="#fundaciones" onclick="return go('fundaciones')" data-i18n="nav.fundaciones">Fundaciones</a>
+  <span class="mnav-g" data-i18n="nav.empresas">Empresas</span>
+  <a href="#empresas" onclick="return go('empresas')" data-i18n="nav.empresas">Empresas</a>
   <a href="#gratitud" onclick="return go('gratitud')" data-i18n="nav.gratitud">Programa de Gratitud</a>
+  <a href="#aliados" onclick="return go('aliados')" data-i18n="ally.t">Quiero ser aliado</a>
+  <span class="mnav-g" data-i18n="nav.membres">Membresías</span>
+  <a href="#membresias" onclick="return go('membresias')" data-i18n="nav.membres">Membresías</a>
+  <a href="#donar" onclick="return go('donar')" data-i18n="membres.cta.btn">Calcular mi aporte</a>
+  <a href="#rastrea" onclick="return go('rastrea')" data-i18n="track.t">Rastrea tu donación</a>
   <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
   <a href="#origen" onclick="return go('origen')" data-i18n="nav.origen">Origen</a>
+  <a href="#impacto" onclick="return go('impacto')" data-i18n="nav.impacto">Impacto</a>
   <a href="#transparencia" onclick="return go('transparencia')" data-i18n="nav.transp">Transparencia</a>
   <a href="#faq" onclick="return go('faq')" data-i18n="nav.faq">FAQ</a>
   <a href="#contacto" onclick="return go('contacto')" data-i18n="nav.contacto">Contacto</a>
