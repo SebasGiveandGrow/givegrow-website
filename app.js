@@ -917,11 +917,11 @@ function buildProjectSelect(){
   var html = '<option value="general" data-partner="">'+(lang==="en"?"Where it's needed most (general fund)":"Donde más se necesite (fondo general)")+'</option>';
   for (var i=0;i<partners.length;i++){
     var p = partners[i];
-    html += '<optgroup label="'+p.name+'">';
+    html += '<optgroup label="'+escapeHtml(p.name)+'">';
     for (var k=0;k<p.impactUnits.length;k++){
       var u = p.impactUnits[k];
       var label = u.project ? u.project : (u[lang]||u.es);
-      html += '<option value="'+u.id+'" data-partner="'+p.id+'">'+label+'</option>';
+      html += '<option value="'+escapeHtml(u.id)+'" data-partner="'+escapeHtml(p.id)+'">'+escapeHtml(label)+'</option>';
     }
     html += '</optgroup>';
   }
@@ -1256,10 +1256,10 @@ function renderWall(){
       var p = list[i];
       var area = p.area ? (p.area[lang]||p.area.es||"") : (p.areaKey ? t(p.areaKey) : "");
       html += '<div class="card net-card"><span class="net-dot" style="background:'+(NET_COLORS[p.type]||NET_COLORS.hub)+'"></span>'
-            + '<h3>'+p.name+'</h3>'
-            + (area ? '<p class="mu" style="margin:6px 0 10px">'+area+'</p>' : '')
+            + '<h3>'+escapeHtml(p.name)+'</h3>'
+            + (area ? '<p class="mu" style="margin:6px 0 10px">'+escapeHtml(area)+'</p>' : '')
             + '<span class="tag">'+t("net.type."+p.type)+'</span>'
-            + (p.url ? '<p style="margin-top:12px"><a class="card-link" href="'+p.url+'" target="_blank" rel="noopener">'+t("map.visit")+'</a></p>' : '')
+            + (p.url ? '<p style="margin-top:12px"><a class="card-link" href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener">'+t("map.visit")+'</a></p>' : '')
             + '</div>';
     }
     html += '<div class="card card-empty"><p>'+t("net.next")+'</p></div>';
@@ -1274,10 +1274,10 @@ function renderAliadas(){
       var p = list[i]; if (p.type !== "foundation") continue;
       var area = p.area ? (p.area[lang]||p.area.es||"") : "";
       var pob = p.poblacion ? (p.poblacion[lang]||p.poblacion.es||"") : "";
-      html += '<a class="pcard" href="#fundacion/'+p.id+'" onclick="return go(\'fundacion/'+p.id+'\')">'
-            + ((p.logo && canShowLogo(p)) ? '<img class="pcard-logo" src="'+p.logo+'" alt="" loading="lazy">' : '')
-            + '<span class="pcard-body"><b>'+p.name+'</b>'
-            + '<span class="mu">'+pob+(pob&&area?" · ":"")+area+'</span></span>'
+      html += '<a class="pcard" href="#fundacion/'+encodeURIComponent(p.id)+'" onclick="return go(\'fundacion/'+escapeHtml(p.id)+'\')">'
+            + ((p.logo && canShowLogo(p)) ? '<img class="pcard-logo" src="'+escapeHtml(p.logo)+'" alt="" loading="lazy">' : '')
+            + '<span class="pcard-body"><b>'+escapeHtml(p.name)+'</b>'
+            + '<span class="mu">'+escapeHtml(pob+(pob&&area?" · ":"")+area)+'</span></span>'
             + '<span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
     }
     html += '<div class="card card-empty"><h3>'+t("hub.aliadas.soon.t")+'</h3><p>'+t("hub.aliadas.soon.p")+'</p></div>';
