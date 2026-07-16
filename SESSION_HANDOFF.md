@@ -29,6 +29,45 @@ Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
 PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
 (Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
 
+## Auditoría de código + Bloques A/B/C (revisión + 2 ideas nuevas)
+Commits `b17f0a86` (A) y `092a0bf1` (B+C), ambos success.
+
+**AUDITORÍA (hallazgos y estado):**
+- XSS latente CERRADO (A1): renderFicha escapaba 0 campos de partners.json (renderComercio
+  escapaba 15 — inconsistencia); popups del mapa y label de hero.impact tampoco. Ahora TODO
+  dato remoto pasa por escapeHtml. Importa porque el pipeline de alta automática nace de
+  formularios públicos.
+- DEUDA DECLARADA (no tarea): script-src 'unsafe-inline' en CSP; endurecer = migrar todos
+  los onclick inline a addEventListener. Grande, no urgente.
+- Limpieza (A2/A3): borrado img/jornadas/hero_futbol_1400.jpg (288KB huérfano); eliminadas
+  10 claves i18n muertas verificadas (nav.g.hub/sumate, nav.alma, nav.conocenos, comm.*,
+  grat.cat, grat.how.*, hub.ey) — stat.*/live.* SE CONSERVAN (secciones ocultas). También
+  retirada ficha.imp.p (sustituida por la mini-calc). Paridad 681/681.
+- Caché (A4): /app.js y /styles.css ahora immutable 1 año en _headers (seguro por
+  hash-busting). OJO: si algún día se deploya app.js/styles.css SIN actualizar el hash en
+  index.html, los usuarios verían versión vieja hasta 1 año — el hash-bump es OBLIGATORIO.
+- Opcionales NO hechos: recompresión top-5 fotos jornadas (674–320KB; tocaría calidad,
+  requiere ojo de Sebas).
+
+**IDEA 3 HECHA (B): mini-calculadora de impacto en ficha de fundación.** Chips $10K/$20K/
+$50K/$100K → convierte a TODAS las impactUnits de la fundación (solo muestra unidades con
+n>=1). Inicializa en $20K. fichaImpCalc() en app.js; claves ficha.imp.calc/ficha.imp.min;
+CSS .fimp-*. Conecta calculadora↔fundación (Conciencia luce sus raciones de COP 3.200).
+
+**IDEA 2 HECHA (C): mapa como vista de red con filtros.** Capas Leaflet por tipo, chips
+Toda la red/Fundaciones/Comercios (HUB SIEMPRE visible — decisión: es el centro de la red),
+y línea-resumen honesta calculada de datos reales (map.sum: '{f} fundaciones, {c}
+comercios, {h} HUB'). Contenedores #map-filters/#map-summary alrededor de #map-box.
+Nota: los chips de filtro se pintan con t() al construir el mapa; si el usuario cambia de
+idioma DESPUÉS de abrir el mapa, los chips tienen data-i18n así que setLang los repinta.
+
+**DECISIONES DE SEBAS registradas:** idea 4 (recibos Wompi) espera confirmación de
+pasarela; idea 5 (Heros Wall) anotada para el futuro (decisiones de diseño siguen
+abiertas); idea 6 (PWA/manifest) EN PAUSA hasta tener logo real — acordado esperar.
+
+PENDIENTE sign-off visual: chips de la ficha y del mapa (día/noche), línea-resumen,
+y que el filtro Comercios muestre Kore + HUB correctamente.
+
 ## Fase 4 (menú Opción B) + fix calculadora — ROADMAP COMPLETO
 Commit `4c34658b` (deploy success). Con esto, las 4 fases del roadmap están hechas.
 - **Menú reestructurado por audiencia (Opción B), aprobado por Sebas.** Desktop:
