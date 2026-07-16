@@ -29,6 +29,34 @@ Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
 PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
 (Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
 
+## DIAGNÓSTICO VISUAL "REDISEÑO v5" (acordado con Sebas, PENDIENTE de ejecutar)
+Diagnóstico honesto: sitio bien construido pero genérico — identidad aprobada aplicada ~25%.
+5 síntomas: (1) card-itis (todo en tarjetas redondeadas; el lenguaje editorial pide reglas
+finas y aire); (2) modo día blanco-default (debe ser "papel institucional" hueso/crema);
+(3) token navy heredado compite con verde-tinta (calculadora); (4) escala tipográfica
+tímida (sin cifras monumentales, saltos cortos); (5) fotografía enjaulada en thumbnails
+(pide bandas a sangre completa).
+
+PLAN v5 EN 3 ETAPAS (cada una con sign-off visual de Sebas ANTES de la siguiente):
+- E1 "Papel y familia": fondo día→hueso; navy→verde-tinta profundo (cascada de 1 variable);
+  radios 24→12 (grandes a casi 0); bordes de tarjeta→reglas finas en 2-3 secciones piloto
+  (Transparencia, Membresías). CSS casi puro, reversible, máximo efecto/esfuerzo.
+- E2 "La voz": escala editorial real (titulares grandes, lead 20px, eyebrows sistema);
+  UNA cifra monumental Unbounded por página (inicio: línea de red real como pieza
+  tipográfica); momentos Fraunces itálica.
+- E3 "Momentos firma": banda foto a sangre entre inicio y evidencia; Transparencia como
+  LIBRO MAYOR (números tabulares, reglas, NIT/RTE con dignidad de sello — extender ADN del
+  cupón/recibos); ascender el "Recorrido 7/12" del pie a elemento con presencia.
+Ideas sueltas a madurar: sello institucional gráfico (NIT+RTE como estampilla); muro
+físico de logos cuando haya 4-5 aliados.
+
+TAREAS QUE ESPERAN EL OJO DE SEBAS (pospuestas por cansancio, retomar):
+- Sign-off visual: Unbounded (H1 hero móvil, peso 700 vs 600, ¿migrar nlogo/precios/h3?);
+  menú nuevo (día/noche, labels de grupos); cupón de beneficio; chips mini-calc de ficha;
+  filtros y resumen del mapa; textarea aliados (aún de sesiones atrás).
+- Recompresión top-5 fotos jornadas (con muestras antes/después).
+- Coordenadas de Conciencia (zona aprox., confirmar punto).
+
 ## Auditoría de código + Bloques A/B/C (revisión + 2 ideas nuevas)
 Commits `b17f0a86` (A) y `092a0bf1` (B+C), ambos success.
 
