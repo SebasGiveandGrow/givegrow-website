@@ -29,6 +29,22 @@ Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
 PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
 (Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
 
+## Claude Code adoptado — flujo Opción A configurado (commit `f4df5b8e`)
+Sebas montará Claude Code (app de escritorio) para el trabajo visual. FLUJO ACORDADO:
+Claude Code trabaja SIEMPRE en ramas `claude/<tema>` (nunca main) → push + PR → revisión
+por Claude (chat claude.ai, vía API sobre la rama) → Sebas fusiona → Actions despliega.
+- Config en repo: `CLAUDE.md` (memoria de proyecto: gate, cache-bust crítico por immutable,
+  datos, seguridad, reglas de contenido/marca, preview local, continuidad),
+  `.claude/settings.json` (comandos seguros pre-aprobados; push a main/force/rebase
+  DENEGADOS), `.claude/skills/givegrow-design-system/` (sistema de diseño versionado).
+- División de trabajo: Claude Code = visual/iterativo con preview local (v5 E2/E3,
+  tarjetas→reglas); este chat = diagnóstico, revisión de ramas, datos, altas.
+- Regla anti-pisotón: un solo actor escribe al repo a la vez.
+- BENEFICIO CLAVE: se acaban los tokens de GitHub pegados en el chat (Code usa el Git
+  local autenticado). Para revisión de ramas, este chat seguirá necesitando token de
+  SOLO LECTURA (scope Contents:Read basta) — pedirlo así, ya no de escritura, salvo
+  tareas que Sebas pida ejecutar desde el chat.
+
 ## Rediseño v5 Etapa 1 DESPLEGADO + auditoría de seguridad completa
 Sebas: "quita Estado financiero 2025 y ejecuta directamente, no me muestres". Aprobó
 desplegar a producción sin preview. Dos commits separados:
