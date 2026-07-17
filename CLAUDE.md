@@ -8,9 +8,25 @@ Deploy: GitHub Actions → Cloudflare Workers, automático al llegar a `main`.
 
 1. **NUNCA hacer push directo a `main`.** Todo cambio va en una rama `claude/<tema>`
    (ej. `claude/v5-etapa2-tipografia`).
-2. Al terminar: push de la rama y abrir Pull Request. La revisión la hace Claude
-   (chat de claude.ai) y la fusión la aprueba Sebas.
-3. `main` despliega solo a producción — por eso está protegido por este flujo.
+2. **Flujo rutinario (auto-merge gateado):** push de la rama → abrir PR con la
+   etiqueta `automerge`:
+   ```bash
+   gh pr create --label automerge --title "…" --body "…"
+   ```
+   El job `automerge` de `.github/workflows/ci.yml` fusiona (squash) **solo cuando
+   el gate `validate` pasa** y luego dispara el deploy explícitamente. Nada humano
+   toca `main`.
+3. **PR que necesita revisión de Claude:** créalo **sin** la etiqueta `automerge`.
+   Queda abierto; Claude lo revisa en el chat y recién ahí se le añade la etiqueta
+   (o se fusiona) tras el visto bueno.
+4. **NUNCA usar `gh pr merge --auto`.** Con la cuenta dueña (`SebasGiveandGrow`) ese
+   merge **bypassea la protección de rama** (`enforce_admins=false`) y puede colar
+   un merge sin gate en verde. La fusión SIEMPRE la hace el bot vía la etiqueta.
+5. `main` despliega solo a producción — por eso está protegido por este flujo.
+
+> Por diseño de GitHub, un push hecho con `GITHUB_TOKEN` (el merge del bot) **no
+> dispara** otros workflows; por eso el job `automerge` invoca el deploy con
+> `gh workflow run` y `deploy.yml` expone `workflow_dispatch:`.
 
 ## GATE OBLIGATORIO ANTES DE CADA COMMIT
 
@@ -19,6 +35,14 @@ node scripts/validate.mjs
 ```
 Debe pasar TODO: sintaxis JS, JSON válidos, paridad i18n ES/EN, cobertura data-i18n,
 balance de tags. Si falla, no se commitea.
+
+**Nota operativa (esta máquina):** `node` y `gh` viven en `/opt/homebrew/bin` y el
+shell no interactivo NO los tiene en el PATH. Exporta antes de correr el gate:
+```bash
+export PATH="/opt/homebrew/bin:$PATH"
+```
+Sin esto, `validate.mjs` da un falso negativo: su subproceso `node --check app.js`
+no encuentra `node` y reporta "app.js sintaxis inválida" aunque el archivo esté bien.
 
 ## REGLA CRÍTICA: cache-bust de assets
 
