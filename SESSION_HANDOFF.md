@@ -1,12 +1,43 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Fase 1 UX + roadmap tarjetas/menú" (jul 2026)
+> Última actualización: sesión "Etiqueta calculadora ¿persona o empresa? + modelo de trabajo reafirmado" (17 jul 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
 - Sitio bilingüe ES/EN, vanilla-JS SPA, Cloudflare Workers.
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
+
+## Cierre de tanda: etiqueta calculadora + MODELO DE TRABAJO reafirmado (17 jul 2026)
+Commit `9c5bc3bb` (deploy Actions success). 4 archivos en un commit atómico (Trees API).
+- **Etiqueta nueva sobre el toggle Persona/Empresa de la calculadora.** ES
+  `"¿Aportas como persona o empresa?"` / EN `"Are you donating as an individual or a
+  company?"` (clave nueva `calc.tipo.lbl`, paridad 682/682). Reusa el estilo de
+  `.calc-dest-lbl` (selector compartido `.calc-dest-lbl,.calc-cap` en styles.css) → cero
+  tokens nuevos; la tarjeta `.calc` es `--navy` con texto blanco en día Y noche (sin
+  override), así que el contraste es idéntico en ambos modos. A11y: el toggle ahora es
+  `role="group"` con `aria-labelledby="calc-tipo-lbl"`.
+- **Copy PENDIENTE de decisión de Sebas.** Puse `"¿Aportas como persona o empresa?"`
+  (institucional, aclara que cambia el cálculo del beneficio). Sebas pidió "algo como
+  ¿Qué eres?". Alternativas de un renglón (editar `calc.tipo.lbl` ES/EN): `¿Persona o
+  empresa?` · `Selecciona tu perfil` · `¿Qué eres?`. Cambio trivial cuando decida.
+- Cache-bust actualizado: styles `d7794fd2`, app `4e1fd8b4`.
+
+**MODELO DE TRABAJO (reafirmado por Sebas esta sesión) — leer y respetar:**
+- El **proceso creativo (planes + lluvia de ideas) se hace en el chat claude.ai**, pensando
+  siempre en las capacidades de **Claude Code** (agente de escritorio), sus integraciones
+  (MCP: Drive, Gmail, Calendar, Cloudflare, Canva, Slack, Wix, WordPress, Fathom) y los
+  plugins/skills disponibles.
+- **Sebas copia el plan en Claude Code de escritorio y lo ejecuta ahí.**
+- **Luego Sebas y Claude (chat) auditan y supervisan** el resultado.
+- Coherente con la sección "Claude Code adoptado — Opción A": Code trabaja en ramas
+  `claude/<tema>`, PR, revisión, Sebas fusiona. Regla anti-pisotón: un solo actor escribe
+  al repo a la vez.
+- **Token:** para AUDITAR desde el chat basta SOLO LECTURA (Contents:Read). Solo pedir
+  escritura si Sebas encarga una ejecución puntual desde el chat (como fue esta tanda de la
+  etiqueta, hecha por excepción con token de escritura de sesión).
+- PENDIENTE Sebas: sign-off visual de la etiqueta (desktop + móvil, día + noche);
+  decidir el texto final; revocar el token de escritura de esta sesión al cerrar.
 
 ## Cierre de tanda: logo Conciencia + Kore en mapa + ocultar 2 bloques
 Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
@@ -422,17 +453,17 @@ descripción en el formulario de aliados (decisión previa: no inventarla nosotr
 - Re-render por idioma en postLang (~757-759).
 - renderFicha (fundaciones) / renderComercio (comercios) — espejos.
 - Lightbox nativo: ensureLightbox()+paintLightbox()+showModal(), LB={list,ix}.
-- i18n: dict ES en app.js; EN lazy desde /i18n/en.json. Paridad actual 685/685.
+- i18n: dict ES en app.js; EN lazy desde /i18n/en.json. Paridad actual 682/682.
 - Datos: partners.json (fundaciones), gratitud.json (comercios), inventario.json.
 - Validación: `node scripts/validate.mjs` (paridad, sintaxis, tags, cobertura).
 
 ## VERIFICADO AL CIERRE
-- Campo ally-desc en index.html: ✓
-- payload.descripcion + i18n ally.f.desc (ES): ✓
-- ally.f.desc en en.json (paridad 686/686): ✓
-- .ally-form textarea en styles.css (tokens, modo noche): ✓
-- validate.mjs: TODO OK (sintaxis, paridad, cobertura, JSON, tags).
-- Cache-bust actualizado: styles 0a072653, app 1c51e738.
-- Deploy 3e198d05 Actions success.
-- PENDIENTE Sebas: pegar+reimplementar .gs, encabezado manual en hoja,
-  confirmación visual del textarea (día/noche), decisión obligatorio/opcional.
+- Etiqueta `calc.tipo.lbl` en index.html (calc-cap + role=group/aria-labelledby): ✓
+- ES en app.js + EN en en.json (paridad 682/682): ✓
+- `.calc-dest-lbl,.calc-cap` en styles.css (reuso de estilo, día/noche ok): ✓
+- validate.mjs: TODO OK (sintaxis, paridad, cobertura, JSON, JSON-LD, tags).
+- Cache-bust actualizado: styles d7794fd2, app 4e1fd8b4.
+- Deploy 9c5bc3bb Actions success.
+- PENDIENTE Sebas: sign-off visual de la etiqueta (desktop+móvil, día+noche);
+  decisión del texto final (ver alternativas en el cierre de tanda de arriba);
+  revocar token de escritura de la sesión.
