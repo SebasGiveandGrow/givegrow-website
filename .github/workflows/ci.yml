@@ -1,0 +1,27 @@
+name: CI — Gate de validación
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    name: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gate del proyecto (sintaxis, i18n, estructura)
+        run: node scripts/validate.mjs
+
+      - name: Cache-bust coherente (md5 de assets vs index.html)
+        run: |
+          CSS_REAL=$(md5sum styles.css | cut -c1-8)
+          JS_REAL=$(md5sum app.js | cut -c1-8)
+          CSS_DECL=$(grep -oE 'styles\.css\?v=[0-9a-f]+' index.html | head -1 | cut -d= -f2)
+          JS_DECL=$(grep -oE 'app\.js\?v=[0-9a-f]+' index.html | head -1 | cut -d= -f2)
+          echo "styles.css real=$CSS_REAL declarado=$CSS_DECL"
+          echo "app.js     real=$JS_REAL declarado=$JS_DECL"
+          if [ "$CSS_REAL" != "$CSS_DECL" ]; then echo "::error::cache-bust de styles.css desactualizado (regla CLAUDE.md)"; exit 1; fi
+          if [ "$JS_REAL" != "$JS_DECL" ]; then echo "::error::cache-bust de app.js desactualizado (regla CLAUDE.md)"; exit 1; fi
