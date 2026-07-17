@@ -29,6 +29,20 @@ Commit `9dbaf72c` (deploy success). 7 archivos en un commit atómico.
 PENDIENTE de confirmar por Sebas: coords aprox. de Kore (Envigado) y de Conciencia
 (Nueva Jerusalén); visual del cupón, del logo en ficha, y del mapa con el pin de Kore.
 
+## Etapa 2 FUSIONADA por Sebas + auto-merge gateado configurado
+- **PR #1 (tipografía E2) fusionado por Sebas** → en producción. Revisión chat funcionó:
+  atrapó cache-bust faltante antes del merge.
+- **Auto-merge nativo configurado** (commit ci.yml `99676d0d` + settings):
+  (1) `.github/workflows/ci.yml`: job `validate` corre en cada PR → gate validate.mjs
+  + chequeo AUTOMÁTICO de cache-bust (md5 real de styles/app vs declarado en index.html).
+  (2) Repo: `allow_auto_merge=true`. (3) Protección de `main`: check `validate` requerido,
+  `enforce_admins=FALSE` — decisión deliberada: mantiene vivos los push directos del dueño
+  (automatización de inventario Apps Script y commits del chat); solo los PRs quedan gateados.
+- **USO del auto-merge**: en el PR, botón "Enable auto-merge" (o Code: `gh pr merge --auto
+  --squash`). Se fusiona SOLO cuando `validate` pasa. Merge a main → deploy automático.
+- Flujo vigente: rutinario = auto-merge; sensible/visual = revisión chat + merge de Sebas
+  (o Claude bajo orden explícita con token de escritura de la sesión).
+
 ## Claude Code adoptado — flujo Opción A configurado (commit `f4df5b8e`)
 Sebas montará Claude Code (app de escritorio) para el trabajo visual. FLUJO ACORDADO:
 Claude Code trabaja SIEMPRE en ramas `claude/<tema>` (nunca main) → push + PR → revisión
