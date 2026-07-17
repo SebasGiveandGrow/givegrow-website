@@ -238,6 +238,7 @@ var I18N = {
     "donar.ey":"Donar",
     "donar.t":"Tu donación, con destino claro.",
     "donar.lead":"Calcula tu impacto y tu beneficio tributario, luego elige cómo aportar.",
+    "calc.tipo.lbl":"¿Aportas como persona o empresa?",
     "calc.tab.ind":"Persona",
     "calc.tab.emp":"Empresa",
     "calc.tax":"Beneficio tributario (25%)",

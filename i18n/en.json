@@ -103,6 +103,7 @@
   "donar.ey": "Donate",
   "donar.t": "Your donation, with a clear destination.",
   "donar.lead": "Estimate your impact and tax benefit, then choose how to give.",
+  "calc.tipo.lbl": "Are you donating as an individual or a company?",
   "calc.tab.ind": "Individual",
   "calc.tab.emp": "Company",
   "calc.tax": "Tax benefit (25%)",
