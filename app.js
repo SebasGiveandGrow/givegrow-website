@@ -1732,10 +1732,15 @@ function renderJourney(id){
   bar.style.display = "";
   var prev = idx > 0 ? JOURNEY[idx-1] : null;
   var next = idx < JOURNEY.length-1 ? JOURNEY[idx+1] : null;
-  var html = '<div class="journey"><span class="j-meta"><span data-i18n="journey.t">El recorrido</span> · ' + (idx+1) + '/' + JOURNEY.length + '</span><div class="j-links">';
+  var segs = "";
+  for (var s=0; s<JOURNEY.length; s++){ segs += '<span class="j-seg'+(s<=idx?" on":"")+'"></span>'; }
+  var html = '<div class="journey">'
+    + '<span class="j-meta"><span data-i18n="journey.t">El recorrido</span> · <b>' + (idx+1) + '</b>/' + JOURNEY.length + '</span>'
+    + '<div class="j-track" aria-hidden="true">' + segs + '</div>'
+    + '<div class="j-links">';
   if (prev) html += '<a class="j-prev" href="#'+prev+'" onclick="return go(\''+prev+'\')">&larr; <span data-i18n="'+JOURNEY_KEYS[prev]+'"></span></a>';
   if (next) html += '<a class="j-next" href="#'+next+'" onclick="return go(\''+next+'\')"><span data-i18n="journey.next">Siguiente</span>: <span data-i18n="'+JOURNEY_KEYS[next]+'"></span> &rarr;</a>';
-  else html += '<span class="j-prev" data-i18n="journey.done">Recorrido completo.</span>';
+  else html += '<span class="j-done" data-i18n="journey.done">Recorrido completo.</span>';
   html += '</div></div>';
   bar.innerHTML = html;
   var page = document.getElementById("page-"+id);
