@@ -43,8 +43,8 @@
 </script>
 </head>
 <body>
-<a class="skip-link" href="#" onclick="return skipToContent()" data-i18n="a11y.skip">Saltar al contenido</a>
-<a href="#" class="skip-link" onclick="var p=document.querySelector('.page.active');if(p){p.setAttribute('tabindex','-1');p.focus();}return false;" data-i18n="a11y.skip">Saltar al contenido</a>
+<a class="skip-link" href="#" data-act="skipToContent()" data-i18n="a11y.skip">Saltar al contenido</a>
+<a href="#" class="skip-link" data-act="focusActivePage()" data-i18n="a11y.skip">Saltar al contenido</a>
 
 <!-- NAV -->
 <nav id="nav">
@@ -54,7 +54,7 @@
       <a class="nlink" href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
       <a class="nlink" href="#fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
       <div class="ndrop">
-        <button class="nlink ndrop-t" type="button" data-i18n="nav.empresas" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Empresas</button>
+        <button class="nlink ndrop-t" type="button" data-i18n="nav.empresas" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Empresas</button>
         <div class="ndrop-menu">
           <a href="#empresas" data-i18n="nav.empresas">Empresas</a>
           <a href="#gratitud" data-i18n="nav.gratitud">Programa de Gratitud</a>
@@ -62,7 +62,7 @@
         </div>
       </div>
       <div class="ndrop">
-        <button class="nlink ndrop-t" type="button" data-i18n="nav.membres" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Membresías</button>
+        <button class="nlink ndrop-t" type="button" data-i18n="nav.membres" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Membresías</button>
         <div class="ndrop-menu">
           <a href="#membresias" data-i18n="nav.membres">Membresías</a>
           <a href="#donar" data-i18n="membres.cta.btn">Calcular mi aporte</a>
@@ -70,7 +70,7 @@
         </div>
       </div>
       <div class="ndrop">
-        <button class="nlink ndrop-t" type="button" data-i18n="nav.g.nosotros" aria-haspopup="menu" aria-expanded="false" onclick="return toggleDrop(this)">Nosotros</button>
+        <button class="nlink ndrop-t" type="button" data-i18n="nav.g.nosotros" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Nosotros</button>
         <div class="ndrop-menu">
           <a href="#origen" data-i18n="nav.origen">Origen</a>
           <a href="#impacto" data-i18n="nav.impacto">Impacto</a>
@@ -82,7 +82,7 @@
     </div>
     <div class="nav-actions">
       <a class="btn-nav" href="#donar" data-i18n="nav.cta">Donar</a>
-      <button id="theme-btn" class="theme-toggle" data-mode="auto" onclick="themeCycle()" role="switch" aria-label="Cambiar tema claro u oscuro" title="Tema">
+      <button id="theme-btn" class="theme-toggle" data-mode="auto" data-act="themeCycle()" role="switch" aria-label="Cambiar tema claro u oscuro" title="Tema">
         <span class="tt-track">
           <svg class="tt-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="7" y2="7"/><line x1="17" y1="17" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="7" y2="17"/><line x1="17" y1="7" x2="19.1" y2="4.9"/></svg>
           <svg class="tt-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -90,10 +90,10 @@
         </span>
       </button>
       <div class="lang">
-        <button id="lang-es" class="on" onclick="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
-        <button id="lang-en" onclick="setLang('en')" aria-label="Switch language to English">EN</button>
+        <button id="lang-es" class="on" data-act="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
+        <button id="lang-en" data-act="setLang('en')" aria-label="Switch language to English">EN</button>
       </div>
-      <button class="burger" aria-label="Menú" aria-expanded="false" onclick="toggleDrawer()">&#9776;</button>
+      <button class="burger" aria-label="Menú" aria-expanded="false" data-act="toggleDrawer()">&#9776;</button>
     </div>
   </div>
 </nav>
@@ -444,7 +444,7 @@
         <h3 data-i18n="emp.grat.t"></h3>
         <p data-i18n="emp.grat.p"></p>
         <a class="btn btn-o" href="#gratitud" data-i18n="emp.grat.btn">Ver Programa de Gratitud</a>
-        <a class="btn btn-g" href="#gratitud" onclick="return goComercios()" data-i18n="emp.grat.btn2" style="margin-left:12px">Ver comercios aliados</a>
+        <a class="btn btn-g" href="#gratitud" data-act="goComercios()" data-i18n="emp.grat.btn2" style="margin-left:12px">Ver comercios aliados</a>
       </div>
     </div>
   </section>
@@ -579,9 +579,9 @@
       <span class="ey rv" data-i18n="imp.ev.ey">La evidencia</span>
       <h2 class="h-sec rv" data-i18n="imp.ev.t">Compruébalo tú mismo.</h2>
       <div class="acc-tabs rv d1">
-        <button id="acctab-gal" class="acc-tab on" onclick="accTab('gal')" data-i18n="imp.tab.gal">Galería</button>
-        <button id="acctab-map" class="acc-tab" onclick="accTab('map')" data-i18n="imp.tab.map">Mapa</button>
-        <button id="acctab-blog" class="acc-tab" onclick="accTab('blog')" data-i18n="imp.tab.blog">Historias</button>
+        <button id="acctab-gal" class="acc-tab on" data-act="accTab('gal')" data-i18n="imp.tab.gal">Galería</button>
+        <button id="acctab-map" class="acc-tab" data-act="accTab('map')" data-i18n="imp.tab.map">Mapa</button>
+        <button id="acctab-blog" class="acc-tab" data-act="accTab('blog')" data-i18n="imp.tab.blog">Historias</button>
       </div>
       <div id="acc-gal" class="acc-panel on"><div id="gallery" class="gallery"></div></div>
       <div id="acc-map" class="acc-panel"><div id="map-filters" class="map-filters"></div><div id="map-box"></div><p id="map-summary" class="map-summary"></p></div>
@@ -633,7 +633,7 @@
         <div class="alma-chips" id="alma-chips" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px 0"></div>
         <div class="alma-in">
           <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder" placeholder="Escribe tu pregunta...">
-          <button id="alma-send" class="alma-send" onclick="almaSend()" data-i18n="alma.send">Enviar</button>
+          <button id="alma-send" class="alma-send" data-act="almaSend()" data-i18n="alma.send">Enviar</button>
         </div>
       </div>
     </div>
@@ -739,34 +739,34 @@
       <div class="calc">
         <div class="calc-cap" id="calc-tipo-lbl" data-i18n="calc.tipo.lbl">¿Aportas como persona o empresa?</div>
         <div class="calc-tabs" role="group" aria-labelledby="calc-tipo-lbl">
-          <button id="ctab-ind" class="calc-tab on" onclick="setCalcMode('ind')" data-i18n="calc.tab.ind">Persona</button>
-          <button id="ctab-emp" class="calc-tab" onclick="setCalcMode('emp')" data-i18n="calc.tab.emp">Empresa</button>
+          <button id="ctab-ind" class="calc-tab on" data-act="setCalcMode('ind')" data-i18n="calc.tab.ind">Persona</button>
+          <button id="ctab-emp" class="calc-tab" data-act="setCalcMode('emp')" data-i18n="calc.tab.emp">Empresa</button>
         </div>
         <div class="cur-toggle">
-          <button id="cur-cop" class="on" onclick="setCur('COP')">COP</button>
-          <button id="cur-usd" onclick="setCur('USD')">USD</button>
+          <button id="cur-cop" class="on" data-act="setCur('COP')">COP</button>
+          <button id="cur-usd" data-act="setCur('USD')">USD</button>
         </div>
         <div class="calc-dest">
           <label class="calc-dest-lbl" for="calc-project" data-i18n="calc.dest.lbl">¿A dónde va tu aporte?</label>
-          <select id="calc-project" class="calc-select" onchange="setProject(this.value)"></select>
+          <select id="calc-project" class="calc-select" data-change="setProject(this.value)"></select>
         </div>
         <div class="calc-amount"><div id="calc-display">$200.000</div></div>
-        <input id="calc-manual" type="text" placeholder="0" oninput="onManual(this.value)">
+        <input id="calc-manual" type="text" placeholder="0" data-input="onManual(this.value)">
         <div id="calc-rate"></div>
-        <input id="calc-slider" type="range" min="0" max="100" value="50" oninput="onSlider(this.value)">
+        <input id="calc-slider" type="range" min="0" max="100" value="50" data-input="onSlider(this.value)">
         <div class="calc-hints"><span>$5.000</span><span>$20.000.000</span></div>
         <div class="calc-quick" id="calc-quick">
-          <button class="qbtn" onclick="setQuick(25000)">$25K</button>
-          <button class="qbtn" onclick="setQuick(100000)">$100K</button>
-          <button class="qbtn" onclick="setQuick(500000)">$500K</button>
-          <button class="qbtn" onclick="setQuick(1000000)">$1M</button>
-          <button class="qbtn" onclick="setQuick(5000000)">$5M</button>
-          <button class="qbtn" onclick="setQuick(20000000)">$20M</button>
+          <button class="qbtn" data-act="setQuick(25000)">$25K</button>
+          <button class="qbtn" data-act="setQuick(100000)">$100K</button>
+          <button class="qbtn" data-act="setQuick(500000)">$500K</button>
+          <button class="qbtn" data-act="setQuick(1000000)">$1M</button>
+          <button class="qbtn" data-act="setQuick(5000000)">$5M</button>
+          <button class="qbtn" data-act="setQuick(20000000)">$20M</button>
         </div>
         <div class="cur-toggle">
-          <button id="freq-m" class="on" onclick="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
-          <button id="freq-a" onclick="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
-          <button id="freq-u" onclick="setFreq('u')" data-i18n="calc.freq.u">Único</button>
+          <button id="freq-m" class="on" data-act="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
+          <button id="freq-a" data-act="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
+          <button id="freq-u" data-act="setFreq('u')" data-i18n="calc.freq.u">Único</button>
         </div>
         <div class="calc-out">
           <div class="calc-row"><span data-i18n="calc.tax">Beneficio tributario (25%)</span><b id="co-tax">-</b></div>
@@ -778,7 +778,7 @@
           <p class="mu" id="calc-impact-note" style="display:none;font-size:13px;margin-top:10px" data-i18n="calc.impact.note"></p>
           <div class="calc-note">
             <label for="calc-msg" data-i18n="calc.note.lbl">Deja un mensaje o dedicatoria (opcional)</label>
-            <textarea id="calc-msg" rows="2" maxlength="280" oninput="onNote(this.value)" data-i18n="calc.note.ph" data-i18n-attr="placeholder" placeholder="Tu mensaje viajará con tu donación y aparecerá en tu recibo."></textarea>
+            <textarea id="calc-msg" rows="2" maxlength="280" data-input="onNote(this.value)" data-i18n="calc.note.ph" data-i18n-attr="placeholder" placeholder="Tu mensaje viajará con tu donación y aparecerá en tu recibo."></textarea>
             <span class="calc-note-count"><span id="calc-msg-count">0</span>/280</span>
           </div>
         </div>
@@ -790,13 +790,13 @@
     <div class="wrap center">
       <h3 class="rv" data-i18n="pay.t" style="margin-bottom:20px">Cómo aportar</h3>
       <div class="pay-tabs rv d1">
-        <button id="paytab-banco" class="pay-tab on" onclick="payMethod('banco')" data-i18n="pay.tab.banco">Bancolombia</button>
-        <button id="paytab-paypal" class="pay-tab" onclick="payMethod('paypal')" data-i18n="pay.tab.paypal">PayPal</button>
-        <button id="paytab-mp" class="pay-tab" onclick="payMethod('mp')" data-i18n="pay.tab.mp">MercadoPago</button>
+        <button id="paytab-banco" class="pay-tab on" data-act="payMethod('banco')" data-i18n="pay.tab.banco">Bancolombia</button>
+        <button id="paytab-paypal" class="pay-tab" data-act="payMethod('paypal')" data-i18n="pay.tab.paypal">PayPal</button>
+        <button id="paytab-mp" class="pay-tab" data-act="payMethod('mp')" data-i18n="pay.tab.mp">MercadoPago</button>
       </div>
       <div id="pay-banco" class="pay-panel on rv d2">
         <div class="pay-row"><span data-i18n="pay.bank">Banco</span><b>Bancolombia</b></div>
-        <div class="pay-row"><span data-i18n="pay.acc">Cuenta de Ahorros</span><span style="display:flex;gap:10px;align-items:center"><b>31000009221</b><button class="copy" id="copy-label" onclick="copyAccount()" data-i18n="copy">Copiar</button></span></div>
+        <div class="pay-row"><span data-i18n="pay.acc">Cuenta de Ahorros</span><span style="display:flex;gap:10px;align-items:center"><b>31000009221</b><button class="copy" id="copy-label" data-act="copyAccount()" data-i18n="copy">Copiar</button></span></div>
         <div class="pay-row"><span data-i18n="pay.holder">Titular</span><b>Fundación Give&Grow International</b></div>
         <div class="pay-row"><span data-i18n="pay.nit">NIT</span><b>901.948.930-2</b></div>
         <p class="mu" style="margin-top:14px;text-align:left;font-size:14px" data-i18n="pay.banco.note"></p>
@@ -948,7 +948,7 @@
           <div class="field"><label data-i18n="form.name">Nombre</label><input type="text" id="cf-name"></div>
           <div class="field"><label data-i18n="form.email">Correo</label><input type="email" id="cf-email"></div>
           <div class="field"><label data-i18n="form.msg">Mensaje</label><textarea rows="4" id="cf-msg"></textarea></div>
-          <button type="button" class="btn btn-g" onclick="formSend()" data-i18n="form.send">Enviar mensaje</button>
+          <button type="button" class="btn btn-g" data-act="formSend()" data-i18n="form.send">Enviar mensaje</button>
           <p id="cf-note" style="margin-top:12px;font-size:14px;display:none"></p>
         </div>
         <div class="card">
@@ -969,17 +969,17 @@
       <p class="lead rv d1" data-i18n="track.lead">Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.</p>
       <div class="track-box rv d2">
         <div class="track-search">
-          <input type="text" id="track-input" placeholder="GG-2026-000001" data-i18n="track.ph" data-i18n-attr="placeholder" onkeydown="if(event.key==='Enter')trackSearch()" autocomplete="off" spellcheck="false">
-          <button type="button" class="btn btn-g" onclick="trackSearch()" data-i18n="track.btn">Rastrear</button>
+          <input type="text" id="track-input" placeholder="GG-2026-000001" data-i18n="track.ph" data-i18n-attr="placeholder" data-enter="trackSearch()" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn btn-g" data-act="trackSearch()" data-i18n="track.btn">Rastrear</button>
         </div>
-        <button type="button" class="track-noguide" onclick="trackNoGuide()" data-i18n="track.noguide">No tengo mi guía</button>
+        <button type="button" class="track-noguide" data-act="trackNoGuide()" data-i18n="track.noguide">No tengo mi guía</button>
       </div>
       <div id="track-result" class="track-result" style="display:none"></div>
       <div id="track-noguide-box" class="track-noguide-box" style="display:none">
         <h3 data-i18n="track.ng.t">Te reenviamos tu guía</h3>
         <p data-i18n="track.ng.p">Escribe el correo con el que hiciste tu donación y te enviaremos tu número de guía para que puedas rastrearla.</p>
         <div class="field"><label data-i18n="form.email">Correo</label><input type="email" id="track-ng-email" autocomplete="email"></div>
-        <button type="button" class="btn btn-g" onclick="trackNoGuideSend()" data-i18n="track.ng.btn">Solicitar mi guía</button>
+        <button type="button" class="btn btn-g" data-act="trackNoGuideSend()" data-i18n="track.ng.btn">Solicitar mi guía</button>
         <p id="track-ng-note" style="margin-top:12px;font-size:14px;display:none"></p>
       </div>
     </div>
@@ -993,7 +993,7 @@
       <h2 class="h-sec rv" data-i18n="ally.t">Quiero ser aliado</h2>
       <p class="lead rv d1" data-i18n="ally.lead">Tu empresa puede apoyar el impacto de la forma que elija — sin costo, sin exclusividad, y con reconocimiento. Cuéntanos y te enviaremos el Convenio Marco de Alianza para revisar y firmar.</p>
 
-      <form id="ally-form" class="ally-form rv d2" onsubmit="return allySubmit(event)">
+      <form id="ally-form" class="ally-form rv d2" data-submit="allySubmit(event)">
         <h3 class="ally-sec" data-i18n="ally.s.empresa">Datos de la empresa</h3>
         <div class="ally-grid">
           <div class="field"><label data-i18n="ally.f.razon">Razón social o nombre del emprendimiento *</label><input type="text" id="ally-razon" required></div>
@@ -1013,8 +1013,8 @@
         <div class="ally-mods">
           <label class="ally-check"><input type="checkbox" id="mod-donacion"><span><b data-i18n="ally.m.don.t">Donación</b><small data-i18n="ally.m.don.p">En dinero o en especie, con certificado.</small></span></label>
           <label class="ally-check"><input type="checkbox" id="mod-rse"><span><b data-i18n="ally.m.rse.t">RSE</b><small data-i18n="ally.m.rse.p">Canaliza tu responsabilidad social con impacto medible.</small></span></label>
-          <label class="ally-check" onclick="setTimeout(allyToggleGrat,0)"><input type="checkbox" id="mod-gratitud"><span><b data-i18n="ally.m.grat.t">Programa de Gratitud</b><small data-i18n="ally.m.grat.p">Ofrece un beneficio a la comunidad de la fundación.</small></span></label>
-          <label class="ally-check" onclick="setTimeout(allyToggleServ,0)"><input type="checkbox" id="mod-servicios"><span><b data-i18n="ally.m.serv.t">Servicios</b><small data-i18n="ally.m.serv.p">Gratuitos o con beneficio para población vulnerable.</small></span></label>
+          <label class="ally-check" data-act="allyGrat()"><input type="checkbox" id="mod-gratitud"><span><b data-i18n="ally.m.grat.t">Programa de Gratitud</b><small data-i18n="ally.m.grat.p">Ofrece un beneficio a la comunidad de la fundación.</small></span></label>
+          <label class="ally-check" data-act="allyServ()"><input type="checkbox" id="mod-servicios"><span><b data-i18n="ally.m.serv.t">Servicios</b><small data-i18n="ally.m.serv.p">Gratuitos o con beneficio para población vulnerable.</small></span></label>
           <label class="ally-check"><input type="checkbox" id="mod-voluntariado"><span><b data-i18n="ally.m.vol.t">Voluntariado corporativo</b><small data-i18n="ally.m.vol.p">Tus colaboradores participan en las actividades.</small></span></label>
           <label class="ally-check"><input type="checkbox" id="mod-difusion"><span><b data-i18n="ally.m.dif.t">Difusión</b><small data-i18n="ally.m.dif.p">Das a conocer la labor en tus canales.</small></span></label>
         </div>
@@ -1056,16 +1056,16 @@
       <div class="center"><span class="ey rv" data-i18n="faq.ey">Preguntas frecuentes</span>
       <h2 class="h-sec rv" data-i18n="faq.t" style="margin-left:auto;margin-right:auto"></h2></div>
       <div class="faq rv d1">
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q6"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a6"></div><a class="faq-cta" href="#fundaciones" data-i18n="faq.cta.fund"></a></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q1"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a1"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q2"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a2"></div><a class="faq-cta" href="#empresas" data-i18n="faq.cta.emp"></a></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q3"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a3"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q4"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a4"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q5"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a5"></div><a class="faq-cta" href="#fundaciones" data-i18n="faq.cta.fund"></a></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q7"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a7"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q8"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a8"></div></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q9"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a9"></div><a class="faq-cta" href="#empresas" data-i18n="faq.cta.emp"></a></div></div>
-        <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q10"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a10"></div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q6"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a6"></div><a class="faq-cta" href="#fundaciones" data-i18n="faq.cta.fund"></a></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q1"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a1"></div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q2"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a2"></div><a class="faq-cta" href="#empresas" data-i18n="faq.cta.emp"></a></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q3"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a3"></div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q4"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a4"></div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q5"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a5"></div><a class="faq-cta" href="#fundaciones" data-i18n="faq.cta.fund"></a></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q7"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a7"></div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q8"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a8"></div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q9"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a9"></div><a class="faq-cta" href="#empresas" data-i18n="faq.cta.emp"></a></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q10"></span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a10"></div></div></div>
       </div>
       <div class="cta-box rv">
         <h3 data-i18n="faq.cta2.t"></h3>
@@ -1176,15 +1176,15 @@
 
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox">
-  <button class="lb-x" onclick="closeLightbox()" aria-label="cerrar">&times;</button>
-  <button class="lb-nav lb-prev" onclick="lbStep(-1)" aria-label="anterior">&#8249;</button>
+  <button class="lb-x" data-act="closeLightbox()" aria-label="cerrar">&times;</button>
+  <button class="lb-nav lb-prev" data-act="lbStep(-1)" aria-label="anterior">&#8249;</button>
   <img id="lb-img" src="" alt="">
-  <button class="lb-nav lb-next" onclick="lbStep(1)" aria-label="siguiente">&#8250;</button>
+  <button class="lb-nav lb-next" data-act="lbStep(1)" aria-label="siguiente">&#8250;</button>
   <div id="lb-cap"></div>
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=16a18cdb"></script>
+<script src="/app.js?v=5ce1f430"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

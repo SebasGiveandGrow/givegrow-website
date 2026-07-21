@@ -813,6 +813,38 @@ function isSpaRoute(id){
   if (id.indexOf("fundacion/")===0 || id.indexOf("comercio/")===0) return true;
   return !!document.getElementById("page-"+id);
 }
+/* Despachador de acciones por delegación (CSP fase 2): reemplaza los on* inline.
+   Atributos: data-act (click), data-input, data-change, data-submit, data-enter.
+   Valor = "fn(args)" donde args admite 'literal', numero, this, this.value, event.
+   Solo funciones de la whitelist ACT_FNS pueden invocarse (sin eval). */
+function allyServ(){ setTimeout(allyToggleServ, 0); }
+function allyGrat(){ setTimeout(allyToggleGrat, 0); }
+function focusActivePage(){ var p=document.querySelector(".page.active"); if(p){ p.setAttribute("tabindex","-1"); p.focus(); } }
+var ACT_FNS = {
+  themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,
+  payMethod:payMethod, accTab:accTab, setQuick:setQuick, lbStep:lbStep, toggleFaq:toggleFaq,
+  toggleDrop:toggleDrop, closeLightbox:closeLightbox, almaSend:almaSend, formSend:formSend,
+  copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
+  trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
+  onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, allySubmit:allySubmit,
+  allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage
+};
+function runAct(spec, el, ev){
+  var m = /^(\w+)\((.*)\)$/.exec((spec||"").trim());
+  if (!m) return;
+  var fn = ACT_FNS[m[1]];
+  if (!fn) return;
+  var raw = m[2].trim();
+  var args = raw==="" ? [] : raw.split(",").map(function(a){
+    a=a.trim();
+    if (a==="this") return el;
+    if (a==="this.value") return el.value;
+    if (a==="event") return ev;
+    if (/^-?\d+$/.test(a)) return parseInt(a,10);
+    return a.replace(/^['"]|['"]$/g,"");
+  });
+  return fn.apply(null, args);
+}
 function go(id, fromPop){
   if (id==="alma" && currentRoute!=="alma") almaFromRoute = currentRoute;
   var pages = document.querySelectorAll(".page");
@@ -1679,12 +1711,18 @@ function init(){
   // Ignora elementos que aún conservan onclick inline → migración incremental sin doble disparo.
   document.addEventListener("click", function(e){
     var el = e.target.closest("[data-nav], a[href^='#']");
-    if (!el || el.getAttribute("onclick")) return;
+    if (!el || el.getAttribute("onclick") || el.hasAttribute("data-act")) return;
     var route = el.getAttribute("data-nav") || (el.getAttribute("href")||"").slice(1);
     if (!isSpaRoute(route)) return;   // deja pasar skip-link (#), anclas internas, etc.
     e.preventDefault();
     go(route);
   });
+  // Despachador de acciones por delegación (CSP fase 2)
+  document.addEventListener("click", function(e){ var el=e.target.closest("[data-act]"); if(!el) return; e.preventDefault(); runAct(el.getAttribute("data-act"), el, e); });
+  document.addEventListener("input", function(e){ var el=e.target.closest("[data-input]"); if(!el) return; runAct(el.getAttribute("data-input"), el, e); });
+  document.addEventListener("change", function(e){ var el=e.target.closest("[data-change]"); if(!el) return; runAct(el.getAttribute("data-change"), el, e); });
+  document.addEventListener("submit", function(e){ var el=e.target.closest("[data-submit]"); if(!el) return; e.preventDefault(); runAct(el.getAttribute("data-submit"), el, e); });
+  document.addEventListener("keydown", function(e){ if(e.key!=="Enter") return; var el=e.target.closest("[data-enter]"); if(!el) return; runAct(el.getAttribute("data-enter"), el, e); });
   // nav scroll
   window.addEventListener("scroll", onScroll, {passive:true});
   onScroll();
