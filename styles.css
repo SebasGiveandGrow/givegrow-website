@@ -510,14 +510,20 @@ html[data-theme="dark"] .tt-moon{opacity:1}
 html[data-theme="dark"] .alma-fab{background:var(--acc);color:#0F1613;box-shadow:0 4px 16px rgba(0,0,0,.4)}
 
 /* ---------- barra de recorrido (0 a 100) ---------- */
-.journey{margin-top:56px;border-top:1px solid var(--bd);padding:22px 0 6px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
-.j-meta{font-size:11.5px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--mu)}
-.j-links{display:flex;align-items:center;gap:22px}
-.j-prev{font-size:14px;font-weight:600;color:var(--mu);transition:color .15s}
+/* El Recorrido — riel de progreso sutil de la guía de 12 paradas (v5) */
+.journey{margin-top:40px;border-top:1px solid var(--bd);padding:15px 0 2px;display:flex;flex-direction:column;gap:8px}
+.j-meta{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mu)}
+.j-meta b{color:var(--acc)}
+.j-track{display:flex;gap:4px}
+.j-seg{flex:1;height:2px;border-radius:2px;background:var(--bd);transition:background .35s var(--ease)}
+.j-seg.on{background:var(--acc)}
+.j-links{display:flex;align-items:center;gap:16px}
+.j-prev{font-size:12.5px;font-weight:600;color:var(--mu);transition:color .15s}
 .j-prev:hover{color:var(--ink)}
-.j-next{font-size:15px;font-weight:800;color:var(--acc)}
-.j-next:hover{text-decoration:underline}
-@media(max-width:600px){.journey{flex-direction:column;align-items:flex-start;gap:10px}}
+.j-next{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--acc);transition:gap .15s var(--ease)}
+.j-next:hover{gap:9px}
+.j-done{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--acc)}
+@media(prefers-reduced-motion:reduce){.j-seg,.j-next{transition:none}}
 
 /* ---------- cierres de página y "empieza aquí" ---------- */
 .cta-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px}
