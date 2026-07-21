@@ -1161,16 +1161,27 @@ function initGallery(){
   if (!g || g.dataset.done) return;
   g.dataset.done = "1";
   GALLERY.forEach(function(item, i){
-    var img = document.createElement("img");
+    var cap = item[lang] || item.es;
     // Miniatura ligera (400px) para la grilla; la imagen completa se carga en el lightbox.
     var thumb = item.f.indexOf("jornadas/")===0 ? item.f.replace("jornadas/","jornadas/thumb/") : item.f;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "gal-item";
+    btn.setAttribute("aria-label", cap);
+    var img = document.createElement("img");
     img.src = IMG_BASE + thumb;
-    img.alt = item[lang] || item.es;
+    img.alt = cap;
     img.loading = "lazy";
     img.decoding = "async";
     img.width = 400; img.height = 300;
-    img.addEventListener("click", function(){ openGalleryLightbox(i); });
-    g.appendChild(img);
+    btn.appendChild(img);
+    var capEl = document.createElement("span");
+    capEl.className = "gal-cap";
+    capEl.setAttribute("aria-hidden", "true");
+    capEl.textContent = cap;
+    btn.appendChild(capEl);
+    btn.addEventListener("click", function(){ openGalleryLightbox(i); });
+    g.appendChild(btn);
   });
 }
 function openGalleryLightbox(i){
@@ -1416,6 +1427,13 @@ function closeGalLb(){
   var d = document.getElementById("gal-lb");
   if (d && d.open) d.close();
 }
+/* Mapa día/noche: los tiles siguen el tema del sitio (v5 "mapa vivo") */
+var GG_MAP=null, GG_TILE=null;
+function ggTileUrl(){
+  var dark = document.documentElement.getAttribute("data-theme")==="dark";
+  return "https://{s}.basemaps.cartocdn.com/"+(dark?"dark_all":"light_all")+"/{z}/{x}/{y}{r}.png";
+}
+function ggMapTiles(){ if (GG_TILE) GG_TILE.setUrl(ggTileUrl()); }
 function initMap(){
   var box = document.getElementById("map-box");
   if (!box || box.dataset.done) return;
@@ -1425,7 +1443,8 @@ function initMap(){
   }
   function build(list){
     var map = L.map("map-box",{scrollWheelZoom:false}).setView([6.2442,-75.5812], 12);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    GG_MAP = map;
+    GG_TILE = L.tileLayer(ggTileUrl(),
       {subdomains:"abcd", maxZoom:19, attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(map);
     var layers = { foundation:L.layerGroup(), company:L.layerGroup(), hub:L.layerGroup() };
     var counts = { foundation:0, company:0, hub:0 };
@@ -1451,9 +1470,9 @@ function initMap(){
     var legend=L.control({position:"bottomleft"});
     legend.onAdd=function(){
       var d=L.DomUtil.create("div","map-legend");
-      d.innerHTML='<span><i class="gg-dot" style="background:#1F5C38"></i>'+t("map.leg.f")+"</span>"
+      d.innerHTML='<span><i class="gg-dot" style="background:#2E7D4F"></i>'+t("map.leg.f")+"</span>"
                  +'<span><i class="gg-dot" style="background:#B4690E"></i>'+t("map.leg.c")+"</span>"
-                 +'<span><i class="gg-dot" style="background:#0A2A5E"></i>'+t("map.leg.hub")+"</span>";
+                 +'<span><i class="gg-dot" style="background:#1F5C38"></i>'+t("map.leg.hub")+"</span>";
       return d;
     };
     legend.addTo(map);
@@ -1688,6 +1707,7 @@ function themeApply(mode, anim){
     setTimeout(function(){ root.classList.remove("theming"); }, 380);
   }
   root.setAttribute("data-theme", res);
+  ggMapTiles();
   var mc = document.querySelector('meta[name="theme-color"]');
   if (mc) mc.setAttribute("content", res==="dark" ? "#0F1613" : "#1F5C38");
   var b = document.getElementById("theme-btn");
