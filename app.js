@@ -808,6 +808,11 @@ function applyLang(l){
 }
 
 /* ---------- SPA routing ---------- */
+function isSpaRoute(id){
+  if (!id) return false;
+  if (id.indexOf("fundacion/")===0 || id.indexOf("comercio/")===0) return true;
+  return !!document.getElementById("page-"+id);
+}
 function go(id, fromPop){
   if (id==="alma" && currentRoute!=="alma") almaFromRoute = currentRoute;
   var pages = document.querySelectorAll(".page");
@@ -1670,6 +1675,16 @@ function init(){
   var hash = location.hash.replace("#","") || "inicio";
   go(hash, true);
   window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||"inicio"; go(h, true); });
+  // Navegación por delegación (reemplaza onclick="return go('...')" inline; CSP fase 1).
+  // Ignora elementos que aún conservan onclick inline → migración incremental sin doble disparo.
+  document.addEventListener("click", function(e){
+    var el = e.target.closest("[data-nav], a[href^='#']");
+    if (!el || el.getAttribute("onclick")) return;
+    var route = el.getAttribute("data-nav") || (el.getAttribute("href")||"").slice(1);
+    if (!isSpaRoute(route)) return;   // deja pasar skip-link (#), anclas internas, etc.
+    e.preventDefault();
+    go(route);
+  });
   // nav scroll
   window.addEventListener("scroll", onScroll, {passive:true});
   onScroll();
