@@ -25,3 +25,20 @@ jobs:
           echo "app.js     real=$JS_REAL declarado=$JS_DECL"
           if [ "$CSS_REAL" != "$CSS_DECL" ]; then echo "::error::cache-bust de styles.css desactualizado (regla CLAUDE.md)"; exit 1; fi
           if [ "$JS_REAL" != "$JS_DECL" ]; then echo "::error::cache-bust de app.js desactualizado (regla CLAUDE.md)"; exit 1; fi
+
+  automerge:
+    needs: validate
+    if: contains(github.event.pull_request.labels.*.name, 'automerge')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Merge cuando el gate está en verde
+        run: gh pr merge ${{ github.event.pull_request.number }} --squash --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Disparar deploy (el push del bot no lo dispara solo)
+        run: gh workflow run "Deploy Give&Grow to Cloudflare" --ref main --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
