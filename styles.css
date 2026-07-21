@@ -525,6 +525,21 @@ html[data-theme="dark"] .alma-fab{background:var(--acc);color:#0F1613;box-shadow
 .j-done{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--acc)}
 @media(prefers-reduced-motion:reduce){.j-seg,.j-next{transition:none}}
 
+/* Roadmap de ALMA — línea de tiempo sobria; Año 1 = presente, resto futuro (v5) */
+.roadmap{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+.roadmap::before{content:"";position:absolute;top:7px;left:0;right:0;height:2px;background:var(--bd)}
+.rm-node{position:relative;padding-top:30px}
+.rm-node::before{content:"";position:absolute;top:0;left:0;width:16px;height:16px;border-radius:50%;background:var(--surface);border:2px solid var(--bd);z-index:1}
+.rm-node.now::before{background:var(--acc);border-color:var(--acc);box-shadow:0 0 0 4px rgba(31,92,56,.18)}
+.rm-node h3{font-size:var(--fs-h4);margin-bottom:6px}
+.rm-node p{font-size:14px;line-height:1.55;color:var(--mu)}
+@media(max-width:720px){
+  .roadmap{grid-template-columns:1fr;gap:6px}
+  .roadmap::before{top:8px;bottom:8px;left:7px;right:auto;width:2px;height:auto}
+  .rm-node{padding-top:0;padding-left:34px;padding-bottom:22px}
+  .rm-node::before{top:2px;left:0}
+}
+
 /* ---------- cierres de página y "empieza aquí" ---------- */
 .cta-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px}
 .hero-tour{display:inline-block;margin-top:22px;font-size:14px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:.2px;border-bottom:1px dashed rgba(255,255,255,.4);padding-bottom:2px;transition:color .15s,border-color .15s}
