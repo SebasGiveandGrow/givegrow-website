@@ -827,7 +827,9 @@ var ACT_FNS = {
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, allySubmit:allySubmit,
-  allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage
+  allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
+  openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
+  stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb
 };
 function runAct(spec, el, ev){
   var m = /^(\w+)\((.*)\)$/.exec((spec||"").trim());
@@ -839,6 +841,7 @@ function runAct(spec, el, ev){
     a=a.trim();
     if (a==="this") return el;
     if (a==="this.value") return el.value;
+    if (a==="this.textContent") return el.textContent;
     if (a==="event") return ev;
     if (/^-?\d+$/.test(a)) return parseInt(a,10);
     return a.replace(/^['"]|['"]$/g,"");
@@ -1330,7 +1333,7 @@ function renderAliadas(){
       var p = list[i]; if (p.type !== "foundation") continue;
       var area = p.area ? (p.area[lang]||p.area.es||"") : "";
       var pob = p.poblacion ? (p.poblacion[lang]||p.poblacion.es||"") : "";
-      html += '<a class="pcard" href="#fundacion/'+encodeURIComponent(p.id)+'" onclick="return go(\'fundacion/'+escapeHtml(p.id)+'\')">'
+      html += '<a class="pcard" href="#fundacion/'+encodeURIComponent(p.id)+'">'
             + ((p.logo && canShowLogo(p)) ? '<img class="pcard-logo" src="'+escapeHtml(p.logo)+'" alt="" loading="lazy">' : '')
             + '<span class="pcard-body"><b>'+escapeHtml(p.name)+'</b>'
             + '<span class="mu">'+escapeHtml(pob+(pob&&area?" · ":"")+area)+'</span></span>'
@@ -1354,7 +1357,7 @@ function renderFicha(fid){
         years = pick(pr.years), about = pick(pr.about), hubTxt = pick(pr.hub),
         quote = pick(pr.quote);
     var u = (p.impactUnits && p.impactUnits[0]) || null;
-    var html = '<a class="card-link" href="#hub" onclick="return go(\'hub\')">&larr; '+t("ficha.back")+'</a>'
+    var html = '<a class="card-link" href="#hub">&larr; '+t("ficha.back")+'</a>'
       + '<div class="ficha-head">'
       + ((p.logo && canShowLogo(p)) ? '<img class="ficha-logo" src="'+esc(p.logo)+'" alt="">' : '')
       + '<div><h1 class="ficha-name">'+esc(p.name)+'</h1>'
@@ -1384,7 +1387,7 @@ function renderFicha(fid){
         html += '<div class="gal-strip" role="list">';
         for (var gi=0; gi<gal.length; gi++){
           var ph = gal[gi], alt = (ph.alt && (ph.alt[lang]||ph.alt.es)) || "";
-          html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" onclick="openLightbox(\''+esc(p.id)+'\','+gi+')">'
+          html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openLightbox(\''+esc(p.id)+'\','+gi+')">'
                 + '<img src="'+esc(ph.src)+'" alt="'+esc(alt)+'" loading="lazy"></button>';
         }
         html += '</div>';
@@ -1395,7 +1398,7 @@ function renderFicha(fid){
     if (u){
       var qs = [10000, 20000, 50000, 100000];
       var chips = qs.map(function(q,qi){
-        return '<button type="button" class="fimp-q'+(qi===1?' on':'')+'" data-cop="'+q+'" onclick="fichaImpCalc(this,\''+esc(p.id)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
+        return '<button type="button" class="fimp-q'+(qi===1?' on':'')+'" data-cop="'+q+'" data-act="fichaImpCalc(this,\''+esc(p.id)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
       }).join('');
       html += '<div class="card ficha-impact" style="margin-top:26px"><h3>'+t("ficha.imp.t")+'</h3>'
         + '<div class="fimp-row">'+chips+'</div>'
@@ -1405,10 +1408,10 @@ function renderFicha(fid){
     html += '<div class="eco-row" style="margin-top:26px">'
       + (p.url ? '<a class="card-link" href="'+esc(p.url)+'" target="_blank" rel="noopener">'+t("ficha.web")+'</a>' : '')
       + (p.instagram ? '<a class="card-link" style="margin-left:18px" href="'+esc(p.instagram)+'" target="_blank" rel="noopener">Instagram</a>' : '')
-      + '<button type="button" id="ficha-share" class="card-link ficha-share" onclick="return shareFicha(\''+esc(p.id)+'\')">'+t("ficha.share")+'</button>'
+      + '<button type="button" id="ficha-share" class="card-link ficha-share" data-act="shareFicha(\''+esc(p.id)+'\')">'+t("ficha.share")+'</button>'
       + '</div>'
       + '<div class="cta-box" style="margin-top:36px"><h2>'+t("ficha.cta.t")+'</h2><p class="mu">'+t("ficha.cta.p")+'</p>'
-      + '<a class="ficha-cta-btn" href="#donar" onclick="return go(\'donar\')">'+t("ficha.cta.btn")+'</a></div>';
+      + '<a class="ficha-cta-btn" href="#donar">'+t("ficha.cta.btn")+'</a></div>';
     el.innerHTML = html;
     var q0 = el.querySelector(".fimp-q.on");
     if (q0) fichaImpCalc(q0, p.id);
@@ -1430,12 +1433,12 @@ function ensureLightbox(){
   if (d) return d;
   d = document.createElement("dialog");
   d.id = "gal-lb"; d.className = "gal-lb";
-  d.innerHTML = '<button type="button" class="gal-lb-btn gal-lb-x" aria-label="'+t("ficha.gal.close")+'" onclick="closeGalLb()">'
+  d.innerHTML = '<button type="button" class="gal-lb-btn gal-lb-x" aria-label="'+t("ficha.gal.close")+'" data-act="closeGalLb()">'
     + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>'
-    + '<button type="button" class="gal-lb-btn gal-lb-prev" aria-label="'+t("ficha.gal.prev")+'" onclick="stepLightbox(-1)">'
+    + '<button type="button" class="gal-lb-btn gal-lb-prev" aria-label="'+t("ficha.gal.prev")+'" data-act="stepLightbox(-1)">'
     + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="14 6 8 12 14 18"/></svg></button>'
     + '<figure class="gal-lb-fig"><img id="gal-lb-img" alt=""><figcaption id="gal-lb-cap" class="mu"></figcaption></figure>'
-    + '<button type="button" class="gal-lb-btn gal-lb-next" aria-label="'+t("ficha.gal.next")+'" onclick="stepLightbox(1)">'
+    + '<button type="button" class="gal-lb-btn gal-lb-next" aria-label="'+t("ficha.gal.next")+'" data-act="stepLightbox(1)">'
     + '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="10 6 16 12 10 18"/></svg></button>';
   d.addEventListener("click", function(e){ if (e.target === d) closeGalLb(); });
   document.body.appendChild(d);
@@ -1499,7 +1502,7 @@ function initMap(){
       var html="<b>"+escapeHtml(pt.name)+"</b>"+(area?("<br>"+escapeHtml(area)):"");
       if (pt.type==="company"){
         if (pt.direccion) html += "<br>"+escapeHtml(pt.direccion);
-        html += '<br><a href="'+escapeHtml(pt.ficha)+'" onclick="return go(\'comercio/'+escapeHtml(pt.id)+'\')">'+t("map.biz")+"</a>";
+        html += '<br><a href="'+escapeHtml(pt.ficha)+'">'+t("map.biz")+"</a>";
         if (pt.direccion) html += ' &middot; <a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(pt.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+"</a>";
       } else if (pt.url){
         html += '<br><a href="'+escapeHtml(pt.url)+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>";
@@ -1707,7 +1710,7 @@ function init(){
   var hash = location.hash.replace("#","") || "inicio";
   go(hash, true);
   window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||"inicio"; go(h, true); });
-  // Navegación por delegación (reemplaza onclick="return go('...')" inline; CSP fase 1).
+  // Navegación por delegación (reemplaza inline; CSP fase 1).
   // Ignora elementos que aún conservan onclick inline → migración incremental sin doble disparo.
   document.addEventListener("click", function(e){
     var el = e.target.closest("[data-nav], a[href^='#']");
@@ -1716,9 +1719,9 @@ function init(){
     if (!isSpaRoute(route)) return;   // deja pasar skip-link (#), anclas internas, etc.
     e.preventDefault();
     go(route);
-  });
+  }, true);   // captura: funciona aun dentro de popups de Leaflet (que detienen la propagación)
   // Despachador de acciones por delegación (CSP fase 2)
-  document.addEventListener("click", function(e){ var el=e.target.closest("[data-act]"); if(!el) return; e.preventDefault(); runAct(el.getAttribute("data-act"), el, e); });
+  document.addEventListener("click", function(e){ var el=e.target.closest("[data-act]"); if(!el) return; e.preventDefault(); runAct(el.getAttribute("data-act"), el, e); }, true);
   document.addEventListener("input", function(e){ var el=e.target.closest("[data-input]"); if(!el) return; runAct(el.getAttribute("data-input"), el, e); });
   document.addEventListener("change", function(e){ var el=e.target.closest("[data-change]"); if(!el) return; runAct(el.getAttribute("data-change"), el, e); });
   document.addEventListener("submit", function(e){ var el=e.target.closest("[data-submit]"); if(!el) return; e.preventDefault(); runAct(el.getAttribute("data-submit"), el, e); });
@@ -1818,8 +1821,8 @@ function renderJourney(id){
     + '<span class="j-meta"><span data-i18n="journey.t">El recorrido</span> · <b>' + (idx+1) + '</b>/' + JOURNEY.length + '</span>'
     + '<div class="j-track" aria-hidden="true">' + segs + '</div>'
     + '<div class="j-links">';
-  if (prev) html += '<a class="j-prev" href="#'+prev+'" onclick="return go(\''+prev+'\')">&larr; <span data-i18n="'+JOURNEY_KEYS[prev]+'"></span></a>';
-  if (next) html += '<a class="j-next" href="#'+next+'" onclick="return go(\''+next+'\')"><span data-i18n="journey.next">Siguiente</span>: <span data-i18n="'+JOURNEY_KEYS[next]+'"></span> &rarr;</a>';
+  if (prev) html += '<a class="j-prev" href="#'+prev+'">&larr; <span data-i18n="'+JOURNEY_KEYS[prev]+'"></span></a>';
+  if (next) html += '<a class="j-next" href="#'+next+'"><span data-i18n="journey.next">Siguiente</span>: <span data-i18n="'+JOURNEY_KEYS[next]+'"></span> &rarr;</a>';
   else html += '<span class="j-done" data-i18n="journey.done">Recorrido completo.</span>';
   html += '</div></div>';
   bar.innerHTML = html;
@@ -1901,7 +1904,7 @@ function trackNotFound(guide){
   return '<div class="track-card track-nf">'
     + '<h3>'+t("track.nf.t")+'</h3>'
     + '<p>'+t("track.nf.p").replace("{guia}", "<b>"+escapeHtml(guide)+"</b>")+'</p>'
-    + '<button type="button" class="track-noguide" onclick="trackNoGuide()">'+t("track.noguide")+'</button>'
+    + '<button type="button" class="track-noguide" data-act="trackNoGuide()">'+t("track.noguide")+'</button>'
     + '</div>';
 }
 function trackRender(d){
@@ -1987,7 +1990,7 @@ function renderAlmaChips(){
   if (!box) return;
   var keys = ALMA_CHIPS[almaFromRoute] || ALMA_CHIPS["default"];
   box.innerHTML = keys.map(function(k){
-    return '<button type="button" class="alma-chip" onclick="almaAsk(this.textContent)" data-i18n="'+k+'">'+t(k)+'</button>';
+    return '<button type="button" class="alma-chip" data-act="almaAsk(this.textContent)" data-i18n="'+k+'">'+t(k)+'</button>';
   }).join("");
 }
 
@@ -2087,7 +2090,7 @@ function renderGratitudComercios(){
       var nameHtml = link
         ? '<a href="'+escapeHtml(link)+'" target="_blank" rel="noopener">'+escapeHtml(c.name)+'</a>'
         : escapeHtml(c.name);
-      return '<a class="grat-card grat-card-link" href="#comercio/'+c.id+'" onclick="return go(\'comercio/'+c.id+'\')">'
+      return '<a class="grat-card grat-card-link" href="#comercio/'+c.id+'">'
         + '<div class="grat-card-head">'+head
         + '<div><h3>'+escapeHtml(c.name)+'</h3>'
         + '<span class="grat-cat">'+escapeHtml(catLabel)+(c.ciudad?' · '+escapeHtml(c.ciudad):'')+'</span></div></div>'
@@ -2116,7 +2119,7 @@ function renderComercio(cid){
     var about = pick(c.about), ben = pick(c.beneficio), cond = pick(c.condiciones), redime = pick(c.redime);
     var showLogo = c.logo && c.consent && c.consent.logo;
 
-    var html = '<a class="card-link" href="#gratitud" onclick="return go(\'gratitud\')">&larr; '+t("com.back")+'</a>'
+    var html = '<a class="card-link" href="#gratitud">&larr; '+t("com.back")+'</a>'
       + '<div class="ficha-head">'
       + (showLogo ? '<img class="ficha-logo ficha-logo-light" src="'+escapeHtml(c.logo)+'" alt="'+escapeHtml(c.name)+'">' : '')
       + '<div><h1 class="ficha-name">'+escapeHtml(c.name)+'</h1>'
@@ -2151,7 +2154,7 @@ function renderComercio(cid){
       html += '<h3 style="margin-top:34px">'+t("com.gal.t")+'</h3><div class="gal-strip" role="list">';
       for (var gi=0; gi<gal.length; gi++){
         var ph = gal[gi], alt = pick(ph.alt);
-        html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" onclick="openComercioLb(\''+c.id+'\','+gi+')">'
+        html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openComercioLb(\''+c.id+'\','+gi+')">'
               + '<img src="'+escapeHtml(ph.src)+'" alt="'+escapeHtml(alt)+'" loading="lazy"></button>';
       }
       html += '</div>';
@@ -2165,7 +2168,7 @@ function renderComercio(cid){
 
     /* CTA: hacerse miembro (NO donar; la empresa ofrece, el miembro disfruta) */
     html += '<div class="cta-box" style="margin-top:36px"><h2>'+t("com.cta.t")+'</h2><p class="mu">'+t("com.cta.p")+'</p>'
-      + '<a class="ficha-cta-btn" href="#membresias" onclick="return go(\'membresias\')">'+t("com.cta.btn")+'</a></div>';
+      + '<a class="ficha-cta-btn" href="#membresias">'+t("com.cta.btn")+'</a></div>';
 
     el.innerHTML = html;
   });
