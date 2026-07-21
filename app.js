@@ -775,7 +775,14 @@ function setLang(l){
     var vt = document.startViewTransition && window.matchMedia &&
              !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
              typeof lang !== "undefined" && lang && lang !== next;
-    if (vt){ document.startViewTransition(function(){ postLang(l); }); }
+    if (vt){
+      try {
+        var tr = document.startViewTransition(function(){ postLang(l); });
+        // Si una transición previa sigue activa, esta la aborta y su promesa
+        // rechaza con InvalidStateError: lo absorbemos (no es un fallo real).
+        if (tr && tr.finished && tr.finished.catch) tr.finished.catch(function(){});
+      } catch(e){ postLang(l); }
+    }
     else { postLang(l); }
   });
 }
@@ -1244,7 +1251,7 @@ function loadPartners(){
     })
     .catch(function(){ PARTNERS_DATA = PARTNERS_FALLBACK; return PARTNERS_DATA; });
 }
-var NET_COLORS = { foundation:"#1F5C38", company:"#B4690E", hub:"#0A2A5E" };
+var NET_COLORS = { foundation:"#2E7D4F", company:"#B4690E", hub:"#1F5C38" };
 function renderHeroImpact(){
   var el = document.getElementById("hero-impact"); if (!el) return;
   loadPartners().then(function(){
