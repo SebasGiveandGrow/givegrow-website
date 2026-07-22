@@ -756,6 +756,8 @@ function postLang(l){
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
+  if (currentRoute==="gratitud") renderGratitudComercios();
+  document.querySelectorAll(".faq-a").forEach(function(a){ if(a.parentElement.classList.contains("open")) a.style.maxHeight = a.scrollHeight + "px"; });
 }
 var I18N_LOADING = null;
 function ensureLang(next){
@@ -868,6 +870,7 @@ function go(id, fromPop){
   if (location.hash !== "#"+id) history[fromPop ? "replaceState" : "pushState"](null,"","#"+id);
   applyRouteMeta(id);
   renderJourney(id);
+  if (id==="impacto") initGallery();
   window.scrollTo(0,0);
   closeDrawer();
   initReveal();
