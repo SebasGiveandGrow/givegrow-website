@@ -869,6 +869,7 @@ function go(id, fromPop){
   applyRouteMeta(id);
   renderJourney(id);
   window.scrollTo(0,0);
+  if (!fromPop) focusActivePage();
   closeDrawer();
   initReveal();
   animateCounters();
