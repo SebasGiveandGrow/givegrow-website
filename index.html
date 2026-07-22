@@ -32,7 +32,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=5533a121">
+<link rel="stylesheet" href="/styles.css?v=605593bb">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -44,7 +44,6 @@
 </head>
 <body>
 <a class="skip-link" href="#" data-act="skipToContent()" data-i18n="a11y.skip">Saltar al contenido</a>
-<a href="#" class="skip-link" data-act="focusActivePage()" data-i18n="a11y.skip">Saltar al contenido</a>
 
 <!-- NAV -->
 <nav id="nav">
@@ -629,7 +628,7 @@
     <div class="wrap rv d2">
       <div class="alma">
         <div class="alma-head"><span class="dot"></span><strong>ALMA</strong></div>
-        <div id="alma-msgs"></div>
+        <div id="alma-msgs" role="log" aria-live="polite" aria-atomic="false"></div>
         <div class="alma-chips" id="alma-chips" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px 0"></div>
         <div class="alma-in">
           <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder" placeholder="Escribe tu pregunta...">
@@ -949,7 +948,7 @@
           <div class="field"><label data-i18n="form.email">Correo</label><input type="email" id="cf-email"></div>
           <div class="field"><label data-i18n="form.msg">Mensaje</label><textarea rows="4" id="cf-msg"></textarea></div>
           <button type="button" class="btn btn-g" data-act="formSend()" data-i18n="form.send">Enviar mensaje</button>
-          <p id="cf-note" style="margin-top:12px;font-size:14px;display:none"></p>
+          <p id="cf-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
         </div>
         <div class="card">
           <p><strong data-i18n="contacto.email">Correo</strong><br>sebas@thegiveandgrowproject.org</p>
@@ -974,7 +973,7 @@
         </div>
         <button type="button" class="track-noguide" data-act="trackNoGuide()" data-i18n="track.noguide">No tengo mi guía</button>
       </div>
-      <div id="track-result" class="track-result" style="display:none"></div>
+      <div id="track-result" class="track-result" role="status" aria-live="polite" style="display:none"></div>
       <div id="track-noguide-box" class="track-noguide-box" style="display:none">
         <h3 data-i18n="track.ng.t">Te reenviamos tu guía</h3>
         <p data-i18n="track.ng.p">Escribe el correo con el que hiciste tu donación y te enviaremos tu número de guía para que puedas rastrearla.</p>
@@ -1184,7 +1183,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=a4b7d95b"></script>
+<script src="/app.js?v=aa1db39c"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
