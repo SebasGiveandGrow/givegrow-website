@@ -1721,7 +1721,7 @@ function init(){
     go(route);
   }, true);   // captura: funciona aun dentro de popups de Leaflet (que detienen la propagación)
   // Despachador de acciones por delegación (CSP fase 2)
-  document.addEventListener("click", function(e){ var el=e.target.closest("[data-act]"); if(!el) return; e.preventDefault(); runAct(el.getAttribute("data-act"), el, e); }, true);
+  document.addEventListener("click", function(e){ var el=e.target.closest("[data-act]"); if(!el) return; if(el.tagName==="A") e.preventDefault(); runAct(el.getAttribute("data-act"), el, e); }, true);
   document.addEventListener("input", function(e){ var el=e.target.closest("[data-input]"); if(!el) return; runAct(el.getAttribute("data-input"), el, e); });
   document.addEventListener("change", function(e){ var el=e.target.closest("[data-change]"); if(!el) return; runAct(el.getAttribute("data-change"), el, e); });
   document.addEventListener("submit", function(e){ var el=e.target.closest("[data-submit]"); if(!el) return; e.preventDefault(); runAct(el.getAttribute("data-submit"), el, e); });
