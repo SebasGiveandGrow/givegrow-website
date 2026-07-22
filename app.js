@@ -1627,7 +1627,7 @@ Más de 25 fundaciones preaprobadas en la red de espera; la vinculación formal 
 
 var almaHistory = [];
 function almaFmt(text){
-  var s = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  var s = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   // links [label](url)
   s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, function(m,l,u){ return '<a href="'+u+'" target="_blank" rel="noopener">'+l+'</a>'; });
   // bare http(s) urls
@@ -2090,7 +2090,7 @@ function renderGratitudComercios(){
       var nameHtml = link
         ? '<a href="'+escapeHtml(link)+'" target="_blank" rel="noopener">'+escapeHtml(c.name)+'</a>'
         : escapeHtml(c.name);
-      return '<a class="grat-card grat-card-link" href="#comercio/'+c.id+'">'
+      return '<a class="grat-card grat-card-link" href="#comercio/'+escapeHtml(c.id)+'">'
         + '<div class="grat-card-head">'+head
         + '<div><h3>'+escapeHtml(c.name)+'</h3>'
         + '<span class="grat-cat">'+escapeHtml(catLabel)+(c.ciudad?' · '+escapeHtml(c.ciudad):'')+'</span></div></div>'
@@ -2154,7 +2154,7 @@ function renderComercio(cid){
       html += '<h3 style="margin-top:34px">'+t("com.gal.t")+'</h3><div class="gal-strip" role="list">';
       for (var gi=0; gi<gal.length; gi++){
         var ph = gal[gi], alt = pick(ph.alt);
-        html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openComercioLb(\''+c.id+'\','+gi+')">'
+        html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openComercioLb(\''+escapeHtml(c.id)+'\','+gi+')">'
               + '<img src="'+escapeHtml(ph.src)+'" alt="'+escapeHtml(alt)+'" loading="lazy"></button>';
       }
       html += '</div>';
