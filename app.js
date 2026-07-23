@@ -1099,7 +1099,9 @@ function calcUpdate(){
       var dirigida = (calc.projectId && calc.projectId!=="general");
       if (n>=1){
         // Alcanza al menos una unidad: conteo normal.
-        iout.textContent = "\u2248 "+n+" "+uLabel; irow.style.display="";
+        var perLbl = (calc.freq==="m") ? (lang==="en"?" per month":" al mes")
+                   : (calc.freq==="a") ? (lang==="en"?" per year":" al a\u00f1o") : "";
+        iout.textContent = "\u2248 "+n+" "+uLabel+perLbl; irow.style.display="";
         if(inote){
           inote.style.display="";
           // Lectura agregada para unidades mensuales: 12 -> años, 6 -> semestres.
