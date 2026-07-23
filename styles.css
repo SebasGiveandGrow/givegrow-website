@@ -289,6 +289,8 @@ input[type=range]{width:100%;accent-color:var(--gn);margin:8px 0 4px}
 .field{margin-bottom:16px}
 .field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
 .field input,.field textarea,.field select{width:100%;padding:11px 14px;border:1px solid var(--bd);border-radius:10px;font-family:inherit;font-size:15px}
+/* select del form: mismo fondo/tinta que los inputs (día y noche) + flecha propia */
+.field select{background-color:var(--surface);color:var(--ink);appearance:none;-webkit-appearance:none;padding-right:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .field input:focus,.field textarea:focus{outline:none;border-color:var(--g)}
 
 /* ===== prose ===== */

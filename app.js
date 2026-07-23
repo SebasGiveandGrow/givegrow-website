@@ -89,7 +89,19 @@ var I18N = {
     "ally.f.tel":"Teléfono",
     "ally.f.ciudad":"Ciudad",
     "ally.f.dir":"Dirección",
-    "ally.f.web":"Sitio web o Instagram",
+    "ally.f.web":"Sitio web",
+    "ally.f.instagram":"Instagram",
+    "ally.f.sector":"Sector o industria",
+    "ally.sector.ph":"Selecciona…",
+    "ally.sector.gastro":"Gastronomía",
+    "ally.sector.moda":"Moda",
+    "ally.sector.belleza":"Belleza y bienestar",
+    "ally.sector.salud":"Salud y odontología",
+    "ally.sector.serv":"Servicios profesionales",
+    "ally.sector.comercio":"Comercio y retail",
+    "ally.sector.otro":"Otro",
+    "ally.f.aporta":"En una frase, ¿qué aporta tu empresa?",
+    "ally.f.aporta.ph":"Ej. Padrinazgo de 200 platos al mes",
     "ally.f.desc":"Descripción del negocio (en tus propias palabras)",
     "ally.s.mods":"¿Cómo quieres apoyar? (elige una o varias)",
     "ally.m.don.t":"Donación",
@@ -120,6 +132,9 @@ var I18N = {
     "ally.sending":"Enviando tu solicitud…",
     "ally.ok":"¡Recibimos tu solicitud! Te enviamos un correo de confirmación y pronto recibirás el Convenio Marco para firmar.",
     "ally.err.aut":"Para continuar, marca las tres autorizaciones requeridas.",
+    "ally.err.mod":"Marca al menos una forma de apoyar.",
+    "ally.err.ben":"Cuéntanos qué beneficio ofreces para el Programa de Gratitud.",
+    "ally.err.serv":"Describe el servicio que ofreces a la población vulnerable.",
     "ally.err.send":"No pudimos enviar tu solicitud. Intenta de nuevo o escríbenos a contabilidad@thegiveandgrowproject.org.",
     "ally.err.config":"El formulario aún se está configurando. Escríbenos a contabilidad@thegiveandgrowproject.org.",
     "track.ey":"Trazabilidad real",
@@ -2095,6 +2110,10 @@ function allyToggleServ(){
   var on = document.getElementById("mod-servicios").checked;
   document.getElementById("ally-servbox").style.display = on ? "" : "none";
 }
+// Mapeo intake -> modalidad pública de la tarjeta (partners.json type:company):
+//   modDonacion|modRse -> "padrinazgo" ; modServicios|modDifusion -> "alianza" ;
+//   modVoluntariado -> "journey" ; modGratitud -> "gratitud".
+// El form guarda las 6 (uso interno); al aprobar, se traduce a modalidad[] curada.
 function allySubmit(ev){
   ev.preventDefault();
   var note = document.getElementById("ally-note");
@@ -2102,13 +2121,26 @@ function allySubmit(ev){
   var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
   var chk = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
 
+  // Honeypot: si el campo trampa viene lleno, es un bot. Fingimos éxito y no enviamos.
+  if (val("ally-website2")){
+    document.getElementById("ally-form").reset(); allyToggleGrat(); allyToggleServ();
+    return allyMsg(note, t("ally.ok"), true);
+  }
+  // Al menos una forma de apoyar
+  var anyMod = chk("mod-donacion")||chk("mod-rse")||chk("mod-gratitud")||chk("mod-servicios")||chk("mod-voluntariado")||chk("mod-difusion");
+  if (!anyMod) return allyMsg(note, t("ally.err.mod"), false);
+  // Condicionales: la modalidad marcada exige su detalle
+  if (chk("mod-gratitud") && !val("ally-ben")) return allyMsg(note, t("ally.err.ben"), false);
+  if (chk("mod-servicios") && !val("ally-servdet")) return allyMsg(note, t("ally.err.serv"), false);
+  // Autorizaciones (Ley 1581 + licitud + uso de marca)
   if (!chk("aut-marca") || !chk("aut-datos") || !chk("aut-licitud")){
     return allyMsg(note, t("ally.err.aut"), false);
   }
   var payload = {
     razon:val("ally-razon"), nit:val("ally-nit"), representante:val("ally-rep"), cedula:val("ally-cedula"),
     contacto:val("ally-contacto"), correo:val("ally-correo"), telefono:val("ally-tel"),
-    ciudad:val("ally-ciudad"), direccion:val("ally-dir"), web:val("ally-web"), descripcion:val("ally-desc"),
+    ciudad:val("ally-ciudad"), sector:val("ally-sector"), direccion:val("ally-dir"),
+    web:val("ally-web"), instagram:val("ally-instagram"), descripcion:val("ally-desc"), aporta:val("ally-aporta"),
     modDonacion:chk("mod-donacion"), modRse:chk("mod-rse"), modGratitud:chk("mod-gratitud"),
     modServicios:chk("mod-servicios"), modVoluntariado:chk("mod-voluntariado"), modDifusion:chk("mod-difusion"),
     benBeneficio:val("ally-ben"), benNivel:val("ally-nivel"), benCondiciones:val("ally-cond"), benRedime:val("ally-redime"),

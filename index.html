@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=12565a42">
+<link rel="stylesheet" href="/styles.css?v=77d4bf13">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1020,6 +1020,11 @@
       <p class="lead rv d1" data-i18n="ally.lead">Tu empresa puede apoyar el impacto de la forma que elija — sin costo, sin exclusividad, y con reconocimiento. Cuéntanos y te enviaremos el Convenio Marco de Alianza para revisar y firmar.</p>
 
       <form id="ally-form" class="ally-form rv d2" data-submit="allySubmit(event)">
+        <!-- honeypot anti-spam: invisible para humanos; si un bot lo llena, descartamos el envío -->
+        <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">
+          <label for="ally-website2">No completar</label>
+          <input type="text" id="ally-website2" name="website2" tabindex="-1" autocomplete="off">
+        </div>
         <h3 class="ally-sec" data-i18n="ally.s.empresa">Datos de la empresa</h3>
         <div class="ally-grid">
           <div class="field"><label for="ally-razon" data-i18n="ally.f.razon">Razón social o nombre del emprendimiento *</label><input type="text" id="ally-razon" required></div>
@@ -1030,9 +1035,21 @@
           <div class="field"><label for="ally-correo" data-i18n="ally.f.correo">Correo *</label><input type="email" id="ally-correo" required autocomplete="email"></div>
           <div class="field"><label for="ally-tel" data-i18n="ally.f.tel">Teléfono</label><input type="tel" id="ally-tel"></div>
           <div class="field"><label for="ally-ciudad" data-i18n="ally.f.ciudad">Ciudad</label><input type="text" id="ally-ciudad"></div>
+          <div class="field"><label for="ally-sector" data-i18n="ally.f.sector">Sector o industria</label><select id="ally-sector">
+            <option value="" data-i18n="ally.sector.ph">Selecciona…</option>
+            <option value="Gastronomía" data-i18n="ally.sector.gastro">Gastronomía</option>
+            <option value="Moda" data-i18n="ally.sector.moda">Moda</option>
+            <option value="Belleza y bienestar" data-i18n="ally.sector.belleza">Belleza y bienestar</option>
+            <option value="Salud y odontología" data-i18n="ally.sector.salud">Salud y odontología</option>
+            <option value="Servicios profesionales" data-i18n="ally.sector.serv">Servicios profesionales</option>
+            <option value="Comercio y retail" data-i18n="ally.sector.comercio">Comercio y retail</option>
+            <option value="Otro" data-i18n="ally.sector.otro">Otro</option>
+          </select></div>
           <div class="field ally-wide"><label for="ally-dir" data-i18n="ally.f.dir">Dirección</label><input type="text" id="ally-dir"></div>
-          <div class="field ally-wide"><label for="ally-web" data-i18n="ally.f.web">Sitio web o Instagram</label><input type="text" id="ally-web" placeholder="@tu_empresa"></div>
+          <div class="field"><label for="ally-web" data-i18n="ally.f.web">Sitio web</label><input type="url" id="ally-web" placeholder="https://tuempresa.com"></div>
+          <div class="field"><label for="ally-instagram" data-i18n="ally.f.instagram">Instagram</label><input type="text" id="ally-instagram" placeholder="@tuempresa"></div>
           <div class="field ally-wide"><label for="ally-desc" data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" rows="4" placeholder="En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud."></textarea></div>
+          <div class="field ally-wide"><label for="ally-aporta" data-i18n="ally.f.aporta">En una frase, ¿qué aporta tu empresa?</label><input type="text" id="ally-aporta" maxlength="90" data-i18n="ally.f.aporta.ph" data-i18n-attr="placeholder" placeholder="Ej. Padrinazgo de 200 platos al mes"></div>
         </div>
 
         <h3 class="ally-sec" data-i18n="ally.s.mods">¿Cómo quieres apoyar? (elige una o varias)</h3>
@@ -1210,7 +1227,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=be7521c8"></script>
+<script src="/app.js?v=4b77899e"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
