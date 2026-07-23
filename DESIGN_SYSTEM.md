@@ -7,7 +7,7 @@ Estas reglas son vinculantes: cualquier trabajo nuevo debe respetarlas.
 - Tagline (INTOCABLE): **"Dar para crecer, crecer para dar más."**
 - Nombre canónico del centro operativo: **HUB SOCIAL** (nunca "Compassion Hub").
 - Colores: `--g` verde #1F5C38, `--navy` #0A1628, acento verde claro #9be3b6. Vars: `--gl/--bd/--mu/--rl/--r/--shadow/--shadow-lg/--ease`.
-- Tipografías: Bricolage Grotesque (títulos), Inter (cuerpo), Fraunces (acento).
+- Tipografías: **Unbounded** (display — títulos h1/h2 y cifras clave, con moderación), **Inter** (cuerpo, UI, h3/h4), **Fraunces** italic (acento editorial). Bricolage Grotesque quedó retirada (etapa anterior de marca).
 
 ## Reglas de diseño (nuevas / confirmadas)
 1. **Cero emojis en todo el sitio.** Sin excepción. Todo ícono es SVG line-art.
