@@ -1,4 +1,3 @@
-@font-face{font-family:"Bricolage Grotesque";font-style:normal;font-weight:200 800;font-display:swap;src:url("/vendor/fonts/bricolage-latin.woff2") format("woff2")}
 @font-face{font-family:"Unbounded";font-style:normal;font-weight:200 900;font-display:swap;src:url("/vendor/fonts/unbounded-latin.woff2") format("woff2")}
 @font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url("/vendor/fonts/inter-latin.woff2") format("woff2")}
 @font-face{font-family:"Fraunces";font-style:italic;font-weight:100 900;font-display:swap;src:url("/vendor/fonts/fraunces-italic-latin.woff2") format("woff2")}
@@ -15,7 +14,7 @@
   --shadow:0 2px 8px rgba(0,0,0,.06);
   --shadow-lg:0 10px 30px rgba(0,0,0,.10);
   --maxw:1120px;
-  --font-display:"Unbounded","Bricolage Grotesque",sans-serif;
+  --font-display:"Unbounded",sans-serif;
   /* ===== Escala tipográfica editorial — v5 Etapa 2 "La voz" =====
      Ritmo modular fluido (base 16px). Gravedad de informe anual, no de landing.
      El término medio del clamp usa vw + rem para respetar el zoom del usuario. */
@@ -47,7 +46,7 @@
 html{font-size:16px;scroll-behavior:smooth}
 body{font-family:"Inter",system-ui,sans-serif;font-size:var(--fs-body);color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;line-height:var(--lh-body);overflow-x:hidden}
 h1,h2{font-family:var(--font-display);line-height:var(--lh-heading);letter-spacing:var(--tr-heading);font-weight:700}
-h3,h4{font-family:"Bricolage Grotesque",sans-serif;line-height:var(--lh-tight);letter-spacing:var(--tr-heading);font-weight:700}
+h3,h4{font-family:"Inter",sans-serif;line-height:var(--lh-tight);letter-spacing:var(--tr-heading);font-weight:700}
 em.fr{font-family:"Fraunces",serif;font-style:italic;font-weight:400}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;cursor:pointer;border:none;background:none}
@@ -63,7 +62,7 @@ img{display:block;max-width:100%;object-fit:cover}
 nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:14px 0;padding-top:calc(14px + env(safe-area-inset-top));transition:background .3s,box-shadow .3s}
 nav.sol{background:var(--nav-bg);backdrop-filter:blur(12px);box-shadow:0 1px 0 var(--bd)}
 .nav-in{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-.nlogo{font-family:"Bricolage Grotesque",sans-serif;font-size:16px;font-weight:800;color:var(--ink)}
+.nlogo{font-family:var(--font-display);font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
 .nlogo em{font-style:normal;color:var(--gm)}
 .nlinks{display:flex;align-items:center;gap:6px}
 .nlink{position:relative;padding:8px 11px;border-radius:8px;font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap;transition:background .15s,color .15s}
@@ -124,7 +123,7 @@ section{padding:72px 0}
 .hero-eyebrow{font-size:var(--fs-eyebrow);letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--gn);font-weight:800;margin-bottom:18px}
 .hero h1{font-size:var(--fs-h1);line-height:var(--lh-tight);letter-spacing:var(--tr-display);max-width:14ch;margin-bottom:22px}
 .hero h1 em{color:var(--gn)}
-.hero-lead{font-size:var(--fs-lead);line-height:var(--lh-snug);max-width:52ch;color:rgba(255,255,255,.88);margin-bottom:34px}
+.hero-lead{font-family:"Fraunces",serif;font-style:italic;font-weight:400;font-size:var(--fs-lead);line-height:var(--lh-snug);letter-spacing:0;max-width:46ch;color:rgba(255,255,255,.92);margin-bottom:34px}
 .paths{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:760px}
 .path{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:var(--rl);padding:22px;text-align:left;backdrop-filter:blur(6px);transition:transform .2s var(--ease),background .2s}
 .path:hover{transform:translateY(-4px);background:rgba(255,255,255,.14)}
@@ -139,7 +138,7 @@ section{padding:72px 0}
 .stats .stat:first-child{background:var(--g);border-color:var(--g)}
 .stats .stat:first-child .num{color:#fff}
 .stats .stat:first-child .lab{color:rgba(255,255,255,.85)}
-.stat .num{font-family:"Bricolage Grotesque",sans-serif;font-size:clamp(30px,4vw,46px);font-weight:800;color:var(--acc)}
+.stat .num{font-family:var(--font-display);font-size:clamp(30px,4vw,46px);font-weight:800;color:var(--acc)}
 .stat .lab{font-size:13px;color:var(--mu);margin-top:4px}
 @media (max-width:880px){.stats{grid-template-columns:1fr 1fr}}
 
@@ -154,7 +153,7 @@ section{padding:72px 0}
 .card-empty h3{color:var(--ink)}
 .card-empty p{color:var(--mu)}
 .tier-price{margin:4px 0 10px}
-.tier-price b{font-family:"Bricolage Grotesque",sans-serif;font-size:23px;color:var(--acc)}
+.tier-price b{font-family:var(--font-display);font-size:23px;color:var(--acc)}
 .tier-price span{font-size:13px;color:var(--mu);margin-left:6px}
 .tier-more{font-size:12.5px;font-weight:700;color:var(--ink);margin:14px 0 8px}
 .tier-ben{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:7px}
@@ -176,7 +175,7 @@ section{padding:72px 0}
 /* trazabilidad steps */
 .steps{counter-reset:s;display:grid;gap:18px}
 .step{display:flex;gap:18px;align-items:flex-start}
-.step::before{counter-increment:s;content:counter(s);flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:var(--g);color:#fff;font-family:"Bricolage Grotesque";font-weight:800;display:flex;align-items:center;justify-content:center}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:var(--g);color:#fff;font-family:var(--font-display);font-weight:800;display:flex;align-items:center;justify-content:center}
 .step-n{display:none}
 .step h4{font-size:17px;margin-bottom:3px}
 .step p{font-size:14px;color:var(--mu)}
@@ -211,7 +210,7 @@ input[type=range]{width:100%;accent-color:var(--gn);margin:8px 0 4px}
 .calc-row b{color:var(--gn)}
 .member{display:flex;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)}
 #m-ic{font-size:30px}
-#m-name{font-weight:800;font-family:"Bricolage Grotesque"}
+#m-name{font-weight:800;font-family:"Inter",sans-serif}
 #m-sub{font-size:13px;color:rgba(255,255,255,.6)}
 
 /* ===== PAYMENTS ===== */
@@ -405,7 +404,7 @@ footer a:hover{color:var(--gn)}
 .pcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(31,92,56,.12)}
 .pcard-logo{width:56px;height:56px;object-fit:contain;background:#fff;padding:5px;box-sizing:border-box;border-radius:12px;border:1px solid var(--bd);flex:0 0 auto}
 .pcard-body{display:flex;flex-direction:column;gap:2px;min-width:0}
-.pcard-body b{font-family:"Bricolage Grotesque",sans-serif;font-size:15.5px;color:var(--ink);line-height:1.25}
+.pcard-body b{font-family:"Inter",sans-serif;font-weight:700;font-size:15.5px;color:var(--ink);line-height:1.25}
 .pcard-body .mu{font-size:12.5px}
 .pcard-go{margin-left:auto;color:var(--acc);font-weight:700;transition:transform .25s var(--ease)}
 .pcard:hover .pcard-go{transform:translateX(4px)}
