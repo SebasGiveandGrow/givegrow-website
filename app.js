@@ -694,6 +694,7 @@ function t(k){ return (I18N[lang] && I18N[lang][k]) || (I18N.es[k]) || k; }
 var currentRoute = "inicio";
 var ROUTE_META = {
   inicio:{t:{es:"Give&Grow International — Dar para crecer, crecer para dar más",en:"Give&Grow International — Give to grow, grow to give more"},d:{es:"Conectamos generosidad con necesidad en Colombia, con trazabilidad completa. Fundación sin ánimo de lucro en Medellín.",en:"We connect generosity with need in Colombia, with full traceability. A nonprofit foundation based in Medellín."}},
+  e404:{t:{es:"Página no encontrada · Give&Grow International",en:"Page not found · Give&Grow International"},d:{es:"El enlace que seguiste no lleva a ningún lugar de nuestro ecosistema.",en:"The link you followed doesn't lead anywhere in our ecosystem."}},
   origen:{t:{es:"Nuestro origen · Give&Grow International",en:"Our origin · Give&Grow International"},d:{es:"Cómo nació Give&Grow: del trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín a una fundación con propósito.",en:"How Give&Grow began: from field work in La Guajira, the Sierra Nevada and Medellín's comunas to a foundation with purpose."}},
   hub:{t:{es:"HUB SOCIAL · Give&Grow International",en:"Social Hub · Give&Grow International"},d:{es:"El centro operativo donde se encuentran alianzas, donaciones e impacto. En Medellín.",en:"The operations center where alliances, donations and impact meet. In Medellín."}},
   empresas:{t:{es:"Empresas y RSE · Give&Grow International",en:"Companies & CSR · Give&Grow International"},d:{es:"Convierte la responsabilidad social de tu empresa en impacto medible y trazable, con beneficios tributarios.",en:"Turn your company's social responsibility into measurable, traceable impact, with tax benefits."}},
@@ -729,6 +730,10 @@ function applyRouteMeta(id){
   setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
   setMetaTag("property","og:image", OG_IMG_DEFAULT);
   setMetaTag("name","twitter:image", OG_IMG_DEFAULT);
+  setMetaTag("name","twitter:title",ti);
+  setMetaTag("name","twitter:description",de);
+  // la vista 404 del SPA se sirve con 200 (fallback SPA): no indexarla
+  setMetaTag("name","robots", id==="e404" ? "noindex, follow" : "index, follow");
 }
 function applyFichaMeta(p){
   var pr = p.profile || {};
@@ -744,6 +749,9 @@ function applyFichaMeta(p){
   setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
   setMetaTag("property","og:image", img);
   setMetaTag("name","twitter:image", img);
+  setMetaTag("name","twitter:title",ti);
+  setMetaTag("name","twitter:description",de);
+  setMetaTag("name","robots","index, follow");
 }
 function shareFicha(pid){
   var url = "https://www.thegiveandgrowproject.org/f/"+pid;
