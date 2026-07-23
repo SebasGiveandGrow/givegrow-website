@@ -177,6 +177,17 @@ var I18N = {
     "emp.ey":"RSE empresarial",
     "emp.t":"Tu empresa, con propósito y trazabilidad.",
     "emp.lead":"Tres formas de aliarte. Cada una con beneficio tributario y reporte verificable.",
+    "emp.aliadas.ey":"Red de empresas aliadas",
+    "emp.aliadas.t":"Empresas que crecen dando",
+    "emp.aliadas.lead":"Cada alianza entra con convenio firmado. Aquí verás las empresas que ya suman al impacto — con trazabilidad y reconocimiento.",
+    "emp.aliadas.empty":"Estamos sumando las primeras empresas aliadas. Muy pronto verás aquí quiénes ya crecen dando — con evidencia, no promesas.",
+    "emp.aliadas.cta":"Quiero aliar mi empresa",
+    "emp.card.aporta":"Aporta",
+    "emp.card.recibe":"Recibe",
+    "emp.mod.padrinazgo":"Padrinazgo de Impacto",
+    "emp.mod.journey":"Impact Journey",
+    "emp.mod.alianza":"Alianza a medida",
+    "emp.mod.gratitud":"Programa de Gratitud",
     "emp.p1.t":"Padrinazgo de Impacto",
     "emp.p1.p":"Defines un presupuesto y, con la Calculadora de Impacto, lo traduces en unidades reales y verificables. Recibes certificado de donación y reporte de impacto con evidencia.",
     "emp.p2.t":"Impact Journey",
@@ -771,7 +782,7 @@ function renderPobChips(){
   el.innerHTML = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
 }
 function postLang(l){
-  applyLang(l); renderWall(); renderHeroImpact(); renderAliadas();
+  applyLang(l); renderWall(); renderHeroImpact(); renderAliadas(); renderEmpresas();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
@@ -1406,6 +1417,42 @@ function renderAliadas(){
     }
     html += '<div class="card card-empty"><h3>'+t("hub.aliadas.soon.t")+'</h3><p>'+t("hub.aliadas.soon.p")+'</p></div>';
     el.innerHTML = html;
+  });
+}
+// Muro de empresas aliadas (#empresas). Misma fuente que fundaciones (partners.json),
+// filtrado a type:company. Sin aliadas verificadas -> estado semilla honesto.
+function renderEmpresas(){
+  var el = document.getElementById("empresas-grid"); if (!el) return;
+  var empty = document.getElementById("empresas-empty");
+  loadPartners().then(function(list){
+    var html = "", n = 0;
+    for (var i=0;i<list.length;i++){
+      var p = list[i]; if (p.type !== "company") continue;
+      n++;
+      var sector = p.sector ? (p.sector[lang]||p.sector.es||"") : "";
+      var mods = Array.isArray(p.modalidad) ? p.modalidad : [];
+      var tags = mods.map(function(m){ return '<span class="emp-mod">'+escapeHtml(t("emp.mod."+m))+'</span>'; }).join("");
+      var aporta = p.aporta ? (p.aporta[lang]||p.aporta.es||"") : "";
+      var recibe = p.recibe ? (p.recibe[lang]||p.recibe.es||"") : "";
+      var recip = "";
+      if (aporta) recip += '<span class="emp-recip"><i>'+escapeHtml(t("emp.card.aporta"))+'</i> '+escapeHtml(aporta)+'</span>';
+      if (recibe) recip += '<span class="emp-recip"><i>'+escapeHtml(t("emp.card.recibe"))+'</i> '+escapeHtml(recibe)+'</span>';
+      var inner = ((p.logo && canShowLogo(p)) ? '<img class="pcard-logo" src="'+escapeHtml(p.logo)+'" alt="" loading="lazy">' : '')
+        + '<span class="pcard-body"><b>'+escapeHtml(p.name)+'</b>'
+        + (sector ? '<span class="mu">'+escapeHtml(sector)+'</span>' : '')
+        + (tags ? '<span class="emp-mods">'+tags+'</span>' : '')
+        + (recip ? '<span class="emp-recips">'+recip+'</span>' : '')
+        + '</span>';
+      if (p.url){
+        html += '<a class="pcard pcard-emp" href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener">'+inner
+          + '<span class="pcard-go" aria-hidden="true">&#8599;</span></a>';
+      } else {
+        html += '<div class="pcard pcard-emp">'+inner+'</div>';
+      }
+    }
+    el.innerHTML = html;
+    el.style.display = n ? "" : "none";
+    if (empty) empty.style.display = n ? "none" : "";
   });
 }
 function renderFicha(fid){
