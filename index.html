@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=f22daa24">
+<link rel="stylesheet" href="/styles.css?v=49040344">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -633,7 +633,7 @@
         <div id="alma-msgs" role="log" aria-live="polite" aria-atomic="false"></div>
         <div class="alma-chips" id="alma-chips" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px 0"></div>
         <div class="alma-in">
-          <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder" placeholder="Escribe tu pregunta...">
+          <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder,aria-label" placeholder="Escribe tu pregunta..." aria-label="Escribe tu pregunta...">
           <button id="alma-send" class="alma-send" data-act="almaSend()" data-i18n="alma.send">Enviar</button>
         </div>
       </div>
@@ -740,8 +740,8 @@
       <div class="calc">
         <div class="calc-cap" id="calc-tipo-lbl" data-i18n="calc.tipo.lbl">¿Aportas como persona o empresa?</div>
         <div class="calc-tabs" role="group" aria-labelledby="calc-tipo-lbl">
-          <button id="ctab-ind" class="calc-tab on" data-act="setCalcMode('ind')" data-i18n="calc.tab.ind">Persona</button>
-          <button id="ctab-emp" class="calc-tab" data-act="setCalcMode('emp')" data-i18n="calc.tab.emp">Empresa</button>
+          <button type="button" id="ctab-ind" class="calc-tab on" aria-pressed="true" data-act="setCalcMode('ind')" data-i18n="calc.tab.ind">Persona</button>
+          <button type="button" id="ctab-emp" class="calc-tab" aria-pressed="false" data-act="setCalcMode('emp')" data-i18n="calc.tab.emp">Empresa</button>
         </div>
         <div class="cur-toggle">
           <button id="cur-cop" class="on" data-act="setCur('COP')">COP</button>
@@ -752,9 +752,9 @@
           <select id="calc-project" class="calc-select" data-change="setProject(this.value)"></select>
         </div>
         <div class="calc-amount"><div id="calc-display">$200.000</div></div>
-        <input id="calc-manual" type="text" placeholder="0" data-input="onManual(this.value)">
+        <input id="calc-manual" type="text" placeholder="0" data-input="onManual(this.value)" data-i18n="calc.manual.aria" data-i18n-attr="aria-label" aria-label="Escribe el monto de tu donación">
         <div id="calc-rate"></div>
-        <input id="calc-slider" type="range" min="0" max="100" value="50" data-input="onSlider(this.value)">
+        <input id="calc-slider" type="range" min="0" max="100" value="50" data-input="onSlider(this.value)" data-i18n="calc.slider.aria" data-i18n-attr="aria-label" aria-label="Ajusta el monto de tu donación">
         <div class="calc-hints"><span>$5.000</span><span>$20.000.000</span></div>
         <div class="calc-quick" id="calc-quick">
           <button class="qbtn" data-act="setQuick(25000)">$25K</button>
@@ -801,21 +801,21 @@
 
   <section class="cream">
     <div class="wrap center">
-      <h3 class="rv" data-i18n="pay.t" style="margin-bottom:20px">Cómo aportar</h3>
-      <div class="pay-tabs rv d1">
-        <button id="paytab-banco" class="pay-tab on" data-act="payMethod('banco')" data-i18n="pay.tab.banco">Bancolombia</button>
-        <button id="paytab-paypal" class="pay-tab" data-act="payMethod('paypal')" data-i18n="pay.tab.paypal">PayPal</button>
-        <button id="paytab-mp" class="pay-tab" data-act="payMethod('mp')" data-i18n="pay.tab.mp">MercadoPago</button>
+      <h3 id="pay-heading" class="rv" data-i18n="pay.t" style="margin-bottom:20px">Cómo aportar</h3>
+      <div class="pay-tabs rv d1" role="tablist" aria-labelledby="pay-heading">
+        <button type="button" id="paytab-banco" class="pay-tab on" role="tab" aria-selected="true" aria-controls="pay-banco" tabindex="0" data-act="payMethod('banco')" data-i18n="pay.tab.banco">Bancolombia</button>
+        <button type="button" id="paytab-paypal" class="pay-tab" role="tab" aria-selected="false" aria-controls="pay-paypal" tabindex="-1" data-act="payMethod('paypal')" data-i18n="pay.tab.paypal">PayPal</button>
+        <button type="button" id="paytab-mp" class="pay-tab" role="tab" aria-selected="false" aria-controls="pay-mp" tabindex="-1" data-act="payMethod('mp')" data-i18n="pay.tab.mp">MercadoPago</button>
       </div>
-      <div id="pay-banco" class="pay-panel on rv d2">
+      <div id="pay-banco" class="pay-panel on rv d2" role="tabpanel" aria-labelledby="paytab-banco" tabindex="0">
         <div class="pay-row"><span data-i18n="pay.bank">Banco</span><b>Bancolombia</b></div>
         <div class="pay-row"><span data-i18n="pay.acc">Cuenta de Ahorros</span><span style="display:flex;gap:10px;align-items:center"><b>31000009221</b><button class="copy" id="copy-label" data-act="copyAccount()" data-i18n="copy">Copiar</button></span></div>
         <div class="pay-row"><span data-i18n="pay.holder">Titular</span><b>Fundación Give&Grow International</b></div>
         <div class="pay-row"><span data-i18n="pay.nit">NIT</span><b>901.948.930-2</b></div>
         <p class="mu" style="margin-top:14px;text-align:left;font-size:14px" data-i18n="pay.banco.note"></p>
       </div>
-      <div id="pay-paypal" class="pay-panel rv d2"><p class="mu" data-i18n="pay.paypal.note"></p></div>
-      <div id="pay-mp" class="pay-panel rv d2"><p class="mu" data-i18n="pay.mp.note"></p><p class="tag soon" style="margin-top:12px" data-i18n="pay.wompi"></p></div>
+      <div id="pay-paypal" class="pay-panel rv d2" role="tabpanel" aria-labelledby="paytab-paypal" tabindex="0"><p class="mu" data-i18n="pay.paypal.note"></p></div>
+      <div id="pay-mp" class="pay-panel rv d2" role="tabpanel" aria-labelledby="paytab-mp" tabindex="0"><p class="mu" data-i18n="pay.mp.note"></p><p class="tag soon" style="margin-top:12px" data-i18n="pay.wompi"></p></div>
     </div>
   </section>
   <section>
@@ -958,9 +958,9 @@
       <h2 class="h-sec rv" data-i18n="contacto.t">Hablemos.</h2>
       <div class="grid g2 rv d1" style="margin-top:26px">
         <div>
-          <div class="field"><label data-i18n="form.name">Nombre</label><input type="text" id="cf-name"></div>
-          <div class="field"><label data-i18n="form.email">Correo</label><input type="email" id="cf-email"></div>
-          <div class="field"><label data-i18n="form.msg">Mensaje</label><textarea rows="4" id="cf-msg"></textarea></div>
+          <div class="field"><label for="cf-name" data-i18n="form.name">Nombre</label><input type="text" id="cf-name"></div>
+          <div class="field"><label for="cf-email" data-i18n="form.email">Correo</label><input type="email" id="cf-email"></div>
+          <div class="field"><label for="cf-msg" data-i18n="form.msg">Mensaje</label><textarea rows="4" id="cf-msg"></textarea></div>
           <button type="button" class="btn btn-g" data-act="formSend()" data-i18n="form.send">Enviar mensaje</button>
           <p id="cf-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
         </div>
@@ -982,6 +982,7 @@
       <p class="lead rv d1" data-i18n="track.lead">Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.</p>
       <div class="track-box rv d2">
         <div class="track-search">
+          <label for="track-input" class="sr-only" data-i18n="track.aria">Número de guía de tu donación</label>
           <input type="text" id="track-input" placeholder="GG-2026-000001" data-i18n="track.ph" data-i18n-attr="placeholder" data-enter="trackSearch()" autocomplete="off" spellcheck="false">
           <button type="button" class="btn btn-g" data-act="trackSearch()" data-i18n="track.btn">Rastrear</button>
         </div>
@@ -991,9 +992,9 @@
       <div id="track-noguide-box" class="track-noguide-box" style="display:none">
         <h3 data-i18n="track.ng.t">Te reenviamos tu guía</h3>
         <p data-i18n="track.ng.p">Escribe el correo con el que hiciste tu donación y te enviaremos tu número de guía para que puedas rastrearla.</p>
-        <div class="field"><label data-i18n="form.email">Correo</label><input type="email" id="track-ng-email" autocomplete="email"></div>
+        <div class="field"><label for="track-ng-email" data-i18n="form.email">Correo</label><input type="email" id="track-ng-email" autocomplete="email"></div>
         <button type="button" class="btn btn-g" data-act="trackNoGuideSend()" data-i18n="track.ng.btn">Solicitar mi guía</button>
-        <p id="track-ng-note" style="margin-top:12px;font-size:14px;display:none"></p>
+        <p id="track-ng-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
       </div>
     </div>
   </section>
@@ -1009,17 +1010,17 @@
       <form id="ally-form" class="ally-form rv d2" data-submit="allySubmit(event)">
         <h3 class="ally-sec" data-i18n="ally.s.empresa">Datos de la empresa</h3>
         <div class="ally-grid">
-          <div class="field"><label data-i18n="ally.f.razon">Razón social o nombre del emprendimiento *</label><input type="text" id="ally-razon" required></div>
-          <div class="field"><label data-i18n="ally.f.nit">NIT o documento</label><input type="text" id="ally-nit"></div>
-          <div class="field"><label data-i18n="ally.f.rep">Representante legal</label><input type="text" id="ally-rep"></div>
-          <div class="field"><label data-i18n="ally.f.cedula">Cédula del representante</label><input type="text" id="ally-cedula"></div>
-          <div class="field"><label data-i18n="ally.f.contacto">Contacto (nombre y cargo)</label><input type="text" id="ally-contacto"></div>
-          <div class="field"><label data-i18n="ally.f.correo">Correo *</label><input type="email" id="ally-correo" required autocomplete="email"></div>
-          <div class="field"><label data-i18n="ally.f.tel">Teléfono</label><input type="tel" id="ally-tel"></div>
-          <div class="field"><label data-i18n="ally.f.ciudad">Ciudad</label><input type="text" id="ally-ciudad"></div>
-          <div class="field ally-wide"><label data-i18n="ally.f.dir">Dirección</label><input type="text" id="ally-dir"></div>
-          <div class="field ally-wide"><label data-i18n="ally.f.web">Sitio web o Instagram</label><input type="text" id="ally-web" placeholder="@tu_empresa"></div>
-          <div class="field ally-wide"><label data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" rows="4" placeholder="En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud."></textarea></div>
+          <div class="field"><label for="ally-razon" data-i18n="ally.f.razon">Razón social o nombre del emprendimiento *</label><input type="text" id="ally-razon" required></div>
+          <div class="field"><label for="ally-nit" data-i18n="ally.f.nit">NIT o documento</label><input type="text" id="ally-nit"></div>
+          <div class="field"><label for="ally-rep" data-i18n="ally.f.rep">Representante legal</label><input type="text" id="ally-rep"></div>
+          <div class="field"><label for="ally-cedula" data-i18n="ally.f.cedula">Cédula del representante</label><input type="text" id="ally-cedula"></div>
+          <div class="field"><label for="ally-contacto" data-i18n="ally.f.contacto">Contacto (nombre y cargo)</label><input type="text" id="ally-contacto"></div>
+          <div class="field"><label for="ally-correo" data-i18n="ally.f.correo">Correo *</label><input type="email" id="ally-correo" required autocomplete="email"></div>
+          <div class="field"><label for="ally-tel" data-i18n="ally.f.tel">Teléfono</label><input type="tel" id="ally-tel"></div>
+          <div class="field"><label for="ally-ciudad" data-i18n="ally.f.ciudad">Ciudad</label><input type="text" id="ally-ciudad"></div>
+          <div class="field ally-wide"><label for="ally-dir" data-i18n="ally.f.dir">Dirección</label><input type="text" id="ally-dir"></div>
+          <div class="field ally-wide"><label for="ally-web" data-i18n="ally.f.web">Sitio web o Instagram</label><input type="text" id="ally-web" placeholder="@tu_empresa"></div>
+          <div class="field ally-wide"><label for="ally-desc" data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" rows="4" placeholder="En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud."></textarea></div>
         </div>
 
         <h3 class="ally-sec" data-i18n="ally.s.mods">¿Cómo quieres apoyar? (elige una o varias)</h3>
@@ -1035,16 +1036,16 @@
         <div id="ally-gratbox" class="ally-cond" style="display:none">
           <h3 class="ally-sec" data-i18n="ally.s.ficha">Ficha del Beneficio (Programa de Gratitud)</h3>
           <div class="ally-grid">
-            <div class="field ally-wide"><label data-i18n="ally.f.ben">¿Qué beneficio ofreces?</label><input type="text" id="ally-ben" placeholder="Ej. 15% de descuento, un postre de cortesía…"></div>
-            <div class="field"><label data-i18n="ally.f.nivel">¿Desde qué nivel de membresía?</label><input type="text" id="ally-nivel" placeholder="Ej. Retoño en adelante"></div>
-            <div class="field"><label data-i18n="ally.f.redime">¿Cómo se redime?</label><input type="text" id="ally-redime" placeholder="Ej. mostrando la credencial digital"></div>
-            <div class="field ally-wide"><label data-i18n="ally.f.cond">Condiciones o vigencia</label><input type="text" id="ally-cond"></div>
+            <div class="field ally-wide"><label for="ally-ben" data-i18n="ally.f.ben">¿Qué beneficio ofreces?</label><input type="text" id="ally-ben" placeholder="Ej. 15% de descuento, un postre de cortesía…"></div>
+            <div class="field"><label for="ally-nivel" data-i18n="ally.f.nivel">¿Desde qué nivel de membresía?</label><input type="text" id="ally-nivel" placeholder="Ej. Retoño en adelante"></div>
+            <div class="field"><label for="ally-redime" data-i18n="ally.f.redime">¿Cómo se redime?</label><input type="text" id="ally-redime" placeholder="Ej. mostrando la credencial digital"></div>
+            <div class="field ally-wide"><label for="ally-cond" data-i18n="ally.f.cond">Condiciones o vigencia</label><input type="text" id="ally-cond"></div>
           </div>
         </div>
 
         <div id="ally-servbox" class="ally-cond" style="display:none">
           <h3 class="ally-sec" data-i18n="ally.s.serv">Servicio para población vulnerable</h3>
-          <div class="field ally-wide"><label data-i18n="ally.f.servdet">Describe el servicio</label><input type="text" id="ally-servdet"></div>
+          <div class="field ally-wide"><label for="ally-servdet" data-i18n="ally.f.servdet">Describe el servicio</label><input type="text" id="ally-servdet"></div>
         </div>
 
         <h3 class="ally-sec" data-i18n="ally.s.aut">Autorizaciones (requeridas)</h3>
@@ -1055,7 +1056,7 @@
         </div>
 
         <button type="submit" class="btn btn-g ally-submit" id="ally-btn" data-i18n="ally.submit">Enviar solicitud</button>
-        <p id="ally-note" class="ally-msg" style="display:none"></p>
+        <p id="ally-note" class="ally-msg" role="status" aria-live="polite" style="display:none"></p>
         <p class="ally-legal" data-i18n="ally.legal">Enviar esta solicitud no constituye la alianza. La alianza se perfecciona con la firma del Convenio Marco, que te enviaremos a tu correo.</p>
       </form>
     </div>
@@ -1188,16 +1189,16 @@
 </a>
 
 <!-- LIGHTBOX -->
-<div class="lightbox" id="lightbox">
-  <button class="lb-x" data-act="closeLightbox()" aria-label="cerrar">&times;</button>
-  <button class="lb-nav lb-prev" data-act="lbStep(-1)" aria-label="anterior">&#8249;</button>
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lb-cap">
+  <button class="lb-x" data-act="closeLightbox()" data-i18n="ficha.gal.close" data-i18n-attr="aria-label" aria-label="Cerrar">&times;</button>
+  <button class="lb-nav lb-prev" data-act="lbStep(-1)" data-i18n="ficha.gal.prev" data-i18n-attr="aria-label" aria-label="Anterior">&#8249;</button>
   <img id="lb-img" src="" alt="">
-  <button class="lb-nav lb-next" data-act="lbStep(1)" aria-label="siguiente">&#8250;</button>
+  <button class="lb-nav lb-next" data-act="lbStep(1)" data-i18n="ficha.gal.next" data-i18n-attr="aria-label" aria-label="Siguiente">&#8250;</button>
   <div id="lb-cap"></div>
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=8f4d5775"></script>
+<script src="/app.js?v=1000b8c8"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
