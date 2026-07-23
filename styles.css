@@ -564,6 +564,12 @@ html[data-theme="dark"] .prog-logo{background:#000}
 
 /* nota legal pequeña bajo el beneficio tributario */
 .calc-legal{font-size:11px;line-height:1.5;color:rgba(255,255,255,.55);margin:2px 0 8px;max-width:52ch}
+/* Zona final de la calc: "Otras formas de ayudar" (persona y empresa) */
+.calc-extra{margin-top:22px;padding-top:20px;border-top:1px solid rgba(255,255,255,.12)}
+.calc-extra .calc-cap{font-size:13.5px;margin-bottom:8px}
+.calc-extra-p{font-size:13px;line-height:1.5;color:rgba(255,255,255,.72);margin:0 0 14px;max-width:52ch}
+.calc-extra .eco-row{justify-content:flex-start;margin-bottom:16px}
+.calc-extra .eco-chip{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.22);color:#fff;font-weight:500}
 
 /* skip link accesible: invisible hasta recibir foco de teclado */
 .skip-link{position:absolute;left:-9999px;top:0;z-index:1000;background:var(--g);color:#fff;font-weight:700;padding:10px 18px;border-radius:0 0 10px 0}
