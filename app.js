@@ -126,6 +126,9 @@ var I18N = {
     "track.t":"Rastrea tu donación",
     "track.lead":"Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.",
     "track.ph":"GG-2026-000001",
+    "track.aria":"Número de guía de tu donación",
+    "calc.slider.aria":"Ajusta el monto de tu donación",
+    "calc.manual.aria":"Escribe el monto de tu donación",
     "track.btn":"Rastrear",
     "track.noguide":"No tengo mi guía",
     "track.loading":"Buscando tu donación…",
@@ -804,7 +807,10 @@ function applyLang(l){
     var k = nodes[i].getAttribute("data-i18n");
     var val = t(k);
     if (nodes[i].hasAttribute("data-i18n-attr")){
-      nodes[i].setAttribute(nodes[i].getAttribute("data-i18n-attr"), val);
+      // admite varios atributos separados por coma (p.ej. "placeholder,aria-label")
+      nodes[i].getAttribute("data-i18n-attr").split(",").forEach(function(a){
+        a = a.trim(); if (a) nodes[i].setAttribute(a, val);
+      });
     } else {
       nodes[i].textContent = val;
     }
@@ -1041,8 +1047,9 @@ function setFreq(f){
 }
 function setCalcMode(m){
   calc.mode = m;
-  document.getElementById("ctab-ind").classList.toggle("on", m==="ind");
-  document.getElementById("ctab-emp").classList.toggle("on", m==="emp");
+  var ti=document.getElementById("ctab-ind"), te=document.getElementById("ctab-emp");
+  ti.classList.toggle("on", m==="ind"); ti.setAttribute("aria-pressed", m==="ind");
+  te.classList.toggle("on", m==="emp"); te.setAttribute("aria-pressed", m==="emp");
 }
 function setQuick(cop){
   calc.val = cop;
@@ -1163,14 +1170,32 @@ function empSim(){
 }
 
 /* ---------- payments ---------- */
-function payMethod(m){
-  ["banco","paypal","mp"].forEach(function(x){
+var PAY_METHODS = ["banco","paypal","mp"];
+function payMethod(m, focusTab){
+  PAY_METHODS.forEach(function(x){
     var tab = document.getElementById("paytab-"+x);
     var pan = document.getElementById("pay-"+x);
-    if (tab) tab.classList.toggle("on", x===m);
-    if (pan) pan.classList.toggle("on", x===m);
+    var sel = x===m;
+    if (tab){ tab.classList.toggle("on", sel); tab.setAttribute("aria-selected", sel); tab.tabIndex = sel ? 0 : -1; }
+    if (pan) pan.classList.toggle("on", sel);
   });
+  if (focusTab){ var f=document.getElementById("paytab-"+m); if (f) f.focus(); }
 }
+// navegación por teclado del tablist de pago (patrón WAI-ARIA)
+document.addEventListener("keydown", function(e){
+  var tab = e.target.closest && e.target.closest(".pay-tab[role=\"tab\"]");
+  if (!tab) return;
+  var i = PAY_METHODS.indexOf(tab.id.replace("paytab-",""));
+  if (i < 0) return;
+  var n = PAY_METHODS.length, j = -1;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") j = (i+1)%n;
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") j = (i-1+n)%n;
+  else if (e.key === "Home") j = 0;
+  else if (e.key === "End") j = n-1;
+  if (j < 0) return;
+  e.preventDefault();
+  payMethod(PAY_METHODS[j], true);
+});
 function copyAccount(){
   var txt = "31000009221";
   if (navigator.clipboard) navigator.clipboard.writeText(txt);
@@ -1245,6 +1270,7 @@ function initGallery(){
     g.appendChild(btn);
   });
 }
+var lbTrigger = null;
 function openGalleryLightbox(i){
   lbIndex = i;
   var item = GALLERY[i];
@@ -1253,9 +1279,18 @@ function openGalleryLightbox(i){
   im.alt = item[lang] || item.es;
   document.getElementById("lb-cap").textContent = item[lang] || item.es;
   document.getElementById("lb-count").textContent = (i+1) + " / " + GALLERY.length;
-  document.getElementById("lightbox").classList.add("on");
+  var lb = document.getElementById("lightbox");
+  if (!lb.classList.contains("on")){
+    lbTrigger = document.activeElement;       // recordar disparador para devolver el foco
+    lb.classList.add("on");
+    var x = lb.querySelector(".lb-x"); if (x) x.focus();
+  }
 }
-function closeLightbox(){ document.getElementById("lightbox").classList.remove("on"); }
+function closeLightbox(){
+  var lb = document.getElementById("lightbox");
+  lb.classList.remove("on");
+  if (lbTrigger && lbTrigger.focus){ lbTrigger.focus(); lbTrigger = null; }
+}
 function lbStep(d){ openGalleryLightbox((lbIndex + d + GALLERY.length) % GALLERY.length); }
 document.addEventListener("keydown", function(e){
   var lb = document.getElementById("lightbox");
@@ -1263,6 +1298,14 @@ document.addEventListener("keydown", function(e){
   if (e.key === "Escape") closeLightbox();
   else if (e.key === "ArrowLeft") lbStep(-1);
   else if (e.key === "ArrowRight") lbStep(1);
+  else if (e.key === "Tab"){                   // trampa de foco dentro del diálogo
+    var foc = Array.prototype.filter.call(lb.querySelectorAll("button"), function(b){ return b.offsetParent !== null; });
+    if (!foc.length) return;
+    var first = foc[0], last = foc[foc.length-1], a = document.activeElement;
+    if (e.shiftKey && a === first){ e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && a === last){ e.preventDefault(); first.focus(); }
+    else if (foc.indexOf(a) === -1){ e.preventDefault(); first.focus(); }
+  }
 });
 document.addEventListener("click", function(e){
   var lb = document.getElementById("lightbox");
