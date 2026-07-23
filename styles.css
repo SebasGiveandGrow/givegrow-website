@@ -123,7 +123,7 @@ section{padding:72px 0}
 .hero-eyebrow{font-size:var(--fs-eyebrow);letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--gn);font-weight:800;margin-bottom:18px}
 .hero h1{font-size:var(--fs-h1);line-height:var(--lh-tight);letter-spacing:var(--tr-display);max-width:14ch;margin-bottom:22px}
 .hero h1 em{color:var(--gn)}
-.hero-lead{font-family:"Fraunces",serif;font-style:italic;font-weight:400;font-size:var(--fs-lead);line-height:var(--lh-snug);letter-spacing:0;max-width:46ch;color:rgba(255,255,255,.92);margin-bottom:34px}
+.hero-lead{font-family:var(--font-display);font-weight:300;font-size:clamp(15px,1.5vw,17px);line-height:1.55;letter-spacing:-.01em;max-width:44ch;color:rgba(255,255,255,.92);margin-bottom:34px}
 .paths{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:760px}
 .path{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:var(--rl);padding:22px;text-align:left;backdrop-filter:blur(6px);transition:transform .2s var(--ease),background .2s}
 .path:hover{transform:translateY(-4px);background:rgba(255,255,255,.14)}
