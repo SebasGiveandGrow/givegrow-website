@@ -767,6 +767,18 @@ html[data-theme="dark"] .track-cta h3{color:var(--ink)}
 .com-address{margin-top:14px;font-size:14.5px;color:var(--mu)}
 .grat-empty{text-align:center;max-width:52ch;margin:26px auto 0;padding:32px;background:var(--cream);border:1px dashed var(--bd);border-radius:16px}
 .grat-empty p{color:var(--ink-soft);margin:0 0 18px}
+/* documento legal (#privacidad): lectura cómoda, tono institucional, día/noche */
+.legal-doc{max-width:72ch;margin-top:24px}
+.legal-doc h3{font-family:"Inter",sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin:30px 0 8px;letter-spacing:-.01em}
+.legal-doc p{color:var(--ink-soft);line-height:1.65;margin:0 0 12px}
+.legal-doc ul{margin:0 0 14px;padding-left:20px;color:var(--ink-soft);line-height:1.6}
+.legal-doc li{margin:5px 0}
+.legal-doc strong{color:var(--ink);font-weight:700}
+.legal-doc a{color:var(--g);font-weight:600;text-decoration:underline}
+html[data-theme="dark"] .legal-doc a{color:var(--gn)}
+.legal-meta{font-size:13.5px;color:var(--mu);border-left:3px solid var(--bd);padding-left:14px;margin:0 0 8px}
+.ally-policy-link{display:inline-block;margin-top:4px;font-size:13.5px;color:var(--g);font-weight:600}
+html[data-theme="dark"] .ally-policy-link{color:var(--gn)}
 html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 
 /* ============ tarjeta de comercio clickeable + ficha ============ */

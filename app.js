@@ -448,7 +448,12 @@ var I18N = {
     "foot.tagline":"Dar para crecer, crecer para dar más.",
     "foot.explore":"Explorar",
     "foot.legal":"Entidad",
+    "foot.privacy":"Privacidad y datos",
     "foot.rights":"Todos los derechos reservados.",
+    "priv.ey":"Legal",
+    "priv.t":"Política de Privacidad y Tratamiento de Datos",
+    "priv.lead":"Cómo protegemos y tratamos tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR — y cómo puedes ejercer tus derechos.",
+    "ally.a.datos.link":"Ver Política de Privacidad",
     "emp.cta.t":"Hablemos de tu alianza",
     "emp.cta.p":"Diseñamos el aporte a la medida de tu empresa, con beneficio tributario y reportes verificables. Cuéntanos tu objetivo y construimos la ruta juntos.",
     "emp.cta.btn":"Quiero conversar",
@@ -732,7 +737,8 @@ var ROUTE_META = {
   transparencia:{t:{es:"Transparencia · Give&Grow International",en:"Transparency · Give&Grow International"},d:{es:"Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International.",en:"Official registration, governance, financial statements and public documents of Give&Grow International."}},
   contacto:{t:{es:"Contacto · Give&Grow International",en:"Contact · Give&Grow International"},d:{es:"Escríbenos para donar, aliar tu empresa o sumar tu fundación al HUB SOCIAL. Medellín, Colombia.",en:"Reach out to donate, partner your company or join your foundation to the Social Hub. Medellín, Colombia."}},
   membresias:{t:{es:"Membresías · Give&Grow International",en:"Memberships · Give&Grow International"},d:{es:"Hazte miembro de Give&Grow: dona de forma recurrente, crece de Semilla a Bosque y suma beneficios en cada nivel.",en:"Become a Give&Grow member: give monthly, grow from Seed to Forest and add benefits at each tier."}},
-  faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}}
+  faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}},
+  privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}}
 };
 function setMetaTag(attr,key,val){ var el=document.querySelector("meta["+attr+"='"+key+"']"); if(el) el.setAttribute("content",val); }
 var OG_IMG_DEFAULT = "https://www.thegiveandgrowproject.org/img/og.jpg";
@@ -797,7 +803,7 @@ function renderPobChips(){
   el.innerHTML = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
 }
 function postLang(l){
-  applyLang(l); renderWall(); renderHeroImpact(); renderAliadas(); renderEmpresas();
+  applyLang(l); renderWall(); renderHeroImpact(); renderAliadas(); renderEmpresas(); renderPrivacy();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
@@ -1469,6 +1475,99 @@ function renderEmpresas(){
     el.style.display = n ? "" : "none";
     if (empty) empty.style.display = n ? "none" : "";
   });
+}
+// Política de Privacidad (#privacidad). Contenido bilingüe inyectado (no i18n key-a-key
+// por ser documento largo). Adaptado del doc legal v1.0: cookies = realidad del sitio
+// (Cloudflare sin cookies), sin citar % tributario para no reabrir la inconsistencia.
+var PRIVACY = {
+  es: `<p class="legal-meta">Versión 1.0 · Vigente desde su publicación · Conforme a la Ley 1581 de 2012 (Colombia), su Decreto 1377 de 2013 y el Reglamento General de Protección de Datos (GDPR, Unión Europea).</p>
+<h3>1. Responsable del tratamiento</h3>
+<ul>
+<li><strong>Razón social:</strong> Fundación Give&amp;Grow International</li>
+<li><strong>NIT:</strong> 901.948.930-2</li>
+<li><strong>Domicilio:</strong> Carrera 82A #9A Sur 28, Medellín, Antioquia, Colombia</li>
+<li><strong>Correo de privacidad:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
+<li><strong>Representante Legal:</strong> Juan Sebastián Navarro Osorio</li>
+<li><strong>Autoridad de vigilancia:</strong> Superintendencia de Industria y Comercio (SIC), Colombia</li>
+</ul>
+<h3>2. Qué datos tratamos y con qué finalidad</h3>
+<p>Tratamos únicamente los datos necesarios para cumplir nuestra labor, según quién nos los entregue:</p>
+<ul>
+<li><strong>Donantes (personas y empresas):</strong> nombre o razón social, identificación, correo, teléfono, ciudad y monto o historial de aportes — para emitir tu certificado de donación con el beneficio tributario que contempla la ley, llevar la contabilidad, gestionar tu membresía y enviarte los reportes de impacto. No almacenamos datos de tarjetas de pago.</li>
+<li><strong>Empresas y comercios aliados:</strong> datos de la empresa, del representante y de contacto — para la debida diligencia, la firma del convenio y la trazabilidad de la alianza.</li>
+<li><strong>Voluntarios:</strong> datos de identificación y profesionales — para verificar idoneidad y asignarte a los programas.</li>
+<li><strong>Beneficiarios de programas:</strong> datos entregados por las fundaciones aliadas para ejecutar y documentar el impacto. Los datos de niñas, niños y adolescentes reciben protección reforzada y solo se tratan con autorización de su representante legal.</li>
+</ul>
+<h3>3. Base legal</h3>
+<p>Tratamos tus datos con tu <strong>autorización previa, expresa e informada</strong>, que recogemos por formulario físico o digital (con registro de fecha). Puedes revocarla en cualquier momento. Para titulares en la Unión Europea aplicamos las bases del Artículo 6 del GDPR (consentimiento, ejecución de un contrato, obligación legal o interés legítimo, según el caso).</p>
+<h3>4. Tus derechos</h3>
+<p>Como titular de los datos puedes, en cualquier momento:</p>
+<ul>
+<li><strong>Conocer y acceder</strong> a los datos que tratamos sobre ti.</li>
+<li><strong>Rectificar</strong> datos inexactos o desactualizados.</li>
+<li><strong>Solicitar la supresión</strong> ("derecho al olvido") cuando no exista un deber legal de conservarlos.</li>
+<li><strong>Revocar la autorización</strong> que nos diste.</li>
+<li><strong>Oponerte</strong> a ciertos tratamientos y solicitar la <strong>portabilidad</strong> de tus datos.</li>
+<li><strong>Presentar una queja</strong> ante la SIC (Colombia) o la autoridad de control europea que corresponda.</li>
+</ul>
+<h3>5. Cómo ejercer tus derechos</h3>
+<p>Escríbenos a <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> con tu nombre, tu documento y la solicitud. Acusamos recibo en <strong>2 días hábiles</strong>; respondemos las consultas de acceso en <strong>10 días hábiles</strong> y los reclamos (rectificación, supresión, revocación) en <strong>15 días hábiles</strong>.</p>
+<h3>6. Conservación de los datos</h3>
+<p>Guardamos cada dato solo el tiempo necesario o el que exige la ley: los soportes de donaciones <strong>10 años</strong> (obligación tributaria y contable); los datos de beneficiarios, la duración del programa más 5 años; los de voluntarios, la vinculación más 3 años. Cumplido el plazo, se eliminan de forma segura.</p>
+<h3>7. Transferencias internacionales</h3>
+<p>Podemos compartir datos con encargados o aliados en otros países (por ejemplo, proveedores tecnológicos o fundaciones de cooperación), siempre con garantías adecuadas: cláusulas contractuales, acuerdos de encargo del tratamiento y el mínimo de datos necesarios, anonimizados cuando es posible.</p>
+<h3>8. Seguridad de la información</h3>
+<p>Protegemos tus datos con cifrado en tránsito, control de acceso por roles, registros de auditoría y protocolos de gestión de incidentes. Ningún sistema es infalible, pero aplicamos estándares reconocidos para reducir el riesgo.</p>
+<h3>9. Cookies y analítica</h3>
+<p>Este sitio <strong>no usa cookies de rastreo ni de marketing, ni píxeles de terceros.</strong> Para entender el uso del sitio empleamos <strong>Cloudflare Web Analytics, que no instala cookies ni identifica a las personas.</strong> Solo guardamos tu <strong>preferencia de tema (claro u oscuro)</strong> localmente en tu navegador; no es una cookie de seguimiento ni se envía a ningún servidor.</p>
+<h3>10. Vigencia y cambios</h3>
+<p>Esta política (Versión 1.0) rige desde su publicación y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>`,
+  en: `<p class="legal-meta">Version 1.0 · Effective upon publication · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
+<h3>1. Data controller</h3>
+<ul>
+<li><strong>Legal name:</strong> Fundación Give&amp;Grow International</li>
+<li><strong>Tax ID (NIT):</strong> 901.948.930-2</li>
+<li><strong>Address:</strong> Carrera 82A #9A Sur 28, Medellín, Antioquia, Colombia</li>
+<li><strong>Privacy email:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
+<li><strong>Legal Representative:</strong> Juan Sebastián Navarro Osorio</li>
+<li><strong>Supervisory authority:</strong> Superintendence of Industry and Commerce (SIC), Colombia</li>
+</ul>
+<h3>2. What data we process and why</h3>
+<p>We process only the data needed to carry out our work, depending on who provides it:</p>
+<ul>
+<li><strong>Donors (individuals and companies):</strong> name or legal name, ID, email, phone, city and donation amount or history — to issue your donation certificate with the tax benefit provided by law, keep our accounting, manage your membership and send you impact reports. We do not store payment-card data.</li>
+<li><strong>Partner companies and businesses:</strong> company, representative and contact details — for due diligence, signing the agreement and alliance traceability.</li>
+<li><strong>Volunteers:</strong> identification and professional data — to verify suitability and assign you to programs.</li>
+<li><strong>Program beneficiaries:</strong> data provided by partner foundations to deliver and document impact. Data of children and adolescents receives reinforced protection and is processed only with their legal guardian's authorization.</li>
+</ul>
+<h3>3. Legal basis</h3>
+<p>We process your data with your <strong>prior, express and informed authorization</strong>, collected through a physical or digital form (with a timestamp). You may revoke it at any time. For data subjects in the European Union we rely on the bases in Article 6 of the GDPR (consent, performance of a contract, legal obligation or legitimate interest, as applicable).</p>
+<h3>4. Your rights</h3>
+<p>As a data subject you may, at any time:</p>
+<ul>
+<li><strong>Know and access</strong> the data we process about you.</li>
+<li><strong>Rectify</strong> inaccurate or outdated data.</li>
+<li><strong>Request erasure</strong> ("right to be forgotten") where there is no legal duty to keep it.</li>
+<li><strong>Withdraw the authorization</strong> you gave us.</li>
+<li><strong>Object</strong> to certain processing and request the <strong>portability</strong> of your data.</li>
+<li><strong>File a complaint</strong> with the SIC (Colombia) or the relevant European supervisory authority.</li>
+</ul>
+<h3>5. How to exercise your rights</h3>
+<p>Write to <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> with your name, ID and request. We acknowledge receipt within <strong>2 business days</strong>; we answer access requests within <strong>10 business days</strong> and claims (rectification, erasure, withdrawal) within <strong>15 business days</strong>.</p>
+<h3>6. Data retention</h3>
+<p>We keep each piece of data only as long as necessary or as required by law: donation records for <strong>10 years</strong> (tax and accounting duty); beneficiary data for the duration of the program plus 5 years; volunteer data for the engagement plus 3 years. Once the term ends, data is securely deleted.</p>
+<h3>7. International transfers</h3>
+<p>We may share data with processors or partners in other countries (for example, technology providers or cooperation foundations), always with adequate safeguards: contractual clauses, data-processing agreements and the minimum data necessary, anonymized where possible.</p>
+<h3>8. Information security</h3>
+<p>We protect your data with encryption in transit, role-based access control, audit logs and incident-management protocols. No system is infallible, but we apply recognized standards to reduce risk.</p>
+<h3>9. Cookies and analytics</h3>
+<p>This site <strong>uses no tracking or marketing cookies, and no third-party pixels.</strong> To understand site usage we use <strong>Cloudflare Web Analytics, which sets no cookies and does not identify individuals.</strong> We only store your <strong>theme preference (light or dark)</strong> locally in your browser; it is not a tracking cookie and is not sent to any server.</p>
+<h3>10. Term and changes</h3>
+<p>This policy (Version 1.0) is effective upon publication and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>`
+};
+function renderPrivacy(){
+  var el = document.getElementById("privacy-body"); if (!el) return;
+  el.innerHTML = PRIVACY[lang] || PRIVACY.es;
 }
 function renderFicha(fid){
   var el = document.getElementById("ficha-body"); if (!el) return;
