@@ -481,7 +481,7 @@ var I18N = {
     "alma.c.rutas":"¿Cuáles son las 5 rutas?",
     "alma.c.evidencia":"¿Cómo garantizan la trazabilidad?",
     "alma.chip2":"Beneficio tributario",
-    "alma.chip3":"Aliar mi empresa",
+    "alma.chip3":"¿Cómo puede ayudar mi empresa?",
     "alma.chip4":"¿Aplica mi fundación?",
     "vis.ey":"Hacia dónde vamos",
     "vis.t":"Que dar sea transparente, medible y mutuo.",
