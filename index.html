@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=77d4bf13">
+<link rel="stylesheet" href="/styles.css?v=5fa92b80">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1081,6 +1081,7 @@
         <div class="ally-auts">
           <label class="ally-check"><input type="checkbox" id="aut-marca" required><span data-i18n="ally.a.marca">Autorizo mostrar públicamente el nombre, logo y redes de mi empresa para difundir la alianza.</span></label>
           <label class="ally-check"><input type="checkbox" id="aut-datos" required><span data-i18n="ally.a.datos">Autorizo el tratamiento de los datos conforme a la Ley 1581 de 2012.</span></label>
+          <a class="ally-policy-link" href="#privacidad" target="_blank" rel="noopener" data-i18n="ally.a.datos.link">Ver Política de Privacidad</a>
           <label class="ally-check"><input type="checkbox" id="aut-licitud" required><span data-i18n="ally.a.licitud">Declaro que la información es veraz y que los recursos y la actividad son de origen lícito.</span></label>
         </div>
 
@@ -1177,6 +1178,17 @@
   </section>
 </main>
 
+<main id="page-privacidad" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="priv.ey">Legal</span>
+      <h2 class="h-sec rv" data-i18n="priv.t">Política de Privacidad y Tratamiento de Datos</h2>
+      <p class="lead rv d1" data-i18n="priv.lead"></p>
+      <div id="privacy-body" class="legal-doc rv d2"></div>
+    </div>
+  </section>
+</main>
+
 <footer>
   <div class="wrap">
     <div class="foot-grid">
@@ -1196,6 +1208,7 @@
       <div>
         <h4 data-i18n="foot.legal">Entidad</h4>
         <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
+        <a href="#privacidad" data-i18n="foot.privacy">Privacidad y datos</a>
         <a href="mailto:sebas@thegiveandgrowproject.org">sebas@thegiveandgrowproject.org</a>
         <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a>
         <a href="https://wa.me/573153305028">+57 315 330 5028</a>
@@ -1227,7 +1240,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=4b77899e"></script>
+<script src="/app.js?v=d909d8c4"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
