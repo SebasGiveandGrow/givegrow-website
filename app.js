@@ -173,6 +173,11 @@ var I18N = {
     "hub.found.ey":"Fundaciones del HUB",
     "hub.found.t":"Quiénes forman la red hoy",
     "hub.found.p":"Empezamos con una fundación aliada y una red en proceso de vinculación formal. Cada una entra una a una, con verificación y convenio — sin nombres ni cifras infladas.",
+    "hub.aporta.ey":"Aliadas que aportan",
+    "hub.aporta.t":"Fundaciones que fortalecen el Hub",
+    "hub.aporta.p":"No todas las aliadas entran a recibir. Algunas fundaciones suman capacidades, servicios y conocimiento que hacen más fuerte al HUB SOCIAL y a Give&Grow — y así llegan mejor a las comunidades.",
+    "hub.aporta.empty":"Estamos formalizando las primeras aliadas que aportan al Hub. Aquí verás qué le entrega cada una — con evidencia, no promesas.",
+    "net.type.foundation.aporta":"Aliada que aporta",
     "hub.routes.ey":"Cómo operamos",
     "hub.t":"Cinco rutas. Un solo propósito.",
     "hub.lead":"El centro operativo donde alianzas, donaciones e impacto se encuentran.",
@@ -806,7 +811,7 @@ function renderPobChips(){
   el.innerHTML = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
 }
 function postLang(l){
-  applyLang(l); renderWall(); renderHeroImpact(); renderAliadas(); renderEmpresas(); renderPrivacy();
+  applyLang(l); renderWall(); renderHeroImpact(); renderAliadas(); renderAportantes(); renderEmpresas(); renderPrivacy();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
@@ -1407,6 +1412,11 @@ function initIconDraw(){
   var shapes = document.querySelectorAll(".ic-svg path, .ic-svg circle, .ic-svg rect, .ic-svg line, .ic-svg polyline, .ic-svg polygon");
   for (var i=0;i<shapes.length;i++) shapes[i].setAttribute("pathLength","1");
 }
+// Etiqueta del muro: una fundación que SOLO aporta se rotula distinto a una beneficiaria.
+function netTypeKey(p){
+  if (p.type === "foundation" && fundAporta(p) && !fundRecibe(p)) return "net.type.foundation.aporta";
+  return "net.type." + p.type;
+}
 function renderWall(){
   var el = document.getElementById("net-wall"); if (!el) return;
   loadPartners().then(function(list){
@@ -1417,7 +1427,7 @@ function renderWall(){
       html += '<div class="card net-card"><span class="net-dot" style="background:'+(NET_COLORS[p.type]||NET_COLORS.hub)+'"></span>'
             + '<h3>'+escapeHtml(p.name)+'</h3>'
             + (area ? '<p class="mu" style="margin:6px 0 10px">'+escapeHtml(area)+'</p>' : '')
-            + '<span class="tag">'+t("net.type."+p.type)+'</span>'
+            + '<span class="tag">'+t(netTypeKey(p))+'</span>'
             + (p.url ? '<p style="margin-top:12px"><a class="card-link" href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener">'+t("map.visit")+'</a></p>' : '')
             + '</div>';
     }
@@ -1425,12 +1435,19 @@ function renderWall(){
     el.innerHTML = html;
   });
 }
+// Rol de una fundación en el Hub: 'recibe' (beneficiaria) y/o 'aporta' (fortalece al Hub).
+// Sin rol declarado se asume ['recibe'] — retrocompatible con las aliadas ya cargadas.
+function fundRoles(p){
+  return (Array.isArray(p.rol) && p.rol.length) ? p.rol : ["recibe"];
+}
+function fundRecibe(p){ return fundRoles(p).indexOf("recibe") >= 0; }
+function fundAporta(p){ return fundRoles(p).indexOf("aporta") >= 0; }
 function renderAliadas(){
   var el = document.getElementById("aliadas-grid"); if (!el) return;
   loadPartners().then(function(list){
     var html = "";
     for (var i=0;i<list.length;i++){
-      var p = list[i]; if (p.type !== "foundation") continue;
+      var p = list[i]; if (p.type !== "foundation" || !fundRecibe(p)) continue;
       var area = p.area ? (p.area[lang]||p.area.es||"") : "";
       var pob = p.poblacion ? (p.poblacion[lang]||p.poblacion.es||"") : "";
       html += '<a class="pcard" href="#fundacion/'+encodeURIComponent(p.id)+'">'
@@ -1441,6 +1458,32 @@ function renderAliadas(){
     }
     html += '<div class="card card-empty"><h3>'+t("hub.aliadas.soon.t")+'</h3><p>'+t("hub.aliadas.soon.p")+'</p></div>';
     el.innerHTML = html;
+  });
+}
+// Muro "Aliadas que aportan" (#hub): fundaciones cuyo rol incluye 'aporta'.
+// Misma fuente (partners.json); muestra QUÉ le entrega cada una al Hub y a Give&Grow.
+function renderAportantes(){
+  var el = document.getElementById("aportantes-grid"); if (!el) return;
+  var empty = document.getElementById("aportantes-empty");
+  loadPartners().then(function(list){
+    var html = "", n = 0;
+    for (var i=0;i<list.length;i++){
+      var p = list[i];
+      if (p.type !== "foundation" || !fundAporta(p)) continue;
+      n++;
+      var area = p.area ? (p.area[lang]||p.area.es||"") : "";
+      var aporta = p.aporta ? (p.aporta[lang]||p.aporta.es||"") : "";
+      html += '<a class="pcard pcard-emp" href="#fundacion/'+encodeURIComponent(p.id)+'">'
+            + ((p.logo && canShowLogo(p)) ? '<img class="pcard-logo" src="'+escapeHtml(p.logo)+'" alt="" loading="lazy">' : '')
+            + '<span class="pcard-body"><b>'+escapeHtml(p.name)+'</b>'
+            + (area ? '<span class="mu">'+escapeHtml(area)+'</span>' : '')
+            + '<span class="emp-mods"><span class="emp-mod">'+escapeHtml(t("net.type.foundation.aporta"))+'</span></span>'
+            + (aporta ? '<span class="emp-recips"><span class="emp-recip"><i>'+escapeHtml(t("emp.card.aporta"))+'</i> '+escapeHtml(aporta)+'</span></span>' : '')
+            + '</span><span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
+    }
+    el.innerHTML = html;
+    el.style.display = n ? "" : "none";
+    if (empty) empty.style.display = n ? "none" : "";
   });
 }
 // Muro de empresas aliadas (#empresas). Misma fuente que fundaciones (partners.json),
