@@ -398,7 +398,10 @@ var I18N = {
     "map.leg.c":"Empresas aliadas",
     "map.leg.hub":"HUB SOCIAL",
     "map.f.all":"Toda la red",
-    "map.sum":"Hoy la red reúne {f} fundación(es), {c} comercio(s) aliado(s) y {h} HUB. Crece una alianza a la vez.",
+    "map.sum":"Hoy la red reúne {f}, {c} y {h}. Crece una alianza a la vez.",
+    "map.noun.f.one":"fundación aliada","map.noun.f.many":"fundaciones aliadas",
+    "map.noun.c.one":"empresa aliada","map.noun.c.many":"empresas aliadas",
+    "map.noun.h.one":"HUB","map.noun.h.many":"HUB",
     "map.biz":"Ver beneficio",
     "com.maps":"Cómo llegar",
     "map.area.med":"Medellín · centro operativo",
@@ -1773,10 +1776,11 @@ function initMap(){
     }
     var sumEl = document.getElementById("map-summary");
     if (sumEl){
+      var phrase = function(n, key){ return n + " " + t("map.noun." + key + "." + (n === 1 ? "one" : "many")); };
       sumEl.textContent = t("map.sum")
-        .replace("{f}", counts.foundation)
-        .replace("{c}", counts.company)
-        .replace("{h}", counts.hub);
+        .replace("{f}", phrase(counts.foundation, "f"))
+        .replace("{c}", phrase(counts.company, "c"))
+        .replace("{h}", phrase(counts.hub, "h"));
     }
   }
   function start(){
