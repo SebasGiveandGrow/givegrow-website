@@ -164,19 +164,26 @@
         },
         "leader": "Francisco Grijalba",
         "years": {
-          "es": "5+ años en territorio",
-          "en": "5+ years on the ground"
+          "es": "6+ años en territorio",
+          "en": "6+ years on the ground"
         },
         "about": {
-          "es": "Fundación comunitaria dirigida por Francisco Grijalba en el sector de La Honda (Manrique, Medellín), con más de cinco años sirviendo a su comunidad. Es la primera fundación aliada del HUB SOCIAL: Give&Grow no reemplaza su labor, la fortalece. Su proyecto principal es el Proyecto de Baile, que usa la danza como herramienta de transformación social y está liderado de forma voluntaria por Jagoda Cwiklik, bailarina radicada en Medellín.",
-          "en": "A community foundation led by Francisco Grijalba in the La Honda area (Manrique, Medellín), with over five years serving its community. It is the Social Hub's first partner foundation: Give&Grow does not replace its work, it strengthens it. Its flagship initiative is the Dance Project, which uses dance as a tool for social transformation, led on a volunteer basis by Jagoda Cwiklik, a dancer based in Medellín."
+          "es": "Fundación comunitaria dirigida por Francisco Grijalba en el sector de La Honda (Manrique, Medellín), con más de seis años acompañando a niñas, niños y jóvenes a través de alimentación, educación, deporte y mentoría. Es la primera fundación aliada del HUB SOCIAL: Give&Grow no reemplaza su labor, la fortalece. Opera en un sector de acceso difícil, de calles empinadas y transporte limitado. El Proyecto de Baile —Borboletas y Flow Callejero— está liderado de forma voluntaria por Jagoda Cwiklik, bailarina radicada en Medellín. La fundación está registrada además como entidad de beneficio público (ANBI) en los Países Bajos.",
+          "en": "A community foundation led by Francisco Grijalba in the La Honda area (Manrique, Medellín), with over six years walking alongside children and youth through food, education, sport and mentorship. It is the Social Hub's first partner foundation: Give&Grow does not replace its work, it strengthens it. It operates in a hard-to-reach area of steep streets and limited transport. The Dance Project —Borboletas and Flow Callejero— is led on a volunteer basis by Jagoda Cwiklik, a dancer based in Medellín. The foundation is also registered as a public-benefit organisation (ANBI) in the Netherlands."
         },
         "programs": [
           {
+            "name": "Comedor comunitario",
+            "desc": {
+              "es": "Más de 100 niñas y niños reciben cada día una comida caliente y nutritiva. Cada uno entra según su necesidad real y su situación se acompaña de forma continua.",
+              "en": "More than 100 children receive a hot, nutritious meal every day. Each one joins according to real need and their situation is followed up continuously."
+            }
+          },
+          {
             "name": "Chefs del Futuro",
             "desc": {
-              "es": "Alimentación diaria: cerca de 100 niños y niñas reciben almuerzo cada día.",
-              "en": "Daily nutrition: around 100 children receive lunch every day."
+              "es": "Programa de formación y emprendimiento social de seis meses en el sector gastronómico. Los participantes aprenden cocina, higiene y manejo de alimentos, y también costos, marketing y creación de negocio — mientras cocinan a diario para el comedor comunitario. Incluye el Cocineas Bootcamp (12 semanas) y cierra con certificación y kit profesional; quienes se destacan pasan a ser mentores del siguiente grupo.",
+              "en": "A six-month training and social-entrepreneurship program in the food sector. Participants learn cooking, hygiene and food handling, plus costing, marketing and business building — while cooking every day for the community kitchen. It includes the 12-week Cocineas Bootcamp and closes with certification and a professional kit; those who stand out become mentors for the next group."
             }
           },
           {
@@ -201,6 +208,13 @@
               "es": "Formación profesional para 7 niños y jóvenes con talento y compromiso, en las academias Move Danza y Elements, incluyendo transporte seguro desde sus hogares.",
               "en": "Professional training for 7 committed, talented children and youth at the Move Danza and Elements academies, including safe transport from their homes."
             }
+          },
+          {
+            "name": "Entregas",
+            "desc": {
+              "es": "Entregas que devuelven dignidad al hogar: camas y zapatos para las familias del sector.",
+              "en": "Deliveries that restore dignity at home: beds and shoes for families in the area."
+            }
           }
         ],
         "hub": {
@@ -208,8 +222,8 @@
           "en": "Through Route 1 (alliances) it receives logistics and visibility, and through Route 2 (donation management) it channels in-kind and monetary gifts with full traceability: reception record, signed delivery, photo report and certificate."
         },
         "quote": {
-          "es": "Más allá de enseñar a bailar, buscamos generar oportunidades y transformar vidas.",
-          "en": "Beyond teaching dance, we aim to create opportunities and transform lives."
+          "es": "No solo damos el pescado: enseñamos a pescar, para que los jóvenes puedan ser autosuficientes y construir su propio futuro.",
+          "en": "We don't just give the fish: we teach fishing, so young people can become self-sufficient and build their own future."
         }
       }
     },
