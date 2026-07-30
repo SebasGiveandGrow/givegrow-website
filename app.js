@@ -1627,12 +1627,13 @@ function renderFicha(fid){
     var pick = function(o){ return o ? esc(o[lang]||o.es||"") : ""; };
     var area = pick(p.area), pob = pick(p.poblacion), badge = pick(pr.badge),
         years = pick(pr.years), about = pick(pr.about), hubTxt = pick(pr.hub),
-        quote = pick(pr.quote);
+        quote = pick(pr.quote), tagline = pick(pr.tagline);
     var u = (p.impactUnits && p.impactUnits[0]) || null;
     var html = '<a class="card-link" href="#hub">&larr; '+t("ficha.back")+'</a>'
       + '<div class="ficha-head">'
       + ((p.logo && canShowLogo(p)) ? '<img class="ficha-logo" src="'+esc(p.logo)+'" alt="">' : '')
       + '<div><h1 class="ficha-name">'+esc(p.name)+'</h1>'
+      + (tagline ? '<p class="ficha-tagline">'+tagline+'</p>' : '')
       + (badge ? '<span class="tag">'+badge+'</span>' : '')
       + '<div class="eco-row" style="margin-top:12px">'
       + (area ? '<span class="eco-chip">'+area+'</span>' : '')
