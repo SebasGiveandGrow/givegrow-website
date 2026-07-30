@@ -162,14 +162,17 @@
           "es": "Proyecto comunitario de base",
           "en": "Grassroots community project"
         },
-        "leader": "Francisco Grijalba",
+        "tagline": {
+          "es": "Formamos a los líderes que la próxima generación necesita.",
+          "en": "Raising the leaders the next generation needs."
+        },
         "years": {
           "es": "6+ años en territorio",
           "en": "6+ years on the ground"
         },
         "about": {
-          "es": "Fundación comunitaria dirigida por Francisco Grijalba en el sector de La Honda (Manrique, Medellín), con más de seis años acompañando a niñas, niños y jóvenes a través de alimentación, educación, deporte y mentoría. Es la primera fundación aliada del HUB SOCIAL: Give&Grow no reemplaza su labor, la fortalece. Opera en un sector de acceso difícil, de calles empinadas y transporte limitado. El Proyecto de Baile —Borboletas y Flow Callejero— está liderado de forma voluntaria por Jagoda Cwiklik, bailarina radicada en Medellín. La fundación está registrada además como entidad de beneficio público (ANBI) en los Países Bajos.",
-          "en": "A community foundation led by Francisco Grijalba in the La Honda area (Manrique, Medellín), with over six years walking alongside children and youth through food, education, sport and mentorship. It is the Social Hub's first partner foundation: Give&Grow does not replace its work, it strengthens it. It operates in a hard-to-reach area of steep streets and limited transport. The Dance Project —Borboletas and Flow Callejero— is led on a volunteer basis by Jagoda Cwiklik, a dancer based in Medellín. The foundation is also registered as a public-benefit organisation (ANBI) in the Netherlands."
+          "es": "Fundación comunitaria de La Honda (Manrique, Medellín) que desde hace más de seis años acompaña a niñas, niños y jóvenes con alimentación, educación, deporte y mentoría. Trabaja en un sector de acceso difícil, de calles empinadas y transporte limitado, donde estar presente todos los días ya es parte del trabajo. Su apuesta no es solo entregar: es que cada niña, niño y joven descubra su talento, tome la iniciativa y se convierta en referente para los demás. Es la primera fundación aliada del HUB SOCIAL — Give&Grow no reemplaza su labor, la fortalece — y está registrada además como entidad de beneficio público (ANBI) en los Países Bajos.",
+          "en": "A community foundation in La Honda (Manrique, Medellín) that for more than six years has walked alongside children and youth with food, education, sport and mentorship. It works in a hard-to-reach area of steep streets and limited transport, where simply showing up every day is already part of the job. Its aim is not only to deliver: it is for every child and young person to discover their talent, take the lead and become an example for others. It is the Social Hub's first partner foundation — Give&Grow does not replace its work, it strengthens it — and it is also registered as a public-benefit organisation (ANBI) in the Netherlands."
         },
         "programs": [
           {
@@ -279,7 +282,6 @@
           "es": "Fundación constituida · educación y seguridad alimentaria",
           "en": "Registered nonprofit · education & food security"
         },
-        "leader": "Lina Marcela Cardona Arango",
         "years": {
           "es": "Desde 2008 · 15+ años en territorio",
           "en": "Since 2008 · 15+ years on the ground"
