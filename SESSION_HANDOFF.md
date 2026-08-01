@@ -1,12 +1,51 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "v5 Fase 1 — correcciones de credibilidad" (31 jul 2026)
+> Última actualización: sesión "v5 Fase 2 — desinflar ImpactOS, liberar ALMA" (31 jul 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
 - Sitio bilingüe ES/EN, vanilla-JS SPA, Cloudflare Workers.
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
+
+## Cierre de tanda: v5 FASE 2 — desinflar ImpactOS, liberar ALMA (31 jul 2026)
+
+`#alma` era **la página más larga del sitio**: 7 secciones, 5.165px, 7,2 pantallas,
+18 tarjetas y 8 sellos de "en construcción/desarrollo" contra 1 solo "Activo". 84 claves
+i18n (11,5% del diccionario) describían software inexistente. Quedó en **1 sección,
+1.169px, 1,6 pantallas** — de la página más larga a la más corta. Medido a 1280×720.
+
+- **Ruta renombrada `#alma` → `#impactos`.** `#alma` sobrevive como alias en `go()`:
+  aterriza en `#impactos`, corrige el hash y abre el panel. Ningún enlace externo se rompe.
+  Añadida al menú "Nosotros" (escritorio y móvil); antes la página no estaba en el nav.
+- **Tres bloques con reglas de 1px** (`.os-rows`/`.os-row`), sin tarjetas ni sellos:
+  qué es · qué está vivo hoy (HUB SOCIAL, con enlace a `#hub`) · hacia dónde va.
+  **Los 7 módulos sin construir se borraron por decisión de Sebas** — nombrar producto
+  inexistente es la promesa que la marca prohíbe. Ese material va a dossier, no al sitio.
+- **ALMA es panel lateral, no página.** `<aside id="alma-panel">` fuera de las `.page`,
+  disponible en cualquier ruta. Papel (`--surface`), reglas de 1px, radio 2px, **cero
+  sombra** (verificado: `box-shadow:none` en panel y botón). Cierra por ✕, scrim, Esc y
+  retorno de foco al disparador; `aria-modal`, trampa de Tab, `prefers-reduced-motion`.
+  Los chips se arman con `currentRoute`: abrirlo en Transparencia ofrece preguntas de
+  trazabilidad. Contraste AA en ambos modos (mín. 5,71 día / 6,44 noche).
+- **El disparador dejó de ser burbuja SaaS**: rectangular, radio 2px, sin brillo ni rebote.
+- Los CTA "Hablar con ALMA" (`#donar`, `#faq`) pasaron de `<a href="#alma">` a
+  `<button data-act="almaPanel(true)">`: abren el panel sin sacarte de la página.
+
+**Dos bugs de fondo encontrados y corregidos:**
+1. **El despachador `data-act` convertía `false` en la cadena `"false"` — que es
+   verdadera.** Cualquier `data-act` con booleano hacía lo contrario de lo que decía.
+   Ahora parsea `true`/`false` como booleanos. Era la razón de que el scrim no cerrara.
+2. **7 claves ES duplicadas** en el diccionario (5 mías al migrar, más `nav.faq` y
+   `a11y.skip` que venían de antes). En un literal JS gana la última, así que el valor
+   nuevo quedaba silenciado. **Nuevo check #5b en `validate.mjs`** que falla el build.
+
+Diccionario 731 → 676 claves. Paridad 676/676. Gate completo en verde.
+Cache-bust: styles `227605f6`, app `494bd381`.
+
+**Deuda anotada:** el botón de WhatsApp sigue siendo un círculo verde con brillo, ahora
+incoherente al lado del disparador sobrio de ALMA. Y el naranja `#B4690E` sigue inline en
+la leyenda del mapa. Ambos son Fase 4 (sistema visual).
 
 ## Cierre de tanda: v5 FASE 1 — correcciones de credibilidad (31 jul 2026)
 

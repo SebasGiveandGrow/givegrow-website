@@ -55,6 +55,17 @@ for (const tag of ["main", "section", "div", "ul", "li", "span", "a", "button"])
 }
 if (tagsOk) ok("balance de tags");
 
+/* 5b · Claves ES duplicadas — en un literal JS gana la última, así que un duplicado
+   silencia el valor que creíste haber puesto. Difícil de ver a ojo en 676 claves. */
+{
+  const blk = src.slice(src.indexOf("var I18N"), src.indexOf("function t("));
+  const cuenta = {};
+  for (const m of blk.matchAll(/"([a-zA-Z0-9_.\-]+)"\s*:/g)) cuenta[m[1]] = (cuenta[m[1]] || 0) + 1;
+  const dup = Object.keys(cuenta).filter(k => cuenta[k] > 1);
+  if (dup.length) err("claves ES duplicadas (gana la última): " + dup.join(", "));
+  else ok("sin claves ES duplicadas");
+}
+
 /* 6 · index.html hidratado — el HTML servido debe decir lo mismo que el diccionario ES.
    Sin esto la SPA publica un cascarón hueco: crawlers, previews de enlace y modos
    lectura ven viñetas vacías y titulares desfasados. Regenerar con:
