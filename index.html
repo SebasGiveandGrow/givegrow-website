@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=6453c986">
+<link rel="stylesheet" href="/styles.css?v=227605f6">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -75,6 +75,7 @@
         <div class="ndrop-menu">
           <a href="#origen" data-i18n="nav.origen">Origen</a>
           <a href="#impacto" data-i18n="nav.impacto">Impacto</a>
+          <a href="#impactos" data-i18n="nav.impactos">ImpactOS</a>
           <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
           <a href="#faq" data-i18n="nav.faq">FAQ</a>
           <a href="#contacto" data-i18n="nav.contacto">Contacto</a>
@@ -112,6 +113,7 @@
   <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
   <a href="#origen" data-i18n="nav.origen">Origen</a>
   <a href="#impacto" data-i18n="nav.impacto">Impacto</a>
+  <a href="#impactos" data-i18n="nav.impactos">ImpactOS</a>
   <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
   <a href="#faq" data-i18n="nav.faq">FAQ</a>
   <a href="#contacto" data-i18n="nav.contacto">Contacto</a>
@@ -626,109 +628,27 @@
 </main>
 
 <!-- ============ ALMA ============ -->
-<main id="page-alma" class="page">
+<main id="page-impactos" class="page">
   <section>
-    <div class="wrap center">
-      <span class="ey rv" data-i18n="alma.ey">Asistente IA</span>
-      <h2 class="h-sec rv" data-i18n="alma.t">Conversa con ALMA.</h2>
-      <p class="lead rv d1" data-i18n="alma.lead">ALMA (Asistente de Labor Misional y Alianzas) responde tus dudas sobre donaciones, alianzas y el HUB SOCIAL.</p>
-    </div>
-    <div class="wrap rv d2">
-      <div class="alma">
-        <div class="alma-head"><span class="dot"></span><strong>ALMA</strong></div>
-        <div id="alma-msgs" role="log" aria-live="polite" aria-atomic="false"></div>
-        <div class="alma-chips" id="alma-chips" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px 0"></div>
-        <div class="alma-in">
-          <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder,aria-label" placeholder="Escribe tu pregunta..." aria-label="Escribe tu pregunta...">
-          <button id="alma-send" class="alma-send" data-act="almaSend()" data-i18n="alma.send">Enviar</button>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="impactos.ey">La plataforma</span>
+      <h2 class="h-sec rv" data-i18n="impactos.t">Qué es ImpactOS y qué funciona hoy.</h2>
+      <p class="lead rv d1" data-i18n="impactos.lead">El sistema operativo del ecosistema Give&amp;Grow. Está en construcción: aquí describimos solo lo que ya opera.</p>
+
+      <div class="os-rows rv d2">
+        <div class="os-row">
+          <h3 data-i18n="impactos.os.t">Qué es</h3>
+          <p data-i18n="impactos.os.p">La capa pensada para reunir donaciones, membresías, trazabilidad de campo, certificados y alianzas en un solo lugar. En español suena a impactos; en inglés significa Impact Operating System.</p>
         </div>
-      </div>
-    </div>
-  </section>
-  <section class="cream">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="impactos.ey">ALMA + ImpactOS</span>
-      <h2 class="h-sec rv" data-i18n="impactos.t">ALMA es la voz de ImpactOS.</h2>
-      <p class="lead rv d1" data-i18n="impactos.lead">ImpactOS es el sistema operativo de Give&amp;Grow: la plataforma que conecta donantes, empresas, fundaciones y comunidades en un solo lugar. ALMA es su interfaz inteligente, la que te lleva a donde necesitas sin formularios ni menús.</p>
-      <p class="tag soon rv d1" data-i18n="impactos.soon" style="margin-top:12px">En construcción · fase inicial</p>
-      <div class="grid g3 rv d2" style="margin-top:30px">
-        <div class="card"><h3 data-i18n="impactos.os.t">Qué es ImpactOS</h3><p data-i18n="impactos.os.p">El sistema operativo del ecosistema. Reúne donaciones, membresías, trazabilidad de campo, certificados y alianzas en una sola plataforma. En español suena a impactos; en inglés significa Impact Operating System.</p></div>
-        <div class="card"><h3 data-i18n="impactos.alma.t">Qué es ALMA</h3><p data-i18n="impactos.alma.p">La capa inteligente que hace accesible todo ImpactOS. ALMA navega, acompaña y conecta: entiende qué necesitas y te guía hasta ahí. Es a Give&amp;Grow lo que Siri es al iPhone.</p></div>
-        <div class="card"><h3 data-i18n="impactos.eco.t">Cómo se conecta</h3><p data-i18n="impactos.eco.p">Give&amp;Grow es el ecosistema; ImpactOS, su plataforma; ALMA, la inteligencia que las une. Hoy ALMA responde tus preguntas; mañana será tu puerta de entrada a todo el ecosistema.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap">
-      <span class="ey rv" data-i18n="eco.ey">El ecosistema</span>
-      <h2 class="h-sec rv" data-i18n="eco.t">ALMA conecta todo, para todos.</h2>
-      <div class="eco rv d1">
-        <div class="eco-label" data-i18n="eco.modules">Módulos de ImpactOS</div>
-        <div class="eco-row"><span class="eco-chip"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Synergy Finder</span><span class="eco-chip"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/><path d="M3.8 12h3l1.3-2.5L11 16l1.8-4h3"/></svg>MenteSana</span><span class="eco-chip"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4ZM3 6h18M16 10a4 4 0 0 1-8 0"/></svg>HopeMarket</span><span class="eco-chip"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg>HUB SOCIAL</span><span class="eco-chip"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1 2.5 2 6 2s6-1 6-2v-5"/></svg>Academy</span><span class="eco-chip"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.4a2.6 2.6 0 0 0-2.5-1.9h-1a2 2 0 0 0 0 4h1a2 2 0 0 1 0 4h-1A2.6 2.6 0 0 1 9 14.6"/></svg>CrowdFunding</span><span class="eco-chip"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></svg>CrisisNet</span><span class="eco-chip"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg>Dashboard</span></div>
-        <div class="eco-conn">&#9650;</div>
-        <div class="eco-alma"><b>&#10022; ALMA</b><span data-i18n="eco.alma"> — la interfaz inteligente que une el ecosistema</span></div>
-        <div class="eco-conn">&#9660;</div>
-        <p class="eco-users" data-i18n="eco.users">Para cada persona: visitante, donante, voluntario, empresa, fundación, beneficiario, equipo y junta — sin importar su nivel técnico.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="cream">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="mod.ey">Los módulos</span>
-      <h2 class="h-sec rv" data-i18n="mod.t">El ecosistema, módulo a módulo.</h2>
-      <div class="grid g4 rv d1" style="margin-top:28px">
-        <div class="card mod"><div class="mod-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg></div><span class="tag" data-i18n="mod.active">Activo</span><h3 data-i18n="mod.hub.t">HUB SOCIAL</h3><p data-i18n="mod.hub.p">El centro operativo en terreno: rutas que reciben, clasifican y redistribuyen donaciones a las comunidades.</p></div>
-        <div class="card mod"><div class="mod-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><span class="tag soon" data-i18n="mod.dev">En desarrollo</span><h3 data-i18n="mod.synergy.t">Synergy Finder</h3><p data-i18n="mod.synergy.p">Motor de coincidencias que conecta necesidades con donantes, aliados y recursos.</p></div>
-        <div class="card mod"><div class="mod-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/><path d="M3.8 12h3l1.3-2.5L11 16l1.8-4h3"/></svg></div><span class="tag soon" data-i18n="mod.dev">En desarrollo</span><h3 data-i18n="mod.mente.t">MenteSana</h3><p data-i18n="mod.mente.p">Acompañamiento emocional: ALMA cambia a modo acompañante cuando lo detecta en el tono.</p></div>
-        <div class="card mod"><div class="mod-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4ZM3 6h18M16 10a4 4 0 0 1-8 0"/></svg></div><span class="tag soon" data-i18n="mod.dev">En desarrollo</span><h3 data-i18n="mod.hope.t">HopeMarket</h3><p data-i18n="mod.hope.p">Mercado solidario para artesanos y emprendedores de las comunidades.</p></div>
-        <div class="card mod"><div class="mod-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1 2.5 2 6 2s6-1 6-2v-5"/></svg></div><span class="tag soon" data-i18n="mod.dev">En desarrollo</span><h3 data-i18n="mod.academy.t">Academy</h3><p data-i18n="mod.academy.p">Formación y orientación de aprendizaje personalizada para personas y organizaciones.</p></div>
-        <div class="card mod"><div class="mod-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.4a2.6 2.6 0 0 0-2.5-1.9h-1a2 2 0 0 0 0 4h1a2 2 0 0 1 0 4h-1A2.6 2.6 0 0 1 9 14.6"/></svg></div><span class="tag soon" data-i18n="mod.dev">En desarrollo</span><h3 data-i18n="mod.crowd.t">CrowdFunding</h3><p data-i18n="mod.crowd.p">Campañas de recaudo para fundaciones aliadas, con metas y trazabilidad.</p></div>
-        <div class="card mod"><div class="mod-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></svg></div><span class="tag soon" data-i18n="mod.dev">En desarrollo</span><h3 data-i18n="mod.crisis.t">CrisisNet</h3><p data-i18n="mod.crisis.p">Alertas y coordinación de emergencias con donantes geolocalizados.</p></div>
-        <div class="card mod"><div class="mod-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg></div><span class="tag soon" data-i18n="mod.dev">En desarrollo</span><h3 data-i18n="mod.dash.t">Dashboard</h3><p data-i18n="mod.dash.p">Datos de impacto y reportes, consultables en lenguaje natural vía ALMA.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap">
-      <span class="ey rv" data-i18n="cap.ey">Qué hace ALMA</span>
-      <h2 class="h-sec rv" data-i18n="cap.t">Cinco capacidades, una sola conversación.</h2>
-      <div class="grid g3 rv d1" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6 6-2z"/></svg></div><h3 data-i18n="cap.nav.t">Navega</h3><p data-i18n="cap.nav.p">Te lleva a cualquier parte de la plataforma en lenguaje natural, sin menús ni formularios.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/></svg></div><h3 data-i18n="cap.acc.t">Acompaña</h3><p data-i18n="cap.acc.p">Si detecta angustia, cambia a modo acompañante. No espera a que se lo pidas.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M8 6h8M7.6 7.8 10.8 16M16.4 7.8 13.2 16"/></svg></div><h3 data-i18n="cap.con.t">Conecta</h3><p data-i18n="cap.con.p">Encuentra aliados, oportunidades y coincidencias para cada perfil del ecosistema.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></div><h3 data-i18n="cap.per.t">Personaliza</h3><p data-i18n="cap.per.p">Con tu cuenta, recuerda tu historial y retoma cada sesión donde la dejaste.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18 9l-4.2 1.3L12 15l-1.8-4.7L6 9l4.2-1.3z"/><path d="M19 14l.8 1.9L22 17l-2.2.7L19 20l-.8-2.3L16 17l2.2-1.1z"/></svg></div><h3 data-i18n="cap.apr.t">Aprende</h3><p data-i18n="cap.apr.p">Mejora con cada conversación para guiar y recomendar mejor.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="band">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="mode.ey">Dos modos</span>
-      <h2 class="h-sec rv" data-i18n="mode.t">Navegador y Acompañante, en la misma interfaz.</h2>
-      <div class="grid g2 rv d1" style="margin-top:26px">
-        <div class="card card-d"><h3 data-i18n="mode.nav.t">Modo Navegador</h3><p data-i18n="mode.nav.p">Para preguntas, tareas y acciones. Directo y conciso: te lleva a donde necesitas en el menor número de pasos.</p></div>
-        <div class="card card-d"><h3 data-i18n="mode.acc.t">Modo Acompañante</h3><p data-i18n="mode.acc.p">Para momentos difíciles. Empático y pausado; escucha antes de actuar. Es MenteSana en acción.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="cream">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="road.ey">Hacia dónde va</span>
-      <h2 class="h-sec rv" data-i18n="road.t">El camino de ALMA.</h2>
-      <div class="roadmap" style="margin-top:34px">
-        <div class="rm-node now rv"><h3 data-i18n="road.y1.t">Año 1 · Interfaz</h3><p data-i18n="road.y1.p">ALMA conecta a las personas con los módulos de ImpactOS en la web, en español.</p></div>
-        <div class="rm-node rv d1"><h3 data-i18n="road.y2.t">Años 2-3 · Voz</h3><p data-i18n="road.y2.p">ALMA en app móvil y WhatsApp; comandos de voz para el trabajo de campo, incluso sin buena conexión.</p></div>
-        <div class="rm-node rv d2"><h3 data-i18n="road.y3.t">Años 4-5 · Red</h3><p data-i18n="road.y3.p">ALMA conecta el ecosistema de Give&amp;Grow con otros de impacto social en Latinoamérica.</p></div>
-      </div>
-      <div class="cta-box rv d2">
-        <h3 data-i18n="impactos.cta.t">ImpactOS está en construcción.</h3>
-        <p data-i18n="impactos.cta.p">Lo estamos levantando módulo a módulo. Si quieres ser parte —como aliado, voluntario técnico o inversionista— conversemos.</p>
-        <a class="btn btn-g" href="#contacto" data-i18n="impactos.cta.btn">Conversemos</a>
+        <div class="os-row">
+          <h3 data-i18n="impactos.live.t">Qué está vivo hoy</h3>
+          <p data-i18n="impactos.live.p">Un módulo: el HUB SOCIAL. Es el centro operativo en terreno que recibe, clasifica y redistribuye donaciones a las comunidades, y el que produce el acta y la foto de cada entrega. Todo lo que este sitio puede probar sale de ahí.</p>
+          <p><a class="card-link" href="#hub"><span data-i18n="impactos.live.link">Conoce el HUB SOCIAL</span> <span aria-hidden="true">&rarr;</span></a></p>
+        </div>
+        <div class="os-row">
+          <h3 data-i18n="impactos.next.t">Hacia dónde va</h3>
+          <p data-i18n="impactos.next.p">Hay más módulos en diseño. No los nombramos todavía: un módulo anunciado no es un módulo entregado, y aquí solo publicamos lo que podemos demostrar. Cuando uno empiece a operar, aparecerá en esta página con su primera evidencia.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -850,7 +770,7 @@
         <h3 data-i18n="don.cta.t">¿Dudas antes de dar el paso?</h3>
         <p data-i18n="don.cta.p">Es normal. Pregunta lo que necesites: para eso están ALMA y nuestro equipo.</p>
         <div class="cta-actions">
-          <a class="btn btn-o" href="#alma" data-i18n="don.cta.b1">Hablar con ALMA</a>
+          <button type="button" class="btn btn-o" data-act="almaPanel(true)" data-i18n="don.cta.b1">Hablar con ALMA</button>
           <a class="btn btn-o" href="#contacto" data-i18n="don.cta.b2">Escribirnos</a>
         </div>
       </div>
@@ -1113,7 +1033,7 @@
         <h3 data-i18n="faq.cta2.t">¿Quedó alguna pregunta?</h3>
         <p data-i18n="faq.cta2.p">ALMA te responde al instante, o escríbenos directamente: una persona real te contesta.</p>
         <div class="cta-actions">
-          <a class="btn btn-g" href="#alma" data-i18n="faq.cta2.b1">Hablar con ALMA</a>
+          <button type="button" class="btn btn-g" data-act="almaPanel(true)" data-i18n="faq.cta2.b1">Hablar con ALMA</button>
           <a class="btn btn-o" href="#contacto" data-i18n="faq.cta2.b2">Ir a contacto</a>
         </div>
       </div>
@@ -1239,10 +1159,29 @@
 </footer>
 
 <!-- WHATSAPP -->
-<button class="alma-fab" data-nav="alma" aria-label="Habla con ALMA, nuestra asistente" data-i18n="alma.fab" data-i18n-attr="aria-label" title="ALMA">
+<!-- ALMA — vive fuera de las .page, así que está disponible desde cualquier ruta.
+     No es una burbuja de chat: es una columna de documento que entra por el borde. -->
+<button id="alma-open" class="alma-fab" data-act="almaPanel(true)" aria-controls="alma-panel" aria-expanded="false" data-i18n="alma.fab" data-i18n-attr="aria-label" aria-label="Abrir ALMA, la asistente de Give&amp;Grow">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
   <span>ALMA</span>
 </button>
+<div id="alma-scrim" class="alma-scrim" data-act="almaPanel(false)"></div>
+<aside id="alma-panel" class="alma-panel" role="dialog" aria-modal="true" aria-labelledby="alma-panel-t">
+  <div class="alma-panel-head">
+    <div>
+      <span class="alma-panel-t" id="alma-panel-t">ALMA</span>
+      <span class="alma-panel-sub" data-i18n="alma.panel.sub">Asistente de Labor Misional y Alianzas</span>
+    </div>
+    <button class="alma-x" data-act="almaPanel(false)" data-i18n="alma.close" data-i18n-attr="aria-label" aria-label="Cerrar ALMA">&times;</button>
+  </div>
+  <div id="alma-msgs" role="log" aria-live="polite" aria-atomic="false"></div>
+  <div class="alma-chips" id="alma-chips"></div>
+  <div class="alma-in">
+    <input id="alma-input" type="text" data-i18n="alma.placeholder" data-i18n-attr="placeholder,aria-label" placeholder="Escribe tu pregunta..." aria-label="Escribe tu pregunta...">
+    <button id="alma-send" class="alma-send" data-act="almaSend()" data-i18n="alma.send">Enviar</button>
+  </div>
+  <p class="alma-note" data-i18n="alma.note">Respuestas generadas con inteligencia artificial. Para datos oficiales, consulta Transparencia.</p>
+</aside>
 <a class="wa" href="https://wa.me/573153305028" target="_blank" rel="noopener" aria-label="WhatsApp">
   <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4-1.1l-.3-.2-2.8.7.8-2.7-.2-.3A8 8 0 1 1 12 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.8 1-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.2 0-.3 0-.5l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3 1 2.6 1.1 2.8s1.9 3 4.7 4.2c1.7.7 2.3.8 3.2.7.5-.1 1.4-.6 1.6-1.2s.2-1 .1-1.2-.3-.1-.5-.2z"/></svg>
 </a>
@@ -1257,7 +1196,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=6b1c4412"></script>
+<script src="/app.js?v=494bd381"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

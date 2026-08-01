@@ -4,6 +4,20 @@
 /* ---------- I18N ---------- */
 var I18N = {
   es: {
+    "nav.impactos":"ImpactOS",
+    "impactos.ey":"La plataforma",
+    "impactos.t":"Qué es ImpactOS y qué funciona hoy.",
+    "impactos.lead":"El sistema operativo del ecosistema Give&Grow. Está en construcción: aquí describimos solo lo que ya opera.",
+    "impactos.os.t":"Qué es",
+    "impactos.os.p":"La capa pensada para reunir donaciones, membresías, trazabilidad de campo, certificados y alianzas en un solo lugar. En español suena a impactos; en inglés significa Impact Operating System.",
+    "impactos.live.t":"Qué está vivo hoy",
+    "impactos.live.p":"Un módulo: el HUB SOCIAL. Es el centro operativo en terreno que recibe, clasifica y redistribuye donaciones a las comunidades, y el que produce el acta y la foto de cada entrega. Todo lo que este sitio puede probar sale de ahí.",
+    "impactos.live.link":"Conoce el HUB SOCIAL",
+    "impactos.next.t":"Hacia dónde va",
+    "impactos.next.p":"Hay más módulos en diseño. No los nombramos todavía: un módulo anunciado no es un módulo entregado, y aquí solo publicamos lo que podemos demostrar. Cuando uno empiece a operar, aparecerá en esta página con su primera evidencia.",
+    "alma.panel.sub":"Asistente de Labor Misional y Alianzas",
+    "alma.close":"Cerrar ALMA",
+    "alma.note":"Respuestas generadas con inteligencia artificial. Para datos oficiales, consulta Transparencia.",
     "nav.donar":"Donar",
     "nav.empresas":"Empresas",
     "nav.fundaciones":"Fundaciones",
@@ -232,9 +246,6 @@ var I18N = {
     "imp.tab.gal":"Galería",
     "imp.tab.map":"Mapa",
     "imp.tab.blog":"Historias",
-    "alma.ey":"Asistente IA",
-    "alma.t":"Conversa con ALMA.",
-    "alma.lead":"ALMA (Asistente de Labor Misional y Alianzas) responde tus dudas sobre donaciones, alianzas y el HUB SOCIAL.",
     "alma.placeholder":"Escribe tu pregunta...",
     "hero.imgalt":"Padre e hijo juegan con un balón entregado en jornada, en su comunidad wayuu de la Alta Guajira",
     "banner.ey":"La Guajira · Enero 2025",
@@ -266,7 +277,6 @@ var I18N = {
     "theme.auto":"Tema: automático según la hora. Clic para modo claro",
     "theme.light":"Tema: claro. Clic para modo oscuro",
     "theme.dark":"Tema: oscuro. Clic para modo automático",
-    "a11y.skip":"Saltar al contenido",
     "alma.send":"Enviar",
     "alma.hello":"Hola, soy ALMA. Puedo contarte cómo donar, los beneficios tributarios, las membresías o cómo aplica tu fundación al Hub. ¿En qué te ayudo?",
     "donar.ey":"Donar",
@@ -411,7 +421,7 @@ var I18N = {
     "com.maps":"Cómo llegar",
     "map.area.med":"Medellín · centro operativo",
     "net.hub":"Conoce una por una a las fundaciones que forman la red",
-    "nav.g.nosotros":"Nosotros","nav.cta":"Donar","nav.faq":"FAQ",
+    "nav.g.nosotros":"Nosotros","nav.cta":"Donar",
     "ficha.back":"Volver al Hub",
     "ficha.lider":"Dirige",
     "ficha.prog.t":"Programas en marcha",
@@ -459,16 +469,6 @@ var I18N = {
     "emp.cta.t":"Hablemos de tu alianza",
     "emp.cta.p":"Diseñamos el aporte a la medida de tu empresa, con beneficio tributario y reportes verificables. Cuéntanos tu objetivo y construimos la ruta juntos.",
     "emp.cta.btn":"Quiero conversar",
-    "impactos.ey":"ALMA + ImpactOS",
-    "impactos.t":"ALMA es la voz de ImpactOS.",
-    "impactos.lead":"ImpactOS es el sistema operativo de Give&Grow: la plataforma que conecta donantes, empresas, fundaciones y comunidades en un solo lugar. ALMA es su interfaz inteligente, la que te lleva a donde necesitas sin formularios ni menús.",
-    "impactos.os.t":"Qué es ImpactOS",
-    "impactos.os.p":"El sistema operativo del ecosistema. Reúne donaciones, membresías, trazabilidad de campo, certificados y alianzas en una sola plataforma. En español suena a impactos; en inglés significa Impact Operating System.",
-    "impactos.alma.t":"Qué es ALMA",
-    "impactos.alma.p":"La capa inteligente que hace accesible todo ImpactOS. ALMA navega, acompaña y conecta: entiende qué necesitas y te guía hasta ahí. Es a Give&Grow lo que Siri es al iPhone.",
-    "impactos.eco.t":"Cómo se conecta",
-    "impactos.eco.p":"Give&Grow es el ecosistema; ImpactOS, su plataforma; ALMA, la inteligencia que las une. Hoy ALMA responde tus preguntas; mañana será tu puerta de entrada a todo el ecosistema.",
-    "impactos.soon":"En construcción · fase inicial",
     "alma.chip1":"¿Cómo dono?",
     "alma.c.donar1":"¿Qué métodos de pago hay?",
     "alma.c.track":"¿Cómo rastreo mi donación?",
@@ -491,60 +491,6 @@ var I18N = {
     "vis.2.p":"Amplificar a quienes ya trabajan en campo, reduciendo costos y multiplicando su alcance.",
     "vis.3.t":"Generosidad que crece",
     "vis.3.p":"Un modelo donde dar deja una huella real y, a la vez, beneficios para quien contribuye.",
-    "eco.ey":"El ecosistema",
-    "eco.t":"ALMA conecta todo, para todos.",
-    "eco.modules":"Módulos de ImpactOS",
-    "eco.alma":" — la interfaz inteligente que une el ecosistema",
-    "eco.users":"Para cada persona: visitante, donante, voluntario, empresa, fundación, beneficiario, equipo y junta — sin importar su nivel técnico.",
-    "mod.ey":"Los módulos",
-    "mod.t":"El ecosistema, módulo a módulo.",
-    "mod.active":"Activo",
-    "mod.dev":"En desarrollo",
-    "mod.hub.t":"HUB SOCIAL",
-    "mod.hub.p":"El centro operativo en terreno: rutas que reciben, clasifican y redistribuyen donaciones a las comunidades.",
-    "mod.synergy.t":"Synergy Finder",
-    "mod.synergy.p":"Motor de coincidencias que conecta necesidades con donantes, aliados y recursos.",
-    "mod.mente.t":"MenteSana",
-    "mod.mente.p":"Acompañamiento emocional: ALMA cambia a modo acompañante cuando lo detecta en el tono.",
-    "mod.hope.t":"HopeMarket",
-    "mod.hope.p":"Mercado solidario para artesanos y emprendedores de las comunidades.",
-    "mod.academy.t":"Academy",
-    "mod.academy.p":"Formación y orientación de aprendizaje personalizada para personas y organizaciones.",
-    "mod.crowd.t":"CrowdFunding",
-    "mod.crowd.p":"Campañas de recaudo para fundaciones aliadas, con metas y trazabilidad.",
-    "mod.crisis.t":"CrisisNet",
-    "mod.crisis.p":"Alertas y coordinación de emergencias con donantes geolocalizados.",
-    "mod.dash.t":"Dashboard",
-    "mod.dash.p":"Datos de impacto y reportes, consultables en lenguaje natural vía ALMA.",
-    "cap.ey":"Qué hace ALMA",
-    "cap.t":"Cinco capacidades, una sola conversación.",
-    "cap.nav.t":"Navega",
-    "cap.nav.p":"Te lleva a cualquier parte de la plataforma en lenguaje natural, sin menús ni formularios.",
-    "cap.acc.t":"Acompaña",
-    "cap.acc.p":"Si detecta angustia, cambia a modo acompañante. No espera a que se lo pidas.",
-    "cap.con.t":"Conecta",
-    "cap.con.p":"Encuentra aliados, oportunidades y coincidencias para cada perfil del ecosistema.",
-    "cap.per.t":"Personaliza",
-    "cap.per.p":"Con tu cuenta, recuerda tu historial y retoma cada sesión donde la dejaste.",
-    "cap.apr.t":"Aprende",
-    "cap.apr.p":"Mejora con cada conversación para guiar y recomendar mejor.",
-    "mode.ey":"Dos modos",
-    "mode.t":"Navegador y Acompañante, en la misma interfaz.",
-    "mode.nav.t":"Modo Navegador",
-    "mode.nav.p":"Para preguntas, tareas y acciones. Directo y conciso: te lleva a donde necesitas en el menor número de pasos.",
-    "mode.acc.t":"Modo Acompañante",
-    "mode.acc.p":"Para momentos difíciles. Empático y pausado; escucha antes de actuar. Es MenteSana en acción.",
-    "road.ey":"Hacia dónde va",
-    "road.t":"El camino de ALMA.",
-    "road.y1.t":"Año 1 · Interfaz",
-    "road.y1.p":"ALMA conecta a las personas con los módulos de ImpactOS en la web, en español.",
-    "road.y2.t":"Años 2-3 · Voz",
-    "road.y2.p":"ALMA en app móvil y WhatsApp; comandos de voz para el trabajo de campo, incluso sin buena conexión.",
-    "road.y3.t":"Años 4-5 · Red",
-    "road.y3.p":"ALMA conecta el ecosistema de Give&Grow con otros de impacto social en Latinoamérica.",
-    "impactos.cta.t":"ImpactOS está en construcción.",
-    "impactos.cta.p":"Lo estamos levantando módulo a módulo. Si quieres ser parte —como aliado, voluntario técnico o inversionista— conversemos.",
-    "impactos.cta.btn":"Conversemos",
     "nav.membres":"Membresías",
     "membres.ey":"Membresías",
     "membres.t":"Crece con cada aporte.",
@@ -734,7 +680,7 @@ var ROUTE_META = {
   fundaciones:{t:{es:"Para fundaciones · Give&Grow International",en:"For foundations · Give&Grow International"},d:{es:"Suma tu fundación al HUB SOCIAL: recibe herramientas y donaciones de forma gratuita, transparente y trazable.",en:"Bring your foundation to the Social Hub: receive tools and donations for free, transparently and traceably."}},
   gratitud:{t:{es:"Programa de Gratitud · Give&Grow International",en:"Gratitude Program · Give&Grow International"},d:{es:"Beneficios y reconocimientos para quienes hacen posible el impacto: donantes, aliados y empresas.",en:"Benefits and recognition for those who make impact possible: donors, allies and companies."}},
   impacto:{t:{es:"Impacto y evidencia · Give&Grow International",en:"Impact & evidence · Give&Grow International"},d:{es:"Evidencia real del trabajo en terreno: fotografías, trazabilidad y resultados de las comunidades que acompañamos.",en:"Real evidence from the field: photos, traceability and results from the communities we support."}},
-  alma:{t:{es:"ALMA, asistente con IA · Give&Grow International",en:"ALMA, AI assistant · Give&Grow International"},d:{es:"Conversa con ALMA, la asistente con inteligencia artificial de Give&Grow. Resuelve tus dudas sobre donar, aliarte o aplicar.",en:"Chat with ALMA, Give&Grow's AI assistant. Get answers about donating, partnering or applying."}},
+  impactos:{t:{es:"ImpactOS · Give&Grow International",en:"ImpactOS · Give&Grow International"},d:{es:"Qué es ImpactOS, la plataforma del ecosistema Give&Grow, y qué módulo está operando hoy: el HUB SOCIAL.",en:"What ImpactOS is, the platform behind the Give&Grow ecosystem, and which module runs today: the HUB SOCIAL."}},
   donar:{t:{es:"Donar · Give&Grow International",en:"Donate · Give&Grow International"},d:{es:"Haz tu donación a Give&Grow con trazabilidad completa y beneficio tributario. Cada aporte transforma una vida.",en:"Donate to Give&Grow with full traceability and a tax benefit. Every gift transforms a life."}},
   transparencia:{t:{es:"Transparencia · Give&Grow International",en:"Transparency · Give&Grow International"},d:{es:"Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International.",en:"Official registration, governance, financial statements and public documents of Give&Grow International."}},
   contacto:{t:{es:"Contacto · Give&Grow International",en:"Contact · Give&Grow International"},d:{es:"Escríbenos para donar, aliar tu empresa o sumar tu fundación al HUB SOCIAL. Medellín, Colombia.",en:"Reach out to donate, partner your company or join your foundation to the Social Hub. Medellín, Colombia."}},
@@ -887,7 +833,7 @@ var ACT_FNS = {
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA, allySubmit:allySubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
-  stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb
+  stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
 };
 function runAct(spec, el, ev){
   var m = /^(\w+)\((.*)\)$/.exec((spec||"").trim());
@@ -901,6 +847,10 @@ function runAct(spec, el, ev){
     if (a==="this.value") return el.value;
     if (a==="this.textContent") return el.textContent;
     if (a==="event") return ev;
+    // Sin esto, "false" llegaba como cadena — que es verdadera. Cualquier
+    // data-act con un booleano hacía lo contrario de lo que decía.
+    if (a==="true") return true;
+    if (a==="false") return false;
     if (/^-?\d+$/.test(a)) return parseInt(a,10);
     return a.replace(/^['"]|['"]$/g,"");
   });
@@ -925,7 +875,10 @@ function ensureE404(){
   return el;
 }
 function go(id, fromPop){
-  if (id==="alma" && currentRoute!=="alma") almaFromRoute = currentRoute;
+  // #alma quedó como alias: ALMA ya no es una página sino un panel. Los enlaces
+  // viejos aterrizan en #impactos y abren el panel, así ninguno queda roto.
+  var abrirAlma = (id === "alma");
+  if (abrirAlma) id = "impactos";
   var pages = document.querySelectorAll(".page");
   for (var i=0;i<pages.length;i++) pages[i].classList.remove("active");
   var target = document.getElementById("page-"+id);
@@ -951,8 +904,8 @@ function go(id, fromPop){
   initReveal();
   animateCounters();
   if (id==="inicio") updateLiveStats();
-  if (id==="alma") renderAlmaChips();
   if (id==="gratitud") renderGratitudComercios();
+  if (abrirAlma) almaPanel(true);
   return false;
 }
 
@@ -1925,6 +1878,45 @@ function almaSetBusy(b){
   if (inp) inp.disabled = b;
   if (btn){ btn.disabled = b; btn.style.opacity = b ? "0.6" : ""; }
 }
+/* ---------- Panel lateral de ALMA ----------
+   ALMA dejó de ser una página (v5 Fase 2): es una columna disponible en cualquier
+   ruta. Maneja foco (trampa + retorno al disparador), Esc y el estado aria. */
+var almaLastFocus = null;
+function almaPanel(open){
+  var p = document.getElementById("alma-panel");
+  if (!p) return false;
+  var s = document.getElementById("alma-scrim");
+  var b = document.getElementById("alma-open");
+  if (open){
+    // Los chips se arman con la ruta desde la que se abrió: ALMA responde en contexto.
+    almaFromRoute = currentRoute || "inicio";
+    renderAlmaChips();
+    almaLastFocus = document.activeElement;
+    p.classList.add("open"); if (s) s.classList.add("open");
+    if (b) b.setAttribute("aria-expanded","true");
+    document.body.classList.add("alma-lock");
+    var i = document.getElementById("alma-input");
+    if (i) setTimeout(function(){ i.focus(); }, 60);
+  } else {
+    p.classList.remove("open"); if (s) s.classList.remove("open");
+    if (b) b.setAttribute("aria-expanded","false");
+    document.body.classList.remove("alma-lock");
+    if (almaLastFocus && almaLastFocus.focus) almaLastFocus.focus();
+    almaLastFocus = null;
+  }
+  return false;
+}
+document.addEventListener("keydown", function(e){
+  var p = document.getElementById("alma-panel");
+  if (!p || !p.classList.contains("open")) return;
+  if (e.key === "Escape"){ almaPanel(false); return; }
+  if (e.key !== "Tab") return;
+  var f = p.querySelectorAll("button, input, a[href]");
+  if (!f.length) return;
+  var first = f[0], last = f[f.length-1];
+  if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+});
 function almaAsk(t){ var i=document.getElementById("alma-input"); if(!i) return; i.value=(t||"").trim(); almaSend(); }
 function almaSend(){
   if (almaBusy) return;

@@ -271,19 +271,78 @@ input[type=range]{width:100%;accent-color:var(--gn);margin:8px 0 4px}
 .faq-a{max-height:0;overflow:hidden;transition:max-height .3s var(--ease)}
 .faq-a-in{padding:0 0 20px;color:var(--mu);font-size:15px}
 
-/* ===== ALMA chat ===== */
-.alma{max-width:620px;margin:0 auto;background:var(--ink-deep);border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
-.alma-head{padding:18px 22px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:12px;color:#fff}
-.alma-head .dot{width:9px;height:9px;border-radius:50%;background:var(--gn);box-shadow:0 0 0 3px rgba(74,222,128,.2)}
-#alma-msgs{height:380px;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
-.amsg{max-width:82%;padding:11px 15px;border-radius:14px;font-size:14.5px;line-height:1.5}
-.amsg.bot{background:rgba(255,255,255,.07);color:#fff;align-self:flex-start;border-bottom-left-radius:4px}
-.amsg.you{background:var(--gm);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+/* ===== ALMA — panel lateral =====
+   No es una burbuja de chat: es una columna de documento que entra por el borde
+   derecho. Papel, reglas de 1px, radio 2px, cero sombra difusa. Vive fuera de las
+   .page, así que está disponible desde cualquier ruta. */
+.alma-panel{
+  position:fixed;top:0;right:0;bottom:0;z-index:600;width:min(420px,100vw);
+  display:flex;flex-direction:column;
+  background:var(--surface);color:var(--ink);
+  border-left:1px solid var(--bd);
+  transform:translateX(100%);visibility:hidden;
+  transition:transform .28s var(--ease),visibility .28s var(--ease);
+}
+.alma-panel.open{transform:translateX(0);visibility:visible}
+/* Con el panel abierto (aria-modal) la página de atrás no se desplaza. */
+body.alma-lock{overflow:hidden}
+body.alma-lock .alma-fab,body.alma-lock .wa{display:none}
+.alma-scrim{
+  position:fixed;inset:0;z-index:599;background:rgba(14,33,24,.34);
+  opacity:0;visibility:hidden;transition:opacity .28s var(--ease),visibility .28s var(--ease);
+}
+.alma-scrim.open{opacity:1;visibility:visible}
+.alma-panel-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:20px 22px 16px;border-bottom:1px solid var(--bd);
+}
+.alma-panel-t{
+  display:block;font-size:15px;font-weight:600;letter-spacing:.02em;color:var(--ink);
+}
+.alma-panel-sub{
+  display:block;margin-top:3px;font-size:12px;line-height:1.4;color:var(--mu);
+}
+.alma-x{
+  flex:0 0 auto;width:30px;height:30px;border:1px solid var(--bd);border-radius:2px;
+  background:transparent;color:var(--mu);font-size:19px;line-height:1;
+  display:flex;align-items:center;justify-content:center;transition:color .15s,border-color .15s;
+}
+.alma-x:hover{color:var(--ink);border-color:var(--ink-soft)}
+#alma-msgs{
+  flex:1;min-height:0;overflow-y:auto;padding:20px 22px;
+  display:flex;flex-direction:column;gap:16px;
+}
+.amsg{max-width:88%;font-size:var(--fs-body);line-height:var(--lh-body)}
+.amsg.bot{align-self:flex-start;color:var(--ink)}
+/* La respuesta del visitante se marca con una regla, no con un globo de color. */
+.amsg.you{
+  align-self:flex-end;text-align:right;color:var(--ink-soft);
+  border-right:2px solid var(--acc);padding-right:12px;
+}
 .amsg p{margin:0 0 8px}.amsg p:last-child{margin:0}
-.alma-in{display:flex;gap:8px;padding:14px;border-top:1px solid rgba(255,255,255,.08)}
-#alma-input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:10px;padding:11px 14px;font-size:14px}
-#alma-input::placeholder{color:rgba(255,255,255,.4)}
-.alma-send{padding:0 18px;border-radius:10px;background:var(--gm);color:#fff;font-weight:700}
+.alma-in{display:flex;gap:8px;padding:14px 22px;border-top:1px solid var(--bd)}
+#alma-input{
+  flex:1;min-width:0;background:var(--bg);border:1px solid var(--bd);color:var(--ink);
+  border-radius:2px;padding:11px 13px;font-size:15px;
+}
+#alma-input::placeholder{color:var(--mu)}
+#alma-input:focus{outline:2px solid var(--acc);outline-offset:-1px}
+.alma-send{
+  padding:0 16px;border-radius:2px;background:var(--g);color:#fff;
+  font-weight:600;font-size:14px;transition:background .15s;
+}
+.alma-send:hover{background:var(--gm)}
+html[data-theme="dark"] .alma-send{background:var(--acc);color:#0F1613}
+.alma-note{
+  margin:0;padding:0 22px 16px;font-size:12px;line-height:1.45;color:var(--mu);
+}
+.alma-panel .alma-chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 22px}
+@media(max-width:640px){
+  .alma-panel{width:100vw;border-left:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .alma-panel,.alma-scrim{transition:none}
+}
 
 /* ===== forms ===== */
 .field{margin-bottom:16px}
@@ -339,22 +398,10 @@ footer a:hover{color:var(--gn)}
 .ic-svg{width:30px;height:30px;display:block}
 .path-ic .ic-svg{width:24px;height:24px;color:#cfeede}
 .card .ic .ic-svg{width:24px;height:24px;color:var(--acc)}
-.mod-ic{width:46px;height:46px;border-radius:12px;background:var(--gl);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
-.mod-ic .ic-svg{width:24px;height:24px;color:var(--acc)}
-/* ---- ImpactOS ecosystem diagram ---- */
-.eco{max-width:920px;margin:0 auto;text-align:center}
-.eco-label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);font-weight:700;margin-bottom:14px}
+/* ---- chips de ecosistema (usados en #hub y #gratitud) ---- */
 .eco-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
 .eco-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid var(--bd);border-radius:12px;background:var(--surface);font-size:14px;font-weight:600;color:var(--ink)}
 .eco-chip .ic-svg{width:18px;height:18px;color:var(--acc)}
-.eco-conn{color:var(--acc);font-size:15px;margin:12px 0;opacity:.5}
-.eco-alma{display:inline-flex;flex-direction:column;gap:4px;background:var(--ink-deep);color:#fff;border-radius:16px;padding:18px 28px;max-width:560px}
-.eco-alma b{color:#9be3b6;font-size:18px}
-.eco-alma span{font-size:14px;color:rgba(255,255,255,.82)}
-.eco-users{margin:14px auto 0;color:var(--mu);font-size:14px;max-width:660px}
-/* ---- module cards ---- */
-.card.mod{position:relative}
-.card.mod .tag,.card.mod .tag.soon{position:absolute;top:14px;right:14px}
 /* ---- dark cards on navy band ---- */
 .band .card-d{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
 .band .card-d h3{color:#fff}
@@ -510,11 +557,21 @@ html[data-theme="dark"] .tt-moon{opacity:1}
 .fb-link:hover{color:var(--gn);border-color:var(--gn)}
 @media(max-width:640px){.foto-banner{min-height:68vh}.fb-in{padding-bottom:38px}}
 
-/* ---------- botón flotante ALMA ---------- */
-.alma-fab{position:fixed;bottom:92px;right:24px;z-index:400;display:flex;align-items:center;gap:8px;padding:0 18px;height:44px;border-radius:999px;background:var(--g);color:#fff;font-weight:800;font-size:14px;letter-spacing:.4px;box-shadow:0 4px 16px rgba(31,92,56,.35);transition:transform .2s var(--ease),background .2s}
-.alma-fab:hover{transform:scale(1.06);background:var(--gh)}
-.alma-fab svg{width:20px;height:20px}
-html[data-theme="dark"] .alma-fab{background:var(--acc);color:#0F1613;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+/* ---------- disparador de ALMA ----------
+   Rectangular, 2px de radio, borde de 1px. Sin píldora, sin sombra difusa,
+   sin brillo, sin rebote al hover: se comporta como una pestaña de archivo. */
+.alma-fab{
+  position:fixed;bottom:92px;right:24px;z-index:400;
+  display:flex;align-items:center;gap:8px;padding:0 15px;height:40px;
+  border-radius:2px;border:1px solid var(--g);
+  background:var(--g);color:#fff;
+  font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;
+  transition:background .15s,border-color .15s;
+}
+.alma-fab:hover{background:var(--gm);border-color:var(--gm)}
+.alma-fab svg{width:16px;height:16px}
+html[data-theme="dark"] .alma-fab{background:var(--acc);border-color:var(--acc);color:#0F1613}
+html[data-theme="dark"] .alma-fab:hover{background:var(--acc-2);border-color:var(--acc-2)}
 
 /* ---------- barra de recorrido (0 a 100) ---------- */
 /* El Recorrido — riel de progreso sutil de la guía de 12 paradas (v5) */
@@ -532,20 +589,14 @@ html[data-theme="dark"] .alma-fab{background:var(--acc);color:#0F1613;box-shadow
 .j-done{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--acc)}
 @media(prefers-reduced-motion:reduce){.j-seg,.j-next{transition:none}}
 
-/* Roadmap de ALMA — línea de tiempo sobria; Año 1 = presente, resto futuro (v5) */
-.roadmap{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
-.roadmap::before{content:"";position:absolute;top:7px;left:0;right:0;height:2px;background:var(--bd)}
-.rm-node{position:relative;padding-top:30px}
-.rm-node::before{content:"";position:absolute;top:0;left:0;width:16px;height:16px;border-radius:50%;background:var(--surface);border:2px solid var(--bd);z-index:1}
-.rm-node.now::before{background:var(--acc);border-color:var(--acc);box-shadow:0 0 0 4px rgba(31,92,56,.18)}
-.rm-node h3{font-size:var(--fs-h4);margin-bottom:6px}
-.rm-node p{font-size:14px;line-height:1.55;color:var(--mu)}
-@media(max-width:720px){
-  .roadmap{grid-template-columns:1fr;gap:6px}
-  .roadmap::before{top:8px;bottom:8px;left:7px;right:auto;width:2px;height:auto}
-  .rm-node{padding-top:0;padding-left:34px;padding-bottom:22px}
-  .rm-node::before{top:2px;left:0}
-}
+/* ---------- ImpactOS: tres bloques separados por reglas finas ----------
+   Sustituye la cuadrícula de módulos. Sin tarjetas, sin sellos de "en desarrollo":
+   filas de informe anual. */
+.os-rows{margin-top:34px;border-top:1px solid var(--bd)}
+.os-row{padding:26px 0;border-bottom:1px solid var(--bd)}
+.os-row h3{font-size:var(--fs-h4);margin-bottom:8px}
+.os-row p{max-width:62ch}
+.os-row p + p{margin-top:10px}
 
 /* ---------- cierres de página y "empieza aquí" ---------- */
 .cta-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px}
@@ -637,8 +688,9 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .e404-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 
 /* chips de sugerencia de ALMA (migrado de estilos inline) */
-.alma-chip{padding:7px 13px;border:1px solid var(--bd);border-radius:999px;background:var(--surface,#fff);font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:background .15s,border-color .15s}
-.alma-chip:hover{background:var(--gl);border-color:var(--gn)}
+/* Radio 2px, no píldora: sugerencias de un índice, no respuestas de chatbot. */
+.alma-chip{padding:7px 11px;border:1px solid var(--bd);border-radius:2px;background:transparent;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;text-align:left;transition:color .15s,border-color .15s}
+.alma-chip:hover{color:var(--ink);border-color:var(--ink-soft)}
 
 /* ===== flotantes en móvil: ALMA y WhatsApp no deben chocar ni tapar contenido ===== */
 @media(max-width:768px){
