@@ -1,12 +1,51 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Empresas aliadas, legal, ficha y cierre de auditoría" (PRs #21–#34, ago 2026)
+> Última actualización: sesión "v5 Fase 1 — correcciones de credibilidad" (31 jul 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
 - Sitio bilingüe ES/EN, vanilla-JS SPA, Cloudflare Workers.
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
+
+## Cierre de tanda: v5 FASE 1 — correcciones de credibilidad (31 jul 2026)
+
+**Hallazgo de fondo: `index.html` se publicaba como cascarón hueco.** De 644 nodos
+`data-i18n` de texto, 297 estaban vacíos y 19 desfasados del diccionario ES. La SPA los
+rellenaba en runtime, así que en el navegador todo se veía bien — pero crawlers, previews
+de enlace, modos lectura y cualquier extractor de texto leían viñetas vacías, enlaces sin
+etiqueta y titulares mal escritos. Los 5 síntomas que reportó Sebas eran ese único fallo.
+
+- **`scripts/hydrate-i18n.mjs`** — escribe el texto ES dentro de cada `data-i18n` de
+  index.html. Idempotente. `--check` reporta sin escribir. Lógica compartida en
+  `scripts/i18n-html.mjs` (lee el dict evaluando el literal `es:{}`, no con regex).
+- **`validate.mjs` check #6** — falla el build si el HTML difiere del diccionario ES.
+  Antes el gate verificaba que la clave *existiera*, nunca que el texto *coincidiera*;
+  por eso la deriva fue invisible. **Si editas textos en el dict ES, corre el hidratador
+  antes de commitear** o el gate te frena.
+- **Tildes ALMA/ImpactOS** corregidas (11 nodos) — venían del fallback estático, el
+  diccionario siempre estuvo bien.
+- **Deriva de copy corregida**, notablemente `stat.pobl`: el HTML decía "Poblaciones
+  impactadas" (claim de impacto consumado) donde el dict dice "Poblaciones que buscamos
+  alcanzar". Era un claim sin evidencia fosilizado en el archivo servido.
+- **404 fuera del documento** — `<main id="page-e404">` era la primera página del HTML;
+  ahora vive en `<template id="tpl-e404">` y lo monta `ensureE404()` en app.js al pedir
+  una ruta inexistente. Verificado: no existe en el DOM hasta que hace falta, y monta
+  hidratado en el idioma vigente.
+- **Red duplicada resuelta** — el muro `#net-wall` de Impacto repetía el titular de
+  `#hub` *y* los datos del mapa que tiene encima. Eliminado; queda un enlace al HUB
+  (clave nueva `net.hub`). Arrastró `renderWall`, `netTypeKey`, `NET_COLORS`, las reglas
+  `.net-card`/`.net-dot` y 6 claves i18n huérfanas.
+- **Guiones de la calculadora** — `co-tax`, `co-net`, `calc-annual`, `m-sub` publicaban
+  un `-` literal y `m-name` decía "Semilla" cuando el default es "Árbol". Ahora llevan
+  el valor real del estado por defecto ($200.000/mes COP); `calcUpdate()` los recalcula
+  igual. `co-impact` queda vacío a propósito: depende de partners.json.
+
+Paridad i18n 729/729. Gate completo en verde. Cache-bust: styles `6453c986`, app `6b1c4412`.
+
+**Deuda que quedó anotada, no resuelta:** el naranja `#B4690E` (fuera de paleta) sigue
+en la leyenda y los pines del mapa, con los colores escritos inline en app.js. Es tema
+de la Fase 4 (sistema visual), no de esta.
 
 ## Cierre de tanda: empresas aliadas, legal, ficha y fin de la auditoría (PRs #21–#34, ago 2026)
 

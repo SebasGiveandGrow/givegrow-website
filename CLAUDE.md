@@ -44,6 +44,18 @@ export PATH="/opt/homebrew/bin:$PATH"
 Sin esto, `validate.mjs` da un falso negativo: su subproceso `node --check app.js`
 no encuentra `node` y reporta "app.js sintaxis inválida" aunque el archivo esté bien.
 
+## REGLA CRÍTICA: hidratar index.html tras tocar textos ES
+
+`index.html` debe decir literalmente lo mismo que el diccionario ES de `app.js`.
+La SPA rellena los `data-i18n` en runtime, pero el HTML servido es lo que leen
+crawlers, previews de enlace y modos lectura. **Si editas un texto del dict ES:**
+```bash
+node scripts/hydrate-i18n.mjs        # reescribe index.html desde el dict
+node scripts/hydrate-i18n.mjs --check # solo reporta, no escribe
+```
+El check #6 de `validate.mjs` falla el build si divergen. No editar a mano el texto
+de un elemento con `data-i18n`: la fuente de verdad es el diccionario.
+
 ## REGLA CRÍTICA: cache-bust de assets
 
 `/app.js` y `/styles.css` se sirven con `Cache-Control: immutable` (1 año).
