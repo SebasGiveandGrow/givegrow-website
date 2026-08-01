@@ -1,12 +1,71 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Etiqueta calculadora ¿persona o empresa? + modelo de trabajo reafirmado" (17 jul 2026)
+> Última actualización: sesión "Empresas aliadas, legal, ficha y cierre de auditoría" (PRs #21–#34, ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
 - Sitio bilingüe ES/EN, vanilla-JS SPA, Cloudflare Workers.
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
+
+## Cierre de tanda: empresas aliadas, legal, ficha y fin de la auditoría (PRs #21–#34, ago 2026)
+
+**El sitio quedó en punto de lanzamiento. Sin PRs abiertos.** QA de pre-lanzamiento: 0 enlaces
+internos rotos (19 páginas), meta/OG/twitter/canonical/favicon completos, 0 errores de consola
+(incl. mapa Leaflet), 0 imágenes sin `alt`, `prefers-reduced-motion` cubierto, formularios sanos.
+
+### Qué entró
+- **Cierre del plan de auditoría**: Bricolage→Unbounded (fuente huérfana de 131 KB eliminada),
+  tramo a11y (labels `for`, tablist ARIA en pagos, `#lightbox` como dialog con foco, contrastes
+  noche, `.sr-only`), SEO (`noindex` en vista 404, twitter cards, título de 404).
+- **Empresas aliadas** (`#empresas`): muro alto con tarjeta de reciprocidad `.pcard-emp`
+  (modalidad en ámbar + líneas Aporta/Recibe), misma fuente que fundaciones. Estado semilla
+  honesto mientras no haya empresas verificadas.
+- **Aliadas que aportan** (`#hub`): fundaciones que fortalecen el Hub en vez de recibir.
+- **Formulario de aliados endurecido**: exige ≥1 modalidad, honeypot `#ally-website2`,
+  condicionales obligatorias (Gratitud→beneficio, Servicios→detalle) y campos nuevos
+  (sector, aporta, web/instagram separados) que alimentan la tarjeta.
+- **`#privacidad`**: Política de Privacidad y Tratamiento de Datos bilingüe, publicada desde el
+  documento del Drive; enlazada en footer y en el checkbox de datos. Sección de cookies
+  **adaptada a la realidad del sitio** (Cloudflare sin cookies; el doc genérico mencionaba
+  GA/Meta/LinkedIn que aquí no existen y la CSP bloquea).
+- **ALMA**: el front envía solo `{messages}` (el worker fija modelo/system/max_tokens). Chip
+  más humano. Worker v2 verificado en vivo: origin-locked, rate-limit, parámetros server-side.
+- **Ficha de fundación**: `profile.tagline` bajo el nombre, nombres de directores retirados, y
+  el CTA `donarA(unitId)` abre la calculadora con esa fundación **ya preseleccionada** (deja
+  `calc.partnerId` → el draft queda `modo:"dirigida"`, base de recibos y trazabilidad).
+- **Mapa**: conteo de la red con pluralización real y término "empresa aliada" (no "comercio").
+
+### Modelo de datos (`data/partners.json` — leer su `_doc`)
+- Fundaciones: `rol` = `['recibe']` y/o `['aporta']`; **sin `rol` se asume `['recibe']`**
+  (retrocompatible). Una solo-aporta no aparece como beneficiaria.
+- Empresas (`type:company`): `modalidad[]` (`padrinazgo|journey|alianza|gratitud`), `sector`,
+  `aporta`, `recibe`.
+- `profile.tagline{es,en}` opcional. `consent{}` gobierna logo y galería; `consent.grantedBy`
+  conserva nombres a propósito (rastro Ley 1581) y **no se renderiza**.
+
+### Trampas para la próxima sesión
+1. **Cache-bust = conflicto recurrente.** Si dos ramas tocan `app.js`/`styles.css`, la segunda
+   choca en el hash de `index.html`. **No resolver en el editor web de GitHub** (deja un hash
+   que no corresponde al archivo fusionado). Resolver local: fusionar `main`, **recalcular**
+   `md5 -q app.js | cut -c1-8` y usar ese valor. Ocurrió en #24, #30 y #33.
+2. **El worker de ALMA no se despliega desde este repo** (worker aparte `givegrow-alma`; aquí
+   se despliega `worker.js` = `givegrow-website`). `ops/givegrow-alma-worker-v2.js` es la fuente.
+3. **"Compartamos con Colombia" sigue prohibido** en toda la comunicación. Se mencionó como
+   ejemplo de aliada-que-aporta y **no se publicó**; confirmar antes de nombrarlo.
+4. **La unidad "plato de comida" no se toca**: la frase del dossier es específica de ese
+   programa; la comida siempre se necesita y lo que sobra en un lado se lleva a otro.
+
+### Pendientes (esperan insumos, no código)
+- Datos de las **2 empresas** a las que Sebas envió el formulario → cargar en `partners.json` y
+  activar su presencia en `#gratitud` (filtro de una línea para modalidad `gratitud`).
+- **Inconsistencia tributaria**: el sitio dice **Art. 257 / 25%** (consistente); documentos del
+  Drive dicen **Art. 125 / 125%**. Sebas lo corrige **con un profesional** — no tocar los docs.
+- Confirmar que el buzón **privacidad@thegiveandgrowproject.org** esté activo.
+- **Regla WAF de rate-limit** para el worker de ALMA (dashboard Cloudflare).
+- Logos → webp diferido (5 logos, ~176 KB, lazy; mejor en el pipeline `alta-automatica.gs`).
+- Ideas grandes de UX **diferidas a propósito** hasta tener entregas reales que mostrar
+  (rastreo como vitrina, tira de entregas trazadas, red en el home, tira de confianza).
 
 ## Cierre de tanda: etiqueta calculadora + MODELO DE TRABAJO reafirmado (17 jul 2026)
 Commit `9c5bc3bb` (deploy Actions success). 4 archivos en un commit atómico (Trees API).
