@@ -890,7 +890,7 @@ var ACT_FNS = {
   toggleDrop:toggleDrop, closeLightbox:closeLightbox, almaSend:almaSend, formSend:formSend,
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
-  onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, allySubmit:allySubmit,
+  onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA, allySubmit:allySubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb
@@ -1047,6 +1047,21 @@ function setProject(unitId){
   var sel = document.getElementById("calc-project");
   if (sel){ var opt = sel.options[sel.selectedIndex]; calc.partnerId = opt ? (opt.getAttribute("data-partner")||"") : ""; }
   calcUpdate();
+}
+/* CTA de la ficha: abre la calculadora con el proyecto de ESA fundación ya elegido,
+   para que el donante no tenga que volver a buscarla en el selector. */
+function donarA(unitId){
+  go("donar");
+  loadPartners().then(function(){
+    try { buildProjectSelect(); } catch(e){}
+    var sel = document.getElementById("calc-project");
+    if (!sel || !unitId) return;
+    sel.value = unitId;
+    if (sel.value !== unitId) return;   // la unidad ya no existe: se queda en el fondo general
+    setProject(unitId);
+    var dest = document.querySelector("#page-donar .calc-dest");
+    if (dest && dest.scrollIntoView) dest.scrollIntoView({block:"center"});
+  });
 }
 function onNote(v){
   calc.note = String(v).slice(0,280);
@@ -1684,7 +1699,7 @@ function renderFicha(fid){
       + '<button type="button" id="ficha-share" class="card-link ficha-share" data-act="shareFicha(\''+esc(p.id)+'\')">'+t("ficha.share")+'</button>'
       + '</div>'
       + '<div class="cta-box" style="margin-top:36px"><h2>'+t("ficha.cta.t")+'</h2><p class="mu">'+t("ficha.cta.p")+'</p>'
-      + '<a class="ficha-cta-btn" href="#donar">'+t("ficha.cta.btn")+'</a></div>';
+      + '<a class="ficha-cta-btn" href="#donar"'+(u ? ' data-act="donarA(\''+esc(u.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a></div>';
     el.innerHTML = html;
     var q0 = el.querySelector(".fimp-q.on");
     if (q0) fichaImpCalc(q0, p.id);
