@@ -410,7 +410,7 @@ var I18N = {
     "map.biz":"Ver beneficio",
     "com.maps":"Cómo llegar",
     "map.area.med":"Medellín · centro operativo",
-    "net.ey":"La red",
+    "net.hub":"Conoce una por una a las fundaciones que forman la red",
     "nav.g.nosotros":"Nosotros","nav.cta":"Donar","nav.faq":"FAQ",
     "ficha.back":"Volver al Hub",
     "ficha.lider":"Dirige",
@@ -424,12 +424,6 @@ var I18N = {
     "ficha.cta.p":"Puedes dirigir tu aporte a esta fundación al donar, con trazabilidad completa de principio a fin.",
     "ficha.cta.btn":"Donar ahora",
     "hero.impact":"{a} al mes se convierten en {x} — con acta y foto.",
-    "net.t":"Quiénes forman la red hoy.",
-    "net.p":"Cada punto del mapa, con nombre propio. Aquí solo aparecen vínculos confirmados: la red crece con evidencia.",
-    "net.next":"Tu fundación o empresa puede ser el siguiente punto en el mapa.",
-    "net.type.foundation":"Fundación aliada",
-    "net.type.company":"Empresa aliada",
-    "net.type.hub":"Centro operativo",
     "map.area.ndf":"Manrique · La Honda, Medellín",
     "transp.funds.ey":"A dónde va tu aporte",
     "transp.funds.t":"Tu aporte, con destino claro.",
@@ -811,7 +805,7 @@ function renderPobChips(){
   el.innerHTML = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
 }
 function postLang(l){
-  applyLang(l); renderWall(); renderHeroImpact(); renderAliadas(); renderAportantes(); renderEmpresas(); renderPrivacy();
+  applyLang(l); renderHeroImpact(); renderAliadas(); renderAportantes(); renderEmpresas(); renderPrivacy();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
@@ -912,6 +906,24 @@ function runAct(spec, el, ev){
   });
   return fn.apply(null, args);
 }
+// El 404 no se publica en el HTML: vive en <template id="tpl-e404"> y se monta la
+// primera vez que una ruta inexistente lo necesita. Ver el comentario en index.html.
+function ensureE404(){
+  var el = document.getElementById("page-e404");
+  if (el) return el;
+  var tpl = document.getElementById("tpl-e404");
+  if (!tpl || !tpl.content || !tpl.content.firstElementChild) return null;
+  el = tpl.content.firstElementChild.cloneNode(true);
+  document.body.insertBefore(el, tpl);
+  // Hidratar al idioma vigente; a partir de aquí applyLang() ya lo alcanza solo.
+  var ns = el.querySelectorAll("[data-i18n]");
+  for (var i=0;i<ns.length;i++){
+    var n = ns[i], v = t(n.getAttribute("data-i18n"));
+    if (n.hasAttribute("data-i18n-attr")) n.getAttribute("data-i18n-attr").split(",").forEach(function(a){ a=a.trim(); if(a) n.setAttribute(a,v); });
+    else n.textContent = v;
+  }
+  return el;
+}
 function go(id, fromPop){
   if (id==="alma" && currentRoute!=="alma") almaFromRoute = currentRoute;
   var pages = document.querySelectorAll(".page");
@@ -925,7 +937,7 @@ function go(id, fromPop){
     target = document.getElementById("page-comercio");
     if (target) renderComercio(id.split("/")[1]);
   }
-  if (!target){ id = "e404"; target = document.getElementById("page-e404"); }
+  if (!target){ id = "e404"; target = ensureE404(); }
   if (!target){ id = "inicio"; target = document.getElementById("page-inicio"); }
   target.classList.add("active");
   currentRoute = id;
@@ -1411,7 +1423,6 @@ function loadPartners(){
     })
     .catch(function(){ PARTNERS_DATA = PARTNERS_FALLBACK; return PARTNERS_DATA; });
 }
-var NET_COLORS = { foundation:"#2E7D4F", company:"#B4690E", hub:"#1F5C38" };
 function renderHeroImpact(){
   var el = document.getElementById("hero-impact"); if (!el) return;
   loadPartners().then(function(){
@@ -1426,29 +1437,6 @@ function renderHeroImpact(){
 function initIconDraw(){
   var shapes = document.querySelectorAll(".ic-svg path, .ic-svg circle, .ic-svg rect, .ic-svg line, .ic-svg polyline, .ic-svg polygon");
   for (var i=0;i<shapes.length;i++) shapes[i].setAttribute("pathLength","1");
-}
-// Etiqueta del muro: una fundación que SOLO aporta se rotula distinto a una beneficiaria.
-function netTypeKey(p){
-  if (p.type === "foundation" && fundAporta(p) && !fundRecibe(p)) return "net.type.foundation.aporta";
-  return "net.type." + p.type;
-}
-function renderWall(){
-  var el = document.getElementById("net-wall"); if (!el) return;
-  loadPartners().then(function(list){
-    var html = "";
-    for (var i=0;i<list.length;i++){
-      var p = list[i];
-      var area = p.area ? (p.area[lang]||p.area.es||"") : (p.areaKey ? t(p.areaKey) : "");
-      html += '<div class="card net-card"><span class="net-dot" style="background:'+(NET_COLORS[p.type]||NET_COLORS.hub)+'"></span>'
-            + '<h3>'+escapeHtml(p.name)+'</h3>'
-            + (area ? '<p class="mu" style="margin:6px 0 10px">'+escapeHtml(area)+'</p>' : '')
-            + '<span class="tag">'+t(netTypeKey(p))+'</span>'
-            + (p.url ? '<p style="margin-top:12px"><a class="card-link" href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener">'+t("map.visit")+'</a></p>' : '')
-            + '</div>';
-    }
-    html += '<div class="card card-empty"><p>'+t("net.next")+'</p></div>';
-    el.innerHTML = html;
-  });
 }
 // Rol de una fundación en el Hub: 'recibe' (beneficiaria) y/o 'aporta' (fortalece al Hub).
 // Sin rol declarado se asume ['recibe'] — retrocompatible con las aliadas ya cargadas.

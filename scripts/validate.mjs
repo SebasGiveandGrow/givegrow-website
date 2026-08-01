@@ -1,6 +1,7 @@
 /* Validación pre-deploy Give&Grow — falla el build si algo se rompe. */
 import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { esDict, decodeHtml, eachTextNode } from "./i18n-html.mjs";
 
 let fail = 0;
 const err = (m) => { console.error("NO OK  " + m); fail = 1; };
@@ -53,5 +54,25 @@ for (const tag of ["main", "section", "div", "ul", "li", "span", "a", "button"])
   if (o !== c) { err("tags <" + tag + "> desbalanceados: " + o + " abren / " + c + " cierran"); tagsOk = false; }
 }
 if (tagsOk) ok("balance de tags");
+
+/* 6 · index.html hidratado — el HTML servido debe decir lo mismo que el diccionario ES.
+   Sin esto la SPA publica un cascarón hueco: crawlers, previews de enlace y modos
+   lectura ven viñetas vacías y titulares desfasados. Regenerar con:
+   node scripts/hydrate-i18n.mjs */
+try {
+  const dict = esDict(src);
+  let vacios = 0, desfasados = 0;
+  const ejemplos = [];
+  eachTextNode(html, ({ key, inner }) => {
+    const want = dict[key];
+    if (want == null || decodeHtml(inner) === want) return;
+    inner.trim() ? desfasados++ : vacios++;
+    if (ejemplos.length < 5) ejemplos.push(key);
+  });
+  if (vacios || desfasados) {
+    err("index.html desincronizado del diccionario ES: " + vacios + " vacíos, " + desfasados +
+        " desfasados (" + ejemplos.join(", ") + "…) — corrige con: node scripts/hydrate-i18n.mjs");
+  } else ok("index.html hidratado");
+} catch (e) { err("no se pudo verificar la hidratación: " + e.message); }
 
 process.exit(fail);
