@@ -75,6 +75,12 @@ nav.sol{background:var(--nav-bg);backdrop-filter:blur(12px);box-shadow:0 1px 0 v
 .ndrop:hover .ndrop-menu,.ndrop:focus-within .ndrop-menu,.ndrop.open .ndrop-menu{opacity:1;visibility:visible;transform:none}
 .ndrop-menu a{display:block;padding:9px 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--ink)}
 .ndrop-menu a:hover{background:var(--gl);color:var(--acc)}
+/* menú con descriptor: distingue ítems de nombre parecido (Evidencia vs ImpactOS) */
+.ndrop-menu-desc{min-width:308px}
+.ndrop-menu-desc a{padding:10px 12px}
+.nd-t{display:block;font-weight:600;line-height:1.3}
+.nd-d{display:block;margin-top:2px;font-size:12.5px;font-weight:400;line-height:1.35;color:var(--mu)}
+.ndrop-menu-desc a:hover .nd-d{color:var(--ink-soft)}
 .nav-actions{display:flex;align-items:center;gap:10px}
 .lang{display:flex;border:1px solid var(--bd);border-radius:999px;overflow:hidden}
 .lang button{padding:5px 11px;font-size:12px;font-weight:700;color:var(--mu)}
@@ -597,6 +603,21 @@ html[data-theme="dark"] .alma-fab:hover{background:var(--acc-2);border-color:var
 .os-row h3{font-size:var(--fs-h4);margin-bottom:8px}
 .os-row p{max-width:62ch}
 .os-row p + p{margin-top:10px}
+/* "Ya lo estás usando": pruebas con enlace al propio sitio */
+.os-uses{margin-top:18px;display:grid;gap:18px}
+.os-use{padding-left:16px;border-left:2px solid var(--bd)}
+.os-use b{display:block;font-size:15.5px;color:var(--ink);margin-bottom:4px}
+.os-use p{margin:0 0 6px;max-width:62ch;font-size:14.5px}
+/* Anatomía de un registro: ledger sobrio (elemento firma de la página) */
+.rec-ledger{margin-top:20px;padding:22px 24px;background:var(--surface-2);border:1px solid var(--bd);border-radius:var(--rl)}
+.rec-cap{font-size:11.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--mu);margin:0 0 10px}
+.rec-list{margin:0 0 22px}
+.rec-list:last-of-type{margin-bottom:12px}
+.rec-item{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--bd)}
+.rec-item:last-child{border-bottom:0}
+.rec-item dt{font-size:14px;color:var(--ink-soft)}
+.rec-item dd{margin:0;font-size:14px;font-weight:600;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.rec-note{font-size:12.5px;margin:0}
 
 /* ---------- cierres de página y "empieza aquí" ---------- */
 .cta-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px}
