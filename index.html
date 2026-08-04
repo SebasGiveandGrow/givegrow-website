@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=227605f6">
+<link rel="stylesheet" href="/styles.css?v=33dea621">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -72,13 +72,13 @@
       </div>
       <div class="ndrop">
         <button class="nlink ndrop-t" type="button" data-i18n="nav.g.nosotros" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Nosotros</button>
-        <div class="ndrop-menu">
-          <a href="#origen" data-i18n="nav.origen">Origen</a>
-          <a href="#impacto" data-i18n="nav.impacto">Impacto</a>
-          <a href="#impactos" data-i18n="nav.impactos">ImpactOS</a>
-          <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
-          <a href="#faq" data-i18n="nav.faq">FAQ</a>
-          <a href="#contacto" data-i18n="nav.contacto">Contacto</a>
+        <div class="ndrop-menu ndrop-menu-desc">
+          <a href="#origen"><span class="nd-t" data-i18n="nav.origen">Origen</span><span class="nd-d" data-i18n="nav.d.origen">Cómo y por qué nació la fundación</span></a>
+          <a href="#impacto"><span class="nd-t" data-i18n="nav.impacto">Evidencia</span><span class="nd-d" data-i18n="nav.d.impacto">Fotos, mapa e historias verificables</span></a>
+          <a href="#impactos"><span class="nd-t" data-i18n="nav.impactos">ImpactOS</span><span class="nd-d" data-i18n="nav.d.impactos">El sistema que registra cada aporte</span></a>
+          <a href="#transparencia"><span class="nd-t" data-i18n="nav.transp">Transparencia</span><span class="nd-d" data-i18n="nav.d.transp">Registros oficiales y documentos públicos</span></a>
+          <a href="#faq"><span class="nd-t" data-i18n="nav.faq">FAQ</span><span class="nd-d" data-i18n="nav.d.faq">Respuestas a las dudas más comunes</span></a>
+          <a href="#contacto"><span class="nd-t" data-i18n="nav.contacto">Contacto</span><span class="nd-d" data-i18n="nav.d.contacto">Escríbenos o pasa por el Hub</span></a>
         </div>
       </div>
     </div>
@@ -112,7 +112,7 @@
   <a href="#rastrea" data-i18n="track.t">Rastrea tu donación</a>
   <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
   <a href="#origen" data-i18n="nav.origen">Origen</a>
-  <a href="#impacto" data-i18n="nav.impacto">Impacto</a>
+  <a href="#impacto" data-i18n="nav.impacto">Evidencia</a>
   <a href="#impactos" data-i18n="nav.impactos">ImpactOS</a>
   <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
   <a href="#faq" data-i18n="nav.faq">FAQ</a>
@@ -632,18 +632,70 @@
   <section>
     <div class="wrap prose">
       <span class="ey rv" data-i18n="impactos.ey">La plataforma</span>
-      <h2 class="h-sec rv" data-i18n="impactos.t">Qué es ImpactOS y qué funciona hoy.</h2>
-      <p class="lead rv d1" data-i18n="impactos.lead">El sistema operativo del ecosistema Give&amp;Grow. Está en construcción: aquí describimos solo lo que ya opera.</p>
+      <h2 class="h-sec rv" data-i18n="impactos.t">ImpactOS: el registro detrás de cada aporte.</h2>
+      <p class="lead rv d1" data-i18n="impactos.lead">No es una promesa a futuro. Es la capa que convierte una intención de donar en un registro con destino, evidencia y certificado — y que ya está operando en este sitio.</p>
 
       <div class="os-rows rv d2">
         <div class="os-row">
-          <h3 data-i18n="impactos.os.t">Qué es</h3>
-          <p data-i18n="impactos.os.p">La capa pensada para reunir donaciones, membresías, trazabilidad de campo, certificados y alianzas en un solo lugar. En español suena a impactos; en inglés significa Impact Operating System.</p>
+          <h3 data-i18n="impactos.why.t">Por qué existe</h3>
+          <p data-i18n="impactos.why.p">El problema del sector no es la falta de generosidad: es que casi nadie sostiene el registro. Sin un sistema, cada donación es un favor irrepetible — imposible de auditar, de repetir y de contar con precisión. ImpactOS existe para que dar deje de depender de la memoria de alguien.</p>
         </div>
         <div class="os-row">
-          <h3 data-i18n="impactos.live.t">Qué está vivo hoy</h3>
-          <p data-i18n="impactos.live.p">Un módulo: el HUB SOCIAL. Es el centro operativo en terreno que recibe, clasifica y redistribuye donaciones a las comunidades, y el que produce el acta y la foto de cada entrega. Todo lo que este sitio puede probar sale de ahí.</p>
-          <p><a class="card-link" href="#hub"><span data-i18n="impactos.live.link">Conoce el HUB SOCIAL</span> <span aria-hidden="true">&rarr;</span></a></p>
+          <h3 data-i18n="impactos.os.t">Qué es</h3>
+          <p data-i18n="impactos.os.p">La capa que reúne en un solo lugar el registro de la red, el cálculo del impacto, la trazabilidad en terreno y los certificados. En español suena a impactos; en inglés significa Impact Operating System.</p>
+        </div>
+        <div class="os-row">
+          <h3 data-i18n="impactos.using.t">Ya lo estás usando</h3>
+          <p data-i18n="impactos.using.p">No hace falta imaginarlo. Casi todo lo que viste en este sitio sale de ImpactOS:</p>
+          <div class="os-uses">
+            <div class="os-use">
+              <b data-i18n="impactos.live.t">El HUB SOCIAL</b>
+              <p data-i18n="impactos.live.p">El módulo en terreno: recibe, clasifica y redistribuye las donaciones, y produce el acta y la foto de cada entrega. Todo lo que este sitio puede probar sale de ahí.</p>
+              <a class="card-link" href="#hub"><span data-i18n="impactos.live.link">Conoce el HUB SOCIAL</span> <span aria-hidden="true">&rarr;</span></a>
+            </div>
+            <div class="os-use">
+              <b data-i18n="impactos.u1.t">El registro de la red</b>
+              <p data-i18n="impactos.u1.p">El mapa y el muro de aliadas se dibujan desde una sola fuente verificada: quién entró, en qué zona trabaja y con qué consentimiento se publica su material.</p>
+              <a class="card-link" href="#impacto"><span data-i18n="impactos.u1.link">Ver el mapa de la red</span> <span aria-hidden="true">&rarr;</span></a>
+            </div>
+            <div class="os-use">
+              <b data-i18n="impactos.u2.t">El cálculo del impacto</b>
+              <p data-i18n="impactos.u2.p">La calculadora no estima al aire: usa unidades documentadas por las propias fundaciones. Un plato de comida en Niños del Futuro cuesta $4.000, y de ahí sale la equivalencia que ves.</p>
+              <a class="card-link" href="#donar"><span data-i18n="impactos.u2.link">Probar la calculadora</span> <span aria-hidden="true">&rarr;</span></a>
+            </div>
+            <div class="os-use">
+              <b data-i18n="impactos.u3.t">El destino, desde el primer clic</b>
+              <p data-i18n="impactos.u3.p">Cuando entras a donar desde la ficha de una fundación, el registro nace dirigido a ella. No es un campo que alguien llena después: queda en el aporte desde el comienzo.</p>
+            </div>
+            <div class="os-use">
+              <b data-i18n="impactos.u4.t">ALMA</b>
+              <p data-i18n="impactos.u4.p">La interfaz que responde en lenguaje natural sobre la red, las membresías y el beneficio tributario, leyendo los mismos datos verificados.</p>
+              <a class="card-link" href="#alma"><span data-i18n="impactos.u4.link">Conversar con ALMA</span> <span aria-hidden="true">&rarr;</span></a>
+            </div>
+          </div>
+        </div>
+        <div class="os-row">
+          <h3 data-i18n="impactos.rec.t">Anatomía de un registro</h3>
+          <p data-i18n="impactos.rec.p">Esto es lo que ImpactOS guarda de una donación. La primera parte la armas tú con el sitio; la segunda la produce el HUB SOCIAL en terreno.</p>
+          <div class="rec-ledger">
+            <p class="rec-cap" data-i18n="impactos.rec.a">Lo que armas con el sitio</p>
+            <dl class="rec-list">
+              <div class="rec-item"><dt data-i18n="impactos.rec.r1.k">Monto y moneda</dt><dd data-i18n="impactos.rec.r1.v">$200.000 COP</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r2.k">Frecuencia</dt><dd data-i18n="impactos.rec.r2.v">Mensual, anual o único</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r3.k">Destino</dt><dd data-i18n="impactos.rec.r3.v">Dirigida a una fundación o al fondo general</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r4.k">Proyecto</dt><dd data-i18n="impactos.rec.r4.v">Chefs del Futuro</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r5.k">Equivalencia verificada</dt><dd data-i18n="impactos.rec.r5.v">≈ 50 platos de comida al mes</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r6.k">Beneficio tributario</dt><dd data-i18n="impactos.rec.r6.v">25% sobre el impuesto a cargo (Art. 257 ET)</dd></div>
+            </dl>
+            <p class="rec-cap" data-i18n="impactos.rec.b">Lo que produce el HUB en terreno</p>
+            <dl class="rec-list">
+              <div class="rec-item"><dt data-i18n="impactos.rec.r7.k">Acta de recepción</dt><dd data-i18n="impactos.rec.r7.v">Con foto de lo recibido</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r8.k">Acta de entrega</dt><dd data-i18n="impactos.rec.r8.v">Firmada por quien recibe</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r9.k">Reporte fotográfico</dt><dd data-i18n="impactos.rec.r9.v">Mensual, al donante</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r10.k">Certificado de donación</dt><dd data-i18n="impactos.rec.r10.v">En máximo 24 horas</dd></div>
+            </dl>
+            <p class="rec-note mu" data-i18n="impactos.rec.note">Los valores son un ejemplo; la estructura es la real.</p>
+          </div>
         </div>
         <div class="os-row">
           <h3 data-i18n="impactos.next.t">Hacia dónde va</h3>
@@ -1196,7 +1248,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=494bd381"></script>
+<script src="/app.js?v=48e1378d"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
