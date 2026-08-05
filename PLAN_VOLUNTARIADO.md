@@ -2,8 +2,15 @@
 
 > Origen: 13 preguntas que Sebas trajo de un congreso de voluntariado corporativo (jul–ago 2026),
 > usadas para auditar la estructura de Give&Grow y su articulación.
-> Estado: **Fase 1 completada** (PR #40). Fases 2–8 pendientes, **una por sesión**.
+> Estado: **Fases 1–4 completadas.** Bloque I (sanear) y Bloque II (definir) cerrados.
+> Pendiente el Bloque III (Fases 5–8, las que tocan el sitio), **una por sesión**.
 > Principio rector que gobierna todo este plan: **"evidencia, no promesas"**.
+
+**Documentos que produjo este plan:**
+> - [VOLUNTARIADO.md](VOLUNTARIADO.md) — el programa: dos niveles, protocolo de protección,
+>   portafolio de experiencias, co-creación *(Fase 2)*
+> - [METODOLOGIA_MIRA.md](METODOLOGIA_MIRA.md) — el marco pedagógico **MIRA** v2.0 *(Fase 3)*
+> - [MEDICION.md](MEDICION.md) — marco de medición, ruta a SROI y mapeo a ODS/GRI/ESG *(Fase 4)*
 
 ---
 
@@ -17,7 +24,7 @@
 | **Mínimo de compromiso** | **No hay mínimo** de horas ni sesiones. |
 | **¿Cobrar por Impact Journey?** | **No. Nada se cobra por el momento.** |
 | **¿Psicólogo en el equipo?** | No, solo voluntarios. Por ahora la metodología **observa, no mide clínicamente**. |
-| **Metodología ACPES** | **Provisional** — Sebas está evaluando cambiarla. Tratarla como reemplazable: el plan no debe depender de su nombre. |
+| **Nombre de la metodología** | **RESUELTO: MIRA** (ago 2026). Sigla de las cuatro fases — **M**arco · **I**nmersión · **R**eflexión · **A**nclaje. El término técnico *"ampliación del campo perceptual a través de experiencias significativas"* sobrevive como el **objetivo** del método. Sustituye a *ACPES*, cuya sigla era impronunciable. Ver `METODOLOGIA_MIRA.md`. |
 | **Jornadas ya realizadas** | Ocurrieron **con donantes y aliados individuales**, *no* con equipos de empresa. |
 | **Detalle publicable** | Sin nombres de empresa ni fechas. Redacción sobria. |
 
@@ -80,7 +87,10 @@ El sitio no lo refleja en ningún lado.
 
 ---
 
-## 2. Auditoría del documento ACPES (metodología actual)
+## 2. Auditoría del documento ACPES (v1.0) — ✅ ya aplicada en `METODOLOGIA_MIRA.md`
+
+> Las 9 correcciones de abajo **están resueltas** en la v2.0 del marco (ahora **MIRA**). Se
+> conservan aquí como registro de qué estaba mal y por qué.
 
 > ACPES = *Ampliación del Campo Perceptual a través de Experiencias Significativas*.
 > Cuatro fases: Encuadre Intencional → Vivencia Directa → Mediación Reflexiva → Anclaje.
@@ -147,7 +157,7 @@ No es opcional.
 
 ### BLOQUE II — DEFINIR *(documentos; aquí se gana o se pierde la credibilidad)*
 
-#### Fase 2 · Documento maestro del voluntariado
+#### ✅ Fase 2 · Documento maestro del voluntariado — COMPLETADA → `VOLUNTARIADO.md`
 1. Modelo de **dos niveles** (tabla §3) con qué hace y qué **no** hace cada uno.
 2. **Protocolo de protección**: los dos filtros, qué verifica cada uno, prohibiciones explícitas
    (fotos sin consentimiento, contacto fuera de la actividad, datos de menores), consecuencias.
@@ -159,9 +169,9 @@ No es opcional.
 6. **Co-creación** (Q10): cómo un voluntario aporta capacidad al HUB y cómo lo propone.
    Perfiles prioritarios: **psicólogo** (ver Fase 4), abogado, contador, desarrollador, chef.
 7. Qué recibe el voluntario / qué recibe la fundación.
-- **Entregable:** `VOLUNTARIADO.md` · **Insumo:** revisión de Sebas.
+- **Entregable:** ✅ `VOLUNTARIADO.md` · **Insumo:** revisión de Sebas.
 
-#### Fase 3 · Marco pedagógico v2 (hoy ACPES, provisional)
+#### ✅ Fase 3 · Marco pedagógico — COMPLETADA → `METODOLOGIA_MIRA.md`
 1. Aplicar las **9 correcciones** de §2.
 2. **Desdoblar en dos rutas paralelas** con las mismas 4 fases: **Comunidad** (ancla R3) y
    **Voluntario** (ancla R4).
@@ -169,10 +179,12 @@ No es opcional.
 4. **Reencuadre como observación pedagógica** (decisión: no hay psicólogo).
 5. **Linaje teórico** con citas.
 6. Redacción institucional para propuestas de cooperación.
-- **Entregable:** `metodologia-v2.md` (nombre de la metodología por confirmar) ·
-  **Insumo:** si Sebas decide sustituir ACPES, definir el reemplazo antes de esta fase.
+7. **Nombre resuelto: MIRA** (Marco · Inmersión · Reflexión · Anclaje), con el término técnico
+   como objetivo del método.
+- **Entregable:** ✅ `METODOLOGIA_MIRA.md` v2.0 · **Pendiente:** verificación de marca (SIC),
+  dominio/handle y colisión en el sector.
 
-#### Fase 4 · Marco de medición y ruta a SROI
+#### ✅ Fase 4 · Marco de medición y ruta a SROI — COMPLETADA → `MEDICION.md`
 1. **Núcleo común de indicadores**: outputs (ya existen) + outcomes observados.
 2. **Capa de mapeo** a ODS / GRI / ESG (Q12).
 3. Declarar **contribución, no atribución** como postura oficial.
@@ -182,7 +194,11 @@ No es opcional.
 6. Cómo se publican resultados **sin exponer a nadie** (agregado, anonimizado, con consentimiento).
 7. **Reclutar un psicólogo voluntario pro-bono** como vía para habilitar el peldaño 2 sin
    contratar. Es la intersección de Q9, Q10 y Q12.
-- **Entregable:** `MEDICION.md` · **Insumo:** decisión sobre asesoría SROI (o esperar al voluntario).
+- **Entregable:** ✅ `MEDICION.md` · **Insumo pendiente:** decisión sobre asesoría SROI (o esperar
+  al psicólogo voluntario).
+
+> **BLOQUE II CERRADO.** Con los tres documentos listos, ya se puede publicar sin anunciar antes de
+> entregar. El Bloque III (Fases 5–8) es el que toca el sitio.
 
 ### BLOQUE III — PUBLICAR *(recién ahora el sitio)*
 
@@ -231,7 +247,8 @@ ImpactOS rechaza.
 
 | Decisión | Bloquea |
 |---|---|
-| ¿Se sustituye ACPES? ¿Por qué marco? | Fase 3 |
+| ~~¿Se sustituye ACPES?~~ | ✅ Resuelto: **MIRA** |
+| Verificación de marca de "MIRA" (SIC, dominio, colisión) | Antes de uso público |
 | ¿Invertir en asesoría SROI o esperar un psicólogo voluntario? | Fase 4 (peldaño 3) |
 | ¿Hasta dónde declarar el modelo de ingresos? | Fase 8 |
 | Encuadre de Chefs del Futuro con NDF | Fase 6 |
