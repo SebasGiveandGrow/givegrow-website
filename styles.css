@@ -840,6 +840,14 @@ html[data-theme="dark"] .track-cta h3{color:var(--ink)}
 .com-address{margin-top:14px;font-size:14.5px;color:var(--mu)}
 .grat-empty{text-align:center;max-width:52ch;margin:26px auto 0;padding:32px;background:var(--cream);border:1px dashed var(--bd);border-radius:16px}
 .grat-empty p{color:var(--ink-soft);margin:0 0 18px}
+/* "La red ya forma" (#hub): el programa arriba, la fundación que lo ejecuta debajo */
+.form-card{display:flex;flex-direction:column;gap:4px}
+.form-card h3{margin:0}
+.form-fund{font-size:12.5px;font-weight:600;letter-spacing:.02em;color:var(--acc);margin-bottom:6px}
+.form-card p{margin:0 0 12px;flex:1;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.form-card .card-link{margin-top:auto}
+.form-mira{max-width:70ch;margin:22px 0 0;font-size:14.5px;line-height:1.6}
+
 /* ===== #voluntariado ===== */
 /* lista de cuidado: reglas finas, sin viñetas decorativas */
 .vol-care{list-style:none;margin:24px 0 0;padding:0;max-width:74ch;border-top:1px solid var(--bd)}
