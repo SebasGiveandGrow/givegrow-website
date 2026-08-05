@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Plan de voluntariado — Fases 1 a 6" (ago 2026)
+> Última actualización: sesión "Plan de voluntariado — Fase 7 (medición visible)" (ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -13,9 +13,36 @@
 | Plan | Dónde vive | Estado |
 |---|---|---|
 | **Plan VISUAL de 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3** (trazabilidad al frente, Transparencia imprimible, contador por recencia) |
-| **Plan de VOLUNTARIADO de 8 fases** | `PLAN_VOLUNTARIADO.md` | Fases **1–6 hechas y en prod**. **Siguiente: su Fase 7** (medición visible + reporte para la empresa) |
+| **Plan de VOLUNTARIADO de 8 fases** | `PLAN_VOLUNTARIADO.md` | Fases **1–6 en prod, la 7 en PR**. **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
 Al retomar, **preguntar de qué plan se habla** si se dice solo "la siguiente fase".
+
+## Cierre de tanda: plan de VOLUNTARIADO, Fase 7 — medición visible (ago 2026)
+
+Publicó `MEDICION.md` en el sitio. Dos hogares, porque los pasos tenían dueños distintos:
+
+- **`#impactos` · nueva fila "Anatomía de una jornada"** — segundo `.rec-ledger`, hermano del de
+  donación (*lo que se acuerda antes* / *lo que queda al cerrar*). **Elemento firma de la fase**,
+  con cero CSS nuevo.
+- **Ruta nueva `#medicion` · "Hasta dónde podemos afirmar."** — dropdown *Nosotros*, nav móvil y
+  footer. Contribución vs. atribución como par en Fraunces; **la escalera de tres peldaños**
+  (elemento firma de la página); 7 reglas de publicación; plantilla de reporte como bloque-documento;
+  tabla de mapeo ODS/GRI/ESG; cierre en `.band` pidiendo el psicólogo voluntario.
+
+**Las dos decisiones que estaban abiertas, ya cerradas:**
+- **Mapeo ODS/GRI/ESG → público**, como referencia, con la nota de que no auditamos el reporte de la
+  empresa ni certificamos su cumplimiento.
+- **Contador por recencia → espera.** No hay fuente de datos de jornadas; escribirlas a mano viola
+  `MEDICION.md` §5. Su hogar es la **Fase 3 del plan VISUAL** (Transparencia imprimible). Lo que sí
+  entró fue la *regla* como principio publicado.
+
+**Detalles que conviene no perder:**
+- El peldaño ③ (SROI) lleva numeral **hueco** (`-webkit-text-stroke`) y pastilla **punteada**: el
+  estado se lee antes que el texto. El trazo va en `--mu` y no en `--bd` porque con `--bd`
+  desaparecía en modo noche (~1.5:1) y con él el gesto entero.
+- Regla dura respetada: **ni un ratio de SROI, ni ejemplos ilustrativos.**
+- Trampa vivida: retoqué `styles.css` **después** del rebust y el navegador sirvió CSS viejo.
+  Recalcular los hashes **al final de todo**, nunca a mitad.
 
 ## Cierre de tanda: plan de VOLUNTARIADO, Fases 1–6 (ago 2026)
 
@@ -636,7 +663,7 @@ descripción en el formulario de aliados (decisión previa: no inventarla nosotr
 - Re-render por idioma en postLang (~757-759).
 - renderFicha (fundaciones) / renderComercio (comercios) — espejos.
 - Lightbox nativo: ensureLightbox()+paintLightbox()+showModal(), LB={list,ix}.
-- i18n: dict ES en app.js; EN lazy desde /i18n/en.json. Paridad actual 682/682.
+- i18n: dict ES en app.js; EN lazy desde /i18n/en.json. Paridad actual 903/903.
 - Datos: partners.json (fundaciones), gratitud.json (comercios), inventario.json.
 - Validación: `node scripts/validate.mjs` (paridad, sintaxis, tags, cobertura).
 

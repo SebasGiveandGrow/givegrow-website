@@ -892,6 +892,62 @@ html[data-theme="dark"] .mira-hv{color:#e6a44e}
   .mira-p{grid-area:p}
 }
 
+/* ---------- #medicion (Fase 7): marco de medición ----------
+   Sin tokens nuevos. Reusa .os-rows/.os-row, .rec-cap y .vol-care.
+   Elemento firma de la página: la escalera de tres peldaños, cuyo tercer
+   escalón está dibujado pero no lleno — es honestidad hecha de tipografía. */
+.med-note{max-width:70ch;font-size:13.5px;line-height:1.6;margin:16px 0 0}
+/* el par contribución / atribución */
+.med-claim{margin-top:18px;max-width:74ch;border-top:1px solid var(--bd)}
+.med-cl{display:grid;grid-template-columns:auto 1fr;gap:6px 20px;align-items:baseline;padding:15px 0;border-bottom:1px solid var(--bd)}
+.med-cl-k{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;white-space:nowrap}
+.med-cl-k.is-yes{color:var(--g)}
+.med-cl-k.is-no{color:var(--mu)}
+html[data-theme="dark"] .med-cl-k.is-yes{color:var(--gn)}
+.med-cl-v{margin:0;font-family:"Fraunces",serif;font-style:italic;font-size:16.5px;line-height:1.45;color:var(--ink)}
+.med-cl-v.is-no{color:var(--mu)}
+/* la escalera de tres peldaños */
+.med-steps{margin-top:20px;max-width:76ch;border-top:1px solid var(--bd)}
+.med-step{display:grid;grid-template-columns:auto 1fr auto;gap:6px 20px;padding:20px 0;border-bottom:1px solid var(--bd);align-items:baseline}
+.med-step-n{grid-row:span 2;align-self:start;font-family:var(--font-display);font-size:32px;line-height:.95;font-weight:700;color:var(--g);width:1.1em;text-align:center}
+html[data-theme="dark"] .med-step-n{color:var(--gn)}
+.med-step-t{font-size:16px;font-weight:700;color:var(--ink);align-self:center}
+.med-step-p{grid-column:2/span 2;margin:0;font-size:14.5px;line-height:1.6;color:var(--ink-soft);max-width:64ch}
+.med-step-s{align-self:center;font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;white-space:nowrap;padding:5px 11px;border-radius:999px;border:1px solid transparent}
+.med-step-s.is-on{color:var(--g);background:var(--gl);border-color:var(--gl)}
+.med-step-s.is-wip{color:var(--amber);background:var(--amberl);border-color:var(--amberl)}
+.med-step-s.is-none{color:var(--mu);background:transparent;border:1px dashed var(--mu)}
+html[data-theme="dark"] .med-step-s.is-on{color:var(--gn)}
+/* el peldaño que no existe: número hueco, no relleno. El trazo va en --mu y no en
+   --bd porque con --bd el glifo desaparecía en modo noche (~1.5:1) y con él el gesto. */
+.med-step.is-off .med-step-n{color:transparent;-webkit-text-stroke:1px var(--mu);text-stroke:1px var(--mu)}
+/* mapeo a ODS/GRI/ESG: tabla de informe, con scroll propio en móvil */
+.med-tw{margin-top:22px;overflow-x:auto}
+.med-tbl{width:100%;min-width:560px;border-collapse:collapse;font-size:14px}
+.med-tbl th{text-align:left;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--mu);padding:0 16px 10px 0;border-bottom:1px solid var(--bd)}
+.med-tbl td{padding:13px 16px 13px 0;border-bottom:1px solid var(--bd);color:var(--ink-soft);vertical-align:top;line-height:1.45}
+.med-tbl td:first-child{color:var(--ink);font-weight:600}
+.med-tbl tr:last-child td{border-bottom:0}
+/* plantilla de reporte: bloque con aire de documento, hermano de .rec-ledger */
+.rep-doc{margin-top:24px;max-width:74ch;padding:24px 26px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl)}
+.rep-hd{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid var(--bd)}
+.rep-ttl{font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.rep-meta{font-size:12.5px;color:var(--mu)}
+.rep-grp{padding:16px 0;border-bottom:1px solid var(--bd)}
+.rep-grp:last-of-type{border-bottom:0;padding-bottom:6px}
+.rep-list{list-style:none;margin:0;padding:0}
+.rep-list li{position:relative;padding:5px 0 5px 20px;font-size:14.5px;line-height:1.5;color:var(--ink-soft)}
+.rep-list li::before{content:"";position:absolute;left:0;top:14px;width:9px;height:1px;background:var(--bd)}
+.rep-note{margin:6px 0 0;padding:13px 16px;background:var(--surface-2);border-left:3px solid var(--g);border-radius:0 var(--r) var(--r) 0;font-size:13.5px;line-height:1.55;color:var(--ink-soft)}
+html[data-theme="dark"] .rep-note{border-left-color:var(--acc)}
+@media(max-width:640px){
+  .med-step{grid-template-columns:auto 1fr;row-gap:8px}
+  .med-step-s{grid-column:2;justify-self:start}
+  .med-step-p{grid-column:1/span 2}
+  .med-cl{grid-template-columns:1fr;row-gap:4px}
+  .rep-doc{padding:20px 18px}
+}
+
 /* documento legal (#privacidad): lectura cómoda, tono institucional, día/noche */
 .legal-doc{max-width:72ch;margin-top:24px}
 .legal-doc h3{font-family:"Inter",sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin:30px 0 8px;letter-spacing:-.01em}
