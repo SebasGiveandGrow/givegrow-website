@@ -1,5 +1,5 @@
 {
-  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}. consent{} = registro de autorizaciones {name, logo, photos: bool; minorsImageProtected; grantedBy; date: YYYY-MM-DD; source}: el logo solo se renderiza si consent.logo===true y la galería solo si consent.photos===true (hub exento). Sin consentimiento registrado no se publica material de terceros. EMPRESA ALIADA (type:company): sale en el muro de #empresas (y en Gratitud si su modalidad la incluye). Campos: modalidad[] = subconjunto de ['padrinazgo','journey','alianza','gratitud'] (lo que la empresa aporta); sector {es,en} opcional; aporta{es,en} y recibe{es,en} opcionales (líneas cortas de reciprocidad); logo + consent.logo===true para mostrar logo. Solo se publica una empresa con convenio firmado (evidencia, no promesas). ROL DE FUNDACIÓN (type:foundation): campo `rol` = arreglo con 'recibe' (beneficiaria del Hub) y/o 'aporta' (fortalece al Hub con servicios/capacidades). Sin `rol` = se asume ['recibe'] (retrocompatible). Una fundación puede tener ambos. Las que incluyen 'aporta' salen además en el muro 'Aliadas que aportan' de #hub; usa `aporta{es,en}` (línea corta: qué le entrega al Hub y a Give&Grow). Las que solo tienen 'aporta' NO aparecen como beneficiarias.",
+  "_doc": "Fuente única de la red Give&Grow. Alta de aliado = agregar un objeto. type: foundation|company|hub. Coordenadas a nivel de zona/barrio, nunca direcciones privadas. impactUnits alimenta la calculadora. gallery[] = fotos curadas auto-alojadas en /img/<id>/ con alt bilingüe {src, alt:{es,en}}. consent{} = registro de autorizaciones {name, logo, photos: bool; minorsImageProtected; grantedBy; date: YYYY-MM-DD; source}: el logo solo se renderiza si consent.logo===true y la galería solo si consent.photos===true (hub exento). Sin consentimiento registrado no se publica material de terceros. EMPRESA ALIADA (type:company): sale en el muro de #empresas (y en Gratitud si su modalidad la incluye). Campos: modalidad[] = subconjunto de ['padrinazgo','journey','alianza','gratitud'] (lo que la empresa aporta); sector {es,en} opcional; aporta{es,en} y recibe{es,en} opcionales (líneas cortas de reciprocidad); logo + consent.logo===true para mostrar logo. Solo se publica una empresa con convenio firmado (evidencia, no promesas). ROL DE FUNDACIÓN (type:foundation): campo `rol` = arreglo con 'recibe' (beneficiaria del Hub) y/o 'aporta' (fortalece al Hub con servicios/capacidades). Sin `rol` = se asume ['recibe'] (retrocompatible). Una fundación puede tener ambos. Las que incluyen 'aporta' salen además en el muro 'Aliadas que aportan' de #hub; usa `aporta{es,en}` (línea corta: qué le entrega al Hub y a Give&Grow). Las que solo tienen 'aporta' NO aparecen como beneficiarias. PROGRAMAS FORMATIVOS: en profile.programs[], marcar `formativo: true` en los programas que desarrollan capacidades en personas (formación, oficios, arte, emprendimiento). El sitio los agrupa en la sección 'La red ya forma' de #hub, SIEMPRE con el nombre de la fundación que los ejecuta: el crédito es suyo, Give&Grow solo canaliza, documenta y da visibilidad.",
   "partners": [
     {
       "id": "hub-medellin",
@@ -187,7 +187,8 @@
             "desc": {
               "es": "Programa de formación y emprendimiento social de seis meses en el sector gastronómico. Los participantes aprenden cocina, higiene y manejo de alimentos, y también costos, marketing y creación de negocio — mientras cocinan a diario para el comedor comunitario. Incluye el Cocineas Bootcamp (12 semanas) y cierra con certificación y kit profesional; quienes se destacan pasan a ser mentores del siguiente grupo.",
               "en": "A six-month training and social-entrepreneurship program in the food sector. Participants learn cooking, hygiene and food handling, plus costing, marketing and business building — while cooking every day for the community kitchen. It includes the 12-week Cocineas Bootcamp and closes with certification and a professional kit; those who stand out become mentors for the next group."
-            }
+            },
+            "formativo": true
           },
           {
             "name": "Borboletas",
@@ -195,7 +196,8 @@
             "desc": {
               "es": "Grupo de iniciación del Proyecto de Baile: más de 30 niñas y niños de 6 a 12 años descubren la danza como herramienta de crecimiento personal, disciplina y confianza.",
               "en": "The Dance Project's entry group: over 30 children aged 6–12 discover dance as a tool for personal growth, discipline and confidence."
-            }
+            },
+            "formativo": true
           },
           {
             "name": "Flow Callejero",
@@ -203,14 +205,16 @@
             "desc": {
               "es": "Grupo juvenil de proyección artística: cerca de 14 adolescentes desde los 13 años representan a la fundación en presentaciones y competencias, formándose como líderes positivos de su comunidad.",
               "en": "The youth performance group: around 14 teens aged 13+ represent the foundation at shows and competitions, growing as positive community leaders."
-            }
+            },
+            "formativo": true
           },
           {
             "name": "Becas",
             "desc": {
               "es": "Formación profesional para 7 niños y jóvenes con talento y compromiso, en las academias Move Danza y Elements, incluyendo transporte seguro desde sus hogares.",
               "en": "Professional training for 7 committed, talented children and youth at the Move Danza and Elements academies, including safe transport from their homes."
-            }
+            },
+            "formativo": true
           },
           {
             "name": "Entregas",
@@ -303,14 +307,16 @@
             "desc": {
               "es": "Desarrollo productivo y sostenibilidad: huertas urbanas, cultivo de setas, avicultura e hidroponía, orientados a la seguridad alimentaria, el emprendimiento comunitario y la generación de ingresos.",
               "en": "Productive development and sustainability: urban gardens, mushroom cultivation, poultry and hydroponics, aimed at food security, community entrepreneurship and income generation."
-            }
+            },
+            "formativo": true
           },
           {
             "name": "Aprender para Emprender",
             "desc": {
               "es": "Formación para la vida y el trabajo: alfabetización, informática, inglés, cocina, artes y emprendimiento, para desarrollar habilidades y abrir oportunidades.",
               "en": "Training for life and work: literacy, computing, English, cooking, arts and entrepreneurship, to build skills and open opportunities."
-            }
+            },
+            "formativo": true
           }
         ],
         "hub": {

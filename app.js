@@ -252,7 +252,13 @@ var I18N = {
     "hub.r2.t":"R2 - Gestión de Donaciones",
     "hub.r2.p":"Donaciones en especie y monetarias con trazabilidad completa: acta, foto y reporte. Ejemplo real: en NDF un plato de comida cuesta $4.000 y tu aporte se traduce en platos entregados, con evidencia.",
     "hub.r3.t":"R3 - Social Grow",
-    "hub.r3.p":"Formación y fortalecimiento de capacidades para las fundaciones aliadas. Próximamente. Ejemplo: talleres de educación financiera para madres comunitarias de La Honda.",
+    "hub.r3.p":"Fortalecer las capacidades de las propias fundaciones aliadas: esa línea la estamos construyendo. La formación que ya ocurre en la red la hacen ellas — nuestro papel es canalizar recursos, documentarla y darle visibilidad.",
+    "hub.form.ey":"Formación",
+    "hub.form.t":"La red ya forma",
+    "hub.form.p":"Give&Grow no dicta estos programas: los diseñan y los sostienen las fundaciones aliadas, que conocen a su gente. Nuestro papel es canalizar recursos, documentar lo que ocurre y darle visibilidad. El crédito y el mérito son suyos.",
+    "hub.form.mira":"Todos comparten algo con MIRA: no se quedan en enseñar una técnica. Buscan que la persona descubra que es capaz — y eso es lo que le amplía la mirada sobre su propio futuro.",
+    "hub.form.link":"Conocer la fundación",
+
     "hub.r4.t":"R4 - Impact Journey",
     "hub.r4.p":"Experiencias que llevan a donantes y equipos aliados al campo, con comunidades reales y un reporte de impacto. Ya hicimos las primeras jornadas con donantes y aliados; estamos profundizando el modelo antes de abrirlo a equipos de empresa.",
     "hub.r5.t":"R5 - Conexión Laboral",
@@ -859,6 +865,29 @@ function shareFicha(pid){
   return false;
 }
 
+/* "La red ya forma" (#hub): agrupa los programas con formativo:true de TODAS las
+   aliadas. Siempre con el nombre de la fundación que lo ejecuta — el crédito es suyo;
+   Give&Grow canaliza, documenta y da visibilidad, no dicta el programa. */
+function renderFormacion(){
+  var el = document.getElementById("formacion-grid"); if (!el) return;
+  loadPartners().then(function(list){
+    var html = "";
+    for (var i=0;i<list.length;i++){
+      var p = list[i]; if (p.type !== "foundation") continue;
+      var progs = (p.profile && p.profile.programs) || [];
+      for (var k=0;k<progs.length;k++){
+        var g = progs[k]; if (g.formativo !== true) continue;
+        var desc = (g.desc && (g.desc[lang]||g.desc.es)) || "";
+        html += '<a class="card form-card" href="#fundacion/'+encodeURIComponent(p.id)+'">'
+              + '<h3>'+escapeHtml(g.name)+'</h3>'
+              + '<span class="form-fund">'+escapeHtml(p.name)+'</span>'
+              + '<p>'+escapeHtml(desc)+'</p>'
+              + '<span class="card-link">'+escapeHtml(t("hub.form.link"))+' <span aria-hidden="true">&rarr;</span></span></a>';
+      }
+    }
+    el.innerHTML = html;
+  });
+}
 /* Chips de poblaciones. Fuente única: hub.pob.list — se pintan en #hub y en
    #voluntariado (allí como portafolio de experiencias), así nunca divergen. */
 function renderPobChips(){
@@ -869,7 +898,7 @@ function renderPobChips(){
   });
 }
 function postLang(l){
-  applyLang(l); renderHeroImpact(); renderAliadas(); renderAportantes(); renderEmpresas(); renderPrivacy();
+  applyLang(l); renderHeroImpact(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); renderPrivacy();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
