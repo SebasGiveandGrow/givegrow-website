@@ -1,12 +1,58 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "v5 Fase 2 — desinflar ImpactOS, liberar ALMA" (31 jul 2026)
+> Última actualización: sesión "Plan de voluntariado — Fases 1 a 6" (ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
 - Sitio bilingüe ES/EN, vanilla-JS SPA, Cloudflare Workers.
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
+
+## ⚠️ OJO: hay DOS planes con fases numeradas — no confundirlos
+
+| Plan | Dónde vive | Estado |
+|---|---|---|
+| **Plan VISUAL de 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3** (trazabilidad al frente, Transparencia imprimible, contador por recencia) |
+| **Plan de VOLUNTARIADO de 8 fases** | `PLAN_VOLUNTARIADO.md` | Fases **1–6 hechas y en prod**. **Siguiente: su Fase 7** (medición visible + reporte para la empresa) |
+
+Al retomar, **preguntar de qué plan se habla** si se dice solo "la siguiente fase".
+
+## Cierre de tanda: plan de VOLUNTARIADO, Fases 1–6 (ago 2026)
+
+Nació de **13 preguntas que Sebas trajo de un congreso de voluntariado corporativo**. Todo el plan,
+las decisiones cerradas y los hallazgos viven en **`PLAN_VOLUNTARIADO.md`** — leerlo antes de seguir.
+Documentos que produjo: `VOLUNTARIADO.md` (el programa), `METODOLOGIA_MIRA.md` (el marco pedagógico),
+`MEDICION.md` (medición y ruta a SROI).
+
+### Qué entró (PRs #40 a #44, todos en prod)
+- **Fase 1 · sanear (#40):** `#empresas` afirmaba *"Ruta 4, ya operativa"* — sobre-anuncio: las
+  jornadas ocurrieron con **donantes y aliados**, nunca con un equipo de empresa. Corregido también
+  `hub.r4.p` ("Se activa en 2026" era falso) y la referencia rota "empleo (R4)" en `hub.r5.p`.
+- **Fases 2–4 · definir (#42):** los tres documentos. Incluye el cambio de nombre de la metodología
+  **ACPES → MIRA** (Marco · Inmersión · Reflexión · Anclaje), la ruta de 3 peldaños hacia SROI y la
+  regla dura de **no publicar ratios de retorno social**.
+- **Fase 5 · página `#voluntariado` (#43):** tres niveles, el método MIRA explicado completo y el
+  **diagrama de doble vía** como elemento firma.
+- **Fase 6 · `#hub-formacion` "La red ya forma" (#44):** los 6 programas formativos de la red, con
+  el crédito a las fundaciones. Nuevo flag `formativo: true` en `profile.programs[]`.
+
+### Decisiones de Sebas que gobiernan este trabajo
+- **Tres niveles de voluntariado, y el nivel lo define el TERRENO, no el oficio**: con el HUB /
+  con Give&Grow / **Mixto**. Dos protocolos con disparadores independientes: el **de cuidado** lo
+  dispara pisar el territorio; el **de imagen**, la cámara (cualquier nivel, incluido un celular).
+- **Nada se cobra** por ahora. **Sin mínimo de compromiso** (por eso la fase Marco es obligatoria).
+- **No hay psicólogo** → la metodología **observa, no mide clínicamente**. Un psicólogo voluntario
+  pro-bono es la llave del peldaño 2 de medición.
+- **Registro cálido en lo público**: rechazó "la fundación aprueba y puede decir no" por apático.
+  La fundación **no es un filtro, es la anfitriona**. En documentos internos sí va lenguaje técnico.
+- **No hay SROI** y no se puede insinuar que sí.
+
+### Pendiente de Sebas (no bloquea código)
+- **Registrar marcas en SIC**: ya buscó **MIRA, GIVE&GROW e ImpactOS** y quiere registrarlos.
+  Decidió hacerlo **al terminar todas las fases**.
+- Datos de las 2 empresas a las que envió el formulario · inconsistencia tributaria (Art. 257/25%
+  del sitio vs Art. 125/125% de los documentos del Drive, que corrige con un profesional) · buzón
+  `privacidad@` · regla WAF para el worker de ALMA.
 
 ## Cierre de tanda: v5 FASE 2 — desinflar ImpactOS, liberar ALMA (31 jul 2026)
 
