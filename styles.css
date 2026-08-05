@@ -846,6 +846,20 @@ html[data-theme="dark"] .track-cta h3{color:var(--ink)}
 .vol-care li{padding:14px 0 14px 22px;border-bottom:1px solid var(--bd);color:var(--ink-soft);line-height:1.55;position:relative}
 .vol-care li::before{content:"";position:absolute;left:0;top:22px;width:9px;height:1px;background:var(--g)}
 
+/* explicación del método: objetivo técnico, subtítulos y prosa */
+.mira-obj{margin:10px 0 0;max-width:70ch;font-size:14.5px;color:var(--mu);border-left:3px solid var(--bd);padding-left:14px}
+.mira-sub{margin:38px 0 10px;font-size:var(--fs-h4)}
+.mira-prose{max-width:70ch;color:var(--ink-soft);line-height:1.65;margin:0 0 12px}
+.mira-teo{max-width:70ch;font-size:13.5px;line-height:1.55;margin:14px 0 0}
+
+/* la sigla, letra por letra: la letra en display, la función al lado */
+.mira-sigla{margin-top:18px;max-width:76ch;border-top:1px solid var(--bd)}
+.mira-sig{display:grid;grid-template-columns:auto 1fr;gap:2px 20px;padding:18px 0;border-bottom:1px solid var(--bd)}
+.mira-sig-l{grid-row:span 2;align-self:start;font-family:var(--font-display);font-size:34px;line-height:.9;font-weight:700;color:var(--g);width:1.1em;text-align:center}
+html[data-theme="dark"] .mira-sig-l{color:var(--gn)}
+.mira-sig-n{font-size:16px;font-weight:700;color:var(--ink);align-self:center}
+.mira-sig-p{margin:0;font-size:14.5px;line-height:1.55;color:var(--ink-soft)}
+
 /* MIRA en doble vía — elemento firma. Espina central con las 4 fases;
    ámbar = quien llega (externo), verde = quien participa (comunidad). */
 .mira-flow{margin-top:26px;border-top:1px solid var(--bd)}
