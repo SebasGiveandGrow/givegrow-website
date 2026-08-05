@@ -2,8 +2,8 @@
 
 > Origen: 13 preguntas que Sebas trajo de un congreso de voluntariado corporativo (jul–ago 2026),
 > usadas para auditar la estructura de Give&Grow y su articulación.
-> Estado: **Fases 1–6 completadas y en producción.** Bloques I (sanear), II (definir) y las dos
-> primeras del III (publicar) cerrados. **Siguiente: Fase 7.** Una fase por sesión.
+> Estado: **Fases 1–7 completadas.** Bloques I (sanear), II (definir) y III (publicar) cerrados.
+> **Siguiente: Fase 8 — sostenibilidad.** Una fase por sesión.
 > Principio rector que gobierna todo este plan: **"evidencia, no promesas"**.
 
 **Documentos que produjo este plan:**
@@ -241,36 +241,37 @@ Consolidados FAQ y la tarjeta de Impact Journey con enlace a la página.
 - **El insumo de NDF ya no bloquea**: el encuadre no se apropia de nada, así que no requiere
   su autorización. (Si algún día se quiere reclamar co-diseño, ahí sí habría que pedirla.)
 
-#### ⏭️ Fase 7 · Medición visible + reporte para la empresa — **SIGUIENTE**
+#### ✅ Fase 7 · Medición visible + reporte para la empresa — **HECHA**
 
-Todo el contenido ya está definido en [MEDICION.md](MEDICION.md); esta fase lo publica.
+Publicó el contenido de [MEDICION.md](MEDICION.md) en **dos hogares**, porque los pasos tenían
+dueños distintos: el ledger de jornada es *registro* (vive en ImpactOS) y el marco de medición es
+un documento que se envía por enlace a un gerente de sostenibilidad (merece ruta propia).
 
-**Pasos concretos:**
-1. **Publicar el marco de medición en lenguaje claro.** Dónde: probablemente una zona nueva en
-   `#impactos` (que ya tiene la "Anatomía de un registro") o sección propia. Debe incluir:
-   - **Contribución, no atribución** como postura declarada — es coherente con el lema y ya es la
-     línea de `#hub-formacion`.
-   - La **ruta de tres peldaños** (① costo por unidad *opera* → ② outcomes observados *en
-     construcción* → ③ SROI *no existe*), dicha con el mismo pudor que el resto del sitio.
-   - **REGLA DURA: no publicar ratios de retorno social.** Ni ejemplos ilustrativos.
-2. **La jornada como registro en ImpactOS.** Una jornada de voluntariado también deja acta,
-   evidencia y reporte → extender el ledger "Anatomía de un registro" de `#impactos` con una
-   segunda columna/variante para jornadas, o una fila que muestre que el registro no es solo de
-   donaciones. Reusar `.rec-ledger` (ya existe).
-3. **Plantilla de reporte para la empresa aliada** — la de `MEDICION.md` §6, en el sitio o como
-   descargable. Redactada en clave de contribución, con nota metodológica incluida.
-4. **Mapeo a ODS/GRI/ESG** (`MEDICION.md` §3): decidir si va público (le habla al gerente de
-   sostenibilidad) o si se queda como material de propuesta.
-5. Bilingüe, `hydrate-i18n`, cache-bust, gate, preview día/noche, PR sin `automerge`.
+**Decisiones que se tomaron antes de codificar:**
+- **Mapeo ODS/GRI/ESG: público**, como tabla de referencia con la nota explícita de que no
+  auditamos el reporte de la empresa ni certificamos su cumplimiento. Es traducción, no claim.
+- **Contador por recencia: espera.** Hoy no existe fuente de datos de jornadas y escribir cifras a
+  mano es exactamente lo que `MEDICION.md` §5 prohíbe. Además el contador honesto ya es pieza
+  declarada de la **Fase 3 del plan VISUAL** (Transparencia imprimible): ahí tiene su hogar. Lo que
+  sí entró es la *regla* (§5.7) como principio publicado, que no necesita datos.
 
-**Elemento firma candidato:** el ledger de jornada, hermano del de donación — refuerza que
-"todo deja registro" sin inventar cifras.
+**Cómo quedó:**
+- **`#impactos` — nueva fila "Anatomía de una jornada"**: segundo `.rec-ledger`, hermano del de
+  donación, con dos grupos (*lo que se acuerda antes* / *lo que queda al cerrar*). **Elemento firma
+  de la fase.** Cero CSS nuevo: reusa la clase tal cual.
+- **Nueva ruta `#medicion` — "Hasta dónde podemos afirmar."** Entrada en el dropdown *Nosotros*
+  (junto a ImpactOS y Transparencia), nav móvil y footer. Contiene: contribución vs. atribución
+  como par tipográfico en Fraunces; **la escalera de tres peldaños** (elemento firma de la página);
+  las 7 reglas de publicación; la plantilla de reporte como bloque-documento; la tabla de mapeo; y
+  cierre en `.band` pidiendo el psicólogo voluntario que desbloquea el peldaño ②.
+- **La escalera dice la verdad sin hedging**: el peldaño ③ lleva el numeral *hueco* (trazo, sin
+  relleno) y una pastilla *punteada* "No existe". El estado se lee antes que el texto.
+- **Regla dura respetada**: ni un ratio de SROI, ni ejemplos ilustrativos. El tercer peldaño está
+  nombrado precisamente como lo que no tenemos — que es el argumento de credibilidad.
+- Cero tokens nuevos. Trampa vivida: al retocar `styles.css` después del rebust, el hash quedó
+  desactualizado y el navegador sirvió CSS viejo. Recalcular **al final**, siempre.
 
-**Decisión que conviene tomar antes de codificar:** si el mapeo ODS/GRI/ESG es público o interno
-(paso 4), y si el contador por recencia (`MEDICION.md` §5.7 — *"N jornadas · N fundaciones activas
-· última evidencia hace X días"*) entra en esta fase o espera datos reales.
-
-#### Fase 8 · Sostenibilidad
+#### ⏭️ Fase 8 · Sostenibilidad — **SIGUIENTE**
 - Reflejar la tesis: donaciones y membresías *(hoy)* → alianzas corporativas *(semilla)* →
   **contratación pública** SECOP/RUP *(documentada, sin ejecutar)* → cooperación internacional →
   servicios propios.

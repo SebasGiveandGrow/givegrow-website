@@ -188,4 +188,4 @@ persona.**
 |---|---|
 | ¿Invertir en asesoría SROI o esperar al psicólogo voluntario? | Define si se llega al peldaño ③ o se consolida el ② |
 | ¿Se define una línea base en la próxima jornada? | Sin "antes" no hay cambio medible después |
-| ¿Qué indicadores del núcleo se publican en el sitio? | Fase 7 del plan |
+| ~~¿Qué indicadores del núcleo se publican en el sitio?~~ | ✅ Resuelto en Fase 7: se publicó el **marco** (postura, peldaños, reglas, plantilla y mapeo) en `#medicion`, no cifras. El contador por recencia (§5.7) espera datos reales y pasa a la Fase 3 del plan VISUAL. |
