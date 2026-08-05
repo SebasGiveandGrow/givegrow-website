@@ -2,8 +2,8 @@
 
 > Origen: 13 preguntas que Sebas trajo de un congreso de voluntariado corporativo (jul–ago 2026),
 > usadas para auditar la estructura de Give&Grow y su articulación.
-> Estado: **Fases 1–4 completadas.** Bloque I (sanear) y Bloque II (definir) cerrados.
-> Pendiente el Bloque III (Fases 5–8, las que tocan el sitio), **una por sesión**.
+> Estado: **Fases 1–6 completadas y en producción.** Bloques I (sanear), II (definir) y las dos
+> primeras del III (publicar) cerrados. **Siguiente: Fase 7.** Una fase por sesión.
 > Principio rector que gobierna todo este plan: **"evidencia, no promesas"**.
 
 **Documentos que produjo este plan:**
@@ -202,7 +202,7 @@ No es opcional.
 
 ### BLOQUE III — PUBLICAR *(recién ahora el sitio)*
 
-#### Fase 5 · Página de voluntariado
+#### ✅ Fase 5 · Página de voluntariado — COMPLETADA (PR #43, en prod)
 - Ruta `#voluntariado` + entrada de menú **con descriptor** (patrón `.nd-t`/`.nd-d` ya en prod).
 - Estructura: los **tres niveles** · **portafolio de experiencias** · la jornada fase por fase (en
   lenguaje humano, sin jerga) · protección infantil dicha con orgullo · qué recibe cada quien · CTA.
@@ -214,18 +214,61 @@ No es opcional.
 - Bilingüe, hidratado, gate, preview día/noche.
 - **Insumo:** aprobar el wireframe antes de codificar.
 
-#### Fase 6 · Chefs del Futuro como prueba de R3
-- `hub.r3.p` dice *"Próximamente"* cuando **ya existe** formación real de seis meses en
-  gastronomía con emprendimiento social. Responde la Q6 con evidencia en vez de promesa.
-- Enlazar R3 → ficha de NDF → Chefs del Futuro. Enmarcar con el marco pedagógico.
-- **El crédito es de la fundación**: distinguir qué es de NDF y qué de Give&Grow.
-- **Insumo:** confirmar encuadre con NDF.
+**Cómo quedó:** H2 **"Aquí nadie viene a mirar."** · tres niveles definidos por el terreno · el
+método MIRA explicado completo (objetivo técnico, qué significa ampliar el campo perceptual, la
+sigla letra por letra con lo que cada fase le hace al campo, por qué son cuatro, y el linaje
+teórico) · **elemento firma: el diagrama de doble vía** · "Primero, el cuidado" · portafolio de
+experiencias desde la misma fuente que `#hub` (`hub.pob.list`) · "Dónde estamos hoy" + CTA.
+Consolidados FAQ y la tarjeta de Impact Journey con enlace a la página.
 
-#### Fase 7 · Medición visible + reporte para la empresa
-- Publicar el marco de medición en lenguaje claro.
-- Integrar la jornada a **ImpactOS**: una jornada también deja acta, evidencia y reporte — encaja
-  con la "Anatomía de un registro" ya publicada en `#impactos`.
-- Plantilla de reporte de impacto de voluntariado para la empresa aliada.
+#### ✅ Fase 6 · La formación, con crédito a las fundaciones — COMPLETADA (PR #44, en prod)
+
+> **Se corrigió el encuadre de esta fase.** El plan decía *"Chefs del Futuro como prueba de R3"* y
+> era un **error de atribución**: R3 es *Give&Grow formando a las fundaciones*; Chefs del Futuro es
+> *NDF formando a personas de su comunidad*. Sujetos distintos. Presentarlo como prueba de R3 le
+> habría atribuido a Give&Grow lo que hace NDF — lo que `MEDICION.md` prohíbe.
+**Cómo quedó:**
+- `hub.r3.p` deja de decir "Próximamente" a secas: la línea de Give&Grow *hacia las fundaciones*
+  se está construyendo, y la formación que ya ocurre la hacen las aliadas. Conserva el tag `soon`
+  porque R3 **como ruta de Give&Grow** no opera.
+- Nueva sección `#hub-formacion` **"La red ya forma"**, con el crédito en el lead: *"Give&Grow no
+  dicta estos programas… El crédito y el mérito son suyos."*
+- Nuevo flag **`formativo: true`** en `profile.programs[]` (documentado en el `_doc` de
+  `partners.json`) + `renderFormacion()`, que recorre **todas** las aliadas, agrupa los formativos
+  y muestra cada uno **con el nombre de la fundación** y enlace a su ficha. Escala solo.
+- Hoy son **6 programas de 2 fundaciones**: Chefs del Futuro, Borboletas, Flow Callejero y Becas
+  (NDF); AgroConciencia y Aprender para Emprender (Conciencia).
+- **El insumo de NDF ya no bloquea**: el encuadre no se apropia de nada, así que no requiere
+  su autorización. (Si algún día se quiere reclamar co-diseño, ahí sí habría que pedirla.)
+
+#### ⏭️ Fase 7 · Medición visible + reporte para la empresa — **SIGUIENTE**
+
+Todo el contenido ya está definido en [MEDICION.md](MEDICION.md); esta fase lo publica.
+
+**Pasos concretos:**
+1. **Publicar el marco de medición en lenguaje claro.** Dónde: probablemente una zona nueva en
+   `#impactos` (que ya tiene la "Anatomía de un registro") o sección propia. Debe incluir:
+   - **Contribución, no atribución** como postura declarada — es coherente con el lema y ya es la
+     línea de `#hub-formacion`.
+   - La **ruta de tres peldaños** (① costo por unidad *opera* → ② outcomes observados *en
+     construcción* → ③ SROI *no existe*), dicha con el mismo pudor que el resto del sitio.
+   - **REGLA DURA: no publicar ratios de retorno social.** Ni ejemplos ilustrativos.
+2. **La jornada como registro en ImpactOS.** Una jornada de voluntariado también deja acta,
+   evidencia y reporte → extender el ledger "Anatomía de un registro" de `#impactos` con una
+   segunda columna/variante para jornadas, o una fila que muestre que el registro no es solo de
+   donaciones. Reusar `.rec-ledger` (ya existe).
+3. **Plantilla de reporte para la empresa aliada** — la de `MEDICION.md` §6, en el sitio o como
+   descargable. Redactada en clave de contribución, con nota metodológica incluida.
+4. **Mapeo a ODS/GRI/ESG** (`MEDICION.md` §3): decidir si va público (le habla al gerente de
+   sostenibilidad) o si se queda como material de propuesta.
+5. Bilingüe, `hydrate-i18n`, cache-bust, gate, preview día/noche, PR sin `automerge`.
+
+**Elemento firma candidato:** el ledger de jornada, hermano del de donación — refuerza que
+"todo deja registro" sin inventar cifras.
+
+**Decisión que conviene tomar antes de codificar:** si el mapeo ODS/GRI/ESG es público o interno
+(paso 4), y si el contador por recencia (`MEDICION.md` §5.7 — *"N jornadas · N fundaciones activas
+· última evidencia hace X días"*) entra en esta fase o espera datos reales.
 
 #### Fase 8 · Sostenibilidad
 - Reflejar la tesis: donaciones y membresías *(hoy)* → alianzas corporativas *(semilla)* →
