@@ -169,7 +169,8 @@ la fundación aliada. No constituye un cálculo de retorno social (SROI).
 ## 7. El desbloqueo: un psicólogo voluntario
 
 El peldaño ② no necesita presupuesto: necesita **un profesional**. Y el programa de voluntariado ya
-tiene el canal para recibirlo — nivel *"voluntariado con Give&Grow"*, **sin acceso a población**,
+tiene el canal para recibirlo — nivel *"con Give&Grow"* (estructura, sin pisar territorio). Si además
+va a observar en campo, pasa al nivel **Mixto** con su protocolo de cuidado,
 aportando capacidad al HUB ([VOLUNTARIADO.md §6](VOLUNTARIADO.md)).
 
 **Qué haría:** validar los instrumentos de observación, definir hasta dónde se puede afirmar sin

@@ -22,50 +22,62 @@ jornada.
 
 ---
 
-## 2. Los dos niveles (la arquitectura que protege)
+## 2. Los tres niveles (la arquitectura que protege)
 
 La pregunta *"¿cómo protegen a los menores con voluntarios externos?"* se responde con estructura,
-no con buena voluntad:
+no con buena voluntad.
 
-| | **Voluntariado CON EL HUB** | **Voluntariado CON GIVE&GROW** |
+> **Principio: el nivel NO lo define el oficio, lo define el terreno.** Un diseñador web puede
+> aportar solo en estructura, solo en terreno, o partir su tiempo entre las dos. Lo que cambia la
+> exigencia es **si pisa el territorio**, no su profesión.
+
+| | **CON EL HUB** | **CON GIVE&GROW** | **MIXTO (HUB y G&G)** |
+|---|---|---|---|
+| **Qué hace** | Acompaña los programas de una fundación aliada | Fortalece la estructura que sostiene la red | Combina las dos, en la proporción que la persona defina |
+| **¿Pisa territorio?** | **Sí** | **No** | **Sí, en parte** |
+| **Verificación** | Give&Grow **+ la fundación** | Give&Grow | Give&Grow **+ la fundación** |
+| **Quién acompaña en campo** | Equipo de la fundación | — | Equipo de la fundación |
+| **Ejemplos** | Impact Journey, jornadas, apoyo a un programa | Derecho, contabilidad, desarrollo, diseño, formación interna | Un diseñador que trabaja en la web y también va a una jornada; comunicaciones que documenta lo que ocurre; un psicólogo que además observa en campo |
+
+**Consecuencia:** nadie está con la comunidad sin que la fundación lo sepa, lo apruebe y lo
+acompañe. No es una promesa de conducta; es una restricción de diseño.
+
+### Por qué dos verificaciones y no una
+La fundación conoce a su comunidad y sus riesgos mejor que nosotros. Give&Grow verifica a la
+persona; la fundación verifica **la pertinencia de la actividad** y tiene la última palabra.
+Ninguna jornada ocurre si la fundación considera que no es el momento.
+
+### Dos protocolos, dos disparadores independientes
+No se amarran al nivel, porque eso dejaría huecos (p. ej. alguien del nivel HUB con un celular):
+
+| Protocolo | Qué lo dispara | Aplica a |
 |---|---|---|
-| **Vía** | A través de una fundación aliada | Directo con Give&Grow |
-| **Acceso a población** | **Sí**, en terreno | **No.** Solo trabajo administrativo / pro-bono |
-| **Filtros de vigilancia** | **Dos**: el de Give&Grow **y** el de la fundación | El de Give&Grow |
-| **Quién acompaña** | Give&Grow + equipo de la fundación | Give&Grow |
-| **Ejemplos** | Impact Journey, jornadas, apoyo a un programa | Asesoría legal, contable, desarrollo, diseño, formación interna |
-
-**Consecuencia:** quien no pasa por una fundación aliada **nunca queda a solas con población
-vulnerable**. No es una promesa de conducta; es una restricción de diseño.
-
-### Por qué dos filtros y no uno
-La fundación conoce a su comunidad y sus riesgos mejor que nosotros. Give&Grow verifica al
-voluntario; la fundación verifica la pertinencia de la actividad y **tiene poder de veto**. Ninguna
-jornada ocurre si la fundación no la aprueba.
+| **Protocolo de cuidado** (§3) | **Pisar el territorio** | Niveles con el HUB y Mixto |
+| **Protocolo de imagen** (§3.1) | **La cámara** — que se vaya a fotografiar o grabar | Cualquier nivel que capture, incluido un celular |
 
 ---
 
-## 3. Protocolo de protección
+## 3. Protocolo de cuidado
 
-Aplica a todo voluntariado con acceso a población. Se ancla al protocolo de cumplimiento que ya
-rige la red (faltas leves → comité con tres oportunidades; faltas gravísimas → expulsión inmediata
-y acción legal).
+**Disparador: pisar el territorio.** Aplica a los niveles *con el HUB* y *Mixto*, sin importar el
+oficio ni la duración (aunque sea un solo día). Se ancla al protocolo de cumplimiento que ya rige la
+red (faltas leves → comité con tres oportunidades; faltas gravísimas → expulsión inmediata y acción
+legal).
 
-### Verificación previa (filtro Give&Grow)
+### Verificación previa (Give&Grow)
 - Identidad verificada.
 - Antecedentes según lo exigible legalmente para actividades con NNA.
 - Firma del acuerdo de voluntariado y del protocolo de protección.
 - Revisión de pertinencia: perfil ↔ actividad.
 
-### Verificación de pertinencia (filtro fundación)
-- La fundación aprueba la actividad, el número de personas y el momento.
-- Define qué espacios son accesibles y cuáles no.
+### Verificación de pertinencia (la fundación)
+- La fundación define la actividad, el número de personas y el momento.
+- Define qué espacios se comparten y cuáles no.
 - Designa una persona responsable del acompañamiento durante toda la jornada.
 
 ### Prohibiciones explícitas
 1. **Nunca a solas** con un menor de edad. Actividades siempre a la vista del equipo.
-2. **Sin fotografía ni video** de menores sin el consentimiento registrado que ya exige el modelo
-   de datos de la red (`consent.photos`). El voluntario no decide esto: lo decide la fundación.
+2. **Sin fotografía ni video** sin el consentimiento registrado — ver §3.1.
 3. **Sin contacto por fuera de la actividad**: no se intercambian datos personales ni redes con
    participantes ni sus familias.
 4. **Sin recolección de datos** de participantes por parte del voluntario.
@@ -76,6 +88,31 @@ y acción legal).
 ### Incumplimiento
 Termina la participación de inmediato y se informa a la empresa aliada si aplica. Las conductas que
 comprometan a un menor se reportan a la autoridad competente. No hay segunda oportunidad en esto.
+
+---
+
+## 3.1 Protocolo de imagen
+
+**Disparador: la cámara.** Aplica a **cualquiera que vaya a fotografiar o grabar**, de cualquier
+nivel — incluido quien solo lleva su celular. No depende del oficio ni de si la persona se considera
+"fotógrafo".
+
+> **El consentimiento va primero que la cámara.** Se acuerda **antes** de capturar, nunca después.
+
+1. **Antes de la jornada** se acuerda con la fundación qué se puede capturar, en qué espacios y
+   quiénes quedan fuera de plano.
+2. **Con niñez, siempre autorización de la familia** o del representante legal. Sin excepción.
+3. **El registro manda**: la publicación se rige por el consentimiento ya registrado en el modelo de
+   datos de la red (`consent.photos`, con `grantedBy` y fecha). Si no está registrado, no se publica.
+4. **Quien aparece no pierde el control de su imagen**: puede pedir que se retire, y se retira.
+5. **La fundación revisa el material** antes de cualquier publicación.
+6. **El material no es del voluntario.** Su uso se rige por el convenio; no se publica en portafolios
+   personales ni redes propias sin autorización expresa.
+
+**Por qué este protocolo es aparte:** en el nivel Mixto, cuando alguien viene a documentar, **el
+entregable ES la imagen de una persona**. Ahí el consentimiento deja de ser un trámite y se vuelve
+el oficio. Y separándolo del nivel se cubre también el caso simple: un voluntario del nivel HUB con
+el celular en la mano.
 
 ---
 
@@ -136,7 +173,8 @@ El voluntario no es solo mano de obra: puede **aportar capacidad al HUB**, igual
 voluntario propone qué quiere aportar. No se le pide en frío al inicio: se le pregunta cuando ya
 entendió el contexto.
 
-Estos aportes entran por el nivel **"voluntariado con Give&Grow"** — sin acceso a población.
+Estos aportes entran por el nivel **"con Give&Grow"**. Si la persona además quiere estar en terreno
+—como el diseñador que parte su tiempo—, pasa al nivel **Mixto** y le aplica el protocolo de cuidado.
 
 ---
 
