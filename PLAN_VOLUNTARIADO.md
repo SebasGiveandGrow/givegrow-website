@@ -7,7 +7,7 @@
 > Principio rector que gobierna todo este plan: **"evidencia, no promesas"**.
 
 **Documentos que produjo este plan:**
-> - [VOLUNTARIADO.md](VOLUNTARIADO.md) — el programa: dos niveles, protocolo de protección,
+> - [VOLUNTARIADO.md](VOLUNTARIADO.md) — el programa: **tres niveles**, protocolo de cuidado y de imagen,
 >   portafolio de experiencias, co-creación *(Fase 2)*
 > - [METODOLOGIA_MIRA.md](METODOLOGIA_MIRA.md) — el marco pedagógico **MIRA** v2.0 *(Fase 3)*
 > - [MEDICION.md](MEDICION.md) — marco de medición, ruta a SROI y mapeo a ODS/GRI/ESG *(Fase 4)*
@@ -78,7 +78,7 @@ nuevo: ya reporta en **ODS, GRI o ESG**. Universal significa un núcleo de indic
 Un abogado fortalece el protocolo de cumplimiento; un desarrollador mejora ImpactOS; un contador
 ordena la trazabilidad; un chef aporta a Chefs del Futuro. **Y un psicólogo voluntario es la
 llave de la capa de medición** (ver Fase 4). Encaja exactamente con el nivel "voluntariado con
-Give&Grow, sin acceso a población".
+Give&Grow" (y al nivel Mixto si además va a terreno).
 
 **F. La tesis de sostenibilidad ya está escrita (Q13).** En el Drive, `LEGAL/06. Guía de
 Inscripción en Plataformas de Contratación Pública` (SECOP II, RUP) apunta literalmente a
@@ -126,7 +126,7 @@ El sitio no lo refleja en ningún lado.
 
 ---
 
-## 3. Modelo de voluntariado en dos niveles
+## 3. Modelo de voluntariado en tres niveles
 
 La pieza que resuelve la protección infantil **por diseño**:
 
@@ -158,7 +158,7 @@ No es opcional.
 ### BLOQUE II — DEFINIR *(documentos; aquí se gana o se pierde la credibilidad)*
 
 #### ✅ Fase 2 · Documento maestro del voluntariado — COMPLETADA → `VOLUNTARIADO.md`
-1. Modelo de **dos niveles** (tabla §3) con qué hace y qué **no** hace cada uno.
+1. Modelo de **tres niveles** (con el HUB · con Give&Grow · Mixto), definidos por el terreno y no por el oficio.
 2. **Protocolo de protección**: los dos filtros, qué verifica cada uno, prohibiciones explícitas
    (fotos sin consentimiento, contacto fuera de la actividad, datos de menores), consecuencias.
    Anclado al protocolo de cumplimiento existente (`fund.proto`).
@@ -204,7 +204,7 @@ No es opcional.
 
 #### Fase 5 · Página de voluntariado
 - Ruta `#voluntariado` + entrada de menú **con descriptor** (patrón `.nd-t`/`.nd-d` ya en prod).
-- Estructura: los **dos niveles** · **portafolio de experiencias** · la jornada fase por fase (en
+- Estructura: los **tres niveles** · **portafolio de experiencias** · la jornada fase por fase (en
   lenguaje humano, sin jerga) · protección infantil dicha con orgullo · qué recibe cada quien · CTA.
 - **Elemento firma: el diagrama de doble vía** — 4 fases × 2 columnas (voluntario | beneficiario).
   Es "Dar para crecer, crecer para dar más" hecho método, y la garantía anti-extractiva.

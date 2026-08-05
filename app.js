@@ -179,7 +179,7 @@ var I18N = {
     "ally.m.serv.t":"Servicios",
     "ally.m.serv.p":"Gratuitos o con beneficio para población vulnerable.",
     "ally.m.vol.t":"Voluntariado corporativo",
-    "ally.m.vol.p":"Tus colaboradores participan en las actividades.",
+    "ally.m.vol.p":"Tus colaboradores participan en jornadas diseñadas, con protocolo de cuidado.",
     "ally.m.dif.t":"Difusión",
     "ally.m.dif.p":"Das a conocer la labor en tus canales.",
     "ally.s.ficha":"Ficha del Beneficio (Programa de Gratitud)",
@@ -280,6 +280,67 @@ var I18N = {
     "emp.p2.p":"Voluntariado corporativo en doble vía (Ruta 4): tu equipo vive la realidad de las comunidades que apoya, y la comunidad también gana. Ya hicimos las primeras jornadas con donantes y aliados; ahora estamos abriendo el formato a equipos de empresa — escríbenos para diseñar la primera.",
     "emp.p3.t":"Alianza a medida",
     "emp.p3.p":"Un canal abierto para co-crear juntos programas, campañas o formas de cooperación ajustadas a la realidad de tu empresa.",
+    "nav.voluntariado":"Voluntariado e Impact Journey",
+    "nav.d.voluntariado":"Cómo participar en terreno, en tres niveles",
+    "vol.ey":"Voluntariado",
+    "vol.t":"Aquí nadie viene a mirar.",
+    "vol.lead":"Buscamos que quien llega amplíe su mirada, y que la fundación quede con algo que antes no tenía. Las dos cosas, en la misma jornada.",
+    "vol.niv.ey":"Cómo participar",
+    "vol.niv.t":"Hay tres maneras de estar",
+    "vol.niv.p":"El nivel no lo define tu oficio: lo define si pisas el territorio. Puedes aportar solo desde la estructura, solo en terreno, o partir tu tiempo entre las dos.",
+    "vol.n1.t":"Con el HUB SOCIAL",
+    "vol.n1.p":"En terreno, junto a una fundación aliada y su equipo. Ellos conocen a su comunidad: definen cuándo una visita suma y qué espacios se comparten.",
+    "vol.n2.t":"Con Give&Grow",
+    "vol.n2.p":"Tu oficio fortalece la estructura que sostiene la red — derecho, contabilidad, desarrollo, diseño, formación. Ocurre fuera del territorio.",
+    "vol.n3.t":"Mixto · HUB y Give&Grow",
+    "vol.n3.p":"Combinas las dos, en la proporción que tú definas. Un diseñador que trabaja en la web y también va a una jornada; alguien de comunicaciones que documenta lo que pasa.",
+    "vol.mira.ey":"El método",
+    "vol.mira.t":"MIRA: dos miradas que se amplían",
+    "vol.mira.p":"Le llamamos MIRA porque de eso se trata: ampliar la mirada. Y porque la sigla nombra sus cuatro fases — Marco, Inmersión, Reflexión y Anclaje.",
+    "vol.mira.obj":"Su nombre técnico lo precisa: metodología de ampliación del campo perceptual a través de experiencias significativas.",
+    "vol.mira.def.t":"Qué significa ampliar la mirada",
+    "vol.mira.def.p":"El campo perceptual es todo lo que una persona alcanza a ver como posible — para sí misma y para su entorno. Cuando alguien crece creyendo que ciertas cosas «no son para él», ese límite muchas veces no es de capacidad: es de percepción. Y lo mismo pasa al otro lado: quien nunca ha estado en un barrio no alcanza a ver lo que allí ya funciona.",
+    "vol.mira.def.p2":"MIRA trabaja justo ahí. No da un discurso: diseña una experiencia donde la persona hace algo que no creía posible, y después la acompaña a ponerlo en palabras. Lo que se amplía no es la información que tiene: es lo que alcanza a ver como posible.",
+    "vol.mira.sigla.t":"Las cuatro fases, letra por letra",
+    "vol.f1.q":"Abre el campo. Un campo en estado de defensa no admite percepción nueva: primero se acuerda un espacio seguro y se plantea un reto que rompe la expectativa.",
+    "vol.f2.q":"Lo tensiona. La experiencia introduce algo que el campo actual no puede explicar. Esa incomodidad es la que obliga a ampliar — por eso el reto tiene que ser exigente, aunque alcanzable.",
+    "vol.f3.q":"Lo consolida. La vivencia se vuelve percepción cuando se pone en palabras. Sin esta fase la experiencia se olvida y el campo se cierra otra vez.",
+    "vol.f4.q":"Lo fija. Un compromiso pequeño y realizable lleva la mirada ampliada a la vida cotidiana, para que no se quede en el día que pasó.",
+    "vol.mira.why.t":"Por qué cuatro y no una",
+    "vol.mira.why.p":"Porque quitar cualquiera rompe la cadena. Sin Marco no hay apertura. Sin Inmersión no hay nada nuevo que explicar. Sin Reflexión no hay significado, solo una anécdota. Y sin Anclaje no hay transferencia: la jornada se queda en el día que pasó. Eso es lo que separa a MIRA de una jornada bonita.",
+    "vol.mira.teo":"No es una idea nueva: se apoya en la psicología del campo perceptual (Combs y Snygg), en la autoeficacia de Bandura y en el ciclo de aprendizaje experiencial de Kolb. Lo propio nuestro es aplicarla en doble vía.",
+    "vol.mira.dv.t":"La misma jornada, dos miradas",
+    "vol.mira.vol":"Quien llega",
+    "vol.mira.par":"Quien participa",
+    "vol.f1":"Marco",
+    "vol.f1.v":"Vienes a aprender de quien sabe algo que tú no sabes.",
+    "vol.f1.p":"«Vas a resolver algo que no habías intentado.»",
+    "vol.f2":"Inmersión",
+    "vol.f2.v":"Trabajas al lado, no por encima.",
+    "vol.f2.p":"Rol protagónico en el reto, no de espectador.",
+    "vol.f3":"Reflexión",
+    "vol.f3.v":"«¿Qué creía antes de llegar que hoy ya no creo?»",
+    "vol.f3.p":"«¿Qué descubrí en mí que no sabía que tenía?»",
+    "vol.f4":"Anclaje",
+    "vol.f4.v":"Qué vas a aportar de vuelta.",
+    "vol.f4.p":"Un compromiso pequeño en su propio entorno.",
+    "vol.mira.cierre":"Dos miradas que se amplían la una hacia la otra. Eso es dar para crecer, y crecer para dar más.",
+    "vol.cuid.ey":"Lo primero",
+    "vol.cuid.t":"Primero, el cuidado",
+    "vol.cuid.p":"Trabajamos con niñas, niños y jóvenes. Por eso el cuidado no es una cláusula al final: está en el diseño.",
+    "vol.cuid.1":"Dos verificaciones antes de pisar terreno: la nuestra y la de la fundación que acompaña a esa comunidad.",
+    "vol.cuid.2":"Nunca a solas: cada actividad ocurre acompañada por el equipo de la fundación.",
+    "vol.cuid.3":"El consentimiento va primero que la cámara. Las fotos las deciden la fundación y las familias, nunca quien visita.",
+    "vol.cuid.4":"Si la fundación considera que no es el momento, esperamos. El ritmo lo pone la comunidad.",
+    "vol.port.ey":"Dónde puedes estar",
+    "vol.port.t":"Una red, muchas realidades",
+    "vol.port.p":"Un solo acuerdo con Give&Grow abre varias experiencias distintas. Ninguna fundación sola puede ofrecer eso.",
+    "vol.port.note":"Así está diseñado el modelo. Cada experiencia se abre cuando hay una fundación aliada verificada para esa población — y la red crece una alianza a la vez.",
+    "vol.hoy.ey":"Dónde estamos hoy",
+    "vol.hoy.t":"Contado sin adornos",
+    "vol.hoy.p":"Ya hicimos las primeras jornadas con donantes y aliados. Con equipos de empresa estamos abriendo el formato: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.",
+    "vol.cta":"Quiero participar",
+    "vol.link":"Ver el programa de voluntariado",
     "fund.ey":"Para fundaciones",
     "fund.t":"Aplica al HUB SOCIAL.",
     "fund.lead":"Más de 25 fundaciones preaprobadas en nuestra red de espera: su vinculación formal se confirma una a una, con verificación y evidencia.",
@@ -428,7 +489,7 @@ var I18N = {
     "faq.q3":"¿Cómo funciona el beneficio tributario?",
     "faq.a3":"Por cada donación realizada a través del sistema financiero accedes a un descuento del 25% sobre el impuesto de renta a cargo (Art. 257 ET). Por ejemplo, $4.000.000 COP donados equivalen a $1.000.000 COP menos en tu impuesto.",
     "faq.q4":"¿Puedo ser voluntario?",
-    "faq.a4":"Aceptamos voluntariado de habilidades profesionales: médicos, odontólogos, abogados, contadores, desarrolladores, docentes y más. Escríbenos a sebas@thegiveandgrowproject.org o por WhatsApp al +57 315 330 5028 indicando tu área y disponibilidad.",
+    "faq.a4":"Sí. Puedes aportar desde tu oficio —salud, derecho, contabilidad, comunicación, desarrollo, docencia y más— en terreno junto a una fundación aliada, en la estructura del Hub, o combinando las dos. Cuéntanos tu área y tu disponibilidad.",
     "faq.q5":"¿Mi fundación puede aplicar al Hub?",
     "faq.a5":"Sí. Buscamos fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad. Algunas aliadas contribuyen servicios al Hub en lugar de solo recibir.",
     "faq.q6":"¿Qué hace único al HUB SOCIAL?",
@@ -737,6 +798,7 @@ var ROUTE_META = {
   transparencia:{t:{es:"Transparencia · Give&Grow International",en:"Transparency · Give&Grow International"},d:{es:"Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International.",en:"Official registration, governance, financial statements and public documents of Give&Grow International."}},
   contacto:{t:{es:"Contacto · Give&Grow International",en:"Contact · Give&Grow International"},d:{es:"Escríbenos para donar, aliar tu empresa o sumar tu fundación al HUB SOCIAL. Medellín, Colombia.",en:"Reach out to donate, partner your company or join your foundation to the Social Hub. Medellín, Colombia."}},
   membresias:{t:{es:"Membresías · Give&Grow International",en:"Memberships · Give&Grow International"},d:{es:"Hazte miembro de Give&Grow: dona de forma recurrente, crece de Semilla a Bosque y suma beneficios en cada nivel.",en:"Become a Give&Grow member: give monthly, grow from Seed to Forest and add benefits at each tier."}},
+  voluntariado:{t:{es:"Voluntariado e Impact Journey · Give&Grow International",en:"Volunteering & Impact Journey · Give&Grow International"},d:{es:"Tres maneras de participar, el método MIRA en doble vía y cómo cuidamos a las comunidades. Voluntariado corporativo y pro-bono.",en:"Three ways to take part, the two-way MIRA method, and how we care for communities. Corporate and pro-bono volunteering."}},
   faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}}
 };
@@ -797,10 +859,14 @@ function shareFicha(pid){
   return false;
 }
 
+/* Chips de poblaciones. Fuente única: hub.pob.list — se pintan en #hub y en
+   #voluntariado (allí como portafolio de experiencias), así nunca divergen. */
 function renderPobChips(){
-  var el=document.getElementById("hub-pob"); if(!el) return;
   var items=(t("hub.pob.list")||"").split(" - ");
-  el.innerHTML = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
+  var html = items.map(function(x){ return '<span class="eco-chip">'+x.trim().replace(/</g,"&lt;")+'</span>'; }).join("");
+  ["hub-pob","vol-pob"].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.innerHTML = html;
+  });
 }
 function postLang(l){
   applyLang(l); renderHeroImpact(); renderAliadas(); renderAportantes(); renderEmpresas(); renderPrivacy();
