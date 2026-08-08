@@ -1,0 +1,9 @@
+# Artefactos locales de `npx wrangler dev` (la vista previa que exige CLAUDE.md).
+# Sin esto se cuelan en los commits: ya pasó dos veces.
+.wrangler/
+
+# Dependencias, si algún día hay
+node_modules/
+
+# Basura del sistema
+.DS_Store
