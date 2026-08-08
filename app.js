@@ -531,7 +531,6 @@ var I18N = {
     "pay.t":"Cómo aportar",
     "pay.tab.banco":"Bancolombia",
     "pay.tab.paypal":"PayPal",
-    "pay.tab.mp":"MercadoPago",
     "pay.banco.note":"Transfiere y envía el comprobante a contabilidad@thegiveandgrowproject.org. En 24h recibes tu credencial de miembro y tu certificado tributario.",
     "pay.bank":"Banco",
     "pay.acc":"Cuenta de Ahorros",
@@ -540,8 +539,6 @@ var I18N = {
     "copy":"Copiar",
     "copied":"Copiado",
     "pay.paypal.note":"Para donaciones internacionales en USD. Escríbenos y te enviamos el enlace de PayPal.",
-    "pay.mp.note":"Paga con tarjeta o PSE vía MercadoPago. Solicita el enlace por WhatsApp o correo.",
-    "pay.wompi":"Próximamente: pagos con tarjeta y PSE vía Wompi.",
     "transp.ey":"Transparencia",
     "transp.t":"Cuentas claras.",
     "transp.p1":"Somos una Entidad Sin Ánimo de Lucro (ESAL) colombiana, constituida formalmente y bajo inspección del Estado. Aquí están nuestros datos de registro, gobernanza y compromisos financieros, verificables de forma independiente.",
@@ -1455,7 +1452,7 @@ function empSim(){
 }
 
 /* ---------- payments ---------- */
-var PAY_METHODS = ["banco","paypal","mp"];
+var PAY_METHODS = ["banco","paypal"];
 function payMethod(m, focusTab){
   PAY_METHODS.forEach(function(x){
     var tab = document.getElementById("paytab-"+x);

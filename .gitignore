@@ -1,0 +1,15 @@
+# Artefactos locales de `npx wrangler dev` (la vista previa que exige CLAUDE.md).
+# Sin esto se cuelan en los commits: ya pasó dos veces.
+.wrangler/
+
+# Secretos locales de `wrangler dev` (llaves de Wompi, del correo…).
+# NUNCA deben entrar al repositorio: se cargan desde aquí en local y como
+# secretos de Wrangler en producción.
+.dev.vars
+.dev.vars.*
+
+# Dependencias, si algún día hay
+node_modules/
+
+# Basura del sistema
+.DS_Store
