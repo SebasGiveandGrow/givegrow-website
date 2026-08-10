@@ -6,7 +6,79 @@ on:
   workflow_dispatch:
 
 jobs:
+  # La automatización del inventario (Apps Script → GitHub) reescribe la marca de
+  # tiempo "actualizado" cada vez que corre su disparador, incluso cuando no hay
+  # datos nuevos: 722 commits en 31 días, y de los últimos 40 los 40 no cambiaban
+  # ni un dato. Cada uno disparaba un despliegue completo del sitio.
+  #
+  # OJO — por qué esto NO se resuelve con `paths-ignore`: el sitio sirve
+  # data/inventario.json como asset del Worker, así que un cambio REAL del
+  # inventario sí necesita desplegar para llegar a producción (de ahí lee
+  # #rastrea). `paths-ignore` es ciego al contenido y bloquearía también los
+  # cambios buenos. Por eso el guard compara el JSON sin la marca de tiempo.
+  #
+  # Ante cualquier duda, el guard decide DESPLEGAR. Nunca se salta un
+  # workflow_dispatch manual.
+  guard:
+    runs-on: ubuntu-latest
+    name: guard (evita despliegues sin cambios reales)
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - name: Checkout con historia
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ¿El único cambio es la marca de tiempo del inventario?
+        id: check
+        run: |
+          set -uo pipefail
+
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "Despliegue manual: el guard no aplica."
+            echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          AFTER="${{ github.sha }}"
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            BEFORE="$(git rev-parse "${AFTER}~1" 2>/dev/null || echo "")"
+          fi
+          if [ -z "$BEFORE" ]; then
+            echo "Sin punto de comparación: se despliega por seguridad."
+            echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          FILES="$(git diff --name-only "$BEFORE" "$AFTER")"
+          echo "Archivos cambiados:"; echo "$FILES"
+
+          if [ "$FILES" != "data/inventario.json" ]; then
+            echo "Cambió algo más que el inventario: se despliega."
+            echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          ANTES="$(git show "${BEFORE}:data/inventario.json" 2>/dev/null | node scripts/inventario-huella.mjs)"
+          AHORA="$(git show "${AFTER}:data/inventario.json"  2>/dev/null | node scripts/inventario-huella.mjs)"
+
+          case "$ANTES$AHORA" in
+            *__vacio__*|*__ilegible__*|"")
+              echo "No se pudo comparar con certeza: se despliega por seguridad."
+              echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
+
+          if [ "$ANTES" = "$AHORA" ]; then
+            echo "::notice::Solo cambió la marca de tiempo del inventario — no se despliega."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "El inventario cambió de verdad: se despliega."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
   deploy:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     name: Deploy to Cloudflare Workers
     steps:

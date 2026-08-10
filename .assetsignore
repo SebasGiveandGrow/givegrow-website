@@ -1,3 +1,33 @@
+# Qué NO se sube como asset público del Worker.
+# Sintaxis tipo .gitignore. Verificado el 8 ago 2026: sin las entradas de abajo,
+# https://www.thegiveandgrowproject.org/SESSION_HANDOFF.md servía 48 KB de notas
+# internas de trabajo, y /.wrangler/cache/cf.json filtraba la ciudad y el
+# proveedor de red de la máquina que hizo el último `wrangler dev`.
+#
+# `_headers` NO va aquí: Cloudflare ya lo excluye solo (verificado) y ponerlo
+# arriesgaría que deje de procesarse, y con él se iría la CSP.
+#
+# Se sirve, a propósito: index.html, app.js, styles.css, favicon.svg,
+# manifest.webmanifest, robots.txt, sitemap.xml, img/, vendor/, docs/, data/,
+# i18n/ y .well-known/.
+
+# Código y configuración del despliegue
 worker.js
+wrangler.toml
 node_modules
+.wrangler
+
+# Automatizaciones y utilidades internas
 ops
+scripts
+.github
+.claude
+
+# Documentación de trabajo (el marco público vive en el sitio, no en estos .md)
+*.md
+.clauderules
+
+# Meta del repositorio
+.assetsignore
+.gitignore
+.DS_Store
