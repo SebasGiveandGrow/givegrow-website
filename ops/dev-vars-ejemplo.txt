@@ -1,0 +1,62 @@
+Plantilla de .dev.vars — llaves de SANDBOX para la vista previa local
+=====================================================================
+
+QUÉ ES
+`.dev.vars` es el archivo donde `wrangler dev` busca los secretos cuando corres
+el sitio en local. En producción esos mismos valores viven como secretos de
+Wrangler (Cloudflare → Workers → givegrow-website → Settings → Variables →
+Encrypted). Nunca en wrangler.toml, que está en el repositorio.
+
+DÓNDE VA
+En la RAÍZ del repositorio, al lado de wrangler.toml. No en ops/, no en
+scripts/, no en tu carpeta de usuario. Si está en otro lugar, wrangler no lo ve
+y no avisa.
+
+    givegrow-website/
+    ├── wrangler.toml
+    ├── .dev.vars        ← aquí
+    └── ...
+
+CÓMO SABER QUE FUNCIONÓ
+Al arrancar, wrangler imprime:
+
+    Using secrets defined in .dev.vars
+    env.WOMPI_PUBLIC_KEY ("(hidden)")        Environment Variable   local
+    env.WOMPI_PRIVATE_KEY ("(hidden)")       Environment Variable   local
+    env.WOMPI_EVENTS_SECRET ("(hidden)")     Environment Variable   local
+    env.WOMPI_INTEGRITY_SECRET ("(hidden)")  Environment Variable   local
+
+Si no aparece esa línea, el archivo está en el lugar equivocado o mal escrito.
+
+SI PARECE QUE "NO FUNCIONA"
+Antes de dudar del archivo, revisa que arrancaste con `--persist-to`:
+
+    npx wrangler dev --persist-to /tmp/gg-wrangler
+
+Sin eso, `wrangler dev` entra en un bucle de recargas infinito y el servidor
+NUNCA responde — se ve igualito a que las variables no cargaran, pero el
+problema es otro. Ver CLAUDE.md, sección VISTA PREVIA LOCAL.
+
+FORMATO
+Una línea por variable, `NOMBRE=valor`, sin `export`, sin comillas, sin
+espacios alrededor del `=`. Nada más.
+
+CONTENIDO (reemplaza cada valor por el de TU sandbox, no pegues los de nadie)
+-----------------------------------------------------------------------------
+WOMPI_PUBLIC_KEY=pub_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+WOMPI_PRIVATE_KEY=prv_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+WOMPI_EVENTS_SECRET=test_events_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+WOMPI_INTEGRITY_SECRET=test_integrity_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+-----------------------------------------------------------------------------
+
+Las cuatro se sacan del panel de Wompi (comercios.wompi.co), bajo el menú
+DESARROLLO, con el ambiente puesto en sandbox. Ojo: la documentación pública de
+Wompi dice que los secretos están en "Mi cuenta → Secretos"; en el panel real
+están bajo Desarrollo.
+
+REGLA
+`.dev.vars` está en .gitignore y debe quedarse ahí. Si alguna vez aparece en
+`git status`, algo se rompió: no lo commitees, arregla el .gitignore.
+Y si una llave se expone por cualquier vía —un chat, una captura, un correo—
+rótala en el panel de Wompi. Las de sandbox no mueven dinero real; las de
+producción sí.
