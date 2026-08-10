@@ -108,10 +108,18 @@ Olvidarlo = los usuarios ven la versión vieja hasta 1 año.
 ## VISTA PREVIA LOCAL
 
 ```bash
-npx wrangler dev          # sitio completo con Worker
+npx wrangler dev --persist-to /tmp/gg-wrangler   # sitio completo con Worker
 # o para vista rápida estática:
 python3 -m http.server 8080
 ```
+
+**`--persist-to` NO es opcional.** Sin él, `wrangler dev` entra en un bucle de
+recargas infinito y el servidor nunca responde: `[assets] directory = "."` hace
+que vigile la raíz del repo, y wrangler escribe su propio estado en `.wrangler/`
+dentro de esa raíz — cada escritura dispara una recarga que vuelve a escribir.
+Medido el 8 ago 2026: **592 recargas** en una corrida, cero respuestas. Con el
+estado fuera del árbol vigilado: **1 recarga** y todo responde.
+
 Revisar SIEMPRE en modo día Y noche (toggle en el nav) antes de abrir PR.
 
 ## CONTINUIDAD
