@@ -8,3 +8,20 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 html_handling = "auto-trailing-slash"
 run_worker_first = ["/f/*"]
+
+# Base PRIVADA (Ley 1581): donantes, aportes, inscripciones y consentimientos.
+# Nunca se sirve al navegador. Los datos públicos de la red siguen en
+# data/partners.json. Esquema en migrations/0001_inicial.sql.
+[[d1_databases]]
+binding = "DB"
+database_name = "givegrow-privado"
+database_id = "e40b0794-37ab-4461-bf59-53b682095446"
+
+# La llave pública de Wompi NO es secreta (viaja en la URL del checkout), así
+# que vive aquí y queda versionada. Las otras tres —privada, integridad y
+# eventos— son secretos de Wrangler y NUNCA van en este archivo.
+# El ambiente se deduce del prefijo: pub_test_ → sandbox, pub_prod_ →
+# producción. Así es imposible que queden llaves de prueba apuntando a
+# producción, que es el error clásico y el más caro.
+[vars]
+WOMPI_PUBLIC_KEY = "pub_prod_sA952OP2Y58ahrZRjHgutdBIr9U0FUr6"
