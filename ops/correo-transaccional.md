@@ -8,17 +8,29 @@ simula el envío y lo registra en el log del Worker, sin romper el cobro.
 
 ## Por qué un subdominio y no el dominio principal
 
-Medido el 8 y el 11 de agosto de 2026 sobre `thegiveandgrowproject.org`:
+**Estado del dominio principal — ARREGLADO el 11 de agosto de 2026.**
 
-| Registro | Estado |
+Cuando se construyó esta capa, el dominio principal estaba roto: el SPF apuntaba
+a un `include` que resolvía vacío, no había DKIM publicado, y el DMARC estaba en
+`p=reject`. Todo correo que salía fallaba autenticación y la propia política del
+dominio ordenaba rechazarlo (síntoma documentado en `ops/aliados-formulario.gs`,
+error 550 5.7.26).
+
+Ya no. Verificado con un informe de `verifier.port25.com`:
+
+| Comprobación | Resultado |
 |---|---|
-| SPF | `include:dc-aa8e722993._spfm.…` → **ese include resuelve vacío**, así que no autoriza a nadie |
-| DKIM | **sin registro** en `google._domainkey` ni en 7 selectores comunes |
-| DMARC | **`p=reject`** |
+| SPF | **pass**, y alineado (`smtp.mailfrom` = `From`) |
+| DKIM | **pass**, y ALINEADO — `d=thegiveandgrowproject.org`, selector `google`, llave de 2048 bits |
+| iprev | pass |
 
-Con esa combinación, todo correo que salga del dominio principal falla
-autenticación y su propia política ordena rechazarlo. Ya está documentado el
-síntoma en `ops/aliados-formulario.gs` (error 550 5.7.26).
+Que ambos estén **alineados** es lo que importa: DMARC ya no depende de una sola
+pata, y el correo reenviado sobrevive (SPF se rompe al reenviar, DKIM no).
+
+**Aun así el transaccional se queda en el subdominio**, y no por necesidad sino
+por diseño: separa reputaciones. Un problema con el correo automático —un pico de
+rebotes, una queja de spam— no arrastra al correo humano de la fundación, ni al
+contrario.
 
 **Un subdominio dedicado esquiva el problema:** `notificaciones.…` publica su
 propio DKIM y SPF, DMARC se evalúa sobre el dominio del remitente, y pasa —

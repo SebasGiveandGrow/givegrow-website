@@ -17,8 +17,14 @@
  */
 
 var SHEET_ID = "1x9vF3PN1qGCX9h8ffXg_l6_9YILeSu4HLR91l2yJnlg";
-// Notificaciones a Gmail externo: el dominio propio rebota por politica DMARC
-// (error 550 5.7.26). NO cambiar a @thegiveandgrowproject.org sin arreglar DNS.
+// HISTÓRICO: estas notificaciones van a un Gmail externo porque el dominio propio
+// rebotaba por su propia politica DMARC (error 550 5.7.26): el SPF apuntaba a un
+// include que resolvia vacio y no habia DKIM publicado.
+// EL 11 AGO 2026 ESO SE ARREGLO. SPF y DKIM pasan y estan alineados, verificado
+// con un informe de verifier.port25.com. La causa del rebote ya no existe, asi que
+// vale la pena volver a probar con contabilidad@thegiveandgrowproject.org.
+// No se cambia aqui a ciegas: este script vive solo en Google, no esta versionado,
+// y un cambio sin probar dejaria las solicitudes de alianza sin avisar a nadie.
 var NOTIFY_EMAIL = "fundaciongiveandgrow@gmail.com";
 var TAB = "Solicitudes";
 
