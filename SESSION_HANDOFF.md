@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Plan de voluntariado — Fase 7 (medición visible)" (ago 2026)
+> Última actualización: sesión "Ecosistema digital — Fases 0 a 4" (8–11 ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -8,14 +8,91 @@
 - Repo: `SebasGiveandGrow/givegrow-website` rama `main`. Dominio: thegiveandgrowproject.org
 - Deploy vía GitHub Actions. Verificar con la API de Actions tras cada push.
 
-## ⚠️ OJO: hay DOS planes con fases numeradas — no confundirlos
+## ⚠️ OJO: hay TRES planes con fases numeradas — no confundirlos
+
+Si Sebas dice solo "la siguiente fase", **preguntar de cuál de los tres**.
 
 | Plan | Dónde vive | Estado |
 |---|---|---|
-| **Plan VISUAL de 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3** (trazabilidad al frente, Transparencia imprimible, contador por recencia) |
-| **Plan de VOLUNTARIADO de 8 fases** | `PLAN_VOLUNTARIADO.md` | Fases **1–6 en prod, la 7 en PR**. **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
+| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso de la sesión del 8–11 ago 2026 | **Fases 0, 1, 2 y 4 hechas.** Fase 3 a medias: voluntariado ✅, faltan migrar fundaciones y empresas. **Siguiente natural: Fase 5** (recibo y certificado en PDF con `pdf-lib`) |
+| **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3** — y ahora sí es viable: el **contador por recencia** estaba bloqueado por no tener datos reales, y D1 ya los tiene |
+| **VOLUNTARIADO, 8 fases** | `PLAN_VOLUNTARIADO.md` | **Fases 1–7 hechas y en producción.** **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
-Al retomar, **preguntar de qué plan se habla** si se dice solo "la siguiente fase".
+Y aparte, el **Social Fest 2026**: la postulación ya se envió (taller «Si no quedó
+documentado, no ocurrió»). Avisan los seleccionados el **28 de agosto**. Si entra,
+hay que producir los ocho materiales del taller — detalle en la memoria del
+proyecto.
+
+## ⏭️ TAREA QUE SIGUE: reordenar `#donar` (pedida por Sebas el 11 ago 2026)
+
+Textual: *«subir el botón del pago para que esté inmediatamente después de la
+dedicatoria, integrado a la calculadora. La zona "otras formas de ayudar" debería
+ir junta a "otras formas de aportar". Y que sea visible luego de todo esto esa
+zona de Pago seguro, es una muy buena sección.»*
+
+**Objetivo:** `.calc` termina con el botón (calc-out → calc-note → `.pay-now`);
+los chips de `.calc-extra` se juntan con `.pay-tabs` en un solo bloque «Otras
+formas de aportar»; y «Pago seguro» queda al final.
+
+**⚠️ EL RIESGO, y no es corta-y-pega:** los dos bloques **cruzan la frontera
+claro/oscuro** y su CSS asume el fondo donde viven hoy.
+
+| Bloque | Su CSS asume | Al moverlo queda sobre |
+|---|---|---|
+| `.pay-now` | claro (`--surface`, `--ink`, `--ink-soft`, `--mu`) | el panel **oscuro** → texto oscuro sobre oscuro |
+| `.calc-extra` | oscuro (`rgba(255,255,255,…)` en texto, chips y borde) | sección **clara** → blanco sobre papel |
+
+Y `.calc` es oscuro en **los dos temas** (usa `--ink-deep`, no depende de
+`data-theme`), mientras `cream` sí cambia: revisar día **y** noche.
+
+**Además:** `aria-labelledby="pay-heading"` del tablist apunta al h3 «Cómo
+aportar»; si ese h3 se mueve o desaparece, re-apuntarlo. Y hay que unificar
+`pay.other` con `calc.emp.t`/`calc.emp.p` en **ambos idiomas**.
+
+Detalle completo, con números de línea verificados, en el traspaso de esa sesión.
+
+## Cierre de tanda: ecosistema digital, Fases 0 a 4 (8–11 ago 2026)
+
+Nació de una auditoría que Sebas pidió con una frase: que todos los procesos se
+pudieran hacer automáticos desde el sitio. El diagnóstico fue que de once flujos
+solo dos funcionaban solos y **ocho terminaban en él**. Lo que quedó construido:
+
+- **Pago con Wompi de punta a punta** (PRs #50, #51): checkout firmado en el
+  Worker → webhook idempotente como única fuente de verdad → página `/gracias`
+  que dice «estamos confirmando tu pago» porque ningún método de Wompi es
+  sincrónico. La guía `GG-YYYY-NNNNNN` **es** la `reference` de Wompi.
+- **Base privada D1** con datos personales aislados en una sola tabla (#49).
+- **Entorno de pruebas** con su propia base, para no poner producción en sandbox
+  ni contaminar el ledger real (#52).
+- **Correo transaccional** con Resend desde un subdominio propio, en el idioma del
+  donante (#54, #56, #57).
+- **Panel `/admin`** tras Cloudflare Access con verificación real de firma RS256,
+  que **no puede mover estados de pago** a propósito (#55, #59).
+- **Formulario de voluntariado**, que no existía: el botón «Quiero participar»
+  llevaba al formulario de EMPRESAS (#61).
+- **Dominio autenticado**: SPF y DKIM pasan y **alinean** (#60).
+
+### Lo que se encontró de paso, y valía más que la tarea
+- **Se publicaba el repositorio completo**: `/.git/HEAD`, `/.git/config` y
+  `/.git/index` respondían con contenido real. El repo ya es público, así que no
+  se filtró nada confidencial, pero era superficie innecesaria — y era la mayor
+  parte de los 2.874 archivos de cada despliegue (el redespliegue bajó de 95 s a 5).
+- **~700 despliegues fantasma al mes**: el inventario recommiteaba su marca de
+  tiempo. 722 commits en 31 días, los últimos 40 sin un solo cambio de dato.
+- **48 KB de notas internas públicas** (`SESSION_HANDOFF.md` entre ellas).
+- **El FAQ del JSON-LD tenía 8 respuestas desfasadas** que Google leía, una
+  prometiendo «próximamente habilitaremos tarjeta y PSE vía Wompi» con Wompi vivo.
+- **El sitio anunciaba PSE y Nequi** y Wompi solo tiene `CARD` y
+  `BANCOLOMBIA_TRANSFER` habilitados en producción.
+
+### Las dos lecciones que conviene no reaprender
+1. **Las pruebas sintéticas confirman tus propias suposiciones.** La batería de
+   pagos pasaba 10/10 mientras producción rechazaba **todos** los webhooks: la
+   documentación de Wompi pone el `timestamp` dentro de `signature` y el evento
+   real lo trae en la raíz. Contra un tercero, probar **contra el tercero**.
+2. **Idempotencia es «ya lo procesé», no «ya lo vi».** Un evento rechazado por ese
+   bug bloqueaba su propio reintento después del arreglo, dejando el aporte en
+   `intencion` para siempre. Costó un pago real de prueba.
 
 ## Cierre de tanda: plan de VOLUNTARIADO, Fase 7 — medición visible (ago 2026)
 
