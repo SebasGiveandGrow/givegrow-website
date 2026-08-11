@@ -27,7 +27,53 @@ eachTextNode(html, ({ key, openEnd, close, inner }) => {
   edits.push({ openEnd, close, html: escapeHtml(want) });
 });
 
+/* El FAQ del JSON-LD es un duplicado del diccionario que nada mantenía: no lleva
+   atributos data-i18n, así que el hidratador lo ignoraba y se desfasaba en
+   silencio. El 11 ago 2026 tenía OCHO respuestas viejas, una de ellas prometiendo
+   "próximamente habilitaremos tarjeta y PSE vía Wompi" con Wompi ya en vivo — y
+   Google lee ese bloque. Ahora se sincroniza desde el mismo diccionario. */
+let ldSync = 0;
+function sincronizarFaqJsonLd(texto) {
+  return texto.replace(
+    /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g,
+    (todo, cuerpo) => {
+      let d;
+      try { d = JSON.parse(cuerpo); } catch { return todo; }
+      if (d["@type"] !== "FAQPage" || !Array.isArray(d.mainEntity)) return todo;
+
+      /* Se empareja por la PREGUNTA, no por posición: si mañana se reordena el
+         bloque o se añade una pregunta, esto sigue funcionando. */
+      const porPregunta = new Map();
+      for (const k of Object.keys(es)) {
+        const m = k.match(/^faq\.q(\d+)$/);
+        if (m && es["faq.a" + m[1]] != null) porPregunta.set(es[k].trim(), es["faq.a" + m[1]]);
+      }
+      let cambio = false;
+      for (const q of d.mainEntity) {
+        const esperado = porPregunta.get((q.name || "").trim());
+        if (esperado == null) continue;
+        const a = q.acceptedAnswer || (q.acceptedAnswer = { "@type": "Answer", text: "" });
+        if ((a.text || "").trim() !== esperado.trim()) { a.text = esperado; cambio = true; ldSync++; }
+      }
+      return cambio
+        ? '<script type="application/ld+json">' + JSON.stringify(d) + '</script>'
+        : todo;
+    }
+  );
+}
+
 if (!edits.length) {
+  const conLd = sincronizarFaqJsonLd(html);
+  if (ldSync && !check) {
+    writeFileSync("index.html", conLd);
+    console.log(`ok     index.html hidratado: ${ldSync} respuesta(s) del JSON-LD sincronizada(s)`);
+    process.exit(0);
+  }
+  if (ldSync && check) {
+    console.error(`NO OK  JSON-LD del FAQ desfasado: ${ldSync} respuesta(s)`);
+    console.error("       corrige con: node scripts/hydrate-i18n.mjs");
+    process.exit(1);
+  }
   console.log("ok     index.html ya está hidratado");
   process.exit(0);
 }
@@ -44,5 +90,7 @@ for (let i = edits.length - 1; i >= 0; i--) {
   const e = edits[i];
   out = out.slice(0, e.openEnd) + e.html + out.slice(e.close);
 }
+out = sincronizarFaqJsonLd(out);
 writeFileSync("index.html", out);
-console.log(`ok     index.html hidratado: ${filled} vacíos rellenados, ${fixed} desfasados corregidos`);
+console.log(`ok     index.html hidratado: ${filled} vacíos rellenados, ${fixed} desfasados corregidos` +
+            (ldSync ? `, ${ldSync} del JSON-LD sincronizadas` : ""));
