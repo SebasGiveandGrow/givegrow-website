@@ -440,10 +440,30 @@ async function rutaCompartir(env, url, id) {
    Router
    ======================================================================== */
 
+/* El entorno de pruebas vive en un subdominio de workers.dev y es una copia
+   completa del sitio. Sin esto sería contenido duplicado indexable compitiendo
+   con el dominio real, así que se marca noindex en TODA respuesta de ahí.
+   Producción, con su dominio propio, no se ve afectada. */
+function marcarPruebas(respuesta, host) {
+  if (!/\.workers\.dev$/i.test(host)) return respuesta;
+  const r = new Response(respuesta.body, respuesta);
+  r.headers.set("x-robots-tag", "noindex, nofollow");
+  return r;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const ruta = url.pathname;
+    const esPruebas = /\.workers\.dev$/i.test(url.hostname);
+    if (esPruebas) {
+      /* Se responde a través del marcador para no repetirlo en cada rama. */
+      return marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname);
+    }
+    return this.ruteo(request, env, url, ruta);
+  },
+
+  async ruteo(request, env, url, ruta) {
 
     const compartir = ruta.match(/^\/f\/([a-z0-9-]+)\/?$/);
     if (compartir) return rutaCompartir(env, url, compartir[1]);

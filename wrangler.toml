@@ -27,3 +27,45 @@ database_id = "e40b0794-37ab-4461-bf59-53b682095446"
 # producción, que es el error clásico y el más caro.
 [vars]
 WOMPI_PUBLIC_KEY = "pub_prod_sA952OP2Y58ahrZRjHgutdBIr9U0FUr6"
+
+# ===========================================================================
+# ENTORNO DE PRUEBAS
+# ===========================================================================
+# Copia completa del sitio con las llaves de SANDBOX de Wompi y su PROPIA base
+# de datos, en su propio subdominio de workers.dev.
+#
+# Existe para no tener que poner producción en modo prueba, que tenía dos
+# problemas reales: un donante que entrara en esa ventana pagaría en una
+# pasarela de juguete creyendo que donó, y los eventos de sandbox escribirían
+# aportes de prueba en la base de producción — contaminando el ledger de una
+# fundación cuya tesis es la trazabilidad.
+#
+#   Desplegar:   npx wrangler deploy --env sandbox
+#   Secretos:    npx wrangler secret put WOMPI_PRIVATE_KEY --env sandbox
+#                npx wrangler secret put WOMPI_INTEGRITY_SECRET --env sandbox
+#                npx wrangler secret put WOMPI_EVENTS_SECRET --env sandbox
+#
+# En el panel de Wompi, el ambiente SANDBOX debe apuntar sus eventos a
+# <url del worker de sandbox>/api/wompi/eventos — nunca a la URL de producción.
+[env.sandbox]
+workers_dev = true
+
+[env.sandbox.assets]
+directory = "."
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+html_handling = "auto-trailing-slash"
+# `true` y no una lista, a diferencia de producción: aquí TODA petición pasa por
+# el Worker para que pueda marcar noindex. Con la lista, las peticiones a assets
+# (incluida "/") se sirven sin invocar al Worker y la cabecera nunca se añadía —
+# verificado: el header no aparecía. Producción conserva la lista, que es el
+# camino rápido.
+run_worker_first = true
+
+[[env.sandbox.d1_databases]]
+binding = "DB"
+database_name = "givegrow-privado-sandbox"
+database_id = "624d07cc-845c-4b96-83c3-866f9a74c752"
+
+[env.sandbox.vars]
+WOMPI_PUBLIC_KEY = "pub_test_ws2Bo5M1W8mecXqqCWjjzpRjpQAHtlec"

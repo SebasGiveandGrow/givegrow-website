@@ -11,6 +11,15 @@
 # manifest.webmanifest, robots.txt, sitemap.xml, img/, vendor/, docs/, data/,
 # i18n/ y .well-known/.
 
+# El repositorio entero. Verificado el 10 ago 2026: /.git/HEAD, /.git/config y
+# /.git/index respondían con contenido real en producción, así que cualquiera
+# podía reconstruir el repositorio con toda su historia. El repo ya es público en
+# GitHub —así que no se filtraba nada confidencial y ningún secreto se commiteó
+# nunca— pero es superficie innecesaria, y el día que el repo se vuelva privado o
+# alguien commitee algo sensible, deja de ser inofensivo.
+# Además era la mayor parte de los 2.874 archivos de cada despliegue.
+.git
+
 # Código y configuración del despliegue
 worker.js
 wrangler.toml
