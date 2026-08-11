@@ -123,6 +123,9 @@ async function apiCheckout(request, env, url) {
   const proyecto   = cuerpo.proyecto ? String(cuerpo.proyecto).slice(0, 120) : null;
   const nota       = cuerpo.nota ? String(cuerpo.nota).slice(0, 280) : null;
   const certificado = cuerpo.certificado ? 1 : 0;
+  /* Único momento en que sabemos con certeza en qué idioma está el donante.
+     Wompi no lo entrega, así que sin esto el correo saldría siempre en español. */
+  const idioma     = cuerpo.idioma === "en" ? "en" : "es";
 
   if (modo === "dirigida" && !destino) return json({ error: "destino_requerido" }, 400);
 
@@ -139,9 +142,9 @@ async function apiCheckout(request, env, url) {
 
   await env.DB.prepare(
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
-    "frecuencia, quiere_certificado, consent_muro, nota) " +
-    "VALUES (?, 'intencion', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(guia, centavos, moneda, modo, destino, proyecto, frecuencia, certificado, muro, nota).run();
+    "frecuencia, quiere_certificado, consent_muro, nota, idioma) " +
+    "VALUES (?, 'intencion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(guia, centavos, moneda, modo, destino, proyecto, frecuencia, certificado, muro, nota, idioma).run();
 
   /* --- firma de integridad ---
      Orden verificado contra el ejemplo de la documentación:
@@ -279,10 +282,154 @@ async function apiEventos(request, env) {
   return json({ ok: true });
 }
 
+/* ========================================================================
+   Correo transaccional
+   ========================================================================
+   Sale de un SUBDOMINIO propio (notificaciones.…) y no del dominio principal.
+   Dos razones:
+
+   1. El dominio principal tiene el SPF roto (su `include` resuelve vacío), no
+      publica DKIM y su DMARC está en `p=reject`. Con un subdominio autenticado
+      por su cuenta, el correo transaccional pasa aunque el principal siga mal.
+   2. Separa reputaciones: un problema con el correo automático no arrastra al
+      correo humano de la fundación, ni al contrario.
+
+   REGLA DURA: el correo NUNCA puede tumbar el cobro. Si falta la llave, si
+   Resend responde error o si se cae la red, se registra y se sigue. Un donante
+   que pagó tiene que quedar aprobado aunque su correo no salga; lo contrario
+   —perder el pago por un fallo de correo— es indefendible.
+   ======================================================================== */
+
+const CORREO_DESDE_DEF = "Give&Grow International <no-responder@notificaciones.thegiveandgrowproject.org>";
+
+async function enviarCorreo(env, { para, asunto, texto, html, etiqueta }) {
+  const llave = env.RESEND_API_KEY;
+  const desde = env.CORREO_DESDE || CORREO_DESDE_DEF;
+
+  /* Sin credencial no se falla: se simula y se deja constancia. Así la capa de
+     correo se puede construir y probar antes de que exista la cuenta. */
+  if (!llave) {
+    console.log("correo simulado", etiqueta || "", "->", para, "|", asunto);
+    return { ok: true, simulado: true };
+  }
+
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: "Bearer " + llave, "content-type": "application/json" },
+      body: JSON.stringify({ from: desde, to: [para], subject: asunto, text: texto, html })
+    });
+    if (!r.ok) {
+      console.error("correo falló", etiqueta || "", r.status, (await r.text()).slice(0, 300));
+      return { ok: false, http: r.status };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("correo excepción", etiqueta || "", e && e.message);
+    return { ok: false, error: String(e && e.message) };
+  }
+}
+
+function fmtPesos(centavos) {
+  const pesos = Math.round(Number(centavos || 0) / 100);
+  return "$" + pesos.toLocaleString("es-CO");
+}
+
+/* Envoltura sobria, sin imágenes ni columnas: un correo institucional que se lee
+   igual en cualquier cliente y no se rompe si se bloquean las imágenes. */
+function plantillaCorreo({ titulo, parrafos, filas, cierre }) {
+  const p = (parrafos || []).map((x) =>
+    `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3A3F45">${esc(x)}</p>`).join("");
+  const f = (filas || []).map(([k, v]) =>
+    `<tr><td style="padding:9px 0;border-bottom:1px solid #DAD3C3;font-size:14px;color:#5C636F">${esc(k)}</td>` +
+    `<td style="padding:9px 0;border-bottom:1px solid #DAD3C3;font-size:14px;font-weight:600;color:#1A1D21;text-align:right">${esc(v)}</td></tr>`
+  ).join("");
+  return `<!doctype html><html><body style="margin:0;padding:24px;background:#F3EFE6">
+<table role="presentation" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#FBF8F1;border:1px solid #DAD3C3;border-radius:14px">
+<tr><td style="padding:28px 30px">
+<div style="font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#1F5C38;margin-bottom:10px">Give&amp;Grow International</div>
+<h1 style="margin:0 0 16px;font-size:22px;line-height:1.25;color:#1A1D21">${esc(titulo)}</h1>
+${p}
+${f ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:18px 0">${f}</table>` : ""}
+${cierre ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.55;color:#5C636F">${esc(cierre)}</p>` : ""}
+<p style="margin:22px 0 0;font-size:12px;color:#5C636F">Fundación Give&amp;Grow International · NIT 901.948.930-2 · Medellín, Colombia</p>
+</td></tr></table></body></html>`;
+}
+
+/* Confirmación al donante: lo único que de verdad necesita conservar es su
+   número de guía, así que el correo existe sobre todo para dárselo por escrito.
+   Antes de esto, quien cerraba la página de gracias lo perdía. */
+async function correoAporteAprobado(env, aporte, email, nombre) {
+  if (!email) return { ok: true, sinCorreo: true };
+  const en = aporte.idioma === "en";
+  const guia = aporte.guia;
+  const enlace = ORIGIN + "/#rastrea";
+  const monto = fmtPesos(aporte.monto_centavos) + " COP";
+
+  const asunto = en
+    ? `Your gift is confirmed · ${guia}`
+    : `Tu aporte quedó confirmado · ${guia}`;
+
+  const titulo = en ? "Confirmado. Gracias." : "Confirmado. Gracias.";
+  const parrafos = en ? [
+    "Your payment was confirmed and your gift is now recorded with its own tracking number.",
+    "Keep that number: with it you can follow your gift from start to finish, and the delivery record will appear there once the partner foundation delivers.",
+    "The work on the ground belongs to the partner foundation. We amplify it, record it and report it."
+  ] : [
+    "Tu pago quedó confirmado y tu aporte está registrado con su propio número de guía.",
+    "Guarda ese número: con él puedes seguir tu aporte de principio a fin, y ahí aparecerá el acta cuando la fundación aliada haga la entrega.",
+    "El trabajo en territorio es de la fundación aliada. Nosotros lo amplificamos, lo registramos y lo reportamos."
+  ];
+  const filas = en
+    ? [["Tracking number", guia], ["Amount", monto], ["Follow it at", enlace]]
+    : [["Número de guía", guia], ["Monto", monto], ["Sígelo en", enlace]];
+
+  const cierre = en
+    ? "This message is automatic. If you asked for a donation certificate, we will send it separately once it is reviewed."
+    : "Este mensaje es automático. Si pediste certificado de donación, te lo enviamos aparte cuando quede revisado.";
+
+  return enviarCorreo(env, {
+    para: email,
+    asunto,
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", cierre].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, cierre }),
+    etiqueta: "aporte-aprobado"
+  });
+}
+
+/* Aviso interno. Va a un buzón que hoy sí recibe (Gmail), porque el dominio
+   principal rebota por su propio DMARC — ver ops/aliados-formulario.gs. */
+async function correoAvisoInterno(env, aporte, email, nombre) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const titulo = "Nuevo aporte confirmado: " + aporte.guia;
+  const filas = [
+    ["Guía", aporte.guia],
+    ["Monto", fmtPesos(aporte.monto_centavos) + " COP"],
+    ["Destino", aporte.modo === "dirigida" ? (aporte.destino_id || "?") : "Fondo general"],
+    ["Frecuencia", aporte.frecuencia],
+    ["Certificado", aporte.quiere_certificado ? "SÍ lo pidió" : "no"],
+    ["Donante", nombre || "(sin nombre)"],
+    ["Correo", email || "(sin correo)"]
+  ];
+  return enviarCorreo(env, {
+    para,
+    asunto: titulo,
+    texto: filas.map(([k, v]) => k + ": " + v).join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: ["Aviso automático del sitio. El aporte ya quedó aprobado en la base."],
+      filas
+    }),
+    etiqueta: "aviso-interno"
+  });
+}
+
 /* Traduce el estado de Wompi al del aporte y detecta manipulación del monto. */
 async function aplicarEstado(env, guia, tx, estado) {
   const fila = await env.DB.prepare(
-    "SELECT guia, monto_centavos, estado FROM aportes WHERE guia = ?"
+    "SELECT guia, monto_centavos, estado, idioma, modo, destino_id, frecuencia, " +
+    "quiere_certificado, aprobada_en FROM aportes WHERE guia = ?"
   ).bind(guia).first();
 
   /* Referencia que no conocemos: se queda en la bitácora y no se inventa nada. */
@@ -321,6 +468,36 @@ async function aplicarEstado(env, guia, tx, estado) {
     nuevo, estado, String(tx.id || ""), tx.payment_method_type ? String(tx.payment_method_type) : null,
     donanteId, nuevo, guia
   ).run();
+
+  /* Correo solo al aprobar, y solo la PRIMERA vez. `aprobada_en` es el candado:
+     si ya tenía fecha de aprobación, este webhook es un reintento o un evento
+     tardío y el donante ya recibió su guía. Sin ese candado, los tres reintentos
+     de Wompi se convertirían en tres correos idénticos.
+
+     Va envuelto en try/catch porque el correo NO puede tumbar el cobro: si algo
+     falla aquí, el aporte ya quedó aprobado arriba y eso es lo que importa. El
+     fallo queda en el log del Worker. */
+  if (nuevo === "aprobada" && !fila.aprobada_en) {
+    try {
+      const d = await env.DB.prepare(
+        "SELECT d.email AS email, d.nombre AS nombre FROM aportes a " +
+        "LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?"
+      ).bind(guia).first();
+      const datos = {
+        guia,
+        monto_centavos: fila.monto_centavos,
+        idioma: fila.idioma,
+        modo: fila.modo,
+        destino_id: fila.destino_id,
+        frecuencia: fila.frecuencia,
+        quiere_certificado: fila.quiere_certificado
+      };
+      await correoAporteAprobado(env, datos, d && d.email, d && d.nombre);
+      await correoAvisoInterno(env, datos, d && d.email, d && d.nombre);
+    } catch (e) {
+      console.error("correo tras aprobar", guia, e && e.message);
+    }
+  }
 }
 
 /* Los datos personales entran SOLO aquí (Ley 1581). Nunca el medio de pago:

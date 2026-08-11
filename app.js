@@ -1369,7 +1369,8 @@ function irAPagar(){
     modo: calc.partnerId ? "dirigida" : "fondo",
     destino: calc.partnerId || null,
     proyecto: (calc.projectId && calc.projectId !== "general") ? calc.projectId : null,
-    nota: calc.note || null
+    nota: calc.note || null,
+    idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
   };
 
   fetch("/api/checkout", {

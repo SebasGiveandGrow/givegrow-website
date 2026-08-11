@@ -95,10 +95,12 @@ def aporte(guia):
         return {"http": e.code}
 
 
-def crear(monto, modo="fondo", destino=None):
+def crear(monto, modo="fondo", destino=None, extra=None):
     payload = {"monto": monto, "frecuencia": "unico", "modo": modo}
     if destino:
         payload["destino"] = destino
+    if extra:
+        payload.update(extra)
     req = urllib.request.Request(BASE + "/api/checkout", data=json.dumps(payload).encode(),
                                  headers=CABECERAS, method="POST")
     with urllib.request.urlopen(req, timeout=20) as r:
@@ -205,6 +207,34 @@ todo.append(linea("un evento rechazado no bloquea su reintento",
 st_otra, rb12 = enviar(evento(tx11, "APPROVED", 6000000, g11))
 todo.append(linea("ya procesado: ahora sí es repetido",
                   st_otra == 200 and rb12.get("repetido") is True, f"respuesta={rb12}"))
+
+# ---- 13. el idioma viaja del sitio al aporte ---------------------------
+g13 = crear(70000, extra={"idioma": "en"})
+enviar(evento("tx-idioma-" + RUN, "APPROVED", 7000000, g13))
+# El idioma no se expone en la consulta pública (no le sirve a nadie de fuera),
+# así que se comprueba que el aporte quedó aprobado y el idioma se verifica en la
+# base. Aquí basta con que el checkout lo aceptara sin romperse.
+todo.append(linea("checkout acepta idioma en", aporte(g13).get("estado") == "aprobada",
+                  f"estado={aporte(g13).get('estado')}"))
+
+# ---- 14. el correo NO puede tumbar el cobro ----------------------------
+# Sin RESEND_API_KEY el envío se simula. El aporte debe quedar aprobado igual:
+# es la garantía de que un fallo de correo nunca pierde un pago confirmado.
+g14 = crear(80000)
+st14, _ = enviar(evento("tx-sin-correo-" + RUN, "APPROVED", 8000000, g14))
+todo.append(linea("sin credencial de correo, el cobro se aprueba igual",
+                  st14 == 200 and aporte(g14).get("estado") == "aprobada",
+                  f"http={st14} estado={aporte(g14).get('estado')}"))
+
+# ---- 15. un reintento no reenvía el correo -----------------------------
+# El candado es aportes.aprobada_en. Se comprueba de forma observable: el
+# reintento debe responder repetido y NO cambiar aprobada_en.
+a15_antes = aporte(g14).get("aprobada_en")
+st15, rb15 = enviar(evento("tx-sin-correo-" + RUN, "APPROVED", 8000000, g14))
+a15_despues = aporte(g14).get("aprobada_en")
+todo.append(linea("reintento: repetido y sin reenviar",
+                  rb15.get("repetido") is True and a15_antes == a15_despues,
+                  f"repetido={rb15.get('repetido')} aprobada_en igual={a15_antes == a15_despues}"))
 
 print()
 print(f"  {sum(todo)}/{len(todo)} pruebas en verde")
