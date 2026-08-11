@@ -986,6 +986,24 @@ export default {
     if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/")) {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
+      /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
+         Cloudflare Access limita cuántos hostnames puede cubrir una aplicación
+         (se alcanzó el máximo con cuatro entradas). La aplicación quedó sobre el
+         ápex, así que una petición al panel por `www` llegaría aquí SIN pasar por
+         Access: la salvaría el fail-closed, pero el panel no funcionaría.
+
+         Se resuelve donde no cuesta un slot: el panel canoniza al ápex. No es un
+         atajo de seguridad —quien llegue por www sigue sin token y sería
+         rechazado igual—, es que el enlace correcto lleve al sitio correcto.
+
+         Solo aplica a las rutas del panel, y nunca cuando el host ya es el ápex,
+         para no crear un bucle. */
+      if (/^www\./i.test(url.hostname)) {
+        const destino = new URL(url.toString());
+        destino.hostname = url.hostname.replace(/^www\./i, "");
+        return Response.redirect(destino.toString(), 302);
+      }
+
       const sesion = await verificarAccess(request, env);
       if (!sesion.ok) {
         /* Sin Access configurado no se sirve nada: 503 y una explicación, no un
