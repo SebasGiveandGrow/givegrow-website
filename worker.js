@@ -79,6 +79,99 @@ function ambienteWompi(pub) {
 }
 
 /* ========================================================================
+   Autenticación del panel: JWT de Cloudflare Access
+   ========================================================================
+   El panel muestra datos personales de donantes (nombre, correo, documento),
+   así que aquí NO se improvisa autenticación.
+
+   Y no basta con comprobar que la cabecera `Cf-Access-Jwt-Assertion` exista:
+   si Access no estuviera configurado delante del Worker, cualquiera podría
+   mandarla a mano y entrar. Hay que VERIFICAR la firma contra las llaves
+   públicas del equipo y comprobar el `aud` de la aplicación.
+
+   Fail-closed: sin ACCESS_TEAM_DOMAIN y ACCESS_AUD configurados, el panel
+   responde 503 y no sirve un solo dato.
+   ======================================================================== */
+
+let ACCESS_CERTS = { hasta: 0, llaves: null };
+
+function b64urlABytes(s) {
+  const b64 = String(s).replace(/-/g, "+").replace(/_/g, "/");
+  const pad = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+  const bin = atob(pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function b64urlAJson(s) {
+  return JSON.parse(new TextDecoder().decode(b64urlABytes(s)));
+}
+
+async function llavesAccess(team) {
+  const ahora = Date.now();
+  if (ACCESS_CERTS.llaves && ACCESS_CERTS.hasta > ahora) return ACCESS_CERTS.llaves;
+  const r = await fetch("https://" + team + "/cdn-cgi/access/certs");
+  if (!r.ok) throw new Error("certs de Access no disponibles: " + r.status);
+  const j = await r.json();
+  ACCESS_CERTS = { llaves: j.keys || [], hasta: ahora + 60 * 60 * 1000 };  // 1 h
+  return ACCESS_CERTS.llaves;
+}
+
+async function verificarAccess(request, env) {
+  const team = env.ACCESS_TEAM_DOMAIN;
+  const aud = env.ACCESS_AUD;
+  if (!team || !aud) return { ok: false, motivo: "no_configurado" };
+
+  /* Access manda el JWT en la cabecera y, en navegación normal, también en la
+     cookie CF_Authorization. Se acepta cualquiera de las dos. */
+  let jwt = request.headers.get("cf-access-jwt-assertion");
+  if (!jwt) {
+    const cookies = request.headers.get("cookie") || "";
+    const m = cookies.match(/(?:^|;\s*)CF_Authorization=([^;]+)/);
+    if (m) jwt = m[1];
+  }
+  if (!jwt) return { ok: false, motivo: "sin_token" };
+
+  const partes = jwt.split(".");
+  if (partes.length !== 3) return { ok: false, motivo: "token_malformado" };
+
+  let cabecera, carga;
+  try {
+    cabecera = b64urlAJson(partes[0]);
+    carga = b64urlAJson(partes[1]);
+  } catch { return { ok: false, motivo: "token_ilegible" }; }
+
+  try {
+    const llaves = await llavesAccess(team);
+    const jwk = llaves.find((k) => k.kid === cabecera.kid);
+    if (!jwk) return { ok: false, motivo: "kid_desconocido" };
+
+    const llave = await crypto.subtle.importKey(
+      "jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]
+    );
+    const firmado = new TextEncoder().encode(partes[0] + "." + partes[1]);
+    const valida = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5", llave, b64urlABytes(partes[2]), firmado
+    );
+    if (!valida) return { ok: false, motivo: "firma_invalida" };
+  } catch (e) {
+    return { ok: false, motivo: "error_verificando" };
+  }
+
+  /* Comprobaciones de contenido: sin estas, un token válido de OTRA aplicación
+     de Access del mismo equipo serviría para entrar aquí. */
+  const auds = Array.isArray(carga.aud) ? carga.aud : [carga.aud];
+  if (!auds.includes(aud)) return { ok: false, motivo: "aud_no_coincide" };
+  if (carga.iss !== "https://" + team) return { ok: false, motivo: "emisor_no_coincide" };
+  const ahora = Math.floor(Date.now() / 1000);
+  if (carga.exp && carga.exp < ahora) return { ok: false, motivo: "token_expirado" };
+  if (carga.nbf && carga.nbf > ahora + 60) return { ok: false, motivo: "token_futuro" };
+
+  return { ok: true, email: carga.email || carga.sub || "?" };
+}
+
+/* ========================================================================
    Guías: GG-YYYY-NNNNNN
    El mismo número es la `reference` de Wompi. Un solo número, una sola verdad.
    INSERT ... ON CONFLICT DO UPDATE ... RETURNING es atómico en D1, así que dos
@@ -594,6 +687,202 @@ async function apiGracias(env, url) {
 }
 
 /* ========================================================================
+   PANEL /admin
+   ========================================================================
+   Para dejar de operar desde el correo: ver los aportes, su estado y quién
+   pidió certificado, y mover el ciclo en terreno.
+
+   La página y su JS los sirve el WORKER, no los assets, por dos razones: quedan
+   detrás de Access, y así el JS del panel no vive en el bundle público.
+   ======================================================================== */
+
+async function adminResumen(env) {
+  const porEstado = await env.DB.prepare(
+    "SELECT estado, COUNT(*) AS n, COALESCE(SUM(monto_centavos),0) AS centavos " +
+    "FROM aportes GROUP BY estado"
+  ).all();
+  const cert = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM aportes WHERE quiere_certificado = 1 AND estado = 'aprobada'"
+  ).first();
+  const recurrentes = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM aportes WHERE frecuencia <> 'unico' AND estado = 'aprobada'"
+  ).first();
+  const inscripciones = await env.DB.prepare(
+    "SELECT tipo, COUNT(*) AS n FROM inscripciones WHERE estado = 'nueva' GROUP BY tipo"
+  ).all();
+  return json({
+    por_estado: porEstado.results || [],
+    certificados_pendientes: cert ? cert.n : 0,
+    esperando_recurrencia: recurrentes ? recurrentes.n : 0,
+    inscripciones_nuevas: inscripciones.results || []
+  });
+}
+
+async function adminAportes(env, url) {
+  const estado = url.searchParams.get("estado");
+  const limite = Math.min(Math.max(Number(url.searchParams.get("limite")) || 50, 1), 200);
+  const where = estado ? " WHERE a.estado = ?" : "";
+  const sql =
+    "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.frecuencia, " +
+    "a.quiere_certificado, a.consent_muro, a.idioma, a.nota, a.metodo_pago, a.creada_en, " +
+    "a.aprobada_en, a.entregada_en, d.nombre AS donante, d.email AS correo " +
+    "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + where +
+    " ORDER BY a.creada_en DESC LIMIT " + limite;
+  const q = estado ? env.DB.prepare(sql).bind(estado) : env.DB.prepare(sql);
+  const r = await q.all();
+  return json({ aportes: r.results || [] });
+}
+
+/* Solo se permiten los dos pasos que ocurren en terreno. Los estados de pago los
+   mueve el webhook y nadie más: si el panel pudiera marcar "aprobada" a mano, la
+   trazabilidad dejaría de significar algo. */
+const ESTADOS_MANUALES = ["en_distribucion", "entregada"];
+
+async function adminMoverEstado(request, env, guia, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let cuerpo;
+  try { cuerpo = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const nuevo = String(cuerpo.estado || "");
+  if (!ESTADOS_MANUALES.includes(nuevo)) {
+    return json({ error: "estado_no_permitido", permitidos: ESTADOS_MANUALES }, 400);
+  }
+
+  const fila = await env.DB.prepare("SELECT guia, estado FROM aportes WHERE guia = ?").bind(guia).first();
+  if (!fila) return json({ error: "no_encontrada" }, 404);
+
+  /* Un aporte que no llegó a aprobarse no puede pasar a distribución: sería
+     mover en terreno algo que nadie pagó. */
+  if (!["aprobada", "en_distribucion", "entregada"].includes(fila.estado)) {
+    return json({ error: "aporte_no_aprobado", estado: fila.estado }, 409);
+  }
+
+  await env.DB.prepare(
+    "UPDATE aportes SET estado = ?, entregada_en = CASE WHEN ? = 'entregada' THEN datetime('now') ELSE entregada_en END, " +
+    "actualizada_en = datetime('now') WHERE guia = ?"
+  ).bind(nuevo, nuevo, guia).run();
+
+  /* Queda rastro de quién lo movió: el panel es de una sola persona hoy, pero el
+     día que sean dos, "quién marcó esta entrega" es la primera pregunta. */
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "aporte " + guia + ": " + fila.estado + " -> " + nuevo).run();
+
+  return json({ ok: true, guia, estado: nuevo });
+}
+
+function paginaAdmin() {
+  return `<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel · Give&Grow</title>
+<link rel="stylesheet" href="/styles.css">
+</head><body>
+<main class="page active"><section><div class="wrap">
+<span class="ey">Interno</span>
+<h1 class="h-sec" style="margin-bottom:6px">Panel de aportes</h1>
+<p class="lead" id="quien" style="margin-bottom:26px">Cargando…</p>
+
+<div id="resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:26px"></div>
+
+<div class="pay-tabs" role="group" aria-label="Filtrar por estado" style="margin-bottom:18px">
+  <button type="button" class="pay-tab on" data-estado="">Todos</button>
+  <button type="button" class="pay-tab" data-estado="aprobada">Aprobados</button>
+  <button type="button" class="pay-tab" data-estado="intencion">Sin pagar</button>
+  <button type="button" class="pay-tab" data-estado="en_distribucion">En distribución</button>
+  <button type="button" class="pay-tab" data-estado="entregada">Entregados</button>
+</div>
+
+<div class="med-tw"><table class="med-tbl" id="tabla">
+<thead><tr>
+<th scope="col">Guía</th><th scope="col">Estado</th><th scope="col">Monto</th>
+<th scope="col">Destino</th><th scope="col">Donante</th><th scope="col">Cert.</th>
+<th scope="col">Creada</th><th scope="col">Acción</th>
+</tr></thead><tbody id="filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
+</table></div>
+
+<p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
+</div></section></main>
+<script src="/admin.js"></script>
+</body></html>`;
+}
+
+function adminJS() {
+  return `"use strict";
+var FILTRO = "";
+function pesos(c){ return "$" + Math.round((c||0)/100).toLocaleString("es-CO"); }
+function esc(s){ var d=document.createElement("div"); d.textContent = s==null?"":String(s); return d.innerHTML; }
+
+function pintarResumen(d){
+  var box = document.getElementById("resumen");
+  var chips = [];
+  (d.por_estado||[]).forEach(function(x){
+    chips.push('<span class="eco-chip">' + esc(x.estado) + ': ' + x.n + ' · ' + pesos(x.centavos) + '</span>');
+  });
+  if (d.certificados_pendientes) chips.push('<span class="eco-chip">certificados por emitir: ' + d.certificados_pendientes + '</span>');
+  if (d.esperando_recurrencia) chips.push('<span class="eco-chip">esperan débito automático: ' + d.esperando_recurrencia + '</span>');
+  (d.inscripciones_nuevas||[]).forEach(function(x){
+    chips.push('<span class="eco-chip">' + esc(x.tipo) + ' por revisar: ' + x.n + '</span>');
+  });
+  box.innerHTML = chips.join("") || '<span class="eco-chip">sin datos todavía</span>';
+}
+
+function accion(a){
+  if (a.estado === "aprobada") return '<button class="copy" data-guia="' + esc(a.guia) + '" data-a="en_distribucion">A distribución</button>';
+  if (a.estado === "en_distribucion") return '<button class="copy" data-guia="' + esc(a.guia) + '" data-a="entregada">Marcar entregada</button>';
+  return "";
+}
+
+function pintarFilas(l){
+  var tb = document.getElementById("filas");
+  if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Nada con ese filtro.</td></tr>'; return; }
+  tb.innerHTML = l.map(function(a){
+    return "<tr>" +
+      "<td>" + esc(a.guia) + "</td>" +
+      "<td>" + esc(a.estado) + "</td>" +
+      "<td>" + pesos(a.monto_centavos) + "</td>" +
+      "<td>" + esc(a.modo === "dirigida" ? (a.destino_id||"?") : "Fondo general") + "</td>" +
+      "<td>" + esc(a.donante || "—") + (a.correo ? "<br><small>" + esc(a.correo) + "</small>" : "") + "</td>" +
+      "<td>" + (a.quiere_certificado ? "sí" : "—") + "</td>" +
+      "<td>" + esc((a.creada_en||"").slice(0,16)) + "</td>" +
+      "<td>" + accion(a) + "</td>" +
+    "</tr>";
+  }).join("");
+}
+
+function cargar(){
+  fetch("/api/admin/resumen").then(function(r){ return r.json(); }).then(pintarResumen);
+  fetch("/api/admin/aportes?limite=100" + (FILTRO ? "&estado=" + encodeURIComponent(FILTRO) : ""))
+    .then(function(r){ return r.json(); })
+    .then(function(d){ pintarFilas(d.aportes || []); });
+}
+
+document.addEventListener("click", function(e){
+  var t = e.target.closest("[data-estado]");
+  if (t){
+    document.querySelectorAll(".pay-tab").forEach(function(b){ b.classList.remove("on"); });
+    t.classList.add("on"); FILTRO = t.getAttribute("data-estado"); cargar(); return;
+  }
+  var b = e.target.closest("[data-guia]");
+  if (b){
+    b.disabled = true; b.textContent = "…";
+    fetch("/api/admin/aporte/" + encodeURIComponent(b.getAttribute("data-guia")) + "/estado", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ estado: b.getAttribute("data-a") })
+    }).then(function(r){ return r.json(); }).then(function(){ cargar(); })
+      .catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
+  }
+});
+
+fetch("/api/admin/quien").then(function(r){ return r.json(); })
+  .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
+  .catch(function(){});
+cargar();
+`;
+}
+
+/* ========================================================================
    /f/<id> — página de compartir (sin cambios de comportamiento)
    ======================================================================== */
 
@@ -684,6 +973,57 @@ export default {
 
     const compartir = ruta.match(/^\/f\/([a-z0-9-]+)\/?$/);
     if (compartir) return rutaCompartir(env, url, compartir[1]);
+
+    /* --- Panel interno: TODO detrás de Access, y fail-closed --- */
+    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/")) {
+      if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+      const sesion = await verificarAccess(request, env);
+      if (!sesion.ok) {
+        /* Sin Access configurado no se sirve nada: 503 y una explicación, no un
+           panel abierto. Con Access configurado pero token inválido, 403. */
+        const noConfig = sesion.motivo === "no_configurado";
+        const cuerpo = {
+          error: noConfig ? "panel_no_configurado" : "no_autorizado",
+          motivo: sesion.motivo,
+          ayuda: noConfig ? "Falta configurar Cloudflare Access — ver ops/panel-admin.md" : undefined
+        };
+        if (ruta === "/admin") {
+          return new Response(
+            "<!doctype html><meta charset=utf-8><title>Panel</title>" +
+            "<body style='font-family:system-ui;max-width:34em;margin:12vh auto;padding:0 1.5em;line-height:1.6'>" +
+            "<h1 style='font-size:1.3em'>" + (noConfig ? "El panel todavía no está configurado" : "No autorizado") + "</h1>" +
+            "<p>" + (noConfig
+              ? "Falta crear la aplicación de Cloudflare Access que protege esta ruta. Instrucciones en <code>ops/panel-admin.md</code>."
+              : "Tu sesión no es válida para esta aplicación (" + esc(sesion.motivo) + ").") + "</p>",
+            { status: noConfig ? 503 : 403, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } }
+          );
+        }
+        return json(cuerpo, noConfig ? 503 : 403);
+      }
+
+      try {
+        if (ruta === "/admin") {
+          return new Response(paginaAdmin(), {
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
+          });
+        }
+        if (ruta === "/admin.js") {
+          return new Response(adminJS(), {
+            headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
+          });
+        }
+        if (ruta === "/api/admin/quien")    return json({ email: sesion.email });
+        if (ruta === "/api/admin/resumen")  return await adminResumen(env);
+        if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
+        const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
+        if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
+        return json({ error: "no_encontrado" }, 404);
+      } catch (e) {
+        console.error("admin", ruta, e && e.message);
+        return json({ error: "error_interno" }, 500);
+      }
+    }
 
     if (ruta.startsWith("/api/")) {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
