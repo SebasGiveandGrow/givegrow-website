@@ -236,6 +236,48 @@ todo.append(linea("reintento: repetido y sin reenviar",
                   rb15.get("repetido") is True and a15_antes == a15_despues,
                   f"repetido={rb15.get('repetido')} aprobada_en igual={a15_antes == a15_despues}"))
 
+# ---- 16. guardián de reversas: un contracargo marca el certificado ------
+# El escenario que cierra la Fase 5.1: el donante paga, se le emite el
+# certificado, y después reversa. El certificado no puede quedarse vigente
+# respaldando un descuento del 25% sobre plata devuelta.
+#
+# El certificado se inserta directo en D1 porque emitirlo pasa por /admin, que
+# está tras Cloudflare Access y no se puede atravesar desde aquí. Lo que esta
+# prueba ejercita es el GUARDIÁN, que sí vive en el camino del webhook.
+import subprocess
+
+def d1(sql):
+    return subprocess.run(
+        ["npx", "wrangler@latest", "d1", "execute", "givegrow-privado", "--local",
+         "--persist-to", "/tmp/gg-wrangler", "--command", sql],
+        capture_output=True, text=True).stdout
+
+g16 = crear(90000)
+enviar(evento("tx-reversa-" + RUN, "APPROVED", 9000000, g16))
+num16 = "CD-TEST-" + RUN[-6:]
+d1(f"INSERT INTO certificados (numero,guia,datos,emitido_por) "
+   f"VALUES ('{num16}','{g16}','{{}}','prueba@local');")
+antes = '"revision_en": null' in d1(f"SELECT revision_en FROM certificados WHERE numero='{num16}';")
+
+# La reversa llega DESPUÉS de aprobar, con el mismo id de transacción.
+st16, _ = enviar(evento("tx-reversa-" + RUN, "VOIDED", 9000000, g16))
+despues = d1(f"SELECT revision_en, revision_motivo FROM certificados WHERE numero='{num16}';")
+marcado = '"revision_en": null' not in despues and "VOIDED" in despues
+
+todo.append(linea("reversa tras emitir: el certificado queda EN REVISIÓN",
+                  antes and marcado, f"http={st16} sano_antes={antes} marcado={marcado}"))
+
+# ---- 17. el guardián no repite el aviso --------------------------------
+# Wompi reintenta sus eventos hasta cuatro veces; tres correos idénticos
+# entrenan a ignorarlos. La marca se pone una vez y la fecha no se mueve.
+fecha_1 = d1(f"SELECT revision_en FROM certificados WHERE numero='{num16}';")
+enviar(evento("tx-reversa2-" + RUN, "VOIDED", 9000000, g16))
+fecha_2 = d1(f"SELECT revision_en FROM certificados WHERE numero='{num16}';")
+todo.append(linea("reintento de la reversa: no vuelve a marcar ni a avisar",
+                  fecha_1 == fecha_2, "fecha de revisión sin cambios" if fecha_1 == fecha_2 else "cambió"))
+
+d1(f"DELETE FROM certificados WHERE numero='{num16}';")
+
 print()
 print(f"  {sum(todo)}/{len(todo)} pruebas en verde")
 sys.exit(0 if all(todo) else 1)

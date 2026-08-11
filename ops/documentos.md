@@ -66,6 +66,46 @@ conserva el hueco a propósito — un número que desaparece es peor que un núm
 anulado. Reexpedir exige anular primero (índice único sobre `guia` donde
 `anulado_en IS NULL`).
 
+## Integridad: los tres huecos que cierra la Fase 5.1
+
+**1 · Reversa después de emitir.** El donante paga, recibe el certificado, y
+después hace un contracargo. Wompi manda `VOIDED`, el aporte pasa a `rechazada`
+— y el certificado seguía vigente respaldando un descuento del 25% sobre plata
+devuelta. Ahora un guardián en el camino del webhook marca el certificado
+`revision_en`, sella el PDF y avisa a `CORREO_AVISOS`.
+
+El guardián corre **antes** del corte que impide que un aporte `entregada`
+retroceda de estado, y esa posición es el punto: el caso más grave —plata
+devuelta después de entregar— era justo el que el corte se saltaba.
+
+El sistema **no anula**: anular lleva motivo y es un acto humano. Marca y avisa.
+`revision_*` es automático y reversible; `anulado_*` es humano y definitivo. Por
+eso no comparten columna.
+
+**2 · Certificado a nombre de otro.** El formulario deja corregir nombre y
+documento, y tiene que dejarlo. Pero esa libertad permite donar como persona y
+emitir el certificado a nombre de la empresa, para que la empresa tome el
+descuento: eso es fraude tributario y desde el formulario se ve igual que un
+error de digitación. Ahora se guarda en `wompi_identidad` lo que validó la
+pasarela, se registra la `divergencia`, y **se exige motivo** (`422
+divergencia_sin_motivo`). No se prohíbe corregir: se deja rastro. Un error de
+digitación se explica en una línea.
+
+**3 · Un anulado se descargaba limpio.** El snapshot congela el CONTENIDO, no el
+ESTADO. `adminCertificadoPdf` ahora le añade el estado encima al armarlo, y el
+PDF sale con sello diagonal y una línea que dice desde cuándo y por qué. El
+papel viaja solo: quien lo tenga en la mano debe poder saber que ya no vale.
+
+### Lo que NO cierra ninguna de las dos fases
+
+**La contraprestación.** El numeral 6 declara «acto de mera liberalidad… sin
+contraprestación alguna, directa ni indirecta». Pero la membresía Tier 2 ofrece
+«Acceso al Programa de Gratitud», que son beneficios reales de comercios
+aliados. Si el donante recibe algo a cambio, esa declaración puede ser falsa —
+y la firma la Revisora Fiscal bajo juramento. **Esto no lo arregla código.**
+Consultar con la contadora antes de emitirle un certificado a cualquier miembro
+con beneficios.
+
 ## Antes de desplegar: la migración va PRIMERO
 
 `migrations/0003_documentos.sql` añade la columna `aportes.token`, y
@@ -76,6 +116,14 @@ migración, el checkout falla y se caen las donaciones.**
 npx wrangler d1 migrations apply givegrow-privado --remote
 npx wrangler d1 migrations apply givegrow-privado-sandbox --env sandbox --remote
 ```
+
+**Esto ya se saltó una vez, el 11 ago 2026.** La 0003 no llegó a producción
+—probablemente un `apply` sin `--remote`, que va a una base local— y el código
+salió igual: `/api/checkout` fallaba al insertar `token` y **nadie pudo donar**
+hasta que se aplicó a mano. Desde entonces `deploy.yml` corre
+`wrangler d1 migrations list --remote` y **se niega a desplegar** si hay
+pendientes. Un paso manual que tumba el cobro no es un paso manual: es un
+incidente que todavía no ocurrió.
 
 Ojo: `0002_idioma.sql` inserta su propia fila en `d1_migrations`, cosa que
 `wrangler d1 migrations apply` también hace, así que ese comando falla sobre una

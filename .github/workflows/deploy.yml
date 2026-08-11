@@ -94,6 +94,31 @@ jobs:
       - name: Install Wrangler
         run: npm install -g wrangler@latest
 
+      # El 11 ago 2026 el código llegó a producción sin su migración: la 0003
+      # añadía `aportes.token` y `/api/checkout` ya la escribía, así que durante
+      # unos minutos NADIE PUDO DONAR y los webhooks de pagos en curso fallaron.
+      # El paso manual estaba escrito en el PR y aun así se perdió — un paso
+      # manual que tumba el cobro no es un paso manual, es un incidente que
+      # todavía no ocurrió. Aquí el despliegue se niega a salir si la base
+      # remota no tiene aplicada alguna migración.
+      - name: La base está migrada (si no, no se despliega)
+        run: |
+          SALIDA=$(wrangler d1 migrations list givegrow-privado --remote 2>&1)
+          echo "$SALIDA"
+          # Se busca el nombre de un archivo de migración en la salida, en vez de
+          # una frase de éxito: `migrations list` sale con código 0 tanto si hay
+          # pendientes como si no, y la frase de "todo al día" cambia entre
+          # versiones de wrangler. Un `NNNN_algo.sql` en la salida solo puede
+          # venir de la tabla "Migrations to be applied".
+          if echo "$SALIDA" | grep -qE '[0-9]{4}_[A-Za-z0-9_]+\.sql'; then
+            echo "::error::Hay migraciones SIN APLICAR en givegrow-privado. Aplícalas ANTES de desplegar: npx wrangler d1 migrations apply givegrow-privado --remote"
+            exit 1
+          fi
+          echo "Base al día."
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Deploy to Cloudflare
         run: wrangler deploy
         env:

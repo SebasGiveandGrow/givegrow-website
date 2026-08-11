@@ -23,7 +23,7 @@
    marca la cargan la estructura, el color y el papel, no la fuente.
    =========================================================================== */
 
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
 
 /* --- identidad de la entidad. Un solo lugar: si cambia el domicilio o la
        Revisora Fiscal, se cambia aquí y cambia en los dos documentos. --- */
@@ -316,6 +316,28 @@ class Hoja {
     this.y -= 3;
   }
 
+  /* Sello diagonal en TODAS las páginas. Un certificado anulado que se vuelve a
+     descargar limpio es un documento falso circulando con nuestra firma: quien
+     lo reciba no tiene forma de saber que ya no vale. El sello va debajo del
+     texto (se dibuja antes de nada en cada página) para no estorbar la lectura,
+     pero es imposible no verlo. */
+  sellar(texto, color) {
+    const tam = 58;
+    const t = winansi(String(texto).toUpperCase());
+    this.paginas.forEach((p) => {
+      const ancho = this.f.negrita.widthOfTextAtSize(t, tam);
+      p.drawText(t, {
+        x: (CARTA[0] - ancho * 0.72) / 2,
+        y: CARTA[1] / 2 - 90,
+        size: tam,
+        font: this.f.negrita,
+        color: color || rgb(0.75, 0.28, 0.22),
+        rotate: degrees(38),
+        opacity: 0.16
+      });
+    });
+  }
+
   /* Pie institucional repetido en todas las páginas, con foliación. Se dibuja
      al cerrar, cuando ya se sabe cuántas páginas hay: un documento tributario
      sin "página 1 de 2" invita a que le falte una hoja y nadie lo note. */
@@ -606,8 +628,35 @@ export async function certificado(c, hoyISO) {
   h.salto(10);
   h.texto("Aporte asociado: " + c.guia + "  ·  Certificado " + c.numero, { tam: 8, color: GRIS });
 
+  /* El estado del certificado se imprime EN el certificado. Si está anulado o
+     en revisión, quien lo tenga en la mano tiene que poder saberlo sin
+     consultarnos: el papel viaja solo. */
+  if (c.anulado_en) {
+    h.salto(16);
+    h.texto("Certificado ANULADO el " + fechaLarga(c.anulado_en) +
+      motivoFrase(c.anulado_motivo) +
+      " Este documento no tiene validez y no sirve como soporte tributario.",
+      { tam: 9, fuente: f.negrita, color: rgb(0.65, 0.20, 0.15), interlinea: 13 });
+    h.sellar("Anulado");
+  } else if (c.revision_en) {
+    h.salto(16);
+    h.texto("Certificado EN REVISIÓN desde el " + fechaLarga(c.revision_en) +
+      motivoFrase(c.revision_motivo) +
+      " No debe usarse como soporte tributario mientras esté en este estado.",
+      { tam: 9, fuente: f.negrita, color: rgb(0.60, 0.36, 0.05), interlinea: 13 });
+    h.sellar("En revisión", rgb(0.78, 0.52, 0.10));
+  }
+
   h.cerrarPie(c.numero);
   return pdf.save();
+}
+
+/* Los motivos los escribe una persona en un campo libre, así que unos traen
+   punto final y otros no. Sin normalizar, el sello salía con «aprobada.. No
+   debe usarse». */
+function motivoFrase(motivo) {
+  const m = String(motivo || "").trim().replace(/[.\s]+$/, "");
+  return m ? ". Motivo: " + m + "." : ".";
 }
 
 function seccion(h, f, romano, titulo) {
