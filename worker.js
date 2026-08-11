@@ -483,7 +483,7 @@ async function correoAporteAprobado(env, aporte, email, nombre) {
   ];
   const filas = en
     ? [["Tracking number", guia], ["Amount", monto], ["Follow it at", enlace]]
-    : [["Número de guía", guia], ["Monto", monto], ["Sígelo en", enlace]];
+    : [["Número de guía", guia], ["Monto", monto], ["Síguelo en", enlace]];
 
   const cierre = en
     ? "This message is automatic. If you asked for a donation certificate, we will send it separately once it is reviewed."
@@ -508,7 +508,7 @@ async function correoAvisoInterno(env, aporte, email, nombre) {
     ["Guía", aporte.guia],
     ["Monto", fmtPesos(aporte.monto_centavos) + " COP"],
     ["Destino", aporte.modo === "dirigida" ? (aporte.destino_id || "?") : "Fondo general"],
-    ["Frecuencia", aporte.frecuencia],
+    ["Frecuencia", { unico: "Único", mensual: "Mensual", anual: "Anual" }[aporte.frecuencia] || aporte.frecuencia],
     ["Certificado", aporte.quiere_certificado ? "SÍ lo pidió" : "no"],
     ["Donante", nombre || "(sin nombre)"],
     ["Correo", email || "(sin correo)"]
