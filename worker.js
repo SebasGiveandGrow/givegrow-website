@@ -1103,6 +1103,13 @@ async function adminMoverEstado(request, env, guia, quien) {
 function destinacionDe(a) {
   if (a.modo === "dirigida") {
     const p = a.proyecto || a.destino_id;
+    /* Las campañas propias van con el prefijo `brigada-` en `destino_id` — ver
+       la constante BRIGADA en app.js. No son «un programa» de una fundación
+       aliada, y el numeral 6 del certificado declara a qué se destinó el
+       dinero: llamarlo programa sería inexacto en un documento juramentado. */
+    if (String(a.destino_id || "").startsWith("brigada-")) {
+      return "la " + (p || "brigada de atención a emergencia");
+    }
     if (p) return "el programa " + p;
   }
   return "el fondo general del HUB SOCIAL";

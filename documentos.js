@@ -402,6 +402,9 @@ const T = {
     medio: "Medio de pago",
     dedicatoria: "Dedicatoria",
     rastreo: "Sigue tu aporte en " + ENTIDAD.sitio + "/#rastrea con tu número de guía. Ahí aparecerá el acta cuando la fundación aliada haga la entrega.",
+    /* En una campaña propia no hay fundación aliada: entregamos nosotros, y
+       decir lo contrario en el recibo sería sencillamente falso. */
+    rastreoBrigada: "Sigue tu aporte en " + ENTIDAD.sitio + "/#rastrea con tu número de guía. Ahí aparecerá el acta cuando la brigada haga la entrega.",
     esal: "Entidad sin ánimo de lucro calificada en el Régimen Tributario Especial del impuesto sobre la renta y complementarios.",
     generado: "Documento generado automáticamente el ",
     freq: { unico: "Único", mensual: "Mensual", anual: "Anual" },
@@ -419,6 +422,7 @@ const T = {
     medio: "Payment method",
     dedicatoria: "Dedication",
     rastreo: "Follow your gift at " + ENTIDAD.sitio + "/#rastrea with your tracking number. The delivery record will appear there once the partner foundation delivers.",
+    rastreoBrigada: "Follow your gift at " + ENTIDAD.sitio + "/#rastrea with your tracking number. The delivery record will appear there once the brigade delivers.",
     esal: "Non-profit entity qualified under Colombia's Special Tax Regime for income tax.",
     generado: "Document generated automatically on ",
     freq: { unico: "One-time", mensual: "Monthly", anual: "Annual" },
@@ -468,7 +472,9 @@ export async function recibo(a, hoyISO) {
   }
 
   h.salto(18);
-  h.texto(t.rastreo, { tam: 9.5, color: SUAVE, interlinea: 14, despues: 18 });
+  const esCampana = String(a.destino_id || "").startsWith("brigada-");
+  h.texto(esCampana ? t.rastreoBrigada : t.rastreo,
+    { tam: 9.5, color: SUAVE, interlinea: 14, despues: 18 });
 
   h.regla({ despues: 12 });
   h.texto(ENTIDAD.nombreCorto, { tam: 9, fuente: f.negrita, color: TINTA, despues: 2 });
