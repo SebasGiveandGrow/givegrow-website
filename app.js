@@ -906,6 +906,8 @@ var I18N = {
     "start.vol.t":"Quiero ayudar",
     "start.vol.p":"Suma tu tiempo o talento al equipo que está construyendo todo esto.",
     "start.vol.btn":"Escríbenos →",
+    "calc.dest.emergencia":"Emergencia abierta",
+    "brigada.opcion":"Brigada de atención a emergencia · 5 sectores",
     "calc.dest.lbl":"¿A dónde va tu aporte?",
     "calc.note.lbl":"Deja un mensaje o dedicatoria (opcional)",
     "calc.note.ph":"Tu mensaje viajará con tu donación y aparecerá en tu recibo.",
@@ -1149,7 +1151,8 @@ var ACT_FNS = {
   toggleDrop:toggleDrop, closeLightbox:closeLightbox, almaSend:almaSend, formSend:formSend,
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
-  onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA, allySubmit:allySubmit,
+  onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
+  donarBrigada:donarBrigada, allySubmit:allySubmit,
   irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
@@ -1199,6 +1202,9 @@ function go(id, fromPop){
   // viejos aterrizan en #impactos y abren el panel, así ninguno queda roto.
   var abrirAlma = (id === "alma");
   if (abrirAlma) id = "impactos";
+  /* #brigada no es una página: es la calculadora con la campaña ya elegida.
+     Existe para tener un enlace corto que compartir en redes y en WhatsApp. */
+  if (id === "brigada"){ setTimeout(donarBrigada, 0); id = "donar"; }
   var pages = document.querySelectorAll(".page");
   for (var i=0;i<pages.length;i++) pages[i].classList.remove("active");
   var target = document.getElementById("page-"+id);
@@ -1307,13 +1313,35 @@ function activeImpactUnit(){
 }
 function setImpactUnit(id){ calc.projectId = id; calcUpdate(); }
 
+/* ---------- campaña abierta: Brigada de atención a emergencia ----------
+   No es un proyecto de una fundación aliada, es una operación propia, así que no
+   sale de partners.json y vive aquí, en un solo lugar.
+
+   `destino` viaja en el campo `destino_id` del aporte, que hasta hoy solo
+   guardaba ids de fundación. El prefijo `brigada-` reserva ese espacio de
+   nombres para campañas propias y deja la consulta trivial:
+   `WHERE destino_id LIKE 'brigada-%'`. Se prefirió esto a una columna nueva
+   porque una migración más es otro despliegue que puede salir sin ella — y la
+   emergencia fue ayer. */
+var BRIGADA = {
+  id: "brigada-emergencia",
+  destino: "brigada-emergencia-2026-08"
+};
+function esBrigada(id){ return id === BRIGADA.id; }
+
 /* Construye el selector fundación → proyecto a partir de partners.json.
    Cada <option> lleva el id de la unidad de impacto (o 'general' para el fondo). */
 function buildProjectSelect(){
   var sel = document.getElementById("calc-project");
   if (!sel) return;
   var partners = (PARTNERS_DATA || PARTNERS_FALLBACK).filter(function(p){ return p.type==="foundation" && p.impactUnits && p.impactUnits.length; });
-  var html = '<option value="general" data-partner="">'+(lang==="en"?"Where it's needed most (general fund)":"Donde más se necesite (fondo general)")+'</option>';
+  /* La brigada va de primera y en su propio grupo: es lo urgente, y mezclarla
+     entre los programas de las fundaciones la escondería. `general` sigue siendo
+     el valor por defecto — más abajo se fija con sel.value. */
+  var html = '<optgroup label="'+escapeHtml(t("calc.dest.emergencia"))+'">' +
+             '<option value="'+BRIGADA.id+'" data-partner="">'+escapeHtml(t("brigada.opcion"))+'</option>' +
+             '</optgroup>';
+  html += '<option value="general" data-partner="">'+(lang==="en"?"Where it's needed most (general fund)":"Donde más se necesite (fondo general)")+'</option>';
   for (var i=0;i<partners.length;i++){
     var p = partners[i];
     html += '<optgroup label="'+escapeHtml(p.name)+'">';
@@ -1348,6 +1376,34 @@ function donarA(unitId){
     if (dest && dest.scrollIntoView) dest.scrollIntoView({block:"center"});
   });
 }
+/* Nombre legible del destino elegido, tal como debe leerse en el recibo y en el
+   certificado. Sale del <option> visible, que ya está en el idioma correcto. */
+function etiquetaDestino(){
+  if (!calc.projectId || calc.projectId === "general") return null;
+  var sel = document.getElementById("calc-project");
+  if (sel){
+    for (var i=0;i<sel.options.length;i++){
+      if (sel.options[i].value === calc.projectId) return sel.options[i].text;
+    }
+  }
+  return esBrigada(calc.projectId) ? t("brigada.opcion") : calc.projectId;
+}
+
+/* Abre la calculadora con la brigada ya elegida. Es el destino del enlace
+   corto #brigada, que es lo que se comparte en redes y en WhatsApp. */
+function donarBrigada(){
+  go("donar");
+  loadPartners().then(function(){
+    try { buildProjectSelect(); } catch(e){}
+    var sel = document.getElementById("calc-project");
+    if (!sel) return;
+    sel.value = BRIGADA.id;
+    setProject(BRIGADA.id);
+    var dest = document.querySelector("#page-donar .calc-dest");
+    if (dest && dest.scrollIntoView) dest.scrollIntoView({block:"center"});
+  });
+}
+
 function onNote(v){
   calc.note = String(v).slice(0,280);
   setText("calc-msg-count", calc.note.length);
@@ -1396,12 +1452,18 @@ function irAPagar(){
   if (msg){ msg.style.display=""; msg.className="pay-now-msg"; msg.textContent = t("pay.now.wait"); }
 
   var frecMap = { m:"mensual", a:"anual", u:"unico" };
+  /* La brigada es una donación DIRIGIDA aunque no tenga fundación detrás: sin
+     esto caía en `fondo` y el aporte se habría contado como fondo general. */
+  var brig = esBrigada(calc.projectId);
   var cuerpo = {
     monto: monto,
     frecuencia: frecMap[calc.freq] || "unico",
-    modo: calc.partnerId ? "dirigida" : "fondo",
-    destino: calc.partnerId || null,
-    proyecto: (calc.projectId && calc.projectId !== "general") ? calc.projectId : null,
+    modo: (brig || calc.partnerId) ? "dirigida" : "fondo",
+    destino: brig ? BRIGADA.destino : (calc.partnerId || null),
+    /* `proyecto` es DESCRIPTIVO: es lo que el donante lee en su recibo y lo que
+       cita el certificado. Antes viajaba el id de la unidad, así que el recibo
+       decía «ndf-plato» en vez del nombre del programa. */
+    proyecto: etiquetaDestino(),
     nota: calc.note || null,
     idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
   };
