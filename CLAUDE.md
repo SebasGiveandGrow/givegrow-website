@@ -33,8 +33,14 @@ Deploy: GitHub Actions → Cloudflare Workers, automático al llegar a `main`.
 ```bash
 node scripts/validate.mjs
 ```
-Debe pasar TODO: sintaxis JS, JSON válidos, paridad i18n ES/EN, cobertura data-i18n,
-balance de tags. Si falla, no se commitea.
+Debe pasar TODO: sintaxis JS (app.js, worker.js, documentos.js), JSON válidos,
+paridad i18n ES/EN, cobertura data-i18n, balance de tags. Si falla, no se commitea.
+
+El gate NO ve el enlazado de imports: de eso se encarga el `wrangler deploy
+--dry-run` de `ci.yml`. Si tocas `worker.js` o `documentos.js`, corre también:
+```bash
+npm ci && npx wrangler deploy --dry-run --outdir /tmp/gg-bundle
+```
 
 **Nota operativa (esta máquina):** `node` y `gh` viven en `/opt/homebrew/bin` y el
 shell no interactivo NO los tiene en el PATH. Exporta antes de correr el gate:
@@ -65,6 +71,21 @@ md5sum styles.css | cut -c1-8   # → reemplazar en <link ... ?v=HASH>
 md5sum app.js | cut -c1-8       # → reemplazar en <script ... ?v=HASH>
 ```
 Olvidarlo = los usuarios ven la versión vieja hasta 1 año.
+
+## DEPENDENCIAS Y BASE DE DATOS
+
+- **`pdf-lib` es la única dependencia npm** (recibo y certificado de donación).
+  Por eso existen `package.json` y `package-lock.json`, y el deploy corre
+  `npm ci`. No añadir dependencias sin necesidad real: el resto del sitio es
+  vanilla a propósito.
+- **`documentos.js`** arma los PDF. La identidad de la entidad (NIT, domicilio,
+  firmantes) vive en su constante `ENTIDAD`, en un solo lugar.
+- **Migraciones D1**: `migrations/`. Se aplican A MANO y **antes** de que el
+  código llegue a producción — la 0003 añade `aportes.token`, que `/api/checkout`
+  escribe; al revés, el checkout se cae. Detalle en `ops/documentos.md`.
+- **El certificado de donación NO se emite solo.** Lo firma la Revisora Fiscal
+  bajo la gravedad de juramento; sale de `/admin`, revisado por una persona. Su
+  texto lo suministró la contadora: no se edita sin ella.
 
 ## ARQUITECTURA DE DATOS
 

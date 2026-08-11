@@ -25,7 +25,13 @@
      transacciones, solo con fines informativos».
    · El ambiente se deduce del prefijo de la llave pública. Así es imposible
      que queden llaves de prueba apuntando a producción.
+
+   3. Los DOCUMENTOS (Fase 5). El recibo lo emite el sistema; el certificado de
+      donación lo emite una PERSONA desde /admin, porque va firmado bajo la
+      gravedad de juramento. El armado vive en documentos.js.
 */
+
+import { recibo, certificado } from "./documentos.js";
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
 
@@ -188,6 +194,27 @@ async function siguienteGuia(env, anio) {
   return "GG-" + anio + "-" + String(n).padStart(6, "0");
 }
 
+/* Consecutivo propio para certificados: CD-YYYY-NNNNNN. Misma mecánica atómica
+   que la guía, serie aparte — ver el porqué en migrations/0003_documentos.sql. */
+async function siguienteCertificado(env, anio) {
+  const { results } = await env.DB.prepare(
+    "INSERT INTO numerador_cert (anio, ultimo) VALUES (?, 1) " +
+    "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1 RETURNING ultimo"
+  ).bind(anio).all();
+  const n = results && results[0] ? results[0].ultimo : null;
+  if (!n) throw new Error("numerador de certificados no devolvió consecutivo");
+  return "CD-" + anio + "-" + String(n).padStart(6, "0");
+}
+
+/* Token de 128 bits para el enlace del recibo. La guía es consecutiva y por lo
+   tanto adivinable; el recibo lleva nombre y dedicatoria, así que no puede
+   depender solo de ella. */
+function tokenNuevo() {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+
 /* ========================================================================
    POST /api/checkout
    Guarda la intención, asigna la guía, firma y devuelve la URL de Wompi.
@@ -215,7 +242,10 @@ async function apiCheckout(request, env, url) {
   const destino    = modo === "dirigida" ? String(cuerpo.destino || "").slice(0, 60) : null;
   const proyecto   = cuerpo.proyecto ? String(cuerpo.proyecto).slice(0, 120) : null;
   const nota       = cuerpo.nota ? String(cuerpo.nota).slice(0, 280) : null;
-  const certificado = cuerpo.certificado ? 1 : 0;
+  /* `quiereCert` y no `certificado`: ese nombre ya es el de la función que arma
+     el PDF, importada arriba, y sombrearla dentro de esta función es pedir un
+     error el día que alguien la invoque aquí. */
+  const quiereCert = cuerpo.certificado ? 1 : 0;
   /* Único momento en que sabemos con certeza en qué idioma está el donante.
      Wompi no lo entrega, así que sin esto el correo saldría siempre en español. */
   const idioma     = cuerpo.idioma === "en" ? "en" : "es";
@@ -235,9 +265,9 @@ async function apiCheckout(request, env, url) {
 
   await env.DB.prepare(
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
-    "frecuencia, quiere_certificado, consent_muro, nota, idioma) " +
-    "VALUES (?, 'intencion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(guia, centavos, moneda, modo, destino, proyecto, frecuencia, certificado, muro, nota, idioma).run();
+    "frecuencia, quiere_certificado, consent_muro, nota, idioma, token) " +
+    "VALUES (?, 'intencion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(guia, centavos, moneda, modo, destino, proyecto, frecuencia, quiereCert, muro, nota, idioma, tokenNuevo()).run();
 
   /* --- firma de integridad ---
      Orden verificado contra el ejemplo de la documentación:
@@ -395,7 +425,7 @@ async function apiEventos(request, env) {
 
 const CORREO_DESDE_DEF = "Give&Grow International <no-responder@notificaciones.thegiveandgrowproject.org>";
 
-async function enviarCorreo(env, { para, asunto, texto, html, etiqueta }) {
+async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos }) {
   const llave = env.RESEND_API_KEY;
   const desde = env.CORREO_DESDE || CORREO_DESDE_DEF;
 
@@ -410,7 +440,10 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta }) {
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: "Bearer " + llave, "content-type": "application/json" },
-      body: JSON.stringify({ from: desde, to: [para], subject: asunto, text: texto, html })
+      body: JSON.stringify({
+        from: desde, to: [para], subject: asunto, text: texto, html,
+        ...(adjuntos && adjuntos.length ? { attachments: adjuntos } : {})
+      })
     });
     if (!r.ok) {
       console.error("correo falló", etiqueta || "", r.status, (await r.text()).slice(0, 300));
@@ -438,7 +471,7 @@ function fmtPesos(centavos) {
 
 /* Envoltura sobria, sin imágenes ni columnas: un correo institucional que se lee
    igual en cualquier cliente y no se rompe si se bloquean las imágenes. */
-function plantillaCorreo({ titulo, parrafos, filas, cierre }) {
+function plantillaCorreo({ titulo, parrafos, filas, cierre, boton }) {
   const p = (parrafos || []).map((x) =>
     `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3A3F45">${esc(x)}</p>`).join("");
   const f = (filas || []).map(([k, v]) =>
@@ -452,6 +485,7 @@ function plantillaCorreo({ titulo, parrafos, filas, cierre }) {
 <h1 style="margin:0 0 16px;font-size:22px;line-height:1.25;color:#1A1D21">${esc(titulo)}</h1>
 ${p}
 ${f ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:18px 0">${f}</table>` : ""}
+${boton ? `<p style="margin:20px 0 0"><a href="${esc(boton.url)}" style="display:inline-block;background:#1F5C38;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:999px">${esc(boton.texto)}</a></p>` : ""}
 ${cierre ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.55;color:#5C636F">${esc(cierre)}</p>` : ""}
 <p style="margin:22px 0 0;font-size:12px;color:#5C636F">Fundación Give&amp;Grow International · NIT 901.948.930-2 · Medellín, Colombia</p>
 </td></tr></table></body></html>`;
@@ -485,15 +519,27 @@ async function correoAporteAprobado(env, aporte, email, nombre) {
     ? [["Tracking number", guia], ["Amount", monto], ["Follow it at", enlace]]
     : [["Número de guía", guia], ["Monto", monto], ["Síguelo en", enlace]];
 
+  /* El recibo va como ENLACE y no como adjunto: este correo lo dispara el
+     webhook de Wompi, y armar un PDF ahí dentro le sumaría trabajo a la ruta
+     que debe responder rápido. El enlace, además, sirve para siempre: el
+     donante que borra el correo puede volver por él. El certificado sí viaja
+     adjunto, pero lo manda una persona y la latencia da igual. */
+  const urlRecibo = aporte.token ? ORIGIN + "/api/recibo/" + guia + ".pdf?t=" + aporte.token : null;
+  const boton = urlRecibo ? { url: urlRecibo, texto: en ? "Download your receipt" : "Descargar tu recibo" } : null;
+
   const cierre = en
-    ? "This message is automatic. If you asked for a donation certificate, we will send it separately once it is reviewed."
-    : "Este mensaje es automático. Si pediste certificado de donación, te lo enviamos aparte cuando quede revisado.";
+    ? "This message is automatic. Your receipt is not the tax certificate: if you asked for a donation certificate, we send it separately once it is reviewed and signed."
+    : "Este mensaje es automático. El recibo no es el certificado tributario: si pediste certificado de donación, te lo enviamos aparte cuando quede revisado y firmado.";
+
+  const texto = [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")];
+  if (urlRecibo) texto.push("", (en ? "Your receipt: " : "Tu recibo: ") + urlRecibo);
+  texto.push("", cierre);
 
   return enviarCorreo(env, {
     para: email,
     asunto,
-    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", cierre].join("\n"),
-    html: plantillaCorreo({ titulo, parrafos, filas, cierre }),
+    texto: texto.join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, cierre, boton }),
     etiqueta: "aporte-aprobado"
   });
 }
@@ -529,8 +575,8 @@ async function correoAvisoInterno(env, aporte, email, nombre) {
 /* Traduce el estado de Wompi al del aporte y detecta manipulación del monto. */
 async function aplicarEstado(env, guia, tx, estado) {
   const fila = await env.DB.prepare(
-    "SELECT guia, monto_centavos, estado, idioma, modo, destino_id, frecuencia, " +
-    "quiere_certificado, aprobada_en FROM aportes WHERE guia = ?"
+    "SELECT guia, monto_centavos, moneda, estado, idioma, modo, destino_id, proyecto, frecuencia, " +
+    "nota, metodo_pago, quiere_certificado, aprobada_en, token, creada_en FROM aportes WHERE guia = ?"
   ).bind(guia).first();
 
   /* Referencia que no conocemos: se queda en la bitácora y no se inventa nada. */
@@ -591,7 +637,8 @@ async function aplicarEstado(env, guia, tx, estado) {
         modo: fila.modo,
         destino_id: fila.destino_id,
         frecuencia: fila.frecuencia,
-        quiere_certificado: fila.quiere_certificado
+        quiere_certificado: fila.quiere_certificado,
+        token: fila.token
       };
       await correoAporteAprobado(env, datos, d && d.email, d && d.nombre);
       await correoAvisoInterno(env, datos, d && d.email, d && d.nombre);
@@ -622,6 +669,52 @@ async function guardarDonante(env, tx) {
   ).run();
   const f = await env.DB.prepare("SELECT id FROM donantes WHERE email=?").bind(email).first();
   return f ? f.id : null;
+}
+
+/* ========================================================================
+   GET /api/recibo/<guia>.pdf?t=<token>
+   ========================================================================
+   El recibo de aporte, generado al vuelo. No se guarda: se puede reconstruir
+   entero desde la base, y un PDF archivado es un dato personal más que
+   custodiar sin necesidad.
+
+   El token es obligatorio y se compara en tiempo constante. Sin él bastaría
+   contar de GG-2026-000001 en adelante para cosechar nombres y dedicatorias.
+   ======================================================================== */
+
+/* Estados en los que el recibo tiene sentido. Una intención sin pagar no tiene
+   nada que recibir. */
+const ESTADOS_CON_RECIBO = ["aprobada", "en_distribucion", "entregada"];
+
+async function apiRecibo(env, guia, token) {
+  const g = String(guia || "").toUpperCase();
+  if (!/^GG-\d{4}-\d{6}$/.test(g)) return json({ error: "guia_invalida" }, 400);
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return json({ error: "token_invalido" }, 403);
+
+  const a = await env.DB.prepare(
+    "SELECT guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, frecuencia, " +
+    "nota, idioma, metodo_pago, creada_en, aprobada_en, token FROM aportes WHERE guia = ?"
+  ).bind(g).first();
+
+  /* Mismo 403 exista o no la guía: distinguirlos convertiría este endpoint en un
+     oráculo para saber qué guías están emitidas. */
+  if (!a || !a.token || !igualesSeguro(a.token, String(token))) {
+    return json({ error: "no_autorizado" }, 403);
+  }
+  if (!ESTADOS_CON_RECIBO.includes(a.estado)) {
+    return json({ error: "aporte_sin_confirmar", estado: a.estado }, 409);
+  }
+
+  const bytes = await recibo(a, new Date().toISOString().replace("T", " "));
+  return new Response(bytes, {
+    headers: {
+      "content-type": "application/pdf",
+      "content-disposition": 'inline; filename="recibo-' + g + '.pdf"',
+      /* Privado y sin caché compartida: lleva datos personales. */
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
 }
 
 /* ========================================================================
@@ -885,7 +978,11 @@ async function adminAportes(env, url) {
   const sql =
     "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.frecuencia, " +
     "a.quiere_certificado, a.consent_muro, a.idioma, a.nota, a.metodo_pago, a.creada_en, " +
-    "a.aprobada_en, a.entregada_en, d.nombre AS donante, d.email AS correo " +
+    "a.aprobada_en, a.entregada_en, d.nombre AS donante, d.email AS correo, " +
+    "d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, d.ciudad AS ciudad, a.token, " +
+    /* El certificado vigente viaja con la fila para que el panel sepa, sin una
+       segunda consulta, si el botón debe decir "Emitir" o "Ver". */
+    "(SELECT c.numero FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS certificado " +
     "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + where +
     " ORDER BY a.creada_en DESC LIMIT " + limite;
   const q = estado ? env.DB.prepare(sql).bind(estado) : env.DB.prepare(sql);
@@ -931,6 +1028,209 @@ async function adminMoverEstado(request, env, guia, quien) {
   return json({ ok: true, guia, estado: nuevo });
 }
 
+/* ========================================================================
+   CERTIFICADOS · /api/admin/certificado/...
+   ========================================================================
+   Aquí está la línea que divide esta fase. El recibo lo emite una máquina; el
+   certificado lo emite una PERSONA, porque el documento dice «certifica bajo la
+   gravedad de juramento» y lleva la firma de la Revisora Fiscal. Automatizar la
+   emisión sería automatizar un juramento ajeno.
+
+   Lo que sí está automatizado: numerar, armar, congelar, archivar y enviar.
+   Lo que nunca lo estará: decidir que se emite.
+   ======================================================================== */
+
+/* Frase del numeral 6 del certificado. Se arma desde el destino real del aporte
+   y no de un texto libre: el numeral declara a qué se destinó el dinero, y eso
+   ya está en la base. */
+function destinacionDe(a) {
+  if (a.modo === "dirigida") {
+    const p = a.proyecto || a.destino_id;
+    if (p) return "el programa " + p;
+  }
+  return "el fondo general del HUB SOCIAL";
+}
+
+function limpiar(v, n) { return String(v == null ? "" : v).trim().slice(0, n); }
+
+async function adminEmitirCertificado(request, env, guia, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let cuerpo = {};
+  try { cuerpo = await request.json(); } catch { /* cuerpo opcional */ }
+
+  const a = await env.DB.prepare(
+    "SELECT a.guia, a.estado, a.monto_centavos, a.modo, a.destino_id, a.proyecto, " +
+    "a.quiere_certificado, a.aprobada_en, a.wompi_transaction_id, a.donante_id, " +
+    "d.nombre AS nombre, d.email AS email, d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, " +
+    "d.ciudad AS ciudad FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?"
+  ).bind(guia).first();
+  if (!a) return json({ error: "no_encontrada" }, 404);
+
+  /* Un certificado sobre un aporte que no se aprobó certificaría dinero que no
+     entró. Es la única validación que no admite override desde el panel. */
+  if (!ESTADOS_CON_RECIBO.includes(a.estado)) {
+    return json({ error: "aporte_no_aprobado", estado: a.estado }, 409);
+  }
+
+  const yaHay = await env.DB.prepare(
+    "SELECT numero FROM certificados WHERE guia = ? AND anulado_en IS NULL"
+  ).bind(guia).first();
+  if (yaHay) return json({ error: "ya_emitido", numero: yaHay.numero }, 409);
+
+  /* Los datos del donante llegan de Wompi, que no entrega domicilio y a veces
+     tampoco documento. El panel puede completarlos: ESO es la revisión humana
+     que pide ops/arquitectura-donaciones-membresias.md §5, no un botón de
+     "aprobar" sin mirar. Lo que se corrija aquí se guarda también en `donantes`,
+     porque si faltaba para este certificado faltará para el siguiente. */
+  const nombre    = limpiar(cuerpo.nombre, 200)    || limpiar(a.nombre, 200);
+  const docTipo   = limpiar(cuerpo.doc_tipo, 10)   || limpiar(a.doc_tipo, 10) || "CC";
+  const docNumero = limpiar(cuerpo.doc_numero, 40) || limpiar(a.doc_numero, 40);
+  const ciudad    = limpiar(cuerpo.ciudad, 120)    || limpiar(a.ciudad, 120);
+
+  const faltan = [];
+  if (!nombre)    faltan.push("nombre");
+  if (!docNumero) faltan.push("doc_numero");
+  if (!ciudad)    faltan.push("ciudad");
+  if (faltan.length) {
+    return json({
+      error: "datos_incompletos", faltan,
+      ayuda: "El certificado identifica al donante ante la DIAN: no puede salir con campos vacíos.",
+      actual: { nombre: a.nombre, doc_tipo: a.doc_tipo, doc_numero: a.doc_numero, ciudad: a.ciudad }
+    }, 422);
+  }
+
+  if (a.donante_id) {
+    await env.DB.prepare(
+      "UPDATE donantes SET nombre=?, doc_tipo=?, doc_numero=?, ciudad=?, actualizado_en=datetime('now') WHERE id=?"
+    ).bind(nombre, docTipo, docNumero, ciudad, a.donante_id).run();
+  }
+
+  const anio = Number(String(a.aprobada_en || "").slice(0, 4)) || new Date().getUTCFullYear();
+  const numero = await siguienteCertificado(env, anio);
+
+  /* El snapshot se congela AQUÍ. Volver a descargar el certificado dentro de un
+     año debe devolver exactamente el mismo papel, aunque el donante haya
+     corregido su nombre entretanto. */
+  const datos = {
+    numero, guia: a.guia,
+    donante_nombre: nombre, doc_tipo: docTipo, doc_numero: docNumero, donante_ciudad: ciudad,
+    monto_centavos: a.monto_centavos,
+    fecha_donacion: a.aprobada_en,
+    transaccion: a.wompi_transaction_id || "",
+    destinacion: destinacionDe(a),
+    emitido_en: new Date().toISOString().replace("T", " ").slice(0, 19)
+  };
+
+  await env.DB.prepare(
+    "INSERT INTO certificados (numero, guia, datos, emitido_por, emitido_en) VALUES (?,?,?,?,?)"
+  ).bind(numero, a.guia, JSON.stringify(datos), quien || "?", datos.emitido_en).run();
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "certificado " + numero + " emitido sobre " + a.guia).run();
+
+  /* Enviarlo es un paso aparte y explícito: emitir y mandar no son lo mismo, y
+     quien emite puede querer revisar el PDF antes de que salga. */
+  let envio = null;
+  if (cuerpo.enviar && a.email) {
+    envio = await correoCertificado(env, datos, a.email);
+    if (envio && envio.ok) {
+      await env.DB.prepare(
+        "UPDATE certificados SET enviado_en=datetime('now'), enviado_a=? WHERE numero=?"
+      ).bind(a.email, numero).run();
+    }
+  }
+
+  return json({ ok: true, numero, enviado: !!(envio && envio.ok), correo: a.email || null });
+}
+
+async function adminCertificadoPdf(env, numero) {
+  const c = await env.DB.prepare(
+    "SELECT numero, datos, anulado_en FROM certificados WHERE numero = ?"
+  ).bind(numero).first();
+  if (!c) return json({ error: "no_encontrado" }, 404);
+
+  const datos = JSON.parse(c.datos);
+  const bytes = await certificado(datos, datos.emitido_en);
+  return new Response(bytes, {
+    headers: {
+      "content-type": "application/pdf",
+      "content-disposition": 'inline; filename="' + c.numero + '.pdf"',
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
+async function adminAnularCertificado(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let cuerpo = {};
+  try { cuerpo = await request.json(); } catch { /* opcional */ }
+  const motivo = limpiar(cuerpo.motivo, 280);
+  if (!motivo) return json({ error: "motivo_requerido" }, 400);
+
+  const c = await env.DB.prepare("SELECT numero, anulado_en FROM certificados WHERE numero=?").bind(numero).first();
+  if (!c) return json({ error: "no_encontrado" }, 404);
+  if (c.anulado_en) return json({ error: "ya_anulado" }, 409);
+
+  /* No se borra: se anula. El consecutivo conserva el hueco a propósito — un
+     número que desaparece es peor que un número anulado con motivo. */
+  await env.DB.prepare(
+    "UPDATE certificados SET anulado_en=datetime('now'), anulado_motivo=? WHERE numero=?"
+  ).bind(motivo, numero).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "certificado " + numero + " ANULADO: " + motivo).run();
+
+  return json({ ok: true, numero });
+}
+
+/* El certificado sí viaja ADJUNTO: es el papel que el donante archiva para su
+   declaración, y un enlace que caduca o se pierde no sirve para eso. */
+async function correoCertificado(env, datos, email) {
+  const titulo = "Tu certificado de donación";
+  const parrafos = [
+    "Adjuntamos tu certificado de donación " + datos.numero + ", correspondiente al aporte " + datos.guia + ".",
+    "Está firmado por el Representante Legal y la Revisora Fiscal de la Fundación y sirve como soporte del descuento tributario del artículo 257 del Estatuto Tributario.",
+    "La procedencia y el monto efectivo del descuento dependen de tu situación tributaria: consúltalo con tu asesor."
+  ];
+  const filas = [
+    ["Certificado", datos.numero],
+    ["Aporte", datos.guia],
+    ["Valor", fmtPesos(datos.monto_centavos) + " COP"],
+    ["Fecha de la donación", fechaLargaISO(datos.fecha_donacion)]
+  ];
+  const bytes = await certificado(datos, datos.emitido_en);
+  return enviarCorreo(env, {
+    para: email,
+    asunto: titulo + " · " + datos.numero,
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas }),
+    etiqueta: "certificado",
+    adjuntos: [{ filename: datos.numero + ".pdf", content: bytesABase64(bytes) }]
+  });
+}
+
+/* Resend pide el adjunto en base64. `btoa` no acepta bytes sueltos por encima de
+   0x7F, así que se pasa por latin-1 en trozos: de una sola vez, un PDF de dos
+   páginas revienta el límite de argumentos de String.fromCharCode. */
+function bytesABase64(bytes) {
+  let bin = "";
+  const paso = 0x8000;
+  for (let i = 0; i < bytes.length; i += paso) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + paso));
+  }
+  return btoa(bin);
+}
+
+const MESES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function fechaLargaISO(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return "";
+  return Number(m[3]) + " de " + MESES_ES[Number(m[2]) - 1] + " de " + m[1];
+}
+
 function paginaAdmin() {
   return `<!doctype html>
 <html lang="es"><head>
@@ -957,12 +1257,15 @@ function paginaAdmin() {
 <div class="med-tw"><table class="med-tbl" id="tabla">
 <thead><tr>
 <th scope="col">Guía</th><th scope="col">Estado</th><th scope="col">Monto</th>
-<th scope="col">Destino</th><th scope="col">Donante</th><th scope="col">Cert.</th>
-<th scope="col">Creada</th><th scope="col">Acción</th>
-</tr></thead><tbody id="filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
+<th scope="col">Destino</th><th scope="col">Donante</th><th scope="col">Recibo</th>
+<th scope="col">Certificado</th><th scope="col">Creada</th><th scope="col">Acción</th>
+</tr></thead><tbody id="filas"><tr><td colspan="9">Cargando…</td></tr></tbody>
 </table></div>
 
+<div id="dlg" style="display:none;margin-top:24px"></div>
+
 <p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
+<p class="mu" style="margin-top:8px;font-size:13px;max-width:70ch">El <strong>recibo</strong> lo emite el sistema al confirmarse el pago. El <strong>certificado</strong> no: lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, así que sale de aquí, revisado, y nunca solo.</p>
 </div></section></main>
 <script src="/admin.js"></script>
 </body></html>`;
@@ -971,6 +1274,7 @@ function paginaAdmin() {
 function adminJS() {
   return `"use strict";
 var FILTRO = "";
+var FILAS = {};
 function pesos(c){ return "$" + Math.round((c||0)/100).toLocaleString("es-CO"); }
 function esc(s){ var d=document.createElement("div"); d.textContent = s==null?"":String(s); return d.innerHTML; }
 
@@ -994,21 +1298,79 @@ function accion(a){
   return "";
 }
 
+var APROBADOS = ["aprobada", "en_distribucion", "entregada"];
+
+/* Columna de certificado. Tres estados y ninguno ambiguo: ya emitido (con
+   enlace al PDF), pedido y emitible (botón), o nada. El botón NO emite de
+   golpe: abre la revisión, que es el punto entero de esta pieza. */
+function celdaCert(a){
+  if (a.certificado){
+    return '<a href="/api/admin/certificado/' + esc(a.certificado) + '.pdf" target="_blank" rel="noopener">' + esc(a.certificado) + '</a>';
+  }
+  if (a.quiere_certificado && APROBADOS.indexOf(a.estado) >= 0){
+    return '<button class="copy" data-cert="' + esc(a.guia) + '">Emitir…</button>';
+  }
+  return a.quiere_certificado ? "pedido" : "—";
+}
+
 function pintarFilas(l){
   var tb = document.getElementById("filas");
-  if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Nada con ese filtro.</td></tr>'; return; }
+  if (!l.length){ tb.innerHTML = '<tr><td colspan="9">Nada con ese filtro.</td></tr>'; return; }
+  FILAS = {};
   tb.innerHTML = l.map(function(a){
+    FILAS[a.guia] = a;
+    var recibo = (APROBADOS.indexOf(a.estado) >= 0 && a.token)
+      ? '<a href="/api/recibo/' + esc(a.guia) + '.pdf?t=' + esc(a.token) + '" target="_blank" rel="noopener">PDF</a>' : "—";
     return "<tr>" +
       "<td>" + esc(a.guia) + "</td>" +
       "<td>" + esc(a.estado) + "</td>" +
       "<td>" + pesos(a.monto_centavos) + "</td>" +
       "<td>" + esc(a.modo === "dirigida" ? (a.destino_id||"?") : "Fondo general") + "</td>" +
       "<td>" + esc(a.donante || "—") + (a.correo ? "<br><small>" + esc(a.correo) + "</small>" : "") + "</td>" +
-      "<td>" + (a.quiere_certificado ? "sí" : "—") + "</td>" +
+      "<td>" + recibo + "</td>" +
+      "<td>" + celdaCert(a) + "</td>" +
       "<td>" + esc((a.creada_en||"").slice(0,16)) + "</td>" +
       "<td>" + accion(a) + "</td>" +
     "</tr>";
   }).join("");
+}
+
+/* ---- revisión previa a emitir -------------------------------------------
+   Wompi no entrega domicilio y a veces tampoco documento, y el certificado
+   identifica al donante ante la DIAN. Este formulario es donde una persona
+   completa y confirma esos datos: no es un trámite, es la revisión que el
+   documento exige. Lo que se corrija aquí se guarda también en el donante. */
+function abrirCert(guia){
+  var a = FILAS[guia] || {};
+  var caja = document.getElementById("dlg");
+  caja.innerHTML =
+    '<div class="card" style="max-width:520px;margin:0 auto;text-align:left">' +
+      '<h3 style="margin-bottom:4px">Emitir certificado</h3>' +
+      '<p class="mu" style="font-size:13px;margin-bottom:16px">Aporte ' + esc(guia) + ' · ' + pesos(a.monto_centavos) +
+        '. Firman el Representante Legal y la Revisora Fiscal: revisa los datos antes de emitir.</p>' +
+      campo("c-nombre", "Nombre o razón social", a.donante) +
+      campo("c-doc", "Documento (NIT o C.C.)", a.doc_numero) +
+      campo("c-ciudad", "Domicilio del donante", a.ciudad) +
+      '<label style="display:flex;gap:8px;align-items:center;margin:14px 0;font-size:14px">' +
+        '<input type="checkbox" id="c-enviar"' + (a.correo ? " checked" : " disabled") + '> ' +
+        (a.correo ? "Enviarlo a " + esc(a.correo) : "Sin correo del donante: solo se emite") +
+      '</label>' +
+      '<p id="c-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>' +
+      '<div style="display:flex;gap:10px;margin-top:8px">' +
+        '<button class="btn btn-g" id="c-ok" data-emitir="' + esc(guia) + '">Emitir</button>' +
+        '<button class="btn btn-w" id="c-no">Cancelar</button>' +
+      '</div>' +
+    '</div>';
+  caja.style.display = "block";
+}
+function campo(id, etiqueta, valor){
+  return '<label style="display:block;margin-bottom:10px;font-size:13px;font-weight:600">' + esc(etiqueta) +
+    '<input id="' + id + '" value="' + esc(valor || "") + '" ' +
+    'style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)"></label>';
+}
+function cerrarCert(){
+  var caja = document.getElementById("dlg");
+  caja.style.display = "none"; caja.innerHTML = "";
 }
 
 function cargar(){
@@ -1024,6 +1386,45 @@ document.addEventListener("click", function(e){
     document.querySelectorAll(".pay-tab").forEach(function(b){ b.classList.remove("on"); });
     t.classList.add("on"); FILTRO = t.getAttribute("data-estado"); cargar(); return;
   }
+  var c = e.target.closest("[data-cert]");
+  if (c){ abrirCert(c.getAttribute("data-cert")); return; }
+
+  if (e.target.id === "c-no"){ cerrarCert(); return; }
+
+  var ok = e.target.closest("[data-emitir]");
+  if (ok){
+    var err = document.getElementById("c-error");
+    err.style.display = "none";
+    ok.disabled = true; ok.textContent = "Emitiendo…";
+    var env = document.getElementById("c-enviar");
+    fetch("/api/admin/certificado/" + encodeURIComponent(ok.getAttribute("data-emitir")), {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({
+        nombre: document.getElementById("c-nombre").value,
+        doc_numero: document.getElementById("c-doc").value,
+        ciudad: document.getElementById("c-ciudad").value,
+        enviar: !!(env && env.checked && !env.disabled)
+      })
+    }).then(function(r){ return r.json().then(function(d){ return { http: r.status, d: d }; }); })
+      .then(function(res){
+        if (res.http !== 200){
+          /* El error se muestra en el formulario y NO se cierra: quien emite
+             tiene que ver qué faltó, no adivinarlo tras un diálogo que se fue. */
+          err.textContent = res.d.faltan
+            ? "Faltan datos obligatorios: " + res.d.faltan.join(", ") + "."
+            : ("No se pudo emitir (" + (res.d.error || res.http) + ").");
+          err.style.display = "block";
+          ok.disabled = false; ok.textContent = "Emitir";
+          return;
+        }
+        cerrarCert();
+        cargar();
+        window.open("/api/admin/certificado/" + encodeURIComponent(res.d.numero) + ".pdf", "_blank", "noopener");
+      })
+      .catch(function(){ ok.disabled = false; ok.textContent = "Reintentar"; });
+    return;
+  }
+
   var b = e.target.closest("[data-guia]");
   if (b){
     b.disabled = true; b.textContent = "…";
@@ -1196,6 +1597,16 @@ export default {
         if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
         const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
         if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
+
+        /* Certificados. El PDF también vive detrás de Access: es un documento
+           con nombre y cédula del donante, no un archivo público. */
+        const ce = ruta.match(/^\/api\/admin\/certificado\/(GG-\d{4}-\d{6})$/i);
+        if (ce) return await adminEmitirCertificado(request, env, ce[1].toUpperCase(), sesion.email);
+        const cp = ruta.match(/^\/api\/admin\/certificado\/(CD-\d{4}-\d{6})\.pdf$/i);
+        if (cp) return await adminCertificadoPdf(env, cp[1].toUpperCase());
+        const ca = ruta.match(/^\/api\/admin\/certificado\/(CD-\d{4}-\d{6})\/anular$/i);
+        if (ca) return await adminAnularCertificado(request, env, ca[1].toUpperCase(), sesion.email);
+
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
         console.error("admin", ruta, e && e.message);
@@ -1212,6 +1623,8 @@ export default {
         if (ruta === "/api/inscripcion")    return await apiInscripcion(request, env, url);
         const aporte = ruta.match(/^\/api\/aporte\/([A-Za-z0-9-]+)$/);
         if (aporte)                         return await apiAporte(env, aporte[1]);
+        const rec = ruta.match(/^\/api\/recibo\/(GG-\d{4}-\d{6})\.pdf$/i);
+        if (rec)                            return await apiRecibo(env, rec[1], url.searchParams.get("t"));
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
         /* Nunca se filtra el detalle interno al cliente. */

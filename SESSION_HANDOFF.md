@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Ecosistema digital — Fases 0 a 4" (8–11 ago 2026)
+> Última actualización: sesión "Ecosistema digital — Fase 5, los documentos" (11 ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -14,7 +14,7 @@ Si Sebas dice solo "la siguiente fase", **preguntar de cuál de los tres**.
 
 | Plan | Dónde vive | Estado |
 |---|---|---|
-| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso de la sesión del 8–11 ago 2026 | **Fases 0, 1, 2 y 4 hechas.** Fase 3 a medias: voluntariado ✅, faltan migrar fundaciones y empresas. **Siguiente natural: Fase 5** (recibo y certificado en PDF con `pdf-lib`) |
+| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso de la sesión del 8–11 ago 2026 | **Fases 0, 1, 2, 4 y 5 hechas.** Fase 3 a medias: voluntariado ✅, faltan migrar fundaciones y empresas. **Siguiente natural: Fase 6** (evidencia: acta de entrega con foto sobre el aporte ya trazado) |
 | **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3** — y ahora sí es viable: el **contador por recencia** estaba bloqueado por no tener datos reales, y D1 ya los tiene |
 | **VOLUNTARIADO, 8 fases** | `PLAN_VOLUNTARIADO.md` | **Fases 1–7 hechas y en producción.** **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
@@ -23,33 +23,83 @@ documentado, no ocurrió»). Avisan los seleccionados el **28 de agosto**. Si en
 hay que producir los ocho materiales del taller — detalle en la memoria del
 proyecto.
 
-## ⏭️ TAREA QUE SIGUE: reordenar `#donar` (pedida por Sebas el 11 ago 2026)
+## ⏭️ TAREA QUE SIGUE: aplicar la migración 0003 y verificar la Fase 5 en vivo
 
-Textual: *«subir el botón del pago para que esté inmediatamente después de la
-dedicatoria, integrado a la calculadora. La zona "otras formas de ayudar" debería
-ir junta a "otras formas de aportar". Y que sea visible luego de todo esto esa
-zona de Pago seguro, es una muy buena sección.»*
+`migrations/0003_documentos.sql` **se aplica a mano y ANTES** de que el código
+llegue a producción: añade `aportes.token`, que `/api/checkout` ya escribe. Al
+revés, el checkout se cae y con él las donaciones.
 
-**Objetivo:** `.calc` termina con el botón (calc-out → calc-note → `.pay-now`);
-los chips de `.calc-extra` se juntan con `.pay-tabs` en un solo bloque «Otras
-formas de aportar»; y «Pago seguro» queda al final.
+```
+npx wrangler d1 migrations apply givegrow-privado --remote
+npx wrangler d1 migrations apply givegrow-privado-sandbox --env sandbox --remote
+```
 
-**⚠️ EL RIESGO, y no es corta-y-pega:** los dos bloques **cruzan la frontera
-claro/oscuro** y su CSS asume el fondo donde viven hoy.
+Después: emitir **un** certificado real desde `/admin` y mirar el PDF. Es lo
+único de la Fase 5 que no se pudo ejercitar en local, porque el panel está tras
+Cloudflare Access y no hay forma legítima de firmar un token de Access en
+`wrangler dev`. Lo que sí quedó verificado en local está abajo.
 
-| Bloque | Su CSS asume | Al moverlo queda sobre |
-|---|---|---|
-| `.pay-now` | claro (`--surface`, `--ink`, `--ink-soft`, `--mu`) | el panel **oscuro** → texto oscuro sobre oscuro |
-| `.calc-extra` | oscuro (`rgba(255,255,255,…)` en texto, chips y borde) | sección **clara** → blanco sobre papel |
+Y falta un dato que solo tiene Sebas: las **cédulas de los firmantes**
+(`ENTIDAD.repLegal.cc` y `ENTIDAD.revisora.cc` en `documentos.js`). El bloque de
+firmas omite la línea mientras estén vacías.
 
-Y `.calc` es oscuro en **los dos temas** (usa `--ink-deep`, no depende de
-`data-theme`), mientras `cream` sí cambia: revisar día **y** noche.
+## Cierre de tanda: ecosistema digital, Fase 5 — los documentos (11 ago 2026)
 
-**Además:** `aria-labelledby="pay-heading"` del tablist apunta al h3 «Cómo
-aportar»; si ese h3 se mueve o desaparece, re-apuntarlo. Y hay que unificar
-`pay.other` con `calc.emp.t`/`calc.emp.p` en **ambos idiomas**.
+El recibo y el certificado de donación, en PDF, armados en el Worker con
+`pdf-lib` — la **primera dependencia npm del repositorio**.
 
-Detalle completo, con números de línea verificados, en el traspaso de esa sesión.
+**La decisión que gobierna toda la fase** es que los dos documentos no son la
+misma cosa con distinta plantilla:
+
+- El **recibo** lo emite el sistema al confirmarse el pago, y puede hacerlo
+  porque no afirma nada tributario. Lo dice en su propio cuerpo: «no es el
+  certificado de donación para efectos tributarios».
+- El **certificado** es una declaración *bajo la gravedad de juramento* que
+  firman el Representante Legal y la Revisora Fiscal. Lo emite una PERSONA desde
+  `/admin`. Automatizar la emisión sería automatizar el juramento de otro.
+
+Automatizado: numerar, armar, congelar, archivar, enviar. Nunca: decidir que se
+emite. Es exactamente el ciclo que ya pedía `ops/arquitectura-donaciones-membresias.md` §5.
+
+**El texto del certificado lo suministró la contadora** y de paso cerró la
+inconsistencia tributaria que estaba abierta: es **Art. 257, 25%**, con el límite
+del 258 — o sea, lo que el SITIO decía. Los documentos del Drive que hablaban de
+Art. 125 / 125% son los que están mal. No se editó el articulado; solo se
+resolvieron sus variables de plantilla y se retiró la rama de «bienes en especie»
+de los numerales 3 y 5, que no aplica a un pago por pasarela.
+
+**Detalles que conviene no perder:**
+- **El recibo exige token** (128 bits, creados en el checkout). La guía es
+  consecutiva: sin token, contar desde `GG-2026-000001` sería cosechar nombres y
+  dedicatorias. Token malo y guía inexistente devuelven **el mismo 403**, para no
+  dejar un oráculo de qué guías existen.
+- **El snapshot del certificado se congela al emitir** (`certificados.datos`). Si
+  el donante corrige su nombre después, el PDF que ya tiene la DIAN no cambia.
+- **No se borra, se anula**, con motivo. El consecutivo conserva el hueco.
+- **La revisión humana es el formulario, no el botón**: Wompi no entrega
+  domicilio, así que el panel abre los campos, quien emite completa, y sin
+  nombre/documento/domicilio el endpoint responde 422.
+- **Recibo por enlace, certificado por adjunto.** El recibo lo dispara el webhook
+  de Wompi, que debe responder rápido; el certificado lo manda una persona.
+- **Tipografía Helvetica, no Unbounded.** Las de marca son woff2 y pdf-lib no las
+  lee; convertir y embeber costaría cientos de KB en el bundle del Worker.
+
+**Lo que se encontró de paso:**
+- `wrangler d1 migrations apply` **falla sobre una base limpia**: `0002_idioma.sql`
+  inserta su propia fila en `d1_migrations` y el comando la inserta otra vez
+  (`UNIQUE constraint failed`). La 0003 ya no lo hace.
+- El gate solo comprobaba la sintaxis de `app.js`. `worker.js` nunca se validó, y
+  ahora además importa. Se añadieron los tres archivos y un
+  `wrangler deploy --dry-run` en `ci.yml`, que es lo único que ve el enlazado.
+
+**Verificado en local** (wrangler dev + D1 real): recibo 200 con token, 403 con
+token malo, 403 sin token, 403 en guía inexistente, 409 en aporte sin pagar;
+cabeceras `private, no-store` y `noindex`; consecutivo `CD-` atómico (1,2,3);
+índice de «un solo certificado vigente» bloqueando el duplicado y permitiendo la
+reexpedición tras anular; `node_modules` NO se publica (los 200 de `/worker.js` y
+compañía son el fallback de SPA sirviendo `index.html`, no los archivos);
+23 casos de número-a-letras, incluidos «veintiún mil» y «un millón».
+Bundle: 915 KB, 240 KB gzip.
 
 ## Cierre de tanda: ecosistema digital, Fases 0 a 4 (8–11 ago 2026)
 

@@ -1,0 +1,14 @@
+{
+  "name": "givegrow-website",
+  "private": true,
+  "type": "module",
+  "description": "Sitio de Fundación Give&Grow International. La única dependencia es pdf-lib, que arma el recibo de aporte y el certificado de donación DENTRO del Worker: son documentos con datos personales y no pueden generarse en el navegador.",
+  "scripts": {
+    "validate": "node scripts/validate.mjs",
+    "dev": "wrangler dev --persist-to /tmp/gg-wrangler",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1"
+  }
+}
