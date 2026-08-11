@@ -191,11 +191,23 @@ async function apiEventos(request, env) {
 
   /* Checksum: valores de signature.properties en ORDEN, luego el timestamp,
      luego el secreto de eventos. Las propiedades vienen como rutas con punto
-     ("transaction.status"), así que se resuelven sobre ev.data. */
+     ("transaction.status"), así que se resuelven sobre ev.data.
+
+     OJO — EL TIMESTAMP VA EN LA RAÍZ DEL EVENTO, NO DENTRO DE `signature`.
+     La documentación de Wompi muestra el ejemplo con `signature.timestamp`, y
+     eso está mal: el evento real trae `timestamp` al mismo nivel que `event`,
+     `data` y `signature`. Leerlo del lugar documentado da undefined, la cadena
+     se firma sin timestamp y TODOS los webhooks legítimos se rechazan.
+     Comprobado el 11 ago 2026 con un pago real en sandbox
+     (tx 12129016-1786413420-91097): con el timestamp de la raíz el checksum
+     reproduce exactamente el de Wompi; sin él, no.
+     Se lee la raíz primero y se cae a signature.timestamp por si algún día
+     cambian al formato que documentan. */
+  const ts = ev.timestamp ?? firma.timestamp ?? "";
   const valorDe = (ruta) => String(
     ruta.split(".").reduce((o, k) => (o == null ? undefined : o[k]), ev.data) ?? ""
   );
-  const cadena = props.map(valorDe).join("") + String(firma.timestamp ?? "") + secreto;
+  const cadena = props.map(valorDe).join("") + String(ts) + secreto;
   const calculado = await sha256Hex(cadena);
   const valida = igualesSeguro(calculado.toLowerCase(), String(firma.checksum || "").toLowerCase());
 
@@ -209,7 +221,7 @@ async function apiEventos(request, env) {
       ).bind(
         String(tx.id || "sin-id"), String(ev.event || "?"), String(tx.status || "?"),
         tx.reference ? String(tx.reference) : null, String(firma.checksum || ""),
-        firma.timestamp ?? null, crudo.slice(0, 8000)
+        (ts === "" ? null : ts), crudo.slice(0, 8000)
       ).run();
     } catch { /* la bitácora no debe tapar la respuesta */ }
     return json({ error: "firma_invalida" }, 401);
@@ -221,20 +233,48 @@ async function apiEventos(request, env) {
   if (!txId || !estado) return json({ error: "evento_incompleto" }, 400);
 
   /* Idempotencia: UNIQUE(transaction_id, estado). El mismo evento puede llegar
-     hasta cuatro veces (reintentos a los 30 min, 3 h y 24 h). Si ya estaba,
-     `changes` es 0 y no se vuelve a procesar. */
+     hasta cuatro veces (reintentos a los 30 min, 3 h y 24 h).
+
+     OJO — la condición es "ya lo PROCESÉ", no "ya lo VI". Son distintas, y la
+     diferencia costó un pago real: el evento del pago de prueba se registró con
+     firma_valida=0 cuando lo rechazábamos por el bug del timestamp, y al
+     corregir el bug su reintento se descartaba como duplicado, dejando el aporte
+     en `intencion` para siempre. Un evento visto pero NO procesado —firma
+     inválida, o un fallo a mitad de camino— tiene que poder procesarse cuando la
+     causa se arregle. Si no, cualquier bug transitorio en la validación se
+     convierte en una donación perdida en silencio. */
   const ins = await env.DB.prepare(
     "INSERT OR IGNORE INTO eventos_wompi (transaction_id, evento, estado, guia, checksum, " +
-    "firma_valida, timestamp_wompi, cuerpo) VALUES (?,?,?,?,?,1,?,?)"
+    "firma_valida, timestamp_wompi, cuerpo, procesado) VALUES (?,?,?,?,?,1,?,?,0)"
   ).bind(
     txId, String(ev.event || "transaction.updated"), estado, guia,
-    String(firma.checksum || ""), firma.timestamp ?? null, crudo.slice(0, 8000)
+    String(firma.checksum || ""), (ts === "" ? null : ts), crudo.slice(0, 8000)
   ).run();
 
-  const yaProcesado = !ins.meta || ins.meta.changes === 0;
-  if (yaProcesado) return json({ ok: true, repetido: true });
+  let idEvento = ins.meta ? ins.meta.last_row_id : null;
+  const eraNuevo = ins.meta && ins.meta.changes > 0;
+
+  if (!eraNuevo) {
+    const prev = await env.DB.prepare(
+      "SELECT id, procesado FROM eventos_wompi WHERE transaction_id = ? AND estado = ?"
+    ).bind(txId, estado).first();
+    if (prev && prev.procesado) return json({ ok: true, repetido: true });
+    if (!prev) return json({ ok: true, repetido: true });   // no debería pasar
+    /* Estaba registrado pero sin procesar: se actualiza con los datos buenos y
+       se procesa ahora. */
+    idEvento = prev.id;
+    await env.DB.prepare(
+      "UPDATE eventos_wompi SET firma_valida=1, checksum=?, timestamp_wompi=?, cuerpo=?, guia=? WHERE id=?"
+    ).bind(String(firma.checksum || ""), (ts === "" ? null : ts), crudo.slice(0, 8000), guia, idEvento).run();
+  }
 
   if (guia) await aplicarEstado(env, guia, tx, estado);
+
+  /* Se marca procesado SOLO después de mover el aporte. Si algo falla arriba, el
+     reintento de Wompi vuelve a entrar por la rama de "visto pero no procesado". */
+  if (idEvento) {
+    await env.DB.prepare("UPDATE eventos_wompi SET procesado = 1 WHERE id = ?").bind(idEvento).run();
+  }
 
   return json({ ok: true });
 }
