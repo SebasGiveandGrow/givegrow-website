@@ -34,9 +34,12 @@ WOMPI_PUBLIC_KEY = "pub_prod_sA952OP2Y58ahrZRjHgutdBIr9U0FUr6"
 # p=reject — ver ops/correo-transaccional.md. La llave (RESEND_API_KEY) es
 # secreto de Wrangler, nunca va aquí.
 CORREO_DESDE = "Give&Grow International <no-responder@notificaciones.thegiveandgrowproject.org>"
-# Aviso interno a un buzón que SÍ recibe hoy. No usar el dominio propio mientras
-# su DNS siga roto: rebotaría por su propio DMARC (error 550 5.7.26).
-CORREO_AVISOS = "fundaciongiveandgrow@gmail.com"
+# Aviso interno. Desde el 11 ago 2026 va al buzón institucional: el dominio ya
+# autentica (SPF y DKIM pasan y ALINEAN, verificado con un informe de
+# verifier.port25.com), así que el motivo para usar un Gmail personal desapareció.
+# Ojo: aquí el dominio es DESTINATARIO, no remitente — quien firma es
+# notificaciones.… vía Resend. Cambiarlo era seguro incluso antes.
+CORREO_AVISOS = "contabilidad@thegiveandgrowproject.org"
 # Panel /admin. Ninguno de los dos es secreto: identifican la aplicación de
 # Cloudflare Access, no autorizan nada por sí solos. Sin ellos el panel responde
 # 503 y no sirve un dato — ver ops/panel-admin.md.
@@ -90,4 +93,7 @@ database_id = "624d07cc-845c-4b96-83c3-866f9a74c752"
 [env.sandbox.vars]
 WOMPI_PUBLIC_KEY = "pub_test_ws2Bo5M1W8mecXqqCWjjzpRjpQAHtlec"
 CORREO_DESDE = "Give&Grow (pruebas) <no-responder@notificaciones.thegiveandgrowproject.org>"
+# A propósito distinto de producción: los avisos de PRUEBA no deben caer en el
+# buzón de contabilidad, que es donde se revisan los aportes reales. Mezclarlos
+# haría que el buzón dejara de ser confiable como bandeja de trabajo.
 CORREO_AVISOS = "fundaciongiveandgrow@gmail.com"
