@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=5b38fb51">
+<link rel="stylesheet" href="/styles.css?v=06d6288b">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1505,7 +1505,60 @@
       <span class="ey rv" data-i18n="vol.hoy.ey">Dónde estamos hoy</span>
       <h3 class="rv" data-i18n="vol.hoy.t" style="margin-bottom:14px">Contado sin adornos</h3>
       <p class="lead rv d1" data-i18n="vol.hoy.p" style="margin-left:auto;margin-right:auto">Ya hicimos las primeras jornadas con donantes y aliados. Con equipos de empresa estamos abriendo el formato: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.</p>
-      <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="#aliados" data-i18n="vol.cta">Quiero participar</a></div>
+      <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="#vol-form" data-nav="voluntariado" data-i18n="vol.cta">Quiero participar</a></div>
+    </div>
+  </section>
+
+  <!-- Formulario de voluntariado. Antes de esto, el botón de arriba llevaba al
+       formulario de EMPRESAS y una persona no tenía dónde inscribirse.
+       El campo de captura es una pregunta APARTE del nivel a propósito: los dos
+       protocolos tienen disparadores independientes (el de cuidado lo dispara
+       pisar territorio; el de imagen, la cámara), así que deducir uno del otro
+       dejaría fuera al voluntario de estructura que llega con el celular. -->
+  <section id="vol-form">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="vf.ey">Sumarte</span>
+      <h2 class="h-sec rv" data-i18n="vf.t">Cuéntanos quién eres</h2>
+      <p class="lead rv d1" data-i18n="vf.lead">No hay mínimo de horas ni compromiso obligado. Lo que sí hay es una conversación antes de empezar: queremos conocerte y encontrar juntos dónde encajas mejor.</p>
+
+      <form id="vf" class="ally-form rv d2" data-submit="volSubmit(event)">
+        <div class="field"><label for="vf-nombre" data-i18n="vf.nombre">Nombre completo</label>
+          <input type="text" id="vf-nombre" autocomplete="name" required></div>
+        <div class="field"><label for="vf-email" data-i18n="vf.email">Correo</label>
+          <input type="email" id="vf-email" autocomplete="email" required></div>
+        <div class="field"><label for="vf-tel" data-i18n="vf.tel">Teléfono o WhatsApp (opcional)</label>
+          <input type="tel" id="vf-tel" autocomplete="tel"></div>
+        <div class="field"><label for="vf-ciudad" data-i18n="vf.ciudad">Ciudad (opcional)</label>
+          <input type="text" id="vf-ciudad" autocomplete="address-level2"></div>
+
+        <fieldset class="vf-set">
+          <legend data-i18n="vf.nivel.lbl">¿Cómo quieres participar?</legend>
+          <p class="vf-help" data-i18n="vf.nivel.help">El nivel no lo define tu oficio: lo define si pisas el territorio. Un diseñador puede aportar solo en la estructura, solo en terreno, o partir su tiempo entre las dos.</p>
+          <label class="ally-check"><input type="radio" name="vf-nivel" value="hub" data-act="volNivel()"><span data-i18n="vf.nivel.hub">Con el HUB SOCIAL — en terreno, junto a una fundación aliada</span></label>
+          <label class="ally-check"><input type="radio" name="vf-nivel" value="estructura" data-act="volNivel()"><span data-i18n="vf.nivel.est">Con Give&amp;Grow — en la estructura, sin pisar territorio</span></label>
+          <label class="ally-check"><input type="radio" name="vf-nivel" value="mixto" data-act="volNivel()"><span data-i18n="vf.nivel.mix">Mixto — parte estructura, parte terreno</span></label>
+          <p class="vf-aviso" id="vf-terreno" style="display:none" data-i18n="vf.terreno.aviso">Como estarías en terreno, antes de cualquier jornada pasan dos verificaciones —la nuestra y la de la fundación que acompaña a esa comunidad— y una sesión de Marco. La fundación tiene la última palabra sobre cuándo una visita suma: no es un filtro, es la anfitriona.</p>
+        </fieldset>
+
+        <div class="field"><label for="vf-oficio" data-i18n="vf.oficio">Tu oficio o área</label>
+          <input type="text" id="vf-oficio" data-i18n="vf.oficio.ph" data-i18n-attr="placeholder" placeholder="Derecho, contabilidad, salud, desarrollo, docencia, comunicación…" required></div>
+        <div class="field"><label for="vf-disp" data-i18n="vf.disp">Disponibilidad (opcional)</label>
+          <input type="text" id="vf-disp" data-i18n="vf.disp.ph" data-i18n-attr="placeholder" placeholder="Un sábado al mes, dos horas a la semana, por proyecto…"></div>
+
+        <label class="ally-check"><input type="checkbox" id="vf-captura"><span><b data-i18n="vf.captura">Voy a fotografiar o grabar</b><small data-i18n="vf.captura.help">Marcarlo no es un problema, es lo que activa el protocolo de imagen. El consentimiento va primero que la cámara, y lo deciden la fundación y las familias — nunca quien visita.</small></span></label>
+
+        <div class="field"><label for="vf-msg" data-i18n="vf.msg">¿Algo que quieras contarnos? (opcional)</label>
+          <textarea id="vf-msg" rows="3" maxlength="600" data-i18n="vf.msg.ph" data-i18n-attr="placeholder" placeholder="Qué te mueve, qué te gustaría hacer, qué dudas tienes."></textarea></div>
+
+        <label class="ally-check"><input type="checkbox" id="vf-datos"><span data-i18n="vf.datos">Autorizo el tratamiento de mis datos para que Give&amp;Grow me contacte sobre voluntariado, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.</span></label>
+
+        <!-- Trampa para bots: invisible y sin etiqueta. Si llega llena, no se guarda. -->
+        <input type="text" id="vf-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+
+        <button type="submit" class="btn btn-g" id="vf-btn" data-i18n="vf.submit">Enviar mis datos</button>
+        <p class="mu" style="margin-top:12px;font-size:13.5px" data-i18n="vf.nada">Nada de esto se cobra, en ninguna dirección.</p>
+        <p id="vf-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
+      </form>
     </div>
   </section>
 </main>
@@ -1611,7 +1664,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=878d9be6"></script>
+<script src="/app.js?v=6f59da2f"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

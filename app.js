@@ -455,6 +455,38 @@ var I18N = {
     "vol.hoy.t":"Contado sin adornos",
     "vol.hoy.p":"Ya hicimos las primeras jornadas con donantes y aliados. Con equipos de empresa estamos abriendo el formato: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.",
     "vol.cta":"Quiero participar",
+    "vf.ey":"Sumarte",
+    "vf.t":"Cuéntanos quién eres",
+    "vf.lead":"No hay mínimo de horas ni compromiso obligado. Lo que sí hay es una conversación antes de empezar: queremos conocerte y encontrar juntos dónde encajas mejor.",
+    "vf.nombre":"Nombre completo",
+    "vf.email":"Correo",
+    "vf.tel":"Teléfono o WhatsApp (opcional)",
+    "vf.ciudad":"Ciudad (opcional)",
+    "vf.nivel.lbl":"¿Cómo quieres participar?",
+    "vf.nivel.help":"El nivel no lo define tu oficio: lo define si pisas el territorio. Un diseñador puede aportar solo en la estructura, solo en terreno, o partir su tiempo entre las dos.",
+    "vf.nivel.hub":"Con el HUB SOCIAL — en terreno, junto a una fundación aliada",
+    "vf.nivel.est":"Con Give&Grow — en la estructura, sin pisar territorio",
+    "vf.nivel.mix":"Mixto — parte estructura, parte terreno",
+    "vf.oficio":"Tu oficio o área",
+    "vf.oficio.ph":"Derecho, contabilidad, salud, desarrollo, docencia, comunicación…",
+    "vf.disp":"Disponibilidad (opcional)",
+    "vf.disp.ph":"Un sábado al mes, dos horas a la semana, por proyecto…",
+    "vf.captura":"Voy a fotografiar o grabar",
+    "vf.captura.help":"Marcarlo no es un problema, es lo que activa el protocolo de imagen. El consentimiento va primero que la cámara, y lo deciden la fundación y las familias — nunca quien visita.",
+    "vf.msg":"¿Algo que quieras contarnos? (opcional)",
+    "vf.msg.ph":"Qué te mueve, qué te gustaría hacer, qué dudas tienes.",
+    "vf.datos":"Autorizo el tratamiento de mis datos para que Give&Grow me contacte sobre voluntariado, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.",
+    "vf.terreno.aviso":"Como estarías en terreno, antes de cualquier jornada pasan dos verificaciones —la nuestra y la de la fundación que acompaña a esa comunidad— y una sesión de Marco. La fundación tiene la última palabra sobre cuándo una visita suma: no es un filtro, es la anfitriona.",
+    "vf.submit":"Enviar mis datos",
+    "vf.sending":"Enviando…",
+    "vf.ok":"Listo. Te escribimos pronto al correo que dejaste, y ahí te contamos los siguientes pasos.",
+    "vf.err.nombre":"Nos falta tu nombre.",
+    "vf.err.email":"Revisa el correo: parece que tiene algo raro.",
+    "vf.err.nivel":"Elige cómo quieres participar.",
+    "vf.err.oficio":"Cuéntanos tu oficio o área.",
+    "vf.err.datos":"Necesitamos tu autorización para guardar tus datos y poder escribirte.",
+    "vf.err.send":"No pudimos enviar tus datos. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
+    "vf.nada":"Nada de esto se cobra, en ninguna dirección.",
     "vol.link":"Ver el programa de voluntariado",
     "fund.ey":"Para fundaciones",
     "fund.t":"Aplica al HUB SOCIAL.",
@@ -1117,7 +1149,7 @@ var ACT_FNS = {
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA, allySubmit:allySubmit,
-  irAPagar:irAPagar,
+  irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
@@ -2751,6 +2783,67 @@ function allySubmit(ev){
     .catch(function(){ btn.disabled = false; allyMsg(note, t("ally.err.send"), false); });
   return false;
 }
+/* ---------- formulario de voluntariado ----------
+   El aviso de terreno aparece según el nivel elegido, no al final: quien va a
+   pisar territorio debe saber ANTES de enviar que hay dos verificaciones y una
+   sesión de Marco. Enterarse después se sentiría como un filtro escondido, que
+   es justo lo que el programa no es. */
+function volNivel(){
+  var n = document.querySelector('input[name="vf-nivel"]:checked');
+  var aviso = document.getElementById("vf-terreno");
+  if (!aviso) return;
+  var pisa = n && (n.value === "hub" || n.value === "mixto");
+  aviso.style.display = pisa ? "" : "none";
+}
+
+function volSubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("vf-note");
+  var btn = document.getElementById("vf-btn");
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
+
+  /* Honeypot: éxito aparente, cero envío. No se le enseña al bot qué lo delató. */
+  if (val("vf-web2")){ document.getElementById("vf").reset(); volNivel(); return allyMsg(note, t("vf.ok"), true); }
+
+  var nivelEl = document.querySelector('input[name="vf-nivel"]:checked');
+  if (!val("vf-nombre")) return allyMsg(note, t("vf.err.nombre"), false);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("vf-email"))) return allyMsg(note, t("vf.err.email"), false);
+  if (!nivelEl) return allyMsg(note, t("vf.err.nivel"), false);
+  if (!val("vf-oficio")) return allyMsg(note, t("vf.err.oficio"), false);
+  if (!chk("vf-datos")) return allyMsg(note, t("vf.err.datos"), false);
+
+  btn.disabled = true;
+  allyMsg(note, t("vf.sending"), true);
+
+  fetch("/api/inscripcion", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tipo: "voluntario",
+      nombre: val("vf-nombre"),
+      email: val("vf-email"),
+      telefono: val("vf-tel"),
+      ciudad: val("vf-ciudad"),
+      nivel: nivelEl.value,
+      oficio: val("vf-oficio"),
+      disponibilidad: val("vf-disp"),
+      mensaje: val("vf-msg"),
+      captura: chk("vf-captura"),
+      autoriza_datos: true,
+      web2: val("vf-web2"),
+      idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
+    })
+  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+    .then(function(){
+      document.getElementById("vf").reset(); volNivel();
+      btn.disabled = false;
+      allyMsg(note, t("vf.ok"), true);
+    })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("vf.err.send"), false); });
+  return false;
+}
+
 function allyMsg(el, msg, ok){
   el.style.display = ""; el.textContent = msg;
   el.style.color = ok ? "var(--g)" : "var(--err,#c0392b)";
