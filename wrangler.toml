@@ -37,6 +37,16 @@ CORREO_DESDE = "Give&Grow International <no-responder@notificaciones.thegiveandg
 # Aviso interno a un buzón que SÍ recibe hoy. No usar el dominio propio mientras
 # su DNS siga roto: rebotaría por su propio DMARC (error 550 5.7.26).
 CORREO_AVISOS = "fundaciongiveandgrow@gmail.com"
+# Panel /admin. Ninguno de los dos es secreto: identifican la aplicación de
+# Cloudflare Access, no autorizan nada por sí solos. Sin ellos el panel responde
+# 503 y no sirve un dato — ver ops/panel-admin.md.
+# El AUD es lo que impide que un token válido de OTRA aplicación de Access del
+# mismo equipo sirva para entrar aquí.
+ACCESS_TEAM_DOMAIN = "dark-wind-8484.cloudflareaccess.com"
+ACCESS_AUD = "48d495e9504ba1eb77fccbb01f16da7123d69492f8d89868962bf169c030c39c"
+
+# El entorno de PRUEBAS no lleva estas variables a propósito: no tiene su propia
+# aplicación de Access, así que su panel debe seguir cerrado (503).
 
 # ===========================================================================
 # ENTORNO DE PRUEBAS
