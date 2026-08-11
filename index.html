@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=709a90c6">
+<link rel="stylesheet" href="/styles.css?v=5b38fb51">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -742,6 +742,35 @@
   </section>
 </main>
 
+<!-- ============ GRACIAS (retorno del checkout) ============
+     Wompi vuelve a /gracias?id=<su id de transacción>. El fallback de SPA sirve
+     index.html, y app.js detecta la ruta, traduce ese id a nuestra guía y
+     consulta NUESTRO estado — nunca el de la redirección, que la documentación
+     de Wompi dice explícitamente que no sirve para validar. -->
+<main id="page-gracias" class="page">
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="gracias.ey">Tu aporte</span>
+      <h2 class="h-sec rv" id="gracias-t" data-i18n="gracias.t">Estamos confirmando tu pago.</h2>
+      <p class="lead rv d1" id="gracias-p" data-i18n="gracias.lead">Ningún medio de pago confirma al instante, así que preferimos decirte la verdad en vez de darte las gracias por algo que todavía no está confirmado. Esta página se actualiza sola.</p>
+      <div class="rec-ledger rv d2" id="gracias-ledger" style="display:none">
+        <dl class="rec-list">
+          <div class="rec-item"><dt data-i18n="gracias.guia">Número de guía</dt><dd id="gr-guia">—</dd></div>
+          <div class="rec-item"><dt data-i18n="gracias.estado">Estado</dt><dd id="gr-estado">—</dd></div>
+          <div class="rec-item"><dt data-i18n="gracias.monto">Monto</dt><dd id="gr-monto">—</dd></div>
+          <div class="rec-item"><dt data-i18n="gracias.destino">Destino</dt><dd id="gr-destino">—</dd></div>
+        </dl>
+        <p class="rec-note mu" data-i18n="gracias.save">Guarda tu número de guía. Es el mismo con el que puedes rastrear tu aporte de principio a fin.</p>
+      </div>
+      <p class="mu rv d2" id="gracias-nota" style="display:none;margin-top:16px;max-width:70ch"></p>
+      <div class="cta-actions rv d2" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-g" href="#rastrea" data-i18n="gracias.track">Rastrear mi aporte</a>
+        <a class="btn btn-o" href="#inicio" data-i18n="gracias.home">Volver al inicio</a>
+      </div>
+    </div>
+  </section>
+</main>
+
 <!-- ============ MEDICIÓN ============ -->
 <main id="page-medicion" class="page">
   <section>
@@ -995,7 +1024,21 @@
   <section class="cream">
     <div class="wrap center">
       <h3 id="pay-heading" class="rv" data-i18n="pay.t" style="margin-bottom:20px">Cómo aportar</h3>
-      <div class="pay-tabs rv d1" role="tablist" aria-labelledby="pay-heading">
+
+      <!-- Camino principal: pago en línea. La transferencia queda como alternativa
+           debajo, no como el único camino. El monto, la frecuencia y el destino
+           salen del estado de la calculadora; la firma la calcula el Worker. -->
+      <div class="pay-now rv d1">
+        <span class="ey" data-i18n="pay.now.ey">Pago en línea</span>
+        <h4 class="pay-now-t" data-i18n="pay.now.t">Tarjeta, PSE, Nequi o Bancolombia</h4>
+        <p class="pay-now-p" data-i18n="pay.now.p">Sales a Wompi, la pasarela de pagos de Bancolombia, y vuelves con tu número de guía. Nosotros nunca vemos ni guardamos los datos de tu medio de pago.</p>
+        <p class="pay-now-rec mu" id="pay-rec-note" style="display:none"></p>
+        <button type="button" class="btn btn-g pay-now-btn" id="pay-go" data-act="irAPagar()" data-i18n="pay.now.btn">Continuar al pago</button>
+        <p class="pay-now-msg" id="pay-msg" role="status" aria-live="polite" style="display:none"></p>
+      </div>
+
+      <p class="rec-cap pay-other-cap rv d2" data-i18n="pay.other">Otras formas de aportar</p>
+      <div class="pay-tabs rv d2" role="tablist" aria-labelledby="pay-heading">
         <button type="button" id="paytab-banco" class="pay-tab on" role="tab" aria-selected="true" aria-controls="pay-banco" tabindex="0" data-act="payMethod('banco')" data-i18n="pay.tab.banco">Bancolombia</button>
         <button type="button" id="paytab-paypal" class="pay-tab" role="tab" aria-selected="false" aria-controls="pay-paypal" tabindex="-1" data-act="payMethod('paypal')" data-i18n="pay.tab.paypal">PayPal</button>
       </div>
@@ -1570,7 +1613,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=ff96d560"></script>
+<script src="/app.js?v=1b9a7baf"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

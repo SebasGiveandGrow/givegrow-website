@@ -892,6 +892,22 @@ html[data-theme="dark"] .mira-hv{color:#e6a44e}
   .mira-p{grid-area:p}
 }
 
+/* ---------- pago en línea (Fase 2): el camino principal de #donar ----------
+   Bloque de papel con regla fina, no tarjeta de app. La audacia de esta página
+   ya está gastada en la calculadora; esto tiene que ser tranquilo y claro. */
+.pay-now{max-width:56ch;margin:0 auto;padding:26px 28px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);text-align:left}
+.pay-now .ey{display:block;margin-bottom:6px}
+.pay-now-t{font-size:var(--fs-h4);margin:0 0 8px;color:var(--ink)}
+.pay-now-p{margin:0;font-size:14.5px;line-height:1.6;color:var(--ink-soft)}
+.pay-now-rec{margin:14px 0 0;font-size:13.5px;line-height:1.55;border-left:3px solid var(--amber);padding-left:14px}
+.pay-now-btn{margin-top:20px;width:100%}
+.pay-now-btn:disabled{opacity:.6;cursor:default}
+.pay-now-msg{margin:12px 0 0;font-size:13.5px;color:var(--mu)}
+.pay-now-msg.err{color:var(--err,#c0392b)}
+html[data-theme="dark"] .pay-now-msg.err{color:#f0857a}
+/* La transferencia baja de categoría: sigue estando, pero deja de ser el camino */
+.pay-other-cap{margin:34px 0 12px;text-align:center}
+
 /* ---------- #medicion (Fase 7): marco de medición ----------
    Sin tokens nuevos. Reusa .os-rows/.os-row, .rec-cap y .vol-care.
    Elemento firma de la página: la escalera de tres peldaños, cuyo tercer
