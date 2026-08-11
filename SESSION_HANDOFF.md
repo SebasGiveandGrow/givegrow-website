@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Ecosistema digital — Fase 5, los documentos" (11 ago 2026)
+> Última actualización: sesión "Fase 5 + 5.1 — documentos e integridad" (11 ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -23,25 +23,75 @@ documentado, no ocurrió»). Avisan los seleccionados el **28 de agosto**. Si en
 hay que producir los ocho materiales del taller — detalle en la memoria del
 proyecto.
 
-## ⏭️ TAREA QUE SIGUE: aplicar la migración 0003 y verificar la Fase 5 en vivo
+## ⏭️ TAREA QUE SIGUE: la contraprestación, y luego la Fase 6
 
-`migrations/0003_documentos.sql` **se aplica a mano y ANTES** de que el código
-llegue a producción: añade `aportes.token`, que `/api/checkout` ya escribe. Al
-revés, el checkout se cae y con él las donaciones.
+**Pregunta para la contadora, antes de emitir certificados a miembros.** El
+numeral 6 del certificado declara «acto de mera liberalidad… sin contraprestación
+alguna, directa ni indirecta». Pero la membresía Tier 2 ofrece «Acceso al
+Programa de Gratitud», que son beneficios reales de comercios aliados. Si el
+donante recibe algo a cambio, esa declaración puede ser falsa — y la firma la
+Revisora Fiscal bajo juramento. **No lo arregla código.** Es el mayor riesgo
+abierto de toda la tanda de documentos.
 
-```
-npx wrangler d1 migrations apply givegrow-privado --remote
-npx wrangler d1 migrations apply givegrow-privado-sandbox --env sandbox --remote
-```
-
-Después: emitir **un** certificado real desde `/admin` y mirar el PDF. Es lo
-único de la Fase 5 que no se pudo ejercitar en local, porque el panel está tras
-Cloudflare Access y no hay forma legítima de firmar un token de Access en
-`wrangler dev`. Lo que sí quedó verificado en local está abajo.
-
-Y falta un dato que solo tiene Sebas: las **cédulas de los firmantes**
+Falta también un dato que solo tiene Sebas: las **cédulas de los firmantes**
 (`ENTIDAD.repLegal.cc` y `ENTIDAD.revisora.cc` en `documentos.js`). El bloque de
 firmas omite la línea mientras estén vacías.
+
+Y sigue sin ejercitarse **la emisión real desde /admin**: está tras Cloudflare
+Access y no hay forma legítima de firmar ese token en `wrangler dev`. Emitir uno
+y mirar el PDF.
+
+Después: **Fase 6 del ecosistema** (evidencia: acta de entrega con foto sobre el
+aporte ya trazado).
+
+## ⚠️ INCIDENTE: producción sin donaciones (11 ago 2026, ~25 min)
+
+La migración 0003 **no llegó a producción** —casi seguro un `apply` sin
+`--remote`, que va a una base local— y el código salió igual. Como
+`/api/checkout` ya escribía `aportes.token` y el `SELECT` del webhook la
+nombraba, **nadie pudo donar** y los pagos en curso no se confirmaron, entre el
+deploy (18:19 UTC) y la reparación.
+
+Se detectó al verificar producción: `/api/recibo` devolvía **500 donde debía
+devolver 403**. Un error de más en un endpoint nuevo delató que la base no tenía
+la columna.
+
+**La lección no es "acordarse de aplicar la migración".** Estaba escrito en el
+PR, en el handoff y en CLAUDE.md, y aun así se perdió. Un paso manual que tumba
+el cobro no es un paso manual: es un incidente que todavía no ocurrió. Desde
+ahora `deploy.yml` corre `wrangler d1 migrations list --remote` y **se niega a
+desplegar** si hay pendientes.
+
+## Cierre de tanda: Fase 5.1 — integridad de los certificados (11 ago 2026)
+
+Nació de una pregunta de Sebas: «¿podrías hacer fraude o aprovecharte de esto?».
+La respuesta corta era que el certificado ya no es automático —lo emite una
+persona— pero al modelar el ataque en serio aparecieron tres huecos, y dos eran
+míos de la Fase 5.
+
+- **Reversa después de emitir.** Pagar, recibir el certificado y hacer
+  contracargo dejaba un certificado vigente respaldando un descuento del 25%
+  sobre plata devuelta. Ahora un guardián en el camino del webhook lo marca
+  `revision_en`, sella el PDF y avisa. Va **antes** del corte que impide que un
+  aporte `entregada` retroceda: el caso más grave era justo el que ese corte se
+  saltaba.
+- **Certificado a nombre de otro.** Donar como persona y emitirlo a nombre de la
+  empresa, para que la empresa tome el descuento. Se guarda lo que validó Wompi,
+  se registra la divergencia y **se exige motivo**. No se prohíbe corregir un
+  nombre incompleto: se deja rastro, porque un error de digitación se explica en
+  una línea y un cambio de beneficiario no.
+- **Un certificado anulado se descargaba limpio.** Fallo real de la Fase 5: el
+  snapshot congela el contenido, no el estado. Ahora el PDF sale con sello
+  diagonal y dice desde cuándo y por qué. El papel viaja solo.
+
+`revision_*` es automático y reversible; `anulado_*` es humano y definitivo. No
+comparten columna a propósito: el sistema marca y avisa, pero **no anula** —
+anular lleva motivo y es un acto de una persona.
+
+Verificado con `ops/probar-pagos.py`, que pasó de 17 a **19 casos en verde**: la
+reversa marca el certificado a través del webhook real y con firma real, y el
+reintento no vuelve a marcar ni a avisar (Wompi reintenta hasta cuatro veces y
+tres correos idénticos entrenan a ignorarlos).
 
 ## Cierre de tanda: ecosistema digital, Fase 5 — los documentos (11 ago 2026)
 

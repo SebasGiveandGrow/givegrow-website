@@ -602,6 +602,20 @@ async function aplicarEstado(env, guia, tx, estado) {
   };
   const nuevo = mapa[estado] || "pendiente";
 
+  /* --- guardián de reversas -------------------------------------------------
+     Va ANTES del corte de abajo, y esa posición es el punto entero: un aporte
+     ya entregado no cambia de estado por un webhook tardío, pero si le
+     devolvieron la plata al donante, su certificado dejó de tener respaldo
+     igual. Justo el caso más grave es el que el corte se saltaba.
+
+     El sistema NO anula: anular es un acto humano y lleva motivo. Marca el
+     certificado, lo sella en el PDF y avisa. La decisión sigue siendo de una
+     persona. */
+  if (["rechazada", "error"].includes(nuevo) && fila.aprobada_en) {
+    try { await revisarCertificadoPorReversa(env, guia, estado); }
+    catch (e) { console.error("guardián de reversa", guia, e && e.message); }
+  }
+
   /* Un aporte ya entregado no vuelve atrás por un webhook tardío. */
   if (["en_distribucion", "entregada"].includes(fila.estado)) return;
 
@@ -646,6 +660,47 @@ async function aplicarEstado(env, guia, tx, estado) {
       console.error("correo tras aprobar", guia, e && e.message);
     }
   }
+}
+
+/* Marca en revisión el certificado de un aporte cuyo pago se cayó después de
+   aprobarse — contracargo, reversa o anulación en la pasarela. Idempotente: si
+   ya estaba en revisión no vuelve a avisar, porque Wompi reintenta sus eventos
+   hasta cuatro veces y tres correos idénticos entrenan a ignorarlos. */
+async function revisarCertificadoPorReversa(env, guia, estadoWompi) {
+  const c = await env.DB.prepare(
+    "SELECT numero, revision_en FROM certificados WHERE guia = ? AND anulado_en IS NULL"
+  ).bind(guia).first();
+  if (!c || c.revision_en) return;
+
+  const motivo = "El pago pasó a " + estadoWompi + " en Wompi después de haberse aprobado.";
+  await env.DB.prepare(
+    "UPDATE certificados SET revision_en = datetime('now'), revision_motivo = ? WHERE numero = ?"
+  ).bind(motivo, c.numero).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES ('sistema', 'auditoria', ?)"
+  ).bind("certificado " + c.numero + " EN REVISIÓN: " + motivo).run();
+
+  /* Esto no puede quedarse en un log que nadie mira: hay un certificado
+     tributario circulando sin respaldo y alguien tiene que decidir qué hacer. */
+  const para = env.CORREO_AVISOS;
+  if (!para) return;
+  const titulo = "Certificado sin respaldo: " + c.numero;
+  const filas = [["Certificado", c.numero], ["Aporte", guia], ["Estado en Wompi", estadoWompi]];
+  await enviarCorreo(env, {
+    para,
+    asunto: "ATENCIÓN · " + titulo,
+    texto: [titulo, "", motivo, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: [
+        motivo,
+        "El certificado quedó marcado EN REVISIÓN: el PDF sale sellado y advierte que no sirve como soporte tributario.",
+        "Decide en /admin si se anula. El sistema no lo anula solo, porque anular lleva motivo y es un acto tuyo."
+      ],
+      filas
+    }),
+    etiqueta: "certificado-sin-respaldo"
+  });
 }
 
 /* Los datos personales entran SOLO aquí (Ley 1581). Nunca el medio de pago:
@@ -981,8 +1036,10 @@ async function adminAportes(env, url) {
     "a.aprobada_en, a.entregada_en, d.nombre AS donante, d.email AS correo, " +
     "d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, d.ciudad AS ciudad, a.token, " +
     /* El certificado vigente viaja con la fila para que el panel sepa, sin una
-       segunda consulta, si el botón debe decir "Emitir" o "Ver". */
-    "(SELECT c.numero FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS certificado " +
+       segunda consulta, si el botón debe decir "Emitir" o "Ver" — y si el que
+       hay quedó sin respaldo tras una reversa. */
+    "(SELECT c.numero FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS certificado, " +
+    "(SELECT c.revision_en FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_revision " +
     "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + where +
     " ORDER BY a.creada_en DESC LIMIT " + limite;
   const q = estado ? env.DB.prepare(sql).bind(estado) : env.DB.prepare(sql);
@@ -1099,6 +1156,30 @@ async function adminEmitirCertificado(request, env, guia, quien) {
     }, 422);
   }
 
+  /* --- divergencia frente a la identidad que validó la pasarela -------------
+     Corregir un nombre incompleto es legítimo y hay que permitirlo. Cambiar el
+     beneficiario del certificado —donar como persona y emitirlo a nombre de la
+     empresa, para que la empresa tome el descuento del 25%— es fraude
+     tributario, y desde el formulario se ven exactamente iguales.
+
+     No se prohíbe: se exige MOTIVO y se deja rastro. Un error de digitación se
+     explica en una línea; un cambio de beneficiario no. El domicilio no cuenta
+     como divergencia porque Wompi sencillamente no lo entrega. */
+  const divergencia = [];
+  if (a.nombre && nombre !== a.nombre) divergencia.push({ campo: "nombre", wompi: a.nombre, emitido: nombre });
+  if (a.doc_numero && docNumero !== a.doc_numero) divergencia.push({ campo: "doc_numero", wompi: a.doc_numero, emitido: docNumero });
+  if (a.doc_tipo && docTipo !== a.doc_tipo) divergencia.push({ campo: "doc_tipo", wompi: a.doc_tipo, emitido: docTipo });
+
+  const motivoCambio = limpiar(cuerpo.motivo_cambio, 280);
+  if (divergencia.length && !motivoCambio) {
+    return json({
+      error: "divergencia_sin_motivo",
+      divergencia,
+      ayuda: "Estás emitiendo el certificado a nombre distinto del que validó la pasarela. " +
+             "Explica por qué: el descuento tributario le corresponde a quien donó."
+    }, 422);
+  }
+
   if (a.donante_id) {
     await env.DB.prepare(
       "UPDATE donantes SET nombre=?, doc_tipo=?, doc_numero=?, ciudad=?, actualizado_en=datetime('now') WHERE id=?"
@@ -1122,12 +1203,24 @@ async function adminEmitirCertificado(request, env, guia, quien) {
   };
 
   await env.DB.prepare(
-    "INSERT INTO certificados (numero, guia, datos, emitido_por, emitido_en) VALUES (?,?,?,?,?)"
-  ).bind(numero, a.guia, JSON.stringify(datos), quien || "?", datos.emitido_en).run();
+    "INSERT INTO certificados (numero, guia, datos, emitido_por, emitido_en, " +
+    "wompi_identidad, divergencia, divergencia_motivo) VALUES (?,?,?,?,?,?,?,?)"
+  ).bind(
+    numero, a.guia, JSON.stringify(datos), quien || "?", datos.emitido_en,
+    JSON.stringify({ nombre: a.nombre, doc_tipo: a.doc_tipo, doc_numero: a.doc_numero }),
+    divergencia.length ? JSON.stringify(divergencia) : null,
+    divergencia.length ? motivoCambio : null
+  ).run();
 
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
-  ).bind(quien || "?", "certificado " + numero + " emitido sobre " + a.guia).run();
+  ).bind(
+    quien || "?",
+    "certificado " + numero + " emitido sobre " + a.guia +
+    (divergencia.length
+      ? " · DIVERGE de la identidad de Wompi en " + divergencia.map((d) => d.campo).join(", ") + ": " + motivoCambio
+      : "")
+  ).run();
 
   /* Enviarlo es un paso aparte y explícito: emitir y mandar no son lo mismo, y
      quien emite puede querer revisar el PDF antes de que salga. */
@@ -1146,11 +1239,18 @@ async function adminEmitirCertificado(request, env, guia, quien) {
 
 async function adminCertificadoPdf(env, numero) {
   const c = await env.DB.prepare(
-    "SELECT numero, datos, anulado_en FROM certificados WHERE numero = ?"
+    "SELECT numero, datos, anulado_en, anulado_motivo, revision_en, revision_motivo " +
+    "FROM certificados WHERE numero = ?"
   ).bind(numero).first();
   if (!c) return json({ error: "no_encontrado" }, 404);
 
-  const datos = JSON.parse(c.datos);
+  /* El snapshot congela el CONTENIDO, no el ESTADO. Un certificado anulado que
+     se vuelve a descargar limpio es un documento falso circulando con nuestra
+     firma, así que el estado se le añade encima al armarlo. */
+  const datos = Object.assign(JSON.parse(c.datos), {
+    anulado_en: c.anulado_en, anulado_motivo: c.anulado_motivo,
+    revision_en: c.revision_en, revision_motivo: c.revision_motivo
+  });
   const bytes = await certificado(datos, datos.emitido_en);
   return new Response(bytes, {
     headers: {
@@ -1305,7 +1405,15 @@ var APROBADOS = ["aprobada", "en_distribucion", "entregada"];
    golpe: abre la revisión, que es el punto entero de esta pieza. */
 function celdaCert(a){
   if (a.certificado){
-    return '<a href="/api/admin/certificado/' + esc(a.certificado) + '.pdf" target="_blank" rel="noopener">' + esc(a.certificado) + '</a>';
+    var enlace = '<a href="/api/admin/certificado/' + esc(a.certificado) + '.pdf" target="_blank" rel="noopener">' + esc(a.certificado) + '</a>';
+    /* Un certificado en revisión perdió su respaldo: el pago se cayó después de
+       emitirlo. Tiene que gritar en la lista, no esconderse tras un número que
+       se ve igual que los sanos. */
+    if (a.cert_revision){
+      return enlace + '<br><strong style="color:#A84D00">sin respaldo</strong>' +
+        '<br><button class="copy" data-anular="' + esc(a.certificado) + '">Anular…</button>';
+    }
+    return enlace + '<br><button class="copy" data-anular="' + esc(a.certificado) + '">Anular…</button>';
   }
   if (a.quiere_certificado && APROBADOS.indexOf(a.estado) >= 0){
     return '<button class="copy" data-cert="' + esc(a.guia) + '">Emitir…</button>';
@@ -1351,6 +1459,13 @@ function abrirCert(guia){
       campo("c-nombre", "Nombre o razón social", a.donante) +
       campo("c-doc", "Documento (NIT o C.C.)", a.doc_numero) +
       campo("c-ciudad", "Domicilio del donante", a.ciudad) +
+      /* Solo aparece si el emisor se aparta de lo que validó Wompi. Pedirlo
+         siempre lo convertiría en un campo que se rellena en automático. */
+      '<div id="c-div" style="display:none;border-left:3px solid #A84D00;padding-left:12px;margin:12px 0">' +
+        '<p style="font-size:13px;margin-bottom:8px"><strong>Cambiaste la identidad que validó la pasarela.</strong> ' +
+        'El descuento tributario le corresponde a quien donó: explica por qué.</p>' +
+        campo("c-motivo", "Motivo del cambio", "") +
+      '</div>' +
       '<label style="display:flex;gap:8px;align-items:center;margin:14px 0;font-size:14px">' +
         '<input type="checkbox" id="c-enviar"' + (a.correo ? " checked" : " disabled") + '> ' +
         (a.correo ? "Enviarlo a " + esc(a.correo) : "Sin correo del donante: solo se emite") +
@@ -1389,6 +1504,22 @@ document.addEventListener("click", function(e){
   var c = e.target.closest("[data-cert]");
   if (c){ abrirCert(c.getAttribute("data-cert")); return; }
 
+  /* Anular exige motivo y se queda escrito en el PDF: el papel viaja solo y
+     quien lo tenga en la mano debe poder ver que ya no vale. */
+  var an = e.target.closest("[data-anular]");
+  if (an){
+    var num = an.getAttribute("data-anular");
+    var motivo = window.prompt("Anular " + num + ". ¿Motivo? Queda impreso en el certificado.");
+    if (!motivo) return;
+    an.disabled = true; an.textContent = "…";
+    fetch("/api/admin/certificado/" + encodeURIComponent(num) + "/anular", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ motivo: motivo })
+    }).then(function(r){ return r.json(); }).then(function(){ cargar(); })
+      .catch(function(){ an.disabled = false; an.textContent = "Reintentar"; });
+    return;
+  }
+
   if (e.target.id === "c-no"){ cerrarCert(); return; }
 
   var ok = e.target.closest("[data-emitir]");
@@ -1403,6 +1534,7 @@ document.addEventListener("click", function(e){
         nombre: document.getElementById("c-nombre").value,
         doc_numero: document.getElementById("c-doc").value,
         ciudad: document.getElementById("c-ciudad").value,
+        motivo_cambio: (document.getElementById("c-motivo") || {}).value || "",
         enviar: !!(env && env.checked && !env.disabled)
       })
     }).then(function(r){ return r.json().then(function(d){ return { http: r.status, d: d }; }); })
@@ -1410,9 +1542,15 @@ document.addEventListener("click", function(e){
         if (res.http !== 200){
           /* El error se muestra en el formulario y NO se cierra: quien emite
              tiene que ver qué faltó, no adivinarlo tras un diálogo que se fue. */
-          err.textContent = res.d.faltan
-            ? "Faltan datos obligatorios: " + res.d.faltan.join(", ") + "."
-            : ("No se pudo emitir (" + (res.d.error || res.http) + ").");
+          if (res.d.error === "divergencia_sin_motivo"){
+            document.getElementById("c-div").style.display = "block";
+            err.textContent = "Cambiaste " + res.d.divergencia.map(function(x){ return x.campo; }).join(", ") +
+              " respecto de lo que validó la pasarela. Escribe el motivo y vuelve a emitir.";
+          } else {
+            err.textContent = res.d.faltan
+              ? "Faltan datos obligatorios: " + res.d.faltan.join(", ") + "."
+              : ("No se pudo emitir (" + (res.d.error || res.http) + ").");
+          }
           err.style.display = "block";
           ok.disabled = false; ok.textContent = "Emitir";
           return;
