@@ -416,7 +416,15 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta }) {
       console.error("correo falló", etiqueta || "", r.status, (await r.text()).slice(0, 300));
       return { ok: false, http: r.status };
     }
-    return { ok: true };
+    /* Registrar también el ÉXITO, con el id que devuelve Resend. Sin esto, la
+       ausencia de errores era la única señal de que un correo salió — y "no veo
+       errores" no es lo mismo que "sé que se envió". Con el id se puede buscar
+       el envío en los registros de Resend y responderle a un donante que dice
+       no haber recibido nada. */
+    let id = null;
+    try { id = (await r.json()).id || null; } catch (e) { /* da igual */ }
+    console.log("correo enviado", etiqueta || "", "->", para, "| id:", id);
+    return { ok: true, id };
   } catch (e) {
     console.error("correo excepción", etiqueta || "", e && e.message);
     return { ok: false, error: String(e && e.message) };
