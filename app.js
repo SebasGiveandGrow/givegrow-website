@@ -529,6 +529,38 @@ var I18N = {
     "calc.emp.c5":"Servicios pro-bono",
     "calc.emp.btn":"Conversemos",
     "pay.t":"Cómo aportar",
+    "pay.now.ey":"Pago en línea",
+    "pay.now.t":"Tarjeta, PSE, Nequi o Bancolombia",
+    "pay.now.p":"Sales a Wompi, la pasarela de pagos de Bancolombia, y vuelves con tu número de guía. Nosotros nunca vemos ni guardamos los datos de tu medio de pago.",
+    "pay.now.btn":"Continuar al pago",
+    "pay.now.wait":"Preparando tu pago…",
+    "pay.now.err":"No pudimos abrir la pasarela. Vuelve a intentarlo, o aporta por transferencia con los datos de abajo.",
+    "pay.now.rec":"Elegiste un aporte {frec}. Por ahora procesamos este primer aporte y dejamos registrada tu intención: cuando habilitemos el débito automático te escribimos para activarlo, sin que tengas que empezar de nuevo.",
+    "pay.now.rec.m":"mensual",
+    "pay.now.rec.a":"anual",
+    "pay.other":"Otras formas de aportar",
+    "gracias.ey":"Tu aporte",
+    "gracias.t":"Estamos confirmando tu pago.",
+    "gracias.lead":"Ningún medio de pago confirma al instante, así que preferimos decirte la verdad en vez de darte las gracias por algo que todavía no está confirmado. Esta página se actualiza sola.",
+    "gracias.guia":"Número de guía",
+    "gracias.estado":"Estado",
+    "gracias.monto":"Monto",
+    "gracias.destino":"Destino",
+    "gracias.fondo":"Fondo general",
+    "gracias.e.confirmando":"Confirmando",
+    "gracias.e.aprobada":"Confirmado",
+    "gracias.e.rechazada":"Rechazado",
+    "gracias.e.error":"Con problema",
+    "gracias.ok.t":"Confirmado. Gracias.",
+    "gracias.ok.p":"Tu aporte quedó registrado con su número de guía. Con ese número puedes seguir su recorrido en cualquier momento, y ahí aparecerá el acta cuando se entregue.",
+    "gracias.no.t":"El pago no se completó.",
+    "gracias.no.p":"No se hizo ningún cobro. Puedes intentarlo de nuevo, o aportar por transferencia; si algo quedó raro, escríbenos con tu número de guía y lo revisamos.",
+    "gracias.slow":"La confirmación está tardando más de lo normal. No cierres esta página con prisa: guarda tu número de guía y consúltalo en «Rastrea tu donación» en unos minutos. Si el cobro se hizo, aparecerá.",
+    "gracias.save":"Guarda tu número de guía. Es el mismo con el que puedes rastrear tu aporte de principio a fin.",
+    "gracias.track":"Rastrear mi aporte",
+    "gracias.home":"Volver al inicio",
+    "gracias.lost.t":"No encontramos esa transacción.",
+    "gracias.lost.p":"Puede que el enlace haya perdido su identificador. Si hiciste un aporte, busca tu número de guía en el correo de confirmación y consúltalo en «Rastrea tu donación».",
     "pay.tab.banco":"Bancolombia",
     "pay.tab.paypal":"PayPal",
     "pay.banco.note":"Transfiere y envía el comprobante a contabilidad@thegiveandgrowproject.org. En 24h recibes tu credencial de miembro y tu certificado tributario.",
@@ -1085,6 +1117,7 @@ var ACT_FNS = {
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA, allySubmit:allySubmit,
+  irAPagar:irAPagar,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
@@ -1310,6 +1343,149 @@ function buildDonationDraft(){
 }
 /* Disponible para el futuro flujo de pago/recibo sin reescribir la captura. */
 window.ggDonationDraft = buildDonationDraft;
+/* ---------- pago en línea (Wompi) ----------
+   El navegador NO firma nada: manda la intención al Worker, que asigna la guía,
+   guarda el aporte, calcula la firma con el secreto de integridad y devuelve la
+   URL. Aquí solo se navega. Por eso el secreto nunca sale del servidor y la CSP
+   no necesita una sola excepción: una navegación no la gobierna `form-action`. */
+function irAPagar(){
+  var btn = document.getElementById("pay-go");
+  var msg = document.getElementById("pay-msg");
+  if (!btn || btn.disabled) return;
+
+  var monto = Math.round(Number(calc.val) || 0);   // calc.val siempre está en COP
+  if (!(monto >= 5000 && monto <= 20000000)){
+    if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = t("pay.now.err"); }
+    return;
+  }
+
+  btn.disabled = true;
+  if (msg){ msg.style.display=""; msg.className="pay-now-msg"; msg.textContent = t("pay.now.wait"); }
+
+  var frecMap = { m:"mensual", a:"anual", u:"unico" };
+  var cuerpo = {
+    monto: monto,
+    frecuencia: frecMap[calc.freq] || "unico",
+    modo: calc.partnerId ? "dirigida" : "fondo",
+    destino: calc.partnerId || null,
+    proyecto: (calc.projectId && calc.projectId !== "general") ? calc.projectId : null,
+    nota: calc.note || null
+  };
+
+  fetch("/api/checkout", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(cuerpo)
+  }).then(function(r){ return r.ok ? r.json() : r.json().then(function(j){ throw new Error(j.error||"http_"+r.status); }); })
+    .then(function(d){
+      if (!d || !d.url) throw new Error("sin_url");
+      /* La guía queda guardada por si el retorno llega sin identificador. */
+      try { sessionStorage.setItem("gg_guia", d.guia); } catch(e){}
+      window.location.href = d.url;
+    })
+    .catch(function(){
+      btn.disabled = false;
+      if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = t("pay.now.err"); }
+    });
+}
+
+/* Aviso honesto cuando se elige mensual o anual: hoy se cobra una vez y la
+   intención queda registrada. No prometemos un débito automático que no existe. */
+function payRecNote(){
+  var n = document.getElementById("pay-rec-note");
+  if (!n) return;
+  if (calc.freq === "u"){ n.style.display = "none"; n.textContent = ""; return; }
+  var etiqueta = t(calc.freq === "a" ? "pay.now.rec.a" : "pay.now.rec.m");
+  n.textContent = t("pay.now.rec").replace("{frec}", etiqueta);
+  n.style.display = "";
+}
+
+/* ---------- retorno del checkout: /gracias ----------
+   Wompi vuelve con SU id, no con nuestra guía. El Worker traduce uno en otra y
+   devuelve NUESTRO estado, que es el que trae el webhook. */
+var GRACIAS = { id:null, guia:null, intentos:0, timer:null };
+
+function graciasArranca(){
+  var q = new URLSearchParams(location.search);
+  GRACIAS.id = q.get("id");
+  try { GRACIAS.guia = sessionStorage.getItem("gg_guia"); } catch(e){}
+  GRACIAS.intentos = 0;
+  graciasConsulta();
+}
+
+function graciasConsulta(){
+  var url = GRACIAS.id ? ("/api/gracias?id=" + encodeURIComponent(GRACIAS.id))
+          : GRACIAS.guia ? ("/api/aporte/" + encodeURIComponent(GRACIAS.guia)) : null;
+  if (!url){ graciasPerdida(); return; }
+
+  fetch(url).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+    if (!d){ graciasPerdida(); return; }
+    graciasPinta(d);
+    var cerrado = ["aprobada","rechazada","error","en_distribucion","entregada"].indexOf(d.estado) >= 0;
+    GRACIAS.intentos++;
+    /* Diez intentos cada 3 s ≈ 30 s. Pasado eso no se insiste: se le dice al
+       donante qué hacer con su guía en vez de dejarlo mirando una rueda. */
+    if (!cerrado && GRACIAS.intentos < 10){
+      GRACIAS.timer = setTimeout(graciasConsulta, 3000);
+    } else if (!cerrado){
+      var nota = document.getElementById("gracias-nota");
+      if (nota){ nota.style.display=""; nota.textContent = t("gracias.slow"); }
+    }
+  }).catch(function(){ graciasPerdida(); });
+}
+
+function graciasPinta(d){
+  var led = document.getElementById("gracias-ledger");
+  if (led) led.style.display = "";
+  var set = function(id, txt){ var e=document.getElementById(id); if(e) e.textContent = txt; };
+
+  set("gr-guia", d.guia || "—");
+  set("gr-monto", (d.moneda === "COP" ? fmtCOP((d.monto_centavos||0)/100) : fmtUSD((d.monto_centavos||0)/100)) + " " + (d.moneda||""));
+
+  var destino = t("gracias.fondo");
+  if (d.modo === "dirigida" && d.destino){
+    var lista = PARTNERS_DATA || PARTNERS_FALLBACK || [];
+    var p = lista.filter(function(x){ return x.id === d.destino; })[0];
+    destino = p ? p.name : d.destino;
+  }
+  set("gr-destino", destino);
+
+  var etiqueta = { aprobada:"gracias.e.aprobada", rechazada:"gracias.e.rechazada", error:"gracias.e.error" }[d.estado] || "gracias.e.confirmando";
+  var pill = { aprobada:"is-on", rechazada:"is-none", error:"is-none" }[d.estado] || "is-wip";
+  var ee = document.getElementById("gr-estado");
+  if (ee){
+    ee.textContent = "";
+    var s = document.createElement("span");
+    s.className = "med-step-s " + pill;
+    s.textContent = t(etiqueta);
+    ee.appendChild(s);
+  }
+
+  var tt = document.getElementById("gracias-t");
+  var pp = document.getElementById("gracias-p");
+  /* Los tres caminos se escriben SIEMPRE, incluido el de confirmando. Si el
+     último se omite, el render deja de depender solo de los datos y empieza a
+     depender de lo que se pintó antes: basta una consulta que vuelva a
+     "pendiente" para que el título siga diciendo "Confirmado". */
+  if (d.estado === "aprobada" || d.estado === "en_distribucion" || d.estado === "entregada"){
+    if (tt) tt.textContent = t("gracias.ok.t");
+    if (pp) pp.textContent = t("gracias.ok.p");
+  } else if (d.estado === "rechazada" || d.estado === "error"){
+    if (tt) tt.textContent = t("gracias.no.t");
+    if (pp) pp.textContent = t("gracias.no.p");
+  } else {
+    if (tt) tt.textContent = t("gracias.t");
+    if (pp) pp.textContent = t("gracias.lead");
+  }
+}
+
+function graciasPerdida(){
+  var tt = document.getElementById("gracias-t");
+  var pp = document.getElementById("gracias-p");
+  if (tt) tt.textContent = t("gracias.lost.t");
+  if (pp) pp.textContent = t("gracias.lost.p");
+}
+
 function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
 function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 
@@ -1435,6 +1611,7 @@ function calcUpdate(){
   }
   setText("m-name", tier[lang] || tier.es);
   setText("m-sub", (lang==="en")?("~ " + Math.round(usdMonthly) + " USD / month"):("~ " + Math.round(usdMonthly) + " USD / mes"));
+  payRecNote();
 }
 function setText(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
 
@@ -2209,6 +2386,13 @@ function init(){
   setLang("es");
   // routing from hash
   var hash = location.hash.replace("#","") || "inicio";
+  /* Wompi devuelve al donante a /gracias?id=… — una ruta con path, no con hash.
+     El fallback de SPA ya sirvió index.html; aquí se enruta a mano y se deja el
+     hash limpio, conservando el identificador en memoria. */
+  if (location.pathname === "/gracias" || location.pathname === "/gracias/"){
+    graciasArranca();
+    hash = "gracias";
+  }
   go(hash, true);
   window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||"inicio"; go(h, true); });
   // Navegación por delegación (reemplaza inline; CSP fase 1).

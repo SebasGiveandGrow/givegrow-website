@@ -156,10 +156,15 @@ async function apiCheckout(request, env, url) {
   p.set("amount-in-cents", String(centavos));
   p.set("reference", guia);
   p.set("signature:integrity", firma);
-  /* El destino de vuelta sigue el origen de la petición, no una constante: así
-     el ciclo completo se puede probar en local contra el sandbox. En producción
-     `url.origin` ES el dominio del sitio, porque el Worker solo lo sirve a él. */
-  p.set("redirect-url", url.origin + "/gracias");
+  /* Destino de vuelta. OJO — verificado el 10 ago 2026 contra el sandbox:
+     Wompi responde 403 (CloudFront «Request blocked») si `redirect-url` apunta a
+     http://localhost. Todas las demás combinaciones dan 200, incluido el mismo
+     checkout sin redirect-url. Así que el origen de la petición solo se usa
+     cuando es un https público; en local se cae al dominio de producción, que
+     produce un checkout válido aunque el retorno aterrice en el sitio real.
+     Un intento anterior de usar `url.origin` siempre rompía el pago en local. */
+  const publico = url.protocol === "https:" && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname);
+  p.set("redirect-url", (publico ? url.origin : ORIGIN) + "/gracias");
 
   return json({ guia, url: amb.checkout + "?" + p.toString(), modo: amb.modo });
 }
@@ -325,6 +330,53 @@ async function apiAporte(env, guia) {
 }
 
 /* ========================================================================
+   GET /api/gracias?id=<id de transacción de Wompi>
+   Al volver del checkout, Wompi solo trae SU id en la URL — no nuestra guía.
+   Este endpoint traduce uno en otra, en tres intentos de menor a mayor costo.
+
+   Importante: devuelve NUESTRO estado, no el de Wompi. La documentación es
+   explícita en que la redirección no sirve para validar; la verdad la trae el
+   webhook. Si el webhook aún no llegó, el aporte sigue en `intencion` y la
+   página dirá que está confirmando — que es exactamente la verdad.
+   ======================================================================== */
+
+async function apiGracias(env, url) {
+  const id = String(url.searchParams.get("id") || "").slice(0, 120);
+  if (!id) return json({ error: "id_requerido" }, 400);
+
+  /* 1 · el webhook ya lo asoció */
+  let f = await env.DB.prepare("SELECT guia FROM aportes WHERE wompi_transaction_id = ?").bind(id).first();
+  let guia = f ? f.guia : null;
+
+  /* 2 · está en la bitácora aunque el aporte no se haya movido */
+  if (!guia) {
+    const ev = await env.DB.prepare(
+      "SELECT guia FROM eventos_wompi WHERE transaction_id = ? AND guia IS NOT NULL LIMIT 1"
+    ).bind(id).first();
+    if (ev) guia = ev.guia;
+  }
+
+  /* 3 · preguntarle a Wompi por la referencia. Es el camino que la propia
+         documentación recomienda para el retorno del checkout. */
+  if (!guia) {
+    const amb = ambienteWompi(env.WOMPI_PUBLIC_KEY);
+    try {
+      const r = await fetch(amb.api + "/transactions/" + encodeURIComponent(id), {
+        headers: env.WOMPI_PRIVATE_KEY ? { authorization: "Bearer " + env.WOMPI_PRIVATE_KEY } : {}
+      });
+      if (r.ok) {
+        const j = await r.json();
+        const ref = j && j.data && j.data.reference;
+        if (ref) guia = String(ref);
+      }
+    } catch (e) { /* si Wompi no responde, se cae al 404 y la página lo dice */ }
+  }
+
+  if (!guia) return json({ error: "no_resuelta" }, 404);
+  return apiAporte(env, guia);
+}
+
+/* ========================================================================
    /f/<id> — página de compartir (sin cambios de comportamiento)
    ======================================================================== */
 
@@ -401,6 +453,7 @@ export default {
       try {
         if (ruta === "/api/checkout")       return await apiCheckout(request, env, url);
         if (ruta === "/api/wompi/eventos")  return await apiEventos(request, env);
+        if (ruta === "/api/gracias")        return await apiGracias(env, url);
         const aporte = ruta.match(/^\/api\/aporte\/([A-Za-z0-9-]+)$/);
         if (aporte)                         return await apiAporte(env, aporte[1]);
         return json({ error: "no_encontrado" }, 404);
