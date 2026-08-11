@@ -648,6 +648,158 @@ async function apiAporte(env, guia) {
 }
 
 /* ========================================================================
+   POST /api/inscripcion
+   La primera puerta de entrada propia del sitio. Hasta hoy, quien quería ser
+   voluntario solo tenía un `mailto:` — y el botón "Quiero participar" de
+   #voluntariado llevaba, por error, al formulario de EMPRESAS.
+
+   El modelo de VOLUNTARIADO.md manda sobre la forma de este endpoint:
+   · Tres niveles, y el nivel lo define EL TERRENO, no el oficio.
+   · Dos protocolos con disparadores INDEPENDIENTES: el de cuidado lo dispara
+     pisar el territorio; el de imagen lo dispara la cámara, en cualquier nivel.
+     Por eso `captura` es una pregunta aparte del nivel y no se deduce de él:
+     amarrarla al nivel dejaría fuera al voluntario de estructura que llega con
+     el celular a documentar.
+   ======================================================================== */
+
+const NIVELES = ["hub", "estructura", "mixto"];
+
+async function apiInscripcion(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  /* Honeypot: si el campo trampa viene lleno es un bot. Se responde ok para no
+     enseñarle qué lo delató, y no se guarda nada. */
+  if (c.web2) return json({ ok: true });
+
+  const tipo = c.tipo === "voluntario" ? "voluntario" : null;
+  if (!tipo) return json({ error: "tipo_no_soportado" }, 400);
+
+  const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const nombre = limpio(c.nombre, 120);
+  const email  = limpio(c.email, 200);
+  const nivel  = NIVELES.includes(c.nivel) ? c.nivel : null;
+  const oficio = limpio(c.oficio, 160);
+
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  if (!nivel) return json({ error: "nivel_requerido", opciones: NIVELES }, 400);
+  if (!oficio) return json({ error: "oficio_requerido" }, 400);
+  /* Sin autorización de datos no se guarda NADA. Es Ley 1581, no una casilla
+     decorativa: guardar primero y pedir permiso después invertiría el orden. */
+  if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
+
+  const pisaTerritorio = nivel === "hub" || nivel === "mixto";
+  const datos = {
+    nivel,
+    oficio,
+    disponibilidad: limpio(c.disponibilidad, 280),
+    mensaje: limpio(c.mensaje, 600),
+    captura: !!c.captura,
+    /* Se guardan los protocolos que quedan disparados, no para el voluntario
+       sino para quien lo reciba: son la lista de lo que hay que cumplir antes. */
+    protocolo_cuidado: pisaTerritorio,
+    protocolo_imagen: !!c.captura,
+    idioma: c.idioma === "en" ? "en" : "es"
+  };
+
+  const ins = await env.DB.prepare(
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
+    "VALUES (?, 'nueva', ?, ?, ?, ?, ?)"
+  ).bind(tipo, nombre, email, limpio(c.telefono, 40) || null, limpio(c.ciudad, 80) || null,
+         JSON.stringify(datos)).run();
+
+  /* El correo no puede tumbar la inscripción: si falla, la persona ya quedó
+     registrada y eso es lo que importa. Misma regla que en los aportes. */
+  try {
+    await correoInscripcionVoluntario(env, { nombre, email, ...datos });
+    await correoAvisoInscripcion(env, { nombre, email, telefono: limpio(c.telefono, 40), ...datos });
+  } catch (e) {
+    console.error("correo inscripción", e && e.message);
+  }
+
+  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+}
+
+/* Acuse al voluntario. El tono lo fija una decisión de marca que no se debe
+   suavizar: la fundación NO es un filtro, es la anfitriona que conoce a su
+   comunidad. Nada de "evaluaremos tu solicitud". */
+async function correoInscripcionVoluntario(env, v) {
+  const en = v.idioma === "en";
+  const titulo = en ? "We got your details. Welcome." : "Recibimos tus datos. Bienvenido.";
+
+  const nivelTexto = {
+    hub:        en ? "In the field, alongside a partner foundation" : "En terreno, junto a una fundación aliada",
+    estructura: en ? "In the structure, without setting foot in the field" : "En la estructura, sin pisar territorio",
+    mixto:      en ? "Mixed: part structure, part field" : "Mixto: parte estructura, parte terreno"
+  }[v.nivel];
+
+  const parrafos = en ? [
+    "Thank you for offering your time and your trade. Someone from Give&Grow will write to you to get to know you and to figure out together where you fit best.",
+    v.protocolo_cuidado
+      ? "Since you would be in the field, two things happen first: our own vetting, and the partner foundation's — they know their community and they decide when a visit adds something. And before any journey there is a Marco session, which is not a formality: it is the only moment we have to prepare."
+      : "Your contribution happens outside the field, so it moves faster: we only need to get to know you and find where your trade fits.",
+    v.protocolo_imagen
+      ? "You told us you plan to photograph or record. That has its own protocol, and one rule that never bends: consent comes before the camera. The foundation and the families decide, never the person visiting."
+      : "",
+    "Nothing about this is charged, in either direction."
+  ] : [
+    "Gracias por ofrecer tu tiempo y tu oficio. Alguien de Give&Grow te escribe para conocerte y para ver juntos dónde encajas mejor.",
+    v.protocolo_cuidado
+      ? "Como estarías en terreno, primero pasan dos cosas: nuestra verificación y la de la fundación aliada — ellos conocen a su comunidad y deciden cuándo una visita suma. Y antes de cualquier jornada hay una sesión de Marco, que no es un trámite: es el único momento que tenemos para prepararnos."
+      : "Tu aporte ocurre fuera del territorio, así que el camino es más corto: solo necesitamos conocerte y encontrar dónde encaja tu oficio.",
+    v.protocolo_imagen
+      ? "Nos dijiste que piensas fotografiar o grabar. Eso tiene su propio protocolo, y una regla que no se negocia: el consentimiento va primero que la cámara. Lo deciden la fundación y las familias, nunca quien visita."
+      : "",
+    "Nada de esto se cobra, en ninguna dirección."
+  ];
+
+  const filas = en
+    ? [["How you want to take part", nivelTexto], ["Your trade", v.oficio]]
+    : [["Cómo quieres participar", nivelTexto], ["Tu oficio", v.oficio]];
+
+  return enviarCorreo(env, {
+    para: v.email,
+    asunto: en ? "Welcome to Give&Grow volunteering" : "Bienvenido al voluntariado de Give&Grow",
+    texto: [titulo, "", ...parrafos.filter(Boolean), "", filas.map(([k, x]) => k + ": " + x).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos: parrafos.filter(Boolean), filas }),
+    etiqueta: "inscripcion-voluntario"
+  });
+}
+
+/* Aviso interno: lo que hay que saber para responderle, y los protocolos que
+   quedaron disparados. */
+async function correoAvisoInscripcion(env, v) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const nivel = { hub: "Con el HUB (terreno)", estructura: "Con Give&Grow (estructura)", mixto: "Mixto" }[v.nivel];
+  const filas = [
+    ["Nombre", v.nombre],
+    ["Correo", v.email],
+    ["Teléfono", v.telefono || "(no dejó)"],
+    ["Nivel", nivel],
+    ["Oficio", v.oficio],
+    ["Disponibilidad", v.disponibilidad || "(no dijo)"],
+    ["Protocolo de cuidado", v.protocolo_cuidado ? "SÍ — pisa territorio, requiere doble verificación y Marco" : "no aplica"],
+    ["Protocolo de imagen", v.protocolo_imagen ? "SÍ — va a fotografiar o grabar" : "no aplica"]
+  ];
+  return enviarCorreo(env, {
+    para,
+    asunto: "Nuevo voluntario: " + v.nombre,
+    texto: filas.map(([k, x]) => k + ": " + x).join("\n") + (v.mensaje ? "\n\nMensaje:\n" + v.mensaje : ""),
+    html: plantillaCorreo({
+      titulo: "Nuevo voluntario: " + v.nombre,
+      parrafos: v.mensaje ? ["Lo que escribió: «" + v.mensaje + "»"] : ["Sin mensaje."],
+      filas,
+      cierre: "Está en el panel, en inscripciones por revisar."
+    }),
+    etiqueta: "aviso-inscripcion"
+  });
+}
+
+/* ========================================================================
    GET /api/gracias?id=<id de transacción de Wompi>
    Al volver del checkout, Wompi solo trae SU id en la URL — no nuestra guía.
    Este endpoint traduce uno en otra, en tres intentos de menor a mayor costo.
@@ -1057,6 +1209,7 @@ export default {
         if (ruta === "/api/checkout")       return await apiCheckout(request, env, url);
         if (ruta === "/api/wompi/eventos")  return await apiEventos(request, env);
         if (ruta === "/api/gracias")        return await apiGracias(env, url);
+        if (ruta === "/api/inscripcion")    return await apiInscripcion(request, env, url);
         const aporte = ruta.match(/^\/api\/aporte\/([A-Za-z0-9-]+)$/);
         if (aporte)                         return await apiAporte(env, aporte[1]);
         return json({ error: "no_encontrado" }, 404);

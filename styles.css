@@ -892,6 +892,17 @@ html[data-theme="dark"] .mira-hv{color:#e6a44e}
   .mira-p{grid-area:p}
 }
 
+/* ---------- formulario de voluntariado (Fase 3) ----------
+   Reusa .ally-form, .field y .ally-check. Solo añade el grupo de niveles y sus
+   dos textos de apoyo. */
+.vf-set{border:0;padding:0;margin:6px 0 18px}
+.vf-set legend{font-size:13px;font-weight:700;color:var(--ink-soft);padding:0;margin-bottom:6px}
+.vf-help{margin:0 0 12px;font-size:13.5px;line-height:1.55;color:var(--mu);max-width:64ch}
+/* El aviso de terreno lleva regla ámbar: no es una alerta, es una condición del
+   programa que conviene leer antes de enviar. */
+.vf-aviso{margin:14px 0 0;padding-left:14px;border-left:3px solid var(--amber);
+  font-size:13.5px;line-height:1.55;color:var(--ink-soft);max-width:66ch}
+
 /* ---------- pago en línea (Fase 2): el camino principal de #donar ----------
    Bloque de papel con regla fina, no tarjeta de app. La audacia de esta página
    ya está gastada en la calculadora; esto tiene que ser tranquilo y claro. */
