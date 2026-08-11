@@ -46,6 +46,38 @@ for (const b of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\
 }
 ok("JSON-LD (" + ld + " bloques)");
 
+/* 4b · El FAQ del JSON-LD es un DUPLICADO del diccionario, y los duplicados se
+   desfasan. `hydrate-i18n.mjs` no lo toca porque no tiene atributos data-i18n,
+   así que nada lo vigilaba: el 11 ago 2026 el bloque seguía prometiendo "próximamente
+   habilitaremos tarjeta y PSE vía Wompi" semanas después de que Wompi estuviera vivo.
+   Google lee ese bloque, así que un texto viejo ahí es desinformación publicada. */
+{
+  const dict = esDict(src);
+  const faqs = [];
+  for (const b of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+    let d; try { d = JSON.parse(b[1]); } catch { continue; }
+    if (d["@type"] !== "FAQPage") continue;
+    for (const q of (d.mainEntity || [])) {
+      faqs.push({ p: (q.name || "").trim(), r: ((q.acceptedAnswer || {}).text || "").trim() });
+    }
+  }
+  const preguntas = Object.keys(dict).filter(k => /^faq\.q\d+$/.test(k));
+  const desfasados = [];
+  for (const kq of preguntas) {
+    const ka = kq.replace(".q", ".a");
+    if (!dict[ka]) continue;
+    const enJson = faqs.find(f => f.p === dict[kq].trim());
+    if (!enJson) continue;                       // no todas las del dict están en el JSON-LD
+    if (enJson.r !== dict[ka].trim()) desfasados.push(ka);
+  }
+  if (desfasados.length) {
+    err("JSON-LD del FAQ desfasado del diccionario ES en: " + desfasados.join(", ") +
+        " — el bloque es un duplicado a mano y hay que actualizarlo junto al dict");
+  } else {
+    ok("JSON-LD del FAQ coincide con el diccionario (" + faqs.length + " respuestas)");
+  }
+}
+
 /* 5 · Balance de tags */
 let tagsOk = true;
 for (const tag of ["main", "section", "div", "ul", "li", "span", "a", "button"]) {
