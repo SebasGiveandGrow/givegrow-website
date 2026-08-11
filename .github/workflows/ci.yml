@@ -15,6 +15,17 @@ jobs:
       - name: Gate del proyecto (sintaxis, i18n, estructura)
         run: node scripts/validate.mjs
 
+      # El Worker dejó de ser un archivo suelto: importa documentos.js, que
+      # importa pdf-lib. `node --check` ve la sintaxis pero no el enlazado, y un
+      # import que no resuelve solo aparecería al desplegar — es decir, en
+      # producción. El dry-run empaqueta de verdad y no publica nada.
+      - name: El Worker empaqueta (bundle + resolución de imports)
+        run: |
+          npm ci
+          npx wrangler@latest deploy --dry-run --outdir /tmp/gg-bundle
+          echo "Tamaño del bundle:"
+          du -sh /tmp/gg-bundle
+
       - name: Cache-bust coherente (md5 de assets vs index.html)
         run: |
           CSS_REAL=$(md5sum styles.css | cut -c1-8)

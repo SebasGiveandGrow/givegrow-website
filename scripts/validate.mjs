@@ -7,9 +7,16 @@ let fail = 0;
 const err = (m) => { console.error("NO OK  " + m); fail = 1; };
 const ok  = (m) => console.log("ok     " + m);
 
-/* 1 · Sintaxis JS */
-try { execSync("node --check app.js"); ok("app.js sintaxis"); }
-catch (e) { err("app.js sintaxis inválida"); }
+/* 1 · Sintaxis JS
+   No solo app.js: worker.js y documentos.js también se despliegan, y un error de
+   sintaxis ahí no rompe el sitio en local —donde nadie los ejecuta al validar—
+   sino el Worker entero en producción. `--check` sobre un módulo ES no resuelve
+   los imports, así que no necesita node_modules: comprueba forma, no enlaces.
+   Del enlazado se encarga el `--dry-run` de wrangler en ci.yml. */
+for (const f of ["app.js", "worker.js", "documentos.js"]) {
+  try { execSync(`node --check --input-type=module < ${f}`, { shell: "/bin/sh" }); ok(f + " sintaxis"); }
+  catch (e) { err(f + " sintaxis inválida"); }
+}
 
 const src  = readFileSync("app.js", "utf8");
 const html = readFileSync("index.html", "utf8");
