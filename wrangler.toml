@@ -27,6 +27,14 @@ database_id = "e40b0794-37ab-4461-bf59-53b682095446"
 # producción, que es el error clásico y el más caro.
 [vars]
 WOMPI_PUBLIC_KEY = "pub_prod_sA952OP2Y58ahrZRjHgutdBIr9U0FUr6"
+# Correo transaccional. Sale de un SUBDOMINIO con su propio DKIM porque el
+# dominio principal tiene el SPF roto, no publica DKIM y su DMARC está en
+# p=reject — ver ops/correo-transaccional.md. La llave (RESEND_API_KEY) es
+# secreto de Wrangler, nunca va aquí.
+CORREO_DESDE = "Give&Grow International <no-responder@notificaciones.thegiveandgrowproject.org>"
+# Aviso interno a un buzón que SÍ recibe hoy. No usar el dominio propio mientras
+# su DNS siga roto: rebotaría por su propio DMARC (error 550 5.7.26).
+CORREO_AVISOS = "fundaciongiveandgrow@gmail.com"
 
 # ===========================================================================
 # ENTORNO DE PRUEBAS
@@ -69,3 +77,5 @@ database_id = "624d07cc-845c-4b96-83c3-866f9a74c752"
 
 [env.sandbox.vars]
 WOMPI_PUBLIC_KEY = "pub_test_ws2Bo5M1W8mecXqqCWjjzpRjpQAHtlec"
+CORREO_DESDE = "Give&Grow (pruebas) <no-responder@notificaciones.thegiveandgrowproject.org>"
+CORREO_AVISOS = "fundaciongiveandgrow@gmail.com"
