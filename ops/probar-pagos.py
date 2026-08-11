@@ -58,14 +58,27 @@ def evento(tx_id, estado, centavos, referencia, ts=1786000000, firma=None, email
             cur = cur.get(k) if isinstance(cur, dict) else None
         return "" if cur is None else str(cur)
     checksum = firma or hashlib.sha256(("".join(valor(p) for p in PROPS) + str(ts) + SECRETO).encode()).hexdigest().upper()
-    return {"event": "transaction.updated", "data": data, "sent_at": "2026-08-10T23:00:00.000Z",
-            "signature": {"properties": PROPS, "checksum": checksum, "timestamp": ts}}
+    # FORMA REAL DEL EVENTO, no la documentada. `timestamp` va en la RAÍZ, no
+    # dentro de `signature`. La documentación de Wompi muestra lo contrario, y
+    # cuando estas pruebas imitaban la documentación pasaban en verde mientras
+    # el Worker rechazaba TODOS los webhooks legítimos: la prueba solo estaba
+    # confirmando mi propia suposición. Comprobado el 11 ago 2026 con un pago
+    # real en sandbox (tx 12129016-1786413420-91097).
+    return {"event": "transaction.updated", "data": data,
+            "sent_at": "2026-08-11T01:57:25.897Z", "timestamp": ts,
+            "environment": "test",
+            "signature": {"properties": PROPS, "checksum": checksum}}
+
+
+UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/140.0 Safari/537.36")
+CABECERAS = {"content-type": "application/json", "user-agent": UA}
 
 
 def enviar(cuerpo):
     req = urllib.request.Request(BASE + "/api/wompi/eventos",
                                 data=json.dumps(cuerpo).encode(),
-                                headers={"content-type": "application/json"}, method="POST")
+                                headers=CABECERAS, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             return r.status, json.loads(r.read().decode())
@@ -75,7 +88,8 @@ def enviar(cuerpo):
 
 def aporte(guia):
     try:
-        with urllib.request.urlopen(BASE + "/api/aporte/" + guia, timeout=20) as r:
+        req = urllib.request.Request(BASE + "/api/aporte/" + guia, headers={"user-agent": UA})
+        with urllib.request.urlopen(req, timeout=20) as r:
             return json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         return {"http": e.code}
@@ -86,7 +100,7 @@ def crear(monto, modo="fondo", destino=None):
     if destino:
         payload["destino"] = destino
     req = urllib.request.Request(BASE + "/api/checkout", data=json.dumps(payload).encode(),
-                                 headers={"content-type": "application/json"}, method="POST")
+                                 headers=CABECERAS, method="POST")
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.loads(r.read().decode())["guia"]
 
@@ -146,6 +160,51 @@ todo.append(linea("consulta pública sin datos personales", not prohibidos,
 
 # ---- 8. guía mal formada ----------------------------------------------
 todo.append(linea("guía mal formada rechazada", aporte("NO-ES-GUIA").get("http") == 400))
+
+# ---- 9. REGRESIÓN: el timestamp va en la raíz, no en signature ---------
+# Si alguien "corrige" el Worker para leer signature.timestamp siguiendo la
+# documentación, este caso lo detecta: un evento con la forma real debe
+# aceptarse, y uno con el timestamp SOLO dentro de signature debe rechazarse.
+g9 = crear(40000)
+ev9 = evento("tx-ts-raiz-" + RUN, "APPROVED", 4000000, g9)
+st9, _ = enviar(ev9)
+a9 = aporte(g9)
+todo.append(linea("timestamp en la raíz: aceptado", st9 == 200 and a9.get("estado") == "aprobada",
+                  f"http={st9} estado={a9.get('estado')}"))
+
+# El Worker lee la raíz PRIMERO y cae a signature.timestamp como respaldo, por si
+# Wompi migra algún día al formato que documenta. Así que este caso debe
+# ACEPTARSE: es el respaldo funcionando, no un agujero. La regresión de verdad la
+# cubre la prueba anterior — si alguien "corrige" el Worker para leer solo
+# signature.timestamp, el evento con la forma real empieza a fallar y salta ahí.
+g10 = crear(40000)
+ev10 = evento("tx-ts-solo-en-firma-" + RUN, "APPROVED", 4000000, g10)
+ev10["signature"]["timestamp"] = ev10.pop("timestamp")   # la forma que documenta Wompi
+st10, _ = enviar(ev10)
+a10 = aporte(g10)
+todo.append(linea("respaldo: timestamp solo en signature también sirve",
+                  st10 == 200 and a10.get("estado") == "aprobada",
+                  f"http={st10} estado={a10.get('estado')}"))
+
+# ---- 11. REGRESIÓN: un evento rechazado no bloquea su propio reintento ----
+# Costó un pago real: el evento quedó en la bitácora con firma_valida=0 y, al
+# arreglar la causa, su reintento se descartaba como duplicado y el aporte se
+# quedaba en `intencion` para siempre.
+g11 = crear(60000)
+tx11 = "tx-rechazado-luego-bueno-" + RUN
+st_mal, _ = enviar(evento(tx11, "APPROVED", 6000000, g11, firma="0" * 64))   # firma inválida
+est_mal = aporte(g11).get("estado")
+st_bien, rb11 = enviar(evento(tx11, "APPROVED", 6000000, g11))               # el mismo, ya bueno
+est_bien = aporte(g11).get("estado")
+todo.append(linea("un evento rechazado no bloquea su reintento",
+                  st_mal == 401 and est_mal == "intencion" and st_bien == 200
+                  and not rb11.get("repetido") and est_bien == "aprobada",
+                  f"rechazo={st_mal}/{est_mal} reintento={st_bien}/{est_bien}"))
+
+# ---- 12. y una vez procesado, sí se considera repetido -------------------
+st_otra, rb12 = enviar(evento(tx11, "APPROVED", 6000000, g11))
+todo.append(linea("ya procesado: ahora sí es repetido",
+                  st_otra == 200 and rb12.get("repetido") is True, f"respuesta={rb12}"))
 
 print()
 print(f"  {sum(todo)}/{len(todo)} pruebas en verde")
