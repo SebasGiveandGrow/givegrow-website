@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=06d6288b">
+<link rel="stylesheet" href="/styles.css?v=554306f1">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1003,17 +1003,18 @@
             <span class="calc-note-count"><span id="calc-msg-count">0</span>/280</span>
           </div>
         </div>
-        <div class="calc-extra">
-          <div class="calc-cap" data-i18n="calc.emp.t">Otras formas de ayudar</div>
-          <p class="calc-extra-p" data-i18n="calc.emp.p">Más allá del aporte monetario, puedes sumar de otras formas. Cuéntanos cuál te interesa y te contactamos.</p>
-          <div class="eco-row">
-            <span class="eco-chip" data-i18n="calc.emp.c1">Voluntariado</span>
-            <span class="eco-chip" data-i18n="calc.emp.c2">Donación en especie</span>
-            <span class="eco-chip" data-i18n="calc.emp.c3">Conexiones y alianzas</span>
-            <span class="eco-chip" data-i18n="calc.emp.c4">Difusión</span>
-            <span class="eco-chip" data-i18n="calc.emp.c5">Servicios pro-bono</span>
-          </div>
-          <a class="btn btn-g" data-nav="aliados" href="#aliados" data-i18n="calc.emp.btn">Conversemos</a>
+        <!-- El pago cierra la calculadora: es el paso siguiente a la dedicatoria,
+             no una sección aparte. El monto, la frecuencia y el destino salen del
+             estado de la calculadora; la firma la calcula el Worker.
+             OJO: este bloque vive sobre el panel OSCURO en los dos temas — su CSS
+             no puede depender de --surface/--ink. -->
+        <div class="pay-now">
+          <span class="ey" data-i18n="pay.now.ey">Pago en línea</span>
+          <h4 class="pay-now-t" data-i18n="pay.now.t">Tarjeta o Botón Bancolombia</h4>
+          <p class="pay-now-p" data-i18n="pay.now.p">Sales a Wompi, la pasarela de pagos de Bancolombia, y vuelves con tu número de guía. Nosotros nunca vemos ni guardamos los datos de tu medio de pago.</p>
+          <p class="pay-now-rec" id="pay-rec-note" style="display:none"></p>
+          <button type="button" class="btn btn-g pay-now-btn" id="pay-go" data-act="irAPagar()" data-i18n="pay.now.btn">Continuar al pago</button>
+          <p class="pay-now-msg" id="pay-msg" role="status" aria-live="polite" style="display:none"></p>
         </div>
       </div>
     </div>
@@ -1021,22 +1022,13 @@
 
   <section class="cream">
     <div class="wrap center">
-      <h3 id="pay-heading" class="rv" data-i18n="pay.t" style="margin-bottom:20px">Cómo aportar</h3>
+      <!-- El camino principal (pago en línea) ya cerró la calculadora arriba. Aquí
+           queda TODO lo demás: el dinero por otro canal y el aporte que no es dinero. -->
+      <h3 id="pay-heading" class="rv" data-i18n="pay.other" style="margin-bottom:12px">Otras formas de aportar</h3>
+      <p class="lead rv d1" data-i18n="pay.other.p" style="margin-left:auto;margin-right:auto">Si prefieres no pagar en línea, o si tu aporte no es dinero.</p>
 
-      <!-- Camino principal: pago en línea. La transferencia queda como alternativa
-           debajo, no como el único camino. El monto, la frecuencia y el destino
-           salen del estado de la calculadora; la firma la calcula el Worker. -->
-      <div class="pay-now rv d1">
-        <span class="ey" data-i18n="pay.now.ey">Pago en línea</span>
-        <h4 class="pay-now-t" data-i18n="pay.now.t">Tarjeta o Botón Bancolombia</h4>
-        <p class="pay-now-p" data-i18n="pay.now.p">Sales a Wompi, la pasarela de pagos de Bancolombia, y vuelves con tu número de guía. Nosotros nunca vemos ni guardamos los datos de tu medio de pago.</p>
-        <p class="pay-now-rec mu" id="pay-rec-note" style="display:none"></p>
-        <button type="button" class="btn btn-g pay-now-btn" id="pay-go" data-act="irAPagar()" data-i18n="pay.now.btn">Continuar al pago</button>
-        <p class="pay-now-msg" id="pay-msg" role="status" aria-live="polite" style="display:none"></p>
-      </div>
-
-      <p class="rec-cap pay-other-cap rv d2" data-i18n="pay.other">Otras formas de aportar</p>
-      <div class="pay-tabs rv d2" role="tablist" aria-labelledby="pay-heading">
+      <p id="pay-money-cap" class="rec-cap pay-other-cap rv d2" data-i18n="pay.other.money">Transferencia o PayPal</p>
+      <div class="pay-tabs rv d2" role="tablist" aria-labelledby="pay-money-cap">
         <button type="button" id="paytab-banco" class="pay-tab on" role="tab" aria-selected="true" aria-controls="pay-banco" tabindex="0" data-act="payMethod('banco')" data-i18n="pay.tab.banco">Bancolombia</button>
         <button type="button" id="paytab-paypal" class="pay-tab" role="tab" aria-selected="false" aria-controls="pay-paypal" tabindex="-1" data-act="payMethod('paypal')" data-i18n="pay.tab.paypal">PayPal</button>
       </div>
@@ -1048,6 +1040,21 @@
         <p class="mu" style="margin-top:14px;text-align:left;font-size:14px" data-i18n="pay.banco.note">Transfiere y envía el comprobante a contabilidad@thegiveandgrowproject.org. En 24h recibes tu credencial de miembro y tu certificado tributario.</p>
       </div>
       <div id="pay-paypal" class="pay-panel rv d2" role="tabpanel" aria-labelledby="paytab-paypal" tabindex="0"><p class="mu" data-i18n="pay.paypal.note">Para donaciones internacionales en USD. Escríbenos y te enviamos el enlace de PayPal.</p></div>
+
+      <!-- Aporte no monetario: vive aquí y no en la calculadora porque también es
+           «otra forma de aportar». Sobre fondo CLARO: usa los chips base, sin overrides. -->
+      <div class="give-extra rv d2">
+        <p class="rec-cap" data-i18n="give.extra.t">Más allá del dinero</p>
+        <p class="give-extra-p" data-i18n="give.extra.p">Más allá del aporte monetario, puedes sumar de otras formas. Cuéntanos cuál te interesa y te contactamos.</p>
+        <div class="eco-row">
+          <span class="eco-chip" data-i18n="give.extra.c1">Voluntariado</span>
+          <span class="eco-chip" data-i18n="give.extra.c2">Donación en especie</span>
+          <span class="eco-chip" data-i18n="give.extra.c3">Conexiones y alianzas</span>
+          <span class="eco-chip" data-i18n="give.extra.c4">Difusión</span>
+          <span class="eco-chip" data-i18n="give.extra.c5">Servicios pro-bono</span>
+        </div>
+        <a class="btn btn-o" data-nav="aliados" href="#aliados" data-i18n="give.extra.btn">Conversemos</a>
+      </div>
     </div>
   </section>
   <section>
@@ -1664,7 +1671,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=6f59da2f"></script>
+<script src="/app.js?v=f6871a0c"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
