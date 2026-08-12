@@ -958,6 +958,42 @@ html[data-theme="dark"] .med-step-s.is-on{color:var(--gn)}
 .med-tbl td{padding:13px 16px 13px 0;border-bottom:1px solid var(--bd);color:var(--ink-soft);vertical-align:top;line-height:1.45}
 .med-tbl td:first-child{color:var(--ink);font-weight:600}
 .med-tbl tr:last-child td{border-bottom:0}
+
+/* ============ Tabla que se apila (solo el panel interno) ============
+   El acta de entrega se publica EN TERRENO, desde un celular, después de una
+   jornada. Medido el 12 ago 2026 en el panel a 375px: la tabla de entregas
+   tenía 633px de contenido en una ventana de 327 —306px de desplazamiento
+   horizontal a ciegas— y sus tres controles («+ foto», «Publicar», «Anular»)
+   quedaban FUERA de pantalla, con 26px de alto.
+
+   `eco-stack` va solo en esa tabla y no en `.med-tbl`, porque esa misma clase
+   la usa la tabla pública de medición y no es asunto de este cambio.
+   `toca` sube los controles a 44px, y va como clase aparte porque `.copy` es
+   también el botón «Copiar» del número de cuenta en el sitio público. */
+.eco-stack .toca{display:inline-flex;align-items:center;justify-content:center;
+  min-height:34px;padding:6px 14px}
+@media(max-width:700px){
+  /* Sin esto, el min-width de .med-tbl seguiría forzando el desplazamiento. */
+  .eco-stack{min-width:0;font-size:15px}
+  /* La cabecera se esconde sin salir del árbol de accesibilidad. */
+  .eco-stack thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;
+    overflow:hidden;clip-path:inset(50%);border:0}
+  .eco-stack tr{display:block;padding:14px 0;border-bottom:1px solid var(--bd)}
+  .eco-stack tr:last-child{border-bottom:0}
+  .eco-stack td{display:grid;grid-template-columns:9ch minmax(0,1fr);gap:12px;
+    align-items:baseline;padding:4px 0;border:0}
+  .eco-stack td::before{content:attr(data-label);font-size:10.5px;font-weight:700;
+    letter-spacing:.9px;text-transform:uppercase;color:var(--mu);line-height:1.8}
+  /* La celda de acciones rompe la rejilla: los botones necesitan el ancho. */
+  .eco-stack td[data-label="Acción"],.eco-stack td[data-label="Fotos"]{
+    display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
+  .eco-stack td[data-label="Acción"]::before,.eco-stack td[data-label="Fotos"]::before{
+    flex:0 0 9ch}
+  .eco-stack .toca{min-height:44px;padding:0 18px;font-size:14px}
+  /* El estado vacío ocupa la fila entera y no necesita etiqueta. */
+  .eco-stack td[colspan]::before{content:none}
+  .eco-stack td[colspan]{display:block}
+}
 /* plantilla de reporte: bloque con aire de documento, hermano de .rec-ledger */
 .rep-doc{margin-top:24px;max-width:74ch;padding:24px 26px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl)}
 .rep-hd{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid var(--bd)}

@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=85b60870">
+<link rel="stylesheet" href="/styles.css?v=6391a3d6">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1290,7 +1290,7 @@
         <div class="brig-mc-b">
           <h4 data-i18n="brig.mc.manos.t">Manos en la estructura</h4>
           <p data-i18n="brig.mc.manos.p">El equipo que viaja ya está cerrado en siete personas: ir a terreno exige doble verificación —la nuestra y la de la fundación del territorio— y una sesión de Marco, y eso no cabe en los días que quedan. Lo que sí necesitamos es gente en Medellín para recibir, clasificar y empacar lo que llega al acopio. En el formulario, elige «Con Give&amp;Grow — en la estructura».</p>
-          <a class="btn btn-o" href="#voluntariado" data-i18n="brig.mc.manos.btn">Ofrecer mi tiempo</a>
+          <a class="btn btn-o" href="#voluntariado" data-act="irAVoluntariadoBrigada()" data-i18n="brig.mc.manos.btn">Ofrecer mi tiempo</a>
         </div>
         <div class="brig-mc-b">
           <h4 data-i18n="brig.mc.cont.t">Contactos que abren puertas</h4>
@@ -1976,6 +1976,8 @@
         <div class="field"><label for="vf-ciudad" data-i18n="vf.ciudad">Ciudad (opcional)</label>
           <input type="text" id="vf-ciudad" autocomplete="address-level2"></div>
 
+        <p class="vf-aviso" id="vf-origen" style="display:none" data-i18n="vf.origen.brig">Vienes de la brigada del terremoto. Te marcamos «en la estructura» porque es lo que se puede sumar a tiempo: el acopio de Medellín, del 24 al 28 de agosto. Puedes cambiarlo si prefieres el programa de todo el año.</p>
+
         <fieldset class="vf-set">
           <legend data-i18n="vf.nivel.lbl">¿Cómo quieres participar?</legend>
           <p class="vf-help" data-i18n="vf.nivel.help">El nivel no lo define tu oficio: lo define si pisas el territorio. Un diseñador puede aportar solo en la estructura, solo en terreno, o partir su tiempo entre las dos.</p>
@@ -2109,7 +2111,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=294a090b"></script>
+<script src="/app.js?v=4f098c2e"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
