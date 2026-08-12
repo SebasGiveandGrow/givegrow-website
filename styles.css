@@ -1143,3 +1143,16 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
   letter-spacing:.04em;padding:9px 20px;border:2px solid;border-radius:999px;margin-bottom:20px}
 .carnet-pie{font-size:12px;line-height:1.5;color:rgba(255,255,255,.6)}
 .carnet-nit{font-size:10.5px;letter-spacing:.06em;color:rgba(255,255,255,.4);margin-top:16px}
+
+/* Reporte de transferencia */
+.rep-link{font-weight:700;color:var(--acc);border-bottom:1px solid var(--bd)}
+.rep-link:hover{border-color:var(--acc)}
+#rep select,#rep input[type=date],#rep input[type=number]{width:100%;padding:11px 12px;
+  border:1px solid var(--bd);border-radius:10px;background:var(--surface);color:var(--ink);
+  font:inherit;font-size:15px}
+.rep-ok{margin-top:26px;padding-top:24px;border-top:2px solid var(--g);max-width:600px}
+.rep-guia{font-family:var(--font-display);font-weight:800;font-size:clamp(26px,6vw,38px);
+  color:var(--acc);letter-spacing:-.02em;margin:6px 0 14px}
+.rep-ok-p{font-size:15px;line-height:1.6;color:var(--ink-soft);max-width:62ch;margin-bottom:16px}
+.rep-sube-t{font-size:var(--fs-h4);margin:22px 0 6px;padding-top:20px;border-top:1px solid var(--bd)}
+#rep-file{font-size:14px;margin-top:6px}

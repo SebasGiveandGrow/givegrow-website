@@ -246,6 +246,51 @@ archivada. No se inventaron estados nuevos en una columna compartida.
 La categoría se valida contra una lista cerrada (las siete de la página más
 «otra»): un campo libre ahí volvería inútil el filtro el primer día.
 
+## Transferencias bancarias reportadas
+
+Era el hueco más grande: la transferencia es el **primer medio de pago** que
+muestra la página de la brigada y el que usan las empresas, y no producía nada —
+ni guía, ni recibo, ni rastreo, ni ruta al certificado. Terminaba en un correo a
+`contabilidad@` que alguien tenía que procesar a mano.
+
+### No se tocó el significado de `aprobada`
+
+Sigue queriendo decir **«el dinero entró»**, que es de lo que depende poder
+firmar un certificado bajo juramento. Lo que se añadió es la **procedencia** de
+esa certeza: `confirmacion` vale `'wompi'` cuando la dio la pasarela y
+`'manual'` cuando una persona la contrastó contra el extracto, con
+`confirmado_por` y `confirmado_en`. El estado no pierde su garantía: gana un
+origen auditable.
+
+El estado intermedio es **`reportada`**: el donante dice que transfirió. Eso no
+es dinero en el banco, así que no da recibo (409), no da certificado y en el
+rastreo no aparece como recibida — aparece con su propio mensaje, «estamos
+verificando tu transferencia», que no es lo mismo que un pago fallido.
+
+### El certificado cita la referencia BANCARIA
+
+El numeral 5 dice «mediante transferencia electrónica No. …». Para un pago por
+pasarela ese número es el id de Wompi; para una transferencia real es el del
+comprobante, y por eso confirmar **exige** escribirlo. Citar un id de Wompi que
+no existe sería falso en un documento juramentado.
+
+### El comprobante
+
+`POST /api/comprobante/<guia>?t=<token>`. Solo sobre un aporte `reportada`, con
+su token, uno por aporte, ≤5 MB, imagen o PDF. Sin esas tres condiciones sería
+una carga pública abierta contra el bucket. Se sirve **solo** tras Access
+(`/api/admin/comprobante/<guia>`): lleva datos bancarios del donante.
+
+### Rutas
+
+```
+POST /api/transferencia                              público, crea la guía
+POST /api/comprobante/GG-…?t=<token>                 público con token
+GET  /api/admin/reportadas                           bandeja de verificación
+GET  /api/admin/comprobante/GG-…                     ver el soporte
+POST /api/admin/transferencia/GG-…/confirmar {referencia|descartar,motivo}
+```
+
 ## Pagos que entran por fuera del checkout
 
 Sebas creó un **enlace de pago propio de Wompi** para la brigada

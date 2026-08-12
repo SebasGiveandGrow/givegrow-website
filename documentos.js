@@ -137,6 +137,18 @@ function centenas(n) {
   return s;
 }
 
+/* «dos millones DE pesos», pero «doscientos mil pesos». El español pide la
+   preposición cuando el numeral termina en millón/millones o billón/billones, y
+   no cuando termina en mil o en unidades. En un documento que se firma bajo
+   juramento el valor en letras es el que manda si discrepa de la cifra, así que
+   la concordancia no es un detalle de estilo. */
+export function pesosEnLetras(n) {
+  const letras = enLetras(n);
+  return /(mill[oó]n|millones|bill[oó]n|billones)$/.test(letras)
+    ? letras + " de pesos"
+    : letras + " pesos";
+}
+
 export function enLetras(n) {
   n = Math.round(Number(n) || 0);
   if (n === 0) return "cero";
@@ -553,7 +565,7 @@ export async function certificado(c, hoyISO) {
   h.numeral(3, "Clase de bien donado: dinero.");
   h.numeral(4,
     "Valor de la donación: " + pesos(c.monto_centavos) + " (" +
-    enLetras(Math.round(Number(c.monto_centavos) / 100)) + " pesos M/cte.).");
+    pesosEnLetras(Math.round(Number(c.monto_centavos) / 100)) + " M/cte.).");
   h.numeral(5,
     "Manera en que se efectuó la donación: mediante transferencia electrónica No. " +
     (c.transaccion || "-") + " del " + fechaLarga(c.fecha_donacion) + ", realizada a través del " +
