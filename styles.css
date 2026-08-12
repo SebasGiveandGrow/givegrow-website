@@ -1118,3 +1118,28 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 .track-ev-box h3{font-size:var(--fs-h4);margin-bottom:8px}
 .track-ev-box .mu{font-size:14.5px;line-height:1.6;max-width:64ch}
 .track-ev-box .ev-lista{margin-top:8px}
+
+/* ---- carnet de miembro ----
+   Página propia, no una sección del sitio: se abre en el celular de quien
+   atiende una caja y tiene que leerse de un vistazo, en una mano y con prisa.
+   Por eso vive sobre el panel oscuro y el estado es lo más grande después del
+   nombre. */
+.carnet{max-width:400px;width:100%;background:var(--ink-deep);color:#fff;
+  border-radius:18px;padding:30px 28px 24px;border:1px solid rgba(255,255,255,.10)}
+.carnet-top{display:flex;align-items:baseline;gap:10px;margin-bottom:26px}
+.carnet-amp{font-family:var(--font-display);font-weight:800;font-size:30px;color:var(--gn);line-height:1}
+.carnet-marca{font-weight:800;text-transform:uppercase;letter-spacing:.14em;font-size:10px;
+  color:rgba(255,255,255,.7);line-height:1.4}
+.carnet-nivel{font-family:var(--font-display);font-weight:700;font-size:13px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--gn);margin-bottom:6px}
+.carnet-nombre{font-family:var(--font-display);font-weight:800;font-size:clamp(24px,7vw,32px);
+  line-height:1.08;letter-spacing:-.02em;color:#fff;margin-bottom:24px;text-wrap:balance}
+.carnet-datos{display:flex;flex-direction:column;gap:0;margin-bottom:22px}
+.carnet-datos > div{display:flex;justify-content:space-between;gap:14px;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,.10)}
+.carnet-datos dt{font-size:13px;color:rgba(255,255,255,.6)}
+.carnet-datos dd{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.carnet-estado{display:inline-block;font-family:var(--font-display);font-weight:700;font-size:15px;
+  letter-spacing:.04em;padding:9px 20px;border:2px solid;border-radius:999px;margin-bottom:20px}
+.carnet-pie{font-size:12px;line-height:1.5;color:rgba(255,255,255,.6)}
+.carnet-nit{font-size:10.5px;letter-spacing:.06em;color:rgba(255,255,255,.4);margin-top:16px}
