@@ -174,6 +174,32 @@ fallback de SPA se lo traga.
 porque el papel firmado se fotografía y se publica; cuando se quiera un
 documento propio, el motor de `documentos.js` ya está.
 
+## Ofrecimientos en especie
+
+Hasta la brigada, ofrecer insumos terminaba en un WhatsApp: un mensaje suelto
+que alguien tiene que leer, responder y recordar. Con dos números publicados y
+una emergencia encima, es donde se pierden los ofrecimientos.
+
+`POST /api/inscripcion` con `tipo:"especie"`. **Mismo endpoint y misma tabla que
+el voluntariado**: `inscripciones` ya tenía `tipo` y un blob `datos` pensados
+para varios tipos, así que comparte el honeypot, el consentimiento de Ley 1581 y
+el patrón de correo — y no hizo falta una migración más antes de que salga la
+brigada.
+
+El acuse tiene un solo trabajo real: **que no compre todavía**. Es el error más
+caro y más frecuente de la donación espontánea, y la propia página lo advierte
+—«comprar sin coordinar suele terminar en insumos que no se pueden entregar»—.
+El aviso interno lo repite del otro lado: «conviene responder antes de que
+compre».
+
+Panel: `/api/admin/ofrecimientos` los lista, y
+`POST /api/admin/inscripcion/<id>/estado` los mueve por los estados que ya
+existían en la tabla — nueva → en_revision (contactado) → aceptada (recibido) →
+archivada. No se inventaron estados nuevos en una columna compartida.
+
+La categoría se valida contra una lista cerrada (las siete de la página más
+«otra»): un campo libre ahí volvería inútil el filtro el primer día.
+
 ## Pagos que entran por fuera del checkout
 
 Sebas creó un **enlace de pago propio de Wompi** para la brigada

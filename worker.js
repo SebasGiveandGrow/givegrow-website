@@ -833,6 +833,13 @@ async function apiInscripcion(request, env, url) {
      enseñarle qué lo delató, y no se guarda nada. */
   if (c.web2) return json({ ok: true });
 
+  /* Un ofrecimiento en especie entra por el mismo endpoint y a la misma tabla:
+     comparte el honeypot, el consentimiento de Ley 1581 y el patrón de correo.
+     `inscripciones.tipo` ya estaba pensado para varios tipos y `datos` guarda lo
+     propio de cada uno — no hacía falta tabla nueva, y por lo tanto tampoco una
+     migración más antes de que salga la brigada. */
+  if (c.tipo === "especie") return await apiOfrecimiento(env, c);
+
   const tipo = c.tipo === "voluntario" ? "voluntario" : null;
   if (!tipo) return json({ error: "tipo_no_soportado" }, 400);
 
@@ -1350,6 +1357,162 @@ function fechaLargaISO(iso) {
 }
 
 /* ========================================================================
+   Ofrecimientos en especie
+   ========================================================================
+   Hasta hoy esto terminaba en un WhatsApp: un mensaje suelto que alguien tiene
+   que leer, responder y recordar. Con dos números publicados y una emergencia
+   encima, es donde se pierden los ofrecimientos.
+
+   El formulario no existe para reemplazar el chat —el chat sigue ahí— sino para
+   que quede registro de quién ofreció qué, y para poder decirle a tiempo «eso
+   no, esto sí». La propia página lo advierte: comprar sin coordinar suele
+   terminar en insumos que no se pueden entregar.
+   ======================================================================== */
+
+const CATEGORIAS_ESPECIE = [
+  "agua", "alimento", "higiene", "panales", "descanso", "energia", "brigada", "otra"
+];
+
+async function apiOfrecimiento(env, c) {
+  const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const nombre    = limpio(c.nombre, 120);
+  const email     = limpio(c.email, 200);
+  const categoria = CATEGORIAS_ESPECIE.includes(c.categoria) ? c.categoria : null;
+  const detalle   = limpio(c.detalle, 400);
+
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  if (!categoria) return json({ error: "categoria_requerida", opciones: CATEGORIAS_ESPECIE }, 400);
+  if (!detalle) return json({ error: "detalle_requerido" }, 400);
+  /* Sin autorización no se guarda NADA. Ley 1581, no una casilla decorativa. */
+  if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
+
+  const datos = {
+    campana: limpio(c.campana, 60) || "brigada-emergencia-2026-08",
+    categoria,
+    detalle,
+    cantidad: limpio(c.cantidad, 120),
+    disponible: limpio(c.disponible, 200),
+    quien: c.quien === "empresa" ? "empresa" : "persona",
+    idioma: c.idioma === "en" ? "en" : "es"
+  };
+
+  const ins = await env.DB.prepare(
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
+    "VALUES ('especie', 'nueva', ?, ?, ?, ?, ?)"
+  ).bind(nombre, email, limpio(c.telefono, 40) || null, limpio(c.ciudad, 80) || null,
+         JSON.stringify(datos)).run();
+
+  /* El correo no puede tumbar el registro: si falla, el ofrecimiento ya quedó
+     guardado y eso es lo que importa. Misma regla que en aportes e inscripciones. */
+  try {
+    await correoOfrecimiento(env, { nombre, email, ciudad: limpio(c.ciudad, 80), ...datos });
+    await correoAvisoOfrecimiento(env, { nombre, email, telefono: limpio(c.telefono, 40), ciudad: limpio(c.ciudad, 80), ...datos });
+  } catch (e) {
+    console.error("correo ofrecimiento", e && e.message);
+  }
+
+  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+}
+
+const ETIQUETA_CAT = {
+  es: { agua:"Agua segura", alimento:"Comida que no necesita cocina", higiene:"Higiene y dignidad",
+        panales:"Pañales, de bebé y de adulto", descanso:"Dormir sin piso frío",
+        energia:"Luz y carga de celular", brigada:"Lo que sostiene a la brigada", otra:"Otra cosa" },
+  en: { agua:"Safe water", alimento:"Food that needs no kitchen", higiene:"Hygiene and dignity",
+        panales:"Nappies, for babies and adults", descanso:"Sleeping off a cold floor",
+        energia:"Light and phone charging", brigada:"What keeps the brigade going", otra:"Something else" }
+};
+
+/* Acuse a quien ofrece. Su trabajo real es UNO: que no compre todavía. Es el
+   error más caro y más frecuente de la donación espontánea. */
+async function correoOfrecimiento(env, o) {
+  const en = o.idioma === "en";
+  const cat = (ETIQUETA_CAT[en ? "en" : "es"] || ETIQUETA_CAT.es)[o.categoria] || o.categoria;
+  const titulo = en ? "We got your offer. Please do not buy anything yet."
+                    : "Recibimos tu ofrecimiento. No compres nada todavía.";
+  const parrafos = en ? [
+    "Thank you. Before you spend a peso, we will write to you to confirm what is actually missing today and in what format it can be handed over.",
+    "The inventory changes daily and what is left over in one sector is missing in another. Buying without coordinating usually ends in supplies that cannot be delivered — and that helps nobody.",
+    "If you already have it, even better: we will arrange collection at the nearest drop-off point."
+  ] : [
+    "Gracias. Antes de que gastes un peso, te escribimos para confirmarte qué falta hoy de verdad y en qué presentación se puede entregar.",
+    "El inventario cambia todos los días y lo que sobra en un sector falta en otro. Comprar sin coordinar suele terminar en insumos que no se pueden entregar, y eso no le sirve a nadie.",
+    "Si ya lo tienes, mejor todavía: coordinamos la recolección en el centro de acopio más cercano."
+  ];
+  const filas = en
+    ? [["Category", cat], ["What you are offering", o.detalle], ["Quantity", o.cantidad || "—"], ["City", o.ciudad || "—"]]
+    : [["Categoría", cat], ["Qué ofreces", o.detalle], ["Cantidad", o.cantidad || "—"], ["Ciudad", o.ciudad || "—"]];
+
+  return enviarCorreo(env, {
+    para: o.email, asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas }),
+    etiqueta: "ofrecimiento-especie"
+  });
+}
+
+async function correoAvisoOfrecimiento(env, o) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const titulo = "Ofrecimiento en especie: " + (ETIQUETA_CAT.es[o.categoria] || o.categoria);
+  const filas = [
+    ["Categoría", ETIQUETA_CAT.es[o.categoria] || o.categoria],
+    ["Qué", o.detalle],
+    ["Cantidad", o.cantidad || "(no dice)"],
+    ["Cuándo/cómo", o.disponible || "(no dice)"],
+    ["Quién", o.quien === "empresa" ? "Empresa" : "Persona"],
+    ["Nombre", o.nombre],
+    ["Correo", o.email],
+    ["Teléfono", o.telefono || "(no dejó)"],
+    ["Ciudad", o.ciudad || "(no dice)"]
+  ];
+  return enviarCorreo(env, {
+    para, asunto: titulo + " · " + o.nombre,
+    texto: filas.map(([k, v]) => k + ": " + v).join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: ["Alguien ofreció insumos por el formulario de la brigada. Ya está en /admin.",
+                 "Conviene responder antes de que compre: el acuse le pidió esperar."],
+      filas
+    }),
+    etiqueta: "aviso-ofrecimiento"
+  });
+}
+
+/* Los ofrecimientos comparten tabla con las inscripciones, así que el panel los
+   filtra por tipo en vez de tener su propia consulta. */
+async function adminOfrecimientos(env) {
+  const r = await env.DB.prepare(
+    "SELECT id, estado, nombre, email, telefono, ciudad, datos, creada_en " +
+    "FROM inscripciones WHERE tipo = 'especie' ORDER BY creada_en DESC LIMIT 100"
+  ).all();
+  return json({ ofrecimientos: r.results || [] });
+}
+
+const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "archivada"];
+
+async function adminMoverInscripcion(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  const nuevo = String(c.estado || "");
+  if (!ESTADOS_INSCRIPCION.includes(nuevo)) {
+    return json({ error: "estado_no_permitido", permitidos: ESTADOS_INSCRIPCION }, 400);
+  }
+  const f = await env.DB.prepare("SELECT id FROM inscripciones WHERE id = ?").bind(id).first();
+  if (!f) return json({ error: "no_encontrada" }, 404);
+
+  await env.DB.prepare(
+    "UPDATE inscripciones SET estado = ?, actualizada_en = datetime('now') WHERE id = ?"
+  ).bind(nuevo, id).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "inscripción " + id + " -> " + nuevo).run();
+  return json({ ok: true, id, estado: nuevo });
+}
+
+/* ========================================================================
    PAGOS SIN APORTE
    ========================================================================
    El enlace de pago propio de Wompi (el QR de la brigada) cobra a la misma
@@ -1639,6 +1802,17 @@ function paginaAdmin() {
 
 <div id="dlg" style="display:none;margin-top:24px"></div>
 
+<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
+de la brigada. <strong>El acuse les pidió NO comprar todavía</strong>, así que conviene responder
+antes de que lo hagan: el inventario cambia todos los días.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Qué</th><th scope="col">Cantidad</th><th scope="col">Cuándo</th>
+<th scope="col">Quién</th><th scope="col">Ciudad</th><th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="o-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
+</table></div>
+
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Pagos sin aporte</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Pagos aprobados que entraron
 por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el checkout del sitio.
@@ -1883,6 +2057,45 @@ document.addEventListener("click", function(e){
   }
 });
 
+/* ---------------- ofrecimientos en especie ---------------- */
+var CAT_ES = { agua:"Agua segura", alimento:"Comida sin cocina", higiene:"Higiene y dignidad",
+  panales:"Pañales", descanso:"Descanso", energia:"Luz y carga", brigada:"Equipo de brigada", otra:"Otra" };
+
+function cargarOfrecimientos(){
+  fetch("/api/admin/ofrecimientos").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("o-filas"); if (!tb) return;
+    var l = d.ofrecimientos || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no hay ofrecimientos.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(o){
+      var x = {}; try { x = JSON.parse(o.datos||"{}"); } catch(e){}
+      var siguiente = o.estado === "nueva" ? ["en_revision","Contactado"]
+                    : o.estado === "en_revision" ? ["aceptada","Recibido"]
+                    : o.estado === "aceptada" ? ["archivada","Archivar"] : null;
+      return "<tr>" +
+        "<td><strong>" + esc(CAT_ES[x.categoria] || x.categoria || "?") + "</strong><br><small>" + esc(x.detalle||"") + "</small></td>" +
+        "<td>" + esc(x.cantidad || "—") + "</td>" +
+        "<td>" + esc(x.disponible || "—") + "</td>" +
+        "<td>" + esc(o.nombre||"") + "<br><small>" + esc(o.email||"") + (o.telefono ? " · " + esc(o.telefono) : "") +
+          (x.quien === "empresa" ? " · empresa" : "") + "</small></td>" +
+        "<td>" + esc(o.ciudad || "—") + "</td>" +
+        "<td>" + esc(o.estado) + "</td>" +
+        "<td>" + (siguiente ? '<button class="copy" data-ins="' + o.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") + "</td>" +
+      "</tr>";
+    }).join("");
+  });
+}
+
+document.addEventListener("click", function(e){
+  var b = e.target.closest("[data-ins]");
+  if (!b) return;
+  b.disabled = true; b.textContent = "…";
+  fetch("/api/admin/inscripcion/" + encodeURIComponent(b.getAttribute("data-ins")) + "/estado", {
+    method: "POST", headers: {"content-type":"application/json"},
+    body: JSON.stringify({ estado: b.getAttribute("data-e") })
+  }).then(function(r){ return r.json(); }).then(function(){ cargarOfrecimientos(); })
+    .catch(function(){ cargarOfrecimientos(); });
+});
+
 /* ---------------- pagos sin aporte ---------------- */
 function cargarSueltos(){
   fetch("/api/admin/pagos-sueltos").then(function(r){ return r.json(); }).then(function(d){
@@ -1998,6 +2211,7 @@ document.addEventListener("click", function(e){
 pintarCampos();
 cargarEntregas();
 cargarSueltos();
+cargarOfrecimientos();
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
@@ -2182,6 +2396,9 @@ export default {
         /* Entregas (Fase 6). El borrador y sus fotos viven tras Access hasta que
            alguien las publica: en terreno se registra rápido y se revisa después. */
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
+        if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
+        const mi = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/estado$/);
+        if (mi) return await adminMoverInscripcion(request, env, Number(mi[1]), sesion.email);
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
         if (ruta === "/api/admin/entrega")  return await adminCrearEntrega(request, env, sesion.email);
         const ef = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/foto$/i);

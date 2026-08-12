@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=f0a10849">
+<link rel="stylesheet" href="/styles.css?v=ce41645e">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1077,6 +1077,53 @@
         <p class="brig-via-v"><a href="https://wa.me/573123023790" target="_blank" rel="noopener" data-i18n="brig.dar.especie.v2">WhatsApp 312 302 3790</a>
           <span class="brig-quien" data-i18n="brig.dar.especie.nat">Nativos · aliado principal</span></p>
         <p class="brig-via-p" data-i18n="brig.dar.especie.p">Escríbenos antes de comprar: te decimos qué falta hoy, en qué presentación sirve y a qué centro de acopio llevarlo. Comprar sin coordinar suele terminar en insumos que no se pueden entregar.</p>
+        <h4 class="of-t" data-i18n="of.t">O déjanos los datos y te escribimos</h4>
+        <p class="brig-via-p" data-i18n="of.p">Si prefieres no escribir por WhatsApp. Lo importante es lo mismo: cuéntanos antes de comprar.</p>
+        <form id="of" class="ally-form" data-submit="ofSubmit(event)">
+          <div class="field"><label for="of-cat" data-i18n="of.cat">¿De qué categoría?</label>
+            <select id="of-cat" required><option value="">—</option>
+            <option value="agua" data-i18n="of.cat.agua">Agua segura</option>
+            <option value="alimento" data-i18n="of.cat.alimento">Comida que no necesita cocina</option>
+            <option value="higiene" data-i18n="of.cat.higiene">Higiene y dignidad</option>
+            <option value="panales" data-i18n="of.cat.panales">Pañales, de bebé y de adulto</option>
+            <option value="descanso" data-i18n="of.cat.descanso">Dormir sin piso frío</option>
+            <option value="energia" data-i18n="of.cat.energia">Luz y carga de celular</option>
+            <option value="brigada" data-i18n="of.cat.brigada">Lo que sostiene a la brigada</option>
+            <option value="otra" data-i18n="of.cat.otra">Otra cosa</option>
+            </select></div>
+          <div class="field"><label for="of-detalle" data-i18n="of.detalle">¿Qué exactamente?</label>
+            <input type="text" id="of-detalle" data-i18n="of.detalle.ph" data-i18n-attr="placeholder" placeholder="Colchonetas de espuma, atún en lata con abre fácil, pañales talla M…" required></div>
+          <div class="field"><label for="of-cantidad" data-i18n="of.cantidad">¿Cuánto? (opcional)</label>
+            <input type="text" id="of-cantidad" data-i18n="of.cantidad.ph" data-i18n-attr="placeholder" placeholder="50 unidades, 3 cajas, un bulto…"></div>
+          <div class="field"><label for="of-disp" data-i18n="of.disponible">¿Cuándo y cómo lo entregas? (opcional)</label>
+            <input type="text" id="of-disp" data-i18n="of.disponible.ph" data-i18n-attr="placeholder" placeholder="Esta semana, puedo llevarlo al acopio; o necesito que lo recojan."></div>
+
+          <fieldset class="vf-set">
+            <legend data-i18n="of.quien">Aportas como</legend>
+            <label class="ally-check"><input type="radio" name="of-quien" value="persona" checked><span data-i18n="of.quien.persona">Persona</span></label>
+            <label class="ally-check"><input type="radio" name="of-quien" value="empresa"><span data-i18n="of.quien.empresa">Empresa</span></label>
+          </fieldset>
+
+          <div class="field"><label for="of-nombre" data-i18n="of.nombre">Nombre o razón social</label>
+            <input type="text" id="of-nombre" autocomplete="name" required></div>
+          <div class="field"><label for="of-email" data-i18n="of.email">Correo</label>
+            <input type="email" id="of-email" autocomplete="email" required></div>
+          <div class="field"><label for="of-tel" data-i18n="of.tel">Teléfono o WhatsApp (opcional)</label>
+            <input type="tel" id="of-tel" autocomplete="tel"></div>
+          <div class="field"><label for="of-ciudad" data-i18n="of.ciudad">Ciudad (opcional)</label>
+            <input type="text" id="of-ciudad" autocomplete="address-level2"></div>
+
+          <!-- Honeypot: invisible para personas, irresistible para bots. Mismo
+               patrón que el del formulario de voluntariado: fuera de pantalla y
+               con aria-hidden, no display:none — algunos bots ignoran lo oculto
+               por display pero sí llenan lo que está posicionado fuera. -->
+          <input type="text" id="of-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+
+          <label class="ally-check"><input type="checkbox" id="of-datos"><span data-i18n="of.datos">Autorizo el tratamiento de mis datos para coordinar este aporte, conforme a la Política de Privacidad.</span></label>
+          <button class="btn btn-g" id="of-btn" type="submit" data-i18n="of.btn">Enviar el ofrecimiento</button>
+          <p class="ally-note" id="of-note" role="status" aria-live="polite"></p>
+        </form>
+
       </div>
 
       <div class="card rv d2 brig-cert">
@@ -1842,7 +1889,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=27834108"></script>
+<script src="/app.js?v=27efde6a"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
