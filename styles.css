@@ -1097,3 +1097,8 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 .ev-foto:hover img{transform:scale(1.03)}
 .ev-vacio{font-size:15px;line-height:1.6;color:var(--ink-soft);max-width:60ch;margin-top:22px;
   padding-left:14px;border-left:3px solid var(--bd)}
+
+/* Segundo contacto de acopio. El número manda y quién lo atiende va detrás, en
+   voz baja: dos líneas de igual peso harían dudar a cuál escribir. */
+.brig-quien{font-family:"Inter",sans-serif;font-weight:600;font-size:13px;
+  letter-spacing:.02em;color:var(--mu);text-transform:none}
