@@ -1008,3 +1008,69 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 .map-fchip{padding:8px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--surface);color:var(--ink-soft);font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
 .map-fchip.on{background:var(--g);border-color:var(--g);color:#fff}
 .map-summary{margin:14px 0 0;font-size:14.5px;color:var(--mu)}
+
+/* ===========================================================================
+   BRIGADA DE ATENCIÓN A EMERGENCIA — página de campaña (agosto 2026)
+   ===========================================================================
+   Campaña, no sección permanente: cuando cierre, esta hoja se retira o se
+   convierte en el registro de lo que ocurrió. Por eso vive al final del
+   archivo y reutiliza los componentes que ya existen (.rec-ledger, .card,
+   .rec-cap) en vez de inventar un lenguaje nuevo para algo temporal.
+   =========================================================================== */
+
+/* Aviso de portada. Una sola línea sobre el hero: es una emergencia y tiene que
+   encontrarse, pero no puede convertir la home en un cartel. */
+.brig-aviso{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;
+  padding:12px 24px;background:var(--gd);color:#fff;font-size:14.5px;line-height:1.45;
+  border-bottom:2px solid var(--gn);transition:background .15s}
+.brig-aviso:hover{background:var(--g)}
+.brig-aviso strong{font-weight:800}
+.brig-aviso span{color:rgba(255,255,255,.82)}
+.brig-aviso span::after{content:" →";color:var(--gn);font-weight:700}
+@media(min-width:760px){.brig-aviso{justify-content:center;padding:12px 24px}}
+
+.brig-nota{font-size:14px;line-height:1.6;max-width:64ch;margin-top:16px}
+
+/* Ledger de sectores: misma gramática que la tabla de transparencia. */
+.brig-sec{margin-top:26px}
+.brig-sec .sec-fila{display:grid;grid-template-columns:1fr auto auto;gap:8px 18px;
+  align-items:baseline;padding:14px 0;border-bottom:1px solid var(--bd)}
+.brig-sec .sec-ciudad{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h4);
+  letter-spacing:-.01em}
+.brig-sec .sec-meta{font-size:14.5px;font-weight:700;font-variant-numeric:tabular-nums}
+/* Ámbar solo donde falta un dato — no como color de alarma. */
+.brig-sec .sec-estado{font-size:13px;font-weight:600;color:var(--amber)}
+@media(max-width:620px){
+  .brig-sec .sec-fila{grid-template-columns:1fr auto}
+  .brig-sec .sec-estado{grid-column:1/-1}
+}
+
+/* Categorías. El numeral cuelga y la razón va en Fraunces: es la voz humana
+   dentro de un documento de logística, y por eso cambia de familia. */
+.brig-cats{display:grid;gap:20px;margin-top:26px;
+  grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr))}
+.brig-cat{padding-top:18px;border-top:2px solid var(--g)}
+.brig-num{display:block;font-family:var(--font-display);font-weight:800;font-size:13px;
+  color:var(--acc);opacity:.5;letter-spacing:-.01em;margin-bottom:8px}
+.brig-cat h3{font-size:var(--fs-h4);margin-bottom:8px}
+.brig-r{font-family:"Fraunces",serif;font-style:italic;font-size:16.5px;line-height:1.4;
+  color:var(--acc);margin-bottom:10px}
+.brig-d{font-size:14.5px;line-height:1.55;color:var(--ink-soft)}
+
+/* Vías de aporte */
+.brig-via{padding:20px 0;border-top:1px solid var(--bd)}
+.brig-via-v{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h4);
+  letter-spacing:-.01em;margin:6px 0 8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  font-variant-numeric:tabular-nums}
+.brig-via-v a{border-bottom:1px solid var(--bd)}
+.brig-via-v a:hover{border-color:var(--acc);color:var(--acc)}
+.brig-via-p{font-size:15px;line-height:1.6;color:var(--ink-soft);max-width:62ch;margin-bottom:14px}
+.brig-cert{margin-top:26px}
+
+/* Reglas. Lo que NO se hace genera más confianza que cualquier promesa. */
+.brig-nos{margin-top:24px}
+.brig-no{padding:16px 0;border-top:1px solid var(--bd)}
+.brig-no-t{font-weight:800;font-size:16px;line-height:1.3;margin-bottom:4px}
+.brig-no-d{font-size:14.5px;line-height:1.55;color:var(--ink-soft)}
+.brig-cierre{margin-top:28px;padding-top:20px;border-top:2px solid var(--g);
+  font-family:"Fraunces",serif;font-style:italic;font-size:var(--fs-h4);color:var(--acc)}
