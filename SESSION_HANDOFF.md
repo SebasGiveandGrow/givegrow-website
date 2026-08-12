@@ -66,6 +66,36 @@ cuáles son antes de confundirlas con donaciones:
 Si se quiere arrancar limpio, se pueden borrar esas tres intenciones y la
 entrega de prueba. **Sebas no lo ha pedido**: preguntar antes.
 
+## ⚠️ El panel `/admin` estuvo caído 7 horas (12 ago 2026) — y el gate no lo veía
+
+**Síntoma:** las cuatro tablas de `/admin` en «Cargando…» para siempre.
+**Causa:** el `admin.js` servido no compilaba, así que no corría una sola línea.
+
+`/admin.js` **no es un archivo del repo**: son ~490 líneas que `adminJS()`
+devuelve como **template literal**. Dentro de un template, las secuencias de
+escape se interpolan — y eso mordió **dos veces**:
+
+- `\n` en el `window.prompt` de confirmar transferencias (PR #77) → salto de
+  línea real dentro de una cadena entre comillas, sin cerrar.
+- `/^https?:\/\//i` en la bandeja nueva (PR #79) → emitía `/^https?:///i`, con
+  la expresión regular cerrada antes de tiempo.
+
+**Dentro de `adminJS()` hay que escribir `\\n` y `\\/`.** Lo que se lee en
+worker.js NO es lo que ejecuta el navegador.
+
+**Por qué no lo atrapó nadie:** el check #1 valida la sintaxis de `worker.js`,
+que compila perfectamente — el error solo existe en lo *emitido*. Y en local el
+panel no se puede abrir: Access es fail-closed y devuelve 403 sin JWT, así que
+«no pude verificar el panel» se volvió costumbre en tres tandas seguidas.
+
+**Cerrado con el check #1b de `validate.mjs`**: extrae el literal de `adminJS()`,
+lo **evalúa** (no lo lee como fuente) y corre `node --check` sobre el resultado.
+Verificado que falla con cada uno de los dos bugs puestos de vuelta. Es el único
+JS generado del repo — `grep "<script" worker.js` da una sola línea.
+
+**La lección:** *código que se genera es código que hay que compilar.* Validar la
+plantilla no es validar el producto.
+
 ## Cierre de tanda: ecosistema, Fase 3 — fundaciones y empresas (12 ago 2026)
 
 Las **cuatro puertas de entrada del sitio terminan en la misma base y en el

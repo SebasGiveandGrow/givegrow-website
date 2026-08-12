@@ -18,6 +18,41 @@ for (const f of ["app.js", "worker.js", "documentos.js"]) {
   catch (e) { err(f + " sintaxis inválida"); }
 }
 
+/* 1b · Sintaxis del JS que worker.js GENERA.
+   El panel `/admin` no es un archivo del repo: son ~485 líneas que `adminJS()`
+   devuelve como template literal y el navegador ejecuta. El check #1 valida
+   worker.js —que compila perfectamente— y nunca miraba lo emitido.
+
+   El 12 ago 2026 eso costó el panel entero durante siete horas: un `\n` dentro
+   del template se interpoló y dejó un salto de línea real dentro de una cadena
+   entre comillas. El admin.js servido no compilaba, así que las CUATRO tablas
+   se quedaban en «Cargando…» y no había forma de notarlo desde el gate. Access
+   es fail-closed, así que en local el panel devuelve 403 y tampoco se ve ahí.
+
+   Se valida lo EMITIDO, no el código fuente del template: hay que evaluar el
+   literal para que las secuencias de escape queden como quedan en producción. */
+const workerSrc = readFileSync("worker.js", "utf8");
+for (const [nombre, fn] of [["adminJS()", "adminJS"]]) {
+  try {
+    const i = workerSrc.indexOf("function " + fn + "()");
+    if (i === -1) throw new Error("no se encontró " + nombre);
+    const ini = workerSrc.indexOf("`", i);
+    /* Cierre real del literal: la primera comilla invertida sin escapar. */
+    let j = ini + 1;
+    for (; j < workerSrc.length; j++) {
+      if (workerSrc[j] === "\\") { j++; continue; }
+      if (workerSrc[j] === "`") break;
+    }
+    const literal = workerSrc.slice(ini, j + 1);
+    if (literal.includes("${")) throw new Error(nombre + " tiene interpolaciones; este check asume que no");
+    const emitido = new Function("return " + literal)();
+    execSync("node --check", { input: emitido });
+    ok(nombre + " emite JS válido (" + emitido.split("\n").length + " líneas)");
+  } catch (e) {
+    err(nombre + " emite JS INVÁLIDO — el panel no cargaría: " + (e.stderr ? String(e.stderr).split("\n")[1] || e.message : e.message));
+  }
+}
+
 const src  = readFileSync("app.js", "utf8");
 const html = readFileSync("index.html", "utf8");
 
