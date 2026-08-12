@@ -3226,6 +3226,10 @@ cargarEntregas();
 cargarSueltos();
 cargarOfrecimientos();
 cargarInscripciones();
+/* Faltaba: la bandeja de transferencias solo se refrescaba DESPUÉS de confirmar
+   o descartar una, así que en una carga limpia se quedaba en «Cargando…» para
+   siempre. Estuvo tapado mientras el archivo entero no compilaba. */
+cargarReportadas();
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
