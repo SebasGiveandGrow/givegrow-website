@@ -15,7 +15,7 @@ Si Sebas dice solo "la siguiente fase", **preguntar de cuál de los tres**.
 | Plan | Dónde vive | Estado |
 |---|---|---|
 | **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso del 8–11 ago + este | **0, 1, 2, 3, 4, 5, 5.1, 6 y 8 hechas.** Fase 7 a medias: **carnet ✅**, falta el **débito automático** en Wompi. De la 8 quedó la mitad de «limpiar», que son decisiones tuyas, no código — ver su cierre de tanda |
-| **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3.** Ojo: parte de esa fase ya se hizo por otro camino — el rastreo real y la evidencia entraron con la brigada. Lo que queda de ella es **Transparencia imprimible en carta** y el **contador honesto por recencia**, que ahora sí tiene datos (`aportes` y `entregas` en D1) |
+| **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Fase 3 cerrada**: el rastreo y la evidencia entraron con la brigada, y **Transparencia imprimible** con el PR #90. Del contador por recencia Sebas decidió **esperar**. **Siguiente: su Fase 4** (sistema visual) |
 | **VOLUNTARIADO, 8 fases** | `PLAN_VOLUNTARIADO.md` | **Fases 1–7 hechas y en producción.** **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
 Y aparte, el **Social Fest 2026**: la postulación ya se envió (taller «Si no quedó
@@ -275,6 +275,50 @@ producción tras fusionar.
    real, pequeño, y mirar que llegue el evento y salga el recibo.
 4. Huérfanos de la auditoría que siguen ahí: `stats.json`, `prog_flow.png`,
    `ops/alma-parche-red.js`.
+
+## Cierre de tanda: plan VISUAL, Fase 3 — Transparencia imprimible (12 ago 2026)
+
+**No existía UNA sola regla `@media print` en el sitio.** Imprimir cualquier
+página se llevaba el menú, los dos botones flotantes, la barra del recorrido y el
+pie entero — y en modo noche, un rectángulo de tinta verde.
+
+Nació con una razón concreta y con fecha: a quien se le pide una bodega, un
+camión o entregar junto a nosotros para la brigada, lo primero que pregunta es
+**quién es la entidad**. Esta hoja lo responde en carta, y **ninguno de sus datos
+es financiero** — la regla de no publicar cifras hasta el cierre de 2025 queda
+intacta. Prueba existencia y gobernanza, no dinero.
+
+**Elemento firma: el sello** — NIT + Régimen Tributario Especial con borde, la
+idea que estaba anotada como suelta desde julio. Vive **solo en el papel**: en
+pantalla la página ya tiene su jerarquía y ahí sería decoración.
+
+**Tres decisiones que hacen la diferencia en papel:**
+- **La paleta de día siempre**, aunque la pantalla esté en noche. Imprimir verde
+  profundo gasta tinta y se lee peor: el papel ya es el fondo.
+- **Los enlaces muestran su URL** entre paréntesis. Un «Consultar en el RUES»
+  impreso no lleva a ninguna parte. Los `mailto:` NO la muestran —saldría
+  «(mailto:…)»— así que la dirección de contacto va una vez en el pie.
+- **La hoja imprime su propia fecha**, y se recalcula en `beforeprint` porque una
+  pestaña puede quedar abierta días. Una copia vieja se delata sola.
+- **Tarjetas → reglas finas** y fuera los iconos: es la conversión que pide el
+  plan v5, y en papel un marco redondeado no aporta nada.
+
+### ⚠️ TINTA INVISIBLE — el fallo que casi se publica
+Varias superficies del sitio son oscuras y pintan su texto en blanco (`.band`,
+`.calc`, `.hero`, `.home-hub`, `.foto-banner`, `.path`, `.stats`, `.carnet`…).
+Al forzar el papel a blanco, ese texto quedaba **blanco sobre blanco**: la
+sección «Gobernanza y control» de Transparencia se imprimía **vacía, sin el
+nombre de la Revisora Fiscal**, en un documento cuyo propósito es probar quién
+responde.
+
+**La lección de método:** el primer arreglo fue enumerar tres superficies a ojo y
+se quedaron tres sueltas, que aparecieron al barrer ruta por ruta. La lista
+definitiva salió de **barrer el CSS entero** buscando `color:#fff` y
+`rgba(255,255,255,…)` a nivel de contenedor. Verificado después: **cero nodos de
+tinta invisible en las 20 rutas del sitio.**
+
+Si algún día se añade una sección oscura, hay que añadirla a esa lista — o su
+texto se imprimirá en blanco y nadie lo notará, porque casi nadie imprime.
 
 ## ⚠️ El panel `/admin` estuvo caído 7 horas (12 ago 2026) — y el gate no lo veía
 

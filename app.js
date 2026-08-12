@@ -709,6 +709,9 @@ var I18N = {
     "copied":"Copiado",
     "pay.paypal.note":"Para donaciones internacionales en USD. Escríbenos y te enviamos el enlace de PayPal.",
     "transp.ey":"Transparencia",
+    "transp.sello.rte":"Régimen Tributario Especial",
+    "transp.pie":"thegiveandgrowproject.org · contabilidad@thegiveandgrowproject.org · Fundación Give&Grow International, Medellín, Colombia",
+    "transp.impreso":"Impreso el",
     "transp.t":"Cuentas claras.",
     "transp.p1":"Somos una Entidad Sin Ánimo de Lucro (ESAL) colombiana, constituida formalmente y bajo inspección del Estado. Aquí están nuestros datos de registro, gobernanza y compromisos financieros, verificables de forma independiente.",
     "transp.p2":"Creemos que la confianza se demuestra con hechos y documentos, no con promesas.",
@@ -1379,11 +1382,29 @@ function pintarBrigadaEstado(){
   if (nota) nota.textContent = f.fase === "despues" ? t("brig.est.p.despues") : t("brig.est.p");
 }
 
+/* La hoja imprime SU PROPIA fecha. Una copia de hace tres meses circulando como
+   si fuera actual es el problema que esto evita: la fecha en el papel la delata
+   sola. Se pone al entrar a Transparencia y otra vez justo antes de imprimir,
+   porque una pestaña puede quedar abierta días. */
+function pintarFechaImpresion(){
+  var el = document.getElementById("transp-fecha");
+  if (!el) return;
+  var d = new Date();
+  var meses = lang === "en"
+    ? ["January","February","March","April","May","June","July","August","September","October","November","December"]
+    : ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  el.textContent = lang === "en"
+    ? meses[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear()
+    : d.getDate() + " de " + meses[d.getMonth()] + " de " + d.getFullYear();
+}
+if (window.addEventListener) window.addEventListener("beforeprint", pintarFechaImpresion);
+
 function postLang(l){
   applyLang(l); renderHeroImpact(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); renderPrivacy();
   /* Va DESPUÉS de applyLang: el repintado de data-i18n devuelve el rango
      estático a su sitio y hay que volver a poner la fase encima. */
   pintarBrigadaEstado();
+  pintarFechaImpresion();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
@@ -1535,6 +1556,7 @@ function go(id, fromPop){
   renderJourney(id);
   if (id==="impacto") initGallery();
   if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); pintarBrigadaEstado(); }
+  if (id==="transparencia") pintarFechaImpresion();
 
   window.scrollTo(0,0);
   if (!fromPop) focusActivePage();

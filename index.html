@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=6391a3d6">
+<link rel="stylesheet" href="/styles.css?v=6d19fb4a">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1529,6 +1529,12 @@
 <main id="page-transparencia" class="page">
   <section>
     <div class="wrap prose">
+      <!-- Cabecera y pie de hoja: no existen en pantalla, solo al imprimir.
+           Fase 3 del plan visual — Transparencia como hoja en carta. -->
+      <div class="transp-cab solo-impresion" aria-hidden="true">
+        <span>Fundación Give&amp;Grow International</span>
+        <span data-i18n="transp.ey">Transparencia</span>
+      </div>
       <span class="ey rv" data-i18n="transp.ey">Transparencia</span>
       <h2 class="h-sec rv" data-i18n="transp.t">Cuentas claras.</h2>
       <p class="rv d1" data-i18n="transp.p1">Somos una Entidad Sin Ánimo de Lucro (ESAL) colombiana, constituida formalmente y bajo inspección del Estado. Aquí están nuestros datos de registro, gobernanza y compromisos financieros, verificables de forma independiente.</p>
@@ -1623,6 +1629,16 @@
           <a class="btn btn-o" href="mailto:contabilidad@thegiveandgrowproject.org?subject=Solicitud%20de%20documentos" data-i18n="transp.docs.btn">Solicitar documentos</a>
         </div>
       </div>
+
+      <!-- El sello: NIT + RTE. Único elemento firma de la hoja. Solo impreso. -->
+      <div class="transp-sello solo-impresion" aria-hidden="true">
+        <b>NIT 901.948.930-2</b>
+        <small data-i18n="transp.sello.rte">Régimen Tributario Especial</small>
+      </div>
+      <p class="transp-pie solo-impresion" aria-hidden="true">
+        <span data-i18n="transp.pie">thegiveandgrowproject.org · contabilidad@thegiveandgrowproject.org · Fundación Give&amp;Grow International, Medellín, Colombia</span>
+        · <span data-i18n="transp.impreso">Impreso el</span> <span id="transp-fecha"></span>
+      </p>
     </div>
   </section>
 </main>
@@ -2111,7 +2127,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=4f098c2e"></script>
+<script src="/app.js?v=1b6d1c27"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
