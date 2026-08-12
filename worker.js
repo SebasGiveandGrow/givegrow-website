@@ -436,14 +436,40 @@ async function apiEventos(request, env) {
 
 const CORREO_DESDE_DEF = "Give&Grow International <no-responder@notificaciones.thegiveandgrowproject.org>";
 
-async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos }) {
+/* Anotar el intento en `correos`. Nunca lanza: el rastro no puede ser más
+   importante que la operación que describe. Si la base falla, se registra en los
+   logs y el correo sigue su camino — al revés, un donante perdería su recibo
+   porque no se pudo escribir la bitácora del recibo, que es absurdo. */
+async function anotarCorreo(env, fila) {
+  if (!env.DB) return;
+  try {
+    await env.DB.prepare(
+      "INSERT INTO correos (etiqueta, para, asunto, guia, resultado, proveedor_id, error) " +
+      "VALUES (?,?,?,?,?,?,?)"
+    ).bind(
+      String(fila.etiqueta || "sin-etiqueta"), String(fila.para || "?"),
+      fila.asunto ? String(fila.asunto).slice(0, 200) : null,
+      fila.guia ? String(fila.guia) : null,
+      fila.resultado, fila.proveedor_id || null,
+      fila.error ? String(fila.error).slice(0, 300) : null
+    ).run();
+  } catch (e) {
+    console.error("no se pudo anotar el correo", fila.etiqueta, e && e.message);
+  }
+}
+
+async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos, guia }) {
   const llave = env.RESEND_API_KEY;
   const desde = env.CORREO_DESDE || CORREO_DESDE_DEF;
+  const base = { etiqueta, para, asunto, guia };
 
-  /* Sin credencial no se falla: se simula y se deja constancia. Así la capa de
-     correo se puede construir y probar antes de que exista la cuenta. */
+  /* Sin credencial no se falla: se simula. Pero AHORA queda escrito como
+     `simulado`, que es distinto de `enviado`: si esto aparece en producción,
+     significa que no se envió nada y hay que configurar la llave. Antes esa
+     diferencia solo existía en un console.log que nadie mira. */
   if (!llave) {
     console.log("correo simulado", etiqueta || "", "->", para, "|", asunto);
+    await anotarCorreo(env, { ...base, resultado: "simulado" });
     return { ok: true, simulado: true };
   }
 
@@ -457,20 +483,24 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
       })
     });
     if (!r.ok) {
-      console.error("correo falló", etiqueta || "", r.status, (await r.text()).slice(0, 300));
+      const detalle = (await r.text()).slice(0, 300);
+      console.error("correo falló", etiqueta || "", r.status, detalle);
+      await anotarCorreo(env, { ...base, resultado: "fallo", error: "HTTP " + r.status + " · " + detalle });
       return { ok: false, http: r.status };
     }
-    /* Registrar también el ÉXITO, con el id que devuelve Resend. Sin esto, la
-       ausencia de errores era la única señal de que un correo salió — y "no veo
-       errores" no es lo mismo que "sé que se envió". Con el id se puede buscar
-       el envío en los registros de Resend y responderle a un donante que dice
+    /* El ÉXITO también se anota, con el id que devuelve Resend. Sin esto, la
+       ausencia de errores era la única señal de que un correo salió — y «no veo
+       errores» no es lo mismo que «sé que se envió». Con el id se busca el envío
+       en los registros de Resend y se le puede responder a un donante que dice
        no haber recibido nada. */
     let id = null;
     try { id = (await r.json()).id || null; } catch (e) { /* da igual */ }
     console.log("correo enviado", etiqueta || "", "->", para, "| id:", id);
+    await anotarCorreo(env, { ...base, resultado: "enviado", proveedor_id: id });
     return { ok: true, id };
   } catch (e) {
     console.error("correo excepción", etiqueta || "", e && e.message);
+    await anotarCorreo(env, { ...base, resultado: "fallo", error: String(e && e.message) });
     return { ok: false, error: String(e && e.message) };
   }
 }
@@ -551,7 +581,7 @@ async function correoAporteAprobado(env, aporte, email, nombre) {
     asunto,
     texto: texto.join("\n"),
     html: plantillaCorreo({ titulo, parrafos, filas, cierre, boton }),
-    etiqueta: "aporte-aprobado"
+    etiqueta: "aporte-aprobado", guia: aporte.guia
   });
 }
 
@@ -720,7 +750,7 @@ async function revisarCertificadoPorReversa(env, guia, estadoWompi) {
       ],
       filas
     }),
-    etiqueta: "certificado-sin-respaldo"
+    etiqueta: "certificado-sin-respaldo", guia
   });
 }
 
@@ -1148,6 +1178,9 @@ async function adminSalud(env) {
     "AND a." + PAGADA + " AND NOT EXISTS " +
     "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)",
     "Lista de aportes · los firma la Revisora Fiscal, no el sistema");
+  await enCola("correos_fallidos",
+    "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'fallo'",
+    "Reenviar a mano y revisar Resend · a esa persona el sitio le prometió un correo que no salió");
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
     "WHERE publicada_en IS NULL AND anulada_en IS NULL",
@@ -1161,6 +1194,18 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, COALESCE(SUM(monto_centavos),0) AS centavos FROM aportes " +
     "WHERE estado = 'intencion' AND wompi_transaction_id IS NULL " +
     "AND creada_en < datetime('now','-48 hours')"
+  );
+
+  /* Correo. `simulado` es el dato que más importa aquí y no es un fallo: es que
+     falta `RESEND_API_KEY` y el sistema lo está simulando en silencio, a
+     propósito, para poder construir la capa antes de tener la cuenta. En
+     producción eso significa que NADIE recibió nada. */
+  const co = await uno(
+    "SELECT COUNT(*) AS total, " +
+    "SUM(CASE WHEN resultado = 'enviado'  THEN 1 ELSE 0 END) AS enviados, " +
+    "SUM(CASE WHEN resultado = 'fallo'    THEN 1 ELSE 0 END) AS fallidos, " +
+    "SUM(CASE WHEN resultado = 'simulado' THEN 1 ELSE 0 END) AS simulados, " +
+    "MAX(intento_en) AS ultimo FROM correos"
   );
 
   const intenciones = emb.intenciones || 0;
@@ -1188,6 +1233,16 @@ async function adminSalud(env) {
          probado en producción — no importa qué diga la batería de pruebas. */
       sin_evidencia_de_cobro: intenciones > 0 && (wh.recibidos || 0) === 0
     },
+    correo: {
+      total: co.total || 0,
+      enviados: co.enviados || 0,
+      fallidos: co.fallidos || 0,
+      simulados: co.simulados || 0,
+      ultimo: co.ultimo || null,
+      /* La alarma: hay correos anotados y NINGUNO salió de verdad. Casi siempre
+         es la llave de Resend sin configurar. */
+      nada_salio: (co.total || 0) > 0 && (co.enviados || 0) === 0
+    },
     cola,
     abandonadas: { n: ab.n || 0, centavos: ab.centavos || 0 }
   });
@@ -1206,7 +1261,12 @@ async function adminAportes(env, url) {
        segunda consulta, si el botón debe decir "Emitir" o "Ver" — y si el que
        hay quedó sin respaldo tras una reversa. */
     "(SELECT c.numero FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS certificado, " +
-    "(SELECT c.revision_en FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_revision " +
+    "(SELECT c.revision_en FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_revision, " +
+    /* El último intento de mandarle el recibo. Es lo que permite contestar «no me
+       llegó» sin salir del panel: si dice `fallo` o `simulado`, no llegó y ya
+       sabemos por qué. */
+    "(SELECT co.resultado FROM correos co WHERE co.guia = a.guia AND co.etiqueta = 'aporte-aprobado' " +
+    "ORDER BY co.id DESC LIMIT 1) AS recibo_correo " +
     "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + where +
     " ORDER BY a.creada_en DESC LIMIT " + limite;
   const q = estado ? env.DB.prepare(sql).bind(estado) : env.DB.prepare(sql);
@@ -1595,7 +1655,7 @@ async function correoCertificado(env, datos, email) {
     asunto: titulo + " · " + datos.numero,
     texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
     html: plantillaCorreo({ titulo, parrafos, filas }),
-    etiqueta: "certificado",
+    etiqueta: "certificado", guia: datos.guia,
     adjuntos: [{ filename: datos.numero + ".pdf", content: bytesABase64(bytes) }]
   });
 }
@@ -1840,7 +1900,7 @@ async function correoTransferenciaReportada(env, x) {
     para: x.email, asunto: titulo + " · " + x.guia,
     texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
     html: plantillaCorreo({ titulo, parrafos, filas }),
-    etiqueta: "transferencia-reportada"
+    etiqueta: "transferencia-reportada", guia: x.guia
   });
 }
 
@@ -3128,6 +3188,13 @@ function pintarFilas(l){
     FILAS[a.guia] = a;
     var recibo = (APROBADOS.indexOf(a.estado) >= 0 && a.token)
       ? '<a href="/api/recibo/' + esc(a.guia) + '.pdf?t=' + esc(a.token) + '" target="_blank" rel="noopener">PDF</a>' : "—";
+    /* Que el PDF exista no significa que al donante le haya llegado. Debajo del
+       enlace va lo que pasó con SU correo: sin esto, «no me llegó el recibo» no
+       tenía respuesta desde el panel. */
+    if (a.recibo_correo === "enviado")       recibo += '<br><small>correo enviado</small>';
+    else if (a.recibo_correo === "fallo")    recibo += '<br><small style="color:#A84D00"><strong>correo falló</strong></small>';
+    else if (a.recibo_correo === "simulado") recibo += '<br><small style="color:#A84D00"><strong>no se envió</strong></small>';
+    else if (APROBADOS.indexOf(a.estado) >= 0) recibo += '<br><small>correo sin registro</small>';
     return "<tr>" +
       "<td>" + esc(a.guia) + "</td>" +
       "<td>" + esc(a.estado) + "</td>" +
@@ -3357,6 +3424,7 @@ var COLA_ES = {
   inscripciones_sin_tocar: "Inscripciones sin tocar",
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
+  correos_fallidos: "Correos que no salieron",
   entregas_en_borrador: "Entregas en borrador"
 };
 
@@ -3410,6 +3478,23 @@ function cargarSalud(){
     h += pasoEmbudo("con firma inválida", w.firma_invalida, w.firma_invalida ? "revisar YA" : "");
     h += pasoEmbudo("sin procesar", w.sin_procesar);
     h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">Una firma inválida es o alguien golpeando el endpoint, o que volvió el bug del <code>timestamp</code>. «Sin procesar» con firma buena es un aporte que se quedó a medias.</p>';
+
+    /* 3b · Correo. La alarma va primero por la misma razón que la de Wompi: si
+       nada salió, el sitio lleva prometiendo acuses que nadie recibió. */
+    var co = d.correo || {};
+    h += '<h3 style="font-size:15px;margin:0 0 8px">Correo que sale del sitio</h3>';
+    if (co.nada_salio){
+      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px">' +
+        '<strong>Ningún correo ha salido de verdad.</strong> Hay ' + esc(String(co.total)) +
+        ' anotados y ' + esc(String(co.simulados)) + ' quedaron en «simulado», que es lo que hace el sistema ' +
+        'cuando falta la llave de Resend: se registra y no se envía. Quien donó, se ofreció o aplicó ' +
+        'no recibió nada.</p>';
+    }
+    h += '<div class="eco-row" style="justify-content:flex-start;margin-bottom:6px">';
+    h += pasoEmbudo("enviados", co.enviados, co.ultimo ? "último " + String(co.ultimo).slice(0,16) : "nunca");
+    h += pasoEmbudo("fallaron", co.fallidos, co.fallidos ? "revisar" : "");
+    h += pasoEmbudo("sin enviar (simulados)", co.simulados);
+    h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">El correo nunca tumba un cobro: si Resend falla, el aporte queda igual y el fallo se anota aquí. Por eso hay que mirarlo — nadie se va a quejar de un acuse que no sabe que existía.</p>';
 
     /* 4 · Lo que espera a una persona. */
     h += '<h3 style="font-size:15px;margin:0 0 8px">Esperando a una persona</h3>';
