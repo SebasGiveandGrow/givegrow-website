@@ -906,6 +906,8 @@ var I18N = {
     "start.vol.t":"Quiero ayudar",
     "start.vol.p":"Suma tu tiempo o talento al equipo que está construyendo todo esto.",
     "start.vol.btn":"Escríbenos →",
+    "calc.brigada.unico":"Aporte único: la brigada es una operación puntual, no una membresía.",
+    "calc.brigada.nota":"Todavía no publicamos equivalencias en pesos para esta campaña: el inventario está en cotización. Tu aporte compra insumos de la lista pública, y cada entrega queda con acta firmada.",
     "calc.dest.emergencia":"Emergencia abierta",
     "brigada.opcion":"Brigada de atención a emergencia · 5 sectores",
     "calc.dest.lbl":"¿A dónde va tu aporte?",
@@ -1307,6 +1309,11 @@ function activeImpactUnit(){
   // Si hay un proyecto elegido con unidad propia, esa manda.
   if (calc.projectId && calc.projectId !== "general"){
     for (var i=0;i<IMPACT_UNITS.length;i++){ if (IMPACT_UNITS[i].id===calc.projectId) return IMPACT_UNITS[i]; }
+    /* Destino dirigido SIN costo propio: no hay equivalencia y no se presta la
+       de otra fundación. Antes caía al primer ítem con costo, así que elegir la
+       brigada mostraba «≈ 50 platos de comida» de Niños del Futuro: una cifra
+       falsa sobre plata que va a comprar colchonetas y pañales. */
+    return null;
   }
   // "Donde más se necesite" (fondo): usa la primera unidad como equivalencia de referencia.
   return IMPACT_UNITS[0];
@@ -1359,6 +1366,8 @@ function setProject(unitId){
   calc.projectId = unitId;
   var sel = document.getElementById("calc-project");
   if (sel){ var opt = sel.options[sel.selectedIndex]; calc.partnerId = opt ? (opt.getAttribute("data-partner")||"") : ""; }
+  /* setFreq ya llama a calcUpdate; llamarlo dos veces solo repinta de más. */
+  if (esBrigada(unitId) && calc.freq !== "u"){ setFreq("u"); return; }
   calcUpdate();
 }
 /* CTA de la ficha: abre la calculadora con el proyecto de ESA fundación ya elegido,
@@ -1649,6 +1658,21 @@ function calcUpdate(){
   setText("co-net", (calc.cur==="USD")? fmtUSD(net/USD_RATE) : fmtCOP(net));
   setText("calc-annual", (calc.cur==="USD")? fmtUSD(annual/USD_RATE) : fmtCOP(annual));
 
+  /* --- estado de campaña -------------------------------------------------
+     La brigada es una operación puntual, no una membresía. Ofrecer «mensual»
+     sería cobrarle a alguien todos los meses por una emergencia de agosto, y
+     mostrarle un nivel de membresía le insinuaría beneficios del Programa de
+     Gratitud — que además es justo lo que el certificado declara que NO hay.
+     Así que la campaña fuerza aporte único y esconde el selector. */
+  var campana = esBrigada(calc.projectId);
+  var fq = document.getElementById("calc-freq");
+  if (fq) fq.style.display = campana ? "none" : "";
+  var cnota = document.getElementById("calc-campana-nota");
+  if (cnota){
+    cnota.style.display = campana ? "" : "none";
+    if (campana) cnota.textContent = t("calc.brigada.unico");
+  }
+
   var isOnce = (calc.freq === "u");
   var arow=document.getElementById("calc-annual-row"); if(arow) arow.style.display = isOnce ? "none" : "";
   var mblock=document.getElementById("calc-member"); if(mblock) mblock.style.display = isOnce ? "none" : "";
@@ -1703,7 +1727,15 @@ function calcUpdate(){
         // Fondo general por debajo de la unidad de referencia: ocultar para no mostrar "0".
         irow.style.display="none"; if(inote) inote.style.display="none";
       }
-    } else { irow.style.display="none"; if(inote) inote.style.display="none"; }
+    } else {
+      irow.style.display="none";
+      /* Sin equivalencia no se calla: se explica POR QUÉ no la hay. Que falte
+         una cifra es información, y decirlo vale más que inventarla. */
+      if (inote){
+        if (campana){ inote.style.display=""; inote.textContent = t("calc.brigada.nota"); }
+        else inote.style.display="none";
+      }
+    }
   }
   setText("m-name", tier[lang] || tier.es);
   setText("m-sub", (lang==="en")?("~ " + Math.round(usdMonthly) + " USD / month"):("~ " + Math.round(usdMonthly) + " USD / mes"));
@@ -1906,7 +1938,10 @@ function loadPartners(){
 function renderHeroImpact(){
   var el = document.getElementById("hero-impact"); if (!el) return;
   loadPartners().then(function(){
-    var u = activeImpactUnit(); if (!u){ el.hidden = true; return; }
+    /* Referencia fija, no `activeImpactUnit()`: el hero es de la portada y no
+       tiene por qué apagarse porque el visitante dejó otro destino elegido en
+       la calculadora. */
+    var u = IMPACT_UNITS.length ? IMPACT_UNITS[0] : null; if (!u){ el.hidden = true; return; }
     var n = Math.floor(20000 / u.cop);
     var label = (lang==="en") ? (n===1?u.en:(u.enPl||u.en)) : (n===1?u.es:(u.esPl||u.es));
     var amount = (lang==="en") ? "$20,000 COP" : "$20.000";

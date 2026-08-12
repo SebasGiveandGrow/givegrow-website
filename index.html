@@ -980,11 +980,15 @@
           <button class="qbtn" data-act="setQuick(5000000)">$5M</button>
           <button class="qbtn" data-act="setQuick(20000000)">$20M</button>
         </div>
-        <div class="cur-toggle">
+        <div class="cur-toggle" id="calc-freq">
           <button id="freq-m" class="on" data-act="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
           <button id="freq-a" data-act="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
           <button id="freq-u" data-act="setFreq('u')" data-i18n="calc.freq.u">Único</button>
         </div>
+        <!-- Reemplaza al selector de frecuencia cuando el destino es una campaña
+             puntual: ahí el aporte es único y ofrecer «mensual» sería cobrar
+             todos los meses por una emergencia que termina. -->
+        <p class="calc-legal" id="calc-campana-nota" style="display:none;text-align:center;max-width:none"></p>
         <!-- Los valores de abajo son el estado por defecto de la calculadora ($200.000 / mes, COP):
              calcUpdate() los recalcula al cargar y en cada cambio. Se escriben resueltos, no como
              guiones, para que el HTML servido nunca muestre campos vacíos en la página donde se
@@ -1671,7 +1675,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=e21b1e7c"></script>
+<script src="/app.js?v=e3e988bb"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
