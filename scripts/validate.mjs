@@ -46,7 +46,9 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"]]) {
     const literal = workerSrc.slice(ini, j + 1);
     if (literal.includes("${")) throw new Error(nombre + " tiene interpolaciones; este check asume que no");
     const emitido = new Function("return " + literal)();
-    execSync("node --check", { input: emitido });
+    /* stdio en pipe: si no, el stderr de node se cuela crudo en la salida del
+       gate antes del NO OK y el mensaje real queda enterrado. */
+    execSync("node --check", { input: emitido, stdio: ["pipe", "pipe", "pipe"] });
     ok(nombre + " emite JS válido (" + emitido.split("\n").length + " líneas)");
 
     /* Y que cada bandeja se pida al arrancar. `cargarReportadas` existía, su

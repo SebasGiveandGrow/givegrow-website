@@ -1214,6 +1214,116 @@ async function adminAportes(env, url) {
    trazabilidad dejaría de significar algo. */
 const ESTADOS_MANUALES = ["en_distribucion", "entregada"];
 
+/* ========================================================================
+   POST /api/admin/aporte/<guia>/conciliar   { transaccion }
+   ========================================================================
+   RESCATAR UN PAGO QUE OCURRIÓ Y NO LLEGÓ.
+
+   El 12 de agosto de 2026 pasó de verdad: un aporte de $5.000 se cobró
+   —transacción 1474268-1786544920-61767, referencia GG-2026-001001, APPROVED en
+   el panel de Wompi y con su correo de «¡Pago exitoso!»— y la base lo tenía en
+   `intencion`. Media hora después seguía igual. El webhook nunca llegó: la URL
+   de eventos no estaba configurada en Wompi y `eventos_wompi` no tenía una sola
+   fila en su historia. Resultado: dinero recibido, sin registro, sin recibo, y
+   el donante viendo «estamos confirmando tu pago» para siempre.
+
+   LA DECISIÓN QUE GOBIERNA ESTE ENDPOINT: **no reimplementa nada.** Le pregunta
+   a Wompi por la transacción y le entrega la respuesta a `aplicarEstado`, que es
+   la MISMA función que usa el webhook. Así el rescate hereda gratis el control
+   de monto contra manipulación, el guardián de reversas, la creación del
+   donante y el recibo. Un parche a mano en la base habría dejado al donante sin
+   recibo y sin `donante_id`, que es justo lo que hay que evitar.
+
+   POR QUÉ ESTO NO ROMPE «EL WEBHOOK ES LA ÚNICA FUENTE DE VERDAD»: esa regla
+   existe porque la REDIRECCIÓN del checkout la controla el navegador y por lo
+   tanto el donante. Aquí no se le cree a nadie: el Worker abre él mismo una
+   conexión a la API de Wompi con la llave privada y lee el estado en la fuente.
+   Es más fuerte que un webhook firmado, no más débil. Lo que sí exige es que
+   una PERSONA lo dispare, igual que la verificación de transferencias.
+
+   EL CANDADO QUE IMPORTA: se comprueba que `data.reference` sea exactamente la
+   guía. Sin eso, quien tenga acceso al panel podría colgar el pago de alguien
+   más a cualquier guía —y emitirle un certificado tributario por una plata que
+   no puso—. Si no coincide, 409 y no se toca nada.
+   ======================================================================== */
+async function adminConciliarWompi(request, env, guia, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.WOMPI_PRIVATE_KEY) return json({ error: "wompi_no_configurado" }, 503);
+
+  let c = {};
+  try { c = await request.json(); } catch { /* se valida abajo */ }
+  const txId = String(c.transaccion == null ? "" : c.transaccion).trim().slice(0, 120);
+  if (!txId) {
+    return json({ error: "transaccion_requerida",
+      ayuda: "Pega el número de transacción de Wompi (lo trae el correo de «Pago exitoso» y el panel de Wompi)." }, 400);
+  }
+
+  const fila = await env.DB.prepare(
+    "SELECT guia, estado, monto_centavos, confirmacion FROM aportes WHERE guia = ?"
+  ).bind(guia).first();
+  if (!fila) return json({ error: "no_encontrada" }, 404);
+
+  /* Un aporte ya aprobado no se reconcilia: o el webhook llegó, o alguien ya lo
+     rescató. Repetirlo volvería a mandar el recibo. */
+  if (["aprobada", "en_distribucion", "entregada"].includes(fila.estado)) {
+    return json({ error: "ya_aprobada", estado: fila.estado,
+      ayuda: "Este aporte ya está confirmado. No hace falta conciliarlo." }, 409);
+  }
+
+  /* Se le pregunta a Wompi, en su API, con la llave privada. */
+  const amb = ambienteWompi(env.WOMPI_PUBLIC_KEY);
+  let tx;
+  try {
+    const r = await fetch(amb.api + "/transactions/" + encodeURIComponent(txId), {
+      headers: { authorization: "Bearer " + env.WOMPI_PRIVATE_KEY }
+    });
+    if (!r.ok) {
+      return json({ error: "wompi_no_responde", http: r.status,
+        ayuda: r.status === 404
+          ? "Wompi no conoce esa transacción. Revisa el número: se copia completo, con los guiones."
+          : "Wompi respondió " + r.status + ". Inténtalo de nuevo en un momento." }, 502);
+    }
+    const j = await r.json();
+    tx = j && j.data;
+  } catch (e) {
+    console.error("conciliar", guia, e && e.message);
+    return json({ error: "wompi_inalcanzable" }, 502);
+  }
+  if (!tx || !tx.status) return json({ error: "respuesta_incompleta" }, 502);
+
+  /* EL CANDADO. La transacción tiene que ser la de ESTA guía, según Wompi. */
+  const ref = tx.reference ? String(tx.reference) : "";
+  if (ref !== guia) {
+    return json({ error: "referencia_no_coincide", referencia_en_wompi: ref, guia,
+      ayuda: "Esa transacción pertenece a otra guía. No se tocó nada." }, 409);
+  }
+
+  /* Marca de dónde vino la certeza ANTES de aplicar el estado: `aplicarEstado`
+     escribe 'wompi' solo si `confirmacion` está en NULL, así que ponerla aquí la
+     preserva. Importa para saber después que este pago se rescató a mano porque
+     el webhook estaba caído — el dato es de Wompi, el disparo fue de una
+     persona, y las dos cosas quedan escritas. */
+  await env.DB.prepare(
+    "UPDATE aportes SET confirmacion='conciliada', confirmado_por=?, confirmado_en=datetime('now') " +
+    "WHERE guia=? AND confirmacion IS NULL"
+  ).bind(quien || "?", guia).run();
+
+  /* La misma función del webhook. Ella decide el estado, valida el monto,
+     dispara el guardián de reversas, crea el donante y manda el recibo. */
+  await aplicarEstado(env, guia, tx, String(tx.status));
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?",
+    "aporte " + guia + " conciliado a mano contra la API de Wompi · tx " + txId + " · " + String(tx.status)).run();
+
+  const despues = await env.DB.prepare(
+    "SELECT guia, estado, wompi_estado, wompi_transaction_id, metodo_pago, confirmacion, donante_id " +
+    "FROM aportes WHERE guia = ?"
+  ).bind(guia).first();
+  return json({ ok: true, wompi_estado: String(tx.status), aporte: despues });
+}
+
 async function adminMoverEstado(request, env, guia, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let cuerpo;
@@ -2967,6 +3077,12 @@ function pintarResumen(d){
 function accion(a){
   if (a.estado === "aprobada") return '<button class="copy" data-guia="' + esc(a.guia) + '" data-a="en_distribucion">A distribución</button>';
   if (a.estado === "en_distribucion") return '<button class="copy" data-guia="' + esc(a.guia) + '" data-a="entregada">Marcar entregada</button>';
+  /* Conciliar solo donde tiene sentido: un aporte que se quedó sin confirmar.
+     Es el rescate para cuando el pago ocurrió y el webhook no llegó — pasó el 12
+     de agosto con GG-2026-001001, cobrada en Wompi y sin confirmar aquí. */
+  if (["intencion", "pendiente", "error"].indexOf(a.estado) >= 0) {
+    return '<button class="copy" data-conc="' + esc(a.guia) + '">Conciliar con Wompi</button>';
+  }
   return "";
 }
 
@@ -3143,6 +3259,27 @@ document.addEventListener("click", function(e){
       body: JSON.stringify({ estado: b.getAttribute("data-a") })
     }).then(function(r){ return r.json(); }).then(function(){ cargar(); })
       .catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
+  }
+
+  /* Conciliar contra la API de Wompi. Se pide el número de transacción y no se
+     busca por referencia a propósito: el número lo trae el correo de «Pago
+     exitoso» y el panel de Wompi, y obligar a copiarlo es lo que permite que el
+     Worker verifique que la transacción es de ESTA guía antes de tocar nada. */
+  var cn = e.target.closest("[data-conc]");
+  if (cn){
+    var g3 = cn.getAttribute("data-conc");
+    var tx = window.prompt("Conciliar " + g3 + " contra la API de Wompi.\\n\\nNúmero de transacción (lo trae el correo de «Pago exitoso» y el panel de Wompi):");
+    if (!tx) return;
+    cn.disabled = true; cn.textContent = "…";
+    fetch("/api/admin/aporte/" + encodeURIComponent(g3) + "/conciliar", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ transaccion: tx })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d.ayuda) alert(d.ayuda);
+      else if (d.error) alert("No se pudo conciliar: " + d.error);
+      else alert("Wompi dice: " + d.wompi_estado + ". El aporte quedó en «" + (d.aporte && d.aporte.estado) + "».");
+      cargar(); cargarSalud();
+    }).catch(function(){ cn.disabled = false; cn.textContent = "Reintentar"; });
   }
 });
 
@@ -3736,6 +3873,8 @@ export default {
         if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
         const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
         if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
+        const cw = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/conciliar$/);
+        if (cw) return await adminConciliarWompi(request, env, cw[1].toUpperCase(), sesion.email);
 
         /* Certificados. El PDF también vive detrás de Access: es un documento
            con nombre y cédula del donante, no un archivo público. */

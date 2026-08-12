@@ -66,6 +66,65 @@ cuáles son antes de confundirlas con donaciones:
 Si se quiere arrancar limpio, se pueden borrar esas tres intenciones y la
 entrega de prueba. **Sebas no lo ha pedido**: preguntar antes.
 
+## 🔴 INCIDENTE: se cobró un pago real y la base no lo supo (12 ago 2026)
+
+**Ocurrió de verdad, con dinero.** Sebas donó $5.000 por el sitio para probar:
+
+| | |
+|---|---|
+| transacción | `1474268-1786544920-61767` |
+| referencia | `GG-2026-001001` |
+| estado en Wompi | **Aprobada**, finalizada 09:30 (14:30 UTC) |
+| método | Transferencia Bancolombia |
+| estado en D1 | **`intencion`** — media hora después seguía igual |
+
+Confirmado en el correo «¡Pago exitoso!» de Wompi y en su panel. Y
+`eventos_wompi` **no tenía una sola fila en su historia**: el webhook no ha
+llegado nunca, ni con este pago ni con ninguno.
+
+**Causa raíz: la URL de eventos no está configurada en el panel de Wompi.** El
+endpoint está sano —un GET a `/api/wompi/eventos` responde `405` del Worker, no
+lo traga el fallback de SPA—. Lo que falta es apuntarle a:
+
+```
+https://thegiveandgrowproject.org/api/wompi/eventos
+```
+
+**⏭️ MIENTRAS ESO NO SE ARREGLE, TODA DONACIÓN NUEVA SE QUEDA EN `intencion`:**
+sin registro, sin recibo, y el donante viendo «estamos confirmando tu pago» para
+siempre. Es lo primero que hay que verificar al retomar.
+
+### El rescate: conciliar contra la API de Wompi
+`POST /api/admin/aporte/<guia>/conciliar` + botón «Conciliar con Wompi» en el
+panel, en los aportes en `intencion`, `pendiente` o `error`.
+
+**No reimplementa nada:** le pregunta a Wompi por la transacción y le entrega la
+respuesta a `aplicarEstado`, la MISMA función del webhook. Así hereda gratis el
+control de monto contra manipulación, el guardián de reversas, la creación del
+donante y el recibo. Un `UPDATE` a mano en la base habría dejado al donante sin
+recibo y sin `donante_id` — por eso no se hizo así.
+
+**Por qué no rompe «el webhook es la única fuente de verdad»:** esa regla existe
+porque la REDIRECCIÓN del checkout la controla el navegador, y por lo tanto el
+donante. Aquí no se le cree a nadie: el Worker abre él mismo la conexión a la API
+de Wompi con la llave privada y lee el estado en la fuente. Es más fuerte que un
+webhook firmado, no más débil. Lo que sí exige es que lo dispare una PERSONA,
+igual que la verificación de transferencias.
+
+**El candado que importa:** se comprueba que `data.reference` sea exactamente la
+guía. Sin eso, quien entre al panel podría colgarle a cualquier guía el pago de
+otra persona —y emitirle un certificado tributario por una plata que no puso—.
+Si no coincide: 409 y **no se escribe nada**. Verificado.
+
+`confirmacion` se marca `'conciliada'` (tercer valor, junto a `'wompi'` y
+`'manual'`) ANTES de llamar a `aplicarEstado`, que solo escribe `'wompi'` si está
+en NULL. Así queda escrito que el dato es de Wompi y el disparo fue de una
+persona.
+
+**Nota sobre la alarma de la Fase 8:** sigue encendida después de conciliar, y
+está bien. `eventos_wompi` seguirá en 0 hasta que llegue un webhook de verdad, y
+es exactamente lo que hay que seguir viendo.
+
 ## Cierre de tanda: ecosistema, Fase 8 — medir (12 ago 2026)
 
 **«Medir» no tenía especificación en el repo**: vivía en el scratchpad de la
