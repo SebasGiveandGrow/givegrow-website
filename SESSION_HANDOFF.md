@@ -14,7 +14,7 @@ Si Sebas dice solo "la siguiente fase", **preguntar de cuál de los tres**.
 
 | Plan | Dónde vive | Estado |
 |---|---|---|
-| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso del 8–11 ago + este | **0, 1, 2, 3, 4, 5, 5.1 y 6 hechas.** Fase 7 a medias: **carnet ✅**, falta el **débito automático** en Wompi. **Fase 8 (medir) sin empezar** |
+| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso del 8–11 ago + este | **0, 1, 2, 3, 4, 5, 5.1, 6 y 8 hechas.** Fase 7 a medias: **carnet ✅**, falta el **débito automático** en Wompi. De la 8 quedó la mitad de «limpiar», que son decisiones tuyas, no código — ver su cierre de tanda |
 | **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3.** Ojo: parte de esa fase ya se hizo por otro camino — el rastreo real y la evidencia entraron con la brigada. Lo que queda de ella es **Transparencia imprimible en carta** y el **contador honesto por recencia**, que ahora sí tiene datos (`aportes` y `entregas` en D1) |
 | **VOLUNTARIADO, 8 fases** | `PLAN_VOLUNTARIADO.md` | **Fases 1–7 hechas y en producción.** **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
@@ -65,6 +65,76 @@ cuáles son antes de confundirlas con donaciones:
 
 Si se quiere arrancar limpio, se pueden borrar esas tres intenciones y la
 entrega de prueba. **Sebas no lo ha pedido**: preguntar antes.
+
+## Cierre de tanda: ecosistema, Fase 8 — medir (12 ago 2026)
+
+**«Medir» no tenía especificación en el repo**: vivía en el scratchpad de la
+auditoría del 8 de agosto y solo sobrevivía la etiqueta «medir y limpiar». Así
+que lo primero fue medir de verdad, contra la base de producción. El corte:
+
+| | |
+|---|---|
+| `aportes` | **4, las cuatro en `intencion`.** Ninguna pagada, nunca. $2.725.000 |
+| `eventos_wompi` | **0 — cero webhooks recibidos en la historia de la base** |
+| `certificados` · `miembros` · `donantes` · `inscripciones` | **0** cada una |
+| `entregas` | 1, **en borrador** (`AE-2026-000001`, ocupa el primer número) |
+| numeradores | guía **1000**, acta 1, certificado sin estrenar |
+
+**El hallazgo que gobierna la fase:** hay cuatro personas que abrieron el
+checkout y **ni un solo evento de Wompi ha llegado nunca**. No existe evidencia
+de que el cobro funcione en producción. El traspaso ya tenía la lección escrita
+—«contra un tercero, probar contra el tercero», que costó un pago real— y aun
+así nadie podía verlo, porque el panel no lo preguntaba.
+
+Por eso la fase NO es un tablero de vanidad sobre cero datos, que sería justo el
+teatro que la marca prohíbe. Es **el panel dejando de listar y empezando a
+decir**: `GET /api/admin/salud` + sección «Salud del ecosistema» arriba de todo.
+
+**Las cuatro cosas que responde:**
+1. **El camino de la donación** — intenciones → declaradas → pagadas →
+   piden certificado → certificados emitidos, con la tasa.
+2. **Señales de Wompi** — recibidos, con firma inválida, sin procesar, y cuánto
+   hace del último. Con la alarma en ámbar cuando hay intenciones y cero eventos.
+3. **Esperando a una persona** — las cuatro colas con **la antigüedad del más
+   viejo**, en ámbar a partir de tres días, y dónde se resuelve cada una.
+4. **Intenciones abandonadas** — >48 h sin pagar y sin transacción.
+
+**Las reglas de honestidad, que aquí no son estilo sino la marca:**
+- **«Pagada» son solo `aprobada`, `en_distribucion` y `entregada`.** `reportada`
+  NO cuenta: es una transferencia que el donante declaró y nadie contrastó
+  todavía. Los estados van escritos uno por uno y no como `<> 'intencion'`
+  precisamente para no ensanchar el significado que la Fase 5.1 cuidó.
+- **Ninguna tasa con denominador cero** → `null` y el panel escribe «sin datos».
+  Es MEDICION.md §5 aplicado a nosotros. (0 pagadas de 4 intenciones sí es 0 %:
+  ahí el denominador existe y el 0 % es el dato.)
+- **La antigüedad es el dato, no el conteo.** Una inscripción sin tocar hace
+  nueve días y una de hace una hora se cuentan igual y no son lo mismo. `dias`
+  es `null` cuando no hay nada esperando, no 0.
+- **Nada de esto es público.** El contador público por recencia es la Fase 3 del
+  plan VISUAL y sigue aplazado por decisión tuya.
+
+**Verificado:** las cinco consultas corridas contra la base de producción (solo
+SELECT) y sus números cuadran con el corte de arriba. El renderizador probado en
+tres escenarios —producción hoy, base vacía del todo, y un ecosistema vivo con
+firma inválida y colas de nueve días— con las etiquetas balanceadas en los tres,
+«sin datos» apareciendo solo sin denominador, y el ámbar marcando ≥3 días.
+
+**No pude ver el panel en vivo** (Access es fail-closed en local); se verifica en
+producción tras fusionar.
+
+### ⏭️ La mitad de «limpiar» son decisiones tuyas, no código
+1. **Las 4 intenciones colgadas.** `GG-2026-000002` y `000003` las creó Claude
+   probando el checkout. **`GG-2026-001000` es de hoy, $2.515.000, dirigida a la
+   brigada, y quemó el número redondo** que este archivo reservaba para «la
+   primera donación real». Borrarlas es una decisión: cada una consumió
+   consecutivo y quien abrió el checkout podría volver a pagar.
+2. **El acta `AE-2026-000001` sigue en borrador** y ocupa el primer número del
+   consecutivo de actas. O se publica con su fecha real o se anula.
+3. **Probar el cobro contra Wompi de punta a punta.** Es lo único que convierte
+   el `0` de `eventos_wompi` en evidencia, y solo lo puedes hacer tú: un pago
+   real, pequeño, y mirar que llegue el evento y salga el recibo.
+4. Huérfanos de la auditoría que siguen ahí: `stats.json`, `prog_flow.png`,
+   `ops/alma-parche-red.js`.
 
 ## ⚠️ El panel `/admin` estuvo caído 7 horas (12 ago 2026) — y el gate no lo veía
 
