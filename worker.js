@@ -1350,6 +1350,47 @@ function fechaLargaISO(iso) {
 }
 
 /* ========================================================================
+   PAGOS SIN APORTE
+   ========================================================================
+   El enlace de pago propio de Wompi (el QR de la brigada) cobra a la misma
+   cuenta pero NO pasa por /api/checkout, así que su `reference` no existe en
+   `aportes`: no hay guía, ni recibo, ni certificado emitible.
+
+   Lo que sí ocurre es que el webhook está configurado a nivel de cuenta, así
+   que esos pagos SÍ entran a `eventos_wompi` con firma válida. Esta vista los
+   saca a la superficie para poder conciliarlos, en vez de dejarlos como una
+   diferencia contra el extracto de Wompi que alguien tiene que descubrir.
+   ======================================================================== */
+
+async function adminPagosSueltos(env) {
+  const r = await env.DB.prepare(
+    "SELECT e.transaction_id, e.guia AS referencia, e.estado, e.recibido_en, e.cuerpo " +
+    "FROM eventos_wompi e LEFT JOIN aportes a ON a.guia = e.guia " +
+    "WHERE e.firma_valida = 1 AND e.estado = 'APPROVED' AND a.guia IS NULL " +
+    "ORDER BY e.recibido_en DESC LIMIT 100"
+  ).all();
+
+  /* Del cuerpo crudo se extrae solo lo necesario para conciliar. Aunque el
+     panel esté tras Access, mandar el JSON completo de la pasarela al navegador
+     es más dato personal del que hace falta para esta pantalla. */
+  const filas = (r.results || []).map((e) => {
+    let tx = {};
+    try { tx = (JSON.parse(e.cuerpo || "{}").data || {}).transaction || {}; } catch (x) { /* nada */ }
+    return {
+      transaction_id: e.transaction_id,
+      referencia: e.referencia,
+      recibido_en: e.recibido_en,
+      monto_centavos: Number(tx.amount_in_cents) || null,
+      moneda: tx.currency || null,
+      metodo: tx.payment_method_type || null,
+      correo: tx.customer_email || null,
+      nombre: (tx.customer_data && tx.customer_data.full_name) || null
+    };
+  });
+  return json({ pagos: filas });
+}
+
+/* ========================================================================
    ENTREGAS · la evidencia (Fase 6)
    ========================================================================
    El sitio prometía «publicamos el acta de cada entrega» sin tener dónde
@@ -1568,6 +1609,19 @@ function paginaAdmin() {
 </table></div>
 
 <div id="dlg" style="display:none;margin-top:24px"></div>
+
+<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Pagos sin aporte</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Pagos aprobados que entraron
+por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el checkout del sitio.
+Cobraron a la misma cuenta, pero no tienen guía, ni recibo, ni certificado emitible: si alguno pide
+certificado, hay que crearle el registro a mano. Si esta lista está vacía, todo lo cobrado está
+trazado.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Referencia</th><th scope="col">Monto</th><th scope="col">Método</th>
+<th scope="col">Donante</th><th scope="col">Recibido</th>
+</tr></thead><tbody id="p-filas"><tr><td colspan="5">Cargando…</td></tr></tbody>
+</table></div>
 
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:18px">El documento legal es el
@@ -1800,6 +1854,24 @@ document.addEventListener("click", function(e){
   }
 });
 
+/* ---------------- pagos sin aporte ---------------- */
+function cargarSueltos(){
+  fetch("/api/admin/pagos-sueltos").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("p-filas"); if (!tb) return;
+    var l = d.pagos || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="5">Ninguno: todo lo cobrado tiene su aporte.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(p){
+      return "<tr>" +
+        "<td>" + esc(p.referencia || p.transaction_id) + "</td>" +
+        "<td>" + (p.monto_centavos ? pesos(p.monto_centavos) : "—") + "</td>" +
+        "<td>" + esc(p.metodo || "—") + "</td>" +
+        "<td>" + esc(p.nombre || "—") + (p.correo ? "<br><small>" + esc(p.correo) + "</small>" : "") + "</td>" +
+        "<td>" + esc((p.recibido_en||"").slice(0,16)) + "</td>" +
+      "</tr>";
+    }).join("");
+  });
+}
+
 /* ---------------- entregas ---------------- */
 var E_CAMPOS = [
   ["e-destino","Destino","brigada-emergencia-2026-08"],
@@ -1896,6 +1968,7 @@ document.addEventListener("click", function(e){
 
 pintarCampos();
 cargarEntregas();
+cargarSueltos();
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
@@ -2079,6 +2152,7 @@ export default {
 
         /* Entregas (Fase 6). El borrador y sus fotos viven tras Access hasta que
            alguien las publica: en terreno se registra rápido y se revisa después. */
+        if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
         if (ruta === "/api/admin/entrega")  return await adminCrearEntrega(request, env, sesion.email);
         const ef = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/foto$/i);

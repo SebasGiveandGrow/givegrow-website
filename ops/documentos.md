@@ -164,6 +164,30 @@ fallback de SPA se lo traga.
 porque el papel firmado se fotografía y se publica; cuando se quiera un
 documento propio, el motor de `documentos.js` ya está.
 
+## Pagos que entran por fuera del checkout
+
+Sebas creó un **enlace de pago propio de Wompi** para la brigada
+(`checkout.wompi.co/l/c5Ym2E`) y su QR impreso. Cobra a la misma cuenta pero NO
+pasa por `/api/checkout`, así que su `reference` no existe en `aportes`: **no
+hay guía, ni recibo, ni certificado emitible**.
+
+Lo que sí ocurre: el webhook está configurado a nivel de cuenta en Wompi, de
+modo que esos pagos entran igual a `eventos_wompi` con firma válida. Se quedan
+ahí porque `aplicarEstado` no encuentra la fila y retorna.
+
+Por eso el panel tiene **«Pagos sin aporte»** (`/api/admin/pagos-sueltos`):
+lista los eventos aprobados con firma válida cuya referencia no tiene aporte.
+Si esa lista está vacía, todo lo cobrado está trazado. Si alguien de esa lista
+pide certificado, hay que crearle el registro a mano.
+
+Del cuerpo crudo del evento se extrae solo monto, método, correo y nombre.
+Aunque el panel esté tras Access, mandar el JSON completo de la pasarela al
+navegador es más dato personal del que esa pantalla necesita.
+
+En la página, ese enlace va **después** del checkout propio y **sin botón**: quien
+llega por el QR nunca ve la página, y quien sí la ve merece saber que por ahí
+pierde el rastreo y el certificado automático.
+
 ## Antes de desplegar: la migración va PRIMERO
 
 `migrations/0003_documentos.sql` añade la columna `aportes.token`, y
