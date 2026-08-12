@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=45d8414a">
+<link rel="stylesheet" href="/styles.css?v=9187e7c8">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -515,7 +515,129 @@
     <div class="wrap center">
       <h3 class="rv" data-i18n="fund.free.t" style="margin-bottom:14px">Sin costo. Sin intermediarios opacos.</h3>
       <p class="lead rv d1" data-i18n="fund.free.p" style="margin-left:auto;margin-right:auto">Vincularte al HUB SOCIAL es y será siempre gratuito. Solo te pedimos una cosa a cambio: trazabilidad, que cada apoyo llegue documentado a quien lo necesita.</p>
-      <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="https://docs.google.com/forms/d/e/1FAIpQLSeB6kFMrVoCV8tAzgalvFyEMe4JY69KGM16ZkcjZYO_PCMihQ/viewform" target="_blank" rel="noopener" data-i18n="fund.btn">Quiero aplicar</a></div>
+      <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="#fundaciones" data-act="irAFormFund()" data-i18n="fund.btn">Quiero aplicar</a></div>
+    </div>
+  </section>
+
+  <!-- Aplicación al HUB. Antes de esto, «Quiero aplicar» sacaba a la fundación
+       del sitio hacia un Google Form de 20–30 minutos con cargas de archivo que
+       exigen cuenta de Google, y la respuesta caía en un Drive: sin estado, sin
+       acuse y fuera de /admin.
+       Aquí se pide solo lo que es TEXTO, que es lo que hace falta para el paso 2
+       del proceso de arriba, «Revisamos». El logo, las fotos y el costo con
+       soporte documental se piden después de la visita de contexto, con el
+       cuestionario largo (ops/cuestionario-fundaciones-hub.md), que sigue siendo
+       la fuente de verdad del esquema de partners.json. De este formulario NO
+       sale una ficha pública: sale una solicitud. -->
+  <section id="fund-form">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ff.ey">Aplicar al HUB</span>
+      <h2 class="h-sec rv" data-i18n="ff.t">Cuéntanos quién es tu fundación</h2>
+      <p class="lead rv d1" data-i18n="ff.lead">Esto es la aplicación, no la vinculación: con lo que escribas aquí revisamos si encajamos, y si encajamos vamos a conocerte a tu territorio. Solo te pedimos texto — el logo, las fotos y las cifras de costos se ven después, cuando ya nos conozcamos.</p>
+
+      <form id="ff" class="ally-form rv d2" data-submit="fundSubmit(event)">
+        <h3 class="ally-sec" data-i18n="ff.s.id">Quiénes son</h3>
+        <div class="ally-grid">
+          <div class="field ally-wide"><label for="ff-nombre" data-i18n="ff.nombre">Nombre oficial de la fundación</label>
+            <input type="text" id="ff-nombre" required>
+            <small class="vf-help" data-i18n="ff.nombre.help">Tal como debe aparecer publicado si algún día publicamos su perfil.</small></div>
+          <div class="field"><label for="ff-sigla" data-i18n="ff.sigla">Nombre corto o sigla (opcional)</label>
+            <input type="text" id="ff-sigla"></div>
+          <div class="field"><label for="ff-anio" data-i18n="ff.anio">¿Desde qué año trabajan? (opcional)</label>
+            <input type="text" id="ff-anio" inputmode="numeric" maxlength="4"></div>
+          <div class="field"><label for="ff-lider" data-i18n="ff.lider">Quién lidera la fundación</label>
+            <input type="text" id="ff-lider" required></div>
+          <div class="field"><label for="ff-cargo" data-i18n="ff.cargo">Su cargo (opcional)</label>
+            <input type="text" id="ff-cargo" data-i18n="ff.cargo.ph" data-i18n-attr="placeholder" placeholder="Directora y fundadora, representante legal…"></div>
+          <div class="field"><label for="ff-email" data-i18n="ff.email">Correo de contacto</label>
+            <input type="email" id="ff-email" autocomplete="email" required></div>
+          <div class="field"><label for="ff-tel" data-i18n="ff.tel">Teléfono o WhatsApp (opcional)</label>
+            <input type="tel" id="ff-tel" autocomplete="tel">
+            <small class="vf-help" data-i18n="ff.tel.help">Los datos de contacto son para coordinar entre nosotros. No se publican en el sitio.</small></div>
+          <div class="field ally-wide"><label for="ff-zona" data-i18n="ff.zona">Barrio o sector y ciudad donde trabajan</label>
+            <input type="text" id="ff-zona" data-i18n="ff.zona.ph" data-i18n-attr="placeholder" placeholder="Ej. La Honda, Manrique, Medellín" required>
+            <small class="vf-help" data-i18n="ff.zona.help">El sector, no la dirección exacta. En el mapa de la red el pin va a nivel de barrio, nunca a la puerta.</small></div>
+          <div class="field"><label for="ff-ciudad" data-i18n="ff.ciudad">Ciudad (opcional)</label>
+            <input type="text" id="ff-ciudad" autocomplete="address-level2"></div>
+        </div>
+
+        <fieldset class="vf-set">
+          <legend data-i18n="ff.pers.lbl">¿Tiene personería jurídica?</legend>
+          <p class="vf-help" data-i18n="ff.pers.help">Cualquier respuesta sirve para aplicar. Esto no define si entran: define cómo describimos a la organización si algún día publicamos su perfil.</p>
+          <label class="ally-check"><input type="radio" name="ff-pers" value="nit"><span data-i18n="ff.pers.nit">Sí, con NIT</span></label>
+          <label class="ally-check"><input type="radio" name="ff-pers" value="tramite"><span data-i18n="ff.pers.tramite">En trámite</span></label>
+          <label class="ally-check"><input type="radio" name="ff-pers" value="base"><span data-i18n="ff.pers.base">No — es un proyecto comunitario de base</span></label>
+        </fieldset>
+
+        <h3 class="ally-sec" data-i18n="ff.s.hist">Qué hacen y por qué</h3>
+        <div class="ally-grid">
+          <div class="field ally-wide"><label for="ff-historia" data-i18n="ff.historia">La historia de la fundación, en un párrafo</label>
+            <textarea id="ff-historia" rows="5" maxlength="1500" data-i18n="ff.historia.ph" data-i18n-attr="placeholder" placeholder="Cómo nació, quién la lidera, a quién sirve y qué la hace distinta." required></textarea></div>
+          <div class="field ally-wide"><label for="ff-mision" data-i18n="ff.mision">La misión, en una o dos frases</label>
+            <textarea id="ff-mision" rows="2" maxlength="600" required></textarea></div>
+        </div>
+
+        <h3 class="ally-sec" data-i18n="ff.s.pob">A quién llegan</h3>
+        <fieldset class="vf-set">
+          <legend data-i18n="ff.pob.lbl">¿A quiénes atiende la fundación?</legend>
+          <div class="ally-mods">
+            <label class="ally-check"><input type="checkbox" name="ff-pob" value="ninos"><span data-i18n="ff.pob.ninos">Niños y niñas</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-pob" value="adolescentes"><span data-i18n="ff.pob.adolescentes">Adolescentes</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-pob" value="jovenes"><span data-i18n="ff.pob.jovenes">Jóvenes</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-pob" value="madres"><span data-i18n="ff.pob.madres">Madres cabeza de familia</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-pob" value="mayores"><span data-i18n="ff.pob.mayores">Adultos mayores</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-pob" value="familias"><span data-i18n="ff.pob.familias">Familias</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-pob" value="migrante"><span data-i18n="ff.pob.migrante">Población migrante</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-pob" value="discapacidad"><span data-i18n="ff.pob.discapacidad">Personas con discapacidad</span></label>
+            <label class="ally-check" data-act="fundOtra()"><input type="checkbox" name="ff-pob" value="otra" id="ff-pob-otra-chk"><span data-i18n="ff.pob.otra">Otra</span></label>
+          </div>
+          <div class="field" id="ff-pob-otra-box" style="display:none;margin-top:12px">
+            <label for="ff-pob-otra" data-i18n="ff.pob.otra.lbl">¿Cuál?</label>
+            <input type="text" id="ff-pob-otra"></div>
+        </fieldset>
+        <div class="ally-grid">
+          <div class="field ally-wide"><label for="ff-atiende" data-i18n="ff.atiende">¿A cuántas personas atienden de forma regular?</label>
+            <input type="text" id="ff-atiende" required>
+            <small class="vf-help" data-i18n="ff.atiende.help">El número real, aunque sea aproximado. Si es estimado lo publicamos con «≈»: preferimos un número honesto a uno redondo.</small></div>
+          <div class="field ally-wide"><label for="ff-conteo" data-i18n="ff.conteo">¿Cómo llevan esa cuenta? (opcional)</label>
+            <input type="text" id="ff-conteo" data-i18n="ff.conteo.ph" data-i18n-attr="placeholder" placeholder="Planillas de asistencia, registro digital, listados por programa, conteo aproximado…">
+            <small class="vf-help" data-i18n="ff.conteo.help">Esto decide si la cifra se publica exacta o con «≈». No es una prueba: es lo que nos permite no inflar su trabajo.</small></div>
+        </div>
+
+        <h3 class="ally-sec" data-i18n="ff.s.prog">Un programa</h3>
+        <p class="vf-help" data-i18n="ff.prog.help">El que mejor represente su labor diaria. Los demás los vemos cuando nos conozcamos.</p>
+        <div class="ally-grid">
+          <div class="field ally-wide"><label for="ff-prog" data-i18n="ff.prog">Nombre del programa (opcional)</label>
+            <input type="text" id="ff-prog" data-i18n="ff.prog.ph" data-i18n-attr="placeholder" placeholder="Ej. Chefs del Futuro"></div>
+          <div class="field ally-wide"><label for="ff-prog-desc" data-i18n="ff.prog.desc">¿Qué hace y a cuántas personas llega? (opcional)</label>
+            <textarea id="ff-prog-desc" rows="3" maxlength="900" data-i18n="ff.prog.desc.ph" data-i18n-attr="placeholder" placeholder="Con números reales y frecuencia. Ej. cerca de 100 niños reciben almuerzo cada día, de lunes a viernes."></textarea></div>
+          <div class="field ally-wide"><label for="ff-evid" data-i18n="ff.evid">¿Qué evidencia tienen de que funciona? (opcional)</label>
+            <input type="text" id="ff-evid" data-i18n="ff.evid.ph" data-i18n-attr="placeholder" placeholder="Registro fotográfico, planillas de asistencia, facturas, testimonios, informes…"></div>
+        </div>
+
+        <h3 class="ally-sec" data-i18n="ff.s.red">Dónde encontrarlos</h3>
+        <div class="ally-grid">
+          <div class="field"><label for="ff-web" data-i18n="ff.web">Página web (opcional)</label>
+            <input type="url" id="ff-web" placeholder="https://tufundacion.org"></div>
+          <div class="field"><label for="ff-instagram" data-i18n="ff.instagram">Instagram (opcional)</label>
+            <input type="text" id="ff-instagram" placeholder="@tufundacion"></div>
+        </div>
+
+        <h3 class="ally-sec" data-i18n="ff.s.aut">Antes de enviar</h3>
+        <div class="ally-auts">
+          <label class="ally-check"><input type="checkbox" id="ff-datos" required><span data-i18n="ff.datos">Autorizo el tratamiento de estos datos para que Give&amp;Grow nos contacte sobre la aplicación al HUB SOCIAL, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.</span></label>
+          <a class="ally-policy-link" href="#privacidad" target="_blank" rel="noopener" data-i18n="ally.a.datos.link">Ver Política de Privacidad</a>
+          <label class="ally-check"><input type="checkbox" id="ff-veraz" required><span data-i18n="ff.veraz">Declaro que la información es veraz, que las cifras corresponden a la realidad de la fundación y que estoy facultado(a) para aplicar en su nombre.</span></label>
+        </div>
+        <p class="vf-help" data-i18n="ff.despues">Todavía no pedimos logo, fotos ni soportes de costos. Eso viene después de la visita de contexto, junto con las autorizaciones de derechos de imagen — la imagen de los menores está protegida por la Ley 1098 y no publicamos nada sin consentimiento escrito.</p>
+
+        <!-- Trampa para bots: invisible y sin etiqueta. Si llega llena, no se guarda. -->
+        <input type="text" id="ff-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+
+        <button type="submit" class="btn btn-g ally-submit" id="ff-btn" data-i18n="ff.submit">Enviar la aplicación</button>
+        <p id="ff-note" class="ally-msg" role="status" aria-live="polite" style="display:none"></p>
+        <p class="ally-legal" data-i18n="ff.legal">Aplicar no es entrar. Lo que sigue es la revisión, la visita de contexto y, si encajamos, el convenio de cooperación — gratuito, como todo lo demás.</p>
+      </form>
     </div>
   </section>
 </main>
@@ -1942,7 +2064,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=4b0998e3"></script>
+<script src="/app.js?v=2187163b"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

@@ -1,4 +1,24 @@
 # Cuestionario de ingreso al HUB SOCIAL — Give&Grow
+
+> **CAMBIÓ CUÁNDO SE USA (12 ago 2026, Fase 3 del ecosistema).** Este documento
+> ya NO es la puerta de entrada: aplicar al HUB se hace en el sitio, en
+> `#fundaciones → #fund-form`, que pide solo texto y guarda en D1. Este
+> cuestionario pasó a ser lo que se envía **después de la visita de contexto**
+> (paso 3 del proceso publicado), cuando ya hubo una conversación y tiene
+> sentido pedir logo, fotos y el soporte documental del costo.
+>
+> **Lo que NO cambió:** sigue siendo la fuente de verdad del esquema de
+> `data/partners.json`, y sus reglas de publicación y su checklist post-alta
+> siguen gobernando el alta. La regla 1 —sin `consent.name === true` no hay
+> perfil— sigue intacta: el formulario del sitio ni siquiera pregunta eso,
+> porque de él no sale una ficha pública sino una solicitud.
+>
+> Secciones que el formulario del sitio ya cubre (no volver a preguntarlas):
+> **1** (salvo 1.8 dirección), **2.1, 2.2**, **3**, **4.1–4.2 y 4.4** del
+> Programa 1, y **6.1–6.2**. Lo que queda para esta etapa: **1.8**, **2.3–2.5**,
+> **4.3**, los Programas 2 y 3, la **Sección 5** entera (unidad de impacto y
+> costos con soporte), **6.3–6.5** y la **Sección 7** completa.
+
 **Google Form · espejo del esquema `data/partners.json`**
 _Regenerado: 03/07/2026. Fuente de verdad del esquema: objeto `ndf` en `data/partners.json` + hooks `canShowLogo()` / `canShowGallery()` en `app.js` + `worker.js` (`/f/<id>`)._
 

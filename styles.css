@@ -795,7 +795,9 @@ html[data-theme="dark"] .track-cta h3{color:var(--ink)}
 .ally-wide{grid-column:1 / -1}
 .ally-form .field{display:flex;flex-direction:column;gap:6px}
 .ally-form label{font-size:13px;font-weight:600;color:var(--ink-soft)}
-.ally-form input[type=text],.ally-form input[type=email],.ally-form input[type=tel]{padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;background:var(--surface);color:var(--ink)}
+/* `url` estaba fuera de la lista y el campo "Sitio web" quedaba con el borde de
+   1px del estilo genérico, medio punto más fino que sus vecinos. */
+.ally-form input[type=text],.ally-form input[type=email],.ally-form input[type=tel],.ally-form input[type=url]{padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;background:var(--surface);color:var(--ink)}
 .ally-form input:focus{outline:none;border-color:var(--g)}
 .ally-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;font-family:inherit;background:var(--surface);color:var(--ink);resize:vertical;min-height:96px;box-sizing:border-box}
 .ally-form textarea:focus{outline:none;border-color:var(--g)}

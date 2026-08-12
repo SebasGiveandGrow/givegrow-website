@@ -1,4 +1,12 @@
 /**
+ * ⚠️ YA NO ES LA PUERTA DE ENTRADA (12 ago 2026, Fase 3 del ecosistema).
+ * Aplicar al HUB se hace en el sitio: #fundaciones → #fund-form, que guarda en
+ * D1 y aparece en /admin. El Form que crea este script pasó a ser el
+ * cuestionario largo que se envía DESPUÉS de la visita de contexto. Leer la
+ * nota de arriba de ops/cuestionario-fundaciones-hub.md antes de usarlo: hay
+ * secciones que el formulario del sitio ya cubre y no hay que volver a
+ * preguntar.
+ *
  * crear-form-fundaciones.gs — Constructor del Google Form de ingreso al HUB
  * ----------------------------------------------------------------------------
  * Ejecuta la función crearFormularioFundaciones() UNA sola vez y crea el
