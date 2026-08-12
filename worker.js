@@ -1057,6 +1057,136 @@ async function adminResumen(env) {
   });
 }
 
+/* ========================================================================
+   GET /api/admin/salud  —  Fase 8: medir
+   ========================================================================
+   El panel sabía LISTAR y no sabía DECIR. Ocho tablas con filas y ninguna
+   respuesta a las tres preguntas que importan: ¿el cobro funciona?, ¿qué lleva
+   días esperando a una persona?, ¿dónde se cae la donación?
+
+   LO QUE ESTA CONSULTA ENCONTRÓ EL DÍA QUE SE ESCRIBIÓ (12 ago 2026) y es la
+   razón de que exista: cuatro intenciones de aporte, **cero pagos aprobados y
+   cero webhooks recibidos en la historia de la base**. O sea: no hay una sola
+   prueba de que el cobro funcione en producción. El traspaso ya había dejado la
+   lección —«contra un tercero, probar contra el tercero»— y aun así nadie podía
+   ver que la evidencia no existía, porque el panel no lo preguntaba.
+
+   TRES REGLAS DE HONESTIDAD, que aquí no son estilo sino la marca:
+
+   1 · **El cero se muestra y se nombra.** Nunca se esconde una fila porque esté
+       en cero: que `certificados = 0` es información, y el día que sea 1 hay que
+       poder ver el cambio.
+   2 · **Ninguna tasa con denominador cero.** «0 %» de cero intenciones se lee
+       como fracaso y no es nada: se devuelve `null` y el panel escribe
+       «sin datos». Es la misma regla que MEDICION.md §5 aplicada a nosotros.
+   3 · **Nada de esto es publicable.** Vive tras Access. El contador público por
+       recencia es otra cosa (Fase 3 del plan VISUAL) y sigue aplazado.
+
+   Y una regla de forma: **la antigüedad es el dato, no el conteo.** Una
+   inscripción sin tocar hace nueve días y una de hace una hora se cuentan igual
+   y no son lo mismo. Todo lo que espera a una persona viaja con sus días.
+   ======================================================================== */
+async function adminSalud(env) {
+  const uno = async (sql) => (await env.DB.prepare(sql).first()) || {};
+
+  /* Embudo. Se mide sobre `aportes` y no sobre los eventos de Wompi porque el
+     aporte es nuestro registro: si Wompi cobró y no hay aporte, eso es la
+     bandeja de «pagos sin aporte», que es otro problema y ya tiene su vista. */
+  /* «Pagada» son SOLO los tres estados en que el dinero está en la cuenta.
+     `reportada` NO cuenta: es una transferencia que el donante declaró y que
+     nadie ha contrastado contra el extracto todavía, y meterla aquí ensancharía
+     el significado de `aprobada` que la Fase 5.1 cuidó a propósito. `rechazada`
+     tampoco, obviamente. Por eso los estados van escritos uno por uno y no como
+     `<> 'intencion'`: la lista corta miente menos. */
+  const PAGADA = "estado IN ('aprobada','en_distribucion','entregada')";
+  const emb = await uno(
+    "SELECT COUNT(*) AS intenciones, " +
+    "SUM(CASE WHEN " + PAGADA + " THEN 1 ELSE 0 END) AS pagadas, " +
+    "SUM(CASE WHEN estado = 'reportada' THEN 1 ELSE 0 END) AS declaradas, " +
+    "SUM(CASE WHEN estado = 'rechazada' THEN 1 ELSE 0 END) AS rechazadas, " +
+    "SUM(CASE WHEN quiere_certificado = 1 AND " + PAGADA + " THEN 1 ELSE 0 END) AS piden_cert, " +
+    "COALESCE(SUM(CASE WHEN estado = 'intencion' THEN monto_centavos ELSE 0 END), 0) AS centavos_sin_pagar " +
+    "FROM aportes"
+  );
+  const certs = await uno("SELECT COUNT(*) AS emitidos FROM certificados WHERE anulado_en IS NULL");
+
+  /* Webhooks. `firma_valida = 0` es el caso que hay que ver de inmediato: o
+     alguien está golpeando el endpoint, o volvió el bug del `timestamp`. */
+  const wh = await uno(
+    "SELECT COUNT(*) AS recibidos, " +
+    "SUM(CASE WHEN firma_valida = 1 THEN 1 ELSE 0 END) AS firma_ok, " +
+    "SUM(CASE WHEN procesado = 1 THEN 1 ELSE 0 END) AS procesados, " +
+    "MAX(recibido_en) AS ultimo " +
+    "FROM eventos_wompi"
+  );
+
+  /* Todo lo que depende de que una persona actúe, con la antigüedad de lo más
+     viejo. `dias` es NULL cuando no hay nada esperando, no 0: son cosas
+     distintas y el panel las escribe distinto. */
+  const cola = [];
+  const enCola = async (clave, sql, comoSeArregla) => {
+    const r = await uno(sql);
+    cola.push({
+      clave, n: r.n || 0,
+      dias: r.n ? Math.floor((Date.now() - Date.parse((r.masViejo || "").replace(" ", "T") + "Z")) / 86400000) : null,
+      arreglo: comoSeArregla
+    });
+  };
+  await enCola("inscripciones_sin_tocar",
+    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones WHERE estado = 'nueva'",
+    "Bandeja «Quién quiere entrar» · a alguien le prometimos que le escribíamos");
+  await enCola("transferencias_sin_verificar",
+    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
+    "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado");
+  await enCola("certificados_por_emitir",
+    "SELECT COUNT(*) AS n, MIN(aprobada_en) AS masViejo FROM aportes a WHERE a.quiere_certificado = 1 " +
+    "AND a." + PAGADA + " AND NOT EXISTS " +
+    "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)",
+    "Lista de aportes · los firma la Revisora Fiscal, no el sistema");
+  await enCola("entregas_en_borrador",
+    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas WHERE publicada_en IS NULL",
+    "Bandeja «Entregas» · el acta existe y todavía no la ve nadie");
+
+  /* Intenciones abandonadas: más de 48 h en `intencion` y sin transacción de
+     Wompi. No se tocan solas —borrar el registro de alguien que quizá vuelva a
+     pagar sería peor que dejarlo— pero hay que poder verlas: cada una quemó un
+     número de guía del consecutivo. */
+  const ab = await uno(
+    "SELECT COUNT(*) AS n, COALESCE(SUM(monto_centavos),0) AS centavos FROM aportes " +
+    "WHERE estado = 'intencion' AND wompi_transaction_id IS NULL " +
+    "AND creada_en < datetime('now','-48 hours')"
+  );
+
+  const intenciones = emb.intenciones || 0;
+  const pagadas = emb.pagadas || 0;
+  return json({
+    corte: new Date().toISOString(),
+    embudo: {
+      intenciones,
+      declaradas: emb.declaradas || 0,
+      pagadas,
+      rechazadas: emb.rechazadas || 0,
+      /* Regla 2: sin denominador no hay tasa. */
+      conversion: intenciones ? Math.round((pagadas / intenciones) * 1000) / 10 : null,
+      piden_certificado: emb.piden_cert || 0,
+      certificados_emitidos: certs.emitidos || 0,
+      centavos_sin_pagar: emb.centavos_sin_pagar || 0
+    },
+    webhooks: {
+      recibidos: wh.recibidos || 0,
+      firma_invalida: (wh.recibidos || 0) - (wh.firma_ok || 0),
+      sin_procesar: (wh.firma_ok || 0) - (wh.procesados || 0),
+      ultimo: wh.ultimo || null,
+      /* La alarma que motivó la fase: hay gente intentando pagar y no ha
+         llegado un solo evento. Si esto sale en true, el cobro no está
+         probado en producción — no importa qué diga la batería de pruebas. */
+      sin_evidencia_de_cobro: intenciones > 0 && (wh.recibidos || 0) === 0
+    },
+    cola,
+    abandonadas: { n: ab.n || 0, centavos: ab.centavos || 0 }
+  });
+}
+
 async function adminAportes(env, url) {
   const estado = url.searchParams.get("estado");
   const limite = Math.min(Math.max(Number(url.searchParams.get("limite")) || 50, 1), 200);
@@ -2648,6 +2778,14 @@ function paginaAdmin() {
 
 <div id="resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:26px"></div>
 
+<h2 class="h-sec" style="margin:8px 0 6px;font-size:26px">Salud del ecosistema</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que las listas de abajo
+no dicen: dónde se cae la donación, si el cobro está dando señales de vida, y qué lleva días
+esperando a que una persona haga algo. <strong>El cero se muestra como cero</strong> — que algo no
+haya pasado todavía es información, no un hueco que tapar. Y no hay porcentajes sin denominador:
+donde falta el dato dice «sin datos», no «0 %».</p>
+<div id="salud"><p class="mu">Cargando…</p></div>
+
 <div class="pay-tabs" role="group" aria-label="Filtrar por estado" style="margin-bottom:18px">
   <button type="button" class="pay-tab on" data-estado="">Todos</button>
   <button type="button" class="pay-tab" data-estado="aprobada">Aprobados</button>
@@ -3000,6 +3138,105 @@ document.addEventListener("click", function(e){
   }
 });
 
+/* ---------------- salud del ecosistema (Fase 8) ----------------
+   El renderizador respeta las tres reglas del endpoint: el cero se escribe, la
+   tasa sin denominador dice «sin datos», y la antigüedad se lee antes que el
+   conteo — porque lo que importa de una cola no es cuántos hay sino desde
+   cuándo esperan. */
+var COLA_ES = {
+  inscripciones_sin_tocar: "Inscripciones sin tocar",
+  transferencias_sin_verificar: "Transferencias sin verificar",
+  certificados_por_emitir: "Certificados por emitir",
+  entregas_en_borrador: "Entregas en borrador"
+};
+
+function pasoEmbudo(etiqueta, n, nota){
+  return '<div class="eco-chip"><strong>' + esc(String(n)) + '</strong> ' + esc(etiqueta) +
+         (nota ? ' <small>' + esc(nota) + '</small>' : '') + '</div>';
+}
+
+/* Días como texto humano. Un nulo no es 0: uno significa «nada esperando» y el
+   otro «llegó hoy», y confundirlos es justo lo que hace inútil una alarma. */
+function antiguedad(d){
+  if (d === null || d === undefined) return "";
+  if (d === 0) return "hoy";
+  if (d === 1) return "hace 1 día";
+  return "hace " + d + " días";
+}
+
+function cargarSalud(){
+  fetch("/api/admin/salud").then(function(r){ return r.json(); }).then(function(d){
+    var box = document.getElementById("salud"); if (!box) return;
+    var h = "";
+
+    /* 1 · La alarma primero, si la hay. Va arriba porque es lo único de esta
+       sección que puede significar «el sitio está cobrando y no lo sabemos». */
+    if (d.webhooks && d.webhooks.sin_evidencia_de_cobro){
+      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 18px;font-size:14px">' +
+        '<strong>El cobro no está probado en producción.</strong> Hay ' +
+        esc(String((d.embudo && d.embudo.intenciones) || 0)) +
+        ' intenciones de aporte y <strong>cero</strong> eventos de Wompi recibidos en la historia de la base. ' +
+        'Mientras no llegue un evento real no hay evidencia de que el webhook funcione — y la batería de pruebas ' +
+        'no cuenta: ya pasó 10 de 10 mientras producción rechazaba todo.' +
+        '</p>';
+    }
+
+    /* 2 · Embudo. */
+    var e = d.embudo || {};
+    h += '<h3 style="font-size:15px;margin:0 0 8px">El camino de la donación</h3><div class="eco-row" style="justify-content:flex-start;margin-bottom:6px">';
+    h += pasoEmbudo("intenciones", e.intenciones);
+    if (e.declaradas) h += pasoEmbudo("transferencias declaradas", e.declaradas, "sin verificar");
+    h += pasoEmbudo("pagadas", e.pagadas, e.conversion === null ? "sin datos" : e.conversion + "% de las intenciones");
+    if (e.rechazadas) h += pasoEmbudo("rechazadas", e.rechazadas);
+    h += pasoEmbudo("piden certificado", e.piden_certificado);
+    h += pasoEmbudo("certificados emitidos", e.certificados_emitidos);
+    h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">«Pagadas» son solo los estados en que el dinero está en la cuenta — una transferencia declarada y sin contrastar no cuenta.' +
+      (e.centavos_sin_pagar ? ' Hay ' + pesos(e.centavos_sin_pagar) + ' en intenciones que nunca se pagaron.' : '') + '</p>';
+
+    /* 3 · Webhooks. */
+    var w = d.webhooks || {};
+    h += '<h3 style="font-size:15px;margin:0 0 8px">Señales de Wompi</h3><div class="eco-row" style="justify-content:flex-start;margin-bottom:6px">';
+    h += pasoEmbudo("eventos recibidos", w.recibidos, w.ultimo ? "último " + String(w.ultimo).slice(0,16) : "nunca");
+    h += pasoEmbudo("con firma inválida", w.firma_invalida, w.firma_invalida ? "revisar YA" : "");
+    h += pasoEmbudo("sin procesar", w.sin_procesar);
+    h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">Una firma inválida es o alguien golpeando el endpoint, o que volvió el bug del <code>timestamp</code>. «Sin procesar» con firma buena es un aporte que se quedó a medias.</p>';
+
+    /* 4 · Lo que espera a una persona. */
+    h += '<h3 style="font-size:15px;margin:0 0 8px">Esperando a una persona</h3>';
+    var cola = d.cola || [];
+    var pend = cola.filter(function(c){ return c.n > 0; });
+    if (!pend.length){
+      h += '<p class="mu" style="font-size:13.5px;margin:0 0 20px">Nada pendiente: ninguna de las cuatro colas tiene algo esperando.</p>';
+    } else {
+      h += '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Qué</th><th scope="col">Cuántos</th><th scope="col">El más viejo</th><th scope="col">Dónde se resuelve</th></tr></thead><tbody>';
+      h += pend.map(function(c){
+        var viejo = antiguedad(c.dias);
+        var urgente = c.dias !== null && c.dias >= 3;
+        return "<tr><td><strong>" + esc(COLA_ES[c.clave] || c.clave) + "</strong></td>" +
+          "<td>" + c.n + "</td>" +
+          "<td>" + (urgente ? '<strong style="color:#A84D00">' + esc(viejo) + "</strong>" : esc(viejo)) + "</td>" +
+          "<td><small>" + esc(c.arreglo) + "</small></td></tr>";
+      }).join("");
+      h += '</tbody></table></div>';
+      h += '<p class="mu" style="font-size:12.5px;margin:6px 0 20px">En ámbar, lo que lleva tres días o más. A la gente de estas colas se le prometió por correo que alguien le escribía.</p>';
+    }
+
+    /* 5 · Intenciones abandonadas. */
+    var ab = d.abandonadas || {};
+    h += '<h3 style="font-size:15px;margin:0 0 8px">Intenciones abandonadas</h3>';
+    h += '<p class="mu" style="font-size:13.5px;margin:0">' +
+      (ab.n
+        ? "<strong>" + ab.n + "</strong> llevan más de 48 horas sin pagarse y sin transacción de Wompi (" + pesos(ab.centavos) + "). No se borran solas: cada una quemó un número de guía, y quien abrió el checkout puede volver a pagar. Borrarlas es una decisión, no una limpieza."
+        : "Ninguna: todo lo que se abrió a pagar o se pagó o es reciente.") + '</p>';
+
+    h += '<p class="mu" style="font-size:12px;margin:20px 0 0">Corte: ' + esc(String(d.corte || "").replace("T"," ").slice(0,16)) + ' UTC. Nada de esta sección es público.</p>';
+    box.innerHTML = h;
+  }).catch(function(){
+    var box = document.getElementById("salud");
+    if (box) box.innerHTML = '<p class="mu">No se pudo leer la salud del ecosistema.</p>';
+  });
+}
+
 /* ---------------- quién quiere entrar ---------------- */
 var TIPO_ES = { voluntario:"Voluntario", fundacion:"Fundación", empresa:"Empresa" };
 var POB_ES = { ninos:"niños", adolescentes:"adolescentes", jovenes:"jóvenes",
@@ -3230,6 +3467,7 @@ cargarInscripciones();
    o descartar una, así que en una carga limpia se quedaba en «Cargando…» para
    siempre. Estuvo tapado mientras el archivo entero no compilaba. */
 cargarReportadas();
+cargarSalud();
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
@@ -3407,6 +3645,7 @@ export default {
         }
         if (ruta === "/api/admin/quien")    return json({ email: sesion.email });
         if (ruta === "/api/admin/resumen")  return await adminResumen(env);
+        if (ruta === "/api/admin/salud")    return await adminSalud(env);
         if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
         const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
         if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
