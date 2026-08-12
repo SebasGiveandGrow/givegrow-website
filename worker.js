@@ -843,12 +843,15 @@ async function apiInscripcion(request, env, url) {
      enseñarle qué lo delató, y no se guarda nada. */
   if (c.web2) return json({ ok: true });
 
-  /* Un ofrecimiento en especie entra por el mismo endpoint y a la misma tabla:
-     comparte el honeypot, el consentimiento de Ley 1581 y el patrón de correo.
+  /* Los otros tres tipos entran por el mismo endpoint y a la misma tabla:
+     comparten el honeypot, el consentimiento de Ley 1581 y el patrón de correo.
      `inscripciones.tipo` ya estaba pensado para varios tipos y `datos` guarda lo
      propio de cada uno — no hacía falta tabla nueva, y por lo tanto tampoco una
-     migración más antes de que salga la brigada. */
-  if (c.tipo === "especie") return await apiOfrecimiento(env, c);
+     migración más. Con estas dos, las CUATRO puertas de entrada del sitio
+     terminan en la misma base y en el mismo panel; ninguna en un tercero. */
+  if (c.tipo === "especie")   return await apiOfrecimiento(env, c);
+  if (c.tipo === "empresa")   return await apiAliado(env, c);
+  if (c.tipo === "fundacion") return await apiFundacion(env, c);
 
   const tipo = c.tipo === "voluntario" ? "voluntario" : null;
   if (!tipo) return json({ error: "tipo_no_soportado" }, 400);
@@ -1944,6 +1947,387 @@ async function correoAvisoOfrecimiento(env, o) {
   });
 }
 
+/* ========================================================================
+   Solicitud de alianza empresarial  ·  tipo = "empresa"
+   ========================================================================
+   Hasta hoy este formulario posteaba a un Apps Script (`ALLY_ENDPOINT`) que
+   escribía una fila en una hoja de cálculo. Tres razones para traerlo:
+
+   1 · TRES CAMPOS SE PERDÍAN EN SILENCIO. El front ya enviaba `sector`,
+       `aporta` e `instagram` —los tres alimentan la tarjeta de reciprocidad de
+       `#empresas`— y la hoja no tiene columna para ellos: llegaban y se caían.
+       Nadie lo habría notado hasta querer publicar la primera empresa real.
+   2 · El acuse salía desde un Gmail externo, no desde el dominio, porque en su
+       momento el propio rebotaba. Eso se arregló el 11 de agosto (SPF y DKIM
+       alinean); el script quedó apuntando al Gmail por inercia.
+   3 · Una solicitud en una hoja no está en `/admin`, así que no tiene estado ni
+       queda en el resumen. La primera empresa aliada es un pendiente vivo.
+
+   El mapeo intake → modalidad pública NO se automatiza aquí, y es a propósito:
+   se guardan las seis casillas como las marcó la empresa, y la traducción a
+   `modalidad[]` de `partners.json` la hace una persona al aprobar. Traducir en
+   el ingreso sería decidir cómo se publica a alguien antes de hablar con él.
+   ======================================================================== */
+
+const MODALIDADES_ALIADO = [
+  ["modDonacion",     "Donación"],
+  ["modRse",          "RSE"],
+  ["modGratitud",     "Programa de Gratitud"],
+  ["modServicios",    "Servicios"],
+  ["modVoluntariado", "Voluntariado corporativo"],
+  ["modDifusion",     "Difusión"]
+];
+
+async function apiAliado(env, c) {
+  const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const razon = limpio(c.razon, 160);
+  const email = limpio(c.correo, 200);
+
+  if (!razon) return json({ error: "razon_requerida" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+
+  const mods = MODALIDADES_ALIADO.filter(([k]) => !!c[k]).map(([k]) => k);
+  if (!mods.length) return json({ error: "modalidad_requerida" }, 400);
+
+  /* Las condicionales se validan también aquí, no solo en el navegador: marcar
+     Gratitud sin decir qué beneficio deja una solicitud que no se puede
+     responder, y el cliente es opcional para cualquiera que sepa hacer un POST. */
+  const benBeneficio = limpio(c.benBeneficio, 200);
+  const servDetalle  = limpio(c.servDetalle, 300);
+  if (c.modGratitud && !benBeneficio) return json({ error: "beneficio_requerido" }, 400);
+  if (c.modServicios && !servDetalle) return json({ error: "servicio_requerido" }, 400);
+
+  /* Las tres autorizaciones son la condición para guardar. La de datos es Ley
+     1581; la de marca y la de licitud son lo que permite publicar la alianza y
+     lo que la fundación necesita declarar recibido. Sin ellas no se guarda. */
+  if (!c.autMarca || !c.autDatos || !c.autLicitud) {
+    return json({ error: "autorizacion_requerida" }, 400);
+  }
+
+  const datos = {
+    nit: limpio(c.nit, 40),
+    representante: limpio(c.representante, 120),
+    cedula: limpio(c.cedula, 40),
+    contacto: limpio(c.contacto, 160),
+    direccion: limpio(c.direccion, 200),
+    sector: limpio(c.sector, 80),
+    web: limpio(c.web, 200),
+    instagram: limpio(c.instagram, 120),
+    descripcion: limpio(c.descripcion, 900),
+    aporta: limpio(c.aporta, 90),
+    modalidades: mods,
+    benBeneficio,
+    benNivel: limpio(c.benNivel, 120),
+    benCondiciones: limpio(c.benCondiciones, 300),
+    benRedime: limpio(c.benRedime, 200),
+    servDetalle,
+    autMarca: true, autDatos: true, autLicitud: true,
+    idioma: c.idioma === "en" ? "en" : "es"
+  };
+
+  const ins = await env.DB.prepare(
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
+    "VALUES ('empresa', 'nueva', ?, ?, ?, ?, ?)"
+  ).bind(razon, email, limpio(c.telefono, 40) || null, limpio(c.ciudad, 80) || null,
+         JSON.stringify(datos)).run();
+
+  /* El rastro de Ley 1581 se deja aquí y no al aprobar: la autorización la dio
+     la empresa al enviar, no nosotros al revisarla. */
+  try {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'marca_y_datos', ?)"
+    ).bind(email, "solicitud de alianza #" + (ins.meta ? ins.meta.last_row_id : "?") + " · " + razon).run();
+  } catch (e) {
+    console.error("consentimiento aliado", e && e.message);
+  }
+
+  /* El correo no puede tumbar la solicitud: si falla, ya quedó registrada.
+     Misma regla que en aportes, inscripciones y ofrecimientos. */
+  try {
+    await correoAliado(env, { razon, email, ...datos });
+    await correoAvisoAliado(env, { razon, email, telefono: limpio(c.telefono, 40), ciudad: limpio(c.ciudad, 80), ...datos });
+  } catch (e) {
+    console.error("correo aliado", e && e.message);
+  }
+
+  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+}
+
+const ETIQUETA_MOD = {
+  es: { modDonacion:"Donación", modRse:"RSE", modGratitud:"Programa de Gratitud",
+        modServicios:"Servicios", modVoluntariado:"Voluntariado corporativo", modDifusion:"Difusión" },
+  en: { modDonacion:"Donation", modRse:"CSR", modGratitud:"Gratitude Programme",
+        modServicios:"Services", modVoluntariado:"Corporate volunteering", modDifusion:"Outreach" }
+};
+
+/* Acuse a la empresa. Su trabajo es UNO: dejar claro que enviar no es aliarse.
+   La página ya lo dice en su letra pequeña y el correo no lo puede contradecir —
+   la alianza se perfecciona con la firma del Convenio Marco, que manda una
+   persona. Prometer aquí «ya eres aliado» sería la promesa que la marca prohíbe. */
+async function correoAliado(env, a) {
+  const en = a.idioma === "en";
+  const mapa = ETIQUETA_MOD[en ? "en" : "es"];
+  const titulo = en ? "We got your alliance request." : "Recibimos tu solicitud de alianza.";
+  const parrafos = en ? [
+    "Thank you. Someone from Give&Grow will read it and write to you — a real person, not an autoresponder.",
+    "Sending this form does not make the alliance official. The alliance is formalised when the Framework Agreement is signed; we will send it to you to review, and nothing is charged in either direction.",
+    a.modGratitud || (a.modalidades || []).includes("modGratitud")
+      ? "You told us you want to join the Gratitude Programme. Your business only appears publicly once the agreement is signed — never before."
+      : ""
+  ] : [
+    "Gracias. Alguien de Give&Grow la lee y te escribe — una persona real, no un autorespondedor.",
+    "Enviar este formulario no constituye la alianza. La alianza se perfecciona con la firma del Convenio Marco, que te enviamos para revisar, y nada se cobra en ninguna dirección.",
+    (a.modalidades || []).includes("modGratitud")
+      ? "Nos dijiste que quieres entrar al Programa de Gratitud. Tu negocio aparece públicamente solo cuando el convenio esté firmado — nunca antes."
+      : ""
+  ];
+  const filas = [
+    [en ? "Organisation" : "Empresa", a.razon],
+    [en ? "How you want to support" : "Cómo quieres apoyar",
+     (a.modalidades || []).map(k => mapa[k] || k).join(", ")]
+  ];
+  if (a.aporta) filas.push([en ? "What you contribute" : "Qué aportas", a.aporta]);
+
+  return enviarCorreo(env, {
+    para: a.email,
+    asunto: en ? "Your alliance request with Give&Grow" : "Tu solicitud de alianza con Give&Grow",
+    texto: [titulo, "", ...parrafos.filter(Boolean), "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos: parrafos.filter(Boolean), filas }),
+    etiqueta: "solicitud-aliado"
+  });
+}
+
+/* Aviso interno: lo que hace falta para responder y para armar la ficha si se
+   aprueba. Incluye los tres campos que la hoja de cálculo perdía. */
+async function correoAvisoAliado(env, a) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const filas = [
+    ["Empresa", a.razon],
+    ["NIT/Doc", a.nit || "(no dejó)"],
+    ["Representante legal", a.representante || "(no dejó)"],
+    ["Contacto", a.contacto || "(no dejó)"],
+    ["Correo", a.email],
+    ["Teléfono", a.telefono || "(no dejó)"],
+    ["Ciudad", a.ciudad || "(no dice)"],
+    ["Sector", a.sector || "(no dice)"],
+    ["Qué aporta", a.aporta || "(no dice)"],
+    ["Web", a.web || "—"],
+    ["Instagram", a.instagram || "—"],
+    ["Modalidades", (a.modalidades || []).map(k => ETIQUETA_MOD.es[k] || k).join(", ")]
+  ];
+  if (a.benBeneficio) {
+    filas.push(["Beneficio ofrecido", a.benBeneficio]);
+    filas.push(["Desde nivel", a.benNivel || "(no dice)"]);
+    filas.push(["Cómo se redime", a.benRedime || "(no dice)"]);
+    filas.push(["Condiciones", a.benCondiciones || "(no dice)"]);
+  }
+  if (a.servDetalle) filas.push(["Servicio ofrecido", a.servDetalle]);
+
+  return enviarCorreo(env, {
+    para,
+    asunto: "Solicitud de alianza: " + a.razon,
+    texto: filas.map(([k, v]) => k + ": " + v).join("\n") +
+           (a.descripcion ? "\n\nDescripción del negocio:\n" + a.descripcion : ""),
+    html: plantillaCorreo({
+      titulo: "Solicitud de alianza: " + a.razon,
+      parrafos: a.descripcion ? ["Cómo se describen: «" + a.descripcion + "»"] : ["Sin descripción del negocio."],
+      filas,
+      cierre: "Está en el panel, en solicitudes por revisar. El Convenio Marco lo envías tú."
+    }),
+    etiqueta: "aviso-aliado"
+  });
+}
+
+/* ========================================================================
+   Aplicación de fundaciones al HUB SOCIAL  ·  tipo = "fundacion"
+   ========================================================================
+   Hasta hoy el botón «Quiero aplicar» sacaba a la fundación del sitio hacia un
+   Google Form de 20–30 minutos, con cargas de archivo que exigen cuenta de
+   Google. Dos secciones más arriba, el propio sitio promete «Toma 10–15
+   minutos». Además, la respuesta caía en un Drive: sin estado, sin acuse y
+   fuera de `/admin`.
+
+   QUÉ PIDE ESTE FORMULARIO Y QUÉ NO, Y POR QUÉ:
+   pide lo que es TEXTO —quiénes son, qué hacen, a cuántos llegan, un programa—
+   que es exactamente lo que hace falta para decidir el paso 2 del proceso
+   publicado, «Revisamos». Deja fuera el costo con soporte documental, el logo,
+   las fotos y el consentimiento formal firmado: todo eso pide archivos y,
+   según el proceso de cinco pasos del propio sitio, va DESPUÉS de la visita de
+   contexto. El cuestionario largo (`ops/cuestionario-fundaciones-hub.md`) sigue
+   siendo la fuente de verdad del esquema de `partners.json` y es lo que se
+   envía en el paso 4, cuando ya hubo una conversación.
+
+   La consecuencia que hay que respetar: de aquí NO sale una ficha pública. Sale
+   una solicitud. La regla 1 del cuestionario —sin `consent.name === true` no hay
+   perfil— sigue intacta, y este formulario ni siquiera pregunta eso.
+   ======================================================================== */
+
+const PERSONERIAS = ["nit", "tramite", "base"];
+const POBLACIONES_FUND = [
+  "ninos", "adolescentes", "jovenes", "madres", "mayores",
+  "familias", "migrante", "discapacidad", "otra"
+];
+
+async function apiFundacion(env, c) {
+  const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const nombre = limpio(c.nombre, 160);
+  const email  = limpio(c.email, 200);
+  const lider  = limpio(c.lider, 120);
+  const zona   = limpio(c.zona, 160);
+  const historia = limpio(c.historia, 1500);
+  const mision   = limpio(c.mision, 600);
+  const atiende  = limpio(c.atiende, 160);
+
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  if (!lider) return json({ error: "lider_requerido" }, 400);
+  if (!zona) return json({ error: "zona_requerida" }, 400);
+  if (!historia) return json({ error: "historia_requerida" }, 400);
+  if (!mision) return json({ error: "mision_requerida" }, 400);
+  if (!atiende) return json({ error: "atiende_requerido" }, 400);
+
+  const personeria = PERSONERIAS.includes(c.personeria) ? c.personeria : null;
+  if (!personeria) return json({ error: "personeria_requerida", opciones: PERSONERIAS }, 400);
+
+  const poblacion = Array.isArray(c.poblacion)
+    ? c.poblacion.filter(p => POBLACIONES_FUND.includes(p)) : [];
+  if (!poblacion.length) return json({ error: "poblacion_requerida", opciones: POBLACIONES_FUND }, 400);
+
+  /* Ley 1581 y declaración de veracidad. Sin las dos no se guarda nada: pedirle
+     a una fundación que declare cifras reales y guardarlas antes de que lo
+     declare sería quedarnos con el dato y no con la responsabilidad. */
+  if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
+  if (!c.declara_veraz)  return json({ error: "declaracion_requerida" }, 400);
+
+  const datos = {
+    sigla: limpio(c.sigla, 60),
+    lider,
+    cargo: limpio(c.cargo, 120),
+    anio: limpio(c.anio, 8),
+    personeria,
+    zona,
+    historia,
+    mision,
+    poblacion,
+    poblacion_otra: limpio(c.poblacion_otra, 120),
+    atiende,
+    /* Cómo llevan la cuenta decide si la cifra se publica exacta o con «≈».
+       Es la pregunta 3.3 del cuestionario y la razón por la que sobrevive aquí:
+       sin ella, cualquier número que nos den se vuelve un claim sin respaldo. */
+    conteo: limpio(c.conteo, 160),
+    programa: limpio(c.programa, 160),
+    programa_desc: limpio(c.programa_desc, 900),
+    evidencia: limpio(c.evidencia, 400),
+    web: limpio(c.web, 200),
+    instagram: limpio(c.instagram, 120),
+    idioma: c.idioma === "en" ? "en" : "es"
+  };
+
+  const ins = await env.DB.prepare(
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
+    "VALUES ('fundacion', 'nueva', ?, ?, ?, ?, ?)"
+  ).bind(nombre, email, limpio(c.telefono, 40) || null, limpio(c.ciudad, 80) || null,
+         JSON.stringify(datos)).run();
+
+  try {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'datos', ?)"
+    ).bind(email, "aplicación al HUB #" + (ins.meta ? ins.meta.last_row_id : "?") + " · " + nombre).run();
+  } catch (e) {
+    console.error("consentimiento fundación", e && e.message);
+  }
+
+  try {
+    await correoFundacion(env, { nombre, email, ...datos });
+    await correoAvisoFundacion(env, { nombre, email, telefono: limpio(c.telefono, 40), ciudad: limpio(c.ciudad, 80), ...datos });
+  } catch (e) {
+    console.error("correo fundación", e && e.message);
+  }
+
+  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+}
+
+/* Acuse a la fundación. Dice los cinco pasos con sus nombres y, sobre todo,
+   dice que aplicar no es entrar. La página lo promete gratuito y sin
+   intermediarios opacos; el correo repite las dos cosas porque es lo que la
+   fundación necesita poder mostrarle a su junta. */
+async function correoFundacion(env, f) {
+  const en = f.idioma === "en";
+  const titulo = en ? "We got your application to the HUB SOCIAL."
+                    : "Recibimos tu aplicación al HUB SOCIAL.";
+  const parrafos = en ? [
+    "Thank you. Someone from Give&Grow reads it and writes back to you. Applying is not joining: what follows is a review of your information, a context visit at your territory, and only then a cooperation agreement.",
+    "Nothing is charged, ever, in either direction. The only thing we ask in return is traceability: that every bit of support arrives documented to whoever needs it.",
+    "We did not ask you for your logo, your photos or your cost figures yet — those come after we meet, together with the image-rights authorisations. Children's images are protected by Law 1098 and we do not publish anything without written consent."
+  ] : [
+    "Gracias. Alguien de Give&Grow la lee y te responde. Aplicar no es entrar: lo que sigue es la revisión de tu información, una visita de contexto en tu territorio y solo entonces un convenio de cooperación.",
+    "Nada se cobra, nunca, en ninguna dirección. Lo único que pedimos a cambio es trazabilidad: que cada apoyo llegue documentado a quien lo necesita.",
+    "Todavía no te pedimos el logo, las fotos ni las cifras de costos — eso viene después de conocernos, junto con las autorizaciones de derechos de imagen. La imagen de los menores está protegida por la Ley 1098 y no publicamos nada sin consentimiento escrito."
+  ];
+  const filas = en
+    ? [["Foundation", f.nombre], ["Who leads it", f.lider], ["Territory", f.zona]]
+    : [["Fundación", f.nombre], ["Quién la lidera", f.lider], ["Territorio", f.zona]];
+
+  return enviarCorreo(env, {
+    para: f.email,
+    asunto: en ? "Your application to the HUB SOCIAL" : "Tu aplicación al HUB SOCIAL",
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas }),
+    etiqueta: "aplicacion-fundacion"
+  });
+}
+
+const ETIQUETA_POB = {
+  ninos:"Niños y niñas", adolescentes:"Adolescentes", jovenes:"Jóvenes",
+  madres:"Madres cabeza de familia", mayores:"Adultos mayores", familias:"Familias",
+  migrante:"Población migrante", discapacidad:"Personas con discapacidad", otra:"Otra"
+};
+const ETIQUETA_PERS = {
+  nit: "Sí, con NIT", tramite: "En trámite", base: "Proyecto comunitario de base"
+};
+
+async function correoAvisoFundacion(env, f) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const pob = (f.poblacion || []).map(p => ETIQUETA_POB[p] || p).join(", ") +
+              (f.poblacion_otra ? " · " + f.poblacion_otra : "");
+  const filas = [
+    ["Fundación", f.nombre + (f.sigla ? " (" + f.sigla + ")" : "")],
+    ["Lidera", f.lider + (f.cargo ? " · " + f.cargo : "")],
+    ["Correo", f.email],
+    ["Teléfono", f.telefono || "(no dejó)"],
+    ["Personería", ETIQUETA_PERS[f.personeria] || f.personeria],
+    ["Desde", f.anio || "(no dice)"],
+    ["Territorio", f.zona],
+    ["Ciudad", f.ciudad || "(no dice)"],
+    ["Atiende a", pob],
+    ["Cuántas personas", f.atiende],
+    ["Cómo llevan la cuenta", f.conteo || "(no dice)"],
+    ["Programa", f.programa || "(no dice)"],
+    ["Evidencia declarada", f.evidencia || "(no dice)"],
+    ["Web", f.web || "—"],
+    ["Instagram", f.instagram || "—"]
+  ];
+  return enviarCorreo(env, {
+    para,
+    asunto: "Aplicación al HUB: " + f.nombre,
+    texto: filas.map(([k, v]) => k + ": " + v).join("\n") +
+           "\n\nHistoria:\n" + f.historia + "\n\nMisión:\n" + f.mision +
+           (f.programa_desc ? "\n\nPrograma:\n" + f.programa_desc : ""),
+    html: plantillaCorreo({
+      titulo: "Aplicación al HUB: " + f.nombre,
+      parrafos: ["Misión: «" + f.mision + "»",
+                 "Historia: " + f.historia,
+                 f.programa_desc ? "Programa: " + f.programa_desc : ""].filter(Boolean),
+      filas,
+      cierre: "Está en el panel. Lo que sigue es revisar y, si encaja, la visita de contexto. " +
+              "El logo, las fotos y los costos con soporte se piden después, con el cuestionario largo."
+    }),
+    etiqueta: "aviso-fundacion"
+  });
+}
+
 /* Los ofrecimientos comparten tabla con las inscripciones, así que el panel los
    filtra por tipo en vez de tener su propia consulta. */
 async function adminOfrecimientos(env) {
@@ -1952,6 +2336,22 @@ async function adminOfrecimientos(env) {
     "FROM inscripciones WHERE tipo = 'especie' ORDER BY creada_en DESC LIMIT 100"
   ).all();
   return json({ ofrecimientos: r.results || [] });
+}
+
+/* Las otras tres puertas —voluntarios, fundaciones y empresas— comparten una
+   sola bandeja: los tres son «alguien quiere entrar» y el flujo de estados es
+   idéntico. Los ofrecimientos siguen aparte porque su urgencia es distinta (hay
+   que contestarles antes de que compren) y su tabla muestra otras columnas.
+
+   Los voluntarios llevaban desde la Fase 3 entrando a la base sin bandeja: solo
+   existía el contador del resumen, que dice cuántos hay y no quiénes son. */
+async function adminInscripciones(env) {
+  const r = await env.DB.prepare(
+    "SELECT id, tipo, estado, nombre, email, telefono, ciudad, datos, creada_en " +
+    "FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa') " +
+    "ORDER BY creada_en DESC LIMIT 200"
+  ).all();
+  return json({ inscripciones: r.results || [] });
 }
 
 const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "archivada"];
@@ -2279,6 +2679,18 @@ número del comprobante porque <strong>es el que cita el certificado</strong>.</
 </tr></thead><tbody id="t-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
 </table></div>
 
+<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Quién quiere entrar</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Voluntarios, fundaciones que
+aplican al HUB y empresas que piden alianza. <strong>Ninguna de estas tres cosas es un alta:</strong>
+la fundación entra con el convenio de cooperación después de la visita de contexto, y la empresa con
+la firma del Convenio Marco. Aceptar aquí significa «seguimos», no «ya está publicado».</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Tipo</th><th scope="col">Quién</th><th scope="col">Lo que hay que saber</th>
+<th scope="col">Contacto</th><th scope="col">Fecha</th><th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="i-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
+</table></div>
+
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
 de la brigada. <strong>El acuse les pidió NO comprar todavía</strong>, así que conviene responder
@@ -2585,6 +2997,75 @@ document.addEventListener("click", function(e){
   }
 });
 
+/* ---------------- quién quiere entrar ---------------- */
+var TIPO_ES = { voluntario:"Voluntario", fundacion:"Fundación", empresa:"Empresa" };
+var POB_ES = { ninos:"niños", adolescentes:"adolescentes", jovenes:"jóvenes",
+  madres:"madres cabeza de familia", mayores:"adultos mayores", familias:"familias",
+  migrante:"migrantes", discapacidad:"personas con discapacidad", otra:"otra" };
+var MOD_ES = { modDonacion:"Donación", modRse:"RSE", modGratitud:"Gratitud",
+  modServicios:"Servicios", modVoluntariado:"Voluntariado", modDifusion:"Difusión" };
+var NIVEL_ES = { hub:"terreno con el HUB", estructura:"estructura", mixto:"mixto" };
+
+/* Lo que se resume en la columna del medio es DISTINTO por tipo, y a propósito:
+   de un voluntario lo primero es si pisa territorio (dispara dos protocolos); de
+   una fundación, a cuántos llega y cómo lleva la cuenta (decide si su cifra se
+   publica exacta o con «≈»); de una empresa, qué modalidad pidió. */
+function resumenInscripcion(tipo, x){
+  if (tipo === "voluntario"){
+    var p = [esc(x.oficio || "?") + " · " + esc(NIVEL_ES[x.nivel] || x.nivel || "?")];
+    if (x.protocolo_cuidado) p.push("<strong>protocolo de cuidado</strong>");
+    if (x.protocolo_imagen) p.push("<strong>protocolo de imagen</strong>");
+    return p.join(" · ");
+  }
+  if (tipo === "fundacion"){
+    var menor = ["cuenta: " + esc(x.conteo || "no dice")];
+    if (x.programa) menor.push("programa: " + esc(x.programa));
+    return esc(x.atiende || "?") + " — " +
+      (x.poblacion || []).map(function(k){ return esc(POB_ES[k] || k); }).join(", ") +
+      "<br><small>" + menor.join(" · ") + "</small>";
+  }
+  var m = (x.modalidades || []).map(function(k){ return esc(MOD_ES[k] || k); }).join(", ");
+  var extra = [];
+  if (x.sector) extra.push(esc(x.sector));
+  if (x.aporta) extra.push(esc(x.aporta));
+  return m + (extra.length ? "<br><small>" + extra.join(" · ") + "</small>" : "");
+}
+
+function cargarInscripciones(){
+  fetch("/api/admin/inscripciones").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("i-filas"); if (!tb) return;
+    var l = d.inscripciones || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no ha aplicado nadie.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(i){
+      var x = {}; try { x = JSON.parse(i.datos||"{}"); } catch(e){}
+      var siguiente = i.estado === "nueva" ? ["en_revision","En revisión"]
+                    : i.estado === "en_revision" ? ["aceptada","Seguimos"]
+                    : i.estado === "aceptada" ? ["archivada","Archivar"] : null;
+      /* La web la escribe quien aplica, así que solo se vuelve enlace si es
+         http(s). Una URL con esquema javascript: escapada sigue ejecutándose al
+         hacer clic, y este panel lo abre una persona con sesión de Access. */
+      var enlaces = [];
+      if (/^https?:\/\//i.test(x.web || "")) {
+        enlaces.push('<a href="' + esc(x.web) + '" target="_blank" rel="noopener">web</a>');
+      } else if (x.web) { enlaces.push(esc(x.web)); }
+      if (x.instagram) enlaces.push(esc(x.instagram));
+      return "<tr>" +
+        "<td>" + esc(TIPO_ES[i.tipo] || i.tipo) + "</td>" +
+        "<td><strong>" + esc(i.nombre||"") + "</strong>" +
+          (x.lider ? "<br><small>" + esc(x.lider) + (x.cargo ? " · " + esc(x.cargo) : "") + "</small>" : "") +
+          (x.contacto ? "<br><small>" + esc(x.contacto) + "</small>" : "") + "</td>" +
+        "<td>" + resumenInscripcion(i.tipo, x) + "</td>" +
+        "<td>" + esc(i.email||"") + (i.telefono ? "<br><small>" + esc(i.telefono) + "</small>" : "") +
+          (i.ciudad ? "<br><small>" + esc(i.ciudad) + "</small>" : "") +
+          (enlaces.length ? "<br><small>" + enlaces.join(" · ") + "</small>" : "") + "</td>" +
+        "<td>" + esc((i.creada_en||"").slice(0,10)) + "</td>" +
+        "<td>" + esc(i.estado) + "</td>" +
+        "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") + "</td>" +
+      "</tr>";
+    }).join("");
+  });
+}
+
 /* ---------------- ofrecimientos en especie ---------------- */
 var CAT_ES = { agua:"Agua segura", alimento:"Comida sin cocina", higiene:"Higiene y dignidad",
   panales:"Pañales", descanso:"Descanso", energia:"Luz y carga", brigada:"Equipo de brigada", otra:"Otra" };
@@ -2621,8 +3102,8 @@ document.addEventListener("click", function(e){
     method: "POST", headers: {"content-type":"application/json"},
     body: JSON.stringify({ estado: b.getAttribute("data-e") })
   }).then(function(r){ return r.json(); }).then(function(){ cargarOfrecimientos();
-cargarReportadas(); })
-    .catch(function(){ cargarOfrecimientos(); });
+cargarInscripciones(); cargarReportadas(); cargar(); })
+    .catch(function(){ cargarOfrecimientos(); cargarInscripciones(); });
 });
 
 /* ---------------- pagos sin aporte ---------------- */
@@ -2741,6 +3222,7 @@ pintarCampos();
 cargarEntregas();
 cargarSueltos();
 cargarOfrecimientos();
+cargarInscripciones();
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
@@ -2935,6 +3417,7 @@ export default {
            alguien las publica: en terreno se registra rápido y se revisa después. */
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
+        if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
         if (ruta === "/api/admin/miembros") return await adminMiembros(env);
         if (ruta === "/api/admin/reportadas") return await adminReportadas(env);
         const rc = ruta.match(/^\/api\/admin\/comprobante\/(GG-\d{4}-\d{6})$/i);

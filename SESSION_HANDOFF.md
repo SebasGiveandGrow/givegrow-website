@@ -14,7 +14,7 @@ Si Sebas dice solo "la siguiente fase", **preguntar de cuál de los tres**.
 
 | Plan | Dónde vive | Estado |
 |---|---|---|
-| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso del 8–11 ago + este | **0, 1, 2, 4, 5, 5.1 y 6 hechas.** Fase 3 a medias: voluntariado ✅ y **especie ✅**, faltan **fundaciones y empresas** (siguen posteando a Apps Script, `ALLY_ENDPOINT`). Fase 7 a medias: **carnet ✅**, falta el **débito automático** en Wompi. **Fase 8 (medir) sin empezar** |
+| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso del 8–11 ago + este | **0, 1, 2, 3, 4, 5, 5.1 y 6 hechas.** Fase 7 a medias: **carnet ✅**, falta el **débito automático** en Wompi. **Fase 8 (medir) sin empezar** |
 | **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3.** Ojo: parte de esa fase ya se hizo por otro camino — el rastreo real y la evidencia entraron con la brigada. Lo que queda de ella es **Transparencia imprimible en carta** y el **contador honesto por recencia**, que ahora sí tiene datos (`aportes` y `entregas` en D1) |
 | **VOLUNTARIADO, 8 fases** | `PLAN_VOLUNTARIADO.md` | **Fases 1–7 hechas y en producción.** **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
@@ -65,6 +65,80 @@ cuáles son antes de confundirlas con donaciones:
 
 Si se quiere arrancar limpio, se pueden borrar esas tres intenciones y la
 entrega de prueba. **Sebas no lo ha pedido**: preguntar antes.
+
+## Cierre de tanda: ecosistema, Fase 3 — fundaciones y empresas (12 ago 2026)
+
+Las **cuatro puertas de entrada del sitio terminan en la misma base y en el
+mismo panel.** Ninguna en un tercero. Con esto la Fase 3 queda cerrada.
+
+**Empresas** (`#aliados`): posteaba a un Apps Script que escribía una hoja. Ahora
+`POST /api/inscripcion` con `tipo:"empresa"`. Se encontró de paso que **tres
+campos se perdían en silencio**: el front enviaba `sector`, `aporta` e
+`instagram` —los tres que arman la tarjeta de reciprocidad de `#empresas`— y
+`HEADERS` de la hoja no tiene columna para ellos. Llegaban y se caían. Nadie lo
+habría notado hasta querer publicar la primera empresa real.
+
+**Fundaciones** (`#fundaciones`): «Quiero aplicar» sacaba del sitio a un Google
+Form de 20–30 minutos con cargas de archivo que exigen cuenta de Google —
+mientras el propio sitio, dos secciones más arriba, promete «Toma 10–15
+minutos». Ahora hay formulario propio (`#fund-form`).
+
+**La decisión que gobierna la fase: se pide solo lo que es TEXTO.** Identificación,
+historia, misión, población, un programa. Fuera quedan costo con soporte
+documental, logo, fotos y el consentimiento formal firmado — todo eso pide
+archivos y, según el proceso de cinco pasos del propio sitio, va **después de la
+visita de contexto**. `ops/cuestionario-fundaciones-hub.md` sigue siendo la
+fuente de verdad del esquema de `partners.json` y pasó a ser lo que se envía en
+el paso 4; su nota de cabecera dice qué secciones ya no hay que volver a
+preguntar. **De este formulario no sale una ficha pública: sale una solicitud.**
+
+**Detalles que conviene no perder:**
+- **Sin migración.** `inscripciones.tipo` contemplaba `fundacion | empresa` desde
+  la 0001 y `datos` es JSON. Cuatro tipos, una tabla.
+- **Bandeja nueva «Quién quiere entrar»** en `/admin`, con los tres tipos. Los
+  **voluntarios llevaban desde la Fase 3 entrando sin bandeja**: solo existía el
+  contador del resumen, que dice cuántos hay y no quiénes son. La columna del
+  medio resume distinto por tipo — del voluntario, si pisa territorio (dispara
+  los dos protocolos); de la fundación, a cuántos llega y **cómo lleva la
+  cuenta**, que es lo que decide si su cifra se publica exacta o con «≈»; de la
+  empresa, la modalidad.
+- **El mapeo intake → `modalidad[]` NO se automatiza**, a propósito: se guardan
+  las seis casillas como las marcó la empresa y la traducción la hace una
+  persona al aprobar. Traducirlo en el ingreso sería decidir cómo se publica a
+  alguien antes de hablar con él.
+- **Rastro de Ley 1581 al enviar, no al aprobar**: la autorización la dio quien
+  aplica, no nosotros al revisar. Fila en `consentimientos` en los dos flujos.
+- **`irAFormFund()` existe porque `go()` termina en `scrollTo(0,0)`** y el botón
+  habría devuelto al aplicante al tope de una página de cinco secciones. Un
+  ancla nativa tampoco servía: `#fund-form` no es ruta y el enrutador la
+  resolvía como 404.
+- Arreglado de paso: `input[type=url]` estaba fuera del selector de
+  `.ally-form`, así que «Sitio web» tenía medio punto menos de borde que sus
+  vecinos. Afectaba también al formulario de aliados.
+
+**Verificado en local** (wrangler dev + D1 migrada): 11 casos por `curl` —alta
+completa de los dos tipos, modalidad ausente, Gratitud sin beneficio,
+autorizaciones incompletas, personería inventada, población vacía, declaración
+de veracidad ausente, tipo desconocido— más el honeypot, que responde `ok` y
+**no** inserta. Población basura (`<script>`) se filtra contra la lista blanca.
+Envío real de los dos formularios desde el navegador, con sus mensajes de error
+en cadena y el reseteo del formulario. Los cuatro correos se disparan. El
+renderizador de la bandeja, corrido contra las filas reales, genera `<small>`
+balanceados en los tres tipos.
+
+**Lo que NO pude verificar y hay que mirar:**
+- **El panel `/admin` en vivo.** Access es fail-closed y en local devuelve 403
+  sin JWT: probé la consulta y el renderizador por separado, no la página.
+- **El scroll de «Quiero aplicar»**: el navegador de la sesión tiene el viewport
+  degenerado (`window.scrollTo` no mueve nada), así que confirmé que la función
+  corre y que el foco aterriza en el primer campo, pero no vi el desplazamiento.
+- **Sign-off visual** del formulario en día y noche, escritorio y móvil.
+
+**Pendiente de Sebas, en Google (no es código):** retirar la implementación de
+la aplicación web del Apps Script de aliados. Mientras siga publicada acepta
+POST de cualquiera y escribe filas que ya nadie mira.
+
+Cache-bust: styles `9187e7c8`, app `2187163b`.
 
 ## Cierre de tanda: la brigada del terremoto (11–12 ago 2026)
 

@@ -311,7 +311,6 @@ var I18N = {
     "ally.err.ben":"Cuéntanos qué beneficio ofreces para el Programa de Gratitud.",
     "ally.err.serv":"Describe el servicio que ofreces a la población vulnerable.",
     "ally.err.send":"No pudimos enviar tu solicitud. Intenta de nuevo o escríbenos a contabilidad@thegiveandgrowproject.org.",
-    "ally.err.config":"El formulario aún se está configurando. Escríbenos a contabilidad@thegiveandgrowproject.org.",
     "rep.ey":"Ya transferí",
     "rep.t":"Repórtanos tu transferencia",
     "rep.lead":"Una transferencia no nos avisa sola. Repórtala aquí y te damos un número de guía al instante: con él sigues tu aporte, y cuando la verifiquemos contra el extracto te llega el recibo — y el certificado, si lo pediste.",
@@ -516,6 +515,81 @@ var I18N = {
     "vf.err.datos":"Necesitamos tu autorización para guardar tus datos y poder escribirte.",
     "vf.err.send":"No pudimos enviar tus datos. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
     "vf.nada":"Nada de esto se cobra, en ninguna dirección.",
+    "ff.ey":"Aplicar al HUB",
+    "ff.t":"Cuéntanos quién es tu fundación",
+    "ff.lead":"Esto es la aplicación, no la vinculación: con lo que escribas aquí revisamos si encajamos, y si encajamos vamos a conocerte a tu territorio. Solo te pedimos texto — el logo, las fotos y las cifras de costos se ven después, cuando ya nos conozcamos.",
+    "ff.s.id":"Quiénes son",
+    "ff.nombre":"Nombre oficial de la fundación",
+    "ff.nombre.help":"Tal como debe aparecer publicado si algún día publicamos su perfil.",
+    "ff.sigla":"Nombre corto o sigla (opcional)",
+    "ff.lider":"Quién lidera la fundación",
+    "ff.cargo":"Su cargo (opcional)",
+    "ff.cargo.ph":"Directora y fundadora, representante legal…",
+    "ff.anio":"¿Desde qué año trabajan? (opcional)",
+    "ff.pers.lbl":"¿Tiene personería jurídica?",
+    "ff.pers.help":"Cualquier respuesta sirve para aplicar. Esto no define si entran: define cómo describimos a la organización si algún día publicamos su perfil.",
+    "ff.pers.nit":"Sí, con NIT",
+    "ff.pers.tramite":"En trámite",
+    "ff.pers.base":"No — es un proyecto comunitario de base",
+    "ff.zona":"Barrio o sector y ciudad donde trabajan",
+    "ff.zona.ph":"Ej. La Honda, Manrique, Medellín",
+    "ff.zona.help":"El sector, no la dirección exacta. En el mapa de la red el pin va a nivel de barrio, nunca a la puerta.",
+    "ff.ciudad":"Ciudad (opcional)",
+    "ff.email":"Correo de contacto",
+    "ff.tel":"Teléfono o WhatsApp (opcional)",
+    "ff.tel.help":"Los datos de contacto son para coordinar entre nosotros. No se publican en el sitio.",
+    "ff.s.hist":"Qué hacen y por qué",
+    "ff.historia":"La historia de la fundación, en un párrafo",
+    "ff.historia.ph":"Cómo nació, quién la lidera, a quién sirve y qué la hace distinta.",
+    "ff.mision":"La misión, en una o dos frases",
+    "ff.s.pob":"A quién llegan",
+    "ff.pob.lbl":"¿A quiénes atiende la fundación?",
+    "ff.pob.ninos":"Niños y niñas",
+    "ff.pob.adolescentes":"Adolescentes",
+    "ff.pob.jovenes":"Jóvenes",
+    "ff.pob.madres":"Madres cabeza de familia",
+    "ff.pob.mayores":"Adultos mayores",
+    "ff.pob.familias":"Familias",
+    "ff.pob.migrante":"Población migrante",
+    "ff.pob.discapacidad":"Personas con discapacidad",
+    "ff.pob.otra":"Otra",
+    "ff.pob.otra.lbl":"¿Cuál?",
+    "ff.atiende":"¿A cuántas personas atienden de forma regular?",
+    "ff.atiende.help":"El número real, aunque sea aproximado. Si es estimado lo publicamos con «≈»: preferimos un número honesto a uno redondo.",
+    "ff.conteo":"¿Cómo llevan esa cuenta? (opcional)",
+    "ff.conteo.ph":"Planillas de asistencia, registro digital, listados por programa, conteo aproximado…",
+    "ff.conteo.help":"Esto decide si la cifra se publica exacta o con «≈». No es una prueba: es lo que nos permite no inflar su trabajo.",
+    "ff.s.prog":"Un programa",
+    "ff.prog.help":"El que mejor represente su labor diaria. Los demás los vemos cuando nos conozcamos.",
+    "ff.prog":"Nombre del programa (opcional)",
+    "ff.prog.ph":"Ej. Chefs del Futuro",
+    "ff.prog.desc":"¿Qué hace y a cuántas personas llega? (opcional)",
+    "ff.prog.desc.ph":"Con números reales y frecuencia. Ej. cerca de 100 niños reciben almuerzo cada día, de lunes a viernes.",
+    "ff.evid":"¿Qué evidencia tienen de que funciona? (opcional)",
+    "ff.evid.ph":"Registro fotográfico, planillas de asistencia, facturas, testimonios, informes…",
+    "ff.s.red":"Dónde encontrarlos",
+    "ff.web":"Página web (opcional)",
+    "ff.instagram":"Instagram (opcional)",
+    "ff.s.aut":"Antes de enviar",
+    "ff.datos":"Autorizo el tratamiento de estos datos para que Give&Grow nos contacte sobre la aplicación al HUB SOCIAL, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.",
+    "ff.veraz":"Declaro que la información es veraz, que las cifras corresponden a la realidad de la fundación y que estoy facultado(a) para aplicar en su nombre.",
+    "ff.despues":"Todavía no pedimos logo, fotos ni soportes de costos. Eso viene después de la visita de contexto, junto con las autorizaciones de derechos de imagen — la imagen de los menores está protegida por la Ley 1098 y no publicamos nada sin consentimiento escrito.",
+    "ff.submit":"Enviar la aplicación",
+    "ff.sending":"Enviando…",
+    "ff.ok":"Recibimos su aplicación. Le llega un correo de confirmación y una persona de Give&Grow le escribe para seguir la conversación.",
+    "ff.legal":"Aplicar no es entrar. Lo que sigue es la revisión, la visita de contexto y, si encajamos, el convenio de cooperación — gratuito, como todo lo demás.",
+    "ff.err.nombre":"Nos falta el nombre de la fundación.",
+    "ff.err.email":"Revisa el correo: parece que tiene algo raro.",
+    "ff.err.lider":"Cuéntanos quién lidera la fundación.",
+    "ff.err.pers":"Elige una opción de personería jurídica. Cualquiera sirve.",
+    "ff.err.zona":"Dinos el barrio o sector y la ciudad donde trabajan.",
+    "ff.err.historia":"Cuéntanos la historia de la fundación, aunque sea en pocas líneas.",
+    "ff.err.mision":"Nos falta la misión.",
+    "ff.err.pob":"Marca al menos una población que atiendan.",
+    "ff.err.atiende":"Dinos a cuántas personas llegan, aunque sea aproximado.",
+    "ff.err.datos":"Necesitamos la autorización de datos para poder escribirles.",
+    "ff.err.veraz":"Necesitamos la declaración de veracidad para recibir la aplicación.",
+    "ff.err.send":"No pudimos enviar la aplicación. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
     "vol.link":"Ver el programa de voluntariado",
     "fund.ey":"Para fundaciones",
     "fund.t":"Aplica al HUB SOCIAL.",
@@ -1319,6 +1393,7 @@ var ACT_FNS = {
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
   donarBrigada:donarBrigada, allySubmit:allySubmit,
   irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit,
+  fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
@@ -3088,8 +3163,10 @@ function renderAlmaChips(){
 }
 
 /* ============ Formulario "Quiero ser aliado" ============ */
-/* URL del Apps Script desplegado como aplicación web. Se cablea tras la instalación. */
-var ALLY_ENDPOINT = "https://script.google.com/macros/s/AKfycbxAe-N5E1qKwbSXrkGtM_zQi49HDtmGodhIjolw3dnTc35SaE_a6b6ZvDkPpX07Nmi0Ng/exec";
+/* Postea a /api/inscripcion, como las otras tres puertas del sitio. Antes iba a
+   un Apps Script que escribía una hoja de cálculo: la hoja no tenía columna para
+   `sector`, `aporta` ni `instagram`, así que esos tres campos —los que arman la
+   tarjeta de reciprocidad de #empresas— se enviaban y se perdían. */
 function allyToggleGrat(){
   var on = document.getElementById("mod-gratitud").checked;
   document.getElementById("ally-gratbox").style.display = on ? "" : "none";
@@ -3133,31 +3210,111 @@ function allySubmit(ev){
     modServicios:chk("mod-servicios"), modVoluntariado:chk("mod-voluntariado"), modDifusion:chk("mod-difusion"),
     benBeneficio:val("ally-ben"), benNivel:val("ally-nivel"), benCondiciones:val("ally-cond"), benRedime:val("ally-redime"),
     servDetalle:val("ally-servdet"),
-    autMarca:chk("aut-marca"), autDatos:chk("aut-datos"), autLicitud:chk("aut-licitud")
+    autMarca:chk("aut-marca"), autDatos:chk("aut-datos"), autLicitud:chk("aut-licitud"),
+    tipo:"empresa", idioma: lang === "en" ? "en" : "es"
   };
-  if (!ALLY_ENDPOINT){
-    return allyMsg(note, t("ally.err.config"), false);
-  }
   btn.disabled = true;
   allyMsg(note, t("ally.sending"), true);
-  fetch(ALLY_ENDPOINT, {
+  fetch("/api/inscripcion", {
     method:"POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
-  }).then(function(r){ return r.json().catch(function(){ return {ok:r.ok}; }); })
-    .then(function(res){
-      if (res && res.ok){
-        document.getElementById("ally-form").reset();
-        allyToggleGrat(); allyToggleServ();
-        allyMsg(note, t("ally.ok"), true);
-      } else {
-        btn.disabled = false;
-        allyMsg(note, t("ally.err.send"), false);
-      }
+  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+    .then(function(){
+      document.getElementById("ally-form").reset();
+      allyToggleGrat(); allyToggleServ();
+      btn.disabled = false;
+      allyMsg(note, t("ally.ok"), true);
     })
     .catch(function(){ btn.disabled = false; allyMsg(note, t("ally.err.send"), false); });
   return false;
 }
+
+/* ---------- aplicación de fundaciones al HUB ----------
+   El botón «Quiero aplicar» sacaba del sitio a un Google Form de 20–30 minutos
+   con cargas de archivo. Este formulario pide solo lo que es texto: es lo que
+   hace falta para el paso 2 del proceso publicado, «Revisamos». El logo, las
+   fotos y el costo con soporte se piden después de la visita de contexto, con
+   el cuestionario largo — y así el sitio deja de contradecirse cuando promete
+   «Toma 10–15 minutos». */
+function fundSubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("ff-note");
+  var btn = document.getElementById("ff-btn");
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
+
+  if (val("ff-web2")){ document.getElementById("ff").reset(); return allyMsg(note, t("ff.ok"), true); }
+
+  var pers = document.querySelector('input[name="ff-pers"]:checked');
+  var pob = [].slice.call(document.querySelectorAll('input[name="ff-pob"]:checked'))
+    .map(function(e){ return e.value; });
+
+  if (!val("ff-nombre")) return allyMsg(note, t("ff.err.nombre"), false);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("ff-email"))) return allyMsg(note, t("ff.err.email"), false);
+  if (!val("ff-lider")) return allyMsg(note, t("ff.err.lider"), false);
+  if (!pers) return allyMsg(note, t("ff.err.pers"), false);
+  if (!val("ff-zona")) return allyMsg(note, t("ff.err.zona"), false);
+  if (!val("ff-historia")) return allyMsg(note, t("ff.err.historia"), false);
+  if (!val("ff-mision")) return allyMsg(note, t("ff.err.mision"), false);
+  if (!pob.length) return allyMsg(note, t("ff.err.pob"), false);
+  if (!val("ff-atiende")) return allyMsg(note, t("ff.err.atiende"), false);
+  if (!chk("ff-datos")) return allyMsg(note, t("ff.err.datos"), false);
+  if (!chk("ff-veraz")) return allyMsg(note, t("ff.err.veraz"), false);
+
+  btn.disabled = true;
+  allyMsg(note, t("ff.sending"), true);
+
+  fetch("/api/inscripcion", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tipo: "fundacion",
+      nombre: val("ff-nombre"), sigla: val("ff-sigla"),
+      lider: val("ff-lider"), cargo: val("ff-cargo"), anio: val("ff-anio"),
+      personeria: pers.value, zona: val("ff-zona"), ciudad: val("ff-ciudad"),
+      email: val("ff-email"), telefono: val("ff-tel"),
+      historia: val("ff-historia"), mision: val("ff-mision"),
+      poblacion: pob, poblacion_otra: val("ff-pob-otra"),
+      atiende: val("ff-atiende"), conteo: val("ff-conteo"),
+      programa: val("ff-prog"), programa_desc: val("ff-prog-desc"), evidencia: val("ff-evid"),
+      web: val("ff-web"), instagram: val("ff-instagram"),
+      autoriza_datos: true, declara_veraz: true,
+      idioma: lang === "en" ? "en" : "es"
+    })
+  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+    .then(function(){
+      document.getElementById("ff").reset(); fundPobOtra();
+      btn.disabled = false;
+      allyMsg(note, t("ff.ok"), true);
+    })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("ff.err.send"), false); });
+  return false;
+}
+
+/* «Quiero aplicar» vive en la última banda de #fundaciones y el formulario está
+   justo debajo, pero `go()` termina con un scrollTo(0,0): sin esto el botón
+   devolvería al aplicante al tope de una página de cinco secciones. Un ancla
+   nativa tampoco sirve — el hash `#fund-form` no es una ruta y el enrutador lo
+   resolvería como 404. Así que se navega y después se baja. */
+function irAFormFund(){
+  if (currentRoute !== "fundaciones") go("fundaciones");
+  var s = document.getElementById("fund-form");
+  if (!s) return;
+  var suave = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  s.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+  var primero = document.getElementById("ff-nombre");
+  if (primero) setTimeout(function(){ primero.focus({ preventScroll: true }); }, suave ? 500 : 0);
+}
+
+/* «Otra» población abre su campo. Mismo patrón que las condicionales del
+   formulario de aliados: el detalle aparece cuando se necesita, no antes. */
+function fundPobOtra(){
+  var on = document.getElementById("ff-pob-otra-chk");
+  var box = document.getElementById("ff-pob-otra-box");
+  if (box) box.style.display = (on && on.checked) ? "" : "none";
+}
+function fundOtra(){ setTimeout(fundPobOtra, 0); }
 /* ---------- formulario de voluntariado ----------
    El aviso de terreno aparece según el nivel elegido, no al final: quien va a
    pisar territorio debe saber ANTES de enviar que hay dos verificaciones y una

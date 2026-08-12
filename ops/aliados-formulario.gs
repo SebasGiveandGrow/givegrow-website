@@ -1,4 +1,25 @@
 /**
+ * ⚠️ RETIRADO el 12 de agosto de 2026 — Fase 3 del ecosistema.
+ * ================================================================
+ * El sitio YA NO postea aquí. `#aliados` va a `POST /api/inscripcion` con
+ * `tipo:"empresa"`, guarda en D1 (`inscripciones`) y aparece en /admin.
+ *
+ * Se conserva el archivo por dos razones: es la única copia versionada del
+ * código que vive en Google, y la hoja de cálculo `SHEET_ID` guarda el
+ * histórico de solicitudes anteriores a la migración.
+ *
+ * PENDIENTE DE SEBAS, EN GOOGLE (no es código): retirar la implementación de
+ * la aplicación web. Mientras siga publicada, la URL acepta POST de cualquiera
+ * y escribiría filas que nadie mira — Apps Script → Implementar → Administrar
+ * implementaciones → archivar.
+ *
+ * TRES CAMPOS QUE ESTE SCRIPT PERDÍA, y que fueron parte del motivo para
+ * migrarlo: `sector`, `aporta` e `instagram` llegaban en el POST y no tienen
+ * columna en HEADERS. Son justo los que alimentan la tarjeta de reciprocidad
+ * de #empresas. Si alguna vez se recupera el histórico de la hoja, esos tres
+ * datos no están ahí: hay que pedírselos a la empresa.
+ * ================================================================
+ *
  * Give&Grow — Formulario "Quiero ser aliado"
  * ================================================================
  * Recibe las solicitudes de alianza empresarial desde el sitio web,
