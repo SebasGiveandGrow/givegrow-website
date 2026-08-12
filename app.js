@@ -1027,8 +1027,25 @@ var I18N = {
     "track.ev.t":"Entregas de tu destino",
     "track.ev.p":"Tu aporte se suma al fondo de este destino. Estas son las entregas que ese fondo hizo posibles — no te atribuimos una en particular, porque el dinero se reúne y las jornadas se pagan entre varios aportes.",
     "brig.ey":"Brigada de atención a emergencia",
-    "brig.t":"Terremoto del 10 de agosto. Vamos a cinco sectores.",
-    "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Salimos con siete personas, insumos y actas, a entregar junto a las fundaciones que ya trabajan en cada territorio.",
+    "brig.t":"Terremoto del 10 de agosto. Cinco territorios, del 24 al 28.",
+    "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Del 24 al 28 de agosto entregamos en cinco territorios, junto a las fundaciones que ya trabajan en cada uno. Hasta el 24 necesitamos cuatro cosas: dinero, insumos, manos y contactos.",
+    "brig.est.rango":"Del 24 al 28 de agosto de 2026",
+    "brig.est.antes":"Faltan {n} días.",
+    "brig.est.antes1":"Falta 1 día.",
+    "brig.est.hoy":"Empieza hoy.",
+    "brig.est.curso":"En curso: día {n} de cinco.",
+    "brig.est.despues":"Las cinco jornadas terminaron.",
+    "brig.est.p":"Todo lo que llegue antes del 24 viaja con la brigada. Lo que llegue después va a la siguiente jornada — no se devuelve y no se pierde.",
+    "brig.est.p.despues":"Cada entrega se publica aquí con su acta firmada. Lo que llegue ahora va a la siguiente jornada.",
+    "brig.nec4.cap":"Qué necesitamos, en concreto",
+    "brig.n1.t":"Dinero",
+    "brig.n1.d":"Transferencia a la cuenta de la Fundación, o en línea con número de guía para seguir tu aporte hasta el acta.",
+    "brig.n2.t":"Insumos",
+    "brig.n2.d":"Escríbenos antes de comprar: te decimos qué falta hoy y en qué presentación sirve.",
+    "brig.n3.t":"Manos",
+    "brig.n3.d":"En Medellín, recibiendo, clasificando y empacando lo que llega al acopio.",
+    "brig.n4.t":"Contactos",
+    "brig.n4.d":"Una bodega, un camión que suba a la zona cafetera, una empresa que preste su sede.",
     "brig.hechos.cap":"El sismo",
     "brig.h1.k":"Magnitud",
     "brig.h1.v":"7,4",
@@ -1045,7 +1062,7 @@ var I18N = {
     "brig.hechos.nota":"Las cifras de víctimas y damnificados cambian hora a hora y las publica la UNGRD. No las repetimos aquí: sería publicar un número que mañana es falso.",
     "brig.plan.ey":"Qué vamos a hacer",
     "brig.plan.t":"Siete personas, cinco sectores, más de cien familias en cada uno.",
-    "brig.plan.p":"La recolección se hace en centros de acopio de empresas y amigos. De ahí sale la carga con el equipo, por carretera, en los próximos días.",
+    "brig.plan.p":"La recolección se hace en centros de acopio de empresas y amigos. De ahí sale la carga con el equipo, por carretera, el 24 de agosto.",
     "brig.sec.cap":"Los cinco sectores",
     "brig.sec.meta":"Más de 100 familias",
     "brig.sec.zona":"zona por confirmar",
@@ -1138,9 +1155,18 @@ var I18N = {
     "brig.no2.d":"Su alimentación, alojamiento y equipo se presupuestan aparte y se reportan aparte.",
     "brig.no3.t":"No prometemos cifras que no tenemos.",
     "brig.no3.d":"El inventario está en cotización. Cuando haya costos verificados, se publican.",
+    "brig.mc.ey":"Sumarse",
+    "brig.mc.t":"También hacen falta manos y contactos.",
+    "brig.mc.p":"No todo se resuelve con plata. Dos cosas que necesitamos y que casi nadie ofrece, porque casi nadie las pide.",
+    "brig.mc.manos.t":"Manos en la estructura",
+    "brig.mc.manos.p":"El equipo que viaja ya está cerrado en siete personas: ir a terreno exige doble verificación —la nuestra y la de la fundación del territorio— y una sesión de Marco, y eso no cabe en los días que quedan. Lo que sí necesitamos es gente en Medellín para recibir, clasificar y empacar lo que llega al acopio. En el formulario, elige «Con Give&Grow — en la estructura».",
+    "brig.mc.manos.btn":"Ofrecer mi tiempo",
+    "brig.mc.cont.t":"Contactos que abren puertas",
+    "brig.mc.cont.p":"Lo más útil que puedes mandarnos si no vas a donar, y es gratis: una bodega o parqueadero en Medellín donde clasificar; un camión o furgón que suba a Cali, Pereira, Manizales, Armenia o Chocó entre el 24 y el 28; una empresa que preste su sede como centro de acopio; o una fundación que ya trabaje en alguno de los cinco territorios.",
+    "brig.mc.cont.btn":"Escribir por WhatsApp",
     "brig.cierre":"Sin acta firmada, para nosotros no ocurrió.",
     "brig.aviso.strong":"Terremoto del 10 de agosto",
-    "brig.aviso.txt":"Brigada de atención a emergencia en cinco sectores. Cómo aportar",
+    "brig.aviso.txt":"Brigada del 24 al 28 de agosto en cinco territorios. Qué necesitamos",
     "calc.brigada.unico":"Aporte único: la brigada es una operación puntual, no una membresía.",
     "calc.brigada.nota":"Todavía no publicamos equivalencias en pesos para esta campaña: el inventario está en cotización. Tu aporte compra insumos de la lista pública, y cada entrega queda con acta firmada.",
     "calc.dest.emergencia":"Emergencia abierta",
@@ -1310,8 +1336,53 @@ function renderPobChips(){
     var el=document.getElementById(id); if(el) el.innerHTML = html;
   });
 }
+/* ============ Brigada: en qué momento estamos ============
+   La página tiene que decir la verdad el 12 de agosto, el 26 y el 3 de
+   septiembre, sin que nadie entre a editarla. Un «faltan 12 días» escrito a
+   mano se vuelve mentira el día siguiente, y un contador que no contempla el
+   después acabaría diciendo «faltan -6 días».
+
+   Tres fases, y la del medio importa tanto como las otras: mientras la brigada
+   está en terreno, la página debe decir que está en terreno.
+
+   Colombia es UTC-5 todo el año —no hay horario de verano—, así que la fecha
+   local se saca con una resta fija y no con la zona del navegador: si no, un
+   donante en Madrid vería el cambio de día seis horas antes que la brigada. */
+var BRIGADA_DESDE = "2026-08-24", BRIGADA_HASTA = "2026-08-28", BRIGADA_DIAS = 5;
+
+function diaBogota(){
+  return new Date(Date.now() - 5*3600*1000).toISOString().slice(0,10);
+}
+function brigadaFase(){
+  var hoy = diaBogota();
+  var dia = function(s){ return Date.parse(s + "T00:00:00Z"); };
+  if (hoy < BRIGADA_DESDE){
+    return { fase:"antes", n: Math.round((dia(BRIGADA_DESDE) - dia(hoy)) / 86400000) };
+  }
+  if (hoy > BRIGADA_HASTA) return { fase:"despues" };
+  return { fase:"curso", n: Math.round((dia(hoy) - dia(BRIGADA_DESDE)) / 86400000) + 1 };
+}
+function pintarBrigadaEstado(){
+  var cifra = document.getElementById("brig-cifra");
+  var nota  = document.getElementById("brig-est-p");
+  if (!cifra) return;
+  var f = brigadaFase();
+  var txt = f.fase === "despues" ? t("brig.est.despues")
+          : f.fase === "curso"   ? t("brig.est.curso").replace("{n}", String(f.n))
+          : f.n === 0            ? t("brig.est.hoy")
+          : f.n === 1            ? t("brig.est.antes1")
+          :                        t("brig.est.antes").replace("{n}", String(f.n));
+  cifra.textContent = txt;
+  /* El aviso de abajo cambia con la fase: antes promete que lo que llegue
+     viaja; después ya no puede prometer eso. */
+  if (nota) nota.textContent = f.fase === "despues" ? t("brig.est.p.despues") : t("brig.est.p");
+}
+
 function postLang(l){
   applyLang(l); renderHeroImpact(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); renderPrivacy();
+  /* Va DESPUÉS de applyLang: el repintado de data-i18n devuelve el rango
+     estático a su sitio y hay que volver a poner la fase encima. */
+  pintarBrigadaEstado();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
@@ -1461,7 +1532,7 @@ function go(id, fromPop){
   applyRouteMeta(id);
   renderJourney(id);
   if (id==="impacto") initGallery();
-  if (id==="brigada") pintarEntregas("brig-entregas", BRIGADA_DESTINO, true);
+  if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); pintarBrigadaEstado(); }
 
   window.scrollTo(0,0);
   if (!fromPop) focusActivePage();

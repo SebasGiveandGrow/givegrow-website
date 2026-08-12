@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=9187e7c8">
+<link rel="stylesheet" href="/styles.css?v=85b60870">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -125,7 +125,7 @@
 <main id="page-inicio" class="page active">
   <a class="brig-aviso" href="#brigada" data-nav="brigada">
     <strong data-i18n="brig.aviso.strong">Terremoto del 10 de agosto</strong>
-    <span data-i18n="brig.aviso.txt">Brigada de atención a emergencia en cinco sectores. Cómo aportar</span>
+    <span data-i18n="brig.aviso.txt">Brigada del 24 al 28 de agosto en cinco territorios. Qué necesitamos</span>
   </a>
   <section class="hero">
     <div class="hero-bg"><picture>
@@ -1079,8 +1079,27 @@
   <section>
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.ey">Brigada de atención a emergencia</span>
-      <h2 class="h-sec rv" data-i18n="brig.t">Terremoto del 10 de agosto. Vamos a cinco sectores.</h2>
-      <p class="lead rv d1" data-i18n="brig.lead">Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Salimos con siete personas, insumos y actas, a entregar junto a las fundaciones que ya trabajan en cada territorio.</p>
+      <h2 class="h-sec rv" data-i18n="brig.t">Terremoto del 10 de agosto. Cinco territorios, del 24 al 28.</h2>
+      <p class="lead rv d1" data-i18n="brig.lead">Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Del 24 al 28 de agosto entregamos en cinco territorios, junto a las fundaciones que ya trabajan en cada uno. Hasta el 24 necesitamos cuatro cosas: dinero, insumos, manos y contactos.</p>
+
+      <!-- Estado de la brigada. Va ANTES de los hechos del sismo a propósito: la
+           página estaba escrita como justificación institucional y el lector no
+           sabía para cuándo era ni qué hacer. El argumento sigue abajo, intacto.
+           La cifra la escribe pintarBrigadaEstado() en app.js — el texto estático
+           es el rango, que es verdad en las tres fases y es lo que leen los
+           crawlers. -->
+      <div class="brig-estado rv d1">
+        <p class="rec-cap" data-i18n="brig.est.rango">Del 24 al 28 de agosto de 2026</p>
+        <p class="brig-cifra" id="brig-cifra" data-i18n="brig.est.rango">Del 24 al 28 de agosto de 2026</p>
+        <p class="brig-est-p" id="brig-est-p" data-i18n="brig.est.p">Todo lo que llegue antes del 24 viaja con la brigada. Lo que llegue después va a la siguiente jornada — no se devuelve y no se pierde.</p>
+        <p class="rec-cap brig-nec-cap" data-i18n="brig.nec4.cap">Qué necesitamos, en concreto</p>
+        <div class="brig-nec4">
+          <div class="brig-n"><b data-i18n="brig.n1.t">Dinero</b><small data-i18n="brig.n1.d">Transferencia a la cuenta de la Fundación, o en línea con número de guía para seguir tu aporte hasta el acta.</small></div>
+          <div class="brig-n"><b data-i18n="brig.n2.t">Insumos</b><small data-i18n="brig.n2.d">Escríbenos antes de comprar: te decimos qué falta hoy y en qué presentación sirve.</small></div>
+          <div class="brig-n"><b data-i18n="brig.n3.t">Manos</b><small data-i18n="brig.n3.d">En Medellín, recibiendo, clasificando y empacando lo que llega al acopio.</small></div>
+          <div class="brig-n"><b data-i18n="brig.n4.t">Contactos</b><small data-i18n="brig.n4.d">Una bodega, un camión que suba a la zona cafetera, una empresa que preste su sede.</small></div>
+        </div>
+      </div>
 
       <div class="rec-ledger rv d2">
         <p class="rec-cap" data-i18n="brig.hechos.cap">El sismo</p>
@@ -1094,7 +1113,7 @@
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.plan.ey">Qué vamos a hacer</span>
       <h3 class="rv" data-i18n="brig.plan.t">Siete personas, cinco sectores, más de cien familias en cada uno.</h3>
-      <p class="lead rv d1" data-i18n="brig.plan.p">La recolección se hace en centros de acopio de empresas y amigos. De ahí sale la carga con el equipo, por carretera, en los próximos días.</p>
+      <p class="lead rv d1" data-i18n="brig.plan.p">La recolección se hace en centros de acopio de empresas y amigos. De ahí sale la carga con el equipo, por carretera, el 24 de agosto.</p>
 
       <div class="brig-sec rv d2">
         <p class="rec-cap" data-i18n="brig.sec.cap">Los cinco sectores</p>
@@ -1252,6 +1271,32 @@
       <div class="card rv d2 brig-cert">
         <h3 data-i18n="brig.dar.cert.t">Certificado de donación</h3>
         <p data-i18n="brig.dar.cert.p">Somos una entidad sin ánimo de lucro vigente en el Régimen Tributario Especial. Tu donación da derecho a un descuento del 25% del valor donado sobre el impuesto de renta (Art. 257 del Estatuto Tributario), sujeto al límite del Art. 258. Su procedencia depende de tu situación tributaria: consúltalo con tu asesor. Lo expedimos firmado por el Representante Legal y la Revisora Fiscal.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Manos y contactos. No existían: la página pedía plata e insumos, y la
+       mitad de lo que la brigada necesita son personas y puertas. El bloque de
+       manos dice por qué el equipo de terreno está cerrado —doble verificación
+       más sesión de Marco no caben en los días que quedan— en vez de invitar a
+       algo que no se puede cumplir. -->
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="brig.mc.ey">Sumarse</span>
+      <h3 class="rv" data-i18n="brig.mc.t">También hacen falta manos y contactos.</h3>
+      <p class="lead rv d1" data-i18n="brig.mc.p">No todo se resuelve con plata. Dos cosas que necesitamos y que casi nadie ofrece, porque casi nadie las pide.</p>
+
+      <div class="brig-mc rv d2">
+        <div class="brig-mc-b">
+          <h4 data-i18n="brig.mc.manos.t">Manos en la estructura</h4>
+          <p data-i18n="brig.mc.manos.p">El equipo que viaja ya está cerrado en siete personas: ir a terreno exige doble verificación —la nuestra y la de la fundación del territorio— y una sesión de Marco, y eso no cabe en los días que quedan. Lo que sí necesitamos es gente en Medellín para recibir, clasificar y empacar lo que llega al acopio. En el formulario, elige «Con Give&amp;Grow — en la estructura».</p>
+          <a class="btn btn-o" href="#voluntariado" data-i18n="brig.mc.manos.btn">Ofrecer mi tiempo</a>
+        </div>
+        <div class="brig-mc-b">
+          <h4 data-i18n="brig.mc.cont.t">Contactos que abren puertas</h4>
+          <p data-i18n="brig.mc.cont.p">Lo más útil que puedes mandarnos si no vas a donar, y es gratis: una bodega o parqueadero en Medellín donde clasificar; un camión o furgón que suba a Cali, Pereira, Manizales, Armenia o Chocó entre el 24 y el 28; una empresa que preste su sede como centro de acopio; o una fundación que ya trabaje en alguno de los cinco territorios.</p>
+          <a class="btn btn-o" href="https://wa.me/573153305028" target="_blank" rel="noopener" data-i18n="brig.mc.cont.btn">Escribir por WhatsApp</a>
+        </div>
       </div>
     </div>
   </section>
@@ -2064,7 +2109,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=2187163b"></script>
+<script src="/app.js?v=294a090b"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

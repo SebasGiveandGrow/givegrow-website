@@ -23,6 +23,41 @@ documentado, no ocurrió»). Avisan los seleccionados el **28 de agosto**. Si en
 hay que producir los ocho materiales del taller — detalle en la memoria del
 proyecto.
 
+## 📣 LA BRIGADA TIENE FECHA: 24 al 28 de agosto de 2026
+
+Cinco territorios en cinco días, entregas coordinadas con las fundaciones de
+cada uno. **Y el foco de la campaña lo fijó Sebas el 12 de agosto: recibir
+donaciones por transferencia, en especie, VOLUNTARIOS y CONTACTOS.** Las dos
+últimas no se pedían en ninguna parte del sitio — ahora sí.
+
+**El diagnóstico de comunicación que originó el cambio:** la página estaba
+escrita como una justificación institucional, no como un llamado a actuar en una
+emergencia. Explicaba muy bien por qué somos confiables y casi nunca decía qué
+se necesita, para cuándo, ni qué hacer. El lead hablaba de nosotros («salimos con
+siete personas…»), no de una petición.
+
+Lo que se hizo: **invertir la jerarquía**. Bloque de estado arriba, con la cuenta
+de días como único elemento firma, las cuatro peticiones en concreto, y el
+argumento institucional intacto debajo. Más una sección nueva de **manos y
+contactos**.
+
+**El contador envejece solo, y eso es el punto:** tres fases —«Faltan N días»,
+«En curso: día N de cinco», «Las cinco jornadas terminaron»— calculadas en hora
+de Bogotá con una resta fija de UTC-5, porque Colombia no tiene horario de
+verano. Verificado en los ocho bordes, incluido el que importa: a las 20:00 del
+23 en Bogotá (ya 24 en UTC) sigue diciendo «Falta 1 día», y no anuncia la brigada
+en terreno seis horas antes de que salga. **Nadie tiene que entrar a editar la
+página el 24 ni el 29.**
+
+**Honestidad que quedó escrita en la página:** el equipo de terreno está cerrado
+en siete personas y se dice POR QUÉ no se puede sumar gente a terreno en doce
+días —doble verificación más sesión de Marco—, en vez de invitar a algo que no se
+puede cumplir. Las manos que se piden son de estructura, en Medellín.
+
+**Sigue sin haber costos del inventario**, y por eso sigue sin haber meta en pesos
+ni equivalencias. Sebas lo confirmó: por ahora no los hay. La página pide sin
+poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemos».
+
 ## ⏭️ LO QUE ESPERA INSUMO DE SEBAS (no código)
 
 1. **Cuántos brigadistas: 7 u 8.** Él dijo siete; el inventario está calculado
