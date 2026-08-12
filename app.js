@@ -906,6 +906,16 @@ var I18N = {
     "start.vol.t":"Quiero ayudar",
     "start.vol.p":"Suma tu tiempo o talento al equipo que está construyendo todo esto.",
     "start.vol.btn":"Escríbenos →",
+    "brig.ev.ey":"Evidencia",
+    "brig.ev.t":"Cada entrega, con su acta.",
+    "brig.ev.p":"El documento que vale es el acta en papel que firma quien recibe. Aquí publicamos su foto y lo que dice. Si no quedó documentado, para nosotros no ocurrió.",
+    "brig.ev.vacio":"Todavía no hay entregas publicadas. La brigada no ha salido: cuando lo haga, cada jornada aparece aquí con su acta firmada y sus fotos, no antes.",
+    "brig.ev.familias":"familias",
+    "brig.ev.con":"Con",
+    "brig.ev.recibio":"Recibió",
+    "ev.error":"No pudimos cargar las entregas en este momento.",
+    "track.ev.t":"Entregas de tu destino",
+    "track.ev.p":"Tu aporte se suma al fondo de este destino. Estas son las entregas que ese fondo hizo posibles — no te atribuimos una en particular, porque el dinero se reúne y las jornadas se pagan entre varios aportes.",
     "brig.ey":"Brigada de atención a emergencia",
     "brig.t":"Terremoto del 10 de agosto. Vamos a cinco sectores.",
     "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Salimos con siete personas, insumos y actas, a entregar junto a las fundaciones que ya trabajan en cada territorio.",
@@ -1301,6 +1311,8 @@ function go(id, fromPop){
   applyRouteMeta(id);
   renderJourney(id);
   if (id==="impacto") initGallery();
+  if (id==="brigada") pintarEntregas("brig-entregas", BRIGADA_DESTINO, true);
+
   window.scrollTo(0,0);
   if (!fromPop) focusActivePage();
   closeDrawer();
@@ -2010,6 +2022,44 @@ function loadPartners(){
     })
     .catch(function(){ PARTNERS_DATA = PARTNERS_FALLBACK; return PARTNERS_DATA; });
 }
+/* ---------- evidencia: entregas publicadas (Fase 6) ----------
+   Una entrega se asocia a un DESTINO, no a un aporte: el dinero es fungible y
+   una jornada se paga entre varios. Es contribución, no atribución — la misma
+   doctrina que ya está publicada en #medicion. */
+var BRIGADA_DESTINO = "brigada-emergencia-2026-08";
+
+function entregaHTML(e){
+  var fotos = (e.fotos||[]).map(function(f){
+    return '<a class="ev-foto" href="'+escapeHtml(f.url)+'" target="_blank" rel="noopener">' +
+           '<img src="'+escapeHtml(f.url)+'" alt="'+escapeHtml(f.alt||"")+'" loading="lazy"></a>';
+  }).join("");
+  var meta = [];
+  if (e.familias) meta.push("<b>"+e.familias+"</b> "+escapeHtml(t("brig.ev.familias")));
+  if (e.aliada) meta.push(escapeHtml(t("brig.ev.con"))+" "+escapeHtml(e.aliada));
+  if (e.recibido_por) meta.push(escapeHtml(t("brig.ev.recibio"))+": "+escapeHtml(e.recibido_por));
+  return '<article class="ev-item">' +
+    '<div class="ev-cab"><span class="ev-num">'+escapeHtml(e.numero)+'</span>' +
+    '<span class="ev-fecha">'+escapeHtml(e.fecha)+'</span></div>' +
+    '<h4 class="ev-sector">'+escapeHtml(e.sector)+(e.lugar?' <span class="ev-lugar">'+escapeHtml(e.lugar)+'</span>':'')+'</h4>' +
+    (meta.length?'<p class="ev-meta">'+meta.join(" · ")+'</p>':'') +
+    '<p class="ev-res">'+escapeHtml(e.resumen)+'</p>' +
+    (fotos?'<div class="ev-fotos">'+fotos+'</div>':'') +
+  '</article>';
+}
+
+function pintarEntregas(cajaId, destino, conVacio){
+  var caja = document.getElementById(cajaId);
+  if (!caja) return;
+  fetch("/api/entregas?destino="+encodeURIComponent(destino))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var l = d.entregas || [];
+      if (!l.length){ caja.innerHTML = conVacio ? '<p class="ev-vacio">'+escapeHtml(t("brig.ev.vacio"))+'</p>' : ""; return; }
+      caja.innerHTML = l.map(entregaHTML).join("");
+    })
+    .catch(function(){ caja.innerHTML = '<p class="ev-vacio">'+escapeHtml(t("ev.error"))+'</p>'; });
+}
+
 function renderHeroImpact(){
   var el = document.getElementById("hero-impact"); if (!el) return;
   loadPartners().then(function(){

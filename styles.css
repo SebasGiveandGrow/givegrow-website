@@ -1074,3 +1074,26 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 .brig-no-d{font-size:14.5px;line-height:1.55;color:var(--ink-soft)}
 .brig-cierre{margin-top:28px;padding-top:20px;border-top:2px solid var(--g);
   font-family:"Fraunces",serif;font-style:italic;font-size:var(--fs-h4);color:var(--acc)}
+
+/* ---- evidencia: entregas publicadas (Fase 6) ----
+   Cada entrega es un registro, no una tarjeta de galería: encabezado con número
+   de acta y fecha, el dato duro, y las fotos al final como prueba, no como
+   decoración. */
+.ev-lista{display:flex;flex-direction:column;gap:28px;margin-top:26px}
+.ev-item{padding-top:18px;border-top:2px solid var(--g)}
+.ev-cab{display:flex;justify-content:space-between;gap:12px;font-size:12px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--mu);font-variant-numeric:tabular-nums}
+.ev-num{color:var(--acc)}
+.ev-sector{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h4);
+  letter-spacing:-.01em;margin:10px 0 0}
+.ev-lugar{font-family:"Inter",sans-serif;font-weight:400;font-size:15px;color:var(--ink-soft)}
+.ev-meta{font-size:14.5px;color:var(--ink-soft);margin-top:6px}
+.ev-res{font-size:15px;line-height:1.6;color:var(--ink);margin-top:10px;max-width:64ch}
+.ev-fotos{display:grid;gap:10px;margin-top:16px;
+  grid-template-columns:repeat(auto-fill,minmax(min(190px,100%),1fr))}
+.ev-foto{display:block;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;
+  background:var(--surface-2)}
+.ev-foto img{width:100%;height:150px;object-fit:cover;transition:transform .2s var(--ease)}
+.ev-foto:hover img{transform:scale(1.03)}
+.ev-vacio{font-size:15px;line-height:1.6;color:var(--ink-soft);max-width:60ch;margin-top:22px;
+  padding-left:14px;border-left:3px solid var(--bd)}

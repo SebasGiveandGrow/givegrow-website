@@ -1,4 +1,4 @@
-# Recibo y certificado de donación
+# Recibo, certificado y actas de entrega
 
 Fase 5 del ecosistema digital. Dos documentos en PDF que se arman en el Worker
 (`documentos.js`), no en el navegador: llevan nombre, cédula y domicilio del
@@ -105,6 +105,64 @@ aliados. Si el donante recibe algo a cambio, esa declaración puede ser falsa �
 y la firma la Revisora Fiscal bajo juramento. **Esto no lo arregla código.**
 Consultar con la contadora antes de emitirle un certificado a cualquier miembro
 con beneficios.
+
+## Actas de entrega (Fase 6)
+
+El sitio prometía «publicamos el acta de cada entrega» sin tener dónde
+registrarla, y la página de la brigada repite esa promesa. Esto es ese registro.
+
+**El documento legal sigue siendo el acta EN PAPEL** que firma quien recibe
+(ítem 98 del inventario: preimpresas, original y copia). Aquí se guarda su
+transcripción y su foto. El sitio no reemplaza la firma: la publica.
+
+### Una entrega se asocia a un DESTINO, no a un aporte
+
+Tentador sería decirle a cada donante «tu plata compró estas colchonetas». Sería
+falso: el dinero es fungible y una jornada se paga con muchos aportes.
+`MEDICION.md` ya fijó la doctrina —contribución, no atribución— y la tabla la
+respeta. Quien aportó a `brigada-emergencia-2026-08` ve las entregas de esa
+campaña, sin trazabilidad peso a peso inventada.
+
+### Reglas que hace cumplir el código
+
+- **No se publica sin foto.** `422 sin_evidencia`. Una entrega sin una sola
+  imagen no es evidencia, es una afirmación — y publicarla rompería justo la
+  regla que la campaña anuncia.
+- **Registrar y publicar son actos distintos.** En terreno se registra rápido;
+  se publica cuando alguien revisó que no salga un dato que no debe.
+- **Las fotos solo responden si su entrega está publicada.** La clave en R2 es
+  difícil de adivinar, pero eso es oscuridad, no control: al despublicar, las
+  imágenes devuelven 404.
+- **El nombre del archivo lo pone el servidor.** Un nombre que llega del cliente
+  es una ruta que llega del cliente.
+- Tipos aceptados: JPEG, PNG y WebP, hasta 8 MB.
+
+### Privacidad
+
+`recibido_por` guarda **rol y entidad** («coordinadora del albergue»), nunca el
+nombre de una persona beneficiaria. Los nombres de quienes reciben ayuda no se
+publican: Ley 1581, y con menores hay protección reforzada. El panel lo dice en
+el formulario, pero es una regla humana — el código no puede distinguir un rol
+de un nombre.
+
+### Rutas
+
+```
+GET  /api/entregas?destino=…                    público, solo publicadas
+GET  /evidencia/AE-YYYY-NNNNNN/<archivo>        público, solo si está publicada
+GET  /api/admin/entregas                        panel
+POST /api/admin/entrega                         crear (borrador)
+POST /api/admin/entrega/AE-…/foto?alt=…         subir foto (cuerpo crudo)
+POST /api/admin/entrega/AE-…/publicar {publicar}
+```
+
+R2: bucket `givegrow-media`, prefijo `entregas/<numero>/`. Estaba creado desde
+junio de 2026 y vacío. `/evidencia/*` va en `run_worker_first`, si no el
+fallback de SPA se lo traga.
+
+**Pendiente:** el acta en PDF generada desde el registro. Hoy no hace falta
+porque el papel firmado se fotografía y se publica; cuando se quiera un
+documento propio, el motor de `documentos.js` ya está.
 
 ## Antes de desplegar: la migración va PRIMERO
 
