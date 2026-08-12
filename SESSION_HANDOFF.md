@@ -44,12 +44,27 @@ proyecto.
 999 y el libro de Sheets conserva los números bajos. Si el libro llegara alguna
 vez a 999, vuelve la colisión. Detalle en `ops/documentos.md`.
 
-**Las transferencias bancarias no crean registro.** Es el primer medio de pago
-que muestra la página de la brigada y el que usan las empresas, y no produce
-guía, ni recibo, ni rastreo, ni ruta al certificado: hoy termina en un correo a
-`contabilidad@`. El panel tiene «Pagos sin aporte» para lo que entra por el
-enlace de Wompi, pero una transferencia ni siquiera pasa por la pasarela. Es el
-hueco más grande que queda en el ecosistema.
+**~~Las transferencias bancarias no crean registro~~ — CERRADO (PR #77).** El
+donante las reporta en `#reportar`, recibe guía al instante y sube su
+comprobante; una persona las confirma contra el extracto desde `/admin`. No se
+tocó el significado de `aprobada`: se añadió `confirmacion` ('wompi' | 'manual')
+para saber de dónde viene la certeza, y el certificado cita la referencia
+BANCARIA y no un id de Wompi inexistente.
+
+## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 12 ago 2026, 06:00 UTC)
+
+**Cero datos reales todavía.** Todo lo que hay son pruebas, y conviene saber
+cuáles son antes de confundirlas con donaciones:
+
+| | |
+|---|---|
+| `aportes` | **3, todos en `intencion`** (ninguno pagado). `GG-2026-000001` es de agosto; `000002` y `000003` los creó Claude probando el checkout |
+| `entregas` | **1, despublicada.** `AE-2026-000001` fue la prueba del panel de Sebas — se publicó con fecha futura y se despublicó. Ocupa el primer número de acta |
+| `certificados`, `miembros`, `inscripciones`, `donantes` | **0** |
+| numerador de guías | en **999** → la primera donación real será `GG-2026-001000` |
+
+Si se quiere arrancar limpio, se pueden borrar esas tres intenciones y la
+entrega de prueba. **Sebas no lo ha pedido**: preguntar antes.
 
 ## Cierre de tanda: la brigada del terremoto (11–12 ago 2026)
 
@@ -77,7 +92,10 @@ por qué no las repetimos. Si alguien propone añadirlas, ese es el motivo.
   usada, el enlace de pago de Wompi y la conciliación de «pagos sin aporte».
 - **#73** Formulario de ofrecimientos en especie, sin migración.
 - **#74** El rastreo lee D1 y muestra las entregas del destino.
-- **#75** El carnet de miembro y la auditoría de promesas.
+- **#75** El carnet de miembro y la auditoría de promesas: el sitio prometía
+  credencial y reporte fotográfico mensual sin una línea de código detrás.
+- **#77** Reporte de transferencias bancarias con comprobante y verificación
+  manual, sin romper el significado de `aprobada`.
 
 ### Las tres lecciones de esta tanda
 1. **Una promesa publicada es una función pendiente.** El sitio prometía carnet
