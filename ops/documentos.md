@@ -135,7 +135,17 @@ campaña, sin trazabilidad peso a peso inventada.
   imágenes devuelven 404.
 - **El nombre del archivo lo pone el servidor.** Un nombre que llega del cliente
   es una ruta que llega del cliente.
+- **No se publica con fecha futura** (`422 fecha_futura`). Un acta registra algo
+  que ya ocurrió; con fecha de mañana, por definición no lo es. Se comprueba al
+  crear Y al publicar, porque publicar es el momento en que el dato se vuelve
+  una afirmación pública y hay filas anteriores a esta validación. Un día de
+  holgura, para que un acta firmada de noche en Colombia (UTC-5) no se rechace
+  por el cambio de día en UTC.
 - Tipos aceptados: JPEG, PNG y WebP, hasta 8 MB.
+
+> **Ocurrió de verdad.** En la prueba del panel del 12 ago 2026 se publicó una
+> jornada en Manizales fechada dos semanas adelante, y el sitio la mostró como
+> real hasta que se despublicó. La validación nació de ahí.
 
 ### Privacidad
 

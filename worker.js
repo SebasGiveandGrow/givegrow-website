@@ -1404,6 +1404,18 @@ async function adminPagosSueltos(env) {
    migrations/0005_entregas.sql. Es contribución, no atribución.
    ======================================================================== */
 
+/* Un acta registra algo que YA ocurrió. Una fecha futura no es un matiz: es una
+   entrega que no ha pasado, publicada como si sí. Ocurrió en la prueba del panel
+   del 12 ago 2026 — se publicó una jornada fechada dos semanas adelante y el
+   sitio la mostró como real durante unos minutos. La fecha se compara en UTC
+   contra el día de hoy, con un día de holgura para que un acta firmada de noche
+   en Colombia (UTC-5) no se rechace por el cambio de día. */
+function fechaEnFuturo(fecha) {
+  const hoy = new Date();
+  hoy.setUTCDate(hoy.getUTCDate() + 1);
+  return String(fecha) > hoy.toISOString().slice(0, 10);
+}
+
 const MAX_FOTO = 8 * 1024 * 1024;
 const TIPOS_FOTO = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -1490,6 +1502,13 @@ async function adminCrearEntrega(request, env, quien) {
   if (!resumen) faltan.push("resumen");
   if (faltan.length) return json({ error: "datos_incompletos", faltan }, 422);
 
+  if (fechaEnFuturo(fecha)) {
+    return json({
+      error: "fecha_futura", fecha,
+      ayuda: "El acta registra una entrega que ya ocurrió. Si la jornada es futura, todavía no hay acta que registrar."
+    }, 422);
+  }
+
   const numero = await siguienteActa(env, Number(fecha.slice(0, 4)));
   await env.DB.prepare(
     "INSERT INTO entregas (numero, destino_id, sector, lugar, fecha, aliada, familias, " +
@@ -1548,9 +1567,19 @@ async function adminPublicarEntrega(request, env, numero, quien) {
   const publicar = c.publicar !== false;
 
   const e = await env.DB.prepare(
-    "SELECT numero, fotos, publicada_en FROM entregas WHERE numero = ?"
+    "SELECT numero, fecha, fotos, publicada_en FROM entregas WHERE numero = ?"
   ).bind(numero).first();
   if (!e) return json({ error: "no_encontrada" }, 404);
+
+  /* Se comprueba también AQUÍ y no solo al crear: las filas registradas antes de
+     esta validación siguen en la base, y publicar es el momento en que el dato
+     se vuelve una afirmación pública. */
+  if (publicar && fechaEnFuturo(e.fecha)) {
+    return json({
+      error: "fecha_futura", fecha: e.fecha,
+      ayuda: "Esta entrega está fechada en el futuro. Corrige la fecha antes de publicarla: el sitio estaría afirmando algo que todavía no ocurrió."
+    }, 422);
+  }
 
   /* Una entrega sin una sola foto no es evidencia, es una afirmación. El sitio
      entero se apoya en «evidencia, no promesas»: publicarla vacía sería romper
@@ -1945,7 +1974,7 @@ document.addEventListener("click", function(e){
         b.disabled = false; b.textContent = "Registrar";
         if (res.http !== 200){
           err.textContent = res.d.faltan ? ("Faltan datos: " + res.d.faltan.join(", ") + ".")
-                                         : ("No se pudo registrar (" + (res.d.error||res.http) + ").");
+                        : (res.d.ayuda || ("No se pudo registrar (" + (res.d.error||res.http) + ")."));
           err.style.display = "block"; return;
         }
         pintarCampos(); cargarEntregas();
@@ -1961,7 +1990,7 @@ document.addEventListener("click", function(e){
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ publicar: quiere })
     }).then(function(r){ return r.json(); })
-      .then(function(d){ if (d.error === "sin_evidencia") alert(d.ayuda); cargarEntregas(); })
+      .then(function(d){ if (d.ayuda) alert(d.ayuda); cargarEntregas(); })
       .catch(function(){ cargarEntregas(); });
   }
 });
