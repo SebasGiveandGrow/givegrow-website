@@ -1060,6 +1060,16 @@
         <button type="button" class="btn btn-g" data-act="donarBrigada()" data-i18n="brig.dar.linea.btn">Aportar a la brigada</button>
       </div>
 
+      <!-- Enlace de pago propio de Wompi, creado por Sebas para la campaña. Va
+           DESPUÉS del checkout del sitio y sin botón, a propósito: cobra igual
+           pero se salta la guía, el recibo y el certificado. Quien llega por el
+           QR nunca ve esta página; quien sí la ve merece saber la diferencia. -->
+      <div class="brig-via rv d1">
+        <p class="rec-cap" data-i18n="brig.dar.qr.k">En dinero · pago directo (QR de la campaña)</p>
+        <p class="brig-via-v"><a href="https://checkout.wompi.co/l/c5Ym2E" target="_blank" rel="noopener" data-i18n="brig.dar.qr.v">checkout.wompi.co/l/c5Ym2E</a></p>
+        <p class="brig-via-p" data-i18n="brig.dar.qr.p">El enlace y el QR impreso de la brigada llevan a la misma cuenta, en la misma pasarela. Es más directo, pero no genera número de guía: no vas a poder rastrear tu aporte, y si necesitas certificado tributario tienes que escribirnos con el comprobante. Si estás aquí, el botón de arriba te deja mejor acompañado.</p>
+      </div>
+
       <div class="brig-via rv d2">
         <p class="rec-cap" data-i18n="brig.dar.especie.k">En especie · centros de acopio</p>
         <p class="brig-via-v"><a href="https://wa.me/573153305028" target="_blank" rel="noopener" data-i18n="brig.dar.especie.v">WhatsApp 315 330 5028</a>
@@ -1832,7 +1842,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=3fdc1b33"></script>
+<script src="/app.js?v=27834108"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
