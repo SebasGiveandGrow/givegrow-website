@@ -667,6 +667,10 @@ async function aplicarEstado(env, guia, tx, estado) {
       };
       await correoAporteAprobado(env, datos, d && d.email, d && d.nombre);
       await correoAvisoInterno(env, datos, d && d.email, d && d.nombre);
+      /* La membresía se crea o se renueva aquí, con el pago ya confirmado.
+         Solo se avisa la primera vez: una renovación no necesita anunciarse. */
+      const carnet = await carnetTrasAporte(env, Object.assign({}, datos, { destino_id: fila.destino_id }), donanteId);
+      if (carnet && carnet.nuevo) await correoCarnet(env, d && d.email, d && d.nombre, carnet, fila.idioma);
     } catch (e) {
       console.error("correo tras aprobar", guia, e && e.message);
     }
@@ -1354,6 +1358,208 @@ function fechaLargaISO(iso) {
   const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return "";
   return Number(m[3]) + " de " + MESES_ES[Number(m[2]) - 1] + " de " + m[1];
+}
+
+/* ========================================================================
+   CARNET DE MIEMBRO
+   ========================================================================
+   El sitio lo prometía en ocho lugares y no existía. Ahora existe, con dos
+   reglas que lo definen:
+
+   · SOLO membresía recurrente. Un aporte único no lo crea, y los de la brigada
+     menos — esa campaña fuerza aporte único y esconde el nivel a propósito.
+   · Es una PÁGINA VERIFICABLE, no una imagen. Una tarjeta descargable es una
+     tarjeta falsificable: el comercio aliado no tendría cómo saber si vale.
+     Esta consulta la base y dice VIGENTE o VENCIDO en el momento.
+   ======================================================================== */
+
+/* Los mismos umbrales y nombres que muestra la calculadora (TIERS en app.js).
+   Si cambian allá, cambian aquí: son la misma promesa vista desde dos lados. */
+const NIVELES_MB = [
+  { id: "semilla", min: 0,      es: "Semilla", en: "Seed" },
+  { id: "retono",  min: 50000,  es: "Retoño",  en: "Sprout" },
+  { id: "arbol",   min: 120000, es: "Árbol",   en: "Tree" },
+  { id: "bosque",  min: 250000, es: "Bosque",  en: "Forest" }
+];
+function nivelPorMensual(cop) {
+  let n = NIVELES_MB[0];
+  for (const x of NIVELES_MB) if (cop >= x.min) n = x;
+  return n;
+}
+function nivelDe(id) { return NIVELES_MB.find((x) => x.id === id) || NIVELES_MB[0]; }
+
+async function siguienteMiembro(env, anio) {
+  const { results } = await env.DB.prepare(
+    "INSERT INTO numerador_miembro (anio, ultimo) VALUES (?, 1) " +
+    "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1 RETURNING ultimo"
+  ).bind(anio).all();
+  const n = results && results[0] ? results[0].ultimo : null;
+  if (!n) throw new Error("numerador de miembros no devolvió consecutivo");
+  return "MB-" + anio + "-" + String(n).padStart(6, "0");
+}
+
+function sumarDias(dias) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+/* Crea o RENUEVA el carnet tras un aporte recurrente aprobado.
+   La vigencia lleva holgura sobre el ciclo —35 días para el mensual, 395 para
+   el anual— porque el cobro no cae siempre el mismo día y un carnet que vence
+   la víspera de la renovación deja a alguien sin beneficio en la caja de un
+   comercio aliado, que es el peor lugar para descubrirlo. */
+async function carnetTrasAporte(env, aporte, donanteId) {
+  if (!donanteId) return null;
+  if (aporte.frecuencia !== "mensual" && aporte.frecuencia !== "anual") return null;
+  /* Las campañas propias no dan membresía: son operaciones puntuales y su
+     certificado declara que no hubo contraprestación. */
+  if (String(aporte.destino_id || "").startsWith("brigada-")) return null;
+
+  const cop = Math.round(Number(aporte.monto_centavos) / 100);
+  const mensual = aporte.frecuencia === "anual" ? Math.round(cop / 12) : cop;
+  const nivel = nivelPorMensual(mensual);
+  const hasta = sumarDias(aporte.frecuencia === "anual" ? 395 : 35);
+
+  const ya = await env.DB.prepare(
+    "SELECT codigo, token, nivel, vigente_hasta FROM miembros WHERE donante_id = ?"
+  ).bind(donanteId).first();
+
+  if (ya) {
+    /* Renovar nunca baja de nivel por un aporte suelto más pequeño: el nivel se
+       queda en el más alto alcanzado mientras la membresía siga viva. */
+    const actual = NIVELES_MB.findIndex((x) => x.id === ya.nivel);
+    const nuevo = NIVELES_MB.findIndex((x) => x.id === nivel.id);
+    const nivelFinal = nuevo > actual ? nivel.id : ya.nivel;
+    const hastaFinal = hasta > ya.vigente_hasta ? hasta : ya.vigente_hasta;
+    await env.DB.prepare(
+      "UPDATE miembros SET nivel = ?, vigente_hasta = ?, revocado_en = NULL, " +
+      "revocado_motivo = NULL, actualizado_en = datetime('now') WHERE codigo = ?"
+    ).bind(nivelFinal, hastaFinal, ya.codigo).run();
+    return { codigo: ya.codigo, token: ya.token, nivel: nivelFinal, vigente_hasta: hastaFinal, nuevo: false };
+  }
+
+  const codigo = await siguienteMiembro(env, new Date().getUTCFullYear());
+  const token = tokenNuevo();
+  await env.DB.prepare(
+    "INSERT INTO miembros (codigo, token, donante_id, nivel, desde, vigente_hasta) " +
+    "VALUES (?,?,?,?,date('now'),?)"
+  ).bind(codigo, token, donanteId, nivel.id, hasta).run();
+  return { codigo, token, nivel: nivel.id, vigente_hasta: hasta, nuevo: true };
+}
+
+/* GET /carnet/<token> — la tarjeta. Página propia servida por el Worker, no la
+   SPA: tiene que abrir rápido en el celular de quien atiende una caja, sin
+   depender de que cargue una aplicación entera. */
+async function rutaCarnet(env, token) {
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return new Response("No encontrado", { status: 404 });
+  const m = await env.DB.prepare(
+    "SELECT m.codigo, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, d.nombre " +
+    "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.token = ?"
+  ).bind(token).first();
+  if (!m) return new Response("No encontrado", { status: 404 });
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  const vigente = !m.revocado_en && m.vigente_hasta >= hoy;
+  const n = nivelDe(m.nivel);
+
+  return new Response(paginaCarnet({
+    nombre: m.nombre || "Miembro", codigo: m.codigo, nivel: n.es,
+    desde: m.desde, hasta: m.vigente_hasta, vigente
+  }), {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      /* Sin caché: el estado se consulta en el momento, que es el punto. */
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
+function paginaCarnet(c) {
+  const estado = c.vigente ? "Vigente" : "No vigente";
+  const color = c.vigente ? "#4ade80" : "#E8A24C";
+  return `<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Carnet de miembro · ${esc(c.codigo)} · Give&Grow</title>
+<link rel="stylesheet" href="/styles.css">
+</head><body style="background:#0E2118;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
+<main class="carnet">
+  <div class="carnet-top">
+    <span class="carnet-amp">&amp;</span>
+    <span class="carnet-marca">Fundación<br>Give&amp;Grow</span>
+  </div>
+  <p class="carnet-nivel">${esc(c.nivel)}</p>
+  <h1 class="carnet-nombre">${esc(c.nombre)}</h1>
+  <dl class="carnet-datos">
+    <div><dt>Carnet</dt><dd>${esc(c.codigo)}</dd></div>
+    <div><dt>Miembro desde</dt><dd>${esc(c.desde)}</dd></div>
+    <div><dt>Vigente hasta</dt><dd>${esc(c.hasta)}</dd></div>
+  </dl>
+  <p class="carnet-estado" style="color:${color};border-color:${color}">${estado}</p>
+  <p class="carnet-pie">Programa de Gratitud · Presenta esta pantalla en los comercios aliados.
+  El estado se consulta en el momento: esta página no sirve como captura.</p>
+  <p class="carnet-nit">NIT 901.948.930-2 · thegiveandgrowproject.org</p>
+</main>
+</body></html>`;
+}
+
+/* ---- panel ---- */
+
+async function adminMiembros(env) {
+  const r = await env.DB.prepare(
+    "SELECT m.codigo, m.token, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, " +
+    "d.nombre, d.email FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
+    "ORDER BY m.creado_en DESC LIMIT 200"
+  ).all();
+  return json({ miembros: r.results || [] });
+}
+
+async function adminRevocarMiembro(request, env, codigo, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* opcional */ }
+  const motivo = limpiar(c.motivo, 280);
+  if (!motivo) return json({ error: "motivo_requerido" }, 400);
+  const m = await env.DB.prepare("SELECT codigo FROM miembros WHERE codigo = ?").bind(codigo).first();
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  await env.DB.prepare(
+    "UPDATE miembros SET revocado_en = datetime('now'), revocado_motivo = ? WHERE codigo = ?"
+  ).bind(motivo, codigo).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "carnet " + codigo + " revocado: " + motivo).run();
+  return json({ ok: true, codigo });
+}
+
+/* Correo con el enlace del carnet. Solo la PRIMERA vez: una renovación no
+   necesita anunciarse, y un correo mensual idéntico se aprende a ignorar. */
+async function correoCarnet(env, email, nombre, carnet, idioma) {
+  if (!email) return { ok: true, sinCorreo: true };
+  const en = idioma === "en";
+  const url = ORIGIN + "/carnet/" + carnet.token;
+  const n = nivelDe(carnet.nivel);
+  const titulo = en ? "Your member card" : "Tu carnet de miembro";
+  const parrafos = en ? [
+    "Your membership is active. This is your card: open the link and show that screen at partner businesses.",
+    "It is a live page, not an image — it states whether it is valid at the moment it is opened, so nobody has to take your word for it.",
+    "It renews on its own with each contribution. If you stop giving, it simply expires."
+  ] : [
+    "Tu membresía quedó activa. Este es tu carnet: abre el enlace y muestra esa pantalla en los comercios aliados.",
+    "Es una página viva, no una imagen: dice si está vigente en el momento en que se abre, así nadie tiene que creerte de palabra.",
+    "Se renueva solo con cada aporte. Si dejas de aportar, simplemente vence."
+  ];
+  const filas = en
+    ? [["Card", carnet.codigo], ["Level", n.en], ["Valid until", carnet.vigente_hasta]]
+    : [["Carnet", carnet.codigo], ["Nivel", n.es], ["Vigente hasta", carnet.vigente_hasta]];
+  return enviarCorreo(env, {
+    para: email, asunto: titulo + " · " + carnet.codigo,
+    texto: [titulo, "", ...parrafos, "", url, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, boton: { url, texto: en ? "Open my card" : "Abrir mi carnet" } }),
+    etiqueta: "carnet"
+  });
 }
 
 /* ========================================================================
@@ -2312,6 +2518,15 @@ export default {
     const compartir = ruta.match(/^\/f\/([a-z0-9-]+)\/?$/);
     if (compartir) return rutaCompartir(env, url, compartir[1]);
 
+    /* El carnet. Fuera de /api/ porque es una página que se abre y se muestra,
+       no una respuesta que se consume. */
+    const car = ruta.match(/^\/carnet\/([a-f0-9]{32})\/?$/i);
+    if (car) {
+      if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+      try { return await rutaCarnet(env, car[1].toLowerCase()); }
+      catch (e) { console.error("carnet", e && e.message); return json({ error: "error_interno" }, 500); }
+    }
+
     /* Fotos de las actas y las jornadas. Fuera de /api/ a propósito: son
        imágenes que se enlazan desde el sitio y se comparten, no una API. */
     const evi = ruta.match(/^\/evidencia\/(AE-\d{4}-\d{6})\/([A-Za-z0-9._-]+)$/);
@@ -2397,6 +2612,9 @@ export default {
            alguien las publica: en terreno se registra rápido y se revisa después. */
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
+        if (ruta === "/api/admin/miembros") return await adminMiembros(env);
+        const mr = ruta.match(/^\/api\/admin\/miembro\/(MB-\d{4}-\d{6})\/revocar$/i);
+        if (mr) return await adminRevocarMiembro(request, env, mr[1].toUpperCase(), sesion.email);
         const mi = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/estado$/);
         if (mi) return await adminMoverInscripcion(request, env, Number(mi[1]), sesion.email);
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
