@@ -881,6 +881,10 @@ async function apiInscripcion(request, env, url) {
        sino para quien lo reciba: son la lista de lo que hay que cumplir antes. */
     protocolo_cuidado: pisaTerritorio,
     protocolo_imagen: !!c.captura,
+    /* De dónde salió la inscripción. Sin esto, quien se ofrece para el acopio de
+       la brigada llega indistinguible de quien se apunta al programa de todo el
+       año, y son dos conversaciones distintas con dos urgencias distintas. */
+    origen: limpio(c.origen, 60),
     idioma: c.idioma === "en" ? "en" : "es"
   };
 
@@ -958,6 +962,7 @@ async function correoAvisoInscripcion(env, v) {
     ["Nombre", v.nombre],
     ["Correo", v.email],
     ["Teléfono", v.telefono || "(no dejó)"],
+    ...(v.origen ? [["Viene de", "la campaña " + v.origen + " — responder con esa urgencia"]] : []),
     ["Nivel", nivel],
     ["Oficio", v.oficio],
     ["Disponibilidad", v.disponibilidad || "(no dijo)"],
@@ -3038,7 +3043,13 @@ y la entidad, no una persona atendida. Una entrega no se puede publicar sin al m
   <button class="btn btn-g" id="e-crear">Registrar</button>
 </div>
 
-<div class="med-tw"><table class="med-tbl">
+<!-- eco-stack: en pantalla angosta esta tabla deja de ser tabla y se apila.
+     Es la única del panel que se usa EN TERRENO, desde un celular, después de
+     una entrega — y era la que peor se comportaba: 633px de contenido en una
+     ventana de 327, con «+foto», «Publicar» y «Anular» fuera de pantalla y de
+     26px de alto. La clase va solo aquí y no en med-tbl porque esa tabla
+     también la usa la página pública de medición. -->
+<div class="med-tw"><table class="med-tbl eco-stack">
 <thead><tr>
 <th scope="col">Acta</th><th scope="col">Fecha</th><th scope="col">Sector</th>
 <th scope="col">Aliada</th><th scope="col">Familias</th><th scope="col">Fotos</th>
@@ -3454,6 +3465,7 @@ function resumenInscripcion(tipo, x){
     var p = [esc(x.oficio || "?") + " · " + esc(NIVEL_ES[x.nivel] || x.nivel || "?")];
     if (x.protocolo_cuidado) p.push("<strong>protocolo de cuidado</strong>");
     if (x.protocolo_imagen) p.push("<strong>protocolo de imagen</strong>");
+    if (x.origen) p.push('<strong style="color:#A84D00">' + esc(x.origen) + "</strong>");
     return p.join(" · ");
   }
   if (tipo === "fundacion"){
@@ -3589,21 +3601,24 @@ function pintarEntregas(l){
     /* Una acta anulada se queda a la vista, en gris y con su motivo: el número
        sigue gastado y el panel tiene que poder explicar por qué. Lo único que
        pierde son los botones — no se publica ni se le suben fotos. */
+    /* Una etiqueta data-label en cada celda: en pantalla angosta la cabecera se esconde y
+       cada dato lleva su etiqueta delante. Sin esto, apilar la tabla dejaría
+       ocho valores sueltos sin decir qué es cada uno. */
     return '<tr' + (nula ? ' style="opacity:.55"' : '') + ">" +
-      "<td>" + esc(e.numero) + "</td>" +
-      "<td>" + esc(e.fecha) + "</td>" +
-      "<td>" + esc(e.sector) + "</td>" +
-      "<td>" + esc(e.aliada || "—") + "</td>" +
-      "<td>" + (e.familias == null ? "—" : e.familias) + "</td>" +
-      "<td>" + nf + (nula ? "" : ' <label class="copy" style="cursor:pointer">+foto' +
+      '<td data-label="Acta">' + esc(e.numero) + "</td>" +
+      '<td data-label="Fecha">' + esc(e.fecha) + "</td>" +
+      '<td data-label="Sector">' + esc(e.sector) + "</td>" +
+      '<td data-label="Aliada">' + esc(e.aliada || "—") + "</td>" +
+      '<td data-label="Familias">' + (e.familias == null ? "—" : e.familias) + "</td>" +
+      '<td data-label="Fotos">' + nf + (nula ? "" : ' <label class="copy toca" style="cursor:pointer">+ foto' +
         '<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" data-foto="' + esc(e.numero) + '"></label>') + "</td>" +
-      "<td>" + (nula
+      '<td data-label="Estado">' + (nula
         ? "anulada<br><small>" + esc(e.anulada_motivo || "") + "</small>"
         : (pub ? "publicada" : '<strong style="color:#A84D00">borrador</strong>')) + "</td>" +
-      "<td>" + (nula ? "—" :
-        '<button class="copy" data-pub="' + esc(e.numero) + '" data-v="' + (pub ? "0" : "1") + '">' +
+      '<td data-label="Acción">' + (nula ? "—" :
+        '<button class="copy toca" data-pub="' + esc(e.numero) + '" data-v="' + (pub ? "0" : "1") + '">' +
         (pub ? "Despublicar" : "Publicar") + "</button>" +
-        ' <button class="copy" data-anu="' + esc(e.numero) + '">Anular</button>') + "</td>" +
+        ' <button class="copy toca" data-anu="' + esc(e.numero) + '">Anular</button>') + "</td>" +
     "</tr>";
   }).join("");
 }

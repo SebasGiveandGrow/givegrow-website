@@ -515,6 +515,7 @@ var I18N = {
     "vf.err.datos":"Necesitamos tu autorización para guardar tus datos y poder escribirte.",
     "vf.err.send":"No pudimos enviar tus datos. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
     "vf.nada":"Nada de esto se cobra, en ninguna dirección.",
+    "vf.origen.brig":"Vienes de la brigada del terremoto. Te marcamos «en la estructura» porque es lo que se puede sumar a tiempo: el acopio de Medellín, del 24 al 28 de agosto. Puedes cambiarlo si prefieres el programa de todo el año.",
     "ff.ey":"Aplicar al HUB",
     "ff.t":"Cuéntanos quién es tu fundación",
     "ff.lead":"Esto es la aplicación, no la vinculación: con lo que escribas aquí revisamos si encajamos, y si encajamos vamos a conocerte a tu territorio. Solo te pedimos texto — el logo, las fotos y las cifras de costos se ven después, cuando ya nos conozcamos.",
@@ -1465,6 +1466,7 @@ var ACT_FNS = {
   donarBrigada:donarBrigada, allySubmit:allySubmit,
   irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit,
   fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
+  irAVoluntariadoBrigada:irAVoluntariadoBrigada,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
@@ -3510,6 +3512,29 @@ function ofSubmit(ev){
     .catch(function(){ btn.disabled = false; allyMsg(note, t("of.err"), false); });
 }
 
+/* De la brigada al formulario de voluntariado, sin perder de dónde viene.
+   Antes el botón «Ofrecer mi tiempo» llevaba a #voluntariado y ahí se perdía el
+   contexto: la inscripción llegaba igual que cualquier otra y nadie podía saber
+   si era para el acopio de la brigada o para el programa de todo el año.
+   Preselecciona «estructura» porque es lo único que se puede ofrecer a tiempo
+   —terreno exige doble verificación y sesión de Marco—, y deja el aviso visible
+   para que el cambio no sea invisible ni irreversible. */
+var VOL_ORIGEN = null;
+function irAVoluntariadoBrigada(){
+  VOL_ORIGEN = BRIGADA_DESTINO;
+  if (currentRoute !== "voluntariado") go("voluntariado");
+  var est = document.querySelector('input[name="vf-nivel"][value="estructura"]');
+  if (est){ est.checked = true; volNivel(); }
+  var aviso = document.getElementById("vf-origen");
+  if (aviso) aviso.style.display = "";
+  var s = document.getElementById("vol-form");
+  if (!s) return;
+  var suave = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  s.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+  var primero = document.getElementById("vf-nombre");
+  if (primero) setTimeout(function(){ primero.focus({ preventScroll: true }); }, suave ? 500 : 0);
+}
+
 function volSubmit(ev){
   ev.preventDefault();
   var note = document.getElementById("vf-note");
@@ -3544,6 +3569,7 @@ function volSubmit(ev){
       disponibilidad: val("vf-disp"),
       mensaje: val("vf-msg"),
       captura: chk("vf-captura"),
+      origen: VOL_ORIGEN || "",
       autoriza_datos: true,
       web2: val("vf-web2"),
       idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
@@ -3551,6 +3577,10 @@ function volSubmit(ev){
   }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
     .then(function(){
       document.getElementById("vf").reset(); volNivel();
+      /* Se limpia el origen: si la misma persona vuelve a inscribir a alguien
+         más desde otra ruta, esa inscripción no debe heredar la brigada. */
+      VOL_ORIGEN = null;
+      var av = document.getElementById("vf-origen"); if (av) av.style.display = "none";
       btn.disabled = false;
       allyMsg(note, t("vf.ok"), true);
     })

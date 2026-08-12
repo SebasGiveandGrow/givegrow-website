@@ -67,6 +67,56 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"]]) {
   }
 }
 
+/* 1c · Las páginas HTML que el Worker GENERA no se truncan.
+   El check #1b cubre el JS emitido y tenía un punto ciego: los templates de
+   HTML. El 12 ago 2026 una comilla invertida dentro de un comentario HTML del
+   panel cerró su template a mitad de camino y se perdieron las cinco tablas.
+   `node --check worker.js` pasó en verde igualmente, porque una plantilla
+   seguida de un punto —`...`.med-tbl— es sintaxis válida por accidente: se lee
+   como un acceso a propiedad menos un identificador.
+
+   La comprobación es tonta y por eso funciona: si un template empieza en
+   <!doctype html>, su valor tiene que terminar en </html>. Un cierre temprano
+   lo rompe siempre. */
+for (const [i, m] of [...workerSrc.matchAll(/return `<!doctype html>/g)].entries()) {
+  const ini = workerSrc.indexOf("`", m.index);
+  let j = ini + 1;
+  for (; j < workerSrc.length; j++) {
+    if (workerSrc[j] === "\\") { j++; continue; }
+    if (workerSrc[j] === "`") break;
+  }
+  const linea = workerSrc.slice(0, ini).split("\n").length;
+  /* No se evalúa: estos templates interpolan valores y montar un entorno falso
+     para cada uno sería más frágil que lo que se quiere comprobar. Se mira el
+     TEXTO: dónde cierra la plantilla y qué hay justo antes.
+     El escáner salta los ${…} con balance de llaves, porque dentro puede haber
+     comillas invertidas legítimas que no cierran nada. */
+  let k = ini + 1, cierre = -1;
+  while (k < workerSrc.length) {
+    const ch = workerSrc[k];
+    if (ch === "\\") { k += 2; continue; }
+    if (ch === "$" && workerSrc[k + 1] === "{") {
+      let d = 1; k += 2;
+      while (k < workerSrc.length && d > 0) {
+        if (workerSrc[k] === "{") d++;
+        else if (workerSrc[k] === "}") d--;
+        k++;
+      }
+      continue;
+    }
+    if (ch === "`") { cierre = k; break; }
+    k++;
+  }
+  if (cierre === -1) { err("plantilla HTML de worker.js:" + linea + " no cierra nunca"); continue; }
+  const cuerpo = workerSrc.slice(ini + 1, cierre).trimEnd();
+  if (!cuerpo.toLowerCase().endsWith("</html>")) {
+    err("plantilla HTML de worker.js:" + linea + " se corta antes de </html> — termina en «" +
+        cuerpo.slice(-46).replace(/\s+/g, " ") + "». Casi siempre es una comilla invertida suelta dentro del template.");
+  } else {
+    ok("plantilla HTML de worker.js:" + linea + " cierra en </html> (" + cuerpo.length + " chars)");
+  }
+}
+
 const src  = readFileSync("app.js", "utf8");
 const html = readFileSync("index.html", "utf8");
 
