@@ -2974,7 +2974,10 @@ document.addEventListener("click", function(e){
   var cf = e.target.closest("[data-conf]");
   if (cf){
     var g = cf.getAttribute("data-conf");
-    var ref = window.prompt("Confirmar " + g + " contra el extracto.\n\nNúmero del comprobante bancario (lo cita el certificado):");
+    /* \\n y no \n: esto vive dentro del template literal de adminJS(), así que un
+       \n se interpolaría aquí y el admin.js emitido quedaría con un salto de
+       línea real dentro de una cadena entre comillas — sin cerrar. */
+    var ref = window.prompt("Confirmar " + g + " contra el extracto.\\n\\nNúmero del comprobante bancario (lo cita el certificado):");
     if (!ref) return;
     cf.disabled = true; cf.textContent = "…";
     fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
@@ -3045,7 +3048,7 @@ function cargarInscripciones(){
          http(s). Una URL con esquema javascript: escapada sigue ejecutándose al
          hacer clic, y este panel lo abre una persona con sesión de Access. */
       var enlaces = [];
-      if (/^https?:\/\//i.test(x.web || "")) {
+      if (/^https?:\\/\\//i.test(x.web || "")) {
         enlaces.push('<a href="' + esc(x.web) + '" target="_blank" rel="noopener">web</a>');
       } else if (x.web) { enlaces.push(esc(x.web)); }
       if (x.instagram) enlaces.push(esc(x.instagram));
