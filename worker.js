@@ -1144,7 +1144,8 @@ async function adminSalud(env) {
     "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)",
     "Lista de aportes · los firma la Revisora Fiscal, no el sistema");
   await enCola("entregas_en_borrador",
-    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas WHERE publicada_en IS NULL",
+    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
+    "WHERE publicada_en IS NULL AND anulada_en IS NULL",
     "Bandeja «Entregas» · el acta existe y todavía no la ve nadie");
 
   /* Intenciones abandonadas: más de 48 h en `intencion` y sin transacción de
@@ -2593,7 +2594,7 @@ async function apiEntregas(env, url) {
   const destino = String(url.searchParams.get("destino") || "").slice(0, 60);
   const limite = Math.min(Math.max(Number(url.searchParams.get("limite")) || 20, 1), 50);
   let sql = "SELECT numero, destino_id, sector, lugar, fecha, aliada, familias, resumen, " +
-            "recibido_por, fotos FROM entregas WHERE publicada_en IS NOT NULL";
+            "recibido_por, fotos FROM entregas WHERE publicada_en IS NOT NULL AND anulada_en IS NULL";
   const args = [];
   if (destino) { sql += " AND destino_id = ?"; args.push(destino); }
   sql += " ORDER BY fecha DESC, numero DESC LIMIT " + limite;
@@ -2612,7 +2613,7 @@ async function rutaEvidencia(env, numero, archivo) {
     return json({ error: "ruta_invalida" }, 400);
   }
   const e = await env.DB.prepare(
-    "SELECT fotos FROM entregas WHERE numero = ? AND publicada_en IS NOT NULL"
+    "SELECT fotos FROM entregas WHERE numero = ? AND publicada_en IS NOT NULL AND anulada_en IS NULL"
   ).bind(numero).first();
   if (!e) return json({ error: "no_encontrada" }, 404);
 
@@ -2637,9 +2638,60 @@ async function rutaEvidencia(env, numero, archivo) {
 async function adminEntregas(env) {
   const r = await env.DB.prepare(
     "SELECT numero, destino_id, sector, lugar, fecha, aliada, familias, resumen, " +
-    "recibido_por, fotos, publicada_en, creada_por FROM entregas ORDER BY fecha DESC, numero DESC LIMIT 100"
+    "recibido_por, fotos, publicada_en, creada_por, anulada_en, anulada_motivo, anulada_por " +
+    "FROM entregas ORDER BY fecha DESC, numero DESC LIMIT 100"
   ).all();
   return json({ entregas: r.results || [] });
+}
+
+/* POST /api/admin/entrega/<numero>/anular  —  { motivo }
+   ========================================================================
+   Anular y no borrar, por el consecutivo: el número ya se consumió, y un hueco
+   sin explicación en una serie de actas es exactamente lo que un auditor
+   pregunta. Con motivo escrito, el hueco tiene razón.
+
+   Es irreversible a propósito. Despublicar es reversible porque es una decisión
+   de calendario —«todavía no»—; anular es un juicio sobre el documento, y un
+   botón que lo deshace invita a usarlo como interruptor. Si un acta anulada
+   describía algo que sí ocurrió, se registra de nuevo con su número siguiente y
+   la anulada queda como el rastro de que hubo un error.
+
+   Lo que NO hace: borrar la foto de R2. La clave sigue apuntada en `fotos` y el
+   archivo queda, porque `/evidencia/...` ya exige que la entrega esté visible —
+   con la fila anulada la foto deja de servirse sola. Borrar el objeto sería
+   destruir la única copia de algo que quizá haya que volver a mirar. */
+async function adminAnularEntrega(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* el motivo se valida abajo */ }
+
+  const motivo = String(c.motivo == null ? "" : c.motivo).trim().slice(0, 300);
+  /* Sin motivo no se anula. Es la misma regla del certificado: lo que explica el
+     hueco del consecutivo es el motivo, así que un motivo vacío deja el hueco
+     igual de inexplicable que si se hubiera borrado la fila. */
+  if (motivo.length < 4) {
+    return json({ error: "motivo_requerido", ayuda: "Escribe por qué se anula: es lo que explica el hueco en el consecutivo de actas." }, 400);
+  }
+
+  const e = await env.DB.prepare(
+    "SELECT numero, anulada_en FROM entregas WHERE numero = ?"
+  ).bind(numero).first();
+  if (!e) return json({ error: "no_encontrada" }, 404);
+  if (e.anulada_en) return json({ error: "ya_anulada", anulada_en: e.anulada_en }, 409);
+
+  /* Se despublica en el mismo movimiento. Dejarla anulada Y publicada sería un
+     estado que ninguna consulta pública contempla, y bastaría con que alguien
+     olvidara el segundo paso para que un acta inválida siguiera a la vista. */
+  await env.DB.prepare(
+    "UPDATE entregas SET anulada_en = datetime('now'), anulada_motivo = ?, anulada_por = ?, " +
+    "publicada_en = NULL, actualizada_en = datetime('now') WHERE numero = ?"
+  ).bind(motivo, quien || "?", numero).run();
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "acta " + numero + " anulada: " + motivo).run();
+
+  return json({ ok: true, numero, anulada: true });
 }
 
 async function adminCrearEntrega(request, env, quien) {
@@ -2724,9 +2776,19 @@ async function adminPublicarEntrega(request, env, numero, quien) {
   const publicar = c.publicar !== false;
 
   const e = await env.DB.prepare(
-    "SELECT numero, fecha, fotos, publicada_en FROM entregas WHERE numero = ?"
+    "SELECT numero, fecha, fotos, publicada_en, anulada_en FROM entregas WHERE numero = ?"
   ).bind(numero).first();
   if (!e) return json({ error: "no_encontrada" }, 404);
+
+  /* Un acta anulada no vuelve. Si describía algo que sí ocurrió, se registra de
+     nuevo con su número siguiente: el consecutivo cuenta actas emitidas, no
+     intentos, y resucitar la anulada borraría el rastro del error. */
+  if (publicar && e.anulada_en) {
+    return json({
+      error: "anulada", anulada_en: e.anulada_en,
+      ayuda: "Esta acta está anulada y no se puede volver a publicar. Si la entrega sí ocurrió, regístrala de nuevo: tomará el número siguiente."
+    }, 409);
+  }
 
   /* Se comprueba también AQUÍ y no solo al crear: las filas registradas antes de
      esta validación siguen en la base, y publicar es el momento en que el dato
@@ -3386,17 +3448,25 @@ function pintarEntregas(l){
   tb.innerHTML = l.map(function(e){
     var nf = 0; try { nf = JSON.parse(e.fotos||"[]").length; } catch(x){}
     var pub = !!e.publicada_en;
-    return "<tr>" +
+    var nula = !!e.anulada_en;
+    /* Una acta anulada se queda a la vista, en gris y con su motivo: el número
+       sigue gastado y el panel tiene que poder explicar por qué. Lo único que
+       pierde son los botones — no se publica ni se le suben fotos. */
+    return '<tr' + (nula ? ' style="opacity:.55"' : '') + ">" +
       "<td>" + esc(e.numero) + "</td>" +
       "<td>" + esc(e.fecha) + "</td>" +
       "<td>" + esc(e.sector) + "</td>" +
       "<td>" + esc(e.aliada || "—") + "</td>" +
       "<td>" + (e.familias == null ? "—" : e.familias) + "</td>" +
-      "<td>" + nf + ' <label class="copy" style="cursor:pointer">+foto' +
-        '<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" data-foto="' + esc(e.numero) + '"></label></td>' +
-      "<td>" + (pub ? "publicada" : '<strong style="color:#A84D00">borrador</strong>') + "</td>" +
-      '<td><button class="copy" data-pub="' + esc(e.numero) + '" data-v="' + (pub ? "0" : "1") + '">' +
-        (pub ? "Despublicar" : "Publicar") + "</button></td>" +
+      "<td>" + nf + (nula ? "" : ' <label class="copy" style="cursor:pointer">+foto' +
+        '<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" data-foto="' + esc(e.numero) + '"></label>') + "</td>" +
+      "<td>" + (nula
+        ? "anulada<br><small>" + esc(e.anulada_motivo || "") + "</small>"
+        : (pub ? "publicada" : '<strong style="color:#A84D00">borrador</strong>')) + "</td>" +
+      "<td>" + (nula ? "—" :
+        '<button class="copy" data-pub="' + esc(e.numero) + '" data-v="' + (pub ? "0" : "1") + '">' +
+        (pub ? "Despublicar" : "Publicar") + "</button>" +
+        ' <button class="copy" data-anu="' + esc(e.numero) + '">Anular</button>') + "</td>" +
     "</tr>";
   }).join("");
 }
@@ -3454,6 +3524,23 @@ document.addEventListener("click", function(e){
       body: JSON.stringify({ publicar: quiere })
     }).then(function(r){ return r.json(); })
       .then(function(d){ if (d.ayuda) alert(d.ayuda); cargarEntregas(); })
+      .catch(function(){ cargarEntregas(); });
+  }
+
+  /* Anular pide motivo y avisa que no se deshace. Dos frenos y no uno porque el
+     botón vive al lado de «Despublicar», que sí es reversible. */
+  var an = e.target.closest("[data-anu]");
+  if (an){
+    var num = an.getAttribute("data-anu");
+    var motivo = window.prompt("Anular " + num + " — no se puede deshacer.\\n\\n¿Por qué se anula? (queda escrito y explica el hueco en el consecutivo)");
+    if (!motivo) return;
+    an.disabled = true; an.textContent = "…";
+    fetch("/api/admin/entrega/" + encodeURIComponent(num) + "/anular", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ motivo: motivo })
+    }).then(function(r){ return r.json(); })
+      .then(function(d){ if (d.ayuda) alert(d.ayuda); else if (d.error) alert("No se pudo anular: " + d.error);
+        cargarEntregas(); cargarSalud(); })
       .catch(function(){ cargarEntregas(); });
   }
 });
@@ -3680,6 +3767,8 @@ export default {
         if (ef) return await adminSubirFoto(request, env, ef[1].toUpperCase(), url);
         const ep = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/publicar$/i);
         if (ep) return await adminPublicarEntrega(request, env, ep[1].toUpperCase(), sesion.email);
+        const ea = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/anular$/i);
+        if (ea) return await adminAnularEntrega(request, env, ea[1].toUpperCase(), sesion.email);
 
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
