@@ -986,6 +986,40 @@ var I18N = {
     "brig.dar.especie.v2":"WhatsApp 312 302 3790",
     "brig.dar.cert.t":"Certificado de donación",
     "brig.dar.cert.p":"Somos una entidad sin ánimo de lucro vigente en el Régimen Tributario Especial. Tu donación da derecho a un descuento del 25% del valor donado sobre el impuesto de renta (Art. 257 del Estatuto Tributario), sujeto al límite del Art. 258. Su procedencia depende de tu situación tributaria: consúltalo con tu asesor. Lo expedimos firmado por el Representante Legal y la Revisora Fiscal.",
+    "of.t":"O déjanos los datos y te escribimos",
+    "of.p":"Si prefieres no escribir por WhatsApp. Lo importante es lo mismo: cuéntanos antes de comprar.",
+    "of.cat":"¿De qué categoría?",
+    "of.cat.agua":"Agua segura",
+    "of.cat.alimento":"Comida que no necesita cocina",
+    "of.cat.higiene":"Higiene y dignidad",
+    "of.cat.panales":"Pañales, de bebé y de adulto",
+    "of.cat.descanso":"Dormir sin piso frío",
+    "of.cat.energia":"Luz y carga de celular",
+    "of.cat.brigada":"Lo que sostiene a la brigada",
+    "of.cat.otra":"Otra cosa",
+    "of.detalle":"¿Qué exactamente?",
+    "of.detalle.ph":"Colchonetas de espuma, atún en lata con abre fácil, pañales talla M…",
+    "of.cantidad":"¿Cuánto? (opcional)",
+    "of.cantidad.ph":"50 unidades, 3 cajas, un bulto…",
+    "of.disponible":"¿Cuándo y cómo lo entregas? (opcional)",
+    "of.disponible.ph":"Esta semana, puedo llevarlo al acopio; o necesito que lo recojan.",
+    "of.quien":"Aportas como",
+    "of.quien.persona":"Persona",
+    "of.quien.empresa":"Empresa",
+    "of.nombre":"Nombre o razón social",
+    "of.email":"Correo",
+    "of.tel":"Teléfono o WhatsApp (opcional)",
+    "of.ciudad":"Ciudad (opcional)",
+    "of.datos":"Autorizo el tratamiento de mis datos para coordinar este aporte, conforme a la Política de Privacidad.",
+    "of.btn":"Enviar el ofrecimiento",
+    "of.sending":"Enviando…",
+    "of.ok":"Recibido. Te escribimos para confirmarte qué falta hoy — no compres nada todavía.",
+    "of.err":"No pudimos enviarlo. Intenta de nuevo o escríbenos por WhatsApp.",
+    "of.err.nombre":"Falta tu nombre.",
+    "of.err.email":"Ese correo no parece válido.",
+    "of.err.cat":"Elige una categoría.",
+    "of.err.detalle":"Cuéntanos qué ofreces.",
+    "of.err.datos":"Necesitamos tu autorización para tratar los datos.",
     "brig.no.ey":"Reglas de la brigada",
     "brig.no.t":"Lo que no vamos a hacer.",
     "brig.no1.t":"No entramos sin coordinación.",
@@ -1247,7 +1281,7 @@ var ACT_FNS = {
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
   donarBrigada:donarBrigada, allySubmit:allySubmit,
-  irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel,
+  irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
@@ -3021,6 +3055,51 @@ function volNivel(){
   if (!aviso) return;
   var pisa = n && (n.value === "hub" || n.value === "mixto");
   aviso.style.display = pisa ? "" : "none";
+}
+
+/* Ofrecimiento en especie. Mismo patrón que volSubmit: honeypot con éxito
+   aparente, validación en el cliente para no hacer viajar lo obviamente
+   incompleto, y la de verdad en el Worker. */
+function ofSubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("of-note");
+  var btn = document.getElementById("of-btn");
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+
+  if (val("of-web2")){ document.getElementById("of").reset(); return allyMsg(note, t("of.ok"), true); }
+
+  if (!val("of-cat")) return allyMsg(note, t("of.err.cat"), false);
+  if (!val("of-detalle")) return allyMsg(note, t("of.err.detalle"), false);
+  if (!val("of-nombre")) return allyMsg(note, t("of.err.nombre"), false);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("of-email"))) return allyMsg(note, t("of.err.email"), false);
+  var ok = document.getElementById("of-datos");
+  if (!ok || !ok.checked) return allyMsg(note, t("of.err.datos"), false);
+
+  var quienEl = document.querySelector('input[name="of-quien"]:checked');
+  btn.disabled = true;
+  allyMsg(note, t("of.sending"), true);
+
+  fetch("/api/inscripcion", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tipo: "especie",
+      campana: BRIGADA.destino,
+      categoria: val("of-cat"),
+      detalle: val("of-detalle"),
+      cantidad: val("of-cantidad"),
+      disponible: val("of-disp"),
+      quien: quienEl ? quienEl.value : "persona",
+      nombre: val("of-nombre"),
+      email: val("of-email"),
+      telefono: val("of-tel"),
+      ciudad: val("of-ciudad"),
+      autoriza_datos: true,
+      idioma: lang
+    })
+  }).then(function(r){ return r.ok ? r.json() : r.json().then(function(j){ throw new Error(j.error||"http"); }); })
+    .then(function(){ document.getElementById("of").reset(); btn.disabled = false; allyMsg(note, t("of.ok"), true); })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("of.err"), false); });
 }
 
 function volSubmit(ev){

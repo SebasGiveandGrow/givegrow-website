@@ -1102,3 +1102,11 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
    voz baja: dos líneas de igual peso harían dudar a cuál escribir. */
 .brig-quien{font-family:"Inter",sans-serif;font-weight:600;font-size:13px;
   letter-spacing:.02em;color:var(--mu);text-transform:none}
+
+/* Formulario de ofrecimiento en especie: vive dentro del bloque de acopios, así
+   que se separa con una regla en vez de con una tarjeta. */
+.of-t{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h4);
+  letter-spacing:-.01em;margin:26px 0 6px;padding-top:22px;border-top:1px solid var(--bd)}
+#of{margin-top:16px;max-width:560px}
+#of select{width:100%;padding:11px 12px;border:1px solid var(--bd);border-radius:10px;
+  background:var(--surface);color:var(--ink);font:inherit;font-size:15px}
