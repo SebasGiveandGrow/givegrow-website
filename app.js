@@ -914,6 +914,11 @@ var I18N = {
     "brig.ev.con":"Con",
     "brig.ev.recibio":"Recibió",
     "ev.error":"No pudimos cargar las entregas en este momento.",
+    "track.fuente.sitio":"Donación hecha por el sitio",
+    "track.fuente.libro":"Registro del libro de donaciones",
+    "track.ev.vacio":"Todavía no hay entregas publicadas para este destino. Cuando la haya, aparece aquí con su acta firmada.",
+    "track.sc.t":"Esa guía existe, pero su pago no está confirmado",
+    "track.sc.p":"Generamos la guía {guia} cuando empezaste el pago, y la pasarela no nos confirmó que se completara. Si crees que sí pagaste, escríbenos con el comprobante a contabilidad@thegiveandgrowproject.org y lo revisamos.",
     "track.ev.t":"Entregas de tu destino",
     "track.ev.p":"Tu aporte se suma al fondo de este destino. Estas son las entregas que ese fondo hizo posibles — no te atribuimos una en particular, porque el dinero se reúne y las jornadas se pagan entre varios aportes.",
     "brig.ey":"Brigada de atención a emergencia",
@@ -2092,7 +2097,12 @@ function pintarEntregas(cajaId, destino, conVacio){
     .then(function(r){ return r.json(); })
     .then(function(d){
       var l = d.entregas || [];
-      if (!l.length){ caja.innerHTML = conVacio ? '<p class="ev-vacio">'+escapeHtml(t("brig.ev.vacio"))+'</p>' : ""; return; }
+      if (!l.length){
+        /* El mensaje de la brigada habla de que «no ha salido»; en el rastreo el
+           donante pregunta por SU destino, que puede ser cualquiera. */
+        var vacio = (cajaId === "track-entregas") ? t("track.ev.vacio") : t("brig.ev.vacio");
+        caja.innerHTML = conVacio ? '<p class="ev-vacio">'+escapeHtml(vacio)+'</p>' : ""; return;
+      }
       caja.innerHTML = l.map(entregaHTML).join("");
     })
     .catch(function(){ caja.innerHTML = '<p class="ev-vacio">'+escapeHtml(t("ev.error"))+'</p>'; });
@@ -2871,13 +2881,72 @@ function trackSearch(){
   if (!guide){ if(inp) inp.focus(); return; }
   box.style.display = "";
   box.innerHTML = '<p class="track-loading">'+t("track.loading")+'</p>';
-  loadInventory().then(function(inv){
-    if (!inv || !inv.donaciones){ box.innerHTML = '<p class="track-error">'+t("track.err.load")+'</p>'; return; }
-    var d = null;
-    for (var i=0;i<inv.donaciones.length;i++){ if (normalizeGuide(inv.donaciones[i].guia)===guide){ d = inv.donaciones[i]; break; } }
-    if (!d){ box.innerHTML = trackNotFound(guide); return; }
-    box.innerHTML = trackRender(d);
-  });
+
+  /* D1 PRIMERO y el libro después. El rastreo leía solo `inventario.json` —lo
+     que escribe la automatización de Sheets— así que una donación hecha por el
+     sitio, que vive en D1, no se encontraba. Y el recibo que le llega al donante
+     le dice justamente que venga aquí con su guía. */
+  fetch("/api/aporte/" + encodeURIComponent(guide))
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .catch(function(){ return null; })
+    .then(function(a){
+      /* Solo manda D1 si el aporte llegó a un estado PÚBLICO. Una `intencion` es
+         una guía que se emitió y nunca se pagó: mostrarla como «Recibida» sería
+         falso, y además taparía la donación real que el libro sí tiene con ese
+         mismo número — que es justo lo que pasaba mientras los dos numeradores
+         se pisaban. */
+      var publico = a && a.guia && PUBLICOS.indexOf(a.estado) >= 0;
+      if (publico){
+        box.innerHTML = trackRender(deAporte(a), "sitio");
+        pintarEntregas("track-entregas", a.destino || "", true);
+        return;
+      }
+      return loadInventory().then(function(inv){
+        var d = null;
+        if (inv && inv.donaciones){
+          for (var i=0;i<inv.donaciones.length;i++){ if (normalizeGuide(inv.donaciones[i].guia)===guide){ d = inv.donaciones[i]; break; } }
+        }
+        if (d){ box.innerHTML = trackRender(d, "libro"); return; }
+        /* Ni pública en D1 ni en el libro. Si D1 la conoce sin confirmar, se lo
+           decimos: a alguien cuyo pago falló le sirve más saberlo que ver un
+           «no existe». */
+        if (a && a.guia){ box.innerHTML = trackSinConfirmar(a); return; }
+        if (!inv || !inv.donaciones){ box.innerHTML = '<p class="track-error">'+t("track.err.load")+'</p>'; return; }
+        box.innerHTML = trackNotFound(guide);
+      });
+    });
+}
+
+/* Estados del aporte que el donante puede ver como recorrido. El pago sin
+   confirmar no es un paso: para el donante el recorrido empieza cuando el
+   dinero entró de verdad. */
+var PUBLICOS = ["aprobada", "en_distribucion", "entregada"];
+
+/* Guía emitida cuyo pago nunca se confirmó. Pasa cuando el donante abandona la
+   pasarela o el medio de pago la rechaza. */
+function trackSinConfirmar(a){
+  return '<div class="track-card track-nf">'
+    + '<h3>'+t("track.sc.t")+'</h3>'
+    + '<p>'+t("track.sc.p").replace("{guia}", "<b>"+escapeHtml(a.guia)+"</b>")+'</p>'
+    + '</div>';
+}
+
+/* Traduce un aporte de D1 a la forma que ya pinta trackRender. Los estados de
+   pago que no son públicos —intencion, pendiente, rechazada— no se muestran
+   como un paso del recorrido: para el donante, el recorrido empieza cuando el
+   pago está confirmado. */
+function deAporte(a){
+  var mapa = { aprobada:"recibida", en_distribucion:"en_distribucion", entregada:"entregada" };
+  return {
+    guia: a.guia,
+    fecha: (a.aprobada_en || a.creada_en || "").slice(0,10),
+    tipo: "dinero",
+    modo: a.modo === "dirigida" ? "dirigida" : "fondo",
+    destino: a.destino || "",
+    desc: a.proyecto || "",
+    estado: mapa[a.estado] || "recibida",
+    entrega: ""
+  };
 }
 function trackNotFound(guide){
   return '<div class="track-card track-nf">'
@@ -2886,7 +2955,7 @@ function trackNotFound(guide){
     + '<button type="button" class="track-noguide" data-act="trackNoGuide()">'+t("track.noguide")+'</button>'
     + '</div>';
 }
-function trackRender(d){
+function trackRender(d, fuente){
   var estado = d.estado || "recibida";
   var idx = TRACK_STEPS.indexOf(estado);
   if (idx<0) idx = 0;
@@ -2914,7 +2983,16 @@ function trackRender(d){
     + '<div class="track-meta"><span>'+tipo+'</span><span>·</span><span>'+modo+'</span>'+(desc?'<span>·</span><span>'+desc+'</span>':'')+'</div>'
     + entrega
     + '<p class="track-foot">'+t("track.foot")+'</p>'
-    + '</div>';
+    + (fuente ? '<p class="track-fuente">'+t(fuente==="sitio"?"track.fuente.sitio":"track.fuente.libro")+'</p>' : "")
+    + '</div>'
+    /* Las entregas del destino, no de este aporte: contribución, no
+       atribución. Solo tiene sentido para lo que vive en D1, que es lo único
+       que sabe a qué destino fue. */
+    + (fuente === "sitio"
+        ? '<div class="track-ev-box"><h3>'+t("track.ev.t")+'</h3>'
+          + '<p class="mu">'+t("track.ev.p")+'</p>'
+          + '<div class="ev-lista" id="track-entregas"></div></div>'
+        : "");
 }
 function trackNoGuide(){
   var ng = document.getElementById("track-noguide-box");

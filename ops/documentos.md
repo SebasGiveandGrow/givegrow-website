@@ -174,6 +174,52 @@ fallback de SPA se lo traga.
 porque el papel firmado se fotografía y se publica; cuando se quiera un
 documento propio, el motor de `documentos.js` ya está.
 
+## ⚠️ Dos numeradores de guías: el libro y D1
+
+Descubierto el 12 ago 2026. **Las mismas guías identificaban donaciones
+distintas en dos sistemas:**
+
+| Guía | `inventario.json` (hoja de cálculo) | D1 `aportes` |
+|---|---|---|
+| GG-2026-000001 | 8 jul · dinero · «Apoyo Programa Flow Callejero» | 11 ago · intención |
+| GG-2026-000002 | 8 jul · especie · «3 cajas de ropa infantil» | 11 ago · intención |
+| GG-2026-000003 | 9 jul · especie | 12 ago · intención |
+
+El numerador de D1 arrancó en 1 sin saber que la automatización de Apps Script
+ya había emitido 1–3 en julio. Como la guía es también la `reference` de Wompi y
+la que cita el certificado, dos donaciones distintas podían compartir
+identificador.
+
+**Mitigación aplicada:** el numerador de D1 se adelantó a 999 en producción y en
+sandbox. Desde entonces las donaciones hechas por el sitio son
+`GG-2026-001000` en adelante, y el libro manual conserva los números bajos. Los
+rangos no se cruzan y el origen se lee de un vistazo.
+
+**No es la solución definitiva.** Lo correcto es que un solo numerador mande. El
+de Apps Script vive en Google (`ops/alta-automatica.gs`) y no se puede cambiar
+desde el repo; cambiar el formato de la guía tocaría regex, referencias de
+Wompi, recibos y certificados. Si el libro manual llegara alguna vez a 999,
+vuelve el problema.
+
+## El rastreo lee D1 primero
+
+`#rastrea` consultaba SOLO `inventario.json`, así que una donación hecha por el
+sitio —que vive en D1— no aparecía. Y el recibo que recibe el donante le dice
+justamente que vaya ahí con su guía.
+
+Ahora consulta `/api/aporte/<guia>` primero y cae al libro si no hay nada. Con
+una regla que importa: **D1 solo manda si el aporte está en un estado público**
+(aprobada, en_distribucion, entregada). Una `intencion` es una guía emitida que
+nunca se pagó; mostrarla como «Recibida» sería falso y además taparía la
+donación real que el libro sí tiene con ese número.
+
+Si la guía existe en D1 sin confirmar y no está en el libro, se dice tal cual:
+«esa guía existe, pero su pago no está confirmado». A quien se le cayó el pago
+le sirve más eso que un «no existe».
+
+Y debajo del recorrido aparecen **las entregas del destino**, no las de ese
+aporte: contribución, no atribución.
+
 ## Ofrecimientos en especie
 
 Hasta la brigada, ofrecer insumos terminaba en un WhatsApp: un mensaje suelto

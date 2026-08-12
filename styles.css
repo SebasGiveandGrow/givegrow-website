@@ -1110,3 +1110,11 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 #of{margin-top:16px;max-width:560px}
 #of select{width:100%;padding:11px 12px;border:1px solid var(--bd);border-radius:10px;
   background:var(--surface);color:var(--ink);font:inherit;font-size:15px}
+
+/* Rastreo: de dónde salió el dato, y las entregas del destino. */
+.track-fuente{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--mu);margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)}
+.track-ev-box{margin-top:28px;padding-top:24px;border-top:2px solid var(--g)}
+.track-ev-box h3{font-size:var(--fs-h4);margin-bottom:8px}
+.track-ev-box .mu{font-size:14.5px;line-height:1.6;max-width:64ch}
+.track-ev-box .ev-lista{margin-top:8px}
