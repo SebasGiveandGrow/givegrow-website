@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Fase 5 + 5.1 — documentos e integridad" (11 ago 2026)
+> Última actualización: sesión "Brigada del terremoto" (11–12 ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -14,8 +14,8 @@ Si Sebas dice solo "la siguiente fase", **preguntar de cuál de los tres**.
 
 | Plan | Dónde vive | Estado |
 |---|---|---|
-| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso de la sesión del 8–11 ago 2026 | **Fases 0, 1, 2, 4 y 5 hechas.** Fase 3 a medias: voluntariado ✅, faltan migrar fundaciones y empresas. **Siguiente natural: Fase 6** (evidencia: acta de entrega con foto sobre el aporte ya trazado) |
-| **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3** — y ahora sí es viable: el **contador por recencia** estaba bloqueado por no tener datos reales, y D1 ya los tiene |
+| **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso del 8–11 ago + este | **0, 1, 2, 4, 5, 5.1 y 6 hechas.** Fase 3 a medias: voluntariado ✅ y **especie ✅**, faltan **fundaciones y empresas** (siguen posteando a Apps Script, `ALLY_ENDPOINT`). Fase 7 a medias: **carnet ✅**, falta el **débito automático** en Wompi. **Fase 8 (medir) sin empezar** |
+| **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Siguiente: su Fase 3.** Ojo: parte de esa fase ya se hizo por otro camino — el rastreo real y la evidencia entraron con la brigada. Lo que queda de ella es **Transparencia imprimible en carta** y el **contador honesto por recencia**, que ahora sí tiene datos (`aportes` y `entregas` en D1) |
 | **VOLUNTARIADO, 8 fases** | `PLAN_VOLUNTARIADO.md` | **Fases 1–7 hechas y en producción.** **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
 Y aparte, el **Social Fest 2026**: la postulación ya se envió (taller «Si no quedó
@@ -23,75 +23,73 @@ documentado, no ocurrió»). Avisan los seleccionados el **28 de agosto**. Si en
 hay que producir los ocho materiales del taller — detalle en la memoria del
 proyecto.
 
-## ⏭️ TAREA QUE SIGUE: la contraprestación, y luego la Fase 6
+## ⏭️ LO QUE ESPERA INSUMO DE SEBAS (no código)
 
-**Pregunta para la contadora, antes de emitir certificados a miembros.** El
-numeral 6 del certificado declara «acto de mera liberalidad… sin contraprestación
-alguna, directa ni indirecta». Pero la membresía Tier 2 ofrece «Acceso al
-Programa de Gratitud», que son beneficios reales de comercios aliados. Si el
-donante recibe algo a cambio, esa declaración puede ser falsa — y la firma la
-Revisora Fiscal bajo juramento. **No lo arregla código.** Es el mayor riesgo
-abierto de toda la tanda de documentos.
+1. **Cuántos brigadistas: 7 u 8.** Él dijo siete; el inventario está calculado
+   para ocho (cascos, botas, sleeping bags, carnés, juegos de documentos).
+   **Pidió expresamente no tocarlo — lo cierra él.**
+2. **Direcciones de los centros de acopio.** La página dice «escríbenos y te
+   decimos a cuál llevarlo». Es honesto sin datos, pero es fricción.
+3. **Avales de CMGRD** por ciudad, para quitar «zona por confirmar».
+4. **Costos del inventario.** Sin ellos no hay meta en pesos ni equivalencias, y
+   la calculadora lo dice en voz alta.
+5. **Cédulas de los firmantes** (`ENTIDAD.repLegal.cc` y `.revisora.cc` en
+   `documentos.js`). El bloque de firmas omite la línea mientras estén vacías.
+6. **La contraprestación, con la contadora.** Sigue abierta. El carnet se diseñó
+   para no ensancharla: solo membresía recurrente, nunca aportes de la brigada.
 
-Falta también un dato que solo tiene Sebas: las **cédulas de los firmantes**
-(`ENTIDAD.repLegal.cc` y `ENTIDAD.revisora.cc` en `documentos.js`). El bloque de
-firmas omite la línea mientras estén vacías.
+## ⚠️ DOS COSAS QUE SIGUEN A MEDIAS Y HAY QUE RECORDAR
 
-Y sigue sin ejercitarse **la emisión real desde /admin**: está tras Cloudflare
-Access y no hay forma legítima de firmar ese token en `wrangler dev`. Emitir uno
-y mirar el PDF.
+**Los dos numeradores de guías.** Mitigado, no resuelto: el de D1 se adelantó a
+999 y el libro de Sheets conserva los números bajos. Si el libro llegara alguna
+vez a 999, vuelve la colisión. Detalle en `ops/documentos.md`.
 
-Después: **Fase 6 del ecosistema** (evidencia: acta de entrega con foto sobre el
-aporte ya trazado).
+**Las transferencias bancarias no crean registro.** Es el primer medio de pago
+que muestra la página de la brigada y el que usan las empresas, y no produce
+guía, ni recibo, ni rastreo, ni ruta al certificado: hoy termina en un correo a
+`contabilidad@`. El panel tiene «Pagos sin aporte» para lo que entra por el
+enlace de Wompi, pero una transferencia ni siquiera pasa por la pasarela. Es el
+hueco más grande que queda en el ecosistema.
 
-## ⚠️ INCIDENTE: producción sin donaciones (11 ago 2026, ~25 min)
+## Cierre de tanda: la brigada del terremoto (11–12 ago 2026)
 
-La migración 0003 **no llegó a producción** —casi seguro un `apply` sin
-`--remote`, que va a una base local— y el código salió igual. Como
-`/api/checkout` ya escribía `aportes.token` y el `SELECT` del webhook la
-nombraba, **nadie pudo donar** y los pagos en curso no se confirmaron, entre el
-deploy (18:19 UTC) y la reparación.
+Un sismo de **magnitud 7,4** el 10 de agosto, epicentro cerca de San José del
+Palmar (Chocó), 103 km de profundidad, según el Servicio Geológico Colombiano;
+desastre nacional declarado. Give&Grow sale con siete personas a **Cali,
+Pereira, Manizales, Armenia y Chocó**, más de 100 familias por sector, con
+fundaciones del territorio (modalidad HUB). Contexto completo en la memoria
+`givegrow-brigada-terremoto`.
 
-Se detectó al verificar producción: `/api/recibo` devolvía **500 donde debía
-devolver 403**. Un error de más en un endpoint nuevo delató que la base no tenía
-la columna.
+**Las cifras de víctimas NO se publican, a propósito.** El 11 de agosto las
+fuentes iban de 132 a más de 240 en horas. La página dice quién las publica y
+por qué no las repetimos. Si alguien propone añadirlas, ese es el motivo.
 
-**La lección no es "acordarse de aplicar la migración".** Estaba escrito en el
-PR, en el handoff y en CLAUDE.md, y aun así se perdió. Un paso manual que tumba
-el cobro no es un paso manual: es un incidente que todavía no ocurrió. Desde
-ahora `deploy.yml` corre `wrangler d1 migrations list --remote` y **se niega a
-desplegar** si hay pendientes.
+### Lo que entró (PRs #63 a #75, todos en producción)
+- **#63** `#donar` reordenado: el pago cierra la calculadora, lo demás se junta.
+- **#64 y #65** Fase 5 y 5.1: recibo automático, certificado firmado a mano, y
+  los tres huecos de integridad (reversa, identidad, sello de anulado).
+- **#66 y #67** La brigada como destino propio en la calculadora, con enlace
+  corto `#brigada`, aporte único forzado y sin nivel de membresía.
+- **#68** La página de la campaña, con los hechos del sismo verificados.
+- **#69 y #72** Fase 6: actas de entrega con foto en R2, y el candado de fecha
+  futura que nació de la prueba real.
+- **#70 y #71** Dos acopios (Give&Grow y Nativos), fuera la regla de la ropa
+  usada, el enlace de pago de Wompi y la conciliación de «pagos sin aporte».
+- **#73** Formulario de ofrecimientos en especie, sin migración.
+- **#74** El rastreo lee D1 y muestra las entregas del destino.
+- **#75** El carnet de miembro y la auditoría de promesas.
 
-## Cierre de tanda: Fase 5.1 — integridad de los certificados (11 ago 2026)
-
-Nació de una pregunta de Sebas: «¿podrías hacer fraude o aprovecharte de esto?».
-La respuesta corta era que el certificado ya no es automático —lo emite una
-persona— pero al modelar el ataque en serio aparecieron tres huecos, y dos eran
-míos de la Fase 5.
-
-- **Reversa después de emitir.** Pagar, recibir el certificado y hacer
-  contracargo dejaba un certificado vigente respaldando un descuento del 25%
-  sobre plata devuelta. Ahora un guardián en el camino del webhook lo marca
-  `revision_en`, sella el PDF y avisa. Va **antes** del corte que impide que un
-  aporte `entregada` retroceda: el caso más grave era justo el que ese corte se
-  saltaba.
-- **Certificado a nombre de otro.** Donar como persona y emitirlo a nombre de la
-  empresa, para que la empresa tome el descuento. Se guarda lo que validó Wompi,
-  se registra la divergencia y **se exige motivo**. No se prohíbe corregir un
-  nombre incompleto: se deja rastro, porque un error de digitación se explica en
-  una línea y un cambio de beneficiario no.
-- **Un certificado anulado se descargaba limpio.** Fallo real de la Fase 5: el
-  snapshot congela el contenido, no el estado. Ahora el PDF sale con sello
-  diagonal y dice desde cuándo y por qué. El papel viaja solo.
-
-`revision_*` es automático y reversible; `anulado_*` es humano y definitivo. No
-comparten columna a propósito: el sistema marca y avisa, pero **no anula** —
-anular lleva motivo y es un acto de una persona.
-
-Verificado con `ops/probar-pagos.py`, que pasó de 17 a **19 casos en verde**: la
-reversa marca el certificado a través del webhook real y con firma real, y el
-reintento no vuelve a marcar ni a avisar (Wompi reintenta hasta cuatro veces y
-tres correos idénticos entrenan a ignorarlos).
+### Las tres lecciones de esta tanda
+1. **Una promesa publicada es una función pendiente.** El sitio prometía carnet
+   y reporte fotográfico mensual sin una línea de código detrás, y prometía
+   actas antes de tener dónde guardarlas. Auditar el diccionario contra el
+   código encontró más deuda que leer el código solo.
+2. **Un paso manual que tumba el cobro es un incidente que todavía no ocurrió.**
+   La migración 0003 se perdió pese a estar escrita en tres sitios; hoy el
+   despliegue se niega a salir si la base no está migrada.
+3. **Dos sistemas que numeran lo mismo terminan chocando.** D1 y la hoja de
+   cálculo emitieron las mismas tres guías para donaciones distintas. Nadie lo
+   habría notado hasta que un donante rastreara la donación de otro.
 
 ## Cierre de tanda: ecosistema digital, Fase 5 — los documentos (11 ago 2026)
 
