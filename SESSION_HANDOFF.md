@@ -58,12 +58,12 @@ pruebas y se borraron.
 
 | | |
 |---|---|
-| `aportes` | **1.** `GG-2026-001001`, $5.000 a la brigada, `en_distribucion`, `confirmacion = 'conciliada'` |
+| `aportes` | **2 reales, las dos pagadas.** `GG-2026-001001` (`en_distribucion`, `'conciliada'`) y `GG-2026-001002` (`aprobada`, `'wompi'`) |
 | `donantes` | **1** — el de esa donación |
-| `eventos_wompi` | **0** ⚠️ el webhook sigue SIN probarse (ver abajo) |
+| `eventos_wompi` | **1**, con firma válida y procesado — el webhook quedó probado (ver abajo) |
 | `certificados`, `miembros`, `inscripciones` | **0** |
 | `entregas` | **0 vivas, 1 anulada** (`AE-2026-000001`, la prueba del panel) |
-| numeradores | guía **1001** · acta **1** · certificado sin estrenar |
+| numeradores | guía **1002** · acta **1** · certificado sin estrenar |
 
 **Se borraron 4 intenciones sin pagar** (`GG-2026-000001`, `000002`, `000003`,
 `001000`). Ninguna tenía transacción, donante, certificado ni evento; el `DELETE`
@@ -77,17 +77,40 @@ referencia — la misma colisión que ya está documentada entre D1 y el libro d
 Sheets. La próxima donación real es `GG-2026-001002`, con huecos antes, y está
 bien: nadie espera que las guías sean consecutivas.
 
-### ⚠️ EL WEBHOOK SIGUE SIN VEREDICTO
-Sebas configuró la URL de eventos en Wompi el 12 de agosto, pero
-**`eventos_wompi` sigue en 0 y por lo tanto no hay prueba de que funcione**: el
-único pago real entró ANTES de configurarla y se rescató a mano con la
-conciliación.
+### ✅ EL WEBHOOK FUNCIONA — probado con dinero real (12 ago 2026, 16:12 UTC)
 
-**Lo primero al retomar: un pago pequeño de prueba.** Si aparece una fila en
-`eventos_wompi` y el aporte llega a `aprobada` solo, con `confirmacion = 'wompi'`
-y su recibo, queda probada la cadena entera —checkout → webhook → recibo— que es
-el último eslabón sin verificar del ecosistema. Si no aparece, la URL no quedó
-guardada. La alarma de la Fase 8 en `/admin` lo dice en la cara mientras siga en 0.
+Sebas configuró la URL de eventos y pagó $5.000 por el sitio para probarla. La
+cadena completa, sin que nadie tocara el panel:
+
+| | |
+|---|---|
+| `eventos_wompi` fila 4 | tx `1474268-1786551110-86008` · `transaction.updated` · APPROVED |
+| firma | **`firma_valida = 1`** — el checksum reproduce el de Wompi |
+| procesado | **1** |
+| `GG-2026-001002` | `intencion` 16:11:03 → **`aprobada` 16:12:37** |
+| confirmación | **`'wompi'`**, con `confirmado_por` en NULL: lo movió la máquina |
+| donante | vinculado, y **deduplicado por correo** (mismo `donante_id 1` que 001001) |
+
+**94 segundos de punta a punta.** Con esto queda verificado en producción lo
+último que faltaba: checkout firmado → Wompi → webhook con firma válida →
+aporte aprobado → donante. Y el `timestamp` de la raíz sigue siendo el correcto
+(`timestamp_wompi = 1786551156`), así que la trampa de la documentación no
+volvió.
+
+**Los dos caminos coexisten y se distinguen en la base**, que era el punto de
+`confirmacion`: `001001` dice `'conciliada'` (rescatada a mano cuando el webhook
+estaba mudo) y `001002` dice `'wompi'`.
+
+**Falta confirmar una sola cosa:** que el **recibo** haya llegado al correo del
+donante. Es el último tramo de la Fase 5 sin ver con datos reales — ninguno de los
+dos aportes pidió certificado (`quiere_certificado = 0`), así que el certificado
+sigue sin estrenarse.
+
+**Nota, y no es nuestra:** Wompi devuelve al donante a
+`/gracias?id=…&env=undefined`. El Worker manda `redirect-url` limpio, sin
+parámetros; el `env` lo añade Wompi y le sale `undefined`. La página solo lee
+`id`, así que es inofensivo — pero si algún día se ve raro en un enlace
+compartido, el origen es Wompi y no el sitio.
 
 ## 🔴 INCIDENTE: se cobró un pago real y la base no lo supo (12 ago 2026)
 
