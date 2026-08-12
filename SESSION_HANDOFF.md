@@ -54,6 +54,20 @@ en siete personas y se dice POR QUÉ no se puede sumar gente a terreno en doce
 días —doble verificación más sesión de Marco—, en vez de invitar a algo que no se
 puede cumplir. Las manos que se piden son de estructura, en Medellín.
 
+**El tono de la petición, corregido (12 ago).** Sebas: «la forma en la que pides
+el dinero es muy abrupta, muy poco humana». Tenía razón y el defecto era mío:
+«Dinero» no es una petición, es una categoría de inventario, y las cuatro
+descripciones eran puro mecanismo —la cuenta, la presentación, empacar, la
+bodega— sin una palabra sobre para quién es. La página ya tenía la voz correcta
+treinta centímetros más abajo, en las observaciones del inventario.
+
+**La regla que quedó, y sirve para todo lo que se escriba de aquí en adelante:**
+el calor no se agrega con adjetivos, se agrega **diciendo qué cambia y para
+quién**. Cada petición ahora abre igual —«Con dinero», «Con insumos», «Con tus
+manos», «Con una llamada»— y ese paralelismo es deliberado: quien no puede dar
+plata no debe sentirse de segunda. Y la fricción se explica como cuidado del que
+da («te lo pedimos para cuidar tu plata»), no como advertencia.
+
 **Sigue sin haber costos del inventario**, y por eso sigue sin haber meta en pesos
 ni equivalencias. Sebas lo confirmó: por ahora no los hay. La página pide sin
 poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemos».
