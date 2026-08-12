@@ -206,6 +206,17 @@ async function siguienteCertificado(env, anio) {
   return "CD-" + anio + "-" + String(n).padStart(6, "0");
 }
 
+/* Consecutivo de actas de entrega: AE-YYYY-NNNNNN. */
+async function siguienteActa(env, anio) {
+  const { results } = await env.DB.prepare(
+    "INSERT INTO numerador_acta (anio, ultimo) VALUES (?, 1) " +
+    "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1 RETURNING ultimo"
+  ).bind(anio).all();
+  const n = results && results[0] ? results[0].ultimo : null;
+  if (!n) throw new Error("numerador de actas no devolvió consecutivo");
+  return "AE-" + anio + "-" + String(n).padStart(6, "0");
+}
+
 /* Token de 128 bits para el enlace del recibo. La guía es consecutiva y por lo
    tanto adivinable; el recibo lleva nombre y dedicatoria, así que no puede
    depender solo de ella. */
@@ -1338,6 +1349,193 @@ function fechaLargaISO(iso) {
   return Number(m[3]) + " de " + MESES_ES[Number(m[2]) - 1] + " de " + m[1];
 }
 
+/* ========================================================================
+   ENTREGAS · la evidencia (Fase 6)
+   ========================================================================
+   El sitio prometía «publicamos el acta de cada entrega» sin tener dónde
+   registrarla. Esto es ese registro.
+
+   El documento legal sigue siendo el ACTA EN PAPEL que firma quien recibe. Aquí
+   se guarda su transcripción y su foto: el sitio no reemplaza la firma, la
+   publica.
+
+   Una entrega se asocia a un DESTINO, no a un aporte — ver el porqué en
+   migrations/0005_entregas.sql. Es contribución, no atribución.
+   ======================================================================== */
+
+const MAX_FOTO = 8 * 1024 * 1024;
+const TIPOS_FOTO = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/* Lo que puede ver cualquiera. Deliberadamente NO incluye `creada_por` (correo
+   interno) ni nada que identifique a una familia. */
+function entregaPublica(e) {
+  let fotos = [];
+  try { fotos = JSON.parse(e.fotos || "[]"); } catch (x) { /* fotos corruptas: se omiten */ }
+  return {
+    numero: e.numero, sector: e.sector, lugar: e.lugar, fecha: e.fecha,
+    aliada: e.aliada, familias: e.familias, resumen: e.resumen,
+    recibido_por: e.recibido_por,
+    fotos: fotos.map((f) => ({ url: "/evidencia/" + e.numero + "/" + f.k, alt: f.alt || "" }))
+  };
+}
+
+async function apiEntregas(env, url) {
+  const destino = String(url.searchParams.get("destino") || "").slice(0, 60);
+  const limite = Math.min(Math.max(Number(url.searchParams.get("limite")) || 20, 1), 50);
+  let sql = "SELECT numero, destino_id, sector, lugar, fecha, aliada, familias, resumen, " +
+            "recibido_por, fotos FROM entregas WHERE publicada_en IS NOT NULL";
+  const args = [];
+  if (destino) { sql += " AND destino_id = ?"; args.push(destino); }
+  sql += " ORDER BY fecha DESC, numero DESC LIMIT " + limite;
+  const q = args.length ? env.DB.prepare(sql).bind(...args) : env.DB.prepare(sql);
+  const r = await q.all();
+  return json({ entregas: (r.results || []).map(entregaPublica) });
+}
+
+/* GET /evidencia/<numero>/<archivo>
+   Sirve la foto desde R2 SOLO si su entrega está publicada. La clave es
+   difícil de adivinar, pero eso es oscuridad, no control: si una entrega se
+   despublica, sus fotos tienen que dejar de responder. */
+async function rutaEvidencia(env, numero, archivo) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  if (!/^AE-\d{4}-\d{6}$/.test(numero) || !/^[a-z0-9._-]{1,80}$/i.test(archivo)) {
+    return json({ error: "ruta_invalida" }, 400);
+  }
+  const e = await env.DB.prepare(
+    "SELECT fotos FROM entregas WHERE numero = ? AND publicada_en IS NOT NULL"
+  ).bind(numero).first();
+  if (!e) return json({ error: "no_encontrada" }, 404);
+
+  let fotos = [];
+  try { fotos = JSON.parse(e.fotos || "[]"); } catch (x) { /* nada */ }
+  if (!fotos.some((f) => f.k === archivo)) return json({ error: "no_encontrada" }, 404);
+
+  const obj = await env.MEDIA.get("entregas/" + numero + "/" + archivo);
+  if (!obj) return json({ error: "no_encontrada" }, 404);
+  return new Response(obj.body, {
+    headers: {
+      "content-type": obj.httpMetadata && obj.httpMetadata.contentType || "application/octet-stream",
+      /* La clave nunca cambia de contenido: si se reemplaza la foto, cambia el
+         nombre del archivo. Por eso puede cachearse de verdad. */
+      "cache-control": "public, max-age=31536000, immutable"
+    }
+  });
+}
+
+/* ---- panel ---- */
+
+async function adminEntregas(env) {
+  const r = await env.DB.prepare(
+    "SELECT numero, destino_id, sector, lugar, fecha, aliada, familias, resumen, " +
+    "recibido_por, fotos, publicada_en, creada_por FROM entregas ORDER BY fecha DESC, numero DESC LIMIT 100"
+  ).all();
+  return json({ entregas: r.results || [] });
+}
+
+async function adminCrearEntrega(request, env, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const destino = limpiar(c.destino_id, 60);
+  const sector  = limpiar(c.sector, 80);
+  const fecha   = limpiar(c.fecha, 10);
+  const resumen = limpiar(c.resumen, 1200);
+
+  const faltan = [];
+  if (!destino) faltan.push("destino_id");
+  if (!sector)  faltan.push("sector");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) faltan.push("fecha");
+  if (!resumen) faltan.push("resumen");
+  if (faltan.length) return json({ error: "datos_incompletos", faltan }, 422);
+
+  const numero = await siguienteActa(env, Number(fecha.slice(0, 4)));
+  await env.DB.prepare(
+    "INSERT INTO entregas (numero, destino_id, sector, lugar, fecha, aliada, familias, " +
+    "resumen, recibido_por, fotos, creada_por) VALUES (?,?,?,?,?,?,?,?,?,'[]',?)"
+  ).bind(
+    numero, destino, sector, limpiar(c.lugar, 160), fecha, limpiar(c.aliada, 160),
+    Number(c.familias) > 0 ? Math.round(Number(c.familias)) : null,
+    resumen, limpiar(c.recibido_por, 160), quien || "?"
+  ).run();
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "entrega " + numero + " creada · " + sector + " · " + fecha).run();
+
+  return json({ ok: true, numero });
+}
+
+async function adminSubirFoto(request, env, numero, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+
+  const e = await env.DB.prepare("SELECT numero, fotos FROM entregas WHERE numero = ?").bind(numero).first();
+  if (!e) return json({ error: "no_encontrada" }, 404);
+
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const ext = TIPOS_FOTO[tipo];
+  if (!ext) return json({ error: "tipo_no_permitido", permitidos: Object.keys(TIPOS_FOTO) }, 415);
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > MAX_FOTO) return json({ error: "archivo_muy_grande", max_mb: 8 }, 413);
+
+  let fotos = [];
+  try { fotos = JSON.parse(e.fotos || "[]"); } catch (x) { /* nada */ }
+  /* El nombre lo pone el servidor: un nombre de archivo que llegue del cliente
+     es una ruta que llega del cliente. */
+  const archivo = (fotos.length + 1) + "-" + tokenNuevo().slice(0, 8) + "." + ext;
+
+  await env.MEDIA.put("entregas/" + numero + "/" + archivo, bytes, {
+    httpMetadata: { contentType: tipo }
+  });
+  fotos.push({ k: archivo, alt: limpiar(url.searchParams.get("alt"), 200) });
+  await env.DB.prepare(
+    "UPDATE entregas SET fotos = ?, actualizada_en = datetime('now') WHERE numero = ?"
+  ).bind(JSON.stringify(fotos), numero).run();
+
+  return json({ ok: true, archivo, total: fotos.length });
+}
+
+/* Publicar es un acto aparte de registrar: se registra en caliente, en terreno,
+   y se publica cuando alguien revisó que no haya un dato que no deba salir. */
+async function adminPublicarEntrega(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* opcional */ }
+  const publicar = c.publicar !== false;
+
+  const e = await env.DB.prepare(
+    "SELECT numero, fotos, publicada_en FROM entregas WHERE numero = ?"
+  ).bind(numero).first();
+  if (!e) return json({ error: "no_encontrada" }, 404);
+
+  /* Una entrega sin una sola foto no es evidencia, es una afirmación. El sitio
+     entero se apoya en «evidencia, no promesas»: publicarla vacía sería romper
+     justo la regla que la campaña anuncia. */
+  if (publicar) {
+    let fotos = [];
+    try { fotos = JSON.parse(e.fotos || "[]"); } catch (x) { /* nada */ }
+    if (!fotos.length) {
+      return json({
+        error: "sin_evidencia",
+        ayuda: "Sube al menos la foto del acta firmada antes de publicar."
+      }, 422);
+    }
+  }
+
+  await env.DB.prepare(
+    "UPDATE entregas SET publicada_en = " + (publicar ? "datetime('now')" : "NULL") +
+    ", actualizada_en = datetime('now') WHERE numero = ?"
+  ).bind(numero).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "entrega " + numero + (publicar ? " PUBLICADA" : " despublicada")).run();
+
+  return json({ ok: true, numero, publicada: publicar });
+}
+
 function paginaAdmin() {
   return `<!doctype html>
 <html lang="es"><head>
@@ -1370,6 +1568,27 @@ function paginaAdmin() {
 </table></div>
 
 <div id="dlg" style="display:none;margin-top:24px"></div>
+
+<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:18px">El documento legal es el
+acta EN PAPEL que firma quien recibe. Aquí se registra su transcripción y se sube su foto.
+<strong>Nunca se publican nombres de personas beneficiarias</strong> — en «recibido por» va el rol
+y la entidad, no una persona atendida. Una entrega no se puede publicar sin al menos una foto.</p>
+
+<div class="card" style="max-width:640px;text-align:left;margin-bottom:20px">
+  <h3 style="margin-bottom:12px">Registrar una entrega</h3>
+  <div id="e-campos"></div>
+  <p id="e-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>
+  <button class="btn btn-g" id="e-crear">Registrar</button>
+</div>
+
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Acta</th><th scope="col">Fecha</th><th scope="col">Sector</th>
+<th scope="col">Aliada</th><th scope="col">Familias</th><th scope="col">Fotos</th>
+<th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="e-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
+</table></div>
 
 <p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
 <p class="mu" style="margin-top:8px;font-size:13px;max-width:70ch">El <strong>recibo</strong> lo emite el sistema al confirmarse el pago. El <strong>certificado</strong> no: lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, así que sale de aquí, revisado, y nunca solo.</p>
@@ -1581,6 +1800,103 @@ document.addEventListener("click", function(e){
   }
 });
 
+/* ---------------- entregas ---------------- */
+var E_CAMPOS = [
+  ["e-destino","Destino","brigada-emergencia-2026-08"],
+  ["e-sector","Sector (ciudad)",""],
+  ["e-fecha","Fecha del acta (AAAA-MM-DD)",""],
+  ["e-lugar","Lugar (albergue o punto)",""],
+  ["e-aliada","Fundación aliada del territorio",""],
+  ["e-familias","Familias que recibieron",""],
+  ["e-recibido","Recibido por (ROL y entidad, no una persona atendida)",""],
+  ["e-resumen","Qué se entregó, por categorías",""]
+];
+function pintarCampos(){
+  var c = document.getElementById("e-campos"); if (!c) return;
+  c.innerHTML = E_CAMPOS.map(function(f){ return campo(f[0], f[1], f[2]); }).join("");
+}
+
+function pintarEntregas(l){
+  var tb = document.getElementById("e-filas"); if (!tb) return;
+  if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Todavía no hay entregas registradas.</td></tr>'; return; }
+  tb.innerHTML = l.map(function(e){
+    var nf = 0; try { nf = JSON.parse(e.fotos||"[]").length; } catch(x){}
+    var pub = !!e.publicada_en;
+    return "<tr>" +
+      "<td>" + esc(e.numero) + "</td>" +
+      "<td>" + esc(e.fecha) + "</td>" +
+      "<td>" + esc(e.sector) + "</td>" +
+      "<td>" + esc(e.aliada || "—") + "</td>" +
+      "<td>" + (e.familias == null ? "—" : e.familias) + "</td>" +
+      "<td>" + nf + ' <label class="copy" style="cursor:pointer">+foto' +
+        '<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" data-foto="' + esc(e.numero) + '"></label></td>' +
+      "<td>" + (pub ? "publicada" : '<strong style="color:#A84D00">borrador</strong>') + "</td>" +
+      '<td><button class="copy" data-pub="' + esc(e.numero) + '" data-v="' + (pub ? "0" : "1") + '">' +
+        (pub ? "Despublicar" : "Publicar") + "</button></td>" +
+    "</tr>";
+  }).join("");
+}
+
+function cargarEntregas(){
+  fetch("/api/admin/entregas").then(function(r){ return r.json(); })
+    .then(function(d){ pintarEntregas(d.entregas || []); });
+}
+
+document.addEventListener("change", function(e){
+  var inp = e.target.closest("[data-foto]");
+  if (!inp || !inp.files || !inp.files[0]) return;
+  var f = inp.files[0];
+  /* El cuerpo va crudo con su content-type: sin multipart no hay que parsear
+     nada en el Worker, y el nombre del archivo lo pone el servidor. */
+  fetch("/api/admin/entrega/" + encodeURIComponent(inp.getAttribute("data-foto")) + "/foto?alt=" +
+        encodeURIComponent(f.name.replace(/\.[a-z0-9]+$/i,"")), {
+    method: "POST", headers: {"content-type": f.type}, body: f
+  }).then(function(r){ return r.json(); })
+    .then(function(d){ if (d.error) alert("No se pudo subir: " + d.error); cargarEntregas(); })
+    .catch(function(){ alert("No se pudo subir la foto."); });
+});
+
+document.addEventListener("click", function(e){
+  if (e.target.id === "e-crear"){
+    var b = e.target, err = document.getElementById("e-error");
+    err.style.display = "none"; b.disabled = true; b.textContent = "Registrando…";
+    function v(id){ var el = document.getElementById(id); return el ? el.value : ""; }
+    fetch("/api/admin/entrega", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({
+        destino_id: v("e-destino"), sector: v("e-sector"), fecha: v("e-fecha"),
+        lugar: v("e-lugar"), aliada: v("e-aliada"), familias: v("e-familias"),
+        recibido_por: v("e-recibido"), resumen: v("e-resumen")
+      })
+    }).then(function(r){ return r.json().then(function(d){ return {http:r.status, d:d}; }); })
+      .then(function(res){
+        b.disabled = false; b.textContent = "Registrar";
+        if (res.http !== 200){
+          err.textContent = res.d.faltan ? ("Faltan datos: " + res.d.faltan.join(", ") + ".")
+                                         : ("No se pudo registrar (" + (res.d.error||res.http) + ").");
+          err.style.display = "block"; return;
+        }
+        pintarCampos(); cargarEntregas();
+      })
+      .catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
+    return;
+  }
+  var pb = e.target.closest("[data-pub]");
+  if (pb){
+    var quiere = pb.getAttribute("data-v") === "1";
+    pb.disabled = true; pb.textContent = "…";
+    fetch("/api/admin/entrega/" + encodeURIComponent(pb.getAttribute("data-pub")) + "/publicar", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ publicar: quiere })
+    }).then(function(r){ return r.json(); })
+      .then(function(d){ if (d.error === "sin_evidencia") alert(d.ayuda); cargarEntregas(); })
+      .catch(function(){ cargarEntregas(); });
+  }
+});
+
+pintarCampos();
+cargarEntregas();
+
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
   .catch(function(){});
@@ -1680,6 +1996,15 @@ export default {
     const compartir = ruta.match(/^\/f\/([a-z0-9-]+)\/?$/);
     if (compartir) return rutaCompartir(env, url, compartir[1]);
 
+    /* Fotos de las actas y las jornadas. Fuera de /api/ a propósito: son
+       imágenes que se enlazan desde el sitio y se comparten, no una API. */
+    const evi = ruta.match(/^\/evidencia\/(AE-\d{4}-\d{6})\/([A-Za-z0-9._-]+)$/);
+    if (evi) {
+      if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+      try { return await rutaEvidencia(env, evi[1].toUpperCase(), evi[2]); }
+      catch (e) { console.error("evidencia", ruta, e && e.message); return json({ error: "error_interno" }, 500); }
+    }
+
     /* --- Panel interno: TODO detrás de Access, y fail-closed --- */
     if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/")) {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
@@ -1752,6 +2077,15 @@ export default {
         const ca = ruta.match(/^\/api\/admin\/certificado\/(CD-\d{4}-\d{6})\/anular$/i);
         if (ca) return await adminAnularCertificado(request, env, ca[1].toUpperCase(), sesion.email);
 
+        /* Entregas (Fase 6). El borrador y sus fotos viven tras Access hasta que
+           alguien las publica: en terreno se registra rápido y se revisa después. */
+        if (ruta === "/api/admin/entregas") return await adminEntregas(env);
+        if (ruta === "/api/admin/entrega")  return await adminCrearEntrega(request, env, sesion.email);
+        const ef = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/foto$/i);
+        if (ef) return await adminSubirFoto(request, env, ef[1].toUpperCase(), url);
+        const ep = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/publicar$/i);
+        if (ep) return await adminPublicarEntrega(request, env, ep[1].toUpperCase(), sesion.email);
+
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
         console.error("admin", ruta, e && e.message);
@@ -1770,6 +2104,7 @@ export default {
         if (aporte)                         return await apiAporte(env, aporte[1]);
         const rec = ruta.match(/^\/api\/recibo\/(GG-\d{4}-\d{6})\.pdf$/i);
         if (rec)                            return await apiRecibo(env, rec[1], url.searchParams.get("t"));
+        if (ruta === "/api/entregas")       return await apiEntregas(env, url);
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
         /* Nunca se filtra el detalle interno al cliente. */

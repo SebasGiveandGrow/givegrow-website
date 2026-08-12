@@ -11,7 +11,7 @@ html_handling = "auto-trailing-slash"
 # single-page-application` se las traga y devuelve index.html en lugar de invocar
 # al Worker. Le pasó a /api/* al construir la Fase 2, y volvería a pasar con
 # /admin — que además serviría la SPA pública en lugar del panel protegido.
-run_worker_first = ["/f/*", "/api/*", "/admin", "/admin.js"]
+run_worker_first = ["/f/*", "/api/*", "/admin", "/admin.js", "/evidencia/*"]
 
 # Base PRIVADA (Ley 1581): donantes, aportes, inscripciones y consentimientos.
 # Nunca se sirve al navegador. Los datos públicos de la red siguen en
@@ -20,6 +20,14 @@ run_worker_first = ["/f/*", "/api/*", "/admin", "/admin.js"]
 binding = "DB"
 database_name = "givegrow-privado"
 database_id = "e40b0794-37ab-4461-bf59-53b682095446"
+
+# Evidencia de terreno (Fase 6): fotos de las actas de entrega firmadas y de las
+# jornadas. Va en R2 y no en el repositorio porque son archivos que crecen con
+# cada salida y no tienen por qué versionarse ni redesplegarse con el sitio.
+# Se sirven por /evidencia/… y SOLO si la entrega está publicada — ver worker.js.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "givegrow-media"
 
 # La llave pública de Wompi NO es secreta (viaja en la URL del checkout), así
 # que vive aquí y queda versionada. Las otras tres —privada, integridad y
@@ -84,6 +92,13 @@ html_handling = "auto-trailing-slash"
 # verificado: el header no aparecía. Producción conserva la lista, que es el
 # camino rápido.
 run_worker_first = true
+
+[[env.sandbox.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "givegrow-media"
+# Prefijo aparte dentro del mismo bucket: las pruebas no ensucian la evidencia
+# real y tampoco obligan a mantener dos buckets.
+preview_bucket_name = "givegrow-media"
 
 [[env.sandbox.d1_databases]]
 binding = "DB"
