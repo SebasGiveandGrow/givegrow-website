@@ -51,20 +51,43 @@ tocó el significado de `aprobada`: se añadió `confirmacion` ('wompi' | 'manua
 para saber de dónde viene la certeza, y el certificado cita la referencia
 BANCARIA y no un id de Wompi inexistente.
 
-## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 12 ago 2026, 06:00 UTC)
+## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 12 ago 2026, 16:20 UTC)
 
-**Cero datos reales todavía.** Todo lo que hay son pruebas, y conviene saber
-cuáles son antes de confundirlas con donaciones:
+**Base limpia: ya hay UNA donación real y nada más.** Sebas pidió borrar las
+pruebas y se borraron.
 
 | | |
 |---|---|
-| `aportes` | **3, todos en `intencion`** (ninguno pagado). `GG-2026-000001` es de agosto; `000002` y `000003` los creó Claude probando el checkout |
-| `entregas` | **1, despublicada.** `AE-2026-000001` fue la prueba del panel de Sebas — se publicó con fecha futura y se despublicó. Ocupa el primer número de acta |
-| `certificados`, `miembros`, `inscripciones`, `donantes` | **0** |
-| numerador de guías | en **999** → la primera donación real será `GG-2026-001000` |
+| `aportes` | **1.** `GG-2026-001001`, $5.000 a la brigada, `en_distribucion`, `confirmacion = 'conciliada'` |
+| `donantes` | **1** — el de esa donación |
+| `eventos_wompi` | **0** ⚠️ el webhook sigue SIN probarse (ver abajo) |
+| `certificados`, `miembros`, `inscripciones` | **0** |
+| `entregas` | **0 vivas, 1 anulada** (`AE-2026-000001`, la prueba del panel) |
+| numeradores | guía **1001** · acta **1** · certificado sin estrenar |
 
-Si se quiere arrancar limpio, se pueden borrar esas tres intenciones y la
-entrega de prueba. **Sebas no lo ha pedido**: preguntar antes.
+**Se borraron 4 intenciones sin pagar** (`GG-2026-000001`, `000002`, `000003`,
+`001000`). Ninguna tenía transacción, donante, certificado ni evento; el `DELETE`
+llevó ese predicado para que no pudiera tocar nada pagado. Queda la fila de
+auditoría en `consentimientos`.
+
+**⚠️ LOS NUMERADORES NO SE REINICIAN, NUNCA.** `GG-2026-001001` es una donación
+real y su referencia vive en Wompi para siempre. Si el contador volviera a cero,
+esa guía se volvería a emitir y habría dos donaciones distintas con la misma
+referencia — la misma colisión que ya está documentada entre D1 y el libro de
+Sheets. La próxima donación real es `GG-2026-001002`, con huecos antes, y está
+bien: nadie espera que las guías sean consecutivas.
+
+### ⚠️ EL WEBHOOK SIGUE SIN VEREDICTO
+Sebas configuró la URL de eventos en Wompi el 12 de agosto, pero
+**`eventos_wompi` sigue en 0 y por lo tanto no hay prueba de que funcione**: el
+único pago real entró ANTES de configurarla y se rescató a mano con la
+conciliación.
+
+**Lo primero al retomar: un pago pequeño de prueba.** Si aparece una fila en
+`eventos_wompi` y el aporte llega a `aprobada` solo, con `confirmacion = 'wompi'`
+y su recibo, queda probada la cadena entera —checkout → webhook → recibo— que es
+el último eslabón sin verificar del ecosistema. Si no aparece, la URL no quedó
+guardada. La alarma de la Fase 8 en `/admin` lo dice en la cara mientras siga en 0.
 
 ## 🔴 INCIDENTE: se cobró un pago real y la base no lo supo (12 ago 2026)
 
