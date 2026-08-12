@@ -641,6 +641,12 @@ async function aplicarEstado(env, guia, tx, estado) {
     donanteId, nuevo, guia
   ).run();
 
+  /* Deja constancia de QUIÉN dio la certeza. Una transferencia también acaba en
+     `aprobada`, y sin esto no habría forma de distinguir lo que confirmó la
+     pasarela de lo que confirmó una persona. */
+  await env.DB.prepare("UPDATE aportes SET confirmacion = 'wompi' WHERE guia = ? AND confirmacion IS NULL")
+    .bind(guia).run();
+
   /* Correo solo al aprobar, y solo la PRIMERA vez. `aprobada_en` es el candado:
      si ya tenía fecha de aprobación, este webhook es un reintento o un evento
      tardío y el donante ya recibió su guía. Sin ese candado, los tres reintentos
@@ -1147,6 +1153,7 @@ async function adminEmitirCertificado(request, env, guia, quien) {
   const a = await env.DB.prepare(
     "SELECT a.guia, a.estado, a.monto_centavos, a.modo, a.destino_id, a.proyecto, " +
     "a.quiere_certificado, a.aprobada_en, a.wompi_transaction_id, a.donante_id, " +
+    "a.confirmacion, a.referencia_pago, " +
     "d.nombre AS nombre, d.email AS email, d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, " +
     "d.ciudad AS ciudad FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?"
   ).bind(guia).first();
@@ -1226,7 +1233,11 @@ async function adminEmitirCertificado(request, env, guia, quien) {
     donante_nombre: nombre, doc_tipo: docTipo, doc_numero: docNumero, donante_ciudad: ciudad,
     monto_centavos: a.monto_centavos,
     fecha_donacion: a.aprobada_en,
-    transaccion: a.wompi_transaction_id || "",
+    /* El numeral 5 dice «mediante transferencia electrónica No. …». Para un pago
+       por pasarela ese número es el id de Wompi; para una transferencia real es
+       el del comprobante bancario, y citar un id de Wompi inexistente sería
+       falso en un documento que se firma bajo juramento. */
+    transaccion: (a.confirmacion === "manual" ? a.referencia_pago : a.wompi_transaction_id) || "",
     destinacion: destinacionDe(a),
     emitido_en: new Date().toISOString().replace("T", " ").slice(0, 19)
   };
@@ -1358,6 +1369,253 @@ function fechaLargaISO(iso) {
   const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return "";
   return Number(m[3]) + " de " + MESES_ES[Number(m[2]) - 1] + " de " + m[1];
+}
+
+/* ========================================================================
+   TRANSFERENCIAS REPORTADAS
+   ========================================================================
+   La transferencia es el primer medio de pago que muestra la página de la
+   brigada y el que usan las empresas, y no producía nada: ni guía, ni recibo,
+   ni rastreo, ni ruta al certificado. Terminaba en un correo a contabilidad@.
+
+   No se toca el significado de `aprobada`. Sigue queriendo decir «el dinero
+   entró», que es de lo que depende poder firmar un certificado bajo juramento.
+   Lo que se añade es de dónde viene esa certeza: `confirmacion` vale 'wompi'
+   cuando la dio la pasarela y 'manual' cuando una persona la contrastó contra
+   el extracto, con su nombre y la fecha.
+
+   El estado intermedio es `reportada`: el donante dice que transfirió. Eso no
+   es dinero en el banco, así que no da recibo, no da certificado y en el
+   rastreo no aparece como recibida.
+   ======================================================================== */
+
+const MAX_COMPROBANTE = 5 * 1024 * 1024;
+const TIPOS_COMPROBANTE = {
+  "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf"
+};
+
+async function apiReportarTransferencia(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  /* Honeypot: éxito aparente y cero registro, igual que en los otros formularios. */
+  if (c.web2) return json({ ok: true, guia: null });
+
+  const monto = c.monto;
+  if (typeof monto !== "number" || !Number.isInteger(monto) || monto < MONTO_MIN || monto > MONTO_MAX) {
+    return json({ error: "monto_invalido", min: MONTO_MIN, max: MONTO_MAX }, 400);
+  }
+  const nombre = limpiar(c.nombre, 200);
+  const email  = limpiar(c.email, 200);
+  const fecha  = limpiar(c.fecha, 10);
+  const refer  = limpiar(c.referencia, 80);
+
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ error: "fecha_invalida" }, 400);
+  /* Una transferencia con fecha futura no ocurrió. Mismo criterio que las actas. */
+  if (fechaEnFuturo(fecha)) return json({ error: "fecha_futura" }, 422);
+  if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
+
+  const modo    = c.modo === "dirigida" ? "dirigida" : "fondo";
+  const destino = modo === "dirigida" ? limpiar(c.destino, 60) : null;
+  if (modo === "dirigida" && !destino) return json({ error: "destino_requerido" }, 400);
+
+  const donanteId = await donantePorCorreo(env, email, nombre);
+  const guia = await siguienteGuia(env, new Date().getUTCFullYear());
+  const token = tokenNuevo();
+
+  await env.DB.prepare(
+    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
+    "frecuencia, quiere_certificado, nota, idioma, token, donante_id, metodo_pago, referencia_pago) " +
+    "VALUES (?, 'reportada', ?, 'COP', ?, ?, ?, 'unico', ?, ?, ?, ?, ?, 'TRANSFERENCIA', ?)"
+  ).bind(
+    guia, monto * 100, modo, destino, limpiar(c.proyecto, 120) || null,
+    c.certificado ? 1 : 0, limpiar(c.nota, 280) || null,
+    c.idioma === "en" ? "en" : "es", token, donanteId, refer || null
+  ).run();
+
+  try {
+    await correoTransferenciaReportada(env, { guia, monto, email, nombre, fecha, refer, idioma: c.idioma });
+    await correoAvisoTransferencia(env, { guia, monto, email, nombre, fecha, refer, destino });
+  } catch (e) { console.error("correo transferencia", e && e.message); }
+
+  /* El token vuelve al navegador SOLO para que pueda subir su comprobante en el
+     paso siguiente. Es el mismo que abre su recibo cuando se confirme. */
+  return json({ ok: true, guia, token });
+}
+
+/* Un donante que transfiere no pasa por Wompi, así que su fila en `donantes` la
+   creamos aquí — con lo mínimo, igual que hace guardarDonante con lo de la
+   pasarela. */
+async function donantePorCorreo(env, email, nombre) {
+  await env.DB.prepare(
+    "INSERT INTO donantes (email, nombre) VALUES (?,?) ON CONFLICT(email) DO UPDATE SET " +
+    "nombre = COALESCE(excluded.nombre, nombre), actualizado_en = datetime('now')"
+  ).bind(email, nombre || null).run();
+  const f = await env.DB.prepare("SELECT id FROM donantes WHERE email = ?").bind(email).first();
+  return f ? f.id : null;
+}
+
+/* POST /api/comprobante/<guia>?t=<token> — el soporte de la transferencia.
+   Solo sobre un aporte REPORTADO y con su token: sin eso, sería una carga
+   pública abierta contra el bucket. */
+async function apiComprobante(request, env, guia, token) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return json({ error: "no_autorizado" }, 403);
+
+  const a = await env.DB.prepare(
+    "SELECT guia, estado, token, comprobante FROM aportes WHERE guia = ?"
+  ).bind(guia).first();
+  if (!a || !a.token || !igualesSeguro(a.token, String(token))) return json({ error: "no_autorizado" }, 403);
+  if (a.estado !== "reportada") return json({ error: "estado_no_permite", estado: a.estado }, 409);
+  if (a.comprobante) return json({ error: "ya_tiene_comprobante" }, 409);
+
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const ext = TIPOS_COMPROBANTE[tipo];
+  if (!ext) return json({ error: "tipo_no_permitido", permitidos: Object.keys(TIPOS_COMPROBANTE) }, 415);
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > MAX_COMPROBANTE) return json({ error: "archivo_muy_grande", max_mb: 5 }, 413);
+
+  const clave = "comprobantes/" + guia + "/" + tokenNuevo().slice(0, 8) + "." + ext;
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+  await env.DB.prepare(
+    "UPDATE aportes SET comprobante = ?, actualizada_en = datetime('now') WHERE guia = ?"
+  ).bind(clave, guia).run();
+  return json({ ok: true });
+}
+
+/* GET /api/admin/comprobante/<guia> — solo tras Access. El comprobante lleva
+   datos bancarios del donante y nunca es público. */
+async function adminComprobante(env, guia) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const a = await env.DB.prepare("SELECT comprobante FROM aportes WHERE guia = ?").bind(guia).first();
+  if (!a || !a.comprobante) return json({ error: "no_encontrado" }, 404);
+  const obj = await env.MEDIA.get(a.comprobante);
+  if (!obj) return json({ error: "no_encontrado" }, 404);
+  return new Response(obj.body, {
+    headers: {
+      "content-type": (obj.httpMetadata && obj.httpMetadata.contentType) || "application/octet-stream",
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
+async function adminReportadas(env) {
+  const r = await env.DB.prepare(
+    "SELECT a.guia, a.monto_centavos, a.modo, a.destino_id, a.proyecto, a.quiere_certificado, " +
+    "a.referencia_pago, a.comprobante, a.creada_en, d.nombre, d.email " +
+    "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id " +
+    "WHERE a.estado = 'reportada' ORDER BY a.creada_en DESC LIMIT 100"
+  ).all();
+  return json({ reportadas: r.results || [] });
+}
+
+/* Confirmar es contrastar contra el extracto y dejarlo firmado con nombre. Por
+   eso pide la referencia bancaria: es la que cita el numeral 5 del certificado,
+   y citar un id de Wompi que no existe sería falso en un documento juramentado. */
+async function adminConfirmarTransferencia(request, env, guia, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* opcional */ }
+
+  const a = await env.DB.prepare(
+    "SELECT guia, estado, monto_centavos, modo, destino_id, frecuencia, idioma, token, donante_id " +
+    "FROM aportes WHERE guia = ?"
+  ).bind(guia).first();
+  if (!a) return json({ error: "no_encontrada" }, 404);
+  if (a.estado !== "reportada") return json({ error: "estado_no_permite", estado: a.estado }, 409);
+
+  if (c.descartar) {
+    const motivo = limpiar(c.motivo, 280) || "sin motivo";
+    await env.DB.prepare(
+      "UPDATE aportes SET estado = 'rechazada', wompi_estado = ?, actualizada_en = datetime('now') WHERE guia = ?"
+    ).bind("DESCARTADA_MANUAL: " + motivo, guia).run();
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(quien || "?", "transferencia " + guia + " DESCARTADA: " + motivo).run();
+    return json({ ok: true, guia, estado: "rechazada" });
+  }
+
+  const refer = limpiar(c.referencia, 80);
+  if (!refer) {
+    return json({
+      error: "referencia_requerida",
+      ayuda: "Escribe el número del comprobante bancario: es el que cita el certificado, y no puede ser un id de Wompi que no existe."
+    }, 422);
+  }
+
+  await env.DB.prepare(
+    "UPDATE aportes SET estado = 'aprobada', confirmacion = 'manual', confirmado_por = ?, " +
+    "confirmado_en = datetime('now'), referencia_pago = ?, aprobada_en = datetime('now'), " +
+    "actualizada_en = datetime('now') WHERE guia = ?"
+  ).bind(quien || "?", refer, guia).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "transferencia " + guia + " CONFIRMADA contra extracto · ref " + refer).run();
+
+  /* Ahora sí hay dinero: el donante recibe lo mismo que quien paga por la
+     pasarela — su recibo con la guía. */
+  try {
+    const d = await env.DB.prepare("SELECT nombre, email FROM donantes WHERE id = ?").bind(a.donante_id).first();
+    await correoAporteAprobado(env, {
+      guia: a.guia, monto_centavos: a.monto_centavos, idioma: a.idioma,
+      modo: a.modo, destino_id: a.destino_id, frecuencia: a.frecuencia, token: a.token
+    }, d && d.email, d && d.nombre);
+  } catch (e) { console.error("correo tras confirmar", guia, e && e.message); }
+
+  return json({ ok: true, guia, estado: "aprobada" });
+}
+
+async function correoTransferenciaReportada(env, x) {
+  const en = x.idioma === "en";
+  const titulo = en ? "We got your transfer report" : "Recibimos el reporte de tu transferencia";
+  const parrafos = en ? [
+    "Thank you. Your tracking number is below — keep it.",
+    "This is not confirmed yet: we check every transfer against the bank statement before recording it as received. As soon as we do, your receipt arrives automatically.",
+    "If you have not uploaded the proof of transfer yet, replying to this email with it speeds things up."
+  ] : [
+    "Gracias. Abajo está tu número de guía: guárdalo.",
+    "Todavía no está confirmada: contrastamos cada transferencia contra el extracto antes de registrarla como recibida. Apenas lo hagamos, tu recibo te llega automáticamente.",
+    "Si aún no subiste el comprobante, responder este correo con él acelera la verificación."
+  ];
+  const filas = en
+    ? [["Tracking number", x.guia], ["Amount", fmtPesos(x.monto * 100) + " COP"], ["Transfer date", x.fecha]]
+    : [["Número de guía", x.guia], ["Monto", fmtPesos(x.monto * 100) + " COP"], ["Fecha de la transferencia", x.fecha]];
+  return enviarCorreo(env, {
+    para: x.email, asunto: titulo + " · " + x.guia,
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas }),
+    etiqueta: "transferencia-reportada"
+  });
+}
+
+async function correoAvisoTransferencia(env, x) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const titulo = "Transferencia reportada: " + x.guia;
+  const filas = [
+    ["Guía", x.guia], ["Monto", fmtPesos(x.monto * 100) + " COP"],
+    ["Fecha que reporta", x.fecha], ["Referencia", x.refer || "(no dio)"],
+    ["Destino", x.destino || "Fondo general"],
+    ["Donante", x.nombre], ["Correo", x.email]
+  ];
+  return enviarCorreo(env, {
+    para, asunto: titulo,
+    texto: filas.map(([k, v]) => k + ": " + v).join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: ["Alguien reporta que transfirió. NO está confirmada: contrástala contra el extracto y confírmala en /admin.",
+                 "Hasta que la confirmes no hay recibo ni certificado, y el donante ya sabe que es así."],
+      filas
+    }),
+    etiqueta: "aviso-transferencia"
+  });
 }
 
 /* ========================================================================
@@ -2008,6 +2266,19 @@ function paginaAdmin() {
 
 <div id="dlg" style="display:none;margin-top:24px"></div>
 
+<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Transferencias por verificar</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Alguien dice que transfirió.
+<strong>Eso no es dinero en el banco:</strong> contrasta contra el extracto antes de confirmar. Hasta
+que lo hagas no hay recibo ni certificado, y el donante ya sabe que es así. Al confirmar se pide el
+número del comprobante porque <strong>es el que cita el certificado</strong>.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Guía</th><th scope="col">Monto</th><th scope="col">Destino</th>
+<th scope="col">Donante</th><th scope="col">Ref.</th><th scope="col">Comprobante</th>
+<th scope="col">Cert.</th><th scope="col">Acción</th>
+</tr></thead><tbody id="t-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
+</table></div>
+
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
 de la brigada. <strong>El acuse les pidió NO comprar todavía</strong>, así que conviene responder
@@ -2263,6 +2534,57 @@ document.addEventListener("click", function(e){
   }
 });
 
+/* ---------------- transferencias por verificar ---------------- */
+function cargarReportadas(){
+  fetch("/api/admin/reportadas").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("t-filas"); if (!tb) return;
+    var l = d.reportadas || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Ninguna esperando verificación.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(a){
+      return "<tr>" +
+        "<td>" + esc(a.guia) + "<br><small>" + esc((a.creada_en||"").slice(0,16)) + "</small></td>" +
+        "<td>" + pesos(a.monto_centavos) + "</td>" +
+        "<td>" + esc(a.modo === "dirigida" ? (a.proyecto || a.destino_id || "?") : "Fondo general") + "</td>" +
+        "<td>" + esc(a.nombre || "—") + (a.email ? "<br><small>" + esc(a.email) + "</small>" : "") + "</td>" +
+        "<td>" + esc(a.referencia_pago || "—") + "</td>" +
+        "<td>" + (a.comprobante
+          ? '<a href="/api/admin/comprobante/' + esc(a.guia) + '" target="_blank" rel="noopener">ver</a>'
+          : '<strong style="color:#A84D00">sin subir</strong>') + "</td>" +
+        "<td>" + (a.quiere_certificado ? "sí" : "—") + "</td>" +
+        '<td><button class="copy" data-conf="' + esc(a.guia) + '">Confirmar…</button> ' +
+        '<button class="copy" data-desc="' + esc(a.guia) + '">Descartar</button></td>' +
+      "</tr>";
+    }).join("");
+  });
+}
+
+document.addEventListener("click", function(e){
+  var cf = e.target.closest("[data-conf]");
+  if (cf){
+    var g = cf.getAttribute("data-conf");
+    var ref = window.prompt("Confirmar " + g + " contra el extracto.\n\nNúmero del comprobante bancario (lo cita el certificado):");
+    if (!ref) return;
+    cf.disabled = true; cf.textContent = "…";
+    fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
+      method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ referencia: ref })
+    }).then(function(r){ return r.json(); })
+      .then(function(d){ if (d.ayuda) alert(d.ayuda); cargarReportadas(); cargar(); })
+      .catch(function(){ cargarReportadas(); });
+    return;
+  }
+  var ds = e.target.closest("[data-desc]");
+  if (ds){
+    var g2 = ds.getAttribute("data-desc");
+    var motivo = window.prompt("Descartar " + g2 + ". ¿Motivo? Queda en la auditoría.");
+    if (!motivo) return;
+    ds.disabled = true; ds.textContent = "…";
+    fetch("/api/admin/transferencia/" + encodeURIComponent(g2) + "/confirmar", {
+      method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ descartar:true, motivo: motivo })
+    }).then(function(r){ return r.json(); }).then(function(){ cargarReportadas(); cargar(); })
+      .catch(function(){ cargarReportadas(); });
+  }
+});
+
 /* ---------------- ofrecimientos en especie ---------------- */
 var CAT_ES = { agua:"Agua segura", alimento:"Comida sin cocina", higiene:"Higiene y dignidad",
   panales:"Pañales", descanso:"Descanso", energia:"Luz y carga", brigada:"Equipo de brigada", otra:"Otra" };
@@ -2298,7 +2620,8 @@ document.addEventListener("click", function(e){
   fetch("/api/admin/inscripcion/" + encodeURIComponent(b.getAttribute("data-ins")) + "/estado", {
     method: "POST", headers: {"content-type":"application/json"},
     body: JSON.stringify({ estado: b.getAttribute("data-e") })
-  }).then(function(r){ return r.json(); }).then(function(){ cargarOfrecimientos(); })
+  }).then(function(r){ return r.json(); }).then(function(){ cargarOfrecimientos();
+cargarReportadas(); })
     .catch(function(){ cargarOfrecimientos(); });
 });
 
@@ -2613,6 +2936,11 @@ export default {
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/miembros") return await adminMiembros(env);
+        if (ruta === "/api/admin/reportadas") return await adminReportadas(env);
+        const rc = ruta.match(/^\/api\/admin\/comprobante\/(GG-\d{4}-\d{6})$/i);
+        if (rc) return await adminComprobante(env, rc[1].toUpperCase());
+        const rt = ruta.match(/^\/api\/admin\/transferencia\/(GG-\d{4}-\d{6})\/confirmar$/i);
+        if (rt) return await adminConfirmarTransferencia(request, env, rt[1].toUpperCase(), sesion.email);
         const mr = ruta.match(/^\/api\/admin\/miembro\/(MB-\d{4}-\d{6})\/revocar$/i);
         if (mr) return await adminRevocarMiembro(request, env, mr[1].toUpperCase(), sesion.email);
         const mi = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/estado$/);
@@ -2643,6 +2971,9 @@ export default {
         const rec = ruta.match(/^\/api\/recibo\/(GG-\d{4}-\d{6})\.pdf$/i);
         if (rec)                            return await apiRecibo(env, rec[1], url.searchParams.get("t"));
         if (ruta === "/api/entregas")       return await apiEntregas(env, url);
+        if (ruta === "/api/transferencia")  return await apiReportarTransferencia(request, env, url);
+        const comp = ruta.match(/^\/api\/comprobante\/(GG-\d{4}-\d{6})$/i);
+        if (comp) return await apiComprobante(request, env, comp[1].toUpperCase(), url.searchParams.get("t"));
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
         /* Nunca se filtra el detalle interno al cliente. */

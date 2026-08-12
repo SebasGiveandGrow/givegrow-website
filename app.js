@@ -312,6 +312,35 @@ var I18N = {
     "ally.err.serv":"Describe el servicio que ofreces a la población vulnerable.",
     "ally.err.send":"No pudimos enviar tu solicitud. Intenta de nuevo o escríbenos a contabilidad@thegiveandgrowproject.org.",
     "ally.err.config":"El formulario aún se está configurando. Escríbenos a contabilidad@thegiveandgrowproject.org.",
+    "rep.ey":"Ya transferí",
+    "rep.t":"Repórtanos tu transferencia",
+    "rep.lead":"Una transferencia no nos avisa sola. Repórtala aquí y te damos un número de guía al instante: con él sigues tu aporte, y cuando la verifiquemos contra el extracto te llega el recibo — y el certificado, si lo pediste.",
+    "rep.monto":"Monto transferido (COP)",
+    "rep.fecha":"Fecha de la transferencia",
+    "rep.ref":"Número del comprobante (opcional, ayuda mucho)",
+    "rep.ref.ph":"El número que aparece en tu comprobante o extracto",
+    "rep.dest":"¿A dónde va?",
+    "rep.dest.fondo":"Donde más se necesite (fondo general)",
+    "rep.dest.brigada":"Brigada de atención a emergencia · 5 sectores",
+    "rep.nombre":"Nombre o razón social",
+    "rep.email":"Correo",
+    "rep.cert":"Quiero certificado de donación",
+    "rep.datos":"Autorizo el tratamiento de mis datos para registrar y verificar este aporte, conforme a la Política de Privacidad.",
+    "rep.btn":"Reportar mi transferencia",
+    "rep.sending":"Registrando…",
+    "rep.err":"No pudimos registrarlo. Intenta de nuevo o escríbenos.",
+    "rep.err.monto":"Escribe el monto que transferiste.",
+    "rep.err.fecha":"Falta la fecha de la transferencia.",
+    "rep.err.nombre":"Falta tu nombre.",
+    "rep.err.email":"Ese correo no parece válido.",
+    "rep.err.datos":"Necesitamos tu autorización para tratar los datos.",
+    "rep.ok.t":"Listo. Tu número de guía es",
+    "rep.ok.p":"Guárdalo: con él sigues tu aporte en el rastreo. Todavía no está confirmado — verificamos cada transferencia contra el extracto antes de registrarla como recibida.",
+    "rep.sube":"Sube tu comprobante (opcional)",
+    "rep.sube.p":"Imagen o PDF, hasta 5 MB. Con el comprobante la verificación es inmediata; sin él hay que buscarla a mano en el extracto.",
+    "rep.sube.ok":"Comprobante recibido. Gracias.",
+    "rep.sube.err":"No pudimos subir el archivo.",
+    "rep.link":"¿Ya transferiste? Repórtalo aquí",
     "track.ey":"Trazabilidad real",
     "track.t":"Rastrea tu donación",
     "track.lead":"Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.",
@@ -917,6 +946,8 @@ var I18N = {
     "track.fuente.sitio":"Donación hecha por el sitio",
     "track.fuente.libro":"Registro del libro de donaciones",
     "track.ev.vacio":"Todavía no hay entregas publicadas para este destino. Cuando la haya, aparece aquí con su acta firmada.",
+    "track.rp.t":"Estamos verificando tu transferencia",
+    "track.rp.p":"Recibimos el reporte de la guía {guia}. Contrastamos cada transferencia contra el extracto del banco antes de registrarla como recibida — apenas lo hagamos, tu recibo te llega automáticamente y esta página cambia sola.",
     "track.sc.t":"Esa guía existe, pero su pago no está confirmado",
     "track.sc.p":"Generamos la guía {guia} cuando empezaste el pago, y la pasarela no nos confirmó que se completara. Si crees que sí pagaste, escríbenos con el comprobante a contabilidad@thegiveandgrowproject.org y lo revisamos.",
     "track.ev.t":"Entregas de tu destino",
@@ -1106,6 +1137,7 @@ var ROUTE_META = {
   impacto:{t:{es:"Impacto y evidencia · Give&Grow International",en:"Impact & evidence · Give&Grow International"},d:{es:"Evidencia real del trabajo en terreno: fotografías, trazabilidad y resultados de las comunidades que acompañamos.",en:"Real evidence from the field: photos, traceability and results from the communities we support."}},
   impactos:{t:{es:"ImpactOS · Give&Grow International",en:"ImpactOS · Give&Grow International"},d:{es:"Qué es ImpactOS, la plataforma del ecosistema Give&Grow, y qué módulo está operando hoy: el HUB SOCIAL.",en:"What ImpactOS is, the platform behind the Give&Grow ecosystem, and which module runs today: the HUB SOCIAL."}},
   brigada:{t:{es:"Brigada de atención a emergencia · Give&Grow International",en:"Emergency response brigade · Give&Grow International"},d:{es:"Terremoto del 10 de agosto de 2026. Brigada de Give&Grow a Cali, Pereira, Manizales, Armenia y Chocó: qué se necesita y cómo aportar, en dinero o en especie.",en:"The 10 August 2026 earthquake. Give&Grow's brigade to Cali, Pereira, Manizales, Armenia and Chocó: what is needed and how to give, in money or in kind."}},
+  reportar:{t:{es:"Reportar una transferencia · Give&Grow International",en:"Report a transfer · Give&Grow International"},d:{es:"¿Ya transferiste a la cuenta de la Fundación? Repórtalo y recibe tu número de guía para seguir tu aporte.",en:"Already transferred to the Foundation's account? Report it and get your tracking number to follow your gift."}},
   donar:{t:{es:"Donar · Give&Grow International",en:"Donate · Give&Grow International"},d:{es:"Haz tu donación a Give&Grow con trazabilidad completa y beneficio tributario. Cada aporte transforma una vida.",en:"Donate to Give&Grow with full traceability and a tax benefit. Every gift transforms a life."}},
   medicion:{t:{es:"Cómo medimos · Give&Grow International",en:"How we measure · Give&Grow International"},d:{es:"Contribución y no atribución, los tres peldaños de la medición, cómo publicamos un número y el reporte de jornada para la empresa aliada.",en:"Contribution rather than attribution, the three rungs of measurement, how we publish a figure, and the journey report for partner companies."}},
   transparencia:{t:{es:"Transparencia · Give&Grow International",en:"Transparency · Give&Grow International"},d:{es:"Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International.",en:"Official registration, governance, financial statements and public documents of Give&Grow International."}},
@@ -1286,7 +1318,7 @@ var ACT_FNS = {
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
   donarBrigada:donarBrigada, allySubmit:allySubmit,
-  irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit,
+  irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
@@ -2925,9 +2957,13 @@ var PUBLICOS = ["aprobada", "en_distribucion", "entregada"];
 /* Guía emitida cuyo pago nunca se confirmó. Pasa cuando el donante abandona la
    pasarela o el medio de pago la rechaza. */
 function trackSinConfirmar(a){
+  /* Una transferencia reportada no es un pago fallido: es un pago que estamos
+     verificando contra el extracto. Decirle lo mismo a los dos sería confundir
+     a quien sí transfirió. */
+  var esReporte = a.estado === "reportada";
   return '<div class="track-card track-nf">'
-    + '<h3>'+t("track.sc.t")+'</h3>'
-    + '<p>'+t("track.sc.p").replace("{guia}", "<b>"+escapeHtml(a.guia)+"</b>")+'</p>'
+    + '<h3>'+t(esReporte ? "track.rp.t" : "track.sc.t")+'</h3>'
+    + '<p>'+t(esReporte ? "track.rp.p" : "track.sc.p").replace("{guia}", "<b>"+escapeHtml(a.guia)+"</b>")+'</p>'
     + '</div>';
 }
 
@@ -3138,6 +3174,72 @@ function volNivel(){
 /* Ofrecimiento en especie. Mismo patrón que volSubmit: honeypot con éxito
    aparente, validación en el cliente para no hacer viajar lo obviamente
    incompleto, y la de verdad en el Worker. */
+/* Reportar una transferencia. El donante se autorreporta y recibe guía al
+   instante; el dinero lo confirma una persona después, contra el extracto. Por
+   eso el mensaje de éxito dice «todavía no está confirmado» sin rodeos. */
+var REP_TOKEN = null, REP_GUIA = null;
+
+function repSubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("rep-note");
+  var btn = document.getElementById("rep-btn");
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
+
+  if (val("rep-web2")){ document.getElementById("rep").reset(); return allyMsg(note, t("rep.ok.t"), true); }
+
+  var monto = Math.round(Number(val("rep-monto")) || 0);
+  if (!(monto >= 5000 && monto <= 20000000)) return allyMsg(note, t("rep.err.monto"), false);
+  if (!val("rep-fecha")) return allyMsg(note, t("rep.err.fecha"), false);
+  if (!val("rep-nombre")) return allyMsg(note, t("rep.err.nombre"), false);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("rep-email"))) return allyMsg(note, t("rep.err.email"), false);
+  if (!chk("rep-datos")) return allyMsg(note, t("rep.err.datos"), false);
+
+  var brigada = val("rep-dest") === "brigada";
+  btn.disabled = true;
+  allyMsg(note, t("rep.sending"), true);
+
+  fetch("/api/transferencia", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      monto: monto,
+      fecha: val("rep-fecha"),
+      referencia: val("rep-ref"),
+      modo: brigada ? "dirigida" : "fondo",
+      destino: brigada ? BRIGADA.destino : null,
+      proyecto: brigada ? t("brigada.opcion") : null,
+      nombre: val("rep-nombre"),
+      email: val("rep-email"),
+      certificado: chk("rep-cert"),
+      autoriza_datos: true,
+      idioma: lang
+    })
+  }).then(function(r){ return r.ok ? r.json() : r.json().then(function(j){ throw new Error(j.error||"http"); }); })
+    .then(function(d){
+      REP_GUIA = d.guia; REP_TOKEN = d.token;
+      document.getElementById("rep").style.display = "none";
+      setText("rep-guia", d.guia);
+      document.getElementById("rep-ok").style.display = "";
+      note.textContent = "";
+    })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("rep.err"), false); });
+}
+
+/* La subida va después de tener guía y token: sin eso sería una carga pública
+   abierta contra el bucket. */
+document.addEventListener("change", function(e){
+  if (!e.target || e.target.id !== "rep-file") return;
+  var f = e.target.files && e.target.files[0];
+  var note = document.getElementById("rep-file-note");
+  if (!f || !REP_GUIA || !REP_TOKEN) return;
+  allyMsg(note, t("rep.sending"), true);
+  fetch("/api/comprobante/" + encodeURIComponent(REP_GUIA) + "?t=" + encodeURIComponent(REP_TOKEN), {
+    method: "POST", headers: { "content-type": f.type }, body: f
+  }).then(function(r){ return r.json(); })
+    .then(function(d){ allyMsg(note, d.error ? t("rep.sube.err") : t("rep.sube.ok"), !d.error); })
+    .catch(function(){ allyMsg(note, t("rep.sube.err"), false); });
+});
+
 function ofSubmit(ev){
   ev.preventDefault();
   var note = document.getElementById("of-note");

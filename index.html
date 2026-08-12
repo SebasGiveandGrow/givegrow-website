@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=cafc7932">
+<link rel="stylesheet" href="/styles.css?v=45d8414a">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1051,6 +1051,7 @@
         <p class="rec-cap" data-i18n="brig.dar.dinero.k">En dinero · transferencia</p>
         <p class="brig-via-v"><span data-i18n="brig.dar.dinero.v">Bancolombia · Ahorros 31000009221</span>
           <button class="copy" data-act="copyAccount()" data-i18n="copy">Copiar</button></p>
+        <p style="margin:2px 0 10px"><a href="#reportar" data-nav="reportar" class="rep-link" data-i18n="rep.link">¿Ya transferiste? Repórtalo aquí</a></p>
         <p class="brig-via-p" data-i18n="brig.dar.dinero.p">Fundación Give&Grow International, NIT 901.948.930-2. Envía el comprobante a contabilidad@thegiveandgrowproject.org y te confirmamos.</p>
       </div>
 
@@ -1158,6 +1159,57 @@
   </section>
 </main>
 
+<!-- ============ REPORTAR TRANSFERENCIA ============
+     La transferencia es el medio de pago que usan las empresas y el que la
+     página de la brigada muestra primero, y no avisaba a nadie. Aquí el donante
+     se autorreporta y recibe guía al instante; el dinero se confirma después,
+     contra el extracto, desde /admin. -->
+<main id="page-reportar" class="page">
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="rep.ey">Ya transferí</span>
+      <h2 class="h-sec rv" data-i18n="rep.t">Repórtanos tu transferencia</h2>
+      <p class="lead rv d1" data-i18n="rep.lead">Una transferencia no nos avisa sola. Repórtala aquí y te damos un número de guía al instante: con él sigues tu aporte, y cuando la verifiquemos contra el extracto te llega el recibo — y el certificado, si lo pediste.</p>
+
+      <form id="rep" class="ally-form rv d2" data-submit="repSubmit(event)">
+        <div class="field"><label for="rep-monto" data-i18n="rep.monto">Monto transferido (COP)</label>
+          <input type="number" id="rep-monto" inputmode="numeric" min="5000" max="20000000" step="1000" required></div>
+        <div class="field"><label for="rep-fecha" data-i18n="rep.fecha">Fecha de la transferencia</label>
+          <input type="date" id="rep-fecha" required></div>
+        <div class="field"><label for="rep-ref" data-i18n="rep.ref">Número del comprobante (opcional, ayuda mucho)</label>
+          <input type="text" id="rep-ref" data-i18n="rep.ref.ph" data-i18n-attr="placeholder" placeholder="El número que aparece en tu comprobante o extracto"></div>
+        <div class="field"><label for="rep-dest" data-i18n="rep.dest">¿A dónde va?</label>
+          <select id="rep-dest">
+            <option value="fondo" data-i18n="rep.dest.fondo">Donde más se necesite (fondo general)</option>
+            <option value="brigada" data-i18n="rep.dest.brigada">Brigada de atención a emergencia · 5 sectores</option>
+          </select></div>
+        <div class="field"><label for="rep-nombre" data-i18n="rep.nombre">Nombre o razón social</label>
+          <input type="text" id="rep-nombre" autocomplete="name" required></div>
+        <div class="field"><label for="rep-email" data-i18n="rep.email">Correo</label>
+          <input type="email" id="rep-email" autocomplete="email" required></div>
+
+        <input type="text" id="rep-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+
+        <label class="ally-check"><input type="checkbox" id="rep-cert"><span data-i18n="rep.cert">Quiero certificado de donación</span></label>
+        <label class="ally-check"><input type="checkbox" id="rep-datos"><span data-i18n="rep.datos">Autorizo el tratamiento de mis datos para registrar y verificar este aporte, conforme a la Política de Privacidad.</span></label>
+        <button class="btn btn-g" id="rep-btn" type="submit" data-i18n="rep.btn">Reportar mi transferencia</button>
+        <p class="ally-note" id="rep-note" role="status" aria-live="polite"></p>
+      </form>
+
+      <!-- Aparece al registrar: la guía y la subida del comprobante. -->
+      <div id="rep-ok" class="rep-ok" style="display:none">
+        <p class="rec-cap" data-i18n="rep.ok.t">Listo. Tu número de guía es</p>
+        <p class="rep-guia" id="rep-guia"></p>
+        <p class="rep-ok-p" data-i18n="rep.ok.p">Guárdalo: con él sigues tu aporte en el rastreo. Todavía no está confirmado — verificamos cada transferencia contra el extracto antes de registrarla como recibida.</p>
+        <h3 class="rep-sube-t" data-i18n="rep.sube">Sube tu comprobante (opcional)</h3>
+        <p class="rep-ok-p" data-i18n="rep.sube.p">Imagen o PDF, hasta 5 MB. Con el comprobante la verificación es inmediata; sin él hay que buscarla a mano en el extracto.</p>
+        <input type="file" id="rep-file" accept="image/jpeg,image/png,image/webp,application/pdf">
+        <p class="ally-note" id="rep-file-note" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
 <!-- ============ DONAR ============ -->
 <main id="page-donar" class="page">
   <section>
@@ -1255,7 +1307,8 @@
         <div class="pay-row"><span data-i18n="pay.acc">Cuenta de Ahorros</span><span style="display:flex;gap:10px;align-items:center"><b>31000009221</b><button class="copy" id="copy-label" data-act="copyAccount()" data-i18n="copy">Copiar</button></span></div>
         <div class="pay-row"><span data-i18n="pay.holder">Titular</span><b>Fundación Give&Grow International</b></div>
         <div class="pay-row"><span data-i18n="pay.nit">NIT</span><b>901.948.930-2</b></div>
-        <p class="mu" style="margin-top:14px;text-align:left;font-size:14px" data-i18n="pay.banco.note">Transfiere y envía el comprobante a contabilidad@thegiveandgrowproject.org. Te confirmamos la recepción y, si lo pediste, te expedimos el certificado de donación firmado.</p>
+        <p style="margin-top:14px;text-align:left"><a href="#reportar" data-nav="reportar" class="rep-link" data-i18n="rep.link">¿Ya transferiste? Repórtalo aquí</a></p>
+        <p class="mu" style="margin-top:10px;text-align:left;font-size:14px" data-i18n="pay.banco.note">Transfiere y envía el comprobante a contabilidad@thegiveandgrowproject.org. Te confirmamos la recepción y, si lo pediste, te expedimos el certificado de donación firmado.</p>
       </div>
       <div id="pay-paypal" class="pay-panel rv d2" role="tabpanel" aria-labelledby="paytab-paypal" tabindex="0"><p class="mu" data-i18n="pay.paypal.note">Para donaciones internacionales en USD. Escríbenos y te enviamos el enlace de PayPal.</p></div>
 
@@ -1889,7 +1942,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=0165e860"></script>
+<script src="/app.js?v=4b0998e3"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
