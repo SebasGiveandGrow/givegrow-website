@@ -1033,6 +1033,28 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 
 .brig-nota{font-size:14px;line-height:1.6;max-width:64ch;margin-top:16px}
 
+/* Estado de la brigada. La cuenta es el ÚNICO elemento firma de la página: una
+   cifra en display, grande, y todo lo demás quieto. Reusa la caja del ledger
+   (papel, regla de 1px, radio del sistema) para que no parezca un banner
+   pegado encima del documento, sino la primera fila del documento. */
+.brig-estado{margin-top:22px;padding:22px 24px;background:var(--surface-2);
+  border:1px solid var(--bd);border-radius:var(--rl)}
+.brig-cifra{font-family:var(--font-display);font-weight:700;
+  font-size:clamp(28px,5.2vw,44px);line-height:1.06;letter-spacing:-.015em;margin:6px 0 0}
+.brig-est-p{font-size:14.5px;line-height:1.6;max-width:62ch;margin:12px 0 0;color:var(--ink-soft)}
+.brig-nec-cap{margin-top:24px;padding-top:18px;border-top:1px solid var(--bd)}
+.brig-nec4{display:grid;gap:16px 26px;margin-top:12px;
+  grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr))}
+.brig-n b{display:block;font-size:14.5px;font-weight:700;letter-spacing:.01em}
+.brig-n small{display:block;margin-top:4px;font-size:13.5px;line-height:1.55;color:var(--mu)}
+
+/* Manos y contactos: dos bloques hermanos, reglas finas, sin tarjetas. */
+.brig-mc{display:grid;gap:26px;margin-top:26px;
+  grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}
+.brig-mc-b{padding-top:18px;border-top:2px solid var(--g)}
+.brig-mc-b h4{font-size:var(--fs-h4);margin:0 0 10px}
+.brig-mc-b p{font-size:14.5px;line-height:1.65;max-width:56ch;margin:0 0 16px}
+
 /* Ledger de sectores: misma gramática que la tabla de transparencia. */
 .brig-sec{margin-top:26px}
 .brig-sec .sec-fila{display:grid;grid-template-columns:1fr auto auto;gap:8px 18px;
