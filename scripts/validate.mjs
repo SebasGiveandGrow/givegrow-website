@@ -48,6 +48,18 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"]]) {
     const emitido = new Function("return " + literal)();
     execSync("node --check", { input: emitido });
     ok(nombre + " emite JS válido (" + emitido.split("\n").length + " líneas)");
+
+    /* Y que cada bandeja se pida al arrancar. `cargarReportadas` existía, su
+       endpoint respondía 200 y su tabla se quedaba en «Cargando…» para siempre:
+       solo se llamaba desde los botones de confirmar, nunca en el arranque.
+       Las llamadas de arranque son las únicas en columna 0; las de dentro de
+       una función van indentadas. */
+    const definidas = [...emitido.matchAll(/^function (cargar\w*)\s*\(/gm)].map(m => m[1]);
+    const arranque  = new Set([...emitido.matchAll(/^(cargar\w*)\(\);$/gm)].map(m => m[1]));
+    const huerfanas = definidas.filter(f => !arranque.has(f));
+    if (huerfanas.length) {
+      err(nombre + ": " + huerfanas.join(", ") + " no se llama al arrancar — su tabla se queda en «Cargando…»");
+    } else ok(nombre + " pide sus " + definidas.length + " bandejas al arrancar");
   } catch (e) {
     err(nombre + " emite JS INVÁLIDO — el panel no cargaría: " + (e.stderr ? String(e.stderr).split("\n")[1] || e.message : e.message));
   }
