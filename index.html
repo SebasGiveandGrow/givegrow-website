@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=6d19fb4a">
+<link rel="stylesheet" href="/styles.css?v=d4e830da">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1096,7 +1096,7 @@
         <div class="brig-nec4">
           <div class="brig-n"><b data-i18n="brig.n1.t">Con dinero</b><small data-i18n="brig.n1.d">Es lo que nos deja comprar lo que falta de verdad, en la talla y la presentación que sirve. Transferencia a la cuenta, o en línea: si es en línea vuelves con un número de guía y puedes seguir tu aporte hasta el acta que firma quien recibe.</small></div>
           <div class="brig-n"><b data-i18n="brig.n2.t">Con insumos</b><small data-i18n="brig.n2.d">Escríbenos antes de comprar. Suena a trámite y es al contrario: te decimos qué falta hoy, para que tu plata no acabe en algo que no se puede entregar.</small></div>
-          <div class="brig-n"><b data-i18n="brig.n3.t">Con tus manos</b><small data-i18n="brig.n3.d">En Medellín hay cajas que alguien tiene que recibir, revisar y empacar. No hace falta experiencia ni un día entero: hace falta estar.</small></div>
+          <div class="brig-n"><b data-i18n="brig.n3.t">Con tus manos</b><small data-i18n="brig.n3.d">En Envigado hay cajas que alguien tiene que recibir, revisar y empacar. No hace falta experiencia ni un día entero: hace falta estar.</small></div>
           <div class="brig-n"><b data-i18n="brig.n4.t">Con una llamada</b><small data-i18n="brig.n4.d">Si no puedes dar, puedes abrir una puerta: una bodega, un camión que suba a la zona cafetera, una empresa que preste su sede. Un mensaje tuyo a la persona correcta mueve tanto como una donación.</small></div>
         </div>
       </div>
@@ -1213,12 +1213,25 @@
       </div>
 
       <div class="brig-via rv d2">
-        <p class="rec-cap" data-i18n="brig.dar.especie.k">En especie · centros de acopio</p>
-        <p class="brig-via-v"><a href="https://wa.me/573153305028" target="_blank" rel="noopener" data-i18n="brig.dar.especie.v">WhatsApp 315 330 5028</a>
-          <span class="brig-quien" data-i18n="brig.dar.especie.gg">Give&amp;Grow · Medellín</span></p>
-        <p class="brig-via-v"><a href="https://wa.me/573123023790" target="_blank" rel="noopener" data-i18n="brig.dar.especie.v2">WhatsApp 312 302 3790</a>
-          <span class="brig-quien" data-i18n="brig.dar.especie.nat">Nativos · aliado principal</span></p>
-        <p class="brig-via-p" data-i18n="brig.dar.especie.p">Escríbenos antes de comprar y te decimos qué falta hoy, en qué presentación sirve y a qué acopio llevarlo. Te lo pedimos para cuidar tu plata: el inventario cambia todos los días, y lo que sobra en un sector falta en otro.</p>
+        <p class="rec-cap" data-i18n="brig.dar.especie.k">En especie · dónde llevarlo</p>
+        <!-- Los dos acopios, con dirección. Antes decía «escríbenos y te decimos a
+             cuál llevarlo»: honesto sin los datos, pero era la fricción más grande
+             de la campaña — cada donante en especie necesitaba una conversación.
+             Y OJO: están en ENVIGADO, no en Medellín. Son municipios distintos. -->
+        <div class="brig-acopio">
+          <p class="brig-acopio-n" data-i18n="brig.dar.especie.a1.n">Esmeraldas Colombia · Envigado</p>
+          <p class="brig-acopio-d" data-i18n="brig.dar.especie.a1.dir">Carrera 48 # 37 Sur 56, frente al rompoy de Viva Envigado</p>
+          <p class="brig-acopio-c"><a href="https://wa.me/573153305028" target="_blank" rel="noopener" data-i18n="brig.dar.especie.v">WhatsApp 315 330 5028</a>
+            · <a href="https://www.google.com/maps/search/?api=1&amp;query=Carrera+48+%2337+Sur+56+Envigado+Antioquia" target="_blank" rel="noopener" data-i18n="brig.dar.especie.maps">Cómo llegar</a></p>
+        </div>
+        <div class="brig-acopio">
+          <p class="brig-acopio-n" data-i18n="brig.dar.especie.a2.n">Club Nativos · Envigado</p>
+          <p class="brig-acopio-d" data-i18n="brig.dar.especie.a2.dir">Sector El Salado</p>
+          <p class="brig-acopio-c"><a href="https://wa.me/573123023790" target="_blank" rel="noopener" data-i18n="brig.dar.especie.v2">WhatsApp 312 302 3790</a>
+            · <a href="https://www.google.com/maps/search/?api=1&amp;query=Club+Nativos+El+Salado+Envigado+Antioquia" target="_blank" rel="noopener" data-i18n="brig.dar.especie.maps">Cómo llegar</a></p>
+        </div>
+        <p class="brig-via-p brig-acopio-aviso" data-i18n="brig.dar.especie.aviso">Los dos son sedes prestadas, no bodegas con horario de atención. Escribe antes de ir y te confirmamos que haya alguien para recibirte — así no cargas el carro para encontrar la puerta cerrada.</p>
+        <p class="brig-via-p" data-i18n="brig.dar.especie.p">Escríbenos antes de comprar y te decimos qué falta hoy y en qué presentación sirve. Te lo pedimos para cuidar tu plata: el inventario cambia todos los días, y lo que sobra en un sector falta en otro.</p>
         <h4 class="of-t" data-i18n="of.t">O déjanos los datos y te escribimos</h4>
         <p class="brig-via-p" data-i18n="of.p">Si prefieres no escribir por WhatsApp. Lo importante es lo mismo: cuéntanos antes de comprar.</p>
         <form id="of" class="ally-form" data-submit="ofSubmit(event)">
@@ -1289,12 +1302,12 @@
       <div class="brig-mc rv d2">
         <div class="brig-mc-b">
           <h4 data-i18n="brig.mc.manos.t">Manos en la estructura</h4>
-          <p data-i18n="brig.mc.manos.p">El equipo que viaja ya está cerrado en siete personas: ir a terreno exige doble verificación —la nuestra y la de la fundación del territorio— y una sesión de Marco, y eso no cabe en los días que quedan. Lo que sí necesitamos es gente en Medellín para recibir, clasificar y empacar lo que llega al acopio. En el formulario, elige «Con Give&amp;Grow — en la estructura».</p>
+          <p data-i18n="brig.mc.manos.p">El equipo que viaja ya está cerrado en siete personas: ir a terreno exige doble verificación —la nuestra y la de la fundación del territorio— y una sesión de Marco, y eso no cabe en los días que quedan. Lo que sí necesitamos es gente en Envigado para recibir, clasificar y empacar lo que llega a los acopios. En el formulario, elige «Con Give&amp;Grow — en la estructura».</p>
           <a class="btn btn-o" href="#voluntariado" data-act="irAVoluntariadoBrigada()" data-i18n="brig.mc.manos.btn">Ofrecer mi tiempo</a>
         </div>
         <div class="brig-mc-b">
           <h4 data-i18n="brig.mc.cont.t">Contactos que abren puertas</h4>
-          <p data-i18n="brig.mc.cont.p">Lo más útil que puedes mandarnos si no vas a donar, y es gratis: una bodega o parqueadero en Medellín donde clasificar; un camión o furgón que suba a Cali, Pereira, Manizales, Armenia o Chocó entre el 24 y el 28; una empresa que preste su sede como centro de acopio; o una fundación que ya trabaje en alguno de los cinco territorios.</p>
+          <p data-i18n="brig.mc.cont.p">Lo más útil que puedes mandarnos si no vas a donar, y es gratis: una bodega o parqueadero en Envigado o alrededores donde clasificar; un camión o furgón que suba a Cali, Pereira, Manizales, Armenia o Chocó entre el 24 y el 28; una empresa que preste su sede como centro de acopio; o una fundación que ya trabaje en alguno de los cinco territorios.</p>
           <a class="btn btn-o" href="https://wa.me/573153305028" target="_blank" rel="noopener" data-i18n="brig.mc.cont.btn">Escribir por WhatsApp</a>
         </div>
       </div>
@@ -2127,7 +2140,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=1f8c6415"></script>
+<script src="/app.js?v=489219b4"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

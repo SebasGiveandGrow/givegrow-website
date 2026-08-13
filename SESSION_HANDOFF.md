@@ -77,8 +77,13 @@ poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemo
 1. **Cuántos brigadistas: 7 u 8.** Él dijo siete; el inventario está calculado
    para ocho (cascos, botas, sleeping bags, carnés, juegos de documentos).
    **Pidió expresamente no tocarlo — lo cierra él.**
-2. **Direcciones de los centros de acopio.** La página dice «escríbenos y te
-   decimos a cuál llevarlo». Es honesto sin datos, pero es fricción.
+2. ~~Direcciones de los centros de acopio~~ — **RESUELTO (12 ago).** Los dos
+   están **en ENVIGADO, no en Medellín**: Esmeraldas Colombia (Carrera 48 # 37
+   Sur 56, frente al rompoy de Viva Envigado) y Club Nativos (Sector El Salado).
+   Publicados con su WhatsApp y su enlace de «Cómo llegar».
+   **Sigue faltando el HORARIO de cada uno** — hoy la página lo resuelve
+   diciendo la verdad: son sedes prestadas, no bodegas, y hay que escribir antes
+   de ir para que no cargues el carro y encuentres la puerta cerrada.
 3. **Avales de CMGRD** por ciudad, para quitar «zona por confirmar».
 4. **Costos del inventario.** Sin ellos no hay meta en pesos ni equivalencias, y
    la calculadora lo dice en voz alta.
