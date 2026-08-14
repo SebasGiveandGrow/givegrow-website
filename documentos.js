@@ -37,9 +37,12 @@ export const ENTIDAD = {
   banco: "Bancolombia",
   cuenta: "cuenta de ahorros No. 31000009221",
   sitio: "thegiveandgrowproject.org",
-  repLegal: { nombre: "Juan Sebastián Navarro Osorio", cargo: "Representante Legal", cc: "" },
-  /* T.P. verificada contra el texto publicado en #transparencia. */
-  revisora: { nombre: "Manuela Londoño Arboleda", cargo: "Revisora Fiscal", tp: "244894-T", cc: "" }
+  repLegal: { nombre: "Juan Sebastián Navarro Osorio", cargo: "Representante Legal", cc: "1.007.420.930" },
+  /* T.P. verificada contra el texto publicado en #transparencia. La C.C. de la
+     Revisora Fiscal acompaña a la T.P. porque el art. 3 de la Ley 43 de 1990
+     obliga a consignar el número de tarjeta profesional, y quien recibe el
+     documento debe poder verificar a la persona detrás de esa tarjeta. */
+  revisora: { nombre: "Manuela Londoño Arboleda", cargo: "Revisora Fiscal", tp: "244894-T", cc: "1.040.745.501" }
 };
 
 /* --- paleta: los mismos tokens del sitio, en el espacio de color del PDF --- */
@@ -507,6 +510,17 @@ export async function recibo(a, hoyISO) {
    pagos en dinero por la pasarela, y ofrecer una rama que no aplica es una
    invitación a firmarla por error. El articulado de la sección III no se tocó.
 
+   CORREGIDA la cita del numeral II.5 (14 ago 2026): decía art. 771-2, que trata
+   de la factura como soporte de costos y deducciones y no viene al caso. La
+   norma que exige que una donación en DINERO pase por el sistema financiero es
+   el numeral 1 del art. 125-2 ET —cheque, tarjeta de crédito o intermediario
+   financiero—, y es la que ahora se cita. El 771-5 sería el complemento sobre
+   medios de pago; no se añade para no cargar el numeral con dos citas.
+
+   Las donaciones EN ESPECIE no salen por aquí: van en la minuta aparte, porque
+   su valor es el menor entre valor comercial y costo fiscal (art. 125-2 par. 1)
+   y ese dato no vive en la base — lo soporta la factura del donante.
+
    Solo en español: es un documento para la DIAN.
    =========================================================================== */
 
@@ -570,7 +584,7 @@ export async function certificado(c, hoyISO) {
     "Manera en que se efectuó la donación: mediante transferencia electrónica No. " +
     (c.transaccion || "-") + " del " + fechaLarga(c.fecha_donacion) + ", realizada a través del " +
     "sistema financiero en la " + ENTIDAD.cuenta + " de " + ENTIDAD.banco + ", en cumplimiento de " +
-    "lo previsto en el artículo 771-2 del Estatuto Tributario.");
+    "lo previsto en el numeral 1 del artículo 125-2 del Estatuto Tributario.");
   h.numeral(6,
     "Destinación de la donación: los recursos donados fueron incorporados al patrimonio de la " +
     "Fundación y destinados exclusivamente al desarrollo de su objeto social y de su actividad " +
