@@ -105,31 +105,33 @@ tocó el significado de `aprobada`: se añadió `confirmacion` ('wompi' | 'manua
 para saber de dónde viene la certeza, y el certificado cita la referencia
 BANCARIA y no un id de Wompi inexistente.
 
-## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 12 ago 2026, 16:20 UTC)
-
-**Base limpia: ya hay UNA donación real y nada más.** Sebas pidió borrar las
-pruebas y se borraron.
+## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 13 ago 2026, 20:00 UTC)
 
 | | |
 |---|---|
-| `aportes` | **2 reales, las dos pagadas.** `GG-2026-001001` (`en_distribucion`, `'conciliada'`) y `GG-2026-001002` (`aprobada`, `'wompi'`) |
-| `donantes` | **1** — el de esa donación |
-| `eventos_wompi` | **1**, con firma válida y procesado — el webhook quedó probado (ver abajo) |
+| `aportes` | **4.** `001001` en_distribucion ('conciliada') · `001002` aprobada ('wompi') · **`001003` REPORTADA, $400.000, esperando verificación** · `001004` intencion |
+| `donantes` | **3** |
+| `eventos_wompi` | **1**, con firma válida y procesado |
+| `correos` | **0** — la tabla es nueva y aún no ha salido ningún correo desde que se desplegó |
 | `certificados`, `miembros`, `inscripciones` | **0** |
-| `entregas` | **0 vivas, 1 anulada** (`AE-2026-000001`, la prueba del panel) |
-| numeradores | guía **1002** · acta **1** · certificado sin estrenar |
+| `entregas` | 0 vivas · 1 anulada |
+| numeradores | guía **1004** · acta **1** · certificado sin estrenar |
 
-**Se borraron 4 intenciones sin pagar** (`GG-2026-000001`, `000002`, `000003`,
-`001000`). Ninguna tenía transacción, donante, certificado ni evento; el `DELETE`
-llevó ese predicado para que no pudiera tocar nada pagado. Queda la fila de
-auditoría en `consentimientos`.
+### 🔴 LO PRIMERO AL RETOMAR: hay una donación real esperando
+**`GG-2026-001003`, $400.000 al fondo general, transferencia reportada con
+comprobante y referencia bancaria, y PIDE CERTIFICADO.** Lleva más de 30 horas
+sin verificar. Es el primer donante que no es Sebas y la donación más grande que
+ha entrado.
 
-**⚠️ LOS NUMERADORES NO SE REINICIAN, NUNCA.** `GG-2026-001001` es una donación
-real y su referencia vive en Wompi para siempre. Si el contador volviera a cero,
-esa guía se volvería a emitir y habría dos donaciones distintas con la misma
-referencia — la misma colisión que ya está documentada entre D1 y el libro de
-Sheets. La próxima donación real es `GG-2026-001002`, con huecos antes, y está
-bien: nadie espera que las guías sean consecutivas.
+El sistema hizo lo suyo —guía al instante, comprobante guardado—; falta
+contrastarla contra el extracto y confirmarla desde `/admin`. Hasta entonces no
+le llega recibo ni certificado. *(Los datos de la persona están en la base y en
+el panel; no se copian aquí porque este repositorio es público.)*
+
+Es justo el caso para el que se construyó la cola «Esperando a una persona» de
+la Fase 8, y funcionó: lo detectó.
+
+**⚠️ Los numeradores NO se reinician, nunca.** Ver la razón más abajo.
 
 ### ✅ EL WEBHOOK FUNCIONA — probado con dinero real (12 ago 2026, 16:12 UTC)
 
@@ -224,6 +226,44 @@ persona.
 **Nota sobre la alarma de la Fase 8:** sigue encendida después de conciliar, y
 está bien. `eventos_wompi` seguirá en 0 hasta que llegue un webhook de verdad, y
 es exactamente lo que hay que seguir viendo.
+
+## Cierre de tanda: piezas de campaña y Canva (13 ago 2026)
+
+**El carrusel de la brigada vive en Canva y su fuente en una rama.** Diseño «Lo
+que falta», **9 láminas a 1080×1350**, editable por Sebas.
+
+**Cómo se llegó ahí, porque no es obvio:** la API de Canva **no puede cambiar la
+familia tipográfica** — `format_text` no tiene ese parámetro. La única vía que
+conserva Unbounded es `import-design-from-url` con HTML anotado con
+`data-document-role="page"`, y eso exige una **URL pública HTTPS**. Como el repo
+ya es público, la fuente vive en la rama **`pieza/carrusel-brigada`** (nunca en
+`main`: `main` despliega) y Canva la importa desde el `raw` de GitHub. Detalle en
+`piezas/LEEME.md`.
+
+**Canva no acepta `.woff2`**, solo `.otf` o `.woff`, y subir la variable la
+usaría en su peso por defecto (400) cuando el carrusel usa 700 — por eso en
+`piezas/` hay instancias estáticas `Unbounded-Bold.woff` y `-Regular.woff`,
+sacadas con fontTools. Unbounded es OFL.
+
+**Verificado que la tipografía quedó bien**, midiendo y no a ojo: «Give&Grow
+International» a 24 px mide **367,98 px** en el diseño y **368,00** en Unbounded
+real (Inter daría 271,88). Ojo con las miniaturas de Canva: llegan cacheadas por
+versión y me hicieron dar un diagnóstico equivocado antes de medir.
+
+**Lo que aprendió la pieza sobre sí misma:**
+- **La escala tipográfica de una pieza de feed no es la de una pantalla.** 1080 px
+  se ven en un teléfono de ~390, así que un cuerpo de 24 px se ve a **8,6 px
+  reales**. Se subió todo ×1,4: ahora el cuerpo va a 13,4 px reales.
+- **El «qué donar» es el contenido, no el adorno.** La primera versión tenía las
+  vías de pago y ninguna lista de insumos; la buena lleva las siete categorías
+  del inventario con su observación y su «Trae:».
+- **Todo el texto va como entidades HTML.** Un servidor sin charset declarado
+  convirtió «Cómo» en «CÓ³mo»; en una pieza publicada un acento roto es fatal.
+
+**De la investigación de referentes quedó un concepto en la lámina 5:** en
+atención a desastres, las donaciones no solicitadas se llaman **«el segundo
+desastre»** — llegan toneladas sin clasificar y el equipo tría cajas en vez de
+atender familias. Eso **valida el «escríbenos antes de comprar»** y le da nombre.
 
 ## Cierre de tanda: ecosistema, Fase 8 — medir (12 ago 2026)
 
