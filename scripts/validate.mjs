@@ -224,4 +224,85 @@ try {
   } else ok("index.html hidratado");
 } catch (e) { err("no se pudo verificar la hidratación: " + e.message); }
 
+/* 10 · Las minutas dicen lo mismo que el certificado del sistema.
+   `ops/minutas-certificado.js` genera los .docx que se llenan a mano cuando una
+   donación no pasó por el sitio o fue en especie. Su articulado es el MISMO que
+   arma `documentos.js` — y ahí está el peligro: son dos copias del mismo texto
+   legal en archivos distintos, que es exactamente la forma en que el Drive y el
+   sitio terminaron diciendo cosas contrarias sobre el mismo artículo (Art. 125 /
+   125% contra Art. 257 / 25%) durante meses, sin que nadie lo notara.
+
+   Se comparan solo las cláusulas que son idénticas por definición en los dos
+   documentos: la sección III completa, la IV, el aviso del art. 257 y la
+   cláusula de expedición. Las que llevan datos del aporte (numerales II.1 a
+   II.6) no se comparan: en el PDF se interpolan y en la minuta son campos en
+   blanco, así que divergen a propósito.
+
+   Falla en las dos direcciones: si el texto cambia en documentos.js y no en la
+   minuta, y si la cláusula desaparece de documentos.js. */
+try {
+  const minutaSrc = readFileSync("ops/minutas-certificado.js", "utf8");
+  const docsSrc = readFileSync("documentos.js", "utf8");
+
+  /* Un literal de texto puede estar partido en varias cadenas unidas por `+`
+     para no pasarse del ancho de línea. Se reconstruyen aquí, o media cláusula
+     no se encontraría nunca. */
+  const cadenas = (fuente) => {
+    const out = [];
+    const re = /"((?:[^"\\]|\\.)*)"(\s*\+\s*"(?:[^"\\]|\\.)*")*/g;
+    for (const m of fuente.matchAll(re)) {
+      const partes = [...m[0].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((x) => x[1]);
+      out.push(partes.join("").replace(/\\"/g, '"').replace(/\s+/g, " ").trim());
+    }
+    return out;
+  };
+
+  const enDocs = cadenas(docsSrc);
+  const enMinuta = new Set(cadenas(minutaSrc));
+
+  /* Las cláusulas juradas, por su arranque. Se busca el texto COMPLETO de cada
+     una en documentos.js y se exige idéntico en la minuta. */
+  const juradas = [
+    "Que recibió a título de donación",
+    "Tipo de entidad donataria:",
+    "Para efectos de lo previsto en los artículos 125-1",
+    "Ha sido reconocida como persona jurídica",
+    "Ha cumplido con la obligación de presentar",
+    "Maneja los ingresos por donaciones",
+    "Se encuentra calificada y vigente",
+    "Destina la totalidad de sus excedentes",
+    "La donación aquí certificada constituye",
+    "La donación no consistió en acciones",
+    "La información aquí certificada fue tomada",
+    "El contenido de esta certificación se entiende rendido",
+    "Se informa al donante que, conforme al artículo 257",
+    "La presente certificación se expide en cumplimiento"
+  ];
+
+  /* Igualdad exacta, y si no, que el literal de documentos.js esté CONTENIDO en
+     alguna cadena de la minuta. Lo segundo es por las cláusulas que interpolan
+     un dato: el numeral II.2 termina en `+ ENTIDAD.vigilancia + "."`, así que su
+     literal se corta en «…control de la » mientras la minuta lleva el nombre
+     escrito. Sin esta rama el check gritaría por una diferencia que no existe. */
+  const listaMinuta = [...enMinuta];
+  const sinFuente = [], divergentes = [];
+  for (const arranque of juradas) {
+    const texto = enDocs.find((s) => s.startsWith(arranque));
+    if (!texto) { sinFuente.push(arranque); continue; }
+    if (enMinuta.has(texto)) continue;
+    if (listaMinuta.some((s) => s.includes(texto))) continue;
+    divergentes.push(arranque);
+  }
+
+  if (sinFuente.length) {
+    err("el certificado de documentos.js ya no tiene estas cláusulas: «" + sinFuente.join("», «") +
+        "» — si el articulado cambió a propósito, actualiza la lista del check #10");
+  } else if (divergentes.length) {
+    err("ops/minutas-certificado.js no dice lo mismo que documentos.js en: «" + divergentes.join("», «") +
+        "» — el mismo texto legal en dos documentos que se contradicen");
+  } else {
+    ok("minutas y certificado dicen lo mismo (" + juradas.length + " cláusulas juradas)");
+  }
+} catch (e) { err("no se pudo comparar las minutas con el certificado: " + e.message); }
+
 process.exit(fail);
