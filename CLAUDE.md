@@ -86,6 +86,14 @@ Olvidarlo = los usuarios ven la versión vieja hasta 1 año.
 - **El certificado de donación NO se emite solo.** Lo firma la Revisora Fiscal
   bajo la gravedad de juramento; sale de `/admin`, revisado por una persona. Su
   texto lo suministró la contadora: no se edita sin ella.
+- **Su articulado está en DOS archivos y el gate lo vigila.** `documentos.js`
+  arma el PDF del sistema; `ops/minutas-certificado.js` genera las minutas en
+  `.docx` que se llenan a mano (donaciones que no entraron por el sitio, y las
+  que son en especie, que el PDF no cubre). El **check #10** compara las
+  cláusulas juradas de los dos y falla el build si divergen — nació de que el
+  Drive dijera Art. 125 / 125% mientras el sitio decía Art. 257 / 25% durante
+  meses. Cambiar el articulado = cambiar los dos, y con la Revisora Fiscal.
+  Los `.docx` **no se commitean**: ver `ops/minutas-certificado.md`.
 
 ## ARQUITECTURA DE DATOS
 
