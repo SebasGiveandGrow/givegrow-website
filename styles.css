@@ -249,7 +249,10 @@ input[type=range]{width:100%;accent-color:var(--gn);margin:8px 0 4px}
 
 /* ===== ACCORDION ===== */
 .acc-tabs{display:flex;gap:8px;justify-content:center;margin-bottom:26px;flex-wrap:wrap}
-.acc-tab{padding:9px 18px;border-radius:999px;border:1px solid var(--bd);font-weight:700;font-size:14px}
+/* `color` explícito y no heredado: sin él, el <button> toma el negro por
+   defecto del navegador, que en modo noche cae sobre superficie oscura y
+   desaparece (1.21:1 medido). Solo la pestaña activa declaraba color. */
+.acc-tab{padding:9px 18px;border-radius:999px;border:1px solid var(--bd);font-weight:700;font-size:14px;color:var(--ink);background:transparent}
 .acc-tab.on{background:var(--g);color:#fff;border-color:var(--g)}
 .acc-panel{display:none}
 .acc-panel.on{display:block}
@@ -883,7 +886,7 @@ html[data-theme="dark"] .mira-sig-l{color:var(--gn)}
 .mira-head{padding:10px 0}
 .mira-head span{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase}
 .mira-hv{text-align:right;color:var(--amber)}
-.mira-hp{color:var(--g)}
+.mira-hp{color:var(--acc)}
 .mira-row{padding:16px 0;align-items:center}
 .mira-row p{margin:0;font-size:14.5px;line-height:1.5;color:var(--ink-soft)}
 .mira-v{text-align:right}

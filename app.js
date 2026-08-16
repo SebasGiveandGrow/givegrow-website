@@ -49,7 +49,7 @@ var I18N = {
     "impactos.rec.r8.k":"Acta de entrega",
     "impactos.rec.r8.v":"Firmada por quien recibe",
     "impactos.rec.r9.k":"Reporte fotográfico",
-    "impactos.rec.r9.v":"Mensual, al donante",
+    "impactos.rec.r9.v":"Con cada entrega, en el rastreo",
     "impactos.rec.r10.k":"Certificado de donación",
     "impactos.rec.r10.v":"Revisado y firmado, no automático",
     "impactos.rec.note":"Los valores son un ejemplo; la estructura es la real.",
@@ -236,7 +236,7 @@ var I18N = {
     "traz.4.t":"Entrega con acta",
     "traz.4.p":"Cada entrega queda documentada y verificada.",
     "traz.5.t":"Reporte fotográfico",
-    "traz.5.p":"El donante recibe evidencia mensual del impacto real.",
+    "traz.5.p":"Cuando la fundación aliada entrega, su acta firmada y sus fotos quedan en el rastreo de tu aporte.",
     "origen.ey":"Nuestro origen",
     "origen.t":"Todo empezó con una tonelada de comida.",
     "origen.p1":"Tras semanas de gestión, una campaña alcanzó su meta: una tonelada de alimento para entregar a una fundación. Pero al llegar, la fundación no tenía cómo almacenar ni repartir todo ese alimento. Casi la mitad se perdió. Ver esa comida desperdiciarse —comida que a pocas cuadras alguien necesitaba— dejó una pregunta que no soltó al fundador: ¿cómo cierro la brecha entre los recursos y la necesidad, con lo que tengo a la mano?",
@@ -360,8 +360,8 @@ var I18N = {
     "track.mode.dirigida":"Donación dirigida",
     "track.delivered.t":"Entregada con evidencia",
     "track.foot":"Cada cambio de estado queda registrado. Cuando tu donación se entregue, aquí verás el acta y el reporte.",
-    "track.ng.t":"Te reenviamos tu guía",
-    "track.ng.p":"Escribe el correo con el que hiciste tu donación y te enviaremos tu número de guía para que puedas rastrearla.",
+    "track.ng.t":"¿Perdiste tu número de guía?",
+    "track.ng.p":"Escribe el correo con el que donaste y te dejamos el mensaje listo para enviárnoslo. Te respondemos con tu número de guía.",
     "track.ng.btn":"Solicitar mi guía",
     "track.ng.invalid":"Escribe un correo válido, por favor.",
     "track.ng.sent":"Abrimos tu correo con la solicitud lista para enviar. Te responderemos con tu guía.",
@@ -700,7 +700,7 @@ var I18N = {
     "gracias.lost.p":"Puede que el enlace haya perdido su identificador. Si hiciste un aporte, busca tu número de guía en el correo de confirmación y consúltalo en «Rastrea tu donación».",
     "pay.tab.banco":"Bancolombia",
     "pay.tab.paypal":"PayPal",
-    "pay.banco.note":"Transfiere y envía el comprobante a contabilidad@thegiveandgrowproject.org. Te confirmamos la recepción y, si lo pediste, te expedimos el certificado de donación firmado.",
+    "pay.banco.note":"Transfiere y repórtalo en el sitio: recibes tu número de guía al instante y subes ahí mismo el comprobante. Lo contrastamos contra el extracto y te llega tu recibo; si lo pediste, después el certificado firmado.",
     "pay.bank":"Banco",
     "pay.acc":"Cuenta de Ahorros",
     "pay.holder":"Titular",
@@ -741,7 +741,7 @@ var I18N = {
     "transp.fin.1":"Estados financieros bajo NIIF (Grupo II), firmados por la Revisora Fiscal Manuela Londoño Arboleda (T.P. 244894-T).",
     "transp.fin.2":"Declaración de renta anual ante la DIAN (Formulario 110).",
     "transp.fin.3":"Actualización anual del Registro Web RTE (Formato 5245).",
-    "transp.fin.4":"Certificado de donación expedido conforme a la ley por cada aporte.",
+    "transp.fin.4":"Certificado de donación expedido conforme a la ley, por cada aporte que lo solicite.",
     "transp.trace.t":"Trazabilidad de cada aporte",
     "transp.trace.p":"Recibo con número de guía al confirmarse el pago, certificado de donación revisado y firmado, y acta de entrega con fotos publicada en el rastreo de tu aporte.",
     "transp.verify.t":"Verifícalo tú mismo",
@@ -1253,7 +1253,16 @@ var ROUTE_META = {
   membresias:{t:{es:"Membresías · Give&Grow International",en:"Memberships · Give&Grow International"},d:{es:"Hazte miembro de Give&Grow: dona de forma recurrente, crece de Semilla a Bosque y suma beneficios en cada nivel.",en:"Become a Give&Grow member: give monthly, grow from Seed to Forest and add benefits at each tier."}},
   voluntariado:{t:{es:"Voluntariado e Impact Journey · Give&Grow International",en:"Volunteering & Impact Journey · Give&Grow International"},d:{es:"Tres maneras de participar, el método MIRA en doble vía y cómo cuidamos a las comunidades. Voluntariado corporativo y pro-bono.",en:"Three ways to take part, the two-way MIRA method, and how we care for communities. Corporate and pro-bono volunteering."}},
   faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}},
-  privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}}
+  privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
+  /* Estas cuatro faltaban y caían al `|| ROUTE_META.inicio`, así que se
+     presentaban con el título y la descripción de la portada. No era cosmético:
+     `rastrea` es la ruta a la que apunta el correo del recibo de cada donante y
+     `gracias` es donde Wompi devuelve a quien acaba de pagar — las dos vistas
+     que más se comparten por mensaje. */
+  rastrea:{t:{es:"Rastrea tu donación · Give&Grow International",en:"Track your gift · Give&Grow International"},d:{es:"Escribe tu número de guía y sigue tu aporte de principio a fin: estado, destino y el acta de entrega cuando la fundación aliada entrega.",en:"Enter your tracking number and follow your gift from start to finish: status, destination and the delivery record once the partner foundation delivers."}},
+  gracias:{t:{es:"Gracias por tu aporte · Give&Grow International",en:"Thank you for your gift · Give&Grow International"},d:{es:"Recibimos tu aporte y lo estamos confirmando. Guarda tu número de guía: con él puedes seguirlo hasta la entrega.",en:"We received your gift and we are confirming it. Keep your tracking number: it lets you follow the gift through to delivery."}},
+  aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
+  comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
 };
 function setMetaTag(attr,key,val){ var el=document.querySelector("meta["+attr+"='"+key+"']"); if(el) el.setAttribute("content",val); }
 var OG_IMG_DEFAULT = "https://www.thegiveandgrowproject.org/img/og.jpg";
@@ -3061,12 +3070,18 @@ function fichaImpCalc(btn, fid){
   });
 }
 var INVENTORY_DATA = null;
+/* Se cachea la PROMESA y no solo el resultado. Con el resultado, dos llamadas
+   disparadas antes de que la primera responda encontraban INVENTORY_DATA
+   todavía en null y pedían el archivo dos veces — medido en la portada. */
+var INVENTORY_PROMISE = null;
 function loadInventory(){
   if (INVENTORY_DATA) return Promise.resolve(INVENTORY_DATA);
-  return fetch("/data/inventario.json")
+  if (INVENTORY_PROMISE) return INVENTORY_PROMISE;
+  INVENTORY_PROMISE = fetch("/data/inventario.json")
     .then(function(r){ if(!r.ok) throw 0; return r.json(); })
     .then(function(j){ INVENTORY_DATA = j; return j; })
-    .catch(function(){ return null; });
+    .catch(function(){ INVENTORY_PROMISE = null; return null; });
+  return INVENTORY_PROMISE;
 }
 /* Estados públicos y su orden en la línea de tiempo */
 var TRACK_STEPS = ["recibida","en_distribucion","entregada"];
