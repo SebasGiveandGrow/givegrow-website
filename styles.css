@@ -443,6 +443,24 @@ html[data-theme="dark"] .alma-fab{background:var(--acc);color:var(--ink-deep)}
 }
 .wa:hover span,.alma-fab:hover span,
 .wa:focus-visible span,.alma-fab:focus-visible span{opacity:1;transform:none}
+
+/* ALMA lleva su nombre puesto, no escondido en el hover.
+   El icono de destellos es hoy el signo convencional de «asistente», así que
+   lo que falta no es decir QUÉ es sino DE QUIÉN es: sin el nombre, el botón es
+   una IA genérica; con él, es ALMA. WhatsApp no lo necesita —su icono se
+   reconoce solo— y conserva la etiqueta al pasar el cursor.
+   Va en pastilla de superficie y no en texto suelto porque estos botones
+   flotan sobre fotografía: sin fondo, el nombre se pierde según la imagen. */
+.alma-fab span{
+  opacity:1;transform:none;
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--bd);border-radius:999px;
+  box-shadow:var(--shadow);
+  padding:6px 13px;letter-spacing:.1em;
+}
+.alma-fab:hover span{border-color:var(--g)}
+html[data-theme="dark"] .alma-fab span{background:var(--surface);color:var(--ink);border-color:var(--bd)}
+html[data-theme="dark"] .alma-fab:hover span{border-color:var(--acc)}
 html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{background:var(--surface);color:var(--ink)}
 
 @media(prefers-reduced-motion:reduce){
