@@ -318,7 +318,7 @@ try {
    Así que esto es un TRINQUETE, no un muro: fija el número actual como techo.
    No se puede empeorar, y cada tanda de migración baja el listón. Si migras,
    BAJA estas dos constantes: el check te dice el número exacto. */
-const TECHO_COLORES = 142;
+const TECHO_COLORES = 72;
 const TECHO_FUENTES = 210;
 try {
   const css = readFileSync("styles.css", "utf8");
