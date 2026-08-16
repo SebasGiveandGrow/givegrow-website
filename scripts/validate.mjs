@@ -305,4 +305,44 @@ try {
   }
 } catch (e) { err("no se pudo comparar las minutas con el certificado: " + e.message); }
 
+/* 11 · Trinquete del sistema visual (plan VISUAL, Fase 4).
+   El sistema existe —más de 50 tokens— pero el CSS no lo usaba: 207 colores
+   escritos a mano en 79 tonos distintos, y 211 tamaños de fuente sueltos en 26
+   medidas, con medios puntos (13.5px, 14.5px, 16.5px…). Así es como aparecen un
+   `#B4690E` fuera de paleta en el mapa y tres rojos de error distintos.
+
+   No se puede exigir cero de golpe: la migración necesita triaje uno por uno
+   —muchos de los `#fff` son legítimos, sobre superficies oscuras en los dos
+   modos— y hacerla a ciegas rompería el modo noche sin que nadie lo note.
+
+   Así que esto es un TRINQUETE, no un muro: fija el número actual como techo.
+   No se puede empeorar, y cada tanda de migración baja el listón. Si migras,
+   BAJA estas dos constantes: el check te dice el número exacto. */
+const TECHO_COLORES = 203;
+const TECHO_FUENTES = 210;
+try {
+  const css = readFileSync("styles.css", "utf8");
+  /* Los bloques que DEFINEN tokens son justo donde los literales deben estar. */
+  const defs = css.match(/(?::root|html\[data-theme="dark"\])\s*\{[^}]*\}/gs) || [];
+  let resto = css;
+  for (const d of defs) resto = resto.replace(d, "");
+
+  const colores = (resto.match(/#[0-9A-Fa-f]{3,8}\b|rgba?\([^)]*\)/g) || []).length;
+  const fuentes = (resto.match(/font-size:\s*[0-9.]+px/g) || []).length;
+
+  const reporta = (nombre, n, techo, ayuda) => {
+    if (n > techo) {
+      err(`${nombre}: ${n} en styles.css, y el techo es ${techo}. ` +
+          `Usa los tokens de \`:root\` (${ayuda}). Si de verdad hace falta uno nuevo, ` +
+          `defínelo como token y súbelo ahí, no lo escribas suelto.`);
+    } else if (n < techo) {
+      ok(`${nombre}: ${n} — BAJÓ del techo ${techo}. Actualiza TECHO_* en validate.mjs a ${n}`);
+    } else {
+      ok(`${nombre}: ${n}, en el techo`);
+    }
+  };
+  reporta("colores literales fuera de los tokens", colores, TECHO_COLORES, "--g, --acc, --amber, --err…");
+  reporta("tamaños de fuente sueltos", fuentes, TECHO_FUENTES, "--fs-body, --fs-h3, --fs-eyebrow…");
+} catch (e) { err("no se pudo medir el sistema visual: " + e.message); }
+
 process.exit(fail);
