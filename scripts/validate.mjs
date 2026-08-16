@@ -319,7 +319,7 @@ try {
    No se puede empeorar, y cada tanda de migración baja el listón. Si migras,
    BAJA estas dos constantes: el check te dice el número exacto. */
 const TECHO_COLORES = 72;
-const TECHO_FUENTES = 210;
+const TECHO_FUENTES = 21;
 try {
   const css = readFileSync("styles.css", "utf8");
   /* Los bloques que DEFINEN tokens son justo donde los literales deben estar.
