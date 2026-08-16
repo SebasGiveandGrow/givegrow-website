@@ -19,6 +19,9 @@
      Las sombras van en dos capas —una cerrada que asienta el botón y otra
      abierta que lo levanta— en vez de la plana teñida de antes. */
   --wa-marca:#25D366;
+  /* Tinta sobre superficie oscura (el check de las casillas, y en adelante todo
+     el texto que hoy escribe `#fff` a mano). */
+  --on-dark:#fff;
   --fab-shadow:0 1px 2px rgba(14,33,24,.16), 0 6px 18px rgba(14,33,24,.14);
   --fab-shadow-hover:0 2px 4px rgba(14,33,24,.20), 0 12px 28px rgba(14,33,24,.22);
   --honor:#B8860B;--honorl:#FFF8E7;
@@ -329,7 +332,7 @@ body.alma-lock .alma-fab,body.alma-lock .wa{display:none}
   display:block;margin-top:3px;font-size:12px;line-height:1.4;color:var(--mu);
 }
 .alma-x{
-  flex:0 0 auto;width:30px;height:30px;border:1px solid var(--bd);border-radius:2px;
+  flex:0 0 auto;width:30px;height:30px;border:1px solid var(--bd);border-radius:50%;
   background:transparent;color:var(--mu);font-size:19px;line-height:1;
   display:flex;align-items:center;justify-content:center;transition:color .15s,border-color .15s;
 }
@@ -349,12 +352,12 @@ body.alma-lock .alma-fab,body.alma-lock .wa{display:none}
 .alma-in{display:flex;gap:8px;padding:14px 22px;border-top:1px solid var(--bd)}
 #alma-input{
   flex:1;min-width:0;background:var(--bg);border:1px solid var(--bd);color:var(--ink);
-  border-radius:2px;padding:11px 13px;font-size:15px;
+  border-radius:var(--r);padding:11px 13px;font-size:15px;
 }
 #alma-input::placeholder{color:var(--mu)}
 #alma-input:focus{outline:2px solid var(--acc);outline-offset:-1px}
 .alma-send{
-  padding:0 16px;border-radius:2px;background:var(--g);color:#fff;
+  padding:0 16px;border-radius:999px;background:var(--g);color:#fff;
   font-weight:600;font-size:14px;transition:background .15s;
 }
 .alma-send:hover{background:var(--gm)}
@@ -433,7 +436,7 @@ html[data-theme="dark"] .alma-fab{background:var(--acc);color:var(--ink-deep)}
   background:var(--ink-deep);color:#fff;
   font-family:"Inter",sans-serif;font-size:var(--fs-control);font-weight:600;
   letter-spacing:.08em;text-transform:uppercase;
-  padding:7px 11px;border-radius:2px;
+  padding:7px 11px;border-radius:8px;
   box-shadow:var(--shadow);
   opacity:0;transform:translateX(6px);
   transition:opacity .16s var(--ease),transform .16s var(--ease);
@@ -781,8 +784,8 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .e404-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 
 /* chips de sugerencia de ALMA (migrado de estilos inline) */
-/* Radio 2px, no píldora: sugerencias de un índice, no respuestas de chatbot. */
-.alma-chip{padding:7px 11px;border:1px solid var(--bd);border-radius:2px;background:transparent;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;text-align:left;transition:color .15s,border-color .15s}
+/* Píldora, como el resto de chips del sitio (.tag, .bc-level). */
+.alma-chip{padding:7px 12px;border:1px solid var(--bd);border-radius:999px;background:transparent;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;text-align:left;transition:color .15s,border-color .15s}
 .alma-chip:hover{color:var(--ink);border-color:var(--ink-soft)}
 
 /* ===== flotantes en móvil: ALMA y WhatsApp no deben chocar ni tapar contenido ===== */
@@ -872,7 +875,46 @@ html[data-theme="dark"] .track-cta h3{color:var(--ink)}
 .ally-mods{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ally-check{display:flex;gap:11px;align-items:flex-start;padding:14px;border:1.5px solid var(--bd);border-radius:12px;cursor:pointer;transition:border-color .15s,background .15s}
 .ally-check:hover{border-color:var(--gm)}
-.ally-check input{margin-top:3px;flex:0 0 auto;width:18px;height:18px;accent-color:var(--g)}
+/* ===== casillas de verificación =====
+   Una casilla nativa no acepta `border-radius`: el navegador la dibuja él y
+   `accent-color` solo le cambia el relleno. Para redondearla hay que apagar el
+   dibujo del sistema (`appearance:none`) y componerla: el cuadro es el propio
+   input y el check es su `::before`, recortado con `clip-path`.
+
+   Sigue siendo un `<input type=checkbox>` de verdad, así que conserva el
+   teclado, el estado para lectores de pantalla y el envío del formulario. */
+input[type=checkbox]{
+  appearance:none;-webkit-appearance:none;
+  flex:0 0 auto;width:19px;height:19px;margin:0;
+  /* `--mu` y no `--bd`: el borde de una casilla NO es decorativo, es el límite
+     de un control, y WCAG pide 3:1 para eso. Con `--bd` —el borde de tarjeta
+     del sitio— la casilla sin marcar daba 1.41:1 y casi no se veía. La nativa
+     no tenía el problema porque la dibujaba el sistema operativo. */
+  border:1.5px solid var(--mu);border-radius:6px;
+  background:var(--surface);
+  display:grid;place-content:center;cursor:pointer;
+  transition:background .15s var(--ease),border-color .15s var(--ease);
+}
+input[type=checkbox]::before{
+  content:"";width:11px;height:11px;
+  background:var(--on-dark);
+  clip-path:polygon(14% 44%, 0 60%, 39% 100%, 100% 18%, 84% 4%, 39% 68%);
+  transform:scale(0);
+  transition:transform .13s var(--ease);
+}
+input[type=checkbox]:checked{background:var(--g);border-color:var(--g)}
+input[type=checkbox]:checked::before{transform:scale(1)}
+input[type=checkbox]:hover:not(:checked){border-color:var(--gm)}
+input[type=checkbox]:disabled{opacity:.5;cursor:not-allowed}
+/* Explícito y no heredado de la regla global: al apagar `appearance` se pierde
+   también el anillo de foco que dibujaba el sistema, y una casilla sin foco
+   visible deja el formulario inservible con el teclado. */
+input[type=checkbox]:focus-visible{outline:3px solid var(--gm);outline-offset:2px}
+html[data-theme="dark"] input[type=checkbox]:checked{background:var(--acc);border-color:var(--acc)}
+html[data-theme="dark"] input[type=checkbox]::before{background:var(--ink-deep)}
+@media(prefers-reduced-motion:reduce){input[type=checkbox],input[type=checkbox]::before{transition:none}}
+
+.ally-check input{margin-top:2px}
 .ally-check span{display:flex;flex-direction:column;gap:2px}
 .ally-check b{font-size:14.5px;color:var(--ink)}
 .ally-check small{font-size:12.5px;color:var(--mu);line-height:1.4}
