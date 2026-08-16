@@ -2696,9 +2696,12 @@ function initMap(){
     var legend=L.control({position:"bottomleft"});
     legend.onAdd=function(){
       var d=L.DomUtil.create("div","map-legend");
-      d.innerHTML='<span><i class="gg-dot" style="background:#2E7D4F"></i>'+t("map.leg.f")+"</span>"
-                 +'<span><i class="gg-dot" style="background:#B4690E"></i>'+t("map.leg.c")+"</span>"
-                 +'<span><i class="gg-dot" style="background:#1F5C38"></i>'+t("map.leg.hub")+"</span>";
+      /* Los tres colores salen de los tokens y no escritos a mano: así la
+         leyenda y los pines no pueden separarse, y el ámbar cambia con el modo
+         noche igual que el resto del sitio. */
+      d.innerHTML='<span><i class="gg-dot" style="background:var(--gm)"></i>'+t("map.leg.f")+"</span>"
+                 +'<span><i class="gg-dot" style="background:var(--amber)"></i>'+t("map.leg.c")+"</span>"
+                 +'<span><i class="gg-dot" style="background:var(--g)"></i>'+t("map.leg.hub")+"</span>";
       return d;
     };
     legend.addTo(map);
