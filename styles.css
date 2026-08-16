@@ -13,6 +13,14 @@
      distintos sueltos por el sitio. Al definirlo aquí, esas tres llamadas
      empiezan a resolver solas. */
   --err:#8C2F1E;
+  /* Botones flotantes. El verde de WhatsApp es marca ajena y por eso vive en su
+     propio token, acotado a ese botón: es el único lugar del sitio donde el
+     reconocimiento del canal pesa más que la paleta de la casa.
+     Las sombras van en dos capas —una cerrada que asienta el botón y otra
+     abierta que lo levanta— en vez de la plana teñida de antes. */
+  --wa-marca:#25D366;
+  --fab-shadow:0 1px 2px rgba(14,33,24,.16), 0 6px 18px rgba(14,33,24,.14);
+  --fab-shadow-hover:0 2px 4px rgba(14,33,24,.20), 0 12px 28px rgba(14,33,24,.22);
   --honor:#B8860B;--honorl:#FFF8E7;
   --r:12px;--rl:13px;
   --ease:cubic-bezier(.16,1,.3,1);
@@ -386,21 +394,58 @@ footer a:hover{color:var(--gn)}
 .foot-bottom{border-top:1px solid rgba(255,255,255,.1);padding-top:20px;font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
 
 /* ===== whatsapp ===== */
-/* Mismo lenguaje que `.alma-fab`, un peldaño más abajo en la jerarquía.
-   Antes era un círculo de 56px en el verde de WhatsApp (#25D366) con sombra
-   difusa de color y `scale` al pasar el cursor: tres cosas que el sistema no
-   usa en ninguna otra parte, y una marca ajena traída a la nuestra. ALMA es la
-   acción propia y va sólida; WhatsApp es un canal y va en contorno. */
-.wa{position:fixed;bottom:24px;right:24px;z-index:400;
-  display:flex;align-items:center;gap:8px;padding:0 15px;height:40px;
-  border-radius:2px;border:1px solid var(--g);
-  background:var(--surface);color:var(--g);
-  font-weight:600;font-size:var(--fs-control);letter-spacing:.06em;text-transform:uppercase;
-  transition:background .15s,color .15s,border-color .15s}
-.wa:hover{background:var(--g);color:var(--surface)}
-.wa svg{width:16px;height:16px;fill:currentColor}
-html[data-theme="dark"] .wa{background:transparent;border-color:var(--acc);color:var(--acc)}
-html[data-theme="dark"] .wa:hover{background:var(--acc);color:var(--ink-deep)}
+/* ===== BOTONES FLOTANTES · ALMA y WhatsApp =====
+   Un PAR: misma silueta, mismo tamaño, misma sombra, misma reacción. Lo que
+   los distingue es el color y el icono, no la forma — antes uno era pastilla y
+   el otro círculo, y por eso no se leían como hermanos.
+
+   La sombra va en dos capas: una cerrada que asienta el botón sobre el papel y
+   otra abierta que lo levanta. La de antes era una sola, plana y teñida de
+   verde al 40%, que es lo que le daba el aire de app.
+
+   Al pasar el cursor suben 2px en vez de crecer: `scale` deforma el icono y
+   delata el truco; la elevación es lo que hace un objeto físico. */
+.wa,.alma-fab{
+  position:fixed;right:24px;z-index:400;
+  width:56px;height:56px;padding:0;
+  border:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;
+  box-shadow:var(--fab-shadow);
+  transition:transform .18s var(--ease),box-shadow .18s var(--ease),background .18s;
+}
+.wa:hover,.alma-fab:hover{transform:translateY(-2px);box-shadow:var(--fab-shadow-hover)}
+.wa:active,.alma-fab:active{transform:translateY(0);box-shadow:var(--fab-shadow)}
+
+.wa{bottom:24px;background:var(--wa-marca)}
+.wa svg{width:28px;height:28px;fill:currentColor}
+
+.alma-fab{bottom:92px;background:var(--g)}
+.alma-fab svg{width:25px;height:25px}
+html[data-theme="dark"] .alma-fab{background:var(--acc);color:var(--ink-deep)}
+
+/* La etiqueta ya no vive dentro del botón: sale al pasar el cursor o al recibir
+   el foco. Así ALMA conserva su nombre —que no se adivina por el icono, a
+   diferencia de WhatsApp— sin romper la simetría de los dos círculos. */
+.wa span,.alma-fab span{
+  position:absolute;right:calc(100% + 12px);
+  white-space:nowrap;pointer-events:none;
+  background:var(--ink-deep);color:#fff;
+  font-family:"Inter",sans-serif;font-size:var(--fs-control);font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;
+  padding:7px 11px;border-radius:2px;
+  box-shadow:var(--shadow);
+  opacity:0;transform:translateX(6px);
+  transition:opacity .16s var(--ease),transform .16s var(--ease);
+}
+.wa:hover span,.alma-fab:hover span,
+.wa:focus-visible span,.alma-fab:focus-visible span{opacity:1;transform:none}
+html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{background:var(--surface);color:var(--ink)}
+
+@media(prefers-reduced-motion:reduce){
+  .wa,.alma-fab,.wa span,.alma-fab span{transition:none}
+  .wa:hover,.alma-fab:hover{transform:none}
+}
 
 /* ===== responsive ===== */
 @media(max-width:1024px){
@@ -550,6 +595,10 @@ html[data-theme="dark"]{
   --skel-a:#1A231D;--skel-b:#222C25;
   --shadow:0 2px 8px rgba(0,0,0,.35);
   --shadow-lg:0 10px 30px rgba(0,0,0,.5);
+  /* En noche la sombra no puede ser «más oscuro»: el fondo ya lo es. Se cierra
+     y se apoya en un halo tenue de luz para que el botón siga despegando. */
+  --fab-shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 22px rgba(0,0,0,.45);
+  --fab-shadow-hover:0 2px 6px rgba(0,0,0,.55), 0 14px 32px rgba(0,0,0,.55);
 }
 html[data-theme="dark"] .hero-bg img{filter:brightness(.8)}
 html[data-theme="dark"] .cur-toggle button.on{color:#0E2118}
@@ -593,19 +642,7 @@ html[data-theme="dark"] .tt-moon{opacity:1}
 /* ---------- disparador de ALMA ----------
    Rectangular, 2px de radio, borde de 1px. Sin píldora, sin sombra difusa,
    sin brillo, sin rebote al hover: se comporta como una pestaña de archivo. */
-.alma-fab{
-  /* 72 y no 92: WhatsApp pasó de 56px de alto a 40, así que los dos quedan
-     apilados con la misma separación de 8px que usan las pastillas del sitio. */
-  position:fixed;bottom:72px;right:24px;z-index:400;
-  display:flex;align-items:center;gap:8px;padding:0 15px;height:40px;
-  border-radius:2px;border:1px solid var(--g);
-  background:var(--g);color:#fff;
-  font-weight:600;font-size:var(--fs-control);letter-spacing:.06em;text-transform:uppercase;
-  transition:background .15s,border-color .15s;
-}
-.alma-fab:hover{background:var(--gm);border-color:var(--gm)}
-.alma-fab svg{width:16px;height:16px}
-html[data-theme="dark"] .alma-fab{background:var(--acc);border-color:var(--acc);color:#0F1613}
+/* La silueta de ALMA se define arriba, junto a la de WhatsApp: son un par. */
 html[data-theme="dark"] .alma-fab:hover{background:var(--acc-2);border-color:var(--acc-2)}
 
 /* ---------- barra de recorrido (0 a 100) ---------- */
@@ -750,14 +787,14 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 
 /* ===== flotantes en móvil: ALMA y WhatsApp no deben chocar ni tapar contenido ===== */
 @media(max-width:768px){
-  /* WhatsApp abajo derecha (círculo, sin etiqueta) — simétrico con ALMA */
-  .wa{bottom:18px;right:18px;width:52px;height:52px;padding:0;border-radius:50%;justify-content:center;gap:0}
-  .wa span{display:none}
-  .wa svg{width:24px;height:24px}
-  /* ALMA pasa a círculo abajo IZQUIERDA, sin texto, para no encimarse */
-  .alma-fab{bottom:18px;left:18px;right:auto;width:52px;height:52px;padding:0;border-radius:50%;justify-content:center;gap:0}
-  .alma-fab span{display:none}
-  .alma-fab svg{width:24px;height:24px}
+  /* Los dos círculos bajan a 52px y se separan a lados opuestos: apilados en la
+     misma esquina taparían contenido en una pantalla de teléfono. */
+  .wa{bottom:18px;right:18px;width:52px;height:52px}
+  .wa svg{width:25px;height:25px}
+  .alma-fab{bottom:18px;left:18px;right:auto;width:52px;height:52px}
+  .alma-fab svg{width:23px;height:23px}
+  /* Sin etiqueta: en táctil no hay hover que la dispare y estorbaría. */
+  .wa span,.alma-fab span{display:none}
 }
 
 /* ============ Rastrea tu donación ============ */
