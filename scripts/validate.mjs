@@ -318,12 +318,17 @@ try {
    Así que esto es un TRINQUETE, no un muro: fija el número actual como techo.
    No se puede empeorar, y cada tanda de migración baja el listón. Si migras,
    BAJA estas dos constantes: el check te dice el número exacto. */
-const TECHO_COLORES = 202;
+const TECHO_COLORES = 142;
 const TECHO_FUENTES = 210;
 try {
   const css = readFileSync("styles.css", "utf8");
-  /* Los bloques que DEFINEN tokens son justo donde los literales deben estar. */
-  const defs = css.match(/(?::root|html\[data-theme="dark"\])\s*\{[^}]*\}/gs) || [];
+  /* Los bloques que DEFINEN tokens son justo donde los literales deben estar.
+     Se reconoce cualquier regla cuyo selector mencione `:root` o
+     `html[data-theme`, no solo las que empiezan por ahí: la hoja de impresión
+     redefine su paleta con `:root, :root[data-theme="dark"] {`, y con la forma
+     anterior ese bloque entero se contaba como fugas. */
+  const defs = (css.match(/[^{}]+\{[^}]*\}/gs) || [])
+    .filter(b => /:root|html\[data-theme/.test(b.slice(0, b.indexOf("{"))));
   let resto = css;
   for (const d of defs) resto = resto.replace(d, "");
 
