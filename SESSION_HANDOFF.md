@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Auditoría completa del sitio" (14–16 ago 2026)
+> Última actualización: sesión "Fase 4 · sistema visual" (16 ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -15,7 +15,7 @@ Si Sebas dice solo "la siguiente fase", **preguntar de cuál de los tres**.
 | Plan | Dónde vive | Estado |
 |---|---|---|
 | **ECOSISTEMA DIGITAL, 9 fases** (limpieza · D1 · Wompi · formularios · panel · documentos · evidencia · membresías · medir) | traspaso del 8–11 ago + este | **0, 1, 2, 3, 4, 5, 5.1, 6 y 8 hechas.** Fase 7 a medias: **carnet ✅**, falta el **débito automático** en Wompi. De la 8 quedó la mitad de «limpiar», que son decisiones tuyas, no código — ver su cierre de tanda |
-| **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo | Fases 1–2 hechas (PRs #36, #37). **Fase 3 cerrada**: el rastreo y la evidencia entraron con la brigada, y **Transparencia imprimible** con el PR #90. Del contador por recencia Sebas decidió **esperar**. **Siguiente: su Fase 4** (sistema visual) |
+| **VISUAL, 6 fases** (credibilidad · ImpactOS/ALMA · trazabilidad · sistema visual · logo "Sello Variable" · recibo público) | secciones de abajo de este archivo + `DESIGN_SYSTEM.md` | Fases 1–2 (PRs #36, #37) y **3 cerradas** (#90). **Fase 4 CERRADA** (PRs #98, #99, #100, #101, #102, #103, #104): tokens, escala, trinquete y las dos familias grandes migradas. **Siguiente: su Fase 5**, el logo «Sello Variable» — que espera el logo real de marca |
 | **VOLUNTARIADO, 8 fases** | `PLAN_VOLUNTARIADO.md` | **Fases 1–7 hechas y en producción.** **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
 Y aparte, el **Social Fest 2026**: la postulación ya se envió (taller «Si no quedó
@@ -254,6 +254,76 @@ persona.
 **Nota sobre la alarma de la Fase 8:** sigue encendida después de conciliar, y
 está bien. `eventos_wompi` seguirá en 0 hasta que llegue un webhook de verdad, y
 es exactamente lo que hay que seguir viendo.
+
+## Cierre de tanda: plan VISUAL, Fase 4 — sistema visual (16 ago 2026)
+
+**El diagnóstico que la gobernó**, medido y no supuesto: el sistema existía —51
+tokens— y el CSS no lo usaba. **207 colores escritos a mano en 79 tonos** y
+**210 tamaños de fuente sueltos en 26 medidas**, con medios puntos como 13.5px
+o 16.5px. Así aparecen un `#B4690E` fuera de paleta en el mapa y tres rojos de
+error distintos.
+
+| | al empezar | al cerrar |
+|---|---|---|
+| colores literales | 207 | **72** |
+| tamaños sueltos | 210 | **21** |
+
+**El check #11 es lo que impide que vuelva.** Es un TRINQUETE, no un muro: fija
+el número actual como techo, falla si sube, y cuando baja dice a cuánto ponerlo.
+Se eligió así porque exigir cero de golpe habría forzado a migrar a ciegas los
+`#fff` legítimos —los que van sobre superficies oscuras en los dos modos— y eso
+rompe el modo noche sin que nadie lo note.
+
+### Las cinco cosas que conviene no reaprender
+
+1. **Los nombres separan ideas que se escribían igual.** Los 54 blancos eran
+   TRES cosas: tinta sobre oscuro (`--on-dark`), fondo de logotipo ajeno
+   (`--logo-bg`, que debe seguir blanco en los dos modos porque los logos vienen
+   con fondo horneado) y superficies claras sobre oscuro. Llamarlos igual habría
+   sido dar un nombre a dos ideas opuestas.
+2. **Tokenizar habilita arreglos que antes no cabían.** La hoja de impresión
+   enumeraba A MANO los contenedores oscuros para que su texto no saliera blanco
+   sobre papel blanco. Ahora `@media print` redefine `--on-dark:#111` y cualquier
+   sección oscura futura se imprime legible sola.
+3. **Verificar según lo que el cambio promete.** Cuando el cambio era neutro
+   (los blancos), se comparó la **huella de color** contra `main` cargando los
+   dos CSS en el mismo navegador: 6 rutas, 6 idénticas, 0 nodos distintos. Cuando
+   sí cambiaba (opacidades, tamaños), se midió lo que podía romperse: contraste
+   compuesto sobre el fondo real, y geometría de 300 cajas por ruta.
+4. **El propio check te caza a ti.** Al escribir el botón nuevo metí un `13px` a
+   mano y el trinquete lo detectó; pasó a `--fs-control`.
+5. **Cuidado con el navegador de pruebas:** NO recalcula el estilo de los nodos
+   que ya existían cuando cambia la hoja. Una casilla marcada daba 1.09 de
+   contraste y parecía un fallo grave; al reinsertar el nodo se pintaba bien. **Medir
+   sobre nodos frescos.** Y su `window.scrollTo` no mueve nada, así que para ver
+   un elemento hay que traerlo al viewport.
+
+### Lo que la fase corrigió de camino
+Dos casillas de verificación que la nativa tapaba: su borde salía a **1.41:1**
+—heredaba `--bd`, que es borde de TARJETA, cuando el borde de un control pide
+3:1— y **el foco desaparecía** al apagar `appearance`. Y `DESIGN_SYSTEM.md`, que
+es documento vinculante, declaraba un `--navy #0A1628` y un acento `#9be3b6` que
+**no existen** (cero apariciones), más un deploy por Trees API y un render con
+Playwright que tampoco. Puesto al día.
+
+### Lo que queda, y no es una familia
+**72 colores y 21 tamaños**: grises sueltos, `rgba` negros de sombra, tamaños
+grandes de 18 a 40px, y dos literales a propósito en `optgroup`/`option` —la
+lista desplegable la pinta el sistema operativo y no todos los navegadores
+resuelven `var()` ahí dentro—. Es cola larga: se mira caso por caso, no de una
+pasada.
+
+### Los botones flotantes, que Sebas corrigió dos veces
+Terminaron en **par de círculos de 56px** con sombra de dos capas y elevación de
+2px al pasar el cursor (no `scale`, que deforma el icono). ALMA en verde
+institucional con **su nombre fijo en pastilla** —el icono de destellos dice QUÉ
+es, el nombre dice DE QUIÉN es— y WhatsApp en su verde de marca, el único lugar
+del sitio donde una marca ajena se justifica.
+
+⚠️ **Dato conocido y aceptado:** el glifo blanco sobre el verde de WhatsApp da
+**1.98:1**, bajo el 3:1 que WCAG pide para iconos. El botón como control se
+distingue de sobra (9.25:1 contra el fondo); lo corto es el dibujo. Se arregla
+con `#128C7E` a costa del verde reconocible. Sebas prefirió el verde.
 
 ## Cierre de tanda: auditoría completa del sitio (14–16 ago 2026)
 
