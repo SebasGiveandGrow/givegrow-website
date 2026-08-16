@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Brigada del terremoto" (11–12 ago 2026)
+> Última actualización: sesión "Auditoría completa del sitio" (14–16 ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -87,10 +87,19 @@ poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemo
 3. **Avales de CMGRD** por ciudad, para quitar «zona por confirmar».
 4. **Costos del inventario.** Sin ellos no hay meta en pesos ni equivalencias, y
    la calculadora lo dice en voz alta.
-5. **Cédulas de los firmantes** (`ENTIDAD.repLegal.cc` y `.revisora.cc` en
-   `documentos.js`). El bloque de firmas omite la línea mientras estén vacías.
+5. ~~Cédulas de los firmantes~~ — **RESUELTO (14 ago, PR #94).** Ya están en
+   `ENTIDAD.repLegal.cc` y `.revisora.cc`, y el bloque de firmas las imprime.
 6. **La contraprestación, con la contadora.** Sigue abierta. El carnet se diseñó
    para no ensancharla: solo membresía recurrente, nunca aportes de la brigada.
+7. **Confirmar `001003` y `001005` contra el extracto**, y pedirle a quien donó
+   `001003` su **cédula y ciudad** — sin eso el certificado responde 422.
+8. **Mirar el registro de Resend** para saber si los correos de `001003`
+   salieron. Es lo único que cierra esa causa.
+9. **Dos verificaciones que arrastramos:** que el buzón `privacidad@` esté activo
+   (la Política lo fija como canal y aparece 4 veces en el sitio) y la regla WAF
+   de rate-limit del worker de ALMA.
+10. **Retirar la implementación del Apps Script de aliados**, que sigue publicada
+    y acepta POST de cualquiera. La CSP ya dejó de autorizarlo (PR #96).
 
 ## ⚠️ DOS COSAS QUE SIGUEN A MEDIAS Y HAY QUE RECORDAR
 
@@ -105,31 +114,50 @@ tocó el significado de `aprobada`: se añadió `confirmacion` ('wompi' | 'manua
 para saber de dónde viene la certeza, y el certificado cita la referencia
 BANCARIA y no un id de Wompi inexistente.
 
-## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 13 ago 2026, 20:00 UTC)
+## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 16 ago 2026, 17:20 UTC)
 
 | | |
 |---|---|
-| `aportes` | **4.** `001001` en_distribucion ('conciliada') · `001002` aprobada ('wompi') · **`001003` REPORTADA, $400.000, esperando verificación** · `001004` intencion |
+| `aportes` | **5.** `001001` en_distribucion ('conciliada') · `001002` aprobada ('wompi') · **`001003` REPORTADA, $400.000, pide certificado** · `001004` intencion · **`001005` REPORTADA, $30.000** |
 | `donantes` | **3** |
-| `eventos_wompi` | **1**, con firma válida y procesado |
-| `correos` | **0** — la tabla es nueva y aún no ha salido ningún correo desde que se desplegó |
+| `eventos_wompi` | **2**, firma válida y procesados |
+| `correos` | **2**, los dos `enviado` con su id de Resend — la tabla se estrenó con `001005` |
 | `certificados`, `miembros`, `inscripciones` | **0** |
 | `entregas` | 0 vivas · 1 anulada |
-| numeradores | guía **1004** · acta **1** · certificado sin estrenar |
+| numeradores | guía **1005** · acta **1** · certificado sin estrenar |
 
-### 🔴 LO PRIMERO AL RETOMAR: hay una donación real esperando
-**`GG-2026-001003`, $400.000 al fondo general, transferencia reportada con
-comprobante y referencia bancaria, y PIDE CERTIFICADO.** Lleva más de 30 horas
-sin verificar. Es el primer donante que no es Sebas y la donación más grande que
-ha entrado.
+### 🔴 LO PRIMERO AL RETOMAR: hay DOS donaciones reales esperando
+**`GG-2026-001003`** — $400.000 al fondo general, transferencia reportada con
+comprobante y referencia bancaria, **y PIDE CERTIFICADO**. Reportada el 12 de
+agosto. Es el primer donante que no es Sebas y la donación más grande recibida.
 
-El sistema hizo lo suyo —guía al instante, comprobante guardado—; falta
-contrastarla contra el extracto y confirmarla desde `/admin`. Hasta entonces no
-le llega recibo ni certificado. *(Los datos de la persona están en la base y en
+**`GG-2026-001005`** — $30.000 al fondo general, reportada el 14 de agosto. No
+pide certificado.
+
+El sistema hizo lo suyo con las dos —guía al instante, comprobante guardado—;
+falta contrastarlas contra el extracto y confirmarlas desde `/admin`. Hasta
+entonces no les llega recibo. *(Los datos de las personas están en la base y en
 el panel; no se copian aquí porque este repositorio es público.)*
 
+**⚠️ Para el certificado de `001003` falta un dato que el formulario no pide.**
+`donantes` no tiene su documento ni su ciudad, y `adminEmitirCertificado`
+responde **422 `datos_incompletos`** sin ellos: el certificado identifica al
+donante ante la DIAN y no puede salir con campos vacíos. Hay que pedírselos por
+correo. El panel permite completarlos al emitir.
+
 Es justo el caso para el que se construyó la cola «Esperando a una persona» de
-la Fase 8, y funcionó: lo detectó.
+la Fase 8, y funcionó: las detectó las dos.
+
+### 📧 El correo transaccional: verificado, con una ventana ciega el 12 de agosto
+`001005` disparó sus dos correos —acuse al donante y aviso a `contabilidad@`— y
+los dos quedaron **`enviado` con id de Resend**, confirmados también en el buzón.
+El correo funciona.
+
+**Pero de `001003` no salió ninguno de los dos.** No llegó el aviso interno —por
+eso nadie se enteró de esa donación durante días— y no hay rastro para saber qué
+pasó: la tabla `correos` se desplegó (PR #89, merge 21:19:41 UTC) **28 segundos
+antes** de que entrara ese reporte (21:20:09 UTC). Lo único que puede cerrar la
+causa es el registro de Resend, que está fuera de este repositorio.
 
 **⚠️ Los numeradores NO se reinician, nunca.** Ver la razón más abajo.
 
@@ -226,6 +254,116 @@ persona.
 **Nota sobre la alarma de la Fase 8:** sigue encendida después de conciliar, y
 está bien. `eventos_wompi` seguirá en 0 hasta que llegue un webhook de verdad, y
 es exactamente lo que hay que seguir viendo.
+
+## Cierre de tanda: auditoría completa del sitio (14–16 ago 2026)
+
+Sebas pidió «una auditoría completa y exhaustiva, sin huecos ni sorpresas a
+futuro». Ocho frentes, todo verificado **contra el sistema corriendo** y no
+contra la documentación. Trece hallazgos, **ninguno crítico**: nada compromete
+el dinero, los datos personales ni el acceso al panel.
+
+**Los dos de severidad alta eran promesas publicadas que el sistema no cumplía**
+—que es justo el riesgo que esta marca no se puede permitir—, y los dos entraron
+en el **PR #96**:
+
+1. **El reporte fotográfico mensual no existía.** Tres textos lo prometían y no
+   hay una sola línea que lo envíe: ni `scheduled` en el Worker, ni `triggers`,
+   ni workflow periódico. **Si algún día se construye, el texto vuelve**; hoy
+   dice lo que sí ocurre (el acta y sus fotos quedan en el rastreo al entregar).
+2. **Cuatro rutas se presentaban con el título de la portada.** `ROUTE_META`
+   tenía 19 entradas para 23 páginas y las demás caían al `|| ROUTE_META.inicio`.
+   Entre ellas **`rastrea`** —a donde apunta el correo del recibo de cada
+   donante— y **`gracias`**, donde Wompi devuelve a quien acaba de pagar.
+
+**Lo demás que entró en el #96:** `h1` en las 21 rutas (antes solo la portada
+tenía; el tamaño lo da `.h-sec` y no la etiqueta, así que fue visualmente
+neutro), tres contrastes por debajo de AA, dos textos desactualizados, la
+carrera de `loadInventory()`, `script.google.com` fuera de la CSP y el último
+huérfano de la auditoría de agosto.
+
+| corregido | antes | noche | día |
+|---|---|---|---|
+| pestaña inactiva de `#impacto` | 1.21 | 14.84 | 16.20 |
+| enlaces a PDF de Transparencia | 2.03 | 6.35 | 7.48 |
+| «Quien participa» en Voluntariado | 2.31 | 7.23 | 6.92 |
+
+### La lección de método de esta tanda
+**Tres de mis primeros «hallazgos» eran defectos de mi propia medición**, y solo
+aparecieron al intentar confirmarlos: los bloques `ld+json` señalados como
+bloqueados por la CSP (el navegador no los ejecuta, así que no los gobierna);
+cuarenta y dos fallos de contraste falsos porque la función de fondo no veía
+gradientes y devolvía blanco para texto sobre el hero verde; y cincuenta y nueve
+problemas de accesibilidad inflados por no reconocer el `<label>` que envuelve al
+input. **Un hallazgo sin su prueba no es un hallazgo.** Lo que sobrevivió a la
+verificación está en el informe; lo que no, se descartó y se dijo.
+
+### ⚠️ Deuda que dejó el propio arreglo
+Al promover los títulos a `h1`, **el salto de nivel de encabezado pasó de 2 rutas
+a 12** (`h1 → h3`). No se corrigió a propósito: exige convertir los `h3` de
+subsección en `h2`, y en este CSS eso les cambia la tipografía —`h3,h4` van en
+Inter y `h1,h2` en la display—. Reescribir la jerarquía de 12 páginas es una
+tanda propia con decisión visual de por medio.
+
+### Lo que la auditoría probó que está SANO
+Panel fail-closed (302 en las seis rutas sin sesión) · el recibo no delata qué
+guías existen (mismo 403 para una real y una inventada) · validaciones públicas
+que rechazan sin escribir · **cero inconsistencias en la base** en siete
+comprobaciones cruzadas · ningún secreto en el repo · CSP coherente (los tres
+hashes son los tres scripts ejecutables) · nada publicado sin `consent` · los
+honeypots bien hechos · `prefers-reduced-motion` cubierto · `ops/` no se sirve ·
+paridad i18n 1.238/1.238.
+
+### Lo que quedó sin comprobar, y no por olvido
+El registro de Resend para `001003` · si el buzón `privacidad@` está activo (la
+Política lo fija como canal y aparece 4 veces en el sitio) · la regla WAF del
+worker de ALMA · el render de las minutas `.docx` · **las imágenes pesadas
+(hasta 676 KB)**, que no se recomprimieron a ciegas: bajar la calidad de una foto
+de terreno sin mirar el resultado, en un sitio cuya tesis es la evidencia, no es
+una decisión de línea de comando.
+
+**Nota de entorno:** `/api/entregas` devuelve **500 en local** porque la base de
+`wrangler dev` no tiene la migración `0008_anular_entregas`. En producción
+responde 200. No es un defecto del código.
+
+## Cierre de tanda: el certificado de donación y sus minutas (14 ago 2026)
+
+**El texto del certificado ya estaba construido** palabra por palabra en
+`documentos.js` desde la Fase 5. Lo que faltaba era poder emitirlo.
+
+**Dos correcciones sobre el documento (PR #94).** Las **cédulas de los
+firmantes**, que estaban vacías y hacían que el PDF saliera con dos nombres y
+ninguna identificación (C.C. 1.007.420.930 y C.C. 1.040.745.501). Y el numeral
+II.5 **citaba el art. 771-2**, que trata de la factura como soporte de costos y
+no viene al caso: la norma que exige que una donación en dinero pase por el
+sistema financiero es el **numeral 1 del art. 125-2 ET**. Fue el único error de
+derecho que apareció al revisar el articulado completo contra la ley.
+
+**Las minutas (PR #95).** Dos `.docx` para llenar a mano y firmar —DINERO y
+ESPECIE— porque el certificado automático solo cubre pagos por pasarela. **Se
+versiona el generador (`ops/minutas-certificado.js`), nunca los `.docx`:** el
+repositorio es público y un documento editable listo para llenar de una
+declaración juramentada no tiene por qué estar ahí. Los documentos viven en el
+Drive de Sebas.
+
+**Y no en el Drive solo, porque ya sabemos cómo termina eso:** el articulado es
+el mismo que arma `documentos.js`, y dos copias del mismo texto legal en
+sistemas distintos se separan sin que nadie lo note —los documentos del Drive
+decían Art. 125 / 125% mientras el sitio decía Art. 257 / 25%—. Por eso el
+**check #10 de `validate.mjs`** compara las 14 cláusulas juradas entre los dos
+archivos y falla el build si divergen. Verificado que falla en las tres
+direcciones que importan.
+
+**Reglas que quedaron escritas** (detalle en `ops/minutas-certificado.md`):
+- **Las minutas se numeran desde `CD-2026-900001`**, en bloque aparte del
+  consecutivo de D1. Dos sistemas que numeran lo mismo terminan emitiendo el
+  mismo número para documentos distintos — ya pasó con las guías.
+- **En especie, el valor lo soporta el donante, no la Fundación.** El art. 125-2
+  par. 1 exige el menor entre valor comercial y costo fiscal; sin factura del
+  donante, esa casilla no se llena. Ropa y enseres usados, por regla, no entran.
+- **Antes de firmar el primero de cada año hay que comprobar dos hechos** que se
+  juran y que ningún código puede verificar: que esté presentada la declaración
+  de renta del año anterior (numeral III.2) y que la calificación en el RTE esté
+  **vigente**, con su actualización anual ante la DIAN (numeral III.4).
 
 ## Cierre de tanda: piezas de campaña y Canva (13 ago 2026)
 
