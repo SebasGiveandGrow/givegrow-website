@@ -1972,6 +1972,126 @@ async function correoAvisoCaso(env, x) {
   });
 }
 
+
+/* ========================================================================
+   LA COLA DE LOS INGENIEROS
+   ========================================================================
+   Vive tras el mismo Access que el panel, pero con endpoints propios y
+   acotados: un ingeniero voluntario ve casos y fotos, NUNCA donantes, aportes
+   ni datos financieros. Y tampoco la dirección exacta — para clasificar por
+   urgencia no hace falta saber dónde queda la casa, y no pedirla es la forma
+   más simple de que no se filtre.
+   ======================================================================== */
+
+const CLASIFICACIONES = ["urgente", "programada", "no_requiere", "inevaluable"];
+
+/* GET /api/triage/casos?estado=… — la cola. Por defecto, lo que nadie ha visto,
+   y del más viejo al más nuevo: en una emergencia el orden es la antigüedad, no
+   la novedad. */
+async function triageCasos(env, url) {
+  const estado = url.searchParams.get("estado") || "pendientes";
+  const filtro = estado === "todos" ? "" :
+    estado === "clasificados" ? "WHERE c.estado = 'clasificado'" :
+    "WHERE c.estado IN ('recibido','en_revision')";
+  const r = await env.DB.prepare(
+    "SELECT c.numero, c.estado, c.clasificacion, c.sector, c.material, c.pisos, " +
+    "c.danio_previo, c.habitada, c.heridos, c.creado_en, " +
+    "(SELECT COUNT(*) FROM caso_medios m WHERE m.caso = c.numero) AS medios, " +
+    "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero) AS evaluaciones " +
+    "FROM casos c " + filtro + " ORDER BY c.creado_en ASC LIMIT 200"
+  ).all();
+  return json({ casos: r.results || [] });
+}
+
+/* GET /api/triage/caso/<n> — la ficha: lo que el ingeniero necesita para
+   decidir, y nada más. Sin nombre, sin teléfono, sin dirección. */
+async function triageFicha(env, numero) {
+  const c = await env.DB.prepare(
+    "SELECT numero, estado, clasificacion, sector, material, pisos, anio_aprox, " +
+    "danio_previo, habitada, heridos, filtra_agua, nota, creado_en " +
+    "FROM casos WHERE numero = ?"
+  ).bind(numero).first();
+  if (!c) return json({ error: "no_encontrado" }, 404);
+  const m = await env.DB.prepare(
+    "SELECT id, clase, categoria, bytes, nota FROM caso_medios WHERE caso = ? ORDER BY categoria, orden"
+  ).bind(numero).all();
+  const e = await env.DB.prepare(
+    "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
+    "FROM evaluaciones WHERE caso = ? ORDER BY creado_en"
+  ).bind(numero).all();
+  return json({ caso: c, medios: m.results || [], evaluaciones: e.results || [] });
+}
+
+/* GET /api/triage/medio/<id> — la foto. Se sirve por id y no por su llave de
+   R2: así la llave no viaja al navegador y nadie puede pedir un objeto
+   arbitrario del bucket, donde también viven comprobantes bancarios. */
+async function triageMedio(env, id) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const m = await env.DB.prepare("SELECT r2_key FROM caso_medios WHERE id = ?").bind(id).first();
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  const obj = await env.MEDIA.get(m.r2_key);
+  if (!obj) return json({ error: "no_encontrado" }, 404);
+  return new Response(obj.body, {
+    headers: {
+      "content-type": (obj.httpMetadata && obj.httpMetadata.contentType) || "application/octet-stream",
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
+/* POST /api/triage/caso/<n>/evaluar — la nota técnica.
+   El correo del ingeniero lo pone Access, no el formulario: es identidad ya
+   verificada. La matrícula sí la escribe él, porque va firmada en lo que se le
+   entrega a la familia. */
+async function triageEvaluar(request, env, numero, email) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const caso = await env.DB.prepare("SELECT numero, estado FROM casos WHERE numero = ?").bind(numero).first();
+  if (!caso) return json({ error: "no_encontrado" }, 404);
+
+  const clasificacion = String(c.clasificacion || "");
+  if (!CLASIFICACIONES.includes(clasificacion)) {
+    return json({ error: "clasificacion_invalida", permitidas: CLASIFICACIONES }, 422);
+  }
+  const nombre = limpiar(c.nombre, 200);
+  const matricula = limpiar(c.matricula, 60);
+  const nota = limpiar(c.nota_tecnica, 2000);
+  /* Sin nombre, matrícula y nota no se guarda. Una clasificación anónima o sin
+     sustento no le sirve a nadie: ni a la familia, que recibe un documento, ni
+     al ingeniero, que responde por lo que firma. */
+  const faltan = [];
+  if (!nombre) faltan.push("nombre");
+  if (!matricula) faltan.push("matricula");
+  if (!nota) faltan.push("nota_tecnica");
+  if (faltan.length) return json({ error: "datos_incompletos", faltan }, 422);
+
+  /* `inevaluable` EXIGE decir qué falta. Si no, el caso se queda parado sin que
+     la familia sepa qué mandar, que es la peor salida posible. */
+  const falta = limpiar(c.falta, 500);
+  if (clasificacion === "inevaluable" && !falta) {
+    return json({ error: "falta_requerido", ayuda: "Di qué foto o dato hace falta para poder evaluar." }, 422);
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO evaluaciones (caso, ing_email, ing_nombre, ing_matricula, clasificacion, " +
+    "nota_tecnica, recomendacion, falta) VALUES (?,?,?,?,?,?,?,?)"
+  ).bind(numero, email || "?", nombre, matricula, clasificacion, nota,
+         limpiar(c.recomendacion, 1000) || null, falta || null).run();
+
+  /* El caso pasa a `clasificado`, salvo que sea inevaluable: ahí vuelve a
+     `en_revision` para que se le pida material a la familia y no se dé por
+     cerrado. */
+  const nuevoEstado = clasificacion === "inevaluable" ? "en_revision" : "clasificado";
+  await env.DB.prepare(
+    "UPDATE casos SET estado = ?, clasificacion = ?, actualizado_en = datetime('now') WHERE numero = ?"
+  ).bind(nuevoEstado, clasificacion === "inevaluable" ? null : clasificacion, numero).run();
+
+  return json({ ok: true, numero, estado: nuevoEstado, clasificacion });
+}
+
 /* GET /api/admin/comprobante/<guia> — solo tras Access. El comprobante lleva
    datos bancarios del donante y nunca es público. */
 async function adminComprobante(env, guia) {
@@ -4085,7 +4205,11 @@ export default {
     }
 
     /* --- Panel interno: TODO detrás de Access, y fail-closed --- */
-    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/")) {
+    /* `/api/triage/` entra por el MISMO guardián que el panel: hereda la
+       verificación real de firma RS256 y el fail-closed. Los ingenieros
+       voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
+       creando cuentas: cero contraseñas que guardar y cero que se filtren. */
+    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/")) {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
       /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
@@ -4142,6 +4266,14 @@ export default {
           });
         }
         if (ruta === "/api/admin/quien")    return json({ email: sesion.email });
+        /* --- triage estructural: la cola de los ingenieros --- */
+        if (ruta === "/api/triage/casos")   return await triageCasos(env, url);
+        const tf = ruta.match(/^\/api\/triage\/caso\/(CV-\d{4}-\d{6})$/i);
+        if (tf) return await triageFicha(env, tf[1].toUpperCase());
+        const tev = ruta.match(/^\/api\/triage\/caso\/(CV-\d{4}-\d{6})\/evaluar$/i);
+        if (tev) return await triageEvaluar(request, env, tev[1].toUpperCase(), sesion.email);
+        const tm = ruta.match(/^\/api\/triage\/medio\/(\d+)$/);
+        if (tm) return await triageMedio(env, Number(tm[1]));
         if (ruta === "/api/admin/resumen")  return await adminResumen(env);
         if (ruta === "/api/admin/salud")    return await adminSalud(env);
         if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
