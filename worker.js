@@ -124,10 +124,20 @@ async function llavesAccess(team) {
   return ACCESS_CERTS.llaves;
 }
 
-async function verificarAccess(request, env) {
+/* `audsValidos` es una LISTA porque hay DOS aplicaciones de Access sobre el
+   mismo dominio y NO son intercambiables:
+
+     ACCESS_AUD          el panel  → donantes, aportes, comprobantes bancarios
+     ACCESS_AUD_TRIAGE   el triage → casos de vivienda y sus fotos
+
+   Un ingeniero voluntario recibe un token de la segunda. Si el guardián
+   comparara contra un solo AUD, o los ingenieros no podrían entrar a lo suyo,
+   o —peor— el mismo token les abriría el panel completo. Cada zona declara qué
+   audiencias acepta, y el panel NUNCA acepta la del triage. */
+async function verificarAccess(request, env, audsValidos) {
   const team = env.ACCESS_TEAM_DOMAIN;
-  const aud = env.ACCESS_AUD;
-  if (!team || !aud) return { ok: false, motivo: "no_configurado" };
+  const aceptados = (audsValidos && audsValidos.length ? audsValidos : [env.ACCESS_AUD]).filter(Boolean);
+  if (!team || !aceptados.length) return { ok: false, motivo: "no_configurado" };
 
   /* Access manda el JWT en la cabecera y, en navegación normal, también en la
      cookie CF_Authorization. Se acepta cualquiera de las dos. */
@@ -168,7 +178,7 @@ async function verificarAccess(request, env) {
   /* Comprobaciones de contenido: sin estas, un token válido de OTRA aplicación
      de Access del mismo equipo serviría para entrar aquí. */
   const auds = Array.isArray(carga.aud) ? carga.aud : [carga.aud];
-  if (!auds.includes(aud)) return { ok: false, motivo: "aud_no_coincide" };
+  if (!auds.some((a) => aceptados.includes(a))) return { ok: false, motivo: "aud_no_coincide" };
   if (carga.iss !== "https://" + team) return { ok: false, motivo: "emisor_no_coincide" };
   const ahora = Math.floor(Date.now() / 1000);
   if (carga.exp && carga.exp < ahora) return { ok: false, motivo: "token_expirado" };
@@ -4455,7 +4465,15 @@ export default {
         return Response.redirect(destino.toString(), 302);
       }
 
-      const sesion = await verificarAccess(request, env);
+      /* Qué audiencias acepta CADA zona. El panel exige la suya y solo la suya:
+         un token de la aplicación del triage no abre donantes ni comprobantes.
+         El triage acepta la suya y también la del panel, para que el equipo
+         entre a revisar sin necesitar una segunda cuenta. */
+      const esTriage = ruta === "/triage" || ruta === "/triage.js" || ruta.startsWith("/api/triage/");
+      const audsZona = esTriage
+        ? [env.ACCESS_AUD_TRIAGE, env.ACCESS_AUD]
+        : [env.ACCESS_AUD];
+      const sesion = await verificarAccess(request, env, audsZona);
       if (!sesion.ok) {
         /* Sin Access configurado no se sirve nada: 503 y una explicación, no un
            panel abierto. Con Access configurado pero token inválido, 403. */
