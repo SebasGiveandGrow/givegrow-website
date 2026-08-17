@@ -2050,7 +2050,7 @@ function paginaTriage() {
   <div id="lista"><p class="cargando">Cargando casos...</p></div>
   <div id="ficha"></div>
 </div>
-<script src="/triage.js"></script>
+<script src="/triaje.js"></script>
 </body>
 </html>`;
 }
@@ -4444,7 +4444,7 @@ export default {
        verificación real de firma RS256 y el fail-closed. Los ingenieros
        voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
        creando cuentas: cero contraseñas que guardar y cero que se filtren. */
-    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triage" || ruta === "/triage.js") {
+    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js") {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
       /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
@@ -4469,7 +4469,7 @@ export default {
          un token de la aplicación del triage no abre donantes ni comprobantes.
          El triage acepta la suya y también la del panel, para que el equipo
          entre a revisar sin necesitar una segunda cuenta. */
-      const esTriage = ruta === "/triage" || ruta === "/triage.js" || ruta.startsWith("/api/triage/");
+      const esTriage = ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js" || ruta.startsWith("/api/triage/");
       const audsZona = esTriage
         ? [env.ACCESS_AUD_TRIAGE, env.ACCESS_AUD]
         : [env.ACCESS_AUD];
@@ -4510,12 +4510,19 @@ export default {
         }
         if (ruta === "/api/admin/quien")    return json({ email: sesion.email });
         /* --- triage estructural: la cola de los ingenieros --- */
-        if (ruta === "/triage") {
+        /* La ruta canónica es en ESPAÑOL: `/triaje`. El sitio entero está en
+           español y esa es la palabra correcta — la ruta en inglés era un
+           descuido mío, y el primero que la escribió a mano escribió «triaje»
+           y aterrizó en la portada pública sin entender por qué. `/triage`
+           sobrevive como alias que redirige, para no romper lo ya enlazado. */
+        if (ruta === "/triage")    return Response.redirect(new URL("/triaje", url).toString(), 301);
+        if (ruta === "/triage.js") return Response.redirect(new URL("/triaje.js", url).toString(), 301);
+        if (ruta === "/triaje") {
           return new Response(paginaTriage(), {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
           });
         }
-        if (ruta === "/triage.js") {
+        if (ruta === "/triaje.js") {
           return new Response(triageJS(), {
             headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }
           });

@@ -11,7 +11,7 @@ html_handling = "auto-trailing-slash"
 # single-page-application` se las traga y devuelve index.html en lugar de invocar
 # al Worker. Le pasó a /api/* al construir la Fase 2, y volvería a pasar con
 # /admin — que además serviría la SPA pública en lugar del panel protegido.
-run_worker_first = ["/f/*", "/api/*", "/admin", "/admin.js", "/triage", "/triage.js", "/evidencia/*", "/carnet/*"]
+run_worker_first = ["/f/*", "/api/*", "/admin", "/admin.js", "/triaje", "/triaje.js", "/triage", "/triage.js", "/evidencia/*", "/carnet/*"]
 
 # Base PRIVADA (Ley 1581): donantes, aportes, inscripciones y consentimientos.
 # Nunca se sirve al navegador. Los datos públicos de la red siguen en
