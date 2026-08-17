@@ -31,7 +31,7 @@
       gravedad de juramento. El armado vive en documentos.js.
 */
 
-import { recibo, certificado } from "./documentos.js";
+import { recibo, certificado, informeTriage } from "./documentos.js";
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
 
@@ -2275,6 +2275,46 @@ async function triageEvaluar(request, env, numero, email) {
   ).bind(nuevoEstado, clasificacion === "inevaluable" ? null : clasificacion, numero).run();
 
   return json({ ok: true, numero, estado: nuevoEstado, clasificacion });
+}
+
+
+/* GET /api/caso/<n>/informe.pdf?t=<token> — el informe para la familia.
+   Solo existe cuando un ingeniero ya evaluó: antes no hay nada que decir, y
+   entregar un papel vacío sería peor que no entregarlo. Se toma la evaluación
+   MÁS RECIENTE; si hubo dos y discrepan, eso lo resuelve una persona antes de
+   que el informe salga, no el PDF. */
+async function apiCasoInforme(env, numero, token) {
+  const c = await env.DB.prepare(
+    "SELECT numero, token, estado, clasificacion, sector, material, pisos, anio_aprox, " +
+    "danio_previo, habitada FROM casos WHERE numero = ?"
+  ).bind(numero).first();
+  if (!c || !token || c.token !== token) return json({ error: "no_autorizado" }, 403);
+
+  const e = await env.DB.prepare(
+    "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
+    "FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
+  ).bind(numero).first();
+  if (!e) return json({ error: "sin_evaluacion", ayuda: "Todavía ningún ingeniero ha revisado este caso." }, 409);
+
+  const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
+  const hoy = new Date().toISOString().slice(0, 10);
+  const bytes = await informeTriage({
+    numero: c.numero, sector: c.sector, material: c.material, pisos: c.pisos,
+    anio_aprox: c.anio_aprox, danio_previo: c.danio_previo, habitada: c.habitada,
+    medios: (m && m.n) || 0,
+    clasificacion: e.clasificacion, nota_tecnica: e.nota_tecnica,
+    recomendacion: e.recomendacion, falta: e.falta,
+    ing_nombre: e.ing_nombre, ing_matricula: e.ing_matricula, evaluado_en: e.creado_en
+  }, hoy);
+
+  return new Response(bytes, {
+    headers: {
+      "content-type": "application/pdf",
+      "content-disposition": 'inline; filename="informe-' + numero + '.pdf"',
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
 }
 
 /* GET /api/admin/comprobante/<guia> — solo tras Access. El comprobante lleva
@@ -4536,6 +4576,8 @@ export default {
         if (ruta === "/api/caso")           return await apiCasoCrear(request, env);
         const cmed = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/medio$/i);
         if (cmed) return await apiCasoMedio(request, env, cmed[1].toUpperCase(), url.searchParams.get("t"), url);
+        const cinf = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/informe\.pdf$/i);
+        if (cinf) return await apiCasoInforme(env, cinf[1].toUpperCase(), url.searchParams.get("t"));
         const cest = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})$/i);
         if (cest) return await apiCasoEstado(env, cest[1].toUpperCase(), url.searchParams.get("t"));
         return json({ error: "no_encontrado" }, 404);
