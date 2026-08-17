@@ -340,6 +340,74 @@ var I18N = {
     "rep.sube.ok":"Comprobante recibido. Gracias.",
     "rep.sube.err":"No pudimos subir el archivo.",
     "rep.link":"¿Ya transferiste? Repórtalo aquí",
+    "cv.t":"Revisa tu casa",
+    "cv.lead":"Si tu casa se afectó por el sismo, sube unas fotos. Ingenieros voluntarios las revisan y te dicen qué tan urgente es una visita.",
+    "cv.aviso":"Esto NO dice si tu casa es habitable. Eso lo define una visita y la autoridad de tu municipio. Lo que hacemos es decidir a quién visitar primero.",
+    "cv.s1.t":"Antes de empezar",
+    "cv.s1.1":"No entres si ves muros caídos, techos hundidos o columnas partidas. Toma las fotos desde afuera.",
+    "cv.s1.2":"No te subas al techo ni a escaleras.",
+    "cv.s1.3":"No muevas escombros para mostrar mejor el daño.",
+    "cv.s1.4":"Si hueles a gas, sal y avisa. No prendas nada.",
+    "cv.s1.5":"Si hay réplicas, espera. La casa va a seguir ahí.",
+    "cv.s1.fin":"Mejor una foto de menos que un accidente. Si algo te da miedo, no lo hagas: escríbelo y ya.",
+    "cv.s1.btn":"Entendido, continuar",
+    "cv.s2.t":"Tu casa",
+    "cv.nombre":"Tu nombre",
+    "cv.tel":"Tu WhatsApp",
+    "cv.tel.h":"Con este número te respondemos. Es lo único que necesitamos para contactarte.",
+    "cv.email":"Correo (opcional)",
+    "cv.sector":"Barrio o sector",
+    "cv.sector.h":"Ejemplo: Cali, comuna 18. Esto es lo único que podría hacerse público algún día.",
+    "cv.dir":"Dirección (solo para la visita)",
+    "cv.dir.h":"No se publica nunca. Solo la ve el equipo para poder llegar.",
+    "cv.material":"¿De qué son los muros?",
+    "cv.mat.ladrillo":"Ladrillo o bloque",
+    "cv.mat.adobe":"Adobe o tapia",
+    "cv.mat.bahareque":"Bahareque",
+    "cv.mat.prefabricado":"Prefabricado",
+    "cv.mat.madera":"Madera",
+    "cv.mat.no_se":"No sé",
+    "cv.pisos":"¿Cuántos pisos?",
+    "cv.anio":"¿De qué año es, más o menos?",
+    "cv.anio.h":"Sirve una respuesta como «hace unos 20 años».",
+    "cv.previo":"¿Tenía grietas ANTES del sismo?",
+    "cv.habitada":"¿Vive alguien ahí ahora?",
+    "cv.heridos":"¿Alguien se lastimó?",
+    "cv.filtra":"¿Le entra agua cuando llueve?",
+    "cv.nota":"¿Algo más que quieras contarnos?",
+    "cv.s2.btn":"Siguiente",
+    "cv.s3.t":"Las fotos",
+    "cv.s3.h":"Cada foto se guarda apenas la tomas. Si se te va la señal, no pierdes lo anterior.",
+    "cv.cat.conjunto":"La casa completa",
+    "cv.cat.conjunto.h":"De lejos, que se vea entera.",
+    "cv.cat.estructura":"Esquinas y columnas",
+    "cv.cat.estructura.h":"De arriba abajo.",
+    "cv.cat.dano":"Cada grieta",
+    "cv.cat.dano.h":"Dos fotos: una de lejos y otra de cerca, con una moneda al lado para el tamaño.",
+    "cv.cat.entorno":"El terreno alrededor",
+    "cv.cat.entorno.h":"Si hay grietas en el suelo o un talud cerca.",
+    "cv.add":"Agregar",
+    "cv.video.h":"También puedes subir un video corto, de unos 30 segundos.",
+    "cv.subiendo":"Subiendo…",
+    "cv.subido":"Guardada",
+    "cv.err.grande":"El archivo pesa demasiado. Si es video, grábalo más corto.",
+    "cv.err.subir":"No se pudo subir. Intenta otra vez.",
+    "cv.s3.btn":"Siguiente",
+    "cv.s4.t":"Permisos",
+    "cv.c1":"Autorizo que un ingeniero voluntario revise mis fotos para decir qué tan urgente es una visita.",
+    "cv.c1.h":"Necesario para poder revisar tu caso.",
+    "cv.c2":"Autorizo que mi caso aparezca, SIN mi nombre ni mi dirección, para buscar quién pueda ayudar con la reparación.",
+    "cv.c2.h":"Opcional. Puedes retirarlo cuando quieras escribiéndonos.",
+    "cv.enviar":"Enviar mi caso",
+    "cv.enviando":"Enviando…",
+    "cv.ok.t":"Listo. Este es tu número de caso",
+    "cv.ok.p":"Guárdalo. Con él puedes consultar tu caso cuando quieras.",
+    "cv.ok.espera":"Un ingeniero voluntario lo va a revisar. Te escribimos por WhatsApp cuando tengamos su respuesta.",
+    "cv.ok.copiar":"Copiar mi número",
+    "cv.ok.copiado":"Copiado",
+    "cv.err.envio":"No pudimos registrar tu caso. Revisa los datos e intenta otra vez.",
+    "cv.err.campos":"Faltan datos: tu nombre, tu WhatsApp y el barrio.",
+    "cv.err.consent":"Necesitamos tu autorización para que un ingeniero revise el caso.",
     "track.ey":"Trazabilidad real",
     "track.t":"Rastrea tu donación",
     "track.lead":"Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.",
@@ -1253,6 +1321,7 @@ var ROUTE_META = {
   membresias:{t:{es:"Membresías · Give&Grow International",en:"Memberships · Give&Grow International"},d:{es:"Hazte miembro de Give&Grow: dona de forma recurrente, crece de Semilla a Bosque y suma beneficios en cada nivel.",en:"Become a Give&Grow member: give monthly, grow from Seed to Forest and add benefits at each tier."}},
   voluntariado:{t:{es:"Voluntariado e Impact Journey · Give&Grow International",en:"Volunteering & Impact Journey · Give&Grow International"},d:{es:"Tres maneras de participar, el método MIRA en doble vía y cómo cuidamos a las comunidades. Voluntariado corporativo y pro-bono.",en:"Three ways to take part, the two-way MIRA method, and how we care for communities. Corporate and pro-bono volunteering."}},
   faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}},
+  vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario dice qué tan urgente es una visita. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer says how urgent a visit is. It does not replace the official assessment."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
   /* Estas cuatro faltaban y caían al `|| ROUTE_META.inicio`, así que se
      presentaban con el título y la descripción de la portada. No era cosmético:
@@ -1490,7 +1559,132 @@ function isSpaRoute(id){
 function allyServ(){ setTimeout(allyToggleServ, 0); }
 function allyGrat(){ setTimeout(allyToggleGrat, 0); }
 function focusActivePage(){ var p=document.querySelector(".page.active"); if(p){ p.setAttribute("tabindex","-1"); p.focus(); } }
+
+/* ===== Triage estructural de viviendas =====
+   El caso se crea al terminar el paso 4 y las fotos suben DESPUÉS, de a una,
+   contra el token que devuelve el servidor. Por eso el paso 3 solo acumula
+   archivos en memoria hasta que hay caso: subir antes obligaría a crear el
+   registro sin consentimiento, que es justo lo que no puede pasar. */
+var CV = { caso:null, token:null, cola:[] };
+var CV_CATS = ["conjunto", "estructura", "dano", "entorno"];
+
+function cvPaso(n){
+  if (n === 3 && !cvValidarDatos()) return;
+  ["cv-p1","cv-p2","cv-p3","cv-p4","cv-ok"].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.style.display = "none";
+  });
+  var destino = document.getElementById(n === 5 ? "cv-ok" : "cv-p" + n);
+  if (destino) destino.style.display = "";
+  if (n === 3) cvPintarCats();
+  window.scrollTo(0, 0);
+}
+
+function cvValidarDatos(){
+  var v = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
+  if (!v("cv-nombre") || !v("cv-sector") || (v("cv-tel").replace(/\D/g,"").length < 7)){
+    alert(t("cv.err.campos")); return false;
+  }
+  return true;
+}
+
+/* Una tarjeta por categoría, con su ayuda y su contador. Se arma en JS y no en
+   el HTML para que las cuatro compartan comportamiento y el día que los
+   ingenieros cambien la lista se toque un solo sitio. */
+function cvPintarCats(){
+  var cont = document.getElementById("cv-cats");
+  if (!cont || cont.dataset.listo) return;
+  var html = "";
+  for (var i = 0; i < CV_CATS.length; i++){
+    var c = CV_CATS[i];
+    html += '<div class="ally-check" style="display:block">'
+         +  '<b>' + escapeHtml(t("cv.cat." + c)) + '</b>'
+         +  '<small style="display:block;color:var(--mu);margin:4px 0 10px">' + escapeHtml(t("cv.cat." + c + ".h")) + '</small>'
+         +  '<label class="btn btn-o" style="display:inline-block;cursor:pointer">'
+         +  '<span>' + escapeHtml(t("cv.add")) + '</span>'
+         +  '<input type="file" accept="image/*,video/*" capture="environment" multiple '
+         +  'data-cat="' + c + '" style="position:absolute;left:-9999px">'
+         +  '</label> <span class="mu" id="cv-n-' + c + '">0</span>'
+         +  '</div>';
+  }
+  cont.innerHTML = html;
+  cont.dataset.listo = "1";
+  cont.querySelectorAll("input[type=file]").forEach(function(inp){
+    inp.addEventListener("change", function(){ cvArchivos(inp); });
+  });
+}
+
+function cvArchivos(inp){
+  var cat = inp.getAttribute("data-cat");
+  for (var i = 0; i < inp.files.length; i++) CV.cola.push({ file: inp.files[i], cat: cat });
+  var n = CV.cola.filter(function(x){ return x.cat === cat; }).length;
+  var et = document.getElementById("cv-n-" + cat);
+  if (et) et.textContent = n;
+  inp.value = "";
+}
+
+function cvEnviar(){
+  var msg = document.getElementById("cv-msg");
+  if (!document.getElementById("cv-c1").checked){
+    if (msg){ msg.textContent = t("cv.err.consent"); msg.style.color = "var(--err)"; }
+    return;
+  }
+  if (!cvValidarDatos()) return;
+  if (msg){ msg.textContent = t("cv.enviando"); msg.style.color = "var(--mu)"; }
+
+  var val = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e = document.getElementById(id); return !!(e && e.checked); };
+
+  fetch("/api/caso", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      nombre: val("cv-nombre"), tel: val("cv-tel"), email: val("cv-email"),
+      sector: val("cv-sector"), direccion: val("cv-dir"),
+      material: val("cv-material"), pisos: parseInt(val("cv-pisos"), 10) || 1,
+      anio: val("cv-anio"), nota: val("cv-nota"),
+      danio_previo: chk("cv-previo"), habitada: chk("cv-habitada"),
+      heridos: chk("cv-heridos"), filtra_agua: chk("cv-filtra"),
+      consent_eval: true, consent_publico: chk("cv-c2"),
+      web2: val("cv-web2")
+    })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok || !d.numero) throw 0;
+    CV.caso = d.numero; CV.token = d.token;
+    var num = document.getElementById("cv-num");
+    if (num) num.textContent = d.numero;
+    cvPaso(5);
+    cvSubirCola();
+  }).catch(function(){
+    if (msg){ msg.textContent = t("cv.err.envio"); msg.style.color = "var(--err)"; }
+  });
+}
+
+/* De a una y en serie. En serie a propósito: con señal mala, siete subidas en
+   paralelo se pisan y fallan todas. */
+function cvSubirCola(){
+  if (!CV.cola.length || !CV.caso) return;
+  var item = CV.cola.shift();
+  var url = "/api/caso/" + encodeURIComponent(CV.caso) + "/medio?t=" + encodeURIComponent(CV.token)
+          + (item.cat ? "&cat=" + encodeURIComponent(item.cat) : "");
+  fetch(url, { method: "POST", headers: { "content-type": item.file.type }, body: item.file })
+    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      if (!res.ok && res.d && res.d.error === "archivo_muy_grande") console.warn(t("cv.err.grande"));
+      cvSubirCola();
+    })
+    .catch(function(){ cvSubirCola(); });
+}
+
+function cvCopiar(){
+  if (!CV.caso) return;
+  var btn = document.querySelector('[data-act="cvCopiar()"]');
+  try {
+    navigator.clipboard.writeText(CV.caso);
+    if (btn) btn.textContent = t("cv.ok.copiado");
+  } catch (e) { /* sin portapapeles: el número está a la vista */ }
+}
+
 var ACT_FNS = {
+  cvPaso:cvPaso, cvEnviar:cvEnviar, cvCopiar:cvCopiar,
   themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,
   payMethod:payMethod, accTab:accTab, setQuick:setQuick, lbStep:lbStep, toggleFaq:toggleFaq,
   toggleDrop:toggleDrop, closeLightbox:closeLightbox, almaSend:almaSend, formSend:formSend,
