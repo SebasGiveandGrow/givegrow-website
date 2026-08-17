@@ -55,6 +55,11 @@ CORREO_AVISOS = "contabilidad@thegiveandgrowproject.org"
 # mismo equipo sirva para entrar aquí.
 ACCESS_TEAM_DOMAIN = "dark-wind-8484.cloudflareaccess.com"
 ACCESS_AUD = "48d495e9504ba1eb77fccbb01f16da7123d69492f8d89868962bf169c030c39c"
+# Segunda aplicación de Access, la del triage estructural: cubre /triage,
+# /triage.js y /api/triage/*, y sus usuarios son los ingenieros voluntarios.
+# Es OTRA audiencia a propósito — un token de esta NO abre /admin, donde están
+# donantes, aportes y comprobantes bancarios. El panel solo acepta ACCESS_AUD.
+ACCESS_AUD_TRIAGE = "cc6b16acd33e62b0c296265b762028e41ddb4b0328faaff001f1b497193dcc13"
 
 # El entorno de PRUEBAS no lleva estas variables a propósito: no tiene su propia
 # aplicación de Access, así que su panel debe seguir cerrado (503).
