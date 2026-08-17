@@ -501,6 +501,112 @@ export async function recibo(a, hoyISO) {
   return pdf.save();
 }
 
+
+/* ===========================================================================
+   INFORME DE PRIORIZACIÓN — triage estructural
+   ===========================================================================
+   Lo que recibe la familia. Y lo que MÁS pesa en el documento no es la
+   clasificación: es el aviso de que esto NO determina habitabilidad.
+
+   Un papel con membrete de fundación y firma de ingeniero se lee como una
+   sentencia sobre la casa. Si alguien lo usa para decidir si vuelve a dormir
+   ahí, el documento tiene que haberle dicho, en grande y arriba, que esa
+   decisión no está aquí — la toma una visita y la autoridad del municipio.
+   Por eso el aviso va antes que el resultado y no en letra pequeña al final.
+   =========================================================================== */
+export async function informeTriage(c, hoyISO) {
+  const { pdf, hoja: h, f } = await abrir(
+    "Informe de priorización " + c.numero,
+    "Triage estructural · no determina habitabilidad"
+  );
+
+  membrete(h);
+
+  h.texto("INFORME DE PRIORIZACIÓN", {
+    tam: 19, fuente: f.negrita, color: TINTA, interlinea: 23, despues: 6
+  });
+  h.texto("Evaluación preliminar por fotografías", { tam: 10, color: GRIS, despues: 16 });
+
+  h.cintillo("CASO", { tam: 7.5, despues: 10 });
+  h.texto(c.numero, { tam: 26, fuente: f.negrita, color: VERDE, interlinea: 30, despues: 18 });
+
+  /* El aviso ANTES del resultado. Es deliberado. */
+  avisoEnCaja(h, f,
+    "Este documento NO determina si la vivienda es habitable. Esa decisión requiere una visita " +
+    "presencial y le corresponde a la autoridad municipal de gestión del riesgo. Lo que aquí se " +
+    "establece es la PRIORIDAD con que un ingeniero voluntario recomienda que se visite esta " +
+    "vivienda, a partir únicamente de las fotografías enviadas.");
+
+  seccion(h, f, "I", "LA VIVIENDA");
+  h.fila("Sector", c.sector || "-");
+  if (c.material) h.fila("Material de los muros", c.material);
+  if (c.pisos) h.fila("Pisos", String(c.pisos));
+  if (c.anio_aprox) h.fila("Año aproximado", c.anio_aprox);
+  h.fila("Tenía grietas antes del sismo", c.danio_previo ? "Sí" : "No");
+  h.fila("Habitada al momento del reporte", c.habitada ? "Sí" : "No");
+  h.fila("Fotografías recibidas", String(c.medios || 0));
+  h.salto(14);
+
+  seccion(h, f, "II", "PRIORIDAD RECOMENDADA");
+  h.texto(ETIQUETA_CLAS[c.clasificacion] || String(c.clasificacion || "-"), {
+    tam: 15, fuente: f.negrita, color: VERDE, interlinea: 19, despues: 6
+  });
+  h.texto(EXPLICA_CLAS[c.clasificacion] || "", { tam: 9.5, color: GRIS, interlinea: 13.5, despues: 16 });
+
+  seccion(h, f, "III", "OBSERVACIONES DEL INGENIERO");
+  h.texto(c.nota_tecnica || "-", { tam: 10, interlinea: 15, despues: 14 });
+  if (c.recomendacion) {
+    h.texto("Mientras se realiza la visita:", { tam: 9.5, fuente: f.negrita, despues: 5 });
+    h.texto(c.recomendacion, { tam: 10, interlinea: 15, despues: 14 });
+  }
+  if (c.falta) {
+    h.texto("Para poder evaluar hace falta:", { tam: 9.5, fuente: f.negrita, despues: 5 });
+    h.texto(c.falta, { tam: 10, interlinea: 15, despues: 14 });
+  }
+
+  /* La firma es del INGENIERO, no de la Fundación: es él quien responde por el
+     criterio técnico. La Fundación aparece como quien organiza, en el pie. */
+  h.reservar(120);
+  seccion(h, f, "IV", "QUIÉN LO EVALUÓ");
+  h.salto(26);
+  const yl = h.y;
+  h.p.drawLine({ start: { x: MG.izq, y: yl }, end: { x: MG.izq + 240, y: yl }, thickness: 0.75, color: TINTA });
+  h.y = yl - 14;
+  h.texto(c.ing_nombre || "-", { tam: 10.5, fuente: f.negrita, despues: 3 });
+  h.texto("Ingeniero voluntario · Matrícula profesional " + (c.ing_matricula || "-"),
+    { tam: 9, color: GRIS, despues: 3 });
+  h.texto("Evaluación realizada el " + fechaLarga(c.evaluado_en || hoyISO), { tam: 9, color: GRIS, despues: 16 });
+
+  h.texto(
+    "Este concepto se emite a título voluntario y gratuito, en el marco de la respuesta al sismo " +
+    "del 10 de agosto de 2026, organizada por la Fundación Give&Grow International (NIT " +
+    ENTIDAD.nit + "). No sustituye la evaluación oficial de habitabilidad ni un estudio " +
+    "estructural detallado.",
+    { tam: 8.5, color: GRIS, interlinea: 12.5 }
+  );
+
+  h.cerrarPie(c.numero);
+  return pdf.save();
+}
+
+const ETIQUETA_CLAS = {
+  urgente:     "Visita urgente",
+  programada:  "Visita programada",
+  no_requiere: "No requiere visita por ahora",
+  inevaluable: "No se pudo evaluar con el material enviado"
+};
+
+const EXPLICA_CLAS = {
+  urgente:     "El ingeniero recomienda que esta vivienda se visite entre las primeras. " +
+               "Mientras tanto, evita permanecer en las zonas señaladas en las observaciones.",
+  programada:  "El ingeniero recomienda una visita, sin que las fotografías muestren una " +
+               "situación que obligue a atenderla de inmediato.",
+  no_requiere: "Con lo que muestran las fotografías, el ingeniero no ve necesaria una visita " +
+               "por ahora. Si aparecen grietas nuevas o crecen las existentes, vuelve a escribirnos.",
+  inevaluable: "Las fotografías enviadas no permiten formarse un criterio. Abajo se indica qué " +
+               "hace falta para poder evaluar."
+};
+
 /* ===========================================================================
    CERTIFICADO DE DONACIÓN
    ===========================================================================
