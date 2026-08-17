@@ -32,7 +32,7 @@ for (const f of ["app.js", "worker.js", "documentos.js"]) {
    Se valida lo EMITIDO, no el código fuente del template: hay que evaluar el
    literal para que las secuencias de escape queden como quedan en producción. */
 const workerSrc = readFileSync("worker.js", "utf8");
-for (const [nombre, fn] of [["adminJS()", "adminJS"]]) {
+for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"]]) {
   try {
     const i = workerSrc.indexOf("function " + fn + "()");
     if (i === -1) throw new Error("no se encontró " + nombre);
@@ -56,6 +56,8 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"]]) {
        solo se llamaba desde los botones de confirmar, nunca en el arranque.
        Las llamadas de arranque son las únicas en columna 0; las de dentro de
        una función van indentadas. */
+    /* Las bandejas son cosa del panel; triageJS() tiene su propia forma. */
+    if (fn !== "adminJS") continue;
     const definidas = [...emitido.matchAll(/^function (cargar\w*)\s*\(/gm)].map(m => m[1]);
     const arranque  = new Set([...emitido.matchAll(/^(cargar\w*)\(\);$/gm)].map(m => m[1]));
     const huerfanas = definidas.filter(f => !arranque.has(f));

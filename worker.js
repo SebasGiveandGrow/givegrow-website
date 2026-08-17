@@ -1973,6 +1973,191 @@ async function correoAvisoCaso(env, x) {
 }
 
 
+
+/* ========================================================================
+   /triage — la pantalla del ingeniero voluntario
+   ========================================================================
+   Se genera desde el Worker, igual que el panel, y por la misma razón: vive
+   tras Access y no puede ser un archivo estático servido a cualquiera.
+
+   ⚠ Dentro de estas plantillas hay que escribir \\n y \\/ — lo que se lee aquí
+   NO es lo que ejecuta el navegador. Este JS evita a propósito los saltos
+   escapados y las expresiones regulares, para no repetir las siete horas que
+   costó esa trampa en el panel. El check #1b del gate valida lo EMITIDO.
+   ======================================================================== */
+function paginaTriage() {
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Triage estructural</title>
+<style>
+  :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;
+        --urg:#8C2F1E;--prog:#9A6B12;--no:#1F5C38}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-size:24px;margin-bottom:4px}
+  .sub{color:var(--mu);font-size:14px;margin-bottom:6px}
+  .aviso{background:var(--surface);border:1px solid var(--bd);border-left:3px solid var(--g);
+         padding:14px 16px;border-radius:8px;margin:18px 0;font-size:14px}
+  .fila{background:var(--surface);border:1px solid var(--bd);border-radius:10px;padding:14px 16px;margin-bottom:10px;
+        display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .fila b{font-family:ui-monospace,Menlo,monospace;font-size:14px}
+  .fila .meta{color:var(--mu);font-size:13px;flex:1;min-width:200px}
+  .btn{background:var(--g);color:#fff;border:0;border-radius:999px;padding:9px 18px;font-size:14px;
+       font-weight:600;cursor:pointer}
+  .btn.o{background:transparent;color:var(--g);border:1px solid var(--g)}
+  .pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+        padding:3px 9px;border-radius:999px;border:1px solid currentColor}
+  .p-urgente{color:var(--urg)} .p-programada{color:var(--prog)} .p-no_requiere{color:var(--no)}
+  .p-inevaluable{color:var(--mu)}
+  .ficha{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-top:16px}
+  .dato{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--bd);font-size:14px}
+  .dato span:first-child{color:var(--mu);min-width:150px}
+  .fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:16px 0}
+  .fotos a{display:block;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:#fff}
+  .fotos img{width:100%;height:130px;object-fit:cover;display:block}
+  .fotos small{display:block;padding:5px 8px;color:var(--mu);font-size:11px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px}
+  input,textarea,select{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:8px;
+                        font:inherit;font-size:15px;background:#fff;color:var(--ink)}
+  .msg{margin-top:12px;font-size:14px}
+  .cargando{color:var(--mu);font-size:14px;padding:20px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Triage estructural</h1>
+  <p class="sub" id="quien">Cargando sesion...</p>
+  <div class="aviso">
+    <b>Esto no es un dictamen de habitabilidad.</b> Por fotos no se determina, y la declaratoria
+    con efectos le corresponde a la autoridad municipal. Lo que decides aqui es <b>a quien se
+    visita primero</b>. Si el material no alcanza, marca <b>No puedo evaluar</b> y di que falta.
+  </div>
+  <div id="lista"><p class="cargando">Cargando casos...</p></div>
+  <div id="ficha"></div>
+</div>
+<script src="/triage.js"></script>
+</body>
+</html>`;
+}
+
+function triageJS() {
+  return `
+var CASO = null;
+function esc(s){ var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+function el(id){ return document.getElementById(id); }
+
+fetch("/api/admin/quien").then(function(r){ return r.json(); }).then(function(d){
+  el("quien").textContent = d.email ? ("Sesion de " + d.email) : "Sesion activa";
+});
+
+function cargarCola(){
+  fetch("/api/triage/casos").then(function(r){ return r.json(); }).then(function(d){
+    var c = d.casos || [];
+    if (!c.length){ el("lista").innerHTML = "<p class='cargando'>No hay casos esperando. Gracias.</p>"; return; }
+    var h = "<p class='sub'>" + c.length + " caso(s) esperando, del mas antiguo al mas reciente.</p>";
+    for (var i = 0; i < c.length; i++){
+      var x = c[i];
+      h += "<div class='fila'><b>" + esc(x.numero) + "</b>"
+        +  "<span class='meta'>" + esc(x.sector) + " &middot; " + esc(x.material || "material sin decir")
+        +  " &middot; " + (x.pisos || "?") + " piso(s) &middot; " + x.medios + " foto(s)"
+        +  (x.danio_previo ? " &middot; tenia grietas antes" : "")
+        +  (x.heridos ? " &middot; hubo heridos" : "")
+        +  "</span>"
+        +  (x.clasificacion ? "<span class='pill p-" + esc(x.clasificacion) + "'>" + esc(x.clasificacion) + "</span>" : "")
+        +  "<button class='btn' data-abrir='" + esc(x.numero) + "'>Abrir</button></div>";
+    }
+    el("lista").innerHTML = h;
+  });
+}
+
+function abrir(numero){
+  fetch("/api/triage/caso/" + encodeURIComponent(numero)).then(function(r){ return r.json(); }).then(function(d){
+    if (!d.caso) return;
+    CASO = d.caso.numero;
+    var c = d.caso, h = "<div class='ficha'><h2 style='font-size:19px'>" + esc(c.numero) + "</h2>";
+    var datos = [["Sector", c.sector], ["Muros", c.material], ["Pisos", c.pisos],
+                 ["Año aprox", c.anio_aprox], ["Grietas antes del sismo", c.danio_previo ? "Si" : "No"],
+                 ["Habitada ahora", c.habitada ? "Si" : "No"], ["Hubo heridos", c.heridos ? "Si" : "No"],
+                 ["Entra agua", c.filtra_agua ? "Si" : "No"], ["Cuenta la familia", c.nota]];
+    for (var i = 0; i < datos.length; i++){
+      if (datos[i][1] === null || datos[i][1] === undefined || datos[i][1] === "") continue;
+      h += "<div class='dato'><span>" + esc(datos[i][0]) + "</span><span>" + esc(datos[i][1]) + "</span></div>";
+    }
+    var m = d.medios || [];
+    h += "<div class='fotos'>";
+    for (var j = 0; j < m.length; j++){
+      var src = "/api/triage/medio/" + m[j].id;
+      h += "<a href='" + src + "' target='_blank' rel='noopener'>";
+      h += m[j].clase === "video"
+         ? "<video src='" + src + "' style='width:100%;height:130px;object-fit:cover' muted></video>"
+         : "<img src='" + src + "' alt='' loading='lazy'>";
+      h += "<small>" + esc(m[j].categoria || m[j].clase) + "</small></a>";
+    }
+    h += "</div>";
+    var ev = d.evaluaciones || [];
+    for (var k = 0; k < ev.length; k++){
+      h += "<div class='dato'><span>Ya evaluo</span><span>" + esc(ev[k].ing_nombre) + " (" + esc(ev[k].ing_matricula)
+        +  ") &rarr; " + esc(ev[k].clasificacion) + "</span></div>";
+    }
+    h += "<label>Tu clasificacion</label><select id='t-clas'>"
+      +  "<option value='urgente'>Visita urgente</option>"
+      +  "<option value='programada'>Visita programada</option>"
+      +  "<option value='no_requiere'>No requiere visita</option>"
+      +  "<option value='inevaluable'>No puedo evaluar con esto</option></select>"
+      +  "<label>Tu nombre</label><input id='t-nombre'>"
+      +  "<label>Tu matricula profesional</label><input id='t-mat'>"
+      +  "<label>Nota tecnica</label><textarea id='t-nota' rows='4'></textarea>"
+      +  "<label>Recomendacion para la familia mientras tanto</label><textarea id='t-rec' rows='3'></textarea>"
+      +  "<label>Si no puedes evaluar: que falta</label><input id='t-falta'>"
+      +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluacion</button></p>"
+      +  "<p class='msg' id='t-msg'></p></div>";
+    el("ficha").innerHTML = h;
+    el("ficha").scrollIntoView({ block: "start" });
+  });
+}
+
+function enviar(){
+  var msg = el("t-msg");
+  msg.textContent = "Guardando...";
+  fetch("/api/triage/caso/" + encodeURIComponent(CASO) + "/evaluar", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      clasificacion: el("t-clas").value, nombre: el("t-nombre").value,
+      matricula: el("t-mat").value, nota_tecnica: el("t-nota").value,
+      recomendacion: el("t-rec").value, falta: el("t-falta").value
+    })
+  }).then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      if (!res.ok){
+        var e = res.d || {};
+        msg.textContent = e.faltan ? ("Falta: " + e.faltan.join(", "))
+                        : (e.ayuda || e.error || "No se pudo guardar");
+        msg.style.color = "#8C2F1E";
+        return;
+      }
+      msg.textContent = "Guardado. Gracias.";
+      msg.style.color = "#1F5C38";
+      el("ficha").innerHTML = "";
+      cargarCola();
+    })
+    .catch(function(){ msg.textContent = "No se pudo guardar"; msg.style.color = "#8C2F1E"; });
+}
+
+document.addEventListener("click", function(ev){
+  var a = ev.target.closest ? ev.target.closest("[data-abrir]") : null;
+  if (a){ abrir(a.getAttribute("data-abrir")); return; }
+  if (ev.target && ev.target.id === "t-enviar"){ enviar(); }
+});
+
+cargarCola();
+`;
+}
+
 /* ========================================================================
    LA COLA DE LOS INGENIEROS
    ========================================================================
@@ -4209,7 +4394,7 @@ export default {
        verificación real de firma RS256 y el fail-closed. Los ingenieros
        voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
        creando cuentas: cero contraseñas que guardar y cero que se filtren. */
-    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/")) {
+    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triage" || ruta === "/triage.js") {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
       /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
@@ -4267,6 +4452,16 @@ export default {
         }
         if (ruta === "/api/admin/quien")    return json({ email: sesion.email });
         /* --- triage estructural: la cola de los ingenieros --- */
+        if (ruta === "/triage") {
+          return new Response(paginaTriage(), {
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
+          });
+        }
+        if (ruta === "/triage.js") {
+          return new Response(triageJS(), {
+            headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }
+          });
+        }
         if (ruta === "/api/triage/casos")   return await triageCasos(env, url);
         const tf = ruta.match(/^\/api\/triage\/caso\/(CV-\d{4}-\d{6})$/i);
         if (tf) return await triageFicha(env, tf[1].toUpperCase());
