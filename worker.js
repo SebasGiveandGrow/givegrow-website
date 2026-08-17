@@ -1798,6 +1798,180 @@ async function apiComprobante(request, env, guia, token) {
   return json({ ok: true });
 }
 
+/* ========================================================================
+   TRIAGE ESTRUCTURAL DE VIVIENDAS
+   ========================================================================
+   NO es un dictamen de habitabilidad: por fotos no se determina, y la
+   declaratoria con efectos —evacuar, demoler— le corresponde a la autoridad
+   municipal (Ley 1523 de 2012). Esto PRIORIZA: a qué casa se va primero.
+
+   El caso se crea ANTES de subir un solo archivo y devuelve su token. Si la
+   señal se cae en la foto cuatro, las tres primeras y todos los datos ya están
+   guardados. En zona de desastre esa es la diferencia entre recibir un caso y
+   recibir un abandono — es el mismo patrón del reporte de transferencia y su
+   comprobante, que ya funciona en producción.
+   ======================================================================== */
+
+/* Consecutivo propio: CV-YYYY-NNNNNN. Mecánica atómica idéntica a la de guías,
+   y misma regla dura: NO SE REINICIA NUNCA. */
+async function siguienteCaso(env, anio) {
+  const { results } = await env.DB.prepare(
+    "INSERT INTO numerador_caso (anio, ultimo) VALUES (?, 1) " +
+    "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1 RETURNING ultimo"
+  ).bind(anio).all();
+  const n = results && results[0] ? results[0].ultimo : null;
+  if (!n) throw new Error("numerador de casos no devolvió consecutivo");
+  return "CV-" + anio + "-" + String(n).padStart(6, "0");
+}
+
+const MATERIALES = ["ladrillo", "adobe", "bahareque", "prefabricado", "madera", "no_se"];
+const CATEGORIAS_MEDIO = ["conjunto", "estructura", "dano", "entorno"];
+/* El tope del video NO lo pone la plataforma sino la conexión de la familia:
+   un video de 30 s de un teléfono moderno pesa decenas de megas y en zona de
+   desastre no sube. Se limita por diseño y el formulario lo dice antes de
+   grabar, que es cuando sirve saberlo. */
+const TIPOS_MEDIO = {
+  "image/jpeg": { ext: "jpg", clase: "foto",  max: 8 * 1024 * 1024 },
+  "image/png":  { ext: "png", clase: "foto",  max: 8 * 1024 * 1024 },
+  "image/webp": { ext: "webp", clase: "foto", max: 8 * 1024 * 1024 },
+  "video/mp4":  { ext: "mp4", clase: "video", max: 60 * 1024 * 1024 },
+  "video/quicktime": { ext: "mov", clase: "video", max: 60 * 1024 * 1024 }
+};
+const MAX_MEDIOS = 20;
+
+/* POST /api/caso — crea el caso. Devuelve número y token. */
+async function apiCasoCrear(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  /* Honeypot, igual que en los otros formularios: éxito aparente, cero registro. */
+  if (c.web2) return json({ ok: true, numero: null });
+
+  const nombre = limpiar(c.nombre, 200);
+  const tel    = limpiar(c.tel, 40);
+  const sector = limpiar(c.sector, 160);
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  /* El TELÉFONO es el identificador, no el correo: en estas zonas mucha gente
+     tiene WhatsApp y no correo, y exigirlo dejaría fuera a quien más lo
+     necesita. Se piden 7 dígitos como mínimo real, sin formato impuesto. */
+  if ((tel.match(/\d/g) || []).length < 7) return json({ error: "telefono_invalido" }, 400);
+  if (!sector) return json({ error: "sector_requerido" }, 400);
+
+  const email = limpiar(c.email, 200);
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+
+  /* Sin esta autorización no hay caso: es la que permite que un ingeniero mire
+     las fotos. La de publicación es OTRA y es opcional — ver migración 0010. */
+  if (!c.consent_eval) return json({ error: "autorizacion_requerida" }, 400);
+
+  const material = MATERIALES.includes(c.material) ? c.material : null;
+  const pisos = Number.isInteger(c.pisos) && c.pisos > 0 && c.pisos < 20 ? c.pisos : null;
+
+  const numero = await siguienteCaso(env, new Date().getUTCFullYear());
+  const token = tokenNuevo();
+
+  await env.DB.prepare(
+    "INSERT INTO casos (numero, token, sector, direccion_ref, contacto_nombre, contacto_tel, " +
+    "contacto_email, material, pisos, anio_aprox, danio_previo, habitada, heridos, filtra_agua, " +
+    "nota, consent_eval, consent_publico, consent_en) " +
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,datetime('now'))"
+  ).bind(
+    numero, token, sector, limpiar(c.direccion, 240) || null,
+    nombre, tel, email || null,
+    material, pisos, limpiar(c.anio, 40) || null,
+    c.danio_previo ? 1 : 0, c.habitada ? 1 : 0, c.heridos ? 1 : 0, c.filtra_agua ? 1 : 0,
+    limpiar(c.nota, 600) || null,
+    c.consent_publico ? 1 : 0
+  ).run();
+
+  try { await correoAvisoCaso(env, { numero, nombre, tel, sector, email }); }
+  catch (e) { console.error("correo caso", numero, e && e.message); }
+
+  return json({ ok: true, numero, token });
+}
+
+/* POST /api/caso/<numero>/medio?t=<token>&cat=<categoria> — una foto o video.
+   Uno por petición, a propósito: con mala señal, subir siete archivos en una
+   sola llamada significa perderlos los siete cuando falla. */
+async function apiCasoMedio(request, env, numero, token, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+
+  const caso = await env.DB.prepare(
+    "SELECT numero, token, estado FROM casos WHERE numero = ?"
+  ).bind(numero).first();
+  /* Mismo 403 para caso inexistente y token equivocado: si se distinguieran,
+     quedaría un oráculo de qué casos existen. Igual que el recibo. */
+  if (!caso || !token || caso.token !== token) return json({ error: "no_autorizado" }, 403);
+
+  const cuantos = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?"
+  ).bind(numero).first();
+  if (cuantos && cuantos.n >= MAX_MEDIOS) return json({ error: "demasiados_medios", max: MAX_MEDIOS }, 409);
+
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const spec = TIPOS_MEDIO[tipo];
+  if (!spec) return json({ error: "tipo_no_permitido", permitidos: Object.keys(TIPOS_MEDIO) }, 415);
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > spec.max) {
+    return json({
+      error: "archivo_muy_grande", clase: spec.clase,
+      max_mb: Math.round(spec.max / 1024 / 1024),
+      ayuda: spec.clase === "video" ? "Graba un video más corto, de unos 30 segundos." : null
+    }, 413);
+  }
+
+  const cat = CATEGORIAS_MEDIO.includes(url.searchParams.get("cat")) ? url.searchParams.get("cat") : null;
+  const clave = "casos/" + numero + "/" + tokenNuevo().slice(0, 8) + "." + spec.ext;
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+  await env.DB.prepare(
+    "INSERT INTO caso_medios (caso, r2_key, clase, categoria, bytes, nota, orden) " +
+    "VALUES (?,?,?,?,?,?, (SELECT COUNT(*) FROM caso_medios WHERE caso = ?))"
+  ).bind(numero, clave, spec.clase, cat, bytes.length,
+         limpiar(url.searchParams.get("nota"), 200) || null, numero).run();
+  await env.DB.prepare("UPDATE casos SET actualizado_en = datetime('now') WHERE numero = ?").bind(numero).run();
+
+  return json({ ok: true, clase: spec.clase });
+}
+
+/* GET /api/caso/<numero>?t=<token> — lo que la familia puede ver de su caso.
+   Nunca devuelve la dirección exacta ni las notas técnicas internas. */
+async function apiCasoEstado(env, numero, token) {
+  const c = await env.DB.prepare(
+    "SELECT numero, token, estado, clasificacion, sector, creado_en FROM casos WHERE numero = ?"
+  ).bind(numero).first();
+  if (!c || !token || c.token !== token) return json({ error: "no_autorizado" }, 403);
+  const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
+  return json({
+    numero: c.numero, estado: c.estado, clasificacion: c.clasificacion,
+    sector: c.sector, medios: (m && m.n) || 0, creado_en: c.creado_en
+  });
+}
+
+async function correoAvisoCaso(env, x) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const titulo = "Caso de vivienda: " + x.numero;
+  const filas = [
+    ["Caso", x.numero], ["Sector", x.sector],
+    ["Contacto", x.nombre], ["Teléfono", x.tel], ["Correo", x.email || "(no dio)"]
+  ];
+  return enviarCorreo(env, {
+    para, asunto: titulo,
+    texto: filas.map(([k, v]) => k + ": " + v).join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: ["Entró un caso nuevo para triage estructural. Todavía no lo ha visto ningún ingeniero.",
+                 "Recuerda: esto prioriza a quién visitar, no determina si la casa es habitable."],
+      filas
+    }),
+    etiqueta: "caso-recibido"
+  });
+}
+
 /* GET /api/admin/comprobante/<guia> — solo tras Access. El comprobante lleva
    datos bancarios del donante y nunca es público. */
 async function adminComprobante(env, guia) {
@@ -4031,6 +4205,12 @@ export default {
         if (ruta === "/api/transferencia")  return await apiReportarTransferencia(request, env, url);
         const comp = ruta.match(/^\/api\/comprobante\/(GG-\d{4}-\d{6})$/i);
         if (comp) return await apiComprobante(request, env, comp[1].toUpperCase(), url.searchParams.get("t"));
+        /* Triage estructural de viviendas */
+        if (ruta === "/api/caso")           return await apiCasoCrear(request, env);
+        const cmed = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/medio$/i);
+        if (cmed) return await apiCasoMedio(request, env, cmed[1].toUpperCase(), url.searchParams.get("t"), url);
+        const cest = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})$/i);
+        if (cest) return await apiCasoEstado(env, cest[1].toUpperCase(), url.searchParams.get("t"));
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
         /* Nunca se filtra el detalle interno al cliente. */
