@@ -2147,7 +2147,9 @@
         <p id="cv-num" class="figure-xl" style="margin:10px 0"></p>
         <p data-i18n="cv.ok.p">Guárdalo. Con él puedes consultar tu caso cuando quieras.</p>
         <p class="mu" style="margin-top:10px" data-i18n="cv.ok.espera">Un ingeniero voluntario lo va a revisar. Te escribimos por WhatsApp cuando tengamos su respuesta.</p>
-        <button type="button" class="btn btn-o" style="margin-top:16px" data-act="cvCopiar()" data-i18n="cv.ok.copiar">Copiar mi número</button>
+        <p style="margin-top:16px" data-i18n="cv.ok.enlace">Este es el enlace de tu caso. Guárdalo o mándatelo por WhatsApp: cuando un ingeniero lo revise, aquí aparecerá tu informe.</p>
+        <p style="margin-top:8px;word-break:break-all"><a id="cv-enlace" href="#" style="color:var(--acc);font-weight:600"></a></p>
+        <button type="button" class="btn btn-o" style="margin-top:16px" data-act="cvCopiar()" data-i18n="cv.ok.copiar">Copiar mi enlace</button>
       </div>
     </div>
   </section>
@@ -2226,7 +2228,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=c6b71c85"></script>
+<script src="/app.js?v=4150aad8"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

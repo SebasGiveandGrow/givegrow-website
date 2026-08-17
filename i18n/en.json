@@ -1300,9 +1300,10 @@
   "cv.ok.t": "Done. This is your case number",
   "cv.ok.p": "Keep it. With it you can check your case any time.",
   "cv.ok.espera": "A volunteer engineer will review it. We will message you on WhatsApp when we have their answer.",
-  "cv.ok.copiar": "Copy my number",
-  "cv.ok.copiado": "Copied",
+  "cv.ok.copiar": "Copy my link",
+  "cv.ok.copiado": "Link copied",
   "cv.err.envio": "We could not register your case. Check the details and try again.",
   "cv.err.campos": "Missing details: your name, your WhatsApp and the neighbourhood.",
-  "cv.err.consent": "We need your authorisation for an engineer to review the case."
+  "cv.err.consent": "We need your authorisation for an engineer to review the case.",
+  "cv.ok.enlace": "This is your case link. Save it or send it to yourself on WhatsApp: once an engineer reviews it, your report will appear there."
 }

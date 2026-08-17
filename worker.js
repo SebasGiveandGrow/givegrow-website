@@ -2002,7 +2002,7 @@ function paginaTriage() {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Triage estructural</title>
+<title>Triaje estructural</title>
 <style>
   :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;
         --urg:#8C2F1E;--prog:#9A6B12;--no:#1F5C38}
@@ -2040,12 +2040,12 @@ function paginaTriage() {
 </head>
 <body>
 <div class="wrap">
-  <h1>Triage estructural</h1>
-  <p class="sub" id="quien">Cargando sesion...</p>
+  <h1>Triaje estructural</h1>
+  <p class="sub" id="quien">Cargando sesión...</p>
   <div class="aviso">
     <b>Esto no es un dictamen de habitabilidad.</b> Por fotos no se determina, y la declaratoria
     con efectos le corresponde a la autoridad municipal. Lo que decides aqui es <b>a quien se
-    visita primero</b>. Si el material no alcanza, marca <b>No puedo evaluar</b> y di que falta.
+    visita primero</b>. Si el material no alcanza, marca <b>No puedo evaluar</b> y di qué falta.
   </div>
   <div id="lista"><p class="cargando">Cargando casos...</p></div>
   <div id="ficha"></div>
@@ -2062,20 +2062,20 @@ function esc(s){ var d = document.createElement("div"); d.textContent = s == nul
 function el(id){ return document.getElementById(id); }
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); }).then(function(d){
-  el("quien").textContent = d.email ? ("Sesion de " + d.email) : "Sesion activa";
+  el("quien").textContent = d.email ? ("Sesión de " + d.email) : "Sesión activa";
 });
 
 function cargarCola(){
   fetch("/api/triage/casos").then(function(r){ return r.json(); }).then(function(d){
     var c = d.casos || [];
     if (!c.length){ el("lista").innerHTML = "<p class='cargando'>No hay casos esperando. Gracias.</p>"; return; }
-    var h = "<p class='sub'>" + c.length + " caso(s) esperando, del mas antiguo al mas reciente.</p>";
+    var h = "<p class='sub'>" + c.length + " caso(s) esperando, del más antiguo al más reciente.</p>";
     for (var i = 0; i < c.length; i++){
       var x = c[i];
       h += "<div class='fila'><b>" + esc(x.numero) + "</b>"
-        +  "<span class='meta'>" + esc(x.sector) + " &middot; " + esc(x.material || "material sin decir")
+        +  "<span class='meta'>" + esc(x.sector) + " &middot; " + esc(x.material || "material sin especificar")
         +  " &middot; " + (x.pisos || "?") + " piso(s) &middot; " + x.medios + " foto(s)"
-        +  (x.danio_previo ? " &middot; tenia grietas antes" : "")
+        +  (x.danio_previo ? " &middot; tenía grietas antes" : "")
         +  (x.heridos ? " &middot; hubo heridos" : "")
         +  "</span>"
         +  (x.clasificacion ? "<span class='pill p-" + esc(x.clasificacion) + "'>" + esc(x.clasificacion) + "</span>" : "")
@@ -2091,9 +2091,9 @@ function abrir(numero){
     CASO = d.caso.numero;
     var c = d.caso, h = "<div class='ficha'><h2 style='font-size:19px'>" + esc(c.numero) + "</h2>";
     var datos = [["Sector", c.sector], ["Muros", c.material], ["Pisos", c.pisos],
-                 ["Año aprox", c.anio_aprox], ["Grietas antes del sismo", c.danio_previo ? "Si" : "No"],
-                 ["Habitada ahora", c.habitada ? "Si" : "No"], ["Hubo heridos", c.heridos ? "Si" : "No"],
-                 ["Entra agua", c.filtra_agua ? "Si" : "No"], ["Cuenta la familia", c.nota]];
+                 ["Año aprox", c.anio_aprox], ["Grietas antes del sismo", c.danio_previo ? "Sí" : "No"],
+                 ["Habitada ahora", c.habitada ? "Sí" : "No"], ["Hubo heridos", c.heridos ? "Sí" : "No"],
+                 ["Entra agua", c.filtra_agua ? "Sí" : "No"], ["Cuenta la familia", c.nota]];
     for (var i = 0; i < datos.length; i++){
       if (datos[i][1] === null || datos[i][1] === undefined || datos[i][1] === "") continue;
       h += "<div class='dato'><span>" + esc(datos[i][0]) + "</span><span>" + esc(datos[i][1]) + "</span></div>";
@@ -2111,20 +2111,20 @@ function abrir(numero){
     h += "</div>";
     var ev = d.evaluaciones || [];
     for (var k = 0; k < ev.length; k++){
-      h += "<div class='dato'><span>Ya evaluo</span><span>" + esc(ev[k].ing_nombre) + " (" + esc(ev[k].ing_matricula)
+      h += "<div class='dato'><span>Ya evaluó</span><span>" + esc(ev[k].ing_nombre) + " (" + esc(ev[k].ing_matricula)
         +  ") &rarr; " + esc(ev[k].clasificacion) + "</span></div>";
     }
-    h += "<label>Tu clasificacion</label><select id='t-clas'>"
+    h += "<label>Tu clasificación</label><select id='t-clas'>"
       +  "<option value='urgente'>Visita urgente</option>"
       +  "<option value='programada'>Visita programada</option>"
       +  "<option value='no_requiere'>No requiere visita</option>"
       +  "<option value='inevaluable'>No puedo evaluar con esto</option></select>"
       +  "<label>Tu nombre</label><input id='t-nombre'>"
-      +  "<label>Tu matricula profesional</label><input id='t-mat'>"
-      +  "<label>Nota tecnica</label><textarea id='t-nota' rows='4'></textarea>"
-      +  "<label>Recomendacion para la familia mientras tanto</label><textarea id='t-rec' rows='3'></textarea>"
-      +  "<label>Si no puedes evaluar: que falta</label><input id='t-falta'>"
-      +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluacion</button></p>"
+      +  "<label>Tu matrícula profesional</label><input id='t-mat'>"
+      +  "<label>Nota técnica</label><textarea id='t-nota' rows='4'></textarea>"
+      +  "<label>Recomendación para la familia mientras tanto</label><textarea id='t-rec' rows='3'></textarea>"
+      +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
+      +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluación</button></p>"
       +  "<p class='msg' id='t-msg'></p></div>";
     el("ficha").innerHTML = h;
     el("ficha").scrollIntoView({ block: "start" });
