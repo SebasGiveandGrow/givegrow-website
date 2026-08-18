@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Fase 4 · sistema visual" (16 ago 2026)
+> Última actualización: sesión "Triaje estructural de viviendas" (17 ago 2026)
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -100,6 +100,14 @@ poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemo
    de rate-limit del worker de ALMA.
 10. **Retirar la implementación del Apps Script de aliados**, que sigue publicada
     y acepta POST de cualquiera. La CSP ya dejó de autorizarlo (PR #96).
+11. **El nombre del proyecto de viviendas** y su **número de WhatsApp** — ver su
+    cierre de tanda. Mientras no existan, el formulario no promete el canal.
+12. **La guía fotográfica de los ingenieros**: la lista de fotos obligatorias,
+    sus categorías de clasificación y qué no firman a distancia. El cuestionario
+    y un borrador de guía ya están redactados para enviárselos.
+13. **Por qué `wrangler d1 migrations apply` da 7403** en la cuenta, cuando
+    `d1 execute` sí funciona. Se sorteó insertando la fila a mano; conviene
+    resolverlo antes de la próxima migración.
 
 ## ⚠️ DOS COSAS QUE SIGUEN A MEDIAS Y HAY QUE RECORDAR
 
@@ -114,7 +122,7 @@ tocó el significado de `aprobada`: se añadió `confirmacion` ('wompi' | 'manua
 para saber de dónde viene la certeza, y el certificado cita la referencia
 BANCARIA y no un id de Wompi inexistente.
 
-## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 16 ago 2026, 17:20 UTC)
+## 🧪 QUÉ HAY EN LA BASE DE PRODUCCIÓN (corte: 17 ago 2026, 13:00 UTC)
 
 | | |
 |---|---|
@@ -124,7 +132,8 @@ BANCARIA y no un id de Wompi inexistente.
 | `correos` | **2**, los dos `enviado` con su id de Resend — la tabla se estrenó con `001005` |
 | `certificados`, `miembros`, `inscripciones` | **0** |
 | `entregas` | 0 vivas · 1 anulada |
-| numeradores | guía **1005** · acta **1** · certificado sin estrenar |
+| `casos` | **1.** `CV-2026-000001` clasificado 'no_requiere' · 4 fotos en R2 · evaluado con nombre y matrícula |
+| numeradores | guía **1005** · acta **1** · caso **1** · certificado sin estrenar |
 
 ### 🔴 LO PRIMERO AL RETOMAR: hay DOS donaciones reales esperando
 **`GG-2026-001003`** — $400.000 al fondo general, transferencia reportada con
@@ -254,6 +263,104 @@ persona.
 **Nota sobre la alarma de la Fase 8:** sigue encendida después de conciliar, y
 está bien. `eventos_wompi` seguirá en 0 hasta que llegue un webhook de verdad, y
 es exactamente lo que hay que seguir viendo.
+
+## Cierre de tanda: TRIAJE ESTRUCTURAL DE VIVIENDAS (16–17 ago 2026)
+
+Proyecto nuevo, nacido de una idea de Sebas: los ingenieros que van a la
+brigada no dan abasto para visitar todas las casas afectadas por el sismo. La
+plataforma deja que la familia suba fotos y que un ingeniero voluntario diga
+**a quién visitar primero**.
+
+### ⚠️ LO QUE GOBIERNA TODO: es un TRIAJE, no un dictamen
+La idea original era evaluar «si la casa se puede reparar, adecuar o si es
+inhabitable y se debe demoler». Eso se replanteó, y el replanteo es lo que hace
+viable el proyecto:
+
+1. **Por fotos no se determina habitabilidad.** Un ingeniero no ve la
+   cimentación, el suelo ni si esa grieta es de un muro que carga.
+2. **La declaratoria con efectos —evacuar, demoler— es de la autoridad
+   municipal** (Ley 1523 de 2012), no de un privado.
+3. **El ingeniero pone su matrícula.** Firmar habitabilidad a distancia
+   compromete su responsabilidad profesional, y el que lo firme sin mirar es
+   justo el que no quieres.
+
+Lo defendible —y que resuelve el problema real— es **priorizar**. Eso está
+escrito en el esquema, no solo en los textos: la columna se llama
+`clasificacion` y no `veredicto`, `evaluaciones` admite varias por caso, e
+`inevaluable` es una salida de primera clase que EXIGE decir qué falta.
+
+### Lo que quedó construido (PRs #106 a #116)
+`formulario → cola → evaluación → informe`, más la bandeja del equipo.
+
+| pieza | qué |
+|---|---|
+| migración `0010` | `casos`, `caso_medios`, `evaluaciones`, `numerador_caso` |
+| `#vivienda` | formulario de 4 pasos, móvil primero |
+| `/triaje` | pantalla del ingeniero, tras Access |
+| `/api/triage/*` | cola, ficha, medios y evaluación |
+| informe PDF | `/api/caso/<n>/informe.pdf?t=<token>` |
+| `/admin` | bandeja «Casas por revisar», la octava |
+
+**VERIFICADO DE PUNTA A PUNTA EN PRODUCCIÓN** con `CV-2026-000001`: caso creado
+con sus 4 fotos en R2, evaluado desde `/triaje` con nombre y matrícula, e
+informe descargado.
+
+### Las cinco decisiones que no hay que deshacer
+1. **La ubicación va partida en dos.** `sector` (público) y `direccion_ref`
+   (privado). Publicar «casa dañada y desocupada, en esta dirección» es un mapa
+   para quien roba. Que la separación esté en el ESQUEMA impide el accidente.
+2. **Dos consentimientos separados.** Que un ingeniero vea tu caso y que tu casa
+   salga en internet son decisiones distintas (Ley 1581); `consent_publico` es
+   opcional y revocable.
+3. **El ingeniero NO ve contacto ni dirección**; el equipo sí, en `/admin`. Cada
+   quien ve lo que su trabajo necesita.
+4. **El caso se crea ANTES de subir fotos**, y suben de a una y en serie. Con
+   señal mala, siete subidas en paralelo se pisan y fallan todas.
+5. **El teléfono es el identificador; el correo es opcional de verdad.** En esas
+   zonas mucha gente tiene WhatsApp y no correo.
+
+### Access: DOS aplicaciones, y no son intercambiables
+    ACCESS_AUD          panel  → donantes, aportes, comprobantes
+    ACCESS_AUD_TRIAGE   triaje → casos de vivienda y fotos
+El panel **nunca** acepta la audiencia del triaje; el triaje sí acepta la del
+panel, para que el equipo entre sin segunda cuenta. La asimetría es deliberada.
+Aprobar a un ingeniero = añadir su correo en Access (OTP por correo, sin
+cuentas ni contraseñas). Sebas confirmó que **el correo puede ser de
+cualquiera** —universidad, empresa o particular—, así que no hay regla por
+dominio y cada uno se aprueba individualmente.
+
+### ⚠️ LAS CUATRO COSAS QUE COSTARON TIEMPO, PARA NO REPETIRLAS
+1. **`d1 execute --file` NO registra la migración.** Ejecuta el SQL pero no
+   escribe en `d1_migrations`, así que el guardián del CI —«la base está
+   migrada, si no, no se despliega»— bloqueó el deploy con las tablas ya
+   creadas. Para producción se usa **`wrangler d1 migrations apply`**. Y ojo:
+   ese comando falló con **7403** en la cuenta de Sebas aunque `d1 execute`
+   funciona; se resolvió insertando la fila a mano en `d1_migrations`. Queda
+   pendiente averiguar por qué.
+2. **La ruta estaba en inglés.** `/triage` en un sitio en español: Sebas escribió
+   `/triaje` y le salió la portada pública, porque el comodín de la SPA se traga
+   cualquier ruta desconocida y **falla en silencio**. Hoy la canónica es
+   `/triaje` y `/triage` redirige.
+3. **Caché del edge.** Cuando `/triaje` todavía servía el `index.html`, esa
+   respuesta quedó cacheada (`cf-cache-status: HIT`) y siguió sirviéndose aunque
+   el Worker ya manejara la ruta. Hubo que purgarla a mano.
+4. **La pantalla final daba el número pero no el token**, y sin token no se
+   abre el informe. La primera prueba real lo destapó: Sebas no pudo bajar su
+   propio PDF. Ahora entrega el ENLACE completo.
+
+### Lo que espera insumo, no código
+- **El NOMBRE del proyecto.** Va con marca propia en un subdominio
+  (`<nombre>.thegiveandgrowproject.org`), no dominio nuevo — el DNS del dominio
+  principal ya dio problemas. Sebas quiere que lleve «casa» u «hogar».
+- **El número de WhatsApp.** Mientras no exista, el formulario NO lo promete: la
+  pantalla final dice que el informe aparecerá en el enlace, que sí es
+  verificable.
+- **Las respuestas de los ingenieros** a la guía fotográfica: la lista de fotos
+  obligatorias, las categorías de clasificación (hoy provisionales) y qué NO
+  están dispuestos a firmar a distancia.
+- **El banco público de casas y el apadrinamiento** son fases posteriores. El
+  apadrinamiento es una donación con destinación específica: hablarlo con la
+  contadora ANTES de recibir el primer peso.
 
 ## Cierre de tanda: plan VISUAL, Fase 4 — sistema visual (16 ago 2026)
 
