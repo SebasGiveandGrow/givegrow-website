@@ -2151,6 +2151,115 @@
         <p style="margin-top:8px;word-break:break-all"><a id="cv-enlace" href="#" style="color:var(--acc);font-weight:600"></a></p>
         <button type="button" class="btn btn-o" style="margin-top:16px" data-act="cvCopiar()" data-i18n="cv.ok.copiar">Copiar mi enlace</button>
       </div>
+
+      <!-- Única puerta visible hacia la postulación de ingenieros. Va al final
+           y en voz baja: esta página la lee una familia con la casa rota, y lo
+           último que necesita es un llamado dirigido a otro. -->
+      <p class="mu" style="margin-top:44px;padding-top:18px;border-top:1px solid var(--bd)">
+        <a class="card-link" href="#ingenieros"><span data-i18n="cv.ing.link">¿Eres ingeniero o arquitecto y quieres revisar casos?</span> <span aria-hidden="true">&rarr;</span></a>
+      </p>
+    </div>
+  </section>
+</main>
+
+<!-- Postulación de ingenieros voluntarios al triaje estructural.
+     Antes de esto, la única forma de sumar un ingeniero era que alguien le
+     pidiera el correo y lo pegara a mano en Cloudflare Access: no había dónde
+     postularse ni registro de quién es ni de qué matrícula dijo tener.
+
+     El orden de la página no es decorativo. El ALCANCE va antes que el
+     formulario a propósito: quien crea que va a dictaminar habitabilidad por
+     fotos tiene que enterarse antes de escribir su matrícula, no después. Por
+     eso además hay una casilla obligatoria que lo repite, y el servidor la
+     exige igual que la de Ley 1581. -->
+<main id="page-ingenieros" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ing.ey">Ingenieros voluntarios</span>
+      <h1 class="h-sec rv" data-i18n="ing.t">Hay más casas dañadas que ingenieros para visitarlas.</h1>
+      <p class="lead rv d1" data-i18n="ing.lead">Después del sismo del 10 de agosto llegan más solicitudes de las que un equipo alcanza a atender en terreno. Lo que pedimos no es que dictamines a distancia: es que mires unas fotos y digas a quién hay que visitar primero.</p>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ing.q.ey">El alcance</span>
+      <h2 class="h-sec rv" data-i18n="ing.q.t">Priorizar, no dictaminar</h2>
+      <p class="lead rv d1" data-i18n="ing.q.p">Esta distinción no es una advertencia legal al pie: gobierna el proyecto entero, hasta el nombre de las columnas de la base. Si no la compartes, este no es el lugar — y preferimos decírtelo antes.</p>
+      <div class="grid g3 rv d2" style="margin-top:28px">
+        <div class="card"><h3 data-i18n="ing.q1.t">Lo que haces</h3><p data-i18n="ing.q1.p">Ordenas la fila. Cada caso queda en visita urgente, visita programada, no requiere visita por ahora, o no se puede evaluar con este material. Y escribes qué le conviene hacer a la familia mientras tanto.</p></div>
+        <div class="card"><h3 data-i18n="ing.q2.t">Lo que no haces</h3><p data-i18n="ing.q2.p">No declaras habitable ni inhabitable una vivienda. La declaratoria con efectos —evacuar, demoler— es de la autoridad municipal, por la Ley 1523 de 2012. Nadie te va a pedir que firmes eso aquí.</p></div>
+        <div class="card"><h3 data-i18n="ing.q3.t">Por qué las fotos no alcanzan</h3><p data-i18n="ing.q3.p">No ves la cimentación, no ves el suelo y no sabes si ese muro carga. Por eso «no puedo evaluar con esto» es una respuesta de primera clase, y no un fracaso: al marcarla, el sistema te obliga a decir qué falta y se lo pide a la familia.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ing.c.ey">Cómo funciona</span>
+      <h2 class="h-sec rv" data-i18n="ing.c.t">De la postulación al primer caso</h2>
+      <div class="steps rv d1" style="margin-top:24px">
+        <div class="step"><div class="step-n">1</div><div><h3 data-i18n="ing.p1.t">Te postulas</h3><p data-i18n="ing.p1.p">Con tu nombre, tu matrícula profesional y tu ciudad. Dos minutos.</p></div></div>
+        <div class="step"><div class="step-n">2</div><div><h3 data-i18n="ing.p2.t">Verificamos tu matrícula</h3><p data-i18n="ing.p2.p">La buscamos en el registro público del COPNIA. Lo hace una persona, así que no es inmediato: es el único filtro que tiene el proyecto y no lo queremos automático.</p></div></div>
+        <div class="step"><div class="step-n">3</div><div><h3 data-i18n="ing.p3.t">Te abrimos el acceso</h3><p data-i18n="ing.p3.p">Con tu correo, el que quieras — de la universidad, de la empresa o particular. Sin cuenta y sin contraseña: pides un código, te llega al buzón y entras.</p></div></div>
+        <div class="step"><div class="step-n">4</div><div><h3 data-i18n="ing.p4.t">Entras a la cola</h3><p data-i18n="ing.p4.p">Abres un caso, ves sus fotos y lo clasificas. No ves el nombre, ni el teléfono, ni la dirección de la familia: para priorizar por urgencia no hacen falta, y quien las necesita para ir a visitar es el equipo de terreno.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap center">
+      <h3 class="rv" data-i18n="ing.f.t" style="margin-bottom:14px">Lo que va con tu nombre</h3>
+      <p class="lead rv d1" data-i18n="ing.f.p" style="margin-left:auto;margin-right:auto">La familia recibe un informe en PDF con tu nombre, tu matrícula y lo que escribiste. Por eso puedes revisar los casos que quieras y ninguno que no quieras, y por eso siempre está abierta la salida de pedir más material. Nada de esto se cobra, en ninguna dirección.</p>
+    </div>
+  </section>
+
+  <section id="ing-form">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ing.form.ey">Postularte</span>
+      <h2 class="h-sec rv" data-i18n="ing.form.t">Cuéntanos quién eres</h2>
+      <p class="lead rv d1" data-i18n="ing.form.lead">No hay mínimo de casos ni horario. Lo que sí hay es una verificación antes de empezar.</p>
+
+      <form id="inf" class="ally-form rv d2" data-submit="ingSubmit(event)">
+        <div class="field"><label for="inf-nombre" data-i18n="ing.nombre">Nombre completo</label>
+          <input type="text" id="inf-nombre" autocomplete="name" required></div>
+        <div class="field"><label for="inf-email" data-i18n="ing.email">Correo</label>
+          <input type="email" id="inf-email" autocomplete="email" required>
+          <small class="mu" data-i18n="ing.email.h">Con este mismo correo entrarías a la plataforma. Puede ser de universidad, de empresa o particular.</small></div>
+        <div class="field"><label for="inf-tel" data-i18n="ing.tel">Teléfono o WhatsApp (opcional)</label>
+          <input type="tel" id="inf-tel" autocomplete="tel"></div>
+        <div class="field"><label for="inf-ciudad" data-i18n="ing.ciudad">Ciudad</label>
+          <input type="text" id="inf-ciudad" autocomplete="address-level2" required></div>
+        <div class="field"><label for="inf-mat" data-i18n="ing.matricula">Matrícula profesional</label>
+          <input type="text" id="inf-mat" required>
+          <small class="mu" data-i18n="ing.matricula.h">La que aparece en tu tarjeta del COPNIA. Es lo que vamos a verificar en su registro público.</small></div>
+        <div class="field"><label for="inf-esp" data-i18n="ing.esp">Tu especialidad</label>
+          <select id="inf-esp" data-change="ingEsp()">
+            <option value="estructural" data-i18n="ing.esp.estructural">Ingeniería estructural</option>
+            <option value="civil" data-i18n="ing.esp.civil">Ingeniería civil</option>
+            <option value="geotecnia" data-i18n="ing.esp.geotecnia">Geotecnia</option>
+            <option value="arquitectura" data-i18n="ing.esp.arquitectura">Arquitectura</option>
+            <option value="otra" data-i18n="ing.esp.otra">Otra</option>
+          </select></div>
+        <div class="field" id="inf-otra-f" style="display:none"><label for="inf-otra" data-i18n="ing.esp.cual">¿Cuál?</label>
+          <input type="text" id="inf-otra"></div>
+        <div class="field"><label for="inf-exp" data-i18n="ing.exp">Años de ejercicio (opcional)</label>
+          <input type="text" id="inf-exp" data-i18n="ing.exp.ph" data-i18n-attr="placeholder" placeholder="Sirve una respuesta como «unos 12 años»."></div>
+        <div class="field"><label for="inf-disp" data-i18n="ing.disp">Cuántos casos podrías mirar por semana (opcional)</label>
+          <input type="text" id="inf-disp" data-i18n="ing.disp.ph" data-i18n-attr="placeholder" placeholder="Dos o tres, cinco, los que lleguen…"></div>
+        <div class="field"><label for="inf-msg" data-i18n="ing.msg">¿Algo que quieras contarnos? (opcional)</label>
+          <textarea id="inf-msg" rows="3" maxlength="600" data-i18n="ing.msg.ph" data-i18n-attr="placeholder" placeholder="Experiencia en evaluación post-sismo, en qué zona estás, qué dudas tienes."></textarea></div>
+
+        <label class="ally-check"><input type="checkbox" id="inf-alcance"><span><b data-i18n="ing.alcance">Entiendo que esto es un triaje de priorización y no un dictamen de habitabilidad.</b><small data-i18n="ing.alcance.h">Es la condición del proyecto. La declaratoria con efectos le corresponde a la autoridad municipal, y nunca se te va a pedir que la firmes a distancia.</small></span></label>
+        <label class="ally-check"><input type="checkbox" id="inf-datos"><span data-i18n="ing.datos">Autorizo el tratamiento de mis datos para que Give&amp;Grow verifique mi matrícula y me contacte sobre el triaje, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.</span></label>
+
+        <!-- Trampa para bots: invisible y sin etiqueta. Si llega llena, no se guarda. -->
+        <input type="text" id="inf-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+
+        <button type="submit" class="btn btn-g" id="inf-btn" data-i18n="ing.submit">Enviar mi postulación</button>
+        <p class="mu" style="margin-top:12px;font-size:13.5px" data-i18n="ing.nada">Nada de esto se cobra, en ninguna dirección.</p>
+        <p id="inf-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
+      </form>
     </div>
   </section>
 </main>
@@ -2228,7 +2337,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=1abf7019"></script>
+<script src="/app.js?v=c17bcb7c"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

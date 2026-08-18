@@ -883,13 +883,14 @@ async function apiInscripcion(request, env, url) {
      enseñarle qué lo delató, y no se guarda nada. */
   if (c.web2) return json({ ok: true });
 
-  /* Los otros tres tipos entran por el mismo endpoint y a la misma tabla:
+  /* Los otros CUATRO tipos entran por el mismo endpoint y a la misma tabla:
      comparten el honeypot, el consentimiento de Ley 1581 y el patrón de correo.
      `inscripciones.tipo` ya estaba pensado para varios tipos y `datos` guarda lo
      propio de cada uno — no hacía falta tabla nueva, y por lo tanto tampoco una
-     migración más. Con estas dos, las CUATRO puertas de entrada del sitio
-     terminan en la misma base y en el mismo panel; ninguna en un tercero. */
+     migración más. Con estas, las CINCO puertas de entrada del sitio terminan
+     en la misma base y en el mismo panel; ninguna en un tercero. */
   if (c.tipo === "especie")   return await apiOfrecimiento(env, c);
+  if (c.tipo === "ingeniero") return await apiIngeniero(env, c);
   if (c.tipo === "empresa")   return await apiAliado(env, c);
   if (c.tipo === "fundacion") return await apiFundacion(env, c);
 
@@ -1020,6 +1021,161 @@ async function correoAvisoInscripcion(env, v) {
       cierre: "Está en el panel, en inscripciones por revisar."
     }),
     etiqueta: "aviso-inscripcion"
+  });
+}
+
+/* ========================================================================
+   POSTULACIÓN DE INGENIEROS VOLUNTARIOS (triaje estructural)
+   ========================================================================
+   Hasta hoy la única forma de sumar un ingeniero era que alguien le pidiera el
+   correo y lo pegara a mano en Cloudflare Access. No había dónde postularse, ni
+   registro de quién es, ni de qué matrícula dijo tener.
+
+   NO LLEVA TABLA NUEVA. Entra por `inscripciones` con `tipo = 'ingeniero'` y lo
+   propio suyo —matrícula, especialidad, experiencia— en el JSON de `datos`. La
+   0001 se diseñó así («cuatro tipos, una tabla») y la 0010 lo dejó escrito: el
+   quinto tipo no exige migración. Y por lo tanto la bandeja «Quién quiere
+   entrar» del panel ya sabe mostrarlo.
+
+   APROBAR SIGUE SIENDO MANUAL, A PROPÓSITO. Hay que verificar que la matrícula
+   exista en el registro público del COPNIA, y eso no se automatiza desde aquí:
+   un ingeniero mal verificado firma un documento que una familia va a leer para
+   decidir si sigue durmiendo en su casa. Aceptar en el panel significa
+   «seguimos», y el acceso se da añadiendo el correo en Access — sin contraseña
+   que guardar y sin cuenta que se filtre.
+
+   SIN REGLA POR DOMINIO DE CORREO: Sebas confirmó que el ingeniero puede ser de
+   universidad, de empresa o particular. Filtrar por dominio dejaría fuera justo
+   al voluntario independiente. Cada uno se aprueba individualmente.
+   ======================================================================== */
+
+/* Provisionales, igual que las categorías de foto: la lista definitiva sale de
+   la guía que están respondiendo los ingenieros. `otra` existe para no perder a
+   quien no se reconozca en ninguna. */
+const ESPECIALIDADES_ING = ["estructural", "civil", "geotecnia", "arquitectura", "otra"];
+
+async function apiIngeniero(env, c) {
+  const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const nombre    = limpio(c.nombre, 120);
+  const email     = limpio(c.email, 200);
+  const matricula = limpio(c.matricula, 60);
+  const ciudad    = limpio(c.ciudad, 80);
+  const esp = ESPECIALIDADES_ING.includes(c.especialidad) ? c.especialidad : null;
+
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  /* La matrícula no se valida de forma aquí: el COPNIA tiene varios formatos
+     históricos y rechazar por patrón dejaría fuera a un ingeniero real. Lo que
+     no se puede es dejarla vacía — es lo que una persona va a ir a verificar. */
+  if (!matricula) return json({ error: "matricula_requerida" }, 400);
+  if (!esp) return json({ error: "especialidad_requerida", opciones: ESPECIALIDADES_ING }, 400);
+  if (!ciudad) return json({ error: "ciudad_requerida" }, 400);
+
+  /* Las dos casillas son condición para guardar, y no son la misma cosa.
+     `acepta_triaje` es el corazón del proyecto: quien crea que va a dictaminar
+     habitabilidad por fotos entendió mal y hay que decírselo ANTES, no después
+     de que firme. `autoriza_datos` es Ley 1581. */
+  if (!c.acepta_triaje) return json({ error: "alcance_requerido" }, 400);
+  if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
+
+  const datos = {
+    matricula,
+    especialidad: esp,
+    especialidad_otra: esp === "otra" ? limpio(c.especialidad_otra, 120) : "",
+    experiencia: limpio(c.experiencia, 40),
+    disponibilidad: limpio(c.disponibilidad, 200),
+    mensaje: limpio(c.mensaje, 600),
+    acepta_triaje: true,
+    /* Se guarda que la matrícula está SIN verificar. El día que alguien la
+       verifique, que quede claro que hasta entonces era un dato declarado por
+       quien se postula, no un hecho comprobado. */
+    matricula_verificada: false,
+    idioma: c.idioma === "en" ? "en" : "es"
+  };
+
+  const ins = await env.DB.prepare(
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
+    "VALUES ('ingeniero', 'nueva', ?, ?, ?, ?, ?)"
+  ).bind(nombre, email, limpio(c.telefono, 40) || null, ciudad, JSON.stringify(datos)).run();
+
+  /* El correo no puede tumbar la postulación: si falla, la persona ya quedó
+     registrada. Misma regla que en aportes, inscripciones y ofrecimientos. */
+  try {
+    await correoIngeniero(env, { nombre, email, ...datos });
+    await correoAvisoIngeniero(env, { nombre, email, ciudad, telefono: limpio(c.telefono, 40), ...datos });
+  } catch (e) {
+    console.error("correo ingeniero", e && e.message);
+  }
+
+  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+}
+
+const ESP_ING_ES = { estructural: "Ingeniería estructural", civil: "Ingeniería civil",
+  geotecnia: "Geotecnia", arquitectura: "Arquitectura", otra: "Otra" };
+const ESP_ING_EN = { estructural: "Structural engineering", civil: "Civil engineering",
+  geotecnia: "Geotechnics", arquitectura: "Architecture", otra: "Other" };
+
+/* Acuse al ingeniero. Su trabajo es UNO: que no confunda postularse con tener
+   acceso. Entre lo uno y lo otro hay una persona verificando su matrícula, y
+   decirlo de frente es más respetuoso que un «pronto te contactamos». */
+async function correoIngeniero(env, i) {
+  const en = i.idioma === "en";
+  const titulo = en ? "We got your application. Thank you." : "Recibimos tu postulación. Gracias.";
+  const parrafos = en ? [
+    "Someone from Give&Grow will check your professional licence in COPNIA's public register before opening access. That check is done by a person and it is the reason this is not instant.",
+    "Once approved you will get access at this same email address: no account, no password. You request a code, it arrives in your inbox, and you are in.",
+    "A reminder of what you would be doing, because it is what makes this defensible: you PRIORITISE. You say who should be visited first and what to advise in the meantime. You do not declare a house habitable — that cannot be done from photos, and the declaration with legal effects belongs to the municipal authority.",
+    "Nothing about this is charged, in either direction."
+  ] : [
+    "Alguien de Give&Grow va a verificar tu matrícula en el registro público del COPNIA antes de abrirte el acceso. Esa comprobación la hace una persona y es la razón de que esto no sea inmediato.",
+    "Cuando quede aprobada, entras con este mismo correo: sin cuenta y sin contraseña. Pides un código, te llega al buzón y entras.",
+    "Un recordatorio de lo que harías, porque es lo que hace defendible el proyecto: tú PRIORIZAS. Dices a quién hay que visitar primero y qué recomendarle mientras tanto. No declaras habitable una casa — eso no se determina por fotos, y la declaratoria con efectos es de la autoridad municipal.",
+    "Nada de esto se cobra, en ninguna dirección."
+  ];
+  const mapa = en ? ESP_ING_EN : ESP_ING_ES;
+  const filas = en
+    ? [["Licence you declared", i.matricula], ["Field", mapa[i.especialidad] || i.especialidad]]
+    : [["Matrícula que declaraste", i.matricula], ["Especialidad", mapa[i.especialidad] || i.especialidad]];
+
+  return enviarCorreo(env, {
+    para: i.email,
+    asunto: en ? "Your application to the structural triage" : "Tu postulación al triaje estructural",
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, x]) => k + ": " + x).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas }),
+    etiqueta: "postulacion-ingeniero"
+  });
+}
+
+/* Aviso interno: lo que hace falta para ir a verificar la matrícula y decidir,
+   sin tener que abrir el panel para saber si vale la pena abrirlo. */
+async function correoAvisoIngeniero(env, i) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const filas = [
+    ["Nombre", i.nombre],
+    ["Correo", i.email],
+    ["Teléfono", i.telefono || "(no dejó)"],
+    ["Ciudad", i.ciudad],
+    ["Matrícula", i.matricula + " — SIN VERIFICAR"],
+    ["Especialidad", (ESP_ING_ES[i.especialidad] || i.especialidad) +
+      (i.especialidad_otra ? " · " + i.especialidad_otra : "")],
+    ["Experiencia", i.experiencia || "(no dijo)"],
+    ["Disponibilidad", i.disponibilidad || "(no dijo)"]
+  ];
+  return enviarCorreo(env, {
+    para,
+    asunto: "Ingeniero se postula al triaje: " + i.nombre,
+    texto: filas.map(([k, x]) => k + ": " + x).join("\n") + (i.mensaje ? "\n\nMensaje:\n" + i.mensaje : ""),
+    html: plantillaCorreo({
+      titulo: "Ingeniero se postula al triaje: " + i.nombre,
+      parrafos: [
+        "Antes de aprobarlo hay que buscar esa matrícula en el registro público del COPNIA. Es el único filtro que tiene el proyecto.",
+        i.mensaje ? "Lo que escribió: «" + i.mensaje + "»" : "Sin mensaje."
+      ],
+      filas,
+      cierre: "Aceptarlo en el panel no le abre el triaje: el acceso se da añadiendo su correo en Cloudflare Access."
+    }),
+    etiqueta: "aviso-ingeniero"
   });
 }
 
@@ -2397,8 +2553,18 @@ async function adminCasos(env) {
     "c.danio_previo, c.habitada, c.heridos, c.consent_publico, c.creado_en, " +
     "(SELECT COUNT(*) FROM caso_medios m WHERE m.caso = c.numero) AS medios, " +
     "(SELECT e.ing_nombre FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS ing, " +
-    "(SELECT e.recomendacion FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS reco " +
+    "(SELECT e.recomendacion FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS reco, " +
+    /* El último movimiento sale del registro de auditoría, que es donde
+       `adminMoverCaso` deja el motivo del cierre o del descarte. Sin esto, un
+       caso cerrado se ve igual que uno abandonado. El prefijo tiene que
+       coincidir con el que allí se escribe. */
+    "(SELECT a.detalle FROM consentimientos a WHERE a.tipo = 'auditoria' " +
+    " AND a.detalle LIKE 'caso ' || c.numero || ' %' ORDER BY a.id DESC LIMIT 1) AS ultimo " +
     "FROM casos c ORDER BY " +
+    /* Lo terminado se hunde al fondo. Antes no hacía falta porque nada
+       terminaba nunca; ahora sí, y una bandeja que mezcla lo cerrado con lo
+       urgente deja de servir para lo único que sirve: saber qué falta. */
+    "CASE WHEN c.estado IN ('cerrado','descartado') THEN 1 ELSE 0 END, " +
     /* Urgentes primero, y dentro de cada grupo el más viejo antes: en una
        emergencia el orden es la gravedad y luego la espera, nunca la novedad. */
     "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
@@ -2406,6 +2572,80 @@ async function adminCasos(env) {
   ).all();
   return json({ casos: r.results || [] });
 }
+
+/* ========================================================================
+   POST /api/admin/caso/<n>/estado — mover un caso, y poder cerrarlo
+   ========================================================================
+   `visitado`, `cerrado` y `descartado` estaban en el esquema desde la 0010 y
+   NADA los escribía: un caso entraba a la bandeja y no salía nunca. Con la
+   brigada visitando cinco territorios, «Casas por revisar» iba a crecer sin que
+   nada saliera de ella, hasta volverse ilegible justo cuando más se necesita.
+
+   POR QUÉ ESTO NO ES UNA MIGRACIÓN. El motivo del cierre no se guarda en
+   `casos` sino en el registro de auditoría que ya usan las inscripciones y las
+   entregas. No hace falta columna nueva —y por lo tanto no hay que aplicar una
+   migración a mano en producción antes de desplegar, que es donde este proyecto
+   ya se tropezó (7403 en `d1 migrations apply`)—, y a cambio queda algo mejor
+   que una columna: el rastro completo, con quién y cuándo, y no solo el último.
+
+   EL MOTIVO ES OBLIGATORIO para cerrar y para descartar. Un caso que desaparece
+   de la lista sin decir por qué es indistinguible de un caso perdido, y aquí
+   del otro lado hay una familia que mandó fotos de su casa rota. Marcar
+   `visitado` no lo pide: ahí lo que pasó es evidente.
+
+   REABRIR ES PARTE DEL DISEÑO, no una concesión. El descarte es un juicio
+   humano hecho a las carreras en medio de una emergencia; si no se puede
+   deshacer, el error se vuelve permanente. Vuelve a `en_revision`, nunca a
+   `recibido`: ya lo miró alguien, y decir lo contrario sería falso. */
+
+const CASO_ACTIVOS = ["recibido", "en_revision", "clasificado", "visitado"];
+const CASO_DESTINOS = {
+  /* destino: desde qué estados se puede, y si exige motivo */
+  visitado:    { desde: ["recibido", "en_revision", "clasificado"], motivo: false },
+  cerrado:     { desde: CASO_ACTIVOS, motivo: true },
+  descartado:  { desde: CASO_ACTIVOS, motivo: true },
+  en_revision: { desde: ["cerrado", "descartado"], motivo: false }
+};
+
+async function adminMoverCaso(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const nuevo = String(c.estado || "");
+  const regla = CASO_DESTINOS[nuevo];
+  if (!regla) return json({ error: "estado_no_permitido", permitidos: Object.keys(CASO_DESTINOS) }, 400);
+
+  const caso = await env.DB.prepare("SELECT numero, estado FROM casos WHERE numero = ?").bind(numero).first();
+  if (!caso) return json({ error: "no_encontrado" }, 404);
+  if (caso.estado === nuevo) return json({ error: "sin_cambio", estado: caso.estado }, 409);
+  /* La transición se valida en el servidor y no solo en los botones del panel:
+     los botones son una comodidad, no un control. */
+  if (!regla.desde.includes(caso.estado)) {
+    return json({ error: "transicion_invalida", desde: caso.estado, a: nuevo, permitidas: regla.desde }, 409);
+  }
+
+  const motivo = String(c.motivo == null ? "" : c.motivo).trim().slice(0, 500);
+  if (regla.motivo && !motivo) {
+    return json({ error: "motivo_requerido",
+                  ayuda: "Di qué pasó con el caso. Sin eso, mañana nadie sabe si se atendió o se perdió." }, 422);
+  }
+
+  await env.DB.prepare(
+    "UPDATE casos SET estado = ?, actualizado_en = datetime('now') WHERE numero = ?"
+  ).bind(nuevo, numero).run();
+
+  /* El prefijo «caso <numero>» no es cosmético: es por lo que la bandeja
+     recupera el último movimiento sin una tabla más. Si cambia aquí, cambia en
+     la subconsulta de `adminCasos`. */
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "caso " + numero + " " + caso.estado + " -> " + nuevo +
+         (motivo ? " · " + motivo : "")).run();
+
+  return json({ ok: true, numero, estado: nuevo, anterior: caso.estado });
+}
+
 
 /* GET /api/admin/comprobante/<guia> — solo tras Access. El comprobante lleva
    datos bancarios del donante y nunca es público. */
@@ -3263,7 +3503,7 @@ async function adminOfrecimientos(env) {
 async function adminInscripciones(env) {
   const r = await env.DB.prepare(
     "SELECT id, tipo, estado, nombre, email, telefono, ciudad, datos, creada_en " +
-    "FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa') " +
+    "FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero') " +
     "ORDER BY creada_en DESC LIMIT 200"
   ).all();
   return json({ inscripciones: r.results || [] });
@@ -3665,9 +3905,14 @@ número del comprobante porque <strong>es el que cita el certificado</strong>.</
 
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Quién quiere entrar</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Voluntarios, fundaciones que
-aplican al HUB y empresas que piden alianza. <strong>Ninguna de estas tres cosas es un alta:</strong>
-la fundación entra con el convenio de cooperación después de la visita de contexto, y la empresa con
-la firma del Convenio Marco. Aceptar aquí significa «seguimos», no «ya está publicado».</p>
+aplican al HUB, empresas que piden alianza e ingenieros que se postulan al triaje. <strong>Ninguna de
+estas cuatro cosas es un alta:</strong> la fundación entra con el convenio de cooperación después de
+la visita de contexto, y la empresa con la firma del Convenio Marco. Aceptar aquí significa
+«seguimos», no «ya está publicado».</p>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px"><strong>Con un ingeniero hay
+un paso más, y este panel no lo hace:</strong> primero se busca su matrícula en el registro público
+del COPNIA, y solo después se le abre el triaje añadiendo su correo en Cloudflare Access. Aceptarlo
+aquí no le da acceso a nada. Su matrícula es un dato que él declaró, no uno comprobado.</p>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Tipo</th><th scope="col">Quién</th><th scope="col">Lo que hay que saber</th>
@@ -3679,12 +3924,18 @@ la firma del Convenio Marco. Aceptar aquí significa «seguimos», no «ya está
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Triaje estructural. Los
 ingenieros clasifican sin ver de quién es la casa ni dónde queda; <strong>aquí sí están el contacto
 y la dirección</strong>, que es lo que permite ir a visitar. Ordenadas por urgencia y, dentro de
-cada grupo, por antigüedad.</p>
+cada grupo, por antigüedad; lo cerrado se hunde al fondo.</p>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Cerrar y descartar
+<strong>piden motivo, y no es un trámite</strong>: un caso que se va de la lista sin decir por qué
+es indistinguible de uno perdido, y del otro lado hay una familia que mandó fotos de su casa. Queda
+en el registro con tu correo y la fecha. <strong>Descartar no borra nada</strong> —es para
+duplicados y pruebas— y todo se puede reabrir.</p>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Caso</th><th scope="col">Prioridad</th><th scope="col">Dónde</th>
 <th scope="col">Contacto</th><th scope="col">La casa</th><th scope="col">Estado</th>
-</tr></thead><tbody id="cs-filas"><tr><td colspan="6">Cargando…</td></tr></tbody>
+<th scope="col">Acción</th>
+</tr></thead><tbody id="cs-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
 </table></div>
 
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
@@ -4154,13 +4405,15 @@ function cargarSalud(){
 }
 
 /* ---------------- quién quiere entrar ---------------- */
-var TIPO_ES = { voluntario:"Voluntario", fundacion:"Fundación", empresa:"Empresa" };
+var TIPO_ES = { voluntario:"Voluntario", fundacion:"Fundación", empresa:"Empresa", ingeniero:"Ingeniero" };
 var POB_ES = { ninos:"niños", adolescentes:"adolescentes", jovenes:"jóvenes",
   madres:"madres cabeza de familia", mayores:"adultos mayores", familias:"familias",
   migrante:"migrantes", discapacidad:"personas con discapacidad", otra:"otra" };
 var MOD_ES = { modDonacion:"Donación", modRse:"RSE", modGratitud:"Gratitud",
   modServicios:"Servicios", modVoluntariado:"Voluntariado", modDifusion:"Difusión" };
 var NIVEL_ES = { hub:"terreno con el HUB", estructura:"estructura", mixto:"mixto" };
+var ESP_ING = { estructural:"Ing. estructural", civil:"Ing. civil", geotecnia:"Geotecnia",
+  arquitectura:"Arquitectura", otra:"Otra especialidad" };
 
 /* Lo que se resume en la columna del medio es DISTINTO por tipo, y a propósito:
    de un voluntario lo primero es si pisa territorio (dispara dos protocolos); de
@@ -4173,6 +4426,19 @@ function resumenInscripcion(tipo, x){
     if (x.protocolo_imagen) p.push("<strong>protocolo de imagen</strong>");
     if (x.origen) p.push('<strong style="color:#A84D00">' + esc(x.origen) + "</strong>");
     return p.join(" · ");
+  }
+  if (tipo === "ingeniero"){
+    /* La matrícula va primero y en grande porque es lo ÚNICO que hay que ir a
+       verificar antes de aprobar. Y se dice que está sin verificar hasta que
+       alguien la busque en el COPNIA: un dato declarado no es un hecho. */
+    var g = ['<strong>Matrícula ' + esc(x.matricula || "?") + '</strong>'];
+    g.push(esc(ESP_ING[x.especialidad] || x.especialidad || "?")
+      + (x.especialidad_otra ? " · " + esc(x.especialidad_otra) : ""));
+    var men = [];
+    if (x.experiencia) men.push(esc(x.experiencia) + " de experiencia");
+    if (x.disponibilidad) men.push(esc(x.disponibilidad));
+    if (!x.matricula_verificada) men.push('<strong style="color:#A84D00">verificar en COPNIA</strong>');
+    return g.join("<br>") + (men.length ? "<br><small>" + men.join(" · ") + "</small>" : "");
   }
   if (tipo === "fundacion"){
     var menor = ["cuenta: " + esc(x.conteo || "no dice")];
@@ -4231,9 +4497,11 @@ function cargarCasos(){
   fetch("/api/admin/casos").then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("cs-filas"); if (!tb) return;
     var l = d.casos || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Todavía no hay casos.</td></tr>'; return; }
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no hay casos.</td></tr>'; return; }
     var ET = { urgente:"Visita urgente", programada:"Visita programada",
                no_requiere:"No requiere visita", inevaluable:"No se pudo evaluar" };
+    var EST = { recibido:"Recibido", en_revision:"En revisión", clasificado:"Clasificado",
+                visitado:"Visitado", cerrado:"Cerrado", descartado:"Descartado" };
     tb.innerHTML = l.map(function(c){
       var pr = c.clasificacion
         ? '<strong>' + esc(ET[c.clasificacion] || c.clasificacion) + '</strong>'
@@ -4243,15 +4511,30 @@ function cargarCasos(){
         + (c.danio_previo ? '<br><small>tenía grietas antes</small>' : '')
         + (c.heridos ? '<br><small>hubo heridos</small>' : '')
         + (c.habitada ? '' : '<br><small>desocupada</small>');
-      return "<tr>" +
+      /* El motivo del cierre vive en el registro de auditoría; aquí se muestra
+         sin el prefijo técnico, que ya lo dice la columna de estado. */
+      var mov = "";
+      if (c.ultimo){
+        var i = String(c.ultimo).indexOf(" · ");
+        if (i > -1) mov = '<br><small>' + esc(String(c.ultimo).slice(i + 3, i + 83)) + '</small>';
+      }
+      var fin = c.estado === "cerrado" || c.estado === "descartado";
+      var acc = fin
+        ? '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="en_revision">Reabrir</button>'
+        : (c.estado === "visitado" ? "" :
+            '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="visitado">Visitada</button> ') +
+          '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="cerrado">Cerrar…</button> ' +
+          '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="descartado">Descartar…</button>';
+      return "<tr" + (fin ? ' style="opacity:.55"' : "") + ">" +
         "<td><strong>" + esc(c.numero) + "</strong><br><small>" + esc((c.creado_en||"").slice(0,10)) + "</small></td>" +
         "<td>" + pr + "</td>" +
         "<td>" + esc(c.sector) + (c.direccion_ref ? "<br><small>" + esc(c.direccion_ref) + "</small>" : "") + "</td>" +
         "<td>" + esc(c.contacto_nombre) + "<br><small>" + esc(c.contacto_tel) +
           (c.contacto_email ? " · " + esc(c.contacto_email) : "") + "</small></td>" +
         "<td>" + casa + "</td>" +
-        "<td>" + esc(c.estado) + (c.consent_publico ? '<br><small>autoriza publicar</small>' : "") +
-          (c.reco ? '<br><small>' + esc(c.reco.slice(0,60)) + '</small>' : "") + "</td>" +
+        "<td>" + esc(EST[c.estado] || c.estado) + (c.consent_publico ? '<br><small>autoriza publicar</small>' : "") +
+          (c.reco ? '<br><small>' + esc(c.reco.slice(0,60)) + '</small>' : "") + mov + "</td>" +
+        "<td>" + acc + "</td>" +
         "</tr>";
     }).join("");
   });
@@ -4281,6 +4564,31 @@ function cargarOfrecimientos(){
 }
 
 document.addEventListener("click", function(e){
+  /* Mover un caso de vivienda. Cerrar y descartar PIDEN motivo: un caso que se
+     va de la lista sin decir por qué es indistinguible de uno perdido, y del
+     otro lado hay una familia que mandó fotos de su casa. El servidor lo exige
+     igual — esto solo evita el viaje. */
+  var cs = e.target.closest("[data-caso]");
+  if (cs){
+    var num = cs.getAttribute("data-caso");
+    var dest = cs.getAttribute("data-ce");
+    var motivo = "";
+    if (dest === "cerrado" || dest === "descartado"){
+      /* \\n y no \n: esto vive dentro del template literal de adminJS(). */
+      motivo = window.prompt((dest === "cerrado" ? "Cerrar " : "Descartar ") + num +
+        ".\\n\\n¿Qué pasó con el caso? Queda en el registro y es lo que va a leer quien pregunte mañana:");
+      if (!motivo) return;
+    }
+    cs.disabled = true; cs.textContent = "…";
+    fetch("/api/admin/caso/" + encodeURIComponent(num) + "/estado", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ estado: dest, motivo: motivo })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.error) window.alert("No se movió: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
+      cargarCasos();
+    }).catch(function(){ cargarCasos(); });
+    return;
+  }
   var b = e.target.closest("[data-ins]");
   if (!b) return;
   b.disabled = true; b.textContent = "…";
@@ -4659,6 +4967,10 @@ export default {
         if (ruta === "/api/admin/resumen")  return await adminResumen(env);
         if (ruta === "/api/admin/salud")    return await adminSalud(env);
         if (ruta === "/api/admin/casos")    return await adminCasos(env);
+        /* El número va en la ruta con su forma exacta, igual que el aporte:
+           cualquier otra cosa ni siquiera entra a la función. */
+        const mc = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/estado$/i);
+        if (mc) return await adminMoverCaso(request, env, mc[1].toUpperCase(), sesion.email);
         if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
         const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
         if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
