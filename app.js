@@ -401,10 +401,11 @@ var I18N = {
     "cv.enviar":"Enviar mi caso",
     "cv.enviando":"Enviando…",
     "cv.ok.t":"Listo. Este es tu número de caso",
+    "cv.ok.enlace":"Este es el enlace de tu caso. Guárdalo o mándatelo por WhatsApp: cuando un ingeniero lo revise, aquí aparecerá tu informe.",
     "cv.ok.p":"Guárdalo. Con él puedes consultar tu caso cuando quieras.",
     "cv.ok.espera":"Un ingeniero voluntario lo va a revisar. Te escribimos por WhatsApp cuando tengamos su respuesta.",
-    "cv.ok.copiar":"Copiar mi número",
-    "cv.ok.copiado":"Copiado",
+    "cv.ok.copiar":"Copiar mi enlace",
+    "cv.ok.copiado":"Enlace copiado",
     "cv.err.envio":"No pudimos registrar tu caso. Revisa los datos e intenta otra vez.",
     "cv.err.campos":"Faltan datos: tu nombre, tu WhatsApp y el barrio.",
     "cv.err.consent":"Necesitamos tu autorización para que un ingeniero revise el caso.",
@@ -1565,7 +1566,7 @@ function focusActivePage(){ var p=document.querySelector(".page.active"); if(p){
    contra el token que devuelve el servidor. Por eso el paso 3 solo acumula
    archivos en memoria hasta que hay caso: subir antes obligaría a crear el
    registro sin consentimiento, que es justo lo que no puede pasar. */
-var CV = { caso:null, token:null, cola:[] };
+var CV = { caso:null, token:null, enlace:null, cola:[] };
 var CV_CATS = ["conjunto", "estructura", "dano", "entorno"];
 
 function cvPaso(n){
@@ -1651,6 +1652,13 @@ function cvEnviar(){
     CV.caso = d.numero; CV.token = d.token;
     var num = document.getElementById("cv-num");
     if (num) num.textContent = d.numero;
+    /* EL ENLACE, no solo el número. El token es lo que permite consultar el
+       caso y abrir el informe, y sin él la familia se queda sin poder ver su
+       propio documento — lo descubrió la primera prueba real. */
+    CV.enlace = location.origin + "/api/caso/" + encodeURIComponent(d.numero) +
+                "/informe.pdf?t=" + encodeURIComponent(d.token);
+    var lnk = document.getElementById("cv-enlace");
+    if (lnk) { lnk.textContent = CV.enlace; lnk.href = CV.enlace; }
     cvPaso(5);
     cvSubirCola();
   }).catch(function(){
@@ -1675,10 +1683,10 @@ function cvSubirCola(){
 }
 
 function cvCopiar(){
-  if (!CV.caso) return;
+  if (!CV.enlace) return;
   var btn = document.querySelector('[data-act="cvCopiar()"]');
   try {
-    navigator.clipboard.writeText(CV.caso);
+    navigator.clipboard.writeText(CV.enlace);
     if (btn) btn.textContent = t("cv.ok.copiado");
   } catch (e) { /* sin portapapeles: el número está a la vista */ }
 }
