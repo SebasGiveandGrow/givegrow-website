@@ -1,6 +1,7 @@
 # SESSION HANDOFF — Give&Grow International
 
 > Última actualización: sesión "Triaje estructural de viviendas" (17 ago 2026)
+> **⏭️ ARRANCA POR: «LO SIGUIENTE EN LA PLATAFORMA DE VIVIENDAS», más abajo.**
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -264,6 +265,51 @@ persona.
 está bien. `eventos_wompi` seguirá en 0 hasta que llegue un webhook de verdad, y
 es exactamente lo que hay que seguir viendo.
 
+## ⏭️ LO SIGUIENTE EN LA PLATAFORMA DE VIVIENDAS (acordado con Sebas, 17 ago)
+
+La plataforma está **en producción y verificada de punta a punta** (ver su cierre
+de tanda). Estos son sus huecos, en el orden que Sebas aprobó:
+
+### 1. Nadie puede postularse como ingeniero ← EMPEZAR AQUÍ
+Hoy la única forma de sumar un ingeniero es que Sebas le pida el correo y lo
+pegue en Cloudflare Access. **No existe el formulario de postulación** ni la
+ficha donde declare matrícula, especialidad y ciudad.
+
+**No necesita migración:** `inscripciones` acepta un `tipo` nuevo —`'ingeniero'`—
+con sus datos en el JSON de `datos`, y su bandeja «Quién quiere entrar» ya existe
+en `/admin`. Aprobar sigue siendo manual A PROPÓSITO: hay que verificar que la
+matrícula sea real, y eso no se automatiza.
+
+⚠️ Sebas confirmó que **el correo puede ser de cualquiera** —universidad, empresa
+o particular—, así que NO hay regla por dominio en Access.
+
+### 2. Nadie puede cerrar un caso ← Y DESPUÉS ESTO
+Los estados `visitado` y `cerrado` están en el esquema desde la 0010 y **nada los
+escribe**. Con la brigada visitando cinco territorios del 24 al 28, la bandeja
+«Casas por revisar» va a crecer sin que nada salga de ella.
+
+Falta también `descartado`, para casos duplicados o de prueba.
+
+### Los tres huecos que quedan para después
+3. **El caso no se puede completar.** Si un ingeniero marca `inevaluable` y pide
+   más fotos, la familia NO tiene forma de agregarlas: el formulario solo crea
+   casos nuevos. Con el token ya podría reabrir el suyo — falta la pantalla. Es
+   la contraparte de `inevaluable`: el sistema sabe pedir lo que falta pero no
+   sabe recibirlo. **Conviene hacerlo DESPUÉS de que los ingenieros respondan la
+   guía**, porque su lista de fotos puede cambiar qué se acepta.
+4. **Un caso no se puede corregir.**
+5. **Las fotos no se pueden borrar.** Si una familia sube por error una foto con
+   personas dentro —justo lo que el sistema promete no publicar— no hay manera de
+   quitarla.
+
+### Lo que NO se debe volver a proponer
+- **Regla de Access por dominio de correo**: descartada, los ingenieros pueden
+  ser particulares.
+- **Drive para la carga de vídeos**: descartado. R2 cuesta ~USD 0,21/mes con 500
+  casos y Drive obligaría a reabrir la CSP a `googleapis.com`, que se cerró en el
+  PR #96. Drive SÍ sirve para archivar casos cerrados.
+- **Prometer el WhatsApp** mientras no exista el número (PR #115).
+
 ## Cierre de tanda: TRIAJE ESTRUCTURAL DE VIVIENDAS (16–17 ago 2026)
 
 Proyecto nuevo, nacido de una idea de Sebas: los ingenieros que van a la
@@ -299,6 +345,7 @@ escrito en el esquema, no solo en los textos: la columna se llama
 | `/triaje` | pantalla del ingeniero, tras Access |
 | `/api/triage/*` | cola, ficha, medios y evaluación |
 | informe PDF | `/api/caso/<n>/informe.pdf?t=<token>` |
+| aviso por correo | al clasificar, SOLO si la familia dejó correo (PR #118) |
 | `/admin` | bandeja «Casas por revisar», la octava |
 
 **VERIFICADO DE PUNTA A PUNTA EN PRODUCCIÓN** con `CV-2026-000001`: caso creado
