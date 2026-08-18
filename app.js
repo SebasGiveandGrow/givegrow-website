@@ -409,6 +409,69 @@ var I18N = {
     "cv.err.envio":"No pudimos registrar tu caso. Revisa los datos e intenta otra vez.",
     "cv.err.campos":"Faltan datos: tu nombre, tu WhatsApp y el barrio.",
     "cv.err.consent":"Necesitamos tu autorización para que un ingeniero revise el caso.",
+    "cv.ing.link":"¿Eres ingeniero o arquitecto y quieres revisar casos?",
+    "ing.ey":"Ingenieros voluntarios",
+    "ing.t":"Hay más casas dañadas que ingenieros para visitarlas.",
+    "ing.lead":"Después del sismo del 10 de agosto llegan más solicitudes de las que un equipo alcanza a atender en terreno. Lo que pedimos no es que dictamines a distancia: es que mires unas fotos y digas a quién hay que visitar primero.",
+    "ing.q.ey":"El alcance",
+    "ing.q.t":"Priorizar, no dictaminar",
+    "ing.q.p":"Esta distinción no es una advertencia legal al pie: gobierna el proyecto entero, hasta el nombre de las columnas de la base. Si no la compartes, este no es el lugar — y preferimos decírtelo antes.",
+    "ing.q1.t":"Lo que haces",
+    "ing.q1.p":"Ordenas la fila. Cada caso queda en visita urgente, visita programada, no requiere visita por ahora, o no se puede evaluar con este material. Y escribes qué le conviene hacer a la familia mientras tanto.",
+    "ing.q2.t":"Lo que no haces",
+    "ing.q2.p":"No declaras habitable ni inhabitable una vivienda. La declaratoria con efectos —evacuar, demoler— es de la autoridad municipal, por la Ley 1523 de 2012. Nadie te va a pedir que firmes eso aquí.",
+    "ing.q3.t":"Por qué las fotos no alcanzan",
+    "ing.q3.p":"No ves la cimentación, no ves el suelo y no sabes si ese muro carga. Por eso «no puedo evaluar con esto» es una respuesta de primera clase, y no un fracaso: al marcarla, el sistema te obliga a decir qué falta y se lo pide a la familia.",
+    "ing.c.ey":"Cómo funciona",
+    "ing.c.t":"De la postulación al primer caso",
+    "ing.p1.t":"Te postulas",
+    "ing.p1.p":"Con tu nombre, tu matrícula profesional y tu ciudad. Dos minutos.",
+    "ing.p2.t":"Verificamos tu matrícula",
+    "ing.p2.p":"La buscamos en el registro público del COPNIA. Lo hace una persona, así que no es inmediato: es el único filtro que tiene el proyecto y no lo queremos automático.",
+    "ing.p3.t":"Te abrimos el acceso",
+    "ing.p3.p":"Con tu correo, el que quieras — de la universidad, de la empresa o particular. Sin cuenta y sin contraseña: pides un código, te llega al buzón y entras.",
+    "ing.p4.t":"Entras a la cola",
+    "ing.p4.p":"Abres un caso, ves sus fotos y lo clasificas. No ves el nombre, ni el teléfono, ni la dirección de la familia: para priorizar por urgencia no hacen falta, y quien las necesita para ir a visitar es el equipo de terreno.",
+    "ing.f.t":"Lo que va con tu nombre",
+    "ing.f.p":"La familia recibe un informe en PDF con tu nombre, tu matrícula y lo que escribiste. Por eso puedes revisar los casos que quieras y ninguno que no quieras, y por eso siempre está abierta la salida de pedir más material. Nada de esto se cobra, en ninguna dirección.",
+    "ing.form.ey":"Postularte",
+    "ing.form.t":"Cuéntanos quién eres",
+    "ing.form.lead":"No hay mínimo de casos ni horario. Lo que sí hay es una verificación antes de empezar.",
+    "ing.nombre":"Nombre completo",
+    "ing.email":"Correo",
+    "ing.email.h":"Con este mismo correo entrarías a la plataforma. Puede ser de universidad, de empresa o particular.",
+    "ing.tel":"Teléfono o WhatsApp (opcional)",
+    "ing.ciudad":"Ciudad",
+    "ing.matricula":"Matrícula profesional",
+    "ing.matricula.h":"La que aparece en tu tarjeta del COPNIA. Es lo que vamos a verificar en su registro público.",
+    "ing.esp":"Tu especialidad",
+    "ing.esp.estructural":"Ingeniería estructural",
+    "ing.esp.civil":"Ingeniería civil",
+    "ing.esp.geotecnia":"Geotecnia",
+    "ing.esp.arquitectura":"Arquitectura",
+    "ing.esp.otra":"Otra",
+    "ing.esp.cual":"¿Cuál?",
+    "ing.exp":"Años de ejercicio (opcional)",
+    "ing.exp.ph":"Sirve una respuesta como «unos 12 años».",
+    "ing.disp":"Cuántos casos podrías mirar por semana (opcional)",
+    "ing.disp.ph":"Dos o tres, cinco, los que lleguen…",
+    "ing.msg":"¿Algo que quieras contarnos? (opcional)",
+    "ing.msg.ph":"Experiencia en evaluación post-sismo, en qué zona estás, qué dudas tienes.",
+    "ing.alcance":"Entiendo que esto es un triaje de priorización y no un dictamen de habitabilidad.",
+    "ing.alcance.h":"Es la condición del proyecto. La declaratoria con efectos le corresponde a la autoridad municipal, y nunca se te va a pedir que la firmes a distancia.",
+    "ing.datos":"Autorizo el tratamiento de mis datos para que Give&Grow verifique mi matrícula y me contacte sobre el triaje, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.",
+    "ing.submit":"Enviar mi postulación",
+    "ing.nada":"Nada de esto se cobra, en ninguna dirección.",
+    "ing.sending":"Enviando…",
+    "ing.ok":"Recibimos tu postulación. Te escribimos cuando verifiquemos tu matrícula.",
+    "ing.err.nombre":"Falta tu nombre.",
+    "ing.err.email":"Revisa tu correo: no parece una dirección válida.",
+    "ing.err.matricula":"Falta tu matrícula profesional. Es lo que vamos a verificar.",
+    "ing.err.esp":"Dinos cuál es tu especialidad.",
+    "ing.err.ciudad":"Falta tu ciudad.",
+    "ing.err.alcance":"Necesitamos que confirmes que esto es un triaje de priorización, no un dictamen.",
+    "ing.err.datos":"Sin tu autorización de datos no podemos guardar la postulación.",
+    "ing.err.send":"No pudimos enviar tu postulación. Revisa los datos e intenta otra vez.",
     "track.ey":"Trazabilidad real",
     "track.t":"Rastrea tu donación",
     "track.lead":"Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.",
@@ -1322,6 +1385,7 @@ var ROUTE_META = {
   membresias:{t:{es:"Membresías · Give&Grow International",en:"Memberships · Give&Grow International"},d:{es:"Hazte miembro de Give&Grow: dona de forma recurrente, crece de Semilla a Bosque y suma beneficios en cada nivel.",en:"Become a Give&Grow member: give monthly, grow from Seed to Forest and add benefits at each tier."}},
   voluntariado:{t:{es:"Voluntariado e Impact Journey · Give&Grow International",en:"Volunteering & Impact Journey · Give&Grow International"},d:{es:"Tres maneras de participar, el método MIRA en doble vía y cómo cuidamos a las comunidades. Voluntariado corporativo y pro-bono.",en:"Three ways to take part, the two-way MIRA method, and how we care for communities. Corporate and pro-bono volunteering."}},
   faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}},
+  ingenieros:{t:{es:"Ingenieros voluntarios · Give&Grow International",en:"Volunteer engineers · Give&Grow International"},d:{es:"Postúlate al triaje estructural: mira fotos de casas afectadas por el sismo y di a quién visitar primero. Es priorización, no un dictamen de habitabilidad.",en:"Apply to the structural triage: review photos of homes hit by the earthquake and say who should be visited first. It is prioritisation, not a habitability ruling."}},
   vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario dice qué tan urgente es una visita. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer says how urgent a visit is. It does not replace the official assessment."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
   /* Estas cuatro faltaban y caían al `|| ROUTE_META.inicio`, así que se
@@ -1702,6 +1766,7 @@ var ACT_FNS = {
   donarBrigada:donarBrigada, allySubmit:allySubmit,
   irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit,
   fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
+  ingSubmit:ingSubmit, ingEsp:ingEsp,
   irAVoluntariadoBrigada:irAVoluntariadoBrigada,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
@@ -3837,6 +3902,69 @@ function volSubmit(ev){
 function allyMsg(el, msg, ok){
   el.style.display = ""; el.textContent = msg;
   el.style.color = ok ? "var(--g)" : "var(--err,#c0392b)";
+  return false;
+}
+
+/* ---------- postulación de ingenieros al triaje ----------
+   Mismo patrón que el formulario de voluntariado, con una diferencia que
+   importa: la casilla de alcance es obligatoria y NO es la de Ley 1581. Quien
+   crea que va a dictaminar habitabilidad por fotos tiene que toparse con eso
+   antes de escribir su matrícula. El servidor la exige igual, porque una
+   validación que solo vive en el navegador no valida nada. */
+function ingEsp(){
+  var sel = document.getElementById("inf-esp");
+  var campo = document.getElementById("inf-otra-f");
+  if (sel && campo) campo.style.display = sel.value === "otra" ? "" : "none";
+}
+
+function ingSubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("inf-note");
+  var btn = document.getElementById("inf-btn");
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
+
+  /* Honeypot: éxito aparente, cero envío. No se le enseña al bot qué lo delató. */
+  if (val("inf-web2")){ document.getElementById("inf").reset(); ingEsp(); return allyMsg(note, t("ing.ok"), true); }
+
+  if (!val("inf-nombre")) return allyMsg(note, t("ing.err.nombre"), false);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("inf-email"))) return allyMsg(note, t("ing.err.email"), false);
+  if (!val("inf-ciudad")) return allyMsg(note, t("ing.err.ciudad"), false);
+  if (!val("inf-mat")) return allyMsg(note, t("ing.err.matricula"), false);
+  if (!val("inf-esp")) return allyMsg(note, t("ing.err.esp"), false);
+  if (!chk("inf-alcance")) return allyMsg(note, t("ing.err.alcance"), false);
+  if (!chk("inf-datos")) return allyMsg(note, t("ing.err.datos"), false);
+
+  btn.disabled = true;
+  allyMsg(note, t("ing.sending"), true);
+
+  fetch("/api/inscripcion", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tipo: "ingeniero",
+      nombre: val("inf-nombre"),
+      email: val("inf-email"),
+      telefono: val("inf-tel"),
+      ciudad: val("inf-ciudad"),
+      matricula: val("inf-mat"),
+      especialidad: val("inf-esp"),
+      especialidad_otra: val("inf-otra"),
+      experiencia: val("inf-exp"),
+      disponibilidad: val("inf-disp"),
+      mensaje: val("inf-msg"),
+      acepta_triaje: true,
+      autoriza_datos: true,
+      web2: val("inf-web2"),
+      idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
+    })
+  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+    .then(function(){
+      document.getElementById("inf").reset(); ingEsp();
+      btn.disabled = false;
+      allyMsg(note, t("ing.ok"), true);
+    })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("ing.err.send"), false); });
   return false;
 }
 

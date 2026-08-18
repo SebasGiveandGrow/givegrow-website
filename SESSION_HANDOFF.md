@@ -1,7 +1,9 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Triaje estructural de viviendas" (17 ago 2026)
-> **⏭️ ARRANCA POR: «LO SIGUIENTE EN LA PLATAFORMA DE VIVIENDAS», más abajo.**
+> Última actualización: sesión "Postulación de ingenieros y cierre de casos" (18 ago 2026)
+> **⏭️ ARRANCA POR: «LO SIGUIENTE EN LA PLATAFORMA DE VIVIENDAS», más abajo — sus
+> huecos 1 y 2 ya están cerrados; el siguiente es el 3, y espera la guía de los
+> ingenieros.**
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -270,27 +272,60 @@ es exactamente lo que hay que seguir viendo.
 La plataforma está **en producción y verificada de punta a punta** (ver su cierre
 de tanda). Estos son sus huecos, en el orden que Sebas aprobó:
 
-### 1. Nadie puede postularse como ingeniero ← EMPEZAR AQUÍ
-Hoy la única forma de sumar un ingeniero es que Sebas le pida el correo y lo
-pegue en Cloudflare Access. **No existe el formulario de postulación** ni la
-ficha donde declare matrícula, especialidad y ciudad.
+### ~~1. Nadie puede postularse como ingeniero~~ — HECHO (18 ago)
+Existe `#ingenieros`: página bilingüe con el alcance ANTES del formulario, y
+formulario que pide nombre, correo, ciudad, matrícula y especialidad. Entra por
+`/api/inscripcion` con `tipo: 'ingeniero'` a la tabla `inscripciones`, con lo
+suyo en el JSON de `datos` — **sin migración**, tal como lo dejó escrito la 0010.
+Sale en «Quién quiere entrar» con la matrícula en primera línea y el aviso de que
+está sin verificar.
 
-**No necesita migración:** `inscripciones` acepta un `tipo` nuevo —`'ingeniero'`—
-con sus datos en el JSON de `datos`, y su bandeja «Quién quiere entrar» ya existe
-en `/admin`. Aprobar sigue siendo manual A PROPÓSITO: hay que verificar que la
-matrícula sea real, y eso no se automatiza.
+**Dos casillas obligatorias, y no son la misma.** La de Ley 1581 es la de
+siempre; la otra es `acepta_triaje` —«entiendo que esto es un triaje de
+priorización y no un dictamen de habitabilidad»— y el servidor la exige igual que
+la de datos. Quien crea que va a dictaminar por fotos tiene que enterarse antes
+de escribir su matrícula, no después.
 
-⚠️ Sebas confirmó que **el correo puede ser de cualquiera** —universidad, empresa
-o particular—, así que NO hay regla por dominio en Access.
+**LO QUE HAY QUE RECORDAR AL APROBAR, porque el panel no lo hace:** aceptar a un
+ingeniero en la bandeja **no le abre nada**. Primero se busca su matrícula en el
+registro público del COPNIA, y el acceso se da añadiendo su correo en Cloudflare
+Access. El correo que le sale se lo dice a él también, para que no espere una
+respuesta instantánea. Sin regla por dominio: puede ser de universidad, de
+empresa o particular.
 
-### 2. Nadie puede cerrar un caso ← Y DESPUÉS ESTO
-Los estados `visitado` y `cerrado` están en el esquema desde la 0010 y **nada los
-escribe**. Con la brigada visitando cinco territorios del 24 al 28, la bandeja
-«Casas por revisar» va a crecer sin que nada salga de ella.
+⚠️ **`#ingenieros` y `#vivienda` no están en el menú.** No hay un solo enlace
+hacia ellas en la navegación: se llega por enlace directo. Lo único que las une
+es un enlace discreto al pie de `#vivienda`. Es una decisión que está pendiente
+de Sebas, no un olvido — pero si la plataforma va a recibir casos de la brigada,
+hay que resolver por dónde entra la gente.
 
-Falta también `descartado`, para casos duplicados o de prueba.
+### ~~2. Nadie puede cerrar un caso~~ — HECHO (18 ago)
+`POST /api/admin/caso/<n>/estado` y tres botones en «Casas por revisar»:
+**Visitada**, **Cerrar…** y **Descartar…**, más **Reabrir** en lo terminado.
 
-### Los tres huecos que quedan para después
+Las tres decisiones que lo gobiernan:
+
+1. **El motivo es obligatorio para cerrar y descartar** (422 sin él). Un caso que
+   se va de la lista sin decir por qué es indistinguible de uno perdido, y del
+   otro lado hay una familia que mandó fotos de su casa rota. `visitado` no lo
+   pide: ahí lo que pasó es evidente.
+2. **El motivo NO llevó columna nueva.** Va al registro de auditoría
+   (`consentimientos`, tipo `'auditoria'`, prefijo `caso <numero> `), que es el
+   mismo sitio donde ya quedan los movimientos de inscripciones y entregas. Así
+   **no hay migración que aplicar a mano antes de desplegar** —justo donde este
+   proyecto se tropezó con el 7403— y a cambio queda el rastro completo con quién
+   y cuándo, no solo el último valor. La bandeja lo recupera con una subconsulta
+   `LIKE`: **si cambia el prefijo en `adminMoverCaso`, hay que cambiarlo en
+   `adminCasos`.**
+3. **Todo se puede reabrir**, a `en_revision` y nunca a `recibido`: ya lo miró
+   alguien. El descarte es un juicio hecho a las carreras en una emergencia; si
+   no se pudiera deshacer, el error se volvería permanente.
+
+Las transiciones se validan en el servidor, no solo en los botones. Y lo cerrado
+se hunde al fondo de la bandeja: mezclar lo terminado con lo urgente es lo que la
+volvería inútil justo cuando más se necesita.
+
+### Los tres huecos que quedan, y ahora son los siguientes
 3. **El caso no se puede completar.** Si un ingeniero marca `inevaluable` y pide
    más fotos, la familia NO tiene forma de agregarlas: el formulario solo crea
    casos nuevos. Con el token ya podría reabrir el suyo — falta la pantalla. Es
