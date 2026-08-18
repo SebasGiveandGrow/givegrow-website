@@ -1368,5 +1368,10 @@
   "ing.err.ciudad": "Your city is missing.",
   "ing.err.alcance": "We need you to confirm that this is prioritisation triage, not a ruling.",
   "ing.err.datos": "Without your data authorisation we cannot save the application.",
-  "ing.err.send": "We could not send your application. Check the details and try again."
+  "ing.err.send": "We could not send your application. Check the details and try again.",
+  "nav.g.emergencia": "Emergency",
+  "nav.brigada": "Emergency brigade",
+  "nav.d.brigada": "The five territories, what is needed and how to help",
+  "nav.d.vivienda": "Upload photos of your home and find out how urgent a visit is",
+  "nav.d.ingenieros": "Apply to the triage: review photos and say who to visit first"
 }

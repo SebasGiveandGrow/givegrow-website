@@ -293,11 +293,15 @@ Access. El correo que le sale se lo dice a él también, para que no espere una
 respuesta instantánea. Sin regla por dominio: puede ser de universidad, de
 empresa o particular.
 
-⚠️ **`#ingenieros` y `#vivienda` no están en el menú.** No hay un solo enlace
-hacia ellas en la navegación: se llega por enlace directo. Lo único que las une
-es un enlace discreto al pie de `#vivienda`. Es una decisión que está pendiente
-de Sebas, no un olvido — pero si la plataforma va a recibir casos de la brigada,
-hay que resolver por dónde entra la gente.
+~~`#ingenieros` y `#vivienda` no están en el menú.~~ **RESUELTO el 18 ago, a
+petición de Sebas.** Hay un grupo nuevo **«Emergencia»**, el PRIMERO de la barra
+—se salta el orden institucional a propósito: mientras la emergencia esté
+abierta es lo más urgente que el sitio ofrece—, con las tres páginas: Brigada,
+Revisa tu casa e Ingenieros voluntarios. Sebas pidió dos; la brigada entró al
+mismo grupo porque hasta entonces solo se llegaba a ella por el aviso de la
+portada, y un menú «Emergencia» sin la brigada manda a buscarla a otra parte.
+Verificado a 1100 px (49 px de holgura a cada lado, sin desbordes) y en el cajón
+móvil, en ES y EN. Sigue el enlace discreto al pie de `#vivienda`.
 
 ### ~~2. Nadie puede cerrar un caso~~ — HECHO (18 ago)
 `POST /api/admin/caso/<n>/estado` y tres botones en «Casas por revisar»:
