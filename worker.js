@@ -2244,7 +2244,9 @@ async function triageEvaluar(request, env, numero, email) {
   let c = {};
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
 
-  const caso = await env.DB.prepare("SELECT numero, estado FROM casos WHERE numero = ?").bind(numero).first();
+  const caso = await env.DB.prepare(
+    "SELECT numero, estado, contacto_email, token, sector FROM casos WHERE numero = ?"
+  ).bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
 
   const clasificacion = String(c.clasificacion || "");
@@ -2284,7 +2286,63 @@ async function triageEvaluar(request, env, numero, email) {
     "UPDATE casos SET estado = ?, clasificacion = ?, actualizado_en = datetime('now') WHERE numero = ?"
   ).bind(nuevoEstado, clasificacion === "inevaluable" ? null : clasificacion, numero).run();
 
+  /* Aviso a la familia, SOLO si dejó correo — es opcional a propósito, así que
+     esto es un extra para quien lo tenga, nunca el canal principal. Y va
+     después de escribir: el correo no puede tumbar una evaluación ya guardada,
+     misma regla dura que en el cobro. */
+  if (caso.contacto_email) {
+    try {
+      await correoCasoClasificado(env, {
+        numero, token: caso.token, clasificacion, recomendacion: limpiar(c.recomendacion, 1000),
+        falta, email: caso.contacto_email
+      });
+    } catch (e) { console.error("correo caso clasificado", numero, e && e.message); }
+  }
+
   return json({ ok: true, numero, estado: nuevoEstado, clasificacion });
+}
+
+/* El aviso va en español y no bilingüe: esta plataforma atiende a familias en
+   Colombia y el caso no guarda idioma. Si algún día hace falta, se añade el
+   campo, no se adivina. */
+const TRIAJE_ET = {
+  urgente: "Visita urgente",
+  programada: "Visita programada",
+  no_requiere: "No requiere visita por ahora",
+  inevaluable: "No se pudo evaluar con las fotos enviadas"
+};
+
+async function correoCasoClasificado(env, x) {
+  const inev = x.clasificacion === "inevaluable";
+  const titulo = inev ? "Necesitamos un par de fotos más" : "Un ingeniero ya revisó tu caso";
+  const url = ORIGIN + "/api/caso/" + x.numero + "/informe.pdf?t=" + x.token;
+
+  const parrafos = inev ? [
+    "Un ingeniero voluntario miró tu caso, pero con las fotos que enviaste no puede formarse un criterio.",
+    "Esto es lo que hace falta: " + (x.falta || "más fotografías de los daños."),
+    "Recuerda: no entres a la casa si ves muros caídos, techos hundidos o columnas partidas. Ninguna foto vale un accidente."
+  ] : [
+    "Un ingeniero voluntario revisó las fotos de tu casa y ya hay una recomendación.",
+    x.recomendacion ? "Mientras se hace la visita: " + x.recomendacion : null,
+    "Esto NO dice si tu casa es habitable. Eso lo define una visita y la autoridad de tu municipio. Lo que dice es qué tan pronto conviene visitarla."
+  ].filter(Boolean);
+
+  const filas = [
+    ["Tu caso", x.numero],
+    ["Resultado", TRIAJE_ET[x.clasificacion] || x.clasificacion]
+  ];
+
+  return enviarCorreo(env, {
+    para: x.email,
+    asunto: titulo + " · " + x.numero,
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", "Tu informe: " + url].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, filas,
+      boton: { url, texto: "Ver mi informe" },
+      cierre: "Este mensaje es automático. Guarda el enlace: desde ahí puedes volver a abrir tu informe cuando quieras."
+    }),
+    etiqueta: "caso-clasificado", guia: x.numero
+  });
 }
 
 
