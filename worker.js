@@ -2111,9 +2111,30 @@ async function apiCasoEstado(env, numero, token) {
   ).bind(numero).first();
   if (!c || !token || c.token !== token) return json({ error: "no_autorizado" }, 403);
   const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
+
+  /* Lo que el ingeniero dijo, para que la familia lo lea en su página y no solo
+     en un correo que pudo no llegarle — el correo es opcional de verdad, así
+     que no puede ser el único sitio donde vive la respuesta.
+
+     `falta` es lo que convierte esta pantalla en útil: si un ingeniero marcó
+     `inevaluable`, aquí dice QUÉ foto se necesita, justo encima del botón para
+     subirla. Antes el sistema sabía pedir lo que faltaba y no sabía recibirlo. */
+  const e = await env.DB.prepare(
+    "SELECT clasificacion, recomendacion, falta, creado_en FROM evaluaciones " +
+    "WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
+  ).bind(numero).first();
+
   return json({
     numero: c.numero, estado: c.estado, clasificacion: c.clasificacion,
-    sector: c.sector, medios: (m && m.n) || 0, creado_en: c.creado_en
+    sector: c.sector, medios: (m && m.n) || 0, creado_en: c.creado_en,
+    /* `evaluado` y `clasificacion` no son lo mismo: un caso `inevaluable`
+       vuelve a `en_revision` con la clasificación en NULL, y aun así ya lo miró
+       alguien. Sin este campo, la pantalla no sabría distinguir «nadie lo ha
+       visto todavía» de «lo vieron y no les alcanzó». */
+    evaluado: !!e,
+    ultima: e ? { clasificacion: e.clasificacion, recomendacion: e.recomendacion,
+                  falta: e.falta, creado_en: e.creado_en } : null,
+    tope_medios: MAX_MEDIOS
   });
 }
 
@@ -2471,7 +2492,11 @@ const TRIAJE_ET = {
 async function correoCasoClasificado(env, x) {
   const inev = x.clasificacion === "inevaluable";
   const titulo = inev ? "Necesitamos un par de fotos más" : "Un ingeniero ya revisó tu caso";
-  const url = ORIGIN + "/api/caso/" + x.numero + "/informe.pdf?t=" + x.token;
+  /* A la PÁGINA del caso, no al PDF. Cuando el ingeniero pide más fotos, este
+     correo es el que se lo dice — y mandarlo a un PDF es mandarlo a un sitio
+     donde no puede responder. La página sirve para las dos cosas: leer el
+     resultado y agregar lo que falta. */
+  const url = ORIGIN + "/caso/" + x.numero + "?t=" + x.token;
 
   const parrafos = inev ? [
     "Un ingeniero voluntario miró tu caso, pero con las fotos que enviaste no puede formarse un criterio.",
@@ -2494,7 +2519,10 @@ async function correoCasoClasificado(env, x) {
     texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", "Tu informe: " + url].join("\n"),
     html: plantillaCorreo({
       titulo, parrafos, filas,
-      boton: { url, texto: "Ver mi informe" },
+      /* El botón dice lo que toca hacer, no siempre lo mismo. Si el ingeniero
+         pidió más fotos, «Ver mi informe» manda a leer un documento que no
+         existe todavía; lo que hay que hacer es subirlas. */
+      boton: { url, texto: inev ? "Agregar las fotos que faltan" : "Ver mi informe" },
       cierre: "Este mensaje es automático. Guarda el enlace: desde ahí puedes volver a abrir tu informe cuando quieras."
     }),
     etiqueta: "caso-clasificado", guia: x.numero
@@ -2644,6 +2672,181 @@ async function adminMoverCaso(request, env, numero, quien) {
          (motivo ? " · " + motivo : "")).run();
 
   return json({ ok: true, numero, estado: nuevo, anterior: caso.estado });
+}
+
+/* ========================================================================
+   GET /api/admin/caso/<n> — la ficha completa, para corregirla y curarla
+   ========================================================================
+   La bandeja es una tabla y sirve para decidir a dónde ir. Esto es lo otro:
+   abrir un caso, ver lo que la familia escribió y lo que subió, y poder
+   arreglarlo. Trae también el historial, que es el registro de auditoría
+   filtrado por este caso — quién lo movió, cuándo y por qué.
+   ======================================================================== */
+async function adminCasoFicha(env, numero) {
+  /* Las columnas van enumeradas y no `SELECT *` por una en concreto: `token`.
+     Es la llave de la familia, y que viaje al panel tiene que ser una decisión
+     y no un descuido de la consulta. Viaja A PROPÓSITO: hoy, si una familia
+     pierde su enlace, no hay forma de devolvérselo —el número de caso solo no
+     abre nada— y el equipo se queda sin poder ayudar a quien ya confió. El
+     panel está detrás de Access, y quien entra ahí ya ve el teléfono y la
+     dirección, que es información más delicada que esta. */
+  const c = await env.DB.prepare(
+    "SELECT numero, token, estado, clasificacion, sector, direccion_ref, contacto_nombre, " +
+    "contacto_tel, contacto_email, material, pisos, anio_aprox, danio_previo, habitada, " +
+    "heridos, filtra_agua, nota, consent_eval, consent_publico, consent_en, creado_en, " +
+    "actualizado_en FROM casos WHERE numero = ?"
+  ).bind(numero).first();
+  if (!c) return json({ error: "no_encontrado" }, 404);
+
+  const m = await env.DB.prepare(
+    "SELECT id, clase, categoria, bytes, nota, orden, subido_en FROM caso_medios " +
+    "WHERE caso = ? ORDER BY categoria, orden"
+  ).bind(numero).all();
+  const e = await env.DB.prepare(
+    "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
+    "FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC"
+  ).bind(numero).all();
+  const h = await env.DB.prepare(
+    "SELECT sujeto, detalle, otorgado_en FROM consentimientos " +
+    "WHERE tipo = 'auditoria' AND detalle LIKE 'caso ' || ? || ' %' ORDER BY id DESC LIMIT 30"
+  ).bind(numero).all();
+
+  return json({ caso: c, medios: m.results || [], evaluaciones: e.results || [], historial: h.results || [] });
+}
+
+/* ========================================================================
+   POST /api/admin/caso/<n>/corregir — arreglar lo que la familia escribió mal
+   ========================================================================
+   Un sector mal escrito, un teléfono con un dígito de menos o una dirección a
+   medias no son detalles: son la diferencia entre encontrar la casa y no
+   encontrarla. La familia llenó el formulario desde un celular, en una zona de
+   desastre, y a veces con la casa rota detrás. Que ese error fuera permanente
+   era el defecto.
+
+   DOS REGLAS QUE NO SE DEBEN AFLOJAR:
+
+   1. `consent_publico` SOLO SE PUEDE REVOCAR, nunca conceder. Que alguien del
+      equipo pueda marcar «la familia autoriza publicar» es fabricar un
+      consentimiento, y la Ley 1581 pide justo lo contrario. Si la familia
+      cambia de opinión hacia el sí, vuelve a decirlo ella. Hacia el no, basta
+      con que lo pida — por eso la 0010 lo dejó revocable.
+
+   2. La auditoría guarda QUÉ CAMPOS cambiaron, NO sus valores. Escribir el
+      teléfono viejo y el nuevo metería datos personales en una tabla que no es
+      la suya y que nadie limpia. Los nombres de los campos dan la misma
+      rendición de cuentas sin arrastrar la PII detrás. */
+
+const CASO_TEXTO = {
+  sector: 160, direccion_ref: 240, contacto_nombre: 200, contacto_tel: 40,
+  contacto_email: 200, anio_aprox: 40, nota: 600
+};
+const CASO_BOOL = ["danio_previo", "habitada", "heridos", "filtra_agua"];
+
+async function adminCorregirCaso(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const caso = await env.DB.prepare("SELECT * FROM casos WHERE numero = ?").bind(numero).first();
+  if (!caso) return json({ error: "no_encontrado" }, 404);
+
+  const sets = [], vals = [], cambiados = [];
+
+  for (const [campo, largo] of Object.entries(CASO_TEXTO)) {
+    if (!(campo in c)) continue;
+    const v = limpiar(c[campo], largo) || null;
+    if (v === (caso[campo] || null)) continue;
+    /* Estos tres son lo que identifica a la familia y lo que permite llegar:
+       vaciarlos deja un caso al que nadie puede volver. */
+    if (!v && (campo === "sector" || campo === "contacto_nombre" || campo === "contacto_tel")) {
+      return json({ error: "campo_requerido", campo }, 422);
+    }
+    sets.push(campo + " = ?"); vals.push(v); cambiados.push(campo);
+  }
+  if ("contacto_email" in c && c.contacto_email &&
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpiar(c.contacto_email, 200))) {
+    return json({ error: "email_invalido" }, 422);
+  }
+  if ("material" in c) {
+    const v = MATERIALES.includes(c.material) ? c.material : null;
+    if (v !== (caso.material || null)) { sets.push("material = ?"); vals.push(v); cambiados.push("material"); }
+  }
+  if ("pisos" in c) {
+    const n = Number(c.pisos);
+    const v = Number.isInteger(n) && n > 0 && n < 20 ? n : null;
+    if (v !== (caso.pisos == null ? null : caso.pisos)) { sets.push("pisos = ?"); vals.push(v); cambiados.push("pisos"); }
+  }
+  for (const campo of CASO_BOOL) {
+    if (!(campo in c)) continue;
+    const v = c[campo] ? 1 : 0;
+    if (v === caso[campo]) continue;
+    sets.push(campo + " = ?"); vals.push(v); cambiados.push(campo);
+  }
+  /* Solo hacia el no. Ver la regla 1 de arriba. */
+  if ("consent_publico" in c && !c.consent_publico && caso.consent_publico) {
+    sets.push("consent_publico = 0"); cambiados.push("consent_publico REVOCADO");
+  }
+
+  if (!sets.length) return json({ error: "sin_cambios" }, 409);
+
+  await env.DB.prepare(
+    "UPDATE casos SET " + sets.join(", ") + ", actualizado_en = datetime('now') WHERE numero = ?"
+  ).bind(...vals, numero).run();
+
+  const motivo = limpiar(c.motivo, 300);
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "caso " + numero + " corregido: " + cambiados.join(", ") +
+         (motivo ? " · " + motivo : "")).run();
+
+  return json({ ok: true, numero, cambiados });
+}
+
+/* ========================================================================
+   POST /api/admin/caso/<n>/medio/<id>/borrar — quitar una foto, de verdad
+   ========================================================================
+   EL SISTEMA LE PROMETE A LA FAMILIA QUE SU CASO NO SALE CON PERSONAS DENTRO, y
+   hasta hoy no tenía cómo cumplirlo: nada borraba de `caso_medios` y nada
+   tocaba el R2. Si alguien subía por error una foto con su hija dentro, ahí se
+   quedaba. Una promesa sin mecanismo no es una promesa.
+
+   SE BORRA DE VERDAD, no se marca como borrado. Un borrado blando que deja el
+   objeto en el bucket no cumple lo que se pidió: la familia no está pidiendo
+   que la foto se oculte, está pidiendo que no exista. Por eso va primero el R2
+   y después la fila — al revés, un fallo a mitad dejaría el archivo huérfano en
+   el bucket sin nada que lo apunte, que es el peor de los dos órdenes.
+
+   El motivo es obligatorio y queda en la auditoría; el contenido de la foto,
+   nunca. Y no se impide borrar la última: si tiene que irse, se va. El caso se
+   quedará sin material y un ingeniero dirá que no puede evaluarlo, que es
+   exactamente lo que debe pasar. */
+async function adminBorrarMedio(request, env, numero, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  let c = {};
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const motivo = limpiar(c.motivo, 300);
+  if (!motivo) {
+    return json({ error: "motivo_requerido",
+                  ayuda: "Di por qué se quita. Es lo que prueba que fue una decisión y no un accidente." }, 422);
+  }
+
+  /* Se exige que la foto sea DE ESE CASO. Sin el cruce, un id suelto borraría
+     la foto de cualquier otra familia. */
+  const m = await env.DB.prepare(
+    "SELECT id, r2_key FROM caso_medios WHERE id = ? AND caso = ?"
+  ).bind(id, numero).first();
+  if (!m) return json({ error: "no_encontrado" }, 404);
+
+  await env.MEDIA.delete(m.r2_key);
+  await env.DB.prepare("DELETE FROM caso_medios WHERE id = ?").bind(id).run();
+  await env.DB.prepare("UPDATE casos SET actualizado_en = datetime('now') WHERE numero = ?").bind(numero).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "caso " + numero + " foto #" + id + " BORRADA · " + motivo).run();
+
+  return json({ ok: true, numero, id });
 }
 
 
@@ -3937,6 +4140,7 @@ duplicados y pruebas— y todo se puede reabrir.</p>
 <th scope="col">Acción</th>
 </tr></thead><tbody id="cs-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
 </table></div>
+<div id="cs-dlg" style="display:none;margin-top:20px"></div>
 
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
@@ -4519,12 +4723,12 @@ function cargarCasos(){
         if (i > -1) mov = '<br><small>' + esc(String(c.ultimo).slice(i + 3, i + 83)) + '</small>';
       }
       var fin = c.estado === "cerrado" || c.estado === "descartado";
-      var acc = fin
+      var acc = '<button class="copy" data-abrir="' + esc(c.numero) + '">Abrir</button> ' + (fin
         ? '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="en_revision">Reabrir</button>'
         : (c.estado === "visitado" ? "" :
             '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="visitado">Visitada</button> ') +
           '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="cerrado">Cerrar…</button> ' +
-          '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="descartado">Descartar…</button>';
+          '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="descartado">Descartar…</button>');
       return "<tr" + (fin ? ' style="opacity:.55"' : "") + ">" +
         "<td><strong>" + esc(c.numero) + "</strong><br><small>" + esc((c.creado_en||"").slice(0,10)) + "</small></td>" +
         "<td>" + pr + "</td>" +
@@ -4539,6 +4743,155 @@ function cargarCasos(){
     }).join("");
   });
 }
+/* ---------------- ficha de un caso: corregirlo y curar sus fotos ----------------
+   No se llama cargarAlgo a propósito: no es una bandeja que se pida al
+   arrancar, sino una ficha que se abre sobre una fila. */
+var MAT_ES = { ladrillo:"Ladrillo o bloque", adobe:"Adobe o tapia", bahareque:"Bahareque",
+  prefabricado:"Prefabricado", madera:"Madera", no_se:"No sé" };
+var CAT_MED = { conjunto:"Conjunto", estructura:"Estructura", dano:"El daño", entorno:"Entorno" };
+var CASO_ABIERTO = null;
+
+function casilla(id, etiqueta, marcada){
+  return '<label style="display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:13px">' +
+    '<input type="checkbox" id="' + id + '"' + (marcada ? " checked" : "") + '> ' + esc(etiqueta) + '</label>';
+}
+
+function abrirCaso(numero){
+  var caja = document.getElementById("cs-dlg");
+  caja.style.display = "block";
+  caja.innerHTML = '<p class="mu">Abriendo ' + esc(numero) + '…</p>';
+  fetch("/api/admin/caso/" + encodeURIComponent(numero)).then(function(r){ return r.json(); }).then(function(d){
+    if (d.error){ caja.innerHTML = '<p class="mu">No se pudo abrir: ' + esc(d.error) + "</p>"; return; }
+    CASO_ABIERTO = numero;
+    var c = d.caso || {};
+
+    var mat = '<label style="display:block;margin-bottom:10px;font-size:13px;font-weight:600">Muros' +
+      '<select id="f-material" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)">';
+    ["ladrillo","adobe","bahareque","prefabricado","madera","no_se"].forEach(function(k){
+      mat += '<option value="' + k + '"' + (c.material === k ? " selected" : "") + ">" + esc(MAT_ES[k]) + "</option>";
+    });
+    mat += "</select></label>";
+
+    /* Las fotos se sirven por el endpoint del triaje, que acepta la audiencia
+       del panel: no hace falta una ruta de medios propia para el equipo. */
+    var fotos = (d.medios || []).map(function(m){
+      var src = "/api/triage/medio/" + m.id;
+      var cuerpo = m.clase === "video"
+        ? '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:var(--surface-2,var(--surface));border-radius:8px">vídeo</div>'
+        : '<a href="' + src + '" target="_blank" rel="noopener"><img src="' + src + '" alt="" ' +
+          'style="width:100%;height:120px;object-fit:cover;border-radius:8px;display:block"></a>';
+      return '<div style="width:160px">' + cuerpo +
+        '<small style="display:block;margin:6px 0 4px">' + esc(CAT_MED[m.categoria] || m.categoria || "sin categoría") + "</small>" +
+        '<button class="copy" data-medio="' + m.id + '">Quitar…</button></div>';
+    }).join("");
+    if (!fotos) fotos = '<p class="mu" style="font-size:13px">Este caso no tiene fotos. Un ingeniero no va a poder evaluarlo.</p>';
+
+    var evals = (d.evaluaciones || []).map(function(e){
+      return '<li style="margin-bottom:10px"><strong>' + esc(e.clasificacion) + "</strong> · " +
+        esc(e.ing_nombre) + " (mat. " + esc(e.ing_matricula) + ") · " + esc((e.creado_en||"").slice(0,10)) +
+        "<br><small>" + esc(e.nota_tecnica || "") + "</small>" +
+        (e.falta ? "<br><small><strong>Falta:</strong> " + esc(e.falta) + "</small>" : "") + "</li>";
+    }).join("");
+
+    var hist = (d.historial || []).map(function(h){
+      return "<li><small>" + esc((h.otorgado_en||"").slice(0,16)) + " · " + esc(h.sujeto) + " — " +
+        esc(String(h.detalle).replace("caso " + numero + " ", "")) + "</small></li>";
+    }).join("");
+
+    caja.innerHTML =
+      '<div class="card" style="max-width:760px;text-align:left">' +
+        '<h3 style="margin-bottom:4px">' + esc(numero) + "</h3>" +
+        '<p class="mu" style="font-size:13px;margin-bottom:16px">Corrige lo que la familia escribió mal — un teléfono ' +
+        'con un dígito de menos o una dirección a medias es la diferencia entre encontrar la casa y no encontrarla. ' +
+        '<strong>Los cambios quedan en el historial</strong> con tu correo, y se guarda qué campos tocaste, nunca los valores.</p>' +
+        campo("f-sector", "Sector (lo único publicable)", c.sector) +
+        campo("f-direccion_ref", "Dirección exacta (nunca se publica)", c.direccion_ref) +
+        campo("f-contacto_nombre", "Nombre", c.contacto_nombre) +
+        campo("f-contacto_tel", "Teléfono", c.contacto_tel) +
+        campo("f-contacto_email", "Correo (opcional)", c.contacto_email) +
+        mat +
+        campo("f-pisos", "Pisos", c.pisos) +
+        campo("f-anio_aprox", "Año aproximado", c.anio_aprox) +
+        casilla("f-danio_previo", "Tenía grietas antes del sismo", c.danio_previo) +
+        casilla("f-habitada", "Vive alguien ahí", c.habitada) +
+        casilla("f-heridos", "Hubo heridos", c.heridos) +
+        casilla("f-filtra_agua", "Le entra agua", c.filtra_agua) +
+        campo("f-nota", "Lo que contó la familia", c.nota) +
+        /* Solo aparece si está concedido, y solo se puede quitar. Marcarlo
+           desde aquí sería fabricar un consentimiento que la familia no dio. */
+        (c.consent_publico
+          ? '<div style="border-left:3px solid #A84D00;padding-left:12px;margin:12px 0">' +
+            '<p style="font-size:13px;margin-bottom:8px"><strong>La familia autorizó que su caso aparezca en público</strong> ' +
+            '(sin nombre ni dirección). Desde aquí solo se puede RETIRAR: concederlo tiene que decirlo ella.</p>' +
+            casilla("f-revocar", "Retirar esa autorización", false) + "</div>"
+          : '<p class="mu" style="font-size:13px;margin:12px 0">La familia NO autorizó que su caso aparezca en público. ' +
+            'Eso no se puede conceder desde el panel.</p>') +
+        campo("f-motivo", "Motivo del cambio (opcional, queda en el historial)", "") +
+        /* El enlace de la familia. Si lo perdió, este es el único sitio desde
+           donde se le puede devolver: el número de caso solo no abre nada. */
+        '<p class="mu" style="font-size:13px;margin:12px 0 4px"><strong>Enlace de la familia</strong> — ' +
+        'si lo perdió, es lo único que se lo devuelve. Mándaselo por WhatsApp; no lo publiques.</p>' +
+        '<p style="font-size:12px;word-break:break-all;margin-bottom:14px">' +
+        esc(location.origin + "/caso/" + numero + "?t=" + (c.token || "")) + "</p>" +
+        '<p id="f-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>' +
+        '<div style="display:flex;gap:10px;margin:8px 0 22px">' +
+          '<button class="btn btn-g" id="f-ok" data-guardar="' + esc(numero) + '">Guardar</button>' +
+          '<button class="btn btn-w" id="f-no">Cerrar</button>' +
+        "</div>" +
+
+        '<h4 style="margin-bottom:4px">Fotos</h4>' +
+        '<p class="mu" style="font-size:13px;margin-bottom:12px">Quitar una foto la borra <strong>de verdad</strong>, ' +
+        'también del almacenamiento. Es lo que cumple la promesa de que el caso no sale con personas dentro — ' +
+        'y por eso pide motivo y no se puede deshacer.</p>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px">' + fotos + "</div>" +
+
+        (evals ? '<h4 style="margin-bottom:8px">Evaluaciones</h4><ul style="margin:0 0 22px 16px">' + evals + "</ul>" : "") +
+        (hist ? '<h4 style="margin-bottom:8px">Historial</h4><ul style="margin:0 0 4px 16px">' + hist + "</ul>" : "") +
+      "</div>";
+  });
+}
+
+function cerrarCaso(){
+  var caja = document.getElementById("cs-dlg");
+  caja.style.display = "none"; caja.innerHTML = ""; CASO_ABIERTO = null;
+}
+
+function guardarCaso(numero){
+  var v = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
+  var k = function(id){ var e = document.getElementById(id); return e ? e.checked : false; };
+  var err = document.getElementById("f-error");
+  var cuerpo = {
+    sector: v("f-sector"), direccion_ref: v("f-direccion_ref"),
+    contacto_nombre: v("f-contacto_nombre"), contacto_tel: v("f-contacto_tel"),
+    contacto_email: v("f-contacto_email"),
+    material: v("f-material"), pisos: v("f-pisos"), anio_aprox: v("f-anio_aprox"),
+    danio_previo: k("f-danio_previo"), habitada: k("f-habitada"),
+    heridos: k("f-heridos"), filtra_agua: k("f-filtra_agua"),
+    nota: v("f-nota"), motivo: v("f-motivo")
+  };
+  /* Solo se manda el campo cuando se pide retirarlo: si fuera siempre, un
+     guardado normal borraría el consentimiento sin que nadie lo pidiera. */
+  if (k("f-revocar")) cuerpo.consent_publico = false;
+
+  var btn = document.getElementById("f-ok");
+  btn.disabled = true; btn.textContent = "Guardando…";
+  fetch("/api/admin/caso/" + encodeURIComponent(numero) + "/corregir", {
+    method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify(cuerpo)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false; btn.textContent = "Guardar";
+    if (d.error){
+      err.style.display = "block";
+      err.textContent = d.error === "sin_cambios" ? "No cambiaste nada." :
+        (d.error + (d.campo ? " (" + d.campo + ")" : ""));
+      return;
+    }
+    cargarCasos(); abrirCaso(numero);
+  }).catch(function(){
+    btn.disabled = false; btn.textContent = "Guardar";
+    err.style.display = "block"; err.textContent = "No se pudo guardar.";
+  });
+}
+
 function cargarOfrecimientos(){
   fetch("/api/admin/ofrecimientos").then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("o-filas"); if (!tb) return;
@@ -4568,6 +4921,32 @@ document.addEventListener("click", function(e){
      va de la lista sin decir por qué es indistinguible de uno perdido, y del
      otro lado hay una familia que mandó fotos de su casa. El servidor lo exige
      igual — esto solo evita el viaje. */
+  var ab = e.target.closest("[data-abrir]");
+  if (ab){ abrirCaso(ab.getAttribute("data-abrir")); return; }
+  if (e.target.id === "f-no"){ cerrarCaso(); return; }
+  var gu = e.target.closest("[data-guardar]");
+  if (gu){ guardarCaso(gu.getAttribute("data-guardar")); return; }
+
+  /* Borrar una foto es lo único de este panel que NO se puede deshacer: el
+     objeto se va del bucket. Por eso pide motivo y lo dice antes. */
+  var bm = e.target.closest("[data-medio]");
+  if (bm && CASO_ABIERTO){
+    var razon = window.prompt("Quitar esta foto de " + CASO_ABIERTO +
+      ".\\n\\nSe borra de verdad, también del almacenamiento, y no se puede deshacer." +
+      "\\n\\n¿Por qué se quita? (por ejemplo: salen personas)");
+    if (!razon) return;
+    bm.disabled = true; bm.textContent = "…";
+    fetch("/api/admin/caso/" + encodeURIComponent(CASO_ABIERTO) + "/medio/" +
+          encodeURIComponent(bm.getAttribute("data-medio")) + "/borrar", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ motivo: razon })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.error) window.alert("No se quitó: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
+      abrirCaso(CASO_ABIERTO); cargarCasos();
+    }).catch(function(){ abrirCaso(CASO_ABIERTO); });
+    return;
+  }
+
   var cs = e.target.closest("[data-caso]");
   if (cs){
     var num = cs.getAttribute("data-caso");
@@ -4971,6 +5350,12 @@ export default {
            cualquier otra cosa ni siquiera entra a la función. */
         const mc = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/estado$/i);
         if (mc) return await adminMoverCaso(request, env, mc[1].toUpperCase(), sesion.email);
+        const cco = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/corregir$/i);
+        if (cco) return await adminCorregirCaso(request, env, cco[1].toUpperCase(), sesion.email);
+        const cbo = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/medio\/(\d{1,9})\/borrar$/i);
+        if (cbo) return await adminBorrarMedio(request, env, cbo[1].toUpperCase(), Number(cbo[2]), sesion.email);
+        const cfi = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})$/i);
+        if (cfi) return await adminCasoFicha(env, cfi[1].toUpperCase());
         if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
         const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
         if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
