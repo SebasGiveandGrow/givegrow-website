@@ -2282,6 +2282,31 @@
   </section>
 </main>
 
+<!-- La página de la familia: en qué va su caso, y cómo agregar fotos.
+     Es la contraparte de `inevaluable`. El sistema sabía PEDIR lo que faltaba
+     —el ingeniero lo escribe y sale por correo— y no sabía RECIBIRLO: el
+     formulario solo creaba casos nuevos, así que quien ya tenía uno no tenía
+     dónde sumar una foto.
+
+     No lleva navegación ni se enlaza desde ninguna parte: se llega con el
+     enlace de la familia, que trae su token. El cuerpo lo pinta el JS porque
+     depende del caso; solo el encabezado es estático. -->
+<main id="page-caso" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey" data-i18n="mc.t">Tu caso</span>
+      <h1 class="h-sec" data-i18n="mc.t">Tu caso</h1>
+      <!-- El número va aparte del h1 y sin data-i18n: el diccionario le pasa
+           por encima a cualquier texto que el JS escriba en un elemento
+           traducido. Y así recibe el tratamiento de cifra que ya tiene en la
+           pantalla final del formulario. -->
+      <p class="figure-xl" id="mc-num" style="margin:10px 0"></p>
+      <p class="lead" data-i18n="mc.lead">Aquí ves en qué va tu caso y puedes agregar fotos si hacen falta.</p>
+      <div id="mc-cuerpo" style="margin-top:30px"><p class="mu" data-i18n="mc.cargando">Buscando tu caso…</p></div>
+    </div>
+  </section>
+</main>
+
 
 <footer>
   <div class="wrap">
@@ -2355,7 +2380,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=edf655d1"></script>
+<script src="/app.js?v=96bd367e"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

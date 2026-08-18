@@ -2,8 +2,8 @@
 
 > Última actualización: sesión "Postulación de ingenieros y cierre de casos" (18 ago 2026)
 > **⏭️ ARRANCA POR: «LO SIGUIENTE EN LA PLATAFORMA DE VIVIENDAS», más abajo — sus
-> huecos 1 y 2 ya están cerrados; el siguiente es el 3, y espera la guía de los
-> ingenieros.**
+> cinco huecos están cerrados. Lo que sigue no es código: la guía fotográfica de
+> los ingenieros, y después el banco público de casas.**
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## Estado del proyecto
@@ -329,17 +329,33 @@ Las transiciones se validan en el servidor, no solo en los botones. Y lo cerrado
 se hunde al fondo de la bandeja: mezclar lo terminado con lo urgente es lo que la
 volvería inútil justo cuando más se necesita.
 
-### Los tres huecos que quedan, y ahora son los siguientes
-3. **El caso no se puede completar.** Si un ingeniero marca `inevaluable` y pide
-   más fotos, la familia NO tiene forma de agregarlas: el formulario solo crea
-   casos nuevos. Con el token ya podría reabrir el suyo — falta la pantalla. Es
-   la contraparte de `inevaluable`: el sistema sabe pedir lo que falta pero no
-   sabe recibirlo. **Conviene hacerlo DESPUÉS de que los ingenieros respondan la
-   guía**, porque su lista de fotos puede cambiar qué se acepta.
-4. **Un caso no se puede corregir.**
-5. **Las fotos no se pueden borrar.** Si una familia sube por error una foto con
-   personas dentro —justo lo que el sistema promete no publicar— no hay manera de
-   quitarla.
+### ~~Los tres huecos que quedan~~ — LOS TRES, HECHOS (18 ago)
+Sebas los pidió los tres juntos, sabiendo que el 3 se adelantaba a la guía.
+
+3. **~~El caso no se puede completar~~.** Existe `/caso/<numero>?t=<token>`:
+   la familia ve en qué va su caso, lee QUÉ FALTA si un ingeniero marcó
+   `inevaluable`, y sube las fotos ahí mismo. El servidor ya aceptaba fotos
+   nuevas contra el token — lo único que faltaba era la pantalla.
+   **Y el enlace de la familia cambió**: antes apuntaba al PDF del informe, que
+   no existe hasta que alguien evalúe y que es justo lo inútil cuando lo que te
+   piden es mandar una foto. Ahora apunta a esta página, en los tres sitios que
+   lo entregan: la pantalla final del formulario, el correo de clasificación y
+   la ficha del panel. El PDF sigue funcionando; ya no es la puerta.
+   ⚠️ **Sigue en pie que la lista de categorías puede cambiar** cuando los
+   ingenieros respondan la guía. Está en UN solo sitio (`CV_CATS` en `app.js`,
+   `CATEGORIAS_MEDIO` en `worker.js`) y las dos pantallas la leen de ahí.
+4. **~~Un caso no se puede corregir~~.** Botón «Abrir» en la bandeja → ficha con
+   los datos editables. `consent_publico` SOLO se puede revocar, nunca conceder
+   —marcarlo desde el panel sería fabricar un consentimiento—, y la auditoría
+   guarda qué campos cambiaron, nunca sus valores.
+5. **~~Las fotos no se pueden borrar~~.** Se quitan desde la ficha, con motivo
+   obligatorio, y se borran DE VERDAD: también del R2, primero el objeto y
+   después la fila. Era la única promesa del sistema sin mecanismo detrás.
+
+**Y una que apareció de camino:** si una familia perdía su enlace, no había
+forma de devolvérselo — el número de caso solo no abre nada. La ficha del panel
+ahora lo muestra, y por eso su consulta enumera columnas en vez de `SELECT *`:
+que el token de la familia viaje al panel es una decisión, no un descuido.
 
 ### Lo que NO se debe volver a proponer
 - **Regla de Access por dominio de correo**: descartada, los ingenieros pueden

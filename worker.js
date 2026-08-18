@@ -2111,9 +2111,30 @@ async function apiCasoEstado(env, numero, token) {
   ).bind(numero).first();
   if (!c || !token || c.token !== token) return json({ error: "no_autorizado" }, 403);
   const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
+
+  /* Lo que el ingeniero dijo, para que la familia lo lea en su página y no solo
+     en un correo que pudo no llegarle — el correo es opcional de verdad, así
+     que no puede ser el único sitio donde vive la respuesta.
+
+     `falta` es lo que convierte esta pantalla en útil: si un ingeniero marcó
+     `inevaluable`, aquí dice QUÉ foto se necesita, justo encima del botón para
+     subirla. Antes el sistema sabía pedir lo que faltaba y no sabía recibirlo. */
+  const e = await env.DB.prepare(
+    "SELECT clasificacion, recomendacion, falta, creado_en FROM evaluaciones " +
+    "WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
+  ).bind(numero).first();
+
   return json({
     numero: c.numero, estado: c.estado, clasificacion: c.clasificacion,
-    sector: c.sector, medios: (m && m.n) || 0, creado_en: c.creado_en
+    sector: c.sector, medios: (m && m.n) || 0, creado_en: c.creado_en,
+    /* `evaluado` y `clasificacion` no son lo mismo: un caso `inevaluable`
+       vuelve a `en_revision` con la clasificación en NULL, y aun así ya lo miró
+       alguien. Sin este campo, la pantalla no sabría distinguir «nadie lo ha
+       visto todavía» de «lo vieron y no les alcanzó». */
+    evaluado: !!e,
+    ultima: e ? { clasificacion: e.clasificacion, recomendacion: e.recomendacion,
+                  falta: e.falta, creado_en: e.creado_en } : null,
+    tope_medios: MAX_MEDIOS
   });
 }
 
@@ -2471,7 +2492,11 @@ const TRIAJE_ET = {
 async function correoCasoClasificado(env, x) {
   const inev = x.clasificacion === "inevaluable";
   const titulo = inev ? "Necesitamos un par de fotos más" : "Un ingeniero ya revisó tu caso";
-  const url = ORIGIN + "/api/caso/" + x.numero + "/informe.pdf?t=" + x.token;
+  /* A la PÁGINA del caso, no al PDF. Cuando el ingeniero pide más fotos, este
+     correo es el que se lo dice — y mandarlo a un PDF es mandarlo a un sitio
+     donde no puede responder. La página sirve para las dos cosas: leer el
+     resultado y agregar lo que falta. */
+  const url = ORIGIN + "/caso/" + x.numero + "?t=" + x.token;
 
   const parrafos = inev ? [
     "Un ingeniero voluntario miró tu caso, pero con las fotos que enviaste no puede formarse un criterio.",
@@ -2494,7 +2519,10 @@ async function correoCasoClasificado(env, x) {
     texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", "Tu informe: " + url].join("\n"),
     html: plantillaCorreo({
       titulo, parrafos, filas,
-      boton: { url, texto: "Ver mi informe" },
+      /* El botón dice lo que toca hacer, no siempre lo mismo. Si el ingeniero
+         pidió más fotos, «Ver mi informe» manda a leer un documento que no
+         existe todavía; lo que hay que hacer es subirlas. */
+      boton: { url, texto: inev ? "Agregar las fotos que faltan" : "Ver mi informe" },
       cierre: "Este mensaje es automático. Guarda el enlace: desde ahí puedes volver a abrir tu informe cuando quieras."
     }),
     etiqueta: "caso-clasificado", guia: x.numero
@@ -4804,7 +4832,7 @@ function abrirCaso(numero){
         '<p class="mu" style="font-size:13px;margin:12px 0 4px"><strong>Enlace de la familia</strong> — ' +
         'si lo perdió, es lo único que se lo devuelve. Mándaselo por WhatsApp; no lo publiques.</p>' +
         '<p style="font-size:12px;word-break:break-all;margin-bottom:14px">' +
-        esc(location.origin + "/api/caso/" + numero + "/informe.pdf?t=" + (c.token || "")) + "</p>" +
+        esc(location.origin + "/caso/" + numero + "?t=" + (c.token || "")) + "</p>" +
         '<p id="f-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>' +
         '<div style="display:flex;gap:10px;margin:8px 0 22px">' +
           '<button class="btn btn-g" id="f-ok" data-guardar="' + esc(numero) + '">Guardar</button>' +

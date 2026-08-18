@@ -414,6 +414,33 @@ var I18N = {
     "cv.err.envio":"No pudimos registrar tu caso. Revisa los datos e intenta otra vez.",
     "cv.err.campos":"Faltan datos: tu nombre, tu WhatsApp y el barrio.",
     "cv.err.consent":"Necesitamos tu autorización para que un ingeniero revise el caso.",
+    "mc.t":"Tu caso",
+    "mc.lead":"Aquí ves en qué va tu caso y puedes agregar fotos si hacen falta.",
+    "mc.cargando":"Buscando tu caso…",
+    "mc.err":"Ese enlace no abre ningún caso. Revisa que lo hayas copiado completo, hasta el final.",
+    "mc.estado":"Estado",
+    "mc.fotos":"Fotos que enviaste",
+    "mc.sin.t":"Todavía no lo ha revisado un ingeniero",
+    "mc.sin.p":"Los casos se revisan por orden de gravedad y luego de espera. Cuando un ingeniero voluntario lo mire, la respuesta aparece en esta misma página.",
+    "mc.falta.t":"Necesitamos un par de fotos más",
+    "mc.falta.p":"Un ingeniero miró tu caso, pero con estas fotos no puede formarse un criterio. Esto es lo que hace falta:",
+    "mc.res.t":"Un ingeniero ya revisó tu caso",
+    "mc.res.reco":"Mientras se hace la visita:",
+    "mc.aviso":"Esto NO dice si tu casa es habitable. Eso lo define una visita y la autoridad de tu municipio. Lo que dice es qué tan pronto conviene visitarla.",
+    "mc.informe":"Ver mi informe en PDF",
+    "mc.cl.urgente":"Visita urgente",
+    "mc.cl.programada":"Visita programada",
+    "mc.cl.no_requiere":"No requiere visita por ahora",
+    "mc.cl.inevaluable":"No se pudo evaluar con las fotos enviadas",
+    "mc.add.t":"Agregar fotos",
+    "mc.add.p":"Puedes sumar fotos cuando quieras: si te pidieron algo, si el daño cambió, o si te faltó una parte de la casa.",
+    "mc.add.seg":"Antes de tomarlas, lo mismo de siempre: no entres si ves muros caídos, techos hundidos o columnas partidas, no te subas al techo y no muevas escombros. Mejor una foto de menos que un accidente.",
+    "mc.add.enviar":"Enviar las fotos",
+    "mc.add.nada":"Elige al menos una foto.",
+    "mc.add.subiendo":"Subiendo tus fotos… no cierres esta página.",
+    "mc.add.ok":"Listo, ya las tenemos. Un ingeniero las va a ver.",
+    "mc.add.tope":"Este caso ya llegó al máximo de archivos. Escríbenos si necesitas cambiar alguno.",
+    "mc.cerrado":"Este caso está cerrado. Si algo cambió, escríbenos y lo reabrimos.",
     "cv.ing.link":"¿Eres ingeniero o arquitecto y quieres revisar casos?",
     "ing.ey":"Ingenieros voluntarios",
     "ing.t":"Hay más casas dañadas que ingenieros para visitarlas.",
@@ -1390,6 +1417,7 @@ var ROUTE_META = {
   membresias:{t:{es:"Membresías · Give&Grow International",en:"Memberships · Give&Grow International"},d:{es:"Hazte miembro de Give&Grow: dona de forma recurrente, crece de Semilla a Bosque y suma beneficios en cada nivel.",en:"Become a Give&Grow member: give monthly, grow from Seed to Forest and add benefits at each tier."}},
   voluntariado:{t:{es:"Voluntariado e Impact Journey · Give&Grow International",en:"Volunteering & Impact Journey · Give&Grow International"},d:{es:"Tres maneras de participar, el método MIRA en doble vía y cómo cuidamos a las comunidades. Voluntariado corporativo y pro-bono.",en:"Three ways to take part, the two-way MIRA method, and how we care for communities. Corporate and pro-bono volunteering."}},
   faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}},
+  caso:{t:{es:"Tu caso · Give&Grow International",en:"Your case · Give&Grow International"},d:{es:"Consulta en qué va tu caso de vivienda y agrega las fotos que te pidieron.",en:"Check where your housing case stands and add the photos you were asked for."}},
   ingenieros:{t:{es:"Ingenieros voluntarios · Give&Grow International",en:"Volunteer engineers · Give&Grow International"},d:{es:"Postúlate al triaje estructural: mira fotos de casas afectadas por el sismo y di a quién visitar primero. Es priorización, no un dictamen de habitabilidad.",en:"Apply to the structural triage: review photos of homes hit by the earthquake and say who should be visited first. It is prioritisation, not a habitability ruling."}},
   vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario dice qué tan urgente es una visita. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer says how urgent a visit is. It does not replace the official assessment."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
@@ -1723,9 +1751,14 @@ function cvEnviar(){
     if (num) num.textContent = d.numero;
     /* EL ENLACE, no solo el número. El token es lo que permite consultar el
        caso y abrir el informe, y sin él la familia se queda sin poder ver su
-       propio documento — lo descubrió la primera prueba real. */
-    CV.enlace = location.origin + "/api/caso/" + encodeURIComponent(d.numero) +
-                "/informe.pdf?t=" + encodeURIComponent(d.token);
+       propio documento — lo descubrió la primera prueba real.
+
+       Apunta a la PÁGINA del caso y no al PDF. El PDF no existe hasta que un
+       ingeniero evalúe, así que hasta entonces ese enlace no abría nada; y
+       cuando el ingeniero pide más fotos, un PDF es justo lo que no sirve para
+       mandárselas. La página funciona en los dos momentos. */
+    CV.enlace = location.origin + "/caso/" + encodeURIComponent(d.numero) +
+                "?t=" + encodeURIComponent(d.token);
     var lnk = document.getElementById("cv-enlace");
     if (lnk) { lnk.textContent = CV.enlace; lnk.href = CV.enlace; }
     cvPaso(5);
@@ -1751,6 +1784,170 @@ function cvSubirCola(){
     .catch(function(){ cvSubirCola(); });
 }
 
+/* ===== Mi caso: en qué va, y cómo agregar fotos =====
+   La contraparte de `inevaluable`. El ingeniero podía decir «con esto no puedo
+   evaluar, mándenme tal foto» y esa petición no tenía dónde aterrizar: el
+   formulario solo crea casos nuevos, así que la familia no tenía forma de
+   sumar nada al suyo. El servidor SÍ aceptaba fotos nuevas contra el token —
+   lo que faltaba era la pantalla.
+
+   Se llega por `/caso/<numero>?t=<token>`, igual que `/gracias?id=…`: una ruta
+   con path que el fallback de SPA sirve como index.html y que se enruta aquí a
+   mano. El token nunca se guarda ni se manda a ningún otro lado: vive en la
+   URL que la familia ya tiene. */
+var MC = { caso: null, token: null, cola: [], tope: 20 };
+
+function mcArranca(){
+  var m = location.pathname.match(/^\/caso\/(CV-\d{4}-\d{6})\/?$/i);
+  if (!m) return false;
+  MC.caso = m[1].toUpperCase();
+  MC.token = new URLSearchParams(location.search).get("t") || "";
+  return true;
+}
+
+/* `aviso` se pinta DESPUÉS de rearmar el cuerpo, no antes. Al terminar una
+   subida hay que hacer las dos cosas —refrescar el conteo y confirmar— y el
+   repintado destruye el elemento del mensaje: escribirlo primero lo borraba, y
+   la familia se quedaba sin saber si sus fotos habían llegado. En una zona con
+   mala señal eso es exactamente lo que no puede pasar. */
+function mcPinta(aviso){
+  var cont = document.getElementById("mc-cuerpo");
+  var tit = document.getElementById("mc-num");
+  if (!cont) return;
+  if (tit) tit.textContent = MC.caso || "";
+  cont.innerHTML = '<p class="mu">' + escapeHtml(t("mc.cargando")) + "</p>";
+
+  fetch("/api/caso/" + encodeURIComponent(MC.caso) + "?t=" + encodeURIComponent(MC.token))
+    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      /* Un caso inexistente y uno ajeno dan el MISMO mensaje, igual que en el
+         servidor: distinguirlos dejaría un oráculo de qué casos existen. */
+      if (!res.ok || !res.d || res.d.error){
+        cont.innerHTML = '<p class="lead">' + escapeHtml(t("mc.err")) + "</p>";
+        return;
+      }
+      var d = res.d;
+      MC.tope = d.tope_medios || 20;
+      var h = "";
+
+      h += '<p><strong>' + escapeHtml(t("mc.estado")) + ":</strong> "
+        +  escapeHtml(d.sector || "") + " · " + escapeHtml(t("mc.fotos")) + ": " + (d.medios || 0) + "</p>";
+
+      var falta = d.ultima && d.ultima.falta;
+      if (falta){
+        h += '<div class="card" style="margin-top:22px;text-align:left">'
+          +  "<h3>" + escapeHtml(t("mc.falta.t")) + "</h3>"
+          +  "<p>" + escapeHtml(t("mc.falta.p")) + "</p>"
+          +  '<p style="margin-top:8px;font-weight:700">' + escapeHtml(falta) + "</p></div>";
+      } else if (d.evaluado && d.clasificacion){
+        h += '<div class="card" style="margin-top:22px;text-align:left">'
+          +  "<h3>" + escapeHtml(t("mc.res.t")) + "</h3>"
+          +  '<p style="margin-top:6px;font-weight:700">'
+          +  escapeHtml(t("mc.cl." + d.clasificacion) || d.clasificacion) + "</p>"
+          +  (d.ultima && d.ultima.recomendacion
+              ? "<p style='margin-top:8px'>" + escapeHtml(t("mc.res.reco")) + " "
+                + escapeHtml(d.ultima.recomendacion) + "</p>"
+              : "")
+          +  '<p class="mu" style="margin-top:10px">' + escapeHtml(t("mc.aviso")) + "</p>"
+          +  '<p style="margin-top:14px"><a class="btn btn-o" href="/api/caso/'
+          +  encodeURIComponent(MC.caso) + "/informe.pdf?t=" + encodeURIComponent(MC.token)
+          +  '">' + escapeHtml(t("mc.informe")) + "</a></p></div>";
+      } else {
+        h += '<div class="card" style="margin-top:22px;text-align:left">'
+          +  "<h3>" + escapeHtml(t("mc.sin.t")) + "</h3>"
+          +  "<p>" + escapeHtml(t("mc.sin.p")) + "</p></div>";
+      }
+
+      if (d.estado === "cerrado" || d.estado === "descartado"){
+        h += '<p class="mu" style="margin-top:22px">' + escapeHtml(t("mc.cerrado")) + "</p>";
+      } else if ((d.medios || 0) >= MC.tope){
+        h += '<p class="mu" style="margin-top:22px">' + escapeHtml(t("mc.add.tope")) + "</p>";
+      } else {
+        h += mcFormFotos();
+      }
+      cont.innerHTML = h;
+      if (document.getElementById("mc-cats")) mcPintaCats();
+      if (aviso){
+        var m = document.getElementById("mc-msg");
+        if (m){ m.textContent = aviso; m.style.color = "var(--g)"; }
+      }
+    })
+    .catch(function(){
+      cont.innerHTML = '<p class="lead">' + escapeHtml(t("mc.err")) + "</p>";
+    });
+}
+
+function mcFormFotos(){
+  return '<div style="margin-top:34px">'
+    +  "<h3>" + escapeHtml(t("mc.add.t")) + "</h3>"
+    +  '<p class="mu" style="margin-top:8px">' + escapeHtml(t("mc.add.p")) + "</p>"
+    +  '<p style="margin-top:10px;font-weight:700">' + escapeHtml(t("mc.add.seg")) + "</p>"
+    +  '<div id="mc-cats" style="margin-top:18px;display:flex;flex-direction:column;gap:16px"></div>'
+    +  '<button type="button" class="btn btn-g" style="margin-top:18px" data-act="mcEnviar()">'
+    +  escapeHtml(t("mc.add.enviar")) + "</button>"
+    +  '<p id="mc-msg" role="status" aria-live="polite" class="mu" style="margin-top:12px"></p></div>';
+}
+
+/* Las MISMAS cuatro categorías del formulario, leídas de la misma constante.
+   El día que los ingenieros cambien la lista se toca un solo sitio — que es
+   justo lo que va a pasar cuando respondan la guía fotográfica. */
+function mcPintaCats(){
+  var cont = document.getElementById("mc-cats");
+  var html = "";
+  for (var i = 0; i < CV_CATS.length; i++){
+    var c = CV_CATS[i];
+    html += '<div class="ally-check" style="display:block">'
+         +  "<b>" + escapeHtml(t("cv.cat." + c)) + "</b>"
+         +  '<small style="display:block;color:var(--mu);margin:4px 0 10px">' + escapeHtml(t("cv.cat." + c + ".h")) + "</small>"
+         +  '<label class="btn btn-o" style="display:inline-block;cursor:pointer">'
+         +  "<span>" + escapeHtml(t("cv.add")) + "</span>"
+         +  '<input type="file" accept="image/*,video/*" capture="environment" multiple '
+         +  'data-cat="' + c + '" style="position:absolute;left:-9999px">'
+         +  "</label> <span class=\"mu\" id=\"mc-n-" + c + '">0</span>'
+         +  "</div>";
+  }
+  cont.innerHTML = html;
+  cont.querySelectorAll("input[type=file]").forEach(function(inp){
+    inp.addEventListener("change", function(){ mcArchivos(inp); });
+  });
+}
+
+function mcArchivos(inp){
+  var cat = inp.getAttribute("data-cat");
+  for (var i = 0; i < inp.files.length; i++) MC.cola.push({ file: inp.files[i], cat: cat });
+  var n = MC.cola.filter(function(x){ return x.cat === cat; }).length;
+  var et = document.getElementById("mc-n-" + cat);
+  if (et) et.textContent = n;
+  inp.value = "";
+}
+
+function mcEnviar(){
+  var msg = document.getElementById("mc-msg");
+  if (!MC.cola.length){
+    if (msg){ msg.textContent = t("mc.add.nada"); msg.style.color = "var(--err)"; }
+    return;
+  }
+  if (msg){ msg.textContent = t("mc.add.subiendo"); msg.style.color = "var(--mu)"; }
+  mcSubirCola();
+}
+
+/* De a una y en serie, por la misma razón que al crear el caso: con señal mala,
+   varias subidas en paralelo se pisan y fallan todas. Al terminar se repinta la
+   página, así el contador de fotos dice la verdad sin recargar. */
+function mcSubirCola(){
+  if (!MC.cola.length){ mcPinta(t("mc.add.ok")); return; }
+  var item = MC.cola.shift();
+  var url = "/api/caso/" + encodeURIComponent(MC.caso) + "/medio?t=" + encodeURIComponent(MC.token)
+          + (item.cat ? "&cat=" + encodeURIComponent(item.cat) : "");
+  fetch(url, { method: "POST", headers: { "content-type": item.file.type }, body: item.file })
+    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      if (!res.ok && res.d && res.d.error === "archivo_muy_grande") console.warn(t("cv.err.grande"));
+      mcSubirCola();
+    })
+    .catch(function(){ mcSubirCola(); });
+}
+
 function cvCopiar(){
   if (!CV.enlace) return;
   var btn = document.querySelector('[data-act="cvCopiar()"]');
@@ -1772,6 +1969,7 @@ var ACT_FNS = {
   irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit,
   fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
   ingSubmit:ingSubmit, ingEsp:ingEsp,
+  mcEnviar:mcEnviar,
   irAVoluntariadoBrigada:irAVoluntariadoBrigada,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
@@ -1842,6 +2040,7 @@ function go(id, fromPop){
   if (id==="impacto") initGallery();
   if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); pintarBrigadaEstado(); }
   if (id==="transparencia") pintarFechaImpresion();
+  if (id==="caso" && MC.caso) mcPinta();
 
   window.scrollTo(0,0);
   if (!fromPop) focusActivePage();
@@ -3187,6 +3386,10 @@ function init(){
     graciasArranca();
     hash = "gracias";
   }
+  /* `/caso/<numero>?t=<token>` — el enlace que tiene la familia. Mismo patrón
+     que /gracias: el fallback de SPA ya sirvió index.html y aquí se enruta a
+     mano. El token se queda en la URL y no se copia a ninguna parte. */
+  if (mcArranca()) hash = "caso";
   go(hash, true);
   window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||"inicio"; go(h, true); });
   // Navegación por delegación (reemplaza inline; CSP fase 1).
