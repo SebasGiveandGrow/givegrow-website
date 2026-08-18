@@ -2327,6 +2327,28 @@ async function apiCasoInforme(env, numero, token) {
   });
 }
 
+
+/* GET /api/admin/casos — la bandeja del EQUIPO, no la del ingeniero.
+   La diferencia es deliberada: `/triaje` oculta contacto y dirección porque
+   para priorizar por urgencia no hacen falta; aquí SÍ están, porque son lo que
+   permite ir a visitar. Cada quien ve lo que su trabajo necesita y nada más. */
+async function adminCasos(env) {
+  const r = await env.DB.prepare(
+    "SELECT c.numero, c.estado, c.clasificacion, c.sector, c.direccion_ref, " +
+    "c.contacto_nombre, c.contacto_tel, c.contacto_email, c.material, c.pisos, " +
+    "c.danio_previo, c.habitada, c.heridos, c.consent_publico, c.creado_en, " +
+    "(SELECT COUNT(*) FROM caso_medios m WHERE m.caso = c.numero) AS medios, " +
+    "(SELECT e.ing_nombre FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS ing, " +
+    "(SELECT e.recomendacion FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS reco " +
+    "FROM casos c ORDER BY " +
+    /* Urgentes primero, y dentro de cada grupo el más viejo antes: en una
+       emergencia el orden es la gravedad y luego la espera, nunca la novedad. */
+    "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
+    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT 200"
+  ).all();
+  return json({ casos: r.results || [] });
+}
+
 /* GET /api/admin/comprobante/<guia> — solo tras Access. El comprobante lleva
    datos bancarios del donante y nunca es público. */
 async function adminComprobante(env, guia) {
@@ -3595,6 +3617,18 @@ la firma del Convenio Marco. Aceptar aquí significa «seguimos», no «ya está
 </tr></thead><tbody id="i-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
 </table></div>
 
+<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Casas por revisar</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Triaje estructural. Los
+ingenieros clasifican sin ver de quién es la casa ni dónde queda; <strong>aquí sí están el contacto
+y la dirección</strong>, que es lo que permite ir a visitar. Ordenadas por urgencia y, dentro de
+cada grupo, por antigüedad.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Caso</th><th scope="col">Prioridad</th><th scope="col">Dónde</th>
+<th scope="col">Contacto</th><th scope="col">La casa</th><th scope="col">Estado</th>
+</tr></thead><tbody id="cs-filas"><tr><td colspan="6">Cargando…</td></tr></tbody>
+</table></div>
+
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
 de la brigada. <strong>El acuse les pidió NO comprar todavía</strong>, así que conviene responder
@@ -4135,6 +4169,35 @@ function cargarInscripciones(){
 var CAT_ES = { agua:"Agua segura", alimento:"Comida sin cocina", higiene:"Higiene y dignidad",
   panales:"Pañales", descanso:"Descanso", energia:"Luz y carga", brigada:"Equipo de brigada", otra:"Otra" };
 
+function cargarCasos(){
+  fetch("/api/admin/casos").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("cs-filas"); if (!tb) return;
+    var l = d.casos || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Todavía no hay casos.</td></tr>'; return; }
+    var ET = { urgente:"Visita urgente", programada:"Visita programada",
+               no_requiere:"No requiere visita", inevaluable:"No se pudo evaluar" };
+    tb.innerHTML = l.map(function(c){
+      var pr = c.clasificacion
+        ? '<strong>' + esc(ET[c.clasificacion] || c.clasificacion) + '</strong>'
+          + (c.ing ? '<br><small>por ' + esc(c.ing) + '</small>' : '')
+        : '<small>sin evaluar</small>';
+      var casa = esc(c.material || "?") + " · " + (c.pisos || "?") + " piso(s) · " + c.medios + " foto(s)"
+        + (c.danio_previo ? '<br><small>tenía grietas antes</small>' : '')
+        + (c.heridos ? '<br><small>hubo heridos</small>' : '')
+        + (c.habitada ? '' : '<br><small>desocupada</small>');
+      return "<tr>" +
+        "<td><strong>" + esc(c.numero) + "</strong><br><small>" + esc((c.creado_en||"").slice(0,10)) + "</small></td>" +
+        "<td>" + pr + "</td>" +
+        "<td>" + esc(c.sector) + (c.direccion_ref ? "<br><small>" + esc(c.direccion_ref) + "</small>" : "") + "</td>" +
+        "<td>" + esc(c.contacto_nombre) + "<br><small>" + esc(c.contacto_tel) +
+          (c.contacto_email ? " · " + esc(c.contacto_email) : "") + "</small></td>" +
+        "<td>" + casa + "</td>" +
+        "<td>" + esc(c.estado) + (c.consent_publico ? '<br><small>autoriza publicar</small>' : "") +
+          (c.reco ? '<br><small>' + esc(c.reco.slice(0,60)) + '</small>' : "") + "</td>" +
+        "</tr>";
+    }).join("");
+  });
+}
 function cargarOfrecimientos(){
   fetch("/api/admin/ofrecimientos").then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("o-filas"); if (!tb) return;
@@ -4314,6 +4377,7 @@ document.addEventListener("click", function(e){
 pintarCampos();
 cargarEntregas();
 cargarSueltos();
+cargarCasos();
 cargarOfrecimientos();
 cargarInscripciones();
 /* Faltaba: la bandeja de transferencias solo se refrescaba DESPUÉS de confirmar
@@ -4536,6 +4600,7 @@ export default {
         if (tm) return await triageMedio(env, Number(tm[1]));
         if (ruta === "/api/admin/resumen")  return await adminResumen(env);
         if (ruta === "/api/admin/salud")    return await adminSalud(env);
+        if (ruta === "/api/admin/casos")    return await adminCasos(env);
         if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
         const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
         if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
