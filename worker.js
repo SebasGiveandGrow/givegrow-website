@@ -1132,12 +1132,12 @@ async function correoIngeniero(env, i) {
   const parrafos = en ? [
     "Someone from Give&Grow will check your professional licence in COPNIA's public register before opening access. That check is done by a person and it is the reason this is not instant.",
     "Once approved you will get access at this same email address: no account, no password. You request a code, it arrives in your inbox, and you are in.",
-    "A reminder of what you would be doing, because it is what makes this defensible: you PRIORITISE. You say who should be visited first and what to advise in the meantime. You do not declare a house habitable — that cannot be done from photos, and the declaration with legal effects belongs to the municipal authority.",
+    "A reminder of what you would be doing, because it is what makes this defensible: you give an OPINION at a distance. You say whether there are signs not to stay in the house or in part of it, what precautions to take and which materials to repair it with, and you order the visit queue. You do not declare a house habitable — that cannot be done from photos, and the declaration with legal effects belongs to the municipal authority.",
     "Nothing about this is charged, in either direction."
   ] : [
     "Alguien de Give&Grow va a verificar tu matrícula en el registro público del COPNIA antes de abrirte el acceso. Esa comprobación la hace una persona y es la razón de que esto no sea inmediato.",
     "Cuando quede aprobada, entras con este mismo correo: sin cuenta y sin contraseña. Pides un código, te llega al buzón y entras.",
-    "Un recordatorio de lo que harías, porque es lo que hace defendible el proyecto: tú PRIORIZAS. Dices a quién hay que visitar primero y qué recomendarle mientras tanto. No declaras habitable una casa — eso no se determina por fotos, y la declaratoria con efectos es de la autoridad municipal.",
+    "Un recordatorio de lo que harías, porque es lo que hace defendible el proyecto: das un CONCEPTO a distancia. Dices si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar y con qué materiales conviene repararla, y ordenas la fila de visitas. No declaras habitable una casa — eso no se determina por fotos, y la declaratoria con efectos es de la autoridad municipal.",
     "Nada de esto se cobra, en ninguna dirección."
   ];
   const mapa = en ? ESP_ING_EN : ESP_ING_ES;
@@ -2241,7 +2241,7 @@ async function correoAvisoCaso(env, x) {
     html: plantillaCorreo({
       titulo,
       parrafos: ["Entró un caso nuevo para triage estructural. Todavía no lo ha visto ningún ingeniero.",
-                 "Recuerda: esto prioriza a quién visitar, no determina si la casa es habitable."],
+                 "Recuerda: el concepto orienta y prioriza; no determina si la casa es habitable."],
       filas
     }),
     etiqueta: "caso-recibido"
@@ -2316,8 +2316,11 @@ function paginaTriage() {
   <p class="sub" id="quien">Cargando sesión...</p>
   <div class="aviso">
     <b>Esto no es un dictamen de habitabilidad.</b> Por fotos no se determina, y la declaratoria
-    con efectos le corresponde a la autoridad municipal. Lo que decides aqui es <b>a quien se
-    visita primero</b>. Si el material no alcanza, marca <b>No puedo evaluar</b> y di qué falta.
+    con efectos le corresponde a la autoridad municipal. Lo que das aqui es un <b>concepto a
+    distancia</b>: si hay señales para no permanecer, qué precauciones tomar y con qué reparar —
+    más el orden de la fila de visitas. Recomendar que no se use una parte de la casa mientras se
+    revisa es una <b>precaución</b>, no una declaratoria. Si el material no alcanza, marca
+    <b>No puedo evaluar</b> y di qué falta.
   </div>
   <div class="tabs" id="tabs">
     <button class="tab on" data-cola="pendientes">Sin revisar</button>
@@ -2428,7 +2431,7 @@ function abrir(numero){
       +  "<label>Tu nombre</label><input id='t-nombre'>"
       +  "<label>Tu matrícula profesional</label><input id='t-mat'>"
       +  "<label>Nota técnica</label><textarea id='t-nota' rows='4'></textarea>"
-      +  "<label>Recomendación para la familia mientras tanto</label><textarea id='t-rec' rows='3'></textarea>"
+      +  "<label>Concepto para la familia: si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar</label><textarea id='t-rec' rows='5'></textarea>"
       +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
       +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluación</button></p>"
       +  "<p class='msg' id='t-msg'></p></div>";
@@ -2784,8 +2787,9 @@ async function correoCasoClasificado(env, x) {
     "Recuerda: no entres a la casa si ves muros caídos, techos hundidos o columnas partidas. Ninguna foto vale un accidente."
   ] : [
     "Un ingeniero voluntario revisó las fotos de tu casa y ya hay una recomendación.",
-    x.recomendacion ? "Mientras se hace la visita: " + x.recomendacion : null,
-    "Esto NO dice si tu casa es habitable. Eso lo define una visita y la autoridad de tu municipio. Lo que dice es qué tan pronto conviene visitarla."
+    x.recomendacion ? "Qué hacer, y con qué reparar: " + x.recomendacion : null,
+    "Esto no reemplaza una visita ni la declaratoria de tu municipio: es un concepto hecho a distancia, sobre las fotos que enviaste.",
+    "Buscaremos gestionar ayuda para todas las casas que podamos, y no podemos comprometerla casa por casa."
   ].filter(Boolean);
 
   const filas = [
