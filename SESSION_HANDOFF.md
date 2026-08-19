@@ -1,70 +1,92 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Marca de Mira Mi Casa y auditoría" (19 ago 2026)
-> **⏭️ ARRANCA POR: «MIGRAR EL TRIAJE A MIRA MI CASA», la primera sección de
-> abajo. Es una tarea acordada con Sebas, definida, y sin empezar.**
+> Última actualización: sesión "Migración a Mira Mi Casa y el concepto" (19 ago 2026)
+> **⏭️ ARRANCA POR: las DOS DONACIONES REALES que llevan días esperando** — ver
+> su sección más abajo. Son de personas, no de código, y una pide certificado.
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
-## ⏭️ MIGRAR EL TRIAJE A MIRA MI CASA (acordado el 19 ago · SIN EMPEZAR)
+## ✅ EL TRIAJE YA VIVE EN MIRA MI CASA (hecho y verificado, 19 ago · PR #138)
 
-**La decisión de Sebas, textual:** todo lo que tiene que ver con el TRIAJE vive
-en Mira Mi Casa. **La BRIGADA se queda en Give&Grow**, porque es anterior a este
-proyecto y es de la fundación.
+Se cerró la duplicidad: el triaje solo existe en `miramicasa.…`. **La BRIGADA se
+quedó en Give&Grow**, porque es anterior a este proyecto y es de la fundación.
+`/triaje`, `/admin` y `/admin/ruta` **siguen en el ápex** y no se pueden mover:
+la aplicación de Access está en su tope de hostnames.
 
-Hoy la plataforma vive en los DOS sitios: el subdominio ya tiene su marca, pero
-`thegiveandgrowproject.org/#vivienda` sigue funcionando con la cara verde, y el
-grupo «Emergencia» del menú apunta ahí. Hay que cerrar esa duplicidad.
+**Los enlaces viejos NO se rompieron**, y era la condición: las rutas de hash las
+mueve `triajeRuta()` en `app.js` —espejo de `mmcRuta()`, porque el Worker nunca
+ve el `#`— y `/caso/*` lo mueve el Worker con un 301 **que conserva la query**,
+que es donde viaja el token de la familia.
 
-### Qué se mueve y qué NO
+### Las cuatro decisiones que conviene no deshacer
 
-| | Dónde queda |
-|---|---|
-| `#vivienda`, `#ingenieros`, `#casas`, `/caso/*` | **solo** en `miramicasa.…` |
-| La brigada (`#brigada`) | se queda en Give&Grow — es anterior y es suya |
-| `/triaje`, `/admin`, `/admin/ruta` | **se quedan en el ápex**, y no es negociable: la aplicación de Access está en su tope de hostnames y cubre el ápex. Moverlas rompe el acceso del equipo y de los ingenieros |
+1. **`ORIGIN` NO se tocó.** La usan el recibo, el carnet y las tarjetas de
+   compartir, que son de la fundación. El triaje tiene su propio `ORIGIN_MMC`.
+   Cambiar la constante mandaría los recibos de donación al subdominio.
+2. **El enlace de la ficha del panel lo arma el SERVIDOR** (`adminCasoFicha`
+   devuelve `enlace`). Su origen ya no es el del panel, y **el check del gate no
+   puede validar `adminJS()` si lleva una interpolación** — la alternativa era un
+   segundo literal del mismo dominio esperando a divergir, que es exactamente
+   cómo nació el check #10.
+3. **El `canonical` y el `og:url` se reescriben al ORIGEN, no a la ruta.** Así
+   ninguna URL de caso —que lleva el token de la familia— puede acabar en un
+   `canonical` que un crawler siga.
+4. **Los redirects van FUERA del guardián de Access**, igual que el de `/ruta`:
+   dentro no se alcanzan nunca y caen al comodín de la SPA.
 
-### Los seis puntos a tocar, con su trampa cada uno
+Verificado en producción mirando la RESPUESTA: el ápex redirige 301 con el token
+intacto, el subdominio sirve `data-marca="mmc"` con su propio canonical, `/triaje`
+y `/admin` siguen en 302 al login **en el ápex**, y `#brigada` sigue viva y verde.
 
-1. **Las rutas de hash no las puede redirigir el Worker** — nunca ve el `#`.
-   `#vivienda`, `#ingenieros` y `#casas` se redirigen desde `app.js`: si el host
-   es el ápex y la ruta es de triaje, `location.href` al subdominio. El espejo
-   de `mmcRuta()`, que ya hace lo contrario.
+## ⚠️ EL CENTRO YA NO ES LA VISITA: ES EL CONCEPTO (19 ago · PR #140)
 
-2. **`/caso/*` SÍ es una ruta de path** y se redirige en el Worker, junto al
-   redirect de `/ruta` → `/admin/ruta` que ya existe. Ojo: tiene que ir FUERA
-   del guardián de Access, como aquel.
+**Decisión de Sebas, y cambia lo que el producto promete.** Lo que la familia
+recibe dejó de ser una prioridad de visita y es un **concepto**: si hay señales
+para **no permanecer** en la casa o en una parte de ella, qué precauciones tomar,
+y **con qué materiales y en qué orden** repararla. La prioridad sigue existiendo
+y pasó a ser un dato más. Su razón: la emergencia lo exige por contingencia, y
+«te diremos qué tan pronto te visitamos» es logística nuestra, no una respuesta
+para quien tiene la casa rota.
 
-3. **`ORIGIN` en `worker.js:36` es UNA sola constante** —
-   `https://www.thegiveandgrowproject.org`— y la usan el recibo, el carnet, las
-   tarjetas de compartir Y el enlace del caso (`worker.js:2771`). **No se cambia
-   la constante**: hay que darle su propio origen al enlace del caso, o los
-   recibos de donación empezarían a apuntar al subdominio del triaje.
+**HASTA DÓNDE LLEGA, Y ES EL LÍMITE QUE NO HAY QUE MOVER.** Se eligió el grado
+intermedio de tres: se habla de **permanencia**, **no se declara habitabilidad**.
+Eso sigue siendo de la autoridad municipal (Ley 1523 de 2012) y de una visita, y
+es lo que el ingeniero firma con su matrícula del COPNIA. Por eso **no se tocó**
+la casilla `acepta_triaje`, ni `clasificacion` en el esquema, ni un solo descargo
+del PDF, **y no hubo migración**.
 
-4. **El enlace que arma el formulario** (`app.js:1801`) usa `location.origin`.
-   Desde el ápex genera un enlace del ápex. Tras la migración siempre debe
-   apuntar al subdominio, esté donde esté quien lo llena.
+Y se añadió la frase que faltaba, que es la que protege al ingeniero: *recomendar
+que no se use una parte de la casa mientras se revisa es una **precaución**, no
+una declaratoria.*
 
-5. **El `canonical`** de `index.html:6` es estático y apunta a
-   `www.thegiveandgrowproject.org`. En el subdominio eso le dice a Google «la
-   buena está allá». Se reescribe con el mismo HTMLRewriter que ya inyecta
-   `data-marca` — es el sitio natural y ya está montado.
+**Lo que la fundación promete quedó escrito antes del formulario, no después:**
+buscaremos gestionar ayuda para todas las casas que podamos, y **no se compromete
+casa por casa**. Va en su propio párrafo (`cv.gestion`) y no dentro de `cv.aviso`
+a propósito: uno habla del alcance TÉCNICO, el otro del COMPROMISO.
 
-6. **El menú «Emergencia»** del ápex: se queda la brigada; los tres del triaje
-   pasan a ser enlaces externos al subdominio, no rutas de la SPA.
+**El cambio que no es de copy, y es el que sostiene la promesa:** el campo del
+ingeniero pasó de «Recomendación para la familia mientras tanto» a pedir
+permanencia, precauciones, materiales y orden. Si no se le pide, la promesa queda
+sin nada detrás — que es literalmente el hallazgo de severidad alta de la
+auditoría de agosto.
 
-### Lo que NO hay que romper
+**En el PDF el concepto va ANTES de la prioridad, y el orden es la decisión.** Se
+llama «Concepto técnico preliminar»; la II es CONCEPTO DEL INGENIERO y la III
+PRIORIDAD DE VISITA. La familia leía primero «visita programada» y tenía que bajar
+hasta las observaciones para encontrar lo único que puede usar hoy.
 
-- **Los enlaces ya compartidos son del ápex** — incluido el que Sebas le pasó a
-  la ingeniera el 19 por la mañana. Los redirects de los puntos 1 y 2 los cubren;
-  si se borran las rutas sin redirigir, se rompen.
-- El `sitemap.xml` solo lista el dominio principal. Si el triaje se va, sus URLs
-  no deberían seguir anunciadas ahí.
+### ⏭️ LO QUE ESTO VUELVE MÁS URGENTE
+La **guía fotográfica** (punto 12 de los insumos) ya no es solo deseable: de sus
+once preguntas, la que pregunta **«qué NO estás dispuesta a firmar a distancia»**
+ahora define directamente si el concepto se puede sostener tal como está escrito.
+Si la ingeniera dice que no firma señales de permanencia, hay que volver al grado
+conservador — y el texto está en `cv.aviso`, `cv.lead`, `mc.aviso`, `ing.q1.p`,
+`ing.q2.p`, el correo de clasificación y `documentos.js`.
 
-### Cómo comprobar que quedó
-Mirando la RESPUESTA y no el código — ver la cicatriz de `run_worker_first`:
-el ápex debe redirigir las cuatro entradas, el subdominio servirlas con
-`data-marca="mmc"`, `/triaje` y `/admin/ruta` deben seguir pidiendo login de
-Access **en el ápex**, y `#brigada` debe seguir viva y verde en Give&Grow.
+### 📐 Y una lección de método que se repitió
+Al leer el PDF generado, la raya larga «desaparecía» y parecía un defecto real.
+No lo era: **la decodifiqué en latin-1 y en WinAnsi el em dash es `0x97`**, que
+ahí es un carácter de control invisible. Tercera vez que un «hallazgo» resulta ser
+un defecto de mi propia medición. **Un hallazgo sin su prueba no es un hallazgo.**
 
 ## Estado del proyecto
 - Sitio bilingüe ES/EN, vanilla-JS SPA, Cloudflare Workers.
