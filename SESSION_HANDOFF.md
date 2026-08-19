@@ -513,9 +513,22 @@ dominio y cada uno se aprueba individualmente.
 - **Las respuestas de los ingenieros** a la guía fotográfica: la lista de fotos
   obligatorias, las categorías de clasificación (hoy provisionales) y qué NO
   están dispuestos a firmar a distancia.
-- **El banco público de casas y el apadrinamiento** son fases posteriores. El
-  apadrinamiento es una donación con destinación específica: hablarlo con la
-  contadora ANTES de recibir el primer peso.
+- **El banco público de casas y el apadrinamiento** son fases posteriores.
+  **El diseño del apadrinamiento ya está escrito: `ops/apadrinamiento.md`** (18
+  ago), con las SIETE preguntas para la contadora redactadas para que las
+  responda con un sí, un no o una regla. Sigue en pie que no se recibe el primer
+  peso sin esa conversación, y ahora se sabe exactamente qué preguntarle.
+
+  Lo que el documento decide y conviene no deshacer: **la fundación financia
+  materiales, no ejecuta obra** (nivel B de los tres). Ejecutar la reparación la
+  metería en responsabilidad civil por la obra y riesgos laborales — otra clase
+  de exposición, y todo el proyecto se diseñó justamente para no asumirla.
+
+  Y un hallazgo que conviene tener presente: **la anonimidad que exige la Ley
+  1581 es también lo que hace defendible la donación.** Nadie dona «para la casa
+  del señor X», dona al programa para un caso identificado por número y sector.
+  Poner cara y nombre para hacer la campaña más emotiva es lo que la volvería
+  indefendible.
 
 ## Cierre de tanda: plan VISUAL, Fase 4 — sistema visual (16 ago 2026)
 
