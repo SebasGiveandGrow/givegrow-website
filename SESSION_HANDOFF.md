@@ -430,6 +430,26 @@ informe descargado.
 5. **El teléfono es el identificador; el correo es opcional de verdad.** En esas
    zonas mucha gente tiene WhatsApp y no correo.
 
+### LA SEGUNDA OPINIÓN, Y QUÉ PASA CUANDO DISCREPAN (18 ago)
+`evaluaciones` admitía varias por caso desde la 0010 y **nada lo usaba**: la
+última sobrescribía a la anterior en silencio, así que un segundo ingeniero
+podía bajar un caso de urgente a no_requiere sin que nadie se enterara.
+
+**Dos reglas nuevas, y no se deben invertir:**
+
+1. **Gana la MÁS GRAVE, no la más reciente.** En una emergencia los dos errores
+   no cuestan lo mismo: visitar una casa que no hacía falta es un viaje perdido;
+   no visitar una que sí, es lo que el proyecto existe para evitar.
+2. **Si discrepan, a la familia NO se le escribe.** Recibiría en dos días
+   «visita urgente» y «no requiere visita» sobre su propia casa. El aviso va al
+   equipo (`discrepancia-triaje`) y la familia recibe una sola respuesta cuando
+   haya una. Verificado: con un ingeniero le llega el correo; con dos que no
+   coinciden le llegan CERO.
+
+`/triaje` tiene pestañas y una nueva, **«Piden confirmación»**, con su contador:
+urgentes con una sola opinión —sobre un urgente se va a mover una brigada— y los
+que están en desacuerdo. `/admin` marca «en discrepancia» en la bandeja.
+
 ### ⚠️ RUTA NUEVA = DOS SITIOS, NO UNO (18 ago)
 Añadir `/ruta` costó una vuelta entera por olvidar el segundo: hay que
 registrarla en **`run_worker_first` de `wrangler.toml`** además de en el
