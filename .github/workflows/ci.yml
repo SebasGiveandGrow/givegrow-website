@@ -44,6 +44,18 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # `actions: write` es lo que permite DISPARAR el deploy. Sin él, el job
+      # fusiona el PR y muere en el último paso con
+      #   HTTP 403: Resource not accessible by integration
+      # dejando `main` desplegado a medias: el cambio está fusionado y
+      # producción sigue con el anterior. Nadie se entera, porque el PR
+      # aparece fusionado y en verde.
+      #
+      # Pasó el 19 ago 2026 con el PR #130 —la ruta de terreno de la brigada—
+      # y se descubrió por casualidad, comprobando producción a mano antes de
+      # una demostración. Es el fallo más caro de esta familia: silencioso y
+      # con apariencia de éxito.
+      actions: write
     steps:
       - name: Merge cuando el gate está en verde
         run: gh pr merge ${{ github.event.pull_request.number }} --squash --repo ${{ github.repository }}
