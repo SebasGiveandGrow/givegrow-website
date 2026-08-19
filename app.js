@@ -189,6 +189,29 @@ var I18N = {
     "nav.transp":"Transparencia",
     "nav.contacto":"Contacto",
     "nav.faq":"FAQ",
+    "bc.ey":"Triaje estructural",
+    "bc.t":"Las casas que hemos revisado",
+    "bc.lead":"Cada una fue reportada por su familia, revisada por un ingeniero voluntario y clasificada por urgencia. Esto no es una lista de casas que vayamos a reparar: es lo que encontramos.",
+    "bc.aviso":"Aparecen sin nombre, sin dirección y sin fotos — solo el barrio o sector. Aparecen únicamente las familias que autorizaron que su caso fuera público, y esa autorización se puede retirar cuando quieran.",
+    "bc.n.revisados":"casas revisadas",
+    "bc.n.urgentes":"clasificadas urgentes",
+    "bc.n.visitados":"ya visitadas",
+    "bc.n.publicas":"con permiso para aparecer aquí",
+    "bc.tabla.caso":"Caso",
+    "bc.tabla.donde":"Dónde",
+    "bc.tabla.casa":"La casa",
+    "bc.tabla.pri":"Prioridad",
+    "bc.cl.urgente":"Visita urgente",
+    "bc.cl.programada":"Visita programada",
+    "bc.cl.no_requiere":"No requiere visita por ahora",
+    "bc.piso":"piso",
+    "bc.pisos":"pisos",
+    "bc.vacio":"Todavía no hay casos públicos. Aparecen cuando un ingeniero los clasifica y la familia autoriza que se muestren.",
+    "bc.cargando":"Cargando…",
+    "bc.cierre":"Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. Lo que hay aquí es a quién conviene visitar primero.",
+    "bc.tuya":"¿Tu casa se afectó y no está aquí?",
+    "nav.casas":"Casas revisadas",
+    "nav.d.casas":"El registro público del triaje, sin nombres ni direcciones",
     "nav.g.emergencia":"Emergencia",
     "nav.brigada":"Brigada de emergencia",
     "nav.d.brigada":"Los cinco territorios, qué se necesita y cómo aportar",
@@ -1423,6 +1446,7 @@ var ROUTE_META = {
   membresias:{t:{es:"Membresías · Give&Grow International",en:"Memberships · Give&Grow International"},d:{es:"Hazte miembro de Give&Grow: dona de forma recurrente, crece de Semilla a Bosque y suma beneficios en cada nivel.",en:"Become a Give&Grow member: give monthly, grow from Seed to Forest and add benefits at each tier."}},
   voluntariado:{t:{es:"Voluntariado e Impact Journey · Give&Grow International",en:"Volunteering & Impact Journey · Give&Grow International"},d:{es:"Tres maneras de participar, el método MIRA en doble vía y cómo cuidamos a las comunidades. Voluntariado corporativo y pro-bono.",en:"Three ways to take part, the two-way MIRA method, and how we care for communities. Corporate and pro-bono volunteering."}},
   faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}},
+  casas:{t:{es:"Casas revisadas · Give&Grow International",en:"Homes reviewed · Give&Grow International"},d:{es:"Registro público del triaje estructural: las casas revisadas por ingenieros voluntarios, sin nombres ni direcciones. Evidencia, no promesas.",en:"Public record of the structural triage: homes reviewed by volunteer engineers, with no names or addresses. Evidence, not promises."}},
   caso:{t:{es:"Tu caso · Give&Grow International",en:"Your case · Give&Grow International"},d:{es:"Consulta en qué va tu caso de vivienda y agrega las fotos que te pidieron.",en:"Check where your housing case stands and add the photos you were asked for."}},
   ingenieros:{t:{es:"Ingenieros voluntarios · Give&Grow International",en:"Volunteer engineers · Give&Grow International"},d:{es:"Postúlate al triaje estructural: mira fotos de casas afectadas por el sismo y di a quién visitar primero. Es priorización, no un dictamen de habitabilidad.",en:"Apply to the structural triage: review photos of homes hit by the earthquake and say who should be visited first. It is prioritisation, not a habitability ruling."}},
   vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario dice qué tan urgente es una visita. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer says how urgent a visit is. It does not replace the official assessment."}},
@@ -1855,6 +1879,59 @@ function cvSubirCola(){
     .catch(function(){ cvSubirCola(); });
 }
 
+/* ===== Banco público de casas =====
+   Lo que el servidor manda ya viene filtrado —sin fotos, sin nota libre, sin
+   contacto— así que aquí no hay que decidir nada sobre privacidad: solo pintar.
+   Aun así todo pasa por escapeHtml: el sector lo escribió una familia. */
+var BC_CL = ["urgente", "programada", "no_requiere"];
+
+function bcPinta(){
+  var tot = document.getElementById("bc-totales");
+  var lis = document.getElementById("bc-lista");
+  if (!tot || !lis) return;
+
+  fetch("/api/casos/publicos").then(function(r){ return r.json(); }).then(function(d){
+    var T = d.totales || {};
+    /* Los totales cuentan todo lo revisado; la tabla solo lo que se puede
+       mostrar. Que los dos números se vean juntos es el punto: si difieren
+       mucho, se ve que hay más trabajo del que la lista alcanza a enseñar. */
+    var cajas = [
+      [T.revisados, t("bc.n.revisados")],
+      [T.urgentes, t("bc.n.urgentes")],
+      [T.visitados, t("bc.n.visitados")],
+      [T.publicables, t("bc.n.publicas")]
+    ];
+    tot.innerHTML = cajas.map(function(c){
+      return '<div class="eco-item"><span class="figure-xl" style="font-size:34px">' + (c[0] || 0) +
+             '</span><span class="figure-lab">' + escapeHtml(c[1]) + "</span></div>";
+    }).join("");
+
+    var l = d.casos || [];
+    if (!l.length){ lis.innerHTML = '<p class="mu">' + escapeHtml(t("bc.vacio")) + "</p>"; return; }
+
+    var h = '<div class="med-tw"><table class="med-tbl"><thead><tr>'
+          + "<th scope=\"col\">" + escapeHtml(t("bc.tabla.caso")) + "</th>"
+          + "<th scope=\"col\">" + escapeHtml(t("bc.tabla.donde")) + "</th>"
+          + "<th scope=\"col\">" + escapeHtml(t("bc.tabla.casa")) + "</th>"
+          + "<th scope=\"col\">" + escapeHtml(t("bc.tabla.pri")) + "</th>"
+          + "</tr></thead><tbody>";
+    for (var i = 0; i < l.length; i++){
+      var c = l[i];
+      var casa = [];
+      if (c.material) casa.push(t("cv.mat." + c.material) || c.material);
+      if (c.pisos) casa.push(c.pisos + " " + t(c.pisos === 1 ? "bc.piso" : "bc.pisos"));
+      h += "<tr><td>" + escapeHtml(c.numero) + "</td>"
+        +  "<td>" + escapeHtml(c.sector) + "</td>"
+        +  "<td>" + escapeHtml(casa.join(" · ") || "—") + "</td>"
+        +  "<td><strong>" + escapeHtml(BC_CL.indexOf(c.clasificacion) > -1
+             ? t("bc.cl." + c.clasificacion) : c.clasificacion) + "</strong></td></tr>";
+    }
+    lis.innerHTML = h + "</tbody></table></div>";
+  }).catch(function(){
+    lis.innerHTML = '<p class="mu">' + escapeHtml(t("bc.vacio")) + "</p>";
+  });
+}
+
 /* ===== Mi caso: en qué va, y cómo agregar fotos =====
    La contraparte de `inevaluable`. El ingeniero podía decir «con esto no puedo
    evaluar, mándenme tal foto» y esa petición no tenía dónde aterrizar: el
@@ -2124,6 +2201,7 @@ function go(id, fromPop){
   if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); pintarBrigadaEstado(); }
   if (id==="transparencia") pintarFechaImpresion();
   if (id==="caso" && MC.caso) mcPinta();
+  if (id==="casas") bcPinta();
 
   window.scrollTo(0,0);
   if (!fromPop) focusActivePage();

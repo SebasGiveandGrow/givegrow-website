@@ -62,6 +62,7 @@
           <a href="#brigada"><span class="nd-t" data-i18n="nav.brigada">Brigada de emergencia</span><span class="nd-d" data-i18n="nav.d.brigada">Los cinco territorios, qué se necesita y cómo aportar</span></a>
           <a href="#vivienda"><span class="nd-t" data-i18n="cv.t">Revisa tu casa</span><span class="nd-d" data-i18n="nav.d.vivienda">Sube fotos de tu casa y sabrás qué tan urgente es una visita</span></a>
           <a href="#ingenieros"><span class="nd-t" data-i18n="ing.ey">Ingenieros voluntarios</span><span class="nd-d" data-i18n="nav.d.ingenieros">Postúlate al triaje: mira fotos y di a quién visitar primero</span></a>
+          <a href="#casas"><span class="nd-t" data-i18n="nav.casas">Casas revisadas</span><span class="nd-d" data-i18n="nav.d.casas">El registro público del triaje, sin nombres ni direcciones</span></a>
         </div>
       </div>
       <a class="nlink" href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
@@ -118,6 +119,7 @@
   <a href="#brigada" data-i18n="nav.brigada">Brigada de emergencia</a>
   <a href="#vivienda" data-i18n="cv.t">Revisa tu casa</a>
   <a href="#ingenieros" data-i18n="ing.ey">Ingenieros voluntarios</a>
+  <a href="#casas" data-i18n="nav.casas">Casas revisadas</a>
   <a href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
   <a href="#fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
   <span class="mnav-g" data-i18n="nav.empresas">Empresas</span>
@@ -2291,6 +2293,27 @@
      No lleva navegación ni se enlaza desde ninguna parte: se llega con el
      enlace de la familia, que trae su token. El cuerpo lo pinta el JS porque
      depende del caso; solo el encabezado es estático. -->
+<!-- Banco público de casas. `consent_publico` y su índice existen desde la 0010
+     y nada los consumía: esta es la primera evidencia pública del programa.
+     La tabla la pinta el JS; aquí solo va el encabezado y el aviso, que son lo
+     que tiene que leer un crawler aunque no cargue nada más. -->
+<main id="page-casas" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey" data-i18n="bc.ey">Triaje estructural</span>
+      <h1 class="h-sec" data-i18n="bc.t">Las casas que hemos revisado</h1>
+      <p class="lead" data-i18n="bc.lead">Cada una fue reportada por su familia, revisada por un ingeniero voluntario y clasificada por urgencia. Esto no es una lista de casas que vayamos a reparar: es lo que encontramos.</p>
+      <p class="mu" style="max-width:62ch;margin-top:14px" data-i18n="bc.aviso">Aparecen sin nombre, sin dirección y sin fotos — solo el barrio o sector. Aparecen únicamente las familias que autorizaron que su caso fuera público, y esa autorización se puede retirar cuando quieran.</p>
+
+      <div id="bc-totales" class="eco-row" style="justify-content:flex-start;margin-top:30px"></div>
+      <div id="bc-lista" style="margin-top:24px"><p class="mu" data-i18n="bc.cargando">Cargando…</p></div>
+
+      <p class="mu" style="max-width:62ch;margin-top:26px;padding-top:18px;border-top:1px solid var(--bd)" data-i18n="bc.cierre">Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. Lo que hay aquí es a quién conviene visitar primero.</p>
+      <p style="margin-top:14px"><a class="card-link" href="#vivienda"><span data-i18n="bc.tuya">¿Tu casa se afectó y no está aquí?</span> <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+</main>
+
 <main id="page-caso" class="page">
   <section>
     <div class="wrap">
@@ -2380,7 +2403,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=252e5802"></script>
+<script src="/app.js?v=a0916829"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

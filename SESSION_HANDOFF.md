@@ -442,6 +442,27 @@ informe descargado.
 5. **El teléfono es el identificador; el correo es opcional de verdad.** En esas
    zonas mucha gente tiene WhatsApp y no correo.
 
+### EL BANCO PÚBLICO DE CASAS — `#casas` (18 ago)
+`consent_publico` y su índice `ix_casos_publico` existían desde la 0010 y nada
+los consumía. Ya hay página pública: totales del triaje y la lista anonimizada.
+
+**Lo que NO sale, y la lista corta importa más que la larga:**
+- **Ninguna foto.** Una fachada ES una dirección: quien conozca el barrio
+  identifica la casa. La familia autorizó aparecer «SIN mi nombre ni mi
+  dirección», y publicar la foto sería incumplirlo diciendo que se cumple.
+- **`nota`**, el campo libre de la familia. Ahí puede haber un apellido o el
+  nombre de un vecino, y eso no se audita a mano cada vez. (Verificado con un
+  caso de prueba cuya nota decía «mi mamá Rosa Elena» y «don Jairo»: no sale.)
+- Contacto y `direccion_ref`, obviamente.
+
+**Tres filtros y los tres se probaron:** solo con `consent_publico = 1`, solo ya
+clasificados —publicar lo que ningún ingeniero ha mirado sería presentar como
+hallazgo una solicitud sin revisar— y nada cerrado ni descartado.
+
+**Los totales cuentan TODO lo clasificado**, con consentimiento o sin él: es el
+tamaño real de lo revisado y no identifica a nadie. Si solo contaran lo
+publicable, el sitio diría que revisó menos casas de las que revisó.
+
 ### LOS CASOS ENTRAN A «SALUD DEL ECOSISTEMA» (18 ago)
 El panel vigilaba cinco colas —inscripciones, transferencias, certificados,
 correos, entregas— y **ninguna era de casos**. La plataforma entera de viviendas
