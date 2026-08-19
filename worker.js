@@ -2216,7 +2216,7 @@ function paginaTriage() {
 <title>Triaje estructural</title>
 <style>
   :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;
-        --urg:#8C2F1E;--prog:#9A6B12;--no:#1F5C38}
+        --urg:#8C2F1E;--prog:#9A6B12;--no:#1F5C38;--amber:#A84D00}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
   .wrap{max-width:1000px;margin:0 auto;padding:28px 20px 80px}
@@ -2235,6 +2235,12 @@ function paginaTriage() {
         padding:3px 9px;border-radius:999px;border:1px solid currentColor}
   .p-urgente{color:var(--urg)} .p-programada{color:var(--prog)} .p-no_requiere{color:var(--no)}
   .p-inevaluable{color:var(--mu)}
+  .p-discrepa{color:var(--amber);border-color:var(--amber)}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 4px}
+  .tab{border:1px solid var(--bd);background:var(--surface);border-radius:999px;
+       padding:8px 15px;font-size:14px;cursor:pointer;color:var(--ink);font-family:inherit}
+  .tab.on{background:var(--g);color:#fff;border-color:var(--g);font-weight:600}
+  .tab span{font-weight:700}
   .ficha{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-top:16px}
   .dato{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--bd);font-size:14px}
   .dato span:first-child{color:var(--mu);min-width:150px}
@@ -2258,6 +2264,11 @@ function paginaTriage() {
     con efectos le corresponde a la autoridad municipal. Lo que decides aqui es <b>a quien se
     visita primero</b>. Si el material no alcanza, marca <b>No puedo evaluar</b> y di qué falta.
   </div>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-cola="pendientes">Sin revisar</button>
+    <button class="tab" data-cola="confirmar">Piden confirmación <span id="n-conf"></span></button>
+    <button class="tab" data-cola="clasificados">Ya clasificados</button>
+  </div>
   <div id="lista"><p class="cargando">Cargando casos...</p></div>
   <div id="ficha"></div>
 </div>
@@ -2276,11 +2287,26 @@ fetch("/api/admin/quien").then(function(r){ return r.json(); }).then(function(d)
   el("quien").textContent = d.email ? ("Sesión de " + d.email) : "Sesión activa";
 });
 
+var COLA = "pendientes";
+
+var VACIO = {
+  pendientes: "No hay casos esperando. Gracias.",
+  confirmar: "Nada pendiente de confirmar. Cuando un caso urgente tenga una sola opinión, o dos ingenieros no coincidan, aparece aquí.",
+  clasificados: "Todavía no hay casos clasificados."
+};
+var CABEZA = {
+  pendientes: "caso(s) esperando, del más antiguo al más reciente.",
+  confirmar: "caso(s) donde un segundo par de ojos cambia algo: urgentes con una sola opinión, y los que están en desacuerdo. Sobre un urgente se va a mover una brigada.",
+  clasificados: "caso(s) ya clasificados."
+};
+
 function cargarCola(){
-  fetch("/api/triage/casos").then(function(r){ return r.json(); }).then(function(d){
+  fetch("/api/triage/casos?estado=" + encodeURIComponent(COLA)).then(function(r){ return r.json(); }).then(function(d){
+    var n = el("n-conf");
+    if (n) n.textContent = d.porConfirmar ? "(" + d.porConfirmar + ")" : "";
     var c = d.casos || [];
-    if (!c.length){ el("lista").innerHTML = "<p class='cargando'>No hay casos esperando. Gracias.</p>"; return; }
-    var h = "<p class='sub'>" + c.length + " caso(s) esperando, del más antiguo al más reciente.</p>";
+    if (!c.length){ el("lista").innerHTML = "<p class='cargando'>" + VACIO[COLA] + "</p>"; return; }
+    var h = "<p class='sub'>" + c.length + " " + CABEZA[COLA] + "</p>";
     for (var i = 0; i < c.length; i++){
       var x = c[i];
       h += "<div class='fila'><b>" + esc(x.numero) + "</b>"
@@ -2288,7 +2314,9 @@ function cargarCola(){
         +  " &middot; " + (x.pisos || "?") + " piso(s) &middot; " + x.medios + " foto(s)"
         +  (x.danio_previo ? " &middot; tenía grietas antes" : "")
         +  (x.heridos ? " &middot; hubo heridos" : "")
+        +  (x.firmes ? " &middot; " + x.firmes + " opinión(es)" : "")
         +  "</span>"
+        +  (x.discrepa ? "<span class='pill p-discrepa'>en discrepancia</span>" : "")
         +  (x.clasificacion ? "<span class='pill p-" + esc(x.clasificacion) + "'>" + esc(x.clasificacion) + "</span>" : "")
         +  "<button class='btn' data-abrir='" + esc(x.numero) + "'>Abrir</button></div>";
     }
@@ -2370,6 +2398,16 @@ function enviar(){
 }
 
 document.addEventListener("click", function(ev){
+  var t = ev.target.closest ? ev.target.closest("[data-cola]") : null;
+  if (t){
+    COLA = t.getAttribute("data-cola");
+    var tt = document.querySelectorAll(".tab");
+    for (var i = 0; i < tt.length; i++) tt[i].classList.remove("on");
+    t.classList.add("on");
+    el("ficha").innerHTML = "";
+    cargarCola();
+    return;
+  }
   var a = ev.target.closest ? ev.target.closest("[data-abrir]") : null;
   if (a){ abrir(a.getAttribute("data-abrir")); return; }
   if (ev.target && ev.target.id === "t-enviar"){ enviar(); }
@@ -2394,19 +2432,40 @@ const CLASIFICACIONES = ["urgente", "programada", "no_requiere", "inevaluable"];
 /* GET /api/triage/casos?estado=… — la cola. Por defecto, lo que nadie ha visto,
    y del más viejo al más nuevo: en una emergencia el orden es la antigüedad, no
    la novedad. */
+/* Cuántas opiniones FIRMES tiene un caso. Las `inevaluable` no cuentan: no
+   opinan sobre la casa, dicen que faltan fotos. */
+const FIRMES = "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero " +
+               "AND e.clasificacion <> 'inevaluable')";
+/* Discrepan si hay más de una clasificación distinta entre las firmes. */
+const DISCREPA = "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e " +
+                 "WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1)";
+
 async function triageCasos(env, url) {
   const estado = url.searchParams.get("estado") || "pendientes";
   const filtro = estado === "todos" ? "" :
     estado === "clasificados" ? "WHERE c.estado = 'clasificado'" :
+    /* PIDEN CONFIRMACIÓN: urgentes con una sola opinión, y los que ya están en
+       desacuerdo. Son los dos casos donde un segundo par de ojos cambia algo —
+       sobre un urgente se va a mover una brigada, y una discrepancia parada no
+       se resuelve sola. El esquema permitía la segunda opinión desde la 0010 y
+       nada la pedía nunca. */
+    estado === "confirmar" ? "WHERE (c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA :
     "WHERE c.estado IN ('recibido','en_revision')";
   const r = await env.DB.prepare(
     "SELECT c.numero, c.estado, c.clasificacion, c.sector, c.material, c.pisos, " +
     "c.danio_previo, c.habitada, c.heridos, c.creado_en, " +
     "(SELECT COUNT(*) FROM caso_medios m WHERE m.caso = c.numero) AS medios, " +
-    "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero) AS evaluaciones " +
+    "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero) AS evaluaciones, " +
+    DISCREPA + " AS discrepa, " + FIRMES + " AS firmes " +
     "FROM casos c " + filtro + " ORDER BY c.creado_en ASC LIMIT 200"
   ).all();
-  return json({ casos: r.results || [] });
+
+  /* Cuántos piden confirmación, siempre — así la pestaña puede decirlo sin que
+     el ingeniero tenga que entrar a mirar si hay algo. */
+  const p = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos c WHERE (c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA
+  ).first();
+  return json({ casos: r.results || [], porConfirmar: (p && p.n) || 0 });
 }
 
 /* GET /api/triage/caso/<n> — la ficha: lo que el ingeniero necesita para
@@ -2493,24 +2552,114 @@ async function triageEvaluar(request, env, numero, email) {
      `en_revision` para que se le pida material a la familia y no se dé por
      cerrado. */
   const nuevoEstado = clasificacion === "inevaluable" ? "en_revision" : "clasificado";
+
+  /* Con qué se queda el caso lo deciden TODAS sus evaluaciones, no la última en
+     llegar. Gana la más grave, y si hay desacuerdo queda marcado — ver la regla
+     completa junto a `resolverClasificacion`. */
+  const veredicto = await resolverClasificacion(env, numero);
   await env.DB.prepare(
     "UPDATE casos SET estado = ?, clasificacion = ?, actualizado_en = datetime('now') WHERE numero = ?"
-  ).bind(nuevoEstado, clasificacion === "inevaluable" ? null : clasificacion, numero).run();
+  ).bind(nuevoEstado, clasificacion === "inevaluable" ? null : veredicto.clasificacion, numero).run();
 
-  /* Aviso a la familia, SOLO si dejó correo — es opcional a propósito, así que
-     esto es un extra para quien lo tenga, nunca el canal principal. Y va
-     después de escribir: el correo no puede tumbar una evaluación ya guardada,
-     misma regla dura que en el cobro. */
-  if (caso.contacto_email) {
-    try {
+  /* Aviso a la familia, SOLO si dejó correo —es opcional a propósito— y SOLO si
+     los ingenieros coinciden. Con dos opiniones distintas recibiría dos
+     respuestas contradictorias sobre su propia casa en dos días; ahí el aviso
+     va al equipo. Va después de escribir: el correo no puede tumbar una
+     evaluación ya guardada, misma regla dura que en el cobro. */
+  try {
+    if (veredicto.discrepa) {
+      const ops = await env.DB.prepare(
+        "SELECT DISTINCT clasificacion FROM evaluaciones WHERE caso = ? AND clasificacion <> 'inevaluable'"
+      ).bind(numero).all();
+      await correoDiscrepancia(env, {
+        numero, sector: caso.sector, clasificacion: veredicto.clasificacion,
+        opiniones: (ops.results || []).map((o) => TRIAJE_ET[o.clasificacion] || o.clasificacion)
+      });
+    } else if (caso.contacto_email) {
       await correoCasoClasificado(env, {
         numero, token: caso.token, clasificacion, recomendacion: limpiar(c.recomendacion, 1000),
         falta, email: caso.contacto_email
       });
-    } catch (e) { console.error("correo caso clasificado", numero, e && e.message); }
-  }
+    }
+  } catch (e) { console.error("correo caso clasificado", numero, e && e.message); }
 
-  return json({ ok: true, numero, estado: nuevoEstado, clasificacion });
+  return json({ ok: true, numero, estado: nuevoEstado,
+                clasificacion: nuevoEstado === "clasificado" ? veredicto.clasificacion : null,
+                discrepa: veredicto.discrepa });
+}
+
+/* ========================================================================
+   CUANDO DOS INGENIEROS NO COINCIDEN
+   ========================================================================
+   `evaluaciones` admite varias por caso desde la 0010, y su comentario dice por
+   qué: «si dos coinciden, la clasificación pesa más; si discrepan, eso es
+   exactamente lo que hay que mirar ANTES de decirle a una familia que no vuelva
+   a dormir en su casa». Estaba escrito y nada lo usaba: la última evaluación
+   sobrescribía la anterior en silencio, así que un segundo ingeniero podía
+   bajar un caso de urgente a no_requiere y nadie se enteraba.
+
+   DOS REGLAS, Y LAS DOS TIENEN LA MISMA RAZÓN DETRÁS.
+
+   1. GANA LA MÁS GRAVE, no la más reciente. En una emergencia los dos errores
+      no cuestan lo mismo: visitar una casa que no hacía falta es un viaje
+      perdido; no visitar una que sí, es lo que este proyecto existe para
+      evitar. Mientras haya desacuerdo, el caso se queda arriba.
+
+   2. SI DISCREPAN, A LA FAMILIA NO SE LE ESCRIBE. Hoy cada evaluación le manda
+      un correo; con dos opiniones distintas, la familia recibiría en dos días
+      «visita urgente» y «no requiere visita». Eso no es transparencia, es
+      ruido, y sobre su casa. El aviso va al equipo, que resuelve, y la familia
+      recibe una sola respuesta cuando haya una.
+   ======================================================================== */
+
+const SEVERIDAD = { urgente: 0, programada: 1, no_requiere: 2 };
+
+/* Mira TODAS las evaluaciones firmes del caso —las `inevaluable` no opinan
+   sobre la casa, dicen que faltan fotos— y devuelve con qué se queda. */
+async function resolverClasificacion(env, numero) {
+  const r = await env.DB.prepare(
+    "SELECT clasificacion, COUNT(*) AS n FROM evaluaciones " +
+    "WHERE caso = ? AND clasificacion <> 'inevaluable' GROUP BY clasificacion"
+  ).bind(numero).all();
+  const filas = r.results || [];
+  if (!filas.length) return { clasificacion: null, discrepa: false, firmes: 0 };
+
+  let severa = filas[0].clasificacion, firmes = 0;
+  for (const f of filas) {
+    firmes += f.n;
+    if ((SEVERIDAD[f.clasificacion] ?? 9) < (SEVERIDAD[severa] ?? 9)) severa = f.clasificacion;
+  }
+  return { clasificacion: severa, discrepa: filas.length > 1, firmes };
+}
+
+/* Aviso al equipo. No lleva el detalle técnico de cada evaluación a propósito:
+   quien tenga que resolver esto abre la ficha y las lee enteras. Lo que este
+   correo tiene que lograr es que alguien la abra. */
+async function correoDiscrepancia(env, x) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  const filas = [
+    ["Caso", x.numero],
+    ["Sector", x.sector || "—"],
+    ["Opiniones", x.opiniones.join(" · ")],
+    ["Quedó en", TRIAJE_ET[x.clasificacion] || x.clasificacion]
+  ];
+  return enviarCorreo(env, {
+    para,
+    asunto: "Dos ingenieros discrepan: " + x.numero,
+    texto: filas.map(([k, v]) => k + ": " + v).join("\n"),
+    html: plantillaCorreo({
+      titulo: "Dos ingenieros discrepan: " + x.numero,
+      parrafos: [
+        "Dos evaluaciones de este caso no coinciden. Mientras tanto el caso se queda con la MÁS GRAVE, que es lo prudente, pero eso no resuelve nada por sí solo.",
+        "A la familia NO se le ha escrito. Con dos opiniones distintas recibiría dos respuestas contradictorias sobre su propia casa; se le escribe cuando haya una sola.",
+        "Abre la ficha y lee las notas técnicas completas: casi siempre la diferencia está en qué vio cada uno, no en el criterio."
+      ],
+      filas,
+      cierre: "Está en el panel, en «Casas por revisar», marcado en discrepancia."
+    }),
+    etiqueta: "discrepancia-triaje", guia: x.numero
+  });
 }
 
 /* El aviso va en español y no bilingüe: esta plataforma atiende a familias en
@@ -2630,6 +2779,8 @@ async function adminCasos(env) {
        teléfono adivinado se enteraría de que ese número reportó, que es
        justamente el dato que la Ley 1581 protege. Aquí no se filtra nada: lo ve
        el equipo, que es quien puede resolverlo, y detrás de Access. */
+    "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e " +
+    "  WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1) AS discrepa, " +
     "(SELECT o.numero FROM casos o WHERE " + TEL_DIGITOS("o.contacto_tel") +
     " = " + TEL_DIGITOS("c.contacto_tel") +
     " AND o.numero <> c.numero ORDER BY o.creado_en LIMIT 1) AS dup " +
@@ -5075,6 +5226,10 @@ function cargarCasos(){
         ? '<strong>' + esc(ET[c.clasificacion] || c.clasificacion) + '</strong>'
           + (c.ing ? '<br><small>por ' + esc(c.ing) + '</small>' : '')
         : '<small>sin evaluar</small>';
+      /* Dos ingenieros no coinciden. Se muestra la MÁS GRAVE, que es lo
+         prudente, pero eso no resuelve nada: alguien tiene que leer las dos
+         notas antes de mover una brigada por esta casa. */
+      if (c.discrepa) pr += '<br><small style="color:#A84D00"><strong>en discrepancia</strong></small>';
       var casa = esc(c.material || "?") + " · " + (c.pisos || "?") + " piso(s) · " + c.medios + " foto(s)"
         + (c.danio_previo ? '<br><small>tenía grietas antes</small>' : '')
         + (c.heridos ? '<br><small>hubo heridos</small>' : '')
