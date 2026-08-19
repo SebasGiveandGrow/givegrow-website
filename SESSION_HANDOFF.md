@@ -288,6 +288,20 @@ persona.
 está bien. `eventos_wompi` seguirá en 0 hasta que llegue un webhook de verdad, y
 es exactamente lo que hay que seguir viendo.
 
+## ⚠️⚠️ `run_worker_first` MUERDE POR TERCERA VEZ (19 ago)
+Le pasó a `/api/*` en la Fase 2, a `/triaje` al construirlo, y ahora a **la
+portada**. Si una ruta no está en esa lista de `wrangler.toml`, la sirve la capa
+de assets **sin invocar al Worker** — y como devuelve la página correcta con un
+200, parece que todo está bien.
+
+Esta vez el síntoma fue que la marca de Mira Mi Casa no aparecía en el
+subdominio ni en local ni en producción: el Worker inyecta `data-marca` según el
+Host, pero para `/` el Worker no corría. Se añadieron `/` y `/caso/*`.
+
+**La regla, ya con tres cicatrices:** si el Worker tiene que hacer algo con una
+ruta —cualquier cosa, aunque sea tocar una cabecera— esa ruta va en
+`run_worker_first`. Comprobarlo mirando la RESPUESTA, no el código.
+
 ## 🏷️ LA ARQUITECTURA DE NOMBRES (decidida por Sebas, 19 ago)
 
 Tres entidades, y conviene no volver a mezclarlas:
