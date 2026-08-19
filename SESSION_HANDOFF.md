@@ -288,6 +288,36 @@ persona.
 está bien. `eventos_wompi` seguirá en 0 hasta que llegue un webhook de verdad, y
 es exactamente lo que hay que seguir viendo.
 
+## 🏷️ LA ARQUITECTURA DE NOMBRES (decidida por Sebas, 19 ago)
+
+Tres entidades, y conviene no volver a mezclarlas:
+
+| | Qué es | Dónde vive |
+|---|---|---|
+| **Fundación Give&Grow International** | La ESAL. El respaldo legal, el NIT, quien responde. | El dominio principal |
+| **Cimientos que Abrazan** | El **proyecto** — la cara pública en redes. Instagram, TikTok, contenido, alcance. | Redes sociales |
+| **Mira Mi Casa** | La **plataforma** — web, pasarela, estructura digital, bancos. | El subdominio |
+
+**Por qué el nombre cálido no quedó en la plataforma.** «Cimientos que Abrazan»
+tiene dos problemas para nombrar un triaje: la ironía de que la cimentación es
+justo lo único que NO se puede evaluar por fotos —está escrito en media docena
+de pantallas— y que «abrazan» promete calor cuando el producto a menudo responde
+«no requiere visita por ahora». En redes, donde el mensaje ES la reconstrucción
+y la calidez, funciona. Ahí se quedó.
+
+**⚠️ EL RIESGO QUE CREA, y se ataja en el diseño y no en el copy.** Alguien
+encuentra el proyecto en Instagram y aterriza en algo que se llama distinto. Sin
+la conexión explícita eso se lee como un cambiazo — y el Ministerio de Vivienda
+está advirtiendo justo ahora sobre estafas con nombres de programas de vivienda.
+
+La cadena tiene que caber en UNA frase, no en tres logos apilados. La que quedó,
+en el pie del subdominio y en su clave `mmc.aval`:
+
+> La plataforma de Cimientos que Abrazan, un proyecto de Fundación Give&Grow
+> International · NIT 901.948.930-2
+
+Y la misma cadena, al revés, tiene que estar en la biografía de la cuenta.
+
 ## ⏭️ LO SIGUIENTE EN LA PLATAFORMA DE VIVIENDAS (acordado con Sebas, 17 ago)
 
 La plataforma está **en producción y verificada de punta a punta** (ver su cierre

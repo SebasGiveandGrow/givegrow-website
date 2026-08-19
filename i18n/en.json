@@ -1429,5 +1429,10 @@
   "bc.tuya": "Was your home affected and it is not here?",
   "nav.casas": "Homes reviewed",
   "nav.d.casas": "The public record of the triage, with no names or addresses",
-  "bc.piso": "floor"
+  "bc.piso": "floor",
+  "mmc.nav.casa": "Check your home",
+  "mmc.nav.casas": "Homes reviewed",
+  "mmc.nav.ing": "Engineers",
+  "mmc.aval": "The platform of Cimientos que Abrazan, a project of Fundación Give&Grow International · NIT 901.948.930-2",
+  "mmc.marca": "Mira Mi Casa"
 }

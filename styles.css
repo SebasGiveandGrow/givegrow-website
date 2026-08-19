@@ -1517,3 +1517,133 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
   .transp-sello small { display:block; font-size:8.5pt; letter-spacing:.09em;
     text-transform:uppercase; color:#1F5C38; margin-top:2pt }
 }
+
+/* ==========================================================================
+   MIRA MI CASA — piel de marca del triaje de viviendas
+   ==========================================================================
+   Se activa con `data-marca="mmc"` en el <html>, que el Worker inyecta SOLO
+   cuando el Host es el subdominio. Sin ese atributo no aplica ni una regla:
+   el sitio de la fundación no puede romperse por esto, y no por cuidado sino
+   por construcción.
+
+   NO ES UNA HOJA NUEVA. Redefine los MISMOS tokens que el sistema ya usa, así
+   que .card, .btn-g, .ally-form y .steps se pintan con la marca nueva sin
+   duplicar un componente.
+
+   De dónde sale la dirección: la tarjeta de triaje —el cartón que se le cuelga
+   a un paciente en urgencias— que nunca dice un diagnóstico y siempre dice a
+   quién se atiende primero. Es el objeto exacto que describe este producto.
+   ========================================================================== */
+html[data-marca="mmc"]{
+  /* Donde el sistema pone verde institucional, va azul de documento oficial.
+     Ni navy corporativo ni azul de aplicación: el registro es el de una
+     entidad de protección civil, que es como debe leerse quien atiende una
+     emergencia sin ser la autoridad. */
+  --acc:#0D3B66;  --acc-2:#12507F;
+  --g:#0D3B66;    --gm:#12507F;   --gl:#E7EFF6;  --gd:#082742;
+  --gn:#8FBFE0;
+  --ink-deep:#0B2135;
+
+  --bg:#FBFAF7;   --surface:#FFFFFF;  --surface-2:#F4F6F8;  --cream:#F4F6F8;
+  --ink:#082742;  --ink-soft:#2A4257; --mu:#56697A;
+  --bd:#CBD5DD;   --bds:#E4EAEF;
+
+  /* --amber SIGUE SIENDO EL COLOR DE ADVERTENCIA del sistema, y NO el ámbar de
+     urgencia del triaje. Solo se reencuadra al azul de esta paleta. Fusionarlos
+     haría aparecer el ámbar en avisos por todo el sitio, y para cuando de
+     verdad importara —una casa que hay que visitar ya— no querría decir nada. */
+  --amber:#B57500; --amberl:#FFF4D6;
+  --nav-bg:rgba(251,250,247,.92);
+  --skel-a:#EEF1F4; --skel-b:#F8FAFB;
+
+  /* ── Propios del triaje ────────────────────────────────────────────────
+     No existen en Give&Grow porque allá no hay una fila que ordenar. La
+     intensidad ES la urgencia: campo lleno arriba, contorno abajo. Los dos
+     niveles bajos no llevan token de relleno a propósito — usan --surface y
+     --bd, y su ausencia de color es el dato. */
+  --pri-urg:#F2B705;       /* visita urgente · campo */
+  --pri-urg-ink:#082742;   /* tinta sobre el ámbar */
+  --pri-prog:#0D3B66;      /* visita programada · campo */
+  --pri-prog-ink:#FFFFFF;
+}
+
+html[data-marca="mmc"][data-theme="dark"]{
+  /* --acc SE ACLARA y --g NO, que es la convención del sistema y la pasé por
+     alto en el primer intento: `--acc` se usa como TEXTO y borde sobre fondos
+     oscuros, mientras que `--g` es el FONDO de .btn-g con tinta blanca encima.
+     Al aclarar los dos, los botones quedaban en 2,56:1 — blanco sobre azul
+     claro. El sitio base ni siquiera redefine `--g` en noche por esta razón.
+     Aquí sí sube un punto, pero solo lo justo para despegar del fondo casi
+     negro sin dejar de sostener tinta blanca. */
+  --acc:#6FA8D0;  --acc-2:#8FBFE0;
+  --g:#12507F;    --gm:#1A6398;   --gl:#122C41;  --gd:#061019;
+  --gn:#8FBFE0;
+  --ink-deep:#0B2135;
+
+  --bg:#07131F;   --surface:#0F2436;  --surface-2:#0B1B29;  --cream:#0B1B29;
+  --ink:#E6EDF3;  --ink-soft:#C3D0DB; --mu:#93A6B6;
+  --bd:#274157;   --bds:#1A3145;
+
+  --amber:#E8A24C; --amberl:#33260F;
+  --nav-bg:rgba(7,19,31,.94);
+  --skel-a:#0F2436; --skel-b:#152C40;
+
+  /* El ámbar NO se aclara de noche: sobre fondo oscuro ya rinde de sobra con su
+     tinta, y moverlo rompería que «urgente» se vea igual en los dos modos. El
+     azul de campo sí sube, porque el de día se hunde contra el fondo. */
+  --pri-urg:#F2B705;  --pri-urg-ink:#082742;
+  --pri-prog:#2E6C9E; --pri-prog-ink:#FFFFFF;
+}
+
+/* ── La nav: esto no es la fundación ──────────────────────────────────────
+   Una familia con la casa rota no tiene por qué ubicarse en un ecosistema de
+   membresías y alianzas. Se deja lo suyo y se quita todo lo demás. */
+/* OCULTA POR DEFECTO, y esto es lo que se me olvidó en el primer intento: sin
+   esta línea los tres enlaces de Mira Mi Casa salían en la nav de la fundación.
+   El aval sí lo tenía y la nav no — el mismo patrón a medias es peor que no
+   tenerlo, porque uno de los dos casos te hace creer que está resuelto. */
+.mmc-nav{ display:none }
+html[data-marca="mmc"] .nlinks > *,
+html[data-marca="mmc"] .nav-mobile > *{ display:none }
+html[data-marca="mmc"] .nlinks > .mmc-nav,
+html[data-marca="mmc"] .nav-mobile > .mmc-nav{ display:inline-flex }
+html[data-marca="mmc"] .nav-mobile > .mmc-nav{ display:block }
+html[data-marca="mmc"] .btn-nav{ display:none }
+
+/* El logotipo es tipográfico a propósito: el nombre todavía es provisional y
+   dibujar una marca que puede cambiar sería trabajo tirado. Unbounded se
+   comparte con la fundación — es el hilo visible de parentesco, y resuelve el
+   problema del aval con tipografía en vez de con dos logos apilados. */
+html[data-marca="mmc"] .nlogo{ font-size:var(--fs-17); letter-spacing:.01em }
+html[data-marca="mmc"] .nlogo em{ font-style:normal; color:var(--acc) }
+/* El logotipo del PIE es blanco sobre fondo oscuro, así que ahí el acento tiene
+   que ser el claro: con el azul oscuro, «Mi» quedaba en 1,43:1 — invisible.
+   Dos sitios con el mismo componente y fondos opuestos. */
+html[data-marca="mmc"] .foot-grid .nlogo em{ color:var(--gn) }
+
+/* El aval, y va donde se ve primero. Una marca nueva, sin historia, pidiendo
+   fotos de tu casa en zona de desastre se parece bastante a una estafa: la
+   confianza no la tiene el nombre nuevo, la tiene la fundación. */
+.mmc-aval{ display:none }
+html[data-marca="mmc"] .mmc-aval{
+  display:block; font-size:var(--fs-11); line-height:1.35; color:var(--mu);
+  margin-top:2px; max-width:34ch;
+}
+html[data-marca="mmc"] .foot-grid .mmc-aval{ color:var(--on-dark-3); max-width:44ch }
+
+/* ── La escala de prioridad, el elemento firma ────────────────────────────
+   Lo único que este producto produce es una posición en una fila, así que la
+   escala ES el sistema visual. El ámbar aparece una sola vez en todo el
+   recorrido, y esa escasez es lo que lo convierte en señal. */
+.mmc-pri{ display:flex; flex-direction:column; gap:5px;
+  padding:16px 18px; border-radius:3px; border:1.5px solid var(--bd);
+  background:var(--surface); color:var(--ink) }
+.mmc-pri .k{ font-size:var(--fs-11); letter-spacing:.13em; text-transform:uppercase;
+  font-weight:700; opacity:.86 }
+.mmc-pri .t{ font-family:var(--font-display); font-size:var(--fs-17);
+  font-weight:700; letter-spacing:-.01em; line-height:1.2 }
+.mmc-pri.urgente{ background:var(--pri-urg); border-color:var(--pri-urg);
+  color:var(--pri-urg-ink) }
+.mmc-pri.programada{ background:var(--pri-prog); border-color:var(--pri-prog);
+  color:var(--pri-prog-ink) }
+.mmc-pri.inevaluable{ background:transparent; border-style:dashed }
