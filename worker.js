@@ -4518,7 +4518,7 @@ function paginaRuta() {
   <div class="secs" id="secs"></div>
   <div id="lista"><p class="vacio">Cargando casos…</p></div>
 </div>
-<script src="/ruta.js"></script>
+<script src="/admin/ruta.js"></script>
 </body>
 </html>`;
 }
@@ -5872,12 +5872,22 @@ export default {
       catch (e) { console.error("evidencia", ruta, e && e.message); return json({ error: "error_interno" }, 500); }
     }
 
+    /* La ruta vieja de la pantalla de terreno sigue viva y redirige. Va ANTES
+       del guardián y no dentro: una redirección no necesita sesión, y puesta
+       dentro no se alcanzaba nunca —el guardián ya no reconoce `/ruta`, así que
+       caía al comodín de la SPA y devolvía la portada pública—. Si alguien
+       guardó el enlace en el teléfono, que no se encuentre con eso en mitad de
+       una jornada. */
+    if (ruta === "/ruta" || ruta === "/ruta.js") {
+      return Response.redirect(new URL("/admin" + ruta, url).toString(), 301);
+    }
+
     /* --- Panel interno: TODO detrás de Access, y fail-closed --- */
     /* `/api/triage/` entra por el MISMO guardián que el panel: hereda la
        verificación real de firma RS256 y el fail-closed. Los ingenieros
        voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
        creando cuentas: cero contraseñas que guardar y cero que se filtren. */
-    if (ruta === "/admin" || ruta === "/admin.js" || ruta === "/ruta" || ruta === "/ruta.js" || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js") {
+    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js") {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
       /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
@@ -5974,12 +5984,24 @@ export default {
         if (ruta === "/api/admin/salud")    return await adminSalud(env);
         if (ruta === "/api/admin/casos")    return await adminCasos(env);
         if (ruta === "/api/admin/ruta")     return await adminRuta(env, url);
-        if (ruta === "/ruta") {
+        /* `/admin/ruta` y no `/ruta`, y la razón es de Access, no de estética.
+           Medido en producción el 19 ago: `/admin` devolvía 302 al login de
+           Access y `/ruta` devolvía 403 `sin_token` del propio Worker. Es
+           decir: Access NUNCA interceptaba /ruta, así que nunca emitía el token
+           que el guardián exige, y la pantalla era inalcanzable para todo el
+           mundo — segura, pero inservible, y es la pantalla de la brigada.
+
+           Lo obvio sería añadir /ruta a la aplicación de Access, pero esa
+           aplicación ya está en su tope de entradas (ver más abajo la nota del
+           ápex y www). Colgándola de /admin/ queda cubierta por la entrada que
+           YA existe: cero cupos nuevos, y nadie puede volver a olvidarlo porque
+           cualquier ruta interna futura hereda la misma cobertura. */
+        if (ruta === "/admin/ruta") {
           return new Response(paginaRuta(), {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
           });
         }
-        if (ruta === "/ruta.js") {
+        if (ruta === "/admin/ruta.js") {
           return new Response(rutaJS(), {
             headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
           });
