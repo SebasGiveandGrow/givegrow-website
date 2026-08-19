@@ -3685,7 +3685,12 @@ function skipToContent(){
 
 /* ============ Rastrea tu donación ============ */
 function escapeHtml(text){
-  return String(text==null?"":text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  /* La comilla SIMPLE también. No había sido explotable porque hoy ningún dato
+     de usuario cae en un atributo delimitado por comillas simples, pero el
+     equivalente de esta función en el panel sí lo era —ver el esc() de
+     worker.js— y dejar dos escapadores con reglas distintas es cómo se cuela
+     el siguiente. */
+  return String(text==null?"":text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 /* Mini-calculadora de impacto en la ficha de fundación (usa impactUnits reales) */
 function fichaImpCalc(btn, fid){

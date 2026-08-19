@@ -2327,7 +2327,19 @@ function paginaTriage() {
 function triageJS() {
   return `
 var CASO = null;
-function esc(s){ var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+function esc(s){
+  /* ESCAPA TAMBIÉN LAS COMILLAS, y esa es la corrección.
+     Antes usaba textContent -> innerHTML, que escapa & < > y NADA MÁS. Basta
+     para texto, pero este panel mete valores dentro de atributos —campo() los
+     pone en value="..."— y ahí una comilla doble cierra el atributo y abre uno
+     nuevo. Comprobado el 19 ago: un caso creado desde el formulario PÚBLICO,
+     sin autenticarse, inyectaba un atributo propio en el input de la ficha. Con
+     un manejador de evento en vez de un data- eso es JavaScript ejecutándose
+     dentro de una sesión de Access, con acceso a donantes y comprobantes. */
+  return String(s == null ? "" : s).replace(/[&<>"\']/g, function(c){
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "\'":"&#39;" }[c];
+  });
+}
 function el(id){ return document.getElementById(id); }
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); }).then(function(d){
@@ -4848,7 +4860,19 @@ function adminJS() {
 var FILTRO = "";
 var FILAS = {};
 function pesos(c){ return "$" + Math.round((c||0)/100).toLocaleString("es-CO"); }
-function esc(s){ var d=document.createElement("div"); d.textContent = s==null?"":String(s); return d.innerHTML; }
+function esc(s){
+  /* ESCAPA TAMBIÉN LAS COMILLAS, y esa es la corrección.
+     Antes usaba textContent -> innerHTML, que escapa & < > y NADA MÁS. Basta
+     para texto, pero este panel mete valores dentro de atributos —campo() los
+     pone en value="..."— y ahí una comilla doble cierra el atributo y abre uno
+     nuevo. Comprobado el 19 ago: un caso creado desde el formulario PÚBLICO,
+     sin autenticarse, inyectaba un atributo propio en el input de la ficha. Con
+     un manejador de evento en vez de un data- eso es JavaScript ejecutándose
+     dentro de una sesión de Access, con acceso a donantes y comprobantes. */
+  return String(s == null ? "" : s).replace(/[&<>"\']/g, function(c){
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "\'":"&#39;" }[c];
+  });
+}
 
 function pintarResumen(d){
   var box = document.getElementById("resumen");

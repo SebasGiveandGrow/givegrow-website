@@ -480,6 +480,28 @@ sin información se siente como abandono. Ahora se dan los dos hechos que sí
 existen y son verificables —los días que lleva y cuántos casos siguen sin abrir—
 y se dice de frente que **no hay fecha y que prometerla sería peor**.
 
+### 🔴 XSS ALMACENADO EN EL PANEL, CERRADO (19 ago)
+Encontrado en la auditoría de seguridad de lo construido estos dos días, y era
+explotable desde internet sin autenticarse.
+
+`campo()` del panel mete valores en `value="…"`, y su `esc()` usaba
+`textContent → innerHTML`, que escapa `& < >` **y nada más**. Con la ficha de
+casos —que yo añadí— ese helper empezó a recibir texto del formulario PÚBLICO de
+viviendas, donde `limpiar()` solo recorta y no toca el HTML. Una comilla doble
+en el nombre cerraba el atributo y abría uno nuevo.
+
+**Comprobado, no supuesto:** un caso creado con un POST anónimo a `/api/caso`
+inyectaba un atributo propio en el `<input>` de la ficha. Con un manejador de
+evento en lugar de un `data-`, eso es JavaScript corriendo dentro de una sesión
+de Cloudflare Access — con acceso a donantes, aportes, comprobantes bancarios y
+la emisión de certificados.
+
+**La corrección es de una línea y sistémica:** los dos `esc()` del Worker (panel
+y triaje) escapan ahora también las comillas, y `escapeHtml` de `app.js` escapa
+la simple, que le faltaba. **Regla que conviene no olvidar: un escapador que
+solo sirve para texto no sirve para atributos**, y en este repositorio hay
+plantillas que construyen HTML a mano en los dos sitios.
+
 ### ⚠️ LA EVALUACIÓN QUE MANDA NO ES LA MÁS RECIENTE (19 ago)
 Fallo introducido por la segunda opinión y encontrado en el ensayo general, no
 por una alarma. Desde que el caso se queda con la clasificación MÁS GRAVE, el
