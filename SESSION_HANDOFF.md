@@ -1,10 +1,70 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Postulación de ingenieros y cierre de casos" (18 ago 2026)
-> **⏭️ ARRANCA POR: «LO SIGUIENTE EN LA PLATAFORMA DE VIVIENDAS», más abajo — sus
-> cinco huecos están cerrados. Lo que sigue no es código: la guía fotográfica de
-> los ingenieros, y después el banco público de casas.**
+> Última actualización: sesión "Marca de Mira Mi Casa y auditoría" (19 ago 2026)
+> **⏭️ ARRANCA POR: «MIGRAR EL TRIAJE A MIRA MI CASA», la primera sección de
+> abajo. Es una tarea acordada con Sebas, definida, y sin empezar.**
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
+
+## ⏭️ MIGRAR EL TRIAJE A MIRA MI CASA (acordado el 19 ago · SIN EMPEZAR)
+
+**La decisión de Sebas, textual:** todo lo que tiene que ver con el TRIAJE vive
+en Mira Mi Casa. **La BRIGADA se queda en Give&Grow**, porque es anterior a este
+proyecto y es de la fundación.
+
+Hoy la plataforma vive en los DOS sitios: el subdominio ya tiene su marca, pero
+`thegiveandgrowproject.org/#vivienda` sigue funcionando con la cara verde, y el
+grupo «Emergencia» del menú apunta ahí. Hay que cerrar esa duplicidad.
+
+### Qué se mueve y qué NO
+
+| | Dónde queda |
+|---|---|
+| `#vivienda`, `#ingenieros`, `#casas`, `/caso/*` | **solo** en `miramicasa.…` |
+| La brigada (`#brigada`) | se queda en Give&Grow — es anterior y es suya |
+| `/triaje`, `/admin`, `/admin/ruta` | **se quedan en el ápex**, y no es negociable: la aplicación de Access está en su tope de hostnames y cubre el ápex. Moverlas rompe el acceso del equipo y de los ingenieros |
+
+### Los seis puntos a tocar, con su trampa cada uno
+
+1. **Las rutas de hash no las puede redirigir el Worker** — nunca ve el `#`.
+   `#vivienda`, `#ingenieros` y `#casas` se redirigen desde `app.js`: si el host
+   es el ápex y la ruta es de triaje, `location.href` al subdominio. El espejo
+   de `mmcRuta()`, que ya hace lo contrario.
+
+2. **`/caso/*` SÍ es una ruta de path** y se redirige en el Worker, junto al
+   redirect de `/ruta` → `/admin/ruta` que ya existe. Ojo: tiene que ir FUERA
+   del guardián de Access, como aquel.
+
+3. **`ORIGIN` en `worker.js:36` es UNA sola constante** —
+   `https://www.thegiveandgrowproject.org`— y la usan el recibo, el carnet, las
+   tarjetas de compartir Y el enlace del caso (`worker.js:2771`). **No se cambia
+   la constante**: hay que darle su propio origen al enlace del caso, o los
+   recibos de donación empezarían a apuntar al subdominio del triaje.
+
+4. **El enlace que arma el formulario** (`app.js:1801`) usa `location.origin`.
+   Desde el ápex genera un enlace del ápex. Tras la migración siempre debe
+   apuntar al subdominio, esté donde esté quien lo llena.
+
+5. **El `canonical`** de `index.html:6` es estático y apunta a
+   `www.thegiveandgrowproject.org`. En el subdominio eso le dice a Google «la
+   buena está allá». Se reescribe con el mismo HTMLRewriter que ya inyecta
+   `data-marca` — es el sitio natural y ya está montado.
+
+6. **El menú «Emergencia»** del ápex: se queda la brigada; los tres del triaje
+   pasan a ser enlaces externos al subdominio, no rutas de la SPA.
+
+### Lo que NO hay que romper
+
+- **Los enlaces ya compartidos son del ápex** — incluido el que Sebas le pasó a
+  la ingeniera el 19 por la mañana. Los redirects de los puntos 1 y 2 los cubren;
+  si se borran las rutas sin redirigir, se rompen.
+- El `sitemap.xml` solo lista el dominio principal. Si el triaje se va, sus URLs
+  no deberían seguir anunciadas ahí.
+
+### Cómo comprobar que quedó
+Mirando la RESPUESTA y no el código — ver la cicatriz de `run_worker_first`:
+el ápex debe redirigir las cuatro entradas, el subdominio servirlas con
+`data-marca="mmc"`, `/triaje` y `/admin/ruta` deben seguir pidiendo login de
+Access **en el ápex**, y `#brigada` debe seguir viva y verde en Give&Grow.
 
 ## Estado del proyecto
 - Sitio bilingüe ES/EN, vanilla-JS SPA, Cloudflare Workers.
@@ -429,6 +489,46 @@ que el token de la familia viaje al panel es una decisión, no un descuido.
   casos y Drive obligaría a reabrir la CSP a `googleapis.com`, que se cerró en el
   PR #96. Drive SÍ sirve para archivar casos cerrados.
 - **Prometer el WhatsApp** mientras no exista el número (PR #115).
+
+## Cierre de tanda: MARCA, AUDITORÍA Y LOS HUECOS QUE QUEDABAN (18–19 ago 2026)
+
+Diecisiete PR fusionados (#120 a #136). Lo que se construyó:
+
+**La plataforma quedó completa.** Postulación de ingenieros (`#ingenieros`),
+cierre de casos, ficha editable en el panel, borrado real de fotos, la página de
+la familia (`/caso/<n>?t=`), la ruta de terreno (`/admin/ruta`), la segunda
+opinión con su regla de discrepancia, el banco público (`#casas`), los casos en
+el panel de salud, y la marca de Mira Mi Casa en su subdominio.
+
+**Lo que se documentó sin construir:** `ops/apadrinamiento.md` (con las siete
+preguntas para la contadora) y `ops/guia-fotografica.md` (las once para la
+ingeniera).
+
+### 🔴 CUATRO FALLOS QUE NINGUNA ALARMA HABRÍA VISTO
+Todos salieron de mirar producción a mano, leer un PDF entero, o sembrar datos y
+medir. **Ninguno lo destapó un test.**
+
+1. **XSS almacenado en `/admin`, explotable desde el formulario público.** El
+   `esc()` del panel usaba `textContent → innerHTML`, que escapa `& < >` y nada
+   más; `campo()` mete valores en `value="…"`. Un caso creado con un POST anónimo
+   inyectaba atributos en la ficha → JavaScript dentro de una sesión de Access.
+   **Regla: un escapador que solo sirve para texto no sirve para atributos.**
+2. **El `automerge` fusionaba sin desplegar** — le faltaba `actions: write`, y
+   dejaba `main` por delante de producción sin avisar.
+3. **El informe contradecía al caso** cuando dos ingenieros discrepaban: el PDF
+   decía «programada» mientras el caso decía «urgente», firmado por quien no tomó
+   esa decisión, y la recomendación de seguridad desaparecía.
+4. **La bandeja no escalaba**: 170 ms con 600 casos por una subconsulta
+   correlacionada que normalizaba el teléfono dentro del `WHERE` y anulaba el
+   índice. Ahora 8 ms.
+
+### Y `/ruta` nació muerta
+Respondía 403 en producción mientras `/admin` daba 302: Access no la interceptaba
+y el Worker, fail-closed, la rechazaba para siempre. Segura e inservible. Se
+colgó de `/admin/ruta`, que hereda la cobertura de Access sin gastar un cupo.
+
+**La regla que dejó:** una ruta interna nueva son TRES sitios — el guardián de
+`worker.js`, `run_worker_first` de `wrangler.toml`, y la aplicación de Access.
 
 ## Cierre de tanda: TRIAJE ESTRUCTURAL DE VIVIENDAS (16–17 ago 2026)
 
