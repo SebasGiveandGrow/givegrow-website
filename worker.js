@@ -1352,6 +1352,36 @@ async function adminSalud(env) {
     "WHERE publicada_en IS NULL AND anulada_en IS NULL",
     "Bandeja «Entregas» · el acta existe y todavía no la ve nadie");
 
+  /* ── Las cuatro del triaje de viviendas ────────────────────────────────
+     La plataforma entera era INVISIBLE para este panel: vigilaba donaciones,
+     correos y entregas, y ni una sola cola de casos. Un caso podía quedarse
+     meses sin que nadie lo mirara y el único que se enteraba era la familia,
+     leyendo «todavía no lo ha revisado un ingeniero» en su pantalla.
+
+     Es justo lo que este panel existe para impedir, y ahora importa más que
+     nunca: la brigada visita cinco territorios y todavía no hay ingenieros
+     aprobados. */
+  await enCola("casos_sin_evaluar",
+    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
+    "WHERE estado IN ('recibido','en_revision') " +
+    "AND NOT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = casos.numero)",
+    "Pantalla /triaje · una familia mandó fotos de su casa y nadie las ha abierto");
+  /* La peor de las cinco, y por eso va con su propio texto: el sistema dijo
+     «vayan ya» y nadie fue. Que exista esta fila es media razón de esta tanda. */
+  await enCola("urgentes_sin_visitar",
+    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
+    "WHERE clasificacion = 'urgente' AND estado NOT IN ('visitado','cerrado','descartado')",
+    "Pantalla /ruta · un ingeniero dijo que era urgente y todavía no ha ido nadie");
+  await enCola("casos_esperando_fotos",
+    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos c " +
+    "WHERE c.estado = 'en_revision' AND EXISTS (SELECT 1 FROM evaluaciones e " +
+    "WHERE e.caso = c.numero AND e.clasificacion = 'inevaluable')",
+    "Se le pidió material a la familia y no ha llegado · quizá haya que llamarla");
+  await enCola("ingenieros_sin_verificar",
+    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones " +
+    "WHERE tipo = 'ingeniero' AND estado = 'nueva'",
+    "Buscar su matrícula en el registro público del COPNIA y añadirlo en Access");
+
   /* Intenciones abandonadas: más de 48 h en `intencion` y sin transacción de
      Wompi. No se tocan solas —borrar el registro de alguien que quizá vuelva a
      pagar sería peor que dejarlo— pero hay que poder verlas: cada una quemó un
@@ -2158,9 +2188,25 @@ async function apiCasoEstado(env, numero, token) {
     "WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
   ).bind(numero).first();
 
+  /* CUÁNTO LLEVA ESPERANDO, y cuántos hay delante en su misma situación.
+     Su pantalla decía «un ingeniero lo va a revisar» sin plazo ni señal, y una
+     espera sin información se siente como abandono — sobre todo después de un
+     sismo, y sobre todo si ya te acostumbraste a que nadie responde.
+
+     No se promete una fecha: no la hay, y prometerla sería justo lo que la
+     marca prohíbe. Se dan los dos hechos verificables que sí existen: los días
+     que lleva y cuántos casos siguen sin abrir. El segundo explica el primero
+     mejor que cualquier disculpa. */
+  const espera = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos WHERE estado IN ('recibido','en_revision') " +
+    "AND NOT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = casos.numero)"
+  ).first();
+
   return json({
     numero: c.numero, estado: c.estado, clasificacion: c.clasificacion,
     sector: c.sector, medios: (m && m.n) || 0, creado_en: c.creado_en,
+    dias: Math.floor((Date.now() - Date.parse(String(c.creado_en).replace(" ", "T") + "Z")) / 86400000),
+    en_cola: (espera && espera.n) || 0,
     /* `evaluado` y `clasificacion` no son lo mismo: un caso `inevaluable`
        vuelve a `en_revision` con la clasificación en NULL, y aun así ya lo miró
        alguien. Sin este campo, la pantalla no sabría distinguir «nadie lo ha
@@ -5016,7 +5062,11 @@ var COLA_ES = {
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
   correos_fallidos: "Correos que no salieron",
-  entregas_en_borrador: "Entregas en borrador"
+  entregas_en_borrador: "Entregas en borrador",
+  casos_sin_evaluar: "Casas que nadie ha abierto",
+  urgentes_sin_visitar: "Urgentes sin visitar",
+  casos_esperando_fotos: "Esperando fotos de la familia",
+  ingenieros_sin_verificar: "Ingenieros sin verificar"
 };
 
 function pasoEmbudo(etiqueta, n, nota){

@@ -441,6 +441,12 @@ var I18N = {
     "mc.add.ok":"Listo, ya las tenemos. Un ingeniero las va a ver.",
     "mc.add.tope":"Este caso ya llegó al máximo de archivos. Escríbenos si necesitas cambiar alguno.",
     "mc.cerrado":"Este caso está cerrado. Si algo cambió, escríbenos y lo reabrimos.",
+    "mc.espera.hoy":"Lo enviaste hoy.",
+    "mc.espera.dia":"Lleva un día esperando.",
+    "mc.espera.dias":"Lleva {d} días esperando.",
+    "mc.espera.cola":"Ahora mismo hay {n} casos sin abrir. Se revisan por gravedad primero y por antigüedad después, no por turno de llegada.",
+    "mc.espera.solo":"Es el único caso sin abrir en este momento.",
+    "mc.espera.sin":"No te damos una fecha porque no la tenemos, y prometerte una sería peor que decírtelo así.",
     "cv.ing.link":"¿Eres ingeniero o arquitecto y quieres revisar casos?",
     "ing.ey":"Ingenieros voluntarios",
     "ing.t":"Hay más casas dañadas que ingenieros para visitarlas.",
@@ -1918,9 +1924,24 @@ function mcPinta(aviso){
           +  encodeURIComponent(MC.caso) + "/informe.pdf?t=" + encodeURIComponent(MC.token)
           +  '">' + escapeHtml(t("mc.informe")) + "</a></p></div>";
       } else {
+        /* La espera, contada con hechos y sin fecha prometida. Los días que
+           lleva y cuántos hay delante: el segundo dato explica el primero
+           mejor que cualquier disculpa, y los dos son verificables. */
+        /* Singular y plural de verdad, no «1 día(s)»: esto lo lee una familia
+           con la casa rota, y esa notación la escribe un formulario, no una
+           persona que te está respondiendo. */
+        var esp = d.dias <= 0 ? t("mc.espera.hoy")
+                : d.dias === 1 ? t("mc.espera.dia")
+                : t("mc.espera.dias").replace("{d}", d.dias);
+        var cola = d.en_cola > 1
+          ? t("mc.espera.cola").replace("{n}", d.en_cola)
+          : (d.en_cola === 1 ? t("mc.espera.solo") : "");
         h += '<div class="card" style="margin-top:22px;text-align:left">'
           +  "<h3>" + escapeHtml(t("mc.sin.t")) + "</h3>"
-          +  "<p>" + escapeHtml(t("mc.sin.p")) + "</p></div>";
+          +  "<p>" + escapeHtml(t("mc.sin.p")) + "</p>"
+          +  '<p style="margin-top:10px;font-weight:600">' + escapeHtml(esp) + "</p>"
+          +  (cola ? '<p class="mu" style="margin-top:6px">' + escapeHtml(cola) + "</p>" : "")
+          +  '<p class="mu" style="margin-top:6px">' + escapeHtml(t("mc.espera.sin")) + "</p></div>";
       }
 
       if (d.estado === "cerrado" || d.estado === "descartado"){
