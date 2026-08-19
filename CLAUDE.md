@@ -27,6 +27,20 @@ Deploy: GitHub Actions → Cloudflare Workers, automático al llegar a `main`.
 > Por diseño de GitHub, un push hecho con `GITHUB_TOKEN` (el merge del bot) **no
 > dispara** otros workflows; por eso el job `automerge` invoca el deploy con
 > `gh workflow run` y `deploy.yml` expone `workflow_dispatch:`.
+>
+> **Y ese job necesita `actions: write` en sus `permissions`.** Sin ese permiso
+> fusiona el PR y falla al disparar el deploy con `HTTP 403: Resource not
+> accessible by integration`, dejando `main` por delante de producción **sin que
+> nada lo avise**: el PR se ve fusionado y el gate en verde. Ocurrió el 19 de
+> agosto de 2026 con el PR #130 y se descubrió comprobando producción a mano.
+
+**COMPROBACIÓN QUE VALE LA PENA TRAS CADA FUSIÓN:** que el último deploy
+corresponda al tip de `main`. Si no coincide, el cambio no está en producción:
+```bash
+git rev-parse --short origin/main
+gh run list --workflow=deploy.yml --limit 1 --json headSha -q '.[0].headSha[0:7]'
+# ¿No coinciden? → gh workflow run "Deploy Give&Grow to Cloudflare" --ref main
+```
 
 ## GATE OBLIGATORIO ANTES DE CADA COMMIT
 
