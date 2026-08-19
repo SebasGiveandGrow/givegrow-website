@@ -430,6 +430,30 @@ informe descargado.
 5. **El teléfono es el identificador; el correo es opcional de verdad.** En esas
    zonas mucha gente tiene WhatsApp y no correo.
 
+### ⚠️ RUTA NUEVA = DOS SITIOS, NO UNO (18 ago)
+Añadir `/ruta` costó una vuelta entera por olvidar el segundo: hay que
+registrarla en **`run_worker_first` de `wrangler.toml`** además de en el
+guardián de `worker.js`. Sin eso, `not_found_handling = "single-page-application"`
+se la traga y devuelve el index.html público — la página responde 200 y parece
+que funciona, que es lo que despista. Le pasó a `/api/*`, le pasó a `/triaje`, y
+volvió a pasar aquí.
+
+### `/ruta` — la bandeja en el bolsillo (18 ago)
+Para el equipo en la calle: casos vivos filtrados por sector, urgentes primero,
+con toque para llamar o abrir WhatsApp, y el botón de marcar visitada. Lo ya
+visitado se hunde al fondo pero no desaparece, porque falta cerrarlo.
+
+**Va con la audiencia del PANEL y nunca con la del triaje** — enseña teléfono y
+dirección, que es justo lo que un ingeniero no puede ver. Está fuera de la lista
+`esTriage` a propósito; si alguien la mete ahí, abre los datos de contacto de
+todas las familias a cualquier ingeniero aprobado.
+
+**`visitado` ahora EXIGE nota.** Era un estado sin contenido: la brigada podía
+recorrer cinco territorios y no quedar registrado qué encontró en ninguna
+puerta. La nota va al registro de auditoría y la foto a `caso_medios` con
+`categoria = 'visita'`, que NO está en la lista pública — una familia no puede
+etiquetar una foto suya como evidencia de visita ni por accidente.
+
 ### Access: DOS aplicaciones, y no son intercambiables
     ACCESS_AUD          panel  → donantes, aportes, comprobantes
     ACCESS_AUD_TRIAGE   triaje → casos de vivienda y fotos

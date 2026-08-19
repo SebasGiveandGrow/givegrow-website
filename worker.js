@@ -2674,7 +2674,11 @@ async function adminCasos(env) {
 const CASO_ACTIVOS = ["recibido", "en_revision", "clasificado", "visitado"];
 const CASO_DESTINOS = {
   /* destino: desde qué estados se puede, y si exige motivo */
-  visitado:    { desde: ["recibido", "en_revision", "clasificado"], motivo: false },
+  /* `visitado` PIDE nota, y ese cambio es el punto de toda esta tanda: era un
+     estado sin contenido. La brigada podía recorrer cinco territorios y no
+     quedar registrado qué encontró en ninguna puerta. Lo que se escribe aquí es
+     la única evidencia de que se estuvo. */
+  visitado:    { desde: ["recibido", "en_revision", "clasificado"], motivo: true },
   cerrado:     { desde: CASO_ACTIVOS, motivo: true },
   descartado:  { desde: CASO_ACTIVOS, motivo: true },
   en_revision: { desde: ["cerrado", "descartado"], motivo: false }
@@ -2717,6 +2721,99 @@ async function adminMoverCaso(request, env, numero, quien) {
          (motivo ? " · " + motivo : "")).run();
 
   return json({ ok: true, numero, estado: nuevo, anterior: caso.estado });
+}
+
+/* ========================================================================
+   POST /api/admin/caso/<n>/medio — la foto de la visita
+   ========================================================================
+   Hasta ahora, todo lo que entraba a `caso_medios` lo subía la familia con su
+   token. El equipo que va a terreno no tenía por dónde: podría usar el token de
+   la familia —hoy la ficha lo muestra— pero eso mezclaría en el mismo registro
+   lo que mandó la casa y lo que vio el equipo, y son dos cosas distintas.
+
+   Va con `categoria = 'visita'`, que NO está en la lista pública: una familia no
+   puede etiquetar una foto suya como evidencia de visita ni por accidente.
+
+   Sin esto, `visitado` era un estado sin contenido — la brigada podía recorrer
+   cinco territorios y no quedar ni una prueba de que estuvo. Para un proyecto
+   cuyo lema es «evidencia, no promesas», ese era el hueco grande.
+   ======================================================================== */
+
+/* La pública se queda como estaba: `visita` solo la puede poner el equipo. */
+const CATEGORIA_VISITA = "visita";
+
+async function adminSubirMedio(request, env, numero, url, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+
+  const caso = await env.DB.prepare("SELECT numero FROM casos WHERE numero = ?").bind(numero).first();
+  if (!caso) return json({ error: "no_encontrado" }, 404);
+
+  const cuantos = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?"
+  ).bind(numero).first();
+  if (cuantos && cuantos.n >= MAX_MEDIOS) return json({ error: "demasiados_archivos", max: MAX_MEDIOS }, 409);
+
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const spec = TIPOS_MEDIO[tipo];
+  if (!spec) return json({ error: "tipo_no_permitido", permitidos: Object.keys(TIPOS_MEDIO) }, 415);
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > spec.max) {
+    return json({ error: "archivo_muy_grande", max_mb: Math.round(spec.max / 1048576) }, 413);
+  }
+
+  const clave = "casos/" + numero + "/" + tokenNuevo().slice(0, 8) + "." + spec.ext;
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+  await env.DB.prepare(
+    "INSERT INTO caso_medios (caso, r2_key, clase, categoria, bytes, nota, orden) " +
+    "VALUES (?,?,?,?,?,?, (SELECT COUNT(*) FROM caso_medios WHERE caso = ?))"
+  ).bind(numero, clave, spec.clase, CATEGORIA_VISITA, bytes.length,
+         limpiar(url.searchParams.get("nota"), 200) || null, numero).run();
+  await env.DB.prepare("UPDATE casos SET actualizado_en = datetime('now') WHERE numero = ?").bind(numero).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "caso " + numero + " foto de visita añadida").run();
+
+  return json({ ok: true, clase: spec.clase });
+}
+
+/* ========================================================================
+   GET /api/admin/ruta — lo que hay que visitar, para llevar en el bolsillo
+   ========================================================================
+   La bandeja del panel es una tabla de escritorio y sirve para decidir. Esto es
+   lo otro: el equipo en la calle, con una mano en el volante, que necesita
+   saber a qué puerta va ahora y cómo llamar antes de tocarla.
+
+   Trae SOLO lo vivo. Lo cerrado y lo descartado no son una parada — y en una
+   pantalla de teléfono cada fila que sobra es una que hay que pasar de largo.
+   ======================================================================== */
+async function adminRuta(env, url) {
+  const sector = limpiar(url.searchParams.get("sector"), 160);
+  const filtro = sector ? " AND c.sector = ?" : "";
+  const q = env.DB.prepare(
+    "SELECT c.numero, c.estado, c.clasificacion, c.sector, c.direccion_ref, " +
+    "c.contacto_nombre, c.contacto_tel, c.habitada, c.heridos, c.creado_en, " +
+    "(SELECT e.recomendacion FROM evaluaciones e WHERE e.caso = c.numero " +
+    " ORDER BY e.creado_en DESC LIMIT 1) AS reco " +
+    "FROM casos c WHERE c.estado NOT IN ('cerrado','descartado')" + filtro + " ORDER BY " +
+    /* Urgente primero, y dentro de cada grupo el más viejo antes. Lo ya visitado
+       se hunde: sigue en la lista porque falta cerrarlo, pero no es una parada. */
+    "CASE WHEN c.estado = 'visitado' THEN 1 ELSE 0 END, " +
+    "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
+    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT 300"
+  );
+  const r = await (sector ? q.bind(sector) : q).all();
+
+  /* Los sectores salen de los casos vivos, no de una lista fija: el día que la
+     brigada entre a un barrio nuevo, aparece solo. */
+  const s = await env.DB.prepare(
+    "SELECT sector, COUNT(*) AS n FROM casos WHERE estado NOT IN ('cerrado','descartado') " +
+    "GROUP BY sector ORDER BY n DESC LIMIT 40"
+  ).all();
+
+  return json({ casos: r.results || [], sectores: s.results || [] });
 }
 
 /* ========================================================================
@@ -4097,6 +4194,223 @@ async function adminPublicarEntrega(request, env, numero, quien) {
   return json({ ok: true, numero, publicada: publicar });
 }
 
+/* ========================================================================
+   /ruta — la bandeja en el bolsillo
+   ========================================================================
+   Se genera desde el Worker, como el panel y el triaje, y por la misma razón:
+   muestra teléfono y dirección, así que no puede ser un archivo estático.
+
+   ⚠ ACCESO: va con la audiencia del PANEL y NUNCA con la del triaje. Un
+   ingeniero voluntario no puede ver de quién es la casa ni dónde queda —esa
+   asimetría es deliberada desde la 0010— y esta pantalla es exactamente lo que
+   él no debe ver.
+
+   ⚠ Dentro de esta plantilla hay que escribir \\n y \\/ : lo que se lee aquí no
+   es lo que ejecuta el navegador. Se evitan a propósito las expresiones
+   regulares y los saltos escapados. El check #1b del gate valida lo EMITIDO.
+   ======================================================================== */
+function paginaRuta() {
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ruta del día</title>
+<style>
+  /* Móvil primero de verdad: esto se usa de pie, en la calle, con una mano.
+     Tipos grandes, blancos de toque de 44px y nada que requiera precisión. */
+  :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;
+        --urg:#8C2F1E;--prog:#9A6B12;--ok:#1F5C38;--amber:#A84D00}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);
+       line-height:1.5;font-size:16px}
+  .wrap{max-width:720px;margin:0 auto;padding:18px 16px 90px}
+  h1{font-size:21px;margin-bottom:2px}
+  .sub{color:var(--mu);font-size:13.5px;margin-bottom:14px}
+  .secs{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:14px}
+  .sec{flex:0 0 auto;border:1px solid var(--bd);background:var(--surface);border-radius:999px;
+       padding:9px 15px;font-size:14px;cursor:pointer;white-space:nowrap;color:var(--ink)}
+  .sec.on{background:var(--g);color:#fff;border-color:var(--g);font-weight:600}
+  .caso{background:var(--surface);border:1px solid var(--bd);border-radius:12px;
+        padding:14px 15px;margin-bottom:12px}
+  .caso.visitado{opacity:.6}
+  .cab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .num{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;color:var(--mu)}
+  .pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+        padding:3px 9px;border-radius:999px;border:1px solid currentColor}
+  .p-urgente{color:var(--urg)} .p-programada{color:var(--prog)}
+  .p-no_requiere{color:var(--ok)} .p-inevaluable{color:var(--mu)} .p-sin{color:var(--mu)}
+  .quien{font-size:17px;font-weight:600}
+  .donde{font-size:14.5px;margin-top:2px}
+  .avisos{font-size:13px;color:var(--amber);font-weight:600;margin-top:4px}
+  .reco{font-size:13.5px;color:var(--mu);margin-top:7px;border-left:2px solid var(--bd);padding-left:10px}
+  /* 44px de alto mínimo: es el blanco de toque que no falla con guantes o prisa. */
+  .acc{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+  .b{flex:1 1 auto;min-height:44px;display:flex;align-items:center;justify-content:center;
+     border-radius:10px;border:1px solid var(--g);color:var(--g);background:transparent;
+     font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;padding:0 14px}
+  .b.full{background:var(--g);color:#fff}
+  .b.hecho{border-color:var(--bd);color:var(--mu)}
+  .vacio{color:var(--mu);font-size:15px;padding:26px 0;text-align:center}
+  .aviso{background:var(--surface);border:1px solid var(--bd);border-left:3px solid var(--g);
+         padding:13px 15px;border-radius:10px;margin-bottom:16px;font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ruta del día</h1>
+  <p class="sub" id="quien">Cargando…</p>
+  <div class="aviso"><strong>Marcar «visitada» pide contar qué encontraste.</strong>
+  Es lo único que va a quedar de que estuviste ahí, y lo que va a leer quien
+  pregunte dentro de un mes. La foto es opcional pero vale por diez líneas.</div>
+  <div class="secs" id="secs"></div>
+  <div id="lista"><p class="vacio">Cargando casos…</p></div>
+</div>
+<script src="/ruta.js"></script>
+</body>
+</html>`;
+}
+
+function rutaJS() {
+  return `
+var SECTOR = "";
+
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c];
+  });
+}
+
+var ET = { urgente:"Urgente", programada:"Programada",
+           no_requiere:"No requiere", inevaluable:"Sin evaluar bien" };
+
+fetch("/api/admin/quien").then(function(r){ return r.json(); }).then(function(d){
+  var e = document.getElementById("quien");
+  if (e) e.textContent = "Sesión de " + (d.email || "?") + " · solo el equipo ve esta pantalla";
+});
+
+function cargarRuta(){
+  var u = "/api/admin/ruta" + (SECTOR ? "?sector=" + encodeURIComponent(SECTOR) : "");
+  fetch(u).then(function(r){ return r.json(); }).then(function(d){
+    pintarSectores(d.sectores || []);
+    pintarCasos(d.casos || []);
+  });
+}
+
+function pintarSectores(l){
+  var c = document.getElementById("secs"); if (!c) return;
+  var h = '<button class="sec' + (SECTOR ? "" : " on") + '" data-sec="">Todos</button>';
+  for (var i = 0; i < l.length; i++){
+    h += '<button class="sec' + (SECTOR === l[i].sector ? " on" : "") + '" data-sec="' +
+         esc(l[i].sector) + '">' + esc(l[i].sector) + " · " + l[i].n + "</button>";
+  }
+  c.innerHTML = h;
+}
+
+function pintarCasos(l){
+  var c = document.getElementById("lista"); if (!c) return;
+  if (!l.length){ c.innerHTML = '<p class="vacio">Nada por visitar aquí. Buen trabajo.</p>'; return; }
+  var h = "";
+  for (var i = 0; i < l.length; i++){
+    var x = l[i];
+    var visitado = x.estado === "visitado";
+    var avisos = [];
+    if (x.heridos) avisos.push("hubo heridos");
+    if (!x.habitada) avisos.push("desocupada");
+    /* El teléfono va sin espacios en el enlace y con ellos a la vista: uno lo
+       marca el sistema, el otro lo lee una persona. */
+    var tel = String(x.contacto_tel || "").replace(/[^0-9+]/g, "");
+    h += '<div class="caso' + (visitado ? " visitado" : "") + '">' +
+      '<div class="cab"><span class="num">' + esc(x.numero) + "</span>" +
+      '<span class="pill p-' + esc(x.clasificacion || "sin") + '">' +
+      esc(x.clasificacion ? (ET[x.clasificacion] || x.clasificacion) : "sin evaluar") + "</span>" +
+      (visitado ? '<span class="pill p-no_requiere">visitada</span>' : "") + "</div>" +
+      '<div class="quien">' + esc(x.contacto_nombre) + "</div>" +
+      '<div class="donde">' + esc(x.direccion_ref || "sin dirección") + "</div>" +
+      '<div class="donde" style="color:var(--mu);font-size:13.5px">' + esc(x.sector) + "</div>" +
+      (avisos.length ? '<div class="avisos">' + esc(avisos.join(" · ")) + "</div>" : "") +
+      (x.reco ? '<div class="reco">' + esc(x.reco) + "</div>" : "") +
+      '<div class="acc">' +
+        '<a class="b" href="tel:' + esc(tel) + '">Llamar</a>' +
+        '<a class="b" href="https://wa.me/' + esc(tel.replace("+","")) + '" target="_blank" rel="noopener">WhatsApp</a>' +
+        (visitado
+          ? '<span class="b hecho">Ya visitada</span>'
+          : '<button class="b full" data-visita="' + esc(x.numero) + '">Visitada…</button>') +
+      "</div>" +
+      '<label class="b" style="margin-top:9px;display:flex;cursor:pointer">Añadir foto de la visita' +
+      '<input type="file" accept="image/*" capture="environment" data-foto="' + esc(x.numero) + '"' +
+      ' style="position:absolute;left:-9999px"></label>' +
+      '<p class="reco" data-msg="' + esc(x.numero) + '" style="display:none"></p>' +
+      "</div>";
+  }
+  c.innerHTML = h;
+}
+
+/* Compresión propia, y sí, es una segunda copia de la del sitio. Esta página
+   es autocontenida y la sirve el Worker: no carga app.js ni debería, así que la
+   alternativa era subir crudo desde un celular con datos móviles en terreno —
+   exactamente el problema que acabamos de arreglar del otro lado.
+   Si algo falla, se sube el original.
+   (Y sin comillas invertidas en este comentario: cerrarían el template. El
+   check #1b acaba de atrapármelo escribiéndolo.) */
+function comprimirEnRuta(file){
+  if (!file || file.type.indexOf("image/") !== 0) return Promise.resolve(file);
+  if (typeof createImageBitmap !== "function") return Promise.resolve(file);
+  return createImageBitmap(file, { imageOrientation: "from-image" }).then(function(img){
+    var lado = Math.max(img.width, img.height);
+    var k = lado > 1600 ? 1600 / lado : 1;
+    var cv = document.createElement("canvas");
+    cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    if (img.close) img.close();
+    return new Promise(function(res){
+      cv.toBlob(function(b){ res(b && b.size < file.size ? b : file); }, "image/jpeg", 0.8);
+    });
+  }).catch(function(){ return file; });
+}
+
+document.addEventListener("change", function(e){
+  var inp = e.target.closest("[data-foto]");
+  if (!inp || !inp.files || !inp.files.length) return;
+  var num = inp.getAttribute("data-foto");
+  var msg = document.querySelector('[data-msg="' + num + '"]');
+  if (msg){ msg.style.display = ""; msg.textContent = "Subiendo la foto…"; }
+  comprimirEnRuta(inp.files[0]).then(function(archivo){
+    return fetch("/api/admin/caso/" + encodeURIComponent(num) + "/medio", {
+      method: "POST", headers: { "content-type": archivo.type || "image/jpeg" }, body: archivo
+    });
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (msg) msg.textContent = d && d.error ? "No se pudo subir: " + d.error : "Foto guardada.";
+  }).catch(function(){ if (msg) msg.textContent = "No se pudo subir la foto."; });
+  inp.value = "";
+});
+
+document.addEventListener("click", function(e){
+  var s = e.target.closest("[data-sec]");
+  if (s){ SECTOR = s.getAttribute("data-sec"); cargarRuta(); return; }
+
+  var v = e.target.closest("[data-visita]");
+  if (!v) return;
+  var num = v.getAttribute("data-visita");
+  /* \\\\n y no \\n: esto vive dentro del template literal de rutaJS(). */
+  var nota = window.prompt("Visita a " + num +
+    ".\\\\n\\\\n¿Qué encontraste? Es lo único que va a quedar de que estuviste ahí:");
+  if (!nota) return;
+  v.disabled = true; v.textContent = "…";
+  fetch("/api/admin/caso/" + encodeURIComponent(num) + "/estado", {
+    method: "POST", headers: {"content-type":"application/json"},
+    body: JSON.stringify({ estado: "visitado", motivo: nota })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d && d.error){ window.alert("No se guardó: " + d.error + (d.ayuda ? "\\\\n\\\\n" + d.ayuda : "")); }
+    cargarRuta();
+  }).catch(function(){ cargarRuta(); });
+});
+
+cargarRuta();
+`;
+}
+
 function paginaAdmin() {
   return `<!doctype html>
 <html lang="es"><head>
@@ -5304,7 +5618,7 @@ export default {
        verificación real de firma RS256 y el fail-closed. Los ingenieros
        voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
        creando cuentas: cero contraseñas que guardar y cero que se filtren. */
-    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js") {
+    if (ruta === "/admin" || ruta === "/admin.js" || ruta === "/ruta" || ruta === "/ruta.js" || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js") {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
       /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
@@ -5329,6 +5643,9 @@ export default {
          un token de la aplicación del triage no abre donantes ni comprobantes.
          El triage acepta la suya y también la del panel, para que el equipo
          entre a revisar sin necesitar una segunda cuenta. */
+      /* `/ruta` NO está aquí a propósito: enseña teléfono y dirección, que es
+         justo lo que un ingeniero voluntario no puede ver. Entra solo con la
+         audiencia del panel, igual que /admin. */
       const esTriage = ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js" || ruta.startsWith("/api/triage/");
       const audsZona = esTriage
         ? [env.ACCESS_AUD_TRIAGE, env.ACCESS_AUD]
@@ -5397,12 +5714,25 @@ export default {
         if (ruta === "/api/admin/resumen")  return await adminResumen(env);
         if (ruta === "/api/admin/salud")    return await adminSalud(env);
         if (ruta === "/api/admin/casos")    return await adminCasos(env);
+        if (ruta === "/api/admin/ruta")     return await adminRuta(env, url);
+        if (ruta === "/ruta") {
+          return new Response(paginaRuta(), {
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
+          });
+        }
+        if (ruta === "/ruta.js") {
+          return new Response(rutaJS(), {
+            headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
+          });
+        }
         /* El número va en la ruta con su forma exacta, igual que el aporte:
            cualquier otra cosa ni siquiera entra a la función. */
         const mc = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/estado$/i);
         if (mc) return await adminMoverCaso(request, env, mc[1].toUpperCase(), sesion.email);
         const cco = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/corregir$/i);
         if (cco) return await adminCorregirCaso(request, env, cco[1].toUpperCase(), sesion.email);
+        const cme = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/medio$/i);
+        if (cme) return await adminSubirMedio(request, env, cme[1].toUpperCase(), url, sesion.email);
         const cbo = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/medio\/(\d{1,9})\/borrar$/i);
         if (cbo) return await adminBorrarMedio(request, env, cbo[1].toUpperCase(), Number(cbo[2]), sesion.email);
         const cfi = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})$/i);
