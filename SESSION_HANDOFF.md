@@ -500,6 +500,24 @@ podía bajar un caso de urgente a no_requiere sin que nadie se enterara.
 urgentes con una sola opinión —sobre un urgente se va a mover una brigada— y los
 que están en desacuerdo. `/admin` marca «en discrepancia» en la bandeja.
 
+### ⚠️⚠️ RUTA INTERNA NUEVA = **TRES** SITIOS (19 ago, corregido)
+La nota de abajo decía DOS y estaba incompleta, y por eso `/ruta` nació muerta:
+respondía **403 `sin_token`** en producción mientras `/admin` respondía 302 al
+login. Access NUNCA la interceptaba, así que jamás emitía el token que el
+guardián exige. Segura pero inservible — y era la pantalla de la brigada.
+
+Una ruta interna nueva necesita:
+1. el guardián de `worker.js`,
+2. `run_worker_first` en `wrangler.toml`,
+3. **y estar cubierta por la aplicación de Cloudflare Access.**
+
+**La solución que quedó, y conviene repetirla:** toda pantalla interna nueva
+cuelga de **`/admin/…`**, que ya está cubierta por la entrada existente. Cero
+cupos nuevos de Access —su aplicación está en el tope— y nadie puede volver a
+olvidar el paso 3. `/ruta` y `/ruta.js` redirigen 301 a `/admin/ruta`, y esa
+redirección va FUERA del guardián: dentro no se alcanzaba nunca y caía al
+comodín de la SPA devolviendo la portada pública.
+
 ### ⚠️ RUTA NUEVA = DOS SITIOS, NO UNO (18 ago)
 Añadir `/ruta` costó una vuelta entera por olvidar el segundo: hay que
 registrarla en **`run_worker_first` de `wrangler.toml`** además de en el
