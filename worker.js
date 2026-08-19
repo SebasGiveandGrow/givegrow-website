@@ -3014,6 +3014,60 @@ async function adminRuta(env, url) {
 }
 
 /* ========================================================================
+   GET /api/casos/publicos — el banco público de casas
+   ========================================================================
+   `consent_publico` y su índice `ix_casos_publico` existen desde la 0010 y nada
+   los consumía. Esto es lo primero que los usa, y es la única evidencia pública
+   que el programa de vivienda ha podido dar hasta ahora.
+
+   QUÉ SALE Y QUÉ NO, y la lista corta importa más que la larga:
+
+   · SALE el número, el sector, la clasificación, el material y los pisos. El
+     sector es lo único publicable por diseño de la 0010 —zona, nunca dirección.
+   · NO SALEN LAS FOTOS. Ninguna. Una fachada ES una dirección: quien conozca el
+     barrio identifica la casa en dos segundos, y la familia autorizó aparecer
+     «SIN mi nombre ni mi dirección». Publicar la foto sería incumplir eso
+     mientras se dice que se cumple.
+   · NO SALE `nota`, el campo libre donde la familia cuenta lo que quiera. Ahí
+     puede haber un apellido, una referencia o el nombre de un vecino. No se
+     puede auditar texto libre a mano cada vez.
+   · NO SALEN contacto ni `direccion_ref`, obviamente.
+
+   Solo casos YA CLASIFICADOS: publicar uno que ningún ingeniero ha mirado sería
+   presentar como hallazgo lo que todavía es una solicitud sin revisar.
+   ======================================================================== */
+async function apiCasosPublicos(env) {
+  const r = await env.DB.prepare(
+    "SELECT numero, sector, clasificacion, material, pisos, creado_en FROM casos " +
+    "WHERE consent_publico = 1 AND clasificacion IS NOT NULL " +
+    "AND estado NOT IN ('cerrado','descartado') ORDER BY " +
+    "CASE clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 ELSE 2 END, " +
+    "creado_en ASC LIMIT 300"
+  ).all();
+
+  /* Los totales cuentan TODO lo clasificado, con consentimiento o sin él: son
+     el tamaño real de lo revisado, y ese número no identifica a nadie. Si solo
+     contaran lo publicable, el sitio estaría diciendo que revisó menos casas de
+     las que revisó — y eso también es faltar a la verdad. */
+  const t = await env.DB.prepare(
+    "SELECT COUNT(*) AS revisados, " +
+    "SUM(CASE WHEN clasificacion = 'urgente' THEN 1 ELSE 0 END) AS urgentes, " +
+    "SUM(CASE WHEN estado = 'visitado' THEN 1 ELSE 0 END) AS visitados " +
+    "FROM casos WHERE clasificacion IS NOT NULL AND estado <> 'descartado'"
+  ).first();
+
+  return json({
+    casos: r.results || [],
+    totales: {
+      revisados: (t && t.revisados) || 0,
+      urgentes: (t && t.urgentes) || 0,
+      visitados: (t && t.visitados) || 0,
+      publicables: (r.results || []).length
+    }
+  });
+}
+
+/* ========================================================================
    GET /api/admin/caso/<n> — la ficha completa, para corregirla y curarla
    ========================================================================
    La bandeja es una tabla y sirve para decidir a dónde ir. Esto es lo otro:
@@ -6005,6 +6059,7 @@ export default {
         if (comp) return await apiComprobante(request, env, comp[1].toUpperCase(), url.searchParams.get("t"));
         /* Triage estructural de viviendas */
         if (ruta === "/api/caso")           return await apiCasoCrear(request, env);
+        if (ruta === "/api/casos/publicos") return await apiCasosPublicos(env);
         const cmed = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/medio$/i);
         if (cmed) return await apiCasoMedio(request, env, cmed[1].toUpperCase(), url.searchParams.get("t"), url);
         const cinf = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/informe\.pdf$/i);
