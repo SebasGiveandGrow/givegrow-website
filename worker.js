@@ -35,6 +35,14 @@ import { recibo, certificado, informeTriage } from "./documentos.js";
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
 
+/* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
+   no como un cambio de `ORIGIN` a propósito: `ORIGIN` lo usan el recibo, el
+   carnet y las tarjetas de compartir, que son de la FUNDACIÓN. Tocarlo mandaría
+   los recibos de donación al subdominio del triaje.
+
+   Sin `www`: el subdominio responde en su nombre exacto. */
+const ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
+
 /* Límites del formulario público, en pesos. Coinciden con el deslizador de la
    calculadora: por debajo no cubre la comisión, por encima conviene hablar. */
 const MONTO_MIN = 5000;
@@ -2768,7 +2776,7 @@ async function correoCasoClasificado(env, x) {
      correo es el que se lo dice — y mandarlo a un PDF es mandarlo a un sitio
      donde no puede responder. La página sirve para las dos cosas: leer el
      resultado y agregar lo que falta. */
-  const url = ORIGIN + "/caso/" + x.numero + "?t=" + x.token;
+  const url = ORIGIN_MMC + "/caso/" + x.numero + "?t=" + x.token;
 
   const parrafos = inev ? [
     "Un ingeniero voluntario miró tu caso, pero con las fotos que enviaste no puede formarse un criterio.",
@@ -3162,7 +3170,15 @@ async function adminCasoFicha(env, numero) {
     "WHERE tipo = 'auditoria' AND detalle LIKE 'caso ' || ? || ' %' ORDER BY id DESC LIMIT 30"
   ).bind(numero).all();
 
-  return json({ caso: c, medios: m.results || [], evaluaciones: e.results || [], historial: h.results || [] });
+  /* El enlace lo arma el SERVIDOR y no el panel, y no es una preferencia de
+     estilo: desde la migración su origen es el subdominio del triaje y no el del
+     panel, así que `location.origin` del navegador ya no sirve. Armarlo aquí
+     deja el dominio escrito UNA sola vez, en `ORIGIN_MMC` — y el gate no puede
+     validar `adminJS()` si se le mete una interpolación, así que la alternativa
+     habría sido un segundo literal del mismo dominio esperando a divergir. */
+  const enlace = ORIGIN_MMC + "/caso/" + c.numero + "?t=" + (c.token || "");
+
+  return json({ caso: c, enlace, medios: m.results || [], evaluaciones: e.results || [], historial: h.results || [] });
 }
 
 /* ========================================================================
@@ -5526,7 +5542,7 @@ function abrirCaso(numero){
         '<p class="mu" style="font-size:13px;margin:12px 0 4px"><strong>Enlace de la familia</strong> — ' +
         'si lo perdió, es lo único que se lo devuelve. Mándaselo por WhatsApp; no lo publiques.</p>' +
         '<p style="font-size:12px;word-break:break-all;margin-bottom:14px">' +
-        esc(location.origin + "/caso/" + numero + "?t=" + (c.token || "")) + "</p>" +
+        esc(d.enlace || "") + "</p>" +
         '<p id="f-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>' +
         '<div style="display:flex;gap:10px;margin:8px 0 22px">' +
           '<button class="btn btn-g" id="f-ok" data-guardar="' + esc(numero) + '">Guardar</button>' +
@@ -5935,6 +5951,23 @@ function marcarMarca(respuesta, host) {
   if (!tipo.includes("text/html")) return respuesta;
   return new HTMLRewriter()
     .on("html", { element(e) { e.setAttribute("data-marca", "mmc"); } })
+    /* EL CANONICAL, que es estático en el HTML y apunta al dominio de la
+       fundación. Servido tal cual desde el subdominio le dice a Google «la
+       versión buena de esta página está allá» — o sea, justo lo contrario de lo
+       que la migración quiere: que el triaje se indexe aquí.
+
+       Se reescribe aquí y no en `index.html` porque el archivo es UNO y lo
+       comparten las dos marcas. Es el mismo sitio que ya inyecta `data-marca`,
+       o sea el mismo recorrido del documento y ningún coste nuevo.
+
+       Al ORIGEN y no a la ruta, igual que en el ápex: es una SPA de hash, así
+       que la portada es la canónica de todas. Y así ninguna página de caso
+       —cuya URL lleva el token de la familia— puede acabar publicada en un
+       `canonical` que un crawler siga. */
+    .on('link[rel="canonical"]', { element(e) { e.setAttribute("href", ORIGIN_MMC); } })
+    /* Lo mismo para `og:url`: sin esto, un enlace del triaje compartido por
+       WhatsApp se previsualiza como el sitio de la fundación. */
+    .on('meta[property="og:url"]', { element(e) { e.setAttribute("content", ORIGIN_MMC); } })
     .transform(respuesta);
 }
 
@@ -5983,6 +6016,30 @@ export default {
        una jornada. */
     if (ruta === "/ruta" || ruta === "/ruta.js") {
       return Response.redirect(new URL("/admin" + ruta, url).toString(), 301);
+    }
+
+    /* EL TRIAJE VIVE EN MIRA MI CASA. `/caso/<n>?t=` es la página de la familia
+       y la única ruta de PATH del triaje, así que es la única que el Worker
+       puede mudar — las de hash (`#vivienda`, `#ingenieros`, `#casas`) no las ve
+       nunca y las mueve `app.js`.
+
+       Por qué 301 y no borrar la ruta: los enlaces ya repartidos son del ápex,
+       incluido el que se le pasó a la ingeniera el 19 por la mañana. Del otro
+       lado hay una familia que mandó fotos de su casa rota; que su enlace deje
+       de abrir no es una regresión de SEO, es dejarla sin su caso.
+
+       Va ANTES del guardián de Access, igual que el de `/ruta`: una redirección
+       no necesita sesión, y metida dentro no se alcanzaría nunca.
+
+       Se preserva la QUERY porque ahí viaja el token, que es lo que abre el
+       caso. `new URL(ruta + search)` la conserva; solo con `ruta` se perdería y
+       la familia aterrizaría en una página que no puede mostrarle nada.
+
+       No aplica en el subdominio (sería un bucle) ni en `workers.dev`, donde el
+       entorno de pruebas sirve las dos marcas y saltar a producción convertiría
+       una prueba en una visita al sitio real. */
+    if (ruta.startsWith("/caso/") && !HOST_MMC.test(url.hostname) && !/\.workers\.dev$/i.test(url.hostname)) {
+      return Response.redirect(ORIGIN_MMC + ruta + url.search, 301);
     }
 
     /* --- Panel interno: TODO detrás de Access, y fail-closed --- */

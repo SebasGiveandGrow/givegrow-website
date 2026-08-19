@@ -60,9 +60,13 @@
         <button class="nlink ndrop-t" type="button" data-i18n="nav.g.emergencia" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Emergencia</button>
         <div class="ndrop-menu ndrop-menu-desc">
           <a href="#brigada"><span class="nd-t" data-i18n="nav.brigada">Brigada de emergencia</span><span class="nd-d" data-i18n="nav.d.brigada">Los cinco territorios, qué se necesita y cómo aportar</span></a>
-          <a href="#vivienda"><span class="nd-t" data-i18n="cv.t">Revisa tu casa</span><span class="nd-d" data-i18n="nav.d.vivienda">Sube fotos de tu casa y sabrás qué tan urgente es una visita</span></a>
-          <a href="#ingenieros"><span class="nd-t" data-i18n="ing.ey">Ingenieros voluntarios</span><span class="nd-d" data-i18n="nav.d.ingenieros">Postúlate al triaje: mira fotos y di a quién visitar primero</span></a>
-          <a href="#casas"><span class="nd-t" data-i18n="nav.casas">Casas revisadas</span><span class="nd-d" data-i18n="nav.d.casas">El registro público del triaje, sin nombres ni direcciones</span></a>
+          <!-- Los tres del triaje son enlaces EXTERNOS, no rutas de la SPA: esas
+               páginas viven en Mira Mi Casa. `app.js` redirige igualmente si
+               alguien llega por un enlace viejo, pero eso es una red de
+               seguridad — desde el menú se va directo, sin el salto de más. -->
+          <a href="https://miramicasa.thegiveandgrowproject.org/#vivienda"><span class="nd-t" data-i18n="cv.t">Revisa tu casa</span><span class="nd-d" data-i18n="nav.d.vivienda">Sube fotos de tu casa y sabrás qué tan urgente es una visita</span></a>
+          <a href="https://miramicasa.thegiveandgrowproject.org/#ingenieros"><span class="nd-t" data-i18n="ing.ey">Ingenieros voluntarios</span><span class="nd-d" data-i18n="nav.d.ingenieros">Postúlate al triaje: mira fotos y di a quién visitar primero</span></a>
+          <a href="https://miramicasa.thegiveandgrowproject.org/#casas"><span class="nd-t" data-i18n="nav.casas">Casas revisadas</span><span class="nd-d" data-i18n="nav.d.casas">El registro público del triaje, sin nombres ni direcciones</span></a>
         </div>
       </div>
       <!-- Nav propia de Mira Mi Casa. Oculta salvo cuando el Worker marca el
@@ -125,9 +129,10 @@
   <a class="mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
   <span class="mnav-g" data-i18n="nav.g.emergencia">Emergencia</span>
   <a href="#brigada" data-i18n="nav.brigada">Brigada de emergencia</a>
-  <a href="#vivienda" data-i18n="cv.t">Revisa tu casa</a>
-  <a href="#ingenieros" data-i18n="ing.ey">Ingenieros voluntarios</a>
-  <a href="#casas" data-i18n="nav.casas">Casas revisadas</a>
+  <!-- Externos, igual que en la barra: el triaje vive en Mira Mi Casa. -->
+  <a href="https://miramicasa.thegiveandgrowproject.org/#vivienda" data-i18n="cv.t">Revisa tu casa</a>
+  <a href="https://miramicasa.thegiveandgrowproject.org/#ingenieros" data-i18n="ing.ey">Ingenieros voluntarios</a>
+  <a href="https://miramicasa.thegiveandgrowproject.org/#casas" data-i18n="nav.casas">Casas revisadas</a>
   <a href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
   <a href="#fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
   <span class="mnav-g" data-i18n="nav.empresas">Empresas</span>
@@ -2415,7 +2420,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=78098263"></script>
+<script src="/app.js?v=bb3dfe31"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

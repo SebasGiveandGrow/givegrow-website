@@ -1798,7 +1798,7 @@ function cvEnviar(){
        ingeniero evalúe, así que hasta entonces ese enlace no abría nada; y
        cuando el ingeniero pide más fotos, un PDF es justo lo que no sirve para
        mandárselas. La página funciona en los dos momentos. */
-    CV.enlace = location.origin + "/caso/" + encodeURIComponent(d.numero) +
+    CV.enlace = origenTriaje() + "/caso/" + encodeURIComponent(d.numero) +
                 "?t=" + encodeURIComponent(d.token);
     var lnk = document.getElementById("cv-enlace");
     if (lnk) { lnk.textContent = CV.enlace; lnk.href = CV.enlace; }
@@ -1903,10 +1903,53 @@ var MARCA_MMC = document.documentElement.getAttribute("data-marca") === "mmc";
    le enseña un 404, se le lleva al sitio donde esa página sí existe. */
 var RUTAS_MMC = ["vivienda", "caso", "casas", "ingenieros", "privacidad", "e404"];
 
+var ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
+
+/* Las rutas del TRIAJE, que ya solo existen en Mira Mi Casa. La brigada NO está
+   aquí a propósito: es anterior a este proyecto y es de la fundación, así que se
+   queda en su dominio.
+
+   `caso` tampoco: es una ruta de PATH (`/caso/<n>?t=`) y la muda el Worker, que
+   sí puede conservar el token de la query. Aquí solo van las de hash, que el
+   Worker no ve nunca porque el `#` no viaja al servidor. */
+var RUTAS_TRIAJE = ["vivienda", "ingenieros", "casas"];
+
 function mmcRuta(id){
   if (!MARCA_MMC || RUTAS_MMC.indexOf(id) > -1) return false;
   location.href = "https://thegiveandgrowproject.org/#" + id;
   return true;
+}
+
+/* El espejo de `mmcRuta`, y existe por lo mismo: un enlace viejo no debe
+   encontrarse con una página que ya no está. Los del triaje se repartieron con
+   la dirección del ápex —el que se le pasó a la ingeniera, entre otros— y desde
+   la migración esas páginas viven en el subdominio.
+
+   Solo corre FUERA del subdominio; dentro, `MARCA_MMC` es true y no hay nada
+   que mover. Y no corre en `localhost` ni en `workers.dev`: ahí saltar a
+   producción convertiría una prueba en una visita al sitio real. */
+function entornoDePruebas(){
+  var h = location.hostname;
+  return h === "localhost" || h === "127.0.0.1" || /\.workers\.dev$/i.test(h);
+}
+
+function triajeRuta(id){
+  if (MARCA_MMC || RUTAS_TRIAJE.indexOf(id) < 0) return false;
+  if (entornoDePruebas()) return false;
+  location.href = ORIGIN_MMC + "/#" + id;
+  return true;
+}
+
+/* El origen con el que se ARMAN los enlaces del triaje que se le entregan a una
+   familia. Fijo al subdominio y no `location.origin`: ese enlace es lo único con
+   lo que la familia vuelve a su caso, y tiene que apuntar al sitio donde el caso
+   vive, esté donde esté quien llenó el formulario.
+
+   La excepción es el entorno de pruebas, donde `location.origin` es lo correcto:
+   un enlace a producción desde `localhost` no abriría el caso que se acabó de
+   crear, porque está en otra base de datos. */
+function origenTriaje(){
+  return entornoDePruebas() ? location.origin : ORIGIN_MMC;
 }
 
 /* El logotipo es tipográfico: el nombre es provisional y dibujar una marca que
@@ -2222,6 +2265,8 @@ function go(id, fromPop){
   /* En el subdominio de Mira Mi Casa solo existen sus rutas; el resto se manda
      al dominio de la fundación en vez de mostrar un 404. */
   if (mmcRuta(id)) return false;
+  /* Y al revés: el triaje ya no vive en el dominio de la fundación. */
+  if (triajeRuta(id)) return false;
   // #alma quedó como alias: ALMA ya no es una página sino un panel. Los enlaces
   // viejos aterrizan en #impactos y abren el panel, así ninguno queda roto.
   var abrirAlma = (id === "alma");
