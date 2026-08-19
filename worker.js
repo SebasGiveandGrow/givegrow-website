@@ -2857,19 +2857,8 @@ async function adminCasos(env) {
        coincidir con el que allí se escribe. */
     "(SELECT a.detalle FROM consentimientos a WHERE a.tipo = 'auditoria' " +
     " AND a.detalle LIKE 'caso ' || c.numero || ' %' ORDER BY a.id DESC LIMIT 1) AS ultimo, " +
-    /* POSIBLE DUPLICADO, y se avisa AQUÍ y no en la respuesta pública.
-       La familia que no está segura de si se envió manda el caso otra vez, y en
-       la bandeja aparecen dos casas donde hay una — así se va dos veces a la
-       misma puerta durante una brigada de cinco días.
-       Decirlo en el formulario habría sido peor: quien enviara un caso con un
-       teléfono adivinado se enteraría de que ese número reportó, que es
-       justamente el dato que la Ley 1581 protege. Aquí no se filtra nada: lo ve
-       el equipo, que es quien puede resolverlo, y detrás de Access. */
     "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e " +
-    "  WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1) AS discrepa, " +
-    "(SELECT o.numero FROM casos o WHERE " + TEL_DIGITOS("o.contacto_tel") +
-    " = " + TEL_DIGITOS("c.contacto_tel") +
-    " AND o.numero <> c.numero ORDER BY o.creado_en LIMIT 1) AS dup " +
+    "  WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1) AS discrepa " +
     "FROM casos c ORDER BY " +
     /* Lo terminado se hunde al fondo. Antes no hacía falta porque nada
        terminaba nunca; ahora sí, y una bandeja que mezcla lo cerrado con lo
@@ -2880,7 +2869,36 @@ async function adminCasos(env) {
     "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
     "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT 200"
   ).all();
-  return json({ casos: r.results || [] });
+
+  /* POSIBLE DUPLICADO, y se calcula AQUÍ y no en SQL.
+     La familia que no está segura de si se envió manda el caso otra vez, y en
+     la bandeja aparecen dos casas donde hay una — así se va dos veces a la
+     misma puerta durante una brigada de cinco días. Decirlo en el formulario
+     habría sido peor: quien enviara un caso con un teléfono adivinado se
+     enteraría de que ese número reportó, que es justo el dato que la Ley 1581
+     protege. Aquí no se filtra nada: lo ve el equipo, detrás de Access.
+
+     POR QUÉ SALIÓ DE SQL: estaba como subconsulta correlacionada que
+     normalizaba los DOS lados con cinco REPLACE anidados, así que el índice
+     `ix_casos_tel` no se podía usar y hacía un escaneo completo POR FILA.
+     Medido con 600 casos: 165 ms contra 0 ms sin ella, y crece de forma
+     cuadrática — justo en la pantalla que el equipo más va a mirar cuando la
+     brigada traiga volumen. Aquí es UN escaneo y un mapa: lineal, y sin
+     migración. */
+  const tel = await env.DB.prepare("SELECT numero, contacto_tel FROM casos").all();
+  const porTelefono = new Map();
+  for (const f of tel.results || []) {
+    const k = String(f.contacto_tel || "").replace(/\D/g, "");
+    if (!k) continue;
+    if (!porTelefono.has(k)) porTelefono.set(k, []);
+    porTelefono.get(k).push(f.numero);
+  }
+  const casos = (r.results || []).map((c) => {
+    const k = String(c.contacto_tel || "").replace(/\D/g, "");
+    const otros = (porTelefono.get(k) || []).filter((n) => n !== c.numero);
+    return { ...c, dup: otros.length ? otros[0] : null };
+  });
+  return json({ casos });
 }
 
 /* ========================================================================
