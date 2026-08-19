@@ -64,8 +64,8 @@
                páginas viven en Mira Mi Casa. `app.js` redirige igualmente si
                alguien llega por un enlace viejo, pero eso es una red de
                seguridad — desde el menú se va directo, sin el salto de más. -->
-          <a href="https://miramicasa.thegiveandgrowproject.org/#vivienda"><span class="nd-t" data-i18n="cv.t">Revisa tu casa</span><span class="nd-d" data-i18n="nav.d.vivienda">Sube fotos de tu casa y sabrás qué tan urgente es una visita</span></a>
-          <a href="https://miramicasa.thegiveandgrowproject.org/#ingenieros"><span class="nd-t" data-i18n="ing.ey">Ingenieros voluntarios</span><span class="nd-d" data-i18n="nav.d.ingenieros">Postúlate al triaje: mira fotos y di a quién visitar primero</span></a>
+          <a href="https://miramicasa.thegiveandgrowproject.org/#vivienda"><span class="nd-t" data-i18n="cv.t">Revisa tu casa</span><span class="nd-d" data-i18n="nav.d.vivienda">Sube fotos y recibe un concepto: si puedes permanecer y con qué reparar</span></a>
+          <a href="https://miramicasa.thegiveandgrowproject.org/#ingenieros"><span class="nd-t" data-i18n="ing.ey">Ingenieros voluntarios</span><span class="nd-d" data-i18n="nav.d.ingenieros">Postúlate: mira fotos, di qué precauciones tomar y con qué reparar</span></a>
           <a href="https://miramicasa.thegiveandgrowproject.org/#casas"><span class="nd-t" data-i18n="nav.casas">Casas revisadas</span><span class="nd-d" data-i18n="nav.d.casas">El registro público del triaje, sin nombres ni direcciones</span></a>
         </div>
       </div>
@@ -2107,8 +2107,13 @@
     <div class="wrap">
       <span class="ey" data-i18n="cv.t">Revisa tu casa</span>
       <h1 class="h-sec" data-i18n="cv.t">Revisa tu casa</h1>
-      <p class="lead" data-i18n="cv.lead">Si tu casa se afectó por el sismo, sube unas fotos. Ingenieros voluntarios las revisan y te dicen qué tan urgente es una visita.</p>
-      <p class="mu" style="max-width:60ch;margin-top:14px" data-i18n="cv.aviso">Esto NO dice si tu casa es habitable. Eso lo define una visita y la autoridad de tu municipio. Lo que hacemos es decidir a quién visitar primero.</p>
+      <p class="lead" data-i18n="cv.lead">Si tu casa se afectó por el sismo, sube unas fotos. Un ingeniero voluntario te dice si hay señales para no permanecer en ella, qué precauciones tomar y con qué materiales conviene repararla.</p>
+      <p class="mu" style="max-width:60ch;margin-top:14px" data-i18n="cv.aviso">Esto no reemplaza una visita ni la declaratoria de tu municipio. Lo que un ingeniero te da es un concepto a distancia, sobre tus fotos: si hay señales para no permanecer en la casa o en alguna parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla. En una emergencia eso es lo que se puede dar rápido, y no darlo es peor.</p>
+      <!-- Lo que la fundación puede y no puede prometer, dicho antes de que la
+           familia llene el formulario y no después. Va aparte de `cv.aviso` a
+           propósito: ese párrafo habla del alcance TÉCNICO del concepto, este
+           del compromiso de la fundación, y son dos cosas distintas. -->
+      <p class="mu" style="max-width:60ch;margin-top:10px" data-i18n="cv.gestion">Buscaremos gestionar ayuda para todas las casas que podamos, y no podemos comprometerla casa por casa. Preferimos decírtelo antes que prometerte algo que no depende solo de nosotros.</p>
 
       <!-- PASO 1 · seguridad -->
       <div id="cv-p1" class="cv-paso" style="margin-top:30px">
@@ -2179,8 +2184,8 @@
         <h3 data-i18n="cv.ok.t">Listo. Este es tu número de caso</h3>
         <p id="cv-num" class="figure-xl" style="margin:10px 0"></p>
         <p data-i18n="cv.ok.p">Guárdalo. Con él puedes consultar tu caso cuando quieras.</p>
-        <p class="mu" style="margin-top:10px" data-i18n="cv.ok.espera">Un ingeniero voluntario lo va a revisar. Cuando tenga su respuesta, aparecerá en tu enlace.</p>
-        <p style="margin-top:16px" data-i18n="cv.ok.enlace">Este es el enlace de tu caso. Guárdalo o mándatelo por WhatsApp: cuando un ingeniero lo revise, aquí aparecerá tu informe.</p>
+        <p class="mu" style="margin-top:10px" data-i18n="cv.ok.espera">Un ingeniero voluntario lo va a revisar. Cuando tenga su concepto, aparecerá en tu enlace.</p>
+        <p style="margin-top:16px" data-i18n="cv.ok.enlace">Este es el enlace de tu caso. Guárdalo o mándatelo por WhatsApp: cuando un ingeniero lo revise, aquí aparecerá su concepto.</p>
         <p style="margin-top:8px;word-break:break-all"><a id="cv-enlace" href="#" style="color:var(--acc);font-weight:600"></a></p>
         <button type="button" class="btn btn-o" style="margin-top:16px" data-act="cvCopiar()" data-i18n="cv.ok.copiar">Copiar mi enlace</button>
       </div>
@@ -2210,7 +2215,7 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="ing.ey">Ingenieros voluntarios</span>
       <h1 class="h-sec rv" data-i18n="ing.t">Hay más casas dañadas que ingenieros para visitarlas.</h1>
-      <p class="lead rv d1" data-i18n="ing.lead">Después del sismo del 10 de agosto llegan más solicitudes de las que un equipo alcanza a atender en terreno. Lo que pedimos no es que dictamines a distancia: es que mires unas fotos y digas a quién hay que visitar primero.</p>
+      <p class="lead rv d1" data-i18n="ing.lead">Después del sismo del 10 de agosto llegan más solicitudes de las que un equipo alcanza a atender en terreno. Lo que pedimos no es que dictamines a distancia: es que mires unas fotos, digas si hay señales para no permanecer y qué conviene reparar y con qué.</p>
     </div>
   </section>
 
@@ -2220,8 +2225,8 @@
       <h2 class="h-sec rv" data-i18n="ing.q.t">Priorizar, no dictaminar</h2>
       <p class="lead rv d1" data-i18n="ing.q.p">Esta distinción no es una advertencia legal al pie: gobierna el proyecto entero, hasta el nombre de las columnas de la base. Si no la compartes, este no es el lugar — y preferimos decírtelo antes.</p>
       <div class="grid g3 rv d2" style="margin-top:28px">
-        <div class="card"><h3 data-i18n="ing.q1.t">Lo que haces</h3><p data-i18n="ing.q1.p">Ordenas la fila. Cada caso queda en visita urgente, visita programada, no requiere visita por ahora, o no se puede evaluar con este material. Y escribes qué le conviene hacer a la familia mientras tanto.</p></div>
-        <div class="card"><h3 data-i18n="ing.q2.t">Lo que no haces</h3><p data-i18n="ing.q2.p">No declaras habitable ni inhabitable una vivienda. La declaratoria con efectos —evacuar, demoler— es de la autoridad municipal, por la Ley 1523 de 2012. Nadie te va a pedir que firmes eso aquí.</p></div>
+        <div class="card"><h3 data-i18n="ing.q1.t">Lo que haces</h3><p data-i18n="ing.q1.p">Das un concepto a distancia: si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla. Y ordenas la fila: visita urgente, programada, no requiere por ahora, o no se puede evaluar con este material.</p></div>
+        <div class="card"><h3 data-i18n="ing.q2.t">Lo que no haces</h3><p data-i18n="ing.q2.p">No declaras habitable ni inhabitable una vivienda, y nadie te va a pedir que firmes eso aquí: la declaratoria con efectos —evacuar, demoler— es de la autoridad municipal, por la Ley 1523 de 2012. Recomendar que no se use una parte de la casa mientras se revisa no es declararla inhabitable: es una precaución, y así queda escrita.</p></div>
         <div class="card"><h3 data-i18n="ing.q3.t">Por qué las fotos no alcanzan</h3><p data-i18n="ing.q3.p">No ves la cimentación, no ves el suelo y no sabes si ese muro carga. Por eso «no puedo evaluar con esto» es una respuesta de primera clase, y no un fracaso: al marcarla, el sistema te obliga a decir qué falta y se lo pide a la familia.</p></div>
       </div>
     </div>
@@ -2243,7 +2248,7 @@
   <section class="band">
     <div class="wrap center">
       <h3 class="rv" data-i18n="ing.f.t" style="margin-bottom:14px">Lo que va con tu nombre</h3>
-      <p class="lead rv d1" data-i18n="ing.f.p" style="margin-left:auto;margin-right:auto">La familia recibe un informe en PDF con tu nombre, tu matrícula y lo que escribiste. Por eso puedes revisar los casos que quieras y ninguno que no quieras, y por eso siempre está abierta la salida de pedir más material. Nada de esto se cobra, en ninguna dirección.</p>
+      <p class="lead rv d1" data-i18n="ing.f.p" style="margin-left:auto;margin-right:auto">La familia recibe un PDF con tu nombre, tu matrícula y lo que escribiste. Por eso puedes revisar los casos que quieras y ninguno que no quieras, y por eso siempre está abierta la salida de pedir más material. Nada de esto se cobra, en ninguna dirección.</p>
     </div>
   </section>
 
@@ -2321,7 +2326,7 @@
       <div id="bc-totales" class="eco-row" style="justify-content:flex-start;margin-top:30px"></div>
       <div id="bc-lista" style="margin-top:24px"><p class="mu" data-i18n="bc.cargando">Cargando…</p></div>
 
-      <p class="mu" style="max-width:62ch;margin-top:26px;padding-top:18px;border-top:1px solid var(--bd)" data-i18n="bc.cierre">Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. Lo que hay aquí es a quién conviene visitar primero.</p>
+      <p class="mu" style="max-width:62ch;margin-top:26px;padding-top:18px;border-top:1px solid var(--bd)" data-i18n="bc.cierre">Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. A cada familia se le entrega un concepto con precauciones y materiales; lo que aparece aquí es solo cuánto corre la prisa.</p>
       <p style="margin-top:14px"><a class="card-link" href="#vivienda"><span data-i18n="bc.tuya">¿Tu casa se afectó y no está aquí?</span> <span aria-hidden="true">&rarr;</span></a></p>
     </div>
   </section>
@@ -2420,7 +2425,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=bb3dfe31"></script>
+<script src="/app.js?v=def5f76a"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

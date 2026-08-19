@@ -503,10 +503,15 @@ export async function recibo(a, hoyISO) {
 
 
 /* ===========================================================================
-   INFORME DE PRIORIZACIÓN — triage estructural
+   CONCEPTO TÉCNICO PRELIMINAR — triage estructural
    ===========================================================================
-   Lo que recibe la familia. Y lo que MÁS pesa en el documento no es la
-   clasificación: es el aviso de que esto NO determina habitabilidad.
+   Lo que recibe la familia. Desde el 19 ago 2026 su centro es el CONCEPTO
+   —si hay señales para no permanecer, qué precauciones tomar y con qué
+   materiales reparar— y la prioridad de visita pasó a ser un dato más. El
+   nombre del documento cambió con él.
+
+   Lo que NO cambió, y no debe cambiar, es el aviso de que esto no determina
+   habitabilidad: sigue yendo antes que el resultado y con las mismas palabras.
 
    Un papel con membrete de fundación y firma de ingeniero se lee como una
    sentencia sobre la casa. Si alguien lo usa para decidir si vuelve a dormir
@@ -516,14 +521,14 @@ export async function recibo(a, hoyISO) {
    =========================================================================== */
 export async function informeTriage(c, hoyISO) {
   const { pdf, hoja: h, f } = await abrir(
-    "Informe de priorización " + c.numero,
+    "Concepto técnico preliminar " + c.numero,
     "Triage estructural · no determina habitabilidad"
   );
 
   membrete(h);
 
-  h.texto("INFORME DE PRIORIZACIÓN", {
-    tam: 19, fuente: f.negrita, color: TINTA, interlinea: 23, despues: 6
+  h.texto("CONCEPTO TÉCNICO PRELIMINAR", {
+    tam: 17, fuente: f.negrita, color: TINTA, interlinea: 21, despues: 6
   });
   h.texto("Evaluación preliminar por fotografías", { tam: 10, color: GRIS, despues: 16 });
 
@@ -534,8 +539,11 @@ export async function informeTriage(c, hoyISO) {
   avisoEnCaja(h, f,
     "Este documento NO determina si la vivienda es habitable. Esa decisión requiere una visita " +
     "presencial y le corresponde a la autoridad municipal de gestión del riesgo. Lo que aquí se " +
-    "establece es la PRIORIDAD con que un ingeniero voluntario recomienda que se visite esta " +
-    "vivienda, a partir únicamente de las fotografías enviadas.");
+    "entrega es el CONCEPTO PRELIMINAR de un ingeniero voluntario —las precauciones que " +
+    "recomienda, los materiales con que sugiere reparar y la prioridad con que conviene visitar " +
+    "esta vivienda—, a partir únicamente de las fotografías enviadas. Recomendar que no se use " +
+    "una parte de la vivienda es una precaución preventiva, no una declaratoria de " +
+    "inhabitabilidad.");
 
   seccion(h, f, "I", "LA VIVIENDA");
   h.fila("Sector", c.sector || "-");
@@ -547,22 +555,27 @@ export async function informeTriage(c, hoyISO) {
   h.fila("Fotografías recibidas", String(c.medios || 0));
   h.salto(14);
 
-  seccion(h, f, "II", "PRIORIDAD RECOMENDADA");
-  h.texto(ETIQUETA_CLAS[c.clasificacion] || String(c.clasificacion || "-"), {
-    tam: 15, fuente: f.negrita, color: VERDE, interlinea: 19, despues: 6
-  });
-  h.texto(EXPLICA_CLAS[c.clasificacion] || "", { tam: 9.5, color: GRIS, interlinea: 13.5, despues: 16 });
-
-  seccion(h, f, "III", "OBSERVACIONES DEL INGENIERO");
+  /* EL CONCEPTO VA ANTES DE LA PRIORIDAD, y el orden es la decisión. Hasta el
+     19 ago 2026 el documento abría con la prioridad de visita: la familia leía
+     primero «visita programada», que es una respuesta de logística nuestra, y
+     tenía que bajar hasta las observaciones para encontrar lo único que puede
+     usar hoy —si permanecer y con qué reparar—. Se invirtió. */
+  seccion(h, f, "II", "CONCEPTO DEL INGENIERO");
   h.texto(c.nota_tecnica || "-", { tam: 10, interlinea: 15, despues: 14 });
   if (c.recomendacion) {
-    h.texto("Mientras se realiza la visita:", { tam: 9.5, fuente: f.negrita, despues: 5 });
+    h.texto("Qué hacer, y con qué reparar:", { tam: 9.5, fuente: f.negrita, despues: 5 });
     h.texto(c.recomendacion, { tam: 10, interlinea: 15, despues: 14 });
   }
   if (c.falta) {
     h.texto("Para poder evaluar hace falta:", { tam: 9.5, fuente: f.negrita, despues: 5 });
     h.texto(c.falta, { tam: 10, interlinea: 15, despues: 14 });
   }
+
+  seccion(h, f, "III", "PRIORIDAD DE VISITA");
+  h.texto(ETIQUETA_CLAS[c.clasificacion] || String(c.clasificacion || "-"), {
+    tam: 15, fuente: f.negrita, color: VERDE, interlinea: 19, despues: 6
+  });
+  h.texto(EXPLICA_CLAS[c.clasificacion] || "", { tam: 9.5, color: GRIS, interlinea: 13.5, despues: 16 });
 
   /* La firma es del INGENIERO, no de la Fundación: es él quien responde por el
      criterio técnico. La Fundación aparece como quien organiza, en el pie. */
