@@ -480,6 +480,29 @@ sin información se siente como abandono. Ahora se dan los dos hechos que sí
 existen y son verificables —los días que lleva y cuántos casos siguen sin abrir—
 y se dice de frente que **no hay fecha y que prometerla sería peor**.
 
+### LA BANDEJA DE CASOS NO ESCALABA (19 ago)
+Medido, no supuesto, sembrando 600 casos en local:
+
+    /api/admin/casos      170 ms      ← la bandeja del panel
+    /api/admin/ruta         7 ms
+    /api/casos/publicos     4 ms
+    /api/triage/casos       5 ms
+
+La causa era el aviso de duplicado: una subconsulta correlacionada que
+normalizaba los DOS teléfonos con cinco `REPLACE` anidados, así que `ix_casos_tel`
+quedaba inservible y hacía un **escaneo completo por fila**. El plan lo decía
+—`CORRELATED SCALAR SUBQUERY` con `SCAN o`— y aislada costaba 165 de esos 170 ms.
+Crece de forma cuadrática, justo en la pantalla que más se va a mirar cuando la
+brigada traiga volumen.
+
+Ahora el cruce se hace en el Worker: **un** escaneo y un mapa por dígitos.
+**170 ms → 8 ms**, y sigue detectando los duplicados entre formatos distintos del
+mismo número. Sin migración.
+
+**La regla:** normalizar una columna dentro del `WHERE` anula su índice. Si
+alguna vez hace falta hacerlo en SQL, la salida es una columna con los dígitos ya
+normalizados y su propio índice — y eso sí sería migración.
+
 ### 🔴 XSS ALMACENADO EN EL PANEL, CERRADO (19 ago)
 Encontrado en la auditoría de seguridad de lo construido estos dos días, y era
 explotable desde internet sin autenticarse.
