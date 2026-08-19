@@ -1991,6 +1991,16 @@ async function siguienteCaso(env, anio) {
 }
 
 const MATERIALES = ["ladrillo", "adobe", "bahareque", "prefabricado", "madera", "no_se"];
+
+/* Los teléfonos se comparan por sus DÍGITOS, no por la cadena. «315 000 0000» y
+   «3150000000» son el mismo número, y una familia los escribe indistintamente
+   —o los dos, si envía dos veces—. Comparando el texto crudo, el freno se
+   saltaba solo y el aviso de duplicado no cruzaba nada.
+
+   Se normaliza al COMPARAR y no al guardar: en la ficha se muestra lo que la
+   persona escribió, que es como lo reconoce cuando el equipo la llama. */
+const TEL_DIGITOS = (col) =>
+  "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" + col + ",' ',''),'-',''),'(',''),')',''),'.','')";
 const CATEGORIAS_MEDIO = ["conjunto", "estructura", "dano", "entorno"];
 /* El tope del video NO lo pone la plataforma sino la conexión de la familia:
    un video de 30 s de un teléfono moderno pesa decenas de megas y en zona de
@@ -2033,6 +2043,30 @@ async function apiCasoCrear(request, env) {
 
   const material = MATERIALES.includes(c.material) ? c.material : null;
   const pisos = Number.isInteger(c.pisos) && c.pisos > 0 && c.pisos < 20 ? c.pisos : null;
+
+  /* FRENO POR TELÉFONO, y solo por teléfono.
+     El numerador de casos NO se reinicia nunca —es la regla dura del proyecto—
+     así que cada POST a este endpoint público quema un número para siempre. Sin
+     ningún freno, un script deja la bandeja inservible justo durante la brigada.
+
+     Y sin embargo un tope GLOBAL sería peor que el problema: una avalancha de
+     casos después de una réplica es exactamente lo que este sistema existe para
+     recibir, y un límite por hora la cortaría. Por eso el freno es por teléfono:
+     no puede bloquear a otra familia, y ataja el caso que de verdad pasa —el
+     doble envío de quien no está seguro de si se envió.
+
+     ⚠️ Esto NO detiene a alguien que rote números. Ese caso se ataja en la
+     regla de rate-limit de Cloudflare, que es configuración y no código; queda
+     anotado en el traspaso. */
+  const recientes = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos WHERE " + TEL_DIGITOS("contacto_tel") + " = ? " +
+    "AND creado_en > datetime('now','-10 minutes')"
+  ).bind(tel.replace(/\D/g, "")).first();
+  if (recientes && recientes.n >= 3) {
+    return json({ error: "demasiados_intentos",
+                  ayuda: "Ya recibimos varios casos desde este número hace un momento. " +
+                         "Espera unos minutos; si ya enviaste el tuyo, revisa el enlace que te dimos." }, 429);
+  }
 
   const numero = await siguienteCaso(env, new Date().getUTCFullYear());
   const token = tokenNuevo();
@@ -2587,7 +2621,18 @@ async function adminCasos(env) {
        caso cerrado se ve igual que uno abandonado. El prefijo tiene que
        coincidir con el que allí se escribe. */
     "(SELECT a.detalle FROM consentimientos a WHERE a.tipo = 'auditoria' " +
-    " AND a.detalle LIKE 'caso ' || c.numero || ' %' ORDER BY a.id DESC LIMIT 1) AS ultimo " +
+    " AND a.detalle LIKE 'caso ' || c.numero || ' %' ORDER BY a.id DESC LIMIT 1) AS ultimo, " +
+    /* POSIBLE DUPLICADO, y se avisa AQUÍ y no en la respuesta pública.
+       La familia que no está segura de si se envió manda el caso otra vez, y en
+       la bandeja aparecen dos casas donde hay una — así se va dos veces a la
+       misma puerta durante una brigada de cinco días.
+       Decirlo en el formulario habría sido peor: quien enviara un caso con un
+       teléfono adivinado se enteraría de que ese número reportó, que es
+       justamente el dato que la Ley 1581 protege. Aquí no se filtra nada: lo ve
+       el equipo, que es quien puede resolverlo, y detrás de Access. */
+    "(SELECT o.numero FROM casos o WHERE " + TEL_DIGITOS("o.contacto_tel") +
+    " = " + TEL_DIGITOS("c.contacto_tel") +
+    " AND o.numero <> c.numero ORDER BY o.creado_en LIMIT 1) AS dup " +
     "FROM casos c ORDER BY " +
     /* Lo terminado se hunde al fondo. Antes no hacía falta porque nada
        terminaba nunca; ahora sí, y una bandeja que mezcla lo cerrado con lo
@@ -4128,6 +4173,11 @@ aquí no le da acceso a nada. Su matrícula es un dato que él declaró, no uno 
 ingenieros clasifican sin ver de quién es la casa ni dónde queda; <strong>aquí sí están el contacto
 y la dirección</strong>, que es lo que permite ir a visitar. Ordenadas por urgencia y, dentro de
 cada grupo, por antigüedad; lo cerrado se hunde al fondo.</p>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Si dos casos comparten
+teléfono aparece el aviso <strong>«mismo teléfono que…»</strong>. Casi siempre es la misma familia
+que envió dos veces porque no estaba segura: <strong>revísalos antes de salir</strong>, o se va dos
+veces a la misma puerta. A veces son dos casas de verdad —un arriendo, un familiar— y entonces no
+hay nada que hacer.</p>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Cerrar y descartar
 <strong>piden motivo, y no es un trámite</strong>: un caso que se va de la lista sin decir por qué
 es indistinguible de uno perdido, y del otro lado hay una familia que mandó fotos de su casa. Queda
@@ -4730,7 +4780,8 @@ function cargarCasos(){
           '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="cerrado">Cerrar…</button> ' +
           '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="descartado">Descartar…</button>');
       return "<tr" + (fin ? ' style="opacity:.55"' : "") + ">" +
-        "<td><strong>" + esc(c.numero) + "</strong><br><small>" + esc((c.creado_en||"").slice(0,10)) + "</small></td>" +
+        "<td><strong>" + esc(c.numero) + "</strong><br><small>" + esc((c.creado_en||"").slice(0,10)) + "</small>" +
+          (c.dup ? '<br><small style="color:#A84D00"><strong>mismo teléfono que ' + esc(c.dup) + "</strong></small>" : "") + "</td>" +
         "<td>" + pr + "</td>" +
         "<td>" + esc(c.sector) + (c.direccion_ref ? "<br><small>" + esc(c.direccion_ref) + "</small>" : "") + "</td>" +
         "<td>" + esc(c.contacto_nombre) + "<br><small>" + esc(c.contacto_tel) +
