@@ -1400,5 +1400,10 @@
   "mc.add.subiendo": "Uploading your photos… do not close this page.",
   "mc.add.ok": "Done, we have them. An engineer will look at them.",
   "mc.add.tope": "This case has reached the maximum number of files. Write to us if you need to change one.",
-  "mc.cerrado": "This case is closed. If something changed, write to us and we will reopen it."
+  "mc.cerrado": "This case is closed. If something changed, write to us and we will reopen it.",
+  "mc.espera.hoy": "You sent it today.",
+  "mc.espera.dias": "It has been waiting {d} day(s).",
+  "mc.espera.cola": "Right now there are {n} case(s) not yet opened. They are reviewed by severity first and waiting time second, not in order of arrival.",
+  "mc.espera.solo": "It is the only case not yet opened at the moment.",
+  "mc.espera.sin": "We are not giving you a date because we do not have one, and promising one would be worse than telling you straight."
 }
