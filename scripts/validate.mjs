@@ -326,12 +326,17 @@ const TECHO_FUENTES = 21;
 try {
   const css = readFileSync("styles.css", "utf8");
   /* Los bloques que DEFINEN tokens son justo donde los literales deben estar.
-     Se reconoce cualquier regla cuyo selector mencione `:root` o
-     `html[data-theme`, no solo las que empiezan por ahí: la hoja de impresión
+     Se reconoce cualquier regla cuyo selector mencione `:root`, `html[data-theme`
+     o `data-marca`, no solo las que empiezan por ahí: la hoja de impresión
      redefine su paleta con `:root, :root[data-theme="dark"] {`, y con la forma
-     anterior ese bloque entero se contaba como fugas. */
+     anterior ese bloque entero se contaba como fugas.
+
+     `data-marca` entró el 19 ago con la piel de Mira Mi Casa, que redefine los
+     mismos tokens del sistema para el subdominio. Sus bloques son definiciones
+     igual que los otros dos, y sin esto el trinquete los contaba como 52 fugas
+     nuevas — que era la respuesta correcta a la pregunta equivocada. */
   const defs = (css.match(/[^{}]+\{[^}]*\}/gs) || [])
-    .filter(b => /:root|html\[data-theme/.test(b.slice(0, b.indexOf("{"))));
+    .filter(b => /:root|html\[data-theme|data-marca/.test(b.slice(0, b.indexOf("{"))));
   let resto = css;
   for (const d of defs) resto = resto.replace(d, "");
 

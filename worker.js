@@ -5907,6 +5907,37 @@ function marcarPruebas(respuesta, host) {
   return r;
 }
 
+/* ========================================================================
+   MIRA MI CASA — la misma plataforma, con su propia marca
+   ========================================================================
+   El triaje de viviendas atiende a familias damnificadas, no a donantes. Que
+   llegue con la nav de una fundación —HUB SOCIAL, Membresías, Donar— es pedirle
+   a alguien con la casa rota que se ubique en un ecosistema que no le importa.
+
+   CÓMO, Y POR QUÉ ASÍ. No es un sitio nuevo ni una hoja de estilos nueva: es el
+   MISMO Worker y el MISMO index.html, marcados con `data-marca="mmc"` cuando el
+   Host es el subdominio. A partir de ahí manda el CSS, que redefine los tokens
+   que el sistema ya usa — así cada componente escrito (.card, .btn-g, .steps)
+   se pinta con la marca nueva sin duplicar una línea.
+
+   LA PROPIEDAD QUE IMPORTA: el sitio principal no puede romperse por esto. No
+   porque se haya tenido cuidado, sino por construcción — sin el atributo, que
+   solo se inyecta para ese hostname, no aplica ni una regla.
+
+   Se usa HTMLRewriter y no un replace sobre el texto: viene en la plataforma,
+   trabaja sobre el flujo sin cargarlo en memoria, y no se equivoca de `<html>`
+   si algún día aparece esa cadena dentro del documento. */
+const HOST_MMC = /^(miramicasa|mira-mi-casa)\./i;
+
+function marcarMarca(respuesta, host) {
+  if (!HOST_MMC.test(host)) return respuesta;
+  const tipo = respuesta.headers.get("content-type") || "";
+  if (!tipo.includes("text/html")) return respuesta;
+  return new HTMLRewriter()
+    .on("html", { element(e) { e.setAttribute("data-marca", "mmc"); } })
+    .transform(respuesta);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -5916,7 +5947,9 @@ export default {
       /* Se responde a través del marcador para no repetirlo en cada rama. */
       return marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname);
     }
-    return this.ruteo(request, env, url, ruta);
+    /* Igual que arriba: se envuelve la respuesta entera en vez de tocar cada
+       rama. Fuera del subdominio devuelve exactamente lo que recibió. */
+    return marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname);
   },
 
   async ruteo(request, env, url, ruta) {

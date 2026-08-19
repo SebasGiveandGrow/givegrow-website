@@ -212,6 +212,11 @@ var I18N = {
     "bc.tuya":"¿Tu casa se afectó y no está aquí?",
     "nav.casas":"Casas revisadas",
     "nav.d.casas":"El registro público del triaje, sin nombres ni direcciones",
+    "mmc.nav.casa":"Revisa tu casa",
+    "mmc.nav.casas":"Casas revisadas",
+    "mmc.nav.ing":"Ingenieros",
+    "mmc.aval":"La plataforma de Cimientos que Abrazan, un proyecto de Fundación Give&Grow International · NIT 901.948.930-2",
+    "mmc.marca":"Mira Mi Casa",
     "nav.g.emergencia":"Emergencia",
     "nav.brigada":"Brigada de emergencia",
     "nav.d.brigada":"Los cinco territorios, qué se necesita y cómo aportar",
@@ -1461,9 +1466,15 @@ var ROUTE_META = {
   aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
 };
+function mmcTitulo(){
+  document.title = String(document.title).replace(/Give&Grow International/g, "Mira Mi Casa");
+}
 function setMetaTag(attr,key,val){ var el=document.querySelector("meta["+attr+"='"+key+"']"); if(el) el.setAttribute("content",val); }
 var OG_IMG_DEFAULT = "https://www.thegiveandgrowproject.org/img/og.jpg";
 function applyRouteMeta(id){
+  /* En el subdominio, el sufijo de la pestaña es la marca de aquí. Se hace
+     sobre el resultado y no duplicando ROUTE_META: son los mismos textos. */
+  if (MARCA_MMC) setTimeout(mmcTitulo, 0);
   if (id.indexOf("fundacion/")===0){
     var pid = id.split("/")[1];
     if (PARTNERS_DATA){
@@ -1879,6 +1890,39 @@ function cvSubirCola(){
     .catch(function(){ cvSubirCola(); });
 }
 
+/* ===== Mira Mi Casa: la misma plataforma, con su propia marca =====
+   El Worker marca el <html> con data-marca="mmc" cuando el Host es el
+   subdominio. Aquí se lee UNA vez y de ahí cuelga todo lo que el CSS no puede
+   hacer solo: el logotipo, el título de la pestaña y qué rutas existen.
+
+   Fuera del subdominio MARCA_MMC es false y nada de esto corre. */
+var MARCA_MMC = document.documentElement.getAttribute("data-marca") === "mmc";
+
+/* Las únicas rutas que existen en este subdominio. Todo lo demás es de la
+   fundación y vive en su dominio: si alguien llega con un enlace viejo no se
+   le enseña un 404, se le lleva al sitio donde esa página sí existe. */
+var RUTAS_MMC = ["vivienda", "caso", "casas", "ingenieros", "privacidad", "e404"];
+
+function mmcRuta(id){
+  if (!MARCA_MMC || RUTAS_MMC.indexOf(id) > -1) return false;
+  location.href = "https://thegiveandgrowproject.org/#" + id;
+  return true;
+}
+
+/* El logotipo es tipográfico: el nombre es provisional y dibujar una marca que
+   puede cambiar sería trabajo tirado. La display se comparte con la fundación
+   a propósito — es el hilo de parentesco, y resuelve el aval con tipografía en
+   vez de con dos logos apilados. */
+function mmcMarca(){
+  if (!MARCA_MMC) return;
+  document.querySelectorAll(".nlogo").forEach(function(el){
+    /* Con espacios: en «Give&Grow» el <em> ES el ampersand y va pegado; aquí
+       son tres palabras y sin ellos se lee «MiraMiCasa». */
+    el.innerHTML = "Mira <em>Mi</em> Casa";
+    el.setAttribute("href", "#vivienda");
+  });
+}
+
 /* ===== Banco público de casas =====
    Lo que el servidor manda ya viene filtrado —sin fotos, sin nota libre, sin
    contacto— así que aquí no hay que decidir nada sobre privacidad: solo pintar.
@@ -2175,6 +2219,9 @@ function ensureE404(){
   return el;
 }
 function go(id, fromPop){
+  /* En el subdominio de Mira Mi Casa solo existen sus rutas; el resto se manda
+     al dominio de la fundación en vez de mostrar un 404. */
+  if (mmcRuta(id)) return false;
   // #alma quedó como alias: ALMA ya no es una página sino un panel. Los enlaces
   // viejos aterrizan en #impactos y abren el panel, así ninguno queda roto.
   var abrirAlma = (id === "alma");
@@ -3551,6 +3598,7 @@ function init(){
      que /gracias: el fallback de SPA ya sirvió index.html y aquí se enruta a
      mano. El token se queda en la URL y no se copia a ninguna parte. */
   if (mcArranca()) hash = "caso";
+  mmcMarca();
   go(hash, true);
   window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||"inicio"; go(h, true); });
   // Navegación por delegación (reemplaza inline; CSP fase 1).

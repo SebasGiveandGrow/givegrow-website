@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=f5ea50b0">
+<link rel="stylesheet" href="/styles.css?v=0fb77638">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -65,6 +65,11 @@
           <a href="#casas"><span class="nd-t" data-i18n="nav.casas">Casas revisadas</span><span class="nd-d" data-i18n="nav.d.casas">El registro público del triaje, sin nombres ni direcciones</span></a>
         </div>
       </div>
+      <!-- Nav propia de Mira Mi Casa. Oculta salvo cuando el Worker marca el
+           <html> con data-marca="mmc" — ver la piel al final de styles.css. -->
+      <a class="nlink mmc-nav" href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
+      <a class="nlink mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
+      <a class="nlink mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
       <a class="nlink" href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
       <a class="nlink" href="#fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
       <div class="ndrop">
@@ -115,6 +120,9 @@
   </div>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
+  <a class="mmc-nav" href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
+  <a class="mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
+  <a class="mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
   <span class="mnav-g" data-i18n="nav.g.emergencia">Emergencia</span>
   <a href="#brigada" data-i18n="nav.brigada">Brigada de emergencia</a>
   <a href="#vivienda" data-i18n="cv.t">Revisa tu casa</a>
@@ -2337,6 +2345,10 @@
       <div>
         <div class="nlogo" style="color:#fff;margin-bottom:10px">Give<em style="color:var(--gn)">&</em>Grow</div>
         <p data-i18n="foot.tagline">Dar para crecer, crecer para dar más.</p>
+        <!-- El aval de Mira Mi Casa. Va donde se ve, no en letra chica: una
+             marca nueva pidiendo fotos de tu casa en zona de desastre se parece
+             a una estafa, y la confianza la tiene la fundación, no el nombre. -->
+        <p class="mmc-aval" data-i18n="mmc.aval">La plataforma de Cimientos que Abrazan, un proyecto de Fundación Give&amp;Grow International · NIT 901.948.930-2</p>
       </div>
       <div>
         <h4 data-i18n="foot.explore">Explorar</h4>
@@ -2403,7 +2415,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=a3921df4"></script>
+<script src="/app.js?v=78098263"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
