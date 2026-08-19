@@ -114,9 +114,21 @@ poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemo
     y acepta POST de cualquiera. La CSP ya dejó de autorizarlo (PR #96).
 11. **El nombre del proyecto de viviendas** y su **número de WhatsApp** — ver su
     cierre de tanda. Mientras no existan, el formulario no promete el canal.
-12. **La guía fotográfica de los ingenieros**: la lista de fotos obligatorias,
-    sus categorías de clasificación y qué no firman a distancia. El cuestionario
-    y un borrador de guía ya están redactados para enviárselos.
+12. **La guía fotográfica de los ingenieros** — el borrador y las once
+    preguntas ya están en **`ops/guia-fotografica.md`** (18 ago), escritas para
+    ser CORREGIDAS y no aprobadas: llevan puestas las respuestas provisionales
+    para que un profesional reaccione a algo concreto en vez de partir de cero.
+    Sebas se reúne con una ingeniera el 19 de agosto.
+
+    De las once, **solo una toca la base de datos** (añadir preguntas sobre la
+    casa). Categorías de foto, clasificaciones y textos son constantes y copia:
+    se cambian el mismo día. Lo caro no es cambiarlas ahora, es cambiarlas
+    cuando quinientas familias ya subieron fotos con las viejas.
+
+    Las tres que más desbloquean: el **mínimo evaluable** (hoy no existe umbral,
+    entra todo), **qué datos de la casa faltan** (ladera, relleno, esquinera,
+    piso agregado después), y **qué no está dispuesta a firmar a distancia** —
+    esa define el producto entero y su respuesta se vuelve texto de pantalla.
 13. **Por qué `wrangler d1 migrations apply` da 7403** en la cuenta, cuando
     `d1 execute` sí funciona. Se sorteó insertando la fila a mano; conviene
     resolverlo antes de la próxima migración.
