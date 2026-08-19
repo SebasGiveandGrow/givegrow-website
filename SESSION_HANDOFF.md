@@ -442,6 +442,23 @@ informe descargado.
 5. **El teléfono es el identificador; el correo es opcional de verdad.** En esas
    zonas mucha gente tiene WhatsApp y no correo.
 
+### LOS CASOS ENTRAN A «SALUD DEL ECOSISTEMA» (18 ago)
+El panel vigilaba cinco colas —inscripciones, transferencias, certificados,
+correos, entregas— y **ninguna era de casos**. La plataforma entera de viviendas
+era invisible para el sistema que existe justamente para decir «esto lleva días
+esperando a que una persona haga algo». Ahora hay cuatro más:
+
+    casos_sin_evaluar        una familia mandó fotos y nadie las ha abierto
+    urgentes_sin_visitar     LA PEOR: el sistema dijo «vayan ya» y nadie fue
+    casos_esperando_fotos    se pidió material y la familia no lo mandó
+    ingenieros_sin_verificar alguien se postuló y su matrícula sigue sin mirarse
+
+### A LA FAMILIA SE LE DICE CUÁNTO LLEVA ESPERANDO (18 ago)
+Su pantalla decía «un ingeniero lo va a revisar» sin plazo ni señal, y una espera
+sin información se siente como abandono. Ahora se dan los dos hechos que sí
+existen y son verificables —los días que lleva y cuántos casos siguen sin abrir—
+y se dice de frente que **no hay fecha y que prometerla sería peor**.
+
 ### LA SEGUNDA OPINIÓN, Y QUÉ PASA CUANDO DISCREPAN (18 ago)
 `evaluaciones` admitía varias por caso desde la 0010 y **nada lo usaba**: la
 última sobrescribía a la anterior en silencio, así que un segundo ingeniero
