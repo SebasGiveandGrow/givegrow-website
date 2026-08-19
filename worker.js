@@ -1333,8 +1333,12 @@ async function adminSalud(env) {
       arreglo: comoSeArregla
     });
   };
+  /* Sin los ingenieros: tienen su propia cola, con su propio «cómo se arregla»
+     —buscar la matrícula en el COPNIA—, y contarlos dos veces inflaba el panel
+     justo en el número que sirve para decidir a qué dedicarle la tarde. */
   await enCola("inscripciones_sin_tocar",
-    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones WHERE estado = 'nueva'",
+    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones " +
+    "WHERE estado = 'nueva' AND tipo <> 'ingeniero'",
     "Bandeja «Quién quiere entrar» · a alguien le prometimos que le escribíamos");
   await enCola("transferencias_sin_verificar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
@@ -2183,10 +2187,7 @@ async function apiCasoEstado(env, numero, token) {
      `falta` es lo que convierte esta pantalla en útil: si un ingeniero marcó
      `inevaluable`, aquí dice QUÉ foto se necesita, justo encima del botón para
      subirla. Antes el sistema sabía pedir lo que faltaba y no sabía recibirlo. */
-  const e = await env.DB.prepare(
-    "SELECT clasificacion, recomendacion, falta, creado_en FROM evaluaciones " +
-    "WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
-  ).bind(numero).first();
+  const e = await evaluacionVigente(env, numero, c.clasificacion);
 
   /* CUÁNTO LLEVA ESPERANDO, y cuántos hay delante en su misma situación.
      Su pantalla decía «un ingeniero lo va a revisar» sin plazo ni señal, y una
@@ -2678,6 +2679,36 @@ async function resolverClasificacion(env, numero) {
   return { clasificacion: severa, discrepa: filas.length > 1, firmes };
 }
 
+/* LA EVALUACIÓN QUE MANDA, que no es la más reciente.
+   Desde que el caso se queda con la clasificación MÁS GRAVE, tomar la última
+   evaluación para el informe y para la pantalla de la familia los hacía
+   divergir — y justo cuando hay desacuerdo, que es cuando más importa.
+
+   Medido en el ensayo del 19 ago: el caso decía `urgente` y su PDF decía
+   «Visita programada», firmado por el ingeniero que NO tomó esa decisión, y la
+   recomendación de seguridad —«no usen el cuarto del patio»— desaparecía de los
+   dos sitios. Un documento que se contradice con el sistema que lo emite no
+   sirve para nada, y el que se queda sin la advertencia es peligroso.
+
+   Se toma la más reciente CUYA CLASIFICACIÓN ES LA DEL CASO. Así el veredicto,
+   las observaciones y la firma vienen todos del mismo ingeniero — atribuirle a
+   alguien una conclusión que no firmó sería peor que el error original. */
+async function evaluacionVigente(env, numero, clasificacion) {
+  if (clasificacion) {
+    const e = await env.DB.prepare(
+      "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
+      "FROM evaluaciones WHERE caso = ? AND clasificacion = ? ORDER BY creado_en DESC LIMIT 1"
+    ).bind(numero, clasificacion).first();
+    if (e) return e;
+  }
+  /* Sin clasificación en el caso —`inevaluable`, que la deja en NULL— manda la
+     última, que es la que dice qué falta. */
+  return await env.DB.prepare(
+    "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
+    "FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
+  ).bind(numero).first();
+}
+
 /* Aviso al equipo. No lleva el detalle técnico de cada evaluación a propósito:
    quien tenga que resolver esto abre la ficha y las lee enteras. Lo que este
    correo tiene que lograr es que alguien la abra. */
@@ -2771,10 +2802,7 @@ async function apiCasoInforme(env, numero, token) {
   ).bind(numero).first();
   if (!c || !token || c.token !== token) return json({ error: "no_autorizado" }, 403);
 
-  const e = await env.DB.prepare(
-    "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
-    "FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
-  ).bind(numero).first();
+  const e = await evaluacionVigente(env, numero, c.clasificacion);
   if (!e) return json({ error: "sin_evaluacion", ayuda: "Todavía ningún ingeniero ha revisado este caso." }, 409);
 
   const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();

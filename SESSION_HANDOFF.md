@@ -480,6 +480,27 @@ sin información se siente como abandono. Ahora se dan los dos hechos que sí
 existen y son verificables —los días que lleva y cuántos casos siguen sin abrir—
 y se dice de frente que **no hay fecha y que prometerla sería peor**.
 
+### ⚠️ LA EVALUACIÓN QUE MANDA NO ES LA MÁS RECIENTE (19 ago)
+Fallo introducido por la segunda opinión y encontrado en el ensayo general, no
+por una alarma. Desde que el caso se queda con la clasificación MÁS GRAVE, el
+informe y la pantalla de la familia seguían tomando la ÚLTIMA evaluación, así
+que divergían justo cuando hay desacuerdo:
+
+    el caso decía   urgente
+    su PDF decía    «Visita programada», firmado por el ingeniero que NO
+                    tomó esa decisión
+    y la recomendación de seguridad —«no usen el cuarto del patio»—
+    desaparecía del informe Y de la pantalla
+
+Un documento que se contradice con el sistema que lo emite no sirve; el que se
+queda sin la advertencia es peligroso. Ahora manda **la más reciente CUYA
+CLASIFICACIÓN ES LA DEL CASO** (`evaluacionVigente`), para que veredicto,
+observaciones y firma vengan del mismo ingeniero — atribuirle a alguien una
+conclusión que no firmó sería peor que el error original.
+
+**Si algún día se cambia la regla de resolución, hay que mirar `evaluacionVigente`
+en el mismo movimiento.** Son la misma decisión escrita en dos sitios.
+
 ### LA SEGUNDA OPINIÓN, Y QUÉ PASA CUANDO DISCREPAN (18 ago)
 `evaluaciones` admitía varias por caso desde la 0010 y **nada lo usaba**: la
 última sobrescribía a la anterior en silencio, así que un segundo ingeniero
