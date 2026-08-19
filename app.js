@@ -1768,15 +1768,80 @@ function cvEnviar(){
   });
 }
 
+/* ===== Comprimir la foto ANTES de subirla =====
+   Lo que arregla: un teléfono de hoy saca fotos de 3 a 5 MB. Con veinte
+   archivos por caso, una familia podía estar subiendo 40 u 80 MB por la red de
+   una zona a la que se le acaba de caer media torre. Suben de a una y en serie
+   —que es lo correcto—, así que eso son diez minutos con la pantalla abierta,
+   y cada corte obliga a empezar ese archivo otra vez.
+
+   1600 px de lado largo NO es un recorte al criterio del ingeniero: una grieta
+   fotografiada con una moneda al lado se lee perfectamente a ese tamaño, y es
+   lo que la guía pide mirar. Lo que se tira es resolución que nadie iba a usar.
+
+   TRES REGLAS QUE NO SE DEBEN AFLOJAR:
+
+   1. Si algo falla, se sube el ORIGINAL. Jamás se pierde una foto porque la
+      compresión no pudo: el navegador de gama baja que no tenga
+      `createImageBitmap`, el archivo raro, el canvas que se queda sin memoria
+      — todos caen al original y siguen.
+   2. `imageOrientation:"from-image"` no es opcional. Sin eso, las fotos
+      tomadas en vertical llegan giradas 90°, porque el dato de rotación vive
+      en el EXIF y el canvas lo descarta al dibujar. Un ingeniero mirando una
+      fachada acostada es un caso que se devuelve como inevaluable.
+   3. Los VIDEOS no se tocan. Comprimir video en el navegador es caro, lento y
+      se come la batería; su tope de 60 MB ya lo acota. */
+
+var FOTO_LADO = 1600;
+var FOTO_CALIDAD = 0.8;
+
+function comprimirFoto(file){
+  /* Solo imágenes, y solo si el navegador trae las dos piezas necesarias. */
+  if (!file || file.type.indexOf("image/") !== 0) return Promise.resolve(file);
+  if (typeof createImageBitmap !== "function" || !document.createElement("canvas").toBlob) {
+    return Promise.resolve(file);
+  }
+  return createImageBitmap(file, { imageOrientation: "from-image" })
+    .then(function(img){
+      var lado = Math.max(img.width, img.height);
+      var escala = lado > FOTO_LADO ? FOTO_LADO / lado : 1;
+      var w = Math.round(img.width * escala), h = Math.round(img.height * escala);
+      var cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      if (img.close) img.close();
+      return new Promise(function(res){
+        cv.toBlob(function(blob){
+          /* Si el "comprimido" pesa más que el original —pasa con imágenes ya
+             pequeñas o con PNG de pocos colores— se queda el original. */
+          res(blob && blob.size < file.size ? blob : file);
+        }, "image/jpeg", FOTO_CALIDAD);
+      });
+    })
+    .catch(function(){ return file; });
+}
+
+/* Una sola función de subida para las DOS pantallas que suben fotos: la del
+   formulario y la de «mi caso». Antes eran dos copias del mismo bucle, y una
+   mejora como esta habría que acordarse de hacerla dos veces. */
+function subirMedio(caso, token, item){
+  return comprimirFoto(item.file).then(function(archivo){
+    var url = "/api/caso/" + encodeURIComponent(caso) + "/medio?t=" + encodeURIComponent(token)
+            + (item.cat ? "&cat=" + encodeURIComponent(item.cat) : "");
+    return fetch(url, {
+      method: "POST",
+      headers: { "content-type": archivo.type || item.file.type },
+      body: archivo
+    }).then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); });
+  });
+}
+
 /* De a una y en serie. En serie a propósito: con señal mala, siete subidas en
    paralelo se pisan y fallan todas. */
 function cvSubirCola(){
   if (!CV.cola.length || !CV.caso) return;
   var item = CV.cola.shift();
-  var url = "/api/caso/" + encodeURIComponent(CV.caso) + "/medio?t=" + encodeURIComponent(CV.token)
-          + (item.cat ? "&cat=" + encodeURIComponent(item.cat) : "");
-  fetch(url, { method: "POST", headers: { "content-type": item.file.type }, body: item.file })
-    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+  subirMedio(CV.caso, CV.token, item)
     .then(function(res){
       if (!res.ok && res.d && res.d.error === "archivo_muy_grande") console.warn(t("cv.err.grande"));
       cvSubirCola();
@@ -1937,10 +2002,7 @@ function mcEnviar(){
 function mcSubirCola(){
   if (!MC.cola.length){ mcPinta(t("mc.add.ok")); return; }
   var item = MC.cola.shift();
-  var url = "/api/caso/" + encodeURIComponent(MC.caso) + "/medio?t=" + encodeURIComponent(MC.token)
-          + (item.cat ? "&cat=" + encodeURIComponent(item.cat) : "");
-  fetch(url, { method: "POST", headers: { "content-type": item.file.type }, body: item.file })
-    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+  subirMedio(MC.caso, MC.token, item)
     .then(function(res){
       if (!res.ok && res.d && res.d.error === "archivo_muy_grande") console.warn(t("cv.err.grande"));
       mcSubirCola();

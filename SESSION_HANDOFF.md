@@ -77,6 +77,15 @@ poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemo
 
 ## ⏭️ LO QUE ESPERA INSUMO DE SEBAS (no código)
 
+0. **La regla de rate-limit de Cloudflare para `/api/caso`** (18 ago). El código
+   ya frena por teléfono —tres casos en diez minutos— y eso ataja el doble envío
+   de una familia sin poder bloquear a otra, que es la propiedad que importa.
+   **Lo que el código NO puede atajar es un script que rote números**, y cada POST
+   quema un número del consecutivo, que no se reinicia nunca. Eso se resuelve en
+   la regla de Cloudflare, que es configuración. Un tope global en el Worker sería
+   peor que el problema: cortaría justo la avalancha de casos reales tras una
+   réplica, que es para lo que existe el sistema.
+
 1. **Cuántos brigadistas: 7 u 8.** Él dijo siete; el inventario está calculado
    para ocho (cascos, botas, sleeping bags, carnés, juegos de documentos).
    **Pidió expresamente no tocarlo — lo cierra él.**
