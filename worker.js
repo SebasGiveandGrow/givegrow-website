@@ -2431,7 +2431,7 @@ function abrir(numero){
       +  "<label>Tu nombre</label><input id='t-nombre'>"
       +  "<label>Tu matrícula profesional</label><input id='t-mat'>"
       +  "<label>Nota técnica</label><textarea id='t-nota' rows='4'></textarea>"
-      +  "<label>Concepto para la familia: si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar</label><textarea id='t-rec' rows='5'></textarea>"
+      +  "<label>Concepto para la familia (OBLIGATORIO, salvo si no puedes evaluar): si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar. Es lo que el sitio le prometió y lo único que va a recibir.</label><textarea id='t-rec' rows='5'></textarea>"
       +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
       +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluación</button></p>"
       +  "<p class='msg' id='t-msg'></p></div>";
@@ -2612,11 +2612,33 @@ async function triageEvaluar(request, env, numero, email) {
     return json({ error: "falta_requerido", ayuda: "Di qué foto o dato hace falta para poder evaluar." }, 422);
   }
 
+  /* Y EL CONCEPTO ES OBLIGATORIO EN TODAS LAS DEMÁS, por simetría exacta con el
+     de arriba. Desde el 19 ago 2026 el sitio le promete a la familia que va a
+     recibir precauciones y materiales — no una prioridad de visita. Este campo
+     es lo único que cumple esa promesa: si queda vacío, la pantalla de la
+     familia, el correo y el PDF se limitan a NO pintarlo, así que la persona
+     lee «esto es un concepto a distancia» y debajo no hay concepto ninguno.
+
+     Es la misma clase de defecto que la auditoría de agosto marcó en severidad
+     alta: una promesa publicada sin una función detrás. La diferencia es que
+     esta la introduje yo al cambiar el copy sin cerrar el campo.
+
+     `no_requiere` lo exige IGUAL, y es el caso donde más importa: si no va a ir
+     nadie, este texto es lo único que la familia va a recibir en su vida sobre
+     su casa. `inevaluable` queda fuera porque ahí la respuesta es `falta`. */
+  const recomendacion = limpiar(c.recomendacion, 1000);
+  if (clasificacion !== "inevaluable" && !recomendacion) {
+    return json({
+      error: "recomendacion_requerida",
+      ayuda: "Escribe el concepto para la familia: si hay señales para no permanecer, qué precauciones tomar y con qué materiales reparar. Es lo que el sitio le prometió y lo único que va a recibir."
+    }, 422);
+  }
+
   await env.DB.prepare(
     "INSERT INTO evaluaciones (caso, ing_email, ing_nombre, ing_matricula, clasificacion, " +
     "nota_tecnica, recomendacion, falta) VALUES (?,?,?,?,?,?,?,?)"
   ).bind(numero, email || "?", nombre, matricula, clasificacion, nota,
-         limpiar(c.recomendacion, 1000) || null, falta || null).run();
+         recomendacion || null, falta || null).run();
 
   /* El caso pasa a `clasificado`, salvo que sea inevaluable: ahí vuelve a
      `en_revision` para que se le pida material a la familia y no se dé por
@@ -2647,7 +2669,7 @@ async function triageEvaluar(request, env, numero, email) {
       });
     } else if (caso.contacto_email) {
       await correoCasoClasificado(env, {
-        numero, token: caso.token, clasificacion, recomendacion: limpiar(c.recomendacion, 1000),
+        numero, token: caso.token, clasificacion, recomendacion,
         falta, email: caso.contacto_email
       });
     }
