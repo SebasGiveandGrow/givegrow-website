@@ -1389,10 +1389,23 @@ async function adminSalud(env) {
     "WHERE c.estado = 'en_revision' AND EXISTS (SELECT 1 FROM evaluaciones e " +
     "WHERE e.caso = c.numero AND e.clasificacion = 'inevaluable')",
     "Se le pidió material a la familia y no ha llegado · quizá haya que llamarla");
+  /* Antes contaba solo `estado = 'nueva'`, y ese era el hueco: un ingeniero
+     movido a «en revisión» o incluso aceptado SIN comprobar su matrícula
+     desaparecía de la alarma, que es exactamente el caso peligroso. Ahora
+     cuenta lo que de verdad falta: la matrícula sin verificar. */
   await enCola("ingenieros_sin_verificar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones " +
-    "WHERE tipo = 'ingeniero' AND estado = 'nueva'",
-    "Buscar su matrícula en el registro público del COPNIA y añadirlo en Access");
+    "WHERE tipo = 'ingeniero' AND estado <> 'archivada' " +
+    "AND COALESCE(json_extract(datos, '$.matricula_verificada'), 0) <> 1",
+    "Consultar su matrícula en el registro público del COPNIA y marcarla en la bandeja");
+
+  /* Y la cola nueva: conceptos que no pueden salir solos. Mientras estén aquí,
+     la familia NO ha recibido respuesta — es la cola más urgente de las de
+     personas, porque del otro lado alguien mandó fotos de su casa rota. */
+  await enCola("conceptos_sin_respaldo",
+    "SELECT COUNT(*) AS n, MIN(c.creado_en) AS masViejo FROM casos c " +
+    "WHERE c.estado = 'clasificado' AND " + SIN_RESPALDO,
+    "Un voluntario ya dio su concepto pero su matrícula no está verificada · falta un segundo par de ojos en /triaje");
 
   /* Intenciones abandonadas: más de 48 h en `intencion` y sin transacción de
      Wompi. No se tocan solas —borrar el registro de alguien que quizá vuelva a
@@ -2503,6 +2516,30 @@ const CLASIFICACIONES = ["urgente", "programada", "no_requiere", "inevaluable"];
 /* GET /api/triage/casos?estado=… — la cola. Por defecto, lo que nadie ha visto,
    y del más viejo al más nuevo: en una emergencia el orden es la antigüedad, no
    la novedad. */
+/* ¿EL CORREO QUE FIRMA TIENE MATRÍCULA VERIFICADA? (20 ago 2026)
+   La verificación es un hecho comprobado a mano contra el registro público del
+   COPNIA, y vive en el JSON de `inscripciones.datos` — SIN columna nueva y sin
+   migración, el mismo patrón que usó el motivo de cierre de casos. Se cruza por
+   correo porque es lo único que comparten `evaluaciones` e `inscripciones`.
+
+   NO HAY PUERTA DE ATRÁS, y es deliberado: quien no tenga una inscripción de
+   ingeniero verificada cuenta como sin verificar, incluido el equipo. Si alguien
+   del equipo va a firmar un concepto, se postula en «Ingenieros voluntarios»
+   como cualquiera y se le verifica la matrícula. Una excepción para nosotros
+   sería justo la que nadie audita. */
+const MATRICULA_OK = (col) =>
+  "EXISTS (SELECT 1 FROM inscripciones i WHERE i.tipo = 'ingeniero' " +
+  "AND lower(i.email) = lower(" + col + ") " +
+  "AND json_extract(i.datos, '$.matricula_verificada') = 1)";
+
+/* Un caso SIN RESPALDO: tiene opinión firme, pero ninguna de un ingeniero con
+   matrícula verificada. Es lo que no puede llegar solo a una familia. */
+const SIN_RESPALDO =
+  "(" + "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero " +
+  "AND e.clasificacion <> 'inevaluable') > 0 " +
+  "AND NOT EXISTS (SELECT 1 FROM evaluaciones e2 WHERE e2.caso = c.numero " +
+  "AND e2.clasificacion <> 'inevaluable' AND " + MATRICULA_OK("e2.ing_email") + "))";
+
 /* Cuántas opiniones FIRMES tiene un caso. Las `inevaluable` no cuentan: no
    opinan sobre la casa, dicen que faltan fotos. */
 const FIRMES = "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero " +
@@ -2520,14 +2557,14 @@ async function triageCasos(env, url) {
        sobre un urgente se va a mover una brigada, y una discrepancia parada no
        se resuelve sola. El esquema permitía la segunda opinión desde la 0010 y
        nada la pedía nunca. */
-    estado === "confirmar" ? "WHERE (c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA :
+    estado === "confirmar" ? "WHERE (c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA + " OR " + SIN_RESPALDO :
     "WHERE c.estado IN ('recibido','en_revision')";
   const r = await env.DB.prepare(
     "SELECT c.numero, c.estado, c.clasificacion, c.sector, c.material, c.pisos, " +
     "c.danio_previo, c.habitada, c.heridos, c.creado_en, " +
     "(SELECT COUNT(*) FROM caso_medios m WHERE m.caso = c.numero) AS medios, " +
     "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero) AS evaluaciones, " +
-    DISCREPA + " AS discrepa, " + FIRMES + " AS firmes " +
+    DISCREPA + " AS discrepa, " + FIRMES + " AS firmes, " + SIN_RESPALDO + " AS sin_respaldo " +
     "FROM casos c " + filtro + " ORDER BY c.creado_en ASC LIMIT 200"
   ).all();
 
@@ -2659,6 +2696,26 @@ async function triageEvaluar(request, env, numero, email) {
      respuestas contradictorias sobre su propia casa en dos días; ahí el aviso
      va al equipo. Va después de escribir: el correo no puede tumbar una
      evaluación ya guardada, misma regla dura que en el cobro. */
+  /* ¿EL VEREDICTO LO RESPALDA UNA MATRÍCULA VERIFICADA? (20 ago 2026)
+     Si no, el concepto NO sale solo a la familia: entra a «Piden confirmación»
+     y espera un segundo par de ojos. La razón no es desconfianza del voluntario
+     —su trabajo se guarda igual y cuenta— es que el sitio le promete a la
+     familia un concepto firmado con matrícula, y una matrícula que nadie
+     comprobó todavía no es eso.
+
+     Esto es lo que permite que cien ingenieros empiecen el mismo día sin que
+     alguien tenga que verificar cien matrículas antes: la verificación pasa de
+     ser un muro a ser una cola que se drena, y mientras se drena nada sin
+     comprobar toca a una familia sin acompañamiento.
+
+     Se reusa la supresión que ya existía para la discrepancia, por la misma
+     razón de fondo: hay respuestas que es peor mandar que no mandar. */
+  const respaldo = await env.DB.prepare(
+    "SELECT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = ? " +
+    "AND e.clasificacion <> 'inevaluable' AND " + MATRICULA_OK("e.ing_email") + ") AS ok"
+  ).bind(numero).first();
+  const conRespaldo = !!(respaldo && respaldo.ok);
+
   try {
     if (veredicto.discrepa) {
       const ops = await env.DB.prepare(
@@ -2667,6 +2724,15 @@ async function triageEvaluar(request, env, numero, email) {
       await correoDiscrepancia(env, {
         numero, sector: caso.sector, clasificacion: veredicto.clasificacion,
         opiniones: (ops.results || []).map((o) => TRIAJE_ET[o.clasificacion] || o.clasificacion)
+      });
+    } else if (!conRespaldo && clasificacion !== "inevaluable") {
+      /* Sin respaldo NO se le escribe a la familia, pero el equipo tiene que
+         enterarse o el caso se queda parado para siempre — que sería peor que
+         el problema original. Reusa el aviso de discrepancia, que es
+         exactamente el mismo mecanismo: «esto necesita otro par de ojos». */
+      await correoDiscrepancia(env, {
+        numero, sector: caso.sector, clasificacion: veredicto.clasificacion,
+        opiniones: ["concepto sin matrícula verificada — falta confirmar"]
       });
     } else if (caso.contacto_email) {
       await correoCasoClasificado(env, {
@@ -2678,7 +2744,7 @@ async function triageEvaluar(request, env, numero, email) {
 
   return json({ ok: true, numero, estado: nuevoEstado,
                 clasificacion: nuevoEstado === "clasificado" ? veredicto.clasificacion : null,
-                discrepa: veredicto.discrepa });
+                discrepa: veredicto.discrepa, con_respaldo: conRespaldo });
 }
 
 /* ========================================================================
@@ -4206,6 +4272,54 @@ async function adminInscripciones(env) {
   return json({ inscripciones: r.results || [] });
 }
 
+/* POST /api/admin/inscripcion/<id>/matricula — «vi su matrícula en el COPNIA».
+   NO es lo mismo que aceptar la inscripción, y por eso es un botón aparte:
+   aceptar es una decisión del equipo, verificar es un HECHO comprobado contra
+   un registro público. Fundirlos haría que aceptar a alguien simpático le
+   abriera la firma de conceptos.
+
+   Sin columna nueva: se mezcla en el JSON de `datos`, y queda el rastro de
+   quién y cuándo en el registro de auditoría — el mismo sitio donde ya viven
+   los movimientos de casos, entregas e inscripciones. Cero migraciones, que en
+   esta cuenta son justo donde el proyecto se tropieza. */
+async function adminVerificarMatricula(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* cuerpo vacío = verificar */ }
+  const verificada = c.verificada !== false;
+
+  const fila = await env.DB.prepare(
+    "SELECT id, tipo, nombre, email, datos FROM inscripciones WHERE id = ?"
+  ).bind(id).first();
+  if (!fila) return json({ error: "no_encontrada" }, 404);
+  if (fila.tipo !== "ingeniero") return json({ error: "no_es_ingeniero" }, 409);
+
+  let datos = {};
+  try { datos = JSON.parse(fila.datos || "{}"); } catch { datos = {}; }
+  if (verificada) {
+    datos.matricula_verificada = 1;
+    datos.matricula_verificada_por = quien || "?";
+    datos.matricula_verificada_en = new Date().toISOString().slice(0, 19).replace("T", " ");
+  } else {
+    delete datos.matricula_verificada;
+    delete datos.matricula_verificada_por;
+    delete datos.matricula_verificada_en;
+  }
+
+  await env.DB.prepare("UPDATE inscripciones SET datos = ? WHERE id = ?")
+    .bind(JSON.stringify(datos), id).run();
+
+  try {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(String(fila.email || "?"),
+      "inscripcion " + id + " matricula " + (verificada ? "VERIFICADA" : "verificacion RETIRADA") +
+      " (matricula " + (datos.matricula || "sin dato") + ") por " + (quien || "?")).run();
+  } catch (e) { console.error("auditoria matricula", id, e && e.message); }
+
+  return json({ ok: true, id, verificada });
+}
+
 const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "archivada"];
 
 async function adminMoverInscripcion(request, env, id, quien) {
@@ -5233,7 +5347,8 @@ var COLA_ES = {
   casos_sin_evaluar: "Casas que nadie ha abierto",
   urgentes_sin_visitar: "Urgentes sin visitar",
   casos_esperando_fotos: "Esperando fotos de la familia",
-  ingenieros_sin_verificar: "Ingenieros sin verificar"
+  ingenieros_sin_verificar: "Matrículas sin verificar",
+  conceptos_sin_respaldo: "Conceptos esperando confirmación"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -5418,8 +5533,9 @@ function cargarInscripciones(){
           (i.ciudad ? "<br><small>" + esc(i.ciudad) + "</small>" : "") +
           (enlaces.length ? "<br><small>" + enlaces.join(" · ") + "</small>" : "") + "</td>" +
         "<td>" + esc((i.creada_en||"").slice(0,10)) + "</td>" +
-        "<td>" + esc(i.estado) + "</td>" +
-        "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") + "</td>" +
+        "<td>" + esc(i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
+        "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") +
+          (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") + "</td>" +
       "</tr>";
     }).join("");
   });
@@ -5629,6 +5745,39 @@ function guardarCaso(numero){
   });
 }
 
+/* ---------------- matrícula del COPNIA ----------------
+   La consulta pública del COPNIA es un POST con token anti-CSRF de ASP.NET, así
+   que NO se puede prellenar con un enlace — lo comprobé en su formulario el 20
+   de agosto de 2026. Falsificar ese token contra un servicio del Estado no se
+   hace. Así que lo que se automatiza es todo lo demás: el enlace exacto, la
+   matrícula en un clic al portapapeles, y el nombre del campo donde va pegada,
+   para que verificar sea cosa de treinta segundos y lo pueda hacer CUALQUIERA
+   con acceso al panel, no solo el dueño de la cuenta. */
+var COPNIA_URL = "https://tramites.copnia.gov.co/Copnia_Microsite/CertificateOfGoodStanding/CertificateOfGoodStandingStart";
+
+function selloMatricula(x){
+  if (!x.matricula) return '<small style="color:var(--err)">sin matrícula</small>';
+  if (x.matricula_verificada === 1 || x.matricula_verificada === true) {
+    return '<small style="color:var(--g)"><strong>matrícula verificada</strong>'
+         + (x.matricula_verificada_en ? "<br>" + esc(String(x.matricula_verificada_en).slice(0,10)) : "")
+         + (x.matricula_verificada_por ? "<br>" + esc(x.matricula_verificada_por) : "")
+         + "</small>";
+  }
+  return '<small style="color:var(--amber)"><strong>sin verificar</strong><br>su concepto no sale solo</small>';
+}
+
+function accionesMatricula(i, x){
+  if (!x.matricula) return "";
+  var ver = (x.matricula_verificada === 1 || x.matricula_verificada === true);
+  return '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;align-items:flex-start">'
+       + '<a href="' + COPNIA_URL + '" target="_blank" rel="noopener">Consultar en el COPNIA</a>'
+       + '<button class="copy" data-mat="' + esc(x.matricula) + '">Copiar matrícula ' + esc(x.matricula) + '</button>'
+       + '<small class="mu">Pégala en «Número de Matrícula»</small>'
+       + '<button class="copy" data-mver="' + i.id + '" data-v="' + (ver ? "0" : "1") + '">'
+       + (ver ? "Quitar verificación" : "Marcar verificada") + '</button>'
+       + '</div>';
+}
+
 function cargarOfrecimientos(){
   fetch("/api/admin/ofrecimientos").then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("o-filas"); if (!tb) return;
@@ -5705,6 +5854,33 @@ document.addEventListener("click", function(e){
     }).catch(function(){ cargarCasos(); });
     return;
   }
+  /* Copiar la matrícula: es el paso que evita teclear mal un número de siete
+     cifras en el formulario del COPNIA y verificar a la persona equivocada. */
+  var cm = e.target.closest("[data-mat]");
+  if (cm) {
+    var m = cm.getAttribute("data-mat");
+    navigator.clipboard.writeText(m).then(function(){
+      cm.textContent = "Copiada: " + m;
+    }).catch(function(){
+      cm.textContent = m + " (cópiala a mano)";
+    });
+    return;
+  }
+
+  var mv = e.target.closest("[data-mver]");
+  if (mv) {
+    var quiere = mv.getAttribute("data-v") === "1";
+    if (quiere && !confirm("¿Viste su matrícula vigente en el registro del COPNIA? Con esto sus conceptos empiezan a salir solos a las familias.")) return;
+    mv.disabled = true;
+    fetch("/api/admin/inscripcion/" + encodeURIComponent(mv.getAttribute("data-mver")) + "/matricula", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ verificada: quiere })
+    }).then(function(r){ return r.json(); }).then(function(){
+      cargarInscripciones(); cargarSalud();
+    }).catch(function(){ mv.disabled = false; mv.textContent = "No se pudo"; });
+    return;
+  }
+
   var b = e.target.closest("[data-ins]");
   if (!b) return;
   b.disabled = true; b.textContent = "…";
@@ -6235,6 +6411,8 @@ export default {
         if (mr) return await adminRevocarMiembro(request, env, mr[1].toUpperCase(), sesion.email);
         const mi = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/estado$/);
         if (mi) return await adminMoverInscripcion(request, env, Number(mi[1]), sesion.email);
+        const mm = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/matricula$/);
+        if (mm) return await adminVerificarMatricula(request, env, Number(mm[1]), sesion.email);
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
         if (ruta === "/api/admin/entrega")  return await adminCrearEntrega(request, env, sesion.email);
         const ef = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/foto$/i);
