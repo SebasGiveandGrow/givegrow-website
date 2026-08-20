@@ -4301,7 +4301,12 @@ async function adminVerificarMatricula(request, env, id, quien) {
     datos.matricula_verificada_por = quien || "?";
     datos.matricula_verificada_en = new Date().toISOString().slice(0, 19).replace("T", " ");
   } else {
-    delete datos.matricula_verificada;
+    /* Se pone en `false`, NO se borra la clave. El formulario la escribe en
+       `false` a propósito —su comentario lo dice: que quede claro que hasta que
+       alguien la compruebe es un dato DECLARADO por quien se postula, no un
+       hecho—. Borrarla dejaría la postulación indistinguible de una anterior a
+       que este campo existiera, y perdería esa distinción. */
+    datos.matricula_verificada = false;
     delete datos.matricula_verificada_por;
     delete datos.matricula_verificada_en;
   }
