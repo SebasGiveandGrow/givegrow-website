@@ -779,8 +779,13 @@ etiquetar una foto suya como evidencia de visita ni por accidente.
     ACCESS_AUD_TRIAGE   triaje → casos de vivienda y fotos
 El panel **nunca** acepta la audiencia del triaje; el triaje sí acepta la del
 panel, para que el equipo entre sin segunda cuenta. La asimetría es deliberada.
-Aprobar a un ingeniero = añadir su correo en Access (OTP por correo, sin
-cuentas ni contraseñas). Sebas confirmó que **el correo puede ser de
+Aprobar a un ingeniero = añadir su correo en Access. **OJO: el código por
+correo (One-time PIN) NO viene habilitado por defecto** desde que Cloudflare
+cambió el proveedor por defecto el 18 jun 2026 — sin él, al voluntario se le
+pide cuenta de Cloudflare y no entra. Costó una jornada de piloto el 20 ago.
+Y las políticas de Access son REUTILIZABLES: mirar `Used by applications`
+antes de añadir a alguien, o se le abre también el panel del dinero.
+Detalle y cómo comprobarlo en `ops/panel-admin.md`.
 cualquiera** —universidad, empresa o particular—, así que no hay regla por
 dominio y cada uno se aprueba individualmente.
 
