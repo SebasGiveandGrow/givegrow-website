@@ -404,7 +404,7 @@ html[data-theme="dark"] .alma-send{background:var(--acc);color:#0F1613}
 /* ===== forms ===== */
 .field{margin-bottom:16px}
 .field label{display:block;font-size:var(--fs-13);font-weight:700;margin-bottom:6px}
-.field input,.field textarea,.field select{width:100%;padding:11px 14px;border:1px solid var(--bd);border-radius:10px;font-family:inherit;font-size:var(--fs-15)}
+.field input,.field textarea,.field select{width:100%;padding:11px 14px;border:1px solid var(--bd);border-radius:10px;font-family:inherit;font-size:var(--fs-16)}
 /* select del form: mismo fondo/tinta que los inputs (día y noche) + flecha propia */
 .field select{background-color:var(--surface);color:var(--ink);appearance:none;-webkit-appearance:none;padding-right:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .field input:focus,.field textarea:focus{outline:none;border-color:var(--g)}
@@ -916,9 +916,9 @@ html[data-theme="dark"] .track-cta h3{color:var(--ink)}
 .ally-form label{font-size:var(--fs-13);font-weight:600;color:var(--ink-soft)}
 /* `url` estaba fuera de la lista y el campo "Sitio web" quedaba con el borde de
    1px del estilo genérico, medio punto más fino que sus vecinos. */
-.ally-form input[type=text],.ally-form input[type=email],.ally-form input[type=tel],.ally-form input[type=url]{padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:var(--fs-15);background:var(--surface);color:var(--ink)}
+.ally-form input[type=text],.ally-form input[type=email],.ally-form input[type=tel],.ally-form input[type=url]{padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:var(--fs-16);background:var(--surface);color:var(--ink)}
 .ally-form input:focus{outline:none;border-color:var(--g)}
-.ally-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:var(--fs-15);font-family:inherit;background:var(--surface);color:var(--ink);resize:vertical;min-height:96px;box-sizing:border-box}
+.ally-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:var(--fs-16);font-family:inherit;background:var(--surface);color:var(--ink);resize:vertical;min-height:96px;box-sizing:border-box}
 .ally-form textarea:focus{outline:none;border-color:var(--g)}
 .ally-mods{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ally-check{display:flex;gap:11px;align-items:flex-start;padding:14px;border:1.5px solid var(--bd);border-radius:12px;cursor:pointer;transition:border-color .15s,background .15s}

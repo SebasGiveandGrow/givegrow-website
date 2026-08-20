@@ -412,7 +412,7 @@ var I18N = {
     "cv.nota":"¿Algo más que quieras contarnos?",
     "cv.s2.btn":"Siguiente",
     "cv.s3.t":"Las fotos",
-    "cv.s3.h":"Cada foto se guarda apenas la tomas. Si se te va la señal, no pierdes lo anterior.",
+    "cv.s3.h":"Las fotos se envían al final, cuando toques «Enviar mi caso». Mientras llegues hasta allá sin cerrar la página, no pierdes nada.",
     "cv.cat.conjunto":"La casa completa",
     "cv.cat.conjunto.h":"De lejos, que se vea entera.",
     "cv.cat.estructura":"Esquinas y columnas",
@@ -424,6 +424,14 @@ var I18N = {
     "cv.add":"Agregar",
     "cv.video.h":"También puedes subir un video corto, de unos 30 segundos.",
     "cv.subiendo":"Subiendo…",
+    "cv.sub.prog":"Enviando tus fotos: {n} de {t}. No cierres esta página.",
+    "cv.sub.ok":"Listas. Ya tenemos tus {t} fotos.",
+    "cv.sub.parcial":"Guardamos {n} de {t}. Las que faltan puedes agregarlas desde tu enlace, aquí abajo.",
+    "cv.sub.nada":"No pudimos enviar tus fotos, pero tu caso quedó creado. Entra a tu enlace de aquí abajo y agrégalas cuando tengas mejor señal.",
+    "cv.err.sinfotos":"Sin fotos un ingeniero no puede evaluar tu casa. ¿Seguro que quieres enviarlo así?",
+    "cv.err.espera":"Ya recibimos varios casos desde este número hace un momento. Espera unos minutos; si ya enviaste el tuyo, revisa el enlace que te dimos.",
+    "cv.err.correo":"Revisa tu correo: parece incompleto. También puedes dejarlo vacío.",
+
     "cv.subido":"Guardada",
     "cv.err.grande":"El archivo pesa demasiado. Si es video, grábalo más corto.",
     "cv.err.subir":"No se pudo subir. Intenta otra vez.",
@@ -1716,7 +1724,7 @@ function focusActivePage(){ var p=document.querySelector(".page.active"); if(p){
    contra el token que devuelve el servidor. Por eso el paso 3 solo acumula
    archivos en memoria hasta que hay caso: subir antes obligaría a crear el
    registro sin consentimiento, que es justo lo que no puede pasar. */
-var CV = { caso:null, token:null, enlace:null, cola:[] };
+var CV = { caso:null, token:null, enlace:null, cola:[], total:0, hechas:0, fallidas:0 };
 var CV_CATS = ["conjunto", "estructura", "dano", "entorno"];
 
 function cvPaso(n){
@@ -1752,7 +1760,7 @@ function cvPintarCats(){
          +  '<small style="display:block;color:var(--mu);margin:4px 0 10px">' + escapeHtml(t("cv.cat." + c + ".h")) + '</small>'
          +  '<label class="btn btn-o" style="display:inline-block;cursor:pointer">'
          +  '<span>' + escapeHtml(t("cv.add")) + '</span>'
-         +  '<input type="file" accept="image/*,video/*" capture="environment" multiple '
+         +  '<input type="file" accept="image/*,video/*" multiple '
          +  'data-cat="' + c + '" style="position:absolute;left:-9999px">'
          +  '</label> <span class="mu" id="cv-n-' + c + '">0</span>'
          +  '</div>';
@@ -1780,6 +1788,21 @@ function cvEnviar(){
     return;
   }
   if (!cvValidarDatos()) return;
+
+  /* SIN FOTOS EL CASO NACE INEVALUABLE, y nadie se lo había dicho a la familia:
+     el paso 3 se podía pasar de largo con la cola vacía y el servidor tampoco
+     exige medios. Se avisa y se deja decidir — puede ser que de verdad no pueda
+     tomarlas ahora, y en ese caso su caso igual debe entrar. */
+  if (!CV.cola.length && !window.confirm(t("cv.err.sinfotos"))) return;
+
+  /* EL BOTÓN SE BLOQUEA, y no es cosmético: sin esto un segundo toque —lo que
+     hace cualquiera cuando la señal es mala y no sabe si se envió— creaba DOS
+     casos, quemaba dos consecutivos que no se reinician nunca, y repartía las
+     fotos entre los dos. Ninguno de los dos quedaba evaluable. */
+  var btn = document.querySelector('[data-act="cvEnviar()"]');
+  if (btn) btn.disabled = true;
+  var soltar = function(){ if (btn) btn.disabled = false; };
+
   if (msg){ msg.textContent = t("cv.enviando"); msg.style.color = "var(--mu)"; }
 
   var val = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
@@ -1797,8 +1820,29 @@ function cvEnviar(){
       consent_eval: true, consent_publico: chk("cv-c2"),
       web2: val("cv-web2")
     })
-  }).then(function(r){ return r.json(); }).then(function(d){
-    if (!d.ok || !d.numero) throw 0;
+  }).then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+   .then(function(res){
+    var d = res.d || {};
+    /* ANTES ERA `throw 0`, y eso colapsaba TODOS los errores del servidor en un
+       solo mensaje: «revisa los datos e intenta otra vez». Es el peor consejo
+       posible en los dos casos que más van a ocurrir hoy:
+
+         · 429 demasiados_intentos → hay que ESPERAR, no reintentar. El servidor
+           manda un `ayuda` bien escrito que el cliente tiraba a la basura.
+         · 400 email_invalido → el correo es OPCIONAL, así que nadie sospecha de
+           él; la familia queda trancada sin ninguna pista.
+
+       Y el honeypot devuelve {ok:true, numero:null}: eso NO es un error del
+       usuario, es un caso descartado a propósito, y merece su propio silencio. */
+    if (!d.ok || !d.numero){
+      var texto = t("cv.err.envio");
+      if (d.error === "demasiados_intentos") texto = d.ayuda || t("cv.err.espera");
+      else if (d.error === "email_invalido")  texto = t("cv.err.correo");
+      else if (d.ayuda)                       texto = d.ayuda;
+      if (msg){ msg.textContent = texto; msg.style.color = "var(--err)"; }
+      soltar();
+      return;
+    }
     CV.caso = d.numero; CV.token = d.token;
     var num = document.getElementById("cv-num");
     if (num) num.textContent = d.numero;
@@ -1818,6 +1862,7 @@ function cvEnviar(){
     cvSubirCola();
   }).catch(function(){
     if (msg){ msg.textContent = t("cv.err.envio"); msg.style.color = "var(--err)"; }
+    soltar();
   });
 }
 
@@ -1890,16 +1935,69 @@ function subirMedio(caso, token, item){
 }
 
 /* De a una y en serie. En serie a propósito: con señal mala, siete subidas en
-   paralelo se pisan y fallan todas. */
+   paralelo se pisan y fallan todas.
+
+   REESCRITA EL 20 AGO 2026, ANTES DEL PRIMER PILOTO CON FAMILIAS REALES.
+   La versión anterior tenía tres defectos que se sumaban en el peor resultado
+   posible del sistema: CASO CREADO, CERO FOTOS, Y LA FAMILIA VIENDO «LISTO».
+
+   1. Hacía `cola.shift()` ANTES de intentar la subida, así que un fallo de red
+      —lo normal en zona de desastre— borraba el archivo de la única copia que
+      existía. No había reintento de ninguna clase.
+   2. El único error que miraba lo mandaba a `console.warn`. La familia no tiene
+      consola. Los 415, 409, 503 y 500 del servidor no se miraban siquiera.
+   3. No había ni progreso ni advertencia de no cerrar la página, y la pantalla
+      ya decía «Listo» mientras la subida seguía corriendo minutos.
+
+   Ahora: el archivo NO sale de la cola hasta que se guarda, un reintento por
+   archivo, progreso visible, y al final se dice la verdad — cuántas llegaron y
+   qué hacer con las que no. Los textos ya existían sin usarse desde que se
+   construyó la pantalla. */
+function cvProg(txt, color){
+  var e = document.getElementById("cv-sub");
+  if (!e) return;
+  e.textContent = txt;
+  e.style.color = color || "var(--mu)";
+}
+
 function cvSubirCola(){
-  if (!CV.cola.length || !CV.caso) return;
-  var item = CV.cola.shift();
+  if (!CV.caso) return;
+  if (!CV.total) { CV.total = CV.cola.length; CV.hechas = 0; CV.fallidas = 0; }
+  if (!CV.cola.length){
+    /* El cierre dice lo que de verdad pasó. Un «listo» cuando no llegó nada es
+       la mentira que deja al ingeniero abriendo un caso vacío. */
+    if (!CV.total)             cvProg("");
+    else if (!CV.fallidas)     cvProg(t("cv.sub.ok").replace("{t}", CV.total), "var(--ok, var(--g))");
+    else if (CV.hechas)        cvProg(t("cv.sub.parcial").replace("{n}", CV.hechas).replace("{t}", CV.total), "var(--amber)");
+    else                       cvProg(t("cv.sub.nada"), "var(--err)");
+    return;
+  }
+
+  var item = CV.cola[0];            /* NO se saca hasta que se guarda */
+  cvProg(t("cv.sub.prog").replace("{n}", CV.hechas + 1).replace("{t}", CV.total));
+
   subirMedio(CV.caso, CV.token, item)
     .then(function(res){
-      if (!res.ok && res.d && res.d.error === "archivo_muy_grande") console.warn(t("cv.err.grande"));
+      if (res.ok){
+        CV.cola.shift(); CV.hechas++;
+        cvSubirCola();
+        return;
+      }
+      /* Un archivo que el servidor RECHAZA por lo que es —demasiado grande, tipo
+         no permitido, tope de medios— no mejora reintentando. Se descarta, pero
+         contado, no en silencio. */
+      CV.cola.shift(); CV.fallidas++;
       cvSubirCola();
     })
-    .catch(function(){ cvSubirCola(); });
+    .catch(function(){
+      /* Fallo de RED. Este sí merece otra oportunidad: es el caso de la señal
+         que se va un segundo, que es lo que pasa en terreno. Un reintento y no
+         más — insistir en bucle deja a la familia esperando sin saberlo. */
+      item.intentos = (item.intentos || 0) + 1;
+      if (item.intentos < 2){ setTimeout(cvSubirCola, 1200); return; }
+      CV.cola.shift(); CV.fallidas++;
+      cvSubirCola();
+    });
 }
 
 /* ===== Mira Mi Casa: la misma plataforma, con su propia marca =====
@@ -2163,7 +2261,7 @@ function mcPintaCats(){
          +  '<small style="display:block;color:var(--mu);margin:4px 0 10px">' + escapeHtml(t("cv.cat." + c + ".h")) + "</small>"
          +  '<label class="btn btn-o" style="display:inline-block;cursor:pointer">'
          +  "<span>" + escapeHtml(t("cv.add")) + "</span>"
-         +  '<input type="file" accept="image/*,video/*" capture="environment" multiple '
+         +  '<input type="file" accept="image/*,video/*" multiple '
          +  'data-cat="' + c + '" style="position:absolute;left:-9999px">'
          +  "</label> <span class=\"mu\" id=\"mc-n-" + c + '">0</span>'
          +  "</div>";
