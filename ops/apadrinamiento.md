@@ -18,9 +18,18 @@ eso no se dictamina habitabilidad: la declaratoria con efectos es de la autorida
 municipal (Ley 1523 de 2012), y firmar a distancia comprometería la matrícula del
 ingeniero. La columna se llama `clasificacion` y no `veredicto` justamente por eso.
 
-**El apadrinamiento mueve a la fundación de «decimos a quién visitar primero» a
-«respondemos por que una casa se repare».** Es otra clase de exposición, y hay
-que entrar en ella a propósito o no entrar.
+⚠️ **EL PUNTO DE PARTIDA SE MOVIÓ EL 19 AGO 2026, y hay que rehacer esta cuenta
+con la contadora.** La fundación ya no dice solo «a quién visitar primero»: dice
+**con qué materiales y en qué orden reparar**, y si hay señales para no
+permanecer. Sigue sin ejecutar obra y sin dictaminar habitabilidad, pero
+recomendar materiales es un paso hacia el lado caro.
+
+**El apadrinamiento mueve a la fundación de «recomendamos con qué reparar» a
+«respondemos por que una casa se repare».** El salto es MÁS CORTO de lo que este
+documento describía —el punto de partida ya está más cerca—, y eso no lo abarata:
+significa que parte de la exposición que el documento atribuía al apadrinamiento
+ya se asumió sin la conversación. Es otra clase de exposición, y hay que entrar
+en ella a propósito o no entrar.
 
 Tres niveles, de menos a más:
 

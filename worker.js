@@ -2011,7 +2011,8 @@ async function apiComprobante(request, env, guia, token) {
    ========================================================================
    NO es un dictamen de habitabilidad: por fotos no se determina, y la
    declaratoria con efectos —evacuar, demoler— le corresponde a la autoridad
-   municipal (Ley 1523 de 2012). Esto PRIORIZA: a qué casa se va primero.
+   municipal (Ley 1523 de 2012). Esto da un CONCEPTO —permanencia, precauciones y
+   materiales— y de paso prioriza a qué casa se va primero (19 ago 2026).
 
    El caso se crea ANTES de subir un solo archivo y devuelve su token. Si la
    señal se cae en la foto cuatro, las tres primeras y todos los datos ya están
@@ -2431,7 +2432,7 @@ function abrir(numero){
       +  "<label>Tu nombre</label><input id='t-nombre'>"
       +  "<label>Tu matrícula profesional</label><input id='t-mat'>"
       +  "<label>Nota técnica</label><textarea id='t-nota' rows='4'></textarea>"
-      +  "<label>Concepto para la familia: si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar</label><textarea id='t-rec' rows='5'></textarea>"
+      +  "<label>Concepto para la familia (OBLIGATORIO, salvo si no puedes evaluar): si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar. Es lo que el sitio le prometió y lo único que va a recibir.</label><textarea id='t-rec' rows='5'></textarea>"
       +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
       +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluación</button></p>"
       +  "<p class='msg' id='t-msg'></p></div>";
@@ -2612,11 +2613,33 @@ async function triageEvaluar(request, env, numero, email) {
     return json({ error: "falta_requerido", ayuda: "Di qué foto o dato hace falta para poder evaluar." }, 422);
   }
 
+  /* Y EL CONCEPTO ES OBLIGATORIO EN TODAS LAS DEMÁS, por simetría exacta con el
+     de arriba. Desde el 19 ago 2026 el sitio le promete a la familia que va a
+     recibir precauciones y materiales — no una prioridad de visita. Este campo
+     es lo único que cumple esa promesa: si queda vacío, la pantalla de la
+     familia, el correo y el PDF se limitan a NO pintarlo, así que la persona
+     lee «esto es un concepto a distancia» y debajo no hay concepto ninguno.
+
+     Es la misma clase de defecto que la auditoría de agosto marcó en severidad
+     alta: una promesa publicada sin una función detrás. La diferencia es que
+     esta la introduje yo al cambiar el copy sin cerrar el campo.
+
+     `no_requiere` lo exige IGUAL, y es el caso donde más importa: si no va a ir
+     nadie, este texto es lo único que la familia va a recibir en su vida sobre
+     su casa. `inevaluable` queda fuera porque ahí la respuesta es `falta`. */
+  const recomendacion = limpiar(c.recomendacion, 1000);
+  if (clasificacion !== "inevaluable" && !recomendacion) {
+    return json({
+      error: "recomendacion_requerida",
+      ayuda: "Escribe el concepto para la familia: si hay señales para no permanecer, qué precauciones tomar y con qué materiales reparar. Es lo que el sitio le prometió y lo único que va a recibir."
+    }, 422);
+  }
+
   await env.DB.prepare(
     "INSERT INTO evaluaciones (caso, ing_email, ing_nombre, ing_matricula, clasificacion, " +
     "nota_tecnica, recomendacion, falta) VALUES (?,?,?,?,?,?,?,?)"
   ).bind(numero, email || "?", nombre, matricula, clasificacion, nota,
-         limpiar(c.recomendacion, 1000) || null, falta || null).run();
+         recomendacion || null, falta || null).run();
 
   /* El caso pasa a `clasificado`, salvo que sea inevaluable: ahí vuelve a
      `en_revision` para que se le pida material a la familia y no se dé por
@@ -2647,7 +2670,7 @@ async function triageEvaluar(request, env, numero, email) {
       });
     } else if (caso.contacto_email) {
       await correoCasoClasificado(env, {
-        numero, token: caso.token, clasificacion, recomendacion: limpiar(c.recomendacion, 1000),
+        numero, token: caso.token, clasificacion, recomendacion,
         falta, email: caso.contacto_email
       });
     }
@@ -2786,7 +2809,7 @@ async function correoCasoClasificado(env, x) {
     "Esto es lo que hace falta: " + (x.falta || "más fotografías de los daños."),
     "Recuerda: no entres a la casa si ves muros caídos, techos hundidos o columnas partidas. Ninguna foto vale un accidente."
   ] : [
-    "Un ingeniero voluntario revisó las fotos de tu casa y ya hay una recomendación.",
+    "Un ingeniero voluntario revisó las fotos de tu casa y ya hay un concepto.",
     x.recomendacion ? "Qué hacer, y con qué reparar: " + x.recomendacion : null,
     "Esto no reemplaza una visita ni la declaratoria de tu municipio: es un concepto hecho a distancia, sobre las fotos que enviaste.",
     "Buscaremos gestionar ayuda para todas las casas que podamos, y no podemos comprometerla casa por casa."
@@ -2800,14 +2823,14 @@ async function correoCasoClasificado(env, x) {
   return enviarCorreo(env, {
     para: x.email,
     asunto: titulo + " · " + x.numero,
-    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", "Tu informe: " + url].join("\n"),
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", "Tu concepto: " + url].join("\n"),
     html: plantillaCorreo({
       titulo, parrafos, filas,
       /* El botón dice lo que toca hacer, no siempre lo mismo. Si el ingeniero
          pidió más fotos, «Ver mi informe» manda a leer un documento que no
          existe todavía; lo que hay que hacer es subirlas. */
-      boton: { url, texto: inev ? "Agregar las fotos que faltan" : "Ver mi informe" },
-      cierre: "Este mensaje es automático. Guarda el enlace: desde ahí puedes volver a abrir tu informe cuando quieras."
+      boton: { url, texto: inev ? "Agregar las fotos que faltan" : "Ver mi concepto" },
+      cierre: "Este mensaje es automático. Guarda el enlace: desde ahí puedes volver a abrir tu concepto cuando quieras."
     }),
     etiqueta: "caso-clasificado", guia: x.numero
   });
@@ -2853,7 +2876,7 @@ async function apiCasoInforme(env, numero, token) {
 
 /* GET /api/admin/casos — la bandeja del EQUIPO, no la del ingeniero.
    La diferencia es deliberada: `/triaje` oculta contacto y dirección porque
-   para priorizar por urgencia no hacen falta; aquí SÍ están, porque son lo que
+   para dar el concepto no hacen falta; aquí SÍ están, porque son lo que
    permite ir a visitar. Cada quien ve lo que su trabajo necesita y nada más. */
 async function adminCasos(env) {
   const r = await env.DB.prepare(

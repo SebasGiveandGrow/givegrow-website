@@ -67,13 +67,27 @@ libre.
 
 ### Preguntas
 7. **¿Son las cuatro correctas?**
-8. **¿Falta un nivel por encima de `urgente`?** Hoy el sistema puede decir
-   «visítenla ya» pero no «no entren». Lo más cerca es el campo de
-   recomendación, que es texto libre. Si hace falta un nivel de peligro
-   inminente, hay que diseñarlo con cuidado: se acerca peligrosamente al
-   dictamen que este proyecto NO da.
+8. **¿Falta un nivel por encima de `urgente`?** ⚠️ **Esta pregunta cambió el
+   19 ago 2026 — el sistema YA dice «no permanezcan».** El campo del concepto
+   es obligatorio y se rotula «si hay señales para no permanecer en la casa o
+   en una parte de ella», así que hoy eso se dice en texto libre y siempre.
+   La decisión ya tomada es que **recomendar no usar una parte de la casa es
+   una PRECAUCIÓN, no una declaratoria de inhabitabilidad** — eso no se acerca
+   al dictamen, es otra cosa.
+   Lo que sigue abierto y es lo que te preguntamos: **¿conviene que «no
+   permanezcan» sea un nivel discreto** —un campo con valores, visible en la
+   bandeja y en el PDF— en vez de una frase dentro del texto libre? Un nivel
+   se puede filtrar, contar y ordenar; una frase no. Y al revés: un nivel
+   discreto se lee como un veredicto y una frase se lee como un consejo.
 9. **¿Qué NO estás dispuesta a firmar a distancia?** Esta es la pregunta que
    define el producto entero. La respuesta se convierte en texto de pantalla.
+   **Contexto que hace falta para responderla, y que este documento no tenía:**
+   desde el 19 ago 2026 el sitio YA promete permanencia, precauciones y
+   materiales, y está en producción. Si tu respuesta es que no firmas señales
+   de permanencia a distancia, **hay que volver atrás en el copy** —no es una
+   pregunta hipotética— y el sitio pasaría a prometer solo orientación de
+   reparación y prioridad. Dilo sin miedo: es más barato cambiarlo ahora que
+   cuando quinientas familias ya recibieron su concepto.
 
 ---
 
