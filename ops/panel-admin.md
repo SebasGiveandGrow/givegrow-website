@@ -2,8 +2,13 @@
 
 El panel muestra **datos personales de donantes** (nombre, correo, y a futuro
 documento). Por eso no lleva autenticación propia: la protege **Cloudflare
-Access**, que es gratis hasta 50 usuarios y da inicio de sesión con la cuenta de
-Google Workspace de la fundación.
+Access**, que es gratis hasta 50 usuarios.
+
+> ⚠️ **Corregido el 20 ago 2026.** Aquí decía «da inicio de sesión con la cuenta
+> de Google Workspace de la fundación». **No hay ningún proveedor de Google
+> configurado en esta cuenta** — comprobado ese día abriendo la pantalla de login
+> real, que ofrecía un solo botón: «Cloudflare». Ver la sección de métodos de
+> acceso más abajo.
 
 **Está fail-closed:** mientras no se configure, `/admin` responde 503 y no sirve
 un solo dato. No hay ventana en la que el panel quede abierto.
@@ -24,6 +29,86 @@ El Worker verifica de verdad:
 3. Comprueba que el **`aud`** sea el de esta aplicación — sin esto, un token
    válido de *otra* aplicación de Access del mismo equipo serviría para entrar.
 4. Comprueba el emisor y la expiración.
+
+---
+
+## ⚠️ LOS MÉTODOS DE ACCESO: lo que costó una jornada de piloto
+
+Crear la aplicación y meter un correo en su política **no basta**. Falta decidir
+CÓMO se autentica esa persona, y el valor por defecto cambió.
+
+**Lo que pasó el 20 de agosto de 2026.** Se le dio acceso al triaje a la primera
+ingeniera voluntaria, con su correo en la política correcta, y aun así no podía
+entrar: Cloudflare le pedía **cuenta y contraseña**. La causa no era la política
+ni la URL. Era que la aplicación ofrecía **un solo método de acceso:
+«Cloudflare»** — es decir, iniciar sesión con una cuenta de Cloudflare, que ella
+no tenía ni tiene por qué tener.
+
+**La razón, de la documentación de Cloudflare:** desde el **18 de junio de 2026**
+las organizaciones nuevas de Zero Trust nacen con el **proveedor de identidad de
+Cloudflare** como método por defecto, y **el PIN de un solo uso ya NO se añade
+automáticamente**. Esta cuenta se creó después de ese cambio.
+
+### Habilitar el código por correo
+
+**Zero Trust → Integrations → Identity providers → Add new identity provider →
+One-time PIN.** No pide configuración.
+
+`Integrations` es un menú distinto de `Access controls`. Esta ruta sale de la
+documentación de Cloudflare, no de memoria — y conviene tratarla como lo que es:
+la interfaz de un tercero, que puede volver a cambiar.
+
+Después, que la aplicación lo acepte: en su sección **Authentication**, o marcar
+**«Accept all available identity providers»**, o seleccionar el PIN además de
+Cloudflare.
+
+### Por qué el PIN importa para este proyecto y no es un detalle
+
+Con «Cloudflare» como único método, **cada ingeniero voluntario tendría que
+crearse una cuenta de Cloudflare** para poder evaluar. Con cien voluntarios eso
+es fricción que abandona sola, y el proyecto ya decidió que los ingenieros pueden
+tener correo de cualquier tipo —universidad, empresa o particular—, así que
+tampoco hay regla por dominio que los agrupe. El código por correo es lo único
+que escala sin pedirle una cuenta a nadie.
+
+Si alguien usa un correo con filtro corporativo, hay que permitir
+`noreply@notify.cloudflare.com` en su lista blanca.
+
+### Cómo comprobar qué métodos ofrece una aplicación
+
+**Sin depender de ninguna ruta de la interfaz, que es lo que falla.** Se pide la
+ruta protegida, se sigue el `location` a la pantalla de Access y se mira qué
+botones ofrece bajo «Sign in with:».
+
+```bash
+curl -s -D- -o /dev/null https://thegiveandgrowproject.org/triaje \
+  | grep -i '^location'
+```
+
+Ese `location` lleva a `<equipo>.cloudflareaccess.com/cdn-cgi/access/login/…` y
+su `kid` es el AUD de la aplicación — sirve además para confirmar que la ruta la
+protege la aplicación que crees. **Ábrelo en un navegador y cuenta los botones.**
+La página los pinta con JavaScript, así que `curl` no los ve: no hay atajo de
+línea de comandos, y buscarlo fue perder el tiempo.
+
+Con un solo botón «Cloudflare», nadie sin cuenta de Cloudflare va a entrar.
+
+---
+
+## Las dos aplicaciones, y una trampa de las políticas
+
+    Panel Give&Grow      → /admin      · donantes, aportes, comprobantes
+    Triage estructural   → /triaje     · casos de vivienda y fotos
+
+**Las políticas de Access son reutilizables y se comparten entre aplicaciones.**
+El 20 de agosto se añadió el correo de la ingeniera a una política llamada
+«Emails Sebas@» que estaba pegada **a las dos**, así que por un rato tuvo acceso
+al panel de los donantes y del dinero. Se resolvió con una política propia
+—«Emails Triaje ING»— usada por una sola aplicación.
+
+**La regla:** antes de añadir a alguien, mirar en la política cuántas
+aplicaciones la usan (`Used by applications`). Si dice más de una, no es la
+política que buscas: hay que crear una nueva para esa aplicación.
 
 ---
 
