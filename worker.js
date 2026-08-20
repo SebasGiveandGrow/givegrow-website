@@ -2011,7 +2011,8 @@ async function apiComprobante(request, env, guia, token) {
    ========================================================================
    NO es un dictamen de habitabilidad: por fotos no se determina, y la
    declaratoria con efectos —evacuar, demoler— le corresponde a la autoridad
-   municipal (Ley 1523 de 2012). Esto PRIORIZA: a qué casa se va primero.
+   municipal (Ley 1523 de 2012). Esto da un CONCEPTO —permanencia, precauciones y
+   materiales— y de paso prioriza a qué casa se va primero (19 ago 2026).
 
    El caso se crea ANTES de subir un solo archivo y devuelve su token. Si la
    señal se cae en la foto cuatro, las tres primeras y todos los datos ya están
@@ -2808,7 +2809,7 @@ async function correoCasoClasificado(env, x) {
     "Esto es lo que hace falta: " + (x.falta || "más fotografías de los daños."),
     "Recuerda: no entres a la casa si ves muros caídos, techos hundidos o columnas partidas. Ninguna foto vale un accidente."
   ] : [
-    "Un ingeniero voluntario revisó las fotos de tu casa y ya hay una recomendación.",
+    "Un ingeniero voluntario revisó las fotos de tu casa y ya hay un concepto.",
     x.recomendacion ? "Qué hacer, y con qué reparar: " + x.recomendacion : null,
     "Esto no reemplaza una visita ni la declaratoria de tu municipio: es un concepto hecho a distancia, sobre las fotos que enviaste.",
     "Buscaremos gestionar ayuda para todas las casas que podamos, y no podemos comprometerla casa por casa."
@@ -2822,14 +2823,14 @@ async function correoCasoClasificado(env, x) {
   return enviarCorreo(env, {
     para: x.email,
     asunto: titulo + " · " + x.numero,
-    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", "Tu informe: " + url].join("\n"),
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", "Tu concepto: " + url].join("\n"),
     html: plantillaCorreo({
       titulo, parrafos, filas,
       /* El botón dice lo que toca hacer, no siempre lo mismo. Si el ingeniero
          pidió más fotos, «Ver mi informe» manda a leer un documento que no
          existe todavía; lo que hay que hacer es subirlas. */
-      boton: { url, texto: inev ? "Agregar las fotos que faltan" : "Ver mi informe" },
-      cierre: "Este mensaje es automático. Guarda el enlace: desde ahí puedes volver a abrir tu informe cuando quieras."
+      boton: { url, texto: inev ? "Agregar las fotos que faltan" : "Ver mi concepto" },
+      cierre: "Este mensaje es automático. Guarda el enlace: desde ahí puedes volver a abrir tu concepto cuando quieras."
     }),
     etiqueta: "caso-clasificado", guia: x.numero
   });
@@ -2875,7 +2876,7 @@ async function apiCasoInforme(env, numero, token) {
 
 /* GET /api/admin/casos — la bandeja del EQUIPO, no la del ingeniero.
    La diferencia es deliberada: `/triaje` oculta contacto y dirección porque
-   para priorizar por urgencia no hacen falta; aquí SÍ están, porque son lo que
+   para dar el concepto no hacen falta; aquí SÍ están, porque son lo que
    permite ir a visitar. Cada quien ve lo que su trabajo necesita y nada más. */
 async function adminCasos(env) {
   const r = await env.DB.prepare(
