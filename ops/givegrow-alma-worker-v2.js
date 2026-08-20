@@ -29,6 +29,12 @@ const MAX_TOKENS = 1024;
 const ALLOWED_ORIGINS = [
   "https://www.thegiveandgrowproject.org",
   "https://thegiveandgrowproject.org",
+  /* El subdominio de Mira Mi Casa sirve la MISMA SPA, con el mismo botón de
+     ALMA. Sin esta línea el worker responde 403 «Origen no autorizado» y ALMA
+     queda visible pero muerta justo en la plataforma de la emergencia.
+     Comprobado en producción el 19 ago 2026 con un OPTIONS: el ápex y www
+     devolvían 204 y el subdominio 403. Añadido el 20 ago 2026. */
+  "https://miramicasa.thegiveandgrowproject.org",
 ];
 
 // Límites de entrada
