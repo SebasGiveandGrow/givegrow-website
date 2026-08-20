@@ -566,7 +566,17 @@ export async function informeTriage(c, hoyISO) {
     h.texto("Qué hacer, y con qué reparar:", { tam: 9.5, fuente: f.negrita, despues: 5 });
     h.texto(c.recomendacion, { tam: 10, interlinea: 15, despues: 14 });
   }
-  if (c.falta) {
+  /* «QUÉ FALTA» SOLO SI EL CASO ES `inevaluable` (20 ago 2026). Antes bastaba
+     con que el campo tuviera algo, y el formulario del triaje deja escribirlo
+     con cualquier clasificación — así que el PDF podía decir a la vez
+     «No requiere visita por ahora» y «Para poder evaluar hace falta: …».
+     Lo vi en el concepto real de CV-2026-000001 al revisarlo antes del piloto.
+
+     La PANTALLA de la familia ya lo hacía bien: solo enseña `mc.falta.*` cuando
+     el caso está esperando material. Eran dos superficies del mismo dato en
+     desacuerdo, que es exactamente la clase de fallo que ya mordió aquí una vez
+     —el informe diciendo «programada» mientras el caso decía «urgente»—. */
+  if (c.falta && c.clasificacion === "inevaluable") {
     h.texto("Para poder evaluar hace falta:", { tam: 9.5, fuente: f.negrita, despues: 5 });
     h.texto(c.falta, { tam: 10, interlinea: 15, despues: 14 });
   }
