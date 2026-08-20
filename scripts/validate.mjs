@@ -172,17 +172,29 @@ ok("JSON-LD (" + ld + " bloques)");
   }
   const preguntas = Object.keys(dict).filter(k => /^faq\.q\d+$/.test(k));
   const desfasados = [];
+  const ausentes = [];
   for (const kq of preguntas) {
     const ka = kq.replace(".q", ".a");
     if (!dict[ka]) continue;
     const enJson = faqs.find(f => f.p === dict[kq].trim());
-    if (!enJson) continue;                       // no todas las del dict están en el JSON-LD
+    /* Antes esto era `continue`, y ahí estaba el hueco: el check cazaba una
+       respuesta DESFASADA pero callaba ante una pregunta AUSENTE. Una pregunta
+       del FAQ que no llega al JSON-LD simplemente no existe para Google, y el
+       gate decía «coincide». Lo destapó añadir las cinco de la emergencia
+       (20 ago 2026): si me hubiera olvidado del bloque, habría pasado en verde.
+       Si algún día hay una pregunta que a propósito no debe ir al JSON-LD, la
+       salida es una lista blanca explícita, no volver a este `continue`. */
+    if (!enJson) { ausentes.push(kq); continue; }
     if (enJson.r !== dict[ka].trim()) desfasados.push(ka);
+  }
+  if (ausentes.length) {
+    err("preguntas del FAQ que NO están en el JSON-LD: " + ausentes.join(", ") +
+        " — Google no las ve; añádelas al bloque FAQPage de index.html");
   }
   if (desfasados.length) {
     err("JSON-LD del FAQ desfasado del diccionario ES en: " + desfasados.join(", ") +
         " — el bloque es un duplicado a mano y hay que actualizarlo junto al dict");
-  } else {
+  } else if (!ausentes.length) {
     ok("JSON-LD del FAQ coincide con el diccionario (" + faqs.length + " respuestas)");
   }
 }
