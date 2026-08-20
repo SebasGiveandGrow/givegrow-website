@@ -378,6 +378,7 @@ var I18N = {
     "cv.aviso":"Esto no reemplaza una visita ni la declaratoria de tu municipio. Lo que un ingeniero te da es un concepto a distancia, sobre tus fotos: si hay señales para no permanecer en la casa o en alguna parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla. En una emergencia eso es lo que se puede dar rápido, y no darlo es peor.",
     "cv.gestion":"Buscaremos gestionar ayuda para todas las casas que podamos, y no podemos comprometerla casa por casa. Preferimos decírtelo antes que prometerte algo que no depende solo de nosotros.",
     "cv.s1.t":"Antes de empezar",
+    "cv.s1.0":"Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— esto no es lo que necesitas: llama al 123 y a tu alcaldía. Un concepto sobre fotos no tiene fecha, y una emergencia no espera.",
     "cv.s1.1":"No entres si ves muros caídos, techos hundidos o columnas partidas. Toma las fotos desde afuera.",
     "cv.s1.2":"No te subas al techo ni a escaleras.",
     "cv.s1.3":"No muevas escombros para mostrar mejor el daño.",
