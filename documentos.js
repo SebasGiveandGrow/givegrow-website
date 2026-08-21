@@ -782,6 +782,11 @@ export async function inspeccionPDF(v, firmas, hoyISO) {
   h.salto(10);
 
   seccion(h, f, "I", "LA VIVIENDA");
+  /* «Proyecto / Campaña» es el PRIMER campo del papel, y se había quedado fuera:
+     la columna existía en el esquema y nada la llenaba ni la imprimía. Con la
+     brigada recorriendo cinco territorios, un documento que no dice a qué
+     jornada pertenece no se puede archivar. */
+  if (v.proyecto) h.fila("Proyecto / campaña", v.proyecto);
   h.fila("Municipio", v.municipio || "-");
   if (v.direccion) h.fila("Dirección / vereda", v.direccion);
   if (v.casa_no)   h.fila("Casa N.º", v.casa_no);
@@ -817,8 +822,12 @@ export async function inspeccionPDF(v, firmas, hoyISO) {
         tam: 9.5, fuente: r.m === "RE" ? f.negrita : f.normal,
         color: TINTA, interlinea: 13, despues: 3
       });
-      if (r.obs)   h.texto("Observación: " + r.obs, { tam: 9, color: GRIS, interlinea: 12.5, despues: 2, x: MG.izq + 14 });
-      if (r.fotos) h.texto("Foto N.º " + r.fotos, { tam: 9, color: GRIS, despues: 2, x: MG.izq + 14 });
+      /* `ancho` HAY QUE PASARLO cuando se pasa `x`: texto() calcula el salto de
+         línea con el ancho completo de la caja y no resta la indentación, así
+         que una observación larga se salía 14 pt del margen derecho. No se veía
+         con observaciones cortas, que son las que probé. */
+      if (r.obs)   h.texto("Observación: " + r.obs, { tam: 9, color: GRIS, interlinea: 12.5, despues: 2, x: MG.izq + 14, ancho: ANCHO - 14 });
+      if (r.fotos) h.texto("Foto N.º " + r.fotos, { tam: 9, color: GRIS, despues: 2, x: MG.izq + 14, ancho: ANCHO - 14 });
       h.salto(6);
     }
     h.salto(6);
@@ -859,7 +868,16 @@ export async function inspeccionPDF(v, firmas, hoyISO) {
    línea en blanco: en un documento firmado, un espacio vacío no distingue «no
    pudo firmar» de «no autorizó», y son cosas opuestas. */
 async function bloqueFirma(pdf, h, f, rol, nombre, cc, matricula, pngBytes, motivo) {
-  h.reservar(112);
+  /* 160 Y NO 112. La cuenta del bloque completo: 58 de imagen más su hueco, 18
+     de la regla, y las cuatro líneas de identificación (rol, nombre, cédula,
+     matrícula) con sus interlineados y separaciones, que suman ~72. Total ~148.
+
+     Con 112 la reserva pasaba y las últimas líneas saltaban de página, así que
+     en el documento que alguien firmó la FIRMA quedaba al pie de una hoja y el
+     «Nombre / C.C. / Matrícula» al inicio de la siguiente. En una evidencia, una
+     firma separada de a quién identifica es justo la ambigüedad que no puede
+     haber. No se vio antes por dónde cayeron los bloques en la prueba. */
+  h.reservar(160);
   const yBase = h.y;
 
   if (pngBytes && pngBytes.length) {
