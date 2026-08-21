@@ -31,7 +31,8 @@
       gravedad de juramento. El armado vive en documentos.js.
 */
 
-import { recibo, certificado, informeTriage } from "./documentos.js";
+import { recibo, certificado, informeTriage,
+         INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT } from "./documentos.js";
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
 
@@ -2745,6 +2746,570 @@ async function triageEvaluar(request, env, numero, email) {
   return json({ ok: true, numero, estado: nuevoEstado,
                 clasificacion: nuevoEstado === "clasificado" ? veredicto.clasificacion : null,
                 discrepa: veredicto.discrepa, con_respaldo: conRespaldo });
+}
+
+/* ========================================================================
+   INSPECCIÓN VISUAL PRELIMINAR — el sistema que funciona SIN SEÑAL
+   ========================================================================
+   Para qué existe: del 24 al 28 de agosto de 2026 la brigada entra a veredas
+   SIN LUZ NI INTERNET. El triaje mira fotos a distancia; esto se llena parado
+   en la casa, con el habitante delante, y puede tardar días en poder enviarse.
+
+   ESTA ES LA PRIMERA CAPACIDAD OFFLINE DEL PROYECTO. Se construye como una
+   rebanada vertical delgada —una sección de las ocho, de punta a punta— porque
+   si el andamio falla hay que rehacerlo todo, y este repositorio tiene tres
+   cicatrices de rutas nuevas que «parecían funcionar».
+
+   LAS CUATRO COSAS QUE LO HACEN FUNCIONAR DE VERDAD, y ninguna es obvia:
+
+   1. HAY QUE PRECARGAR ANTES DE PERDER LA SEÑAL. Un service worker solo guarda
+      lo que se le pide. Si el formulario se abre por primera vez ya en la
+      vereda, no hay nada en caché y no carga nada. Por eso hay un botón
+      explícito de preparación que se usa CON internet, antes de salir, y que
+      dice qué quedó listo.
+
+   2. SIN `storage.persist()` EL SISTEMA OPERATIVO PUEDE BORRAR UN DÍA DE
+      TRABAJO. Con los tamaños medidos en el caso real —4 fotos, 2,2 MB por
+      casa— treinta casas son ~66 MB en IndexedDB, y iOS y Android desalojan ese
+      almacenamiento cuando el teléfono se llena, sin avisar a nadie.
+
+   3. EL CONSECUTIVO LO ASIGNA EL SERVIDOR. Dos ingenieros sin señal reclamarían
+      los dos `IV-2026-000005`. El teléfono crea un `local_id` y el número real
+      se pone al llegar.
+
+   4. IDEMPOTENCIA, que es la lección que este proyecto ya pagó con Wompi: «ya
+      lo procesé», no «ya lo vi». Con señal mala un envío puede LLEGAR y perderse
+      su respuesta; el teléfono reintenta y crearía una inspección duplicada con
+      otro consecutivo. El `local_id` es lo que deja al servidor reconocerla.
+
+   Y UNA TRAMPA PROPIA DE ESTAR DETRÁS DE ACCESS: cuando la sesión expira,
+   Cloudflare responde con el HTML del login, no con un error. Un envío que
+   recibe HTML NO se puede tratar como éxito ni borrar de la cola — se reintenta
+   después de volver a entrar. Se comprueba el content-type, no solo el estado.
+   ======================================================================== */
+
+/* El service worker. Se sirve desde /triaje/ para que su ámbito NO alcance el
+   sitio público: un fallo aquí no puede romper la portada ni el formulario de
+   las familias. */
+function inspeccionSW() {
+  return `const CACHE = "inspeccion-v1";
+const ESENCIALES = ["/triaje/inspeccion", "/triaje/inspeccion.js"];
+
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ESENCIALES)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener("activate", (e) => {
+  e.waitUntil(caches.keys().then((ks) =>
+    Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+  ).then(() => self.clients.claim()));
+});
+
+/* Solo la pantalla y su JS. Los envíos NO se interceptan: los gobierna la cola
+   de IndexedDB, que sabe reintentar. Un service worker que "ayude" con los POST
+   es la forma más rápida de perder un formulario firmado. */
+self.addEventListener("fetch", (e) => {
+  const u = new URL(e.request.url);
+  if (e.request.method !== "GET") return;
+  if (u.pathname !== "/triaje/inspeccion" && u.pathname !== "/triaje/inspeccion.js") return;
+  e.respondWith(
+    fetch(e.request).then((r) => {
+      /* Detrás de Access, una sesión expirada devuelve el HTML del login. Eso NO
+         se guarda en caché: sustituiría el formulario por una pantalla de
+         entrada, justo cuando no hay señal para volver a entrar. */
+      const ct = r.headers.get("content-type") || "";
+      const esLogin = r.redirected || (u.pathname.endsWith(".js") && !ct.includes("javascript"));
+      if (r.ok && !esLogin) {
+        const copia = r.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copia));
+      }
+      return r;
+    }).catch(() => caches.match(e.request).then((c) => c || new Response(
+      "Sin señal y sin copia guardada. Abre esta pantalla una vez con internet antes de salir.",
+      { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } }
+    )))
+  );
+});
+`;
+}
+
+/* POST /api/triage/inspeccion — recibe una inspección llenada en terreno.
+   Idempotente por `local_id`: el mismo envío dos veces devuelve el MISMO
+   número y no crea una segunda fila. */
+async function triageInspeccionRecibir(request, env, email) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const localId = limpiar(c.local_id, 80);
+  if (!localId) return json({ error: "local_id_requerido" }, 400);
+
+  /* IDEMPOTENCIA ANTES DE CUALQUIER ESCRITURA. Si ya la recibimos, se devuelve
+     su número y el teléfono la borra de su cola tranquilo. Sin esto, la señal
+     mala multiplica inspecciones y quema consecutivos. */
+  const ya = await env.DB.prepare(
+    "SELECT numero FROM inspecciones WHERE json_extract(respuestas, '$._local_id') = ?"
+  ).bind(localId).first();
+  if (ya) return json({ ok: true, numero: ya.numero, repetida: true });
+
+  const municipio = limpiar(c.municipio, 120);
+  const fecha = limpiar(c.fecha_visita, 10);
+  const obsNombre = limpiar(c.obs_nombre, 160);
+  const faltan = [];
+  if (!municipio)  faltan.push("municipio");
+  if (!fecha)      faltan.push("fecha_visita");
+  if (!obsNombre)  faltan.push("obs_nombre");
+  if (faltan.length) return json({ error: "datos_incompletos", faltan }, 422);
+
+  /* EL CONSENTIMIENTO DEL HABITANTE NO ES OPCIONAL. Es la única autorización
+     que da, y el documento se la enseña ANTES de firmar. Sin ella no hay
+     inspección: se le habría entrado a su casa sin permiso registrado. */
+  if (!c.consent_hab) return json({ error: "consent_habitante_requerido" }, 422);
+
+  const respuestas = (c.respuestas && typeof c.respuestas === "object") ? c.respuestas : {};
+  respuestas._local_id = localId;
+
+  const numero = await siguienteInspeccion(env, new Date().getUTCFullYear());
+  await env.DB.prepare(
+    "INSERT INTO inspecciones (numero, caso, proyecto, casa_no, direccion, municipio, " +
+    "fecha_visita, hora, obs_nombre, obs_cc, obs_matricula, obs_email, propietario, contacto, " +
+    "respuestas, requiere_esp, consent_hab, creado_en, dispositivo) " +
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+  ).bind(
+    numero, limpiar(c.caso, 20) || null, limpiar(c.proyecto, 120) || null,
+    limpiar(c.casa_no, 40) || null, limpiar(c.direccion, 240) || null, municipio,
+    fecha, limpiar(c.hora, 8) || null, obsNombre, limpiar(c.obs_cc, 40) || null,
+    limpiar(c.obs_matricula, 60) || null, email || null,
+    limpiar(c.propietario, 160) || null, limpiar(c.contacto, 80) || null,
+    JSON.stringify(respuestas), c.requiere_esp ? 1 : 0, 1,
+    /* `creado_en` es la hora DEL TELÉFONO, cuando se llenó. Si no llega o es
+       absurda se usa la del servidor, pero jamás se sobreescribe una válida:
+       la fecha del documento tiene que ser la de la visita. */
+    limpiar(c.creado_en, 19) || new Date().toISOString().slice(0, 19).replace("T", " "),
+    limpiar(c.dispositivo, 120) || null
+  ).run();
+
+  return json({ ok: true, numero, repetida: false });
+}
+
+/* La pantalla. Se arma en el Worker igual que /triaje, así el catálogo de los
+   26 ítems se inyecta desde `documentos.js` y no hay una segunda copia. */
+/* El JS del formulario. Ojo con la plantilla: dentro de este literal las
+   secuencias de escape se interpolan, así que hay que escribir \\n y \\/ — es
+   la misma trampa que tumbó el panel siete horas el 12 de agosto, y el check
+   #1b del gate compila lo que esto EMITE, no lo que se lee aquí. */
+function inspeccionJS() {
+  return `"use strict";
+var DB = null, ACTUAL = null, SECS = [];
+
+/* ---- IndexedDB. Sin librerías: el sitio es vanilla a propósito y esto tiene
+   que caber en un teléfono viejo sin descargar nada. ---- */
+function abrirDB(){
+  return new Promise(function(res, rej){
+    /* VERSIÓN 2: la 1 no tenía el almacén \`perfil\`. Añadir un almacén SIN subir\n       la versión no dispara \`onupgradeneeded\`, así que en un teléfono que ya\n       abrió la versión 1 el almacén no existiría y la transacción lanzaría.\n       Subir el número es lo único que ejecuta la migración local. */\n    var r = indexedDB.open("gg-inspecciones", 2);
+    r.onupgradeneeded = function(){
+      var d = r.result;
+      if (!d.objectStoreNames.contains("borradores")) d.createObjectStore("borradores", { keyPath: "local_id" });
+      if (!d.objectStoreNames.contains("cola"))       d.createObjectStore("cola", { keyPath: "local_id" });\n      /* Lo que NO cambia de casa en casa. Un ingeniero hace treinta en un día\n         y el municipio, su nombre y su matrícula son los mismos treinta veces\n         — y tras recargar la página se perdían. Lo encontré probando el\n         reinicio del teléfono, no leyendo el código. */\n      if (!d.objectStoreNames.contains("perfil"))     d.createObjectStore("perfil", { keyPath: "k" });
+    };
+    r.onsuccess = function(){ res(r.result); };
+    r.onerror   = function(){ rej(r.error); };
+  });
+}
+function tx(almacen, modo){ return DB.transaction(almacen, modo).objectStore(almacen); }
+function poner(almacen, v){ return new Promise(function(res,rej){ var q=tx(almacen,"readwrite").put(v); q.onsuccess=function(){res()}; q.onerror=function(){rej(q.error)} }); }
+function quitar(almacen, k){ return new Promise(function(res,rej){ var q=tx(almacen,"readwrite").delete(k); q.onsuccess=function(){res()}; q.onerror=function(){rej(q.error)} }); }
+function todos(almacen){ return new Promise(function(res,rej){ var q=tx(almacen,"readonly").getAll(); q.onsuccess=function(){res(q.result||[])}; q.onerror=function(){rej(q.error)} }); }
+
+function idNuevo(){
+  /* Identificador del TELÉFONO, no consecutivo. El número real lo pone el
+     servidor: dos ingenieros sin señal reclamarían el mismo. Y este id es lo
+     que hace idempotente el reenvío cuando la respuesta se pierde. */
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "loc-" + Date.now() + "-" + Math.floor(Math.random() * 1e9);
+}
+
+function el(id){ return document.getElementById(id); }
+function val(id){ var e = el(id); return e ? e.value.trim() : ""; }
+function esc(t){ var d=document.createElement("div"); d.textContent=t==null?"":String(t); return d.innerHTML.replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+
+function aviso(txt, clase){
+  var m = el("msg");
+  m.textContent = txt;
+  m.className = "aviso v " + (clase || "info");
+}
+
+/* ---- Pintar las secciones desde el catálogo del servidor ---- */
+function pintarSecciones(){
+  var h = "";
+  for (var i = 0; i < SECS.length; i++){
+    var sec = SECS[i];
+    h += "<h2>" + esc(sec.n + ". " + sec.titulo) + "</h2>";
+    for (var j = 0; j < sec.items.length; j++){
+      var it = sec.items[j];
+      h += '<div class="item" data-id="' + esc(it.id) + '">'
+        +    "<b>" + esc(it.id + "  " + it.t) + "</b>"
+        +    '<div class="marcas">'
+        +      '<button type="button" class="re" data-m="RE"  aria-pressed="false">RE</button>'
+        +      '<button type="button"          data-m="OBS" aria-pressed="false">Obs</button>'
+        +      '<button type="button"          data-m="SO"  aria-pressed="false">S/O</button>'
+        +    "</div>"
+        +    '<div class="detalle">'
+        +      '<label>Observaciones</label><textarea data-campo="obs"></textarea>'
+        +      '<label>Foto N.º (los que anotaste en la cámara)</label><input data-campo="fotos" inputmode="numeric" placeholder="3, 4">'
+        +    "</div>"
+        +  "</div>";
+    }
+  }
+  el("secciones").innerHTML = h;
+}
+
+/* ---- Estado del borrador. SE GUARDA EN CADA CAMBIO, no al enviar: sin luz el
+   teléfono se puede morir a mitad del formulario. ---- */
+function leerFormulario(){
+  var r = {};
+  var items = document.querySelectorAll(".item[data-id]");
+  for (var i = 0; i < items.length; i++){
+    var nodo = items[i], id = nodo.getAttribute("data-id");
+    var marcado = nodo.querySelector("[data-m][aria-pressed=true]");
+    if (!marcado) continue;
+    var obs = nodo.querySelector("[data-campo=obs]");
+    var fot = nodo.querySelector("[data-campo=fotos]");
+    r[id] = { m: marcado.getAttribute("data-m"), obs: obs ? obs.value.trim() : "", fotos: fot ? fot.value.trim() : "" };
+  }
+  var esp  = document.querySelector("[data-esp][aria-pressed=true]");
+  var cons = document.querySelector("[data-cons][aria-pressed=true]");
+  return {
+    local_id: ACTUAL,
+    municipio: val("f-muni"), fecha_visita: val("f-fecha"), hora: val("f-hora"),
+    casa_no: val("f-casa"), direccion: val("f-dir"), caso: val("f-caso"),
+    obs_nombre: val("f-obs"), obs_matricula: val("f-mat"), obs_cc: val("f-cc"),
+    propietario: val("f-prop"), contacto: val("f-cont"),
+    respuestas: r,
+    requiere_esp: esp ? esp.getAttribute("data-esp") === "1" : false,
+    consent_hab: !!cons,
+    creado_en: new Date().toISOString().slice(0,19).replace("T"," "),
+    dispositivo: (navigator.userAgent || "").slice(0,120)
+  };
+}
+
+var guardarPronto = null;
+function guardarBorrador(){
+  if (guardarPronto) clearTimeout(guardarPronto);
+  guardarPronto = setTimeout(function(){
+    var reg = leerFormulario();
+    poner("borradores", reg);
+    poner("perfil", { k: "fijos", municipio: reg.municipio, obs_nombre: reg.obs_nombre,
+                      obs_matricula: reg.obs_matricula, obs_cc: reg.obs_cc, proyecto: reg.proyecto })
+      .then(estado);
+  }, 400);
+}
+
+/* ---- La cola. Reintenta, y NO borra nada que no se haya confirmado. ---- */
+function enviarUno(reg){
+  return fetch("/api/triage/inspeccion", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify(reg)
+  }).then(function(r){
+    var ct = r.headers.get("content-type") || "";
+    /* DETRÁS DE ACCESS UNA SESIÓN EXPIRADA DEVUELVE EL HTML DEL LOGIN, no un
+       error. Tratarlo como éxito borraría de la cola una inspección firmada que
+       nunca llegó. Se exige JSON, no solo un 200. */
+    if (ct.indexOf("json") < 0) {
+      return { estado: "sesion" };
+    }
+    return r.json().then(function(d){
+      if (r.ok && d.ok) return { estado: "ok", numero: d.numero, repetida: !!d.repetida };
+      /* 422 y 400 son de los DATOS: reintentar no arregla nada y quedaría
+         atascada para siempre. Se marca y se avisa. */
+      if (r.status === 422 || r.status === 400) return { estado: "rechazada", d: d };
+      return { estado: "reintentar" };
+    });
+  }).catch(function(){ return { estado: "reintentar" }; });
+}
+
+function vaciarCola(){
+  return todos("cola").then(function(l){
+    if (!l.length) { estado(); return; }
+    var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false;
+    function paso(){
+      if (i >= l.length){
+        estado();
+        if (sesionCaida) aviso("Tu sesión caducó. Vuelve a entrar y toca Enviar otra vez: nada se perdió.", "mal");
+        else if (malas)  aviso("Quedaron " + malas + " sin enviar por datos incompletos. Ábrelas y complétalas.", "mal");
+        else if (enviadas || repes) aviso("Enviadas " + enviadas + (repes ? " (" + repes + " ya estaban)" : "") + ".", "bien");
+        else aviso("Sin señal todavía. Quedan guardadas en el teléfono.", "info");
+        return;
+      }
+      var reg = l[i++];
+      enviarUno(reg).then(function(res){
+        if (res.estado === "ok"){
+          if (res.repetida) repes++; else enviadas++;
+          quitar("cola", reg.local_id).then(paso);
+          return;
+        }
+        if (res.estado === "sesion")   { sesionCaida = true; paso(); return; }
+        if (res.estado === "rechazada"){ malas++; paso(); return; }
+        paso();
+      });
+    }
+    paso();
+  });
+}
+
+function estado(){
+  return todos("cola").then(function(c){
+    el("n-pend").textContent = c.length;
+    var partes = [];
+    partes.push(navigator.onLine ? "Con señal" : "SIN SEÑAL — puedes seguir llenando");
+    partes.push(c.length ? c.length + " por enviar" : "nada pendiente");
+    el("est").textContent = partes.join(" · ");
+    if (c.length && navigator.onLine) el("b-cola").disabled = false;
+    return c.length;
+  });
+}
+
+/* ---- Preparación explícita. Sin esto el formulario NO abre en la vereda:
+   un service worker solo guarda lo que se le pidió. ---- */
+function preparar(){
+  var p = el("prep");
+  if (!("serviceWorker" in navigator)) {
+    p.className = "aviso mal v";
+    p.textContent = "Este navegador no puede trabajar sin señal. Usa Chrome o Safari actualizados.";
+    return;
+  }
+  navigator.serviceWorker.register("/triaje/inspeccion-sw.js", { scope: "/triaje/" }).then(function(){
+    var pedir = (navigator.storage && navigator.storage.persist)
+      ? navigator.storage.persist() : Promise.resolve(false);
+    return pedir.then(function(duradero){
+      var extra = duradero
+        ? "El teléfono no va a borrar lo guardado."
+        : "OJO: el sistema podría borrar lo guardado si el teléfono se llena. Envía en cuanto tengas señal.";
+      p.className = "aviso bien v";
+      p.textContent = "Listo para trabajar sin señal. " + extra;
+    });
+  }).catch(function(){
+    p.className = "aviso mal v";
+    p.textContent = "No se pudo preparar. Con internet, recarga esta pantalla e intenta otra vez.";
+  });
+}
+
+function INSP_ARRANCA(secciones){
+  SECS = secciones || [];
+  pintarSecciones();
+  ACTUAL = idNuevo();
+  var f = el("f-fecha"); if (f && !f.value) f.value = new Date().toISOString().slice(0,10);
+
+  abrirDB().then(function(d){
+    DB = d;
+    /* Se repone lo fijo ANTES de nada: si el teléfono se reinició en la vereda,
+       reescribir municipio y matrícula treinta veces es lo que hace que alguien
+       deje de usar la herramienta. */
+    var g = tx("perfil", "readonly").get("fijos");
+    g.onsuccess = function(){
+      var f = g.result; if (!f) return;
+      if (f.municipio     && !val("f-muni")) el("f-muni").value = f.municipio;
+      if (f.obs_nombre    && !val("f-obs"))  el("f-obs").value  = f.obs_nombre;
+      if (f.obs_matricula && !val("f-mat"))  el("f-mat").value  = f.obs_matricula;
+      if (f.obs_cc        && !val("f-cc"))   el("f-cc").value   = f.obs_cc;
+    };
+    estado();
+    var p = el("prep");
+    p.className = "aviso info v";
+    p.textContent = navigator.serviceWorker && navigator.serviceWorker.controller
+      ? "Preparado para trabajar sin señal."
+      : "Toca «Preparar» ANTES de salir a zona sin señal.";
+  }).catch(function(){
+    aviso("Este navegador no deja guardar en el teléfono. No trabajes sin señal con él.", "mal");
+  });
+
+  document.addEventListener("click", function(e){
+    var b = e.target.closest("button[data-m]");
+    if (b){
+      var caja = b.closest(".item");
+      var hermanos = caja.querySelectorAll("button[data-m]");
+      for (var i=0;i<hermanos.length;i++) hermanos[i].setAttribute("aria-pressed","false");
+      b.setAttribute("aria-pressed","true");
+      /* El detalle se abre solo si hay algo que contar. «Sin observación
+         aparente» no necesita texto, y abrirlo invitaría a rellenar por
+         rellenar — el papel tampoco lo pide. */
+      caja.classList.toggle("abierto", b.getAttribute("data-m") !== "SO");
+      guardarBorrador(); return;
+    }
+    var esp = e.target.closest("button[data-esp]");
+    if (esp){
+      var g = document.querySelectorAll("button[data-esp]");
+      for (var k=0;k<g.length;k++) g[k].setAttribute("aria-pressed","false");
+      esp.setAttribute("aria-pressed","true"); guardarBorrador(); return;
+    }
+    var cons = e.target.closest("button[data-cons]");
+    if (cons){
+      cons.setAttribute("aria-pressed", cons.getAttribute("aria-pressed") === "true" ? "false" : "true");
+      guardarBorrador(); return;
+    }
+    if (e.target.closest("#b-prep"))  { preparar(); return; }
+    if (e.target.closest("#b-cola"))  { aviso("Enviando…", "info"); vaciarCola(); return; }
+    if (e.target.closest("#b-guardar")){ guardarInspeccion(); return; }
+  });
+
+  document.addEventListener("input", function(e){
+    if (e.target.matches("input,textarea")) guardarBorrador();
+  });
+
+  window.addEventListener("online",  function(){ estado(); vaciarCola(); });
+  window.addEventListener("offline", estado);
+}
+
+function guardarInspeccion(){
+  var reg = leerFormulario();
+  var faltan = [];
+  if (!reg.municipio)    faltan.push("municipio");
+  if (!reg.fecha_visita) faltan.push("fecha de la visita");
+  if (!reg.obs_nombre)   faltan.push("tu nombre");
+  if (faltan.length){ aviso("Falta: " + faltan.join(", ") + ".", "mal"); return; }
+  if (!reg.consent_hab){ aviso("Falta la autorización del habitante. Léele el alcance y márcala.", "mal"); return; }
+
+  el("b-guardar").disabled = true;
+  /* A LA COLA PRIMERO, y solo después se limpia la pantalla. Si se limpiara
+     antes y la escritura fallara, la inspección se perdería con el habitante
+     ya despedido en la puerta. */
+  poner("cola", reg).then(function(){
+    return quitar("borradores", reg.local_id);
+  }).then(function(){
+    ACTUAL = idNuevo();
+    document.querySelectorAll("input,textarea").forEach(function(x){
+      if (x.id === "f-muni" || x.id === "f-obs" || x.id === "f-mat" || x.id === "f-cc" || x.id === "f-fecha") return;
+      x.value = "";
+    });
+    document.querySelectorAll("[aria-pressed=true]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
+    document.querySelectorAll(".item.abierto").forEach(function(x){ x.classList.remove("abierto"); });
+    el("b-guardar").disabled = false;
+    aviso("Guardada en el teléfono. " + (navigator.onLine ? "Enviando…" : "Se enviará sola cuando haya señal."), "bien");
+    estado();
+    if (navigator.onLine) vaciarCola();
+  }).catch(function(){
+    el("b-guardar").disabled = false;
+    aviso("NO se pudo guardar en el teléfono. No borres nada y avisa al equipo.", "mal");
+  });
+}
+`;
+}
+
+function inspeccionHTML(seccionesJSON, alcance, consentTexto) {
+  return `<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Inspección visual preliminar · Give&amp;Grow</title>
+<style>
+:root{--az:#0D3B66;--az2:#12507F;--tinta:#082742;--pap:#FBFAF7;--sup:#fff;
+  --bd:#CBD5DD;--mu:#56697A;--amb:#B57500;--ok:#0F6B3F;--err:#B3261E}
+*{box-sizing:border-box}
+body{margin:0;background:var(--pap);color:var(--tinta);
+  font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:680px;margin:0 auto;padding:16px 16px 96px}
+h1{font-size:22px;line-height:1.2;margin:6px 0 4px}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--az);
+  margin:26px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--az)}
+.ey{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mu)}
+.alcance{background:var(--sup);border:1px solid var(--bd);border-left:3px solid var(--amb);
+  border-radius:3px;padding:12px 14px;font-size:13.5px;line-height:1.5;color:#33475b;margin:14px 0}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+input,textarea,select{width:100%;padding:11px 12px;border:1px solid var(--bd);
+  border-radius:6px;font-size:16px;font-family:inherit;background:var(--sup);color:var(--tinta)}
+textarea{min-height:64px;resize:vertical}
+.item{border:1px solid var(--bd);border-radius:6px;background:var(--sup);padding:12px;margin:10px 0}
+.item>b{display:block;font-size:14.5px;font-weight:600;line-height:1.4;margin-bottom:10px}
+.marcas{display:flex;gap:6px}
+.marcas button{flex:1;padding:10px 4px;border:1.5px solid var(--bd);border-radius:6px;
+  background:var(--sup);font-size:12.5px;font-weight:700;cursor:pointer;color:var(--mu)}
+.marcas button[aria-pressed=true]{background:var(--az);border-color:var(--az);color:#fff}
+.marcas button.re[aria-pressed=true]{background:var(--amb);border-color:var(--amb);color:#fff}
+.detalle{margin-top:10px;display:none}
+.item.abierto .detalle{display:block}
+.barra{position:fixed;left:0;right:0;bottom:0;background:var(--sup);
+  border-top:1px solid var(--bd);padding:10px 14px;display:flex;gap:10px;align-items:center}
+.barra .est{flex:1;font-size:12.5px;line-height:1.35;color:var(--mu)}
+.btn{padding:12px 16px;border-radius:6px;border:0;background:var(--az);color:#fff;
+  font-size:15px;font-weight:700;cursor:pointer}
+.btn.o{background:var(--sup);color:var(--az);border:1.5px solid var(--az)}
+.btn:disabled{opacity:.5}
+.pend{display:inline-block;min-width:22px;padding:1px 6px;border-radius:11px;
+  background:var(--amb);color:#fff;font-weight:700;font-size:12px;text-align:center}
+.aviso{padding:10px 12px;border-radius:6px;font-size:13.5px;margin:10px 0;display:none}
+.aviso.v{display:block}
+.aviso.bien{background:#E6F4EC;color:var(--ok)}
+.aviso.mal{background:#FDECEA;color:var(--err)}
+.aviso.info{background:#E7EFF6;color:var(--az)}
+</style></head><body>
+<div class="wrap">
+  <p class="ey">Give&amp;Grow International</p>
+  <h1>Inspección visual preliminar de vivienda</h1>
+  <p style="font-size:13.5px;color:var(--mu);margin:2px 0 0">Reporte de observaciones — documento preliminar y no vinculante</p>
+
+  <div id="prep" class="aviso info v"></div>
+  <button type="button" class="btn o" id="b-prep" style="width:100%">Preparar para trabajar sin señal</button>
+
+  <div class="alcance"><b>Alcance y limitaciones.</b> ${alcance}</div>
+
+  <h2>Identificación</h2>
+  <label for="f-muni">Municipio *</label><input id="f-muni" autocomplete="off">
+  <label for="f-fecha">Fecha de la visita *</label><input id="f-fecha" type="date">
+  <label for="f-hora">Hora</label><input id="f-hora" type="time">
+  <label for="f-casa">Casa N.º (el que pinta la brigada)</label><input id="f-casa" autocomplete="off">
+  <label for="f-dir">Dirección / vereda</label><input id="f-dir" autocomplete="off">
+  <label for="f-caso">N.º de caso del triaje, si existe</label><input id="f-caso" placeholder="CV-2026-000123" autocomplete="off">
+
+  <h2>Quien observa</h2>
+  <label for="f-obs">Nombre *</label><input id="f-obs" autocomplete="off">
+  <label for="f-mat">Matrícula profesional</label><input id="f-mat" autocomplete="off">
+  <label for="f-cc">Cédula</label><input id="f-cc" inputmode="numeric" autocomplete="off">
+
+  <h2>Propietario o habitante</h2>
+  <label for="f-prop">Nombre</label><input id="f-prop" autocomplete="off">
+  <label for="f-cont">Contacto</label><input id="f-cont" inputmode="tel" autocomplete="off">
+
+  <div id="secciones"></div>
+
+  <h2>Conclusión</h2>
+  <div class="item">
+    <b>¿Se observaron elementos que requieren revisión especializada?</b>
+    <div class="marcas">
+      <button type="button" class="re" data-esp="1" aria-pressed="false">SÍ</button>
+      <button type="button" data-esp="0" aria-pressed="false">NO</button>
+    </div>
+  </div>
+
+  <h2>Autorización del habitante</h2>
+  <div class="item">
+    <b style="font-weight:400;font-size:13.5px">${consentTexto}</b>
+    <div class="marcas">
+      <button type="button" id="b-cons" data-cons="1" aria-pressed="false">El habitante lo entendió y autoriza</button>
+    </div>
+  </div>
+
+  <div id="msg" class="aviso"></div>
+</div>
+
+<div class="barra">
+  <span class="est" id="est">—</span>
+  <button type="button" class="btn o" id="b-cola">Enviar <span class="pend" id="n-pend">0</span></button>
+  <button type="button" class="btn" id="b-guardar">Guardar inspección</button>
+</div>
+<script src="/triaje/inspeccion.js"></script>
+<script>INSP_ARRANCA(${seccionesJSON});</script>
+</body></html>`;
+}
+
+async function siguienteInspeccion(env, anio) {
+  const { results } = await env.DB.prepare(
+    "INSERT INTO numerador_inspeccion (anio, ultimo) VALUES (?, 1) " +
+    "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1 RETURNING ultimo"
+  ).bind(anio).all();
+  const n = results && results[0] ? results[0].ultimo : null;
+  if (!n) throw new Error("numerador de inspecciones no devolvió consecutivo");
+  return "IV-" + anio + "-" + String(n).padStart(6, "0");
 }
 
 /* ========================================================================
@@ -6255,7 +6820,7 @@ export default {
        verificación real de firma RS256 y el fail-closed. Los ingenieros
        voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
        creando cuentas: cero contraseñas que guardar y cero que se filtren. */
-    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js") {
+    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/") || ruta === "/triage" || ruta === "/triage.js") {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
       /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
@@ -6283,7 +6848,11 @@ export default {
       /* `/ruta` NO está aquí a propósito: enseña teléfono y dirección, que es
          justo lo que un ingeniero voluntario no puede ver. Entra solo con la
          audiencia del panel, igual que /admin. */
-      const esTriage = ruta === "/triaje" || ruta === "/triaje.js" || ruta === "/triage" || ruta === "/triage.js" || ruta.startsWith("/api/triage/");
+      /* Las SUBRUTAS de /triaje entran con la audiencia del triaje: la
+         inspección en terreno la llena un ingeniero, no el equipo. Comprobado
+         contra producción que Access cubre `/triaje/*` con esa audiencia
+         (302 con su kid), así que no gastó un cupo nuevo de hostnames. */
+      const esTriage = ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/") || ruta === "/triage" || ruta === "/triage.js" || ruta.startsWith("/api/triage/");
       const audsZona = esTriage
         ? [env.ACCESS_AUD_TRIAGE, env.ACCESS_AUD]
         : [env.ACCESS_AUD];
@@ -6331,6 +6900,45 @@ export default {
            sobrevive como alias que redirige, para no romper lo ya enlazado. */
         if (ruta === "/triage")    return Response.redirect(new URL("/triaje", url).toString(), 301);
         if (ruta === "/triage.js") return Response.redirect(new URL("/triaje.js", url).toString(), 301);
+        /* La inspección de terreno. Tres piezas: la pantalla, su JS y el
+           service worker. El SW se sirve desde /triaje/ para que su ámbito no
+           alcance el sitio público — un fallo aquí no puede romper la portada.
+
+           ⚠️ `/triaje/*` tuvo que entrar en `run_worker_first` de
+           wrangler.toml. Sin eso la capa de assets se traga la ruta y devuelve
+           el index.html público con un 200: le pasó a /api/*, a /triaje y a
+           /ruta. Tres cicatrices de lo mismo. */
+        if (ruta === "/triaje/inspeccion") {
+          const cuerpo = inspeccionHTML(
+            JSON.stringify(INSPECCION_SECCIONES),
+            esc(INSPECCION_ALCANCE),
+            esc(INSPECCION_CONSENT)
+          );
+          return new Response(cuerpo, { headers: {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "no-store",
+            "x-robots-tag": "noindex, nofollow"
+          }});
+        }
+        if (ruta === "/triaje/inspeccion.js") {
+          return new Response(inspeccionJS(), { headers: {
+            "content-type": "text/javascript; charset=utf-8",
+            "cache-control": "no-store"
+          }});
+        }
+        if (ruta === "/triaje/inspeccion-sw.js") {
+          return new Response(inspeccionSW(), { headers: {
+            "content-type": "text/javascript; charset=utf-8",
+            "cache-control": "no-store",
+            /* Sin esto el navegador limita el ámbito del SW a su propia
+               carpeta y no podría servir /triaje/inspeccion. */
+            "service-worker-allowed": "/triaje/"
+          }});
+        }
+        if (ruta === "/api/triage/inspeccion") {
+          return await triageInspeccionRecibir(request, env, sesion.email);
+        }
+
         if (ruta === "/triaje") {
           return new Response(paginaTriage(), {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }

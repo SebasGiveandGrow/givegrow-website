@@ -32,7 +32,7 @@ for (const f of ["app.js", "worker.js", "documentos.js"]) {
    Se valida lo EMITIDO, no el código fuente del template: hay que evaluar el
    literal para que las secuencias de escape queden como quedan en producción. */
 const workerSrc = readFileSync("worker.js", "utf8");
-for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"], ["rutaJS()", "rutaJS"]]) {
+for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"], ["rutaJS()", "rutaJS"], ["inspeccionJS()", "inspeccionJS"], ["inspeccionSW()", "inspeccionSW"]]) {
   try {
     const i = workerSrc.indexOf("function " + fn + "()");
     if (i === -1) throw new Error("no se encontró " + nombre);
