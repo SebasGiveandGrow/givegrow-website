@@ -22,7 +22,7 @@ html_handling = "auto-trailing-slash"
 # Ojo con el coste: ahora el Worker se invoca en cada visita a la portada. Es
 # aceptable porque su última línea es `env.ASSETS.fetch(request)`, o sea que
 # para todo lo que no reconoce se limita a devolver el asset.
-run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triage", "/triage.js", "/evidencia/*", "/carnet/*"]
+run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*"]
 
 # Base PRIVADA (Ley 1581): donantes, aportes, inscripciones y consentimientos.
 # Nunca se sirve al navegador. Los datos públicos de la red siguen en
