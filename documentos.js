@@ -742,6 +742,151 @@ const EXPLICA_CLAS = {
    Solo en español: es un documento para la DIAN.
    =========================================================================== */
 
+/* ===========================================================================
+   INSPECCIÓN VISUAL PRELIMINAR — el documento
+   ===========================================================================
+   Transcripción fiel del papel que trajo Sebas, en el mismo orden y con sus
+   textos literales. Lo que se añade es lo que el papel no podía tener: las
+   firmas capturadas con el dedo, embebidas como imagen.
+
+   SE CONGELA AL EMITIRSE. Alguien lo firmó: si el articulado o la plantilla
+   cambian mañana, el documento que esa persona firmó no puede cambiar con
+   ellos. Es la misma regla del certificado de donación, y por eso el PDF se
+   guarda en R2 y no se regenera — a diferencia del concepto del triaje, que sí
+   se arma cada vez porque nadie lo firma.
+
+   NO ES UN DICTAMEN, y el documento lo dice tres veces porque el papel lo decía
+   tres veces: en el subtítulo, en el alcance y en el cierre. No se suaviza
+   ninguna. =========================================================================== */
+export async function inspeccionPDF(v, firmas, hoyISO) {
+  const { pdf, hoja: h, f } = await abrir(
+    "Inspección visual preliminar " + v.numero,
+    "Reporte de observaciones · documento preliminar y no vinculante"
+  );
+
+  membrete(h);
+
+  h.texto("INSPECCIÓN VISUAL PRELIMINAR DE VIVIENDA", {
+    tam: 15, fuente: f.negrita, color: TINTA, interlinea: 19, despues: 5
+  });
+  h.texto("Reporte de observaciones — documento preliminar y no vinculante",
+    { tam: 9.5, color: GRIS, despues: 14 });
+
+  h.cintillo("INSPECCIÓN", { tam: 7.5, despues: 9 });
+  h.texto(v.numero, { tam: 22, fuente: f.negrita, color: VERDE, interlinea: 26, despues: 16 });
+
+  /* EL ALCANCE VA ANTES DE LOS HALLAZGOS, igual que en el papel y por la misma
+     razón que el concepto del triaje pone su aviso arriba: quien lee tiene que
+     saber qué NO es esto antes de leer qué se vio. */
+  avisoEnCaja(h, f, "Alcance y limitaciones. " + INSPECCION_ALCANCE);
+  h.salto(10);
+
+  seccion(h, f, "I", "LA VIVIENDA");
+  h.fila("Municipio", v.municipio || "-");
+  if (v.direccion) h.fila("Dirección / vereda", v.direccion);
+  if (v.casa_no)   h.fila("Casa N.º", v.casa_no);
+  h.fila("Fecha de la visita", v.fecha_visita || "-");
+  if (v.hora)        h.fila("Hora", v.hora);
+  if (v.propietario) h.fila("Propietario / habitante", v.propietario);
+  if (v.contacto)    h.fila("Contacto", v.contacto);
+  if (v.caso)        h.fila("Caso del triaje", v.caso);
+  h.salto(12);
+
+  seccion(h, f, "II", "OBSERVACIONES");
+  h.texto("RE = requiere revisión especializada  ·  Obs = observación a documentar  ·  " +
+          "S/O = sin observación aparente", { tam: 8, color: GRIS, despues: 12 });
+
+  /* Solo se imprime lo que se MARCÓ. Un documento con 26 renglones donde 20
+     dicen «sin marcar» esconde los 6 que importan, y el papel se llenaba a mano
+     precisamente marcando. Lo no marcado se declara al final con su cuenta, que
+     es un dato distinto y honesto. */
+  let marcados = 0, sinMarcar = 0;
+  for (const sec of INSPECCION_SECCIONES) {
+    const conMarca = sec.items.filter((it) => v.respuestas && v.respuestas[it.id] && v.respuestas[it.id].m);
+    sinMarcar += sec.items.length - conMarca.length;
+    if (!conMarca.length) continue;
+    h.reservar(46);
+    h.texto(sec.n + ". " + sec.titulo.toUpperCase(),
+      { tam: 9, fuente: f.negrita, color: TINTA, despues: 6 });
+    for (const it of conMarca) {
+      const r = v.respuestas[it.id];
+      marcados++;
+      const etiqueta = r.m === "RE" ? "[RE] " : r.m === "OBS" ? "[Obs] " : "[S/O] ";
+      h.reservar(30);
+      h.texto(etiqueta + it.id + "  " + it.t, {
+        tam: 9.5, fuente: r.m === "RE" ? f.negrita : f.normal,
+        color: TINTA, interlinea: 13, despues: 3
+      });
+      if (r.obs)   h.texto("Observación: " + r.obs, { tam: 9, color: GRIS, interlinea: 12.5, despues: 2, x: MG.izq + 14 });
+      if (r.fotos) h.texto("Foto N.º " + r.fotos, { tam: 9, color: GRIS, despues: 2, x: MG.izq + 14 });
+      h.salto(6);
+    }
+    h.salto(6);
+  }
+  if (!marcados) {
+    h.texto("No se marcó ningún elemento en la visita.", { tam: 9.5, color: GRIS, despues: 8 });
+  }
+  if (sinMarcar) {
+    h.texto("Elementos del listado sin marcar en esta visita: " + sinMarcar + " de " +
+            (marcados + sinMarcar) + ".", { tam: 8.5, color: GRIS, despues: 10 });
+  }
+
+  seccion(h, f, "III", "CONCLUSIÓN");
+  h.fila("¿Requiere revisión especializada?", v.requiere_esp ? "SÍ" : "NO");
+  h.salto(10);
+  h.texto("Recomendación. " + INSPECCION_RECOMENDACION,
+    { tam: 9.5, interlinea: 13.5, despues: 16 });
+
+  seccion(h, f, "IV", "FIRMAS");
+  h.texto(INSPECCION_CONSENT, { tam: 9, color: GRIS, interlinea: 12.5, despues: 16 });
+
+  await bloqueFirma(pdf, h, f, "Quien realizó la observación",
+    v.obs_nombre, v.obs_cc, v.obs_matricula, firmas && firmas.obs, null);
+  await bloqueFirma(pdf, h, f, "Propietario / habitante",
+    v.propietario, v.hab_cc, null, firmas && firmas.hab, v.firma_hab_motivo);
+
+  h.salto(6);
+  h.texto("El concepto estructural definitivo (reparar / reforzar / demoler) y el diseño de " +
+          "reconstrucción se emiten en documento independiente firmado por el ingeniero " +
+          "responsable con matrícula profesional.",
+    { tam: 8.5, color: GRIS, interlinea: 12, despues: 6 });
+
+  h.cerrarPie(v.numero);
+  return await pdf.save();
+}
+
+/* Un bloque de firma: la imagen si existe, o el motivo por el que no. NUNCA una
+   línea en blanco: en un documento firmado, un espacio vacío no distingue «no
+   pudo firmar» de «no autorizó», y son cosas opuestas. */
+async function bloqueFirma(pdf, h, f, rol, nombre, cc, matricula, pngBytes, motivo) {
+  h.reservar(112);
+  const yBase = h.y;
+
+  if (pngBytes && pngBytes.length) {
+    try {
+      const img = await pdf.embedPng(pngBytes);
+      /* Se escala para caber en 190x52 sin deformar: una firma estirada deja de
+         parecerse a la de la persona. */
+      const esc = Math.min(190 / img.width, 52 / img.height, 1);
+      h.p.drawImage(img, {
+        x: MG.izq + 2, y: yBase - 52, width: img.width * esc, height: img.height * esc
+      });
+    } catch {
+      h.texto("[la firma no se pudo incrustar]", { tam: 8.5, color: GRIS, despues: 0 });
+    }
+  } else {
+    h.texto("Sin firma. Motivo declarado por quien observó: " + (motivo || "no se registró"),
+      { tam: 9, fuente: f.cursiva, color: SUAVE, interlinea: 12.5, despues: 0 });
+  }
+
+  h.y = yBase - 58;
+  h.regla({ ancho: 210, grueso: 0.9, despues: 8 });
+  h.texto(rol, { tam: 8, fuente: f.negrita, color: GRIS, despues: 3 });
+  h.texto("Nombre: " + (nombre || "-"), { tam: 9, despues: 2 });
+  h.texto("C.C.: " + (cc || "-"), { tam: 9, despues: matricula ? 2 : 14 });
+  if (matricula) h.texto("Matrícula profesional: " + matricula, { tam: 9, despues: 14 });
+}
+
 export async function certificado(c, hoyISO) {
   const { pdf, hoja: h, f } = await abrir(
     "Certificado de donación " + c.numero,
