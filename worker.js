@@ -5073,6 +5073,36 @@ async function adminOfrecimientos(env) {
 
    Los voluntarios llevaban desde la Fase 3 entrando a la base sin bandeja: solo
    existía el contador del resumen, que dice cuántos hay y no quiénes son. */
+/* GET /api/admin/inspecciones — lo que la brigada necesita ver de un vistazo.
+   NO devuelve las respuestas completas: 26 ítems por fila harían la carga
+   pesada y la tabla ilegible, y para eso está el PDF. Sí devuelve las CUENTAS
+   —cuántos RE, cuántas observaciones— porque es lo que decide a cuál entrar. */
+async function adminInspecciones(env) {
+  const r = await env.DB.prepare(
+    "SELECT numero, caso, municipio, direccion, casa_no, fecha_visita, hora, " +
+    "obs_nombre, obs_matricula, propietario, contacto, requiere_esp, " +
+    "firma_hab_key, firma_hab_motivo, pdf_key, respuestas, " +
+    "substr(creado_en,1,16) AS creado_en, substr(recibido_en,1,16) AS recibido_en " +
+    "FROM inspecciones ORDER BY requiere_esp DESC, recibido_en DESC LIMIT 300"
+  ).all();
+
+  const filas = (r.results || []).map((v) => {
+    let marcas = { RE: 0, OBS: 0, SO: 0 };
+    try {
+      const resp = JSON.parse(v.respuestas || "{}");
+      for (const k of Object.keys(resp)) {
+        if (k.charAt(0) === "_") continue;          /* `_local_id` no es un ítem */
+        const m = resp[k] && resp[k].m;
+        if (m && marcas[m] != null) marcas[m]++;
+      }
+    } catch { /* una fila con JSON roto no puede tumbar la bandeja entera */ }
+    /* `respuestas` NO viaja al panel: pesa y no se usa en la tabla. */
+    const { respuestas, ...resto } = v;
+    return { ...resto, marcas };
+  });
+  return json({ inspecciones: filas });
+}
+
 async function adminInscripciones(env) {
   const r = await env.DB.prepare(
     "SELECT id, tipo, estado, nombre, email, telefono, ciudad, datos, creada_en " +
@@ -5786,6 +5816,29 @@ duplicados y pruebas— y todo se puede reabrir.</p>
 </tr></thead><tbody id="cs-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
 </table></div>
 <div id="cs-dlg" style="display:none;margin-top:20px"></div>
+
+<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Inspecciones en terreno</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">La visita en persona, que es
+<strong>otra cosa</strong> que el triaje: el triaje mira fotos a distancia y ordena la fila; esto lo
+llena un ingeniero parado en la casa, con el habitante delante. Se llena <strong>sin internet</strong>
+y puede llegar días después, así que la fecha de la visita y la de recepción son distintas a
+propósito.</p>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Ordenadas poniendo primero las
+que <strong>requieren revisión especializada</strong>, que son las que hay que mirar hoy. La columna
+<strong>RE / Obs</strong> dice cuántos elementos se marcaron de cada tipo — para saber a cuál entrar
+sin abrir todos los PDF.</p>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Si dice <strong>«sin firma»</strong>
+NO significa que no autorizara: significa que no pudo firmar, y al lado está el motivo que el
+ingeniero escribió. Un espacio en blanco no distingue esas dos cosas, por eso el motivo es
+obligatorio. Y el <strong>PDF está congelado</strong>: es el documento que esa persona firmó y no se
+regenera nunca.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Inspección</th><th scope="col">Dónde</th><th scope="col">Visita</th>
+<th scope="col">Quién observó</th><th scope="col">RE / Obs</th><th scope="col">Firma del habitante</th>
+<th scope="col">Documento</th>
+</tr></thead><tbody id="ins-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
+</table></div>
 
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
@@ -6593,6 +6646,57 @@ function accionesMatricula(i, x){
        + '</div>';
 }
 
+function cargarInspecciones(){
+  fetch("/api/admin/inspecciones").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("ins-filas"); if (!tb) return;
+    var l = d.inspecciones || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no ha llegado ninguna inspección de terreno.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(v){
+      var m = v.marcas || {};
+      /* El conteo de RE va en negrita cuando hay alguno: es el dato que decide
+         si esta fila se mira hoy o mañana. */
+      var cuentas = (m.RE ? "<strong>" + m.RE + " RE</strong>" : "0 RE")
+                  + " · " + (m.OBS || 0) + " Obs · " + (m.SO || 0) + " S/O";
+
+      /* «Sin firma» NO es «no autorizó». El motivo va al lado, siempre, porque
+         sin él las dos cosas se leen igual. */
+      var firma = v.firma_hab_key
+        ? "firmó"
+        : '<span style="color:var(--amber)">sin firma</span>'
+          + (v.firma_hab_motivo ? "<br><small>" + esc(v.firma_hab_motivo) + "</small>"
+                                : "<br><small>sin motivo registrado</small>");
+
+      var doc = v.pdf_key
+        ? '<a href="/api/triage/inspeccion/' + esc(v.numero) + '.pdf" target="_blank" rel="noopener">Ver PDF</a>'
+        : '<span style="color:var(--err)">sin documento</span>';
+
+      /* Las dos fechas se enseñan JUNTAS cuando no coinciden: es lo que revela
+         que el reporte se llenó sin señal y llegó después, y confundirlas haría
+         parecer del viernes un recorrido del martes. */
+      var visita = esc(v.fecha_visita || "-") + (v.hora ? " " + esc(v.hora) : "");
+      var recib = (v.recibido_en || "").slice(0,10);
+      if (recib && v.fecha_visita && recib !== v.fecha_visita) {
+        visita += "<br><small>recibida el " + esc(recib) + "</small>";
+      }
+
+      return "<tr>" +
+        "<td><strong>" + esc(v.numero) + "</strong>" +
+          (v.caso ? "<br><small>" + esc(v.caso) + "</small>" : "") +
+          (v.requiere_esp ? '<br><small style="color:var(--amber)"><strong>requiere revisión especializada</strong></small>' : "") + "</td>" +
+        "<td>" + esc(v.municipio || "-") +
+          (v.casa_no ? "<br><small>casa " + esc(v.casa_no) + "</small>" : "") +
+          (v.direccion ? "<br><small>" + esc(v.direccion) + "</small>" : "") + "</td>" +
+        "<td>" + visita + "</td>" +
+        "<td>" + esc(v.obs_nombre || "-") +
+          (v.obs_matricula ? "<br><small>mat. " + esc(v.obs_matricula) + "</small>" : "") + "</td>" +
+        "<td>" + cuentas + "</td>" +
+        "<td>" + firma + "</td>" +
+        "<td>" + doc + "</td>" +
+      "</tr>";
+    }).join("");
+  });
+}
+
 function cargarOfrecimientos(){
   fetch("/api/admin/ofrecimientos").then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("o-filas"); if (!tb) return;
@@ -6703,6 +6807,7 @@ document.addEventListener("click", function(e){
     method: "POST", headers: {"content-type":"application/json"},
     body: JSON.stringify({ estado: b.getAttribute("data-e") })
   }).then(function(r){ return r.json(); }).then(function(){ cargarOfrecimientos();
+cargarInspecciones();
 cargarInscripciones(); cargarReportadas(); cargar(); })
     .catch(function(){ cargarOfrecimientos(); cargarInscripciones(); });
 });
@@ -7261,6 +7366,7 @@ export default {
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
+        if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env);
         if (ruta === "/api/admin/miembros") return await adminMiembros(env);
         if (ruta === "/api/admin/reportadas") return await adminReportadas(env);
         const rc = ruta.match(/^\/api\/admin\/comprobante\/(GG-\d{4}-\d{6})$/i);
