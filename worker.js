@@ -188,12 +188,18 @@ async function verificarAccess(request, env, audsValidos) {
      de Access del mismo equipo serviría para entrar aquí. */
   const auds = Array.isArray(carga.aud) ? carga.aud : [carga.aud];
   if (!auds.some((a) => aceptados.includes(a))) return { ok: false, motivo: "aud_no_coincide" };
+  /* CUÁL audiencia validó, no solo que alguna lo hiciera. La asimetría entre el
+     panel y el triaje ya estaba en el esquema —el triaje acepta las dos, el
+     panel solo la suya— pero la sesión no la exponía, así que un endpoint del
+     triaje no podía saber si quien pregunta es del equipo o un voluntario. Sin
+     ese dato, el PDF de la inspección se le servía a cualquiera. */
+  const audEquipo = auds.includes(env.ACCESS_AUD);
   if (carga.iss !== "https://" + team) return { ok: false, motivo: "emisor_no_coincide" };
   const ahora = Math.floor(Date.now() / 1000);
   if (carga.exp && carga.exp < ahora) return { ok: false, motivo: "token_expirado" };
   if (carga.nbf && carga.nbf > ahora + 60) return { ok: false, motivo: "token_futuro" };
 
-  return { ok: true, email: carga.email || carga.sub || "?" };
+  return { ok: true, email: carga.email || carga.sub || "?", equipo: audEquipo };
 }
 
 /* ========================================================================
@@ -2859,6 +2865,58 @@ function firmaABytes(dataUri) {
   return b;
 }
 
+/* Los ids válidos y las marcas válidas, DERIVADOS del catálogo único. No se
+   escriben a mano aquí: si los ingenieros corrigen la lista, esto la sigue. */
+const INSP_IDS = new Set(INSPECCION_SECCIONES.flatMap((s) => s.items.map((i) => i.id)));
+const INSP_MARCAS_OK = new Set(["RE", "OBS", "SO"]);
+
+/* Las respuestas llegaban del teléfono y entraban tal cual a la base y al PDF,
+   sin una sola comprobación, mientras TODOS los demás campos del handler pasan
+   por `limpiar()`. Dos cosas malas salían de ahí:
+
+     · Una marca desconocida —`{"m":"XX"}`— caía al último ramal del ternario del
+       PDF y se imprimía como «[S/O]», o sea «sin observación aparente», sobre un
+       muro que el ingeniero había marcado. El documento afirmaba lo contrario de
+       lo observado y nadie lo notaba.
+     · `obs` no tenía tope: megabytes de texto a D1 y al PDF.
+
+   Se descarta lo que no reconoce, en vez de intentar adivinarlo: en un documento
+   que alguien firma, un dato dudoso vale menos que su ausencia. */
+function limpiarRespuestas(entrada) {
+  const salida = {};
+  if (!entrada || typeof entrada !== "object") return salida;
+  let n = 0;
+  for (const id of Object.keys(entrada)) {
+    if (n >= INSP_IDS.size) break;          /* nunca más ítems que el catálogo */
+    if (!INSP_IDS.has(id)) continue;
+    const r = entrada[id];
+    if (!r || typeof r !== "object") continue;
+    const m = String(r.m || "").toUpperCase();
+    if (!INSP_MARCAS_OK.has(m)) continue;   /* sin marca válida no es respuesta */
+    salida[id] = { m, obs: limpiar(r.obs, 1200), fotos: limpiar(r.fotos, 60) };
+    n++;
+  }
+  return salida;
+}
+
+/* La hora del teléfono, comprobada. El comentario de antes decía que una fecha
+   «absurda» se sustituía por la del servidor, y era falso: `limpiar()` solo
+   recorta, así que pasaba cualquier cadena —incluido «no soy una fecha», que la
+   columna TEXT acepta y la bandeja del panel enseñaba cruda.
+
+   Se exige el formato exacto y un rango con sentido: no antes del sismo (10 ago
+   2026), no más de un día en el futuro. Un teléfono cuyo reloj se reinició en la
+   vereda cae fuera y se usa la hora del servidor. */
+function fechaTelefono(valor) {
+  const t = limpiar(valor, 19);
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(t)) return null;
+  const ms = Date.parse(t.replace(" ", "T") + "Z");
+  if (!Number.isFinite(ms)) return null;
+  const sismo = Date.parse("2026-08-10T00:00:00Z");
+  if (ms < sismo || ms > Date.now() + 86400000) return null;
+  return t;
+}
+
 async function triageInspeccionRecibir(request, env, email) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -2908,7 +2966,7 @@ async function triageInspeccionRecibir(request, env, email) {
                   ayuda: "Si el habitante no pudo firmar, escribe por qué. Un espacio en blanco no distingue «no pudo» de «no autorizó»." }, 422);
   }
 
-  const respuestas = (c.respuestas && typeof c.respuestas === "object") ? c.respuestas : {};
+  const respuestas = limpiarRespuestas(c.respuestas);
   respuestas._local_id = localId;
 
   const numero = await siguienteInspeccion(env, new Date().getUTCFullYear());
@@ -2925,6 +2983,13 @@ async function triageInspeccionRecibir(request, env, email) {
     await env.MEDIA.put(claveHab, firmaHab, { httpMetadata: { contentType: "image/png" } });
   }
 
+  /* El SELECT de arriba ataja el caso normal, pero NO es atómico: dos
+     peticiones con el mismo `local_id` pueden pasarlo las dos antes de que
+     ninguna inserte. El índice único de la 0013 es lo que cierra esa ventana, y
+     aquí se trata su choque como lo que es: no un error, sino la confirmación
+     de que la inspección ya está guardada. Se devuelve su número y el teléfono
+     la borra de su cola tranquilo. */
+  try {
   await env.DB.prepare(
     "INSERT INTO inspecciones (numero, caso, proyecto, casa_no, direccion, municipio, " +
     "fecha_visita, hora, obs_nombre, obs_cc, obs_matricula, obs_email, propietario, contacto, " +
@@ -2940,12 +3005,23 @@ async function triageInspeccionRecibir(request, env, email) {
     limpiar(c.hab_cc, 40) || null,
     JSON.stringify(respuestas), c.requiere_esp ? 1 : 0, 1,
     claveObs, claveHab, motivoHab || null,
-    /* `creado_en` es la hora DEL TELÉFONO, cuando se llenó. Si no llega o es
-       absurda se usa la del servidor, pero jamás se sobreescribe una válida:
-       la fecha del documento tiene que ser la de la visita. */
-    limpiar(c.creado_en, 19) || new Date().toISOString().slice(0, 19).replace("T", " "),
+    /* `creado_en` es la hora DEL TELÉFONO, cuando se llenó. Si no llega, no
+       tiene el formato o cae fuera de rango, se usa la del servidor — pero
+       jamás se sobreescribe una válida: la fecha del documento tiene que ser la
+       de la visita. Ver `fechaTelefono`. */
+    fechaTelefono(c.creado_en) || new Date().toISOString().slice(0, 19).replace("T", " "),
     limpiar(c.dispositivo, 120) || null
   ).run();
+  } catch (e) {
+    const msg = String((e && e.message) || "");
+    if (/UNIQUE|constraint/i.test(msg)) {
+      const otra = await env.DB.prepare(
+        "SELECT numero FROM inspecciones WHERE json_extract(respuestas, '$._local_id') = ?"
+      ).bind(localId).first();
+      if (otra) return json({ ok: true, numero: otra.numero, repetida: true });
+    }
+    throw e;
+  }
 
   /* EL PDF SE GENERA AQUÍ Y SE CONGELA. Va DESPUÉS del INSERT a propósito: si
      armarlo fallara, lo que no se puede perder es la inspección —alguien la
@@ -2957,7 +3033,7 @@ async function triageInspeccionRecibir(request, env, email) {
   try {
     const bytes = await inspeccionPDF(
       {
-        numero, caso: limpiar(c.caso, 20) || null, municipio, direccion: limpiar(c.direccion, 240),
+        numero, caso: limpiar(c.caso, 20) || null, proyecto: limpiar(c.proyecto, 120), municipio, direccion: limpiar(c.direccion, 240),
         casa_no: limpiar(c.casa_no, 40), fecha_visita: fecha, hora: limpiar(c.hora, 8),
         propietario: limpiar(c.propietario, 160), contacto: limpiar(c.contacto, 80),
         obs_nombre: obsNombre, obs_cc: limpiar(c.obs_cc, 40), obs_matricula: limpiar(c.obs_matricula, 60),
@@ -2977,13 +3053,78 @@ async function triageInspeccionRecibir(request, env, email) {
   return json({ ok: true, numero, repetida: false });
 }
 
+/* POST /api/admin/inspeccion/<numero>/pdf — emitir el documento que faltó.
+   El PDF se genera después del INSERT a propósito, para que un fallo al armarlo
+   no pierda una visita. Pero antes NO había forma de emitirlo después: la
+   familia había firmado algo que no existía como PDF y el único camino era
+   reconstruirlo a mano contra la base.
+
+   SOLO SI FALTA. Si ya hay uno, se responde 409 y no se toca: está congelado
+   porque alguien lo firmó, y regenerarlo podría producir un documento distinto
+   del que esa persona vio. Emitir el que falta no rompe esa regla; rehacer el
+   que existe, sí. */
+async function adminInspeccionEmitirPDF(request, env, numero) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const v = await env.DB.prepare("SELECT * FROM inspecciones WHERE numero = ?").bind(numero).first();
+  if (!v) return json({ error: "no_encontrada" }, 404);
+  if (v.pdf_key) {
+    return json({ error: "ya_existe",
+                  ayuda: "Este documento ya se emitió y está congelado. No se regenera: alguien lo firmó." }, 409);
+  }
+
+  /* Las firmas se recuperan de R2, que es donde quedaron aunque el PDF fallara
+     — por eso se escriben ANTES de la fila. */
+  const traer = async (clave) => {
+    if (!clave) return null;
+    const o = await env.MEDIA.get(clave);
+    if (!o) return null;
+    return new Uint8Array(await o.arrayBuffer());
+  };
+  const firmaObs = await traer(v.firma_obs_key);
+  if (!firmaObs) {
+    return json({ error: "sin_firma_del_observador",
+                  ayuda: "No está su firma en el almacén, así que el documento no se puede emitir tal como se firmó." }, 409);
+  }
+  const firmaHab = await traer(v.firma_hab_key);
+
+  let respuestas = {};
+  try { respuestas = JSON.parse(v.respuestas || "{}"); } catch { respuestas = {}; }
+
+  const bytes = await inspeccionPDF(
+    { ...v, respuestas }, { obs: firmaObs, hab: firmaHab },
+    new Date().toISOString().slice(0, 10)
+  );
+  const clave = "inspecciones/" + numero + "/inspeccion.pdf";
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: "application/pdf" } });
+  await env.DB.prepare("UPDATE inspecciones SET pdf_key = ? WHERE numero = ?").bind(clave, numero).run();
+  return json({ ok: true, numero, bytes: bytes.length });
+}
+
 /* GET /api/triage/inspeccion/<numero>.pdf — sirve el PDF CONGELADO desde R2.
    No lo regenera nunca: alguien lo firmó. Si falta, se dice que falta en vez de
    armar uno nuevo que podría no coincidir con el que se firmó. */
-async function triageInspeccionPDF(env, numero) {
-  const v = await env.DB.prepare("SELECT numero, pdf_key FROM inspecciones WHERE numero = ?")
+async function triageInspeccionPDF(env, numero, sesion) {
+  const v = await env.DB.prepare("SELECT numero, pdf_key, obs_email FROM inspecciones WHERE numero = ?")
     .bind(numero).first();
-  if (!v) return json({ error: "no_encontrada" }, 404);
+
+  /* QUIÉN PUEDE VER ESTE DOCUMENTO. El equipo (audiencia del panel) ve todas:
+     es su trabajo coordinar las visitas. Un ingeniero voluntario ve SOLO las que
+     él firmó.
+
+     Antes no había ninguna comprobación, y era un agujero de fondo: el PDF lleva
+     nombre, cédula, dirección, contacto y la FIRMA del habitante, y los
+     consecutivos son adivinables. Con cien voluntarios aprobados, cien personas
+     podían bajarse los datos personales y la firma de todas las familias. Y
+     contradecía la regla que el propio proyecto ya tenía escrita: el ingeniero
+     no ve contacto ni dirección, por eso `/triaje` se los oculta.
+
+     El MISMO 404 exista o no la inspección, y por la misma razón que el recibo
+     de donación: distinguirlos convertiría esto en un oráculo para saber cuántas
+     inspecciones hay y de quién. */
+  const suya = v && sesion && sesion.email &&
+               String(v.obs_email || "").toLowerCase() === String(sesion.email).toLowerCase();
+  const puede = v && ((sesion && sesion.equipo) || suya);
+  if (!puede) return json({ error: "no_encontrada" }, 404);
   if (!v.pdf_key) return json({ error: "pdf_no_generado", ayuda: "La inspección llegó pero su documento no se pudo armar. Avisa al equipo." }, 409);
   const obj = await env.MEDIA.get(v.pdf_key);
   if (!obj) return json({ error: "pdf_no_encontrado" }, 404);
@@ -3085,6 +3226,7 @@ function leerFormulario(){
   var cons = document.querySelector("[data-cons][aria-pressed=true]");
   return {
     local_id: ACTUAL,
+    proyecto: val("f-proy"),
     municipio: val("f-muni"), fecha_visita: val("f-fecha"), hora: val("f-hora"),
     casa_no: val("f-casa"), direccion: val("f-dir"), caso: val("f-caso"),
     obs_nombre: val("f-obs"), obs_matricula: val("f-mat"), obs_cc: val("f-cc"),
@@ -3202,12 +3344,21 @@ function enviarUno(reg){
   }).catch(function(){ return { estado: "reintentar" }; });
 }
 
+/* UNA SOLA CORRIDA A LA VEZ. Se llama desde el botón «Enviar» y desde el evento
+   online: tocar el botón justo cuando vuelve la señal lanzaba DOS vaciados
+   sobre la misma cola, y los dos posteaban el mismo registro. El servidor tiene
+   su propio candado (índice único), pero dejar que el cliente dispare el choque
+   es pedirle a la base que arregle lo que aquí sobra. */
+var VACIANDO = false;
 function vaciarCola(){
+  if (VACIANDO) return Promise.resolve();
+  VACIANDO = true;
   return todos("cola").then(function(l){
-    if (!l.length) { estado(); return; }
+    if (!l.length) { VACIANDO = false; estado(); return; }
     var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false;
     function paso(){
       if (i >= l.length){
+        VACIANDO = false;
         estado();
         if (sesionCaida) aviso("Tu sesión caducó. Vuelve a entrar y toca Enviar otra vez: nada se perdió.", "mal");
         else if (malas)  aviso("Quedaron " + malas + " sin enviar por datos incompletos. Ábrelas y complétalas.", "mal");
@@ -3296,6 +3447,7 @@ function INSP_ARRANCA(secciones){
     var g = tx("perfil", "readonly").get("fijos");
     g.onsuccess = function(){
       var f = g.result; if (!f) return;
+      if (f.proyecto      && !val("f-proy")) el("f-proy").value = f.proyecto;
       if (f.municipio     && !val("f-muni")) el("f-muni").value = f.municipio;
       if (f.obs_nombre    && !val("f-obs"))  el("f-obs").value  = f.obs_nombre;
       if (f.obs_matricula && !val("f-mat"))  el("f-mat").value  = f.obs_matricula;
@@ -3382,7 +3534,7 @@ function guardarInspeccion(){
   }).then(function(){
     ACTUAL = idNuevo();
     document.querySelectorAll("input,textarea").forEach(function(x){
-      if (x.id === "f-muni" || x.id === "f-obs" || x.id === "f-mat" || x.id === "f-cc" || x.id === "f-fecha") return;
+      if (x.id === "f-proy" || x.id === "f-muni" || x.id === "f-obs" || x.id === "f-mat" || x.id === "f-cc" || x.id === "f-fecha") return;
       x.value = "";
     });
     document.querySelectorAll("[aria-pressed=true]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
@@ -3472,6 +3624,8 @@ textarea{min-height:64px;resize:vertical}
   <div class="alcance"><b>Alcance y limitaciones.</b> ${alcance}</div>
 
   <h2>Identificación</h2>
+  <label for="f-proy">Proyecto / campaña</label><input id="f-proy" autocomplete="off"
+    placeholder="Brigada sismo agosto 2026">
   <label for="f-muni">Municipio *</label><input id="f-muni" autocomplete="off">
   <label for="f-fecha">Fecha de la visita *</label><input id="f-fecha" type="date">
   <label for="f-hora">Hora</label><input id="f-hora" type="time">
@@ -6668,7 +6822,8 @@ function cargarInspecciones(){
 
       var doc = v.pdf_key
         ? '<a href="/api/triage/inspeccion/' + esc(v.numero) + '.pdf" target="_blank" rel="noopener">Ver PDF</a>'
-        : '<span style="color:var(--err)">sin documento</span>';
+        : '<span style="color:var(--err)">sin documento</span>'
+          + '<br><button class="copy" data-inspdf="' + esc(v.numero) + '">Emitirlo</button>';
 
       /* Las dos fechas se enseñan JUNTAS cuando no coinciden: es lo que revela
          que el reporte se llenó sin señal y llegó después, y confundirlas haría
@@ -6775,6 +6930,21 @@ document.addEventListener("click", function(e){
   }
   /* Copiar la matrícula: es el paso que evita teclear mal un número de siete
      cifras en el formulario del COPNIA y verificar a la persona equivocada. */
+  var ip = e.target.closest("[data-inspdf]");
+  if (ip){
+    ip.disabled = true; ip.textContent = "Emitiendo…";
+    fetch("/api/admin/inspeccion/" + encodeURIComponent(ip.getAttribute("data-inspdf")) + "/pdf",
+      { method: "POST" })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) { cargarInspecciones(); return; }
+        ip.disabled = false; ip.textContent = d.ayuda ? "No se pudo" : "No se pudo";
+        alert(d.ayuda || d.error || "No se pudo emitir el documento.");
+      })
+      .catch(function(){ ip.disabled = false; ip.textContent = "No se pudo"; });
+    return;
+  }
+
   var cm = e.target.closest("[data-mat]");
   if (cm) {
     var m = cm.getAttribute("data-mat");
@@ -7286,7 +7456,7 @@ export default {
           }});
         }
         const mp = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\.pdf$/);
-        if (mp) return await triageInspeccionPDF(env, mp[1]);
+        if (mp) return await triageInspeccionPDF(env, mp[1], sesion);
         if (ruta === "/api/triage/inspeccion") {
           return await triageInspeccionRecibir(request, env, sesion.email);
         }
@@ -7367,6 +7537,8 @@ export default {
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
         if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env);
+        const mip = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/pdf$/);
+        if (mip) return await adminInspeccionEmitirPDF(request, env, mip[1]);
         if (ruta === "/api/admin/miembros") return await adminMiembros(env);
         if (ruta === "/api/admin/reportadas") return await adminReportadas(env);
         const rc = ruta.match(/^\/api\/admin\/comprobante\/(GG-\d{4}-\d{6})$/i);
