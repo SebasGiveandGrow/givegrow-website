@@ -519,6 +519,95 @@ export async function recibo(a, hoyISO) {
    decisión no está aquí — la toma una visita y la autoridad del municipio.
    Por eso el aviso va antes que el resultado y no en letra pequeña al final.
    =========================================================================== */
+/* ===========================================================================
+   INSPECCIÓN VISUAL PRELIMINAR — el catálogo de lo que se revisa
+   ===========================================================================
+   FUENTE ÚNICA de los 26 ítems. Los lee el formulario que se llena en terreno
+   y los lee el PDF que sale de él: si estuvieran dos veces, se separarían sin
+   que nadie lo note — este repositorio ya tiene esa cicatriz con el articulado
+   del certificado, y por eso existe el check #10 del gate.
+
+   Transcrito del documento en papel «Inspección Visual Preliminar de Vivienda»,
+   sin añadir ni quitar ítems. Si los ingenieros lo corrigen, se corrige AQUÍ y
+   las dos pantallas cambian solas.
+
+   ⚠️ LOS IDENTIFICADORES SON PERMANENTES. Las respuestas se guardan en JSON
+   con esta clave (`{"3.2":{"m":"RE",…}}`), así que renumerar un ítem
+   reescribiría el significado de inspecciones ya firmadas. Para quitar uno se
+   marca `retirado:true` y se deja su hueco; para añadir, se usa un número nuevo.
+
+   LA ESCALA es la del papel y no se traduce a otra cosa:
+     RE  = requiere revisión especializada
+     OBS = observación a documentar
+     SO  = sin observación aparente
+   =========================================================================== */
+export const INSPECCION_SECCIONES = [
+  { n: "1", titulo: "Terreno y cimentación", items: [
+    { id: "1.1", t: "Grietas en el suelo, hundimientos o talud inestable cercano" },
+    { id: "1.2", t: "Pisos desnivelados / asentamientos (la casa «se corrió»)" },
+    { id: "1.3", t: "Grietas que suben desde la base del muro" },
+    { id: "1.4", t: "Humedad o socavación por agua en la base" }
+  ]},
+  { n: "2", titulo: "Estructura (columnas, vigas, nudos, placas)", items: [
+    { id: "2.1", t: "Columnas: grietas diagonales, en X o con acero expuesto" },
+    { id: "2.2", t: "Vigas: fisuras a 45°, pandeo o desprendimiento de recubrimiento" },
+    { id: "2.3", t: "Nudos viga-columna dañados" },
+    { id: "2.4", t: "Placa / entrepiso: fisuras pasantes o deflexión visible" },
+    { id: "2.5", t: "Acero de refuerzo expuesto, corroído o pandeado" }
+  ]},
+  { n: "3", titulo: "Muros", items: [
+    { id: "3.1", t: "Identificar si es portante o divisorio (anotar en observaciones)" },
+    { id: "3.2", t: "Grietas pasantes (atraviesan el muro) o diagonales / escalonadas" },
+    { id: "3.3", t: "Muro fuera de plomo (desplomado) o abombado" },
+    { id: "3.4", t: "Separación muro-estructura o muro-muro en esquinas" },
+    { id: "3.5", t: "Muros en tapia / adobe / bahareque (mayor vulnerabilidad)" }
+  ]},
+  { n: "4", titulo: "Cubierta", items: [
+    { id: "4.1", t: "Estructura de soporte (cerchas/correas): pudrición, comején, desplazamiento" },
+    { id: "4.2", t: "Anclajes de la cubierta a los muros (riesgo de soltarse)" },
+    { id: "4.3", t: "Tejas rotas/desplazadas y filtraciones activas" }
+  ]},
+  { n: "5", titulo: "Cielo raso y pisos", items: [
+    { id: "5.1", t: "Cielo raso: abombamiento, manchas de humedad, riesgo de caída" },
+    { id: "5.2", t: "Pisos: hundimientos o baldosa fracturada en línea (sigue grieta inferior)" }
+  ]},
+  { n: "6", titulo: "Puertas y ventanas", items: [
+    { id: "6.1", t: "Marcos deformados / hojas que no cierran (posible movimiento estructural)" },
+    { id: "6.2", t: "Vidrios rotos o ventanas fuera de escuadra" }
+  ]},
+  { n: "7", titulo: "Instalaciones (seguridad inmediata)", items: [
+    { id: "7.1", t: "Eléctrica: cableado expuesto, humedad en tomas o tablero" },
+    { id: "7.2", t: "Gas: olor o tubería comprometida" },
+    { id: "7.3", t: "Hidrosanitaria: fugas activas o tubería rota" }
+  ]},
+  { n: "8", titulo: "Humedad / patologías", items: [
+    { id: "8.1", t: "Origen (cubierta, capilaridad, fuga) — anotar" },
+    { id: "8.2", t: "Moho, eflorescencias, pudrición de maderas" }
+  ]}
+];
+
+export const INSPECCION_MARCAS = { RE: "Requiere revisión especializada", OBS: "Observación a documentar", SO: "Sin observación aparente" };
+
+/* Los textos de alcance y de descargo van AQUÍ y no en el generador del PDF,
+   porque el formulario tiene que enseñárselos al habitante ANTES de que firme.
+   Firmar un documento cuyo alcance solo aparece en el PDF que recibe después
+   no es consentir: es enterarse. Son literales del documento en papel. */
+export const INSPECCION_ALCANCE =
+  "Esta revisión es una inspección visual, preliminar y no destructiva. No incluye ensayos de " +
+  "materiales, apiques ni cálculos estructurales. No constituye certificación de sismo-resistencia " +
+  "ni garantía de habitabilidad. Las observaciones corresponden únicamente al estado aparente a la " +
+  "fecha de la visita y pueden variar por réplicas, lluvias u otros eventos. El concepto estructural " +
+  "definitivo y el diseño de intervención son responsabilidad de un ingeniero con matrícula " +
+  "profesional, en documento aparte.";
+
+export const INSPECCION_RECOMENDACION =
+  "Se recomienda evaluación estructural detallada por ingeniero con matrícula profesional antes de " +
+  "habitar o intervenir la vivienda. Este documento no autoriza ni prohíbe la ocupación del inmueble.";
+
+export const INSPECCION_CONSENT =
+  "El propietario / habitante autoriza la visita y declara entender que esta revisión es preliminar, " +
+  "visual y no vinculante, y que no constituye garantía de habitabilidad.";
+
 export async function informeTriage(c, hoyISO) {
   const { pdf, hoja: h, f } = await abrir(
     "Concepto técnico preliminar " + c.numero,
