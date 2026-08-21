@@ -7311,6 +7311,33 @@ export default {
       return Response.redirect(new URL("/admin" + ruta, url).toString(), 301);
     }
 
+    /* EL TRIAJE NO EXISTE EN EL SUBDOMINIO, y hasta hoy eso era un callejón sin
+       salida: `miramicasa.…/triaje` respondía 403 y ahí se acababa. La
+       aplicación de Cloudflare Access cubre el ÁPEX y está en su tope de
+       hostnames, así que la pantalla del ingeniero vive allá y no se puede
+       mudar. Pero un 403 no se lo explica a nadie.
+
+       Le pasó a `/ruta` por lo mismo y se resolvió igual: redirigir en vez de
+       dejar morir el enlace. Va FUERA del guardián de Access —dentro nunca se
+       alcanzaría— y conserva la ruta completa, así que
+       `miramicasa.…/triaje/inspeccion` aterriza en el formulario del ápex y no
+       en su portada.
+
+       Importa hoy y no en abstracto: en terreno alguien va a escribir el
+       subdominio, que es el nombre que la familia conoce, y toparse con un 403
+       en mitad de una jornada sin señal buena no se recupera. */
+    if (HOST_MMC.test(url.hostname) && (ruta === "/triaje" || ruta.startsWith("/triaje/") || ruta === "/triaje.js")) {
+      /* AL ÁPEX Y NO A `ORIGIN`, que lleva www. Comprobado hoy: la aplicación de
+         Access vive sobre el ápex; `www` responde con su propia redirección al
+         ápex y solo entonces entra Access. Usar www funcionaría con DOS saltos y
+         apoyándose en esa redirección intermedia — para la herramienta que
+         alguien abre en la calle, con señal mala, prefiero un salto y ninguna
+         dependencia de más. Se deriva de la misma constante para no tener dos
+         cadenas de host que puedan separarse. */
+      const apex = ORIGIN.replace("://www.", "://");
+      return Response.redirect(new URL(ruta + url.search, apex).toString(), 301);
+    }
+
     /* EL TRIAJE VIVE EN MIRA MI CASA. `/caso/<n>?t=` es la página de la familia
        y la única ruta de PATH del triaje, así que es la única que el Worker
        puede mudar — las de hash (`#vivienda`, `#ingenieros`, `#casas`) no las ve
