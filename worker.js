@@ -31,7 +31,7 @@
       gravedad de juramento. El armado vive en documentos.js.
 */
 
-import { recibo, certificado, informeTriage,
+import { recibo, certificado, informeTriage, inspeccionPDF,
          INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT } from "./documentos.js";
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
@@ -2947,7 +2947,53 @@ async function triageInspeccionRecibir(request, env, email) {
     limpiar(c.dispositivo, 120) || null
   ).run();
 
+  /* EL PDF SE GENERA AQUÍ Y SE CONGELA. Va DESPUÉS del INSERT a propósito: si
+     armarlo fallara, lo que no se puede perder es la inspección —alguien la
+     llenó en una casa y el habitante ya se despidió en la puerta—. Un documento
+     que falta se puede volver a generar; una visita, no.
+
+     Por eso el fallo se registra y no tumba la respuesta: el teléfono recibe su
+     número y borra la inspección de su cola, que es lo correcto. */
+  try {
+    const bytes = await inspeccionPDF(
+      {
+        numero, caso: limpiar(c.caso, 20) || null, municipio, direccion: limpiar(c.direccion, 240),
+        casa_no: limpiar(c.casa_no, 40), fecha_visita: fecha, hora: limpiar(c.hora, 8),
+        propietario: limpiar(c.propietario, 160), contacto: limpiar(c.contacto, 80),
+        obs_nombre: obsNombre, obs_cc: limpiar(c.obs_cc, 40), obs_matricula: limpiar(c.obs_matricula, 60),
+        hab_cc: limpiar(c.hab_cc, 40), respuestas, requiere_esp: c.requiere_esp ? 1 : 0,
+        firma_hab_motivo: motivoHab || null
+      },
+      { obs: firmaObs, hab: firmaHab },
+      new Date().toISOString().slice(0, 10)
+    );
+    const clavePdf = "inspecciones/" + numero + "/inspeccion.pdf";
+    await env.MEDIA.put(clavePdf, bytes, { httpMetadata: { contentType: "application/pdf" } });
+    await env.DB.prepare("UPDATE inspecciones SET pdf_key = ? WHERE numero = ?").bind(clavePdf, numero).run();
+  } catch (e) {
+    console.error("pdf inspeccion", numero, e && e.message);
+  }
+
   return json({ ok: true, numero, repetida: false });
+}
+
+/* GET /api/triage/inspeccion/<numero>.pdf — sirve el PDF CONGELADO desde R2.
+   No lo regenera nunca: alguien lo firmó. Si falta, se dice que falta en vez de
+   armar uno nuevo que podría no coincidir con el que se firmó. */
+async function triageInspeccionPDF(env, numero) {
+  const v = await env.DB.prepare("SELECT numero, pdf_key FROM inspecciones WHERE numero = ?")
+    .bind(numero).first();
+  if (!v) return json({ error: "no_encontrada" }, 404);
+  if (!v.pdf_key) return json({ error: "pdf_no_generado", ayuda: "La inspección llegó pero su documento no se pudo armar. Avisa al equipo." }, 409);
+  const obj = await env.MEDIA.get(v.pdf_key);
+  if (!obj) return json({ error: "pdf_no_encontrado" }, 404);
+  return new Response(obj.body, { headers: {
+    "content-type": "application/pdf",
+    "content-disposition": 'inline; filename="inspeccion-' + numero + '.pdf"',
+    /* Lleva datos personales y firmas: privado y fuera de cachés compartidas. */
+    "cache-control": "private, no-store",
+    "x-robots-tag": "noindex, nofollow"
+  }});
 }
 
 /* La pantalla. Se arma en el Worker igual que /triaje, así el catálogo de los
@@ -7134,6 +7180,8 @@ export default {
             "service-worker-allowed": "/triaje/"
           }});
         }
+        const mp = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\.pdf$/);
+        if (mp) return await triageInspeccionPDF(env, mp[1]);
         if (ruta === "/api/triage/inspeccion") {
           return await triageInspeccionRecibir(request, env, sesion.email);
         }
