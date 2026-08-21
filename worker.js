@@ -2836,6 +2836,29 @@ self.addEventListener("fetch", (e) => {
 /* POST /api/triage/inspeccion — recibe una inspección llenada en terreno.
    Idempotente por `local_id`: el mismo envío dos veces devuelve el MISMO
    número y no crea una segunda fila. */
+/* Una firma llega como data URI desde el teléfono (`canvas.toDataURL`). Se
+   valida y se convierte a bytes ANTES de tocar la base: un data URI mal formado
+   o enorme no puede entrar a R2 ni dejar una fila a medias.
+
+   Solo PNG, y comprobado por su firma de formato y no por lo que diga el
+   prefijo: aceptar cualquier base64 sería aceptar un archivo arbitrario con
+   nombre de firma. */
+const FIRMA_MAX = 400 * 1024;   /* una firma real pesa 5–20 KB; 400 KB es techo de sobra */
+
+function firmaABytes(dataUri) {
+  if (typeof dataUri !== "string") return null;
+  const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(dataUri.trim());
+  if (!m) return null;
+  let bin;
+  try { bin = atob(m[1]); } catch { return null; }
+  if (!bin.length || bin.length > FIRMA_MAX) return null;
+  const b = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+  const png = [137, 80, 78, 71, 13, 10, 26, 10];
+  for (let i = 0; i < 8; i++) if (b[i] !== png[i]) return null;
+  return b;
+}
+
 async function triageInspeccionRecibir(request, env, email) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -2866,22 +2889,57 @@ async function triageInspeccionRecibir(request, env, email) {
      inspección: se le habría entrado a su casa sin permiso registrado. */
   if (!c.consent_hab) return json({ error: "consent_habitante_requerido" }, 422);
 
+  /* LAS FIRMAS. La del observador es obligatoria: es quien responde por lo que
+     escribió, y su matrícula va al documento.
+
+     La del habitante puede ser IMPOSIBLE y no por mala voluntad —herido, sin
+     saber escribir, o ausente—, así que se admite su ausencia SOLO con un
+     motivo escrito. Dejarla vacía en silencio haría que «no pudo firmar» y «no
+     autorizó» quedaran como el mismo dato, y son opuestos. Es la regla que ya
+     gobierna cerrar un caso: el motivo es obligatorio porque un caso que se va
+     sin decir por qué es indistinguible de uno perdido. */
+  const firmaObs = firmaABytes(c.firma_obs);
+  if (!firmaObs) return json({ error: "firma_observador_requerida" }, 422);
+
+  const firmaHab = firmaABytes(c.firma_hab);
+  const motivoHab = limpiar(c.firma_hab_motivo, 300);
+  if (!firmaHab && !motivoHab) {
+    return json({ error: "firma_habitante_o_motivo",
+                  ayuda: "Si el habitante no pudo firmar, escribe por qué. Un espacio en blanco no distingue «no pudo» de «no autorizó»." }, 422);
+  }
+
   const respuestas = (c.respuestas && typeof c.respuestas === "object") ? c.respuestas : {};
   respuestas._local_id = localId;
 
   const numero = await siguienteInspeccion(env, new Date().getUTCFullYear());
+
+  /* R2 ANTES DE LA FILA. Si la escritura del archivo falla, no queda una
+     inspección apuntando a una firma que no existe — el documento se emitiría
+     sin la evidencia que lo sostiene. Al revés se quema un consecutivo, y un
+     hueco en la numeración es más barato que una firma perdida. */
+  const claveObs = "inspecciones/" + numero + "/firma-observador.png";
+  await env.MEDIA.put(claveObs, firmaObs, { httpMetadata: { contentType: "image/png" } });
+  let claveHab = null;
+  if (firmaHab) {
+    claveHab = "inspecciones/" + numero + "/firma-habitante.png";
+    await env.MEDIA.put(claveHab, firmaHab, { httpMetadata: { contentType: "image/png" } });
+  }
+
   await env.DB.prepare(
     "INSERT INTO inspecciones (numero, caso, proyecto, casa_no, direccion, municipio, " +
     "fecha_visita, hora, obs_nombre, obs_cc, obs_matricula, obs_email, propietario, contacto, " +
-    "respuestas, requiere_esp, consent_hab, creado_en, dispositivo) " +
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "hab_cc, respuestas, requiere_esp, consent_hab, firma_obs_key, firma_hab_key, " +
+    "firma_hab_motivo, creado_en, dispositivo) " +
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(
     numero, limpiar(c.caso, 20) || null, limpiar(c.proyecto, 120) || null,
     limpiar(c.casa_no, 40) || null, limpiar(c.direccion, 240) || null, municipio,
     fecha, limpiar(c.hora, 8) || null, obsNombre, limpiar(c.obs_cc, 40) || null,
     limpiar(c.obs_matricula, 60) || null, email || null,
     limpiar(c.propietario, 160) || null, limpiar(c.contacto, 80) || null,
+    limpiar(c.hab_cc, 40) || null,
     JSON.stringify(respuestas), c.requiere_esp ? 1 : 0, 1,
+    claveObs, claveHab, motivoHab || null,
     /* `creado_en` es la hora DEL TELÉFONO, cuando se llenó. Si no llega o es
        absurda se usa la del servidor, pero jamás se sobreescribe una válida:
        la fecha del documento tiene que ser la de la visita. */
@@ -2988,9 +3046,79 @@ function leerFormulario(){
     respuestas: r,
     requiere_esp: esp ? esp.getAttribute("data-esp") === "1" : false,
     consent_hab: !!cons,
+    hab_cc: val("f-habcc"),
+    firma_obs: firmaDe("c-obs"),
+    firma_hab: firmaDe("c-hab"),
+    firma_hab_motivo: (el("b-nofirma") && el("b-nofirma").getAttribute("aria-pressed") === "true") ? val("f-nofirma") : "",
     creado_en: new Date().toISOString().slice(0,19).replace("T"," "),
     dispositivo: (navigator.userAgent || "").slice(0,120)
   };
+}
+
+/* ---- Firmas en lienzo ----
+   Eventos de PUNTERO y no de ratón ni de toque por separado: pointerdown/move/up
+   cubren dedo, lápiz y ratón con un solo camino, y con setPointerCapture el
+   trazo no se corta si el dedo sale del lienzo.
+
+   Y el lienzo se dimensiona por devicePixelRatio: sin eso, en un teléfono de 3x
+   la firma sale borrosa —y una firma borrosa en un documento que alguien firmó
+   es justo lo que no sirve como evidencia. */
+var FIRMAS = {};
+
+function prepararLienzo(id){
+  var c = el(id); if (!c) return;
+  var r = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  var ancho = c.clientWidth || 300;
+  c.width  = Math.round(ancho * r);
+  c.height = Math.round(150 * r);
+  var g = c.getContext("2d");
+  g.scale(r, r);
+  g.lineWidth = 2.2; g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = "#082742";
+  FIRMAS[id] = { g: g, trazos: 0, pintando: false };
+
+  c.addEventListener("pointerdown", function(e){
+    var f = FIRMAS[id];
+    c.setPointerCapture(e.pointerId);
+    f.pintando = true; f.trazos++;
+    var p = punto(c, e);
+    f.g.beginPath(); f.g.moveTo(p.x, p.y);
+    e.preventDefault();
+  });
+  c.addEventListener("pointermove", function(e){
+    var f = FIRMAS[id]; if (!f.pintando) return;
+    var p = punto(c, e);
+    f.g.lineTo(p.x, p.y); f.g.stroke();
+    e.preventDefault();
+  });
+  var soltar = function(e){
+    var f = FIRMAS[id]; if (!f.pintando) return;
+    f.pintando = false; guardarBorrador();
+    if (e && e.pointerId != null && c.hasPointerCapture(e.pointerId)) c.releasePointerCapture(e.pointerId);
+  };
+  c.addEventListener("pointerup", soltar);
+  c.addEventListener("pointercancel", soltar);
+  c.addEventListener("pointerleave", soltar);
+}
+
+function punto(c, e){
+  var b = c.getBoundingClientRect();
+  return { x: e.clientX - b.left, y: e.clientY - b.top };
+}
+
+function limpiarLienzo(id){
+  var c = el(id), f = FIRMAS[id]; if (!c || !f) return;
+  var r = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  f.g.clearRect(0, 0, c.width / r, c.height / r);
+  f.trazos = 0; guardarBorrador();
+}
+
+/* Devuelve null si NADIE trazó nada. Un lienzo en blanco convertido a PNG es un
+   archivo válido de una firma inexistente: se guardaría como si alguien hubiera
+   firmado. Se cuenta el trazo, no el pixel. */
+function firmaDe(id){
+  var f = FIRMAS[id];
+  if (!f || !f.trazos) return "";
+  return el(id).toDataURL("image/png");
 }
 
 var guardarPronto = null;
@@ -3099,6 +3227,20 @@ function INSP_ARRANCA(secciones){
   pintarSecciones();
   ACTUAL = idNuevo();
   var f = el("f-fecha"); if (f && !f.value) f.value = new Date().toISOString().slice(0,10);
+  prepararLienzo("c-obs"); prepararLienzo("c-hab");
+  /* El nombre del observador se copia al pie de su firma. No se puede escribir
+     ahí: son el mismo dato y dos casillas se separarían. */
+  var refl = function(){ if (el("f-obs2")) el("f-obs2").value = val("f-obs"); };
+  refl();
+  if (el("f-obs")) el("f-obs").addEventListener("input", refl);
+  /* Si el teléfono gira, el lienzo cambia de ancho y el trazo se deformaría.
+     Se rehace vacío y se avisa, en vez de guardar una firma estirada. */
+  window.addEventListener("orientationchange", function(){
+    setTimeout(function(){
+      prepararLienzo("c-obs"); prepararLienzo("c-hab");
+      aviso("Giraste el teléfono: las firmas se borraron. Vuelve a firmar.", "info");
+    }, 350);
+  });
 
   abrirDB().then(function(d){
     DB = d;
@@ -3147,6 +3289,18 @@ function INSP_ARRANCA(secciones){
       cons.setAttribute("aria-pressed", cons.getAttribute("aria-pressed") === "true" ? "false" : "true");
       guardarBorrador(); return;
     }
+    var lim = e.target.closest("[data-limpiar]");
+    if (lim){ limpiarLienzo(lim.getAttribute("data-limpiar")); return; }
+    var nf = e.target.closest("#b-nofirma");
+    if (nf){
+      var activo = nf.getAttribute("aria-pressed") !== "true";
+      nf.setAttribute("aria-pressed", activo ? "true" : "false");
+      el("caja-nofirma").style.display = activo ? "block" : "none";
+      /* Si no pudo firmar, se borra lo que hubiera en su lienzo: dejar un trazo
+         a medias junto a un motivo sería contradecirse en el documento. */
+      if (activo) limpiarLienzo("c-hab");
+      guardarBorrador(); return;
+    }
     if (e.target.closest("#b-prep"))  { preparar(); return; }
     if (e.target.closest("#b-cola"))  { aviso("Enviando…", "info"); vaciarCola(); return; }
     if (e.target.closest("#b-guardar")){ guardarInspeccion(); return; }
@@ -3168,6 +3322,10 @@ function guardarInspeccion(){
   if (!reg.obs_nombre)   faltan.push("tu nombre");
   if (faltan.length){ aviso("Falta: " + faltan.join(", ") + ".", "mal"); return; }
   if (!reg.consent_hab){ aviso("Falta la autorización del habitante. Léele el alcance y márcala.", "mal"); return; }
+  if (!reg.firma_obs){ aviso("Falta tu firma. Eres quien responde por lo que escribiste.", "mal"); return; }
+  if (!reg.firma_hab && !reg.firma_hab_motivo){
+    aviso("Falta la firma del habitante. Si no pudo firmar, toca «No pudo firmar» y escribe por qué.", "mal"); return;
+  }
 
   el("b-guardar").disabled = true;
   /* A LA COLA PRIMERO, y solo después se limpia la pantalla. Si se limpiara
@@ -3183,6 +3341,9 @@ function guardarInspeccion(){
     });
     document.querySelectorAll("[aria-pressed=true]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
     document.querySelectorAll(".item.abierto").forEach(function(x){ x.classList.remove("abierto"); });
+    limpiarLienzo("c-obs"); limpiarLienzo("c-hab");
+    if (el("b-nofirma")){ el("b-nofirma").setAttribute("aria-pressed","false"); el("caja-nofirma").style.display="none"; }
+    if (el("f-obs2")) el("f-obs2").value = val("f-obs");
     el("b-guardar").disabled = false;
     aviso("Guardada en el teléfono. " + (navigator.onLine ? "Enviando…" : "Se enviará sola cuando haya señal."), "bien");
     estado();
@@ -3228,9 +3389,15 @@ textarea{min-height:64px;resize:vertical}
 .marcas button.re[aria-pressed=true]{background:var(--amb);border-color:var(--amb);color:#fff}
 .detalle{margin-top:10px;display:none}
 .item.abierto .detalle{display:block}
+/* La barra se APILA: en 375 px el estado y dos botones en una fila estrangulan
+   el texto en tres líneas y encogen los botones justo donde se toca con una
+   mano. El estado va arriba, ancho completo, y los botones debajo. */
 .barra{position:fixed;left:0;right:0;bottom:0;background:var(--sup);
-  border-top:1px solid var(--bd);padding:10px 14px;display:flex;gap:10px;align-items:center}
-.barra .est{flex:1;font-size:12.5px;line-height:1.35;color:var(--mu)}
+  border-top:1px solid var(--bd);padding:8px 12px 10px;display:flex;
+  flex-direction:column;gap:7px}
+.barra .est{font-size:12.5px;line-height:1.3;color:var(--mu);text-align:center}
+.barra .fila{display:flex;gap:8px}
+.barra .fila .btn{flex:1;white-space:nowrap}
 .btn{padding:12px 16px;border-radius:6px;border:0;background:var(--az);color:#fff;
   font-size:15px;font-weight:700;cursor:pointer}
 .btn.o{background:var(--sup);color:var(--az);border:1.5px solid var(--az)}
@@ -3242,6 +3409,11 @@ textarea{min-height:64px;resize:vertical}
 .aviso.bien{background:#E6F4EC;color:var(--ok)}
 .aviso.mal{background:#FDECEA;color:var(--err)}
 .aviso.info{background:#E7EFF6;color:var(--az)}
+/* touch-action:none es lo que impide que el dedo haga scroll en vez de
+   dibujar. Sin esa línea el lienzo es inservible en un teléfono. */
+.firma{margin:8px 0;border:1px dashed var(--bd);border-radius:6px;background:#fff}
+.firma canvas{display:block;width:100%;height:150px;touch-action:none;border-radius:6px}
+.btn.mini{padding:8px 12px;font-size:13px}
 </style></head><body>
 <div class="wrap">
   <p class="ey">Give&amp;Grow International</p>
@@ -3289,13 +3461,40 @@ textarea{min-height:64px;resize:vertical}
     </div>
   </div>
 
+  <h2>Firmas</h2>
+  <p style="font-size:13px;color:var(--mu);margin:0 0 10px">
+    Léele el alcance de arriba antes de que firme. Se firma con el dedo.</p>
+
+  <div class="item">
+    <b>Quien realizó la observación</b>
+    <label for="f-obs2">Nombre</label><input id="f-obs2" disabled>
+    <div class="firma"><canvas id="c-obs" height="150"></canvas></div>
+    <button type="button" class="btn o mini" data-limpiar="c-obs">Borrar y firmar de nuevo</button>
+  </div>
+
+  <div class="item">
+    <b>Propietario / habitante</b>
+    <label for="f-habcc">Cédula</label><input id="f-habcc" inputmode="numeric" autocomplete="off">
+    <div class="firma"><canvas id="c-hab" height="150"></canvas></div>
+    <button type="button" class="btn o mini" data-limpiar="c-hab">Borrar y firmar de nuevo</button>
+    <div style="margin-top:12px">
+      <button type="button" class="btn o mini" id="b-nofirma" aria-pressed="false">No pudo firmar</button>
+      <div id="caja-nofirma" style="display:none;margin-top:8px">
+        <label for="f-nofirma">¿Por qué? (obligatorio)</label>
+        <textarea id="f-nofirma" placeholder="Está herido · no sabe escribir · no estaba en la casa"></textarea>
+      </div>
+    </div>
+  </div>
+
   <div id="msg" class="aviso"></div>
 </div>
 
 <div class="barra">
   <span class="est" id="est">—</span>
-  <button type="button" class="btn o" id="b-cola">Enviar <span class="pend" id="n-pend">0</span></button>
-  <button type="button" class="btn" id="b-guardar">Guardar inspección</button>
+  <div class="fila">
+    <button type="button" class="btn o" id="b-cola">Enviar <span class="pend" id="n-pend">0</span></button>
+    <button type="button" class="btn" id="b-guardar">Guardar inspección</button>
+  </div>
 </div>
 <script src="/triaje/inspeccion.js"></script>
 <script>INSP_ARRANCA(${seccionesJSON});</script>
