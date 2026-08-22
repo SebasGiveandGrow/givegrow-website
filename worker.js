@@ -3086,6 +3086,50 @@ async function triageInspeccionRecibir(request, env, email) {
   return json({ ok: true, numero, repetida: false });
 }
 
+/* GET /api/triage/mis-inspecciones — lo que ESTE ingeniero mandó.
+   Existe porque faltaba: el ingeniero enviaba, el contador de pendientes bajaba
+   a cero, y ahí se acababa su información. Con varios en terreno, nadie podía
+   confirmar que su trabajo llegó sin preguntarle a alguien con acceso al panel
+   — y «no me llegan» era indistinguible de «no las estoy mirando donde están».
+
+   MISMA REGLA DE PROPIEDAD QUE EL PDF: un ingeniero ve las que él firmó. El
+   equipo (audiencia del panel) ve todas, porque su trabajo es coordinarlas.
+
+   NO devuelve datos del habitante —ni nombre, ni contacto, ni cédula— aunque sea
+   su propia inspección: para confirmar que llegó no hacen falta, y esta pantalla
+   es la que el proyecto decidió mantener sin datos personales. */
+async function triageMisInspecciones(env, sesion) {
+  const email = String((sesion && sesion.email) || "");
+  const equipo = !!(sesion && sesion.equipo);
+  const r = await env.DB.prepare(
+    "SELECT numero, familia, finca, municipio, fecha_visita, requiere_esp, pdf_key, " +
+    "obs_email, respuestas, fotos, substr(recibido_en,1,16) AS recibido_en " +
+    "FROM inspecciones " +
+    (equipo ? "" : "WHERE lower(obs_email) = lower(?) ") +
+    "ORDER BY recibido_en DESC LIMIT 100"
+  ).bind(...(equipo ? [] : [email])).all();
+
+  const filas = (r.results || []).map((v) => {
+    let marcas = { RE: 0, OBS: 0, SO: 0 }, fotos = 0;
+    try {
+      const resp = JSON.parse(v.respuestas || "{}");
+      for (const k of Object.keys(resp)) {
+        if (k.charAt(0) === "_") continue;
+        const m = resp[k] && resp[k].m;
+        if (m && marcas[m] != null) marcas[m]++;
+      }
+    } catch { /* una fila con JSON roto no tumba la lista */ }
+    try { const f = JSON.parse(v.fotos || "[]"); fotos = Array.isArray(f) ? f.length : 0; } catch { fotos = 0; }
+    return {
+      numero: v.numero, familia: v.familia, finca: v.finca, municipio: v.municipio,
+      fecha_visita: v.fecha_visita, requiere_esp: v.requiere_esp, recibido_en: v.recibido_en,
+      tiene_pdf: !!v.pdf_key, marcas, fotos,
+      mia: String(v.obs_email || "").toLowerCase() === email.toLowerCase()
+    };
+  });
+  return json({ inspecciones: filas, equipo });
+}
+
 /* POST /api/triage/inspeccion/<numero>/foto — una foto, una petición.
    En serie y de a una por la misma razón que en el formulario de la familia: con
    señal mala, siete subidas en paralelo se pisan y fallan todas.
@@ -3265,6 +3309,49 @@ function aviso(txt, clase){
    de las 8 secciones porque son las tres cosas que cambian cómo se marca todo lo
    demás: el ancho de grieta según el material, la regla de la vista, y los
    límites de lo que una inspección visual puede decir. */
+/* La confirmación que faltaba. Viene del SERVIDOR y no del teléfono a propósito:
+   el contador de la barra dice lo que queda por enviar, y eso no es lo mismo que
+   saber que algo llegó. Si aparece en esta lista, está guardado en la nube. */
+function cargarMias(){
+  var c = el("mias"); if (!c) return;
+  c.innerHTML = '<p class="mu" style="font-size:13.5px">Consultando…</p>';
+  fetch("/api/triage/mis-inspecciones").then(function(r){
+    var ct = r.headers.get("content-type") || "";
+    if (ct.indexOf("json") < 0) throw 0;   /* sesión caída: devuelve el login */
+    return r.json();
+  }).then(function(d){
+    var l = d.inspecciones || [];
+    if (!l.length){
+      c.innerHTML = '<div class="ref"><p style="margin:0;font-size:13.5px">Todavía no ha llegado '
+        + 'ninguna con tu correo. Si acabas de enviar, espera unos segundos y vuelve a consultar.</p></div>';
+      return;
+    }
+    c.innerHTML = '<div class="ref"><p style="margin:0 0 10px;font-size:13.5px"><strong>'
+      + l.length + (l.length === 1 ? " inspección" : " inspecciones") + " en el servidor"
+      + (d.equipo ? " (ves todas porque entras con la cuenta del equipo)" : "") + ".</strong></p>"
+      + l.map(function(v){
+          var m = v.marcas || {};
+          return '<div style="border-top:1px solid var(--bd);padding:9px 0;font-size:13.5px">'
+            + "<strong>" + esc(v.numero) + "</strong>"
+            + (v.requiere_esp ? ' <span style="color:var(--amb);font-weight:700">· revisión especializada</span>' : "")
+            + "<br>" + esc(v.familia || "sin nombre de familia")
+            + (v.finca ? " · " + esc(v.finca) : "")
+            + "<br><small>" + esc(v.municipio || "-") + " · visita " + esc(v.fecha_visita || "-")
+            + " · recibida " + esc(v.recibido_en || "-") + "</small>"
+            + "<br><small>" + (m.RE || 0) + " RE · " + (m.OBS || 0) + " Obs · " + (m.SO || 0) + " S/O · "
+            + (v.fotos || 0) + (v.fotos === 1 ? " foto" : " fotos") + " · "
+            + (v.tiene_pdf
+                ? '<a href="/api/triage/inspeccion/' + esc(v.numero) + '.pdf" target="_blank" rel="noopener">ver el documento</a>'
+                : '<span style="color:var(--err)">documento pendiente</span>')
+            + "</small></div>";
+        }).join("") + "</div>";
+  }).catch(function(){
+    c.innerHTML = '<div class="ref"><p style="margin:0;font-size:13.5px">No se pudo consultar. '
+      + "Si estás sin señal es normal: esta lista necesita internet. Si tienes señal, tu sesión "
+      + "pudo caducar — vuelve a entrar.</p></div>";
+  });
+}
+
 function pintarReferencia(){
   var c = el("referencia"); if (!c) return;
   var h = "";
@@ -3684,7 +3771,7 @@ function vaciarCola(){
         estado();
         if (sesionCaida) aviso("Tu sesión caducó. Vuelve a entrar y toca Enviar otra vez: nada se perdió.", "mal");
         else if (malas)  aviso("Quedaron " + malas + " sin enviar por datos incompletos. Ábrelas y complétalas.", "mal");
-        else if (enviadas || repes) aviso("Enviadas " + enviadas + (repes ? " (" + repes + " ya estaban)" : "") + ".", "bien");
+        else if (enviadas || repes) { aviso("Enviadas " + enviadas + (repes ? " (" + repes + " ya estaban)" : "") + ".", "bien"); cargarMias(); }
         else aviso("Sin señal todavía. Quedan guardadas en el teléfono.", "info");
         return;
       }
@@ -3838,6 +3925,7 @@ function INSP_ARRANCA(paquete){
     }
     var qf = e.target.closest("[data-quitafoto]");
     if (qf){ FOTOS.splice(Number(qf.getAttribute("data-quitafoto")), 1); pintarFotos(); guardarBorrador(); return; }
+    if (e.target.closest("#b-mias"))  { cargarMias(); return; }
     if (e.target.closest("#b-gps"))   { tomarGPS(); return; }
     if (e.target.closest("#b-prep"))  { preparar(); return; }
     if (e.target.closest("#b-cola"))  { aviso("Enviando…", "info"); vaciarCola(); return; }
@@ -4094,6 +4182,13 @@ textarea{min-height:64px;resize:vertical}
   </div>
 
   <div id="msg" class="aviso"></div>
+
+  <h2>Las que ya enviaste</h2>
+  <p style="font-size:13px;color:var(--mu);margin:0 0 10px">Esto viene del servidor, no del
+  teléfono: si una inspección aparece aquí, <strong>llegó</strong>. Lo que sigue en el teléfono lo
+  dice el contador de la barra de abajo.</p>
+  <button type="button" class="btn o mini" id="b-mias">Ver las que llegaron</button>
+  <div id="mias" style="margin-top:12px"></div>
 </div>
 
 <div class="barra">
@@ -7913,6 +8008,7 @@ export default {
             "service-worker-allowed": "/triaje/"
           }});
         }
+        if (ruta === "/api/triage/mis-inspecciones") return await triageMisInspecciones(env, sesion);
         const mf = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\/foto$/);
         if (mf) return await triageInspeccionFoto(request, env, mf[1], sesion);
         const mp = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\.pdf$/);
