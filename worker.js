@@ -3573,6 +3573,7 @@ function agregarFotos(inp){
    vuelve a preguntar. Se pide cuando la persona toca el botón, que es cuando
    entiende para qué es. */
 var GPS = { lat: null, lon: null, precision: null };
+var CORREO = "";
 
 function tomarGPS(){
   var e = el("gps-est");
@@ -3991,6 +3992,110 @@ function escribirFormulario(reg){
     .then(function(){ RESTAURANDO = false; });
 }
 
+/* ---- EL RESPALDO, Y PARA QUÉ SIRVE ----
+   Lo guardado en el teléfono no se puede mirar ni mandar: vive en IndexedDB, que
+   no es un archivo y no sale de ahí por WhatsApp. Mientras la única salida sea
+   que el propio formulario logre enviarlo, cualquier fallo que no hayamos
+   previsto vuelve a ser un callejón sin salida — y eso es justo lo que acabamos
+   de vivir.
+
+   Esto lo convierte en UN ARCHIVO que una persona puede mandar. Funciona sin
+   señal: se baja al teléfono y se envía cuando haya. ---- */
+function blobABase64(b){
+  return new Promise(function(res, rej){
+    var r = new FileReader();
+    r.onload  = function(){ var t = String(r.result); res(t.slice(t.indexOf(",") + 1)); };
+    r.onerror = function(){ rej(r.error); };
+    r.readAsDataURL(b);
+  });
+}
+
+/* Las fotos se convierten DE UNA EN UNA. Treinta casas con cuatro fotos son 120
+   lecturas en paralelo, y un teléfono modesto se queda sin memoria a mitad y no
+   baja nada. En serie tarda más y termina. */
+function empacar(lista, donde){
+  var salida = [], i = 0;
+  function paso(){
+    if (i >= lista.length) return Promise.resolve(salida);
+    var reg = lista[i++];
+    var fs = (reg.fotos || []).filter(function(f){ return f && f.blob; });
+    var j = 0, fotos = [];
+    function foto(){
+      if (j >= fs.length) return Promise.resolve();
+      var f = fs[j++];
+      return blobABase64(f.blob).then(function(b64){
+        fotos.push({ tipo: f.tipo || "image/jpeg", b64: b64 });
+        return foto();
+      }).catch(foto);
+    }
+    return foto().then(function(){
+      var copia = {};
+      for (var k in reg) if (k !== "fotos") copia[k] = reg[k];
+      copia.fotos = fotos;
+      copia._donde = donde;
+      salida.push(copia);
+      return paso();
+    });
+  }
+  return paso();
+}
+
+function sinTildes(t){
+  /* Los escapes van DOBLES: esto vive dentro de una plantilla, y escritos
+     sencillos la plantilla los resolvía a los caracteres combinantes
+     literales. Funcionaba, y es la clase de cosa que un editor rompe sin
+     que nada avise. */
+  return String(t || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
+}
+
+function respaldo(){
+  var b = el("b-resp"); if (!b) return;
+  b.disabled = true; b.textContent = "Empacando…";
+  var soltar = function(){ b.disabled = false; b.textContent = "Bajar respaldo de todo"; };
+  Promise.all([todos("borradores"), todos("cola")]).then(function(par){
+    var brr = par[0].filter(borradorVale);
+    if (!brr.length && !par[1].length){
+      soltar();
+      aviso("No hay nada que respaldar: el teléfono está vacío.", "info");
+      return;
+    }
+    return empacar(brr, "borrador").then(function(a){
+      return empacar(par[1], "cola").then(function(c){
+        var doc = {
+          respaldo: "inspecciones-mira-mi-casa", version: 1,
+          generado_en: new Date().toISOString().slice(0,19).replace("T"," "),
+          correo: CORREO,
+          observador: val("f-obs"),
+          dispositivo: (navigator.userAgent || "").slice(0,160),
+          cola: c, borradores: a
+        };
+        var arch = new Blob([JSON.stringify(doc)], { type: "application/json" });
+        var nombre = "respaldo-inspecciones-"
+          + (sinTildes(val("f-obs")) || "sin-nombre").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+          + "-" + new Date().toISOString().slice(0,10) + ".json";
+        var u = URL.createObjectURL(arch);
+        var a2 = document.createElement("a");
+        a2.href = u; a2.download = nombre;
+        document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+        setTimeout(function(){ URL.revokeObjectURL(u); }, 8000);
+        soltar();
+        var mb = arch.size / 1048576;
+        /* Se avisa del tamaño porque las fotos pesan y WhatsApp tiene tope: es
+           mejor saberlo aquí que descubrirlo cuando el envío falle y nadie
+           entienda por qué. */
+        aviso("Respaldo bajado: " + nombre + " · "
+          + (mb >= 1 ? mb.toFixed(1) + " MB" : Math.round(arch.size / 1024) + " KB") + " · "
+          + c.length + " por enviar y " + a.length + " a medias. Búscalo en Descargas."
+          + (mb > 40 ? " OJO: pesa mucho para WhatsApp — avisa al equipo antes de mandarlo."
+                     : " Mándalo al equipo por WhatsApp."), mb > 40 ? "info" : "bien");
+      });
+    });
+  }).catch(function(){
+    soltar();
+    aviso("No se pudo armar el respaldo. NO borres nada y avisa al equipo.", "mal");
+  });
+}
+
 /* Se repone el trazo Y el contador: firmaDe() cuenta TRAZOS, no pixeles, así que
    una firma dibujada sin subir el contador se guardaría como inexistente.
    Y se escala CONSERVANDO LA PROPORCIÓN, porque el lienzo puede tener otro ancho
@@ -4042,6 +4147,7 @@ function preparar(){
 function INSP_ARRANCA(paquete){
   var G = paquete || {};
   SECS  = G.secciones || [];
+  CORREO = G.correo || "";
   AYUDA = G.ayuda || {};
   GUIA  = G;
   pintarReferencia();
@@ -4144,6 +4250,7 @@ function INSP_ARRANCA(paquete){
     var tbb = e.target.closest("[data-tiraborr]");
     if (tbb){ tirarBorrador(tbb.getAttribute("data-tiraborr")); return; }
     if (e.target.closest("#b-borr")) { cargarBorradores(); return; }
+    if (e.target.closest("#b-resp")) { respaldo(); return; }
     if (e.target.closest("#b-mias"))  { cargarMias(); return; }
     if (e.target.closest("#b-gps"))   { tomarGPS(); return; }
     if (e.target.closest("#b-prep"))  { preparar(); return; }
@@ -4413,6 +4520,15 @@ textarea{min-height:64px;resize:vertical}
   que volver a la casa: ábrela, revísala y guárdala.</p>
   <div id="borr"></div>
   <button type="button" class="btn o mini" id="b-borr" style="margin-top:10px">Volver a revisar el teléfono</button>
+
+  <div class="ref" style="margin-top:16px">
+    <p style="margin:0 0 8px;font-size:13.5px"><strong>Si algo se atasca, baja el respaldo.</strong>
+    Lo guardado en el teléfono no se puede mirar ni mandar por WhatsApp: esto lo convierte en
+    <strong>un archivo</strong> con todo —las que faltan por enviar, las que quedaron a medias, las
+    firmas y las fotos— que el equipo puede cargar por su lado. <strong>Funciona sin señal:</strong>
+    se baja ahora y lo mandas cuando tengas.</p>
+    <button type="button" class="btn o mini" id="b-resp">Bajar respaldo de todo</button>
+  </div>
 
   <h2>Las que ya enviaste</h2>
   <p style="font-size:13px;color:var(--mu);margin:0 0 10px">Esto viene del servidor, no del
@@ -5960,6 +6076,115 @@ async function adminOfrecimientos(env) {
 
    Los voluntarios llevaban desde la Fase 3 entrando a la base sin bandeja: solo
    existía el contador del resumen, que dice cuántos hay y no quiénes son. */
+/* POST /api/admin/inspecciones/importar — el respaldo de un teléfono.
+
+   LA SALIDA DE EMERGENCIA. Lo guardado en el teléfono vive en IndexedDB, que no
+   es un archivo y no sale de ahí por WhatsApp: mientras la única salida sea que
+   el propio formulario logre enviar, cualquier fallo que no hayamos previsto es
+   un callejón sin salida. Eso ya pasó una vez.
+
+   Reutiliza ENTERO el camino normal —triageInspeccionRecibir y luego
+   triageInspeccionFoto— en vez de escribir su propio INSERT. Si validara
+   distinto, el respaldo se convertiría en la puerta por la que entra lo que el
+   formulario habría rechazado, y la idempotencia seguiría siendo la del índice
+   único sobre _local_id solo por casualidad. Así lo es por construcción: cargar
+   dos veces el mismo archivo no duplica nada. */
+async function adminInspeccionesImportar(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  /* El correo lo escribe QUIEN CARGA, no el archivo. Es la atribución de un
+     documento firmado —de quién responde por lo que dice— y un archivo que llegó
+     por WhatsApp no puede decidirla solo. El panel enseña el que el respaldo
+     trae, para copiarlo cuando sea el correcto. */
+  const correo = String(c.email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
+    return json({ error: "email_requerido",
+                  ayuda: "Escribe el correo con el que ese ingeniero entra a Mira Mi Casa. Sin el correcto, no verá la inspección en «Las que ya enviaste»." }, 400);
+  }
+
+  const lote = (Array.isArray(c.cola) ? c.cola : [])
+    .concat(Array.isArray(c.borradores) ? c.borradores : []);
+  if (!lote.length) {
+    return json({ error: "respaldo_vacio", ayuda: "El archivo no trae ninguna inspección." }, 400);
+  }
+  if (lote.length > 120) {
+    return json({ error: "respaldo_demasiado_grande",
+                  ayuda: "Trae " + lote.length + " inspecciones. Pide que se baje por partes." }, 413);
+  }
+
+  const base = new URL(request.url).origin;
+  const sesion = { email: correo, equipo: true };
+  const informe = [];
+
+  for (const reg of lote) {
+    const etiqueta = String((reg && reg.familia) || "sin nombre de familia").slice(0, 80);
+    const fotos = Array.isArray(reg && reg.fotos) ? reg.fotos : [];
+    const cuerpo = {};
+    for (const k of Object.keys(reg || {})) if (k !== "fotos") cuerpo[k] = reg[k];
+    cuerpo.fotos_tomadas = fotos.length;
+
+    let d;
+    try {
+      const r = await triageInspeccionRecibir(new Request(base + "/api/triage/inspeccion", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify(cuerpo)
+      }), env, correo);
+      d = await r.json();
+    } catch {
+      informe.push({ familia: etiqueta, error: "no_se_pudo_procesar" });
+      continue;
+    }
+
+    if (!d.ok) {
+      /* Un borrador a medias cae aquí, y eso es lo correcto: se devuelve QUÉ le
+         falta para que alguien lo termine en el teléfono o lo pase del papel.
+         Aceptarlo a medias metería en la base un documento sin firma. */
+      informe.push({ familia: etiqueta, error: d.error || "rechazada",
+                     faltan: d.faltan || null, ayuda: d.ayuda || null });
+      continue;
+    }
+
+    /* Si ya estaba, NO se vuelven a subir las fotos: el endpoint las añade a la
+       lista de la inspección y volver a cargar el archivo las duplicaría. */
+    if (d.repetida) {
+      informe.push({ familia: etiqueta, numero: d.numero, repetida: true });
+      continue;
+    }
+
+    let subidas = 0, fallidas = 0;
+    for (const f of fotos) {
+      const bytes = base64ABytes(f && f.b64);
+      if (!bytes) { fallidas++; continue; }
+      try {
+        const rf = await triageInspeccionFoto(new Request(
+          base + "/api/triage/inspeccion/" + encodeURIComponent(d.numero) + "/foto",
+          { method: "POST", headers: { "content-type": String((f && f.tipo) || "image/jpeg") }, body: bytes }
+        ), env, d.numero, sesion);
+        if (rf.ok) subidas++; else fallidas++;
+      } catch { fallidas++; }
+    }
+    informe.push({ familia: etiqueta, numero: d.numero, repetida: false,
+                   fotos: { subidas, fallidas } });
+  }
+
+  return json({ ok: true, informe });
+}
+
+/* base64 sin el «data:» delante. Devuelve null en vez de lanzar: una foto
+   ilegible no puede tumbar la carga de las otras veintinueve. */
+function base64ABytes(t) {
+  const s = String(t || "");
+  if (!s || s.length > 12000000) return null;
+  try {
+    const bin = atob(s);
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u.length ? u : null;
+  } catch { return null; }
+}
+
 /* GET /api/admin/inspecciones — lo que la brigada necesita ver de un vistazo.
    NO devuelve las respuestas completas: 26 ítems por fila harían la carga
    pesada y la tabla ilegible, y para eso está el PDF. Sí devuelve las CUENTAS
@@ -6738,6 +6963,28 @@ regenera nunca.</p>
 <th scope="col">Documento</th>
 </tr></thead><tbody id="ins-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
 </table></div>
+
+<div style="margin-top:18px;border:1px solid var(--bd);border-radius:8px;padding:15px">
+<h3 style="margin:0 0 6px;font-size:17px">Cargar el respaldo de un teléfono</h3>
+<p class="mu" style="font-size:13px;max-width:70ch;margin:0 0 9px">La salida de emergencia. Si el
+formulario de un ingeniero no logra enviar, él baja un archivo desde su teléfono y se carga aquí.
+Pasa por las <strong>mismas validaciones</strong> que el envío normal, así que lo que el formulario
+habría rechazado se rechaza también, y <strong>cargar dos veces el mismo archivo no duplica nada</strong>.</p>
+<p class="mu" style="font-size:13px;max-width:70ch;margin:0 0 9px">Las que vengan <strong>a medias</strong>
+saldrán rechazadas diciendo qué les falta. Esas hay que terminarlas en el teléfono o pasarlas del
+papel: aceptarlas incompletas metería en la base un documento sin firma.</p>
+<p class="mu" style="font-size:13px;max-width:70ch;margin:0 0 12px"><strong>El correo importa.</strong>
+Es de quién responde por lo que el documento dice, y decide si esa persona la verá en «Las que ya
+enviaste». Al elegir el archivo se rellena con el que el respaldo trae — cámbialo solo si sabes que
+está mal.</p>
+<label for="imp-correo" style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Correo del ingeniero</label>
+<input id="imp-correo" type="email" autocomplete="off" placeholder="ingeniera@ejemplo.com"
+ style="width:100%;max-width:340px;padding:8px 10px;border:1px solid var(--bd);border-radius:5px;font:inherit;font-size:14px">
+<div style="margin-top:10px"><input id="imp-arch" type="file" accept="application/json,.json" style="font-size:13px"></div>
+<div id="imp-de" class="mu" style="font-size:13px;margin-top:8px"></div>
+<button class="copy" id="b-imp" style="margin-top:10px">Cargar el respaldo</button>
+<div id="imp-res" style="margin-top:12px"></div>
+</div>
 
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
@@ -7545,6 +7792,85 @@ function accionesMatricula(i, x){
        + '</div>';
 }
 
+var RESPALDO = null;
+
+function leerRespaldo(){
+  var inp = document.getElementById("imp-arch");
+  var f = inp && inp.files && inp.files[0];
+  if (!f) return Promise.resolve(null);
+  return new Promise(function(res, rej){
+    var l = new FileReader();
+    l.onload  = function(){ res(String(l.result)); };
+    l.onerror = function(){ rej(l.error); };
+    l.readAsText(f);
+  }).then(function(t){
+    var d = JSON.parse(t);
+    if (d.respaldo !== "inspecciones-mira-mi-casa") throw new Error("no_es_un_respaldo");
+    return d;
+  });
+}
+
+function mirarRespaldo(){
+  var de = document.getElementById("imp-de");
+  document.getElementById("imp-res").innerHTML = "";
+  RESPALDO = null;
+  de.textContent = "Leyendo el archivo…";
+  leerRespaldo().then(function(d){
+    if (!d) { de.textContent = ""; return; }
+    RESPALDO = d;
+    var c = (d.cola || []).length, b = (d.borradores || []).length;
+    if (d.correo && !document.getElementById("imp-correo").value) {
+      document.getElementById("imp-correo").value = d.correo;
+    }
+    de.innerHTML = "El respaldo dice que salió de <strong>" + esc(d.observador || "sin nombre") + "</strong>"
+      + (d.correo ? " (" + esc(d.correo) + ")" : ", <strong>sin correo dentro</strong>: escríbelo a mano")
+      + ", el " + esc(d.generado_en || "-") + ". Trae <strong>" + c + "</strong> por enviar y <strong>"
+      + b + "</strong> a medias.";
+  }).catch(function(x){
+    de.textContent = (x && x.message === "no_es_un_respaldo")
+      ? "Ese archivo no es un respaldo de inspecciones."
+      : "No se pudo leer el archivo. ¿Llegó completo por WhatsApp?";
+  });
+}
+
+function importarRespaldo(){
+  var b = document.getElementById("b-imp"), r = document.getElementById("imp-res");
+  var correo = document.getElementById("imp-correo").value.trim();
+  if (!RESPALDO){ r.innerHTML = '<p class="mu">Elige primero el archivo que te mandó el ingeniero.</p>'; return; }
+  if (!correo){ r.innerHTML = '<p class="mu">Falta el correo del ingeniero.</p>'; return; }
+  b.disabled = true; b.textContent = "Cargando…";
+  r.innerHTML = '<p class="mu">Cargando. Con fotos puede tardar un rato: no cierres la pestaña.</p>';
+  fetch("/api/admin/inspecciones/importar", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: correo, cola: RESPALDO.cola || [], borradores: RESPALDO.borradores || [] })
+  }).then(function(x){ return x.json(); }).then(function(d){
+    b.disabled = false; b.textContent = "Cargar el respaldo";
+    if (!d.ok){ r.innerHTML = '<p style="color:var(--err)">' + esc(d.ayuda || d.error || "No se pudo cargar.") + '</p>'; return; }
+    var l = d.informe || [];
+    var bien = l.filter(function(x){ return x.numero && !x.repetida; }).length;
+    var yaS = l.filter(function(x){ return x.repetida; }).length;
+    var mal = l.filter(function(x){ return !x.numero; }).length;
+    r.innerHTML = "<p><strong>" + bien + (bien === 1 ? " cargada" : " cargadas")
+      + (yaS ? " · " + yaS + (yaS === 1 ? " ya estaba" : " ya estaban") : "")
+      + (mal ? ' · <span style="color:var(--err)">' + mal + " sin cargar</span>" : "") + "</strong></p>"
+      + l.map(function(x){
+          if (x.numero) return '<div style="font-size:13px;padding:3px 0">' + esc(x.familia)
+            + " → <strong>" + esc(x.numero) + "</strong>" + (x.repetida ? " (ya estaba)" : "")
+            + (x.fotos && x.fotos.fallidas
+                ? ' · <span style="color:var(--amber)">' + x.fotos.fallidas + " sin subir</span>" : "")
+            + "</div>";
+          return '<div style="font-size:13px;padding:3px 0;color:var(--err)">' + esc(x.familia) + " — "
+            + esc(x.ayuda || x.error)
+            + (x.faltan ? ": falta " + esc(x.faltan.join(", ")) : "") + "</div>";
+        }).join("");
+    cargarInspecciones();
+  }).catch(function(){
+    b.disabled = false; b.textContent = "Cargar el respaldo";
+    r.innerHTML = '<p style="color:var(--err)">No se pudo cargar. Revisa la conexión y vuelve a intentar: '
+      + 'lo que ya entró no se duplica.</p>';
+  });
+}
+
 function cargarInspecciones(){
   fetch("/api/admin/inspecciones").then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("ins-filas"); if (!tb) return;
@@ -7678,6 +8004,7 @@ document.addEventListener("click", function(e){
   }
   /* Copiar la matrícula: es el paso que evita teclear mal un número de siete
      cifras en el formulario del COPNIA y verificar a la persona equivocada. */
+  if (e.target.closest("#b-imp")) { importarRespaldo(); return; }
   var ip = e.target.closest("[data-inspdf]");
   if (ip){
     ip.disabled = true; ip.textContent = "Emitiendo…";
@@ -7802,6 +8129,10 @@ function cargarEntregas(){
 }
 
 document.addEventListener("change", function(e){
+  /* Al elegir el archivo se lee ANTES de cargar nada, por dos razones: rellenar
+     el correo que el respaldo trae —teclearlo mal atribuye a otra persona un
+     documento firmado— y decir qué hay dentro antes de mandarlo. */
+  if (e.target.id === "imp-arch"){ mirarRespaldo(); return; }
   var inp = e.target.closest("[data-foto]");
   if (!inp || !inp.files || !inp.files[0]) return;
   var f = inp.files[0];
@@ -8213,7 +8544,11 @@ export default {
               limites: INSPECCION_LIMITES,
               reglaVista: INSPECCION_REGLA_VISTA,
               recomienda: INSPECCION_RECOMENDA,
-              mensaje: INSPECCION_MENSAJE_COMUNIDAD
+              mensaje: INSPECCION_MENSAJE_COMUNIDAD,
+              /* Va en el paquete y no en un argumento nuevo para que el
+                 respaldo diga de QUÉ cuenta salió: sin eso, un archivo que
+                 llega por WhatsApp no se puede atribuir a nadie. */
+              correo: sesion.email || ""
             }),
             esc(INSPECCION_ALCANCE),
             esc(INSPECCION_CONSENT)
@@ -8323,6 +8658,7 @@ export default {
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
+        if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
         if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env);
         const mip = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/pdf$/);
         if (mip) return await adminInspeccionEmitirPDF(request, env, mip[1]);
