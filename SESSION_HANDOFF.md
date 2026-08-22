@@ -1,9 +1,159 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Migración a Mira Mi Casa y el concepto" (19 ago 2026)
-> **⏭️ ARRANCA POR: las DOS DONACIONES REALES que llevan días esperando** — ver
-> su sección más abajo. Son de personas, no de código, y una pide certificado.
+> Última actualización: sesión "Inspección visual preliminar, offline" (22 ago 2026)
+> **⏭️ ARRANCA POR: los TRES PENDIENTES DE LA BRIGADA**, que empieza el 24 —
+> ver la sección siguiente. Dos son de Sebas y uno no es código.
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
+
+## ⏭️ LO QUE ESPERA, CON LA BRIGADA EL 24 (sesión del 21–22 ago)
+
+1. **DESPLEGAR EL WORKER DE ALMA.** Sigue en **403 en el subdominio** —comprobado
+   hoy con un OPTIONS— y sin saber del sismo. Los tres cambios viven en el MISMO
+   archivo, así que un solo pegado los cierra: `ops/givegrow-alma-worker-v2.js`
+   en el worker `givegrow-alma` del dashboard. **No se despliega desde este
+   repo.** Mientras no se haga, ALMA está muerta en la plataforma que las
+   familias están usando.
+
+2. **EL ENSAYO EN EL TELÉFONO, EN MODO AVIÓN.** Es lo único que prueba cuatro
+   piezas que NADIE ha verificado en un teléfono real: el service worker, el
+   permiso de GPS, las fotos con señal intermitente, y las firmas con el dedo.
+   El navegador de la sesión **bloquea la registración de service workers** —
+   comprobado con uno de UNA LÍNEA que falla idénticamente—, así que no es
+   pereza: no se puede desde aquí.
+
+   El guion: preparar CON internet → modo avión → llenar completa con firmas →
+   **cerrar el navegador** → reabrir (debe abrir igual) → quitar modo avión →
+   debe enviarse sola y aparecer en «Las que ya enviaste».
+
+3. **DECIDIR SI LA ESCALA CAMBIA.** La guía del AIS tiene un nivel intermedio
+   —«fuerte»— que nuestra RE/Obs/S-O no distingue, y CUATRO categorías de
+   habitabilidad con color. No se tocó porque cambiar la escala del papel es
+   decisión de Sebas. Si va a usarse en cinco territorios, conviene resolverlo
+   antes del 24 y no después.
+
+## ✅ LA INSPECCIÓN VISUAL PRELIMINAR, COMPLETA Y EN PRODUCCIÓN (21–22 ago)
+
+Nació de un PDF que trajo Sebas —el formulario en papel de la fundación— y de
+una pregunta: que funcione **sin luz ni internet**, porque la brigada entra a
+veredas donde no hay ninguna de las dos.
+
+**Ruta: `/triaje/inspeccion`**, cubierta por la aplicación de Access del TRIAJE
+—comprobado, no supuesto: `/triaje/*` responde 302 con `kid=cc6b16ac…`— así que
+no gastó un cupo nuevo de hostnames. El subdominio redirige al ápex.
+
+**PRs #151 a #159. Migraciones 0011 a 0015, las cinco aplicadas.**
+
+### LO QUE GOBIERNA EL DISEÑO: no es un dictamen, y el papel lo dice mejor
+«Reporte de observaciones — documento preliminar y no vinculante», «no
+constituye certificación de sismo-resistencia ni garantía de habitabilidad»,
+«este documento no autoriza ni prohíbe la ocupación del inmueble». El esquema lo
+refleja: **no hay ninguna columna que diga «habitable» ni «veredicto»**, igual
+que en `casos` la columna se llama `clasificacion`.
+
+Y la guía del AIS añadió una prohibición que quedó escrita en el código: **el
+evaluador NO puede recomendar demoler.** Por eso «demoler» no es una opción del
+formulario — no se ofrece lo que no se puede recomendar, porque una casilla que
+existe se marca.
+
+### LAS CUATRO COSAS QUE HACEN QUE EL OFFLINE FUNCIONE, y ninguna es obvia
+1. **Precarga explícita.** Un service worker solo guarda lo que se le pide: si el
+   formulario se abre por primera vez YA en la vereda, no carga nada. De ahí el
+   botón «Preparar para trabajar sin señal», que se usa antes de salir.
+2. **`storage.persist()`.** Sin él, iOS y Android desalojan IndexedDB cuando el
+   teléfono se llena. Con los tamaños medidos —2,2 MB por casa— treinta casas son
+   ~66 MB.
+3. **El consecutivo lo asigna el SERVIDOR.** Dos ingenieros sin señal reclamarían
+   los dos `IV-2026-000005`.
+4. **Idempotencia por `local_id`**, con **índice ÚNICO en la base** (0013). El
+   SELECT-antes-de-INSERT no resiste concurrencia, y era alcanzable de verdad:
+   `vaciarCola()` se llama desde el botón Y desde el evento `online`.
+
+### LO QUE SE APRENDIÓ DE LA GUÍA DEL AIS, y la regla que quedó
+Fuente: «Guía Técnica para la Inspección de Edificaciones Después de un Sismo»,
+manual de campo del AIS y el IDIGER, 4.ª ed. 2018.
+
+**LA REGLA: solo se afirma lo que la guía respalda, y donde no dice nada se dice
+que no dice nada.** Por eso **19 de los 26 ítems llevan ayuda y SIETE NO** —
+puertas, ventanas, pisos y humedad no están en la guía— y el glosario **marca los
+cuatro términos que son NUESTROS y no suyos** («grieta pasante», «escalonada»,
+«fuera de plomo», «abombado»). Rellenar sus huecos y presentarlo con su autoridad
+sería justo lo que este proyecto prohíbe.
+
+Lo más útil que aportó: **el ancho de grieta no es el mismo umbral por material**
+—2 mm en concreto, 3 en ladrillo, **4 en tapia y adobe**—. Confundirlos hace que
+una grieta grave en adobe parezca leve.
+
+### ⚠️ LO QUE LA REVISIÓN ENCONTRÓ (PR #155), y conviene no reintroducir
+Ocho hallazgos. Los dos que importan:
+
+- **El PDF se le servía a CUALQUIER ingeniero aprobado.** Sin comprobación de
+  propiedad y con consecutivos adivinables: cien voluntarios podían bajar la
+  cédula, la dirección y la FIRMA de todas las familias. Contradecía la regla que
+  el proyecto ya tenía escrita. Ahora el equipo ve todas y un ingeniero solo las
+  que él firmó, con el MISMO 404 en los dos casos para no dejar un oráculo.
+- **Una marca desconocida se imprimía como «[S/O]»** —sin observación aparente—
+  sobre un muro que el ingeniero había marcado. Las respuestas ahora se validan
+  contra el catálogo y lo que no se reconoce **se descarta, no se adivina**.
+
+### DÓNDE SE VEN LAS INSPECCIONES (importa, porque ya causó confusión)
+**NO aparecen en `/triaje`.** Esa pantalla muestra CASOS del triaje remoto. Las
+inspecciones están en la bandeja «Inspecciones en terreno» de **`/admin`**, y
+desde el 22 de agosto el ingeniero también ve **las suyas** en el propio
+formulario, sección «Las que ya enviaste» — que pregunta al SERVIDOR y no al
+teléfono, porque el contador de pendientes dice lo que falta por enviar y eso no
+es lo mismo que saber que algo llegó.
+
+### VERIFICADO CON UNA PERSONA REAL
+`IV-2026-000001` llegó el **21 ago a las 16:40**: 23 de 26 ítems, **las dos
+firmas**, PDF generado. La llenó la ingeniera voluntaria. Su campo `familia` está
+vacío porque ese campo se añadió al día siguiente.
+
+### DECISIONES DEL ESQUEMA QUE NO HAY QUE DESHACER
+- **`creado_en` y `recibido_en` son columnas DISTINTAS.** Se llena offline y puede
+  llegar días después; confundirlas haría parecer del viernes un recorrido del
+  martes. `creado_en` se valida: formato exacto y rango con sentido.
+- **Las 26 respuestas van en JSON**, no en 26 columnas: la lista va a cambiar
+  cuando los ingenieros la corrijan.
+- **Las coordenadas son PRIVADAS.** Más precisas que la dirección, así que nunca
+  salen al banco público — la misma razón por la que la 0010 partió la ubicación
+  en dos. El GPS **funciona sin internet**.
+- **`familia` y `finca` NO se quedan pegadas entre casas**, y por eso no bastaba
+  renombrar el campo anterior: «Proyecto» era de la jornada, la familia es de
+  ESTA casa. Si se quedaran, la segunda casa heredaría el apellido de la primera.
+- **El PDF se CONGELA al emitirse** y el endpoint no lo regenera nunca: alguien lo
+  firmó. Si falta, hay un botón en el panel para emitirlo — y solo si falta.
+- **Un bloque de firma nunca va en blanco.** Sin firma, imprime el motivo: un
+  espacio vacío no distingue «no pudo firmar» de «no autorizó».
+
+### 🪤 TRAMPAS QUE COSTARON TIEMPO ESTA SESIÓN
+1. **Las comillas invertidas dentro de las plantillas generadoras** mordieron
+   TRES veces. Dentro de `inspeccionJS()` y `inspeccionHTML()` no puede haber una
+   comilla invertida sin escapar, ni en un comentario. `node --check` las atrapa
+   al instante, y el check #1b compila lo EMITIDO.
+2. **`migrations apply` da 7403 en esta cuenta.** El camino que funciona:
+   `d1 execute --remote --file` y luego `INSERT OR IGNORE INTO d1_migrations
+   (name) VALUES ('00NN_….sql')`. **Sin el segundo paso el guardián del CI
+   bloquea el deploy con la base ya migrada**, y el deploy queda rojo.
+3. **Fusionar mientras Claude sigue trabajando pierde commits.** Pasó DOS veces:
+   los PR #151 y #152 se llevaron solo los commits que existían al momento del
+   merge. La regla que quedó: **un PR por pieza terminada**, y avisar cuando esté
+   lista en vez de apilar commits sobre un PR abierto.
+4. **`h.texto()` de `documentos.js` envuelve con el ancho COMPLETO e ignora la
+   `x`.** Si se indenta, hay que pasar `ancho` también o el texto desborda el
+   margen derecho.
+5. **Cuando el clasificador corta un comando, hay que reintentarlo ENTERO.**
+   Reintenté media mitad y `familia`, `finca` y las coordenadas se quedaron fuera
+   del PDF; la verificación de entonces miró el INSERT y no el documento.
+6. **Probar el caso corto no prueba nada.** De los ocho hallazgos de la revisión,
+   cinco no se manifestaron en mis pruebas porque probé lo que escribí, no lo que
+   iba a llegar: la observación que cabía en una línea, el bloque de firma que
+   cayó donde no se partía, la marca siempre válida.
+
+### DOCUMENTOS PARA LOS INGENIEROS
+Hay un **manual de campo** publicado como artefacto y en PDF, con los enlaces
+completos, las dos pantallas, los tres límites y la tabla de «cuando algo sale
+mal». Si el ensayo del teléfono destapa que algo no se comporta como dice el
+manual, **hay que corregir el manual el mismo día**.
 
 ## ✅ EL TRIAJE YA VIVE EN MIRA MI CASA (hecho y verificado, 19 ago · PR #138)
 
