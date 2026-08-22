@@ -586,6 +586,110 @@ export const INSPECCION_SECCIONES = [
   ]}
 ];
 
+/* ===========================================================================
+   AYUDA PARA QUIEN NO ES INGENIERO
+   ===========================================================================
+   Fuente: «Guía Técnica para la Inspección de Edificaciones Después de un
+   Sismo — Manual de Campo», 4.ª edición, marzo de 2018. Asociación Colombiana
+   de Ingeniería Sísmica (AIS) para el IDIGER de Bogotá.
+
+   LA REGLA QUE GOBIERNA ESTE BLOQUE: solo se afirma lo que la guía respalda, y
+   donde NO dice nada se dice que no dice nada. La guía es una fuente
+   autorizada; rellenar sus huecos con conocimiento general y presentarlo con su
+   autoridad sería justo lo que este proyecto prohíbe.
+
+   Lo que la guía NO define, y por eso aquí no se explica como si lo hiciera:
+   grieta escalonada, grieta pasante, grieta de retracción, cómo distinguir una
+   grieta nueva de una vieja, deflexión, eflorescencia, abombado, fuera de plomo
+   (usa «desplome» e «inclinación»), cercha y correa (las usa sin definirlas), y
+   la humedad como daño. Varios de esos términos vienen del formulario en papel,
+   no de la guía.
+
+   Y UNA CORRECCIÓN QUE LA GUÍA LE HACE A ESTE FORMULARIO: su escala oficial
+   tiene CINCO niveles de daño más colapso (ninguno/muy leve, leve, moderado,
+   FUERTE, severo, colapso total) y CUATRO categorías de habitabilidad con color
+   (habitable verde, uso restringido amarillo, no habitable naranja, peligro de
+   colapso rojo). Nuestra escala RE/Obs/S-O es más simple a propósito —es la del
+   papel que usa la fundación y no pretende clasificar habitabilidad—, pero
+   conviene no confundirlas ni presentar la nuestra como si fuera la oficial.
+   =========================================================================== */
+
+/* El ancho de la grieta es la herramienta operativa central de la guía, y NO es
+   el mismo umbral para todos los materiales. Confundirlos hace que una grieta
+   grave en adobe parezca leve, o al revés. */
+export const INSPECCION_ANCHOS = [
+  { material: "Concreto (vigas, columnas, placas)", leve: "0,2 a 1,0 mm", moderado: "1,0 a 2,0 mm", fuerte: "más de 2,0 mm, con el acero a la vista" },
+  { material: "Mampostería (ladrillo o bloque)",    leve: "0,2 a 1,0 mm", moderado: "1,0 a 3,0 mm", fuerte: "más de 3,0 mm, con piezas dislocadas" },
+  { material: "Tapia, adobe o bahareque",           leve: "0,4 a 2,0 mm", moderado: "2,0 a 4,0 mm", fuerte: "más de 4,0 mm" }
+];
+
+/* El primer filtro que la guía autoriza y que cualquiera puede aplicar sin
+   instrumento: si la grieta se ve a simple vista, ya pasó el umbral más bajo. */
+export const INSPECCION_REGLA_VISTA =
+  "Antes de medir: la guía del AIS llama «difícilmente visibles» a las fisuras de menos de 0,2 mm y " +
+  "«perceptible a simple vista» a partir de ahí. Si la ves sin acercarte ni buscarla, ya no es la más leve.";
+
+/* Ayuda por ítem. SOLO los que la guía respalda; los demás no llevan nada antes
+   que llevar una explicación inventada. */
+export const INSPECCION_AYUDA = {
+  "1.1": "Agrietarse el suelo en una ladera puede indicar que un deslizamiento está próximo. La guía del AIS trata las grietas generalizadas en el terreno como la señal más grave de este grupo. Y si hay problemas de talud, dice que la evaluación necesita un ingeniero geotecnista, no solo estructural.",
+  "1.2": "La guía llama subsidencia al desplazamiento hacia abajo del terreno que sostiene la casa, y nombra como causas frecuentes las tuberías de desagüe perforadas —el agua que se escapa erosiona los cimientos—, las obras subterráneas y los árboles robustos que secan el suelo.",
+  "1.4": "Ojo con el agua: la guía nombra la fuga de un desagüe como causa de que el suelo bajo la casa se erosione. No es solo humedad, puede estar vaciando el apoyo.",
+  "2.1": "Las grietas diagonales en columnas las produce el cortante o la torsión. Cuando se ve el acero de refuerzo, la guía ya lo cataloga como daño fuerte. Y las columnas son uno de los elementos que, dañados de gravedad, pueden obligar a evacuar aunque el resto de la casa se vea bien.",
+  "2.2": "En vigas, las grietas diagonales vienen de cortante o torsión; las verticales, de flexión. La guía advierte que las uniones entre elementos son, por lo general, los puntos más críticos.",
+  "2.3": "Los nudos viga-columna son de los elementos que la guía llama de «saturación del daño»: si están muy dañados, la casa puede perder estabilidad aunque los demás elementos no muestren daño importante. Puede ser necesaria la evacuación inmediata.",
+  "2.4": "En las placas, la guía nombra las grietas por punzonamiento alrededor de las columnas y las grietas largas a lo largo del piso por exceso de flexión.",
+  "2.5": "El acero expuesto o corroído importa doble: la guía advierte que el estado de oxidación de los materiales puede indicar una reducción significativa de resistencia, así que el daño real puede ser mayor que el visible.",
+  "3.1": "Esta es la pregunta más difícil del formulario y la guía NO da un método para responderla mirando el muro: depende del sistema estructural de la casa. Lo que sí dice: en mampostería estructural las fachadas y algunos muros divisorios SÍ son estructurales; y en tapia, adobe, bahareque o mampostería sin confinar, los muros suelen ser los que cargan. La pista visual que ofrece: si el muro RELLENA un entramado visible de columnas y vigas, es divisorio; si no hay columnas ni vigas y el muro ES la estructura, es portante. Si tienes duda, anótalo como duda: la guía trata «no se pudo determinar» del lado grave, no del neutro.",
+  "3.2": "El cortante produce grietas diagonales, muchas veces en forma de equis. La flexión produce grietas horizontales en los extremos del muro, más largas abajo. Y un matiz que la guía subraya: en un muro reforzado, que esté agrietado NO implica que vaya a fallar — depende del refuerzo que tenga. (La guía no usa los términos «pasante» ni «escalonada», que vienen de nuestro formulario.)",
+  "3.3": "La guía llama a esto «desplome» o «inclinación», y lo cataloga como daño severo: aparece junto al aplastamiento local del muro. No usa «fuera de plomo» ni «abombado».",
+  "3.5": "La guía dedica un apartado a estos materiales y es tajante: las viviendas de adobe y tapia son en general muy antiguas y muy vulnerables, sin condiciones de sismorresistencia adecuadas. Y sus umbrales de grieta son MÁS ANCHOS que en ladrillo (ver la tabla de anchos). Del bahareque dice algo que contradice el prejuicio: sus muros por sí solos tienen vulnerabilidad baja; el problema está en las conexiones y en el deterioro por agua, insectos y hongos.",
+  "4.1": "La guía pide observar con especial atención los apoyos de correas y cerchas, porque fallar ahí puede hacer caer sectores enteros de la cubierta. También advierte que una cubierta muy pesada se mueve como un péndulo invertido y castiga los elementos que la sostienen.",
+  "4.2": "La guía describe un buen amarre así: existen conexiones que sujetan el techo a los muros, hay arriostramiento de las vigas y la distancia entre ellas no es muy grande. Si la mayoría de eso no se cumple y la cubierta es pesada, lo llama malo.",
+  "4.3": "Para cubierta, la guía mide por porcentaje de tejas caídas: hasta un 30% lo llama leve; entre 30 y 45% moderado; entre 45 y 60% fuerte, ya con problemas en los apoyos.",
+  "5.1": "La guía califica el cielo raso por riesgo de caída, no por estética: si perdió su anclaje o apoyo, es daño severo. Y recuerda que muchos elementos que no cayeron con el sismo principal pueden caer con una réplica.",
+  "7.1": "Entre las medidas que la guía autoriza recomendar está desconectar los suministros de energía, gas y acueducto.",
+  "7.2": "Olor a gas es una de las condiciones que la guía trata como peligro inmediato, junto con la presencia de sustancias peligrosas. Desconectar el suministro está entre sus recomendaciones.",
+  "7.3": "Una fuga no es solo un daño de la instalación: la guía nombra las tuberías de desagüe perforadas como causa de que el suelo bajo la casa se erosione."
+};
+
+/* Lo que el formulario nombra y un lego no entendería. Se marca la procedencia,
+   porque no todo está en la guía. */
+export const INSPECCION_GLOSARIO = [
+  { t: "Cimentación", d: "La base sobre la que se apoya la casa. La guía no define la palabra, pero distingue las superficiales (entre 0,5 y 4 m de profundidad) de las profundas (pilas o pilotes).", fuente: "AIS" },
+  { t: "Muro portante o de carga", d: "El que sostiene el peso de la casa. Si se daña de gravedad, puede comprometer la estabilidad completa. Ver la ayuda del ítem 3.1: no siempre se distingue mirando.", fuente: "AIS" },
+  { t: "Muro divisorio", d: "El que solo separa espacios. La guía dice que su falla puede representar un riesgo para la vida —por caída— pero normalmente no causa el colapso de la casa.", fuente: "AIS" },
+  { t: "Mampostería confinada", d: "Muros de ladrillo o bloque rodeados de elementos delgados de concreto —viguetas y columnetas— que los encierran como un anillo.", fuente: "AIS" },
+  { t: "Tapia y adobe", d: "Muros de tierra apisonada o de bloques de tierra sin cocer, a veces mezclada con fibras vegetales, ladrillos o piedras.", fuente: "AIS" },
+  { t: "Bahareque", d: "Paredes de paneles de madera o guadua, con o sin relleno de tierra, y recubrimientos de mortero, tabla o lámina. También existe sin relleno, «bahareque hueco».", fuente: "AIS" },
+  { t: "Cercha y correa", d: "Las piezas que forman el armazón que sostiene el techo. La guía las nombra sin definirlas; lo que sí dice es que hay que mirar con especial atención sus APOYOS.", fuente: "AIS parcial" },
+  { t: "Licuación", d: "En suelos arenosos saturados, el sismo puede hacer que el suelo pierda su capacidad de soporte y la casa se asiente.", fuente: "AIS" },
+  { t: "Fisura y grieta", d: "La guía separa las dos por ancho: fisura por debajo de 1 mm, grieta a partir de ahí. Y usa la vista como primer filtro.", fuente: "AIS" },
+  { t: "Fuera de plomo · abombado", d: "Términos de nuestro formulario. La guía usa «desplome» e «inclinación» para lo mismo, y no usa «abombado».", fuente: "nuestro" },
+  { t: "Grieta pasante · escalonada", d: "Términos de nuestro formulario. La guía del AIS no los usa: clasifica por ancho y por dirección (diagonal, horizontal, vertical).", fuente: "nuestro" },
+  { t: "Deflexión · eflorescencia", d: "Términos de nuestro formulario. La guía no los define. Deflexión es que un elemento horizontal se pandee visiblemente; eflorescencia, las manchas blancas que deja el agua al salir por el muro.", fuente: "nuestro" }
+];
+
+/* Lo que hay que DECIRLE a la gente al terminar. Es de la guía, que lo pone como
+   obligación del evaluador — y su última frase es la razón por la que este
+   documento no puede ser lo último que pase en esa casa. */
+export const INSPECCION_MENSAJE_COMUNIDAD =
+  "Esta revisión y sus recomendaciones se basan en lo que se pudo ver durante la visita, así que " +
+  "pueden existir situaciones no previstas que se escapan de su alcance. Quien responde por la " +
+  "vivienda y quienes viven en ella deben tener presente que esto NO los exime de hacer los " +
+  "estudios y las reparaciones que la casa necesite. Y que las condiciones de la vivienda y de su " +
+  "entorno pueden cambiar: si eso pasa, hay que pedir una nueva evaluación a las autoridades " +
+  "competentes.";
+
+/* Cuatro límites que la guía impone al que inspecciona, y que conviene tener a
+   la vista mientras se llena el formulario. */
+export const INSPECCION_LIMITES = [
+  "La estructura casi siempre está TAPADA por acabados y muros divisorios. La guía lo dice tres veces: si queda duda sobre un elemento estructural, hay que recomendar una inspección más detallada con un ingeniero particular, que incluya quitar acabados.",
+  "NUNCA recomiendes demoler. La guía lo prohíbe expresamente al evaluador: si el peligro parece inminente, se pide la visita de un experto y se señala la urgencia.",
+  "Después de un sismo fuerte las réplicas son muy probables, y muchos elementos que no cayeron con el principal pueden caer con una réplica o por su propio peso.",
+  "Si no pudiste determinar algo, anótalo como no determinado. La guía trata la duda del lado grave, no del neutro."
+];
+
 export const INSPECCION_MARCAS = { RE: "Requiere revisión especializada", OBS: "Observación a documentar", SO: "Sin observación aparente" };
 
 /* Los textos de alcance y de descargo van AQUÍ y no en el generador del PDF,
