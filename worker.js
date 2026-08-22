@@ -2400,7 +2400,14 @@ function cargarCola(){
     if (n) n.textContent = d.porConfirmar ? "(" + d.porConfirmar + ")" : "";
     var c = d.casos || [];
     if (!c.length){ el("lista").innerHTML = "<p class='cargando'>" + VACIO[COLA] + "</p>"; return; }
-    var h = "<p class='sub'>" + c.length + " " + CABEZA[COLA] + "</p>";
+    /* Si la lista llegó al tope, se DICE. Un «200» a secas se lee como «hay
+       200», y con eso el caso 201 no existe para nadie mientras la familia
+       espera. */
+    var truncada = d.total && d.tope && d.total > d.tope;
+    var h = "<p class='sub'>" + (truncada
+      ? c.length + " de " + d.total + " " + CABEZA[COLA]
+        + " &middot; <b>faltan " + (d.total - c.length) + " por mostrar</b>, usa las pestañas para acotar"
+      : c.length + " " + CABEZA[COLA]) + "</p>";
     for (var i = 0; i < c.length; i++){
       var x = c[i];
       h += "<div class='fila'><b>" + esc(x.numero) + "</b>"
@@ -2558,6 +2565,12 @@ const FIRMES = "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero " +
 const DISCREPA = "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e " +
                  "WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1)";
 
+/* El tope de las listas de casos. Existe como constante y no como número
+   suelto porque va acompañado SIEMPRE de su total: el día que alguien lo suba,
+   lo que la pantalla dice sigue siendo verdad. */
+const TOPE_COLA = 200;
+const TOPE_INSPECCIONES = 300;
+
 async function triageCasos(env, url) {
   const estado = url.searchParams.get("estado") || "pendientes";
   const filtro = estado === "todos" ? "" :
@@ -2575,15 +2588,25 @@ async function triageCasos(env, url) {
     "(SELECT COUNT(*) FROM caso_medios m WHERE m.caso = c.numero) AS medios, " +
     "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero) AS evaluaciones, " +
     DISCREPA + " AS discrepa, " + FIRMES + " AS firmes, " + SIN_RESPALDO + " AS sin_respaldo " +
-    "FROM casos c " + filtro + " ORDER BY c.creado_en ASC LIMIT 200"
+    "FROM casos c " + filtro + " ORDER BY c.creado_en ASC LIMIT " + TOPE_COLA
   ).all();
+
+  /* EL TOTAL, con el MISMO filtro que la lista. Sin esto la cola termina en el
+     caso 200 y parece que ahí se acaba: cinco territorios con más de cien
+     familias cada uno pasan de doscientos, y el caso 201 sería invisible para
+     todo el mundo mientras la familia espera. Es la misma clase de fallo que
+     los borradores que nadie leía — una lista que termina en silencio parece
+     completa. El filtro se reutiliza a propósito: un total calculado sobre otra
+     condición miente de otra manera. */
+  const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM casos c " + filtro).first();
 
   /* Cuántos piden confirmación, siempre — así la pestaña puede decirlo sin que
      el ingeniero tenga que entrar a mirar si hay algo. */
   const p = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM casos c WHERE (c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA
   ).first();
-  return json({ casos: r.results || [], porConfirmar: (p && p.n) || 0 });
+  return json({ casos: r.results || [], porConfirmar: (p && p.n) || 0,
+                total: (tot && tot.n) || 0, tope: TOPE_COLA });
 }
 
 /* GET /api/triage/caso/<n> — la ficha: lo que el ingeniero necesita para
@@ -4781,7 +4804,7 @@ async function adminCasos(env) {
     /* Urgentes primero, y dentro de cada grupo el más viejo antes: en una
        emergencia el orden es la gravedad y luego la espera, nunca la novedad. */
     "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
-    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT 200"
+    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT " + TOPE_COLA
   ).all();
 
   /* POSIBLE DUPLICADO, y se calcula AQUÍ y no en SQL.
@@ -4812,7 +4835,11 @@ async function adminCasos(env) {
     const otros = (porTelefono.get(k) || []).filter((n) => n !== c.numero);
     return { ...c, dup: otros.length ? otros[0] : null };
   });
-  return json({ casos });
+  /* El total sale GRATIS: la consulta de teléfonos ya trajo todas las filas
+     para el mapa de duplicados. Sin decirlo, la bandeja se corta en el caso 200
+     y parece que ahí se acaban — con cinco territorios de más de cien familias
+     eso pasa, y el caso 201 no existiría para nadie. */
+  return json({ casos, total: (tel.results || []).length, tope: TOPE_COLA });
 }
 
 /* ========================================================================
@@ -6195,7 +6222,7 @@ async function adminInspecciones(env) {
     "obs_nombre, obs_matricula, propietario, contacto, requiere_esp, " +
     "firma_hab_key, firma_hab_motivo, pdf_key, respuestas, familia, finca, recomendaciones, " +
     "substr(creado_en,1,16) AS creado_en, substr(recibido_en,1,16) AS recibido_en " +
-    "FROM inspecciones ORDER BY requiere_esp DESC, recibido_en DESC LIMIT 300"
+    "FROM inspecciones ORDER BY requiere_esp DESC, recibido_en DESC LIMIT " + TOPE_INSPECCIONES
   ).all();
 
   const filas = (r.results || []).map((v) => {
@@ -6224,16 +6251,22 @@ async function adminInspecciones(env) {
     const { respuestas, recomendaciones, ...resto } = v;
     return { ...resto, marcas, urgente, nReco };
   });
-  return json({ inspecciones: filas });
+  const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM inspecciones").first();
+  return json({ inspecciones: filas, total: (tot && tot.n) || 0, tope: TOPE_INSPECCIONES });
 }
 
 async function adminInscripciones(env) {
   const r = await env.DB.prepare(
     "SELECT id, tipo, estado, nombre, email, telefono, ciudad, datos, creada_en " +
     "FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero') " +
-    "ORDER BY creada_en DESC LIMIT 200"
+    "ORDER BY creada_en DESC LIMIT " + TOPE_COLA
   ).all();
-  return json({ inscripciones: r.results || [] });
+  /* Importa aquí más que en ninguna otra: si cien ingenieros se postulan en un
+     día, la bandeja no puede quedarse callada en el número doscientos. */
+  const tot = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero')"
+  ).first();
+  return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0, tope: TOPE_COLA });
 }
 
 /* POST /api/admin/inscripcion/<id>/matricula — «vi su matrícula en el COPNIA».
@@ -7519,12 +7552,25 @@ function resumenInscripcion(tipo, x){
   return m + (extra.length ? "<br><small>" + extra.join(" · ") + "</small>" : "");
 }
 
+/* EL AVISO DE TRUNCADO, y va al FINAL de la tabla a propósito: es donde el
+   lector concluye «esto es todo», así que es donde engaña. Un tope callado hace
+   que el caso 201 no exista para nadie mientras la familia espera — la misma
+   clase de fallo que los borradores que ningún código leía. */
+function filaTope(d, columnas, que){
+  if (!d || !d.total || !d.tope || d.total <= d.tope) return "";
+  var faltan = d.total - d.tope;
+  return '<tr><td colspan="' + columnas + '" style="background:var(--amber-bg,#fff8e6);font-size:13px">'
+    + "<strong>Faltan " + faltan + " " + que + " por mostrar</strong> · se enseñan "
+    + d.tope + " de " + d.total + ". Usa los filtros para acotar."
+    + "</td></tr>";
+}
+
 function cargarInscripciones(){
   fetch("/api/admin/inscripciones").then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("i-filas"); if (!tb) return;
     var l = d.inscripciones || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no ha aplicado nadie.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(i){
+    tb.innerHTML = filaTope(d, 7, "postulaciones") + l.map(function(i){
       var x = {}; try { x = JSON.parse(i.datos||"{}"); } catch(e){}
       var siguiente = i.estado === "nueva" ? ["en_revision","En revisión"]
                     : i.estado === "en_revision" ? ["aceptada","Seguimos"]
@@ -7568,7 +7614,7 @@ function cargarCasos(){
                no_requiere:"No requiere visita", inevaluable:"No se pudo evaluar" };
     var EST = { recibido:"Recibido", en_revision:"En revisión", clasificado:"Clasificado",
                 visitado:"Visitado", cerrado:"Cerrado", descartado:"Descartado" };
-    tb.innerHTML = l.map(function(c){
+    tb.innerHTML = filaTope(d, 7, "casos") + l.map(function(c){
       var pr = c.clasificacion
         ? '<strong>' + esc(ET[c.clasificacion] || c.clasificacion) + '</strong>'
           + (c.ing ? '<br><small>por ' + esc(c.ing) + '</small>' : '')
@@ -7876,7 +7922,7 @@ function cargarInspecciones(){
     var tb = document.getElementById("ins-filas"); if (!tb) return;
     var l = d.inspecciones || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Todavía no ha llegado ninguna inspección de terreno.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(v){
+    tb.innerHTML = filaTope(d, 8, "inspecciones") + l.map(function(v){
       var m = v.marcas || {};
       /* El conteo de RE va en negrita cuando hay alguno: es el dato que decide
          si esta fila se mira hoy o mañana. */
@@ -8438,7 +8484,20 @@ export default {
        entorno de pruebas sirve las dos marcas y saltar a producción convertiría
        una prueba en una visita al sitio real. */
     if (ruta.startsWith("/caso/") && !HOST_MMC.test(url.hostname) && !/\.workers\.dev$/i.test(url.hostname)) {
-      return Response.redirect(ORIGIN_MMC + ruta + url.search, 301);
+      /* 302 Y `no-store`, no 301. Esta URL lleva el token de la familia en la
+         query —es lo único con lo que vuelve a su caso— y un 301 es cacheable
+         para siempre: el navegador lo fija y una caché compartida puede
+         guardarlo. Para una URL que carga un secreto, la redirección tiene que
+         ser temporal y no almacenarse. Se construye a mano porque
+         Response.redirect no admite cabeceras. */
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: ORIGIN_MMC + ruta + url.search,
+          "cache-control": "no-store",
+          "x-robots-tag": "noindex, nofollow"
+        }
+      });
     }
 
     /* --- Panel interno: TODO detrás de Access, y fail-closed --- */
