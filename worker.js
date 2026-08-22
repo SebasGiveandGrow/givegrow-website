@@ -32,7 +32,10 @@
 */
 
 import { recibo, certificado, informeTriage, inspeccionPDF,
-         INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT } from "./documentos.js";
+         INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT,
+         INSPECCION_AYUDA, INSPECCION_ANCHOS, INSPECCION_GLOSARIO,
+         INSPECCION_LIMITES, INSPECCION_REGLA_VISTA,
+         INSPECCION_MENSAJE_COMUNIDAD } from "./documentos.js";
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
 
@@ -2937,6 +2940,8 @@ async function triageInspeccionRecibir(request, env, email) {
   const fecha = limpiar(c.fecha_visita, 10);
   const obsNombre = limpiar(c.obs_nombre, 160);
   const faltan = [];
+  const familia = limpiar(c.familia, 160);
+  if (!familia)    faltan.push("familia");
   if (!municipio)  faltan.push("municipio");
   if (!fecha)      faltan.push("fecha_visita");
   if (!obsNombre)  faltan.push("obs_nombre");
@@ -2966,6 +2971,18 @@ async function triageInspeccionRecibir(request, env, email) {
                   ayuda: "Si el habitante no pudo firmar, escribe por qué. Un espacio en blanco no distingue «no pudo» de «no autorizó»." }, 422);
   }
 
+  /* Las coordenadas se guardan solo si son NÚMEROS y caen en el planeta. Un
+     teléfono que devuelve basura, o un envío manipulado, no puede poner una casa
+     en medio del océano. Son PRIVADAS: nunca salen al banco público, igual que
+     la dirección — ver la 0010, que partió la ubicación en dos por esa razón. */
+  const num = (x, min, max) => {
+    const n = Number(x);
+    return Number.isFinite(n) && n >= min && n <= max ? n : null;
+  };
+  const lat = num(c.lat, -90, 90);
+  const lon = num(c.lon, -180, 180);
+  const prec = num(c.gps_precision, 0, 100000);
+
   const respuestas = limpiarRespuestas(c.respuestas);
   respuestas._local_id = localId;
 
@@ -2994,8 +3011,8 @@ async function triageInspeccionRecibir(request, env, email) {
     "INSERT INTO inspecciones (numero, caso, proyecto, casa_no, direccion, municipio, " +
     "fecha_visita, hora, obs_nombre, obs_cc, obs_matricula, obs_email, propietario, contacto, " +
     "hab_cc, respuestas, requiere_esp, consent_hab, firma_obs_key, firma_hab_key, " +
-    "firma_hab_motivo, creado_en, dispositivo) " +
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "firma_hab_motivo, creado_en, dispositivo, familia, finca, lat, lon, gps_precision) " +
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(
     numero, limpiar(c.caso, 20) || null, limpiar(c.proyecto, 120) || null,
     limpiar(c.casa_no, 40) || null, limpiar(c.direccion, 240) || null, municipio,
@@ -3010,7 +3027,8 @@ async function triageInspeccionRecibir(request, env, email) {
        jamás se sobreescribe una válida: la fecha del documento tiene que ser la
        de la visita. Ver `fechaTelefono`. */
     fechaTelefono(c.creado_en) || new Date().toISOString().slice(0, 19).replace("T", " "),
-    limpiar(c.dispositivo, 120) || null
+    limpiar(c.dispositivo, 120) || null,
+    familia, limpiar(c.finca, 160) || null, lat, lon, prec
   ).run();
   } catch (e) {
     const msg = String((e && e.message) || "");
@@ -3033,7 +3051,8 @@ async function triageInspeccionRecibir(request, env, email) {
   try {
     const bytes = await inspeccionPDF(
       {
-        numero, caso: limpiar(c.caso, 20) || null, proyecto: limpiar(c.proyecto, 120), municipio, direccion: limpiar(c.direccion, 240),
+        numero, caso: limpiar(c.caso, 20) || null, familia, finca: limpiar(c.finca, 160),
+        lat, lon, gps_precision: prec, municipio, direccion: limpiar(c.direccion, 240),
         casa_no: limpiar(c.casa_no, 40), fecha_visita: fecha, hora: limpiar(c.hora, 8),
         propietario: limpiar(c.propietario, 160), contacto: limpiar(c.contacto, 80),
         obs_nombre: obsNombre, obs_cc: limpiar(c.obs_cc, 40), obs_matricula: limpiar(c.obs_matricula, 60),
@@ -3051,6 +3070,49 @@ async function triageInspeccionRecibir(request, env, email) {
   }
 
   return json({ ok: true, numero, repetida: false });
+}
+
+/* POST /api/triage/inspeccion/<numero>/foto — una foto, una petición.
+   En serie y de a una por la misma razón que en el formulario de la familia: con
+   señal mala, siete subidas en paralelo se pisan y fallan todas.
+
+   Solo el AUTOR de la inspección puede añadirle fotos, con la misma regla que
+   gobierna su PDF. Y solo mientras el documento no se haya emitido: una vez
+   congelado, añadir material cambiaría lo que la inspección dice sin cambiar el
+   documento que la gente firmó. */
+async function triageInspeccionFoto(request, env, numero, sesion) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const v = await env.DB.prepare(
+    "SELECT numero, obs_email, fotos, pdf_key FROM inspecciones WHERE numero = ?"
+  ).bind(numero).first();
+
+  const suya = v && sesion && sesion.email &&
+               String(v.obs_email || "").toLowerCase() === String(sesion.email).toLowerCase();
+  if (!v || !((sesion && sesion.equipo) || suya)) return json({ error: "no_encontrada" }, 404);
+
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const spec = TIPOS_MEDIO[tipo];
+  if (!spec) return json({ error: "tipo_no_permitido", permitidos: Object.keys(TIPOS_MEDIO) }, 415);
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > spec.max) {
+    return json({ error: "archivo_muy_grande", max_mb: Math.round(spec.max / 1048576) }, 413);
+  }
+
+  let lista = [];
+  try { lista = JSON.parse(v.fotos || "[]"); } catch { lista = []; }
+  if (lista.length >= 20) return json({ error: "demasiadas_fotos", max: 20 }, 409);
+
+  /* El número de la foto es su POSICIÓN, y es el que la persona anotó en
+     «Foto N.º» de cada ítem. Por eso se añade al final y nunca se reordena. */
+  const n = lista.length + 1;
+  const clave = "inspecciones/" + numero + "/foto-" + String(n).padStart(2, "0") + "." + spec.ext;
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+  lista.push({ n, clave, bytes: bytes.length });
+  await env.DB.prepare("UPDATE inspecciones SET fotos = ? WHERE numero = ?")
+    .bind(JSON.stringify(lista), numero).run();
+  return json({ ok: true, numero, foto: n });
 }
 
 /* POST /api/admin/inspeccion/<numero>/pdf — emitir el documento que faltó.
@@ -3145,7 +3207,7 @@ async function triageInspeccionPDF(env, numero, sesion) {
    #1b del gate compila lo que esto EMITE, no lo que se lee aquí. */
 function inspeccionJS() {
   return `"use strict";
-var DB = null, ACTUAL = null, SECS = [];
+var DB = null, ACTUAL = null, SECS = [], AYUDA = {}, GUIA = {};
 
 /* ---- IndexedDB. Sin librerías: el sitio es vanilla a propósito y esto tiene
    que caber en un teléfono viejo sin descargar nada. ---- */
@@ -3185,6 +3247,62 @@ function aviso(txt, clase){
 }
 
 /* ---- Pintar las secciones desde el catálogo del servidor ---- */
+/* La referencia: lo que la guía del AIS aporta y que no cabe por ítem. Va ANTES
+   de las 8 secciones porque son las tres cosas que cambian cómo se marca todo lo
+   demás: el ancho de grieta según el material, la regla de la vista, y los
+   límites de lo que una inspección visual puede decir. */
+function pintarReferencia(){
+  var c = el("referencia"); if (!c) return;
+  var h = "";
+
+  if (GUIA.reglaVista) {
+    h += '<div class="ayuda" style="margin-bottom:12px">' + esc(GUIA.reglaVista) + "</div>";
+  }
+
+  if (GUIA.anchos && GUIA.anchos.length) {
+    h += '<div class="ref"><h3>Ancho de grieta: NO es el mismo umbral en todos los materiales</h3>'
+      +  '<table><thead><tr><th>Material</th><th>Leve</th><th>Moderado</th><th>Fuerte</th></tr></thead><tbody>';
+    for (var i = 0; i < GUIA.anchos.length; i++){
+      var a = GUIA.anchos[i];
+      h += "<tr><td>" + esc(a.material) + "</td><td>" + esc(a.leve) + "</td><td>"
+        +  esc(a.moderado) + "</td><td>" + esc(a.fuerte) + "</td></tr>";
+    }
+    h += "</tbody></table></div>";
+  }
+
+  if (GUIA.limites && GUIA.limites.length) {
+    h += '<div class="ref"><h3>Cuatro límites de esta inspección</h3><ul>';
+    for (var j = 0; j < GUIA.limites.length; j++) h += "<li>" + esc(GUIA.limites[j]) + "</li>";
+    h += "</ul></div>";
+  }
+
+  if (GUIA.glosario && GUIA.glosario.length) {
+    h += '<div class="ref"><h3>Palabras del formulario, explicadas</h3><dl>';
+    for (var k = 0; k < GUIA.glosario.length; k++){
+      var g = GUIA.glosario[k];
+      /* Se MARCA lo que no viene de la guía. Presentar un término nuestro con la
+         autoridad del AIS sería atribuirle algo que no dijo. */
+      h += "<dt>" + esc(g.t)
+        +  (g.fuente !== "AIS" ? ' <span class="propio">término nuestro</span>' : "")
+        +  "</dt><dd>" + esc(g.d) + "</dd>";
+    }
+    h += "</dl></div>";
+  }
+
+  h += '<p style="font-size:12.5px;color:var(--mu);margin:10px 0 0">Lo anterior resume la '
+    +  '<strong>Guía Técnica para la Inspección de Edificaciones Después de un Sismo</strong>, '
+    +  'manual de campo del AIS y el IDIGER, 4.ª edición de 2018. Su escala oficial tiene cinco '
+    +  'niveles de daño y cuatro categorías de habitabilidad con color; la nuestra es más simple a '
+    +  'propósito y <strong>no clasifica habitabilidad</strong>.</p>';
+  c.innerHTML = h;
+
+  var m = el("mensaje-fam");
+  if (m && GUIA.mensaje) {
+    m.innerHTML = "<h3>Léele esto al habitante antes de que firme</h3>"
+      + '<p style="font-size:13.5px;line-height:1.55;margin:0">' + esc(GUIA.mensaje) + "</p>";
+  }
+}
+
 function pintarSecciones(){
   var h = "";
   for (var i = 0; i < SECS.length; i++){
@@ -3192,8 +3310,16 @@ function pintarSecciones(){
     h += "<h2>" + esc(sec.n + ". " + sec.titulo) + "</h2>";
     for (var j = 0; j < sec.items.length; j++){
       var it = sec.items[j];
+      var ay = AYUDA[it.id];
       h += '<div class="item" data-id="' + esc(it.id) + '">'
         +    "<b>" + esc(it.id + "  " + it.t) + "</b>"
+        /* La ayuda va PLEGADA: 19 explicaciones abiertas convertirían el
+           formulario en un manual y nadie lo leería. Se abre la que hace falta,
+           cuando hace falta. Los ítems que la guía del AIS no respalda no
+           llevan botón, en vez de llevar una explicación inventada. */
+        +    (ay ? '<button type="button" class="btn o mini ayuda-btn" style="margin-bottom:8px" data-ayuda="' + esc(it.id) + '">¿Qué estoy mirando?</button>'
+                 + '<div class="ayuda" id="ay-' + esc(it.id) + '" style="display:none">' + esc(ay) + "</div>"
+                 : "")
         +    '<div class="marcas">'
         +      '<button type="button" class="re" data-m="RE"  aria-pressed="false">RE</button>'
         +      '<button type="button"          data-m="OBS" aria-pressed="false">Obs</button>'
@@ -3226,7 +3352,9 @@ function leerFormulario(){
   var cons = document.querySelector("[data-cons][aria-pressed=true]");
   return {
     local_id: ACTUAL,
-    proyecto: val("f-proy"),
+    familia: val("f-fam"), finca: val("f-finca"),
+    lat: GPS.lat, lon: GPS.lon, gps_precision: GPS.precision,
+    fotos: FOTOS.slice(),
     municipio: val("f-muni"), fecha_visita: val("f-fecha"), hora: val("f-hora"),
     casa_no: val("f-casa"), direccion: val("f-dir"), caso: val("f-caso"),
     obs_nombre: val("f-obs"), obs_matricula: val("f-mat"), obs_cc: val("f-cc"),
@@ -3241,6 +3369,102 @@ function leerFormulario(){
     creado_en: new Date().toISOString().slice(0,19).replace("T"," "),
     dispositivo: (navigator.userAgent || "").slice(0,120)
   };
+}
+
+/* ---- Fotos ----
+   Se comprimen ANTES de guardarlas, y no por ahorrar red: por ahorrar
+   ALMACENAMIENTO EN EL TELÉFONO. Una foto de un móvil de hoy pesa 4–12 MB; con
+   treinta casas a cuatro fotos serían cientos de megas en IndexedDB, y iOS y
+   Android desalojan ese almacén cuando el teléfono se llena. Comprimidas a
+   1600 px de lado largo pesan 300–600 KB, que es lo medido en los casos reales
+   de este proyecto.
+
+   Se numeran en el orden en que entran, y ese número es el que la persona anota
+   en «Foto N.º» de cada ítem — el papel ya había resuelto así el problema de
+   asociar fotos con observaciones, y copiarlo evita una interfaz de arrastrar. */
+var FOTOS = [];
+var FOTO_LADO = 1600, FOTO_CALIDAD = 0.72;
+
+function comprimirFotoInsp(file){
+  return createImageBitmap(file, { imageOrientation: "from-image" }).then(function(bm){
+    var esc = Math.min(1, FOTO_LADO / Math.max(bm.width, bm.height));
+    var w = Math.round(bm.width * esc), h = Math.round(bm.height * esc);
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d").drawImage(bm, 0, 0, w, h);
+    bm.close && bm.close();
+    return new Promise(function(res){
+      c.toBlob(function(b){ res(b || file); }, "image/jpeg", FOTO_CALIDAD);
+    });
+  }).catch(function(){
+    /* Si el navegador no puede decodificarla (un HEIC en Chrome de Android), se
+       guarda el original. Pesa más, pero perder la foto es peor: el servidor la
+       rechazará y quedará contada como fallida, que es visible. */
+    return file;
+  });
+}
+
+function pintarFotos(){
+  var l = el("fotos-lista"), e = el("fotos-est");
+  if (!l || !e) return;
+  var kb = FOTOS.reduce(function(a, f){ return a + (f.blob ? f.blob.size : 0); }, 0) / 1024;
+  e.textContent = FOTOS.length
+    ? FOTOS.length + (FOTOS.length === 1 ? " foto" : " fotos") + " · " + Math.round(kb) + " KB en el teléfono"
+    : "Ninguna todavía.";
+  l.innerHTML = FOTOS.map(function(f, i){
+    return '<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd);'
+         + 'border-radius:4px;padding:5px 8px;font-size:13px">N.º ' + (i + 1)
+         + ' <button type="button" class="btn o mini" style="padding:2px 7px" data-quitafoto="' + i + '">quitar</button></span>';
+  }).join("");
+}
+
+function agregarFotos(inp){
+  var archivos = Array.prototype.slice.call(inp.files || []);
+  inp.value = "";
+  if (!archivos.length) return;
+  var pendientes = archivos.length;
+  el("fotos-est").textContent = "Preparando " + pendientes + "…";
+  archivos.forEach(function(file){
+    comprimirFotoInsp(file).then(function(blob){
+      FOTOS.push({ blob: blob, tipo: blob.type || file.type || "image/jpeg" });
+      if (--pendientes === 0){ pintarFotos(); guardarBorrador(); }
+    });
+  });
+}
+
+/* ---- Ubicación ----
+   El GPS del teléfono NO necesita internet: el chip habla con los satélites. Es
+   la única pieza de este formulario que funciona igual en la vereda que en la
+   oficina, y resuelve el problema de verdad — en vereda no hay nomenclatura y
+   una dirección escrita a mano no lleva a nadie de vuelta.
+
+   NO se pide sola al abrir. Un permiso de ubicación que salta sin que nadie lo
+   haya pedido se deniega por reflejo, y una vez denegado el navegador no lo
+   vuelve a preguntar. Se pide cuando la persona toca el botón, que es cuando
+   entiende para qué es. */
+var GPS = { lat: null, lon: null, precision: null };
+
+function tomarGPS(){
+  var e = el("gps-est");
+  if (!navigator.geolocation){ e.textContent = "Este teléfono no da ubicación."; return; }
+  e.textContent = "Buscando satélites… puede tardar hasta un minuto a cielo abierto.";
+  navigator.geolocation.getCurrentPosition(function(pos){
+    GPS.lat = pos.coords.latitude;
+    GPS.lon = pos.coords.longitude;
+    GPS.precision = pos.coords.accuracy;
+    /* Se enseña la PRECISIÓN, no solo las coordenadas: 8 metros sirven para
+       volver a la casa, 2.000 metros son el barrio y no valen para nada. Quien
+       está en terreno tiene que poder decidir si vuelve a intentarlo. */
+    e.textContent = "Tomada: " + GPS.lat.toFixed(5) + ", " + GPS.lon.toFixed(5)
+      + " · precisión " + Math.round(GPS.precision) + " m"
+      + (GPS.precision > 100 ? " — muy imprecisa, intenta a cielo abierto" : "");
+    e.style.color = GPS.precision > 100 ? "var(--amb)" : "var(--ok)";
+    guardarBorrador();
+  }, function(err){
+    e.style.color = "var(--amb)";
+    e.textContent = err.code === 1
+      ? "No diste permiso de ubicación. Puedes seguir sin ella, pero será más difícil volver a esta casa."
+      : "No se pudo tomar la ubicación. Intenta a cielo abierto, lejos de muros.";
+  }, { enableHighAccuracy: true, timeout: 60000, maximumAge: 0 });
 }
 
 /* ---- Firmas en lienzo ----
@@ -3315,17 +3539,67 @@ function guardarBorrador(){
   guardarPronto = setTimeout(function(){
     var reg = leerFormulario();
     poner("borradores", reg);
+    /* SOLO lo que no cambia de casa en casa. familia y finca NO entran aquí,
+       y es la razón por la que no bastaba renombrar el campo anterior: si se
+       quedaran pegados, la segunda casa heredaría el apellido de la primera y el
+       documento diría que la inspección es de una familia que no es. */
     poner("perfil", { k: "fijos", municipio: reg.municipio, obs_nombre: reg.obs_nombre,
-                      obs_matricula: reg.obs_matricula, obs_cc: reg.obs_cc, proyecto: reg.proyecto })
+                      obs_matricula: reg.obs_matricula, obs_cc: reg.obs_cc })
       .then(estado);
   }, 400);
 }
 
 /* ---- La cola. Reintenta, y NO borra nada que no se haya confirmado. ---- */
+/* DOS TRAMOS, y el orden importa: primero la inspección en JSON, después las
+   fotos de a una.
+
+   Los Blob NO sobreviven a JSON.stringify —se convertirían en {}— así que las
+   fotos no pueden viajar en el mismo cuerpo. Y separarlas tiene una ventaja: si
+   la señal se corta a mitad de las fotos, el reintento NO vuelve a crear la
+   inspección (la idempotencia devuelve su mismo número) y solo sube las que
+   faltan, porque cada una queda marcada en la cola en cuanto se guarda. Sin esa
+   marca, cada reintento duplicaría las fotos ya subidas. */
+function enviarFotos(reg, numero){
+  var pend = (reg.fotos || []).filter(function(f){ return f && f.blob && !f.subida; });
+  if (!pend.length) return Promise.resolve({ estado: "ok", numero: numero });
+  var i = 0;
+  function paso(){
+    if (i >= pend.length) return Promise.resolve({ estado: "ok", numero: numero });
+    var f = pend[i++];
+    return fetch("/api/triage/inspeccion/" + encodeURIComponent(numero) + "/foto", {
+      method: "POST", headers: { "content-type": f.tipo || "image/jpeg" }, body: f.blob
+    }).then(function(r){
+      var ct = r.headers.get("content-type") || "";
+      if (ct.indexOf("json") < 0) return { estado: "sesion" };
+      if (r.ok){
+        f.subida = true;
+        /* Se persiste el avance ANTES de seguir: si el teléfono se muere en la
+           foto 3 de 5, al volver solo sube las dos que faltan. */
+        return poner("cola", reg).then(paso);
+      }
+      /* Un rechazo por lo que la foto ES —tipo, tamaño, tope— no mejora
+         reintentando. Se marca como resuelta para no atascar la cola, y el
+         conteo del panel enseñará que llegaron menos de las que se tomaron. */
+      if (r.status === 413 || r.status === 415 || r.status === 409){
+        f.subida = true; f.rechazada = true;
+        return poner("cola", reg).then(paso);
+      }
+      return { estado: "reintentar" };
+    }).catch(function(){ return { estado: "reintentar" }; });
+  }
+  return paso();
+}
+
 function enviarUno(reg){
+  /* Los blobs se quitan del cuerpo a mano: JSON.stringify los dejaría en {} y el
+     servidor recibiría basura donde espera nada. */
+  var cuerpo = {};
+  for (var k in reg) if (k !== "fotos") cuerpo[k] = reg[k];
+  cuerpo.fotos_tomadas = (reg.fotos || []).length;
+
   return fetch("/api/triage/inspeccion", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify(reg)
+    body: JSON.stringify(cuerpo)
   }).then(function(r){
     var ct = r.headers.get("content-type") || "";
     /* DETRÁS DE ACCESS UNA SESIÓN EXPIRADA DEVUELVE EL HTML DEL LOGIN, no un
@@ -3335,7 +3609,15 @@ function enviarUno(reg){
       return { estado: "sesion" };
     }
     return r.json().then(function(d){
-      if (r.ok && d.ok) return { estado: "ok", numero: d.numero, repetida: !!d.repetida };
+      if (r.ok && d.ok){
+        /* La inspección ya está a salvo. Las fotos van después, y si fallan el
+           registro se queda en la cola para reintentarlas — no para volver a
+           crear la inspección. */
+        return enviarFotos(reg, d.numero).then(function(res){
+          if (res.estado !== "ok") return res;
+          return { estado: "ok", numero: d.numero, repetida: !!d.repetida };
+        });
+      }
       /* 422 y 400 son de los DATOS: reintentar no arregla nada y quedaría
          atascada para siempre. Se marca y se avisa. */
       if (r.status === 422 || r.status === 400) return { estado: "rechazada", d: d };
@@ -3419,8 +3701,12 @@ function preparar(){
   });
 }
 
-function INSP_ARRANCA(secciones){
-  SECS = secciones || [];
+function INSP_ARRANCA(paquete){
+  var G = paquete || {};
+  SECS  = G.secciones || [];
+  AYUDA = G.ayuda || {};
+  GUIA  = G;
+  pintarReferencia();
   pintarSecciones();
   ACTUAL = idNuevo();
   var f = el("f-fecha"); if (f && !f.value) f.value = new Date().toISOString().slice(0,10);
@@ -3447,7 +3733,6 @@ function INSP_ARRANCA(secciones){
     var g = tx("perfil", "readonly").get("fijos");
     g.onsuccess = function(){
       var f = g.result; if (!f) return;
-      if (f.proyecto      && !val("f-proy")) el("f-proy").value = f.proyecto;
       if (f.municipio     && !val("f-muni")) el("f-muni").value = f.municipio;
       if (f.obs_nombre    && !val("f-obs"))  el("f-obs").value  = f.obs_nombre;
       if (f.obs_matricula && !val("f-mat"))  el("f-mat").value  = f.obs_matricula;
@@ -3487,6 +3772,12 @@ function INSP_ARRANCA(secciones){
       cons.setAttribute("aria-pressed", cons.getAttribute("aria-pressed") === "true" ? "false" : "true");
       guardarBorrador(); return;
     }
+    var ab = e.target.closest("[data-ayuda]");
+    if (ab){
+      var caja = el("ay-" + ab.getAttribute("data-ayuda"));
+      if (caja) caja.style.display = caja.style.display === "none" ? "block" : "none";
+      return;
+    }
     var lim = e.target.closest("[data-limpiar]");
     if (lim){ limpiarLienzo(lim.getAttribute("data-limpiar")); return; }
     var nf = e.target.closest("#b-nofirma");
@@ -3499,11 +3790,17 @@ function INSP_ARRANCA(secciones){
       if (activo) limpiarLienzo("c-hab");
       guardarBorrador(); return;
     }
+    var qf = e.target.closest("[data-quitafoto]");
+    if (qf){ FOTOS.splice(Number(qf.getAttribute("data-quitafoto")), 1); pintarFotos(); guardarBorrador(); return; }
+    if (e.target.closest("#b-gps"))   { tomarGPS(); return; }
     if (e.target.closest("#b-prep"))  { preparar(); return; }
     if (e.target.closest("#b-cola"))  { aviso("Enviando…", "info"); vaciarCola(); return; }
     if (e.target.closest("#b-guardar")){ guardarInspeccion(); return; }
   });
 
+  document.addEventListener("change", function(e){
+    if (e.target.id === "f-fotos") agregarFotos(e.target);
+  });
   document.addEventListener("input", function(e){
     if (e.target.matches("input,textarea")) guardarBorrador();
   });
@@ -3517,6 +3814,7 @@ function guardarInspeccion(){
   var faltan = [];
   if (!reg.municipio)    faltan.push("municipio");
   if (!reg.fecha_visita) faltan.push("fecha de la visita");
+  if (!reg.familia)      faltan.push("el nombre de la familia");
   if (!reg.obs_nombre)   faltan.push("tu nombre");
   if (faltan.length){ aviso("Falta: " + faltan.join(", ") + ".", "mal"); return; }
   if (!reg.consent_hab){ aviso("Falta la autorización del habitante. Léele el alcance y márcala.", "mal"); return; }
@@ -3534,12 +3832,17 @@ function guardarInspeccion(){
   }).then(function(){
     ACTUAL = idNuevo();
     document.querySelectorAll("input,textarea").forEach(function(x){
-      if (x.id === "f-proy" || x.id === "f-muni" || x.id === "f-obs" || x.id === "f-mat" || x.id === "f-cc" || x.id === "f-fecha") return;
+      if (x.id === "f-muni" || x.id === "f-obs" || x.id === "f-mat" || x.id === "f-cc" || x.id === "f-fecha") return;
       x.value = "";
     });
     document.querySelectorAll("[aria-pressed=true]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
     document.querySelectorAll(".item.abierto").forEach(function(x){ x.classList.remove("abierto"); });
     limpiarLienzo("c-obs"); limpiarLienzo("c-hab");
+    /* La ubicación es de ESTA casa: se borra con el resto. Dejarla pegada
+       pondría las coordenadas de la casa anterior en la siguiente. */
+    GPS = { lat: null, lon: null, precision: null };
+    FOTOS = []; pintarFotos();
+    if (el("gps-est")){ el("gps-est").textContent = "Sin tomar."; el("gps-est").style.color = "var(--mu)"; }
     if (el("b-nofirma")){ el("b-nofirma").setAttribute("aria-pressed","false"); el("caja-nofirma").style.display="none"; }
     if (el("f-obs2")) el("f-obs2").value = val("f-obs");
     el("b-guardar").disabled = false;
@@ -3612,6 +3915,18 @@ textarea{min-height:64px;resize:vertical}
 .firma{margin:8px 0;border:1px dashed var(--bd);border-radius:6px;background:#fff}
 .firma canvas{display:block;width:100%;height:150px;touch-action:none;border-radius:6px}
 .btn.mini{padding:8px 12px;font-size:13px}
+.ayuda{background:#E7EFF6;border-left:3px solid var(--az);border-radius:3px;
+  padding:11px 13px;margin:0 0 10px;font-size:13.5px;line-height:1.5;color:#22384d}
+.ref{background:var(--sup);border:1px solid var(--bd);border-radius:6px;padding:14px;margin:12px 0}
+.ref h3{margin:0 0 8px;font-size:14.5px}
+.ref table{width:100%;border-collapse:collapse;font-size:13px}
+.ref th,.ref td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd)}
+.ref th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mu)}
+.ref ul{margin:8px 0 0 18px;padding:0;font-size:13.5px;line-height:1.5}
+.ref li{margin-bottom:7px}
+.ref dt{font-weight:600;font-size:13.5px;margin-top:9px}
+.ref dd{margin:2px 0 0;font-size:13px;color:#33475b;line-height:1.45}
+.ref .propio{font-size:11px;color:var(--amb);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 </style></head><body>
 <div class="wrap">
   <p class="ey">Give&amp;Grow International</p>
@@ -3624,14 +3939,25 @@ textarea{min-height:64px;resize:vertical}
   <div class="alcance"><b>Alcance y limitaciones.</b> ${alcance}</div>
 
   <h2>Identificación</h2>
-  <label for="f-proy">Proyecto / campaña</label><input id="f-proy" autocomplete="off"
-    placeholder="Brigada sismo agosto 2026">
+  <label for="f-fam">Nombre de la familia *</label><input id="f-fam" autocomplete="off"
+    placeholder="Los Guti&eacute;rrez">
+  <label for="f-finca">Nombre de la finca o predio</label><input id="f-finca" autocomplete="off"
+    placeholder="La Esperanza">
   <label for="f-muni">Municipio *</label><input id="f-muni" autocomplete="off">
   <label for="f-fecha">Fecha de la visita *</label><input id="f-fecha" type="date">
   <label for="f-hora">Hora</label><input id="f-hora" type="time">
   <label for="f-casa">Casa N.º (el que pinta la brigada)</label><input id="f-casa" autocomplete="off">
   <label for="f-dir">Dirección / vereda</label><input id="f-dir" autocomplete="off">
   <label for="f-caso">N.º de caso del triaje, si existe</label><input id="f-caso" placeholder="CV-2026-000123" autocomplete="off">
+
+  <div class="item" style="margin-top:14px">
+    <b>Ubicación GPS</b>
+    <p style="font-size:13.5px;color:var(--mu);margin:0 0 10px">En vereda no hay nomenclatura,
+    y sin coordenadas nadie encuentra la casa dos días después. <strong>El GPS funciona sin
+    señal</strong>: es lo único de esta pantalla que no necesita internet.</p>
+    <button type="button" class="btn o mini" id="b-gps">Tomar la ubicación</button>
+    <p id="gps-est" style="font-size:13.5px;margin:10px 0 0;color:var(--mu)">Sin tomar.</p>
+  </div>
 
   <h2>Quien observa</h2>
   <label for="f-obs">Nombre *</label><input id="f-obs" autocomplete="off">
@@ -3641,6 +3967,9 @@ textarea{min-height:64px;resize:vertical}
   <h2>Propietario o habitante</h2>
   <label for="f-prop">Nombre</label><input id="f-prop" autocomplete="off">
   <label for="f-cont">Contacto</label><input id="f-cont" inputmode="tel" autocomplete="off">
+
+  <h2>Antes de empezar a marcar</h2>
+  <div id="referencia"></div>
 
   <div id="secciones"></div>
 
@@ -3661,9 +3990,22 @@ textarea{min-height:64px;resize:vertical}
     </div>
   </div>
 
+  <h2>Fotos</h2>
+  <p style="font-size:13.5px;color:var(--mu);margin:0 0 10px">Se numeran solas, y ese número es el
+  que anotas en «Foto N.º» de cada ítem — igual que en el papel. <strong>Se guardan en el teléfono y
+  suben con la inspección</strong>, así que puedes tomarlas sin señal.</p>
+  <div class="item">
+    <label class="btn o mini" style="display:inline-block;cursor:pointer">
+      <span>Agregar fotos</span>
+      <input type="file" id="f-fotos" accept="image/*" multiple style="position:absolute;left:-9999px">
+    </label>
+    <p id="fotos-est" style="font-size:13.5px;margin:10px 0 0;color:var(--mu)">Ninguna todavía.</p>
+    <div id="fotos-lista" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"></div>
+  </div>
+
   <h2>Firmas</h2>
-  <p style="font-size:13px;color:var(--mu);margin:0 0 10px">
-    Léele el alcance de arriba antes de que firme. Se firma con el dedo.</p>
+  <div class="ref" id="mensaje-fam"></div>
+  <p style="font-size:13px;color:var(--mu);margin:0 0 10px">Se firma con el dedo.</p>
 
   <div class="item">
     <b>Quien realizó la observación</b>
@@ -7457,7 +7799,15 @@ export default {
            /ruta. Tres cicatrices de lo mismo. */
         if (ruta === "/triaje/inspeccion") {
           const cuerpo = inspeccionHTML(
-            JSON.stringify(INSPECCION_SECCIONES),
+            JSON.stringify({
+              secciones: INSPECCION_SECCIONES,
+              ayuda: INSPECCION_AYUDA,
+              anchos: INSPECCION_ANCHOS,
+              glosario: INSPECCION_GLOSARIO,
+              limites: INSPECCION_LIMITES,
+              reglaVista: INSPECCION_REGLA_VISTA,
+              mensaje: INSPECCION_MENSAJE_COMUNIDAD
+            }),
             esc(INSPECCION_ALCANCE),
             esc(INSPECCION_CONSENT)
           );
@@ -7482,6 +7832,8 @@ export default {
             "service-worker-allowed": "/triaje/"
           }});
         }
+        const mf = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\/foto$/);
+        if (mf) return await triageInspeccionFoto(request, env, mf[1], sesion);
         const mp = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\.pdf$/);
         if (mp) return await triageInspeccionPDF(env, mp[1], sesion);
         if (ruta === "/api/triage/inspeccion") {
