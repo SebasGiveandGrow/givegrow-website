@@ -1,9 +1,78 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Inspección visual preliminar, offline" (22 ago 2026)
-> **⏭️ ARRANCA POR: los TRES PENDIENTES DE LA BRIGADA**, que empieza el 24 —
-> ver la sección siguiente. Dos son de Sebas y uno no es código.
+> Última actualización: sesión "El rescate de los borradores" (22 ago 2026)
+> **⏭️ ARRANCA POR: LA CORRIDA DE RESCATE con cada ingeniero** — hay inspecciones
+> firmadas esperando en teléfonos, y ahora sí hay código que las lee. Después,
+> los tres pendientes de la brigada. Ver las dos secciones siguientes.
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
+
+## 🚨 EL DEFECTO QUE ESCONDIÓ INSPECCIONES FIRMADAS (22 ago, PR #161 y #162)
+
+`guardarBorrador()` escribía el registro COMPLETO —las 26 respuestas, las fotos y
+las DOS firmas— en el almacén `borradores` en cada cambio, y **nada lo volvía a
+leer nunca**: `todos("cola")` aparecía dos veces en el archivo y
+`todos("borradores")`, ninguna. Un teléfono que se bloqueaba a mitad del
+formulario dejaba la inspección íntegra guardada y fuera de alcance, y como el
+contador de la barra cuenta la COLA, marcaba **0**.
+
+Lo único que sí se reponía era el perfil —municipio, nombre, matrícula—, que es
+justo **lo que hacía creer que el formulario se había acordado de todo**.
+
+**LA LECCIÓN, que vale más que el arreglo:** un autoguardado sin su lectura no es
+un autoguardado, es un agujero con buena intención. Si alguna vez se añade otro
+almacén, la pregunta no es «¿se escribe?» sino **«¿quién lo lee, y qué pantalla lo
+enseña?»**. Se encontró rastreando inspecciones que no llegaron —no leyendo el
+código— y la pista fue que el papel decía más casas que la base.
+
+### Lo que quedó construido
+- **«Sin terminar en este teléfono»**, que se lista SOLA al abrir. Detrás de un
+  botón, quien no sabe que perdió algo nunca lo tocaría, y es esa persona la que
+  hay que avisar. Excluye la que está abierta, y se refresca al guardar: **una
+  cuenta que no baja es lo que hizo perder la confianza en la anterior.**
+- **`escribirFormulario()`**, el inverso de `leerFormulario()`. Campo por campo y
+  NO con un bucle sobre las claves: los nombres del registro y los del formulario
+  no coinciden y un bucle «listo» dejaría campos sin reponer en silencio. Hay una
+  comprobación que compara las dos funciones y falla si aparece un campo huérfano
+  — **si se añade un campo al formulario, hay que añadirlo a las dos.**
+- **El respaldo descargable** y su carga en `/admin`. El endpoint reutiliza
+  ENTERO el camino normal (`triageInspeccionRecibir` y `triageInspeccionFoto`) en
+  vez de escribir su propio INSERT: si validara distinto, el respaldo sería la
+  puerta por la que entra lo que el formulario habría rechazado.
+
+### ⚠️ Tres cosas que NO hay que deshacer
+1. **La bandera `RESTAURANDO`.** Reponer una firma exige cargar una imagen, que
+   es asíncrono; un autoguardado que cayera en esa ventana leería el lienzo
+   vacío y escribiría `firma_obs` en blanco: **destruiría la firma que está
+   rescatando.**
+2. **Las firmas se reponen con su CONTADOR DE TRAZOS** (`firmaDe()` cuenta
+   trazos, no pixeles) y **conservando la proporción**: el lienzo puede tener
+   otro ancho que cuando se firmó, y estirarla deformaría la firma de una persona
+   en el documento que esa persona firmó.
+3. **`requiere_esp` se guarda como `null`** cuando nadie contestó. `false` hacía
+   indistinguible «contestó NO» de «no contestó».
+
+### 🪤 Dos trampas nuevas
+- **`cargarX()` en el panel significa «carga una tabla al arrancar»**, y el gate
+  lo vigila: una función de acción con ese nombre falla el build. Por eso se
+  llama `importarRespaldo` y no `cargarRespaldo`.
+- **Los escapes `\u0300` dentro de las plantillas generadoras van DOBLES.**
+  Escritos sencillos, la plantilla los resolvía a los caracteres combinantes
+  literales. Funcionaba —y es exactamente la clase de cosa que un editor rompe
+  sin que nada avise.
+
+### ⏭️ LO QUE FALTA DE ESTO, y es de personas
+1. **El mensaje a los ingenieros: QUE NADIE BORRE NADA.** No limpiar el
+   navegador, no reinstalarlo, y **volver a entrar desde el mismo sitio de la
+   primera vez** —lo guardado le pertenece a ese navegador y no se ve desde
+   otro—. Si alguien llenó el formulario en una pestaña privada, eso sí se
+   perdió: hay que saber quién, para ir al papel.
+2. **La corrida de rescate, ingeniero por ingeniero.** Abre con señal, mira la
+   lista, y por cada una: «Guardar inspección» → «Enviar». **La cuenta la lleva
+   la persona, no el teléfono**: hay que preguntarle cuántas casas visitó, porque
+   ese número es el único con el que se puede verificar que no quedó nada.
+3. **La carga del respaldo contra la base real NO se ha ejercido.** El panel está
+   detrás de Access. La primera prueba, con UNA sola inspección; y la más segura
+   es cargar una que ya esté: debe responder «ya estaba» y no escribir nada.
 
 ## ⏭️ LO QUE ESPERA, CON LA BRIGADA EL 24 (sesión del 21–22 ago)
 
