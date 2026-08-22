@@ -670,6 +670,49 @@ export const INSPECCION_GLOSARIO = [
   { t: "Deflexión · eflorescencia", d: "Términos de nuestro formulario. La guía no los define. Deflexión es que un elemento horizontal se pandee visiblemente; eflorescencia, las manchas blancas que deja el agua al salir por el muro.", fuente: "nuestro" }
 ];
 
+/* LAS MEDIDAS QUE LA GUÍA AUTORIZA A RECOMENDAR, agrupadas como ella las
+   agrupa: por daño estructural, por daño no estructural y por problemas
+   geotécnicos. Son las suyas, no una lista nuestra.
+
+   ⚠️ «DEMOLER» NO ESTÁ, y no es un olvido: la guía lo prohíbe expresamente al
+   evaluador —«en ningún caso los evaluadores deberán recomendar la posible
+   demolición»— y en su lugar pide solicitar la visita de un experto señalando
+   la inminencia del peligro. No se ofrece en el formulario lo que no se puede
+   recomendar: una casilla que existe se marca.
+
+   El id es PERMANENTE, como los de los ítems: se guarda en el JSON y renumerar
+   reescribiría lo que dice una inspección ya firmada. */
+export const INSPECCION_RECOMENDA = [
+  { g: "Si el daño es estructural", items: [
+    { id: "e1", t: "Evacuar la vivienda" },
+    { id: "e2", t: "Evacuar o restringir el acceso a las viviendas vecinas" },
+    { id: "e3", t: "Apuntalar" },
+    { id: "e4", t: "Restringir el acceso a una parte de la vivienda" },
+    { id: "e5", t: "Restringir el tránsito de personas o vehículos alrededor" }
+  ]},
+  { g: "Si el daño NO es estructural", items: [
+    { id: "n1", t: "Retirar elementos en peligro de caer — solo si al quitarlos no se cae nada más" },
+    { id: "n2", t: "Evacuar parcialmente y restringir el acceso a esa zona" },
+    { id: "n3", t: "Desconectar la energía" },
+    { id: "n4", t: "Cerrar el gas" },
+    { id: "n5", t: "Cerrar el agua" },
+    { id: "n6", t: "Cuidado con sustancias peligrosas en la vivienda" }
+  ]},
+  { g: "Si el problema es del terreno", items: [
+    { id: "g1", t: "Cubrir con plástico la zona comprometida por el deslizamiento" },
+    { id: "g2", t: "Taponar las grietas del terreno con material impermeable" },
+    { id: "g3", t: "Desviar o controlar las aguas que caen sobre el talud" },
+    { id: "g4", t: "Poner barreras para que nadie se acerque al talud" },
+    { id: "g5", t: "NO remover material del pie del deslizamiento" }
+  ]},
+  { g: "Siempre que quede duda", items: [
+    { id: "x1", t: "Pedir visita de un ingeniero estructural" },
+    { id: "x2", t: "Pedir visita de un ingeniero geotecnista (problemas de talud o suelo)" },
+    { id: "x3", t: "Avisar a la empresa de servicios públicos (fuga o daño en la red)" },
+    { id: "x4", t: "URGENTE: el peligro parece inminente, priorizar la visita del experto" }
+  ]}
+];
+
 /* Lo que hay que DECIRLE a la gente al terminar. Es de la guía, que lo pone como
    obligación del evaluador — y su última frase es la razón por la que este
    documento no puede ser lo último que pase en esa casa. */
@@ -862,6 +905,20 @@ const EXPLICA_CLAS = {
    NO ES UN DICTAMEN, y el documento lo dice tres veces porque el papel lo decía
    tres veces: en el subtítulo, en el alcance y en el cierre. No se suaviza
    ninguna. =========================================================================== */
+/* Los ids marcados se traducen a su texto desde el catálogo. Guardar el id y no
+   la frase es lo que permite contarlos; imprimir la frase y no el id es lo que
+   hace que el documento se entienda. */
+function leerReco(crudo) {
+  let d = {};
+  try { d = typeof crudo === "string" ? JSON.parse(crudo || "{}") : (crudo || {}); } catch { d = {}; }
+  const mapa = {};
+  for (const g of INSPECCION_RECOMENDA) for (const it of g.items) mapa[it.id] = it.t;
+  return {
+    marcadas: (Array.isArray(d.marcadas) ? d.marcadas : []).map((x) => mapa[x]).filter(Boolean),
+    texto: typeof d.texto === "string" ? d.texto : ""
+  };
+}
+
 export async function inspeccionPDF(v, firmas, hoyISO) {
   const { pdf, hoja: h, f } = await abrir(
     "Inspección visual preliminar " + v.numero,
@@ -886,11 +943,12 @@ export async function inspeccionPDF(v, firmas, hoyISO) {
   h.salto(10);
 
   seccion(h, f, "I", "LA VIVIENDA");
-  /* «Proyecto / Campaña» es el PRIMER campo del papel, y se había quedado fuera:
-     la columna existía en el esquema y nada la llenaba ni la imprimía. Con la
-     brigada recorriendo cinco territorios, un documento que no dice a qué
-     jornada pertenece no se puede archivar. */
-  if (v.proyecto) h.fila("Proyecto / campaña", v.proyecto);
+  /* LA FAMILIA PRIMERO. El papel abría con «Proyecto / Campaña», pero en terreno
+     lo que identifica una visita es de quién es la casa — y por eso el campo
+     cambió. En vereda, el nombre del predio y las coordenadas hacen el trabajo
+     que la dirección no puede hacer, porque no hay nomenclatura. */
+  h.fila("Familia", v.familia || "-");
+  if (v.finca) h.fila("Finca o predio", v.finca);
   h.fila("Municipio", v.municipio || "-");
   if (v.direccion) h.fila("Dirección / vereda", v.direccion);
   if (v.casa_no)   h.fila("Casa N.º", v.casa_no);
@@ -899,6 +957,12 @@ export async function inspeccionPDF(v, firmas, hoyISO) {
   if (v.propietario) h.fila("Propietario / habitante", v.propietario);
   if (v.contacto)    h.fila("Contacto", v.contacto);
   if (v.caso)        h.fila("Caso del triaje", v.caso);
+  /* Las coordenadas van al documento porque son lo que permite VOLVER, y con su
+     precisión al lado: 9 metros llevan a la casa, 2.000 son el municipio. */
+  if (v.lat != null && v.lon != null) {
+    h.fila("Coordenadas", Number(v.lat).toFixed(5) + ", " + Number(v.lon).toFixed(5) +
+      (v.gps_precision != null ? "  (\u00b1" + Math.round(v.gps_precision) + " m)" : ""));
+  }
   h.salto(12);
 
   seccion(h, f, "II", "OBSERVACIONES");
@@ -950,7 +1014,36 @@ export async function inspeccionPDF(v, firmas, hoyISO) {
   h.texto("Recomendación. " + INSPECCION_RECOMENDACION,
     { tam: 9.5, interlinea: 13.5, despues: 16 });
 
-  seccion(h, f, "IV", "FIRMAS");
+  /* LAS RECOMENDACIONES VAN ANTES DE LAS FIRMAS, y no es cosmético: la guía del
+     AIS obliga a explicárselas de viva voz a los ocupantes, y quien firma tiene
+     que haberlas oído. Un documento que las pone después de la firma haría que
+     la persona firmara algo que todavía no le habían dicho. */
+  const reco = leerReco(v.recomendaciones);
+  if (reco.marcadas.length || reco.texto || v.observaciones) {
+    seccion(h, f, "IV", "RECOMENDACIONES Y OBSERVACIONES");
+    if (reco.marcadas.length) {
+      h.texto("Medidas recomendadas:", { tam: 9.5, fuente: f.negrita, despues: 5 });
+      for (const t of reco.marcadas) {
+        h.reservar(16);
+        h.texto("·  " + t, { tam: 9.5, interlinea: 13, despues: 2, x: MG.izq + 8, ancho: ANCHO - 8 });
+      }
+      h.salto(8);
+    }
+    if (reco.texto) {
+      h.texto("Además:", { tam: 9.5, fuente: f.negrita, despues: 5 });
+      h.texto(reco.texto, { tam: 9.5, interlinea: 13.5, despues: 12 });
+    }
+    if (v.observaciones) {
+      h.texto("Observaciones generales:", { tam: 9.5, fuente: f.negrita, despues: 5 });
+      h.texto(v.observaciones, { tam: 9.5, interlinea: 13.5, despues: 12 });
+    }
+    h.texto("Esta inspección NO recomienda demoler. La guía técnica del AIS lo prohíbe " +
+            "expresamente al evaluador: cuando el peligro parece inminente se pide la visita " +
+            "de un experto y se señala la urgencia.",
+      { tam: 8.5, fuente: f.cursiva, color: GRIS, interlinea: 12, despues: 16 });
+  }
+
+  seccion(h, f, "V", "FIRMAS");
   h.texto(INSPECCION_CONSENT, { tam: 9, color: GRIS, interlinea: 12.5, despues: 16 });
 
   await bloqueFirma(pdf, h, f, "Quien realizó la observación",
