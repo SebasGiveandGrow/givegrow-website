@@ -34,7 +34,7 @@
 import { recibo, certificado, informeTriage, inspeccionPDF,
          INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT,
          INSPECCION_AYUDA, INSPECCION_ANCHOS, INSPECCION_GLOSARIO,
-         INSPECCION_LIMITES, INSPECCION_REGLA_VISTA,
+         INSPECCION_LIMITES, INSPECCION_REGLA_VISTA, INSPECCION_RECOMENDA,
          INSPECCION_MENSAJE_COMUNIDAD } from "./documentos.js";
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
@@ -2983,6 +2983,17 @@ async function triageInspeccionRecibir(request, env, email) {
   const lon = num(c.lon, -180, 180);
   const prec = num(c.gps_precision, 0, 100000);
 
+  /* Las recomendaciones se filtran contra el catálogo, igual que las respuestas:
+     un id que no existe se descarta en vez de guardarse. Y el texto libre lleva
+     tope, porque es el único campo de esta pantalla sin uno. */
+  const recoIds = new Set(INSPECCION_RECOMENDA.flatMap((g) => g.items.map((i) => i.id)));
+  const reco = {
+    marcadas: Array.isArray(c.recomendaciones && c.recomendaciones.marcadas)
+      ? c.recomendaciones.marcadas.filter((x) => recoIds.has(String(x))).slice(0, recoIds.size)
+      : [],
+    texto: limpiar(c.recomendaciones && c.recomendaciones.texto, 1200)
+  };
+
   const respuestas = limpiarRespuestas(c.respuestas);
   respuestas._local_id = localId;
 
@@ -3011,8 +3022,9 @@ async function triageInspeccionRecibir(request, env, email) {
     "INSERT INTO inspecciones (numero, caso, proyecto, casa_no, direccion, municipio, " +
     "fecha_visita, hora, obs_nombre, obs_cc, obs_matricula, obs_email, propietario, contacto, " +
     "hab_cc, respuestas, requiere_esp, consent_hab, firma_obs_key, firma_hab_key, " +
-    "firma_hab_motivo, creado_en, dispositivo, familia, finca, lat, lon, gps_precision) " +
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "firma_hab_motivo, creado_en, dispositivo, familia, finca, lat, lon, gps_precision, " +
+    "observaciones, recomendaciones) " +
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(
     numero, limpiar(c.caso, 20) || null, limpiar(c.proyecto, 120) || null,
     limpiar(c.casa_no, 40) || null, limpiar(c.direccion, 240) || null, municipio,
@@ -3028,7 +3040,8 @@ async function triageInspeccionRecibir(request, env, email) {
        de la visita. Ver `fechaTelefono`. */
     fechaTelefono(c.creado_en) || new Date().toISOString().slice(0, 19).replace("T", " "),
     limpiar(c.dispositivo, 120) || null,
-    familia, limpiar(c.finca, 160) || null, lat, lon, prec
+    familia, limpiar(c.finca, 160) || null, lat, lon, prec,
+    limpiar(c.observaciones, 3000) || null, JSON.stringify(reco)
   ).run();
   } catch (e) {
     const msg = String((e && e.message) || "");
@@ -3057,6 +3070,7 @@ async function triageInspeccionRecibir(request, env, email) {
         propietario: limpiar(c.propietario, 160), contacto: limpiar(c.contacto, 80),
         obs_nombre: obsNombre, obs_cc: limpiar(c.obs_cc, 40), obs_matricula: limpiar(c.obs_matricula, 60),
         hab_cc: limpiar(c.hab_cc, 40), respuestas, requiere_esp: c.requiere_esp ? 1 : 0,
+        observaciones: limpiar(c.observaciones, 3000), recomendaciones: JSON.stringify(reco),
         firma_hab_motivo: motivoHab || null
       },
       { obs: firmaObs, hab: firmaHab },
@@ -3303,6 +3317,26 @@ function pintarReferencia(){
   }
 }
 
+/* Las recomendaciones, agrupadas como las agrupa la guía. Casillas y no texto
+   libre porque así se pueden CONTAR: «cuántas casas de este municipio necesitan
+   evacuación» es la pregunta que va a importar el 24, y de un párrafo no sale. */
+function pintarRecomienda(){
+  var c = el("recomienda"); if (!c || !GUIA.recomienda) return;
+  var h = "";
+  for (var i = 0; i < GUIA.recomienda.length; i++){
+    var g = GUIA.recomienda[i];
+    h += '<div class="item"><b>' + esc(g.g) + "</b>";
+    for (var j = 0; j < g.items.length; j++){
+      var it = g.items[j];
+      h += '<button type="button" class="btn o mini reco" data-reco="' + esc(it.id) + '"'
+        +  ' aria-pressed="false" style="display:block;width:100%;text-align:left;margin:5px 0">'
+        +  esc(it.t) + "</button>";
+    }
+    h += "</div>";
+  }
+  c.innerHTML = h;
+}
+
 function pintarSecciones(){
   var h = "";
   for (var i = 0; i < SECS.length; i++){
@@ -3355,6 +3389,12 @@ function leerFormulario(){
     familia: val("f-fam"), finca: val("f-finca"),
     lat: GPS.lat, lon: GPS.lon, gps_precision: GPS.precision,
     fotos: FOTOS.slice(),
+    observaciones: val("f-obsgen"),
+    recomendaciones: {
+      marcadas: Array.prototype.slice.call(document.querySelectorAll('[data-reco][aria-pressed="true"]'))
+        .map(function(b){ return b.getAttribute("data-reco"); }),
+      texto: val("f-recotexto")
+    },
     municipio: val("f-muni"), fecha_visita: val("f-fecha"), hora: val("f-hora"),
     casa_no: val("f-casa"), direccion: val("f-dir"), caso: val("f-caso"),
     obs_nombre: val("f-obs"), obs_matricula: val("f-mat"), obs_cc: val("f-cc"),
@@ -3707,6 +3747,7 @@ function INSP_ARRANCA(paquete){
   AYUDA = G.ayuda || {};
   GUIA  = G;
   pintarReferencia();
+  pintarRecomienda();
   pintarSecciones();
   ACTUAL = idNuevo();
   var f = el("f-fecha"); if (f && !f.value) f.value = new Date().toISOString().slice(0,10);
@@ -3770,6 +3811,11 @@ function INSP_ARRANCA(paquete){
     var cons = e.target.closest("button[data-cons]");
     if (cons){
       cons.setAttribute("aria-pressed", cons.getAttribute("aria-pressed") === "true" ? "false" : "true");
+      guardarBorrador(); return;
+    }
+    var rc = e.target.closest("[data-reco]");
+    if (rc){
+      rc.setAttribute("aria-pressed", rc.getAttribute("aria-pressed") === "true" ? "false" : "true");
       guardarBorrador(); return;
     }
     var ab = e.target.closest("[data-ayuda]");
@@ -3842,6 +3888,7 @@ function guardarInspeccion(){
        pondría las coordenadas de la casa anterior en la siguiente. */
     GPS = { lat: null, lon: null, precision: null };
     FOTOS = []; pintarFotos();
+    document.querySelectorAll('[data-reco][aria-pressed="true"]').forEach(function(b){ b.setAttribute("aria-pressed","false"); });
     if (el("gps-est")){ el("gps-est").textContent = "Sin tomar."; el("gps-est").style.color = "var(--mu)"; }
     if (el("b-nofirma")){ el("b-nofirma").setAttribute("aria-pressed","false"); el("caja-nofirma").style.display="none"; }
     if (el("f-obs2")) el("f-obs2").value = val("f-obs");
@@ -3980,6 +4027,24 @@ textarea{min-height:64px;resize:vertical}
       <button type="button" class="re" data-esp="1" aria-pressed="false">SÍ</button>
       <button type="button" data-esp="0" aria-pressed="false">NO</button>
     </div>
+  </div>
+
+  <h2>Observaciones y recomendaciones</h2>
+  <p style="font-size:13px;color:var(--mu);margin:0 0 10px">La guía del AIS obliga a
+  <strong>consignar las recomendaciones y explicárselas de viva voz</strong> a quien vive ahí.
+  Marca las que apliquen: son las medidas que esa guía autoriza a recomendar.
+  <strong>Demoler no está en la lista porque la guía lo prohíbe expresamente</strong> — para eso se
+  pide la visita de un experto y se marca como urgente.</p>
+  <div id="recomienda"></div>
+  <div class="item">
+    <label for="f-recotexto">Otra recomendación, con tus palabras</label>
+    <textarea id="f-recotexto" placeholder="No usen el cuarto del patio hasta que lo revise un ingeniero"></textarea>
+  </div>
+  <div class="item">
+    <label for="f-obsgen">Observaciones generales</label>
+    <p style="font-size:13px;color:var(--mu);margin:0 0 8px">Lo que no cae en ningún ítem: el
+    contexto, lo que contó la familia, lo que quieras dejar dicho.</p>
+    <textarea id="f-obsgen" rows="4" placeholder="La familia dice que la grieta del patio apareció con la réplica del jueves…"></textarea>
   </div>
 
   <h2>Autorización del habitante</h2>
@@ -5577,7 +5642,7 @@ async function adminInspecciones(env) {
   const r = await env.DB.prepare(
     "SELECT numero, caso, municipio, direccion, casa_no, fecha_visita, hora, " +
     "obs_nombre, obs_matricula, propietario, contacto, requiere_esp, " +
-    "firma_hab_key, firma_hab_motivo, pdf_key, respuestas, " +
+    "firma_hab_key, firma_hab_motivo, pdf_key, respuestas, familia, finca, recomendaciones, " +
     "substr(creado_en,1,16) AS creado_en, substr(recibido_en,1,16) AS recibido_en " +
     "FROM inspecciones ORDER BY requiere_esp DESC, recibido_en DESC LIMIT 300"
   ).all();
@@ -5592,9 +5657,21 @@ async function adminInspecciones(env) {
         if (m && marcas[m] != null) marcas[m]++;
       }
     } catch { /* una fila con JSON roto no puede tumbar la bandeja entera */ }
-    /* `respuestas` NO viaja al panel: pesa y no se usa en la tabla. */
-    const { respuestas, ...resto } = v;
-    return { ...resto, marcas };
+    /* SI ALGUIEN MARCÓ «peligro inminente», eso no puede quedar dentro de un PDF
+       que hay que abrir: es lo único de esta bandeja que no espera. Se sube a la
+       fila como una bandera. */
+    let urgente = false, nReco = 0;
+    try {
+      const r = JSON.parse(v.recomendaciones || "{}");
+      const m = Array.isArray(r.marcadas) ? r.marcadas : [];
+      nReco = m.length + (r.texto ? 1 : 0);
+      urgente = m.indexOf("x4") >= 0;
+    } catch { /* una fila con JSON roto no tumba la bandeja */ }
+
+    /* `respuestas` y `recomendaciones` NO viajan al panel: pesan y lo que se usa
+       en la tabla son sus cuentas. */
+    const { respuestas, recomendaciones, ...resto } = v;
+    return { ...resto, marcas, urgente, nReco };
   });
   return json({ inspecciones: filas });
 }
@@ -6330,10 +6407,10 @@ obligatorio. Y el <strong>PDF está congelado</strong>: es el documento que esa 
 regenera nunca.</p>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
-<th scope="col">Inspección</th><th scope="col">Dónde</th><th scope="col">Visita</th>
+<th scope="col">Inspección</th><th scope="col">Familia</th><th scope="col">Dónde</th><th scope="col">Visita</th>
 <th scope="col">Quién observó</th><th scope="col">RE / Obs</th><th scope="col">Firma del habitante</th>
 <th scope="col">Documento</th>
-</tr></thead><tbody id="ins-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="ins-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
 </table></div>
 
 <h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
@@ -7146,7 +7223,7 @@ function cargarInspecciones(){
   fetch("/api/admin/inspecciones").then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("ins-filas"); if (!tb) return;
     var l = d.inspecciones || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no ha llegado ninguna inspección de terreno.</td></tr>'; return; }
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Todavía no ha llegado ninguna inspección de terreno.</td></tr>'; return; }
     tb.innerHTML = l.map(function(v){
       var m = v.marcas || {};
       /* El conteo de RE va en negrita cuando hay alguno: es el dato que decide
@@ -7179,14 +7256,17 @@ function cargarInspecciones(){
       return "<tr>" +
         "<td><strong>" + esc(v.numero) + "</strong>" +
           (v.caso ? "<br><small>" + esc(v.caso) + "</small>" : "") +
-          (v.requiere_esp ? '<br><small style="color:var(--amber)"><strong>requiere revisión especializada</strong></small>' : "") + "</td>" +
+          (v.requiere_esp ? '<br><small style="color:var(--amber)"><strong>requiere revisión especializada</strong></small>' : "") +
+          (v.urgente ? '<br><small style="color:var(--err)"><strong>PELIGRO INMINENTE — el ingeniero pidió priorizar</strong></small>' : "") + "</td>" +
+        "<td>" + esc(v.familia || "-") +
+          (v.finca ? "<br><small>" + esc(v.finca) + "</small>" : "") + "</td>" +
         "<td>" + esc(v.municipio || "-") +
           (v.casa_no ? "<br><small>casa " + esc(v.casa_no) + "</small>" : "") +
           (v.direccion ? "<br><small>" + esc(v.direccion) + "</small>" : "") + "</td>" +
         "<td>" + visita + "</td>" +
         "<td>" + esc(v.obs_nombre || "-") +
           (v.obs_matricula ? "<br><small>mat. " + esc(v.obs_matricula) + "</small>" : "") + "</td>" +
-        "<td>" + cuentas + "</td>" +
+        "<td>" + cuentas + (v.nReco ? "<br><small>" + v.nReco + (v.nReco === 1 ? " recomendación" : " recomendaciones") + "</small>" : "") + "</td>" +
         "<td>" + firma + "</td>" +
         "<td>" + doc + "</td>" +
       "</tr>";
@@ -7806,6 +7886,7 @@ export default {
               glosario: INSPECCION_GLOSARIO,
               limites: INSPECCION_LIMITES,
               reglaVista: INSPECCION_REGLA_VISTA,
+              recomienda: INSPECCION_RECOMENDA,
               mensaje: INSPECCION_MENSAJE_COMUNIDAD
             }),
             esc(INSPECCION_ALCANCE),
