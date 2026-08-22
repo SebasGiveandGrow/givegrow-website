@@ -3487,7 +3487,11 @@ function leerFormulario(){
     obs_nombre: val("f-obs"), obs_matricula: val("f-mat"), obs_cc: val("f-cc"),
     propietario: val("f-prop"), contacto: val("f-cont"),
     respuestas: r,
-    requiere_esp: esp ? esp.getAttribute("data-esp") === "1" : false,
+    /* null, NO false, cuando nadie contestó. Guardar false hacía
+       indistinguible «contestó NO» de «no contestó», y al reponer un borrador
+       se habría marcado un NO que el ingeniero nunca dio. El servidor lo lee
+       como booleano, así que null y false le llegan igual. */
+    requiere_esp: esp ? esp.getAttribute("data-esp") === "1" : null,
     consent_hab: !!cons,
     hab_cc: val("f-habcc"),
     firma_obs: firmaDe("c-obs"),
@@ -3661,7 +3665,13 @@ function firmaDe(id){
 }
 
 var guardarPronto = null;
+/* Mientras se repone un borrador NO se guarda. Reponer una firma exige cargar
+   una imagen, que es asíncrono, y un guardado que cayera en esa ventana leería
+   el lienzo todavía vacío y escribiría firma_obs en blanco: destruiría la firma
+   que está rescatando. */
+var RESTAURANDO = false;
 function guardarBorrador(){
+  if (RESTAURANDO) return;
   if (guardarPronto) clearTimeout(guardarPronto);
   guardarPronto = setTimeout(function(){
     var reg = leerFormulario();
@@ -3803,6 +3813,207 @@ function estado(){
   });
 }
 
+/* ---- LOS BORRADORES, Y POR QUÉ ESTA PANTALLA TENÍA QUE EXISTIR ----
+   guardarBorrador() escribía el registro COMPLETO —las 26 respuestas, las fotos
+   y las DOS firmas— en cada cambio, y nada lo volvía a leer nunca: todos("cola")
+   aparecía dos veces en el archivo y todos("borradores") ninguna. Un teléfono
+   que se bloqueaba a mitad del formulario dejaba la inspección íntegra guardada
+   y fuera de alcance, y el contador de la barra cuenta la COLA, así que marcaba
+   0 y todo parecía perdido.
+
+   Lo único que sí se reponía era el perfil —municipio, nombre, matrícula—, que
+   es justo lo que hacía creer que el formulario se había acordado de todo.
+
+   Encontrado el 22 de agosto de 2026 buscando inspecciones que los ingenieros
+   habían llenado y que nunca llegaron. Estaban en los teléfonos. ---- */
+
+/* Un borrador nace al primer tecleo, así que la mayoría son cascarones: el
+   municipio y el nombre que el perfil acaba de reponer. Se listan solo los que
+   tienen algo de LA CASA, o la lista se llenaría de ruido y el ingeniero no
+   distinguiría lo que de verdad quedó a medias. */
+function borradorVale(b){
+  if (!b) return false;
+  var n = b.respuestas ? Object.keys(b.respuestas).length : 0;
+  return !!(b.familia || b.finca || b.direccion || b.propietario || n
+            || (b.fotos && b.fotos.length) || b.firma_obs || b.observaciones);
+}
+
+function cargarBorradores(){
+  var c = el("borr"); if (!c) return Promise.resolve(0);
+  return todos("borradores").then(function(l){
+    /* Se excluye la que está ABIERTA en pantalla. Si no, el número contaría la
+       casa que el ingeniero está llenando en este momento y «sin terminar»
+       pasaría a significar dos cosas a la vez: lo que se perdió de vista y lo
+       que tiene delante. Al recargar, ACTUAL es un id nuevo y todas vuelven. */
+    var u = l.filter(function(b){ return borradorVale(b) && b.local_id !== ACTUAL; });
+    u.sort(function(a,b){ return String(b.creado_en||"").localeCompare(String(a.creado_en||"")); });
+    if (el("n-borr")) el("n-borr").textContent = u.length;
+    if (!u.length){
+      c.innerHTML = '<p class="mu" style="font-size:13.5px">Nada a medias. Todo lo que llenaste '
+        + 'ya pasó a la cola de envío.</p>';
+      return 0;
+    }
+    c.innerHTML = '<div class="ref"><p style="margin:0 0 10px;font-size:13.5px"><strong>'
+      + u.length + (u.length === 1 ? " inspección sin terminar" : " inspecciones sin terminar")
+      + ' en este teléfono.</strong> Ábrela, revísala de arriba abajo y toca «Guardar inspección».</p>'
+      + u.map(function(b){
+          var n = b.respuestas ? Object.keys(b.respuestas).length : 0;
+          var nf = (b.fotos && b.fotos.length) || 0;
+          return '<div style="border-top:1px solid var(--bd);padding:10px 0;font-size:13.5px">'
+            + "<strong>" + esc(b.familia || "sin nombre de familia") + "</strong>"
+            + (b.finca ? " · " + esc(b.finca) : "")
+            + "<br><small>" + esc(b.municipio || "-")
+            + (b.direccion ? " · " + esc(b.direccion) : "")
+            + " · " + esc(String(b.creado_en || "-").slice(0,16)) + "</small>"
+            + "<br><small>" + n + (n === 1 ? " ítem marcado" : " ítems marcados")
+            + " · " + nf + (nf === 1 ? " foto" : " fotos")
+            + " · tu firma: " + (b.firma_obs ? "sí" : "NO")
+            + " · la del habitante: "
+            + (b.firma_hab ? "sí" : (b.firma_hab_motivo ? "no pudo firmar" : "NO"))
+            + "</small><br>"
+            + '<button type="button" class="btn mini" style="margin-top:8px" data-abreborr="'
+            + esc(b.local_id) + '">Abrir y terminar</button> '
+            + '<button type="button" class="btn o mini" style="margin-top:8px" data-tiraborr="'
+            + esc(b.local_id) + '">Descartar</button>'
+            + "</div>";
+        }).join("") + "</div>";
+    return u.length;
+  }).catch(function(){
+    c.innerHTML = '<p class="mu" style="font-size:13.5px">No se pudo leer lo guardado en este '
+      + 'teléfono. NO borres nada y avisa al equipo.</p>';
+    return 0;
+  });
+}
+
+function abrirBorrador(id){
+  var q = tx("borradores", "readonly").get(id);
+  q.onsuccess = function(){
+    if (!q.result){ aviso("Ese borrador ya no está en el teléfono.", "mal"); cargarBorradores(); return; }
+    escribirFormulario(q.result);
+    aviso("Recuperada. Revísala de arriba abajo y toca «Guardar inspección».", "bien");
+    window.scrollTo(0, 0);
+  };
+  q.onerror = function(){ aviso("No se pudo abrir. NO borres nada y avisa al equipo.", "mal"); };
+}
+
+/* Se pregunta antes, y se dice que no hay vuelta atrás: es el único botón de
+   esta pantalla que destruye trabajo de alguien. */
+function tirarBorrador(id){
+  if (!window.confirm("¿Descartar esta inspección a medias? No se puede recuperar.")) return;
+  quitar("borradores", id).then(function(){
+    aviso("Descartada.", "info");
+    cargarBorradores();
+  }).catch(function(){ aviso("No se pudo descartar.", "mal"); });
+}
+
+/* El inverso de leerFormulario(), campo por campo a propósito y no con un bucle
+   sobre las claves: los nombres del registro y los del formulario no coinciden
+   —familia es f-fam, direccion es f-dir— y un bucle «listo» dejaría campos sin
+   reponer EN SILENCIO, que es exactamente la clase de error que esto arregla. */
+function escribirFormulario(reg){
+  RESTAURANDO = true;
+  ACTUAL = reg.local_id || idNuevo();
+
+  document.querySelectorAll("[aria-pressed=true]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
+  document.querySelectorAll(".item.abierto").forEach(function(x){ x.classList.remove("abierto"); });
+  document.querySelectorAll("[data-campo]").forEach(function(x){ x.value = ""; });
+
+  var p = function(id, v){ var e = el(id); if (e) e.value = (v == null ? "" : String(v)); };
+  p("f-fam",  reg.familia);       p("f-finca", reg.finca);
+  p("f-muni", reg.municipio);     p("f-fecha", reg.fecha_visita);
+  p("f-hora", reg.hora);          p("f-casa",  reg.casa_no);
+  p("f-dir",  reg.direccion);     p("f-caso",  reg.caso);
+  p("f-obs",  reg.obs_nombre);    p("f-mat",   reg.obs_matricula);
+  p("f-cc",   reg.obs_cc);        p("f-prop",  reg.propietario);
+  p("f-cont", reg.contacto);      p("f-habcc", reg.hab_cc);
+  p("f-obsgen", reg.observaciones);
+  p("f-obs2",   reg.obs_nombre);
+  p("f-recotexto", reg.recomendaciones && reg.recomendaciones.texto);
+
+  /* Las claves y las marcas se validan antes de entrar en un selector. Vienen
+     del propio teléfono, pero es dato guardado y el selector es código: la misma
+     regla que ya gobierna las respuestas en el servidor. */
+  var r = reg.respuestas || {};
+  Object.keys(r).forEach(function(k){
+    if (!/^[0-9.]{1,12}$/.test(k)) return;
+    var nodo = document.querySelector('.item[data-id="' + k + '"]'); if (!nodo) return;
+    var m = r[k] && r[k].m;
+    if (["RE","OBS","SO"].indexOf(m) < 0) return;
+    var b = nodo.querySelector('[data-m="' + m + '"]');
+    if (b) b.setAttribute("aria-pressed", "true");
+    var o = nodo.querySelector("[data-campo=obs]");   if (o) o.value = r[k].obs   || "";
+    var f = nodo.querySelector("[data-campo=fotos]"); if (f) f.value = r[k].fotos || "";
+    nodo.classList.toggle("abierto", m !== "SO");
+  });
+
+  if (reg.requiere_esp === true || reg.requiere_esp === false){
+    var esp = document.querySelector('[data-esp="' + (reg.requiere_esp ? "1" : "0") + '"]');
+    if (esp) esp.setAttribute("aria-pressed", "true");
+  }
+  if (reg.consent_hab && el("b-cons")) el("b-cons").setAttribute("aria-pressed", "true");
+
+  ((reg.recomendaciones && reg.recomendaciones.marcadas) || []).forEach(function(id){
+    var limpio = String(id).replace(/[^A-Za-z0-9_-]/g, "");
+    if (!limpio) return;
+    var b = document.querySelector('[data-reco="' + limpio + '"]');
+    if (b) b.setAttribute("aria-pressed", "true");
+  });
+
+  FOTOS = (reg.fotos || []).filter(function(f){ return f && f.blob; });
+  pintarFotos();
+
+  GPS = { lat: reg.lat == null ? null : reg.lat,
+          lon: reg.lon == null ? null : reg.lon,
+          precision: reg.gps_precision == null ? null : reg.gps_precision };
+  if (el("gps-est")){
+    if (GPS.lat == null || GPS.lon == null){
+      el("gps-est").textContent = "Sin tomar."; el("gps-est").style.color = "var(--mu)";
+    } else {
+      el("gps-est").textContent = "Recuperada: " + Number(GPS.lat).toFixed(5) + ", "
+        + Number(GPS.lon).toFixed(5)
+        + (GPS.precision == null ? "" : " · precisión " + Math.round(GPS.precision) + " m");
+      el("gps-est").style.color = "var(--ok)";
+    }
+  }
+
+  var nof = el("b-nofirma");
+  if (nof){
+    var sinFirma = !reg.firma_hab && !!reg.firma_hab_motivo;
+    nof.setAttribute("aria-pressed", sinFirma ? "true" : "false");
+    el("caja-nofirma").style.display = sinFirma ? "block" : "none";
+    p("f-nofirma", sinFirma ? reg.firma_hab_motivo : "");
+  }
+
+  limpiarLienzo("c-obs"); limpiarLienzo("c-hab");
+  /* La bandera se baja SOLO cuando las dos imágenes terminaron, y también si
+     fallan: dejarla arriba congelaría el autoguardado para el resto del día. */
+  Promise.all([dibujarFirma("c-obs", reg.firma_obs), dibujarFirma("c-hab", reg.firma_hab)])
+    .then(function(){ RESTAURANDO = false; });
+}
+
+/* Se repone el trazo Y el contador: firmaDe() cuenta TRAZOS, no pixeles, así que
+   una firma dibujada sin subir el contador se guardaría como inexistente.
+   Y se escala CONSERVANDO LA PROPORCIÓN, porque el lienzo puede tener otro ancho
+   que cuando se firmó —otra orientación, otro teléfono— y estirarla deformaría
+   la firma de una persona en el documento que esa persona firmó. */
+function dibujarFirma(id, dato){
+  return new Promise(function(res){
+    var c = el(id), f = FIRMAS[id];
+    if (!dato || !c || !f){ res(); return; }
+    var im = new Image();
+    im.onload = function(){
+      var r = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+      var aw = c.width / r, ah = c.height / r;
+      var k = Math.min(aw / im.width, ah / im.height, 1);
+      f.g.drawImage(im, 0, 0, im.width * k, im.height * k);
+      f.trazos = 1;
+      res();
+    };
+    im.onerror = function(){ res(); };
+    im.src = dato;
+  });
+}
+
 /* ---- Preparación explícita. Sin esto el formulario NO abre en la vereda:
    un service worker solo guarda lo que se le pidió. ---- */
 function preparar(){
@@ -3867,6 +4078,9 @@ function INSP_ARRANCA(paquete){
       if (f.obs_cc        && !val("f-cc"))   el("f-cc").value   = f.obs_cc;
     };
     estado();
+    /* Se listan SOLOS al abrir. Detrás de un botón, quien no sabe que perdió
+       algo nunca lo tocaría — y es justo esa persona la que hay que avisar. */
+    cargarBorradores();
     var p = el("prep");
     p.className = "aviso info v";
     p.textContent = navigator.serviceWorker && navigator.serviceWorker.controller
@@ -3925,6 +4139,11 @@ function INSP_ARRANCA(paquete){
     }
     var qf = e.target.closest("[data-quitafoto]");
     if (qf){ FOTOS.splice(Number(qf.getAttribute("data-quitafoto")), 1); pintarFotos(); guardarBorrador(); return; }
+    var abb = e.target.closest("[data-abreborr]");
+    if (abb){ abrirBorrador(abb.getAttribute("data-abreborr")); return; }
+    var tbb = e.target.closest("[data-tiraborr]");
+    if (tbb){ tirarBorrador(tbb.getAttribute("data-tiraborr")); return; }
+    if (e.target.closest("#b-borr")) { cargarBorradores(); return; }
     if (e.target.closest("#b-mias"))  { cargarMias(); return; }
     if (e.target.closest("#b-gps"))   { tomarGPS(); return; }
     if (e.target.closest("#b-prep"))  { preparar(); return; }
@@ -3983,6 +4202,10 @@ function guardarInspeccion(){
     el("b-guardar").disabled = false;
     aviso("Guardada en el teléfono. " + (navigator.onLine ? "Enviando…" : "Se enviará sola cuando haya señal."), "bien");
     estado();
+    /* La lista de lo que queda a medias se refresca AQUÍ. Sin esto el contador
+       seguía marcando la que acabas de terminar, y una cuenta que no baja es lo
+       que hizo perder la confianza en la anterior. */
+    cargarBorradores();
     if (navigator.onLine) vaciarCola();
   }).catch(function(){
     el("b-guardar").disabled = false;
@@ -4182,6 +4405,14 @@ textarea{min-height:64px;resize:vertical}
   </div>
 
   <div id="msg" class="aviso"></div>
+
+  <h2>Sin terminar en este teléfono <span class="pend" id="n-borr">0</span></h2>
+  <p style="font-size:13px;color:var(--mu);margin:0 0 10px">Esto vive en el teléfono, no en el
+  servidor: es lo que quedó a medias porque se bloqueó la pantalla, se acabó la batería o te
+  pasaste a otra aplicación. <strong>Las firmas y las fotos siguen ahí</strong>, así que no hay
+  que volver a la casa: ábrela, revísala y guárdala.</p>
+  <div id="borr"></div>
+  <button type="button" class="btn o mini" id="b-borr" style="margin-top:10px">Volver a revisar el teléfono</button>
 
   <h2>Las que ya enviaste</h2>
   <p style="font-size:13px;color:var(--mu);margin:0 0 10px">Esto viene del servidor, no del
