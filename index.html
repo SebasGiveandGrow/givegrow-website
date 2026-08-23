@@ -74,6 +74,7 @@
       <a class="nlink mmc-nav" href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
       <a class="nlink mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
       <a class="nlink mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
+      <a class="nlink mmc-nav" href="#apadrinar" data-i18n="mmc.nav.apad">Apadrinar</a>
       <a class="nlink" href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
       <a class="nlink" href="#fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
       <div class="ndrop">
@@ -127,6 +128,7 @@
   <a class="mmc-nav" href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
   <a class="mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
   <a class="mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
+  <a class="mmc-nav" href="#apadrinar" data-i18n="mmc.nav.apad">Apadrinar</a>
   <span class="mnav-g" data-i18n="nav.g.emergencia">Emergencia</span>
   <a href="#brigada" data-i18n="nav.brigada">Brigada de emergencia</a>
   <!-- Externos, igual que en la barra: el triaje vive en Mira Mi Casa. -->
@@ -2356,6 +2358,115 @@
 </main>
 
 
+<!-- Apadrinar una casa. La única entrada pública que le faltaba a Mira Mi Casa:
+     los ingenieros ya se postulan solos y las familias ya reportan solas, pero
+     quien quería aportar a la reparación no tenía dónde, y acababa en un
+     WhatsApp que alguien tenía que atender.
+
+     REGISTRA UN OFRECIMIENTO, NO UNA TRANSACCIÓN, y no es una limitación
+     técnica: es la misma regla que gobierna todo Mira Mi Casa. Apadrinar no
+     reserva una casa concreta, porque las casas las ordenan los conceptos de
+     los ingenieros y dejar elegir por foto pondría primero la más
+     fotografiable. Por eso no hay pasarela aquí y la casilla del alcance es
+     obligatoria, igual que en la postulación de ingenieros. -->
+<main id="page-apadrinar" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ap.ey">Apadrinar</span>
+      <h1 class="h-sec rv d1" data-i18n="ap.t">Ayudar a reparar una casa</h1>
+      <p class="lead rv d2" data-i18n="ap.lead">Hay familias que ya tienen el concepto de un ingeniero y saben qué necesita su casa: unas tejas, un muro apuntalado, cemento, una puerta. Lo que falta es con qué. Aquí registras lo que puedes aportar y alguien del equipo te escribe.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2 class="h-sec rv" data-i18n="ap.no.t">Lo que apadrinar aquí no es</h2>
+      <div class="grid g3" style="margin-top:26px">
+        <div class="card rv d1">
+          <h3 data-i18n="ap.no.1.t">No eliges la casa</h3>
+          <p data-i18n="ap.no.1.p">Qué casas se atienden lo ordenan los conceptos escritos de los ingenieros. La necesidad tiene un orden y una fotografía no es ese orden: dejar elegir pondría primero la casa más fotografiable, no la más urgente.</p>
+        </div>
+        <div class="card rv d2">
+          <h3 data-i18n="ap.no.2.t">No declara nada habitable</h3>
+          <p data-i18n="ap.no.2.p">Ni el concepto del ingeniero ni una reparación declaran que una vivienda se pueda habitar. Esa declaratoria, con efectos como evacuar o demoler, es de la autoridad municipal por la Ley 1523 de 2012.</p>
+        </div>
+        <div class="card rv d3">
+          <h3 data-i18n="ap.no.3.t">No se cobra aquí</h3>
+          <p data-i18n="ap.no.3.p">Este formulario no pide datos de pago ni cobra nada. Registra lo que ofreces y una persona del equipo te contacta para acordar los detalles.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ap.ev.ey">Qué vuelve</span>
+      <h2 class="h-sec rv d1" data-i18n="ap.ev.t">Evidencia, no un agradecimiento</h2>
+      <p class="lead rv d2" data-i18n="ap.ev.p">Cada entrega que hacemos se publica con su acta: qué se entregó, dónde y con qué fundación del territorio. No prometemos una casa con tu nombre; publicamos lo que efectivamente se hizo.</p>
+      <p class="rv d3" style="margin-top:16px"><a href="#casas" data-i18n="ap.ev.link">Ver las casas revisadas</a></p>
+    </div>
+  </section>
+
+  <section id="ap-form">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ap.form.ey">Tu ofrecimiento</span>
+      <h2 class="h-sec rv" data-i18n="ap.form.t">Cuéntanos qué puedes aportar</h2>
+      <p class="lead rv d1" data-i18n="ap.form.lead">No hay mínimo. Un bulto de cemento sirve, y una empresa que done treinta también.</p>
+
+      <form id="apf" class="ally-form rv d2" data-submit="apSubmit(event)">
+        <div class="field"><label for="apf-nombre" data-i18n="ap.nombre">Nombre completo</label>
+          <input type="text" id="apf-nombre" autocomplete="name" required></div>
+        <div class="field"><label for="apf-email" data-i18n="ap.email">Correo</label>
+          <input type="email" id="apf-email" autocomplete="email" required></div>
+        <div class="field"><label for="apf-tel" data-i18n="ap.tel">Teléfono o WhatsApp (opcional)</label>
+          <input type="tel" id="apf-tel" autocomplete="tel"></div>
+        <div class="field"><label for="apf-ciudad" data-i18n="ap.ciudad">Desde qué ciudad escribes (opcional)</label>
+          <input type="text" id="apf-ciudad" autocomplete="address-level2"></div>
+        <div class="field"><label for="apf-quien" data-i18n="ap.quien">Escribes como</label>
+          <select id="apf-quien" data-change="apQuien()">
+            <option value="persona" data-i18n="ap.quien.persona">Persona</option>
+            <option value="empresa" data-i18n="ap.quien.empresa">Empresa u organización</option>
+          </select></div>
+        <div class="field" id="apf-org-f" style="display:none"><label for="apf-org" data-i18n="ap.org">Nombre de la empresa u organización</label>
+          <input type="text" id="apf-org" autocomplete="organization"></div>
+        <div class="field"><label for="apf-aporte" data-i18n="ap.aporte">Qué puedes aportar</label>
+          <select id="apf-aporte">
+            <option value="materiales" data-i18n="ap.aporte.materiales">Materiales de reparación</option>
+            <option value="mano_obra" data-i18n="ap.aporte.mano_obra">Mano de obra</option>
+            <option value="transporte" data-i18n="ap.aporte.transporte">Transporte de materiales</option>
+            <option value="dinero" data-i18n="ap.aporte.dinero">Un aporte en dinero</option>
+            <option value="otra" data-i18n="ap.aporte.otra">Otra forma</option>
+          </select></div>
+        <div class="field"><label for="apf-detalle" data-i18n="ap.detalle">Qué exactamente</label>
+          <textarea id="apf-detalle" rows="3" maxlength="600" required data-i18n="ap.detalle.ph" data-i18n-attr="placeholder" placeholder="Tejas de zinc, cemento, una cuadrilla de dos albañiles un sábado, un camión que suba al Quindío."></textarea>
+          <small class="mu" data-i18n="ap.detalle.h">Sé concreto si puedes. Es lo que nos permite cruzarlo con lo que los ingenieros escribieron que hace falta.</small></div>
+        <div class="field"><label for="apf-alcance" data-i18n="ap.alcance">Cuánto o cuándo (opcional)</label>
+          <input type="text" id="apf-alcance" data-i18n="ap.alcance.ph" data-i18n-attr="placeholder" placeholder="Veinte bultos, una vez al mes, disponible desde septiembre."></div>
+        <div class="field"><label for="apf-sector" data-i18n="ap.sector">Territorio, si tienes preferencia</label>
+          <select id="apf-sector">
+            <option value="cualquiera" data-i18n="ap.sector.cualquiera">Donde más se necesite</option>
+            <option value="cali" data-i18n="ap.sector.cali">Cali</option>
+            <option value="pereira" data-i18n="ap.sector.pereira">Pereira</option>
+            <option value="manizales" data-i18n="ap.sector.manizales">Manizales</option>
+            <option value="armenia" data-i18n="ap.sector.armenia">Armenia</option>
+            <option value="choco" data-i18n="ap.sector.choco">Chocó</option>
+          </select>
+          <small class="mu" data-i18n="ap.sector.h">Lo tenemos en cuenta, pero no es un compromiso: la prioridad la siguen ordenando los conceptos de los ingenieros.</small></div>
+
+        <label class="ally-check"><input type="checkbox" id="apf-concepto"><span><b data-i18n="ap.concepto">Entiendo que apadrinar NO reserva una casa concreta y que Give&amp;Grow decide qué viviendas se atienden con los conceptos de los ingenieros.</b><small data-i18n="ap.concepto.h">Es la condición del proyecto, y está aquí para que no haya malentendido después. Si lo que buscas es apoyar una casa que ya conoces, escríbenos y lo hablamos de frente.</small></span></label>
+        <label class="ally-check"><input type="checkbox" id="apf-datos"><span data-i18n="ap.datos">Autorizo el tratamiento de mis datos para que Give&amp;Grow me contacte sobre este ofrecimiento, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.</span></label>
+
+        <!-- Trampa para bots: invisible y sin etiqueta. Si llega llena, no se guarda. -->
+        <input type="text" id="apf-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+
+        <button type="submit" class="btn btn-g" id="apf-btn" data-i18n="ap.submit">Enviar mi ofrecimiento</button>
+        <p class="mu" style="margin-top:12px;font-size:13.5px" data-i18n="ap.nada">Este formulario no cobra nada ni pide datos de pago.</p>
+        <p id="apf-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
+      </form>
+    </div>
+  </section>
+</main>
+
 <footer>
   <div class="wrap">
     <div class="foot-grid">
@@ -2432,7 +2543,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=5b78aa32"></script>
+<script src="/app.js?v=76ea3701"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

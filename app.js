@@ -215,6 +215,7 @@ var I18N = {
     "mmc.nav.casa":"Revisa tu casa",
     "mmc.nav.casas":"Casas revisadas",
     "mmc.nav.ing":"Ingenieros",
+    "mmc.nav.apad":"Apadrinar",
     "mmc.aval":"La plataforma de Cimientos que Abrazan, un proyecto de Fundación Give&Grow International · NIT 901.948.930-2",
     "mmc.marca":"Mira Mi Casa",
     "nav.g.emergencia":"Emergencia",
@@ -548,6 +549,63 @@ var I18N = {
     "ing.err.alcance":"Necesitamos que confirmes el alcance: das un concepto a distancia, no un dictamen de habitabilidad.",
     "ing.err.datos":"Sin tu autorización de datos no podemos guardar la postulación.",
     "ing.err.send":"No pudimos enviar tu postulación. Revisa los datos e intenta otra vez.",
+    "ap.ey":"Apadrinar",
+    "ap.t":"Ayudar a reparar una casa",
+    "ap.lead":"Hay familias que ya tienen el concepto de un ingeniero y saben qué necesita su casa: unas tejas, un muro apuntalado, cemento, una puerta. Lo que falta es con qué. Aquí registras lo que puedes aportar y alguien del equipo te escribe.",
+    "ap.no.t":"Lo que apadrinar aquí no es",
+    "ap.no.1.t":"No eliges la casa",
+    "ap.no.1.p":"Qué casas se atienden lo ordenan los conceptos escritos de los ingenieros. La necesidad tiene un orden y una fotografía no es ese orden: dejar elegir pondría primero la casa más fotografiable, no la más urgente.",
+    "ap.no.2.t":"No declara nada habitable",
+    "ap.no.2.p":"Ni el concepto del ingeniero ni una reparación declaran que una vivienda se pueda habitar. Esa declaratoria, con efectos como evacuar o demoler, es de la autoridad municipal por la Ley 1523 de 2012.",
+    "ap.no.3.t":"No se cobra aquí",
+    "ap.no.3.p":"Este formulario no pide datos de pago ni cobra nada. Registra lo que ofreces y una persona del equipo te contacta para acordar los detalles.",
+    "ap.ev.ey":"Qué vuelve",
+    "ap.ev.t":"Evidencia, no un agradecimiento",
+    "ap.ev.p":"Cada entrega que hacemos se publica con su acta: qué se entregó, dónde y con qué fundación del territorio. No prometemos una casa con tu nombre; publicamos lo que efectivamente se hizo.",
+    "ap.ev.link":"Ver las casas revisadas",
+    "ap.form.ey":"Tu ofrecimiento",
+    "ap.form.t":"Cuéntanos qué puedes aportar",
+    "ap.form.lead":"No hay mínimo. Un bulto de cemento sirve, y una empresa que done treinta también.",
+    "ap.nombre":"Nombre completo",
+    "ap.email":"Correo",
+    "ap.tel":"Teléfono o WhatsApp (opcional)",
+    "ap.ciudad":"Desde qué ciudad escribes (opcional)",
+    "ap.quien":"Escribes como",
+    "ap.quien.persona":"Persona",
+    "ap.quien.empresa":"Empresa u organización",
+    "ap.org":"Nombre de la empresa u organización",
+    "ap.aporte":"Qué puedes aportar",
+    "ap.aporte.materiales":"Materiales de reparación",
+    "ap.aporte.mano_obra":"Mano de obra",
+    "ap.aporte.transporte":"Transporte de materiales",
+    "ap.aporte.dinero":"Un aporte en dinero",
+    "ap.aporte.otra":"Otra forma",
+    "ap.detalle":"Qué exactamente",
+    "ap.detalle.ph":"Tejas de zinc, cemento, una cuadrilla de dos albañiles un sábado, un camión que suba al Quindío.",
+    "ap.detalle.h":"Sé concreto si puedes. Es lo que nos permite cruzarlo con lo que los ingenieros escribieron que hace falta.",
+    "ap.alcance":"Cuánto o cuándo (opcional)",
+    "ap.alcance.ph":"Veinte bultos, una vez al mes, disponible desde septiembre.",
+    "ap.sector":"Territorio, si tienes preferencia",
+    "ap.sector.cualquiera":"Donde más se necesite",
+    "ap.sector.cali":"Cali",
+    "ap.sector.pereira":"Pereira",
+    "ap.sector.manizales":"Manizales",
+    "ap.sector.armenia":"Armenia",
+    "ap.sector.choco":"Chocó",
+    "ap.sector.h":"Lo tenemos en cuenta, pero no es un compromiso: la prioridad la siguen ordenando los conceptos de los ingenieros.",
+    "ap.concepto":"Entiendo que apadrinar NO reserva una casa concreta y que Give&Grow decide qué viviendas se atienden con los conceptos de los ingenieros.",
+    "ap.concepto.h":"Es la condición del proyecto, y está aquí para que no haya malentendido después. Si lo que buscas es apoyar una casa que ya conoces, escríbenos y lo hablamos de frente.",
+    "ap.datos":"Autorizo el tratamiento de mis datos para que Give&Grow me contacte sobre este ofrecimiento, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.",
+    "ap.submit":"Enviar mi ofrecimiento",
+    "ap.nada":"Este formulario no cobra nada ni pide datos de pago.",
+    "ap.sending":"Enviando…",
+    "ap.ok":"Recibimos tu ofrecimiento. Alguien del equipo te escribe para acordar los detalles.",
+    "ap.err.nombre":"Falta tu nombre.",
+    "ap.err.email":"Revisa tu correo: no parece una dirección válida.",
+    "ap.err.detalle":"Cuéntanos qué puedes aportar, aunque sea en una línea.",
+    "ap.err.concepto":"Necesitamos que confirmes esto: apadrinar no reserva una casa concreta.",
+    "ap.err.datos":"Sin tu autorización de datos no podemos guardar el ofrecimiento.",
+    "ap.err.send":"No pudimos enviar tu ofrecimiento. Revisa los datos e intenta otra vez.",
     "track.ey":"Trazabilidad real",
     "track.t":"Rastrea tu donación",
     "track.lead":"Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.",
@@ -1473,6 +1531,7 @@ var ROUTE_META = {
   faq:{t:{es:"Preguntas frecuentes · Give&Grow International",en:"FAQ · Give&Grow International"},d:{es:"Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",en:"Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."}},
   casas:{t:{es:"Casas revisadas · Give&Grow International",en:"Homes reviewed · Give&Grow International"},d:{es:"Registro público del triaje estructural: las casas revisadas por ingenieros voluntarios, sin nombres ni direcciones. Evidencia, no promesas.",en:"Public record of the structural triage: homes reviewed by volunteer engineers, with no names or addresses. Evidence, not promises."}},
   caso:{t:{es:"Tu caso · Give&Grow International",en:"Your case · Give&Grow International"},d:{es:"Consulta en qué va tu caso de vivienda y agrega las fotos que te pidieron.",en:"Check where your housing case stands and add the photos you were asked for."}},
+  apadrinar:{t:{es:"Apadrinar una casa · Give&Grow International",en:"Sponsor a home · Give&Grow International"},d:{es:"Aporta materiales, mano de obra o transporte para reparar viviendas afectadas por el sismo. Registra lo que puedes dar: no reserva una casa concreta ni declara habitabilidad.",en:"Contribute materials, labour or transport to repair homes hit by the earthquake. Register what you can give: it does not reserve a particular home and does not rule on habitability."}},
   ingenieros:{t:{es:"Ingenieros voluntarios · Give&Grow International",en:"Volunteer engineers · Give&Grow International"},d:{es:"Postúlate al triaje estructural: mira fotos de casas afectadas por el sismo y da un concepto sobre permanencia, precauciones y materiales. Es orientación, no un dictamen de habitabilidad.",en:"Apply to the structural triage: review photos of homes hit by the earthquake and give an opinion on staying, precautions and materials. It is guidance, not a habitability ruling."}},
   vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario te da un concepto: si puedes permanecer, qué precauciones tomar y con qué reparar. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer gives you an opinion: whether you can stay, what precautions to take and what to repair with. It does not replace the official assessment."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
@@ -2011,7 +2070,7 @@ var MARCA_MMC = document.documentElement.getAttribute("data-marca") === "mmc";
 /* Las únicas rutas que existen en este subdominio. Todo lo demás es de la
    fundación y vive en su dominio: si alguien llega con un enlace viejo no se
    le enseña un 404, se le lleva al sitio donde esa página sí existe. */
-var RUTAS_MMC = ["vivienda", "caso", "casas", "ingenieros", "privacidad", "e404"];
+var RUTAS_MMC = ["vivienda", "caso", "casas", "ingenieros", "apadrinar", "privacidad", "e404"];
 
 var ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
 
@@ -2022,7 +2081,7 @@ var ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
    `caso` tampoco: es una ruta de PATH (`/caso/<n>?t=`) y la muda el Worker, que
    sí puede conservar el token de la query. Aquí solo van las de hash, que el
    Worker no ve nunca porque el `#` no viaja al servidor. */
-var RUTAS_TRIAJE = ["vivienda", "ingenieros", "casas"];
+var RUTAS_TRIAJE = ["vivienda", "ingenieros", "casas", "apadrinar"];
 
 function mmcRuta(id){
   if (!MARCA_MMC || RUTAS_MMC.indexOf(id) > -1) return false;
@@ -2323,7 +2382,7 @@ var ACT_FNS = {
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
   donarBrigada:donarBrigada, allySubmit:allySubmit,
-  irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit,
+  irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit, apSubmit:apSubmit, apQuien:apQuien,
   fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
   ingSubmit:ingSubmit, ingEsp:ingEsp,
   mcEnviar:mcEnviar,
@@ -4492,6 +4551,65 @@ function ingEsp(){
   var sel = document.getElementById("inf-esp");
   var campo = document.getElementById("inf-otra-f");
   if (sel && campo) campo.style.display = sel.value === "otra" ? "" : "none";
+}
+
+/* Igual que `ingEsp()`: el campo de organización solo aparece si hace falta.
+   Un campo visible y vacío invita a rellenarlo con cualquier cosa. */
+function apQuien(){
+  var sel = document.getElementById("apf-quien");
+  var caja = document.getElementById("apf-org-f");
+  if (!sel || !caja) return;
+  caja.style.display = sel.value === "empresa" ? "" : "none";
+  if (sel.value !== "empresa"){ var o = document.getElementById("apf-org"); if (o) o.value = ""; }
+}
+
+function apSubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("apf-note");
+  var btn = document.getElementById("apf-btn");
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
+
+  /* Honeypot: éxito aparente, cero envío. No se le enseña al bot qué lo delató. */
+  if (val("apf-web2")){ document.getElementById("apf").reset(); apQuien(); return allyMsg(note, t("ap.ok"), true); }
+
+  if (!val("apf-nombre")) return allyMsg(note, t("ap.err.nombre"), false);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("apf-email"))) return allyMsg(note, t("ap.err.email"), false);
+  if (!val("apf-detalle")) return allyMsg(note, t("ap.err.detalle"), false);
+  if (!chk("apf-concepto")) return allyMsg(note, t("ap.err.concepto"), false);
+  if (!chk("apf-datos")) return allyMsg(note, t("ap.err.datos"), false);
+
+  btn.disabled = true;
+  allyMsg(note, t("ap.sending"), true);
+
+  fetch("/api/inscripcion", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tipo: "apadrinamiento",
+      nombre: val("apf-nombre"),
+      email: val("apf-email"),
+      telefono: val("apf-tel"),
+      ciudad: val("apf-ciudad"),
+      quien: val("apf-quien"),
+      organizacion: val("apf-org"),
+      aporte: val("apf-aporte"),
+      detalle: val("apf-detalle"),
+      alcance: val("apf-alcance"),
+      sector: val("apf-sector"),
+      acepta_concepto: true,
+      autoriza_datos: true,
+      web2: val("apf-web2"),
+      idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
+    })
+  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+    .then(function(){
+      document.getElementById("apf").reset(); apQuien();
+      btn.disabled = false;
+      allyMsg(note, t("ap.ok"), true);
+    })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("ap.err.send"), false); });
+  return false;
 }
 
 function ingSubmit(ev){
