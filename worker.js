@@ -1094,6 +1094,7 @@ async function apiInscripcion(request, env, url) {
      en la misma base y en el mismo panel; ninguna en un tercero. */
   if (c.tipo === "especie")   return await apiOfrecimiento(env, c);
   if (c.tipo === "ingeniero") return await apiIngeniero(env, c);
+  if (c.tipo === "apadrinamiento") return await apiApadrinamiento(env, c);
   if (c.tipo === "empresa")   return await apiAliado(env, c);
   if (c.tipo === "fundacion") return await apiFundacion(env, c);
 
@@ -5783,6 +5784,144 @@ const CATEGORIAS_ESPECIE = [
   "agua", "alimento", "higiene", "panales", "descanso", "energia", "brigada", "otra"
 ];
 
+/* Los cinco territorios de la brigada. Existen como lista cerrada porque el
+   sector es un dato que después ordena trabajo real, y un campo libre acabaría
+   con «Pereira», «pereira» y «Risaralda» siendo tres cosas distintas.
+   `cualquiera` está a propósito y es la opción honesta por omisión: la mayoría
+   de quien quiere ayudar no tiene preferencia, y forzarle a elegir una ciudad
+   inventa un dato que luego se lee como compromiso. */
+const SECTORES_MMC = ["cali", "pereira", "manizales", "armenia", "choco", "cualquiera"];
+
+/* Qué se puede ofrecer. `dinero` está en la lista, pero este formulario NO
+   cobra: registra el ofrecimiento y una persona del equipo contacta. Cobrar
+   aquí exigiría prometer a qué casa va, que es justo lo que no se puede
+   prometer. */
+const APORTES_APADRINA = ["materiales", "mano_obra", "transporte", "dinero", "otra"];
+
+const ETIQUETA_APORTE = {
+  es: { materiales: "Materiales de reparación", mano_obra: "Mano de obra",
+        transporte: "Transporte de materiales", dinero: "Aporte en dinero", otra: "Otra forma" },
+  en: { materiales: "Repair materials", mano_obra: "Labour",
+        transporte: "Transport of materials", dinero: "Money", otra: "Other" }
+};
+
+const ETIQUETA_SECTOR = {
+  cali: "Cali", pereira: "Pereira", manizales: "Manizales",
+  armenia: "Armenia", choco: "Chocó", cualquiera: "Donde más se necesite"
+};
+
+/* POST /api/inscripcion con tipo=apadrinamiento — quien quiere aportar a la
+   reparación de viviendas.
+
+   REGISTRA UN OFRECIMIENTO, NO UNA TRANSACCIÓN, y esa es la decisión de fondo.
+   No hay pasarela aquí y no la va a haber mientras el destino no se pueda
+   nombrar: apadrinar NO reserva una casa concreta. Las casas las ordenan los
+   conceptos de los ingenieros, y dejar elegir por foto pondría primero la casa
+   más fotografiable, no la más urgente.
+
+   Por eso `acepta_concepto` es obligatorio, igual que `acepta_triaje` en la
+   postulación de ingenieros: quien crea que está comprando la reparación de una
+   casa que eligió entendió mal, y hay que decírselo ANTES. */
+async function apiApadrinamiento(env, c) {
+  const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const nombre  = limpio(c.nombre, 120);
+  const email   = limpio(c.email, 200);
+  const aporte  = APORTES_APADRINA.includes(c.aporte) ? c.aporte : null;
+  const detalle = limpio(c.detalle, 600);
+  const sector  = SECTORES_MMC.includes(c.sector) ? c.sector : "cualquiera";
+
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  if (!aporte)  return json({ error: "aporte_requerido", opciones: APORTES_APADRINA }, 400);
+  if (!detalle) return json({ error: "detalle_requerido" }, 400);
+  if (!c.acepta_concepto) return json({ error: "concepto_requerido" }, 400);
+  /* Sin autorización no se guarda NADA. Ley 1581, no una casilla decorativa. */
+  if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
+
+  const datos = {
+    aporte, detalle, sector,
+    alcance: limpio(c.alcance, 200),
+    quien: c.quien === "empresa" ? "empresa" : "persona",
+    organizacion: limpio(c.organizacion, 160),
+    acepta_concepto: true,
+    idioma: c.idioma === "en" ? "en" : "es"
+  };
+
+  const ins = await env.DB.prepare(
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
+    "VALUES ('apadrinamiento', 'nueva', ?, ?, ?, ?, ?)"
+  ).bind(nombre, email, limpio(c.telefono, 40) || null, limpio(c.ciudad, 80) || null,
+         JSON.stringify(datos)).run();
+
+  /* El correo no puede tumbar el registro: si falla, el ofrecimiento ya quedó
+     guardado y eso es lo que importa. Misma regla que en aportes e inscripciones. */
+  try {
+    await correoApadrinamiento(env, { nombre, email, ...datos });
+    await correoAvisoApadrinamiento(env, { nombre, email, telefono: limpio(c.telefono, 40),
+                                           ciudad: limpio(c.ciudad, 80), ...datos });
+  } catch (e) {
+    console.error("correo apadrinamiento", e && e.message);
+  }
+
+  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+}
+
+async function correoApadrinamiento(env, a) {
+  const en = a.idioma === "en";
+  return await enviarCorreo(env, {
+    para: a.email,
+    asunto: en ? "We received your offer to help repair a home"
+               : "Recibimos tu ofrecimiento para reparar una vivienda",
+    etiqueta: "apadrinamiento",
+    html: plantillaCorreo({
+      titulo: en ? "Thank you. Here is what happens now." : "Gracias. Esto es lo que sigue.",
+      parrafos: en ? [
+        "Someone from the team will write to you to agree on the details. Nothing is charged from this form.",
+        "One thing so there is no misunderstanding: sponsoring does not reserve a particular home. Which homes are attended is decided with the engineers' written opinions, because the need has an order and a photograph is not that order.",
+        "What you do get back is evidence: every delivery we make is published with its record."
+      ] : [
+        "Alguien del equipo te va a escribir para acordar los detalles. Desde este formulario no se cobra nada.",
+        "Una cosa para que no haya malentendido: apadrinar no reserva una casa concreta. Qué casas se atienden se decide con los conceptos escritos de los ingenieros, porque la necesidad tiene un orden y una fotografía no es ese orden.",
+        "Lo que sí vuelve es evidencia: cada entrega que hacemos se publica con su acta."
+      ],
+      filas: [
+        [en ? "What you offer" : "Qué ofreces", (ETIQUETA_APORTE[en ? "en" : "es"][a.aporte] || a.aporte)],
+        [en ? "Details" : "Detalle", a.detalle],
+        [en ? "Territory" : "Territorio", ETIQUETA_SECTOR[a.sector] || a.sector]
+      ],
+      cierre: en ? "Fundación Give&Grow International · NIT 901.948.930-2"
+                 : "Fundación Give&Grow International · NIT 901.948.930-2"
+    })
+  });
+}
+
+async function correoAvisoApadrinamiento(env, a) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+  return await enviarCorreo(env, {
+    para,
+    asunto: "Apadrinamiento: " + (ETIQUETA_APORTE.es[a.aporte] || a.aporte)
+            + " · " + (ETIQUETA_SECTOR[a.sector] || a.sector),
+    etiqueta: "apadrinamiento-aviso",
+    html: plantillaCorreo({
+      titulo: "Alguien quiere aportar a la reparación de viviendas",
+      filas: [
+        ["Qué ofrece", ETIQUETA_APORTE.es[a.aporte] || a.aporte],
+        ["Detalle", a.detalle],
+        ["Alcance", a.alcance || "(no dice)"],
+        ["Territorio", ETIQUETA_SECTOR[a.sector] || a.sector],
+        ["Quién", a.quien === "empresa" ? "Empresa" : "Persona"],
+        ["Organización", a.organizacion || "(no dice)"],
+        ["Nombre", a.nombre],
+        ["Correo", a.email],
+        ["Teléfono", a.telefono || "(no dejó)"],
+        ["Ciudad", a.ciudad || "(no dice)"]
+      ],
+      cierre: "Está en /admin, en la bandeja de postulaciones."
+    })
+  });
+}
+
 async function apiOfrecimiento(env, c) {
   const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
   const nombre    = limpio(c.nombre, 120);
@@ -6443,13 +6582,13 @@ async function adminInspecciones(env) {
 async function adminInscripciones(env) {
   const r = await env.DB.prepare(
     "SELECT id, tipo, estado, nombre, email, telefono, ciudad, datos, creada_en " +
-    "FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero') " +
+    "FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero','apadrinamiento') " +
     "ORDER BY creada_en DESC LIMIT " + TOPE_COLA
   ).all();
   /* Importa aquí más que en ninguna otra: si cien ingenieros se postulan en un
      día, la bandeja no puede quedarse callada en el número doscientos. */
   const tot = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero')"
+    "SELECT COUNT(*) AS n FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero','apadrinamiento')"
   ).first();
   return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0, tope: TOPE_COLA });
 }
@@ -7688,7 +7827,7 @@ function cargarSalud(){
 }
 
 /* ---------------- quién quiere entrar ---------------- */
-var TIPO_ES = { voluntario:"Voluntario", fundacion:"Fundación", empresa:"Empresa", ingeniero:"Ingeniero" };
+var TIPO_ES = { voluntario:"Voluntario", fundacion:"Fundación", empresa:"Empresa", ingeniero:"Ingeniero", apadrinamiento:"Apadrinamiento" };
 var POB_ES = { ninos:"niños", adolescentes:"adolescentes", jovenes:"jóvenes",
   madres:"madres cabeza de familia", mayores:"adultos mayores", familias:"familias",
   migrante:"migrantes", discapacidad:"personas con discapacidad", otra:"otra" };
