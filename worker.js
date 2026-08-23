@@ -206,6 +206,191 @@ async function verificarAccess(request, env, audsValidos) {
 }
 
 /* ========================================================================
+   EVALUACIÓN EXTERNA DE ACCESS — que habilitar a un ingeniero no dependa
+   de que una persona edite una lista de correos a mano.
+
+   EL PROBLEMA QUE RESUELVE. La postulación ya entra sola a `inscripciones`, y
+   `/admin` ya tiene el interruptor que marca la matrícula como verificada, con
+   quién y cuándo. Lo que NO era automático era lo único que de verdad abre la
+   puerta: añadir el correo a la política de Cloudflare Access, a mano, en el
+   dashboard. Si cien ingenieros se postulan un martes, cien ediciones.
+
+   CÓMO. Access permite una regla de «External Evaluation»: llama a un endpoint
+   nuestro y le pregunta si esta persona pasa. Con eso, MARCAR «verificada» EN
+   `/admin` PASA A SER EL ACTO COMPLETO DE DAR ACCESO.
+
+   EL CONTRATO no se dedujo de la documentación —que no lo detalla— sino del
+   código de referencia de Cloudflare
+   (github.com/cloudflare/workers-access-external-auth-example):
+
+     entra   POST con cuerpo JSON  { token: "<jwt firmado por Access>" }
+     sale    200 con               { token: "<jwt NUESTRO firmado>" }
+             cuya carga es         { success, iat, exp, nonce }
+     claves  GET que devuelve      { keys: [ { kid, kty, n, e, ... } ] }
+
+   El `nonce` que llega hay que devolverlo IGUAL: es lo que ata la respuesta a
+   la pregunta y evita que una respuesta vieja se reutilice.
+
+   ⚠️ LAS DOS RUTAS TIENEN QUE SER PÚBLICAS, y no es un descuido: las llama
+   Cloudflare, no un navegador con sesión. Ponerlas detrás de la política que
+   ellas mismas alimentan sería un bloqueo mutuo — Access esperando nuestra
+   respuesta para dejar pasar la petición con la que la pedimos.
+
+   ⚠️ Y NO SUSTITUYEN A LA LISTA MANUAL, se suman. En Access los «Include» se
+   combinan con OR. La documentación NO dice qué pasa si este endpoint se cae o
+   tarda, y el código de referencia responde 403 ante cualquier error, lo que la
+   regla lee como «no pasa». Con cinco territorios en terreno, dejar la entrada
+   de los ingenieros colgando de un endpoint sin comportamiento de fallo
+   documentado es exactamente el riesgo que no se debe tomar. Si esto falla,
+   quien ya entraba sigue entrando.
+   ======================================================================== */
+
+/* El par de claves vive en UN secreto (`ACCESS_EVAL_JWK`, el JWK privado en
+   JSON) y no en KV como el ejemplo de Cloudflare, que lo genera al vuelo en la
+   primera llamada. Dos razones: este proyecto no tiene KV, y sobre todo que así
+   NINGÚN endpoint puede acuñar una clave nueva — no hay carrera posible ni un
+   camino por el que la clave se regenere sola y deje de coincidir con la que
+   Access ya conoce.
+
+   La pública se DERIVA de la privada tomando `n` y `e`. No se guarda aparte, y
+   eso elimina de raíz la clase de fallo en la que las dos dejan de casar. */
+let EVAL_LLAVE = null;
+
+async function evalLlave(env) {
+  if (EVAL_LLAVE) return EVAL_LLAVE;
+  if (!env.ACCESS_EVAL_JWK) throw new Error("ACCESS_EVAL_JWK sin configurar");
+  const jwk = JSON.parse(env.ACCESS_EVAL_JWK);
+  if (!jwk.n || !jwk.e || !jwk.d) throw new Error("ACCESS_EVAL_JWK no es un JWK privado");
+  const publica = { kty: jwk.kty || "RSA", n: jwk.n, e: jwk.e, alg: "RS256", use: "sig" };
+  /* El `kid` se deriva de la clave pública, así que es estable sin guardarlo. */
+  const kid = (await sha256Hex(JSON.stringify(publica))).slice(0, 32);
+  const priv = await crypto.subtle.importKey(
+    "jwk", { ...jwk, alg: "RS256" }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]
+  );
+  EVAL_LLAVE = { priv, publica: { kid, ...publica }, kid };
+  return EVAL_LLAVE;
+}
+
+function bytesAB64url(b) {
+  let bin = "";
+  for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+  return btoa(bin).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+function textoAB64url(t) {
+  return bytesAB64url(new TextEncoder().encode(t));
+}
+
+async function firmarEval(env, carga) {
+  const { priv, kid } = await evalLlave(env);
+  const trozo = textoAB64url(JSON.stringify({ alg: "RS256", kid }))
+    + "." + textoAB64url(JSON.stringify(carga));
+  const firma = new Uint8Array(await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5", priv, new TextEncoder().encode(trozo)
+  ));
+  return trozo + "." + bytesAB64url(firma);
+}
+
+/* GET /api/access/claves — el JWKS con el que Access verifica NUESTRA firma. */
+async function accessClaves(env) {
+  try {
+    const { publica } = await evalLlave(env);
+    return new Response(JSON.stringify({ keys: [publica] }), {
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+    });
+  } catch {
+    /* Sin clave no se inventa un JWKS vacío que parezca válido: se dice que no
+       está configurado, y la regla de Access evalúa a falso — que con la lista
+       manual como segundo Include no deja a nadie fuera. */
+    return json({ error: "no_configurado" }, 503);
+  }
+}
+
+/* POST /api/access/evaluar — ¿este correo es de un ingeniero verificado? */
+async function accessEvaluar(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const ahora = Math.floor(Date.now() / 1000);
+  /* Se parte de NO. Cualquier camino que no llegue a comprobarlo todo termina
+     en un «no pasa» firmado, no en un error ambiguo. */
+  const carga = { success: false, iat: ahora, exp: ahora + 60 };
+
+  try {
+    const cuerpo = await request.json();
+    const token = String((cuerpo && cuerpo.token) || "");
+    const partes = token.split(".");
+    if (partes.length !== 3) throw new Error("token_malformado");
+
+    const cabecera = b64urlAJson(partes[0]);
+    const claims = b64urlAJson(partes[1]);
+
+    /* La firma se comprueba contra los certificados de NUESTRO equipo de
+       Access, reutilizando el mismo cargador con caché que ya usa el panel. Sin
+       esto el endpoint sería un oráculo abierto: cualquiera podría preguntarle
+       si un correo cualquiera es un ingeniero verificado. */
+    const team = env.ACCESS_TEAM_DOMAIN;
+    if (!team) throw new Error("sin_team_domain");
+    const llaves = await llavesAccess(team);
+    const jwk = llaves.find((k) => k.kid === cabecera.kid);
+    if (!jwk) throw new Error("kid_desconocido");
+    const llave = await crypto.subtle.importKey(
+      "jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]
+    );
+    const valida = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5", llave, b64urlABytes(partes[2]),
+      new TextEncoder().encode(partes[0] + "." + partes[1])
+    );
+    if (!valida) throw new Error("firma_invalida");
+
+    /* EL NONCE SE COPIA AQUÍ, en cuanto la firma está comprobada y ANTES de
+       mirar la caducidad o el emisor. Así un token auténtico pero vencido
+       recibe un «no» bien formado en vez de una respuesta que Access descarta
+       por no reconocerla: las dos deniegan, pero solo una se puede diagnosticar
+       cuando algo vaya mal en terreno. De un token sin verificar no se copia
+       nada. */
+    if (claims.nonce) carga.nonce = claims.nonce;
+
+    if (!claims.exp || claims.exp < ahora) throw new Error("token_expirado");
+    if (claims.iss && claims.iss !== "https://" + team) throw new Error("emisor_no_coincide");
+
+    /* `identity.email` es donde lo pone el código de referencia; `email` es
+        donde lo pone el token de una aplicación normal de Access. Se aceptan
+        los dos porque no está documentado cuál llega aquí, y equivocarse
+        significa denegar a todo el mundo en silencio. */
+    const correo = String(
+      (claims.identity && claims.identity.email) || claims.email || ""
+    ).trim().toLowerCase();
+    if (!correo) throw new Error("sin_correo");
+
+    /* LA REGLA. Matrícula verificada por una persona, y la postulación ni
+       archivada ni rechazada: archivar a alguien tiene que revocarle la entrada
+       sin obligar a acordarse de desmarcar también el interruptor. */
+    const fila = await env.DB.prepare(
+      "SELECT 1 AS s FROM inscripciones WHERE tipo = 'ingeniero' " +
+      "AND LOWER(email) = ? " +
+      "AND COALESCE(json_extract(datos, '$.matricula_verificada'), 0) = 1 " +
+      "AND estado NOT IN ('archivada','rechazada') LIMIT 1"
+    ).bind(correo).first();
+    if (fila) carga.success = true;
+
+    return new Response(JSON.stringify({ token: await firmarEval(env, carga) }), {
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+    });
+  } catch (e) {
+    /* Se intenta responder un «no» FIRMADO incluso ante el error, porque es lo
+       que Access sabe leer. Si ni eso se puede —falta la clave—, entonces sí un
+       403, igual que el ejemplo de Cloudflare. */
+    try {
+      return new Response(JSON.stringify({ token: await firmarEval(env, carga) }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+      });
+    } catch {
+      return json({ success: false, error: "no_evaluable" }, 403);
+    }
+  }
+}
+
+/* ========================================================================
    Guías: GG-YYYY-NNNNNN
    El mismo número es la `reference` de Wompi. Un solo número, una sola verdad.
    INSERT ... ON CONFLICT DO UPDATE ... RETURNING es atómico en D1, así que dos
@@ -8499,6 +8684,15 @@ export default {
         }
       });
     }
+
+    /* --- Evaluación externa de Access: PÚBLICA a la fuerza ---
+       Las llama Cloudflare, no un navegador con sesión, así que van ANTES del
+       guardián. Detrás de él serían un bloqueo mutuo: Access esperando nuestra
+       respuesta para dejar pasar la petición con la que se la pedimos.
+       Su propia seguridad es el JWT firmado por Access que traen en el cuerpo,
+       que se verifica contra los certificados del equipo. */
+    if (ruta === "/api/access/claves")  return await accessClaves(env);
+    if (ruta === "/api/access/evaluar") return await accessEvaluar(request, env);
 
     /* --- Panel interno: TODO detrás de Access, y fail-closed --- */
     /* `/api/triage/` entra por el MISMO guardián que el panel: hereda la
