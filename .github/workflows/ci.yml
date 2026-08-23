@@ -3,6 +3,19 @@ name: CI — Gate de validación
 on:
   pull_request:
     branches: [main]
+    # `labeled` NO está en los tipos por omisión —que son opened, synchronize y
+    # reopened— y esa ausencia era una carrera silenciosa: `gh pr create --label`
+    # crea el PR y lo etiqueta en DOS llamadas, así que el evento `opened` puede
+    # llegar sin la etiqueta. El job `automerge` la busca en el payload del
+    # evento, no la busca de nuevo, así que se saltaba: el PR quedaba abierto,
+    # con el gate en verde y sin fusionar.
+    #
+    # Pasó el 22 ago 2026 con el PR #164. Es la misma familia que la cicatriz
+    # del #130 que está documentada más abajo: apariencia de éxito y nada
+    # avisando. Con `labeled` en la lista, etiquetar dispara su propia
+    # evaluación y el PR se fusiona igual llegue la etiqueta al crearlo o
+    # después.
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   validate:
