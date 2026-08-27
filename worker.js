@@ -3984,13 +3984,21 @@ function vaciarCola(){
   VACIANDO = true;
   return todos("cola").then(function(l){
     if (!l.length) { VACIANDO = false; estado(); return; }
-    var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false;
+    var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false, sinBorrar = 0;
     function paso(){
       if (i >= l.length){
         VACIANDO = false;
         estado();
         if (sesionCaida) aviso("Tu sesión caducó. Vuelve a entrar y toca Enviar otra vez: nada se perdió.", "mal");
         else if (malas)  aviso("Quedaron " + malas + " sin enviar por datos incompletos. Ábrelas y complétalas.", "mal");
+        else if (sinBorrar) {
+          /* Llegaron al servidor pero no se pudieron quitar del teléfono, así
+             que el contador NO va a bajar. Se dice, porque un contador que no
+             baja después de enviar es justo lo que hace pensar que no llegó. */
+          aviso("Enviadas " + enviadas + ", pero " + sinBorrar + " siguen contando en el teléfono. "
+            + "Ya están a salvo: si las envías otra vez el servidor las reconoce y no se duplican.", "info");
+          cargarMias();
+        }
         else if (enviadas || repes) { aviso("Enviadas " + enviadas + (repes ? " (" + repes + " ya estaban)" : "") + ".", "bien"); cargarMias(); }
         else aviso("Sin señal todavía. Quedan guardadas en el teléfono.", "info");
         return;
@@ -3999,15 +4007,31 @@ function vaciarCola(){
       enviarUno(reg).then(function(res){
         if (res.estado === "ok"){
           if (res.repetida) repes++; else enviadas++;
-          quitar("cola", reg.local_id).then(paso);
+          /* SI EL BORRADO LOCAL FALLA, SE SIGUE. Antes "quitar" rechazaba sin
+             manejador: "paso" no se volvía a llamar, VACIANDO se quedaba en
+             true y la cola NO se vaciaba nunca más en lo que durara la pantalla.
+             El síntoma en terreno habría sido el peor conocido —«toco Enviar y
+             no pasa nada»— y la única salida, cerrar y reabrir sin saber por
+             qué. La inspección ya está en el servidor; que se quede una vez más
+             en la cola es inofensivo porque el envío es idempotente. */
+          quitar("cola", reg.local_id).then(paso, function(){ sinBorrar++; paso(); });
           return;
         }
         if (res.estado === "sesion")   { sesionCaida = true; paso(); return; }
         if (res.estado === "rechazada"){ malas++; paso(); return; }
         paso();
+      }, function(){
+        /* "enviarUno" ya atrapa lo suyo y no debería rechazar. Esto es el
+           cinturón: una sola promesa rota aquí congelaba toda la cola. */
+        paso();
       });
     }
     paso();
+  }).catch(function(){
+    /* Leer la cola también puede fallar —el almacén se cierra si el navegador
+       recicla la pestaña— y sin esto la bandera quedaba levantada para siempre. */
+    VACIANDO = false;
+    aviso("No se pudo leer la cola de este teléfono. NO borres nada: cierra esta pantalla y vuelve a abrirla.", "mal");
   });
 }
 
@@ -4020,6 +4044,12 @@ function estado(){
     el("est").textContent = partes.join(" · ");
     if (c.length && navigator.onLine) el("b-cola").disabled = false;
     return c.length;
+  }).catch(function(){
+    /* Antes se quedaba con el número viejo en pantalla, que es peor que no
+       tener número: parece un dato y no lo es. */
+    el("n-pend").textContent = "?";
+    el("est").textContent = "No se pudo leer lo guardado en este teléfono.";
+    return 0;
   });
 }
 
