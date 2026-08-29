@@ -216,7 +216,7 @@ var I18N = {
     "mmc.nav.casas":"Casas revisadas",
     "mmc.nav.ing":"Ingenieros",
     "mmc.nav.apad":"Apadrinar",
-    "mmc.aval":"La plataforma de Cimientos que Abrazan, un proyecto de Fundación Give&Grow International · NIT 901.948.930-2",
+    "mmc.aval":"La plataforma de Cimientos que Unen, un proyecto de Fundación Give&Grow International · NIT 901.948.930-2",
     "mmc.marca":"Mira Mi Casa",
     "nav.g.emergencia":"Emergencia",
     "nav.brigada":"Brigada de emergencia",
