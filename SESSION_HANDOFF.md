@@ -40,12 +40,23 @@ formulario (`worker.js` ~2651 y ~2890), el correo de bienvenida (~1336) y el PDF
 (`documentos.js` ~779). **Cinco sitios.** Es la pregunta 9 de
 `ops/guia-fotografica.md`, y sigue sin respuesta.
 
-## ⚠️ EL NOMBRE DEL PROYECTO EN REDES, SIN CONFIRMAR
-El 19 ago quedó como **«Cimientos que Abrazan»**; el 25 Sebas escribió
-**«Cimientos que Unen»**. No se ha tocado nada con ninguno de los dos —la cadena
-del pie dice «Abrazan»— así que **hay que confirmar cuál es antes de publicar la
-cuenta o imprimir nada.** Un nombre a medias entre dos versiones es peor que
-cualquiera de los dos.
+## ✅ EL NOMBRE EN REDES: «CIMIENTOS QUE UNEN» (cerrado por Sebas, 25 ago)
+Estuvo dos versiones en el aire —el 19 se escribió «Abrazan» y el 25 «Unen»— y
+Sebas cerró **«Cimientos que Unen»**. Ya está corregido en el diccionario ES, en
+el EN y en la copia versionada del worker de ALMA; el pie del subdominio lo dice
+correcto en producción.
+
+**La cadena de tres nombres, definitiva:**
+
+| | Qué es |
+|---|---|
+| **Fundación Give&Grow International** | la ESAL, el respaldo legal, el NIT |
+| **Cimientos que Unen** | el PROYECTO — la cara pública en redes |
+| **Mira Mi Casa** | la PLATAFORMA — web, pasarela, estructura digital |
+
+⚠️ **Queda «Abrazan» dentro de este documento más abajo**, en la sección de
+arquitectura de nombres del 19 ago: se deja a propósito como registro de cómo se
+llegó aquí. **El nombre vigente es «Unen».**
 
 ## 🚨 EL DEFECTO QUE ESCONDIÓ INSPECCIONES FIRMADAS (22 ago, PR #161 y #162)
 
@@ -651,7 +662,7 @@ Tres entidades, y conviene no volver a mezclarlas:
 | | Qué es | Dónde vive |
 |---|---|---|
 | **Fundación Give&Grow International** | La ESAL. El respaldo legal, el NIT, quien responde. | El dominio principal |
-| **Cimientos que Abrazan** | El **proyecto** — la cara pública en redes. Instagram, TikTok, contenido, alcance. | Redes sociales |
+| **Cimientos que Abrazan** ⚠️ *(renombrado a «Unen» el 25 ago — ver arriba)* | El **proyecto** — la cara pública en redes. Instagram, TikTok, contenido, alcance. | Redes sociales |
 | **Mira Mi Casa** | La **plataforma** — web, pasarela, estructura digital, bancos. | El subdominio |
 
 **Por qué el nombre cálido no quedó en la plataforma.** «Cimientos que Abrazan»
