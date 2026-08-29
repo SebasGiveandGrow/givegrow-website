@@ -59,12 +59,44 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"]
     /* Las bandejas son cosa del panel; triageJS() y rutaJS() tienen su propia
        forma y sus propias funciones de arranque. */
     if (fn !== "adminJS") continue;
+    /* Desde la carga perezosa, «se pide al arrancar» ya no es la única forma
+       válida: una bandeja puede estar registrada en BANDEJAS y pedirse cuando
+       su tabla se acerca a la pantalla. El invariante NO cambia —toda bandeja
+       tiene que llegar a pedirse— y por eso se comprueban las dos vías en vez
+       de aflojar la regla. Aflojarla habría devuelto el fallo original: una
+       tabla en «Cargando…» para siempre y nada avisando. */
     const definidas = [...emitido.matchAll(/^function (cargar\w*)\s*\(/gm)].map(m => m[1]);
-    const arranque  = new Set([...emitido.matchAll(/^(cargar\w*)\(\);$/gm)].map(m => m[1]));
-    const huerfanas = definidas.filter(f => !arranque.has(f));
+    /* SE LEEN DOS LISTAS, no las llamadas.
+
+       Antes el arranque se detectaba buscando `cargarX();` en la columna 0, y
+       eso era falso: un salto de línea dentro de un manejador de clic dejó
+       `cargarInspecciones();` en columna 0 pero DENTRO de una función, el gate
+       lo contó como arranque, y esa bandeja llevaba tiempo quedándose en
+       «Cargando…» en cada carga limpia. El check que existía para atrapar ese
+       fallo exacto lo estaba tapando.
+
+       Leyendo ARRANQUE y BANDEJAS no hay que adivinar dónde empieza una
+       sentencia: son datos, y una coma fuera de sitio la caza `node --check`. */
+    const arranque = new Set(
+      ((emitido.match(/var ARRANQUE\s*=\s*\[([^\]]*)\]/) || [])[1] || "")
+        .split(",").map(x => x.trim()).filter(Boolean)
+    );
+    const registro  = new Set(
+      [...emitido.matchAll(/^\s*"[a-z0-9-]+":\s*(cargar\w*)\s*,?$/gm)].map(m => m[1])
+    );
+    const huerfanas = definidas.filter(f => !arranque.has(f) && !registro.has(f));
     if (huerfanas.length) {
-      err(nombre + ": " + huerfanas.join(", ") + " no se llama al arrancar — su tabla se queda en «Cargando…»");
-    } else ok(nombre + " pide sus " + definidas.length + " bandejas al arrancar");
+      err(nombre + ": " + huerfanas.join(", ") + " no se pide ni al arrancar ni por BANDEJAS — su tabla se queda en «Cargando…»");
+    } else if (arranque.size && !/ARRANQUE\.forEach/.test(emitido)) {
+      err(nombre + ": ARRANQUE tiene " + arranque.size + " funciones y nadie la recorre");
+    } else if (registro.size && !/armarBandejas\(\);/.test(emitido)) {
+      /* El registro sin su observador es peor que no tenerlo: parece que las
+         bandejas están cubiertas y ninguna se pide nunca. */
+      err(nombre + ": BANDEJAS tiene " + registro.size + " bandejas y armarBandejas() no se llama al arrancar");
+    } else {
+      ok(nombre + " pide sus " + definidas.length + " bandejas (" + arranque.size +
+         " al arrancar, " + registro.size + " al acercarse)");
+    }
   } catch (e) {
     err(nombre + " emite JS INVÁLIDO — el panel no cargaría: " + (e.stderr ? String(e.stderr).split("\n")[1] || e.message : e.message));
   }

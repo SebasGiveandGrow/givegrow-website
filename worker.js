@@ -7349,7 +7349,7 @@ donde falta el dato dice «sin datos», no «0 %».</p>
 <th scope="col">Guía</th><th scope="col">Estado</th><th scope="col">Monto</th>
 <th scope="col">Destino</th><th scope="col">Donante</th><th scope="col">Recibo</th>
 <th scope="col">Certificado</th><th scope="col">Creada</th><th scope="col">Acción</th>
-</tr></thead><tbody id="filas"><tr><td colspan="9">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="filas"><tr><td colspan="9" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <div id="dlg" style="display:none;margin-top:24px"></div>
@@ -7364,7 +7364,7 @@ número del comprobante porque <strong>es el que cita el certificado</strong>.</
 <th scope="col">Guía</th><th scope="col">Monto</th><th scope="col">Destino</th>
 <th scope="col">Donante</th><th scope="col">Ref.</th><th scope="col">Comprobante</th>
 <th scope="col">Cert.</th><th scope="col">Acción</th>
-</tr></thead><tbody id="t-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="t-filas"><tr><td colspan="8" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <h2 id="sec-entrar" class="h-sec" style="margin:48px 0 6px;font-size:26px">Quién quiere entrar</h2>
@@ -7381,7 +7381,7 @@ aquí no le da acceso a nada. Su matrícula es un dato que él declaró, no uno 
 <thead><tr>
 <th scope="col">Tipo</th><th scope="col">Quién</th><th scope="col">Lo que hay que saber</th>
 <th scope="col">Contacto</th><th scope="col">Fecha</th><th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="i-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="i-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <h2 id="sec-casas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Casas por revisar</h2>
@@ -7404,7 +7404,7 @@ duplicados y pruebas— y todo se puede reabrir.</p>
 <th scope="col">Caso</th><th scope="col">Prioridad</th><th scope="col">Dónde</th>
 <th scope="col">Contacto</th><th scope="col">La casa</th><th scope="col">Estado</th>
 <th scope="col">Acción</th>
-</tr></thead><tbody id="cs-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="cs-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 <div id="cs-dlg" style="display:none;margin-top:20px"></div>
 
@@ -7428,7 +7428,7 @@ regenera nunca.</p>
 <th scope="col">Inspección</th><th scope="col">Familia</th><th scope="col">Dónde</th><th scope="col">Visita</th>
 <th scope="col">Quién observó</th><th scope="col">RE / Obs</th><th scope="col">Firma del habitante</th>
 <th scope="col">Documento</th>
-</tr></thead><tbody id="ins-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="ins-filas"><tr><td colspan="8" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <div style="margin-top:18px;border:1px solid var(--bd);border-radius:8px;padding:15px">
@@ -7461,7 +7461,7 @@ antes de que lo hagan: el inventario cambia todos los días.</p>
 <thead><tr>
 <th scope="col">Qué</th><th scope="col">Cantidad</th><th scope="col">Cuándo</th>
 <th scope="col">Quién</th><th scope="col">Ciudad</th><th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="o-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="o-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <h2 id="sec-pagos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Pagos sin aporte</h2>
@@ -7474,7 +7474,7 @@ trazado.</p>
 <thead><tr>
 <th scope="col">Referencia</th><th scope="col">Monto</th><th scope="col">Método</th>
 <th scope="col">Donante</th><th scope="col">Recibido</th>
-</tr></thead><tbody id="p-filas"><tr><td colspan="5">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="p-filas"><tr><td colspan="5" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <h2 id="sec-entregas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
@@ -7501,7 +7501,7 @@ y la entidad, no una persona atendida. Una entrega no se puede publicar sin al m
 <th scope="col">Acta</th><th scope="col">Fecha</th><th scope="col">Sector</th>
 <th scope="col">Aliada</th><th scope="col">Familias</th><th scope="col">Fotos</th>
 <th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="e-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
+</tr></thead><tbody id="e-filas"><tr><td colspan="8" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
@@ -7653,8 +7653,15 @@ function cerrarCert(){
   caja.style.display = "none"; caja.innerHTML = "";
 }
 
-function cargar(){
+/* Partida en dos porque tienen urgencias distintas: el resumen son las cifras
+   que van junto al titulo y se ven al abrir; la lista de aportes es una tabla
+   larga que casi siempre queda por debajo del pliegue. Antes viajaban juntas y
+   la segunda se pedia siempre. */
+function cargarResumen(){
   fetch("/api/admin/resumen").then(function(r){ return r.json(); }).then(pintarResumen);
+}
+
+function cargarAportes(){
   fetch("/api/admin/aportes?limite=100" + (FILTRO ? "&estado=" + encodeURIComponent(FILTRO) : ""))
     .then(function(r){ return r.json(); })
     .then(function(d){ pintarFilas(d.aportes || []); });
@@ -7664,7 +7671,7 @@ document.addEventListener("click", function(e){
   var t = e.target.closest("[data-estado]");
   if (t){
     document.querySelectorAll(".pay-tab").forEach(function(b){ b.classList.remove("on"); });
-    t.classList.add("on"); FILTRO = t.getAttribute("data-estado"); cargar(); return;
+    t.classList.add("on"); FILTRO = t.getAttribute("data-estado"); cargarAportes(); return;
   }
   var c = e.target.closest("[data-cert]");
   if (c){ abrirCert(c.getAttribute("data-cert")); return; }
@@ -7680,7 +7687,7 @@ document.addEventListener("click", function(e){
     fetch("/api/admin/certificado/" + encodeURIComponent(num) + "/anular", {
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ motivo: motivo })
-    }).then(function(r){ return r.json(); }).then(function(){ cargar(); })
+    }).then(function(r){ return r.json(); }).then(function(){ cargarResumen(); cargarAportes(); })
       .catch(function(){ an.disabled = false; an.textContent = "Reintentar"; });
     return;
   }
@@ -7721,7 +7728,7 @@ document.addEventListener("click", function(e){
           return;
         }
         cerrarCert();
-        cargar();
+        cargarResumen(); cargarAportes();
         window.open("/api/admin/certificado/" + encodeURIComponent(res.d.numero) + ".pdf", "_blank", "noopener");
       })
       .catch(function(){ ok.disabled = false; ok.textContent = "Reintentar"; });
@@ -7734,7 +7741,7 @@ document.addEventListener("click", function(e){
     fetch("/api/admin/aporte/" + encodeURIComponent(b.getAttribute("data-guia")) + "/estado", {
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ estado: b.getAttribute("data-a") })
-    }).then(function(r){ return r.json(); }).then(function(){ cargar(); })
+    }).then(function(r){ return r.json(); }).then(function(){ cargarResumen(); cargarAportes(); })
       .catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
   }
 
@@ -7755,7 +7762,7 @@ document.addEventListener("click", function(e){
       if (d.ayuda) alert(d.ayuda);
       else if (d.error) alert("No se pudo conciliar: " + d.error);
       else alert("Wompi dice: " + d.wompi_estado + ". El aporte quedó en «" + (d.aporte && d.aporte.estado) + "».");
-      cargar(); cargarSalud();
+      cargarResumen(); cargarAportes(); cargarSalud();
     }).catch(function(){ cn.disabled = false; cn.textContent = "Reintentar"; });
   }
 });
@@ -7797,7 +7804,7 @@ document.addEventListener("click", function(e){
     fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
       method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ referencia: ref })
     }).then(function(r){ return r.json(); })
-      .then(function(d){ if (d.ayuda) alert(d.ayuda); cargarReportadas(); cargar(); })
+      .then(function(d){ if (d.ayuda) alert(d.ayuda); cargarReportadas(); cargarResumen(); cargarAportes(); })
       .catch(function(){ cargarReportadas(); });
     return;
   }
@@ -7809,7 +7816,7 @@ document.addEventListener("click", function(e){
     ds.disabled = true; ds.textContent = "…";
     fetch("/api/admin/transferencia/" + encodeURIComponent(g2) + "/confirmar", {
       method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ descartar:true, motivo: motivo })
-    }).then(function(r){ return r.json(); }).then(function(){ cargarReportadas(); cargar(); })
+    }).then(function(r){ return r.json(); }).then(function(){ cargarReportadas(); cargarResumen(); cargarAportes(); })
       .catch(function(){ cargarReportadas(); });
   }
 });
@@ -8598,9 +8605,7 @@ document.addEventListener("click", function(e){
   fetch("/api/admin/inscripcion/" + encodeURIComponent(b.getAttribute("data-ins")) + "/estado", {
     method: "POST", headers: {"content-type":"application/json"},
     body: JSON.stringify({ estado: b.getAttribute("data-e") })
-  }).then(function(r){ return r.json(); }).then(function(){ cargarOfrecimientos();
-cargarInspecciones();
-cargarInscripciones(); cargarReportadas(); cargar(); })
+  }).then(function(r){ return r.json(); }).then(function(){ cargarOfrecimientos(); cargarReportadas(); cargarResumen(); cargarAportes(); })
     .catch(function(){ cargarOfrecimientos(); cargarInscripciones(); });
 });
 
@@ -8749,21 +8754,99 @@ document.addEventListener("click", function(e){
 });
 
 pintarCampos();
-cargarEntregas();
-cargarSueltos();
-cargarCasos();
-cargarOfrecimientos();
-cargarInscripciones();
 /* Faltaba: la bandeja de transferencias solo se refrescaba DESPUÉS de confirmar
    o descartar una, así que en una carga limpia se quedaba en «Cargando…» para
    siempre. Estuvo tapado mientras el archivo entero no compilaba. */
-cargarReportadas();
-cargarSalud();
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
   .catch(function(){});
-cargar();
+/* ---- LAS BANDEJAS SE PIDEN CUANDO SE VAN A VER ----
+
+   Antes el panel disparaba ONCE peticiones al abrirlo y pintaba ocho tablas que
+   casi nadie miraba en esa visita: entrabas a hacer una cosa y pagabas por las
+   ocho. Ahora al abrir solo van tres —quien eres, el resumen del titulo y la
+   salud, que es la que alimenta la portada de decisiones— y cada bandeja se
+   pide cuando su tabla se acerca a la pantalla.
+
+   SE OBSERVA LA TABLA Y NO LA SECCION, a proposito: la lista de aportes vive
+   dentro de «Salud del ecosistema», que esta arriba del todo, asi que observar
+   el encabezado la habria pedido siempre. Lo que decide es si vas a VER esa
+   tabla, no en que seccion esta escrita.
+
+   Y engancha con la portada: cuando tocas «Ir» y saltas a una seccion, el salto
+   es instantaneo y no arrastra por las de en medio, asi que se pide esa y nada
+   mas. */
+var BANDEJAS = {
+  "filas": cargarAportes,
+  "t-filas": cargarReportadas,
+  "i-filas": cargarInscripciones,
+  "cs-filas": cargarCasos,
+  "ins-filas": cargarInspecciones,
+  "o-filas": cargarOfrecimientos,
+  "p-filas": cargarSueltos,
+  "e-filas": cargarEntregas
+};
+
+function armarBandejas(){
+  var pedidas = {};
+  var pedir = function(id){
+    if (pedidas[id]) return;
+    pedidas[id] = true;
+    BANDEJAS[id]();
+  };
+
+  /* Sin IntersectionObserver se piden todas, o sea como estaba antes. Una carga
+     pesada es peor que nada, pero una tabla que no llega NUNCA es mucho peor:
+     es exactamente el fallo que el gate vigila desde que cargarReportadas se
+     quedo en «Cargando…» para siempre. */
+  if (!window.IntersectionObserver){
+    Object.keys(BANDEJAS).forEach(pedir);
+    return;
+  }
+
+  /* SE OBSERVA EL CONTENEDOR DE LA TABLA, no el tbody. Un tbody es
+     display:table-row-group y no es un elemento del que quiera depender algo
+     que, si falla, deja ocho tablas vacias sin que nada avise. El div .med-tw
+     esta en el mismo sitio de la pagina y es una caja normal. Como ese div no
+     tiene id propio, se guarda el vinculo elemento -> bandeja en un mapa.
+
+     300px de margen: se pide antes de que la tabla asome, asi que en la
+     practica nadie llega a leer el texto de espera. */
+  var deQuien = new Map();
+  var obs = new IntersectionObserver(function(entradas){
+    for (var i = 0; i < entradas.length; i++){
+      if (!entradas[i].isIntersecting) continue;
+      obs.unobserve(entradas[i].target);
+      pedir(deQuien.get(entradas[i].target));
+    }
+  }, { rootMargin: "300px 0px" });
+
+  Object.keys(BANDEJAS).forEach(function(id){
+    var el = document.getElementById(id);
+    /* Si el contenedor no esta en el HTML, se pide igual: quedarse esperando a
+       un elemento que no existe es como no pedirlo nunca. */
+    if (!el) { pedir(id); return; }
+    var caja = el.closest(".med-tw") || el;
+    deQuien.set(caja, id);
+    obs.observe(caja);
+  });
+}
+
+/* EL ARRANQUE TAMBIEN ES UNA LISTA, y no por simetria.
+
+   El gate comprobaba las llamadas de arranque buscandolas en la columna 0 del
+   JS emitido, y eso resulto ser falso: un salto de linea dentro de un manejador
+   de clic dejo "cargarInspecciones();" en columna 0 DENTRO de una funcion, el
+   gate lo conto como arranque, y la bandeja de inspecciones llevaba tiempo
+   quedandose en «Cargando…» en cada carga limpia. El check que existia para
+   atrapar ese fallo exacto lo estaba tapando.
+
+   Con el arranque y las bandejas como datos, el gate no tiene que adivinar
+   donde empieza una sentencia: lee dos listas. */
+var ARRANQUE = [cargarSalud, cargarResumen];
+ARRANQUE.forEach(function(f){ f(); });
+armarBandejas();
 `;
 }
 
