@@ -5435,7 +5435,12 @@ async function apiAlma(request, env, url) {
   /* SIN LLAVE NO SE INVENTA NADA: se dice que no está configurada. Mientras el
      secreto no exista este endpoint es inerte, y el sitio sigue hablando con el
      Worker de siempre. */
-  if (!env.ANTHROPIC_API_KEY) {
+  /* Se recorta el valor. Un secreto cargado por tubería se lleva el salto de
+     línea final, y Anthropic responde «invalid x-api-key» sin decir por qué —
+     que es media hora buscando en el sitio equivocado. Recortar aquí no arregla
+     una llave mala, pero descarta la causa tonta para siempre. */
+  const llaveAlma = String(env.ANTHROPIC_API_KEY || "").trim();
+  if (!llaveAlma) {
     return json({ error: "alma_no_configurada",
                   ayuda: "Falta el secreto ANTHROPIC_API_KEY en este Worker." }, 503);
   }
@@ -5462,7 +5467,7 @@ async function apiAlma(request, env, url) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": env.ANTHROPIC_API_KEY,
+      "x-api-key": llaveAlma,
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({ model: ALMA_MODELO, max_tokens: ALMA_MAX_TOKENS, system, messages: mensajes })
