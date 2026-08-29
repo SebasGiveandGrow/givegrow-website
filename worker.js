@@ -1529,12 +1529,26 @@ async function adminSalud(env) {
      viejo. `dias` es NULL cuando no hay nada esperando, no 0: son cosas
      distintas y el panel las escribe distinto. */
   const cola = [];
-  const enCola = async (clave, sql, comoSeArregla) => {
+  /* `orden` y `destino` existen para la portada de decisiones.
+
+     EL ORDEN NO ES POR CANTIDAD, y esa es la decisión. Cinco certificados
+     pendientes no son más urgentes que una casa que un ingeniero marcó urgente
+     y que nadie ha visitado. El criterio es QUIÉN ESPERA y QUÉ SE ROMPE si esto
+     sigue igual: primero las familias en riesgo, después lo que destraba a esas
+     familias, después el dinero y los papeles. Se escribe aquí, junto a la
+     consulta, y no en el panel, porque es la misma clase de dato que el
+     «cómo se arregla»: dice qué significa esta cola, no cómo se dibuja.
+
+     `destino` es a dónde va quien decide atenderla. Cuando no hay pantalla
+     —los correos fallidos se arreglan en Resend— se deja vacío en vez de
+     inventar un enlace que no lleva a ninguna parte. */
+  const enCola = async (clave, sql, comoSeArregla, orden, destino) => {
     const r = await uno(sql);
     cola.push({
       clave, n: r.n || 0,
       dias: r.n ? Math.floor((Date.now() - Date.parse((r.masViejo || "").replace(" ", "T") + "Z")) / 86400000) : null,
-      arreglo: comoSeArregla
+      arreglo: comoSeArregla,
+      orden: orden, destino: destino || null
     });
   };
   /* Sin los ingenieros: tienen su propia cola, con su propio «cómo se arregla»
@@ -1543,22 +1557,22 @@ async function adminSalud(env) {
   await enCola("inscripciones_sin_tocar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones " +
     "WHERE estado = 'nueva' AND tipo <> 'ingeniero'",
-    "Bandeja «Quién quiere entrar» · a alguien le prometimos que le escribíamos");
+    "Bandeja «Quién quiere entrar» · a alguien le prometimos que le escribíamos", 90, "#sec-entrar");
   await enCola("transferencias_sin_verificar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
-    "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado");
+    "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado", 60, "#sec-transferencias");
   await enCola("certificados_por_emitir",
     "SELECT COUNT(*) AS n, MIN(aprobada_en) AS masViejo FROM aportes a WHERE a.quiere_certificado = 1 " +
     "AND a." + PAGADA + " AND NOT EXISTS " +
     "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)",
-    "Lista de aportes · los firma la Revisora Fiscal, no el sistema");
+    "Lista de aportes · los firma la Revisora Fiscal, no el sistema", 70, "#sec-salud");
   await enCola("correos_fallidos",
     "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'fallo'",
-    "Reenviar a mano y revisar Resend · a esa persona el sitio le prometió un correo que no salió");
+    "Reenviar a mano y revisar Resend · a esa persona el sitio le prometió un correo que no salió", 95, null);
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
     "WHERE publicada_en IS NULL AND anulada_en IS NULL",
-    "Bandeja «Entregas» · el acta existe y todavía no la ve nadie");
+    "Bandeja «Entregas» · el acta existe y todavía no la ve nadie", 80, "#sec-entregas");
 
   /* ── Las cuatro del triaje de viviendas ────────────────────────────────
      La plataforma entera era INVISIBLE para este panel: vigilaba donaciones,
@@ -1573,18 +1587,18 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
     "WHERE estado IN ('recibido','en_revision') " +
     "AND NOT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = casos.numero)",
-    "Pantalla /triaje · una familia mandó fotos de su casa y nadie las ha abierto");
+    "Pantalla /triaje · una familia mandó fotos de su casa y nadie las ha abierto", 20, "/triaje");
   /* La peor de las cinco, y por eso va con su propio texto: el sistema dijo
      «vayan ya» y nadie fue. Que exista esta fila es media razón de esta tanda. */
   await enCola("urgentes_sin_visitar",
     "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
     "WHERE clasificacion = 'urgente' AND estado NOT IN ('visitado','cerrado','descartado')",
-    "Pantalla /ruta · un ingeniero dijo que era urgente y todavía no ha ido nadie");
+    "Pantalla /ruta · un ingeniero dijo que era urgente y todavía no ha ido nadie", 10, "/admin/ruta");
   await enCola("casos_esperando_fotos",
     "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos c " +
     "WHERE c.estado = 'en_revision' AND EXISTS (SELECT 1 FROM evaluaciones e " +
     "WHERE e.caso = c.numero AND e.clasificacion = 'inevaluable')",
-    "Se le pidió material a la familia y no ha llegado · quizá haya que llamarla");
+    "Se le pidió material a la familia y no ha llegado · quizá haya que llamarla", 50, "#sec-casas");
   /* Antes contaba solo `estado = 'nueva'`, y ese era el hueco: un ingeniero
      movido a «en revisión» o incluso aceptado SIN comprobar su matrícula
      desaparecía de la alarma, que es exactamente el caso peligroso. Ahora
@@ -1593,7 +1607,7 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones " +
     "WHERE tipo = 'ingeniero' AND estado <> 'archivada' " +
     "AND COALESCE(json_extract(datos, '$.matricula_verificada'), 0) <> 1",
-    "Consultar su matrícula en el registro público del COPNIA y marcarla en la bandeja");
+    "Consultar su matrícula en el registro público del COPNIA y marcarla en la bandeja", 30, "#sec-entrar");
 
   /* Y la cola nueva: conceptos que no pueden salir solos. Mientras estén aquí,
      la familia NO ha recibido respuesta — es la cola más urgente de las de
@@ -1601,7 +1615,7 @@ async function adminSalud(env) {
   await enCola("conceptos_sin_respaldo",
     "SELECT COUNT(*) AS n, MIN(c.creado_en) AS masViejo FROM casos c " +
     "WHERE c.estado = 'clasificado' AND " + SIN_RESPALDO,
-    "Un voluntario ya dio su concepto pero su matrícula no está verificada · falta un segundo par de ojos en /triaje");
+    "Un voluntario ya dio su concepto pero su matrícula no está verificada · falta un segundo par de ojos en /triaje", 40, "#sec-entrar");
 
   /* Intenciones abandonadas: más de 48 h en `intencion` y sin transacción de
      Wompi. No se tocan solas —borrar el registro de alguien que quizá vuelva a
@@ -7262,6 +7276,48 @@ function paginaAdmin() {
 <meta name="robots" content="noindex, nofollow">
 <title>Panel · Give&Grow</title>
 <link rel="stylesheet" href="/styles.css">
+<style>
+/* ---- Portada de decisiones ----
+   VA AQUÍ Y NO EN styles.css, y es deliberado. El panel enlaza /styles.css SIN
+   versión, y esa URL se sirve «Cache-Control: immutable» durante un año: un
+   cambio de CSS para el panel puede no llegarle nunca al navegador que ya la
+   tiene guardada. Esta página, en cambio, se sirve «no-store», así que lo que
+   viaja aquí llega siempre. De paso, son bytes que no paga cada visitante del
+   sitio público por una pantalla que nunca va a abrir.
+
+   La jerarquía va al revés de una tabla porque esto es para ACTUAR: primero
+   desde cuándo espera, después cuántos, y el «cómo se arregla» debajo del
+   nombre. El único acento es el ámbar de lo que lleva tres días o más, para que
+   ese ámbar signifique algo cuando aparezca. */
+.dec-caja{border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:10px;
+  padding:18px 20px;margin:0 0 30px;background:var(--surface)}
+.dec-t{font-size:var(--fs-h4);margin:0 0 14px;letter-spacing:.01em}
+.dec-alarma{border-left:3px solid var(--amber);padding:9px 13px;margin:0 0 12px;
+  font-size:var(--fs-14);background:var(--amberl)}
+.dec-lista{list-style:none;margin:0;padding:0}
+.dec-fila{display:grid;grid-template-columns:9.5rem 3rem 1fr auto;gap:14px;align-items:baseline;
+  padding:11px 0;border-top:1px solid var(--bd)}
+.dec-fila:first-child{border-top:0}
+.dec-cuando{font-size:var(--fs-13);color:var(--mu);font-variant-numeric:tabular-nums}
+.dec-viejo .dec-cuando{color:var(--amber);font-weight:600}
+.dec-n{font-size:var(--fs-17);font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.dec-que{display:block;min-width:0}
+.dec-que strong{display:block;font-size:var(--fs-15);font-weight:600}
+.dec-que small{display:block;color:var(--mu);font-size:var(--fs-13);margin-top:2px}
+.dec-ir{white-space:nowrap;font-size:var(--fs-13);font-weight:600;text-decoration:none;
+  border:1px solid var(--bd);border-radius:6px;padding:5px 11px;color:var(--acc)}
+.dec-ir:hover{border-color:var(--acc)}
+.dec-sinir{color:var(--mu);font-weight:400;border-style:dashed}
+.dec-sinir:hover{border-color:var(--bd)}
+@media (max-width:640px){
+  /* En móvil la rejilla de cuatro columnas aplasta el texto: se apila, y el
+     conteo queda junto a la antigüedad, que es como se leería en voz alta. */
+  .dec-fila{grid-template-columns:auto 1fr;gap:4px 12px}
+  .dec-que,.dec-ir{grid-column:1 / -1}
+  .dec-n{text-align:left}
+  .dec-ir{justify-self:start;margin-top:6px}
+}
+</style>
 </head><body>
 <main class="page active"><section><div class="wrap">
 <span class="ey">Interno</span>
@@ -7270,7 +7326,9 @@ function paginaAdmin() {
 
 <div id="resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:26px"></div>
 
-<h2 class="h-sec" style="margin:8px 0 6px;font-size:26px">Salud del ecosistema</h2>
+<div id="decisiones"></div>
+
+<h2 id="sec-salud" class="h-sec" style="margin:8px 0 6px;font-size:26px">Salud del ecosistema</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que las listas de abajo
 no dicen: dónde se cae la donación, si el cobro está dando señales de vida, y qué lleva días
 esperando a que una persona haga algo. <strong>El cero se muestra como cero</strong> — que algo no
@@ -7296,7 +7354,7 @@ donde falta el dato dice «sin datos», no «0 %».</p>
 
 <div id="dlg" style="display:none;margin-top:24px"></div>
 
-<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Transferencias por verificar</h2>
+<h2 id="sec-transferencias" class="h-sec" style="margin:48px 0 6px;font-size:26px">Transferencias por verificar</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Alguien dice que transfirió.
 <strong>Eso no es dinero en el banco:</strong> contrasta contra el extracto antes de confirmar. Hasta
 que lo hagas no hay recibo ni certificado, y el donante ya sabe que es así. Al confirmar se pide el
@@ -7309,7 +7367,7 @@ número del comprobante porque <strong>es el que cita el certificado</strong>.</
 </tr></thead><tbody id="t-filas"><tr><td colspan="8">Cargando…</td></tr></tbody>
 </table></div>
 
-<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Quién quiere entrar</h2>
+<h2 id="sec-entrar" class="h-sec" style="margin:48px 0 6px;font-size:26px">Quién quiere entrar</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Voluntarios, fundaciones que
 aplican al HUB, empresas que piden alianza e ingenieros que se postulan al triaje. <strong>Ninguna de
 estas cuatro cosas es un alta:</strong> la fundación entra con el convenio de cooperación después de
@@ -7326,7 +7384,7 @@ aquí no le da acceso a nada. Su matrícula es un dato que él declaró, no uno 
 </tr></thead><tbody id="i-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
 </table></div>
 
-<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Casas por revisar</h2>
+<h2 id="sec-casas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Casas por revisar</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Triaje estructural. Los
 ingenieros clasifican sin ver de quién es la casa ni dónde queda; <strong>aquí sí están el contacto
 y la dirección</strong>, que es lo que permite ir a visitar. Ordenadas por urgencia y, dentro de
@@ -7350,7 +7408,7 @@ duplicados y pruebas— y todo se puede reabrir.</p>
 </table></div>
 <div id="cs-dlg" style="display:none;margin-top:20px"></div>
 
-<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Inspecciones en terreno</h2>
+<h2 id="sec-inspecciones" class="h-sec" style="margin:48px 0 6px;font-size:26px">Inspecciones en terreno</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">La visita en persona, que es
 <strong>otra cosa</strong> que el triaje: el triaje mira fotos a distancia y ordena la fila; esto lo
 llena un ingeniero parado en la casa, con el habitante delante. Se llena <strong>sin internet</strong>
@@ -7395,7 +7453,7 @@ está mal.</p>
 <div id="imp-res" style="margin-top:12px"></div>
 </div>
 
-<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
+<h2 id="sec-ofrecimientos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
 de la brigada. <strong>El acuse les pidió NO comprar todavía</strong>, así que conviene responder
 antes de que lo hagan: el inventario cambia todos los días.</p>
@@ -7406,7 +7464,7 @@ antes de que lo hagan: el inventario cambia todos los días.</p>
 </tr></thead><tbody id="o-filas"><tr><td colspan="7">Cargando…</td></tr></tbody>
 </table></div>
 
-<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Pagos sin aporte</h2>
+<h2 id="sec-pagos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Pagos sin aporte</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Pagos aprobados que entraron
 por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el checkout del sitio.
 Cobraron a la misma cuenta, pero no tienen guía, ni recibo, ni certificado emitible: si alguno pide
@@ -7419,7 +7477,7 @@ trazado.</p>
 </tr></thead><tbody id="p-filas"><tr><td colspan="5">Cargando…</td></tr></tbody>
 </table></div>
 
-<h2 class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
+<h2 id="sec-entregas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:18px">El documento legal es el
 acta EN PAPEL que firma quien recibe. Aquí se registra su transcripción y se sube su foto.
 <strong>Nunca se publican nombres de personas beneficiarias</strong> — en «recibido por» va el rol
@@ -7788,8 +7846,75 @@ function antiguedad(d){
   return "hace " + d + " días";
 }
 
+/* LA PORTADA DE DECISIONES. Lo primero del panel deja de ser una tabla y pasa a
+   ser lo que hay que hacer hoy.
+
+   No calcula nada nuevo: /api/admin/salud ya devolvía las diez colas con su
+   conteo, su antigüedad y su «cómo se arregla». Lo que faltaba era ponerlo
+   arriba — el dato estaba a seis pantallazos de scroll, debajo del embudo y de
+   las señales de Wompi, que son para entender y no para actuar.
+
+   ORDEN POR URGENCIA, NO POR CANTIDAD: lo trae el endpoint en «orden», decidido
+   junto a cada consulta. Y dentro de cada fila la ANTIGÜEDAD SE LEE ANTES QUE
+   EL CONTEO, que es la regla que ya gobierna la tabla de abajo: de una cola no
+   importa cuántos hay, importa desde cuándo esperan. */
+function pintarDecisiones(d){
+  var caja = document.getElementById("decisiones"); if (!caja) return;
+  var h = "";
+
+  /* Las alarmas van ARRIBA de todo y no son una cola: significan que el sitio
+     le está prometiendo algo a alguien que no se está cumpliendo ahora mismo. */
+  var alarmas = [];
+  if (d.webhooks && d.webhooks.sin_evidencia_de_cobro){
+    alarmas.push("El cobro no está probado en producción: cero eventos de Wompi en toda la historia de la base.");
+  }
+  if (d.correo && d.correo.nada_salio){
+    alarmas.push("Ningún correo ha salido de verdad. Quien donó, se ofreció o aplicó no recibió nada.");
+  }
+
+  var pend = (d.cola || []).filter(function(c){ return c.n > 0; })
+    .sort(function(a,b){ return (a.orden || 999) - (b.orden || 999); });
+
+  if (!alarmas.length && !pend.length){
+    caja.innerHTML = '<div class="dec-caja"><h2 class="dec-t">Nada esperando</h2>'
+      + '<p class="mu" style="margin:0;font-size:13.5px">Las diez colas están en cero. '
+      + 'Lo de abajo es para entender el sistema, no para actuar sobre él.</p></div>';
+    return;
+  }
+
+  h += '<div class="dec-caja"><h2 class="dec-t">Lo que hay que hacer hoy</h2>';
+
+  for (var i = 0; i < alarmas.length; i++){
+    h += '<p class="dec-alarma">' + esc(alarmas[i]) + '</p>';
+  }
+
+  if (pend.length){
+    h += '<ul class="dec-lista">';
+    h += pend.map(function(c){
+      /* El mismo umbral que la tabla de abajo: tres días o más se marca. */
+      var viejo = c.dias !== null && c.dias >= 3;
+      return '<li class="dec-fila' + (viejo ? " dec-viejo" : "") + '">'
+        + '<span class="dec-cuando">' + esc(antiguedad(c.dias)) + '</span>'
+        + '<span class="dec-n">' + esc(String(c.n)) + '</span>'
+        + '<span class="dec-que"><strong>' + esc(COLA_ES[c.clave] || c.clave) + '</strong>'
+        + '<small>' + esc(c.arreglo) + '</small></span>'
+        + (c.destino
+            ? '<a class="dec-ir" href="' + esc(c.destino) + '">Ir</a>'
+            : '<span class="dec-ir dec-sinir">sin pantalla</span>')
+        + '</li>';
+    }).join("");
+    h += '</ul>';
+  }
+
+  h += '</div>';
+  caja.innerHTML = h;
+}
+
 function cargarSalud(){
   fetch("/api/admin/salud").then(function(r){ return r.json(); }).then(function(d){
+    /* Se pinta con los MISMOS datos y sin una petición más: la portada y esta
+       sección salen del mismo /api/admin/salud. */
+    pintarDecisiones(d);
     var box = document.getElementById("salud"); if (!box) return;
     var h = "";
 
