@@ -286,12 +286,48 @@ teléfono. Es el único número contra el que se puede verificar que no quedó n
 
 ## ⏭️ LO QUE ESPERA, CON LA BRIGADA EL 24 (sesión del 21–22 ago)
 
-1. **DESPLEGAR EL WORKER DE ALMA.** Sigue en **403 en el subdominio** —comprobado
-   hoy con un OPTIONS— y sin saber del sismo. Los tres cambios viven en el MISMO
-   archivo, así que un solo pegado los cierra: `ops/givegrow-alma-worker-v2.js`
-   en el worker `givegrow-alma` del dashboard. **No se despliega desde este
-   repo.** Mientras no se haga, ALMA está muerta en la plataforma que las
-   familias están usando.
+1. **EL PROMPT DE ALMA ESTÁ VIEJO** — y el diagnóstico que había aquí era falso,
+   por eso llevaba una semana sin resolverse.
+
+   **Lo que decía:** «sigue en 403 en el subdominio… ALMA está muerta».
+   **Lo que pasa de verdad** (comprobado el 29 ago):
+
+   - El sitio **no llama al subdominio**. Llama a
+     `https://givegrow-alma.sebas-4af.workers.dev`, que está **viva y responde**.
+     Que `alma.thegiveandgrowproject.org` no conteste es irrelevante: nada lo usa.
+   - **El endurecimiento de la v2 SÍ está desplegado.** Comprobado con tres
+     pruebas: un `Origin` ajeno recibe 403, un modelo pedido por el cliente se
+     ignora, y un `system` inyectado se ignora. El agujero de «proxy gratuito de
+     Claude» está cerrado.
+   - **Lo que NO está desplegado es el prompt.** ALMA no conoce el sismo, ni la
+     brigada, ni Mira Mi Casa, ni «Cimientos que Unen».
+
+   ⚠️ **Y así se ve el daño.** A «mi casa se agrietó con el sismo, ¿pueden
+   ayudarme?» ALMA responde que la misión de Give&Grow es otra y **que acuda a la
+   alcaldía**. Le está cerrando la puerta exactamente a la persona para la que se
+   construyó Mira Mi Casa.
+
+   **El arreglo sigue siendo un pegado**: `ops/givegrow-alma-worker-v2.js` en el
+   worker `givegrow-alma` del dashboard. Ese archivo SÍ trae el prompt con el
+   sismo, la brigada, los límites de Mira Mi Casa y el nombre nuevo.
+
+   **Cómo comprobar que quedó** (sin abrir el dashboard):
+
+       curl -s -X POST https://givegrow-alma.sebas-4af.workers.dev \
+         -H "content-type: application/json" \
+         -H "Origin: https://thegiveandgrowproject.org" \
+         -d '{"messages":[{"role":"user","content":"Mi casa se agrietó con el sismo, ¿pueden ayudarme?"}]}'
+
+   Tiene que hablar de Mira Mi Casa. Si dice que vaya a la alcaldía, no quedó.
+
+   **LA LECCIÓN, que vale para todo este documento:** el pendiente decía «403 en
+   el subdominio», que es un síntoma que nadie podía accionar y que además no era
+   el problema. Un pendiente que describe mal el fallo se queda quieto. **Anotar
+   la comprobación que lo prueba, no la impresión.**
+
+   💡 **Y la pregunta de fondo:** ALMA es lo único del ecosistema que se despliega
+   pegando código a mano, y por eso es lo único que lleva un mes desincronizado.
+   Mientras siga fuera del repo va a volver a pasar.
 
 2. **EL ENSAYO EN EL TELÉFONO, EN MODO AVIÓN.** Es lo único que prueba cuatro
    piezas que NADIE ha verificado en un teléfono real: el service worker, el
