@@ -1,21 +1,150 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "Copy sin promesa y revisión de estado" (25 ago 2026)
+> Última actualización: sesión "El respaldo probado y el panel usable" (29 ago 2026)
 > **⏭️ ARRANCA POR: LA CORRIDA DE RESCATE con cada ingeniero** — sigue sin hacerse
-> y es lo único con inspecciones firmadas en juego. Después, los tres pendientes
-> de la brigada. Ver las dos secciones siguientes.
+> y es lo único con inspecciones firmadas en juego. Ya no le falta nada de
+> plataforma: los ingenieros entran solos, el respaldo está probado de punta a
+> punta y la bandeja donde aterriza por fin se carga. Falta hacerla.
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
-## 📸 FOTO DEL ESTADO (25 ago 2026, consultado en producción)
+## 📸 FOTO DEL ESTADO (29 ago 2026, consultado en producción)
 
     casos               2        inspecciones en terreno   1
-    evaluaciones        3        ingenieros postulados     2
-                                 ingenieros ACEPTADOS      0
+    evaluaciones        3        aportes                   8
+    ingenieros          2        con matrícula verificada  2
 
-**Léelo junto:** hay inspecciones firmándose en terreno y **cero ingenieros
-aprobados en Access**. Dos se postularon y nadie ha verificado su matrícula.
-Mientras eso siga así, la cola de `/triaje` no la puede vaciar nadie más que
-Sebas — y las inspecciones que están en los teléfonos siguen sin bajar.
+**Los ingenieros YA ENTRAN SOLOS.** La evaluación externa de Access está viva
+(`/api/access/claves` responde su JWKS) y la regla mira `matricula_verificada`,
+que Sebas puso en 1 para los dos el 22 de agosto. Marcar «verificada» en
+`/admin` es ahora el acto completo de dar acceso.
+
+⚠️ **CUIDADO CON UNA CONFUSIÓN QUE YA COSTÓ UNA SESIÓN.** En `inscripciones` hay
+DOS campos y no significan lo mismo:
+
+| | qué es | valor hoy |
+|---|---|---|
+| `estado` | el paso de la postulación en la bandeja | `nueva` en los dos |
+| `datos.matricula_verificada` | si una persona comprobó su matrícula en el COPNIA | `1` en los dos |
+
+La foto del 25 de agosto decía «ingenieros ACEPTADOS 0» mirando `estado`, y de
+ahí salió la idea de que estaban sin verificar. **La puerta la abre
+`matricula_verificada`** — decisión de Sebas, 29 de agosto. Nadie movió el
+`estado`, y eso no impide entrar.
+
+## ✅ ACCESS YA NO DEPENDE DE SEBAS (29 ago · PR #166 + la regla en el dashboard)
+
+Era el cuello de botella declarado del proyecto: la postulación entraba sola,
+`/admin` tenía el interruptor de «verificada», y aun así la puerta se abría
+editando a mano una lista de correos en Cloudflare.
+
+Ahora la política del triaje tiene una regla de **External Evaluation** que
+llama a `/api/access/evaluar`, y ese endpoint responde desde `inscripciones`.
+
+**El contrato salió del código de referencia de Cloudflare**
+(`github.com/cloudflare/workers-access-external-auth-example`), no de la
+documentación, que no lo detalla: entra `POST {token}`, sale `{token}` con una
+carga `{success, iat, exp, nonce}` firmada en RS256, y las claves se sirven como
+JWKS.
+
+**Tres decisiones que no hay que deshacer:**
+
+1. **La clave vive en UN secreto** (`ACCESS_EVAL_JWK`), no en KV como el ejemplo
+   —que la genera al vuelo en la primera llamada—. Así ningún endpoint puede
+   acuñar una clave nueva y dejar de coincidir con la que Access ya conoce. La
+   pública se DERIVA de la privada tomando `n` y `e`: no se guarda aparte, y eso
+   borra de raíz la clase de fallo en que las dos dejan de casar.
+2. **Se verifica la firma del JWT que entra.** Sin eso el endpoint sería un
+   oráculo abierto: cualquiera podría preguntarle si un correo es un ingeniero
+   verificado.
+3. **La regla se SUMA a la lista manual de correos, no la reemplaza.** Los
+   Include se combinan con OR. La documentación no dice qué pasa si el endpoint
+   se cae, y el código de referencia responde 403 ante cualquier error —que la
+   regla lee como «no pasa»—. Si lo nuestro falla, quien ya entraba sigue
+   entrando.
+
+⚠️ **La política correcta es «Emails Triaje ING», y hay que mirar su campo
+`Used by applications` antes de tocarla: tiene que decir 1.** El 20 de agosto un
+correo en una política compartida le dio a la ingeniera acceso al panel de los
+donantes. Comprobado el 29: dice 1, y su única aplicación es «Triage
+estructural».
+
+## ✅ EL RESPALDO DEL TELÉFONO, PROBADO DE PUNTA A PUNTA (29 ago · PR #172)
+
+El traspaso lo marcaba como **no ejercido**, y era lo único que quedaba entre la
+corrida de rescate y un fallo con un ingeniero al teléfono. Se probó en local con
+`wrangler dev`, D1 persistente y las 15 migraciones:
+
+| paso | resultado |
+|---|---|
+| inspección completa por el camino normal | con foto, dos firmas y PDF |
+| el respaldo | baja con su cabecera y su nombre sin tildes |
+| el panel lee el archivo | dice de quién salió y prellena el correo |
+| la carga | entra con foto, firmas y PDF |
+| atribución | toma el correo que **escribe quien carga**, no el del archivo |
+| `creado_en` vs `recibido_en` | distintas, como manda el diseño |
+| **el mismo archivo dos veces** | «ya estaba» · sin duplicar fila, **ni foto**, ni quemar consecutivo |
+
+Lo único que fallaba era humano: una inspección a medias se rechazaba con
+`consent_habitante_requerido` en crudo. Ahora el informe lo dice en castellano y
+**la traducción vive en el endpoint de importación, no en el del teléfono**: el
+contrato con el formulario no cambia.
+
+**Para atravesar Access en local** se parchea `verificarAccess` con un
+interruptor que solo existe en `.dev.vars` (gitignored) y se revierte antes de
+commitear. Está hecho tres veces esta sesión sin que se escapara ni una.
+
+## ✅ `/admin` DEJÓ DE SER OCHO TABLAS (29 ago · PR #173, #174, #175)
+
+| | antes | ahora |
+|---|---|---|
+| lo primero que se ve | una tabla | **qué hay que hacer hoy**, por urgencia |
+| peticiones al abrir | 10 | **3** |
+| encontrar algo por su número | saber en cuál de las ocho tablas mirar | **una casilla** |
+
+**La portada no calcula nada nuevo**: `/api/admin/salud` ya devolvía las diez
+colas con conteo, antigüedad y «cómo se arregla». Estaba a seis pantallazos de
+scroll. El orden lo trae el endpoint en `orden`, escrito junto a cada consulta:
+**por urgencia, no por cantidad** —cinco certificados no son más urgentes que una
+casa que un ingeniero marcó urgente y nadie visitó— y dentro de cada fila **la
+antigüedad se lee antes que el conteo**.
+
+**La carga perezosa** observa el CONTENEDOR de la tabla, no el `tbody`. Y el
+buscador **no es de texto libre** a propósito: los consecutivos llevan prefijo
+(GG, CV, IV, CD, AE, MB), así que el dato dice en qué tabla vive. Lo que sí
+acepta es un teléfono, y cruza las cuatro grafías del mismo número comparando
+por dígitos con el `TEL_DIGITOS` que ya existía.
+
+### 🪤 CUATRO TRAMPAS NUEVAS, y dos son de las caras
+
+1. **EL CSS DEL PANEL NO PUEDE VIVIR EN `styles.css`.** El panel enlaza
+   `/styles.css` **sin versión**, y `_headers` la sirve `immutable` durante un
+   año: un cambio de CSS para el panel puede no llegarle nunca al navegador que
+   ya la tiene guardada. Pasó en la prueba local, con las reglas servidas
+   correctamente y la pantalla ignorándolas. **Va en el `<style>` de
+   `paginaAdmin()`**, que se sirve `no-store`.
+2. **EL GATE TENÍA UN FALSO NEGATIVO Y TAPABA UN FALLO REAL.** Buscaba las
+   llamadas de arranque por estar en la **columna 0**, y un salto de línea dentro
+   de un manejador de clic dejó `cargarInspecciones();` en columna 0 **dentro de
+   una función**. Resultado: `/api/admin/inspecciones` no se pedía nunca y su
+   tabla se quedaba en «Cargando…» en cada carga limpia — la bandeja donde
+   aterrizan las inspecciones del rescate. **Ahora el arranque y las bandejas son
+   LISTAS de datos (`ARRANQUE` y `BANDEJAS`) y el gate lee listas, no llamadas.**
+   La trampa de la columna 0 ya no puede existir.
+3. **Las comillas invertidas dentro de las plantillas mordieron SEIS veces más**
+   en esta sesión, todas en comentarios. `node --check` las atrapa siempre.
+4. **Inventarse tokens y clases.** `--fs-19` no existe (la escala llega a
+   `--fs-17`), y antes `.grid-3` tampoco (era `grid g3`). **Verificar contra el
+   CSS vivo, no contra la memoria.**
+
+### Cómo se mide esta pantalla
+En el navegador, no estáticamente: el conteo estático se pierde las peticiones
+que no salen de una función `cargarX` —`quien`, `resumen`, `aportes`—.
+
+    performance.getEntriesByType('resource').filter(x => x.name.includes('/api/admin/'))
+
+⚠️ **El navegador de la sesión bloquea el scroll**, programático y de entrada, y
+a veces reporta la ventana en 0×0. Si una medida de layout sale absurda, lo
+primero que hay que mirar es `innerWidth`.
 
 ## ✂️ EL COPY DEJÓ DE PROMETER LO QUE NO SE GARANTIZA (25 ago · PR #169)
 
@@ -122,9 +251,38 @@ código— y la pista fue que el papel decía más casas que la base.
    lista, y por cada una: «Guardar inspección» → «Enviar». **La cuenta la lleva
    la persona, no el teléfono**: hay que preguntarle cuántas casas visitó, porque
    ese número es el único con el que se puede verificar que no quedó nada.
-3. **La carga del respaldo contra la base real NO se ha ejercido.** El panel está
-   detrás de Access. La primera prueba, con UNA sola inspección; y la más segura
-   es cargar una que ya esté: debe responder «ya estaba» y no escribir nada.
+3. **~~La carga del respaldo contra la base real NO se ha ejercido~~ — HECHO
+   (29 ago, PR #172).** Probado de punta a punta contra una base real, incluido
+   cargar el mismo archivo dos veces. Ver su sección arriba.
+
+**El texto para mandarle a cada ingeniero por WhatsApp** (lo que más importa es
+el bloque de «no borres», que va ANTES de cualquier instrucción):
+
+    Encontramos un fallo nuestro: algunas inspecciones que llenaste quedaron
+    guardadas en tu teléfono y nunca nos llegaron. NO se perdieron y ya podemos
+    recuperarlas, pero necesito 10 minutos contigo.
+
+    ANTES DE ABRIR NADA:
+    · NO borres datos ni historial del navegador
+    · NO desinstales ni reinstales el navegador
+    · NO uses modo incógnito
+
+    Y entra desde el MISMO lugar donde entraste la primera vez. Si abriste el
+    enlace desde WhatsApp, ábrelo desde WhatsApp otra vez: lo guardado le
+    pertenece a ese navegador y no se ve desde otro.
+
+    Con señal, abre https://thegiveandgrowproject.org/triaje/inspeccion y baja
+    hasta «Sin terminar en este teléfono». Por cada una: Abrir y terminar →
+    revisarla → Guardar inspección → Enviar.
+
+    Las firmas y las fotos siguen guardadas: NO hay que volver a la casa.
+
+    Si algo se traba, toca «Bajar respaldo de todo» y mándame el archivo.
+
+    Y dime cuántas casas visitaste en total.
+
+**Ese último punto cierra la corrida:** la cuenta la lleva la persona, no el
+teléfono. Es el único número contra el que se puede verificar que no quedó nada.
 
 ## ⏭️ LO QUE ESPERA, CON LA BRIGADA EL 24 (sesión del 21–22 ago)
 
