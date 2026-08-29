@@ -162,6 +162,69 @@ No son secretos: identifican la aplicación, no autorizan nada por sí solos.
 
 ---
 
+## Dar acceso a un ingeniero SIN tocar el dashboard (desde el 29 ago 2026)
+
+**Marcar «verificada» en `/admin` es el acto completo.** No hay que añadir su
+correo a ninguna política: la política del triaje tiene una regla de **External
+Evaluation** que le pregunta al sitio, y el sitio responde desde la base.
+
+    la persona se postula  →  entra sola a `inscripciones`
+    alguien comprueba su matrícula en el COPNIA
+    marca «verificada» en /admin  →  YA PUEDE ENTRAR
+
+**La regla exacta**, por si hay que auditarla: entra si su `matricula_verificada`
+es 1 **y** su postulación no está `archivada` ni `rechazada`. Lo segundo importa:
+**archivar a alguien le quita la entrada** sin que haya que acordarse de
+desmarcar también el interruptor.
+
+⚠️ **`estado` y `matricula_verificada` NO son lo mismo.** `estado` es el paso en
+la bandeja (`nueva` → `en_revision` → `aceptada` → `archivada`) y **no abre nada**.
+Quien mire `estado` para saber si alguien tiene acceso se va a equivocar: ya pasó.
+
+### Cómo está montado, y qué NO hay que deshacer
+
+| pieza | dónde |
+|---|---|
+| la clave privada | secreto `ACCESS_EVAL_JWK` del Worker (un JWK en JSON) |
+| la pública | **se deriva** de la privada; no se guarda aparte |
+| lo que Access llama | `https://thegiveandgrowproject.org/api/access/evaluar` |
+| las claves | `https://thegiveandgrowproject.org/api/access/claves` |
+| la política | **«Emails Triaje ING»**, con DOS Include |
+
+1. **Las dos rutas son públicas a la fuerza.** Las llama Cloudflare, no un
+   navegador con sesión. Detrás de Access serían un bloqueo mutuo.
+2. **El Include de correos a mano SE QUEDA.** Los Include se combinan con OR. La
+   documentación de Cloudflare no dice qué pasa si nuestro endpoint se cae, y su
+   código de referencia responde 403 ante cualquier error — que la regla lee como
+   «no pasa». Si lo nuestro falla, quien ya entraba sigue entrando.
+3. **La clave vive en un secreto y no en KV**, al revés que el ejemplo de
+   Cloudflare, que la genera al vuelo. Así ningún endpoint puede acuñar una clave
+   nueva y dejar de coincidir con la que Access ya conoce.
+
+### Si hay que rehacer la clave
+
+Un solo comando desde el repo; la clave privada no toca el disco:
+
+    node -e 'crypto.subtle.generateKey({name:"RSASSA-PKCS1-v1_5",modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"},true,["sign","verify"]).then(k=>crypto.subtle.exportKey("jwk",k.privateKey)).then(j=>process.stdout.write(JSON.stringify(j)))' | npx wrangler secret put ACCESS_EVAL_JWK
+
+Y se comprueba que la pública ya se sirve — y que **no lleva la parte privada**:
+
+    curl -s https://thegiveandgrowproject.org/api/access/claves
+
+Debe devolver un JWKS con un solo `kid` y los campos `kty, n, e, alg, use`. Si
+aparece una `d`, hay una fuga y hay que rehacer la clave.
+
+### Comprobarlo sin molestar a nadie
+
+Un token que no es de Access debe recibir una negativa **firmada**:
+
+    curl -s -X POST -H "content-type: application/json" \
+      -d '{"token":"basura"}' \
+      https://thegiveandgrowproject.org/api/access/evaluar
+
+Devuelve `{"token":"..."}` cuyo contenido es `success:false`. Que responda con un
+token y no con un error es la señal de que la clave está cargada.
+
 ## Cómo saber que quedó bien
 
 | Comprobación | Esperado |
