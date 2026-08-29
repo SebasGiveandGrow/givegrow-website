@@ -1,10 +1,51 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "El rescate de los borradores" (22 ago 2026)
-> **⏭️ ARRANCA POR: LA CORRIDA DE RESCATE con cada ingeniero** — hay inspecciones
-> firmadas esperando en teléfonos, y ahora sí hay código que las lee. Después,
-> los tres pendientes de la brigada. Ver las dos secciones siguientes.
+> Última actualización: sesión "Copy sin promesa y revisión de estado" (25 ago 2026)
+> **⏭️ ARRANCA POR: LA CORRIDA DE RESCATE con cada ingeniero** — sigue sin hacerse
+> y es lo único con inspecciones firmadas en juego. Después, los tres pendientes
+> de la brigada. Ver las dos secciones siguientes.
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
+
+## 📸 FOTO DEL ESTADO (25 ago 2026, consultado en producción)
+
+    casos               2        inspecciones en terreno   1
+    evaluaciones        3        ingenieros postulados     2
+                                 ingenieros ACEPTADOS      0
+
+**Léelo junto:** hay inspecciones firmándose en terreno y **cero ingenieros
+aprobados en Access**. Dos se postularon y nadie ha verificado su matrícula.
+Mientras eso siga así, la cola de `/triaje` no la puede vaciar nadie más que
+Sebas — y las inspecciones que están en los teléfonos siguen sin bajar.
+
+## ✂️ EL COPY DEJÓ DE PROMETER LO QUE NO SE GARANTIZA (25 ago · PR #169)
+
+Sebas: «no podemos comprometernos a esto». La captura que mostró era una versión
+**cacheada**; la viva prometía MÁS: «con qué materiales y en qué orden conviene
+repararla», como lista de entregables garantizados.
+
+No se puede garantizar sobre fotos —`inevaluable` existe justo para eso— así que
+la promesa pasó a descripción: «te escribe **lo que alcance a ver desde ahí**…
+y, **cuando puede decirlo con lo que enviaste**, por dónde conviene empezar a
+reparar. Sobre fotos no se ve todo, así que hay cosas que ningún ingeniero va a
+firmar sin ir hasta la casa.»
+
+**Se cambió SOLO lo público** (`cv.aviso`, `bc.cierre`). El campo obligatorio del
+ingeniero, su correo y el PDF **siguen igual a propósito**: el ingeniero puede
+seguir escribiendo materiales cuando sepa decirlos. Se quitó la promesa, no la
+capacidad.
+
+⚠️ **Lo que sigue abierto:** si la ingeniera no respalda firmar **señales de
+permanencia** a distancia, hay que volver atrás también en el campo del
+formulario (`worker.js` ~2651 y ~2890), el correo de bienvenida (~1336) y el PDF
+(`documentos.js` ~779). **Cinco sitios.** Es la pregunta 9 de
+`ops/guia-fotografica.md`, y sigue sin respuesta.
+
+## ⚠️ EL NOMBRE DEL PROYECTO EN REDES, SIN CONFIRMAR
+El 19 ago quedó como **«Cimientos que Abrazan»**; el 25 Sebas escribió
+**«Cimientos que Unen»**. No se ha tocado nada con ninguno de los dos —la cadena
+del pie dice «Abrazan»— así que **hay que confirmar cuál es antes de publicar la
+cuenta o imprimir nada.** Un nombre a medias entre dos versiones es peor que
+cualquiera de los dos.
 
 ## 🚨 EL DEFECTO QUE ESCONDIÓ INSPECCIONES FIRMADAS (22 ago, PR #161 y #162)
 
