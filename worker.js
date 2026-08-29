@@ -5265,6 +5265,215 @@ async function adminRuta(env, url) {
    Solo casos YA CLASIFICADOS: publicar uno que ningún ingeniero ha mirado sería
    presentar como hallazgo lo que todavía es una solicitud sin revisar.
    ======================================================================== */
+/* ========================================================================
+   ALMA — la asistente, ahora DENTRO del repo.
+
+   POR QUÉ SE MUEVE. Vivía en un Worker aparte que se actualizaba pegando código
+   en el dashboard, y fue lo único del ecosistema que pasó un mes
+   desincronizado: el endurecimiento estaba desplegado y el prompt NO, así que a
+   una familia con la casa agrietada por el sismo le respondía que fuera a la
+   alcaldía —justo la persona para la que se construyó Mira Mi Casa—. Un
+   despliegue manual es un despliegue que se olvida.
+
+   AL SER DEL MISMO ORIGEN SOBRA EL CORS ENTERO: no hay preflight, ni cabeceras
+   de permiso, ni lista de orígenes que mantener.
+
+   Y conviene decir la verdad sobre esa lista, porque se fue creyendo que
+   protegía: la comprobación de `Origin` NUNCA detuvo a nadie decidido —basta
+   mandar la cabecera con curl, comprobado hoy contra el worker viejo—. Lo que
+   de verdad protege es que el MODELO, el MÁXIMO DE TOKENS y el SYSTEM se fijen
+   aquí y que haya límite por IP. La comprobación se conserva solo como estorbo
+   a que otro sitio empotre el chat, que es lo único para lo que servía.
+   ======================================================================== */
+
+/* Estorbo al empotrado desde otro sitio. Las tres marcas del sitio, porque el
+   chat vive en las tres. */
+const ORIGENES_ALMA = [
+  "https://www.thegiveandgrowproject.org",
+  "https://thegiveandgrowproject.org",
+  "https://miramicasa.thegiveandgrowproject.org"
+];
+
+const ALMA_MODELO = "claude-haiku-4-5";
+const ALMA_MAX_TOKENS = 1024;
+const ALMA_MAX_MENSAJES = 24;
+const ALMA_MAX_CHARS = 2000;
+const ALMA_MAX_CUERPO = 64 * 1024;
+
+/* El límite vive en la memoria del isolate, así que es por isolate y no global.
+   No es un control de abuso serio —para eso está la regla de rate limiting del
+   WAF, que es configuración— pero ataja el caso real: alguien dando al botón. */
+const ALMA_VENTANA_MS = 60000;
+const ALMA_MAX_POR_VENTANA = 10;
+const ALMA_GOLPES = new Map();
+
+function almaLimitada(ip) {
+  const ahora = Date.now();
+  const previos = (ALMA_GOLPES.get(ip) || []).filter((t) => ahora - t < ALMA_VENTANA_MS);
+  if (previos.length >= ALMA_MAX_POR_VENTANA) { ALMA_GOLPES.set(ip, previos); return true; }
+  previos.push(ahora);
+  ALMA_GOLPES.set(ip, previos);
+  if (ALMA_GOLPES.size > 5000) ALMA_GOLPES.clear();
+  return false;
+}
+
+const ALMA_SYS = `Eres ALMA (Asistente de Labor Misional y Alianzas), la IA de Fundación Give&Grow International. Respondes de forma clara, cálida y concisa. Máximo 3 párrafos por respuesta. No uses listas extensas. Responde en el idioma del usuario.
+
+GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Fundada el 19 de mayo de 2025 en Medellín. Fundador: Juan Sebastián Navarro Osorio, casi 4 años de trabajo en zonas de difícil acceso (La Guajira, Sierra Nevada, Medellín). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
+
+MISIÓN: Conectar generosidad con necesidad de forma estratégica y con trazabilidad completa. No reemplazamos fundaciones, las amplificamos.
+
+IMPACTOS Y ALMA: ImpactOS es el sistema operativo de Give&Grow (la plataforma digital del ecosistema). ALMA es su interfaz inteligente. Give&Grow es el ecosistema completo. ALMA es a Give&Grow lo que Siri es al iPhone.
+
+HUB SOCIAL: Centro operativo en Medellín. 5 rutas: R1 Alianzas con Fundaciones, R2 Gestión de Donaciones, R3 Social Grow, R4 Impact Journey, R5 Conexión Laboral. Proceso: visita de contexto, onboarding, gestión de necesidades, entrega con acta, reporte fotográfico al donante.
+
+DONACIONES: Transferencia a Bancolombia Cuenta de Ahorros 31000009221 (NIT 901.948.930-2). Mejor aún: que la reporte en el sitio (#reportar), porque así recibe su número de guía al instante y sube ahí mismo el comprobante. Una persona la contrasta contra el extracto y entonces le llega el RECIBO.
+
+DOS COSAS QUE NO DEBES PROMETER, porque el sitio dejó de prometerlas a propósito. NO existe reporte fotográfico mensual: no hay nada que lo envíe, y prometerlo fue un error que ya se corrigió. Lo que sí ocurre es que el acta de entrega y sus fotos quedan publicadas en el rastreo del aporte. Y el CERTIFICADO tributario NO es automático ni sale en 24h: es una declaración bajo la gravedad de juramento que firman el Representante Legal y la Revisora Fiscal, la emite una persona, solo si el donante lo pidió, y para emitirlo hacen falta su documento y su ciudad. El recibo sí es automático; el certificado es otra cosa. No los confundas.
+
+BENEFICIO TRIBUTARIO: 25% de descuento sobre el impuesto de renta a cargo (Art. 257 ET), en los términos y límites que contempla la ley. Ejemplo: 4.000.000 COP donados = hasta 1.000.000 COP menos de impuesto, según la situación tributaria del donante.
+
+MEMBRESÍAS: Semilla, Retoño, Árbol y Bosque (niveles crecientes de aporte mensual), Temporal (donación única) y Honor (por invitación).
+
+PROGRAMA DE GRATITUD: Red de empresas aliadas con descuentos exclusivos para todos los miembros activos. Categorías: gastronomía, moda, belleza, bienestar, odontología.
+
+RSE EMPRESARIAL: 3 puertas cumplibles hoy: Padrinazgo de Impacto (presupuesto traducido a unidades reales con certificado y reporte), Impact Journey (voluntariado corporativo en doble vía, Ruta 4) y Alianza a medida (co-creación de programas). El aporte se define a la medida de cada empresa; invita a escribir para una propuesta personalizada.
+
+POBLACIONES OBJETIVO: la misión busca impactar todo tipo de población vulnerable a través de las fundaciones del HUB. Las que hoy guían el objeto social: niñez en riesgo, comunidades indígenas, comunidades campesinas, personas en situación de calle, adultos mayores, animales en maltrato, personas en rehabilitación, personas privadas de la libertad. La cobertura real crece con cada aliada verificada.
+
+EMERGENCIA ABIERTA — SISMO DEL 10 DE AGOSTO DE 2026. Magnitud 7,4, epicentro cerca de San José del Palmar (Chocó), 103 km de profundidad, según el Servicio Geológico Colombiano. Desastre nacional declarado. NO des cifras de víctimas: en las primeras horas las fuentes iban de 132 a más de 240 y no repetimos números que no podemos verificar. Remite a las fuentes oficiales.
+
+LA BRIGADA: del 24 al 28 de agosto de 2026, cinco territorios en cinco días — Cali, Pereira, Manizales, Armenia y Chocó — con las fundaciones de cada territorio. El equipo de terreno está CERRADO en siete personas y no se puede sumar gente a terreno: exige doble verificación y sesión de formación previa. Las manos que sí se necesitan son de estructura, en Medellín. Se piden cuatro cosas: dinero, insumos en especie, manos y contactos. Dos centros de acopio, los dos en ENVIGADO (no en Medellín): Esmeraldas Colombia (Carrera 48 # 37 Sur 56, frente al rompoy de Viva Envigado) y Club Nativos (Sector El Salado). Son sedes prestadas, no bodegas: hay que escribir ANTES de ir, o alguien carga el carro y encuentra la puerta cerrada. No hay meta en pesos porque todavía no hay costos del inventario, y no inventamos equivalencias.
+
+MIRA MI CASA — la plataforma del triaje estructural. Vive en miramicasa.thegiveandgrowproject.org. Es la plataforma de "Cimientos que Unen", el proyecto, que es de Fundación Give&Grow International. Si alguien llegó por Instagram con el nombre del proyecto y aterrizó en otro nombre, explícale esa cadena: no es un cambiazo, y conviene decirlo porque el Ministerio de Vivienda está advirtiendo sobre estafas con nombres de programas de vivienda.
+
+QUÉ HACE MIRA MI CASA: una familia sube fotos de su casa afectada y un ingeniero voluntario con matrícula del COPNIA le da un CONCEPTO a distancia — si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla. De paso se prioriza a qué casa se va primero. Entra por la página "Revisa tu casa" del sitio.
+
+LOS LÍMITES DE MIRA MI CASA, Y ESTOS NO SE NEGOCIAN NI SE SUAVIZAN:
+1. NO se declara habitabilidad. La declaratoria con efectos —evacuar, demoler— es de la autoridad municipal, Ley 1523 de 2012, nunca de un privado. Por fotos no se ve la cimentación, ni el suelo, ni si esa grieta es de un muro que carga.
+2. Recomendar que no se use una parte de la casa mientras se revisa es una PRECAUCIÓN, no una declaratoria de inhabitabilidad. Son cosas distintas.
+3. TÚ NO DAS EL CONCEPTO. No eres ingeniera y no evalúas casas. Si alguien te describe grietas, muros o daños y te pide una opinión estructural, dile con calidez que eso lo tiene que ver un ingeniero con matrícula, y mándalo a subir las fotos. No opines sobre si una casa se puede habitar, ni siquiera con matices o "podría ser". Ni una insinuación.
+4. NO prometas visita, ni reparación, ni materiales para una casa concreta. La fundación va a buscar gestionar ayuda para todas las casas que pueda, y NO puede comprometerse casa por casa. Dilo así, de frente: es más honesto que una esperanza vaga.
+5. NO hay fecha de respuesta y prometerla sería peor. La familia recibe un enlace donde ve en qué va su caso.
+6. Si lo que describen es un peligro EN CURSO —muros caídos, techo hundido, gente adentro— eso no espera un concepto: que llamen a la línea de emergencias 123 y a su alcaldía. Dilo primero, antes que cualquier otra cosa.
+7. Nunca pidas ni repitas la dirección exacta de una casa, ni datos personales. La plataforma separa a propósito el sector (público) de la dirección (privada), porque publicar "casa dañada y desocupada, en esta dirección" es un mapa para quien roba.
+
+INGENIEROS: quien quiera ser voluntario se postula en la página "Ingenieros voluntarios" con su matrícula del COPNIA. Se verifica en el registro público del COPNIA y el acceso se da a mano; no es instantáneo. Puede ser correo de universidad, de empresa o particular.
+
+Más de 25 fundaciones preaprobadas en la red de espera; la vinculación formal se confirma una a una con verificación. Hoy el muro muestra las aliadas ya verificadas.`;
+
+/* La red viva sale de partners.json, que es un ASSET de este mismo Worker: se
+   lee por el binding y no saliendo a internet a buscar nuestro propio archivo.
+   Una fundación que retiró el consentimiento del nombre no entra. */
+async function almaContextoRed(env, origen) {
+  try {
+    const r = await env.ASSETS.fetch(new URL("/data/partners.json", origen));
+    if (!r.ok) return "";
+    const data = await r.json();
+    const partners = Array.isArray(data && data.partners) ? data.partners : [];
+    const lineas = [];
+    for (const p of partners) {
+      const c = p.consent || {};
+      if (p.type === "foundation" && c.name === false) continue;
+      const es = (v) => (v && typeof v === "object" ? v.es : v) || "";
+      const partes = ["- " + p.name + " (" + (p.type === "hub" ? "hub" : "fundación aliada") + ")"];
+      if (p.area) partes.push("zona: " + es(p.area));
+      if (p.poblacion) partes.push("población atendida: " + es(p.poblacion));
+      const pr = p.profile || {};
+      if (pr.leader) partes.push("líder: " + pr.leader);
+      if (pr.years) partes.push(es(pr.years));
+      if (pr.about) partes.push("acerca de: " + es(pr.about));
+      if (Array.isArray(pr.programs) && pr.programs.length) {
+        partes.push("programas: " + pr.programs.map((g) => g.name + ": " + es(g.desc)).join(" | "));
+      }
+      if (pr.hub) partes.push("relación con el Hub: " + es(pr.hub));
+      if (Array.isArray(p.impactUnits) && p.impactUnits.length) {
+        partes.push("unidad de impacto documentada: " + p.impactUnits
+          .map((u) => "1 " + u.es + " ≈ $" + Number(u.cop).toLocaleString("es-CO") + " COP").join("; "));
+      }
+      if (p.url) partes.push("web: " + p.url);
+      if (p.instagram) partes.push("instagram: " + p.instagram);
+      lineas.push(partes.join(" · "));
+    }
+    if (!lineas.length) return "";
+    return ["", "=== RED DEL HUB SOCIAL (datos en vivo de thegiveandgrowproject.org) ===",
+      "Estos son los ÚNICOS datos verificados sobre la red de aliadas:", ...lineas, "",
+      "Reglas estrictas sobre estos datos:",
+      "- Solo afirma sobre aliadas lo que aparece arriba. Nada de inventar cifras ni fundaciones.",
+      "- Si preguntan por una fundación que no está en la lista, di que aún no hace parte de la red verificada."
+    ].join("\n");
+  } catch { return ""; }
+}
+
+function almaMensajes(bruto) {
+  if (!Array.isArray(bruto)) return null;
+  const msgs = [];
+  for (const m of bruto.slice(-ALMA_MAX_MENSAJES)) {
+    if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
+    if (typeof m.content !== "string") continue;
+    const content = m.content.slice(0, ALMA_MAX_CHARS);
+    if (!content.trim()) continue;
+    msgs.push({ role: m.role, content });
+  }
+  while (msgs.length && msgs[0].role !== "user") msgs.shift();
+  return msgs.length ? msgs : null;
+}
+
+/* POST /api/alma */
+async function apiAlma(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+
+  /* El Origin se mira ANTES que la llave: si no, a un sitio ajeno le
+     contaríamos si tenemos el secreto configurado o no, que no es asunto suyo.
+     Es estorbo al empotrado desde otro sitio, no seguridad: si no viene Origin
+     —una petición del propio sitio puede no mandarlo— se deja pasar. */
+  const origen = request.headers.get("Origin");
+  if (origen && !ORIGENES_ALMA.some((o) => origen === o)) {
+    return json({ error: "origen_no_autorizado" }, 403);
+  }
+
+  /* SIN LLAVE NO SE INVENTA NADA: se dice que no está configurada. Mientras el
+     secreto no exista este endpoint es inerte, y el sitio sigue hablando con el
+     Worker de siempre. */
+  if (!env.ANTHROPIC_API_KEY) {
+    return json({ error: "alma_no_configurada",
+                  ayuda: "Falta el secreto ANTHROPIC_API_KEY en este Worker." }, 503);
+  }
+
+  const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+  if (almaLimitada(ip)) {
+    return json({ error: "demasiados_mensajes",
+                  ayuda: "Has enviado demasiados mensajes seguidos. Espera un minuto." }, 429);
+  }
+
+  const texto = await request.text();
+  if (texto.length > ALMA_MAX_CUERPO) return json({ error: "cuerpo_demasiado_grande" }, 413);
+  let cuerpo;
+  try { cuerpo = JSON.parse(texto); } catch { return json({ error: "json_invalido" }, 400); }
+
+  /* Del cliente se toman SOLO los mensajes. El modelo, el tope de tokens y el
+     system son del servidor: es lo que impide que esto sea un proxy gratuito. */
+  const mensajes = almaMensajes(cuerpo.messages);
+  if (!mensajes) return json({ error: "conversacion_vacia" }, 400);
+
+  const system = ALMA_SYS + (await almaContextoRed(env, url.origin));
+
+  const arriba = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({ model: ALMA_MODELO, max_tokens: ALMA_MAX_TOKENS, system, messages: mensajes })
+  });
+
+  return new Response(await arriba.text(), {
+    status: arriba.status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+  });
+}
+
 async function apiCasosPublicos(env) {
   const r = await env.DB.prepare(
     "SELECT numero, sector, clasificacion, material, pisos, creado_en FROM casos " +
@@ -9258,6 +9467,7 @@ export default {
        respuesta para dejar pasar la petición con la que se la pedimos.
        Su propia seguridad es el JWT firmado por Access que traen en el cuerpo,
        que se verifica contra los certificados del equipo. */
+    if (ruta === "/api/alma")           return await apiAlma(request, env, url);
     if (ruta === "/api/access/claves")  return await accessClaves(env);
     if (ruta === "/api/access/evaluar") return await accessEvaluar(request, env);
 
