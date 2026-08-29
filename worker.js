@@ -6470,6 +6470,27 @@ async function adminOfrecimientos(env) {
    formulario habría rechazado, y la idempotencia seguiría siendo la del índice
    único sobre _local_id solo por casualidad. Así lo es por construcción: cargar
    dos veces el mismo archivo no duplica nada. */
+/* POR QUÉ NO ENTRÓ, EN CASTELLANO. El camino normal devuelve códigos —los lee
+   el teléfono, que ya sabe qué hacer con cada uno—, pero este informe lo lee una
+   persona mientras tiene a un ingeniero esperando al teléfono. «Falta la
+   autorización del habitante» le dice qué pedirle; «consent_habitante_requerido»
+   le hace adivinar. Se traduce aquí y no en el otro endpoint a propósito: el
+   contrato con el teléfono no cambia. */
+const RECHAZO_EN_CASTELLANO = {
+  consent_habitante_requerido:
+    "Falta la autorización del habitante. Quedó a medias: hay que terminarla en el teléfono o pasarla del papel.",
+  firma_observador_requerida:
+    "Falta la firma del ingeniero. Sin ella no hay documento: tiene que abrirla en su teléfono y firmarla.",
+  firma_habitante_o_motivo:
+    "Falta la firma del habitante o el motivo por el que no pudo firmar.",
+  datos_incompletos:
+    "Le faltan datos de identificación.",
+  local_id_requerido:
+    "El registro viene sin identificador. Es un archivo dañado: pide que lo bajen otra vez.",
+  json_invalido:
+    "El registro no se pudo leer. Probablemente el archivo llegó cortado por WhatsApp."
+};
+
 async function adminInspeccionesImportar(request, env) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -6523,7 +6544,8 @@ async function adminInspeccionesImportar(request, env) {
          falta para que alguien lo termine en el teléfono o lo pase del papel.
          Aceptarlo a medias metería en la base un documento sin firma. */
       informe.push({ familia: etiqueta, error: d.error || "rechazada",
-                     faltan: d.faltan || null, ayuda: d.ayuda || null });
+                     faltan: d.faltan || null,
+                     ayuda: d.ayuda || RECHAZO_EN_CASTELLANO[d.error] || null });
       continue;
     }
 
