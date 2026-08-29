@@ -6602,6 +6602,104 @@ function base64ABytes(t) {
   } catch { return null; }
 }
 
+/* GET /api/admin/buscar?q= — UNA casilla en vez de ocho tablas.
+
+   El panel tiene ocho bandejas y hasta ahora había que saber en cuál mirar: con
+   un número en la mano —el que llegó por correo, el que dictó una familia por
+   teléfono— tocaba adivinar si era de aportes, de casas o de inspecciones.
+
+   NO ES UNA BÚSQUEDA DE TEXTO LIBRE, y es deliberado. Los consecutivos de este
+   proyecto llevan su prefijo (GG, CV, IV, CD, AE, MB), así que el propio dato
+   dice en qué tabla vive: se hace UNA consulta a la tabla correcta en vez de
+   siete a todas. Y un buscador difuso sobre nombres y notas sería un escaneo de
+   todo el panel para responder casi siempre lo mismo que el prefijo ya sabía.
+
+   Lo que sí acepta además del número es un TELÉFONO, porque es lo único que una
+   familia sabe de memoria cuando llama. */
+const BUSCA_NUMERO = {
+  GG: { sql: "SELECT a.guia AS numero, a.estado, a.creada_en AS cuando, d.nombre " +
+             "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?",
+        clase: "Aporte", destino: "#sec-salud" },
+  CV: { sql: "SELECT numero, estado, creado_en AS cuando, contacto_nombre AS nombre, sector " +
+             "FROM casos WHERE numero = ?",
+        clase: "Caso de vivienda", destino: "#sec-casas" },
+  IV: { sql: "SELECT numero, familia AS nombre, municipio AS sector, recibido_en AS cuando, " +
+             "CASE WHEN requiere_esp = 1 THEN 'requiere revisión especializada' ELSE 'recibida' END AS estado " +
+             "FROM inspecciones WHERE numero = ?",
+        clase: "Inspección en terreno", destino: "#sec-inspecciones" },
+  CD: { sql: "SELECT numero, guia AS sector, emitido_en AS cuando, " +
+             "CASE WHEN anulado_en IS NULL THEN 'vigente' ELSE 'anulado' END AS estado " +
+             "FROM certificados WHERE numero = ?",
+        clase: "Certificado", destino: "#sec-salud" },
+  AE: { sql: "SELECT numero, creada_en AS cuando, " +
+             "CASE WHEN anulada_en IS NOT NULL THEN 'anulada' " +
+             "WHEN publicada_en IS NULL THEN 'en borrador' ELSE 'publicada' END AS estado " +
+             "FROM entregas WHERE numero = ?",
+        clase: "Acta de entrega", destino: "#sec-entregas" },
+  /* Los miembros no tienen bandeja propia en este panel, así que el resultado
+     sale sin enlace en vez de mandar a una pantalla que no los enseña. */
+  MB: { sql: "SELECT codigo AS numero, nivel AS estado, creado_en AS cuando FROM miembros WHERE codigo = ?",
+        clase: "Membresía", destino: null }
+};
+
+async function adminBuscar(env, url) {
+  const q = String(url.searchParams.get("q") || "").trim().slice(0, 60);
+  if (q.length < 3) return json({ q, tipo: "corto", resultados: [] });
+
+  const num = q.toUpperCase().replace(/\s+/g, "");
+  const m = /^(GG|CV|IV|CD|AE|MB)-(\d{4})-(\d{6})$/.exec(num);
+  if (m) {
+    const cfg = BUSCA_NUMERO[m[1]];
+    const f = await env.DB.prepare(cfg.sql).bind(num).first();
+    return json({ q, tipo: "numero", resultados: f ? [{
+      clase: cfg.clase, numero: f.numero, estado: f.estado || null,
+      nombre: f.nombre || null, sector: f.sector || null,
+      cuando: f.cuando ? String(f.cuando).slice(0, 16) : null,
+      destino: cfg.destino
+    }] : [] });
+  }
+
+  const digitos = q.replace(/\D/g, "");
+  if (digitos.length >= 7) {
+    /* SE NORMALIZA LA COLUMNA, así que esto es UN escaneo por tabla y el índice
+       de teléfono no entra. Es aceptable —lineal, tres tablas, con tope— y es
+       muy distinto de lo que ya mordió esta pantalla: allí la normalización
+       vivía en una subconsulta correlacionada y se ejecutaba UNA VEZ POR FILA,
+       o sea cuadrática. Un escaneo no es el problema; un escaneo por fila sí. */
+    const filas = [];
+    const casos = await env.DB.prepare(
+      "SELECT numero, estado, sector, contacto_nombre AS nombre, creado_en AS cuando FROM casos " +
+      "WHERE " + TEL_DIGITOS("contacto_tel") + " = ? ORDER BY creado_en DESC LIMIT 20"
+    ).bind(digitos).all();
+    for (const f of casos.results || []) {
+      filas.push({ clase: "Caso de vivienda", numero: f.numero, estado: f.estado,
+                   nombre: f.nombre, sector: f.sector,
+                   cuando: String(f.cuando || "").slice(0, 16), destino: "#sec-casas" });
+    }
+    const aportes = await env.DB.prepare(
+      "SELECT a.guia AS numero, a.estado, a.creada_en AS cuando, d.nombre FROM aportes a " +
+      "JOIN donantes d ON d.id = a.donante_id " +
+      "WHERE " + TEL_DIGITOS("d.telefono") + " = ? ORDER BY a.creada_en DESC LIMIT 20"
+    ).bind(digitos).all();
+    for (const f of aportes.results || []) {
+      filas.push({ clase: "Aporte", numero: f.numero, estado: f.estado, nombre: f.nombre,
+                   sector: null, cuando: String(f.cuando || "").slice(0, 16), destino: "#sec-salud" });
+    }
+    const insc = await env.DB.prepare(
+      "SELECT id, tipo, estado, nombre, creada_en AS cuando FROM inscripciones " +
+      "WHERE " + TEL_DIGITOS("telefono") + " = ? ORDER BY creada_en DESC LIMIT 20"
+    ).bind(digitos).all();
+    for (const f of insc.results || []) {
+      filas.push({ clase: "Quién quiere entrar (" + f.tipo + ")", numero: "#" + f.id,
+                   estado: f.estado, nombre: f.nombre, sector: null,
+                   cuando: String(f.cuando || "").slice(0, 16), destino: "#sec-entrar" });
+    }
+    return json({ q, tipo: "telefono", resultados: filas });
+  }
+
+  return json({ q, tipo: "no_reconocido", resultados: [] });
+}
+
 /* GET /api/admin/inspecciones — lo que la brigada necesita ver de un vistazo.
    NO devuelve las respuestas completas: 26 ítems por fila harían la carga
    pesada y la tabla ilegible, y para eso está el PDF. Sí devuelve las CUENTAS
@@ -7289,6 +7387,21 @@ function paginaAdmin() {
    desde cuándo espera, después cuántos, y el «cómo se arregla» debajo del
    nombre. El único acento es el ámbar de lo que lleva tres días o más, para que
    ese ámbar signifique algo cuando aparezca. */
+/* El buscador: una casilla, arriba de todo. Ancho de sobra porque lo que se
+   pega dentro es un consecutivo largo y verlo entero evita el error de teclear
+   uno y buscar otro. */
+#buscador{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+#buscador label{font-size:var(--fs-13);font-weight:600;color:var(--mu)}
+#buscador input{flex:1 1 22rem;min-width:0;padding:9px 12px;border:1px solid var(--bd);
+  border-radius:7px;font:inherit;font-size:var(--fs-14);background:var(--surface);color:inherit}
+#busca-res{margin:0 0 22px}
+.bus-fila{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:baseline;
+  padding:10px 0;border-top:1px solid var(--bd)}
+.bus-fila:first-child{border-top:0}
+.bus-q{font-size:var(--fs-15);font-weight:600}
+.bus-q small{display:block;font-weight:400;color:var(--mu);font-size:var(--fs-13);margin-top:2px}
+.bus-nada{font-size:var(--fs-14);color:var(--mu);margin:0}
+@media (max-width:640px){ .bus-fila{grid-template-columns:1fr} }
 .dec-caja{border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:10px;
   padding:18px 20px;margin:0 0 30px;background:var(--surface)}
 .dec-t{font-size:var(--fs-h4);margin:0 0 14px;letter-spacing:.01em}
@@ -7325,6 +7438,14 @@ function paginaAdmin() {
 <p class="lead" id="quien" style="margin-bottom:26px">Cargando…</p>
 
 <div id="resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:26px"></div>
+
+<form id="buscador">
+  <label for="q">Buscar</label>
+  <input id="q" type="search" autocomplete="off" spellcheck="false"
+         placeholder="CV-2026-000012, GG-2026-000004, IV-2026-000001 o un teléfono">
+  <button type="submit" class="copy">Buscar</button>
+</form>
+<div id="busca-res"></div>
 
 <div id="decisiones"></div>
 
@@ -7852,6 +7973,53 @@ function antiguedad(d){
   if (d === 1) return "hace 1 día";
   return "hace " + d + " días";
 }
+
+/* EL BUSCADOR. Busca AL ENVIAR y no al teclear, a propósito: una búsqueda por
+   teléfono son tres escaneos de tabla, y dispararlos en cada pulsación es como
+   se construye una pantalla lenta sin darse cuenta. Además un consecutivo se
+   pega entero de una vez, así que teclear no es la forma en que este campo se
+   usa de verdad. */
+function pintarBusqueda(d){
+  var caja = document.getElementById("busca-res"); if (!caja) return;
+  if (d.tipo === "corto"){ caja.innerHTML = ""; return; }
+  if (d.tipo === "no_reconocido"){
+    caja.innerHTML = '<p class="bus-nada">No reconozco «' + esc(d.q) + '». '
+      + 'Se busca por número completo —CV, GG, IV, CD, AE o MB— o por un teléfono.</p>';
+    return;
+  }
+  var l = d.resultados || [];
+  if (!l.length){
+    caja.innerHTML = '<p class="bus-nada">Nada con «' + esc(d.q) + '»'
+      + (d.tipo === "telefono" ? ": ningún caso, aporte ni postulación con ese teléfono." : ".") + '</p>';
+    return;
+  }
+  caja.innerHTML = '<div class="dec-caja">' + l.map(function(x){
+    return '<div class="bus-fila"><span class="bus-q">' + esc(x.clase) + " " + esc(x.numero)
+      + "<small>"
+      + [x.nombre, x.sector, x.estado, x.cuando].filter(Boolean).map(esc).join(" · ")
+      + "</small></span>"
+      + (x.destino ? '<a class="dec-ir" href="' + esc(x.destino) + '">Ir</a>'
+                   : '<span class="dec-ir dec-sinir">sin bandeja</span>')
+      + "</div>";
+  }).join("") + "</div>";
+}
+
+function buscar(){
+  var q = (document.getElementById("q") || {}).value || "";
+  var caja = document.getElementById("busca-res");
+  if (!q.trim()){ caja.innerHTML = ""; return; }
+  caja.innerHTML = '<p class="bus-nada">Buscando…</p>';
+  fetch("/api/admin/buscar?q=" + encodeURIComponent(q.trim()))
+    .then(function(r){ return r.json(); })
+    .then(pintarBusqueda)
+    .catch(function(){
+      caja.innerHTML = '<p class="bus-nada">No se pudo buscar. Revisa la conexión.</p>';
+    });
+}
+
+document.addEventListener("submit", function(e){
+  if (e.target && e.target.id === "buscador"){ e.preventDefault(); buscar(); }
+});
 
 /* LA PORTADA DE DECISIONES. Lo primero del panel deja de ser una tabla y pasa a
    ser lo que hay que hacer hoy.
@@ -9310,6 +9478,7 @@ export default {
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
+        if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
         if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
         if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env);
         const mip = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/pdf$/);
