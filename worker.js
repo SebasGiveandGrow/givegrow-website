@@ -5463,13 +5463,31 @@ async function apiAlma(request, env, url) {
 
   const system = ALMA_SYS + (await almaContextoRed(env, url.origin));
 
+  /* EL WORKSPACE, y por qué es condicional.
+
+     Anthropic tiene dos clases de llave. Una creada DENTRO de un workspace ya
+     sabe dónde actúa. Una personal o de cuenta de servicio sirve para varios,
+     así que hay que decírselo en cada petición con `anthropic-workspace-id`; si
+     no, responde 400 con «is required when authenticating with an
+     identity-linked API key» — que fue exactamente lo que nos pasó.
+
+     Se manda SOLO si está configurado, así que el mismo código sirve con las
+     dos clases de llave y cambiar de una a otra no obliga a tocar nada.
+
+     El id NO es un secreto —es un identificador, tipo wrkspc_01ABC…— así que
+     vive en wrangler.toml, versionado y a la vista, y no en un secreto que
+     nadie pueda leer después. */
+  const cabecerasAlma = {
+    "content-type": "application/json",
+    "x-api-key": llaveAlma,
+    "anthropic-version": "2023-06-01"
+  };
+  const espacioAlma = String(env.ANTHROPIC_WORKSPACE_ID || "").trim();
+  if (espacioAlma) cabecerasAlma["anthropic-workspace-id"] = espacioAlma;
+
   const arriba = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": llaveAlma,
-      "anthropic-version": "2023-06-01"
-    },
+    headers: cabecerasAlma,
     body: JSON.stringify({ model: ALMA_MODELO, max_tokens: ALMA_MAX_TOKENS, system, messages: mensajes })
   });
 
