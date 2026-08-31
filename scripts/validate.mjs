@@ -56,9 +56,40 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"]
        solo se llamaba desde los botones de confirmar, nunca en el arranque.
        Las llamadas de arranque son las únicas en columna 0; las de dentro de
        una función van indentadas. */
-    /* Las bandejas son cosa del panel; triageJS() y rutaJS() tienen su propia
-       forma y sus propias funciones de arranque. */
-    if (fn !== "adminJS") continue;
+    /* LAS PANTALLAS DE EMERGENCIA TAMBIÉN, aunque con una regla más débil.
+
+       Hasta el 31 ago 2026 esta línea era `if (fn !== "adminJS") continue;`, así
+       que la regla de «toda bandeja llega a pedirse» cubría SOLO el panel.
+       triageJS, rutaJS e inspeccionJS —las pantallas de las que dependen las
+       personas en terreno, sin señal— pasaban únicamente por `node --check`.
+       Era el hueco más caro del gate: el defecto original de `cargarReportadas`
+       podía repetirse ahí sin que nada avisara.
+
+       No tienen ARRANQUE ni BANDEJAS, y montárselos significaría refactorizar el
+       formulario de terreno, que no se toca sin probarlo en un teléfono. Así que
+       aquí se comprueba lo que SÍ se puede comprobar sin tocar nada: que ninguna
+       función `cargar*`/`pintar*` esté definida y no se mencione en ningún otro
+       sitio. Eso caza el caso de código muerto —definida y nunca llamada— que es
+       el primo hermano del defecto original.
+
+       LO QUE ESTA REGLA NO CAZA, y conviene saberlo: una función llamada SOLO
+       desde un botón que nadie pulsa. Para eso hace falta la lista explícita de
+       arranque, y eso es una tarea con teléfono delante. Comprobado el 31 ago:
+       hoy ninguna de las tres tiene huérfanas. */
+    if (fn !== "adminJS") {
+      if (fn === "inspeccionSW") continue;
+      const defs = [...emitido.matchAll(/^function (cargar\w*|pintar\w*)\s*\(/gm)].map(m => m[1]);
+      const sueltas = defs.filter(f => {
+        const veces = [...emitido.matchAll(new RegExp("\\b" + f + "\\b", "g"))].length;
+        return veces <= 1;   /* solo su propia definición */
+      });
+      if (sueltas.length) {
+        err(nombre + ": " + sueltas.join(", ") + " está definida y nadie la llama — su pantalla se queda en «Cargando…»");
+      } else {
+        ok(nombre + " no deja funciones sueltas (" + defs.length + " revisadas)");
+      }
+      continue;
+    }
     /* Desde la carga perezosa, «se pide al arrancar» ya no es la única forma
        válida: una bandeja puede estar registrada en BANDEJAS y pedirse cuando
        su tabla se acerca a la pantalla. El invariante NO cambia —toda bandeja
@@ -99,6 +130,64 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"]
     }
   } catch (e) {
     err(nombre + " emite JS INVÁLIDO — el panel no cargaría: " + (e.stderr ? String(e.stderr).split("\n")[1] || e.message : e.message));
+  }
+}
+
+/* 1d · Todo «Cargando…» tiene quien lo rellene.
+
+   Los checks 1b y 1c miran si el código es válido. Este mira el SÍNTOMA que la
+   persona ve: una tabla que dice «Cargando…» para siempre. Fue así como se
+   descubrió el defecto de `cargarReportadas` —no lo encontró una revisión, lo
+   encontró alguien mirando una pantalla— y es el estado en el que un ingeniero
+   sin señal se queda sin saber si el problema es el sistema o su conexión.
+
+   La comprobación es directa: si el HTML generado deja un elemento con «Cargando»
+   dentro, el JS de esa misma pantalla tiene que escribir en ese id. Si nadie lo
+   escribe, ese texto es permanente.
+
+   Se lee el TEXTO CRUDO de las dos funciones, sin evaluar: así entra también
+   `inspeccionHTML`, que recibe argumentos e interpola, y que es justo la
+   pantalla del formulario de terreno. Comprobado el 31 ago 2026: los seis
+   marcadores que existen hoy tienen quien los rellene. */
+/* Se extrae LA PLANTILLA, no el cuerpo de la función, y con el mismo barrido
+   balanceado del check 1c. Buscar el cierre con `\n}\n` no vale: dentro de estas
+   plantillas hay JS y HTML emitido con llaves en columna 0, así que el cuerpo se
+   cortaba a mitad y el check daba falsos positivos —me pasó escribiéndolo—. */
+const literalDe = (nombre) => {
+  const i = workerSrc.indexOf("function " + nombre + "(");
+  if (i === -1) return null;
+  const ini = workerSrc.indexOf("`", i);
+  if (ini === -1) return null;
+  let k = ini + 1;
+  while (k < workerSrc.length) {
+    const ch = workerSrc[k];
+    if (ch === "\\") { k += 2; continue; }
+    if (ch === "$" && workerSrc[k + 1] === "{") {
+      let d = 1; k += 2;
+      while (k < workerSrc.length && d > 0) {
+        if (workerSrc[k] === "{") d++;
+        else if (workerSrc[k] === "}") d--;
+        k++;
+      }
+      continue;
+    }
+    if (ch === "`") return workerSrc.slice(ini + 1, k);
+    k++;
+  }
+  return null;
+};
+for (const [htmlFn, jsFn] of [["paginaAdmin", "adminJS"], ["paginaTriage", "triageJS"],
+                              ["paginaRuta", "rutaJS"], ["inspeccionHTML", "inspeccionJS"]]) {
+  const h = literalDe(htmlFn), j = literalDe(jsFn);
+  if (!h || !j) { err("1d: no encontré " + (h ? jsFn : htmlFn)); continue; }
+  const ids = [...new Set(
+    [...h.matchAll(/id="([a-zA-Z0-9_-]+)"[^>]*>\s*(?:<[^>]+>\s*)?[^<]*[Cc]argando/g)].map(m => m[1])
+  )];
+  const sinDueno = ids.filter((id) => !new RegExp('(?:el|getElementById)\\(\\s*"' + id + '"\\s*\\)').test(j));
+  if (sinDueno.length) {
+    err(htmlFn + ": #" + sinDueno.join(", #") + " dice «Cargando…» y " + jsFn + "() nunca lo escribe");
+  } else {
+    ok(htmlFn + " · sus " + ids.length + " «Cargando…» tienen quien los rellene");
   }
 }
 
