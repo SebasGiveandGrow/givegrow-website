@@ -842,9 +842,11 @@ Si Sebas dice solo "la siguiente fase", **preguntar de cuál de los tres**.
 | **VOLUNTARIADO, 8 fases** | `PLAN_VOLUNTARIADO.md` | **Fases 1–7 hechas y en producción.** **Siguiente: su Fase 8** (sostenibilidad: SECOP/RUP, con la restricción de que nada se cobra) |
 
 Y aparte, el **Social Fest 2026**: la postulación ya se envió (taller «Si no quedó
-documentado, no ocurrió»). Avisan los seleccionados el **28 de agosto**. Si entra,
-hay que producir los ocho materiales del taller — detalle en la memoria del
-proyecto.
+documentado, no ocurrió»). Avisaban a los seleccionados el **28 de agosto**, o sea
+que la respuesta ya salió y **al 31 de agosto no está registrada aquí**. Es la
+primera cosa que hay que preguntarle a Sebas si retoma esto: si entró, lo más
+urgente del tablero pasan a ser los **ocho materiales del taller**, porque el
+evento es el 14–15 de octubre. Detalle en la memoria del proyecto.
 
 ## 📣 LA BRIGADA TIENE FECHA: 24 al 28 de agosto de 2026
 
@@ -1171,12 +1173,21 @@ priorización y no un dictamen de habitabilidad»— y el servidor la exige igua
 la de datos. Quien crea que va a dictaminar por fotos tiene que enterarse antes
 de escribir su matrícula, no después.
 
-**LO QUE HAY QUE RECORDAR AL APROBAR, porque el panel no lo hace:** aceptar a un
-ingeniero en la bandeja **no le abre nada**. Primero se busca su matrícula en el
-registro público del COPNIA, y el acceso se da añadiendo su correo en Cloudflare
-Access. El correo que le sale se lo dice a él también, para que no espere una
-respuesta instantánea. Sin regla por dominio: puede ser de universidad, de
-empresa o particular.
+**⚠️ ESTE PÁRRAFO ESTABA DESFASADO Y SE CORRIGIÓ EL 31 AGO.** Decía que el acceso
+se da «añadiendo su correo en Cloudflare Access», y eso dejó de ser cierto el 29,
+cuando entró la evaluación externa. Se deja la corrección y no el texto viejo,
+porque un traspaso que manda hacer a mano lo que ya es automático hace perder una
+sesión entera.
+
+**CÓMO SE APRUEBA HOY.** Aceptar a un ingeniero en la bandeja **no le abre nada**:
+lo que abre la puerta es **VERIFICAR su matrícula** —se busca en el registro
+público del COPNIA y se marca en «Quién quiere entrar»—, y la evaluación externa
+de Access la concede sola desde ese momento. Al marcarla, **el sistema le escribe
+al ingeniero** diciéndole que ya puede entrar, con la dirección del triaje (PR
+#199): antes nadie se lo decía y el correo de acuse lo prometía. Si ese aviso
+falla, el panel lo dice en el momento y en su fila hay un botón para reenviarlo.
+Sin regla por dominio: el correo puede ser de universidad, de empresa o
+particular.
 
 ~~`#ingenieros` y `#vivienda` no están en el menú.~~ **RESUELTO el 18 ago, a
 petición de Sebas.** Hay un grupo nuevo **«Emergencia»**, el PRIMERO de la barra
