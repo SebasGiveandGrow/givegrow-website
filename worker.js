@@ -3759,7 +3759,16 @@ function leerFormulario(){
    en «Foto N.º» de cada ítem — el papel ya había resuelto así el problema de
    asociar fotos con observaciones, y copiarlo evita una interfaz de arrastrar. */
 var FOTOS = [];
-var FOTO_LADO = 1600, FOTO_CALIDAD = 0.72;
+/* 1600 px de lado largo y calidad 0,6.
+
+   LA RESOLUCIÓN NO SE TOCA, y es deliberado: el ingeniero juzga el ANCHO de una
+   grieta en esta foto, y la guía del AIS distingue 2 mm en concreto de 4 mm en
+   adobe. Los píxeles son la evidencia; bajarlos es tirar el dato.
+
+   La calidad sí baja, de 0,72 a 0,6. Medido sobre una foto real de terreno:
+   367 KB contra 295 KB, un 20% menos, con los mismos 1600 px. En una subida de
+   1 Mbps eso es casi un segundo menos por foto, y en terreno se suben tres. */
+var FOTO_LADO = 1600, FOTO_CALIDAD = 0.6;
 
 function comprimirFotoInsp(file){
   return createImageBitmap(file, { imageOrientation: "from-image" }).then(function(bm){
@@ -3987,9 +3996,14 @@ function enviarFotos(reg, numero){
       x.timeout = PLAZO_FOTO;
       x.responseType = "text";
 
+      /* SE DICE QUE LA INSPECCIÓN YA LLEGÓ. Cuando empiezan a subir las fotos
+         el servidor ya devolvió el número, o sea que lo firmado está a salvo y
+         lo que falta es solo material. Sin decirlo, una subida lenta se vive
+         como «no ha llegado nada todavía», y eso es lo que angustia: no son los
+         segundos, es no saber si se perdió el trabajo. */
       var pinta = function(subidos){
-        aviso("Enviando foto " + cual + " de " + total + " · "
-              + pesoCorto(subidos) + " de " + pesoCorto(peso) + ".", "info");
+        aviso("La inspección ya llegó. Subiendo foto " + cual + " de " + total
+              + " · " + pesoCorto(subidos) + " de " + pesoCorto(peso) + ".", "info");
         medidor(subidos, peso);
       };
       pinta(0);
