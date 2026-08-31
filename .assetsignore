@@ -43,3 +43,18 @@ scripts
 .assetsignore
 .gitignore
 .DS_Store
+
+# Descargas locales de R2. `wrangler r2 object get` escribe el objeto en un
+# archivo con la RUTA DE LA LLAVE como nombre, así que revisar el bucket deja
+# `casos/CV-2026-…` e `inspecciones/IV-2026-…` en la raíz del repo sin que nadie
+# lo pida. Pasó el 31 ago 2026 comprobando qué medios existían antes de borrar
+# los datos de prueba: aparecieron cinco archivos, y `/casos/` e
+# `/inspecciones/` ya respondían 200 en producción.
+#
+# Esta vez estaban vacíos y no se filtró nada. Pero el respaldo de terreno
+# genera `respaldo-inspecciones-*.json` con nombres, cédulas, contactos,
+# coordenadas y firmas en base64: si uno de esos cae aquí, queda servido en
+# internet. Se excluyen los dos nombres, que no sirven ningún asset real —
+# `/caso/<n>` es ruta del Worker (`run_worker_first`), no un archivo.
+casos
+inspecciones
