@@ -5286,14 +5286,6 @@ async function adminRuta(env, url) {
    a que otro sitio empotre el chat, que es lo único para lo que servía.
    ======================================================================== */
 
-/* Estorbo al empotrado desde otro sitio. Las tres marcas del sitio, porque el
-   chat vive en las tres. */
-const ORIGENES_ALMA = [
-  "https://www.thegiveandgrowproject.org",
-  "https://thegiveandgrowproject.org",
-  "https://miramicasa.thegiveandgrowproject.org"
-];
-
 const ALMA_MODELO = "claude-haiku-4-5";
 const ALMA_MAX_TOKENS = 1024;
 const ALMA_MAX_MENSAJES = 24;
@@ -5423,14 +5415,21 @@ function almaMensajes(bruto) {
 async function apiAlma(request, env, url) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
 
-  /* El Origin se mira ANTES que la llave: si no, a un sitio ajeno le
-     contaríamos si tenemos el secreto configurado o no, que no es asunto suyo.
-     Es estorbo al empotrado desde otro sitio, no seguridad: si no viene Origin
-     —una petición del propio sitio puede no mandarlo— se deja pasar. */
-  const origen = request.headers.get("Origin");
-  if (origen && !ORIGENES_ALMA.some((o) => origen === o)) {
-    return json({ error: "origen_no_autorizado" }, 403);
-  }
+  /* NO HAY LISTA DE ORÍGENES, y quitarla fue lo correcto.
+
+     Venía del Worker aparte, donde hacía falta para el CORS. Aquí no protege
+     nada: un llamador decidido manda la cabecera que quiera —comprobado con
+     curl contra el worker viejo— y un navegador en OTRO origen ya no puede leer
+     la respuesta, porque al ser mismo origen no mandamos Access-Control-Allow-
+     Origin. Esa es la protección real, y es automática.
+
+     Lo que sí hacía la lista era romper el desarrollo local: desde
+     `wrangler dev` el Origin es localhost y ALMA respondía 403, así que no se
+     podía probar sin tocar código. Un control que no protege y que estorba para
+     probar es peor que no tenerlo.
+
+     Lo que protege de verdad sigue en pie: el modelo, el tope de tokens y el
+     system se fijan aquí, y hay límite por IP. */
 
   /* SIN LLAVE NO SE INVENTA NADA: se dice que no está configurada. Mientras el
      secreto no exista este endpoint es inerte, y el sitio sigue hablando con el
@@ -5441,8 +5440,12 @@ async function apiAlma(request, env, url) {
      una llave mala, pero descarta la causa tonta para siempre. */
   const llaveAlma = String(env.ANTHROPIC_API_KEY || "").trim();
   if (!llaveAlma) {
-    return json({ error: "alma_no_configurada",
-                  ayuda: "Falta el secreto ANTHROPIC_API_KEY en este Worker." }, 503);
+    /* SIN `ayuda`, y es deliberado: el chat enseña ese campo tal cual a quien
+       está preguntando, y «falta el secreto ANTHROPIC_API_KEY» es un detalle de
+       nuestra cocina que no le dice nada a una familia y sí le cuenta de más a
+       cualquiera. `ayuda` existe SOLO cuando el texto es para la persona —el
+       límite de mensajes, por ejemplo—. Para quien opera, el código basta. */
+    return json({ error: "alma_no_configurada" }, 503);
   }
 
   const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
