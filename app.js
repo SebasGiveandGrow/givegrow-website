@@ -2320,6 +2320,16 @@ function mcPinta(aviso, color){
           +  '<p style="margin-top:8px;font-weight:700">' + escapeHtml(falta) + "</p></div>";
       }
 
+      /* AQUÍ NO SE COMPRUEBA `d.evaluado`, Y ES A PROPÓSITO. El barrido marcó que
+         esta tarjeta dice «Todavía no lo ha revisado un ingeniero» sin mirar ese
+         campo, y sería una mentira si un caso llegara aquí ya evaluado. No puede:
+         el servidor EXIGE `falta` cuando la clasificación es `inevaluable`
+         (`falta_requerido`, 422), así que toda evaluación deja o una clasificación
+         firme —y entonces `tieneConcepto`— o una petición de fotos —y entonces
+         `pideFotos`—. Las dos ramas de arriba cubren todo lo evaluado.
+
+         Queda escrito para el día que alguien haga `falta` opcional: ese día este
+         estado se vuelve alcanzable y esta tarjeta empieza a mentir. */
       if (!tieneConcepto && !pideFotos){
         /* La espera, contada con hechos y sin fecha prometida. Los días que
            lleva y cuántos hay delante: el segundo dato explica el primero
