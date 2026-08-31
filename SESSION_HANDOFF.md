@@ -37,8 +37,9 @@ nadie podía llegar a él, y quien llegaba no siempre recibía lo que se le prom
 | #195 | Un caso cerrado ya no se evalúa ni se resucita |
 | #197 | `mcSubirCola` dejó de mentir: no pierde archivos y dice cuántas llegaron |
 | #199 | Al ingeniero se le dice que ya puede entrar · el botón para reenviarlo · un aviso interno desfasado |
+| #201 | La visita mueve el caso · **un número mal teclado dejaba la visita atrapada para siempre** · la ficha enseña sus visitas |
 
-### ⚠️ DIEZ COSAS QUE NO HAY QUE DESHACER, con su razón
+### ⚠️ DOCE COSAS QUE NO HAY QUE DESHACER, con su razón
 
 Se suman a las tres de la sesión anterior (la bandera `RESTAURANDO`, las firmas
 con su contador de trazos y su proporción, y `requiere_esp` guardado como null).
@@ -80,6 +81,16 @@ con su contador de trazos y su proporción, y `requiere_esp` guardado como null)
    en la calle con señal mala, un salto menos importa.
 10. **El aviso «ya puedes entrar» NO se manda al retirar la verificación.** «Ya
    no puedes entrar» es una conversación que tiene una persona.
+11. **`triageInspeccionRecibir` COMPRUEBA que el caso citado exista antes de
+   insertar, y guarda NULL si no.** No es cortesía: `inspecciones.caso` tiene
+   `REFERENCES casos(numero)` y **D1 SÍ impone la clave foránea** —comprobado el
+   31 ago—, así que un dígito mal escrito daba `FOREIGN KEY constraint failed`,
+   el `catch` no encontraba nada por `_local_id`, relanzaba, y el teléfono
+   recibía un 500 y reintentaba esa visita ETERNAMENTE. Perder el cruce es
+   recuperable; perder la visita no.
+12. **Mover el caso a `visitado` respeta `CASO_DESTINOS`** y va en try/catch
+   DESPUÉS del PDF. Nunca antes: que el caso no se mueva es un desajuste de
+   bandeja; que la inspección se pierda, no.
 
 ### 🔨 Lo que queda abierto, y por qué
 
@@ -102,13 +113,10 @@ pidas.
 
 **Trabajo que sigue pendiente, en orden:**
 
-1. **Una inspección firmada no mueve el caso,** así que `urgentes_sin_visitar`
-   sigue diciendo que nadie fue. Y la ficha del caso en el panel no enseña sus
-   inspecciones, aunque el índice existe para eso.
-2. **Callejón sin salida con 20 archivos:** piden una foto concreta y la familia
+1. **Callejón sin salida con 20 archivos:** piden una foto concreta y la familia
    no puede subirla. Y las fotos del equipo consumen su cupo.
-3. **Deuda de SQL que el gate no ve:** cinco índices muertos, siete columnas que
-   se escriben y nadie lee, las coordenadas GPS que solo existen dentro del PDF
+2. **Deuda de SQL que el gate no ve:** CUATRO índices muertos —`ix_insp_caso` dejó de
+   estarlo con el #201—, siete columnas que se escriben y nadie lee, las coordenadas GPS que solo existen dentro del PDF
    (la pantalla de ruta no las tiene), y `filaTope` mandando usar filtros que no
    existen.
 
