@@ -7,7 +7,10 @@
 > del triaje, ni el de terreno, ni el botón nuevo del panel. Es el único riesgo
 > que queda y no se puede cerrar desde aquí.
 > (2) **La corrida de rescate con Camila,** que sigue sin haberse hecho y sigue
-> sin haber cómo contactarla.
+> sin haber cómo contactarla. Y cuando aparezca el canal: en «Quién quiere
+> entrar» hay un botón **«Avisarle que ya puede entrar»** en su fila y en la de
+> David — llevan desde el 22 de agosto con la puerta abierta sin saberlo, porque
+> el correo que lo dice no existía hasta el 31.
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
 ## ✅ LA AUDITORÍA DE MIRA MI CASA, Y SU CIERRE (31 ago 2026)
@@ -33,8 +36,9 @@ nadie podía llegar a él, y quien llegaba no siempre recibía lo que se le prom
 | #194 | El contador «Piden confirmación» mentía · «undefined» en la pantalla del ingeniero · la subconsulta cuadrática de `adminCasos` (54 ms → 2 ms medido) |
 | #195 | Un caso cerrado ya no se evalúa ni se resucita |
 | #197 | `mcSubirCola` dejó de mentir: no pierde archivos y dice cuántas llegaron |
+| #199 | Al ingeniero se le dice que ya puede entrar · el botón para reenviarlo · un aviso interno desfasado |
 
-### ⚠️ SIETE COSAS QUE NO HAY QUE DESHACER, con su razón
+### ⚠️ DIEZ COSAS QUE NO HAY QUE DESHACER, con su razón
 
 Se suman a las tres de la sesión anterior (la bandera `RESTAURANDO`, las firmas
 con su contador de trazos y su proporción, y `requiere_esp` guardado como null).
@@ -69,6 +73,13 @@ con su contador de trazos y su proporción, y `requiere_esp` guardado como null)
    cierre que dice cuántas llegaron. `mcSubirCola` estuvo diez días mintiendo
    porque el arreglo del 20 ago se hizo en uno y no en el otro. Si cambia el
    trato con la familia, cambia en los dos o en ninguno.
+9. **Las URLs del triaje que van en correos son las del ÁPEX,** no las del
+   subdominio: `thegiveandgrowproject.org/triaje`. Comprobado en producción el 31
+   ago — `miramicasa…/triaje` da 301 al ápex y `www` da 302, así que las dos
+   añaden un salto, y el ápex va directo al login de Access. Para algo que se abre
+   en la calle con señal mala, un salto menos importa.
+10. **El aviso «ya puedes entrar» NO se manda al retirar la verificación.** «Ya
+   no puedes entrar» es una conversación que tiene una persona.
 
 ### 🔨 Lo que queda abierto, y por qué
 
@@ -91,14 +102,12 @@ pidas.
 
 **Trabajo que sigue pendiente, en orden:**
 
-1. **Nadie le dice al ingeniero que ya está verificado,** y el correo de acuse lo
-   promete. Pesa el doble ahora que Access abre la puerta sola.
-2. **Una inspección firmada no mueve el caso,** así que `urgentes_sin_visitar`
+1. **Una inspección firmada no mueve el caso,** así que `urgentes_sin_visitar`
    sigue diciendo que nadie fue. Y la ficha del caso en el panel no enseña sus
    inspecciones, aunque el índice existe para eso.
-3. **Callejón sin salida con 20 archivos:** piden una foto concreta y la familia
+2. **Callejón sin salida con 20 archivos:** piden una foto concreta y la familia
    no puede subirla. Y las fotos del equipo consumen su cupo.
-4. **Deuda de SQL que el gate no ve:** cinco índices muertos, siete columnas que
+3. **Deuda de SQL que el gate no ve:** cinco índices muertos, siete columnas que
    se escriben y nadie lee, las coordenadas GPS que solo existen dentro del PDF
    (la pantalla de ruta no las tiene), y `filaTope` mandando usar filtros que no
    existen.
