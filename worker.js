@@ -2910,7 +2910,12 @@ async function firmanteVerificado(env, email) {
    archivo, así que esta constante se arma como función para no depender del
    orden de evaluación. */
 const CONFIRMAR = () =>
-  "(c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA + " OR " + SIN_RESPALDO;
+  "((c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA + " OR " + SIN_RESPALDO + ")" +
+  /* Y NO LO TERMINADO. La pestaña enseñaba casos cerrados y descartados, así que
+     invitaba a un segundo ingeniero a opinar sobre algo que el servidor ahora
+     rechaza con un 409 — y rechazarlo después de que escribiera su concepto es
+     peor que no ofrecerlo. Mejor que no aparezca. */
+  " AND c.estado NOT IN ('cerrado','descartado')";
 
 /* Un caso SIN RESPALDO: tiene opinión firme, pero ninguna de un ingeniero con
    matrícula verificada. Es lo que no puede llegar solo a una familia. */
@@ -3047,6 +3052,30 @@ async function triageEvaluar(request, env, numero, email) {
     "SELECT numero, estado, contacto_email, token, sector FROM casos WHERE numero = ?"
   ).bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
+
+  /* NI SE EVALÚA NI SE RESUCITA UN CASO TERMINADO.
+
+     Esto solo comprobaba que el caso existiera. No miraba su estado, así que un
+     caso `cerrado` o `descartado` volvía a `clasificado` más abajo: se saltaba
+     entera la máquina de estados de `CASO_DESTINOS` —donde reabrir exige pasar
+     por `en_revision`— y no dejaba fila de auditoría, porque esa la escribe solo
+     `adminMoverCaso`. El motivo del cierre quedaba huérfano en el registro,
+     diciendo por qué se cerró un caso que ya estaba abierto otra vez. Y si la
+     familia había dejado correo, se le escribía como si nada.
+
+     Y era ALCANZABLE, no teórico: la pestaña «Piden confirmación» no filtra por
+     estado, así que un caso urgente que se cerró sigue apareciendo ahí,
+     invitando al segundo ingeniero a opinar.
+
+     El mismo criterio que `adminMoverCaso` deja escrito: los botones son una
+     comodidad, no un control. Reabrir es una decisión del equipo, con su motivo
+     y su registro, no un efecto secundario de que alguien abriera una ficha. */
+  if (caso.estado === "cerrado" || caso.estado === "descartado") {
+    return json({
+      error: "caso_terminado", estado: caso.estado,
+      ayuda: "Este caso está " + caso.estado + ", así que no se puede evaluar. Si hay que retomarlo, el equipo lo reabre desde el panel y vuelve a aparecer aquí."
+    }, 409);
+  }
 
   const clasificacion = String(c.clasificacion || "");
   if (!CLASIFICACIONES.includes(clasificacion)) {
