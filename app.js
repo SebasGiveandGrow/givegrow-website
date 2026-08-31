@@ -397,6 +397,7 @@ var I18N = {
     "cv.dir":"Dirección (solo para la visita)",
     "cv.dir.h":"No se publica nunca. Solo la ve el equipo para poder llegar.",
     "cv.material":"¿De qué son los muros?",
+    "cv.mat.elige":"Elige una",
     "cv.mat.ladrillo":"Ladrillo o bloque",
     "cv.mat.adobe":"Adobe o tapia",
     "cv.mat.bahareque":"Bahareque",
@@ -450,6 +451,7 @@ var I18N = {
     "cv.ok.espera":"Un ingeniero voluntario lo va a revisar. Cuando tenga su concepto, aparecerá en tu enlace.",
     "cv.ok.copiar":"Copiar mi enlace",
     "cv.ok.copiado":"Enlace copiado",
+    "cv.err.raro":"Algo en el formulario nos confundió y no llegó tu caso. Recarga la página e inténtalo otra vez; si vuelve a pasar, escríbenos.",
     "cv.err.envio":"No pudimos registrar tu caso. Revisa los datos e intenta otra vez.",
     "cv.err.campos":"Faltan datos: tu nombre, tu WhatsApp y el barrio.",
     "cv.err.consent":"Necesitamos tu autorización para que un ingeniero revise el caso.",
@@ -1899,7 +1901,14 @@ function cvEnviar(){
        usuario, es un caso descartado a propósito, y merece su propio silencio. */
     if (!d.ok || !d.numero){
       var texto = t("cv.err.envio");
-      if (d.error === "demasiados_intentos") texto = d.ayuda || t("cv.err.espera");
+      /* EL HONEYPOT devuelve {ok:true, numero:null} y caía aquí con «revisa los
+         datos e intenta otra vez» — el peor consejo posible, porque los datos
+         están bien y no hay nada que revisar. El campo está bien escondido
+         (tabindex -1, autocomplete off, aria-hidden, fuera de pantalla), así que
+         que lo rellene una persona es improbable; pero si pasa, que tenga una
+         salida en vez de un callejón. */
+      if (d.ok && !d.numero && !d.error) texto = t("cv.err.raro");
+      else if (d.error === "demasiados_intentos") texto = d.ayuda || t("cv.err.espera");
       else if (d.error === "email_invalido")  texto = t("cv.err.correo");
       else if (d.ayuda)                       texto = d.ayuda;
       if (msg){ msg.textContent = texto; msg.style.color = "var(--err)"; }

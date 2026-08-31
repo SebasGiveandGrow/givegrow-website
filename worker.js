@@ -2456,8 +2456,47 @@ async function apiCasoCrear(request, env) {
     c.consent_publico ? 1 : 0
   ).run();
 
+  /* EL RASTRO DEL CONSENTIMIENTO, que faltaba. Se guardaban dos enteros
+     (`consent_eval` hardcodeado a 1 y `consent_publico`) más la marca de tiempo, y
+     nada más: ninguna fila en `consentimientos`, que es donde los OTROS
+     formularios del sitio sí la dejan. Para la Ley 1581 la prueba de la
+     autorización quedaba reducida a dos columnas de la misma tabla que se puede
+     corregir desde el panel.
+
+     `sujeto` es el NÚMERO DE CASO y no el correo o el teléfono: identifica a la
+     persona igual —el caso los tiene— y no duplica datos personales en una
+     segunda tabla, que es exactamente lo que la ley pide evitar.
+
+     Se anotan las CLAVES del texto (`cv.c1`, `cv.c2`) y no el texto entero: son
+     los identificadores estables de lo que se le enseñó, y su redacción de esa
+     fecha se recupera del repositorio. Copiar 600 caracteres en cada fila haría
+     la tabla ilegible sin añadir una prueba mejor. */
+  try {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'datos', ?)"
+    ).bind(numero,
+      "caso de vivienda · cv.c1 (revisar) = SI · cv.c2 (aparecer en publico) = " +
+      (c.consent_publico ? "SI" : "no") +
+      (email ? " · dejo correo" : " · sin correo")).run();
+  } catch (e) { console.error("consentimiento caso", numero, e && e.message); }
+
   try { await correoAvisoCaso(env, { numero, nombre, tel, sector, email }); }
   catch (e) { console.error("correo caso", numero, e && e.message); }
+
+  /* Y AHORA SÍ SE LE ESCRIBE A LA FAMILIA. Hasta hoy el único correo que salía al
+     crear un caso iba al EQUIPO: a la familia, ninguno, ni cuando dejaba correo.
+     Así que el enlace de su caso vivía en UNA sola pantalla — sin `localStorage`,
+     sin reenvío— y quien cerraba la pestaña lo perdía para siempre. La única
+     recuperación era que alguien lo sacara del panel y lo mandara a mano.
+
+     Va después del aviso al equipo y en su propio try/catch: si Resend falla, el
+     caso ya está creado y la pantalla le enseña el enlace igual. Nunca al revés.
+
+     Solo si dejó correo, que es opcional DE VERDAD y así se queda. */
+  if (email) {
+    try { await correoCasoCreado(env, { numero, token, nombre, sector, email }); }
+    catch (e) { console.error("correo familia caso", numero, e && e.message); }
+  }
 
   return json({ ok: true, numero, token });
 }
@@ -2601,6 +2640,46 @@ async function apiCasoEstado(env, numero, token) {
        vuelve al comportamiento anterior en vez de romperse. */
     cupo: { usados: cupo.usados, tope: cupo.tope, queda: cupo.queda, pedidas: cupo.pedidas },
     tope_medios: MAX_MEDIOS
+  });
+}
+
+/* El correo que la familia recibe al crear su caso: su número y su enlace.
+
+   SOLO EN CASTELLANO, y eso es deliberado: `casos` no guarda idioma, y el
+   comentario de `correoCasoClasificado` ya dejó dicho por qué —«si algún día hace
+   falta, se añade el campo, no se adivina»—. Inventar el idioma a partir del
+   navegador sería adivinar.
+
+   NO lleva el concepto ni promete plazo: en este momento no hay ninguno de los
+   dos. Lleva lo único que se pierde si no se manda, que es el enlace. */
+async function correoCasoCreado(env, x) {
+  if (!x.email) return { ok: true, sinDestino: true };
+  const enlace = ORIGIN_MMC + "/caso/" + x.numero + "?t=" + x.token;
+  const titulo = "Recibimos tu caso: " + x.numero;
+  const parrafos = [
+    "Guarda este correo. El enlace de abajo es la única forma de volver a tu caso: " +
+    "desde ahí ves si un ingeniero ya lo revisó, agregas fotos si te las piden, y " +
+    "descargas el concepto cuando esté.",
+    "Un ingeniero voluntario lo va a mirar. No te damos una fecha porque no la " +
+    "tenemos: depende de cuántos casos haya delante, y eso lo ves en tu enlace.",
+    "Esto no reemplaza una visita ni la declaratoria de tu municipio. Es un " +
+    "concepto a distancia sobre fotos: si hay señales para no permanecer en la " +
+    "casa o en una parte, qué precauciones tomar y con qué conviene repararla.",
+    "Y si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien " +
+    "atrapado— esto no es lo que necesitas: llama al 123 y a tu alcaldía."
+  ];
+  const filas = [["Tu caso", x.numero], ["Sector", x.sector || "—"]];
+  return enviarCorreo(env, {
+    para: x.email,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", "Tu enlace: " + enlace, "",
+            filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, filas,
+      boton: { url: enlace, texto: "Abrir mi caso" },
+      cierre: "Este mensaje es automático. Si pierdes este correo, escríbenos con tu número de caso."
+    }),
+    etiqueta: "caso-creado", guia: x.numero
   });
 }
 
