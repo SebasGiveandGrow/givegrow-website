@@ -1624,11 +1624,39 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
     "WHERE clasificacion = 'urgente' AND estado NOT IN ('visitado','cerrado','descartado')",
     "Pantalla /ruta · un ingeniero dijo que era urgente y todavía no ha ido nadie", 10, "/admin/ruta");
+  /* ESTA COLA NO SE LIMPIABA CUANDO LAS FOTOS LLEGABAN. Contaba cualquier caso en
+     `en_revision` que hubiera recibido un «no puedo evaluar» alguna vez, y subir
+     material solo toca `actualizado_en`: así que una familia que respondía seguía
+     contada como «no ha llegado», y el «cómo se arregla» mandaba LLAMARLA — a
+     alguien que ya había contestado. Ahora sale en cuanto responde.
+
+     Y los DÍAS eran los de la espera total, no los de la espera por fotos: salían
+     de `MIN(creado_en)` del caso. Ahora salen de cuándo se pidió el material, que
+     es el dato que esta cola necesita para decidir si hay que llamar. */
   await enCola("casos_esperando_fotos",
-    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos c " +
-    "WHERE c.estado = 'en_revision' AND EXISTS (SELECT 1 FROM evaluaciones e " +
-    "WHERE e.caso = c.numero AND e.clasificacion = 'inevaluable')",
+    "SELECT COUNT(*) AS n, MIN((SELECT MAX(e2.creado_en) FROM evaluaciones e2 " +
+    "WHERE e2.caso = c.numero AND e2.clasificacion = 'inevaluable')) AS masViejo " +
+    "FROM casos c WHERE " + PIDIERON_MATERIAL + " AND NOT " + RESPONDIO_TRAS_PEDIDO,
     "Se le pidió material a la familia y no ha llegado · quizá haya que llamarla", 50, "#sec-casas");
+
+  /* Y LA QUE FALTABA: la familia mandó lo que le pidieron y nadie lo ha vuelto a
+     mirar. Antes ese caso no aparecía en ninguna lista de pendientes — seguía
+     contado como «esperando fotos», así que quedaba tapado dentro del número
+     equivocado, y estaba FUERA de `casos_sin_evaluar`, que exige que no haya
+     ninguna evaluación. Nadie vigilaba esa vuelta.
+
+     Orden 20: por debajo de una señal de terreno o de un urgente sin visitar, y por
+     encima del resto. Del otro lado hay alguien que hizo lo que se le pidió, salió
+     a tomar una foto de su casa rota, y está esperando otra vez.
+
+     Se vacía sola: en cuanto llega la evaluación nueva el caso deja `en_revision`,
+     y si el ingeniero vuelve a pedir material regresa a la cola de arriba. */
+  await enCola("casos_respondieron",
+    "SELECT COUNT(*) AS n, MIN((SELECT MAX(m.subido_en) FROM caso_medios m " +
+    "WHERE m.caso = c.numero)) AS masViejo " +
+    "FROM casos c WHERE " + PIDIERON_MATERIAL + " AND " + RESPONDIO_TRAS_PEDIDO,
+    "La familia mandó las fotos que le pidieron y nadie las ha vuelto a mirar · están en /triaje, sin revisar",
+    20, "#sec-casas");
   /* Antes contaba solo `estado = 'nueva'`, y ese era el hueco: un ingeniero
      movido a «en revisión» o incluso aceptado SIN comprobar su matrícula
      desaparecía de la alarma, que es exactamente el caso peligroso. Ahora
@@ -2747,6 +2775,10 @@ function paginaTriage() {
   .p-urgente{color:var(--urg)} .p-programada{color:var(--prog)} .p-no_requiere{color:var(--no)}
   .p-inevaluable{color:var(--mu)}
   .p-discrepa{color:var(--amber);border-color:var(--amber)}
+  /* «mandó lo que faltaba» NO es una gravedad, así que no reusa los colores de la
+     clasificación: es verde porque para el ingeniero es buena noticia —hay algo
+     que hacer y la familia cumplió—, y con su propio borde como la discrepancia. */
+  .p-respondio{color:var(--g);border-color:var(--g)}
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 4px}
   .tab{border:1px solid var(--bd);background:var(--surface);border-radius:999px;
        padding:8px 15px;font-size:14px;cursor:pointer;color:var(--ink);font-family:inherit}
@@ -2874,6 +2906,11 @@ function cargarCola(){
         +  (x.heridos ? " &middot; hubo heridos" : "")
         +  (x.firmes ? " &middot; " + x.firmes + " opinión(es)" : "")
         +  "</span>"
+        /* YA RESPONDIÓ. Sin esto, un caso al que se le pidió material y que ya lo
+           mandó se veía idéntico a uno recién llegado, así que nadie sabía que
+           había una vuelta esperando. Va antes de la clasificación porque es lo
+           que decide si vale la pena abrirlo ahora. */
+        +  (x.respondio ? "<span class='pill p-respondio'>mandó lo que faltaba</span>" : "")
         +  (x.discrepa ? "<span class='pill p-discrepa'>en discrepancia</span>" : "")
         +  (x.clasificacion ? "<span class='pill p-" + esc(x.clasificacion) + "'>" + esc(x.clasificacion) + "</span>" : "")
         +  "<button class='btn' data-abrir='" + esc(x.numero) + "'>Abrir</button></div>";
@@ -3113,6 +3150,31 @@ const TOPE_COLA = 200;
    que estar de acuerdo. Dos copias de esta regla en desacuerdo serían la clase
    de fallo que este proyecto ya conoce: el contador diciendo una cosa y la lista
    otra. */
+/* SE LE PIDIÓ MATERIAL A LA FAMILIA, y si YA RESPONDIÓ. Dos condiciones que van
+   juntas porque una es el complemento de la otra, y en un solo sitio porque las
+   usan dos colas de salud y la bandeja del ingeniero — tres copias en desacuerdo
+   es el fallo que este proyecto ya conoce.
+
+   `RESPONDIO_TRAS_PEDIDO` compara la fecha del material con la del ÚLTIMO «no
+   puedo evaluar». Así funciona en los dos sentidos: si la familia manda fotos, el
+   caso sale de «esperando» y entra en «respondió»; y si después llega OTRO «no
+   puedo evaluar», el máximo se mueve por delante del material y vuelve a
+   «esperando». No hace falta ninguna columna nueva ni ninguna migración: las dos
+   fechas ya estaban ahí.
+
+   Son subconsultas correlacionadas, sí — pero en un COUNT sobre la tabla entera,
+   UNA vez, no como columna de una lista paginada. Esa distinción es la que importa
+   y está escrita en el comentario del mapa de duplicados: un escaneo no es el
+   problema; un escaneo por fila sí. */
+const PIDIERON_MATERIAL =
+  "c.estado = 'en_revision' AND EXISTS (SELECT 1 FROM evaluaciones e " +
+  "WHERE e.caso = c.numero AND e.clasificacion = 'inevaluable')";
+
+const RESPONDIO_TRAS_PEDIDO =
+  "EXISTS (SELECT 1 FROM caso_medios m WHERE m.caso = c.numero AND m.subido_en > " +
+  "(SELECT MAX(e2.creado_en) FROM evaluaciones e2 WHERE e2.caso = c.numero " +
+  "AND e2.clasificacion = 'inevaluable'))";
+
 const TERRENO_URGE =
   "requiere_esp = 1 " +
   "OR instr(COALESCE(json_extract(recomendaciones, '$.marcadas'), ''), '\"x4\"') > 0 " +
@@ -3156,7 +3218,23 @@ async function triageCasos(env, url) {
   const p = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM casos c WHERE " + CONFIRMAR()
   ).first();
-  return json({ casos: r.results || [], porConfirmar: (p && p.n) || 0,
+
+  /* CUÁLES YA RESPONDIERON. Un caso al que se le pidió material y que ya lo mandó
+     se veía IDÉNTICO a uno recién llegado en esta lista, así que nadie sabía que
+     había una vuelta esperando. Con la insignia se distingue.
+
+     UNA consulta y un conjunto, no una columna correlacionada en la lista: la
+     lista está paginada y esa forma es la que ya costó cara dos veces en este
+     archivo. Misma regla que `PIDIERON_MATERIAL` usa la cola de salud, para que la
+     bandeja y el contador no puedan discrepar. */
+  const resp = await env.DB.prepare(
+    "SELECT c.numero FROM casos c WHERE " + PIDIERON_MATERIAL + " AND " + RESPONDIO_TRAS_PEDIDO
+  ).all();
+  const respondieron = new Set((resp.results || []).map((x) => x.numero));
+  const casos = (r.results || []).map((c) =>
+    respondieron.has(c.numero) ? { ...c, respondio: 1 } : c);
+
+  return json({ casos, porConfirmar: (p && p.n) || 0,
                 total: (tot && tot.n) || 0, tope: TOPE_COLA });
 }
 
@@ -10508,6 +10586,32 @@ function marcarPruebas(respuesta, host) {
   return r;
 }
 
+/* LA PÁGINA DE LA FAMILIA LLEVA SU TOKEN EN LA URL, y hasta hoy salía sin
+   protección ninguna.
+
+   La REDIRECCIÓN del ápex sí la llevaba —`no-store` y `noindex`, puesto cuando se
+   mudó la ruta al subdominio— pero el DESTINO no: `/caso/<n>?t=…` respondía 200
+   con `cache-control: public, max-age=0, must-revalidate` y sin `x-robots-tag`.
+   Comprobado contra producción el 31 ago 2026. O sea que la protección estaba en
+   el cartel y no en la puerta.
+
+   Dos consecuencias, y ninguna hipotética: una caché compartida podía guardar la
+   página de un caso —con su token en la URL de la petición— y un crawler que
+   llegara a esa URL por cualquier vía podía indexarla. `robots.txt` es
+   `Allow: /`, y el `canonical` reescrito al origen mitiga pero no cubre un enlace
+   que alguien pegue en un foro.
+
+   Va como envoltura y no en cada rama por lo mismo que `marcarPruebas`: la página
+   la sirve el fallback de assets, no una rama nuestra, así que no hay un solo
+   sitio donde poner las cabeceras «a mano». */
+function marcarCaso(respuesta, ruta) {
+  if (!ruta.startsWith("/caso/")) return respuesta;
+  const r = new Response(respuesta.body, respuesta);
+  r.headers.set("x-robots-tag", "noindex, nofollow");
+  r.headers.set("cache-control", "private, no-store");
+  return r;
+}
+
 /* ========================================================================
    MIRA MI CASA — la misma plataforma, con su propia marca
    ========================================================================
@@ -10563,11 +10667,11 @@ export default {
     const esPruebas = /\.workers\.dev$/i.test(url.hostname);
     if (esPruebas) {
       /* Se responde a través del marcador para no repetirlo en cada rama. */
-      return marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname);
+      return marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta);
     }
     /* Igual que arriba: se envuelve la respuesta entera en vez de tocar cada
        rama. Fuera del subdominio devuelve exactamente lo que recibió. */
-    return marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname);
+    return marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta);
   },
 
   async ruteo(request, env, url, ruta) {
