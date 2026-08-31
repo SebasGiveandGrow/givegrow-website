@@ -1,118 +1,116 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "La auditoría de Mira Mi Casa" (31 ago 2026)
-> **⏭️ ARRANCA POR DOS COSAS.** (1) **Probar el PR #189 en un móvil** — está
-> abierto a propósito, sin `automerge`, porque toca el endpoint al que envía el
-> formulario de terreno. El guion de la prueba está en el PR. (2) **Que un
-> ingeniero de verdad entre**: la evaluación externa de Access lleva desde el 29
-> sin que nadie la ejerza, y toda la Fase 2 descansa en eso. Se le escribió a
-> David el 31.
-> La corrida de rescate con Camila sigue pendiente y sigue sin haber cómo
-> contactarla.
+> Última actualización: sesión "El cierre de la auditoría" (31 ago 2026)
+> **⏭️ ARRANCA POR DOS COSAS, y las dos necesitan una persona, no código.**
+> (1) **Que un ingeniero de verdad entre y evalúe un caso.** Nada del vertical se
+> ha ejercitado de punta a punta con una sesión real de Access: ni el formulario
+> del triaje, ni el de terreno, ni el botón nuevo del panel. Es el único riesgo
+> que queda y no se puede cerrar desde aquí.
+> (2) **La corrida de rescate con Camila,** que sigue sin haberse hecho y sigue
+> sin haber cómo contactarla.
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
-## 🔍 LA AUDITORÍA DE MIRA MI CASA (31 ago 2026)
+## ✅ LA AUDITORÍA DE MIRA MI CASA, Y SU CIERRE (31 ago 2026)
 
 Tres barridos completos del vertical —el recorrido de la familia, el del
-ingeniero, y las promesas que el código no cumple— más comprobaciones contra
-producción. **24 hallazgos confirmados; 18 que importan.** El informe completo,
-ordenado por daño real y con lo que sigue abierto, está en un artefacto:
+ingeniero, y las promesas que el código no cumple—, 24 hallazgos confirmados, y
+**ocho PRs el mismo día**. Informe completo:
 `https://claude.ai/code/artifact/092fa388-b31f-46b3-989a-84c280043d3d`
 
-**La conclusión de la auditoría, en una frase:** el sistema funcionaba; el
-problema era que **casi nadie podía llegar a él, y quien llegaba no siempre
-recibía lo que se le prometió.**
+**La conclusión, en una frase:** el sistema funcionaba; el problema era que casi
+nadie podía llegar a él, y quien llegaba no siempre recibía lo que se le prometió.
 
-### Cerrado el mismo día
+### Lo que se cerró, por PR
 
-**Datos de prueba borrados.** 2 casos, 3 evaluaciones, 8 medios, 3 inspecciones
-y 30 objetos de R2. Y el dato que apareció al mirarlos antes de tocar nada:
-**ninguno de los dos casos era real** —`CV-2026-000001` era Sebas con dirección
-«Prueba», `CV-2026-000002` era «Pepito Perez» en «Medayork»—, así que el banco
-público era 100 % prueba. Queda vacío, con su mensaje honesto, y la inspección
-real de Camila (`IV-2026-000001`) intacta.
+| PR | qué cerró |
+|---|---|
+| — | **Datos de prueba borrados.** 2 casos, 3 evaluaciones, 8 medios, 3 inspecciones, 30 objetos de R2. Y el dato que apareció al mirarlos: **no había NINGÚN caso real**, el banco público era 100 % prueba. |
+| #188 | La raíz del subdominio expulsaba a la familia · un concepto urgente podía quedar invisible · un «no puedo evaluar» borraba la clasificación de otro · `.assetsignore` |
+| #189 | Las fotos de terreno eran de solo escritura · recibir una inspección no avisaba a nadie · `/triaje/inspeccion` no estaba enlazado · tope de tiempo en el correo |
+| #191 | La cola `terreno_sin_atender` y su salida (migración **0016**) |
+| #192 | La matrícula impresa es la verificada · el PDF distingue verificada de declarada · un 403 del voluntario |
+| #193 | El gate mira también las pantallas de emergencia (checks 1b extendido y 1d) |
+| #194 | El contador «Piden confirmación» mentía · «undefined» en la pantalla del ingeniero · la subconsulta cuadrática de `adminCasos` (54 ms → 2 ms medido) |
+| #195 | Un caso cerrado ya no se evalúa ni se resucita |
 
-**PR #188 — el recorrido de la familia** (fusionado y desplegado, comprobado en
-producción):
+### ⚠️ SIETE COSAS QUE NO HAY QUE DESHACER, con su razón
 
-1. **La puerta de entrada expulsaba a la familia.** Sin hash la SPA arrancaba en
-   `inicio`, ruta que NO existe en `RUTAS_MMC`, así que `mmcRuta` rebotaba al
-   ápex: quien teclaba `miramicasa.thegiveandgrowproject.org` acababa en la
-   portada de la fundación. Y el Worker reescribe `canonical` y `og:url` a esa
-   misma raíz, así que era la URL que Google indexa y la que se previsualiza en
-   WhatsApp. Ahora `rutaPorDefecto()` da `vivienda` en el subdominio.
-2. **Un concepto urgente podía quedar invisible.** La pantalla hacía
-   `if (falta) … else if (clasificación) …` y la condición era solo que el campo
-   tuviera texto. El formulario del triaje manda «qué falta» con cualquier
-   clasificación. El PDF se blindó el 20 ago y el correo también; **la pantalla
-   se quedó fuera, y el comentario de `documentos.js` afirmaba que no.**
-3. **Un «no puedo evaluar» borraba la clasificación de otro ingeniero.** Se
-   calculaba el veredicto y se descartaba con `? null :`. Un caso `urgente` que
-   recibía un `inevaluable` quedaba en NULL y salía de `urgentes_sin_visitar`.
+Se suman a las tres de la sesión anterior (la bandera `RESTAURANDO`, las firmas
+con su contador de trazos y su proporción, y `requiere_esp` guardado como null).
 
-   ⚠️ **NO deshagas el campo `falta_pendiente` de `apiCasoEstado`.** Nació del
-   hueco que abría el arreglo 3: con la clasificación ya preservada,
-   `evaluacionVigente` devuelve la evaluación firme, así que un pedido de fotos
-   POSTERIOR se volvía invisible. Qué vale el caso y qué falta son dos preguntas
-   y estaban atadas a la misma respuesta.
+1. **`falta_pendiente` en `apiCasoEstado`.** Qué vale el caso y qué falta son dos
+   preguntas; estaban atadas a la misma respuesta. Sin este campo, un pedido de
+   fotos POSTERIOR a una clasificación firme se vuelve invisible para la familia.
+2. **`msTope` en el aviso de inspección** (6 s). Ese correo se manda dentro de la
+   petición que hace el TELÉFONO, y Resend no tiene tope propio: sin esto, un
+   Resend lento deja a alguien en zona sin señal esperando para vaciar su cola.
+   Los demás envíos no pasan tope, a propósito.
+3. **`TERRENO_URGE`,** una sola constante. La bandeja ya traía un `urgente` que
+   mira SOLO `x4`; si el botón de «ya la atendimos» usara ese, una inspección que
+   solo marcó `e1` estaría en la cola sin forma de cerrarse. `urgente` sigue
+   existiendo porque significa otra cosa: es la insignia de PELIGRO INMINENTE.
+4. **`firmanteVerificado`.** La matrícula que se imprime sale del REGISTRO, no del
+   formulario. Y exige nombre Y matrícula: con solo la matrícula, el formulario
+   dejaría de pedir el nombre y el servidor lo exigiría igual — el ingeniero
+   quedaría encerrado con «datos_incompletos» y ningún campo que rellenar.
+5. **`matricula_verificada` se consulta AL EMITIR el PDF,** no se guarda con la
+   evaluación. El PDF se arma en cada descarga: verificar a alguien después tiene
+   que mejorar los documentos ya emitidos, no dejar congelada una advertencia que
+   dejó de ser cierta.
+6. **`CONFIRMAR()`,** una sola constante para la lista y el contador. Estaban
+   escritas dos veces y ya se habían desfasado una vez.
+7. **`conceptos_sin_respaldo` NO filtra por `estado='clasificado'`.** Con ese
+   filtro, mover un caso a `visitado` lo hacía desaparecer de la cola con el
+   correo todavía sin enviar y sin rastro de que se debía.
 
-**`.assetsignore`: `casos` e `inspecciones` fuera del despliegue.** Revisar el
-bucket con `r2 object get` deja archivos con la ruta de la llave como nombre en
-la raíz del repo —me pasó el 31 sondeando qué medios existían— y `/casos/` e
-`/inspecciones/` ya respondían 200 en producción. Esta vez estaban vacíos; el
-respaldo de terreno lleva cédulas, GPS y firmas en base64.
+### 🔨 Lo que queda abierto, y por qué
 
-### Abierto y esperando tu móvil
+**Decisiones tuyas, no trabajo pendiente:**
 
-**PR #189 — que el trabajo de terreno no se pierda.** Sin `automerge` a
-propósito. Tres cosas: las fotos de la visita eran **de solo escritura** (no
-había ruta que las sirviera ni van en el PDF; las llaves sí estaban en
-`inspecciones.fotos`, faltaba la puerta); recibir una inspección **no avisaba a
-nadie**, ni con «peligro inminente» marcado; y `/triaje/inspeccion` **no estaba
-enlazado desde ningún sitio**.
+- **Correo a la familia al crear el caso.** Hoy el enlace del caso vive en UNA
+  sola pantalla: quien cierra la pestaña lo pierde para siempre. Mandarlo por
+  correo lo arregla, y a la vez pone un token en una bandeja ajena. Yo lo
+  mandaría. Sin decidir desde el 31 ago.
+- **Que verificar una matrícula MANDE los correos retenidos** de ese ingeniero.
+  Escribe a familias de forma retroactiva, así que es tuya. Hoy no hay ninguno
+  pendiente.
+- **Bajar las fotos a 1280 px**, y si la escala AIS cambia.
+- **La promesa de «señales de permanencia»**: son CINCO sitios, no uno.
 
-⚠️ **Y por qué lleva un tope de tiempo.** El aviso se manda dentro de la petición
-que hace el TELÉFONO, y la llamada a Resend no tenía tope: un Resend lento habría
-dejado a alguien en zona sin señal esperando para vaciar su cola. `enviarCorreo`
-acepta `msTope` y el aviso de inspección pasa 6 s. **Los demás envíos no pasan
-tope.** No le quites eso al aviso de inspección.
+**Excluido por decisión tuya (31 ago):** todo lo de `DISCREPA` —que es
+irreversible y mientras esté puesto a la familia no se le escribe nunca más, y
+que se dispara de más porque cuenta FILAS y no PERSONAS—. No se toca hasta que lo
+pidas.
 
-### Los que siguen abiertos, en orden
+**Trabajo que sigue pendiente, en orden:**
 
-4. **La matrícula verificada ≠ la impresa.** Camila declaró
-   `091037-0518660 CND` y escribió `24579` en su evaluación, que es lo que va
-   firmado en el PDF. Nada cruza los dos valores. *Corrección importante: esa
-   evaluación era sobre un caso de PRUEBA, así que ninguna familia real ha
-   recibido todavía un concepto con matrícula sin comprobar. Muerde en el primer
-   caso real.*
-5. **El respaldo de matrícula solo protege el correo.** La pantalla y el PDF
-   entregan conceptos sin respaldo, con la matrícula sin verificar impresa como
-   firma. Y verificar después no libera el correo retenido: si alguien mueve el
-   caso a `visitado`, desaparece de la cola con el correo sin enviar.
-6. **`DISCREPA` es irreversible** y mientras esté puesto a la familia no se le
-   escribe nunca más. Y el conteo de opiniones firmes cuenta FILAS, no PERSONAS:
-   un ingeniero que corrige su propio concepto dispara «dos ingenieros no
-   coinciden» y apaga el caso él solo.
-7. **Nadie le dice al ingeniero que ya está verificado**, y el correo de acuse lo
+1. **Nadie le dice al ingeniero que ya está verificado,** y el correo de acuse lo
    promete. Pesa el doble ahora que Access abre la puerta sola.
-8. **Quien cierra la pestaña pierde su caso para siempre.** No hay correo al
-   crear el caso, así que el enlace vive en una sola pantalla.
-9. **`mcSubirCola` miente.** Saca el archivo de la cola antes de subirlo —el
+2. **Una inspección firmada no mueve el caso,** así que `urgentes_sin_visitar`
+   sigue diciendo que nadie fue. Y la ficha del caso en el panel no enseña sus
+   inspecciones, aunque el índice existe para eso.
+3. **`mcSubirCola` miente.** Saca el archivo de la cola antes de subirlo —el
    defecto que `cvSubirCola` documenta como corregido el 20 ago— e ignora los
    fallos: siempre dice «listo, ya las tenemos».
-10. **No hay cola de inspecciones en `/api/admin/salud`**, y `requiere_esp` no
-    tiene salida: se pone en 1 y nada lo baja ni registra que se atendió. **Esto
-    necesita una migración** (una columna tipo `atendida_en`), y las migraciones
-    se aplican a mano ANTES de que el código llegue a producción — por eso quedó
-    fuera del PR #189.
-11. **El gate no vigila las pantallas de emergencia.** `validate.mjs` hace
-    `if (fn !== "adminJS") continue;`, así que la regla de «toda bandeja se pide»
-    no cubre `triageJS`, `rutaJS` ni `inspeccionJS`. Es el hueco más caro: son
-    justo las pantallas de las que dependen siete personas sin señal.
-12. **Nada valida el SQL.** Cinco índices muertos, siete columnas que se escriben
-    y nadie lee, y una subconsulta correlacionada con `LIKE` en `adminCasos` —la
-    misma forma cuadrática que ya se pagó, con el comentario que celebra haber
-    sacado la otra justo debajo.
+4. **Callejón sin salida con 20 archivos:** piden una foto concreta y la familia
+   no puede subirla. Y las fotos del equipo consumen su cupo.
+5. **Deuda de SQL que el gate no ve:** cinco índices muertos, siete columnas que
+   se escriben y nadie lee, las coordenadas GPS que solo existen dentro del PDF
+   (la pantalla de ruta no las tiene), y `filaTope` mandando usar filtros que no
+   existen.
+
+### 📌 Lo que NO se ha probado nunca con una persona real
+
+Vale la pena tenerlo junto, porque es todo el riesgo que queda:
+
+- Una sesión de Access de un ingeniero voluntario, en cualquier pantalla.
+- El formulario del triaje enseñando la firma en vez de pedirla (#192).
+- El botón «Ya la atendimos» y su endpoint (#191).
+- La ruta de las fotos de terreno y sus enlaces en el panel (#189).
+- Un envío del formulario de terreno con el aviso por correo puesto (#189).
+
+Todo eso vive tras Access y **no hay puerta local**: no se puede forjar un JWT
+del equipo. Lo que sí se comprobó de cada uno está en su PR.
 
 ## 📸 FOTO DEL ESTADO (31 ago 2026, consultado en producción)
 
@@ -124,10 +122,13 @@ Los casos y evaluaciones están en cero porque el 31 de agosto se borraron los
 datos de prueba, y NO HABÍA NINGÚN CASO REAL: el banco público era íntegramente
 prueba. La única cosa real del vertical es la inspección `IV-2026-000001`.
 
-El consecutivo de inspecciones está en **8**: la próxima real será
-`IV-2026-000009`. Los números 2 a 8 se quemaron en pruebas y **no vuelven** —
-regla dura del proyecto, no se reinicia nunca. (Las filas 6, 7 y 8 se borraron el
-31 de agosto por ser de prueba; el consecutivo no retrocede.)
+El consecutivo de inspecciones está en **8** (comprobado en
+`numerador_inspeccion`): la próxima real será `IV-2026-000009`. Los números 2 a 8
+se quemaron en pruebas y **no vuelven** — regla dura del proyecto, no se reinicia
+nunca. Las filas 6, 7 y 8 se borraron el 31 de agosto por ser de prueba; el
+consecutivo no retrocede.
+
+**Migraciones aplicadas: hasta la 0016** (`d1 migrations list` en verde).
 
 ⚠️ **Nadie ha entrado todavía por la regla nueva de Access.** Camila entró el 21
 de agosto; la evaluación externa se activó el 29. Verifiqué desde fuera lo que
