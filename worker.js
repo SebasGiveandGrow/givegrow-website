@@ -2818,6 +2818,12 @@ function paginaTriage() {
   <div id="lista"><p class="cargando">Cargando casos...</p></div>
   <div id="ficha"></div>
 
+  <!-- QUÉ PASÓ CON LO QUE FIRMÓ. Va DESPUÉS de la cola y no antes: lo primero es
+       lo que falta por hacer; esto es la consecuencia de lo ya hecho, y mirarlo
+       primero invertiría la prioridad de la pantalla. -->
+  <h2 style="font-size:19px;margin:38px 0 4px">Tus conceptos</h2>
+  <div id="mis-evals"><p class="cargando">Consultando…</p></div>
+
   <!-- EL FORMULARIO DE TERRENO, que hasta hoy no estaba enlazado desde ningún
        sitio: se llegaba escribiendo la URL a mano, y la única forma de saberla
        era que alguien te la hubiera pasado por chat. Va al final y no arriba a
@@ -2878,6 +2884,66 @@ var CABEZA = {
   confirmar: "caso(s) donde un segundo par de ojos cambia algo: urgentes con una sola opinión, y los que están en desacuerdo. Sobre un urgente se va a mover una brigada.",
   clasificados: "caso(s) ya clasificados."
 };
+
+/* EL LAZO CERRADO. El ingeniero daba su concepto, el caso salía de la pestaña, y
+   ahí se acababa su información: no sabía si llegó a la familia, si otro lo
+   clasificó más grave, ni si alguien fue a la casa. Un voluntario que no ve
+   consecuencia deja de volver.
+
+   Se pide AL ARRANCAR, como la cola: si hubiera que pulsar algo, nadie lo pulsa. */
+function cargarMisEvaluaciones(){
+  var c = el("mis-evals"); if (!c) return;
+  fetch("/api/triage/mis-evaluaciones").then(function(r){
+    var ct = r.headers.get("content-type") || "";
+    if (ct.indexOf("json") < 0) throw 0;   /* sesión caída: devuelve el login */
+    return r.json();
+  }).then(function(d){
+    var l = d.evaluaciones || [];
+    /* LA ADVERTENCIA VA PRIMERO y aparece incluso sin evaluaciones: quien entró
+       antes del aviso automático no sabe que sus conceptos no salen solos. */
+    var aviso = (!d.equipo && !d.matricula_verificada)
+      ? "<div class='aviso' style='margin-bottom:10px'><b>Tu matrícula todavía no está verificada.</b> "
+        + "Tus conceptos se guardan y los revisa el equipo, pero NO le salen solos a la familia "
+        + "hasta que alguien compruebe tu matrícula en el COPNIA.</div>"
+      : "";
+    if (!l.length){
+      c.innerHTML = aviso + "<p class='sub'>Todavía no has firmado ningún concepto. "
+        + "Cuando evalúes un caso, aquí vas a ver qué pasó con él.</p>";
+      return;
+    }
+    var h = aviso + "<p class='sub'>" + l.length + (l.length === 1 ? " concepto" : " conceptos")
+      + (d.equipo ? " (ves todos porque entras con la cuenta del equipo)" : " que firmaste")
+      + ". Esto es lo que pasó con ellos despues.</p>";
+    for (var i = 0; i < l.length; i++){
+      var v = l[i];
+      /* QUÉ PASÓ, y se dice distinto en los tres casos que significan cosas
+         distintas: tu opinión manda, otro la superó, o pediste material. */
+      var suerte;
+      if (v.clasificacion === "inevaluable"){
+        suerte = "pediste material";
+      } else if (v.manda){
+        suerte = "<b>es el concepto que manda</b>";
+      } else if (v.caso_clasificacion){
+        suerte = "el caso quedó como <b>" + esc(v.caso_clasificacion) + "</b>";
+      } else {
+        suerte = "el caso todavía no tiene clasificación";
+      }
+      h += "<div class='fila'><b>" + esc(v.caso) + "</b>"
+        +  "<span class='meta'>" + esc(v.sector || "sin sector") + " &middot; dijiste "
+        /* El valor CRUDO, no una etiqueta traducida. Las pastillas de la cola de
+           arriba ya enseñan urgente / programada / no_requiere tal cual, y añadir
+           aquí un mapa de etiquetas sería la TERCERA copia de esas cuatro palabras
+           —están en el desplegable del formulario y en el diccionario de la
+           familia—. Tres copias en desacuerdo es el fallo que este proyecto ya
+           conoce, y el ingeniero ya lee esos valores en esta misma pantalla. */
+        +  esc(v.clasificacion) + " &middot; " + esc(v.creado_en)
+        +  "<br>" + suerte + " &middot; hoy está <b>" + esc(v.caso_estado) + "</b></span></div>";
+    }
+    c.innerHTML = h;
+  }).catch(function(){
+    c.innerHTML = "<p class='sub'>No pudimos consultar tus conceptos ahora. Recarga la página.</p>";
+  });
+}
 
 function cargarCola(){
   fetch("/api/triage/casos?estado=" + encodeURIComponent(COLA)).then(function(r){ return r.json(); }).then(function(d){
@@ -3024,6 +3090,7 @@ document.addEventListener("click", function(ev){
 });
 
 cargarCola();
+cargarMisEvaluaciones();
 `;
 }
 
@@ -3939,6 +4006,55 @@ async function correoAvisoInspeccion(env, x) {
        barra de señal esperando a que el teléfono suelte la inspección. */
     msTope: 6000
   });
+}
+
+/* GET /api/triage/mis-evaluaciones — LO QUE PASÓ CON LOS CONCEPTOS QUE FIRMÓ.
+
+   Existe por lo mismo que `mis-inspecciones`, y el hueco era peor aquí porque
+   evaluar es lo que un ingeniero hace todos los días: daba su concepto, el caso
+   desaparecía de la pestaña, y ahí se acababa su información. No podía saber si
+   llegó a la familia, si otro lo clasificó más grave, ni si alguien fue a la casa.
+
+   NO ES UNA LISTA, ES EL LAZO CERRADO. Lo que devuelve de cada uno no es lo que él
+   escribió —eso ya lo sabe— sino QUÉ PASÓ DESPUÉS: con qué se quedó el caso, en
+   qué estado está, y si su opinión es la que manda. Un voluntario que no ve
+   consecuencia deja de volver, y este proyecto depende de que vuelvan.
+
+   `manda` sale de comparar su clasificación con la del caso, que es la MÁS GRAVE
+   de todas: quien dijo «programada» sobre un caso que otro marcó «urgente» tiene
+   que poder verlo, y hoy no había forma.
+
+   Y ARRIBA, LO QUE MÁS IMPORTA SI LE APLICA: si su matrícula no está verificada,
+   sus conceptos NO le salen solos a las familias. Eso se lo dice el sistema al
+   verificarlo (PR #199), pero quien entró antes de eso no lo sabe.
+
+   MISMA REGLA DE PROPIEDAD Y DE PRIVACIDAD que las inspecciones: ve las que él
+   firmó, el equipo ve todas, y NO viaja ni un dato personal de la familia —ni
+   nombre, ni teléfono, ni dirección—. Para saber qué pasó con su concepto no
+   hacen falta, y esta pantalla es la que el proyecto decidió mantener sin ellos. */
+async function triageMisEvaluaciones(env, sesion) {
+  const email = String((sesion && sesion.email) || "");
+  const equipo = !!(sesion && sesion.equipo);
+  const r = await env.DB.prepare(
+    "SELECT e.caso, e.clasificacion, substr(e.creado_en,1,16) AS creado_en, " +
+    "c.sector, c.estado AS caso_estado, c.clasificacion AS caso_clasificacion " +
+    "FROM evaluaciones e JOIN casos c ON c.numero = e.caso " +
+    (equipo ? "" : "WHERE lower(e.ing_email) = lower(?) ") +
+    "ORDER BY e.creado_en DESC LIMIT 100"
+  ).bind(...(equipo ? [] : [email])).all();
+
+  const filas = (r.results || []).map((v) => ({
+    caso: v.caso, sector: v.sector, clasificacion: v.clasificacion,
+    creado_en: v.creado_en, caso_estado: v.caso_estado,
+    caso_clasificacion: v.caso_clasificacion,
+    /* `inevaluable` nunca «manda»: no es una opinión sobre la casa, es decir que
+       con eso no se puede opinar. Marcarla como la que manda sería mentirle. */
+    manda: v.clasificacion !== "inevaluable" && v.clasificacion === v.caso_clasificacion
+  }));
+
+  const firmante = await firmanteVerificado(env, email);
+  return json({ evaluaciones: filas, equipo,
+                matricula_verificada: firmante.verificada, total: filas.length });
 }
 
 /* GET /api/triage/mis-inspecciones — lo que ESTE ingeniero mandó.
@@ -10926,6 +11042,7 @@ export default {
                         nombre: f.nombre, matricula: f.matricula, verificada: f.verificada });
         }
         if (ruta === "/api/triage/mis-inspecciones") return await triageMisInspecciones(env, sesion);
+        if (ruta === "/api/triage/mis-evaluaciones") return await triageMisEvaluaciones(env, sesion);
         const mf = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\/foto$/);
         if (mf) return await triageInspeccionFoto(request, env, mf[1], sesion);
         const mfv = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\/foto\/(\d{1,2})$/);
