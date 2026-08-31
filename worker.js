@@ -3477,6 +3477,30 @@ async function triageInspeccionRecibir(request, env, email) {
     await env.MEDIA.put(claveHab, firmaHab, { httpMetadata: { contentType: "image/png" } });
   }
 
+  /* EL CASO CITADO SE COMPRUEBA ANTES DE INSERTAR, y esto no es una validación
+     de cortesía: es lo que evita que una visita se quede en el teléfono para
+     siempre.
+
+     `inspecciones.caso` tiene `REFERENCES casos(numero)` y **D1 SÍ impone la
+     clave foránea** —comprobado el 31 ago 2026 con una inserción de prueba, que
+     devolvió `FOREIGN KEY constraint failed`—. Un número mal teclado hacía que el
+     INSERT lanzara, el `catch` de abajo entrara por su prueba `/constraint/i`, no
+     encontrara nada por `_local_id` porque nada se insertó, y relanzara: 500 al
+     teléfono. Y un 500 no vacía la cola, así que el teléfono reintentaba esa
+     inspección eternamente y la visita no llegaba nunca.
+
+     Un dígito mal escrito en un patio no puede costar una visita. Así que el
+     número se guarda SOLO si el caso existe; si no, la inspección entra igual sin
+     el vínculo, y el desajuste queda anotado en la auditoría para que alguien lo
+     arregle. Perder el cruce es recuperable; perder la visita no. */
+  const casoCitado = limpiar(c.caso, 20) || null;
+  let casoValido = null, casoEstado = null;
+  if (casoCitado) {
+    const existe = await env.DB.prepare("SELECT numero, estado FROM casos WHERE numero = ?")
+      .bind(casoCitado.toUpperCase()).first();
+    if (existe) { casoValido = existe.numero; casoEstado = existe.estado; }
+  }
+
   /* El SELECT de arriba ataja el caso normal, pero NO es atómico: dos
      peticiones con el mismo `local_id` pueden pasarlo las dos antes de que
      ninguna inserte. El índice único de la 0013 es lo que cierra esa ventana, y
@@ -3492,7 +3516,7 @@ async function triageInspeccionRecibir(request, env, email) {
     "observaciones, recomendaciones) " +
     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(
-    numero, limpiar(c.caso, 20) || null, limpiar(c.proyecto, 120) || null,
+    numero, casoValido, limpiar(c.proyecto, 120) || null,
     limpiar(c.casa_no, 40) || null, limpiar(c.direccion, 240) || null, municipio,
     fecha, limpiar(c.hora, 8) || null, obsNombre, limpiar(c.obs_cc, 40) || null,
     limpiar(c.obs_matricula, 60) || null, email || null,
@@ -3547,6 +3571,55 @@ async function triageInspeccionRecibir(request, env, email) {
     await env.DB.prepare("UPDATE inspecciones SET pdf_key = ? WHERE numero = ?").bind(clavePdf, numero).run();
   } catch (e) {
     console.error("pdf inspeccion", numero, e && e.message);
+  }
+
+  /* Y EL CASO PASA A `visitado`, porque alguien fue.
+
+     El INSERT guardaba el número del caso y no tocaba `casos`, así que se
+     visitaba la casa, se firmaba la inspección, se emitía el PDF — y el caso
+     seguía en la cola `urgentes_sin_visitar`, cuyo texto dice literalmente «un
+     ingeniero dijo que era urgente y todavía no ha ido nadie». La cola mentía, y
+     mentía justo en la dirección que hace perder el tiempo: mandando a alguien a
+     una puerta donde ya se estuvo.
+
+     SE RESPETA LA MÁQUINA DE ESTADOS de `CASO_DESTINOS`, no se salta: `visitado`
+     solo se acepta desde `recibido`, `en_revision` y `clasificado`. Un caso
+     `cerrado` o `descartado` NO se resucita —misma regla que `triageEvaluar`
+     desde el PR #195— y uno que ya estaba `visitado` no se vuelve a mover.
+
+     Y deja auditoría con el MISMO prefijo que `adminMoverCaso`, porque es de ahí
+     de donde la bandeja saca el último movimiento. El motivo lo pone el sistema y
+     dice qué inspección lo movió: sin eso, la fila diría «visitado» sin decir por
+     qué, que es justo lo que ese estado tenía antes de que se le exigiera nota. */
+  const PUEDE_VISITARSE = ["recibido", "en_revision", "clasificado"];
+  if (casoValido && PUEDE_VISITARSE.indexOf(casoEstado) > -1) {
+    try {
+      await env.DB.prepare(
+        "UPDATE casos SET estado = 'visitado', actualizado_en = datetime('now') WHERE numero = ?"
+      ).bind(casoValido).run();
+      await env.DB.prepare(
+        "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+      ).bind(email || "?",
+        "caso " + casoValido + " " + casoEstado + " -> visitado · visita registrada en la inspeccion " +
+        numero + (obsNombre ? " por " + obsNombre : "")).run();
+    } catch (e) {
+      /* Que el caso no se mueva es un desajuste de bandeja; que la inspección se
+         pierda, no. Se anota y se sigue. */
+      console.error("mover caso por inspeccion", numero, casoValido, e && e.message);
+    }
+  }
+
+  /* EL DESAJUSTE, SI LO HUBO. Se anota aparte del caso normal para que quien mire
+     la auditoría vea que esta inspección citó un caso que no existe — el vínculo
+     se puede rehacer a mano, pero solo si alguien se entera. */
+  if (casoCitado && !casoValido) {
+    try {
+      await env.DB.prepare(
+        "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+      ).bind(email || "?",
+        "inspeccion " + numero + " cito el caso " + casoCitado +
+        ", que no existe · se guardo sin vinculo, revisar a mano").run();
+    } catch (e) { console.error("auditoria caso inexistente", numero, e && e.message); }
   }
 
   /* AVISO AL EQUIPO. Hasta hoy recibir una inspección de terreno no mandaba
@@ -6164,7 +6237,22 @@ async function adminCasoFicha(env, numero) {
      habría sido un segundo literal del mismo dominio esperando a divergir. */
   const enlace = ORIGIN_MMC + "/caso/" + c.numero + "?t=" + (c.token || "");
 
-  return json({ caso: c, enlace, medios: m.results || [], evaluaciones: e.results || [], historial: h.results || [] });
+  /* LAS INSPECCIONES DE ESTE CASO. `inspecciones.caso` y su índice `ix_insp_caso`
+     existen desde la 0011 —cuyo comentario dice «para cruzar con el triaje sin
+     escanear la tabla»— y el cruce NUNCA se escribió: la ficha traía caso,
+     medios, evaluaciones e historial, y nada de terreno. Abrir un caso en el
+     panel no revelaba que alguien ya había ido, ni dejaba llegar a su documento.
+
+     Ese índice era uno de los cinco que la auditoría encontró muertos. Este deja
+     de estarlo. */
+  const insp = await env.DB.prepare(
+    "SELECT numero, fecha_visita, hora, obs_nombre, requiere_esp, pdf_key, " +
+    "atendida_en, atendida_nota, substr(recibido_en,1,16) AS recibido_en " +
+    "FROM inspecciones WHERE caso = ? ORDER BY recibido_en DESC"
+  ).bind(numero).all();
+
+  return json({ caso: c, enlace, medios: m.results || [], evaluaciones: e.results || [],
+                inspecciones: insp.results || [], historial: h.results || [] });
 }
 
 /* ========================================================================
@@ -9356,6 +9444,26 @@ function abrirCaso(numero){
         (e.falta ? "<br><small><strong>Falta:</strong> " + esc(e.falta) + "</small>" : "") + "</li>";
     }).join("");
 
+    /* LAS VISITAS DE TERRENO. La ficha no las enseñaba, así que abrir un caso no
+       revelaba que alguien ya había ido ni dejaba llegar a su documento firmado.
+       Y sin esto, la única forma de saberlo era acordarse. */
+    var visitas = (d.inspecciones || []).map(function(v){
+      return '<li style="margin-bottom:10px"><strong>' + esc(v.numero) + "</strong> · " +
+        esc(v.fecha_visita || "sin fecha") + (v.hora ? " " + esc(v.hora) : "") +
+        (v.obs_nombre ? " · " + esc(v.obs_nombre) : "") +
+        (v.recibido_en && String(v.recibido_en).slice(0,10) !== v.fecha_visita
+          ? "<br><small>recibida el " + esc(v.recibido_en) + "</small>" : "") +
+        (v.requiere_esp ? '<br><small style="color:var(--amber)"><strong>requiere revisión especializada</strong></small>' : "") +
+        (v.atendida_en
+          ? '<br><small style="color:var(--ok)">atendida ' + esc(String(v.atendida_en).slice(0,16))
+            + (v.atendida_nota ? " · " + esc(v.atendida_nota) : "") + "</small>"
+          : "") +
+        (v.pdf_key
+          ? '<br><a href="/api/triage/inspeccion/' + esc(v.numero) + '.pdf" target="_blank" rel="noopener">Ver el documento firmado</a>'
+          : '<br><small style="color:var(--err)">sin documento</small>') +
+        "</li>";
+    }).join("");
+
     var hist = (d.historial || []).map(function(h){
       return "<li><small>" + esc((h.otorgado_en||"").slice(0,16)) + " · " + esc(h.sujeto) + " — " +
         esc(String(h.detalle).replace("caso " + numero + " ", "")) + "</small></li>";
@@ -9409,6 +9517,7 @@ function abrirCaso(numero){
         '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px">' + fotos + "</div>" +
 
         (evals ? '<h4 style="margin-bottom:8px">Evaluaciones</h4><ul style="margin:0 0 22px 16px">' + evals + "</ul>" : "") +
+        (visitas ? '<h4 style="margin-bottom:8px">Visitas de terreno</h4><ul style="margin:0 0 22px 16px">' + visitas + "</ul>" : "") +
         (hist ? '<h4 style="margin-bottom:8px">Historial</h4><ul style="margin:0 0 4px 16px">' + hist + "</ul>" : "") +
       "</div>";
   });
