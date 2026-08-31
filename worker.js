@@ -1684,6 +1684,28 @@ async function adminSalud(env) {
     "WHERE c.estado NOT IN ('cerrado','descartado') AND " + SIN_RESPALDO,
     "Un voluntario ya dio su concepto pero su matrícula no está verificada · falta un segundo par de ojos en /triaje", 40, "#sec-entrar");
 
+  /* CASAS VISITADAS QUE NO HAN RECIBIDO MATERIALES, y es la cola de la fase que
+     viene: hasta hoy `entregas` y `casos` no se conocían, así que la pregunta
+     «¿a qué casa evaluada le falta lo suyo?» no tenía respuesta en ningún sitio.
+
+     Solo `urgente` y `programada`: una casa clasificada `no_requiere` no está
+     esperando materiales, y contarla haría el número inútil. Y solo `visitado`,
+     porque antes de ir no se sabe qué hace falta.
+
+     ARRANCA EN 0 Y ESO ES CORRECTO. Hoy hay una entrega —109 familias en
+     Manizales, del 25 de agosto— y cero casos, porque esa brigada llegó a casas
+     que nunca pasaron por Mira Mi Casa. La cola es el riel, no el inventario: se
+     llena cuando el vertical empiece a recibir casos de verdad.
+
+     Usa `ix_entrega_casos_caso`, que la 0019 creó justo para este sentido de la
+     pregunta. */
+  await enCola("visitadas_sin_materiales",
+    "SELECT COUNT(*) AS n, MIN(c.creado_en) AS masViejo FROM casos c " +
+    "WHERE c.estado = 'visitado' AND c.clasificacion IN ('urgente','programada') " +
+    "AND NOT EXISTS (SELECT 1 FROM entrega_casos ec WHERE ec.caso = c.numero)",
+    "Se fue a la casa y no se le ha anotado ninguna entrega · se ata desde «Entregas», con el número del caso",
+    60, "#sec-entregas");
+
   /* LA COLA DE TERRENO, que no existía. Había cinco colas de casos e
      inscripciones y NINGUNA de inspecciones, así que un ingeniero podía marcar
      «el peligro parece inminente» estando frente a la casa y eso no aparecía en
@@ -6686,6 +6708,17 @@ async function adminCasoFicha(env, numero) {
     "WHERE tipo = 'datos' AND sujeto = ? ORDER BY id ASC"
   ).bind(numero).all();
 
+  /* LOS MATERIALES QUE YA RECIBIÓ. El hilo los enseña gratis, porque atar deja una
+     fila de auditoría con el prefijo del caso — pero eso es el RASTRO, no el
+     estado: si alguien desató un vínculo, el hilo cuenta las dos cosas y la ficha
+     tiene que decir qué hay AHORA. Son preguntas distintas y se responden aparte. */
+  const mat = await env.DB.prepare(
+    "SELECT ec.entrega, ec.nota, substr(ec.anotado_en,1,16) AS anotado_en, " +
+    "g.fecha, g.sector, g.resumen " +
+    "FROM entrega_casos ec JOIN entregas g ON g.numero = ec.entrega " +
+    "WHERE ec.caso = ? ORDER BY g.fecha DESC"
+  ).bind(numero).all();
+
   const hilo = [];
   const cuando = (v) => String(v || "").slice(0, 16);
 
@@ -6748,7 +6781,8 @@ async function adminCasoFicha(env, numero) {
   hilo.sort((a, b) => (a.cuando < b.cuando ? -1 : a.cuando > b.cuando ? 1 : 0));
 
   return json({ caso: c, enlace, medios: m.results || [], evaluaciones: e.results || [],
-                inspecciones: insp.results || [], historial: h.results || [], hilo });
+                inspecciones: insp.results || [], historial: h.results || [],
+                materiales: mat.results || [], hilo });
 }
 
 /* ========================================================================
@@ -8368,6 +8402,83 @@ async function correoIngenieroVerificado(env, i) {
   });
 }
 
+/* POST /api/admin/entrega/<AE-…>/caso — atar una casa a una entrega, o soltarla.
+
+   `entregas` y `casos` no se conocían, y lo siguiente de Mira Mi Casa es llevar
+   materiales a casas YA evaluadas: no había dónde escribir que se llevaron.
+
+   SE COMPRUEBAN LOS DOS NÚMEROS ANTES DE INSERTAR. D1 impone las claves foráneas
+   —comprobado hoy, y eso ya se tragó visitas enteras en `inspecciones`— así que
+   sin esto un número mal escrito llegaría como un 500 a la pantalla en vez de
+   como «ese caso no existe». Aquí sí es correcto que falle: esto se escribe desde
+   el panel con el número delante, no desde un teléfono en un patio.
+
+   NO MUEVE EL ESTADO DEL CASO. Entregar materiales no es cerrar un caso —puede
+   faltar la mitad de lo que necesita— y `CASO_DESTINOS` no tiene un estado para
+   esto. Si algún día hace falta, se decide entonces y con una migración.
+
+   Atar y soltar dejan auditoría con el prefijo del caso, que es de donde la
+   bandeja saca el último movimiento: así el vínculo aparece en el hilo de la casa
+   incluso si alguien lo quita. */
+async function adminEntregaCaso(request, env, entrega, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const caso = String(c.caso || "").trim().toUpperCase();
+  if (!/^CV-\d{4}-\d{6}$/.test(caso)) {
+    return json({ error: "caso_invalido", ayuda: "El número de caso va con la forma CV-2026-000001." }, 400);
+  }
+
+  const e = await env.DB.prepare(
+    "SELECT numero, anulada_en FROM entregas WHERE numero = ?"
+  ).bind(entrega).first();
+  if (!e) return json({ error: "entrega_no_encontrada" }, 404);
+  if (e.anulada_en) {
+    return json({ error: "entrega_anulada",
+                  ayuda: "Esa entrega está anulada, así que no se le pueden atar casas." }, 409);
+  }
+
+  const k = await env.DB.prepare("SELECT numero FROM casos WHERE numero = ?").bind(caso).first();
+  if (!k) return json({ error: "caso_no_encontrado", ayuda: "No hay ningún caso con ese número." }, 404);
+
+  if (c.quitar) {
+    const r = await env.DB.prepare(
+      "DELETE FROM entrega_casos WHERE entrega = ? AND caso = ?"
+    ).bind(entrega, caso).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_estaba_atado" }, 409);
+    try {
+      await env.DB.prepare(
+        "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+      ).bind(quien || "?", "caso " + caso + " materiales de " + entrega + " DESATADOS").run();
+    } catch (err) { console.error("auditoria desatar", entrega, caso, err && err.message); }
+    return json({ ok: true, entrega, caso, atado: false });
+  }
+
+  const nota = limpiar(c.nota, 300) || null;
+  try {
+    await env.DB.prepare(
+      "INSERT INTO entrega_casos (entrega, caso, nota, anotado_por) VALUES (?,?,?,?)"
+    ).bind(entrega, caso, nota, quien || "?").run();
+  } catch (err) {
+    /* La clave primaria (entrega, caso) impide el duplicado. No es un error del
+       usuario: es que ya estaba, y decirlo así evita que alguien lo intente tres
+       veces creyendo que no funciona. */
+    if (/UNIQUE|constraint/i.test(String((err && err.message) || ""))) {
+      return json({ error: "ya_estaba_atado", entrega, caso }, 409);
+    }
+    throw err;
+  }
+  try {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(quien || "?", "caso " + caso + " materiales entregados en " + entrega +
+           (nota ? " · " + nota : "")).run();
+  } catch (err) { console.error("auditoria atar", entrega, caso, err && err.message); }
+
+  return json({ ok: true, entrega, caso, atado: true });
+}
+
 const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "archivada"];
 
 async function adminMoverInscripcion(request, env, id, quien) {
@@ -8524,7 +8635,25 @@ async function adminEntregas(env) {
     "recibido_por, fotos, publicada_en, creada_por, anulada_en, anulada_motivo, anulada_por " +
     "FROM entregas ORDER BY fecha DESC, numero DESC LIMIT 100"
   ).all();
-  return json({ entregas: r.results || [] });
+
+  /* QUÉ CASAS CUBRIÓ CADA ENTREGA. Un escaneo y un mapa, no una subconsulta por
+     fila: es el patrón de esta casa, y aquí además la tabla es diminuta.
+
+     Se mandan los NÚMEROS y no un conteo: quien mira una entrega necesita saber
+     cuáles, para no atar dos veces la misma casa. Y son números de caso, no datos
+     de la familia — el vínculo vive en su propia tabla justo para que nada de
+     `casos` se acerque a un registro publicable. */
+  const ec = await env.DB.prepare(
+    "SELECT entrega, caso FROM entrega_casos ORDER BY caso ASC"
+  ).all();
+  const porEntrega = new Map();
+  for (const x of ec.results || []) {
+    if (!porEntrega.has(x.entrega)) porEntrega.set(x.entrega, []);
+    porEntrega.get(x.entrega).push(x.caso);
+  }
+  const filas = (r.results || []).map((g) => ({ ...g, casos: porEntrega.get(g.numero) || [] }));
+
+  return json({ entregas: filas });
 }
 
 /* POST /api/admin/entrega/<numero>/anular  —  { motivo }
@@ -9189,8 +9318,8 @@ y la entidad, no una persona atendida. Una entrega no se puede publicar sin al m
 <thead><tr>
 <th scope="col">Acta</th><th scope="col">Fecha</th><th scope="col">Sector</th>
 <th scope="col">Aliada</th><th scope="col">Familias</th><th scope="col">Fotos</th>
-<th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="e-filas"><tr><td colspan="8" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+<th scope="col">Casas</th><th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="e-filas"><tr><td colspan="9" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
@@ -10054,6 +10183,21 @@ function abrirCaso(numero){
         'y por eso pide motivo y no se puede deshacer.</p>' +
         '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px">' + fotos + "</div>" +
 
+        /* LO QUE YA RECIBIÓ. Va antes del hilo porque es el ESTADO, y el hilo es el
+           rastro: si alguien desató un vínculo, el hilo cuenta las dos cosas y esto
+           dice qué hay ahora. */
+        ((d.materiales || []).length
+          ? '<h4 style="margin-bottom:8px">Materiales recibidos</h4><ul style="margin:0 0 22px 16px">'
+            + (d.materiales || []).map(function(x){
+                return "<li><strong>" + esc(x.entrega) + "</strong> &middot; " + esc(x.fecha)
+                  + " &middot; " + esc(x.sector || "")
+                  + (x.nota ? "<br><small>" + esc(x.nota) + "</small>" : "")
+                  + (x.resumen ? '<br><small class="mu">' + esc(String(x.resumen).slice(0,140)) + "</small>" : "")
+                  + "</li>";
+              }).join("")
+            + "</ul>"
+          : "") +
+
         (hilo
           ? '<h4 style="margin-bottom:4px">Hilo de la casa</h4>'
             + '<p class="mu" style="font-size:13px;margin-bottom:10px">Todo lo que pasó, en orden. '
@@ -10449,6 +10593,45 @@ document.addEventListener("click", function(e){
     return;
   }
 
+  /* ATAR una casa a una entrega. Sin confirmación: es un dato que se corrige con
+     el botón «quitar» de al lado, y pedir confirmación para cada casa de una
+     entrega de 109 familias haría que nadie la use. */
+  var at = e.target.closest("[data-atar]");
+  if (at){
+    var ent = at.getAttribute("data-atar");
+    var caja = document.querySelector('.ecaso[data-para="' + ent + '"]');
+    var num = caja ? caja.value.trim().toUpperCase() : "";
+    if (!num){ alert("Escribe el número del caso, con la forma CV-2026-000001."); return; }
+    at.disabled = true; at.textContent = "…";
+    fetch("/api/admin/entrega/" + encodeURIComponent(ent) + "/caso", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ caso: num })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      at.disabled = false; at.textContent = "atar";
+      if (d.ok){ if (caja) caja.value = ""; cargarEntregas(); cargarSalud(); return; }
+      alert(d.ayuda || d.error || "No se pudo atar.");
+    }).catch(function(){ at.disabled = false; at.textContent = "atar"; });
+    return;
+  }
+
+  /* QUITAR sí confirma: deshace un hecho que alguien anotó, y el vínculo es lo
+     que responde «esta casa ya recibió lo suyo». Queda en auditoría igual. */
+  var de = e.target.closest("[data-desatar]");
+  if (de){
+    var ent2 = de.getAttribute("data-desatar"), c2 = de.getAttribute("data-caso");
+    if (!confirm("¿Quitar " + c2 + " de la entrega " + ent2 + "? Vuelve a contar como casa sin materiales.")) return;
+    de.disabled = true;
+    fetch("/api/admin/entrega/" + encodeURIComponent(ent2) + "/caso", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ caso: c2, quitar: true })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d.ok){ cargarEntregas(); cargarSalud(); return; }
+      de.disabled = false;
+      alert(d.ayuda || d.error || "No se pudo quitar.");
+    }).catch(function(){ de.disabled = false; });
+    return;
+  }
+
   var cm = e.target.closest("[data-mat]");
   if (cm) {
     var m = cm.getAttribute("data-mat");
@@ -10547,7 +10730,7 @@ function pintarCampos(){
 
 function pintarEntregas(l){
   var tb = document.getElementById("e-filas"); if (!tb) return;
-  if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Todavía no hay entregas registradas.</td></tr>'; return; }
+  if (!l.length){ tb.innerHTML = '<tr><td colspan="9">Todavía no hay entregas registradas.</td></tr>'; return; }
   tb.innerHTML = l.map(function(e){
     var nf = 0; try { nf = JSON.parse(e.fotos||"[]").length; } catch(x){}
     var pub = !!e.publicada_en;
@@ -10566,6 +10749,27 @@ function pintarEntregas(l){
       '<td data-label="Familias">' + (e.familias == null ? "—" : e.familias) + "</td>" +
       '<td data-label="Fotos">' + nf + (nula ? "" : ' <label class="copy toca" style="cursor:pointer">+ foto' +
         '<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" data-foto="' + esc(e.numero) + '"></label>') + "</td>" +
+      /* LAS CASAS DE MIRA MI CASA QUE CUBRIÓ ESTA ENTREGA. Hasta hoy las entregas
+         y los casos no se conocían, así que «a qué casa evaluada le falta lo suyo»
+         no tenía respuesta. Se enseñan los NÚMEROS y no un conteo: quien mira una
+         entrega necesita saber cuáles para no atar dos veces la misma casa.
+
+         El vínculo vive en su propia tabla y NUNCA se publica: la entrega sí se
+         publica, y su esquema dice «NUNCA dirección de una familia». Un número de
+         caso no es una dirección, pero abre una ficha que sí la tiene, así que se
+         queda del lado privado. */
+      '<td data-label="Casas">' +
+        (e.casos && e.casos.length
+          ? e.casos.map(function(k){
+              return '<div style="white-space:nowrap"><small>' + esc(k) + "</small> " +
+                (nula ? "" : '<button class="copy" data-desatar="' + esc(e.numero) + '" data-caso="' + esc(k) + '">quitar</button>') + "</div>";
+            }).join("")
+          : '<small class="mu">ninguna</small>') +
+        (nula ? "" :
+          '<div style="margin-top:6px;white-space:nowrap"><input class="ecaso" data-para="' + esc(e.numero) + '" ' +
+          'placeholder="CV-2026-000001" style="width:130px;font-size:12px"> ' +
+          '<button class="copy" data-atar="' + esc(e.numero) + '">atar</button></div>') +
+      "</td>" +
       '<td data-label="Estado">' + (nula
         ? "anulada<br><small>" + esc(e.anulada_motivo || "") + "</small>"
         : (pub ? "publicada" : '<strong style="color:#A84D00">borrador</strong>')) + "</td>" +
@@ -11275,6 +11479,8 @@ export default {
         const ma = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/avisar$/);
         if (ma) return await adminAvisarIngeniero(request, env, Number(ma[1]), sesion.email);
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
+        const mec = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/caso$/i);
+        if (mec) return await adminEntregaCaso(request, env, mec[1].toUpperCase(), sesion.email);
         if (ruta === "/api/admin/entrega")  return await adminCrearEntrega(request, env, sesion.email);
         const ef = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/foto$/i);
         if (ef) return await adminSubirFoto(request, env, ef[1].toUpperCase(), url);
