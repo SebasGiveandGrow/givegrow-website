@@ -38,8 +38,9 @@ nadie podía llegar a él, y quien llegaba no siempre recibía lo que se le prom
 | #197 | `mcSubirCola` dejó de mentir: no pierde archivos y dice cuántas llegaron |
 | #199 | Al ingeniero se le dice que ya puede entrar · el botón para reenviarlo · un aviso interno desfasado |
 | #201 | La visita mueve el caso · **un número mal teclado dejaba la visita atrapada para siempre** · la ficha enseña sus visitas |
+| #203 | El callejón de los 20 archivos · las fotos del equipo ya no roban cupo · se aceptaban fotos en casos cerrados · `orden` colisionaba tras borrar |
 
-### ⚠️ DOCE COSAS QUE NO HAY QUE DESHACER, con su razón
+### ⚠️ CATORCE COSAS QUE NO HAY QUE DESHACER, con su razón
 
 Se suman a las tres de la sesión anterior (la bandera `RESTAURANDO`, las firmas
 con su contador de trazos y su proporción, y `requiere_esp` guardado como null).
@@ -91,6 +92,17 @@ con su contador de trazos y su proporción, y `requiere_esp` guardado como null)
 12. **Mover el caso a `visitado` respeta `CASO_DESTINOS`** y va en try/catch
    DESPUÉS del PDF. Nunca antes: que el caso no se mueva es un desajuste de
    bandeja; que la inspección se pierda, no.
+13. **`cupoFamilia` es el ÚNICO sitio que decide cuántos archivos caben,** y lo
+   usan el endpoint de subida y el de estado. Si se separan, la pantalla vuelve a
+   ofrecer huecos que el servidor rechaza o a esconder huecos que existen — que es
+   el defecto que tenía. Dentro hay dos reglas que parecen generosidades y no lo
+   son: las fotos del equipo (`categoria='visita'`) NO cuentan contra la familia,
+   y una evaluación `inevaluable` abre seis de margen. Lo segundo no es un agujero
+   porque solo lo abre alguien detrás de Access: el token no se lo puede conceder
+   a sí mismo.
+14. **`orden` en `caso_medios` es `MAX(orden)+1`, no `COUNT(*)`,** en LOS DOS
+   sitios que insertan. Con COUNT, borrar un medio hacía que el siguiente
+   reutilizara un número ocupado. Los huecos son correctos; los duplicados no.
 
 ### 🔨 Lo que queda abierto, y por qué
 
@@ -113,9 +125,7 @@ pidas.
 
 **Trabajo que sigue pendiente, en orden:**
 
-1. **Callejón sin salida con 20 archivos:** piden una foto concreta y la familia
-   no puede subirla. Y las fotos del equipo consumen su cupo.
-2. **Deuda de SQL que el gate no ve:** CUATRO índices muertos —`ix_insp_caso` dejó de
+1. **Deuda de SQL que el gate no ve:** CUATRO índices muertos —`ix_insp_caso` dejó de
    estarlo con el #201—, siete columnas que se escriben y nadie lee, las coordenadas GPS que solo existen dentro del PDF
    (la pantalla de ruta no las tiene), y `filaTope` mandando usar filtros que no
    existen.
