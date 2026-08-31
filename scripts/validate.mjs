@@ -142,8 +142,13 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"]
    sin señal se queda sin saber si el problema es el sistema o su conexión.
 
    La comprobación es directa: si el HTML generado deja un elemento con «Cargando»
-   dentro, el JS de esa misma pantalla tiene que escribir en ese id. Si nadie lo
-   escribe, ese texto es permanente.
+   o «Consultando» dentro, el JS de esa misma pantalla tiene que escribir en ese
+   id. Si nadie lo escribe, ese texto es permanente.
+
+   ⚠️ ES UNA LISTA DE PALABRAS, y esa es su limitación: un marcador que diga
+   «Un momento…» se le escapa. «Consultando» se añadió el 31 ago porque el bloque
+   nuevo de /triaje lo usaba y el check no lo vio — o sea que la limitación no es
+   teórica, ya mordió una vez. Si aparece un tercer verbo, va aquí.
 
    Se lee el TEXTO CRUDO de las dos funciones, sin evaluar: así entra también
    `inspeccionHTML`, que recibe argumentos e interpola, y que es justo la
@@ -181,7 +186,7 @@ for (const [htmlFn, jsFn] of [["paginaAdmin", "adminJS"], ["paginaTriage", "tria
   const h = literalDe(htmlFn), j = literalDe(jsFn);
   if (!h || !j) { err("1d: no encontré " + (h ? jsFn : htmlFn)); continue; }
   const ids = [...new Set(
-    [...h.matchAll(/id="([a-zA-Z0-9_-]+)"[^>]*>\s*(?:<[^>]+>\s*)?[^<]*[Cc]argando/g)].map(m => m[1])
+    [...h.matchAll(/id="([a-zA-Z0-9_-]+)"[^>]*>\s*(?:<[^>]+>\s*)?[^<]*(?:[Cc]argando|[Cc]onsultando)/g)].map(m => m[1])
   )];
   const sinDueno = ids.filter((id) => !new RegExp('(?:el|getElementById)\\(\\s*"' + id + '"\\s*\\)').test(j));
   if (sinDueno.length) {
