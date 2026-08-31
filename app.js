@@ -478,6 +478,7 @@ var I18N = {
     "mc.add.nada":"Elige al menos una foto.",
     "mc.add.subiendo":"Subiendo tus fotos… no cierres esta página.",
     "mc.add.ok":"Listo, ya las tenemos. Un ingeniero las va a ver.",
+    "mc.add.pasa":"Elegiste {n} y solo caben {q} más. Quita algunas, o mándalas en dos veces.",
     "mc.sub.prog":"Enviando: {n} de {t}. No cierres esta página.",
     "mc.sub.parcial":"Guardamos {n} de {t}. Vuelve a elegir las que faltan cuando tengas mejor señal.",
     "mc.sub.nada":"No pudimos enviar ninguna. Tu caso está bien; vuelve a intentarlo cuando tengas mejor señal.",
@@ -2223,7 +2224,7 @@ function bcPinta(){
    URL que la familia ya tiene. */
 /* `total`, `hechas` y `fallidas` son lo que permite decir la verdad al final.
    Antes no existían y el cierre era siempre «listo», llegaran las fotos o no. */
-var MC = { caso: null, token: null, cola: [], tope: 20, total: 0, hechas: 0, fallidas: 0 };
+var MC = { caso: null, token: null, cola: [], tope: 20, queda: null, total: 0, hechas: 0, fallidas: 0 };
 
 function mcArranca(){
   var m = location.pathname.match(/^\/caso\/(CV-\d{4}-\d{6})\/?$/i);
@@ -2256,6 +2257,7 @@ function mcPinta(aviso, color){
       }
       var d = res.d;
       MC.tope = d.tope_medios || 20;
+      MC.queda = d.cupo ? d.cupo.queda : null;
       var h = "";
 
       h += '<p><strong>' + escapeHtml(t("mc.estado")) + ":</strong> "
@@ -2330,9 +2332,20 @@ function mcPinta(aviso, color){
           +  '<p class="mu" style="margin-top:6px">' + escapeHtml(t("mc.espera.sin")) + "</p></div>";
       }
 
+      /* EL CUPO LO DICE EL SERVIDOR, no se deduce aquí. Antes se comparaba el
+         TOTAL de medios contra el tope, y ese total incluye las fotos que sube el
+         equipo en la visita: la familia veía «llegaste al máximo» por archivos que
+         no subió ella. Y si un ingeniero le había PEDIDO una foto, el formulario
+         desaparecía justo cuando más falta hacía.
+
+         `d.cupo` viene del mismo ayudante que valida la subida, así que la
+         pantalla no puede ofrecer un hueco que el servidor rechace ni esconder uno
+         que sí existe. El respaldo al cálculo viejo es para un navegador con un
+         app.js viejo hablando con la API nueva. */
+      var queda = d.cupo ? d.cupo.queda : Math.max(0, MC.tope - (d.medios || 0));
       if (d.estado === "cerrado" || d.estado === "descartado"){
         h += '<p class="mu" style="margin-top:22px">' + escapeHtml(t("mc.cerrado")) + "</p>";
-      } else if ((d.medios || 0) >= MC.tope){
+      } else if (queda <= 0){
         h += '<p class="mu" style="margin-top:22px">' + escapeHtml(t("mc.add.tope")) + "</p>";
       } else {
         h += mcFormFotos();
@@ -2402,6 +2415,18 @@ function mcEnviar(){
     if (msg){ msg.textContent = t("mc.add.nada"); msg.style.color = "var(--err)"; }
     return;
   }
+  /* SI NO CABEN, SE DICE ANTES DE SUBIR. Dejar que sobren y las rechace el
+     servidor una por una gasta datos y batería de alguien que quizá esté con una
+     barra de señal — y el cierre honesto diría «guardamos 4 de 8» sin explicar
+     por qué. Mejor decirlo cuando todavía se puede elegir. */
+  if (MC.queda != null && MC.cola.length > MC.queda){
+    if (msg){
+      msg.textContent = t("mc.add.pasa").replace("{n}", MC.cola.length).replace("{q}", MC.queda);
+      msg.style.color = "var(--amber)";
+    }
+    return;
+  }
+
   /* Se reinician EN CADA TANDA. `mcPinta` vuelve a dibujar la página al
      terminar, así que puede haber una segunda subida en la misma visita y los
      contadores de la anterior mentirían. */

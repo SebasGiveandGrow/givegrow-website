@@ -2343,6 +2343,49 @@ const TIPOS_MEDIO = {
 };
 const MAX_MEDIOS = 20;
 
+/* CUÁNTOS ARCHIVOS MÁS PUEDE MANDAR LA FAMILIA, y por qué no es una resta simple.
+
+   Había un callejón sin salida con nombre y apellido: la familia sube 20 fotos,
+   el ingeniero devuelve «no puedo evaluar» PIDIENDO una foto concreta, y el
+   servidor responde 409 y la pantalla esconde el formulario. El caso quedaba
+   pidiendo algo que la familia no podía entregar, en la cola
+   `casos_esperando_fotos`, y sin ninguna acción que lo destrabara salvo una
+   llamada. Es la peor forma de fallar: el sistema sabe pedir y no sabe recibir.
+
+   Dos cosas lo abren, y las dos son correcciones de contabilidad, no favores:
+
+   1. LAS FOTOS DEL EQUIPO NO CUENTAN CONTRA LA FAMILIA. `adminSubirMedio` escribe
+      en la misma tabla con `categoria = 'visita'`, y el tope las contaba: una
+      brigada que subiera cinco fotos de la visita le quitaba cinco a la familia,
+      sin que nadie lo dijera. El tope existe para acotar un endpoint PÚBLICO, no
+      para acotar al equipo.
+
+   2. SI UN INGENIERO PIDIÓ MATERIAL, SE ABRE UN MARGEN. No es un agujero: lo
+      abre una evaluación `inevaluable`, que solo puede escribir alguien detrás de
+      Access. Quien tiene el token no puede concederse el margen a sí mismo.
+      Seis, que alcanza para lo que se pide y para reintentar un par de veces. */
+const MEDIOS_EXTRA_PEDIDOS = 6;
+
+async function cupoFamilia(env, numero) {
+  /* Solo lo que subió la familia. `COALESCE` porque `categoria` es NULL cuando
+     el formulario no mandó una válida, y NULL <> 'visita' no es true en SQL. */
+  const u = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ? AND COALESCE(categoria,'') <> ?"
+  ).bind(numero, CATEGORIA_VISITA).first();
+
+  /* La MÁS RECIENTE, sin filtrar por clasificación: es la misma regla que
+     `falta_pendiente` de `apiCasoEstado`, y tienen que estar de acuerdo. Si la
+     última es firme, el pedido quedó atendido y el margen se cierra. */
+  const pend = await env.DB.prepare(
+    "SELECT clasificacion FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC, id DESC LIMIT 1"
+  ).bind(numero).first();
+
+  const pedidas = !!(pend && pend.clasificacion === "inevaluable");
+  const usados = (u && u.n) || 0;
+  const tope = MAX_MEDIOS + (pedidas ? MEDIOS_EXTRA_PEDIDOS : 0);
+  return { usados, tope, queda: Math.max(0, tope - usados), pedidas };
+}
+
 /* POST /api/caso — crea el caso. Devuelve número y token. */
 async function apiCasoCrear(request, env) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
@@ -2433,10 +2476,21 @@ async function apiCasoMedio(request, env, numero, token, url) {
      quedaría un oráculo de qué casos existen. Igual que el recibo. */
   if (!caso || !token || caso.token !== token) return json({ error: "no_autorizado" }, 403);
 
-  const cuantos = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?"
-  ).bind(numero).first();
-  if (cuantos && cuantos.n >= MAX_MEDIOS) return json({ error: "demasiados_medios", max: MAX_MEDIOS }, 409);
+  /* EL ESTADO SE MIRABA Y NO SE USABA. La consulta de arriba trae `estado` desde
+     siempre y nadie lo consultaba: el servidor aceptaba fotos en un caso
+     `cerrado` o `descartado` y devolvía `{ok:true}`. El cliente sí lo bloqueaba,
+     pero un reintento de una cola pendiente entraba igual — y guardar material en
+     un caso que alguien cerró con un motivo escrito no es inofensivo: reabre por
+     la puerta de atrás lo que se cerró por la de delante. */
+  if (caso.estado === "cerrado" || caso.estado === "descartado") {
+    return json({ error: "caso_terminado", estado: caso.estado,
+                  ayuda: "Este caso está cerrado. Si hay que retomarlo, el equipo lo reabre y entonces se pueden agregar fotos." }, 409);
+  }
+
+  const cupo = await cupoFamilia(env, numero);
+  if (cupo.queda <= 0) {
+    return json({ error: "demasiados_medios", max: cupo.tope, usados: cupo.usados }, 409);
+  }
 
   const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
   const spec = TIPOS_MEDIO[tipo];
@@ -2456,8 +2510,14 @@ async function apiCasoMedio(request, env, numero, token, url) {
   const clave = "casos/" + numero + "/" + tokenNuevo().slice(0, 8) + "." + spec.ext;
   await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
   await env.DB.prepare(
+    /* `orden` = MÁXIMO + 1, y no COUNT(*). Con COUNT, después de borrar un medio
+       el conteo bajaba y la siguiente foto reutilizaba un `orden` ya ocupado, así
+       que `ORDER BY categoria, orden` quedaba con empates no deterministas. Con el
+       máximo los números pueden tener huecos, y eso es lo correcto: un hueco dice
+       la verdad —ahí hubo algo— y no colisiona. Corregido en los DOS sitios que
+       insertan medios; tenerlo bien en uno solo era la mitad del arreglo. */
     "INSERT INTO caso_medios (caso, r2_key, clase, categoria, bytes, nota, orden) " +
-    "VALUES (?,?,?,?,?,?, (SELECT COUNT(*) FROM caso_medios WHERE caso = ?))"
+    "VALUES (?,?,?,?,?,?, (SELECT COALESCE(MAX(orden), -1) + 1 FROM caso_medios WHERE caso = ?))"
   ).bind(numero, clave, spec.clase, cat, bytes.length,
          limpiar(url.searchParams.get("nota"), 200) || null, numero).run();
   await env.DB.prepare("UPDATE casos SET actualizado_en = datetime('now') WHERE numero = ?").bind(numero).run();
@@ -2499,6 +2559,11 @@ async function apiCasoEstado(env, numero, token) {
   ).bind(numero).first();
   const faltaPendiente = pend && pend.clasificacion === "inevaluable" ? (pend.falta || null) : null;
 
+  /* Cuánto le queda por mandar. Sale del mismo ayudante que usa el endpoint de
+     subida, así que la pantalla no puede ofrecer un hueco que el servidor va a
+     rechazar, ni esconder uno que sí existe. */
+  const cupo = await cupoFamilia(env, numero);
+
   /* CUÁNTO LLEVA ESPERANDO, y cuántos hay delante en su misma situación.
      Su pantalla decía «un ingeniero lo va a revisar» sin plazo ni señal, y una
      espera sin información se siente como abandono — sobre todo después de un
@@ -2526,6 +2591,15 @@ async function apiCasoEstado(env, numero, token) {
     ultima: e ? { clasificacion: e.clasificacion, recomendacion: e.recomendacion,
                   falta: e.falta, creado_en: e.creado_en } : null,
     falta_pendiente: faltaPendiente,
+    /* EL CUPO REAL, calculado por `cupoFamilia`. La pantalla decidía si mostrar el
+       formulario comparando el TOTAL de medios contra el tope, y ese total incluye
+       las fotos que sube el equipo en la visita: la familia podía ver «llegaste al
+       máximo» por archivos que no subió ella. Ahora el servidor manda cuántos
+       puede mandar todavía y la pantalla no tiene que deducirlo.
+
+       `tope_medios` se queda por si un navegador conserva un app.js viejo: con él
+       vuelve al comportamiento anterior en vez de romperse. */
+    cupo: { usados: cupo.usados, tope: cupo.tope, queda: cupo.queda, pedidas: cupo.pedidas },
     tope_medios: MAX_MEDIOS
   });
 }
@@ -5836,9 +5910,14 @@ async function adminSubirMedio(request, env, numero, url, quien) {
   const caso = await env.DB.prepare("SELECT numero FROM casos WHERE numero = ?").bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
 
+  /* SU PROPIO TOPE, contando SOLO fotos de visita. Antes contaba todas y compartía
+     el número con la familia, así que subir cinco fotos de la brigada le quitaba
+     cinco a ella — y la familia lo descubría cuando le pedían una foto y no podía
+     mandarla. Sigue acotado, porque un endpoint sin límite acaba siendo el que
+     llena el bucket, pero con su propio presupuesto. */
   const cuantos = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?"
-  ).bind(numero).first();
+    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ? AND categoria = ?"
+  ).bind(numero, CATEGORIA_VISITA).first();
   if (cuantos && cuantos.n >= MAX_MEDIOS) return json({ error: "demasiados_archivos", max: MAX_MEDIOS }, 409);
 
   const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
@@ -5855,7 +5934,7 @@ async function adminSubirMedio(request, env, numero, url, quien) {
   await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
   await env.DB.prepare(
     "INSERT INTO caso_medios (caso, r2_key, clase, categoria, bytes, nota, orden) " +
-    "VALUES (?,?,?,?,?,?, (SELECT COUNT(*) FROM caso_medios WHERE caso = ?))"
+    "VALUES (?,?,?,?,?,?, (SELECT COALESCE(MAX(orden), -1) + 1 FROM caso_medios WHERE caso = ?))"
   ).bind(numero, clave, spec.clase, CATEGORIA_VISITA, bytes.length,
          limpiar(url.searchParams.get("nota"), 200) || null, numero).run();
   await env.DB.prepare("UPDATE casos SET actualizado_en = datetime('now') WHERE numero = ?").bind(numero).run();
