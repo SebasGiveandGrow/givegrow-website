@@ -3521,6 +3521,24 @@ function el(id){ return document.getElementById(id); }
 function val(id){ var e = el(id); return e ? e.value.trim() : ""; }
 function esc(t){ var d=document.createElement("div"); d.textContent=t==null?"":String(t); return d.innerHTML.replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 
+/* EL MEDIDOR. «de» y «hasta» son bytes cuando se conocen —una foto— y pasos
+   cuando no —una inspección sin fotos—. Se esconde en cuanto no hay nada
+   enviándose, porque una barra al 100% que se queda puesta es ruido. */
+function medidor(de, hasta){
+  var caja = el("prog"), barra = el("prog-b");
+  if (!caja || !barra) return;
+  if (hasta === null || hasta === undefined){ caja.hidden = true; barra.style.width = "0%"; return; }
+  caja.hidden = false;
+  var pct = hasta > 0 ? Math.min(100, Math.round((de / hasta) * 100)) : 0;
+  barra.style.width = pct + "%";
+}
+
+/* Los pesos en algo que una persona pueda leer de un vistazo. */
+function pesoCorto(b){
+  if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
+  return Math.max(1, Math.round(b / 1024)) + " KB";
+}
+
 function aviso(txt, clase){
   var m = el("msg");
   m.textContent = txt;
@@ -3955,32 +3973,55 @@ function enviarFotos(reg, numero){
   function paso(){
     if (i >= pend.length) return Promise.resolve({ estado: "ok", numero: numero });
     var f = pend[i++];
-    /* SE DICE POR CUAL VA. Sin esto, subir tres fotos desde un telefono es una
-       pantalla quieta que dice «Enviando…», y quieto se lee como colgado. */
-    aviso("Enviando… foto " + i + " de " + pend.length + ".", "info");
-    var plazo = conPlazo(PLAZO_FOTO);
-    return fetch("/api/triage/inspeccion/" + encodeURIComponent(numero) + "/foto", {
-      method: "POST", headers: { "content-type": f.tipo || "image/jpeg" }, body: f.blob,
-      signal: plazo.signal
-    }).then(function(r){
-      plazo.listo();
-      var ct = r.headers.get("content-type") || "";
-      if (ct.indexOf("json") < 0) return { estado: "sesion" };
-      if (r.ok){
-        f.subida = true;
-        /* Se persiste el avance ANTES de seguir: si el teléfono se muere en la
-           foto 3 de 5, al volver solo sube las dos que faltan. */
-        return poner("cola", reg).then(paso);
-      }
-      /* Un rechazo por lo que la foto ES —tipo, tamaño, tope— no mejora
-         reintentando. Se marca como resuelta para no atascar la cola, y el
-         conteo del panel enseñará que llegaron menos de las que se tomaron. */
-      if (r.status === 413 || r.status === 415 || r.status === 409){
-        f.subida = true; f.rechazada = true;
-        return poner("cola", reg).then(paso);
-      }
-      return { estado: "reintentar" };
-    }).catch(function(){ return { estado: "reintentar" }; });
+    var cual = i, total = pend.length, peso = f.blob.size;
+
+    /* XHR Y NO FETCH, y es la única razón por la que este medidor sirve: fetch
+       no informa del avance de una subida y XHR sí, con upload.onprogress. Una
+       foto de media mega por una carretera veredal tarda, y sin ver moverse
+       algo eso se lee como colgado — que fue exactamente la queja de terreno.
+       De paso XHR trae su propio plazo, sin AbortController. */
+    return new Promise(function(listo){
+      var x = new XMLHttpRequest();
+      x.open("POST", "/api/triage/inspeccion/" + encodeURIComponent(numero) + "/foto");
+      x.setRequestHeader("content-type", f.tipo || "image/jpeg");
+      x.timeout = PLAZO_FOTO;
+      x.responseType = "text";
+
+      var pinta = function(subidos){
+        aviso("Enviando foto " + cual + " de " + total + " · "
+              + pesoCorto(subidos) + " de " + pesoCorto(peso) + ".", "info");
+        medidor(subidos, peso);
+      };
+      pinta(0);
+      x.upload.onprogress = function(e){ if (e.lengthComputable) pinta(e.loaded); };
+
+      x.onload = function(){
+        var ct = x.getResponseHeader("content-type") || "";
+        /* Detrás de Access una sesión expirada devuelve el HTML del login, no un
+           error. Se exige JSON, igual que en el envío de la inspección. */
+        if (ct.indexOf("json") < 0) { listo({ estado: "sesion" }); return; }
+        if (x.status >= 200 && x.status < 300){
+          f.subida = true;
+          /* Se persiste el avance ANTES de seguir: si el teléfono se muere en
+             la foto 3 de 5, al volver solo sube las dos que faltan. */
+          poner("cola", reg).then(paso).then(listo, function(){ listo({ estado: "reintentar" }); });
+          return;
+        }
+        /* Un rechazo por lo que la foto ES —tipo, tamaño, tope— no mejora
+           reintentando. Se marca como resuelta para no atascar la cola, y el
+           conteo del panel enseñará que llegaron menos de las que se tomaron. */
+        if (x.status === 413 || x.status === 415 || x.status === 409){
+          f.subida = true; f.rechazada = true;
+          poner("cola", reg).then(paso).then(listo, function(){ listo({ estado: "reintentar" }); });
+          return;
+        }
+        listo({ estado: "reintentar" });
+      };
+      x.onerror = function(){ listo({ estado: "reintentar" }); };
+      x.ontimeout = function(){ listo({ estado: "reintentar" }); };
+      x.onabort = function(){ listo({ estado: "reintentar" }); };
+      x.send(f.blob);
+    });
   }
   return paso();
 }
@@ -4047,6 +4088,9 @@ function vaciarCola(){
     function paso(){
       if (i >= l.length){
         VACIANDO = false;
+        /* Se esconde SIEMPRE al terminar, salga bien o mal: una barra al 100%
+           que se queda puesta hace pensar que sigue pasando algo. */
+        medidor(null);
         estado();
         if (sesionCaida) aviso("Tu sesión caducó. Vuelve a entrar y toca Enviar otra vez: nada se perdió.", "mal");
         else if (malas)  aviso("Quedaron " + malas + " sin enviar por datos incompletos. Ábrelas y complétalas.", "mal");
@@ -4095,6 +4139,7 @@ function vaciarCola(){
     /* Leer la cola también puede fallar —el almacén se cierra si el navegador
        recicla la pestaña— y sin esto la bandera quedaba levantada para siempre. */
     VACIANDO = false;
+    medidor(null);
     aviso("No se pudo leer la cola de este teléfono. NO borres nada: cierra esta pantalla y vuelve a abrirla.", "mal");
   });
 }
@@ -4670,6 +4715,10 @@ textarea{min-height:64px;resize:vertical}
 /* La barra se APILA: en 375 px el estado y dos botones en una fila estrangulan
    el texto en tres líneas y encogen los botones justo donde se toca con una
    mano. El estado va arriba, ancho completo, y los botones debajo. */
+.prog{height:8px;border-radius:99px;background:var(--bd);overflow:hidden}
+.prog>div{height:100%;width:0;border-radius:99px;background:var(--az);
+  transition:width .18s linear}
+@media (prefers-reduced-motion:reduce){ .prog>div{transition:none} }
 .eco{margin:0;font-size:13.5px;line-height:1.35;padding:7px 10px;border-radius:6px;
   border-left:3px solid var(--bd);background:var(--pap)}
 .eco:empty{display:none}
@@ -4866,6 +4915,11 @@ textarea{min-height:64px;resize:vertical}
        mirando, así que parecía que no enviaba. Esto lo repite donde están los
        ojos. Vacío no ocupa nada. -->
   <p id="eco" class="eco"></p>
+  <!-- EL MEDIDOR. Solo aparece mientras se envía. Es determinado —de verdad
+       sabe cuánto lleva— porque la subida de fotos usa XHR, que sí informa del
+       avance; fetch no lo hace. Un medidor que se inventa el avance es peor que
+       no tenerlo: enseña a desconfiar de él. -->
+  <div id="prog" class="prog" hidden><div id="prog-b"></div></div>
   <div class="fila">
     <!-- «Reintentar» y no «Enviar»: enviar es lo que hace el botón de al lado.
          Se esconde cuando no hay nada pendiente, así que llenando la primera
