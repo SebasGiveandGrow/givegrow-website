@@ -40,8 +40,10 @@ nadie podía llegar a él, y quien llegaba no siempre recibía lo que se le prom
 | #201 | La visita mueve el caso · **un número mal teclado dejaba la visita atrapada para siempre** · la ficha enseña sus visitas |
 | #203 | El callejón de los 20 archivos · las fotos del equipo ya no roban cupo · se aceptaban fotos en casos cerrados · `orden` colisionaba tras borrar |
 | #205 | La deuda de SQL: índice por expresión (**migración 0017**) · las coordenadas salen del PDF a la pantalla de ruta · la leyenda del PDF estaba escrita tres veces · `filaTope` señalaba filtros que no existen |
+| #208 | Se le escribe a la familia al crear el caso · el sitio publicaba «ladrillo» sobre casas que nadie declaró · el consentimiento ya deja rastro auditable (Ley 1581) |
+| #209 | «Esperando fotos» no se limpiaba al llegar las fotos · la cola que faltaba: «respondió y nadie lo ha vuelto a mirar» · insignia en /triaje · **la página con el token de la familia salía sin `noindex` ni `no-store`** |
 
-### ⚠️ DIECISÉIS COSAS QUE NO HAY QUE DESHACER, con su razón
+### ⚠️ DIECINUEVE COSAS QUE NO HAY QUE DESHACER, con su razón
 
 Se suman a las tres de la sesión anterior (la bandera `RESTAURANDO`, las firmas
 con su contador de trazos y su proporción, y `requiere_esp` guardado como null).
@@ -114,6 +116,19 @@ con su contador de trazos y su proporción, y `requiere_esp` guardado como null)
    lleva sigla y significado. Estaba escrita TRES veces —la constante sin usar, la
    leyenda larga y las siglas de cada renglón— en un papel que alguien firma. No
    volver a escribir «[RE] » a mano.
+17. **`marcarCaso` pone `noindex` y `no-store` en `/caso/*`,** y va como envoltura
+   del router porque esa página la sirve el fallback de assets, no una rama
+   nuestra. La redirección del ápex ya llevaba esas cabeceras y el DESTINO no: la
+   protección estaba en el cartel y no en la puerta, sobre una URL que lleva el
+   token de la familia.
+18. **`PIDIERON_MATERIAL` y `RESPONDIO_TRAS_PEDIDO` son un solo sitio,** y las usan
+   dos colas de salud y la bandeja del ingeniero. Comparan la fecha del material
+   con la del ÚLTIMO «no puedo evaluar», así que funcionan en los dos sentidos sin
+   ninguna columna nueva. Tres copias en desacuerdo es el fallo que este proyecto
+   ya conoce.
+19. **El desplegable de material arranca en una opción VACÍA.** Sin ella «Ladrillo
+   o bloque» iba preseleccionado y el sitio publicaba en el banco público y en el
+   PDF una afirmación sobre la casa de alguien que nadie hizo.
 
 ### 🔨 Lo que queda abierto, y por qué
 
@@ -133,6 +148,27 @@ con su contador de trazos y su proporción, y `requiere_esp` guardado como null)
 irreversible y mientras esté puesto a la familia no se le escribe nunca más, y
 que se dispara de más porque cuenta FILAS y no PERSONAS—. No se toca hasta que lo
 pidas.
+
+### 🔻 TRES HALLAZGOS DEL BARRIDO QUE HUBO QUE BAJAR DE CATEGORÍA
+
+Los agentes encontraron cosas reales, pero no todo lo que reportaron lo era. Queda
+escrito para que nadie los «arregle» otra vez:
+
+- **`en_cola` NO miente.** El texto dice «hay {n} casos SIN ABRIR» y la consulta
+  excluye exactamente los que ya se miraron. El caso propio no está porque ya se
+  abrió, y eso es correcto. Y la tarjeta de espera tampoco puede mentir con
+  «todavía no lo ha revisado un ingeniero»: el servidor EXIGE `falta` cuando la
+  clasificación es `inevaluable`, así que toda evaluación deja o concepto o
+  petición de fotos. Está anotado en `app.js` por si algún día `falta` se vuelve
+  opcional — ese día sí empezaría a mentir.
+- **El honeypot no dejaba a la familia en un callejón.** El campo ya está bien
+  escondido (`tabindex="-1"`, `autocomplete="off"`, `aria-hidden`, fuera de
+  pantalla), así que que lo rellene una persona es improbable. Lo que sí era malo
+  era el mensaje, y eso se arregló.
+- **Las fotos de terreno no eran trabajo perdido.** Las llaves sí quedaban en
+  `inspecciones.fotos`: faltaba la ruta que las sirviera, no el rastro. Y la
+  inspección real de Camila no lleva ninguna foto, así que no se había
+  desperdiciado ninguna visita.
 
 **Trabajo pendiente de código: NINGUNO.** Los 21 hallazgos de la auditoría que
 eran trabajo están cerrados y desplegados. Lo que queda son tus cuatro decisiones,
