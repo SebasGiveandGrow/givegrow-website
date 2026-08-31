@@ -3914,6 +3914,30 @@ function guardarBorrador(){
   }, 400);
 }
 
+/* NINGUN ENVIO ESPERA PARA SIEMPRE.
+
+   fetch no trae plazo: en un telefono con señal moribunda una peticion se queda
+   colgada y la pantalla dice «Enviando…» hasta que alguien recarga. Paso en la
+   primera prueba de campo con dos fotos.
+
+   Al vencer el plazo se aborta, cae en el catch que ya existe y sale como
+   «reintentar»: la inspeccion se queda en la cola y se vuelve a mandar sola.
+   Como el envio es idempotente, reintentar algo que si habia llegado no
+   duplica nada — asi que cortar por lo sano es seguro.
+
+   Las fotos llevan mas plazo que el JSON porque pesan de verdad: media mega por
+   una carretera veredal no es un fallo, es una espera legitima. */
+var PLAZO_JSON = 45000;
+var PLAZO_FOTO = 120000;
+
+function conPlazo(ms){
+  /* AbortController y no AbortSignal.timeout: el segundo no existe en los
+     navegadores viejos de Android que hay en terreno. */
+  var ctrl = new AbortController();
+  var t = setTimeout(function(){ ctrl.abort(); }, ms);
+  return { signal: ctrl.signal, listo: function(){ clearTimeout(t); } };
+}
+
 /* ---- La cola. Reintenta, y NO borra nada que no se haya confirmado. ---- */
 /* DOS TRAMOS, y el orden importa: primero la inspección en JSON, después las
    fotos de a una.
@@ -3931,9 +3955,15 @@ function enviarFotos(reg, numero){
   function paso(){
     if (i >= pend.length) return Promise.resolve({ estado: "ok", numero: numero });
     var f = pend[i++];
+    /* SE DICE POR CUAL VA. Sin esto, subir tres fotos desde un telefono es una
+       pantalla quieta que dice «Enviando…», y quieto se lee como colgado. */
+    aviso("Enviando… foto " + i + " de " + pend.length + ".", "info");
+    var plazo = conPlazo(PLAZO_FOTO);
     return fetch("/api/triage/inspeccion/" + encodeURIComponent(numero) + "/foto", {
-      method: "POST", headers: { "content-type": f.tipo || "image/jpeg" }, body: f.blob
+      method: "POST", headers: { "content-type": f.tipo || "image/jpeg" }, body: f.blob,
+      signal: plazo.signal
     }).then(function(r){
+      plazo.listo();
       var ct = r.headers.get("content-type") || "";
       if (ct.indexOf("json") < 0) return { estado: "sesion" };
       if (r.ok){
@@ -3962,10 +3992,12 @@ function enviarUno(reg){
   for (var k in reg) if (k !== "fotos") cuerpo[k] = reg[k];
   cuerpo.fotos_tomadas = (reg.fotos || []).length;
 
+  var plazo = conPlazo(PLAZO_JSON);
   return fetch("/api/triage/inspeccion", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify(cuerpo)
+    body: JSON.stringify(cuerpo), signal: plazo.signal
   }).then(function(r){
+    plazo.listo();
     var ct = r.headers.get("content-type") || "";
     /* DETRÁS DE ACCESS UNA SESIÓN EXPIRADA DEVUELVE EL HTML DEL LOGIN, no un
        error. Tratarlo como éxito borraría de la cola una inspección firmada que
@@ -3998,7 +4030,11 @@ function enviarUno(reg){
    es pedirle a la base que arregle lo que aquí sobra. */
 var VACIANDO = false;
 function vaciarCola(){
-  if (VACIANDO) return Promise.resolve();
+  /* Si ya hay una corrida en marcha se sale, pero AVISANDO. Antes salía en
+     silencio: el manejador del botón ya había escrito «Enviando…», así que
+     tocarlo mientras subían unas fotos dejaba ese mensaje puesto sin que nada
+     lo cambiara. Parecía un cuelgue y era una espera. */
+  if (VACIANDO){ aviso("Ya se está enviando. Espera a que termine.", "info"); return Promise.resolve(); }
   VACIANDO = true;
   return todos("cola").then(function(l){
     if (!l.length) {
@@ -4006,6 +4042,7 @@ function vaciarCola(){
       aviso("No hay nada pendiente: todo lo que terminaste ya llegó.", "bien");
       return;
     }
+    aviso(l.length === 1 ? "Enviando…" : "Enviando… " + l.length + " pendientes.", "info");
     var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false, sinBorrar = 0;
     function paso(){
       if (i >= l.length){
@@ -4030,6 +4067,7 @@ function vaciarCola(){
         return;
       }
       var reg = l[i++];
+      if (l.length > 1) aviso("Enviando… " + i + " de " + l.length + ".", "info");
       enviarUno(reg).then(function(res){
         if (res.estado === "ok"){
           if (res.repetida) repes++; else enviadas++;
@@ -4526,7 +4564,9 @@ function INSP_ARRANCA(paquete){
     if (e.target.closest("#b-mias"))  { cargarMias(); return; }
     if (e.target.closest("#b-gps"))   { tomarGPS(); return; }
     if (e.target.closest("#b-prep"))  { preparar(); return; }
-    if (e.target.closest("#b-cola"))  { aviso("Enviando…", "info"); vaciarCola(); return; }
+    /* El aviso lo pone vaciarCola, que es quien sabe si arrancó, cuántas hay o
+       si ya había una corrida. Ponerlo aquí era prometer que empezó. */
+    if (e.target.closest("#b-cola"))  { vaciarCola(); return; }
     if (e.target.closest("#b-guardar")){ guardarInspeccion(); return; }
   });
 
