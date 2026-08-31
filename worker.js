@@ -2728,7 +2728,9 @@ async function correoAvisoCaso(env, x) {
                  "Recuerda: el concepto orienta y prioriza; no determina si la casa es habitable."],
       filas
     }),
-    etiqueta: "caso-recibido"
+    /* `guia` con el número de caso, para que este aviso salga en el hilo de la
+       casa: sin él, el hilo diría que nadie se enteró de que el caso entró. */
+    etiqueta: "caso-recibido", guia: x.numero
   });
 }
 
@@ -6653,8 +6655,100 @@ async function adminCasoFicha(env, numero) {
     "FROM inspecciones WHERE caso = ? ORDER BY recibido_en DESC"
   ).bind(numero).all();
 
+  /* ═══ EL HILO DE LA CASA ═══
+     Un solo relato en orden, y no cuatro bloques que hay que cruzar de cabeza.
+
+     La ficha ya traía caso, medios, evaluaciones, inspecciones e historial — cada
+     uno en su lista y en su propio orden. Para responder «¿qué pasó con esta
+     casa?» —lo que hace falta cuando una familia llama, o antes de llevarle
+     materiales— había que leer los cuatro y ordenar las fechas mentalmente.
+
+     Y FALTABA LO QUE MÁS IMPORTA: si la familia recibió algo. Las reglas que
+     retienen la respuesta (matrícula sin verificar, discrepancia, sin correo) son
+     invisibles en la ficha, así que «esta familia nunca supo nada» no se podía ver
+     — solo deducir. `correos.guia` guarda el número de caso, así que el hilo lo
+     dice con nombre y resultado.
+
+     SE ARMA EN EL SERVIDOR y no en el navegador: ordenar y fusionar seis fuentes
+     en el cliente sería la misma lógica escrita otra vez, y el gate no puede
+     validar el JS del panel si se le mete una interpolación.
+
+     Las DOS consultas nuevas son las únicas que faltaban; el resto se reutiliza de
+     lo que ya está arriba. Los medios se AGRUPAN POR DÍA: veinte renglones de
+     «una foto» ahogan la historia, y lo que la historia necesita es «ese día
+     mandaron cuatro», que es lo que revela si respondieron a un pedido. */
+  const co = await env.DB.prepare(
+    "SELECT etiqueta, para, resultado, substr(intento_en,1,16) AS cuando " +
+    "FROM correos WHERE guia = ? ORDER BY id ASC"
+  ).bind(numero).all();
+  const cons = await env.DB.prepare(
+    "SELECT detalle, substr(otorgado_en,1,16) AS cuando FROM consentimientos " +
+    "WHERE tipo = 'datos' AND sujeto = ? ORDER BY id ASC"
+  ).bind(numero).all();
+
+  const hilo = [];
+  const cuando = (v) => String(v || "").slice(0, 16);
+
+  hilo.push({ cuando: cuando(c.creado_en), tipo: "caso",
+    texto: "La familia reportó su casa · " + (c.sector || "sin sector") +
+           (c.contacto_email ? " · dejó correo" : " · SIN correo, así que no hay a dónde escribirle") });
+
+  for (const x of cons.results || []) {
+    hilo.push({ cuando: x.cuando, tipo: "consent", texto: "Autorizaciones registradas · " + x.detalle });
+  }
+
+  /* Medios por día, con la hora del último de ese día para ordenar bien frente a
+     una evaluación de la misma fecha. */
+  const porDia = new Map();
+  for (const x of m.results || []) {
+    const dia = String(x.subido_en || "").slice(0, 10);
+    if (!dia) continue;
+    const a = porDia.get(dia) || { n: 0, ultimo: "", visita: 0 };
+    a.n++;
+    if (String(x.categoria || "") === CATEGORIA_VISITA) a.visita++;
+    const t = cuando(x.subido_en);
+    if (t > a.ultimo) a.ultimo = t;
+    porDia.set(dia, a);
+  }
+  for (const [, a] of porDia) {
+    /* Se distingue quién las subió: las de la visita las sube el equipo, y
+       contarlas como material de la familia hace parecer que respondió cuando no. */
+    const dela = a.visita === a.n ? "el equipo, en la visita"
+               : a.visita ? "la familia y el equipo" : "la familia";
+    hilo.push({ cuando: a.ultimo, tipo: "medios",
+      texto: a.n + (a.n === 1 ? " archivo subido" : " archivos subidos") + " por " + dela });
+  }
+
+  for (const x of e.results || []) {
+    hilo.push({ cuando: cuando(x.creado_en), tipo: "eval",
+      texto: "Concepto de " + (x.ing_nombre || "?") + " (mat. " + (x.ing_matricula || "—") + "): " +
+             x.clasificacion + (x.falta ? " · pidió: " + x.falta : "") });
+  }
+
+  for (const x of co.results || []) {
+    /* El RESULTADO va en el texto y no escondido: un `simulado` significa que no
+       se envió nada, y un `fallo` que la familia no recibió lo que dice el hilo. */
+    hilo.push({ cuando: x.cuando, tipo: "correo",
+      texto: "Correo «" + x.etiqueta + "» a " + x.para + " · " + x.resultado });
+  }
+
+  for (const x of insp.results || []) {
+    hilo.push({ cuando: cuando(x.recibido_en), tipo: "insp",
+      texto: "Visita de terreno " + x.numero + " · " + (x.obs_nombre || "?") +
+             (x.requiere_esp ? " · REQUIERE ESPECIALISTA" : "") });
+  }
+
+  for (const x of h.results || []) {
+    hilo.push({ cuando: cuando(x.otorgado_en), tipo: "mov",
+      texto: String(x.detalle).replace("caso " + numero + " ", "") + " · " + x.sujeto });
+  }
+
+  /* Ascendente: una historia se lee hacia adelante. Y con la fecha como texto
+     ISO, ordenar cadenas ES ordenar cronológicamente. */
+  hilo.sort((a, b) => (a.cuando < b.cuando ? -1 : a.cuando > b.cuando ? 1 : 0));
+
   return json({ caso: c, enlace, medios: m.results || [], evaluaciones: e.results || [],
-                inspecciones: insp.results || [], historial: h.results || [] });
+                inspecciones: insp.results || [], historial: h.results || [], hilo });
 }
 
 /* ========================================================================
@@ -9874,13 +9968,38 @@ function abrirCaso(numero){
           ? "<br><small>recibida el " + esc(v.recibido_en) + "</small>" : "") +
         (v.requiere_esp ? '<br><small style="color:var(--amber)"><strong>requiere revisión especializada</strong></small>' : "") +
         (v.atendida_en
-          ? '<br><small style="color:var(--ok)">atendida ' + esc(String(v.atendida_en).slice(0,16))
+          ? '<br><small style="color:var(--g)">atendida ' + esc(String(v.atendida_en).slice(0,16))
             + (v.atendida_nota ? " · " + esc(v.atendida_nota) : "") + "</small>"
           : "") +
         (v.pdf_key
           ? '<br><a href="/api/triage/inspeccion/' + esc(v.numero) + '.pdf" target="_blank" rel="noopener">Ver el documento firmado</a>'
           : '<br><small style="color:var(--err)">sin documento</small>') +
         "</li>";
+    }).join("");
+
+    /* EL HILO DE LA CASA. Va antes de los bloques de detalle porque es lo que
+       ORIENTA: responde «qué pasó con esta casa» de un tirón, y los bloques de
+       abajo son la letra pequeña de cada paso. El servidor lo manda ya ordenado.
+
+       Los correos que NO salieron se marcan en rojo, y los simulados en ámbar:
+       un renglón que dice «Correo caso-clasificado» hace creer que la familia se
+       enteró, y un resultado simulado significa que no se envió nada. */
+    /* LOS COLORES SALEN DE styles.css, no de un CSS propio: esta pantalla lo
+       enlaza. Y ahí NO existe --ok — lo declaran inspeccionHTML y paginaRuta en su
+       propio bloque, no el panel. Lo usé dos veces hoy en esta misma pantalla y no
+       pintó nada; se corrigió a --g, que sí está. Antes de escribir cualquier token
+       aquí: comprobarlo en styles.css. */
+    var ICONO = { caso: "○", consent: "✓", medios: "▣", eval: "◆",
+                  correo: "✉", insp: "⌂", mov: "→" };
+    var hilo = (d.hilo || []).map(function(x){
+      var color = "var(--mu)";
+      if (x.tipo === "correo" && /fallo/.test(x.texto)) color = "var(--err)";
+      else if (x.tipo === "correo" && /simulado/.test(x.texto)) color = "var(--amber)";
+      else if (x.tipo === "eval" || x.tipo === "insp") color = "var(--ink)";
+      return '<li style="margin-bottom:8px;list-style:none">'
+        + '<span style="display:inline-block;width:18px;color:var(--mu)">' + (ICONO[x.tipo] || "·") + "</span>"
+        + '<small style="color:var(--mu)">' + esc(x.cuando) + "</small> "
+        + '<span style="color:' + color + '">' + esc(x.texto) + "</span></li>";
     }).join("");
 
     var hist = (d.historial || []).map(function(h){
@@ -9935,6 +10054,12 @@ function abrirCaso(numero){
         'y por eso pide motivo y no se puede deshacer.</p>' +
         '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px">' + fotos + "</div>" +
 
+        (hilo
+          ? '<h4 style="margin-bottom:4px">Hilo de la casa</h4>'
+            + '<p class="mu" style="font-size:13px;margin-bottom:10px">Todo lo que pasó, en orden. '
+            + 'Los bloques de abajo son el detalle de cada paso.</p>'
+            + '<ul style="margin:0 0 22px;padding:0">' + hilo + "</ul>"
+          : "") +
         (evals ? '<h4 style="margin-bottom:8px">Evaluaciones</h4><ul style="margin:0 0 22px 16px">' + evals + "</ul>" : "") +
         (visitas ? '<h4 style="margin-bottom:8px">Visitas de terreno</h4><ul style="margin:0 0 22px 16px">' + visitas + "</ul>" : "") +
         (hist ? '<h4 style="margin-bottom:8px">Historial</h4><ul style="margin:0 0 4px 16px">' + hist + "</ul>" : "") +
@@ -10156,7 +10281,7 @@ function cargarInspecciones(){
       var atender = "";
       if (v.urge) {
         atender = v.atendida_en
-          ? '<br><small style="color:var(--ok)"><strong>atendida</strong> ' + esc((v.atendida_en || "").slice(0,16))
+          ? '<br><small style="color:var(--g)"><strong>atendida</strong> ' + esc((v.atendida_en || "").slice(0,16))
             + (v.atendida_por ? " · " + esc(v.atendida_por) : "")
             + (v.atendida_nota ? "<br>" + esc(v.atendida_nota) : "")
             + '<br><button class="copy" data-insp-reabrir="' + esc(v.numero) + '">Reabrir</button></small>'
