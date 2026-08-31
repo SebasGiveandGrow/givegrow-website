@@ -255,3 +255,53 @@ el sitio le promete al donante.
 Cada cambio manual deja rastro de quién lo hizo, en la tabla `consentimientos`
 con tipo `auditoria`. Hoy el panel es de una sola persona; el día que sean dos,
 «quién marcó esta entrega» es la primera pregunta.
+
+## Cerrar una señal de terreno (desde el 31 ago 2026)
+
+Cuando un ingeniero vuelve de una casa puede dejar tres señales que **no
+esperan**: «requiere revisión especializada», la recomendación `x4` («URGENTE: el
+peligro parece inminente») y la `e1` («Evacuar la vivienda»). Antes esas banderas
+se ponían en 1 y **nada las bajaba**: no había cola que las contara ni forma de
+registrar que alguien se había hecho cargo.
+
+Ahora salen en dos sitios:
+
+- **«Salud del ecosistema» → `terreno_sin_atender`.** Es la cola con la
+  prioridad más alta de todas, porque es la única donde del otro lado hay alguien
+  que ya fue, ya vio, y dijo que corre.
+- **«Inspecciones en terreno».** La fila trae el botón **«Ya la atendimos»**.
+
+### Cómo se cierra
+
+1. Pulsa «Ya la atendimos» en la fila.
+2. **Escribe qué se hizo.** No es opcional, ni en la pantalla ni en el servidor.
+   «Atendido» a secas no sirve: dentro de un mes la pregunta va a ser qué pasó
+   con esa casa, no si alguien pulsó un botón.
+3. La fila queda con la fecha, tu correo y la nota, y la cola baja.
+
+Si te equivocaste, **«Reabrir»** la devuelve a la cola. Las dos cosas —cerrar y
+reabrir— quedan en la auditoría con quién las hizo.
+
+### Lo que esto NO hace, y es a propósito
+
+**No toca el concepto del ingeniero.** `requiere_esp` y las recomendaciones se
+quedan exactamente como las dejó quien estuvo en la casa, igual que el PDF
+congelado. Marcar «atendida» dice *«el equipo ya respondió a esta señal»*, nunca
+*«la señal era falsa»*. Por eso son columnas aparte (`atendida_en`,
+`atendida_por`, `atendida_nota`) y no un `UPDATE` sobre las del ingeniero.
+
+Y **no declara nada sobre la casa.** Declarar si una vivienda es habitable le
+corresponde a la autoridad municipal, no a nosotros — cerrar la fila en el panel
+no es un dictamen.
+
+### Si la cola dice 0 y crees que no debería
+
+La regla vive en **un solo sitio** del código, la constante `TERRENO_URGE` de
+`worker.js`, y la bandeja del panel usa esa misma regla vía el campo `urge` que
+manda la API. Si alguna vez el contador y la lista no coinciden, es que alguien
+duplicó la regla: se arregla volviendo a la constante, no añadiendo una segunda
+copia.
+
+Ojo con una diferencia real: la insignia **«PELIGRO INMINENTE»** de la fila es
+`x4` y solo `x4`. La cola cuenta las tres señales. No es una incoherencia — son
+dos preguntas distintas, y las dos hacen falta.

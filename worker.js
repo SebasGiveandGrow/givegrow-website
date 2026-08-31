@@ -1642,6 +1642,29 @@ async function adminSalud(env) {
     "WHERE c.estado = 'clasificado' AND " + SIN_RESPALDO,
     "Un voluntario ya dio su concepto pero su matrícula no está verificada · falta un segundo par de ojos en /triaje", 40, "#sec-entrar");
 
+  /* LA COLA DE TERRENO, que no existía. Había cinco colas de casos e
+     inscripciones y NINGUNA de inspecciones, así que un ingeniero podía marcar
+     «el peligro parece inminente» estando frente a la casa y eso no aparecía en
+     ninguna lista de pendientes: esperaba a que alguien abriera la bandeja por su
+     cuenta y se fijara en una insignia.
+
+     Es la cola con el orden más alto de todas (10) porque es la única donde del
+     otro lado hay alguien que ya fue, ya vio, y dijo que corre.
+
+     `x4` es «URGENTE: el peligro parece inminente» y `e1` «Evacuar la vivienda».
+     Se buscan con `instr` sobre el TEXTO del arreglo JSON —no con `json_each`—
+     porque eso último sería una subconsulta correlacionada por fila, la misma
+     forma cuadrática que ya se pagó una vez en esta base. Los identificadores
+     van entre comillas para que `"x4"` no case con un futuro `"x40"`.
+
+     Y se vacía: `atendida_en` la saca. Sin eso sería un reproche permanente que
+     a la semana nadie mira porque siempre dice lo mismo. */
+  await enCola("terreno_sin_atender",
+    "SELECT COUNT(*) AS n, MIN(recibido_en) AS masViejo FROM inspecciones " +
+    "WHERE atendida_en IS NULL AND (" + TERRENO_URGE + ")",
+    "Alguien ya fue a la casa y dijo que corre · panel, «Inspecciones en terreno» · se cierra con «Ya la atendimos» y qué se hizo",
+    10, "#sec-inspecciones");
+
   /* Intenciones abandonadas: más de 48 h en `intencion` y sin transacción de
      Wompi. No se tocan solas —borrar el registro de alguien que quizá vuelva a
      pagar sería peor que dejarlo— pero hay que poder verlas: cada una quemó un
@@ -2823,6 +2846,29 @@ const DISCREPA = "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e "
    suelto porque va acompañado SIEMPRE de su total: el día que alguien lo suba,
    lo que la pantalla dice sigue siendo verdad. */
 const TOPE_COLA = 200;
+/* QUÉ CUENTA COMO SEÑAL DE TERRENO QUE NO ESPERA, en un solo sitio.
+
+   Tres cosas, y las tres las decidió alguien que estaba de pie frente a la casa:
+   `requiere_esp` (hace falta un especialista), la recomendación `x4` («URGENTE:
+   el peligro parece inminente, priorizar la visita del experto») y la `e1`
+   («Evacuar la vivienda»). Los identificadores viven en `documentos.js` y son
+   PERMANENTES, por eso se pueden escribir aquí.
+
+   Se busca con `instr` sobre el texto del arreglo JSON y no con `json_each`:
+   eso último sería una subconsulta correlacionada por fila —la forma cuadrática
+   que ya costó cara en esta base— y aquí basta un escaneo corto. Las comillas
+   dentro de la aguja son a propósito: `"x4"` no puede casar con un `"x40"` que
+   alguien añada mañana.
+
+   Existe como constante porque la cola de salud y la bandeja del panel tienen
+   que estar de acuerdo. Dos copias de esta regla en desacuerdo serían la clase
+   de fallo que este proyecto ya conoce: el contador diciendo una cosa y la lista
+   otra. */
+const TERRENO_URGE =
+  "requiere_esp = 1 " +
+  "OR instr(COALESCE(json_extract(recomendaciones, '$.marcadas'), ''), '\"x4\"') > 0 " +
+  "OR instr(COALESCE(json_extract(recomendaciones, '$.marcadas'), ''), '\"e1\"') > 0";
+
 const TOPE_INSPECCIONES = 300;
 
 async function triageCasos(env, url) {
@@ -5470,6 +5516,66 @@ async function adminMoverCaso(request, env, numero, quien) {
   return json({ ok: true, numero, estado: nuevo, anterior: caso.estado });
 }
 
+/* POST /api/admin/inspeccion/<numero>/atendida — cerrar una señal de terreno.
+
+   `requiere_esp` y las recomendaciones `x4`/`e1` eran banderas SIN SALIDA: se
+   ponían en 1 y nada las bajaba ni registraba que alguien se hubiera hecho
+   cargo. Sin esto, la cola de salud sería un reproche permanente — a la semana
+   nadie la mira porque siempre dice lo mismo.
+
+   NO TOCA EL CONCEPTO. `requiere_esp` y las recomendaciones se quedan como las
+   dejó quien estuvo en la casa, igual que el PDF congelado: marcar «atendida»
+   dice «el equipo ya respondió a esta señal», no «la señal era falsa». Por eso
+   son columnas aparte y no un UPDATE sobre las del ingeniero.
+
+   LA NOTA ES OBLIGATORIA, y esa es la única razón por la que este endpoint vale
+   algo. «Atendido» a secas no sirve: dentro de un mes la pregunta va a ser qué
+   pasó con esa casa, no si alguien pulsó un botón. Mismo criterio que el motivo
+   de `adminMoverCaso`.
+
+   Se puede reabrir mandando `atendida: false`, porque cerrar por error tiene que
+   poder deshacerse — el callejón sin salida es justo lo que se está arreglando
+   aquí y sería absurdo crear otro. */
+async function adminInspeccionAtendida(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  const v = await env.DB.prepare(
+    "SELECT numero, atendida_en FROM inspecciones WHERE numero = ?"
+  ).bind(numero).first();
+  if (!v) return json({ error: "no_encontrada" }, 404);
+
+  /* Reabrir. Se registra igual que cerrar: quién la reabrió queda en auditoría,
+     porque volver a poner una casa en la cola de peligro es una decisión. */
+  if (c.atendida === false) {
+    if (!v.atendida_en) return json({ error: "no_estaba_atendida" }, 409);
+    await env.DB.prepare(
+      "UPDATE inspecciones SET atendida_en = NULL, atendida_por = NULL, atendida_nota = NULL WHERE numero = ?"
+    ).bind(numero).run();
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(quien || "?", "inspeccion " + numero + " reabierta").run();
+    return json({ ok: true, numero, atendida: false });
+  }
+
+  const nota = String(c.nota == null ? "" : c.nota).trim().slice(0, 500);
+  if (!nota) {
+    return json({ error: "nota_requerida",
+                  ayuda: "Di qué se hizo con esta casa. Sin eso, en un mes nadie sabe si se atendió o solo se cerró la fila." }, 422);
+  }
+  if (v.atendida_en) return json({ error: "ya_atendida", atendida_en: v.atendida_en }, 409);
+
+  await env.DB.prepare(
+    "UPDATE inspecciones SET atendida_en = datetime('now'), atendida_por = ?, atendida_nota = ? WHERE numero = ?"
+  ).bind(quien || "?", nota, numero).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "inspeccion " + numero + " atendida · " + nota).run();
+
+  return json({ ok: true, numero, atendida: true });
+}
+
 /* ========================================================================
    POST /api/admin/caso/<n>/medio — la foto de la visita
    ========================================================================
@@ -7264,6 +7370,7 @@ async function adminInspecciones(env) {
   const r = await env.DB.prepare(
     "SELECT numero, caso, municipio, direccion, casa_no, fecha_visita, hora, " +
     "obs_nombre, obs_matricula, propietario, contacto, requiere_esp, " +
+    "atendida_en, atendida_por, atendida_nota, " +
     "firma_hab_key, firma_hab_motivo, pdf_key, respuestas, familia, finca, recomendaciones, fotos, " +
     "substr(creado_en,1,16) AS creado_en, substr(recibido_en,1,16) AS recibido_en " +
     "FROM inspecciones ORDER BY requiere_esp DESC, recibido_en DESC LIMIT " + TOPE_INSPECCIONES
@@ -7282,13 +7389,25 @@ async function adminInspecciones(env) {
     /* SI ALGUIEN MARCÓ «peligro inminente», eso no puede quedar dentro de un PDF
        que hay que abrir: es lo único de esta bandeja que no espera. Se sube a la
        fila como una bandera. */
-    let urgente = false, nReco = 0;
+    let urgente = false, evacuar = false, nReco = 0;
     try {
       const r = JSON.parse(v.recomendaciones || "{}");
       const m = Array.isArray(r.marcadas) ? r.marcadas : [];
       nReco = m.length + (r.texto ? 1 : 0);
       urgente = m.indexOf("x4") >= 0;
+      evacuar = m.indexOf("e1") >= 0;
     } catch { /* una fila con JSON roto no tumba la bandeja */ }
+
+    /* `urge` ES LA MISMA REGLA QUE `TERRENO_URGE`, la de la cola de salud, y por
+       eso se calcula aquí y no en el navegador. La bandeja ya tenía `urgente`
+       mirando solo `x4`; si el botón de «ya la atendimos» hubiera usado eso, una
+       inspección que solo marcó `e1` («Evacuar la vivienda») habría estado en la
+       cola sin forma de cerrarse desde la fila. El contador diciendo una cosa y
+       la lista otra es un fallo que este proyecto ya conoce.
+
+       `urgente` se queda como estaba porque significa otra cosa —es la insignia
+       de PELIGRO INMINENTE, que es `x4` y solo `x4`— y las dos hacen falta. */
+    const urge = !!(v.requiere_esp || urgente || evacuar);
 
     /* CUÁNTAS FOTOS TIENE. La lista completa lleva llave y bytes de cada una y
        no hace falta en la tabla: el panel solo necesita saber hasta qué número
@@ -7302,7 +7421,7 @@ async function adminInspecciones(env) {
     /* `respuestas`, `recomendaciones` y `fotos` NO viajan al panel: pesan y lo
        que se usa en la tabla son sus cuentas. */
     const { respuestas, recomendaciones, fotos, ...resto } = v;
-    return { ...resto, marcas, urgente, nReco, n_fotos: nFotos };
+    return { ...resto, marcas, urgente, evacuar, urge, nReco, n_fotos: nFotos };
   });
   const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM inspecciones").first();
   return json({ inspecciones: filas, total: (tot && tot.n) || 0, tope: TOPE_INSPECCIONES });
@@ -9205,11 +9324,27 @@ function cargarInspecciones(){
         visita += "<br><small>recibida el " + esc(recib) + "</small>";
       }
 
+      /* CERRAR LA SEÑAL. Solo aparece en las filas que la cola de salud cuenta
+         —v.urge, que es la misma regla— porque en las demás no hay nada que
+         cerrar. Atendida no significa que la señal fuera falsa: el concepto del
+         ingeniero no se toca. Significa que el equipo ya respondió. */
+      var atender = "";
+      if (v.urge) {
+        atender = v.atendida_en
+          ? '<br><small style="color:var(--ok)"><strong>atendida</strong> ' + esc((v.atendida_en || "").slice(0,16))
+            + (v.atendida_por ? " · " + esc(v.atendida_por) : "")
+            + (v.atendida_nota ? "<br>" + esc(v.atendida_nota) : "")
+            + '<br><button class="copy" data-insp-reabrir="' + esc(v.numero) + '">Reabrir</button></small>'
+          : '<br><button class="copy" data-insp-at="' + esc(v.numero) + '">Ya la atendimos</button>';
+      }
+
       return "<tr>" +
         "<td><strong>" + esc(v.numero) + "</strong>" +
           (v.caso ? "<br><small>" + esc(v.caso) + "</small>" : "") +
           (v.requiere_esp ? '<br><small style="color:var(--amber)"><strong>requiere revisión especializada</strong></small>' : "") +
-          (v.urgente ? '<br><small style="color:var(--err)"><strong>PELIGRO INMINENTE — el ingeniero pidió priorizar</strong></small>' : "") + "</td>" +
+          (v.urgente ? '<br><small style="color:var(--err)"><strong>PELIGRO INMINENTE — el ingeniero pidió priorizar</strong></small>' : "") +
+          (v.evacuar ? '<br><small style="color:var(--err)"><strong>recomendó EVACUAR la vivienda</strong></small>' : "") +
+          atender + "</td>" +
         "<td>" + esc(v.familia || "-") +
           (v.finca ? "<br><small>" + esc(v.finca) + "</small>" : "") + "</td>" +
         "<td>" + esc(v.municipio || "-") +
@@ -9317,6 +9452,50 @@ document.addEventListener("click", function(e){
         alert(d.ayuda || d.error || "No se pudo emitir el documento.");
       })
       .catch(function(){ ip.disabled = false; ip.textContent = "No se pudo"; });
+    return;
+  }
+
+  /* «Ya la atendimos». La nota se PIDE y no se puede saltar: el servidor la
+     exige, y aquí se pregunta antes para no gastar un viaje. Lo que importa no
+     es cerrar la fila, es que en un mes se pueda leer qué se hizo con la casa. */
+  var ia = e.target.closest("[data-insp-at]");
+  if (ia){
+    var num = ia.getAttribute("data-insp-at");
+    var nota = prompt("¿Qué se hizo con esta casa? (" + num + ")\\n\\nLo va a leer alguien dentro de un mes preguntando qué pasó.");
+    if (nota === null) return;
+    nota = nota.trim();
+    if (!nota) { alert("Hace falta decir qué se hizo. Sin eso la fila se cierra y no queda rastro."); return; }
+    ia.disabled = true; ia.textContent = "Guardando…";
+    fetch("/api/admin/inspeccion/" + encodeURIComponent(num) + "/atendida",
+      { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ nota: nota }) })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) { cargarInspecciones(); cargarSalud(); return; }
+        ia.disabled = false; ia.textContent = "Ya la atendimos";
+        alert(d.ayuda || d.error || "No se pudo guardar.");
+      })
+      .catch(function(){ ia.disabled = false; ia.textContent = "Ya la atendimos"; });
+    return;
+  }
+
+  /* Reabrir. Volver a poner una casa en la cola de peligro es una decisión, así
+     que se confirma y queda en auditoría del lado del servidor. */
+  var ir = e.target.closest("[data-insp-reabrir]");
+  if (ir){
+    var numr = ir.getAttribute("data-insp-reabrir");
+    if (!confirm("¿Reabrir " + numr + "? Vuelve a la cola de señales de terreno sin atender.")) return;
+    ir.disabled = true; ir.textContent = "Reabriendo…";
+    fetch("/api/admin/inspeccion/" + encodeURIComponent(numr) + "/atendida",
+      { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ atendida: false }) })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) { cargarInspecciones(); cargarSalud(); return; }
+        ir.disabled = false; ir.textContent = "Reabrir";
+        alert(d.ayuda || d.error || "No se pudo reabrir.");
+      })
+      .catch(function(){ ir.disabled = false; ir.textContent = "Reabrir"; });
     return;
   }
 
@@ -10064,6 +10243,8 @@ export default {
         if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env);
         const mip = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/pdf$/);
         if (mip) return await adminInspeccionEmitirPDF(request, env, mip[1]);
+        const mia = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/atendida$/);
+        if (mia) return await adminInspeccionAtendida(request, env, mia[1], sesion.email);
         if (ruta === "/api/admin/miembros") return await adminMiembros(env);
         if (ruta === "/api/admin/reportadas") return await adminReportadas(env);
         const rc = ruta.match(/^\/api\/admin\/comprobante\/(GG-\d{4}-\d{6})$/i);
