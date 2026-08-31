@@ -832,8 +832,35 @@ export async function informeTriage(c, hoyISO) {
   h.p.drawLine({ start: { x: MG.izq, y: yl }, end: { x: MG.izq + 240, y: yl }, thickness: 0.75, color: TINTA });
   h.y = yl - 14;
   h.texto(c.ing_nombre || "-", { tam: 10.5, fuente: f.negrita, despues: 3 });
-  h.texto("Ingeniero voluntario · Matrícula profesional " + (c.ing_matricula || "-"),
-    { tam: 9, color: GRIS, despues: 3 });
+
+  /* LA MATRÍCULA, Y SI ALGUIEN LA COMPROBÓ — que no es lo mismo y este documento
+     los daba por iguales.
+
+     Aquí se imprimía el número sin más, y `faq.a11` le promete a la familia «un
+     ingeniero voluntario CON MATRÍCULA». Pero la regla que retiene la respuesta
+     hasta que haya una matrícula verificada solo se aplicaba al correo: la
+     pantalla y este PDF entregaban el concepto igual, con la matrícula sin
+     comprobar impresa como si lo estuviera. De los tres canales por los que la
+     familia recibe la respuesta, la garantía cubría uno.
+
+     Decir «declarada» cuando nadie la comprobó no debilita el documento: lo hace
+     cierto. Un concepto útil firmado con una credencial que la fundación aún no
+     confirmó sigue siendo útil — lo que no puede es presentarse como confirmado.
+
+     Desde el 31 ago la matrícula la pone el registro y no el formulario (ver
+     `firmanteVerificado` en worker.js), así que el caso normal es el verificado.
+     Este otro queda para cuando alguien del equipo firma un concepto: entra con
+     la audiencia del panel y no cuenta como verificado, a propósito. */
+  if (c.matricula_verificada) {
+    h.texto("Ingeniero voluntario · Matrícula profesional " + (c.ing_matricula || "-")
+      + ", verificada por la Fundación ante el COPNIA",
+      { tam: 9, color: GRIS, despues: 3 });
+  } else {
+    h.texto("Ingeniero voluntario · Matrícula profesional declarada: " + (c.ing_matricula || "-"),
+      { tam: 9, color: GRIS, despues: 3 });
+    h.texto("La Fundación todavía no ha verificado esta matrícula ante el COPNIA.",
+      { tam: 9, color: GRIS, despues: 3 });
+  }
   h.texto("Evaluación realizada el " + fechaLarga(c.evaluado_en || hoyISO), { tam: 9, color: GRIS, despues: 16 });
 
   h.texto(

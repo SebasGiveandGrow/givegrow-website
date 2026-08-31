@@ -1636,10 +1636,19 @@ async function adminSalud(env) {
 
   /* Y la cola nueva: conceptos que no pueden salir solos. Mientras estén aquí,
      la familia NO ha recibido respuesta — es la cola más urgente de las de
-     personas, porque del otro lado alguien mandó fotos de su casa rota. */
+     personas, porque del otro lado alguien mandó fotos de su casa rota.
+
+     NO SE FILTRA POR `estado = 'clasificado'`, y eso era un escape silencioso:
+     bastaba que alguien moviera el caso a `visitado` para que desapareciera de
+     aquí CON EL CORREO TODAVÍA SIN ENVIAR, y sin dejar rastro de que se debía.
+     El caso se veía atendido y la familia seguía sin haber recibido nada. Ahora
+     solo salen de la cola los que se cerraron o descartaron a propósito —donde
+     alguien tuvo que escribir un motivo— o cuando el respaldo llega de verdad.
+
+     Encontrado el 31 ago 2026 en la auditoría, junto con la matrícula. */
   await enCola("conceptos_sin_respaldo",
     "SELECT COUNT(*) AS n, MIN(c.creado_en) AS masViejo FROM casos c " +
-    "WHERE c.estado = 'clasificado' AND " + SIN_RESPALDO,
+    "WHERE c.estado NOT IN ('cerrado','descartado') AND " + SIN_RESPALDO,
     "Un voluntario ya dio su concepto pero su matrícula no está verificada · falta un segundo par de ojos en /triaje", 40, "#sec-entrar");
 
   /* LA COLA DE TERRENO, que no existía. Había cinco colas de casos e
@@ -2654,9 +2663,18 @@ function esc(s){
 }
 function el(id){ return document.getElementById(id); }
 
-fetch("/api/admin/quien").then(function(r){ return r.json(); }).then(function(d){
-  el("quien").textContent = d.email ? ("Sesión de " + d.email) : "Sesión activa";
-});
+/* CON QUÉ SE FIRMA, traído del registro. FIRMANTE es lo que el servidor dice
+   que se va a imprimir en el PDF de la familia, no lo que alguien teclee: si su
+   matrícula está verificada, el formulario NO la pregunta. */
+var FIRMANTE = { verificada: false, nombre: null, matricula: null };
+
+fetch("/api/triage/quien").then(function(r){ return r.json(); }).then(function(d){
+  FIRMANTE = d || FIRMANTE;
+  el("quien").textContent = d.verificada
+    ? ("Sesión de " + (d.email || "?") + " · firmas como " + (d.nombre || "?")
+       + ", matrícula " + (d.matricula || "?"))
+    : (d.email ? ("Sesión de " + d.email) : "Sesión activa");
+}).catch(function(){ el("quien").textContent = "Sesión activa"; });
 
 var COLA = "pendientes";
 
@@ -2736,8 +2754,19 @@ function abrir(numero){
       +  "<option value='programada'>Visita programada</option>"
       +  "<option value='no_requiere'>No requiere visita</option>"
       +  "<option value='inevaluable'>No puedo evaluar con esto</option></select>"
-      +  "<label>Tu nombre</label><input id='t-nombre'>"
-      +  "<label>Tu matrícula profesional</label><input id='t-mat'>"
+      /* NO SE PREGUNTAN si el registro ya los tiene verificados. El número de
+         matrícula es largo y se pedía de memoria en cada caso; así fue como un
+         concepto salió firmado con un número que no era el comprobado. Lo que se
+         enseña aquí es exactamente lo que va a ir impreso. */
+      +  (FIRMANTE.verificada
+          ? "<label>Firma</label><p class='sub' style='margin:0 0 10px'><b>"
+            + esc(FIRMANTE.nombre || "?") + "</b> &middot; matrícula <b>"
+            + esc(FIRMANTE.matricula || "?") + "</b><br><small>Del registro, ya verificada. "
+            + "Si algo de esto está mal, avisa al equipo: no se corrige desde aquí.</small></p>"
+          : "<label>Tu nombre</label><input id='t-nombre'>"
+            + "<label>Tu matrícula profesional</label><input id='t-mat'>"
+            + "<p class='sub' style='margin:0 0 10px'><small>Tu matrícula no está verificada todavía, "
+            + "así que este concepto no le sale solo a la familia: lo revisa el equipo primero.</small></p>")
       +  "<label>Nota técnica</label><textarea id='t-nota' rows='4'></textarea>"
       +  "<label>Concepto para la familia (OBLIGATORIO, salvo si no puedes evaluar): si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar. Es lo que el sitio le prometió y lo único que va a recibir.</label><textarea id='t-rec' rows='5'></textarea>"
       +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
@@ -2754,8 +2783,12 @@ function enviar(){
   fetch("/api/triage/caso/" + encodeURIComponent(CASO) + "/evaluar", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      clasificacion: el("t-clas").value, nombre: el("t-nombre").value,
-      matricula: el("t-mat").value, nota_tecnica: el("t-nota").value,
+      clasificacion: el("t-clas").value,
+      /* Si están verificados, estos campos no existen en la pantalla y el
+         servidor los ignora de todas formas: la firma la pone él. */
+      nombre: el("t-nombre") ? el("t-nombre").value : "",
+      matricula: el("t-mat") ? el("t-mat").value : "",
+      nota_tecnica: el("t-nota").value,
       recomendacion: el("t-rec").value, falta: el("t-falta").value
     })
   }).then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
@@ -2825,6 +2858,36 @@ const MATRICULA_OK = (col) =>
   "EXISTS (SELECT 1 FROM inscripciones i WHERE i.tipo = 'ingeniero' " +
   "AND lower(i.email) = lower(" + col + ") " +
   "AND json_extract(i.datos, '$.matricula_verificada') = 1)";
+
+/* QUIÉN FIRMA, según el registro y no según lo que alguien teclee.
+
+   Camila declaró `091037-0518660 CND` al inscribirse —la matrícula que se
+   comprobó en el COPNIA— y escribió `24579` en su evaluación. `24579` es lo que
+   iba impreso como firma en el PDF de la familia, y nada cruzaba los dos
+   valores. No era mala fe: es un número largo que el formulario pedía otra vez,
+   de memoria, cada vez que se evalúa un caso.
+
+   La salida no es comprobar y avisar del desajuste, es NO PREGUNTAR. El sistema
+   ya sabe el nombre y la matrícula de quien entró —los verificó una persona
+   contra el COPNIA— así que el formulario no tiene por qué ofrecer la
+   oportunidad de equivocarse. Mismo criterio que la lista de recomendaciones del
+   terreno: no se ofrece lo que no se puede escribir mal.
+
+   Devuelve `verificada: false` cuando no hay inscripción de ingeniero verificada
+   para ese correo — el equipo entra a `/triaje` con la audiencia del panel y NO
+   cuenta como verificado, que es deliberado y está explicado en `MATRICULA_OK`.
+   En ese caso sí hace falta lo que se teclee, y el concepto queda sin respaldo. */
+async function firmanteVerificado(env, email) {
+  if (!email) return { verificada: false, nombre: null, matricula: null };
+  const i = await env.DB.prepare(
+    "SELECT nombre, json_extract(datos, '$.matricula') AS matricula FROM inscripciones " +
+    "WHERE tipo = 'ingeniero' AND lower(email) = lower(?) " +
+    "AND COALESCE(json_extract(datos, '$.matricula_verificada'), 0) = 1 " +
+    "AND estado NOT IN ('archivada','rechazada') LIMIT 1"
+  ).bind(email).first();
+  if (!i || !i.matricula) return { verificada: false, nombre: null, matricula: null };
+  return { verificada: true, nombre: i.nombre || null, matricula: String(i.matricula) };
+}
 
 /* Un caso SIN RESPALDO: tiene opinión firme, pero ninguna de un ingeniero con
    matrícula verificada. Es lo que no puede llegar solo a una familia. */
@@ -2964,8 +3027,14 @@ async function triageEvaluar(request, env, numero, email) {
   if (!CLASIFICACIONES.includes(clasificacion)) {
     return json({ error: "clasificacion_invalida", permitidas: CLASIFICACIONES }, 422);
   }
-  const nombre = limpiar(c.nombre, 200);
-  const matricula = limpiar(c.matricula, 60);
+  /* LA FIRMA SALE DEL REGISTRO, NO DEL FORMULARIO. Ver `firmanteVerificado`:
+     lo que se teclea solo se usa si no hay inscripción verificada para ese
+     correo, y entonces el concepto queda sin respaldo de todas formas. Así la
+     matrícula que va impresa en el PDF de la familia es exactamente la que
+     alguien comprobó en el COPNIA, y no un número escrito de memoria. */
+  const firmante = await firmanteVerificado(env, email);
+  const nombre = firmante.verificada ? firmante.nombre : limpiar(c.nombre, 200);
+  const matricula = firmante.verificada ? firmante.matricula : limpiar(c.matricula, 60);
   const nota = limpiar(c.nota_tecnica, 2000);
   /* Sin nombre, matrícula y nota no se guarda. Una clasificación anónima o sin
      sustento no le sirve a nadie: ni a la familia, que recibe un documento, ni
@@ -5241,7 +5310,7 @@ async function resolverClasificacion(env, numero) {
 async function evaluacionVigente(env, numero, clasificacion) {
   if (clasificacion) {
     const e = await env.DB.prepare(
-      "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
+      "SELECT ing_nombre, ing_matricula, ing_email, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
       "FROM evaluaciones WHERE caso = ? AND clasificacion = ? ORDER BY creado_en DESC LIMIT 1"
     ).bind(numero, clasificacion).first();
     if (e) return e;
@@ -5249,7 +5318,7 @@ async function evaluacionVigente(env, numero, clasificacion) {
   /* Sin clasificación en el caso —`inevaluable`, que la deja en NULL— manda la
      última, que es la que dice qué falta. */
   return await env.DB.prepare(
-    "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
+    "SELECT ing_nombre, ing_matricula, ing_email, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
     "FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
   ).bind(numero).first();
 }
@@ -5359,7 +5428,17 @@ async function apiCasoInforme(env, numero, token) {
     medios: (m && m.n) || 0,
     clasificacion: e.clasificacion, nota_tecnica: e.nota_tecnica,
     recomendacion: e.recomendacion, falta: e.falta,
-    ing_nombre: e.ing_nombre, ing_matricula: e.ing_matricula, evaluado_en: e.creado_en
+    ing_nombre: e.ing_nombre, ing_matricula: e.ing_matricula, evaluado_en: e.creado_en,
+    /* SI ESA MATRÍCULA ESTÁ COMPROBADA, y se pregunta AHORA en vez de guardarse
+       con la evaluación: este PDF se arma en cada descarga, así que verificar a
+       alguien después tiene que mejorar los documentos que ya emitió, no dejar
+       congelada una advertencia que dejó de ser cierta.
+
+       Desde el 31 ago la firma sale del registro (ver `firmanteVerificado`), así
+       que en la práctica esto será true casi siempre. Sigue haciendo falta para
+       el equipo, que entra a /triaje con la audiencia del panel y NO cuenta como
+       verificado — deliberado, ver `MATRICULA_OK`. */
+    matricula_verificada: (await firmanteVerificado(env, e.ing_email)).verificada
   }, hoy);
 
   return new Response(bytes, {
@@ -10151,6 +10230,17 @@ export default {
                carpeta y no podría servir /triaje/inspeccion. */
             "service-worker-allowed": "/triaje/"
           }});
+        }
+        /* La sesión del ingeniero. Antes `/triaje` pedía `/api/admin/quien`, que
+           exige la audiencia DEL PANEL: a un voluntario le daba 403 y su línea
+           de «Cargando sesión…» no resolvía nunca. Encontrado el 31 ago 2026
+           arreglando la matrícula. Esta vive bajo `/api/triage/`, que acepta las
+           dos audiencias, y además dice con qué nombre y matrícula va a firmar,
+           para que el formulario no tenga que preguntarlo. */
+        if (ruta === "/api/triage/quien") {
+          const f = await firmanteVerificado(env, sesion.email);
+          return json({ email: sesion.email, equipo: !!sesion.equipo,
+                        nombre: f.nombre, matricula: f.matricula, verificada: f.verificada });
         }
         if (ruta === "/api/triage/mis-inspecciones") return await triageMisInspecciones(env, sesion);
         const mf = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\/foto$/);
