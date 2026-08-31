@@ -39,8 +39,9 @@ nadie podía llegar a él, y quien llegaba no siempre recibía lo que se le prom
 | #199 | Al ingeniero se le dice que ya puede entrar · el botón para reenviarlo · un aviso interno desfasado |
 | #201 | La visita mueve el caso · **un número mal teclado dejaba la visita atrapada para siempre** · la ficha enseña sus visitas |
 | #203 | El callejón de los 20 archivos · las fotos del equipo ya no roban cupo · se aceptaban fotos en casos cerrados · `orden` colisionaba tras borrar |
+| #205 | La deuda de SQL: índice por expresión (**migración 0017**) · las coordenadas salen del PDF a la pantalla de ruta · la leyenda del PDF estaba escrita tres veces · `filaTope` señalaba filtros que no existen |
 
-### ⚠️ CATORCE COSAS QUE NO HAY QUE DESHACER, con su razón
+### ⚠️ DIECISÉIS COSAS QUE NO HAY QUE DESHACER, con su razón
 
 Se suman a las tres de la sesión anterior (la bandera `RESTAURANDO`, las firmas
 con su contador de trazos y su proporción, y `requiere_esp` guardado como null).
@@ -103,6 +104,16 @@ con su contador de trazos y su proporción, y `requiere_esp` guardado como null)
 14. **`orden` en `caso_medios` es `MAX(orden)+1`, no `COUNT(*)`,** en LOS DOS
    sitios que insertan. Con COUNT, borrar un medio hacía que el siguiente
    reutilizara un número ocupado. Los huecos son correctos; los duplicados no.
+15. **`ix_inscripciones_email_lower` es un índice POR EXPRESIÓN** —`lower(email)`—
+   y existe porque `MATRICULA_OK` compara `lower(i.email) = lower(?)`, así que el
+   índice sobre la columna no se podía usar. Medido: 8-9 ms → 1-2 ms, y esa
+   subconsulta va como columna del SELECT en TODAS las pestañas de /triaje. Si
+   alguien «normaliza» la comparación quitando el `lower`, hay que cambiar el
+   índice a la vez o se vuelve inútil otra vez.
+16. **La leyenda del PDF de inspección sale de `INSPECCION_MARCAS`,** que ahora
+   lleva sigla y significado. Estaba escrita TRES veces —la constante sin usar, la
+   leyenda larga y las siglas de cada renglón— en un papel que alguien firma. No
+   volver a escribir «[RE] » a mano.
 
 ### 🔨 Lo que queda abierto, y por qué
 
@@ -123,12 +134,19 @@ irreversible y mientras esté puesto a la familia no se le escribe nunca más, y
 que se dispara de más porque cuenta FILAS y no PERSONAS—. No se toca hasta que lo
 pidas.
 
-**Trabajo que sigue pendiente, en orden:**
+**Trabajo pendiente de código: NINGUNO.** Los 21 hallazgos de la auditoría que
+eran trabajo están cerrados y desplegados. Lo que queda son tus cuatro decisiones,
+lo que excluiste, y la prueba con una persona real — que es lo de abajo.
 
-1. **Deuda de SQL que el gate no ve:** CUATRO índices muertos —`ix_insp_caso` dejó de
-   estarlo con el #201—, siete columnas que se escriben y nadie lee, las coordenadas GPS que solo existen dentro del PDF
-   (la pantalla de ruta no las tiene), y `filaTope` mandando usar filtros que no
-   existen.
+De la deuda de SQL quedan tres columnas muertas (`proyecto`, `consent_hab`,
+`dispositivo`) y tres índices que no se pueden usar (`ix_casos_tel`,
+`ix_eval_ing`, `ix_insp_muni`). **Se dejaron a propósito, no por olvido:** las
+columnas están documentadas junto al INSERT para que nadie las lea como si
+significaran algo, y borrarlas es una migración destructiva sobre una tabla con
+documentos firmados por un beneficio cosmético. Los índices se activarían solos el
+día que se escriba la consulta que los justifica —una pantalla de «mis
+evaluaciones» para el ingeniero usaría `ix_eval_ing`, y un filtro por municipio
+usaría `ix_insp_muni`—; hasta entonces cuestan un poco de escritura y nada más.
 
 ### 📌 Lo que NO se ha probado nunca con una persona real
 
