@@ -2885,8 +2885,12 @@ async function firmanteVerificado(env, email) {
     "AND COALESCE(json_extract(datos, '$.matricula_verificada'), 0) = 1 " +
     "AND estado NOT IN ('archivada','rechazada') LIMIT 1"
   ).bind(email).first();
-  if (!i || !i.matricula) return { verificada: false, nombre: null, matricula: null };
-  return { verificada: true, nombre: i.nombre || null, matricula: String(i.matricula) };
+  /* HACEN FALTA LOS DOS. Si faltara el nombre, el formulario dejaría de pedirlo
+     —porque se cree verificado— y el servidor lo exigiría igual: el ingeniero
+     vería «datos_incompletos» sin ningún campo que rellenar, encerrado. Con los
+     dos ausentes se cae al camino de siempre, que pide y funciona. */
+  if (!i || !i.matricula || !i.nombre) return { verificada: false, nombre: null, matricula: null };
+  return { verificada: true, nombre: String(i.nombre), matricula: String(i.matricula) };
 }
 
 /* Un caso SIN RESPALDO: tiene opinión firme, pero ninguna de un ingeniero con
