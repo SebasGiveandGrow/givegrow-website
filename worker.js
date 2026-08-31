@@ -671,7 +671,18 @@ async function anotarCorreo(env, fila) {
   }
 }
 
-async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos, guia }) {
+/* `msTope` — TIEMPO LÍMITE OPCIONAL, y existe por un camino concreto: el aviso
+   de que entró una inspección de terreno se manda dentro de la peticion que
+   hace el TELÉFONO del ingeniero. La llamada a Resend no tenía tope, así que un
+   Resend lento habría dejado a alguien en zona sin señal esperando para vaciar
+   su cola — y vaciar la cola es lo único que no puede fallar ahí.
+
+   Con tope, lo peor que pasa es que el correo se anote como `fallo` y aparezca
+   en la cola `correos_fallidos`: la inspección ya está guardada y el teléfono
+   sigue. Sin tope, lo peor es que la visita se quede en el teléfono.
+
+   Los demás envíos NO pasan tope y se comportan exactamente igual que antes. */
+async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos, guia, msTope }) {
   const llave = env.RESEND_API_KEY;
   const desde = env.CORREO_DESDE || CORREO_DESDE_DEF;
   const base = { etiqueta, para, asunto, guia };
@@ -686,6 +697,10 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
     return { ok: true, simulado: true };
   }
 
+  /* AbortController y no AbortSignal.timeout: el patrón que ya usa el resto del
+     proyecto, y el que funciona en todas partes. */
+  const corte = msTope ? new AbortController() : null;
+  const reloj = corte ? setTimeout(() => corte.abort(), msTope) : null;
   try {
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -693,7 +708,8 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
       body: JSON.stringify({
         from: desde, to: [para], subject: asunto, text: texto, html,
         ...(adjuntos && adjuntos.length ? { attachments: adjuntos } : {})
-      })
+      }),
+      ...(corte ? { signal: corte.signal } : {})
     });
     if (!r.ok) {
       const detalle = (await r.text()).slice(0, 300);
@@ -712,9 +728,18 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
     await anotarCorreo(env, { ...base, resultado: "enviado", proveedor_id: id });
     return { ok: true, id };
   } catch (e) {
-    console.error("correo excepción", etiqueta || "", e && e.message);
-    await anotarCorreo(env, { ...base, resultado: "fallo", error: String(e && e.message) });
-    return { ok: false, error: String(e && e.message) };
+    /* Un corte por tope entra por aquí como `AbortError`, y se anota como lo que
+       es: el correo no salió. Se nombra distinto para que en la cola de correos
+       fallidos se distinga «Resend contestó mal» de «no esperamos más». */
+    const abortado = e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")));
+    const detalle = abortado
+      ? "sin respuesta en " + msTope + " ms · se cortó para no bloquear a quien envió"
+      : String(e && e.message);
+    console.error("correo excepción", etiqueta || "", detalle);
+    await anotarCorreo(env, { ...base, resultado: "fallo", error: detalle });
+    return { ok: false, error: detalle, cortado: !!abortado };
+  } finally {
+    if (reloj) clearTimeout(reloj);
   }
 }
 
@@ -2570,6 +2595,18 @@ function paginaTriage() {
   </div>
   <div id="lista"><p class="cargando">Cargando casos...</p></div>
   <div id="ficha"></div>
+
+  <!-- EL FORMULARIO DE TERRENO, que hasta hoy no estaba enlazado desde ningún
+       sitio: se llegaba escribiendo la URL a mano, y la única forma de saberla
+       era que alguien te la hubiera pasado por chat. Va al final y no arriba a
+       propósito: esta pantalla es para dar conceptos por fotos, y visitar la
+       casa es lo otro que se hace, no lo primero. -->
+  <div class="aviso" style="margin-top:34px">
+    <b>¿Vas a visitar una casa?</b> El formulario de la visita es
+    <a href="/triaje/inspeccion" style="color:inherit"><b>/triaje/inspeccion</b></a>.
+    Ábrelo <b>con señal antes de salir</b>: se guarda en el teléfono y desde ahí
+    funciona sin internet, y lo que llenes se envía cuando vuelvas a tener.
+  </div>
 </div>
 <script src="/triaje.js"></script>
 </body>
@@ -3338,7 +3375,75 @@ async function triageInspeccionRecibir(request, env, email) {
     console.error("pdf inspeccion", numero, e && e.message);
   }
 
+  /* AVISO AL EQUIPO. Hasta hoy recibir una inspección de terreno no mandaba
+     NINGÚN correo — mientras que unas fotos subidas desde la web sí generan uno
+     (`correoAvisoCaso`). La señal de aquí es mucho más fuerte: alguien estuvo
+     parado frente a la casa, y puede haber marcado «el peligro parece
+     inminente» o «evacuar la vivienda». Eso quedaba esperando a que alguien
+     abriera la bandeja del panel por su cuenta.
+
+     Va DESPUÉS del PDF y en su propio try: si el correo falla, la inspección ya
+     está guardada y el teléfono tiene que poder vaciar su cola igual. Nunca al
+     revés. */
+  try {
+    await correoAvisoInspeccion(env, {
+      numero, municipio, direccion: limpiar(c.direccion, 240),
+      familia, propietario: limpiar(c.propietario, 160),
+      obs_nombre: obsNombre, fecha, hora: limpiar(c.hora, 8),
+      requiere_esp: c.requiere_esp ? 1 : 0,
+      inminente: Array.isArray(reco.marcadas) && reco.marcadas.indexOf("x4") >= 0,
+      evacuar: Array.isArray(reco.marcadas) && reco.marcadas.indexOf("e1") >= 0
+    });
+  } catch (e) {
+    console.error("aviso inspeccion", numero, e && e.message);
+  }
+
   return json({ ok: true, numero, repetida: false });
+}
+
+/* El aviso de que entró una inspección de terreno. Dos niveles en un solo
+   correo, porque el equipo lee una bandeja y no dos: el asunto lleva la palabra
+   que hace que se abra, y el cuerpo dice qué se marcó.
+
+   `x4` es «URGENTE: el peligro parece inminente» y `e1` es «Evacuar la
+   vivienda» —los identificadores viven en `documentos.js` y son permanentes—.
+   Si alguno está marcado, el asunto lo dice; si no, es un aviso normal. */
+async function correoAvisoInspeccion(env, x) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return { ok: true, sinDestino: true };
+
+  const grave = x.inminente || x.evacuar || x.requiere_esp;
+  const asunto = (x.inminente ? "PELIGRO INMINENTE · " : x.evacuar ? "EVACUAR · " : "")
+    + "Inspección " + x.numero + (x.municipio ? " · " + x.municipio : "");
+
+  const filas = [
+    ["Inspección", x.numero],
+    ["Municipio", x.municipio || "(no dijo)"],
+    ["Dirección", x.direccion || "(no dijo)"],
+    ["Familia", x.familia || x.propietario || "(no dijo)"],
+    ["Visitó", x.obs_nombre],
+    ["Fecha de la visita", x.fecha + (x.hora ? " " + x.hora : "")],
+    ["Peligro inminente (x4)", x.inminente ? "SÍ" : "no"],
+    ["Evacuar la vivienda (e1)", x.evacuar ? "SÍ" : "no"],
+    ["Requiere especialista", x.requiere_esp ? "SÍ" : "no"]
+  ];
+
+  const parrafos = grave
+    ? ["Esta inspección trae una señal que no espera. Ábrela antes de seguir con el resto de la bandeja.",
+       "El documento firmado está en el panel, en «Inspecciones de terreno». La conclusión la tomó quien estuvo en la casa: no se cambia desde el panel.",
+       "Recuerda que declarar si una casa es habitable le corresponde al municipio, no a nosotros."]
+    : ["Entró una inspección de terreno. El documento firmado está en el panel, en «Inspecciones de terreno».",
+       "Recuerda que declarar si una casa es habitable le corresponde al municipio, no a nosotros."];
+
+  return enviarCorreo(env, {
+    para, asunto,
+    texto: parrafos.join("\n\n") + "\n\n" + filas.map(([k, v]) => k + ": " + v).join("\n"),
+    html: plantillaCorreo({ titulo: asunto, parrafos, filas }),
+    etiqueta: grave ? "inspeccion-grave" : "inspeccion-recibida",
+    /* 6 s: de sobra para Resend, y poco para alguien de pie en un patio con una
+       barra de señal esperando a que el teléfono suelte la inspección. */
+    msTope: 6000
+  });
 }
 
 /* GET /api/triage/mis-inspecciones — lo que ESTE ingeniero mandó.
@@ -3507,6 +3612,46 @@ async function triageInspeccionPDF(env, numero, sesion) {
     "content-type": "application/pdf",
     "content-disposition": 'inline; filename="inspeccion-' + numero + '.pdf"',
     /* Lleva datos personales y firmas: privado y fuera de cachés compartidas. */
+    "cache-control": "private, no-store",
+    "x-robots-tag": "noindex, nofollow"
+  }});
+}
+
+/* GET /api/triage/inspeccion/<numero>/foto/<n> — las fotos de la visita.
+
+   Existían en R2 desde la primera inspección y NO HABÍA RUTA QUE LAS SIRVIERA:
+   se subían una por una desde el teléfono, en zona sin señal, y no había forma
+   de verlas. Tampoco van en el PDF. Eran de solo escritura — el ingeniero
+   gastaba batería y datos en algo que ninguna pantalla enseñaba.
+
+   Las llaves sí quedaban registradas en `inspecciones.fotos`, así que no había
+   nada perdido: faltaba la puerta, no el rastro. Se lee de esa lista y no se
+   construye el nombre a mano, porque la lista es la que sabe la extensión real y
+   el orden que la persona anotó en «Foto N.º» de cada ítem.
+
+   MISMO control de acceso que el PDF, y por lo mismo: una foto de la visita
+   puede llevar la fachada, la placa de la casa o a la familia dentro. El equipo
+   ve todas; un voluntario, solo las de las inspecciones que él firmó. Y el mismo
+   404 exista o no, para no dejar un oráculo de cuántas hay. */
+async function triageInspeccionFotoVer(env, numero, n, sesion) {
+  const v = await env.DB.prepare("SELECT numero, fotos, obs_email FROM inspecciones WHERE numero = ?")
+    .bind(numero).first();
+  const suya = v && sesion && sesion.email &&
+               String(v.obs_email || "").toLowerCase() === String(sesion.email).toLowerCase();
+  if (!v || !((sesion && sesion.equipo) || suya)) return json({ error: "no_encontrada" }, 404);
+
+  let lista = [];
+  try { lista = JSON.parse(v.fotos || "[]"); } catch { lista = []; }
+  const foto = lista.find((f) => Number(f.n) === Number(n));
+  if (!foto || !foto.clave) return json({ error: "no_encontrada" }, 404);
+
+  const obj = await env.MEDIA.get(foto.clave);
+  if (!obj) return json({ error: "no_encontrada" }, 404);
+  return new Response(obj.body, { headers: {
+    "content-type": obj.httpMetadata && obj.httpMetadata.contentType || "application/octet-stream",
+    "content-disposition": 'inline; filename="' + numero + "-foto-" + String(n).padStart(2, "0") + '"',
+    /* Puede llevar la casa y a quien vive en ella: privado y fuera de cachés
+       compartidas, igual que el PDF. */
     "cache-control": "private, no-store",
     "x-robots-tag": "noindex, nofollow"
   }});
@@ -7119,7 +7264,7 @@ async function adminInspecciones(env) {
   const r = await env.DB.prepare(
     "SELECT numero, caso, municipio, direccion, casa_no, fecha_visita, hora, " +
     "obs_nombre, obs_matricula, propietario, contacto, requiere_esp, " +
-    "firma_hab_key, firma_hab_motivo, pdf_key, respuestas, familia, finca, recomendaciones, " +
+    "firma_hab_key, firma_hab_motivo, pdf_key, respuestas, familia, finca, recomendaciones, fotos, " +
     "substr(creado_en,1,16) AS creado_en, substr(recibido_en,1,16) AS recibido_en " +
     "FROM inspecciones ORDER BY requiere_esp DESC, recibido_en DESC LIMIT " + TOPE_INSPECCIONES
   ).all();
@@ -7145,10 +7290,19 @@ async function adminInspecciones(env) {
       urgente = m.indexOf("x4") >= 0;
     } catch { /* una fila con JSON roto no tumba la bandeja */ }
 
-    /* `respuestas` y `recomendaciones` NO viajan al panel: pesan y lo que se usa
-       en la tabla son sus cuentas. */
-    const { respuestas, recomendaciones, ...resto } = v;
-    return { ...resto, marcas, urgente, nReco };
+    /* CUÁNTAS FOTOS TIENE. La lista completa lleva llave y bytes de cada una y
+       no hace falta en la tabla: el panel solo necesita saber hasta qué número
+       enlazar, porque la ruta las pide por su posición. */
+    let nFotos = 0;
+    try {
+      const f = JSON.parse(v.fotos || "[]");
+      if (Array.isArray(f)) nFotos = f.length;
+    } catch { /* una fila con JSON roto no tumba la bandeja */ }
+
+    /* `respuestas`, `recomendaciones` y `fotos` NO viajan al panel: pesan y lo
+       que se usa en la tabla son sus cuentas. */
+    const { respuestas, recomendaciones, fotos, ...resto } = v;
+    return { ...resto, marcas, urgente, nReco, n_fotos: nFotos };
   });
   const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM inspecciones").first();
   return json({ inspecciones: filas, total: (tot && tot.n) || 0, tope: TOPE_INSPECCIONES });
@@ -9029,6 +9183,19 @@ function cargarInspecciones(){
         : '<span style="color:var(--err)">sin documento</span>'
           + '<br><button class="copy" data-inspdf="' + esc(v.numero) + '">Emitirlo</button>';
 
+      /* LAS FOTOS DE LA VISITA, que hasta hoy no se podían ver desde ninguna
+         pantalla: se subían desde el teléfono y no había ruta que las sirviera.
+         Van numeradas como la persona las anotó en «Foto N.º» de cada ítem, así
+         que el número de aquí es el que cita la observación del documento. */
+      if (v.n_fotos) {
+        var enlaces = [];
+        for (var f = 1; f <= v.n_fotos; f++) {
+          enlaces.push('<a href="/api/triage/inspeccion/' + esc(v.numero) + '/foto/' + f
+            + '" target="_blank" rel="noopener">' + f + '</a>');
+        }
+        doc += '<br><small>fotos: ' + enlaces.join(" · ") + '</small>';
+      }
+
       /* Las dos fechas se enseñan JUNTAS cuando no coinciden: es lo que revela
          que el reporte se llenó sin señal y llegó después, y confundirlas haría
          parecer del viernes un recorrido del martes. */
@@ -9809,6 +9976,8 @@ export default {
         if (ruta === "/api/triage/mis-inspecciones") return await triageMisInspecciones(env, sesion);
         const mf = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\/foto$/);
         if (mf) return await triageInspeccionFoto(request, env, mf[1], sesion);
+        const mfv = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\/foto\/(\d{1,2})$/);
+        if (mfv) return await triageInspeccionFotoVer(env, mfv[1], Number(mfv[2]), sesion);
         const mp = ruta.match(/^\/api\/triage\/inspeccion\/(IV-\d{4}-\d{6})\.pdf$/);
         if (mp) return await triageInspeccionPDF(env, mp[1], sesion);
         if (ruta === "/api/triage/inspeccion") {
