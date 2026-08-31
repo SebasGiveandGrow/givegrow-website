@@ -1475,6 +1475,7 @@
   "mc.add.nada": "Choose at least one photo.",
   "mc.add.subiendo": "Uploading your photos… do not close this page.",
   "mc.add.ok": "Done, we have them. An engineer will look at them.",
+  "mc.add.pasa": "You picked {n} and only {q} more fit. Remove some, or send them in two goes.",
   "mc.sub.prog": "Sending: {n} of {t}. Please don't close this page.",
   "mc.sub.parcial": "We saved {n} of {t}. Pick the missing ones again when you have a better signal.",
   "mc.sub.nada": "We couldn't send any of them. Your case is fine; try again when you have a better signal.",
