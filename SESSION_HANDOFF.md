@@ -32,6 +32,7 @@ nadie podía llegar a él, y quien llegaba no siempre recibía lo que se le prom
 | #193 | El gate mira también las pantallas de emergencia (checks 1b extendido y 1d) |
 | #194 | El contador «Piden confirmación» mentía · «undefined» en la pantalla del ingeniero · la subconsulta cuadrática de `adminCasos` (54 ms → 2 ms medido) |
 | #195 | Un caso cerrado ya no se evalúa ni se resucita |
+| #197 | `mcSubirCola` dejó de mentir: no pierde archivos y dice cuántas llegaron |
 
 ### ⚠️ SIETE COSAS QUE NO HAY QUE DESHACER, con su razón
 
@@ -62,6 +63,12 @@ con su contador de trazos y su proporción, y `requiere_esp` guardado como null)
 7. **`conceptos_sin_respaldo` NO filtra por `estado='clasificado'`.** Con ese
    filtro, mover un caso a `visitado` lo hacía desaparecer de la cola con el
    correo todavía sin enviar y sin rastro de que se debía.
+8. **Los DOS bucles de subida tienen el mismo contrato,** y eso es deliberado:
+   `cvSubirCola` (crear el caso) y `mcSubirCola` (agregar fotos). El archivo no
+   sale de la cola hasta guardarse, un reintento solo para fallos de red, y un
+   cierre que dice cuántas llegaron. `mcSubirCola` estuvo diez días mintiendo
+   porque el arreglo del 20 ago se hizo en uno y no en el otro. Si cambia el
+   trato con la familia, cambia en los dos o en ninguno.
 
 ### 🔨 Lo que queda abierto, y por qué
 
@@ -89,12 +96,9 @@ pidas.
 2. **Una inspección firmada no mueve el caso,** así que `urgentes_sin_visitar`
    sigue diciendo que nadie fue. Y la ficha del caso en el panel no enseña sus
    inspecciones, aunque el índice existe para eso.
-3. **`mcSubirCola` miente.** Saca el archivo de la cola antes de subirlo —el
-   defecto que `cvSubirCola` documenta como corregido el 20 ago— e ignora los
-   fallos: siempre dice «listo, ya las tenemos».
-4. **Callejón sin salida con 20 archivos:** piden una foto concreta y la familia
+3. **Callejón sin salida con 20 archivos:** piden una foto concreta y la familia
    no puede subirla. Y las fotos del equipo consumen su cupo.
-5. **Deuda de SQL que el gate no ve:** cinco índices muertos, siete columnas que
+4. **Deuda de SQL que el gate no ve:** cinco índices muertos, siete columnas que
    se escriben y nadie lee, las coordenadas GPS que solo existen dentro del PDF
    (la pantalla de ruta no las tiene), y `filaTope` mandando usar filtros que no
    existen.
