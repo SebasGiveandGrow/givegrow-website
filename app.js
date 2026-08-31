@@ -478,6 +478,9 @@ var I18N = {
     "mc.add.nada":"Elige al menos una foto.",
     "mc.add.subiendo":"Subiendo tus fotos… no cierres esta página.",
     "mc.add.ok":"Listo, ya las tenemos. Un ingeniero las va a ver.",
+    "mc.sub.prog":"Enviando: {n} de {t}. No cierres esta página.",
+    "mc.sub.parcial":"Guardamos {n} de {t}. Vuelve a elegir las que faltan cuando tengas mejor señal.",
+    "mc.sub.nada":"No pudimos enviar ninguna. Tu caso está bien; vuelve a intentarlo cuando tengas mejor señal.",
     "mc.add.tope":"Este caso ya llegó al máximo de archivos. Escríbenos si necesitas cambiar alguno.",
     "mc.cerrado":"Este caso está cerrado. Si algo cambió, escríbenos y lo reabrimos.",
     "mc.espera.hoy":"Lo enviaste hoy.",
@@ -2218,7 +2221,9 @@ function bcPinta(){
    con path que el fallback de SPA sirve como index.html y que se enruta aquí a
    mano. El token nunca se guarda ni se manda a ningún otro lado: vive en la
    URL que la familia ya tiene. */
-var MC = { caso: null, token: null, cola: [], tope: 20 };
+/* `total`, `hechas` y `fallidas` son lo que permite decir la verdad al final.
+   Antes no existían y el cierre era siempre «listo», llegaran las fotos o no. */
+var MC = { caso: null, token: null, cola: [], tope: 20, total: 0, hechas: 0, fallidas: 0 };
 
 function mcArranca(){
   var m = location.pathname.match(/^\/caso\/(CV-\d{4}-\d{6})\/?$/i);
@@ -2233,7 +2238,7 @@ function mcArranca(){
    repintado destruye el elemento del mensaje: escribirlo primero lo borraba, y
    la familia se quedaba sin saber si sus fotos habían llegado. En una zona con
    mala señal eso es exactamente lo que no puede pasar. */
-function mcPinta(aviso){
+function mcPinta(aviso, color){
   var cont = document.getElementById("mc-cuerpo");
   var tit = document.getElementById("mc-num");
   if (!cont) return;
@@ -2334,9 +2339,12 @@ function mcPinta(aviso){
       }
       cont.innerHTML = h;
       if (document.getElementById("mc-cats")) mcPintaCats();
+      /* EL COLOR SE PASA, no se supone. Estaba fijo en verde, así que un aviso
+         de «solo llegaron 2 de 5» o de «no llegó ninguna» se pintaba con el
+         color de que todo salió bien. */
       if (aviso){
         var m = document.getElementById("mc-msg");
-        if (m){ m.textContent = aviso; m.style.color = "var(--g)"; }
+        if (m){ m.textContent = aviso; m.style.color = color || "var(--g)"; }
       }
     })
     .catch(function(){
@@ -2394,22 +2402,78 @@ function mcEnviar(){
     if (msg){ msg.textContent = t("mc.add.nada"); msg.style.color = "var(--err)"; }
     return;
   }
+  /* Se reinician EN CADA TANDA. `mcPinta` vuelve a dibujar la página al
+     terminar, así que puede haber una segunda subida en la misma visita y los
+     contadores de la anterior mentirían. */
+  MC.total = MC.cola.length; MC.hechas = 0; MC.fallidas = 0;
   if (msg){ msg.textContent = t("mc.add.subiendo"); msg.style.color = "var(--mu)"; }
   mcSubirCola();
 }
 
 /* De a una y en serie, por la misma razón que al crear el caso: con señal mala,
    varias subidas en paralelo se pisan y fallan todas. Al terminar se repinta la
-   página, así el contador de fotos dice la verdad sin recargar. */
+   página, así el contador de fotos dice la verdad sin recargar.
+
+   REESCRITA EL 31 AGO 2026. Tenía LOS MISMOS TRES DEFECTOS que `cvSubirCola`
+   documenta como corregidos el 20 de agosto — el arreglo se hizo en un bucle y
+   no en el otro, y este es el que usa la familia cuando un ingeniero le PIDE una
+   foto concreta. O sea: el peor momento para perderla.
+
+   1. `MC.cola.shift()` iba ANTES de intentar la subida, así que un fallo de red
+      borraba el archivo de la única copia que existía, y sin reintento.
+   2. El único error que miraba lo mandaba a `console.warn` — la consola que la
+      familia no tiene. Los 413, 415, 409 y 500 del servidor no se miraban.
+   3. No contaba nada, y el `.catch()` se comía los fallos, así que al terminar
+      SIEMPRE pintaba «Listo, ya las tenemos. Un ingeniero las va a ver.» aunque
+      no hubiera llegado ni una. Es exactamente la mentira que el otro bucle dejó
+      de decir.
+
+   Mismo contrato que `cvSubirCola`, a propósito: si algún día cambia el trato con
+   la familia, que cambie en los dos o en ninguno. */
+function mcProg(txt, color){
+  var e = document.getElementById("mc-msg");
+  if (!e) return;
+  e.textContent = txt;
+  e.style.color = color || "var(--mu)";
+}
+
 function mcSubirCola(){
-  if (!MC.cola.length){ mcPinta(t("mc.add.ok")); return; }
-  var item = MC.cola.shift();
+  if (!MC.caso) return;
+  if (!MC.cola.length){
+    /* El cierre dice lo que de verdad pasó, y repinta la página para que el
+       contador de fotos cuadre con lo que se guardó. El color va con el mensaje:
+       antes se pintaba todo en verde. */
+    if (!MC.total)          mcPinta();
+    else if (!MC.fallidas)  mcPinta(t("mc.add.ok"), "var(--g)");
+    else if (MC.hechas)     mcPinta(t("mc.sub.parcial").replace("{n}", MC.hechas).replace("{t}", MC.total), "var(--amber)");
+    else                    mcPinta(t("mc.sub.nada"), "var(--err)");
+    return;
+  }
+
+  var item = MC.cola[0];            /* NO se saca hasta que se guarda */
+  mcProg(t("mc.sub.prog").replace("{n}", MC.hechas + MC.fallidas + 1).replace("{t}", MC.total));
+
   subirMedio(MC.caso, MC.token, item)
     .then(function(res){
-      if (!res.ok && res.d && res.d.error === "archivo_muy_grande") console.warn(t("cv.err.grande"));
+      if (res.ok){
+        MC.cola.shift(); MC.hechas++;
+        mcSubirCola();
+        return;
+      }
+      /* Rechazo del servidor por lo que el archivo ES —demasiado grande, tipo no
+         permitido, tope de medios—: reintentar no lo mejora. Se descarta, pero
+         CONTADO, que es lo que faltaba. */
+      MC.cola.shift(); MC.fallidas++;
       mcSubirCola();
     })
-    .catch(function(){ mcSubirCola(); });
+    .catch(function(){
+      /* Fallo de RED, el de la señal que se va un segundo. Un reintento y no
+         más: insistir en bucle deja a la familia esperando sin saberlo. */
+      item.intentos = (item.intentos || 0) + 1;
+      if (item.intentos < 2){ setTimeout(mcSubirCola, 1200); return; }
+      MC.cola.shift(); MC.fallidas++;
+      mcSubirCola();
+    });
 }
 
 function cvCopiar(){
