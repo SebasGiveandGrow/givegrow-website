@@ -3677,8 +3677,14 @@ function toggleFaq(btn){
 }
 
 /* ---------- ALMA chat ---------- */
-// El system prompt, el modelo y max_tokens viven en el Worker givegrow-alma
-// (fijos del lado del servidor). El cliente solo envía los mensajes.
+// El system prompt, el modelo y max_tokens viven en el WORKER DE ESTE MISMO
+// SITIO (/api/alma), fijos del lado del servidor. El cliente solo manda los
+// mensajes: si pidiera modelo o system, se ignoran.
+//
+// Vivía en un Worker aparte que se actualizaba pegando código en el dashboard, y
+// fue lo único del ecosistema que pasó un mes desincronizado — el prompt viejo
+// le decía a una familia con la casa agrietada que fuera a la alcaldía. Al ser
+// del mismo origen ya no hace falta CORS ni preconnect a un host externo.
 var almaHistory = [];
 function almaFmt(text){
   var s = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -3774,15 +3780,25 @@ function almaSend(){
   almaHistory.push({role:"user", content:text});
   var thinking = almaPush("bot", '<span class="alma-typing" aria-label="Escribiendo"><i></i><i></i><i></i></span>');
   almaSetBusy(true);
-  fetch("https://givegrow-alma.sebas-4af.workers.dev", {
+  fetch("/api/alma", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ messages: almaHistory })
   })
   .then(function(r){ return r.json(); })
   .then(function(data){
-    var reply = (data.content && data.content[0]) ? data.content[0].text
-      : (data.error ? ("Error: " + data.error.message) : "Error: respuesta inesperada");
+    /* DOS FORMAS DE ERROR, y hay que entender las dos. Lo que responde
+       Anthropic viene como {error:{message}}; lo que responde NUESTRO endpoint
+       —sin llave, límite de mensajes, origen ajeno— viene como
+       {error:"codigo", ayuda:"…"}, que es la forma del resto del proyecto.
+       Leyendo solo la primera, a quien tocara el límite de mensajes le salía
+       «Error: undefined», que no le dice nada a nadie. */
+    var reply;
+    if (data.content && data.content[0]) reply = data.content[0].text;
+    else if (data.error && data.error.message) reply = "Error: " + data.error.message;
+    else if (data.ayuda) reply = data.ayuda;
+    else if (data.error) reply = "No pude responder ahora mismo. Intenta en un momento.";
+    else reply = "Error: respuesta inesperada";
     thinking.innerHTML = almaFmt(reply);
     almaHistory.push({role:"assistant", content:reply});
     document.getElementById("alma-msgs").scrollTop = 99999;
