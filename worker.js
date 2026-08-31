@@ -1402,7 +1402,12 @@ async function correoAvisoIngeniero(env, i) {
         i.mensaje ? "Lo que escribió: «" + i.mensaje + "»" : "Sin mensaje."
       ],
       filas,
-      cierre: "Aceptarlo en el panel no le abre el triaje: el acceso se da añadiendo su correo en Cloudflare Access."
+      /* CORREGIDO EL 31 AGO 2026. Decía que el acceso se da «añadiendo su correo
+         en Cloudflare Access», y eso dejó de ser cierto el 29: la evaluación
+         externa lo concede sola con `matricula_verificada = 1`. Un aviso interno
+         que manda hacer a mano algo que ya es automático hace perder el tiempo a
+         quien lo lee y, peor, sugiere que el sistema no funciona. */
+      cierre: "Aceptarlo en el panel no le abre el triaje: lo que abre la puerta es VERIFICAR su matrícula, y al hacerlo se le avisa por correo. Ese interruptor está en «Quién quiere entrar»."
     }),
     etiqueta: "aviso-ingeniero"
   });
@@ -7647,7 +7652,136 @@ async function adminVerificarMatricula(request, env, id, quien) {
       " (matricula " + (datos.matricula || "sin dato") + ") por " + (quien || "?")).run();
   } catch (e) { console.error("auditoria matricula", id, e && e.message); }
 
-  return json({ ok: true, id, verificada });
+  /* Y SE LE DICE. Solo al verificar, nunca al retirar la verificación: «ya no
+     puedes entrar» es una conversación que tiene que tener una persona, no un
+     correo automático.
+
+     En su propio try/catch y DESPUÉS del UPDATE: si el correo falla, la
+     verificación ya está guardada —que es lo que abre la puerta— y el fallo
+     queda en la cola `correos_fallidos` con un botón para reenviarlo. Nunca al
+     revés: no se pierde el acceso por un problema de Resend.
+
+     `avisar: false` permite verificar sin escribir, para el caso de que se esté
+     corrigiendo un dato y no haya nada que anunciar. */
+  let aviso = null;
+  if (verificada && c.avisar !== false) {
+    try {
+      const r = await correoIngenieroVerificado(env, {
+        email: fila.email, nombre: fila.nombre,
+        matricula: datos.matricula, idioma: datos.idioma
+      });
+      aviso = r && r.ok ? (r.simulado ? "simulado" : "enviado") : "fallo";
+    } catch (e) {
+      console.error("aviso verificado", id, e && e.message);
+      aviso = "fallo";
+    }
+  }
+
+  return json({ ok: true, id, verificada, aviso });
+}
+
+/* POST /api/admin/inscripcion/<id>/avisar — reenviar «ya puedes entrar».
+
+   Existe por dos personas concretas: Camila y David quedaron verificados el 22 de
+   agosto, cuando este correo no existía, así que llevan una semana con la puerta
+   abierta y sin saberlo. Verificarlos otra vez no serviría —ya lo están— y
+   automatizar un envío retroactivo al desplegar sería mandar correos que nadie
+   pidió. Esto lo deja en manos de quien decide, con un botón.
+
+   Sirve igual para el caso normal: si el aviso falló por Resend, se reintenta
+   desde la fila en vez de tener que desverificar y verificar. */
+async function adminAvisarIngeniero(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const fila = await env.DB.prepare(
+    "SELECT id, tipo, nombre, email, datos FROM inscripciones WHERE id = ?"
+  ).bind(id).first();
+  if (!fila) return json({ error: "no_encontrada" }, 404);
+  if (fila.tipo !== "ingeniero") return json({ error: "no_es_ingeniero" }, 409);
+  if (!fila.email) return json({ error: "sin_correo", ayuda: "Esa postulación no dejó correo, así que no hay a dónde escribir." }, 409);
+
+  let datos = {};
+  try { datos = JSON.parse(fila.datos || "{}"); } catch { datos = {}; }
+  /* No se avisa a quien NO está verificado: sería decirle que puede entrar
+     cuando Access lo va a rechazar. */
+  if (Number(datos.matricula_verificada) !== 1) {
+    return json({ error: "sin_verificar",
+                  ayuda: "Verifica su matrícula primero: el aviso dice que ya puede entrar, y sin la verificación Access lo rechaza." }, 409);
+  }
+
+  const r = await correoIngenieroVerificado(env, {
+    email: fila.email, nombre: fila.nombre,
+    matricula: datos.matricula, idioma: datos.idioma
+  });
+  try {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(String(fila.email), "inscripcion " + id + " aviso de acceso reenviado por " + (quien || "?")).run();
+  } catch (e) { console.error("auditoria aviso", id, e && e.message); }
+
+  if (!r || !r.ok) return json({ error: "correo_fallo", ayuda: "No salió el correo. Mira la cola de correos fallidos." }, 502);
+  return json({ ok: true, id, simulado: !!r.simulado });
+}
+
+/* EL CORREO QUE FALTABA: «ya puedes entrar».
+
+   El acuse de la postulación le promete «cuando quede aprobada, entras con este
+   mismo correo», y la pantalla le dice «te escribimos cuando verifiquemos tu
+   matrícula». Y hasta hoy `adminVerificarMatricula` hacía UPDATE, auditoría y
+   nada más: CERO correos. El ingeniero quedaba esperando un aviso que no existía.
+
+   Pesa el doble desde que la evaluación externa de Access concede la entrada sola
+   con `matricula_verificada = 1`: la puerta se abre y nadie se lo dice.
+
+   LAS URLS SON LAS DEL ÁPEX, y eso está comprobado en producción el 31 ago 2026,
+   no supuesto: `miramicasa…/triaje` devuelve un 301 al ápex, y `www` un 302, así
+   que las dos añaden un salto. El ápex va DIRECTO al login de Access. Para una
+   herramienta que alguien abre en la calle con señal mala, un salto menos importa
+   — es el mismo razonamiento que ya está escrito junto a esa redirección.
+
+   Se le dice CON QUÉ MATRÍCULA queda registrado, y no es un adorno: desde el PR
+   #192 la que se imprime en el PDF de la familia sale del registro y no de lo que
+   se teclee, así que si ahí hay un error tiene que poder verlo y avisar. */
+async function correoIngenieroVerificado(env, i) {
+  if (!i || !i.email) return { ok: true, sinDestino: true };
+  const en = i.idioma === "en";
+  const triaje = "https://thegiveandgrowproject.org/triaje";
+  const terreno = "https://thegiveandgrowproject.org/triaje/inspeccion";
+
+  const titulo = en
+    ? "Your licence is verified. You can come in."
+    : "Tu matrícula quedó verificada. Ya puedes entrar.";
+
+  const parrafos = en ? [
+    "Someone checked your licence in COPNIA's public register, so your access to the structural triage is open.",
+    "You get in with this same email address: no account, no password. Open " + triaje + ", ask for a code, and it arrives in this inbox.",
+    "Inside you will find the cases that are waiting, oldest first. What you give is an OPINION at a distance: whether there are signs not to stay in the house or in part of it, what precautions to take, and which materials to repair it with. You do not declare a house habitable — that cannot be done from photos, and the declaration with legal effects belongs to the municipal authority.",
+    "If you are going to visit a house, the field form is " + terreno + ". Open it WITH signal before you leave: it saves itself to your phone and works with no internet from then on, and what you fill in is sent when you have signal again.",
+    "Nothing about this is charged, in either direction. And if the licence below is not yours or has a typo, tell us before you sign anything: it is what gets printed on the report the family receives."
+  ] : [
+    "Alguien comprobó tu matrícula en el registro público del COPNIA, así que tu acceso al triaje estructural está abierto.",
+    "Entras con este mismo correo: sin cuenta y sin contraseña. Abre " + triaje + ", pide un código y te llega a este buzón.",
+    "Adentro vas a encontrar los casos que están esperando, del más antiguo primero. Lo que das es un CONCEPTO a distancia: si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar y con qué materiales conviene repararla. No declaras habitable una casa — eso no se determina por fotos, y la declaratoria con efectos es de la autoridad municipal.",
+    "Si vas a visitar una casa, el formulario de la visita es " + terreno + ". Ábrelo CON señal antes de salir: se guarda en el teléfono y desde ahí funciona sin internet, y lo que llenes se envía cuando vuelvas a tener.",
+    "Nada de esto se cobra, en ninguna dirección. Y si la matrícula de abajo no es la tuya o tiene un error, dínoslo antes de firmar nada: es la que va impresa en el informe que recibe la familia."
+  ];
+
+  const filas = en
+    ? [["Your name on record", i.nombre || "—"], ["Verified licence", i.matricula || "—"]]
+    : [["Tu nombre en el registro", i.nombre || "—"], ["Matrícula verificada", i.matricula || "—"]];
+
+  return enviarCorreo(env, {
+    para: i.email,
+    asunto: en ? "You can come in to the structural triage" : "Ya puedes entrar al triaje estructural",
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, x]) => k + ": " + x).join("\n")].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, filas,
+      boton: { url: triaje, texto: en ? "Open the triage" : "Abrir el triaje" },
+      cierre: en
+        ? "This message is automatic. If you cannot get in, reply to this email and we will look at it."
+        : "Este mensaje es automático. Si no logras entrar, responde a este correo y lo miramos."
+    }),
+    etiqueta: "ingeniero-verificado"
+  });
 }
 
 const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "archivada"];
@@ -9351,6 +9485,13 @@ function accionesMatricula(i, x){
        + '<small class="mu">Pégala en «Número de Matrícula»</small>'
        + '<button class="copy" data-mver="' + i.id + '" data-v="' + (ver ? "0" : "1") + '">'
        + (ver ? "Quitar verificación" : "Marcar verificada") + '</button>'
+       /* REENVIAR EL AVISO. Solo aparece si ya está verificado, porque decirle
+          «ya puedes entrar» a quien no lo está es mandarlo a un rechazo de
+          Access. Existe por Camila y David, verificados el 22 de agosto cuando
+          ese correo no existía: llevan días con la puerta abierta sin saberlo, y
+          verificarlos otra vez no serviría porque ya lo están. */
+       + (ver ? '<button class="copy" data-mavisar="' + i.id + '">Avisarle que ya puede entrar</button>'
+              + '<small class="mu">Le manda el correo con la dirección del triaje</small>' : "")
        + '</div>';
 }
 
@@ -9669,14 +9810,41 @@ document.addEventListener("click", function(e){
   var mv = e.target.closest("[data-mver]");
   if (mv) {
     var quiere = mv.getAttribute("data-v") === "1";
-    if (quiere && !confirm("¿Viste su matrícula vigente en el registro del COPNIA? Con esto sus conceptos empiezan a salir solos a las familias.")) return;
+    /* El aviso por correo se anuncia en la confirmación: desde el 31 ago este
+       botón le ESCRIBE a la persona, y quien lo pulsa tiene que saberlo antes. */
+    if (quiere && !confirm("¿Viste su matrícula vigente en el registro del COPNIA?\\n\\nCon esto sus conceptos empiezan a salir solos a las familias, y se le manda un correo diciéndole que ya puede entrar.")) return;
     mv.disabled = true;
     fetch("/api/admin/inscripcion/" + encodeURIComponent(mv.getAttribute("data-mver")) + "/matricula", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ verificada: quiere })
-    }).then(function(r){ return r.json(); }).then(function(){
+    }).then(function(r){ return r.json(); }).then(function(d){
+      /* SI EL AVISO NO SALIÓ, SE DICE. La verificación sí quedó guardada —eso es
+         lo que abre la puerta— pero la persona sigue sin saberlo, y eso hay que
+         verlo aquí y no en la cola de correos. */
+      if (d && d.aviso === "fallo") alert("Quedó verificada, pero el correo de aviso NO salió. Usa «Avisarle que ya puede entrar» en su fila, o revisa la cola de correos fallidos.");
+      if (d && d.aviso === "simulado") alert("Quedó verificada. El correo quedó como SIMULADO: falta configurar RESEND_API_KEY, así que la persona no recibió nada.");
       cargarInscripciones(); cargarSalud();
     }).catch(function(){ mv.disabled = false; mv.textContent = "No se pudo"; });
+    return;
+  }
+
+  /* Reenviar el aviso de acceso. Sin confirmación: es un correo informativo y
+     repetido no hace daño — el daño era que no llegara nunca. */
+  var av = e.target.closest("[data-mavisar]");
+  if (av) {
+    av.disabled = true; av.textContent = "Enviando…";
+    fetch("/api/admin/inscripcion/" + encodeURIComponent(av.getAttribute("data-mavisar")) + "/avisar",
+      { method: "POST" })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.ok) {
+          av.textContent = d.simulado ? "Simulado (falta la llave)" : "Avisado";
+          return;
+        }
+        av.disabled = false; av.textContent = "Avisarle que ya puede entrar";
+        alert(d && (d.ayuda || d.error) ? (d.ayuda || d.error) : "No se pudo enviar.");
+      })
+      .catch(function(){ av.disabled = false; av.textContent = "No se pudo"; });
     return;
   }
 
@@ -10424,6 +10592,8 @@ export default {
         if (mi) return await adminMoverInscripcion(request, env, Number(mi[1]), sesion.email);
         const mm = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/matricula$/);
         if (mm) return await adminVerificarMatricula(request, env, Number(mm[1]), sesion.email);
+        const ma = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/avisar$/);
+        if (ma) return await adminAvisarIngeniero(request, env, Number(ma[1]), sesion.email);
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
         if (ruta === "/api/admin/entrega")  return await adminCrearEntrega(request, env, sesion.email);
         const ef = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/foto$/i);
