@@ -1,17 +1,28 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "ALMA al repo, el respaldo probado y el panel usable" (29 ago 2026)
-> **⏭️ ARRANCA POR: LA CORRIDA DE RESCATE con cada ingeniero** — sigue sin hacerse
-> y es lo único con inspecciones firmadas en juego. Ya no le falta nada de
-> plataforma: los ingenieros entran solos, el respaldo está probado de punta a
-> punta y la bandeja donde aterriza por fin se carga. Falta hacerla.
+> Última actualización: sesión "Lo que encontró un teléfono" (31 ago 2026)
+> **⏭️ ARRANCA POR DOS COSAS.** (1) **Que un ingeniero de verdad entre**: la
+> evaluación externa de Access lleva desde el 29 sin que nadie la ejerza, y toda
+> la Fase 2 descansa en eso. Se le escribió a David el 31 para probarlo.
+> (2) **La corrida de rescate con Camila**, que sigue sin hacerse y es lo único
+> con inspecciones firmadas en juego — aunque no hay cómo contactarla.
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
-## 📸 FOTO DEL ESTADO (29 ago 2026, consultado en producción)
+## 📸 FOTO DEL ESTADO (31 ago 2026, consultado en producción)
 
     casos               2        inspecciones en terreno   1
     evaluaciones        3        aportes                   8
     ingenieros          2        con matrícula verificada  2
+
+El consecutivo de inspecciones está en **5**: la próxima real será
+`IV-2026-000006`. Los números 2 a 5 se quemaron en pruebas y **no vuelven** —
+regla dura del proyecto, no se reinicia nunca.
+
+⚠️ **Nadie ha entrado todavía por la regla nueva de Access.** Camila entró el 21
+de agosto; la evaluación externa se activó el 29. Verifiqué desde fuera lo que
+se puede —el endpoint responde, la firma valida contra el JWKS, y la regla dice
+que los dos correos pasan— pero **el inicio de sesión completo no lo ha hecho
+ningún ingeniero**. Si falla, se descubriría con una familia esperando.
 
 **Los ingenieros YA ENTRAN SOLOS.** La evaluación externa de Access está viva
 (`/api/access/claves` responde su JWKS) y la regla mira `matricula_verificada`,
@@ -30,6 +41,69 @@ La foto del 25 de agosto decía «ingenieros ACEPTADOS 0» mirando `estado`, y d
 ahí salió la idea de que estaban sin verificar. **La puerta la abre
 `matricula_verificada`** — decisión de Sebas, 29 de agosto. Nadie movió el
 `estado`, y eso no impide entrar.
+
+## 📱 LO QUE ENCONTRÓ UN TELÉFONO (31 ago · PR #183 a #186)
+
+**CUATRO defectos reales en el formulario de terreno. Los cuatro los encontró
+Sebas probando en su teléfono. Ninguno lo encontraron mis pruebas.**
+
+Esa frase es el hallazgo, más que los cuatro arreglos. Todos existían desde que
+la pantalla se escribió, todos pasaban el gate, y ninguno se ve en un navegador
+de escritorio con buena conexión.
+
+| lo que se vio | lo que era |
+|---|---|
+| «guardan, pero no veo que envíe» | sí enviaba: la barra es `position:fixed` abajo y el aviso se escribía a pantalla y media hacia arriba |
+| «los botones son confusos» | «Guardar» sonaba a borrador y en realidad enviaba; «Enviar» sonaba a mandar esa y vaciaba la cola |
+| «le di en reintentar y se queda enviando» | `fetch` no trae plazo: una petición colgada esperaba **para siempre** |
+| «es muy lenta la carga de archivos» | 367 KB por foto, y sobre todo: nadie decía que la inspección **ya había llegado** |
+
+### Lo que quedó
+- **Un eco dentro de la barra fija**, donde están los ojos de quien acaba de
+  tocar un botón. El aviso de arriba se queda como registro.
+- **«Terminar y enviar»** y **«Reintentar»**, y el segundo **se esconde** cuando
+  no hay nada pendiente: llenando la primera casa solo hay un botón. Antes
+  estaba siempre y tocarlo con la cola vacía **no hacía absolutamente nada**.
+- **Plazo en cada envío** con `AbortController` —45 s el JSON, 120 s cada foto—.
+  Al vencer sale como «reintentar»: se queda en la cola y se manda sola, y como
+  el envío es idempotente reintentar algo que sí llegó no duplica nada.
+  Se usa `AbortController` y **no** `AbortSignal.timeout`: el segundo no existe
+  en los navegadores viejos de Android que hay en terreno.
+- **Un medidor con avance real de bytes.** Para eso la subida de fotos pasó de
+  `fetch` a **XHR**, que es lo único que informa del avance
+  (`upload.onprogress`). Un medidor que se inventa el avance es peor que no
+  tenerlo: enseña a desconfiar de él.
+- **Fotos un 20% más livianas** sin perder un píxel: calidad 0,72 → 0,6.
+- **«La inspección ya llegó. Subiendo foto 2 de 3…»** — cuando empiezan las
+  fotos el servidor ya devolvió el número. Lo que angustia en una subida lenta
+  no son los segundos, es no saber si se perdió el trabajo.
+
+### ⚠️ Tres cosas que NO hay que deshacer
+1. **La resolución de las fotos se queda en 1600 px.** El ingeniero juzga el
+   ANCHO de una grieta ahí, y la guía del AIS distingue 2 mm en concreto de
+   4 mm en adobe. Bajar a 1280 px ahorra el doble y **es decisión de Sebas**,
+   con una foto de cada una delante — no se toma por rendimiento a solas.
+2. **Las fotos suben EN SERIE, no en paralelo.** En una subida móvil manda el
+   ancho de banda, no la latencia, así que el paralelo apenas ganaría — y
+   costaría poder reanudar en la foto 3 de 5, que sí vale.
+3. **XHR en la subida de fotos.** Volver a `fetch` mataría el medidor.
+
+### Cómo se prueba esta pantalla, de ahora en adelante
+**En un teléfono, con datos móviles y no wifi.** Lo que el escritorio no ve:
+que la confirmación quede fuera de pantalla, que una petición se cuelgue, que
+una barra no se mueva. Mis pruebas sirven para la lógica; **el juicio de si se
+entiende y de si se siente viva es del teléfono.**
+
+Y una advertencia de método que costó tiempo: `innerText` devuelve cadena vacía
+cuando el elemento no se está pintando. Si una comprobación dice que no hay
+texto, mirar con `textContent` antes de creer que el código falla — pasó dos
+veces.
+
+## 🧹 Los datos de prueba se borraron (31 ago)
+`IV-2026-000003` y `IV-2026-000004` salieron de la base **y sus 9 archivos de
+R2** —firmas, PDF y fotos—. Si solo se borra la fila, esos archivos quedan
+huérfanos para siempre: sus claves solo viven ahí. Queda únicamente
+`IV-2026-000001`, la real de Camila.
 
 ## ✅ ALMA VIVE EN EL REPO (29 ago · PR #178 a #181)
 
@@ -315,9 +389,18 @@ código— y la pista fue que el papel decía más casas que la base.
    otro—. Si alguien llenó el formulario en una pestaña privada, eso sí se
    perdió: hay que saber quién, para ir al papel.
 2. **La corrida de rescate, ingeniero por ingeniero.** Abre con señal, mira la
-   lista, y por cada una: «Guardar inspección» → «Enviar». **La cuenta la lleva
-   la persona, no el teléfono**: hay que preguntarle cuántas casas visitó, porque
-   ese número es el único con el que se puede verificar que no quedó nada.
+   lista, y por cada una: **«Terminar y enviar»** (así se llama desde el 31 de
+   agosto; antes era «Guardar inspección»). **La cuenta la lleva la persona, no
+   el teléfono**: hay que preguntarle cuántas casas visitó, porque ese número es
+   el único con el que se puede verificar que no quedó nada.
+
+   ⚠️ **Y hay reloj.** La última actividad de Camila fue el 21 de agosto. Safari
+   en iPhone borra los datos de un sitio a los 7 días sin visitarlo, salvo que
+   se haya tocado «Preparar para trabajar sin señal», que pide almacenamiento
+   persistente. En Android/Chrome la regla es por presión de espacio y no por
+   calendario, así que ahí probablemente sobrevivan. **Puede que ya no estén.**
+   Al 31 de agosto no había cómo contactarla; sus datos, por si sirven:
+   `camilapavia95@gmail.com` · 3134019808 · Medellín.
 3. **~~La carga del respaldo contra la base real NO se ha ejercido~~ — HECHO
    (29 ago, PR #172).** Probado de punta a punta contra una base real, incluido
    cargar el mismo archivo dos veces. Ver su sección arriba.
