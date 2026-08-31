@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "El respaldo probado y el panel usable" (29 ago 2026)
+> Última actualización: sesión "ALMA al repo, el respaldo probado y el panel usable" (29 ago 2026)
 > **⏭️ ARRANCA POR: LA CORRIDA DE RESCATE con cada ingeniero** — sigue sin hacerse
 > y es lo único con inspecciones firmadas en juego. Ya no le falta nada de
 > plataforma: los ingenieros entran solos, el respaldo está probado de punta a
@@ -30,6 +30,73 @@ La foto del 25 de agosto decía «ingenieros ACEPTADOS 0» mirando `estado`, y d
 ahí salió la idea de que estaban sin verificar. **La puerta la abre
 `matricula_verificada`** — decisión de Sebas, 29 de agosto. Nadie movió el
 `estado`, y eso no impide entrar.
+
+## ✅ ALMA VIVE EN EL REPO (29 ago · PR #178 a #181)
+
+Era lo único del ecosistema que se desplegaba **pegando código en el dashboard**,
+y por eso fue lo único que pasó un mes desincronizado: el endurecimiento estaba
+desplegado y el prompt no. A «mi casa se agrietó con el sismo, ¿pueden
+ayudarme?» respondía que la misión de Give&Grow era otra y **que acudiera a la
+alcaldía** — justo la persona para la que se construyó Mira Mi Casa.
+
+Ahora vive en `worker.js`, en **`/api/alma`**, y se despliega con todo lo demás.
+
+**LA LECCIÓN, y es la que hay que llevarse:** el problema nunca fue el prompt.
+Fue que había **dos copias** y una ruta de despliegue que dependía de que alguien
+se acordara. Un despliegue manual es un despliegue que se olvida.
+
+### Qué mejoró al ser del mismo origen
+- **Sobra el CORS entero.** Sin preflight, sin cabeceras de permiso, sin una
+  lista de orígenes que mantener sincronizada con las tres marcas.
+- **La CSP se cerró**: `connect-src` ya no tiene un host externo abierto.
+- **La red viva sale de `partners.json` por `env.ASSETS`**, no saliendo a
+  internet a buscar nuestro propio archivo.
+
+### ⚠️ Cuatro cosas que NO hay que deshacer
+1. **No hay lista de orígenes, y quitarla fue correcto.** No protegía —un
+   llamador decidido manda la cabecera que quiera, comprobado con curl— y sí
+   **rompía el desarrollo local**: desde `wrangler dev` el Origin es localhost y
+   ALMA respondía 403. Lo que protege es que el modelo, el tope de tokens y el
+   `system` se fijen en el servidor, más el límite por IP.
+2. **`ayuda` SOLO cuando el texto es para la persona.** El chat enseña ese campo
+   tal cual; la del 503 decía «falta el secreto ANTHROPIC_API_KEY», que no le
+   dice nada a una familia y le cuenta de más a cualquiera. Para quien opera,
+   basta el código.
+3. **El chat entiende DOS formas de error.** Anthropic manda
+   `{error:{message}}`; nosotros `{error:"codigo", ayuda:"…"}`. Leyendo solo la
+   primera, a quien tocara el límite de mensajes le salía «Error: undefined».
+4. **La cabecera `anthropic-workspace-id` se manda solo si está configurada**,
+   así que el mismo código sirve con las dos clases de llave.
+
+### 🪤 LA TRAMPA DE LA LLAVE, que costó seis intentos
+Anthropic tiene dos clases de llave y **el mensaje de error no las distingue**:
+
+| llave | qué pasa |
+|---|---|
+| incompleta o revocada | `invalid x-api-key` |
+| **personal / multi-workspace** | `anthropic-workspace-id is required…` |
+| **acotada a un workspace** | funciona sin configurar nada |
+
+⚠️ **El Default Workspace es el único cuyo ID no se publica** —lo dice la
+documentación—, así que perseguirlo es el camino equivocado. **La llave hay que
+crearla acotada al workspace**, en `https://platform.claude.com/settings/keys`,
+marcando el workspace al crearla.
+
+Y el secreto va en **`givegrow-website`**, no en `givegrow-alma`. Se comprueba
+con `npx wrangler secret list` desde el repo.
+
+### Cómo comprobar que ALMA está bien, en una línea
+
+    curl -s -X POST https://thegiveandgrowproject.org/api/alma \
+      -H "content-type: application/json" \
+      -d '{"messages":[{"role":"user","content":"Mi casa se agrietó con el sismo, ¿pueden ayudarme?"}]}'
+
+Tiene que hablar de **Mira Mi Casa**. Si dice que vaya a la alcaldía sin ofrecer
+la plataforma, algo se rompió.
+
+⚠️ **El worker viejo `givegrow-alma` sigue desplegado como red de seguridad.**
+Revertir el PR #181 devuelve el sitio a él. Cuando se confirme que todo va bien,
+se borra con su llave.
 
 ## ✅ ACCESS YA NO DEPENDE DE SEBAS (29 ago · PR #166 + la regla en el dashboard)
 
@@ -286,48 +353,10 @@ teléfono. Es el único número contra el que se puede verificar que no quedó n
 
 ## ⏭️ LO QUE ESPERA, CON LA BRIGADA EL 24 (sesión del 21–22 ago)
 
-1. **EL PROMPT DE ALMA ESTÁ VIEJO** — y el diagnóstico que había aquí era falso,
-   por eso llevaba una semana sin resolverse.
-
-   **Lo que decía:** «sigue en 403 en el subdominio… ALMA está muerta».
-   **Lo que pasa de verdad** (comprobado el 29 ago):
-
-   - El sitio **no llama al subdominio**. Llama a
-     `https://givegrow-alma.sebas-4af.workers.dev`, que está **viva y responde**.
-     Que `alma.thegiveandgrowproject.org` no conteste es irrelevante: nada lo usa.
-   - **El endurecimiento de la v2 SÍ está desplegado.** Comprobado con tres
-     pruebas: un `Origin` ajeno recibe 403, un modelo pedido por el cliente se
-     ignora, y un `system` inyectado se ignora. El agujero de «proxy gratuito de
-     Claude» está cerrado.
-   - **Lo que NO está desplegado es el prompt.** ALMA no conoce el sismo, ni la
-     brigada, ni Mira Mi Casa, ni «Cimientos que Unen».
-
-   ⚠️ **Y así se ve el daño.** A «mi casa se agrietó con el sismo, ¿pueden
-   ayudarme?» ALMA responde que la misión de Give&Grow es otra y **que acuda a la
-   alcaldía**. Le está cerrando la puerta exactamente a la persona para la que se
-   construyó Mira Mi Casa.
-
-   **El arreglo sigue siendo un pegado**: `ops/givegrow-alma-worker-v2.js` en el
-   worker `givegrow-alma` del dashboard. Ese archivo SÍ trae el prompt con el
-   sismo, la brigada, los límites de Mira Mi Casa y el nombre nuevo.
-
-   **Cómo comprobar que quedó** (sin abrir el dashboard):
-
-       curl -s -X POST https://givegrow-alma.sebas-4af.workers.dev \
-         -H "content-type: application/json" \
-         -H "Origin: https://thegiveandgrowproject.org" \
-         -d '{"messages":[{"role":"user","content":"Mi casa se agrietó con el sismo, ¿pueden ayudarme?"}]}'
-
-   Tiene que hablar de Mira Mi Casa. Si dice que vaya a la alcaldía, no quedó.
-
-   **LA LECCIÓN, que vale para todo este documento:** el pendiente decía «403 en
-   el subdominio», que es un síntoma que nadie podía accionar y que además no era
-   el problema. Un pendiente que describe mal el fallo se queda quieto. **Anotar
-   la comprobación que lo prueba, no la impresión.**
-
-   💡 **Y la pregunta de fondo:** ALMA es lo único del ecosistema que se despliega
-   pegando código a mano, y por eso es lo único que lleva un mes desincronizado.
-   Mientras siga fuera del repo va a volver a pasar.
+1. **~~EL PROMPT DE ALMA ESTÁ VIEJO~~ — CERRADO (29 ago · PR #178 a #181).**
+   ALMA vive ahora DENTRO del repo, en `/api/alma`, y se despliega con todo lo
+   demás. Ver su sección propia más abajo. El worker `givegrow-alma` queda sin
+   uso: se puede borrar, con su llave.
 
 2. **EL ENSAYO EN EL TELÉFONO, EN MODO AVIÓN.** Es lo único que prueba cuatro
    piezas que NADIE ha verificado en un teléfono real: el service worker, el
@@ -2063,8 +2092,10 @@ internos rotos (19 páginas), meta/OG/twitter/canonical/favicon completos, 0 err
    choca en el hash de `index.html`. **No resolver en el editor web de GitHub** (deja un hash
    que no corresponde al archivo fusionado). Resolver local: fusionar `main`, **recalcular**
    `md5 -q app.js | cut -c1-8` y usar ese valor. Ocurrió en #24, #30 y #33.
-2. **El worker de ALMA no se despliega desde este repo** (worker aparte `givegrow-alma`; aquí
-   se despliega `worker.js` = `givegrow-website`). `ops/givegrow-alma-worker-v2.js` es la fuente.
+2. **~~El worker de ALMA no se despliega desde este repo~~ — YA NO.** Desde el
+   29 de agosto ALMA vive en `worker.js`, en `/api/alma`, y se despliega con
+   todo lo demás. `ops/givegrow-alma-worker-v2.js` se retiró: dos copias del
+   mismo prompt es exactamente como se desincronizó.
 3. **"Compartamos con Colombia" sigue prohibido** en toda la comunicación. Se mencionó como
    ejemplo de aliada-que-aporta y **no se publicó**; confirmar antes de nombrarlo.
 4. **La unidad "plato de comida" no se toca**: la frase del dossier es específica de ese
