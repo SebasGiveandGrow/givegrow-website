@@ -2421,6 +2421,22 @@ async function apiCasoEstado(env, numero, token) {
      subirla. Antes el sistema sabía pedir lo que faltaba y no sabía recibirlo. */
   const e = await evaluacionVigente(env, numero, c.clasificacion);
 
+  /* QUÉ FALTA ES OTRA PREGUNTA QUE QUÉ VALE EL CASO, y hay que resolverlas por
+     separado. `evaluacionVigente` devuelve a propósito la evaluación que casa
+     con la clasificación del caso, para que veredicto, recomendación y firma
+     vengan todos del mismo ingeniero. Pero eso hace que, en un caso ya
+     clasificado, un «no puedo evaluar» POSTERIOR no aparezca por ningún lado: la
+     familia no se enteraría de que le están pidiendo una foto.
+
+     Así que se mira la evaluación MÁS RECIENTE, sin filtrar por clasificación.
+     Si es `inevaluable`, su `falta` sigue pendiente y la pantalla la pide. Si la
+     más reciente ya es firme, el pedido quedó atendido o superado y no se
+     enseña. */
+  const pend = await env.DB.prepare(
+    "SELECT clasificacion, falta FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC, id DESC LIMIT 1"
+  ).bind(numero).first();
+  const faltaPendiente = pend && pend.clasificacion === "inevaluable" ? (pend.falta || null) : null;
+
   /* CUÁNTO LLEVA ESPERANDO, y cuántos hay delante en su misma situación.
      Su pantalla decía «un ingeniero lo va a revisar» sin plazo ni señal, y una
      espera sin información se siente como abandono — sobre todo después de un
@@ -2447,6 +2463,7 @@ async function apiCasoEstado(env, numero, token) {
     evaluado: !!e,
     ultima: e ? { clasificacion: e.clasificacion, recomendacion: e.recomendacion,
                   falta: e.falta, creado_en: e.creado_en } : null,
+    falta_pendiente: faltaPendiente,
     tope_medios: MAX_MEDIOS
   });
 }
@@ -2918,11 +2935,26 @@ async function triageEvaluar(request, env, numero, email) {
 
   /* Con qué se queda el caso lo deciden TODAS sus evaluaciones, no la última en
      llegar. Gana la más grave, y si hay desacuerdo queda marcado — ver la regla
-     completa junto a `resolverClasificacion`. */
+     completa junto a `resolverClasificacion`.
+
+     Y EL VEREDICTO SE GUARDA SIEMPRE, incluso si esta evaluación es
+     `inevaluable`. Antes se calculaba y acto seguido se descartaba con un
+     `clasificacion === "inevaluable" ? null : …`, así que un segundo ingeniero
+     que abría un caso ya marcado `urgente` y respondía «no puedo evaluar» le
+     BORRABA la clasificación al primero: el caso salía de la cola
+     `urgentes_sin_visitar` —donde dice «un ingeniero dijo que era urgente y
+     todavía no ha ido nadie»— y a la familia se le pedían fotos después de
+     haberle dicho que era urgente.
+
+     El `null` no hace falta para nada: `resolverClasificacion` ya excluye las
+     `inevaluable` de su cuenta, así que un caso que SOLO tiene evaluaciones
+     inevaluables sigue quedando en NULL por sí solo. El estado sí vuelve a
+     `en_revision`, que es lo que de verdad significa «falta material»: las dos
+     cosas son preguntas distintas y estaban atadas a la misma respuesta. */
   const veredicto = await resolverClasificacion(env, numero);
   await env.DB.prepare(
     "UPDATE casos SET estado = ?, clasificacion = ?, actualizado_en = datetime('now') WHERE numero = ?"
-  ).bind(nuevoEstado, clasificacion === "inevaluable" ? null : veredicto.clasificacion, numero).run();
+  ).bind(nuevoEstado, veredicto.clasificacion, numero).run();
 
   /* Aviso a la familia, SOLO si dejó correo —es opcional a propósito— y SOLO si
      los ingenieros coinciden. Con dos opiniones distintas recibiría dos

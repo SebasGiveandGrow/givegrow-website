@@ -2089,6 +2089,25 @@ function mmcRuta(id){
   return true;
 }
 
+/* CON QUÉ ARRANCA UNA URL SIN HASH, y no es lo mismo en los dos sitios.
+
+   En el subdominio la ruta `inicio` NO EXISTE —no está en `RUTAS_MMC`— así que
+   arrancar en ella hacía que `mmcRuta` rebotara a la portada de la fundación.
+   Es decir: quien tecleaba `miramicasa.thegiveandgrowproject.org`, que es el
+   nombre que reparte el proyecto y el que ALMA menciona, acababa fuera de Mira
+   Mi Casa sin haber visto una sola línea de él.
+
+   Comprobado en producción el 31 ago 2026: la raíz del subdominio terminaba en
+   `thegiveandgrowproject.org/#inicio`. Y el agravante es que el Worker reescribe
+   `canonical` y `og:url` a esa misma raíz, así que la URL que Google indexa y la
+   que se previsualiza al compartir por WhatsApp era justo la que expulsaba.
+
+   Se arregla aquí y no con una Redirect Rule del panel porque el rebote lo hace
+   la SPA, no el borde: una regla del panel no lo vería. */
+function rutaPorDefecto(){
+  return MARCA_MMC ? "vivienda" : "inicio";
+}
+
 /* El espejo de `mmcRuta`, y existe por lo mismo: un enlace viejo no debe
    encontrarse con una página que ya no está. Los del triaje se repartieron con
    la dirección del ápex —el que se le pasó a la ingeniera, entre otros— y desde
@@ -2237,13 +2256,33 @@ function mcPinta(aviso){
       h += '<p><strong>' + escapeHtml(t("mc.estado")) + ":</strong> "
         +  escapeHtml(d.sector || "") + " · " + escapeHtml(t("mc.fotos")) + ": " + (d.medios || 0) + "</p>";
 
-      var falta = d.ultima && d.ultima.falta;
-      if (falta){
-        h += '<div class="card" style="margin-top:22px;text-align:left">'
-          +  "<h3>" + escapeHtml(t("mc.falta.t")) + "</h3>"
-          +  "<p>" + escapeHtml(t("mc.falta.p")) + "</p>"
-          +  '<p style="margin-top:8px;font-weight:700">' + escapeHtml(falta) + "</p></div>";
-      } else if (d.evaluado && d.clasificacion){
+      /* TRES DECISIONES INDEPENDIENTES, NO UNA CADENA.
+
+         Antes esto era `if (falta) … else if (clasificación) … else …`, y la
+         condición del primer brazo era solo que el campo tuviera texto. Pero el
+         formulario del triaje manda «qué falta» con CUALQUIER clasificación, así
+         que a un caso `urgente` cuyo ingeniero además escribió algo ahí se le
+         enseñaba «necesitamos un par de fotos más» y NUNCA el veredicto, ni la
+         recomendación, ni el enlace al informe. La familia esperaba semanas para
+         leer una petición de fotos en lugar de la respuesta que ya existía.
+
+         El PDF se blindó el 20 ago con `falta && clasificacion === "inevaluable"`
+         y el correo también, pero esta pantalla se quedó fuera: el comentario de
+         `documentos.js` afirma que «la PANTALLA de la familia ya lo hacía bien»,
+         y no era cierto. Eran dos superficies del mismo dato en desacuerdo, que
+         es exactamente la clase de fallo que ese arreglo decía haber cerrado.
+
+         Ahora el concepto se pinta siempre que exista, y la petición de fotos
+         solo cuando de verdad hay una pendiente — eso lo decide el servidor en
+         `falta_pendiente`, mirando si la evaluación más reciente es la que no
+         pudo evaluar. Pueden salir las dos a la vez: si hay veredicto y además
+         hacen falta fotos, la familia merece leer las dos cosas, y el veredicto
+         va primero porque es a lo que vino. */
+      var tieneConcepto = !!(d.evaluado && d.clasificacion);
+      var falta = d.falta_pendiente;
+      var pideFotos = !!falta;
+
+      if (tieneConcepto){
         h += '<div class="card" style="margin-top:22px;text-align:left">'
           +  "<h3>" + escapeHtml(t("mc.res.t")) + "</h3>"
           +  '<p style="margin-top:6px;font-weight:700">'
@@ -2256,7 +2295,16 @@ function mcPinta(aviso){
           +  '<p style="margin-top:14px"><a class="btn btn-o" href="/api/caso/'
           +  encodeURIComponent(MC.caso) + "/informe.pdf?t=" + encodeURIComponent(MC.token)
           +  '">' + escapeHtml(t("mc.informe")) + "</a></p></div>";
-      } else {
+      }
+
+      if (pideFotos){
+        h += '<div class="card" style="margin-top:22px;text-align:left">'
+          +  "<h3>" + escapeHtml(t("mc.falta.t")) + "</h3>"
+          +  "<p>" + escapeHtml(t("mc.falta.p")) + "</p>"
+          +  '<p style="margin-top:8px;font-weight:700">' + escapeHtml(falta) + "</p></div>";
+      }
+
+      if (!tieneConcepto && !pideFotos){
         /* La espera, contada con hechos y sin fecha prometida. Los días que
            lleva y cuántos hay delante: el segundo dato explica el primero
            mejor que cualquier disculpa, y los dos son verificables. */
@@ -3816,7 +3864,7 @@ function init(){
   // language
   setLang("es");
   // routing from hash
-  var hash = location.hash.replace("#","") || "inicio";
+  var hash = location.hash.replace("#","") || rutaPorDefecto();
   /* Wompi devuelve al donante a /gracias?id=… — una ruta con path, no con hash.
      El fallback de SPA ya sirvió index.html; aquí se enruta a mano y se deja el
      hash limpio, conservando el identificador en memoria. */
@@ -3830,7 +3878,7 @@ function init(){
   if (mcArranca()) hash = "caso";
   mmcMarca();
   go(hash, true);
-  window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||"inicio"; go(h, true); });
+  window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||rutaPorDefecto(); go(h, true); });
   // Navegación por delegación (reemplaza inline; CSP fase 1).
   // Ignora elementos que aún conservan onclick inline → migración incremental sin doble disparo.
   document.addEventListener("click", function(e){
