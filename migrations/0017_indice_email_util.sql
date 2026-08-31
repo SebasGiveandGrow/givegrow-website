@@ -1,0 +1,45 @@
+-- ============================================================================
+-- 0017 · UN ÍNDICE QUE SÍ SE PUEDE USAR
+-- ============================================================================
+-- La 0001 creó `ix_inscripciones_email ON inscripciones(email)`, y donde más
+-- pesa NO SE PUEDE USAR: `MATRICULA_OK` compara `lower(i.email) = lower(?)`, y
+-- SQLite no puede usar un índice sobre la columna cuando la consulta la envuelve
+-- en una función. Lo mismo que le pasa a `ix_casos_tel` con `TEL_DIGITOS()`, y
+-- eso está admitido en el código desde hace semanas.
+--
+-- Y este no es un índice cualquiera. `MATRICULA_OK` vive dentro de
+-- `SIN_RESPALDO`, que va como COLUMNA DEL SELECT en TODAS las pestañas de
+-- `/triaje` — no solo en la de confirmar. O sea: una subconsulta correlacionada
+-- por cada fila de `casos`, en la pantalla que abre un ingeniero voluntario para
+-- responderle a una familia.
+--
+-- MEDIDO en local con 602 casos, 202 inscripciones y 600 evaluaciones, sobre la
+-- consulta exacta que arma el código:
+--
+--     sin este índice   8, 9, 8 ms
+--     con este índice   1, 1, 2 ms
+--
+-- Y el plan pasa de `SEARCH i USING INDEX ix_inscripciones_tipo (tipo=?)` —que
+-- acota a ingenieros y luego filtra los 200 uno por uno— a
+-- `SEARCH i USING INDEX ix_inscripciones_email_lower (<expr>=? AND tipo=?)`.
+--
+-- POR QUÉ UN ÍNDICE POR EXPRESIÓN y no bajar el correo a minúsculas en la
+-- columna: cambiar los datos guardados obligaría a normalizar en cada escritura
+-- y a confiar en que nadie lo olvide, y perdería cómo lo escribió la persona.
+-- El índice hace que la consulta que YA existe sea rápida, sin tocar ni un dato
+-- ni una línea de las escrituras. SQLite admite índices por expresión desde la
+-- 3.9 y D1 los usa — comprobado con EXPLAIN QUERY PLAN, no supuesto.
+--
+-- `tipo` va como segunda columna porque la consulta filtra por los dos, así que
+-- el índice resuelve las dos condiciones y no vuelve a la tabla para descartar.
+--
+-- EL VIEJO NO SE BORRA. Sigue sirviendo para cualquier búsqueda que compare el
+-- correo tal cual, y borrarlo sería un cambio que no hace falta para esto.
+--
+-- ⚠️ SE APLICA A MANO Y ANTES DE QUE EL CÓDIGO LLEGUE A PRODUCCIÓN — aunque esta
+-- vez el orden da igual: crear un índice no cambia ningún resultado, solo el
+-- camino. Es la migración más segura de todas las que lleva el proyecto.
+-- ============================================================================
+
+CREATE INDEX IF NOT EXISTS ix_inscripciones_email_lower
+  ON inscripciones(lower(email), tipo);

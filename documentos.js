@@ -733,7 +733,27 @@ export const INSPECCION_LIMITES = [
   "Si no pudiste determinar algo, anótalo como no determinado. La guía trata la duda del lado grave, no del neutro."
 ];
 
-export const INSPECCION_MARCAS = { RE: "Requiere revisión especializada", OBS: "Observación a documentar", SO: "Sin observación aparente" };
+/* LAS TRES MARCAS, con su sigla y su significado, en UN solo sitio.
+
+   Esta constante existía y no la usaba nadie, mientras el PDF escribía la misma
+   leyenda a mano dos veces: la larga («RE = requiere revisión especializada · …»)
+   y las siglas de cada renglón («[RE] », «[Obs] », «[S/O] »). Tres copias de lo
+   mismo en un documento que alguien firma, esperando a divergir — es el patrón
+   contra el que el propio gate protege en el FAQ y en las cláusulas juradas.
+
+   Las siglas son las que están impresas en el papel del AIS y las que la persona
+   marcó con lápiz en la casa, así que no se tocan: se leen de aquí. */
+export const INSPECCION_MARCAS = {
+  RE:  { sigla: "RE",  que: "requiere revisión especializada" },
+  OBS: { sigla: "Obs", que: "observación a documentar" },
+  SO:  { sigla: "S/O", que: "sin observación aparente" }
+};
+
+/* La leyenda del PDF, armada desde las marcas. Si mañana se añade una cuarta o
+   cambia un texto, cambia aquí y en los renglones a la vez, no en uno solo. */
+export const INSPECCION_LEYENDA = Object.keys(INSPECCION_MARCAS)
+  .map((k) => INSPECCION_MARCAS[k].sigla + " = " + INSPECCION_MARCAS[k].que)
+  .join("  ·  ");
 
 /* Los textos de alcance y de descargo van AQUÍ y no en el generador del PDF,
    porque el formulario tiene que enseñárselos al habitante ANTES de que firme.
@@ -993,8 +1013,7 @@ export async function inspeccionPDF(v, firmas, hoyISO) {
   h.salto(12);
 
   seccion(h, f, "II", "OBSERVACIONES");
-  h.texto("RE = requiere revisión especializada  ·  Obs = observación a documentar  ·  " +
-          "S/O = sin observación aparente", { tam: 8, color: GRIS, despues: 12 });
+  h.texto(INSPECCION_LEYENDA, { tam: 8, color: GRIS, despues: 12 });
 
   /* Solo se imprime lo que se MARCÓ. Un documento con 26 renglones donde 20
      dicen «sin marcar» esconde los 6 que importan, y el papel se llenaba a mano
@@ -1011,7 +1030,12 @@ export async function inspeccionPDF(v, firmas, hoyISO) {
     for (const it of conMarca) {
       const r = v.respuestas[it.id];
       marcados++;
-      const etiqueta = r.m === "RE" ? "[RE] " : r.m === "OBS" ? "[Obs] " : "[S/O] ";
+      /* La sigla sale de INSPECCION_MARCAS, no de una cadena escrita aquí. El
+         respaldo a la propia clave es para una marca que alguien añada al
+         catálogo sin pasar por aquí: mejor imprimir su clave que un corchete
+         vacío en un documento firmado. */
+      const marca = INSPECCION_MARCAS[r.m];
+      const etiqueta = "[" + ((marca && marca.sigla) || r.m) + "] ";
       h.reservar(30);
       h.texto(etiqueta + it.id + "  " + it.t, {
         tam: 9.5, fuente: r.m === "RE" ? f.negrita : f.normal,

@@ -3581,6 +3581,23 @@ async function triageInspeccionRecibir(request, env, email) {
      aquí se trata su choque como lo que es: no un error, sino la confirmación
      de que la inspección ya está guardada. Se devuelve su número y el teléfono
      la borra de su cola tranquilo. */
+  /* TRES COLUMNAS DE ESTE INSERT NO SIRVEN PARA NADA, y queda escrito para que
+     nadie las «arregle» al revés — la auditoría del 31 ago las encontró y decidir
+     qué hacer con ellas es una conversación, no un arreglo:
+
+       · `proyecto` — se escribe desde `c.proyecto`, y `leerFormulario()` NO manda
+         ese campo, así que es NULL siempre. Tampoco se lee en ninguna pantalla ni
+         en el PDF: está muerta por los dos lados. La 0014 anticipó que «puede
+         volver a servir para la jornada» y no volvió.
+       · `consent_hab` — es la constante 1. La comprobación de verdad ocurre ANTES
+         de este INSERT y aborta si falta, así que la columna no aporta nada: no
+         distingue un consentimiento dado de uno ausente, porque el ausente no
+         llega hasta aquí. NO la leas como si significara algo.
+       · `dispositivo` — se escribe y no se lee en ninguna pantalla. La 0011 dice
+         «para rastrear un envío raro»; hoy no hay dónde mirarla.
+
+     Borrarlas es una migración destructiva sobre una tabla con documentos
+     firmados, y el beneficio es cosmético. Se quedan, dichas. */
   try {
   await env.DB.prepare(
     "INSERT INTO inspecciones (numero, caso, proyecto, casa_no, direccion, municipio, " +
@@ -5979,7 +5996,40 @@ async function adminRuta(env, url) {
     "GROUP BY sector ORDER BY n DESC LIMIT 40"
   ).all();
 
-  return json({ casos: r.results || [], sectores: s.results || [] });
+  /* LAS COORDENADAS DE LA CASA, si alguien ya estuvo.
+
+     La 0014 justifica `lat`/`lon` con una frase que dice todo: «en vereda no hay
+     nomenclatura, y sin coordenadas nadie encuentra la casa dos días después». Su
+     ÚNICO lector era el PDF de la inspección, que se congela al emitirse. Así que
+     esta pantalla —la que se lleva en el bolsillo para saber a qué puerta se va
+     ahora— no las tenía: para volver a una casa había que abrir el PDF y
+     transcribir dos números a mano, en la calle.
+
+     Importa más ahora que antes: lo que viene es llevar materiales a casas YA
+     evaluadas, y a esas ya se les tomaron las coordenadas.
+
+     UN ESCANEO Y UN MAPA, no una subconsulta correlacionada. Es el patrón que ya
+     usan los duplicados por teléfono y el último movimiento, y por la misma
+     razón: correlacionada sería una consulta por fila, hasta 300, que es la forma
+     cuadrática que este proyecto ya pagó dos veces. Se leen ascendente y se
+     sobreescriben, así el mapa acaba con la inspección MÁS RECIENTE de cada caso.
+
+     Solo las que tienen las dos: una latitud sin longitud no lleva a ninguna
+     parte, y enseñar media coordenada es peor que no enseñar ninguna. */
+  const coords = await env.DB.prepare(
+    "SELECT caso, lat, lon FROM inspecciones " +
+    "WHERE caso IS NOT NULL AND lat IS NOT NULL AND lon IS NOT NULL " +
+    "ORDER BY recibido_en ASC"
+  ).all();
+  const porCaso = new Map();
+  for (const f of coords.results || []) porCaso.set(f.caso, { lat: f.lat, lon: f.lon });
+
+  const casos = (r.results || []).map((c) => {
+    const g = porCaso.get(c.numero);
+    return g ? { ...c, lat: g.lat, lon: g.lon } : c;
+  });
+
+  return json({ casos, sectores: s.results || [] });
 }
 
 /* ========================================================================
@@ -8431,6 +8481,16 @@ function pintarCasos(l){
       '<div class="acc">' +
         '<a class="b" href="tel:' + esc(tel) + '">Llamar</a>' +
         '<a class="b" href="https://wa.me/' + esc(tel.replace("+","")) + '" target="_blank" rel="noopener">WhatsApp</a>' +
+        /* EL MAPA, solo si alguien ya estuvo y tomó las coordenadas. Es un enlace
+           geo: — lo abre la app de mapas que la persona tenga, sin decidir por
+           ella y sin cargar nada: en vereda, con una barra de señal, abrir una
+           web de mapas es peor que no abrir nada. El texto dice CUÁL es, porque
+           una coordenada de una visita anterior no es la dirección declarada. */
+        (x.lat && x.lon
+          ? '<a class="b" href="geo:' + encodeURIComponent(x.lat) + "," + encodeURIComponent(x.lon)
+            + '?q=' + encodeURIComponent(x.lat) + "," + encodeURIComponent(x.lon)
+            + '">Mapa (de la visita)</a>'
+          : "") +
         (visitado
           ? '<span class="b hecho">Ya visitada</span>'
           : '<button class="b full" data-visita="' + esc(x.numero) + '">Visitada…</button>') +
@@ -9376,9 +9436,16 @@ function resumenInscripcion(tipo, x){
 function filaTope(d, columnas, que){
   if (!d || !d.total || !d.tope || d.total <= d.tope) return "";
   var faltan = d.total - d.tope;
+  /* EL CONSEJO TIENE QUE EXISTIR. Decía «usa los filtros para acotar» y estas
+     bandejas NO ACEPTAN NINGÚN PARÁMETRO: señalaba una salida que no está, que
+     es peor que no decir nada — quien lo lee busca los filtros, no los encuentra,
+     y concluye que es él. Lo que sí ayuda son dos cosas ciertas: la lista viene
+     ordenada por gravedad, así que lo que no se ve es lo MENOS urgente; y el
+     buscador de arriba encuentra por número exacto o por teléfono. */
   return '<tr><td colspan="' + columnas + '" style="background:var(--amber-bg,#fff8e6);font-size:13px">'
     + "<strong>Faltan " + faltan + " " + que + " por mostrar</strong> · se enseñan "
-    + d.tope + " de " + d.total + ". Usa los filtros para acotar."
+    + d.tope + " de " + d.total + ". La lista va ordenada por gravedad, así que lo que "
+    + "falta es lo menos urgente. Para uno en concreto, búscalo arriba por su número o por el teléfono."
     + "</td></tr>";
 }
 
