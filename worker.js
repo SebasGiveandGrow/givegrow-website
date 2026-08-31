@@ -3525,6 +3525,10 @@ function aviso(txt, clase){
   var m = el("msg");
   m.textContent = txt;
   m.className = "aviso v " + (clase || "info");
+  /* Y EN LA BARRA, que es donde está mirando quien acaba de tocar un botón.
+     El de arriba se queda como registro; este es el que se lee. */
+  var e = el("eco");
+  if (e){ e.textContent = txt; e.className = "eco " + (clase || "info"); }
 }
 
 /* ---- Pintar las secciones desde el catálogo del servidor ---- */
@@ -3997,7 +4001,11 @@ function vaciarCola(){
   if (VACIANDO) return Promise.resolve();
   VACIANDO = true;
   return todos("cola").then(function(l){
-    if (!l.length) { VACIANDO = false; estado(); return; }
+    if (!l.length) {
+      VACIANDO = false; estado();
+      aviso("No hay nada pendiente: todo lo que terminaste ya llegó.", "bien");
+      return;
+    }
     var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false, sinBorrar = 0;
     function paso(){
       if (i >= l.length){
@@ -4014,7 +4022,11 @@ function vaciarCola(){
           cargarMias();
         }
         else if (enviadas || repes) { aviso("Enviadas " + enviadas + (repes ? " (" + repes + " ya estaban)" : "") + ".", "bien"); cargarMias(); }
-        else aviso("Sin señal todavía. Quedan guardadas en el teléfono.", "info");
+        /* NO se afirma la causa. Este camino se toma siempre que no se envió
+           nada y nada fue rechazado, que incluye «no hay señal» pero también
+           «el servidor no contestó». Decir «sin señal» con el teléfono
+           conectado es contradecir a la propia barra, que dice «Con señal». */
+        else aviso("No se pudo enviar todavía. Quedan guardadas en el teléfono.", "info");
         return;
       }
       var reg = l[i++];
@@ -4056,7 +4068,14 @@ function estado(){
     partes.push(navigator.onLine ? "Con señal" : "SIN SEÑAL — puedes seguir llenando");
     partes.push(c.length ? c.length + " por enviar" : "nada pendiente");
     el("est").textContent = partes.join(" · ");
-    if (c.length && navigator.onLine) el("b-cola").disabled = false;
+    /* Aparece SOLO si hay algo que reintentar. Antes estaba siempre, y tocarlo
+       con la cola vacía no hacía absolutamente nada —ni un mensaje—, que es la
+       peor respuesta posible en terreno. */
+    var b = el("b-cola");
+    if (b){
+      b.hidden = !c.length;
+      b.disabled = !c.length || !navigator.onLine;
+    }
     return c.length;
   }).catch(function(){
     /* Antes se quedaba con el número viejo en pantalla, que es peor que no
@@ -4304,7 +4323,7 @@ function sinTildes(t){
 function respaldo(){
   var b = el("b-resp"); if (!b) return;
   b.disabled = true; b.textContent = "Empacando…";
-  var soltar = function(){ b.disabled = false; b.textContent = "Bajar respaldo de todo"; };
+  var soltar = function(){ b.disabled = false; b.textContent = "Respaldar todo en un archivo"; };
   Promise.all([todos("borradores"), todos("cola")]).then(function(par){
     var brr = par[0].filter(borradorVale);
     if (!brr.length && !par[1].length){
@@ -4336,9 +4355,9 @@ function respaldo(){
         /* Se avisa del tamaño porque las fotos pesan y WhatsApp tiene tope: es
            mejor saberlo aquí que descubrirlo cuando el envío falle y nadie
            entienda por qué. */
-        aviso("Respaldo bajado: " + nombre + " · "
+        aviso("Respaldo creado: " + nombre + " · "
           + (mb >= 1 ? mb.toFixed(1) + " MB" : Math.round(arch.size / 1024) + " KB") + " · "
-          + c.length + " por enviar y " + a.length + " a medias. Búscalo en Descargas."
+          + c.length + " por enviar y " + a.length + " a medias. Está en Descargas."
           + (mb > 40 ? " OJO: pesa mucho para WhatsApp — avisa al equipo antes de mandarlo."
                      : " Mándalo al equipo por WhatsApp."), mb > 40 ? "info" : "bien");
       });
@@ -4611,6 +4630,12 @@ textarea{min-height:64px;resize:vertical}
 /* La barra se APILA: en 375 px el estado y dos botones en una fila estrangulan
    el texto en tres líneas y encogen los botones justo donde se toca con una
    mano. El estado va arriba, ancho completo, y los botones debajo. */
+.eco{margin:0;font-size:13.5px;line-height:1.35;padding:7px 10px;border-radius:6px;
+  border-left:3px solid var(--bd);background:var(--pap)}
+.eco:empty{display:none}
+.eco.bien{border-left-color:var(--ok)}
+.eco.mal{border-left-color:var(--err)}
+.eco.info{border-left-color:var(--amb)}
 .barra{position:fixed;left:0;right:0;bottom:0;background:var(--sup);
   border-top:1px solid var(--bd);padding:8px 12px 10px;display:flex;
   flex-direction:column;gap:7px}
@@ -4775,12 +4800,15 @@ textarea{min-height:64px;resize:vertical}
   <button type="button" class="btn o mini" id="b-borr" style="margin-top:10px">Volver a revisar el teléfono</button>
 
   <div class="ref" style="margin-top:16px">
-    <p style="margin:0 0 8px;font-size:13.5px"><strong>Si algo se atasca, baja el respaldo.</strong>
-    Lo guardado en el teléfono no se puede mirar ni mandar por WhatsApp: esto lo convierte en
-    <strong>un archivo</strong> con todo —las que faltan por enviar, las que quedaron a medias, las
-    firmas y las fotos— que el equipo puede cargar por su lado. <strong>Funciona sin señal:</strong>
-    se baja ahora y lo mandas cuando tengas.</p>
-    <button type="button" class="btn o mini" id="b-resp">Bajar respaldo de todo</button>
+    <p style="margin:0 0 8px;font-size:13.5px"><strong>¿Algo no se envía y no sabes por qué?
+    Respalda.</strong></p>
+    <p style="margin:0 0 8px;font-size:13.5px">Se guarda <strong>un archivo</strong> con todo lo que
+    hay en este teléfono: lo que falta por enviar, lo que quedó a medias, las firmas y las fotos.
+    Se lo mandas al equipo por WhatsApp y ellos lo suben por su lado.</p>
+    <p style="margin:0 0 10px;font-size:13.5px"><strong>Funciona sin señal.</strong> El archivo se
+    crea ahora mismo y lo mandas cuando tengas. Y respaldar no borra nada del teléfono: puedes
+    seguir trabajando igual.</p>
+    <button type="button" class="btn o mini" id="b-resp">Respaldar todo en un archivo</button>
   </div>
 
   <h2>Las que ya enviaste</h2>
@@ -4793,9 +4821,17 @@ textarea{min-height:64px;resize:vertical}
 
 <div class="barra">
   <span class="est" id="est">—</span>
+  <!-- EL ECO. La barra está fija abajo y el aviso de arriba queda a pantalla y
+       media: tocabas «guardar» y la confirmación aparecía donde no estabas
+       mirando, así que parecía que no enviaba. Esto lo repite donde están los
+       ojos. Vacío no ocupa nada. -->
+  <p id="eco" class="eco"></p>
   <div class="fila">
-    <button type="button" class="btn o" id="b-cola">Enviar <span class="pend" id="n-pend">0</span></button>
-    <button type="button" class="btn" id="b-guardar">Guardar inspección</button>
+    <!-- «Reintentar» y no «Enviar»: enviar es lo que hace el botón de al lado.
+         Se esconde cuando no hay nada pendiente, así que llenando la primera
+         casa solo hay UN botón y no hay nada que elegir mal. -->
+    <button type="button" class="btn o" id="b-cola" hidden>Reintentar <span class="pend" id="n-pend">0</span></button>
+    <button type="button" class="btn" id="b-guardar">Terminar y enviar</button>
   </div>
 </div>
 <script src="/triaje/inspeccion.js"></script>
