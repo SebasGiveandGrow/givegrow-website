@@ -2694,7 +2694,11 @@ function cargarCola(){
     var n = el("n-conf");
     if (n) n.textContent = d.porConfirmar ? "(" + d.porConfirmar + ")" : "";
     var c = d.casos || [];
-    if (!c.length){ el("lista").innerHTML = "<p class='cargando'>" + VACIO[COLA] + "</p>"; return; }
+    /* VACIO y CABEZA tienen tres claves y el servidor acepta una cuarta,
+       estado=todos, que ninguna pestaña usa. Si alguien la pide, esto pintaba
+       literalmente «undefined» en la pantalla desde la que un ingeniero responde
+       a una familia. Un respaldo cuesta cuatro palabras. */
+    if (!c.length){ el("lista").innerHTML = "<p class='cargando'>" + (VACIO[COLA] || "No hay casos que mostrar.") + "</p>"; return; }
     /* Si la lista llegó al tope, se DICE. Un «200» a secas se lee como «hay
        200», y con eso el caso 201 no existe para nadie mientras la familia
        espera. */
@@ -2702,7 +2706,7 @@ function cargarCola(){
     var h = "<p class='sub'>" + (truncada
       ? c.length + " de " + d.total + " " + CABEZA[COLA]
         + " &middot; <b>faltan " + (d.total - c.length) + " por mostrar</b>, usa las pestañas para acotar"
-      : c.length + " " + CABEZA[COLA]) + "</p>";
+      : c.length + " " + (CABEZA[COLA] || "caso(s).")) + "</p>";
     for (var i = 0; i < c.length; i++){
       var x = c[i];
       h += "<div class='fila'><b>" + esc(x.numero) + "</b>"
@@ -2893,6 +2897,21 @@ async function firmanteVerificado(env, email) {
   return { verificada: true, nombre: String(i.nombre), matricula: String(i.matricula) };
 }
 
+/* QUÉ PIDE CONFIRMACIÓN, en un solo sitio.
+
+   Estaba escrito DOS VECES —en el filtro de la lista y en el contador de la
+   pestaña— y las dos copias se habían desfasado: el contador se quedó sin
+   `SIN_RESPALDO`. Resultado: un caso que solo estaba sin respaldo aparecía en la
+   lista mientras la pestaña decía «(0)». El comentario del propio contador
+   explica que el total se calcula con el mismo filtro «para que la pantalla no
+   mienta», y el contador se había quedado fuera de esa regla.
+
+   Se define después de FIRMES y DISCREPA porque los usa; van más abajo en el
+   archivo, así que esta constante se arma como función para no depender del
+   orden de evaluación. */
+const CONFIRMAR = () =>
+  "(c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA + " OR " + SIN_RESPALDO;
+
 /* Un caso SIN RESPALDO: tiene opinión firme, pero ninguna de un ingeniero con
    matrícula verificada. Es lo que no puede llegar solo a una familia. */
 const SIN_RESPALDO =
@@ -2947,7 +2966,7 @@ async function triageCasos(env, url) {
        sobre un urgente se va a mover una brigada, y una discrepancia parada no
        se resuelve sola. El esquema permitía la segunda opinión desde la 0010 y
        nada la pedía nunca. */
-    estado === "confirmar" ? "WHERE (c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA + " OR " + SIN_RESPALDO :
+    estado === "confirmar" ? "WHERE " + CONFIRMAR() :
     "WHERE c.estado IN ('recibido','en_revision')";
   const r = await env.DB.prepare(
     "SELECT c.numero, c.estado, c.clasificacion, c.sector, c.material, c.pisos, " +
@@ -2968,9 +2987,11 @@ async function triageCasos(env, url) {
   const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM casos c " + filtro).first();
 
   /* Cuántos piden confirmación, siempre — así la pestaña puede decirlo sin que
-     el ingeniero tenga que entrar a mirar si hay algo. */
+     el ingeniero tenga que entrar a mirar si hay algo. Con `CONFIRMAR()`, que es
+     literalmente el mismo filtro de la lista: aquí faltaba `SIN_RESPALDO` y la
+     pestaña decía «(0)» sobre una lista que tenía casos. */
   const p = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM casos c WHERE (c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + CONFIRMAR()
   ).first();
   return json({ casos: r.results || [], porConfirmar: (p && p.n) || 0,
                 total: (tot && tot.n) || 0, tope: TOPE_COLA });
@@ -5468,12 +5489,6 @@ async function adminCasos(env) {
     "(SELECT COUNT(*) FROM caso_medios m WHERE m.caso = c.numero) AS medios, " +
     "(SELECT e.ing_nombre FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS ing, " +
     "(SELECT e.recomendacion FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS reco, " +
-    /* El último movimiento sale del registro de auditoría, que es donde
-       `adminMoverCaso` deja el motivo del cierre o del descarte. Sin esto, un
-       caso cerrado se ve igual que uno abandonado. El prefijo tiene que
-       coincidir con el que allí se escribe. */
-    "(SELECT a.detalle FROM consentimientos a WHERE a.tipo = 'auditoria' " +
-    " AND a.detalle LIKE 'caso ' || c.numero || ' %' ORDER BY a.id DESC LIMIT 1) AS ultimo, " +
     "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e " +
     "  WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1) AS discrepa " +
     "FROM casos c ORDER BY " +
@@ -5510,10 +5525,39 @@ async function adminCasos(env) {
     if (!porTelefono.has(k)) porTelefono.set(k, []);
     porTelefono.get(k).push(f.numero);
   }
+  /* EL ÚLTIMO MOVIMIENTO, y también sale de SQL por la misma razón que los
+     duplicados de arriba.
+
+     Estaba como subconsulta correlacionada con `LIKE 'caso ' || c.numero || ' %'`,
+     una vez POR FILA, sobre `consentimientos` — que no tiene índice por
+     `detalle` y que acumula TODA la auditoría del sistema: movimientos de casos,
+     inscripciones, correcciones, matrículas, entregas, fotos de visita. Es la
+     misma forma cuadrática que el comentario de arriba celebra haber sacado, y
+     se había quedado justo debajo.
+
+     Medido en local con 602 casos y 3.000 filas de auditoría: 54 ms contra 2 ms.
+     Y lo que importa no es el número de hoy —en producción hay 10 filas y no
+     cuesta nada— sino que crece con el PRODUCTO de casos por auditoría, y la
+     auditoría crece cada vez que alguien mueve un caso. Con la brigada, las dos
+     suben a la vez.
+
+     Se leen ascendente y se sobreescriben, así el mapa acaba con el más reciente
+     de cada caso sin ordenar nada en memoria. El prefijo tiene que coincidir con
+     el que escribe `adminMoverCaso`; si cambia allí, cambia aquí. */
+  const audit = await env.DB.prepare(
+    "SELECT detalle FROM consentimientos WHERE tipo = 'auditoria' " +
+    "AND detalle LIKE 'caso %' ORDER BY id ASC"
+  ).all();
+  const ultimoDe = new Map();
+  for (const f of audit.results || []) {
+    const partes = String(f.detalle || "").split(" ");
+    if (partes.length > 1 && partes[1]) ultimoDe.set(partes[1], f.detalle);
+  }
+
   const casos = (r.results || []).map((c) => {
     const k = String(c.contacto_tel || "").replace(/\D/g, "");
     const otros = (porTelefono.get(k) || []).filter((n) => n !== c.numero);
-    return { ...c, dup: otros.length ? otros[0] : null };
+    return { ...c, dup: otros.length ? otros[0] : null, ultimo: ultimoDe.get(c.numero) || null };
   });
   /* El total sale GRATIS: la consulta de teléfonos ya trajo todas las filas
      para el mapa de duplicados. Sin decirlo, la bandeja se corta en el caso 200
