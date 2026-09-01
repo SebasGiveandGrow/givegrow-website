@@ -207,6 +207,7 @@ var I18N = {
     "bc.piso":"piso",
     "bc.pisos":"pisos",
     "bc.vacio":"Todavía no hay casos públicos. Aparecen cuando un ingeniero los clasifica y la familia autoriza que se muestren.",
+    "bc.falla":"No pudimos consultar el banco en este momento. No quiere decir que no haya casas revisadas: quiere decir que no lo pudimos comprobar. Vuelve a intentar en un rato.",
     "bc.cargando":"Cargando…",
     "bc.cierre":"Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. A cada familia se le escribe un concepto con lo que el ingeniero alcanzó a ver en sus fotos; lo que aparece aquí es solo cuánto corre la prisa.",
     "bc.tuya":"¿Tu casa se afectó y no está aquí?",
@@ -2203,7 +2204,39 @@ function bcPinta(){
   var lis = document.getElementById("bc-lista");
   if (!tot || !lis) return;
 
-  fetch("/api/casos/publicos").then(function(r){ return r.json(); }).then(function(d){
+  /* NO PUDE CONSULTAR ≠ NO HAY NADA, y hasta hoy la pantalla decía lo segundo
+     cuando pasaba lo primero. Había DOS caminos al mismo engaño:
+
+       · si la red falla, el `catch` pintaba «Todavía no hay casos públicos»;
+       · si el servidor responde 503 o 500 —`base_no_configurada`,
+         `error_interno`— el JSON parsea bien pero SIN `casos`, así que ni
+         llegaba al `catch`: los cuatro contadores salían en cero y la lista
+         decía que no hay casos públicos.
+
+     Es exactamente lo que el propio proyecto prohíbe. El panel lo dice con
+     todas las letras: «donde falta el dato dice sin datos, no 0 %» (regla de
+     MEDICION.md §5). Y aquí duele más que en el panel, porque `#casas` es la
+     página que abre alguien de fuera para decidir si esto es real: afirmar «no
+     hay casas revisadas» cuando la verdad es «no pude consultar» es peor que no
+     decir nada.
+
+     Con cero casos de verdad el mensaje vacío SÍ es correcto y se queda: que
+     algo no haya pasado todavía es información. Lo que cambia es que ahora se
+     distingue de un fallo. */
+  var falla = function(){
+    /* Sin cifras inventadas: la fila de contadores se vacía en vez de mostrar
+       cuatro ceros que nadie contó. */
+    tot.innerHTML = "";
+    lis.innerHTML = '<p class="mu">' + escapeHtml(t("bc.falla")) + "</p>";
+  };
+
+  fetch("/api/casos/publicos").then(function(r){
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function(d){
+    /* La forma de la respuesta es la prueba de que se consultó de verdad: un
+       error de la API llega como `{error:…}` y parsea igual de bien. */
+    if (!d || d.error || !Array.isArray(d.casos) || !d.totales) throw new Error("respuesta sin datos");
     var T = d.totales || {};
     /* Los totales cuentan todo lo revisado; la tabla solo lo que se puede
        mostrar. Que los dos números se vean juntos es el punto: si difieren
@@ -2240,9 +2273,7 @@ function bcPinta(){
              ? t("bc.cl." + c.clasificacion) : c.clasificacion) + "</strong></td></tr>";
     }
     lis.innerHTML = h + "</tbody></table></div>";
-  }).catch(function(){
-    lis.innerHTML = '<p class="mu">' + escapeHtml(t("bc.vacio")) + "</p>";
-  });
+  }).catch(falla);
 }
 
 /* ===== Mi caso: en qué va, y cómo agregar fotos =====

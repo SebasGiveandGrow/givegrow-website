@@ -1516,6 +1516,7 @@
   "bc.cl.no_requiere": "No visit needed for now",
   "bc.pisos": "floors",
   "bc.vacio": "There are no public cases yet. They appear once an engineer ranks them and the family authorises showing them.",
+  "bc.falla": "We could not query the bank right now. That does not mean there are no reviewed homes: it means we could not check. Please try again in a while.",
   "bc.cargando": "Loading…",
   "bc.cierre": "What we do not say: whether a home is habitable. That is decided by a visit and by each municipal authority. Every family gets a written opinion with what the engineer could tell from their photos; what appears here is only how urgent it is.",
   "bc.tuya": "Was your home affected and it is not here?",
