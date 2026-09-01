@@ -1324,7 +1324,7 @@ var I18N = {
     "brig.ev.ey":"Evidencia",
     "brig.ev.t":"Cada entrega, con su acta.",
     "brig.ev.p":"El documento que vale es el acta en papel que firma quien recibe. Aquí publicamos su foto y lo que dice. Si no quedó documentado, para nosotros no ocurrió.",
-    "brig.ev.vacio":"Todavía no hay entregas publicadas. La brigada no ha salido: cuando lo haga, cada jornada aparece aquí con su acta firmada y sus fotos, no antes.",
+    "brig.ev.vacio":"Todavía no hay entregas publicadas con su acta. Cada jornada aparece aquí cuando su acta firmada está revisada, no antes.",
     "brig.ev.familias":"familias",
     "brig.ev.con":"Con",
     "brig.ev.recibio":"Recibió",
@@ -3458,10 +3458,44 @@ function entregaHTML(e){
 function pintarEntregas(cajaId, destino, conVacio){
   var caja = document.getElementById(cajaId);
   if (!caja) return;
+  /* NO PUDE CONSULTAR ≠ NO HA PASADO NADA. El `catch` de red ya era honesto
+     —«No pudimos cargar las entregas»— pero había una puerta de atrás: si la API
+     responde 503 o 500 (`base_no_configurada`, `error_interno`), el JSON parsea
+     perfectamente y `d.entregas` queda `undefined`, así que `l` salía vacía y se
+     pintaba el mensaje de VACÍO sin pasar por el `catch`.
+
+     Y aquí el mensaje de vacío no era tibio: decía «La brigada no ha salido»,
+     una afirmación sobre el mundo. Mostrarla porque la base está caída habría
+     sido la mentira más gruesa del sitio. En el rastreo es igual de serio con
+     otro público: a un donante que ya pagó se le diría que no hay entregas para
+     su destino.
+
+     ⚠️ Y AL MIRARLO SE VIO QUE ESA FRASE YA ERA FALSA POR SÍ SOLA, incluso sin
+     fallo: la brigada SÍ salió, del 20 al 23 de agosto de 2026, y el mismo sitio
+     publica seis fotos de esa jornada en la galería de impacto. El sitio se
+     contradecía a sí mismo. Ahora `brig.ev.vacio` habla de lo único que es
+     cierto —que no hay entregas publicadas CON SU ACTA— y no de si alguien
+     salió o no.
+
+     Mismo arreglo que en el banco público de casas (`bcPinta`), y a propósito se
+     leen igual: comprobar `r.ok`, comprobar la FORMA de la respuesta, y separar
+     el fallo del vacío.
+
+     El fallo se muestra SIEMPRE, aunque el llamador pase `conVacio` en false:
+     ese parámetro dice «no metas ruido cuando legítimamente no hay nada», no
+     «esconde los errores». */
+  var falla = function(){
+    caja.innerHTML = '<p class="ev-vacio">'+escapeHtml(t("ev.error"))+'</p>';
+  };
+
   fetch("/api/entregas?destino="+encodeURIComponent(destino))
-    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.json();
+    })
     .then(function(d){
-      var l = d.entregas || [];
+      if (!d || d.error || !Array.isArray(d.entregas)) throw new Error("respuesta sin datos");
+      var l = d.entregas;
       if (!l.length){
         /* El mensaje de la brigada habla de que «no ha salido»; en el rastreo el
            donante pregunta por SU destino, que puede ser cualquiera. */
@@ -3470,7 +3504,7 @@ function pintarEntregas(cajaId, destino, conVacio){
       }
       caja.innerHTML = l.map(entregaHTML).join("");
     })
-    .catch(function(){ caja.innerHTML = '<p class="ev-vacio">'+escapeHtml(t("ev.error"))+'</p>'; });
+    .catch(falla);
 }
 
 function renderHeroImpact(){
