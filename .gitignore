@@ -13,3 +13,20 @@ node_modules/
 
 # Basura del sistema
 .DS_Store
+
+# PDFs sueltos en la RAÍZ. `ops/guia-mira-mi-casa.mjs` escribe en
+# `guia-mira-mi-casa.pdf` cuando se corre sin argumento, y la raíz del repo SÍ se
+# sirve: `[assets] directory = "."` en wrangler.toml, y `.assetsignore` excluye
+# `ops` pero no la raíz. Así que un `git add -A` después de generar la guía la
+# publica en internet sin que nadie lo decida. Pasó el 1 sep 2026 verificando el
+# PDF; se borró antes de commitear.
+#
+# Aquí el daño sería menor —la guía es para repartirse— pero el patrón no: es
+# publicación por accidente, la misma clase de cosa que ya obligó a excluir
+# `casos` e `inspecciones` en .assetsignore.
+#
+# VA ANCLADO A LA RAÍZ, con la barra de delante. `*.pdf` a secas se llevaría
+# `docs/estados-financieros-2025.pdf` y `docs/informe-gestion-2025.pdf`, que
+# están versionados a propósito y el sitio los enlaza. Un PDF que deba
+# publicarse va en `docs/`, no en la raíz.
+/*.pdf
