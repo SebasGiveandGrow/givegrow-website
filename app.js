@@ -3200,6 +3200,51 @@ function formSend(){
 /* ---------- gallery + lightbox ---------- */
 var IMG_BASE = "/img/";
 var GALLERY = [
+  /* BRIGADA POR EL SISMO DEL 10 DE AGOSTO DE 2026 · van primero a propósito.
+     No es orden de importancia: es la regla que el propio sitio publica en
+     «Cómo medimos» —«preferimos la recencia al acumulado»— aplicada a la
+     galería. La evidencia más reciente es la que dice si esto sigue vivo.
+
+     LA FECHA DE CADA PIE ESTÁ VERIFICADA CONTRA EL EXIF DEL ARCHIVO, no contra
+     el nombre de la carpeta de donde salió. Las carpetas del equipo en Drive
+     decían «Marsella (viernes 21)», «El Aguila (sabado 22)» y «Manizales
+     (domingo 23)», y el EXIF confirmó 2026:08:21, 2026:08:22 y 2026:08:23 en
+     todas. Coincidieron. Si algún día se añaden más, se comprueba igual: un
+     pie de foto con una fecha que el archivo desmiente es exactamente lo
+     contrario de «evidencia, no promesas».
+
+     LOS PIES DICEN SOLO LO QUE LA FOTO PRUEBA. «Muro colapsado», «apuntalado»
+     y «bodega afectada» se ven. En la de Ansermanuevo se ve una casa con
+     mampostería expuesta que PUEDE ser del sismo o puede ser obra sin
+     terminar, así que dice «vivienda visitada», que es lo único verificable.
+     Y en la de Manizales dice «revisión» sin decir de quién: los que aparecen
+     con chaleco parecen autoridad municipal, y atribuirnos esa revisión sería
+     falso. Es la misma línea que Mira Mi Casa sostiene al no declarar
+     habitabilidad por fotos.
+
+     LA DE MANIZALES ESTÁ RECORTADA A PROPÓSITO. En el original aparecía un
+     NIÑO en el borde derecho. Sebas autorizó mostrar todas las fotos, y la
+     autorización se respeta —por eso la foto entra—, pero CLAUDE.md da
+     protección especial a menores bajo la Ley 1581 y esa autorización se dio
+     sobre el conjunto, no sobre ese niño en particular. Se recortó el 22 %
+     derecho: el menor sale del cuadro y la evidencia no se pierde — al
+     contrario, se leen mejor las ventanas estalladas y los paneles de fachada
+     desplazados. Si alguien recompone esta imagen desde el original, ese
+     recorte hay que volver a hacerlo.
+
+     SE MIRARON 33 Y ENTRARON 6. El material de origen es un carrete de cámara,
+     no una galería: más de la mitad son tomas por el parabrisas, dentro del
+     carro, fachadas sin nada legible o cielo. Tres que ya estaban convertidas
+     se descartaron AL VERLAS AL TAMAÑO DE LA GRILLA, no antes: una tenía una
+     cabeza desenfocada tapando el centro, otra el marco de la ventanilla
+     ocupando un borde, y la tercera un techo de zinc comiéndose un tercio del
+     cuadro. Rellenar con esas habría abaratado las que sí prueban algo. */
+  {f:"jornadas/brigada_aguila_escombros.jpg", es:"Muro colapsado en El Águila, agosto 2026", en:"Collapsed wall in El Águila, August 2026"},
+  {f:"jornadas/brigada_manizales_revision.jpg", es:"Revisión de un edificio afectado en Manizales", en:"Inspection of a damaged building in Manizales"},
+  {f:"jornadas/brigada_aguila_apuntalado.jpg", es:"Edificio apuntalado en El Águila, agosto 2026", en:"Shored-up building in El Águila, August 2026"},
+  {f:"jornadas/brigada_aguila_bodega.jpg", es:"Bodega afectada en El Águila, agosto 2026", en:"Damaged storehouse in El Águila, August 2026"},
+  {f:"jornadas/brigada_ansermanuevo_vivienda.jpg", es:"Vivienda visitada en Ansermanuevo, agosto 2026", en:"Home visited in Ansermanuevo, August 2026"},
+  {f:"jornadas/brigada_marsella_equipo.jpg", es:"Equipo en terreno, Marsella, agosto 2026", en:"Team in the field, Marsella, August 2026"},
   {f:"benef_01.jpg", es:"Comunidad acompañada en terreno", en:"Community accompanied in the field"},
   {f:"benef_02.jpg", es:"Entrega documentada con acta", en:"Delivery documented with a record"},
   {f:"benef_03.jpg", es:"Impacto medible, personas reales", en:"Measurable impact, real people"},
