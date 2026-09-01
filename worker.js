@@ -11152,6 +11152,37 @@ export default {
       return Response.redirect(new URL("/admin" + ruta, url).toString(), 301);
     }
 
+    /* LOS ALIAS EN INGLÉS DEL TRIAJE, Y POR QUÉ SE MUDARON AQUÍ FUERA.
+       La ruta canónica es en ESPAÑOL —`/triaje`— porque el sitio entero lo está;
+       la inglesa fue un descuido y sobrevive como alias para no romper lo ya
+       enlazado.
+
+       Estaban DENTRO del guardián de Access, y eso los volvía inútiles a medias:
+       un alias que exige sesión para decirte «esto se llama distinto» no sirve de
+       nada. Es la tercera vez que este archivo aprende lo mismo — `/ruta` justo
+       arriba, y `/triaje`+`/admin` del subdominio más abajo: UNA REDIRECCIÓN NO
+       NECESITA SESIÓN.
+
+       Y `/triage.js` estaba peor que a medias: NO tiene destino en la aplicación
+       de Access (comprobado en el panel el 1 sep 2026, los cinco destinos son
+       `triaje.js`, `triaje`, `api/triaje`, `triage` y `api/triage`), así que
+       llegaba al guardián sin JWT y respondía 403. Un callejón sin salida más.
+
+       ESTO LIBERA UN DESTINO DE ACCESS, que es el motivo real del cambio. La
+       aplicación está en su tope de CINCO y hace falta espacio para cubrir el
+       subdominio. Con los alias fuera del guardián, el destino `triage` ya no
+       protege nada que lo necesite y se puede borrar del panel. El otro que
+       sobra es `api/triaje`: el Worker no tiene UNA SOLA referencia a esa ruta
+       —la API real es `/api/triage/` en inglés, 35 referencias— así que ese
+       destino nunca protegió nada.
+
+       Se puede borrar sin miedo porque el guardián es FAIL-CLOSED: verifica la
+       firma del JWT contra las llaves del equipo y el `aud`. Una ruta sin
+       destino de Access no queda EXPUESTA, queda ROTA. El peor caso de un
+       borrado equivocado es un 403, no una fuga. */
+    if (ruta === "/triage")    return Response.redirect(new URL("/triaje", url).toString(), 301);
+    if (ruta === "/triage.js") return Response.redirect(new URL("/triaje.js", url).toString(), 301);
+
     /* LAS DOS HERRAMIENTAS DE TRABAJO NO EXISTEN EN EL SUBDOMINIO: el triaje del
        ingeniero y el panel del equipo. Las dos eran un callejón sin salida —403
        crudo— y hasta hoy solo se había arreglado el del triaje.
@@ -11254,7 +11285,7 @@ export default {
        verificación real de firma RS256 y el fail-closed. Los ingenieros
        voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
        creando cuentas: cero contraseñas que guardar y cero que se filtren. */
-    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/") || ruta === "/triage" || ruta === "/triage.js") {
+    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/")) {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
       /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
@@ -11286,7 +11317,7 @@ export default {
          inspección en terreno la llena un ingeniero, no el equipo. Comprobado
          contra producción que Access cubre `/triaje/*` con esa audiencia
          (302 con su kid), así que no gastó un cupo nuevo de hostnames. */
-      const esTriage = ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/") || ruta === "/triage" || ruta === "/triage.js" || ruta.startsWith("/api/triage/");
+      const esTriage = ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/") || ruta.startsWith("/api/triage/");
       const audsZona = esTriage
         ? [env.ACCESS_AUD_TRIAGE, env.ACCESS_AUD]
         : [env.ACCESS_AUD];
@@ -11327,13 +11358,6 @@ export default {
         }
         if (ruta === "/api/admin/quien")    return json({ email: sesion.email });
         /* --- triage estructural: la cola de los ingenieros --- */
-        /* La ruta canónica es en ESPAÑOL: `/triaje`. El sitio entero está en
-           español y esa es la palabra correcta — la ruta en inglés era un
-           descuido mío, y el primero que la escribió a mano escribió «triaje»
-           y aterrizó en la portada pública sin entender por qué. `/triage`
-           sobrevive como alias que redirige, para no romper lo ya enlazado. */
-        if (ruta === "/triage")    return Response.redirect(new URL("/triaje", url).toString(), 301);
-        if (ruta === "/triage.js") return Response.redirect(new URL("/triaje.js", url).toString(), 301);
         /* La inspección de terreno. Tres piezas: la pantalla, su JS y el
            service worker. El SW se sirve desde /triaje/ para que su ámbito no
            alcance el sitio público — un fallo aquí no puede romper la portada.
