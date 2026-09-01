@@ -370,6 +370,7 @@ fila("El equipo", "Cuando entra un caso nuevo.", { wIzq: 120 });
 fila("", "Cuando llega una inspección de terreno. Si trae PELIGRO INMINENTE o EVACUAR, lo dice en el asunto.", { wIzq: 120 });
 fila("", "Cuando dos ingenieros no coinciden, o cuando un concepto no puede salir por falta de matrícula verificada.", { wIzq: 120 });
 fila("El ingeniero", "Al postularse, el acuse. Al verificarse su matrícula, que ya puede entrar.", { wIzq: 120 });
+fila("", "Y cuando la fila pasa de VACÍA a tener un caso. Solo entonces: no llega uno por cada caso, porque son voluntarios y el aviso que llega cuando ya hay diez esperando no dice nada nuevo. No lleva nombre, teléfono ni dirección de la familia — solo el número y el sector.", { wIzq: 120 });
 
 pie();
 
@@ -413,18 +414,28 @@ caja("Contado contra la base de datos el 1 de septiembre de 2026, no de memoria"
 ]);
 
 espacio(6);
-caja("Antes de repartir esto: dos avisos, y uno que le falta al formulario", [
-  "Ninguna de las tres es obvia, y las tres se descubren tarde si nadie las dice:",
+caja("Antes de repartir esto: cuatro cosas que se descubren tarde si nadie las dice", [
+  "     · EL ENLACE QUE SE REPARTE es miramicasa.thegiveandgrowproject.org.",
+  "       Al compartirlo por WhatsApp ya se previsualiza como «Mira Mi Casa» y con",
+  "       una foto de una casa afectada, no como la fundación. Importa: el",
+  "       Ministerio de Vivienda advierte sobre estafas con nombres de programas de",
+  "       vivienda, y un enlace que se llama una cosa y se ve como otra da",
+  "       desconfianza. Los enlaces viejos del dominio principal siguen sirviendo",
+  "       porque redirigen, pero conviene repartir el nuevo.",
   "",
-  "     · Quien haya preparado el formulario de la visita sin señal en el dominio",
+  "     · QUIEN PREPARÓ EL FORMULARIO DE LA VISITA SIN SEÑAL en el dominio",
   "       principal tiene que volver a prepararlo en «miramicasa». Su copia vieja",
-  "       sigue funcionando, pero se queda huérfana.",
-  "     · El formulario de la visita se abre CON señal antes de salir. Siempre.",
+  "       sigue funcionando, pero queda huérfana: si sale a terreno sin rehacerlo,",
+  "       se queda sin formulario offline.",
   "",
-  "Y una que le falta al formulario de la familia: hoy le dice cómo NO lastimarse —no entres,",
-  "no te subas al techo— pero no le dice qué hace que una foto SIRVA. Cada foto que no se",
-  "puede leer es una vuelta completa: el ingeniero pide más, la familia sube, y vuelve a",
-  "esperar sin fecha. Si vas a acompañar a alguien a llenarlo, eso es lo que hay que explicarle."
+  "     · EL FORMULARIO DE LA VISITA SE ABRE CON SEÑAL ANTES DE SALIR. Siempre.",
+  "",
+  "     · SI ACOMPAÑAS A UNA FAMILIA A LLENAR EL FORMULARIO, lo que hay que",
+  "       explicarle es el encuadre. El formulario ya le muestra cuatro ejemplos",
+  "       reales —dos que un ingeniero puede leer y dos que no— pero una foto que",
+  "       no se puede leer sigue costando una vuelta completa: el ingeniero pide",
+  "       más, la familia sube, y vuelve a esperar sin fecha prometida. La regla",
+  "       corta: el daño de cerca, y la casa entera para saber dónde está."
 ], VERDE);
 
 texto("Esta guía se reescribió el 1 de septiembre de 2026, el día que el triaje y el panel se " +
