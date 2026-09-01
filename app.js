@@ -3460,9 +3460,30 @@ var PARTNERS_FALLBACK = [
   { name:"Fundación Niños del Futuro", type:"foundation", lat:6.2925, lng:-75.5375, areaKey:"map.area.ndf", url:"https://ninosdelfuturo.com" }
 ];
 var PARTNERS_DATA = null;
+/* SE CACHEA LA PROMESA, NO SOLO EL RESULTADO — y es el MISMO bug que
+   `loadInventory` ya tuvo y arregló, tres funciones más abajo, con este comentario:
+   «dos llamadas disparadas antes de que la primera responda encontraban
+   INVENTORY_DATA todavía en null y pedían el archivo dos veces». A `loadPartners`
+   nadie se lo aplicó, y tiene ONCE llamadores.
+
+   Medido en producción el 1 sep 2026 en `miramicasa.…/#casas`:
+   `/data/partners.json` se pedía SEIS VECES en una sola carga. 6 KB cada una, 36
+   en total, para un archivo que no cambia entre ellas. En la página que abre una
+   familia con mala señal eso es más que todo el CSS del sitio comprimido (30 KB).
+
+   El `if (PARTNERS_DATA)` de arriba SÍ funciona — pero solo después de que la
+   primera respuesta llegue. Entre la primera llamada y su respuesta, las otras
+   diez ven `null` y salen a la red. Guardar la promesa cierra esa ventana.
+
+   ⚠️ EL FALLO NO SE REINTENTA, y eso NO cambia: al fallar se fija
+   `PARTNERS_FALLBACK` en `PARTNERS_DATA`, así que el `if` de arriba devuelve el
+   fallback para siempre. Es distinto de `loadInventory`, que anula su promesa y
+   vuelve a intentar — y es a propósito: aquí hay un fallback usable y allá no. */
+var PARTNERS_PROMISE = null;
 function loadPartners(){
   if (PARTNERS_DATA) return Promise.resolve(PARTNERS_DATA);
-  return fetch("/data/partners.json")
+  if (PARTNERS_PROMISE) return PARTNERS_PROMISE;
+  PARTNERS_PROMISE = fetch("/data/partners.json")
     .then(function(r){ if(!r.ok) throw 0; return r.json(); })
     .then(function(j){
       PARTNERS_DATA = (j && j.partners && j.partners.length) ? j.partners : PARTNERS_FALLBACK;
@@ -3476,6 +3497,7 @@ function loadPartners(){
       return PARTNERS_DATA;
     })
     .catch(function(){ PARTNERS_DATA = PARTNERS_FALLBACK; return PARTNERS_DATA; });
+  return PARTNERS_PROMISE;
 }
 /* ---------- evidencia: entregas publicadas (Fase 6) ----------
    Una entrega se asocia a un DESTINO, no a un aporte: el dinero es fungible y
