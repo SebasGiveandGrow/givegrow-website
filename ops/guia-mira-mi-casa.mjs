@@ -37,120 +37,165 @@ doc.setTitle("Mira Mi Casa - Guia de funcionamiento");
 doc.setAuthor("Fundacion Give&Grow International");
 doc.setSubject("Como funciona Mira Mi Casa y donde esta cada area");
 
-const N  = await doc.embedFont(StandardFonts.Helvetica);
-const B  = await doc.embedFont(StandardFonts.HelveticaBold);
-const M  = await doc.embedFont(StandardFonts.Courier);
+const N = await doc.embedFont(StandardFonts.Helvetica);
+const B = await doc.embedFont(StandardFonts.HelveticaBold);
+const M = await doc.embedFont(StandardFonts.Courier);
+/* La «&» de la marca es de palo seco con peso, no una serif: Helvetica-Bold es
+   lo mas cercano que dan las Standard 14. El favicon usa Georgia porque ahi la
+   sirve el navegador; aqui no se puede embeber Unbounded (ver la nota de arriba). */
+const MARCA = B;
 
 const A4 = [595.28, 841.89];
-const MG = 52, ANCHO = A4[0] - MG * 2;
+const MG = 56, ANCHO = A4[0] - MG * 2;
 let p, y;
 
-function pagina() {
-  p = doc.addPage(A4);
-  y = A4[1] - 58;
+/* ── LA MARCA ────────────────────────────────────────────────────────────────
+   Se DIBUJA, no se importa: `favicon.svg` la define como un cuadrado verde de
+   radio 14/64 con la «&» blanca centrada, y esa es la marca que esta en
+   produccion. Reconstruirla vectorialmente sale nitida a cualquier tamano y no
+   mete un PNG borroso en el PDF. Si el favicon cambia, esto cambia con el. */
+function marca(x, yTop, s, sobreVerde = false) {
+  const r = s * (14 / 64);
+  const d = "M " + r + " 0 H " + (s - r) +
+            " A " + r + " " + r + " 0 0 1 " + s + " " + r + " V " + (s - r) +
+            " A " + r + " " + r + " 0 0 1 " + (s - r) + " " + s + " H " + r +
+            " A " + r + " " + r + " 0 0 1 0 " + (s - r) + " V " + r +
+            " A " + r + " " + r + " 0 0 1 " + r + " 0 Z";
+  p.drawSvgPath(d, { x, y: yTop, color: sobreVerde ? PAPEL : VERDE, borderWidth: 0 });
+  const t = "&", ts = s * 0.62;
+  p.drawText(t, {
+    x: x + (s - MARCA.widthOfTextAtSize(t, ts)) / 2,
+    y: yTop - s + s * 0.24,
+    size: ts, font: MARCA, color: sobreVerde ? VERDE : PAPEL
+  });
 }
+
+/* Tracking a mano: pdf-lib no tiene letter-spacing, y los eyebrows en
+   mayusculas pequenas con aire son la mitad del lenguaje editorial que pide el
+   sistema de diseno. Se dibuja caracter por caracter. */
+function eyebrow(t, o = {}) {
+  const size = o.size || 7.6, extra = o.extra == null ? 1.7 : o.extra;
+  const color = o.color || GRIS, font = o.font || B;
+  let x = o.x == null ? MG : o.x;
+  for (const ch of wa(t.toUpperCase())) {
+    p.drawText(ch, { x, y: o.y == null ? y : o.y, size, font, color });
+    x += font.widthOfTextAtSize(ch, size) + extra;
+  }
+  if (o.y == null) y -= (o.despues == null ? 14 : o.despues);
+  return x;
+}
+
+function pagina() { p = doc.addPage(A4); y = A4[1] - 62; }
+
 const DESBORDES = [];
 function pie(n, total) {
-  /* Si el contenido paso del pie, el PDF sale con texto encima del pie o fuera de
-     la hoja. Se avisa en la consola en vez de publicar una pagina rota. */
   if (y < 62) DESBORDES.push("pagina " + n + " (y=" + Math.round(y) + ")");
-  p.drawLine({ start: { x: MG, y: 42 }, end: { x: MG + ANCHO, y: 42 }, thickness: 0.5, color: LINEA });
-  p.drawText(wa("Mira Mi Casa · guía de funcionamiento - 31 de agosto de 2026"),
-    { x: MG, y: 30, size: 7.5, font: N, color: GRIS });
-  const t = wa(n + " de " + total);
-  p.drawText(t, { x: MG + ANCHO - N.widthOfTextAtSize(t, 7.5), y: 30, size: 7.5, font: N, color: GRIS });
+  p.drawLine({ start: { x: MG, y: 46 }, end: { x: MG + ANCHO, y: 46 }, thickness: 0.5, color: LINEA });
+  marca(MG, 40, 11);
+  p.drawText(wa("Mira Mi Casa  ·  guía de funcionamiento  ·  31 de agosto de 2026"),
+    { x: MG + 18, y: 32, size: 7.4, font: N, color: GRIS });
+  const t = wa(String(n) + " / " + String(total));
+  p.drawText(t, { x: MG + ANCHO - N.widthOfTextAtSize(t, 7.4), y: 32, size: 7.4, font: B, color: VERDE });
 }
 function espacio(n) { y -= n; }
-function saltoSi(alto) { if (y - alto < 70) { return true; } return false; }
 
-/* Texto con corte de línea real: sin esto una frase larga se sale del margen. */
 function texto(t, o = {}) {
-  const size = o.size || 9.8, font = o.font || N, color = o.color || TINTA;
-  const ancho = o.ancho || ANCHO, x0 = o.x || MG, il = o.interlinea || size * 1.42;
-  const palabras = wa(t).split(/\s+/);
-  let linea = "";
+  const size = o.size || 9.7, font = o.font || N, color = o.color || TINTA;
+  const ancho = o.ancho || ANCHO, x0 = o.x || MG, il = o.interlinea || size * 1.5;
   const lineas = [];
-  for (const w of palabras) {
+  let linea = "";
+  for (const w of wa(t).split(/\s+/)) {
     const prueba = linea ? linea + " " + w : w;
     if (font.widthOfTextAtSize(prueba, size) <= ancho) { linea = prueba; continue; }
     lineas.push(linea); linea = w;
   }
   if (linea) lineas.push(linea);
-  for (const l of lineas) {
-    p.drawText(l, { x: x0, y, size, font, color });
-    y -= il;
-  }
-  y -= (o.despues == null ? 4 : o.despues);
+  for (const l of lineas) { p.drawText(l, { x: x0, y, size, font, color }); y -= il; }
+  y -= (o.despues == null ? 5 : o.despues);
 }
-function h1(t) {
-  texto(t, { size: 22, font: B, color: TINTA, interlinea: 26, despues: 6 });
-}
+/* Regla fina y titulo: jerarquia de publicacion, no de dashboard. La regla va
+   ARRIBA del titulo — separa secciones sin encajonarlas en tarjetas. */
 function h2(t) {
-  espacio(10);
-  p.drawText(wa(t), { x: MG, y, size: 13, font: B, color: VERDE });
-  y -= 6;
-  p.drawLine({ start: { x: MG, y: y - 3 }, end: { x: MG + ANCHO, y: y - 3 }, thickness: 0.7, color: VERDE });
-  y -= 16;
+  espacio(14);
+  p.drawLine({ start: { x: MG, y: y + 13 }, end: { x: MG + ANCHO, y: y + 13 }, thickness: 1.4, color: VERDE });
+  p.drawText(wa(t), { x: MG, y, size: 14.5, font: B, color: TINTA });
+  y -= 20;
 }
 function h3(t) {
-  espacio(4);
-  texto(t, { size: 10.5, font: B, despues: 3 });
+  espacio(5);
+  texto(t, { size: 10.3, font: B, despues: 3 });
 }
 function punto(t, o = {}) {
-  p.drawText("-", { x: MG + 4, y, size: 9.8, font: N, color: GRIS });
-  texto(t, { x: MG + 16, ancho: ANCHO - 16, despues: o.despues == null ? 2 : o.despues });
+  /* Un guion fino y no una vineta: la vineta redonda es lenguaje de app. */
+  p.drawLine({ start: { x: MG + 3, y: y + 3.2 }, end: { x: MG + 9, y: y + 3.2 },
+               thickness: 0.9, color: VERDE });
+  texto(t, { x: MG + 17, ancho: ANCHO - 17, despues: o.despues == null ? 3 : o.despues });
 }
 function mono(t, o = {}) {
-  texto(t, { font: M, size: o.size || 8.6, color: o.color || VERDE, x: o.x || MG + 16,
-             ancho: ANCHO - 16, despues: o.despues == null ? 3 : o.despues });
+  texto(t, { font: M, size: o.size || 8.5, color: o.color || VERDE, x: o.x || MG + 17,
+             ancho: ANCHO - 17, despues: o.despues == null ? 4 : o.despues });
 }
-function caja(titulo, lineas, color = AMBAR) {
-  const alto = 26 + lineas.length * 13;
-  p.drawRectangle({ x: MG, y: y - alto + 12, width: ANCHO, height: alto,
-                    color: PAPEL, borderColor: color, borderWidth: 0.8 });
-  p.drawText(wa(titulo), { x: MG + 12, y: y, size: 10, font: B, color });
+/* Panel de aviso: fondo papel y UNA regla vertical de color a la izquierda. Sin
+   bordes en las cuatro caras ni esquinas redondas — eso es tarjeta de app. */
+function caja(titulo, lineas, color) {
+  const c = color || AMBAR;
+  const alto = 24 + lineas.length * 12.8;
+  p.drawRectangle({ x: MG, y: y - alto + 13, width: ANCHO, height: alto, color: PAPEL });
+  p.drawRectangle({ x: MG, y: y - alto + 13, width: 2.4, height: alto, color: c });
+  eyebrow(titulo, { y: y, x: MG + 14, color: c, size: 7.8 });
   y -= 17;
   for (const l of lineas) {
-    p.drawText(wa(l), { x: MG + 12, y, size: 9, font: N, color: TINTA });
-    y -= 13;
+    p.drawText(wa(l), { x: MG + 14, y, size: 8.8, font: N, color: TINTA });
+    y -= 12.8;
   }
-  y -= 18;
+  y -= 20;
 }
-/* Tabla de dos columnas: la etiqueta a la izquierda y el enlace o la explicación
-   a la derecha. Cada fila corta sus líneas para no salirse. */
 function fila(izq, der, o = {}) {
-  const wIzq = o.wIzq || 150;
-  const size = 9.2;
-  const dl = [];
-  { let l = "";
-    for (const w of wa(der).split(/\s+/)) {
+  const wIzq = o.wIzq || 150, size = 9.1;
+  const corta = (txt, font, sz, max) => {
+    const out = []; let l = "";
+    for (const w of wa(txt).split(/\s+/)) {
       const t = l ? l + " " + w : w;
-      if ((o.mono ? M : N).widthOfTextAtSize(t, o.mono ? 8.4 : size) <= ANCHO - wIzq - 10) { l = t; continue; }
-      dl.push(l); l = w;
+      if (font.widthOfTextAtSize(t, sz) <= max) { l = t; continue; }
+      out.push(l); l = w;
     }
-    if (l) dl.push(l); }
-  const il = [];
-  { let l = "";
-    for (const w of wa(izq).split(/\s+/)) {
-      const t = l ? l + " " + w : w;
-      if (B.widthOfTextAtSize(t, size) <= wIzq - 10) { l = t; continue; }
-      il.push(l); l = w;
-    }
-    if (l) il.push(l); }
-  const filas = Math.max(dl.length, il.length);
-  const y0 = y;
-  il.forEach((l, i) => p.drawText(l, { x: MG, y: y0 - i * 12.6, size, font: B, color: TINTA }));
-  dl.forEach((l, i) => p.drawText(l, { x: MG + wIzq, y: y0 - i * 12.6,
-    size: o.mono ? 8.4 : size, font: o.mono ? M : N, color: o.mono ? VERDE : GRIS }));
-  y = y0 - filas * 12.6 - 6;
+    if (l) out.push(l);
+    return out;
+  };
+  const dl = corta(der, o.mono ? M : N, o.mono ? 8.3 : size, ANCHO - wIzq - 8);
+  const il = corta(izq, B, size, wIzq - 10);
+  const y0 = y, n = Math.max(dl.length, il.length);
+  il.forEach((l, i) => p.drawText(l, { x: MG, y: y0 - i * 12.4, size, font: B, color: TINTA }));
+  dl.forEach((l, i) => p.drawText(l, { x: MG + wIzq, y: y0 - i * 12.4,
+    size: o.mono ? 8.3 : size, font: o.mono ? M : N, color: o.mono ? VERDE : GRIS }));
+  y = y0 - n * 12.4 - 7;
 }
-
 /* ══════════════════════ 1 ══════════════════════ */
 pagina();
-p.drawText(wa("FUNDACIÓN GIVE&GROW INTERNATIONAL"), { x: MG, y: y + 16, size: 8, font: B, color: GRIS });
-h1("Mira Mi Casa");
-texto("Guía de funcionamiento: qué es, cómo funciona, y dónde está cada cosa.",
-  { size: 12, color: GRIS, despues: 14 });
+
+/* ── LA PORTADA ──────────────────────────────────────────────────────────────
+   El «elemento firma» de la pieza, y el unico: una banda verde con la marca en
+   negativo. Todo lo demas del documento se queda quieto y disciplinado, que es
+   la regla del sistema de diseno — se gasta la audacia en un solo sitio.
+
+   La banda ocupa el tercio superior y no la pagina entera: una portada suelta
+   obligaria a una hoja mas para cinco paginas de contenido, y un documento
+   operativo que se imprime y se lleva encima no puede gastar papel en eso. */
+const BANDA = 208;
+p.drawRectangle({ x: 0, y: A4[1] - BANDA, width: A4[0], height: BANDA, color: VERDE });
+marca(MG, A4[1] - 44, 34, true);
+/* Alineado al CENTRO ÓPTICO de la marca, no al borde superior de la banda: con
+   la línea base arriba el eyebrow flotaba y la marca quedaba colgando. */
+eyebrow("Fundación Give&Grow International", { y: A4[1] - 64, x: MG + 48, color: PAPEL, size: 7.8, extra: 2 });
+p.drawText(wa("Mira Mi Casa"), { x: MG, y: A4[1] - 122, size: 34, font: B, color: PAPEL });
+p.drawText(wa("Guía de funcionamiento"), { x: MG, y: A4[1] - 150, size: 13, font: N, color: PAPEL });
+p.drawText(wa("Qué es, cómo funciona, y dónde está cada cosa."),
+  { x: MG, y: A4[1] - 172, size: 10, font: N, color: PAPEL });
+/* La regla en papel sobre el verde cierra la banda por dentro: el mismo recurso
+   editorial que separa las secciones, no un adorno distinto. */
+p.drawLine({ start: { x: MG, y: A4[1] - 188 }, end: { x: MG + 96, y: A4[1] - 188 },
+             thickness: 1.6, color: PAPEL });
+y = A4[1] - BANDA - 34;
 
 h2("Qué es");
 texto("Una familia cuya casa se afectó por el sismo del 10 de agosto de 2026 sube unas fotos. " +
