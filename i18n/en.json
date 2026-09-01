@@ -1331,6 +1331,8 @@
   "ing.ey": "Volunteer engineers",
   "ing.t": "There are more damaged homes than engineers to visit them.",
   "ing.lead": "After the 10 August earthquake, more requests arrive than any field team can handle. We are not asking you to rule from a distance: we are asking you to look at some photos, say whether there are signs not to stay, and what should be repaired and with what.",
+  "ing.volver.p": "If you have already applied and we verified your licence, this is your door.",
+  "ing.volver.cta": "Enter the triage",
   "ing.q.ey": "The scope",
   "ing.q.t": "Guiding, not ruling",
   "ing.q.p": "This distinction is not fine print: it governs the whole project, down to the names of the database columns. If you do not share it, this is not the place — and we would rather say so up front.",
