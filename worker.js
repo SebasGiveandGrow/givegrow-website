@@ -2860,7 +2860,7 @@ function paginaTriage() {
     funciona sin internet, y lo que llenes se envía cuando vuelvas a tener.
   </div>
 </div>
-<script src="/triaje.js"></script>
+<script src="/triaje/app.js"></script>
 </body>
 </html>`;
 }
@@ -11181,7 +11181,19 @@ export default {
        destino de Access no queda EXPUESTA, queda ROTA. El peor caso de un
        borrado equivocado es un 403, no una fuga. */
     if (ruta === "/triage")    return Response.redirect(new URL("/triaje", url).toString(), 301);
-    if (ruta === "/triage.js") return Response.redirect(new URL("/triaje.js", url).toString(), 301);
+
+    /* LOS DOS NOMBRES VIEJOS DEL SCRIPT, apuntando al sitio nuevo. Van los dos
+       al destino FINAL y no en cadena: `/triage.js` redirigía a `/triaje.js`, y
+       si este saltara a su vez a `/triaje/app.js` serían dos saltos para cargar
+       un archivo. Aquí no hay ninguna página que los pida ya —el HTML del triaje
+       apunta al nuevo— pero un 301 cacheado por ahí sí puede pedirlos.
+
+       Se usa 302 y no 301 a propósito: un 301 de este archivo es exactamente lo
+       que se acaba de sufrir con `miramicasa.…/triaje`, donde el permanente
+       quedó cacheado en los navegadores después de dejar de ser cierto. Para una
+       ruta que ya se movió una vez, la redirección no es permanente. */
+    if (ruta === "/triaje.js") return Response.redirect(new URL("/triaje/app.js", url).toString(), 302);
+    if (ruta === "/triage.js") return Response.redirect(new URL("/triaje/app.js", url).toString(), 302);
 
     /* EL TRIAJE YA VIVE EN MIRA MI CASA. Aquí solo queda el panel.
 
@@ -11297,6 +11309,11 @@ export default {
        voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
        creando cuentas: cero contraseñas que guardar y cero que se filtren. */
     if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/")) {
+      /* `/triaje.js` ya no llega hasta aquí: se redirige más arriba, fuera del
+         guardián. Se deja en la condición A PROPÓSITO, como red: si algún día
+         alguien quita esa redirección, la ruta cae en el guardián y se cierra en
+         vez de caer al comodín del SPA y devolver el index.html con un 200. Este
+         archivo tiene TRES cicatrices de exactamente eso. */
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
       /* El sitio responde en el ápex Y en www, sin redirigir entre ellos, pero
@@ -11445,7 +11462,25 @@ export default {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
           });
         }
-        if (ruta === "/triaje.js") {
+        /* EL SCRIPT VIVE BAJO /triaje/ Y NO EN /triaje.js, Y NO ES ESTÉTICA.
+           Cloudflare Access cubre por PATH, y comprobado en producción el 1 sep
+           2026 con los destinos ya añadidos al subdominio:
+
+             miramicasa.…/triaje              302 → login de Access   ✓
+             miramicasa.…/triaje/inspeccion   302 → login de Access   ✓
+             miramicasa.…/api/triage/casos    302 → login de Access   ✓
+             miramicasa.…/triaje.js           403                     ✗
+
+           El destino `triaje` cubre lo que está DEBAJO —`/triaje/inspeccion` no
+           tiene destino propio y entra— pero `/triaje.js` es un HERMANO, no un
+           hijo, y se queda fuera. La página cargaba y su script no: una pantalla
+           en blanco para el ingeniero.
+
+           Moverlo aquí lo mete bajo el destino que ya existe, en los DOS hosts, y
+           de paso deja libre el destino `triaje.js` de la aplicación — que era
+           uno de los cinco. La alternativa era gastar un slot en el subdominio
+           para un archivo. */
+        if (ruta === "/triaje/app.js") {
           return new Response(triageJS(), {
             headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }
           });
