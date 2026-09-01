@@ -2140,11 +2140,11 @@
       <div id="cv-p2" class="cv-paso" style="display:none;margin-top:30px">
         <h3 data-i18n="cv.s2.t">Tu casa</h3>
         <div class="ally-form" style="margin-top:16px">
-          <div class="field"><label for="cv-nombre" data-i18n="cv.nombre">Tu nombre</label><input type="text" id="cv-nombre" autocomplete="name"></div>
-          <div class="field"><label for="cv-tel" data-i18n="cv.tel">Tu WhatsApp</label><input type="tel" id="cv-tel" autocomplete="tel"><small class="mu" data-i18n="cv.tel.h">Lo usamos para contactarte si necesitamos más fotos o para coordinar una visita.</small></div>
+          <div class="field"><label for="cv-nombre" data-i18n="cv.nombre">Tu nombre</label><input type="text" id="cv-nombre" autocomplete="name" required></div>
+          <div class="field"><label for="cv-tel" data-i18n="cv.tel">Tu WhatsApp</label><input type="tel" id="cv-tel" autocomplete="tel" required><small class="mu" data-i18n="cv.tel.h">Lo usamos para contactarte si necesitamos más fotos o para coordinar una visita.</small></div>
           <div class="field"><label for="cv-email" data-i18n="cv.email">Correo (opcional)</label><input type="email" id="cv-email" autocomplete="email"></div>
-          <div class="field"><label for="cv-sector" data-i18n="cv.sector">Barrio o sector</label><input type="text" id="cv-sector"><small class="mu" data-i18n="cv.sector.h">Ejemplo: Cali, comuna 18. Esto es lo único que podría hacerse público algún día.</small></div>
-          <div class="field"><label for="cv-dir" data-i18n="cv.dir">Dirección (solo para la visita)</label><input type="text" id="cv-dir"><small class="mu" data-i18n="cv.dir.h">No se publica nunca. Solo la ve el equipo para poder llegar.</small></div>
+          <div class="field"><label for="cv-sector" data-i18n="cv.sector">Barrio o sector</label><input type="text" id="cv-sector" required><small class="mu" data-i18n="cv.sector.h">Ejemplo: Cali, comuna 18. Esto es lo único que podría hacerse público algún día.</small></div>
+          <div class="field"><label for="cv-dir" data-i18n="cv.dir">Dirección (solo para la visita)</label><input type="text" id="cv-dir" autocomplete="street-address"><small class="mu" data-i18n="cv.dir.h">No se publica nunca. Solo la ve el equipo para poder llegar.</small></div>
           <div class="field"><label for="cv-material" data-i18n="cv.material">¿De qué son los muros?</label>
             <select id="cv-material">
               <!-- OPCIÓN VACÍA Y PRIMERA. Sin ella «Ladrillo o bloque» iba
@@ -2172,6 +2172,14 @@
           <input type="text" id="cv-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
         </div>
         <button type="button" class="btn btn-g" style="margin-top:18px" data-act="cvPaso(3)" data-i18n="cv.s2.btn">Siguiente</button>
+        <!-- EL AVISO DE LO QUE FALTA. Antes esto era un `alert()` nativo — el único
+             de todo app.js. Un alert lo anuncia un lector de pantalla, así que no era
+             inaccesible, pero no dice QUÉ campo falta, no lleva el foco hasta él, y
+             contradecía el patrón del propio sitio, que usa regiones vivas en todas
+             partes. `role="alert"` y no `status`: esto BLOQUEA el avance, así que tiene
+             que interrumpir, no esperar a que la persona termine lo que hacía. No se
+             reutilizó `cv-msg` porque ese vive en el paso 4. -->
+        <p id="cv-msg2" role="alert" aria-live="assertive" class="mu" style="margin-top:12px"></p>
       </div>
 
       <!-- PASO 3 · fotos -->
@@ -2595,7 +2603,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=fdc05851"></script>
+<script src="/app.js?v=bd8e38ab"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
