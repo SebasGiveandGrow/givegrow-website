@@ -1,5 +1,5 @@
 /* Validación pre-deploy Give&Grow — falla el build si algo se rompe. */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { esDict, decodeHtml, eachTextNode } from "./i18n-html.mjs";
 
@@ -270,6 +270,39 @@ const used = [...html.matchAll(/data-i18n="([^"]+)"/g)].map(x => x[1]);
 const missing = [...new Set(used)].filter(k => !es.has(k));
 if (missing.length) err("data-i18n sin clave: " + missing.join(", "));
 else ok("cobertura data-i18n (" + new Set(used).size + " claves usadas)");
+
+/* 3.9 · CADA FOTO DE LA GALERÍA EXISTE, Y SU MINIATURA TAMBIÉN
+   Este check nació de un fallo que NO SE VE. `[assets] directory = "."` con el
+   fallback del SPA hace que una ruta de imagen inexistente responda 200 con
+   `text/html` —el index.html entero— en vez de 404. Comprobado el 1 sep 2026:
+   /img/jornadas/thumb/brigada_marsella_derrumbe.jpg devolvía
+   «200 text/html» después de borrar el archivo. Así que el navegador recibe
+   HTML donde esperaba un JPEG: sale el icono de imagen rota, sin 404 en la
+   consola y sin nada en los logs del Worker. Un dedazo en un nombre de archivo
+   no lo atrapa nadie hasta que alguien mira la galería con sus propios ojos.
+
+   Y la galería tiene DOS archivos por entrada: la imagen y su miniatura, que
+   `initGallery` deriva sola metiendo `thumb/` en la ruta cuando empieza por
+   `jornadas/`. Olvidar la miniatura es el error fácil, porque la grilla es lo
+   único que la usa y la imagen grande del lightbox seguiría bien.
+
+   Se lee el array del propio app.js en vez de mantener una lista aparte: una
+   lista aparte es otra cosa que se desincroniza. */
+{
+  const bloque = src.slice(src.indexOf("var GALLERY = ["), src.indexOf("var lbIndex"));
+  const rutas = [...bloque.matchAll(/\{f:"([^"]+)"/g)].map((m) => m[1]);
+  if (!rutas.length) err("galería: no se pudo leer GALLERY de app.js");
+  else {
+    let faltan = 0;
+    for (const f of rutas) {
+      const mini = f.startsWith("jornadas/") ? f.replace("jornadas/", "jornadas/thumb/") : f;
+      for (const ruta of ["img/" + f, "img/" + mini]) {
+        if (!existsSync(ruta)) { err("galería: falta " + ruta); faltan++; }
+      }
+    }
+    if (!faltan) ok("galería: " + rutas.length + " entradas, imagen y miniatura presentes");
+  }
+}
 
 /* 4 · JSONs */
 try { JSON.parse(readFileSync("data/partners.json", "utf8")); ok("data/partners.json válido"); }
