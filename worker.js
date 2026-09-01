@@ -11183,22 +11183,34 @@ export default {
     if (ruta === "/triage")    return Response.redirect(new URL("/triaje", url).toString(), 301);
     if (ruta === "/triage.js") return Response.redirect(new URL("/triaje.js", url).toString(), 301);
 
-    /* LAS DOS HERRAMIENTAS DE TRABAJO NO EXISTEN EN EL SUBDOMINIO: el triaje del
-       ingeniero y el panel del equipo. Las dos eran un callejón sin salida —403
-       crudo— y hasta hoy solo se había arreglado el del triaje.
+    /* EL TRIAJE YA VIVE EN MIRA MI CASA. Aquí solo queda el panel.
 
-       POR QUÉ VIVEN EN EL ÁPEX. Las aplicaciones de Cloudflare Access se
-       definen por hostname, y las de este proyecto se crearon sobre el ápex.
-       ⚠️ Una sesión anterior anotó aquí que la aplicación estaba «en su tope de
-       hostnames»; ESO NO ESTÁ VERIFICADO en ninguna parte del repositorio y no
-       se puede comprobar desde el código, así que no se trata como un hecho. Si
-       resulta que se pueden añadir hostnames —o crear una aplicación aparte para
-       el subdominio— este bloque se invierte: el ápex redirige al subdominio y
-       Mira Mi Casa queda entero bajo un solo nombre, que es lo que se quiere.
-       El guardián ya está preparado: acepta una LISTA de audiencias, así que
-       sumar la de una aplicación nueva es una línea de configuración.
+       QUÉ CAMBIÓ, el 1 sep 2026. La aplicación de Access del triaje estaba en su
+       tope de CINCO destinos, y de esos cinco DOS no protegían nada: `api/triaje`
+       —que el Worker no sirve, la API real es `/api/triage/` en inglés— y
+       `triage`, que solo era un alias que redirige y cuya redirección se sacó del
+       guardián justo arriba. Liberados esos dos, entraron
+       `miramicasa.…/triaje` y `miramicasa.…/api/triage`.
 
-       Mientras eso no pase, un 403 no se lo explica a nadie.
+       Así que este bloque YA NO redirige el triaje: lo serviría igual y mandarlo
+       al ápex era, a partir de ese momento, lo único que impedía que Mira Mi Casa
+       tuviera su herramienta en casa. Comprobado en vivo: con los destinos ya
+       añadidos, abrir `miramicasa.…/triaje` seguía aterrizando en el ápex — y era
+       ESTA redirección, no Access.
+
+       EL PANEL SÍ SIGUE REDIRIGIENDO. `/admin` tiene su PROPIA aplicación de
+       Access, con su propio tope de cinco, y no se ha tocado. Mudarlo es otra
+       operación: mientras su aplicación no cubra el subdominio, servirlo aquí
+       sería un 403 —el guardián es fail-closed— y un 403 no se lo explica a
+       nadie. La redirección se queda hasta entonces.
+
+       ⚠️ EL 301 DE ANTES SE QUEDA EN LOS NAVEGADORES. Un 301 es permanente y se
+       cachea con ganas, así que quien haya abierto `miramicasa.…/triaje` mientras
+       redirigía va a seguir saltando al ápex desde su propio caché, sin pedirle
+       nada al servidor. No hay nada que el Worker pueda hacer contra eso: se
+       prueba en una ventana privada. Y de ahí la lección para el día que el ápex
+       tenga que apuntar al subdominio: ESE irá con 302, porque esta ruta ya
+       demostró que cambia de sitio.
 
        Le pasó a `/ruta` por lo mismo y se resolvió igual: redirigir en vez de
        dejar morir el enlace. Va FUERA del guardián de Access —dentro nunca se
@@ -11210,7 +11222,6 @@ export default {
        subdominio, que es el nombre que la familia conoce, y toparse con un 403
        en mitad de una jornada sin señal buena no se recupera. */
     if (HOST_MMC.test(url.hostname) && (
-          ruta === "/triaje" || ruta.startsWith("/triaje/") || ruta === "/triaje.js" ||
           /* EL PANEL TENÍA EL MISMO CALLEJÓN SIN SALIDA Y SE QUEDÓ SIN ARREGLAR.
              Comprobado en producción el 1 sep 2026: `miramicasa.…/admin` y
              `miramicasa.…/admin/ruta` respondían 403 CRUDO — ni redirigían ni
