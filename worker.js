@@ -11247,12 +11247,22 @@ function marcarMarca(respuesta, host) {
     /* Y LA IMAGEN. La genérica de la fundación con el título de Mira Mi Casa era
        incoherente, y la imagen es la mitad de la señal de confianza en WhatsApp.
 
-       LA ELEGIDA ES UNA CASA CAÍDA, SIN NINGUNA PERSONA. La primera versión fue
-       el equipo en una calle y no comunicaba nada: era una calle con un perro.
-       Esta se lee sin explicación —muros en el suelo, la estructura del techo
-       abierta en diagonal, una estufa sola en el pasto y el valle al fondo— y es
-       exactamente la situación de quien recibe el enlace. La estufa es lo que la
-       hace aterrizar: alguien cocinaba ahí.
+       LA ELEGIDA ES UNA CASA CAÍDA, SIN NINGUNA PERSONA. Se llegó a ella en tres
+       pasos, y los dos descartes explican la elección:
+
+         1. El equipo en una calle. No comunicaba nada — era una calle con un perro.
+         2. La misma casa con una estufa sola en el pasto. Mejor, pero plana.
+         3. ESTA: el escombro entra en diagonal desde el borde inferior y la casa
+            se abre a la derecha con la ropa todavía colgada dentro, con las lomas
+            al fondo. Se entiende en un segundo, que es lo que necesita una
+            miniatura de WhatsApp, y tiene profundidad en vez de ser un montón de
+            escombro de frente.
+
+       SE VE EL INTERIOR DE LA CASA, y se aceptó por la distancia. Se distinguen
+       formas —ropa en una cuerda, muebles— pero no un rostro ni un objeto
+       identificable. Había una versión con la nevera y las bolsas de la familia en
+       primer plano: esa se descartó porque ahí ya no se documenta un daño, se
+       husmea entre las cosas de alguien.
 
        SIN PERSONAS, Y ESO FUE UNA DECISIÓN. La candidata más fuerte era una
        señora de pie frente a su casa destruida sosteniendo una caja. Emocionalmente
