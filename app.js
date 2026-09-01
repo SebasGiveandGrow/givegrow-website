@@ -496,6 +496,23 @@ var I18N = {
     "ing.ey":"Ingenieros voluntarios",
     "ing.t":"Hay más casas dañadas que ingenieros para visitarlas.",
     "ing.lead":"Después del sismo del 10 de agosto llegan más solicitudes de las que un equipo alcanza a atender en terreno. Lo que pedimos no es que dictamines a distancia: es que mires unas fotos, digas si hay señales para no permanecer y qué conviene reparar y con qué.",
+    /* LA PUERTA DEL INGENIERO QUE YA ENTRÓ UNA VEZ. Hasta hoy no existía: el
+       enlace del triaje solo llegaba por correo al verificarle la matrícula, así
+       que quien lo perdía no tenía DÓNDE buscarlo — ni en el subdominio, que es
+       el nombre que reparte el proyecto, ni en ninguna otra parte del sitio.
+
+       VA AQUÍ Y NO EN UNA SECCIÓN PROPIA. Esta página ya gasta su audacia en los
+       pasos numerados y en la banda de «lo que va con tu nombre»; el sistema de
+       diseño pide un solo elemento firma por pieza, así que esto es una línea
+       discreta bajo la entrada y nada más. Y va ARRIBA, no al final: alguien que
+       vuelve no debería recorrer el formulario de postulación —que no es para
+       él— para encontrar su herramienta.
+
+       EL COPY DICE LA CONDICIÓN, no solo la invitación. Si la matrícula no está
+       verificada, Access va a negar la entrada; prometer «entrar» sin decir de
+       qué depende sería mandar a alguien a una puerta cerrada sin avisarle. */
+    "ing.volver.p":"Si ya te postulaste y verificamos tu matrícula, tu puerta es esta.",
+    "ing.volver.cta":"Entrar al triaje",
     "ing.q.ey":"El alcance",
     "ing.q.t":"Orientar, no dictaminar",
     "ing.q.p":"Esta distinción no es una advertencia legal al pie: gobierna el proyecto entero, hasta el nombre de las columnas de la base. Si no la compartes, este no es el lugar — y preferimos decírtelo antes.",
