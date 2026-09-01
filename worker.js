@@ -2533,6 +2533,13 @@ async function apiCasoCrear(request, env) {
   try { await correoAvisoCaso(env, { numero, nombre, tel, sector, email }); }
   catch (e) { console.error("correo caso", numero, e && e.message); }
 
+  /* Y A LOS INGENIEROS, si la fila estaba vacía. Va DESPUÉS del insert a
+     propósito: el COUNT tiene que ver el caso nuevo para saber si es el único.
+     Envuelto en su propio try porque un fallo aquí no puede costarle a la
+     familia su número de caso — el caso ya está guardado. */
+  try { await avisarIngenierosFilaDespierta(env, { numero, sector }); }
+  catch (e) { console.error("aviso fila ingenieros", numero, e && e.message); }
+
   /* Y AHORA SÍ SE LE ESCRIBE A LA FAMILIA. Hasta hoy el único correo que salía al
      crear un caso iba al EQUIPO: a la familia, ninguno, ni cuando dejaba correo.
      Así que el enlace de su caso vivía en UNA sola pantalla — sin `localStorage`,
@@ -2731,6 +2738,80 @@ async function correoCasoCreado(env, x) {
     }),
     etiqueta: "caso-creado", guia: x.numero
   });
+}
+
+/* AVISO A LOS INGENIEROS CUANDO LA FILA DESPIERTA.
+   ============================================================================
+   EL HUECO QUE CIERRA. Al crear un caso salían dos correos: uno a la familia y
+   uno al equipo. A los INGENIEROS —las únicas personas que pueden producir el
+   concepto que se le prometió a la familia— ninguno. Tenían que entrar por su
+   cuenta a ver si había algo. Comprobado el 1 sep 2026: dos ingenieros
+   verificados desde el 22 de agosto y CERO conceptos firmados. El primer caso
+   podía quedarse quieto días mientras la familia esperaba, y la familia no tiene
+   una fecha prometida a la que agarrarse.
+
+   SOLO CUANDO LA FILA PASA DE VACÍA A TENER ALGO, y esto es lo que hace que el
+   aviso sea utilizable. Son VOLUNTARIOS: un correo por caso los quemaría en la
+   primera jornada con veinte solicitudes, y el que llega cuando ya hay diez
+   esperando no informa de nada nuevo. Si la fila ya tenía trabajo, el aviso se
+   calla. El disparador es un COUNT, no un cron —el Worker no tiene tarea
+   programada— así que no hay infraestructura nueva.
+
+   NO LLEVA UN SOLO DATO DE LA FAMILIA. Ni nombre, ni teléfono, ni dirección: el
+   ingeniero no los puede ver en el triaje y sería incoherente mandárselos por
+   correo. Va el número y el sector, que es lo mismo que ya publica el banco de
+   casas.
+
+   Y NO PIDE NADA. El alcance que el ingeniero aceptó al postularse dice que
+   revisa los casos que quiera y ninguno que no quiera; un correo que sonara a
+   obligación contradiría eso. Lo dice explícitamente, y dice también cuándo se
+   le escribe, para que sepa que no va a recibir uno por cada caso.
+   ============================================================================ */
+async function avisarIngenierosFilaDespierta(env, x) {
+  const fila = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_REVISAR
+  ).first();
+  /* Exactamente 1 = el que se acaba de crear es el único esperando. Si hay más,
+     alguien ya tenía trabajo pendiente y este correo no aporta. */
+  if (!fila || Number(fila.n) !== 1) return { ok: true, motivo: "la fila ya tenia trabajo" };
+
+  const r = await env.DB.prepare(
+    "SELECT nombre, email FROM inscripciones WHERE tipo = 'ingeniero' " +
+    "AND email IS NOT NULL AND TRIM(email) <> '' " +
+    "AND json_extract(datos, '$.matricula_verificada') = 1"
+  ).all();
+  const ing = (r.results || []);
+  if (!ing.length) return { ok: true, motivo: "ningun ingeniero verificado" };
+
+  const triaje = ORIGIN_MMC + "/triaje";
+  let enviados = 0;
+  for (const i of ing) {
+    try {
+      await enviarCorreo(env, {
+        para: i.email,
+        asunto: "Hay un caso esperando en Mira Mi Casa",
+        texto: "La fila del triaje estaba vacia y acaba de entrar un caso.\n\n" +
+          "Caso: " + x.numero + "\nSector: " + x.sector + "\n\n" +
+          "Entra en " + triaje + " con este mismo correo.\n\n" +
+          "No hay compromiso: revisas los casos que quieras y ninguno que no quieras. " +
+          "Y solo te escribimos cuando la fila pasa de vacia a tener algo, no por cada caso.",
+        html: plantillaCorreo({
+          titulo: "Hay un caso esperando",
+          parrafos: [
+            "La fila del triaje estaba vacía y acaba de entrar un caso. Del otro lado hay una familia que subió fotos de su casa y no tiene una fecha prometida, así que lo que tarde en mirarse es lo que va a esperar.",
+            "Entras en " + triaje + " con este mismo correo: pides un código y te llega a este buzón.",
+            "No hay compromiso de ninguna clase: revisas los casos que quieras y ninguno que no quieras, igual que dice el alcance que aceptaste al postularte. Y solo te escribimos cuando la fila pasa de vacía a tener algo — no vas a recibir un correo por cada caso."
+          ],
+          filas: [["Caso", x.numero], ["Sector", x.sector]],
+          boton: { url: triaje, texto: "Abrir el triaje" },
+          cierre: "Este mensaje es automático. Si ya no quieres recibirlos, respóndelo y lo quitamos."
+        }),
+        etiqueta: "fila-despierta", guia: x.numero
+      });
+      enviados++;
+    } catch (e) { console.error("aviso fila", i.email, e && e.message); }
+  }
+  return { ok: true, enviados };
 }
 
 async function correoAvisoCaso(env, x) {
@@ -3195,6 +3276,14 @@ async function firmanteVerificado(env, email) {
    Se define después de FIRMES y DISCREPA porque los usa; van más abajo en el
    archivo, así que esta constante se arma como función para no depender del
    orden de evaluación. */
+/* LA FILA DEL INGENIERO, en un solo sitio. Es la misma condición que usa la
+   pestaña por defecto del triaje —«sin revisar»— y ahora también el aviso por
+   correo. Estaba escrita a mano dentro de `triageCasos` y nada más la usaba;
+   sacarla aquí es lo que impide que el correo diga «hay un caso esperando»
+   mientras la pantalla enseña otra cosa. Es el mismo patrón de `CONFIRMAR` y
+   `TERRENO_URGE`, y por la misma razón. */
+const SIN_REVISAR = "c.estado IN ('recibido','en_revision')";
+
 const CONFIRMAR = () =>
   "((c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA + " OR " + SIN_RESPALDO + ")" +
   /* Y NO LO TERMINADO. La pestaña enseñaba casos cerrados y descartados, así que
@@ -3283,7 +3372,7 @@ async function triageCasos(env, url) {
        se resuelve sola. El esquema permitía la segunda opinión desde la 0010 y
        nada la pedía nunca. */
     estado === "confirmar" ? "WHERE " + CONFIRMAR() :
-    "WHERE c.estado IN ('recibido','en_revision')";
+    "WHERE " + SIN_REVISAR;
   const r = await env.DB.prepare(
     "SELECT c.numero, c.estado, c.clasificacion, c.sector, c.material, c.pisos, " +
     "c.danio_previo, c.habitada, c.heridos, c.creado_en, " +
@@ -8362,8 +8451,15 @@ async function adminAvisarIngeniero(request, env, id, quien) {
 async function correoIngenieroVerificado(env, i) {
   if (!i || !i.email) return { ok: true, sinDestino: true };
   const en = i.idioma === "en";
-  const triaje = "https://thegiveandgrowproject.org/triaje";
-  const terreno = "https://thegiveandgrowproject.org/triaje/inspeccion";
+  /* DEL SUBDOMINIO Y DERIVADAS DE `ORIGIN_MMC`, no escritas a mano. Estaban
+     apuntando al ápex, y aunque el ápex redirige, el correo que le abre la
+     puerta a un ingeniero debería enseñarle el nombre del proyecto y no el de la
+     fundación — que es exactamente el motivo por el que el triaje se mudó el 1
+     sep 2026. Derivarlas de la constante evita que la próxima mudanza vuelva a
+     dejar estas dos atrás: fueron las ÚNICAS dos URLs del ápex escritas a mano
+     que quedaban, y se encontraron buscándolas a propósito, no de casualidad. */
+  const triaje = ORIGIN_MMC + "/triaje";
+  const terreno = ORIGIN_MMC + "/triaje/inspeccion";
 
   const titulo = en
     ? "Your licence is verified. You can come in."
