@@ -159,7 +159,7 @@
 <main id="page-inicio" class="page active">
   <a class="brig-aviso" href="#brigada" data-nav="brigada">
     <strong data-i18n="brig.aviso.strong">Terremoto del 10 de agosto</strong>
-    <span data-i18n="brig.aviso.txt">Brigada del 24 al 28 de agosto en cinco territorios. Qué necesitamos</span>
+    <span data-i18n="brig.aviso.txt">Qué hicimos en cinco territorios, y cómo sigue con Mira Mi Casa</span>
   </a>
   <section class="hero">
     <div class="hero-bg"><picture>
@@ -1114,7 +1114,7 @@
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.ey">Brigada de atención a emergencia</span>
       <h1 class="h-sec rv" data-i18n="brig.t">Terremoto del 10 de agosto. Cinco territorios, del 24 al 28.</h1>
-      <p class="lead rv d1" data-i18n="brig.lead">Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Del 24 al 28 de agosto entregamos en cinco territorios, junto a las fundaciones que ya trabajan en cada uno. Hasta el 24 se puede ayudar de cuatro formas, y ninguna vale menos que las otras.</p>
+      <p class="lead rv d1" data-i18n="brig.lead">Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Del 24 al 28 de agosto entregamos en cinco territorios, junto a las fundaciones que ya trabajan en cada uno. Se puede seguir ayudando de cuatro formas, y ninguna vale menos que las otras.</p>
 
       <!-- Estado de la brigada. Va ANTES de los hechos del sismo a propósito: la
            página estaba escrita como justificación institucional y el lector no
@@ -1145,9 +1145,9 @@
 
   <section class="cream">
     <div class="wrap prose">
-      <span class="ey rv" data-i18n="brig.plan.ey">Qué vamos a hacer</span>
+      <span class="ey rv" data-i18n="brig.plan.ey">Cómo se armó</span>
       <h3 class="rv" data-i18n="brig.plan.t">Siete personas, cinco sectores, más de cien familias en cada uno.</h3>
-      <p class="lead rv d1" data-i18n="brig.plan.p">La recolección se hace en centros de acopio de empresas y amigos. De ahí sale la carga con el equipo, por carretera, el 24 de agosto.</p>
+      <p class="lead rv d1" data-i18n="brig.plan.p">La recolección se hizo en centros de acopio de empresas y amigos. De ahí salió la carga con el equipo, por carretera, el 24 de agosto.</p>
 
       <div class="brig-sec rv d2">
         <p class="rec-cap" data-i18n="brig.sec.cap">Los cinco sectores</p>
@@ -1157,6 +1157,50 @@
     </div>
   </section>
 
+  <!-- QUÉ SIGUE: MIRA MI CASA POR SUS TRES ESPECTROS.
+       Sustituye en la práctica al viejo «Qué vamos a hacer», que hablaba en FUTURO
+       de la salida del 24 de agosto — una fecha ya pasada. Aquí va lo que sigue de
+       verdad: arrancar Mira Mi Casa, y para eso hacen falta tres personas
+       distintas.
+
+       REGLAS FINAS Y NO TARJETAS (`.brig-nos`/`.brig-no`, ya en el archivo): es el
+       lenguaje editorial que pide el sistema de diseño, y CLAUDE.md lista
+       «tarjetas→reglas finas» como pendiente del rediseño v5. Cero CSS nuevo.
+
+       NO VAN NUMERADAS. El sistema pide numerar solo donde hay secuencia real, y
+       estos tres no son pasos: son tres puertas en paralelo. La secuencia sí
+       existe entre lo que producen —fotos, concepto, materiales— y eso lo dice el
+       cierre, no unos números.
+
+       LOS ENLACES SON ABSOLUTOS AL SUBDOMINIO a propósito: `brigada` no está en
+       `RUTAS_MMC`, así que esta página solo se renderiza en el ápex y un enlace
+       relativo se quedaría aquí. -->
+  <section class="cream">
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="brig.mmc.ey">Qué sigue</span>
+      <h3 class="rv" data-i18n="brig.mmc.t">Arranca Mira Mi Casa. Para que una casa avance hacen falta tres personas distintas.</h3>
+      <p class="lead rv d1" data-i18n="brig.mmc.p">La brigada llevó lo que cabe en un camión. Lo que sigue no se carga: es el concepto de un ingeniero sobre una casa concreta, y los materiales para repararla en el orden correcto. Eso pide tres papeles, y cada uno entra por su propia puerta.</p>
+
+      <div class="brig-nos rv d2">
+        <div class="brig-no">
+          <p class="brig-no-t" data-i18n="brig.mmc1.t">La familia publica su casa.</p>
+          <p class="brig-no-d" data-i18n="brig.mmc1.d">Sube fotos desde el teléfono, sin cuenta y sin contraseña. Recibe un número de caso y un enlace privado con el que vuelve a ver en qué va y puede sumar más fotos si le piden.</p>
+          <p style="margin-top:8px"><a class="card-link" href="https://miramicasa.thegiveandgrowproject.org/#vivienda"><span data-i18n="brig.mmc1.cta">Revisa tu casa</span> <span aria-hidden="true">&rarr;</span></a></p>
+        </div>
+        <div class="brig-no">
+          <p class="brig-no-t" data-i18n="brig.mmc2.t">Un ingeniero voluntario la diagnostica.</p>
+          <p class="brig-no-d" data-i18n="brig.mmc2.d">Mira esas fotos y da un concepto a distancia: si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla. Con matrícula verificada en el registro público del COPNIA. No declara si una casa es habitable: eso le corresponde a la autoridad municipal.</p>
+          <p style="margin-top:8px"><a class="card-link" href="https://miramicasa.thegiveandgrowproject.org/#ingenieros"><span data-i18n="brig.mmc2.cta">Postularme como ingeniero</span> <span aria-hidden="true">&rarr;</span></a></p>
+        </div>
+        <div class="brig-no">
+          <p class="brig-no-t" data-i18n="brig.mmc3.t">Alguien apadrina la reparación.</p>
+          <p class="brig-no-d" data-i18n="brig.mmc3.d">Aporta materiales, mano de obra, transporte o dinero para las casas que ya tienen concepto. No se cobra nada en línea y no se compromete una casa concreta: primero queda registrado el ofrecimiento y después se conversa.</p>
+          <p style="margin-top:8px"><a class="card-link" href="https://miramicasa.thegiveandgrowproject.org/#apadrinar"><span data-i18n="brig.mmc3.cta">Quiero apadrinar</span> <span aria-hidden="true">&rarr;</span></a></p>
+        </div>
+      </div>
+      <p class="brig-cierre rv d3" data-i18n="brig.mmc.cierre">Ninguna de las tres funciona sola: sin fotos no hay concepto, sin concepto no se sabe qué comprar, y sin materiales el concepto se queda en un papel.</p>
+    </div>
+  </section>
   <section>
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.hub.ey">Cómo entregamos</span>
@@ -2603,7 +2647,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=62a7f70c"></script>
+<script src="/app.js?v=3df944a8"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
