@@ -11276,6 +11276,49 @@ export default {
        No aplica en el subdominio (sería un bucle) ni en `workers.dev`, donde el
        entorno de pruebas sirve las dos marcas y saltar a producción convertiría
        una prueba en una visita al sitio real. */
+    /* EL TRIAJE YA NO VIVE EN EL ÁPEX: SUS DOS PANTALLAS SE MUDAN AL SUBDOMINIO.
+       Es la vuelta completa de la migración. Access ya cubre `miramicasa.…/triaje`
+       y `miramicasa.…/api/triage`, se comprobó pantalla por pantalla en
+       producción, y el ingeniero que abre su herramienta tiene que ver el nombre
+       del proyecto en la barra de direcciones, no el de la fundación.
+
+       SE REDIRIGEN SOLO LAS DOS PANTALLAS, y esto es lo que hace que el cambio sea
+       seguro en vez de temerario:
+
+         · `/api/triage/*` NO se redirige. Son peticiones XHR, y mandarlas a otro
+           host las convierte en peticiones de origen cruzado: morirían por CORS.
+           La página llama a su API con rutas relativas, así que cada pantalla
+           habla con el API de SU propio host y ninguna cruza.
+         · `/triaje/app.js`, `/triaje/inspeccion.js` y el service worker TAMPOCO.
+           Por lo mismo: que cada pantalla cargue sus piezas de donde se cargó
+           ella. Redirigir un script a otro origen funciona pero es enredo sin
+           ganancia, y el ámbito del service worker es por origen.
+
+       Resultado: una pantalla servida desde el ápex sigue funcionando ENTERA en el
+       ápex —API incluida— y las nuevas visitas aterrizan en el subdominio. No hay
+       un estado intermedio roto.
+
+       302 Y NO 301, y esta lección salió cara hoy: el 301 que mandaba
+       `miramicasa.…/triaje` al ápex quedó cacheado en los navegadores como
+       permanente y siguió saltando después de dejar de ser cierto — Sebas acabó
+       probando el ápex creyendo que probaba el subdominio. Una ruta que ya se
+       movió dos veces no se declara permanente nunca más.
+
+       ⚠️ EL SERVICE WORKER DE QUIEN YA PREPARÓ EL FORMULARIO EN EL ÁPEX sigue
+       registrado allá, con su ámbito en `/triaje/` del ápex. Eso NO se rompe:
+       quien preparó la visita y se va sin señal recibe la pantalla desde su
+       propia caché y el redirect no llega ni a intentarse. Pero su caché queda
+       huérfana el día que vuelva con señal y aterrice en el subdominio, donde
+       tendrá que volver a pulsar «preparar para trabajar sin señal». Conviene
+       decírselo al equipo antes de una jornada, no después.
+
+       Se preserva la QUERY: `/triaje` no la usa hoy, pero perderla en silencio es
+       la clase de cosa que se descubre tarde. */
+    if ((ruta === "/triaje" || ruta === "/triaje/inspeccion") &&
+        !HOST_MMC.test(url.hostname) && !/\.workers\.dev$/i.test(url.hostname)) {
+      return Response.redirect(new URL(ruta + url.search, ORIGIN_MMC).toString(), 302);
+    }
+
     if (ruta.startsWith("/caso/") && !HOST_MMC.test(url.hostname) && !/\.workers\.dev$/i.test(url.hostname)) {
       /* 302 Y `no-store`, no 301. Esta URL lleva el token de la familia en la
          query —es lo único con lo que vuelve a su caso— y un 301 es cacheable
