@@ -2178,6 +2178,50 @@
       <div id="cv-p3" class="cv-paso" style="display:none;margin-top:30px">
         <h3 data-i18n="cv.s3.t">Las fotos</h3>
         <p class="mu" style="margin-top:8px" data-i18n="cv.s3.h">Las fotos se envían al final, cuando toques «Enviar mi caso». Mientras llegues hasta allá sin cerrar la página, no pierdes nada.</p>
+        <!-- QUÉ FOTO SIRVE · va en el paso de las fotos, no en el de seguridad.
+             El paso 1 es el de «no te subas al techo» y su fuerza está en ser
+             seco; meterle cuatro imágenes lo diluiría. Aquí la familia está a
+             punto de elegir archivos, que es cuando esto sirve.
+
+             POR QUÉ EXISTE: hasta hoy el formulario le decía a la familia cómo
+             NO lastimarse y nada sobre qué hace que una foto se pueda leer. Y el
+             sistema tiene un estado —«no puedo evaluar con esto»— que cuando el
+             ingeniero lo marca obliga a pedirle más material y a la familia a
+             esperar de nuevo, sin fecha prometida. Cada foto ilegible es una
+             vuelta completa.
+
+             LAS CUATRO SON REALES, de la brigada de agosto de 2026: dos que un
+             ingeniero puede leer y dos que no. Los malos ejemplos NO están
+             montados — salieron del mismo carrete. Y ninguna de las cuatro tiene
+             una persona dentro, que es a propósito: esto se publica en una página
+             abierta.
+
+             Sin CSS nuevo: `img` ya trae `max-width:100%` global, y `.grid.g2`,
+             `.ey` y `.mu` ya existen. -->
+        <p class="mu" style="margin-top:20px" data-i18n="cv.ej.h">Estas cuatro son de casas que visitamos. Las dos primeras se pueden leer; las otras dos no, y con ellas habría que pedirte más.</p>
+        <div class="grid g2" style="margin-top:14px;gap:18px">
+          <div>
+            <img src="/img/vivienda/sirve-cerca.jpg" alt="Muro blanco agrietado junto a una puerta, con escombro al pie" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
+            <span class="ey" style="display:block;margin-top:9px;font-size:11px;color:var(--acc)" data-i18n="cv.ej.si">SIRVE</span>
+            <p class="mu" style="margin-top:3px;font-size:14px" data-i18n="cv.ej.1">El daño de cerca: se ve por dónde va la grieta y qué tan ancha es.</p>
+          </div>
+          <div>
+            <img src="/img/vivienda/sirve-lejos.jpg" alt="Una casa completa vista desde la calle, con el piso de arriba en ladrillo a la vista" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
+            <span class="ey" style="display:block;margin-top:9px;font-size:11px;color:var(--acc)" data-i18n="cv.ej.si">SIRVE</span>
+            <p class="mu" style="margin-top:3px;font-size:14px" data-i18n="cv.ej.2">Y la casa entera, para saber en qué parte está el daño.</p>
+          </div>
+          <div>
+            <img src="/img/vivienda/no-cerca.jpg" alt="Una ventana fotografiada tan de cerca que llena todo el cuadro" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
+            <span class="ey" style="display:block;margin-top:9px;font-size:11px;color:var(--amber)" data-i18n="cv.ej.no">NO ALCANZA</span>
+            <p class="mu" style="margin-top:3px;font-size:14px" data-i18n="cv.ej.3">Tan cerca que solo se ve la ventana. No se sabe en qué muro está ni qué le pasó.</p>
+          </div>
+          <div>
+            <img src="/img/vivienda/no-angulo.jpg" alt="Un muro fotografiado desde abajo y en diagonal, con cables por delante" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
+            <span class="ey" style="display:block;margin-top:9px;font-size:11px;color:var(--amber)" data-i18n="cv.ej.no">NO ALCANZA</span>
+            <p class="mu" style="margin-top:3px;font-size:14px" data-i18n="cv.ej.4">De muy abajo y en diagonal: el muro sale torcido y el daño, si lo hay, no se alcanza a ver.</p>
+          </div>
+        </div>
+        <p style="margin-top:14px;font-weight:700" data-i18n="cv.ej.fin">Si no puedes tomar alguna sin arriesgarte, no lo hagas: cuéntalo en las observaciones y ya.</p>
         <div id="cv-cats" style="margin-top:18px;display:flex;flex-direction:column;gap:16px"></div>
         <p class="mu" style="margin-top:14px" data-i18n="cv.video.h">También puedes subir un video corto, de unos 30 segundos.</p>
         <button type="button" class="btn btn-g" style="margin-top:18px" data-act="cvPaso(4)" data-i18n="cv.s3.btn">Siguiente</button>
@@ -2551,7 +2595,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=f7a3d736"></script>
+<script src="/app.js?v=6359cac5"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
