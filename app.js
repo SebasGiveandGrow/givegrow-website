@@ -3497,8 +3497,10 @@ function pintarEntregas(cajaId, destino, conVacio){
       if (!d || d.error || !Array.isArray(d.entregas)) throw new Error("respuesta sin datos");
       var l = d.entregas;
       if (!l.length){
-        /* El mensaje de la brigada habla de que «no ha salido»; en el rastreo el
-           donante pregunta por SU destino, que puede ser cualquiera. */
+        /* Dos públicos distintos: en la brigada se habla de las jornadas en
+           general; en el rastreo el donante pregunta por SU destino, que puede
+           ser cualquiera. (El mensaje de la brigada decía «no ha salido» y se
+           corrigió: era falso, la brigada salió del 20 al 23 de agosto.) */
         var vacio = (cajaId === "track-entregas") ? t("track.ev.vacio") : t("brig.ev.vacio");
         caja.innerHTML = conVacio ? '<p class="ev-vacio">'+escapeHtml(vacio)+'</p>' : ""; return;
       }
