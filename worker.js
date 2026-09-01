@@ -11282,6 +11282,44 @@ function marcarMarca(respuesta, host) {
        quitar. */
     .on('meta[property="og:image"]', { element(e) { e.setAttribute("content", ORIGIN_MMC + "/img/og-mmc.jpg"); } })
     .on('meta[name="twitter:image"]', { element(e) { e.setAttribute("content", ORIGIN_MMC + "/img/og-mmc.jpg"); } })
+    /* EL HERO DE LA FUNDACIÓN NO SE DESCARGA EN MIRA MI CASA.
+       ========================================================================
+       `index.html` trae la imagen grande de la portada del ápex —
+       `/img/jornadas/hero_futbol_*.webp` — con su `<link rel=preload>` y su
+       `<img fetchpriority="high">`. En el ápex está bien: es lo primero que se
+       ve. Pero en el subdominio ESA PÁGINA NUNCA SE MUESTRA — `RUTAS_MMC` no
+       incluye `inicio` y `rutaPorDefecto()` devuelve `vivienda` — y aun así se
+       descargaba, porque el `<img>` vive en el DOM de la página oculta.
+
+       MEDIDO, y la primera medición estaba mal, así que queda el número bueno:
+       los archivos pesan 77 KB (800w), 262 KB (1400w) y 533 KB (2000w). En un
+       teléfono de 375 px con DPR 2 el navegador elige el de 800w y lo baja UNA
+       vez — el preload y el `<img>` declaran el mismo `sizes`, así que comparten
+       la descarga. Quitar SOLO el preload no habría ahorrado un byte: habría
+       bajado la prioridad y nada más. Con DPR 3 el elegido es el de 1400 y son
+       262 KB.
+
+       Así que se hacen las dos cosas: fuera el preload —ya no tiene a quién
+       adelantar— y el `<img>` pasa a `loading="lazy"`. Una imagen diferida dentro
+       de un contenedor con `display:none` NO se pide hasta que se muestra, y en
+       el subdominio no se muestra nunca. Resultado: cero bytes de hero.
+
+       Le toca justo a quien menos puede pagarlo: la familia que abre este
+       formulario está en zona de sismo con mala señal, y esos 77 KB son más que
+       el CSS entero comprimido (30 KB).
+
+       SE FILTRA POR `/img/jornadas/` y no por `as="image"` a secas: si algún día
+       Mira Mi Casa tiene su propia imagen de portada, la precargaría desde su
+       propia carpeta y esta regla NO se la llevaría por delante.
+
+       ⚠️ EL ÁPEX NO SE TOCA. Allí la imagen sigue precargada y con
+       `fetchpriority="high"`, que es lo correcto para su LCP. Añadirle `lazy` al
+       archivo compartido habría empeorado la portada de la fundación. */
+    .on('link[rel="preload"][href^="/img/jornadas/"]', { element(e) { e.remove(); } })
+    .on('img[src^="/img/jornadas/hero"]', { element(e) {
+      e.setAttribute("loading", "lazy");
+      e.removeAttribute("fetchpriority");
+    } })
     .transform(respuesta);
 }
 
