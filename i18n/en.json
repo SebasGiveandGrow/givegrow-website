@@ -779,7 +779,7 @@
   "brig.ev.ey": "Evidence",
   "brig.ev.t": "Every delivery, with its handover record.",
   "brig.ev.p": "The document that counts is the paper record signed by whoever receives. Here we publish its photo and what it says. If it was not documented, for us it did not happen.",
-  "brig.ev.vacio": "No deliveries published yet. The brigade has not gone out: when it does, each day's work appears here with its signed record and photos, not before.",
+  "brig.ev.vacio": "There are no published deliveries with their record yet. Each outing appears here once its signed record has been reviewed, not before.",
   "brig.ev.familias": "families",
   "brig.ev.con": "With",
   "brig.ev.recibio": "Received by",
