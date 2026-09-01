@@ -1,17 +1,189 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "El cierre de la auditoría" (31 ago 2026)
-> **⏭️ ARRANCA POR DOS COSAS, y las dos necesitan una persona, no código.**
-> (1) **Que un ingeniero de verdad entre y evalúe un caso.** Nada del vertical se
-> ha ejercitado de punta a punta con una sesión real de Access: ni el formulario
-> del triaje, ni el de terreno, ni el botón nuevo del panel. Es el único riesgo
-> que queda y no se puede cerrar desde aquí.
-> (2) **La corrida de rescate con Camila,** que sigue sin haberse hecho y sigue
-> sin haber cómo contactarla. Y cuando aparezca el canal: en «Quién quiere
-> entrar» hay un botón **«Avisarle que ya puede entrar»** en su fila y en la de
-> David — llevan desde el 22 de agosto con la puerta abierta sin saberlo, porque
-> el correo que lo dice no existía hasta el 31.
+> Última actualización: sesión "La mudanza de Mira Mi Casa" (1 sep 2026)
+> **⏭️ ARRANCA POR AQUÍ: no falta producto, falta la primera familia.**
+> Contado contra la base el 1 sep: **0 casos, 0 fotos, 0 conceptos firmados.**
+> 1 inspección en terreno, 2 ingenieros verificados desde el 22 de agosto, 15
+> correos enviados. El recorrido está construido, migrado y documentado, y nadie
+> lo ha usado. Todo lo que sigue en este documento describe un sistema que
+> funciona, **no uno que ya se usó** — leerlo sabiendo eso.
+>
+> **Lo único que hay que hacer y no es código:**
+> (1) **Que alguien reparta el enlace** `miramicasa.thegiveandgrowproject.org`.
+> (2) **Un ensayo de punta a punta con una sesión real:** llenar el formulario
+> como una familia, comprobar el correo, entrar al triaje y firmar un concepto, y
+> ver que a la familia le sale el PDF. Desde aquí no se puede: no hay sesión de
+> Access ni teléfono. Bonus: al crear ese caso, **a los dos ingenieros les llega
+> el aviso de que la fila despertó** (nuevo, 1 sep), así que el ensayo prueba dos
+> cosas de una.
+> (3) **Las actas de entrega.** Siguen esperando tres datos que están en papel:
+> cuántas familias, qué aliada recibió y quién firmó, por sector. Sin eso la
+> galería de trazabilidad no se puede llenar — y ojo: la única fila de `entregas`
+> está **ANULADA** desde el 12 ago («acta de prueba del panel»), no es un borrador.
+>
+> **DISCREPA queda FUERA hasta nuevo aviso** (decisión de Sebas, 1 sep).
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
+
+## ✅ MIRA MI CASA QUEDÓ ENTERO EN SU PROPIO NOMBRE (1 sep 2026 · PR #220 a #233)
+
+Sebas leyó la guía en PDF y notó que las herramientas no estaban en Mira Mi Casa:
+el ingeniero **entraba** por el subdominio pero **trabajaba** en el dominio de la
+fundación. Se cerró entero. Hoy las cuatro pantallas de trabajo viven en
+`miramicasa.…`: `/triaje`, `/triaje/inspeccion`, `/admin` y `/admin/ruta`.
+
+### El hallazgo que lo destrabó, y hay que recordarlo
+
+Las DOS aplicaciones de Cloudflare Access estaban en su tope de **cinco destinos**
+y la respuesta NO fue pedir un plan más grande: fue **contar qué protegía cada
+destino**. Cinco de los diez no protegían nada.
+
+| app | destino | qué era en realidad |
+|---|---|---|
+| Triaje | `api/triaje` | no existe en el Worker — la API es `/api/triage`, en inglés |
+| Triaje | `triage` | solo un alias que redirige |
+| Triaje | `triaje.js` | el script; se movió a `/triaje/app.js` |
+| Panel | `admin.js` | el script; se movió a `/admin/app.js` |
+| Panel | `www.` | una **RUTA literal** `/www.`, escrita en el campo Path queriendo añadir el hostname `www`. Custodiaba una URL que no existe |
+
+El `www.` es el más elocuente: el Worker canoniza `www` al ápex **por código**
+justo porque «no cabía» en Access — y lo que había en Access era un campo mal
+escrito. **La próxima vez que Cloudflare diga «has añadido el máximo»: contar
+antes de creerle.**
+
+### ⚠️ LA REGLA DE ACCESS QUE HAY QUE SABER: padre sí, hermano no
+
+Access cubre por **PATH** y trata el destino como **PADRE**: `triaje` cubre
+`/triaje/inspeccion` sin destino propio, y `admin` cubre `/admin/ruta` y
+`/admin/ruta.js`. Pero un **HERMANO** queda FUERA: `/triaje.js` respondía **403**
+mientras `/triaje/inspeccion` entraba sin problema. Por eso los dos scripts se
+mudaron debajo de su carpeta — el del panel ANTES de mudar el panel, para que no
+arrancara roto. Costó un despliegue extra descubrirlo con el triaje.
+
+### ⚠️ 302, NUNCA 301, EN ESTAS RUTAS
+
+El 301 que mandaba `miramicasa.…/triaje` al ápex **quedó cacheado en los
+navegadores como permanente** y siguió saltando después de dejar de ser cierto:
+Sebas acabó probando el ápex creyendo que probaba el subdominio, y la captura lo
+delató. Estas rutas ya se movieron tres veces. **No se declaran permanentes.**
+
+### Qué se redirige y qué no, y por qué importa
+
+Del ápex al subdominio se redirigen **solo las pantallas** (`/triaje`,
+`/triaje/inspeccion`, `/admin`, `/admin/ruta`). **NO** se redirigen
+`/api/triage/*`, `/api/admin/*` ni los scripts: son peticiones XHR y mandarlas a
+otro host las mata por **CORS**. Así una pantalla ya abierta en el ápex sigue
+funcionando entera allí. No hay estado intermedio roto.
+
+### ⚠️ AVISO PARA EL EQUIPO ANTES DE UNA JORNADA
+
+Quien preparó el **formulario de la visita sin señal en el ápex** no se rompe (su
+service worker le sirve la pantalla desde su caché), pero esa caché **queda
+huérfana**: la próxima vez con señal aterriza en el subdominio y tiene que volver
+a pulsar «preparar para trabajar sin señal». Si sale a terreno sin hacerlo, se
+queda sin formulario offline.
+
+---
+
+## ✅ EL AUTOMERGE DEJÓ DE FALLAR SIEMPRE (1 sep · PR #219)
+
+**Trece de los últimos cuarenta runs** de `ci.yml` fallaban con
+`GraphQL: Merge already in progress`. Causa: `gh pr create --label automerge` hace
+DOS llamadas (crear + etiquetar), así que llegan `opened` y `labeled`; los dos
+están en `types` desde el arreglo del #164, y cuando la etiqueta alcanza a entrar
+antes del payload del `opened`, **los dos pasan el `if` y los dos corren a
+fusionar**. Uno gana, el otro muere.
+
+**Por qué importaba aunque el PR se fusionara:** un rojo que siempre está no
+informa. Las dos cicatrices de ese archivo (#130, #164) son «apariencia de éxito y
+nada avisando»; esto era el espejo, y ciega igual.
+
+**El arreglo:** merge idempotente. Si el PR ya está fusionado, verde. Si el merge
+falla, comprueba el estado REAL antes de dar error. Y **solo dispara el deploy el
+run que fusionó**, para no desplegar dos veces el mismo SHA.
+
+**NO se usó `concurrency` + `cancel-in-progress`:** cancelar ese job entre el merge
+y el disparo del deploy deja `main` fusionado y producción atrás — literalmente el
+#130. Queda escrito en el workflow.
+
+---
+
+## ✅ LO QUE SE AÑADIÓ AL SITIO (1 sep)
+
+- **La brigada entró a la galería de evidencia** (#218): seis fotos del 20–23 ago
+  con fecha **verificada contra el EXIF**, no contra el nombre de la carpeta. Van
+  primero porque el propio sitio publica «preferimos la recencia al acumulado».
+  Se miraron 33 y entraron 6; tres se descartaron **al verlas al tamaño de la
+  grilla**. La de Manizales está **recortada** porque en el original había un niño
+  en el borde — la autorización de Sebas es sobre el conjunto, no sobre ese niño.
+- **Check 3.9 en el gate** (#218), y este hallazgo vale: una imagen de galería que
+  no existe responde **200 con `text/html`**, no 404 — el fallback del SPA. Icono
+  roto sin 404 en consola y sin nada en los logs. El check lee el array `GALLERY`
+  del propio `app.js` y exige la imagen **y su miniatura**. Probado que FALLA.
+- **La puerta del ingeniero que vuelve** (#221): una línea en `#ingenieros`. El
+  enlace del triaje solo llegaba por correo; quien lo perdía no tenía dónde
+  buscarlo. **El href es relativo (`/triaje`) a propósito**, así se quedó en casa
+  solo cuando Access cubrió el subdominio.
+- **Qué foto sirve** (#230): cuatro ejemplos reales en el paso 3 del formulario,
+  dos que un ingeniero puede leer y dos que no — y **los malos no están montados**.
+  Cierra el hueco de que el formulario decía cómo no lastimarse y nada sobre qué
+  hace legible una foto. Cero CSS nuevo.
+- **Aviso a los ingenieros cuando la fila despierta** (#231): al crear un caso
+  salían dos correos (familia y equipo) y a los ingenieros **ninguno**. Solo avisa
+  cuando la fila pasa de vacía a tener algo — son voluntarios. Recibe
+  `{ numero, sector }` y nada más, así que **no puede filtrar datos de la familia
+  por construcción**. Constante nueva `SIN_REVISAR`, compartida con la pantalla.
+- **La tarjeta con la que se comparte el enlace** (#232, #233): compartir el
+  subdominio previsualizaba «Give&Grow International — Dar para crecer». Ahora
+  dice **Mira Mi Casa** con la descripción real y su propia imagen. Importa porque
+  WhatsApp es EL canal y porque el Ministerio de Vivienda advierte sobre **estafas
+  con nombres de programas de vivienda**: un enlace que se llama una cosa y se
+  previsualiza como otra es lo que parece una estafa. Se reescribe en el
+  SERVIDOR, dentro de `marcarMarca` — WhatsApp no ejecuta JavaScript.
+- **`/*.pdf` en .gitignore** (#217): el generador de la guía escribe en la raíz, y
+  la raíz SE SIRVE. Un `git add -A` publicaba el PDF sin que nadie lo decidiera.
+- **La guía en PDF, reescrita** (#229): rutas nuevas, y su **pie dejó de mentir**
+  — el total se escribía a mano y al añadir una página el documento tuvo seis
+  mientras los pies decían «de 5». Ahora sale de `doc.getPageCount()` y `pies()`
+  **grita** si sobran o faltan.
+
+---
+
+## 📸 LA FOTO DE LA IMAGEN QUE SE COMPARTE (1 sep · pendiente de elección)
+
+`img/og-mmc.jpg` es la que se ve al compartir el enlace. Hoy está la casa caída
+con la estufa (carpeta «Varios», **EXIF 2026:08:15**, y su carpeta NO tiene
+municipio rotulado, así que **no se le atribuye lugar**). Sebas pidió más opciones
+y hay cinco preparadas a 1200×630 de la serie `IMG_50xx` (la misma casa desde
+distintos ángulos).
+
+**⚠️ UNA QUE SE DESCARTÓ A PROPÓSITO:** la más fuerte del carrete es una señora de
+pie frente a su casa destruida sosteniendo una caja. Es una **beneficiaria
+identificable**, y una imagen que se reenvía por WhatsApp llega mucho más lejos que
+una galería: la reconocería cualquiera, marcada como alguien que recibió ayuda. Su
+consentimiento **no está registrado**. No se usa sin que ella lo sepa.
+
+**Trampa técnica de esa carpeta:** varias fotos salen **giradas 90°** al
+decodificarlas (la orientación no sobrevive), y dos las estuve juzgando boca abajo.
+Rotar ANTES de decidir.
+
+---
+
+## ✅ EL CORREO SÍ FUNCIONA (comprobado 1 sep, contra una nota vieja que decía lo contrario)
+
+Una nota anterior decía «DNS de correo roto». **Ya no es cierto y conviene no
+repetirlo.** Comprobado contra 1.1.1.1 y 8.8.8.8:
+
+- Remitente: `no-responder@notificaciones.thegiveandgrowproject.org` — es un
+  SUBDOMINIO, así que los registros que importan están ahí, no en el ápex.
+- **DKIM de Resend: publicado.** SPF del subdominio: vacío. DMARC del ápex:
+  `p=quarantine` con `adkim=r`, así que **DMARC pasa por DKIM** con alineación
+  relajada.
+- Los 15 correos de la base están todos en `enviado`.
+
+**Endurecimiento opcional, no urgente:** añadir SPF y MX al subdominio de envío da
+un segundo mecanismo que pase y deja que Resend reciba rebotes.
+
+---
 
 ## ✅ LA AUDITORÍA DE MIRA MI CASA, Y SU CIERRE (31 ago 2026)
 
