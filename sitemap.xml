@@ -1,14 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Solo URLs REALES. El sitio es una SPA de hash: `#vivienda`, `#casas` y el
+     resto no son URLs distintas y no van aquí. Las de path sí: la raíz de cada
+     host y las páginas de compartir de cada fundación (/f/<id>).
+
+     La raíz de miramicasa. es otro host, y está aquí por cross-submission: el
+     robots.txt que se sirve en ese subdominio nombra ESTE sitemap, que es lo que
+     la hace válida. Sin esa línea, las cuatro puertas de Mira Mi Casa no estaban
+     en ningún sitemap.
+
+     hub-medellin NO va: /f/hub-medellin responde 302, no es una fundación.
+     Los lastmod salen de git (último commit del archivo que genera cada página),
+     no a mano: un lastmod inventado Google lo ignora. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.thegiveandgrowproject.org/</loc>
-    <lastmod>2026-07-02</lastmod>
+    <lastmod>2026-09-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://miramicasa.thegiveandgrowproject.org/</loc>
+    <lastmod>2026-09-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://www.thegiveandgrowproject.org/f/ndf</loc>
-    <lastmod>2026-07-02</lastmod>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.thegiveandgrowproject.org/f/conciencia</loc>
+    <lastmod>2026-08-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
