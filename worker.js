@@ -9325,7 +9325,7 @@ y la entidad, no una persona atendida. Una entrega no se puede publicar sin al m
 <p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
 <p class="mu" style="margin-top:8px;font-size:13px;max-width:70ch">El <strong>recibo</strong> lo emite el sistema al confirmarse el pago. El <strong>certificado</strong> no: lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, así que sale de aquí, revisado, y nunca solo.</p>
 </div></section></main>
-<script src="/admin.js"></script>
+<script src="/admin/app.js"></script>
 </body></html>`;
 }
 
@@ -11192,6 +11192,7 @@ export default {
        que se acaba de sufrir con `miramicasa.…/triaje`, donde el permanente
        quedó cacheado en los navegadores después de dejar de ser cierto. Para una
        ruta que ya se movió una vez, la redirección no es permanente. */
+    if (ruta === "/admin.js")  return Response.redirect(new URL("/admin/app.js", url).toString(), 302);
     if (ruta === "/triaje.js") return Response.redirect(new URL("/triaje/app.js", url).toString(), 302);
     if (ruta === "/triage.js") return Response.redirect(new URL("/triaje/app.js", url).toString(), 302);
 
@@ -11351,7 +11352,7 @@ export default {
        verificación real de firma RS256 y el fail-closed. Los ingenieros
        voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
        creando cuentas: cero contraseñas que guardar y cero que se filtren. */
-    if (ruta === "/admin" || ruta === "/admin.js" || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/")) {
+    if (ruta === "/admin" || ruta === "/admin.js" /* red: ver la nota de /triaje.js */ || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/")) {
       /* `/triaje.js` ya no llega hasta aquí: se redirige más arriba, fuera del
          guardián. Se deja en la condición A PROPÓSITO, como red: si algún día
          alguien quita esa redirección, la ruta cae en el guardián y se cierra en
@@ -11422,7 +11423,22 @@ export default {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
           });
         }
-        if (ruta === "/admin.js") {
+        /* EL SCRIPT DEL PANEL VIVE BAJO /admin/, por lo mismo que el del triaje.
+           Access cubre por PATH y trata el destino como PADRE: `/admin/ruta` y
+           `/admin/ruta.js` entran sin destino propio. Pero `/admin.js` es un
+           HERMANO, no un hijo, y necesitaría el suyo — comprobado con el triaje
+           en producción el 1 sep 2026, donde `miramicasa.…/triaje.js` respondía
+           403 mientras `/triaje/inspeccion` entraba sin problema.
+
+           Moverlo AHORA, antes de mudar el panel, baja de TRES a DOS los destinos
+           que la aplicación del panel necesita en el subdominio: `admin` (que
+           cubre la página, `/admin/ruta` y este script) y `api/admin`. Y deja
+           libre `admin.js` en el ápex.
+
+           Se hace antes y no después porque hacerlo después significa que el
+           panel arranca roto en el subdominio: la página cargaría y su script
+           no. */
+        if (ruta === "/admin/app.js") {
           return new Response(adminJS(), {
             headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
           });
