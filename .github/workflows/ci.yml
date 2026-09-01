@@ -70,11 +70,82 @@ jobs:
       # con apariencia de éxito.
       actions: write
     steps:
+      # DOS EVENTOS, UN SOLO MERGE. `gh pr create --label automerge` hace DOS
+      # llamadas a la API —crea el PR y luego lo etiqueta— así que llegan dos
+      # eventos: `opened` y `labeled`. Los dos están en `types`, y cuando la
+      # etiqueta alcanza a entrar antes de que GitHub arme el payload del
+      # `opened` (un segundo de diferencia basta), LOS DOS pasan el `if` de
+      # arriba y los dos jobs corren a fusionar el mismo PR. Uno gana; el otro
+      # muere con `GraphQL: Merge already in progress (mergePullRequest)`.
+      #
+      # Medido el 1 sep 2026: TRECE de los últimos cuarenta runs de este
+      # workflow fallaron así, todos con la misma línea. El PR 218 se creó a
+      # las 12:47:11, se etiquetó a las 12:47:12, y los dos runs arrancaron a
+      # las 12:47:14 y 12:47:15.
+      #
+      # POR QUÉ IMPORTA, si el PR se fusionaba igual: porque el rojo en
+      # `automerge` pasó a ser lo normal. Las dos cicatrices de este archivo
+      # —el #130 y el #164— son «apariencia de éxito y nada avisando»; esto es
+      # el espejo, «apariencia de fallo siempre», y ciega igual. Un fallo de
+      # verdad aquí —el 403 del #130, por ejemplo— se vería idéntico al ruido.
+      #
+      # NO se arregla con `concurrency` + `cancel-in-progress`: cancelar este
+      # job entre el merge y el disparo del deploy deja `main` fusionado y
+      # producción atrás, que es exactamente el #130. Se arregla haciendo el
+      # merge IDEMPOTENTE: si el PR ya está fusionado, este run no tiene nada
+      # que hacer y lo dice.
       - name: Merge cuando el gate está en verde
-        run: gh pr merge ${{ github.event.pull_request.number }} --squash --repo ${{ github.repository }}
+        id: merge
+        run: |
+          set -uo pipefail
+          PR=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+
+          estado() { gh pr view "$PR" --repo "$REPO" --json state -q .state; }
+
+          if [ "$(estado)" = "MERGED" ]; then
+            echo "El otro run del mismo PR ya lo fusionó. Nada que hacer."
+            echo "fusionado_aqui=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if gh pr merge "$PR" --squash --repo "$REPO"; then
+            echo "fusionado_aqui=si" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Falló. Antes de dar error hay que distinguir la carrera de un fallo
+          # real: si el otro run fusionó mientras este lo intentaba, el
+          # resultado que importa —el PR fusionado— se cumplió. Se espera un
+          # momento porque el merge del otro run puede no estar visible todavía.
+          sleep 10
+          if [ "$(estado)" = "MERGED" ]; then
+            echo "El merge falló por la carrera, pero el PR quedó fusionado por el otro run."
+            echo "fusionado_aqui=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "::error::el merge falló y el PR NO está fusionado. Esto no es la carrera de los dos eventos: es un fallo real."
+          exit 1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # SOLO DISPARA EL DEPLOY EL RUN QUE FUSIONÓ. Si lo dispararan los dos,
+      # cada PR desplegaría dos veces el mismo SHA — y este repositorio ya
+      # peleó esa guerra: el job `guard` de deploy.yml existe porque se
+      # acumularon cientos de despliegues que no cambiaban ni un dato.
+      #
+      # HUECO QUE QUEDA ABIERTO, dicho a propósito: si el run que fusiona se
+      # muriera entre el merge y este paso —una caída del runner en una ventana
+      # de dos segundos— el otro run vería «ya fusionado» y tampoco desplegaría,
+      # dejando `main` por delante de producción sin nada en rojo. Es la
+      # ventana del #130 y no se cierra aquí: cerrarla pediría que este job
+      # averiguara si ya existe un deploy para el SHA de `main`, y meter esa
+      # lógica en lo único que protege `main` cuesta más de lo que vale. Lo
+      # cubre la comprobación manual que CLAUDE.md pide tras cada fusión:
+      # que el último deploy corresponda al tip de `main`.
       - name: Disparar deploy (el push del bot no lo dispara solo)
+        if: steps.merge.outputs.fusionado_aqui == 'si'
         run: gh workflow run "Deploy Give&Grow to Cloudflare" --ref main --repo ${{ github.repository }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
