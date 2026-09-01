@@ -659,6 +659,46 @@ const CORREO_DESDE_DEF = "Give&Grow International <no-responder@notificaciones.t
    importante que la operación que describe. Si la base falla, se registra en los
    logs y el correo sigue su camino — al revés, un donante perdería su recibo
    porque no se pudo escribir la bitácora del recibo, que es absurdo. */
+/* LA PRUEBA DE LA AUTORIZACIÓN, para los cinco formularios que la piden.
+   ==========================================================================
+   Los cinco —apadrinamiento, especie, ingeniero, empresa y fundación— EXIGEN la
+   autorización de Ley 1581 y la obtienen de verdad: cada uno tiene su casilla y
+   el formulario se niega a enviar si no está marcada (comprobado uno por uno el
+   1 sep 2026; el de empresas incluso transmite el booleano real en vez de un
+   `true` fijo). Lo que faltaba era DEJAR CONSTANCIA: ninguno escribía una fila
+   en `consentimientos`.
+
+   Y eso importa porque la Ley 1581 no pide solo obtener la autorización: pide
+   poder PROBARLA. Sin fila, la prueba era «el código no deja pasar sin la
+   casilla», que es un argumento sobre el software y no un registro de lo que esa
+   persona aceptó y cuándo.
+
+   Medido antes de escribir esto: `consentimientos` tenía en producción DIEZ
+   filas y las diez de `tipo='auditoria'`. Ni un solo consentimiento.
+
+   `sujeto` es el ID DE LA INSCRIPCIÓN, no el correo: identifica a la persona
+   igual —la fila de `inscripciones` lo tiene— y no duplica un dato personal en
+   una segunda tabla, que es justo lo que la ley pide evitar. Es el mismo criterio
+   que ya usaba el flujo de la familia con el número de caso.
+
+   Se anotan las CLAVES del texto (`ap.datos`, `ing.alcance`…) y no el texto
+   entero: son los identificadores estables de lo que se le enseñó, y su
+   redacción de esa fecha se recupera del repositorio.
+
+   NO PUEDE TUMBAR EL REGISTRO. Si esta fila falla, la inscripción ya quedó
+   guardada y eso es lo que le importa a quien se inscribió. Se registra el fallo
+   en la consola, que es lo que hace el resto del archivo. */
+async function anotarAutorizacion(env, id, tipo, claves) {
+  if (!id) return;
+  try {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'datos', ?)"
+    ).bind("inscripcion " + id, tipo + " · " + claves).run();
+  } catch (e) {
+    console.error("consentimiento", tipo, id, e && e.message);
+  }
+}
+
 async function anotarCorreo(env, fila) {
   if (!env.DB) return;
   try {
@@ -1341,6 +1381,9 @@ async function apiIngeniero(env, c) {
   } catch (e) {
     console.error("correo ingeniero", e && e.message);
   }
+
+  await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "ingeniero",
+    "ing.alcance + ing.datos");
 
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
 }
@@ -2514,10 +2557,16 @@ async function apiCasoCrear(request, env) {
 
   /* EL RASTRO DEL CONSENTIMIENTO, que faltaba. Se guardaban dos enteros
      (`consent_eval` hardcodeado a 1 y `consent_publico`) más la marca de tiempo, y
-     nada más: ninguna fila en `consentimientos`, que es donde los OTROS
-     formularios del sitio sí la dejan. Para la Ley 1581 la prueba de la
-     autorización quedaba reducida a dos columnas de la misma tabla que se puede
-     corregir desde el panel.
+     nada más. Para la Ley 1581 la prueba de la autorización quedaba reducida a dos
+     columnas de la misma tabla que se puede corregir desde el panel.
+
+     ⚠️ CORRECCIÓN (1 sep 2026): este comentario decía que ésta era la fila «que
+     los OTROS formularios del sitio sí dejan». Era al revés y se comprobó
+     contando: los cinco —apadrinamiento, especie, ingeniero, empresa y
+     fundación— NO escribían ninguna. En producción `consentimientos` tenía diez
+     filas y las diez de `tipo='auditoria'`. Este flujo era el ÚNICO que dejaba
+     constancia, y como no ha entrado ninguna familia, nunca había corrido. Ya se
+     les puso a los cinco vía `anotarAutorizacion`.
 
      `sujeto` es el NÚMERO DE CASO y no el correo o el teléfono: identifica a la
      persona igual —el caso los tiene— y no duplica datos personales en una
@@ -7443,6 +7492,9 @@ async function apiApadrinamiento(env, c) {
     console.error("correo apadrinamiento", e && e.message);
   }
 
+  await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "apadrinamiento",
+    "ap.concepto + ap.datos");
+
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
 }
 
@@ -7540,6 +7592,9 @@ async function apiOfrecimiento(env, c) {
   } catch (e) {
     console.error("correo ofrecimiento", e && e.message);
   }
+
+  await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "especie",
+    "of.datos");
 
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
 }
@@ -7694,14 +7749,14 @@ async function apiAliado(env, c) {
          JSON.stringify(datos)).run();
 
   /* El rastro de Ley 1581 se deja aquí y no al aprobar: la autorización la dio
-     la empresa al enviar, no nosotros al revisarla. */
-  try {
-    await env.DB.prepare(
-      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'marca_y_datos', ?)"
-    ).bind(email, "solicitud de alianza #" + (ins.meta ? ins.meta.last_row_id : "?") + " · " + razon).run();
-  } catch (e) {
-    console.error("consentimiento aliado", e && e.message);
-  }
+     la empresa al enviar, no nosotros al revisarla.
+
+     Antes esta fila se escribía a mano con `sujeto = email` y `tipo
+     'marca_y_datos'`. Se pasó al helper por dos razones: deja de duplicar un dato
+     personal en una segunda tabla —el `sujeto` es ahora el id de la inscripción,
+     que llega al mismo sitio— y anota QUÉ textos se aceptaron, que es lo que
+     convierte la fila en prueba. El nombre de la empresa no se copia porque ya
+     está en `inscripciones`, alcanzable por ese id. */
 
   /* El correo no puede tumbar la solicitud: si falla, ya quedó registrada.
      Misma regla que en aportes, inscripciones y ofrecimientos. */
@@ -7711,6 +7766,9 @@ async function apiAliado(env, c) {
   } catch (e) {
     console.error("correo aliado", e && e.message);
   }
+
+  await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "empresa",
+    "ally.a.marca + ally.a.datos + ally.a.licitud");
 
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
 }
@@ -7892,13 +7950,8 @@ async function apiFundacion(env, c) {
   ).bind(nombre, email, limpio(c.telefono, 40) || null, limpio(c.ciudad, 80) || null,
          JSON.stringify(datos)).run();
 
-  try {
-    await env.DB.prepare(
-      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'datos', ?)"
-    ).bind(email, "aplicación al HUB #" + (ins.meta ? ins.meta.last_row_id : "?") + " · " + nombre).run();
-  } catch (e) {
-    console.error("consentimiento fundación", e && e.message);
-  }
+  /* Esta fila también se escribía a mano con `sujeto = email`; ver la nota de
+     `apiAliado`. Ahora la deja el helper, con el id como sujeto. */
 
   try {
     await correoFundacion(env, { nombre, email, ...datos });
@@ -7906,6 +7959,9 @@ async function apiFundacion(env, c) {
   } catch (e) {
     console.error("correo fundación", e && e.message);
   }
+
+  await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "fundacion",
+    "ff.datos + ff.veraz");
 
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
 }
