@@ -2,7 +2,14 @@
    del sitio y se borra después de correrlo. Usa el pdf-lib que ya tiene el repo.
 
    Los ENLACES de este documento se comprobaron uno por uno contra producción el
-   31 de agosto de 2026 antes de escribirlos — no se copiaron de memoria. */
+   1 de septiembre de 2026 antes de escribirlos — no se copiaron de memoria.
+
+   ⚠️ SE REESCRIBIÓ ENTERA LA MITAD DE LOS ENLACES. Ese día el triaje y el panel se
+   mudaron al subdominio: las cuatro pantallas de trabajo ya viven en
+   `miramicasa.…`. La versión anterior decía «va en el dominio principal, NO en
+   miramicasa» y «el subdominio responde 403»; las dos cosas dejaron de ser
+   ciertas. Los enlaces del dominio principal siguen funcionando porque redirigen,
+   pero los que se reparten son los del subdominio. */
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import fs from "node:fs";
 
@@ -88,14 +95,41 @@ function eyebrow(t, o = {}) {
 function pagina() { p = doc.addPage(A4); y = A4[1] - 62; }
 
 const DESBORDES = [];
-function pie(n, total) {
+
+/* EL PIE SE DIBUJA AL FINAL, Y EL TOTAL SALE DEL DOCUMENTO.
+   Antes cada llamada escribía su total a mano y al añadir una página el
+   documento pasó a tener SEIS mientras los pies seguían diciendo «de 5». Y a la
+   página nueva se le olvidó el pie del todo. Una guía cuyo propio número de
+   página miente no invita a creerle el resto.
+
+   Así que esta función ya no dibuja: anota la página y hace su comprobación de
+   desborde —que necesita la `y` de ESTE momento— y `pies()` las dibuja todas al
+   cerrar, cuando `doc.getPageCount()` ya sabe la verdad. El total no se puede
+   volver a desincronizar porque nadie lo escribe a mano. */
+const PIES = [];
+function pie() {
+  const n = PIES.length + 1;
   if (y < 62) DESBORDES.push("pagina " + n + " (y=" + Math.round(y) + ")");
-  p.drawLine({ start: { x: MG, y: 46 }, end: { x: MG + ANCHO, y: 46 }, thickness: 0.5, color: LINEA });
-  marca(MG, 40, 11);
-  p.drawText(wa("Mira Mi Casa  ·  guía de funcionamiento  ·  31 de agosto de 2026"),
-    { x: MG + 18, y: 32, size: 7.4, font: N, color: GRIS });
-  const t = wa(String(n) + " / " + String(total));
-  p.drawText(t, { x: MG + ANCHO - N.widthOfTextAtSize(t, 7.4), y: 32, size: 7.4, font: B, color: VERDE });
+  PIES.push(p);
+}
+function pies() {
+  const total = doc.getPageCount();
+  /* Una página sin pie no lleva número y TAMPOCO pasa por la comprobación de
+     desborde: es un agujero silencioso, así que se grita. */
+  if (PIES.length !== total) {
+    DESBORDES.push("hay " + total + " paginas y " + PIES.length + " pies: a alguna le falta su pie");
+  }
+  const guardar = p;
+  PIES.forEach((pg, i) => {
+    p = pg;
+    p.drawLine({ start: { x: MG, y: 46 }, end: { x: MG + ANCHO, y: 46 }, thickness: 0.5, color: LINEA });
+    marca(MG, 40, 11);
+    p.drawText(wa("Mira Mi Casa  ·  guía de funcionamiento  ·  1 de septiembre de 2026"),
+      { x: MG + 18, y: 32, size: 7.4, font: N, color: GRIS });
+    const t = wa(String(i + 1) + " / " + String(total));
+    p.drawText(t, { x: MG + ANCHO - N.widthOfTextAtSize(t, 7.4), y: 32, size: 7.4, font: B, color: VERDE });
+  });
+  p = guardar;
 }
 function espacio(n) { y -= n; }
 
@@ -225,7 +259,7 @@ punto("En la casa se llena el formulario de la visita, que funciona SIN internet
 h3("4. Y si hay materiales");
 punto("Se anota qué casa los recibió, atándola a la entrega. Así se puede responder a qué casa evaluada le falta lo suyo.", { despues: 6 });
 
-pie(1, 5);
+pie();
 
 /* ══════════════════════ 2 ══════════════════════ */
 pagina();
@@ -241,12 +275,12 @@ h3("2. Quien quiera ayudar — pública");
 punto("Desde la misma dirección: el banco de casas revisadas, la postulación de ingenieros y el apadrinamiento.");
 
 h3("3. El ingeniero voluntario — pide identificarse");
-mono("https://thegiveandgrowproject.org/triaje");
-punto("OJO: va en el dominio principal, NO en «miramicasa». Con el subdominio funciona igual, pero da un salto de más — y en la calle con mala señal eso importa.");
+mono("https://miramicasa.thegiveandgrowproject.org/triaje");
+punto("Todo Mira Mi Casa vive en «miramicasa», herramientas incluidas. Si alguien tiene guardado el enlace del dominio principal, sigue funcionando: redirige.");
 
 h3("4. El equipo — pide identificarse");
-mono("https://thegiveandgrowproject.org/admin");
-punto("El subdominio «miramicasa» NO sirve para el panel: responde 403 y no redirige. Hay que usar el dominio principal.");
+mono("https://miramicasa.thegiveandgrowproject.org/admin");
+punto("Mismo dominio que todo lo demás. El enlace viejo del dominio principal redirige aquí.");
 
 caja("Cómo se entra a las dos que piden identificarse", [
   "Sin cuenta y sin contraseña. Se abre el enlace, se pide un código, llega al correo, y con",
@@ -257,7 +291,7 @@ caja("Cómo se entra a las dos que piden identificarse", [
 ], VERDE);
 
 h2("Las áreas públicas, con su enlace");
-texto("Comprobados uno por uno contra el sitio en producción el 31 de agosto de 2026.",
+texto("Comprobados uno por uno contra el sitio en producción el 1 de septiembre de 2026.",
   { size: 8.6, color: GRIS, despues: 10 });
 
 fila("Revisa tu casa", "https://miramicasa.thegiveandgrowproject.org/#vivienda", { mono: true });
@@ -270,7 +304,7 @@ fila("Apadrinar", "https://miramicasa.thegiveandgrowproject.org/#apadrinar", { m
 fila("", "Quien quiere aportar se registra. No se cobra nada en línea y no se compromete una casa concreta.");
 fila("Privacidad", "https://miramicasa.thegiveandgrowproject.org/#privacidad", { mono: true });
 
-pie(2, 5);
+pie();
 
 /* ══════════════════════ 3 ══════════════════════ */
 pagina();
@@ -283,18 +317,18 @@ punto("Ese enlace es lo único que devuelve el acceso a un caso. Se le manda por
 punto("La página no se indexa ni se guarda en cachés compartidas, justamente porque la dirección lleva la llave.");
 
 h3("El triaje — el ingeniero voluntario");
-mono("https://thegiveandgrowproject.org/triaje");
+mono("https://miramicasa.thegiveandgrowproject.org/triaje");
 punto("Tres pestañas: sin revisar, piden confirmación (urgentes con una sola opinión, o casos en desacuerdo) y ya clasificados.");
 punto("Al final: «Tus conceptos», que dice qué pasó con cada uno que firmó — si es el que manda, si otro lo clasificó más grave, y en qué estado está la casa hoy.");
 punto("NO ve teléfono ni dirección de la familia. No los necesita para dar un concepto.");
 
 h3("El formulario de la visita — en la casa");
-mono("https://thegiveandgrowproject.org/triaje/inspeccion");
+mono("https://miramicasa.thegiveandgrowproject.org/triaje/inspeccion");
 punto("ÁBRELO CON SEÑAL ANTES DE SALIR. Se guarda en el teléfono y desde ahí funciona sin internet; lo que se llene se envía cuando vuelva la señal.");
 punto("Recoge 26 ítems, observaciones, recomendaciones de la guía del AIS, coordenadas y dos firmas. Al enviarse sale un documento firmado y un aviso al equipo.");
 
 h3("El panel del equipo");
-mono("https://thegiveandgrowproject.org/admin");
+mono("https://miramicasa.thegiveandgrowproject.org/admin");
 punto("«Salud del ecosistema»: las colas de lo que está pendiente, ordenadas por urgencia.");
 punto("«Casas por revisar»: la bandeja completa, con teléfono y dirección, y el «hilo de la casa» de cada una — todo lo que pasó, en orden.");
 punto("«Inspecciones en terreno», con su documento y sus fotos.");
@@ -302,10 +336,10 @@ punto("«Entregas»: se ata cada casa que recibió materiales.");
 punto("«Quién quiere entrar»: se verifica la matrícula de un ingeniero, y con eso se le abre el acceso.");
 
 h3("La ruta de la brigada");
-mono("https://thegiveandgrowproject.org/admin/ruta");
+mono("https://miramicasa.thegiveandgrowproject.org/admin/ruta");
 punto("Para llevar en el bolsillo: a qué puerta se va ahora, con teléfono, WhatsApp y —si alguien ya estuvo— un enlace al mapa con las coordenadas de esa visita.");
 
-pie(3, 5);
+pie();
 
 /* ══════════════════════ 4 ══════════════════════ */
 pagina();
@@ -337,7 +371,7 @@ fila("", "Cuando llega una inspección de terreno. Si trae PELIGRO INMINENTE o E
 fila("", "Cuando dos ingenieros no coinciden, o cuando un concepto no puede salir por falta de matrícula verificada.", { wIzq: 120 });
 fila("El ingeniero", "Al postularse, el acuse. Al verificarse su matrícula, que ya puede entrar.", { wIzq: 120 });
 
-pie(4, 5);
+pie();
 
 /* ══════════════════════ 5 ══════════════════════ */
 pagina();
@@ -354,26 +388,53 @@ fila("Visitadas sin materiales", "Se fue a la casa y no se le ha anotado ninguna
 
 h2("Tres cosas que conviene saber");
 punto("El formulario de la visita hay que abrirlo CON señal antes de salir. Si se abre por primera vez sin internet, no carga.");
-punto("Para el panel hay que usar el dominio principal: el subdominio «miramicasa» responde 403 en /admin y no redirige.");
+punto("Todo vive en «miramicasa», herramientas incluidas. Quien tenga guardado un enlace del dominio principal no se queda fuera: redirige. Pero conviene guardar el nuevo, porque el salto cuesta.");
 punto("Un concepto de un ingeniero cuya matrícula no se ha verificado se guarda y lo revisa el equipo, pero NO le sale solo a la familia. Eso es a propósito.");
 
-caja("Lo que todavía no se ha probado con una persona real", [
-  "Al 31 de agosto de 2026, ningún ingeniero ha entrado con la regla de acceso automática.",
-  "Todo lo de abajo funciona en el código y se verificó contra la base de datos, pero no se",
-  "ha ejercitado con una sesión real:",
+pie();
+
+pagina();
+h2("En qué punto está esto de verdad");
+caja("Contado contra la base de datos el 1 de septiembre de 2026, no de memoria", [
+  "     casos de familias . . . . . . 0        inspecciones en terreno . . 1",
+  "     fotos subidas  . . . . . . . 0        ingenieros inscritos  . . . 2",
+  "     conceptos firmados . . . . . 0        correos enviados  . . . . . 15",
   "",
-  "     · el formulario del triaje enseñando con qué firma, en vez de pedirlo",
-  "     · un envío del formulario de la visita, con su aviso por correo",
-  "     · el botón «Ya la atendimos», y el de atar una casa a una entrega",
+  "Es decir: el recorrido está construido, migrado y documentado, y TODAVÍA NO HA ENTRADO",
+  "NINGUNA FAMILIA. Ningún ingeniero ha firmado un concepto. Conviene leer el resto de esta",
+  "guía sabiendo eso — describe un sistema que funciona, no uno que ya se usó.",
   "",
-  "La primera vez que un ingeniero entre es la prueba que falta. Lo que hay que mirar es que",
-  "al enviar una inspección el contador del teléfono baje a cero."
+  "Lo que sí se ejercitó con sesión real el 1 de septiembre: el triaje y el panel completos",
+  "en el subdominio, con sus contadores y sus datos. Lo que sigue sin ejercitarse es lo que",
+  "solo pasa cuando hay un caso: el aviso por correo del concepto a la familia, el botón",
+  "«Ya la atendimos», y atar una casa a una entrega.",
+  "",
+  "La prueba que falta no es técnica: es la primera familia."
 ]);
 
-texto("Esta guía se escribió el 31 de agosto de 2026. Los enlaces se comprobaron uno por uno " +
-  "contra el sitio en producción antes de incluirlos.", { size: 8.4, color: GRIS, despues: 0 });
+espacio(6);
+caja("Antes de repartir esto: dos avisos, y uno que le falta al formulario", [
+  "Ninguna de las tres es obvia, y las tres se descubren tarde si nadie las dice:",
+  "",
+  "     · Quien haya preparado el formulario de la visita sin señal en el dominio",
+  "       principal tiene que volver a prepararlo en «miramicasa». Su copia vieja",
+  "       sigue funcionando, pero se queda huérfana.",
+  "     · El formulario de la visita se abre CON señal antes de salir. Siempre.",
+  "",
+  "Y una que le falta al formulario de la familia: hoy le dice cómo NO lastimarse —no entres,",
+  "no te subas al techo— pero no le dice qué hace que una foto SIRVA. Cada foto que no se",
+  "puede leer es una vuelta completa: el ingeniero pide más, la familia sube, y vuelve a",
+  "esperar sin fecha. Si vas a acompañar a alguien a llenarlo, eso es lo que hay que explicarle."
+], VERDE);
 
-pie(5, 5);
+texto("Esta guía se reescribió el 1 de septiembre de 2026, el día que el triaje y el panel se " +
+  "mudaron a «miramicasa». Los enlaces se comprobaron uno por uno contra el sitio en " +
+  "producción antes de incluirlos, y las cifras se contaron contra la base de datos.",
+  { size: 8.4, color: GRIS, despues: 0 });
+
+pie();
+
+pies();
 
 const bytes = await doc.save();
 fs.writeFileSync(process.argv[2] || "guia-mira-mi-casa.pdf", bytes);
