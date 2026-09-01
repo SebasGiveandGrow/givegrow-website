@@ -47,6 +47,12 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    Sin `www`: el subdominio responde en su nombre exacto. */
 const ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
 
+/* Con qué nombre se presenta Mira Mi Casa cuando alguien reenvía su enlace.
+   Los usa `marcarMarca`; ver la nota larga que hay allí. */
+const MMC_TITULO = "Mira Mi Casa · Fundación Give&Grow International";
+const MMC_OG_TITULO = "Mira Mi Casa";
+const MMC_DESC = "Si tu casa se afectó por el sismo, sube unas fotos. Un ingeniero voluntario con matrícula te dice si hay señales para no permanecer en ella, qué precauciones tomar y con qué materiales conviene repararla. Sin costo.";
+
 /* Límites del formulario público, en pesos. Coinciden con el deslizador de la
    calculadora: por debajo no cubre la comisión, por encima conviene hablar. */
 const MONTO_MIN = 5000;
@@ -11198,6 +11204,61 @@ function marcarMarca(respuesta, host) {
     /* Lo mismo para `og:url`: sin esto, un enlace del triaje compartido por
        WhatsApp se previsualiza como el sitio de la fundación. */
     .on('meta[property="og:url"]', { element(e) { e.setAttribute("content", ORIGIN_MMC); } })
+    /* EL NOMBRE Y LA DESCRIPCIÓN CON LOS QUE SE COMPARTE EL ENLACE.
+       ========================================================================
+       Comprobado en producción el 1 sep 2026: compartir
+       `miramicasa.thegiveandgrowproject.org` por WhatsApp previsualizaba
+       «Give&Grow International — Dar para crecer, crecer para dar más», con la
+       imagen genérica de la fundación. Ni el nombre del proyecto ni una palabra
+       de para qué sirve.
+
+       Y ESO NO ES SOLO UNA OPORTUNIDAD PERDIDA. WhatsApp es EL canal: el propio
+       formulario le pide el teléfono a la familia y no el correo porque «en estas
+       zonas mucha gente tiene WhatsApp y no correo». Y la copia de ALMA advierte
+       que el Ministerio de Vivienda está alertando sobre ESTAFAS CON NOMBRES DE
+       PROGRAMAS DE VIVIENDA. Un enlace que se llama «miramicasa» y se
+       previsualiza con otro nombre es exactamente la forma que tiene una estafa.
+       Con cero casos en la base, lo que decide si una familia entra es si confía
+       en el enlace que le reenviaron.
+
+       SE REESCRIBE AQUÍ, en el mismo recorrido del documento que ya inyecta
+       `data-marca` y arregla el canonical: ningún coste nuevo. Y se reescribe en
+       el SERVIDOR porque WhatsApp y los crawlers NO EJECUTAN JavaScript — la SPA
+       ya pone su propio título por ruta, pero eso solo lo ve una persona con un
+       navegador, nunca una vista previa.
+
+       UN SOLO TEXTO PARA TODO EL SUBDOMINIO, igual que el canonical: son rutas
+       de hash sobre el MISMO documento servido, así que el servidor no puede
+       distinguir `#vivienda` de `#casas`. Se escribe el de la puerta principal.
+
+       En español y no bilingüe a propósito: el HTML servido está hidratado en
+       español y quien recibe este enlace por WhatsApp es una familia
+       colombiana. El inglés lo pone la SPA cuando alguien cambia de idioma.
+
+       NO PROMETE NADA que el proyecto no cumpla: dice qué recibe la familia —un
+       concepto sobre lo que las fotos permiten ver— y dice «sin costo», que sí
+       es verdad. No dice plazos ni dice que le vayan a arreglar la casa. */
+    .on("title", { element(e) { e.setInnerContent(MMC_TITULO); } })
+    .on('meta[name="description"]', { element(e) { e.setAttribute("content", MMC_DESC); } })
+    .on('meta[property="og:title"]', { element(e) { e.setAttribute("content", MMC_OG_TITULO); } })
+    .on('meta[property="og:description"]', { element(e) { e.setAttribute("content", MMC_DESC); } })
+    .on('meta[name="twitter:title"]', { element(e) { e.setAttribute("content", MMC_OG_TITULO); } })
+    .on('meta[name="twitter:description"]', { element(e) { e.setAttribute("content", MMC_DESC); } })
+    /* Y LA IMAGEN. La genérica de la fundación con el título de Mira Mi Casa era
+       incoherente, y la imagen es la mitad de la señal de confianza en WhatsApp.
+
+       LA ELEGIDA ES EL EQUIPO EN UNA CALLE, no escombros. Para una familia que
+       duda de un enlace reenviado, «vino gente a una calle como la mía» convence
+       más que el espectáculo del daño — y una portada de destrucción para alguien
+       que acaba de perder parte de su casa sería otra cosa. Es de Marsella, 21 de
+       agosto de 2026, la misma jornada que ya está en la galería de evidencia.
+
+       SE SIRVE DESDE EL SUBDOMINIO para que la vista previa entera venga de un
+       solo host: título, descripción, URL e imagen. Una imagen del ápex en una
+       tarjeta que dice «Mira Mi Casa» es justo la incoherencia que se quería
+       quitar. */
+    .on('meta[property="og:image"]', { element(e) { e.setAttribute("content", ORIGIN_MMC + "/img/og-mmc.jpg"); } })
+    .on('meta[name="twitter:image"]', { element(e) { e.setAttribute("content", ORIGIN_MMC + "/img/og-mmc.jpg"); } })
     .transform(respuesta);
 }
 
