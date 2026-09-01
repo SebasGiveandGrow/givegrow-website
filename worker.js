@@ -11247,11 +11247,24 @@ function marcarMarca(respuesta, host) {
     /* Y LA IMAGEN. La genérica de la fundación con el título de Mira Mi Casa era
        incoherente, y la imagen es la mitad de la señal de confianza en WhatsApp.
 
-       LA ELEGIDA ES EL EQUIPO EN UNA CALLE, no escombros. Para una familia que
-       duda de un enlace reenviado, «vino gente a una calle como la mía» convence
-       más que el espectáculo del daño — y una portada de destrucción para alguien
-       que acaba de perder parte de su casa sería otra cosa. Es de Marsella, 21 de
-       agosto de 2026, la misma jornada que ya está en la galería de evidencia.
+       LA ELEGIDA ES UNA CASA CAÍDA, SIN NINGUNA PERSONA. La primera versión fue
+       el equipo en una calle y no comunicaba nada: era una calle con un perro.
+       Esta se lee sin explicación —muros en el suelo, la estructura del techo
+       abierta en diagonal, una estufa sola en el pasto y el valle al fondo— y es
+       exactamente la situación de quien recibe el enlace. La estufa es lo que la
+       hace aterrizar: alguien cocinaba ahí.
+
+       SIN PERSONAS, Y ESO FUE UNA DECISIÓN. La candidata más fuerte era una
+       señora de pie frente a su casa destruida sosteniendo una caja. Emocionalmente
+       gana, pero es una BENEFICIARIA IDENTIFICABLE, y una imagen que se reenvía por
+       WhatsApp llega mucho más lejos que una galería: la reconocería cualquiera que
+       la conozca, marcada como alguien que recibió ayuda. Esa foto no se publica
+       sin que ella lo sepa, y su consentimiento no está registrado.
+
+       DE DÓNDE SALE: carpeta «Varios» de Cimientos que Unen, EXIF 2026:08:15 —
+       cinco días después del sismo y antes de la visita del 20 al 23. Su carpeta
+       NO tiene lugar rotulado, así que no se le atribuye municipio: no se puede
+       verificar y aquí no se afirma lo que no se comprobó.
 
        SE SIRVE DESDE EL SUBDOMINIO para que la vista previa entera venga de un
        solo host: título, descripción, URL e imagen. Una imagen del ápex en una
