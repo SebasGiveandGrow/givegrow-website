@@ -462,7 +462,9 @@ var I18N = {
     "cv.ok.copiado":"Enlace copiado",
     "cv.err.raro":"Algo en el formulario nos confundió y no llegó tu caso. Recarga la página e inténtalo otra vez; si vuelve a pasar, escríbenos.",
     "cv.err.envio":"No pudimos registrar tu caso. Revisa los datos e intenta otra vez.",
-    "cv.err.campos":"Faltan datos: tu nombre, tu WhatsApp y el barrio.",
+    "cv.err.nombre":"Falta tu nombre. Con eso el ingeniero sabe a quién le está escribiendo.",
+    "cv.err.tel":"Falta tu WhatsApp, o tiene muy pocos números. Es por donde te avisamos: sin él no hay forma de volver a ti.",
+    "cv.err.sector":"Falta el barrio o el sector. Sin eso no sabemos a dónde iría una visita.",
     "cv.err.consent":"Necesitamos tu autorización para que un ingeniero revise el caso.",
     "mc.t":"Tu caso",
     "mc.lead":"Aquí ves en qué va tu caso y puedes agregar fotos si hacen falta.",
@@ -1829,12 +1831,57 @@ function cvPaso(n){
   window.scrollTo(0, 0);
 }
 
+/* QUÉ FALTA, DÓNDE, Y CON EL CURSOR YA PUESTO AHÍ.
+   Antes esto era `alert(t("cv.err.campos"))` — el único `alert()` de todo
+   app.js— con un texto que listaba los TRES campos siempre: «Faltan datos: tu
+   nombre, tu WhatsApp y el barrio». Si solo faltaba el teléfono, la persona
+   tenía que revisar los tres.
+
+   Tres cosas cambian, y la segunda es la que más importa:
+
+     · se dice cuál falta, no la lista entera;
+     · EL FOCO SE MUEVE al campo. Para quien usa lector de pantalla eso es la
+       diferencia entre saber y adivinar; y para cualquiera en un teléfono, el
+       campo entra en pantalla solo;
+     · el aviso va a una región viva con `role="alert"` en el propio paso 2, en
+       vez de un diálogo nativo que hay que cerrar.
+
+   `aria-invalid` se pone y se QUITA: dejarlo puesto haría que el lector de
+   pantalla siguiera anunciando el campo como inválido después de corregirlo.
+
+   El orden de comprobación es el de la pantalla —nombre, WhatsApp, barrio— para
+   que el salto del foco no vaya hacia atrás. */
 function cvValidarDatos(){
   var v = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
-  if (!v("cv-nombre") || !v("cv-sector") || (v("cv-tel").replace(/\D/g,"").length < 7)){
-    alert(t("cv.err.campos")); return false;
-  }
-  return true;
+  var msg = document.getElementById("cv-msg2");
+  var limpiar = function(){
+    ["cv-nombre","cv-tel","cv-sector"].forEach(function(id){
+      var e = document.getElementById(id); if (e) e.removeAttribute("aria-invalid");
+    });
+    if (msg){ msg.textContent = ""; msg.style.color = ""; }
+  };
+  limpiar();
+
+  var falta = null;
+  if (!v("cv-nombre")) falta = ["cv-nombre", "cv.err.nombre"];
+  else if (v("cv-tel").replace(/\D/g,"").length < 7) falta = ["cv-tel", "cv.err.tel"];
+  else if (!v("cv-sector")) falta = ["cv-sector", "cv.err.sector"];
+  if (!falta) return true;
+
+  var campo = document.getElementById(falta[0]);
+  if (campo){ campo.setAttribute("aria-invalid", "true"); }
+  /* `var(--err)` Y NO LA CLASE `.err`, y esto se midió. La regla del sitio es
+     `.pay-now-msg.err{color:#f0857a}` — ACOTADA a ese elemento, así que un
+     `classList.add("err")` aquí no pintaba nada y el aviso salía del gris de
+     `.mu`, indistinguible de una ayuda. Y ese salmón tampoco serviría: da 2.41:1
+     sobre el papel del formulario, por debajo del 4.5 de AA. Donde sí se usa
+     —sobre el azul oscuro del bloque de pago— da 6.50:1 y está bien.
+     El token es consciente del tema y da 7.92:1 en modo día. */
+  if (msg){ msg.textContent = t(falta[1]); msg.style.color = "var(--err)"; }
+  /* El foco al final: si se moviera antes de escribir el mensaje, algunos
+     lectores anunciarían el campo y se comerían el aviso. */
+  if (campo) campo.focus();
+  return false;
 }
 
 /* Una tarjeta por categoría, con su ayuda y su contador. Se arma en JS y no en
