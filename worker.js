@@ -11284,7 +11284,16 @@ export default {
 
        Se preserva la QUERY: `/triaje` no la usa hoy, pero perderla en silencio es
        la clase de cosa que se descubre tarde. */
-    if ((ruta === "/triaje" || ruta === "/triaje/inspeccion") &&
+    if ((ruta === "/triaje" || ruta === "/triaje/inspeccion" ||
+         /* Y EL PANEL, que cierra la mudanza. Sus dos pantallas: la bandeja y la
+            ruta de la brigada. Comprobado con una sesión real el 1 sep 2026 en
+            `miramicasa.…/admin` —contadores, «Lo que hay que hacer hoy» y «Salud
+            del ecosistema» con datos— antes de mandar a nadie aquí.
+
+            `/admin/ruta` es la que más importa de las dos: es la pantalla que
+            alguien abre EN LA CALLE para saber a qué casa va, y el nombre que el
+            equipo tiene en la cabeza es el del subdominio. */
+         ruta === "/admin" || ruta === "/admin/ruta") &&
         !HOST_MMC.test(url.hostname) && !/\.workers\.dev$/i.test(url.hostname)) {
       return Response.redirect(new URL(ruta + url.search, ORIGIN_MMC).toString(), 302);
     }
