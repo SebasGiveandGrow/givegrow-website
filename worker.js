@@ -11196,66 +11196,35 @@ export default {
     if (ruta === "/triaje.js") return Response.redirect(new URL("/triaje/app.js", url).toString(), 302);
     if (ruta === "/triage.js") return Response.redirect(new URL("/triaje/app.js", url).toString(), 302);
 
-    /* EL TRIAJE YA VIVE EN MIRA MI CASA. Aquí solo queda el panel.
+    /* MIRA MI CASA YA ESTÁ COMPLETO EN SU PROPIO NOMBRE. Aquí vivía la
+       redirección que mandaba el triaje y el panel al ápex, y ya no queda nada
+       que mandar: las dos aplicaciones de Cloudflare Access cubren el subdominio.
 
-       QUÉ CAMBIÓ, el 1 sep 2026. La aplicación de Access del triaje estaba en su
-       tope de CINCO destinos, y de esos cinco DOS no protegían nada: `api/triaje`
-       —que el Worker no sirve, la API real es `/api/triage/` en inglés— y
-       `triage`, que solo era un alias que redirige y cuya redirección se sacó del
-       guardián justo arriba. Liberados esos dos, entraron
-       `miramicasa.…/triaje` y `miramicasa.…/api/triage`.
+       CÓMO SE HIZO EL ESPACIO, porque las dos aplicaciones estaban en su tope de
+       cinco destinos y la respuesta no fue pedir un plan más grande:
 
-       Así que este bloque YA NO redirige el triaje: lo serviría igual y mandarlo
-       al ápex era, a partir de ese momento, lo único que impedía que Mira Mi Casa
-       tuviera su herramienta en casa. Comprobado en vivo: con los destinos ya
-       añadidos, abrir `miramicasa.…/triaje` seguía aterrizando en el ápex — y era
-       ESTA redirección, no Access.
+         Triaje  api/triaje  no existía en el Worker            → borrado
+                 triage      solo un alias que redirige         → borrado
+                 triaje.js   el script se movió bajo /triaje/   → borrado
+         Panel   admin.js    el script se movió bajo /admin/    → borrado
+                 www.        una RUTA literal `/www.`, escrita en el campo Path
+                             queriendo añadir el hostname `www`; custodiaba una
+                             URL que no existe                  → borrado
 
-       EL PANEL SÍ SIGUE REDIRIGIENDO. `/admin` tiene su PROPIA aplicación de
-       Access, con su propio tope de cinco, y no se ha tocado. Mudarlo es otra
-       operación: mientras su aplicación no cubra el subdominio, servirlo aquí
-       sería un 403 —el guardián es fail-closed— y un 403 no se lo explica a
-       nadie. La redirección se queda hasta entonces.
+       Cinco destinos recuperados, y ninguno protegía nada. La lección para la
+       próxima vez que Cloudflare diga «has añadido el máximo»: contar qué
+       protege cada uno antes de dar por bueno que el tope es el problema.
 
-       ⚠️ EL 301 DE ANTES SE QUEDA EN LOS NAVEGADORES. Un 301 es permanente y se
-       cachea con ganas, así que quien haya abierto `miramicasa.…/triaje` mientras
-       redirigía va a seguir saltando al ápex desde su propio caché, sin pedirle
-       nada al servidor. No hay nada que el Worker pueda hacer contra eso: se
-       prueba en una ventana privada. Y de ahí la lección para el día que el ápex
-       tenga que apuntar al subdominio: ESE irá con 302, porque esta ruta ya
-       demostró que cambia de sitio.
+       LO QUE HIZO VIABLE MOVER LAS PANTALLAS es que Access cubre por PATH y trata
+       el destino como PADRE: `admin` cubre `/admin/ruta`, `/admin/ruta.js` y
+       `/admin/app.js`; `triaje` cubre `/triaje/inspeccion`. Pero un HERMANO
+       —`/admin.js`, `/triaje.js`— queda FUERA, y de ahí que los dos scripts se
+       mudaran debajo de su carpeta. Se aprendió a las malas: con los destinos ya
+       puestos, `miramicasa.…/triaje.js` respondía 403 mientras
+       `/triaje/inspeccion` entraba sin problema.
 
-       Le pasó a `/ruta` por lo mismo y se resolvió igual: redirigir en vez de
-       dejar morir el enlace. Va FUERA del guardián de Access —dentro nunca se
-       alcanzaría— y conserva la ruta completa, así que
-       `miramicasa.…/triaje/inspeccion` aterriza en el formulario del ápex y no
-       en su portada.
-
-       Importa hoy y no en abstracto: en terreno alguien va a escribir el
-       subdominio, que es el nombre que la familia conoce, y toparse con un 403
-       en mitad de una jornada sin señal buena no se recupera. */
-    if (HOST_MMC.test(url.hostname) && (
-          /* EL PANEL TENÍA EL MISMO CALLEJÓN SIN SALIDA Y SE QUEDÓ SIN ARREGLAR.
-             Comprobado en producción el 1 sep 2026: `miramicasa.…/admin` y
-             `miramicasa.…/admin/ruta` respondían 403 CRUDO — ni redirigían ni
-             explicaban nada. Es exactamente el agujero que este bloque ya cerró
-             para `/triaje` y que `/ruta` cerró antes; simplemente no se aplicó
-             al panel.
-             Y duele más aquí que en `/triaje`: `/admin/ruta` es la pantalla que
-             alguien abre EN LA CALLE para saber a qué casa va. El nombre que
-             todo el equipo tiene en la cabeza es el del subdominio, porque es el
-             que se reparte. Un 403 en ese momento no se recupera. */
-          ruta === "/admin" || ruta.startsWith("/admin/") || ruta === "/admin.js")) {
-      /* AL ÁPEX Y NO A `ORIGIN`, que lleva www. Comprobado hoy: la aplicación de
-         Access vive sobre el ápex; `www` responde con su propia redirección al
-         ápex y solo entonces entra Access. Usar www funcionaría con DOS saltos y
-         apoyándose en esa redirección intermedia — para la herramienta que
-         alguien abre en la calle, con señal mala, prefiero un salto y ninguna
-         dependencia de más. Se deriva de la misma constante para no tener dos
-         cadenas de host que puedan separarse. */
-      const apex = ORIGIN.replace("://www.", "://");
-      return Response.redirect(new URL(ruta + url.search, apex).toString(), 301);
-    }
+       Los alias viejos siguen vivos más arriba, fuera del guardián, porque una
+       redirección no necesita sesión. */
 
     /* EL TRIAJE VIVE EN MIRA MI CASA. `/caso/<n>?t=` es la página de la familia
        y la única ruta de PATH del triaje, así que es la única que el Worker
