@@ -11152,11 +11152,22 @@ export default {
       return Response.redirect(new URL("/admin" + ruta, url).toString(), 301);
     }
 
-    /* EL TRIAJE NO EXISTE EN EL SUBDOMINIO, y hasta hoy eso era un callejón sin
-       salida: `miramicasa.…/triaje` respondía 403 y ahí se acababa. La
-       aplicación de Cloudflare Access cubre el ÁPEX y está en su tope de
-       hostnames, así que la pantalla del ingeniero vive allá y no se puede
-       mudar. Pero un 403 no se lo explica a nadie.
+    /* LAS DOS HERRAMIENTAS DE TRABAJO NO EXISTEN EN EL SUBDOMINIO: el triaje del
+       ingeniero y el panel del equipo. Las dos eran un callejón sin salida —403
+       crudo— y hasta hoy solo se había arreglado el del triaje.
+
+       POR QUÉ VIVEN EN EL ÁPEX. Las aplicaciones de Cloudflare Access se
+       definen por hostname, y las de este proyecto se crearon sobre el ápex.
+       ⚠️ Una sesión anterior anotó aquí que la aplicación estaba «en su tope de
+       hostnames»; ESO NO ESTÁ VERIFICADO en ninguna parte del repositorio y no
+       se puede comprobar desde el código, así que no se trata como un hecho. Si
+       resulta que se pueden añadir hostnames —o crear una aplicación aparte para
+       el subdominio— este bloque se invierte: el ápex redirige al subdominio y
+       Mira Mi Casa queda entero bajo un solo nombre, que es lo que se quiere.
+       El guardián ya está preparado: acepta una LISTA de audiencias, así que
+       sumar la de una aplicación nueva es una línea de configuración.
+
+       Mientras eso no pase, un 403 no se lo explica a nadie.
 
        Le pasó a `/ruta` por lo mismo y se resolvió igual: redirigir en vez de
        dejar morir el enlace. Va FUERA del guardián de Access —dentro nunca se
@@ -11167,7 +11178,19 @@ export default {
        Importa hoy y no en abstracto: en terreno alguien va a escribir el
        subdominio, que es el nombre que la familia conoce, y toparse con un 403
        en mitad de una jornada sin señal buena no se recupera. */
-    if (HOST_MMC.test(url.hostname) && (ruta === "/triaje" || ruta.startsWith("/triaje/") || ruta === "/triaje.js")) {
+    if (HOST_MMC.test(url.hostname) && (
+          ruta === "/triaje" || ruta.startsWith("/triaje/") || ruta === "/triaje.js" ||
+          /* EL PANEL TENÍA EL MISMO CALLEJÓN SIN SALIDA Y SE QUEDÓ SIN ARREGLAR.
+             Comprobado en producción el 1 sep 2026: `miramicasa.…/admin` y
+             `miramicasa.…/admin/ruta` respondían 403 CRUDO — ni redirigían ni
+             explicaban nada. Es exactamente el agujero que este bloque ya cerró
+             para `/triaje` y que `/ruta` cerró antes; simplemente no se aplicó
+             al panel.
+             Y duele más aquí que en `/triaje`: `/admin/ruta` es la pantalla que
+             alguien abre EN LA CALLE para saber a qué casa va. El nombre que
+             todo el equipo tiene en la cabeza es el del subdominio, porque es el
+             que se reparte. Un 403 en ese momento no se recupera. */
+          ruta === "/admin" || ruta.startsWith("/admin/") || ruta === "/admin.js")) {
       /* AL ÁPEX Y NO A `ORIGIN`, que lleva www. Comprobado hoy: la aplicación de
          Access vive sobre el ápex; `www` responde con su propia redirección al
          ápex y solo entonces entra Access. Usar www funcionaría con DOS saltos y
