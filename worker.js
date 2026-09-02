@@ -2498,6 +2498,57 @@ const TIPOS_MEDIO = {
   "video/mp4":  { ext: "mp4", clase: "video", max: 60 * 1024 * 1024 },
   "video/quicktime": { ext: "mov", clase: "video", max: 60 * 1024 * 1024 }
 };
+/* LO QUE EL ARCHIVO ES, no lo que la cabecera dice que es.
+
+   `TIPOS_MEDIO` valida el `content-type`, que lo pone quien sube. Y quien sube
+   es el navegador de la familia, que lo saca de la EXTENSION del archivo. O sea
+   que un archivo ilegible con nombre `foto.jpg` llegaba como `image/jpeg` y se
+   guardaba como una foto perfecta: comprobado el 2 sep 2026 subiendo 17 bytes de
+   texto y recibiendo `{"ok":true,"clase":"foto"}`.
+
+   No es un agujero de ejecucion -los tipos permitidos no incluyen SVG, que es el
+   unico que ejecuta al servirse- pero SI es un viaje perdido, y el peor de todos:
+
+     `comprimirFoto` en app.js termina en `.catch(function(){ return file; })`, o
+     sea que si la imagen esta corrupta y `createImageBitmap` falla, SUBE EL
+     ORIGINAL. Entonces la familia ve «3 fotos enviadas», el ingeniero abre el
+     caso, encuentra una imagen rota, y lo mas probable es que marque
+     `inevaluable` y le pida mas fotos. La familia vuelve a subir al techo de una
+     casa agrietada por algo que el servidor pudo rechazar en el acto.
+
+   Es la misma regla que este proyecto aplica en todas partes: no decirle a
+   alguien «listo» cuando no llego.
+
+   LOS VIDEO NO SE COMPRUEBAN, a proposito. MP4 y QuickTime son contenedores con
+   variantes segun el telefono que grabo, y una firma demasiado estricta
+   rechazaria video legitimo de campo — que es justo el dano que se quiere
+   evitar. Las tres firmas de imagen, en cambio, son invariantes. */
+const FIRMAS_MEDIO = {
+  "image/jpeg": (b) => b.length > 3 && b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF,
+  "image/png":  (b) => b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47 &&
+                       b[4] === 0x0D && b[5] === 0x0A && b[6] === 0x1A && b[7] === 0x0A,
+  /* RIFF....WEBP: los cuatro bytes del medio son el tamano y varian. */
+  "image/webp": (b) => b.length > 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+                       b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+};
+
+function noEsLoQueDice(tipo, bytes) {
+  const comprueba = FIRMAS_MEDIO[tipo];
+  return comprueba ? !comprueba(bytes) : false;
+}
+
+/* El mismo rechazo en los tres sitios que aceptan fotos. Se responde 400 y no
+   415: el tipo SI esta permitido, lo que no cuadra es el contenido. El cliente
+   ya trata cualquier rechazo del servidor como definitivo -no reintenta, lo
+   cuenta, y al final dice cuantas llegaron de cuantas-, asi que la familia se
+   entera en vez de creer que subio. */
+function rechazoNoEsFoto() {
+  return json({
+    error: "archivo_no_es_foto",
+    ayuda: "Ese archivo no se pudo leer como foto. Vuelve a tomarla con la camara del telefono y subela otra vez."
+  }, 400);
+}
+
 const MAX_MEDIOS = 20;
 
 /* CUÁNTOS ARCHIVOS MÁS PUEDE MANDAR LA FAMILIA, y por qué no es una resta simple.
@@ -2714,6 +2765,8 @@ async function apiCasoMedio(request, env, numero, token, url) {
       ayuda: spec.clase === "video" ? "Graba un video más corto, de unos 30 segundos." : null
     }, 413);
   }
+
+  if (noEsLoQueDice(tipo, bytes)) return rechazoNoEsFoto();
 
   const cat = CATEGORIAS_MEDIO.includes(url.searchParams.get("cat")) ? url.searchParams.get("cat") : null;
   const clave = "casos/" + numero + "/" + tokenNuevo().slice(0, 8) + "." + spec.ext;
@@ -4354,6 +4407,8 @@ async function triageInspeccionFoto(request, env, numero, sesion) {
   if (bytes.length > spec.max) {
     return json({ error: "archivo_muy_grande", max_mb: Math.round(spec.max / 1048576) }, 413);
   }
+
+  if (noEsLoQueDice(tipo, bytes)) return rechazoNoEsFoto();
 
   let lista = [];
   try { lista = JSON.parse(v.fotos || "[]"); } catch { lista = []; }
@@ -6445,6 +6500,8 @@ async function adminSubirMedio(request, env, numero, url, quien) {
   if (bytes.length > spec.max) {
     return json({ error: "archivo_muy_grande", max_mb: Math.round(spec.max / 1048576) }, 413);
   }
+
+  if (noEsLoQueDice(tipo, bytes)) return rechazoNoEsFoto();
 
   const clave = "casos/" + numero + "/" + tokenNuevo().slice(0, 8) + "." + spec.ext;
   await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
