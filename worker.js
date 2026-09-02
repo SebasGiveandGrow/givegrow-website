@@ -6696,7 +6696,7 @@ BENEFICIO TRIBUTARIO: 25% de descuento sobre el impuesto de renta a cargo (Art. 
 
 MEMBRESÍAS: Semilla, Retoño, Árbol y Bosque (niveles crecientes de aporte mensual), Temporal (donación única) y Honor (por invitación).
 
-PROGRAMA DE GRATITUD: Red de empresas aliadas con descuentos exclusivos para todos los miembros activos. Categorías: gastronomía, moda, belleza, bienestar, odontología.
+PROGRAMA DE GRATITUD: beneficios que comercios aliados dan a los miembros activos. Las cinco categorias para las que esta construido el programa son gastronomia, moda, belleza, bienestar y odontologia, pero ESO ES LA TAXONOMIA, NO LO QUE HAY: no enumeres categorias como si cada una tuviera comercios. Los comercios de verdad te llegan mas abajo en datos en vivo, y son los unicos sobre los que puedes afirmar algo. Hoy son muy pocos; decirlo asi es mas util que insinuar una red.
 
 RSE EMPRESARIAL: 3 puertas cumplibles hoy: Padrinazgo de Impacto (presupuesto traducido a unidades reales con certificado y reporte), Impact Journey (voluntariado corporativo en doble vía, Ruta 4) y Alianza a medida (co-creación de programas). El aporte se define a la medida de cada empresa; invita a escribir para una propuesta personalizada.
 
@@ -6772,6 +6772,62 @@ async function almaContextoRed(env, origen) {
   } catch { return ""; }
 }
 
+/* LOS COMERCIOS DE GRATITUD, EN VIVO — igual que la red del Hub.
+
+   La linea del prompt decia «Red de empresas aliadas… Categorias: gastronomia,
+   moda, belleza, bienestar, odontologia», y eso leido por alguien que pregunta
+   «que descuentos tengo» suena a una red repartida en cinco rubros. La realidad
+   comprobada el 2 sep 2026: `categorias` es una TAXONOMIA de cinco y `comercios`
+   tiene UNA entrada activa. O sea que el prompt prometia amplitud que no existe,
+   que es justo lo que la regla de la casa prohibe -«evidencia, no promesas»-.
+
+   Se arregla como ya estaba resuelto para las fundaciones: en vez de una frase
+   escrita a mano que envejece, se le pasan los datos vivos y se le prohibe
+   afirmar fuera de ellos. Asi no puede volver a quedar caducado: cuando entre el
+   segundo comercio, ALMA lo sabe sin que nadie toque el prompt.
+
+   SOLO `status === "activa"`, que es la misma regla que el sitio aplica para
+   mostrar un comercio en publico: sin convenio firmado no existe. */
+async function almaContextoGratitud(env, origen) {
+  try {
+    const r = await env.ASSETS.fetch(new URL("/data/gratitud.json", origen));
+    if (!r.ok) return "";
+    const data = await r.json();
+    const cats = (data && data.categorias) || {};
+    const activos = (Array.isArray(data && data.comercios) ? data.comercios : [])
+      .filter((c) => c && c.status === "activa");
+
+    /* CERO NO ES UN ERROR, y hay que decirlo en voz alta: si no hay comercios
+       activos, la instruccion es admitirlo, no callarlo y dejar que el modelo
+       rellene con la taxonomia del prompt. */
+    if (!activos.length) {
+      return ["", "=== PROGRAMA DE GRATITUD (datos en vivo) ===",
+        "AHORA MISMO NO HAY NINGUN COMERCIO ACTIVO. Si preguntan por descuentos, dilo tal cual:",
+        "el programa existe y todavia no hay comercios publicados. No menciones categorias como si",
+        "tuvieran comercios, y no inventes ninguno."].join("\n");
+    }
+
+    const lineas = activos.map((c) => {
+      const cat = (cats[c.categoria] && (cats[c.categoria].es || cats[c.categoria])) || c.categoria || "";
+      const ben = c.beneficio && (c.beneficio.es || c.beneficio);
+      const partes = ["- " + c.name + (cat ? " (" + cat + ")" : "")];
+      if (c.ciudad) partes.push("ciudad: " + c.ciudad);
+      if (ben) partes.push("beneficio: " + ben);
+      if (c.nivelDesde) partes.push("desde el nivel: " + c.nivelDesde);
+      if (c.redime && (c.redime.es || c.redime)) partes.push("como se redime: " + (c.redime.es || c.redime));
+      return partes.join(" · ");
+    });
+
+    return ["", "=== PROGRAMA DE GRATITUD (datos en vivo de thegiveandgrowproject.org) ===",
+      "Estos son los UNICOS comercios sobre los que puedes afirmar algo, y son " + activos.length + ":",
+      ...lineas, "",
+      "Reglas estrictas:",
+      "- No menciones ningun comercio que no este en esta lista.",
+      "- No enumeres las cinco categorias como si cada una tuviera comercios: di cuantos hay de verdad.",
+      "- Si preguntan por un rubro sin comercio, di que ese todavia no tiene aliado."].join("\n");
+  } catch { return ""; }
+}
+
 function almaMensajes(bruto) {
   if (!Array.isArray(bruto)) return null;
   const msgs = [];
@@ -6839,7 +6895,8 @@ async function apiAlma(request, env, url) {
   const mensajes = almaMensajes(cuerpo.messages);
   if (!mensajes) return json({ error: "conversacion_vacia" }, 400);
 
-  const system = ALMA_SYS + (await almaContextoRed(env, url.origin));
+  const system = ALMA_SYS + (await almaContextoRed(env, url.origin))
+                              + (await almaContextoGratitud(env, url.origin));
 
   /* EL WORKSPACE, y por qué es condicional.
 
