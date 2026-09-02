@@ -211,6 +211,7 @@ var I18N = {
     "bc.cargando":"Cargando…",
     "bc.cierre":"Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. A cada familia se le escribe un concepto con lo que el ingeniero alcanzó a ver en sus fotos; lo que aparece aquí es solo cuánto corre la prisa.",
     "bc.tuya":"¿Tu casa se afectó y no está aquí?",
+    "bc.apadrinar":"¿Quieres ayudar a repararlas?",
     "nav.casas":"Casas revisadas",
     "nav.d.casas":"El registro público del triaje, sin nombres ni direcciones",
     "mmc.nav.casa":"Revisa tu casa",

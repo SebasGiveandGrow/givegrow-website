@@ -2440,7 +2440,19 @@
       <div id="bc-lista" style="margin-top:24px"><p class="mu" data-i18n="bc.cargando">Cargando…</p></div>
 
       <p class="mu" style="max-width:62ch;margin-top:26px;padding-top:18px;border-top:1px solid var(--bd)" data-i18n="bc.cierre">Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. A cada familia se le escribe un concepto con lo que el ingeniero alcanzó a ver en sus fotos; lo que aparece aquí es solo cuánto corre la prisa.</p>
+      <!-- DOS puertas, no una. Esta pagina la lee gente de los dos lados: una
+           familia que no se ve en la lista, y alguien de fuera que acaba de leer
+           que hay casas clasificadas como urgentes. Hasta hoy solo la primera
+           tenia a donde ir.
+      
+           «Repararlas», en plural y sin articulo: apadrinar NO reserva una casa
+           concreta -lo dice esa misma pagina- y un enlace que dijera «ayuda a
+           reparar ESTA» prometeria justo lo que el proyecto prohibe.
+      
+           Relativos y no absolutos: `casas` y `apadrinar` estan las dos en
+           RUTAS_MMC, asi que esta pagina existe en los dos hosts. -->
       <p style="margin-top:14px"><a class="card-link" href="#vivienda"><span data-i18n="bc.tuya">¿Tu casa se afectó y no está aquí?</span> <span aria-hidden="true">&rarr;</span></a></p>
+      <p style="margin-top:10px"><a class="card-link" href="#apadrinar"><span data-i18n="bc.apadrinar">¿Quieres ayudar a repararlas?</span> <span aria-hidden="true">&rarr;</span></a></p>
     </div>
   </section>
 </main>
@@ -2647,7 +2659,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=3df944a8"></script>
+<script src="/app.js?v=d5c82eff"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
