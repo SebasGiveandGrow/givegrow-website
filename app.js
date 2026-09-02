@@ -212,6 +212,7 @@ var I18N = {
     "bc.cierre":"Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. A cada familia se le escribe un concepto con lo que el ingeniero alcanzó a ver en sus fotos; lo que aparece aquí es solo cuánto corre la prisa.",
     "bc.tuya":"¿Tu casa se afectó y no está aquí?",
     "bc.apadrinar":"¿Quieres ayudar a repararlas?",
+    "tbl.region":"Tabla que se desliza en horizontal. Con el teclado, usa las flechas.",
     "nav.casas":"Casas revisadas",
     "nav.d.casas":"El registro público del triaje, sin nombres ni direcciones",
     "mmc.nav.casa":"Revisa tu casa",
@@ -1758,6 +1759,9 @@ function postLang(l){
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
   if (currentRoute==="gratitud") renderGratitudComercios();
   document.querySelectorAll(".faq-a").forEach(function(a){ if(a.parentElement.classList.contains("open")) a.style.maxHeight = a.scrollHeight + "px"; });
+  /* El nombre de la region sale del diccionario, asi que hay que volver a
+     ponerlo cuando cambia el idioma. */
+  cajasDesplazables();
 }
 var I18N_LOADING = null;
 function ensureLang(next){
@@ -2258,6 +2262,49 @@ function mmcMarca(){
    Lo que el servidor manda ya viene filtrado —sin fotos, sin nota libre, sin
    contacto— así que aquí no hay que decidir nada sobre privacidad: solo pintar.
    Aun así todo pasa por escapeHtml: el sector lo escribió una familia. */
+/* CAJAS QUE SE DESPLAZAN Y QUE EL TECLADO NO PODIA ALCANZAR.
+
+   `.med-tw` lleva `overflow-x:auto` y su tabla `min-width:560px`, asi que en un
+   telefono de 375 px la del banco publico se desplaza: 560 de ancho en una caja
+   de 327. El patron es el correcto —la que scrollea es la caja, el body nunca—
+   pero faltaba la otra mitad: el div NO tiene `tabindex` y dentro de la tabla no
+   hay ni un elemento enfocable, asi que el Tab nunca entra ahi. Con teclado no
+   habia forma de moverla, y la ultima columna —PRIORIDAD, la que dice cuanta
+   prisa corre— quedaba inalcanzable sin raton ni dedo. Medido el 1 sep 2026 a
+   375 px: `scrollWidth` 560, `clientWidth` 327, `tabindex` null, cero
+   enfocables dentro. Es WCAG 2.1.1, y el arreglo es el que documenta la propia
+   WAI para regiones desplazables: `tabindex="0"` + `role="region"` + nombre.
+
+   SOLO LA QUE DESBORDA DE VERDAD. Una tabla que cabe no debe ser una parada de
+   tabulacion: una parada que no hace nada tambien estorba a quien tabula. Por
+   eso se re-evalua cuando cambia el ancho —girar el telefono cambia la
+   respuesta— y se quitan los atributos cuando ya cabe. */
+function cajasDesplazables(){
+  document.querySelectorAll(".med-tw").forEach(function(c){
+    /* +1 por el redondeo de subpixeles: sin el margen, una caja que cabe justo
+       se marcaba como desplazable en algunos anchos. */
+    if (c.scrollWidth > c.clientWidth + 1){
+      c.setAttribute("tabindex", "0");
+      c.setAttribute("role", "region");
+      c.setAttribute("aria-label", t("tbl.region"));
+    } else {
+      c.removeAttribute("tabindex");
+      c.removeAttribute("role");
+      c.removeAttribute("aria-label");
+    }
+  });
+}
+
+var CAJAS_T = null;
+window.addEventListener("resize", function(){
+  /* Es el primer listener de resize del archivo, y esta aqui por una razon
+     concreta: si desborda o no depende del ancho, asi que girar el telefono
+     puede convertir una tabla alcanzable en una inalcanzable y al reves. Con
+     freno, porque el resize dispara decenas de veces por gesto. */
+  clearTimeout(CAJAS_T);
+  CAJAS_T = setTimeout(cajasDesplazables, 150);
+});
+
 var BC_CL = ["urgente", "programada", "no_requiere"];
 
 function bcPinta(){
@@ -2334,6 +2381,10 @@ function bcPinta(){
              ? t("bc.cl." + c.clasificacion) : c.clasificacion) + "</strong></td></tr>";
     }
     lis.innerHTML = h + "</tbody></table></div>";
+      /* AQUI y no solo en `go`: la tabla se pinta cuando vuelve la promesa, o
+         sea despues de que la navegacion ya paso. Sin esta llamada la caja del
+         banco -la unica publica que desborda de verdad- se quedaba sin marcar. */
+      cajasDesplazables();
   }).catch(falla);
 }
 
@@ -2745,6 +2796,7 @@ function go(id, fromPop){
   if (id==="inicio") updateLiveStats();
   if (id==="gratitud") renderGratitudComercios();
   if (abrirAlma) almaPanel(true);
+  cajasDesplazables();
   return false;
 }
 
