@@ -25,6 +25,90 @@
 > **DISCREPA queda FUERA hasta nuevo aviso** (decisión de Sebas, 1 sep).
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
+## 💳 PAYPAL: EL ANÁLISIS, ANTES DE ESCRIBIR CÓDIGO (2 sep)
+
+Sebas creó la cuenta de PayPal de la fundación. Lo que hay que saber antes de
+integrar, todo comprobado contra el repo:
+
+**EL SITIO YA LO PROMETE.** Existe la pestaña `paytab-paypal` en el formulario de
+pago (`PAY_METHODS = ["banco","paypal"]`) y su panel dice: «Para donaciones
+internacionales en USD. **Escríbenos y te enviamos el enlace** de PayPal»
+(`pay.paypal.note`). O sea que el ROL ya está decidido —donantes del exterior,
+porque Wompi cubre Colombia con PSE y Nequi— y el hueco es ese paso manual.
+
+**⚠️ LA CSP DESCARTA TRES DE LAS CUATRO INTEGRACIONES HABITUALES.** Esto no es
+opinión, es leer `_headers`:
+
+| lo habitual en PayPal | qué directiva lo bloquea |
+|---|---|
+| SDK de JS / Smart Buttons | `script-src 'self'` |
+| **botón HTML clásico** (`<form action="paypal.com">`) | **`form-action 'self'`** |
+| campos alojados en iframe | `default-src 'self'` (no hay `frame-src`) |
+| `fetch` a la API desde el navegador | `connect-src 'self'` |
+
+El `form-action` es el que nadie ve venir. Y NO se relaja la CSP: es la misma
+razón por la que se eligió Wompi **por redirección y no por widget** — no darle
+ejecución a un tercero en la página donde el donante escribe sus datos.
+
+Quedan DOS formas viables:
+
+- **A · Enlace de pago** («Enlaces y botones de pago» del dashboard). Un `<a>`
+  hacia una página alojada por PayPal. Cero código, cero CSP. Es la misma forma
+  del enlace de Wompi que el proyecto ya usa.
+- **B · Orders v2 desde el Worker + redirección.** El Worker crea la orden, manda
+  a PayPal, PayPal devuelve a una URL nuestra y el Worker captura. También limpio
+  de CSP, y el único camino que da **guía y trazabilidad**.
+
+**LA CICATRIZ QUE HEREDA LA OPCIÓN A:** un enlace de pago significa que el sitio
+NO se entera del aporte. Ya pasó con el QR de Wompi y por eso existe la bandeja
+«Pagos sin aporte» — pero ojo, `adminPagosSueltos` lee `eventos_wompi`, así que
+**no cazaría un pago de PayPal**. Con A, o el donante lo reporta en `#reportar`,
+o esos aportes quedan invisibles.
+
+**Para la opción B hace falta una MIGRACIÓN:** `aportes` tiene
+`wompi_transaction_id` y `wompi_estado`, columnas propias de un proveedor, no
+genéricas. La buena noticia: la columna `moneda` ya existe con `COP` por defecto,
+así que USD es representable sin tocar el esquema.
+
+**DECISIONES QUE NO SON DE CÓDIGO:**
+- **De la contadora / Revisora Fiscal:** el certificado es Art. 257 ET, en pesos y
+  bajo juramento. ¿Cómo se registra y certifica un aporte en USD? Y un donante
+  del exterior probablemente NO quiere un certificado colombiano, mientras el
+  sitio le pide documento y ciudad.
+- **De Sebas, en PayPal:** asociar la cuenta bancaria (el dashboard lo pide; sin
+  eso el saldo entra y no sale) y averiguar si la fundación califica para tarifas
+  de entidad sin ánimo de lucro, que dependen del país.
+
+**Y cuando exista el enlace, hay que actualizar también `pay.how.s2.p`**, que hoy
+enumera las formas de pagar «hoy» —tarjeta, Botón Bancolombia, transferencia— y
+NO menciona PayPal.
+
+## ⚖️ `privacidad@` LLEVA MESES SIN VERIFICAR, Y ES EL ÚNICO CANAL LEGAL (2 sep)
+
+Este documento ya lo pide en TRES entradas distintas («dos verificaciones que
+arrastramos»), y sigue abierto. Vale subirlo de categoría, porque el riesgo es
+mayor de lo que sugiere una línea de pendientes:
+
+La Política de Privacidad fija `privacidad@thegiveandgrowproject.org` como el
+**único** canal para ejercer derechos —acceso, rectificación, supresión,
+revocación, portabilidad— bajo Ley 1581 y GDPR, con plazos escritos: acuse en 2
+días hábiles, consultas en 10, reclamos en 15. **Si ese buzón no existe, un
+titular ejerciendo un derecho legal recibe un rebote**, y los plazos corren igual.
+
+**Corrección de un dato de este propio documento:** las notas dicen «aparece 4
+veces en el sitio». Son **OCHO** — cuatro en español y cuatro en inglés, porque
+`renderPrivacy` emite las dos versiones. Contado el 2 sep.
+
+Y no hay nada que arreglar en código: no existe un camino de código para una
+solicitud que llega por correo de una persona. Es verificación de buzón, y son 30
+segundos en la consola de Workspace —donde Sebas ya estuvo hoy creando
+`MiraMiCasa@`—. Si no existe, un ALIAS hacia quien lo atienda basta; no hace
+falta un buzón nuevo.
+
+Nota que sí ayuda: hoy **sí se puede cumplir** una solicitud de supresión, porque
+el PR #250 le dio al panel el botón «Suprimir». Antes la política prometía un
+derecho que el sistema no podía ejecutar.
+
 ## ✅ BARRIDO DE PROSA CADUCADA, Y ALMA (2 sep · PR #259 a #263)
 
 **LA VETA.** Tres de los hallazgos del día salieron de leer la PROSA del sitio y
