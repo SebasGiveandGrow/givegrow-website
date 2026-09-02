@@ -1,6 +1,6 @@
 # SESSION HANDOFF — Give&Grow International
 
-> Última actualización: sesión "La mudanza de Mira Mi Casa" (1 sep 2026)
+> Última actualización: sesión "El arranque de Mira Mi Casa" (1 sep 2026)
 > **⏭️ ARRANCA POR AQUÍ: no falta producto, falta la primera familia.**
 > Contado contra la base el 1 sep: **0 casos, 0 fotos, 0 conceptos firmados.**
 > 1 inspección en terreno, 2 ingenieros verificados desde el 22 de agosto, 15
@@ -23,6 +23,82 @@
 >
 > **DISCREPA queda FUERA hasta nuevo aviso** (decisión de Sebas, 1 sep).
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
+
+## ✅ MIRA MI CASA ARRANCA POR SUS TRES PUERTAS (1 sep · PR #243 y #244)
+
+**Qué entró.**
+
+- **La sección de arranque**, al cierre de la página de la brigada: los tres
+  espectros del proyecto (la familia publica su casa · el ingeniero la
+  diagnostica · alguien apadrina la reparación). Sin numerar a propósito —son
+  tres puertas paralelas, no una secuencia— y con reglas finas en vez de
+  tarjetas. **Cero CSS nuevo:** reusa `.brig-nos`/`.brig-no`, que ya vivían en
+  esa misma página.
+  Los enlaces son **absolutos** al subdominio y eso NO es un descuido:
+  `brigada` no está en `RUTAS_MMC`, así que la página solo existe en el ápex y
+  un enlace relativo no llevaría a ninguna parte.
+
+- **Tres fechas caducadas jubiladas.** La brigada terminó el 28 de agosto y la
+  página seguía hablando en futuro. Lo peor estaba en la portada: el aviso de
+  arriba —lo primero que ve cualquiera— anunciaba «Brigada del 24 al 28 de
+  agosto… Qué necesitamos», promocionando un evento cerrado. Y la entradilla
+  decía «Hasta el 24 se puede ayudar» tres párrafos encima de un recuadro que
+  dice «Las cinco jornadas terminaron»: la misma página se contradecía.
+  Corregidos `brig.aviso.txt`, `brig.lead` (la ayuda sigue haciendo falta; la
+  FECHA era lo falso) y `brig.plan.ey` («Qué vamos a hacer» → «Cómo se armó»).
+
+- **El sitemap** (PR #244). Tenía dos URLs y era del 2 de julio. **Las cuatro
+  puertas de Mira Mi Casa no estaban en NINGÚN sitemap.** Ahora está la raíz del
+  subdominio, por cross-submission —válida porque el `robots.txt` que se sirve
+  en ese subdominio nombra este mismo sitemap— y `/f/conciencia`, que responde
+  200 con sus propios OG igual que `/f/ndf` y llevaba desde julio sin declarar.
+  Los `lastmod` salen de `git log`, no a mano.
+
+**EL MECANISMO DE ARRANQUE ESTÁ PROBADO DE PUNTA A PUNTA (en local).**
+Esto es nuevo y vale releerlo antes del ensayo real: se creó la primera casa
+por la API pública (`POST /api/caso`) contra el D1 local y salieron los **tres**
+correos que tienen que salir —`caso-recibido` a la fundación, **`fila-despierta`
+al ingeniero verificado** y `caso-creado` a la familia—. Verificado además:
+
+- el aviso **excluye** al ingeniero sin correo (el fixture «Ing. sin correo»
+  existe justo para eso: NO borrarlo);
+- con la **segunda** casa **no** se repite el aviso — hay exactamente un
+  `fila-despierta`, el de la primera. La condición `COUNT(...) !== 1` funciona;
+- el enlace del correo apunta a `ORIGIN_MMC + "/triaje"`, el subdominio.
+
+**El banco público se vio con casas dentro por primera vez** (hasta hoy solo se
+había visto su estado vacío). Renderiza bien en día y noche, y la API respeta la
+privacidad con datos reales: salen número, sector, clasificación, material y
+pisos — ni nombres, ni teléfonos, ni direcciones, ni fotos.
+
+**⚠️ TRAMPA DE WRANGLER que costó cuatro intentos — anotada para no repetirla.**
+**Encadenar varias invocaciones de `npx wrangler d1 execute` en un mismo comando
+de shell PIERDE escrituras silenciosamente.** Cada invocación abre el SQLite por
+su cuenta y se pisan entre ellas: wrangler informa «1 command executed
+successfully», exit 0, y la fila no cambió. Regla: **una invocación de wrangler
+por llamada, y leer de vuelta en una llamada aparte.** Y corolario que también
+mordió cuatro veces esta sesión: **no filtrar la salida con grep mientras se
+depura** — los `>/dev/null` y los `grep -E` escondieron el fallo cada vez.
+
+**VERIFICADO CORRECTO (no re-auditar).** El vocabulario de materiales está
+cerrado en los DOS caminos de escritura —`worker.js:2514` (API pública) y
+`worker.js:6986` (edición del panel), ambos con `MATERIALES.includes(...)`— así
+que ninguna clave i18n cruda puede llegar al banco público. Apareció un
+`cv.mat.mamposteria` en pantalla durante la prueba y **era un fixture mío con un
+material inválido**, no un defecto del sitio.
+
+**Las cuatro puertas ya estaban en la nav del subdominio** (`#vivienda`,
+`#casas`, `#ingenieros`, `#apadrinar`, en escritorio y móvil, vía `.mmc-nav`):
+se comprobó por si la de apadrinar solo se alcanzaba con enlace directo, y no.
+
+**Datos de prueba que quedaron EN LOCAL** (no en producción): casos
+`CV-2026-000005` y `CV-2026-000006`, y un segundo ingeniero
+`ing.prueba@example.com` verificado. Borrarlos si molestan; sirven para ver el
+banco con contenido.
+
+**Lo que NO se tocó por falta de datos de campo:** el bloque de los cinco
+sectores sigue diciendo «zona por confirmar». No se puede verificar desde aquí
+qué se cubrió.
 
 ## ✅ MIRA MI CASA QUEDÓ ENTERO EN SU PROPIO NOMBRE (1 sep 2026 · PR #220 a #233)
 
