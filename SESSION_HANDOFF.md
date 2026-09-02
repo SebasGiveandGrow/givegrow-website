@@ -25,6 +25,78 @@
 > **DISCREPA queda FUERA hasta nuevo aviso** (decisión de Sebas, 1 sep).
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
+## 💳 PAYPAL: QUÉ INTEGRACIONES CABEN, Y CUÁNTO CUESTA DE VERDAD (2 sep)
+
+Investigado contra la documentación de PayPal, no de memoria. Va ANTES del
+análisis de abajo, que sigue vigente en lo de la CSP.
+
+### 🔢 EL NÚMERO QUE DECIDE: la comisión en Colombia es del ~9 al 12 %
+
+Página de comisiones para comercios de PayPal **Colombia**, actualizada el 28 may
+2026: recibir de un comprador del exterior cuesta **5,40 % + USD 0,30**, y
+convertir a pesos suma **3,50 %** más.
+
+| donación | comisión | conversión | **neto** | se pierde |
+|---|---|---|---|---|
+| USD 10 | 0,84 | 0,32 | **8,84** | 11,6 % |
+| USD 20 | 1,38 | 0,65 | **17,97** | 10,2 % |
+| USD 50 | 3,00 | 1,65 | **45,35** | 9,3 % |
+| USD 100 | 5,70 | 3,30 | **91,00** | 9,0 % |
+| USD 500 | 27,30 | 16,54 | **456,16** | 8,8 % |
+
+**La tarifa reducida de ESAL (1,99 % + 0,49) es un programa de ESTADOS UNIDOS**
+—«Confirmed Charity»— y no aparece en la página de Colombia. No asumir que
+aplica: hay que preguntárselo a PayPal para esta cuenta concreta.
+
+**PERO la comparación correcta no es contra Wompi, es contra NADA.** Un donante
+en España o EE. UU. no puede usar PSE y no va a hacer un giro internacional por
+USD 20. Un 10 % de algo es infinitamente mejor que el 100 % de nada. Y frente al
+giro, que cobra un FIJO de USD 15–40, PayPal gana claramente por debajo de USD
+~400 y pierde por encima:
+
+| donación | PayPal neto | giro (fijo 25) | conviene |
+|---|---|---|---|
+| USD 20 | 17,97 | −5,00 | PayPal |
+| USD 100 | 91,00 | 75,00 | PayPal |
+| USD 500 | 456,16 | 475,00 | giro |
+| USD 1000 | 912,60 | 975,00 | giro |
+
+**Conclusión operativa:** PayPal es la puerta para el aporte internacional
+PEQUEÑO. Para un aporte grande del exterior conviene ofrecer datos bancarios.
+Decirlo de frente es más honesto que cobrarle 50 dólares de comisión a quien dona
+500 sin avisarle — y es lo que la regla de la casa manda.
+
+### ✅ LO QUE SÍ SE PUEDE INTEGRAR (y cabe en la CSP)
+
+- **Enlace de pago alojado** («Enlaces y botones de pago» del dashboard). Un `<a>`
+  y nada más. Cero código. Sin guía ni trazabilidad.
+- **Orders v2 desde el Worker + redirección.** El Worker crea la orden, redirige,
+  PayPal devuelve, el Worker captura. Da guía y recibo como Wompi.
+- **⭐ SUBSCRIPTIONS API, y esto es lo interesante.** Verificado en la doc: se
+  puede crear la suscripción por REST desde el servidor y redirigir al enlace de
+  aprobación (`.../webapps/billing/subscriptions?ba_token=…`), **sin SDK de JS**.
+  O sea que es compatible con la CSP.
+
+  Importa porque **el sitio lleva meses prometiendo el débito automático**:
+  `pay.now.rec` dice «cuando habilitemos el débito automático te escribimos para
+  activarlo», el panel tiene un chip «esperan débito automático», y NO existe
+  —comprobado: sin handler `scheduled`, sin crons en `wrangler.toml`—. PayPal
+  Subscriptions lo cerraría, al menos para donantes del exterior.
+- **Webhooks** con verificación de firma, imprescindible: la cicatriz del 12 ago
+  («se cobró un pago real y la base no lo supo») fue exactamente esto.
+
+### ❌ LO QUE NO CABE, y por qué (lo detalla la entrada de abajo)
+
+SDK de JS / Smart Buttons, botón HTML clásico (`form-action 'self'`), campos en
+iframe y `fetch` desde el navegador. Tres de las cuatro integraciones habituales.
+
+### ✅ CERRADO: `privacidad@` EXISTE
+
+Verificado por Sebas el 2 sep entrando al buzón: tiene bandeja, con los correos
+de bienvenida de Gmail del **11 de agosto** —o sea que llevaba activo todo el
+tiempo—. La verificación que este documento arrastraba en TRES entradas queda
+cerrada: la Política de Privacidad tiene un canal real.
+
 ## 💳 PAYPAL: EL ANÁLISIS, ANTES DE ESCRIBIR CÓDIGO (2 sep)
 
 Sebas creó la cuenta de PayPal de la fundación. Lo que hay que saber antes de
