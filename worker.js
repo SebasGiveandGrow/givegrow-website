@@ -728,6 +728,47 @@ async function anotarCorreo(env, fila) {
    sigue. Sin tope, lo peor es que la visita se quede en el teléfono.
 
    Los demás envíos NO pasan tope y se comportan exactamente igual que antes. */
+/* UN BUZON SIN CONFIGURAR TIENE QUE VERSE.
+
+   Once avisos internos empiezan con `if (!para) return {ok:true, sinDestino:true}`,
+   donde `para` sale de la configuracion — `CORREO_AVISOS` o `CORREO_MMC`. Ese
+   `ok:true` es correcto: que falte el buzon del equipo no puede tumbar el caso de
+   una familia ni la postulacion de un ingeniero. Lo que NO era correcto es que no
+   quedara rastro: se salia ANTES de `enviarCorreo`, asi que no se escribia fila en
+   `correos` y el aviso desaparecia sin dejar nada que mirar.
+
+   O sea que si alguien vacia una de esas dos variables, los avisos se apagan y la
+   unica senal es que el equipo deja de recibir correos — que es exactamente lo que
+   nadie nota hasta que se pierde algo. Es la misma clase de fallo que el banco
+   publico diciendo «no hay casos» cuando en realidad no pudo consultar.
+
+   Ahora se escribe la fila, con `resultado = 'sin_destino'`. Asi la ausencia se ve
+   en la misma tabla donde se mira todo lo demas, y se puede contar:
+
+     SELECT etiqueta, COUNT(*) FROM correos WHERE resultado = 'sin_destino'
+     GROUP BY etiqueta;
+
+   NO cubre los dos sitios donde falta el correo DE LA PERSONA -una familia que no
+   dio correo, un ingeniero sin correo-: eso es normal y frecuente, y registrarlo
+   como problema llenaria la tabla de ruido. Solo los once que dependen de la
+   configuracion. */
+async function avisoSinBuzon(env, etiqueta) {
+  try {
+    await env.DB.prepare(
+      "INSERT INTO correos (etiqueta, para, asunto, resultado, error) VALUES (?, ?, ?, 'sin_destino', ?)"
+    ).bind(
+      etiqueta,
+      "(sin buzon configurado)",
+      "No se envio: falta el buzon de avisos",
+      "CORREO_AVISOS o CORREO_MMC vacio en la configuracion del Worker"
+    ).run();
+  } catch (e) {
+    /* Ni el registro del fallo puede tumbar la operacion. */
+    console.error("registro sin_destino", etiqueta, e && e.message);
+  }
+  return { ok: true, sinDestino: true };
+}
+
 async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos, guia, msTope }) {
   const llave = env.RESEND_API_KEY;
   const desde = env.CORREO_DESDE || CORREO_DESDE_DEF;
@@ -873,7 +914,7 @@ async function correoAporteAprobado(env, aporte, email, nombre) {
    principal rebota por su propio DMARC — ver ops/aliados-formulario.gs. */
 async function correoAvisoInterno(env, aporte, email, nombre) {
   const para = env.CORREO_AVISOS;
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "aviso-interno");
   const titulo = "Nuevo aporte confirmado: " + aporte.guia;
   const filas = [
     ["Guía", aporte.guia],
@@ -1272,7 +1313,7 @@ async function correoInscripcionVoluntario(env, v) {
    quedaron disparados. */
 async function correoAvisoInscripcion(env, v) {
   const para = env.CORREO_AVISOS;
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "aviso-inscripcion");
   const nivel = { hub: "Con el HUB (terreno)", estructura: "Con Give&Grow (estructura)", mixto: "Mixto" }[v.nivel];
   const filas = [
     ["Nombre", v.nombre],
@@ -1445,7 +1486,7 @@ function correoMMC(env) {
 
 async function correoAvisoIngeniero(env, i) {
   const para = correoMMC(env);
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "aviso-ingeniero");
   const filas = [
     ["Nombre", i.nombre],
     ["Correo", i.email],
@@ -2888,7 +2929,7 @@ async function avisarIngenierosFilaDespierta(env, x) {
 
 async function correoAvisoCaso(env, x) {
   const para = correoMMC(env);
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "caso-recibido");
   const titulo = "Caso de vivienda: " + x.numero;
   const filas = [
     ["Caso", x.numero], ["Sector", x.sector],
@@ -4157,7 +4198,7 @@ async function triageInspeccionRecibir(request, env, email) {
    Si alguno está marcado, el asunto lo dice; si no, es un aviso normal. */
 async function correoAvisoInspeccion(env, x) {
   const para = correoMMC(env);
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "inspeccion-recibida");
 
   const grave = x.inminente || x.evacuar || x.requiere_esp;
   const asunto = (x.inminente ? "PELIGRO INMINENTE · " : x.evacuar ? "EVACUAR · " : "")
@@ -6009,7 +6050,7 @@ async function evaluacionVigente(env, numero, clasificacion) {
    correo tiene que lograr es que alguien la abra. */
 async function correoDiscrepancia(env, x) {
   const para = correoMMC(env);
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "discrepancia-triaje");
   const filas = [
     ["Caso", x.numero],
     ["Sector", x.sector || "—"],
@@ -7190,7 +7231,7 @@ async function correoTransferenciaReportada(env, x) {
 
 async function correoAvisoTransferencia(env, x) {
   const para = env.CORREO_AVISOS;
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "aviso-transferencia");
   const titulo = "Transferencia reportada: " + x.guia;
   const filas = [
     ["Guía", x.guia], ["Monto", fmtPesos(x.monto * 100) + " COP"],
@@ -7546,7 +7587,7 @@ async function correoApadrinamiento(env, a) {
 
 async function correoAvisoApadrinamiento(env, a) {
   const para = correoMMC(env);
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "apadrinamiento-aviso");
   return await enviarCorreo(env, {
     para,
     asunto: "Apadrinamiento: " + (ETIQUETA_APORTE.es[a.aporte] || a.aporte)
@@ -7655,7 +7696,7 @@ async function correoOfrecimiento(env, o) {
 
 async function correoAvisoOfrecimiento(env, o) {
   const para = env.CORREO_AVISOS;
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "aviso-ofrecimiento");
   const titulo = "Ofrecimiento en especie: " + (ETIQUETA_CAT.es[o.categoria] || o.categoria);
   const filas = [
     ["Categoría", ETIQUETA_CAT.es[o.categoria] || o.categoria],
@@ -7838,7 +7879,7 @@ async function correoAliado(env, a) {
    aprueba. Incluye los tres campos que la hoja de cálculo perdía. */
 async function correoAvisoAliado(env, a) {
   const para = env.CORREO_AVISOS;
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "aviso-aliado");
   const filas = [
     ["Empresa", a.razon],
     ["NIT/Doc", a.nit || "(no dejó)"],
@@ -8024,7 +8065,7 @@ const ETIQUETA_PERS = {
 
 async function correoAvisoFundacion(env, f) {
   const para = env.CORREO_AVISOS;
-  if (!para) return { ok: true, sinDestino: true };
+  if (!para) return avisoSinBuzon(env, "aviso-fundacion");
   const pob = (f.poblacion || []).map(p => ETIQUETA_POB[p] || p).join(", ") +
               (f.poblacion_otra ? " · " + f.poblacion_otra : "");
   const filas = [
