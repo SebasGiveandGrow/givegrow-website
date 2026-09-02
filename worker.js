@@ -8676,6 +8676,61 @@ async function adminMoverInscripcion(request, env, id, quien) {
   return json({ ok: true, id, estado: nuevo });
 }
 
+/* DELETE /api/admin/inscripcion/<id> — el derecho de supresion.
+
+   Hasta hoy una inscripcion NO se podia borrar: el panel solo movia su estado
+   entre nueva / en_revision / aceptada / archivada, y `DELETE FROM` solo existia
+   para caso_medios y entrega_casos. O sea que si alguien escribia pidiendo
+   que sacaramos sus datos —un derecho que la Ley 1581 le da, y que el propio
+   sitio le promete en la pagina de privacidad— NO habia forma de cumplirlo.
+   Archivar no es suprimir: la fila sigue ahi con su nombre, su correo y su
+   telefono.
+
+   QUE SE BORRA, y por que tambien lo otro. Se va la fila de `inscripciones` y
+   se van sus `consentimientos`. Podria parecer que el consentimiento hay que
+   conservarlo —es la prueba de que hubo autorizacion— pero conservarlo despues
+   de suprimir a la persona no prueba nada: su sujeto es «inscripcion 21» y ya
+   no hay ninguna inscripcion 21. Queda un puntero a nada.
+
+   LO QUE SI QUEDA es el acto. Se escribe una linea de auditoria con quien borro,
+   cuando, que TIPO de inscripcion era y por que — y deliberadamente SIN el
+   nombre ni el correo ni el telefono: una auditoria que conservara los datos
+   personales convertiria la supresion en un cambio de tabla.
+
+   PIDE MOTIVO, y no por burocracia. Es la unica ruta del panel que destruye
+   algo sin vuelta atras; obligar a escribir por que es lo que hace util la linea
+   de auditoria el dia que alguien pregunte.
+
+   VERBO DELETE y no POST: es lo que hace, y aqui importa que se lea distinto de
+   sus vecinas /estado y /matricula, que solo mueven. */
+async function adminBorrarInscripcion(request, env, id, quien) {
+  if (request.method !== "DELETE") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* el cuerpo es opcional en DELETE */ }
+  const motivo = limpiar(c && c.motivo, 300);
+  if (!motivo) {
+    return json({ error: "motivo_requerido",
+                  ayuda: "Escribe por que se borra. Es lo unico que va a quedar de esta fila." }, 400);
+  }
+
+  /* Se lee ANTES de borrar, y solo el tipo: es lo que la auditoria necesita y
+     lo unico que puede conservarse sin deshacer la supresion. */
+  const f = await env.DB.prepare("SELECT id, tipo FROM inscripciones WHERE id = ?").bind(id).first();
+  if (!f) return json({ error: "no_encontrada" }, 404);
+
+  const sujeto = "inscripcion " + id;
+  await env.DB.prepare("DELETE FROM consentimientos WHERE sujeto = ?").bind(sujeto).run();
+  await env.DB.prepare("DELETE FROM inscripciones WHERE id = ?").bind(id).run();
+
+  /* La auditoria va DESPUES del borrado, para que no quede una linea diciendo
+     que se borro algo que luego fallo al borrarse. */
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "inscripcion " + id + " (" + (f.tipo || "?") + ") SUPRIMIDA · " + motivo).run();
+
+  return json({ ok: true, id, suprimida: true });
+}
+
 /* ========================================================================
    PAGOS SIN APORTE
    ========================================================================
@@ -10150,7 +10205,10 @@ function cargarInscripciones(){
         "<td>" + esc((i.creada_en||"").slice(0,10)) + "</td>" +
         "<td>" + esc(i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
         "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") +
-          (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") + "</td>" +
+          (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") +
+          /* La supresion va SIEMPRE, en cualquier estado: quien pide que le
+             borren sus datos no tiene por que haber llegado a «aceptada». */
+          '<br><small><button class="copy" data-insborrar="' + i.id + '">Suprimir</button></small>' + "</td>" +
       "</tr>";
     }).join("");
   });
@@ -10856,6 +10914,33 @@ document.addEventListener("click", function(e){
         alert(d && (d.ayuda || d.error) ? (d.ayuda || d.error) : "No se pudo enviar.");
       })
       .catch(function(){ av.disabled = false; av.textContent = "No se pudo"; });
+    return;
+  }
+
+  /* Va DELANTE del manejador de estado y sale por su cuenta: son dos botones
+     en la misma celda y el de suprimir no debe caer nunca en la rama que solo
+     mueve el estado.
+
+     Pide el motivo con prompt, como ya hacen anular un certificado y conciliar
+     un pago en este mismo panel. Y avisa de las tres cosas que importan: que no
+     se puede deshacer, que tambien se van los consentimientos, y que la linea de
+     auditoria NO conserva el nombre ni el correo. */
+  var ib = e.target.closest("[data-insborrar]");
+  if (ib) {
+    var idIns = ib.getAttribute("data-insborrar");
+    var mot = window.prompt("SUPRIMIR la inscripcion " + idIns + ".\\n\\n"
+      + "Se borra la fila y sus consentimientos. NO se puede deshacer.\\n"
+      + "Queda una linea de auditoria con quien, cuando y este motivo, sin el nombre ni el correo.\\n\\n"
+      + "Motivo:");
+    if (!mot) return;
+    ib.disabled = true; ib.textContent = "...";
+    fetch("/api/admin/inscripcion/" + encodeURIComponent(idIns), {
+      method: "DELETE", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ motivo: mot })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.error) { alert("No se pudo suprimir: " + (d.ayuda || d.error)); }
+      cargarInscripciones();
+    }).catch(function(){ cargarInscripciones(); });
     return;
   }
 
@@ -11895,6 +11980,10 @@ export default {
         if (mr) return await adminRevocarMiembro(request, env, mr[1].toUpperCase(), sesion.email);
         const mi = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/estado$/);
         if (mi) return await adminMoverInscripcion(request, env, Number(mi[1]), sesion.email);
+        /* Sin sufijo y con DELETE: la supresion actua sobre la inscripcion
+           entera, no sobre una propiedad suya. */
+        const mb = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)$/);
+        if (mb && request.method === "DELETE") return await adminBorrarInscripcion(request, env, Number(mb[1]), sesion.email);
         const mm = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/matricula$/);
         if (mm) return await adminVerificarMatricula(request, env, Number(mm[1]), sesion.email);
         const ma = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/avisar$/);
