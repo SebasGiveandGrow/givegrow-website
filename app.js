@@ -4605,13 +4605,16 @@ function allySubmit(ev){
   }
   // Al menos una forma de apoyar
   var anyMod = chk("mod-donacion")||chk("mod-rse")||chk("mod-gratitud")||chk("mod-servicios")||chk("mod-voluntariado")||chk("mod-difusion");
-  if (!anyMod) return allyMsg(note, t("ally.err.mod"), false);
+  if (!anyMod) return allyMal(note, "mod-donacion", "ally.err.mod");
   // Condicionales: la modalidad marcada exige su detalle
-  if (chk("mod-gratitud") && !val("ally-ben")) return allyMsg(note, t("ally.err.ben"), false);
-  if (chk("mod-servicios") && !val("ally-servdet")) return allyMsg(note, t("ally.err.serv"), false);
+  if (chk("mod-gratitud") && !val("ally-ben")) return allyMal(note, "ally-ben", "ally.err.ben");
+  if (chk("mod-servicios") && !val("ally-servdet")) return allyMal(note, "ally-servdet", "ally.err.serv");
   // Autorizaciones (Ley 1581 + licitud + uso de marca)
   if (!chk("aut-marca") || !chk("aut-datos") || !chk("aut-licitud")){
-    return allyMsg(note, t("ally.err.aut"), false);
+    /* A la PRIMERA sin marcar. Son tres casillas distintas -marca, datos y
+       licitud- y llevar siempre a la misma haria buscar cual falta. */
+    var faltaAut = ["aut-marca", "aut-datos", "aut-licitud"].filter(function(id){ return !chk(id); })[0];
+    return allyMal(note, faltaAut, "ally.err.aut");
   }
   var payload = {
     razon:val("ally-razon"), nit:val("ally-nit"), representante:val("ally-rep"), cedula:val("ally-cedula"),
@@ -4662,17 +4665,17 @@ function fundSubmit(ev){
   var pob = [].slice.call(document.querySelectorAll('input[name="ff-pob"]:checked'))
     .map(function(e){ return e.value; });
 
-  if (!val("ff-nombre")) return allyMsg(note, t("ff.err.nombre"), false);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("ff-email"))) return allyMsg(note, t("ff.err.email"), false);
-  if (!val("ff-lider")) return allyMsg(note, t("ff.err.lider"), false);
-  if (!pers) return allyMsg(note, t("ff.err.pers"), false);
-  if (!val("ff-zona")) return allyMsg(note, t("ff.err.zona"), false);
-  if (!val("ff-historia")) return allyMsg(note, t("ff.err.historia"), false);
-  if (!val("ff-mision")) return allyMsg(note, t("ff.err.mision"), false);
-  if (!pob.length) return allyMsg(note, t("ff.err.pob"), false);
-  if (!val("ff-atiende")) return allyMsg(note, t("ff.err.atiende"), false);
-  if (!chk("ff-datos")) return allyMsg(note, t("ff.err.datos"), false);
-  if (!chk("ff-veraz")) return allyMsg(note, t("ff.err.veraz"), false);
+  if (!val("ff-nombre")) return allyMal(note, "ff-nombre", "ff.err.nombre");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("ff-email"))) return allyMal(note, "ff-email", "ff.err.email");
+  if (!val("ff-lider")) return allyMal(note, "ff-lider", "ff.err.lider");
+  if (!pers) return allyMal(note, document.querySelector('input[name="ff-pers"]'), "ff.err.pers");
+  if (!val("ff-zona")) return allyMal(note, "ff-zona", "ff.err.zona");
+  if (!val("ff-historia")) return allyMal(note, "ff-historia", "ff.err.historia");
+  if (!val("ff-mision")) return allyMal(note, "ff-mision", "ff.err.mision");
+  if (!pob.length) return allyMal(note, document.querySelector('input[name="ff-pob"]'), "ff.err.pob");
+  if (!val("ff-atiende")) return allyMal(note, "ff-atiende", "ff.err.atiende");
+  if (!chk("ff-datos")) return allyMal(note, "ff-datos", "ff.err.datos");
+  if (!chk("ff-veraz")) return allyMal(note, "ff-veraz", "ff.err.veraz");
 
   btn.disabled = true;
   allyMsg(note, t("ff.sending"), true);
@@ -4758,11 +4761,11 @@ function repSubmit(ev){
   if (val("rep-web2")){ document.getElementById("rep").reset(); return allyMsg(note, t("rep.ok.t"), true); }
 
   var monto = Math.round(Number(val("rep-monto")) || 0);
-  if (!(monto >= 5000 && monto <= 20000000)) return allyMsg(note, t("rep.err.monto"), false);
-  if (!val("rep-fecha")) return allyMsg(note, t("rep.err.fecha"), false);
-  if (!val("rep-nombre")) return allyMsg(note, t("rep.err.nombre"), false);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("rep-email"))) return allyMsg(note, t("rep.err.email"), false);
-  if (!chk("rep-datos")) return allyMsg(note, t("rep.err.datos"), false);
+  if (!(monto >= 5000 && monto <= 20000000)) return allyMal(note, "rep-monto", "rep.err.monto");
+  if (!val("rep-fecha")) return allyMal(note, "rep-fecha", "rep.err.fecha");
+  if (!val("rep-nombre")) return allyMal(note, "rep-nombre", "rep.err.nombre");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("rep-email"))) return allyMal(note, "rep-email", "rep.err.email");
+  if (!chk("rep-datos")) return allyMal(note, "rep-datos", "rep.err.datos");
 
   var brigada = val("rep-dest") === "brigada";
   btn.disabled = true;
@@ -4817,12 +4820,12 @@ function ofSubmit(ev){
 
   if (val("of-web2")){ document.getElementById("of").reset(); return allyMsg(note, t("of.ok"), true); }
 
-  if (!val("of-cat")) return allyMsg(note, t("of.err.cat"), false);
-  if (!val("of-detalle")) return allyMsg(note, t("of.err.detalle"), false);
-  if (!val("of-nombre")) return allyMsg(note, t("of.err.nombre"), false);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("of-email"))) return allyMsg(note, t("of.err.email"), false);
+  if (!val("of-cat")) return allyMal(note, "of-cat", "of.err.cat");
+  if (!val("of-detalle")) return allyMal(note, "of-detalle", "of.err.detalle");
+  if (!val("of-nombre")) return allyMal(note, "of-nombre", "of.err.nombre");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("of-email"))) return allyMal(note, "of-email", "of.err.email");
   var ok = document.getElementById("of-datos");
-  if (!ok || !ok.checked) return allyMsg(note, t("of.err.datos"), false);
+  if (!ok || !ok.checked) return allyMal(note, ok || "of-datos", "of.err.datos");
 
   var quienEl = document.querySelector('input[name="of-quien"]:checked');
   btn.disabled = true;
@@ -4885,11 +4888,11 @@ function volSubmit(ev){
   if (val("vf-web2")){ document.getElementById("vf").reset(); volNivel(); return allyMsg(note, t("vf.ok"), true); }
 
   var nivelEl = document.querySelector('input[name="vf-nivel"]:checked');
-  if (!val("vf-nombre")) return allyMsg(note, t("vf.err.nombre"), false);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("vf-email"))) return allyMsg(note, t("vf.err.email"), false);
-  if (!nivelEl) return allyMsg(note, t("vf.err.nivel"), false);
-  if (!val("vf-oficio")) return allyMsg(note, t("vf.err.oficio"), false);
-  if (!chk("vf-datos")) return allyMsg(note, t("vf.err.datos"), false);
+  if (!val("vf-nombre")) return allyMal(note, "vf-nombre", "vf.err.nombre");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("vf-email"))) return allyMal(note, "vf-email", "vf.err.email");
+  if (!nivelEl) return allyMal(note, document.querySelector('input[name="vf-nivel"]'), "vf.err.nivel");
+  if (!val("vf-oficio")) return allyMal(note, "vf-oficio", "vf.err.oficio");
+  if (!chk("vf-datos")) return allyMal(note, "vf-datos", "vf.err.datos");
 
   btn.disabled = true;
   allyMsg(note, t("vf.sending"), true);
@@ -4930,6 +4933,49 @@ function volSubmit(ev){
 function allyMsg(el, msg, ok){
   el.style.display = ""; el.textContent = msg;
   el.style.color = ok ? "var(--g)" : "var(--err,#c0392b)";
+  /* Al dejar de fallar se BORRAN las marcas. Sin esto un campo ya corregido se
+     quedaba con `aria-invalid="true"` puesto, y un lector de pantalla seguiria
+     anunciandolo como invalido para siempre — peor que no marcar nada. Vale
+     tanto para el envio como para el exito porque los dos pasan `ok` en true. */
+  if (ok) allyLimpia(el);
+  return false;
+}
+
+/* De donde cuelga este mensaje. Los siete `*-note` viven DENTRO de su <form>,
+   asi que el formulario se deduce y no hay que pasarle el id a mano en cada
+   manejador. */
+function allyForm(el){
+  return el && el.closest ? el.closest("form") : null;
+}
+
+function allyLimpia(el){
+  var f = allyForm(el);
+  if (!f) return;
+  f.querySelectorAll('[aria-invalid="true"]').forEach(function(e){
+    e.removeAttribute("aria-invalid");
+  });
+}
+
+/* LLEVA AL CAMPO, no solo lo dice.
+   Los siete formularios ya decian QUE falta, con mensaje propio por campo, y el
+   mensaje se anuncia —los `*-note` llevan aria-live—. Lo que faltaba es lo otro:
+   nadie marcaba el campo ni movia el foco. Quien usa teclado o lector oia
+   «Cuentanos que puedes aportar» y se quedaba en el boton, al final de un
+   formulario largo, teniendo que buscar a mano cual de los diez campos era.
+   Es el mismo arreglo que ya se le hizo al formulario de la familia.
+
+   Se limpia el formulario ENTERO antes de marcar: la validacion se detiene en el
+   primer fallo, asi que el campo marcado en el intento anterior puede ser otro. */
+function allyMal(note, campo, clave){
+  /* `campo` es un id o ya un elemento: los grupos de radios y de casillas no
+     tienen un id unico al que apuntar, asi que el que llama pasa el primero. */
+  var c = typeof campo === "string" ? document.getElementById(campo) : campo;
+  allyLimpia(note);
+  if (c) c.setAttribute("aria-invalid", "true");
+  allyMsg(note, t(clave), false);
+  /* El foco DESPUES del mensaje: al revés, algunos lectores anuncian el campo y
+     se pierden el texto que explica por qué. */
+  if (c && typeof c.focus === "function") c.focus();
   return false;
 }
 
@@ -4965,11 +5011,11 @@ function apSubmit(ev){
   /* Honeypot: éxito aparente, cero envío. No se le enseña al bot qué lo delató. */
   if (val("apf-web2")){ document.getElementById("apf").reset(); apQuien(); return allyMsg(note, t("ap.ok"), true); }
 
-  if (!val("apf-nombre")) return allyMsg(note, t("ap.err.nombre"), false);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("apf-email"))) return allyMsg(note, t("ap.err.email"), false);
-  if (!val("apf-detalle")) return allyMsg(note, t("ap.err.detalle"), false);
-  if (!chk("apf-concepto")) return allyMsg(note, t("ap.err.concepto"), false);
-  if (!chk("apf-datos")) return allyMsg(note, t("ap.err.datos"), false);
+  if (!val("apf-nombre")) return allyMal(note, "apf-nombre", "ap.err.nombre");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("apf-email"))) return allyMal(note, "apf-email", "ap.err.email");
+  if (!val("apf-detalle")) return allyMal(note, "apf-detalle", "ap.err.detalle");
+  if (!chk("apf-concepto")) return allyMal(note, "apf-concepto", "ap.err.concepto");
+  if (!chk("apf-datos")) return allyMal(note, "apf-datos", "ap.err.datos");
 
   btn.disabled = true;
   allyMsg(note, t("ap.sending"), true);
@@ -5014,13 +5060,13 @@ function ingSubmit(ev){
   /* Honeypot: éxito aparente, cero envío. No se le enseña al bot qué lo delató. */
   if (val("inf-web2")){ document.getElementById("inf").reset(); ingEsp(); return allyMsg(note, t("ing.ok"), true); }
 
-  if (!val("inf-nombre")) return allyMsg(note, t("ing.err.nombre"), false);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("inf-email"))) return allyMsg(note, t("ing.err.email"), false);
-  if (!val("inf-ciudad")) return allyMsg(note, t("ing.err.ciudad"), false);
-  if (!val("inf-mat")) return allyMsg(note, t("ing.err.matricula"), false);
-  if (!val("inf-esp")) return allyMsg(note, t("ing.err.esp"), false);
-  if (!chk("inf-alcance")) return allyMsg(note, t("ing.err.alcance"), false);
-  if (!chk("inf-datos")) return allyMsg(note, t("ing.err.datos"), false);
+  if (!val("inf-nombre")) return allyMal(note, "inf-nombre", "ing.err.nombre");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("inf-email"))) return allyMal(note, "inf-email", "ing.err.email");
+  if (!val("inf-ciudad")) return allyMal(note, "inf-ciudad", "ing.err.ciudad");
+  if (!val("inf-mat")) return allyMal(note, "inf-mat", "ing.err.matricula");
+  if (!val("inf-esp")) return allyMal(note, "inf-esp", "ing.err.esp");
+  if (!chk("inf-alcance")) return allyMal(note, "inf-alcance", "ing.err.alcance");
+  if (!chk("inf-datos")) return allyMal(note, "inf-datos", "ing.err.datos");
 
   btn.disabled = true;
   allyMsg(note, t("ing.sending"), true);
