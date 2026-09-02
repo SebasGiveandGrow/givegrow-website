@@ -9565,9 +9565,12 @@ estas cuatro cosas es un alta:</strong> la fundación entra con el convenio de c
 la visita de contexto, y la empresa con la firma del Convenio Marco. Aceptar aquí significa
 «seguimos», no «ya está publicado».</p>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px"><strong>Con un ingeniero hay
-un paso más, y este panel no lo hace:</strong> primero se busca su matrícula en el registro público
-del COPNIA, y solo después se le abre el triaje añadiendo su correo en Cloudflare Access. Aceptarlo
-aquí no le da acceso a nada. Su matrícula es un dato que él declaró, no uno comprobado.</p>
+un paso que sigue siendo humano:</strong> buscar su matrícula en el registro público del COPNIA. El
+resto ya lo hace este panel — al pulsar «Marcar verificada», Access le abre el triaje solo, sin
+tocar nada en el dashboard de Cloudflare. Ojo con la diferencia, porque no es la misma cosa:
+<strong>«Seguimos» no le da acceso; «Marcar verificada» sí.</strong> Y archivarlo se lo quita, sin
+tener que acordarse de desmarcar nada. Mientras no esté verificada, su matrícula es un dato que él
+declaró, no uno comprobado.</p>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Tipo</th><th scope="col">Quién</th><th scope="col">Lo que hay que saber</th>
