@@ -688,12 +688,12 @@ const CORREO_DESDE_DEF = "Give&Grow International <no-responder@notificaciones.t
    NO PUEDE TUMBAR EL REGISTRO. Si esta fila falla, la inscripción ya quedó
    guardada y eso es lo que le importa a quien se inscribió. Se registra el fallo
    en la consola, que es lo que hace el resto del archivo. */
-async function anotarAutorizacion(env, id, tipo, claves) {
+async function anotarAutorizacion(env, id, tipo, claves, prefijo) {
   if (!id) return;
   try {
     await env.DB.prepare(
       "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'datos', ?)"
-    ).bind("inscripcion " + id, tipo + " · " + claves).run();
+    ).bind((prefijo || "inscripcion") + " " + id, tipo + " · " + claves).run();
   } catch (e) {
     console.error("consentimiento", tipo, id, e && e.message);
   }
@@ -6678,6 +6678,350 @@ function almaLimitada(ip) {
   return false;
 }
 
+/* ========================================================================
+   PAYPAL — MEMBRESIAS INTERNACIONALES POR SUSCRIPCION
+   ========================================================================
+   POR QUE PAYPAL SI YA HAY WOMPI. Wompi cubre Colombia -PSE, Nequi, tarjeta- y
+   no sirve para quien esta fuera. Un donante en España no puede usar PSE y no va
+   a hacer un giro internacional por US$20. La pestaña de PayPal del formulario
+   lleva meses diciendo «escribenos y te enviamos el enlace»; esto es lo que
+   cierra esa promesa.
+
+   POR QUE SUSCRIPCION Y NO SOLO UN COBRO. El sitio promete desde hace meses el
+   debito automatico -`pay.now.rec` dice «cuando lo habilitemos te escribimos»- y
+   NO existia: sin handler `scheduled`, sin crons. Las suscripciones de PayPal lo
+   cierran, al menos para el exterior.
+
+   ── LA FORMA, Y LA DECIDE LA CSP ──────────────────────────────────────────────
+   Todo pasa por el SERVIDOR y el navegador solo NAVEGA. No hay SDK de PayPal, ni
+   boton HTML suyo, ni iframe, ni fetch a paypal.com desde la pagina. No es
+   preferencia: `_headers` lo prohibe con `script-src 'self'`, `form-action
+   'self'`, `default-src 'self'` y `connect-src 'self'`. Es la misma razon por la
+   que Wompi entro por redireccion y no por widget: no darle ejecucion a un
+   tercero en la pagina donde el donante escribe sus datos.
+
+   ── INERTE SIN SUS SECRETOS, igual que ALMA ───────────────────────────────────
+   Sin `PAYPAL_CLIENT_ID` y `PAYPAL_SECRET` los dos endpoints responden 503 y no
+   tocan la base. Por eso este codigo puede vivir en produccion antes de estar
+   probado: mientras no existan los secretos, no hace nada.
+
+   ── SANDBOX POR DEFECTO ───────────────────────────────────────────────────────
+   `PAYPAL_ENTORNO` tiene que decir literalmente "live" para apuntar a produccion.
+   Cualquier otra cosa -vacio, "sandbox", un dedazo- va a sandbox. Equivocarse
+   hacia el lado seguro. */
+
+const PAYPAL_NIVELES = {
+  semilla: { env: "PAYPAL_PLAN_SEMILLA", nombre: "Semilla", usd: 5 },
+  retono:  { env: "PAYPAL_PLAN_RETONO",  nombre: "Retoño",  usd: 15 },
+  arbol:   { env: "PAYPAL_PLAN_ARBOL",   nombre: "Árbol",   usd: 35 },
+  bosque:  { env: "PAYPAL_PLAN_BOSQUE",  nombre: "Bosque",  usd: 75 }
+};
+
+function paypalConfig(env) {
+  /* Se recorta por lo mismo que ALMA: un secreto cargado por tuberia se lleva el
+     salto de linea y el proveedor responde «credenciales invalidas» sin decir
+     por que. Recortar no arregla una llave mala, descarta la causa tonta. */
+  const id = String(env.PAYPAL_CLIENT_ID || "").trim();
+  const secreto = String(env.PAYPAL_SECRET || "").trim();
+  if (!id || !secreto) return null;
+  const live = String(env.PAYPAL_ENTORNO || "").trim().toLowerCase() === "live";
+  return {
+    id, secreto, live,
+    base: live ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com",
+    webhookId: String(env.PAYPAL_WEBHOOK_ID || "").trim()
+  };
+}
+
+async function paypalToken(cfg) {
+  const r = await fetch(cfg.base + "/v1/oauth2/token", {
+    method: "POST",
+    headers: {
+      authorization: "Basic " + btoa(cfg.id + ":" + cfg.secreto),
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body: "grant_type=client_credentials"
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.access_token) throw new Error("paypal_auth_" + r.status);
+  return d.access_token;
+}
+
+async function paypalPost(cfg, tk, ruta, cuerpo, requestId) {
+  const cab = {
+    authorization: "Bearer " + tk,
+    "content-type": "application/json",
+    accept: "application/json"
+  };
+  if (requestId) cab["paypal-request-id"] = requestId;
+  const r = await fetch(cfg.base + ruta, {
+    method: "POST", headers: cab, body: JSON.stringify(cuerpo)
+  });
+  const d = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, d };
+}
+
+/* POST /api/paypal/suscripcion — crea la suscripcion y devuelve a donde ir.
+
+   El navegador NO habla con PayPal: recibe una URL y navega. Esa URL es el enlace
+   `approve` que PayPal devuelve en su respuesta (HATEOAS), no una que armemos
+   nosotros — armarla a mano seria adivinar un formato que ellos pueden cambiar. */
+async function apiPaypalSuscripcion(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const cfg = paypalConfig(env);
+  if (!cfg) return json({ error: "paypal_no_configurado" }, 503);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+
+  /* Honeypot, igual que los siete formularios del sitio: exito aparente y cero
+     registro. No se le enseña al bot que lo delato. */
+  if (c.web2) return json({ ok: true, url: null });
+
+  const nivel = PAYPAL_NIVELES[String(c.nivel || "").toLowerCase()];
+  if (!nivel) {
+    return json({ error: "nivel_invalido", opciones: Object.keys(PAYPAL_NIVELES) }, 400);
+  }
+  const planId = String(env[nivel.env] || "").trim();
+  if (!planId) {
+    /* Sin `ayuda`: el nombre de una variable de entorno es de nuestra cocina. */
+    return json({ error: "plan_no_configurado" }, 503);
+  }
+
+  const email = limpiar(c.email, 200);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  const nombre = limpiar(c.nombre, 120);
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
+
+  const idioma = c.idioma === "en" ? "en" : "es";
+  const quiereCert = c.quiere_certificado ? 1 : 0;
+  const muro = c.consent_muro === "si" ? "si" : "no";
+
+  /* NUESTRO id, que viaja como `custom_id` y vuelve en cada webhook. Es lo que
+     permite reconocer una suscripcion sin fiarse del correo -que la persona puede
+     cambiar en PayPal- ni del id de PayPal, que todavia no existe cuando armamos
+     la peticion. */
+  const propio = "GG-SUB-" + tokenNuevo().slice(0, 12);
+
+  let tk;
+  try { tk = await paypalToken(cfg); }
+  catch (e) {
+    console.error("paypal token", e && e.message);
+    return json({ error: "paypal_sin_conexion" }, 502);
+  }
+
+  const partes = nombre.split(/\s+/);
+  const r = await paypalPost(cfg, tk, "/v1/billing/subscriptions", {
+    plan_id: planId,
+    custom_id: propio,
+    subscriber: {
+      email_address: email,
+      name: { given_name: partes[0], surname: partes.slice(1).join(" ") || partes[0] }
+    },
+    application_context: {
+      brand_name: "Fundación Give&Grow International",
+      locale: idioma === "en" ? "en-US" : "es-CO",
+      /* NO_SHIPPING porque una membresia no se envia a ninguna parte, y pedir
+         direccion seria pedir un dato que no necesitamos. */
+      shipping_preference: "NO_SHIPPING",
+      user_action: "SUBSCRIBE_NOW",
+      return_url: ORIGIN + "/#gracias",
+      cancel_url: ORIGIN + "/#membresias"
+    }
+  }, propio);
+
+  if (!r.ok || !r.d || !r.d.id) {
+    console.error("paypal suscripcion", r.status, JSON.stringify(r.d).slice(0, 300));
+    return json({ error: "paypal_rechazo", status: r.status }, 502);
+  }
+
+  const aprobar = (r.d.links || []).find((l) => l && l.rel === "approve");
+  if (!aprobar || !aprobar.href) {
+    console.error("paypal suscripcion sin enlace approve", JSON.stringify(r.d).slice(0, 300));
+    return json({ error: "paypal_sin_enlace" }, 502);
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO suscripciones (id, proveedor, plan_ref, estado, nivel, monto_centavos, " +
+    "moneda, frecuencia, idioma, quiere_certificado, consent_muro) " +
+    "VALUES (?, 'paypal', ?, 'aprobacion_pendiente', ?, ?, 'USD', 'mensual', ?, ?, ?)"
+  ).bind(r.d.id, planId, nivel.nombre, nivel.usd * 100, idioma, quiereCert, muro).run();
+
+  /* La autorizacion de Ley 1581 se anota como en los otros formularios: es la
+     misma obligacion, no una excepcion porque el dinero venga de fuera. */
+  /* Con PREFIJO propio. El defecto de `anotarAutorizacion` es «inscripcion», y
+     una suscripcion no lo es: dejarlo asi etiquetaria mal el registro de Ley 1581
+     y confundiria a quien lo lea buscando una inscripcion que no existe. */
+  await anotarAutorizacion(env, r.d.id, "suscripcion_paypal",
+                           "autoriza_datos + nivel " + nivel.nombre, "suscripcion");
+
+  return json({ ok: true, url: aprobar.href, suscripcion: r.d.id });
+}
+
+/* POST /api/paypal/webhook — lo que PayPal nos cuenta.
+
+   TRES REGLAS, Y LAS TRES SON CICATRICES DE ESTA CASA:
+
+   1. SE VERIFICA LA FIRMA, contra la API de PayPal. Este endpoint es publico y lo
+      que hace es crear aportes: sin verificar, cualquiera podria inventarse un
+      cobro. Se hace con `/v1/notifications/verify-webhook-signature`, que es la
+      via documentada, y hace falta `PAYPAL_WEBHOOK_ID`. Sin ese id NO se procesa
+      nada: fallar cerrado, como el guardian de Access.
+
+   2. EL EVENTO SE GUARDA ANTES DE PROCESARLO, con su `firma_valida`. Asi una
+      firma invalida queda REGISTRADA en vez de desaparecer, que es lo que
+      permitiria descubrir un intento. Es el patron de `eventos_wompi`.
+
+   3. UN REINTENTO NO DUPLICA. PayPal reintenta lo que no responde 2xx y manda el
+      MISMO `id` de evento; el UNIQUE de `eventos_paypal` hace que el segundo
+      insert falle, y ahi se responde 200 sin volver a procesar. Sin esto, un
+      cobro mensual podria quedar con dos guias por el mismo dinero. */
+async function apiPaypalWebhook(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const cfg = paypalConfig(env);
+  if (!cfg) return json({ error: "paypal_no_configurado" }, 503);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+  if (!cfg.webhookId) {
+    console.error("paypal webhook sin PAYPAL_WEBHOOK_ID: no se procesa");
+    return json({ error: "webhook_no_configurado" }, 503);
+  }
+
+  const crudo = await request.text();
+  let ev;
+  try { ev = JSON.parse(crudo); } catch { return json({ error: "json_invalido" }, 400); }
+  const eventoId = String(ev.id || "").trim();
+  const tipo = String(ev.event_type || "").trim();
+  if (!eventoId || !tipo) return json({ error: "evento_incompleto" }, 400);
+
+  const cab = (n) => request.headers.get(n) || "";
+  const certUrl = cab("paypal-cert-url");
+  /* El `cert_url` lo manda quien llama, asi que se comprueba que sea de PayPal
+     antes de pasarselo a nadie. La verificacion la hace su API, pero reenviar sin
+     mirar una URL que llego de fuera es como no mirarla. */
+  if (!/^https:\/\/[a-z0-9.-]*\.paypal\.com\//i.test(certUrl)) {
+    console.error("paypal webhook con cert_url ajeno:", certUrl.slice(0, 120));
+    return json({ error: "cert_url_invalido" }, 400);
+  }
+
+  const recurso = ev.resource || {};
+  const suscripcionId = String(
+    recurso.billing_agreement_id || (tipo.startsWith("BILLING.SUBSCRIPTION") ? recurso.id : "") || ""
+  ).trim() || null;
+
+  let valida = 0;
+  try {
+    const tk = await paypalToken(cfg);
+    const v = await paypalPost(cfg, tk, "/v1/notifications/verify-webhook-signature", {
+      auth_algo: cab("paypal-auth-algo"),
+      cert_url: certUrl,
+      transmission_id: cab("paypal-transmission-id"),
+      transmission_sig: cab("paypal-transmission-sig"),
+      transmission_time: cab("paypal-transmission-time"),
+      webhook_id: cfg.webhookId,
+      webhook_event: ev
+    });
+    valida = v.ok && v.d && v.d.verification_status === "SUCCESS" ? 1 : 0;
+  } catch (e) {
+    console.error("paypal verificar firma", e && e.message);
+  }
+
+  /* Se registra pase lo que pase. Si el insert falla por el UNIQUE, es un
+     reintento de algo ya visto: 200 y a otra cosa. */
+  try {
+    await env.DB.prepare(
+      "INSERT INTO eventos_paypal (evento_id, tipo, suscripcion, recurso_id, firma_valida, cuerpo) " +
+      "VALUES (?,?,?,?,?,?)"
+    ).bind(eventoId, tipo, suscripcionId, String(recurso.id || "") || null, valida, crudo.slice(0, 20000)).run();
+  } catch (e) {
+    return json({ ok: true, repetido: true });
+  }
+
+  if (!valida) {
+    /* Queda escrito y NO se procesa. El 200 es a proposito: si fuera un intento
+       de suplantacion, reintentarlo no lo hace mas valido, y un 4xx solo le
+       cuenta al atacante que lo detectamos. */
+    await env.DB.prepare("UPDATE eventos_paypal SET resultado = 'firma_invalida' WHERE evento_id = ?")
+      .bind(eventoId).run();
+    return json({ ok: true });
+  }
+
+  let resultado = "sin_regla";
+  try {
+    if (tipo === "PAYMENT.SALE.COMPLETED" && suscripcionId) {
+      resultado = await paypalCobro(env, suscripcionId, recurso);
+    } else if (tipo === "BILLING.SUBSCRIPTION.ACTIVATED") {
+      await paypalEstado(env, recurso.id, "activa");
+      resultado = "activa";
+    } else if (tipo === "BILLING.SUBSCRIPTION.CANCELLED") {
+      await paypalEstado(env, recurso.id, "cancelada", true);
+      resultado = "cancelada";
+    } else if (tipo === "BILLING.SUBSCRIPTION.SUSPENDED") {
+      await paypalEstado(env, recurso.id, "suspendida");
+      resultado = "suspendida";
+    } else if (tipo === "BILLING.SUBSCRIPTION.EXPIRED") {
+      await paypalEstado(env, recurso.id, "expirada", true);
+      resultado = "expirada";
+    }
+  } catch (e) {
+    /* El fallo se ESCRIBE, no se pierde: `resultado` es donde se mira despues.
+       Y se responde 200 igual, porque el evento ya quedo guardado y un reintento
+       de PayPal chocaria con el UNIQUE sin volver a intentar el proceso. */
+    resultado = "error: " + String((e && e.message) || e).slice(0, 160);
+    console.error("paypal procesar", tipo, resultado);
+  }
+
+  await env.DB.prepare(
+    "UPDATE eventos_paypal SET procesado = 1, resultado = ? WHERE evento_id = ?"
+  ).bind(resultado, eventoId).run();
+
+  return json({ ok: true });
+}
+
+async function paypalEstado(env, id, estado, cerrada) {
+  if (!id) return;
+  await env.DB.prepare(
+    "UPDATE suscripciones SET estado = ?, actualizada_en = datetime('now')" +
+    (cerrada ? ", cancelada_en = COALESCE(cancelada_en, datetime('now'))" : "") +
+    " WHERE id = ?"
+  ).bind(estado, String(id)).run();
+}
+
+/* UN COBRO MENSUAL ES UN APORTE COMO CUALQUIER OTRO, y por eso entra en `aportes`
+   con su propia guia. La familia de decisiones que hay detras: quien apoya desde
+   el exterior merece el mismo rastreo que quien paga por Wompi, asi que el cobro
+   no vive solo en la tabla de suscripciones — se convierte en un aporte con guia,
+   y de ahi cuelgan el recibo y la trazabilidad que ya existen.
+
+   Entra como `aprobada` porque PayPal ya cobro: no es una intencion. */
+async function paypalCobro(env, suscripcionId, recurso) {
+  const sub = await env.DB.prepare(
+    "SELECT id, nivel, idioma, quiere_certificado, consent_muro FROM suscripciones WHERE id = ?"
+  ).bind(suscripcionId).first();
+  if (!sub) return "suscripcion_desconocida";
+
+  const monto = recurso && recurso.amount ? recurso.amount : {};
+  const valor = Number(monto.total || monto.value || 0);
+  if (!(valor > 0)) return "monto_ilegible";
+  const moneda = String(monto.currency || monto.currency_code || "USD").toUpperCase();
+  const centavos = Math.round(valor * 100);
+
+  const guia = await siguienteGuia(env, new Date().getUTCFullYear());
+  await env.DB.prepare(
+    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
+    "quiere_certificado, consent_muro, idioma, token, proveedor, proveedor_ref, suscripcion, aprobada_en) " +
+    "VALUES (?, 'aprobada', ?, ?, 'fondo', 'mensual', ?, ?, ?, ?, 'paypal', ?, ?, datetime('now'))"
+  ).bind(guia, centavos, moneda, sub.quiere_certificado, sub.consent_muro, sub.idioma,
+         tokenNuevo(), String((recurso && recurso.id) || ""), suscripcionId).run();
+
+  await env.DB.prepare(
+    "UPDATE suscripciones SET cobros = cobros + 1, ultimo_cobro_en = datetime('now'), " +
+    "actualizada_en = datetime('now') WHERE id = ?"
+  ).bind(suscripcionId).run();
+
+  return "aporte " + guia;
+}
+
 const ALMA_SYS = `Eres ALMA (Asistente de Labor Misional y Alianzas), la IA de Fundación Give&Grow International. Respondes de forma clara, cálida y concisa. Máximo 3 párrafos por respuesta. No uses listas extensas. Responde en el idioma del usuario.
 
 GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Fundada el 19 de mayo de 2025 en Medellín. Fundador: Juan Sebastián Navarro Osorio, casi 4 años de trabajo en zonas de difícil acceso (La Guajira, Sierra Nevada, Medellín). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
@@ -11936,6 +12280,11 @@ export default {
        respuesta para dejar pasar la petición con la que se la pedimos.
        Su propia seguridad es el JWT firmado por Access que traen en el cuerpo,
        que se verifica contra los certificados del equipo. */
+    /* PayPal. Publicas por necesidad -las llama un navegador que va a pagar, y el
+       webhook lo llama PayPal, que no tiene sesion- y las dos son INERTES sin sus
+       secretos, asi que estar aqui antes de estar probadas no habilita nada. */
+    if (ruta === "/api/paypal/suscripcion") return await apiPaypalSuscripcion(request, env, url);
+    if (ruta === "/api/paypal/webhook")     return await apiPaypalWebhook(request, env);
     if (ruta === "/api/alma")           return await apiAlma(request, env, url);
     if (ruta === "/api/access/claves")  return await accessClaves(env);
     if (ruta === "/api/access/evaluar") return await accessEvaluar(request, env);
