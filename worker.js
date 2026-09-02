@@ -11380,6 +11380,34 @@ function marcarCaso(respuesta, ruta) {
    si algún día aparece esa cadena dentro del documento. */
 const HOST_MMC = /^(miramicasa|mira-mi-casa)\./i;
 
+/* DONDE NO HAY QUE SALTAR A PRODUCCION.
+
+   Las cinco rutas que se mudaron al subdominio redirigen desde cualquier host
+   que no sea el subdominio, y eximian `.workers.dev` pero NO `localhost`. O sea
+   que en `wrangler dev` abrir `/caso/<n>?t=…`, `/triaje`, `/triaje/inspeccion`,
+   `/admin` o `/admin/ruta` te sacaba del entorno local y te dejaba en el sitio
+   real. Dos consecuencias, y la primera es la que dolia:
+
+   1. LA PANTALLA A LA QUE VUELVE LA FAMILIA NO SE PODIA PROBAR EN LOCAL. Nunca.
+      Se salta a produccion, que no tiene ese caso, asi que el camino de vuelta
+      -el unico que tiene una familia para ver como va lo suyo y sumar fotos si
+      se las piden- solo se podia verificar contra la base real.
+   2. El token del caso viajaba en la query a OTRO host. Para un caso local no
+      vale nada, pero es un secreto cruzando de host sin necesidad.
+
+   El cliente ya tenia esta idea escrita en `entornoDePruebas()` de app.js, con
+   el motivo dicho igual: «ahi saltar a produccion convertiria una prueba en una
+   visita al sitio real». Al Worker le faltaba. Descubierto el 2 sep 2026 al
+   intentar abrir un caso local y aterrizar en el subdominio de produccion.
+
+   Incluye `*.localhost` porque asi se ejercita la marca del subdominio en local
+   (`miramicasa.localhost`), y ese host TAMPOCO debe rebotar. */
+function hostDePruebas(host) {
+  return /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host)
+      || /\.localhost(:\d+)?$/i.test(host)
+      || /\.workers\.dev$/i.test(host);
+}
+
 function marcarMarca(respuesta, host) {
   if (!HOST_MMC.test(host)) return respuesta;
   const tipo = respuesta.headers.get("content-type") || "";
@@ -11711,11 +11739,11 @@ export default {
             alguien abre EN LA CALLE para saber a qué casa va, y el nombre que el
             equipo tiene en la cabeza es el del subdominio. */
          ruta === "/admin" || ruta === "/admin/ruta") &&
-        !HOST_MMC.test(url.hostname) && !/\.workers\.dev$/i.test(url.hostname)) {
+        !HOST_MMC.test(url.hostname) && !hostDePruebas(url.hostname)) {
       return Response.redirect(new URL(ruta + url.search, ORIGIN_MMC).toString(), 302);
     }
 
-    if (ruta.startsWith("/caso/") && !HOST_MMC.test(url.hostname) && !/\.workers\.dev$/i.test(url.hostname)) {
+    if (ruta.startsWith("/caso/") && !HOST_MMC.test(url.hostname) && !hostDePruebas(url.hostname)) {
       /* 302 Y `no-store`, no 301. Esta URL lleva el token de la familia en la
          query —es lo único con lo que vuelve a su caso— y un 301 es cacheable
          para siempre: el navegador lo fija y una caché compartida puede
