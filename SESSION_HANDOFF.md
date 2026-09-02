@@ -25,6 +25,117 @@
 > **DISCREPA queda FUERA hasta nuevo aviso** (decisión de Sebas, 1 sep).
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
 
+## ✅ TANDA AUTÓNOMA: EL RECORRIDO DE LA FAMILIA, PROBADO (2 sep · PR #252 a #256)
+
+**⭐ LO MÁS IMPORTANTE DE ESTA TANDA no es un arreglo, es que AHORA SE PUEDE
+PROBAR.** Las cinco rutas mudadas al subdominio eximían `.workers.dev` pero NO
+`localhost`, así que en `wrangler dev` abrir `/caso/<n>?t=…`, `/triaje`,
+`/triaje/inspeccion`, `/admin` o `/admin/ruta` te sacaba del entorno local y te
+dejaba en producción. Consecuencia: **la pantalla a la que vuelve la familia no
+se podía probar en local. Nunca.** Y el token del caso viajaba a otro host.
+
+Arreglado con `hostDePruebas(host)` en worker.js (PR #253), que es el espejo de
+`entornoDePruebas()` que app.js ya tenía. `/caso/…` pasó de 302-a-producción a
+**200** en local.
+
+Ojo: `/triaje` y `/admin` ahora dan **403 en local**, y eso es lo CORRECTO —
+están detrás de Access, que falla cerrado también en localhost. La redirección lo
+tapaba haciéndote creer que probabas en local cuando estabas en el sitio real.
+
+**EL RECORRIDO COMPLETO DE LA FAMILIA, VERIFICADO DE PUNTA A PUNTA EN LOCAL, por
+primera vez.** Con casos y evaluaciones de prueba en el D1 local:
+
+  1. formulario → caso creado, y el ENLACE se muestra ANTES de subir las fotos
+     (así la familia se lo queda aunque la subida falle · app.js ~2020)
+  2. subida de fotos por `POST /api/caso/<n>/medio` → 200
+  3. estado «necesitamos un par de fotos más»: sale la petición textual del
+     ingeniero justo encima del botón, con las cuatro categorías y la
+     advertencia de seguridad
+  4. estado «veredicto»: clasificación, qué hacer y con qué reparar, el descargo
+     (no reemplaza visita ni declaratoria, sin compromiso casa por casa) y el
+     enlace al PDF
+  5. el PDF: 2 páginas, `%PDF-1.7`, `private, no-store` + `noindex`. Página 1
+     abre con el descargo y los datos; página 2 lleva prioridad de visita y
+     QUIÉN LO EVALUÓ con nombre, matrícula y la nota del COPNIA.
+
+**OJO con lo que esto NO reemplaza:** las evaluaciones se simularon con INSERT
+directo. O sea que está verificado que las pantallas de la familia PINTAN BIEN
+dados los datos, no que el formulario del ingeniero los produzca — eso vive tras
+Access y sigue siendo prueba de Sebas, igual que el teléfono en modo avión.
+
+**Y con la pantalla por fin abierta, apareció el error que nadie había visto:**
+decía «**Estado:** \<el barrio de la familia\>». La etiqueta era `mc.estado`
+—«Estado» en ES, «Status» en EN— y el valor impreso era `d.sector`. Se corrigió
+la ETIQUETA y no el valor: el estado real ya se cuenta en prosa justo debajo, y
+el enum crudo lo repetiría. Quedó «Dónde», la palabra que ya usa el banco
+público. Hacían falta las dos cosas a la vez para verlo: producción con 0 casos y
+la pantalla imposible de abrir en local.
+
+### Los otros cuatro arreglos
+
+- **#252 · Un buzón de avisos sin configurar ya deja rastro.** Once avisos salían
+  con `{ok:true, sinDestino:true}` ANTES de `enviarCorreo`, así que no escribían
+  fila en `correos`. Vaciar `CORREO_AVISOS` o `CORREO_MMC` apagaba los avisos sin
+  una señal. Ahora escriben `resultado = 'sin_destino'` con la causa. NO cubre
+  los dos sitios donde falta el correo DE LA PERSONA: eso es normal y sería ruido.
+- **#256 · Y la salud del panel ya lee esa fila.** Contaba solo `fallo`, así que
+  el registro nuevo se escribía y nadie lo miraba. Cola propia, APARTE de `fallo`
+  porque el remedio es otro (poner la variable, no reenviar), y con orden **15**
+  en vez de 95: mientras esté vacía no sale NINGÚN aviso interno.
+- **#254 · Una foto que no es una foto se rechaza en el acto.** `TIPOS_MEDIO`
+  validaba el `content-type`, que lo pone el navegador desde la EXTENSIÓN. 17
+  bytes de texto devolvían `{"ok":true,"clase":"foto"}`. No es ejecución —SVG no
+  está permitido— pero sí un viaje perdido: `comprimirFoto` termina en
+  `.catch(function(){ return file; })`, así que una imagen corrupta se sube tal
+  cual, la familia ve «3 fotos enviadas» y el ingeniero encuentra una imagen
+  rota. Guarda en los tres sitios que aceptan fotos. **LOS VÍDEO NO SE
+  COMPRUEBAN a propósito:** MP4/QuickTime son contenedores con variantes por
+  teléfono y una firma estricta rechazaría vídeo legítimo de campo.
+- **#255 · El banco público ya no recorta en silencio.** `publicables` era el
+  largo de la página, no el total: con más de 300 casas habría dicho «300 con
+  permiso para aparecer aquí» —falso— y omitido el resto. La brigada apuntaba a
+  más de 100 familias por sector en cinco sectores, así que 300 se cruza.
+
+### 🔧 TÉCNICAS QUE FUNCIONARON, para no reinventarlas
+
+- **Simular mala configuración:** `wrangler dev --var CORREO_MMC:"" --var
+  CORREO_AVISOS:""`. Así se comprobó el `sin_destino` de verdad en vez de leerlo.
+- **Ejercitar un tope sin generar 300 filas:** bajar la constante a 1 en local,
+  probar, restaurar, y comprobar con `diff` contra un respaldo que no quedó dentro.
+- **Ver un PDF completo:** `qlmanage -t` solo saca la página 1. Para el resto,
+  `python3` con **pypdf** (está instalado) y `extract_text()` por página.
+- **Una ruta nueva del panel NO se puede probar entera desde aquí** (Access falla
+  cerrado, sin puerta trasera). Lo que sí: la expresión del router en `node -e` y
+  el SQL contra el D1 local.
+
+### ✅ VERIFICADO CORRECTO (no re-auditar)
+
+- **La cola de subida de la familia** (`cvSubirCola`): no se atasca —el archivo no
+  sale de la cola hasta guardarse—, un reintento por fallo de red, y el cierre
+  dice la verdad (todo / parcial / nada).
+- **IDOR en la subida de medios:** 403 idéntico sin token, con el token de otro
+  caso y con un caso inexistente. Sin oráculo.
+- **`cat` NO es traversal:** se valida contra `CATEGORIAS_MEDIO` y queda en `null`
+  si no encaja, y la clave de R2 no lo usa — es `casos/<numero>/<8 hex>.<ext>`.
+- **«opinion» para «concepto» en EN es la convención del sitio**, en 21 sitios, y
+  es deliberada: señala un parecer profesional NO vinculante, que es la postura
+  legal del proyecto («concepto», no «dictamen»). *Assessment* sonaría vinculante.
+  No cambiarlo.
+
+### ⏭️ PENDIENTE DE SEBAS (de esta tanda)
+
+- **Suprimir la inscripción id 4 de producción** («PRUEBA DMARC - suprimir»), con
+  el botón «Suprimir» de la bandeja. Se disparó para que el tráfico de
+  `notificaciones.` apareciera en el informe DMARC del día.
+- **Mirar Email → DMARC Management en Cloudflare** a las 24 h. Lo que se busca
+  antes de quitar `sp=quarantine`: tráfico de `notificaciones.…` alineando por
+  DKIM. El registro vivo quedó
+  `p=reject; sp=quarantine; rua=<cloudflare>,<contabilidad@>`, y la autorización
+  de destino externo está publicada (se comprobó
+  `…_report._dmarc.dmarc-reports.cloudflare.net` → `v=DMARC1;`).
+- **Datos de prueba EN LOCAL** (no producción): casos `CV-2026-000005/6/7` con
+  evaluaciones simuladas, varias fotos, y tres inscripciones. Borrar si molestan.
+
 ## ✅ EL BUZÓN DE MIRA MI CASA Y EL DERECHO DE SUPRESIÓN (1 sep · PR #249 y #250)
 
 **Los avisos de Mira Mi Casa ya no caen en contabilidad.** Los doce avisos
