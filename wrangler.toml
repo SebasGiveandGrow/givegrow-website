@@ -59,6 +59,7 @@ CORREO_DESDE = "Give&Grow International <no-responder@notificaciones.thegiveandg
 # Ojo: aquí el dominio es DESTINATARIO, no remitente — quien firma es
 # notificaciones.… vía Resend. Cambiarlo era seguro incluso antes.
 CORREO_AVISOS = "contabilidad@thegiveandgrowproject.org"
+CORREO_MMC = "MiraMiCasa@thegiveandgrowproject.org"
 # Panel /admin. Ninguno de los dos es secreto: identifican la aplicación de
 # Cloudflare Access, no autorizan nada por sí solos. Sin ellos el panel responde
 # 503 y no sirve un dato — ver ops/panel-admin.md.
@@ -128,3 +129,4 @@ CORREO_DESDE = "Give&Grow (pruebas) <no-responder@notificaciones.thegiveandgrowp
 # buzón de contabilidad, que es donde se revisan los aportes reales. Mezclarlos
 # haría que el buzón dejara de ser confiable como bandeja de trabajo.
 CORREO_AVISOS = "fundaciongiveandgrow@gmail.com"
+CORREO_MMC = "fundaciongiveandgrow+mmc@gmail.com"

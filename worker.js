@@ -1426,8 +1426,25 @@ async function correoIngeniero(env, i) {
 
 /* Aviso interno: lo que hace falta para ir a verificar la matrícula y decidir,
    sin tener que abrir el panel para saber si vale la pena abrirlo. */
+/* A DONDE VAN LOS AVISOS DE MIRA MI CASA.
+
+   Los doce avisos internos iban al MISMO buzon, `CORREO_AVISOS`, que es
+   contabilidad@. Para una transferencia o un certificado eso es correcto: son
+   asuntos de contabilidad. Para «la casa de una familia esta danada» o «un
+   ingeniero se postulo» no lo es — son operativos, y quien los atiende no es
+   quien lleva las cuentas. Con la fila del triaje vacia, un aviso que cae en el
+   buzon equivocado es lo mismo que un aviso que no se manda.
+
+   CON RESPALDO, y no es adorno: si `CORREO_MMC` faltara, estos avisos caen en
+   contabilidad en vez de en ninguna parte. `enviarCorreo` devuelve
+   `{ok:true, sinDestino:true}` cuando no hay destino y NO escribe fila en
+   `correos`, asi que un buzon sin configurar seria invisible. */
+function correoMMC(env) {
+  return env.CORREO_MMC || env.CORREO_AVISOS;
+}
+
 async function correoAvisoIngeniero(env, i) {
-  const para = env.CORREO_AVISOS;
+  const para = correoMMC(env);
   if (!para) return { ok: true, sinDestino: true };
   const filas = [
     ["Nombre", i.nombre],
@@ -2870,7 +2887,7 @@ async function avisarIngenierosFilaDespierta(env, x) {
 }
 
 async function correoAvisoCaso(env, x) {
-  const para = env.CORREO_AVISOS;
+  const para = correoMMC(env);
   if (!para) return { ok: true, sinDestino: true };
   const titulo = "Caso de vivienda: " + x.numero;
   const filas = [
@@ -4139,7 +4156,7 @@ async function triageInspeccionRecibir(request, env, email) {
    vivienda» —los identificadores viven en `documentos.js` y son permanentes—.
    Si alguno está marcado, el asunto lo dice; si no, es un aviso normal. */
 async function correoAvisoInspeccion(env, x) {
-  const para = env.CORREO_AVISOS;
+  const para = correoMMC(env);
   if (!para) return { ok: true, sinDestino: true };
 
   const grave = x.inminente || x.evacuar || x.requiere_esp;
@@ -5991,7 +6008,7 @@ async function evaluacionVigente(env, numero, clasificacion) {
    quien tenga que resolver esto abre la ficha y las lee enteras. Lo que este
    correo tiene que lograr es que alguien la abra. */
 async function correoDiscrepancia(env, x) {
-  const para = env.CORREO_AVISOS;
+  const para = correoMMC(env);
   if (!para) return { ok: true, sinDestino: true };
   const filas = [
     ["Caso", x.numero],
@@ -7528,7 +7545,7 @@ async function correoApadrinamiento(env, a) {
 }
 
 async function correoAvisoApadrinamiento(env, a) {
-  const para = env.CORREO_AVISOS;
+  const para = correoMMC(env);
   if (!para) return { ok: true, sinDestino: true };
   return await enviarCorreo(env, {
     para,
