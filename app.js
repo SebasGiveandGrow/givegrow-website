@@ -1750,7 +1750,21 @@ function pintarFechaImpresion(){
 if (window.addEventListener) window.addEventListener("beforeprint", pintarFechaImpresion);
 
 function postLang(l){
-  applyLang(l); renderHeroImpact(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); renderPrivacy();
+  applyLang(l);
+  /* Los cinco renderizadores de la FUNDACION, y solo fuera del subdominio.
+     Ninguna de sus pantallas esta en `RUTAS_MMC`, y los cinco piden
+     `partners.json`: en Mira Mi Casa repintaban paginas que no existen y de paso
+     disparaban esa peticion.
+
+     Y pasaba en la PRIMERA carga, en cualquier idioma: `init` llama a
+     `setLang("es")`, asi que `postLang` corre siempre. Medido: guardar solo la
+     precarga del arranque NO quitaba la peticion —seguia saliendo por aqui—.
+     Este guardado es el que la quita; el otro se queda porque tambien es cierto
+     que en el subdominio esa precarga no hace falta.
+
+     `renderPrivacy` NO va guardado: `privacidad` si es una ruta de MMC. */
+  if (!MARCA_MMC){ renderHeroImpact(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
+  renderPrivacy();
   /* Va DESPUÉS de applyLang: el repintado de data-i18n devuelve el rango
      estático a su sitio y hay que volver a poner la fase encima. */
   pintarBrigadaEstado();
@@ -4329,7 +4343,32 @@ function init(){
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
-loadPartners();
+/* LA PRECARGA DE LA RED, y por que NO en Mira Mi Casa.
+
+   `partners.json` son las fundaciones, los comercios y el hub: 18,5 KB (5,9 en
+   gzip). En el sitio de la fundacion tiene sentido precargarlo, porque casi
+   cualquier recorrido acaba en una de esas pantallas.
+
+   En el subdominio no lo tiene. `RUTAS_MMC` son vivienda, caso, casas,
+   ingenieros, apadrinar y privacidad, y NINGUNA usa esos datos — `#casas` tiene
+   su propia API. Se comprobo: los once sitios que llaman a `loadPartners` son
+   renderizadores del lado de la fundacion (aliadas, aportantes, empresas, ficha,
+   mapa, lightbox, calculadora).
+
+   Asi que en la puerta de entrada de una familia era una peticion entera de
+   desperdicio, compitiendo con las fuentes y con app.js en el enlace de una zona
+   a la que se le cayo media torre. Poco peso, si; pero el criterio en esta
+   pantalla no es «cuanto pesa» sino «hacia falta».
+
+   SE QUITA LA PRECARGA, NO LA CAPACIDAD: quitar un prefetch no puede romper
+   nada. Si algun dia una pantalla de MMC necesitara la red, `loadPartners()`
+   sigue pidiendola a demanda y su promesa sigue cacheada.
+
+   Queda un camino menor sin cubrir, y se dice: `postLang` llama a los
+   renderizadores de la fundacion, asi que cambiar de idioma en el subdominio si
+   dispara la peticion. No se toca porque eso ya no es la primera carga, que es
+   lo que se estaba protegiendo. */
+if (!MARCA_MMC) loadPartners();
 if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
 
