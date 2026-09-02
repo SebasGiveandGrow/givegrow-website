@@ -1481,7 +1481,6 @@
   "mc.lead": "Here you can see where your case stands and add photos if any are needed.",
   "mc.cargando": "Looking for your case…",
   "mc.err": "That link does not open any case. Check that you copied it in full, all the way to the end.",
-  "mc.estado": "Status",
   "mc.fotos": "Photos you sent",
   "mc.sin.t": "No engineer has reviewed it yet",
   "mc.sin.p": "Cases are reviewed by severity first and waiting time second. Once a volunteer engineer looks at yours, the answer appears on this same page.",
@@ -1545,5 +1544,6 @@
   "mmc.aval": "The platform of Cimientos que Unen, a project of Fundación Give&Grow International · NIT 901.948.930-2",
   "mmc.marca": "Mira Mi Casa",
   "bc.apadrinar": "Want to help repair them?",
-  "tbl.region": "Table that scrolls horizontally. With a keyboard, use the arrow keys."
+  "tbl.region": "Table that scrolls horizontally. With a keyboard, use the arrow keys.",
+  "mc.donde": "Where"
 }

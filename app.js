@@ -472,7 +472,7 @@ var I18N = {
     "mc.lead":"Aquí ves en qué va tu caso y puedes agregar fotos si hacen falta.",
     "mc.cargando":"Buscando tu caso…",
     "mc.err":"Ese enlace no abre ningún caso. Revisa que lo hayas copiado completo, hasta el final.",
-    "mc.estado":"Estado",
+    "mc.donde":"Dónde",
     "mc.fotos":"Fotos que enviaste",
     "mc.sin.t":"Todavía no lo ha revisado un ingeniero",
     "mc.sin.p":"Los casos se revisan por orden de gravedad y luego de espera. Cuando un ingeniero voluntario lo mire, la respuesta aparece en esta misma página.",
@@ -2437,7 +2437,14 @@ function mcPinta(aviso, color){
       MC.queda = d.cupo ? d.cupo.queda : null;
       var h = "";
 
-      h += '<p><strong>' + escapeHtml(t("mc.estado")) + ":</strong> "
+      /* «Dónde» y no «Estado». La etiqueta decía Estado y el valor era
+         `d.sector`, así que a una familia de «Barrio X» su propia página le
+         decía «Estado: Barrio X». Se corrige la ETIQUETA y no el valor porque
+         el estado de verdad ya se cuenta en prosa justo debajo —si lo ha visto
+         un ingeniero, cuánto llevas esperando, cuántos casos hay sin abrir— y
+         poner ahí el enum crudo (`recibido`) lo repetiría y sonaría a sistema.
+         Se usa la misma palabra que la columna del banco público. */
+      h += '<p><strong>' + escapeHtml(t("mc.donde")) + ":</strong> "
         +  escapeHtml(d.sector || "") + " · " + escapeHtml(t("mc.fotos")) + ": " + (d.medios || 0) + "</p>";
 
       /* TRES DECISIONES INDEPENDIENTES, NO UNA CADENA.
