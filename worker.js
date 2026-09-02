@@ -1706,6 +1706,24 @@ async function adminSalud(env) {
   await enCola("correos_fallidos",
     "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'fallo'",
     "Reenviar a mano y revisar Resend · a esa persona el sitio le prometió un correo que no salió", 95, null);
+  /* APARTE DE `fallo`, y no por prolijidad: el remedio es otro.
+
+     Un `fallo` es un correo que Resend rechazó — se reenvía a mano y se mira el
+     proveedor. Un `sin_destino` es que NO HAY A QUIÉN mandarlo: `CORREO_MMC` o
+     `CORREO_AVISOS` están vacíos en la configuración del Worker. Reenviarlo no
+     arregla nada; hay que poner la variable.
+
+     Y es MÁS urgente que un fallo suelto, por eso va con orden 15 y no 95:
+     mientras esa variable esté vacía NINGÚN aviso interno sale. El equipo deja
+     de enterarse de que entró un caso, de que se postuló un ingeniero y de que
+     alguien quiere apadrinar — todo a la vez y sin una sola señal. Esta fila ES
+     la señal, y normalmente vale cero.
+
+     El registro de esas filas se añadió el 2 sep 2026; sin esta cola se
+     escribían y nadie las leía, que es justo el defecto que venían a resolver. */
+  await enCola("correos_sin_buzon",
+    "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'sin_destino'",
+    "Poner CORREO_MMC o CORREO_AVISOS en la configuración del Worker · mientras estén vacíos ningún aviso interno sale", 15, null);
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
     "WHERE publicada_en IS NULL AND anulada_en IS NULL",
