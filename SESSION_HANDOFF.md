@@ -1,6 +1,7 @@
 # SESSION HANDOFF — Give&Grow International
 
 > Última actualización: sesión "El arranque de Mira Mi Casa" (1 sep 2026)
+> Lo último: buzón propio de MMC y **supresión de inscripciones (Ley 1581)**, ambos probados en producción.
 > **⏭️ ARRANCA POR AQUÍ: no falta producto, falta la primera familia.**
 > Contado contra la base el 1 sep: **0 casos, 0 fotos, 0 conceptos firmados.**
 > 1 inspección en terreno, 2 ingenieros verificados desde el 22 de agosto, 15
@@ -23,6 +24,64 @@
 >
 > **DISCREPA queda FUERA hasta nuevo aviso** (decisión de Sebas, 1 sep).
 > Responder SIEMPRE en español. Principio rector: **"evidencia, no promesas"**.
+
+## ✅ EL BUZÓN DE MIRA MI CASA Y EL DERECHO DE SUPRESIÓN (1 sep · PR #249 y #250)
+
+**Los avisos de Mira Mi Casa ya no caen en contabilidad.** Los doce avisos
+internos iban al mismo sitio. Para una transferencia o un certificado eso es
+correcto; para «la casa de una familia está dañada» o «un ingeniero se postuló»
+no, porque quien los atiende no es quien lleva las cuentas. Sebas creó
+`MiraMiCasa@thegiveandgrowproject.org` y **cinco** se mudaron ahí —caso,
+ingeniero, apadrinamiento, inspección y discrepancia—; los otros **siete** se
+quedaron en contabilidad@ a propósito (aporte aprobado, certificado por reversa,
+transferencia, especie, aliado, fundación del Hub y voluntariado).
+
+El reparto vive en `correoMMC(env)`, que devuelve `env.CORREO_MMC ||
+env.CORREO_AVISOS`. **El respaldo no es adorno:** `enviarCorreo` devuelve
+`{ok:true, sinDestino:true}` cuando no hay destino y NO escribe fila en
+`correos`, así que un buzón sin configurar sería completamente invisible.
+
+**⚖️ SUPRIMIR UNA INSCRIPCIÓN YA ES POSIBLE, y es lo más importante de esta
+tanda.** Hasta hoy NO se podía borrar una inscripción: el panel solo movía su
+estado y `DELETE FROM` solo existía para caso_medios y entrega_casos. O sea que
+si alguien escribía pidiendo que sacáramos sus datos —un derecho que la Ley 1581
+le da y que la página de privacidad le promete— **no había forma de cumplirlo**.
+Archivar no es suprimir: la fila sigue con su nombre, su correo y su teléfono.
+
+`DELETE /api/admin/inscripcion/<id>` + botón «Suprimir» en la bandeja, en
+cualquier estado. Borra la fila Y sus consentimientos —conservar el
+consentimiento después de suprimir a la persona no prueba nada: su `sujeto`
+apunta a una inscripción que ya no existe—. Deja una línea de auditoría con
+quién, cuándo, qué TIPO era y por qué, **sin el nombre ni el correo ni el
+teléfono**: una auditoría que conservara los datos personales convertiría la
+supresión en un cambio de tabla. Motivo obligatorio.
+
+**COMPROBADO EN PRODUCCIÓN, las dos cosas y el mismo día.** Se disparó un
+apadrinamiento real de prueba (id 3) usando el buzón nuevo como correo del
+donante, así que sus DOS correos —el aviso interno y el acuse— cayeron ahí:
+llegaron ambos a las 22:43. Sebas lo suprimió después desde `/admin`, sin
+incidencias. Esa fue la primera ejecución real de la ruta de borrado.
+
+**⚠️ DOS TRAMPAS DEL REPO que mordieron al escribir esto**, las dos ya conocidas
+y las dos invisibles para `node --check`:
+
+1. **`limpio()` NO es global.** Es un `const` dentro de otra función. Usarlo
+   fuera da ReferenceError EN EJECUCIÓN, y el gate no lo ve porque es un fallo
+   de ámbito, no de sintaxis. El global es **`limpiar()`**.
+2. **worker.js GENERA el panel.** Dentro de esas plantillas no puede haber
+   comillas invertidas —las de un comentario mío cortaron el template literal— y
+   los saltos de línea de un `prompt` necesitan `\\n` para llegar al guion
+   generado.
+
+**Access no tiene puerta trasera de desarrollo**, ni siquiera en localhost: `/api/admin/*`
+responde `sin_token`. Una ruta nueva del panel NO se puede probar entera desde
+aquí. Lo que sí se puede, y es lo que se hizo: la expresión del router en node
+—comprobando que no pisa a `/estado` ni a `/matricula`— y las sentencias SQL
+contra el D1 local.
+
+**El correo del proyecto ya no bloquea nada.** Envía (verificado el 11 ago) y
+recibe (MX de Google Workspace, verificado hoy con esta prueba). Si alguna nota
+vieja dice que el DNS de correo está roto, está desactualizada.
 
 ## ✅ MIRA MI CASA ARRANCA POR SUS TRES PUERTAS (1 sep · PR #243 y #244)
 
