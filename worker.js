@@ -11877,9 +11877,11 @@ export default {
 
     /* --- Panel interno: TODO detrás de Access, y fail-closed --- */
     /* `/api/triage/` entra por el MISMO guardián que el panel: hereda la
-       verificación real de firma RS256 y el fail-closed. Los ingenieros
-       voluntarios se aprueban añadiendo su correo en Cloudflare Access, no
-       creando cuentas: cero contraseñas que guardar y cero que se filtren. */
+       verificación real de firma RS256 y el fail-closed. Un ingeniero entra
+       SIN CUENTA: pide un código a su correo y Access lo deja pasar si
+       `accessEvaluar` dice que su matrícula está verificada. Ya NO hay que
+       añadir su correo a mano en el dashboard — eso dejó de ser cierto con la
+       regla de External Evaluation, y este comentario lo siguió diciendo. */
     if (ruta === "/admin" || ruta === "/admin.js" /* red: ver la nota de /triaje.js */ || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/")) {
       /* `/triaje.js` ya no llega hasta aquí: se redirige más arriba, fuera del
          guardián. Se deja en la condición A PROPÓSITO, como red: si algún día

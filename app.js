@@ -1076,7 +1076,7 @@ var I18N = {
     "faq.q14":"¿Cuánto tarda?",
     "faq.a14":"No hay fecha, y prometerte una sería peor. Los ingenieros son voluntarios y los casos más graves se miran primero. Lo que sí te damos son dos datos verificables en tu enlace: los días que llevas esperando y cuántos casos siguen sin abrir. Guarda ese enlace: es donde ves en qué va tu caso y donde subes más fotos si te las piden.",
     "faq.q15":"Soy ingeniero. ¿Cómo ayudo?",
-    "faq.a15":"Te postulas en «Ingenieros voluntarios» con tu matrícula del COPNIA. La verificamos en el registro público del COPNIA y el acceso se habilita a mano, así que no es instantáneo. Lo que vas a hacer es dar un concepto a distancia sobre fotos —permanencia, precauciones, materiales y prioridad de visita—, nunca un dictamen de habitabilidad. No ves el contacto ni la dirección de la familia: para dar el concepto no hacen falta.",
+    "faq.a15":"Te postulas en «Ingenieros voluntarios» con tu matrícula del COPNIA. La verificamos a mano en el registro público del COPNIA —lo hace una persona, así que no es inmediato—, y en cuanto queda verificada el acceso se abre solo. Lo que vas a hacer es dar un concepto a distancia sobre fotos —permanencia, precauciones, materiales y prioridad de visita—, nunca un dictamen de habitabilidad. No ves el contacto ni la dirección de la familia: para dar el concepto no hacen falta.",
     "faq.ey":"Preguntas frecuentes",
     "faq.t":"Lo que más nos preguntan.",
     "faq.q1":"¿Cómo hago una donación?",
