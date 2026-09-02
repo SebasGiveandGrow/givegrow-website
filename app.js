@@ -201,6 +201,7 @@ var I18N = {
     "bc.tabla.donde":"Dónde",
     "bc.tabla.casa":"La casa",
     "bc.tabla.pri":"Prioridad",
+    "bc.tope":"Aquí se enseñan {v} de {t} casas publicadas. Van ordenadas por urgencia, así que las que no aparecen son las menos urgentes.",
     "bc.cl.urgente":"Visita urgente",
     "bc.cl.programada":"Visita programada",
     "bc.cl.no_requiere":"No requiere visita por ahora",
@@ -2380,6 +2381,27 @@ function bcPinta(){
         +  "<td><strong>" + escapeHtml(BC_CL.indexOf(c.clasificacion) > -1
              ? t("bc.cl." + c.clasificacion) : c.clasificacion) + "</strong></td></tr>";
     }
+    /* SI SE RECORTO, SE DICE. El servidor manda a lo sumo `tope` filas, y
+       `publicables` es el total de verdad. Cuando no coinciden, la tabla esta
+       ensenando una parte y callarlo seria afirmar que eso es todo — lo mismo que
+       ya se corrigio en esta pantalla cuando no podia consultar.
+
+       El texto informa en vez de alarmar: dice de cuantas se ensenan cuantas y
+       que van ordenadas por urgencia, asi que lo que no aparece es lo menos
+       urgente -y eso es verdad, porque la consulta ordena por gravedad-.
+
+       Y esta redactado para que NINGUN numero rompa la gramatica. Los dos
+       primeros intentos si la rompian: «Faltan 1 casas por mostrar» y «se
+       ensenan las 1 mas urgentes». Con el tope real en 300 casi nunca se veria,
+       pero depender de que un tope no valga 1 no es una razon. */
+    var pub = (d.totales && d.totales.publicables) || 0;
+    var vistos = typeof d.mostrados === "number" ? d.mostrados : l.length;
+    if (pub > vistos){
+      h += '<tr><td colspan="4" class="mu">'
+        +  escapeHtml(t("bc.tope").replace("{v}", vistos).replace("{t}", pub))
+        +  "</td></tr>";
+    }
+
     lis.innerHTML = h + "</tbody></table></div>";
       /* AQUI y no solo en `go`: la tabla se pinta cuando vuelve la promesa, o
          sea despues de que la navegacion ya paso. Sin esta llamada la caja del

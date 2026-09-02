@@ -1545,5 +1545,6 @@
   "mmc.marca": "Mira Mi Casa",
   "bc.apadrinar": "Want to help repair them?",
   "tbl.region": "Table that scrolls horizontally. With a keyboard, use the arrow keys.",
-  "mc.donde": "Where"
+  "mc.donde": "Where",
+  "bc.tope": "Showing {v} of {t} published homes. They are ordered by urgency, so the ones not listed are the least urgent."
 }

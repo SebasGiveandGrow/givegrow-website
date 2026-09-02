@@ -2551,6 +2551,11 @@ function rechazoNoEsFoto() {
 
 const MAX_MEDIOS = 20;
 
+/* Cuantas casas caben en una carga del banco publico. Vive aqui y no incrustada
+   en la consulta porque la pantalla necesita el mismo numero para saber si esta
+   viendo todo. */
+const TOPE_BANCO = 300;
+
 /* CUÁNTOS ARCHIVOS MÁS PUEDE MANDAR LA FAMILIA, y por qué no es una resta simple.
 
    Había un callejón sin salida con nombre y apellido: la familia sube 20 fotos,
@@ -6852,7 +6857,7 @@ async function apiCasosPublicos(env) {
     "WHERE consent_publico = 1 AND clasificacion IS NOT NULL " +
     "AND estado NOT IN ('cerrado','descartado') ORDER BY " +
     "CASE clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 ELSE 2 END, " +
-    "creado_en ASC LIMIT 300"
+    "creado_en ASC LIMIT " + TOPE_BANCO
   ).all();
 
   /* Los totales cuentan TODO lo clasificado, con consentimiento o sin él: son
@@ -6866,14 +6871,36 @@ async function apiCasosPublicos(env) {
     "FROM casos WHERE clasificacion IS NOT NULL AND estado <> 'descartado'"
   ).first();
 
+  /* Se cuenta con el MISMO filtro que la lista, no con uno parecido: si los dos
+     divergen, el aviso de «faltan N» miente en la direccion contraria. */
+  const pub = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos WHERE consent_publico = 1 AND clasificacion IS NOT NULL " +
+    "AND estado NOT IN ('cerrado','descartado')"
+  ).first();
+
   return json({
     casos: r.results || [],
     totales: {
       revisados: (t && t.revisados) || 0,
       urgentes: (t && t.urgentes) || 0,
       visitados: (t && t.visitados) || 0,
-      publicables: (r.results || []).length
-    }
+      /* EL TOTAL DE VERDAD, no el largo de la pagina.
+
+         Antes esto era `(r.results||[]).length`, o sea el numero de filas que
+         cupieron en el tope. Con mas de TOPE_BANCO casas publicables el contador
+         habria dicho exactamente «300 con permiso para aparecer aqui» —un numero
+         falso— y la tabla habria omitido el resto sin una palabra.
+
+         Es el mismo defecto que ya se corrigio en esta misma pantalla por el otro
+         lado: no afirmar en silencio algo que no se comprobo. Y el proyecto tiene
+         la regla escrita: «no hay topes callados; si se recorta, se dice». El
+         panel lo resuelve con `filaTope`; esto es lo mismo para el banco. */
+      publicables: (pub && pub.n) || 0
+    },
+    /* Con que la pantalla pueda comparar `mostrados` contra `publicables` sabe si
+       falta algo, sin tener que conocer el tope. */
+    tope: TOPE_BANCO,
+    mostrados: (r.results || []).length
   });
 }
 
