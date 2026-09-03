@@ -1250,6 +1250,11 @@ var I18N = {
     "mi.aviso":"Dos cosas de frente. El descuento del Art. 257 ET es para contribuyentes de renta en Colombia, así que probablemente no aplica en tu caso. Y la comisión internacional de PayPal se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más.",
     "mi.monto":"Cuánto quieres aportar cada mes, en dólares",
     "mi.calc":"Nivel {nivel}. De lo que aportes llegan {neto} a la fundación: PayPal se lleva el {pct} % en comisión y conversión.",
+    "mi.cubre":"Súmale la comisión de PayPal, para que a la fundación le llegue completo",
+    "mi.cubre.h":"Opcional. Te cobran un poco más cada mes y tu aporte llega íntegro.",
+    "mi.calc.cubre":"Nivel {nivel}. PayPal te cobrará {cargo} al mes para que lleguen {neto} completos a la fundación.",
+    "mi.calc.max.cubre":"Con la comisión sumada el cobro pasa de US$2.000 al mes. Baja el monto o desmarca la casilla.",
+    "mi.err.max.cubre":"Con la comisión sumada el cobro pasa de US$2.000 al mes. Baja el monto o desmarca la casilla.",
     "mi.calc.min":"El mínimo es US$5. Por debajo, la comisión fija de PayPal se lleva una parte demasiado grande.",
     "mi.calc.max":"Por encima de US$2.000 al mes preferimos hablarlo: una transferencia te deja más.",
     "mi.nombre":"Nombre completo",
@@ -5304,17 +5309,20 @@ function allyMal(note, campo, clave){
    aporte de US$5 eso es el 14,5%. Quien esta a punto de comprometerse a un cobro
    MENSUAL tiene derecho a ver ese numero antes, y ocultarlo seria exactamente lo
    que «evidencia, no promesas» prohibe. */
+/* Se guarda la CLAVE del diccionario y no el nombre: las tarjetas de membresia
+   traducen los niveles (Semilla/Seed, Retoño/Sprout...) y esta linea decia
+   «Retoño tier» en la pagina en ingles. Una sola fuente para los cuatro nombres. */
 var MI_NIVELES = [
-  { nombre: "Semilla", desde: 5 },
-  { nombre: "Retoño",  desde: 15 },
-  { nombre: "Árbol",   desde: 35 },
-  { nombre: "Bosque",  desde: 75 }
+  { clave: "membres.t1.t", desde: 5 },
+  { clave: "membres.t2.t", desde: 15 },
+  { clave: "membres.t3.t", desde: 35 },
+  { clave: "membres.t4.t", desde: 75 }
 ];
 
 function miNivel(usd){
   var n = MI_NIVELES[0];
   for (var i = 0; i < MI_NIVELES.length; i++){ if (usd >= MI_NIVELES[i].desde) n = MI_NIVELES[i]; }
-  return n.nombre;
+  return t(n.clave);
 }
 
 /* La misma cuenta que la pagina de comisiones de PayPal Colombia, en el mismo
@@ -5324,6 +5332,28 @@ function miNeto(usd){
   return tras - tras * 0.035;
 }
 
+/* EL INVERSO EXACTO de miNeto: cuanto hay que cobrar para que lleguen `neto`.
+   Despejado de la misma formula, en el mismo orden —
+     neto = (bruto - (0,054·bruto + 0,30)) · 0,965
+     bruto = (neto / 0,965 + 0,30) / 0,946
+   Se redondea HACIA ARRIBA al centavo: si cae, llega un centavo menos de lo que
+   la persona quiso dar, y el sentido de la casilla era justo lo contrario. */
+function miBruto(neto){
+  return Math.ceil(((neto / 0.965 + 0.30) / 0.946) * 100) / 100;
+}
+
+function miCubre(){
+  var c = document.getElementById("mif-cubre");
+  return !!(c && c.checked);
+}
+
+/* LO QUE PAYPAL VA A COBRAR, que es lo unico que se le manda al servidor: la
+   suscripcion se crea por el monto que se cobra, no por el que se quiso dar.
+   El nivel tambien sale de aqui — quien cubre la comision esta dando mas. */
+function miCargo(usd){
+  return miCubre() ? miBruto(usd) : usd;
+}
+
 function miCalcula(){
   var e = document.getElementById("mif-monto");
   var out = document.getElementById("mif-calc");
@@ -5331,6 +5361,19 @@ function miCalcula(){
   var usd = Math.round(Number(e.value) * 100) / 100;
   if (!(usd >= 5)){ out.textContent = t("mi.calc.min"); return; }
   if (usd > 2000){ out.textContent = t("mi.calc.max"); return; }
+
+  /* El tope de PayPal aplica a LO QUE SE COBRA, no a lo que se quiso dar: con la
+     comision sumada, US$2.000 se sale de la ventana. */
+  var cargo = miCargo(usd);
+  if (cargo > 2000){ out.textContent = t("mi.calc.max.cubre"); return; }
+
+  if (miCubre()){
+    out.textContent = t("mi.calc.cubre")
+      .replace("{nivel}", miNivel(cargo))
+      .replace("{cargo}", "$" + cargo.toFixed(2))
+      .replace("{neto}", "$" + miNeto(cargo).toFixed(2));
+    return;
+  }
   var neto = miNeto(usd);
   out.textContent = t("mi.calc")
     .replace("{nivel}", miNivel(usd))
@@ -5350,6 +5393,8 @@ function miSubmit(ev){
   var usd = Math.round(Number(val("mif-monto")) * 100) / 100;
   if (!(usd >= 5)) return allyMal(note, "mif-monto", "mi.err.min");
   if (usd > 2000) return allyMal(note, "mif-monto", "mi.err.max");
+  var cargo = miCargo(usd);
+  if (cargo > 2000) return allyMal(note, "mif-monto", "mi.err.max.cubre");
   if (!val("mif-nombre")) return allyMal(note, "mif-nombre", "mi.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("mif-email"))) return allyMal(note, "mif-email", "mi.err.email");
   var ok = document.getElementById("mif-datos");
@@ -5359,7 +5404,7 @@ function miSubmit(ev){
   allyMsg(note, t("mi.enviando"), true);
   fetch("/api/paypal/suscripcion", {
     method: "POST", headers: {"content-type":"application/json"},
-    body: JSON.stringify({ monto: usd, nombre: val("mif-nombre"), email: val("mif-email"),
+    body: JSON.stringify({ monto: cargo, nombre: val("mif-nombre"), email: val("mif-email"),
                            idioma: lang, autoriza_datos: true })
   }).then(function(r){ return r.json(); }).then(function(d){
     /* SE VA A PAYPAL, no se dibuja nada de PayPal aqui: la CSP prohibe su SDK,

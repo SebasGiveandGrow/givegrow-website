@@ -1995,6 +1995,11 @@
           <input type="number" id="mif-monto" min="5" max="2000" step="1" value="15" inputmode="decimal" data-input="miCalcula()" required></div>
         <p id="mif-calc" class="mu" style="margin:-4px 0 14px" aria-live="polite"></p>
 
+        <!-- VA DESMARCADA, y no es un detalle: pedirle a alguien que pague mas
+             tiene que ser una decision suya. Precargada seria cobrarle un
+             sobrecosto que no eligio. -->
+        <label class="ally-check"><input type="checkbox" id="mif-cubre" data-change="miCalcula()"><span><b data-i18n="mi.cubre">Súmale la comisión de PayPal, para que a la fundación le llegue completo</b><small data-i18n="mi.cubre.h">Opcional. Te cobran un poco más cada mes y tu aporte llega íntegro.</small></span></label>
+
         <div class="field"><label for="mif-nombre" data-i18n="mi.nombre">Nombre completo</label>
           <input type="text" id="mif-nombre" autocomplete="name" required></div>
         <div class="field"><label for="mif-email" data-i18n="mi.email">Correo</label>
@@ -2717,7 +2722,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=5222918b"></script>
+<script src="/app.js?v=dc0e3129"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
