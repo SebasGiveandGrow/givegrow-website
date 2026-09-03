@@ -963,6 +963,15 @@ var I18N = {
     "pay.now.t":"Tarjeta o Botón Bancolombia",
     "pay.now.p":"Sales a Wompi, la pasarela de pagos de Bancolombia, y vuelves con tu número de guía. Nosotros nunca vemos ni guardamos los datos de tu medio de pago.",
     "pay.now.btn":"Continuar al pago",
+    "pay.via.wompi":"Bancolombia",
+    "pay.via.paypal":"PayPal",
+    "pay.now.t.pp":"PayPal, en dólares",
+    "pay.now.p.pp":"Para quien no está en Colombia. Convertimos tu aporte con la TRM oficial del día y PayPal cobra en dólares. Su comisión internacional se lleva cerca del 10 %.",
+    "pay.pp.min":"Con PayPal el mínimo es US$5 al mes, que hoy son unos {cop}. Por debajo, su comisión fija se lleva demasiado.",
+    "pay.pp.max":"Ese monto es muy alto para PayPal. Escríbenos: una transferencia te deja más.",
+    "pay.pp.unico":"Te llevamos al pago de PayPal, donde escribes el monto.",
+    "pay.pp.sintrm":"No pudimos consultar la TRM, así que no podemos convertir tu aporte a dólares. Vuelve a intentarlo en un momento.",
+    "pay.pp.correo":"Para una membresía por PayPal necesitamos tu correo: ahí te llega el recibo de cada mes.",
     "pay.now.wait":"Preparando tu pago…",
     "pay.now.err":"No pudimos abrir la pasarela. Vuelve a intentarlo, o aporta por transferencia con los datos de abajo.",
     "pay.now.rec":"Elegiste un aporte {frec}. Por ahora procesamos este primer aporte y dejamos registrada tu intención: cuando habilitemos el débito automático te escribimos para activarlo, sin que tengas que empezar de nuevo.",
@@ -2787,6 +2796,7 @@ var ACT_FNS = {
      delegacion solo invoca funciones de esta lista, a proposito y sin eval.
      Es la clase de fallo que no da error en consola — simplemente no pasa. */
   miSubmit:miSubmit, miCalcula:miCalcula,
+  setPagoVia:setPagoVia,
   mcEnviar:mcEnviar,
   irAVoluntariadoBrigada:irAVoluntariadoBrigada,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
@@ -3110,10 +3120,90 @@ window.ggDonationDraft = buildDonationDraft;
    guarda el aporte, calcula la firma con el secreto de integridad y devuelve la
    URL. Aquí solo se navega. Por eso el secreto nunca sale del servidor y la CSP
    no necesita una sola excepción: una navegación no la gobierna `form-action`. */
+/* CON QUE PASARELA. Wompi cubre Colombia -PSE, Nequi, tarjeta- y PayPal cubre a
+   quien esta fuera. Antes esta zona era Wompi y nada mas, y PayPal vivia abajo en
+   «otras formas», como si fuera un plan B; para alguien en España es el UNICO
+   camino, no el segundo.
+
+   El estado vive aqui y no en el DOM para que `irAPagar` no tenga que leer clases
+   para saber que hacer. */
+/* El enlace alojado de PayPal, para el aporte UNICO. En un solo sitio: es el
+   mismo que publica la pestaña de «otras formas de aportar». */
+var PAYPAL_ENLACE = "https://www.paypal.com/ncp/payment/9ZDKY6PRBLZ98";
+var PAGO_VIA = "wompi";
+
+function setPagoVia(v){
+  PAGO_VIA = (v === "paypal") ? "paypal" : "wompi";
+  var w = document.getElementById("via-wompi");
+  var pp = document.getElementById("via-paypal");
+  if (w) w.classList.toggle("on", PAGO_VIA === "wompi");
+  if (pp) pp.classList.toggle("on", PAGO_VIA === "paypal");
+  /* El titulo y el parrafo cambian con la eleccion: dejar «Sales a Wompi»
+     mientras esta elegido PayPal seria mentirle a quien va a pagar. */
+  var tt = document.querySelector(".pay-now-t");
+  var pd = document.querySelector(".pay-now-p");
+  if (tt) tt.textContent = t(PAGO_VIA === "paypal" ? "pay.now.t.pp" : "pay.now.t");
+  if (pd) pd.textContent = t(PAGO_VIA === "paypal" ? "pay.now.p.pp" : "pay.now.p");
+  var msg = document.getElementById("pay-msg");
+  if (msg){ msg.style.display = "none"; msg.textContent = ""; }
+  calcUpdate();
+}
+
+/* CUANTO SE LE VA A COBRAR EN DOLARES, con la TRM oficial. `calc.val` esta
+   siempre en COP; el aporte anual se divide por 12 porque la suscripcion de
+   PayPal cobra MENSUAL — es la misma cuenta que ya hace `carnetTrasAporte` en el
+   servidor para decidir el nivel. */
+function pagoUsdMensual(){
+  var cop = Math.round(Number(calc.val) || 0);
+  if (calc.freq === "a") cop = Math.round(cop / 12);
+  if (!(USD_RATE > 0)) return 0;
+  return Math.round((cop / USD_RATE) * 100) / 100;
+}
+
+function irAPagarPaypal(){
+  var msg = document.getElementById("pay-msg");
+  var aviso = function(txt, err){
+    if (!msg) return;
+    msg.style.display = "";
+    msg.className = "pay-now-msg" + (err ? " err" : "");
+    msg.textContent = txt;
+  };
+
+  /* Sin TRM no se convierte NADA. Cobrar en dolares un monto calculado con una
+     tasa inventada es justo lo que se acaba de arreglar. */
+  if (!TRM_INFO){ aviso(t("pay.pp.sintrm"), true); return; }
+
+  /* UN APORTE UNICO NO ES UNA SUSCRIPCION. Para eso esta el enlace alojado de
+     PayPal, que acepta el monto que la persona escriba alli. */
+  if (calc.freq === "u"){ aviso(t("pay.pp.unico"), false); location.href = PAYPAL_ENLACE; return; }
+
+  var usd = pagoUsdMensual();
+  if (!(usd >= 5)){ aviso(t("pay.pp.min").replace("{cop}", fmtCOP(5 * USD_RATE)), true); return; }
+  if (usd > 2000){ aviso(t("pay.pp.max"), true); return; }
+
+  /* NO SE CREA LA SUSCRIPCION AQUI, y la razon es concreta: PayPal necesita
+     correo -ahi va el recibo de cada mes- y la calculadora NO lo pide. Wompi si
+     puede, porque recoge los datos en su propia pagina.
+
+     Asi que la calculadora decide el MONTO y el formulario de membresia recoge lo
+     que PayPal necesita. Se lleva alla con el monto ya puesto, en vez de duplicar
+     aqui los campos y la casilla de Ley 1581. */
+  var campo = document.getElementById("mif-monto");
+  if (campo){ campo.value = usd.toFixed(2); }
+  go("membresias");
+  setTimeout(function(){
+    var sec = document.getElementById("membres-intl");
+    if (sec) sec.scrollIntoView({ block: "start" });
+    try { miCalcula(); } catch(e){}
+    var n = document.getElementById("mif-nombre");
+    if (n) n.focus();
+  }, 60);
+}
 function irAPagar(){
   var btn = document.getElementById("pay-go");
   var msg = document.getElementById("pay-msg");
   if (!btn || btn.disabled) return;
+  if (PAGO_VIA === "paypal") return irAPagarPaypal();
 
   var monto = Math.round(Number(calc.val) || 0);   // calc.val siempre está en COP
   if (!(monto >= 5000 && monto <= 20000000)){
