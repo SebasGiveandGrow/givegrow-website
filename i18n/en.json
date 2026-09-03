@@ -1546,5 +1546,7 @@
   "bc.apadrinar": "Want to help repair them?",
   "tbl.region": "Table that scrolls horizontally. With a keyboard, use the arrow keys.",
   "mc.donde": "Where",
-  "bc.tope": "Showing {v} of {t} published homes. They are ordered by urgency, so the ones not listed are the least urgent."
+  "bc.tope": "Showing {v} of {t} published homes. They are ordered by urgency, so the ones not listed are the least urgent.",
+  "gracias.sub.t": "Your membership is registered.",
+  "gracias.sub.p": "PayPal confirms the first charge and that is when your receipt with its tracking number arrives. It is not instant, so we would rather tell you than thank you for something not yet charged. You can cancel it whenever you want from your own PayPal account."
 }

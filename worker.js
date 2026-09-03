@@ -6826,7 +6826,27 @@ async function apiPaypalSuscripcion(request, env, url) {
          direccion seria pedir un dato que no necesitamos. */
       shipping_preference: "NO_SHIPPING",
       user_action: "SUBSCRIBE_NOW",
-      return_url: ORIGIN + "/#gracias",
+      /* Se manda NUESTRO `custom_id` en la query, no el id de PayPal: ese
+         todavia no existe cuando armamos esta peticion. Y va en la QUERY y no en
+         el fragmento porque el fragmento no viaja a ningun servidor y hay
+         proveedores que lo recortan; la query si sobrevive.
+
+         Sirve para que la pagina de gracias sepa que viene de una MEMBRESIA y no
+         de un aporte unico. Sin esto aterrizaba en «Estamos confirmando tu pago»
+         y buscaba un `?id=` que PayPal nunca manda -manda `subscription_id`-,
+         asi que quien acababa de hacerse miembro leia algo que no era lo suyo y
+         que no se iba a resolver nunca. */
+      /* `/gracias` CON PATH, no `#gracias`. Es la convencion que ya usa Wompi y
+         no un detalle: `init()` solo llama a `graciasArranca()` cuando
+         `location.pathname` es `/gracias`. Con el hash la pagina se pinta pero su
+         logica NO corre — comprobado el 2 sep, aterrizaba en «Estamos
+         confirmando tu pago» y ahi se quedaba.
+
+         Y va NUESTRO `custom_id`, no el id de PayPal: ese todavia no existe
+         cuando armamos esta peticion. Sirve para que la pagina sepa que viene de
+         una MEMBRESIA y no de un aporte unico; PayPal manda `subscription_id`,
+         nunca el `?id=` que esa pantalla busca. */
+      return_url: ORIGIN + "/gracias?sub=" + encodeURIComponent(propio),
       cancel_url: ORIGIN + "/#membresias"
     }
   }, propio);

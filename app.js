@@ -999,6 +999,8 @@ var I18N = {
     "gracias.save":"Guarda tu número de guía. Es el mismo con el que puedes rastrear tu aporte de principio a fin.",
     "gracias.track":"Rastrear mi aporte",
     "gracias.home":"Volver al inicio",
+    "gracias.sub.t":"Tu membresía quedó registrada.",
+    "gracias.sub.p":"PayPal confirma el primer cobro y ahí te llega el recibo con tu número de guía. No es inmediato, así que preferimos decírtelo en vez de darte las gracias por algo que todavía no está cobrado. Puedes cancelarla cuando quieras desde tu propia cuenta de PayPal.",
     "gracias.lost.t":"No encontramos esa transacción.",
     "gracias.lost.p":"Puede que el enlace haya perdido su identificador. Si hiciste un aporte, busca tu número de guía en el correo de confirmación y consúltalo en «Rastrea tu donación».",
     "pay.tab.banco":"Bancolombia",
@@ -1768,6 +1770,9 @@ function postLang(l){
   /* Va DESPUÉS de applyLang: el repintado de data-i18n devuelve el rango
      estático a su sitio y hay que volver a poner la fase encima. */
   pintarBrigadaEstado();
+  /* Por lo mismo que la linea de arriba: `applyLang` acaba de repintar los
+     `data-i18n` y se lleva por delante el mensaje de membresia. */
+  graciasMembresia();
   pintarFechaImpresion();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
@@ -3116,8 +3121,41 @@ function payRecNote(){
    devuelve NUESTRO estado, que es el que trae el webhook. */
 var GRACIAS = { id:null, guia:null, intentos:0, timer:null };
 
+/* EL MENSAJE DE MEMBRESIA, y vive aparte porque hay que volver a ponerlo.
+
+   `gracias-t` y `gracias-p` llevan `data-i18n`, y `applyLang` los repinta con el
+   texto del diccionario. Como `setLang` es ASINCRONO, ese repintado ocurre
+   DESPUES de `graciasArranca` y borraba lo que acababa de escribirse: la pantalla
+   volvia a decir «Estamos confirmando tu pago». Por eso se llama en los dos
+   sitios, igual que `pintarBrigadaEstado`, que existe por lo mismo.
+
+   Devuelve true si esto era una membresia, para que quien llama no siga con la
+   consulta del aporte unico. */
+function graciasMembresia(){
+  if (!new URLSearchParams(location.search).get("sub")) return false;
+  var st = document.getElementById("gracias-t");
+  var sp = document.getElementById("gracias-p");
+  if (st) st.textContent = t("gracias.sub.t");
+  if (sp) sp.textContent = t("gracias.sub.p");
+  return true;
+}
+
 function graciasArranca(){
   var q = new URLSearchParams(location.search);
+
+  /* UNA MEMBRESIA NO ES UN APORTE UNICO, y esta pantalla estaba escrita solo para
+     lo segundo. Quien vuelve de aprobar una suscripcion de PayPal trae `?sub=`
+     -nuestro `custom_id`, que ponemos en el `return_url`- y no trae `?id=`.
+
+     Sin esto leia «Estamos confirmando tu pago» y se quedaba consultando un
+     aporte que no existe: el primer cobro de una suscripcion no es inmediato y
+     puede tardar. Decirle la verdad -quedo registrada, el cobro lo confirma
+     PayPal y le avisamos- es lo que corresponde.
+
+     No se consulta nada al servidor: el `custom_id` es NUESTRO y no identifica a
+     nadie, asi que no hay que exponer una consulta publica por suscripcion. */
+  if (graciasMembresia()) return;
+
   GRACIAS.id = q.get("id");
   try { GRACIAS.guia = sessionStorage.getItem("gg_guia"); } catch(e){}
   GRACIAS.intentos = 0;
