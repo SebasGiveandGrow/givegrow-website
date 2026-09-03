@@ -251,7 +251,7 @@
   "pay.nit": "Tax ID",
   "copy": "Copy",
   "copied": "Copied",
-  "pay.paypal.note": "For international donations in USD. Write to us and we will send the PayPal link.",
+  "pay.paypal.note": "For donors outside Colombia, in dollars. Its international fee takes close to 10%, so if your gift is large, write to us and we will send you the bank details: more of it arrives.",
   "transp.ey": "Transparency",
   "transp.t": "Open books.",
   "transp.p1": "We are a Colombian nonprofit (ESAL), formally incorporated and under State oversight. Here are our registration details, governance and financial commitments, independently verifiable.",
@@ -332,7 +332,7 @@
   "faq.q7": "Can I make a one-time gift instead of monthly?",
   "faq.a7": "Yes. In the calculator you can choose One-off for a single gift, or Monthly/Annual. A heads-up on the second, because it is better known upfront: automatic debit does not exist yet. Today we process that first gift and record your intention, and we write to you to activate it once we enable it, without you starting over. In every case you receive your receipt with a tracking number once the payment is confirmed. The donation certificate for tax purposes is separate: you request it when you give, it is signed by the Legal Representative and the Statutory Auditor under oath, and a person issues it — which is why we need your ID document and your city.",
   "faq.q8": "Can I donate from abroad?",
-  "faq.a8": "Yes. For international donors we enable PayPal; write to us and we will share the link. Note that the Art. 257 ET deduction applies to income-tax payers in Colombia.",
+  "faq.a8": "Yes. The PayPal tab on the donation form has a direct link, in dollars. Bear in mind its international fee takes close to 10%: if your gift is large, write to us for the bank details, because more of it arrives. Note that the Art. 257 ET deduction applies to income-tax payers in Colombia.",
   "faq.q9": "How do I know where my gift went?",
   "faq.a9": "Evidence, not promises. Every gift follows our traceability: a receipt with a tracking number once the payment is confirmed, a delivery record signed by whoever receives it, and its photos published in your gift's tracking page. If you requested a donation certificate, it is issued reviewed and signed. We tell you where it went and who it helped.",
   "faq.q10": "What are ImpactOS and ALMA?",
@@ -373,7 +373,7 @@
   "pay.how.s1.t": "Choose your tier and amount",
   "pay.how.s1.p": "Use the calculator to see your gift, your tax benefit and your tier. You can choose monthly, annual or one-time.",
   "pay.how.s2.t": "Pay through a secure channel",
-  "pay.how.s2.p": "Today: pay online by card or with the Bancolombia Button through Wompi, Bancolombia gateway, and come back with your tracking number. You can also transfer and send the receipt. Automatic debit for memberships comes later.",
+  "pay.how.s2.p": "Today: pay online by card or with the Bancolombia Button through Wompi, Bancolombia gateway, and come back with your tracking number. You can also transfer and send the receipt, or pay with PayPal if you are outside Colombia. Automatic debit for memberships comes later.",
   "pay.how.s3.t": "Get your receipt, and then your certificate",
   "pay.how.s3.p": "The receipt with your tracking number arrives as soon as the payment clears, automatically. The donation certificate (Art. 257 of the Tax Code) is different: we review it and it is signed by the Legal Representative and the Statutory Auditor, so it is not instant.",
   "pay.how.sec.t": "Security tips",
@@ -1548,5 +1548,6 @@
   "mc.donde": "Where",
   "bc.tope": "Showing {v} of {t} published homes. They are ordered by urgency, so the ones not listed are the least urgent.",
   "gracias.sub.t": "Your membership is registered.",
-  "gracias.sub.p": "PayPal confirms the first charge and that is when your receipt with its tracking number arrives. It is not instant, so we would rather tell you than thank you for something not yet charged. You can cancel it whenever you want from your own PayPal account."
+  "gracias.sub.p": "PayPal confirms the first charge and that is when your receipt with its tracking number arrives. It is not instant, so we would rather tell you than thank you for something not yet charged. You can cancel it whenever you want from your own PayPal account.",
+  "pay.paypal.cta": "Donate with PayPal"
 }
