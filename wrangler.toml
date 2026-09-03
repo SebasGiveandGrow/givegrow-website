@@ -130,3 +130,33 @@ CORREO_DESDE = "Give&Grow (pruebas) <no-responder@notificaciones.thegiveandgrowp
 # haría que el buzón dejara de ser confiable como bandeja de trabajo.
 CORREO_AVISOS = "fundaciongiveandgrow@gmail.com"
 CORREO_MMC = "fundaciongiveandgrow+mmc@gmail.com"
+
+# ---------------------------------------------------------------------------
+# PAYPAL — MEMBRESIAS INTERNACIONALES, y va SOLO en este entorno
+# ---------------------------------------------------------------------------
+# NINGUNO DE ESTOS ES SECRETO. El id del webhook y los ids de plan identifican
+# recursos de PayPal; no autorizan nada por si solos, igual que el AUD de Access.
+# Los que SI son secretos -PAYPAL_CLIENT_ID y PAYPAL_SECRET- van con
+# `npx wrangler secret put ... --env sandbox` y nunca aqui.
+#
+# ⚠️ POR QUE ESTO NO ESTA EN PRODUCCION, Y NO ES UN OLVIDO.
+# La tentacion era poner las llaves de sandbox de PayPal en produccion para que
+# sus webhooks tuvieran una URL publica a la que llegar. Este archivo ya explica
+# arriba por que eso es exactamente lo que no se hace, y son las dos razones que
+# valen: un donante que entrara en esa ventana pagaria en una pasarela de juguete
+# creyendo que dono, y los eventos de prueba escribirian aportes falsos en la base
+# de PRODUCCION — contaminando el ledger de una fundacion cuya tesis es la
+# trazabilidad. El entorno de pruebas existe para esto y su URL de workers.dev es
+# igual de publica.
+#
+# En el panel de desarrollador de PayPal, el webhook de SANDBOX debe apuntar a
+# <url del worker de sandbox>/api/paypal/webhook — nunca a la de produccion.
+PAYPAL_ENTORNO = "sandbox"
+PAYPAL_WEBHOOK_ID = "WH-37C1825267002473W"
+# Creados con `node ops/paypal-plans.mjs --crear` el 2 sep 2026. Son de SANDBOX:
+# los de produccion son OTROS y hay que crearlos aparte con PAYPAL_ENTORNO=live.
+PAYPAL_PRODUCTO = "PROD-41D12513UL2706608"
+PAYPAL_PLAN_SEMILLA = "P-9BG09831XA1085144NKMMLNA"
+PAYPAL_PLAN_RETONO = "P-7398672717248935BNKMMLNI"
+PAYPAL_PLAN_ARBOL = "P-8T600504SC255541ENKMMLNQ"
+PAYPAL_PLAN_BOSQUE = "P-0W178534CC254241JNKMMLNY"
