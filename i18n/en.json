@@ -240,6 +240,8 @@
   "gracias.save": "Save your tracking number. It is the same one you use to follow your gift from start to finish.",
   "gracias.track": "Track my gift",
   "gracias.home": "Back to home",
+  "gracias.pp.t": "Thank you. Your donation went through PayPal.",
+  "gracias.pp.p": "On this route your gift carries no tracking number of ours: PayPal emails you the receipt. If you made it monthly, you can pause or cancel it from your own PayPal account, without writing to us. And if you would like your donation certificate, write to us at contabilidad@thegiveandgrowproject.org.",
   "gracias.lost.t": "We could not find that transaction.",
   "gracias.lost.p": "The link may have lost its identifier. If you made a gift, find your tracking number in the confirmation email and check it under “Track your donation”.",
   "pay.tab.banco": "Bancolombia",
