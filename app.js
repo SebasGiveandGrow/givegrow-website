@@ -1235,6 +1235,29 @@ var I18N = {
     "membres.t4.b2":"Reunión con el equipo directivo",
     "membres.t4.b3":"Membresía honorífica y liderazgo en la comunidad",
     "membres.cancel":"Puedes pausar o cancelar tu membresía cuando quieras escribiendo a contabilidad@thegiveandgrowproject.org o desde tu pasarela de pago. Aplica al siguiente ciclo, sin penalidades; el certificado tributario cubre lo donado hasta la fecha.",
+    "mi.ey":"Desde el exterior",
+    "mi.t":"Membresía en dólares, por PayPal",
+    "mi.lead":"Si no estás en Colombia no puedes usar PSE ni Nequi, así que esta es tu puerta: eliges cuánto aportas cada mes y PayPal lo cobra solo. Puedes cancelarla en cualquier momento desde tu propia cuenta de PayPal, sin escribirnos.",
+    "mi.aviso":"Dos cosas de frente. El descuento del Art. 257 ET es para contribuyentes de renta en Colombia, así que probablemente no aplica en tu caso. Y la comisión internacional de PayPal se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más.",
+    "mi.monto":"Cuánto quieres aportar cada mes, en dólares",
+    "mi.calc":"Nivel {nivel}. De lo que aportes llegan {neto} a la fundación: PayPal se lleva el {pct} % en comisión y conversión.",
+    "mi.calc.min":"El mínimo es US$5. Por debajo, la comisión fija de PayPal se lleva una parte demasiado grande.",
+    "mi.calc.max":"Por encima de US$2.000 al mes preferimos hablarlo: una transferencia te deja más.",
+    "mi.nombre":"Nombre completo",
+    "mi.email":"Correo",
+    "mi.datos":"Autorizo el tratamiento de mis datos para gestionar mi membresía y enviarme el recibo de cada aporte, conforme a la Ley 1581 de 2012.",
+    "mi.datos.h":"Puedes pedir que los borremos escribiendo a privacidad@thegiveandgrowproject.org.",
+    "mi.enviar":"Continuar a PayPal",
+    "mi.enviando":"Preparando tu membresía…",
+    "mi.pie":"PayPal te pide la aprobación y el primer cobro lo hace él. Nosotros no vemos ni guardamos los datos de tu tarjeta.",
+    "mi.ok":"Listo.",
+    "mi.err.min":"El mínimo es US$5 al mes.",
+    "mi.err.max":"Ese monto es muy alto para este formulario. Escríbenos y lo coordinamos.",
+    "mi.err.nombre":"Necesitamos tu nombre completo.",
+    "mi.err.email":"Revisa el correo: ahí te llega el recibo de cada aporte.",
+    "mi.err.datos":"Necesitamos tu autorización para tratar tus datos.",
+    "mi.err.cerrado":"La membresía internacional todavía no está abierta. Escríbenos y te ayudamos.",
+    "mi.err.envio":"No pudimos conectar con PayPal. Vuelve a intentarlo en un momento.",
     "membres.extra.ey":"Otras formas",
     "membres.extra.t":"No todo es mensual.",
     "membres.temp.t":"Temporal",
@@ -5135,6 +5158,94 @@ function allyMal(note, campo, clave){
   /* El foco DESPUES del mensaje: al revés, algunos lectores anuncian el campo y
      se pierden el texto que explica por qué. */
   if (c && typeof c.focus === "function") c.focus();
+  return false;
+}
+
+/* ---------- membresía internacional por PayPal ----------
+   El monto es LIBRE y el nivel se deduce, igual que hace `TIERS` con los pesos:
+   este sitio nunca tuvo precios fijos, tuvo umbrales. Los umbrales en dolares son
+   los equivalentes que ya publican las tarjetas de membresia.
+
+   Se calcula tambien LO QUE LLEGA, y no es un adorno: PayPal Colombia cobra
+   5,40% + USD 0,30 al recibir del exterior y 3,50% al convertir a pesos. En un
+   aporte de US$5 eso es el 14,5%. Quien esta a punto de comprometerse a un cobro
+   MENSUAL tiene derecho a ver ese numero antes, y ocultarlo seria exactamente lo
+   que «evidencia, no promesas» prohibe. */
+var MI_NIVELES = [
+  { nombre: "Semilla", desde: 5 },
+  { nombre: "Retoño",  desde: 15 },
+  { nombre: "Árbol",   desde: 35 },
+  { nombre: "Bosque",  desde: 75 }
+];
+
+function miNivel(usd){
+  var n = MI_NIVELES[0];
+  for (var i = 0; i < MI_NIVELES.length; i++){ if (usd >= MI_NIVELES[i].desde) n = MI_NIVELES[i]; }
+  return n.nombre;
+}
+
+/* La misma cuenta que la pagina de comisiones de PayPal Colombia, en el mismo
+   orden: primero la transaccion, despues la conversion sobre lo que quedo. */
+function miNeto(usd){
+  var tras = usd - (usd * 0.054 + 0.30);
+  return tras - tras * 0.035;
+}
+
+function miCalcula(){
+  var e = document.getElementById("mif-monto");
+  var out = document.getElementById("mif-calc");
+  if (!e || !out) return;
+  var usd = Math.round(Number(e.value) * 100) / 100;
+  if (!(usd >= 5)){ out.textContent = t("mi.calc.min"); return; }
+  if (usd > 2000){ out.textContent = t("mi.calc.max"); return; }
+  var neto = miNeto(usd);
+  out.textContent = t("mi.calc")
+    .replace("{nivel}", miNivel(usd))
+    .replace("{neto}", "$" + neto.toFixed(2))
+    .replace("{pct}", ((usd - neto) / usd * 100).toFixed(1));
+}
+
+function miSubmit(ev){
+  if (ev && ev.preventDefault) ev.preventDefault();
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+  var note = document.getElementById("mif-note");
+  var btn = document.getElementById("mif-btn");
+
+  /* Honeypot: exito aparente y cero envio, igual que los otros siete. */
+  if (val("mif-web2")){ document.getElementById("mif").reset(); return allyMsg(note, t("mi.ok"), true); }
+
+  var usd = Math.round(Number(val("mif-monto")) * 100) / 100;
+  if (!(usd >= 5)) return allyMal(note, "mif-monto", "mi.err.min");
+  if (usd > 2000) return allyMal(note, "mif-monto", "mi.err.max");
+  if (!val("mif-nombre")) return allyMal(note, "mif-nombre", "mi.err.nombre");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("mif-email"))) return allyMal(note, "mif-email", "mi.err.email");
+  var ok = document.getElementById("mif-datos");
+  if (!ok || !ok.checked) return allyMal(note, ok || "mif-datos", "mi.err.datos");
+
+  btn.disabled = true;
+  allyMsg(note, t("mi.enviando"), true);
+  fetch("/api/paypal/suscripcion", {
+    method: "POST", headers: {"content-type":"application/json"},
+    body: JSON.stringify({ monto: usd, nombre: val("mif-nombre"), email: val("mif-email"),
+                           idioma: lang, autoriza_datos: true })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    /* SE VA A PAYPAL, no se dibuja nada de PayPal aqui: la CSP prohibe su SDK,
+       su boton y su iframe, y esa es tambien la forma segura — nadie de fuera
+       ejecuta codigo en la pagina donde alguien escribe sus datos. */
+    if (d && d.ok && d.url){ location.href = d.url; return; }
+    btn.disabled = false;
+    /* Se dice QUE fallo cuando el servidor lo sabe, en vez de un «algo salio
+       mal» que no deja hacer nada. */
+    var texto = d && d.error === "monto_muy_bajo"  ? t("mi.err.min")
+              : d && d.error === "monto_muy_alto"  ? t("mi.err.max")
+              : d && d.error === "email_invalido"  ? t("mi.err.email")
+              : d && d.error === "paypal_no_configurado" ? t("mi.err.cerrado")
+              : t("mi.err.envio");
+    allyMsg(note, texto, false);
+  }).catch(function(){
+    btn.disabled = false;
+    allyMsg(note, t("mi.err.envio"), false);
+  });
   return false;
 }
 

@@ -1964,6 +1964,44 @@
       </div>
     </div>
   </section>
+
+  <!-- MEMBRESIA INTERNACIONAL. Vive aparte de la calculadora a proposito: esa
+       esta en pesos y calcula el beneficio del Art. 257, que NO aplica a un
+       contribuyente del exterior. Mostrarselo seria la clase de promesa falsa que
+       este proyecto prohibe.
+
+       El MONTO ES LIBRE y el nivel se deduce, igual que hace `TIERS` con los
+       pesos: el sitio nunca tuvo precios fijos, tuvo umbrales. PayPal permite
+       sobreescribir el precio del plan al crear la suscripcion -verificado contra
+       su API- asi que no hacen falta cuatro botones. -->
+  <section id="membres-intl">
+    <div class="wrap">
+      <p class="ey rv" data-i18n="mi.ey">Desde el exterior</p>
+      <h2 class="h-sec rv" data-i18n="mi.t">Membresía en dólares, por PayPal</h2>
+      <p class="lead rv d1" data-i18n="mi.lead">Si no estás en Colombia no puedes usar PSE ni Nequi, así que esta es tu puerta: eliges cuánto aportas cada mes y PayPal lo cobra solo. Puedes cancelarla en cualquier momento desde tu propia cuenta de PayPal, sin escribirnos.</p>
+      <p class="mu rv d1" style="max-width:62ch;margin-top:14px" data-i18n="mi.aviso">Dos cosas de frente. El descuento del Art. 257 ET es para contribuyentes de renta en Colombia, así que probablemente no aplica en tu caso. Y la comisión internacional de PayPal se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más.</p>
+
+      <form id="mif" class="ally-form rv d2" data-submit="miSubmit(event)">
+        <div class="field"><label for="mif-monto" data-i18n="mi.monto">Cuánto quieres aportar cada mes, en dólares</label>
+          <input type="number" id="mif-monto" min="5" max="2000" step="1" value="15" inputmode="decimal" data-input="miCalcula()" required></div>
+        <p id="mif-calc" class="mu" style="margin:-4px 0 14px" aria-live="polite"></p>
+
+        <div class="field"><label for="mif-nombre" data-i18n="mi.nombre">Nombre completo</label>
+          <input type="text" id="mif-nombre" autocomplete="name" required></div>
+        <div class="field"><label for="mif-email" data-i18n="mi.email">Correo</label>
+          <input type="email" id="mif-email" autocomplete="email" required></div>
+
+        <label class="ally-check"><input type="checkbox" id="mif-datos"><span><b data-i18n="mi.datos">Autorizo el tratamiento de mis datos para gestionar mi membresía y enviarme el recibo de cada aporte, conforme a la Ley 1581 de 2012.</b><small data-i18n="mi.datos.h">Puedes pedir que los borremos escribiendo a privacidad@thegiveandgrowproject.org.</small></span></label>
+
+        <!-- Trampa para bots, igual que en los otros siete formularios. -->
+        <input type="text" id="mif-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
+
+        <button type="submit" class="btn btn-g" id="mif-btn" data-i18n="mi.enviar">Continuar a PayPal</button>
+        <p id="mif-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
+        <p class="mu" style="margin-top:10px;font-size:13px" data-i18n="mi.pie">PayPal te pide la aprobación y el primer cobro lo hace él. Nosotros no vemos ni guardamos los datos de tu tarjeta.</p>
+      </form>
+    </div>
+  </section>
 </main>
 
 <main id="page-voluntariado" class="page">
@@ -2670,7 +2708,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=f280ff0c"></script>
+<script src="/app.js?v=9089b4fa"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

@@ -6710,12 +6710,36 @@ function almaLimitada(ip) {
    Cualquier otra cosa -vacio, "sandbox", un dedazo- va a sandbox. Equivocarse
    hacia el lado seguro. */
 
-const PAYPAL_NIVELES = {
-  semilla: { env: "PAYPAL_PLAN_SEMILLA", nombre: "Semilla", usd: 5 },
-  retono:  { env: "PAYPAL_PLAN_RETONO",  nombre: "Retoño",  usd: 15 },
-  arbol:   { env: "PAYPAL_PLAN_ARBOL",   nombre: "Árbol",   usd: 35 },
-  bosque:  { env: "PAYPAL_PLAN_BOSQUE",  nombre: "Bosque",  usd: 75 }
-};
+/* UMBRALES, NO PRECIOS, y esto es fiel a como ya funciona el sitio. `TIERS` en
+   app.js no tiene precios fijos: tiene minimos, y el nivel se DEDUCE del monto.
+   Quien pone $77.000 COP es Retoño porque pasa de 50.000, no porque exista un
+   boton de 77. Aqui igual, en dolares.
+
+   Los `usd` son los equivalentes que el sitio ya publica en las tarjetas de
+   membresia (`membres.tN.priceu`). */
+const PAYPAL_NIVELES = [
+  { env: "PAYPAL_PLAN_SEMILLA", nombre: "Semilla", desde: 5 },
+  { env: "PAYPAL_PLAN_RETONO",  nombre: "Retoño",  desde: 15 },
+  { env: "PAYPAL_PLAN_ARBOL",   nombre: "Árbol",   desde: 35 },
+  { env: "PAYPAL_PLAN_BOSQUE",  nombre: "Bosque",  desde: 75 }
+];
+
+/* EL MINIMO NO ES CAPRICHO. Por debajo de US$5 la comision de PayPal se vuelve
+   absurda: el fijo de US$0,30 solo, sobre US$1, ya es el 30%. Cobrarle a alguien
+   para que llegue menos de la mitad no es aceptar su aporte, es desperdiciarlo.
+
+   Y EL TOPE PROTEGE DE UN DEDAZO. Un 7700 escrito en vez de 77 crea un cobro
+   MENSUAL de casi ocho mil dolares. Por encima del tope se le pide que escriba,
+   que para un aporte de ese tamano es lo que hay que hacer de todos modos —una
+   transferencia le deja mas, porque PayPal se lleva cerca del 9%. */
+const PAYPAL_MIN_USD = 5;
+const PAYPAL_MAX_USD = 2000;
+
+function paypalNivelDe(usd) {
+  let n = PAYPAL_NIVELES[0];
+  for (const x of PAYPAL_NIVELES) if (usd >= x.desde) n = x;
+  return n;
+}
 
 function paypalConfig(env) {
   /* Se recorta por lo mismo que ALMA: un secreto cargado por tuberia se lleva el
@@ -6790,10 +6814,26 @@ async function apiPaypalSuscripcion(request, env, url) {
      registro. No se le enseña al bot que lo delato. */
   if (c.web2) return json({ ok: true, url: null });
 
-  const nivel = PAYPAL_NIVELES[String(c.nivel || "").toLowerCase()];
-  if (!nivel) {
-    return json({ error: "nivel_invalido", opciones: Object.keys(PAYPAL_NIVELES) }, 400);
+  /* EL MONTO LO ELIGE QUIEN DONA. PayPal permite sobreescribir el precio del
+     plan al crear la suscripcion -comprobado contra su API el 3 sep 2026: se
+     pidio US$77 sobre el plan de US$15 y la suscripcion quedo en 77,0 con
+     `plan_overridden: true`-. Asi que no hace falta un plan por monto.
+
+     Se prueba tambien `quantity` y PayPal lo RECHAZA con
+     SUBSCRIPTION_CANNOT_HAVE_QUANTITY porque los planes no lo declaran; era la
+     opcion peor de todos modos, porque al donante le apareceria «77 × US$1». */
+  const usd = Math.round(Number(c.monto) * 100) / 100;
+  if (!(usd >= PAYPAL_MIN_USD)) {
+    return json({ error: "monto_muy_bajo", min: PAYPAL_MIN_USD }, 400);
   }
+  if (usd > PAYPAL_MAX_USD) {
+    return json({ error: "monto_muy_alto", max: PAYPAL_MAX_USD }, 400);
+  }
+
+  /* El nivel se DEDUCE, y se usa SU plan como base: asi los registros de PayPal
+     dicen «Membresia Bosque» y no un plan que no corresponde, aunque el precio
+     sea el que eligio la persona. */
+  const nivel = paypalNivelDe(usd);
   const planId = String(env[nivel.env] || "").trim();
   if (!planId) {
     /* Sin `ayuda`: el nombre de una variable de entorno es de nuestra cocina. */
@@ -6827,6 +6867,16 @@ async function apiPaypalSuscripcion(request, env, url) {
   const r = await paypalPost(cfg, tk, "/v1/billing/subscriptions", {
     plan_id: planId,
     custom_id: propio,
+    /* EL OVERRIDE. Un solo ciclo REGULAR con el precio elegido; `total_cycles: 0`
+       lo mantiene indefinido. Esta es la forma exacta que se verifico contra la
+       API, no una interpretacion de la documentacion. */
+    plan: {
+      billing_cycles: [{
+        sequence: 1,
+        total_cycles: 0,
+        pricing_scheme: { fixed_price: { value: usd.toFixed(2), currency_code: "USD" } }
+      }]
+    },
     subscriber: {
       email_address: email,
       name: { given_name: partes[0], surname: partes.slice(1).join(" ") || partes[0] }
@@ -6878,7 +6928,7 @@ async function apiPaypalSuscripcion(request, env, url) {
     "INSERT INTO suscripciones (id, proveedor, plan_ref, estado, nivel, monto_centavos, " +
     "moneda, frecuencia, idioma, quiere_certificado, consent_muro) " +
     "VALUES (?, 'paypal', ?, 'aprobacion_pendiente', ?, ?, 'USD', 'mensual', ?, ?, ?)"
-  ).bind(r.d.id, planId, nivel.nombre, nivel.usd * 100, idioma, quiereCert, muro).run();
+  ).bind(r.d.id, planId, nivel.nombre, Math.round(usd * 100), idioma, quiereCert, muro).run();
 
   /* La autorizacion de Ley 1581 se anota como en los otros formularios: es la
      misma obligacion, no una excepcion porque el dinero venga de fuera. */
@@ -6886,9 +6936,11 @@ async function apiPaypalSuscripcion(request, env, url) {
      una suscripcion no lo es: dejarlo asi etiquetaria mal el registro de Ley 1581
      y confundiria a quien lo lea buscando una inscripcion que no existe. */
   await anotarAutorizacion(env, r.d.id, "suscripcion_paypal",
-                           "autoriza_datos + nivel " + nivel.nombre, "suscripcion");
+                           "autoriza_datos + US$" + usd.toFixed(2) + " · nivel " + nivel.nombre,
+                           "suscripcion");
 
-  return json({ ok: true, url: aprobar.href, suscripcion: r.d.id });
+  return json({ ok: true, url: aprobar.href, suscripcion: r.d.id,
+                nivel: nivel.nombre, monto: usd });
 }
 
 /* POST /api/paypal/webhook — lo que PayPal nos cuenta.
