@@ -6,21 +6,25 @@
    guia en PDF.
 
    ── COMO SE CORRE ─────────────────────────────────────────────────────────────
-   Sin credenciales imprime lo que HARIA y no llama a nadie:
+   Las credenciales se leen de `.dev.vars`, el mismo archivo de la raiz donde
+   `wrangler dev` guarda las llaves locales. No hay que escribirlas en la linea de
+   comandos: ahi quedarian en el historial del shell.
+
+   Comprueba que las llaves sirven, sin crear nada:
 
      node ops/paypal-plans.mjs
 
-   Con credenciales, y todavia sin crear nada:
+   Crea de verdad -hay que pedirlo explicitamente-:
 
-     PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... node ops/paypal-plans.mjs
+     node ops/paypal-plans.mjs --crear
 
-   Para crear de verdad hay que pedirlo explicitamente:
+   Y para produccion, encima, PAYPAL_ENTORNO=live en `.dev.vars`.
 
-     PAYPAL_CLIENT_ID=... PAYPAL_SECRET=... node ops/paypal-plans.mjs --crear
-
-   Y para produccion, encima, cambiar el entorno:
-
-     PAYPAL_ENTORNO=live ... node ops/paypal-plans.mjs --crear
+   ⚠️ NODE NO LEE `.dev.vars` SOLO. Esa es la trampa que costo una vuelta el 2 sep
+   2026: se puso `PAYPAL_CLIENT_ID` en `.dev.vars` y el script dijo «SIN
+   CREDENCIALES», porque `.dev.vars` lo lee WRANGLER y este es un `node` pelado.
+   Se lee a mano abajo (`leerDevVars`). Las variables de entorno de verdad, si
+   existen, tienen prioridad.
 
    ── DOS DECISIONES DE SEGURIDAD, Y NO SON ADORNO ──────────────────────────────
    1. EL DEFECTO ES SANDBOX Y ES DRY-RUN. Crear planes de produccion por
@@ -54,8 +58,41 @@
      Bosque    US$75    68,18    9,1%
 */
 
+import fs from "node:fs";
+import path from "node:path";
+
+/* Lee `.dev.vars` de la raiz del repo. Formato CLAVE=valor, una por linea, con
+   `#` para comentarios. No se interpreta nada mas -ni comillas ni continuaciones-
+   porque el archivo es de wrangler y ese es su formato.
+
+   Devuelve un objeto y NUNCA imprime un valor. */
+function leerDevVars() {
+  /* La raiz es el padre de ops/, calculado desde este archivo y no desde el
+     directorio actual: asi el script funciona igual se corra desde donde se
+     corra. */
+  const raiz = path.resolve(new URL(".", import.meta.url).pathname, "..");
+  const arch = path.join(raiz, ".dev.vars");
+  const salida = { ruta: arch, existe: false, vars: {} };
+  let texto;
+  try { texto = fs.readFileSync(arch, "utf8"); } catch { return salida; }
+  salida.existe = true;
+  for (const linea of texto.split("\n")) {
+    const t = linea.trim();
+    if (!t || t.startsWith("#")) continue;
+    const i = t.indexOf("=");
+    if (i < 1) continue;
+    salida.vars[t.slice(0, i).trim()] = t.slice(i + 1).trim();
+  }
+  return salida;
+}
+
+const DEV = leerDevVars();
+/* El entorno de verdad manda sobre el archivo: asi se puede probar algo puntual
+   sin editarlo. */
+const conf = (n) => process.env[n] || DEV.vars[n] || "";
+
 const CREAR = process.argv.includes("--crear");
-const ENTORNO = process.env.PAYPAL_ENTORNO === "live" ? "live" : "sandbox";
+const ENTORNO = conf("PAYPAL_ENTORNO") === "live" ? "live" : "sandbox";
 const BASE = ENTORNO === "live"
   ? "https://api-m.paypal.com"
   : "https://api-m.sandbox.paypal.com";
@@ -63,7 +100,7 @@ const BASE = ENTORNO === "live"
 /* Si PayPal rechaza la categoria, su lista valida esta en la doc de catalogos y
    este es el UNICO sitio donde hay que cambiarla. El script imprime el error
    textual del proveedor para que se vea cual acepta. */
-const CATEGORIA = process.env.PAYPAL_CATEGORIA || "CHARITY";
+const CATEGORIA = conf("PAYPAL_CATEGORIA") || "CHARITY";
 
 const NIVELES = [
   { clave: "semilla", nombre: "Semilla", usd: "5.00",  cop: "$20.000" },
@@ -142,15 +179,29 @@ async function crear(ruta, cuerpo, requestId, tk) {
 }
 
 async function main() {
-  const id = process.env.PAYPAL_CLIENT_ID;
-  const secreto = process.env.PAYPAL_SECRET;
+  const id = conf("PAYPAL_CLIENT_ID");
+  const secreto = conf("PAYPAL_SECRET");
 
   console.log("entorno: " + ENTORNO + "  (" + BASE + ")");
   console.log("categoria del producto: " + CATEGORIA);
   console.log("");
 
   if (!id || !secreto) {
-    console.log("SIN CREDENCIALES: esto es lo que se crearia, y no se llamo a nadie.");
+    /* SE DICE POR QUE FALTAN, y se distinguen los tres casos. Un «faltan las
+       credenciales» a secas obliga a adivinar cual de los tres es. */
+    if (!DEV.existe) {
+      console.log("NO ENCONTRE " + DEV.ruta);
+      console.log("Ese archivo va en la RAIZ del repo, al lado de wrangler.toml.");
+    } else if (!DEV.vars.PAYPAL_CLIENT_ID && !DEV.vars.PAYPAL_SECRET) {
+      console.log("ENCONTRE " + DEV.ruta + " pero no tiene PAYPAL_CLIENT_ID ni PAYPAL_SECRET.");
+      console.log("Agregale esas dos lineas al final, sin borrar las que ya estan.");
+    } else {
+      console.log("Falta una de las dos: " +
+        (DEV.vars.PAYPAL_CLIENT_ID ? "" : "PAYPAL_CLIENT_ID ") +
+        (DEV.vars.PAYPAL_SECRET ? "" : "PAYPAL_SECRET"));
+    }
+    console.log("");
+    console.log("Mientras tanto, esto es lo que se crearia, y no se llamo a nadie.");
     console.log("");
     console.log("producto:");
     console.log(JSON.stringify(PRODUCTO, null, 2));
@@ -185,12 +236,29 @@ async function main() {
     console.log("plan " + n.nombre.padEnd(8) + " US$" + n.usd.padEnd(6) + " -> " + p.id);
   }
 
+  /* DONDE VAN LOS IDS DEPENDE DEL ENTORNO, y decirlo mal cuesta caro: un id de
+     sandbox en `wrangler.toml` es un plan que en produccion no existe, y el
+     endpoint responderia «plan_no_configurado» sin que se vea por que.
+
+       sandbox -> `.dev.vars`, que solo lo lee la vista previa local.
+       live    -> `wrangler.toml`, en [vars]. No son secretos: son ids.
+  */
   console.log("");
-  console.log("Pega esto en wrangler.toml, en [vars]:");
-  console.log("");
-  console.log('PAYPAL_PRODUCTO = "' + prod.id + '"');
-  for (const n of NIVELES) {
-    console.log("PAYPAL_PLAN_" + n.clave.toUpperCase() + ' = "' + ids[n.clave] + '"');
+  if (ENTORNO === "live") {
+    console.log("Pega esto en wrangler.toml, en [vars]:");
+    console.log("");
+    console.log('PAYPAL_PRODUCTO = "' + prod.id + '"');
+    for (const n of NIVELES) {
+      console.log("PAYPAL_PLAN_" + n.clave.toUpperCase() + ' = "' + ids[n.clave] + '"');
+    }
+  } else {
+    console.log("Estos son ids de SANDBOX: van en .dev.vars, no en wrangler.toml.");
+    console.log("Agregalos al final del archivo, sin borrar lo que ya tiene:");
+    console.log("");
+    console.log("PAYPAL_PRODUCTO=" + prod.id);
+    for (const n of NIVELES) {
+      console.log("PAYPAL_PLAN_" + n.clave.toUpperCase() + "=" + ids[n.clave]);
+    }
   }
 }
 
