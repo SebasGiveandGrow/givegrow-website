@@ -253,7 +253,7 @@
   "pay.nit": "Tax ID",
   "copy": "Copy",
   "copied": "Copied",
-  "pay.paypal.note": "For donors outside Colombia, in dollars. Its international fee takes close to 10%, so if your gift is large, write to us and we will send you the bank details: more of it arrives.",
+  "pay.paypal.note": "For donors outside Colombia, in dollars. Its international fee takes close to 10%; on PayPal’s page you can add it on so the full gift arrives. If yours is large, write to us and we will send you the bank details: more of it arrives.",
   "transp.ey": "Transparency",
   "transp.t": "Open books.",
   "transp.p1": "We are a Colombian nonprofit (ESAL), formally incorporated and under State oversight. Here are our registration details, governance and financial commitments, independently verifiable.",
@@ -1588,7 +1588,7 @@
   "pay.now.p.pp": "For those outside Colombia. We convert your gift using the day’s official TRM rate and PayPal charges in dollars. Its international fee takes close to 10%.",
   "pay.pp.min": "With PayPal the minimum is US$5 a month, about {cop} today. Below that, its fixed fee takes too much.",
   "pay.pp.max": "That amount is too high for PayPal. Write to us: a bank transfer leaves you more.",
-  "pay.pp.unico": "Taking you to PayPal’s payment page, where you enter the amount.",
+  "pay.pp.unico": "Taking you to PayPal’s donation page, where you enter the amount.",
   "pay.pp.sintrm": "We could not look up the exchange rate, so we cannot convert your gift to dollars. Please try again in a moment.",
   "pay.pp.correo": "For a PayPal membership we need your email: that is where each monthly receipt goes."
 }
