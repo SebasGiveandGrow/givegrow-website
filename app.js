@@ -969,7 +969,7 @@ var I18N = {
     "pay.now.p.pp":"Para quien no está en Colombia. Convertimos tu aporte con la TRM oficial del día y PayPal cobra en dólares. Su comisión internacional se lleva cerca del 10 %.",
     "pay.pp.min":"Con PayPal el mínimo es US$5 al mes, que hoy son unos {cop}. Por debajo, su comisión fija se lleva demasiado.",
     "pay.pp.max":"Ese monto es muy alto para PayPal. Escríbenos: una transferencia te deja más.",
-    "pay.pp.unico":"Te llevamos al pago de PayPal, donde escribes el monto.",
+    "pay.pp.unico":"Te llevamos a la página de donación de PayPal, donde escribes el monto.",
     "pay.pp.sintrm":"No pudimos consultar la TRM, así que no podemos convertir tu aporte a dólares. Vuelve a intentarlo en un momento.",
     "pay.pp.correo":"Para una membresía por PayPal necesitamos tu correo: ahí te llega el recibo de cada mes.",
     "pay.now.wait":"Preparando tu pago…",
@@ -1023,7 +1023,7 @@ var I18N = {
     "pay.nit":"NIT",
     "copy":"Copiar",
     "copied":"Copiado",
-    "pay.paypal.note":"Para donantes fuera de Colombia, en dólares. Su comisión internacional se lleva cerca del 10 %, así que si tu aporte es grande escríbenos y te pasamos los datos bancarios: llega más.",
+    "pay.paypal.note":"Para donantes fuera de Colombia, en dólares. Su comisión internacional se lleva cerca del 10 %; en la página de PayPal puedes sumarla para que el aporte llegue completo. Si es grande, escríbenos y te pasamos los datos bancarios: llega más.",
     "pay.paypal.cta":"Donar con PayPal",
     "transp.ey":"Transparencia",
     "transp.sello.rte":"Régimen Tributario Especial",
@@ -3134,9 +3134,23 @@ window.ggDonationDraft = buildDonationDraft;
 
    El estado vive aqui y no en el DOM para que `irAPagar` no tenga que leer clases
    para saber que hacer. */
-/* El enlace alojado de PayPal, para el aporte UNICO. En un solo sitio: es el
-   mismo que publica la pestaña de «otras formas de aportar». */
-var PAYPAL_ENLACE = "https://www.paypal.com/ncp/payment/9ZDKY6PRBLZ98";
+/* El BOTON DE DONACIONES de PayPal, para el aporte UNICO. En un solo sitio: es
+   el mismo que publica la pestaña de «otras formas de aportar».
+
+   Antes apuntaba a un «no-code checkout», que le decia Payment al donante. El
+   boton de donaciones dice Donar, lleva el logo, deja escribir cualquier monto,
+   acepta tarjeta sin cuenta de PayPal y —lo que de verdad importa— ofrece SUMAR
+   LA COMISION para que el aporte llegue completo.
+
+   Es un enlace y nada mas: la CSP prohibe su SDK (`script-src 'self'`), su
+   formulario HTML (`form-action 'self'`) y su iframe. Navegar es lo unico que
+   pasa, y por eso el `hosted_button_id` va en el URL y no en un formulario.
+
+   NO SE LE PUEDE PASAR NI MONTO NI REFERENCIA: PayPal genera los parametros del
+   boton alojado y solo acepta variables que no afecten el cobro. Por eso este
+   camino es solo para el aporte unico y el mensual sigue por el formulario de
+   membresia, que si escribe en la base. */
+var PAYPAL_ENLACE = "https://www.paypal.com/donate/?hosted_button_id=6SXBC7CHC5BJW";
 var PAGO_VIA = "wompi";
 
 function setPagoVia(v){
