@@ -6728,7 +6728,19 @@ function paypalConfig(env) {
   return {
     id, secreto, live,
     base: live ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com",
-    webhookId: String(env.PAYPAL_WEBHOOK_ID || "").trim()
+    /* SE LE QUITA EL PREFIJO `WH-`, y esto costo una prueba entera.
+
+       El panel de PayPal muestra el id del webhook como `WH-37C18…` pero su API
+       lo espera PELADO: `37C18…`. Con el prefijo,
+       `/v1/notifications/verify-webhook-signature` devuelve FAILURE sin decir por
+       que — o sea que el webhook llega, se registra, y se descarta como si
+       alguien lo hubiera falsificado. Comprobado el 3 sep 2026 listando los
+       webhooks reales con la API: el id era `37C1825267002473W` y la variable
+       decia `WH-37C1825267002473W`.
+
+       Se normaliza aqui y no solo en la variable porque quien configure
+       PRODUCCION va a copiar del mismo panel y va a copiar el mismo prefijo. */
+    webhookId: String(env.PAYPAL_WEBHOOK_ID || "").trim().replace(/^WH-/i, "")
   };
 }
 
@@ -6942,6 +6954,16 @@ async function apiPaypalWebhook(request, env) {
       webhook_event: ev
     });
     valida = v.ok && v.d && v.d.verification_status === "SUCCESS" ? 1 : 0;
+    if (!valida) {
+      /* SE DICE CON QUE SE COMPARO, y esto no es ruido: la primera vez que esto
+         fallo -3 sep 2026- el motivo era que el id del webhook llevaba el
+         prefijo `WH-` que muestra el panel, y desde fuera era indistinguible de
+         una firma falsificada. Sin estos dos datos hubo que listar los webhooks
+         con la API para descubrirlo. Ninguno es secreto: son identificadores. */
+      console.error("paypal firma NO valida · webhook_id usado:", cfg.webhookId,
+                    "· transmission:", cab("paypal-transmission-id"),
+                    "· respuesta:", JSON.stringify(v.d).slice(0, 200));
+    }
   } catch (e) {
     console.error("paypal verificar firma", e && e.message);
   }
