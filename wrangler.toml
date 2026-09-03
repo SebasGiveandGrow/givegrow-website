@@ -152,7 +152,11 @@ CORREO_MMC = "fundaciongiveandgrow+mmc@gmail.com"
 # En el panel de desarrollador de PayPal, el webhook de SANDBOX debe apuntar a
 # <url del worker de sandbox>/api/paypal/webhook — nunca a la de produccion.
 PAYPAL_ENTORNO = "sandbox"
-PAYPAL_WEBHOOK_ID = "WH-37C1825267002473W"
+# OJO: SIN el prefijo `WH-`. El panel de PayPal lo muestra como
+# "WH-37C1825267002473W" pero su API lo espera pelado, y con el prefijo la
+# verificacion de firma devuelve FAILURE en silencio. El codigo tambien lo
+# recorta por si acaso, pero aqui queda el valor tal como la API lo quiere.
+PAYPAL_WEBHOOK_ID = "37C1825267002473W"
 # Creados con `node ops/paypal-plans.mjs --crear` el 2 sep 2026. Son de SANDBOX:
 # los de produccion son OTROS y hay que crearlos aparte con PAYPAL_ENTORNO=live.
 PAYPAL_PRODUCTO = "PROD-41D12513UL2706608"
