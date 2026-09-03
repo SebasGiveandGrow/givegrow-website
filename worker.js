@@ -7074,6 +7074,26 @@ function ipnEntorno(env) {
   return String(env.PAYPAL_ENTORNO || "").trim().toLowerCase() === "live" ? "live" : "sandbox";
 }
 
+function ipnEsPrueba(d) {
+  return String(d.get("test_ipn") || "").trim() === "1";
+}
+
+/* SE VERIFICA CONTRA EL ENTORNO QUE PRODUJO EL MENSAJE, no contra el que este
+   worker cree que es el suyo.
+
+   `test_ipn=1` lo ponen el simulador y el sandbox, y NUNCA viene en un IPN real
+   -eso lo documenta PayPal-. Sin esta distincion, un IPN del simulador enviado a
+   PRODUCCION se validaria contra el endpoint live, que no lo conoce, y volveria
+   INVALID: una prueba legitima quedaria registrada como un intento de
+   suplantacion. Y es justo al contrario de lo que uno concluye al verla.
+
+   No abre un hueco: el sandbox solo dice VERIFIED de un cuerpo que el mismo
+   mando, asi que poner `test_ipn=1` en un cuerpo inventado no lo verifica. Y
+   aunque lo hiciera, mas abajo una prueba nunca se cuenta como plata. */
+function ipnPostback(env, d) {
+  return ipnEsPrueba(d) ? IPN_POSTBACK.sandbox : IPN_POSTBACK[ipnEntorno(env)];
+}
+
 /* `ipn_track_id` no sirve como clave: se repite entre eventos de la misma
    compra. La clave es el `txn_id` cuando existe; cuando no -subscr_signup,
    subscr_cancel y compañia no traen transaccion- se arma con el tipo y el id de
@@ -7138,7 +7158,7 @@ async function apiPaypalIpn(request, env) {
   /* EL POSTBACK, con el cuerpo intacto. */
   let respuesta = "";
   try {
-    const r = await fetch(IPN_POSTBACK[ipnEntorno(env)], {
+    const r = await fetch(ipnPostback(env, d), {
       method: "POST",
       headers: {
         "content-type": "application/x-www-form-urlencoded",
@@ -7155,9 +7175,21 @@ async function apiPaypalIpn(request, env) {
   if (respuesta !== "VERIFIED") {
     /* Se dice QUE contesto PayPal. Con INVALID el sospechoso numero uno es que
        algo toco el cuerpo antes del postback, no que alguien nos ataque. */
-    console.error("ipn NO verificado · respuesta:", respuesta.slice(0, 80), "· clave:", clave);
+    /* SE DICE CONTRA QUE ENDPOINT se comparo, por la misma razon que el webhook
+       registra el `webhook_id` que uso: un INVALID no distingue entre «alguien
+       falsifico esto» y «lo verifique en el entorno equivocado», y sin este dato
+       hay que adivinar cual de las dos fue. No es secreto: son dos URLs
+       publicas. */
+    console.error("ipn NO verificado · respuesta:", respuesta.slice(0, 80),
+                  "· clave:", clave, "· postback:", ipnPostback(env, d));
     return await marcar(respuesta === "INVALID" ? "invalido" : "respuesta_rara", false);
   }
+
+  /* UNA PRUEBA NUNCA ES PLATA. Se deja VERIFICADA -el postback si paso, que es
+     precisamente lo que se queria comprobar- pero marcada como prueba, y antes
+     de comparar el destinatario: el simulador usa un correo de sandbox, asi que
+     saldria `otro_destinatario` y eso no dice lo que de verdad paso. */
+  if (ipnEsPrueba(d)) return await marcar("prueba", true);
 
   /* VERIFICADO significa «esto lo mando PayPal». Falta saber si es para nosotros. */
   const nuestro = String(env.PAYPAL_IPN_CORREO || "").trim().toLowerCase();
@@ -11933,7 +11965,10 @@ function cargarIpn(){
       var comision = e.comision_centavos != null
         ? "<br><small>comision " + (e.comision_centavos/100).toFixed(2) + "</small>"
         : "";
-      var sello = e.verificado
+      /* Una prueba esta verificada, pero decir solo «Si» la haria indistinguible
+         de una donacion real en la unica columna que se mira de reojo. */
+      var sello = e.resultado === "prueba" ? "Prueba, no es plata"
+        : e.verificado
         ? (e.resultado === "por_registrar" ? "Si, por registrar" : "Si")
         : ("No: " + esc(e.resultado || "sin verificar"));
       return "<tr>" +
