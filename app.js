@@ -1010,6 +1010,8 @@ var I18N = {
     "gracias.home":"Volver al inicio",
     "gracias.sub.t":"Tu membresía quedó registrada.",
     "gracias.sub.p":"PayPal confirma el primer cobro y ahí te llega el recibo con tu número de guía. No es inmediato, así que preferimos decírtelo en vez de darte las gracias por algo que todavía no está cobrado. Puedes cancelarla cuando quieras desde tu propia cuenta de PayPal.",
+    "gracias.pp.t":"Gracias. Tu donación quedó en PayPal.",
+    "gracias.pp.p":"Por este camino tu aporte no lleva número de guía nuestro: el comprobante te lo envía PayPal a tu correo. Si la hiciste mensual, la pausas o la cancelas desde tu propia cuenta de PayPal, sin escribirnos. Y si quieres tu certificado de donación, escríbenos a contabilidad@thegiveandgrowproject.org.",
     "gracias.lost.t":"No encontramos esa transacción.",
     "gracias.lost.p":"Puede que el enlace haya perdido su identificador. Si hiciste un aporte, busca tu número de guía en el correo de confirmación y consúltalo en «Rastrea tu donación».",
     "pay.tab.banco":"Bancolombia",
@@ -1812,7 +1814,7 @@ function postLang(l){
   pintarBrigadaEstado();
   /* Por lo mismo que la linea de arriba: `applyLang` acaba de repintar los
      `data-i18n` y se lleva por delante el mensaje de membresia. */
-  graciasMembresia();
+  graciasFijo();
   pintarFechaImpresion();
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
@@ -3269,7 +3271,8 @@ function payRecNote(){
    devuelve NUESTRO estado, que es el que trae el webhook. */
 var GRACIAS = { id:null, guia:null, intentos:0, timer:null };
 
-/* EL MENSAJE DE MEMBRESIA, y vive aparte porque hay que volver a ponerlo.
+/* LOS MENSAJES FIJOS DE ESTA PANTALLA, y viven aparte porque hay que volver a
+   ponerlos.
 
    `gracias-t` y `gracias-p` llevan `data-i18n`, y `applyLang` los repinta con el
    texto del diccionario. Como `setLang` es ASINCRONO, ese repintado ocurre
@@ -3277,14 +3280,34 @@ var GRACIAS = { id:null, guia:null, intentos:0, timer:null };
    volvia a decir «Estamos confirmando tu pago». Por eso se llama en los dos
    sitios, igual que `pintarBrigadaEstado`, que existe por lo mismo.
 
-   Devuelve true si esto era una membresia, para que quien llama no siga con la
-   consulta del aporte unico. */
-function graciasMembresia(){
-  if (!new URLSearchParams(location.search).get("sub")) return false;
+   Devuelve true si el caso ya quedo resuelto aqui, para que quien llama no siga
+   con la consulta del aporte unico. */
+function graciasFijo(){
   var st = document.getElementById("gracias-t");
   var sp = document.getElementById("gracias-p");
-  if (st) st.textContent = t("gracias.sub.t");
-  if (sp) sp.textContent = t("gracias.sub.p");
+
+  /* DOS REGRESOS SIN CONSULTA. La membresia trae `?sub=` -nuestro `custom_id`- y
+     la donacion del boton de PayPal trae `?donacion=paypal`. Ninguno de los dos
+     se puede consultar: el primer cobro de una suscripcion tarda, y la donacion
+     del boton alojado no tiene guia nuestra porque PayPal no acepta que le
+     pasemos una referencia por donante.
+
+     La deteccion es por SUBCADENA y no con URLSearchParams a proposito: PayPal
+     pega sus propios parametros al volver y no siempre respeta el `&`, asi que
+     `?donacion=paypal?tx=...` es posible y `get("donacion")` devolveria
+     «paypal?tx=...». */
+  var clave = new URLSearchParams(location.search).get("sub") ? "sub"
+            : location.search.indexOf("donacion=paypal") >= 0 ? "pp"
+            : null;
+  if (!clave) return false;
+
+  if (st) st.textContent = t("gracias." + clave + ".t");
+  if (sp) sp.textContent = t("gracias." + clave + ".p");
+
+  /* «Rastrear mi aporte» no lleva a ninguna parte cuando no hay guia que
+     rastrear. Un boton que no puede cumplir es peor que no tenerlo. */
+  var tr = document.getElementById("gracias-track");
+  if (tr) tr.style.display = (clave === "pp") ? "none" : "";
   return true;
 }
 
@@ -3302,7 +3325,7 @@ function graciasArranca(){
 
      No se consulta nada al servidor: el `custom_id` es NUESTRO y no identifica a
      nadie, asi que no hay que exponer una consulta publica por suscripcion. */
-  if (graciasMembresia()) return;
+  if (graciasFijo()) return;
 
   GRACIAS.id = q.get("id");
   try { GRACIAS.guia = sessionStorage.getItem("gg_guia"); } catch(e){}
