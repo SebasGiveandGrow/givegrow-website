@@ -1528,6 +1528,8 @@ var I18N = {
     "brig.aviso.strong":"Terremoto del 10 de agosto",
     "brig.aviso.txt":"Qué hicimos en cinco territorios, y cómo sigue con Mira Mi Casa",
     "calc.brigada.unico":"Aporte único: la brigada es una operación puntual, no una membresía.",
+    "calc.trm":"1 USD = {v} COP · TRM oficial del {f}",
+    "calc.trm.no":"No pudimos consultar la TRM en este momento.",
     "calc.brigada.nota":"Todavía no publicamos equivalencias en pesos para esta campaña: el inventario está en cotización. Tu aporte compra insumos de la lista pública, y cada entrega queda con acta firmada.",
     "calc.dest.emergencia":"Emergencia abierta",
     "brigada.opcion":"Brigada de atención a emergencia · 5 sectores",
@@ -2781,6 +2783,10 @@ var ACT_FNS = {
   irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit, apSubmit:apSubmit, apQuien:apQuien,
   fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
   ingSubmit:ingSubmit, ingEsp:ingEsp,
+  /* Sin estas dos, el boton de la membresia internacional no hacia NADA: la
+     delegacion solo invoca funciones de esta lista, a proposito y sin eval.
+     Es la clase de fallo que no da error en consola — simplemente no pasa. */
+  miSubmit:miSubmit, miCalcula:miCalcula,
   mcEnviar:mcEnviar,
   irAVoluntariadoBrigada:irAVoluntariadoBrigada,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
@@ -2924,7 +2930,30 @@ function animateCounters(){
 
 /* ---------- calculator ---------- */
 var calc = { cur:"COP", freq:"m", val:200000, mode:"ind", partnerId:"", projectId:"general", note:"" };
-var USD_RATE = 4200;
+/* LA TASA LA TRAE EL SERVIDOR, de la TRM oficial. Este numero era 4200 y la TRM
+   del 3 sep 2026 es 3140,55: un 34% de error en un dato con el que alguien decide
+   cuanto donar.
+
+   Se deja un valor inicial para que la calculadora tenga algo que mostrar en el
+   primer pintado, pero se REEMPLAZA en cuanto responde `/api/trm` — y si no
+   responde, la linea de equivalencia se esconde en vez de mentir.
+
+   `TRM_INFO` guarda la fecha y la fuente porque una tasa sin fecha no se puede
+   verificar, y aqui se publica lo que alguien pueda ir a comprobar. */
+var USD_RATE = 3140.55;
+var TRM_INFO = null;
+
+function trmCarga(){
+  return fetch("/api/trm").then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+    if (!d || !d.trm) return null;
+    USD_RATE = Number(d.trm);
+    TRM_INFO = d;
+    /* Se repinta lo que ya dependia del numero viejo. */
+    try { setCur(calc.cur); } catch(e){}
+    try { miCalcula(); } catch(e){}
+    return d;
+  }).catch(function(){ return null; });
+}
 var TIERS = [
   {min:0,  svg:'<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c-.6-3-3.2-4.6-6.3-4 .3 3 2.6 4.8 6.3 4z"/></svg>', es:"Semilla", en:"Seed"},
   {min:50000, svg:'<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 15c-.6-2.6-3-4-6-3.4.3 2.7 2.6 4.2 6 3.4z"/><path d="M12 13c.6-2.6 3-4 6-3.4-.3 2.7-2.6 4.2-6 3.4z"/></svg>', es:"Retoño",  en:"Sprout"},
@@ -3266,7 +3295,18 @@ function setCur(c){
   calc.cur = c;
   document.getElementById("cur-cop").classList.toggle("on", c==="COP");
   document.getElementById("cur-usd").classList.toggle("on", c==="USD");
-  document.getElementById("calc-rate").textContent = (c==="USD") ? "1 USD = $4.200 COP " + (lang==="en"?"(reference)":"(referencia)") : "";
+  /* SE NOMBRA LA FECHA Y LA FUENTE. «1 USD = $4.200 (referencia)» no se podia
+     comprobar y estaba mal; «TRM del 3 de septiembre» si, y quien quiera la
+     verifica en datos.gov.co. Si no se pudo consultar, no se muestra tasa: es la
+     misma regla del banco publico. */
+  var lr = document.getElementById("calc-rate");
+  if (c !== "USD") { lr.textContent = ""; }
+  else if (TRM_INFO) {
+    lr.textContent = t("calc.trm").replace("{v}", "$" + Math.round(USD_RATE).toLocaleString("es-CO"))
+                                  .replace("{f}", TRM_INFO.desde);
+  } else {
+    lr.textContent = t("calc.trm.no");
+  }
   calcUpdate();
 }
 function setFreq(f){
@@ -4431,6 +4471,9 @@ else init();
    dispara la peticion. No se toca porque eso ya no es la primera carga, que es
    lo que se estaba protegiendo. */
 if (!MARCA_MMC) loadPartners();
+/* La TRM se pide siempre: la usan la calculadora y la membresia internacional, y
+   las dos existen en los dos hosts. */
+trmCarga();
 if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
 

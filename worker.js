@@ -6678,6 +6678,66 @@ function almaLimitada(ip) {
   return false;
 }
 
+/* GET /api/trm — la tasa de cambio, de la fuente oficial y no inventada.
+
+   EL SITIO DECIA 4.200 Y LA TRM DE HOY ES 3.140,55: un 34% de error, en un
+   numero que un donante usa para decidir cuanto dar. Lo encontro Sebas.
+
+   LA FUENTE ES LA TRM de la Superintendencia Financiera, publicada en el portal
+   de datos abiertos del Estado. No es una eleccion estetica: para una ESAL
+   colombiana la TRM es LA tasa con la que se registra un ingreso en divisa, asi
+   que es la misma que usaria la contadora. Un promedio de mercado cualquiera
+   daria un numero distinto del que va a quedar en los libros.
+
+   LA PIDE EL WORKER Y NO EL NAVEGADOR porque la CSP tiene `connect-src 'self'`:
+   la pagina no puede llamar a datos.gov.co. Aqui se pide, se cachea y se sirve
+   desde nuestro propio origen — el mismo patron que el contexto de ALMA.
+
+   SE CACHEA 6 HORAS. La TRM cambia una vez al dia (y en fin de semana ni eso),
+   asi que pedirla en cada visita seria castigar a un tercero gratis. Con el
+   cache, una jornada entera cuesta cuatro peticiones.
+
+   Y DEVUELVE LA FECHA, no solo el numero: una tasa sin fecha no se puede
+   verificar, y este proyecto publica cosas que alguien puede ir a comprobar. */
+const TRM_URL = "https://www.datos.gov.co/resource/32sa-8pi3.json" +
+                "?$order=vigenciadesde%20DESC&$limit=1";
+
+async function apiTrm(request) {
+  const clave = new Request("https://trm.interno/v1", { method: "GET" });
+  const cache = caches.default;
+  const guardada = await cache.match(clave);
+  if (guardada) return guardada;
+
+  let cuerpo;
+  try {
+    const r = await fetch(TRM_URL, { headers: { accept: "application/json" } });
+    if (!r.ok) throw new Error("http " + r.status);
+    const d = await r.json();
+    const fila = Array.isArray(d) ? d[0] : null;
+    const valor = Number(fila && fila.valor);
+    if (!(valor > 0)) throw new Error("sin valor");
+    cuerpo = {
+      trm: valor,
+      /* Solo la fecha, sin la hora: es un dato diario y la hora sobra. */
+      desde: String((fila.vigenciadesde || "")).slice(0, 10),
+      fuente: "Superintendencia Financiera · datos.gov.co"
+    };
+  } catch (e) {
+    /* NO SE INVENTA UN NUMERO. Si la fuente no responde se dice que no se pudo,
+       y la pantalla decide que hacer con eso — que en su caso es esconder la
+       equivalencia en vez de mostrar una tasa que nadie verifico. Es la misma
+       regla del banco publico: no pude consultar NO es lo mismo que un dato. */
+    console.error("trm", e && e.message);
+    return json({ error: "trm_no_disponible" }, 503);
+  }
+
+  const res = json(cuerpo);
+  const guardar = new Response(res.clone().body, res);
+  guardar.headers.set("cache-control", "public, max-age=21600");
+  await cache.put(clave, guardar);
+  return res;
+}
+
 /* ========================================================================
    PAYPAL — MEMBRESIAS INTERNACIONALES POR SUSCRIPCION
    ========================================================================
@@ -12392,6 +12452,7 @@ export default {
     /* PayPal. Publicas por necesidad -las llama un navegador que va a pagar, y el
        webhook lo llama PayPal, que no tiene sesion- y las dos son INERTES sin sus
        secretos, asi que estar aqui antes de estar probadas no habilita nada. */
+    if (ruta === "/api/trm")               return await apiTrm(request);
     if (ruta === "/api/paypal/suscripcion") return await apiPaypalSuscripcion(request, env, url);
     if (ruta === "/api/paypal/webhook")     return await apiPaypalWebhook(request, env);
     if (ruta === "/api/alma")           return await apiAlma(request, env, url);
