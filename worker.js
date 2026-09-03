@@ -7056,8 +7056,23 @@ async function paypalCobro(env, suscripcionId, recurso) {
   ).bind(guia, centavos, moneda, sub.quiere_certificado, sub.consent_muro, sub.idioma,
          tokenNuevo(), String((recurso && recurso.id) || ""), suscripcionId).run();
 
+  /* UN COBRO ES PRUEBA DE ACTIVACION, y por eso se marca aqui tambien.
+
+     PayPal NO le cobra a una suscripcion pendiente de aprobacion. Asi que si
+     llego un cobro, la suscripcion esta activa — lo diga o no un evento aparte.
+
+     Esto no es defensa teorica: en la primera prueba real (3 sep 2026) llego
+     `PAYMENT.SALE.COMPLETED` y NUNCA llego `BILLING.SUBSCRIPTION.ACTIVATED`. La
+     fila quedaba con `cobros = 1` y estado `aprobacion_pendiente` a la vez, que
+     es un estado que no existe en la realidad: alguien mirando el panel veria a
+     un miembro que ya pago como si no hubiera terminado de aprobar.
+
+     Se usa el estado que se PUEDE deducir del hecho que si ocurrio, en vez de
+     esperar un evento que puede no venir. Y NO se pisa una cancelacion o
+     suspension posterior: solo asciende desde `aprobacion_pendiente`. */
   await env.DB.prepare(
     "UPDATE suscripciones SET cobros = cobros + 1, ultimo_cobro_en = datetime('now'), " +
+    "estado = CASE WHEN estado = 'aprobacion_pendiente' THEN 'activa' ELSE estado END, " +
     "actualizada_en = datetime('now') WHERE id = ?"
   ).bind(suscripcionId).run();
 
