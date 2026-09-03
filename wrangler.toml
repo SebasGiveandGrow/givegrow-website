@@ -83,6 +83,12 @@ PAYPAL_PLAN_SEMILLA = "P-5L029923PY7871929NKMWNSI"
 PAYPAL_PLAN_RETONO = "P-33P89059E34419313NKMWNSI"
 PAYPAL_PLAN_ARBOL = "P-0XM89316XJ9677303NKMWNSI"
 PAYPAL_PLAN_BOSQUE = "P-60151894XG4410524NKMWNSQ"
+# El correo de la cuenta que recibe NO va aqui: este repositorio es publico y es
+# un dato de contacto real. Va con `wrangler secret put PAYPAL_IPN_CORREO`, y es
+# lo que hace que /api/paypal/ipn distinga una donacion nuestra de la de un
+# desconocido que apunte su boton a nuestra URL. Sin el, el endpoint guarda pero
+# marca `sin_correo_configurado` y no cuenta nada como cobrado.
+
 # Panel /admin. Ninguno de los dos es secreto: identifican la aplicación de
 # Cloudflare Access, no autorizan nada por sí solos. Sin ellos el panel responde
 # 503 y no sirve un dato — ver ops/panel-admin.md.

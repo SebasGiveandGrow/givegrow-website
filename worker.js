@@ -7021,6 +7021,170 @@ async function apiPaypalSuscripcion(request, env, url) {
       MISMO `id` de evento; el UNIQUE de `eventos_paypal` hace que el segundo
       insert falle, y ahi se responde 200 sin volver a procesar. Sin esto, un
       cobro mensual podria quedar con dos guias por el mismo dinero. */
+/* ============================================================================
+   IPN — LA UNICA FORMA DE VER EL BOTON DE DONACIONES
+   ============================================================================
+   El boton de donaciones alojado quedo con el mensual habilitado, y a un boton
+   alojado PayPal no acepta que se le pase monto ni referencia por donante. Sin
+   referencia no hay guia, sin guia no hay recibo ni rastreo: ese camino es
+   CIEGO. IPN no lo arregla, lo hace VISIBLE — avisa que hubo cobro, de cuanto y
+   de quien, para que una persona lo registre desde /admin. Nada mas.
+
+   ── POR QUE ESTO NO ES EL WEBHOOK OTRA VEZ ────────────────────────────────────
+   Son dos protocolos. El webhook trae JSON y se verifica con firma RS256 contra
+   la API. IPN trae `x-www-form-urlencoded` y se verifica DEVOLVIENDOLE a PayPal
+   el mismo cuerpo con `cmd=_notify-validate` delante; contesta la cadena literal
+   VERIFIED o INVALID. No hay firma que comprobar en local.
+
+   ── LA TRAMPA CENTRAL, y arruina la verificacion en silencio ──────────────────
+   El cuerpo se devuelve TAL COMO LLEGO: mismos campos, mismo orden, misma
+   codificacion. Por eso se usa el texto crudo y NO se vuelve a serializar desde
+   URLSearchParams — reordenar o recodificar un solo campo da INVALID y desde
+   fuera es indistinguible de una suplantacion.
+
+   ── DOS COMPROBACIONES, Y NINGUNA ES OPCIONAL ─────────────────────────────────
+   1. El postback dice que el mensaje ES de PayPal. NO dice que sea PARA
+      NOSOTROS: cualquiera puede apuntar el `notify_url` de SU boton a esta URL y
+      su IPN pasaria el postback, porque es un mensaje legitimo de PayPal. Por
+      eso se compara `receiver_email` contra PAYPAL_IPN_CORREO. Sin esa
+      comprobacion, el panel mostraria donaciones de desconocidos como si fueran
+      nuestras.
+   2. Si el evento pertenece a una suscripcion que YA maneja el webhook, se
+      marca y no se muestra. Existe porque IPN se puede configurar por boton
+      -lo deseable- o a nivel de CUENTA, y a nivel de cuenta dispararia tambien
+      con las suscripciones de la API: la misma plata contada dos veces.
+
+   ── SIEMPRE 200 ───────────────────────────────────────────────────────────────
+   PayPal reintenta hasta 16 veces lo que no responde 200. Un 4xx no evita nada y
+   un 5xx solo aplaza. Se responde 200 con cuerpo vacio y lo que no se pudo
+   procesar queda ESCRITO con su motivo en `resultado`, que es lo que se puede
+   mirar despues. La unica excepcion es no tener base: ahi si conviene que
+   reintente, porque no hay donde dejar rastro. */
+const IPN_POSTBACK = {
+  live: "https://ipnpb.paypal.com/cgi-bin/webscr",
+  sandbox: "https://ipnpb.sandbox.paypal.com/cgi-bin/webscr"
+};
+
+/* Los tipos que SI son dinero entrando. El resto -disputas, cambios de perfil-
+   se guarda igual pero no se cuenta como cobro: la conciliacion mira esta lista
+   y no adivina por el nombre. */
+const IPN_TIPOS_COBRO = ["web_accept", "subscr_payment", "recurring_payment", "send_money"];
+
+function ipnEntorno(env) {
+  return String(env.PAYPAL_ENTORNO || "").trim().toLowerCase() === "live" ? "live" : "sandbox";
+}
+
+/* `ipn_track_id` no sirve como clave: se repite entre eventos de la misma
+   compra. La clave es el `txn_id` cuando existe; cuando no -subscr_signup,
+   subscr_cancel y compañia no traen transaccion- se arma con el tipo y el id de
+   la suscripcion, que es lo unico estable que llega. */
+function ipnClave(d) {
+  const txn = String(d.get("txn_id") || "").trim();
+  if (txn) return txn;
+  const tipo = String(d.get("txn_type") || "sin_tipo").trim();
+  const susc = String(d.get("subscr_id") || d.get("recurring_payment_id") || "").trim();
+  return tipo + ":" + (susc || "sin_id");
+}
+
+/* AUSENTE NO ES CERO. `subscr_signup` y `subscr_cancel` no traen `mc_gross`, y
+   con un Number("") que da 0 el panel imprimia «0.00» — una donacion de cero
+   pesos donde en realidad no hubo monto en ese evento. Se distingue el campo
+   vacio del numero, y solo entonces se convierte. */
+function ipnCentavos(v) {
+  const txt = String(v == null ? "" : v).trim();
+  if (!txt) return null;
+  const n = Number(txt.replace(",", "."));
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+}
+
+async function apiPaypalIpn(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  /* Sin base no hay donde dejar rastro, y ahi si vale que PayPal reintente. */
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+  const crudo = await request.text();
+  if (!crudo) return new Response("", { status: 200 });
+
+  const d = new URLSearchParams(crudo);
+  const clave = ipnClave(d);
+  const tipo = String(d.get("txn_type") || "").trim() || null;
+  const estado = String(d.get("payment_status") || "").trim() || tipo || "sin_estado";
+  const susc = String(d.get("subscr_id") || d.get("recurring_payment_id") || "").trim() || null;
+
+  /* SE REGISTRA ANTES DE VERIFICAR, porque el postback es una llamada de red y
+     puede fallar. Si se guardara despues, un IPN legitimo que llegue mientras
+     PayPal esta caido se perderia sin dejar constancia. Si el INSERT choca con
+     el UNIQUE es un reintento de algo ya visto: 200 y a otra cosa. */
+  try {
+    await env.DB.prepare(
+      "INSERT INTO eventos_ipn (clave, estado, txn_type, txn_id, suscripcion, " +
+      "monto_centavos, moneda, comision_centavos, cuerpo) VALUES (?,?,?,?,?,?,?,?,?)"
+    ).bind(
+      clave, estado, tipo, String(d.get("txn_id") || "") || null, susc,
+      ipnCentavos(d.get("mc_gross")), String(d.get("mc_currency") || "") || null,
+      ipnCentavos(d.get("mc_fee")), crudo.slice(0, 20000)
+    ).run();
+  } catch (e) {
+    return new Response("", { status: 200 });
+  }
+
+  const marcar = async (motivo, verificado) => {
+    await env.DB.prepare(
+      "UPDATE eventos_ipn SET resultado = ?, verificado = ? WHERE clave = ? AND estado = ?"
+    ).bind(motivo, verificado ? 1 : 0, clave, estado).run();
+    return new Response("", { status: 200 });
+  };
+
+  /* EL POSTBACK, con el cuerpo intacto. */
+  let respuesta = "";
+  try {
+    const r = await fetch(IPN_POSTBACK[ipnEntorno(env)], {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "user-agent": "givegrow-website-ipn"
+      },
+      body: "cmd=_notify-validate&" + crudo
+    });
+    respuesta = (await r.text()).trim();
+  } catch (e) {
+    console.error("ipn postback", e && e.message);
+    return await marcar("postback_fallo", false);
+  }
+
+  if (respuesta !== "VERIFIED") {
+    /* Se dice QUE contesto PayPal. Con INVALID el sospechoso numero uno es que
+       algo toco el cuerpo antes del postback, no que alguien nos ataque. */
+    console.error("ipn NO verificado · respuesta:", respuesta.slice(0, 80), "· clave:", clave);
+    return await marcar(respuesta === "INVALID" ? "invalido" : "respuesta_rara", false);
+  }
+
+  /* VERIFICADO significa «esto lo mando PayPal». Falta saber si es para nosotros. */
+  const nuestro = String(env.PAYPAL_IPN_CORREO || "").trim().toLowerCase();
+  if (!nuestro) {
+    console.error("ipn sin PAYPAL_IPN_CORREO: se guarda pero no se cuenta como nuestro");
+    return await marcar("sin_correo_configurado", false);
+  }
+  const recibe = [d.get("receiver_email"), d.get("business")]
+    .map((x) => String(x || "").trim().toLowerCase()).filter(Boolean);
+  if (!recibe.includes(nuestro)) {
+    console.error("ipn de otra cuenta · receiver:", recibe.join(",").slice(0, 120));
+    return await marcar("otro_destinatario", false);
+  }
+
+  /* Ya es nuestro y es de PayPal. Lo ultimo: que no sea una suscripcion que el
+     webhook ya lleva, o la misma plata quedaria contada dos veces. */
+  if (susc) {
+    const ya = await env.DB.prepare("SELECT id FROM suscripciones WHERE id = ?").bind(susc).first();
+    if (ya) return await marcar("ya_por_webhook", true);
+  }
+
+  return await marcar(
+    IPN_TIPOS_COBRO.includes(tipo || "") ? "por_registrar" : "sin_accion",
+    true
+  );
+}
+
 async function apiPaypalWebhook(request, env) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   const cfg = paypalConfig(env);
@@ -9465,6 +9629,49 @@ async function adminBorrarInscripcion(request, env, id, quien) {
    diferencia contra el extracto de Wompi que alguien tiene que descubrir.
    ======================================================================== */
 
+/* Las donaciones que entraron por el BOTON de PayPal. Se muestran las que el
+   postback verifico y que son de nuestra cuenta; las que quedaron con
+   `ya_por_webhook` NO salen —esas ya tienen su suscripcion y su recibo— y las
+   que fallaron alguna comprobacion salen con su motivo, porque un IPN que no
+   pasa es justo lo que hay que poder mirar.
+
+   Del cuerpo crudo se saca SOLO lo que hace falta para conciliar. IPN trae
+   direccion postal completa; mandarla al navegador seria mas dato personal del
+   que esta pantalla necesita, aunque viva detras de Access. */
+async function adminIpn(env) {
+  const r = await env.DB.prepare(
+    "SELECT clave, estado, txn_type, txn_id, suscripcion, monto_centavos, moneda, " +
+    "comision_centavos, verificado, resultado, cuerpo, recibido_en " +
+    "FROM eventos_ipn WHERE resultado IS NULL OR resultado <> 'ya_por_webhook' " +
+    "ORDER BY recibido_en DESC LIMIT 100"
+  ).all();
+
+  const filas = (r.results || []).map((e) => {
+    let p = new URLSearchParams("");
+    try { p = new URLSearchParams(e.cuerpo || ""); } catch (x) { /* nada */ }
+    const nombre = [p.get("first_name"), p.get("last_name")]
+      .map((x) => String(x || "").trim()).filter(Boolean).join(" ");
+    return {
+      clave: e.clave,
+      estado: e.estado,
+      txn_type: e.txn_type,
+      recurrente: !!e.suscripcion,
+      monto_centavos: e.monto_centavos,
+      moneda: e.moneda,
+      comision_centavos: e.comision_centavos,
+      verificado: e.verificado,
+      resultado: e.resultado,
+      recibido_en: e.recibido_en,
+      nombre: nombre || null,
+      correo: p.get("payer_email") || null,
+      /* El destino que eligio el donante en la pagina de PayPal. */
+      destino: p.get("item_name") || p.get("option_selection1") || null,
+      nota: p.get("memo") || null
+    };
+  });
+  return json({ ipn: filas });
+}
+
 async function adminPagosSueltos(env) {
   const r = await env.DB.prepare(
     "SELECT e.transaction_id, e.guia AS referencia, e.estado, e.recibido_en, e.cuerpo " +
@@ -10247,6 +10454,21 @@ trazado.</p>
 <th scope="col">Referencia</th><th scope="col">Monto</th><th scope="col">Método</th>
 <th scope="col">Donante</th><th scope="col">Recibido</th>
 </tr></thead><tbody id="p-filas"><tr><td colspan="5" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</table></div>
+
+<h2 id="sec-ipn" class="h-sec" style="margin:48px 0 6px;font-size:26px">Donaciones por el botón de PayPal</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que entró por el
+<strong>botón de donaciones</strong>, único o mensual. A un botón alojado PayPal no acepta que se le
+pase una referencia por donante, así que <strong>estas donaciones no tienen guía</strong>: si alguien
+pide certificado o quiere rastrear su aporte, hay que crearle el registro a mano. Las membresías
+creadas desde el sitio no salen aquí — esas ya tienen su suscripción y su recibo.
+<strong>Verificado</strong> significa que PayPal confirmó el mensaje y que la cuenta que recibió es
+la nuestra; si dice otra cosa, es el motivo por el que no pasó y no hay que darlo por cobrado.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Recibido</th><th scope="col">Tipo</th><th scope="col">Monto</th>
+<th scope="col">Donante</th><th scope="col">Destino</th><th scope="col">Verificado</th>
+</tr></thead><tbody id="ipn-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <h2 id="sec-entregas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
@@ -11696,6 +11918,36 @@ function cargarSueltos(){
   });
 }
 
+/* ---------------- donaciones por el boton de PayPal (IPN) ---------------- */
+function cargarIpn(){
+  fetch("/api/admin/ipn").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("ipn-filas"); if (!tb) return;
+    var l = d.ipn || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguna todavia. Si el boton ya recibio donaciones y esto sigue vacio, el notify_url no esta puesto.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(e){
+      /* El monto viene en la moneda que cobro PayPal, casi siempre USD, asi que
+         NO se formatea con pesos(): eso mentiria sobre la moneda. */
+      var monto = e.monto_centavos != null
+        ? ((e.monto_centavos/100).toFixed(2) + " " + esc(e.moneda || ""))
+        : "—";
+      var comision = e.comision_centavos != null
+        ? "<br><small>comision " + (e.comision_centavos/100).toFixed(2) + "</small>"
+        : "";
+      var sello = e.verificado
+        ? (e.resultado === "por_registrar" ? "Si, por registrar" : "Si")
+        : ("No: " + esc(e.resultado || "sin verificar"));
+      return "<tr>" +
+        "<td>" + esc((e.recibido_en||"").slice(0,16)) + "</td>" +
+        "<td>" + esc(e.txn_type || e.estado || "—") + (e.recurrente ? "<br><small>mensual</small>" : "") + "</td>" +
+        "<td>" + monto + comision + "</td>" +
+        "<td>" + esc(e.nombre || "—") + (e.correo ? "<br><small>" + esc(e.correo) + "</small>" : "") + "</td>" +
+        "<td>" + esc(e.destino || "—") + "</td>" +
+        "<td>" + sello + "</td>" +
+      "</tr>";
+    }).join("");
+  });
+}
+
 /* ---------------- entregas ---------------- */
 var E_CAMPOS = [
   ["e-destino","Destino","brigada-emergencia-2026-08"],
@@ -11875,6 +12127,7 @@ var BANDEJAS = {
   "ins-filas": cargarInspecciones,
   "o-filas": cargarOfrecimientos,
   "p-filas": cargarSueltos,
+  "ipn-filas": cargarIpn,
   "e-filas": cargarEntregas
 };
 
@@ -12455,6 +12708,7 @@ export default {
     if (ruta === "/api/trm")               return await apiTrm(request);
     if (ruta === "/api/paypal/suscripcion") return await apiPaypalSuscripcion(request, env, url);
     if (ruta === "/api/paypal/webhook")     return await apiPaypalWebhook(request, env);
+    if (ruta === "/api/paypal/ipn")         return await apiPaypalIpn(request, env);
     if (ruta === "/api/alma")           return await apiAlma(request, env, url);
     if (ruta === "/api/access/claves")  return await accessClaves(env);
     if (ruta === "/api/access/evaluar") return await accessEvaluar(request, env);
@@ -12721,6 +12975,7 @@ export default {
         /* Entregas (Fase 6). El borrador y sus fotos viven tras Access hasta que
            alguien las publica: en terreno se registra rápido y se revisa después. */
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
+        if (ruta === "/api/admin/ipn")           return await adminIpn(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
