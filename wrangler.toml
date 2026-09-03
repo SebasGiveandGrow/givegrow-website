@@ -60,6 +60,29 @@ CORREO_DESDE = "Give&Grow International <no-responder@notificaciones.thegiveandg
 # notificaciones.… vía Resend. Cambiarlo era seguro incluso antes.
 CORREO_AVISOS = "contabilidad@thegiveandgrowproject.org"
 CORREO_MMC = "MiraMiCasa@thegiveandgrowproject.org"
+
+# ---------------------------------------------------------------------------
+# PAYPAL — MEMBRESIAS INTERNACIONALES (PRODUCCION)
+# ---------------------------------------------------------------------------
+# NINGUNO ES SECRETO: identifican recursos de PayPal y no autorizan nada por si
+# solos, igual que el AUD de Access. Los secretos -PAYPAL_CLIENT_ID y
+# PAYPAL_SECRET, los del interruptor LIVE- van con `wrangler secret put` y nunca
+# aqui.
+#
+# ⚠️ ESTOS IDS SON DE LIVE Y COBRAN DINERO REAL. Los de sandbox son OTROS y viven
+# en [env.sandbox.vars]. Confundirlos es el error caro: una membresia de prueba
+# apuntando a un plan real le cobra a alguien.
+#
+# El webhook id lo da el panel a veces con prefijo `WH-`; su API lo quiere pelado
+# y el codigo lo recorta. Aqui va como lo entrego PayPal.
+PAYPAL_ENTORNO = "live"
+PAYPAL_WEBHOOK_ID = "8WN91706YM9366150"
+# Creados con `PAYPAL_ENTORNO=live node ops/paypal-plans.mjs --crear` el 3 sep 2026.
+PAYPAL_PRODUCTO = "PROD-3YL4767619199045K"
+PAYPAL_PLAN_SEMILLA = "P-5L029923PY7871929NKMWNSI"
+PAYPAL_PLAN_RETONO = "P-33P89059E34419313NKMWNSI"
+PAYPAL_PLAN_ARBOL = "P-0XM89316XJ9677303NKMWNSI"
+PAYPAL_PLAN_BOSQUE = "P-60151894XG4410524NKMWNSQ"
 # Panel /admin. Ninguno de los dos es secreto: identifican la aplicación de
 # Cloudflare Access, no autorizan nada por sí solos. Sin ellos el panel responde
 # 503 y no sirve un dato — ver ops/panel-admin.md.
