@@ -1574,5 +1574,14 @@
   "mi.err.cerrado": "International membership is not open yet. Write to us and we will help.",
   "mi.err.envio": "We could not reach PayPal. Please try again in a moment.",
   "calc.trm": "1 USD = {v} COP · official TRM of {f}",
-  "calc.trm.no": "We could not look up the exchange rate right now."
+  "calc.trm.no": "We could not look up the exchange rate right now.",
+  "pay.via.wompi": "Bancolombia",
+  "pay.via.paypal": "PayPal",
+  "pay.now.t.pp": "PayPal, in dollars",
+  "pay.now.p.pp": "For those outside Colombia. We convert your gift using the day’s official TRM rate and PayPal charges in dollars. Its international fee takes close to 10%.",
+  "pay.pp.min": "With PayPal the minimum is US$5 a month, about {cop} today. Below that, its fixed fee takes too much.",
+  "pay.pp.max": "That amount is too high for PayPal. Write to us: a bank transfer leaves you more.",
+  "pay.pp.unico": "Taking you to PayPal’s payment page, where you enter the amount.",
+  "pay.pp.sintrm": "We could not look up the exchange rate, so we cannot convert your gift to dollars. Please try again in a moment.",
+  "pay.pp.correo": "For a PayPal membership we need your email: that is where each monthly receipt goes."
 }
