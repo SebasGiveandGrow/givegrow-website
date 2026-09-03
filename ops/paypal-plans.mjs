@@ -66,12 +66,22 @@ import path from "node:path";
    porque el archivo es de wrangler y ese es su formato.
 
    Devuelve un objeto y NUNCA imprime un valor. */
-function leerDevVars() {
+function leerDevVars(entornoPedido) {
   /* La raiz es el padre de ops/, calculado desde este archivo y no desde el
      directorio actual: asi el script funciona igual se corra desde donde se
      corra. */
   const raiz = path.resolve(new URL(".", import.meta.url).pathname, "..");
-  const arch = path.join(raiz, ".dev.vars");
+  /* ⚠️ LIVE LEE OTRO ARCHIVO, Y ESTO EVITA UN ERROR QUE YA PASO.
+     `.dev.vars` es por definicion el archivo de llaves LOCALES, o sea de
+     sandbox. Correr con PAYPAL_ENTORNO=live leyendo de ahi manda credenciales de
+     sandbox contra api-m.paypal.com y PayPal responde 401 «invalid_client» —
+     ocurrio el 3 sep 2026 y el error no dice cual es la confusion.
+
+     Asi que live exige `.dev.vars.live`, un archivo aparte. `.gitignore` ya cubre
+     `.dev.vars.*`, asi que no se sube. Y separar los archivos hace el error
+     IMPOSIBLE en vez de solo diagnosticable: no hay forma de que una llave de
+     prueba llegue a produccion por descuido. */
+  const arch = path.join(raiz, entornoPedido === "live" ? ".dev.vars.live" : ".dev.vars");
   const salida = { ruta: arch, existe: false, vars: {} };
   let texto;
   try { texto = fs.readFileSync(arch, "utf8"); } catch { return salida; }
@@ -86,13 +96,16 @@ function leerDevVars() {
   return salida;
 }
 
-const DEV = leerDevVars();
+/* El entorno se resuelve ANTES de leer el archivo, porque decide cual leer. */
+const ENTORNO_PEDIDO = String(process.env.PAYPAL_ENTORNO || "").trim().toLowerCase() === "live"
+  ? "live" : "sandbox";
+const DEV = leerDevVars(ENTORNO_PEDIDO);
 /* El entorno de verdad manda sobre el archivo: asi se puede probar algo puntual
    sin editarlo. */
 const conf = (n) => process.env[n] || DEV.vars[n] || "";
 
 const CREAR = process.argv.includes("--crear");
-const ENTORNO = conf("PAYPAL_ENTORNO") === "live" ? "live" : "sandbox";
+const ENTORNO = ENTORNO_PEDIDO;
 const BASE = ENTORNO === "live"
   ? "https://api-m.paypal.com"
   : "https://api-m.sandbox.paypal.com";
@@ -192,6 +205,12 @@ async function main() {
     if (!DEV.existe) {
       console.log("NO ENCONTRE " + DEV.ruta);
       console.log("Ese archivo va en la RAIZ del repo, al lado de wrangler.toml.");
+      if (ENTORNO === "live") {
+        console.log("");
+        console.log("OJO: para live NO se usa .dev.vars, que tiene las llaves de SANDBOX.");
+        console.log("Las de produccion son OTRAS: salen del interruptor Live en");
+        console.log("Apps & Credentials. Ponlas en .dev.vars.live (ya esta en .gitignore).");
+      }
     } else if (!DEV.vars.PAYPAL_CLIENT_ID && !DEV.vars.PAYPAL_SECRET) {
       console.log("ENCONTRE " + DEV.ruta + " pero no tiene PAYPAL_CLIENT_ID ni PAYPAL_SECRET.");
       console.log("Agregale esas dos lineas al final, sin borrar las que ya estan.");
