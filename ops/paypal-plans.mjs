@@ -17,6 +17,8 @@
    Crea de verdad -hay que pedirlo explicitamente-:
 
      node ops/paypal-plans.mjs --crear
+     node ops/paypal-plans.mjs --webhooks    (solo lista, no crea nada)
+     PAYPAL_ENTORNO=live node ops/paypal-plans.mjs --webhooks
 
    Y para produccion, encima, PAYPAL_ENTORNO=live en `.dev.vars`.
 
@@ -105,6 +107,17 @@ const DEV = leerDevVars(ENTORNO_PEDIDO);
 const conf = (n) => process.env[n] || DEV.vars[n] || "";
 
 const CREAR = process.argv.includes("--crear");
+/* `--webhooks` no crea ni toca nada: LISTA los webhooks del comercio y los
+   eventos a los que cada uno esta suscrito. Existe porque hay dos preguntas que
+   el panel de PayPal no contesta bien y que ya costaron tiempo:
+
+   1. El id que hay que poner en PAYPAL_WEBHOOK_ID. El panel lo muestra con el
+      prefijo `WH-` que su API NO acepta; asi se ve el valor real. Fue asi como
+      se descubrio el 3 sep 2026, listando con la API.
+   2. A QUE EVENTOS esta suscrito. De eso depende si una donacion del boton
+      alojado puede llegar por webhook -que tiene firma y ya esta construido- o
+      si de verdad hace falta IPN, que PayPal marca como metodo legado. */
+const WEBHOOKS = process.argv.includes("--webhooks");
 const ENTORNO = ENTORNO_PEDIDO;
 const BASE = ENTORNO === "live"
   ? "https://api-m.paypal.com"
@@ -191,12 +204,37 @@ async function crear(ruta, cuerpo, requestId, tk) {
   return d;
 }
 
+async function listarWebhooks(tk) {
+  const r = await fetch(BASE + "/v1/notifications/webhooks", {
+    headers: { authorization: "Bearer " + tk, accept: "application/json" }
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error("no se pudieron listar (" + r.status + "): " + JSON.stringify(d).slice(0, 300));
+
+  const lista = d.webhooks || [];
+  if (!lista.length) {
+    console.log("No hay NINGUN webhook en este entorno.");
+    console.log("Sin webhook, ninguna suscripcion se confirma sola: el sitio no");
+    console.log("se enteraria de los cobros mensuales.");
+    return;
+  }
+  for (const w of lista) {
+    console.log("id (para PAYPAL_WEBHOOK_ID, sin el prefijo WH-):");
+    console.log("  " + w.id);
+    console.log("url: " + w.url);
+    const evs = (w.event_types || []).map((e) => e.name).sort();
+    console.log("eventos (" + evs.length + "):");
+    for (const e of evs) console.log("  · " + e);
+    console.log("");
+  }
+}
+
 async function main() {
   const id = conf("PAYPAL_CLIENT_ID");
   const secreto = conf("PAYPAL_SECRET");
 
   console.log("entorno: " + ENTORNO + "  (" + BASE + ")");
-  console.log("categoria del producto: " + CATEGORIA);
+  if (!WEBHOOKS) console.log("categoria del producto: " + CATEGORIA);
   console.log("");
 
   if (!id || !secreto) {
@@ -231,11 +269,17 @@ async function main() {
     }
     console.log("");
     console.log("Para crear: exporta PAYPAL_CLIENT_ID y PAYPAL_SECRET y agrega --crear.");
+    console.log("Para solo VER los webhooks y sus eventos, sin crear nada: --webhooks.");
     return;
   }
 
   const tk = await token(id, secreto);
   console.log("autenticado.");
+  console.log("");
+
+  /* `--webhooks` sale AQUI: ya se autentico, y todo lo de abajo es del producto y
+     los planes, que no tienen nada que ver con listar. */
+  if (WEBHOOKS) return await listarWebhooks(tk);
 
   if (!CREAR) {
     console.log("");
