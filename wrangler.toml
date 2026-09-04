@@ -22,7 +22,7 @@ html_handling = "auto-trailing-slash"
 # Ojo con el coste: ahora el Worker se invoca en cada visita a la portada. Es
 # aceptable porque su última línea es `env.ASSETS.fetch(request)`, o sea que
 # para todo lo que no reconoce se limita a devolver el asset.
-run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*"]
+run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*"]
 
 # Base PRIVADA (Ley 1581): donantes, aportes, inscripciones y consentimientos.
 # Nunca se sirve al navegador. Los datos públicos de la red siguen en
@@ -60,6 +60,10 @@ CORREO_DESDE = "Give&Grow International <no-responder@notificaciones.thegiveandg
 # notificaciones.… vía Resend. Cambiarlo era seguro incluso antes.
 CORREO_AVISOS = "contabilidad@thegiveandgrowproject.org"
 CORREO_MMC = "MiraMiCasa@thegiveandgrowproject.org"
+# Alianzas: la visita de contexto de una fundacion la coordina Sebas, no
+# contabilidad. Mezclarla con los avisos de aportes haria que el buzon donde se
+# revisan pagos dejara de ser una bandeja de trabajo fiable.
+CORREO_ALIANZAS = "sebas@thegiveandgrowproject.org"
 
 # ---------------------------------------------------------------------------
 # PAYPAL — MEMBRESIAS INTERNACIONALES (PRODUCCION)

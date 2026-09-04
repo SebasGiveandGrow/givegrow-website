@@ -32,7 +32,13 @@ for (const f of ["app.js", "worker.js", "documentos.js"]) {
    Se valida lo EMITIDO, no el código fuente del template: hay que evaluar el
    literal para que las secuencias de escape queden como quedan en producción. */
 const workerSrc = readFileSync("worker.js", "utf8");
-for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"], ["rutaJS()", "rutaJS"], ["inspeccionJS()", "inspeccionJS"], ["inspeccionSW()", "inspeccionSW"]]) {
+/* `fichaJS` entra el 4 sep 2026, con el cuestionario del HUB. La lista es
+   MANUAL y eso es su punto flaco: un emisor nuevo que no se agregue aqui queda
+   sin vigilar, y es justo donde viven las dos trampas de worker.js —comillas
+   invertidas dentro de la plantilla y saltos de linea sin escapar—. Al escribir
+   `fichaJS` pise la primera otra vez, en un comentario; el gate la caza SOLO si
+   la funcion esta en esta lista. */
+for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"], ["rutaJS()", "rutaJS"], ["inspeccionJS()", "inspeccionJS"], ["inspeccionSW()", "inspeccionSW"], ["fichaJS()", "fichaJS"]]) {
   try {
     const i = workerSrc.indexOf("function " + fn + "()");
     if (i === -1) throw new Error("no se encontró " + nombre);
@@ -77,7 +83,7 @@ for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"]
        arranque, y eso es una tarea con teléfono delante. Comprobado el 31 ago:
        hoy ninguna de las tres tiene huérfanas. */
     if (fn !== "adminJS") {
-      if (fn === "inspeccionSW") continue;
+      if (fn === "inspeccionSW" || fn === "fichaJS") continue;
       const defs = [...emitido.matchAll(/^function (cargar\w*|pintar\w*)\s*\(/gm)].map(m => m[1]);
       const sueltas = defs.filter(f => {
         const veces = [...emitido.matchAll(new RegExp("\\b" + f + "\\b", "g"))].length;
