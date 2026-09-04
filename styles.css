@@ -238,6 +238,13 @@ section{padding:72px 0}
 .band .lead,.band .mu{color:var(--on-dark-3)}
 .band .card{background:var(--on-dark-fill-2);border-color:var(--on-dark-fill);color:var(--on-dark)}
 .band .card p{color:var(--on-dark-3)}
+/* El boton de contorno hereda `--acc`, que es el verde institucional pleno, y
+   `.band` es fondo verde-tinta en LOS DOS MODOS: quedaba en 2.1:1, borde
+   incluido. No es un fallo de modo noche — en dia se ve igual de mal. */
+.band .btn-o{color:var(--gn);border-color:var(--gn)}
+/* Y su hover no puede seguir siendo `--gl`: en dia eso es casi blanco y dejaria
+   el verde claro flotando encima. Se usa el mismo relleno tenue de las tarjetas. */
+.band .btn-o:hover{background:var(--on-dark-fill)}
 .cream{background:var(--surface-2)}
 
 /* ===== CALCULATOR ===== */
@@ -871,6 +878,7 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .track-search input:focus{outline:none;border-color:var(--g)}
 .track-search .btn{flex:0 0 auto;white-space:nowrap}
 .track-noguide{margin-top:14px;background:none;border:none;color:var(--g);font-weight:600;font-size:var(--fs-14);cursor:pointer;text-decoration:underline;padding:4px 0}
+html[data-theme="dark"] .track-noguide{color:var(--gn)}
 .track-noguide:hover{opacity:.75}
 .track-result{margin-top:24px;max-width:640px}
 .track-loading{color:var(--ink-soft);font-size:var(--fs-15)}
@@ -1001,6 +1009,12 @@ html[data-theme="dark"] input[type=checkbox]::before{background:var(--ink-deep)}
 .grat-card-head h3{margin:0;font-size:var(--fs-17)}
 .grat-card-head h3 a{color:var(--ink);text-decoration:none}
 .grat-card-head h3 a:hover{color:var(--g);text-decoration:underline}
+/* `--gl` tambien cambia de valor en noche (#1D2F24): la inicial del comercio sin
+   logo quedaba en verde oscuro sobre verde oscuro, 1.78:1. Y el hover del nombre
+   apagaba el enlace justo al pasar por encima — dos estados que el barrido del
+   navegador no alcanza a ver: uno pide un comercio sin logo, el otro pide el raton. */
+html[data-theme="dark"] .grat-logo-ph{color:var(--gn)}
+html[data-theme="dark"] .grat-card-head h3 a:hover{color:var(--gn)}
 .grat-cat{font-size:var(--fs-13);color:var(--mu);font-weight:600}
 .grat-benefit{font-size:var(--fs-15);color:var(--ink);font-weight:600;line-height:1.4;margin:0 0 14px;padding:12px 14px;background:var(--gl);border-radius:10px}
 .grat-meta{margin:0;display:flex;flex-direction:column;gap:8px}
@@ -1206,6 +1220,7 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 .grat-card-link{display:block;text-decoration:none;color:inherit;cursor:pointer}
 .grat-card-link h3{color:var(--ink)}
 .grat-card-more{display:inline-block;margin-top:14px;font-size:var(--fs-13);font-weight:700;color:var(--g)}
+html[data-theme="dark"] .grat-card-more{color:var(--gn)}
 .grat-card-link:hover .grat-card-more{text-decoration:underline}
 /* logo de comercio en la ficha: fondo claro (logos suelen ser oscuros) */
 .ficha-logo-light{background:var(--logo-bg);border:1px solid var(--bd);object-fit:contain;padding:6px}
