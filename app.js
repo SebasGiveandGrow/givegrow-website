@@ -482,7 +482,9 @@ var I18N = {
     "mc.res.t":"Un ingeniero ya revisó tu caso",
     "mc.res.reco":"Qué hacer, y con qué reparar:",
     "mc.aviso":"Esto no reemplaza una visita ni la declaratoria de tu municipio: es un concepto hecho a distancia, sobre las fotos que enviaste. Buscaremos gestionar ayuda para todas las casas que podamos, y no podemos comprometerla casa por casa.",
-    "mc.informe":"Ver mi concepto en PDF",
+    "mc.respaldo.t":"Ya lo revisó un ingeniero.",
+    "mc.respaldo.p":"Antes de entregarte el concepto estamos comprobando su matrícula en el registro del COPNIA, y eso lo hace una persona. En cuanto quede verificada, el concepto aparece aquí — no tienes que hacer nada.",
+        "mc.informe":"Ver mi concepto en PDF",
     "mc.cl.urgente":"Visita urgente",
     "mc.cl.programada":"Visita programada",
     "mc.cl.no_requiere":"No requiere visita por ahora",
@@ -2590,7 +2592,16 @@ function mcPinta(aviso, color){
 
          Queda escrito para el día que alguien haga `falta` opcional: ese día este
          estado se vuelve alcanzable y esta tarjeta empieza a mentir. */
-      if (!tieneConcepto && !pideFotos){
+      /* YA LO REVISARON, FALTA COMPROBAR LA MATRICULA. Va antes de la tarjeta de
+         espera porque esa dice «todavia no lo ha revisado un ingeniero», y aqui
+         si lo hicieron: lo que falta es que alguien confirme su matricula en el
+         COPNIA. Decirle lo primero seria mentirle, y ademas le quitaria el unico
+         dato que explica por que sigue esperando. */
+      if (!tieneConcepto && !pideFotos && d.esperando_respaldo){
+        h += '<div class="card" style="margin-top:22px;text-align:left">'
+          +  "<h3>" + escapeHtml(t("mc.respaldo.t")) + "</h3>"
+          +  "<p>" + escapeHtml(t("mc.respaldo.p")) + "</p></div>";
+      } else if (!tieneConcepto && !pideFotos){
         /* La espera, contada con hechos y sin fecha prometida. Los días que
            lleva y cuántos hay delante: el segundo dato explica el primero
            mejor que cualquier disculpa, y los dos son verificables. */
