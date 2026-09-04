@@ -916,9 +916,17 @@ async function correoAvisoInterno(env, aporte, email, nombre) {
   const para = env.CORREO_AVISOS;
   if (!para) return avisoSinBuzon(env, "aviso-interno");
   const titulo = "Nuevo aporte confirmado: " + aporte.guia;
+  /* LA MONEDA DE VERDAD. Esto decia siempre «COP» porque solo lo llamaba el
+     camino de Wompi, que liquida en pesos. Un cobro de PayPal son DOLARES: con
+     el texto fijo, US$35 llegaba al buzon como «$3.500 COP» — un numero que no
+     es ni el monto ni la moneda. */
+  const enUsd = String(aporte.moneda || "COP").toUpperCase() === "USD";
+  const montoTexto = enUsd
+    ? "US$" + (Number(aporte.monto_centavos || 0) / 100).toFixed(2)
+    : fmtPesos(aporte.monto_centavos) + " COP";
   const filas = [
     ["Guía", aporte.guia],
-    ["Monto", fmtPesos(aporte.monto_centavos) + " COP"],
+    ["Monto", montoTexto],
     ["Destino", aporte.modo === "dirigida" ? (aporte.destino_id || "?") : "Fondo general"],
     ["Frecuencia", { unico: "Único", mensual: "Mensual", anual: "Anual" }[aporte.frecuencia] || aporte.frecuencia],
     ["Certificado", aporte.quiere_certificado ? "SÍ lo pidió" : "no"],
@@ -7494,6 +7502,14 @@ async function paypalCobro(env, suscripcionId, recurso) {
     const d = sub.donante_id
       ? await env.DB.prepare("SELECT nombre, email FROM donantes WHERE id = ?").bind(sub.donante_id).first()
       : null;
+    /* EL AVISO INTERNO, la tercera pieza que le faltaba a este camino. Sin el,
+       la fundacion no se entera de que hay un miembro nuevo cobrando cada mes
+       salvo que alguien abra el panel. El de Wompi lleva anios mandandolo. */
+    await correoAvisoInterno(env, {
+      guia, monto_centavos: centavos, moneda,
+      modo: "fondo", destino_id: null, frecuencia: "mensual"
+    }, d && d.email, d && d.nombre);
+
     const carnet = await carnetTrasAporte(
       env,
       { frecuencia: "mensual", monto_centavos: centavos, destino_id: null },
