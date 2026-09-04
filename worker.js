@@ -5929,7 +5929,7 @@ function guardarInspeccion(){
 `;
 }
 
-function inspeccionHTML(seccionesJSON, alcance, consentTexto) {
+function inspeccionHTML(seccionesJSON, alcance, consentTexto, nonce) {
   return `<!doctype html>
 <html lang="es"><head>
 <meta charset="utf-8">
@@ -6179,7 +6179,7 @@ textarea{min-height:64px;resize:vertical}
   </div>
 </div>
 <script src="/triaje/inspeccion.js"></script>
-<script>INSP_ARRANCA(${seccionesJSON});</script>
+<script nonce="${nonce}">INSP_ARRANCA(${seccionesJSON});</script>
 </body></html>`;
 }
 
@@ -8690,7 +8690,9 @@ async function rutaCarnet(env, token) {
       "content-type": "text/html; charset=utf-8",
       /* Sin caché: el estado se consulta en el momento, que es el punto. */
       "cache-control": "private, no-store",
-      "x-robots-tag": "noindex, nofollow"
+      "x-robots-tag": "noindex, nofollow",
+      /* El carnet no tiene UN SOLO script: se le niega la capacidad entera. */
+      "content-security-policy": cspPagina({ script: "'none'" })
     }
   });
 }
@@ -9893,6 +9895,44 @@ async function correoFichaRecibida(env, nombre, d) {
 
    El nonce se genera por respuesta. La pagina se sirve «no-store», asi que no
    hay riesgo de que se cachee un nonce y deje de casar con la cabecera. */
+/* LA POLITICA DE LAS PANTALLAS QUE GENERA EL WORKER.
+   Una sola funcion para las seis, porque la alternativa —una cadena escrita a
+   mano en cada respuesta— es como se quedan dos sueltas y nadie lo nota: un
+   fallo de CSP no rompe la pagina, solo deja de proteger.
+
+   Lo que decide cada directiva, comprobado leyendo lo que estas paginas hacen
+   de verdad, no lo que uno supondria:
+   · `style-src` lleva 'unsafe-inline' porque hay atributos style= en el HTML
+     (50 en el panel, 24 en la inspeccion) y un nonce NO cubre un atributo,
+     solo una etiqueta <style>. Es lo mismo que ya hace _headers.
+   · `img-src` admite data: y blob: por las firmas en canvas (`toDataURL`) y las
+     vistas previas de foto. Las fotos del panel salen de /api/triage/medio/…,
+     que es propio origen.
+   · `worker-src 'self'` por el service worker de la inspeccion, que es lo que
+     permite trabajar sin señal. Safari no implementa `worker-src` y cae a
+     `child-src`/`default-src`, que aqui tambien son 'self': no queda hueco.
+   · `form-action` es 'none' salvo en el panel, que tiene el buscador. Su envio
+     lleva preventDefault, pero si el JS no cargara, dejar 'self' evita convertir
+     un fallo en otro distinto.
+   · `frame-ancestors 'none'`: ninguna de estas pantallas se empotra en ningun
+     sitio. */
+function cspPagina(o) {
+  const op = o || {};
+  return [
+    "default-src 'self'",
+    "script-src " + (op.script || "'self'"),
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "worker-src 'self'",
+    "form-action " + (op.form || "'none'"),
+    "base-uri 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
 function nonceCSP() {
   const b = new Uint8Array(16);
   crypto.getRandomValues(b);
@@ -14754,7 +14794,9 @@ export default {
       try {
         if (ruta === "/admin") {
           return new Response(paginaAdmin(), {
-            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+                       "x-robots-tag": "noindex, nofollow",
+                       "content-security-policy": cspPagina({ form: "'self'" }) }
           });
         }
         /* EL SCRIPT DEL PANEL VIVE BAJO /admin/, por lo mismo que el del triaje.
@@ -14788,6 +14830,7 @@ export default {
            el index.html público con un 200: le pasó a /api/*, a /triaje y a
            /ruta. Tres cicatrices de lo mismo. */
         if (ruta === "/triaje/inspeccion") {
+          const nonce = nonceCSP();
           const cuerpo = inspeccionHTML(
             JSON.stringify({
               secciones: INSPECCION_SECCIONES,
@@ -14804,12 +14847,14 @@ export default {
               correo: sesion.email || ""
             }),
             esc(INSPECCION_ALCANCE),
-            esc(INSPECCION_CONSENT)
+            esc(INSPECCION_CONSENT),
+            nonce
           );
           return new Response(cuerpo, { headers: {
             "content-type": "text/html; charset=utf-8",
             "cache-control": "no-store",
-            "x-robots-tag": "noindex, nofollow"
+            "x-robots-tag": "noindex, nofollow",
+            "content-security-policy": cspPagina({ script: "'self' 'nonce-" + nonce + "'" })
           }});
         }
         if (ruta === "/triaje/inspeccion.js") {
@@ -14852,7 +14897,9 @@ export default {
 
         if (ruta === "/triaje") {
           return new Response(paginaTriage(), {
-            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+                       "x-robots-tag": "noindex, nofollow",
+                       "content-security-policy": cspPagina() }
           });
         }
         /* EL SCRIPT VIVE BAJO /triaje/ Y NO EN /triaje.js, Y NO ES ESTÉTICA.
@@ -14903,7 +14950,8 @@ export default {
            cualquier ruta interna futura hereda la misma cobertura. */
         if (ruta === "/admin/ruta") {
           return new Response(paginaRuta(), {
-            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+                       "content-security-policy": cspPagina() }
           });
         }
         if (ruta === "/admin/ruta.js") {
