@@ -2413,6 +2413,19 @@ async function apiReportarTransferencia(request, env, url) {
     c.idioma === "en" ? "en" : "es", token, donanteId, refer || null
   ).run();
 
+  /* LA AUTORIZACION SE ANOTA, y faltaba. Este formulario EXIGE la casilla de Ley
+     1581 —arriba, `autorizacion_requerida`— y guarda a la persona en `donantes`.
+     Los otros siete formularios del sitio dejan su rastro en `consentimientos`;
+     este no, así que el sitio conservaba datos personales sin la prueba de que
+     hubo autorización — que es lo que pide la ley y lo que promete la Política
+     de Privacidad publicada.
+
+     Va DESPUÉS del INSERT y no antes: `guia` no existe hasta la línea de arriba,
+     y ponerlo antes es un error de zona muerta que `node --check` no ve.
+     Sujeto = la guía, para poder encontrarlo después sin arrastrar el correo. */
+  await anotarAutorizacion(env, guia, "transferencia_reportada",
+                           "autoriza_datos + $" + monto + " COP", "aporte");
+
   try {
     await correoTransferenciaReportada(env, { guia, monto, email, nombre, fecha, refer, idioma: c.idioma });
     await correoAvisoTransferencia(env, { guia, monto, email, nombre, fecha, refer, destino });
@@ -8077,9 +8090,14 @@ async function adminComprobante(env, guia) {
 async function adminReportadas(env) {
   const r = await env.DB.prepare(
     "SELECT a.guia, a.monto_centavos, a.modo, a.destino_id, a.proyecto, a.quiere_certificado, " +
-    "a.referencia_pago, a.comprobante, a.creada_en, d.nombre, d.email " +
+    "a.referencia_pago, a.comprobante, a.creada_en, d.nombre, d.email, " +
+    /* LA EDAD, y no es cosmetica: al auditar habia tres transferencias
+       reportadas de 15, 20 y 22 dias —$630.000 en total, dos pidiendo
+       certificado— y la bandeja solo mostraba la fecha. Una fecha no grita;
+       «hace 22 dias» si. Las mas viejas salen primero por lo mismo. */
+    "CAST(julianday('now') - julianday(a.creada_en) AS INTEGER) AS dias " +
     "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id " +
-    "WHERE a.estado = 'reportada' ORDER BY a.creada_en DESC LIMIT 100"
+    "WHERE a.estado = 'reportada' ORDER BY a.creada_en ASC LIMIT 100"
   ).all();
   return json({ reportadas: r.results || [] });
 }
@@ -10971,7 +10989,9 @@ function cargarReportadas(){
     if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Ninguna esperando verificación.</td></tr>'; return; }
     tb.innerHTML = l.map(function(a){
       return "<tr>" +
-        "<td>" + esc(a.guia) + "<br><small>" + esc((a.creada_en||"").slice(0,16)) + "</small></td>" +
+        "<td>" + esc(a.guia) + "<br><small>" + esc((a.creada_en||"").slice(0,16)) +
+          (a.dias >= 3 ? '<br><strong style="color:#A84D00">esperando ' + a.dias + " dia(s)</strong>" : "") +
+        "</small></td>" +
         "<td>" + pesos(a.monto_centavos) + "</td>" +
         "<td>" + esc(a.modo === "dirigida" ? (a.proyecto || a.destino_id || "?") : "Fondo general") + "</td>" +
         "<td>" + esc(a.nombre || "—") + (a.email ? "<br><small>" + esc(a.email) + "</small>" : "") + "</td>" +
