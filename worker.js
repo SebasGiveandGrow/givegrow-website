@@ -1760,8 +1760,9 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(e.recibido_en) AS masViejo " +
     "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
     "WHERE e.firma_valida = 0 " +
-    "   OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL)",
-    "Bandeja «Eventos de PayPal sin casa» · entró plata que no tiene a quién atribuirse, o una firma no cuadra", 30, "#sec-pps");
+    "   OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL) " +
+    "   OR e.resultado IN ('sin_regla','reversa_sin_aporte')",
+    "Bandeja «Eventos de PayPal sin casa» · entró o salió plata que no tiene a quién atribuirse, o una firma no cuadra", 30, "#sec-pps");
   await enCola("ipn_por_registrar",
     "SELECT COUNT(*) AS n, MIN(recibido_en) AS masViejo FROM eventos_ipn WHERE resultado = 'por_registrar'",
     "Bandeja «Donaciones por el botón de PayPal» · sin guía no hay recibo: hay que registrarlas a mano", 65, "#sec-ipn");
@@ -7474,6 +7475,8 @@ async function apiPaypalWebhook(request, env) {
     } else if (tipo === "BILLING.SUBSCRIPTION.EXPIRED") {
       await paypalEstado(env, recurso.id, "expirada", true);
       resultado = "expirada";
+    } else if (PAYPAL_REVERSAS.includes(tipo)) {
+      resultado = await paypalReversa(env, tipo, recurso);
     }
   } catch (e) {
     /* El fallo se ESCRIBE, no se pierde: `resultado` es donde se mira despues.
@@ -7506,6 +7509,113 @@ async function paypalEstado(env, id, estado, cerrada) {
    y de ahi cuelgan el recibo y la trazabilidad que ya existen.
 
    Entra como `aprobada` porque PayPal ya cobro: no es una intencion. */
+/* LA PLATA QUE SE DEVUELVE.
+   ============================================================================
+   El camino de Wompi tiene desde hace tiempo un guardian de reversas: si a un
+   donante le devuelven la plata despues de aprobado el aporte, se marca su
+   certificado EN REVISION y se avisa, porque hay un papel tributario circulando
+   sin respaldo. El de PayPal no tenia NADA.
+
+   Un reembolso o un contracargo llegaban al webhook, caian en el `else` que no
+   existe —`resultado = "sin_regla"`— y ahi morian: el aporte seguia `aprobada`,
+   el dinero ya no estaba, y el libro decia que si.
+
+   LOS NOMBRES SON LOS REALES, preguntados a la API el 4 de septiembre de 2026
+   (`/v1/notifications/webhooks-event-types`, 205 eventos) y no inventados: hay
+   dos familias porque PayPal tiene dos generaciones de recurso —`sale` la vieja
+   y `capture` la v2— y una donacion del boton o de una suscripcion puede llegar
+   por cualquiera de las dos.
+
+   ⚠️ ESTO NO SE DISPARA SOLO. El webhook de produccion esta suscrito a cinco
+   eventos y NINGUNO es de reversa: hay que agregarlos en el panel de PayPal.
+   El codigo entra antes a proposito, para que el dia que se suscriban ya haya
+   quien los atienda en vez de descubrirlo con una reversa perdida. */
+const PAYPAL_REVERSAS = [
+  "PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED", "PAYMENT.SALE.DENIED",
+  "PAYMENT.CAPTURE.REFUNDED", "PAYMENT.CAPTURE.REVERSED", "PAYMENT.CAPTURE.DENIED",
+  "CUSTOMER.DISPUTE.CREATED"
+];
+
+/* El id del cobro ORIGINAL, que es lo que hay que encontrar para saber a que
+   aporte pertenece. PayPal lo pone en sitios distintos segun el evento, asi que
+   se buscan todos y se prueban en orden. Si ninguno cuadra NO se inventa nada:
+   se devuelve un resultado que la bandeja de «eventos sin casa» muestra. */
+function paypalOrigenDe(recurso) {
+  const r = recurso || {};
+  const posibles = [r.sale_id, r.capture_id, r.parent_payment, r.id];
+  /* Una disputa trae los cobros discutidos en `disputed_transactions`. */
+  for (const d of (Array.isArray(r.disputed_transactions) ? r.disputed_transactions : [])) {
+    if (d && d.seller_transaction_id) posibles.push(d.seller_transaction_id);
+  }
+  for (const l of (Array.isArray(r.links) ? r.links : [])) {
+    const m = String((l && l.href) || "").match(/\/(?:sale|captures|payments\/sale)\/([A-Z0-9]{8,})/i);
+    if (m) posibles.push(m[1]);
+  }
+  return posibles.map((x) => String(x || "").trim()).filter(Boolean);
+}
+
+async function paypalReversa(env, tipo, recurso) {
+  const candidatos = paypalOrigenDe(recurso);
+  let a = null;
+  for (const ref of candidatos) {
+    a = await env.DB.prepare(
+      "SELECT guia, estado, monto_centavos, moneda FROM aportes WHERE proveedor = 'paypal' AND proveedor_ref = ?"
+    ).bind(ref).first();
+    if (a) break;
+  }
+  /* SIN APORTE NO SE INVENTA. Puede ser una donacion del boton —que no tiene
+     guia por diseño— o un cobro que nunca llego a registrarse. En los dos casos
+     lo correcto es dejarlo VISIBLE, no adivinar a quien pertenece. */
+  if (!a) return "reversa_sin_aporte";
+
+  /* Una disputa NO es todavia una devolucion: la plata sigue ahi mientras se
+     resuelve. Se avisa y se marca el certificado, pero el aporte no se toca —
+     decir «rechazada» sobre dinero que aun esta seria tan falso como callarlo. */
+  const devuelto = tipo !== "CUSTOMER.DISPUTE.CREATED";
+  if (devuelto && a.estado !== "rechazada") {
+    await env.DB.prepare(
+      "UPDATE aportes SET estado = 'rechazada', actualizada_en = datetime('now') WHERE guia = ?"
+    ).bind(a.guia).run();
+  }
+
+  try { await revisarCertificadoPorReversa(env, a.guia, tipo); }
+  catch (e) { console.error("guardian de reversa paypal", a.guia, e && e.message); }
+
+  try { await correoReversaPaypal(env, a, tipo, devuelto); }
+  catch (e) { console.error("aviso reversa paypal", a.guia, e && e.message); }
+
+  return (devuelto ? "reversa " : "disputa ") + a.guia;
+}
+
+async function correoReversaPaypal(env, a, tipo, devuelto) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return avisoSinBuzon(env, "reversa-paypal");
+  const titulo = (devuelto ? "Le devolvieron la plata a un aporte: " : "Disputa abierta sobre un aporte: ") + a.guia;
+  const monto = String(a.moneda || "COP").toUpperCase() === "USD"
+    ? "US$" + (Number(a.monto_centavos || 0) / 100).toFixed(2)
+    : fmtPesos(a.monto_centavos) + " COP";
+  const filas = [["Guía", a.guia], ["Monto", monto], ["Evento de PayPal", tipo]];
+  return enviarCorreo(env, {
+    para,
+    asunto: "ATENCIÓN · " + titulo,
+    texto: [titulo, "", devuelto
+      ? "El aporte quedó como rechazado: el dinero ya no está."
+      : "El dinero sigue ahí mientras la disputa se resuelve, así que el aporte NO se tocó.",
+      "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: [
+        devuelto
+          ? "El aporte quedó como rechazado: el dinero ya no está."
+          : "El dinero sigue ahí mientras la disputa se resuelve, así que el aporte NO se tocó — decir «rechazada» sobre plata que aún está sería tan falso como callarlo.",
+        "Si ese aporte tenía certificado, quedó marcado EN REVISIÓN y su PDF sale sellado. Anularlo es una decisión tuya, en /admin."
+      ],
+      filas
+    }),
+    etiqueta: "reversa-paypal", guia: a.guia
+  });
+}
+
 async function paypalCobro(env, suscripcionId, recurso) {
   const sub = await env.DB.prepare(
     "SELECT id, nivel, idioma, quiere_certificado, consent_muro, donante_id " +
@@ -10823,6 +10933,14 @@ async function adminPaypalSueltos(env) {
     "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
     "WHERE e.firma_valida = 0 " +
     "   OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL) " +
+    /* UN EVENTO SIN REGLA TAMPOCO PUEDE SER INVISIBLE. El webhook guarda todo lo
+       que llega, y lo que no reconoce queda con `resultado = 'sin_regla'` — que
+       hasta hoy significaba «nadie lo va a ver nunca». Ahi es donde habrian
+       caido los reembolsos y los contracargos de PayPal: plata devuelta, aporte
+       intacto en el libro, y silencio. Ahora sale a la bandeja, y con el sale
+       cualquier tipo de evento futuro que se suscriba y no tenga quien lo
+       atienda. */
+    "   OR e.resultado IN ('sin_regla','reversa_sin_aporte') " +
     "ORDER BY e.recibido_en DESC LIMIT 100"
   ).all();
 
@@ -13346,6 +13464,10 @@ function cargarPaypalSueltos(){
       var monto = e.monto ? (esc(e.monto) + " " + esc(e.moneda || "")) : "—";
       var que = !e.firma_valida
         ? "Firma invalida: NO se proceso"
+        : e.resultado === "sin_regla"
+        ? "Evento sin regla: llego y nadie lo atiende"
+        : e.resultado === "reversa_sin_aporte"
+        ? "REVERSA sin aporte: le devolvieron plata a algo que no esta en el libro"
         : "Pago sin suscripcion: registrar a mano";
       return "<tr>" +
         "<td>" + esc((e.recibido_en||"").slice(0,16)) + "</td>" +
