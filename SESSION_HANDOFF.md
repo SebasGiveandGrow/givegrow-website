@@ -483,6 +483,37 @@ por llamada, y leer de vuelta en una llamada aparte.** Y corolario que también
 mordió cuatro veces esta sesión: **no filtrar la salida con grep mientras se
 depura** — los `>/dev/null` y los `grep -E` escondieron el fallo cada vez.
 
+**Y volvió a morder, peor, el 3 de septiembre de 2026 — con un `DELETE`.**
+Auditando PayPal apareció que `eventos_ipn` tenía `max(id) = 10` y **una sola
+fila**: se crearon nueve y desaparecieron ocho. Todas eran pruebas mías y
+**ninguna era una donación**, así que no se perdió nada de nadie — pero no se
+pudo atribuir qué las borró, y la hipótesis más probable es uno de mis propios
+`DELETE FROM eventos_ipn` corridos con `>/dev/null 2>&1`. Sobre una tabla que
+existe para conciliar dinero, «no sé qué pasó» es la respuesta más cara posible.
+
+Regla que sale de ahí, más dura que la anterior: **un `DELETE` contra la base
+remota nunca lleva la salida silenciada, nunca va sin `WHERE`, y su `WHERE` es
+defensivo** — que incluya las condiciones que hacen imposible tocar algo con
+plata. El borrado de las dos suscripciones fantasma de esa misma sesión se hizo
+así y sirve de plantilla:
+
+```sql
+DELETE FROM suscripciones
+ WHERE id IN ('…','…')
+   AND estado = 'aprobacion_pendiente'
+   AND cobros = 0
+   AND NOT EXISTS (SELECT 1 FROM aportes a WHERE a.suscripcion = suscripciones.id)
+```
+
+Se imprime la fila **antes** (con sus aportes ligados y su `donante_id`), se
+borra, y se cuenta **después**. Tres llamadas, ninguna filtrada.
+
+**Corolario del mismo día, y también propio:** `git checkout <rama> -- .` sobre
+un árbol con cambios sin commitear se los lleva por delante **sin avisar y sin
+reflog que valga** — así se perdió esta misma nota la primera vez que se
+escribió. Si hay trabajo sin commitear, se commitea o se hace `stash` antes de
+cambiar de rama; nunca se «arregla» la rama con un checkout de rutas.
+
 **VERIFICADO CORRECTO (no re-auditar).** El vocabulario de materiales está
 cerrado en los DOS caminos de escritura —`worker.js:2514` (API pública) y
 `worker.js:6986` (edición del panel), ambos con `MATERIALES.includes(...)`— así
