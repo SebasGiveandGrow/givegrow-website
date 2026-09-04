@@ -2956,8 +2956,11 @@ async function apiCasoEstado(env, numero, token) {
 
      `falta` es lo que convierte esta pantalla en útil: si un ingeniero marcó
      `inevaluable`, aquí dice QUÉ foto se necesita, justo encima del botón para
-     subirla. Antes el sistema sabía pedir lo que faltaba y no sabía recibirlo. */
-  const e = await evaluacionVigente(env, numero, c.clasificacion);
+     subirla. Antes el sistema sabía pedir lo que faltaba y no sabía recibirlo.
+
+     SOLO CON RESPALDO —el cuarto argumento—: es lo que la familia LEE. El
+     porqué está en `evaluacionVigente`. */
+  const e = await evaluacionVigente(env, numero, c.clasificacion, true);
 
   /* QUÉ FALTA ES OTRA PREGUNTA QUE QUÉ VALE EL CASO, y hay que resolverlas por
      separado. `evaluacionVigente` devuelve a propósito la evaluación que casa
@@ -3004,6 +3007,16 @@ async function apiCasoEstado(env, numero, token) {
        alguien. Sin este campo, la pantalla no sabría distinguir «nadie lo ha
        visto todavía» de «lo vieron y no les alcanzó». */
     evaluado: !!e,
+    /* HAY CONCEPTO PERO TODAVIA NO TIENE RESPALDO. Sin este campo la pantalla
+       diria «todavia no lo ha revisado un ingeniero» a una familia cuyo caso SI
+       se reviso — que es justo la mentira que el comentario de `app.js` dejo
+       advertida: «queda escrito para el dia que alguien haga `falta` opcional:
+       ese dia este estado se vuelve alcanzable y esta tarjeta empieza a
+       mentir». No fue `falta` lo que lo hizo alcanzable, fue el filtro de
+       matricula — pero la mentira habria sido la misma. */
+    esperando_respaldo: !e && !!(await env.DB.prepare(
+      "SELECT 1 AS n FROM evaluaciones WHERE caso = ? LIMIT 1"
+    ).bind(numero).first()),
     ultima: e ? { clasificacion: e.clasificacion, recomendacion: e.recomendacion,
                   falta: e.falta, creado_en: e.creado_en } : null,
     falta_pendiente: faltaPendiente,
@@ -6238,19 +6251,40 @@ async function resolverClasificacion(env, numero) {
    Se toma la más reciente CUYA CLASIFICACIÓN ES LA DEL CASO. Así el veredicto,
    las observaciones y la firma vienen todos del mismo ingeniero — atribuirle a
    alguien una conclusión que no firmó sería peor que el error original. */
-async function evaluacionVigente(env, numero, clasificacion) {
+/* `soloConRespaldo` — SOLO las evaluaciones de quien tiene la matrícula
+   comprobada en el COPNIA. Lo usan las dos superficies que ve LA FAMILIA.
+
+   Esto faltaba, y el hueco era este: `conRespaldo` en `triageEvaluar` decide si
+   se le ESCRIBE a la familia, y esa parte estaba bien. Pero su página y su PDF
+   leían la evaluación sin filtrar, y a la familia se le dice —en el acuse y en
+   la pantalla— «guarda ese enlace: es donde ves en qué va tu caso». O sea que
+   no mandarle el correo no le impedía leer el concepto: solo le quitaba el
+   aviso de que ya estaba.
+
+   Lo que el sitio promete es «un ingeniero voluntario CON MATRÍCULA te da un
+   concepto», y la matrícula «la verificamos a mano en el registro público del
+   COPNIA». Un concepto estructural sin esa comprobación —sobre si permanecer o
+   no en una casa— no es lo prometido, y la firma que lleva impresa lo hace
+   parecer que sí.
+
+   El diseño de dos velocidades se conserva entero: la evaluación se guarda, el
+   caso se clasifica, el equipo recibe su aviso y la cola de verificación se
+   drena. Lo único que cambia es que la familia no lee un concepto que todavía
+   no tiene respaldo. */
+async function evaluacionVigente(env, numero, clasificacion, soloConRespaldo) {
+  const filtro = soloConRespaldo ? " AND " + MATRICULA_OK("ing_email") : "";
+  const campos = "SELECT ing_nombre, ing_matricula, ing_email, clasificacion, nota_tecnica, " +
+                 "recomendacion, falta, creado_en FROM evaluaciones WHERE caso = ?";
   if (clasificacion) {
     const e = await env.DB.prepare(
-      "SELECT ing_nombre, ing_matricula, ing_email, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
-      "FROM evaluaciones WHERE caso = ? AND clasificacion = ? ORDER BY creado_en DESC LIMIT 1"
+      campos + " AND clasificacion = ?" + filtro + " ORDER BY creado_en DESC LIMIT 1"
     ).bind(numero, clasificacion).first();
     if (e) return e;
   }
   /* Sin clasificación en el caso —`inevaluable`, que la deja en NULL— manda la
      última, que es la que dice qué falta. */
   return await env.DB.prepare(
-    "SELECT ing_nombre, ing_matricula, ing_email, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
-    "FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC LIMIT 1"
+    campos + filtro + " ORDER BY creado_en DESC LIMIT 1"
   ).bind(numero).first();
 }
 
@@ -6348,8 +6382,21 @@ async function apiCasoInforme(env, numero, token) {
   ).bind(numero).first();
   if (!c || !token || c.token !== token) return json({ error: "no_autorizado" }, 403);
 
-  const e = await evaluacionVigente(env, numero, c.clasificacion);
-  if (!e) return json({ error: "sin_evaluacion", ayuda: "Todavía ningún ingeniero ha revisado este caso." }, 409);
+  const e = await evaluacionVigente(env, numero, c.clasificacion, true);
+  if (!e) {
+    /* SE DISTINGUEN LOS DOS CASOS, porque el remedio no es el mismo y decirle
+       «nadie lo ha revisado» a alguien cuyo caso SÍ se revisó es faltar a la
+       verdad. Si hay evaluación pero sin matrícula comprobada, se dice eso: la
+       espera tiene un motivo, y no es que nadie haya mirado su casa. */
+    const hay = await env.DB.prepare(
+      "SELECT 1 AS n FROM evaluaciones WHERE caso = ? LIMIT 1"
+    ).bind(numero).first();
+    return json(hay
+      ? { error: "sin_respaldo",
+          ayuda: "Un ingeniero ya revisó tu caso. Antes de entregarte el concepto estamos comprobando su matrícula en el registro del COPNIA, y eso lo hace una persona. En cuanto quede, aparece aquí." }
+      : { error: "sin_evaluacion",
+          ayuda: "Todavía ningún ingeniero ha revisado este caso." }, 409);
+  }
 
   const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
   const hoy = fechaCO();

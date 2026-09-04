@@ -1493,6 +1493,8 @@
   "mc.res.t": "An engineer has reviewed your case",
   "mc.res.reco": "What to do, and what to repair it with:",
   "mc.aviso": "This does not replace a visit or your municipality's declaration: it is an opinion formed at a distance, from the photos you sent. We will try to arrange help for every home we can, and we cannot commit to it house by house.",
+  "mc.respaldo.t": "An engineer has already reviewed it.",
+  "mc.respaldo.p": "Before we hand you the opinion we are checking their licence in the COPNIA register, and a person does that. As soon as it is verified the opinion appears here — you do not have to do anything.",
   "mc.informe": "See my opinion as a PDF",
   "mc.cl.urgente": "Urgent visit",
   "mc.cl.programada": "Scheduled visit",
