@@ -491,7 +491,7 @@ async function apiCheckout(request, env, url) {
   const moneda = "COP";                 // Wompi liquida en COP; el USD del sitio es solo referencia visual
 
   /* --- guía + intención --- */
-  const guia = await siguienteGuia(env, new Date().getUTCFullYear());
+  const guia = await siguienteGuia(env, anioCO());
 
   await env.DB.prepare(
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
@@ -1136,7 +1136,7 @@ async function apiRecibo(env, guia, token) {
     return json({ error: "aporte_sin_confirmar", estado: a.estado }, 409);
   }
 
-  const bytes = await recibo(a, new Date().toISOString().replace("T", " "));
+  const bytes = await recibo(a, selloCO());
   return new Response(bytes, {
     headers: {
       "content-type": "application/pdf",
@@ -2227,7 +2227,9 @@ async function adminEmitirCertificado(request, env, guia, quien) {
     ).bind(nombre, docTipo, docNumero, ciudad, a.donante_id).run();
   }
 
-  const anio = Number(String(a.aprobada_en || "").slice(0, 4)) || new Date().getUTCFullYear();
+  /* EL AÑO GRAVABLE sale del dia COLOMBIANO en que se aprobo, no del UTC en
+     que quedo guardado. Es el dato del que depende la deduccion del donante. */
+  const anio = a.aprobada_en ? anioCO(a.aprobada_en) : anioCO();
   const numero = await siguienteCertificado(env, anio);
 
   /* El snapshot se congela AQUÍ. Volver a descargar el certificado dentro de un
@@ -2244,7 +2246,10 @@ async function adminEmitirCertificado(request, env, guia, quien) {
        falso en un documento que se firma bajo juramento. */
     transaccion: (a.confirmacion === "manual" ? a.referencia_pago : a.wompi_transaction_id) || "",
     destinacion: destinacionDe(a),
-    emitido_en: new Date().toISOString().replace("T", " ").slice(0, 19)
+    /* La fecha que va impresa y que queda congelada en el snapshot: el dia
+       colombiano en que se firmo, no el UTC. Hoy no hay ningun certificado
+       emitido, asi que esto no reescribe ninguno viejo. */
+    emitido_en: selloCO()
   };
 
   await env.DB.prepare(
@@ -2428,7 +2433,7 @@ async function apiReportarTransferencia(request, env, url) {
   if (modo === "dirigida" && !destino) return json({ error: "destino_requerido" }, 400);
 
   const donanteId = await donantePorCorreo(env, email, nombre);
-  const guia = await siguienteGuia(env, new Date().getUTCFullYear());
+  const guia = await siguienteGuia(env, anioCO());
   const token = tokenNuevo();
 
   await env.DB.prepare(
@@ -7430,7 +7435,7 @@ async function paypalCobro(env, suscripcionId, recurso) {
   const moneda = String(monto.currency || monto.currency_code || "USD").toUpperCase();
   const centavos = Math.round(valor * 100);
 
-  const guia = await siguienteGuia(env, new Date().getUTCFullYear());
+  const guia = await siguienteGuia(env, anioCO());
   const token = tokenNuevo();
   await env.DB.prepare(
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
@@ -8311,7 +8316,7 @@ async function carnetTrasAporte(env, aporte, donanteId) {
     return { codigo: ya.codigo, token: ya.token, nivel: nivelFinal, vigente_hasta: hastaFinal, nuevo: false };
   }
 
-  const codigo = await siguienteMiembro(env, new Date().getUTCFullYear());
+  const codigo = await siguienteMiembro(env, anioCO());
   const token = tokenNuevo();
   await env.DB.prepare(
     "INSERT INTO miembros (codigo, token, donante_id, nivel, desde, vigente_hasta) " +
@@ -9939,6 +9944,47 @@ async function adminPagosSueltos(env) {
    sitio la mostró como real durante unos minutos. La fecha se compara en UTC
    contra el día de hoy, con un día de holgura para que un acta firmada de noche
    en Colombia (UTC-5) no se rechace por el cambio de día. */
+/* EL RELOJ DE COLOMBIA, y no es un detalle de presentacion.
+   ============================================================================
+   El Worker corre en UTC y Colombia es UTC−5 SIEMPRE (no hay horario de
+   verano). O sea que entre las 7 p.m. y la medianoche de Colombia, el reloj del
+   servidor YA ESTA EN EL DIA SIGUIENTE. Comprobado el 3 de septiembre de 2026:
+   siendo las 20:47 en Medellin, la base respondia `2026-09-04`.
+
+   Donde eso importa de verdad:
+
+   · EL AÑO GRAVABLE DEL CERTIFICADO. Una donacion aprobada el 31 de diciembre a
+     las 8 p.m. en Colombia se guarda como 1 de enero en UTC, asi que el
+     certificado —que firman bajo juramento el Representante Legal y la Revisora
+     Fiscal— declararia el año siguiente. El Art. 257 concede el descuento «en el
+     año o periodo gravable»: declarar el año equivocado le tumba la deduccion al
+     donante.
+   · EL NUMERO DE GUIA. Esa misma donacion se numeraria GG-2027-… siendo de 2026.
+   · LA FECHA IMPRESA en el recibo y en el certificado.
+
+   NO se cambia lo que se GUARDA: las marcas de tiempo de la base siguen en UTC,
+   que es lo correcto para una bitacora. Se corrige lo que se PRESENTA y lo que
+   fija un año. */
+const MS_UTC_A_COLOMBIA = 5 * 60 * 60 * 1000;
+
+/* Acepta tanto el formato de SQLite («2026-12-31 23:00:00», que es UTC sin
+   decirlo) como un ISO con zona. Sin la `Z` explicita, `new Date()` interpreta
+   el primero como hora LOCAL y el desfase saldria al reves. */
+function enColombia(iso) {
+  if (!iso) return new Date(Date.now() - MS_UTC_A_COLOMBIA);
+  const t = String(iso).trim().replace(" ", "T");
+  const conZona = /[Zz]$|[+-]\d\d:?\d\d$/.test(t) ? t : t + "Z";
+  const d = new Date(conZona);
+  if (isNaN(d)) return new Date(Date.now() - MS_UTC_A_COLOMBIA);
+  return new Date(d.getTime() - MS_UTC_A_COLOMBIA);
+}
+/* AAAA-MM-DD del dia civil colombiano. */
+function fechaCO(iso) { return enColombia(iso).toISOString().slice(0, 10); }
+/* AAAA-MM-DD HH:MM:SS, para lo que imprime hora. */
+function selloCO(iso) { return enColombia(iso).toISOString().replace("T", " ").slice(0, 19); }
+/* El año civil colombiano — el que usan los numeradores y el año gravable. */
+function anioCO(iso) { return enColombia(iso).getUTCFullYear(); }
+
 function fechaEnFuturo(fecha) {
   const hoy = new Date();
   hoy.setUTCDate(hoy.getUTCDate() + 1);
