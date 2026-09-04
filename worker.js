@@ -2189,7 +2189,7 @@ async function adminEmitirCertificado(request, env, guia, quien) {
   try { cuerpo = await request.json(); } catch { /* cuerpo opcional */ }
 
   const a = await env.DB.prepare(
-    "SELECT a.guia, a.estado, a.monto_centavos, a.modo, a.destino_id, a.proyecto, " +
+    "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.proyecto, " +
     "a.quiere_certificado, a.aprobada_en, a.wompi_transaction_id, a.donante_id, " +
     "a.confirmacion, a.referencia_pago, " +
     "d.nombre AS nombre, d.email AS email, d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, " +
@@ -2201,6 +2201,33 @@ async function adminEmitirCertificado(request, env, guia, quien) {
      entró. Es la única validación que no admite override desde el panel. */
   if (!ESTADOS_CON_RECIBO.includes(a.estado)) {
     return json({ error: "aporte_no_aprobado", estado: a.estado }, 409);
+  }
+
+  /* NO SE PUEDE CERTIFICAR EN DOLARES CON ESTA MINUTA, y no es un problema de
+     formato: es que el articulado no lo describe.
+
+     El texto lo suministro la contadora y lo firman bajo juramento el
+     Representante Legal y la Revisora Fiscal. Su numeral 4 dice el valor «en
+     letras» seguido de «M/cte.» —moneda corriente, o sea pesos colombianos— y
+     su numeral 5 declara que la donacion entro «mediante transferencia
+     electronica … en la cuenta … de Bancolombia, en cumplimiento del numeral 1
+     del articulo 125-2». Un cobro de PayPal en dolares NO entro por ahi. Emitir
+     ese papel seria firmar dos afirmaciones falsas bajo la gravedad de juramento.
+
+     Y es alcanzable: `quiere_certificado` viaja de la suscripcion al aporte, asi
+     que un miembro internacional que marque la casilla cae aqui.
+
+     La solucion NO es que yo reescriba la minuta —eso se hace con la Revisora
+     Fiscal, y ya esta pedido— sino negarse y decir por que. */
+  const moneda = String(a.moneda || "COP").toUpperCase();
+  if (moneda !== "COP") {
+    return json({
+      error: "moneda_no_certificable",
+      moneda,
+      ayuda: "La minuta del certificado esta escrita para pesos: dice «M/cte.» y declara " +
+             "una transferencia a la cuenta de Bancolombia. Un aporte en " + moneda +
+             " necesita un texto propio, y ese lo define la Revisora Fiscal."
+    }, 409);
   }
 
   const yaHay = await env.DB.prepare(

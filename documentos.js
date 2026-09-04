@@ -106,8 +106,21 @@ export function fechaLarga(iso) {
   if (!p) return "";
   return p.dia + " de " + MESES[p.mes - 1] + " de " + p.anio;
 }
-export function pesos(centavos) {
-  return "$" + Math.round(Number(centavos || 0) / 100).toLocaleString("es-CO");
+/* CON LA MONEDA, y no es cosmetica. `Math.round` sobre pesos es correcto —el
+   peso no tiene centavos en la practica y `monto_centavos` siempre es monto×100—
+   pero sobre DOLARES redondea el centavo: un cobro de US$16,75 se imprimia
+   «$17» en el recibo, o sea un documento que dice un monto distinto del que se
+   cobro. Y esos montos existen justamente por la casilla de cubrir la comision,
+   que produce 16,75 · 38,66 · 84,67.
+
+   La etiqueta va DENTRO: en dolares «US$16,75» ya se explica solo y agregarle
+   « USD» daba «US$16.75 USD». */
+export function pesos(centavos, moneda) {
+  const n = Number(centavos || 0) / 100;
+  if (String(moneda || "COP").toUpperCase() === "USD") {
+    return "US$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  return "$" + Math.round(n).toLocaleString("es-CO") + (moneda ? " COP" : "");
 }
 
 /* ---------------------------------------------------------------------------
@@ -470,7 +483,7 @@ export async function recibo(a, hoyISO) {
 
   h.regla({ despues: 16 });
   h.fila(t.fecha, fechaLarga(a.aprobada_en || a.creada_en));
-  h.fila(t.monto, pesos(a.monto_centavos) + " " + (a.moneda || "COP"));
+  h.fila(t.monto, pesos(a.monto_centavos, a.moneda || "COP"));
   h.fila(t.frecuencia, t.freq[a.frecuencia] || a.frecuencia);
   h.fila(t.destino, a.modo === "dirigida" ? (a.proyecto || a.destino_id || "-") : t.fondo);
   if (a.metodo_pago) h.fila(t.medio, METODOS[a.metodo_pago] || a.metodo_pago);
