@@ -1516,6 +1516,15 @@ async function correoIngeniero(env, i) {
    contabilidad en vez de en ninguna parte. `enviarCorreo` devuelve
    `{ok:true, sinDestino:true}` cuando no hay destino y NO escribe fila en
    `correos`, asi que un buzon sin configurar seria invisible. */
+/* El buzon de ALIANZAS, que no es el de contabilidad. Una visita de contexto por
+   agendar no es un asunto contable: la pide Sebas y la coordina el. Mezclarla con
+   los avisos de aportes haria que el buzon donde se revisan pagos dejara de ser
+   una bandeja de trabajo fiable. Cae a CORREO_AVISOS si no esta configurado, por
+   la misma razon que `correoMMC`: mejor que llegue a algun sitio. */
+function correoAlianzas(env) {
+  return env.CORREO_ALIANZAS || env.CORREO_AVISOS;
+}
+
 function correoMMC(env) {
   return env.CORREO_MMC || env.CORREO_AVISOS;
 }
@@ -9151,6 +9160,589 @@ async function correoFundacion(env, f) {
   });
 }
 
+/* CERRAR EL PASO 2 Y ABRIR EL 3.
+   ============================================================================
+   Aceptar una fundacion en el panel no le decia NADA a la fundacion. El acuse
+   de la aplicacion promete que «alguien de Give&Grow la lee y te responde», y
+   esa respuesta no existia: la solicitud cambiaba de estado en la base y ahi
+   moria. Ancla Colombia aplico el 3 de septiembre y no recibio nada.
+
+   QUE DICE Y QUE NO. El proceso publicado son cinco pasos —aplicas, revisamos,
+   visita de contexto, convenio, vinculacion— y aceptar cierra el SEGUNDO. Asi
+   que este correo dice exactamente eso y NO dice «ya eres parte del HUB»:
+   aceptada no es vinculada, y el propio acuse ya le explico que «aplicar no es
+   entrar». Tampoco promete fecha: no hay agenda automatica y prometer una
+   semana que nadie garantiza es la clase de promesa que este sitio no hace.
+
+   Y REPITE lo del logo y las fotos, porque es el momento en que una fundacion
+   entusiasmada los manda sin que nadie se los pida: eso viene despues de la
+   visita, con las autorizaciones de derechos de imagen. */
+async function correoFundacionAceptada(env, f) {
+  const en = f.idioma === "en";
+  const titulo = en ? "Your foundation passed the review."
+                    : "Tu fundación pasó la revisión.";
+  const parrafos = en ? [
+    "We read your application and verified your work. That closes step 2 of five. It does not mean you are in the HUB yet — what comes next is the context visit.",
+    "Someone from Give&Grow writes to you to arrange it: we go to your territory, meet your team and understand what you actually need. We do not put a date on this email because we would rather not promise a week nobody can guarantee.",
+    "Please do not send your logo, your photos or your cost figures yet. Those come after the visit, together with the image-rights authorisations — children's images are protected by Law 1098 and we publish nothing without written consent.",
+    "Nothing is charged, ever, in either direction."
+  ] : [
+    "Leímos tu aplicación y verificamos tu trabajo. Con eso queda cerrado el paso 2 de cinco. Todavía no significa que estés en el HUB: lo que sigue es la visita de contexto.",
+    "Alguien de Give&Grow te escribe para coordinarla: vamos a tu territorio, conocemos a tu equipo y entendemos qué necesitas de verdad. No ponemos fecha en este correo porque preferimos no prometer una semana que nadie puede garantizar.",
+    "Por ahora no nos mandes el logo, las fotos ni las cifras de costos. Eso viene después de la visita, junto con las autorizaciones de derechos de imagen — la imagen de los menores está protegida por la Ley 1098 y no publicamos nada sin consentimiento escrito.",
+    "Nada se cobra, nunca, en ninguna dirección."
+  ];
+  const filas = en
+    ? [["Foundation", f.nombre], ["Step just closed", "2 · Review"], ["Next step", "3 · Context visit"]]
+    : [["Fundación", f.nombre], ["Paso que se cierra", "2 · Revisamos"], ["Paso siguiente", "3 · Visita de contexto"]];
+
+  return enviarCorreo(env, {
+    para: f.email,
+    asunto: en ? "Your application to the HUB SOCIAL: review passed"
+               : "Tu aplicación al HUB SOCIAL: pasaste la revisión",
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas }),
+    etiqueta: "fundacion-aceptada"
+  });
+}
+
+/* Y el aviso interno, porque la visita no se agenda sola. Sin esto, aceptar
+   dejaria a la fundacion esperando una llamada que nadie sabe que tiene que
+   hacer: el correo de arriba se la promete. */
+async function correoVisitaPendiente(env, f) {
+  const para = correoAlianzas(env);
+  if (!para) return avisoSinBuzon(env, "aviso-visita-contexto");
+  const titulo = "Hay que agendar una visita de contexto: " + f.nombre;
+  return enviarCorreo(env, {
+    para,
+    asunto: "Visita de contexto pendiente · " + f.nombre,
+    texto: [titulo, "",
+      "Se acepto su aplicacion al HUB y ya se le escribio diciendo que alguien la contacta para coordinar la visita.",
+      "Ese correo lo promete. Falta hacerlo.", "",
+      "Fundacion: " + f.nombre, "Contacto: " + f.email, "Territorio: " + (f.zona || "-")].join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: [
+        "Se aceptó su aplicación al HUB y ya se le escribió diciendo que alguien la contacta para coordinar la visita.",
+        "Ese correo lo promete. Falta hacerlo."
+      ],
+      filas: [["Fundación", f.nombre], ["Contacto", f.email], ["Territorio", f.zona || "—"]]
+    }),
+    etiqueta: "aviso-visita-contexto"
+  });
+}
+
+/* EL ENLACE DEL CUESTIONARIO. Sale al marcar la visita, no al aceptar.
+   ============================================================================
+   No lleva contraseña ni cuenta: crear una para llenar un formulario una vez es
+   una barrera, y este proyecto ya decidio que estas puertas se abren con enlace
+   y token —igual que el caso de Mira Mi Casa o el comprobante de una
+   transferencia—. El correo lo dice, para que nadie lo confunda con phishing:
+   el enlace es personal y no se comparte.
+
+   DICE CUANTO TARDA Y QUE HACE FALTA TENER A MANO, porque la mitad de las
+   preguntas piden datos que no se sacan de memoria —el costo de una unidad de
+   impacto con su soporte— y descubrirlo a mitad del formulario es la forma mas
+   segura de que se abandone. */
+async function correoFichaFundacion(env, f) {
+  const en = f.idioma === "en";
+  const url = ORIGIN + "/ficha/" + f.token;
+  const titulo = en ? "Your HUB profile questionnaire is open."
+                    : "Ya está abierto tu cuestionario del HUB.";
+  const parrafos = en ? [
+    "We visited you. That closes step 3 of five. Now we can ask for what we deliberately did not ask before: your impact unit and its cost, your logo, and the image-rights authorisations.",
+    "The link below is personal and does not need a password or an account — do not share it. It takes about 20 minutes and you can come back to it: what you type is saved as a draft.",
+    "Have at hand what a single unit of your work costs and how you can document it (an invoice, a market receipt, a budget). That is the one question that cannot be answered from memory, and it is the one that lets a donor see what their money buys."
+  ] : [
+    "Ya nos visitamos. Con eso queda cerrado el paso 3 de cinco. Ahora sí podemos pedirte lo que a propósito no te pedimos antes: tu unidad de impacto y su costo, tu logo y las autorizaciones de derechos de imagen.",
+    "El enlace de abajo es personal y no necesita contraseña ni cuenta — no lo compartas. Toma unos 20 minutos y puedes volver: lo que escribas queda guardado como borrador.",
+    "Ten a mano cuánto cuesta UNA unidad de tu trabajo y cómo lo puedes documentar (una factura, una cuenta de mercado, un presupuesto). Es la única pregunta que no se responde de memoria, y es la que le permite a un donante ver qué compra su plata."
+  ];
+  return enviarCorreo(env, {
+    para: f.email,
+    asunto: en ? "Your HUB SOCIAL questionnaire" : "Tu cuestionario del HUB SOCIAL",
+    texto: [titulo, "", ...parrafos, "", (en ? "Your link: " : "Tu enlace: ") + url].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos,
+      filas: en ? [["Foundation", f.nombre], ["Step just closed", "3 · Context visit"]]
+                : [["Fundación", f.nombre], ["Paso que se cierra", "3 · Visita de contexto"]],
+      boton: { texto: en ? "Open the questionnaire" : "Abrir el cuestionario", url }
+    }),
+    etiqueta: "ficha-fundacion"
+  });
+}
+
+/* ============================================================================
+   EL CUESTIONARIO DEL HUB, NATIVO
+   ============================================================================
+   UNA SOLA LISTA DE CAMPOS, y esa es la decision de diseño que importa.
+   `FICHA_CAMPOS` se usa para DOS cosas: pintar el formulario y validar lo que
+   llega. Con dos listas separadas, agregar una pregunta al HTML y olvidarla en
+   la validacion —o al reves— es cuestion de tiempo, y ese fallo es silencioso:
+   el campo se pide, la fundacion lo llena, y el servidor lo tira. Es
+   exactamente lo que le paso al Apps Script de aliados con `sector`, `aporta` e
+   `instagram`, que la auditoria de agosto encontro perdiendose sin avisar.
+
+   QUE PREGUNTA Y QUE NO. Solo lo que el formulario publico del sitio NO cubre.
+   La cabecera de ops/cuestionario-fundaciones-hub.md lo enumera y esta lista lo
+   respeta: 1.8, 2.3-2.5, la frecuencia de los programas, los programas 2 y 3,
+   la Seccion 5 entera, 6.3-6.5 y la Seccion 7 completa. Volver a preguntar el
+   nombre o la mision seria hacerle repetir a alguien lo que ya escribio.
+
+   LOS ARCHIVOS van por ENLACE o WhatsApp, no por carga. No es una limitacion
+   nuestra —aqui si se podria subir, como ya se sube un comprobante— sino lo que
+   el proceso ya asumia: el cuestionario se escribio contra la API de Forms, que
+   no permite crear campos de carga. Se mantiene igual para no cambiar dos cosas
+   a la vez; la carga nativa es una mejora limpia y aparte.
+
+   NUMERACION VISIBLE. Cada pregunta lleva su numero del documento (5.2, 7.4).
+   Asi una fundacion que llame preguntando puede decir «no entiendo la 5.2» y
+   quien conteste sabe de que habla, sin contar campos en la pantalla. */
+const FICHA_CAMPOS = [
+  { sec: "Sede", id: "direccion", num: "1.8", tipo: "texto", req: true, max: 200,
+    lbl: "Dirección o punto de referencia de la sede o lugar de operación",
+    ayuda: "No se publica. Es para saber a dónde llegar." },
+
+  { sec: "Historia", id: "anios_territorio", num: "2.3", tipo: "numero", req: true, min: 0, max: 200,
+    lbl: "¿Hace cuántos años trabaja la fundación en su territorio actual?" },
+  { sec: "Historia", id: "logro", num: "2.4", tipo: "parrafo", max: 900,
+    lbl: "¿Qué logro reciente los enorgullece más y cómo lo pueden evidenciar?",
+    ayuda: "Evidencia, no promesas: si no se puede documentar, mejor contarlo sin cifra." },
+  { sec: "Historia", id: "frase", num: "2.5", tipo: "texto", max: 220,
+    lbl: "Una frase corta que represente el espíritu de la fundación",
+    ayuda: "Se publica como cita en su perfil, si autorizan el nombre." },
+
+  { sec: "Programas", id: "prog1_frecuencia", num: "4.3", tipo: "texto", req: true, max: 120,
+    lbl: "¿Con qué frecuencia opera el programa que ya nos contaron?",
+    ayuda: "Ej.: «tres veces por semana», «una jornada al mes»." },
+  { sec: "Programas", id: "prog2_nombre", num: "4.1b", tipo: "texto", max: 160,
+    lbl: "Segundo programa: nombre (si tienen otro)" },
+  { sec: "Programas", id: "prog2_que", num: "4.2b", tipo: "parrafo", max: 700,
+    lbl: "Segundo programa: qué hace y a cuántas personas llega" },
+  { sec: "Programas", id: "prog3_nombre", num: "4.1c", tipo: "texto", max: 160,
+    lbl: "Tercer programa: nombre (si tienen otro)" },
+  { sec: "Programas", id: "prog3_que", num: "4.2c", tipo: "parrafo", max: 700,
+    lbl: "Tercer programa: qué hace y a cuántas personas llega" },
+
+  { sec: "Unidad de impacto y costos", id: "unidad", num: "5.1", tipo: "texto", req: true, max: 160,
+    lbl: "¿Cuál es la unidad de impacto más representativa de su labor?",
+    ayuda: "En singular y plural. Ej.: «plato de comida / platos de comida»." },
+  { sec: "Unidad de impacto y costos", id: "unidad_costo", num: "5.2", tipo: "numero", req: true, min: 1, max: 100000000,
+    lbl: "¿Cuánto cuesta producir o entregar UNA unidad, en pesos colombianos?",
+    ayuda: "El costo real y completo. Ej.: 4000." },
+  { sec: "Unidad de impacto y costos", id: "unidad_doc", num: "5.3", tipo: "opcion", req: true,
+    lbl: "¿Cómo está documentado ese costo?",
+    ops: ["Facturas de compra recientes", "Cuentas de mercado del último mes",
+          "Presupuesto detallado", "Cálculo propio"] },
+  { sec: "Unidad de impacto y costos", id: "unidad_calculo", num: "5.3b", tipo: "parrafo", max: 900,
+    lbl: "Si quieres, explica cómo calculan ese costo" },
+  { sec: "Unidad de impacto y costos", id: "unidad_soporte", num: "5.3c", tipo: "texto", max: 400,
+    lbl: "El soporte del costo (factura, cuenta de mercado o presupuesto)",
+    ayuda: "Pega un enlace con acceso para ver, o escribe «lo enviaré por WhatsApp». No se publica: es archivo interno de evidencia." },
+  { sec: "Unidad de impacto y costos", id: "unidad2", num: "5.4", tipo: "texto", max: 300,
+    lbl: "¿Hay una segunda unidad de impacto? (unidad, costo y cómo se documenta)" },
+
+  { sec: "Presencia digital", id: "redes", num: "6.3", tipo: "parrafo", max: 400,
+    lbl: "Otras redes (Facebook, YouTube, TikTok)" },
+  { sec: "Presencia digital", id: "logo", num: "6.4", tipo: "texto", req: true, max: 400,
+    lbl: "El logo de la fundación, en la mejor resolución que tengan",
+    ayuda: "Pega un enlace con acceso para ver, o escribe «lo enviaré por WhatsApp». Ideal: PNG con fondo transparente, mínimo 480 px de lado corto." },
+  { sec: "Presencia digital", id: "fotos", num: "6.5", tipo: "opcion", req: true,
+    lbl: "¿Tienen fotos de su trabajo que quieran mostrar en su perfil?",
+    ayuda: "Pasan por las autorizaciones de abajo antes de publicarse. Máximo 8, curadas.",
+    ops: ["Sí, las enviaremos", "Sí, están en nuestro Instagram y autorizamos tomarlas de ahí", "Aún no"] },
+
+  { sec: "Autorizaciones", id: "aut_nombre", num: "7.1", tipo: "opcion", req: true,
+    lbl: "¿Autorizan publicar el NOMBRE de la fundación en el sitio y sus materiales?",
+    ops: ["Sí, lo autorizamos", "No"] },
+  { sec: "Autorizaciones", id: "aut_logo", num: "7.2", tipo: "opcion", req: true,
+    lbl: "¿Autorizan la publicación del LOGO?",
+    ops: ["Sí, lo autorizamos", "No"] },
+  { sec: "Autorizaciones", id: "aut_fotos", num: "7.3", tipo: "opcion", req: true,
+    lbl: "¿Autorizan la publicación de FOTOGRAFÍAS de sus actividades?",
+    ops: ["Sí, las que enviemos o aprobemos expresamente", "No por ahora"] },
+  { sec: "Autorizaciones", id: "menores", num: "7.4", tipo: "casillas", req: true,
+    lbl: "Protección de la imagen de menores de edad",
+    ayuda: "Las tres, y no es un trámite: sin ellas no se publica ninguna foto donde un menor sea identificable.",
+    ops: ["Entendemos que la imagen de niños, niñas y adolescentes está protegida por la Ley 1098 de 2006.",
+          "Declaramos que contamos con autorización escrita de los padres o acudientes de los menores que aparezcan en las fotos que enviemos, y podemos presentarla si se requiere.",
+          "Aceptamos que Give&Grow descarte cualquier foto donde un menor sea identificable sin esa autorización, o aplique difuminado o encuadre que impida identificarlo."] },
+  { sec: "Autorizaciones", id: "autoriza_nombre", num: "7.5", tipo: "texto", req: true, max: 200,
+    lbl: "Nombre completo de quien otorga estas autorizaciones" },
+  { sec: "Autorizaciones", id: "autoriza_cargo", num: "7.6", tipo: "texto", req: true, max: 200,
+    lbl: "Cargo y documento de identidad de quien autoriza",
+    ayuda: "Ej.: «Directora y representante legal — C.C. 00.000.000»." },
+  { sec: "Autorizaciones", id: "autoriza_fecha", num: "7.7", tipo: "fecha", req: true,
+    lbl: "Fecha de la autorización" },
+  { sec: "Autorizaciones", id: "declaracion", num: "7.8", tipo: "casillas", req: true,
+    lbl: "Declaración final",
+    ops: ["Declaro que la información entregada es veraz, que las cifras reportadas corresponden a la realidad de la fundación y que estoy facultado o facultada para otorgar estas autorizaciones en su nombre."] },
+];
+
+/* Valida contra la MISMA lista con que se pinto. Devuelve {ok, errores} y no
+   lanza: quien llama decide si es un borrador —donde faltar es normal— o un
+   envio final, donde no lo es. */
+function fichaValida(datos, final) {
+  const errores = [];
+  const limpio = {};
+  for (const c of FICHA_CAMPOS) {
+    let v = datos[c.id];
+    if (c.tipo === "casillas") {
+      const marcadas = Array.isArray(v) ? v.filter((x) => c.ops.includes(x)) : [];
+      /* TODAS las casillas, no una: el consentimiento de imagen de menores no
+         admite marcar dos de tres. */
+      if (final && c.req && marcadas.length !== c.ops.length) errores.push(c.num);
+      limpio[c.id] = marcadas;
+      continue;
+    }
+    if (c.tipo === "opcion") {
+      v = typeof v === "string" && c.ops.includes(v) ? v : "";
+      if (final && c.req && !v) errores.push(c.num);
+      limpio[c.id] = v;
+      continue;
+    }
+    if (c.tipo === "numero") {
+      const n = Number(v);
+      const bien = Number.isFinite(n) && n >= (c.min ?? 0) && n <= (c.max ?? 1e12);
+      if (final && c.req && !bien) errores.push(c.num);
+      limpio[c.id] = bien ? Math.round(n) : null;
+      continue;
+    }
+    if (c.tipo === "fecha") {
+      const f = String(v || "").trim();
+      const bien = /^\d{4}-\d{2}-\d{2}$/.test(f) && !fechaEnFuturo(f);
+      if (final && c.req && !bien) errores.push(c.num);
+      limpio[c.id] = bien ? f : "";
+      continue;
+    }
+    const t = limpiar(v, c.max || 400);
+    if (final && c.req && !t) errores.push(c.num);
+    limpio[c.id] = t;
+  }
+  return { ok: !errores.length, errores, limpio };
+}
+
+/* La ficha vive tras un token y nada mas: sin cuenta ni contraseña, igual que el
+   caso de Mira Mi Casa. Se exige que la inscripcion este en `visitada` — antes
+   de la visita el enlace no deberia existir, y si alguien lo guardo de una
+   prueba, no le sirve. */
+async function fichaPorToken(env, token) {
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return null;
+  const i = await env.DB.prepare(
+    "SELECT i.id, i.nombre, i.estado, i.tipo, f.estado AS ficha_estado, f.datos " +
+    "FROM inscripciones i LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
+    "WHERE i.token = ?"
+  ).bind(token).first();
+  if (!i || i.tipo !== "fundacion") return null;
+  if (i.estado !== "visitada") return null;
+  return i;
+}
+
+async function apiFicha(request, env, token) {
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+  const i = await fichaPorToken(env, token);
+  if (!i) return json({ error: "no_autorizado" }, 403);
+
+  if (request.method === "GET") {
+    let datos = {};
+    try { datos = JSON.parse(i.datos || "{}"); } catch (e) { /* nada */ }
+    /* LA LISTA DE CAMPOS VIAJA AQUI, y no incrustada en el JS de la pagina.
+       Dos razones y las dos valen: una, el JS queda una cadena ESTATICA sin
+       interpolaciones, que es lo que el check del gate puede evaluar —con una
+       `${...}` dentro se niega a revisarlo, y quedaria sin vigilancia justo el
+       archivo con las dos trampas conocidas—. Y dos, `FICHA_CAMPOS` sigue
+       siendo la unica fuente: pinta, valida y ahora tambien informa. */
+    const campos = FICHA_CAMPOS.map((c) => ({ id: c.id, tipo: c.tipo, num: c.num }));
+    return json({ ok: true, nombre: i.nombre, estado: i.ficha_estado || "borrador", campos, datos });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+
+  /* UNA VEZ ENVIADA NO SE REESCRIBE. La Seccion 7 es un consentimiento firmado
+     con nombre, cargo, documento y fecha: dejar que se sobreescriba en silencio
+     convertiria la prueba en un borrador. Si hay que corregir algo, lo reabre
+     una persona desde el panel. */
+  if (i.ficha_estado === "enviada") return json({ error: "ya_enviada" }, 409);
+
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  const final = c.enviar === true;
+  const v = fichaValida(c.datos || {}, final);
+  if (final && !v.ok) return json({ error: "faltan_campos", campos: v.errores }, 400);
+
+  await env.DB.prepare(
+    "INSERT INTO fichas_fundacion (inscripcion, estado, datos, enviada_en) " +
+    "VALUES (?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END) " +
+    "ON CONFLICT(inscripcion) DO UPDATE SET estado = excluded.estado, datos = excluded.datos, " +
+    "enviada_en = COALESCE(excluded.enviada_en, fichas_fundacion.enviada_en), " +
+    "actualizada_en = datetime('now')"
+  ).bind(i.id, final ? "enviada" : "borrador", JSON.stringify(v.limpio), final ? 1 : 0).run();
+
+  if (final) {
+    /* EL CONSENTIMIENTO SE ANOTA APARTE, en `consentimientos`, y no solo dentro
+       del JSON de la ficha: es el rastro de Ley 1581 y tiene que poder
+       encontrarse sin abrir un blob. Y NO lleva el nombre de quien autorizo —eso
+       vive en la ficha, en la base privada— por lo mismo que se saco de
+       `partners.json`: un rastro no necesita repetir el dato. */
+    await anotarAutorizacion(env, i.id, "ficha_fundacion",
+      "nombre=" + (v.limpio.aut_nombre || "-") + " · logo=" + (v.limpio.aut_logo || "-") +
+      " · fotos=" + (v.limpio.aut_fotos || "-") + " · menores=" + (v.limpio.menores || []).length + "/3",
+      "inscripcion");
+    try { await correoFichaRecibida(env, i.nombre, v.limpio); } catch (e) {
+      console.error("aviso ficha recibida", i.id, e && e.message);
+    }
+  }
+  return json({ ok: true, estado: final ? "enviada" : "borrador" });
+}
+
+/* Al buzon de ALIANZAS, que es quien sigue el proceso. Lleva el costo de la
+   unidad porque es el dato que decide si la fundacion puede entrar a la
+   calculadora, y es el unico que hay que contrastar contra un soporte. */
+async function correoFichaRecibida(env, nombre, d) {
+  const para = correoAlianzas(env);
+  if (!para) return avisoSinBuzon(env, "aviso-ficha-fundacion");
+  const titulo = "Cuestionario del HUB recibido: " + nombre;
+  return enviarCorreo(env, {
+    para,
+    asunto: "Cuestionario recibido · " + nombre,
+    texto: [titulo, "", "Queda por contrastar el costo de la unidad contra su soporte antes de publicar nada.", "",
+      "Unidad: " + (d.unidad || "-"), "Costo: " + (d.unidad_costo || "-") + " COP",
+      "Documentado como: " + (d.unidad_doc || "-"), "Soporte: " + (d.unidad_soporte || "-"),
+      "Autoriza nombre: " + (d.aut_nombre || "-"), "Autoriza logo: " + (d.aut_logo || "-"),
+      "Autoriza fotos: " + (d.aut_fotos || "-")].join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: ["Queda por contrastar el costo de la unidad contra su soporte antes de publicar nada."],
+      filas: [["Unidad", d.unidad || "—"], ["Costo", (d.unidad_costo || "—") + " COP"],
+              ["Documentado como", d.unidad_doc || "—"], ["Soporte", d.unidad_soporte || "—"],
+              ["Autoriza nombre", d.aut_nombre || "—"], ["Autoriza logo", d.aut_logo || "—"],
+              ["Autoriza fotos", d.aut_fotos || "—"]]
+    }),
+    etiqueta: "aviso-ficha-fundacion"
+  });
+}
+
+/* La pagina. Se sirve desde el WORKER y no desde la SPA por lo mismo que
+   /triaje: vive tras un token, no tiene por que estar en el bundle publico, y
+   nadie deberia poder listar las preguntas sin tener un enlace.
+
+   Los campos se pintan desde `FICHA_CAMPOS`, la misma lista que valida. */
+function paginaFicha(i) {
+  const secciones = [];
+  for (const c of FICHA_CAMPOS) {
+    if (!secciones.length || secciones[secciones.length - 1].nombre !== c.sec) {
+      secciones.push({ nombre: c.sec, campos: [] });
+    }
+    secciones[secciones.length - 1].campos.push(c);
+  }
+
+  const campoHTML = (c) => {
+    const req = c.req ? ' <span class="req" aria-hidden="true">*</span>' : "";
+    const ayuda = c.ayuda ? '<small class="ayuda">' + esc(c.ayuda) + "</small>" : "";
+    const cab = '<div class="num">' + esc(c.num) + "</div>" +
+                '<label for="f-' + c.id + '">' + esc(c.lbl) + req + "</label>" + ayuda;
+    let control = "";
+    if (c.tipo === "parrafo") {
+      control = '<textarea id="f-' + c.id + '" rows="4" maxlength="' + (c.max || 900) + '"></textarea>';
+    } else if (c.tipo === "numero") {
+      control = '<input type="number" id="f-' + c.id + '" min="' + (c.min ?? 0) + '" max="' + (c.max ?? 1e9) +
+                '" step="1" inputmode="numeric">';
+    } else if (c.tipo === "fecha") {
+      control = '<input type="date" id="f-' + c.id + '">';
+    } else if (c.tipo === "opcion") {
+      control = c.ops.map((o, n) =>
+        '<label class="op"><input type="radio" name="f-' + c.id + '" value="' + esc(o) + '"' +
+        ' id="f-' + c.id + (n ? "-" + n : "") + '"><span>' + esc(o) + "</span></label>").join("");
+    } else if (c.tipo === "casillas") {
+      control = c.ops.map((o, n) =>
+        '<label class="op"><input type="checkbox" data-ck="' + c.id + '" value="' + esc(o) + '"' +
+        ' id="f-' + c.id + (n ? "-" + n : "") + '"><span>' + esc(o) + "</span></label>").join("");
+    } else {
+      control = '<input type="text" id="f-' + c.id + '" maxlength="' + (c.max || 200) + '">';
+    }
+    return '<div class="campo" data-campo="' + c.num + '">' + cab + control + "</div>";
+  };
+
+  const cuerpo = secciones.map((sx) =>
+    '<section class="sec"><h2>' + esc(sx.nombre) + "</h2>" + sx.campos.map(campoHTML).join("") + "</section>"
+  ).join("");
+
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cuestionario del HUB SOCIAL</title>
+<style>
+  :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;--err:#8C2F1E}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+  .wrap{max-width:720px;margin:0 auto;padding:28px 20px 96px}
+  h1{font-size:24px;margin-bottom:4px}
+  .sub{color:var(--mu);font-size:14px}
+  .aviso{background:var(--surface);border:1px solid var(--bd);border-left:3px solid var(--g);
+         padding:14px 16px;border-radius:8px;margin:18px 0;font-size:14px}
+  .sec{margin-top:30px}
+  .sec h2{font-size:17px;border-bottom:1px solid var(--bd);padding-bottom:6px;margin-bottom:4px}
+  .campo{background:var(--surface);border:1px solid var(--bd);border-radius:10px;padding:14px 16px;margin-top:12px}
+  .campo.mal{border-color:var(--err);border-left:3px solid var(--err)}
+  .num{font-size:11px;color:var(--mu);letter-spacing:.06em;margin-bottom:2px}
+  label{display:block;font-weight:600;font-size:15px;margin-bottom:2px}
+  .req{color:var(--err)}
+  .ayuda{display:block;color:var(--mu);font-size:13px;margin-bottom:8px;font-weight:400}
+  input[type=text],input[type=number],input[type=date],textarea{width:100%;font:inherit;font-size:16px;
+    padding:9px 11px;border:1px solid var(--bd);border-radius:8px;background:#fff;color:var(--ink)}
+  textarea{resize:vertical}
+  .op{display:flex;gap:9px;align-items:flex-start;font-weight:400;font-size:14px;margin-top:7px}
+  .op input{margin-top:3px;width:17px;height:17px;flex:0 0 auto}
+  .barra{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--bd);
+         padding:12px 20px;display:flex;gap:10px;align-items:center;justify-content:flex-end}
+  button{font:inherit;font-size:15px;font-weight:700;padding:10px 18px;border:1px solid var(--g);
+         border-radius:9px;background:var(--g);color:#fff;cursor:pointer}
+  button.sec2{background:transparent;color:var(--g)}
+  button[disabled]{opacity:.55;cursor:default}
+  #nota{margin-right:auto;font-size:14px;color:var(--mu)}
+  #nota.mal{color:var(--err)}
+  @media(max-width:560px){.barra{flex-wrap:wrap}#nota{width:100%;margin-bottom:4px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cuestionario del HUB SOCIAL</h1>
+  <p class="sub">${esc(i.nombre || "")}</p>
+  <div class="aviso">
+    Ya nos visitamos, así que ahora sí te pedimos lo que a propósito no pedimos antes.
+    <strong>Lo que escribas se guarda solo</strong>, así que puedes cerrar y volver con este mismo enlace.
+    Solo se publica lo que autorices en la última sección, y puedes retirar cualquier autorización después
+    escribiéndonos.
+  </div>
+  <form id="ficha" autocomplete="off">${cuerpo}</form>
+</div>
+<div class="barra">
+  <span id="nota" role="status" aria-live="polite"></span>
+  <button type="button" class="sec2" id="guardar">Guardar borrador</button>
+  <button type="button" id="enviar">Enviar</button>
+</div>
+<script>
+${fichaJS()}
+</script>
+</body>
+</html>`;
+}
+
+/* El JS de la pagina. Va aparte por lo mismo que `adminJS`: mantiene la
+   plantilla de arriba legible y permite que el gate compruebe que emite JS
+   valido. OJO con las dos trampas de este archivo: aqui dentro no puede haber
+   comillas invertidas, y los saltos de linea de las cadenas van escapados. */
+function fichaJS() {
+  return `
+var CAMPOS = [];
+var API = location.pathname.replace("/ficha/", "/api/ficha/");
+var nota = document.getElementById("nota");
+var guardado = null;
+
+function di(txt, mal){ nota.textContent = txt; nota.className = mal ? "mal" : ""; }
+
+function leer(){
+  var d = {};
+  CAMPOS.forEach(function(c){
+    if (c.tipo === "casillas"){
+      d[c.id] = [].slice.call(document.querySelectorAll('[data-ck="' + c.id + '"]:checked')).map(function(e){ return e.value; });
+    } else if (c.tipo === "opcion"){
+      var m = document.querySelector('input[name="f-' + c.id + '"]:checked');
+      d[c.id] = m ? m.value : "";
+    } else {
+      var e = document.getElementById("f-" + c.id);
+      d[c.id] = e ? e.value : "";
+    }
+  });
+  return d;
+}
+
+function pintar(d){
+  CAMPOS.forEach(function(c){
+    var v = d[c.id];
+    if (c.tipo === "casillas"){
+      [].slice.call(document.querySelectorAll('[data-ck="' + c.id + '"]')).forEach(function(e){
+        e.checked = Array.isArray(v) && v.indexOf(e.value) >= 0;
+      });
+    } else if (c.tipo === "opcion"){
+      [].slice.call(document.querySelectorAll('input[name="f-' + c.id + '"]')).forEach(function(e){
+        e.checked = (e.value === v);
+      });
+    } else {
+      var e = document.getElementById("f-" + c.id);
+      if (e && v != null) e.value = v;
+    }
+  });
+}
+
+function enviarDatos(final){
+  var cuerpo = JSON.stringify({ datos: leer(), enviar: !!final });
+  /* Si nada cambio desde el ultimo guardado, no se vuelve a escribir: el
+     autoguardado corre cada 20 s y no tiene por que golpear la base por nada. */
+  if (!final && cuerpo === guardado) return Promise.resolve(null);
+  /* Sin la lista todavia no se sabe que leer, y guardar un objeto vacio
+     borraria el borrador que hay en la base. */
+  if (!CAMPOS.length) return Promise.resolve(null);
+  return fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: cuerpo })
+    .then(function(r){ return r.json().then(function(j){ return { http: r.status, j: j }; }); })
+    .then(function(res){
+      document.querySelectorAll(".campo.mal").forEach(function(e){ e.classList.remove("mal"); });
+      if (res.j && res.j.ok){
+        guardado = cuerpo;
+        if (final){
+          document.getElementById("enviar").disabled = true;
+          document.getElementById("guardar").disabled = true;
+          di("Enviado. Gracias — lo revisamos y te escribimos.");
+        } else { di("Borrador guardado."); }
+        return res;
+      }
+      if (res.j && res.j.error === "faltan_campos"){
+        var faltan = res.j.campos || [];
+        faltan.forEach(function(num){
+          var caja = document.querySelector('[data-campo="' + num + '"]');
+          if (caja) caja.classList.add("mal");
+        });
+        var primera = document.querySelector(".campo.mal");
+        if (primera) primera.scrollIntoView({ block: "center" });
+        di("Faltan " + faltan.length + " respuesta(s) obligatoria(s): " + faltan.join(", "), true);
+        return res;
+      }
+      if (res.j && res.j.error === "ya_enviada"){
+        di("Este cuestionario ya se envio. Si hay que corregir algo, escribenos.", true);
+        return res;
+      }
+      di("No se pudo guardar. Vuelve a intentarlo en un momento.", true);
+      return res;
+    })
+    .catch(function(){ di("No se pudo guardar. Revisa tu conexion.", true); });
+}
+
+document.getElementById("guardar").addEventListener("click", function(){ enviarDatos(false); });
+document.getElementById("enviar").addEventListener("click", function(){ enviarDatos(true); });
+
+/* Autoguardado. No hay boton que la fundacion tenga que acordarse de pulsar:
+   veinte minutos de formulario perdidos por cerrar una pestaña es la forma mas
+   segura de que nadie lo termine. */
+setInterval(function(){ enviarDatos(false); }, 20000);
+window.addEventListener("beforeunload", function(){ enviarDatos(false); });
+
+fetch(API).then(function(r){ return r.json(); }).then(function(d){
+  if (d && d.ok){
+    CAMPOS = d.campos || [];
+    pintar(d.datos || {});
+    guardado = JSON.stringify({ datos: leer(), enviar: false });
+    if (d.estado === "enviada"){
+      document.getElementById("enviar").disabled = true;
+      document.getElementById("guardar").disabled = true;
+      di("Este cuestionario ya se envio.");
+    }
+  } else { di("Este enlace no esta activo. Escribenos y te mandamos uno nuevo.", true); }
+}).catch(function(){ di("No se pudo cargar. Revisa tu conexion.", true); });
+`;
+}
+
 const ETIQUETA_POB = {
   ninos:"Niños y niñas", adolescentes:"Adolescentes", jovenes:"Jóvenes",
   madres:"Madres cabeza de familia", mayores:"Adultos mayores", familias:"Familias",
@@ -9514,9 +10106,11 @@ async function adminInspecciones(env) {
 
 async function adminInscripciones(env) {
   const r = await env.DB.prepare(
-    "SELECT id, tipo, estado, nombre, email, telefono, ciudad, datos, creada_en " +
-    "FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero','apadrinamiento') " +
-    "ORDER BY creada_en DESC LIMIT " + TOPE_COLA
+    "SELECT i.id, i.tipo, i.estado, i.nombre, i.email, i.telefono, i.ciudad, i.datos, " +
+    "i.creada_en, i.token, f.estado AS ficha_estado " +
+    "FROM inscripciones i LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
+    "WHERE i.tipo IN ('voluntario','fundacion','empresa','ingeniero','apadrinamiento') " +
+    "ORDER BY i.creada_en DESC LIMIT " + TOPE_COLA
   ).all();
   /* Importa aquí más que en ninguna otra: si cien ingenieros se postulan en un
      día, la bandeja no puede quedarse callada en el número doscientos. */
@@ -9792,7 +10386,12 @@ async function adminEntregaCaso(request, env, entrega, quien) {
   return json({ ok: true, entrega, caso, atado: true });
 }
 
-const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "archivada"];
+/* `visitada` es lo que ABRE el cuestionario largo. El proceso publicado son
+   cinco pasos y la visita de contexto es el TERCERO: pedirle logo, fotos y
+   costos a una fundacion antes de conocerse es pedirle documentacion a alguien
+   con quien todavia no se ha hablado. Lo dice la cabecera del propio
+   cuestionario, y por eso el estado existe. */
+const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "visitada", "archivada"];
 
 async function adminMoverInscripcion(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
@@ -9802,7 +10401,11 @@ async function adminMoverInscripcion(request, env, id, quien) {
   if (!ESTADOS_INSCRIPCION.includes(nuevo)) {
     return json({ error: "estado_no_permitido", permitidos: ESTADOS_INSCRIPCION }, 400);
   }
-  const f = await env.DB.prepare("SELECT id FROM inscripciones WHERE id = ?").bind(id).first();
+  /* Se traen tipo, correo y datos: sin eso no se puede avisar a nadie, y avisar
+     es justo lo que faltaba. */
+  const f = await env.DB.prepare(
+    "SELECT id, tipo, estado, nombre, email, datos FROM inscripciones WHERE id = ?"
+  ).bind(id).first();
   if (!f) return json({ error: "no_encontrada" }, 404);
 
   await env.DB.prepare(
@@ -9811,7 +10414,60 @@ async function adminMoverInscripcion(request, env, id, quien) {
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "inscripción " + id + " -> " + nuevo).run();
-  return json({ ok: true, id, estado: nuevo });
+
+  /* SOLO FUNDACIONES, y solo al ACEPTAR por primera vez.
+     · Solo fundaciones porque es el unico tipo con un proceso de cinco pasos
+       publicado en el sitio. Un voluntario o un ingeniero tienen su propio
+       camino —el ingeniero, de hecho, ya recibe el suyo cuando se le verifica
+       la matricula— y mandarles este texto seria inventarles un proceso.
+     · Solo al ACEPTAR y solo si NO estaba ya aceptada: reabrir y volver a
+       aceptar no debe disparar un segundo correo identico.
+     · En try aparte, y sin tumbar la respuesta: el estado ya se movio, y eso
+       es lo que el panel necesita saber. Si el correo falla queda en `correos`
+       con su motivo y en la cola de salud. */
+  let aviso = null;
+
+  /* AL MARCAR LA VISITA se abre el cuestionario: se genera el token —si no lo
+     tiene ya— y se le manda el enlace. Es el unico momento en que tiene sentido
+     pedirle logo, fotos y costos, porque ya hubo una conversacion.
+
+     El token se genera UNA vez y se reusa: marcar la visita dos veces no debe
+     invalidar el enlace que la fundacion ya tiene abierto en una pestaña. */
+  if (nuevo === "visitada" && f.estado !== "visitada" && f.tipo === "fundacion" && f.email) {
+    let token = f.token;
+    if (!token) {
+      token = tokenNuevo();
+      await env.DB.prepare("UPDATE inscripciones SET token = ? WHERE id = ?").bind(token, id).run();
+    }
+    let x = {};
+    try { x = JSON.parse(f.datos || "{}"); } catch (e) { /* nada */ }
+    try {
+      const r = await correoFichaFundacion(env, {
+        nombre: f.nombre || "", email: f.email,
+        idioma: x.idioma === "en" ? "en" : "es", token
+      });
+      aviso = r && r.ok ? "correo_enviado" : "correo_fallo";
+    } catch (e) {
+      console.error("correo ficha fundacion", id, e && e.message);
+      aviso = "correo_fallo";
+    }
+  }
+
+  if (nuevo === "aceptada" && f.estado !== "aceptada" && f.tipo === "fundacion" && f.email) {
+    let x = {};
+    try { x = JSON.parse(f.datos || "{}"); } catch (e) { /* nada */ }
+    const datos = { nombre: f.nombre || "", email: f.email, zona: x.zona || "", idioma: x.idioma === "en" ? "en" : "es" };
+    try {
+      const r = await correoFundacionAceptada(env, datos);
+      await correoVisitaPendiente(env, datos);
+      aviso = r && r.ok ? "correo_enviado" : "correo_fallo";
+    } catch (e) {
+      console.error("correo aceptacion fundacion", id, e && e.message);
+      aviso = "correo_fallo";
+    }
+  }
+
+  return json({ ok: true, id, estado: nuevo, aviso });
 }
 
 /* DELETE /api/admin/inscripcion/<id> — el derecho de supresion.
@@ -11536,9 +12192,35 @@ function cargarInscripciones(){
     if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no ha aplicado nadie.</td></tr>'; return; }
     tb.innerHTML = filaTope(d, 7, "postulaciones") + l.map(function(i){
       var x = {}; try { x = JSON.parse(i.datos||"{}"); } catch(e){}
+      /* AVANZAR Y CERRAR SON COSAS DISTINTAS, y mezclarlas costo una solicitud.
+         Antes habia UN solo boton que recorria la cadena entera, y su ultimo
+         paso era «Archivar». O sea que despues de aceptar a una fundacion, la
+         UNICA accion disponible decia «Archivar» — presentada exactamente igual
+         que los pasos anteriores, en el mismo sitio y con el mismo estilo—. Paso
+         el 3 de septiembre de 2026: Sebas acepto a una fundacion, vio el
+         siguiente boton y lo pulso creyendo que continuaba el proceso. La
+         solicitud quedo en «archivada» y sin vuelta: ese estado no tenia boton.
+
+         Ahora el primario solo AVANZA, y solo cuando avanzar significa algo.
+         Sobre una aceptada no hay primario: el proceso sigue fuera del panel
+         —visita de contexto, convenio— y el panel no debe fingir que hay un
+         boton para eso. Archivar y reabrir van abajo, con «Suprimir», que es
+         donde viven las acciones que cierran. */
+      /* Solo las FUNDACIONES tienen visita de contexto y cuestionario largo: es
+         su proceso de cinco pasos. Ofrecerle «Visita hecha» a un voluntario
+         seria inventarle un paso que no existe. */
+      var esFund = i.tipo === "fundacion";
       var siguiente = i.estado === "nueva" ? ["en_revision","En revisión"]
-                    : i.estado === "en_revision" ? ["aceptada","Seguimos"]
-                    : i.estado === "aceptada" ? ["archivada","Archivar"] : null;
+                    : i.estado === "en_revision" ? ["aceptada","Aceptar"]
+                    : (i.estado === "aceptada" && esFund) ? ["visitada","Visita hecha"] : null;
+      var cerrar = i.estado === "archivada" ? ["en_revision","Reabrir"]
+                 : (i.estado === "aceptada" || i.estado === "visitada") ? ["archivada","Archivar"] : null;
+      /* El enlace del cuestionario se muestra para poder reenviarlo a mano si el
+         correo no llego: el token ya existe y esconderlo no lo hace mas secreto. */
+      var ficha = (i.estado === "visitada" && i.token)
+        ? '<br><small><a href="/ficha/' + esc(i.token) + '" target="_blank" rel="noopener">cuestionario</a>' +
+          (i.ficha_estado ? " · " + esc(i.ficha_estado) : " · sin abrir") + "</small>"
+        : "";
       /* La web la escribe quien aplica, así que solo se vuelve enlace si es
          http(s). Una URL con esquema javascript: escapada sigue ejecutándose al
          hacer clic, y este panel lo abre una persona con sesión de Access. */
@@ -11560,6 +12242,8 @@ function cargarInscripciones(){
         "<td>" + esc(i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
         "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") +
           (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") +
+          ficha +
+          (cerrar ? '<br><small><button class="copy" data-ins="' + i.id + '" data-e="' + cerrar[0] + '">' + cerrar[1] + '</button></small>' : "") +
           /* La supresion va SIEMPRE, en cualquier estado: quien pide que le
              borren sus datos no tiene por que haber llegado a «aceptada». */
           '<br><small><button class="copy" data-insborrar="' + i.id + '">Suprimir</button></small>' + "</td>" +
@@ -13525,6 +14209,8 @@ export default {
         if (rec)                            return await apiRecibo(env, rec[1], url.searchParams.get("t"));
         if (ruta === "/api/entregas")       return await apiEntregas(env, url);
         if (ruta === "/api/transferencia")  return await apiReportarTransferencia(request, env, url);
+        const fapi = ruta.match(/^\/api\/ficha\/([a-f0-9]{32})$/);
+        if (fapi)                           return await apiFicha(request, env, fapi[1]);
         const comp = ruta.match(/^\/api\/comprobante\/(GG-\d{4}-\d{6})$/i);
         if (comp) return await apiComprobante(request, env, comp[1].toUpperCase(), url.searchParams.get("t"));
         /* Triage estructural de viviendas */
@@ -13542,6 +14228,35 @@ export default {
         console.error("api", ruta, e && e.message);
         return json({ error: "error_interno" }, 500);
       }
+    }
+
+    /* LA FICHA VA ANTES DEL COMODIN DE LA SPA, y su ruta esta en
+       `run_worker_first`. Sin las dos cosas, /ficha/<token> devolveria la
+       portada con un 200 y nadie sabria por que — este archivo tiene tres
+       cicatrices de exactamente eso. */
+    /* Atrapa CUALQUIER /ficha/… y valida dentro, no en el patron. Con el patron
+       exigiendo 32 hex, un token mal escrito no coincidia y caia al comodin de
+       la SPA: `/ficha/abc` devolvia la PORTADA con un 200. Nadie ve datos de
+       nadie, pero a quien pego mal el enlace le decimos «aqui esta la pagina de
+       donaciones» en vez de «este enlace no sirve». Es la cuarta cicatriz de
+       este comodin en este archivo. */
+    const fpag = ruta.match(/^\/ficha\/(.*)$/);
+    if (fpag) {
+      if (!env.DB) return new Response("No disponible", { status: 503 });
+      const i = await fichaPorToken(env, fpag[1]);
+      if (!i) {
+        return new Response("Este enlace no está activo.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex, nofollow" }
+        });
+      }
+      return new Response(paginaFicha(i), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "private, no-store",
+          "x-robots-tag": "noindex, nofollow"
+        }
+      });
     }
 
     return env.ASSETS.fetch(request);

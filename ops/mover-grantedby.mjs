@@ -17,8 +17,9 @@
 
    USO — dos pasos, en este orden:
 
-     1) node ops/mover-grantedby.mjs            (imprime el SQL, no toca nada)
-     2) node ops/mover-grantedby.mjs --aplicar  (lo ejecuta contra la base remota)
+     1) node ops/mover-grantedby.mjs                    (imprime la forma, enmascarada)
+     2) node ops/mover-grantedby.mjs --aplicar --local  (ensayo contra la base local)
+     3) node ops/mover-grantedby.mjs --aplicar          (de verdad, contra produccion)
 
    Y DESPUÉS de que el paso 2 diga que quedó, se fusiona el PR que quita el
    campo del JSON. Al revés se pierde el rastro. */
@@ -26,6 +27,14 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const APLICAR = process.argv.includes("--aplicar");
+/* `--local` ensaya contra la base LOCAL de `wrangler dev`. Existe por una razon
+   incomoda: sin el, la primera ejecucion de la rama `--aplicar` en la historia
+   de este script seria contra la base de PRODUCCION. Un script que mueve un
+   rastro legal no deberia estrenarse ahi. */
+const LOCAL = process.argv.includes("--local");
+const DESTINO = LOCAL
+  ? ["--local", "--persist-to", "/tmp/gg-wrangler"]
+  : ["--remote"];
 const d = JSON.parse(readFileSync("data/partners.json", "utf8"));
 const items = Array.isArray(d) ? d : (d.partners || []);
 
@@ -78,10 +87,16 @@ if (!APLICAR) {
 
 /* Se pasa por --command y no por archivo: asi no queda un .sql con nombres
    tirado en el disco esperando que alguien lo commitee. */
+console.log("destino: " + (LOCAL ? "base LOCAL (ensayo)" : "base REMOTA (produccion)") + "\n");
 const salida = execFileSync("npx", [
-  "--yes", "wrangler", "d1", "execute", "givegrow-privado", "--remote", "--command", sql
+  "--yes", "wrangler", "d1", "execute", "givegrow-privado", ...DESTINO, "--command", sql
 ], { encoding: "utf8" });
 console.log(salida.split("\n").filter((l) => /success|changes|rows_written|error/i.test(l)).join("\n"));
 console.log("\nListo. Comprueba con:");
-console.log("  npx wrangler d1 execute givegrow-privado --remote --command \"SELECT sujeto, tipo FROM consentimientos WHERE sujeto LIKE 'aliada %'\"");
-console.log("Y solo entonces fusiona el PR que quita `grantedBy` del JSON.");
+console.log("  npx wrangler d1 execute givegrow-privado " + DESTINO.join(" ") +
+            " --command \"SELECT sujeto, tipo FROM consentimientos WHERE sujeto LIKE 'aliada %'\"");
+if (LOCAL) {
+  console.log("\nEsto fue un ENSAYO: no toco produccion. Repitelo sin --local cuando quieras que valga.");
+} else {
+  console.log("Y solo entonces fusiona el PR que quita `grantedBy` del JSON.");
+}
