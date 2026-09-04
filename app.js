@@ -4,6 +4,20 @@
 /* ---------- I18N ---------- */
 var I18N = {
   es: {
+    "nav.menu.aria": "Menú",
+    "donar.via.aria": "Con qué pasarela pagar",
+    "cv.ej.sirvecerca.alt": "Muro blanco agrietado junto a una puerta, con escombro al pie",
+    "cv.ej.sirvelejos.alt": "Una casa completa vista desde la calle, con el piso de arriba en ladrillo a la vista",
+    "cv.ej.nocerca.alt": "Una ventana fotografiada tan de cerca que llena todo el cuadro",
+    "cv.ej.noangulo.alt": "Un muro fotografiado desde abajo y en diagonal, con cables por delante",
+    "ff.web.ph": "https://tufundacion.org",
+    "ff.instagram.ph": "@tufundacion",
+    "ally.web.ph": "https://tuempresa.com",
+    "ally.instagram.ph": "@tuempresa",
+    "ally.desc.ph": "En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud.",
+    "ally.ben.ph": "Ej. 15% de descuento, un postre de cortesía…",
+    "ally.nivel.ph": "Ej. Retoño en adelante",
+    "ally.redime.ph": "Ej. mostrando la credencial digital",
     "nav.impactos":"ImpactOS",
     "impactos.ey":"La plataforma",
     "impactos.t":"ImpactOS: el registro detrás de cada aporte.",
@@ -4518,7 +4532,7 @@ function almaSend(){
   input.value = "";
   almaPush("you", almaFmt(text));
   almaHistory.push({role:"user", content:text});
-  var thinking = almaPush("bot", '<span class="alma-typing" aria-label="Escribiendo"><i></i><i></i><i></i></span>');
+  var thinking = almaPush("bot", '<span class="alma-typing" aria-label="' + (lang === "en" ? "Typing" : "Escribiendo") + '"><i></i><i></i><i></i></span>');
   almaSetBusy(true);
   fetch("/api/alma", {
     method:"POST",
@@ -4533,12 +4547,25 @@ function almaSend(){
        {error:"codigo", ayuda:"…"}, que es la forma del resto del proyecto.
        Leyendo solo la primera, a quien tocara el límite de mensajes le salía
        «Error: undefined», que no le dice nada a nadie. */
+    /* EL .catch DE ABAJO YA ESTABA EN LOS DOS IDIOMAS Y ESTAS RAMAS NO, aunque
+       ALMA tiene escrito «responde en el idioma del usuario» y contesta en
+       ingles a quien le escribe en ingles. O sea que a un visitante ingles se le
+       respondia en ingles hasta que algo fallaba, y entonces en espanol.
+       El `ayuda` viene del servidor y siempre es espanol —lo escribe el mismo
+       endpoint que sirve al panel—, asi que en ingles se traduce por codigo, que
+       es lo que ya hace el resto del sitio con los errores de membresia. */
+    var en = (lang === "en");
     var reply;
     if (data.content && data.content[0]) reply = data.content[0].text;
     else if (data.error && data.error.message) reply = "Error: " + data.error.message;
-    else if (data.ayuda) reply = data.ayuda;
-    else if (data.error) reply = "No pude responder ahora mismo. Intenta en un momento.";
-    else reply = "Error: respuesta inesperada";
+    else if (data.error === "demasiados_mensajes")
+      reply = en ? "You have sent too many messages in a row. Wait a minute."
+                 : (data.ayuda || "Has enviado demasiados mensajes seguidos. Espera un minuto.");
+    else if (data.ayuda && !en) reply = data.ayuda;
+    else if (data.error)
+      reply = en ? "I could not answer right now. Try again in a moment."
+                 : "No pude responder ahora mismo. Intenta en un momento.";
+    else reply = en ? "Error: unexpected response" : "Error: respuesta inesperada";
     thinking.innerHTML = almaFmt(reply);
     almaHistory.push({role:"assistant", content:reply});
     document.getElementById("alma-msgs").scrollTop = 99999;
@@ -4667,7 +4694,12 @@ function themeApply(mode, anim){
     b.setAttribute("data-mode", mode);
     var k = mode==="auto" ? "theme.auto" : (mode==="light" ? "theme.light" : "theme.dark");
     b.setAttribute("data-i18n", k);
-    b.setAttribute("data-i18n-attr", "aria-label");
+    /* «aria-label,title» y no solo «aria-label»: las dos se escriben aqui con el
+       mismo texto, pero al CAMBIAR DE IDIOMA applyLang solo repinta las que estan
+       en esta lista. Con una sola, el tooltip se quedaba en el idioma anterior —
+       en ingles decia «Tema: oscuro. Clic para modo automatico» mientras el
+       aria-label ya decia «Theme: dark». */
+    b.setAttribute("data-i18n-attr", "aria-label,title");
     var label = t(k);
     b.setAttribute("aria-label", label);
     b.setAttribute("title", label);
