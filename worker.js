@@ -9606,6 +9606,40 @@ const FICHA_CAMPOS = [
 /* Valida contra la MISMA lista con que se pinto. Devuelve {ok, errores} y no
    lanza: quien llama decide si es un borrador —donde faltar es normal— o un
    envio final, donde no lo es. */
+/* UN COSTO EN PESOS NO SE LEE CON `Number()`.
+   `<input type="number">` parecia lo correcto y hacia dos daños distintos, los
+   dos en silencio y los dos medidos en el navegador:
+
+   · «4.000» —cuatro mil escrito como se escribe en Colombia— el navegador lo
+     acepta como decimal y `Number()` devuelve 4. Se guardaba un costo MIL VECES
+     menor sin que nada chillara, en el unico campo de la ficha que acaba en la
+     calculadora diciendole a un donante que compra su plata.
+   · «4.000.000», «$ 4.000», «4 000», «4000,50» el navegador los considera
+     invalidos y `.value` devuelve CADENA VACIA, pero DEJA EL TEXTO A LA VISTA.
+     O sea: la persona ve su numero escrito en la casilla y al enviar se le dice
+     «falta la respuesta 5.2». Vuelve a escribir lo mismo y vuelve a fallar.
+
+   Asi que el control pasa a `type="text"` —para que lo tecleado llegue siempre,
+   nunca vaciado por el navegador— y el numero se interpreta aqui:
+   · se tira todo lo que no sea digito, punto o coma («$», espacios, «COP», «años»);
+   · una coma seguida de UNO O DOS digitos al final son centavos y se descartan
+     (un peso no se cobra en centavos);
+   · el resto de puntos y comas son separadores de miles y se quitan.
+
+   «4,000» queda como 4000 y no como cuatro: es una lectura, no una certeza — por
+   eso el numero interpretado se le DEVUELVE a la pantalla, que es lo que
+   convierte una suposicion callada en algo que la persona puede ver y corregir. */
+function numeroCO(v) {
+  const bruto = String(v == null ? "" : v).trim();
+  if (!bruto) return null;
+  let t = bruto.replace(/[^\d.,]/g, "");
+  t = t.replace(/,\d{1,2}$/, "");
+  t = t.replace(/[.,]/g, "");
+  if (!/^\d+$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
 function fichaValida(datos, final) {
   const errores = [];
   const limpio = {};
@@ -9626,8 +9660,8 @@ function fichaValida(datos, final) {
       continue;
     }
     if (c.tipo === "numero") {
-      const n = Number(v);
-      const bien = Number.isFinite(n) && n >= (c.min ?? 0) && n <= (c.max ?? 1e12);
+      const n = numeroCO(v);
+      const bien = n !== null && n >= (c.min ?? 0) && n <= (c.max ?? 1e12);
       if (final && c.req && !bien) errores.push(c.num);
       limpio[c.id] = bien ? Math.round(n) : null;
       continue;
@@ -9724,7 +9758,10 @@ async function apiFicha(request, env, token) {
       console.error("aviso ficha recibida", i.id, e && e.message);
     }
   }
-  return json({ ok: true, estado: final ? "enviada" : "borrador" });
+  /* SE DEVUELVE LO QUE SE ENTENDIO, no solo un «ok». Es lo que permite que la
+     pantalla ensene el numero ya interpretado: sin esto, «4.000» se guardaria
+     como 4.000 pesos o como 4 sin que nadie pudiera notar la diferencia. */
+  return json({ ok: true, estado: final ? "enviada" : "borrador", datos: v.limpio });
 }
 
 /* Al buzon de ALIANZAS, que es quien sigue el proceso. Lleva el costo de la
@@ -9860,8 +9897,10 @@ function paginaFicha(i) {
     if (c.tipo === "parrafo") {
       control = '<textarea id="f-' + c.id + '" rows="4" maxlength="' + (c.max || 900) + '"></textarea>';
     } else if (c.tipo === "numero") {
-      control = '<input type="number" id="f-' + c.id + '" min="' + (c.min ?? 0) + '" max="' + (c.max ?? 1e9) +
-                '" step="1" inputmode="numeric">';
+      /* `text` y no `number`: con `number` el navegador vacia `.value` cuando lo
+         escrito no le cuadra y deja el texto en pantalla, asi que la respuesta se
+         perdia sin que se notara. Ver `numeroCO`. */
+      control = '<input type="text" id="f-' + c.id + '" inputmode="numeric" autocomplete="off">';
     } else if (c.tipo === "fecha") {
       control = '<input type="date" id="f-' + c.id + '">';
     } else if (c.tipo === "opcion") {
@@ -9972,6 +10011,9 @@ var CAMPOS = [];
 var API = location.pathname.replace("/ficha/", "/api/ficha/");
 var nota = document.getElementById("nota");
 var guardado = null;
+/* Lo ultimo que el servidor dijo haber entendido. Se guarda para poder repintar
+   al soltar el foco sin tener que volver a escribir en la base. */
+var limpio = {};
 
 function di(txt, mal){ nota.textContent = txt; nota.className = mal ? "mal" : ""; }
 
@@ -10009,6 +10051,24 @@ function pintar(d){
   });
 }
 
+/* LO QUE EL SERVIDOR ENTENDIO, DE VUELTA A LA CASILLA.
+   Sin esto, escribir «4.000» en el costo se guarda como 4000 (o como 4, o como
+   nada) y la persona no tiene forma de saber cual de las tres. Se repinta solo
+   el campo numerico, y NUNCA el que se esta escribiendo en ese momento: el
+   autoguardado corre cada 20 s y reescribirle el numero a alguien a mitad de
+   teclear es peor que el fallo que esto arregla. */
+function pintarNumeros(d){
+  if (!d) return;
+  CAMPOS.forEach(function(c){
+    if (c.tipo !== "numero") return;
+    var e = document.getElementById("f-" + c.id);
+    if (!e || e === document.activeElement) return;
+    var v = d[c.id];
+    var txt = (v === null || v === undefined) ? "" : String(v);
+    if (e.value !== txt) e.value = txt;
+  });
+}
+
 function enviarDatos(final){
   var cuerpo = JSON.stringify({ datos: leer(), enviar: !!final });
   /* Si nada cambio desde el ultimo guardado, no se vuelve a escribir: el
@@ -10022,7 +10082,13 @@ function enviarDatos(final){
     .then(function(res){
       document.querySelectorAll(".campo.mal").forEach(function(e){ e.classList.remove("mal"); });
       if (res.j && res.j.ok){
-        guardado = cuerpo;
+        if (res.j.datos) limpio = res.j.datos;
+        pintarNumeros(res.j.datos);
+        /* El testigo se recalcula DESPUES de repintar: si se guardara «cuerpo»,
+           el formulario creeria que lo enviado y lo que hay en pantalla coinciden
+           cuando el servidor acaba de corregir un numero, y el siguiente
+           autoguardado se saltaria. */
+        guardado = JSON.stringify({ datos: leer(), enviar: false });
         if (final){
           document.getElementById("enviar").disabled = true;
           document.getElementById("guardar").disabled = true;
@@ -10105,6 +10171,24 @@ document.addEventListener("change", function(ev){
   }).then(function(){ inp.value = ""; });
 });
 
+/* AL SOLTAR EL FOCO SE REPINTA, y esta es la unica ocasion en que se ve el
+   numero interpretado si la persona escribio y el autoguardado corrio mientras
+   seguia dentro del campo: ahi no se repinta a proposito, y si despues no vuelve
+   a tocar nada, nunca llegaria a verlo.
+   Se llama a enviarDatos primero porque resuelve los dos casos: si cambio algo,
+   guarda y repinta con lo nuevo; si no, se sale sin tocar la base y «limpio»
+   sigue correspondiendo a lo que hay escrito, asi que repintar es seguro. */
+function escucharNumeros(){
+  CAMPOS.forEach(function(c){
+    if (c.tipo !== "numero") return;
+    var e = document.getElementById("f-" + c.id);
+    if (!e) return;
+    e.addEventListener("blur", function(){
+      enviarDatos(false).then(function(){ pintarNumeros(limpio); });
+    });
+  });
+}
+
 document.getElementById("guardar").addEventListener("click", function(){ enviarDatos(false); });
 document.getElementById("enviar").addEventListener("click", function(){ enviarDatos(true); });
 
@@ -10118,6 +10202,8 @@ fetch(API).then(function(r){ return r.json(); }).then(function(d){
   if (d && d.ok){
     CAMPOS = d.campos || [];
     pintar(d.datos || {});
+    limpio = d.datos || {};
+    escucharNumeros();
     guardado = JSON.stringify({ datos: leer(), enviar: false });
     if (d.estado === "enviada"){
       document.getElementById("enviar").disabled = true;
