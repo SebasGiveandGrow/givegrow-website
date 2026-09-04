@@ -1739,6 +1739,31 @@ async function adminSalud(env) {
     "AND a." + PAGADA + " AND NOT EXISTS " +
     "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)",
     "Lista de aportes · los firma la Revisora Fiscal, no el sistema", 70, "#sec-salud");
+  /* LAS TRES COLAS DE PAYPAL. El panel ya tiene las bandejas —membresias,
+     donaciones del boton y eventos sin casa— pero `salud` es lo que DICE que
+     algo necesita atencion, y no las miraba. Una bandeja que hay que acordarse
+     de abrir no es una alarma.
+
+     `paypal_sin_casa` va con prioridad alta a proposito: es plata que entro y no
+     se le puede atribuir a nadie, o un evento cuya firma no cuadra. Las otras
+     dos son trabajo pendiente, no incidentes. */
+  await enCola("paypal_sin_casa",
+    "SELECT COUNT(*) AS n, MIN(e.recibido_en) AS masViejo " +
+    "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
+    "WHERE e.firma_valida = 0 " +
+    "   OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL)",
+    "Bandeja «Eventos de PayPal sin casa» · entró plata que no tiene a quién atribuirse, o una firma no cuadra", 30, "#sec-pps");
+  await enCola("ipn_por_registrar",
+    "SELECT COUNT(*) AS n, MIN(recibido_en) AS masViejo FROM eventos_ipn WHERE resultado = 'por_registrar'",
+    "Bandeja «Donaciones por el botón de PayPal» · sin guía no hay recibo: hay que registrarlas a mano", 65, "#sec-ipn");
+  /* Mas de dos dias: una recien creada es NORMAL —la persona esta en la pantalla
+     de PayPal ahora mismo—. Lo que no es normal es que siga ahi pasados dos dias,
+     porque el evento que la activaria ya no va a llegar. */
+  await enCola("suscripciones_sin_aprobar",
+    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM suscripciones " +
+    "WHERE estado = 'aprobacion_pendiente' AND cobros = 0 " +
+    "AND julianday('now') - julianday(creada_en) > 2",
+    "Bandeja «Membresías internacionales» · quedaron a medias en PayPal y ya no se van a activar solas", 85, "#sec-sus");
   await enCola("correos_fallidos",
     "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'fallo'",
     "Reenviar a mano y revisar Resend · a esa persona el sitio le prometió un correo que no salió", 95, null);
