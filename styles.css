@@ -763,6 +763,12 @@ html[data-theme="dark"] .prog-logo{background:#000}
 
 /* nota legal pequeña bajo el beneficio tributario */
 .calc-legal{font-size:var(--fs-11);line-height:1.5;color:var(--on-dark-4);margin:2px 0 8px;max-width:52ch}
+/* `.mu` es el gris apagado del fondo PAPEL, y `.calc` es oscuro en los DOS
+   temas. Un `.mu` que caiga aquí dentro queda en 2,28:1 —medido— cuando el
+   mínimo es 4,5. Le pasaba a la nota de equivalencia de impacto, visible, de
+   13px y en la página donde se pide dinero. Se corrige por regla y no en el
+   elemento para que el próximo `.mu` que alguien ponga aquí ya nazca legible. */
+.calc .mu{color:var(--on-dark-4)}
 /* Zona final de la calc: el pago en línea. Vive DENTRO del panel oscuro y `.calc`
    es oscuro en los dos temas — por eso los colores van fijos y no por token de tema. */
 .pay-now{margin-top:22px;padding-top:20px;border-top:1px solid var(--on-dark-fill);text-align:left}
