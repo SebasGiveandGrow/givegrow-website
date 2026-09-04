@@ -529,4 +529,49 @@ try {
   reporta("tamaños de fuente sueltos", fuentes, TECHO_FUENTES, "--fs-body, --fs-h3, --fs-eyebrow…");
 } catch (e) { err("no se pudo medir el sistema visual: " + e.message); }
 
+/* 12 · LA WHITELIST `ACT_FNS` CUBRE TODO LO QUE EL HTML INVOCA.
+   ---------------------------------------------------------------------------
+   La CSP prohíbe `onclick`, así que los eventos van por delegación: los
+   atributos `data-act` / `data-input` / `data-change` / `data-submit` /
+   `data-enter` nombran una función y el despachador SOLO invoca las que estén
+   registradas en `ACT_FNS`. Sin `eval`, y eso es deliberado.
+
+   El precio de ese diseño es que una función NO registrada falla EN SILENCIO:
+   se hace clic y no pasa nada, sin error en consola. Pasó de verdad el 3 de
+   septiembre de 2026 — `miSubmit` y `miCalcula` se quedaron fuera y el botón
+   «Continuar a PayPal» de la membresía internacional no hacía nada. Lo reportó
+   Sebas usando el sitio, que es la peor forma de enterarse.
+
+   Este check lo habría atrapado antes de salir. Mira los DOS sitios donde vive
+   HTML: `index.html` y las plantillas que `app.js` genera en runtime. */
+try {
+  /* `src` y `html` ya se leyeron arriba (app.js e index.html): se reusan en vez
+     de volver a tocar el disco. */
+  const app = src;
+  const i = app.indexOf("var ACT_FNS = {");
+  if (i < 0) throw new Error("no encontré `var ACT_FNS = {` en app.js");
+  const bloque = app.slice(i, app.indexOf("};", i));
+  const registradas = new Set([...bloque.matchAll(/(\w+)\s*:/g)].map(m => m[1]));
+
+  const usadas = new Map();
+  for (const [nombre, txt] of [["index.html", html], ["app.js", app]]) {
+    for (const m of txt.matchAll(/data-(?:act|input|change|submit|enter)=\\?["']([^"']+)/g)) {
+      for (const f of m[1].matchAll(/([A-Za-z_$][\w$]*)\s*\(/g)) {
+        if (!usadas.has(f[1])) usadas.set(f[1], new Set());
+        usadas.get(f[1]).add(nombre);
+      }
+    }
+  }
+
+  const huerfanas = [...usadas.keys()].filter(f => !registradas.has(f));
+  if (huerfanas.length) {
+    err("botones muertos — el HTML invoca " + huerfanas.length + " función(es) que NO están en ACT_FNS, " +
+        "así que el clic no hace nada y NO sale error: " +
+        huerfanas.map(f => f + "() [" + [...usadas.get(f)].join(", ") + "]").join(", ") +
+        ". Regístralas en ACT_FNS de app.js.");
+  } else {
+    ok("ACT_FNS cubre las " + usadas.size + " funciones que invoca el HTML");
+  }
+} catch (e) { err("no se pudo verificar ACT_FNS: " + e.message); }
+
 process.exit(fail);
