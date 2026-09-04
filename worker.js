@@ -9151,6 +9151,78 @@ async function correoFundacion(env, f) {
   });
 }
 
+/* CERRAR EL PASO 2 Y ABRIR EL 3.
+   ============================================================================
+   Aceptar una fundacion en el panel no le decia NADA a la fundacion. El acuse
+   de la aplicacion promete que «alguien de Give&Grow la lee y te responde», y
+   esa respuesta no existia: la solicitud cambiaba de estado en la base y ahi
+   moria. Ancla Colombia aplico el 3 de septiembre y no recibio nada.
+
+   QUE DICE Y QUE NO. El proceso publicado son cinco pasos —aplicas, revisamos,
+   visita de contexto, convenio, vinculacion— y aceptar cierra el SEGUNDO. Asi
+   que este correo dice exactamente eso y NO dice «ya eres parte del HUB»:
+   aceptada no es vinculada, y el propio acuse ya le explico que «aplicar no es
+   entrar». Tampoco promete fecha: no hay agenda automatica y prometer una
+   semana que nadie garantiza es la clase de promesa que este sitio no hace.
+
+   Y REPITE lo del logo y las fotos, porque es el momento en que una fundacion
+   entusiasmada los manda sin que nadie se los pida: eso viene despues de la
+   visita, con las autorizaciones de derechos de imagen. */
+async function correoFundacionAceptada(env, f) {
+  const en = f.idioma === "en";
+  const titulo = en ? "Your foundation passed the review."
+                    : "Tu fundación pasó la revisión.";
+  const parrafos = en ? [
+    "We read your application and verified your work. That closes step 2 of five. It does not mean you are in the HUB yet — what comes next is the context visit.",
+    "Someone from Give&Grow writes to you to arrange it: we go to your territory, meet your team and understand what you actually need. We do not put a date on this email because we would rather not promise a week nobody can guarantee.",
+    "Please do not send your logo, your photos or your cost figures yet. Those come after the visit, together with the image-rights authorisations — children's images are protected by Law 1098 and we publish nothing without written consent.",
+    "Nothing is charged, ever, in either direction."
+  ] : [
+    "Leímos tu aplicación y verificamos tu trabajo. Con eso queda cerrado el paso 2 de cinco. Todavía no significa que estés en el HUB: lo que sigue es la visita de contexto.",
+    "Alguien de Give&Grow te escribe para coordinarla: vamos a tu territorio, conocemos a tu equipo y entendemos qué necesitas de verdad. No ponemos fecha en este correo porque preferimos no prometer una semana que nadie puede garantizar.",
+    "Por ahora no nos mandes el logo, las fotos ni las cifras de costos. Eso viene después de la visita, junto con las autorizaciones de derechos de imagen — la imagen de los menores está protegida por la Ley 1098 y no publicamos nada sin consentimiento escrito.",
+    "Nada se cobra, nunca, en ninguna dirección."
+  ];
+  const filas = en
+    ? [["Foundation", f.nombre], ["Step just closed", "2 · Review"], ["Next step", "3 · Context visit"]]
+    : [["Fundación", f.nombre], ["Paso que se cierra", "2 · Revisamos"], ["Paso siguiente", "3 · Visita de contexto"]];
+
+  return enviarCorreo(env, {
+    para: f.email,
+    asunto: en ? "Your application to the HUB SOCIAL: review passed"
+               : "Tu aplicación al HUB SOCIAL: pasaste la revisión",
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas }),
+    etiqueta: "fundacion-aceptada"
+  });
+}
+
+/* Y el aviso interno, porque la visita no se agenda sola. Sin esto, aceptar
+   dejaria a la fundacion esperando una llamada que nadie sabe que tiene que
+   hacer: el correo de arriba se la promete. */
+async function correoVisitaPendiente(env, f) {
+  const para = env.CORREO_AVISOS;
+  if (!para) return avisoSinBuzon(env, "aviso-visita-contexto");
+  const titulo = "Hay que agendar una visita de contexto: " + f.nombre;
+  return enviarCorreo(env, {
+    para,
+    asunto: "Visita de contexto pendiente · " + f.nombre,
+    texto: [titulo, "",
+      "Se acepto su aplicacion al HUB y ya se le escribio diciendo que alguien la contacta para coordinar la visita.",
+      "Ese correo lo promete. Falta hacerlo.", "",
+      "Fundacion: " + f.nombre, "Contacto: " + f.email, "Territorio: " + (f.zona || "-")].join("\n"),
+    html: plantillaCorreo({
+      titulo,
+      parrafos: [
+        "Se aceptó su aplicación al HUB y ya se le escribió diciendo que alguien la contacta para coordinar la visita.",
+        "Ese correo lo promete. Falta hacerlo."
+      ],
+      filas: [["Fundación", f.nombre], ["Contacto", f.email], ["Territorio", f.zona || "—"]]
+    }),
+    etiqueta: "aviso-visita-contexto"
+  });
+}
+
 const ETIQUETA_POB = {
   ninos:"Niños y niñas", adolescentes:"Adolescentes", jovenes:"Jóvenes",
   madres:"Madres cabeza de familia", mayores:"Adultos mayores", familias:"Familias",
@@ -9802,7 +9874,11 @@ async function adminMoverInscripcion(request, env, id, quien) {
   if (!ESTADOS_INSCRIPCION.includes(nuevo)) {
     return json({ error: "estado_no_permitido", permitidos: ESTADOS_INSCRIPCION }, 400);
   }
-  const f = await env.DB.prepare("SELECT id FROM inscripciones WHERE id = ?").bind(id).first();
+  /* Se traen tipo, correo y datos: sin eso no se puede avisar a nadie, y avisar
+     es justo lo que faltaba. */
+  const f = await env.DB.prepare(
+    "SELECT id, tipo, estado, nombre, email, datos FROM inscripciones WHERE id = ?"
+  ).bind(id).first();
   if (!f) return json({ error: "no_encontrada" }, 404);
 
   await env.DB.prepare(
@@ -9811,7 +9887,33 @@ async function adminMoverInscripcion(request, env, id, quien) {
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "inscripción " + id + " -> " + nuevo).run();
-  return json({ ok: true, id, estado: nuevo });
+
+  /* SOLO FUNDACIONES, y solo al ACEPTAR por primera vez.
+     · Solo fundaciones porque es el unico tipo con un proceso de cinco pasos
+       publicado en el sitio. Un voluntario o un ingeniero tienen su propio
+       camino —el ingeniero, de hecho, ya recibe el suyo cuando se le verifica
+       la matricula— y mandarles este texto seria inventarles un proceso.
+     · Solo al ACEPTAR y solo si NO estaba ya aceptada: reabrir y volver a
+       aceptar no debe disparar un segundo correo identico.
+     · En try aparte, y sin tumbar la respuesta: el estado ya se movio, y eso
+       es lo que el panel necesita saber. Si el correo falla queda en `correos`
+       con su motivo y en la cola de salud. */
+  let aviso = null;
+  if (nuevo === "aceptada" && f.estado !== "aceptada" && f.tipo === "fundacion" && f.email) {
+    let x = {};
+    try { x = JSON.parse(f.datos || "{}"); } catch (e) { /* nada */ }
+    const datos = { nombre: f.nombre || "", email: f.email, zona: x.zona || "", idioma: x.idioma === "en" ? "en" : "es" };
+    try {
+      const r = await correoFundacionAceptada(env, datos);
+      await correoVisitaPendiente(env, datos);
+      aviso = r && r.ok ? "correo_enviado" : "correo_fallo";
+    } catch (e) {
+      console.error("correo aceptacion fundacion", id, e && e.message);
+      aviso = "correo_fallo";
+    }
+  }
+
+  return json({ ok: true, id, estado: nuevo, aviso });
 }
 
 /* DELETE /api/admin/inscripcion/<id> — el derecho de supresion.
@@ -11536,9 +11638,24 @@ function cargarInscripciones(){
     if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no ha aplicado nadie.</td></tr>'; return; }
     tb.innerHTML = filaTope(d, 7, "postulaciones") + l.map(function(i){
       var x = {}; try { x = JSON.parse(i.datos||"{}"); } catch(e){}
+      /* AVANZAR Y CERRAR SON COSAS DISTINTAS, y mezclarlas costo una solicitud.
+         Antes habia UN solo boton que recorria la cadena entera, y su ultimo
+         paso era «Archivar». O sea que despues de aceptar a una fundacion, la
+         UNICA accion disponible decia «Archivar» — presentada exactamente igual
+         que los pasos anteriores, en el mismo sitio y con el mismo estilo—. Paso
+         el 3 de septiembre de 2026: Sebas acepto a una fundacion, vio el
+         siguiente boton y lo pulso creyendo que continuaba el proceso. La
+         solicitud quedo en «archivada» y sin vuelta: ese estado no tenia boton.
+
+         Ahora el primario solo AVANZA, y solo cuando avanzar significa algo.
+         Sobre una aceptada no hay primario: el proceso sigue fuera del panel
+         —visita de contexto, convenio— y el panel no debe fingir que hay un
+         boton para eso. Archivar y reabrir van abajo, con «Suprimir», que es
+         donde viven las acciones que cierran. */
       var siguiente = i.estado === "nueva" ? ["en_revision","En revisión"]
-                    : i.estado === "en_revision" ? ["aceptada","Seguimos"]
-                    : i.estado === "aceptada" ? ["archivada","Archivar"] : null;
+                    : i.estado === "en_revision" ? ["aceptada","Aceptar"] : null;
+      var cerrar = i.estado === "archivada" ? ["en_revision","Reabrir"]
+                 : i.estado === "aceptada" ? ["archivada","Archivar"] : null;
       /* La web la escribe quien aplica, así que solo se vuelve enlace si es
          http(s). Una URL con esquema javascript: escapada sigue ejecutándose al
          hacer clic, y este panel lo abre una persona con sesión de Access. */
@@ -11560,6 +11677,7 @@ function cargarInscripciones(){
         "<td>" + esc(i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
         "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") +
           (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") +
+          (cerrar ? '<br><small><button class="copy" data-ins="' + i.id + '" data-e="' + cerrar[0] + '">' + cerrar[1] + '</button></small>' : "") +
           /* La supresion va SIEMPRE, en cualquier estado: quien pide que le
              borren sus datos no tiene por que haber llegado a «aceptada». */
           '<br><small><button class="copy" data-insborrar="' + i.id + '">Suprimir</button></small>' + "</td>" +
