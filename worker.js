@@ -2801,7 +2801,7 @@ async function apiCasoCrear(request, env) {
                          "Espera unos minutos; si ya enviaste el tuyo, revisa el enlace que te dimos." }, 429);
   }
 
-  const numero = await siguienteCaso(env, new Date().getUTCFullYear());
+  const numero = await siguienteCaso(env, anioCO());
   const token = tokenNuevo();
 
   await env.DB.prepare(
@@ -4194,7 +4194,7 @@ async function triageInspeccionRecibir(request, env, email) {
   const respuestas = limpiarRespuestas(c.respuestas);
   respuestas._local_id = localId;
 
-  const numero = await siguienteInspeccion(env, new Date().getUTCFullYear());
+  const numero = await siguienteInspeccion(env, anioCO());
 
   /* R2 ANTES DE LA FILA. Si la escritura del archivo falla, no queda una
      inspección apuntando a una firma que no existe — el documento se emitiría
@@ -4312,7 +4312,7 @@ async function triageInspeccionRecibir(request, env, email) {
         firma_hab_motivo: motivoHab || null
       },
       { obs: firmaObs, hab: firmaHab },
-      new Date().toISOString().slice(0, 10)
+      fechaCO()
     );
     const clavePdf = "inspecciones/" + numero + "/inspeccion.pdf";
     await env.MEDIA.put(clavePdf, bytes, { httpMetadata: { contentType: "application/pdf" } });
@@ -4618,7 +4618,7 @@ async function adminInspeccionEmitirPDF(request, env, numero) {
 
   const bytes = await inspeccionPDF(
     { ...v, respuestas }, { obs: firmaObs, hab: firmaHab },
-    new Date().toISOString().slice(0, 10)
+    fechaCO()
   );
   const clave = "inspecciones/" + numero + "/inspeccion.pdf";
   await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: "application/pdf" } });
@@ -6352,7 +6352,7 @@ async function apiCasoInforme(env, numero, token) {
   if (!e) return json({ error: "sin_evaluacion", ayuda: "Todavía ningún ingeniero ha revisado este caso." }, 409);
 
   const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaCO();
   const bytes = await informeTriage({
     numero: c.numero, sector: c.sector, material: c.material, pisos: c.pisos,
     anio_aprox: c.anio_aprox, danio_previo: c.danio_previo, habitada: c.habitada,
@@ -8498,8 +8498,10 @@ async function siguienteMiembro(env, anio) {
   return "MB-" + anio + "-" + String(n).padStart(6, "0");
 }
 
+/* Desde el dia COLOMBIANO, no desde el UTC. Si no, una membresia creada a las
+   8 p.m. de un martes vence un dia antes de lo que su dueño cuenta. */
 function sumarDias(dias) {
-  const d = new Date();
+  const d = enColombia();
   d.setUTCDate(d.getUTCDate() + dias);
   return d.toISOString().slice(0, 10);
 }
@@ -8567,7 +8569,10 @@ async function rutaCarnet(env, token) {
   ).bind(token).first();
   if (!m) return new Response("No encontrado", { status: 404 });
 
-  const hoy = new Date().toISOString().slice(0, 10);
+  /* EL DIA COLOMBIANO. Con el reloj en UTC, un carnet que vence HOY se veia
+     «No vigente» desde las 7 de la tarde: cinco horas en las que su dueño abre
+     su enlace y lee que ya no vale, siendo mentira. */
+  const hoy = fechaCO();
   const vigente = !m.revocado_en && m.vigente_hasta >= hoy;
   const n = nivelDe(m.nivel);
 
