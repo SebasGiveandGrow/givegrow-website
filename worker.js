@@ -7126,6 +7126,20 @@ async function apiPaypalIpn(request, env) {
   if (!crudo) return new Response("", { status: 200 });
 
   const d = new URLSearchParams(crudo);
+
+  /* ESTO NI SIQUIERA ES UN IPN. Todo IPN trae al menos uno de los tres: la
+     transaccion, el tipo, o la suscripcion. Sin ninguno, lo que llego es ruido
+     -un escaner, un POST perdido, un cuerpo JSON- y guardarlo solo sirve para
+     que la tabla se llene de filas «sin_tipo:sin_id» que no dicen nada y que
+     comparten clave, o sea que la primera bloquea a las siguientes.
+
+     Se descubrio auditando: un `POST {}` de prueba a la ruta dejo exactamente
+     esa fila en la base de PRODUCCION. Sigue devolviendo 200, porque un 4xx
+     hace que PayPal reintente y esto no es de PayPal. */
+  if (!d.get("txn_id") && !d.get("txn_type") && !d.get("subscr_id") && !d.get("recurring_payment_id")) {
+    return new Response("", { status: 200 });
+  }
+
   const clave = ipnClave(d);
   const tipo = String(d.get("txn_type") || "").trim() || null;
   const estado = String(d.get("payment_status") || "").trim() || tipo || "sin_estado";
