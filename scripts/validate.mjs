@@ -1,7 +1,7 @@
 /* Validación pre-deploy Give&Grow — falla el build si algo se rompe. */
 import { readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
-import { esDict, decodeHtml, eachTextNode } from "./i18n-html.mjs";
+import { esDict, decodeHtml, eachTextNode, eachAttrNode } from "./i18n-html.mjs";
 
 let fail = 0;
 const err = (m) => { console.error("NO OK  " + m); fail = 1; };
@@ -398,10 +398,30 @@ try {
     inner.trim() ? desfasados++ : vacios++;
     if (ejemplos.length < 5) ejemplos.push(key);
   });
-  if (vacios || desfasados) {
+  /* Y LOS ATRIBUTOS, que este check no miraba. `eachTextNode` los omite porque su
+     destino no es el contenido, y nadie recogía el testigo: un aria-label o un alt
+     escrito a mano podía decir una cosa y el diccionario otra sin que nada lo
+     notara. En marcha no se ve —applyLang los repinta— pero un rastreador sí, y un
+     lector de pantalla en el rato anterior a que cargue el JS también. Al escribir
+     esto había tres desfasados, dos de ellos aria-label de una galería. */
+  let enAttr = 0, ausentes = [];
+  eachAttrNode(html, ({ key, attr, value }) => {
+    const want = dict[key];
+    if (want == null) return;
+    if (value === null) { ausentes.push(key + " [" + attr + "]"); return; }
+    if (decodeHtml(value) === want) return;
+    enAttr++;
+    if (ejemplos.length < 5) ejemplos.push(key + " [" + attr + "]");
+  });
+  if (ausentes.length) {
+    err("index.html declara data-i18n-attr para " + ausentes.length + " atributo(s) que NO están " +
+        "escritos en la etiqueta, así que antes de que cargue el JS no existen: " + ausentes.join(", "));
+  }
+  if (vacios || desfasados || enAttr) {
     err("index.html desincronizado del diccionario ES: " + vacios + " vacíos, " + desfasados +
-        " desfasados (" + ejemplos.join(", ") + "…) — corrige con: node scripts/hydrate-i18n.mjs");
-  } else ok("index.html hidratado");
+        " desfasados" + (enAttr ? ", " + enAttr + " en atributos" : "") +
+        " (" + ejemplos.join(", ") + "…) — corrige con: node scripts/hydrate-i18n.mjs");
+  } else ok("index.html hidratado (texto y atributos)");
 } catch (e) { err("no se pudo verificar la hidratación: " + e.message); }
 
 /* 10 · Las minutas dicen lo mismo que el certificado del sistema.

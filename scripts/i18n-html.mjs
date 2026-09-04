@@ -49,3 +49,39 @@ export function eachTextNode(html, fn) {
     fn({ key, tag, openEnd, close, inner: html.slice(openEnd, close) });
   }
 }
+
+/* Texto plano -> VALOR DE ATRIBUTO seguro. No vale `escapeHtml`: un atributo va
+   entre comillas dobles y hay claves con comillas dentro. */
+export function escapeAttr(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* El GEMELO de eachTextNode para el otro destino: los elementos cuyo data-i18n
+   apunta a uno o varios ATRIBUTOS.
+
+   Existe porque `eachTextNode` los omite —correctamente, su destino no es el
+   contenido— y nadie recogia el testigo: ni el hidratador ni el gate los miraban,
+   asi que su valor escrito a mano podia decir una cosa y el diccionario otra sin
+   que nada lo notara. En marcha no se ve, porque applyLang los repinta; lo ve un
+   rastreador, y un lector de pantalla en el rato anterior a que cargue el JS.
+
+   `value` es null cuando el atributo ni siquiera esta escrito: eso no se puede
+   arreglar moviendo texto, asi que se reporta en vez de inventarselo. */
+export function eachAttrNode(html, fn) {
+  const re = /<([a-z0-9]+)\b([^>]*?)\bdata-i18n="([^"]+)"([^>]*)>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    const [full, tag, pre, key, post] = m;
+    const lista = /data-i18n-attr="([^"]*)"/.exec(pre + post);
+    if (!lista) continue;
+    for (const attr of lista[1].split(",").map((a) => a.trim()).filter(Boolean)) {
+      /* Se busca DENTRO de la etiqueta de apertura y con un espacio delante, para
+         que `label` no case dentro de `aria-label`. */
+      const ra = new RegExp('\\s' + attr.replace(/[-]/g, "\\-") + '="([^"]*)"');
+      const ma = ra.exec(full);
+      if (!ma) { fn({ key, tag, attr, valueStart: null, valueEnd: null, value: null }); continue; }
+      const dentro = ma.index + ma[0].indexOf('="') + 2;
+      fn({ key, tag, attr, valueStart: m.index + dentro, valueEnd: m.index + dentro + ma[1].length, value: ma[1] });
+    }
+  }
+}
