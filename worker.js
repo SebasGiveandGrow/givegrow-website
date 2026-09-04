@@ -9670,6 +9670,62 @@ async function adminBorrarInscripcion(request, env, id, quien) {
    Del cuerpo crudo se saca SOLO lo que hace falta para conciliar. IPN trae
    direccion postal completa; mandarla al navegador seria mas dato personal del
    que esta pantalla necesita, aunque viva detras de Access. */
+/* LO QUE LLEGO DE PAYPAL Y NO TIENE CASA.
+   ============================================================================
+   El webhook guarda TODO lo que recibe en `eventos_paypal`, pero solo se
+   convierte en algo visible cuando pertenece a una suscripcion conocida. O sea
+   que un cobro que llegue sin suscripcion -o un evento cuya firma no cuadre- se
+   guarda y NO LO VE NADIE. Es la misma ceguera del boton de donaciones, en otra
+   tabla, y por eso existe esta bandeja: la hermana de «Pagos sin aporte», que
+   hace exactamente lo mismo con Wompi.
+
+   Se muestran DOS cosas, y son problemas distintos:
+
+   · PAGO SIN SUSCRIPCION — un `PAYMENT.SALE.COMPLETED` o `.CAPTURE.COMPLETED`
+     con firma valida que no corresponde a ninguna fila de `suscripciones`. Es
+     plata que entro y no tiene a quien atribuirse: pudo ser una donacion del
+     boton llegando por webhook en vez de por IPN.
+
+   · FIRMA INVALIDA — el evento se registro y NO se proceso. Puede ser una
+     suplantacion, pero la primera vez que paso -3 sep 2026- la causa fue que el
+     id del webhook llevaba el prefijo `WH-` que su API no acepta, y desde fuera
+     era indistinguible. Esa vez el sintoma fue el silencio; ahora se ve. */
+async function adminPaypalSueltos(env) {
+  const r = await env.DB.prepare(
+    "SELECT e.evento_id, e.tipo, e.suscripcion, e.recurso_id, e.firma_valida, " +
+    "e.resultado, e.cuerpo, e.recibido_en " +
+    "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
+    "WHERE e.firma_valida = 0 " +
+    "   OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL) " +
+    "ORDER BY e.recibido_en DESC LIMIT 100"
+  ).all();
+
+  const filas = (r.results || []).map((e) => {
+    let rec = {};
+    try { rec = JSON.parse(e.cuerpo || "{}").resource || {}; } catch (x) { /* nada */ }
+    /* Las dos formas del monto: el recurso viejo (`sale`) dice total/currency y
+       el nuevo (`capture`) value/currency_code. Se leen las dos porque no
+       sabemos por cual llega una donacion del boton — que es justo lo que esta
+       bandeja existe para averiguar. */
+    const m = rec.amount || {};
+    const correo = (rec.payer && rec.payer.email_address)
+                || (rec.payer && rec.payer.payer_info && rec.payer.payer_info.email)
+                || null;
+    return {
+      evento_id: e.evento_id,
+      tipo: e.tipo,
+      suscripcion: e.suscripcion,
+      firma_valida: e.firma_valida,
+      resultado: e.resultado,
+      recibido_en: e.recibido_en,
+      monto: m.total != null ? String(m.total) : (m.value != null ? String(m.value) : null),
+      moneda: m.currency || m.currency_code || null,
+      correo
+    };
+  });
+  return json({ eventos: filas });
+}
+
 async function adminIpn(env) {
   const r = await env.DB.prepare(
     "SELECT clave, estado, txn_type, txn_id, suscripcion, monto_centavos, moneda, " +
@@ -10501,6 +10557,21 @@ la nuestra; si dice otra cosa, es el motivo por el que no pasó y no hay que dar
 <th scope="col">Recibido</th><th scope="col">Tipo</th><th scope="col">Monto</th>
 <th scope="col">Donante</th><th scope="col">Destino</th><th scope="col">Verificado</th>
 </tr></thead><tbody id="ipn-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</table></div>
+
+<h2 id="sec-pps" class="h-sec" style="margin:48px 0 6px;font-size:26px">Eventos de PayPal sin casa</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">La hermana de «Pagos sin aporte»,
+para PayPal. Dos cosas distintas caen aquí. <strong>Pago sin suscripción</strong>: entró plata con firma
+válida que no corresponde a ninguna membresía — pudo ser una donación del botón llegando por webhook en
+vez de por IPN, y hay que registrarla a mano. <strong>Firma inválida</strong>: el evento se guardó y
+<strong>no</strong> se procesó; puede ser una suplantación, pero la primera vez que pasó la causa fue una
+variable mal puesta, así que conviene mirarlo antes de asumir lo peor. Si esta lista está vacía, todo lo
+que llegó de PayPal tiene dónde ir.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Recibido</th><th scope="col">Evento</th><th scope="col">Monto</th>
+<th scope="col">Donante</th><th scope="col">Qué pasa</th>
+</tr></thead><tbody id="pps-filas"><tr><td colspan="5" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <h2 id="sec-entregas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
@@ -11983,6 +12054,30 @@ function cargarIpn(){
   });
 }
 
+/* ---------------- eventos de PayPal sin casa ---------------- */
+function cargarPaypalSueltos(){
+  fetch("/api/admin/paypal-sueltos").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("pps-filas"); if (!tb) return;
+    var l = d.eventos || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="5">Ninguno: todo lo que llego de PayPal tiene donde ir.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(e){
+      /* El monto llega como texto desde PayPal y se muestra tal cual con su
+         moneda. Convertirlo a pesos aqui seria inventar una tasa. */
+      var monto = e.monto ? (esc(e.monto) + " " + esc(e.moneda || "")) : "—";
+      var que = !e.firma_valida
+        ? "Firma invalida: NO se proceso"
+        : "Pago sin suscripcion: registrar a mano";
+      return "<tr>" +
+        "<td>" + esc((e.recibido_en||"").slice(0,16)) + "</td>" +
+        "<td>" + esc(e.tipo || "—") + "<br><small>" + esc(e.evento_id || "") + "</small></td>" +
+        "<td>" + monto + "</td>" +
+        "<td>" + esc(e.correo || "—") + "</td>" +
+        "<td>" + que + "</td>" +
+      "</tr>";
+    }).join("");
+  });
+}
+
 /* ---------------- entregas ---------------- */
 var E_CAMPOS = [
   ["e-destino","Destino","brigada-emergencia-2026-08"],
@@ -12163,6 +12258,7 @@ var BANDEJAS = {
   "o-filas": cargarOfrecimientos,
   "p-filas": cargarSueltos,
   "ipn-filas": cargarIpn,
+  "pps-filas": cargarPaypalSueltos,
   "e-filas": cargarEntregas
 };
 
@@ -13011,6 +13107,7 @@ export default {
            alguien las publica: en terreno se registra rápido y se revisa después. */
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/ipn")           return await adminIpn(env);
+        if (ruta === "/api/admin/paypal-sueltos") return await adminPaypalSueltos(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
