@@ -916,9 +916,17 @@ async function correoAvisoInterno(env, aporte, email, nombre) {
   const para = env.CORREO_AVISOS;
   if (!para) return avisoSinBuzon(env, "aviso-interno");
   const titulo = "Nuevo aporte confirmado: " + aporte.guia;
+  /* LA MONEDA DE VERDAD. Esto decia siempre «COP» porque solo lo llamaba el
+     camino de Wompi, que liquida en pesos. Un cobro de PayPal son DOLARES: con
+     el texto fijo, US$35 llegaba al buzon como «$3.500 COP» — un numero que no
+     es ni el monto ni la moneda. */
+  const enUsd = String(aporte.moneda || "COP").toUpperCase() === "USD";
+  const montoTexto = enUsd
+    ? "US$" + (Number(aporte.monto_centavos || 0) / 100).toFixed(2)
+    : fmtPesos(aporte.monto_centavos) + " COP";
   const filas = [
     ["Guía", aporte.guia],
-    ["Monto", fmtPesos(aporte.monto_centavos) + " COP"],
+    ["Monto", montoTexto],
     ["Destino", aporte.modo === "dirigida" ? (aporte.destino_id || "?") : "Fondo general"],
     ["Frecuencia", { unico: "Único", mensual: "Mensual", anual: "Anual" }[aporte.frecuencia] || aporte.frecuencia],
     ["Certificado", aporte.quiere_certificado ? "SÍ lo pidió" : "no"],
@@ -7488,6 +7496,35 @@ async function paypalCobro(env, suscripcionId, recurso) {
     }
   } catch (e) { console.error("correo tras cobro paypal", guia, e && e.message); }
 
+  /* Y EL CARNET, que tampoco salia. `carnetTrasAporte` solo se llamaba desde el
+     camino de Wompi, asi que un miembro internacional pagaba todos los meses y
+     nunca recibia su carnet — mientras la pagina de membresias se lo promete a
+     todos: «tu carnet digital de miembro, que se renueva con cada aporte».
+
+     Se le pasa el nivel QUE YA DECIDIO la suscripcion en dolares. Recalcularlo
+     aqui con `nivelPorMensual` leeria 35 dolares como 35 pesos. */
+  try {
+    const d = sub.donante_id
+      ? await env.DB.prepare("SELECT nombre, email FROM donantes WHERE id = ?").bind(sub.donante_id).first()
+      : null;
+    /* EL AVISO INTERNO, la tercera pieza que le faltaba a este camino. Sin el,
+       la fundacion no se entera de que hay un miembro nuevo cobrando cada mes
+       salvo que alguien abra el panel. El de Wompi lleva anios mandandolo. */
+    await correoAvisoInterno(env, {
+      guia, monto_centavos: centavos, moneda,
+      modo: "fondo", destino_id: null, frecuencia: "mensual"
+    }, d && d.email, d && d.nombre);
+
+    const carnet = await carnetTrasAporte(
+      env,
+      { frecuencia: "mensual", monto_centavos: centavos, destino_id: null },
+      sub.donante_id, sub.nivel
+    );
+    if (carnet && carnet.nuevo && d && d.email) {
+      await correoCarnet(env, d.email, d.nombre, carnet, sub.idioma);
+    }
+  } catch (e) { console.error("carnet tras cobro paypal", guia, e && e.message); }
+
   return "aporte " + guia;
 }
 
@@ -8286,7 +8323,13 @@ function sumarDias(dias) {
    el anual— porque el cobro no cae siempre el mismo día y un carnet que vence
    la víspera de la renovación deja a alguien sin beneficio en la caja de un
    comercio aliado, que es el peor lugar para descubrirlo. */
-async function carnetTrasAporte(env, aporte, donanteId) {
+/* `nivelForzado` existe por una razon concreta: `NIVELES_MB` tiene umbrales en
+   PESOS, y un aporte de PayPal viene en DOLARES. Sin este parametro, un miembro
+   de US$35 al mes entraria como `nivelPorMensual(35)` —treinta y cinco pesos— y
+   saldria Semilla. El nivel en dolares ya lo decidio `paypalNivelDe` al crear la
+   suscripcion, con sus propios umbrales; aqui se respeta en vez de recalcularlo
+   con la tabla equivocada. */
+async function carnetTrasAporte(env, aporte, donanteId, nivelForzado) {
   if (!donanteId) return null;
   if (aporte.frecuencia !== "mensual" && aporte.frecuencia !== "anual") return null;
   /* Las campañas propias no dan membresía: son operaciones puntuales y su
@@ -8295,7 +8338,9 @@ async function carnetTrasAporte(env, aporte, donanteId) {
 
   const cop = Math.round(Number(aporte.monto_centavos) / 100);
   const mensual = aporte.frecuencia === "anual" ? Math.round(cop / 12) : cop;
-  const nivel = nivelPorMensual(mensual);
+  const nivel = nivelForzado
+    ? (NIVELES_MB.find((x) => x.es === nivelForzado || x.id === nivelForzado) || NIVELES_MB[0])
+    : nivelPorMensual(mensual);
   const hasta = sumarDias(aporte.frecuencia === "anual" ? 395 : 35);
 
   const ya = await env.DB.prepare(
