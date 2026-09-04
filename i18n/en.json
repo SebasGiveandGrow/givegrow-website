@@ -206,6 +206,8 @@
   "pay.now.btn": "Continue to payment",
   "pay.now.wait": "Preparing your payment…",
   "pay.now.err": "We could not open the gateway. Please try again, or give by bank transfer using the details below.",
+  "pay.now.cerrado": "Online payment is closed right now, so trying again will not help. Give by bank transfer using the details below: you get your tracking number instantly and upload your proof right there.",
+  "pay.now.monto": "That amount is outside what the gateway accepts: the minimum is COP 5,000 and the maximum COP 20,000,000. If you want to give more, write to us and we will arrange it.",
   "pay.now.rec": "You chose a {frec} gift. For now we process this first gift and record your intention: when we enable automatic debit we will write to you to activate it, without you having to start over.",
   "pay.now.rec.m": "monthly",
   "pay.now.rec.a": "annual",
