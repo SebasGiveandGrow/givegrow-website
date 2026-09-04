@@ -9874,12 +9874,37 @@ async function correoFichaRecibida(env, nombre, d) {
   });
 }
 
+/* LA CSP NO LLEGA SOLA A ESTA PAGINA.
+   CLAUDE.md describe «CSP estricta en _headers (default-src 'self')» y es cierto
+   —para los ARCHIVOS ESTATICOS—. Las paginas que genera el Worker responden con
+   sus propias cabeceras, asi que ninguna de las seis la llevaba: se comprobo
+   pidiendo /ficha a produccion y mirando lo que NO venia.
+
+   No habia agujero: `i.nombre` es lo unico de fuera que entra al HTML y pasa por
+   `esc()`. Pero era una capa que el proyecto creia tener.
+
+   Se empieza por esta porque es la unica autocontenida —un <style> y un <script>,
+   los dos en linea, cero atributos style=, y solo habla con su propio origen— y
+   porque hoy tiene CERO usuarios, asi que un fallo aqui no le rompe el dia a
+   nadie. Las otras cinco (el panel, el triaje, la inspeccion de terreno, la ruta
+   y el carnet) son herramientas que ya se usan: van aparte y con luz verde, no
+   de tapadillo. Quedan ENUMERADAS a proposito, que es lo que distingue esto de
+   dejarse tres sueltas.
+
+   El nonce se genera por respuesta. La pagina se sirve «no-store», asi que no
+   hay riesgo de que se cachee un nonce y deje de casar con la cabecera. */
+function nonceCSP() {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/=+$/, "");
+}
+
 /* La pagina. Se sirve desde el WORKER y no desde la SPA por lo mismo que
    /triaje: vive tras un token, no tiene por que estar en el bundle publico, y
    nadie deberia poder listar las preguntas sin tener un enlace.
 
    Los campos se pintan desde `FICHA_CAMPOS`, la misma lista que valida. */
-function paginaFicha(i) {
+function paginaFicha(i, nonce) {
   const secciones = [];
   for (const c of FICHA_CAMPOS) {
     if (!secciones.length || secciones[secciones.length - 1].nombre !== c.sec) {
@@ -9939,7 +9964,7 @@ function paginaFicha(i) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Cuestionario del HUB SOCIAL</title>
-<style>
+<style nonce="${nonce}">
   :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;--err:#8C2F1E}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
@@ -9994,7 +10019,7 @@ function paginaFicha(i) {
   <button type="button" class="sec2" id="guardar">Guardar borrador</button>
   <button type="button" id="enviar">Enviar</button>
 </div>
-<script>
+<script nonce="${nonce}">
 ${fichaJS()}
 </script>
 </body>
@@ -15026,11 +15051,18 @@ export default {
           headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex, nofollow" }
         });
       }
-      return new Response(paginaFicha(i), {
+      const nonce = nonceCSP();
+      return new Response(paginaFicha(i, nonce), {
         headers: {
           "content-type": "text/html; charset=utf-8",
           "cache-control": "private, no-store",
-          "x-robots-tag": "noindex, nofollow"
+          "x-robots-tag": "noindex, nofollow",
+          "content-security-policy":
+            "default-src 'self'; " +
+            "script-src 'nonce-" + nonce + "'; " +
+            "style-src 'nonce-" + nonce + "'; " +
+            "img-src 'self' data:; connect-src 'self'; " +
+            "form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
         }
       });
     }
