@@ -10977,6 +10977,155 @@ async function adminBorrarInscripcion(request, env, id, quien) {
    Devuelve las respuestas ETIQUETADAS con la pregunta y su numero, no las claves
    crudas: quien concilia esto contra `partners.json` no tiene por que saber que
    `unidad_doc` era la 5.3. */
+/* ============================================================================
+   EL BORRADOR DEL OBJETO DE `partners.json`
+   ============================================================================
+   QUE ES Y QUE NO ES. No crea la tarjeta de la fundacion en el sitio: arma el
+   objeto y se lo enseña a una persona para que lo revise y lo pegue. La
+   diferencia no es tecnica —el Worker no puede escribir en el repo— sino de
+   criterio, y el checklist post-alta del propio cuestionario la explica:
+   contrastar el costo de la unidad contra su soporte, curar como maximo ocho
+   fotos con la proteccion de la Ley 1098, y optimizar el logo. Publicar una
+   cifra que nadie miro es exactamente lo que «evidencia, no promesas» prohibe,
+   y esa cifra acaba en la calculadora diciendole a un donante cuantos platos
+   compra su plata.
+
+   LO QUE HACE ES QUITAR LA TRANSCRIPCION. Entre el formulario publico y la
+   ficha ya estan casi todos los campos; copiarlos a mano es donde se cuelan los
+   errores y donde se pierden tardes.
+
+   NO INVENTA NADA. Un campo sin respuesta NO sale con cadena vacia: se omite y
+   se nombra en `pendientes`. Un objeto a medias que se ve completo es peor que
+   uno corto que dice que le falta.
+
+   TRES COSAS QUE NUNCA PUEDE SACAR DE UNA RESPUESTA, y por eso van siempre en
+   `pendientes`:
+   · `lat`/`lng` — el cuestionario pide la direccion pero las coordenadas se
+     publican A NIVEL DE ZONA, nunca la direccion exacta. Eso lo decide una
+     persona mirando un mapa, no una conversion.
+   · El INGLES. El sitio es bilingue y el cuestionario esta en español: `area`,
+     `poblacion`, `about` y los plurales de la unidad de impacto necesitan su
+     version en ingles, y traducir sin que nadie lo lea es publicar en un idioma
+     que nadie reviso.
+   · Las IMAGENES. El logo y las fotos llegan como archivo o enlace, pero
+     `partners.json` apunta a rutas de `/img/` ya optimizadas.
+
+   Y LA REGLA 1 MANDA: sin autorizacion del NOMBRE no hay perfil. Si la ficha
+   dice que no, esto no devuelve un objeto — devuelve el porque. */
+function fichaAObjeto(ins, ficha) {
+  const d = ficha || {};
+  const x = ins || {};
+  const pendientes = [];
+  const si = (v) => typeof v === "string" && v.startsWith("Sí");
+  const texto = (v) => { const t = String(v == null ? "" : v).trim(); return t || null; };
+
+  /* REGLA 1, y corta antes de armar nada. */
+  if (!si(d.aut_nombre)) {
+    return { ok: false, motivo: "sin_consentimiento_nombre",
+      ayuda: "La ficha no autoriza publicar el nombre de la fundación, así que no hay perfil que crear. Es la regla 1 del cuestionario." };
+  }
+
+  const o = { id: null, type: "foundation", name: texto(x.nombre) };
+
+  /* El `id` se PROPONE, no se decide: es la clave de las rutas /f/<id> y de las
+     carpetas de imagenes, y una vez publicado no se cambia sin romper enlaces. */
+  const propuesta = String(x.nombre || "").toLowerCase().normalize("NFD")
+    .replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "").split("-").slice(0, 2).join("-");
+  pendientes.push("id — propuesta: «" + (propuesta || "sin-nombre") + "». Es la clave de /f/<id> y de /img/<id>/, y no se cambia después sin romper enlaces.");
+
+  if (texto(x.zona)) { o.area = { es: texto(x.zona) }; pendientes.push("area.en — falta la traducción"); }
+
+  const pobs = Array.isArray(x.poblacion) ? x.poblacion : [];
+  const etiquetas = pobs.map((k) => ETIQUETA_POB[k] || k).filter(Boolean);
+  if (texto(x.poblacion_otra)) etiquetas.push(texto(x.poblacion_otra));
+  if (etiquetas.length) { o.poblacion = { es: etiquetas.join(", ") }; pendientes.push("poblacion.en — falta la traducción"); }
+
+  if (texto(x.web)) o.url = texto(x.web);
+  if (texto(x.instagram)) o.instagram = texto(x.instagram);
+
+  const perfil = {};
+  if (texto(x.historia)) { perfil.about = { es: texto(x.historia) }; pendientes.push("profile.about.en — falta la traducción"); }
+  if (texto(d.frase)) { perfil.quote = { es: texto(d.frase) }; pendientes.push("profile.quote.en — falta la traducción"); }
+  if (d.anios_territorio != null && d.anios_territorio !== "") {
+    pendientes.push("profile.years — la ficha dice " + d.anios_territorio + " años en el territorio; la frase exacta que se publica la escribe una persona, en los dos idiomas.");
+  }
+  const programas = [];
+  if (texto(x.programa)) programas.push({ name: texto(x.programa), desc: { es: texto(x.programa_desc) || "" } });
+  if (texto(d.prog2_nombre)) programas.push({ name: texto(d.prog2_nombre), desc: { es: texto(d.prog2_que) || "" } });
+  if (texto(d.prog3_nombre)) programas.push({ name: texto(d.prog3_nombre), desc: { es: texto(d.prog3_que) || "" } });
+  if (programas.length) { perfil.programs = programas; pendientes.push("profile.programs[].desc.en — faltan las traducciones (" + programas.length + ")"); }
+  if (Object.keys(perfil).length) o.profile = perfil;
+
+  /* EL LIDER NO ENTRA SOLO. Es el nombre de una persona, y la autorizacion que
+     firmo la fundacion es sobre el nombre de la FUNDACION, su logo y sus fotos —
+     la Seccion 7 no pregunta por publicar el nombre de quien la dirige. */
+  if (texto(x.lider)) {
+    pendientes.push("profile.leader — la ficha trae quién la lidera, pero la Sección 7 no autoriza publicar el nombre de esa persona. Preguntar antes de ponerlo.");
+  }
+
+  /* LA UNIDAD DE IMPACTO. Es lo unico de aqui que acaba en la calculadora
+     diciendole a un donante que compra su plata, asi que su costo NO se publica
+     sin contrastarlo contra el soporte. */
+  const costo = Number(d.unidad_costo);
+  if (texto(d.unidad) && Number.isFinite(costo) && costo > 0) {
+    const partes = String(d.unidad).split("/").map((t) => t.trim()).filter(Boolean);
+    o.impactUnits = [{
+      id: (propuesta || "unidad") + "-1",
+      es: partes[0] || String(d.unidad).trim(),
+      esPl: partes[1] || partes[0] || String(d.unidad).trim(),
+      cop: Math.round(costo)
+    }];
+    if (partes.length < 2) pendientes.push("impactUnits[0].esPl — la ficha no separó singular y plural con «/»");
+    pendientes.push("impactUnits[0].en y .enPl — faltan las traducciones");
+    pendientes.push("impactUnits[0].project — a qué programa pertenece esa unidad");
+    pendientes.push("CONTRASTAR EL COSTO ($" + Math.round(costo).toLocaleString("es-CO") +
+      " COP) contra su soporte (" + (texto(d.unidad_doc) || "sin indicar") + ") ANTES de publicar: ese número va a la calculadora.");
+  } else {
+    pendientes.push("impactUnits — la ficha no dejó unidad de impacto con costo, así que esta fundación no entra en la calculadora todavía.");
+  }
+  if (texto(d.unidad2)) pendientes.push("impactUnits[1] — la ficha menciona una segunda unidad: «" + texto(d.unidad2) + "»");
+
+  /* EL CONSENTIMIENTO SE COPIA TAL CUAL, sin interpretarlo. */
+  o.consent = {
+    name: true,
+    logo: si(d.aut_logo),
+    photos: si(d.aut_fotos),
+    minorsImageProtected: Array.isArray(d.menores) && d.menores.length === 3,
+    date: texto(d.autoriza_fecha),
+    source: "cuestionario HUB · inscripción " + (x.id || "?")
+  };
+
+  if (o.consent.logo) pendientes.push("logo — autorizado. Falta el archivo optimizado en /img/ y su ruta aquí.");
+  if (o.consent.photos) pendientes.push("gallery — autorizadas. Faltan las fotos curadas (máximo 8) en /img/<id>/ con su alt en los dos idiomas.");
+  pendientes.push("lat y lng — a nivel de zona o barrio, NUNCA la dirección exacta.");
+
+  return { ok: true, objeto: o, pendientes };
+}
+
+async function adminFichaObjeto(env, id) {
+  const f = await env.DB.prepare(
+    "SELECT f.datos AS ficha, f.estado, i.id, i.nombre, i.datos AS ins " +
+    "FROM fichas_fundacion f JOIN inscripciones i ON i.id = f.inscripcion WHERE f.inscripcion = ?"
+  ).bind(id).first();
+  if (!f) return json({ error: "no_encontrada" }, 404);
+  /* Sobre un BORRADOR no se arma nada: la Seccion 7 puede no estar firmada
+     todavia, y un objeto con un consentimiento a medias es justo lo que no debe
+     existir. */
+  if (f.estado !== "enviada") {
+    return json({ error: "ficha_en_borrador",
+      ayuda: "El cuestionario todavía no se ha enviado. Sobre un borrador las autorizaciones aún pueden cambiar." }, 409);
+  }
+  let ficha = {}, ins = {};
+  try { ficha = JSON.parse(f.ficha || "{}"); } catch (e) { /* nada */ }
+  try { ins = JSON.parse(f.ins || "{}"); } catch (e) { /* nada */ }
+  ins.id = f.id;
+  ins.nombre = f.nombre;
+  const r = fichaAObjeto(ins, ficha);
+  if (!r.ok) return json(r, 409);
+  return json({ ok: true, nombre: f.nombre, objeto: r.objeto, pendientes: r.pendientes });
+}
+
 async function adminFicha(env, id) {
   const f = await env.DB.prepare(
     "SELECT f.inscripcion, f.estado, f.datos, f.creada_en, f.actualizada_en, f.enviada_en, " +
@@ -13511,6 +13660,10 @@ function verFicha(id){
       return "<tr><td>" + esc(r.num) + "</td><td>" + esc(r.lbl) + "</td><td>" +
              (r.valor ? esc(r.valor) : '<em style="color:#5C636F">sin responder</em>') + "</td></tr>";
     }).join("");
+    /* El boton del objeto va DENTRO de la ventana de la ficha, no en la fila:
+       solo tiene sentido con las respuestas delante. */
+    var objeto = '<p style="margin:14px 0"><button id="obj">Armar el objeto de partners.json</button></p>'
+               + '<div id="objsal"></div>';
     var arch = (d.archivos||[]).map(function(a){
       return '<li><a href="/api/admin/ficha-archivo/' + encodeURIComponent(a.clave) +
              '" target="_blank" rel="noopener">' + esc(a.clase) + "</a></li>";
@@ -13527,8 +13680,42 @@ function verFicha(id){
       '<p class="sub">' + esc(d.estado) + (d.enviada_en ? " · enviada " + esc(d.enviada_en) : "") +
       " · " + esc(d.email || "") + "</p>" +
       (arch ? "<h3>Archivos</h3><ul>" + arch + "</ul>" : "<p><em>Sin archivos subidos.</em></p>") +
+      objeto +
       "<table>" + filas + "</table>");
     w.document.close();
+
+    /* Se arma A PETICION y no al abrir: quien viene a leer las respuestas no
+       siempre viene a dar el alta, y el objeto sin revisar no le sirve. */
+    var boton = w.document.getElementById("obj");
+    if (boton) boton.addEventListener("click", function(){
+      boton.disabled = true;
+      boton.textContent = "Armando…";
+      fetch("/api/admin/ficha/" + id + "/objeto").then(function(r){ return r.json(); }).then(function(o){
+        var caja = w.document.getElementById("objsal");
+        boton.disabled = false;
+        boton.textContent = "Armar el objeto de partners.json";
+        if (!o || !o.ok){
+          caja.innerHTML = "<p class='sub'><strong>" + esc((o && o.error) || "error") + "</strong> · " +
+                           esc((o && o.ayuda) || "") + "</p>";
+          return;
+        }
+        /* El JSON y la lista de pendientes van JUNTOS y en ese orden: pegar el
+           objeto sin leer lo que falta es exactamente el error que este boton
+           existe para no cometer. */
+        caja.innerHTML =
+          "<p class='sub'>Pégalo en <code>data/partners.json</code> dentro de <code>partners[]</code>, " +
+          "y <strong>después</strong> completa lo de abajo. Corre <code>node scripts/validate.mjs</code> antes de commitear.</p>" +
+          "<textarea readonly style='width:100%;height:300px;font:13px/1.45 ui-monospace,monospace;" +
+          "border:1px solid #DAD3C3;border-radius:8px;padding:10px;background:#FBF8F1'>" +
+          esc(JSON.stringify(o.objeto, null, 2)) + "</textarea>" +
+          "<h3 style='margin-top:18px'>Falta completar a mano (" + (o.pendientes||[]).length + ")</h3><ul>" +
+          (o.pendientes||[]).map(function(x){ return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+      }).catch(function(){
+        boton.disabled = false;
+        boton.textContent = "Armar el objeto de partners.json";
+        w.document.getElementById("objsal").textContent = "No se pudo armar.";
+      });
+    });
   });
 }
 
@@ -14648,6 +14835,8 @@ export default {
         if (ruta === "/api/admin/suscripciones") return await adminSuscripciones(env);
         const afi = ruta.match(/^\/api\/admin\/ficha\/(\d+)$/);
         if (afi)                                return await adminFicha(env, Number(afi[1]));
+        const afo = ruta.match(/^\/api\/admin\/ficha\/(\d+)\/objeto$/);
+        if (afo)                                return await adminFichaObjeto(env, Number(afo[1]));
         const afa = ruta.match(/^\/api\/admin\/ficha-archivo\/(.+)$/);
         if (afa)                                return await adminFichaArchivo(env, decodeURIComponent(afa[1]));
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
