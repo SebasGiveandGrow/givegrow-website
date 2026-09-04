@@ -1164,8 +1164,36 @@ async function apiAporte(env, guia) {
   ).bind(g).first();
 
   if (!f) return json({ error: "no_encontrada" }, 404);
+
+  /* EL MONTO SOLO SE PUBLICA CUANDO EL LIBRO PUEDE RESPALDARLO.
+     ------------------------------------------------------------------------
+     Las guias son SECUENCIALES y esta ruta es publica y sin token —tiene que
+     serlo: al donante se le dice «guarda tu numero y consultalo cuando
+     quieras»—. O sea que cualquiera puede recorrer el rango y leer el monto de
+     todo. Medido el 3 de septiembre de 2026 contra produccion: de lo que
+     quedaba expuesto, $975.000 eran INTENCIONES —guias emitidas que nunca se
+     pagaron— frente a $650.000 de dinero real. Enumerar daba un retrato donde
+     la mayoria de la plata no existe.
+
+     Y choca de frente con una decision vigente del proyecto: el sitio NO
+     publica cifras financieras hasta el cierre de 2025. Esta ruta las publicaba
+     todas, y ademas mal.
+
+     La linea la pone el propio sitio, no yo: `PUBLICOS` en app.js ya define que
+     estados son visibles para el donante —aprobada, en_distribucion,
+     entregada— y la pantalla de rastreo NUNCA muestra el monto de los demas.
+     El servidor se alinea con esa misma definicion.
+
+     NO se oculta la existencia de la guia ni su estado: a quien reporto una
+     transferencia le sirve saber que la conocemos. Lo que no se publica es la
+     cifra de algo que todavia no es plata. */
+  const publico = ["aprobada", "en_distribucion", "entregada"].includes(f.estado);
+
   return json({
-    guia: f.guia, estado: f.estado, monto_centavos: f.monto_centavos, moneda: f.moneda,
+    guia: f.guia, estado: f.estado,
+    monto_centavos: publico ? f.monto_centavos : null,
+    moneda: publico ? f.moneda : null,
+    publico,
     modo: f.modo, destino: f.destino_id, proyecto: f.proyecto, frecuencia: f.frecuencia,
     creada_en: f.creada_en, aprobada_en: f.aprobada_en
   });
