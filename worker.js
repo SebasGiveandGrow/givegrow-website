@@ -2511,6 +2511,16 @@ async function apiComprobante(request, env, guia, token) {
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
   if (bytes.length > MAX_COMPROBANTE) return json({ error: "archivo_muy_grande", max_mb: 5 }, 413);
+  /* QUE EL ARCHIVO SEA LO QUE DICE SER. Los tres caminos que aceptan fotos ya lo
+     comprueban por los bytes de cabecera; este, que guarda el soporte de una
+     transferencia, se fiaba solo del `Content-Type` que manda el cliente. */
+  if (noEsLoQueDice(tipo, bytes)) {
+    return json({
+      error: "archivo_no_coincide",
+      ayuda: "Ese archivo no se pudo leer como " + (tipo === "application/pdf" ? "PDF" : "imagen") +
+             ". Vuelve a exportarlo del banco o toma una foto de la pantalla."
+    }, 400);
+  }
 
   const clave = "comprobantes/" + guia + "/" + tokenNuevo().slice(0, 8) + "." + ext;
   await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
@@ -2601,7 +2611,12 @@ const FIRMAS_MEDIO = {
                        b[4] === 0x0D && b[5] === 0x0A && b[6] === 0x1A && b[7] === 0x0A,
   /* RIFF....WEBP: los cuatro bytes del medio son el tamano y varian. */
   "image/webp": (b) => b.length > 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
-                       b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+                       b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50,
+  /* «%PDF-». Entra aqui porque el comprobante de transferencia SI acepta PDF
+     -es lo que exporta el banco- y sin su firma `noEsLoQueDice` lo dejaba pasar
+     todo: para un tipo que no conoce devuelve `false`, o sea «esta bien». */
+  "application/pdf": (b) => b.length > 5 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 &&
+                            b[3] === 0x46 && b[4] === 0x2D
 };
 
 function noEsLoQueDice(tipo, bytes) {
@@ -12687,6 +12702,27 @@ function marcarPruebas(respuesta, host) {
    Va como envoltura y no en cada rama por lo mismo que `marcarPruebas`: la página
    la sirve el fallback de assets, no una rama nuestra, así que no hay un solo
    sitio donde poner las cabeceras «a mano». */
+/* NOSNIFF EN TODA RESPUESTA DEL WORKER.
+   ============================================================================
+   `_headers` pone `X-Content-Type-Options: nosniff`, pero SOLO alcanza a los
+   assets estaticos: las respuestas que construye el Worker no pasan por ahi.
+   Comprobado contra produccion —/styles.css la trae, /api/trm no—.
+
+   Importa sobre todo en las CINCO rutas que devuelven bytes que subio alguien
+   (comprobantes de transferencia, evidencia de entregas, fotos y PDF del
+   triaje): ahi el navegador estaba autorizado a adivinar el tipo en vez de
+   creerle a la cabecera, que es el camino clasico para que un archivo subido se
+   interprete como algo que no es.
+
+   Va en el UNICO sitio por donde salen todas, y no en cada ruta: asi la proxima
+   ruta que alguien escriba nace protegida en vez de olvidarse. */
+function sinOlfato(respuesta) {
+  if (respuesta.headers.get("x-content-type-options")) return respuesta;
+  const r = new Response(respuesta.body, respuesta);
+  r.headers.set("x-content-type-options", "nosniff");
+  return r;
+}
+
 function marcarCaso(respuesta, ruta) {
   if (!ruta.startsWith("/caso/")) return respuesta;
   const r = new Response(respuesta.body, respuesta);
@@ -12894,11 +12930,11 @@ export default {
     const esPruebas = /\.workers\.dev$/i.test(url.hostname);
     if (esPruebas) {
       /* Se responde a través del marcador para no repetirlo en cada rama. */
-      return marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta);
+      return sinOlfato(marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
     }
     /* Igual que arriba: se envuelve la respuesta entera en vez de tocar cada
        rama. Fuera del subdominio devuelve exactamente lo que recibió. */
-    return marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta);
+    return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
   },
 
   async ruteo(request, env, url, ruta) {
