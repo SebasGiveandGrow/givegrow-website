@@ -974,6 +974,8 @@ var I18N = {
     "pay.pp.correo":"Para una membresía por PayPal necesitamos tu correo: ahí te llega el recibo de cada mes.",
     "pay.now.wait":"Preparando tu pago…",
     "pay.now.err":"No pudimos abrir la pasarela. Vuelve a intentarlo, o aporta por transferencia con los datos de abajo.",
+    "pay.now.cerrado":"El pago en línea está cerrado en este momento, así que reintentar no va a servir. Aporta por transferencia con los datos de abajo: recibes tu número de guía al instante y subes ahí mismo el comprobante.",
+    "pay.now.monto":"Ese monto está fuera de lo que acepta la pasarela: el mínimo es $5.000 y el máximo $20.000.000. Si quieres aportar más, escríbenos y lo coordinamos.",
     "pay.now.rec":"Elegiste un aporte {frec}. Por ahora procesamos este primer aporte y dejamos registrada tu intención: cuando habilitemos el débito automático te escribimos para activarlo, sin que tengas que empezar de nuevo.",
     "pay.now.rec.m":"mensual",
     "pay.now.rec.a":"anual",
@@ -3263,9 +3265,25 @@ function irAPagar(){
       try { sessionStorage.setItem("gg_guia", d.guia); } catch(e){}
       window.location.href = d.url;
     })
-    .catch(function(){
+    .catch(function(e){
       btn.disabled = false;
-      if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = t("pay.now.err"); }
+      /* SE DICE QUE FALLO CUANDO EL SERVIDOR LO SABE, que es la norma que el
+         camino de PayPal ya sigue en `miSubmit`. Este mandaba a TODOS al mismo
+         «no pudimos abrir la pasarela… vuelve a intentarlo», y con la pasarela
+         sin configurar eso es un consejo falso: reintentar no va a funcionar
+         nunca, y quien esta donando se queda dando vueltas en vez de irse a la
+         transferencia, que si funciona.
+
+         Solo se traducen los dos que pueden pasar de verdad. `destino_requerido`
+         es inalcanzable desde la calculadora —si hay destino dirigido, siempre
+         viaja el id— y `json_invalido` y `metodo_no_permitido` no los produce
+         este formulario: esos caen al mensaje general, que es lo correcto para
+         algo que, si ocurre, es un fallo nuestro y no una decision del donante. */
+      var codigo = e && e.message;
+      var texto = codigo === "pasarela_no_configurada" ? t("pay.now.cerrado")
+                : codigo === "monto_invalido"          ? t("pay.now.monto")
+                : t("pay.now.err");
+      if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = texto; }
     });
 }
 
