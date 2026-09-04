@@ -760,6 +760,16 @@ html[data-theme="dark"] .prog-logo{background:#000}
 .calc-note textarea::placeholder{color:var(--on-dark-4)}
 .calc-note textarea:focus{outline:none;border-color:var(--on-dark-4)}
 .calc-note-count{display:block;text-align:right;font-size:var(--fs-11);color:var(--on-dark-4);margin-top:4px}
+/* SAFARI EN iOS HACE ZOOM al enfocar un campo con letra menor de 16px, y lo hace
+   justo cuando la persona esta escribiendo en la pagina donde se pide dinero: la
+   vista salta, el panel se sale del encuadre y hay que volver a buscarlo con los
+   dedos. `#calc-manual` ya estaba en `--fs-16` —alguien lo supo y lo aplico solo
+   ahi—; el destino (15px) y la dedicatoria (14px) se quedaron fuera.
+   Solo en pantallas estrechas: en escritorio la escala se respeta tal cual. */
+@media(max-width:640px){
+  .calc-select,
+  .calc-note textarea{font-size:var(--fs-16)}
+}
 
 /* nota legal pequeña bajo el beneficio tributario */
 .calc-legal{font-size:var(--fs-11);line-height:1.5;color:var(--on-dark-4);margin:2px 0 8px;max-width:52ch}
