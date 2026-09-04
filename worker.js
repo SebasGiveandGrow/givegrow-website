@@ -12778,7 +12778,7 @@ function filaTope(d, columnas, que){
      y concluye que es él. Lo que sí ayuda son dos cosas ciertas: la lista viene
      ordenada por gravedad, así que lo que no se ve es lo MENOS urgente; y el
      buscador de arriba encuentra por número exacto o por teléfono. */
-  return '<tr><td colspan="' + columnas + '" style="background:var(--amber-bg,#fff8e6);font-size:13px">'
+  return '<tr><td colspan="' + columnas + '" style="background:var(--amberl);font-size:13px">'
     + "<strong>Faltan " + faltan + " " + que + " por mostrar</strong> · se enseñan "
     + d.tope + " de " + d.total + ". La lista va ordenada por gravedad, así que lo que "
     + "falta es lo menos urgente. Para uno en concreto, búscalo arriba por su número o por el teléfono."

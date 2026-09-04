@@ -580,4 +580,46 @@ try {
   }
 } catch (e) { err("no se pudo verificar ACT_FNS: " + e.message); }
 
+/* CHECK #13 — TOKENS DE COLOR QUE NO EXISTEN.
+   Nace de una cicatriz escrita en worker.js: el panel usó `var(--ok)` dos veces
+   porque otras pantallas del Worker lo declaran, pero el panel enlaza
+   /styles.css y ahí --ok NO existe. No pintó nada y no dio error: CSS descarta
+   en silencio una custom property indefinida. Se descubrió mirando la pantalla.
+
+   Hoy quedaba otro igual, `--amber-bg`, vivo solo por su valor de respaldo.
+
+   LIMITACIÓN, dicha en voz alta: esto no sabe QUÉ página emite cada `var()`, así
+   que acepta un token declarado en cualquier <style> de worker.js. O sea que
+   atrapa el token que no existe en ningún sitio —el caso de --amber-bg— pero no
+   el que existe en otra página, que fue justo el caso de --ok. Para eso haría
+   falta atribuir cada uso a su plantilla; se deja escrito en vez de fingir que
+   está cubierto. */
+try {
+  const hoja = readFileSync("styles.css", "utf8");
+  const declarados = new Set([
+    ...[...hoja.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map(m => m[1]),
+    ...[...workerSrc.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map(m => m[1]),
+  ]);
+
+  const huerfanos = new Map();
+  for (const m of workerSrc.matchAll(/var\((--[a-z0-9-]+)\s*(,)?/g)) {
+    if (declarados.has(m[1])) continue;
+    const linea = workerSrc.slice(0, m.index).split("\n").length;
+    if (!huerfanos.has(m[1])) huerfanos.set(m[1], { lineas: [], respaldo: !!m[2] });
+    huerfanos.get(m[1]).lineas.push(linea);
+    if (!m[2]) huerfanos.get(m[1]).respaldo = false;
+  }
+
+  if (huerfanos.size) {
+    err("worker.js usa " + huerfanos.size + " token(s) de color que NO declara ni " +
+        "styles.css ni el propio worker.js. CSS los descarta en silencio: " +
+        [...huerfanos].map(([t, d]) =>
+          t + " (línea " + d.lineas[0] + (d.respaldo ? ", solo pinta por su respaldo" : ", no pinta nada")
+        + ")").join(", "));
+  } else {
+    ok("los tokens de color de worker.js existen (" +
+       [...workerSrc.matchAll(/var\(--[a-z0-9-]+/g)].length + " usos)");
+  }
+} catch (e) { err("no se pudo verificar los tokens de worker.js: " + e.message); }
+
 process.exit(fail);
