@@ -1594,5 +1594,19 @@
   "pay.pp.max": "That amount is too high for PayPal. Write to us: a bank transfer leaves you more.",
   "pay.pp.unico": "Taking you to PayPal’s donation page, where you enter the amount.",
   "pay.pp.sintrm": "We could not look up the exchange rate, so we cannot convert your gift to dollars. Please try again in a moment.",
-  "pay.pp.correo": "For a PayPal membership we need your email: that is where each monthly receipt goes."
+  "pay.pp.correo": "For a PayPal membership we need your email: that is where each monthly receipt goes.",
+  "nav.menu.aria": "Menu",
+  "donar.via.aria": "Which payment gateway to use",
+  "cv.ej.sirvecerca.alt": "A cracked white wall next to a door, with rubble at its foot",
+  "cv.ej.sirvelejos.alt": "A whole house seen from the street, its upper floor in exposed brick",
+  "cv.ej.nocerca.alt": "A window photographed so close up that it fills the whole frame",
+  "cv.ej.noangulo.alt": "A wall photographed from below and at an angle, with cables in front",
+  "ff.web.ph": "https://yourfoundation.org",
+  "ff.instagram.ph": "@yourfoundation",
+  "ally.web.ph": "https://yourcompany.com",
+  "ally.instagram.ph": "@yourcompany",
+  "ally.desc.ph": "In your own words: who you are and what you do. It will appear on your public profile if you join the Gratitude Program.",
+  "ally.ben.ph": "E.g. 15% off, a complimentary dessert…",
+  "ally.nivel.ph": "E.g. Sprout and above",
+  "ally.redime.ph": "E.g. by showing the digital membership card"
 }

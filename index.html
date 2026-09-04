@@ -108,7 +108,7 @@
     </div>
     <div class="nav-actions">
       <a class="btn-nav" href="#donar" data-i18n="nav.cta">Donar</a>
-      <button id="theme-btn" class="theme-toggle" data-mode="auto" data-act="themeCycle()" role="switch" aria-label="Cambiar tema claro u oscuro" title="Tema">
+      <button id="theme-btn" class="theme-toggle" data-mode="auto" data-act="themeCycle()" role="switch" aria-label="Cambiar tema claro u oscuro" title="Cambiar tema claro u oscuro">
         <span class="tt-track">
           <svg class="tt-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="7" y2="7"/><line x1="17" y1="17" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="7" y2="17"/><line x1="17" y1="7" x2="19.1" y2="4.9"/></svg>
           <svg class="tt-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -119,7 +119,7 @@
         <button id="lang-es" class="on" data-act="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
         <button id="lang-en" data-act="setLang('en')" aria-label="Switch language to English">EN</button>
       </div>
-      <button class="burger" aria-label="Menú" aria-expanded="false" data-act="toggleDrawer()">&#9776;</button>
+      <button class="burger" aria-label="Menú" data-i18n="nav.menu.aria" data-i18n-attr="aria-label" aria-expanded="false" data-act="toggleDrawer()">&#9776;</button>
     </div>
   </div>
 </nav>
@@ -652,9 +652,9 @@
         <h3 class="ally-sec" data-i18n="ff.s.red">Dónde encontrarlos</h3>
         <div class="ally-grid">
           <div class="field"><label for="ff-web" data-i18n="ff.web">Página web (opcional)</label>
-            <input type="url" id="ff-web" placeholder="https://tufundacion.org"></div>
+            <input type="url" id="ff-web" placeholder="https://tufundacion.org" data-i18n="ff.web.ph" data-i18n-attr="placeholder"></div>
           <div class="field"><label for="ff-instagram" data-i18n="ff.instagram">Instagram (opcional)</label>
-            <input type="text" id="ff-instagram" placeholder="@tufundacion"></div>
+            <input type="text" id="ff-instagram" placeholder="@tufundacion" data-i18n="ff.instagram.ph" data-i18n-attr="placeholder"></div>
         </div>
 
         <h3 class="ally-sec" data-i18n="ff.s.aut">Antes de enviar</h3>
@@ -1543,7 +1543,7 @@
                    cero CSS nuevo, y sobre todo ya funciona en ESTE panel, que es
                    oscuro en los dos temas y cuyo CSS no puede depender de
                    --surface ni --ink (lo advierte el comentario de arriba). -->
-              <div class="cur-toggle" id="pay-via" role="group" aria-label="Con qué pasarela pagar">
+              <div class="cur-toggle" id="pay-via" role="group" aria-label="Con qué pasarela pagar" data-i18n="donar.via.aria" data-i18n-attr="aria-label">
                 <button type="button" id="via-wompi" class="on" data-act="setPagoVia('wompi')" data-i18n="pay.via.wompi">Bancolombia</button>
                 <button type="button" id="via-paypal" data-act="setPagoVia('paypal')" data-i18n="pay.via.paypal">PayPal</button>
               </div>
@@ -1838,9 +1838,9 @@
             <option value="Otro" data-i18n="ally.sector.otro">Otro</option>
           </select></div>
           <div class="field ally-wide"><label for="ally-dir" data-i18n="ally.f.dir">Dirección</label><input type="text" id="ally-dir"></div>
-          <div class="field"><label for="ally-web" data-i18n="ally.f.web">Sitio web</label><input type="url" id="ally-web" placeholder="https://tuempresa.com"></div>
-          <div class="field"><label for="ally-instagram" data-i18n="ally.f.instagram">Instagram</label><input type="text" id="ally-instagram" placeholder="@tuempresa"></div>
-          <div class="field ally-wide"><label for="ally-desc" data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" rows="4" placeholder="En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud."></textarea></div>
+          <div class="field"><label for="ally-web" data-i18n="ally.f.web">Sitio web</label><input type="url" id="ally-web" placeholder="https://tuempresa.com" data-i18n="ally.web.ph" data-i18n-attr="placeholder"></div>
+          <div class="field"><label for="ally-instagram" data-i18n="ally.f.instagram">Instagram</label><input type="text" id="ally-instagram" placeholder="@tuempresa" data-i18n="ally.instagram.ph" data-i18n-attr="placeholder"></div>
+          <div class="field ally-wide"><label for="ally-desc" data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" rows="4" placeholder="En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud." data-i18n="ally.desc.ph" data-i18n-attr="placeholder"></textarea></div>
           <div class="field ally-wide"><label for="ally-aporta" data-i18n="ally.f.aporta">En una frase, ¿qué aporta tu empresa?</label><input type="text" id="ally-aporta" maxlength="90" data-i18n="ally.f.aporta.ph" data-i18n-attr="placeholder" placeholder="Ej. Padrinazgo de 200 platos al mes"></div>
         </div>
 
@@ -1857,9 +1857,9 @@
         <div id="ally-gratbox" class="ally-cond" style="display:none">
           <h3 class="ally-sec" data-i18n="ally.s.ficha">Ficha del Beneficio (Programa de Gratitud)</h3>
           <div class="ally-grid">
-            <div class="field ally-wide"><label for="ally-ben" data-i18n="ally.f.ben">¿Qué beneficio ofreces?</label><input type="text" id="ally-ben" placeholder="Ej. 15% de descuento, un postre de cortesía…"></div>
-            <div class="field"><label for="ally-nivel" data-i18n="ally.f.nivel">¿Desde qué nivel de membresía?</label><input type="text" id="ally-nivel" placeholder="Ej. Retoño en adelante"></div>
-            <div class="field"><label for="ally-redime" data-i18n="ally.f.redime">¿Cómo se redime?</label><input type="text" id="ally-redime" placeholder="Ej. mostrando la credencial digital"></div>
+            <div class="field ally-wide"><label for="ally-ben" data-i18n="ally.f.ben">¿Qué beneficio ofreces?</label><input type="text" id="ally-ben" placeholder="Ej. 15% de descuento, un postre de cortesía…" data-i18n="ally.ben.ph" data-i18n-attr="placeholder"></div>
+            <div class="field"><label for="ally-nivel" data-i18n="ally.f.nivel">¿Desde qué nivel de membresía?</label><input type="text" id="ally-nivel" placeholder="Ej. Retoño en adelante" data-i18n="ally.nivel.ph" data-i18n-attr="placeholder"></div>
+            <div class="field"><label for="ally-redime" data-i18n="ally.f.redime">¿Cómo se redime?</label><input type="text" id="ally-redime" placeholder="Ej. mostrando la credencial digital" data-i18n="ally.redime.ph" data-i18n-attr="placeholder"></div>
             <div class="field ally-wide"><label for="ally-cond" data-i18n="ally.f.cond">Condiciones o vigencia</label><input type="text" id="ally-cond"></div>
           </div>
         </div>
@@ -2316,22 +2316,22 @@
         <p class="mu" style="margin-top:20px" data-i18n="cv.ej.h">Estas cuatro son de casas que visitamos. Las dos primeras se pueden leer; las otras dos no, y con ellas habría que pedirte más.</p>
         <div class="grid g2" style="margin-top:14px;gap:18px">
           <div>
-            <img src="/img/vivienda/sirve-cerca.jpg" alt="Muro blanco agrietado junto a una puerta, con escombro al pie" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
+            <img src="/img/vivienda/sirve-cerca.jpg" alt="Muro blanco agrietado junto a una puerta, con escombro al pie" data-i18n="cv.ej.sirvecerca.alt" data-i18n-attr="alt" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
             <span class="ey" style="display:block;margin-top:9px;font-size:11px;color:var(--acc)" data-i18n="cv.ej.si">SIRVE</span>
             <p class="mu" style="margin-top:3px;font-size:14px" data-i18n="cv.ej.1">El daño de cerca: se ve por dónde va la grieta y qué tan ancha es.</p>
           </div>
           <div>
-            <img src="/img/vivienda/sirve-lejos.jpg" alt="Una casa completa vista desde la calle, con el piso de arriba en ladrillo a la vista" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
+            <img src="/img/vivienda/sirve-lejos.jpg" alt="Una casa completa vista desde la calle, con el piso de arriba en ladrillo a la vista" data-i18n="cv.ej.sirvelejos.alt" data-i18n-attr="alt" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
             <span class="ey" style="display:block;margin-top:9px;font-size:11px;color:var(--acc)" data-i18n="cv.ej.si">SIRVE</span>
             <p class="mu" style="margin-top:3px;font-size:14px" data-i18n="cv.ej.2">Y la casa entera, para saber en qué parte está el daño.</p>
           </div>
           <div>
-            <img src="/img/vivienda/no-cerca.jpg" alt="Una ventana fotografiada tan de cerca que llena todo el cuadro" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
+            <img src="/img/vivienda/no-cerca.jpg" alt="Una ventana fotografiada tan de cerca que llena todo el cuadro" data-i18n="cv.ej.nocerca.alt" data-i18n-attr="alt" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
             <span class="ey" style="display:block;margin-top:9px;font-size:11px;color:var(--amber)" data-i18n="cv.ej.no">NO ALCANZA</span>
             <p class="mu" style="margin-top:3px;font-size:14px" data-i18n="cv.ej.3">Tan cerca que solo se ve la ventana. No se sabe en qué muro está ni qué le pasó.</p>
           </div>
           <div>
-            <img src="/img/vivienda/no-angulo.jpg" alt="Un muro fotografiado desde abajo y en diagonal, con cables por delante" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
+            <img src="/img/vivienda/no-angulo.jpg" alt="Un muro fotografiado desde abajo y en diagonal, con cables por delante" data-i18n="cv.ej.noangulo.alt" data-i18n-attr="alt" width="640" height="480" loading="lazy" decoding="async" style="border-radius:var(--r)">
             <span class="ey" style="display:block;margin-top:9px;font-size:11px;color:var(--amber)" data-i18n="cv.ej.no">NO ALCANZA</span>
             <p class="mu" style="margin-top:3px;font-size:14px" data-i18n="cv.ej.4">De muy abajo y en diagonal: el muro sale torcido y el daño, si lo hay, no se alcanza a ver.</p>
           </div>
@@ -2722,7 +2722,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=d2971205"></script>
+<script src="/app.js?v=e9c0f48c"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>
