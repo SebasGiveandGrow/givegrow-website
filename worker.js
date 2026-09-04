@@ -1761,7 +1761,7 @@ async function adminSalud(env) {
     "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
     "WHERE e.firma_valida = 0 " +
     "   OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL) " +
-    "   OR e.resultado IN ('sin_regla','reversa_sin_aporte')",
+    "   OR e.resultado IN ('sin_regla','reversa_sin_aporte','donacion_sin_guia')",
     "Bandeja «Eventos de PayPal sin casa» · entró o salió plata que no tiene a quién atribuirse, o una firma no cuadra", 30, "#sec-pps");
   await enCola("ipn_por_registrar",
     "SELECT COUNT(*) AS n, MIN(recibido_en) AS masViejo FROM eventos_ipn WHERE resultado = 'por_registrar'",
@@ -7477,6 +7477,21 @@ async function apiPaypalWebhook(request, env) {
       resultado = "expirada";
     } else if (PAYPAL_REVERSAS.includes(tipo)) {
       resultado = await paypalReversa(env, tipo, recurso);
+    } else if (tipo === "PAYMENT.SALE.COMPLETED" || tipo === "PAYMENT.CAPTURE.COMPLETED") {
+      /* UN COBRO QUE NO ES DE NINGUNA SUSCRIPCION NUESTRA. Casi seguro es una
+         donacion del BOTON, que llega por webhook desde que Sebas suscribio
+         `PAYMENT.CAPTURE.COMPLETED` el 4 de septiembre de 2026 — era justo lo que
+         queriamos averiguar, y ahora lo sabemos por el evento y no por conjetura.
+
+         No se puede hacer nada automatico con ella: a un boton alojado PayPal no
+         acepta que se le pase una referencia por donante, asi que no hay guia a
+         la cual atribuirla. Lo que SI se puede es no confundirla con un evento
+         que nadie programo: `sin_regla` significa «llego algo desconocido» y esto
+         no es desconocido, es una donacion esperando que alguien la registre.
+
+         Se distinguen porque el remedio es distinto: una es un aviso de que falta
+         codigo, la otra es trabajo de una persona. */
+      resultado = "donacion_sin_guia";
     }
   } catch (e) {
     /* El fallo se ESCRIBE, no se pierde: `resultado` es donde se mira despues.
@@ -10945,7 +10960,7 @@ async function adminPaypalSueltos(env) {
        intacto en el libro, y silencio. Ahora sale a la bandeja, y con el sale
        cualquier tipo de evento futuro que se suscriba y no tenga quien lo
        atienda. */
-    "   OR e.resultado IN ('sin_regla','reversa_sin_aporte') " +
+    "   OR e.resultado IN ('sin_regla','reversa_sin_aporte','donacion_sin_guia') " +
     "ORDER BY e.recibido_en DESC LIMIT 100"
   ).all();
 
@@ -13473,6 +13488,8 @@ function cargarPaypalSueltos(){
         ? "Evento sin regla: llego y nadie lo atiende"
         : e.resultado === "reversa_sin_aporte"
         ? "REVERSA sin aporte: le devolvieron plata a algo que no esta en el libro"
+        : e.resultado === "donacion_sin_guia"
+        ? "Donacion del boton: sin guia, hay que registrarla a mano"
         : "Pago sin suscripcion: registrar a mano";
       return "<tr>" +
         "<td>" + esc((e.recibido_en||"").slice(0,16)) + "</td>" +
