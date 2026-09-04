@@ -3374,7 +3374,13 @@ function graciasPinta(d){
   var set = function(id, txt){ var e=document.getElementById(id); if(e) e.textContent = txt; };
 
   set("gr-guia", d.guia || "—");
-  set("gr-monto", (d.moneda === "COP" ? fmtCOP((d.monto_centavos||0)/100) : fmtUSD((d.monto_centavos||0)/100)) + " " + (d.moneda||""));
+  /* UN MONTO AUSENTE ES «—», NO «$0». Mientras el pago no esta confirmado el
+     servidor ya no publica la cifra, y `(d.monto_centavos||0)` la habria pintado
+     como cero: decirle «$0 COP» a alguien que acaba de pagar es peor que no
+     decirle nada. */
+  set("gr-monto", d.monto_centavos == null
+    ? "—"
+    : (d.moneda === "COP" ? fmtCOP(d.monto_centavos/100) : fmtUSD(d.monto_centavos/100)) + " " + (d.moneda||""));
 
   var destino = t("gracias.fondo");
   if (d.modo === "dirigida" && d.destino){
