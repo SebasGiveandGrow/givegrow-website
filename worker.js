@@ -9338,6 +9338,7 @@ const FICHA_CAMPOS = [
     lbl: "Si quieres, explica cómo calculan ese costo" },
   { sec: "Unidad de impacto y costos", id: "unidad_soporte", num: "5.3c", tipo: "texto", max: 400,
     lbl: "El soporte del costo (factura, cuenta de mercado o presupuesto)",
+    sube: "soporte", acepta: "image/jpeg,image/png,image/webp,application/pdf",
     ayuda: "Pega un enlace con acceso para ver, o escribe «lo enviaré por WhatsApp». No se publica: es archivo interno de evidencia." },
   { sec: "Unidad de impacto y costos", id: "unidad2", num: "5.4", tipo: "texto", max: 300,
     lbl: "¿Hay una segunda unidad de impacto? (unidad, costo y cómo se documenta)" },
@@ -9346,9 +9347,11 @@ const FICHA_CAMPOS = [
     lbl: "Otras redes (Facebook, YouTube, TikTok)" },
   { sec: "Presencia digital", id: "logo", num: "6.4", tipo: "texto", req: true, max: 400,
     lbl: "El logo de la fundación, en la mejor resolución que tengan",
+    sube: "logo", acepta: "image/png,image/jpeg,image/webp",
     ayuda: "Pega un enlace con acceso para ver, o escribe «lo enviaré por WhatsApp». Ideal: PNG con fondo transparente, mínimo 480 px de lado corto." },
   { sec: "Presencia digital", id: "fotos", num: "6.5", tipo: "opcion", req: true,
     lbl: "¿Tienen fotos de su trabajo que quieran mostrar en su perfil?",
+    sube: "foto", acepta: "image/jpeg,image/png,image/webp",
     ayuda: "Pasan por las autorizaciones de abajo antes de publicarse. Máximo 8, curadas.",
     ops: ["Sí, las enviaremos", "Sí, están en nuestro Instagram y autorizamos tomarlas de ahí", "Aún no"] },
 
@@ -9452,7 +9455,7 @@ async function apiFicha(request, env, token) {
        `${...}` dentro se niega a revisarlo, y quedaria sin vigilancia justo el
        archivo con las dos trampas conocidas—. Y dos, `FICHA_CAMPOS` sigue
        siendo la unica fuente: pinta, valida y ahora tambien informa. */
-    const campos = FICHA_CAMPOS.map((c) => ({ id: c.id, tipo: c.tipo, num: c.num }));
+    const campos = FICHA_CAMPOS.map((c) => ({ id: c.id, tipo: c.tipo, num: c.num, sube: c.sube || null }));
     return json({ ok: true, nombre: i.nombre, estado: i.ficha_estado || "borrador", campos, datos });
   }
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
@@ -9468,6 +9471,15 @@ async function apiFicha(request, env, token) {
   const final = c.enviar === true;
   const v = fichaValida(c.datos || {}, final);
   if (final && !v.ok) return json({ error: "faltan_campos", campos: v.errores }, 400);
+
+  /* `archivos` ES DEL SERVIDOR, no del navegador. Lo escribe el endpoint de
+     carga y el formulario ni lo conoce, asi que se lee de la fila y se vuelve a
+     poner. Fiarse de que el cliente lo devuelva seria fragil de la peor manera:
+     el primer autoguardado tras subir un logo lo borraria de la ficha, los bytes
+     seguirian en R2 y nadie sabria que estan. */
+  let previos = {};
+  try { previos = JSON.parse(i.datos || "{}"); } catch (e) { /* nada */ }
+  if (previos.archivos && typeof previos.archivos === "object") v.limpio.archivos = previos.archivos;
 
   await env.DB.prepare(
     "INSERT INTO fichas_fundacion (inscripcion, estado, datos, enviada_en) " +
@@ -9497,6 +9509,89 @@ async function apiFicha(request, env, token) {
 /* Al buzon de ALIANZAS, que es quien sigue el proceso. Lleva el costo de la
    unidad porque es el dato que decide si la fundacion puede entrar a la
    calculadora, y es el unico que hay que contrastar contra un soporte. */
+/* ============================================================================
+   LOS ARCHIVOS DE LA FICHA
+   ============================================================================
+   El cuestionario salio pidiendo el logo y el soporte del costo «por enlace o
+   WhatsApp», que era lo que ya asumia el proceso — se escribio contra la API de
+   Forms, que no permite crear campos de carga. Aqui si se puede, y se hace.
+
+   EL CAMPO DE TEXTO NO DESAPARECE. Sigue valiendo pegar un enlace o escribir
+   «lo enviare por WhatsApp», por una razon practica: una fundacion con mala
+   conexion o con el logo solo en el telefono de otra persona no puede quedarse
+   bloqueada en la pregunta obligatoria. La carga es una via mas, no un requisito
+   nuevo.
+
+   TRES TIPOS Y SUS LIMITES, cada uno por su motivo:
+   · `logo`  — una sola. Imagen, no SVG: un SVG es un documento que puede
+     traer script, y ni las firmas de cabecera ni el `nosniff` lo cubren. El
+     cuestionario pide PNG de todas formas.
+   · `soporte` — uno solo. Acepta PDF porque es lo que exporta un banco o un
+     contador, con su firma «%PDF-» comprobada como en el comprobante.
+   · `foto` — hasta OCHO, que es el tope que el propio cuestionario publica
+     («maximo 8, curadas»). Sin tope, una galeria se convierte en un vertedero.
+
+   SE COMPRUEBAN LOS BYTES, no el `Content-Type`: la misma regla que los otros
+   cuatro caminos de carga del sitio. Y solo mientras la ficha es BORRADOR —
+   despues de enviada, cambiar los archivos cambiaria el soporte de un
+   consentimiento ya firmado. */
+const FICHA_ARCHIVOS = {
+  logo:    { tipos: { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }, tope: 1 },
+  soporte: { tipos: TIPOS_COMPROBANTE, tope: 1 },
+  foto:    { tipos: { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }, tope: 8 }
+};
+
+async function apiFichaArchivo(request, env, token, clase) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const reglas = FICHA_ARCHIVOS[clase];
+  if (!reglas) return json({ error: "clase_no_permitida", permitidas: Object.keys(FICHA_ARCHIVOS) }, 400);
+
+  const i = await fichaPorToken(env, token);
+  if (!i) return json({ error: "no_autorizado" }, 403);
+  if (i.ficha_estado === "enviada") return json({ error: "ya_enviada" }, 409);
+
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const ext = reglas.tipos[tipo];
+  if (!ext) return json({ error: "tipo_no_permitido", permitidos: Object.keys(reglas.tipos) }, 415);
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > MAX_COMPROBANTE) return json({ error: "archivo_muy_grande", max_mb: 5 }, 413);
+  if (noEsLoQueDice(tipo, bytes)) {
+    return json({
+      error: "archivo_no_coincide",
+      ayuda: "Ese archivo no se pudo leer como " + (tipo === "application/pdf" ? "PDF" : "imagen") + "."
+    }, 400);
+  }
+
+  /* Se lee la ficha, se agrega el archivo y se vuelve a escribir. No hace falta
+     transaccion: el token es de una sola fundacion y dos cargas simultaneas de
+     la misma persona son el caso raro, no el peligroso — lo peor que pasa es que
+     una de las dos no aparezca en la lista y se vuelva a subir. */
+  let datos = {};
+  try { datos = JSON.parse(i.datos || "{}"); } catch (e) { /* nada */ }
+  const arch = datos.archivos && typeof datos.archivos === "object" ? datos.archivos : {};
+  const yaHay = clase === "foto" ? (Array.isArray(arch.foto) ? arch.foto.length : 0) : (arch[clase] ? 1 : 0);
+  if (yaHay >= reglas.tope) {
+    return json({ error: "tope_alcanzado", tope: reglas.tope }, 409);
+  }
+
+  const clave = "fichas/" + i.id + "/" + clase + "-" + tokenNuevo().slice(0, 8) + "." + ext;
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+
+  if (clase === "foto") arch.foto = (Array.isArray(arch.foto) ? arch.foto : []).concat([clave]);
+  else arch[clase] = clave;
+  datos.archivos = arch;
+
+  await env.DB.prepare(
+    "INSERT INTO fichas_fundacion (inscripcion, estado, datos) VALUES (?, 'borrador', ?) " +
+    "ON CONFLICT(inscripcion) DO UPDATE SET datos = excluded.datos, actualizada_en = datetime('now')"
+  ).bind(i.id, JSON.stringify(datos)).run();
+
+  return json({ ok: true, clase, clave, cuantos: clase === "foto" ? arch.foto.length : 1 });
+}
+
 async function correoFichaRecibida(env, nombre, d) {
   const para = correoAlianzas(env);
   if (!para) return avisoSinBuzon(env, "aviso-ficha-fundacion");
@@ -9559,6 +9654,17 @@ function paginaFicha(i) {
     } else {
       control = '<input type="text" id="f-' + c.id + '" maxlength="' + (c.max || 200) + '">';
     }
+    /* El campo de carga va DEBAJO del de texto, no en su lugar: escribir «lo
+       enviaré por WhatsApp» sigue siendo una respuesta válida, y quien no pueda
+       subir el archivo no se queda bloqueado en una pregunta obligatoria. */
+    if (c.sube) {
+      control += '<div class="sube">' +
+        '<input type="file" id="up-' + c.id + '" data-sube="' + c.sube + '" accept="' + c.acepta + '"' +
+        (c.sube === "foto" ? " multiple" : "") + ">" +
+        '<span class="subenota" id="upn-' + c.id + '">' +
+        (c.sube === "foto" ? "Hasta 8 fotos, 5 MB cada una." : "Un archivo, hasta 5 MB.") +
+        " O deja el enlace arriba.</span></div>";
+    }
     return '<div class="campo" data-campo="' + c.num + '">' + cab + control + "</div>";
   };
 
@@ -9595,6 +9701,11 @@ function paginaFicha(i) {
   textarea{resize:vertical}
   .op{display:flex;gap:9px;align-items:flex-start;font-weight:400;font-size:14px;margin-top:7px}
   .op input{margin-top:3px;width:17px;height:17px;flex:0 0 auto}
+  .sube{margin-top:10px;padding-top:10px;border-top:1px dashed var(--bd)}
+  .sube input[type=file]{font:inherit;font-size:14px;max-width:100%}
+  .subenota{display:block;color:var(--mu);font-size:13px;margin-top:5px}
+  .subenota.ok{color:var(--g);font-weight:600}
+  .subenota.mal{color:var(--err);font-weight:600}
   .barra{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--bd);
          padding:12px 20px;display:flex;gap:10px;align-items:center;justify-content:flex-end}
   button{font:inherit;font-size:15px;font-weight:700;padding:10px 18px;border:1px solid var(--g);
@@ -9718,6 +9829,60 @@ function enviarDatos(final){
     })
     .catch(function(){ di("No se pudo guardar. Revisa tu conexion.", true); });
 }
+
+/* LA CARGA. Un archivo a la vez y en cuanto se elige: sin boton que haya que
+   acordarse de pulsar, y sin acumular en memoria varios megas de fotos que se
+   pierden si la pestaña se cierra.
+
+   Antes de subir se GUARDA EL BORRADOR. La carga escribe la fila de la ficha, y
+   si todavia no existe la crearia vacia y pisaria lo escrito: guardando primero,
+   la fila ya esta y el archivo solo se suma. */
+function subir(clase, archivo, nota){
+  return fetch(API + "/archivo/" + clase, {
+    method: "POST", headers: { "content-type": archivo.type }, body: archivo
+  }).then(function(r){ return r.json().then(function(j){ return { http: r.status, j: j }; }); })
+   .then(function(res){
+      if (res.j && res.j.ok){
+        nota.className = "subenota ok";
+        nota.textContent = clase === "foto"
+          ? ("Subida. Llevas " + res.j.cuantos + " de 8.")
+          : "Archivo subido.";
+        return true;
+      }
+      var e = res.j && res.j.error;
+      nota.className = "subenota mal";
+      nota.textContent = e === "tipo_no_permitido"   ? "Ese tipo de archivo no se acepta."
+                       : e === "archivo_muy_grande"  ? "Ese archivo pasa de 5 MB."
+                       : e === "archivo_no_coincide" ? "Ese archivo no se pudo leer como imagen o PDF."
+                       : e === "tope_alcanzado"      ? "Ya llegaste al tope."
+                       : e === "ya_enviada"          ? "El cuestionario ya se envio: no se pueden cambiar los archivos."
+                       : "No se pudo subir. Vuelve a intentarlo.";
+      return false;
+   })
+   .catch(function(){
+      nota.className = "subenota mal";
+      nota.textContent = "No se pudo subir. Revisa tu conexion.";
+      return false;
+   });
+}
+
+document.addEventListener("change", function(ev){
+  var inp = ev.target;
+  if (!inp || !inp.getAttribute || !inp.getAttribute("data-sube")) return;
+  var clase = inp.getAttribute("data-sube");
+  var nota = document.getElementById("upn-" + inp.id.replace("up-", ""));
+  var lista = [].slice.call(inp.files || []);
+  if (!lista.length) return;
+  nota.className = "subenota";
+  nota.textContent = "Subiendo…";
+  enviarDatos(false).then(function(){
+    /* En serie y no en paralelo: el tope se comprueba contra lo que ya hay, y
+       ocho peticiones a la vez pueden leer todas el mismo «hay cero». */
+    return lista.reduce(function(cadena, f){
+      return cadena.then(function(){ return subir(clase, f, nota); });
+    }, Promise.resolve());
+  }).then(function(){ inp.value = ""; });
+});
 
 document.getElementById("guardar").addEventListener("click", function(){ enviarDatos(false); });
 document.getElementById("enviar").addEventListener("click", function(){ enviarDatos(true); });
@@ -10581,6 +10746,63 @@ async function adminBorrarInscripcion(request, env, id, quien) {
    automatico que nadie revisa.
 
    Las pendientes salen primero a proposito: son las unicas que piden algo. */
+/* LA FICHA, PARA QUIEN LA TIENE QUE LEER.
+   ============================================================================
+   Sin esto, una fundacion podia llenar veintiseis preguntas y sus respuestas no
+   se veian en ninguna parte: quedaban en un JSON de D1 y habia que abrir la base
+   a mano para leerlas. Un formulario cuyas respuestas nadie puede ver no es un
+   formulario, es un buzon tapiado.
+
+   Devuelve las respuestas ETIQUETADAS con la pregunta y su numero, no las claves
+   crudas: quien concilia esto contra `partners.json` no tiene por que saber que
+   `unidad_doc` era la 5.3. */
+async function adminFicha(env, id) {
+  const f = await env.DB.prepare(
+    "SELECT f.inscripcion, f.estado, f.datos, f.creada_en, f.actualizada_en, f.enviada_en, " +
+    "i.nombre, i.email FROM fichas_fundacion f JOIN inscripciones i ON i.id = f.inscripcion " +
+    "WHERE f.inscripcion = ?"
+  ).bind(id).first();
+  if (!f) return json({ error: "no_encontrada" }, 404);
+
+  let d = {};
+  try { d = JSON.parse(f.datos || "{}"); } catch (e) { /* nada */ }
+  const respuestas = FICHA_CAMPOS.map((c) => {
+    const v = d[c.id];
+    const texto = Array.isArray(v) ? v.join(" · ") : (v == null ? "" : String(v));
+    return { num: c.num, sec: c.sec, lbl: c.lbl, valor: texto };
+  });
+  const arch = (d.archivos && typeof d.archivos === "object") ? d.archivos : {};
+  const archivos = [];
+  if (arch.logo) archivos.push({ clase: "logo", clave: arch.logo });
+  if (arch.soporte) archivos.push({ clase: "soporte", clave: arch.soporte });
+  for (const k of (Array.isArray(arch.foto) ? arch.foto : [])) archivos.push({ clase: "foto", clave: k });
+
+  return json({
+    ok: true, nombre: f.nombre, email: f.email, estado: f.estado,
+    enviada_en: f.enviada_en, actualizada_en: f.actualizada_en, respuestas, archivos
+  });
+}
+
+/* Los bytes, solo tras Access. La clave viene de la fila —no del navegador— pero
+   igual se comprueba su forma: una ruta que concatena lo que llega en la URL con
+   una lectura de R2 es una travesia de directorios esperando a alguien. */
+async function adminFichaArchivo(env, clave) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  if (!/^fichas\/\d+\/(logo|soporte|foto)-[a-f0-9]{8}\.(png|jpg|webp|pdf)$/.test(String(clave || ""))) {
+    return json({ error: "clave_invalida" }, 400);
+  }
+  const obj = await env.MEDIA.get(clave);
+  if (!obj) return json({ error: "no_encontrado" }, 404);
+  return new Response(obj.body, {
+    headers: {
+      "content-type": (obj.httpMetadata && obj.httpMetadata.contentType) || "application/octet-stream",
+      "content-disposition": "inline",
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
 async function adminSuscripciones(env) {
   const r = await env.DB.prepare(
     "SELECT s.id, s.estado, s.nivel, s.monto_centavos, s.moneda, s.cobros, s.creada_en, " +
@@ -12218,8 +12440,10 @@ function cargarInscripciones(){
       /* El enlace del cuestionario se muestra para poder reenviarlo a mano si el
          correo no llego: el token ya existe y esconderlo no lo hace mas secreto. */
       var ficha = (i.estado === "visitada" && i.token)
-        ? '<br><small><a href="/ficha/' + esc(i.token) + '" target="_blank" rel="noopener">cuestionario</a>' +
-          (i.ficha_estado ? " · " + esc(i.ficha_estado) : " · sin abrir") + "</small>"
+        ? '<br><small><a href="/ficha/' + esc(i.token) + '" target="_blank" rel="noopener">enlace</a>' +
+          (i.ficha_estado
+            ? ' · <button class="copy" data-verficha="' + i.id + '">ver respuestas (' + esc(i.ficha_estado) + ")</button>"
+            : " · sin abrir") + "</small>"
         : "";
       /* La web la escribe quien aplica, así que solo se vuelve enlace si es
          http(s). Una URL con esquema javascript: escapada sigue ejecutándose al
@@ -12963,6 +13187,9 @@ document.addEventListener("click", function(e){
      un pago en este mismo panel. Y avisa de las tres cosas que importan: que no
      se puede deshacer, que tambien se van los consentimientos, y que la linea de
      auditoria NO conserva el nombre ni el correo. */
+  var vf = e.target.closest("[data-verficha]");
+  if (vf) { verFicha(vf.getAttribute("data-verficha")); return; }
+
   var ib = e.target.closest("[data-insborrar]");
   if (ib) {
     var idIns = ib.getAttribute("data-insborrar");
@@ -13040,6 +13267,39 @@ function cargarIpn(){
         "<td>" + sello + "</td>" +
       "</tr>";
     }).join("");
+  });
+}
+
+/* Las respuestas del cuestionario, en una ventana aparte. Se pintan aqui y no
+   en la fila porque son veintiseis: meterlas en la tabla la volveria ilegible
+   justo cuando hay algo que leer. */
+function verFicha(id){
+  fetch("/api/admin/ficha/" + id).then(function(r){ return r.json(); }).then(function(d){
+    if (!d || !d.ok){ alert("No se pudo cargar la ficha."); return; }
+    var w = window.open("", "_blank");
+    if (!w){ alert("El navegador bloqueo la ventana."); return; }
+    var filas = (d.respuestas||[]).map(function(r){
+      return "<tr><td>" + esc(r.num) + "</td><td>" + esc(r.lbl) + "</td><td>" +
+             (r.valor ? esc(r.valor) : '<em style="color:#5C636F">sin responder</em>') + "</td></tr>";
+    }).join("");
+    var arch = (d.archivos||[]).map(function(a){
+      return '<li><a href="/api/admin/ficha-archivo/' + encodeURIComponent(a.clave) +
+             '" target="_blank" rel="noopener">' + esc(a.clase) + "</a></li>";
+    }).join("");
+    w.document.write(
+      "<!doctype html><meta charset=utf-8><title>Ficha · " + esc(d.nombre) + "</title>" +
+      "<style>body{font:15px/1.5 system-ui;margin:24px;color:#191813;background:#F3EFE6}" +
+      "table{border-collapse:collapse;width:100%;background:#FBF8F1}" +
+      "td{border-bottom:1px solid #DAD3C3;padding:7px 9px;vertical-align:top}" +
+      "td:first-child{width:52px;color:#5C636F;font-size:13px}" +
+      "td:nth-child(2){width:38%;font-weight:600}h1{font-size:20px;margin:0 0 2px}" +
+      "p.sub{color:#5C636F;font-size:13px;margin:0 0 16px}ul{margin:8px 0 20px 18px}</style>" +
+      "<h1>" + esc(d.nombre) + "</h1>" +
+      '<p class="sub">' + esc(d.estado) + (d.enviada_en ? " · enviada " + esc(d.enviada_en) : "") +
+      " · " + esc(d.email || "") + "</p>" +
+      (arch ? "<h3>Archivos</h3><ul>" + arch + "</ul>" : "<p><em>Sin archivos subidos.</em></p>") +
+      "<table>" + filas + "</table>");
+    w.document.close();
   });
 }
 
@@ -14151,6 +14411,10 @@ export default {
         if (ruta === "/api/admin/ipn")           return await adminIpn(env);
         if (ruta === "/api/admin/paypal-sueltos") return await adminPaypalSueltos(env);
         if (ruta === "/api/admin/suscripciones") return await adminSuscripciones(env);
+        const afi = ruta.match(/^\/api\/admin\/ficha\/(\d+)$/);
+        if (afi)                                return await adminFicha(env, Number(afi[1]));
+        const afa = ruta.match(/^\/api\/admin\/ficha-archivo\/(.+)$/);
+        if (afa)                                return await adminFichaArchivo(env, decodeURIComponent(afa[1]));
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
@@ -14211,6 +14475,8 @@ export default {
         if (ruta === "/api/transferencia")  return await apiReportarTransferencia(request, env, url);
         const fapi = ruta.match(/^\/api\/ficha\/([a-f0-9]{32})$/);
         if (fapi)                           return await apiFicha(request, env, fapi[1]);
+        const farc = ruta.match(/^\/api\/ficha\/([a-f0-9]{32})\/archivo\/([a-z]+)$/);
+        if (farc)                           return await apiFichaArchivo(request, env, farc[1], farc[2]);
         const comp = ruta.match(/^\/api\/comprobante\/(GG-\d{4}-\d{6})$/i);
         if (comp) return await apiComprobante(request, env, comp[1].toUpperCase(), url.searchParams.get("t"));
         /* Triage estructural de viviendas */
