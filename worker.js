@@ -6984,11 +6984,29 @@ async function apiPaypalSuscripcion(request, env, url) {
     return json({ error: "paypal_sin_enlace" }, 502);
   }
 
+  /* LA SUSCRIPCION TIENE QUE SABER DE QUIEN ES, y esto faltaba.
+
+     El formulario pide nombre y correo, y con ellos se creaba la suscripcion en
+     PayPal... pero `donante_id` quedaba NULO en nuestra base. Consecuencia, que
+     no es teorica: el aporte que nace de cada cobro heredaba ese nulo, y
+     `correoAporteAprobado` necesita el correo del donante — o sea que le
+     habriamos cobrado a alguien todos los meses SIN MANDARLE NUNCA SU RECIBO,
+     justo lo que la casilla de Ley 1581 de ese mismo formulario promete: «para
+     gestionar mi membresia y enviarme el recibo de cada aporte».
+
+     Se crea AQUI y no al primer cobro porque aqui es donde la persona nos dio
+     sus datos y su autorizacion. Si falla, la suscripcion se guarda igual: mejor
+     un miembro sin correo enlazado -que se puede reparar mirando el panel- que
+     perder una suscripcion que PayPal ya creo. */
+  let donanteId = null;
+  try { donanteId = await donantePorCorreo(env, email, nombre); }
+  catch (e) { console.error("paypal donante", e && e.message); }
+
   await env.DB.prepare(
     "INSERT INTO suscripciones (id, proveedor, plan_ref, estado, nivel, monto_centavos, " +
-    "moneda, frecuencia, idioma, quiere_certificado, consent_muro) " +
-    "VALUES (?, 'paypal', ?, 'aprobacion_pendiente', ?, ?, 'USD', 'mensual', ?, ?, ?)"
-  ).bind(r.d.id, planId, nivel.nombre, Math.round(usd * 100), idioma, quiereCert, muro).run();
+    "moneda, frecuencia, idioma, quiere_certificado, consent_muro, donante_id) " +
+    "VALUES (?, 'paypal', ?, 'aprobacion_pendiente', ?, ?, 'USD', 'mensual', ?, ?, ?, ?)"
+  ).bind(r.d.id, planId, nivel.nombre, Math.round(usd * 100), idioma, quiereCert, muro, donanteId).run();
 
   /* La autorizacion de Ley 1581 se anota como en los otros formularios: es la
      misma obligacion, no una excepcion porque el dinero venga de fuera. */
@@ -7360,7 +7378,8 @@ async function paypalEstado(env, id, estado, cerrada) {
    Entra como `aprobada` porque PayPal ya cobro: no es una intencion. */
 async function paypalCobro(env, suscripcionId, recurso) {
   const sub = await env.DB.prepare(
-    "SELECT id, nivel, idioma, quiere_certificado, consent_muro FROM suscripciones WHERE id = ?"
+    "SELECT id, nivel, idioma, quiere_certificado, consent_muro, donante_id " +
+    "FROM suscripciones WHERE id = ?"
   ).bind(suscripcionId).first();
   if (!sub) return "suscripcion_desconocida";
 
@@ -7371,12 +7390,14 @@ async function paypalCobro(env, suscripcionId, recurso) {
   const centavos = Math.round(valor * 100);
 
   const guia = await siguienteGuia(env, new Date().getUTCFullYear());
+  const token = tokenNuevo();
   await env.DB.prepare(
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
-    "quiere_certificado, consent_muro, idioma, token, proveedor, proveedor_ref, suscripcion, aprobada_en) " +
-    "VALUES (?, 'aprobada', ?, ?, 'fondo', 'mensual', ?, ?, ?, ?, 'paypal', ?, ?, datetime('now'))"
+    "quiere_certificado, consent_muro, idioma, token, proveedor, proveedor_ref, suscripcion, " +
+    "donante_id, aprobada_en) " +
+    "VALUES (?, 'aprobada', ?, ?, 'fondo', 'mensual', ?, ?, ?, ?, 'paypal', ?, ?, ?, datetime('now'))"
   ).bind(guia, centavos, moneda, sub.quiere_certificado, sub.consent_muro, sub.idioma,
-         tokenNuevo(), String((recurso && recurso.id) || ""), suscripcionId).run();
+         token, String((recurso && recurso.id) || ""), suscripcionId, sub.donante_id).run();
 
   /* UN COBRO ES PRUEBA DE ACTIVACION, y por eso se marca aqui tambien.
 
@@ -7397,6 +7418,29 @@ async function paypalCobro(env, suscripcionId, recurso) {
     "estado = CASE WHEN estado = 'aprobacion_pendiente' THEN 'activa' ELSE estado END, " +
     "actualizada_en = datetime('now') WHERE id = ?"
   ).bind(suscripcionId).run();
+
+  /* Y AHORA SI, EL RECIBO. Quien apoya desde el exterior recibe lo mismo que
+     quien paga por Wompi: su recibo con la guia, cada mes. Antes no salia
+     ninguno, y no por un fallo de envio sino porque no habia a quien mandarlo.
+
+     Va en try aparte: un correo que no sale no puede tumbar el registro de un
+     cobro que YA ocurrio. Si falla queda en el log y el aporte existe igual, que
+     es el orden correcto de prioridades cuando ya hay dinero de por medio. */
+  try {
+    const d = sub.donante_id
+      ? await env.DB.prepare("SELECT nombre, email FROM donantes WHERE id = ?").bind(sub.donante_id).first()
+      : null;
+    if (d && d.email) {
+      await correoAporteAprobado(env, {
+        guia, monto_centavos: centavos, idioma: sub.idioma,
+        modo: "fondo", destino_id: null, frecuencia: "mensual", token
+      }, d.email, d.nombre);
+    } else {
+      /* Se DICE que no se mando y por que. Una membresia sin correo enlazado es
+         reparable, pero solo si alguien se entera. */
+      console.error("paypal cobro sin donante: no se mando recibo ·", guia, "·", suscripcionId);
+    }
+  } catch (e) { console.error("correo tras cobro paypal", guia, e && e.message); }
 
   return "aporte " + guia;
 }
@@ -9704,6 +9748,33 @@ async function adminBorrarInscripcion(request, env, id, quien) {
      suplantacion, pero la primera vez que paso -3 sep 2026- la causa fue que el
      id del webhook llevaba el prefijo `WH-` que su API no acepta, y desde fuera
      era indistinguible. Esa vez el sintoma fue el silencio; ahora se ve. */
+/* LAS MEMBRESIAS, que hasta ahora no se veian en ninguna parte.
+   ============================================================================
+   `suscripciones` solo la escribia el alta y la actualizaba el webhook: NADIE la
+   leia. O sea que no habia forma de responder «quien es miembro, en que nivel y
+   desde cuando» sin abrir la base a mano.
+
+   Y hacia invisible un estado que se acumula solo: una suscripcion que la
+   persona no llega a aprobar en PayPal se queda en `aprobacion_pendiente` PARA
+   SIEMPRE, porque el webhook que la sacaria de ahi nunca llega. No hay cron en
+   este proyecto ni hace falta: en vez de un proceso que las caduque, se muestra
+   su EDAD y quien mire decide. Un dato visible vale mas que un barrido
+   automatico que nadie revisa.
+
+   Las pendientes salen primero a proposito: son las unicas que piden algo. */
+async function adminSuscripciones(env) {
+  const r = await env.DB.prepare(
+    "SELECT s.id, s.estado, s.nivel, s.monto_centavos, s.moneda, s.cobros, s.creada_en, " +
+    "s.ultimo_cobro_en, s.cancelada_en, d.nombre, d.email, " +
+    "CAST(julianday('now') - julianday(s.creada_en) AS INTEGER) AS dias, " +
+    "(SELECT COUNT(*) FROM aportes a WHERE a.suscripcion = s.id) AS aportes " +
+    "FROM suscripciones s LEFT JOIN donantes d ON d.id = s.donante_id " +
+    "ORDER BY CASE WHEN s.estado = 'aprobacion_pendiente' THEN 0 ELSE 1 END, s.creada_en DESC " +
+    "LIMIT 200"
+  ).all();
+  return json({ suscripciones: r.results || [] });
+}
+
 async function adminPaypalSueltos(env) {
   const r = await env.DB.prepare(
     "SELECT e.evento_id, e.tipo, e.suscripcion, e.recurso_id, e.firma_valida, " +
@@ -10556,6 +10627,20 @@ trazado.</p>
 <th scope="col">Referencia</th><th scope="col">Monto</th><th scope="col">Método</th>
 <th scope="col">Donante</th><th scope="col">Recibido</th>
 </tr></thead><tbody id="p-filas"><tr><td colspan="5" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</table></div>
+
+<h2 id="sec-sus" class="h-sec" style="margin:48px 0 6px;font-size:26px">Membresías internacionales</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Las suscripciones en dólares por
+PayPal. <strong>Las pendientes salen primero</strong> porque son las únicas que piden algo: una que la
+persona no llegó a aprobar en PayPal se queda pendiente para siempre —el evento que la activaría nunca
+llega— así que se muestra su edad y quien mire decide. Con muchos días y cero cobros, es un abandono en
+la pantalla de PayPal y no un miembro. <strong>Sin correo</strong> significa que el recibo mensual no
+tiene a dónde ir: eso hay que repararlo.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Creada</th><th scope="col">Estado</th><th scope="col">Nivel</th>
+<th scope="col">Monto</th><th scope="col">Cobros</th><th scope="col">Miembro</th>
+</tr></thead><tbody id="sus-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <h2 id="sec-ipn" class="h-sec" style="margin:48px 0 6px;font-size:26px">Donaciones por el botón de PayPal</h2>
@@ -12068,6 +12153,37 @@ function cargarIpn(){
   });
 }
 
+/* ---------------- membresias internacionales ---------------- */
+function cargarSuscripciones(){
+  fetch("/api/admin/suscripciones").then(function(r){ return r.json(); }).then(function(d){
+    var tb = document.getElementById("sus-filas"); if (!tb) return;
+    var l = d.suscripciones || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguna todavia.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(s){
+      var pend = s.estado === "aprobacion_pendiente";
+      var estado = esc(s.estado || "—");
+      /* La EDAD solo se muestra en las pendientes: en una activa el dato no dice
+         nada, y en una pendiente lo dice todo. */
+      if (pend) estado += "<br><small>hace " + (s.dias || 0) + " dia(s)" +
+        (!s.cobros && s.dias > 2 ? " · parece abandono" : "") + "</small>";
+      var monto = s.monto_centavos != null
+        ? ((s.monto_centavos/100).toFixed(2) + " " + esc(s.moneda || ""))
+        : "—";
+      var quien = s.email
+        ? esc(s.nombre || "—") + "<br><small>" + esc(s.email) + "</small>"
+        : "<strong>sin correo</strong>";
+      return "<tr>" +
+        "<td>" + esc((s.creada_en||"").slice(0,16)) + "</td>" +
+        "<td>" + estado + "</td>" +
+        "<td>" + esc(s.nivel || "—") + "</td>" +
+        "<td>" + monto + "</td>" +
+        "<td>" + (s.cobros || 0) + (s.aportes ? "<br><small>" + s.aportes + " aporte(s)</small>" : "") + "</td>" +
+        "<td>" + quien + "</td>" +
+      "</tr>";
+    }).join("");
+  });
+}
+
 /* ---------------- eventos de PayPal sin casa ---------------- */
 function cargarPaypalSueltos(){
   fetch("/api/admin/paypal-sueltos").then(function(r){ return r.json(); }).then(function(d){
@@ -12271,6 +12387,7 @@ var BANDEJAS = {
   "ins-filas": cargarInspecciones,
   "o-filas": cargarOfrecimientos,
   "p-filas": cargarSueltos,
+  "sus-filas": cargarSuscripciones,
   "ipn-filas": cargarIpn,
   "pps-filas": cargarPaypalSueltos,
   "e-filas": cargarEntregas
@@ -13122,6 +13239,7 @@ export default {
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
         if (ruta === "/api/admin/ipn")           return await adminIpn(env);
         if (ruta === "/api/admin/paypal-sueltos") return await adminPaypalSueltos(env);
+        if (ruta === "/api/admin/suscripciones") return await adminSuscripciones(env);
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
