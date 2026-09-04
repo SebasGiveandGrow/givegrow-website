@@ -2941,7 +2941,54 @@ document.addEventListener("click", function(e){
 document.addEventListener("keydown", function(e){
   if(e.key==="Escape") document.querySelectorAll(".ndrop.open").forEach(function(d){ d.classList.remove("open"); var t=d.querySelector(".ndrop-t"); if(t) t.setAttribute("aria-expanded","false"); });
 });
-function closeDrawer(){ var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open"); document.body.classList.remove("menu-open"); var b=document.querySelector(".burger"); if(b) b.setAttribute("aria-expanded","false"); }
+/* `volverFoco` solo lo pide quien cierra el cajon SIN navegar —la tecla Escape—.
+   En la navegacion NO se pide a proposito: ahi manda `focusActivePage()`, que
+   acaba de mover el foco a la pagina nueva, y devolverlo al boton lo desharia. */
+function closeDrawer(volverFoco){
+  var d=document.getElementById("nav-mobile"); if(d) d.classList.remove("open");
+  document.body.classList.remove("menu-open");
+  var b=document.querySelector(".burger");
+  if(b) b.setAttribute("aria-expanded","false");
+  if(volverFoco && b && b.focus) b.focus();
+}
+
+/* EL FOCO NO PODIA SALIR DEL CAJON Y SI SALIA. Medido en ancho movil: el orden
+   del DOM lleva bien el foco del boton a los 20 enlaces del menu, pero al pasar
+   del ultimo («Contacto») la siguiente tabulacion cae en el contenido de la
+   pagina, que el panel esta TAPANDO —comprobado con elementFromPoint—. O sea que
+   quien navega con teclado o lector de pantalla acaba en enlaces que no puede
+   ver, con el menu todavia abierto.
+
+   Es la misma trampa que ya tienen ALMA y el lightbox; el cajon era el unico de
+   los tres que no la tenia. El boton entra en el ciclo porque es el control que
+   cierra: el cajon no tiene una «X» propia. */
+document.addEventListener("keydown", function(e){
+  if (e.key !== "Tab") return;
+  var d = document.getElementById("nav-mobile");
+  if (!d || !d.classList.contains("open")) return;
+  /* GUARDA DEFENSIVA, y conviene decir exactamente lo que es. Protege del estado
+     «cajon oculto pero con la clase open puesta» —girar una tableta con el menu
+     abierto—, donde la lista podria quedarse solo con el boton y atrapar el
+     tabulador ahi para siempre. Hoy ese estado NO ocurre: el cajon y el boton se
+     ocultan en el mismo breakpoint, comprobado a 1400 px. Se deja porque cuesta
+     una linea y ese dia dependeria de que dos reglas de CSS sigan de acuerdo.
+
+     La visibilidad se mira con `getClientRects()` y NO con `offsetParent`: el
+     cajon es `position:fixed`, y un elemento fijo tiene `offsetParent` null
+     SIEMPRE, tambien cuando se ve. Escrito con offsetParent, esta misma guarda
+     desactivaba la trampa entera en movil — pasó, y se cazo volviendo a correr
+     la prueba del caso bueno despues de tocar el malo. */
+  if (!d.getClientRects().length) return;
+  var foc = Array.prototype.filter.call(d.querySelectorAll("a[href], button"),
+    function(x){ return x.offsetParent !== null; });
+  if (!foc.length) return;
+  var b = document.querySelector(".burger");
+  if (b && b.offsetParent !== null) foc.unshift(b);
+  var first = foc[0], last = foc[foc.length-1], a = document.activeElement;
+  if (e.shiftKey && a === first){ e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && a === last){ e.preventDefault(); first.focus(); }
+  else if (foc.indexOf(a) === -1){ e.preventDefault(); first.focus(); }
+});
 
 /* ---------- reveal ---------- */
 var revObserver;
@@ -4631,7 +4678,7 @@ function init(){
   if (ainput) ainput.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); almaSend(); } });
   // lightbox keys
   document.addEventListener("keydown", function(e){
-    if (e.key === "Escape"){ var dm=document.getElementById("nav-mobile"); if(dm && dm.classList.contains("open")){ closeDrawer(); return; } }
+    if (e.key === "Escape"){ var dm=document.getElementById("nav-mobile"); if(dm && dm.classList.contains("open")){ closeDrawer(true); return; } }
   });
   initReveal();
   animateCounters();
