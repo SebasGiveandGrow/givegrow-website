@@ -7634,7 +7634,10 @@ async function paypalReversa(env, tipo, recurso) {
      resuelve. Se avisa y se marca el certificado, pero el aporte no se toca —
      decir «rechazada» sobre dinero que aun esta seria tan falso como callarlo. */
   const devuelto = tipo !== "CUSTOMER.DISPUTE.CREATED";
-  if (devuelto && a.estado !== "rechazada") {
+  /* `yaEstaba` decide DOS cosas, y por eso se calcula antes de tocar nada: si
+     hay que mover el aporte, y si hay que avisar. */
+  const yaEstaba = a.estado === "rechazada";
+  if (devuelto && !yaEstaba) {
     await env.DB.prepare(
       "UPDATE aportes SET estado = 'rechazada', actualizada_en = datetime('now') WHERE guia = ?"
     ).bind(a.guia).run();
@@ -7643,8 +7646,20 @@ async function paypalReversa(env, tipo, recurso) {
   try { await revisarCertificadoPorReversa(env, a.guia, tipo); }
   catch (e) { console.error("guardian de reversa paypal", a.guia, e && e.message); }
 
-  try { await correoReversaPaypal(env, a, tipo, devuelto); }
-  catch (e) { console.error("aviso reversa paypal", a.guia, e && e.message); }
+  /* NO SE AVISA DOS VECES DE LA MISMA PLATA. PayPal puede mandar REFUNDED y
+     REVERSED sobre el mismo cobro —son eventos distintos, asi que el UNIQUE de
+     `eventos_paypal` no los junta— y el segundo aviso diria exactamente lo mismo
+     sobre un aporte que ya esta marcado. Es la regla que este archivo ya aplica
+     al guardian de certificados y al webhook de Wompi: «tres correos identicos
+     entrenan a ignorarlos», y el dia que llegue uno de verdad nadie lo abre.
+
+     La DISPUTA si avisa siempre aunque el aporte ya este rechazado: una disputa
+     sobre plata ya devuelta es informacion nueva —alguien esta reclamando— y no
+     una repeticion. */
+  if (!devuelto || !yaEstaba) {
+    try { await correoReversaPaypal(env, a, tipo, devuelto); }
+    catch (e) { console.error("aviso reversa paypal", a.guia, e && e.message); }
+  }
 
   return (devuelto ? "reversa " : "disputa ") + a.guia;
 }
