@@ -2323,7 +2323,16 @@ async function adminEmitirCertificado(request, env, guia, quien) {
     numero, guia: a.guia,
     donante_nombre: nombre, doc_tipo: docTipo, doc_numero: docNumero, donante_ciudad: ciudad,
     monto_centavos: a.monto_centavos,
-    fecha_donacion: a.aprobada_en,
+    /* EN DIA COLOMBIANO, igual que el año gravable de tres lineas arriba y que
+       `emitido_en` de unas mas abajo. Esta era la unica de las tres que seguia
+       en UTC, y es la que MAS se ve: se imprime dos veces en el certificado —el
+       numeral 1 y el numeral 5—.
+
+       Una donacion aprobada despues de las 7 de la tarde salia con la fecha del
+       dia siguiente en un documento que se firma bajo juramento. Y en la ultima
+       noche del año el papel se contradecia solo: el año gravable, calculado con
+       `anioCO`, decia 2026, y la fecha impresa 1 de enero de 2027. */
+    fecha_donacion: a.aprobada_en ? fechaCO(a.aprobada_en) : "",
     /* El numeral 5 dice «mediante transferencia electrónica No. …». Para un pago
        por pasarela ese número es el id de Wompi; para una transferencia real es
        el del comprobante bancario, y citar un id de Wompi inexistente sería
@@ -2381,9 +2390,16 @@ async function adminCertificadoPdf(env, numero) {
   /* El snapshot congela el CONTENIDO, no el ESTADO. Un certificado anulado que
      se vuelve a descargar limpio es un documento falso circulando con nuestra
      firma, así que el estado se le añade encima al armarlo. */
+  /* Las dos fechas de estado tambien se IMPRIMEN, y se guardan con
+     `datetime('now')`, que es UTC. Se convierten aqui, en el borde de
+     presentacion, y NO en la columna: `anulado_en` se lee ademas para decidir
+     («si ya esta anulado, no se anula otra vez»), y cambiar lo que se guarda
+     tocaria esa logica sin necesidad. */
   const datos = Object.assign(JSON.parse(c.datos), {
-    anulado_en: c.anulado_en, anulado_motivo: c.anulado_motivo,
-    revision_en: c.revision_en, revision_motivo: c.revision_motivo
+    anulado_en: c.anulado_en ? fechaCO(c.anulado_en) : null,
+    anulado_motivo: c.anulado_motivo,
+    revision_en: c.revision_en ? fechaCO(c.revision_en) : null,
+    revision_motivo: c.revision_motivo
   });
   const bytes = await certificado(datos, datos.emitido_en);
   return new Response(bytes, {
