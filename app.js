@@ -4,6 +4,7 @@
 /* ---------- I18N ---------- */
 var I18N = {
   es: {
+    "rep.err.espera": "Ya recibimos varios reportes desde este correo hace un momento. Espera unos minutos; si ya enviaste el tuyo, busca tu número de guía en el correo que te llegó.",
     "grat.falla": "No pudimos cargar los comercios aliados en este momento. No quiere decir que no haya: quiere decir que no lo pudimos comprobar. Vuelve a intentar en un rato.",
     "nav.menu.aria": "Menú",
     "donar.via.aria": "Con qué pasarela pagar",
@@ -5325,8 +5326,34 @@ function repSubmit(ev){
       autoriza_datos: true,
       idioma: lang
     })
-  }).then(function(r){ return r.ok ? r.json() : r.json().then(function(j){ throw new Error(j.error||"http"); }); })
-    .then(function(d){
+  }).then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      var d = res.d || {};
+      /* NO SE COLAPSAN TODOS LOS ERRORES EN UNO, que es lo que hacía el
+         `throw new Error(j.error)` de antes: cualquier respuesta del servidor
+         acababa en «no se pudo enviar», y las claves para decirlo bien ya
+         existían —se usan en la validación del cliente— y se tiraban a la basura.
+
+         Es el mismo arreglo que ya se hizo en `cvEnviar`, con su motivo escrito:
+         «429 hay que ESPERAR, no reintentar» y «el correo es OPCIONAL, así que
+         nadie sospecha de él». Aquí el más probable es la FECHA: quien escribe
+         una futura veía «algo salió mal» sin ninguna pista de dónde. */
+      if (!res.ok || !d.guia){
+        var texto = t("rep.err");
+        if (d.error === "demasiados_reportes")     texto = t("rep.err.espera");
+        else if (d.error === "email_invalido")     texto = t("rep.err.email");
+        else if (d.error === "fecha_invalida" ||
+                 d.error === "fecha_futura")       texto = t("rep.err.fecha");
+        else if (d.error === "monto_invalido")     texto = t("rep.err.monto");
+        else if (d.error === "nombre_requerido")   texto = t("rep.err.nombre");
+        else if (d.error === "autorizacion_requerida" ||
+                 d.error === "destino_requerido")  texto = t("rep.err.datos");
+        /* El `ayuda` del servidor va en español; en inglés manda la clave. */
+        else if (d.ayuda && lang !== "en")         texto = d.ayuda;
+        btn.disabled = false;
+        allyMsg(note, texto, false);
+        return;
+      }
       REP_GUIA = d.guia; REP_TOKEN = d.token;
       document.getElementById("rep").style.display = "none";
       setText("rep-guia", d.guia);

@@ -1609,5 +1609,6 @@
   "ally.ben.ph": "E.g. 15% off, a complimentary dessert…",
   "ally.nivel.ph": "E.g. Sprout and above",
   "ally.redime.ph": "E.g. by showing the digital membership card",
-  "grat.falla": "We could not load the allied businesses right now. That does not mean there are none: it means we could not check. Please try again in a while."
+  "grat.falla": "We could not load the allied businesses right now. That does not mean there are none: it means we could not check. Please try again in a while.",
+  "rep.err.espera": "We already received several reports from this email a moment ago. Wait a few minutes; if you already sent yours, look for your tracking number in the email we sent you."
 }
