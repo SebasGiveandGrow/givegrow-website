@@ -14241,8 +14241,14 @@ async function rutaCompartir(env, url, id) {
   try {
     const r = await env.ASSETS.fetch(new URL("/data/partners.json", url.origin));
     const j = await r.json();
+    /* `consent.name === true` y no «distinto de false»: esto genera una PAGINA
+       PUBLICA con el nombre de la fundacion, que es lo que se lleva un enlace
+       compartido y lo que rastrea una vista previa. La regla 1 del cuestionario
+       dice «sin consent.name === true no hay perfil», y la condicion anterior
+       dejaba pasar a una fundacion SIN bloque de consentimiento. Falla cerrado:
+       si no consta la autorizacion, no hay pagina. */
     const p = (j.partners || []).find(
-      (x) => x.id === id && x.type === "foundation" && (!x.consent || x.consent.name !== false)
+      (x) => x.id === id && x.type === "foundation" && x.consent && x.consent.name === true
     );
     if (p) {
       return new Response(sharePage(p), {

@@ -3895,9 +3895,26 @@ function accTab(name){
 }
 /* Red en el mapa: cada fundación/empresa aliada se agrega a PARTNERS.
    type: "foundation" | "company" | "hub". Coordenadas a nivel de zona/barrio (nunca direcciones privadas). */
+/* EL RESPALDO SOLO LLEVA LO PROPIO DE GIVE&GROW, y esa es la regla, no una
+   casualidad de esta lista.
+
+   Traía además a Fundación Niños del Futuro —nombre y enlace— escrita a mano
+   aquí dentro, o sea FUERA del sistema de consentimiento: sin bloque `consent`,
+   sin nada que la ate a la autorización que sí está registrada en
+   `partners.json`. Hoy NDF autoriza su nombre, así que no había nada indebido
+   publicado. Lo que fallaba era la REVOCACIÓN: el día que una fundación retire
+   el consentimiento y se la saque de `partners.json`, esta copia la seguiría
+   publicando cada vez que la descarga falle, que es justo cuando este respaldo
+   entra. Comprobado en el navegador cortando la red: la lista de aliadas
+   quedaba con su nombre y su enlace.
+
+   Con solo el HUB —que es Give&Grow, y no necesita autorización de un tercero—
+   el mapa sigue dibujándose y centrado en Medellín. Se comprobó: 380 px de alto
+   y su marcador. Es una degradación honesta en lugar de una lista vieja.
+
+   El check #14 del gate impide que vuelva a entrar aquí nadie que no sea `hub`. */
 var PARTNERS_FALLBACK = [
-  { name:"HUB SOCIAL Give&Grow", type:"hub", lat:6.2442, lng:-75.5812, areaKey:"map.area.med" },
-  { name:"Fundación Niños del Futuro", type:"foundation", lat:6.2925, lng:-75.5375, areaKey:"map.area.ndf", url:"https://ninosdelfuturo.com" }
+  { name:"HUB SOCIAL Give&Grow", type:"hub", lat:6.2442, lng:-75.5812, areaKey:"map.area.med" }
 ];
 var PARTNERS_DATA = null;
 /* SE CACHEA LA PROMESA, NO SOLO EL RESULTADO — y es el MISMO bug que

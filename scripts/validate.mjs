@@ -642,4 +642,47 @@ try {
   }
 } catch (e) { err("no se pudo verificar los tokens de worker.js: " + e.message); }
 
+/* CHECK #14 — LA REGLA 1 DEL CONSENTIMIENTO, OBLIGADA POR EL BUILD.
+   «Sin `consent.name === true` no hay perfil» está escrita en worker.js y la
+   respetaba el generador del objeto de partners.json… y nadie más. Quedaban dos
+   puertas por las que el nombre de una fundación podía publicarse sin que
+   constara su autorización:
+
+     · una entrada añadida a mano a `partners.json` sin bloque `consent`;
+     · `PARTNERS_FALLBACK` en app.js, que traía una fundación real escrita a
+       mano, fuera del sistema de consentimiento. Ahí lo que fallaba no era
+       publicar de más hoy, sino la REVOCACIÓN: sacar a alguien de
+       `partners.json` no lo sacaba del respaldo.
+
+   Este check cierra las dos. El `hub` es Give&Grow: no necesita autorización de
+   un tercero para nombrarse a sí misma. */
+try {
+  const datos = JSON.parse(readFileSync("data/partners.json", "utf8"));
+  const malos = (datos.partners || []).filter(
+    (p) => p.type !== "hub" && !(p.consent && p.consent.name === true)
+  );
+  if (malos.length) {
+    err("partners.json publica " + malos.length + " aliada(s) sin `consent.name === true`, " +
+        "que es la regla 1 del cuestionario: " + malos.map((p) => p.name || p.id).join(", ") +
+        ". Sin autorización registrada no se publica el nombre.");
+  } else {
+    ok("consentimiento: las " + (datos.partners || []).length + " entradas de partners.json cumplen la regla 1");
+  }
+
+  /* Y el respaldo de app.js, que no pasa por partners.json ni por su consent. */
+  const i = src.indexOf("var PARTNERS_FALLBACK = [");
+  if (i < 0) throw new Error("no encontré PARTNERS_FALLBACK en app.js");
+  const fin = src.indexOf("];", i);
+  const respaldo = new Function("return " + src.slice(i + "var PARTNERS_FALLBACK = ".length, fin + 1))();
+  const ajenos = respaldo.filter((p) => p.type !== "hub");
+  if (ajenos.length) {
+    err("PARTNERS_FALLBACK de app.js trae " + ajenos.length + " entrada(s) que NO son del hub: " +
+        ajenos.map((p) => p.name).join(", ") + ". Ese respaldo se pinta cuando partners.json no carga, " +
+        "y vive fuera del sistema de consentimiento: quien esté ahí sigue publicándose aunque se le " +
+        "retire la autorización y se le saque de partners.json.");
+  } else {
+    ok("el respaldo de aliadas solo lleva lo propio de Give&Grow (" + respaldo.length + ")");
+  }
+} catch (e) { err("no se pudo verificar el consentimiento de las aliadas: " + e.message); }
+
 process.exit(fail);
