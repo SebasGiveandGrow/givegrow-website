@@ -2516,6 +2516,38 @@ async function apiReportarTransferencia(request, env, url) {
   const destino = modo === "dirigida" ? limpiar(c.destino, 60) : null;
   if (modo === "dirigida" && !destino) return json({ error: "destino_requerido" }, 400);
 
+  /* EL MISMO FRENO QUE `/api/caso`, POR LA MISMA RAZON, y esta escrita alli:
+     «El numerador NO se reinicia nunca —es la regla dura del proyecto— asi que
+     cada POST a este endpoint publico quema un numero para siempre. Sin ningun
+     freno, un script deja la bandeja inservible.»
+
+     `siguienteGuia` es exactamente igual de monotono que el de casos, y esta
+     bandeja es peor de ensuciar: cada fila cae en la cola que una persona
+     verifica A MANO contra el extracto del banco. Enterrar tres reportes reales
+     bajo cientos de falsos no cuesta nada.
+
+     Se frena por CORREO y no globalmente, por lo mismo que alli: un tope global
+     cortaria una tanda legitima —quien transfirio varios meses y los reporta de
+     una sentada— y ese es justo el caso que hay que dejar pasar. Cinco en diez
+     minutos deja pasar esa tanda y para en seco cualquier script.
+
+     Se cuenta solo lo `reportada`: quien ademas pago con tarjeta no gasta cupo.
+
+     ⚠️ Esto NO detiene a alguien que rote correos. Ese caso se ataja en la regla
+     de rate-limit de Cloudflare, que es configuracion y no codigo — el mismo
+     pendiente ya anotado para /api/caso y para ALMA. */
+  const recientes = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM aportes a JOIN donantes d ON d.id = a.donante_id " +
+    "WHERE d.email = ? AND a.estado = 'reportada' " +
+    "AND a.creada_en > datetime('now','-10 minutes')"
+  ).bind(email).first();
+  if (recientes && recientes.n >= 5) {
+    return json({ error: "demasiados_reportes",
+                  ayuda: "Ya recibimos varios reportes desde este correo hace un momento. " +
+                         "Espera unos minutos; si ya enviaste el tuyo, busca tu numero de guia " +
+                         "en el correo que te llego." }, 429);
+  }
+
   const donanteId = await donantePorCorreo(env, email, nombre);
   const guia = await siguienteGuia(env, anioCO());
   const token = tokenNuevo();
