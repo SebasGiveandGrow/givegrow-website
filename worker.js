@@ -1203,7 +1203,21 @@ async function apiAporte(env, guia) {
     moneda: publico ? f.moneda : null,
     publico,
     modo: f.modo, destino: f.destino_id, proyecto: f.proyecto, frecuencia: f.frecuencia,
-    creada_en: f.creada_en, aprobada_en: f.aprobada_en
+    /* EN HORA DE COLOMBIA, no en UTC. D1 guarda con `datetime('now')`, que es
+       UTC, y el cliente se queda con los diez primeros caracteres para pintar la
+       fecha del recorrido. O sea que un aporte aprobado despues de las 7 de la
+       tarde se le mostraba al donante con la fecha del DIA SIGUIENTE — y en la
+       ultima noche del año, con el año siguiente, justo el dato con el que
+       cuenta para su declaracion.
+       Hoy no lo esta viendo nadie: los tres aportes aprobados que hay en
+       produccion se aprobaron entre las 9 y las 11 de la mañana. Salta la
+       primera vez que se apruebe uno de noche, y se aprueban a mano.
+       El certificado ya lo hacia bien con `anioCO`; esto alinea la pantalla
+       publica con el documento legal.
+       La guarda importa: `enColombia(null)` devuelve AHORA, asi que convertir a
+       ciegas le inventaria fecha de aprobacion a un aporte sin aprobar. */
+    creada_en: f.creada_en ? selloCO(f.creada_en) : null,
+    aprobada_en: f.aprobada_en ? selloCO(f.aprobada_en) : null
   });
 }
 
@@ -8231,14 +8245,20 @@ async function adminCasoFicha(env, numero) {
   ).bind(numero).all();
 
   const hilo = [];
-  const cuando = (v) => String(v || "").slice(0, 16);
+  /* TODAS las fuentes del hilo pasan por aqui, y eso es lo que permite convertir
+     a hora de Colombia en un solo sitio. Si solo se convirtieran unas, el hilo
+     mezclaria zonas y el orden se romperia: mas abajo se ordena comparando las
+     cadenas, y eso solo es cronologico si todas estan en la misma hora.
+     Dos llegan ya troceadas por SQL (`substr(...,1,16) AS cuando`); se las hace
+     pasar igual por aqui, que acepta ese formato. */
+  const cuando = (v) => (v ? selloCO(v).slice(0, 16) : "");
 
   hilo.push({ cuando: cuando(c.creado_en), tipo: "caso",
     texto: "La familia reportó su casa · " + (c.sector || "sin sector") +
            (c.contacto_email ? " · dejó correo" : " · SIN correo, así que no hay a dónde escribirle") });
 
   for (const x of cons.results || []) {
-    hilo.push({ cuando: x.cuando, tipo: "consent", texto: "Autorizaciones registradas · " + x.detalle });
+    hilo.push({ cuando: cuando(x.cuando), tipo: "consent", texto: "Autorizaciones registradas · " + x.detalle });
   }
 
   /* Medios por día, con la hora del último de ese día para ordenar bien frente a
@@ -8272,7 +8292,7 @@ async function adminCasoFicha(env, numero) {
   for (const x of co.results || []) {
     /* El RESULTADO va en el texto y no escondido: un `simulado` significa que no
        se envió nada, y un `fallo` que la familia no recibió lo que dice el hilo. */
-    hilo.push({ cuando: x.cuando, tipo: "correo",
+    hilo.push({ cuando: cuando(x.cuando), tipo: "correo",
       texto: "Correo «" + x.etiqueta + "» a " + x.para + " · " + x.resultado });
   }
 
@@ -10530,7 +10550,7 @@ async function adminBuscar(env, url) {
     return json({ q, tipo: "numero", resultados: f ? [{
       clase: cfg.clase, numero: f.numero, estado: f.estado || null,
       nombre: f.nombre || null, sector: f.sector || null,
-      cuando: f.cuando ? String(f.cuando).slice(0, 16) : null,
+      cuando: f.cuando ? selloCO(f.cuando).slice(0, 16) : null,
       destino: cfg.destino
     }] : [] });
   }
@@ -10550,7 +10570,7 @@ async function adminBuscar(env, url) {
     for (const f of casos.results || []) {
       filas.push({ clase: "Caso de vivienda", numero: f.numero, estado: f.estado,
                    nombre: f.nombre, sector: f.sector,
-                   cuando: String(f.cuando || "").slice(0, 16), destino: "#sec-casas" });
+                   cuando: f.cuando ? selloCO(f.cuando).slice(0, 16) : "", destino: "#sec-casas" });
     }
     const aportes = await env.DB.prepare(
       "SELECT a.guia AS numero, a.estado, a.creada_en AS cuando, d.nombre FROM aportes a " +
@@ -10559,7 +10579,7 @@ async function adminBuscar(env, url) {
     ).bind(digitos).all();
     for (const f of aportes.results || []) {
       filas.push({ clase: "Aporte", numero: f.numero, estado: f.estado, nombre: f.nombre,
-                   sector: null, cuando: String(f.cuando || "").slice(0, 16), destino: "#sec-salud" });
+                   sector: null, cuando: f.cuando ? selloCO(f.cuando).slice(0, 16) : "", destino: "#sec-salud" });
     }
     const insc = await env.DB.prepare(
       "SELECT id, tipo, estado, nombre, creada_en AS cuando FROM inscripciones " +
@@ -10568,7 +10588,7 @@ async function adminBuscar(env, url) {
     for (const f of insc.results || []) {
       filas.push({ clase: "Quién quiere entrar (" + f.tipo + ")", numero: "#" + f.id,
                    estado: f.estado, nombre: f.nombre, sector: null,
-                   cuando: String(f.cuando || "").slice(0, 16), destino: "#sec-entrar" });
+                   cuando: f.cuando ? selloCO(f.cuando).slice(0, 16) : "", destino: "#sec-entrar" });
     }
     return json({ q, tipo: "telefono", resultados: filas });
   }
