@@ -12412,6 +12412,27 @@ function adminJS() {
 var FILTRO = "";
 var FILAS = {};
 function pesos(c){ return "$" + Math.round((c||0)/100).toLocaleString("es-CO"); }
+/* HORA DE COLOMBIA. El panel leia estas marcas tal como las guarda D1, que es
+   UTC, asi que TODO el registro operativo iba corrido cinco horas: un caso
+   reportado a las 10:47 de la manana se leia «15:47», y cualquier cosa de
+   despues de las 7 de la tarde salia con la fecha del dia siguiente. En una
+   pantalla cuyo trabajo es reconstruir que paso y cuando, eso no es cosmetico.
+
+   El hilo del caso ya se habia arreglado (PR #325) convirtiendo en el servidor;
+   estas dieciseis se quedaron. Aqui se hace en el cliente porque son filas de
+   ocho endpoints distintos y este es el unico punto por el que pasan todas.
+
+   OJO: «fecha_visita», «desde», «hasta» y las vigencias NO pasan por aqui. Las
+   escribe una persona y ya estan en su hora: restarles cinco seria meter el
+   fallo, no quitarlo. */
+function enCO(v, n){
+  if (!v) return "";
+  var t = String(v).trim().replace(" ", "T");
+  if (!/[Zz]$|[+-]\d\d:?\d\d$/.test(t)) t += "Z";
+  var d = new Date(t);
+  if (isNaN(d)) return String(v).slice(0, n || 16);
+  return new Date(d.getTime() - 5*3600*1000).toISOString().replace("T", " ").slice(0, n || 16);
+}
 function esc(s){
   /* ESCAPA TAMBIÉN LAS COMILLAS, y esa es la corrección.
      Antes usaba textContent -> innerHTML, que escapa & < > y NADA MÁS. Basta
@@ -12498,7 +12519,7 @@ function pintarFilas(l){
       "<td>" + esc(a.donante || "—") + (a.correo ? "<br><small>" + esc(a.correo) + "</small>" : "") + "</td>" +
       "<td>" + recibo + "</td>" +
       "<td>" + celdaCert(a) + "</td>" +
-      "<td>" + esc((a.creada_en||"").slice(0,16)) + "</td>" +
+      "<td>" + esc(enCO(a.creada_en, 16)) + "</td>" +
       "<td>" + accion(a) + "</td>" +
     "</tr>";
   }).join("");
@@ -12671,7 +12692,7 @@ function cargarReportadas(){
     if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Ninguna esperando verificación.</td></tr>'; return; }
     tb.innerHTML = l.map(function(a){
       return "<tr>" +
-        "<td>" + esc(a.guia) + "<br><small>" + esc((a.creada_en||"").slice(0,16)) +
+        "<td>" + esc(a.guia) + "<br><small>" + esc(enCO(a.creada_en, 16)) +
           (a.dias >= 3 ? '<br><strong style="color:#A84D00">esperando ' + a.dias + " dia(s)</strong>" : "") +
         "</small></td>" +
         "<td>" + pesos(a.monto_centavos) + "</td>" +
@@ -13080,7 +13101,7 @@ function cargarInscripciones(){
         "<td>" + esc(i.email||"") + (i.telefono ? "<br><small>" + esc(i.telefono) + "</small>" : "") +
           (i.ciudad ? "<br><small>" + esc(i.ciudad) + "</small>" : "") +
           (enlaces.length ? "<br><small>" + enlaces.join(" · ") + "</small>" : "") + "</td>" +
-        "<td>" + esc((i.creada_en||"").slice(0,10)) + "</td>" +
+        "<td>" + esc(enCO(i.creada_en, 10)) + "</td>" +
         "<td>" + esc(i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
         "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") +
           (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") +
@@ -13135,7 +13156,7 @@ function cargarCasos(){
           '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="cerrado">Cerrar…</button> ' +
           '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="descartado">Descartar…</button>');
       return "<tr" + (fin ? ' style="opacity:.55"' : "") + ">" +
-        "<td><strong>" + esc(c.numero) + "</strong><br><small>" + esc((c.creado_en||"").slice(0,10)) + "</small>" +
+        "<td><strong>" + esc(c.numero) + "</strong><br><small>" + esc(enCO(c.creado_en, 10)) + "</small>" +
           (c.dup ? '<br><small style="color:#A84D00"><strong>mismo teléfono que ' + esc(c.dup) + "</strong></small>" : "") + "</td>" +
         "<td>" + pr + "</td>" +
         "<td>" + esc(c.sector) + (c.direccion_ref ? "<br><small>" + esc(c.direccion_ref) + "</small>" : "") + "</td>" +
@@ -13194,7 +13215,7 @@ function abrirCaso(numero){
 
     var evals = (d.evaluaciones || []).map(function(e){
       return '<li style="margin-bottom:10px"><strong>' + esc(e.clasificacion) + "</strong> · " +
-        esc(e.ing_nombre) + " (mat. " + esc(e.ing_matricula) + ") · " + esc((e.creado_en||"").slice(0,10)) +
+        esc(e.ing_nombre) + " (mat. " + esc(e.ing_matricula) + ") · " + esc(enCO(e.creado_en, 10)) +
         "<br><small>" + esc(e.nota_tecnica || "") + "</small>" +
         (e.falta ? "<br><small><strong>Falta:</strong> " + esc(e.falta) + "</small>" : "") + "</li>";
     }).join("");
@@ -13207,10 +13228,10 @@ function abrirCaso(numero){
         esc(v.fecha_visita || "sin fecha") + (v.hora ? " " + esc(v.hora) : "") +
         (v.obs_nombre ? " · " + esc(v.obs_nombre) : "") +
         (v.recibido_en && String(v.recibido_en).slice(0,10) !== v.fecha_visita
-          ? "<br><small>recibida el " + esc(v.recibido_en) + "</small>" : "") +
+          ? "<br><small>recibida el " + esc(enCO(v.recibido_en)) + "</small>" : "") +
         (v.requiere_esp ? '<br><small style="color:var(--amber)"><strong>requiere revisión especializada</strong></small>' : "") +
         (v.atendida_en
-          ? '<br><small style="color:var(--g)">atendida ' + esc(String(v.atendida_en).slice(0,16))
+          ? '<br><small style="color:var(--g)">atendida ' + esc(enCO(v.atendida_en, 16))
             + (v.atendida_nota ? " · " + esc(v.atendida_nota) : "") + "</small>"
           : "") +
         (v.pdf_key
@@ -13245,7 +13266,7 @@ function abrirCaso(numero){
     }).join("");
 
     var hist = (d.historial || []).map(function(h){
-      return "<li><small>" + esc((h.otorgado_en||"").slice(0,16)) + " · " + esc(h.sujeto) + " — " +
+      return "<li><small>" + esc(enCO(h.otorgado_en, 16)) + " · " + esc(h.sujeto) + " — " +
         esc(String(h.detalle).replace("caso " + numero + " ", "")) + "</small></li>";
     }).join("");
 
@@ -13379,7 +13400,7 @@ function selloMatricula(x){
   if (!x.matricula) return '<small style="color:var(--err)">sin matrícula</small>';
   if (x.matricula_verificada === 1 || x.matricula_verificada === true) {
     return '<small style="color:var(--g)"><strong>matrícula verificada</strong>'
-         + (x.matricula_verificada_en ? "<br>" + esc(String(x.matricula_verificada_en).slice(0,10)) : "")
+         + (x.matricula_verificada_en ? "<br>" + esc(enCO(x.matricula_verificada_en, 10)) : "")
          + (x.matricula_verificada_por ? "<br>" + esc(x.matricula_verificada_por) : "")
          + "</small>";
   }
@@ -13437,7 +13458,7 @@ function mirarRespaldo(){
     }
     de.innerHTML = "El respaldo dice que salió de <strong>" + esc(d.observador || "sin nombre") + "</strong>"
       + (d.correo ? " (" + esc(d.correo) + ")" : ", <strong>sin correo dentro</strong>: escríbelo a mano")
-      + ", el " + esc(d.generado_en || "-") + ". Trae <strong>" + c + "</strong> por enviar y <strong>"
+      + ", el " + esc(enCO(d.generado_en) || "-") + ". Trae <strong>" + c + "</strong> por enviar y <strong>"
       + b + "</strong> a medias.";
   }).catch(function(x){
     de.textContent = (x && x.message === "no_es_un_respaldo")
@@ -13538,7 +13559,7 @@ function cargarInspecciones(){
       var atender = "";
       if (v.urge) {
         atender = v.atendida_en
-          ? '<br><small style="color:var(--g)"><strong>atendida</strong> ' + esc((v.atendida_en || "").slice(0,16))
+          ? '<br><small style="color:var(--g)"><strong>atendida</strong> ' + esc(enCO(v.atendida_en, 16))
             + (v.atendida_por ? " · " + esc(v.atendida_por) : "")
             + (v.atendida_nota ? "<br>" + esc(v.atendida_nota) : "")
             + '<br><button class="copy" data-insp-reabrir="' + esc(v.numero) + '">Reabrir</button></small>'
@@ -13849,7 +13870,7 @@ function cargarSueltos(){
         "<td>" + (p.monto_centavos ? pesos(p.monto_centavos) : "—") + "</td>" +
         "<td>" + esc(p.metodo || "—") + "</td>" +
         "<td>" + esc(p.nombre || "—") + (p.correo ? "<br><small>" + esc(p.correo) + "</small>" : "") + "</td>" +
-        "<td>" + esc((p.recibido_en||"").slice(0,16)) + "</td>" +
+        "<td>" + esc(enCO(p.recibido_en, 16)) + "</td>" +
       "</tr>";
     }).join("");
   });
@@ -13877,7 +13898,7 @@ function cargarIpn(){
         ? (e.resultado === "por_registrar" ? "Si, por registrar" : "Si")
         : ("No: " + esc(e.resultado || "sin verificar"));
       return "<tr>" +
-        "<td>" + esc((e.recibido_en||"").slice(0,16)) + "</td>" +
+        "<td>" + esc(enCO(e.recibido_en, 16)) + "</td>" +
         "<td>" + esc(e.txn_type || e.estado || "—") + (e.recurrente ? "<br><small>mensual</small>" : "") + "</td>" +
         "<td>" + monto + comision + "</td>" +
         "<td>" + esc(e.nombre || "—") + (e.correo ? "<br><small>" + esc(e.correo) + "</small>" : "") + "</td>" +
@@ -13917,7 +13938,7 @@ function verFicha(id){
       "td:nth-child(2){width:38%;font-weight:600}h1{font-size:20px;margin:0 0 2px}" +
       "p.sub{color:#5C636F;font-size:13px;margin:0 0 16px}ul{margin:8px 0 20px 18px}</style>" +
       "<h1>" + esc(d.nombre) + "</h1>" +
-      '<p class="sub">' + esc(d.estado) + (d.enviada_en ? " · enviada " + esc(d.enviada_en) : "") +
+      '<p class="sub">' + esc(d.estado) + (d.enviada_en ? " · enviada " + esc(enCO(d.enviada_en)) : "") +
       " · " + esc(d.email || "") + "</p>" +
       (arch ? "<h3>Archivos</h3><ul>" + arch + "</ul>" : "<p><em>Sin archivos subidos.</em></p>") +
       objeto +
@@ -13979,7 +14000,7 @@ function cargarSuscripciones(){
         ? esc(s.nombre || "—") + "<br><small>" + esc(s.email) + "</small>"
         : "<strong>sin correo</strong>";
       return "<tr>" +
-        "<td>" + esc((s.creada_en||"").slice(0,16)) + "</td>" +
+        "<td>" + esc(enCO(s.creada_en, 16)) + "</td>" +
         "<td>" + estado + "</td>" +
         "<td>" + esc(s.nivel || "—") + "</td>" +
         "<td>" + monto + "</td>" +
@@ -14010,7 +14031,7 @@ function cargarPaypalSueltos(){
         ? "Donacion del boton: sin guia, hay que registrarla a mano"
         : "Pago sin suscripcion: registrar a mano";
       return "<tr>" +
-        "<td>" + esc((e.recibido_en||"").slice(0,16)) + "</td>" +
+        "<td>" + esc(enCO(e.recibido_en, 16)) + "</td>" +
         "<td>" + esc(e.tipo || "—") + "<br><small>" + esc(e.evento_id || "") + "</small></td>" +
         "<td>" + monto + "</td>" +
         "<td>" + esc(e.correo || "—") + "</td>" +
