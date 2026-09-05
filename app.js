@@ -1676,6 +1676,30 @@ function applyRouteMeta(id){
     }
     return; /* renderFicha la aplica cuando cargan los datos */
   }
+  /* LA FICHA DE UN COMERCIO CAIA A LA PORTADA, que es la misma cicatriz que ya
+     esta escrita unas lineas mas arriba para las cuatro rutas que faltaban:
+     «se presentaban con el titulo y la descripcion de la portada».
+
+     Aqui la causa es distinta y por eso no se vio: la entrada `comercio` SI
+     existe en ROUTE_META, pero la ruta real es `comercio/<id>`, asi que la
+     busqueda nunca la encuentra y cae al `|| ROUTE_META.inicio`. La entrada era
+     inalcanzable. `comercio/` esta contemplada en el enrutado, en el titulo de
+     la pagina y en el desplazamiento — en todas menos en los metadatos.
+
+     Medido: abrir #comercio/kore-makeup dejaba el titulo «Give&Grow
+     International — Dar para crecer, crecer para dar mas» y la descripcion de
+     la portada, en la pagina de un comercio que entro al Programa de Gratitud
+     precisamente para tener visibilidad. */
+  if (id.indexOf("comercio/")===0){
+    var cid = id.split("/")[1];
+    if (GRATITUD_DATA){
+      var cs = GRATITUD_DATA.comercios || [];
+      for (var k=0;k<cs.length;k++){
+        if (cs[k].id===cid && cs[k].status==="activa"){ applyComercioMeta(cs[k]); return; }
+      }
+    }
+    return; /* renderComercio la aplica cuando cargan los datos */
+  }
   var m = ROUTE_META[id] || ROUTE_META.inicio;
   var ti = m.t[lang]||m.t.es, de = m.d[lang]||m.d.es;
   document.title = ti;
@@ -1702,6 +1726,32 @@ function applyFichaMeta(p){
   setMetaTag("property","og:title",ti);
   setMetaTag("property","og:description",de);
   setMetaTag("property","og:url","https://www.thegiveandgrowproject.org/f/"+p.id);
+  setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
+  setMetaTag("property","og:image", img);
+  setMetaTag("name","twitter:image", img);
+  setMetaTag("name","twitter:title",ti);
+  setMetaTag("name","twitter:description",de);
+  setMetaTag("name","robots","index, follow");
+}
+/* Gemelo de `applyFichaMeta` para un comercio aliado. Dos diferencias, y las dos
+   por como son los datos:
+   · la descripcion sale de `about` y, si no hay, del BENEFICIO — que es lo que
+     de verdad describe a un comercio del Programa de Gratitud;
+   · `og:url` es la ruta con almohadilla y no `/f/<id>`: esa ruta del Worker solo
+     existe para fundaciones. Queda anotado como lo que es. */
+function applyComercioMeta(c){
+  var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
+  var ti = c.name + " · Give&Grow International";
+  var de = pick(c.about) || pick(c.beneficio) || "";
+  if (de.length > 155) de = de.slice(0,152).replace(/\s+\S*$/,"") + "…";
+  var img = (c.logo && c.consent && c.consent.logo === true)
+    ? ("https://www.thegiveandgrowproject.org"+c.logo) : OG_IMG_DEFAULT;
+  var url = "https://www.thegiveandgrowproject.org/#comercio/"+c.id;
+  document.title = ti;
+  setMetaTag("name","description",de);
+  setMetaTag("property","og:title",ti);
+  setMetaTag("property","og:description",de);
+  setMetaTag("property","og:url",url);
   setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
   setMetaTag("property","og:image", img);
   setMetaTag("name","twitter:image", img);
@@ -5793,6 +5843,9 @@ function renderComercio(cid){
     var comercios = (data && data.comercios) || [];
     for (var i=0;i<comercios.length;i++){ if (comercios[i].id === cid && comercios[i].status === "activa"){ c = comercios[i]; break; } }
     if (!c){ go("gratitud"); return; }
+    /* Igual que `renderFicha`: al llegar por enlace directo, applyRouteMeta se
+       ejecuta ANTES de que existan los datos y se sale sin tocar nada. */
+    applyComercioMeta(c);
     var cats = (data && data.categorias) || {};
     var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
     var catLabel = cats[c.categoria] ? pick(cats[c.categoria]) : "";
