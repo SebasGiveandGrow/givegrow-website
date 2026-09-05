@@ -8937,14 +8937,27 @@ async function apiApadrinamiento(env, c) {
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
 }
 
+/* EL MISMO CONTENIDO EN TEXTO PLANO, derivado de las mismas variables que arma
+   el HTML. Los otros correos del proyecto lo escriben aparte, y eso deja dos
+   copias que pueden separarse; aqui hay una sola.
+
+   Y hace falta: Resend recibe `text` y `html`, y un correo SOLO-HTML puntua peor
+   en los filtros de spam y no dice nada en un lector de texto o en una pasarela
+   corporativa que quita el HTML. Estos dos van a alguien que acaba de ofrecerse
+   a reparar viviendas despues de un sismo: acabar en spam tiene un costo real. */
+function textoCorreo(c) {
+  const l = [];
+  if (c.titulo) l.push(c.titulo, "");
+  for (const p of c.parrafos || []) l.push(p, "");
+  for (const f of c.filas || []) l.push(f[0] + ": " + (f[1] === null || f[1] === undefined || f[1] === "" ? "—" : f[1]));
+  if ((c.filas || []).length) l.push("");
+  if (c.cierre) l.push(c.cierre);
+  return l.join("\n");
+}
+
 async function correoApadrinamiento(env, a) {
   const en = a.idioma === "en";
-  return await enviarCorreo(env, {
-    para: a.email,
-    asunto: en ? "We received your offer to help repair a home"
-               : "Recibimos tu ofrecimiento para reparar una vivienda",
-    etiqueta: "apadrinamiento",
-    html: plantillaCorreo({
+  const cuerpo = {
       titulo: en ? "Thank you. Here is what happens now." : "Gracias. Esto es lo que sigue.",
       parrafos: en ? [
         "Someone from the team will write to you to agree on the details. Nothing is charged from this form.",
@@ -8960,21 +8973,22 @@ async function correoApadrinamiento(env, a) {
         [en ? "Details" : "Detalle", a.detalle],
         [en ? "Territory" : "Territorio", ETIQUETA_SECTOR[a.sector] || a.sector]
       ],
-      cierre: en ? "Fundación Give&Grow International · NIT 901.948.930-2"
-                 : "Fundación Give&Grow International · NIT 901.948.930-2"
-    })
+      cierre: "Fundación Give&Grow International · NIT 901.948.930-2"
+  };
+  return await enviarCorreo(env, {
+    para: a.email,
+    asunto: en ? "We received your offer to help repair a home"
+               : "Recibimos tu ofrecimiento para reparar una vivienda",
+    etiqueta: "apadrinamiento",
+    texto: textoCorreo(cuerpo),
+    html: plantillaCorreo(cuerpo)
   });
 }
 
 async function correoAvisoApadrinamiento(env, a) {
   const para = correoMMC(env);
   if (!para) return avisoSinBuzon(env, "apadrinamiento-aviso");
-  return await enviarCorreo(env, {
-    para,
-    asunto: "Apadrinamiento: " + (ETIQUETA_APORTE.es[a.aporte] || a.aporte)
-            + " · " + (ETIQUETA_SECTOR[a.sector] || a.sector),
-    etiqueta: "apadrinamiento-aviso",
-    html: plantillaCorreo({
+  const cuerpo = {
       titulo: "Alguien quiere aportar a la reparación de viviendas",
       filas: [
         ["Qué ofrece", ETIQUETA_APORTE.es[a.aporte] || a.aporte],
@@ -8989,7 +9003,14 @@ async function correoAvisoApadrinamiento(env, a) {
         ["Ciudad", a.ciudad || "(no dice)"]
       ],
       cierre: "Está en /admin, en la bandeja de postulaciones."
-    })
+  };
+  return await enviarCorreo(env, {
+    para,
+    asunto: "Apadrinamiento: " + (ETIQUETA_APORTE.es[a.aporte] || a.aporte)
+            + " · " + (ETIQUETA_SECTOR[a.sector] || a.sector),
+    etiqueta: "apadrinamiento-aviso",
+    texto: textoCorreo(cuerpo),
+    html: plantillaCorreo(cuerpo)
   });
 }
 
