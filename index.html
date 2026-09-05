@@ -1459,9 +1459,10 @@
         <p class="rec-cap" data-i18n="rep.ok.t">Listo. Tu número de guía es</p>
         <p class="rep-guia" id="rep-guia"></p>
         <p class="rep-ok-p" data-i18n="rep.ok.p">Guárdalo: con él sigues tu aporte en el rastreo. Todavía no está confirmado — verificamos cada transferencia contra el extracto antes de registrarla como recibida.</p>
-        <h3 class="rep-sube-t" data-i18n="rep.sube">Sube tu comprobante (opcional)</h3>
-        <p class="rep-ok-p" data-i18n="rep.sube.p">Imagen o PDF, hasta 5 MB. Con el comprobante la verificación es inmediata; sin él hay que buscarla a mano en el extracto.</p>
-        <input type="file" id="rep-file" accept="image/jpeg,image/png,image/webp,application/pdf">
+        <h3 class="rep-sube-t" id="rep-sube-t" data-i18n="rep.sube">Sube tu comprobante (opcional)</h3>
+        <p class="rep-ok-p" id="rep-sube-p" data-i18n="rep.sube.p">Imagen o PDF, hasta 5 MB. Con el comprobante la verificación es inmediata; sin él hay que buscarla a mano en el extracto.</p>
+        <input type="file" id="rep-file" accept="image/jpeg,image/png,image/webp,application/pdf"
+               aria-labelledby="rep-sube-t" aria-describedby="rep-sube-p">
         <p class="ally-note" id="rep-file-note" role="status" aria-live="polite"></p>
       </div>
     </div>
