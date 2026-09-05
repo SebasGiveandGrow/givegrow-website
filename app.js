@@ -4,6 +4,7 @@
 /* ---------- I18N ---------- */
 var I18N = {
   es: {
+    "grat.falla": "No pudimos cargar los comercios aliados en este momento. No quiere decir que no haya: quiere decir que no lo pudimos comprobar. Vuelve a intentar en un rato.",
     "nav.menu.aria": "Menú",
     "donar.via.aria": "Con qué pasarela pagar",
     "cv.ej.sirvecerca.alt": "Muro blanco agrietado junto a una puerta, con escombro al pie",
@@ -5714,8 +5715,24 @@ function renderGratitudComercios(){
   var empty = document.getElementById("grat-empty");
   if (!grid) return;
   loadGratitud().then(function(data){
+    /* FALLO Y VACIO NO SON LO MISMO, y decirlos con el mismo mensaje es afirmar
+       algo falso. `loadGratitud` devuelve null cuando la descarga falla; eso
+       caia en la misma rama que «cargo bien y no hay ninguno» y la pagina
+       anunciaba «Estamos sumando los primeros comercios aliados» — con Kore
+       Makeup Academy ya publicada, con convenio firmado. A un comercio que
+       acaba de aliarse, o a quien va a buscarlo, se le estaba diciendo que el
+       programa todavia no tiene a nadie.
+
+       Es EXACTAMENTE el fallo que ya se corrigio en el banco publico de casas
+       («si la red falla, el catch pintaba "Todavia no hay casos publicos"»).
+       Se arreglo alli y esta se quedo suelta: misma familia, mismo remedio. */
+    if (!data){
+      if (empty) empty.style.display = "none";
+      grid.innerHTML = '<p class="mu">' + escapeHtml(t("grat.falla")) + "</p>";
+      return;
+    }
     // Solo comercios con convenio firmado (status "activa")
-    var activos = (data && data.comercios || []).filter(function(c){ return c.status === "activa"; });
+    var activos = (data.comercios || []).filter(function(c){ return c.status === "activa"; });
     if (!activos.length){
       grid.innerHTML = "";
       if (empty) empty.style.display = "";

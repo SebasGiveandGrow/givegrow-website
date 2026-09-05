@@ -1608,5 +1608,6 @@
   "ally.desc.ph": "In your own words: who you are and what you do. It will appear on your public profile if you join the Gratitude Program.",
   "ally.ben.ph": "E.g. 15% off, a complimentary dessert…",
   "ally.nivel.ph": "E.g. Sprout and above",
-  "ally.redime.ph": "E.g. by showing the digital membership card"
+  "ally.redime.ph": "E.g. by showing the digital membership card",
+  "grat.falla": "We could not load the allied businesses right now. That does not mean there are none: it means we could not check. Please try again in a while."
 }
