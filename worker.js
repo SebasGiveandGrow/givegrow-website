@@ -3312,6 +3312,7 @@ function paginaTriage() {
   </div>
   <div class="tabs" id="tabs">
     <button class="tab on" data-cola="pendientes">Sin revisar</button>
+    <button class="tab" data-cola="mios">Los que tomé <span id="n-mios"></span></button>
     <button class="tab" data-cola="confirmar">Piden confirmación <span id="n-conf"></span></button>
     <button class="tab" data-cola="clasificados">Ya clasificados</button>
   </div>
@@ -3373,16 +3374,41 @@ fetch("/api/triage/quien").then(function(r){ return r.json(); }).then(function(d
 }).catch(function(){ el("quien").textContent = "Sesión activa"; });
 
 var COLA = "pendientes";
+var DESDE = 0;
+var MIOS = 0, TOMA_MAX = 10, TOMA_HORAS = 8;
+
+/* TOMAR Y SOLTAR. El caso desaparece de la cola de los demas mientras se tiene,
+   y vuelve solo a las TOMA_HORAS si no se termina: la caducidad la resuelve el
+   servidor con una condicion, aqui no hay temporizador que mantener. */
+function tomarSoltar(numero, accion){
+  fetch("/api/triage/caso/" + encodeURIComponent(numero) + "/" + accion, { method: "POST" })
+    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      if (!res.ok || !res.d.ok){
+        var d = res.d || {};
+        /* Los tres motivos se dicen distinto a proposito: «ya lo tiene otro» es
+           informacion util —no es un fallo, es que alguien se adelanto—. */
+        alert(d.error === "ya_tomado" ? "Otro ingeniero tomo ese caso hace un momento. Se quita de tu lista."
+            : d.error === "demasiados_tomados" ? (d.ayuda || "Tienes demasiados casos tomados.")
+            : d.error === "no_era_tuyo" ? "Ese caso ya no lo tenias tomado."
+            : "No se pudo. Intenta otra vez.");
+      }
+      cargarCola();
+    })
+    .catch(function(){ alert("No se pudo. Revisa tu conexion."); });
+}
 
 var VACIO = {
   pendientes: "No hay casos esperando. Gracias.",
   confirmar: "Nada pendiente de confirmar. Cuando un caso urgente tenga una sola opinión, o dos ingenieros no coincidan, aparece aquí.",
-  clasificados: "Todavía no hay casos clasificados."
+  clasificados: "Todavía no hay casos clasificados.",
+  mios: "No tienes ningún caso tomado. Toma uno de «Sin revisar» y desaparece de la cola de los demás mientras lo trabajas."
 };
 var CABEZA = {
   pendientes: "caso(s) esperando, del más antiguo al más reciente.",
   confirmar: "caso(s) donde un segundo par de ojos cambia algo: urgentes con una sola opinión, y los que están en desacuerdo. Sobre un urgente se va a mover una brigada.",
-  clasificados: "caso(s) ya clasificados."
+  clasificados: "caso(s) ya clasificados.",
+  mios: "caso(s) que tomaste. Nadie más los ve mientras los tengas."
 };
 
 /* EL LAZO CERRADO. El ingeniero daba su concepto, el caso salía de la pestaña, y
@@ -3446,9 +3472,13 @@ function cargarMisEvaluaciones(){
 }
 
 function cargarCola(){
-  fetch("/api/triage/casos?estado=" + encodeURIComponent(COLA)).then(function(r){ return r.json(); }).then(function(d){
+  fetch("/api/triage/casos?estado=" + encodeURIComponent(COLA) + "&desde=" + DESDE)
+    .then(function(r){ return r.json(); }).then(function(d){
     var n = el("n-conf");
     if (n) n.textContent = d.porConfirmar ? "(" + d.porConfirmar + ")" : "";
+    var nm = el("n-mios");
+    if (nm) nm.textContent = d.mios ? "(" + d.mios + ")" : "";
+    MIOS = d.mios || 0; TOMA_MAX = d.tomaMax || 10; TOMA_HORAS = d.tomaHoras || 8;
     var c = d.casos || [];
     /* VACIO y CABEZA tienen tres claves y el servidor acepta una cuarta,
        estado=todos, que ninguna pestaña usa. Si alguien la pide, esto pintaba
@@ -3458,10 +3488,12 @@ function cargarCola(){
     /* Si la lista llegó al tope, se DICE. Un «200» a secas se lee como «hay
        200», y con eso el caso 201 no existe para nadie mientras la familia
        espera. */
-    var truncada = d.total && d.tope && d.total > d.tope;
-    var h = "<p class='sub'>" + (truncada
-      ? c.length + " de " + d.total + " " + CABEZA[COLA]
-        + " &middot; <b>faltan " + (d.total - c.length) + " por mostrar</b>, usa las pestañas para acotar"
+    /* ANTES DECIA «usa las pestañas para acotar» Y NO HABIA CON QUE: la cola
+       terminaba en el caso 200 y no existia forma de llegar al 201. Ahora se
+       pagina de verdad, asi que el aviso pasa a ser un boton. */
+    var hay = (DESDE + c.length) < (d.total || 0);
+    var h = "<p class='sub'>" + (d.total > c.length
+      ? (DESDE + 1) + "&ndash;" + (DESDE + c.length) + " de " + d.total + " " + CABEZA[COLA]
       : c.length + " " + (CABEZA[COLA] || "caso(s).")) + "</p>";
     for (var i = 0; i < c.length; i++){
       var x = c[i];
@@ -3478,8 +3510,21 @@ function cargarCola(){
            que decide si vale la pena abrirlo ahora. */
         +  (x.respondio ? "<span class='pill p-respondio'>mandó lo que faltaba</span>" : "")
         +  (x.discrepa ? "<span class='pill p-discrepa'>en discrepancia</span>" : "")
+        /* El boton va en la fila y no dentro de la ficha: la decision de tomar
+           se hace mirando la lista, antes de abrir nada. */
+        +  (x.tomado_por
+              ? "<button class='tab' data-tomar='" + esc(x.numero) + "' data-accion='soltar'>soltar</button>"
+              : (MIOS >= TOMA_MAX
+                   ? ""
+                   : "<button class='tab' data-tomar='" + esc(x.numero) + "' data-accion='tomar'>tomar</button>"))
         +  (x.clasificacion ? "<span class='pill p-" + esc(x.clasificacion) + "'>" + esc(x.clasificacion) + "</span>" : "")
         +  "<button class='btn' data-abrir='" + esc(x.numero) + "'>Abrir</button></div>";
+    }
+    if (DESDE > 0 || hay){
+      h += "<p class='sub'>"
+        + (DESDE > 0 ? "<button class='tab' data-mas='" + Math.max(0, DESDE - d.tope) + "'>&larr; anteriores</button> " : "")
+        + (hay ? "<button class='tab' data-mas='" + (DESDE + d.tope) + "'>ver los siguientes " + Math.min(d.tope, d.total - DESDE - c.length) + " &rarr;</button>" : "")
+        + "</p>";
     }
     el("lista").innerHTML = h;
   });
@@ -3577,6 +3622,7 @@ document.addEventListener("click", function(ev){
   var t = ev.target.closest ? ev.target.closest("[data-cola]") : null;
   if (t){
     COLA = t.getAttribute("data-cola");
+    DESDE = 0;
     var tt = document.querySelectorAll(".tab");
     for (var i = 0; i < tt.length; i++) tt[i].classList.remove("on");
     t.classList.add("on");
@@ -3584,6 +3630,10 @@ document.addEventListener("click", function(ev){
     cargarCola();
     return;
   }
+  var tm = ev.target.closest ? ev.target.closest("[data-tomar]") : null;
+  if (tm){ ev.stopPropagation(); tomarSoltar(tm.getAttribute("data-tomar"), tm.getAttribute("data-accion")); return; }
+  var mas = ev.target.closest ? ev.target.closest("[data-mas]") : null;
+  if (mas){ DESDE = Number(mas.getAttribute("data-mas")) || 0; cargarCola(); return; }
   var a = ev.target.closest ? ev.target.closest("[data-abrir]") : null;
   if (a){ abrir(a.getAttribute("data-abrir")); return; }
   if (ev.target && ev.target.id === "t-enviar"){ enviar(); }
@@ -3707,6 +3757,30 @@ const DISCREPA = "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e "
    suelto porque va acompañado SIEMPRE de su total: el día que alguien lo suba,
    lo que la pantalla dice sigue siendo verdad. */
 const TOPE_COLA = 200;
+
+/* ═══ EL REPARTO DE CASOS ═══
+   Un ingeniero TOMA un caso y desaparece de la cola de los demas mientras lo
+   tiene. Sin esto, cien ingenieros miran las mismas doscientas filas.
+
+   Los dos numeros son constantes para poder moverlos sin buscar en el codigo:
+   · TOMA_HORAS  cuanto dura una toma antes de volver sola al monton. Ocho es
+     una jornada: da tiempo a mirar fotos y escribir el concepto, y un caso
+     abandonado vuelve el mismo dia en vez de quedarse retenido.
+   · TOMA_MAX    cuantos puede tener a la vez. Sin tope, una sola persona podria
+     retener la cola entera.
+
+   NO HACE FALTA NINGUN PROCESO QUE LIMPIE: la caducidad es una condicion en el
+   WHERE, no un estado que alguien tenga que apagar. Misma idea que
+   `RESPONDIO_TRAS_PEDIDO`, que deduce de fechas en vez de guardar una bandera. */
+const TOMA_HORAS = 8;
+const TOMA_MAX = 10;
+
+/* Vigente = tomado por alguien y dentro de la ventana. Fuera de la ventana, el
+   caso esta libre aunque la columna siga escrita. */
+const TOMA_VIGENTE =
+  "(c.tomado_por IS NOT NULL AND c.tomado_en > datetime('now','-" + TOMA_HORAS + " hours'))";
+/* Lo que otro tiene tomado ahora mismo. `?` es el correo de quien mira. */
+const TOMADO_POR_OTRO = "(" + TOMA_VIGENTE + " AND c.tomado_por <> ?)";
 /* QUÉ CUENTA COMO SEÑAL DE TERRENO QUE NO ESPERA, en un solo sitio.
 
    Tres cosas, y las tres las decidió alguien que estaba de pie frente a la casa:
@@ -3757,9 +3831,15 @@ const TERRENO_URGE =
 
 const TOPE_INSPECCIONES = 300;
 
-async function triageCasos(env, url) {
+async function triageCasos(env, url, email) {
   const estado = url.searchParams.get("estado") || "pendientes";
-  const filtro = estado === "todos" ? "" :
+  /* DESDE — la paginacion que faltaba. La cola terminaba en el caso 200 y no
+     habia forma de llegar al 201: el total lo decia, pero decirlo no es poder
+     abrirlo. */
+  const desde = Math.max(0, Number(url.searchParams.get("desde")) || 0);
+  const yo = String(email || "");
+  const filtro = estado === "mios" ? "WHERE " + TOMA_VIGENTE + " AND c.tomado_por = ?" :
+    estado === "todos" ? "" :
     estado === "clasificados" ? "WHERE c.estado = 'clasificado'" :
     /* PIDEN CONFIRMACIÓN: urgentes con una sola opinión, y los que ya están en
        desacuerdo. Son los dos casos donde un segundo par de ojos cambia algo —
@@ -3768,14 +3848,24 @@ async function triageCasos(env, url) {
        nada la pedía nunca. */
     estado === "confirmar" ? "WHERE " + CONFIRMAR() :
     "WHERE " + SIN_REVISAR;
+
+  /* Lo que otro tiene tomado no se le ensena a nadie mas: es lo que impide que
+     cien ingenieros abran el mismo caso. La pestana «mios» ya filtra por correo,
+     asi que ahi no se aplica. */
+  const oculto = (estado === "mios" || estado === "todos") ? ""
+    : (filtro ? " AND NOT " + TOMADO_POR_OTRO : "WHERE NOT " + TOMADO_POR_OTRO);
+  const args = estado === "mios" ? [yo] : (oculto ? [yo] : []);
+
   const r = await env.DB.prepare(
     "SELECT c.numero, c.estado, c.clasificacion, c.sector, c.material, c.pisos, " +
     "c.danio_previo, c.habitada, c.heridos, c.creado_en, " +
     "(SELECT COUNT(*) FROM caso_medios m WHERE m.caso = c.numero) AS medios, " +
     "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero) AS evaluaciones, " +
-    DISCREPA + " AS discrepa, " + FIRMES + " AS firmes, " + SIN_RESPALDO + " AS sin_respaldo " +
-    "FROM casos c " + filtro + " ORDER BY c.creado_en ASC LIMIT " + TOPE_COLA
-  ).all();
+    DISCREPA + " AS discrepa, " + FIRMES + " AS firmes, " + SIN_RESPALDO + " AS sin_respaldo, " +
+    "c.tomado_por, c.tomado_en " +
+    "FROM casos c " + filtro + oculto +
+    " ORDER BY c.creado_en ASC LIMIT " + TOPE_COLA + " OFFSET " + desde
+  ).bind(...args).all();
 
   /* EL TOTAL, con el MISMO filtro que la lista. Sin esto la cola termina en el
      caso 200 y parece que ahí se acaba: cinco territorios con más de cien
@@ -3784,7 +3874,14 @@ async function triageCasos(env, url) {
      los borradores que nadie leía — una lista que termina en silencio parece
      completa. El filtro se reutiliza a propósito: un total calculado sobre otra
      condición miente de otra manera. */
-  const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM casos c " + filtro).first();
+  const tot = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos c " + filtro + oculto
+  ).bind(...args).first();
+
+  /* Cuantos tengo yo ahora mismo: lo necesita la pestana y lo necesita el tope. */
+  const mios = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + TOMA_VIGENTE + " AND c.tomado_por = ?"
+  ).bind(yo).first();
 
   /* Cuántos piden confirmación, siempre — así la pestaña puede decirlo sin que
      el ingeniero tenga que entrar a mirar si hay algo. Con `CONFIRMAR()`, que es
@@ -3810,7 +3907,8 @@ async function triageCasos(env, url) {
     respondieron.has(c.numero) ? { ...c, respondio: 1 } : c);
 
   return json({ casos, porConfirmar: (p && p.n) || 0,
-                total: (tot && tot.n) || 0, tope: TOPE_COLA });
+                total: (tot && tot.n) || 0, tope: TOPE_COLA, desde,
+                mios: (mios && mios.n) || 0, tomaMax: TOMA_MAX, tomaHoras: TOMA_HORAS });
 }
 
 /* GET /api/triage/caso/<n> — la ficha: lo que el ingeniero necesita para
@@ -3854,8 +3952,52 @@ async function triageMedio(env, id) {
    El correo del ingeniero lo pone Access, no el formulario: es identidad ya
    verificada. La matrícula sí la escribe él, porque va firmada en lo que se le
    entrega a la familia. */
+/* POST /api/triage/caso/<n>/tomar  y  /soltar
+   ------------------------------------------------------------------------
+   Tomar es un UPDATE CONDICIONAL, no un «leer y luego escribir»: la condicion
+   viaja dentro del propio UPDATE, asi que si dos ingenieros pulsan a la vez solo
+   uno cambia una fila y el otro recibe «ya_tomado». Comprobarlo antes con un
+   SELECT dejaria la carrera abierta entre las dos consultas.
+
+   Soltar solo puede soltar lo PROPIO: liberar el caso de otro seria darle a
+   cualquiera la forma de vaciarle la mesa al de al lado. */
+async function triageTomar(env, numero, email) {
+  const yo = String(email || "");
+  if (!yo) return json({ error: "sin_sesion" }, 403);
+
+  const mios = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + TOMA_VIGENTE + " AND c.tomado_por = ?"
+  ).bind(yo).first();
+  if (mios && mios.n >= TOMA_MAX) {
+    return json({ error: "demasiados_tomados", max: TOMA_MAX,
+                  ayuda: "Ya tienes " + mios.n + " casos tomados. Termina o suelta alguno antes de tomar otro." }, 409);
+  }
+
+  const r = await env.DB.prepare(
+    "UPDATE casos SET tomado_por = ?, tomado_en = datetime('now') " +
+    "WHERE numero = ? AND (tomado_por IS NULL OR tomado_por = ? " +
+    "OR tomado_en <= datetime('now','-" + TOMA_HORAS + " hours'))"
+  ).bind(yo, numero, yo).run();
+
+  if (!r.meta || !r.meta.changes) return json({ error: "ya_tomado" }, 409);
+  return json({ ok: true, numero, horas: TOMA_HORAS });
+}
+
+async function triageSoltar(env, numero, email) {
+  const yo = String(email || "");
+  if (!yo) return json({ error: "sin_sesion" }, 403);
+  const r = await env.DB.prepare(
+    "UPDATE casos SET tomado_por = NULL, tomado_en = NULL WHERE numero = ? AND tomado_por = ?"
+  ).bind(numero, yo).run();
+  if (!r.meta || !r.meta.changes) return json({ error: "no_era_tuyo" }, 409);
+  return json({ ok: true, numero });
+}
+
 async function triageEvaluar(request, env, numero, email) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  /* Quien emite el concepto suelta el caso sin tener que acordarse: dejarlo
+     tomado lo escondería de los demás las ocho horas siguientes para nada. Se
+     hace al final, junto al resto de la escritura. */
   let c = {};
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
 
@@ -3970,7 +4112,11 @@ async function triageEvaluar(request, env, numero, email) {
      cosas son preguntas distintas y estaban atadas a la misma respuesta. */
   const veredicto = await resolverClasificacion(env, numero);
   await env.DB.prepare(
-    "UPDATE casos SET estado = ?, clasificacion = ?, actualizado_en = datetime('now') WHERE numero = ?"
+    "UPDATE casos SET estado = ?, clasificacion = ?, actualizado_en = datetime('now'), " +
+    /* Y SE SUELTA. Quien acaba de emitir el concepto ya no lo necesita retenido,
+       y dejarlo tomado lo escondería de los demás las ocho horas siguientes para
+       nada. Va en el MISMO UPDATE que ya se hace, no en uno aparte. */
+    "tomado_por = NULL, tomado_en = NULL WHERE numero = ?"
   ).bind(nuevoEstado, veredicto.clasificacion, numero).run();
 
   /* Aviso a la familia, SOLO si dejó correo —es opcional a propósito— y SOLO si
@@ -15041,11 +15187,18 @@ export default {
             headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }
           });
         }
-        if (ruta === "/api/triage/casos")   return await triageCasos(env, url);
+        if (ruta === "/api/triage/casos")   return await triageCasos(env, url, sesion.email);
         const tf = ruta.match(/^\/api\/triage\/caso\/(CV-\d{4}-\d{6})$/i);
         if (tf) return await triageFicha(env, tf[1].toUpperCase());
         const tev = ruta.match(/^\/api\/triage\/caso\/(CV-\d{4}-\d{6})\/evaluar$/i);
         if (tev) return await triageEvaluar(request, env, tev[1].toUpperCase(), sesion.email);
+        const tto = ruta.match(/^\/api\/triage\/caso\/(CV-\d{4}-\d{6})\/(tomar|soltar)$/i);
+        if (tto) {
+          if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+          return tto[2].toLowerCase() === "tomar"
+            ? await triageTomar(env, tto[1].toUpperCase(), sesion.email)
+            : await triageSoltar(env, tto[1].toUpperCase(), sesion.email);
+        }
         const tm = ruta.match(/^\/api\/triage\/medio\/(\d+)$/);
         if (tm) return await triageMedio(env, Number(tm[1]));
         if (ruta === "/api/admin/resumen")  return await adminResumen(env);
