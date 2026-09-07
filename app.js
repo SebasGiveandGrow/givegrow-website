@@ -4,6 +4,9 @@
 /* ---------- I18N ---------- */
 var I18N = {
   es: {
+    "bc.pagina": "Página {a}–{b} de {t} casas publicadas, ordenadas por urgencia.",
+    "bc.mas": "Ver las siguientes",
+    "bc.ant": "Anteriores",
     "rep.err.espera": "Ya recibimos varios reportes desde este correo hace un momento. Espera unos minutos; si ya enviaste el tuyo, busca tu número de guía en el correo que te llegó.",
     "grat.falla": "No pudimos cargar los comercios aliados en este momento. No quiere decir que no haya: quiere decir que no lo pudimos comprobar. Vuelve a intentar en un rato.",
     "nav.menu.aria": "Menú",
@@ -2439,6 +2442,8 @@ window.addEventListener("resize", function(){
 
 var BC_CL = ["urgente", "programada", "no_requiere"];
 
+var BC_DESDE = 0;
+function bcPaso(d){ BC_DESDE = Math.max(0, Number(d) || 0); bcPinta(); }
 function bcPinta(){
   var tot = document.getElementById("bc-totales");
   var lis = document.getElementById("bc-lista");
@@ -2470,7 +2475,7 @@ function bcPinta(){
     lis.innerHTML = '<p class="mu">' + escapeHtml(t("bc.falla")) + "</p>";
   };
 
-  fetch("/api/casos/publicos").then(function(r){
+  fetch("/api/casos/publicos?desde=" + BC_DESDE).then(function(r){
     if (!r.ok) throw new Error("http " + r.status);
     return r.json();
   }).then(function(d){
@@ -2527,9 +2532,20 @@ function bcPinta(){
        pero depender de que un tope no valga 1 no es una razon. */
     var pub = (d.totales && d.totales.publicables) || 0;
     var vistos = typeof d.mostrados === "number" ? d.mostrados : l.length;
-    if (pub > vistos){
+    /* ANTES ESTO SOLO AVISABA: «se enseñan 300 de N, las que no aparecen son las
+       menos urgentes». Era cierto y no servía — de la casa 301 en adelante no
+       había forma de llegar, y este es el registro PÚBLICO de casas revisadas:
+       la de alguien que autorizó que se publicara. Ahora se pagina. */
+    var desde = d.desde || 0;
+    var hay = (desde + l.length) < pub;
+    if (desde > 0 || hay){
       h += '<tr><td colspan="4" class="mu">'
-        +  escapeHtml(t("bc.tope").replace("{v}", vistos).replace("{t}", pub))
+        +  escapeHtml(t("bc.pagina").replace("{a}", desde + 1).replace("{b}", desde + l.length).replace("{t}", pub))
+        +  " "
+        +  (desde > 0 ? '<button type="button" class="copy" data-act="bcPaso(' + Math.max(0, desde - (d.tope || 300)) + ')">'
+             + escapeHtml(t("bc.ant")) + "</button> " : "")
+        +  (hay ? '<button type="button" class="copy" data-act="bcPaso(' + (desde + (d.tope || 300)) + ')">'
+             + escapeHtml(t("bc.mas")) + " " + Math.min(d.tope || 300, pub - desde - l.length) + "</button>" : "")
         +  "</td></tr>";
     }
 
@@ -2871,6 +2887,7 @@ var ACT_FNS = {
   themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,
   payMethod:payMethod, accTab:accTab, setQuick:setQuick, lbStep:lbStep, toggleFaq:toggleFaq,
   toggleDrop:toggleDrop, closeLightbox:closeLightbox, almaSend:almaSend, formSend:formSend,
+  bcPaso:bcPaso,
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
