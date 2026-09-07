@@ -5374,14 +5374,34 @@ function guardarBorrador(){
   if (guardarPronto) clearTimeout(guardarPronto);
   guardarPronto = setTimeout(function(){
     var reg = leerFormulario();
-    poner("borradores", reg);
+    /* SI EL AUTOGUARDADO FALLA, HAY QUE DECIRLO. Esta escritura no atrapaba nada:
+       la promesa se rompia en silencio y quien esta llenando el formulario seguia
+       creyendo que se guarda cada pocos segundos.
+
+       Y puede fallar de verdad: el borrador lleva LAS FOTOS dentro
+       («fotos: FOTOS.slice()»), asi que un telefono casi lleno agota la cuota de
+       IndexedDB en mitad de la jornada. «preparar()» pide almacenamiento
+       duradero, pero el propio aviso admite que el sistema puede borrar si el
+       telefono se llena.
+
+       El envio final ya lo hacia bien —«NO se pudo guardar en el telefono»— y
+       este quedo sin red. Mismo tono, porque es el mismo problema visto antes:
+       aqui todavia se puede hacer algo. */
+    poner("borradores", reg).catch(function(){
+      aviso("NO se esta guardando en el telefono: puede que se haya llenado. "
+          + "Envia lo que ya tengas antes de seguir, o descarga el respaldo.", "mal");
+    });
     /* SOLO lo que no cambia de casa en casa. familia y finca NO entran aquí,
        y es la razón por la que no bastaba renombrar el campo anterior: si se
        quedaran pegados, la segunda casa heredaría el apellido de la primera y el
        documento diría que la inspección es de una familia que no es. */
     poner("perfil", { k: "fijos", municipio: reg.municipio, obs_nombre: reg.obs_nombre,
                       obs_matricula: reg.obs_matricula, obs_cc: reg.obs_cc })
-      .then(estado);
+      /* El perfil es comodidad —rellena municipio y matricula en la casa
+         siguiente—, asi que su fallo no merece un aviso propio: el del borrador
+         ya se dio y decir dos veces lo mismo resta. Pero «estado()» tiene que
+         correr igual, o el contador de pendientes se queda congelado. */
+      .then(estado, estado);
   }, 400);
 }
 
