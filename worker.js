@@ -8284,13 +8284,18 @@ async function apiAlma(request, env, url) {
   });
 }
 
-async function apiCasosPublicos(env) {
+async function apiCasosPublicos(env, url) {
+  /* EL BANCO SE PAGINA. Se quedaba en las 300 primeras y el resto no existia
+     para nadie — y este es el registro PUBLICO: la casa de alguien que autorizo
+     que se publicara, y que a partir de la 301 no aparecia. El total ya se decia
+     bien; lo que faltaba era poder llegar. */
+  const desde = Math.max(0, Number(url && url.searchParams.get("desde")) || 0);
   const r = await env.DB.prepare(
     "SELECT numero, sector, clasificacion, material, pisos, creado_en FROM casos " +
     "WHERE consent_publico = 1 AND clasificacion IS NOT NULL " +
     "AND estado NOT IN ('cerrado','descartado') ORDER BY " +
     "CASE clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 ELSE 2 END, " +
-    "creado_en ASC LIMIT " + TOPE_BANCO
+    "creado_en ASC LIMIT " + TOPE_BANCO + " OFFSET " + desde
   ).all();
 
   /* Los totales cuentan TODO lo clasificado, con consentimiento o sin él: son
@@ -8313,6 +8318,7 @@ async function apiCasosPublicos(env) {
 
   return json({
     casos: r.results || [],
+    desde, tope: TOPE_BANCO,
     totales: {
       revisados: (t && t.revisados) || 0,
       urgentes: (t && t.urgentes) || 0,
@@ -10815,14 +10821,18 @@ async function adminBuscar(env, url) {
    NO devuelve las respuestas completas: 26 ítems por fila harían la carga
    pesada y la tabla ilegible, y para eso está el PDF. Sí devuelve las CUENTAS
    —cuántos RE, cuántas observaciones— porque es lo que decide a cuál entrar. */
-async function adminInspecciones(env) {
+async function adminInspecciones(env, url) {
+  /* Misma historia que la cola y que la bandeja de postulaciones: se quedaba en
+     300 y no habia forma de ver la 301. */
+  const desde = Math.max(0, Number(url && url.searchParams.get("desde")) || 0);
   const r = await env.DB.prepare(
     "SELECT numero, caso, municipio, direccion, casa_no, fecha_visita, hora, " +
     "obs_nombre, obs_matricula, propietario, contacto, requiere_esp, " +
     "atendida_en, atendida_por, atendida_nota, " +
     "firma_hab_key, firma_hab_motivo, pdf_key, respuestas, familia, finca, recomendaciones, fotos, " +
     "substr(creado_en,1,16) AS creado_en, substr(recibido_en,1,16) AS recibido_en " +
-    "FROM inspecciones ORDER BY requiere_esp DESC, recibido_en DESC LIMIT " + TOPE_INSPECCIONES
+    "FROM inspecciones ORDER BY requiere_esp DESC, recibido_en DESC " +
+    "LIMIT " + TOPE_INSPECCIONES + " OFFSET " + desde
   ).all();
 
   const filas = (r.results || []).map((v) => {
@@ -10873,7 +10883,7 @@ async function adminInspecciones(env) {
     return { ...resto, marcas, urgente, evacuar, urge, nReco, n_fotos: nFotos };
   });
   const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM inspecciones").first();
-  return json({ inspecciones: filas, total: (tot && tot.n) || 0, tope: TOPE_INSPECCIONES });
+  return json({ inspecciones: filas, total: (tot && tot.n) || 0, tope: TOPE_INSPECCIONES, desde });
 }
 
 const TIPOS_INSC = ["voluntario", "fundacion", "empresa", "ingeniero", "apadrinamiento"];
@@ -12781,6 +12791,8 @@ document.addEventListener("click", function(e){
   if (fi){ inscFiltro(fi.getAttribute("data-ifil"), fi.getAttribute("data-ipend")); return; }
   var ip = e.target.closest("[data-ipag]");
   if (ip){ inscPagina(ip.getAttribute("data-ipag")); return; }
+  var np = e.target.closest("[data-inspag]");
+  if (np){ inspPagina(np.getAttribute("data-inspag")); return; }
   var t = e.target.closest("[data-estado]");
   if (t){
     document.querySelectorAll(".pay-tab").forEach(function(b){ b.classList.remove("on"); });
@@ -13754,12 +13766,28 @@ function importarRespaldo(){
   });
 }
 
+var INSP_DESDE = 0;
+function inspPagina(d){ INSP_DESDE = Math.max(0, Number(d) || 0); cargarInspecciones(); }
+
+/* La cabecera con la pagina, en lugar del aviso que solo podia decir que
+   faltaban. Misma forma que la bandeja de postulaciones. */
+function paginaInsp(d, columnas){
+  var n = (d.inspecciones || []).length;
+  var hay = ((d.desde || 0) + n) < (d.total || 0);
+  if (!d.desde && !hay) return "";
+  return '<tr><td colspan="' + columnas + '" style="background:var(--amberl);font-size:13px">'
+    + "<strong>" + ((d.desde || 0) + 1) + "&ndash;" + ((d.desde || 0) + n) + " de " + d.total + "</strong> &middot; "
+    + (d.desde > 0 ? '<button class="copy" data-inspag="' + Math.max(0, d.desde - d.tope) + '">&larr; anteriores</button> ' : "")
+    + (hay ? '<button class="copy" data-inspag="' + ((d.desde || 0) + d.tope) + '">ver las siguientes ' + Math.min(d.tope, d.total - (d.desde || 0) - n) + ' &rarr;</button>' : "")
+    + "</td></tr>";
+}
+
 function cargarInspecciones(){
-  fetch("/api/admin/inspecciones").then(function(r){ return r.json(); }).then(function(d){
+  fetch("/api/admin/inspecciones?desde=" + INSP_DESDE).then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("ins-filas"); if (!tb) return;
     var l = d.inspecciones || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Todavía no ha llegado ninguna inspección de terreno.</td></tr>'; return; }
-    tb.innerHTML = filaTope(d, 8, "inspecciones") + l.map(function(v){
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="8">' + (INSP_DESDE ? "No hay mas inspecciones en esta pagina." : "Todavía no ha llegado ninguna inspección de terreno.") + '</td></tr>'; return; }
+    tb.innerHTML = paginaInsp(d, 8) + l.map(function(v){
       var m = v.marcas || {};
       /* El conteo de RE va en negrita cuando hay alguno: es el dato que decide
          si esta fila se mira hoy o mañana. */
@@ -15374,7 +15402,7 @@ export default {
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env, url);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
         if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
-        if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env);
+        if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env, url);
         const mip = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/pdf$/);
         if (mip) return await adminInspeccionEmitirPDF(request, env, mip[1]);
         const mia = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/atendida$/);
@@ -15436,7 +15464,7 @@ export default {
         if (comp) return await apiComprobante(request, env, comp[1].toUpperCase(), url.searchParams.get("t"));
         /* Triage estructural de viviendas */
         if (ruta === "/api/caso")           return await apiCasoCrear(request, env);
-        if (ruta === "/api/casos/publicos") return await apiCasosPublicos(env);
+        if (ruta === "/api/casos/publicos") return await apiCasosPublicos(env, url);
         const cmed = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/medio$/i);
         if (cmed) return await apiCasoMedio(request, env, cmed[1].toUpperCase(), url.searchParams.get("t"), url);
         const cinf = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/informe\.pdf$/i);
