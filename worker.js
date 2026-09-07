@@ -5318,10 +5318,24 @@ function prepararLienzo(id){
   g.lineWidth = 2.2; g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = "#082742";
   FIRMAS[id] = { g: g, trazos: 0, pintando: false };
 
+  /* EL CONTADOR SUBE CUANDO HAY TINTA, NO CUANDO SE TOCA.
+
+     Estaba en «pointerdown», y ahi todavia no se ha dibujado nada: un toque sin
+     arrastrar dejaba trazos=1 con el lienzo VACIO, y «firmaDe» devolvia un PNG en
+     blanco que se guardaba como la firma del habitante. Medido en el navegador:
+     un pointerdown+pointerup da trazos=1 y CERO pixeles con tinta.
+
+     Y no es un detalle cosmetico: el documento afirma que esa persona firmo. El
+     formulario tiene una ruta aparte —«No pudo firmar», con motivo— que existe
+     precisamente para cuando no firma, y una firma en blanco se la saltaba sin
+     que nadie lo notara. Rozar el area al desplazarse bastaba.
+
+     Ahora un toque suelto no cuenta, asi que salta la validacion que ya existe:
+     «Falta la firma del habitante. Si no pudo firmar, toca No pudo firmar…». */
   c.addEventListener("pointerdown", function(e){
     var f = FIRMAS[id];
     c.setPointerCapture(e.pointerId);
-    f.pintando = true; f.trazos++;
+    f.pintando = true;
     var p = punto(c, e);
     f.g.beginPath(); f.g.moveTo(p.x, p.y);
     e.preventDefault();
@@ -5330,6 +5344,7 @@ function prepararLienzo(id){
     var f = FIRMAS[id]; if (!f.pintando) return;
     var p = punto(c, e);
     f.g.lineTo(p.x, p.y); f.g.stroke();
+    f.trazos++;
     e.preventDefault();
   });
   var soltar = function(e){
