@@ -5864,7 +5864,9 @@ function blobABase64(b){
 /* Las fotos se convierten DE UNA EN UNA. Treinta casas con cuatro fotos son 120
    lecturas en paralelo, y un teléfono modesto se queda sin memoria a mitad y no
    baja nada. En serie tarda más y termina. */
-function empacar(lista, donde){
+/* «cuenta» es un objeto del que llama: empacar se usa DOS veces —borradores y
+   cola— y las perdidas de las dos tienen que sumarse en el mismo aviso. */
+function empacar(lista, donde, cuenta){
   var salida = [], i = 0;
   function paso(){
     if (i >= lista.length) return Promise.resolve(salida);
@@ -5877,7 +5879,16 @@ function empacar(lista, donde){
       return blobABase64(f.blob).then(function(b64){
         fotos.push({ tipo: f.tipo || "image/jpeg", b64: b64 });
         return foto();
-      }).catch(foto);
+      }).catch(function(){
+        /* UNA FOTO QUE NO SE PUDO CONVERTIR SE CONTABA, y no se contaba.
+           El «.catch(foto)» la saltaba y seguia: el respaldo salia sin ella y el
+           aviso final decia igual «N por enviar y M a medias», porque cuenta
+           REGISTROS y no fotos. En la herramienta que existe justamente para no
+           perder nada, y que se usa cuando el telefono ya va mal —que es cuando
+           una lectura falla—. */
+        cuenta.perdidas++;
+        return foto();
+      });
     }
     return foto().then(function(){
       var copia = {};
@@ -5910,8 +5921,9 @@ function respaldo(){
       aviso("No hay nada que respaldar: el teléfono está vacío.", "info");
       return;
     }
-    return empacar(brr, "borrador").then(function(a){
-      return empacar(par[1], "cola").then(function(c){
+    var cuenta = { perdidas: 0 };
+    return empacar(brr, "borrador", cuenta).then(function(a){
+      return empacar(par[1], "cola", cuenta).then(function(c){
         var doc = {
           respaldo: "inspecciones-mira-mi-casa", version: 1,
           generado_en: new Date().toISOString().slice(0,19).replace("T"," "),
@@ -5937,8 +5949,16 @@ function respaldo(){
         aviso("Respaldo creado: " + nombre + " · "
           + (mb >= 1 ? mb.toFixed(1) + " MB" : Math.round(arch.size / 1024) + " KB") + " · "
           + c.length + " por enviar y " + a.length + " a medias. Está en Descargas."
+          /* Lo que NO entró va primero y cambia el tono del aviso entero: un
+             respaldo incompleto que se anuncia como bueno es peor que no tenerlo,
+             porque despues del respaldo se borra el telefono. */
+          + (cuenta.perdidas
+              ? " OJO: " + cuenta.perdidas + (cuenta.perdidas === 1 ? " foto NO entró" : " fotos NO entraron")
+                + " en el archivo. NO borres nada del teléfono y avísale al equipo."
+              : "")
           + (mb > 40 ? " OJO: pesa mucho para WhatsApp — avisa al equipo antes de mandarlo."
-                     : " Mándalo al equipo por WhatsApp."), mb > 40 ? "info" : "bien");
+                     : " Mándalo al equipo por WhatsApp."),
+          cuenta.perdidas ? "mal" : (mb > 40 ? "info" : "bien"));
       });
     });
   }).catch(function(){
