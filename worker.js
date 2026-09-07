@@ -5441,10 +5441,10 @@ function conPlazo(ms){
    marca, cada reintento duplicaría las fotos ya subidas. */
 function enviarFotos(reg, numero){
   var pend = (reg.fotos || []).filter(function(f){ return f && f.blob && !f.subida; });
-  if (!pend.length) return Promise.resolve({ estado: "ok", numero: numero });
-  var i = 0;
+  if (!pend.length) return Promise.resolve({ estado: "ok", numero: numero, rechazadas: 0 });
+  var i = 0, rechazadas = 0;
   function paso(){
-    if (i >= pend.length) return Promise.resolve({ estado: "ok", numero: numero });
+    if (i >= pend.length) return Promise.resolve({ estado: "ok", numero: numero, rechazadas: rechazadas });
     var f = pend[i++];
     var cual = i, total = pend.length, peso = f.blob.size;
 
@@ -5489,7 +5489,7 @@ function enviarFotos(reg, numero){
            reintentando. Se marca como resuelta para no atascar la cola, y el
            conteo del panel enseñará que llegaron menos de las que se tomaron. */
         if (x.status === 413 || x.status === 415 || x.status === 409){
-          f.subida = true; f.rechazada = true;
+          f.subida = true; f.rechazada = true; rechazadas++;
           poner("cola", reg).then(paso).then(listo, function(){ listo({ estado: "reintentar" }); });
           return;
         }
@@ -5531,7 +5531,8 @@ function enviarUno(reg){
            crear la inspección. */
         return enviarFotos(reg, d.numero).then(function(res){
           if (res.estado !== "ok") return res;
-          return { estado: "ok", numero: d.numero, repetida: !!d.repetida };
+          return { estado: "ok", numero: d.numero, repetida: !!d.repetida,
+                   rechazadas: res.rechazadas || 0 };
         });
       }
       /* 422 y 400 son de los DATOS: reintentar no arregla nada y quedaría
@@ -5562,7 +5563,7 @@ function vaciarCola(){
       return;
     }
     aviso(l.length === 1 ? "Enviando…" : "Enviando… " + l.length + " pendientes.", "info");
-    var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false, sinBorrar = 0;
+    var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false, sinBorrar = 0, fotosMalas = 0;
     function paso(){
       if (i >= l.length){
         VACIANDO = false;
@@ -5580,6 +5581,22 @@ function vaciarCola(){
             + "Ya están a salvo: si las envías otra vez el servidor las reconoce y no se duplican.", "info");
           cargarMias();
         }
+        /* LAS FOTOS QUE EL SERVIDOR RECHAZO, DICHAS A QUIEN PUEDE ARREGLARLO.
+           El comentario de "comprimirFotoInsp" afirmaba que un rechazo «quedara
+           contado como fallido, que es visible»: no lo era. Se marcaba en el
+           registro y el resumen decia «Enviadas N» sin mas, asi que quien estaba
+           frente a la casa —y podia volver a tomarlas— no se enteraba. Lo veia
+           el panel, dias despues, comparando fotos tomadas contra recibidas.
+
+           Pasa de verdad: si el navegador no puede decodificar la imagen —un
+           HEIC de iPhone— se sube el original y el servidor solo acepta jpeg,
+           png y webp. Va ANTES del «enviadas» porque es lo unico accionable. */
+        else if (fotosMalas) {
+          aviso("Enviadas " + enviadas + ", pero el servidor NO acepto " + fotosMalas
+              + (fotosMalas === 1 ? " foto" : " fotos") + " (formato o tamano). "
+              + "Si todavia estas en la casa, vuelve a tomarlas; si no, avisa al equipo.", "mal");
+          cargarMias();
+        }
         else if (enviadas || repes) { aviso("Enviadas " + enviadas + (repes ? " (" + repes + " ya estaban)" : "") + ".", "bien"); cargarMias(); }
         /* NO se afirma la causa. Este camino se toma siempre que no se envió
            nada y nada fue rechazado, que incluye «no hay señal» pero también
@@ -5593,6 +5610,7 @@ function vaciarCola(){
       enviarUno(reg).then(function(res){
         if (res.estado === "ok"){
           if (res.repetida) repes++; else enviadas++;
+          fotosMalas += (res.rechazadas || 0);
           /* SI EL BORRADO LOCAL FALLA, SE SIGUE. Antes "quitar" rechazaba sin
              manejador: "paso" no se volvía a llamar, VACIANDO se quedaba en
              true y la cola NO se vaciaba nunca más en lo que durara la pantalla.
