@@ -10876,20 +10876,65 @@ async function adminInspecciones(env) {
   return json({ inspecciones: filas, total: (tot && tot.n) || 0, tope: TOPE_INSPECCIONES });
 }
 
-async function adminInscripciones(env) {
+const TIPOS_INSC = ["voluntario", "fundacion", "empresa", "ingeniero", "apadrinamiento"];
+
+/* FILTRAR Y PAGINAR, y el motivo no es comodidad.
+
+   La bandeja devolvía las 200 más recientes de los CINCO tipos mezclados. El
+   comentario que había aquí ya avisaba —«si cien ingenieros se postulan en un
+   día, la bandeja no puede quedarse callada en el número doscientos»— y lo
+   resolvía diciendo el total. Decirlo no es poder llegar.
+
+   Con trescientos ingenieros entrando, verificar una matrícula ya cuesta treinta
+   segundos —el enlace al COPNIA, el botón de copiar y el de marcar ya están—,
+   pero ENCONTRAR las que faltan obligaba a recorrer a ojo una lista con
+   voluntarios, empresas y ofrecimientos por medio. El trabajo no estaba en
+   verificar: estaba en buscar.
+
+   `sin_verificar` es el filtro que de verdad se usa: los ingenieros a los que
+   les falta el único paso que bloquea que su concepto llegue a una familia. */
+async function adminInscripciones(env, url) {
+  const tipo = TIPOS_INSC.includes(url && url.searchParams.get("tipo"))
+    ? url.searchParams.get("tipo") : "";
+  const soloSinVerificar = url && url.searchParams.get("pendiente") === "matricula";
+  const desde = Math.max(0, Number(url && url.searchParams.get("desde")) || 0);
+
+  const cond = ["i.tipo IN ('" + TIPOS_INSC.join("','") + "')"];
+  const args = [];
+  if (tipo) { cond.push("i.tipo = ?"); args.push(tipo); }
+  if (soloSinVerificar) {
+    cond.push("i.tipo = 'ingeniero'");
+    cond.push("i.estado <> 'archivada'");
+    cond.push("COALESCE(json_extract(i.datos, '$.matricula_verificada'), 0) <> 1");
+  }
+  const donde = " WHERE " + cond.join(" AND ");
+
   const r = await env.DB.prepare(
     "SELECT i.id, i.tipo, i.estado, i.nombre, i.email, i.telefono, i.ciudad, i.datos, " +
     "i.creada_en, i.token, f.estado AS ficha_estado " +
-    "FROM inscripciones i LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
-    "WHERE i.tipo IN ('voluntario','fundacion','empresa','ingeniero','apadrinamiento') " +
-    "ORDER BY i.creada_en DESC LIMIT " + TOPE_COLA
-  ).all();
-  /* Importa aquí más que en ninguna otra: si cien ingenieros se postulan en un
-     día, la bandeja no puede quedarse callada en el número doscientos. */
+    "FROM inscripciones i LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id" + donde +
+    /* Las que esperan verificación van de la MÁS VIEJA a la más nueva: quien
+       lleva más tiempo esperando se atiende primero. El resto, al revés, que es
+       lo que sirve para ver lo que acaba de entrar. */
+    " ORDER BY i.creada_en " + (soloSinVerificar ? "ASC" : "DESC") +
+    " LIMIT " + TOPE_COLA + " OFFSET " + desde
+  ).bind(...args).all();
+
   const tot = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM inscripciones WHERE tipo IN ('voluntario','fundacion','empresa','ingeniero','apadrinamiento')"
+    "SELECT COUNT(*) AS n FROM inscripciones i" + donde
+  ).bind(...args).first();
+
+  /* Cuántas esperan verificación, SIEMPRE — así la pestaña lo dice sin que nadie
+     tenga que entrar a mirar. Mismo criterio que usa la alarma de salud, para
+     que el contador y la bandeja no puedan discrepar. */
+  const pend = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM inscripciones WHERE tipo = 'ingeniero' AND estado <> 'archivada' " +
+    "AND COALESCE(json_extract(datos, '$.matricula_verificada'), 0) <> 1"
   ).first();
-  return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0, tope: TOPE_COLA });
+
+  return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0,
+                tope: TOPE_COLA, desde, tipo, pendiente: soloSinVerificar ? "matricula" : "",
+                sinVerificar: (pend && pend.n) || 0 });
 }
 
 /* POST /api/admin/inscripcion/<id>/matricula — «vi su matrícula en el COPNIA».
@@ -12375,6 +12420,7 @@ tocar nada en el dashboard de Cloudflare. Ojo con la diferencia, porque no es la
 <strong>«Seguimos» no le da acceso; «Marcar verificada» sí.</strong> Y archivarlo se lo quita, sin
 tener que acordarse de desmarcar nada. Mientras no esté verificada, su matrícula es un dato que él
 declaró, no uno comprobado.</p>
+<div id="i-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0"></div>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Tipo</th><th scope="col">Quién</th><th scope="col">Lo que hay que saber</th>
@@ -12731,6 +12777,10 @@ function cargarAportes(){
 }
 
 document.addEventListener("click", function(e){
+  var fi = e.target.closest("[data-ifil]");
+  if (fi){ inscFiltro(fi.getAttribute("data-ifil"), fi.getAttribute("data-ipend")); return; }
+  var ip = e.target.closest("[data-ipag]");
+  if (ip){ inscPagina(ip.getAttribute("data-ipag")); return; }
   var t = e.target.closest("[data-estado]");
   if (t){
     document.querySelectorAll(".pay-tab").forEach(function(b){ b.classList.remove("on"); });
@@ -13192,12 +13242,65 @@ function filaTope(d, columnas, que){
     + "</td></tr>";
 }
 
+var ETIQ_INSC = { voluntario:"Voluntarios", fundacion:"Fundaciones", empresa:"Empresas",
+                  ingeniero:"Ingenieros", apadrinamiento:"Apadrinamientos" };
+
+/* Los botones del filtro. El de «matriculas por verificar» va PRIMERO y con su
+   contador: es el unico que bloquea que el concepto de un ingeniero llegue a una
+   familia, asi que es lo que hay que ver al abrir la bandeja. */
+function pintarFiltrosInsc(d){
+  var c = document.getElementById("i-filtros"); if (!c) return;
+  var b = function(tipo, pend, texto, extra){
+    var on = (INSC_TIPO === tipo && INSC_PEND === pend);
+    return '<button class="copy" data-ifil="' + tipo + '" data-ipend="' + pend + '"'
+         + (on ? ' style="background:var(--acc);color:#fff"' : "") + '>'
+         + texto + (extra || "") + "</button>";
+  };
+  var h = b("ingeniero", "matricula", "Matrículas por verificar",
+            d.sinVerificar ? " (" + d.sinVerificar + ")" : " (0)");
+  h += " " + b("", "", "Todas");
+  for (var k in ETIQ_INSC) if (ETIQ_INSC.hasOwnProperty(k)) h += " " + b(k, "", ETIQ_INSC[k]);
+  c.innerHTML = h;
+}
+
+/* La cabecera con la pagina y sus dos botones. Sustituye a «filaTope», que solo
+   podia AVISAR de que faltaban: ahora se puede ir. */
+function paginaInsc(d){
+  var n = (d.inscripciones || []).length;
+  var hay = (d.desde + n) < (d.total || 0);
+  if (!d.desde && !hay) return "";
+  return '<tr><td colspan="7" style="background:var(--amberl);font-size:13px">'
+    + "<strong>" + (d.desde + 1) + "&ndash;" + (d.desde + n) + " de " + d.total + "</strong> &middot; "
+    + (d.desde > 0 ? '<button class="copy" data-ipag="' + Math.max(0, d.desde - d.tope) + '">&larr; anteriores</button> ' : "")
+    + (hay ? '<button class="copy" data-ipag="' + (d.desde + d.tope) + '">ver las siguientes ' + Math.min(d.tope, d.total - d.desde - n) + ' &rarr;</button>' : "")
+    + "</td></tr>";
+}
+
+/* El filtro vivo de la bandeja. Vacio = todo, como antes. */
+var INSC_TIPO = "", INSC_PEND = "", INSC_DESDE = 0;
+
+function inscFiltro(tipo, pend){
+  INSC_TIPO = tipo || ""; INSC_PEND = pend || ""; INSC_DESDE = 0;
+  cargarInscripciones();
+}
+function inscPagina(d){ INSC_DESDE = Number(d) || 0; cargarInscripciones(); }
+
 function cargarInscripciones(){
-  fetch("/api/admin/inscripciones").then(function(r){ return r.json(); }).then(function(d){
+  var q = "?desde=" + INSC_DESDE
+        + (INSC_TIPO ? "&tipo=" + encodeURIComponent(INSC_TIPO) : "")
+        + (INSC_PEND ? "&pendiente=" + encodeURIComponent(INSC_PEND) : "");
+  fetch("/api/admin/inscripciones" + q).then(function(r){ return r.json(); }).then(function(d){
     var tb = document.getElementById("i-filas"); if (!tb) return;
     var l = d.inscripciones || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no ha aplicado nadie.</td></tr>'; return; }
-    tb.innerHTML = filaTope(d, 7, "postulaciones") + l.map(function(i){
+    pintarFiltrosInsc(d);
+    if (!l.length){
+      tb.innerHTML = '<tr><td colspan="7">' +
+        (INSC_PEND ? "Ninguna matrícula esperando verificación. Está todo al día."
+         : INSC_TIPO ? "No hay postulaciones de ese tipo."
+         : "Todavía no ha aplicado nadie.") + "</td></tr>";
+      return;
+    }
+    tb.innerHTML = paginaInsc(d) + l.map(function(i){
       var x = {}; try { x = JSON.parse(i.datos||"{}"); } catch(e){}
       /* AVANZAR Y CERRAR SON COSAS DISTINTAS, y mezclarlas costo una solicitud.
          Antes habia UN solo boton que recorria la cadena entera, y su ultimo
@@ -15268,7 +15371,7 @@ export default {
         const afa = ruta.match(/^\/api\/admin\/ficha-archivo\/(.+)$/);
         if (afa)                                return await adminFichaArchivo(env, decodeURIComponent(afa[1]));
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
-        if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env);
+        if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env, url);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
         if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
         if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env);
