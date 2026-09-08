@@ -70,7 +70,44 @@ const ANCHO = CARTA[0] - MG.izq - MG.der;
 const MAPA = {
   "‘": "'", "’": "'", "‚": ",", "“": '"', "”": '"',
   "–": "-", "—": "—", "…": "...", " ": " ",
-  "−": "-", "•": "·", "​": "", " ": " ", " ": " "
+  "−": "-", "•": "·", "​": "", " ": " ", " ": " ",
+  /* LOS OPERADORES, y no son adorno: CALIFICAN LOS NUMEROS.
+
+     Lo que no esta en este mapa se BORRA sin decir nada, y hasta el 8 sep 2026
+     los signos de comparacion no estaban. Medido generando el PDF de un caso
+     real con una frase que una ingeniera teclea de verdad:
+
+       escrito   «Grieta >= 5 mm y desplome <= 1/200 -> apuntalar.»
+       impreso   «Grieta 5 mm y desplome 1/200 apuntalar.»
+
+     El segundo tramo se INVIERTE de sentido: la ingeniera dijo que el desplome
+     esta DENTRO de tolerancia, y el documento queda leyendose como una medida
+     seguida de la orden de apuntalar. Un concepto estructural que pierde sus
+     operadores dice otra cosa que la que se firmo.
+
+     Y era dificil de notar porque los vecinos de esos signos SI pasan —±, °, ²,
+     ×, ½ estan todos en Latin-1— asi que en pantalla parece que los simbolos
+     funcionan.
+
+     Se traducen a texto en vez de dejarlos caer, que es lo que escribe cualquiera
+     que no tenga el simbolo a mano. Los emoji y lo demas exotico se siguen
+     borrando, y ahi si es lo correcto: no aportan nada a un documento tecnico. */
+  "≥": ">=", "≤": "<=", "≠": "=/=",
+  "→": "->", "←": "<-", "≈": "~", "≅": "~",
+  /* Diametro y las primas de pie y pulgada, que aparecen en toda medida de
+     varilla y de tuberia. */
+  /* La prima doble va escrita con la comilla ESCAPADA dentro de comillas dobles
+     y no como '"'. El check #10 del gate reconstruye los literales de este
+     archivo con una expresion que solo entiende comillas dobles, asi que una
+     comilla suelta dentro de un literal de comilla simple le descuadra el
+     emparejamiento de ahi en adelante — y se queja diciendo que al certificado
+     le faltan sus catorce clausulas juradas, que es un mensaje que manda a
+     buscar donde no es. Las dos que ya habia arriba se cancelan entre si por ser
+     par; añadir una tercera fue lo que lo rompio. */
+  "⌀": "diam. ", "∅": "diam. ", "′": "'", "″": "\"",
+  /* Fracciones que no estan en Latin-1 —½ ¼ ¾ si estan, estas no—. */
+  "⅓": "1/3", "⅔": "2/3", "⅛": "1/8", "⅜": "3/8",
+  "⅝": "5/8", "⅞": "7/8"
 };
 function winansi(s) {
   let out = "";
