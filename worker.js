@@ -1144,7 +1144,31 @@ async function apiRecibo(env, guia, token) {
     return json({ error: "aporte_sin_confirmar", estado: a.estado }, 409);
   }
 
-  const bytes = await recibo(a, selloCO());
+  /* LA FECHA, EN HORA DE COLOMBIA. Lo que D1 guarda en `aprobada_en` es UTC
+     —`datetime('now')`— y el recibo lo imprimía tal cual. Colombia es UTC−5
+     siempre, así que todo lo aprobado entre las 19:00 y la medianoche se
+     imprimía CON LA FECHA DEL DÍA SIGUIENTE.
+
+     Medido: un aporte con `aprobada_en = 2027-01-01 02:30` —o sea el 31 de
+     diciembre a las 21:30 en Medellín— salía así:
+
+       recibo       «Fecha de confirmación: 1 de enero de 2027»
+       certificado  «31 de diciembre de 2026», año gravable 2026
+
+     Dos documentos de la misma fundación sobre la misma donación, en AÑOS
+     GRAVABLES distintos. El certificado ya se corrigió en su día (#332); el
+     recibo se quedó suelto, y es el que el donante guarda. En el mismo recibo se
+     leía además «confirmado el 1 de enero» sobre «documento generado el 8 de
+     septiembre», porque el pie sí usa `selloCO()`.
+
+     Se convierte AQUÍ, en el borde de presentación, y no dentro de
+     `documentos.js`, que recibe fechas ISO y no sabe de husos. Con guarda: sin
+     ella `fechaCO(null)` devuelve HOY, que es peor que no imprimir nada. */
+  const bytes = await recibo({
+    ...a,
+    aprobada_en: a.aprobada_en ? fechaCO(a.aprobada_en) : null,
+    creada_en: a.creada_en ? fechaCO(a.creada_en) : null
+  }, selloCO());
   return new Response(bytes, {
     headers: {
       "content-type": "application/pdf",
@@ -6786,7 +6810,15 @@ async function apiCasoInforme(env, numero, token) {
     medios: (m && m.n) || 0,
     clasificacion: e.clasificacion, nota_tecnica: e.nota_tecnica,
     recomendacion: e.recomendacion, falta: e.falta,
-    ing_nombre: e.ing_nombre, ing_matricula: e.ing_matricula, evaluado_en: e.creado_en,
+    ing_nombre: e.ing_nombre, ing_matricula: e.ing_matricula,
+    /* MISMA CONVERSIÓN QUE EL RECIBO, y por lo mismo: `evaluaciones.creado_en`
+       es UTC. Un concepto firmado a las 21:30 de un martes decía «Evaluación
+       realizada el miércoles» — medido: `2026-09-09 02:30` UTC imprimía «9 de
+       septiembre» siendo el 8 a las 21:30 en Colombia. Y la tarde-noche es justo
+       cuando un voluntario se sienta a mirar fotos, así que no es un borde raro:
+       son cinco horas de cada día. Un documento técnico firmado que dice que se
+       evaluó un día en que no se evaluó no sirve para lo que se firma. */
+    evaluado_en: e.creado_en ? fechaCO(e.creado_en) : null,
     /* SI ESA MATRÍCULA ESTÁ COMPROBADA, y se pregunta AHORA en vez de guardarse
        con la evaluación: este PDF se arma en cada descarga, así que verificar a
        alguien después tiene que mejorar los documentos que ya emitió, no dejar
