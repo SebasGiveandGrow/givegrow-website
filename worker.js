@@ -3587,9 +3587,27 @@ function abrir(numero){
   });
 }
 
+/* UN ENVIO A LA VEZ. El boton no se apagaba mientras guardaba, asi que un doble
+   toque —en un telefono, que es como se usa esto— mandaba DOS veces el mismo
+   concepto. El servidor los aceptaba los dos y el caso urgente pasaba a tener
+   «dos opiniones»: salia de «Piden confirmacion» sin que nadie mas lo hubiera
+   mirado. La cuenta ya se arreglo del lado del servidor —ver FIRMES—, y esto
+   cierra la puerta por la que entraba. */
+var ENVIANDO = false;
 function enviar(){
   var msg = el("t-msg");
+  if (ENVIANDO) return;
+  ENVIANDO = true;
+  var soltar = function(){
+    ENVIANDO = false;
+    var b = el("t-enviar");
+    if (b){ b.disabled = false; b.textContent = "Guardar evaluación"; }
+  };
+  var b0 = el("t-enviar");
+  if (b0){ b0.disabled = true; b0.textContent = "Guardando..."; }
   msg.textContent = "Guardando...";
+  msg.style.color = "";
+  var numero = CASO;
   fetch("/api/triage/caso/" + encodeURIComponent(CASO) + "/evaluar", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -3608,14 +3626,28 @@ function enviar(){
         msg.textContent = e.faltan ? ("Falta: " + e.faltan.join(", "))
                         : (e.ayuda || e.error || "No se pudo guardar");
         msg.style.color = "#8C2F1E";
+        soltar();
         return;
       }
-      msg.textContent = "Guardado. Gracias.";
-      msg.style.color = "#1F5C38";
-      el("ficha").innerHTML = "";
+      /* EL ACUSE SOBREVIVE. Antes se escribia «Guardado. Gracias.» en #t-msg y en
+         la linea siguiente se vaciaba #ficha, que es donde vive #t-msg: el
+         mensaje se destruia sin llegar a verse nunca. Lo unico que pasaba era
+         que el formulario desaparecia. Ahora la ficha se REEMPLAZA por el acuse,
+         con el numero del caso, y ese si se queda en pantalla. */
+      CASO = null;
+      ENVIANDO = false;
+      el("ficha").innerHTML = "<div class='ficha'><p class='msg' style='color:#1F5C38;margin:0'>"
+        + "<b>Guardado.</b> Tu concepto de " + esc(numero) + " quedó firmado. Gracias.</p></div>";
       cargarCola();
+      /* Y su propia lista se refresca: es la pantalla que le dice que paso con lo
+         que firmo, y se quedaba con la foto del arranque hasta recargar. */
+      cargarMisEvaluaciones();
     })
-    .catch(function(){ msg.textContent = "No se pudo guardar"; msg.style.color = "#8C2F1E"; });
+    .catch(function(){
+      msg.textContent = "No se pudo guardar. Revisa tu conexión y vuelve a intentarlo.";
+      msg.style.color = "#8C2F1E";
+      soltar();
+    });
 }
 
 document.addEventListener("click", function(ev){
@@ -3746,9 +3778,33 @@ const SIN_RESPALDO =
   "AND e2.clasificacion <> 'inevaluable' AND " + MATRICULA_OK("e2.ing_email") + "))";
 
 /* Cuántas opiniones FIRMES tiene un caso. Las `inevaluable` no cuentan: no
-   opinan sobre la casa, dicen que faltan fotos. */
-const FIRMES = "(SELECT COUNT(*) FROM evaluaciones e WHERE e.caso = c.numero " +
-               "AND e.clasificacion <> 'inevaluable')";
+   opinan sobre la casa, dicen que faltan fotos.
+
+   CUENTA INGENIEROS, NO FILAS, y esa es la corrección del 8 sep 2026.
+
+   Era `COUNT(*)`, o sea filas de `evaluaciones`, y nada impide que un mismo
+   ingeniero escriba dos. El formulario no deshabilitaba el botón mientras
+   guardaba, así que un doble toque en un teléfono —la forma en que esto se usa
+   en terreno— mandaba dos veces el MISMO concepto.
+
+   Consecuencia medida contra el endpoint real: `CONFIRMAR()` saca de «Piden
+   confirmación» a los urgentes que ya tienen dos opiniones. Con una evaluación,
+   el caso urgente estaba en esa pestaña; tras el segundo envío del mismo
+   ingeniero, `porConfirmar` bajaba a 0 y el caso desaparecía. O sea: una casa
+   urgente pasaba a parecer confirmada por dos ingenieros sin que nadie más la
+   hubiera mirado, y sobre un urgente se mueve una brigada.
+
+   `lower()` porque es lo que hace el resto del archivo con este correo —viene
+   del token de Access— y así una diferencia de mayúsculas entre sesiones no
+   parte a una persona en dos.
+
+   LO QUE ESTO NO ARREGLA, a propósito: si el mismo ingeniero se corrige con OTRA
+   clasificación, `DISCREPA` lo sigue marcando como desacuerdo. Ahí el caso queda
+   igualmente en la pestaña y lo mira una persona, que es la salida segura;
+   resolverlo bien pide cambiar el veredicto a «lo último que dijo cada
+   ingeniero», y eso no se toca el día de un piloto. */
+const FIRMES = "(SELECT COUNT(DISTINCT lower(e.ing_email)) FROM evaluaciones e " +
+               "WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable')";
 /* Discrepan si hay más de una clasificación distinta entre las firmes. */
 const DISCREPA = "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e " +
                  "WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1)";
