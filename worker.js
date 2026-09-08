@@ -3360,6 +3360,44 @@ function esc(s){
 }
 function el(id){ return document.getElementById(id); }
 
+/* LA TRAMPA DE ESTAR DETRÁS DE ACCESS, en un solo sitio.
+
+   Cuando la sesión de Access caduca, Cloudflare NO responde con un error:
+   responde con el HTML del login y un 200. Así que «r.json()» revienta con un
+   SyntaxError, y esta pantalla tenía cinco caminos que reaccionaban de cinco
+   maneras distintas. Medido el 8 sep 2026 sustituyendo la respuesta por el HTML
+   del login:
+
+     primera carga de la cola   «Cargando casos...» para siempre
+     cambiar de pestaña         LA RESPUESTA DE LA PESTAÑA ANTERIOR, como si
+                                fuera de ésta: se lee «No hay casos esperando.
+                                Gracias.» sobre «Piden confirmación»
+     abrir un caso              nada; el botón no hace nada
+     tomar un caso              avisa, pero manda a revisar la conexión
+     mis conceptos              avisa bien, y era el único
+
+   El segundo es el peor de largo: no es una pantalla que se queda cargando, es
+   una respuesta CONFIADA Y FALSA sobre si hay casas urgentes esperando. La
+   regla que este archivo ya tiene escrita para el formulario de terreno —«se
+   comprueba el content-type, no solo el estado»— faltaba aquí. */
+function pedirJSON(ruta){
+  return fetch(ruta).then(function(r){
+    var ct = r.headers.get("content-type") || "";
+    if (ct.indexOf("json") < 0){ var e = new Error("sesion"); e.sesion = true; throw e; }
+    return r.json();
+  });
+}
+/* Y SE DICE DÓNDE, porque el remedio no es el mismo: si caducó la sesión hay que
+   volver a entrar, y si es la conexión hay que reintentar. Mandar a lo otro es
+   perder el rato de alguien que está de voluntario. */
+function pintarFallo(donde, e){
+  var c = el(donde); if (!c) return;
+  c.innerHTML = "<p class='cargando'>" + (e && e.sesion
+    ? "<b>Tu sesión caducó.</b> Vuelve a entrar y recarga esta página: hasta entonces, "
+      + "lo que ves aquí no está al día."
+    : "No pudimos cargar esto ahora. Revisa tu conexión y recarga la página.") + "</p>";
+}
+
 /* CON QUÉ SE FIRMA, traído del registro. FIRMANTE es lo que el servidor dice
    que se va a imprimir en el PDF de la familia, no lo que alguien teclee: si su
    matrícula está verificada, el formulario NO la pregunta. */
@@ -3395,7 +3433,10 @@ function tomarSoltar(numero, accion){
       }
       cargarCola();
     })
-    .catch(function(){ alert("No se pudo. Revisa tu conexion."); });
+    /* No se distingue el motivo aquí a propósito —la respuesta ya se consumió
+       para leer el código de error— así que el aviso cubre los dos remedios en
+       vez de mandar a uno solo. */
+    .catch(function(){ alert("No se pudo. Revisa tu conexión, y si tu sesión caducó vuelve a entrar."); });
 }
 
 var VACIO = {
@@ -3419,11 +3460,7 @@ var CABEZA = {
    Se pide AL ARRANCAR, como la cola: si hubiera que pulsar algo, nadie lo pulsa. */
 function cargarMisEvaluaciones(){
   var c = el("mis-evals"); if (!c) return;
-  fetch("/api/triage/mis-evaluaciones").then(function(r){
-    var ct = r.headers.get("content-type") || "";
-    if (ct.indexOf("json") < 0) throw 0;   /* sesión caída: devuelve el login */
-    return r.json();
-  }).then(function(d){
+  pedirJSON("/api/triage/mis-evaluaciones").then(function(d){
     var l = d.evaluaciones || [];
     /* LA ADVERTENCIA VA PRIMERO y aparece incluso sin evaluaciones: quien entró
        antes del aviso automático no sabe que sus conceptos no salen solos. */
@@ -3466,14 +3503,12 @@ function cargarMisEvaluaciones(){
         +  "<br>" + suerte + " &middot; hoy está <b>" + esc(v.caso_estado) + "</b></span></div>";
     }
     c.innerHTML = h;
-  }).catch(function(){
-    c.innerHTML = "<p class='sub'>No pudimos consultar tus conceptos ahora. Recarga la página.</p>";
-  });
+  }).catch(function(e){ pintarFallo("mis-evals", e); });
 }
 
 function cargarCola(){
-  fetch("/api/triage/casos?estado=" + encodeURIComponent(COLA) + "&desde=" + DESDE)
-    .then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/triage/casos?estado=" + encodeURIComponent(COLA) + "&desde=" + DESDE)
+    .then(function(d){
     var n = el("n-conf");
     if (n) n.textContent = d.porConfirmar ? "(" + d.porConfirmar + ")" : "";
     var nm = el("n-mios");
@@ -3527,12 +3562,20 @@ function cargarCola(){
         + "</p>";
     }
     el("lista").innerHTML = h;
-  });
+  }).catch(function(e){ pintarFallo("lista", e); });
 }
 
 function abrir(numero){
-  fetch("/api/triage/caso/" + encodeURIComponent(numero)).then(function(r){ return r.json(); }).then(function(d){
-    if (!d.caso) return;
+  el("ficha").innerHTML = "<p class='cargando'>Abriendo " + esc(numero) + "...</p>";
+  pedirJSON("/api/triage/caso/" + encodeURIComponent(numero)).then(function(d){
+    /* Sin esto el clic en «Abrir» no hacía NADA cuando el caso ya no estaba
+       —lo movió el equipo, o se cerró mientras la lista estaba en pantalla—. Un
+       botón que no responde se lee como que la pantalla está rota. */
+    if (!d.caso){
+      el("ficha").innerHTML = "<p class='cargando'>Ese caso ya no está disponible. "
+        + "Recarga la lista: puede que el equipo lo haya movido.</p>";
+      return;
+    }
     CASO = d.caso.numero;
     var c = d.caso, h = "<div class='ficha'><h2 style='font-size:19px'>" + esc(c.numero) + "</h2>";
     var datos = [["Sector", c.sector], ["Muros", c.material], ["Pisos", c.pisos],
@@ -3584,7 +3627,7 @@ function abrir(numero){
       +  "<p class='msg' id='t-msg'></p></div>";
     el("ficha").innerHTML = h;
     el("ficha").scrollIntoView({ block: "start" });
-  });
+  }).catch(function(e){ pintarFallo("ficha", e); });
 }
 
 /* UN ENVIO A LA VEZ. El boton no se apagaba mientras guardaba, asi que un doble
