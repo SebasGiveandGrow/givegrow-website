@@ -1617,14 +1617,15 @@ poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemo
 
 ## ⏭️ LO QUE ESPERA INSUMO DE SEBAS (no código)
 
-0. **La regla de rate-limit de Cloudflare para `/api/caso`** (18 ago). El código
-   ya frena por teléfono —tres casos en diez minutos— y eso ataja el doble envío
-   de una familia sin poder bloquear a otra, que es la propiedad que importa.
-   **Lo que el código NO puede atajar es un script que rote números**, y cada POST
-   quema un número del consecutivo, que no se reinicia nunca. Eso se resuelve en
-   la regla de Cloudflare, que es configuración. Un tope global en el Worker sería
-   peor que el problema: cortaría justo la avalancha de casos reales tras una
-   réplica, que es para lo que existe el sistema.
+0. ~~**La regla de rate-limit de Cloudflare para `/api/caso`**~~ — **RESUELTO
+   (7 sep 2026, aplicada por Sebas; verificada en producción el 7 y el 8).**
+   Cubre cinco rutas —`/api/alma`, `/api/caso`, `/api/transferencia`,
+   `/api/inscripcion`, `/api/checkout`— y deja FUERA la subida de fotos, que es
+   la exclusión que hay que respetar: una familia sube de a una foto en serie y
+   meterla en la regla la bloquearía a mitad de su propio reporte.
+   **Todo escrito en `ops/regla-waf.md`**, incluida la receta para comprobarla
+   sin gastar una llamada de ALMA. La regla vive solo en el dashboard, así que
+   ese archivo es lo único que la describe.
 
 1. **Cuántos brigadistas: 7 u 8.** Él dijo siete; el inventario está calculado
    para ocho (cascos, botas, sleeping bags, carnés, juegos de documentos).
@@ -1647,9 +1648,11 @@ poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemo
    `001003` su **cédula y ciudad** — sin eso el certificado responde 422.
 8. **Mirar el registro de Resend** para saber si los correos de `001003`
    salieron. Es lo único que cierra esa causa.
-9. **Dos verificaciones que arrastramos:** que el buzón `privacidad@` esté activo
-   (la Política lo fija como canal y aparece 4 veces en el sitio) y la regla WAF
-   de rate-limit del worker de ALMA.
+9. **Una verificación que arrastramos:** que el buzón `privacidad@` esté activo
+   (la Política lo fija como canal y aparece 4 veces en el sitio). ~~La regla WAF
+   de rate-limit de ALMA~~ — **RESUELTA:** `/api/alma` está dentro de la regla,
+   comprobado en producción el 8 sep (peticiones 1–10 llegan al Worker, la 11
+   la para Cloudflare con `error code: 1015`). Ver `ops/regla-waf.md`.
 10. **Retirar la implementación del Apps Script de aliados**, que sigue publicada
     y acepta POST de cualquiera. La CSP ya dejó de autorizarlo (PR #96).
 11. **El nombre del proyecto de viviendas** y su **número de WhatsApp** — ver su
@@ -3080,7 +3083,7 @@ internos rotos (19 páginas), meta/OG/twitter/canonical/favicon completos, 0 err
 - **Inconsistencia tributaria**: el sitio dice **Art. 257 / 25%** (consistente); documentos del
   Drive dicen **Art. 125 / 125%**. Sebas lo corrige **con un profesional** — no tocar los docs.
 - Confirmar que el buzón **privacidad@thegiveandgrowproject.org** esté activo.
-- **Regla WAF de rate-limit** para el worker de ALMA (dashboard Cloudflare).
+- ~~**Regla WAF de rate-limit** para el worker de ALMA~~ — **RESUELTA** (7 sep, verificada el 8). Ver `ops/regla-waf.md`.
 - Logos → webp diferido (5 logos, ~176 KB, lazy; mejor en el pipeline `alta-automatica.gs`).
 - Ideas grandes de UX **diferidas a propósito** hasta tener entregas reales que mostrar
   (rastreo como vitrina, tira de entregas trazadas, red en el home, tira de confianza).
