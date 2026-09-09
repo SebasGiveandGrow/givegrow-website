@@ -2465,8 +2465,14 @@ async function adminAnularCertificado(request, env, numero, quien) {
   if (!motivo) return json({ error: "motivo_requerido" }, 400);
 
   const c = await env.DB.prepare("SELECT numero, anulado_en FROM certificados WHERE numero=?").bind(numero).first();
-  if (!c) return json({ error: "no_encontrado" }, 404);
-  if (c.anulado_en) return json({ error: "ya_anulado" }, 409);
+  if (!c) return json({
+    error: "no_encontrado",
+    ayuda: "No existe un certificado con ese numero. Recarga la tabla: puede que la fila que tienes en pantalla ya no este."
+  }, 404);
+  if (c.anulado_en) return json({
+    error: "ya_anulado",
+    ayuda: "Ese certificado ya estaba anulado. No se anula dos veces: el motivo del primero es el que queda impreso."
+  }, 409);
 
   /* No se borra: se anula. El consecutivo conserva el hueco a propósito — un
      número que desaparece es peor que un número anulado con motivo. */
@@ -2670,7 +2676,15 @@ async function apiComprobante(request, env, guia, token) {
     "SELECT guia, estado, token, comprobante FROM aportes WHERE guia = ?"
   ).bind(guia).first();
   if (!a || !a.token || !igualesSeguro(a.token, String(token))) return json({ error: "no_autorizado" }, 403);
-  if (a.estado !== "reportada") return json({ error: "estado_no_permite", estado: a.estado }, 409);
+  /* CON SU FRASE: esto lo lee una persona en el panel, y hasta hoy le llegaba el
+     codigo pelado. El caso real es que otra persona —u otra pestaña— ya la movio.
+     Ver `avisoSinBuzon` y `triageEvaluar`: `ayuda` existe cuando el texto es para
+     quien esta mirando. */
+  if (a.estado !== "reportada") return json({
+    error: "estado_no_permite", estado: a.estado,
+    ayuda: "Esa guia ya no esta esperando verificacion: ahora esta en «" + a.estado +
+           "». Puede que ya la hayan confirmado o descartado. Recarga la tabla."
+  }, 409);
   if (a.comprobante) return json({ error: "ya_tiene_comprobante" }, 409);
 
   const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
@@ -9060,7 +9074,15 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
     "FROM aportes WHERE guia = ?"
   ).bind(guia).first();
   if (!a) return json({ error: "no_encontrada" }, 404);
-  if (a.estado !== "reportada") return json({ error: "estado_no_permite", estado: a.estado }, 409);
+  /* CON SU FRASE: esto lo lee una persona en el panel, y hasta hoy le llegaba el
+     codigo pelado. El caso real es que otra persona —u otra pestaña— ya la movio.
+     Ver `avisoSinBuzon` y `triageEvaluar`: `ayuda` existe cuando el texto es para
+     quien esta mirando. */
+  if (a.estado !== "reportada") return json({
+    error: "estado_no_permite", estado: a.estado,
+    ayuda: "Esa guia ya no esta esperando verificacion: ahora esta en «" + a.estado +
+           "». Puede que ya la hayan confirmado o descartado. Recarga la tabla."
+  }, 409);
 
   if (c.descartar) {
     const motivo = limpiar(c.motivo, 280) || "sin motivo";
@@ -11641,14 +11663,20 @@ async function adminMoverInscripcion(request, env, id, quien) {
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
   const nuevo = String(c.estado || "");
   if (!ESTADOS_INSCRIPCION.includes(nuevo)) {
-    return json({ error: "estado_no_permitido", permitidos: ESTADOS_INSCRIPCION }, 400);
+    return json({
+      error: "estado_no_permitido", permitidos: ESTADOS_INSCRIPCION,
+      ayuda: "Ese no es un estado valido para una inscripcion. Los que hay son: " + ESTADOS_INSCRIPCION.join(", ") + "."
+    }, 400);
   }
   /* Se traen tipo, correo y datos: sin eso no se puede avisar a nadie, y avisar
      es justo lo que faltaba. */
   const f = await env.DB.prepare(
     "SELECT id, tipo, estado, nombre, email, datos FROM inscripciones WHERE id = ?"
   ).bind(id).first();
-  if (!f) return json({ error: "no_encontrada" }, 404);
+  if (!f) return json({
+    error: "no_encontrada",
+    ayuda: "Esa inscripcion ya no existe. Recarga la bandeja: puede que alguien la haya suprimido."
+  }, 404);
 
   await env.DB.prepare(
     "UPDATE inscripciones SET estado = ?, actualizada_en = datetime('now') WHERE id = ?"
@@ -13029,6 +13057,28 @@ function adminJS() {
 var FILTRO = "";
 var FILAS = {};
 function pesos(c){ return "$" + Math.round((c||0)/100).toLocaleString("es-CO"); }
+
+/* ¿DIJO QUE SI EL SERVIDOR? Devuelve true si algo salio mal, y lo DICE.
+
+   Cuatro botones del panel disparaban su POST y se limitaban a recargar la
+   tabla, sin mirar la respuesta: anular un certificado, descartar una
+   transferencia, mover el estado de una inscripcion, y —a medias— confirmar una
+   transferencia, que solo hablaba si el servidor mandaba «ayuda». Un 409 o un
+   404 se tragaban enteros: la tabla se refrescaba igual y la persona se quedaba
+   creyendo que su clic habia hecho algo.
+
+   No es una decision de diseño, es deriva: en este mismo archivo el boton de
+   emitir un certificado SI comprueba el estado y explica que falto. Estos cuatro
+   se quedaron atras, y son justo los que no se pueden deshacer.
+
+   El «catch» de cada sitio sigue siendo suyo: esto mira la respuesta, no la red. */
+function fallo(http, d){
+  if (http >= 200 && http < 300 && !(d && d.error)) return false;
+  alert((d && (d.ayuda || d.error)) || "No se pudo. Intenta otra vez.");
+  return true;
+}
+/* Los cuatro sitios repiten el mismo gesto: leer estado y cuerpo a la vez. */
+function conEstado(r){ return r.json().then(function(d){ return { http: r.status, d: d }; }); }
 /* HORA DE COLOMBIA. El panel leia estas marcas tal como las guarda D1, que es
    UTC, asi que TODO el registro operativo iba corrido cinco horas: un caso
    reportado a las 10:47 de la manana se leia «15:47», y cualquier cosa de
@@ -13227,8 +13277,10 @@ document.addEventListener("click", function(e){
     fetch("/api/admin/certificado/" + encodeURIComponent(num) + "/anular", {
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ motivo: motivo })
-    }).then(function(r){ return r.json(); }).then(function(){ cargarResumen(); cargarAportes(); })
-      .catch(function(){ an.disabled = false; an.textContent = "Reintentar"; });
+    }).then(conEstado).then(function(res){
+      if (fallo(res.http, res.d)){ an.disabled = false; an.textContent = "Anular"; return; }
+      cargarResumen(); cargarAportes();
+    }).catch(function(){ an.disabled = false; an.textContent = "Reintentar"; });
     return;
   }
 
@@ -13345,9 +13397,12 @@ document.addEventListener("click", function(e){
     cf.disabled = true; cf.textContent = "…";
     fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
       method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ referencia: ref })
-    }).then(function(r){ return r.json(); })
-      .then(function(d){ if (d.ayuda) alert(d.ayuda); cargarReportadas(); cargarResumen(); cargarAportes(); })
-      .catch(function(){ cargarReportadas(); });
+    }).then(conEstado)
+      .then(function(res){
+        if (fallo(res.http, res.d)){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); return; }
+        cargarReportadas(); cargarResumen(); cargarAportes();
+      })
+      .catch(function(){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); });
     return;
   }
   var ds = e.target.closest("[data-desc]");
@@ -13358,8 +13413,10 @@ document.addEventListener("click", function(e){
     ds.disabled = true; ds.textContent = "…";
     fetch("/api/admin/transferencia/" + encodeURIComponent(g2) + "/confirmar", {
       method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ descartar:true, motivo: motivo })
-    }).then(function(r){ return r.json(); }).then(function(){ cargarReportadas(); cargarResumen(); cargarAportes(); })
-      .catch(function(){ cargarReportadas(); });
+    }).then(conEstado).then(function(res){
+      if (fallo(res.http, res.d)){ ds.disabled = false; ds.textContent = "Descartar"; cargarReportadas(); return; }
+      cargarReportadas(); cargarResumen(); cargarAportes();
+    }).catch(function(){ ds.disabled = false; ds.textContent = "Descartar"; cargarReportadas(); });
   }
 });
 
@@ -14546,8 +14603,10 @@ document.addEventListener("click", function(e){
   fetch("/api/admin/inscripcion/" + encodeURIComponent(b.getAttribute("data-ins")) + "/estado", {
     method: "POST", headers: {"content-type":"application/json"},
     body: JSON.stringify({ estado: b.getAttribute("data-e") })
-  }).then(function(r){ return r.json(); }).then(function(){ cargarOfrecimientos(); cargarReportadas(); cargarResumen(); cargarAportes(); })
-    .catch(function(){ cargarOfrecimientos(); cargarInscripciones(); });
+  }).then(conEstado).then(function(res){
+    if (fallo(res.http, res.d)){ b.disabled = false; b.textContent = "Reintentar"; cargarInscripciones(); return; }
+    cargarOfrecimientos(); cargarReportadas(); cargarResumen(); cargarAportes();
+  }).catch(function(){ cargarOfrecimientos(); cargarInscripciones(); });
 });
 
 /* ---------------- pagos sin aporte ---------------- */
