@@ -197,9 +197,27 @@ function centenas(n) {
    la concordancia no es un detalle de estilo. */
 export function pesosEnLetras(n) {
   const letras = enLetras(n);
-  return /(mill[oó]n|millones|bill[oó]n|billones)$/.test(letras)
-    ? letras + " de pesos"
-    : letras + " pesos";
+  if (/(mill[oó]n|millones|bill[oó]n|billones)$/.test(letras)) return letras + " de pesos";
+  /* Y APOCOPA TAMBIÉN ANTE «PESOS», que es el sustantivo que sigue.
+
+     `enLetras` ya apocopa el «uno» final ante escala —«treinta y un mil»— con la
+     razón escrita ahí arriba. Pero el numeral que termina en 1 y NO lleva escala
+     detrás salía sin apocopar: «cincuenta mil uno pesos», «ciento veintiuno
+     pesos». Es 1 de cada 10 montos posibles, y `MONTO_MIN`/`MONTO_MAX` aceptan
+     cualquier entero, así que no es un borde teórico.
+
+     Importa por lo que este mismo archivo ya dice dos comentarios más arriba: en
+     un documento que se firma bajo juramento el valor en letras es el que manda,
+     «así que la concordancia no es un detalle de estilo». La cifra y las letras
+     coinciden —las dos salen del mismo `monto_centavos`—, lo que fallaba era el
+     castellano de una escritura pública.
+
+     Y UN PESO VA EN SINGULAR. No lo alcanza `MONTO_MIN` (5.000), pero una
+     función que sabe decir «cero pesos» tiene que saber decir «un peso». */
+  const apocopado = letras
+    .replace(/veintiuno$/, "veintiún")
+    .replace(/\buno$/, "un");
+  return apocopado + (n === 1 ? " peso" : " pesos");
 }
 
 export function enLetras(n) {
