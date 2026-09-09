@@ -1711,6 +1711,29 @@ async function adminResumen(env) {
    inscripción sin tocar hace nueve días y una de hace una hora se cuentan igual
    y no son lo mismo. Todo lo que espera a una persona viaja con sus días.
    ======================================================================== */
+/* QUE ES UN EVENTO DE PAYPAL «SIN CASA», en un solo sitio.
+
+   Esta condicion estaba escrita DOS VECES —en la alarma de `salud` y en la
+   consulta de la bandeja— palabra por palabra. Es exactamente la forma en que
+   `CONFIRMAR()` ya se habia desfasado en el triaje: el contador decia «(0)»
+   sobre una lista que tenia casos. Aqui todavia no habian divergido, pero la
+   tercera clausula que se añade hoy tenia que entrar en las dos, y esa es la
+   ocasion de juntarlas.
+
+   LA CLAUSULA NUEVA: `firma_valida = 1 AND procesado = 0`. Un evento de PayPal
+   BUENO que se quedo a medias. Antes no existia este estado —el manejador
+   marcaba `procesado = 1` aunque hubiera fallado— y por eso ninguna de las dos
+   consultas lo miraba. Desde que un fallo deja el evento sin procesar para que
+   PayPal reintente, ese estado SI existe: si los reintentos se agotan y sigue
+   ahi, es un cobro que no quedo registrado y nada lo decia.
+
+   `e.` es el alias que usan las dos consultas. */
+const PAYPAL_SIN_CASA =
+  "(e.firma_valida = 0 " +
+  " OR (e.firma_valida = 1 AND e.procesado = 0) " +
+  " OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL) " +
+  " OR e.resultado IN ('sin_regla','reversa_sin_aporte','donacion_sin_guia'))";
+
 async function adminSalud(env) {
   const uno = async (sql) => (await env.DB.prepare(sql).first()) || {};
 
@@ -1797,10 +1820,8 @@ async function adminSalud(env) {
   await enCola("paypal_sin_casa",
     "SELECT COUNT(*) AS n, MIN(e.recibido_en) AS masViejo " +
     "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
-    "WHERE e.firma_valida = 0 " +
-    "   OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL) " +
-    "   OR e.resultado IN ('sin_regla','reversa_sin_aporte','donacion_sin_guia')",
-    "Bandeja «Eventos de PayPal sin casa» · entró o salió plata que no tiene a quién atribuirse, o una firma no cuadra", 30, "#sec-pps");
+    "WHERE " + PAYPAL_SIN_CASA,
+    "Bandeja «Eventos de PayPal sin casa» · entró o salió plata que no tiene a quién atribuirse, una firma no cuadra, o un cobro bueno se quedó a medias", 30, "#sec-pps");
   await enCola("ipn_por_registrar",
     "SELECT COUNT(*) AS n, MIN(recibido_en) AS masViejo FROM eventos_ipn WHERE resultado = 'por_registrar'",
     "Bandeja «Donaciones por el botón de PayPal» · sin guía no hay recibo: hay que registrarlas a mano", 65, "#sec-ipn");
@@ -12023,19 +12044,16 @@ async function adminSuscripciones(env) {
 
 async function adminPaypalSueltos(env) {
   const r = await env.DB.prepare(
-    "SELECT e.evento_id, e.tipo, e.suscripcion, e.recurso_id, e.firma_valida, " +
-    "e.resultado, e.cuerpo, e.recibido_en " +
-    "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
-    "WHERE e.firma_valida = 0 " +
-    "   OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL) " +
     /* UN EVENTO SIN REGLA TAMPOCO PUEDE SER INVISIBLE. El webhook guarda todo lo
        que llega, y lo que no reconoce queda con `resultado = 'sin_regla'` — que
-       hasta hoy significaba «nadie lo va a ver nunca». Ahi es donde habrian
+       en su dia significaba «nadie lo va a ver nunca». Ahi es donde habrian
        caido los reembolsos y los contracargos de PayPal: plata devuelta, aporte
-       intacto en el libro, y silencio. Ahora sale a la bandeja, y con el sale
-       cualquier tipo de evento futuro que se suscriba y no tenga quien lo
-       atienda. */
-    "   OR e.resultado IN ('sin_regla','reversa_sin_aporte','donacion_sin_guia') " +
+       intacto en el libro, y silencio. La condicion entera vive en
+       `PAYPAL_SIN_CASA`, compartida con la alarma de `salud`. */
+    "SELECT e.evento_id, e.tipo, e.suscripcion, e.recurso_id, e.firma_valida, " +
+    "e.procesado, e.resultado, e.cuerpo, e.recibido_en " +
+    "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
+    "WHERE " + PAYPAL_SIN_CASA + " " +
     "ORDER BY e.recibido_en DESC LIMIT 100"
   ).all();
 
@@ -12055,6 +12073,7 @@ async function adminPaypalSueltos(env) {
       tipo: e.tipo,
       suscripcion: e.suscripcion,
       firma_valida: e.firma_valida,
+      procesado: e.procesado,
       resultado: e.resultado,
       recibido_en: e.recibido_en,
       monto: m.total != null ? String(m.total) : (m.value != null ? String(m.value) : null),
@@ -12956,12 +12975,14 @@ la nuestra; si dice otra cosa, es el motivo por el que no pasó y no hay que dar
 
 <h2 id="sec-pps" class="h-sec" style="margin:48px 0 6px;font-size:26px">Eventos de PayPal sin casa</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">La hermana de «Pagos sin aporte»,
-para PayPal. Dos cosas distintas caen aquí. <strong>Pago sin suscripción</strong>: entró plata con firma
+para PayPal. Tres cosas distintas caen aquí. <strong>Pago sin suscripción</strong>: entró plata con firma
 válida que no corresponde a ninguna membresía — pudo ser una donación del botón llegando por webhook en
 vez de por IPN, y hay que registrarla a mano. <strong>Firma inválida</strong>: el evento se guardó y
 <strong>no</strong> se procesó; puede ser una suplantación, pero la primera vez que pasó la causa fue una
-variable mal puesta, así que conviene mirarlo antes de asumir lo peor. Si esta lista está vacía, todo lo
-que llegó de PayPal tiene dónde ir.</p>
+variable mal puesta, así que conviene mirarlo antes de asumir lo peor. <strong>Se quedó a medias</strong>:
+la firma era buena y el proceso falló, así que ese cobro puede no estar en el libro — PayPal reintenta
+durante días, de modo que una fila recién aparecida suele resolverse sola; una que lleve días ahí, no.
+Si esta lista está vacía, todo lo que llegó de PayPal tiene dónde ir.</p>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Recibido</th><th scope="col">Evento</th><th scope="col">Monto</th>
@@ -14693,7 +14714,15 @@ function cargarPaypalSueltos(){
          moneda. Convertirlo a pesos aqui seria inventar una tasa. */
       var monto = e.monto ? (esc(e.monto) + " " + esc(e.moneda || "")) : "—";
       var que = !e.firma_valida
-        ? "Firma invalida: NO se proceso"
+        ? (e.resultado === "verificacion_indeterminada"
+            ? "No se pudo comprobar la firma: se le pidio a PayPal que reintente"
+            : "Firma invalida: NO se proceso")
+        /* SE QUEDO A MEDIAS. Firma buena y sin procesar: el cobro puede no estar
+           en el libro. Se enseña el motivo tal como lo dejo el manejador, que es
+           lo unico que dice por que fallo. */
+        : !e.procesado
+        ? ("Se quedo a medias: llego con firma buena y no se proceso"
+           + (e.resultado ? " · " + esc(String(e.resultado).slice(0, 90)) : ""))
         : e.resultado === "sin_regla"
         ? "Evento sin regla: llego y nadie lo atiende"
         : e.resultado === "reversa_sin_aporte"
