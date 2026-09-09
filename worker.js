@@ -9100,7 +9100,7 @@ async function carnetTrasAporte(env, aporte, donanteId, nivelForzado) {
   const hasta = sumarDias(aporte.frecuencia === "anual" ? 395 : 35);
 
   const ya = await env.DB.prepare(
-    "SELECT codigo, token, nivel, vigente_hasta FROM miembros WHERE donante_id = ?"
+    "SELECT codigo, token, nivel, vigente_hasta, revocado_en FROM miembros WHERE donante_id = ?"
   ).bind(donanteId).first();
 
   if (ya) {
@@ -9110,11 +9110,37 @@ async function carnetTrasAporte(env, aporte, donanteId, nivelForzado) {
     const nuevo = NIVELES_MB.findIndex((x) => x.id === nivel.id);
     const nivelFinal = nuevo > actual ? nivel.id : ya.nivel;
     const hastaFinal = hasta > ya.vigente_hasta ? hasta : ya.vigente_hasta;
+    /* RENOVAR NO LEVANTA UNA REVOCACIÓN, y hasta el 8 sep 2026 sí lo hacía.
+
+       Este UPDATE ponía `revocado_en = NULL, revocado_motivo = NULL`, así que el
+       siguiente cobro mensual deshacía la decisión del equipo. Medido de punta a
+       punta: se revoca un carnet con motivo —«uso indebido del beneficio en un
+       comercio aliado»—, la tarjeta pasa a «No vigente», llega el cobro del mes
+       y la tarjeta vuelve a decir «Vigente» con el motivo BORRADO de la fila.
+
+       Y el camino no es raro, es el normal: revocar el carnet no cancela la
+       suscripción, así que el cobro siguiente llega solo. Una decisión
+       deliberada, con motivo y con registro, la deshacía un proceso automático
+       sin avisarle a nadie —`nuevo` es false, así que ni siquiera sale el correo
+       del carnet—.
+
+       El tiempo pagado SÍ se acumula: `vigente_hasta` y el nivel se extienden
+       igual, para que si el equipo reactiva el carnet no se pierda lo que la
+       persona pagó mientras tanto. Lo que no se toca es la revocación. */
     await env.DB.prepare(
-      "UPDATE miembros SET nivel = ?, vigente_hasta = ?, revocado_en = NULL, " +
-      "revocado_motivo = NULL, actualizado_en = datetime('now') WHERE codigo = ?"
+      "UPDATE miembros SET nivel = ?, vigente_hasta = ?, actualizado_en = datetime('now') WHERE codigo = ?"
     ).bind(nivelFinal, hastaFinal, ya.codigo).run();
-    return { codigo: ya.codigo, token: ya.token, nivel: nivelFinal, vigente_hasta: hastaFinal, nuevo: false };
+    /* Y SE ANOTA que un carnet revocado siguió cobrando. Es lo que le permite al
+       equipo decidir: reactivar, o cancelar la suscripción para que la persona
+       deje de pagar por algo que no está recibiendo. Sin esta línea, el silencio
+       favorece justo al que menos conviene. */
+    if (ya.revocado_en) {
+      await env.DB.prepare(
+        "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES ('sistema', 'auditoria', ?)"
+      ).bind("carnet " + ya.codigo + " REVOCADO recibió un aporte y sigue revocado · vigente_hasta " + hastaFinal).run();
+    }
+    return { codigo: ya.codigo, token: ya.token, nivel: nivelFinal,
+             vigente_hasta: hastaFinal, nuevo: false, revocado: !!ya.revocado_en };
   }
 
   const codigo = await siguienteMiembro(env, anioCO());
@@ -9200,21 +9226,39 @@ async function adminMiembros(env) {
   return json({ miembros: r.results || [] });
 }
 
+/* Y SE PUEDE DESHACER, con `revocar: false` y su motivo.
+
+   Desde que renovar dejó de levantar la revocación (ver `carnetTrasAporte`), la
+   única forma de volver atrás habría sido tocar la base a mano. Eso es crear un
+   callejón sin salida, que es exactamente lo que `adminInspeccionAtendida` dejó
+   escrito que no se hace: «cerrar por error tiene que poder deshacerse». Mismo
+   patrón que su `atendida: false`, y el motivo se exige en las dos direcciones
+   porque reactivar también es una decisión de la que alguien responde. */
 async function adminRevocarMiembro(request, env, codigo, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { /* opcional */ }
   const motivo = limpiar(c.motivo, 280);
   if (!motivo) return json({ error: "motivo_requerido" }, 400);
-  const m = await env.DB.prepare("SELECT codigo FROM miembros WHERE codigo = ?").bind(codigo).first();
+  const quitar = c.revocar === false;
+  const m = await env.DB.prepare(
+    "SELECT codigo, revocado_en FROM miembros WHERE codigo = ?"
+  ).bind(codigo).first();
   if (!m) return json({ error: "no_encontrado" }, 404);
+  if (quitar && !m.revocado_en) return json({ error: "no_estaba_revocado" }, 409);
+  if (!quitar && m.revocado_en) return json({ error: "ya_revocado" }, 409);
+
   await env.DB.prepare(
-    "UPDATE miembros SET revocado_en = datetime('now'), revocado_motivo = ? WHERE codigo = ?"
-  ).bind(motivo, codigo).run();
+    quitar
+      ? "UPDATE miembros SET revocado_en = NULL, revocado_motivo = NULL, " +
+        "actualizado_en = datetime('now') WHERE codigo = ?"
+      : "UPDATE miembros SET revocado_en = datetime('now'), revocado_motivo = ?, " +
+        "actualizado_en = datetime('now') WHERE codigo = ?"
+  ).bind(...(quitar ? [codigo] : [motivo, codigo])).run();
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
-  ).bind(quien || "?", "carnet " + codigo + " revocado: " + motivo).run();
-  return json({ ok: true, codigo });
+  ).bind(quien || "?", "carnet " + codigo + (quitar ? " REACTIVADO: " : " revocado: ") + motivo).run();
+  return json({ ok: true, codigo, revocado: !quitar });
 }
 
 /* Correo con el enlace del carnet. Solo la PRIMERA vez: una renovación no
@@ -10997,7 +11041,15 @@ const BUSCA_NUMERO = {
         clase: "Acta de entrega", destino: "#sec-entregas" },
   /* Los miembros no tienen bandeja propia en este panel, así que el resultado
      sale sin enlace en vez de mandar a una pantalla que no los enseña. */
-  MB: { sql: "SELECT codigo AS numero, nivel AS estado, creado_en AS cuando FROM miembros WHERE codigo = ?",
+  /* EL ESTADO, no el nivel. Esta fila devolvía `nivel AS estado`, así que un
+     carnet revocado se buscaba por su código y salía «retono» — el mismo texto
+     que uno vigente. Los miembros no tienen bandeja propia, así que el buscador
+     es LA superficie donde el equipo mira un carnet: si ahí no se ve la
+     revocación, no se ve en ningún sitio. */
+  MB: { sql: "SELECT codigo AS numero, creado_en AS cuando, nivel AS sector, " +
+             "CASE WHEN revocado_en IS NOT NULL THEN 'revocado' " +
+             "WHEN vigente_hasta < date('now','-5 hours') THEN 'vencido' " +
+             "ELSE 'vigente' END AS estado FROM miembros WHERE codigo = ?",
         clase: "Membresía", destino: null }
 };
 
