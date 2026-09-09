@@ -3626,6 +3626,22 @@ function abrir(numero){
       h += "<div class='dato'><span>Ya evaluó</span><span>" + esc(ev[k].ing_nombre) + " (" + esc(ev[k].ing_matricula)
         +  ") &rarr; " + esc(ev[k].clasificacion) + "</span></div>";
     }
+    /* UN CASO TERMINADO NO OFRECE EL FORMULARIO.
+
+       El servidor rechaza evaluarlo con un 409, y hacia bien; el problema era
+       CUANDO se enteraba la persona. La ficha pintaba el formulario completo, asi
+       que se escribia la nota tecnica y el concepto entero y el aviso llegaba al
+       pulsar guardar. Ofrecer lo que no se puede hacer es peor que no ofrecerlo:
+       es la misma regla que el resto de esta pantalla ya sigue cuando esconde el
+       boton «tomar» al llegar al tope. */
+    if (c.estado === "cerrado" || c.estado === "descartado"){
+      h += "<p class='cargando' style='margin-top:14px'>Este caso está <b>" + esc(c.estado)
+        +  "</b>, así que ya no se evalúa. Si hay que retomarlo, el equipo lo reabre "
+        +  "desde el panel y vuelve a aparecer en la cola.</p></div>";
+      el("ficha").innerHTML = h;
+      el("ficha").scrollIntoView({ block: "start" });
+      return;
+    }
     h += "<label>Tu clasificación</label><select id='t-clas'>"
       +  "<option value='urgente'>Visita urgente</option>"
       +  "<option value='programada'>Visita programada</option>"
@@ -6978,7 +6994,9 @@ async function adminMoverCaso(request, env, numero, quien) {
   const regla = CASO_DESTINOS[nuevo];
   if (!regla) return json({ error: "estado_no_permitido", permitidos: Object.keys(CASO_DESTINOS) }, 400);
 
-  const caso = await env.DB.prepare("SELECT numero, estado FROM casos WHERE numero = ?").bind(numero).first();
+  const caso = await env.DB.prepare(
+    "SELECT numero, estado, tomado_por FROM casos WHERE numero = ?"
+  ).bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
   if (caso.estado === nuevo) return json({ error: "sin_cambio", estado: caso.estado }, 409);
   /* La transición se valida en el servidor y no solo en los botones del panel:
@@ -6993,8 +7011,24 @@ async function adminMoverCaso(request, env, numero, quien) {
                   ayuda: "Di qué pasó con el caso. Sin eso, mañana nadie sabe si se atendió o se perdió." }, 422);
   }
 
+  /* CERRAR UN CASO SE LO QUITA A QUIEN LO TENÍA TOMADO.
+
+     `triageEvaluar` ya suelta el caso en el mismo UPDATE que hace, y por la
+     misma razón: retener lo que ya no se puede trabajar no le sirve a nadie.
+     Aquí faltaba, y el efecto medido era este: el equipo cierra un caso que una
+     ingeniera tenía tomado y el caso SE QUEDA en su pestaña «Los que tomé», con
+     el mismo aspecto que los demás —la fila no pinta el estado— ocupando uno de
+     sus diez cupos. Solo se entera al abrirlo, escribir el concepto entero y
+     pulsar guardar: ahí el servidor responde 409 «este caso está cerrado». El
+     trabajo escrito se pierde.
+
+     Se suelta solo en los dos estados donde `triageEvaluar` bloquea de verdad.
+     `visitado` no: ahí el concepto todavía sirve y el endpoint lo acepta. */
+  const suelta = (nuevo === "cerrado" || nuevo === "descartado");
   await env.DB.prepare(
-    "UPDATE casos SET estado = ?, actualizado_en = datetime('now') WHERE numero = ?"
+    "UPDATE casos SET estado = ?, actualizado_en = datetime('now')" +
+    (suelta ? ", tomado_por = NULL, tomado_en = NULL" : "") +
+    " WHERE numero = ?"
   ).bind(nuevo, numero).run();
 
   /* El prefijo «caso <numero>» no es cosmético: es por lo que la bandeja
@@ -7003,9 +7037,13 @@ async function adminMoverCaso(request, env, numero, quien) {
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "caso " + numero + " " + caso.estado + " -> " + nuevo +
-         (motivo ? " · " + motivo : "")).run();
+         (motivo ? " · " + motivo : "") +
+         /* Y QUEDA ESCRITO A QUIÉN se le quitó. Sin esto, la ingeniera ve
+            desaparecer un caso de su lista y el registro no dice por qué. */
+         (suelta && caso.tomado_por ? " · se soltó de " + caso.tomado_por : "")).run();
 
-  return json({ ok: true, numero, estado: nuevo, anterior: caso.estado });
+  return json({ ok: true, numero, estado: nuevo, anterior: caso.estado,
+                soltado_de: suelta ? (caso.tomado_por || null) : null });
 }
 
 /* POST /api/admin/inspeccion/<numero>/atendida — cerrar una señal de terreno.
