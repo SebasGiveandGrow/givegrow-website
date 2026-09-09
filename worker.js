@@ -7909,7 +7909,14 @@ async function apiPaypalWebhook(request, env) {
     recurso.billing_agreement_id || (tipo.startsWith("BILLING.SUBSCRIPTION") ? recurso.id : "") || ""
   ).trim() || null;
 
-  let valida = 0;
+  /* TRES VEREDICTOS, NO DOS, y de ahi sale casi todo lo demas.
+
+     Esto colapsaba en un solo `valida = 0` dos cosas muy distintas: que PayPal
+     dijera que la firma NO es buena —lo que casi siempre significa que el evento
+     no viene de PayPal— y que NOSOTROS no hayamos podido comprobarla, porque se
+     cayo la red o su API contesto mal. La primera no se reintenta; la segunda
+     tiene que reintentarse, o un tropiezo de un segundo se lleva un cobro. */
+  let veredicto = "rechazada";
   try {
     const tk = await paypalToken(cfg);
     const v = await paypalPost(cfg, tk, "/v1/notifications/verify-webhook-signature", {
@@ -7921,8 +7928,9 @@ async function apiPaypalWebhook(request, env) {
       webhook_id: cfg.webhookId,
       webhook_event: ev
     });
-    valida = v.ok && v.d && v.d.verification_status === "SUCCESS" ? 1 : 0;
-    if (!valida) {
+    if (v.ok && v.d && v.d.verification_status === "SUCCESS") veredicto = "ok";
+    else if (!v.ok) veredicto = "indeterminada";
+    if (veredicto === "rechazada") {
       /* SE DICE CON QUE SE COMPARO, y esto no es ruido: la primera vez que esto
          fallo -3 sep 2026- el motivo era que el id del webhook llevaba el
          prefijo `WH-` que muestra el panel, y desde fuera era indistinguible de
@@ -7933,18 +7941,49 @@ async function apiPaypalWebhook(request, env) {
                     "· respuesta:", JSON.stringify(v.d).slice(0, 200));
     }
   } catch (e) {
+    veredicto = "indeterminada";
     console.error("paypal verificar firma", e && e.message);
   }
+  const valida = veredicto === "ok" ? 1 : 0;
 
-  /* Se registra pase lo que pase. Si el insert falla por el UNIQUE, es un
-     reintento de algo ya visto: 200 y a otra cosa. */
+  /* «YA LO PROCESE», NO «YA LO VI» — la misma leccion que costo un pago real en
+     Wompi, escrita en `apiEventos`, y que este camino no habia aprendido.
+
+     Aqui el UNIQUE de `evento_id` se leia como «esto ya se vio, 200 y a otra
+     cosa», sin mirar si llego a procesarse. Consecuencia: cualquier tropiezo
+     —la red al pedir el token de PayPal, un fallo de D1 a mitad— dejaba el
+     evento guardado SIN procesar, y el reintento de PayPal chocaba con el UNIQUE
+     y se descartaba. Un cobro mensual perdido en silencio, sin nada que avise.
+     El comentario del `catch` de mas abajo ya lo decia en voz alta.
+
+     Ahora un evento visto pero sin procesar se refresca con lo de esta vuelta y
+     SIGUE. Reprocesar es seguro porque las tres salidas lo son: `paypalCobro` ya
+     no duplica —ver su llave por `proveedor_ref`—, `paypalEstado` es un UPDATE y
+     `paypalReversa` mira `yaEstaba`. */
   try {
     await env.DB.prepare(
       "INSERT INTO eventos_paypal (evento_id, tipo, suscripcion, recurso_id, firma_valida, cuerpo) " +
       "VALUES (?,?,?,?,?,?)"
     ).bind(eventoId, tipo, suscripcionId, String(recurso.id || "") || null, valida, crudo.slice(0, 20000)).run();
   } catch (e) {
-    return json({ ok: true, repetido: true });
+    const visto = await env.DB.prepare(
+      "SELECT procesado FROM eventos_paypal WHERE evento_id = ?"
+    ).bind(eventoId).first();
+    if (!visto || visto.procesado) return json({ ok: true, repetido: true });
+    await env.DB.prepare(
+      "UPDATE eventos_paypal SET firma_valida = ?, cuerpo = ?, " +
+      "suscripcion = COALESCE(?, suscripcion) WHERE evento_id = ?"
+    ).bind(valida, crudo.slice(0, 20000), suscripcionId, eventoId).run();
+  }
+
+  /* NO PUDIMOS COMPROBARLA: se pide el reintento. Es nuestro fallo, no de quien
+     llama, y PayPal reintenta durante dias — asi que un 503 aqui es la
+     diferencia entre recuperar el cobro y perderlo. `procesado` se queda en 0. */
+  if (veredicto === "indeterminada") {
+    await env.DB.prepare(
+      "UPDATE eventos_paypal SET resultado = 'verificacion_indeterminada' WHERE evento_id = ?"
+    ).bind(eventoId).run();
+    return json({ error: "verificacion_indeterminada" }, 503);
   }
 
   if (!valida) {
@@ -7991,11 +8030,21 @@ async function apiPaypalWebhook(request, env) {
       resultado = "donacion_sin_guia";
     }
   } catch (e) {
-    /* El fallo se ESCRIBE, no se pierde: `resultado` es donde se mira despues.
-       Y se responde 200 igual, porque el evento ya quedo guardado y un reintento
-       de PayPal chocaria con el UNIQUE sin volver a intentar el proceso. */
+    /* EL FALLO SE ESCRIBE Y SE PIDE EL REINTENTO. Antes se respondia 200 y se
+       marcaba `procesado = 1` aunque no se hubiera procesado nada: el evento
+       quedaba con un `resultado` que empezaba por «error:» y ahi moria, porque
+       el reintento de PayPal chocaba con el UNIQUE. Ese comentario decia la
+       verdad y describia el agujero.
+
+       Ahora se deja `procesado = 0` y se responde 503, que es lo que hace que
+       PayPal vuelva a llamar. Reprocesar es seguro: ninguna de las tres salidas
+       duplica nada. */
     resultado = "error: " + String((e && e.message) || e).slice(0, 160);
     console.error("paypal procesar", tipo, resultado);
+    await env.DB.prepare(
+      "UPDATE eventos_paypal SET resultado = ? WHERE evento_id = ?"
+    ).bind(resultado, eventoId).run();
+    return json({ error: "procesado_fallido" }, 503);
   }
 
   await env.DB.prepare(
@@ -8155,6 +8204,30 @@ async function paypalCobro(env, suscripcionId, recurso) {
   if (!(valor > 0)) return "monto_ilegible";
   const moneda = String(monto.currency || monto.currency_code || "USD").toUpperCase();
   const centavos = Math.round(valor * 100);
+
+  /* IDEMPOTENTE POR EL ID DEL COBRO, y esto es lo que permite que un evento se
+     pueda reprocesar sin miedo.
+
+     Esta funcion insertaba siempre: pedia una guia nueva —un consecutivo que no
+     se reinicia jamas—, creaba un aporte y subia `cobros` en uno. Si el mismo
+     `PAYMENT.SALE.COMPLETED` entrara dos veces, la fundacion tendria DOS
+     donaciones por un solo pago, con dos guias y dos recibos.
+
+     Hasta hoy eso no podia pasar, pero solo porque el UNIQUE de `eventos_paypal`
+     impedia reprocesar NADA — y ese candado era justamente el que hacia que un
+     fallo pasajero perdiera un cobro para siempre. O sea que la propiedad buena
+     se sostenia sobre el fallo malo.
+
+     `proveedor_ref` ya es la llave con la que `paypalReversa` encuentra el
+     aporte de un cobro, asi que no se inventa nada: se usa la que ya existe.
+     Va ANTES de `siguienteGuia` para que un cobro repetido no queme un numero. */
+  const refCobro = String((recurso && recurso.id) || "").trim();
+  if (refCobro) {
+    const ya = await env.DB.prepare(
+      "SELECT guia FROM aportes WHERE proveedor = 'paypal' AND proveedor_ref = ?"
+    ).bind(refCobro).first();
+    if (ya) return "cobro_ya_registrado " + ya.guia;
+  }
 
   const guia = await siguienteGuia(env, anioCO());
   const token = tokenNuevo();
