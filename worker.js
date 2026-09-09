@@ -3927,6 +3927,17 @@ const FIRMES = "(SELECT COUNT(DISTINCT lower(e.ing_email)) FROM evaluaciones e "
 const DISCREPA = "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e " +
                  "WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1)";
 
+/* EL TOPE DE LAS BANDEJAS DEL PANEL, con la misma razón que el de los casos.
+
+   Once consultas del panel llevaban su `LIMIT` escrito a mano y NINGUNA devolvía
+   su total, contra la regla que este repositorio tiene escrita: «no hay topes
+   callados; si se recorta, se dice». Y el detalle que lo vuelve grave: cuatro de
+   esas bandejas ordenan `DESC`, así que lo que el tope esconde es LO MÁS VIEJO —
+   justo en colas donde la antigüedad es el dato que decide. Un ofrecimiento de
+   hace tres meses que nadie atendió es exactamente lo que desaparece primero. */
+const TOPE_BANDEJA = 100;
+const TOPE_RUTA = 300;
+
 /* El tope de las listas de casos. Existe como constante y no como número
    suelto porque va acompañado SIEMPRE de su total: el día que alguien lo suba,
    lo que la pantalla dice sigue siendo verdad. */
@@ -4905,7 +4916,7 @@ async function triageMisInspecciones(env, sesion) {
     "obs_email, respuestas, fotos, substr(recibido_en,1,16) AS recibido_en " +
     "FROM inspecciones " +
     (equipo ? "" : "WHERE lower(obs_email) = lower(?) ") +
-    "ORDER BY recibido_en DESC LIMIT 100"
+    "ORDER BY recibido_en DESC LIMIT " + TOPE_BANDEJA
   ).bind(...(equipo ? [] : [email])).all();
 
   const filas = (r.results || []).map((v) => {
@@ -7227,7 +7238,7 @@ async function adminRuta(env, url) {
        se hunde: sigue en la lista porque falta cerrarlo, pero no es una parada. */
     "CASE WHEN c.estado = 'visitado' THEN 1 ELSE 0 END, " +
     "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
-    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT 300"
+    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT " + TOPE_RUTA
   );
   const r = await (sector ? q.bind(sector) : q).all();
 
@@ -7271,7 +7282,16 @@ async function adminRuta(env, url) {
     return g ? { ...c, lat: g.lat, lon: g.lon } : c;
   });
 
-  return json({ casos, sectores: s.results || [] });
+  /* EL TOTAL DE LA RUTA. Aquí el orden pone los urgentes primero, así que lo que
+     el tope esconde es lo MENOS urgente — pero esconderlo en silencio deja fuera
+     también los `visitado`, que siguen en la lista justamente porque falta
+     cerrarlos. */
+  const totR = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos c WHERE c.estado NOT IN ('cerrado','descartado')" + filtro
+  );
+  const tot = await (sector ? totR.bind(sector) : totR).first();
+  return json({ casos, sectores: s.results || [],
+                total: (tot && tot.n) || 0, tope: TOPE_RUTA });
 }
 
 /* ========================================================================
@@ -9056,9 +9076,14 @@ async function adminReportadas(env) {
        «hace 22 dias» si. Las mas viejas salen primero por lo mismo. */
     "CAST(julianday('now') - julianday(a.creada_en) AS INTEGER) AS dias " +
     "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id " +
-    "WHERE a.estado = 'reportada' ORDER BY a.creada_en ASC LIMIT 100"
+    "WHERE a.estado = 'reportada' ORDER BY a.creada_en ASC LIMIT " + TOPE_BANDEJA
   ).all();
-  return json({ reportadas: r.results || [] });
+  /* EL TOTAL, con el mismo filtro que la lista: un total calculado sobre otra
+     condición miente de otra manera. */
+  const tot = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM aportes WHERE estado = 'reportada'"
+  ).first();
+  return json({ reportadas: r.results || [], total: (tot && tot.n) || 0, tope: TOPE_BANDEJA });
 }
 
 /* Confirmar es contrastar contra el extracto y dejarlo firmado con nombre. Por
@@ -11005,9 +11030,12 @@ async function correoAvisoFundacion(env, f) {
 async function adminOfrecimientos(env) {
   const r = await env.DB.prepare(
     "SELECT id, estado, nombre, email, telefono, ciudad, datos, creada_en " +
-    "FROM inscripciones WHERE tipo = 'especie' ORDER BY creada_en DESC LIMIT 100"
+    "FROM inscripciones WHERE tipo = 'especie' ORDER BY creada_en DESC LIMIT " + TOPE_BANDEJA
   ).all();
-  return json({ ofrecimientos: r.results || [] });
+  const tot = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM inscripciones WHERE tipo = 'especie'"
+  ).first();
+  return json({ ofrecimientos: r.results || [], total: (tot && tot.n) || 0, tope: TOPE_BANDEJA });
 }
 
 /* Las otras tres puertas —voluntarios, fundaciones y empresas— comparten una
@@ -12082,7 +12110,7 @@ async function adminPaypalSueltos(env) {
     "e.procesado, e.resultado, e.cuerpo, e.recibido_en " +
     "FROM eventos_paypal e LEFT JOIN suscripciones s ON s.id = e.suscripcion " +
     "WHERE " + PAYPAL_SIN_CASA + " " +
-    "ORDER BY e.recibido_en DESC LIMIT 100"
+    "ORDER BY e.recibido_en DESC LIMIT " + TOPE_BANDEJA
   ).all();
 
   const filas = (r.results || []).map((e) => {
@@ -12117,7 +12145,7 @@ async function adminIpn(env) {
     "SELECT clave, estado, txn_type, txn_id, suscripcion, monto_centavos, moneda, " +
     "comision_centavos, verificado, resultado, cuerpo, recibido_en " +
     "FROM eventos_ipn WHERE resultado IS NULL OR resultado <> 'ya_por_webhook' " +
-    "ORDER BY recibido_en DESC LIMIT 100"
+    "ORDER BY recibido_en DESC LIMIT " + TOPE_BANDEJA
   ).all();
 
   const filas = (r.results || []).map((e) => {
@@ -12143,7 +12171,10 @@ async function adminIpn(env) {
       nota: p.get("memo") || null
     };
   });
-  return json({ ipn: filas });
+  const tot = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM eventos_ipn WHERE resultado IS NULL OR resultado <> 'ya_por_webhook'"
+  ).first();
+  return json({ ipn: filas, total: (tot && tot.n) || 0, tope: TOPE_BANDEJA });
 }
 
 async function adminPagosSueltos(env) {
@@ -12151,7 +12182,7 @@ async function adminPagosSueltos(env) {
     "SELECT e.transaction_id, e.guia AS referencia, e.estado, e.recibido_en, e.cuerpo " +
     "FROM eventos_wompi e LEFT JOIN aportes a ON a.guia = e.guia " +
     "WHERE e.firma_valida = 1 AND e.estado = 'APPROVED' AND a.guia IS NULL " +
-    "ORDER BY e.recibido_en DESC LIMIT 100"
+    "ORDER BY e.recibido_en DESC LIMIT " + TOPE_BANDEJA
   ).all();
 
   /* Del cuerpo crudo se extrae solo lo necesario para conciliar. Aunque el
@@ -12306,7 +12337,7 @@ async function adminEntregas(env) {
   const r = await env.DB.prepare(
     "SELECT numero, destino_id, sector, lugar, fecha, aliada, familias, resumen, " +
     "recibido_por, fotos, publicada_en, creada_por, anulada_en, anulada_motivo, anulada_por " +
-    "FROM entregas ORDER BY fecha DESC, numero DESC LIMIT 100"
+    "FROM entregas ORDER BY fecha DESC, numero DESC LIMIT " + TOPE_BANDEJA
   ).all();
 
   /* QUÉ CASAS CUBRIÓ CADA ENTREGA. Un escaneo y un mapa, no una subconsulta por
@@ -12326,7 +12357,8 @@ async function adminEntregas(env) {
   }
   const filas = (r.results || []).map((g) => ({ ...g, casos: porEntrega.get(g.numero) || [] }));
 
-  return json({ entregas: filas });
+  const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM entregas").first();
+  return json({ entregas: filas, total: (tot && tot.n) || 0, tope: TOPE_BANDEJA });
 }
 
 /* POST /api/admin/entrega/<numero>/anular  —  { motivo }
@@ -12610,7 +12642,7 @@ function cargarRuta(){
   var u = "/api/admin/ruta" + (SECTOR ? "?sector=" + encodeURIComponent(SECTOR) : "");
   fetch(u).then(function(r){ return r.json(); }).then(function(d){
     pintarSectores(d.sectores || []);
-    pintarCasos(d.casos || []);
+    pintarCasos(d.casos || [], d);
   });
 }
 
@@ -12624,10 +12656,21 @@ function pintarSectores(l){
   c.innerHTML = h;
 }
 
-function pintarCasos(l){
+function pintarCasos(l, sobre){
   var c = document.getElementById("lista"); if (!c) return;
   if (!l.length){ c.innerHTML = '<p class="vacio">Nada por visitar aquí. Buen trabajo.</p>'; return; }
+  /* SI LA RUTA SE RECORTA, SE DICE. Esta pantalla es la que alguien lleva en el
+     bolsillo para decidir a que puerta va ahora, y terminaba en la casa 300 sin
+     una palabra. El orden pone los urgentes primero, asi que lo que falta es lo
+     menos grave — pero tambien los «visitado», que siguen en la lista justamente
+     porque falta cerrarlos. */
   var h = "";
+  if (sobre && sobre.total && sobre.tope && sobre.total > sobre.tope){
+    h += '<p class="vacio" style="background:#FDF3E3;border-radius:10px;padding:10px 14px">'
+      + "<b>Se enseñan " + sobre.tope + " de " + sobre.total + " casas.</b> Van los urgentes primero, "
+      + "asi que lo que falta es lo menos grave. Filtra por sector para verlo todo."
+      + "</p>";
+  }
   for (var i = 0; i < l.length; i++){
     var x = l[i];
     var visitado = x.estado === "visitado";
@@ -13365,7 +13408,10 @@ function cargarReportadas(){
     var tb = document.getElementById("t-filas"); if (!tb) return;
     var l = d.reportadas || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Ninguna esperando verificación.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(a){
+    /* Esta va ASC: lo que el tope esconde es lo mas RECIENTE, no lo mas viejo. */
+    tb.innerHTML = filaTope(d, 8, "transferencias",
+      "Van de la mas antigua a la mas nueva, asi que lo que falta es lo que acaba de llegar.")
+      + l.map(function(a){
       return "<tr>" +
         "<td>" + esc(a.guia) + "<br><small>" + esc(enCO(a.creada_en, 16)) +
           (a.dias >= 3 ? '<br><strong style="color:#A84D00">esperando ' + a.dias + " dia(s)</strong>" : "") +
@@ -13710,7 +13756,7 @@ function resumenInscripcion(tipo, x){
    lector concluye «esto es todo», así que es donde engaña. Un tope callado hace
    que el caso 201 no exista para nadie mientras la familia espera — la misma
    clase de fallo que los borradores que ningún código leía. */
-function filaTope(d, columnas, que){
+function filaTope(d, columnas, que, consejo){
   if (!d || !d.total || !d.tope || d.total <= d.tope) return "";
   var faltan = d.total - d.tope;
   /* EL CONSEJO TIENE QUE EXISTIR. Decía «usa los filtros para acotar» y estas
@@ -13719,10 +13765,16 @@ function filaTope(d, columnas, que){
      y concluye que es él. Lo que sí ayuda son dos cosas ciertas: la lista viene
      ordenada por gravedad, así que lo que no se ve es lo MENOS urgente; y el
      buscador de arriba encuentra por número exacto o por teléfono. */
+  /* EL CONSEJO SE PUEDE CAMBIAR, y hace falta: la frase de abajo afirma que la
+     lista va ordenada por gravedad, y eso solo es verdad en la bandeja de casos.
+     Cuatro de las bandejas ordenan por fecha DESC, o sea que lo que el tope
+     esconde es lo MAS VIEJO — decirles «lo que falta es lo menos urgente» seria
+     exactamente al reves de la verdad. */
   return '<tr><td colspan="' + columnas + '" style="background:var(--amberl);font-size:13px">'
     + "<strong>Faltan " + faltan + " " + que + " por mostrar</strong> · se enseñan "
-    + d.tope + " de " + d.total + ". La lista va ordenada por gravedad, así que lo que "
-    + "falta es lo menos urgente. Para uno en concreto, búscalo arriba por su número o por el teléfono."
+    + d.tope + " de " + d.total + ". "
+    + (consejo || "La lista va ordenada por gravedad, así que lo que falta es lo menos urgente.")
+    + " Para uno en concreto, búscalo arriba por su número o por el teléfono."
     + "</td></tr>";
 }
 
@@ -14343,7 +14395,7 @@ function cargarOfrecimientos(){
     var tb = document.getElementById("o-filas"); if (!tb) return;
     var l = d.ofrecimientos || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no hay ofrecimientos.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(o){
+    tb.innerHTML = filaTope(d, 7, "ofrecimientos", "Lo que no se ve es lo MAS VIEJO de la cola, que es justo lo que llevaba mas tiempo esperando.") + l.map(function(o){
       var x = {}; try { x = JSON.parse(o.datos||"{}"); } catch(e){}
       var siguiente = o.estado === "nueva" ? ["en_revision","Contactado"]
                     : o.estado === "en_revision" ? ["aceptada","Recibido"]
@@ -14615,7 +14667,7 @@ function cargarSueltos(){
     var tb = document.getElementById("p-filas"); if (!tb) return;
     var l = d.pagos || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="5">Ninguno: todo lo cobrado tiene su aporte.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(p){
+    tb.innerHTML = filaTope(d, 5, "pagos", "Lo que no se ve es lo MAS VIEJO de la cola, que es justo lo que llevaba mas tiempo esperando.") + l.map(function(p){
       return "<tr>" +
         "<td>" + esc(p.referencia || p.transaction_id) + "</td>" +
         "<td>" + (p.monto_centavos ? pesos(p.monto_centavos) : "—") + "</td>" +
@@ -14633,7 +14685,7 @@ function cargarIpn(){
     var tb = document.getElementById("ipn-filas"); if (!tb) return;
     var l = d.ipn || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguna todavia. Si el boton ya recibio donaciones y esto sigue vacio, el notify_url no esta puesto.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(e){
+    tb.innerHTML = filaTope(d, 6, "avisos", "Lo que no se ve es lo MAS VIEJO de la cola, que es justo lo que llevaba mas tiempo esperando.") + l.map(function(e){
       /* El monto viene en la moneda que cobro PayPal, casi siempre USD, asi que
          NO se formatea con pesos(): eso mentiria sobre la moneda. */
       var monto = e.monto_centavos != null
@@ -14816,10 +14868,10 @@ function pintarCampos(){
   c.innerHTML = E_CAMPOS.map(function(f){ return campo(f[0], f[1], f[2]); }).join("");
 }
 
-function pintarEntregas(l){
+function pintarEntregas(l, sobre){
   var tb = document.getElementById("e-filas"); if (!tb) return;
   if (!l.length){ tb.innerHTML = '<tr><td colspan="9">Todavía no hay entregas registradas.</td></tr>'; return; }
-  tb.innerHTML = l.map(function(e){
+  tb.innerHTML = filaTope(sobre, 9, "actas", "Lo que no se ve es lo MAS VIEJO de la cola, que es justo lo que llevaba mas tiempo esperando.") + l.map(function(e){
     var nf = 0; try { nf = JSON.parse(e.fotos||"[]").length; } catch(x){}
     var pub = !!e.publicada_en;
     var nula = !!e.anulada_en;
@@ -14871,7 +14923,7 @@ function pintarEntregas(l){
 
 function cargarEntregas(){
   fetch("/api/admin/entregas").then(function(r){ return r.json(); })
-    .then(function(d){ pintarEntregas(d.entregas || []); });
+    .then(function(d){ pintarEntregas(d.entregas || [], d); });
 }
 
 document.addEventListener("change", function(e){
