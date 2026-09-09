@@ -426,7 +426,10 @@ html[data-theme="dark"] .alma-send{background:var(--acc);color:#0F1613}
 /* ===== footer ===== */
 footer{background:var(--ink-deep);color:var(--on-dark-3);padding:54px 0 30px}
 .foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:32px;margin-bottom:32px}
-footer h4{color:var(--on-dark);font-size:var(--fs-15);margin-bottom:14px}
+/* h2 y no h4: son los dos agrupadores del pie y aparecen en TODAS las rutas, asi
+   que su nivel decidia el unico salto de encabezados que tenia el sitio entero.
+   El tamaño no cambia — lo fija esta regla, no el nivel. */
+footer h2{color:var(--on-dark);font-size:var(--fs-15);margin-bottom:14px;font-family:"Inter",sans-serif;line-height:var(--lh-tight);letter-spacing:var(--tr-heading);font-weight:700}
 footer a{display:block;padding:4px 0;font-size:var(--fs-14)}
 footer a:hover{color:var(--gn)}
 .foot-bottom{border-top:1px solid var(--on-dark-fill-2);padding-top:20px;font-size:var(--fs-13);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
