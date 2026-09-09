@@ -685,4 +685,80 @@ try {
   }
 } catch (e) { err("no se pudo verificar el consentimiento de las aliadas: " + e.message); }
 
+/* CHECK #15 — LOS `data-*` DEL PANEL Y DEL TRIAJE, QUE NADIE VIGILABA.
+   ---------------------------------------------------------------------------
+   El check #12 protege el sitio público: `ACT_FNS` es una lista blanca y el
+   gate comprueba que cubra todo lo que el HTML invoca, porque «un botón muerto
+   no hace nada y NO sale error».
+
+   Las pantallas del Worker no usan `ACT_FNS`. Cablean sus botones con
+   `data-*` leídos por delegadores de clic —el panel tiene 34 atributos
+   repartidos en cinco delegadores— y hasta hoy NADA los cruzaba. Un
+   `data-anular` emitido y un delegador que lee `data-anul` es exactamente el
+   mismo fallo silencioso, en el sitio donde se anulan certificados y se borran
+   fotos de familias.
+
+   Se cuentan como «leído» las cuatro formas reales que usa este archivo:
+   `getAttribute`, `hasAttribute`, cualquier `[data-x` dentro de un selector
+   —eso cubre `closest("[data-x]")` y los compuestos tipo
+   `.ecaso[data-para="…"]`— y `dataset.enCamello`. Y también el CSS, porque
+   `data-label` existe solo para `td::before{content:attr(data-label)}`.
+
+   LIMITACIÓN, dicha en voz alta: esto casa por NOMBRE de atributo, no por
+   pareja emisor–lector. Un `data-cert` emitido en una tabla y leído por el
+   delegador de otra pasa el check. Atrapa el error de dedo, que es el que
+   ocurre; no atrapa el de cableado cruzado. */
+try {
+  const src = readFileSync("worker.js", "utf8");
+  const css = readFileSync("styles.css", "utf8");
+
+  /* Saca la plantilla de una función, respetando las comillas invertidas
+     escapadas — que en este archivo las hay. */
+  const plantilla = (nombre) => {
+    const i = src.indexOf("function " + nombre + "(");
+    if (i < 0) return "";
+    const ini = src.indexOf("`", i);
+    let j = ini + 1;
+    while (j < src.length) {
+      if (src[j] === "\\") { j += 2; continue; }
+      if (src[j] === "`") break;
+      j++;
+    }
+    return src.slice(ini + 1, j);
+  };
+
+  const camello = (a) => a.replace(/^data-/, "").replace(/-([a-z])/g, (m, c) => c.toUpperCase());
+
+  const pantallas = [
+    { nombre: "panel", html: plantilla("paginaAdmin"), js: plantilla("adminJS") },
+    { nombre: "triaje", html: plantilla("paginaTriage"), js: plantilla("triageJS") },
+    { nombre: "terreno", html: plantilla("inspeccionHTML"), js: plantilla("inspeccionJS") },
+    { nombre: "ruta", html: plantilla("paginaRuta"), js: plantilla("rutaJS") }
+  ];
+
+  for (const p of pantallas) {
+    if (!p.js) { err("check #15: no encontré la plantilla JS de " + p.nombre); continue; }
+    const texto = p.html + "\n" + p.js;
+    const emitidos = new Set([...texto.matchAll(/(data-[a-z0-9-]+)\s*=/g)].map((m) => m[1]));
+    const huerfanos = [...emitidos].filter((a) => {
+      const leeJS = new RegExp(
+        "(?:get|has)Attribute\\(\"" + a + "\"\\)" +
+        "|\\[" + a + "[\\]=]" +
+        "|dataset\\." + camello(a) + "\\b"
+      );
+      if (leeJS.test(p.js)) return false;
+      /* El CSS también cuenta: attr(data-x) y [data-x…]. */
+      if (css.includes("attr(" + a + ")") || css.includes("[" + a)) return false;
+      if (texto.includes("attr(" + a + ")")) return false;
+      return true;
+    });
+    if (huerfanos.length) {
+      err("check #15 · " + p.nombre + ": " + huerfanos.join(", ") +
+          " se emite(n) en el HTML y nadie los lee — el clic no hace nada y NO sale error");
+    } else {
+      ok("los data-* de " + p.nombre + " tienen quien los lea (" + emitidos.size + ")");
+    }
+  }
+} catch (e) { err("no se pudieron cruzar los data-* de las pantallas del Worker: " + e.message); }
+
 process.exit(fail);
