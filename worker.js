@@ -8772,10 +8772,20 @@ async function adminCasoFicha(env, numero) {
     "SELECT ing_nombre, ing_matricula, clasificacion, nota_tecnica, recomendacion, falta, creado_en " +
     "FROM evaluaciones WHERE caso = ? ORDER BY creado_en DESC"
   ).bind(numero).all();
+  /* EL HISTORIAL ES UN RASTRO DE AUDITORIA, y recortarlo en silencio es la peor
+     version del tope callado: una lista de trabajo que se corta se nota porque
+     alguien echa en falta una fila, pero un registro de quien movio que y por
+     que se lee ENTERO o no sirve de registro. Se trae su total con el mismo
+     filtro, para que la ficha pueda decir cuantos movimientos no caben. */
+  const FICHA_HIST = 30;
   const h = await env.DB.prepare(
     "SELECT sujeto, detalle, otorgado_en FROM consentimientos " +
-    "WHERE tipo = 'auditoria' AND detalle LIKE 'caso ' || ? || ' %' ORDER BY id DESC LIMIT 30"
+    "WHERE tipo = 'auditoria' AND detalle LIKE 'caso ' || ? || ' %' ORDER BY id DESC LIMIT " + FICHA_HIST
   ).bind(numero).all();
+  const hTot = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM consentimientos " +
+    "WHERE tipo = 'auditoria' AND detalle LIKE 'caso ' || ? || ' %'"
+  ).bind(numero).first();
 
   /* El enlace lo arma el SERVIDOR y no el panel, y no es una preferencia de
      estilo: desde la migración su origen es el subdominio del triaje y no el del
@@ -8910,6 +8920,7 @@ async function adminCasoFicha(env, numero) {
 
   return json({ caso: c, enlace, medios: m.results || [], evaluaciones: e.results || [],
                 inspecciones: insp.results || [], historial: h.results || [],
+                historial_total: (hTot && hTot.n) || 0, historial_tope: FICHA_HIST,
                 materiales: mat.results || [], hilo });
 }
 
@@ -14054,6 +14065,13 @@ function abrirCaso(numero){
       return "<li><small>" + esc(enCO(h.otorgado_en, 16)) + " · " + esc(h.sujeto) + " — " +
         esc(String(h.detalle).replace("caso " + numero + " ", "")) + "</small></li>";
     }).join("");
+    /* Y SI EL HISTORIAL NO CABE ENTERO, SE DICE. Un rastro de auditoria
+       recortado en silencio deja de ser un rastro: quien lo lee no puede saber
+       si vio todo lo que paso con ese caso. */
+    if (d.historial_total && d.historial_tope && d.historial_total > d.historial_tope){
+      hist = "<li><small><b>Se enseñan los " + d.historial_tope + " movimientos mas recientes de "
+           + d.historial_total + ".</b> Los anteriores no caben en esta ficha.</small></li>" + hist;
+    }
 
     caja.innerHTML =
       '<div class="card" style="max-width:760px;text-align:left">' +
