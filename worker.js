@@ -5764,6 +5764,10 @@ function vaciarCola(){
     }
     aviso(l.length === 1 ? "Enviando…" : "Enviando… " + l.length + " pendientes.", "info");
     var i = 0, enviadas = 0, repes = 0, malas = 0, sesionCaida = false, sinBorrar = 0, fotosMalas = 0;
+    /* QUE fue lo que no le gusto al servidor. Sin esto, «datos incompletos» era
+       todo lo que se sabia, y con un cliente viejo contra un servidor nuevo es
+       justo el dato que dice por que. */
+    var motivoMalas = "";
     function paso(){
       if (i >= l.length){
         VACIANDO = false;
@@ -5772,7 +5776,33 @@ function vaciarCola(){
         medidor(null);
         estado();
         if (sesionCaida) aviso("Tu sesión caducó. Vuelve a entrar y toca Enviar otra vez: nada se perdió.", "mal");
-        else if (malas)  aviso("Quedaron " + malas + " sin enviar por datos incompletos. Ábrelas y complétalas.", "mal");
+        /* «ÁBRELAS Y COMPLÉTALAS» ERA UNA PUERTA QUE NO EXISTE.
+
+           Una inspección que el servidor rechaza con 400 o 422 se queda en la
+           cola —correcto: reintentarla no la va a arreglar, y perderla seria
+           peor— pero NADA de esta pantalla lista ni abre lo que esta en la cola.
+           «cargarBorradores» lee «borradores», no «cola». Asi que el consejo
+           señalaba una salida que no esta, que es peor que no decir nada: quien
+           lo lee la busca, no la encuentra, y concluye que es el.
+
+           Y no es un borde raro en ESTA app: el service worker guarda su propio
+           codigo durante dias, asi que un telefono en la vereda puede estar
+           corriendo la version de la semana pasada contra el servidor de hoy. Si
+           el servidor empieza a exigir un campo que ese cliente no manda, TODAS
+           sus inspecciones caen aqui.
+
+           La salida que si existe es el respaldo: «respaldo()» empaqueta
+           «borradores» Y «cola», y el equipo lo importa desde el panel. Se dice
+           eso, y se dice QUE falto — el servidor lo manda en «faltan». */
+        else if (malas)  aviso("Quedaron " + malas + " sin enviar: el servidor no las acepta"
+            + (motivoMalas ? " (" + motivoMalas + ")" : "") + ". Reintentar no las va a arreglar. "
+            /* EL BOTON SE NOMBRA CON LAS PALABRAS QUE TIENE ESCRITAS. Puse
+               «Descargar respaldo» de primeras y en la pantalla dice
+               «Respaldar todo en un archivo» — o sea que iba a repetir el
+               mismo error que vengo a arreglar, mandando a un boton que no se
+               llama asi. Comprobado leyendo la pantalla, no el codigo. */
+            + "Toca «Respaldar todo en un archivo» y manda el archivo al equipo: "
+            + "ellos lo importan desde el panel.", "mal");
         else if (sinBorrar) {
           /* Llegaron al servidor pero no se pudieron quitar del teléfono, así
              que el contador NO va a bajar. Se dice, porque un contador que no
@@ -5822,7 +5852,15 @@ function vaciarCola(){
           return;
         }
         if (res.estado === "sesion")   { sesionCaida = true; paso(); return; }
-        if (res.estado === "rechazada"){ malas++; paso(); return; }
+        if (res.estado === "rechazada"){
+          malas++;
+          if (!motivoMalas && res.d){
+            motivoMalas = res.d.faltan && res.d.faltan.length
+              ? "falta " + res.d.faltan.join(", ")
+              : (res.d.error || "");
+          }
+          paso(); return;
+        }
         paso();
       }, function(){
         /* "enviarUno" ya atrapa lo suyo y no debería rechazar. Esto es el
