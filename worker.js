@@ -15211,7 +15211,28 @@ async function rutaCompartir(env, url, id) {
       return new Response(sharePage(p), {
         headers: {
           "content-type": "text/html; charset=utf-8",
-          "cache-control": "public, max-age=3600",
+          /* SIN CACHÉ PÚBLICA, y esto es la mitad que faltaba de la regla 1.
+
+             `partners.json` —la FUENTE de esta página— se sirve `no-store,
+             must-revalidate` por `_headers`, y el motivo es que la revocación
+             del consentimiento tiene que propagarse en el momento: en cuanto una
+             fundación sale del JSON, deja de aparecer en el sitio.
+
+             Esta página se construye de ese mismo JSON y se servía `public,
+             max-age=3600`. O sea que la fuente se niega a que la guarden y la
+             página pública que lleva el nombre —la que se comparte por enlace y
+             la que raspan las vistas previas— se dejaba guardar una hora, en
+             cachés compartidas incluidas. La revocación quedaba inmediata en
+             todas partes menos en la superficie MÁS pública.
+
+             Comprobado en producción el 9 sep 2026: `/f/conciencia` respondía
+             `public, max-age=3600` mientras `/data/partners.json` respondía
+             `no-store, must-revalidate`.
+
+             Se iguala a la fuente. El coste es una página HTML pequeña que sale
+             del Worker; lo que se gana es que «si no consta la autorización, no
+             hay página» sea verdad también un minuto después de revocarla. */
+          "cache-control": "no-store, must-revalidate",
           "x-content-type-options": "nosniff",
           "referrer-policy": "strict-origin-when-cross-origin"
         }
