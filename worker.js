@@ -8520,6 +8520,33 @@ async function apiAlma(request, env, url) {
     body: JSON.stringify({ model: ALMA_MODELO, max_tokens: ALMA_MAX_TOKENS, system, messages: mensajes })
   });
 
+  /* SI ARRIBA FALLA, EL CUERPO DE ARRIBA NO SALE AL NAVEGADOR.
+
+     Esto devolvía la respuesta de Anthropic tal cual, con su estado, así que un
+     fallo nuestro se le imprimía a quien estuviera preguntando. Medido con una
+     llave inválida: el endpoint respondía 401 con
+     {"error":{"message":"API key is invalid."}} y el chat mostraba, en inglés,
+     «Error: API key is invalid.» a una familia que había entrado a preguntar por
+     una grieta en su casa.
+
+     Y el caso realista es peor que ese: con una cuenta de prepago, el mensaje que
+     verían TODOS los visitantes sería «Your credit balance is too low to access
+     the Anthropic API».
+
+     Es justo lo que este mismo archivo ya evitaba unas líneas más arriba, cuando
+     se niega a decir «falta el secreto ANTHROPIC_API_KEY» porque es «un detalle
+     de nuestra cocina que no le dice nada a una familia y sí le cuenta de más a
+     cualquiera». Se suprimía por un lado y salía por el otro.
+
+     Sale con NUESTRA forma y sin `ayuda`, a propósito: así el cliente cae en su
+     rama genérica, que ya está escrita en los dos idiomas. El motivo de verdad
+     se queda en el log, que es donde le sirve a quien opera. */
+  if (!arriba.ok) {
+    const detalle = await arriba.text();
+    console.error("alma arriba", arriba.status, detalle.slice(0, 300));
+    return json({ error: "alma_no_disponible" }, 503);
+  }
+
   return new Response(await arriba.text(), {
     status: arriba.status,
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }

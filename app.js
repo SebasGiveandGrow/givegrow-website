@@ -4688,19 +4688,27 @@ function almaSend(){
        endpoint que sirve al panel—, asi que en ingles se traduce por codigo, que
        es lo que ya hace el resto del sitio con los errores de membresia. */
     var en = (lang === "en");
-    var reply;
-    if (data.content && data.content[0]) reply = data.content[0].text;
-    else if (data.error && data.error.message) reply = "Error: " + data.error.message;
+    var reply, esRespuesta = false;
+    if (data.content && data.content[0]) { reply = data.content[0].text; esRespuesta = true; }
+    /* AQUÍ HABÍA UNA RAMA QUE IMPRIMÍA `data.error.message` TAL CUAL, y ese
+       campo venía de Anthropic: con una llave vencida, el chat le mostraba
+       «Error: API key is invalid.» —en inglés— a una familia que entró a
+       preguntar por una grieta. Con una cuenta de prepago agotada habría dicho
+       «Your credit balance is too low». El servidor ya dejó de reenviar ese
+       cuerpo (ver `apiAlma`), y la rama se va también de aquí: si algún día
+       vuelve a colarse una forma ajena, el cliente tampoco la imprime. */
     else if (data.error === "demasiados_mensajes")
       reply = en ? "You have sent too many messages in a row. Wait a minute."
                  : (data.ayuda || "Has enviado demasiados mensajes seguidos. Espera un minuto.");
     else if (data.ayuda && !en) reply = data.ayuda;
-    else if (data.error)
+    else
       reply = en ? "I could not answer right now. Try again in a moment."
                  : "No pude responder ahora mismo. Intenta en un momento.";
-    else reply = en ? "Error: unexpected response" : "Error: respuesta inesperada";
     thinking.innerHTML = almaFmt(reply);
-    almaHistory.push({role:"assistant", content:reply});
+    /* Y UN AVISO DE ERROR NO ES UNA RESPUESTA DE ALMA. Se empujaba al historial
+       igual que un mensaje suyo, así que en el turno siguiente se le mandaba de
+       vuelta al modelo como si lo hubiera dicho él. */
+    if (esRespuesta) almaHistory.push({role:"assistant", content:reply});
     document.getElementById("alma-msgs").scrollTop = 99999;
   })
   .catch(function(){
