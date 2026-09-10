@@ -24,9 +24,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        # HISTORIA COMPLETA, y no por gusto: el sitemap deriva cada `lastmod` del
+        # ultimo commit del archivo que genera la pagina, y con la profundidad 1
+        # por omision `git log` devuelve el unico commit que hay — todas las
+        # fechas saldrian iguales y el check aprobaria una mentira distinta. Esa
+        # es exactamente la razon por la que esto no se habia automatizado.
+        with:
+          fetch-depth: 0
 
       - name: Gate del proyecto (sintaxis, i18n, estructura)
         run: node scripts/validate.mjs
+
+      # Que los `lastmod` del sitemap digan la verdad. El propio sitemap.xml
+      # lleva la regla escrita —«no a mano: un lastmod inventado Google lo
+      # ignora»— y estaban a mano, con un mes de desfase.
+      - name: Los lastmod del sitemap coinciden con git
+        run: node scripts/sitemap.mjs --check
 
       # El Worker dejó de ser un archivo suelto: importa documentos.js, que
       # importa pdf-lib. `node --check` ve la sintaxis pero no el enlazado, y un
