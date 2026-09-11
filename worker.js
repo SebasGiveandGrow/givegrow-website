@@ -7225,11 +7225,25 @@ async function adminMoverCaso(request, env, numero, quien) {
      Se suelta solo en los dos estados donde `triageEvaluar` bloquea de verdad.
      `visitado` no: ahí el concepto todavía sirve y el endpoint lo acepta. */
   const suelta = (nuevo === "cerrado" || nuevo === "descartado");
-  await env.DB.prepare(
+  /* EL ESTADO QUE SE LEYÓ ARRIBA VUELVE AL WHERE. Entre el SELECT y este UPDATE
+     cabe otra petición entera, y las comprobaciones de arriba ya se hicieron con
+     una foto vieja. Medido con cinco peticiones a la vez sobre el mismo caso:
+     las CINCO contestaron 200 y dejaron CINCO filas de auditoría para un solo
+     movimiento. Un registro que dice cinco veces lo que pasó una vez deja de ser
+     un registro.
+
+     Con `AND estado = ?` solo gana la primera; el resto no cambia nada y se va
+     por el mismo 409 que ya existía. Es el patrón que este archivo ya usa en
+     `tomarSoltar`, donde el UPDATE repite la condición que decide. */
+  const mov = await env.DB.prepare(
     "UPDATE casos SET estado = ?, actualizado_en = datetime('now')" +
     (suelta ? ", tomado_por = NULL, tomado_en = NULL" : "") +
-    " WHERE numero = ?"
-  ).bind(nuevo, numero).run();
+    " WHERE numero = ? AND estado = ?"
+  ).bind(nuevo, numero, caso.estado).run();
+  if (!mov.meta || !mov.meta.changes) {
+    return json({ error: "sin_cambio", estado: nuevo,
+                  ayuda: "Alguien movió este caso mientras mirabas. Recarga la bandeja." }, 409);
+  }
 
   /* El prefijo «caso <numero>» no es cosmético: es por lo que la bandeja
      recupera el último movimiento sin una tabla más. Si cambia aquí, cambia en
@@ -9300,11 +9314,24 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
     }, 422);
   }
 
-  await env.DB.prepare(
+  const hecho = await env.DB.prepare(
+    /* «reportada» vuelve al WHERE. El `if (a.estado !== "reportada")` de arriba
+       se hizo sobre una lectura anterior, y entre las dos cabe otra petición
+       entera. Medido con cinco confirmaciones a la vez sobre la misma guía: DOS
+       pasaron el guardián, y el donante recibió DOS recibos de la misma
+       transferencia —comprobado en el log del servidor, dos «aporte-aprobado»
+       al mismo correo— más dos filas de auditoría.
+
+       Un recibo duplicado de un aporte no es ruido: es un documento que el
+       donante guarda y con el que cuadra su declaración. */
     "UPDATE aportes SET estado = 'aprobada', confirmacion = 'manual', confirmado_por = ?, " +
     "confirmado_en = datetime('now'), referencia_pago = ?, aprobada_en = datetime('now'), " +
-    "actualizada_en = datetime('now') WHERE guia = ?"
+    "actualizada_en = datetime('now') WHERE guia = ? AND estado = 'reportada'"
   ).bind(quien || "?", refer, guia).run();
+  if (!hecho.meta || !hecho.meta.changes) {
+    return json({ error: "estado_no_permite", estado: "aprobada",
+                  ayuda: "Alguien la confirmó mientras mirabas. Recarga la bandeja." }, 409);
+  }
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "transferencia " + guia + " CONFIRMADA contra extracto · ref " + refer).run();
@@ -12605,10 +12632,20 @@ async function adminAnularEntrega(request, env, numero, quien) {
   /* Se despublica en el mismo movimiento. Dejarla anulada Y publicada sería un
      estado que ninguna consulta pública contempla, y bastaría con que alguien
      olvidara el segundo paso para que un acta inválida siguiera a la vista. */
-  await env.DB.prepare(
+  /* «todavía sin anular» vuelve al WHERE. El `if (e.anulada_en)` de arriba mira
+     una lectura anterior. Medido con cinco anulaciones a la vez sobre la misma
+     acta: las CINCO contestaron 200 y dejaron CINCO filas de auditoría, cada una
+     pisando el motivo de la anterior. El motivo es lo único que explica por qué
+     el consecutivo tiene un hueco, así que perderlo es perder la explicación. */
+  const anul = await env.DB.prepare(
     "UPDATE entregas SET anulada_en = datetime('now'), anulada_motivo = ?, anulada_por = ?, " +
-    "publicada_en = NULL, actualizada_en = datetime('now') WHERE numero = ?"
+    "publicada_en = NULL, actualizada_en = datetime('now') " +
+    "WHERE numero = ? AND anulada_en IS NULL"
   ).bind(motivo, quien || "?", numero).run();
+  if (!anul.meta || !anul.meta.changes) {
+    return json({ error: "ya_anulada",
+                  ayuda: "Alguien la anuló mientras mirabas. Recarga la bandeja." }, 409);
+  }
 
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
