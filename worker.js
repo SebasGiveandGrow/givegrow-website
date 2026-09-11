@@ -11355,6 +11355,124 @@ async function adminProveedorCrear(request, env) {
   }
 }
 
+/* ANULAR, NO BORRAR. Misma regla que las actas de entrega y por el mismo motivo:
+   lo que explica un hueco en el consecutivo es el motivo, así que borrar la fila
+   se lleva la explicación. Un libro contable del que desaparecen renglones no es
+   un libro contable.
+
+   Y la condición que se comprobó vuelve al WHERE — es la corrección del PR #369:
+   entre leer y escribir cabe otra petición entera. */
+async function adminEgresoAnular(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* el motivo se valida abajo */ }
+  if (!esObjeto(c)) c = {};
+
+  const motivo = limpiar(c.motivo, 300);
+  if (!motivo) {
+    return json({ error: "motivo_requerido",
+                  ayuda: "Escribe por qué se anula. Es lo único que va a explicar el hueco." }, 422);
+  }
+
+  const e = await env.DB.prepare("SELECT numero, anulado_en FROM egresos WHERE numero = ?").bind(numero).first();
+  if (!e) return json({ error: "no_encontrado" }, 404);
+  if (e.anulado_en) return json({ error: "ya_anulado", anulado_en: e.anulado_en }, 409);
+
+  const r = await env.DB.prepare(
+    "UPDATE egresos SET anulado_en = datetime('now'), anulado_motivo = ?, anulado_por = ?, " +
+    "actualizado_en = datetime('now') WHERE numero = ? AND anulado_en IS NULL"
+  ).bind(motivo, quien || "?", numero).run();
+  if (!r.meta || !r.meta.changes) {
+    return json({ error: "ya_anulado", ayuda: "Alguien lo anuló mientras mirabas. Recarga." }, 409);
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "egreso " + numero + " ANULADO: " + motivo).run();
+
+  return json({ ok: true, numero });
+}
+
+/* ========================================================================
+   EL LIBRO, PARA EL CONTADOR
+   ========================================================================
+   Este modulo no es el libro oficial: es la fuente de la que el contador
+   trabaja. Una fuente de la que no se puede sacar nada no sirve de fuente.
+
+   PUNTO Y COMA, y no coma. El destino es Excel en español, que con coma mete
+   todo en una sola columna. Y CON BOM: sin el, Excel lee el UTF-8 como latin-1 y
+   «Chocó» sale «ChocÃ³» en todas las filas. Las dos cosas se descubren tarde y
+   se arreglan volviendo a exportar, que es justo lo que no quieres estar
+   haciendo el dia que cierras el mes.
+
+   EN PESOS, NO EN CENTAVOS, y sin separador de miles: asi Excel los lee como
+   numeros y se pueden sumar. El formato de miles es cosa de quien mire la hoja.
+
+   LAS COLUMNAS SON LAS DE LA EXOGENA. El formato 1001 pide tipo de documento,
+   documento, nombre, concepto, pago y retencion: estan todas, con sus nombres
+   en claro. Ponerlas desde el principio no cuesta nada; anadirlas despues es
+   rehacer el historico.
+   ======================================================================== */
+function csvCampo(v) {
+  const t = String(v == null ? "" : v);
+  return /[;"\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+
+async function adminEgresosCSV(env, url) {
+  const desde = limpiar(url && url.searchParams.get("desde"), 10);
+  const hasta = limpiar(url && url.searchParams.get("hasta"), 10);
+  const cond = [];
+  const args = [];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(desde)) { cond.push("e.fecha >= ?"); args.push(desde); }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(hasta)) { cond.push("e.fecha <= ?"); args.push(hasta); }
+
+  const sql =
+    "SELECT e.numero, e.fecha, e.concepto, e.concepto_ret, e.base_centavos, e.iva_centavos, " +
+    "e.total_centavos, e.retefuente_centavos, e.reteica_centavos, e.neto_centavos, " +
+    "e.soporte, e.soporte_numero, e.soporte_cufe, e.meritoria, e.centro, e.entrega, " +
+    "e.medio_pago, e.nota, e.creado_por, e.creado_en, e.anulado_en, e.anulado_motivo, " +
+    "p.tipo_doc, p.documento, p.dv, p.nombre AS proveedor, p.natural_ " +
+    "FROM egresos e LEFT JOIN proveedores p ON p.id = e.proveedor_id " +
+    (cond.length ? "WHERE " + cond.join(" AND ") + " " : "") +
+    "ORDER BY e.fecha, e.numero";
+  const q = args.length ? env.DB.prepare(sql).bind(...args) : env.DB.prepare(sql);
+  const r = await q.all();
+
+  const pesos = (c) => String(Math.round((c || 0) / 100));
+  const cab = [
+    "Numero", "Fecha", "Tipo documento", "Documento", "DV", "Proveedor", "Persona",
+    "Concepto", "Concepto retencion", "Base", "IVA", "Total",
+    "Retefuente", "Reteica", "Neto pagado",
+    "Soporte", "Numero soporte", "CUFE", "Actividad meritoria",
+    "Centro de costo", "Acta de entrega", "Medio de pago", "Nota",
+    "Registrado por", "Registrado el", "Anulado el", "Motivo de anulacion"
+  ];
+  const filas = (r.results || []).map((e) => [
+    e.numero, e.fecha, e.tipo_doc || "", e.documento || "", e.dv || "",
+    e.proveedor || "", e.natural_ ? "natural" : "juridica",
+    e.concepto, e.concepto_ret || "", pesos(e.base_centavos), pesos(e.iva_centavos),
+    pesos(e.total_centavos), pesos(e.retefuente_centavos), pesos(e.reteica_centavos),
+    pesos(e.neto_centavos), e.soporte, e.soporte_numero || "", e.soporte_cufe || "",
+    e.meritoria ? "si" : "no", e.centro || "", e.entrega || "", e.medio_pago || "",
+    e.nota || "", e.creado_por || "",
+    /* Los sellos van en hora de Colombia: el contador cuadra contra extractos y
+       facturas que estan en esa hora, no en UTC. */
+    e.creado_en ? selloCO(e.creado_en) : "",
+    e.anulado_en ? selloCO(e.anulado_en) : "", e.anulado_motivo || ""
+  ]);
+
+  const texto = "\ufeff" + [cab].concat(filas).map((f) => f.map(csvCampo).join(";")).join("\r\n") + "\r\n";
+  const nombre = "egresos" + (desde ? "-desde-" + desde : "") + (hasta ? "-hasta-" + hasta : "") + ".csv";
+  return new Response(texto, {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": 'attachment; filename="' + nombre + '"',
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
 /* EL SOPORTE SE GUARDA, no solo se lee.
    Este modulo se presenta como «el custodio del soporte», asi que leer el XML
    para rellenar un formulario y despues tirarlo seria no cumplir esa frase. El
@@ -11432,7 +11550,7 @@ async function adminEgresos(request, env, url, quien) {
   const r = await env.DB.prepare(
     "SELECT e.numero, e.fecha, e.concepto, e.total_centavos, e.retefuente_centavos, " +
     "e.reteica_centavos, e.neto_centavos, e.concepto_ret, e.soporte, e.soporte_numero, " +
-    "e.meritoria, e.centro, e.entrega, e.medio_pago, e.anulado_en, " +
+    "e.meritoria, e.centro, e.entrega, e.medio_pago, e.anulado_en, e.anulado_motivo, " +
     "(e.soporte_key IS NOT NULL) AS tiene_archivo, " +
     "p.nombre AS proveedor, p.tipo_doc, p.documento " +
     "FROM egresos e LEFT JOIN proveedores p ON p.id = e.proveedor_id " +
@@ -13359,6 +13477,16 @@ input:not([type=checkbox]):not([type=radio]),
 select,
 textarea { font-size: 16px }
 
+/* La barra de acciones del libro: filtro, rango y descarga en una sola linea,
+   que se parte sola en el telefono. */
+.eg-acciones{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 8px}
+.eg-acciones label{font-size:12.5px;font-weight:700;color:var(--mu);margin:0}
+.eg-acciones input[type=date]{padding:7px 10px;border:1px solid var(--bd);border-radius:7px;
+  font:inherit;font-size:16px;background:#fff;color:var(--ink)}
+.eg-acciones .eg-check{margin:0}
+.eg-sep{flex:1 1 auto}
+@media(max-width:560px){ .eg-sep{display:none} .eg-acciones{gap:8px 10px} }
+
 /* El bloque de la factura va ARRIBA del todo del formulario, y no al final
    junto al resto del papel, porque es el atajo: si hay XML, lo primero que
    haces es soltarlo y lo demas se rellena solo. Ponerlo abajo seria pedirte que
@@ -13859,12 +13987,24 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
   </div>
 </details>
 
+<div class="eg-acciones">
+  <label class="eg-check"><input type="checkbox" id="eg-solo-sin"> Ver solo los que no tienen papel</label>
+  <span class="eg-sep"></span>
+  <label for="eg-d1">Desde</label><input id="eg-d1" type="date">
+  <label for="eg-d2">Hasta</label><input id="eg-d2" type="date">
+  <button type="button" class="tab" id="eg-csv">Descargar para el contador</button>
+</div>
+<p class="mu" style="font-size:12.5px;margin:0 0 14px">El archivo sale con punto y coma y con las columnas que
+pide la exógena, así que Excel en español lo abre en columnas y no en una sola. Las fechas acotan la descarga,
+no la tabla.</p>
+
 <div class="med-tw"><table class="med-tbl" id="eg-tabla">
 <thead><tr>
 <th scope="col">Número</th><th scope="col">Fecha</th><th scope="col">Proveedor</th>
 <th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Retenido</th>
 <th scope="col">Papel</th><th scope="col">Centro</th><th scope="col">Acta</th>
-</tr></thead><tbody id="eg-filas"><tr><td colspan="9" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
+<th scope="col">Acción</th>
+</tr></thead><tbody id="eg-filas"><tr><td colspan="10" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
 </table></div>
 
 <h2 id="sec-proveedores" class="h-sec" style="margin:48px 0 6px;font-size:26px">Proveedores</h2>
@@ -16076,7 +16216,8 @@ var SOPORTE_ES = {
 };
 
 function cargarEgresos(){
-  fetch("/api/admin/egresos").then(conEstado).then(function(res){
+  var solo = document.getElementById("eg-solo-sin");
+  fetch("/api/admin/egresos" + (solo && solo.checked ? "?sin_soporte=1" : "")).then(conEstado).then(function(res){
     if (res.http !== 200) throw 0;
     var d = res.d;
     var r = document.getElementById("eg-resumen");
@@ -16107,12 +16248,20 @@ function cargarEgresos(){
                       ? ' <a href="/api/admin/egreso/' + esc(e.numero) + '/soporte.ver" target="_blank" rel="noopener">ver</a>'
                       : ' <span class="mu">sin archivo</span>')) + "</td>"
             + "<td>" + esc(e.centro || "—") + "</td>"
-            + "<td>" + (e.entrega ? esc(e.entrega) : '<span class="mu">—</span>') + "</td></tr>";
+            + "<td>" + (e.entrega ? esc(e.entrega) : '<span class="mu">—</span>') + "</td>"
+            /* El motivo de la anulación se enseña EN la fila. Un renglón tachado
+               sin explicación obliga a ir a buscarla a otro sitio, que es donde
+               nadie va. */
+            + "<td>" + (e.anulado_en
+                ? '<span class="mu">anulado' + (e.anulado_motivo ? " · " + esc(e.anulado_motivo) : "") + "</span>"
+                : '<button type="button" class="tab" data-eg-anular="' + esc(e.numero) + '">Anular</button>') + "</td></tr>";
         }).join("")
-      : '<tr><td colspan="9" class="mu">Todavía no hay egresos registrados.</td></tr>';
+      : '<tr><td colspan="10" class="mu">' + (solo && solo.checked
+          ? "Ninguno sin papel. Eso es lo que se quiere."
+          : "Todavía no hay egresos registrados.") + "</td></tr>";
   }).catch(function(){
     var tb = document.getElementById("eg-filas");
-    if (tb) tb.innerHTML = '<tr><td colspan="9" class="mu">No se pudieron cargar.</td></tr>';
+    if (tb) tb.innerHTML = '<tr><td colspan="10" class="mu">No se pudieron cargar.</td></tr>';
   });
 }
 
@@ -16131,6 +16280,7 @@ document.addEventListener("input", function(ev){
 var EG_ARCHIVO = null;
 
 document.addEventListener("change", function(ev){
+  if (ev.target.id === "eg-solo-sin"){ cargarEgresos(); return; }
   if (ev.target.id !== "eg-arch") return;
   var f = ev.target.files && ev.target.files[0];
   EG_ARCHIVO = f || null;
@@ -16232,6 +16382,39 @@ document.addEventListener("click", function(ev){
           if (sel && res.d && res.d.id) sel.value = String(res.d.id);
         }, 400);
       }).catch(function(){ b.disabled = false; egMsg("eg-pmsg", "No se pudo. Revisa la conexión.", false); });
+    return;
+  }
+  if (ev.target.id === "eg-csv"){
+    var d1 = val("eg-d1"), d2 = val("eg-d2");
+    var q = [];
+    if (d1) q.push("desde=" + encodeURIComponent(d1));
+    if (d2) q.push("hasta=" + encodeURIComponent(d2));
+    /* Una navegacion y no un fetch: el navegador ya sabe guardar un archivo que
+       viene con Content-Disposition, y montar un blob a mano solo anadiria una
+       copia en memoria y una URL que hay que acordarse de revocar. */
+    location.href = "/api/admin/egresos.csv" + (q.length ? "?" + q.join("&") : "");
+    return;
+  }
+  var an = ev.target.closest ? ev.target.closest("[data-eg-anular]") : null;
+  if (an){
+    var num = an.getAttribute("data-eg-anular");
+    /* Se pide el motivo ANTES de tocar nada, y sin motivo no se llama al
+       servidor: es el unico boton de esta pantalla que retira una fila del
+       libro, y lo que explica el hueco es justo esa frase. */
+    var motivo = prompt("¿Por qué se anula " + num + "?\\n\\nEsto no lo borra: queda tachado, con tu motivo y tu nombre.");
+    if (motivo === null) return;
+    motivo = String(motivo).trim();
+    if (!motivo){ alert("Sin motivo no se anula."); return; }
+    an.disabled = true;
+    fetch("/api/admin/egreso/" + encodeURIComponent(num) + "/anular", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ motivo: motivo })
+    }).then(conEstado).then(function(res){
+      an.disabled = false;
+      if (fallo(res.http, res.d)) return;
+      cargarEgresos();
+      cargarProveedores();
+    }).catch(function(){ an.disabled = false; alert("No se pudo. Revisa la conexión."); });
     return;
   }
   if (ev.target.id === "eg-guardar"){
@@ -17293,6 +17476,9 @@ export default {
         if (egs) return await adminEgresoSoporte(request, env, egs[1].toUpperCase(), sesion.email);
         const egv = ruta.match(/^\/api\/admin\/egreso\/(EG-\d{4}-\d{6})\/soporte\.ver$/i);
         if (egv) return await adminEgresoVerSoporte(env, egv[1].toUpperCase());
+        const ega = ruta.match(/^\/api\/admin\/egreso\/(EG-\d{4}-\d{6})\/anular$/i);
+        if (ega) return await adminEgresoAnular(request, env, ega[1].toUpperCase(), sesion.email);
+        if (ruta === "/api/admin/egresos.csv") return await adminEgresosCSV(env, url);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env, url);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
         if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
