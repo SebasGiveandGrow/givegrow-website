@@ -11869,8 +11869,25 @@ async function adminEgresos(request, env, url, quien) {
     "COALESCE(SUM(CASE WHEN soporte = 'sin_soporte' THEN 1 ELSE 0 END),0) AS sin_papel " +
     "FROM egresos WHERE anulado_en IS NULL"
   ).first();
+  /* LOS CENTROS QUE YA EXISTEN, para que el formulario los ofrezca. Escribirlo a
+     mano cada vez es cómo «brigada-chocó» y «brigada choco» acaban siendo dos
+     centros distintos y el reporte del mes sale partido en dos — el mismo
+     problema que el NIT con puntos, en un campo que dejé libre.
+
+     Salen de lo que el proyecto YA usa: los destinos de los aportes, los de las
+     actas de entrega y los centros de egresos anteriores. Así la lista se
+     mantiene sola y no hay un catálogo que alguien tenga que recordar actualizar
+     cuando arranque una brigada nueva. */
+  const cen = await env.DB.prepare(
+    "SELECT destino_id AS c FROM aportes WHERE destino_id IS NOT NULL " +
+    "UNION SELECT destino_id FROM entregas WHERE destino_id IS NOT NULL " +
+    "UNION SELECT centro FROM egresos WHERE centro IS NOT NULL " +
+    "ORDER BY c"
+  ).all();
+
   return json({
     egresos: r.results || [], tope: TOPE_BANDEJA,
+    centros: (cen.results || []).map((x) => x.c).filter(Boolean),
     total: (sum && sum.n) || 0,
     suma_centavos: (sum && sum.total) || 0,
     retenido_centavos: (sum && sum.retenido) || 0,
@@ -14274,7 +14291,9 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
     </div>
 
     <div class="eg-par">
-      <div><label for="eg-centro">Centro de costo</label><input id="eg-centro" autocomplete="off" placeholder="ndf, brigada-chocó, estructura"></div>
+      <div><label for="eg-centro">Centro de costo</label>
+        <input id="eg-centro" list="eg-centros" autocomplete="off" placeholder="ndf, brigada-chocó, estructura">
+        <datalist id="eg-centros"></datalist></div>
       <div><label for="eg-entrega">Acta que pagó (opcional)</label><input id="eg-entrega" autocomplete="off" placeholder="AE-2026-000001"></div>
     </div>
 
@@ -16533,6 +16552,14 @@ function cargarEgresos(){
         + pasoEmbudo("meritoria", deCentavos(d.meritoria_centavos), "lo que sostiene el RTE")
         + (d.sin_papel ? pasoEmbudo("sin papel", d.sin_papel, "les falta soporte") : "");
     }
+    /* «datalist» SUGIERE, no obliga: una brigada nueva se escribe y ya, y a
+       partir de ahí aparece sola para las siguientes. Un desplegable cerrado
+       habría hecho falta mantenerlo a mano el día que arranca una. */
+    var dl = document.getElementById("eg-centros");
+    if (dl) dl.innerHTML = ((d.centros || []).concat(["estructura"]))
+      .filter(function(c, i, a){ return a.indexOf(c) === i; })
+      .map(function(c){ return '<option value="' + esc(c) + '"></option>'; }).join("");
+
     var tb = document.getElementById("eg-filas"); if (!tb) return;
     var l = d.egresos || [];
     tb.innerHTML = l.length
