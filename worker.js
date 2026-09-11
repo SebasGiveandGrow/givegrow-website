@@ -80,6 +80,31 @@ function esc(s) {
    se reserva para cuando el roto es nuestro. */
 const esObjeto = (c) => !!c && typeof c === "object";
 
+/* NÚMEROS DE PAGINACIÓN, SANEADOS.
+
+   `desde` y `limite` se interpolan en el SQL —«LIMIT 300 OFFSET » + desde—, y
+   eso es seguro porque antes pasan por Number(): una inyección se vuelve NaN.
+   Lo que Number() no garantiza es que el resultado se ESCRIBA como un entero.
+   Dos cosas se colaban y llegaban a SQLite como sintaxis inválida:
+
+     ?desde=0.5     ->  OFFSET 0.5
+     ?desde=1e21    ->  OFFSET 1e+21   (JavaScript lo escribe así desde 1e21)
+
+   Las dos salían por el 500, que es la respuesta que reservamos para cuando el
+   roto es nuestro. Y no hace falta buscarlo a propósito: un enlace de
+   paginación mal copiado basta, y la bandeja de casas es una página pública.
+
+   Math.floor deja el valor entero; el tope superior garantiza que nunca llegue
+   a la zona donde JavaScript cambia a notación exponencial. Ausente y no
+   numérico caen al valor por omisión, que es lo que ya hacían. */
+const PAGINA_MAX = 1000000;
+const entero = (crudo, porDefecto, min, max) => {
+  if (crudo == null || crudo === "") return porDefecto;
+  const n = Math.floor(Number(crudo));
+  return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : porDefecto;
+};
+const desplazamiento = (url) => entero(url && url.searchParams.get("desde"), 0, 0, PAGINA_MAX);
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -2062,7 +2087,7 @@ async function adminSalud(env) {
 
 async function adminAportes(env, url) {
   const estado = url.searchParams.get("estado");
-  const limite = Math.min(Math.max(Number(url.searchParams.get("limite")) || 50, 1), 200);
+  const limite = entero(url.searchParams.get("limite"), 50, 1, 200);
   const where = estado ? " WHERE a.estado = ?" : "";
   const sql =
     "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.frecuencia, " +
@@ -4067,7 +4092,7 @@ async function triageCasos(env, url, email) {
   /* DESDE — la paginacion que faltaba. La cola terminaba en el caso 200 y no
      habia forma de llegar al 201: el total lo decia, pero decirlo no es poder
      abrirlo. */
-  const desde = Math.max(0, Number(url.searchParams.get("desde")) || 0);
+  const desde = desplazamiento(url);
   const yo = String(email || "");
   const filtro = estado === "mios" ? "WHERE " + TOMA_VIGENTE + " AND c.tomado_por = ?" :
     estado === "todos" ? "" :
@@ -8777,7 +8802,7 @@ async function apiCasosPublicos(env, url) {
      para nadie — y este es el registro PUBLICO: la casa de alguien que autorizo
      que se publicara, y que a partir de la 301 no aparecia. El total ya se decia
      bien; lo que faltaba era poder llegar. */
-  const desde = Math.max(0, Number(url && url.searchParams.get("desde")) || 0);
+  const desde = desplazamiento(url);
   const r = await env.DB.prepare(
     "SELECT numero, sector, clasificacion, material, pisos, creado_en FROM casos " +
     "WHERE consent_publico = 1 AND clasificacion IS NOT NULL " +
@@ -11407,7 +11432,7 @@ async function adminBuscar(env, url) {
 async function adminInspecciones(env, url) {
   /* Misma historia que la cola y que la bandeja de postulaciones: se quedaba en
      300 y no habia forma de ver la 301. */
-  const desde = Math.max(0, Number(url && url.searchParams.get("desde")) || 0);
+  const desde = desplazamiento(url);
   const r = await env.DB.prepare(
     "SELECT numero, caso, municipio, direccion, casa_no, fecha_visita, hora, " +
     "obs_nombre, obs_matricula, propietario, contacto, requiere_esp, " +
@@ -11490,7 +11515,7 @@ async function adminInscripciones(env, url) {
   const tipo = TIPOS_INSC.includes(url && url.searchParams.get("tipo"))
     ? url.searchParams.get("tipo") : "";
   const soloSinVerificar = url && url.searchParams.get("pendiente") === "matricula";
-  const desde = Math.max(0, Number(url && url.searchParams.get("desde")) || 0);
+  const desde = desplazamiento(url);
 
   const cond = ["i.tipo IN ('" + TIPOS_INSC.join("','") + "')"];
   const args = [];
@@ -12412,7 +12437,7 @@ function entregaPublica(e) {
 
 async function apiEntregas(env, url) {
   const destino = String(url.searchParams.get("destino") || "").slice(0, 60);
-  const limite = Math.min(Math.max(Number(url.searchParams.get("limite")) || 20, 1), 50);
+  const limite = entero(url.searchParams.get("limite"), 20, 1, 50);
   let sql = "SELECT numero, destino_id, sector, lugar, fecha, aliada, familias, resumen, " +
             "recibido_por, fotos FROM entregas WHERE publicada_en IS NOT NULL AND anulada_en IS NULL";
   const args = [];
