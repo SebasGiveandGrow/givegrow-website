@@ -11355,6 +11355,77 @@ async function adminProveedorCrear(request, env) {
   }
 }
 
+/* EL SOPORTE SE GUARDA, no solo se lee.
+   Este modulo se presenta como «el custodio del soporte», asi que leer el XML
+   para rellenar un formulario y despues tirarlo seria no cumplir esa frase. El
+   XML de la DIAN ES el documento legal — el PDF que lo acompaña es una
+   representacion grafica suya— y es el que hay que poder enseñar dentro de tres
+   años. Tambien se acepta PDF, que es lo unico que hay cuando la factura es de
+   papel y se escanea. */
+const TIPOS_SOPORTE = {
+  "application/xml":  { ext: "xml", max: 2 * 1024 * 1024 },
+  "text/xml":         { ext: "xml", max: 2 * 1024 * 1024 },
+  "application/pdf":  { ext: "pdf", max: 8 * 1024 * 1024 }
+};
+
+async function adminEgresoSoporte(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+
+  const e = await env.DB.prepare(
+    "SELECT numero, soporte_key FROM egresos WHERE numero = ? AND anulado_en IS NULL"
+  ).bind(numero).first();
+  if (!e) return json({ error: "no_encontrado" }, 404);
+  /* No se reemplaza en silencio: un soporte que se pisa es un soporte que ya no
+     se puede enseñar, y nadie se entera hasta que lo piden. */
+  if (e.soporte_key) return json({ error: "ya_tiene_soporte", ayuda: "Ese egreso ya tiene su archivo." }, 409);
+
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const spec = TIPOS_SOPORTE[tipo];
+  if (!spec) return json({ error: "tipo_no_permitido", permitidos: Object.keys(TIPOS_SOPORTE) }, 415);
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > spec.max) return json({ error: "archivo_muy_grande", max_mb: Math.round(spec.max / 1048576) }, 413);
+
+  /* Que sea lo que dice ser, igual que con las fotos. Un XML empieza por «<» y
+     un PDF por «%PDF»; no es una validacion profunda, pero corta el caso de
+     subir cualquier cosa con la cabecera cambiada. */
+  const cabeza = String.fromCharCode.apply(null, bytes.subarray(0, 5));
+  const bien = spec.ext === "pdf" ? cabeza.indexOf("%PDF") === 0 : /^\s*</.test(cabeza);
+  if (!bien) return json({ error: "no_es_lo_que_dice", ayuda: "El archivo no parece " + spec.ext.toUpperCase() + "." }, 415);
+
+  const clave = "egresos/" + numero + "/soporte." + spec.ext;
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+  await env.DB.prepare(
+    "UPDATE egresos SET soporte_key = ?, actualizado_en = datetime('now') WHERE numero = ? AND soporte_key IS NULL"
+  ).bind(clave, numero).run();
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "egreso " + numero + " · soporte " + spec.ext + " guardado").run();
+
+  return json({ ok: true, clave });
+}
+
+/* Y se puede volver a ver. Privado y sin cache compartida, como los otros seis
+   documentos de esta base. */
+async function adminEgresoVerSoporte(env, numero) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const e = await env.DB.prepare("SELECT soporte_key FROM egresos WHERE numero = ?").bind(numero).first();
+  if (!e || !e.soporte_key) return json({ error: "no_encontrado" }, 404);
+  const obj = await env.MEDIA.get(e.soporte_key);
+  if (!obj) return json({ error: "no_encontrado" }, 404);
+  return new Response(obj.body, {
+    headers: {
+      "content-type": (obj.httpMetadata && obj.httpMetadata.contentType) || "application/octet-stream",
+      "content-disposition": 'inline; filename="' + numero + "." + (e.soporte_key.split(".").pop() || "bin") + '"',
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
 async function adminEgresos(request, env, url, quien) {
   if (request.method === "POST") return await adminEgresoCrear(request, env, quien);
   const soloSinPapel = url && url.searchParams.get("sin_soporte") === "1";
@@ -11362,6 +11433,7 @@ async function adminEgresos(request, env, url, quien) {
     "SELECT e.numero, e.fecha, e.concepto, e.total_centavos, e.retefuente_centavos, " +
     "e.reteica_centavos, e.neto_centavos, e.concepto_ret, e.soporte, e.soporte_numero, " +
     "e.meritoria, e.centro, e.entrega, e.medio_pago, e.anulado_en, " +
+    "(e.soporte_key IS NOT NULL) AS tiene_archivo, " +
     "p.nombre AS proveedor, p.tipo_doc, p.documento " +
     "FROM egresos e LEFT JOIN proveedores p ON p.id = e.proveedor_id " +
     (soloSinPapel ? "WHERE e.soporte = 'sin_soporte' AND e.anulado_en IS NULL " : "") +
@@ -13287,6 +13359,14 @@ input:not([type=checkbox]):not([type=radio]),
 select,
 textarea { font-size: 16px }
 
+/* El bloque de la factura va ARRIBA del todo del formulario, y no al final
+   junto al resto del papel, porque es el atajo: si hay XML, lo primero que
+   haces es soltarlo y lo demas se rellena solo. Ponerlo abajo seria pedirte que
+   teclees catorce campos y descubras al final que no hacia falta. */
+.eg-xml{border:1px dashed var(--bd);border-radius:10px;padding:14px 16px;margin:0 0 6px;
+        background:var(--surface)}
+.eg-xml input[type=file]{width:100%;font-size:16px;padding:8px 0;border:0;background:none}
+
 /* ---- EL FORMULARIO DE EGRESOS ----
    Una columna, etiquetas encima y pares que se parten en el telefono. Nada de
    rejilla elaborada: son catorce campos que se llenan de arriba abajo. */
@@ -13691,6 +13771,15 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
 <details id="eg-nuevo" style="margin-bottom:22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px">
   <summary style="cursor:pointer;font-weight:700;font-size:14px">Registrar un egreso</summary>
   <div class="eg-form">
+    <div class="eg-xml">
+      <label for="eg-arch" style="margin-top:0">Arrastra la factura electrónica</label>
+      <input id="eg-arch" type="file" accept=".xml,application/xml,text/xml,.pdf,application/pdf">
+      <p class="mu" style="font-size:12.5px;margin:6px 0 0">El XML de la DIAN trae todo esto escrito, así que
+      no hay que teclearlo. Se lee <strong>en tu navegador</strong>: el archivo no sale de aquí hasta que
+      registres el egreso. También vale un PDF, pero ese solo se guarda — no se puede leer.</p>
+      <p class="msg" id="eg-xmsg"></p>
+    </div>
+
     <label for="eg-prov">Proveedor</label>
     <div class="eg-par">
       <select id="eg-prov"><option value="">Cargando…</option></select>
@@ -15839,6 +15928,84 @@ fetch("/api/admin/quien").then(function(r){ return r.json(); })
    Y engancha con la portada: cuando tocas «Ir» y saltas a una seccion, el salto
    es instantaneo y no arrastra por las de en medio, asi que se pide esa y nada
    mas. */
+/* ---- LEER LA FACTURA ELECTRONICA ----
+
+   El XML de la DIAN es UBL 2.1 y trae TODO lo que este formulario pide, asi que
+   teclearlo a mano es teclear lo que ya esta escrito.
+
+   SE LEE EN EL NAVEGADOR, con DOMParser, y no en el servidor. Tres razones: los
+   Workers no tienen DOMParser y parsear XML con expresiones regulares es
+   fragil; no hay dependencias npm nuevas —la regla del proyecto—; y el archivo
+   no sale de la maquina hasta que tu confirmas lo que se leyo.
+
+   LA TRAMPA QUE ROMPE A CASI TODOS LOS LECTORES: lo que los proveedores mandan
+   por correo no suele ser la factura, es un <AttachedDocument> que la lleva
+   DENTRO, metida como texto en un cbc:Description. Hay que desenvolverla y
+   volver a parsear. Un lector que no lo haga no encuentra ni un campo y parece
+   que el archivo esta mal.
+
+   Y los nombres van con prefijo de espacio de nombres (cbc:, cac:). Como el
+   documento se parsea sin resolverlos, se busca por nombre local. */
+function xmlTexto(nodo, local){
+  if (!nodo) return "";
+  var t = nodo.getElementsByTagName("*");
+  for (var i = 0; i < t.length; i++){
+    if (t[i].localName === local) return (t[i].textContent || "").trim();
+  }
+  return "";
+}
+function xmlNodo(nodo, local){
+  if (!nodo) return null;
+  var t = nodo.getElementsByTagName("*");
+  for (var i = 0; i < t.length; i++){ if (t[i].localName === local) return t[i]; }
+  return null;
+}
+
+function leerFacturaXML(texto){
+  var dp = new DOMParser();
+  var doc = dp.parseFromString(texto, "text/xml");
+  if (doc.getElementsByTagName("parsererror").length) return { error: "El archivo no es XML válido." };
+
+  /* Si viene envuelta, la de dentro es la buena. */
+  if (doc.documentElement && doc.documentElement.localName === "AttachedDocument"){
+    var dentro = xmlTexto(doc.documentElement, "Description");
+    if (dentro && dentro.indexOf("<") >= 0){
+      doc = dp.parseFromString(dentro, "text/xml");
+      if (doc.getElementsByTagName("parsererror").length) return { error: "La factura que venía dentro del archivo no se pudo leer." };
+    }
+  }
+
+  var raiz = doc.documentElement;
+  if (!raiz) return { error: "El archivo está vacío." };
+  var clase = raiz.localName;
+  if (clase !== "Invoice" && clase !== "DebitNote" && clase !== "CreditNote"){
+    return { error: "Esto no es una factura: el documento es «" + clase + "»." };
+  }
+
+  var prov = xmlNodo(raiz, "AccountingSupplierParty");
+  var clie = xmlNodo(raiz, "AccountingCustomerParty");
+  var totales = xmlNodo(raiz, "LegalMonetaryTotal");
+  var imp = xmlNodo(raiz, "TaxTotal");
+
+  var pesos = function(v){
+    var n = parseFloat(String(v || "0").replace(/,/g, ""));
+    return isFinite(n) ? Math.round(n) : 0;
+  };
+
+  return {
+    clase: clase,
+    numero: xmlTexto(raiz, "ID"),
+    fecha: (xmlTexto(raiz, "IssueDate") || "").slice(0, 10),
+    cufe: xmlTexto(raiz, "UUID"),
+    proveedor_nit: xmlTexto(prov, "CompanyID"),
+    proveedor_nombre: xmlTexto(prov, "RegistrationName") || xmlTexto(prov, "Name"),
+    cliente_nit: xmlTexto(clie, "CompanyID"),
+    base: pesos(xmlTexto(totales, "LineExtensionAmount")),
+    iva: pesos(xmlTexto(imp, "TaxAmount")),
+    total: pesos(xmlTexto(totales, "PayableAmount"))
+  };
+}
+
 /* ---- CONTABILIDAD ----
    Los pesos se escriben en pesos y se guardan en centavos, como todo el dinero
    de esta base. La conversion es en un solo sitio para que no haya dos. */
@@ -15933,7 +16100,12 @@ function cargarEgresos(){
             + "<td>" + (ret ? esc(deCentavos(ret)) + ' <small class="mu">' + esc(e.concepto_ret || "") + "</small>" : '<span class="mu">—</span>') + "</td>"
             + "<td>" + (e.soporte === "sin_soporte"
                 ? '<b style="color:#A84D00">sin papel</b>'
-                : esc(SOPORTE_ES[e.soporte] || e.soporte) + (e.soporte_numero ? " " + esc(e.soporte_numero) : "")) + "</td>"
+                : esc(SOPORTE_ES[e.soporte] || e.soporte) + (e.soporte_numero ? " " + esc(e.soporte_numero) : "")
+                  /* El archivo se abre desde la fila: un soporte que hay que ir a
+                     buscar a otro sitio es un soporte que no se mira. */
+                  + (e.tiene_archivo
+                      ? ' <a href="/api/admin/egreso/' + esc(e.numero) + '/soporte.ver" target="_blank" rel="noopener">ver</a>'
+                      : ' <span class="mu">sin archivo</span>')) + "</td>"
             + "<td>" + esc(e.centro || "—") + "</td>"
             + "<td>" + (e.entrega ? esc(e.entrega) : '<span class="mu">—</span>') + "</td></tr>";
         }).join("")
@@ -15952,6 +16124,80 @@ function egMsg(id, txt, bien){
 
 document.addEventListener("input", function(ev){
   if (["eg-base", "eg-iva", "eg-rf"].indexOf(ev.target.id) >= 0) egCuentas();
+});
+
+/* El archivo elegido se guarda para subirlo DESPUES de crear el egreso: hasta
+   que el egreso no existe no hay numero, y sin numero no hay donde ponerlo. */
+var EG_ARCHIVO = null;
+
+document.addEventListener("change", function(ev){
+  if (ev.target.id !== "eg-arch") return;
+  var f = ev.target.files && ev.target.files[0];
+  EG_ARCHIVO = f || null;
+  if (!f) { egMsg("eg-xmsg", "", true); return; }
+
+  if (!/\.xml$/i.test(f.name)){
+    egMsg("eg-xmsg", "Guardado para subirlo con el egreso. Un PDF no se puede leer: los campos los escribes tú.", true);
+    var sp = document.getElementById("eg-soporte");
+    if (sp && sp.value === "factura_electronica") sp.value = "factura_manual";
+    return;
+  }
+
+  var lector = new FileReader();
+  lector.onload = function(){
+    var d = leerFacturaXML(String(lector.result || ""));
+    if (d.error){ egMsg("eg-xmsg", d.error, false); return; }
+
+    /* PRIMERO: ¿esta factura es nuestra? Una factura dirigida a otro NIT no es un
+       egreso de la fundacion, y es un error facil de cometer cuando llegan
+       varias por correo. Se avisa y se deja seguir: quien manda es quien mira. */
+    var mio = String(d.cliente_nit || "").replace(/[^0-9]/g, "");
+    var aviso = (mio && mio.indexOf("901948930") !== 0)
+      ? "OJO: esta factura está a nombre del NIT " + d.cliente_nit + ", que no es el de la fundación. "
+      : "";
+
+    if (d.fecha) document.getElementById("eg-fecha").value = d.fecha;
+    if (d.numero) document.getElementById("eg-snum").value = d.numero;
+    if (d.cufe) document.getElementById("eg-cufe").value = d.cufe;
+    document.getElementById("eg-soporte").value = "factura_electronica";
+    /* La base del XML es la suma de las lineas ANTES de impuestos, que es justo
+       lo que este formulario llama base. El IVA sale del total de impuestos. */
+    if (d.base) document.getElementById("eg-base").value = String(d.base);
+    if (d.iva) document.getElementById("eg-iva").value = String(d.iva);
+    egCuentas();
+
+    /* El proveedor se elige solo si ya existe, comparando el NIT sin puntos —la
+       misma normalizacion que hace el servidor al crearlo—. Si no existe, se
+       deja el formulario de alta abierto y relleno: es el paso que sigue. */
+    var nit = String(d.proveedor_nit || "").replace(/[^0-9A-Za-z]/g, "");
+    var sel = document.getElementById("eg-prov");
+    var hallado = null;
+    for (var i = 0; i < sel.options.length; i++){
+      if (nit && sel.options[i].textContent.replace(/[^0-9A-Za-z]/g, "").indexOf(nit) >= 0){ hallado = sel.options[i]; break; }
+    }
+    if (hallado){
+      sel.value = hallado.value;
+      /* El NIT manda para emparejar —es la identidad— pero si el nombre de la
+         factura no es el que tenemos fichado conviene decirlo: o el proveedor se
+         cambio el nombre, o el que esta guardado se escribio mal. Callarlo deja
+         un certificado anual a nombre de quien no es. */
+      var fichado = hallado.textContent.split(" · ")[0].trim();
+      var deLaFactura = String(d.proveedor_nombre || "").trim();
+      var distinto = deLaFactura && fichado &&
+        fichado.toLowerCase().replace(/[^a-z0-9]/g, "") !== deLaFactura.toLowerCase().replace(/[^a-z0-9]/g, "");
+      egMsg("eg-xmsg", aviso + "Leída: " + esc(d.numero) + " de " + esc(deLaFactura || "?") + "."
+        + (distinto ? " OJO: con ese NIT tienes fichado a «" + esc(fichado) + "», que no es el mismo nombre." : ""),
+        !aviso && !distinto);
+    } else {
+      document.getElementById("eg-prov-caja").hidden = false;
+      document.getElementById("eg-pn").value = d.proveedor_nombre || "";
+      document.getElementById("eg-pd").value = nit;
+      document.getElementById("eg-pt").value = "NIT";
+      egMsg("eg-xmsg", aviso + "Leída: " + esc(d.numero) + ". Ese proveedor todavía no existe — revísalo abajo y guárdalo.", !aviso);
+    }
+  };
+  lector.onerror = function(){ egMsg("eg-xmsg", "No se pudo leer el archivo.", false); };
+  lector.readAsText(f);
 });
 
 document.addEventListener("click", function(ev){
@@ -16009,7 +16255,31 @@ document.addEventListener("click", function(ev){
       .then(function(res){
         g.disabled = false;
         if (res.http !== 200){ egMsg("eg-msg", (res.d && (res.d.ayuda || res.d.error)) || "No se pudo.", false); return; }
-        egMsg("eg-msg", "Registrado como " + res.d.numero + ".", true);
+        var num = res.d.numero;
+        egMsg("eg-msg", "Registrado como " + num + ".", true);
+        /* El archivo va DESPUES, ya con numero. Si falla, el egreso queda igual
+           —que es lo que importa— y se dice que falta el papel, en vez de perder
+           los catorce campos por un archivo que no subio. */
+        if (EG_ARCHIVO){
+          var f = EG_ARCHIVO;
+          var tipo = /\.xml$/i.test(f.name) ? "application/xml" : "application/pdf";
+          fetch("/api/admin/egreso/" + encodeURIComponent(num) + "/soporte", {
+            method: "POST", headers: { "content-type": tipo }, body: f
+          }).then(conEstado).then(function(r2){
+            if (r2.http !== 200){
+              egMsg("eg-msg", "Registrado como " + num + ", pero el archivo no subió: "
+                + ((r2.d && (r2.d.ayuda || r2.d.error)) || "reintenta desde la fila."), false);
+              return;
+            }
+            egMsg("eg-msg", "Registrado como " + num + ", con su archivo guardado.", true);
+            cargarEgresos();
+          }).catch(function(){
+            egMsg("eg-msg", "Registrado como " + num + ", pero el archivo no subió.", false);
+          });
+          EG_ARCHIVO = null;
+          var inp = document.getElementById("eg-arch"); if (inp) inp.value = "";
+          egMsg("eg-xmsg", "", true);
+        }
         ["eg-concepto", "eg-base", "eg-iva", "eg-rf", "eg-snum", "eg-cufe", "eg-entrega", "eg-nota"]
           .forEach(function(id){ var e = document.getElementById(id); if (e) e.value = ""; });
         egCuentas();
@@ -17017,6 +17287,12 @@ export default {
            método, como ya hacen otras del panel. */
         if (ruta === "/api/admin/egresos")      return await adminEgresos(request, env, url, sesion.email);
         if (ruta === "/api/admin/proveedores")  return await adminProveedores(request, env);
+        /* El soporte de un egreso: subirlo y volver a verlo. Con el número en la
+           ruta y su forma exacta, como el aporte y el acta. */
+        const egs = ruta.match(/^\/api\/admin\/egreso\/(EG-\d{4}-\d{6})\/soporte$/i);
+        if (egs) return await adminEgresoSoporte(request, env, egs[1].toUpperCase(), sesion.email);
+        const egv = ruta.match(/^\/api\/admin\/egreso\/(EG-\d{4}-\d{6})\/soporte\.ver$/i);
+        if (egv) return await adminEgresoVerSoporte(env, egv[1].toUpperCase());
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env, url);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
         if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
