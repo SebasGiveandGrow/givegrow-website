@@ -191,14 +191,40 @@ for (const [htmlFn, jsFn] of [["paginaAdmin", "adminJS"], ["paginaTriage", "tria
                               ["paginaRuta", "rutaJS"], ["inspeccionHTML", "inspeccionJS"]]) {
   const h = literalDe(htmlFn), j = literalDe(jsFn);
   if (!h || !j) { err("1d: no encontré " + (h ? jsFn : htmlFn)); continue; }
+  /* UNA ETIQUETA NO BASTA, y por eso este check llevaba tiempo sin ver nada.
+
+     La versión anterior toleraba `(?:<[^>]+>\s*)?` — UNA etiqueta intermedia—.
+     Sirve para `<div id="salud"><p>Cargando…</p></div>`, que tiene una. No sirve
+     para una TABLA, que tiene dos: `<tbody id="x"><tr><td>Cargando…`.
+
+     O sea que el check nacido de una TABLA atascada en «Cargando…» no podía
+     casar con una tabla. Comprobado el 11 sep 2026 metiendo un tbody huérfano
+     con ese texto literal: el gate pasaba en verde.
+
+     Con `*` en vez de `?` entra cualquier anidamiento. */
   const ids = [...new Set(
-    [...h.matchAll(/id="([a-zA-Z0-9_-]+)"[^>]*>\s*(?:<[^>]+>\s*)?[^<]*(?:[Cc]argando|[Cc]onsultando)/g)].map(m => m[1])
+    [...h.matchAll(/id="([a-zA-Z0-9_-]+)"[^>]*>\s*(?:<[^>]+>\s*)*[^<]*(?:[Cc]argando|[Cc]onsultando|[Ss]e pide)/g)].map(m => m[1])
   )];
-  const sinDueno = ids.filter((id) => !new RegExp('(?:el|getElementById)\\(\\s*"' + id + '"\\s*\\)').test(j));
+
+  /* Y ADEMÁS, LA REGLA ESTRUCTURAL, que no depende del vocabulario.
+
+     La de arriba es una lista de palabras y su propio comentario ya avisaba de
+     que «Un momento…» se le escapa. Lo que de verdad define el problema no es lo
+     que el marcador diga: es que un `<tbody>` SIEMPRE lleva filas que vienen de
+     datos. Si nadie lo escribe, esa tabla enseña su marcador para siempre, diga
+     lo que diga.
+
+     Los trece tbody del panel decían «Se pide al bajar hasta aquí» y «Se pide al
+     abrir el módulo» —dos textos deliberados, de la carga diferida— y ninguno de
+     los dos estaba en la lista. Trece tablas de datos sin vigilar. */
+  const cuerpos = [...new Set([...h.matchAll(/<tbody id="([a-zA-Z0-9_-]+)"/g)].map(m => m[1]))];
+
+  const escribe = (id) => new RegExp('(?:el|getElementById)\\(\\s*"' + id + '"\\s*\\)').test(j);
+  const sinDueno = [...new Set(ids.concat(cuerpos))].filter((id) => !escribe(id));
   if (sinDueno.length) {
-    err(htmlFn + ": #" + sinDueno.join(", #") + " dice «Cargando…» y " + jsFn + "() nunca lo escribe");
+    err(htmlFn + ": #" + sinDueno.join(", #") + " se queda con su texto de espera — " + jsFn + "() nunca lo escribe");
   } else {
-    ok(htmlFn + " · sus " + ids.length + " «Cargando…» tienen quien los rellene");
+    ok(htmlFn + " · " + ids.length + " marcador(es) y " + cuerpos.length + " tabla(s) tienen quien los rellene");
   }
 }
 
