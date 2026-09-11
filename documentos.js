@@ -293,19 +293,43 @@ class Hoja {
     this.y -= (opts.despues != null ? opts.despues : 14);
   }
 
-  /* Parte una cadena en líneas que quepan en `ancho`. Una palabra más larga que
-     la caja (una URL, un correo) se deja desbordar en su propia línea antes que
-     partirla: un correo cortado deja de ser un correo. */
+  /* Parte una cadena en líneas que quepan en `ancho`.
+
+     Una palabra que no cabe junto a la anterior se baja entera: un correo o una
+     URL de largo normal siguen sin partirse, que era la intención original —
+     un correo cortado deja de ser un correo.
+
+     Pero si la palabra no cabe NI SOLA en la caja vacía, dejarla entera no la
+     conserva: pdf-lib no tiene flujo, la dibuja en una línea que se sale de la
+     hoja y el lector no ve nada, ni siquiera el trozo que sí cabía. Ahí sí se
+     parte por caracteres. Una dedicatoria de 280 letras seguidas, una URL
+     pegada de un tirón o una medida escrita sin espacios salían invisibles del
+     recibo, del certificado y del concepto técnico. */
   lineas(txt, fuente, tam, ancho) {
+    const trozos = (palabra) => {
+      if (fuente.widthOfTextAtSize(palabra, tam) <= ancho) return [palabra];
+      const ts = [];
+      let t = "";
+      for (const ch of palabra) {
+        /* El `t &&` evita el bucle infinito cuando ni un solo carácter cabe:
+           en ese caso cada trozo es de uno y se desborda lo mínimo posible. */
+        if (t && fuente.widthOfTextAtSize(t + ch, tam) > ancho) { ts.push(t); t = ""; }
+        t += ch;
+      }
+      if (t) ts.push(t);
+      return ts;
+    };
     const salida = [];
     for (const bloque of String(txt).split("\n")) {
       let linea = "";
-      for (const palabra of bloque.split(/\s+/)) {
-        if (!palabra) continue;
-        const prueba = linea ? linea + " " + palabra : palabra;
-        if (fuente.widthOfTextAtSize(prueba, tam) <= ancho) { linea = prueba; continue; }
-        if (linea) salida.push(linea);
-        linea = palabra;
+      for (const bruta of bloque.split(/\s+/)) {
+        if (!bruta) continue;
+        for (const palabra of trozos(bruta)) {
+          const prueba = linea ? linea + " " + palabra : palabra;
+          if (fuente.widthOfTextAtSize(prueba, tam) <= ancho) { linea = prueba; continue; }
+          if (linea) salida.push(linea);
+          linea = palabra;
+        }
       }
       salida.push(linea);
     }
@@ -434,7 +458,21 @@ class Hoja {
       });
       const izq = winansi(ENTIDAD.nombreCorto + "  ·  NIT " + ENTIDAD.nit + "  ·  " + ENTIDAD.sitio);
       p.drawText(izq, { x: MG.izq, y: y + 8, size: 7.5, font: this.f.normal, color: GRIS });
-      const der = winansi(referencia + "  ·  Página " + (i + 1) + " de " + total);
+      /* El pie no pasa por `lineas`: se dibuja anclado a la derecha y una
+         referencia larga empujaría el texto fuera de la hoja por la izquierda,
+         llevándose también la foliación. La foliación es justo lo que no puede
+         faltar en un documento tributario, así que si algo se recorta es la
+         referencia. */
+      const folio = "  ·  Página " + (i + 1) + " de " + total;
+      const cabe = ANCHO - this.f.normal.widthOfTextAtSize(winansi(folio), 7.5);
+      let ref = winansi(String(referencia == null ? "" : referencia));
+      if (this.f.normal.widthOfTextAtSize(ref, 7.5) > cabe) {
+        while (ref.length > 1 && this.f.normal.widthOfTextAtSize(ref + "...", 7.5) > cabe) {
+          ref = ref.slice(0, -1);
+        }
+        ref += "...";
+      }
+      const der = ref + winansi(folio);
       p.drawText(der, {
         x: MG.izq + ANCHO - this.f.normal.widthOfTextAtSize(der, 7.5),
         y: y + 8, size: 7.5, font: this.f.normal, color: GRIS
