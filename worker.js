@@ -12472,8 +12472,24 @@ async function rutaEvidencia(env, numero, archivo) {
     headers: {
       "content-type": obj.httpMetadata && obj.httpMetadata.contentType || "application/octet-stream",
       /* La clave nunca cambia de contenido: si se reemplaza la foto, cambia el
-         nombre del archivo. Por eso puede cachearse de verdad. */
-      "cache-control": "public, max-age=31536000, immutable"
+         nombre del archivo. Eso sigue siendo cierto y por eso esta respuesta se
+         puede cachear — pero lo que se cacheaba no era solo el contenido, era
+         también el PERMISO para servirlo, y ese sí cambia.
+
+         Tres líneas más arriba esta misma función dice por qué existe la
+         consulta a la base: «si una entrega se despublica, sus fotos tienen que
+         dejar de responder». El origen lo cumple —despublicada devuelve 404,
+         comprobado—, pero con un año y `immutable` por delante, cualquier caché
+         compartida seguía entregando la foto sin volver a preguntar. El
+         `immutable` además le decía al navegador que no revalidara ni con una
+         recarga forzada.
+
+         Despublicar es justo lo que se hace cuando una familia retira su
+         consentimiento, así que el permiso no puede sobrevivir al permiso.
+         Cinco minutos mantienen el beneficio de caché para la ráfaga real —un
+         donante abriendo su rastreo con varias fotos— y acotan la retirada a
+         minutos en vez de a un año. */
+      "cache-control": "public, max-age=300"
     }
   });
 }
