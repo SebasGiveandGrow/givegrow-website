@@ -3426,8 +3426,17 @@ function paginaTriage() {
   .fotos img{width:100%;height:130px;object-fit:cover;display:block}
   .fotos small{display:block;padding:5px 8px;color:var(--mu);font-size:11px}
   label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px}
+  /* 16px Y NO 15. Por debajo de 16, iOS Safari HACE ZOOM al enfocar un campo de
+     escritura: la pantalla salta, el diseño se descoloca y hay que pellizcar
+     para volver — en cada campo. Esta pantalla se usa en un teléfono, lo dice
+     este mismo archivo unas líneas más abajo cuando explica por qué el botón se
+     apaga al enviar.
+
+     Que es un descuido y no un criterio lo decide el propio archivo: las otras
+     DOS hojas de formulario que viven aquí —la de terreno y la del cuestionario
+     de la fundación— ya escriben 16px por esta misma razón. Esta se quedó en 15. */
   input,textarea,select{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:8px;
-                        font:inherit;font-size:15px;background:#fff;color:var(--ink)}
+                        font:inherit;font-size:16px;background:#fff;color:var(--ink)}
   .msg{margin-top:12px;font-size:14px}
   .cargando{color:var(--mu);font-size:14px;padding:20px 0}
 </style>
