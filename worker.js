@@ -13301,11 +13301,46 @@ fetch("/api/admin/quien").then(function(r){ return r.json(); }).then(function(d)
   if (e) e.textContent = "Sesión de " + (d.email || "?") + " · solo el equipo ve esta pantalla";
 });
 
+/* LA TRAMPA DE ESTAR DETRAS DE ACCESS, otra vez. Cuando la sesion expira,
+   Cloudflare NO devuelve un error: devuelve el HTML del login con un 200. Un
+   «r.json()» sobre eso lanza, y aqui no habia ni un catch — asi que la promesa
+   se rechazaba sin que nadie la recogiera y la pantalla se quedaba con la lista
+   vieja, o en «Cargando…» para siempre si era la primera carga.
+
+   La pantalla de inspeccion en terreno ya se guardaba de esto y lo deja escrito;
+   esta, que es la que alguien abre EN LA CALLE, no. Se comprueba el estado Y el
+   content-type, no solo que la peticion no reventara. */
+function pedirRuta(u, opciones){
+  return fetch(u, opciones).then(function(r){
+    var ct = r.headers.get("content-type") || "";
+    if (ct.indexOf("application/json") < 0){
+      /* Casi siempre es la sesion caida. Decirlo con esas palabras evita que
+         alguien en un patio se quede mirando un boton sin entender nada. */
+      throw new Error("sesion");
+    }
+    return r.json().then(function(d){ return { http: r.status, d: d }; });
+  });
+}
+
+/* Lo que se escribió y no llegó a guardarse, por caso. Vive solo en la pestaña:
+   no es un sustituto de la cola de la inspección, es que no haya que volver a
+   escribir una nota de memoria cuando falla un envío. */
+var NOTAS_SIN_GUARDAR = {};
+
 function cargarRuta(){
   var u = "/api/admin/ruta" + (SECTOR ? "?sector=" + encodeURIComponent(SECTOR) : "");
-  fetch(u).then(function(r){ return r.json(); }).then(function(d){
-    pintarSectores(d.sectores || []);
-    pintarCasos(d.casos || [], d);
+  pedirRuta(u).then(function(res){
+    if (res.http !== 200) throw new Error("http");
+    pintarSectores(res.d.sectores || []);
+    pintarCasos(res.d.casos || [], res.d);
+  }).catch(function(e){
+    /* «#lista» y no «#casos»: es el contenedor que pinta «pintarCasos». Escribir
+       el aviso en un id que no existe lo habría dejado igual de mudo que antes,
+       que es justo el fallo que este cambio corrige. */
+    var c = document.getElementById("lista");
+    if (c) c.innerHTML = '<p class="vacio">' + (String(e && e.message) === "sesion"
+      ? "Tu sesión caducó. Vuelve a abrir esta página para entrar otra vez — la ruta sigue ahí."
+      : "No se pudo cargar la ruta. Revisa la señal y vuelve a intentarlo.") + "</p>";
   });
 }
 
@@ -13412,9 +13447,21 @@ document.addEventListener("change", function(e){
     return fetch("/api/admin/caso/" + encodeURIComponent(num) + "/medio", {
       method: "POST", headers: { "content-type": archivo.type || "image/jpeg" }, body: archivo
     });
-  }).then(function(r){ return r.json(); }).then(function(d){
-    if (msg) msg.textContent = d && d.error ? "No se pudo subir: " + d.error : "Foto guardada.";
-  }).catch(function(){ if (msg) msg.textContent = "No se pudo subir la foto."; });
+  }).then(function(r){
+    var ct = r.headers.get("content-type") || "";
+    if (ct.indexOf("application/json") < 0) throw new Error("sesion");
+    return r.json().then(function(d){ return { http: r.status, d: d }; });
+  }).then(function(res){
+    /* Se mira el ESTADO y no solo el cuerpo: un 413 o un 415 traen su error, pero
+       un fallo sin cuerpo se habría leído como «Foto guardada». */
+    if (msg) msg.textContent = (res.http !== 200 || (res.d && res.d.error))
+      ? "No se pudo subir: " + ((res.d && (res.d.ayuda || res.d.error)) || res.http)
+      : "Foto guardada.";
+  }).catch(function(e){
+    if (msg) msg.textContent = String(e && e.message) === "sesion"
+      ? "No se subió: tu sesión caducó. Vuelve a abrir la página."
+      : "No se pudo subir la foto. Revisa la señal.";
+  });
   inp.value = "";
 });
 
@@ -13425,18 +13472,53 @@ document.addEventListener("click", function(e){
   var v = e.target.closest("[data-visita]");
   if (!v) return;
   var num = v.getAttribute("data-visita");
-  /* \\\\n y no \\n: esto vive dentro del template literal de rutaJS(). */
+  /* LOS SALTOS DE LINEA DE ESTE AVISO, que estaban mal desde siempre.
+
+     Esto vive dentro del template literal de rutaJS(), asi que lo escrito aqui
+     pasa por DOS lecturas: primero la del template —que convierte dos barras en
+     una— y despues la del JavaScript que se emite.
+
+     Con cuatro barras llegaba una barra y una ene al usuario, LITERAL: el aviso
+     decia «Visita a CV-2026-000003.\\n\\n¿Que encontraste?» en la pantalla que
+     alguien lee en la calle. Con dos, llega un salto de linea de verdad.
+
+     Es lo que CLAUDE.md dice —«dentro de sus plantillas hay que escribir \\n»—
+     y lo que hace el resto del archivo en sus otras nueve llamadas. Esta
+     pantalla era la unica que lo hacia al reves, y el comentario que estaba aqui
+     enseñaba el error. */
+  /* LA NOTA NO SE PIERDE SI FALLA. Es «lo único que va a quedar de que estuviste
+     ahí» —lo dice esta misma pantalla— y antes, si el envío fallaba, había que
+     volver a escribirla de memoria en un patio. Se guarda por caso y se le
+     devuelve al prompt como valor por omisión. */
   var nota = window.prompt("Visita a " + num +
-    ".\\\\n\\\\n¿Qué encontraste? Es lo único que va a quedar de que estuviste ahí:");
+    ".\\n\\n¿Qué encontraste? Es lo único que va a quedar de que estuviste ahí:",
+    NOTAS_SIN_GUARDAR[num] || "");
   if (!nota) return;
+  var textoOriginal = v.textContent;
   v.disabled = true; v.textContent = "…";
-  fetch("/api/admin/caso/" + encodeURIComponent(num) + "/estado", {
+  pedirRuta("/api/admin/caso/" + encodeURIComponent(num) + "/estado", {
     method: "POST", headers: {"content-type":"application/json"},
     body: JSON.stringify({ estado: "visitado", motivo: nota })
-  }).then(function(r){ return r.json(); }).then(function(d){
-    if (d && d.error){ window.alert("No se guardó: " + d.error + (d.ayuda ? "\\\\n\\\\n" + d.ayuda : "")); }
+  }).then(function(res){
+    if (res.http !== 200 || (res.d && res.d.error)){
+      /* EL BOTON VUELVE. Antes se quedaba en «…» y deshabilitado para siempre:
+         quien lo pulsó no sabía si había guardado, y no podía reintentar. */
+      NOTAS_SIN_GUARDAR[num] = nota;
+      v.disabled = false; v.textContent = textoOriginal;
+      window.alert("NO se guardó " + num + ".\\n\\n" +
+        ((res.d && (res.d.ayuda || res.d.error)) || "Inténtalo otra vez.") +
+        "\\n\\nTu nota no se perdió: vuelve a tocar «Visitada» y estará escrita.");
+      return;
+    }
+    delete NOTAS_SIN_GUARDAR[num];
     cargarRuta();
-  }).catch(function(){ cargarRuta(); });
+  }).catch(function(e){
+    NOTAS_SIN_GUARDAR[num] = nota;
+    v.disabled = false; v.textContent = textoOriginal;
+    window.alert(String(e && e.message) === "sesion"
+      ? "NO se guardó: tu sesión caducó.\\n\\nVuelve a abrir esta página para entrar, y toca «Visitada» otra vez — tu nota estará escrita."
+      : "NO se guardó " + num + ". Revisa la señal.\\n\\nTu nota no se perdió: vuelve a tocar «Visitada» y estará escrita.");
+  });
 });
 
 cargarRuta();
