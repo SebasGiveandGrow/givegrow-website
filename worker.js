@@ -3095,17 +3095,39 @@ async function apiCasoMedio(request, env, numero, token, url) {
   const cat = CATEGORIAS_MEDIO.includes(url.searchParams.get("cat")) ? url.searchParams.get("cat") : null;
   const clave = "casos/" + numero + "/" + tokenNuevo().slice(0, 8) + "." + spec.ext;
   await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
-  await env.DB.prepare(
+  const guardado = await env.DB.prepare(
     /* `orden` = MÁXIMO + 1, y no COUNT(*). Con COUNT, después de borrar un medio
        el conteo bajaba y la siguiente foto reutilizaba un `orden` ya ocupado, así
        que `ORDER BY categoria, orden` quedaba con empates no deterministas. Con el
        máximo los números pueden tener huecos, y eso es lo correcto: un hueco dice
        la verdad —ahí hubo algo— y no colisiona. Corregido en los DOS sitios que
        insertan medios; tenerlo bien en uno solo era la mitad del arreglo. */
+    /* EL CUPO SE VUELVE A CONTAR AQUÍ DENTRO, en la misma sentencia que inserta.
+
+       El `cupo.queda <= 0` de arriba mira una cuenta que ya es vieja para cuando
+       se llega a esta línea, y este endpoint no tiene delante la regla del WAF
+       —está excluido a propósito, para que una familia con mala señal pueda
+       reintentar—. Medido: 40 subidas a la vez contra un tope de 20 dejaron 37
+       archivos en R2. El tope existe, dice el comentario de `cupoFamilia`, «para
+       acotar un endpoint PÚBLICO», y así no acotaba nada.
+
+       Con el INSERT ... SELECT ... WHERE, contar y escribir son el mismo paso y
+       ya no cabe nadie en medio. El `changes` de después dice si esta petición
+       fue la que entró. */
     "INSERT INTO caso_medios (caso, r2_key, clase, categoria, bytes, nota, orden) " +
-    "VALUES (?,?,?,?,?,?, (SELECT COALESCE(MAX(orden), -1) + 1 FROM caso_medios WHERE caso = ?))"
+    "SELECT ?,?,?,?,?,?, (SELECT COALESCE(MAX(orden), -1) + 1 FROM caso_medios WHERE caso = ?) " +
+    "WHERE (SELECT COUNT(*) FROM caso_medios WHERE caso = ? AND COALESCE(categoria,'') <> ?) < ?"
   ).bind(numero, clave, spec.clase, cat, bytes.length,
-         limpiar(url.searchParams.get("nota"), 200) || null, numero).run();
+         limpiar(url.searchParams.get("nota"), 200) || null, numero,
+         numero, CATEGORIA_VISITA, cupo.tope).run();
+
+  /* Si no entró, el archivo ya está en R2 y hay que retirarlo: un objeto sin
+     fila no lo ve nadie, no lo borra nadie y se paga igual. */
+  if (!guardado.meta || !guardado.meta.changes) {
+    try { await env.MEDIA.delete(clave); } catch (e) { console.error("medio huerfano", clave, e && e.message); }
+    return json({ error: "demasiados_medios", max: cupo.tope, usados: cupo.tope }, 409);
+  }
+
   await env.DB.prepare("UPDATE casos SET actualizado_en = datetime('now') WHERE numero = ?").bind(numero).run();
 
   return json({ ok: true, clase: spec.clase });
