@@ -13077,6 +13077,42 @@ function paginaAdmin() {
    desde cuándo espera, después cuántos, y el «cómo se arregla» debajo del
    nombre. El único acento es el ámbar de lo que lleva tres días o más, para que
    ese ámbar signifique algo cuando aparezca. */
+/* ---- LA BARRA DE MODULOS ----
+   Vocabulario editorial y no de pestanas de aplicacion: versalita ancha sobre
+   una regla fina, y el modulo abierto marcado por un trazo verde APOYADO en esa
+   regla. Es el mismo gesto de los cintillos del sistema.
+
+   Y a proposito NO son pildoras: las pildoras ya significan otra cosa en esta
+   pantalla —filtrar el estado de un aporte, en «.pay-tab»—, y repetir la forma
+   para la navegacion de primer nivel haria que las dos dejaran de significar
+   nada. Un solo elemento firma, y aqui el firma es el trazo. */
+.mod-barra{display:flex;gap:0;flex-wrap:wrap;align-items:flex-end;
+           border-bottom:1px solid var(--bd);margin:0 0 30px}
+.mod-tab{appearance:none;background:none;border:0;cursor:pointer;
+         padding:10px 18px 11px;margin-bottom:-1px;
+         font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+         color:var(--mu);border-bottom:2px solid transparent;
+         display:inline-flex;align-items:center;gap:8px}
+.mod-tab:hover{color:var(--ink)}
+.mod-tab.on{color:var(--g);border-bottom-color:var(--g)}
+/* El contador solo aparece cuando hay algo esperando: un cero dibujado es ruido
+   que te hace mirar seis veces para descubrir que no habia nada. */
+.mod-n{font-size:11px;font-weight:700;letter-spacing:0;
+       background:var(--gl);color:var(--gd);border-radius:999px;padding:2px 7px;min-width:20px;text-align:center}
+.mod-n:empty{display:none}
+.mod-n.urge{background:#F6E7DF;color:#8C2F1E}
+@media(max-width:560px){
+  .mod-barra{gap:0;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .mod-tab{padding:10px 13px 11px;white-space:nowrap}
+}
+/* La primera seccion de un modulo no necesita el aire que la separaba de la
+   anterior, porque ahora no hay anterior. */
+.mod>.h-sec:first-child{margin-top:8px}
+/* El foco a un encabezado lo pone el codigo cuando pulsas «Ir», nunca el Tab:
+   el anillo alrededor de un titulo no senalaria nada accionable. Misma regla
+   que la ficha del triaje. */
+.mod .h-sec:focus{outline:none}
+
 /* El buscador: una casilla, arriba de todo. Ancho de sobra porque lo que se
    pega dentro es un consecutivo largo y verlo entero evita el error de teclear
    uno y buscar otro. */
@@ -13137,8 +13173,24 @@ function paginaAdmin() {
 </form>
 <div id="busca-res"></div>
 
-<div id="decisiones"></div>
 
+<!-- LA BARRA DE MODULOS. El panel era una sola pagina con once secciones
+     apiladas: cada visita las recorria todas para llegar a la que ibas a mirar,
+     y mezclaba tres cosas que se usan distinto — bandejas que esperan una
+     decision, libros de lo que ya paso, y el estado de la maquina.
+     Se agrupan por LO QUE ESTAS HACIENDO, no por tipo de dato. -->
+<nav class="mod-barra" aria-label="Modulos del panel">
+  <button type="button" class="mod-tab on" data-mod-ir="hoy">Hoy<span class="mod-n" id="n-hoy"></span></button>
+  <button type="button" class="mod-tab" data-mod-ir="dinero">Dinero<span class="mod-n" id="n-dinero"></span></button>
+  <button type="button" class="mod-tab" data-mod-ir="mmc">Mira Mi Casa<span class="mod-n" id="n-mmc"></span></button>
+  <button type="button" class="mod-tab" data-mod-ir="red">Red<span class="mod-n" id="n-red"></span></button>
+  <button type="button" class="mod-tab" data-mod-ir="entregas">Entregas<span class="mod-n" id="n-entregas"></span></button>
+  <button type="button" class="mod-tab" data-mod-ir="salud">Salud<span class="mod-n" id="n-salud"></span></button>
+</nav>
+
+<div class="mod" data-mod="hoy"><div id="decisiones"></div></div>
+
+<div class="mod" data-mod="salud" hidden>
 <h2 id="sec-salud" class="h-sec" style="margin:8px 0 6px;font-size:26px">Salud del ecosistema</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que las listas de abajo
 no dicen: dónde se cae la donación, si el cobro está dando señales de vida, y qué lleva días
@@ -13147,6 +13199,11 @@ haya pasado todavía es información, no un hueco que tapar. Y no hay porcentaje
 donde falta el dato dice «sin datos», no «0 %».</p>
 <div id="salud"><p class="mu">Cargando…</p></div>
 
+</div>
+
+<div class="mod" data-mod="dinero" hidden>
+<h2 id="sec-aportes" class="h-sec" style="margin:8px 0 6px;font-size:26px">Aportes</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">El libro de todo lo que ha entrado. Vivia sin encabezado propio, colgando de «Salud del ecosistema», que es de donde venia que los avisos de un aporte te mandaran a mirar la salud del sitio.</p>
 <div class="pay-tabs" role="group" aria-label="Filtrar por estado" style="margin-bottom:18px">
   <button type="button" class="pay-tab on" data-estado="">Todos</button>
   <button type="button" class="pay-tab" data-estado="aprobada">Aprobados</button>
@@ -13165,6 +13222,8 @@ donde falta el dato dice «sin datos», no «0 %».</p>
 
 <div id="dlg" style="display:none;margin-top:24px"></div>
 
+</div>
+<div class="mod" data-mod="dinero" hidden>
 <h2 id="sec-transferencias" class="h-sec" style="margin:48px 0 6px;font-size:26px">Transferencias por verificar</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Alguien dice que transfirió.
 <strong>Eso no es dinero en el banco:</strong> contrasta contra el extracto antes de confirmar. Hasta
@@ -13178,6 +13237,8 @@ número del comprobante porque <strong>es el que cita el certificado</strong>.</
 </tr></thead><tbody id="t-filas"><tr><td colspan="8" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
+</div>
+<div class="mod" data-mod="red" hidden>
 <h2 id="sec-entrar" class="h-sec" style="margin:48px 0 6px;font-size:26px">Quién quiere entrar</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Voluntarios, fundaciones que
 aplican al HUB, empresas que piden alianza e ingenieros que se postulan al triaje. <strong>Ninguna de
@@ -13199,6 +13260,8 @@ declaró, no uno comprobado.</p>
 </tr></thead><tbody id="i-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
+</div>
+<div class="mod" data-mod="mmc" hidden>
 <h2 id="sec-casas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Casas por revisar</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Triaje estructural. Los
 ingenieros clasifican sin ver de quién es la casa ni dónde queda; <strong>aquí sí están el contacto
@@ -13223,6 +13286,8 @@ duplicados y pruebas— y todo se puede reabrir.</p>
 </table></div>
 <div id="cs-dlg" style="display:none;margin-top:20px"></div>
 
+</div>
+<div class="mod" data-mod="mmc" hidden>
 <h2 id="sec-inspecciones" class="h-sec" style="margin:48px 0 6px;font-size:26px">Inspecciones en terreno</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">La visita en persona, que es
 <strong>otra cosa</strong> que el triaje: el triaje mira fotos a distancia y ordena la fila; esto lo
@@ -13268,6 +13333,8 @@ está mal.</p>
 <div id="imp-res" style="margin-top:12px"></div>
 </div>
 
+</div>
+<div class="mod" data-mod="red" hidden>
 <h2 id="sec-ofrecimientos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
 de la brigada. <strong>El acuse les pidió NO comprar todavía</strong>, así que conviene responder
@@ -13279,6 +13346,8 @@ antes de que lo hagan: el inventario cambia todos los días.</p>
 </tr></thead><tbody id="o-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
+</div>
+<div class="mod" data-mod="dinero" hidden>
 <h2 id="sec-pagos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Pagos sin aporte</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Pagos aprobados que entraron
 por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el checkout del sitio.
@@ -13292,6 +13361,8 @@ trazado.</p>
 </tr></thead><tbody id="p-filas"><tr><td colspan="5" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
+</div>
+<div class="mod" data-mod="dinero" hidden>
 <h2 id="sec-sus" class="h-sec" style="margin:48px 0 6px;font-size:26px">Membresías internacionales</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Las suscripciones en dólares por
 PayPal. <strong>Las pendientes salen primero</strong> porque son las únicas que piden algo: una que la
@@ -13306,6 +13377,8 @@ tiene a dónde ir: eso hay que repararlo.</p>
 </tr></thead><tbody id="sus-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
+</div>
+<div class="mod" data-mod="dinero" hidden>
 <h2 id="sec-ipn" class="h-sec" style="margin:48px 0 6px;font-size:26px">Donaciones por el botón de PayPal</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que entró por el
 <strong>botón de donaciones</strong>, único o mensual. A un botón alojado PayPal no acepta que se le
@@ -13321,6 +13394,8 @@ la nuestra; si dice otra cosa, es el motivo por el que no pasó y no hay que dar
 </tr></thead><tbody id="ipn-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
+</div>
+<div class="mod" data-mod="dinero" hidden>
 <h2 id="sec-pps" class="h-sec" style="margin:48px 0 6px;font-size:26px">Eventos de PayPal sin casa</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">La hermana de «Pagos sin aporte»,
 para PayPal. Tres cosas distintas caen aquí. <strong>Pago sin suscripción</strong>: entró plata con firma
@@ -13338,6 +13413,8 @@ Si esta lista está vacía, todo lo que llegó de PayPal tiene dónde ir.</p>
 </tr></thead><tbody id="pps-filas"><tr><td colspan="5" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
+</div>
+<div class="mod" data-mod="entregas" hidden>
 <h2 id="sec-entregas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:18px">El documento legal es el
 acta EN PAPEL que firma quien recibe. Aquí se registra su transcripción y se sube su foto.
@@ -13367,6 +13444,7 @@ y la entidad, no una persona atendida. Una entrega no se puede publicar sin al m
 
 <p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
 <p class="mu" style="margin-top:8px;font-size:13px;max-width:70ch">El <strong>recibo</strong> lo emite el sistema al confirmarse el pago. El <strong>certificado</strong> no: lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, así que sale de aquí, revisado, y nunca solo.</p>
+</div>
 </div></section></main>
 <script src="/admin/app.js"></script>
 </body></html>`;
@@ -13834,6 +13912,111 @@ document.addEventListener("submit", function(e){
    junto a cada consulta. Y dentro de cada fila la ANTIGÜEDAD SE LEE ANTES QUE
    EL CONTEO, que es la regla que ya gobierna la tabla de abajo: de una cola no
    importa cuántos hay, importa desde cuándo esperan. */
+/* ---- LOS MODULOS ----
+
+   Que seccion vive en que modulo NO se escribe aqui: se lee del DOM, subiendo
+   desde la seccion hasta su envoltorio. Asi mover una seccion de modulo es
+   mover una linea de HTML, y esta funcion no se entera — que es justo lo que
+   hace falta cuando lo que se espera es que el panel siga creciendo. */
+function moduloDe(id){
+  var el = document.getElementById(id);
+  var caja = el && el.closest ? el.closest("[data-mod]") : null;
+  return caja ? caja.getAttribute("data-mod") : null;
+}
+
+function irAModulo(nombre, seccion){
+  var hay = false;
+  document.querySelectorAll("[data-mod]").forEach(function(caja){
+    var suyo = caja.getAttribute("data-mod") === nombre;
+    caja.hidden = !suyo;
+    if (suyo) hay = true;
+  });
+  if (!hay) return false;
+  document.querySelectorAll("[data-mod-ir]").forEach(function(b){
+    b.classList.toggle("on", b.getAttribute("data-mod-ir") === nombre);
+  });
+  pedirDeModulo(nombre);
+  /* El modulo abierto va en la URL: recargar cae donde estabas, y un enlace a
+     una seccion concreta se puede pegar en un chat y abre lo que debe. */
+  var hash = "#" + nombre + (seccion ? "/" + seccion : "");
+  if (location.hash !== hash) history.replaceState(null, "", hash);
+  if (seccion){
+    var s = document.getElementById(seccion);
+    /* El foco va con la vista, igual que en la ficha del triaje: quien usa
+       teclado se quedaba en el boton «Ir» con el modulo entero por delante. */
+    if (s){ s.scrollIntoView({ block: "start" }); s.setAttribute("tabindex", "-1"); s.focus(); }
+  } else {
+    window.scrollTo(0, 0);
+  }
+  return true;
+}
+
+function abrirDesdeURL(){
+  var h = (location.hash || "").replace(/^#/, "");
+  if (!h) return irAModulo("hoy");
+  var partes = h.split("/");
+  /* Dos formas: «#dinero» y «#dinero/sec-aportes». Y ademas la de antes,
+     «#sec-aportes» a secas, que es la que llevan los enlaces ya escritos. */
+  if (partes[0].indexOf("sec-") === 0){
+    var m = moduloDe(partes[0]);
+    return m ? irAModulo(m, partes[0]) : irAModulo("hoy");
+  }
+  return irAModulo(partes[0], partes[1] || null) || irAModulo("hoy");
+}
+
+document.addEventListener("click", function(ev){
+  var t = ev.target.closest ? ev.target.closest("[data-mod-ir]") : null;
+  if (t){ ev.preventDefault(); irAModulo(t.getAttribute("data-mod-ir")); return; }
+  /* Los «Ir» de la portada son enlaces a #sec-… y el navegador no salta a algo
+     oculto. Se atienden aqui: primero se abre el modulo, despues se baja. */
+  var a = ev.target.closest ? ev.target.closest('a[href^="#sec-"]') : null;
+  if (a){
+    var id = a.getAttribute("href").slice(1);
+    var m = moduloDe(id);
+    if (m){ ev.preventDefault(); irAModulo(m, id); }
+  }
+});
+window.addEventListener("hashchange", abrirDesdeURL);
+
+/* De que modulo es cada cola de «Lo que hay que hacer hoy». Es lo unico que se
+   escribe a mano, porque una cola no es un elemento del DOM del que se pueda
+   deducir donde vive. */
+var COLA_MOD = {
+  inscripciones_sin_tocar: "red",
+  transferencias_sin_verificar: "dinero",
+  certificados_por_emitir: "dinero",
+  correos_fallidos: "salud",
+  entregas_en_borrador: "entregas",
+  casos_sin_evaluar: "mmc",
+  urgentes_sin_visitar: "mmc",
+  casos_esperando_fotos: "mmc",
+  ingenieros_sin_verificar: "mmc",
+  conceptos_sin_respaldo: "mmc"
+};
+
+/* El numero en la pestana es lo que convierte esto en una consola: sin el hay
+   que entrar a los seis modulos para saber si hay algo. Sale de /api/admin/salud,
+   que ya se pide al abrir — ni un endpoint mas, ni una peticion mas. */
+function pintarContadores(pend){
+  var por = {}, urge = {};
+  (pend || []).forEach(function(c){
+    var m = COLA_MOD[c.clave];
+    if (!m) return;
+    por[m] = (por[m] || 0) + c.n;
+    if (c.dias !== null && c.dias >= 3) urge[m] = true;
+  });
+  var total = 0;
+  Object.keys(por).forEach(function(m){ total += por[m]; });
+  por.hoy = total;
+  if (Object.keys(urge).length) urge.hoy = true;
+  ["hoy", "dinero", "mmc", "red", "entregas", "salud"].forEach(function(m){
+    var n = document.getElementById("n-" + m);
+    if (!n) return;
+    n.textContent = por[m] ? String(por[m]) : "";
+    n.classList.toggle("urge", !!urge[m]);
+  });
+}
+
 function pintarDecisiones(d){
   var caja = document.getElementById("decisiones"); if (!caja) return;
   var h = "";
@@ -13850,6 +14033,10 @@ function pintarDecisiones(d){
 
   var pend = (d.cola || []).filter(function(c){ return c.n > 0; })
     .sort(function(a,b){ return (a.orden || 999) - (b.orden || 999); });
+  /* Los contadores salen de la MISMA lista ya filtrada que pinta la portada:
+     si algun dia cambia la regla de que cuenta como pendiente, cambia en un
+     solo sitio y la barra no se queda diciendo otra cosa. */
+  pintarContadores(pend);
 
   if (!alarmas.length && !pend.length){
     caja.innerHTML = '<div class="dec-caja"><h2 class="dec-t">Nada esperando</h2>'
@@ -15288,6 +15475,7 @@ pintarCampos();
    o descartar una, así que en una carga limpia se quedaba en «Cargando…» para
    siempre. Estuvo tapado mientras el archivo entero no compilaba. */
 
+abrirDesdeURL();
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
   .catch(function(){});
@@ -15321,13 +15509,28 @@ var BANDEJAS = {
   "e-filas": cargarEntregas
 };
 
+/* «pedir» sale de «armarBandejas» para que tambien pueda llamarlo el cambio de
+   modulo. Sigue siendo idempotente: pedir dos veces la misma bandeja no cuesta
+   una peticion mas, asi que el observador y el modulo pueden pisarse sin dano. */
+var PEDIDAS = {};
+function pedir(id){
+  if (PEDIDAS[id] || !BANDEJAS[id]) return;
+  PEDIDAS[id] = true;
+  BANDEJAS[id]();
+}
+
+/* LO QUE SE ABRE, SE PIDE. El observador solo dispara cuando algo ENTRA en
+   pantalla al hacer scroll; al cambiar de modulo las tablas aparecen ya en su
+   sitio, y depender de que el observador lo note es depender de un detalle del
+   navegador para que el panel no salga vacio. Se piden explicitamente las
+   bandejas del modulo que se abre — como maximo seis, y son las del trabajo que
+   acabas de decir que vas a hacer. El observador se queda igual, para lo que
+   quede por debajo del pliegue dentro del modulo. */
+function pedirDeModulo(nombre){
+  document.querySelectorAll('[data-mod="' + nombre + '"] tbody[id]').forEach(function(t){ pedir(t.id); });
+}
+
 function armarBandejas(){
-  var pedidas = {};
-  var pedir = function(id){
-    if (pedidas[id]) return;
-    pedidas[id] = true;
-    BANDEJAS[id]();
-  };
 
   /* Sin IntersectionObserver se piden todas, o sea como estaba antes. Una carga
      pesada es peor que nada, pero una tabla que no llega NUNCA es mucho peor:
