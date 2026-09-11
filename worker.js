@@ -9565,6 +9565,7 @@ async function rutaCarnet(env, token) {
   }), {
     headers: {
       "content-type": "text/html; charset=utf-8",
+      "referrer-policy": "strict-origin-when-cross-origin",
       /* Sin caché: el estado se consulta en el momento, que es el punto. */
       "cache-control": "private, no-store",
       "x-robots-tag": "noindex, nofollow",
@@ -15429,6 +15430,7 @@ async function rutaCompartir(env, url, id) {
       return new Response(sharePage(p), {
         headers: {
           "content-type": "text/html; charset=utf-8",
+          "referrer-policy": "strict-origin-when-cross-origin",
           /* SIN CACHÉ PÚBLICA, y esto es la mitad que faltaba de la regla 1.
 
              `partners.json` —la FUENTE de esta página— se sirve `no-store,
@@ -15452,7 +15454,19 @@ async function rutaCompartir(env, url, id) {
              hay página» sea verdad también un minuto después de revocarla. */
           "cache-control": "no-store, must-revalidate",
           "x-content-type-options": "nosniff",
-          "referrer-policy": "strict-origin-when-cross-origin"
+          "referrer-policy": "strict-origin-when-cross-origin",
+          /* LA CSP TAMBIÉN. Esta respuesta se construye desde cero, así que no
+             hereda nada de `_headers` —que es de donde el resto del sitio saca
+             su CSP y su X-Frame-Options—. El resultado medido: `/f/<id>`, que es
+             justo la página que existe para compartirse por enlace, era la única
+             del sitio que cualquiera podía meter en un iframe.
+
+             `sharePage` no tiene ni un script ni un estilo ni una imagen de
+             fuera: es metadatos, un refresco y un enlace interno. Así que le va
+             la misma negación entera que al carnet, y `frame-ancestors 'none'`
+             de `cspPagina` cierra el marco mejor que el SAMEORIGIN de todo lo
+             demás. */
+          "content-security-policy": cspPagina({ script: "'none'" })
         }
       });
     }
@@ -16022,7 +16036,15 @@ export default {
             "<p>" + (noConfig
               ? "Falta crear la aplicación de Cloudflare Access que protege esta ruta. Instrucciones en <code>ops/panel-admin.md</code>."
               : "Tu sesión no es válida para esta aplicación (" + esc(sesion.motivo) + ").") + "</p>",
-            { status: noConfig ? 503 : 403, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } }
+            { status: noConfig ? 503 : 403, headers: {
+                "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+                /* Era la única respuesta HTML del Worker sin CSP. No tiene
+                   scripts y lo único variable que imprime ya pasa por `esc`,
+                   pero una página que se sirve sin CSP por descuido es la que
+                   mañana crece con un script. */
+                "content-security-policy": cspPagina({ script: "'none'" }),
+                "referrer-policy": "strict-origin-when-cross-origin"
+              } }
           );
         }
         return json(cuerpo, noConfig ? 503 : 403);
@@ -16032,6 +16054,7 @@ export default {
         if (ruta === "/admin") {
           return new Response(paginaAdmin(), {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+            "referrer-policy": "strict-origin-when-cross-origin",
                        "x-robots-tag": "noindex, nofollow",
                        "content-security-policy": cspPagina({ form: "'self'" }) }
           });
@@ -16089,6 +16112,7 @@ export default {
           );
           return new Response(cuerpo, { headers: {
             "content-type": "text/html; charset=utf-8",
+            "referrer-policy": "strict-origin-when-cross-origin",
             "cache-control": "no-store",
             "x-robots-tag": "noindex, nofollow",
             "content-security-policy": cspPagina({ script: "'self' 'nonce-" + nonce + "'" })
@@ -16135,6 +16159,7 @@ export default {
         if (ruta === "/triaje") {
           return new Response(paginaTriage(), {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+            "referrer-policy": "strict-origin-when-cross-origin",
                        "x-robots-tag": "noindex, nofollow",
                        "content-security-policy": cspPagina() }
           });
@@ -16195,6 +16220,7 @@ export default {
         if (ruta === "/admin/ruta") {
           return new Response(paginaRuta(), {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+            "referrer-policy": "strict-origin-when-cross-origin",
                        "content-security-policy": cspPagina() }
           });
         }
@@ -16347,6 +16373,7 @@ export default {
       return new Response(paginaFicha(i, nonce), {
         headers: {
           "content-type": "text/html; charset=utf-8",
+          "referrer-policy": "strict-origin-when-cross-origin",
           "cache-control": "private, no-store",
           "x-robots-tag": "noindex, nofollow",
           "content-security-policy":
