@@ -1859,7 +1859,20 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(aprobada_en) AS masViejo FROM aportes a WHERE a.quiere_certificado = 1 " +
     "AND a." + PAGADA + " AND NOT EXISTS " +
     "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)",
-    "Lista de aportes · los firma la Revisora Fiscal, no el sistema", 70, "#sec-salud");
+    "Lista de aportes · los firma la Revisora Fiscal, no el sistema", 70, "#sec-aportes");
+  /* EMITIDO NO ES FIRMADO, y esta cola nació con la pantalla de firma: sin ella,
+     un certificado podía quedarse esperando una firma para siempre y nada lo
+     diría — ni a nosotros ni al donante, que lo está esperando. Es exactamente
+     la forma de fallo que este panel lleva corrigiendo todo el tiempo: una
+     bandeja que hay que acordarse de abrir no es una alarma.
+
+     Prioridad por delante de «por emitir»: ahí falta un acto nuestro; aquí ya se
+     emitió, el donante ya sabe que viene, y lo único que falta es que alguien
+     mire un papel que ya está escrito. */
+  await enCola("certificados_sin_firmar",
+    "SELECT COUNT(*) AS n, MIN(emitido_en) AS masViejo FROM certificados " +
+    "WHERE anulado_en IS NULL AND (firma_rl_en IS NULL OR firma_rf_en IS NULL)",
+    "Pantalla «Firma» · emitido no es firmado: sin las dos firmas no sale al donante", 68, "/firma");
   /* LAS TRES COLAS DE PAYPAL. El panel ya tiene las bandejas —membresias,
      donaciones del boton y eventos sin casa— pero `salud` es lo que DICE que
      algo necesita atencion, y no las miraba. Una bandeja que hay que acordarse
@@ -14694,6 +14707,7 @@ var COLA_ES = {
   inscripciones_sin_tocar: "Inscripciones sin tocar",
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
+  certificados_sin_firmar: "Certificados esperando firma",
   correos_fallidos: "Correos que no salieron",
   entregas_en_borrador: "Entregas en borrador",
   casos_sin_evaluar: "Casas que nadie ha abierto",
@@ -14849,6 +14863,7 @@ var COLA_MOD = {
   inscripciones_sin_tocar: "red",
   transferencias_sin_verificar: "dinero",
   certificados_por_emitir: "dinero",
+  certificados_sin_firmar: "dinero",
   correos_fallidos: "salud",
   entregas_en_borrador: "entregas",
   casos_sin_evaluar: "mmc",
