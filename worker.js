@@ -462,6 +462,18 @@ async function siguienteCertificado(env, anio) {
   return "CD-" + anio + "-" + String(n).padStart(6, "0");
 }
 
+/* Consecutivo de egresos: EG-YYYY-NNNNNN. Serie aparte de las otras cuatro
+   porque un egreso no es ninguna de esas cosas, y misma mecánica atómica. */
+async function siguienteEgreso(env, anio) {
+  const { results } = await env.DB.prepare(
+    "INSERT INTO numerador_egreso (anio, ultimo) VALUES (?, 1) " +
+    "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1 RETURNING ultimo"
+  ).bind(anio).all();
+  const n = results && results[0] ? results[0].ultimo : null;
+  if (!n) throw new Error("numerador de egresos no devolvió consecutivo");
+  return "EG-" + anio + "-" + String(n).padStart(6, "0");
+}
+
 /* Consecutivo de actas de entrega: AE-YYYY-NNNNNN. */
 async function siguienteActa(env, anio) {
   const { results } = await env.DB.prepare(
@@ -11270,6 +11282,190 @@ async function correoAvisoFundacion(env, f) {
 
 /* Los ofrecimientos comparten tabla con las inscripciones, así que el panel los
    filtra por tipo en vez de tener su propia consulta. */
+/* ========================================================================
+   EGRESOS — la otra mitad del libro
+   ========================================================================
+   Ver `migrations/0025_egresos.sql` para el porqué de cada campo. Aquí solo va
+   lo que el servidor tiene que hacer cumplir.
+
+   EL SERVIDOR NO CALCULA LA RETENCIÓN, y es deliberado. Las tarifas y la UVT
+   cambian cada año; quien firma la declaración es el contador. El panel sugiere
+   y aquí se guarda LO QUE SE APLICÓ. Un cálculo del servidor que nadie revisa es
+   un cálculo que alguien va a creerse.
+
+   LO QUE SÍ SE HACE CUMPLIR es la aritmética: si `total` y `neto` no cuadran con
+   lo retenido, la fila miente y no entra. Es la única resta que no puede
+   quedarle a nadie de cabeza.
+   ======================================================================== */
+
+const SOPORTES = ["factura_electronica", "factura_manual", "documento_soporte", "sin_soporte"];
+const CONCEPTOS_RET = ["compras", "servicios", "honorarios", "arrendamientos", "transporte", "no_aplica"];
+const MEDIOS_PAGO = ["transferencia", "efectivo", "tarjeta", "otro"];
+const TIPOS_DOC_PROV = ["NIT", "CC", "CE", "PAS", "NINGUNO"];
+
+async function adminProveedores(request, env) {
+  if (request.method === "POST") return await adminProveedorCrear(request, env);
+  const r = await env.DB.prepare(
+    "SELECT p.id, p.tipo_doc, p.documento, p.dv, p.nombre, p.natural_, p.factura, " +
+    "p.email, p.telefono, p.ciudad, " +
+    "(SELECT COUNT(*) FROM egresos e WHERE e.proveedor_id = p.id AND e.anulado_en IS NULL) AS egresos, " +
+    "(SELECT COALESCE(SUM(e.total_centavos), 0) FROM egresos e WHERE e.proveedor_id = p.id AND e.anulado_en IS NULL) AS total_centavos " +
+    "FROM proveedores p ORDER BY p.nombre LIMIT " + TOPE_BANDEJA
+  ).all();
+  const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM proveedores").first();
+  return json({ proveedores: r.results || [], total: (tot && tot.n) || 0, tope: TOPE_BANDEJA });
+}
+
+async function adminProveedorCrear(request, env) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+
+  const nombre = limpiar(c.nombre, 200);
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+
+  const tipoDoc = TIPOS_DOC_PROV.includes(c.tipo_doc) ? c.tipo_doc : "NIT";
+  /* Sin puntos ni guiones: el mismo NIT escrito de tres formas son tres
+     proveedores, y entonces el certificado anual sale partido en tres. */
+  const documento = tipoDoc === "NINGUNO" ? null : (String(c.documento || "").replace(/[^0-9A-Za-z]/g, "") || null);
+  if (tipoDoc !== "NINGUNO" && !documento) {
+    return json({ error: "documento_requerido",
+                  ayuda: "Si no tienes el documento, elige «sin documento»: queda registrado que falta, en vez de inventado." }, 400);
+  }
+
+  try {
+    const r = await env.DB.prepare(
+      "INSERT INTO proveedores (tipo_doc, documento, dv, nombre, natural_, factura, email, telefono, ciudad, nota) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id"
+    ).bind(tipoDoc, documento, limpiar(c.dv, 2) || null, nombre,
+           c.natural === false ? 0 : 1, c.factura === false ? 0 : 1,
+           limpiar(c.email, 200) || null, limpiar(c.telefono, 40) || null,
+           limpiar(c.ciudad, 80) || null, limpiar(c.nota, 500) || null).first();
+    return json({ ok: true, id: r && r.id });
+  } catch (e) {
+    /* El índice único es parcial: solo muerde a quien SÍ trae documento. */
+    if (/UNIQUE|constraint/i.test(String(e && e.message))) {
+      const ya = await env.DB.prepare(
+        "SELECT id, nombre FROM proveedores WHERE tipo_doc = ? AND documento = ?"
+      ).bind(tipoDoc, documento).first();
+      return json({ error: "proveedor_repetido", id: ya && ya.id, nombre: ya && ya.nombre,
+                    ayuda: "Ese documento ya está registrado. Usa el proveedor que ya existe." }, 409);
+    }
+    throw e;
+  }
+}
+
+async function adminEgresos(request, env, url, quien) {
+  if (request.method === "POST") return await adminEgresoCrear(request, env, quien);
+  const soloSinPapel = url && url.searchParams.get("sin_soporte") === "1";
+  const r = await env.DB.prepare(
+    "SELECT e.numero, e.fecha, e.concepto, e.total_centavos, e.retefuente_centavos, " +
+    "e.reteica_centavos, e.neto_centavos, e.concepto_ret, e.soporte, e.soporte_numero, " +
+    "e.meritoria, e.centro, e.entrega, e.medio_pago, e.anulado_en, " +
+    "p.nombre AS proveedor, p.tipo_doc, p.documento " +
+    "FROM egresos e LEFT JOIN proveedores p ON p.id = e.proveedor_id " +
+    (soloSinPapel ? "WHERE e.soporte = 'sin_soporte' AND e.anulado_en IS NULL " : "") +
+    "ORDER BY e.fecha DESC, e.numero DESC LIMIT " + TOPE_BANDEJA
+  ).all();
+  /* Los totales van sobre TODO lo vigente y no sobre la página: un total que
+     solo suma lo que cupo en pantalla es un total que miente. */
+  const sum = await env.DB.prepare(
+    "SELECT COUNT(*) AS n, COALESCE(SUM(total_centavos),0) AS total, " +
+    "COALESCE(SUM(retefuente_centavos + reteica_centavos),0) AS retenido, " +
+    "COALESCE(SUM(CASE WHEN meritoria = 1 THEN total_centavos ELSE 0 END),0) AS meritoria, " +
+    "COALESCE(SUM(CASE WHEN soporte = 'sin_soporte' THEN 1 ELSE 0 END),0) AS sin_papel " +
+    "FROM egresos WHERE anulado_en IS NULL"
+  ).first();
+  return json({
+    egresos: r.results || [], tope: TOPE_BANDEJA,
+    total: (sum && sum.n) || 0,
+    suma_centavos: (sum && sum.total) || 0,
+    retenido_centavos: (sum && sum.retenido) || 0,
+    meritoria_centavos: (sum && sum.meritoria) || 0,
+    sin_papel: (sum && sum.sin_papel) || 0
+  });
+}
+
+async function adminEgresoCrear(request, env, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+
+  /* A QUIEN SE LE PAGO VA PRIMERO. Con la comprobacion del soporte por delante,
+     a quien se le olvidaba elegir proveedor le contestabamos «falta el numero de
+     la factura» — que es cierto, pero no es lo que le faltaba. El orden de las
+     comprobaciones es el orden en que se leen los errores. */
+  const proveedorId = Number(c.proveedor_id);
+  if (!Number.isInteger(proveedorId) || proveedorId <= 0) {
+    return json({ error: "proveedor_requerido", ayuda: "Elige a quien se le pago, o crealo ahi mismo." }, 400);
+  }
+  const prov = await env.DB.prepare("SELECT id FROM proveedores WHERE id = ?").bind(proveedorId).first();
+  if (!prov) return json({ error: "proveedor_no_encontrado" }, 404);
+
+  const concepto = limpiar(c.concepto, 300);
+  if (!concepto) return json({ error: "concepto_requerido" }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(c.fecha || ""))) return json({ error: "fecha_invalida" }, 400);
+  if (fechaEnFuturo(c.fecha)) return json({ error: "fecha_futura" }, 422);
+
+  const ent = (v) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  };
+  const base = ent(c.base_centavos), iva = ent(c.iva_centavos);
+  const total = ent(c.total_centavos);
+  const rf = ent(c.retefuente_centavos), ri = ent(c.reteica_centavos);
+  const neto = ent(c.neto_centavos);
+
+  if (total <= 0) return json({ error: "total_invalido", ayuda: "El total tiene que ser mayor que cero." }, 400);
+
+  /* LA ARITMÉTICA SE COMPRUEBA AQUÍ. Una fila donde el total no cuadra con lo
+     retenido y lo pagado no es un error de dedos que se arregla después: es una
+     fila que va a acabar en una declaración. */
+  if (base + iva !== total) {
+    return json({ error: "total_no_cuadra", base, iva, total,
+                  ayuda: "Base más IVA tiene que dar el total." }, 422);
+  }
+  if (total - rf - ri !== neto) {
+    return json({ error: "neto_no_cuadra", total, retefuente: rf, reteica: ri, neto,
+                  ayuda: "El neto es el total menos lo retenido." }, 422);
+  }
+
+  const soporte = SOPORTES.includes(c.soporte) ? c.soporte : "sin_soporte";
+  if (soporte !== "sin_soporte" && !limpiar(c.soporte_numero, 60)) {
+    return json({ error: "numero_de_soporte_requerido",
+                  ayuda: "Si hay papel, tiene número. Si no lo hay, marca «sin soporte»." }, 422);
+  }
+
+  /* La entrega, si se cita, tiene que existir: el valor de poder decir «esta
+     factura pagó esta acta» está en que sea verdad. */
+  const entrega = limpiar(c.entrega, 20) || null;
+  if (entrega) {
+    const e = await env.DB.prepare("SELECT numero FROM entregas WHERE numero = ?").bind(entrega).first();
+    if (!e) return json({ error: "entrega_no_encontrada", entrega }, 404);
+  }
+
+  const numero = await siguienteEgreso(env, anioCO());
+  await env.DB.prepare(
+    "INSERT INTO egresos (numero, proveedor_id, fecha, concepto, base_centavos, iva_centavos, " +
+    "total_centavos, retefuente_centavos, reteica_centavos, neto_centavos, concepto_ret, " +
+    "soporte, soporte_numero, soporte_cufe, meritoria, centro, entrega, medio_pago, nota, creado_por) " +
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+  ).bind(
+    numero, proveedorId, c.fecha, concepto, base, iva, total, rf, ri, neto,
+    CONCEPTOS_RET.includes(c.concepto_ret) ? c.concepto_ret : "no_aplica",
+    soporte, limpiar(c.soporte_numero, 60) || null, limpiar(c.soporte_cufe, 120) || null,
+    c.meritoria === false ? 0 : 1, limpiar(c.centro, 60) || null, entrega,
+    MEDIOS_PAGO.includes(c.medio_pago) ? c.medio_pago : null,
+    limpiar(c.nota, 500) || null, quien || "?"
+  ).run();
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "egreso " + numero + " registrado · " + concepto).run();
+
+  return json({ ok: true, numero });
+}
+
 async function adminOfrecimientos(env) {
   const r = await env.DB.prepare(
     "SELECT id, estado, nombre, email, telefono, ciudad, datos, creada_en " +
@@ -13077,6 +13273,39 @@ function paginaAdmin() {
    desde cuándo espera, después cuántos, y el «cómo se arregla» debajo del
    nombre. El único acento es el ámbar de lo que lleva tres días o más, para que
    ese ámbar signifique algo cuando aparezca. */
+/* ---- 16px EN TODO LO QUE SE ESCRIBE ----
+   Por debajo de 16px, iOS Safari hace zoom al enfocar un campo de escritura: la
+   pantalla salta y hay que pellizcar para volver, en cada campo. El panel estaba
+   entero a 13 y 14 — el buscador, el formulario de entregas, el de importar — y
+   ahora ademas estrena el formulario de egresos, que es el que mas campos tiene
+   y el que se va a llenar desde un telefono en una vereda.
+
+   Es la misma correccion del PR #372 para la pantalla del triaje, donde el
+   propio archivo ya tenia dos de sus tres hojas de formulario en 16 y solo una
+   se habia quedado atras. Aqui se habian quedado todas. */
+input:not([type=checkbox]):not([type=radio]),
+select,
+textarea { font-size: 16px }
+
+/* ---- EL FORMULARIO DE EGRESOS ----
+   Una columna, etiquetas encima y pares que se parten en el telefono. Nada de
+   rejilla elaborada: son catorce campos que se llenan de arriba abajo. */
+.eg-form{max-width:640px;padding-top:14px}
+.eg-form label{display:block;font-size:12.5px;font-weight:700;color:var(--mu);margin:12px 0 4px}
+.eg-form input,.eg-form select{width:100%;padding:10px 12px;border:1px solid var(--bd);
+  border-radius:8px;font:inherit;font-size:16px;background:#fff;color:var(--ink)}
+.eg-par{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;margin-top:4px}
+.eg-par>div{min-width:0}
+.eg-par>button{align-self:end;white-space:nowrap}
+@media(max-width:560px){ .eg-par{grid-template-columns:1fr} }
+.eg-check{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;
+  color:var(--ink);margin:14px 0 0}
+.eg-check input{width:auto}
+/* Las cuentas en vivo: la misma gramatica de fichas que el resumen de arriba. */
+.eg-cuentas{display:flex;flex-wrap:wrap;gap:8px 18px;margin:10px 0 4px;font-size:13.5px;color:var(--mu)}
+.eg-cuentas:empty{display:none}
+.eg-cuentas b{color:var(--ink);font-variant-numeric:tabular-nums}
+
 /* ---- LA BARRA DE MODULOS ----
    Vocabulario editorial y no de pestanas de aplicacion: versalita ancha sobre
    una regla fina, y el modulo abierto marcado por un trazo verde APOYADO en esa
@@ -13102,8 +13331,12 @@ function paginaAdmin() {
 .mod-n:empty{display:none}
 .mod-n.urge{background:#F6E7DF;color:#8C2F1E}
 @media(max-width:560px){
-  .mod-barra{gap:0;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
-  .mod-tab{padding:10px 13px 11px;white-space:nowrap}
+  /* «max-width:100%» y «min-width:0» no son adorno: sin ellos la barra se hace
+     tan ancha como sus seis pestañas y EMPUJA la página, que era justo lo que se
+     queria evitar. El desplazamiento tiene que ocurrir DENTRO de la barra. */
+  .mod-barra{gap:0;overflow-x:auto;flex-wrap:nowrap;max-width:100%;min-width:0;
+             -webkit-overflow-scrolling:touch}
+  .mod-tab{padding:10px 13px 11px;white-space:nowrap;flex:0 0 auto}
 }
 /* La primera seccion de un modulo no necesita el aire que la separaba de la
    anterior, porque ahora no hay anterior. */
@@ -13119,7 +13352,7 @@ function paginaAdmin() {
 #buscador{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
 #buscador label{font-size:var(--fs-13);font-weight:600;color:var(--mu)}
 #buscador input{flex:1 1 22rem;min-width:0;padding:9px 12px;border:1px solid var(--bd);
-  border-radius:7px;font:inherit;font-size:var(--fs-14);background:var(--surface);color:inherit}
+  border-radius:7px;font:inherit;font-size:16px;background:var(--surface);color:inherit}
 #busca-res{margin:0 0 22px}
 .bus-fila{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:baseline;
   padding:10px 0;border-top:1px solid var(--bd)}
@@ -13185,6 +13418,7 @@ function paginaAdmin() {
   <button type="button" class="mod-tab" data-mod-ir="mmc">Mira Mi Casa<span class="mod-n" id="n-mmc"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="red">Red<span class="mod-n" id="n-red"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="entregas">Entregas<span class="mod-n" id="n-entregas"></span></button>
+  <button type="button" class="mod-tab" data-mod-ir="conta">Contabilidad<span class="mod-n" id="n-conta"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="salud">Salud<span class="mod-n" id="n-salud"></span></button>
 </nav>
 
@@ -13445,6 +13679,117 @@ y la entidad, no una persona atendida. Una entrega no se puede publicar sin al m
 <p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
 <p class="mu" style="margin-top:8px;font-size:13px;max-width:70ch">El <strong>recibo</strong> lo emite el sistema al confirmarse el pago. El <strong>certificado</strong> no: lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, así que sale de aquí, revisado, y nunca solo.</p>
 </div>
+
+<div class="mod" data-mod="conta" hidden>
+<h2 id="sec-egresos" class="h-sec" style="margin:8px 0 6px;font-size:26px">Egresos</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Cada peso que sale, con su papel y su clasificación.
+<strong>Esto no es el libro oficial</strong> — los libros, la declaración y la exógena son de tu contador y llevan
+responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde vive el soporte.</p>
+
+<div id="eg-resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:18px"></div>
+
+<details id="eg-nuevo" style="margin-bottom:22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px">
+  <summary style="cursor:pointer;font-weight:700;font-size:14px">Registrar un egreso</summary>
+  <div class="eg-form">
+    <label for="eg-prov">Proveedor</label>
+    <div class="eg-par">
+      <select id="eg-prov"><option value="">Cargando…</option></select>
+      <button type="button" class="tab" id="eg-prov-nuevo">Nuevo proveedor</button>
+    </div>
+
+    <div id="eg-prov-caja" hidden style="border-left:2px solid var(--g);padding:10px 0 10px 14px;margin:10px 0">
+      <label for="eg-pn">Nombre o razón social</label>
+      <input id="eg-pn" autocomplete="off">
+      <div class="eg-par">
+        <select id="eg-pt"><option value="NIT">NIT</option><option value="CC">Cédula</option><option value="CE">C. extranjería</option><option value="NINGUNO">Sin documento</option></select>
+        <input id="eg-pd" placeholder="Número de documento" autocomplete="off">
+      </div>
+      <label class="eg-check"><input type="checkbox" id="eg-pf" checked> Está obligado a facturar</label>
+      <p class="mu" style="font-size:12.5px;margin:4px 0 10px">Si no lo está —la tienda de la vereda—, desmárcalo:
+      es lo que dice que ese egreso necesita <strong>documento soporte</strong> y no una factura suya.</p>
+      <button type="button" class="btn" id="eg-pg">Guardar proveedor</button>
+      <p class="msg" id="eg-pmsg"></p>
+    </div>
+
+    <div class="eg-par">
+      <div><label for="eg-fecha">Fecha</label><input id="eg-fecha" type="date"></div>
+      <div><label for="eg-medio">Medio de pago</label><select id="eg-medio">
+        <option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option>
+        <option value="tarjeta">Tarjeta</option><option value="otro">Otro</option></select></div>
+    </div>
+
+    <label for="eg-concepto">Qué se compró</label>
+    <input id="eg-concepto" autocomplete="off" placeholder="Cemento y arena para la brigada">
+
+    <div class="eg-par">
+      <div><label for="eg-base">Base</label><input id="eg-base" inputmode="numeric" placeholder="500000"></div>
+      <div><label for="eg-iva">IVA</label><input id="eg-iva" inputmode="numeric" placeholder="95000"></div>
+    </div>
+    <p class="mu" style="font-size:12.5px;margin:0 0 10px">En pesos, sin centavos. El IVA se guarda para poder
+    informarlo: la fundación <strong>no es responsable de IVA</strong>, así que es mayor valor del costo y no se descuenta.</p>
+
+    <div class="eg-par">
+      <div><label for="eg-cret">Concepto de retención</label><select id="eg-cret">
+        <option value="no_aplica">No aplica</option><option value="compras">Compras</option>
+        <option value="servicios">Servicios</option><option value="honorarios">Honorarios</option>
+        <option value="arrendamientos">Arrendamientos</option><option value="transporte">Transporte</option></select></div>
+      <div><label for="eg-rf">Retefuente practicada</label><input id="eg-rf" inputmode="numeric" placeholder="0"></div>
+    </div>
+    <p class="mu" style="font-size:12.5px;margin:0 0 10px">Lo que retuviste <strong>de verdad</strong>, no lo que
+    debería ser. Las tarifas y las bases mínimas en UVT cambian cada año y las confirma tu contador; aquí se guarda
+    lo aplicado. El concepto sí hace falta siempre: de él salen la exógena y el certificado anual del proveedor.</p>
+
+    <div id="eg-cuentas" class="eg-cuentas"></div>
+
+    <label for="eg-soporte">El papel</label>
+    <select id="eg-soporte">
+      <option value="factura_electronica">Factura electrónica</option>
+      <option value="factura_manual">Factura en papel</option>
+      <option value="documento_soporte">Documento soporte (a no obligado a facturar)</option>
+      <option value="sin_soporte">Sin soporte todavía</option>
+    </select>
+    <div class="eg-par" id="eg-papel">
+      <input id="eg-snum" placeholder="Número del documento" autocomplete="off">
+      <input id="eg-cufe" placeholder="CUFE (si es electrónica)" autocomplete="off">
+    </div>
+
+    <div class="eg-par">
+      <div><label for="eg-centro">Centro de costo</label><input id="eg-centro" autocomplete="off" placeholder="ndf, brigada-chocó, estructura"></div>
+      <div><label for="eg-entrega">Acta que pagó (opcional)</label><input id="eg-entrega" autocomplete="off" placeholder="AE-2026-000001"></div>
+    </div>
+
+    <label class="eg-check"><input type="checkbox" id="eg-mer" checked> Es egreso de la actividad meritoria</label>
+    <p class="mu" style="font-size:12.5px;margin:4px 0 12px">De esto cuelga el Régimen Tributario Especial. Se pregunta
+    ahora y no al cerrar el año, que es cuando ya no se acuerda nadie.</p>
+
+    <label for="eg-nota">Nota interna (opcional)</label>
+    <input id="eg-nota" autocomplete="off">
+
+    <p><button type="button" class="btn" id="eg-guardar" style="margin-top:12px">Registrar egreso</button></p>
+    <p class="msg" id="eg-msg"></p>
+  </div>
+</details>
+
+<div class="med-tw"><table class="med-tbl" id="eg-tabla">
+<thead><tr>
+<th scope="col">Número</th><th scope="col">Fecha</th><th scope="col">Proveedor</th>
+<th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Retenido</th>
+<th scope="col">Papel</th><th scope="col">Centro</th><th scope="col">Acta</th>
+</tr></thead><tbody id="eg-filas"><tr><td colspan="9" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
+</table></div>
+
+<h2 id="sec-proveedores" class="h-sec" style="margin:48px 0 6px;font-size:26px">Proveedores</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">A quién se le paga. Van aparte porque un proveedor
+se repite y sus datos se corrigen — y porque el <strong>certificado anual de retención</strong> se expide por proveedor,
+no por factura.</p>
+<div class="med-tw"><table class="med-tbl" id="pr-tabla">
+<thead><tr>
+<th scope="col">Nombre</th><th scope="col">Documento</th><th scope="col">Factura</th>
+<th scope="col">Egresos</th><th scope="col">Total pagado</th>
+</tr></thead><tbody id="pr-filas"><tr><td colspan="5" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
+</table></div>
+</div>
+
 </div></section></main>
 <script src="/admin/app.js"></script>
 </body></html>`;
@@ -15475,7 +15820,6 @@ pintarCampos();
    o descartar una, así que en una carga limpia se quedaba en «Cargando…» para
    siempre. Estuvo tapado mientras el archivo entero no compilaba. */
 
-abrirDesdeURL();
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
   .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
   .catch(function(){});
@@ -15495,6 +15839,186 @@ fetch("/api/admin/quien").then(function(r){ return r.json(); })
    Y engancha con la portada: cuando tocas «Ir» y saltas a una seccion, el salto
    es instantaneo y no arrastra por las de en medio, asi que se pide esa y nada
    mas. */
+/* ---- CONTABILIDAD ----
+   Los pesos se escriben en pesos y se guardan en centavos, como todo el dinero
+   de esta base. La conversion es en un solo sitio para que no haya dos. */
+/* El panel no tenia un lector de campos porque hasta ahora no tenia formularios:
+   solo botones sobre filas ya pintadas. */
+function val(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; }
+
+function aCentavos(v){
+  var n = String(v == null ? "" : v).replace(/[^0-9]/g, "");
+  return n ? parseInt(n, 10) * 100 : 0;
+}
+function deCentavos(c){
+  return "$" + String(Math.round((c || 0) / 100)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
+}
+
+/* Las cuentas se enseñan MIENTRAS se escribe, y no al guardar. El servidor
+   rechaza una fila donde el total no cuadre con lo retenido —esa comprobacion
+   no se puede quitar de ahi— pero descubrirlo al pulsar el boton, con el
+   formulario entero lleno, es exactamente el fallo que esta pantalla ya conocia
+   en el triaje. */
+function egCuentas(){
+  var base = aCentavos(val("eg-base")), iva = aCentavos(val("eg-iva"));
+  var rf = aCentavos(val("eg-rf"));
+  var total = base + iva, neto = total - rf;
+  var c = document.getElementById("eg-cuentas"); if (!c) return;
+  c.innerHTML = total
+    ? "<span><b>" + esc(deCentavos(total)) + "</b> total</span>"
+      + (rf ? "<span>menos <b>" + esc(deCentavos(rf)) + "</b> retenido</span>" : "")
+      + "<span>sale de la cuenta <b>" + esc(deCentavos(neto)) + "</b></span>"
+    : "";
+}
+
+function cargarProveedores(){
+  fetch("/api/admin/proveedores").then(conEstado).then(function(res){
+    if (res.http !== 200) throw 0;
+    var d = res.d;
+    var l = d.proveedores || [];
+    var sel = document.getElementById("eg-prov");
+    if (sel){
+      sel.innerHTML = '<option value="">Elige un proveedor…</option>'
+        + l.map(function(p){
+            return '<option value="' + esc(String(p.id)) + '">' + esc(p.nombre)
+              + (p.documento ? " · " + esc(p.tipo_doc) + " " + esc(p.documento) : " · sin documento")
+              + "</option>";
+          }).join("");
+    }
+    var tb = document.getElementById("pr-filas"); if (!tb) return;
+    tb.innerHTML = l.length
+      ? l.map(function(p){
+          return "<tr><td>" + esc(p.nombre) + "</td>"
+            + "<td>" + (p.documento ? esc(p.tipo_doc) + " " + esc(p.documento) + (p.dv ? "-" + esc(p.dv) : "") : '<span class="mu">sin documento</span>') + "</td>"
+            + "<td>" + (p.factura ? "sí" : '<b>no</b> · necesita documento soporte') + "</td>"
+            + "<td>" + esc(String(p.egresos)) + "</td>"
+            + "<td>" + esc(deCentavos(p.total_centavos)) + "</td></tr>";
+        }).join("")
+      : '<tr><td colspan="5" class="mu">Todavía no hay proveedores.</td></tr>';
+  }).catch(function(){
+    var tb = document.getElementById("pr-filas");
+    if (tb) tb.innerHTML = '<tr><td colspan="5" class="mu">No se pudieron cargar.</td></tr>';
+  });
+}
+
+var SOPORTE_ES = {
+  factura_electronica: "Factura electrónica",
+  factura_manual: "Factura en papel",
+  documento_soporte: "Documento soporte",
+  sin_soporte: "sin papel"
+};
+
+function cargarEgresos(){
+  fetch("/api/admin/egresos").then(conEstado).then(function(res){
+    if (res.http !== 200) throw 0;
+    var d = res.d;
+    var r = document.getElementById("eg-resumen");
+    if (r){
+      r.innerHTML = pasoEmbudo("egresos", d.total, "registrados")
+        + pasoEmbudo("salido", deCentavos(d.suma_centavos), "suma de lo vigente")
+        + pasoEmbudo("retenido", deCentavos(d.retenido_centavos), "pendiente de declarar")
+        + pasoEmbudo("meritoria", deCentavos(d.meritoria_centavos), "lo que sostiene el RTE")
+        + (d.sin_papel ? pasoEmbudo("sin papel", d.sin_papel, "les falta soporte") : "");
+    }
+    var tb = document.getElementById("eg-filas"); if (!tb) return;
+    var l = d.egresos || [];
+    tb.innerHTML = l.length
+      ? l.map(function(e){
+          var ret = (e.retefuente_centavos || 0) + (e.reteica_centavos || 0);
+          return '<tr' + (e.anulado_en ? ' style="opacity:.5"' : "") + "><td>" + esc(e.numero) + "</td>"
+            + "<td>" + esc(e.fecha) + "</td>"
+            + "<td>" + esc(e.proveedor || "?") + "</td>"
+            + "<td>" + esc(e.concepto) + (e.meritoria ? "" : ' <b class="mu">no meritoria</b>') + "</td>"
+            + "<td>" + esc(deCentavos(e.total_centavos)) + "</td>"
+            + "<td>" + (ret ? esc(deCentavos(ret)) + ' <small class="mu">' + esc(e.concepto_ret || "") + "</small>" : '<span class="mu">—</span>') + "</td>"
+            + "<td>" + (e.soporte === "sin_soporte"
+                ? '<b style="color:#A84D00">sin papel</b>'
+                : esc(SOPORTE_ES[e.soporte] || e.soporte) + (e.soporte_numero ? " " + esc(e.soporte_numero) : "")) + "</td>"
+            + "<td>" + esc(e.centro || "—") + "</td>"
+            + "<td>" + (e.entrega ? esc(e.entrega) : '<span class="mu">—</span>') + "</td></tr>";
+        }).join("")
+      : '<tr><td colspan="9" class="mu">Todavía no hay egresos registrados.</td></tr>';
+  }).catch(function(){
+    var tb = document.getElementById("eg-filas");
+    if (tb) tb.innerHTML = '<tr><td colspan="9" class="mu">No se pudieron cargar.</td></tr>';
+  });
+}
+
+function egMsg(id, txt, bien){
+  var m = document.getElementById(id); if (!m) return;
+  m.textContent = txt;
+  m.style.color = bien ? "#1F5C38" : "#8C2F1E";
+}
+
+document.addEventListener("input", function(ev){
+  if (["eg-base", "eg-iva", "eg-rf"].indexOf(ev.target.id) >= 0) egCuentas();
+});
+
+document.addEventListener("click", function(ev){
+  if (ev.target.id === "eg-prov-nuevo"){
+    var caja = document.getElementById("eg-prov-caja");
+    caja.hidden = !caja.hidden;
+    if (!caja.hidden) document.getElementById("eg-pn").focus();
+    return;
+  }
+  if (ev.target.id === "eg-pg"){
+    var b = ev.target; b.disabled = true;
+    egMsg("eg-pmsg", "Guardando…", true);
+    fetch("/api/admin/proveedores", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        nombre: val("eg-pn"), tipo_doc: val("eg-pt"), documento: val("eg-pd"),
+        factura: document.getElementById("eg-pf").checked
+      })
+    }).then(conEstado)
+      .then(function(res){
+        b.disabled = false;
+        if (res.http !== 200){ egMsg("eg-pmsg", (res.d && (res.d.ayuda || res.d.error)) || "No se pudo.", false); return; }
+        egMsg("eg-pmsg", "Guardado.", true);
+        document.getElementById("eg-prov-caja").hidden = true;
+        document.getElementById("eg-pn").value = "";
+        document.getElementById("eg-pd").value = "";
+        /* Se recarga la lista y se deja elegido el que acaba de crear: si no,
+           hay que buscarlo a mano en un desplegable que acaba de cambiar. */
+        cargarProveedores();
+        setTimeout(function(){
+          var sel = document.getElementById("eg-prov");
+          if (sel && res.d && res.d.id) sel.value = String(res.d.id);
+        }, 400);
+      }).catch(function(){ b.disabled = false; egMsg("eg-pmsg", "No se pudo. Revisa la conexión.", false); });
+    return;
+  }
+  if (ev.target.id === "eg-guardar"){
+    var g = ev.target; g.disabled = true;
+    egMsg("eg-msg", "Guardando…", true);
+    var base = aCentavos(val("eg-base")), iva = aCentavos(val("eg-iva"));
+    var rf = aCentavos(val("eg-rf"));
+    fetch("/api/admin/egresos", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        proveedor_id: Number(val("eg-prov")), fecha: val("eg-fecha"), concepto: val("eg-concepto"),
+        base_centavos: base, iva_centavos: iva, total_centavos: base + iva,
+        retefuente_centavos: rf, reteica_centavos: 0, neto_centavos: base + iva - rf,
+        concepto_ret: val("eg-cret"), soporte: val("eg-soporte"),
+        soporte_numero: val("eg-snum"), soporte_cufe: val("eg-cufe"),
+        meritoria: document.getElementById("eg-mer").checked,
+        centro: val("eg-centro"), entrega: val("eg-entrega") || null,
+        medio_pago: val("eg-medio"), nota: val("eg-nota")
+      })
+    }).then(conEstado)
+      .then(function(res){
+        g.disabled = false;
+        if (res.http !== 200){ egMsg("eg-msg", (res.d && (res.d.ayuda || res.d.error)) || "No se pudo.", false); return; }
+        egMsg("eg-msg", "Registrado como " + res.d.numero + ".", true);
+        ["eg-concepto", "eg-base", "eg-iva", "eg-rf", "eg-snum", "eg-cufe", "eg-entrega", "eg-nota"]
+          .forEach(function(id){ var e = document.getElementById(id); if (e) e.value = ""; });
+        egCuentas();
+        cargarEgresos();
+        cargarProveedores();
+      }).catch(function(){ g.disabled = false; egMsg("eg-msg", "No se pudo. Revisa la conexión.", false); });
+  }
+});
+
 var BANDEJAS = {
   "filas": cargarAportes,
   "t-filas": cargarReportadas,
@@ -15506,7 +16030,9 @@ var BANDEJAS = {
   "sus-filas": cargarSuscripciones,
   "ipn-filas": cargarIpn,
   "pps-filas": cargarPaypalSueltos,
-  "e-filas": cargarEntregas
+  "e-filas": cargarEntregas,
+  "eg-filas": cargarEgresos,
+  "pr-filas": cargarProveedores
 };
 
 /* «pedir» sale de «armarBandejas» para que tambien pueda llamarlo el cambio de
@@ -15583,6 +16109,12 @@ function armarBandejas(){
 var ARRANQUE = [cargarSalud, cargarResumen];
 ARRANQUE.forEach(function(f){ f(); });
 armarBandejas();
+/* VA DESPUES DE «armarBandejas», y no al principio. «BANDEJAS» y «PEDIDAS» se
+   declaran con «var» mas abajo en el archivo: estan izadas pero valen undefined
+   hasta que la ejecucion llega a su linea, asi que abrir el modulo antes hacia
+   que «pedir» reventara leyendo una propiedad de undefined — y el panel se
+   quedaba con las tablas en su texto de espera, sin que nada avisara. */
+abrirDesdeURL();
 `;
 }
 
@@ -16481,6 +17013,10 @@ export default {
         const afa = ruta.match(/^\/api\/admin\/ficha-archivo\/(.+)$/);
         if (afa)                                return await adminFichaArchivo(env, decodeURIComponent(afa[1]));
         if (ruta === "/api/admin/ofrecimientos") return await adminOfrecimientos(env);
+        /* Egresos y proveedores: la misma ruta lee y escribe, distinguido por el
+           método, como ya hacen otras del panel. */
+        if (ruta === "/api/admin/egresos")      return await adminEgresos(request, env, url, sesion.email);
+        if (ruta === "/api/admin/proveedores")  return await adminProveedores(request, env);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env, url);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
         if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
