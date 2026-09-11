@@ -3326,6 +3326,10 @@ function paginaTriage() {
         display:flex;gap:14px;align-items:center;flex-wrap:wrap}
   .fila b{font-family:ui-monospace,Menlo,monospace;font-size:14px}
   .fila .meta{color:var(--mu);font-size:13px;flex:1;min-width:200px}
+  /* El foco a #ficha lo pone el código, nunca el Tab: el anillo del navegador
+     alrededor de toda la caja no señalaría nada que el usuario pueda accionar.
+     Los botones de dentro conservan el suyo. */
+  #ficha:focus{outline:none}
   .btn{background:var(--g);color:#fff;border:0;border-radius:999px;padding:9px 18px;font-size:14px;
        font-weight:600;cursor:pointer}
   .btn.o{background:transparent;color:var(--g);border:1px solid var(--g)}
@@ -3376,7 +3380,9 @@ function paginaTriage() {
     <button class="tab" data-cola="clasificados">Ya clasificados</button>
   </div>
   <div id="lista"><p class="cargando">Cargando casos...</p></div>
-  <div id="ficha"></div>
+  <!-- tabindex=-1 para poder llevarle el foco al abrir un caso y al guardarlo.
+       No entra en el orden de tabulación: solo se enfoca por código. -->
+  <div id="ficha" tabindex="-1"></div>
 
   <!-- QUÉ PASÓ CON LO QUE FIRMÓ. Va DESPUÉS de la cola y no antes: lo primero es
        lo que falta por hacer; esto es la consecuencia de lo ya hecho, y mirarlo
@@ -3624,6 +3630,24 @@ function cargarCola(){
   }).catch(function(e){ pintarFallo("lista", e); });
 }
 
+/* EL FOCO VA DONDE VA LA VISTA. La ficha ya hacia scrollIntoView, asi que quien
+   usa el raton la ve aparecer; quien usa el teclado se quedaba con el foco en el
+   boton «Abrir», que esta ARRIBA de la ficha y con hasta 200 casos en medio.
+   Medido en la bandeja real: abrir el PRIMER caso dejaba el formulario a 400
+   pulsaciones de Tab, y el caso 25 a 352. Al guardar era peor todavia: el boton
+   de enviar se destruye junto con el formulario y el foco caia al body, o sea a
+   la parada 1 de 406.
+
+   Llevar el foco al contenedor resuelve las dos cosas a la vez: el teclado
+   continua desde ahi, y el lector de pantalla lee lo que acaba de aparecer —que
+   es justo lo que no se anunciaba, porque esta pantalla no tiene aria-live. */
+function pintarFicha(html){
+  var f = el("ficha");
+  f.innerHTML = html;
+  f.focus();
+  return f;
+}
+
 function abrir(numero){
   el("ficha").innerHTML = "<p class='cargando'>Abriendo " + esc(numero) + "...</p>";
   pedirJSON("/api/triage/caso/" + encodeURIComponent(numero)).then(function(d){
@@ -3631,8 +3655,8 @@ function abrir(numero){
        —lo movió el equipo, o se cerró mientras la lista estaba en pantalla—. Un
        botón que no responde se lee como que la pantalla está rota. */
     if (!d.caso){
-      el("ficha").innerHTML = "<p class='cargando'>Ese caso ya no está disponible. "
-        + "Recarga la lista: puede que el equipo lo haya movido.</p>";
+      pintarFicha("<p class='cargando'>Ese caso ya no está disponible. "
+        + "Recarga la lista: puede que el equipo lo haya movido.</p>");
       return;
     }
     CASO = d.caso.numero;
@@ -3673,8 +3697,7 @@ function abrir(numero){
       h += "<p class='cargando' style='margin-top:14px'>Este caso está <b>" + esc(c.estado)
         +  "</b>, así que ya no se evalúa. Si hay que retomarlo, el equipo lo reabre "
         +  "desde el panel y vuelve a aparecer en la cola.</p></div>";
-      el("ficha").innerHTML = h;
-      el("ficha").scrollIntoView({ block: "start" });
+      pintarFicha(h).scrollIntoView({ block: "start" });
       return;
     }
     h += "<label>Tu clasificación</label><select id='t-clas'>"
@@ -3700,8 +3723,7 @@ function abrir(numero){
       +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
       +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluación</button></p>"
       +  "<p class='msg' id='t-msg'></p></div>";
-    el("ficha").innerHTML = h;
-    el("ficha").scrollIntoView({ block: "start" });
+    pintarFicha(h).scrollIntoView({ block: "start" });
   }).catch(function(e){ pintarFallo("ficha", e); });
 }
 
@@ -3754,8 +3776,8 @@ function enviar(){
          con el numero del caso, y ese si se queda en pantalla. */
       CASO = null;
       ENVIANDO = false;
-      el("ficha").innerHTML = "<div class='ficha'><p class='msg' style='color:#1F5C38;margin:0'>"
-        + "<b>Guardado.</b> Tu concepto de " + esc(numero) + " quedó firmado. Gracias.</p></div>";
+      pintarFicha("<div class='ficha'><p class='msg' style='color:#1F5C38;margin:0'>"
+        + "<b>Guardado.</b> Tu concepto de " + esc(numero) + " quedó firmado. Gracias.</p></div>");
       cargarCola();
       /* Y su propia lista se refresca: es la pantalla que le dice que paso con lo
          que firmo, y se quedaba con la foto del arranque hasta recargar. */
@@ -10911,8 +10933,18 @@ function enviarDatos(final){
           var caja = document.querySelector('[data-campo="' + num + '"]');
           if (caja) caja.classList.add("mal");
         });
+        /* EL FOCO VA CON LA VISTA, aqui tambien. El scroll llevaba los ojos al
+           primer campo que falta, pero el foco se quedaba en «Enviar», al final
+           de la pagina. Medido enviando el cuestionario vacio: 16 obligatorias
+           sin responder, la pagina saltaba al error de la parada 0 y el cursor
+           seguia en la parada 40 de 41. Quien usa teclado tenia que retroceder
+           la pagina entera hasta el error que le acabamos de senalar. */
         var primera = document.querySelector(".campo.mal");
-        if (primera) primera.scrollIntoView({ block: "center" });
+        if (primera){
+          primera.scrollIntoView({ block: "center" });
+          var dentro = primera.querySelector("input, textarea, select");
+          if (dentro) dentro.focus({ preventScroll: true });
+        }
         di("Faltan " + faltan.length + " respuesta(s) obligatoria(s): " + faltan.join(", "), true);
         return res;
       }
