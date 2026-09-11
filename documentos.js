@@ -37,12 +37,23 @@ export const ENTIDAD = {
   banco: "Bancolombia",
   cuenta: "cuenta de ahorros No. 31000009221",
   sitio: "thegiveandgrowproject.org",
-  repLegal: { nombre: "Juan Sebastián Navarro Osorio", cargo: "Representante Legal", cc: "1.007.420.930" },
-  /* T.P. verificada contra el texto publicado en #transparencia. La C.C. de la
-     Revisora Fiscal acompaña a la T.P. porque el art. 3 de la Ley 43 de 1990
-     obliga a consignar el número de tarjeta profesional, y quien recibe el
-     documento debe poder verificar a la persona detrás de esa tarjeta. */
-  revisora: { nombre: "Manuela Londoño Arboleda", cargo: "Revisora Fiscal", tp: "244894-T", cc: "1.040.745.501" }
+  repLegal: { nombre: "Juan Sebastián Navarro Osorio", cargo: "Representante Legal" },
+  /* SIN CÉDULAS, y la ausencia es deliberada.
+
+     Las dos estuvieron aquí, y este archivo vive en un repositorio PÚBLICO: la
+     del Representante Legal es suya y la decide él, pero la de la Revisora
+     Fiscal es dato personal de un tercero, indexable y permanente. El
+     comentario que las justificaba citaba el art. 3 de la Ley 43 de 1990, y ese
+     artículo obliga a consignar la TARJETA PROFESIONAL, no la cédula.
+
+     Quien recibe el certificado sigue pudiendo verificar a la persona detrás de
+     la firma, que era el objetivo: el nombre y la T.P. van impresos, y con la
+     T.P. se consulta el registro de la Junta Central de Contadores. El sitio ya
+     publica las dos en #transparencia por esa misma razón.
+
+     Si alguien vuelve a añadir `cc` aquí, no se imprimirá: la línea que lo
+     dibujaba también se quitó, a propósito. */
+  revisora: { nombre: "Manuela Londoño Arboleda", cargo: "Revisora Fiscal", tp: "244894-T" }
 };
 
 /* --- paleta: los mismos tokens del sitio, en el espacio de color del PDF --- */
@@ -1472,7 +1483,6 @@ function firmas(h, f) {
     h.p.drawText(winansi(col.p.nombre), { x: col.x, y, size: 10, font: f.negrita, color: TINTA });
     y -= 13;
     h.p.drawText(winansi(col.p.cargo), { x: col.x, y, size: 9, font: f.normal, color: GRIS });
-    if (col.p.cc) { y -= 12; h.p.drawText(winansi("C.C. " + col.p.cc), { x: col.x, y, size: 9, font: f.normal, color: GRIS }); }
     if (col.extra) { y -= 12; h.p.drawText(winansi(col.extra), { x: col.x, y, size: 9, font: f.normal, color: GRIS }); }
   }
   h.y = yLinea - 62;
