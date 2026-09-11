@@ -52,6 +52,16 @@ jobs:
           echo "Tamaño del bundle:"
           du -sh /tmp/gg-bundle
 
+      # pdf-lib dibuja en coordenadas absolutas y no tiene flujo: si el texto no
+      # cabe, se sale de la hoja EN SILENCIO. No lanza, no recorta, no avisa —
+      # el trozo que queda fuera no existe para quien abre el documento. Una
+      # dedicatoria con una URL pegada salía del recibo sin su final, y el
+      # concepto técnico perdía renglones del criterio del ingeniero. Este paso
+      # arma los cuatro documentos con datos adversarios y mira dónde cae cada
+      # trazo. Va después de `npm ci` porque necesita pdf-lib de verdad.
+      - name: Nada se sale del papel en los PDF
+        run: node ops/desborde.mjs
+
       - name: Cache-bust coherente (md5 de assets vs index.html)
         run: |
           CSS_REAL=$(md5sum styles.css | cut -c1-8)
