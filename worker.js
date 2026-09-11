@@ -3459,6 +3459,27 @@ function paginaTriage() {
 function triageJS() {
   return `
 var CASO = null;
+/* LA HORA DE COLOMBIA, igual que en el panel. D1 escribe datetime('now') en
+   UTC y esta pantalla imprimia ese sello tal cual: el ingeniero leia 13:29
+   cuando habia firmado a las 08:29. Peor cerca de la medianoche, donde cambia
+   la FECHA: un caso de las 20:40 del 10 se muestra como el 11 a la 01:40.
+
+   Es la misma familia que ya se arreglo dos veces en este repositorio —el hilo
+   del caso en el PR #325, y las dieciseis filas del panel con esta misma
+   funcion—. Lo que faltaba era esta plantilla, que es la de los ingenieros
+   voluntarios y la de terreno.
+
+   OJO, la misma advertencia que lleva la copia del panel: «fecha_visita»,
+   «desde» y «hasta» NO pasan por aqui. Las escribe una persona y ya estan en su
+   hora; restarles cinco seria meter el fallo, no quitarlo. */
+function enCO(v, n){
+  if (!v) return "";
+  var t = String(v).trim().replace(" ", "T");
+  if (!/[Zz]$|[+-]\\d\\d:?\\d\\d$/.test(t)) t += "Z";
+  var d = new Date(t);
+  if (isNaN(d)) return String(v).slice(0, n || 16);
+  return new Date(d.getTime() - 5*3600*1000).toISOString().replace("T", " ").slice(0, n || 16);
+}
 function esc(s){
   /* ESCAPA TAMBIÉN LAS COMILLAS, y esa es la corrección.
      Antes usaba textContent -> innerHTML, que escapa & < > y NADA MÁS. Basta
@@ -3613,7 +3634,7 @@ function cargarMisEvaluaciones(){
            —están en el desplegable del formulario y en el diccionario de la
            familia—. Tres copias en desacuerdo es el fallo que este proyecto ya
            conoce, y el ingeniero ya lee esos valores en esta misma pantalla. */
-        +  esc(v.clasificacion) + " &middot; " + esc(v.creado_en)
+        +  esc(v.clasificacion) + " &middot; " + esc(enCO(v.creado_en))
         +  "<br>" + suerte + " &middot; hoy está <b>" + esc(v.caso_estado) + "</b></span></div>";
     }
     c.innerHTML = h;
@@ -5221,6 +5242,27 @@ function idNuevo(){
 
 function el(id){ return document.getElementById(id); }
 function val(id){ var e = el(id); return e ? e.value.trim() : ""; }
+/* LA HORA DE COLOMBIA, igual que en el panel. D1 escribe datetime('now') en
+   UTC y esta pantalla imprimia ese sello tal cual: el ingeniero leia 13:29
+   cuando habia firmado a las 08:29. Peor cerca de la medianoche, donde cambia
+   la FECHA: un caso de las 20:40 del 10 se muestra como el 11 a la 01:40.
+
+   Es la misma familia que ya se arreglo dos veces en este repositorio —el hilo
+   del caso en el PR #325, y las dieciseis filas del panel con esta misma
+   funcion—. Lo que faltaba era esta plantilla, que es la de los ingenieros
+   voluntarios y la de terreno.
+
+   OJO, la misma advertencia que lleva la copia del panel: «fecha_visita»,
+   «desde» y «hasta» NO pasan por aqui. Las escribe una persona y ya estan en su
+   hora; restarles cinco seria meter el fallo, no quitarlo. */
+function enCO(v, n){
+  if (!v) return "";
+  var t = String(v).trim().replace(" ", "T");
+  if (!/[Zz]$|[+-]\\d\\d:?\\d\\d$/.test(t)) t += "Z";
+  var d = new Date(t);
+  if (isNaN(d)) return String(v).slice(0, n || 16);
+  return new Date(d.getTime() - 5*3600*1000).toISOString().replace("T", " ").slice(0, n || 16);
+}
 function esc(t){ var d=document.createElement("div"); d.textContent=t==null?"":String(t); return d.innerHTML.replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 
 /* EL MEDIDOR. «de» y «hasta» son bytes cuando se conocen —una foto— y pasos
@@ -5284,7 +5326,7 @@ function cargarMias(){
             + "<br>" + esc(v.familia || "sin nombre de familia")
             + (v.finca ? " · " + esc(v.finca) : "")
             + "<br><small>" + esc(v.municipio || "-") + " · visita " + esc(v.fecha_visita || "-")
-            + " · recibida " + esc(v.recibido_en || "-") + "</small>"
+            + " · recibida " + esc(enCO(v.recibido_en) || "-") + "</small>"
             + "<br><small>" + (m.RE || 0) + " RE · " + (m.OBS || 0) + " Obs · " + (m.SO || 0) + " S/O · "
             + (v.fotos || 0) + (v.fotos === 1 ? " foto" : " fotos") + " · "
             + (v.tiene_pdf
@@ -6027,7 +6069,7 @@ function cargarBorradores(){
             + (b.finca ? " · " + esc(b.finca) : "")
             + "<br><small>" + esc(b.municipio || "-")
             + (b.direccion ? " · " + esc(b.direccion) : "")
-            + " · " + esc(String(b.creado_en || "-").slice(0,16)) + "</small>"
+            + " · " + esc(enCO(b.creado_en) || "-") + "</small>"
             + "<br><small>" + n + (n === 1 ? " ítem marcado" : " ítems marcados")
             + " · " + nf + (nf === 1 ? " foto" : " fotos")
             + " · tu firma: " + (b.firma_obs ? "sí" : "NO")
