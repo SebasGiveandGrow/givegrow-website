@@ -1485,6 +1485,7 @@
   "mc.lead": "Here you can see where your case stands and add photos if any are needed.",
   "mc.cargando": "Looking for your case…",
   "mc.err": "That link does not open any case. Check that you copied it in full, all the way to the end.",
+  "mc.err.red": "We could not load your case right now. It may be the signal: try again in a moment. Your case and your photos are still saved.",
   "mc.fotos": "Photos you sent",
   "mc.sin.t": "No engineer has reviewed it yet",
   "mc.sin.p": "Cases are reviewed by severity first and waiting time second. Once a volunteer engineer looks at yours, the answer appears on this same page.",
