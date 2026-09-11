@@ -68,6 +68,18 @@ function esc(s) {
   }[c]));
 }
 
+/* `request.json()` y `JSON.parse` aceptan el literal `null` sin protestar: es
+   JSON perfectamente válido que no es un objeto. La línea siguiente lee una
+   propiedad —`c.web2`, `c.tipo`, `cuerpo.messages`— y revienta.
+
+   Reventar no era lo grave. Lo grave es que /api/alma y los dos de PayPal viven
+   FUERA del try/catch que envuelve el resto de /api/, así que la excepción se
+   salía del Worker entero y Cloudflare respondía con su propia página 1101: un
+   HTML donde el sitio espera JSON, y sin una sola línea en el log que dijera por
+   qué. Un cuerpo mal formado es culpa de quien llama y se contesta 400; el 500
+   se reserva para cuando el roto es nuestro. */
+const esObjeto = (c) => !!c && typeof c === "object";
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -456,6 +468,7 @@ async function apiCheckout(request, env, url) {
   let cuerpo;
   try { cuerpo = await request.json(); }
   catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(cuerpo)) return json({ error: "json_invalido" }, 400);
 
   /* --- validación: nada se guarda antes de que los datos sean sanos ---
      El monto tiene que llegar como NÚMERO, no como cadena. Con Number() de por
@@ -1267,6 +1280,7 @@ async function apiInscripcion(request, env, url) {
 
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   /* Honeypot: si el campo trampa viene lleno es un bot. Se responde ok para no
      enseñarle qué lo delató, y no se guarda nada. */
@@ -2115,6 +2129,13 @@ async function adminConciliarWompi(request, env, guia, quien) {
 
   let c = {};
   try { c = await request.json(); } catch { /* se valida abajo */ }
+  /* El `let c = {}` decía «el cuerpo es opcional», pero solo cubría el JSON
+     roto: un cuerpo `null` parsea bien y PISA ese objeto vacío, así que la
+     línea siguiente leía una propiedad de null. Aquí y en los otros seis
+     sitios iguales, un cuerpo que no es objeto vuelve a ser el cuerpo ausente
+     —que es lo que la variable ya prometía— y la validación de abajo contesta
+     lo mismo que contestaría sin cuerpo. */
+  if (!esObjeto(c)) c = {};
   const txId = String(c.transaccion == null ? "" : c.transaccion).trim().slice(0, 120);
   if (!txId) {
     return json({ error: "transaccion_requerida",
@@ -2191,6 +2212,7 @@ async function adminMoverEstado(request, env, guia, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let cuerpo;
   try { cuerpo = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(cuerpo)) return json({ error: "json_invalido" }, 400);
 
   const nuevo = String(cuerpo.estado || "");
   if (!ESTADOS_MANUALES.includes(nuevo)) {
@@ -2559,6 +2581,7 @@ async function apiReportarTransferencia(request, env, url) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   /* Honeypot: éxito aparente y cero registro, igual que en los otros formularios. */
   if (c.web2) return json({ ok: true, guia: null });
@@ -2874,6 +2897,7 @@ async function apiCasoCrear(request, env) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   /* Honeypot, igual que en los otros formularios: éxito aparente, cero registro. */
   if (c.web2) return json({ ok: true, numero: null });
@@ -4207,6 +4231,7 @@ async function triageEvaluar(request, env, numero, email) {
      hace al final, junto al resto de la escritura. */
   let c = {};
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const caso = await env.DB.prepare(
     "SELECT numero, estado, contacto_email, token, sector FROM casos WHERE numero = ?"
@@ -4549,6 +4574,7 @@ async function triageInspeccionRecibir(request, env, email) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const localId = limpiar(c.local_id, 80);
   if (!localId) return json({ error: "local_id_requerido" }, 400);
@@ -7095,6 +7121,7 @@ async function adminMoverCaso(request, env, numero, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const nuevo = String(c.estado || "");
   const regla = CASO_DESTINOS[nuevo];
@@ -7176,6 +7203,7 @@ async function adminInspeccionAtendida(request, env, numero, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const v = await env.DB.prepare(
     "SELECT numero, atendida_en FROM inspecciones WHERE numero = ?"
@@ -7612,6 +7640,7 @@ async function apiPaypalSuscripcion(request, env, url) {
 
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   /* Honeypot, igual que los siete formularios del sitio: exito aparente y cero
      registro. No se le enseña al bot que lo delato. */
@@ -8005,6 +8034,7 @@ async function apiPaypalWebhook(request, env) {
   const crudo = await request.text();
   let ev;
   try { ev = JSON.parse(crudo); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(ev)) return json({ error: "json_invalido" }, 400);
   const eventoId = String(ev.id || "").trim();
   const tipo = String(ev.event_type || "").trim();
   if (!eventoId || !tipo) return json({ error: "evento_incompleto" }, 400);
@@ -8671,6 +8701,7 @@ async function apiAlma(request, env, url) {
   if (texto.length > ALMA_MAX_CUERPO) return json({ error: "cuerpo_demasiado_grande" }, 413);
   let cuerpo;
   try { cuerpo = JSON.parse(texto); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(cuerpo)) return json({ error: "json_invalido" }, 400);
 
   /* Del cliente se toman SOLO los mensajes. El modelo, el tope de tokens y el
      system son del servidor: es lo que impide que esto sea un proxy gratuito. */
@@ -9016,6 +9047,7 @@ async function adminCorregirCaso(request, env, numero, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const caso = await env.DB.prepare("SELECT * FROM casos WHERE numero = ?").bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
@@ -9095,6 +9127,7 @@ async function adminBorrarMedio(request, env, numero, id, quien) {
   if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
   let c = {};
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const motivo = limpiar(c.motivo, 300);
   if (!motivo) {
@@ -9164,6 +9197,7 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { /* opcional */ }
+  if (!esObjeto(c)) c = {};
 
   const a = await env.DB.prepare(
     "SELECT guia, estado, monto_centavos, modo, destino_id, frecuencia, idioma, token, donante_id " +
@@ -9477,6 +9511,7 @@ async function adminRevocarMiembro(request, env, codigo, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { /* opcional */ }
+  if (!esObjeto(c)) c = {};
   const motivo = limpiar(c.motivo, 280);
   if (!motivo) return json({ error: "motivo_requerido" }, 400);
   const quitar = c.revocar === false;
@@ -10491,6 +10526,7 @@ async function apiFicha(request, env, token) {
 
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
   const final = c.enviar === true;
   const v = fichaValida(c.datos || {}, final);
   if (final && !v.ok) return json({ error: "faltan_campos", campos: v.errores }, 400);
@@ -11164,6 +11200,7 @@ async function adminInspeccionesImportar(request, env) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   /* El correo lo escribe QUIEN CARGA, no el archivo. Es la atribución de un
      documento firmado —de quién responde por lo que dice— y un archivo que llegó
@@ -11507,6 +11544,7 @@ async function adminVerificarMatricula(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { /* cuerpo vacío = verificar */ }
+  if (!esObjeto(c)) c = {};
   const verificada = c.verificada !== false;
 
   const fila = await env.DB.prepare(
@@ -11704,6 +11742,7 @@ async function adminEntregaCaso(request, env, entrega, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const caso = String(c.caso || "").trim().toUpperCase();
   if (!/^CV-\d{4}-\d{6}$/.test(caso)) {
@@ -11770,6 +11809,7 @@ async function adminMoverInscripcion(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
   const nuevo = String(c.estado || "");
   if (!ESTADOS_INSCRIPCION.includes(nuevo)) {
     return json({
@@ -11880,6 +11920,7 @@ async function adminBorrarInscripcion(request, env, id, quien) {
   if (request.method !== "DELETE") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { /* el cuerpo es opcional en DELETE */ }
+  if (!esObjeto(c)) c = {};
   const motivo = limpiar(c && c.motivo, 300);
   if (!motivo) {
     return json({ error: "motivo_requerido",
@@ -12462,6 +12503,7 @@ async function adminAnularEntrega(request, env, numero, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { /* el motivo se valida abajo */ }
+  if (!esObjeto(c)) c = {};
 
   const motivo = String(c.motivo == null ? "" : c.motivo).trim().slice(0, 300);
   /* Sin motivo no se anula. Es la misma regla del certificado: lo que explica el
@@ -12496,6 +12538,7 @@ async function adminCrearEntrega(request, env, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const destino = limpiar(c.destino_id, 60);
   const sector  = limpiar(c.sector, 80);
@@ -12571,6 +12614,7 @@ async function adminPublicarEntrega(request, env, numero, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c = {};
   try { c = await request.json(); } catch { /* opcional */ }
+  if (!esObjeto(c)) c = {};
   const publicar = c.publicar !== false;
 
   const e = await env.DB.prepare(
@@ -15532,14 +15576,29 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const ruta = url.pathname;
-    const esPruebas = /\.workers\.dev$/i.test(url.hostname);
-    if (esPruebas) {
-      /* Se responde a través del marcador para no repetirlo en cada rama. */
-      return sinOlfato(marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
+    /* LA RED VA AQUÍ Y NO EN CADA RAMA. Había un try/catch que cubría
+       `/api/…` y otro que cubría el panel, pero SIETE rutas se resuelven antes
+       de llegar a ellos —`/api/trm`, las tres de PayPal, `/api/alma` y las dos
+       de Access— y quedaban al descubierto. Una excepción ahí se salía del
+       Worker y la contestaba Cloudflare con su página 1101: un HTML donde el
+       sitio espera JSON, y ni una línea en el log diciendo qué pasó.
+
+       Envolver el enrutador entero cubre también lo que se añada mañana, que es
+       justo lo que fallaba: la red no se olvidaba de una ruta, es que se ponía
+       ruta por ruta. */
+    try {
+      const esPruebas = /\.workers\.dev$/i.test(url.hostname);
+      if (esPruebas) {
+        /* Se responde a través del marcador para no repetirlo en cada rama. */
+        return sinOlfato(marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
+      }
+      /* Igual que arriba: se envuelve la respuesta entera en vez de tocar cada
+         rama. Fuera del subdominio devuelve exactamente lo que recibió. */
+      return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
+    } catch (e) {
+      console.error("sin_capturar", ruta, e && e.message);
+      return json({ error: "error_interno" }, 500);
     }
-    /* Igual que arriba: se envuelve la respuesta entera en vez de tocar cada
-       rama. Fuera del subdominio devuelve exactamente lo que recibió. */
-    return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
   },
 
   async ruteo(request, env, url, ruta) {
