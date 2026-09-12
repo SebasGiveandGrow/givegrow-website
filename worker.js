@@ -16257,7 +16257,16 @@ function aCentavos(v){
   }
   var ent = s.replace(/[^0-9]/g, "");
   if (!ent && !dec) return 0;
-  return (ent ? parseInt(ent, 10) : 0) * 100 + (dec ? parseInt(dec, 10) : 0);
+  var cent = (ent ? parseInt(ent, 10) : 0) * 100 + (dec ? parseInt(dec, 10) : 0);
+  /* Y SE REDONDEA AL PESO. Aqui no se transa en centavos, la exogena se informa
+     en pesos enteros, y la otra puerta de entrada —«leerFacturaXML»— ya venia
+     redondeando asi antes de escribir en el campo.
+     Guardar centavos sueltos rompe algo silencioso aguas abajo: el CSV del
+     contador imprime Math.round(centavos / 100) por columna, y con importes que
+     no son multiplos de cien una fila puede salir con base mas IVA distinto del
+     total. Toda fila que existe hoy es multiplo de cien, porque la version vieja
+     multiplicaba por cien siempre; se conserva esa propiedad. */
+  return Math.round(cent / 100) * 100;
 }
 function deCentavos(c){
   return "$" + String(Math.round((c || 0) / 100)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
