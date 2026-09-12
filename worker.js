@@ -1859,7 +1859,20 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(aprobada_en) AS masViejo FROM aportes a WHERE a.quiere_certificado = 1 " +
     "AND a." + PAGADA + " AND NOT EXISTS " +
     "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)",
-    "Lista de aportes · los firma la Revisora Fiscal, no el sistema", 70, "#sec-salud");
+    "Lista de aportes · los firma la Revisora Fiscal, no el sistema", 70, "#sec-aportes");
+  /* EMITIDO NO ES FIRMADO, y esta cola nació con la pantalla de firma: sin ella,
+     un certificado podía quedarse esperando una firma para siempre y nada lo
+     diría — ni a nosotros ni al donante, que lo está esperando. Es exactamente
+     la forma de fallo que este panel lleva corrigiendo todo el tiempo: una
+     bandeja que hay que acordarse de abrir no es una alarma.
+
+     Prioridad por delante de «por emitir»: ahí falta un acto nuestro; aquí ya se
+     emitió, el donante ya sabe que viene, y lo único que falta es que alguien
+     mire un papel que ya está escrito. */
+  await enCola("certificados_sin_firmar",
+    "SELECT COUNT(*) AS n, MIN(emitido_en) AS masViejo FROM certificados " +
+    "WHERE anulado_en IS NULL AND (firma_rl_en IS NULL OR firma_rf_en IS NULL)",
+    "Pantalla «Firma» · emitido no es firmado: sin las dos firmas no sale al donante", 68, "/firma");
   /* LAS TRES COLAS DE PAYPAL. El panel ya tiene las bandejas —membresias,
      donaciones del boton y eventos sin casa— pero `salud` es lo que DICE que
      algo necesita atencion, y no las miraba. Una bandeja que hay que acordarse
@@ -2311,6 +2324,135 @@ function destinacionDe(a) {
 
 function limpiar(v, n) { return String(v == null ? "" : v).trim().slice(0, n); }
 
+/* ========================================================================
+   LA FIRMA DEL CERTIFICADO
+   ========================================================================
+   Ver `migrations/0026_firma_certificados.sql` para el porqué. Aquí va lo que
+   el servidor hace cumplir.
+
+   LA HUELLA ES DE LO QUE SE FIRMA, no del PDF. El PDF se vuelve a dibujar cada
+   vez que alguien lo descarga —lleva la fecha de generación en el pie— así que
+   su hash cambiaría solo y no probaría nada. Lo que no cambia es el JSON
+   congelado al emitir, y eso es lo que se firma.
+   ======================================================================== */
+async function huellaDe(texto) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(texto)));
+  return Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+/* QUIÉN PUEDE FIRMAR CADA CASILLA. Una firma es una persona: el sistema tiene
+   que saber cuál. Se configuran con `wrangler secret put` y mientras no existan,
+   el flujo de firma está APAGADO y el certificado se emite y se manda como
+   siempre — un sistema vivo no puede quedarse sin poder emitir certificados
+   porque falte una variable. El panel lo dice cuando está así. */
+function quienFirma(env, email) {
+  const e = String(email || "").trim().toLowerCase();
+  const rl = String(env.FIRMA_RL_EMAIL || "").trim().toLowerCase();
+  const rf = String(env.FIRMA_RF_EMAIL || "").trim().toLowerCase();
+  if (rl && e === rl) return "rl";
+  if (rf && e === rf) return "rf";
+  return null;
+}
+function firmaConfigurada(env) {
+  return !!(String(env.FIRMA_RL_EMAIL || "").trim() && String(env.FIRMA_RF_EMAIL || "").trim());
+}
+
+/* GET /api/firma/pendientes — lo que espera una firma. */
+async function firmaPendientes(env, sesion) {
+  const r = await env.DB.prepare(
+    "SELECT c.numero, c.guia, c.datos, c.emitido_en, c.emitido_por, " +
+    "c.firma_rl_en, c.firma_rl_por, c.firma_rf_en, c.firma_rf_por " +
+    "FROM certificados c WHERE c.anulado_en IS NULL " +
+    "AND (c.firma_rl_en IS NULL OR c.firma_rf_en IS NULL) " +
+    "ORDER BY c.emitido_en LIMIT 100"
+  ).all();
+  const papel = quienFirma(env, sesion && sesion.email);
+  return json({
+    configurado: firmaConfigurada(env),
+    /* Qué casilla puede firmar QUIEN PREGUNTA. Sin esto la pantalla tendría que
+       adivinarlo, y acabaría enseñando un botón que el servidor va a rechazar. */
+    puede_firmar: papel,
+    pendientes: (r.results || []).map((c) => {
+      let d = {};
+      try { d = JSON.parse(c.datos) || {}; } catch (x) { /* se muestra lo que haya */ }
+      return {
+        numero: c.numero, guia: c.guia,
+        donante: d.donante_nombre || null,
+        documento: d.doc_numero || null,
+        monto_centavos: d.monto_centavos || 0,
+        fecha_donacion: d.fecha_donacion || null,
+        emitido_en: c.emitido_en ? selloCO(c.emitido_en) : null,
+        emitido_por: c.emitido_por,
+        firma_rl: c.firma_rl_en ? { en: selloCO(c.firma_rl_en), por: c.firma_rl_por } : null,
+        firma_rf: c.firma_rf_en ? { en: selloCO(c.firma_rf_en), por: c.firma_rf_por } : null
+      };
+    })
+  });
+}
+
+/* POST /api/firma/<numero> — el acto. */
+async function firmaFirmar(request, env, numero, sesion) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!firmaConfigurada(env)) {
+    return json({ error: "firma_no_configurada",
+                  ayuda: "Faltan los correos de quién firma. Se ponen con wrangler secret put." }, 503);
+  }
+  const papel = quienFirma(env, sesion && sesion.email);
+  if (!papel) {
+    return json({ error: "no_es_firmante",
+                  ayuda: "Esta sesión no corresponde a ninguno de los dos firmantes del certificado." }, 403);
+  }
+
+  const c = await env.DB.prepare(
+    "SELECT numero, datos, anulado_en, firma_rl_en, firma_rf_en FROM certificados WHERE numero = ?"
+  ).bind(numero).first();
+  if (!c) return json({ error: "no_encontrado" }, 404);
+  if (c.anulado_en) return json({ error: "esta_anulado", ayuda: "Un certificado anulado no se firma." }, 409);
+  if (papel === "rl" && c.firma_rl_en) return json({ error: "ya_firmado", papel }, 409);
+  if (papel === "rf" && c.firma_rf_en) return json({ error: "ya_firmado", papel }, 409);
+
+  const huella = await huellaDe(c.datos);
+  /* La casilla vuelve al WHERE: entre leer y escribir cabe otra petición, y una
+     firma registrada dos veces con dos sellos distintos no se puede explicar. */
+  const col = papel === "rl" ? "firma_rl" : "firma_rf";
+  const r = await env.DB.prepare(
+    "UPDATE certificados SET " + col + "_por = ?, " + col + "_en = datetime('now'), " + col + "_huella = ? " +
+    "WHERE numero = ? AND " + col + "_en IS NULL"
+  ).bind(sesion.email, huella, numero).run();
+  if (!r.meta || !r.meta.changes) return json({ error: "ya_firmado", papel }, 409);
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(sesion.email, "certificado " + numero + " firmado como " + (papel === "rl" ? "Representante Legal" : "Revisora Fiscal") +
+         " · huella " + huella.slice(0, 16)).run();
+
+  /* CUANDO ESTÁN LAS DOS, SALE. Ni antes —el donante recibiría un borrador con
+     dos nombres que nadie puso— ni por un camino aparte que haya que acordarse
+     de disparar. */
+  const ya = await env.DB.prepare(
+    "SELECT firma_rl_en, firma_rf_en, enviado_en, datos FROM certificados WHERE numero = ?"
+  ).bind(numero).first();
+  let enviado = false;
+  if (ya && ya.firma_rl_en && ya.firma_rf_en && !ya.enviado_en) {
+    try {
+      const d = JSON.parse(ya.datos);
+      const a = await env.DB.prepare("SELECT email FROM donantes d JOIN aportes a ON a.donante_id = d.id WHERE a.guia = ?")
+        .bind(d.guia).first();
+      const envio = await correoCertificado(env, Object.assign({}, d, {
+        firma_rl_en: ya.firma_rl_en, firma_rf_en: ya.firma_rf_en
+      }), a && a.email);
+      if (envio && envio.ok && a && a.email) {
+        await env.DB.prepare("UPDATE certificados SET enviado_en = datetime('now'), enviado_a = ? WHERE numero = ?")
+          .bind(a.email, numero).run();
+        enviado = true;
+      }
+    } catch (e) { console.error("correo tras firmar", numero, e && e.message); }
+  }
+
+  return json({ ok: true, numero, papel, huella: huella.slice(0, 16),
+                completo: !!(ya && ya.firma_rl_en && ya.firma_rf_en), enviado });
+}
+
 async function adminEmitirCertificado(request, env, guia, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let cuerpo = {};
@@ -2470,8 +2612,24 @@ async function adminEmitirCertificado(request, env, guia, quien) {
   ).run();
 
   /* Enviarlo es un paso aparte y explícito: emitir y mandar no son lo mismo, y
-     quien emite puede querer revisar el PDF antes de que salga. */
+     quien emite puede querer revisar el PDF antes de que salga.
+
+     Y AHORA TAMPOCO SE PUEDE MANDAR SIN FIRMA. El PDF imprime dos nombres bajo
+     una frase que dice «certifica bajo la gravedad de juramento», así que
+     mandarlo sin que esas dos personas lo hayan visto es mandar un documento
+     jurado por nadie. Recién emitido no tiene ninguna firma, así que con el
+     flujo encendido este camino queda cerrado por definición: se manda al
+     firmar la segunda, desde `firmaFirmar`.
+
+     Con el flujo APAGADO —sin los dos correos configurados— se comporta como
+     siempre. Un sistema vivo no se queda sin poder mandar certificados porque
+     falte una variable; lo que hace es decirlo, y el panel lo dice. */
   let envio = null;
+  if (cuerpo.enviar && firmaConfigurada(env)) {
+    return json({ ok: true, numero, enviado: false, correo: a.email || null,
+                  espera_firma: true,
+                  ayuda: "Emitido. Sale al donante cuando lo firmen el Representante Legal y la Revisora Fiscal." });
+  }
   if (cuerpo.enviar && a.email) {
     envio = await correoCertificado(env, datos, a.email);
     if (envio && envio.ok) {
@@ -2486,7 +2644,8 @@ async function adminEmitirCertificado(request, env, guia, quien) {
 
 async function adminCertificadoPdf(env, numero) {
   const c = await env.DB.prepare(
-    "SELECT numero, datos, anulado_en, anulado_motivo, revision_en, revision_motivo " +
+    "SELECT numero, datos, anulado_en, anulado_motivo, revision_en, revision_motivo, " +
+    "firma_rl_en, firma_rl_huella, firma_rf_en, firma_rf_huella " +
     "FROM certificados WHERE numero = ?"
   ).bind(numero).first();
   if (!c) return json({ error: "no_encontrado" }, 404);
@@ -2503,7 +2662,13 @@ async function adminCertificadoPdf(env, numero) {
     anulado_en: c.anulado_en ? fechaCO(c.anulado_en) : null,
     anulado_motivo: c.anulado_motivo,
     revision_en: c.revision_en ? fechaCO(c.revision_en) : null,
-    revision_motivo: c.revision_motivo
+    revision_motivo: c.revision_motivo,
+    /* La firma también es estado, y también se añade encima: el snapshot se
+       congeló al emitir, cuando todavía no había firmado nadie. */
+    firma_rl_en: c.firma_rl_en ? fechaCO(c.firma_rl_en) : null,
+    firma_rl_huella: c.firma_rl_huella,
+    firma_rf_en: c.firma_rf_en ? fechaCO(c.firma_rf_en) : null,
+    firma_rf_huella: c.firma_rf_huella
   });
   const bytes = await certificado(datos, datos.emitido_en);
   return new Response(bytes, {
@@ -9596,6 +9761,144 @@ async function rutaCarnet(env, token) {
   });
 }
 
+/* ========================================================================
+   LA PANTALLA DE FIRMA
+   ========================================================================
+   Pequeña a propósito. La Revisora Fiscal entra a firmar certificados, no a
+   operar la fundación: aquí no hay donantes, ni comprobantes, ni casos de
+   vivienda. Una pantalla que enseña de más obliga a confiar en que nadie mire.
+
+   Y por eso NO es un módulo del panel: restringir módulos dentro de /admin
+   dejaría el resto del panel a una clase CSS de distancia. Una ruta aparte, con
+   su propia audiencia de Access, no tiene esa puerta.
+   ======================================================================== */
+function paginaFirma() {
+  return `<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Firma de certificados · Give&Grow</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .wrap{max-width:820px;margin:0 auto;padding:28px 20px 80px}
+  input,select,textarea{font-size:16px}
+  .f-fila{border:1px solid var(--bd);border-radius:10px;padding:16px 18px;margin:0 0 14px;background:var(--surface)}
+  .f-cab{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin-bottom:10px}
+  .f-num{font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:15px}
+  .f-monto{font-weight:700;font-size:18px;font-variant-numeric:tabular-nums}
+  .f-dato{font-size:13.5px;color:var(--mu);margin:2px 0}
+  .f-dato b{color:var(--ink);font-weight:600}
+  .f-firmas{display:flex;flex-wrap:wrap;gap:8px 20px;margin:12px 0 0;font-size:13px}
+  .f-si{color:var(--g);font-weight:700}
+  .f-no{color:#A84D00;font-weight:700}
+  .f-acc{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .f-aviso{border-left:3px solid #A84D00;padding:12px 16px;margin:0 0 22px;font-size:14px;background:var(--surface)}
+  .msg{font-size:13.5px;margin:8px 0 0}
+</style>
+</head>
+<body>
+<main class="page active"><section><div class="wrap">
+<span class="ey">Interno</span>
+<h1 class="h-sec" style="margin-bottom:6px">Firma de certificados</h1>
+<p class="lead" id="quien" style="margin-bottom:8px">Cargando…</p>
+<p class="mu" style="font-size:13.5px;max-width:68ch;margin-bottom:24px">
+Un certificado de donación se expide <strong>bajo la gravedad del juramento</strong> y lo firman el
+Representante Legal y la Revisora Fiscal. Hasta que no estén las dos firmas no sale al donante, y el PDF
+va sellado <strong>«Sin firmar»</strong>. Lo que se guarda de tu firma no es una imagen: es el acto —quién,
+cuándo, y una huella del contenido exacto que firmaste—.</p>
+
+<div id="aviso"></div>
+<div id="cola"><p class="mu">Cargando…</p></div>
+</div></section></main>
+<script src="/firma.js"></script>
+</body></html>`;
+}
+
+const firmaJS = `
+function esc(t){ var d=document.createElement("div"); d.textContent=t==null?"":String(t); return d.innerHTML.replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+function pesos(c){ return "$" + String(Math.round((c||0)/100)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, "."); }
+var PUEDE = null;
+
+function cargar(){
+  fetch("/api/firma/pendientes").then(function(r){ return r.json(); }).then(function(d){
+    PUEDE = d.puede_firmar;
+    var q = document.getElementById("quien");
+    q.textContent = PUEDE === "rl" ? "Entras como Representante Legal."
+      : PUEDE === "rf" ? "Entras como Revisora Fiscal."
+      : "Entras como observador: puedes ver la cola, no firmarla.";
+
+    var av = document.getElementById("aviso");
+    av.innerHTML = d.configurado ? "" :
+      '<p class="f-aviso"><strong>La firma todavía no está configurada.</strong> Faltan los correos de ' +
+      'quién firma cada casilla, así que los certificados siguen saliendo como antes — con los dos ' +
+      'nombres impresos y sin que nadie los haya firmado. Se configura con <code>wrangler secret put ' +
+      'FIRMA_RL_EMAIL</code> y <code>FIRMA_RF_EMAIL</code>.</p>';
+
+    var c = document.getElementById("cola");
+    var l = d.pendientes || [];
+    if (!l.length){
+      c.innerHTML = '<p class="mu">Nada esperando firma.</p>';
+      return;
+    }
+    c.innerHTML = l.map(function(x){
+      var mia = PUEDE && !x["firma_" + PUEDE];
+      return '<div class="f-fila">'
+        + '<div class="f-cab"><span class="f-num">' + esc(x.numero) + '</span>'
+        + '<span class="f-monto">' + esc(pesos(x.monto_centavos)) + '</span></div>'
+        + '<p class="f-dato">Donante <b>' + esc(x.donante || "sin nombre") + '</b>'
+        + (x.documento ? " · documento <b>" + esc(x.documento) + "</b>" : "") + "</p>"
+        + '<p class="f-dato">Donación del <b>' + esc(x.fecha_donacion || "?") + '</b> · guía <b>' + esc(x.guia) + "</b></p>"
+        + '<p class="f-dato">Emitido el ' + esc(x.emitido_en || "?") + " por " + esc(x.emitido_por || "?") + "</p>"
+        + '<p class="f-firmas">'
+        + "<span>Representante Legal: " + (x.firma_rl
+            ? '<span class="f-si">firmado ' + esc(x.firma_rl.en) + "</span>"
+            : '<span class="f-no">pendiente</span>') + "</span>"
+        + "<span>Revisora Fiscal: " + (x.firma_rf
+            ? '<span class="f-si">firmado ' + esc(x.firma_rf.en) + "</span>"
+            : '<span class="f-no">pendiente</span>') + "</span></p>"
+        + '<div class="f-acc">'
+        + '<a class="tab" href="/api/admin/certificado/' + esc(x.numero) + '.pdf" target="_blank" rel="noopener">Ver el documento</a>'
+        + (mia ? '<button type="button" class="btn" data-firmar="' + esc(x.numero) + '">Firmar</button>' : "")
+        + '<span class="msg" id="m-' + esc(x.numero) + '"></span>'
+        + "</div></div>";
+    }).join("");
+  }).catch(function(){
+    document.getElementById("cola").innerHTML = '<p class="mu">No se pudo cargar la cola.</p>';
+  });
+}
+
+document.addEventListener("click", function(ev){
+  var b = ev.target.closest ? ev.target.closest("[data-firmar]") : null;
+  if (!b) return;
+  var num = b.getAttribute("data-firmar");
+  /* SE PREGUNTA, y con las palabras que importan. Firmar esto es jurar: el
+     paso no puede ser un clic que se da sin leer. */
+  if (!window.confirm("Vas a firmar " + num + " bajo la gravedad del juramento.\\n\\n" +
+      "Se guardará tu correo, la fecha y una huella del contenido exacto. ¿Lo revisaste?")) return;
+  b.disabled = true;
+  var m = document.getElementById("m-" + num);
+  m.textContent = "Firmando…"; m.style.color = "var(--mu)";
+  fetch("/api/firma/" + encodeURIComponent(num), { method: "POST" })
+    .then(function(r){ return r.json().then(function(j){ return { http: r.status, d: j }; }); })
+    .then(function(res){
+      b.disabled = false;
+      if (res.http !== 200){
+        m.textContent = (res.d && (res.d.ayuda || res.d.error)) || "No se pudo.";
+        m.style.color = "#8C2F1E";
+        return;
+      }
+      m.textContent = res.d.completo
+        ? (res.d.enviado ? "Firmado. Ya está completo y salió al donante." : "Firmado. Ya está completo.")
+        : "Firmado. Falta la otra firma.";
+      m.style.color = "#1F5C38";
+      setTimeout(cargar, 900);
+    })
+    .catch(function(){ b.disabled = false; m.textContent = "No se pudo. Revisa la conexión."; m.style.color = "#8C2F1E"; });
+});
+
+cargar();
+`;
+
 function paginaCarnet(c) {
   const estado = c.vigente ? "Vigente" : "No vigente";
   const color = c.vigente ? "#4ade80" : "#E8A24C";
@@ -11566,8 +11869,25 @@ async function adminEgresos(request, env, url, quien) {
     "COALESCE(SUM(CASE WHEN soporte = 'sin_soporte' THEN 1 ELSE 0 END),0) AS sin_papel " +
     "FROM egresos WHERE anulado_en IS NULL"
   ).first();
+  /* LOS CENTROS QUE YA EXISTEN, para que el formulario los ofrezca. Escribirlo a
+     mano cada vez es cómo «brigada-chocó» y «brigada choco» acaban siendo dos
+     centros distintos y el reporte del mes sale partido en dos — el mismo
+     problema que el NIT con puntos, en un campo que dejé libre.
+
+     Salen de lo que el proyecto YA usa: los destinos de los aportes, los de las
+     actas de entrega y los centros de egresos anteriores. Así la lista se
+     mantiene sola y no hay un catálogo que alguien tenga que recordar actualizar
+     cuando arranque una brigada nueva. */
+  const cen = await env.DB.prepare(
+    "SELECT destino_id AS c FROM aportes WHERE destino_id IS NOT NULL " +
+    "UNION SELECT destino_id FROM entregas WHERE destino_id IS NOT NULL " +
+    "UNION SELECT centro FROM egresos WHERE centro IS NOT NULL " +
+    "ORDER BY c"
+  ).all();
+
   return json({
     egresos: r.results || [], tope: TOPE_BANDEJA,
+    centros: (cen.results || []).map((x) => x.c).filter(Boolean),
     total: (sum && sum.n) || 0,
     suma_centavos: (sum && sum.total) || 0,
     retenido_centavos: (sum && sum.retenido) || 0,
@@ -14077,7 +14397,9 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
     </div>
 
     <div class="eg-par">
-      <div><label for="eg-centro">Centro de costo</label><input id="eg-centro" autocomplete="off" placeholder="ndf, brigada-chocó, estructura"></div>
+      <div><label for="eg-centro">Centro de costo</label>
+        <input id="eg-centro" list="eg-centros" autocomplete="off" placeholder="ndf, brigada-chocó, estructura">
+        <datalist id="eg-centros"></datalist></div>
       <div><label for="eg-entrega">Acta que pagó (opcional)</label><input id="eg-entrega" autocomplete="off" placeholder="AE-2026-000001"></div>
     </div>
 
@@ -14510,6 +14832,7 @@ var COLA_ES = {
   inscripciones_sin_tocar: "Inscripciones sin tocar",
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
+  certificados_sin_firmar: "Certificados esperando firma",
   correos_fallidos: "Correos que no salieron",
   entregas_en_borrador: "Entregas en borrador",
   casos_sin_evaluar: "Casas que nadie ha abierto",
@@ -14677,6 +15000,7 @@ var COLA_MOD = {
   inscripciones_sin_tocar: "red",
   transferencias_sin_verificar: "dinero",
   certificados_por_emitir: "dinero",
+  certificados_sin_firmar: "dinero",
   correos_fallidos: "salud",
   entregas_en_borrador: "entregas",
   casos_sin_evaluar: "mmc",
@@ -16398,6 +16722,14 @@ function cargarEgresos(){
         + pasoEmbudo("meritoria", deCentavos(d.meritoria_centavos), "lo que sostiene el RTE")
         + (d.sin_papel ? pasoEmbudo("sin papel", d.sin_papel, "les falta soporte") : "");
     }
+    /* «datalist» SUGIERE, no obliga: una brigada nueva se escribe y ya, y a
+       partir de ahí aparece sola para las siguientes. Un desplegable cerrado
+       habría hecho falta mantenerlo a mano el día que arranca una. */
+    var dl = document.getElementById("eg-centros");
+    if (dl) dl.innerHTML = ((d.centros || []).concat(["estructura"]))
+      .filter(function(c, i, a){ return a.indexOf(c) === i; })
+      .map(function(c){ return '<option value="' + esc(c) + '"></option>'; }).join("");
+
     var tb = document.getElementById("eg-filas"); if (!tb) return;
     var l = d.egresos || [];
     tb.innerHTML = l.length
@@ -17344,7 +17676,7 @@ export default {
        `accessEvaluar` dice que su matrícula está verificada. Ya NO hay que
        añadir su correo a mano en el dashboard — eso dejó de ser cierto con la
        regla de External Evaluation, y este comentario lo siguió diciendo. */
-    if (ruta === "/admin" || ruta === "/admin.js" /* red: ver la nota de /triaje.js */ || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/")) {
+    if (ruta === "/admin" || ruta === "/admin.js" /* red: ver la nota de /triaje.js */ || ruta.startsWith("/admin/") || ruta.startsWith("/api/admin/") || ruta.startsWith("/api/triage/") || ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/") || ruta === "/firma" || ruta === "/firma.js" || ruta.startsWith("/api/firma/")) {
       /* `/triaje.js` ya no llega hasta aquí: se redirige más arriba, fuera del
          guardián. Se deja en la condición A PROPÓSITO, como red: si algún día
          alguien quita esa redirección, la ruta cae en el guardián y se cierra en
@@ -17382,9 +17714,18 @@ export default {
          contra producción que Access cubre `/triaje/*` con esa audiencia
          (302 con su kid), así que no gastó un cupo nuevo de hostnames. */
       const esTriage = ruta === "/triaje" || ruta === "/triaje.js" || ruta.startsWith("/triaje/") || ruta.startsWith("/api/triage/");
+      /* LA FIRMA TIENE SU PROPIA AUDIENCIA, por la misma razón que el triaje: la
+         Revisora Fiscal entra a firmar certificados y no tiene por qué ver
+         donantes, comprobantes bancarios ni casos de vivienda. La del panel
+         también vale, para que el equipo pueda mirar la cola sin una segunda
+         cuenta — pero mirar no es firmar: quién puede firmar cada casilla lo
+         decide `quienFirma`, por correo, y eso no depende de la audiencia. */
+      const esFirma = ruta === "/firma" || ruta === "/firma.js" || ruta.startsWith("/api/firma/");
       const audsZona = esTriage
         ? [env.ACCESS_AUD_TRIAGE, env.ACCESS_AUD]
-        : [env.ACCESS_AUD];
+        : esFirma
+          ? [env.ACCESS_AUD_FIRMA, env.ACCESS_AUD]
+          : [env.ACCESS_AUD];
       const sesion = await verificarAccess(request, env, audsZona);
       if (!sesion.ok) {
         /* Sin Access configurado no se sirve nada: 503 y una explicación, no un
@@ -17416,6 +17757,28 @@ export default {
         }
         return json(cuerpo, noConfig ? 503 : 403);
       }
+
+      /* LA FIRMA, antes del bloque del panel: entra por otra audiencia y no
+         comparte su superficie. */
+      if (ruta === "/firma") {
+        return new Response(paginaFirma(), {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "no-store",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "x-robots-tag": "noindex, nofollow",
+            "content-security-policy": cspPagina({ script: "'self'" })
+          }
+        });
+      }
+      if (ruta === "/firma.js") {
+        return new Response(firmaJS, {
+          headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
+        });
+      }
+      if (ruta === "/api/firma/pendientes") return await firmaPendientes(env, sesion);
+      const fir = ruta.match(/^\/api\/firma\/(CD-\d{4}-\d{6})$/i);
+      if (fir) return await firmaFirmar(request, env, fir[1].toUpperCase(), sesion);
 
       try {
         if (ruta === "/admin") {

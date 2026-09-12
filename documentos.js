@@ -1398,7 +1398,9 @@ export async function certificado(c, hoyISO) {
     { tam: 9.5, interlinea: 14, despues: 22 }
   );
 
-  firmas(h, f);
+  firmas(h, f,
+    { en: c.firma_rl_en, huella: c.firma_rl_huella },
+    { en: c.firma_rf_en, huella: c.firma_rf_huella });
 
   /* Trazabilidad interna: el certificado apunta a la guía, y la guía es la
      misma referencia que conoce la pasarela. Un auditor puede recorrer el
@@ -1423,6 +1425,24 @@ export async function certificado(c, hoyISO) {
       " No debe usarse como soporte tributario mientras esté en este estado.",
       { tam: 9, fuente: f.negrita, color: rgb(0.60, 0.36, 0.05), interlinea: 13 });
     h.sellar("En revisión", rgb(0.78, 0.52, 0.10));
+  } else if (!c.firma_rl_en || !c.firma_rf_en) {
+    /* SIN LAS DOS FIRMAS NO ES UN CERTIFICADO, es un borrador. Y un borrador que
+       se filtra tiene que verse como lo que es: esta misma página imprime
+       «certifica bajo la gravedad de juramento» con dos nombres debajo, así que
+       sin el sello un borrador es indistinguible del documento bueno.
+
+       Se dice CUÁL falta, porque quien lo tenga en la mano necesita saber a quién
+       está esperando. */
+    /* La contracción va DENTRO de cada nombre: con un «de» suelto delante, la
+       unión salía «falta la firma de el Representante Legal». */
+    const faltan = [];
+    if (!c.firma_rl_en) faltan.push("del Representante Legal");
+    if (!c.firma_rf_en) faltan.push("de la Revisora Fiscal");
+    h.salto(16);
+    h.texto("BORRADOR: falta la firma " + faltan.join(" y ") +
+      ". Este documento todavía no es un certificado y no sirve como soporte tributario.",
+      { tam: 9, fuente: f.negrita, color: rgb(0.60, 0.36, 0.05), interlinea: 13 });
+    h.sellar("Sin firmar", rgb(0.78, 0.52, 0.10));
   }
 
   h.cerrarPie(c.numero);
@@ -1464,14 +1484,14 @@ function avisoEnCaja(h, f, txt) {
 
 /* Dos firmas, lado a lado: el documento no vale con una sola. Se dibujan sobre
    la misma línea base para que ninguna parezca subordinada a la otra. */
-function firmas(h, f) {
+function firmas(h, f, firmaRL, firmaRF) {
   const anchoCol = (ANCHO - 40) / 2;
   h.reservar(96);
   const yLinea = h.y - 34;
 
   const cols = [
-    { x: MG.izq, p: ENTIDAD.repLegal, extra: null },
-    { x: MG.izq + anchoCol + 40, p: ENTIDAD.revisora, extra: "T.P. " + ENTIDAD.revisora.tp }
+    { x: MG.izq, p: ENTIDAD.repLegal, extra: null, firma: firmaRL },
+    { x: MG.izq + anchoCol + 40, p: ENTIDAD.revisora, extra: "T.P. " + ENTIDAD.revisora.tp, firma: firmaRF }
   ];
 
   for (const col of cols) {
@@ -1484,6 +1504,27 @@ function firmas(h, f) {
     y -= 13;
     h.p.drawText(winansi(col.p.cargo), { x: col.x, y, size: 9, font: f.normal, color: GRIS });
     if (col.extra) { y -= 12; h.p.drawText(winansi(col.extra), { x: col.x, y, size: 9, font: f.normal, color: GRIS }); }
+    /* LA CONSTANCIA DE LA FIRMA, debajo del nombre y no en un anexo. Sin esto,
+       la línea sobre el nombre no distingue un documento firmado de uno que
+       simplemente imprimió ese nombre — que es como estaba antes.
+
+       La huella es de lo que se firmó, no del PDF: el PDF se vuelve a dibujar
+       cada vez que alguien lo descarga y su hash cambiaría solo. Lo que no
+       cambia es el JSON congelado al emitir, y eso es lo que se firma. */
+    if (col.firma && col.firma.en) {
+      y -= 12;
+      h.p.drawText(winansi("Firmado electrónicamente el " + fechaLarga(col.firma.en)),
+        { x: col.x, y, size: 8, font: f.normal, color: GRIS });
+      if (col.firma.huella) {
+        y -= 10;
+        h.p.drawText(winansi("Huella " + String(col.firma.huella).slice(0, 16) + " · Ley 527 de 1999"),
+          { x: col.x, y, size: 7.5, font: f.normal, color: GRIS });
+      }
+    } else {
+      y -= 12;
+      h.p.drawText(winansi("PENDIENTE DE FIRMA"),
+        { x: col.x, y, size: 8, font: f.negrita, color: rgb(0.60, 0.36, 0.05) });
+    }
   }
-  h.y = yLinea - 62;
+  h.y = yLinea - 86;
 }
