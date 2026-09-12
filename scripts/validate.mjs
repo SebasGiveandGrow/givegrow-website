@@ -649,7 +649,14 @@ try {
    Así que esto es un TRINQUETE, no un muro: fija el número actual como techo.
    No se puede empeorar, y cada tanda de migración baja el listón. Si migras,
    BAJA estas dos constantes: el check te dice el número exacto. */
-const TECHO_COLORES = 72;
+/* 72 -> 73 el 12 sep 2026: se definio el token `--ok` tambien dentro del
+   bloque `@media print`, que fuerza la paleta de dia. Ese bloque es una
+   DEFINICION de tokens como las otras, pero el filtro de arriba no lo
+   reconoce —su selector va dentro de la at-rule— asi que sus literales
+   cuentan, igual que ya contaban los de `--g`, `--acc` y `--amber` que
+   estan a su lado. Subir el trinquete es lo correcto aqui: el numero no
+   empeoro por una fuga, sino por un token mas. */
+const TECHO_COLORES = 73;
 const TECHO_FUENTES = 21;
 try {
   const css = readFileSync("styles.css", "utf8");

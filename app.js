@@ -2308,7 +2308,7 @@ function cvSubirCola(){
     /* El cierre dice lo que de verdad pasó. Un «listo» cuando no llegó nada es
        la mentira que deja al ingeniero abriendo un caso vacío. */
     if (!CV.total)             cvProg("");
-    else if (!CV.fallidas)     cvProg(t("cv.sub.ok").replace("{t}", CV.total), "var(--ok, var(--g))");
+    else if (!CV.fallidas)     cvProg(t("cv.sub.ok").replace("{t}", CV.total), "var(--ok)");
     else if (CV.hechas)        cvProg(t("cv.sub.parcial").replace("{n}", CV.hechas).replace("{t}", CV.total), "var(--amber)");
     else                       cvProg(t("cv.sub.nada"), "var(--err)");
     return;
