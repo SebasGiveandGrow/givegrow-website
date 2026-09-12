@@ -1,6 +1,6 @@
 # La regla de rate-limit de Cloudflare
 
-**Aplicada por Sebas el 7 sep 2026. Verificada contra producción el 7 y el 8.**
+**Aplicada por Sebas el 7 sep 2026. Verificada contra producción el 7, el 8 y el 12.**
 
 Este archivo existe porque la regla vive **solo en el dashboard de Cloudflare**.
 No hay código que la describa, ni despliegue que la reponga si alguien la borra,
@@ -36,6 +36,12 @@ Lo único que se elige es **a qué rutas se aplica**, y ahí está todo el dise�
 El criterio es uno solo: **rutas que CREAN algo permanente o que cuestan
 dinero**. Nada de lectura entra, porque bloquear una lectura le rompe el sitio a
 una familia sin evitar ningún daño.
+
+**Comprobado otra vez el 12 sep 2026**, con el método de más abajo: la regla
+sigue en pie y las cinco están dentro. Y lo que de verdad importaba comprobar
+—que `/api/caso/<n>/medio` siga FUERA— también: durante el bloqueo contestó el
+Worker con un 403 suyo. Fuera siguen igual `/api/trm`, `/api/casos/publicos` y
+la portada.
 
 ## Lo que queda FUERA a propósito, y no se debe añadir
 
@@ -75,10 +81,26 @@ Lo que se espera, y lo que salió el 8 sep 2026:
 11..14   429  text/plain          error code: 1015            ← lo para Cloudflare
 ```
 
-**Las dos señales que distinguen quién bloqueó:** Cloudflare responde
-`text/plain` con el cuerpo literal `error code: 1015`; el Worker responde JSON.
-Si ves un 429 con JSON, ese es un freno del código (el tope de ALMA por isolate,
-o el de transferencias), no la regla.
+**Las dos señales que distinguen quién bloqueó:** el Worker responde
+**JSON**; Cloudflare responde **cualquier otra cosa**. Si ves un 429 con JSON,
+ese es un freno del código (el tope de ALMA por isolate, o el de transferencias),
+no la regla.
+
+⚠️ **No te fíes de `text/plain`.** El 8 sep el bloqueo llegaba como `text/plain`
+con el cuerpo `error code: 1015`, y así estaba escrito aquí. El 12 sep, pidiendo
+lo mismo desde Node en vez de curl, **el mismo bloqueo llegó como `text/html`**
+—la página de bloqueo de Cloudflare—. El tipo depende del cliente. Lo que no
+cambia es que no es JSON: esa es la señal a la que hay que mirar. Un script que
+busque `text/plain` da un falso «la regla no está» (pasó, escribiendo uno).
+
+⚠️ **Y el ariete se gasta.** El tope de ALMA es del CÓDIGO y responde ANTES que
+Cloudflare. En una segunda corrida seguida, las catorce peticiones pueden
+devolver `429 {"error":"demasiados_mensajes"}` —JSON— sin que Cloudflare llegue
+a intervenir, y parece que la regla desapareció. Además ese tope es **por
+isolate**: dos peticiones del mismo bucle pueden caer en isolates distintos y
+contestar una `400 json_invalido` y otra `429 demasiados_mensajes`. Si vas a
+repetir la prueba, **espera un minuto entre corridas** y lee la tabla completa,
+no una petición suelta.
 
 Y para saber si una ruta está dentro sin desmontar nada: hazte bloquear con
 `/api/alma` y, **mientras dure el bloqueo**, pide esa ruta una vez. Si devuelve
