@@ -390,14 +390,47 @@ ok("JSON-LD (" + ld + " bloques)");
   }
 }
 
-/* 5 · Balance de tags */
-let tagsOk = true;
-for (const tag of ["main", "section", "div", "ul", "li", "span", "a", "button"]) {
-  const o = (html.match(new RegExp("<" + tag + "[\\s>]", "g")) || []).length;
-  const c = (html.match(new RegExp("</" + tag + ">", "g")) || []).length;
+/* 5 · Balance de tags
+
+   VIGILABA OCHO ETIQUETAS de las cuarenta y seis que esta página usa. Borrar un
+   </footer>, un </form>, un </table> o un </h2> pasaba en verde — comprobado el
+   11 sep 2026 quitando el </footer>: el gate no dijo nada.
+
+   Y CONTABA DENTRO DE LOS COMENTARIOS. `index.html` tiene un comentario que
+   menciona «<template>» al explicar por qué el 404 vive en uno, y eso bastaba
+   para que esa etiqueta saliera descuadrada 2/1. O sea que la lista corta tapaba
+   además un falso positivo: si alguien hubiera escrito «<div>» en un comentario,
+   el check habría fallado sin que nada estuviera mal.
+
+   Se quitan comentarios, <script> y <style> antes de contar —dentro de un script
+   hay texto entre comillas que puede parecer una etiqueta, y el bloque JSON-LD
+   es exactamente eso— y se vigilan todas las que se cierran.
+
+   NO ENTRAN LAS VACÍAS (img, br, input, meta, link, hr, source): no llevan
+   cierre, así que contarlas daría siempre desbalance. */
+const htmlLimpio = html
+  .replace(/<!--[\s\S]*?-->/g, "")
+  .replace(/<script[\s\S]*?<\/script>/gi, "")
+  .replace(/<style[\s\S]*?<\/style>/gi, "");
+const TAGS_CERRADAS = [
+  "main", "section", "div", "ul", "ol", "li", "span", "a", "button",
+  "footer", "header", "nav", "p", "form", "label", "fieldset", "legend",
+  "table", "thead", "tbody", "tr", "td", "th",
+  "article", "aside", "figure", "figcaption", "details", "summary",
+  "select", "option", "textarea", "picture", "video", "blockquote",
+  "dl", "dt", "dd", "strong", "em", "small", "b", "i", "code", "pre",
+  "time", "address", "template",
+  "h1", "h2", "h3", "h4", "h5", "h6"
+];
+let tagsOk = true, tagsVistas = 0;
+for (const tag of TAGS_CERRADAS) {
+  const o = (htmlLimpio.match(new RegExp("<" + tag + "[\\s>]", "g")) || []).length;
+  const c = (htmlLimpio.match(new RegExp("</" + tag + ">", "g")) || []).length;
+  if (!o && !c) continue;
+  tagsVistas++;
   if (o !== c) { err("tags <" + tag + "> desbalanceados: " + o + " abren / " + c + " cierran"); tagsOk = false; }
 }
-if (tagsOk) ok("balance de tags");
+if (tagsOk) ok("balance de tags (" + tagsVistas + " etiquetas vigiladas)");
 
 /* 5b · Claves ES duplicadas — en un literal JS gana la última, así que un duplicado
    silencia el valor que creíste haber puesto. Difícil de ver a ojo en 676 claves. */
