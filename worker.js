@@ -16235,9 +16235,29 @@ function leerFacturaXML(texto){
    solo botones sobre filas ya pintadas. */
 function val(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; }
 
+/* EL SEPARADOR DECIMAL NO SE BORRA, SE LEE. Esta funcion borraba todo lo que no
+   fuera cifra, y eso acierta con «1.500.000» —que es como se escribe un millon y
+   medio en Colombia— y falla por CIEN con «1.500.000,00», que es como viene
+   escrito en la factura de la que se copia. Las dos entradas se ven casi iguales
+   y una de ellas mete ciento cincuenta millones donde habia millon y medio.
+   El servidor no puede atraparlo: comprueba que base mas IVA den el total y que
+   el neto cuadre, y una escala uniforme conserva las dos igualdades. Una fila
+   cien veces mas grande pasa entera, y de ahi sale a la exogena y a la cuenta de
+   lo meritorio, que es lo que sostiene la calificacion en el RTE.
+   La regla: el ultimo separador es decimal SOLO si le siguen una o dos cifras.
+   Tres cifras son millares, porque en Colombia 1.500 es mil quinientos. */
 function aCentavos(v){
-  var n = String(v == null ? "" : v).replace(/[^0-9]/g, "");
-  return n ? parseInt(n, 10) * 100 : 0;
+  var s = String(v == null ? "" : v).replace(/[^0-9.,]/g, "");
+  if (!s) return 0;
+  var ult = Math.max(s.lastIndexOf("."), s.lastIndexOf(","));
+  var dec = "";
+  if (ult >= 0){
+    var cola = s.slice(ult + 1);
+    if (/^[0-9]{1,2}$/.test(cola)){ dec = cola.length === 1 ? cola + "0" : cola; s = s.slice(0, ult); }
+  }
+  var ent = s.replace(/[^0-9]/g, "");
+  if (!ent && !dec) return 0;
+  return (ent ? parseInt(ent, 10) : 0) * 100 + (dec ? parseInt(dec, 10) : 0);
 }
 function deCentavos(c){
   return "$" + String(Math.round((c || 0) / 100)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
