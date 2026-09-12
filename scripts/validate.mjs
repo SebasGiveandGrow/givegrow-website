@@ -191,14 +191,40 @@ for (const [htmlFn, jsFn] of [["paginaAdmin", "adminJS"], ["paginaTriage", "tria
                               ["paginaRuta", "rutaJS"], ["inspeccionHTML", "inspeccionJS"]]) {
   const h = literalDe(htmlFn), j = literalDe(jsFn);
   if (!h || !j) { err("1d: no encontré " + (h ? jsFn : htmlFn)); continue; }
+  /* UNA ETIQUETA NO BASTA, y por eso este check llevaba tiempo sin ver nada.
+
+     La versión anterior toleraba `(?:<[^>]+>\s*)?` — UNA etiqueta intermedia—.
+     Sirve para `<div id="salud"><p>Cargando…</p></div>`, que tiene una. No sirve
+     para una TABLA, que tiene dos: `<tbody id="x"><tr><td>Cargando…`.
+
+     O sea que el check nacido de una TABLA atascada en «Cargando…» no podía
+     casar con una tabla. Comprobado el 11 sep 2026 metiendo un tbody huérfano
+     con ese texto literal: el gate pasaba en verde.
+
+     Con `*` en vez de `?` entra cualquier anidamiento. */
   const ids = [...new Set(
-    [...h.matchAll(/id="([a-zA-Z0-9_-]+)"[^>]*>\s*(?:<[^>]+>\s*)?[^<]*(?:[Cc]argando|[Cc]onsultando)/g)].map(m => m[1])
+    [...h.matchAll(/id="([a-zA-Z0-9_-]+)"[^>]*>\s*(?:<[^>]+>\s*)*[^<]*(?:[Cc]argando|[Cc]onsultando|[Ss]e pide)/g)].map(m => m[1])
   )];
-  const sinDueno = ids.filter((id) => !new RegExp('(?:el|getElementById)\\(\\s*"' + id + '"\\s*\\)').test(j));
+
+  /* Y ADEMÁS, LA REGLA ESTRUCTURAL, que no depende del vocabulario.
+
+     La de arriba es una lista de palabras y su propio comentario ya avisaba de
+     que «Un momento…» se le escapa. Lo que de verdad define el problema no es lo
+     que el marcador diga: es que un `<tbody>` SIEMPRE lleva filas que vienen de
+     datos. Si nadie lo escribe, esa tabla enseña su marcador para siempre, diga
+     lo que diga.
+
+     Los trece tbody del panel decían «Se pide al bajar hasta aquí» y «Se pide al
+     abrir el módulo» —dos textos deliberados, de la carga diferida— y ninguno de
+     los dos estaba en la lista. Trece tablas de datos sin vigilar. */
+  const cuerpos = [...new Set([...h.matchAll(/<tbody id="([a-zA-Z0-9_-]+)"/g)].map(m => m[1]))];
+
+  const escribe = (id) => new RegExp('(?:el|getElementById)\\(\\s*"' + id + '"\\s*\\)').test(j);
+  const sinDueno = [...new Set(ids.concat(cuerpos))].filter((id) => !escribe(id));
   if (sinDueno.length) {
-    err(htmlFn + ": #" + sinDueno.join(", #") + " dice «Cargando…» y " + jsFn + "() nunca lo escribe");
+    err(htmlFn + ": #" + sinDueno.join(", #") + " se queda con su texto de espera — " + jsFn + "() nunca lo escribe");
   } else {
-    ok(htmlFn + " · sus " + ids.length + " «Cargando…» tienen quien los rellene");
+    ok(htmlFn + " · " + ids.length + " marcador(es) y " + cuerpos.length + " tabla(s) tienen quien los rellene");
   }
 }
 
@@ -320,6 +346,78 @@ for (const b of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\
 }
 ok("JSON-LD (" + ld + " bloques)");
 
+/* 4a · EL BLOQUE DE IDENTIDAD EXISTE, Y SU NIT ES EL DE VERDAD.
+
+   El check de arriba cuenta bloques y valida su sintaxis, pero NUNCA exige que
+   haya ninguno. Comprobado el 11 sep 2026 borrando el bloque NGO: el gate pasó
+   en verde. El FAQ sí está protegido —el check 4b lo compara contra el
+   diccionario y falla si no está— así que el único sin guardián era justo el de
+   la identidad: nombre, dirección, fecha de constitución y taxID.
+
+   Ese bloque es lo que un buscador lee para saber QUIÉN es esta fundación.
+   Perderlo no rompe nada visible: simplemente se deja de existir como entidad
+   identificada, y nadie se entera.
+
+   Y EL NIT ESTÁ ESCRITO EN 34 SITIOS. Hoy los 34 coinciden, pero nada lo
+   obligaba: corregir uno dejaría a los otros 33 diciendo otra cosa, y entre
+   ellos está `ENTIDAD.nit`, que es el que se imprime en el certificado de
+   donación que el donante le enseña a la DIAN.
+
+   Es la misma cicatriz del articulado del certificado —Art. 125 en un archivo y
+   Art. 257 en otro durante meses— y se cierra igual: una fuente, y el gate
+   comparando contra ella.
+
+   La fuente es `ENTIDAD.nit` de documentos.js, porque es la que va impresa en un
+   documento firmado bajo juramento. Se comparan solo los DÍGITOS: el JSON-LD lo
+   escribe sin puntos a propósito —es un campo para máquinas— y eso es correcto. */
+try {
+  const digitos = (t) => String(t || "").replace(/[^0-9]/g, "");
+  /* LOS NUEVE DÍGITOS SIEMPRE; EL DV SOLO SI VIENE. «901948930» y
+     «901.948.930-2» son el mismo NIT escrito de dos formas legítimas —el campo
+     para máquinas del JSON-LD suele ir sin puntos— y exigir el dígito de
+     verificación habría marcado como error una de las dos. Lo que no puede
+     variar son los nueve dígitos, y el DV cuando está escrito. */
+  const mismoNit = (a, b) => a.slice(0, 9) === b.slice(0, 9) &&
+    (a.length < 10 || b.length < 10 || a[9] === b[9]);
+  const docs = readFileSync("documentos.js", "utf8");
+  const mNit = docs.match(/nit:\s*"([^"]+)"/);
+  if (!mNit) err("4a: no encontré ENTIDAD.nit en documentos.js");
+  else {
+    const canon = digitos(mNit[1]);
+
+    let ngo = null;
+    for (const b of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+      try { const d = JSON.parse(b[1]); if (d["@type"] && d["@type"] !== "FAQPage") ngo = d; } catch (e) { /* ya lo reporta 4 */ }
+    }
+    if (!ngo) {
+      err("4a: falta el bloque JSON-LD de identidad (@type NGO) — sin él la fundación " +
+          "deja de existir como entidad identificada para los buscadores");
+    } else if (!mismoNit(digitos(ngo.taxID), canon)) {
+      err("4a: el taxID del JSON-LD (" + ngo.taxID + ") no es el NIT de ENTIDAD (" + mNit[1] + ")");
+    } else {
+      /* Y el resto de los sitios donde está escrito. Un NIT que difiere en UN
+         sitio es un NIT que alguien va a copiar del sitio equivocado. */
+      const fuentes = ["app.js", "index.html", "i18n/en.json", "documentos.js", "worker.js"];
+      const malos = [];
+      for (const f of fuentes) {
+        let t = ""; try { t = readFileSync(f, "utf8"); } catch (e) { continue; }
+        /* SOLO DONDE SE DICE QUE ES UN NIT. Cualquier número de nueve cifras
+           no vale: la primera versión de esta regla marcó el «999.999.999.999»
+           de un comentario sobre el tope de la pasarela. Lo que interesa no es
+           un número con esa forma, es un sitio que AFIRMA un NIT. */
+        for (const m of t.matchAll(/(?:NIT|taxID"?\s*:\s*"?|nit:\s*")[^0-9]{0,6}(\d[\d.\s]{9,14}\d)/gi)) {
+          if (!mismoNit(digitos(m[1]), canon)) malos.push(f + ": " + m[1].trim());
+        }
+      }
+      if (malos.length) {
+        err("4a: hay NIT que no coinciden con ENTIDAD.nit — " + [...new Set(malos)].slice(0, 4).join(" · "));
+      } else {
+        ok("identidad: el bloque NGO está y su NIT coincide con el del certificado");
+      }
+    }
+  }
+} catch (e) { err("4a: no se pudo comprobar la identidad: " + e.message); }
+
 /* 4b · El FAQ del JSON-LD es un DUPLICADO del diccionario, y los duplicados se
    desfasan. `hydrate-i18n.mjs` no lo toca porque no tiene atributos data-i18n,
    así que nada lo vigilaba: el 11 ago 2026 el bloque seguía prometiendo "próximamente
@@ -364,14 +462,47 @@ ok("JSON-LD (" + ld + " bloques)");
   }
 }
 
-/* 5 · Balance de tags */
-let tagsOk = true;
-for (const tag of ["main", "section", "div", "ul", "li", "span", "a", "button"]) {
-  const o = (html.match(new RegExp("<" + tag + "[\\s>]", "g")) || []).length;
-  const c = (html.match(new RegExp("</" + tag + ">", "g")) || []).length;
+/* 5 · Balance de tags
+
+   VIGILABA OCHO ETIQUETAS de las cuarenta y seis que esta página usa. Borrar un
+   </footer>, un </form>, un </table> o un </h2> pasaba en verde — comprobado el
+   11 sep 2026 quitando el </footer>: el gate no dijo nada.
+
+   Y CONTABA DENTRO DE LOS COMENTARIOS. `index.html` tiene un comentario que
+   menciona «<template>» al explicar por qué el 404 vive en uno, y eso bastaba
+   para que esa etiqueta saliera descuadrada 2/1. O sea que la lista corta tapaba
+   además un falso positivo: si alguien hubiera escrito «<div>» en un comentario,
+   el check habría fallado sin que nada estuviera mal.
+
+   Se quitan comentarios, <script> y <style> antes de contar —dentro de un script
+   hay texto entre comillas que puede parecer una etiqueta, y el bloque JSON-LD
+   es exactamente eso— y se vigilan todas las que se cierran.
+
+   NO ENTRAN LAS VACÍAS (img, br, input, meta, link, hr, source): no llevan
+   cierre, así que contarlas daría siempre desbalance. */
+const htmlLimpio = html
+  .replace(/<!--[\s\S]*?-->/g, "")
+  .replace(/<script[\s\S]*?<\/script>/gi, "")
+  .replace(/<style[\s\S]*?<\/style>/gi, "");
+const TAGS_CERRADAS = [
+  "main", "section", "div", "ul", "ol", "li", "span", "a", "button",
+  "footer", "header", "nav", "p", "form", "label", "fieldset", "legend",
+  "table", "thead", "tbody", "tr", "td", "th",
+  "article", "aside", "figure", "figcaption", "details", "summary",
+  "select", "option", "textarea", "picture", "video", "blockquote",
+  "dl", "dt", "dd", "strong", "em", "small", "b", "i", "code", "pre",
+  "time", "address", "template",
+  "h1", "h2", "h3", "h4", "h5", "h6"
+];
+let tagsOk = true, tagsVistas = 0;
+for (const tag of TAGS_CERRADAS) {
+  const o = (htmlLimpio.match(new RegExp("<" + tag + "[\\s>]", "g")) || []).length;
+  const c = (htmlLimpio.match(new RegExp("</" + tag + ">", "g")) || []).length;
+  if (!o && !c) continue;
+  tagsVistas++;
   if (o !== c) { err("tags <" + tag + "> desbalanceados: " + o + " abren / " + c + " cierran"); tagsOk = false; }
 }
-if (tagsOk) ok("balance de tags");
+if (tagsOk) ok("balance de tags (" + tagsVistas + " etiquetas vigiladas)");
 
 /* 5b · Claves ES duplicadas — en un literal JS gana la última, así que un duplicado
    silencia el valor que creíste haber puesto. Difícil de ver a ojo en 676 claves. */

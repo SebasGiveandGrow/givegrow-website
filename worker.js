@@ -16235,9 +16235,38 @@ function leerFacturaXML(texto){
    solo botones sobre filas ya pintadas. */
 function val(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; }
 
+/* EL SEPARADOR DECIMAL NO SE BORRA, SE LEE. Esta funcion borraba todo lo que no
+   fuera cifra, y eso acierta con «1.500.000» —que es como se escribe un millon y
+   medio en Colombia— y falla por CIEN con «1.500.000,00», que es como viene
+   escrito en la factura de la que se copia. Las dos entradas se ven casi iguales
+   y una de ellas mete ciento cincuenta millones donde habia millon y medio.
+   El servidor no puede atraparlo: comprueba que base mas IVA den el total y que
+   el neto cuadre, y una escala uniforme conserva las dos igualdades. Una fila
+   cien veces mas grande pasa entera, y de ahi sale a la exogena y a la cuenta de
+   lo meritorio, que es lo que sostiene la calificacion en el RTE.
+   La regla: el ultimo separador es decimal SOLO si le siguen una o dos cifras.
+   Tres cifras son millares, porque en Colombia 1.500 es mil quinientos. */
 function aCentavos(v){
-  var n = String(v == null ? "" : v).replace(/[^0-9]/g, "");
-  return n ? parseInt(n, 10) * 100 : 0;
+  var s = String(v == null ? "" : v).replace(/[^0-9.,]/g, "");
+  if (!s) return 0;
+  var ult = Math.max(s.lastIndexOf("."), s.lastIndexOf(","));
+  var dec = "";
+  if (ult >= 0){
+    var cola = s.slice(ult + 1);
+    if (/^[0-9]{1,2}$/.test(cola)){ dec = cola.length === 1 ? cola + "0" : cola; s = s.slice(0, ult); }
+  }
+  var ent = s.replace(/[^0-9]/g, "");
+  if (!ent && !dec) return 0;
+  var cent = (ent ? parseInt(ent, 10) : 0) * 100 + (dec ? parseInt(dec, 10) : 0);
+  /* Y SE REDONDEA AL PESO. Aqui no se transa en centavos, la exogena se informa
+     en pesos enteros, y la otra puerta de entrada —«leerFacturaXML»— ya venia
+     redondeando asi antes de escribir en el campo.
+     Guardar centavos sueltos rompe algo silencioso aguas abajo: el CSV del
+     contador imprime Math.round(centavos / 100) por columna, y con importes que
+     no son multiplos de cien una fila puede salir con base mas IVA distinto del
+     total. Toda fila que existe hoy es multiplo de cien, porque la version vieja
+     multiplicaba por cien siempre; se conserva esa propiedad. */
+  return Math.round(cent / 100) * 100;
 }
 function deCentavos(c){
   return "$" + String(Math.round((c || 0) / 100)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
