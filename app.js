@@ -492,6 +492,11 @@ var I18N = {
     "mc.lead":"Aquí ves en qué va tu caso y puedes agregar fotos si hacen falta.",
     "mc.cargando":"Buscando tu caso…",
     "mc.err":"Ese enlace no abre ningún caso. Revisa que lo hayas copiado completo, hasta el final.",
+    /* DISTINTA DE «mc.err» A PROPÓSITO. «Tu enlace está mal» es exactamente lo
+       que NO hay que decirle a una familia cuando el enlace está bien y lo que
+       falló fue la red: la manda a buscar un problema que no existe, y en zona
+       de desastre con mala señal ese es el caso frecuente, no el raro. */
+    "mc.err.red":"No pudimos cargar tu caso ahora mismo. Puede ser la señal: vuelve a intentarlo en un momento. Tu caso y tus fotos siguen guardados.",
     "mc.donde":"Dónde",
     "mc.fotos":"Fotos que enviaste",
     "mc.sin.t":"Todavía no lo ha revisado un ingeniero",
@@ -2733,7 +2738,18 @@ function mcPinta(aviso, color){
       }
     })
     .catch(function(){
-      cont.innerHTML = '<p class="lead">' + escapeHtml(t("mc.err")) + "</p>";
+      /* CATCH SÍ HABÍA; lo que decía estaba mal. Aquí solo se llega cuando la
+         petición NO se pudo hacer o su respuesta no era JSON —red caída, señal
+         que se va, una página de error por delante—. El caso inexistente o
+         ajeno no entra por aquí: ese lo atiende el `if` de arriba con su propio
+         mensaje.
+
+         Y el mensaje que había era `mc.err`: «Ese enlace no abre ningún caso,
+         revisa que lo hayas copiado completo». A una familia con el enlace BIEN
+         y la señal mal eso la manda a buscar un problema que no existe, y a
+         sospechar que su caso se perdió. En zona de desastre ese es el caso
+         frecuente, no el raro. */
+      cont.innerHTML = '<p class="lead">' + escapeHtml(t("mc.err.red")) + "</p>";
     });
 }
 
@@ -4970,9 +4986,17 @@ function trackSearch(){
      que escribe la automatización de Sheets— así que una donación hecha por el
      sitio, que vive en D1, no se encontraba. Y el recibo que le llega al donante
      le dice justamente que venga aquí con su guía. */
+  /* «NO ESTÁ» Y «NO PUDE PREGUNTAR» NO SON LO MISMO, y aquí se colapsaban en el
+     mismo `null`. Si la API fallaba pero el libro estático sí cargaba —cosa
+     perfectamente posible: uno es el Worker y el otro un archivo— al donante se
+     le decía «No encontramos esa guía» sobre una donación que existe.
+
+     A quien confió su plata se le puede decir «ahora no puedo», nunca «no
+     existe» cuando sí existe. */
+  var apiFallo = false;
   fetch("/api/aporte/" + encodeURIComponent(guide))
     .then(function(r){ return r.ok ? r.json() : null; })
-    .catch(function(){ return null; })
+    .catch(function(){ apiFallo = true; return null; })
     .then(function(a){
       /* Solo manda D1 si el aporte llegó a un estado PÚBLICO. Una `intencion` es
          una guía que se emitió y nunca se pagó: mostrarla como «Recibida» sería
@@ -4995,7 +5019,7 @@ function trackSearch(){
            decimos: a alguien cuyo pago falló le sirve más saberlo que ver un
            «no existe». */
         if (a && a.guia){ box.innerHTML = trackSinConfirmar(a); return; }
-        if (!inv || !inv.donaciones){ box.innerHTML = '<p class="track-error">'+t("track.err.load")+'</p>'; return; }
+        if (!inv || !inv.donaciones || apiFallo){ box.innerHTML = '<p class="track-error">'+t("track.err.load")+'</p>'; return; }
         box.innerHTML = trackNotFound(guide);
       });
     });
