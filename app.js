@@ -3647,6 +3647,22 @@ function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
 function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 
 function setCur(c){
+  /* SIN TASA NO HAY DOLARES, y hasta hoy si los habia. Con `/api/trm` caido la
+     calculadora decia «No pudimos consultar la TRM en este momento» y debajo
+     enseñaba $16, $48 y $764 en dolares: cifras que solo pueden salir de una
+     tasa, sacadas del 3140.55 que este archivo lleva escrito como valor inicial
+     —sin fecha y sin fuente—. Medido contra produccion el 12 sep 2026.
+     Es exactamente lo que el comentario de aqui abajo dice haber quitado: «1 USD
+     = $4.200 (referencia)» no se podia comprobar y estaba mal.
+     Asi que no se entra en dolares sin tasa. Y se reintenta, porque el fallo
+     real casi siempre es un parpadeo: si la tasa llega, se cumple lo que el
+     usuario pidio y se pasa a dolares sin que tenga que volver a pulsar. */
+  if (c === "USD" && !TRM_INFO){
+    var sin = document.getElementById("calc-rate");
+    if (sin) sin.textContent = t("calc.trm.no");
+    trmCarga().then(function(d){ if (d && TRM_INFO) setCur("USD"); });
+    return;
+  }
   calc.cur = c;
   document.getElementById("cur-cop").classList.toggle("on", c==="COP");
   document.getElementById("cur-usd").classList.toggle("on", c==="USD");
@@ -3801,7 +3817,12 @@ function calcUpdate(){
     }
   }
   setText("m-name", tier[lang] || tier.es);
-  setText("m-sub", (lang==="en")?("~ " + Math.round(usdMonthly) + " USD / month"):("~ " + Math.round(usdMonthly) + " USD / mes"));
+  /* Y esta linea imprimia dolares SIEMPRE: en pesos tambien, y sin TRM tambien,
+     que es donde no hay ninguna linea de tasa que la acompañe. Sin tasa que
+     citar, no se cita cifra: queda el nivel, que no depende del cambio. */
+  setText("m-sub", TRM_INFO
+    ? ((lang==="en")?("~ " + Math.round(usdMonthly) + " USD / month"):("~ " + Math.round(usdMonthly) + " USD / mes"))
+    : "");
   payRecNote();
 }
 function setText(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
