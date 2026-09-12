@@ -32,10 +32,15 @@ por diseño: separa reputaciones. Un problema con el correo automático —un pi
 rebotes, una queja de spam— no arrastra al correo humano de la fundación, ni al
 contrario.
 
-**Un subdominio dedicado esquiva el problema:** `notificaciones.…` publica su
-propio DKIM y SPF, DMARC se evalúa sobre el dominio del remitente, y pasa —
+**Un subdominio dedicado esquiva el problema:** `notificaciones.…` publica sus
+propios registros, DMARC se evalúa sobre el dominio del remitente, y pasa —
 aunque el principal siga mal. Además separa reputaciones: un problema del correo
 automático no arrastra al correo humano de la fundación.
+
+> ⚠️ **PERO HOY SOLO PUBLICA EL DKIM.** Comprobado por DNS el 12 sep 2026 contra
+> 1.1.1.1 y 8.8.8.8: `notificaciones.thegiveandgrowproject.org` **no tiene NINGÚN
+> registro TXT** —o sea, sin SPF— **ni MX**. El DKIM de Resend sí está. Ver
+> «Lo que falta en el DNS» al final de este archivo.
 
 > Esto **no** arregla `sebas@` ni `contabilidad@`. Ese arreglo sigue pendiente y
 > es el mismo de siempre: publicar el DKIM de Workspace, corregir el SPF a
@@ -111,3 +116,51 @@ error o si se cae la red, se registra y se sigue: el aporte queda aprobado igual
 Perder un pago confirmado por un fallo de correo sería indefendible, y es un
 error fácil de introducir si alguien "mejora" el código quitando el try/catch o
 poniendo el envío antes del UPDATE.
+
+---
+
+## Lo que falta en el DNS del subdominio (comprobado el 12 sep 2026)
+
+El paso 2 de arriba dice que Resend entrega dos o tres registros y que hay que
+copiarlos **tal cual**. Se copió uno.
+
+| registro | estado |
+|---|---|
+| DKIM (`resend._domainkey.notificaciones…`) | ✅ publicado |
+| SPF (TXT en `notificaciones…`) | ❌ **no existe** |
+| MX (rebotes) | ❌ **no existe** |
+
+Verificado contra 1.1.1.1 y 8.8.8.8: el subdominio no devuelve ningún TXT.
+
+### Qué significa hoy, sin dramatizarlo
+
+**DMARC sigue pasando.** Se apoya en DKIM, que está alineado, y a este subdominio
+le aplica el `sp=quarantine` del ápex —no el `p=reject`—, así que el modo de fallo
+es «va a spam», no «lo rechazan».
+
+**Pero se sostiene en una sola pata.** Si el DKIM se rompe —la llave se rota en
+Resend, el registro se borra al tocar el DNS— **todo** el correo del sitio se va a
+spam a la vez: recibos, certificados, el enlace del caso de una familia, los
+avisos a ingenieros. Con SPF publicado harían falta dos fallos, no uno.
+
+**Y sin MX no hay rebotes.** Resend no puede recibir la notificación de que una
+dirección no existe, así que un correo mal escrito por un donante se queda en
+`enviado` para siempre. Conviene tenerlo claro al leer el panel: **`enviado`
+significa «Resend lo aceptó», no «llegó»**. La tabla `correos` solo conoce tres
+resultados —`enviado`, `fallo`, `simulado`— y un rebote posterior no es ninguno
+de los tres, así que la cola «Correos que no salieron» no puede verlo.
+
+### Qué hacer, cuando se quiera
+
+1. En Resend → Domains → `notificaciones.thegiveandgrowproject.org`, copiar el
+   TXT de SPF y el MX que ahí aparecen, y publicarlos en el DNS.
+2. Volver a comprobar:
+
+```bash
+dig +short TXT notificaciones.thegiveandgrowproject.org
+dig +short MX  notificaciones.thegiveandgrowproject.org
+```
+
+Ninguna de las dos cosas es urgente: el correo funciona y los 15 envíos de la
+base están en `enviado`. Queda escrito porque la diferencia entre «funciona» y
+«funciona por un solo mecanismo» solo se nota el día que ese mecanismo falla.
