@@ -346,6 +346,78 @@ for (const b of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\
 }
 ok("JSON-LD (" + ld + " bloques)");
 
+/* 4a · EL BLOQUE DE IDENTIDAD EXISTE, Y SU NIT ES EL DE VERDAD.
+
+   El check de arriba cuenta bloques y valida su sintaxis, pero NUNCA exige que
+   haya ninguno. Comprobado el 11 sep 2026 borrando el bloque NGO: el gate pasó
+   en verde. El FAQ sí está protegido —el check 4b lo compara contra el
+   diccionario y falla si no está— así que el único sin guardián era justo el de
+   la identidad: nombre, dirección, fecha de constitución y taxID.
+
+   Ese bloque es lo que un buscador lee para saber QUIÉN es esta fundación.
+   Perderlo no rompe nada visible: simplemente se deja de existir como entidad
+   identificada, y nadie se entera.
+
+   Y EL NIT ESTÁ ESCRITO EN 34 SITIOS. Hoy los 34 coinciden, pero nada lo
+   obligaba: corregir uno dejaría a los otros 33 diciendo otra cosa, y entre
+   ellos está `ENTIDAD.nit`, que es el que se imprime en el certificado de
+   donación que el donante le enseña a la DIAN.
+
+   Es la misma cicatriz del articulado del certificado —Art. 125 en un archivo y
+   Art. 257 en otro durante meses— y se cierra igual: una fuente, y el gate
+   comparando contra ella.
+
+   La fuente es `ENTIDAD.nit` de documentos.js, porque es la que va impresa en un
+   documento firmado bajo juramento. Se comparan solo los DÍGITOS: el JSON-LD lo
+   escribe sin puntos a propósito —es un campo para máquinas— y eso es correcto. */
+try {
+  const digitos = (t) => String(t || "").replace(/[^0-9]/g, "");
+  /* LOS NUEVE DÍGITOS SIEMPRE; EL DV SOLO SI VIENE. «901948930» y
+     «901.948.930-2» son el mismo NIT escrito de dos formas legítimas —el campo
+     para máquinas del JSON-LD suele ir sin puntos— y exigir el dígito de
+     verificación habría marcado como error una de las dos. Lo que no puede
+     variar son los nueve dígitos, y el DV cuando está escrito. */
+  const mismoNit = (a, b) => a.slice(0, 9) === b.slice(0, 9) &&
+    (a.length < 10 || b.length < 10 || a[9] === b[9]);
+  const docs = readFileSync("documentos.js", "utf8");
+  const mNit = docs.match(/nit:\s*"([^"]+)"/);
+  if (!mNit) err("4a: no encontré ENTIDAD.nit en documentos.js");
+  else {
+    const canon = digitos(mNit[1]);
+
+    let ngo = null;
+    for (const b of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+      try { const d = JSON.parse(b[1]); if (d["@type"] && d["@type"] !== "FAQPage") ngo = d; } catch (e) { /* ya lo reporta 4 */ }
+    }
+    if (!ngo) {
+      err("4a: falta el bloque JSON-LD de identidad (@type NGO) — sin él la fundación " +
+          "deja de existir como entidad identificada para los buscadores");
+    } else if (!mismoNit(digitos(ngo.taxID), canon)) {
+      err("4a: el taxID del JSON-LD (" + ngo.taxID + ") no es el NIT de ENTIDAD (" + mNit[1] + ")");
+    } else {
+      /* Y el resto de los sitios donde está escrito. Un NIT que difiere en UN
+         sitio es un NIT que alguien va a copiar del sitio equivocado. */
+      const fuentes = ["app.js", "index.html", "i18n/en.json", "documentos.js", "worker.js"];
+      const malos = [];
+      for (const f of fuentes) {
+        let t = ""; try { t = readFileSync(f, "utf8"); } catch (e) { continue; }
+        /* SOLO DONDE SE DICE QUE ES UN NIT. Cualquier número de nueve cifras
+           no vale: la primera versión de esta regla marcó el «999.999.999.999»
+           de un comentario sobre el tope de la pasarela. Lo que interesa no es
+           un número con esa forma, es un sitio que AFIRMA un NIT. */
+        for (const m of t.matchAll(/(?:NIT|taxID"?\s*:\s*"?|nit:\s*")[^0-9]{0,6}(\d[\d.\s]{9,14}\d)/gi)) {
+          if (!mismoNit(digitos(m[1]), canon)) malos.push(f + ": " + m[1].trim());
+        }
+      }
+      if (malos.length) {
+        err("4a: hay NIT que no coinciden con ENTIDAD.nit — " + [...new Set(malos)].slice(0, 4).join(" · "));
+      } else {
+        ok("identidad: el bloque NGO está y su NIT coincide con el del certificado");
+      }
+    }
+  }
+} catch (e) { err("4a: no se pudo comprobar la identidad: " + e.message); }
+
 /* 4b · El FAQ del JSON-LD es un DUPLICADO del diccionario, y los duplicados se
    desfasan. `hydrate-i18n.mjs` no lo toca porque no tiene atributos data-i18n,
    así que nada lo vigilaba: el 11 ago 2026 el bloque seguía prometiendo "próximamente
