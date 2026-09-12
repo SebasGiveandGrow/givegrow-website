@@ -419,7 +419,13 @@ html[data-theme="dark"] .alma-send{background:var(--acc);color:#0F1613}
 .field input,.field textarea,.field select{width:100%;padding:11px 14px;border:1px solid var(--bd);border-radius:10px;font-family:inherit;font-size:var(--fs-16)}
 /* select del form: mismo fondo/tinta que los inputs (día y noche) + flecha propia */
 .field select{background-color:var(--surface);color:var(--ink);appearance:none;-webkit-appearance:none;padding-right:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
-.field input:focus,.field textarea:focus{outline:none;border-color:var(--g)}
+/* --acc Y NO --g. Son el MISMO color de dia, token por token; de noche --acc
+   se aclara y --g no se mueve. Con --g, el borde de un campo enfocado
+   quedaba en 2.03:1 contra el fondo del campo y en 1.59:1 contra el borde sin
+   foco: verde oscuro sobre verde oscuro. Y como aqui se quita el outline, no
+   habia indicador de repuesto — de noche no se veia en que campo estabas.
+   De dia no cambia nada. */
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--acc)}
 
 /* ===== prose ===== */
 .prose{max-width:720px;margin:0 auto}
@@ -883,7 +889,7 @@ html[data-theme="dark"] .e404-code{color:var(--gd)}
 .track-box{max-width:640px;margin-top:26px}
 .track-search{display:flex;gap:10px}
 .track-search input{flex:1;padding:14px 16px;border:1.5px solid var(--bd);border-radius:12px;font-size:var(--fs-16);font-family:var(--mono,monospace);letter-spacing:.5px;background:var(--surface);color:var(--ink);text-transform:uppercase}
-.track-search input:focus{outline:none;border-color:var(--g)}
+.track-search input:focus{outline:none;border-color:var(--acc)}
 .track-search .btn{flex:0 0 auto;white-space:nowrap}
 .track-noguide{margin-top:14px;background:none;border:none;color:var(--g);font-weight:600;font-size:var(--fs-14);cursor:pointer;text-decoration:underline;padding:4px 0}
 html[data-theme="dark"] .track-noguide{color:var(--gn)}
@@ -959,9 +965,9 @@ html[data-theme="dark"] .track-cta h3{color:var(--ink)}
 /* `url` estaba fuera de la lista y el campo "Sitio web" quedaba con el borde de
    1px del estilo genérico, medio punto más fino que sus vecinos. */
 .ally-form input[type=text],.ally-form input[type=email],.ally-form input[type=tel],.ally-form input[type=url]{padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:var(--fs-16);background:var(--surface);color:var(--ink)}
-.ally-form input:focus{outline:none;border-color:var(--g)}
+.ally-form input:focus{outline:none;border-color:var(--acc)}
 .ally-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:var(--fs-16);font-family:inherit;background:var(--surface);color:var(--ink);resize:vertical;min-height:96px;box-sizing:border-box}
-.ally-form textarea:focus{outline:none;border-color:var(--g)}
+.ally-form textarea:focus{outline:none;border-color:var(--acc)}
 .ally-mods{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ally-check{display:flex;gap:11px;align-items:flex-start;padding:14px;border:1.5px solid var(--bd);border-radius:12px;cursor:pointer;transition:border-color .15s,background .15s}
 .ally-check:hover{border-color:var(--gm)}
