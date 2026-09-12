@@ -12923,12 +12923,21 @@ function entregaPublica(e) {
 }
 
 async function apiEntregas(env, url) {
-  const destino = String(url.searchParams.get("destino") || "").slice(0, 60);
+  /* SE RECORTA Y NO DISTINGUE MAYUSCULAS. El destino del APORTE lo genera el
+     sitio —sale de los id de partners.json, del id de la brigada o de «general»—
+     pero el de la ENTREGA lo escribe una persona a mano en el panel, en un campo
+     de texto con un ejemplo por toda guia. En SQLite «ndf» = «NDF» da 0, asi que
+     una diferencia de caja rompia el enlace entre el aporte y su acta.
+     Lo que ve el donante cuando se rompe no es un hueco: es «Todavia no hay
+     entregas publicadas para este destino», una afirmacion sobre el mundo que
+     seria falsa. Este archivo ya tiene escrito el mismo miedo unas lineas mas
+     abajo, sobre el otro extremo del mismo enlace. */
+  const destino = String(url.searchParams.get("destino") || "").trim().slice(0, 60);
   const limite = entero(url.searchParams.get("limite"), 20, 1, 50);
   let sql = "SELECT numero, destino_id, sector, lugar, fecha, aliada, familias, resumen, " +
             "recibido_por, fotos FROM entregas WHERE publicada_en IS NOT NULL AND anulada_en IS NULL";
   const args = [];
-  if (destino) { sql += " AND destino_id = ?"; args.push(destino); }
+  if (destino) { sql += " AND destino_id = ? COLLATE NOCASE"; args.push(destino); }
   sql += " ORDER BY fecha DESC, numero DESC LIMIT " + limite;
   const q = args.length ? env.DB.prepare(sql).bind(...args) : env.DB.prepare(sql);
   const r = await q.all();
@@ -13111,7 +13120,22 @@ async function adminCrearEntrega(request, env, quien) {
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "entrega " + numero + " creada · " + sector + " · " + fecha).run();
 
-  return json({ ok: true, numero });
+  /* Y SE MIRA SI ALGUIEN DONO A ESE DESTINO. Ignorar la caja arregla «NDF» por
+     «ndf», pero no arregla «ndff»: un destino mal escrito de verdad deja el acta
+     colgando de nada, y quien aporto a ese destino sigue viendo que no hay
+     entregas. Se avisa y se deja seguir —una entrega en especie puede preceder a
+     cualquier aporte dirigido—, pero se dice en el momento de crearla, que es
+     cuando la persona tiene el dato delante y puede corregirlo. */
+  const conAporte = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM aportes WHERE destino_id = ? COLLATE NOCASE"
+  ).bind(destino).first();
+
+  return json({
+    ok: true, numero,
+    aviso: (conAporte && conAporte.n) ? null
+      : "Ningun aporte tiene el destino «" + destino + "». El acta queda registrada, "
+        + "pero no va a aparecerle a ningun donante. Comprueba como esta escrito."
+  });
 }
 
 async function adminSubirFoto(request, env, numero, url) {
@@ -16100,7 +16124,8 @@ document.addEventListener("change", function(e){
 document.addEventListener("click", function(e){
   if (e.target.id === "e-crear"){
     var b = e.target, err = document.getElementById("e-error");
-    err.style.display = "none"; b.disabled = true; b.textContent = "Registrando…";
+    err.style.display = "none"; err.style.color = "#c0392b";
+    b.disabled = true; b.textContent = "Registrando…";
     function v(id){ var el = document.getElementById(id); return el ? el.value : ""; }
     fetch("/api/admin/entrega", {
       method: "POST", headers: {"content-type":"application/json"},
@@ -16116,6 +16141,14 @@ document.addEventListener("click", function(e){
           err.textContent = res.d.faltan ? ("Faltan datos: " + res.d.faltan.join(", ") + ".")
                         : (res.d.ayuda || ("No se pudo registrar (" + (res.d.error||res.http) + ")."));
           err.style.display = "block"; return;
+        }
+        /* El aviso NO es un error: el acta quedo registrada. Se enseña en el
+           mismo sitio pero en ambar, que es como este panel dice «mira esto»
+           sin decir «fallo». */
+        if (res.d && res.d.aviso){
+          err.textContent = res.d.aviso;
+          err.style.color = "#b7791f";
+          err.style.display = "block";
         }
         pintarCampos(); cargarEntregas();
       })
