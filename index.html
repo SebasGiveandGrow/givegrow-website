@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=db536313">
+<link rel="stylesheet" href="/styles.css?v=9c0cc21c">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -123,6 +123,12 @@
     </div>
   </div>
 </nav>
+<!-- Se coloca sola, justo bajo la barra. NO puede ir en el flujo normal: el nav
+     es `position:fixed` con z-index 200 y la taparia entera. Tampoco dentro del
+     nav, que es flex y la estira. Va fija, y su `top` lo pone el JS midiendo la
+     altura real de la barra, que cambia entre movil y escritorio. -->
+<p id="lang-fallo" class="lang-fallo" role="status" aria-live="polite" style="display:none"
+   data-i18n="lang.fallo">Couldn't load English — check your connection · No se pudo cargar el inglés — revisa tu conexión</p>
 <div class="nav-mobile" id="nav-mobile">
   <a class="mmc-nav" href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
   <a class="mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
@@ -2723,7 +2729,7 @@
   <div id="lb-count"></div>
 </div>
 
-<script src="/app.js?v=22631e2f"></script>
+<script src="/app.js?v=ba3ef604"></script>
 <!-- Cloudflare Web Analytics (sin cookies, respeta privacidad). Pega tu token entre las comillas de CF_BEACON_TOKEN. -->
 <script>window.CF_BEACON_TOKEN="9714671399c141338413637371be8796";</script>
 <script>(function(){var t=window.CF_BEACON_TOKEN;if(t){var s=document.createElement("script");s.defer=true;s.src="https://static.cloudflareinsights.com/beacon.min.js";s.setAttribute("data-cf-beacon",JSON.stringify({token:t}));document.head.appendChild(s);}})();</script>

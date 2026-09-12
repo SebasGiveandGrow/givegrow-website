@@ -1614,5 +1614,6 @@
   "rep.err.espera": "We already received several reports from this email a moment ago. Wait a few minutes; if you already sent yours, look for your tracking number in the email we sent you.",
   "bc.pagina": "Page {a}–{b} of {t} published homes, ordered by urgency.",
   "bc.mas": "See the next",
-  "bc.ant": "Previous"
+  "bc.ant": "Previous",
+  "lang.fallo": "Couldn't load English — check your connection · No se pudo cargar el inglés — revisa tu conexión"
 }

@@ -9,6 +9,7 @@ var I18N = {
     "bc.ant": "Anteriores",
     "rep.err.espera": "Ya recibimos varios reportes desde este correo hace un momento. Espera unos minutos; si ya enviaste el tuyo, busca tu número de guía en el correo que te llegó.",
     "grat.falla": "No pudimos cargar los comercios aliados en este momento. No quiere decir que no haya: quiere decir que no lo pudimos comprobar. Vuelve a intentar en un rato.",
+    "lang.fallo": "Couldn't load English — check your connection · No se pudo cargar el inglés — revisa tu conexión",
     "nav.menu.aria": "Menú",
     "donar.via.aria": "Con qué pasarela pagar",
     "cv.ej.sirvecerca.alt": "Muro blanco agrietado junto a una puerta, con escombro al pie",
@@ -1904,20 +1905,57 @@ function postLang(l){
   cajasDesplazables();
 }
 var I18N_LOADING = null;
+/* EL ESPAÑOL VIAJA DENTRO DE app.js; EL INGLÉS SE PIDE POR RED. Esa asimetría
+   está bien —son 1.616 claves que la mayoría no necesita— pero tenía un modo de
+   fallo mudo: si el fetch no llegaba, `setLang` hacía `return` y no pasaba nada
+   de nada. El botón EN quedaba muerto, sin mensaje, sin cambio de estado, sin
+   pista. Comprobado en producción el 12 sep 2026 bloqueando la petición: `lang`
+   seguía en «es», el h1 seguía en español y el botón ES conservaba su clase.
+   Dos arreglos, y el primero es el que de verdad importa:
+   1) SE REINTENTA UNA VEZ. El fallo real casi siempre es un parpadeo de red, y
+      un segundo intento lo resuelve sin molestar a nadie.
+   2) Si insiste, se dice. Que es la regla de esta casa: «no existe» y «no pude
+      preguntar» no son lo mismo. */
+function pedirIngles(){
+  return fetch("/i18n/en.json", { cache: "force-cache" })
+    .then(function(r){ if(!r.ok) throw 0; return r.json(); });
+}
 function ensureLang(next){
   if (next !== "en" || I18N.en) return Promise.resolve();
   if (!I18N_LOADING){
-    I18N_LOADING = fetch("/i18n/en.json")
-      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+    I18N_LOADING = pedirIngles()
+      .catch(function(){ return pedirIngles(); })
       .then(function(j){ I18N.en = j; })
       .catch(function(){ I18N_LOADING = null; });
   }
   return I18N_LOADING;
 }
+/* La franja vive fuera de las páginas porque se puede pulsar EN desde
+   cualquiera. Va en las dos lenguas en la misma línea a propósito: el
+   diccionario inglés es justo lo que no cargó, así que no se puede confiar en
+   él para redactar el aviso, y quien pulsó EN probablemente lee inglés. */
+var AVISO_IDIOMA_T = null;
+function avisoIdioma(mostrar){
+  var f = document.getElementById("lang-fallo");
+  if (!f) return;
+  /* SE VA SOLO. La franja va fija sobre el contenido, asi que mientras este
+     puesta tapa lo que haya debajo —en la portada, el enlace a la brigada—. Un
+     aviso de que algo no cargo no puede quedarse a vivir encima de un enlace:
+     se lee y se quita. Si se vuelve a fallar, vuelve a salir. */
+  clearTimeout(AVISO_IDIOMA_T);
+  if (mostrar) AVISO_IDIOMA_T = setTimeout(function(){ avisoIdioma(false); }, 8000);
+  /* El `top` se mide, no se escribe: la barra no mide lo mismo en movil que en
+     escritorio, y un numero fijo aqui deja la franja pisando la barra o flotando
+     separada de ella. */
+  var nav = document.querySelector("nav");
+  f.style.top = (nav ? nav.getBoundingClientRect().height : 0) + "px";
+  f.style.display = mostrar ? "block" : "none";
+}
 function setLang(l){
   var next = (l === "en") ? "en" : "es";
   ensureLang(next).then(function(){
-    if (next === "en" && !I18N.en) return;
+    if (next === "en" && !I18N.en){ avisoIdioma(true); return; }
+    avisoIdioma(false);
     var vt = document.startViewTransition && window.matchMedia &&
              !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
              typeof lang !== "undefined" && lang && lang !== next;
@@ -2443,6 +2481,10 @@ window.addEventListener("resize", function(){
      freno, porque el resize dispara decenas de veces por gesto. */
   clearTimeout(CAJAS_T);
   CAJAS_T = setTimeout(cajasDesplazables, 150);
+  /* Y la franja del idioma, si esta puesta: su `top` se midio con la barra de
+     antes, y la barra no mide lo mismo girando el telefono. */
+  var lf = document.getElementById("lang-fallo");
+  if (lf && lf.style.display === "block") avisoIdioma(true);
 });
 
 var BC_CL = ["urgente", "programada", "no_requiere"];
