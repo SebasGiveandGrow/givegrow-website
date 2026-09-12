@@ -1260,6 +1260,21 @@ html[data-theme="dark"] .grat-card-more{color:var(--gn)}
 .map-fchip.on{background:var(--g);border-color:var(--g);color:var(--on-dark)}
 .map-summary{margin:14px 0 0;font-size:var(--fs-15);color:var(--mu)}
 
+/* LAS PILDORAS SELECCIONADAS, DE NOCHE. Las cuatro pestañas/chips que marcan lo
+   elegido lo hacen rellenandose con --g, y --g no se aclara de noche: la pildora
+   quedaba en 2.19 contra el fondo de su zona, por debajo del 3.0 que pide
+   WCAG 1.4.11 para un indicador que no es texto.
+   Y era el UNICO indicador: la tinta de la elegida y la de las demas quedan en
+   1.17 entre si —las dos son claras de noche—, asi que el relleno es todo lo que
+   distingue «Bancolombia» de «PayPal» en la pantalla de donar.
+   Se sube a --gm, que es el mismo verde un paso mas claro: 3.45 contra el fondo
+   y 5.05 para el texto blanco de dentro. La tinta no se toca, asi que el aspecto
+   es el mismo un punto mas legible. De dia no cambia nada. */
+html[data-theme="dark"] .pay-tab.on,
+html[data-theme="dark"] .acc-tab.on,
+html[data-theme="dark"] .fimp-q.on,
+html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm)}
+
 /* ===========================================================================
    BRIGADA DE ATENCIÓN A EMERGENCIA — página de campaña (agosto 2026)
    ===========================================================================
