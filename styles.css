@@ -8,6 +8,11 @@
   --cream:#F7F4EF;
   --mu:#5C636F;--bd:#DAD3C3;--bds:#EDE8DC;
   --amber:#A84D00;--amberl:#FEF3E0;
+  /* EL VERDE DE «SALIO BIEN». Faltaba: `var(--ok)` no estaba definido en
+     ninguna parte de esta hoja, asi que el unico sitio que lo usa —el mensaje
+     que le dice a una familia que sus fotos se subieron— caia en su respaldo,
+     `var(--g)`, que no se aclara de noche. De dia vale lo mismo que antes. */
+  --ok:#1F5C38;
   /* Rojo de error. No existía: `app.js` lo invocaba tres veces como
      `var(--err,#c0392b)` y caía SIEMPRE al fallback, así que había tres rojos
      distintos sueltos por el sitio. Al definirlo aquí, esas tres llamadas
@@ -659,6 +664,9 @@ html[data-theme="dark"]{
   /* Más claro y desaturado que el de día: el rojo institucional sobre fondo
      oscuro se apaga y deja de leerse. */
   --err:#E58E76;
+  /* De noche si se aclara, como --amber y --err. Los tres son estados y los
+     tres tienen que leerse igual de bien; el de exito era el unico que no. */
+  --ok:#6FB08D;
   --amber:#E8A24C;--amberl:#33260F;
   --honor:#D4A017;--honorl:#2E2711;
   --nav-bg:rgba(15,22,19,.94);
@@ -1510,7 +1518,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
   :root, :root[data-theme="dark"] {
     --bg:#fff; --surface:#fff; --surface-2:#fff;
     --ink:#111; --ink-soft:#333; --mu:#555; --bd:#bbb;
-    --g:#1F5C38; --acc:#1F5C38; --gl:#fff; --amber:#7a3800;
+    --g:#1F5C38; --acc:#1F5C38; --gl:#fff; --amber:#7a3800; --ok:#1F5C38;
     /* RED DE SEGURIDAD CONTRA LA TINTA INVISIBLE.
        Todo el texto que va sobre superficie oscura usa ahora `--on-dark`, así
        que aquí se le da la vuelta: en papel, ese token ES la tinta. Cualquier
