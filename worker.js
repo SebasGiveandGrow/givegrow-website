@@ -14492,7 +14492,19 @@ var COLA_ES = {
   urgentes_sin_visitar: "Urgentes sin visitar",
   casos_esperando_fotos: "Esperando fotos de la familia",
   ingenieros_sin_verificar: "Matrículas sin verificar",
-  conceptos_sin_respaldo: "Conceptos esperando confirmación"
+  conceptos_sin_respaldo: "Conceptos esperando confirmación",
+  /* LAS SIETE QUE FALTABAN. El servidor emite diecisiete colas y aqui habia
+     nombre para diez, asi que estas siete salian a pantalla con su clave cruda
+     —«visitadas_sin_materiales»—. Se pintaban, si: el respaldo es
+     «COLA_ES[clave] || clave». Pero un nombre de variable no le dice a nadie que
+     hacer, y esa es toda la razon de ser de esta lista. */
+  paypal_sin_casa: "Eventos de PayPal sin casa",
+  ipn_por_registrar: "Donaciones del botón, sin registrar",
+  suscripciones_sin_aprobar: "Membresías que quedaron a medias",
+  correos_sin_buzon: "Avisos internos sin buzón a donde ir",
+  casos_respondieron: "Familias que ya mandaron sus fotos",
+  visitadas_sin_materiales: "Visitadas y todavía sin materiales",
+  terreno_sin_atender: "Inspecciones de terreno sin atender"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -14647,7 +14659,21 @@ var COLA_MOD = {
   urgentes_sin_visitar: "mmc",
   casos_esperando_fotos: "mmc",
   ingenieros_sin_verificar: "mmc",
-  conceptos_sin_respaldo: "mmc"
+  conceptos_sin_respaldo: "mmc",
+  /* Y SUS MODULOS, que es lo que de verdad faltaba: «pintarContadores» hace
+     «if (!m) return;», asi que una cola sin entrada aqui no suma en ninguna
+     insignia — tampoco en la de «hoy», que es el total. Siete de diecisiete no
+     se contaban.
+     El modulo NO se elige a ojo: sale de la seccion a la que apunta el
+     «destino» de cada cola, para que la pestaña que se enciende sea la misma a
+     la que lleva el boton «Ir». */
+  paypal_sin_casa: "dinero",
+  ipn_por_registrar: "dinero",
+  suscripciones_sin_aprobar: "dinero",
+  correos_sin_buzon: "salud",
+  casos_respondieron: "mmc",
+  terreno_sin_atender: "mmc",
+  visitadas_sin_materiales: "entregas"
 };
 
 /* El numero en la pestana es lo que convierte esto en una consola: sin el hay
@@ -14696,7 +14722,7 @@ function pintarDecisiones(d){
 
   if (!alarmas.length && !pend.length){
     caja.innerHTML = '<div class="dec-caja"><h2 class="dec-t">Nada esperando</h2>'
-      + '<p class="mu" style="margin:0;font-size:13.5px">Las diez colas están en cero. '
+      + '<p class="mu" style="margin:0;font-size:13.5px">Las ' + esc(String((d.cola || []).length)) + ' colas están en cero. '
       + 'Lo de abajo es para entender el sistema, no para actuar sobre él.</p></div>';
     return;
   }
