@@ -113,20 +113,22 @@ console.log("\ntotal: " + fallos);
    nadie lo corria y no estaba en ningun workflow. Un guardian que no puede
    suspender no es un guardian.
 
-   El techo es el numero de HOY, no cero, y eso es a proposito: las cuatro
-   parejas que quedan son decisiones de paleta que estan puestas sobre la mesa
-   de Sebas, no fallos que yo deba resolver por mi cuenta. Lo que este numero
-   garantiza es que no salgan mas.
+   El techo es el numero de HOY, no cero, y eso es a proposito: las parejas que
+   quedan son decisiones de paleta que estan puestas sobre la mesa de Sebas, no
+   fallos que yo deba resolver por mi cuenta. Lo que este numero garantiza es
+   que no salgan mas.
 
-   LAS CUATRO, para que quien las vea sepa cual es cual:
-     · `.tag.honor` (dia, en las dos marcas) — 3.07. Es CODIGO MUERTO: la clase
-       no se usa en ningun sitio y `--honor`/`--honorl` no tienen otro consumidor.
-       Borrar la regla y sus dos tokens cerraria estas dos sin decidir nada.
+   LAS DOS QUE QUEDAN, para que quien las vea sepa cual es cual:
      · `.tag.new` y `.med-step-s.is-wip` (MMC, dia) — 3.48. Son la pareja
        `--amber` sobre `--amberl`, la misma que quedo señalada en el PR #393.
 
+   El techo era 4. Las otras dos eran `.tag.honor` (dia, en las dos marcas) —
+   3.07, y resultaron ser CODIGO MUERTO: la clase no se usaba en ningun sitio
+   y `--honor`/`--honorl` no tenian otro consumidor. Se borro la regla y sus
+   dos tokens, que no decidia nada de paleta, y el techo bajo de 4 a 2.
+
    Si se arregla alguna, el script lo dice y hay que BAJAR este numero. */
-const TECHO_CONTRASTE = 4;
+const TECHO_CONTRASTE = 2;
 if (fallos > TECHO_CONTRASTE) {
   console.log(`\n\u2718 ${fallos} parejas por debajo del minimo y el techo es ${TECHO_CONTRASTE}.`);
   console.log("  Usa un token que SI se aclare de noche, o sube el contraste del par.");
