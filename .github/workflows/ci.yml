@@ -62,6 +62,23 @@ jobs:
       - name: Nada se sale del papel en los PDF
         run: node ops/desborde.mjs
 
+      # El contraste tenía guardián desde el 10 sep —`ops/contraste.mjs`, que barre
+      # el CSS entero en las CUATRO combinaciones de marca y tema— pero salía
+      # siempre con código 0 y no estaba en ningún workflow. O sea que informaba
+      # y no paraba nada, así que nadie lo corría. Esta semana aparecieron tres
+      # fallos de esta familia buscándolos a mano.
+      #
+      # Ahora lleva trinquete con el número de hoy (4), no con cero: las cuatro
+      # parejas que quedan son decisiones de paleta de Sebas. Lo que esto impide
+      # es que salga una quinta.
+      #
+      # Ojo con lo que NO cubre, para que nadie lo lea como una red completa:
+      # solo mira reglas que declaran color Y fondo en la misma regla (84 hoy).
+      # Un borde de foco, o una tinta cuyo fondo viene de un ancestro, se le
+      # escapan — los tres de esta semana eran de ese tipo.
+      - name: Contraste de color (las 4 combinaciones de marca y tema)
+        run: node ops/contraste.mjs
+
       - name: Cache-bust coherente (md5 de assets vs index.html)
         run: |
           CSS_REAL=$(md5sum styles.css | cut -c1-8)

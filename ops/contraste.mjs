@@ -107,3 +107,33 @@ for (const [nombre, t] of Object.entries(tablas)) {
   for (const x of malas.slice(0,8)) console.log("   %s  %s sobre %s   %s < %s", x.sel.padEnd(52), x.f, x.b, x.r, x.min);
 }
 console.log("\ntotal: " + fallos);
+
+/* TRINQUETE, igual que los de `validate.mjs`. Este script existia desde el 10 de
+   septiembre y salia SIEMPRE con codigo 0: informaba y no paraba nada, asi que
+   nadie lo corria y no estaba en ningun workflow. Un guardian que no puede
+   suspender no es un guardian.
+
+   El techo es el numero de HOY, no cero, y eso es a proposito: las cuatro
+   parejas que quedan son decisiones de paleta que estan puestas sobre la mesa
+   de Sebas, no fallos que yo deba resolver por mi cuenta. Lo que este numero
+   garantiza es que no salgan mas.
+
+   LAS CUATRO, para que quien las vea sepa cual es cual:
+     · `.tag.honor` (dia, en las dos marcas) — 3.07. Es CODIGO MUERTO: la clase
+       no se usa en ningun sitio y `--honor`/`--honorl` no tienen otro consumidor.
+       Borrar la regla y sus dos tokens cerraria estas dos sin decidir nada.
+     · `.tag.new` y `.med-step-s.is-wip` (MMC, dia) — 3.48. Son la pareja
+       `--amber` sobre `--amberl`, la misma que quedo señalada en el PR #393.
+
+   Si se arregla alguna, el script lo dice y hay que BAJAR este numero. */
+const TECHO_CONTRASTE = 4;
+if (fallos > TECHO_CONTRASTE) {
+  console.log(`\n\u2718 ${fallos} parejas por debajo del minimo y el techo es ${TECHO_CONTRASTE}.`);
+  console.log("  Usa un token que SI se aclare de noche, o sube el contraste del par.");
+  process.exit(1);
+}
+if (fallos < TECHO_CONTRASTE) {
+  console.log(`\n\u2714 BAJO del techo ${TECHO_CONTRASTE}. Actualiza TECHO_CONTRASTE en ops/contraste.mjs a ${fallos}.`);
+  process.exit(0);
+}
+console.log(`\n\u2714 ${fallos}, en el techo. Ninguna pareja nueva.`);
