@@ -124,10 +124,14 @@ Están redactadas para que se puedan responder con un sí, un no o una regla.
 
 ## 5. Qué se puede construir sin esperar respuestas
 
-- **El banco público de casas, sin dinero de por medio.** Casos con
-  `consent_publico` verificado, anonimizados, mostrando qué hay y qué falta. No
-  promete nada, no toca contabilidad y construye el lado de la demanda. El
-  índice `ix_casos_publico` existe desde la 0010 y nadie lo consume.
+- ~~**El banco público de casas, sin dinero de por medio.**~~ **HECHO.** Vive en
+  `#casas` y lo sirve `/api/casos/publicos`: casos con `consent_publico = 1` y
+  clasificación puesta, anonimizados, sin tocar contabilidad.
+  Y el índice `ix_casos_publico` **sí se consume** —decía aquí que no—. Verificado
+  el 15 sep 2026 con `EXPLAIN QUERY PLAN` sobre la consulta real:
+  `SEARCH casos USING INDEX ix_casos_publico (consent_publico=? AND clasificacion>?)`.
+  El `USE TEMP B-TREE FOR ORDER BY` que lo acompaña es inevitable: el orden sale
+  de un `CASE` sobre la clasificación y eso ningún índice lo resuelve.
 - Nada que mueva plata.
 
 ## 6. Lo que NO se debe hacer
@@ -137,3 +141,19 @@ Están redactadas para que se puedan responder con un sí, un no o una regla.
   permita identificar la vivienda.
 - **Prometer que una casa se va a reparar.** Hasta que haya acta firmada solo
   hay una intención — y esa distinción es la marca entera.
+
+### Y la pantalla que se construyó las cumple (verificado el 15 sep 2026)
+
+`#apadrinar` está viva en Mira Mi Casa. Leído su texto contra las tres reglas de
+arriba:
+
+| regla | lo que dice la pantalla |
+|---|---|
+| nada de checkout todavía | «**No se cobra aquí.** Este formulario no pide datos de pago ni cobra nada.» |
+| no identificar la vivienda | «**No eliges la casa.** Qué casas se atienden lo ordenan los conceptos escritos de los ingenieros.» |
+| no prometer la reparación | «**No prometemos una casa con tu nombre**; publicamos lo que efectivamente se hizo.» |
+
+Añade por su cuenta la salvedad que el proyecto necesitaba: «ni el concepto del
+ingeniero ni una reparación declaran que una vivienda se pueda habitar», con la
+Ley 1523 de 2012 citada. Queda anotado para que quien la toque sepa que ese
+texto no es relleno: es lo que impide que la página prometa de más.
