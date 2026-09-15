@@ -359,11 +359,31 @@ tipografía de documento; la marca la cargan la estructura, el verde y el papel.
 
 ## Pendiente
 
-- **Cédulas de los firmantes.** `ENTIDAD.repLegal.cc` y `ENTIDAD.revisora.cc`
-  están vacías en `documentos.js` y el bloque de firmas omite la línea cuando lo
-  están. La T.P. de la Revisora Fiscal sí está (244894-T, tomada de
-  `#transparencia`).
-- **Donaciones por transferencia bancaria.** El numeral 5 dice «transferencia
-  electrónica No. …» con el id de Wompi. Un aporte que llegue por consignación
-  directa a Bancolombia hoy no está en D1, así que no puede certificarse por
-  aquí todavía.
+*Repasado contra el código el 14 sep 2026. Los dos que había aquí ya no lo eran.*
+
+- **La firma del certificado.** Hoy el bloque de firmas imprime los nombres y el
+  cargo, y nada prueba que esas dos personas lo vieran. El PR #378 —abierto,
+  sin fusionar— añade la firma electrónica de la Revisora Fiscal con su huella
+  SHA-256, su propia aplicación de Access y la migración `0026`. Hasta que entre,
+  un certificado emitido es un documento **sin firmar**.
+- **Validación de la contadora** sobre el articulado del certificado. Su texto lo
+  suministró ella y el check #10 del gate vigila que `documentos.js` y
+  `ops/minutas-certificado.js` no diverjan, pero el visto bueno formal sobre la
+  versión actual sigue sin darse.
+
+### Lo que ESTABA aquí y ya no es pendiente
+
+- ~~**Cédulas de los firmantes.**~~ Decía que `ENTIDAD.repLegal.cc` y
+  `ENTIDAD.revisora.cc` «están vacías». **No están vacías: no existen.** Se
+  quitaron —los dos campos y la línea que los imprimía— porque este repositorio
+  es público y el número de cédula de dos personas reales no puede vivir en él.
+  Describirlos como «campos vacíos» invitaba a rellenarlos, que es exactamente lo
+  que no debe pasar. Si algún día hace falta la cédula en el PDF, va por variable
+  de entorno, nunca en el archivo.
+  La T.P. de la Revisora Fiscal sí está y sí es pública: 244894-T.
+- ~~**Donaciones por transferencia bancaria.**~~ Decía que «hoy no está en D1, así
+  que no puede certificarse». Se contradecía con la sección «Transferencias
+  bancarias reportadas» de este mismo archivo: `/api/transferencia` escribe el
+  aporte en D1 con `metodo_pago = 'TRANSFERENCIA'`, confirmar **exige** la
+  referencia del comprobante, y el numeral 5 del certificado cita esa referencia
+  bancaria en vez del id de la pasarela.
