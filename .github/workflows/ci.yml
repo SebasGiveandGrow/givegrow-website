@@ -68,14 +68,25 @@ jobs:
       # y no paraba nada, así que nadie lo corría. Esta semana aparecieron tres
       # fallos de esta familia buscándolos a mano.
       #
-      # Ahora lleva trinquete con el número de hoy (4), no con cero: las cuatro
-      # parejas que quedan son decisiones de paleta de Sebas. Lo que esto impide
-      # es que salga una quinta.
+      # El trinquete arrancó en 4 y hoy está en CERO, y llegó ahí bajando: se
+      # borró `.tag.honor` (código muerto, valía 2) y se oscureció el `--amber`
+      # de Mira Mi Casa de #B57500 a #9A6400 (3.48 -> 4.57, valía las otras 2).
+      # Cero ya no significa "que no salgan más": significa "que no salga
+      # ninguna". Cualquier pareja por debajo del mínimo suspende.
       #
       # Ojo con lo que NO cubre, para que nadie lo lea como una red completa:
-      # solo mira reglas que declaran color Y fondo en la misma regla (84 hoy).
-      # Un borde de foco, o una tinta cuyo fondo viene de un ancestro, se le
-      # escapan — los tres de esta semana eran de ese tipo.
+      # solo mira reglas que declaran color Y fondo en la MISMA regla — 118 hoy,
+      # 83 de styles.css y 35 de los <style> que el Worker emite en sus páginas
+      # generadas. Un borde de foco, o una tinta cuyo fondo viene de un ancestro,
+      # se le escapan; los tres fallos de la semana del 10 sep eran de ese tipo.
+      #
+      # Los <style> del Worker entraron el 15 sep. Antes decía "0" cubriendo solo
+      # styles.css e ignorando 35 reglas: un techo en cero que mira medio sitio
+      # miente más que uno en cuatro que lo dice. Se juzgan solo de DÍA —esas
+      # páginas no cargan app.js, que es quien pone `data-theme`, y styles.css no
+      # tiene ni un `prefers-color-scheme`— pero SÍ en las dos marcas, porque
+      # `marcarMarca` le pone `data-marca="mmc"` a cualquier HTML servido desde
+      # el host de Mira Mi Casa.
       - name: Contraste de color (las 4 combinaciones de marca y tema)
         run: node ops/contraste.mjs
 
