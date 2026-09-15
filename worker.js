@@ -9868,7 +9868,7 @@ function cargar(){
             ? '<span class="f-si">firmado ' + esc(x.firma_rf.en) + "</span>"
             : '<span class="f-no">pendiente</span>') + "</span></p>"
         + '<div class="f-acc">'
-        + '<a class="tab" href="/api/admin/certificado/' + esc(x.numero) + '.pdf" target="_blank" rel="noopener">Ver el documento</a>'
+        + '<a class="tab" href="/api/firma/' + esc(x.numero) + '.pdf" target="_blank" rel="noopener">Ver el documento</a>'
         + (mia ? '<button type="button" class="btn" data-firmar="' + esc(x.numero) + '">Firmar</button>' : "")
         + '<span class="msg" id="m-' + esc(x.numero) + '"></span>'
         + "</div></div>";
@@ -17843,6 +17843,25 @@ export default {
         });
       }
       if (ruta === "/api/firma/pendientes") return await firmaPendientes(env, sesion);
+      /* EL DOCUMENTO, DENTRO DE LA ZONA DE FIRMA. La pantalla enlazaba el PDF
+         por `/api/admin/certificado/<n>.pdf`, y esa ruta NO es zona de firma:
+         Access la cubre con la aplicacion del PANEL (kid 48d495e9, comprobado en
+         produccion) y el Worker solo acepta ahi la audiencia del panel. O sea que
+         la Revisora Fiscal podia FIRMAR y no podia LEER lo que firmaba, que es
+         justo lo que este flujo existia para impedir.
+
+         Se sirve el mismo PDF bajo `/api/firma/`, ya cubierto por su propia
+         aplicacion, en vez de ampliar la zona del panel: asi no hay que tocar el
+         dashboard y la separacion de audiencias queda intacta — un token de firma
+         sigue sin abrir donantes ni comprobantes bancarios.
+
+         Es el patron que el triaje YA usaba con `/api/triage/inspeccion/<n>.pdf`.
+         La firma se habia desviado de el.
+
+         No expone nada nuevo: la cola de esta misma pantalla ya muestra nombre
+         del donante, documento, monto y guia de cada certificado que lista. */
+      const fpdf = ruta.match(/^\/api\/firma\/(CD-\d{4}-\d{6})\.pdf$/i);
+      if (fpdf) return await adminCertificadoPdf(env, fpdf[1].toUpperCase());
       const fir = ruta.match(/^\/api\/firma\/(CD-\d{4}-\d{6})$/i);
       if (fir) return await firmaFirmar(request, env, fir[1].toUpperCase(), sesion);
 
