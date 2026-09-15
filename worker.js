@@ -14374,9 +14374,9 @@ y la entidad, no una persona atendida. Una entrega no se puede publicar sin al m
 <div class="med-tw"><table class="med-tbl eco-stack">
 <thead><tr>
 <th scope="col">Acta</th><th scope="col">Fecha</th><th scope="col">Sector</th>
-<th scope="col">Aliada</th><th scope="col">Familias</th><th scope="col">Fotos</th>
+<th scope="col">Aliada</th><th scope="col">Recibido por</th><th scope="col">Familias</th><th scope="col">Fotos</th>
 <th scope="col">Casas</th><th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="e-filas"><tr><td colspan="9" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</tr></thead><tbody id="e-filas"><tr><td colspan="10" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 <p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
@@ -16495,8 +16495,8 @@ function pintarCampos(){
 
 function pintarEntregas(l, sobre){
   var tb = document.getElementById("e-filas"); if (!tb) return;
-  if (!l.length){ tb.innerHTML = '<tr><td colspan="9">Todavía no hay entregas registradas.</td></tr>'; return; }
-  tb.innerHTML = filaTope(sobre, 9, "actas", "Lo que no se ve es lo MAS VIEJO de la cola, que es justo lo que llevaba mas tiempo esperando.") + l.map(function(e){
+  if (!l.length){ tb.innerHTML = '<tr><td colspan="10">Todavía no hay entregas registradas.</td></tr>'; return; }
+  tb.innerHTML = filaTope(sobre, 10, "actas", "Lo que no se ve es lo MAS VIEJO de la cola, que es justo lo que llevaba mas tiempo esperando.") + l.map(function(e){
     var nf = 0; try { nf = JSON.parse(e.fotos||"[]").length; } catch(x){}
     var pub = !!e.publicada_en;
     var nula = !!e.anulada_en;
@@ -16511,6 +16511,27 @@ function pintarEntregas(l, sobre){
       '<td data-label="Fecha">' + esc(e.fecha) + "</td>" +
       '<td data-label="Sector">' + esc(e.sector) + "</td>" +
       '<td data-label="Aliada">' + esc(e.aliada || "—") + "</td>" +
+      /* RECIBIDO POR, A LA VISTA. Este campo SE PUBLICA tal cual —entregaPublica
+         lo devuelve y el sitio lo muestra— y su regla esta escrita en dos sitios:
+         el esquema de la 0005 dice "ROL Y ENTIDAD de quien firma el acta, no el
+         nombre de una persona beneficiaria. Ley 1581, y con menores hay
+         proteccion reforzada", y el formulario lo repite en negrita.
+
+         Lo que faltaba era poder COMPROBARLO. adminEntregas ya traia el campo
+         al navegador y esta tabla no lo pintaba en ninguna de sus nueve
+         columnas, asi que el unico campo que el proyecto marca como legalmente
+         sensible era tambien el unico que, una vez escrito, no se podia revisar
+         desde ninguna pantalla: habia que consultar la API publica para ver que
+         estaba diciendo el sitio.
+
+         No se valida el contenido a proposito. "Esto parece el nombre de una
+         persona" no se decide con una expresion regular sin rechazar tambien
+         roles legitimos, y un guardian que se equivoca en esto bloquea una
+         publicacion honesta. Lo que si se puede hacer sin adivinar es enseñarlo
+         al lado de su acta. */
+      '<td data-label="Recibido por">' + (e.recibido_por
+        ? esc(e.recibido_por)
+        : '<small class="mu">—</small>') + "</td>" +
       '<td data-label="Familias">' + (e.familias == null ? "—" : e.familias) + "</td>" +
       '<td data-label="Fotos">' + nf + (nula ? "" : ' <label class="copy toca" style="cursor:pointer">+ foto' +
         '<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" data-foto="' + esc(e.numero) + '"></label>') + "</td>" +
