@@ -2124,6 +2124,14 @@ async function adminAportes(env, url) {
        hay quedó sin respaldo tras una reversa. */
     "(SELECT c.numero FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS certificado, " +
     "(SELECT c.revision_en FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_revision, " +
+    /* CUANTAS FIRMAS LLEVA Y SI YA SALIO. Desde el PR #378 «emitido» dejo de
+       significar «el donante lo tiene»: un certificado recien emitido espera dos
+       firmas y NO se manda. La tabla no tenia como decirlo y mostraba el numero
+       con su enlace al PDF igual que uno ya entregado. */
+    "(SELECT (CASE WHEN c.firma_rl_en IS NOT NULL THEN 1 ELSE 0 END) + " +
+    "        (CASE WHEN c.firma_rf_en IS NOT NULL THEN 1 ELSE 0 END) " +
+    " FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_firmas, " +
+    "(SELECT c.enviado_en FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_enviado, " +
     /* El último intento de mandarle el recibo. Es lo que permite contestar «no me
        llegó» sin salir del panel: si dice `fallo` o `simulado`, no llegó y ya
        sabemos por qué. */
@@ -2133,7 +2141,10 @@ async function adminAportes(env, url) {
     " ORDER BY a.creada_en DESC LIMIT " + limite;
   const q = estado ? env.DB.prepare(sql).bind(estado) : env.DB.prepare(sql);
   const r = await q.all();
-  return json({ aportes: r.results || [] });
+  /* Con el flujo de firma APAGADO ningun certificado tendra firmas nunca, asi
+     que sin este dato la tabla diria «esperando firma» de todos para siempre.
+     Que el panel sepa en que mundo esta es mas barato que adivinarlo. */
+  return json({ aportes: r.results || [], firma_activa: firmaConfigurada(env) });
 }
 
 /* Solo se permiten los dos pasos que ocurren en terreno. Los estados de pago los
@@ -14548,17 +14559,36 @@ var APROBADOS = ["aprobada", "en_distribucion", "entregada"];
 function celdaCert(a){
   if (a.certificado){
     var enlace = '<a href="/api/admin/certificado/' + esc(a.certificado) + '.pdf" target="_blank" rel="noopener">' + esc(a.certificado) + '</a>';
+    var anular = '<br><button class="copy" data-anular="' + esc(a.certificado) + '">Anular&hellip;</button>';
     /* Un certificado en revisión perdió su respaldo: el pago se cayó después de
        emitirlo. Tiene que gritar en la lista, no esconderse tras un número que
-       se ve igual que los sanos. */
+       se ve igual que los sanos. VA PRIMERO: un certificado puede estar sin
+       respaldo Y esperando firma a la vez, y de los dos el que urge es este. */
     if (a.cert_revision){
-      return enlace + '<br><strong style="color:#A84D00">sin respaldo</strong>' +
-        '<br><button class="copy" data-anular="' + esc(a.certificado) + '">Anular…</button>';
+      return enlace + '<br><strong style="color:#A84D00">sin respaldo</strong>' + anular;
     }
-    return enlace + '<br><button class="copy" data-anular="' + esc(a.certificado) + '">Anular…</button>';
+    /* ESPERANDO FIRMA. Desde el PR #378 «emitido» dejó de significar «el donante
+       lo tiene»: un certificado recién emitido espera dos firmas y NO se manda.
+       La celda mostraba el número con su enlace al PDF igual que uno entregado,
+       así que «ya está» y «falta la mitad» se veían idénticos. Se dice cuántas
+       van, porque una de dos no es cero. No es alarma —es el estado correcto—,
+       por eso va en gris apagado y no en el ámbar de arriba. */
+    if (FIRMA_ACTIVA && !a.cert_enviado && Number(a.cert_firmas || 0) < 2){
+      return enlace + '<br><span class="mu" style="font-size:12px">esperando firma &middot; ' +
+        Number(a.cert_firmas || 0) + ' de 2</span>' + anular;
+    }
+    /* FIRMADO Y NO SALIO. firmaFirmar manda el certificado al registrarse la
+       segunda firma; si ese envio falla, lo unico que pasa es un console.error.
+       La fecha de envio se queda en NULL, nadie lo reintenta, y hasta aqui la celda
+       lo mostraba igual que uno entregado. Es el peor de los desenlaces —el
+       tramite entero se completo y el donante no tiene nada— asi que grita. */
+    if (FIRMA_ACTIVA && Number(a.cert_firmas || 0) >= 2 && !a.cert_enviado){
+      return enlace + '<br><strong style="color:#A84D00">firmado, no salió</strong>' + anular;
+    }
+    return enlace + anular;
   }
   if (a.quiere_certificado && APROBADOS.indexOf(a.estado) >= 0){
-    return '<button class="copy" data-cert="' + esc(a.guia) + '">Emitir…</button>';
+    return '<button class="copy" data-cert="' + esc(a.guia) + '">Emitir&hellip;</button>';
   }
   return a.quiere_certificado ? "pedido" : "—";
 }
@@ -14632,9 +14662,35 @@ function campo(id, etiqueta, valor){
     '<input id="' + id + '" value="' + esc(valor || "") + '" ' +
     'style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)"></label>';
 }
-function cerrarCert(){
+function cerrarCert(hecho){
   var caja = document.getElementById("dlg");
-  caja.style.display = "none"; caja.innerHTML = "";
+  if (!hecho){ caja.style.display = "none"; caja.innerHTML = ""; return; }
+  var pdf = "/api/admin/certificado/" + encodeURIComponent(hecho.numero) + ".pdf";
+  /* Tres desenlaces y ninguno se parece: espera firma, salio al donante, o se
+     emitio y no salia a nadie porque no hay correo. */
+  var linea, tono;
+  if (hecho.espera_firma){
+    linea = hecho.ayuda || "Emitido. Sale al donante cuando lo firmen los dos.";
+    tono = "#b7791f";
+  } else if (hecho.enviado){
+    linea = "Emitido y enviado a " + esc(hecho.correo || "");
+    tono = "var(--ok)";
+  } else {
+    linea = hecho.correo
+      ? "Emitido. NO se envio: el correo no salio, mira la cola de correos."
+      : "Emitido. No se envio porque el donante no tiene correo registrado.";
+    tono = hecho.correo ? "#c0392b" : "#b7791f";
+  }
+  caja.innerHTML =
+    '<div class="card" style="max-width:520px;margin:0 auto;text-align:left">' +
+      '<h3 style="margin-bottom:4px">' + esc(hecho.numero) + '</h3>' +
+      '<p style="font-size:14px;margin-bottom:16px;color:' + tono + '">' + esc(linea) + '</p>' +
+      '<div style="display:flex;gap:10px">' +
+        '<a class="btn btn-w" href="' + pdf + '" target="_blank" rel="noopener">Ver el documento</a>' +
+        '<button class="btn btn-g" id="c-no">Cerrar</button>' +
+      '</div>' +
+    '</div>';
+  caja.style.display = "block";
 }
 
 /* Partida en dos porque tienen urgencias distintas: el resumen son las cifras
@@ -14645,10 +14701,11 @@ function cargarResumen(){
   fetch("/api/admin/resumen").then(function(r){ return r.json(); }).then(pintarResumen);
 }
 
+var FIRMA_ACTIVA = false;
 function cargarAportes(){
   fetch("/api/admin/aportes?limite=100" + (FILTRO ? "&estado=" + encodeURIComponent(FILTRO) : ""))
     .then(function(r){ return r.json(); })
-    .then(function(d){ pintarFilas(d.aportes || []); });
+    .then(function(d){ FIRMA_ACTIVA = !!d.firma_activa; pintarFilas(d.aportes || []); });
 }
 
 document.addEventListener("click", function(e){
@@ -14719,9 +14776,18 @@ document.addEventListener("click", function(e){
           ok.disabled = false; ok.textContent = "Emitir";
           return;
         }
-        cerrarCert();
+        /* QUE PASO, DICHO. El servidor ya venia contestando espera_firma y un
+           texto de ayuda —su comentario dice «y el panel lo dice»— y el panel lo
+           tiraba: cerraba el dialogo, recargaba y abria el PDF. Con el flujo de
+           firma encendido eso significaba marcar «Enviarlo a X», que no saliera,
+           y no enterarse.
+
+           Tambien se quita el window.open automatico: el PDF recien emitido
+           lleva el sello «SIN FIRMAR», abrirlo solo era util cuando emitir y
+           mandar eran el mismo acto. Queda como enlace, que ademas no lo bloquea
+           el navegador. */
         cargarResumen(); cargarAportes();
-        window.open("/api/admin/certificado/" + encodeURIComponent(res.d.numero) + ".pdf", "_blank", "noopener");
+        cerrarCert(res.d);
       })
       .catch(function(){ ok.disabled = false; ok.textContent = "Reintentar"; });
     return;
