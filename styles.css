@@ -1659,7 +1659,13 @@ html[data-marca="mmc"]{
      urgencia del triaje. Solo se reencuadra al azul de esta paleta. Fusionarlos
      haría aparecer el ámbar en avisos por todo el sitio, y para cuando de
      verdad importara —una casa que hay que visitar ya— no querría decir nada. */
-  --amber:#B57500; --amberl:#FFF4D6;
+  /* Oscurecido de #B57500 a #9A6400 el 15 sep 2026: mismo tono (38.8) y misma
+     saturacion, cinco puntos menos de luminosidad. Sobre --amberl daba 3.48 y el
+     minimo son 4.5, asi que `.tag.new` y `.med-step-s.is-wip` —las dos unicas
+     parejas que quedaban bajo el minimo en todo el sitio— no se leian. Se
+     oscurece el TEXTO y no se aclara el fondo porque --amberl tambien es fondo
+     de avisos, y aclararlo los habria vuelto invisibles sobre el papel. */
+  --amber:#9A6400; --amberl:#FFF4D6;
   --nav-bg:rgba(251,250,247,.92);
   --skel-a:#EEF1F4; --skel-b:#F8FAFB;
 
