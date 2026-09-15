@@ -11766,7 +11766,28 @@ async function adminEgresoAnular(request, env, numero, quien) {
    ======================================================================== */
 function csvCampo(v) {
   const t = String(v == null ? "" : v);
-  return /[;"\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  /* FORMULAS DE EXCEL, NEUTRALIZADAS. El escape de abajo cuida la ESTRUCTURA del
+     archivo —comillas, separadores, saltos— y eso estaba bien. Lo que no cubria
+     es que Excel EVALUA una celda que empieza por = + @ - : abierta la hoja, la
+     formula corre sola.
+
+     Y aqui no todo el texto lo escribe el equipo. El lector de facturas mete en
+     el formulario campos que vienen del XML QUE MANDA EL PROVEEDOR —el numero de
+     la factura, el CUFE y, si el proveedor no existe todavia, SU NOMBRE— y de
+     ahi pasan a la base y a este CSV. La cadena entera es:
+
+       XML del proveedor -> eg-pn / eg-snum / eg-cufe -> proveedores, egresos
+                         -> este CSV -> el Excel de la contadora
+
+     El apostrofo delante es la defensa estandar: Excel lo consume y muestra el
+     texto tal cual, sin evaluarlo.
+
+     EL GUION SE TRATA APARTE, porque un importe negativo es legitimo y
+     prefijarlo romperia las sumas de la contadora: solo se protege cuando lo que
+     sigue NO es un numero. `-2+3` se protege; `-45000` no. */
+  const formula = /^[=+@\t\r]/.test(t) || (/^-/.test(t) && !/^-?\d+(?:[.,]\d+)?$/.test(t));
+  const seguro = formula ? "'" + t : t;
+  return /[;"\n\r]/.test(seguro) ? '"' + seguro.replace(/"/g, '""') + '"' : seguro;
 }
 
 async function adminEgresosCSV(env, url) {
