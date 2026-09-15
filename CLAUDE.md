@@ -34,13 +34,29 @@ Deploy: GitHub Actions → Cloudflare Workers, automático al llegar a `main`.
 > nada lo avise**: el PR se ve fusionado y el gate en verde. Ocurrió el 19 de
 > agosto de 2026 con el PR #130 y se descubrió comprobando producción a mano.
 
-**COMPROBACIÓN QUE VALE LA PENA TRAS CADA FUSIÓN:** que el último deploy
-corresponda al tip de `main`. Si no coincide, el cambio no está en producción:
+**COMPROBACIÓN QUE VALE LA PENA TRAS CADA FUSIÓN:** que el código de `main`
+esté de verdad en producción.
 ```bash
-git rev-parse --short origin/main
-gh run list --workflow=deploy.yml --limit 1 --json headSha -q '.[0].headSha[0:7]'
-# ¿No coinciden? → gh workflow run "Deploy Give&Grow to Cloudflare" --ref main
+node ops/en-produccion.mjs
+# ¿Falta código? → gh workflow run "Deploy Give&Grow to Cloudflare" --ref main
 ```
+
+> **NO sirve `gh run list --limit 1`, que es lo que decía aquí antes.** Desde que
+> existe el job `guard`, un run del workflow sale **success** aunque el job
+> `Deploy to Cloudflare Workers` haya quedado **skipped**: el guard ve que solo
+> cambió la marca de tiempo del inventario y no despliega. El run está verde y su
+> `headSha` es el tip de `main`, así que la comparación decía «coinciden, todo
+> bien» **sin haber desplegado nada**.
+>
+> Medido el 14 sep 2026: ese día hubo **26 runs y cero despliegues reales**, y la
+> receta vieja daba el mismo SHA para las dos líneas. Basta con que el deploy de
+> un PR falle y que después entre uno de los commits horarios del inventario para
+> que el fallo quede tapado — la misma familia que la cicatriz del #130, pero
+> dentro de la comprobación que existe para atraparla.
+>
+> `ops/en-produccion.mjs` busca el último run cuyo **job** de deploy terminó en
+> success, no el último run, y cuenta aparte los commits del inventario porque
+> quedarse atrás en esos es justo lo que el guard busca.
 
 ## GATE OBLIGATORIO ANTES DE CADA COMMIT
 
