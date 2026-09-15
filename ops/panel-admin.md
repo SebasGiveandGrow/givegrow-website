@@ -241,11 +241,35 @@ falsificar.
 
 ## Qué hace el panel
 
-- **Resumen**: aportes por estado con su monto, certificados por emitir,
-  cuántos esperan débito automático, e inscripciones por revisar.
-- **Tabla** de aportes con guía, estado, monto, destino, donante, si pidió
-  certificado y fecha.
-- **Dos acciones**: marcar *a distribución* y marcar *entregada*.
+> Esta sección describía un panel de tres líneas —«resumen, tabla de aportes y
+> dos acciones»— que dejó de existir hace meses. Reescrita el 14 sep 2026 contra
+> el código, no de memoria.
+
+El panel está partido en **siete pestañas**, y cada una agrupa sus pantallas:
+
+| pestaña | qué hay dentro |
+|---|---|
+| **Hoy** | «Lo que hay que hacer hoy»: las colas pendientes, ordenadas por prioridad y con los días que llevan esperando. Es la portada. |
+| **Dinero** | Aportes · Transferencias por verificar · Pagos sin aporte · Membresías internacionales · Donaciones por el botón de PayPal · Eventos de PayPal sin casa |
+| **Mira Mi Casa** | Casas por revisar · Inspecciones en terreno |
+| **Red** | Quién quiere entrar · Ofrecimientos en especie |
+| **Entregas** | Entregas, con sus fotos y su publicación |
+| **Contabilidad** | Egresos · Proveedores |
+| **Salud** | Salud del ecosistema: dónde se cae la donación y qué lleva días esperando |
+
+**Las colas son diecisiete** y se calculan en `/api/admin/salud`. Cada una trae
+su conteo, desde cuándo espera la más vieja, cómo se arregla y a qué pantalla
+lleva. La insignia de cada pestaña suma las suyas.
+
+**Las bandejas son trece** y se cargan solas al abrir su módulo o al asomar por
+pantalla, nunca todas de golpe.
+
+**Lo que el panel NO puede hacer, a propósito:** mover estados de pago. Los
+únicos que admite a mano son `en_distribucion` y `entregada` —está escrito en
+`ESTADOS_MANUALES`, comprobado el 14 sep 2026—. Marcar un aporte como `aprobada`
+solo lo hace el webhook de la pasarela. Si el panel pudiera hacerlo, la
+trazabilidad dejaría de significar algo, que es justo lo que el sitio le promete
+al donante.
 
 **Lo que el panel NO puede hacer, a propósito:** mover estados de pago. Eso lo
 hace únicamente el webhook de Wompi. Si el panel pudiera marcar un aporte como
