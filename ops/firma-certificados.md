@@ -151,3 +151,83 @@ configurada, faltan los secretos. Si no aparece, está encendido.
 Y para comprobarlo de punta a punta: emite un certificado desde `/admin` pidiendo
 enviarlo. Debe contestar que queda esperando firma y **no** mandarlo. El PDF
 descargado debe salir con el sello diagonal **«SIN FIRMAR»**.
+
+---
+
+## ⚠️ LO QUE LA FIRMA TODAVÍA NO ATA: el NOMBRE impreso
+
+Hallado el 15 de septiembre de 2026, barriendo el código del PR #378 ya
+fusionado. **No está arreglado.** Se escribe aquí porque hoy cuesta un commit y
+después de la primera firma cuesta bastante más.
+
+### El hueco
+
+La huella SHA-256 se calcula sobre `certificados.datos`, que es el JSON
+congelado al emitir. Ese JSON lleva el donante, el monto, las fechas, la
+transacción y la destinación. **No lleva a los firmantes.**
+
+Los nombres, los cargos y la tarjeta profesional que se imprimen en el bloque de
+firmas salen de la constante `ENTIDAD` de `documentos.js` —`ENTIDAD.repLegal` y
+`ENTIDAD.revisora`— y el PDF **se vuelve a dibujar en cada descarga**
+(`adminCertificadoPdf`). Esa consulta ni siquiera selecciona `firma_rl_por` /
+`firma_rf_por`, que es lo único que sabe quién firmó de verdad.
+
+O sea que el documento dice, una debajo de otra:
+
+    Manuela Londoño Arboleda        <- constante, mutable
+    Revisora Fiscal                 <- constante, mutable
+    T.P. 244894-T                   <- constante, mutable
+    Firmado electrónicamente el 20 de septiembre de 2026   <- base de datos
+    Huella a1b2c3d4e5f6a7b8 · Ley 527 de 1999              <- base de datos
+
+Las dos últimas líneas son verdad y están atadas. Las tres primeras son texto
+que se reimprime con el valor de hoy.
+
+### Qué pasa el día que cambie la Revisora Fiscal
+
+1. Se firma un certificado. Queda `firma_rf_por = 'RV@…'`, su fecha y su huella.
+2. Meses después la Revisora Fiscal cambia. Alguien edita `ENTIDAD.revisora`
+   con la persona nueva y su T.P., que es lo correcto para los certificados
+   nuevos.
+3. El donante —o la DIAN— vuelve a descargar aquel certificado. Ahora imprime el
+   nombre y la T.P. de la persona NUEVA, encima de «Firmado electrónicamente el
+   20 de septiembre de 2026» y de una huella que **sigue validando**, porque la
+   huella nunca cubrió ese nombre.
+
+Una persona que no era Revisora Fiscal ese día aparece jurando un documento que
+no vio. **Es exactamente el defecto que este PR existía para cerrar**, entrando
+por la puerta de la constante en vez de por la del envío.
+
+Y hay una asimetría que lo deja claro: `firmaPendientes` —la cola interna— SÍ
+lee `firma_*_por` y muestra quién firmó. El documento que sale a la calle, no.
+El sistema sabe la verdad y el papel no la dice.
+
+### Por qué ahora es barato
+
+**No hay ninguna firma todavía.** `firmaFirmar` devuelve 503 mientras
+`firmaConfigurada` sea falso, y los secretos no están puestos. Así que no hay
+historia que reconstruir: cualquiera de los dos arreglos es aditivo hoy y
+mañana, con firmas encima, ya no.
+
+### Los dos arreglos posibles (decisión de Sebas)
+
+**(a) Lista con fechas, SIN migración.** `ENTIDAD.repLegal` y `ENTIDAD.revisora`
+pasan de ser una persona a ser una lista con `desde`, y `firmas()` elige la que
+estaba en ejercicio en `firma_*_en`. Los certificados sin firmar usan la
+vigente. No toca la base. El riesgo es humano: quien cambie de revisora tiene
+que AÑADIR una entrada, no sobrescribir la que hay — y eso se puede vigilar
+desde el gate.
+
+**(b) Congelar la identidad al firmar, CON migración.** Columnas nuevas que
+guarden nombre, cargo y T.P. en el momento de la firma. Más explícito y a prueba
+de descuidos, pero es otra migración aplicada a mano en producción.
+
+La (a) es más barata y además deja bien los certificados ya firmados, porque la
+lista codifica la historia. La (b) solo protege lo que se firme después de
+aplicarla.
+
+### Lo que NO es este hallazgo
+
+No es explotable por nadie de fuera: no hay forma de que un tercero provoque el
+cambio. Se dispara con un hecho normal de la vida de una ESAL —que rote el
+revisor fiscal— y por eso no es urgente hoy, pero sí es seguro con el tiempo.
