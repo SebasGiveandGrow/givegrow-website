@@ -2374,6 +2374,17 @@ async function firmaPendientes(env, sesion) {
     "SELECT c.numero, c.guia, c.datos, c.emitido_en, c.emitido_por, " +
     "c.firma_rl_en, c.firma_rl_por, c.firma_rf_en, c.firma_rf_por " +
     "FROM certificados c WHERE c.anulado_en IS NULL " +
+    /* EN REVISION TAMPOCO. Un certificado entra en revision cuando el pago se
+       revierte DESPUES de emitirlo: perdio su respaldo. Firmarlo seria jurar que
+       hubo una donacion que se devolvio, y el PDF saldria contradiciendose solo
+       —"No debe usarse como soporte tributario" encima de dos firmas—.
+
+       Se saca de la cola en vez de mostrarlo bloqueado, por la misma razon que
+       `puede_firmar` existe: no enseñar un boton que el servidor va a rechazar.
+       Quien lo resuelve es el panel, donde SI se ve, en rojo, como "sin
+       respaldo". Y no se pierde de vista: `revision_en` solo se pone y nunca se
+       quita, asi que el unico camino de salida es anularlo. */
+    "AND c.revision_en IS NULL " +
     "AND (c.firma_rl_en IS NULL OR c.firma_rf_en IS NULL) " +
     "ORDER BY c.emitido_en LIMIT 100"
   ).all();
@@ -2415,10 +2426,16 @@ async function firmaFirmar(request, env, numero, sesion) {
   }
 
   const c = await env.DB.prepare(
-    "SELECT numero, datos, anulado_en, firma_rl_en, firma_rf_en FROM certificados WHERE numero = ?"
+    "SELECT numero, datos, anulado_en, revision_en, firma_rl_en, firma_rf_en FROM certificados WHERE numero = ?"
   ).bind(numero).first();
   if (!c) return json({ error: "no_encontrado" }, 404);
   if (c.anulado_en) return json({ error: "esta_anulado", ayuda: "Un certificado anulado no se firma." }, 409);
+  /* Sacarlo de la cola no basta: esta ruta se alcanza con un POST directo, y
+     quien ya la tenia abierta cuando el pago se revirtio sigue viendo su boton. */
+  if (c.revision_en) {
+    return json({ error: "sin_respaldo",
+                  ayuda: "Este certificado perdio su respaldo: el pago se revirtio despues de emitirlo. No se firma mientras este en revision." }, 409);
+  }
   if (papel === "rl" && c.firma_rl_en) return json({ error: "ya_firmado", papel }, 409);
   if (papel === "rf" && c.firma_rf_en) return json({ error: "ya_firmado", papel }, 409);
 
