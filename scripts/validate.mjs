@@ -899,4 +899,54 @@ try {
   }
 } catch (e) { err("no se pudieron cruzar los data-* de las pantallas del Worker: " + e.message); }
 
+/* ── check #16 · LA SUCESIÓN DE FIRMANTES SE AÑADE, NO SE SOBRESCRIBE ──────
+   `ENTIDAD.repLegal` y `ENTIDAD.revisora` son listas con `desde` porque el PDF
+   se redibuja en cada descarga: si fueran una sola persona, rotar el revisor
+   fiscal reescribiría el nombre impreso en TODOS los certificados ya firmados,
+   encima de su fecha de firma y de una huella que seguiría validando. El
+   porqué completo está en `ops/firma-certificados.md`.
+
+   Esto vigila la FORMA, que es lo que se puede ver desde fuera: que sigan
+   siendo listas, que estén ordenadas, que solo la fundacional pueda ir sin
+   fecha, y que toda revisora lleve su tarjeta profesional —el art. 3 de la Ley
+   43 de 1990 pide la T.P., no la cédula—.
+
+   LO QUE ESTE CHECK NO PUEDE VER: que alguien edite EN SITIO el nombre de una
+   entrada existente en vez de añadir una nueva. Eso no lo distingue ningún
+   análisis estático del archivo; lo dice el comentario de `documentos.js` y lo
+   dice aquí, y es cuanto se puede hacer sin comparar contra el histórico. */
+try {
+  const doc = readFileSync("documentos.js", "utf8");
+  const bloque = doc.slice(doc.indexOf("const ENTIDAD"), doc.indexOf("const VERDE"));
+  for (const quien of ["repLegal", "revisora"]) {
+    const m = bloque.match(new RegExp(quien + ":\\s*\\[([\\s\\S]*?)\\n  \\]"));
+    if (!m) {
+      err("check #16: ENTIDAD." + quien + " ya no es una lista. Volver a una sola persona reabre " +
+          "el hueco entero: ver ops/firma-certificados.md");
+      continue;
+    }
+    const entradas = [...m[1].matchAll(/desde:\s*(null|"(\d{4}-\d{2}-\d{2})")/g)].map((x) => x[2] || null);
+    if (!entradas.length) { err("check #16: ENTIDAD." + quien + " está vacía"); continue; }
+    const sinFecha = entradas.filter((d) => d === null).length;
+    if (sinFecha > 1) err("check #16: ENTIDAD." + quien + " tiene " + sinFecha + " entradas sin `desde`. " +
+                          "Solo la fundacional puede ir sin fecha; las demás dicen desde cuándo.");
+    if (entradas.length > 1 && entradas[0] !== null && !entradas[0]) err("check #16: la primera entrada de " + quien + " no es válida");
+    const fechas = entradas.filter(Boolean);
+    for (let i = 1; i < fechas.length; i++) {
+      if (fechas[i] <= fechas[i - 1]) {
+        err("check #16: ENTIDAD." + quien + " está desordenada (" + fechas[i - 1] + " antes de " + fechas[i] +
+            "). La lista va de la más antigua a la más reciente.");
+      }
+    }
+    if (quien === "revisora") {
+      const conTp = [...m[1].matchAll(/tp:\s*"/g)].length;
+      if (conTp !== entradas.length) {
+        err("check #16: " + entradas.length + " revisora(s) y solo " + conTp + " con tarjeta profesional. " +
+            "El certificado imprime la T.P. y con ella se consulta la Junta Central de Contadores.");
+      }
+    }
+    ok("sucesión de " + quien + ": " + entradas.length + " entrada(s), en orden");
+  }
+} catch (e) { err("no se pudo revisar la sucesión de firmantes: " + e.message); }
+
 process.exit(fail);

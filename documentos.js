@@ -37,7 +37,28 @@ export const ENTIDAD = {
   banco: "Bancolombia",
   cuenta: "cuenta de ahorros No. 31000009221",
   sitio: "thegiveandgrowproject.org",
-  repLegal: { nombre: "Juan Sebastián Navarro Osorio", cargo: "Representante Legal" },
+  /* LISTAS Y NO PERSONAS, y la razón es que el PDF se redibuja en cada descarga.
+     Ver `ops/firma-certificados.md`.
+
+     El certificado imprime el nombre y la T.P. encima de «Firmado
+     electrónicamente el …» y de una huella SHA-256. Pero esa huella se calcula
+     sobre `certificados.datos`, que NO contiene a los firmantes. Con una sola
+     persona escrita aquí, el día que rote el revisor fiscal TODOS los
+     certificados ya firmados pasarían a imprimir el nombre de quien entró
+     después — encima de una fecha de firma que no es suya y de una huella que
+     sigue validando. Alguien jurando un documento que no vio, que es justo el
+     defecto que el PR #378 existía para cerrar.
+
+     Así que se guarda la SUCESIÓN, de la más antigua a la más reciente, y el
+     bloque de firmas elige quién estaba en ejercicio en la fecha de cada firma.
+     `desde: null` es la fundacional: vale para cualquier fecha anterior a la
+     siguiente entrada.
+
+     AL CAMBIAR DE FIRMANTE SE AÑADE, NUNCA SE SOBRESCRIBE. Sobrescribir vuelve
+     a abrir el hueco entero. El check 45 del gate lo vigila. */
+  repLegal: [
+    { desde: null, nombre: "Juan Sebastián Navarro Osorio", cargo: "Representante Legal" }
+  ],
   /* SIN CÉDULAS, y la ausencia es deliberada.
 
      Las dos estuvieron aquí, y este archivo vive en un repositorio PÚBLICO: la
@@ -53,8 +74,21 @@ export const ENTIDAD = {
 
      Si alguien vuelve a añadir `cc` aquí, no se imprimirá: la línea que lo
      dibujaba también se quitó, a propósito. */
-  revisora: { nombre: "Manuela Londoño Arboleda", cargo: "Revisora Fiscal", tp: "244894-T" }
+  revisora: [
+    { desde: null, nombre: "Manuela Londoño Arboleda", cargo: "Revisora Fiscal", tp: "244894-T" }
+  ]
 };
+
+/* Quién estaba en ejercicio en una fecha. Sin fecha —un certificado todavía sin
+   firmar— devuelve a quien esté hoy, que es quien lo va a firmar. `fechaCO` ya
+   entrega AAAA-MM-DD, así que la comparación de cadenas ordena bien. */
+function enEjercicio(lista, fecha) {
+  const hasta = fecha ? String(fecha).slice(0, 10) : null;
+  if (!hasta) return lista[lista.length - 1];
+  let elegida = lista[0];
+  for (const p of lista) if (!p.desde || p.desde <= hasta) elegida = p;
+  return elegida;
+}
 
 /* --- paleta: los mismos tokens del sitio, en el espacio de color del PDF --- */
 const VERDE = rgb(0.122, 0.361, 0.220);   // #1F5C38
@@ -1489,9 +1523,12 @@ function firmas(h, f, firmaRL, firmaRF) {
   h.reservar(96);
   const yLinea = h.y - 34;
 
+  /* Cada columna se resuelve contra la fecha de SU firma, no contra hoy. */
+  const rl = enEjercicio(ENTIDAD.repLegal, firmaRL && firmaRL.en);
+  const rf = enEjercicio(ENTIDAD.revisora, firmaRF && firmaRF.en);
   const cols = [
-    { x: MG.izq, p: ENTIDAD.repLegal, extra: null, firma: firmaRL },
-    { x: MG.izq + anchoCol + 40, p: ENTIDAD.revisora, extra: "T.P. " + ENTIDAD.revisora.tp, firma: firmaRF }
+    { x: MG.izq, p: rl, extra: null, firma: firmaRL },
+    { x: MG.izq + anchoCol + 40, p: rf, extra: "T.P. " + rf.tp, firma: firmaRF }
   ];
 
   for (const col of cols) {

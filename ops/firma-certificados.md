@@ -154,11 +154,13 @@ descargado debe salir con el sello diagonal **«SIN FIRMAR»**.
 
 ---
 
-## ⚠️ LO QUE LA FIRMA TODAVÍA NO ATA: el NOMBRE impreso
+## ✅ EL NOMBRE IMPRESO, ATADO A LA FECHA DE SU FIRMA
 
-Hallado el 15 de septiembre de 2026, barriendo el código del PR #378 ya
-fusionado. **No está arreglado.** Se escribe aquí porque hoy cuesta un commit y
-después de la primera firma cuesta bastante más.
+Hallado el 15 de septiembre de 2026 barriendo el código del PR #378 ya
+fusionado, y **arreglado el mismo día** por la vía (a) de las dos que se
+plantean más abajo. Se deja escrito el problema entero porque la solución solo
+se sostiene si se entiende: basta con que alguien sobrescriba una entrada en vez
+de añadirla para que vuelva completo.
 
 ### El hueco
 
@@ -209,7 +211,7 @@ El sistema sabe la verdad y el papel no la dice.
 historia que reconstruir: cualquiera de los dos arreglos es aditivo hoy y
 mañana, con firmas encima, ya no.
 
-### Los dos arreglos posibles (decisión de Sebas)
+### Los dos arreglos posibles, y cuál se tomó
 
 **(a) Lista con fechas, SIN migración.** `ENTIDAD.repLegal` y `ENTIDAD.revisora`
 pasan de ser una persona a ser una lista con `desde`, y `firmas()` elige la que
@@ -222,9 +224,32 @@ desde el gate.
 guarden nombre, cargo y T.P. en el momento de la firma. Más explícito y a prueba
 de descuidos, pero es otra migración aplicada a mano en producción.
 
-La (a) es más barata y además deja bien los certificados ya firmados, porque la
-lista codifica la historia. La (b) solo protege lo que se firme después de
-aplicarla.
+**Se tomó la (a)**, por dos razones: no toca la base, y deja bien también los
+certificados ya firmados, porque la lista codifica la historia. La (b) solo
+protege lo que se firme después de aplicarla.
+
+### Cómo quedó
+
+`ENTIDAD.repLegal` y `ENTIDAD.revisora` son listas ordenadas de la más antigua a
+la más reciente. `desde: null` es la entrada fundacional — vale para cualquier
+fecha anterior a la siguiente. `enEjercicio(lista, fecha)` elige, y el bloque de
+firmas resuelve **cada columna contra la fecha de SU propia firma**, no contra
+hoy. Un certificado todavía sin firmar usa a quien esté hoy, que es quien lo va
+a firmar.
+
+### ⚠️ AL CAMBIAR DE FIRMANTE SE AÑADE, NUNCA SE SOBRESCRIBE
+
+Es la única regla que hay que recordar, y es donde la vía (a) puede fallar,
+porque el fallo es humano y no técnico. Sobrescribir la entrada de Manuela con
+la persona siguiente reabre el hueco entero y en silencio.
+
+El **check #16** del gate vigila la forma: que sigan siendo listas, que estén
+ordenadas, que solo la fundacional vaya sin fecha, y que toda revisora lleve su
+tarjeta profesional. Comprobado que suspende en los cuatro casos.
+
+Lo que ese check **no** puede ver es que alguien edite en sitio el nombre de una
+entrada existente. Eso no lo distingue ningún análisis estático del archivo. Por
+eso está dicho aquí y en el comentario de `documentos.js`.
 
 ### Lo que NO es este hallazgo
 
