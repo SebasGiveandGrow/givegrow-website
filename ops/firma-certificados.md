@@ -251,6 +251,34 @@ Lo que ese check **no** puede ver es que alguien edite en sitio el nombre de una
 entrada existente. Eso no lo distingue ningún análisis estático del archivo. Por
 eso está dicho aquí y en el comentario de `documentos.js`.
 
+### ✅ Y `RV@` no es un buzón de rol
+
+Esta pregunta quedó abierta unas horas y conviene cerrarla por escrito, porque
+el nombre invita a suponer lo contrario: `RV@thegiveandgrowproject.org` parece
+una dirección funcional —«revisoría»— y una dirección funcional es un buzón
+compartido.
+
+**No lo es. Es de Manuela y de nadie más** (confirmado por Sebas el 15 de
+septiembre de 2026).
+
+Importa porque es la otra capa del mismo problema. La sucesión de arriba arregla
+el NOMBRE IMPRESO; `firma_rf_por` es el REGISTRO DE AUDITORÍA, y si ese correo
+fuera un buzón compartido, la firma electrónica no identificaría a una persona
+—que es literalmente lo que la Ley 527 de 1999 pide del método— y cualquiera con
+acceso al buzón podría firmar como la Revisora Fiscal.
+
+Siendo suyo y de nadie más, las dos capas quedan bien:
+
+| capa | qué guarda | estado |
+|---|---|---|
+| el papel | nombre y T.P. de quien era revisora en la fecha de la firma | sucesión con fechas |
+| la auditoría | `firma_rf_por`, el correo que ejecutó el acto | una persona, no un rol |
+
+**Si algún día `RV@` pasara a ser compartido —una auxiliar, un relevo, una
+sucesora que hereda la dirección— esto deja de ser cierto en silencio.** No hay
+nada en el código que lo detecte: para el Worker un correo es un correo. Sería
+el momento de mover `FIRMA_RF_EMAIL` a una dirección personal.
+
 ### Lo que NO es este hallazgo
 
 No es explotable por nadie de fuera: no hay forma de que un tercero provoque el
