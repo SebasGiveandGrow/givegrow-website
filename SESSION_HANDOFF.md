@@ -685,13 +685,29 @@ repetirlo.** Comprobado contra 1.1.1.1 y 8.8.8.8:
 
 - Remitente: `no-responder@notificaciones.thegiveandgrowproject.org` — es un
   SUBDOMINIO, así que los registros que importan están ahí, no en el ápex.
-- **DKIM de Resend: publicado.** SPF del subdominio: vacío. DMARC del ápex:
-  `p=quarantine` con `adkim=r`, así que **DMARC pasa por DKIM** con alineación
-  relajada.
+- **DKIM, SPF y MX de Resend: los tres publicados.** ~~SPF del subdominio: vacío~~
+  — **eso era un error de medición, corregido el 15 sep 2026.** Resend no publica
+  el SPF ni el MX en `notificaciones.…`, sino en **`send.notificaciones.…`**, y
+  este documento (y `ops/correo-transaccional.md`) consultaban el host de arriba.
+  Lo que hay de verdad:
+
+  | registro | host | valor |
+  |---|---|---|
+  | DKIM | `resend._domainkey.notificaciones.…` | `p=MIGfMA0…` |
+  | SPF | `send.notificaciones.…` | `v=spf1 include:amazonses.com ~all` |
+  | MX | `send.notificaciones.…` | `10 feedback-smtp.sa-east-1.amazonses.com` |
+
+  DMARC del ápex: `p=reject; sp=quarantine; adkim=r; aspf=r`. Con alineación
+  relajada el dominio del Return-Path (`send.notificaciones.…`) y el del `From:`
+  (`notificaciones.…`) comparten dominio organizativo, así que **DMARC pasa por
+  las dos patas, no por una**.
 - Los 15 correos de la base están todos en `enviado`.
 
-**Endurecimiento opcional, no urgente:** añadir SPF y MX al subdominio de envío da
-un segundo mecanismo que pase y deja que Resend reciba rebotes.
+**~~Endurecimiento opcional~~ — ya estaba hecho.** Lo único que sigue siendo
+cierto de aquel párrafo es que `enviado` significa «Resend lo aceptó», no
+«llegó»: los rebotes SÍ le llegan a Resend por el MX, pero no hay webhook de
+Resend hacia D1 (comprobado: los únicos webhooks del Worker son de Wompi), así
+que la tabla `correos` nunca se entera.
 
 ---
 
@@ -1648,15 +1664,21 @@ poder decir cuánto, y lo dice de frente en «No prometemos cifras que no tenemo
    `001003` su **cédula y ciudad** — sin eso el certificado responde 422.
 8. **Mirar el registro de Resend** para saber si los correos de `001003`
    salieron. Es lo único que cierra esa causa.
-9. **Una verificación que arrastramos:** que el buzón `privacidad@` esté activo
-   (la Política lo fija como canal y aparece 4 veces en el sitio). ~~La regla WAF
+9. ~~**Una verificación que arrastramos:** que el buzón `privacidad@` esté activo~~
+   — **CERRADA el 2 sep**, ver «✅ CERRADO: `privacidad@` EXISTE» al principio de este
+   documento. Aquella entrada dice que cerraba la verificación «que este documento
+   arrastraba en TRES entradas»; eran cuatro, y esta es la que se quedó sin tachar.
+   ~~La regla WAF
    de rate-limit de ALMA~~ — **RESUELTA:** `/api/alma` está dentro de la regla,
    comprobado en producción el 8 sep (peticiones 1–10 llegan al Worker, la 11
    la para Cloudflare con `error code: 1015`). Ver `ops/regla-waf.md`.
 10. **Retirar la implementación del Apps Script de aliados**, que sigue publicada
     y acepta POST de cualquiera. La CSP ya dejó de autorizarlo (PR #96).
-11. **El nombre del proyecto de viviendas** y su **número de WhatsApp** — ver su
-    cierre de tanda. Mientras no existan, el formulario no promete el canal.
+11. ~~**El nombre del proyecto de viviendas** y su **número de WhatsApp**~~ — **RESUELTO.**
+    El proyecto se llama **Mira Mi Casa** y el nombre está por todo el sitio (11 usos en
+    `index.html`, 11 en `app.js`); los WhatsApp están publicados (`wa.me/573153305028` y
+    `wa.me/573123023790`). La condición que ponía esta línea —«mientras no existan, el
+    formulario no promete el canal»— ya no aplica.
 12. **La guía fotográfica de los ingenieros** — el borrador y las once
     preguntas ya están en **`ops/guia-fotografica.md`** (18 ago), escritas para
     ser CORREGIDAS y no aprobadas: llevan puestas las respuestas provisionales
@@ -3331,11 +3353,13 @@ Kore firmado. Decisiones micro del menú abiertas por si Sebas quiere afinar.
   `.card.ficha-impact`+`.grat-benefit`+`.grat-meta` SOLO en la ficha de comercio (esas
   clases siguen usándose en las mini-cards del grid, no se tocaron). Kore aún con textos de
   beneficio de ejemplo → el cupón queda listo para el contenido real.
-- **Fase 2b PENDIENTE:** comercios en el mapa. gratitud.json NO tiene aún `direccion`/`coords`.
-  Para comercios la dirección es PÚBLICA y deseada (distinto de fundaciones). Falta: añadir
-  soporte de marcador `type:"company"` en el mapa (el código ya lo contempla), y `direccion`
-  + `coords` de Kore (buscar dirección pública de Kore Makeup Academy, Envigado, o que la dé
-  Sebas). Luego dirección visible en ficha + enlace a Google Maps.
+- ~~**Fase 2b:** comercios en el mapa~~ — **HECHA** (verificado el 15 sep 2026 contra el
+  código, no contra este documento). Las dos cosas que aquí faltaban ya están: Kore tiene
+  `direccion` ("Dg. 33 #32A Sur 34, Zona 9, Envigado") y `coords` (6.174531, -75.584507) en
+  `data/gratitud.json`, y el marcador `type:"company"` está implementado entero en `app.js`
+  — la lista del mapa recoge los comercios con `status==="activa"` y coordenadas numéricas,
+  y el globo pinta nombre, ciudad, dirección, enlace a la ficha Y enlace a Google Maps. O
+  sea que también está hecho el "luego" de la última frase.
 - **LOGO de Conciencia — límite de herramientas:** el binario vive en Drive; moverlo al repo
   exige pasar ~146KB base64 por el contexto de Claude, lo que corrompería el PNG (no es
   fiable copiarlo a mano), y bash no puede alcanzar Drive (fuera del allowlist de red). Vía
@@ -3528,12 +3552,15 @@ descripción en el formulario de aliados (decisión previa: no inventarla nosotr
   cada cambio (md5sum → sed). Ya está en el flujo de deploy.
 
 ## ARQUITECTURA CLAVE (app.js)
-- Router: `go(id, fromPop)` (~805). Rutas dinámicas fundacion/[id] y
+- Router: `go(id, fromPop)` (~3006; este bloque traía los números de línea de agosto y
+  estaban todos corridos — se remidieron el 15 sep 2026). Rutas dinámicas fundacion/[id] y
   comercio/[id] resueltas ANTES del fallback e404.
-- Re-render por idioma en postLang (~757-759).
+- Re-render por idioma en postLang (~1875).
 - renderFicha (fundaciones) / renderComercio (comercios) — espejos.
-- Lightbox nativo: ensureLightbox()+paintLightbox()+showModal(), LB={list,ix}.
-- i18n: dict ES en app.js; EN lazy desde /i18n/en.json. Paridad actual 903/903.
+- Lightbox nativo: ensureLightbox() (~4469) + paintLightbox() (~4496) + showModal(),
+  LB={list,ix}. renderFicha ~4383, renderComercio ~5978.
+- i18n: dict ES en app.js; EN lazy desde /i18n/en.json. Paridad actual **1617/1617**
+  (decía 903/903, y más abajo 682/682: los dos eran de agosto).
 - Datos: partners.json (fundaciones), gratitud.json (comercios), inventario.json.
 - Validación: `node scripts/validate.mjs` (paridad, sintaxis, tags, cobertura).
 

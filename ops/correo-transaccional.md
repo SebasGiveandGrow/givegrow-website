@@ -122,45 +122,61 @@ poniendo el envío antes del UPDATE.
 ## Lo que falta en el DNS del subdominio (comprobado el 12 sep 2026)
 
 El paso 2 de arriba dice que Resend entrega dos o tres registros y que hay que
-copiarlos **tal cual**. Se copió uno.
+copiarlos **tal cual**. Se copiaron los tres.
 
-| registro | estado |
-|---|---|
-| DKIM (`resend._domainkey.notificaciones…`) | ✅ publicado |
-| SPF (TXT en `notificaciones…`) | ❌ **no existe** |
-| MX (rebotes) | ❌ **no existe** |
+| registro | host | estado |
+|---|---|---|
+| DKIM | `resend._domainkey.notificaciones…` | ✅ publicado |
+| SPF | `send.notificaciones…` | ✅ `v=spf1 include:amazonses.com ~all` |
+| MX (rebotes) | `send.notificaciones…` | ✅ `10 feedback-smtp.sa-east-1.amazonses.com` |
 
-Verificado contra 1.1.1.1 y 8.8.8.8: el subdominio no devuelve ningún TXT.
+> **⚠️ ESTA TABLA DECÍA QUE FALTABAN DOS, Y ERA FALSO (corregido el 15 sep 2026).**
+> El error no estaba en el DNS sino en la consulta: se preguntaba por
+> `notificaciones.thegiveandgrowproject.org`, y **Resend publica el SPF y el MX
+> en `send.notificaciones.…`**, que es el dominio del Return-Path. Ahí estaban
+> desde el principio. Si alguna nota vuelve a decir que el subdominio «no
+> devuelve ningún TXT», es que está preguntando por el host de arriba.
 
 ### Qué significa hoy, sin dramatizarlo
 
-**DMARC sigue pasando.** Se apoya en DKIM, que está alineado, y a este subdominio
-le aplica el `sp=quarantine` del ápex —no el `p=reject`—, así que el modo de fallo
-es «va a spam», no «lo rechazan».
+**DMARC pasa por las dos patas.** DKIM alinea, y SPF también: el ápex lleva
+`aspf=r`, y con alineación relajada `send.notificaciones.…` (Return-Path) y
+`notificaciones.…` (`From:`) comparten dominio organizativo. Si el DKIM se
+rompiera —llave rotada en Resend, registro borrado al tocar el DNS— el SPF
+sostiene solo. A este subdominio le aplica el `sp=quarantine` del ápex, no el
+`p=reject`, así que además el modo de fallo sería «va a spam», no «lo rechazan».
 
-**Pero se sostiene en una sola pata.** Si el DKIM se rompe —la llave se rota en
-Resend, el registro se borra al tocar el DNS— **todo** el correo del sitio se va a
-spam a la vez: recibos, certificados, el enlace del caso de una familia, los
-avisos a ingenieros. Con SPF publicado harían falta dos fallos, no uno.
+**Los rebotes sí llegan… a Resend.** El MX de `send.notificaciones.…` apunta a
+`feedback-smtp.sa-east-1.amazonses.com`, así que Resend recibe la notificación de
+que una dirección no existe. Lo que NO hay es camino de vuelta a la base: **no
+existe ningún webhook de Resend hacia D1** —los únicos webhooks del Worker son
+los de Wompi—, así que el rebote se queda en el panel de Resend.
 
-**Y sin MX no hay rebotes.** Resend no puede recibir la notificación de que una
-dirección no existe, así que un correo mal escrito por un donante se queda en
-`enviado` para siempre. Conviene tenerlo claro al leer el panel: **`enviado`
-significa «Resend lo aceptó», no «llegó»**. La tabla `correos` solo conoce tres
-resultados —`enviado`, `fallo`, `simulado`— y un rebote posterior no es ninguno
-de los tres, así que la cola «Correos que no salieron» no puede verlo.
+Conviene tenerlo claro al leer el panel: **`enviado` significa «Resend lo
+aceptó», no «llegó»**. La tabla `correos` solo conoce tres resultados —`enviado`,
+`fallo`, `simulado`— y un rebote posterior no es ninguno de los tres, así que la
+cola «Correos que no salieron» no puede verlo. Eso sigue igual de cierto que
+antes; lo que cambia es el motivo, que no es la falta de MX.
 
-### Qué hacer, cuando se quiera
+### Cómo comprobarlo, y en qué host
 
-1. En Resend → Domains → `notificaciones.thegiveandgrowproject.org`, copiar el
-   TXT de SPF y el MX que ahí aparecen, y publicarlos en el DNS.
-2. Volver a comprobar:
+Ya no hay nada que publicar. Lo que sí hay que hacer bien es **preguntar por el
+host correcto**, que es donde se equivocó la versión anterior de este documento:
 
 ```bash
-dig +short TXT notificaciones.thegiveandgrowproject.org
-dig +short MX  notificaciones.thegiveandgrowproject.org
+dig +short TXT resend._domainkey.notificaciones.thegiveandgrowproject.org
+dig +short TXT send.notificaciones.thegiveandgrowproject.org
+dig +short MX  send.notificaciones.thegiveandgrowproject.org
 ```
 
-Ninguna de las dos cosas es urgente: el correo funciona y los 15 envíos de la
-base están en `enviado`. Queda escrito porque la diferencia entre «funciona» y
-«funciona por un solo mecanismo» solo se nota el día que ese mecanismo falla.
+Los tres deben devolver algo. Si se pregunta por `notificaciones.…` a secas
+—sin el `send.`— las dos últimas salen vacías, y eso **no** significa que
+falten: significa que se está preguntando en el sitio equivocado.
+
+> ⚠️ Ojo con zsh: si se mete esto en un bucle sobre una variable con varios
+> hosts, zsh **no** divide por palabras y la consulta sale mal. Envolver en
+> `bash -c '…'`.
+
+Lo único que sigue abierto de esta zona es el `sp=quarantine` del ápex: pasarlo
+a `sp=reject` alinearía el subdominio con la política del dominio principal, y
+hoy hay margen para hacerlo porque DMARC pasa por DKIM **y** por SPF.
