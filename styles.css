@@ -44,7 +44,6 @@
   --logo-bg:#fff;
   --fab-shadow:0 1px 2px rgba(14,33,24,.16), 0 6px 18px rgba(14,33,24,.14);
   --fab-shadow-hover:0 2px 4px rgba(14,33,24,.20), 0 12px 28px rgba(14,33,24,.22);
-  --honor:#B8860B;--honorl:#FFF8E7;
   --r:12px;--rl:13px;
   --ease:cubic-bezier(.16,1,.3,1);
   --shadow:0 2px 8px rgba(0,0,0,.06);
@@ -230,7 +229,6 @@ section{padding:72px 0}
 .card .eco-row{justify-content:flex-start;margin-left:0;margin-right:0}
 .tag{display:inline-block;font-size:var(--fs-11);font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--gl);color:var(--acc)}
 .tag.new{background:var(--amberl);color:var(--amber)}
-.tag.honor{background:var(--honorl);color:var(--honor)}
 .tag.soon{background:var(--bds);color:var(--mu)}
 .card>.tag{margin-bottom:12px}
 
@@ -668,7 +666,6 @@ html[data-theme="dark"]{
      tres tienen que leerse igual de bien; el de exito era el unico que no. */
   --ok:#6FB08D;
   --amber:#E8A24C;--amberl:#33260F;
-  --honor:#D4A017;--honorl:#2E2711;
   --nav-bg:rgba(15,22,19,.94);
   --skel-a:#1A231D;--skel-b:#222C25;
   --shadow:0 2px 8px rgba(0,0,0,.35);
