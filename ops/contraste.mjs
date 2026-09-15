@@ -7,6 +7,12 @@ import { dirname, join } from "node:path";
 /* Ruta relativa al propio archivo: corre igual desde la raiz o desde ops/. */
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
 const css = readFileSync(join(raiz, "styles.css"), "utf8");
+/* EL WORKER TAMBIEN PINTA. Sus ocho paginas generadas —panel, triaje, terreno,
+   ruta, firma, carnet…— llevan su propio <style> ademas de enlazar styles.css,
+   y hasta hoy este medidor no los miraba: decia "0" cubriendo 83 reglas e
+   ignorando 35. Un techo en cero que solo mira medio sitio miente mas que uno
+   en cuatro que lo dice. */
+const worker = readFileSync(join(raiz, "worker.js"), "utf8");
 
 /* --- las cuatro tablas de tokens: 2 marcas x 2 temas --- */
 const bloque = (sel) => {
@@ -62,7 +68,23 @@ for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
   const px = (cuerpo.match(/font-size\s*:\s*([^;]+)/) || [])[1] || "";
   parejas.push({ sel, color: col[1].trim(), fondo: bg[1].trim(), px });
 }
-console.log("reglas del CSS que declaran color Y fondo juntos: " + parejas.length + "\n");
+/* Las mismas parejas, dentro de los <style> que el Worker emite. */
+let nWorker = 0;
+for (const bloqueStyle of worker.matchAll(/<style>([\s\S]*?)<\/style>/g)) {
+  for (const m of bloqueStyle[1].matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const sel = m[1].trim().split("\n").pop().trim();
+    if (sel.startsWith("@") || sel.startsWith("/*")) continue;
+    const cuerpo = m[2];
+    const col = cuerpo.match(/(?:^|;)\s*color\s*:\s*([^;]+)/);
+    const bg  = cuerpo.match(/(?:^|;)\s*background(?:-color)?\s*:\s*([^;!]+)/);
+    if (!col || !bg) continue;
+    const px = (cuerpo.match(/font-size\s*:\s*([^;]+)/) || [])[1] || "";
+    parejas.push({ sel, color: col[1].trim(), fondo: bg[1].trim(), px, worker: true });
+    nWorker++;
+  }
+}
+console.log("reglas que declaran color Y fondo juntos: " + parejas.length +
+            "  (styles.css " + (parejas.length - nWorker) + " · worker.js " + nWorker + ")\n");
 
 let fallos = 0;
 for (const [nombre, t] of Object.entries(tablas)) {
@@ -71,6 +93,16 @@ for (const [nombre, t] of Object.entries(tablas)) {
     /* si la regla es de una marca/tema concretos, solo se juzga en su contexto */
     if (/data-marca="mmc"/.test(p.sel) && !nombre.startsWith("mmc")) continue;
     if (/data-theme="dark"/.test(p.sel) && !nombre.endsWith("noche")) continue;
+    /* LAS PAGINAS DEL WORKER SON SIEMPRE DE DIA, y no es una suposicion:
+       `styles.css` no tiene NI UN `prefers-color-scheme` —el modo noche se
+       activa solo con `html[data-theme="dark"]`, que pone `app.js`— y ninguna
+       de esas paginas carga `app.js`. Juzgarlas de noche inventaria fallos que
+       nadie puede ver.
+
+       Pero si van en las DOS marcas: `marcarMarca` le pone `data-marca="mmc"`
+       a cualquier HTML servido desde el host de Mira Mi Casa, y eso incluye lo
+       que el Worker genera. Por eso se evaluan en fundacion/dia Y en mmc/dia. */
+    if (p.worker && nombre.endsWith("noche")) continue;
     /* SE APLICAN LOS OVERRIDE, o se marca como fallo lo que ya se arreglo.
        `.grat-logo-ph` tiene su `html[data-theme="dark"] .grat-logo-ph{color:var(--gn)}`
        desde la #317; sin mirarlo, este medidor lo denunciaba otra vez. Se busca
