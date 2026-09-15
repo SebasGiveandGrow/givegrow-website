@@ -3509,18 +3509,33 @@ descripción en el formulario de aliados (decisión previa: no inventarla nosotr
      públicos. PENDIENTE: reemplazar por los reales que dé Kore.
 
 ## PENDIENTES (prioridad)
-- [ ] **ACCIÓN MANUAL — Apps Script aliados:** pegar el nuevo `ops/aliados-
-      formulario.gs` en el editor de Apps Script y **publicar VERSIÓN NUEVA**
-      (Implementar → Administrar implementaciones → lápiz → Versión nueva). Si no,
-      la app web sigue con el código viejo y la columna/descripción NO se guardan.
-- [ ] **ACCIÓN MANUAL — hoja de cálculo:** añadir a mano el encabezado
-      "Descripcion del negocio" en la última columna de la pestaña "Solicitudes".
-      El script NO reescribe encabezados en hoja con datos, así que la columna nueva
-      llega sin título hasta que se ponga manualmente.
-- [ ] **Confirmar visualmente** el textarea nuevo en #aliados (día y NOCHE).
+- [x] ~~**ACCIÓN MANUAL — Apps Script aliados:** pegar el nuevo `.gs` y publicar
+      versión nueva~~ · ~~**hoja de cálculo:** añadir el encabezado a mano~~ ·
+      ~~**Verificar el `NOTIFY_EMAIL` del script vivo**~~ — **LAS TRES SOBRAN
+      (comprobado el 15 sep 2026). El formulario de aliados NO pasa por Apps
+      Script.** Rastreado de punta a punta:
+
+      - `allySubmit` en `app.js` postea a **`/api/inscripcion`**, no a
+        `script.google.com`, y ya manda `descripcion: val("ally-desc")`.
+      - `worker.js` la sanea (`limpio(c.descripcion, 900)`), la imprime en el
+        correo de aviso y la muestra en la ficha de la solicitud.
+      - No queda ni una referencia a `script.google.com` en el repo, y la CSP
+        tampoco lo autoriza.
+
+      O sea que la hoja de cálculo ya no recibe nada del sitio: pegar código,
+      poner encabezados o revisar el `NOTIFY_EMAIL` del script sería trabajo
+      sobre un camino muerto. **Lo único que queda vivo de esto es retirar la
+      implementación publicada** — ver el punto de abajo.
+- [ ] 🔴 **RETIRAR la implementación web del Apps Script de aliados.** Sigue
+      publicada y **acepta POST de cualquiera en internet** contra la hoja de
+      solicitudes. Ya nadie la llama —el sitio va por `/api/inscripcion`— así que
+      es un endpoint huérfano: nadie lo usa y nadie lo vigila, que es justo el que
+      no te enteras de que alguien encontró. Editor → Implementar → Administrar
+      implementaciones → archivar. Alternativa mínima: cambiar el acceso de
+      «Cualquier usuario» a «Solo yo».
+- [ ] **Confirmar visualmente** el textarea de #aliados (día y NOCHE). El campo
+      `ally-desc` SÍ existe y funciona; falta el visto bueno visual.
 - [ ] **Decisión Sebas:** ¿campo descripción obligatorio u opcional? (hoy opcional).
-- [ ] **Verificar** que el `NOTIFY_EMAIL` del script vivo sí es el Gmail (se asumió
-      por el handoff; la copia del repo estaba desactualizada y ya se corrigió).
 - [ ] **Textos reales de Kore**: beneficio, nivelDesde, redime, condiciones
       (hoy son de ejemplo y están públicos). Editar en data/gratitud.json.
 - [ ] **Convenio firmado de Kore** (dijo que firma en breve).
