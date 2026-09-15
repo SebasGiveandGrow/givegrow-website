@@ -143,8 +143,14 @@ copiarlos **tal cual**. Se copiaron los tres.
 `aspf=r`, y con alineación relajada `send.notificaciones.…` (Return-Path) y
 `notificaciones.…` (`From:`) comparten dominio organizativo. Si el DKIM se
 rompiera —llave rotada en Resend, registro borrado al tocar el DNS— el SPF
-sostiene solo. A este subdominio le aplica el `sp=quarantine` del ápex, no el
-`p=reject`, así que además el modo de fallo sería «va a spam», no «lo rechazan».
+sostiene solo.
+
+> **El 15 de septiembre de 2026 el ápex pasó de `sp=quarantine` a `sp=reject`**,
+> una vez comprobado que las dos patas estaban publicadas. Antes, el modo de
+> fallo de este subdominio era «va a spam»; ahora es «lo rechazan», igual que el
+> dominio principal. Por eso la comprobación previa dejó de ser opcional: subir
+> `sp` con una sola pata habría convertido un fallo de DKIM en correo rebotado
+> en vez de correo en spam.
 
 **Los rebotes sí llegan… a Resend.** El MX de `send.notificaciones.…` apunta a
 `feedback-smtp.sa-east-1.amazonses.com`, así que Resend recibe la notificación de
@@ -177,6 +183,15 @@ falten: significa que se está preguntando en el sitio equivocado.
 > hosts, zsh **no** divide por palabras y la consulta sale mal. Envolver en
 > `bash -c '…'`.
 
-Lo único que sigue abierto de esta zona es el `sp=quarantine` del ápex: pasarlo
-a `sp=reject` alinearía el subdominio con la política del dominio principal, y
-hoy hay margen para hacerlo porque DMARC pasa por DKIM **y** por SPF.
+~~Lo único que sigue abierto de esta zona es el `sp=quarantine` del ápex~~ —
+**cerrado el 15 de septiembre de 2026.** El registro vivo es:
+
+```
+v=DMARC1; p=reject; sp=reject; adkim=r; aspf=r; rua=…
+```
+
+Ya no queda nada abierto en esta zona. La comprobación de arriba sigue sirviendo
+para lo de siempre: confirmar que las dos patas siguen en pie. Si alguna vez
+falta el SPF de `send.notificaciones.…`, con `sp=reject` el correo del sitio no
+va a spam — **rebota**, y entonces hay que bajar a `sp=quarantine` mientras se
+republica.

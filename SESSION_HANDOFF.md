@@ -361,9 +361,11 @@ la pantalla imposible de abrir en local.
   el botón «Suprimir» de la bandeja. Se disparó para que el tráfico de
   `notificaciones.` apareciera en el informe DMARC del día.
 - **Mirar Email → DMARC Management en Cloudflare** a las 24 h. Lo que se busca
-  antes de quitar `sp=quarantine`: tráfico de `notificaciones.…` alineando por
+  ~~antes de quitar `sp=quarantine`~~ — **YA SE QUITÓ (15 sep 2026).** Ver más
+  abajo. Lo que se buscaba entonces: tráfico de `notificaciones.…` alineando por
   DKIM. El registro vivo quedó
-  `p=reject; sp=quarantine; rua=<cloudflare>,<contabilidad@>`, y la autorización
+  `p=reject; sp=quarantine; rua=<cloudflare>,<contabilidad@>` —hoy
+  `sp=reject`—, y la autorización
   de destino externo está publicada (se comprobó
   `…_report._dmarc.dmarc-reports.cloudflare.net` → `v=DMARC1;`).
 - **Datos de prueba EN LOCAL** (no producción): casos `CV-2026-000005/6/7` con
@@ -697,7 +699,11 @@ repetirlo.** Comprobado contra 1.1.1.1 y 8.8.8.8:
   | SPF | `send.notificaciones.…` | `v=spf1 include:amazonses.com ~all` |
   | MX | `send.notificaciones.…` | `10 feedback-smtp.sa-east-1.amazonses.com` |
 
-  DMARC del ápex: `p=reject; sp=quarantine; adkim=r; aspf=r`. Con alineación
+  DMARC del ápex: **`p=reject; sp=reject; adkim=r; aspf=r`** desde el 15 de
+  septiembre de 2026 (antes `sp=quarantine`). Se subió solo después de comprobar
+  que las DOS patas estaban publicadas —DKIM en `resend._domainkey.…` y SPF en
+  `send.notificaciones.…`—, que es lo que quita el riesgo: con una sola, un fallo
+  de DKIM habría pasado de mandar todo a spam a hacerlo REBOTAR. Con alineación
   relajada el dominio del Return-Path (`send.notificaciones.…`) y el del `From:`
   (`notificaciones.…`) comparten dominio organizativo, así que **DMARC pasa por
   las dos patas, no por una**.
