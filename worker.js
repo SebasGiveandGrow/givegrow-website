@@ -7680,11 +7680,33 @@ async function adminRuta(env, url) {
 
      Solo las que tienen las dos: una latitud sin longitud no lleva a ninguna
      parte, y enseñar media coordenada es peor que no enseñar ninguna. */
-  const coords = await env.DB.prepare(
+  /* ACOTADA A LOS CASOS DE ESTA RUTA, y no a toda la historia. Leia TODAS las
+     inspecciones con coordenadas para adornar como mucho TOPE_RUTA casos, y las
+     dos consultas divergian con el tiempo: la ruta excluye `cerrado` y
+     `descartado`, asi que se acorta a medida que el trabajo se cierra, mientras
+     que `inspecciones` solo crece. Medido con 5000 casos de los que 300 siguen
+     vivos: la ruta devolvia 300 y esto leia 5000.
+
+     Importa mas desde el 1 de septiembre de 2026, cuando D1 empezo a FALLAR las
+     consultas al superar el limite diario de filas leidas. La guia de Cloudflare
+     para eso dice exactamente esto: revisar las consultas que hacen escaneos
+     completos de tabla.
+
+     La subconsulta repite el predicado de la ruta en vez de recibir una lista de
+     numeros: asi no hay 300 parametros que atar, y sobre todo las dos no pueden
+     desincronizarse — si alguien cambia que entra en la ruta, esto le sigue.
+
+     Comprobado con EXPLAIN QUERY PLAN que el indice sobrevive:
+       SEARCH inspecciones USING INDEX ix_insp_caso (caso=?)
+     El escaneo que queda es el de `casos`, que la ruta hace igualmente. */
+  const sqlCoords =
     "SELECT caso, lat, lon FROM inspecciones " +
-    "WHERE caso IS NOT NULL AND lat IS NOT NULL AND lon IS NOT NULL " +
-    "ORDER BY recibido_en ASC"
-  ).all();
+    "WHERE lat IS NOT NULL AND lon IS NOT NULL AND caso IN (" +
+    "SELECT numero FROM casos WHERE estado NOT IN ('cerrado','descartado')" +
+    (sector ? " AND sector = ?" : "") + ") " +
+    "ORDER BY recibido_en ASC";
+  const qc = env.DB.prepare(sqlCoords);
+  const coords = await (sector ? qc.bind(sector) : qc).all();
   const porCaso = new Map();
   for (const f of coords.results || []) porCaso.set(f.caso, { lat: f.lat, lon: f.lon });
 
