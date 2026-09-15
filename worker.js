@@ -2444,11 +2444,16 @@ async function firmaFirmar(request, env, numero, sesion) {
     "SELECT firma_rl_en, firma_rf_en, enviado_en, datos FROM certificados WHERE numero = ?"
   ).bind(numero).first();
   let enviado = false;
+  /* A QUE CORREO SE INTENTO, para que la pantalla pueda distinguir "no salio
+     porque fallo el envio" de "no salio porque el donante no tiene correo". Son
+     dos cosas distintas y solo una es un fallo. */
+  let correoDonante = null;
   if (ya && ya.firma_rl_en && ya.firma_rf_en && !ya.enviado_en) {
     try {
       const d = JSON.parse(ya.datos);
       const a = await env.DB.prepare("SELECT email FROM donantes d JOIN aportes a ON a.donante_id = d.id WHERE a.guia = ?")
         .bind(d.guia).first();
+      correoDonante = (a && a.email) || null;
       const envio = await correoCertificado(env, Object.assign({}, d, {
         firma_rl_en: ya.firma_rl_en, firma_rf_en: ya.firma_rf_en
       }), a && a.email);
@@ -2461,7 +2466,8 @@ async function firmaFirmar(request, env, numero, sesion) {
   }
 
   return json({ ok: true, numero, papel, huella: huella.slice(0, 16),
-                completo: !!(ya && ya.firma_rl_en && ya.firma_rf_en), enviado });
+                completo: !!(ya && ya.firma_rl_en && ya.firma_rf_en), enviado,
+                correo: correoDonante });
 }
 
 async function adminEmitirCertificado(request, env, guia, quien) {
@@ -9898,10 +9904,24 @@ document.addEventListener("click", function(ev){
         m.style.color = "#8C2F1E";
         return;
       }
-      m.textContent = res.d.completo
-        ? (res.d.enviado ? "Firmado. Ya está completo y salió al donante." : "Firmado. Ya está completo.")
-        : "Firmado. Falta la otra firma.";
-      m.style.color = "#1F5C38";
+      /* CUATRO DESENLACES, no tres. "Ya está completo" sin más se leía como
+         éxito incluso cuando el correo había fallado: firmaFirmar manda el
+         certificado al registrarse la segunda firma y, si ese envío falla, lo
+         único que pasa es un console.error. Nadie lo reintenta. Quien acaba de
+         firmar bajo juramento tiene que saber si el donante lo recibió. */
+      var bien = true;
+      if (!res.d.completo){
+        m.textContent = "Firmado. Falta la otra firma.";
+      } else if (res.d.enviado){
+        m.textContent = "Firmado. Ya está completo y salió al donante.";
+      } else if (res.d.correo){
+        m.textContent = "Firmado y completo, pero el correo NO salió a " + res.d.correo + ". Queda en el panel, en la cola de correos.";
+        bien = false;
+      } else {
+        m.textContent = "Firmado y completo. No se envió: el donante no tiene correo registrado.";
+        bien = false;
+      }
+      m.style.color = bien ? "#1F5C38" : "#8C2F1E";
       setTimeout(cargar, 900);
     })
     .catch(function(){ b.disabled = false; m.textContent = "No se pudo. Revisa la conexión."; m.style.color = "#8C2F1E"; });
