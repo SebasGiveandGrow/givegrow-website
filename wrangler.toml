@@ -105,6 +105,20 @@ ACCESS_AUD = "48d495e9504ba1eb77fccbb01f16da7123d69492f8d89868962bf169c030c39c"
 # Es OTRA audiencia a propósito — un token de esta NO abre /admin, donde están
 # donantes, aportes y comprobantes bancarios. El panel solo acepta ACCESS_AUD.
 ACCESS_AUD_TRIAGE = "cc6b16acd33e62b0c296265b762028e41ddb4b0328faaff001f1b497193dcc13"
+# Tercera aplicacion, la de la firma de certificados: cubre /firma, /firma.js y
+# /api/firma/*, y sus usuarios son el Representante Legal y la Revisora Fiscal.
+# Otra audiencia por la misma razon que el triaje — la Revisora Fiscal entra a
+# firmar certificados, no a ver donantes ni comprobantes bancarios.
+#
+# La audiencia del panel TAMBIEN abre /firma, para que el equipo pueda mirar la
+# cola sin una segunda cuenta. Pero mirar no es firmar: quien puede firmar cada
+# casilla lo decide `quienFirma` por correo, contra FIRMA_RL_EMAIL y
+# FIRMA_RF_EMAIL, y eso no depende de la audiencia.
+#
+# Tomado del `kid` con el que Access redirige /firma en produccion (15 sep
+# 2026), distinto del de /admin y del de /triaje. No es secreto: identifica la
+# aplicacion, no autoriza nada por si solo.
+ACCESS_AUD_FIRMA = "2095e04e0d23f477495364a645c03a07b9e90e448e417b93accc4fef465806ed"
 
 # El entorno de PRUEBAS no lleva estas variables a propósito: no tiene su propia
 # aplicación de Access, así que su panel debe seguir cerrado (503).
