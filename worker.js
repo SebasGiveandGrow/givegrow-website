@@ -17865,6 +17865,39 @@ export default {
 
        Se preserva la QUERY: `/triaje` no la usa hoy, pero perderla en silencio es
        la clase de cosa que se descubre tarde. */
+    /* ENLACES CORTOS, porque el nombre completo no se puede dictar.
+       ======================================================================
+       `miramicasa.thegiveandgrowproject.org` son 35 caracteres. Quien tiene que
+       repartir esto es una brigada, en la calle, a familias que muchas veces
+       lo van a teclear a mano en un teléfono y con una sola barra de señal. Un
+       error de dedo en cualquiera de esos 35 caracteres acaba en «no se pudo
+       encontrar el sitio», que es indistinguible de «esto no existe».
+
+       Así que el ápex acepta tres atajos hacia Mira Mi Casa. Tres y no uno
+       porque la gente no recuerda cuál le dijeron: `casa`, `micasa` y
+       `mimicasa` llegan todos al mismo sitio y ninguno cuesta nada.
+
+       ESTO NO RESUELVE EL PROBLEMA DE FONDO, y conviene no engañarse:
+       `thegiveandgrowproject.org/casa` sigue siendo largo. Lo que lo resuelve es
+       un dominio corto propio —`miramicasa.co` son trece caracteres y se dicta
+       en voz alta sin deletrear—. El código ya está listo para recibirlo: el
+       `HOST_MMC` de arriba casa con cualquier host que empiece por
+       `miramicasa.`, así que el día que exista basta con apuntarlo al Worker.
+
+       302 y no 301, por la misma cicatriz escrita más abajo: una ruta que
+       todavía puede moverse no se declara permanente. */
+    if (ruta === "/casa" || ruta === "/micasa" || ruta === "/mimicasa") {
+      /* Ya estamos en Mira Mi Casa: a su propia raíz, sin salir del host.
+         En un entorno de pruebas se antepone `miramicasa.` al host que haya, que
+         es el análogo local del subdominio — así el atajo se puede EJERCITAR en
+         local en vez de comprobarse leyéndolo, y una prueba nunca salta a
+         producción. Solo el resto va al subdominio de verdad. */
+      const aMMC = HOST_MMC.test(url.hostname) ? new URL("/", url.origin).toString()
+        : hostDePruebas(url.hostname) ? url.protocol + "//miramicasa." + url.host + "/"
+        : ORIGIN_MMC + "/";
+      return Response.redirect(aMMC, 302);
+    }
+
     if ((ruta === "/triaje" || ruta === "/triaje/inspeccion" ||
          /* Y EL PANEL, que cierra la mudanza. Sus dos pantallas: la bandeja y la
             ruta de la brigada. Comprobado con una sesión real el 1 sep 2026 en
