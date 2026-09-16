@@ -394,7 +394,7 @@ var I18N = {
     "rep.ok.t":"Listo. Tu número de guía es",
     "rep.ok.p":"Guárdalo: con él sigues tu aporte en el rastreo. Todavía no está confirmado — verificamos cada transferencia contra el extracto antes de registrarla como recibida.",
     "rep.sube":"Sube tu comprobante (opcional)",
-    "rep.sube.p":"Imagen o PDF, hasta 5 MB. Con el comprobante la verificación es inmediata; sin él hay que buscarla a mano en el extracto.",
+    "rep.sube.p":"Imagen o PDF, hasta 5 MB. Con el comprobante la verificación es directa: el equipo la cuadra contra el extracto sin tener que buscarla. Sin él hay que rastrearla a mano, y tarda más. En los dos casos la confirma una persona.",
     "rep.sube.ok":"Comprobante recibido. Gracias.",
     "rep.sube.err":"No pudimos subir el archivo.",
     "rep.link":"¿Ya transferiste? Repórtalo aquí",

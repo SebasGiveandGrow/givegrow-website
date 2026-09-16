@@ -988,7 +988,7 @@
   "rep.ok.t": "Done. Your tracking number is",
   "rep.ok.p": "Keep it: use it to follow your gift in the tracking page. It is not confirmed yet — we check every transfer against the bank statement before recording it as received.",
   "rep.sube": "Upload your proof of transfer (optional)",
-  "rep.sube.p": "Image or PDF, up to 5 MB. With the proof, verification is immediate; without it we have to find it by hand in the statement.",
+  "rep.sube.p": "Image or PDF, up to 5 MB. With the proof, verification is straightforward: the team matches it against the statement without having to search. Without it we have to track it down by hand, and it takes longer. Either way a person confirms it.",
   "rep.sube.ok": "Proof received. Thank you.",
   "rep.sube.err": "We could not upload the file.",
   "rep.link": "Already transferred? Report it here",
