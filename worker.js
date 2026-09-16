@@ -45,7 +45,27 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    los recibos de donación al subdominio del triaje.
 
    Sin `www`: el subdominio responde en su nombre exacto. */
-const ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
+/* EL HOGAR DE MIRA MI CASA, desde el 16 sep 2026: dominio propio.
+   ==========================================================================
+   De aquí cuelga más de lo que parece, y por eso cambiar esta línea MUEVE LA
+   CASA ENTERA: el enlace privado que se le entrega a cada familia, el canonical
+   y el og:url que reescribe el HTMLRewriter, la imagen con la que se
+   previsualiza en WhatsApp, los atajos /casa y las redirecciones desde el sitio
+   de la fundación.
+
+   EL SUBDOMINIO VIEJO NO SE TOCA Y NO SE APAGA NUNCA. Cada familia que ya
+   reportó su casa tiene un enlace que apunta allí, y ese enlace es su única
+   llave: no hay recuperación por teléfono ni por número de caso. `HOST_MMC`
+   casa con los dos hosts, así que los dos siguen sirviendo el sitio entero.
+
+   Y NO SE LE PONE UN REDIRECT AL VIEJO, a propósito. Tentaba, para consolidar
+   el posicionamiento en un solo sitio. Pero la consolidación ya la hace el
+   `canonical`, que ahora apunta aquí; y un redirect global tendría que excluir
+   `/api/...` y los `.js` —una petición XHR mandada a otro host muere por CORS,
+   que es la cicatriz escrita más abajo en la mudanza del triaje— y cerraría la
+   sesión de Access de quien estuviera trabajando. Riesgo real a cambio de algo
+   que el canonical ya resuelve. */
+const ORIGIN_MMC = "https://miramicasa.org";
 
 /* Con qué nombre se presenta Mira Mi Casa cuando alguien reenvía su enlace.
    Los usa `marcarMarca`; ver la nota larga que hay allí. */
@@ -8937,7 +8957,7 @@ SOBRE LOS ACOPIOS: los dos centros de la brigada estaban en ENVIGADO (no en Mede
 
 Lo que sigue vigente de la brigada: el equipo de terreno estaba CERRADO en siete personas —ir a terreno exige doble verificacion y formacion previa— y no hay meta en pesos porque no hay costos del inventario. No inventes equivalencias.
 
-MIRA MI CASA — la plataforma del triaje estructural. Vive en miramicasa.thegiveandgrowproject.org. Es la plataforma de "Cimientos que Unen", el proyecto, que es de Fundación Give&Grow International. Si alguien llegó por Instagram con el nombre del proyecto y aterrizó en otro nombre, explícale esa cadena: no es un cambiazo, y conviene decirlo porque el Ministerio de Vivienda está advirtiendo sobre estafas con nombres de programas de vivienda.
+MIRA MI CASA — la plataforma del triaje estructural. Vive en miramicasa.org, que es la direccion que hay que dar siempre: es corta y se dicta en voz alta sin deletrear, y muchas familias la van a teclear a mano en un telefono. La direccion vieja, miramicasa.thegiveandgrowproject.org, sigue funcionando y sirve exactamente lo mismo, asi que si alguien llega con ella o con un enlace viejo de su caso, no esta perdido ni es una estafa: esta en el sitio correcto. Es la plataforma de "Cimientos que Unen", el proyecto, que es de Fundación Give&Grow International. Si alguien llegó por Instagram con el nombre del proyecto y aterrizó en otro nombre, explícale esa cadena: no es un cambiazo, y conviene decirlo porque el Ministerio de Vivienda está advirtiendo sobre estafas con nombres de programas de vivienda.
 
 QUÉ HACE MIRA MI CASA: una familia sube fotos de su casa afectada y un ingeniero voluntario con matrícula del COPNIA le da un CONCEPTO a distancia — si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla. De paso se prioriza a qué casa se va primero. Entra por la página "Revisa tu casa" del sitio.
 

@@ -29,7 +29,7 @@ import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const APEX = "https://www.thegiveandgrowproject.org";
-const MMC = "https://miramicasa.thegiveandgrowproject.org";
+const MMC = "https://miramicasa.org";
 
 /* Cada URL con LA FUENTE que la genera. Si mañana una página nace de otro
    archivo, se cambia aquí y la fecha la pone git. */
