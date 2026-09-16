@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=0a11dce2">
+<link rel="stylesheet" href="/styles.css?v=3a59d085">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=3691d2d2" defer></script>
+<script src="/app.js?v=b5f41a26" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -2760,6 +2760,13 @@
       <span class="ey rv" data-i18n="ing.ey">Ingenieros voluntarios</span>
       <h1 class="h-sec rv" data-i18n="ing.t">Hay más casas dañadas que ingenieros para visitarlas.</h1>
       <p class="lead rv d1" data-i18n="ing.lead">Después del sismo del 10 de agosto llegan más solicitudes de las que un equipo alcanza a atender en terreno. Lo que pedimos no es que dictamines a distancia: es que mires unas fotos, digas si hay señales para no permanecer y qué conviene reparar y con qué.</p>
+      <!-- LA FILA, A LA VISTA. Que un ingeniero se postule no es que entre: la
+           página le pedía la matrícula y le explicaba el alcance, pero no le
+           decía SI HAY ALGO QUE HACER AHORA. Ese es el dato que convierte «me
+           apunto» en «entro hoy», y es el único que el proyecto ya tenía y no
+           enseñaba. Se pinta desde /api/casos/fila — ver la nota de
+           `apiFilaTriaje` para qué cuenta y por qué no dice zonas. -->
+      <div class="mmc-fila rv d2" id="ing-fila" aria-live="polite"></div>
       <p class="rv d2 mu" style="margin-top:18px;font-size:14px"><span data-i18n="ing.volver.p">Si ya te postulaste y verificamos tu matrícula, tu puerta es esta.</span> <a class="card-link" href="/triaje"><span data-i18n="ing.volver.cta">Entrar al triaje</span> <span aria-hidden="true">&rarr;</span></a></p>
     </div>
   </section>

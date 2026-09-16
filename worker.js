@@ -176,14 +176,19 @@ const entero = (crudo, porDefecto, min, max) => {
 };
 const desplazamiento = (url) => entero(url && url.searchParams.get("desde"), 0, 0, PAGINA_MAX);
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store"
-    }
-  });
+/* `no-store` POR DEFECTO y a propósito: casi todo lo que sale por aquí es de
+   una persona —su caso, su aporte, su postulación— y una respuesta así no se
+   guarda en ninguna caché compartida. `extra` existe para las pocas que son
+   recuentos públicos y sí conviene cachear; pasar una cabecera equivocada aquí
+   es la forma de filtrar un dato privado a una caché de borde, así que se usa
+   con cuidado y se dice por qué en cada sitio que lo use. */
+function json(data, status = 200, extra = null) {
+  const headers = {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+  };
+  if (extra) for (const k of Object.keys(extra)) headers[k] = extra[k];
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
 async function sha256Hex(texto) {
@@ -9265,6 +9270,53 @@ async function apiAlma(request, env, url) {
   return new Response(await arriba.text(), {
     status: arriba.status,
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+  });
+}
+
+/* GET /api/casos/fila — el tamaño de la fila del triaje, en público.
+   ==========================================================================
+   QUE UN INGENIERO SE POSTULE NO ES QUE ENTRE. La página le pide la matrícula,
+   le explica el alcance y le promete que puede revisar los casos que quiera; lo
+   único que no le dice es SI HAY ALGO QUE HACER AHORA. Y ese es justamente el
+   dato que convierte «me apunto» en «entro hoy» — el único que el proyecto ya
+   tiene y no enseñaba.
+
+   CUENTA TODO LO QUE ESPERA, con consentimiento de publicación o sin él, por el
+   mismo motivo que ya está escrito en `apiCasosPublicos` unas líneas más abajo
+   para los totales: «son el tamaño real de lo revisado, y ese número no
+   identifica a nadie». Un recuento no es la casa de nadie.
+
+   Y NO DICE ZONAS, que era la tentación. El sector solo es publicable en los
+   casos donde la familia lo autorizó; enseñar los sectores de la fila entera
+   publicaría lo que no se autorizó, y enseñar solo los autorizados daría un
+   mapa falso de dónde hace falta ayuda. Entre las dos, ninguna.
+
+   LA FILA VACÍA TAMBIÉN SE DICE. Tentaba esconderla —un cero no recluta— pero
+   ahí el número honesto es el que más vale: la fila vacía es la prueba de que
+   el aviso automático funciona, porque `avisarIngenierosFilaDespierta` escribe
+   exactamente cuando pasa de vacía a tener algo. */
+async function apiFilaTriaje(env) {
+  const f = await env.DB.prepare(
+    "SELECT COUNT(*) AS esperando, MIN(c.creado_en) AS mas_viejo " +
+    "FROM casos c WHERE " + SIN_REVISAR
+  ).first();
+
+  const esperando = (f && Number(f.esperando)) || 0;
+  let dias = null;
+  if (esperando && f && f.mas_viejo) {
+    const t = Date.parse(String(f.mas_viejo).replace(" ", "T") + "Z");
+    if (!Number.isNaN(t)) dias = Math.max(0, Math.floor((Date.now() - t) / 86400000));
+  }
+
+  /* NO VA EL NÚMERO DE INGENIEROS, y se pensó. Junto a «N casos esperan», un
+     «0 ingenieros verificados» le estaría diciendo a la familia que lee esta
+     misma página que nadie está mirando su caso. Y un endpoint público no debe
+     exponer un dato que ninguna pantalla usa. */
+  return json({ esperando, espera_dias: dias }, 200, {
+    /* Un minuto. Lo bastante corto para que un ingeniero que acaba de recibir el
+       aviso vea la fila con el caso dentro, y lo bastante largo para que la
+       página no consulte la base en cada visita. */
+    "cache-control": "public, max-age=60"
   });
 }
 
@@ -18568,6 +18620,7 @@ export default {
         if (ruta === "/api/caso")           return await apiCasoCrear(request, env);
         if (ruta === "/api/casos/publicos.csv") return await apiCasosPublicosCSV(env);
         if (ruta === "/api/casos/publicos") return await apiCasosPublicos(env, url);
+        if (ruta === "/api/casos/fila")     return await apiFilaTriaje(env);
         const cmed = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/medio$/i);
         if (cmed) return await apiCasoMedio(request, env, cmed[1].toUpperCase(), url.searchParams.get("t"), url);
         const cinf = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/informe\.pdf$/i);
