@@ -458,7 +458,15 @@ else ok("cobertura data-i18n (" + new Set(used).size + " claves usadas)");
    contraste y los colores literales.
 
    Si se arregla alguna, este check lo dice y hay que BAJAR el numero. */
-const TECHO_ENCABEZADOS = 14;
+/* EN CERO desde el 16 sep 2026, y el trinquete pasa a ser una prohibición: ya
+   no queda ninguna página con saltos, así que cualquier número por encima de 0
+   es una regresión y no una deuda heredada. El arreglo de las 14 está en
+   styles.css bajo «ENCABEZADO DE COMPONENTE»: el nivel lo fija el esquema del
+   documento y la apariencia la fija `.h-comp3` / `.h-comp4`. Antes estaban
+   atados, y por eso una tarjeta tenía que escribirse `h3` aunque el h2 no
+   existiera. Es WCAG 1.3.1 y es lo primero que reporta una auditoría
+   automática de accesibilidad. */
+const TECHO_ENCABEZADOS = 0;
 {
   const limpio = html
     .replace(/<!--[\s\S]*?-->/g, "")
