@@ -15776,6 +15776,18 @@ function abrirCaso(numero){
     CASO_ABIERTO = numero;
     var c = d.caso || {};
 
+    /* El telefono tal como lo escribio la familia, convertido en algo que
+       wa.me acepte. Diez digitos son un movil colombiano y les falta el 57;
+       doce que ya empiezan por 57 van tal cual. Cualquier otra cosa devuelve
+       vacio y el boton no se pinta — ver por que arriba. */
+    var waFamilia = function(tel, enlace){
+      var d2 = String(tel || "").replace(/[^0-9]/g, "");
+      if (d2.length === 10) d2 = "57" + d2;
+      if (!/^[0-9]{11,15}$/.test(d2)) return "";
+      return "https://wa.me/" + d2 + "?text=" +
+        encodeURIComponent("Hola, te escribimos de Mira Mi Casa. Este es el enlace de tu caso: " + enlace);
+    };
+
     var mat = '<label style="display:block;margin-bottom:10px;font-size:13px;font-weight:600">Muros' +
       '<select id="f-material" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)">';
     ["ladrillo","adobe","bahareque","prefabricado","madera","no_se"].forEach(function(k){
@@ -15894,8 +15906,27 @@ function abrirCaso(numero){
            donde se le puede devolver: el número de caso solo no abre nada. */
         '<p class="mu" style="font-size:13px;margin:12px 0 4px"><strong>Enlace de la familia</strong> — ' +
         'si lo perdió, es lo único que se lo devuelve. Mándaselo por WhatsApp; no lo publiques.</p>' +
-        '<p style="font-size:12px;word-break:break-all;margin-bottom:14px">' +
+        '<p style="font-size:12px;word-break:break-all;margin-bottom:8px">' +
         esc(d.enlace || "") + "</p>" +
+        /* COPIAR Y MANDAR, EN UN TOQUE. El enlace ya se pintaba aqui, pero
+           mandarselo obligaba a seleccionar a mano una URL larga con un token
+           dentro, cambiar de aplicacion y buscar el numero de la familia. Un
+           caracter de menos en esa seleccion y lo que llega no abre nada, y la
+           familia cree que el equipo le mando algo roto.
+
+           El numero va al WhatsApp de LA FAMILIA, que es el que esta en la
+           ficha. Si no se puede normalizar a algo que parezca un telefono, el
+           boton no se pinta: mejor sin boton que un enlace a un numero
+           equivocado con el token de alguien dentro. */
+        (d.enlace
+          ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">' +
+            '<button class="copy" data-enlace="' + esc(d.enlace) + '">Copiar el enlace</button>' +
+            (waFamilia(c.contacto_tel, d.enlace)
+              ? '<a class="copy" style="text-decoration:none" target="_blank" rel="noopener" href="' +
+                esc(waFamilia(c.contacto_tel, d.enlace)) + '">Mandarselo por WhatsApp</a>'
+              : '<span class="mu" style="font-size:12px;align-self:center">El telefono no se puede marcar: copia el enlace.</span>') +
+            "</div>"
+          : "") +
         '<p id="f-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>' +
         '<div style="display:flex;gap:10px;margin:8px 0 22px">' +
           '<button class="btn btn-g" id="f-ok" data-guardar="' + esc(numero) + '">Guardar</button>' +
@@ -16370,6 +16401,17 @@ document.addEventListener("click", function(e){
       de.disabled = false;
       alert(d.ayuda || d.error || "No se pudo quitar.");
     }).catch(function(){ de.disabled = false; });
+    return;
+  }
+
+  var ce = e.target.closest("[data-enlace]");
+  if (ce) {
+    var en = ce.getAttribute("data-enlace");
+    navigator.clipboard.writeText(en).then(function(){
+      ce.textContent = "Copiado";
+    }).catch(function(){
+      ce.textContent = "Copialo a mano de la linea de arriba";
+    });
     return;
   }
 

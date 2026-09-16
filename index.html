@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=25a24763" defer></script>
+<script src="/app.js?v=3691d2d2" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -2560,6 +2560,22 @@
            encuentra su enlace vuelve a llenar el formulario, y entonces hay dos
            casos de la misma casa compitiendo por el mismo ingeniero. -->
       <div class="mmc-mio" data-mi-caso hidden style="margin-top:20px"></div>
+
+      <!-- LA OTRA MITAD DEL ENLACE PERDIDO. La banda de arriba solo aparece si
+           el caso está guardado en ESTE teléfono. Quien cambió de aparato, borró
+           los datos del navegador o reportó desde el teléfono de un vecino no
+           tiene nada, y hasta hoy tampoco tenía a quién preguntarle: el panel ya
+           le enseña al equipo el enlace de cada familia —y lo dice en su propia
+           nota: «si lo perdió, es lo único que se lo devuelve»— pero la familia
+           no sabía que eso existía.
+
+           PIDE NOMBRE Y BARRIO en el texto previo porque son los dos campos con
+           los que el equipo la encuentra en la bandeja. Sin ellos, un «perdí mi
+           enlace» no se puede atender. -->
+      <p class="mu mmc-perdido" style="max-width:60ch;margin-top:18px">
+        <span data-i18n="mmc.perdido.t">¿Ya reportaste tu casa y perdiste el enlace?</span>
+        <a id="mmc-perdido-wa" href="https://wa.me/573153305028" target="_blank" rel="noopener" data-i18n="mmc.perdido.wa">Escríbenos por WhatsApp y te lo devolvemos.</a>
+      </p>
       <p class="mu" style="max-width:60ch;margin-top:14px" data-i18n="cv.aviso">Esto no reemplaza una visita ni la declaratoria de tu municipio. Un ingeniero voluntario mira tus fotos y te escribe lo que alcance a ver desde ahí: qué precauciones tomar mientras tanto y, cuando puede decirlo con lo que enviaste, por dónde conviene empezar a reparar. Sobre fotos no se ve todo, así que hay cosas que ningún ingeniero va a firmar sin ir hasta la casa.</p>
       <!-- Lo que la fundación puede y no puede prometer, dicho antes de que la
            familia llene el formulario y no después. Va aparte de `cv.aviso` a
