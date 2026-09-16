@@ -17520,7 +17520,27 @@ function marcarCaso(respuesta, ruta) {
    Se usa HTMLRewriter y no un replace sobre el texto: viene en la plataforma,
    trabaja sobre el flujo sin cargarlo en memoria, y no se equivoca de `<html>`
    si algún día aparece esa cadena dentro del documento. */
-const HOST_MMC = /^(miramicasa|mira-mi-casa)\./i;
+/* SE ABRE A `www.`, y no es cosmética: es lo que impide que el dominio propio
+   salga con la marca equivocada.
+
+   Hasta aquí el patrón estaba anclado al principio de la cadena, y con un
+   subdominio —`miramicasa.thegiveandgrowproject.org`— eso bastaba. Con dominio
+   propio deja de bastar: `miramicasa.org` sigue casando, pero
+   `www.miramicasa.org` NO, así que el Worker no le habría inyectado
+   `data-marca="mmc"` y una familia que teclea el `www` por costumbre habría
+   aterrizado en Mira Mi Casa con el logotipo, la nav y la paleta de la
+   fundación. Es la CUARTA vez que la marca se pierde por una condición de host
+   —las tres anteriores están escritas en wrangler.toml— y el patrón siempre es
+   el mismo: parece que funciona porque el caso que uno prueba sí casa.
+
+   El patrón exige principio de cadena O un punto delante, así que un
+   «evilmiramicasa.org» de un tercero NO casa. Lo que sí casa es cualquier
+   subdominio nuestro, que es justo lo que se quiere.
+
+   (Escrito con palabras y sin el escape de la expresión: el check #1a del gate
+   vigila las barras dentro de las plantillas del Worker y este comentario cae
+   en su radio. La regla del proyecto es no pelearse con ese guardián.) */
+const HOST_MMC = /(^|\.)(miramicasa|mira-mi-casa)\./i;
 
 /* DONDE NO HAY QUE SALTAR A PRODUCCION.
 
@@ -17907,6 +17927,21 @@ export default {
 
        302 y no 301, por la misma cicatriz escrita más abajo: una ruta que
        todavía puede moverse no se declara permanente. */
+    /* UN SOLO HOST CANÓNICO para Mira Mi Casa. Con dominio propio aparecen dos
+       puertas —`miramicasa.org` y `www.miramicasa.org`— y dos puertas al mismo
+       contenido es contenido duplicado para un buscador y una fuente de enlaces
+       divergentes para todo lo demás. El `www` se va al ápex conservando ruta y
+       query, que es lo que importa: por ahí viaja el token con el que una
+       familia abre su caso.
+
+       Solo en los hosts de Mira Mi Casa: el sitio de la fundación es `www.` a
+       propósito y su `ORIGIN` lo dice. */
+    if (/^www\./i.test(url.hostname) && HOST_MMC.test(url.hostname)) {
+      const sinWww = new URL(url.toString());
+      sinWww.hostname = url.hostname.replace(/^www\./i, "");
+      return Response.redirect(sinWww.toString(), 302);
+    }
+
     if (ruta === "/casa" || ruta === "/micasa" || ruta === "/mimicasa") {
       /* Ya estamos en Mira Mi Casa: a su propia raíz, sin salir del host.
          En un entorno de pruebas se antepone `miramicasa.` al host que haya, que
