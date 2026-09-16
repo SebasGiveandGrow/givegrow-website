@@ -258,6 +258,9 @@ var I18N = {
     "mmc.nav.casas":"Casas revisadas",
     "mmc.nav.ing":"Ingenieros",
     "mmc.nav.apad":"Apadrinar",
+    "mmc.perdido.t": "¿Ya reportaste tu casa y perdiste el enlace?",
+    "mmc.perdido.wa": "Escríbenos por WhatsApp y te lo devolvemos.",
+    "mmc.perdido.texto": "Hola, reporté mi casa en Mira Mi Casa y perdí el enlace. Mi nombre es ____ y mi barrio o vereda es ____.",
     "mmc.mio.t": "Ya tienes un caso guardado en este teléfono",
     "mmc.mio.abrir": "Abrir mi caso",
     "mmc.mio.olvidar": "Olvidarlo en este teléfono",
@@ -2775,6 +2778,11 @@ function mmcWhatsApp(){
   if (!MARCA_MMC) return;
   var fab = document.querySelector("a.wa");
   if (fab) fab.href = "https://wa.me/573153305028?text=" + encodeURIComponent(t("mmc.wa.texto"));
+  /* El de «perdí mi enlace» lleva su propio texto, y pide lo que el equipo
+     necesita para encontrarla: nombre y barrio. Mismo motivo que el flotante
+     para reponerlo aquí — el href no lleva `data-i18n`. */
+  var per = document.getElementById("mmc-perdido-wa");
+  if (per) per.href = "https://wa.me/573153305028?text=" + encodeURIComponent(t("mmc.perdido.texto"));
 }
 
 /* ===== Banco público de casas =====
