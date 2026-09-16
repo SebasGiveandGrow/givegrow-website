@@ -258,6 +258,10 @@ var I18N = {
     "mmc.nav.casas":"Casas revisadas",
     "mmc.nav.ing":"Ingenieros",
     "mmc.nav.apad":"Apadrinar",
+    "mmc.mio.t": "Ya tienes un caso guardado en este teléfono",
+    "mmc.mio.abrir": "Abrir mi caso",
+    "mmc.mio.olvidar": "Olvidarlo en este teléfono",
+    "mmc.mio.nota": "Guardado solo en este teléfono, no en nuestros servidores. Quien use este teléfono puede abrirlo.",
     "cv.ok.wa": "Mandármelo por WhatsApp",
     "cv.wa.texto": "Este es el enlace de mi caso en Mira Mi Casa:",
     "mmc.wa.texto": "Hola, escribo por Mira Mi Casa.",
@@ -2179,6 +2183,7 @@ function applyLang(l){
   applyRouteMeta(currentRoute);
   calcUpdate();
   mmcWhatsApp();
+  mmcMiCaso();
 }
 
 /* ---------- SPA routing ---------- */
@@ -2391,6 +2396,10 @@ function cvEnviar(){
        mí» —que es lo que dice el texto— queda a un toque. */
     var wa = document.getElementById("cv-wa");
     if (wa) wa.href = "https://wa.me/?text=" + encodeURIComponent(t("cv.wa.texto") + " " + CV.enlace);
+    /* Y EL TELÉFONO SE LO GUARDA. Este es el único instante en toda la vida del
+       caso en que el navegador tiene el token: si no se guarda aquí, la única
+       copia es la pantalla que la familia está mirando. */
+    mmcCasoGuardar(d.numero, CV.enlace);
     cvPaso(5);
     cvSubirCola();
   }).catch(function(){
@@ -2655,6 +2664,113 @@ function mmcMarca(){
    pasar a inglés el botón seguía mandando «Hola, escribo por Mira Mi Casa».
    El href no lleva `data-i18n`, o sea que el recorrido del diccionario no lo
    alcanza; hay que reponerlo a mano en cada cambio de idioma. */
+/* ===== EL TELÉFONO SE ACUERDA DEL CASO =====
+   ==========================================================================
+   EL AGUJERO MÁS GRAVE QUE LE QUEDABA A MIRA MI CASA. El enlace del caso es la
+   ÚNICA llave que tiene la familia: no hay recuperación por teléfono, ni por
+   número de caso, ni por nombre. Si lo pierde —y la gente pierde mensajes— su
+   caso queda huérfano en la base y ella sin respuesta, con las fotos de su casa
+   ya subidas y un ingeniero que quizá ya escribió el concepto.
+
+   Hasta hoy solo salía correo a la familia SI dejaba correo, y el correo es
+   opcional de verdad: el identificador es el teléfono, porque «en estas zonas
+   mucha gente tiene WhatsApp y no correo». O sea que justo quien más lo
+   necesita era quien se quedaba sin ninguna copia.
+
+   ESTO NO LO RESUELVE ENTERO, y conviene no engañarse: cubre el caso común
+   —cerrar la pestaña, el teléfono se apaga, pasan tres días— y no cubre cambiar
+   de teléfono ni borrar los datos del navegador. Eso necesita un servidor y va
+   aparte.
+
+   SE GUARDA EN EL TELÉFONO Y NO EN UN SERVIDOR, a propósito: no crea una copia
+   nueva de datos personales en ningún sitio, que es lo que la Ley 1581 pide
+   evitar. El precio es que quien use ese teléfono puede abrir el caso — por eso
+   hay un botón para olvidarlo y el aviso lo dice sin rodeos. El enlace ya vive
+   en el historial del navegador de ese mismo teléfono, así que esto no abre una
+   puerta que no estuviera abierta; solo la hace visible y, por primera vez,
+   cerrable.
+
+   TODO LO QUE SALE DE AQUÍ SE VALIDA antes de tocar el DOM. Lo guardado lo
+   puede editar el dueño del dispositivo, así que el número tiene que casar con
+   su forma exacta y el enlace tiene que empezar por un origen conocido: sin eso,
+   un valor fabricado podría dejar un `javascript:` en un href. Y se escribe con
+   textContent y setAttribute, nunca con innerHTML. */
+var MMC_CASO_KEY = "mmc-caso";
+
+function mmcCasoGuardar(numero, enlace){
+  if (!MARCA_MMC) return;
+  try {
+    localStorage.setItem(MMC_CASO_KEY, JSON.stringify({
+      numero: String(numero), enlace: String(enlace), fecha: new Date().toISOString().slice(0,10)
+    }));
+  } catch(e){ /* modo privado o almacenamiento lleno: no es un fallo que reportar */ }
+}
+
+function mmcCasoLeer(){
+  try {
+    var crudo = localStorage.getItem(MMC_CASO_KEY);
+    if (!crudo) return null;
+    var d = JSON.parse(crudo);
+    if (!d || !/^CV-\d{4}-\d{6}$/.test(d.numero || "")) return null;
+    /* El enlace tiene que apuntar a uno de NUESTROS orígenes. Un
+       `javascript:` o el sitio de otro fabricado a mano muere aquí. */
+    var u;
+    try { u = new URL(d.enlace); } catch(e){ return null; }
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    if (!/(^|\.)(miramicasa|mira-mi-casa)\./i.test(u.hostname) &&
+        !/(^|\.)thegiveandgrowproject\.org$/i.test(u.hostname) &&
+        !/^(localhost|127\.0\.0\.1)$/i.test(u.hostname)) return null;
+    return d;
+  } catch(e){ return null; }
+}
+
+function mmcCasoOlvidar(){
+  try { localStorage.removeItem(MMC_CASO_KEY); } catch(e){}
+  mmcMiCaso();
+}
+
+function mmcMiCaso(){
+  var cajas = document.querySelectorAll("[data-mi-caso]");
+  if (!cajas.length) return;
+  var d = MARCA_MMC ? mmcCasoLeer() : null;
+  for (var i=0;i<cajas.length;i++){
+    var c = cajas[i];
+    c.textContent = "";
+    if (!d){ c.hidden = true; continue; }
+    c.hidden = false;
+
+    var et = document.createElement("span");
+    et.className = "mmc-mio-et";
+    et.textContent = t("mmc.mio.t");
+    c.appendChild(et);
+
+    var num = document.createElement("p");
+    num.className = "mmc-mio-num";
+    num.textContent = d.numero;
+    c.appendChild(num);
+
+    var fila = document.createElement("div");
+    fila.className = "mmc-mio-fila";
+    var abrir = document.createElement("a");
+    abrir.className = "btn btn-g";
+    abrir.setAttribute("href", d.enlace);
+    abrir.textContent = t("mmc.mio.abrir");
+    fila.appendChild(abrir);
+    var olv = document.createElement("button");
+    olv.type = "button";
+    olv.className = "btn btn-o";
+    olv.setAttribute("data-act", "mmcCasoOlvidar()");
+    olv.textContent = t("mmc.mio.olvidar");
+    fila.appendChild(olv);
+    c.appendChild(fila);
+
+    var nota = document.createElement("p");
+    nota.className = "mmc-mio-nota";
+    nota.textContent = t("mmc.mio.nota");
+    c.appendChild(nota);
+  }
+}
+
 function mmcWhatsApp(){
   if (!MARCA_MMC) return;
   var fab = document.querySelector("a.wa");
@@ -2874,6 +2990,12 @@ function mcPinta(aviso, color){
         return;
       }
       var d = res.d;
+      /* LLEGÓ AQUÍ CON UN TOKEN QUE EL SERVIDOR ACEPTÓ, así que este enlace es
+         bueno: se guarda. Cubre a quien abre el caso desde su propio WhatsApp
+         semanas después y no vuelve a tocar el mensaje — a partir de ahí el
+         teléfono se lo sabe. Es lo mismo que hace `cvEnviar` al crearlo, en el
+         otro momento en que el token pasa por el navegador. */
+      mmcCasoGuardar(MC.caso, location.origin + location.pathname + location.search);
       MC.tope = d.tope_medios || 20;
       MC.queda = d.cupo ? d.cupo.queda : null;
       var h = "";
@@ -3166,7 +3288,7 @@ function cvCopiar(){
 }
 
 var ACT_FNS = {
-  cvPaso:cvPaso, cvEnviar:cvEnviar, cvCopiar:cvCopiar,
+  cvPaso:cvPaso, cvEnviar:cvEnviar, cvCopiar:cvCopiar, mmcCasoOlvidar:mmcCasoOlvidar,
   themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,
   payMethod:payMethod, accTab:accTab, setQuick:setQuick, lbStep:lbStep, toggleFaq:toggleFaq,
   toggleDrop:toggleDrop, closeLightbox:closeLightbox, almaSend:almaSend, formSend:formSend,
@@ -3261,6 +3383,7 @@ function go(id, fromPop){
   if (id==="transparencia") pintarFechaImpresion();
   if (id==="caso" && MC.caso) mcPinta();
   if (id==="casas") bcPinta();
+  mmcMiCaso();
 
   window.scrollTo(0,0);
   if (!fromPop) focusActivePage();
