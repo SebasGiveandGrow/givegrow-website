@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=f6a8a0e8" defer></script>
+<script src="/app.js?v=a2bf358b" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -110,6 +110,7 @@
           <a href="#impactos"><span class="nd-t" data-i18n="nav.impactos">ImpactOS</span><span class="nd-d" data-i18n="nav.d.impactos">El sistema que registra cada aporte</span></a>
           <a href="#medicion"><span class="nd-t" data-i18n="nav.medicion">Cómo medimos</span><span class="nd-d" data-i18n="nav.d.medicion">Hasta dónde podemos afirmar, y con qué respaldo</span></a>
           <a href="#transparencia"><span class="nd-t" data-i18n="nav.transp">Transparencia</span><span class="nd-d" data-i18n="nav.d.transp">Registros oficiales y documentos públicos</span></a>
+          <a href="#estandares"><span class="nd-t" data-i18n="nav.estandares">Marco de actuación</span><span class="nd-d" data-i18n="nav.d.estandares">Bajo qué normas trabajamos, y qué no afirmamos</span></a>
           <a href="#faq"><span class="nd-t" data-i18n="nav.faq">FAQ</span><span class="nd-d" data-i18n="nav.d.faq">Respuestas a las dudas más comunes</span></a>
           <a href="#contacto"><span class="nd-t" data-i18n="nav.contacto">Contacto</span><span class="nd-d" data-i18n="nav.d.contacto">Escríbenos o pasa por el Hub</span></a>
         </div>
@@ -167,6 +168,7 @@
   <a href="#impactos" data-i18n="nav.impactos">ImpactOS</a>
   <a href="#medicion" data-i18n="nav.medicion">Cómo medimos</a>
   <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
+  <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
   <a href="#faq" data-i18n="nav.faq">FAQ</a>
   <a href="#contacto" data-i18n="nav.contacto">Contacto</a>
 </div>
@@ -1654,6 +1656,147 @@
 </main>
 
 <!-- ============ TRANSPARENCIA ============ -->
+<!-- ============ MARCO DE ACTUACIÓN ============
+     La página que traduce lo que ya se hace al idioma en el que lo evalúa un
+     aliado institucional. «Cómo medimos» ya trae el mapeo a ODS, GRI y ESG, y
+     está escrito para una empresa; esto es la otra mitad, la humanitaria, que
+     es la que le corresponde a un programa de alojamiento después de un sismo.
+
+     NO DUPLICA LA IDENTIDAD LEGAL. El NIT, la constitución, la revisoría y los
+     documentos viven en #transparencia y se enlazan desde aquí: dos sitios
+     diciendo el mismo dato es la forma más segura de que un día se contradigan.
+
+     EL CUADRO NO ESTÁ TODO EN VERDE Y ESE ES EL PUNTO. Tres compromisos van a
+     medias y uno no existe. Un cuadro entero cumplido sería comprobable y falso
+     en diez minutos.
+
+     SIN CSS NUEVO: `.med-tw` y `.med-tbl` ya existen en «Cómo medimos» —con su
+     desplazamiento horizontal accesible, que `cajasDesplazables()` completa—, y
+     `.tag`, `.tag.new` y `.tag.soon` ya son los tres estados que hacían falta. -->
+<main id="page-estandares" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="std.ey">Marco de actuación</span>
+      <h1 class="h-sec rv" data-i18n="std.t">Bajo qué normas trabajamos, y qué no afirmamos.</h1>
+      <p class="lead rv d1" data-i18n="std.lead">Give&amp;Grow International es una entidad colombiana sin ánimo de lucro que hoy opera dos cosas: un hub de donaciones con trazabilidad documental, y un triaje estructural de viviendas tras el sismo del 10 de agosto de 2026. Esta página reúne lo que un aliado institucional necesita comprobar antes de trabajar con nosotros, incluidos los vacíos que todavía estamos cerrando.</p>
+      <p class="rv d2" style="margin-top:16px"><a class="card-link" href="#transparencia" data-nav="transparencia"><span data-i18n="std.ident">La identidad legal, la gobernanza y los documentos públicos</span> <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="std.chs.ey">Norma Humanitaria Esencial</span>
+      <h2 class="h-sec rv" data-i18n="std.chs.t">Los nueve compromisos, uno por uno</h2>
+      <p class="lead rv d1" data-i18n="std.chs.p">La Norma Humanitaria Esencial en materia de calidad y rendición de cuentas es el marco con el que se mide a una organización que responde a una emergencia. Lo que sigue es dónde estamos en cada compromiso, con lo que se puede comprobar y sin redondear hacia arriba.</p>
+
+      <div class="med-tw rv d2">
+        <table class="med-tbl">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="std.chs.h1">Compromiso</th>
+              <th scope="col" data-i18n="std.chs.h2">Qué existe hoy</th>
+              <th scope="col" data-i18n="std.chs.h3">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-i18n="std.chs.c1">1 · Respuesta pertinente</td>
+              <td data-i18n="std.chs.c1.p">El triaje ordena por gravedad y no por orden de llegada, y cada clasificación la firma un ingeniero con matrícula verificada. Qué se entrega en territorio lo define la fundación aliada que está allí, no nosotros desde Medellín.</td>
+              <td><span class="tag" data-i18n="std.est.op">Operando</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="std.chs.c2">2 · Respuesta oportuna</td>
+              <td data-i18n="std.chs.c2.p">No prometemos fechas porque no las tenemos: los ingenieros son voluntarios y son menos que las casas. Lo que sí damos es el dato comprobable en la pantalla de cada familia — los días que lleva esperando y cuántos casos siguen sin abrir.</td>
+              <td><span class="tag new" data-i18n="std.est.par">Parcial</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="std.chs.c3">3 · No causar daño</td>
+              <td data-i18n="std.chs.c3.p">No declaramos si una vivienda es habitable: esa competencia es de la autoridad municipal por la Ley 1523 de 2012, y extralimitarnos sería el daño. Los programas los ejecutan las fundaciones del territorio y el crédito es suyo, con su nombre.</td>
+              <td><span class="tag" data-i18n="std.est.op">Operando</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="std.chs.c4">4 · Comunicación y participación</td>
+              <td data-i18n="std.chs.c4.p">Cada familia recibe un enlace privado donde ve en qué va su caso y puede sumar material si se lo piden. Y publicamos lo que NO va a recibir con el mismo énfasis que lo que sí: no hay letra chica al final.</td>
+              <td><span class="tag" data-i18n="std.est.op">Operando</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="std.chs.c5">5 · Quejas atendidas</td>
+              <td data-i18n="std.chs.c5.p">Hoy solo existe la ruta de protección de datos ante la Superintendencia de Industria y Comercio. El mecanismo general, con una ruta confidencial separada de la ordinaria, está redactado y pendiente de adopción por la junta.</td>
+              <td><span class="tag soon" data-i18n="std.est.con">En construcción</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="std.chs.c6">6 · Respuesta coordinada</td>
+              <td data-i18n="std.chs.c6.p">Trabajamos con fundaciones aliadas verificadas y remitimos a la autoridad municipal lo que le corresponde. Todavía no participamos en mecanismos formales de coordinación humanitaria.</td>
+              <td><span class="tag new" data-i18n="std.est.par">Parcial</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="std.chs.c7">7 · Aprendizaje continuo</td>
+              <td data-i18n="std.chs.c7.p">El sistema registra los casos que un ingeniero no pudo evaluar y qué material faltaba, y eso realimenta lo que se le pide a la siguiente familia. No hay todavía un ciclo de evaluación externa.</td>
+              <td><span class="tag new" data-i18n="std.est.par">Parcial</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="std.chs.c8">8 · Personal competente</td>
+              <td data-i18n="std.chs.c8.p">La matrícula de cada ingeniero se verifica a mano en el registro público del COPNIA. Es el único filtro del proyecto y no lo queremos automático. El código de conducta está redactado y pendiente de adopción.</td>
+              <td><span class="tag" data-i18n="std.est.op">Operando</span></td>
+            </tr>
+            <tr>
+              <td data-i18n="std.chs.c9">9 · Recursos bien manejados</td>
+              <td data-i18n="std.chs.c9.p">Ningún voluntario recibe ni custodia dinero: todo aporte entra por pasarela o por cuenta bancaria a nombre de la Fundación, genera número de guía y su entrega se documenta con acta firmada por quien recibe. El certificado de donación lo firma la Revisora Fiscal bajo la gravedad de juramento.</td>
+              <td><span class="tag" data-i18n="std.est.op">Operando</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="mu rv d3" style="margin-top:22px;max-width:66ch" data-i18n="std.chs.nota">Ningún compromiso aparece aquí como cumplido si no podemos mostrar con qué. Tres van a medias y uno no existe todavía: decirlo es más útil, para quien nos evalúa y para nosotros, que un cuadro entero en verde que no resistiría diez minutos de comprobación.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="std.dnh.ey">El límite que nos pusimos</span>
+      <h2 class="h-sec rv" data-i18n="std.dnh.t">Orientar, no dictaminar</h2>
+      <p class="lead rv d1" data-i18n="std.dnh.p">Un ingeniero voluntario mira las fotografías de una vivienda afectada y escribe si hay señales para no permanecer en ella, qué precauciones tomar y con qué materiales conviene repararla. Lo que nunca escribe es si la casa es habitable.</p>
+      <p class="rv d2" style="margin-top:16px;max-width:66ch" data-i18n="std.dnh.p2">Esa declaratoria tiene efectos —evacuar, demoler— y en Colombia le corresponde a la autoridad de cada municipio por la Ley 1523 de 2012. Un privado que la emitiera a distancia estaría desplazando a quien sí responde por ella, y la familia quedaría con un papel que no la protege de nada. Por eso la distinción no es una advertencia al pie: gobierna el proyecto entero, hasta el nombre de las columnas de la base de datos, y es una casilla obligatoria que cada ingeniero acepta antes de ver su primer caso.</p>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="std.dat.ey">Datos personales</span>
+      <h2 class="h-sec rv" data-i18n="std.dat.t">Minimización, y no solo consentimiento</h2>
+      <p class="lead rv d1" data-i18n="std.dat.p">El tratamiento se rige por la Ley 1581 de 2012 y su Decreto 1377 de 2013. Más allá del consentimiento, el sistema está construido para que cada quien vea lo mínimo:</p>
+      <div class="grid g3 rv d2" style="margin-top:26px">
+        <div class="card"><p data-i18n="std.dat.1">El ingeniero que evalúa una vivienda no ve el nombre, el teléfono ni la dirección de la familia. Para dar el concepto no hacen falta, y quien sí los necesita para ir a visitar es el equipo de terreno.</p></div>
+        <div class="card"><p data-i18n="std.dat.2">El registro público de casas revisadas no lleva nombres, direcciones ni fotografías: solo el sector y la prioridad. Y solo aparece la familia que lo autorizó.</p></div>
+        <div class="card"><p data-i18n="std.dat.3">Toda autorización se puede retirar, y retirarla obliga a despublicar. Las fotografías de menores tienen protección reforzada por la Ley 1098 de 2006.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="std.no.ey">Los límites de lo que decimos</span>
+      <h2 class="h-sec rv" data-i18n="std.no.t">Lo que no vamos a afirmar</h2>
+      <div class="grid g3 rv d2" style="margin-top:26px">
+        <div class="card"><h3 class="h-comp3" data-i18n="std.no.1.t">Cifras financieras</h3><p data-i18n="std.no.1.p">No publicamos ingresos, gastos ni totales hasta el cierre contable de 2025, firmado por la Revisora Fiscal. Publicar una cifra provisional y corregirla después vale menos que esperar.</p></div>
+        <div class="card"><h3 class="h-comp3" data-i18n="std.no.2.t">Cifras de impacto</h3><p data-i18n="std.no.2.p">Solo publicamos lo que podemos probar con un documento. Lo que reporta un tercero se marca como reportado por un tercero, y no lo presentamos como nuestro.</p></div>
+        <div class="card"><h3 class="h-comp3" data-i18n="std.no.3.t">Nuestro tamaño</h3><p data-i18n="std.no.3.p">Somos una fundación joven, constituida en 2025. No tenemos una década de programas ni un equipo grande, y preferimos decirlo antes que se note.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="std.ver.ey">Cómo comprobarlo</span>
+      <h2 class="h-sec rv" data-i18n="std.ver.t">Nada de esto pide que nos creas</h2>
+      <p class="rv d1" style="margin-top:14px"><a class="card-link" href="#transparencia" data-nav="transparencia"><span data-i18n="std.ver.1">El registro oficial, la gobernanza y los documentos públicos</span> <span aria-hidden="true">&rarr;</span></a></p>
+      <p class="rv d1" style="margin-top:10px"><a class="card-link" href="https://miramicasa.thegiveandgrowproject.org/#casas"><span data-i18n="std.ver.2">El registro público de viviendas revisadas</span> <span aria-hidden="true">&rarr;</span></a></p>
+      <p class="rv d2" style="margin-top:10px"><a class="card-link" href="#medicion" data-nav="medicion"><span data-i18n="std.ver.3">Cómo medimos, y el mapeo a ODS, GRI y ESG</span> <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+</main>
+
 <main id="page-transparencia" class="page">
   <section>
     <div class="wrap prose">
@@ -2829,6 +2972,7 @@
       <div>
         <h2 data-i18n="foot.legal">Entidad</h2>
         <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
+        <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
         <a href="#medicion" data-i18n="nav.medicion">Cómo medimos</a>
         <a href="#privacidad" data-i18n="foot.privacy">Privacidad y datos</a>
         <a href="mailto:sebas@thegiveandgrowproject.org">sebas@thegiveandgrowproject.org</a>
