@@ -4857,8 +4857,7 @@ function init(){
   animateCounters();
   if (currentRoute==="inicio") updateLiveStats();
 }
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-else init();
+/* El ARRANQUE no va aquí: está al FINAL del archivo. Ver la nota de allá. */
 /* LA PRECARGA DE LA RED, y por que NO en Mira Mi Casa.
 
    `partners.json` son las fundaciones, los comercios y el hub: 18,5 KB (5,9 en
@@ -6068,3 +6067,26 @@ function goComercios(){
   }, 120);
   return false;
 }
+
+/* ═══ EL ARRANQUE, Y POR QUÉ VA AL FINAL ═══════════════════════════════════
+   Estaba en la línea 4861, con 1.209 líneas de declaraciones POR DEBAJO. Eso
+   solo funcionaba por accidente: el `<script>` iba al final del body, así que
+   `readyState` valía "loading", se registraba el listener y `init()` corría en
+   `DOMContentLoaded` — cuando el archivo entero ya se había evaluado.
+
+   En cuanto el script se carga de cualquier otra forma —`defer`, `async`, un
+   bundler, un navegador que sirve el archivo de caché— `readyState` ya no es
+   "loading", la rama `else` corre `init()` EN EL ACTO, y ahí abajo `var JOURNEY`
+   está izada pero todavía sin asignar. Medido el 16 sep 2026 al mover el script
+   a `<head>` con `defer`:
+
+     TypeError: Cannot read properties of undefined (reading 'indexOf')
+       at renderJourney  (JOURNEY.indexOf(id))
+       at go
+       at init
+
+   La página se quedaba con el idioma sin aplicar y el tema sin repintar, sin que
+   nada más fallara a la vista. Puesto aquí abajo, las dos formas de carga se
+   comportan igual, que es lo que se esperaba desde el principio. */
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+else init();
