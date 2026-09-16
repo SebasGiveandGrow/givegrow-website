@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=629d72ba">
+<link rel="stylesheet" href="/styles.css?v=cf04119d">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=2fe9c2b9" defer></script>
+<script src="/app.js?v=0a374f70" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -3038,7 +3038,7 @@
              a una estafa, y la confianza la tiene la fundación, no el nombre. -->
         <p class="mmc-aval" data-i18n="mmc.aval">La plataforma de Cimientos que Unen, un proyecto de Fundación Give&amp;Grow International · NIT 901.948.930-2</p>
       </div>
-      <div>
+      <div class="foot-gg">
         <h2 data-i18n="foot.explore">Explorar</h2>
         <a href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
         <a href="#donar" data-i18n="nav.donar">Donar</a>
@@ -3047,7 +3047,7 @@
         <a href="#fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
         <a href="#faq" data-i18n="nav.faq">FAQ</a>
       </div>
-      <div>
+      <div class="foot-gg">
         <h2 data-i18n="foot.legal">Entidad</h2>
         <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
         <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
@@ -3056,6 +3056,44 @@
         <a href="mailto:sebas@thegiveandgrowproject.org">sebas@thegiveandgrowproject.org</a>
         <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a>
         <a href="https://wa.me/573153305028">+57 315 330 5028</a>
+      </div>
+
+      <!-- EL PIE DE MIRA MI CASA, y el motivo es el mismo que el del aval tres
+           líneas más arriba: una marca nueva pidiendo fotos de tu casa en zona
+           de desastre se parece a una estafa.
+
+           Medido el 16 sep 2026 en producción: de los 13 enlaces visibles del
+           pie en miramicasa.org, NUEVE eran rutas que no existen aquí
+           —#hub, #donar, #rastrea, #aliados, #fundaciones, #faq, #transparencia,
+           #estandares, #medicion— y `mmcRuta` las manda al dominio de la
+           fundación SIN AVISAR. O sea que una familia que toca «FAQ» aterriza,
+           de golpe, en un sitio de alianzas y membresías que no se parece en
+           nada a lo que le dijeron. Es justo la forma que tiene una estafa.
+
+           La nav ya estaba resuelta así desde el primer día; el pie se quedó
+           sin hacer, que es el mismo patrón a medias que esta hoja ya advierte.
+
+           LOS DOS ENLACES QUE SÍ SALEN DEL SITIO SE QUEDAN, y se quedan
+           ROTULADOS: transparencia y marco de actuación son de la ENTIDAD, no
+           del proyecto, y son lo primero que mira quien viene a comprobar que
+           esto es real. Van con la URL completa y bajo un encabezado que dice
+           a dónde llevan — un salto anunciado no es un salto sospechoso. -->
+      <div class="mmc-foot">
+        <h2 data-i18n="mmc.foot.t">Mira Mi Casa</h2>
+        <a href="#proyecto" data-i18n="mmc.nav.que">Qué es esto</a>
+        <a href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
+        <a href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
+        <a href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
+        <a href="#apadrinar" data-i18n="mmc.nav.apad">Apadrinar</a>
+      </div>
+      <div class="mmc-foot">
+        <h2 data-i18n="mmc.foot.quien">Quién responde</h2>
+        <a href="#privacidad" data-i18n="foot.privacy">Privacidad y datos</a>
+        <a href="mailto:MiraMiCasa@thegiveandgrowproject.org">MiraMiCasa@thegiveandgrowproject.org</a>
+        <a href="https://wa.me/573153305028">+57 315 330 5028</a>
+        <p class="mmc-foot-fuera" data-i18n="mmc.foot.fuera">En el sitio de la fundación, que es la entidad que responde por esto:</p>
+        <a href="https://www.thegiveandgrowproject.org/#transparencia" data-i18n="nav.transp">Transparencia</a>
+        <a href="https://www.thegiveandgrowproject.org/#estandares" data-i18n="nav.estandares">Marco de actuación</a>
       </div>
     </div>
     <div class="foot-bottom">

@@ -1781,6 +1781,22 @@ html[data-marca="mmc"] .mmc-aval{
 }
 html[data-marca="mmc"] .foot-grid .mmc-aval{ color:var(--on-dark-3); max-width:44ch }
 
+/* El pie, por la misma razón que el aval y que la nav. Se marca con clase en
+   los dos lados —`.foot-gg` lo de la fundación, `.mmc-foot` lo de aquí— y no
+   por posición en la rejilla: una columna nueva en el pie no debe poder
+   cambiar en silencio quién se esconde. La primera columna, la del logotipo y
+   el aval, se queda en los dos sitios: es la que dice quién responde. */
+.mmc-foot{ display:none }
+html[data-marca="mmc"] .foot-gg{ display:none }
+html[data-marca="mmc"] .mmc-foot{ display:block }
+/* El rótulo de los dos enlaces que sí salen del sitio. Va como texto y no como
+   un icono de «enlace externo» porque quien lo lee puede no conocer ese icono,
+   y aquí la frase es la advertencia. */
+html[data-marca="mmc"] .mmc-foot-fuera{
+  margin:18px 0 6px; font-size:var(--fs-11); line-height:1.35;
+  color:var(--on-dark-3); max-width:30ch;
+}
+
 /* ── La escala de prioridad, el elemento firma ────────────────────────────
    Lo único que este producto produce es una posición en una fila, así que la
    escala ES el sistema visual. El ámbar aparece una sola vez en todo el
