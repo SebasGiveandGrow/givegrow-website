@@ -443,6 +443,54 @@ const missing = [...new Set(used)].filter(k => !es.has(k));
 if (missing.length) err("data-i18n sin clave: " + missing.join(", "));
 else ok("cobertura data-i18n (" + new Set(used).size + " claves usadas)");
 
+/* 3a · JERARQUIA DE ENCABEZADOS, con trinquete.
+   Quien navega con lector de pantalla salta de encabezado en encabezado y usa
+   el NIVEL como indice: un `h1` seguido de un `h3` deja un hueco en el esquema y
+   el oyente no sabe si se perdio una seccion.
+
+   Hoy 14 de las 29 paginas del SPA lo rompen —casi todas `h1 -> h3`, y dos peor:
+   `donar` salta a `h4` e `inicio` tiene ademas `h2 -> h4`—. Arreglarlo NO es un
+   cambio de accesibilidad sino de DISEÑO: `h2` y `h3` no se ven igual, asi que
+   bajar el nivel cambia la pagina. Esa decision es de Sebas y esta en su lista.
+
+   Mientras tanto, el techo es el numero de HOY: las 14 que hay pueden quedarse,
+   y una pagina NUEVA nace con el esquema bien. Es el mismo trato que el
+   contraste y los colores literales.
+
+   Si se arregla alguna, este check lo dice y hay que BAJAR el numero. */
+const TECHO_ENCABEZADOS = 14;
+{
+  const limpio = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "");
+  const pg = [...limpio.matchAll(/<\w+[^>]*\bid="page-([^"]+)"/g)].map((m) => [m[1], m.index]);
+  pg.push(["(fin)", limpio.length]);
+  const rotas = [];
+  for (let k = 0; k < pg.length - 1; k++) {
+    const [nombre, ini] = pg[k], fin = pg[k + 1][1];
+    const hs = [...limpio.slice(ini, fin).matchAll(/<h([1-6])\b/g)].map((m) => Number(m[1]));
+    if (!hs.length) continue;
+    const mal = [];
+    let prev = null;
+    for (const niv of hs) {
+      if (prev !== null && niv > prev + 1) mal.push("h" + prev + "→h" + niv);
+      prev = niv;
+    }
+    if (hs[0] !== 1) mal.unshift("empieza en h" + hs[0]);
+    if (mal.length) rotas.push(nombre + " (" + mal[0] + ")");
+  }
+  if (rotas.length > TECHO_ENCABEZADOS) {
+    err("jerarquía de encabezados: " + rotas.length + " páginas con saltos de nivel y el techo es " +
+        TECHO_ENCABEZADOS + ". Una página nueva nace con el esquema bien: h1 → h2 → h3, sin saltar. " +
+        "Las que sobran: " + rotas.slice(TECHO_ENCABEZADOS).join(", "));
+  } else if (rotas.length < TECHO_ENCABEZADOS) {
+    ok("jerarquía de encabezados: " + rotas.length + " páginas con saltos — BAJÓ del techo " +
+       TECHO_ENCABEZADOS + ". Actualiza TECHO_ENCABEZADOS en validate.mjs a " + rotas.length);
+  } else {
+    ok("jerarquía de encabezados: " + rotas.length + " páginas con saltos, en el techo");
+  }
+}
+
 /* 3b · LAS CLAVES QUE PIDE EL JS, que nadie miraba.
    El check de arriba cubre `data-i18n="…"`, y eso solo existe en index.html.
    Pero `app.js` pide 218 claves mas con `t("…")` y ninguna se comprobaba.
