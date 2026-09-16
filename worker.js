@@ -1534,6 +1534,16 @@ async function apiIngeniero(env, c) {
     especialidad: esp,
     especialidad_otra: esp === "otra" ? limpio(c.especialidad_otra, 120) : "",
     experiencia: limpio(c.experiencia, 40),
+    /* LA FORMACIÓN MÁS ALLÁ DE LA MATRÍCULA. Van en `datos`, que ya es JSON, así
+       que esto NO necesita migración: la tabla `inscripciones` guarda aquí todo
+       lo propio de cada tipo desde la 0001.
+
+       `otros_saberes` admite lo de FUERA de la ingeniería por una razón
+       operativa y no por cortesía: muchas de estas casas son de adobe o
+       bahareque, y quien sabe leerlas no siempre lo aprendió en la universidad. */
+    posgrado: limpio(c.posgrado, 200),
+    diplomados: limpio(c.diplomados, 240),
+    otros_saberes: limpio(c.otros_saberes, 500),
     disponibilidad: limpio(c.disponibilidad, 200),
     mensaje: limpio(c.mensaje, 600),
     acepta_triaje: true,
@@ -1639,6 +1649,9 @@ async function correoAvisoIngeniero(env, i) {
     ["Matrícula", i.matricula + " — SIN VERIFICAR"],
     ["Especialidad", (ESP_ING_ES[i.especialidad] || i.especialidad) +
       (i.especialidad_otra ? " · " + i.especialidad_otra : "")],
+    ["Posgrado", i.posgrado || "(no dijo)"],
+    ["Diplomados o cursos", i.diplomados || "(no dijo)"],
+    ["Otros conocimientos", i.otros_saberes || "(no dijo)"],
     ["Experiencia", i.experiencia || "(no dijo)"],
     ["Disponibilidad", i.disponibilidad || "(no dijo)"]
   ];
@@ -15449,6 +15462,14 @@ function resumenInscripcion(tipo, x){
     var g = ['<strong>Matrícula ' + esc(x.matricula || "?") + '</strong>'];
     g.push(esc(ESP_ING[x.especialidad] || x.especialidad || "?")
       + (x.especialidad_otra ? " · " + esc(x.especialidad_otra) : ""));
+    /* La formación va en su propia línea y no mezclada con la disponibilidad:
+       es lo que se lee para decidir qué casos ofrecerle, y «otros conocimientos»
+       puede traer justo lo que falta —bahareque, tapia, trato con comunidad—. */
+    var form = [];
+    if (x.posgrado) form.push(esc(x.posgrado));
+    if (x.diplomados) form.push(esc(x.diplomados));
+    if (x.otros_saberes) form.push("<em>" + esc(x.otros_saberes) + "</em>");
+    if (form.length) g.push("<small>" + form.join(" · ") + "</small>");
     var men = [];
     if (x.experiencia) men.push(esc(x.experiencia) + " de experiencia");
     if (x.disponibilidad) men.push(esc(x.disponibilidad));
