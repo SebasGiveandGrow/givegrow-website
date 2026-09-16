@@ -258,6 +258,9 @@ var I18N = {
     "mmc.nav.casas":"Casas revisadas",
     "mmc.nav.ing":"Ingenieros",
     "mmc.nav.apad":"Apadrinar",
+    "cv.ok.wa": "Mandármelo por WhatsApp",
+    "cv.wa.texto": "Este es el enlace de mi caso en Mira Mi Casa:",
+    "mmc.wa.texto": "Hola, escribo por Mira Mi Casa.",
     "mmc.foot.t": "Mira Mi Casa",
     "mmc.foot.quien": "Quién responde",
     "mmc.foot.fuera": "En el sitio de la fundación, que es la entidad que responde por esto:",
@@ -2175,6 +2178,7 @@ function applyLang(l){
   renderPobChips();
   applyRouteMeta(currentRoute);
   calcUpdate();
+  mmcWhatsApp();
 }
 
 /* ---------- SPA routing ---------- */
@@ -2382,6 +2386,11 @@ function cvEnviar(){
                 "?t=" + encodeURIComponent(d.token);
     var lnk = document.getElementById("cv-enlace");
     if (lnk) { lnk.textContent = CV.enlace; lnk.href = CV.enlace; }
+    /* El mismo enlace, listo para reenviar. Sin número en `wa.me`: así abre el
+       selector de contactos en vez de un chat con la fundación, y «Enviarme a
+       mí» —que es lo que dice el texto— queda a un toque. */
+    var wa = document.getElementById("cv-wa");
+    if (wa) wa.href = "https://wa.me/?text=" + encodeURIComponent(t("cv.wa.texto") + " " + CV.enlace);
     cvPaso(5);
     cvSubirCola();
   }).catch(function(){
@@ -2632,6 +2641,24 @@ function mmcMarca(){
        toca un logotipo. Antes llevaba a `#vivienda` porque esa era la raíz. */
     el.setAttribute("href", "#proyecto");
   });
+  mmcWhatsApp();
+}
+
+/* EL BOTÓN FLOTANTE DE WHATSAPP, que aquí abría un chat en blanco con la
+   fundación. Quien escribe desde Mira Mi Casa llega por su casa, no por una
+   donación ni por una alianza, y al otro lado llegaba un «hola» sin contexto en
+   el mismo buzón que atiende todo lo demás. Un texto previo —que la persona
+   puede borrar— dice de qué se trata antes de la primera respuesta.
+
+   VA APARTE Y LO LLAMA TAMBIÉN `applyLang`, y esto lo cazó la prueba y no la
+   lectura: escrito dentro de `mmcMarca` se fijaba UNA vez al cargar, así que al
+   pasar a inglés el botón seguía mandando «Hola, escribo por Mira Mi Casa».
+   El href no lleva `data-i18n`, o sea que el recorrido del diccionario no lo
+   alcanza; hay que reponerlo a mano en cada cambio de idioma. */
+function mmcWhatsApp(){
+  if (!MARCA_MMC) return;
+  var fab = document.querySelector("a.wa");
+  if (fab) fab.href = "https://wa.me/573153305028?text=" + encodeURIComponent(t("mmc.wa.texto"));
 }
 
 /* ===== Banco público de casas =====
