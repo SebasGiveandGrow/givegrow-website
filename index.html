@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=71379bb5">
+<link rel="stylesheet" href="/styles.css?v=5d007b55">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=eeede797" defer></script>
+<script src="/app.js?v=7985e9e8" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -2450,11 +2450,45 @@
     </div>
   </section>
 
-  <section class="cream">
+  <!-- EL ÍNDICE, ENTRE LA PORTADA Y EL CUERPO.
+       Esta página mide nueve pantallas en un teléfono, y eso no se arregla
+       recortándola: lo que dice —el alcance, quién ve tus datos, por qué esto no
+       es una estafa— es exactamente lo que alguien viene a comprobar antes de
+       mandar fotos de su casa. Lo que faltaba no era brevedad, era poder llegar.
+
+       VA DESPUÉS DE LA PORTADA ENTERA y no dentro de ella. El primer intento lo
+       metió junto a los tres botones y los empujó de 427 px a 722: en un
+       teléfono de 667 px el tercero se caía bajo el pliegue. Quien llega
+       decidido tiene su salida en la primera pantalla; el índice es para quien
+       se queda a leer, y esa es su posición.
+
+       CON `data-act` Y NO CON `href="#..."`: el sitio es una SPA de hash, así
+       que un ancla interna la leería el enrutador como un cambio de ruta y
+       sacaría a la persona de la página. Se desplaza con JS y se le pasa el
+       foco, igual que `skipToContent`. -->
+  <!-- SIN `rv`, y eso es deliberado. El resto de la página se revela al entrar
+       en pantalla con un IntersectionObserver; un índice no. Es navegación, no
+       adorno: si el observador no dispara —y me pasó al probarlo— lo que queda
+       es un bloque invisible justo donde alguien busca por dónde seguir. Lo que
+       ayuda a moverse está siempre, sin depender de que algo se active. -->
+  <section class="mmc-indice-sec">
+    <div class="wrap">
+      <nav class="mmc-indice" data-i18n="mmc.p.idx.aria" data-i18n-attr="aria-label" aria-label="Índice de esta página">
+        <span class="mmc-indice-t" data-i18n="mmc.p.idx.t">En esta página</span>
+        <button type="button" data-act="irASeccion('p-rol')" data-i18n="mmc.p.rol.ey">Quién hace qué</button>
+        <button type="button" data-act="irASeccion('p-alc')" data-i18n="mmc.p.alc.ey">El alcance</button>
+        <button type="button" data-act="irASeccion('p-conf')" data-i18n="mmc.p.conf.ey">Quiénes somos y qué no somos</button>
+        <button type="button" data-act="irASeccion('p-pas')" data-i18n="mmc.p.pas.ey">Cómo avanza un caso</button>
+        <button type="button" data-act="irASeccion('p-fin')" data-i18n="mmc.p.idx.reg">Casas ya revisadas</button>
+      </nav>
+    </div>
+  </section>
+
+  <section id="p-rol" class="cream">
     <div class="wrap">
       <span class="ey rv" data-i18n="mmc.p.rol.ey">Quién hace qué</span>
       <h2 class="h-sec rv" data-i18n="mmc.p.rol.t">Para que una casa avance hacen falta tres personas distintas</h2>
-      <p class="lead rv d1" data-i18n="mmc.p.rol.lead">Cada una entra por su propia puerta y ninguna hace el trabajo de la otra. Si no sabes cuál es la tuya, empieza por la primera.</p>
+      <p class="lead rv d1" data-i18n="mmc.p.rol.lead">Cada una entra por su propia puerta y ninguna hace el trabajo de la otra.</p>
 
       <div class="grid g3 rv d2" style="margin-top:28px">
         <div class="card">
@@ -2466,7 +2500,7 @@
         <div class="card">
           <span class="ey" style="margin-bottom:8px" data-i18n="mmc.p.rol2.k">Si eres ingeniero o arquitecto</span>
           <h3 data-i18n="mmc.p.rol2.t">El ingeniero da el concepto</h3>
-          <p data-i18n="mmc.p.rol2.p">Te postulas con tu matrícula del COPNIA y la verificamos a mano en su registro público. Después miras los casos que quieras, cuando puedas, y escribes un concepto a distancia: si hay señales para no permanecer, qué precauciones tomar y con qué reparar. No ves el nombre, el teléfono ni la dirección de la familia.</p>
+          <p data-i18n="mmc.p.rol2.p">Te postulas con tu matrícula del COPNIA y la verificamos a mano en su registro público. Después miras los casos que quieras, cuando puedas, y escribes un concepto a distancia. No ves el nombre, el teléfono ni la dirección de la familia.</p>
           <a class="card-link" href="#ingenieros"><span data-i18n="mmc.p.rol2.cta">Postularme como ingeniero</span> <span aria-hidden="true">&rarr;</span></a>
         </div>
         <div class="card">
@@ -2481,7 +2515,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="p-alc">
     <div class="wrap">
       <span class="ey rv" data-i18n="mmc.p.alc.ey">El alcance</span>
       <h2 class="h-sec rv" data-i18n="mmc.p.alc.t">Orientar, no dictaminar</h2>
@@ -2502,7 +2536,7 @@
     </div>
   </section>
 
-  <section class="band">
+  <section id="p-conf" class="band">
     <div class="wrap">
       <span class="ey rv" data-i18n="mmc.p.conf.ey">Quiénes somos y qué no somos</span>
       <h2 class="h-sec rv" data-i18n="mmc.p.conf.t">Esto es gratuito y no somos el Gobierno</h2>
@@ -2530,7 +2564,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="p-pas">
     <div class="wrap">
       <span class="ey rv" data-i18n="mmc.p.pas.ey">Cómo avanza un caso</span>
       <h2 class="h-sec rv" data-i18n="mmc.p.pas.t">Del teléfono de una familia al concepto de un ingeniero</h2>
@@ -2551,7 +2585,7 @@
     </div>
   </section>
 
-  <section class="cream">
+  <section id="p-fin" class="cream">
     <div class="wrap">
       <h2 class="h-sec rv" data-i18n="mmc.p.fin.t">Lo que ya se revisó está publicado</h2>
       <p class="lead rv d1" data-i18n="mmc.p.fin.p">Cada casa revisada aparece en un registro público sin nombres, sin direcciones y sin fotos: solo el sector y cuánta prisa corre. Es la forma que tenemos de probar lo que decimos en vez de pedirte que nos creas.</p>
