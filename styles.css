@@ -170,6 +170,30 @@ nav.sol{background:var(--nav-bg);backdrop-filter:blur(12px);box-shadow:0 1px 0 v
 .lang{display:flex;border:1px solid var(--bd);border-radius:999px;overflow:hidden}
 .lang button{padding:5px 11px;font-size:var(--fs-12);font-weight:700;color:var(--mu)}
 .lang button.on{background:var(--g);color:var(--on-dark)}
+/* EL CONMUTADOR DE IDIOMA SE BAJA AL CAJÓN EN EL TELÉFONO, y el motivo se midió
+   en la portada de la fundación a 375 px: la barra mete cuatro controles
+   —«Donar», tema, ES/EN y el menú— que suman 262 px, así que a «Give&Grow» le
+   quedaban 49 px para los 114 que necesita. Se partía en TRES líneas y la barra
+   llegaba a 105 px de alto. En un teléfono, y en la portada.
+
+   De los cuatro, el idioma es el que menos se toca y el único que ya tenía
+   sitio donde vivir: `applyLang` marca `dlang-es`/`dlang-en` desde hace tiempo,
+   o sea que el conmutador del cajón estaba previsto en el código y nunca se
+   escribió en el HTML. «Donar» se queda: es la acción principal de un sitio que
+   recauda, y esconderla para salvar un logotipo es el trueque al revés.
+
+   460 px y no 420: el ápex carga un control más que Mira Mi Casa, así que suelta
+   el idioma antes. */
+/* SOLO FUERA DE MIRA MI CASA, y esto casi se me escapa: allí el cajón esconde
+   todo lo que no sea suyo —`.nav-mobile > *` con `display:none`— así que una
+   regla sin marcar habría quitado el conmutador de la barra Y lo habría dejado
+   oculto en el cajón. Resultado: ningún modo de cambiar de idioma en un teléfono,
+   en un sitio cuya regla dura es que nada existe en un solo idioma. Mira Mi Casa
+   no lo necesita: su barra lleva tres controles y su logotipo ya cabe. */
+@media (max-width:460px){
+  html:not([data-marca="mmc"]) .nav-actions > .lang{ display:none }
+}
+.lang-cajon{ width:max-content; margin:4px 0 8px }
 /* El aviso de que el diccionario inglés no llegó. Discreto a proposito: es un
    estorbo, no una emergencia. Sin tokens nuevos. */
 .lang-fallo{position:fixed;left:0;right:0;z-index:199;margin:0;

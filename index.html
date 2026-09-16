@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=57f4e92b">
+<link rel="stylesheet" href="/styles.css?v=71379bb5">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=b5f41a26" defer></script>
+<script src="/app.js?v=eeede797" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -171,6 +171,16 @@
   <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
   <a href="#faq" data-i18n="nav.faq">FAQ</a>
   <a href="#contacto" data-i18n="nav.contacto">Contacto</a>
+  <!-- EL IDIOMA, QUE EN EL TELÉFONO NO CABE ARRIBA. `applyLang` lleva tiempo
+       marcando `dlang-es` y `dlang-en` —el conmutador del cajón estaba previsto
+       en el código y nunca se escribió aquí—, así que esto no inventa un
+       mecanismo: le pone el cuerpo al que ya había. Ver la nota de `.lang` en
+       styles.css para por qué la barra lo suelta por debajo de 460 px. -->
+  <span class="mnav-g" data-i18n="nav.idioma">Idioma</span>
+  <div class="lang lang-cajon">
+    <button id="dlang-es" class="on" data-act="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
+    <button id="dlang-en" data-act="setLang('en')" aria-label="Switch language to English">EN</button>
+  </div>
 </div>
 
 <!-- ============ INICIO ============ -->
