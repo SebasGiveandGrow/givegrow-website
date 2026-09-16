@@ -2534,7 +2534,7 @@ var MARCA_MMC = document.documentElement.getAttribute("data-marca") === "mmc";
    le enseña un 404, se le lleva al sitio donde esa página sí existe. */
 var RUTAS_MMC = ["proyecto", "vivienda", "caso", "casas", "ingenieros", "apadrinar", "privacidad", "e404"];
 
-var ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
+var ORIGIN_MMC = "https://miramicasa.org";
 
 /* Las rutas del TRIAJE, que ya solo existen en Mira Mi Casa. La brigada NO está
    aquí a propósito: es anterior a este proyecto y es de la fundación, así que se
