@@ -1,4 +1,16 @@
 User-agent: *
 Allow: /
 
+# DOS LÍNEAS DE SITEMAP, y es a propósito.
+#
+# Este archivo es UNO y lo sirven los dos sitios: el de la fundación y Mira Mi
+# Casa, que desde el 16 sep 2026 tiene dominio propio. Hasta hoy solo declaraba
+# el sitemap del ápex, así que un rastreador que llegaba a miramicasa.org por
+# primera vez —que es exactamente lo que pasa con un dominio recién registrado—
+# recibía un robots.txt que le señalaba OTRO dominio y ninguna pista de dónde
+# estaba el mapa del sitio que estaba visitando.
+#
+# El estándar admite varias líneas Sitemap y las dos URLs sirven el MISMO
+# archivo, que ya lista las dos raíces. No hay nada que mantener en paralelo.
 Sitemap: https://www.thegiveandgrowproject.org/sitemap.xml
+Sitemap: https://miramicasa.org/sitemap.xml
