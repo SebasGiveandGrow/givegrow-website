@@ -303,6 +303,51 @@ const missing = [...new Set(used)].filter(k => !es.has(k));
 if (missing.length) err("data-i18n sin clave: " + missing.join(", "));
 else ok("cobertura data-i18n (" + new Set(used).size + " claves usadas)");
 
+/* 3b · LAS CLAVES QUE PIDE EL JS, que nadie miraba.
+   El check de arriba cubre `data-i18n="…"`, y eso solo existe en index.html.
+   Pero `app.js` pide 218 claves mas con `t("…")` y ninguna se comprobaba.
+
+   Importa por como termina `t`:
+
+     function t(k){ return (I18N[lang] && I18N[lang][k]) || (I18N.es[k]) || k; }
+
+   Si la clave no existe DEVUELVE LA CLAVE. O sea que un error de dedo no rompe
+   nada: pinta `cv.err.nuevo` en la pantalla, en medio del texto, y sigue.
+
+   DOS COSAS QUE HAY QUE SALTARSE, y las dos me mordieron al escribir esto:
+
+   · LOS COMENTARIOS. `cv.err.campos` aparece una sola vez en app.js, dentro de
+     un comentario que cuenta como era el codigo antes. Sin quitarlos, este
+     check denuncia historia.
+   · LOS PREFIJOS de composicion dinamica —`t("bc.cl." + x)`— que se leen como
+     una clave acabada en punto. Para esos no se exige la clave exacta sino que
+     EXISTA ALGUNA que empiece asi: un prefijo del que no cuelga nada tampoco
+     sirve de nada. */
+try {
+  const limpio = src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\/[^\n]*/gm, "");
+  const pedidas = [...new Set([...limpio.matchAll(/\bt\(\s*"([^"]+)"/g)].map((m) => m[1]))];
+  const huerfanas = [], prefijosVacios = [];
+  for (const k of pedidas) {
+    if (k.endsWith(".")) {
+      if (![...es].some((d) => d.startsWith(k))) prefijosVacios.push(k);
+    } else if (!es.has(k)) {
+      huerfanas.push(k);
+    }
+  }
+  if (huerfanas.length) {
+    err("check #3b: app.js pide " + huerfanas.length + " clave(s) i18n que NO existen; `t()` devuelve la " +
+        "clave tal cual, asi que se pintan en la pantalla: " + huerfanas.join(", "));
+  }
+  if (prefijosVacios.length) {
+    err("check #3b: prefijo(s) de clave dinamica sin ninguna clave detras: " + prefijosVacios.join(", "));
+  }
+  if (!huerfanas.length && !prefijosVacios.length) {
+    ok("claves i18n que pide app.js: " + pedidas.length + " y todas existen");
+  }
+} catch (e) { err("no se pudieron verificar las claves i18n de app.js: " + e.message); }
+
 /* 3.9 · CADA FOTO DE LA GALERÍA EXISTE, Y SU MINIATURA TAMBIÉN
    Este check nació de un fallo que NO SE VE. `[assets] directory = "."` con el
    fallback del SPA hace que una ruta de imagen inexistente responda 200 con
