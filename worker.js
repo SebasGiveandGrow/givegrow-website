@@ -71,7 +71,48 @@ const ORIGIN_MMC = "https://miramicasa.org";
    Los usa `marcarMarca`; ver la nota larga que hay allí. */
 const MMC_TITULO = "Mira Mi Casa · Fundación Give&Grow International";
 const MMC_OG_TITULO = "Mira Mi Casa";
+const MMC_OG_IMG_ALT = "Mira Mi Casa · Una vivienda afectada por el sismo del 10 de agosto de 2026";
 const MMC_DESC = "Si tu casa se afectó por el sismo, sube unas fotos. Un ingeniero voluntario con matrícula te dice si hay señales para no permanecer en ella, qué precauciones tomar y con qué materiales conviene repararla. Sin costo.";
+
+/* EL ICONO Y EL NOMBRE CON LOS QUE MIRA MI CASA SE GUARDA EN EL TELEFONO.
+   ==========================================================================
+   La nota larga de `marcarMarca` cuenta por que la vista previa de WhatsApp se
+   reescribe en el servidor. ESTO ES LA MISMA HISTORIA UN PASO DESPUES, y se
+   habia quedado sin hacer: cuando la familia ya entro y usa «Anadir a pantalla
+   de inicio» —que para alguien que «no sabe mucho de redes o TIC» es la unica
+   forma realista de volver, porque no va a recordar una URL ni a buscarla en
+   Google—, lo que queda en su telefono sale del manifiesto y de los iconos.
+
+   Y lo que quedaba era: un icono verde con el `&` de la fundacion, rotulado
+   «Give&Grow». Comprobado en produccion el 16 sep 2026 pidiendo
+   `miramicasa.org/manifest.webmanifest`: devolvia el de la fundacion tal cual.
+   O sea que la familia que hizo justo lo que debia hacer terminaba con un icono
+   que no reconoce y un nombre que nadie le menciono nunca.
+
+   SE SIRVE DESDE EL WORKER y no con un segundo archivo enlazado por marca,
+   porque el `<link rel="manifest">` vive en el index.html que comparten los dos
+   sitios: reescribir su `href` obligaria a mantener dos archivos con los mismos
+   colores duplicados. Aqui es UNA funcion que decide por Host, igual que el
+   resto de la marca.
+
+   LOS COLORES SON LOS DE LA PALETA MMC de styles.css —azul de documento
+   oficial, no el verde institucional—: `--g` en dia para `theme_color` y `--bg`
+   de noche para `background_color`, que es el fondo de la pantalla de arranque. */
+const MMC_MANIFIESTO = JSON.stringify({
+  name: "Mira Mi Casa",
+  short_name: "Mira Mi Casa",
+  description: MMC_DESC,
+  start_url: "/?utm_source=pwa",
+  display: "standalone",
+  background_color: "#07131F",
+  theme_color: "#0D3B66",
+  lang: "es",
+  orientation: "portrait-primary",
+  icons: [
+    { src: "/favicon-mmc.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+    { src: "/img/og-mmc.jpg", sizes: "1200x630", type: "image/jpeg", purpose: "any" }
+  ]
+}, null, 2);
 
 /* Límites del formulario público, en pesos. Coinciden con el deslizador de la
    calculadora: por debajo no cubre la comisión, por encima conviene hablar. */
@@ -17691,6 +17732,23 @@ function marcarMarca(respuesta, host) {
        quitar. */
     .on('meta[property="og:image"]', { element(e) { e.setAttribute("content", ORIGIN_MMC + "/img/og-mmc.jpg"); } })
     .on('meta[name="twitter:image"]', { element(e) { e.setAttribute("content", ORIGIN_MMC + "/img/og-mmc.jpg"); } })
+    /* Y EL ALT DE ESA IMAGEN, que se quedaba describiendo la de la fundacion:
+       «Give&Grow International — Dar para crecer, crecer para dar mas» colgado
+       de una foto de una casa caida. Lo lee quien navega con lector de pantalla
+       y lo usan las vistas previas que no cargan la imagen. */
+    .on('meta[property="og:image:alt"]', { element(e) { e.setAttribute("content", MMC_OG_IMG_ALT); } })
+    /* EL ICONO Y EL NOMBRE EN EL TELEFONO. La pareja del manifiesto de arriba:
+       el manifiesto manda en Android, pero en iOS —donde «Anadir a pantalla de
+       inicio» es la ruta que mas se usa— quien manda son estas dos etiquetas, y
+       las dos venian de la fundacion. Sin esto, arreglar solo el manifiesto
+       dejaba a la mitad de los telefonos con el icono verde y el nombre ajeno. */
+    .on('link[rel="apple-touch-icon"]', { element(e) { e.setAttribute("href", "/favicon-mmc.svg"); } })
+    .on('link[rel="icon"]', { element(e) { e.setAttribute("href", "/favicon-mmc.svg"); } })
+    .on('meta[name="apple-mobile-web-app-title"]', { element(e) { e.setAttribute("content", MMC_OG_TITULO); } })
+    /* La barra del navegador pintaba el verde institucional encima de un sitio
+       entero en azul. El valor de noche lo pone el script en linea de
+       index.html, que ahora mira `data-marca` por la misma razon. */
+    .on('meta[name="theme-color"]', { element(e) { e.setAttribute("content", "#0D3B66"); } })
     /* EL HERO DE LA FUNDACIÓN NO SE DESCARGA EN MIRA MI CASA.
        ========================================================================
        `index.html` trae la imagen grande de la portada del ápex —
@@ -17960,6 +18018,23 @@ export default {
       const sinWww = new URL(url.toString());
       sinWww.hostname = url.hostname.replace(/^www\./i, "");
       return Response.redirect(sinWww.toString(), 302);
+    }
+
+    /* El manifiesto de Mira Mi Casa. Ver `MMC_MANIFIESTO` arriba para el motivo.
+       TIENE QUE ESTAR EN `run_worker_first` de wrangler.toml, y es la QUINTA vez
+       que este mismo despiste muerde —/api/*, /triaje, la raiz y los atajos—:
+       sin esa linea la capa de assets sirve el archivo del repo y este bloque
+       no llega a correr. Se comprobo con curl, no leyendolo. */
+    if (ruta === "/manifest.webmanifest" && HOST_MMC.test(url.hostname)) {
+      return new Response(MMC_MANIFIESTO, {
+        headers: {
+          "content-type": "application/manifest+json; charset=utf-8",
+          /* Corto a proposito: el manifiesto lo relee el navegador al instalar,
+             y una hora basta para no pedirlo en cada visita sin dejar clavado
+             un nombre viejo en los telefonos durante dias. */
+          "cache-control": "public, max-age=3600"
+        }
+      });
     }
 
     if (ruta === "/casa" || ruta === "/micasa" || ruta === "/mimicasa") {
