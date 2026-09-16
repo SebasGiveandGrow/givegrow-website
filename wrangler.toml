@@ -27,7 +27,13 @@ html_handling = "auto-trailing-slash"
 # la capa de assets se los tragaba antes de invocar al Worker, exactamente lo que
 # el párrafo de arriba lleva advirtiendo desde /api/*. Se cazó ejercitándolos con
 # curl, no leyéndolos.
-run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa"]
+# Y LA QUINTA fue `/manifest.webmanifest`, el archivo que decide con qué nombre
+# y con qué ícono queda Mira Mi Casa cuando una familia lo guarda en la pantalla
+# de inicio de su teléfono. El Worker ya tenía el manifiesto propio del proyecto
+# escrito; sin esta línea la capa de assets servía el del repo —«Give&Grow»,
+# ícono verde— y ese código no llegaba a correr nunca. Misma forma que las
+# cuatro anteriores: el bloque se lee bien y no se ejecuta.
+run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest"]
 
 # Base PRIVADA (Ley 1581): donantes, aportes, inscripciones y consentimientos.
 # Nunca se sirve al navegador. Los datos públicos de la red siguen en
