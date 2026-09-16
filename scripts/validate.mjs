@@ -96,6 +96,68 @@ for (const f of ["app.js", "worker.js", "documentos.js"]) {
   }
 }
 
+/* 1c · LAS SEIS COPIAS DE `esc` TIENEN QUE COMPORTARSE IGUAL.
+   `esc` esta definida SEIS veces en worker.js —una por ambito: el modulo y cada
+   plantilla, que no pueden importar nada— y esa duplicacion es forzosa. Lo que
+   no puede pasar es que discrepen: es la funcion que impide que un dato ajeno se
+   convierta en HTML.
+
+   Y discrepar no es teorico. El 16 sep 2026 se encontraron CUATRO variantes: las
+   seis escapaban los mismos cinco caracteres —el negativo importante, no habia
+   agujero— pero la del modulo usaba `String(s || "")` y convertia el CERO en
+   cadena vacia, contra la regla del propio proyecto de que el cero se muestra.
+   Ese mismo dia, tres copias de `enCO` divergian en una barra y una llegaba al
+   navegador con la regex rota (PR #430).
+
+   NO SE COMPARA EL TEXTO sino el COMPORTAMIENTO: el formato difiere
+   legitimamente entre una flecha y un `function`, y lo que importa es la salida.
+   Dos usan `document` —no existe en Node— asi que se les da un doble que
+   reproduce lo que hace el navegador al serializar un nodo de texto: escapa
+   & < > y NO las comillas, que es justo por lo que esas copias las añaden
+   aparte. */
+try {
+  const fuente = readFileSync("worker.js", "utf8");
+  const cuerpoFn = (desde) => {
+    const a = fuente.indexOf("{", desde);
+    let d = 0, k = a;
+    while (k < fuente.length) {
+      if (fuente[k] === "{") d++;
+      else if (fuente[k] === "}") { d--; if (!d) return fuente.slice(desde, k + 1); }
+      k++;
+    }
+    return "";
+  };
+  const copias = [];
+  for (const m of fuente.matchAll(/\bfunction esc\s*\(/g)) {
+    copias.push({ linea: fuente.slice(0, m.index).split("\n").length, src: cuerpoFn(m.index) });
+  }
+  if (copias.length < 2) {
+    err("check #1c: esperaba varias copias de `esc` en worker.js y encontre " + copias.length);
+  } else {
+    /* El doble del navegador: textContent -> innerHTML escapa & < > y nada mas. */
+    const documentoFalso = {
+      createElement: () => ({
+        set textContent(v) { this._t = String(v); },
+        get innerHTML() { return this._t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+      })
+    };
+    const BATERIA = ["hola", "<b>x</b>", "a\"b'c", "a&b", 0, false, "", null, undefined, NaN, 42, "<script>", "&amp;"];
+    const salidas = copias.map((c) => {
+      const fn = new Function("document", c.src + "; return esc;")(documentoFalso);
+      return BATERIA.map((v) => { try { return String(fn(v)); } catch (e) { return "ERROR:" + e.message; } }).join("\u0001");
+    });
+    const distintas = [...new Set(salidas)];
+    if (distintas.length > 1) {
+      const grupos = distintas.map((d) => copias.filter((_, i) => salidas[i] === d).map((c) => c.linea).join("+"));
+      err("check #1c: las " + copias.length + " copias de `esc` NO se comportan igual — " +
+          distintas.length + " variantes: " + grupos.join(" vs ") +
+          ". Es la funcion que impide que un dato ajeno se vuelva HTML; no puede depender de en que pantalla estes.");
+    } else {
+      ok("las " + copias.length + " copias de `esc` se comportan igual (" + BATERIA.length + " entradas)");
+    }
+  }
+} catch (e) { err("no se pudieron comparar las copias de `esc`: " + e.message); }
+
 /* 1b · Sintaxis del JS que worker.js GENERA.
    El panel `/admin` no es un archivo del repo: son ~485 líneas que `adminJS()`
    devuelve como template literal y el navegador ejecuta. El check #1 valida
