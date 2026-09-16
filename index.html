@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=e028f500" defer></script>
+<script src="/app.js?v=000f83be" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -2786,6 +2786,26 @@
           </select></div>
         <div class="field" id="inf-otra-f" style="display:none"><label for="inf-otra" data-i18n="ing.esp.cual">¿Cuál?</label>
           <input type="text" id="inf-otra"></div>
+        <!-- LA FORMACIÓN, MÁS ALLÁ DE LA MATRÍCULA. La especialidad dice en qué
+             se titutló; esto dice qué más sabe. Los tres campos son OPCIONALES a
+             propósito: un ingeniero civil con veinte años de obra y sin posgrado
+             es exactamente quien queremos, y un formulario que le pida un título
+             que no tiene le dice lo contrario en la primera pantalla.
+
+             «Otros conocimientos» admite lo de FUERA de la ingeniería por una
+             razón operativa: el triaje necesita gente que sepa mampostería
+             tradicional, bahareque o tapia —oficios que no dan diploma— y que
+             hable con una familia sin tecnicismos. Eso no cabe en «especialidad»
+             y hasta hoy no cabía en ninguna parte. -->
+        <div class="field"><label for="inf-posgrado" data-i18n="ing.posgrado">Especialización, maestría o doctorado (opcional)</label>
+          <input type="text" id="inf-posgrado" maxlength="200" data-i18n="ing.posgrado.ph" data-i18n-attr="placeholder" placeholder="Especialización en estructuras, Universidad Nacional">
+          <small class="mu" data-i18n="ing.posgrado.h">Si tienes varios, sepáralos con comas.</small></div>
+        <div class="field"><label for="inf-diplomados" data-i18n="ing.diplomados">Diplomados o cursos (opcional)</label>
+          <input type="text" id="inf-diplomados" maxlength="240" data-i18n="ing.diplomados.ph" data-i18n-attr="placeholder" placeholder="Evaluación de daños post-sismo, patología de estructuras…">
+          <small class="mu" data-i18n="ing.diplomados.h">Cuentan los cortos y los de gremio. Si es sobre evaluación post-sismo, dilo: eso pesa aquí.</small></div>
+        <div class="field"><label for="inf-otros" data-i18n="ing.otros">Otros conocimientos, dentro o fuera de la ingeniería (opcional)</label>
+          <textarea id="inf-otros" rows="3" maxlength="500" data-i18n="ing.otros.ph" data-i18n-attr="placeholder" placeholder="Construcción en bahareque o tapia, trabajo con comunidad, lengua indígena, gestión del riesgo…"></textarea>
+          <small class="mu" data-i18n="ing.otros.h">Nos sirve tanto como un título. Muchas de estas casas son de adobe o bahareque, y quien sabe leerlas no siempre lo aprendió en la universidad.</small></div>
         <div class="field"><label for="inf-exp" data-i18n="ing.exp">Años de ejercicio (opcional)</label>
           <input type="text" id="inf-exp" data-i18n="ing.exp.ph" data-i18n-attr="placeholder" placeholder="Sirve una respuesta como «unos 12 años»."></div>
         <div class="field"><label for="inf-disp" data-i18n="ing.disp">Cuántos casos podrías mirar por semana (opcional)</label>
