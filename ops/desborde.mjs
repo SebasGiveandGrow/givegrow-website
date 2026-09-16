@@ -98,6 +98,51 @@ for (const campo of ["nota_tecnica", "recomendacion", "sector", "material", "ani
 caso("concepto · normal", () => D.informeTriage(TRIAJE, HOY));
 caso("concepto · lo que falta, larguísimo", () => D.informeTriage({ ...TRIAJE, clasificacion: "inevaluable", falta: "F".repeat(220) }, HOY));
 
+/* LA INSPECCIÓN DE TERRENO NO TENÍA NI UN CASO, y es el documento con MÁS texto
+   escrito por una persona de todos: veintiséis respuestas, observaciones libres,
+   dos nombres, dos cédulas, una matrícula y un motivo de firma. Se llenan en un
+   teléfono, de pie frente a una casa, que es donde menos se cuida el largo.
+
+   Los otros tres documentos sí estaban. Este se quedó fuera desde que el script
+   se escribió, y nadie lo notó porque el guardián pasaba en verde. */
+const INSPECCION = {
+  numero: "IV-2026-0117", caso: "CV-2026-000042", casa_no: "3",
+  familia: "Familia Restrepo Ochoa", finca: "Lote 14", municipio: "Envigado",
+  direccion: "Dg. 33 #32A Sur 34, Zona 9", contacto: "313 555 0111",
+  fecha_visita: "2026-09-10", hora: "10:20", propietario: "Ana María Ochoa",
+  lat: 6.174531, lon: -75.584507, gps_precision: 8,
+  obs_nombre: "Ing. Juan Pablo Ríos", obs_cc: "1.017.845.221", obs_matricula: "05202-123456",
+  hab_cc: "43.512.987", firma_hab_motivo: "",
+  observaciones: "Fisuras diagonales en el muro sur, sin acero expuesto.",
+  requiere_esp: 0,
+  respuestas: { "1.1": "si", "2.1": "no", "3.2": "si" },
+  recomendaciones: { marcadas: ["x1", "e2"] }
+};
+const FIRMAS = { obs: null, hab: null };
+
+caso("inspección · normal", () => D.inspeccionPDF(INSPECCION, FIRMAS, HOY));
+for (const campo of ["familia", "direccion", "municipio", "propietario", "obs_nombre", "obs_matricula", "finca"]) {
+  caso("inspección · " + campo + " con palabra de 200",
+       () => D.inspeccionPDF({ ...INSPECCION, [campo]: "Normal " + PALABROTA + " y sigue." }, FIRMAS, HOY));
+}
+caso("inspección · observaciones larguísimas",
+     () => D.inspeccionPDF({ ...INSPECCION, observaciones: "O".repeat(1200) }, FIRMAS, HOY));
+caso("inspección · motivo de firma largo",
+     () => D.inspeccionPDF({ ...INSPECCION, firma_hab_motivo: "M".repeat(300) }, FIRMAS, HOY));
+caso("inspección · coordenadas con muchos decimales",
+     () => D.inspeccionPDF({ ...INSPECCION, lat: 6.17453188888888, lon: -75.58450799999999 }, FIRMAS, HOY));
+
+/* EL BLOQUE DE FIRMAS DEL CERTIFICADO, que tampoco se probaba. Importa desde el
+   PR #407: `ENTIDAD.repLegal` y `ENTIDAD.revisora` dejaron de ser una persona
+   fija para ser una sucesión, así que el nombre impreso PUEDE cambiar — y la
+   columna mide 224 pt. Medido hoy: un nombre de 43 letras ocupa 210,8. Cabe,
+   pero el margen es de dos palabras. */
+caso("certificado · firmado, nombres largos", () => D.certificado({
+  ...CERT,
+  firma_rl_en: "2026-09-15", firma_rl_huella: "a".repeat(64),
+  firma_rf_en: "2026-09-16", firma_rf_huella: "b".repeat(64)
+}, HOY));
+
 let malos = 0;
 for (const [nombre, fn] of CASOS) {
   REG.length = 0;
