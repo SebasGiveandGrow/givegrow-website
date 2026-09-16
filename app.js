@@ -258,6 +258,15 @@ var I18N = {
     "mmc.nav.casas":"Casas revisadas",
     "mmc.nav.ing":"Ingenieros",
     "mmc.nav.apad":"Apadrinar",
+    "ing.fila.ey": "La fila ahora mismo",
+    "ing.fila.cargando": "Consultando la fila…",
+    "ing.fila.falla": "No pudimos consultar la fila en este momento. No quiere decir que esté vacía: quiere decir que no lo pudimos comprobar.",
+    "ing.fila.vacia.t": "No hay ningún caso esperando.",
+    "ing.fila.vacia.p": "Postúlate igual. Cuando entre el primero te escribimos, y solo entonces: el aviso sale cuando la fila pasa de vacía a tener algo, no por cada caso.",
+    "ing.fila.uno": "caso espera a que alguien lo mire.",
+    "ing.fila.varios": "casos esperan a que alguien los mire.",
+    "ing.fila.espera": "El más antiguo lleva {d} días esperando.",
+    "ing.fila.hoy": "El más antiguo entró hoy.",
     "mmc.perdido.t": "¿Ya reportaste tu casa y perdiste el enlace?",
     "mmc.perdido.wa": "Escríbenos por WhatsApp y te lo devolvemos.",
     "mmc.perdido.texto": "Hola, reporté mi casa en Mira Mi Casa y perdí el enlace. Mi nombre es ____ y mi barrio o vereda es ____.",
@@ -2187,6 +2196,8 @@ function applyLang(l){
   calcUpdate();
   mmcWhatsApp();
   mmcMiCaso();
+  /* Solo si ya hay dato: repintar sin él borraría la fila al cambiar de idioma. */
+  if (FILA_DATO) filaPinta(FILA_DATO.esperando > 0 ? "hay" : "vacia", FILA_DATO);
 }
 
 /* ---------- SPA routing ---------- */
@@ -2772,6 +2783,94 @@ function mmcMiCaso(){
     nota.textContent = t("mmc.mio.nota");
     c.appendChild(nota);
   }
+}
+
+/* ===== LA FILA DEL TRIAJE, EN LA PÁGINA DE INGENIEROS =====
+   ==========================================================================
+   Cuatro estados y los cuatro se dicen, porque «no hay nada» y «no lo pude
+   comprobar» no son lo mismo — que es la regla de esta casa y la que ya
+   gobierna el mensaje de los comercios aliados y el del inglés que no carga.
+
+   LA FILA VACÍA NO SE ESCONDE. Tentaba —un cero no recluta— pero ahí el número
+   honesto es el que más vale: es la prueba de que el aviso automático funciona.
+   El servidor escribe a los ingenieros verificados EXACTAMENTE cuando la fila
+   pasa de vacía a tener un caso, y decirlo aquí convierte el cero en una
+   promesa comprobable en vez de en un silencio. */
+function filaPinta(estado, d){
+  var c = document.getElementById("ing-fila");
+  if (!c) return;
+  c.textContent = "";
+  c.setAttribute("data-estado", estado);
+
+  if (estado === "cargando"){
+    var p0 = document.createElement("p");
+    p0.className = "mmc-fila-nota";
+    p0.textContent = t("ing.fila.cargando");
+    c.appendChild(p0);
+    return;
+  }
+  if (estado === "falla"){
+    var p1 = document.createElement("p");
+    p1.className = "mmc-fila-nota";
+    p1.textContent = t("ing.fila.falla");
+    c.appendChild(p1);
+    return;
+  }
+
+  var et = document.createElement("span");
+  et.className = "mmc-fila-et";
+  et.textContent = t("ing.fila.ey");
+  c.appendChild(et);
+
+  if (estado === "vacia"){
+    var p2 = document.createElement("p");
+    p2.className = "mmc-fila-t";
+    p2.textContent = t("ing.fila.vacia.t");
+    c.appendChild(p2);
+    var p3 = document.createElement("p");
+    p3.className = "mmc-fila-nota";
+    p3.textContent = t("ing.fila.vacia.p");
+    c.appendChild(p3);
+    return;
+  }
+
+  var n = document.createElement("p");
+  n.className = "mmc-fila-n";
+  n.textContent = String(d.esperando);
+  c.appendChild(n);
+  var q = document.createElement("p");
+  q.className = "mmc-fila-t";
+  q.textContent = d.esperando === 1 ? t("ing.fila.uno") : t("ing.fila.varios");
+  c.appendChild(q);
+  var nota = document.createElement("p");
+  nota.className = "mmc-fila-nota";
+  /* Los días solo se dicen si hay algo que decir. «Lleva 0 días esperando»
+     suena a sistema y no informa: entró hoy, y eso ya lo dice el cero. */
+  nota.textContent = (d.espera_dias > 0)
+    ? t("ing.fila.espera").replace("{d}", String(d.espera_dias))
+    : t("ing.fila.hoy");
+  c.appendChild(nota);
+}
+
+var FILA_PEDIDA = false;
+var FILA_DATO = null;
+function filaCargar(){
+  if (FILA_PEDIDA) return;
+  FILA_PEDIDA = true;
+  filaPinta("cargando");
+  fetch("/api/casos/fila")
+    .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+    .then(function(d){
+      FILA_DATO = d;
+      filaPinta(d.esperando > 0 ? "hay" : "vacia", d);
+    })
+    .catch(function(){
+      /* Se suelta el cerrojo: si fue un parpadeo de red, volver a la página lo
+         reintenta. Es el mismo criterio que `pedirIngles`. */
+      FILA_PEDIDA = false;
+      FILA_DATO = null;
+      filaPinta("falla");
+    });
 }
 
 function mmcWhatsApp(){
@@ -3391,6 +3490,7 @@ function go(id, fromPop){
   if (id==="transparencia") pintarFechaImpresion();
   if (id==="caso" && MC.caso) mcPinta();
   if (id==="casas") bcPinta();
+  if (id==="ingenieros") filaCargar();
   mmcMiCaso();
 
   window.scrollTo(0,0);

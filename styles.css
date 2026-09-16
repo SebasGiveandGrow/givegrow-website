@@ -1801,6 +1801,24 @@ html[data-marca="mmc"] .mmc-foot-fuera{
    Lo único que este producto produce es una posición en una fila, así que la
    escala ES el sistema visual. El ámbar aparece una sola vez en todo el
    recorrido, y esa escasez es lo que lo convierte en señal. */
+/* ── La fila del triaje, en la página de ingenieros ───────────────────────
+   La cifra es el elemento firme y lo demás se aparta: lo que este bloque tiene
+   que contestar en un vistazo es «¿hay algo que hacer ahora?». Mismo encuadre
+   de documento que el resto del proyecto, sin caja de color: no es una alarma,
+   es un dato. En vacío la cifra no se pinta —un cero enorme grita lo que no
+   hay— y manda la frase. */
+.mmc-fila{ margin:26px 0 0; padding:18px 0 0; border-top:1.5px solid var(--bd);
+  max-width:46ch }
+.mmc-fila-et{ display:block; font-size:var(--fs-11); letter-spacing:.13em;
+  text-transform:uppercase; font-weight:700; color:var(--acc) }
+.mmc-fila-n{ margin:6px 0 0; font-family:var(--font-display); font-size:2.6rem;
+  font-weight:700; line-height:1; letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums; color:var(--ink) }
+.mmc-fila-t{ margin:6px 0 0; font-size:var(--fs-17); font-weight:600;
+  line-height:1.3; color:var(--ink) }
+.mmc-fila-nota{ margin:8px 0 0; font-size:var(--fs-13); line-height:1.45;
+  color:var(--mu) }
+
 /* ── El caso que este teléfono ya conoce ──────────────────────────────────
    Va donde estorba —encima de los tres botones de la portada— porque quien
    vuelve a teclear el dominio y ya reportó viene a UNA cosa. No grita: es la
