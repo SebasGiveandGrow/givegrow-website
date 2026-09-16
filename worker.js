@@ -7769,6 +7769,65 @@ async function adminRuta(env, url) {
    presentar como hallazgo lo que todavía es una solicitud sin revisar.
    ======================================================================== */
 /* ========================================================================
+   GET /api/casos/publicos.csv — el registro público, descargable
+   ========================================================================
+   El banco de casas ya era público: se ve en una tabla y sale por una API en
+   JSON. Lo que no era es REUTILIZABLE. Quien lo quisiera analizar —una agencia,
+   una universidad, una alcaldía— tenía que raspar una página o paginar una API
+   no documentada, y el sector humanitario trabaja con hojas y con CSV.
+
+   MISMA CONSULTA QUE LA TABLA, a propósito y no por ahorro: si el archivo y la
+   pantalla divergieran, una de las dos estaría mintiendo y no habría forma de
+   saber cuál. Lo único que cambia es el tope, porque un conjunto de datos que
+   se corta en 300 no sirve para nada.
+
+   NO LLEVA NI UN DATO PERSONAL, y eso no depende de recordarlo: las columnas
+   van enumeradas —caso, sector, prioridad, material, pisos, fecha— y el nombre,
+   el teléfono, la dirección y las fotografías no están en la consulta. Aparecen
+   solo las familias que autorizaron que su caso fuera público.
+
+   Y EL TOPE SE DICE. El proyecto tiene la regla escrita —«no hay topes
+   callados; si se recorta, se dice»— así que se pide uno de más para saber si
+   sobraba y, cuando sobra, la respuesta lo declara en sus cabeceras en vez de
+   entregar un archivo corto con cara de completo.
+   ======================================================================== */
+const TOPE_DESCARGA = 5000;
+
+async function apiCasosPublicosCSV(env) {
+  const r = await env.DB.prepare(
+    "SELECT numero, sector, clasificacion, material, pisos, creado_en FROM casos " +
+    "WHERE consent_publico = 1 AND clasificacion IS NOT NULL " +
+    "AND estado NOT IN ('cerrado','descartado') " +
+    "ORDER BY creado_en ASC LIMIT " + (TOPE_DESCARGA + 1)
+  ).all();
+
+  const todas = r.results || [];
+  const recortado = todas.length > TOPE_DESCARGA;
+  const filas = recortado ? todas.slice(0, TOPE_DESCARGA) : todas;
+
+  /* Separador `;` y BOM: es lo que ya emite el resto del proyecto y es lo que
+     abre bien en un Excel con configuración regional colombiana. Queda dicho en
+     el diccionario de la página, que es donde alguien va a buscarlo. */
+  const cab = ["caso", "sector", "prioridad", "material_muros", "pisos", "reportado_en"];
+  const cuerpo = filas.map(function (c) {
+    return [c.numero, c.sector, c.clasificacion, c.material, c.pisos, c.creado_en]
+      .map(csvCampo).join(";");
+  });
+  const csv = "\uFEFF" + [cab.join(";")].concat(cuerpo).join("\r\n") + "\r\n";
+
+  const cabeceras = {
+    "content-type": "text/csv; charset=utf-8",
+    "content-disposition": 'attachment; filename="mira-mi-casa-casas-revisadas-' + fechaCO() + '.csv"',
+    /* Público y cacheable un rato: es un registro, no un panel. */
+    "cache-control": "public, max-age=300",
+    "x-registros": String(filas.length)
+  };
+  if (recortado) cabeceras["x-registros-omitidos"] = "1";
+
+  return new Response(csv, { status: 200, headers: cabeceras });
+}
+
+/* ========================================================================
    ALMA — la asistente, ahora DENTRO del repo.
 
    POR QUÉ SE MUEVE. Vivía en un Worker aparte que se actualizaba pegando código
@@ -18281,6 +18340,7 @@ export default {
         if (comp) return await apiComprobante(request, env, comp[1].toUpperCase(), url.searchParams.get("t"));
         /* Triage estructural de viviendas */
         if (ruta === "/api/caso")           return await apiCasoCrear(request, env);
+        if (ruta === "/api/casos/publicos.csv") return await apiCasosPublicosCSV(env);
         if (ruta === "/api/casos/publicos") return await apiCasosPublicos(env, url);
         const cmed = ruta.match(/^\/api\/caso\/(CV-\d{4}-\d{6})\/medio$/i);
         if (cmed) return await apiCasoMedio(request, env, cmed[1].toUpperCase(), url.searchParams.get("t"), url);

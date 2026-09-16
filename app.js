@@ -233,6 +233,24 @@ var I18N = {
     "bc.cierre":"Lo que no decimos: si una casa es habitable. Eso lo define una visita y la autoridad de cada municipio. A cada familia se le escribe un concepto con lo que el ingeniero alcanzó a ver en sus fotos; lo que aparece aquí es solo cuánto corre la prisa.",
     "bc.tuya":"¿Tu casa se afectó y no está aquí?",
     "bc.apadrinar":"¿Quieres ayudar a repararlas?",
+
+    /* DATOS ABIERTOS. El banco ya era público —se veía en una tabla y salía por
+       una API— pero no era reutilizable: quien lo quisiera analizar tenía que
+       raspar una página. El sector humanitario trabaja con hojas y con CSV. */
+    "bc.od.ey":"Datos abiertos",
+    "bc.od.t":"Descarga el registro y úsalo",
+    "bc.od.p":"Este registro no está solo para mirarlo. Se descarga entero, en el formato que usa el sector, y se puede reutilizar citando la fuente. Lleva exactamente lo mismo que la tabla de arriba: sin nombres, sin direcciones y sin fotografías.",
+    "bc.od.csv":"Descargar en CSV",
+    "bc.od.json":"Ver la versión en JSON",
+    "bc.od.dic.t":"Qué trae cada columna",
+    "bc.od.d1":"caso — el número del caso. Es público y no identifica a nadie.",
+    "bc.od.d2":"sector — el barrio o la zona que escribió la familia. Es lo único que ubica la vivienda, y a propósito no baja de ahí.",
+    "bc.od.d3":"prioridad — urgente, programada, no_requiere o inevaluable. La escribió un ingeniero con matrícula verificada en el registro público del COPNIA.",
+    "bc.od.d4":"material_muros — ladrillo, adobe, bahareque, prefabricado, madera o no_se. Va vacío si la familia no lo dijo.",
+    "bc.od.d5":"pisos — cuántos pisos tiene, según la familia.",
+    "bc.od.d6":"reportado_en — cuándo lo reportó la familia, en UTC. Colombia es UTC−5.",
+    "bc.od.nota":"El CSV usa punto y coma como separador y lleva marca de orden de bytes, para que abra bien en Excel sin tocar nada. Se descargan hasta 5.000 registros; si alguna vez sobraran, la respuesta lo dice en sus cabeceras en vez de entregar un archivo corto con cara de completo.",
+    "bc.od.uso":"Puedes reutilizar estos datos, incluso con fines comerciales, citando como fuente a Fundación Give&Grow International. Lo que te pedimos a cambio es lo mismo que nos exigimos: no afirmar con ellos más de lo que dicen. Una clasificación es un concepto hecho sobre fotografías, no un dictamen de habitabilidad.",
     "tbl.region":"Tabla que se desliza en horizontal. Con el teclado, usa las flechas.",
     "nav.casas":"Casas revisadas",
     "nav.d.casas":"El registro público del triaje, sin nombres ni direcciones",
