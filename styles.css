@@ -1867,6 +1867,39 @@ html[data-marca="mmc"] .mmc-foot-fuera{
    Lo único que este producto produce es una posición en una fila, así que la
    escala ES el sistema visual. El ámbar aparece una sola vez en todo el
    recorrido, y esa escasez es lo que lo convierte en señal. */
+/* ── El índice de la portada ──────────────────────────────────────────────
+   Nueve pantallas en un teléfono no se arreglan recortando: lo que esta página
+   dice es lo que alguien viene a comprobar antes de mandar fotos de su casa.
+   Lo que faltaba era poder llegar. Fichas de documento, no pastillas de app:
+   rectas, con regla arriba y el rótulo en versalitas, como el sumario de un
+   informe. */
+.mmc-indice-sec{ padding:0 }
+/* El destino de cada salto se para DEBAJO de la barra fija, que mide 68 px y
+   taparía el rótulo de la sección a la que se acaba de llegar. Sin esto el
+   índice te deja mirando el segundo párrafo de lo que pediste. */
+html[data-marca="mmc"] #page-proyecto > section[id]{ scroll-margin-top:84px }
+/* ⚠️ `position:static` Y EL RESTO NO SON ADORNO: la barra superior del sitio se
+   estila con el SELECTOR DE ELEMENTO `nav{position:fixed;top:0;left:0;right:0;
+   z-index:200;padding:14px 0}`, así que CUALQUIER <nav> del documento lo hereda.
+   Este índice es un <nav> de verdad —es navegación— y al ponerlo salió de flujo:
+   su sección medía 0 px de alto, el índice quedaba pegado arriba bajo la barra y
+   no se veía. Se cazó midiendo `position` en el navegador, no leyendo.
+   Si mañana aparece otro <nav> en una página, le pasará lo mismo. */
+.mmc-indice{ position:static; top:auto; left:auto; right:auto; z-index:auto;
+  margin:0; padding:20px 0 26px; border-top:1.5px solid var(--bd);
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; max-width:52ch }
+.mmc-indice-t{ flex-basis:100%; font-size:var(--fs-11); letter-spacing:.13em;
+  text-transform:uppercase; font-weight:700; color:var(--mu); margin-bottom:2px }
+/* 44 px de alto mínimo: es un objetivo táctil, y medido daba 38. */
+.mmc-indice button{ font:inherit; font-size:var(--fs-13); font-weight:600;
+  color:var(--acc); background:none; border:1.5px solid var(--bd); border-radius:3px;
+  padding:10px 14px; min-height:44px; cursor:pointer; text-align:left;
+  transition:border-color .15s, background .15s }
+.mmc-indice button:hover{ border-color:var(--acc); background:var(--gl) }
+/* El destino del salto no debe quedar con el anillo de foco pegado: recibe el
+   foco para que con teclado el salto signifique algo, pero no es un control. */
+section[tabindex="-1"]:focus{ outline:none }
+
 /* ── La fila del triaje, en la página de ingenieros ───────────────────────
    La cifra es el elemento firme y lo demás se aparta: lo que este bloque tiene
    que contestar en un vistazo es «¿hay algo que hacer ahora?». Mismo encuadre

@@ -259,6 +259,9 @@ var I18N = {
     "mmc.nav.ing":"Ingenieros",
     "mmc.nav.apad":"Apadrinar",
     "nav.idioma": "Idioma",
+    "mmc.p.idx.t": "En esta página",
+    "mmc.p.idx.aria": "Índice de esta página",
+    "mmc.p.idx.reg": "Casas ya revisadas",
     "ing.fila.ey": "La fila ahora mismo",
     "ing.fila.cargando": "Consultando la fila…",
     "ing.fila.falla": "No pudimos consultar la fila en este momento. No quiere decir que esté vacía: quiere decir que no lo pudimos comprobar.",
@@ -310,14 +313,14 @@ var I18N = {
 
     "mmc.p.rol.ey":"Quién hace qué",
     "mmc.p.rol.t":"Para que una casa avance hacen falta tres personas distintas",
-    "mmc.p.rol.lead":"Cada una entra por su propia puerta y ninguna hace el trabajo de la otra. Si no sabes cuál es la tuya, empieza por la primera.",
+    "mmc.p.rol.lead":"Cada una entra por su propia puerta y ninguna hace el trabajo de la otra.",
     "mmc.p.rol1.k":"Si tu casa se afectó",
     "mmc.p.rol1.t":"La familia reporta",
     "mmc.p.rol1.p":"Subes fotos desde el teléfono, sin cuenta y sin contraseña. Recibes un número de caso y un enlace privado: ahí ves en qué va tu caso y puedes sumar más fotos si te las piden. Es gratis, y en ninguna pantalla se te va a pedir dinero.",
     "mmc.p.rol1.cta":"Revisa tu casa",
     "mmc.p.rol2.k":"Si eres ingeniero o arquitecto",
     "mmc.p.rol2.t":"El ingeniero da el concepto",
-    "mmc.p.rol2.p":"Te postulas con tu matrícula del COPNIA y la verificamos a mano en su registro público. Después miras los casos que quieras, cuando puedas, y escribes un concepto a distancia: si hay señales para no permanecer, qué precauciones tomar y con qué reparar. No ves el nombre, el teléfono ni la dirección de la familia.",
+    "mmc.p.rol2.p":"Te postulas con tu matrícula del COPNIA y la verificamos a mano en su registro público. Después miras los casos que quieras, cuando puedas, y escribes un concepto a distancia. No ves el nombre, el teléfono ni la dirección de la familia.",
     "mmc.p.rol2.cta":"Postularme como ingeniero",
     "mmc.p.rol3.k":"Si puedes aportar",
     "mmc.p.rol3.t":"Alguien apadrina la reparación",
@@ -3397,6 +3400,7 @@ function cvCopiar(){
 
 var ACT_FNS = {
   cvPaso:cvPaso, cvEnviar:cvEnviar, cvCopiar:cvCopiar, mmcCasoOlvidar:mmcCasoOlvidar,
+  irASeccion:irASeccion,
   themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,
   payMethod:payMethod, accTab:accTab, setQuick:setQuick, lbStep:lbStep, toggleFaq:toggleFaq,
   toggleDrop:toggleDrop, closeLightbox:closeLightbox, almaSend:almaSend, formSend:formSend,
@@ -5431,6 +5435,21 @@ function renderJourney(id){
 renderJourney(currentRoute || "inicio");
 
 /* ---------- accesibilidad: saltar al contenido ---------- */
+/* Desplazarse a una sección DENTRO de la página, sin tocar el hash.
+   Un `href="#p-rol"` aquí no sirve: el sitio es una SPA de hash y el enrutador
+   leería eso como un cambio de ruta que no existe. Así que se desplaza a mano y
+   se le pasa el foco, que es lo que hace falta para que con teclado o con
+   lector de pantalla el salto signifique algo y no solo mueva el scroll. */
+function irASeccion(id){
+  var el = document.getElementById(id);
+  if (!el) return false;
+  el.setAttribute("tabindex", "-1");
+  var suave = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+  el.focus({ preventScroll: true });
+  return false;
+}
+
 function skipToContent(){
   var page = document.querySelector("main.page.active") || document.querySelector("main");
   if (page){ page.setAttribute("tabindex","-1"); page.focus(); page.scrollIntoView(); }
