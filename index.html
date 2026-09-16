@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=0a374f70" defer></script>
+<script src="/app.js?v=4f4c4812" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -2691,6 +2691,20 @@
         <p class="mu" style="margin-top:10px" data-i18n="cv.ok.espera">Un ingeniero voluntario lo va a revisar. Cuando tenga su concepto, aparecerá en tu enlace.</p>
         <p style="margin-top:16px" data-i18n="cv.ok.enlace">Este es el enlace de tu caso. Guárdalo o mándatelo por WhatsApp: cuando un ingeniero lo revise, aquí aparecerá su concepto.</p>
         <p style="margin-top:8px;word-break:break-all"><a id="cv-enlace" href="#" style="color:var(--acc);font-weight:600"></a></p>
+        <!-- EL BOTÓN QUE EL TEXTO DE ARRIBA YA PROMETÍA. «Guárdalo o mándatelo
+             por WhatsApp», decía, y debajo solo había «Copiar mi enlace»: para
+             mandárselo había que copiar, salir, abrir WhatsApp, buscarse a uno
+             mismo y pegar. Cinco pasos para la única llave que tiene la familia
+             —no hay recuperación por teléfono ni por número de caso— y en el
+             momento en que menos paciencia le queda.
+
+             `wa.me` SIN NÚMERO abre el selector de contactos, donde «Enviarme a
+             mí» es la primera opción. Va PRIMERO y en verde: en estas zonas
+             mucha gente tiene WhatsApp y no correo —es el motivo por el que el
+             formulario de arriba pide el teléfono—, así que mandárselo por ahí
+             conserva el enlace mucho mejor que un portapapeles que se pierde en
+             el siguiente copiado. -->
+        <a id="cv-wa" class="btn btn-g" style="margin-top:16px" href="https://wa.me/" target="_blank" rel="noopener" data-i18n="cv.ok.wa">Mandármelo por WhatsApp</a>
         <button type="button" class="btn btn-o" style="margin-top:16px" data-act="cvCopiar()" data-i18n="cv.ok.copiar">Copiar mi enlace</button>
       </div>
 
