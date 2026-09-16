@@ -1462,6 +1462,32 @@ vacío porque ese campo se añadió al día siguiente.
    `d1 execute --remote --file` y luego `INSERT OR IGNORE INTO d1_migrations
    (name) VALUES ('00NN_….sql')`. **Sin el segundo paso el guardián del CI
    bloquea el deploy con la base ya migrada**, y el deploy queda rojo.
+
+   **Lo mejor es que el `INSERT` viva DENTRO del propio `.sql`** — la 0026 y la
+   0027 lo hacen— porque así no hay un segundo paso que olvidar.
+
+   **AÑADIDO EL 15 SEP 2026, aplicando la 0027, y son cuatro cosas:**
+
+   · **`--file` puede fallar con `Authentication error [code: 10000]` y ser
+     TRANSITORIO.** Fallo una vez y a la segunda, sin cambiar nada, aplico las
+     dos sentencias sin problema. **Reintenta antes de teorizar**: yo lo até con
+     el 7403 de arriba y monté una explicación sobre la cuenta con un solo dato.
+     El `whoami` ya decía que el token tenía `d1 (write)` y Super Administrator.
+
+   · **Una migración en el repo CONGELA TODOS LOS DESPLIEGUES** hasta aplicarla,
+     no solo el suyo. El guard «La base está migrada» corre en cada deploy y
+     sale con 1 mientras `migrations apply --dry-run` liste algo. Es lo correcto
+     —la base va antes que el código— pero conviene saberlo ANTES de fusionar
+     una migración un viernes: cualquier arreglo urgente se queda dentro.
+
+   · **Rutas ABSOLUTAS siempre.** `--file=migrations/…` se resuelve desde donde
+     esté la terminal, y la de Sebas vive en `~/Documents/GitHub`, un nivel por
+     encima del repo. Costó tres intentos con la 0026 y tres más con la 0027,
+     y el error que da —«Unable to read SQL text file»— no dice que el problema
+     sea la carpeta.
+
+   · **`gh workflow run` necesita estar DENTRO del repo**, o contesta «not a git
+     repository». Mismo origen que lo anterior.
 3. **Fusionar mientras Claude sigue trabajando pierde commits.** Pasó DOS veces:
    los PR #151 y #152 se llevaron solo los commits que existían al momento del
    merge. La regla que quedó: **un PR por pieza terminada**, y avisar cuando esté
