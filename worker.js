@@ -3345,7 +3345,14 @@ async function apiCasoMedio(request, env, numero, token, url) {
 }
 
 /* GET /api/caso/<numero>?t=<token> — lo que la familia puede ver de su caso.
-   Nunca devuelve la dirección exacta ni las notas técnicas internas. */
+   Nunca devuelve la direccion exacta. Tampoco el texto de la evaluacion, pero
+   NO porque sea interno: `nota_tecnica` es justo lo que la familia recibe
+   firmado en `/api/caso/<n>/informe.pdf`. Aqui no va porque esta pantalla es el
+   estado —en que punto va— y el concepto se entrega en el documento.
+
+   (Este comentario decia "las notas tecnicas internas", y no existe tal cosa:
+   `evaluaciones` tiene UN solo campo de nota y va impreso al donante de la
+   casa. Decirlo mal invitaba a escribir ahi un apunte para el equipo.) */
 async function apiCasoEstado(env, numero, token) {
   const c = await env.DB.prepare(
     "SELECT numero, token, estado, clasificacion, sector, creado_en FROM casos WHERE numero = ?"
@@ -4030,8 +4037,9 @@ function abrir(numero){
             + "<label>Tu matrícula profesional</label><input id='t-mat'>"
             + "<p class='sub' style='margin:0 0 10px'><small>Tu matrícula no está verificada todavía, "
             + "así que este concepto no le sale solo a la familia: lo revisa el equipo primero.</small></p>")
-      +  "<label>Nota técnica</label><textarea id='t-nota' rows='4'></textarea>"
-      +  "<label>Concepto para la familia (OBLIGATORIO, salvo si no puedes evaluar): si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar. Es lo que el sitio le prometió y lo único que va a recibir.</label><textarea id='t-rec' rows='5'></textarea>"
+      +  "<label>Nota técnica — LA LEE LA FAMILIA: es el titular de su informe</label><textarea id='t-nota' rows='4'></textarea>"
+      +  "<p class='sub' style='margin:0 0 10px'><small>Sale impresa bajo «CONCEPTO DEL INGENIERO», encima de lo de abajo y firmada con tu nombre y tu matrícula. No es un apunte para el equipo.</small></p>"
+      +  "<label>Qué hacer, y con qué reparar (OBLIGATORIO, salvo si no puedes evaluar): si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar. Es lo que el sitio le prometió.</label><textarea id='t-rec' rows='5'></textarea>"
       +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
       +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluación</button></p>"
       +  "<p class='msg' id='t-msg'></p></div>";
