@@ -1,15 +1,29 @@
-/* Genera la guía de Mira Mi Casa en PDF. Script de un solo uso: no forma parte
-   del sitio y se borra después de correrlo. Usa el pdf-lib que ya tiene el repo.
+/* Genera la guía de Mira Mi Casa en PDF. No forma parte del sitio: se corre a
+   mano y su salida se reparte impresa. Usa el pdf-lib que ya tiene el repo.
+
+   (Nació como «script de un solo uso que se borra después de correrlo». Ya se
+   ha corrido dos veces más, y las dos por lo mismo: el documento se queda
+   mintiendo cuando algo se mueve de sitio. Se queda en el repo.)
 
    Los ENLACES de este documento se comprobaron uno por uno contra producción el
-   1 de septiembre de 2026 antes de escribirlos — no se copiaron de memoria.
+   16 de septiembre de 2026 antes de escribirlos — no se copiaron de memoria.
 
-   ⚠️ SE REESCRIBIÓ ENTERA LA MITAD DE LOS ENLACES. Ese día el triaje y el panel se
-   mudaron al subdominio: las cuatro pantallas de trabajo ya viven en
-   `miramicasa.…`. La versión anterior decía «va en el dominio principal, NO en
-   miramicasa» y «el subdominio responde 403»; las dos cosas dejaron de ser
-   ciertas. Los enlaces del dominio principal siguen funcionando porque redirigen,
-   pero los que se reparten son los del subdominio. */
+   ⚠️ SEGUNDA MUDANZA DE ENLACES, y esta es la que importaba para el papel. Mira
+   Mi Casa estrenó dominio propio: `miramicasa.org`, trece caracteres, que se
+   dicta en voz alta sin deletrear. La dirección anterior tenía treinta y cinco,
+   y este documento existe justamente para repartirse en la calle, a familias que
+   van a teclearla a mano en un teléfono con una barra de señal. Un error de dedo
+   en cualquiera de esos treinta y cinco acaba en «no se pudo encontrar el sitio»,
+   que es indistinguible de «esto no existe».
+
+   LA DIRECCIÓN ANTERIOR NO SE APAGA y por eso el documento la menciona en vez de
+   borrarla: hay guías impresas circulando y familias con su enlace guardado. El
+   sitio responde igual en las dos. Lo que se REPARTE de aquí en adelante es la
+   corta.
+
+   (La primera mudanza, el 1 de septiembre, movió el triaje y el panel del dominio
+   principal al subdominio. Aquella nota decía «los que se reparten son los del
+   subdominio»; dejó de ser cierta hoy.) */
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import fs from "node:fs";
 
@@ -124,7 +138,7 @@ function pies() {
     p = pg;
     p.drawLine({ start: { x: MG, y: 46 }, end: { x: MG + ANCHO, y: 46 }, thickness: 0.5, color: LINEA });
     marca(MG, 40, 11);
-    p.drawText(wa("Mira Mi Casa  ·  guía de funcionamiento  ·  1 de septiembre de 2026"),
+    p.drawText(wa("Mira Mi Casa  ·  guía de funcionamiento  ·  16 de septiembre de 2026"),
       { x: MG + 18, y: 32, size: 7.4, font: N, color: GRIS });
     const t = wa(String(i + 1) + " / " + String(total));
     p.drawText(t, { x: MG + ANCHO - N.widthOfTextAtSize(t, 7.4), y: 32, size: 7.4, font: B, color: VERDE });
@@ -268,19 +282,19 @@ texto("Mira Mi Casa tiene cuatro entradas y cada una es para alguien distinto. L
   "son públicas; las otras dos piden identificarse.", { despues: 12 });
 
 h3("1. La familia — pública, sin cuenta");
-mono("https://miramicasa.thegiveandgrowproject.org");
-punto("Es la dirección que se reparte. Abre directamente en «Revisa tu casa».");
+mono("https://miramicasa.org");
+punto("Se dicta en voz alta tal cual: mira mi casa punto org. Sin guiones ni espacios.");
 
 h3("2. Quien quiera ayudar — pública");
 punto("Desde la misma dirección: el banco de casas revisadas, la postulación de ingenieros y el apadrinamiento.");
 
 h3("3. El ingeniero voluntario — pide identificarse");
-mono("https://miramicasa.thegiveandgrowproject.org/triaje");
-punto("Todo Mira Mi Casa vive en «miramicasa», herramientas incluidas. Si alguien tiene guardado el enlace del dominio principal, sigue funcionando: redirige.");
+mono("https://miramicasa.org/triaje");
+punto("Todo Mira Mi Casa vive aquí, herramientas incluidas. Si alguien tiene guardada una dirección anterior, o llega por thegiveandgrowproject.org/casa, sigue funcionando: no hay que reenviarle nada.");
 
 h3("4. El equipo — pide identificarse");
-mono("https://miramicasa.thegiveandgrowproject.org/admin");
-punto("Mismo dominio que todo lo demás. El enlace viejo del dominio principal redirige aquí.");
+mono("https://miramicasa.org/admin");
+punto("Mismo dominio que todo lo demás. Las direcciones anteriores siguen abriendo lo mismo.");
 
 caja("Cómo se entra a las dos que piden identificarse", [
   "Sin cuenta y sin contraseña. Se abre el enlace, se pide un código, llega al correo, y con",
@@ -291,18 +305,18 @@ caja("Cómo se entra a las dos que piden identificarse", [
 ], VERDE);
 
 h2("Las áreas públicas, con su enlace");
-texto("Comprobados uno por uno contra el sitio en producción el 1 de septiembre de 2026.",
+texto("Comprobados uno por uno contra el sitio en producción el 16 de septiembre de 2026.",
   { size: 8.6, color: GRIS, despues: 10 });
 
-fila("Revisa tu casa", "https://miramicasa.thegiveandgrowproject.org/#vivienda", { mono: true });
+fila("Revisa tu casa", "https://miramicasa.org/#vivienda", { mono: true });
 fila("", "El formulario de la familia.");
-fila("Casas revisadas", "https://miramicasa.thegiveandgrowproject.org/#casas", { mono: true });
+fila("Casas revisadas", "https://miramicasa.org/#casas", { mono: true });
 fila("", "El banco público. Sale sector, material y prioridad; nunca nombre, dirección ni fotos, y solo si la familia lo autorizó.");
-fila("Ingenieros", "https://miramicasa.thegiveandgrowproject.org/#ingenieros", { mono: true });
+fila("Ingenieros", "https://miramicasa.org/#ingenieros", { mono: true });
 fila("", "Donde se postula un ingeniero. El alcance se lee ANTES del formulario.");
-fila("Apadrinar", "https://miramicasa.thegiveandgrowproject.org/#apadrinar", { mono: true });
+fila("Apadrinar", "https://miramicasa.org/#apadrinar", { mono: true });
 fila("", "Quien quiere aportar se registra. No se cobra nada en línea y no se compromete una casa concreta.");
-fila("Privacidad", "https://miramicasa.thegiveandgrowproject.org/#privacidad", { mono: true });
+fila("Privacidad", "https://miramicasa.org/#privacidad", { mono: true });
 
 pie();
 
@@ -311,24 +325,24 @@ pagina();
 h2("Las áreas privadas");
 
 h3("Tu caso — solo la familia, con su enlace");
-mono("https://miramicasa.thegiveandgrowproject.org/caso/CV-2026-000001?t=…");
+mono("https://miramicasa.org/caso/CV-2026-000001?t=…");
 punto("Cada familia tiene el suyo, con una llave en la dirección. Ahí ve si un ingeniero ya lo revisó, qué le falta si le pidieron algo, puede subir más fotos, y descarga su concepto en PDF.");
 punto("Ese enlace es lo único que devuelve el acceso a un caso. Se le manda por correo al crearlo, y el equipo puede volver a dárselo desde el panel.");
 punto("La página no se indexa ni se guarda en cachés compartidas, justamente porque la dirección lleva la llave.");
 
 h3("El triaje — el ingeniero voluntario");
-mono("https://miramicasa.thegiveandgrowproject.org/triaje");
+mono("https://miramicasa.org/triaje");
 punto("Tres pestañas: sin revisar, piden confirmación (urgentes con una sola opinión, o casos en desacuerdo) y ya clasificados.");
 punto("Al final: «Tus conceptos», que dice qué pasó con cada uno que firmó — si es el que manda, si otro lo clasificó más grave, y en qué estado está la casa hoy.");
 punto("NO ve teléfono ni dirección de la familia. No los necesita para dar un concepto.");
 
 h3("El formulario de la visita — en la casa");
-mono("https://miramicasa.thegiveandgrowproject.org/triaje/inspeccion");
+mono("https://miramicasa.org/triaje/inspeccion");
 punto("ÁBRELO CON SEÑAL ANTES DE SALIR. Se guarda en el teléfono y desde ahí funciona sin internet; lo que se llene se envía cuando vuelva la señal.");
 punto("Recoge 26 ítems, observaciones, recomendaciones de la guía del AIS, coordenadas y dos firmas. Al enviarse sale un documento firmado y un aviso al equipo.");
 
 h3("El panel del equipo");
-mono("https://miramicasa.thegiveandgrowproject.org/admin");
+mono("https://miramicasa.org/admin");
 punto("«Salud del ecosistema»: las colas de lo que está pendiente, ordenadas por urgencia.");
 punto("«Casas por revisar»: la bandeja completa, con teléfono y dirección, y el «hilo de la casa» de cada una — todo lo que pasó, en orden.");
 punto("«Inspecciones en terreno», con su documento y sus fotos.");
@@ -336,7 +350,7 @@ punto("«Entregas»: se ata cada casa que recibió materiales.");
 punto("«Quién quiere entrar»: se verifica la matrícula de un ingeniero, y con eso se le abre el acceso.");
 
 h3("La ruta de la brigada");
-mono("https://miramicasa.thegiveandgrowproject.org/admin/ruta");
+mono("https://miramicasa.org/admin/ruta");
 punto("Para llevar en el bolsillo: a qué puerta se va ahora, con teléfono, WhatsApp y —si alguien ya estuvo— un enlace al mapa con las coordenadas de esa visita.");
 
 pie();
@@ -396,17 +410,18 @@ pie();
 
 pagina();
 h2("En qué punto está esto de verdad");
-caja("Contado contra la base de datos el 1 de septiembre de 2026, no de memoria", [
+caja("Contado contra la base de datos el 16 de septiembre de 2026, no de memoria", [
   "     casos de familias . . . . . . 0        inspecciones en terreno . . 1",
   "     fotos subidas  . . . . . . . 0        ingenieros inscritos  . . . 2",
-  "     conceptos firmados . . . . . 0        correos enviados  . . . . . 15",
+  "     conceptos firmados . . . . . 0        correos enviados  . . . . . 28",
   "",
   "Es decir: el recorrido está construido, migrado y documentado, y TODAVÍA NO HA ENTRADO",
   "NINGUNA FAMILIA. Ningún ingeniero ha firmado un concepto. Conviene leer el resto de esta",
   "guía sabiendo eso — describe un sistema que funciona, no uno que ya se usó.",
   "",
-  "Lo que sí se ejercitó con sesión real el 1 de septiembre: el triaje y el panel completos",
-  "en el subdominio, con sus contadores y sus datos. Lo que sigue sin ejercitarse es lo que",
+  "Lo que sí se ejercitó con sesión real el 1 de septiembre: el triaje y el panel completos,",
+  "con sus contadores y sus datos. Y el 16 de septiembre se comprobó, ruta por ruta, que las",
+  "cuatro pantallas de trabajo responden en el dominio nuevo. Lo que sigue sin ejercitarse",
   "solo pasa cuando hay un caso: el aviso por correo del concepto a la familia, el botón",
   "«Ya la atendimos», y atar una casa a una entrega.",
   "",
@@ -415,18 +430,21 @@ caja("Contado contra la base de datos el 1 de septiembre de 2026, no de memoria"
 
 espacio(6);
 caja("Antes de repartir esto: cuatro cosas que se descubren tarde si nadie las dice", [
-  "     · EL ENLACE QUE SE REPARTE es miramicasa.thegiveandgrowproject.org.",
-  "       Al compartirlo por WhatsApp ya se previsualiza como «Mira Mi Casa» y con",
+  "     · EL ENLACE QUE SE REPARTE es miramicasa.org. Trece caracteres, y se",
+  "       dicta en voz alta sin deletrear: mira mi casa punto org. Eso es lo que",
+  "       cambia respecto de la guía anterior, y es la razón de esta versión.",
+  "       Al compartirlo por WhatsApp se previsualiza como «Mira Mi Casa» y con",
   "       una foto de una casa afectada, no como la fundación. Importa: el",
-  "       Ministerio de Vivienda advierte sobre estafas con nombres de programas de",
-  "       vivienda, y un enlace que se llama una cosa y se ve como otra da",
-  "       desconfianza. Los enlaces viejos del dominio principal siguen sirviendo",
-  "       porque redirigen, pero conviene repartir el nuevo.",
+  "       Ministerio de Vivienda advierte sobre estafas con nombres de programas",
+  "       de vivienda, y un enlace que se llama una cosa y se ve como otra da",
+  "       desconfianza. Las direcciones anteriores siguen sirviendo -nadie se",
+  "       queda fuera- pero la que se reparte de aquí en adelante es la corta.",
   "",
-  "     · QUIEN PREPARÓ EL FORMULARIO DE LA VISITA SIN SEÑAL en el dominio",
-  "       principal tiene que volver a prepararlo en «miramicasa». Su copia vieja",
-  "       sigue funcionando, pero queda huérfana: si sale a terreno sin rehacerlo,",
-  "       se queda sin formulario offline.",
+  "     · QUIEN PREPARÓ EL FORMULARIO DE LA VISITA SIN SEÑAL en una dirección",
+  "       anterior tiene que volver a prepararlo en miramicasa.org. La copia sin",
+  "       señal se guarda por dirección, no por persona: la vieja sigue ahí, pero",
+  "       queda huérfana. Si sale a terreno sin rehacerlo, se queda sin",
+  "       formulario offline.",
   "",
   "     · EL FORMULARIO DE LA VISITA SE ABRE CON SEÑAL ANTES DE SALIR. Siempre.",
   "",
@@ -438,9 +456,11 @@ caja("Antes de repartir esto: cuatro cosas que se descubren tarde si nadie las d
   "       corta: el daño de cerca, y la casa entera para saber dónde está."
 ], VERDE);
 
-texto("Esta guía se reescribió el 1 de septiembre de 2026, el día que el triaje y el panel se " +
-  "mudaron a «miramicasa». Los enlaces se comprobaron uno por uno contra el sitio en " +
-  "producción antes de incluirlos, y las cifras se contaron contra la base de datos.",
+texto("Esta guía se reescribió el 16 de septiembre de 2026, el día que Mira Mi Casa estrenó " +
+  "dominio propio. Los enlaces se comprobaron uno por uno contra el sitio en producción " +
+  "antes de incluirlos, y las cifras se contaron contra la base de datos ese mismo día. " +
+  "La versión anterior, del 1 de septiembre, repartía la dirección larga: si tienes una " +
+  "copia impresa con ese pie, es la vieja.",
   { size: 8.4, color: GRIS, despues: 0 });
 
 pie();
