@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=fba11d66">
+<link rel="stylesheet" href="/styles.css?v=d1babec0">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=35f18798" defer></script>
+<script src="/app.js?v=f6a8a0e8" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -78,6 +78,7 @@
       </div>
       <!-- Nav propia de Mira Mi Casa. Oculta salvo cuando el Worker marca el
            <html> con data-marca="mmc" — ver la piel al final de styles.css. -->
+      <a class="nlink mmc-nav" href="#proyecto" data-i18n="mmc.nav.que">Qué es esto</a>
       <a class="nlink mmc-nav" href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
       <a class="nlink mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
       <a class="nlink mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
@@ -138,6 +139,7 @@
 <p id="lang-fallo" class="lang-fallo" role="status" aria-live="polite" style="display:none"
    data-i18n="lang.fallo">Couldn't load English — check your connection · No se pudo cargar el inglés — revisa tu conexión</p>
 <div class="nav-mobile" id="nav-mobile">
+  <a class="mmc-nav" href="#proyecto" data-i18n="mmc.nav.que">Qué es esto</a>
   <a class="mmc-nav" href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
   <a class="mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
   <a class="mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
@@ -2230,6 +2232,149 @@
 </main>
 
 </template>
+<!-- ============ MIRA MI CASA · LA PUERTA DE ENTRADA ============
+     La raíz del subdominio caía en `#vivienda`, es decir en el paso 1 del
+     formulario de la familia: la lista de «no te subas al techo». Funcionaba
+     para quien ya sabía a qué venía y para nadie más. El sitio no decía qué es
+     esto, quién lo hace, qué recibe una familia y qué no, ni que existen tres
+     papeles distintos — y un ingeniero o una empresa que quisiera aportar
+     aterrizaba en un formulario dirigido a otra persona.
+
+     EL ORDEN NO ES DECORATIVO. Primero el 123, porque una emergencia en curso
+     no debe leer una página entera. Después los tres papeles, que es la
+     pregunta «¿y yo qué hago aquí?». Después el alcance, antes de que nadie
+     llene nada. Y solo entonces quiénes somos — que en zona de desastre, con
+     el Ministerio de Vivienda advirtiendo sobre estafas con nombres de
+     programas, es información de seguridad y no un «sobre nosotros».
+
+     SIN CSS NUEVO: `.card`, `.grid`, `.steps`, `.band`, `.cream`, `.ey`,
+     `.h-sec`, `.lead` y `.card-link` ya existen y ya llevan la piel de Mira
+     Mi Casa por tokens. -->
+<main id="page-proyecto" class="page">
+  <section>
+    <div class="wrap">
+      <!-- EL 123 VA PRIMERO, ANTES DEL TITULAR. Medido a 375 px: con el aviso
+           debajo del `lead`, la primera pantalla de un teléfono solo alcanzaba
+           a mostrar el h1 — o sea que quien abre esto con un muro agrietándose
+           tenía que bajar para encontrar el único dato que no puede esperar.
+           Todo lo demás de la página aguanta un scroll; esto no.
+
+           Sin `.card` a propósito: esa clase se levanta al pasar el cursor, y
+           un aviso de emergencia no es algo que se explore. -->
+      <div class="rv" style="max-width:62ch;margin-bottom:30px;padding:18px 20px;border:1.5px solid var(--amber);border-radius:var(--r);background:var(--amberl)">
+        <p style="font-weight:800;color:var(--amber)" data-i18n="mmc.p.123.k">Antes que nada</p>
+        <p style="margin-top:6px" data-i18n="mmc.p.123.p">Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— esto no es lo que necesitas: llama al 123 y a tu alcaldía. Un concepto sobre fotos no tiene fecha, y una emergencia no espera.</p>
+      </div>
+      <span class="ey rv" data-i18n="mmc.p.ey">Qué es Mira Mi Casa</span>
+      <h1 class="h-sec rv" data-i18n="mmc.p.t">Un ingeniero mira las fotos de tu casa y te escribe qué hacer con ella.</h1>
+      <p class="lead rv d1" data-i18n="mmc.p.lead">Después del sismo del 10 de agosto quedaron más casas dañadas que ingenieros para visitarlas. Mira Mi Casa acorta esa fila: una familia sube fotos desde el teléfono, un ingeniero voluntario con matrícula verificada las mira y escribe un concepto, y quien puede aportar materiales sabe por fin qué hace falta. No se cobra nada, en ninguna dirección.</p>
+
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="mmc.p.rol.ey">Quién hace qué</span>
+      <h2 class="h-sec rv" data-i18n="mmc.p.rol.t">Para que una casa avance hacen falta tres personas distintas</h2>
+      <p class="lead rv d1" data-i18n="mmc.p.rol.lead">Cada una entra por su propia puerta y ninguna hace el trabajo de la otra. Si no sabes cuál es la tuya, empieza por la primera.</p>
+
+      <div class="grid g3 rv d2" style="margin-top:28px">
+        <div class="card">
+          <span class="ey" style="margin-bottom:8px" data-i18n="mmc.p.rol1.k">Si tu casa se afectó</span>
+          <h3 data-i18n="mmc.p.rol1.t">La familia reporta</h3>
+          <p data-i18n="mmc.p.rol1.p">Subes fotos desde el teléfono, sin cuenta y sin contraseña. Recibes un número de caso y un enlace privado: ahí ves en qué va tu caso y puedes sumar más fotos si te las piden. Es gratis, y en ninguna pantalla se te va a pedir dinero.</p>
+          <a class="card-link" href="#vivienda"><span data-i18n="mmc.p.rol1.cta">Revisa tu casa</span> <span aria-hidden="true">&rarr;</span></a>
+        </div>
+        <div class="card">
+          <span class="ey" style="margin-bottom:8px" data-i18n="mmc.p.rol2.k">Si eres ingeniero o arquitecto</span>
+          <h3 data-i18n="mmc.p.rol2.t">El ingeniero da el concepto</h3>
+          <p data-i18n="mmc.p.rol2.p">Te postulas con tu matrícula del COPNIA y la verificamos a mano en su registro público. Después miras los casos que quieras, cuando puedas, y escribes un concepto a distancia: si hay señales para no permanecer, qué precauciones tomar y con qué reparar. No ves el nombre, el teléfono ni la dirección de la familia.</p>
+          <a class="card-link" href="#ingenieros"><span data-i18n="mmc.p.rol2.cta">Postularme como ingeniero</span> <span aria-hidden="true">&rarr;</span></a>
+        </div>
+        <div class="card">
+          <span class="ey" style="margin-bottom:8px" data-i18n="mmc.p.rol3.k">Si puedes aportar</span>
+          <h3 data-i18n="mmc.p.rol3.t">Alguien apadrina la reparación</h3>
+          <p data-i18n="mmc.p.rol3.p">Materiales, mano de obra, transporte o dinero para las casas que ya tienen concepto. Registras lo que puedes dar y una persona del equipo te escribe. Aquí no se cobra nada en línea y no se reserva una casa concreta: el orden lo ponen los conceptos de los ingenieros, no las fotos.</p>
+          <a class="card-link" href="#apadrinar"><span data-i18n="mmc.p.rol3.cta">Quiero apadrinar</span> <span aria-hidden="true">&rarr;</span></a>
+        </div>
+      </div>
+
+      <p class="rv d3" style="margin-top:24px;max-width:62ch;font-weight:600" data-i18n="mmc.p.rol.cierre">Ninguna de las tres funciona sola: sin fotos no hay concepto, sin concepto no se sabe qué comprar, y sin materiales el concepto se queda en un papel.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="mmc.p.alc.ey">El alcance</span>
+      <h2 class="h-sec rv" data-i18n="mmc.p.alc.t">Orientar, no dictaminar</h2>
+      <p class="lead rv d1" data-i18n="mmc.p.alc.lead">Esta distinción gobierna el proyecto entero, así que va en la entrada y no en letra chica al final.</p>
+
+      <div class="grid g2 rv d2" style="margin-top:26px">
+        <div class="card">
+          <h3 data-i18n="mmc.p.si.t">Lo que sí recibe una familia</h3>
+          <p data-i18n="mmc.p.si.p">Un concepto escrito y firmado por un ingeniero con matrícula: si hay señales para no permanecer en la casa o en alguna parte de ella, qué precauciones tomar mientras tanto, con qué materiales y en qué orden conviene repararla, y con qué prioridad conviene visitarla. Llega a su enlace privado, con el nombre y la matrícula de quien lo firmó.</p>
+        </div>
+        <div class="card">
+          <h3 data-i18n="mmc.p.no.t">Lo que no va a recibir</h3>
+          <p data-i18n="mmc.p.no.p">Una declaratoria de habitabilidad, que no es nuestra: evacuar o demoler lo decide la autoridad de cada municipio, por la Ley 1523 de 2012. Tampoco una visita garantizada, una fecha de respuesta ni la promesa de que su casa se repare. Buscaremos gestionar ayuda para todas las que podamos, y no podemos comprometerla casa por casa.</p>
+        </div>
+      </div>
+
+      <p class="mu rv d3" style="margin-top:22px;max-width:62ch" data-i18n="mmc.p.alc.fotos">Y hay un límite que ningún ingeniero puede saltarse: sobre fotos no se ve la cimentación, ni el suelo, ni si ese muro carga. Por eso «no puedo evaluar con esto» es una respuesta de primera clase del sistema, y al marcarla obliga a decir qué falta y se le pide a la familia.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="mmc.p.conf.ey">Quiénes somos y qué no somos</span>
+      <h2 class="h-sec rv" data-i18n="mmc.p.conf.t">Esto es gratuito y no somos el Gobierno</h2>
+      <p class="lead rv d1" data-i18n="mmc.p.conf.lead">Una marca nueva pidiendo fotos de tu casa en zona de desastre se parece bastante a una estafa. Así que lo decimos de frente y con qué comprobarlo.</p>
+
+      <div class="grid g3 rv d2" style="margin-top:28px">
+        <div class="card">
+          <h3 data-i18n="mmc.p.conf1.t">Nunca te vamos a pedir dinero</h3>
+          <p data-i18n="mmc.p.conf1.p">Ni una cuota, ni un trámite, ni los datos de tu tarjeta o de tu cuenta. Este sitio no le cobra nada a una familia en ninguna pantalla. Si alguien te pide plata a nombre de Mira Mi Casa, no somos nosotros.</p>
+        </div>
+        <div class="card">
+          <h3 data-i18n="mmc.p.conf2.t">No gestionamos subsidios</h3>
+          <p data-i18n="mmc.p.conf2.p">No tenemos relación con los programas de vivienda del Estado y no tramitamos ayudas oficiales. Si lo que buscas es un subsidio, el camino es tu alcaldía. Aquí damos un concepto técnico y buscamos materiales, y eso es todo lo que hacemos.</p>
+        </div>
+        <div class="card">
+          <h3 data-i18n="mmc.p.conf3.t">Quién ve tus datos</h3>
+          <p data-i18n="mmc.p.conf3.p">Tu nombre, tu teléfono y tu dirección los ve el equipo que coordina la visita, y nadie más: el ingeniero que revisa tus fotos no los ve, porque para dar el concepto no hacen falta. En el registro público de casas solo aparece el barrio, y solo si lo autorizaste.</p>
+        </div>
+      </div>
+
+      <!-- La cadena de nombres, y el enlace sale del subdominio a propósito:
+           lo que da confianza es el registro de la fundación, no esta página. -->
+      <p class="rv d3" style="margin-top:26px;max-width:66ch" data-i18n="mmc.p.conf.quien">Mira Mi Casa es la plataforma de Cimientos que Unen, un proyecto de Fundación Give&amp;Grow International: entidad sin ánimo de lucro con domicilio en Medellín, NIT 901.948.930-2. Si llegaste por uno de esos nombres y aterrizaste en otro, esa es la cadena, y no un cambiazo.</p>
+      <p class="rv d3" style="margin-top:12px"><a class="card-link" href="https://thegiveandgrowproject.org/#transparencia"><span data-i18n="mmc.p.conf.link">Ver el registro y los documentos públicos de la fundación</span> <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="mmc.p.pas.ey">Cómo avanza un caso</span>
+      <h2 class="h-sec rv" data-i18n="mmc.p.pas.t">Del teléfono de una familia al concepto de un ingeniero</h2>
+      <div class="steps rv d1" style="margin-top:24px">
+        <div class="step"><div class="step-n">1</div><div><h3 data-i18n="mmc.p.pas1.t">Reportas tu casa</h3><p data-i18n="mmc.p.pas1.p">Unos datos, unas fotos y dos autorizaciones. Al final te quedan tu número de caso y tu enlace privado. Guárdalo: es con lo que vuelves.</p></div></div>
+        <div class="step"><div class="step-n">2</div><div><h3 data-i18n="mmc.p.pas2.t">Tu caso entra a la fila</h3><p data-i18n="mmc.p.pas2.p">No es orden de llegada: se mira primero lo que parece más grave. Tu enlace te dice dos datos que puedes comprobar — cuántos días llevas esperando y cuántos casos siguen sin abrir.</p></div></div>
+        <div class="step"><div class="step-n">3</div><div><h3 data-i18n="mmc.p.pas3.t">Un ingeniero lo abre</h3><p data-i18n="mmc.p.pas3.p">Mira tus fotos y escribe el concepto. Si con lo que enviaste no alcanza, marca que no puede evaluar y te pedimos exactamente lo que falta: por eso el enlace también sirve para subir más.</p></div></div>
+        <div class="step"><div class="step-n">4</div><div><h3 data-i18n="mmc.p.pas4.t">El concepto llega a tu enlace</h3><p data-i18n="mmc.p.pas4.p">Con el nombre y la matrícula de quien lo firmó. A partir de ahí tu casa tiene algo concreto que pedir, y es lo que le mostramos a quien quiera apadrinar una reparación.</p></div></div>
+      </div>
+      <p class="mu rv d2" style="margin-top:22px;max-width:62ch" data-i18n="mmc.p.pas.fecha">Lo que no vas a encontrar es una fecha prometida. Los ingenieros son voluntarios y son menos que las casas: preferimos decírtelo a inventarte un plazo.</p>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <h2 class="h-sec rv" data-i18n="mmc.p.fin.t">Lo que ya se revisó está publicado</h2>
+      <p class="lead rv d1" data-i18n="mmc.p.fin.p">Cada casa revisada aparece en un registro público sin nombres, sin direcciones y sin fotos: solo el sector y cuánta prisa corre. Es la forma que tenemos de probar lo que decimos en vez de pedirte que nos creas.</p>
+      <p class="rv d2" style="margin-top:16px"><a class="card-link" href="#casas"><span data-i18n="mmc.p.fin.cta">Ver las casas revisadas</span> <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+</main>
+
 <main id="page-vivienda" class="page">
   <section>
     <div class="wrap">
