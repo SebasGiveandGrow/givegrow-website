@@ -97,6 +97,34 @@ html{font-size:var(--fs-16);scroll-behavior:smooth}
 body{font-family:"Inter",system-ui,sans-serif;font-size:var(--fs-body);color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;line-height:var(--lh-body);overflow-x:hidden}
 h1,h2{font-family:var(--font-display);line-height:var(--lh-heading);letter-spacing:var(--tr-heading);font-weight:700}
 h3,h4{font-family:"Inter",sans-serif;line-height:var(--lh-tight);letter-spacing:var(--tr-heading);font-weight:700}
+/* ENCABEZADO DE COMPONENTE — el NIVEL y la APARIENCIA son dos cosas distintas.
+   ==========================================================================
+   Hasta el 16 sep 2026 estaban atadas: el tamaño de un titular salía de su
+   etiqueta, así que para que una tarjeta se viera como tarjeta había que
+   escribirla `h3`. Resultado: 14 páginas saltaban de h1 a h3 sin un h2 en
+   medio, que es WCAG 1.3.1 y es lo primero que reporta una auditoría
+   automática de accesibilidad.
+
+   Ahora el nivel lo fija el esquema del documento y la apariencia la fija esta
+   clase. `h-comp3` se ve como se veía un h3; `h-comp4`, como un h4. Los valores
+   son los del navegador (1.17em y 1em) a propósito: reproducen EXACTAMENTE lo
+   que había, para que un arreglo de accesibilidad no traiga de contrabando un
+   cambio de diseño que nadie pidió. */
+.h-comp3,.h-comp4{font-family:"Inter",sans-serif;line-height:var(--lh-tight);
+  letter-spacing:var(--tr-heading);font-weight:700}
+.h-comp3{font-size:1.17em}
+.h-comp4{font-size:1em}
+/* Y las reglas de componente lo alcanzan con `:is(h3:not(:where(.h-comp4)),:where(.h-comp3))`, que NO
+   es lo mismo que `:is(h3,.h-comp3)`. La segunda forma sube la especificidad de
+   (0,1,1) a (0,2,0) y le gana a reglas que antes mandaban: se midió, y movía el
+   margen de las seis tarjetas de programas del Hub, los tres peldaños de
+   Medición y el titular de la brigada. `:where()` aporta cero, así que el
+   selector conserva EXACTAMENTE la especificidad que tenía cuando decía `h3`. */
+/* Y la rama `h3` lleva `:not(:where(.h-comp4))` por el fallo simétrico: 14
+   titulares que eran `h4` ahora son `h3`, así que empezaron a caer dentro de
+   reglas escritas para `h3` que antes no los veían. Medido: los tres peldaños
+   de Medición viven dentro de un `.os-row` y se llevaban su tamaño; el titular
+   de la brigada, dentro de un `.prose` y se llevaba sus márgenes. */
 em.fr{font-family:"Fraunces",serif;font-style:italic;font-weight:400}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;cursor:pointer;border:none;background:none}
@@ -189,7 +217,7 @@ section{padding:72px 0}
 .path{background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);border-radius:var(--rl);padding:22px;text-align:left;backdrop-filter:blur(6px);transition:transform .2s var(--ease),background .2s}
 .path:hover{transform:translateY(-4px);background:var(--on-dark-fill)}
 .path-ic{width:46px;height:46px;border-radius:12px;background:var(--on-dark-fill);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
-.path h3{font-size:18px;margin-bottom:4px}
+.path :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:18px;margin-bottom:4px}
 .path p{font-size:var(--fs-14);color:var(--on-dark-3)}
 
 /* ===== STATS ===== */
@@ -224,7 +252,7 @@ section{padding:72px 0}
 .card .ic{width:46px;height:46px;border-radius:12px;background:var(--gl);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
 .partner-logo{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border:1px solid var(--bd);border-radius:14px;background:var(--logo-bg);margin-bottom:14px}
 .partner-logo img{display:block;width:auto;height:auto;max-width:200px;max-height:88px}
-.card h3{font-size:19px;margin-bottom:8px}
+.card :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:19px;margin-bottom:8px}
 .card p{font-size:var(--fs-15);color:var(--mu)}
 .card .eco-row{justify-content:flex-start;margin-left:0;margin-right:0}
 .tag{display:inline-block;font-size:var(--fs-11);font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--gl);color:var(--acc)}
@@ -237,7 +265,7 @@ section{padding:72px 0}
 .step{display:flex;gap:18px;align-items:flex-start}
 .step::before{counter-increment:s;content:counter(s);flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:var(--g);color:var(--on-dark);font-family:var(--font-display);font-weight:800;display:flex;align-items:center;justify-content:center}
 .step-n{display:none}
-.step h4{font-size:var(--fs-17);margin-bottom:3px}
+.step :is(h4,:where(.h-comp4)){font-size:var(--fs-17);margin-bottom:3px}
 .step p{font-size:var(--fs-14);color:var(--mu)}
 
 /* banded section */
@@ -439,7 +467,7 @@ html[data-theme="dark"] .alma-send{background:var(--acc);color:#0F1613}
 /* ===== prose ===== */
 .prose{max-width:720px;margin:0 auto}
 .prose p{margin-bottom:16px;color:var(--ink-soft)}
-.prose h3{margin:28px 0 10px}
+.prose :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){margin:28px 0 10px}
 .prose ul{margin:0 0 16px 20px;color:var(--ink-soft)}
 .prose li{margin-bottom:6px}
 
@@ -562,7 +590,7 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 .band .card-d p{color:var(--on-dark-3)}
 /* ---- CTA box ---- */
 .cta-box{margin-top:34px;text-align:center;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:34px}
-.cta-box h3{font-size:22px;margin-bottom:8px}
+.cta-box :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:22px;margin-bottom:8px}
 .cta-box p{color:var(--mu);max-width:560px;margin:0 auto 18px}
 /* ---- 4-col grid ---- */
 .grid.g4{grid-template-columns:repeat(4,1fr)}
@@ -747,7 +775,7 @@ html[data-theme="dark"] .alma-fab:hover{background:var(--acc-2);border-color:var
    filas de informe anual. */
 .os-rows{margin-top:34px;border-top:1px solid var(--bd)}
 .os-row{padding:26px 0;border-bottom:1px solid var(--bd)}
-.os-row h3{font-size:var(--fs-h4);margin-bottom:8px}
+.os-row :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:var(--fs-h4);margin-bottom:8px}
 .os-row p{max-width:62ch}
 .os-row p + p{margin-top:10px}
 /* "Ya lo estás usando": pruebas con enlace al propio sitio */
@@ -949,7 +977,7 @@ html[data-theme="dark"] .track-badge-recibida{color:var(--gn)}
 .track-ev p{margin:2px 0 0;font-size:var(--fs-14);color:var(--ink-soft)}
 .track-foot{margin-top:16px;font-size:var(--fs-13);color:var(--mu);line-height:1.5}
 .track-noguide-box{margin-top:24px;max-width:520px;background:var(--surface);border:1px solid var(--bd);border-radius:16px;padding:24px}
-.track-noguide-box h3{margin:0 0 8px}
+.track-noguide-box :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){margin:0 0 8px}
 .track-noguide-box p{color:var(--ink-soft);font-size:var(--fs-14);margin:0 0 16px}
 
 /* ============ movimiento reducido (accesibilidad vestibular) ============ */
@@ -959,8 +987,8 @@ html[data-theme="dark"] .track-badge-recibida{color:var(--gn)}
 }
 
 .track-cta{margin-top:24px;background:var(--gl);border-radius:16px;padding:22px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
-.track-cta h3{margin:0 0 4px;color:var(--gd)}
-html[data-theme="dark"] .track-cta h3{color:var(--ink)}
+.track-cta :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){margin:0 0 4px;color:var(--gd)}
+html[data-theme="dark"] .track-cta :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){color:var(--ink)}
 .track-cta p{margin:0;font-size:var(--fs-14);color:var(--ink-soft);max-width:46ch}
 .track-cta .btn{flex:0 0 auto}
 
@@ -1359,7 +1387,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .brig-mc{display:grid;gap:26px;margin-top:26px;
   grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}
 .brig-mc-b{padding-top:18px;border-top:2px solid var(--g)}
-.brig-mc-b h4{font-size:var(--fs-h4);margin:0 0 10px}
+.brig-mc-b :is(h4,:where(.h-comp4)){font-size:var(--fs-h4);margin:0 0 10px}
 .brig-mc-b p{font-size:var(--fs-15);line-height:1.65;max-width:56ch;margin:0 0 16px}
 
 /* Ledger de sectores: misma gramática que la tabla de transparencia. */
@@ -1383,7 +1411,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .brig-cat{padding-top:18px;border-top:2px solid var(--g)}
 .brig-num{display:block;font-family:var(--font-display);font-weight:800;font-size:var(--fs-13);
   color:var(--acc);opacity:.5;letter-spacing:-.01em;margin-bottom:8px}
-.brig-cat h3{font-size:var(--fs-h4);margin-bottom:8px}
+.brig-cat :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:var(--fs-h4);margin-bottom:8px}
 .brig-r{font-family:"Fraunces",serif;font-style:italic;font-size:var(--fs-17);line-height:1.4;
   color:var(--acc);margin-bottom:10px}
 .brig-d{font-size:var(--fs-15);line-height:1.55;color:var(--ink-soft)}
