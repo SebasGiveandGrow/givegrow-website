@@ -1,4 +1,37 @@
 /* Validación pre-deploy Give&Grow — falla el build si algo se rompe. */
+
+/* ═══ ANTES DE ESCRIBIR UN GUARDIÁN NUEVO, LEE ESTO ═══════════════════════════
+   El 16 de septiembre de 2026 se auditaron SIETE de los guardianes de este
+   archivo y de `ops/`, preguntándole a cada uno lo mismo: ¿lo que mira es lo
+   que su mensaje da a entender? Los siete se ampliaron. Ninguno mentía —todos
+   describían con precisión lo que hacían— pero CINCO tenían el MISMO hueco:
+
+     contraste        miraba styles.css, no los <style> del Worker
+     tokens de color  miraba los var() de worker.js, no los de styles.css
+     data-*           miraba 4 pantallas de 6, y una leyendo 4 caracteres
+     cobertura i18n   miraba data-i18n del HTML, no las 215 claves que pide el JS
+     balance de tags  miraba index.html, no las 10 plantillas del Worker
+     desbordes de PDF miraba 3 documentos de 4
+     sistema visual   miraba styles.css, no los 30.000 chars de CSS del Worker
+
+   LA CAUSA es una sola y conviene nombrarla: este proyecto nació como un sitio
+   estático con `index.html` y `styles.css`, y el Worker creció después hasta
+   ser la mitad del sistema —diez páginas generadas, siete bloques <style>, su
+   propio JS—. Los guardianes se escribieron mirando donde estaba el código
+   entonces, y ahí se quedaron. El código se movió; ellos no.
+
+   ASÍ QUE, AL AÑADIR UN CHECK, PREGÚNTATE LAS TRES:
+
+     1 · ¿Vale también para lo que el Worker GENERA? Casi siempre sí.
+     2 · Si lleva una lista escrita a mano, ¿qué pasa cuando alguien añada el
+         elemento siguiente y no la actualice? Los cinco de arriba fallaron por
+         esto. El check #8b se cuenta a sí mismo para no repetirlo: compara el
+         número de plantillas reales contra el largo de su propia lista, y a la
+         primera corrida encontró una que yo no había visto.
+     3 · ¿Sabes que puede FALLAR? Escribe el caso malo y ejecútalo. Un guardián
+         que nadie ha visto suspender no se ha probado — y el que pasa en verde
+         no se vuelve a mirar nunca. De ahí venían los siete.
+   ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { esDict, decodeHtml, eachTextNode, eachAttrNode } from "./i18n-html.mjs";
