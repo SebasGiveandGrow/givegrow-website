@@ -253,6 +253,12 @@ section{padding:72px 0}
 /* Y su hover no puede seguir siendo `--gl`: en dia eso es casi blanco y dejaria
    el verde claro flotando encima. Se usa el mismo relleno tenue de las tarjetas. */
 .band .btn-o:hover{background:var(--on-dark-fill)}
+/* Y `.card-link` corre exactamente la misma suerte, por la misma razón: hereda
+   `--acc` y sobre `--ink-deep` da 1,43:1 — el mismo número que ya se midió en
+   el «Mi» del logotipo del pie. Hasta el 16 sep 2026 no había ni un solo
+   `.card-link` dentro de un `.band` en todo el sitio, así que la regla faltaba
+   sin que se notara: la primera que lo pusiera se llevaba el enlace invisible. */
+.band .card-link{color:var(--gn)}
 .cream{background:var(--surface-2)}
 
 /* ===== CALCULATOR ===== */

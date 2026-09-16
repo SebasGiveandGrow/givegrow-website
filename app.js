@@ -242,6 +242,74 @@ var I18N = {
     "mmc.nav.apad":"Apadrinar",
     "mmc.aval":"La plataforma de Cimientos que Unen, un proyecto de Fundación Give&Grow International · NIT 901.948.930-2",
     "mmc.marca":"Mira Mi Casa",
+    "mmc.nav.que":"Qué es esto",
+
+    /* LA PUERTA DE ENTRADA DE MIRA MI CASA (`mmc.p.*`, de portada).
+       Hasta hoy la raíz del subdominio caía directo en el paso 1 del formulario
+       —«Antes de empezar», la lista de no te subas al techo—, así que el sitio
+       nunca decía qué es esto, quién lo hace ni qué papeles existen. Quien no
+       era una familia con la casa rota —un ingeniero, una empresa que quiere
+       aportar— aterrizaba en un formulario que no es el suyo y tenía que
+       deducir el resto del menú. */
+    "mmc.p.ey":"Qué es Mira Mi Casa",
+    "mmc.p.t":"Un ingeniero mira las fotos de tu casa y te escribe qué hacer con ella.",
+    "mmc.p.lead":"Después del sismo del 10 de agosto quedaron más casas dañadas que ingenieros para visitarlas. Mira Mi Casa acorta esa fila: una familia sube fotos desde el teléfono, un ingeniero voluntario con matrícula verificada las mira y escribe un concepto, y quien puede aportar materiales sabe por fin qué hace falta. No se cobra nada, en ninguna dirección.",
+    "mmc.p.123.k":"Antes que nada",
+    "mmc.p.123.p":"Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— esto no es lo que necesitas: llama al 123 y a tu alcaldía. Un concepto sobre fotos no tiene fecha, y una emergencia no espera.",
+
+    "mmc.p.rol.ey":"Quién hace qué",
+    "mmc.p.rol.t":"Para que una casa avance hacen falta tres personas distintas",
+    "mmc.p.rol.lead":"Cada una entra por su propia puerta y ninguna hace el trabajo de la otra. Si no sabes cuál es la tuya, empieza por la primera.",
+    "mmc.p.rol1.k":"Si tu casa se afectó",
+    "mmc.p.rol1.t":"La familia reporta",
+    "mmc.p.rol1.p":"Subes fotos desde el teléfono, sin cuenta y sin contraseña. Recibes un número de caso y un enlace privado: ahí ves en qué va tu caso y puedes sumar más fotos si te las piden. Es gratis, y en ninguna pantalla se te va a pedir dinero.",
+    "mmc.p.rol1.cta":"Revisa tu casa",
+    "mmc.p.rol2.k":"Si eres ingeniero o arquitecto",
+    "mmc.p.rol2.t":"El ingeniero da el concepto",
+    "mmc.p.rol2.p":"Te postulas con tu matrícula del COPNIA y la verificamos a mano en su registro público. Después miras los casos que quieras, cuando puedas, y escribes un concepto a distancia: si hay señales para no permanecer, qué precauciones tomar y con qué reparar. No ves el nombre, el teléfono ni la dirección de la familia.",
+    "mmc.p.rol2.cta":"Postularme como ingeniero",
+    "mmc.p.rol3.k":"Si puedes aportar",
+    "mmc.p.rol3.t":"Alguien apadrina la reparación",
+    "mmc.p.rol3.p":"Materiales, mano de obra, transporte o dinero para las casas que ya tienen concepto. Registras lo que puedes dar y una persona del equipo te escribe. Aquí no se cobra nada en línea y no se reserva una casa concreta: el orden lo ponen los conceptos de los ingenieros, no las fotos.",
+    "mmc.p.rol3.cta":"Quiero apadrinar",
+    "mmc.p.rol.cierre":"Ninguna de las tres funciona sola: sin fotos no hay concepto, sin concepto no se sabe qué comprar, y sin materiales el concepto se queda en un papel.",
+
+    "mmc.p.alc.ey":"El alcance",
+    "mmc.p.alc.t":"Orientar, no dictaminar",
+    "mmc.p.alc.lead":"Esta distinción gobierna el proyecto entero, así que va en la entrada y no en letra chica al final.",
+    "mmc.p.si.t":"Lo que sí recibe una familia",
+    "mmc.p.si.p":"Un concepto escrito y firmado por un ingeniero con matrícula: si hay señales para no permanecer en la casa o en alguna parte de ella, qué precauciones tomar mientras tanto, con qué materiales y en qué orden conviene repararla, y con qué prioridad conviene visitarla. Llega a su enlace privado, con el nombre y la matrícula de quien lo firmó.",
+    "mmc.p.no.t":"Lo que no va a recibir",
+    "mmc.p.no.p":"Una declaratoria de habitabilidad, que no es nuestra: evacuar o demoler lo decide la autoridad de cada municipio, por la Ley 1523 de 2012. Tampoco una visita garantizada, una fecha de respuesta ni la promesa de que su casa se repare. Buscaremos gestionar ayuda para todas las que podamos, y no podemos comprometerla casa por casa.",
+    "mmc.p.alc.fotos":"Y hay un límite que ningún ingeniero puede saltarse: sobre fotos no se ve la cimentación, ni el suelo, ni si ese muro carga. Por eso «no puedo evaluar con esto» es una respuesta de primera clase del sistema, y al marcarla obliga a decir qué falta y se le pide a la familia.",
+
+    "mmc.p.conf.ey":"Quiénes somos y qué no somos",
+    "mmc.p.conf.t":"Esto es gratuito y no somos el Gobierno",
+    "mmc.p.conf.lead":"Una marca nueva pidiendo fotos de tu casa en zona de desastre se parece bastante a una estafa. Así que lo decimos de frente y con qué comprobarlo.",
+    "mmc.p.conf1.t":"Nunca te vamos a pedir dinero",
+    "mmc.p.conf1.p":"Ni una cuota, ni un trámite, ni los datos de tu tarjeta o de tu cuenta. Este sitio no le cobra nada a una familia en ninguna pantalla. Si alguien te pide plata a nombre de Mira Mi Casa, no somos nosotros.",
+    "mmc.p.conf2.t":"No gestionamos subsidios",
+    "mmc.p.conf2.p":"No tenemos relación con los programas de vivienda del Estado y no tramitamos ayudas oficiales. Si lo que buscas es un subsidio, el camino es tu alcaldía. Aquí damos un concepto técnico y buscamos materiales, y eso es todo lo que hacemos.",
+    "mmc.p.conf3.t":"Quién ve tus datos",
+    "mmc.p.conf3.p":"Tu nombre, tu teléfono y tu dirección los ve el equipo que coordina la visita, y nadie más: el ingeniero que revisa tus fotos no los ve, porque para dar el concepto no hacen falta. En el registro público de casas solo aparece el barrio, y solo si lo autorizaste.",
+    "mmc.p.conf.quien":"Mira Mi Casa es la plataforma de Cimientos que Unen, un proyecto de Fundación Give&Grow International: entidad sin ánimo de lucro con domicilio en Medellín, NIT 901.948.930-2. Si llegaste por uno de esos nombres y aterrizaste en otro, esa es la cadena, y no un cambiazo.",
+    "mmc.p.conf.link":"Ver el registro y los documentos públicos de la fundación",
+
+    "mmc.p.pas.ey":"Cómo avanza un caso",
+    "mmc.p.pas.t":"Del teléfono de una familia al concepto de un ingeniero",
+    "mmc.p.pas1.t":"Reportas tu casa",
+    "mmc.p.pas1.p":"Unos datos, unas fotos y dos autorizaciones. Al final te quedan tu número de caso y tu enlace privado. Guárdalo: es con lo que vuelves.",
+    "mmc.p.pas2.t":"Tu caso entra a la fila",
+    "mmc.p.pas2.p":"No es orden de llegada: se mira primero lo que parece más grave. Tu enlace te dice dos datos que puedes comprobar — cuántos días llevas esperando y cuántos casos siguen sin abrir.",
+    "mmc.p.pas3.t":"Un ingeniero lo abre",
+    "mmc.p.pas3.p":"Mira tus fotos y escribe el concepto. Si con lo que enviaste no alcanza, marca que no puede evaluar y te pedimos exactamente lo que falta: por eso el enlace también sirve para subir más.",
+    "mmc.p.pas4.t":"El concepto llega a tu enlace",
+    "mmc.p.pas4.p":"Con el nombre y la matrícula de quien lo firmó. A partir de ahí tu casa tiene algo concreto que pedir, y es lo que le mostramos a quien quiera apadrinar una reparación.",
+    "mmc.p.pas.fecha":"Lo que no vas a encontrar es una fecha prometida. Los ingenieros son voluntarios y son menos que las casas: preferimos decírtelo a inventarte un plazo.",
+
+    "mmc.p.fin.t":"Lo que ya se revisó está publicado",
+    "mmc.p.fin.p":"Cada casa revisada aparece en un registro público sin nombres, sin direcciones y sin fotos: solo el sector y cuánta prisa corre. Es la forma que tenemos de probar lo que decimos en vez de pedirte que nos creas.",
+    "mmc.p.fin.cta":"Ver las casas revisadas",
     "nav.g.emergencia":"Emergencia",
     "nav.brigada":"Brigada de emergencia",
     "nav.d.brigada":"Los cinco territorios, qué se necesita y cómo aportar",
@@ -1656,6 +1724,7 @@ var ROUTE_META = {
   caso:{t:{es:"Tu caso · Give&Grow International",en:"Your case · Give&Grow International"},d:{es:"Consulta en qué va tu caso de vivienda y agrega las fotos que te pidieron.",en:"Check where your housing case stands and add the photos you were asked for."}},
   apadrinar:{t:{es:"Apadrinar una casa · Give&Grow International",en:"Sponsor a home · Give&Grow International"},d:{es:"Aporta materiales, mano de obra o transporte para reparar viviendas afectadas por el sismo. Registra lo que puedes dar: no reserva una casa concreta ni declara habitabilidad.",en:"Contribute materials, labour or transport to repair homes hit by the earthquake. Register what you can give: it does not reserve a particular home and does not rule on habitability."}},
   ingenieros:{t:{es:"Ingenieros voluntarios · Give&Grow International",en:"Volunteer engineers · Give&Grow International"},d:{es:"Postúlate al triaje estructural: mira fotos de casas afectadas por el sismo y da un concepto sobre permanencia, precauciones y materiales. Es orientación, no un dictamen de habitabilidad.",en:"Apply to the structural triage: review photos of homes hit by the earthquake and give an opinion on staying, precautions and materials. It is guidance, not a habitability ruling."}},
+  proyecto:{t:{es:"Qué es y cómo funciona · Give&Grow International",en:"What it is and how it works · Give&Grow International"},d:{es:"Un ingeniero voluntario con matrícula mira las fotos de tu casa y escribe qué hacer con ella: si puedes permanecer, qué precauciones tomar y con qué reparar. Gratis y a distancia. Las tres formas de participar: reportar tu casa, dar conceptos o apadrinar una reparación.",en:"A licensed volunteer engineer looks at photos of your home and writes what to do with it: whether you can stay, what precautions to take and what to repair with. Free and remote. The three ways to take part: report your home, give opinions or sponsor a repair."}},
   vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario te da un concepto: si puedes permanecer, qué precauciones tomar y con qué reparar. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer gives you an opinion: whether you can stay, what precautions to take and what to repair with. It does not replace the official assessment."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
   /* Estas cuatro faltaban y caían al `|| ROUTE_META.inicio`, así que se
@@ -2352,7 +2421,7 @@ var MARCA_MMC = document.documentElement.getAttribute("data-marca") === "mmc";
 /* Las únicas rutas que existen en este subdominio. Todo lo demás es de la
    fundación y vive en su dominio: si alguien llega con un enlace viejo no se
    le enseña un 404, se le lleva al sitio donde esa página sí existe. */
-var RUTAS_MMC = ["vivienda", "caso", "casas", "ingenieros", "apadrinar", "privacidad", "e404"];
+var RUTAS_MMC = ["proyecto", "vivienda", "caso", "casas", "ingenieros", "apadrinar", "privacidad", "e404"];
 
 var ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
 
@@ -2363,7 +2432,7 @@ var ORIGIN_MMC = "https://miramicasa.thegiveandgrowproject.org";
    `caso` tampoco: es una ruta de PATH (`/caso/<n>?t=`) y la muda el Worker, que
    sí puede conservar el token de la query. Aquí solo van las de hash, que el
    Worker no ve nunca porque el `#` no viaja al servidor. */
-var RUTAS_TRIAJE = ["vivienda", "ingenieros", "casas", "apadrinar"];
+var RUTAS_TRIAJE = ["proyecto", "vivienda", "ingenieros", "casas", "apadrinar"];
 
 function mmcRuta(id){
   if (!MARCA_MMC || RUTAS_MMC.indexOf(id) > -1) return false;
@@ -2386,8 +2455,21 @@ function mmcRuta(id){
 
    Se arregla aquí y no con una Redirect Rule del panel porque el rebote lo hace
    la SPA, no el borde: una regla del panel no lo vería. */
+/* Y ARRANCA EN `proyecto`, NO EN `vivienda`, desde el 16 sep 2026.
+
+   Hasta aquí la raíz del subdominio abría el formulario de la familia en su
+   paso 1 —«Antes de empezar»—, así que el sitio que reparte el proyecto no
+   decía en ninguna parte qué es esto, quién lo hace ni que existen tres
+   papeles distintos. Un ingeniero o una empresa que quisiera aportar
+   aterrizaba en un formulario dirigido a otra persona.
+
+   Lo que NO cambia: `#vivienda` sigue existiendo y sigue siendo un enlace
+   directo. Todo lo que ya se repartió —el menú de la fundación, los enlaces
+   de WhatsApp, lo que diga ALMA— apunta al hash y no a la raíz, así que a
+   nadie se le mete un paso de más; solo gana una entrada quien llega con el
+   nombre del sitio y nada más. */
 function rutaPorDefecto(){
-  return MARCA_MMC ? "vivienda" : "inicio";
+  return MARCA_MMC ? "proyecto" : "inicio";
 }
 
 /* El espejo de `mmcRuta`, y existe por lo mismo: un enlace viejo no debe
@@ -2432,7 +2514,9 @@ function mmcMarca(){
     /* Con espacios: en «Give&Grow» el <em> ES el ampersand y va pegado; aquí
        son tres palabras y sin ellos se lee «MiraMiCasa». */
     el.innerHTML = "Mira <em>Mi</em> Casa";
-    el.setAttribute("href", "#vivienda");
+    /* El logotipo lleva a la puerta de entrada, que es lo que espera quien
+       toca un logotipo. Antes llevaba a `#vivienda` porque esa era la raíz. */
+    el.setAttribute("href", "#proyecto");
   });
 }
 
