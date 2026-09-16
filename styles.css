@@ -90,6 +90,13 @@
   --ink:#191813;--ink-soft:#47443B;
   --acc:#1F5C38;--acc-2:#2E7D4F;
   --nav-bg:rgba(243,239,230,.90);
+  /* EL VELO DEL HERO Y EL ICONO DE `.path`, que estaban escritos sueltos.
+     Se vuelven tokens porque Mira Mi Casa los necesita en otro color: sobre
+     su paleta azul, un velo verde tinta y un icono verde claro se leen como
+     un despiste. Van en tripleta RGB y no en hex porque el degradado les
+     pone alfa. */
+  --hero-velo:14,33,24;
+  --ic-path:#cfeede;
   --skel-a:#ece9e2;--skel-b:#f7f5ef;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -208,7 +215,7 @@ section{padding:72px 0}
 .hero{position:relative;min-height:92vh;display:flex;align-items:center;color:var(--on-dark);overflow:hidden}
 .hero-bg{position:absolute;inset:0;z-index:-2}
 .hero-bg img{width:100%;height:100%;object-fit:cover;object-position:center 58%;filter:brightness(.92)}
-.hero-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,rgba(14,33,24,.82) 0%,rgba(14,33,24,.5) 48%,rgba(14,33,24,.1) 100%)}
+.hero-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,rgba(var(--hero-velo),.82) 0%,rgba(var(--hero-velo),.5) 48%,rgba(var(--hero-velo),.1) 100%)}
 .hero-eyebrow{font-size:var(--fs-eyebrow);letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--gn);font-weight:800;margin-bottom:18px}
 .hero h1{font-size:var(--fs-h1);line-height:var(--lh-tight);letter-spacing:var(--tr-display);max-width:14ch;margin-bottom:22px}
 .hero h1 em{color:var(--gn)}
@@ -578,7 +585,7 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 
 /* ---- SVG line icons ---- */
 .ic-svg{width:30px;height:30px;display:block}
-.path-ic .ic-svg{width:24px;height:24px;color:#cfeede}
+.path-ic .ic-svg{width:24px;height:24px;color:var(--ic-path)}
 .card .ic .ic-svg{width:24px;height:24px;color:var(--acc)}
 /* ---- chips de ecosistema (usados en #hub y #gratitud) ---- */
 .eco-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
@@ -1703,16 +1710,12 @@ html[data-marca="mmc"]{
   --nav-bg:rgba(251,250,247,.92);
   --skel-a:#EEF1F4; --skel-b:#F8FAFB;
 
-  /* ── Propios del triaje ────────────────────────────────────────────────
-     No existen en Give&Grow porque allá no hay una fila que ordenar. La
-     intensidad ES la urgencia: campo lleno arriba, contorno abajo. Los dos
-     niveles bajos no llevan token de relleno a propósito — usan --surface y
-     --bd, y su ausencia de color es el dato. */
-  --pri-urg:#F2B705;       /* visita urgente · campo */
-  --pri-urg-ink:#082742;   /* tinta sobre el ámbar */
-  --pri-prog:#0D3B66;      /* visita programada · campo */
-  --pri-prog-ink:#FFFFFF;
+  /* El velo del hero en el azul de documento, no en el verde de la
+     fundación; y el icono de `.path` en el azul claro que ya usa el pie. */
+  --hero-velo:11,33,53;
+  --ic-path:#8FBFE0;
 }
+
 
 html[data-marca="mmc"][data-theme="dark"]{
   /* --acc SE ACLARA y --g NO, que es la convención del sistema y la pasé por
@@ -1794,3 +1797,35 @@ html[data-marca="mmc"] .foot-grid .mmc-aval{ color:var(--on-dark-3); max-width:4
 .mmc-pri.programada{ background:var(--pri-prog); border-color:var(--pri-prog);
   color:var(--pri-prog-ink) }
 .mmc-pri.inevaluable{ background:transparent; border-style:dashed }
+
+/* ── La portada partida ───────────────────────────────────────────────────
+   La foto al lado del texto y no debajo de él. Nace de una medición: con el
+   texto ENCIMA de esta fotografía —una vivienda encalada a pleno día— el
+   eyebrow daba 1,34 y el titular 2,03, y el velo que los arreglaba borraba la
+   casa. Al lado, la foto va a plena fuerza y el texto sobre el papel del sitio.
+
+   `1.05fr .95fr` y no mitades: la columna de texto lleva un titular en display
+   y tres botones, y necesita un punto más de aire que la imagen. */
+.mmc-portada{ padding-block:clamp(40px,7vw,84px) clamp(36px,6vw,72px) }
+.mmc-portada-in{ display:grid; grid-template-columns:1.05fr .95fr;
+  gap:clamp(28px,4vw,52px); align-items:center }
+.mmc-portada .h-sec{ max-width:17ch }
+.mmc-portada-foto{ margin:0 }
+/* `height:auto` NO SOBRA. El <img> lleva `width`/`height` en el marcado —hacen
+   falta para que el navegador reserve el hueco y no salte el diseño— y ese
+   `height="1200"` es una pista de presentación que le gana a `aspect-ratio`
+   mientras nadie ponga la altura en CSS. Medido: la caja salía de 444×1200 y la
+   portada crecía hasta 1382 px de alto. */
+.mmc-portada-foto img{ width:100%; height:auto; aspect-ratio:4/3; object-fit:cover;
+  border-radius:var(--rl); box-shadow:var(--shadow) }
+.mmc-portada-foto figcaption{ margin-top:10px; font-size:var(--fs-14); line-height:1.4 }
+.mmc-botones{ display:flex; flex-wrap:wrap; gap:12px; margin-top:28px }
+
+/* EN UNA COLUMNA ANTES DE QUE APRIETE. A 860 px la foto ya bajaba de 400 px de
+   ancho y el titular partía por sílabas raras; y quien abre esto lo abre casi
+   siempre en un teléfono, así que el orden de una columna es el que importa:
+   primero qué es, después los botones, y la foto de cierre. */
+@media (max-width:860px){
+  .mmc-portada-in{ grid-template-columns:1fr }
+  .mmc-portada-foto img{ aspect-ratio:3/2; max-height:300px; object-position:center 60% }
+}

@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=928eb3c6">
+<link rel="stylesheet" href="/styles.css?v=629d72ba">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=33791992" defer></script>
+<script src="/app.js?v=e028f500" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -2394,24 +2394,43 @@
      `.h-sec`, `.lead` y `.card-link` ya existen y ya llevan la piel de Mira
      Mi Casa por tokens. -->
 <main id="page-proyecto" class="page">
-  <section>
-    <div class="wrap">
-      <!-- EL 123 VA PRIMERO, ANTES DEL TITULAR. Medido a 375 px: con el aviso
-           debajo del `lead`, la primera pantalla de un teléfono solo alcanzaba
-           a mostrar el h1 — o sea que quien abre esto con un muro agrietándose
-           tenía que bajar para encontrar el único dato que no puede esperar.
-           Todo lo demás de la página aguanta un scroll; esto no.
+  <!-- LA PORTADA, PARTIDA Y NO SUPERPUESTA, y la razón se midió.
+       ======================================================================
+       El primer intento puso el texto ENCIMA de la fotografía, con el `.hero`
+       del sitio de la fundación. La foto es una vivienda encalada a pleno día
+       —casi blanca en media imagen— y el texto encima daba 1,34 en el eyebrow,
+       2,03 en el titular y 2,26 en la bajada, midiendo el peor píxel bajo cada
+       bloque. Para que pasara el mínimo hacía falta un velo de .95/.88/.70, y
+       con ese velo la casa ya no se veía: quedaba el gesto de tener una foto.
 
-           Sin `.card` a propósito: esa clase se levanta al pasar el cursor, y
-           un aviso de emergencia no es algo que se explore. -->
-      <div class="rv" style="max-width:62ch;margin-bottom:30px;padding:18px 20px;border:1.5px solid var(--amber);border-radius:var(--r);background:var(--amberl)">
-        <p style="font-weight:800;color:var(--amber)" data-i18n="mmc.p.123.k">Antes que nada</p>
-        <p style="margin-top:6px" data-i18n="mmc.p.123.p">Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— esto no es lo que necesitas: llama al 123 y a tu alcaldía. Un concepto sobre fotos no tiene fecha, y una emergencia no espera.</p>
+       Así que no se pelea con la imagen, se pone al lado. La foto va a plena
+       fuerza y el texto sobre el papel del sitio, que es donde ya se lee. Es
+       además el patrón de las fundaciones que este proyecto mira.
+
+       LOS TRES BOTONES son las tres puertas —familia, ingeniero, quien aporta—
+       y llevan al mismo sitio que las tarjetas largas de más abajo, que siguen
+       explicando cada papel con calma para quien quiera leerlo.
+
+       LA FOTOGRAFÍA NO TIENE UNA SOLA PERSONA DENTRO, a propósito: esta página
+       se comparte por WhatsApp y se previsualiza sola. Es de la brigada de
+       agosto de 2026 y su descripción es la que ya lleva en la galería. -->
+  <section class="mmc-portada">
+    <div class="wrap mmc-portada-in">
+      <div>
+        <span class="ey rv" data-i18n="mmc.p.hero.ey">Tras el sismo del 10 de agosto</span>
+        <h1 class="h-sec rv" data-i18n="mmc.p.t">Tu casa, revisada por un ingeniero.</h1>
+        <p class="lead rv d1" data-i18n="mmc.p.lead">Sin costo y sin que nadie tenga que venir. Subes fotos desde el teléfono y un ingeniero voluntario con matrícula te escribe si puedes permanecer, qué precauciones tomar y con qué materiales conviene reparar.</p>
+        <div class="mmc-botones rv d2">
+          <a class="btn btn-g" href="#vivienda" data-i18n="mmc.p.b1.t">Revisa tu casa</a>
+          <a class="btn btn-o" href="#ingenieros" data-i18n="mmc.p.b2.t">Soy ingeniero</a>
+          <a class="btn btn-o" href="#apadrinar" data-i18n="mmc.p.b3.t">Quiero apadrinar</a>
+        </div>
+        <p class="mu rv d3" style="margin-top:16px;font-size:var(--fs-14)" data-i18n="mmc.p.b.pie">Las tres puertas del proyecto. Si no sabes cuál es la tuya, empieza por la primera.</p>
       </div>
-      <span class="ey rv" data-i18n="mmc.p.ey">Qué es Mira Mi Casa</span>
-      <h1 class="h-sec rv" data-i18n="mmc.p.t">Un ingeniero mira las fotos de tu casa y te escribe qué hacer con ella.</h1>
-      <p class="lead rv d1" data-i18n="mmc.p.lead">Después del sismo del 10 de agosto quedaron más casas dañadas que ingenieros para visitarlas. Mira Mi Casa acorta esa fila: una familia sube fotos desde el teléfono, un ingeniero voluntario con matrícula verificada las mira y escribe un concepto, y quien puede aportar materiales sabe por fin qué hace falta. No se cobra nada, en ninguna dirección.</p>
-
+      <figure class="mmc-portada-foto rv d1">
+        <img src="/img/jornadas/brigada_ansermanuevo_vivienda.jpg" alt="Vivienda de dos plantas visitada por la brigada en Ansermanuevo, con el segundo piso en ladrillo a la vista" data-i18n="mmc.p.hero.alt" data-i18n-attr="alt" width="1600" height="1200" fetchpriority="high" decoding="async">
+        <figcaption class="mu" data-i18n="mmc.p.hero.pie">Ansermanuevo, agosto de 2026. Una de las viviendas que visitó la brigada.</figcaption>
+      </figure>
     </div>
   </section>
 
@@ -2505,6 +2524,13 @@
         <div class="step"><div class="step-n">3</div><div><h3 data-i18n="mmc.p.pas3.t">Un ingeniero lo abre</h3><p data-i18n="mmc.p.pas3.p">Mira tus fotos y escribe el concepto. Si con lo que enviaste no alcanza, marca que no puede evaluar y te pedimos exactamente lo que falta: por eso el enlace también sirve para subir más.</p></div></div>
         <div class="step"><div class="step-n">4</div><div><h3 data-i18n="mmc.p.pas4.t">El concepto llega a tu enlace</h3><p data-i18n="mmc.p.pas4.p">Con el nombre y la matrícula de quien lo firmó. A partir de ahí tu casa tiene algo concreto que pedir, y es lo que le mostramos a quien quiera apadrinar una reparación.</p></div></div>
       </div>
+      <!-- Una sola fotografía en el cuerpo, y va aquí: el paso 4 habla del
+           concepto y esto es lo que un concepto acaba pidiendo. De la brigada
+           de agosto, sin personas dentro. -->
+      <figure class="rv d2" style="margin-top:28px">
+        <img src="/img/jornadas/brigada_aguila_apuntalado.jpg" alt="Edificio apuntalado con maderos y acordonado con cinta en El Águila, agosto de 2026" data-i18n="mmc.p.pas.alt" data-i18n-attr="alt" width="1200" height="1600" loading="lazy" decoding="async" style="border-radius:var(--r);max-height:420px;width:100%;object-fit:cover;object-position:center 62%">
+        <figcaption class="mu" style="margin-top:9px;font-size:var(--fs-14)" data-i18n="mmc.p.pas.pie">El Águila, agosto de 2026. Un muro apuntalado es exactamente el tipo de precaución que un ingeniero escribe en su concepto.</figcaption>
+      </figure>
       <p class="mu rv d2" style="margin-top:22px;max-width:62ch" data-i18n="mmc.p.pas.fecha">Lo que no vas a encontrar es una fecha prometida. Los ingenieros son voluntarios y son menos que las casas: preferimos decírtelo a inventarte un plazo.</p>
     </div>
   </section>
