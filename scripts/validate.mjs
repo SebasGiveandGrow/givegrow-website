@@ -780,6 +780,45 @@ try {
   }
 } catch (e) { err("no se pudo verificar los tokens de worker.js: " + e.message); }
 
+/* CHECK #13b — Y LOS DEL PROPIO `styles.css`, que era el hueco.
+   El check de arriba comprueba los `var()` de worker.js contra los tokens
+   declarados en los DOS archivos. Su mensaje de error nombra bien el peligro
+   —«CSS los descarta en silencio»— y dejaba sin vigilar el archivo GRANDE: un
+   `var(--acento-nuevo)` mal escrito en styles.css, sin fallback, hace que el
+   navegador tire la declaracion entera sin decir nada. Ni consola, ni error de
+   build, ni nada: el color simplemente no se aplica.
+
+   DOS CATEGORIAS, y solo una es un fallo:
+
+   · SIN fallback  -> la declaracion se pierde. Es un bug y suspende siempre.
+     Hoy hay CERO, asi que el techo es cero.
+   · CON fallback  -> funciona, pero el token esta MUERTO: el valor real es
+     siempre el de respaldo. No suspende; se nombra para que no se esconda.
+     Hoy son tres —`--bg2` una vez y `--mono` dos—, y llevan asi desde antes
+     de este check. */
+try {
+  const hoja = readFileSync("styles.css", "utf8");
+  const declarados = new Set([
+    ...[...hoja.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]),
+    ...[...workerSrc.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1])
+  ]);
+  const conFb = [], sinFb = [];
+  for (const m of hoja.matchAll(/var\(\s*(--[a-z0-9-]+)\s*(,)?/g)) {
+    if (declarados.has(m[1])) continue;
+    const linea = hoja.slice(0, m.index).split("\n").length;
+    (m[2] ? conFb : sinFb).push(m[1] + " (styles.css:" + linea + ")");
+  }
+  if (sinFb.length) {
+    err("check #13b: " + sinFb.length + " var() de styles.css apunta(n) a un token que NO existe y SIN " +
+        "fallback, asi que el navegador descarta la declaracion en silencio: " + sinFb.join(", "));
+  } else if (conFb.length) {
+    ok("var() de styles.css: ninguno roto · " + conFb.length + " apunta(n) a un token muerto pero con " +
+       "fallback, que es el valor real: " + conFb.join(", "));
+  } else {
+    ok("var() de styles.css: todos apuntan a un token declarado");
+  }
+} catch (e) { err("no se pudieron verificar los tokens de styles.css: " + e.message); }
+
 /* CHECK #14 — LA REGLA 1 DEL CONSENTIMIENTO, OBLIGADA POR EL BUILD.
    «Sin `consent.name === true` no hay perfil» está escrita en worker.js y la
    respetaba el generador del objeto de partners.json… y nadie más. Quedaban dos
