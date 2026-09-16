@@ -891,17 +891,45 @@ try {
 
   /* Saca la plantilla de una función, respetando las comillas invertidas
      escapadas — que en este archivo las hay. */
+  /* SE LEE LA FUNCION ENTERA, y no su primera plantilla. Antes esto cogia la
+     primera cadena entre comillas invertidas y paraba. Medido:
+
+       paginaFicha      funcion  6.700 chars -> leia      4
+       inspeccionHTML   funcion 54.703 chars -> leia 14.187
+
+     Cuatro caracteres. El check decia «los data-* de ficha tienen quien los
+     lea» habiendo leido nada. Un guardian que informa sobre lo que no vio es
+     peor que no tenerlo.
+
+     Y juntar todas las plantillas tampoco bastaba: `paginaFicha` arma su HTML
+     CONCATENANDO CADENAS con comillas simples, asi que ahi no hay plantillas que
+     juntar. Leyendo el cuerpo entero da igual como se construya el HTML — y el
+     texto de mas es inofensivo, porque este check solo busca atributos `data-*`
+     y quien los lee.
+
+     EL FINAL NO SE BUSCA CON UN indexOf. `\nfunction ` aparece DENTRO de las
+     plantillas, porque el JS que emiten define funciones: con eso el corte caia
+     antes de empezar y no se encontraba ni una. Hay que recorrer sabiendo
+     cuando se esta dentro de una plantilla y cuando fuera. */
   const plantilla = (nombre) => {
-    const i = src.indexOf("function " + nombre + "(");
+    let i = src.indexOf("function " + nombre + "(");
+    if (i < 0) i = src.indexOf("const " + nombre + " = `");
     if (i < 0) return "";
-    const ini = src.indexOf("`", i);
-    let j = ini + 1;
+
+    let j = i + 10, dentro = false;
     while (j < src.length) {
-      if (src[j] === "\\") { j += 2; continue; }
-      if (src[j] === "`") break;
+      const c = src[j];
+      if (dentro) {
+        if (c === "\\") { j += 2; continue; }
+        if (c === "`") dentro = false;
+      } else if (c === "`") {
+        dentro = true;
+      } else if (c === "\n" && /^(?:async function |function |const [A-Za-z_$][\w$]* = `)/.test(src.slice(j + 1, j + 40))) {
+        break;
+      }
       j++;
     }
-    return src.slice(ini + 1, j);
+    return src.slice(i, j);
   };
 
   const camello = (a) => a.replace(/^data-/, "").replace(/-([a-z])/g, (m, c) => c.toUpperCase());
@@ -910,7 +938,13 @@ try {
     { nombre: "panel", html: plantilla("paginaAdmin"), js: plantilla("adminJS") },
     { nombre: "triaje", html: plantilla("paginaTriage"), js: plantilla("triageJS") },
     { nombre: "terreno", html: plantilla("inspeccionHTML"), js: plantilla("inspeccionJS") },
-    { nombre: "ruta", html: plantilla("paginaRuta"), js: plantilla("rutaJS") }
+    { nombre: "ruta", html: plantilla("paginaRuta"), js: plantilla("rutaJS") },
+    /* AÑADIDAS EL 16 SEP 2026. El Worker genera SEIS pantallas con JS y este
+       check cruzaba cuatro. Faltaban la ficha de fundacion y —mas grave— la de
+       FIRMA, que es la mas nueva del sistema y donde un `data-*` que nadie lee
+       significa un boton que no firma y no avisa. */
+    { nombre: "ficha", html: plantilla("paginaFicha"), js: plantilla("fichaJS") },
+    { nombre: "firma", html: plantilla("paginaFirma"), js: plantilla("firmaJS") }
   ];
 
   for (const p of pantallas) {
