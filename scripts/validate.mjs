@@ -783,6 +783,17 @@ try {
    empeoro por una fuga, sino por un token mas. */
 const TECHO_COLORES = 73;
 const TECHO_FUENTES = 21;
+/* Y LOS DEL WORKER, que este trinquete nunca habia contado. Sus siete bloques
+   <style> son 30.000 caracteres de CSS —el panel, el triaje, terreno, ruta,
+   firma, la ficha y el carnet— y el sistema de tokens les aplica igual.
+
+   Techos separados a proposito: mezclarlos con los de styles.css borraria de
+   donde viene cada fuga, y son dos sitios que se tocan en momentos distintos.
+
+   Es el mismo hueco que tenia el medidor de contraste hasta el PR #415: miraba
+   styles.css y no lo que el Worker pinta. */
+const TECHO_COLORES_WK = 33;
+const TECHO_FUENTES_WK = 83;
 try {
   const css = readFileSync("styles.css", "utf8");
   /* Los bloques que DEFINEN tokens son justo donde los literales deben estar.
@@ -803,6 +814,16 @@ try {
   const colores = (resto.match(/#[0-9A-Fa-f]{3,8}\b|rgba?\([^)]*\)/g) || []).length;
   const fuentes = (resto.match(/font-size:\s*[0-9.]+px/g) || []).length;
 
+  const reportaWk = (nombre, n, techo) => {
+    if (n > techo) {
+      err(nombre + ": " + n + " y el techo es " + techo + ". El sistema de tokens vale igual " +
+          "en las pantallas que genera el Worker; usa `var(--…)` en vez de escribirlo suelto.");
+    } else if (n < techo) {
+      ok(nombre + ": " + n + " — BAJÓ del techo " + techo + ". Actualiza TECHO_*_WK en validate.mjs a " + n);
+    } else {
+      ok(nombre + ": " + n + ", en el techo");
+    }
+  };
   const reporta = (nombre, n, techo, ayuda) => {
     if (n > techo) {
       err(`${nombre}: ${n} en styles.css, y el techo es ${techo}. ` +
@@ -816,6 +837,19 @@ try {
   };
   reporta("colores literales fuera de los tokens", colores, TECHO_COLORES, "--g, --acc, --amber, --err…");
   reporta("tamaños de fuente sueltos", fuentes, TECHO_FUENTES, "--fs-body, --fs-h3, --fs-eyebrow…");
+
+  /* LO MISMO EN LOS <style> DEL WORKER. Se juntan los siete y se les quita sus
+     propias definiciones de tokens, igual que arriba con styles.css. */
+  const cssWk = (workerSrc.match(/<style>([\s\S]*?)<\/style>/g) || [])
+    .map((b) => b.replace(/^<style>/, "").replace(/<\/style>$/, "")).join("\n");
+  const defsWk = (cssWk.match(/[^{}]+\{[^}]*\}/gs) || [])
+    .filter((b) => /:root|html\[data-theme|data-marca/.test(b.slice(0, b.indexOf("{"))));
+  let restoWk = cssWk;
+  for (const d of defsWk) restoWk = restoWk.replace(d, "");
+  const coloresWk = (restoWk.match(/#[0-9A-Fa-f]{3,8}\b|rgba?\([^)]*\)/g) || []).length;
+  const fuentesWk = (restoWk.match(/font-size:\s*[0-9.]+px/g) || []).length;
+  reportaWk("colores literales en los <style> del Worker", coloresWk, TECHO_COLORES_WK);
+  reportaWk("tamaños de fuente sueltos en los <style> del Worker", fuentesWk, TECHO_FUENTES_WK);
 } catch (e) { err("no se pudo medir el sistema visual: " + e.message); }
 
 /* 12 · LA WHITELIST `ACT_FNS` CUBRE TODO LO QUE EL HTML INVOCA.
