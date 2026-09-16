@@ -51,6 +51,51 @@ for (const f of ["app.js", "worker.js", "documentos.js"]) {
   catch (e) { err(f + " sintaxis inválida"); }
 }
 
+/* 1a · LAS BARRAS QUE SE PIERDEN DENTRO DE UNA PLANTILLA.
+   El check #1b de abajo compila lo EMITIDO y atrapa lo que rompe la sintaxis.
+   Esto atrapa lo que NO la rompe y cambia el significado.
+
+   Dentro de una plantilla, `\d` no es un escape valido de JS y la barra
+   DESAPARECE: `\d` vale "d". Asi que una expresion regular escrita con una sola
+   barra llega al navegador convertida en otra cosa, sintacticamente perfecta:
+
+     /[+-]\d\d:?\d\d$/   ->  /[+-]dd:?dd$/     ya no son digitos
+     /\.xml$/i           ->  /.xml$/i          el punto es cualquier caracter
+
+   Encontrados SIETE el 16 sep 2026, todos en la plantilla del panel: los cuatro
+   de la deteccion de zona horaria de `enCO` y tres de validacion de archivo. Con
+   la segunda rota, un archivo llamado `facturaxml` —sin extension— pasaba el
+   control de tipo. Comprobado: /.xml$/i lo acepta, /\.xml$/i no.
+
+   El proyecto ya documentaba la trampa —«dentro de las plantillas hay que
+   escribir \\n y \\/»— y no tenia quien la vigilara. El techo es CERO. */
+{
+  const fuenteWorker = readFileSync("worker.js", "utf8");
+  const VALIDAS = new Set(["n", "t", "r", "b", "f", "v", "0", "'", '"', "\\", "`", "$", "x", "u", "\n"]);
+  const malas = [];
+  let dentro = false, i = 0;
+  while (i < fuenteWorker.length) {
+    const c = fuenteWorker[i];
+    if (dentro) {
+      if (c === "\\") {
+        const sig = fuenteWorker[i + 1] || "";
+        if (!VALIDAS.has(sig)) {
+          malas.push("\\" + sig + " (worker.js:" + (fuenteWorker.slice(0, i).split("\n").length) + ")");
+        }
+        i += 2; continue;
+      }
+      if (c === "`") dentro = false;
+    } else if (c === "`") dentro = true;
+    i++;
+  }
+  if (malas.length) {
+    err("check #1a: " + malas.length + " escape(s) dentro de una plantilla pierden la barra y cambian " +
+        "el significado sin romper la sintaxis — duplicalas: " + [...new Set(malas)].join(", "));
+  } else {
+    ok("ningun escape pierde la barra dentro de las plantillas");
+  }
+}
+
 /* 1b · Sintaxis del JS que worker.js GENERA.
    El panel `/admin` no es un archivo del repo: son ~485 líneas que `adminJS()`
    devuelve como template literal y el navegador ejecuta. El check #1 valida

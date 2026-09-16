@@ -14594,7 +14594,7 @@ function conEstado(r){ return r.json().then(function(d){ return { http: r.status
 function enCO(v, n){
   if (!v) return "";
   var t = String(v).trim().replace(" ", "T");
-  if (!/[Zz]$|[+-]\d\d:?\d\d$/.test(t)) t += "Z";
+  if (!/[Zz]$|[+-]\\d\\d:?\\d\\d$/.test(t)) t += "Z";
   var d = new Date(t);
   if (isNaN(d)) return String(v).slice(0, n || 16);
   return new Date(d.getTime() - 5*3600*1000).toISOString().replace("T", " ").slice(0, n || 16);
@@ -16613,7 +16613,7 @@ document.addEventListener("change", function(e){
   /* El cuerpo va crudo con su content-type: sin multipart no hay que parsear
      nada en el Worker, y el nombre del archivo lo pone el servidor. */
   fetch("/api/admin/entrega/" + encodeURIComponent(inp.getAttribute("data-foto")) + "/foto?alt=" +
-        encodeURIComponent(f.name.replace(/\.[a-z0-9]+$/i,"")), {
+        encodeURIComponent(f.name.replace(/\\.[a-z0-9]+$/i,"")), {
     method: "POST", headers: {"content-type": f.type}, body: f
   }).then(function(r){ return r.json(); })
     .then(function(d){ if (d.error) alert("No se pudo subir: " + d.error); cargarEntregas(); })
@@ -16963,7 +16963,7 @@ document.addEventListener("change", function(ev){
   EG_ARCHIVO = f || null;
   if (!f) { egMsg("eg-xmsg", "", true); return; }
 
-  if (!/\.xml$/i.test(f.name)){
+  if (!/\\.xml$/i.test(f.name)){
     egMsg("eg-xmsg", "Guardado para subirlo con el egreso. Un PDF no se puede leer: los campos los escribes tú.", true);
     var sp = document.getElementById("eg-soporte");
     if (sp && sp.value === "factura_electronica") sp.value = "factura_manual";
@@ -17122,7 +17122,7 @@ document.addEventListener("click", function(ev){
            los catorce campos por un archivo que no subio. */
         if (EG_ARCHIVO){
           var f = EG_ARCHIVO;
-          var tipo = /\.xml$/i.test(f.name) ? "application/xml" : "application/pdf";
+          var tipo = /\\.xml$/i.test(f.name) ? "application/xml" : "application/pdf";
           fetch("/api/admin/egreso/" + encodeURIComponent(num) + "/soporte", {
             method: "POST", headers: { "content-type": tipo }, body: f
           }).then(conEstado).then(function(r2){
