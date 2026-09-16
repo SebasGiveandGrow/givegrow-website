@@ -1801,6 +1801,24 @@ html[data-marca="mmc"] .mmc-foot-fuera{
    Lo único que este producto produce es una posición en una fila, así que la
    escala ES el sistema visual. El ámbar aparece una sola vez en todo el
    recorrido, y esa escasez es lo que lo convierte en señal. */
+/* ── El caso que este teléfono ya conoce ──────────────────────────────────
+   Va donde estorba —encima de los tres botones de la portada— porque quien
+   vuelve a teclear el dominio y ya reportó viene a UNA cosa. No grita: es la
+   misma caja de documento que el resto del proyecto, con el número tratado
+   como cifra. La nota de abajo dice dónde está guardado y quién puede abrirlo,
+   y eso no se suaviza. */
+.mmc-mio{ margin:0 0 22px; padding:16px 18px; border-radius:3px;
+  border:1.5px solid var(--acc); background:var(--gl); max-width:46ch }
+.mmc-mio[hidden]{ display:none }
+.mmc-mio-et{ display:block; font-size:var(--fs-11); letter-spacing:.13em;
+  text-transform:uppercase; font-weight:700; color:var(--acc) }
+.mmc-mio-num{ margin:4px 0 0; font-family:var(--font-display);
+  font-size:var(--fs-17); font-weight:700; letter-spacing:-.01em;
+  font-variant-numeric:tabular-nums; color:var(--ink) }
+.mmc-mio-fila{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px }
+.mmc-mio-nota{ margin:12px 0 0; font-size:var(--fs-11); line-height:1.4;
+  color:var(--mu) }
+
 .mmc-pri{ display:flex; flex-direction:column; gap:5px;
   padding:16px 18px; border-radius:3px; border:1.5px solid var(--bd);
   background:var(--surface); color:var(--ink) }

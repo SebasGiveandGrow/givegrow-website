@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=cf04119d">
+<link rel="stylesheet" href="/styles.css?v=0a11dce2">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=4f4c4812" defer></script>
+<script src="/app.js?v=25a24763" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -2420,6 +2420,12 @@
         <span class="ey rv" data-i18n="mmc.p.hero.ey">Tras el sismo del 10 de agosto</span>
         <h1 class="h-sec rv" data-i18n="mmc.p.t">Tu casa, revisada por un ingeniero.</h1>
         <p class="lead rv d1" data-i18n="mmc.p.lead">Sin costo y sin que nadie tenga que venir. Subes fotos desde el teléfono y un ingeniero voluntario con matrícula te escribe si puedes permanecer, qué precauciones tomar y con qué materiales conviene reparar.</p>
+        <!-- QUIEN VUELVE NO VIENE A ELEGIR PUERTA. Ver `mmcMiCaso` en app.js:
+             el enlace del caso es la única llave de la familia y no había
+             ninguna forma de recuperarlo. Va ANTES de los tres botones porque
+             quien teclea el dominio y ya reportó viene a UNA cosa. Oculta
+             mientras no haya nada guardado. -->
+        <div class="mmc-mio" data-mi-caso hidden></div>
         <div class="mmc-botones rv d2">
           <a class="btn btn-g" href="#vivienda" data-i18n="mmc.p.b1.t">Revisa tu casa</a>
           <a class="btn btn-o" href="#ingenieros" data-i18n="mmc.p.b2.t">Soy ingeniero</a>
@@ -2550,6 +2556,10 @@
       <span class="ey" data-i18n="cv.t">Revisa tu casa</span>
       <h1 class="h-sec" data-i18n="cv.t">Revisa tu casa</h1>
       <p class="lead" data-i18n="cv.lead">Si tu casa se afectó por el sismo, sube unas fotos. Un ingeniero voluntario te dice si hay señales para no permanecer en ella, qué precauciones tomar y con qué materiales conviene repararla.</p>
+      <!-- Y AQUÍ EVITA ADEMÁS UN CASO DUPLICADO: quien ya reportó y no
+           encuentra su enlace vuelve a llenar el formulario, y entonces hay dos
+           casos de la misma casa compitiendo por el mismo ingeniero. -->
+      <div class="mmc-mio" data-mi-caso hidden style="margin-top:20px"></div>
       <p class="mu" style="max-width:60ch;margin-top:14px" data-i18n="cv.aviso">Esto no reemplaza una visita ni la declaratoria de tu municipio. Un ingeniero voluntario mira tus fotos y te escribe lo que alcance a ver desde ahí: qué precauciones tomar mientras tanto y, cuando puede decirlo con lo que enviaste, por dónde conviene empezar a reparar. Sobre fotos no se ve todo, así que hay cosas que ningún ingeniero va a firmar sin ir hasta la casa.</p>
       <!-- Lo que la fundación puede y no puede prometer, dicho antes de que la
            familia llene el formulario y no después. Va aparte de `cv.aviso` a
