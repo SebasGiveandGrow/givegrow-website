@@ -1766,6 +1766,48 @@ html[data-marca="mmc"] .btn-nav{ display:none }
    problema del aval con tipografía en vez de con dos logos apilados. */
 html[data-marca="mmc"] .nlogo{ font-size:var(--fs-17); letter-spacing:.01em }
 html[data-marca="mmc"] .nlogo em{ font-style:normal; color:var(--acc) }
+
+/* EL LOGOTIPO SE PARTÍA EN DOS LÍNEAS EN CASI TODOS LOS TELÉFONOS, y esto es
+   aritmética, no gusto. Medido en producción a 375 px: «Mira Mi Casa» en una
+   línea pide 146 px y la caja que le queda son 127, así que envuelve y la barra
+   crece a 82 px de alto con el nombre del proyecto partido en dos. La marca de
+   la fundación no lo sufre porque «Give&Grow» es más corto.
+
+   LO QUE COMPITE POR EL ANCHO son los 24 px de margen a cada lado, los 184 de
+   los tres controles —tema, ES/EN y el menú— y los 16 de separación. A 375 px
+   eso deja 143; a 360, que es el ancho de media Colombia con Android, deja 127.
+
+   Así que se recupera la separación y se baja el cuerpo lo justo, por tramos y
+   solo en Mira Mi Casa. Los números de cada tramo salen de medir el texto con
+   la tipografía real, no de tantear:
+
+     ≤420 px → 15 px, ocupa 125 y caben 151 a 375 px
+     ≤370 px → 14 px, ocupa 116 y caben 120 a 360 px
+
+   Y POR DEBAJO DE 357 PX SE LE DEJA ENVOLVER OTRA VEZ, a propósito.
+
+   EL PRIMER INTENTO PUSO ESE CORTE EN 335 Y ESTABA MAL, y la medición que lo
+   dejó pasar también: `scrollWidth` decía que la página no desbordaba, pero la
+   barra tiene `overflow:visible`, así que el texto se salía de su caja flexible
+   SIN mover el scroll. Midiendo la extensión pintada del texto con un Range en
+   vez de la caja, a 336 px el logotipo se metía 13 px encima de los controles y
+   a 345 px, 4 px. El número bueno es 357: ahí el texto ocupa exactamente los
+   117 px que quedan.
+
+   Por debajo no cabe de ninguna manera. Entre 336 y 356 px no vive ningún
+   teléfono real —los dos anchos pequeños de verdad son 320 y 360— así que el
+   tramo que envuelve se lo quedan los de 320, donde dos líneas son la única
+   salida honesta: un `nowrap` que no cabe pisa los controles, y eso es peor. */
+@media (max-width:420px){
+  html[data-marca="mmc"] .nav-in{ gap:8px }
+  html[data-marca="mmc"] .nlogo{ white-space:nowrap; font-size:var(--fs-15); letter-spacing:-.005em }
+}
+@media (max-width:370px){
+  html[data-marca="mmc"] .nlogo{ font-size:var(--fs-14) }
+}
+@media (max-width:356px){
+  html[data-marca="mmc"] .nlogo{ white-space:normal }
+}
 /* El logotipo del PIE es blanco sobre fondo oscuro, así que ahí el acento tiene
    que ser el claro: con el azul oscuro, «Mi» quedaba en 1,43:1 — invisible.
    Dos sitios con el mismo componente y fondos opuestos. */
