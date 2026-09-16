@@ -549,6 +549,86 @@ for (const tag of TAGS_CERRADAS) {
 }
 if (tagsOk) ok("balance de tags (" + tagsVistas + " etiquetas vigiladas)");
 
+/* 8b · Y EL MISMO BALANCE EN LAS PLANTILLAS DEL WORKER.
+   El check de arriba corre sobre index.html. Las paginas que el Worker GENERA
+   —panel, triaje, terreno, ruta, firma, ficha, carnet, correo, compartir— solo
+   se comprobaban con «termina en </html>». Un </div> que falte en el panel, que
+   son 36.000 caracteres generados, no lo veia nadie.
+
+   SOLO LAS QUE SON UNA PLANTILLA LITERAL, y el limite es honesto: worker.js
+   tambien arma HTML CONCATENANDO cadenas —`'<tr' + (nula ? ' style=…' : '') +
+   '>'`— y ahi contar etiquetas no funciona. Medido sobre el archivo entero
+   daban tres desbalances (div 162/160, label 55/53, tr 61/64) y los tres eran
+   artefactos: hay exactamente tres `'<tr' +` concatenados, que abren sin que
+   `<tr[\s>]` los vea y cierran donde si se ve. Un guardian que falla por
+   no-razones se acaba silenciando, que es peor que no tenerlo.
+
+   Quedan fuera dos paginas construidas asi: la de «Access no configurado» del
+   router y el popup `verFicha`. Las dos son pequeñas y de tags contados.
+
+   LA LISTA SE VIGILA A SI MISMA. Hoy he encontrado CINCO guardianes que cubrian
+   menos de lo que parecia, todos por una lista escrita a mano que se quedo
+   corta al crecer el sistema. Asi que se cuentan los `<!doctype` que viven
+   DENTRO de una plantilla literal y se comparan con el largo de la lista:
+   añadir una decima sin registrarla SUSPENDE. */
+const PLANTILLAS = [
+  "plantillaCorreo", "paginaTriage", "inspeccionHTML", "paginaFirma",
+  "paginaCarnet", "paginaFicha", "paginaRuta", "paginaAdmin", "sharePage",
+  /* Vive DENTRO de la plantilla de adminJS: es el popup que abre el panel. */
+  "verFicha"
+];
+try {
+  /* `<!doctype` dentro de comillas invertidas, recorriendo con estado. */
+  let enPlantilla = 0, dentro = false;
+  for (let k = 0; k < workerSrc.length; k++) {
+    const c = workerSrc[k];
+    if (dentro) {
+      if (c === "\\") { k++; continue; }
+      if (c === "`") { dentro = false; continue; }
+      if (c === "<" && /^<!doctype/i.test(workerSrc.slice(k, k + 9))) enPlantilla++;
+    } else if (c === "`") dentro = true;
+  }
+  if (enPlantilla !== PLANTILLAS.length) {
+    err("check #8b: worker.js tiene " + enPlantilla + " plantillas HTML literales y la lista registra " +
+        PLANTILLAS.length + ". Si añadiste una, ponla en PLANTILLAS o nadie le mira el balance.");
+  }
+  const cuerpoDe = (nombre) => {
+    let i = workerSrc.indexOf("function " + nombre + "(");
+    if (i < 0) i = workerSrc.indexOf("const " + nombre + " = ");
+    if (i < 0) return "";
+    let j = i + 10, dentro2 = false;
+    while (j < workerSrc.length) {
+      const c = workerSrc[j];
+      if (dentro2) {
+        if (c === "\\") { j += 2; continue; }
+        if (c === "`") dentro2 = false;
+      } else if (c === "`") { dentro2 = true; }
+      else if (c === "\n" && /^(?:async function |function |const [A-Za-z_$][\w$]* = `)/.test(workerSrc.slice(j + 1, j + 40))) break;
+      j++;
+    }
+    return workerSrc.slice(i, j);
+  };
+  let malas = 0;
+  for (const nombre of PLANTILLAS) {
+    const cuerpo = cuerpoDe(nombre);
+    if (!cuerpo) { err("check #8b: no encontre la plantilla " + nombre); malas++; continue; }
+    const limpio = cuerpo
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "");
+    const rotas = [];
+    for (const tag of TAGS_CERRADAS) {
+      const a = (limpio.match(new RegExp("<" + tag + "[\\s>]", "g")) || []).length;
+      const c = (limpio.match(new RegExp("</" + tag + ">", "g")) || []).length;
+      if (a !== c) rotas.push("<" + tag + "> " + a + "/" + c);
+    }
+    if (rotas.length) { err("check #8b · " + nombre + ": tags desbalanceados — " + rotas.join(", ")); malas++; }
+  }
+  if (!malas && enPlantilla === PLANTILLAS.length) {
+    ok("balance de tags en las " + PLANTILLAS.length + " plantillas literales del Worker");
+  }
+} catch (e) { err("no se pudo verificar el balance de las plantillas del Worker: " + e.message); }
+
 /* 5b · Claves ES duplicadas — en un literal JS gana la última, así que un duplicado
    silencia el valor que creíste haber puesto. Difícil de ver a ojo en 676 claves. */
 {
