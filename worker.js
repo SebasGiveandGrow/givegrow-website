@@ -62,8 +62,18 @@ const MONTO_MAX = 20000000;
    Utilidades
    ======================================================================== */
 
+/* `s == null ? "" : s` y NO `s || ""`. Con la segunda, `esc(0)` devolvia cadena
+   vacia: un cero se pintaba como un hueco. Las otras cinco copias de `esc` de
+   este archivo ya lo hacian bien, asi que esta era la unica que discrepaba — y
+   el proyecto tiene la regla escrita en el check de salud: «el cero se muestra y
+   se nombra; que algo este en cero es informacion, no un hueco que tapar».
+
+   Hoy ningun sitio le pasa un cero: de las 15 llamadas en ambito de modulo la
+   unica numerica es `c.num` de FICHA_CAMPOS, y son "1.8", "2.3"… Se arregla
+   igual, porque seis copias de la funcion de escapado que no se comportan igual
+   es exactamente lo que acaba de morder con `enCO` en el PR #430. */
 function esc(s) {
-  return String(s || "").replace(/[&<>"']/g, (c) => ({
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
 }
