@@ -258,6 +258,7 @@ var I18N = {
     "mmc.nav.casas":"Casas revisadas",
     "mmc.nav.ing":"Ingenieros",
     "mmc.nav.apad":"Apadrinar",
+    "nav.idioma": "Idioma",
     "ing.fila.ey": "La fila ahora mismo",
     "ing.fila.cargando": "Consultando la fila…",
     "ing.fila.falla": "No pudimos consultar la fila en este momento. No quiere decir que esté vacía: quiere decir que no lo pudimos comprobar.",
