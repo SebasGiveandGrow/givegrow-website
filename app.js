@@ -1,6 +1,26 @@
 /* ===== Give&Grow International - app.js (rebuild v4) ===== */
 "use strict";
 
+/* EL ORIGEN CANÓNICO DE LA FUNDACIÓN, con `www`. Existe como constante porque
+   estaba escrito a mano en cinco sitios y en dos de ellos SIN el `www`, que es
+   justo los dos por los que se sale desde Mira Mi Casa.
+
+   NO ES COSMÉTICO: el ápex y el `www` sirven los dos el sitio entero y ninguno
+   redirige al otro —comprobado, los dos devuelven 200—, así que son ORÍGENES
+   DISTINTOS para el navegador. Quien sale de aquí por el enlace sin `www`
+   aterriza en una copia donde su preferencia de tema y cualquier otra cosa
+   guardada en el navegador no existen, y donde el `canonical` le está diciendo
+   a Google que la buena es la otra.
+
+   Lo que NO se hace aquí es redirigir el ápex al `www` en el Worker, que sería
+   el arreglo de fondo. Tienta, y es exactamente el movimiento que en la mudanza
+   de Mira Mi Casa dejó escrita la cicatriz de CORS: una petición XHR o un
+   webhook mandado al host viejo muere si le contestan con un 302. Hay webhooks
+   de Wompi y de PayPal configurados en paneles que no puedo leer desde aquí, y
+   un pago que deja de confirmarse es mucho peor que un enlace sin `www`. Eso se
+   decide mirando esos paneles, no adivinando. */
+var ORIGIN_FUND = "https://www.thegiveandgrowproject.org";
+
 /* ---------- I18N ---------- */
 var I18N = {
   es: {
@@ -1922,7 +1942,7 @@ function applyRouteMeta(id){
   setMetaTag("name","description",de);
   setMetaTag("property","og:title",ti);
   setMetaTag("property","og:description",de);
-  setMetaTag("property","og:url","https://www.thegiveandgrowproject.org/#"+id);
+  setMetaTag("property","og:url",ORIGIN_FUND+"/#"+id);
   setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
   setMetaTag("property","og:image", OG_IMG_DEFAULT);
   setMetaTag("name","twitter:image", OG_IMG_DEFAULT);
@@ -1936,7 +1956,7 @@ function applyFichaMeta(p){
   var ti = p.name + " · Give&Grow International";
   var de = pr.about ? (pr.about[lang]||pr.about.es||"") : "";
   if (de.length > 155) de = de.slice(0,152).replace(/\s+\S*$/,"") + "…";
-  var img = (p.logo && canShowLogo(p)) ? ("https://www.thegiveandgrowproject.org"+p.logo) : OG_IMG_DEFAULT;
+  var img = (p.logo && canShowLogo(p)) ? (ORIGIN_FUND+p.logo) : OG_IMG_DEFAULT;
   document.title = ti;
   setMetaTag("name","description",de);
   setMetaTag("property","og:title",ti);
@@ -1961,8 +1981,8 @@ function applyComercioMeta(c){
   var de = pick(c.about) || pick(c.beneficio) || "";
   if (de.length > 155) de = de.slice(0,152).replace(/\s+\S*$/,"") + "…";
   var img = (c.logo && c.consent && c.consent.logo === true)
-    ? ("https://www.thegiveandgrowproject.org"+c.logo) : OG_IMG_DEFAULT;
-  var url = "https://www.thegiveandgrowproject.org/#comercio/"+c.id;
+    ? (ORIGIN_FUND+c.logo) : OG_IMG_DEFAULT;
+  var url = ORIGIN_FUND + "/#comercio/"+c.id;
   document.title = ti;
   setMetaTag("name","description",de);
   setMetaTag("property","og:title",ti);
@@ -2586,7 +2606,7 @@ var RUTAS_TRIAJE = ["proyecto", "vivienda", "ingenieros", "casas", "apadrinar"];
 
 function mmcRuta(id){
   if (!MARCA_MMC || RUTAS_MMC.indexOf(id) > -1) return false;
-  location.href = "https://thegiveandgrowproject.org/#" + id;
+  location.href = ORIGIN_FUND + "/#" + id;
   return true;
 }
 
