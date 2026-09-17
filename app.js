@@ -2160,6 +2160,27 @@ function ensureLang(next){
    cualquiera. Va en las dos lenguas en la misma línea a propósito: el
    diccionario inglés es justo lo que no cargó, así que no se puede confiar en
    él para redactar el aviso, y quien pulsó EN probablemente lee inglés. */
+/* LA ALTURA REAL DE LA BARRA, EN UNA VARIABLE DE CSS.
+   La barra no mide lo mismo en móvil que en escritorio, ni en los dos sitios:
+   el logotipo cambia de cuerpo por tramos. Todo lo que se cuelga debajo de ella
+   —el cajón del menú, la franja del aviso de idioma— necesita ese número, y
+   escribirlo a mano es lo que dejó un hueco de 10 px entre la barra y el cajón
+   el día que la barra adelgazó. Se mide y se publica; quien lo necesite lo lee.
+
+   Se vuelve a medir al cambiar el tamaño y al girar el teléfono, que es cuando
+   el logotipo cruza un tramo y la barra cambia de alto. */
+function medirNav(){
+  var n = document.querySelector("nav");
+  if (!n) return;
+  document.documentElement.style.setProperty("--nav-h", Math.round(n.getBoundingClientRect().height) + "px");
+}
+medirNav();
+window.addEventListener("resize", medirNav);
+window.addEventListener("orientationchange", medirNav);
+/* Y cuando las tipografías terminan de cargar: con la de respaldo el logotipo
+   ocupa otro alto, así que la primera medida puede quedarse corta. */
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(medirNav);
+
 var AVISO_IDIOMA_T = null;
 function avisoIdioma(mostrar){
   var f = document.getElementById("lang-fallo");
