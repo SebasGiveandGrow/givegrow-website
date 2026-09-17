@@ -3708,8 +3708,12 @@ function paginaTriage() {
      alrededor de toda la caja no señalaría nada que el usuario pueda accionar.
      Los botones de dentro conservan el suyo. */
   #ficha:focus{outline:none}
-  .btn{background:var(--g);color:#fff;border:0;border-radius:999px;padding:9px 18px;font-size:14px;
-       font-weight:600;cursor:pointer}
+  /* 44 px de alto mínimo en todo lo que se toca. Medido en la pantalla real a
+     393 px: «Guardar evaluación» daba 34, «tomar» y «Abrir» 34-35 y las cuatro
+     pestañas de la cola 35. Esto se usa en un teléfono y a veces en la calle, y
+     el botón de 34 px es justo el que cierra el único trabajo del proyecto. */
+  .btn{background:var(--g);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-size:14px;
+       font-weight:600;cursor:pointer;min-height:44px}
   .btn.o{background:transparent;color:var(--g);border:1px solid var(--g)}
   .pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
         padding:3px 9px;border-radius:999px;border:1px solid currentColor}
@@ -3722,7 +3726,7 @@ function paginaTriage() {
   .p-respondio{color:var(--g);border-color:var(--g)}
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 4px}
   .tab{border:1px solid var(--bd);background:var(--surface);border-radius:999px;
-       padding:8px 15px;font-size:14px;cursor:pointer;color:var(--ink);font-family:inherit}
+       padding:11px 15px;font-size:14px;cursor:pointer;color:var(--ink);font-family:inherit;min-height:44px}
   .tab.on{background:var(--g);color:#fff;border-color:var(--g);font-weight:600}
   .tab span{font-weight:700}
   .ficha{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-top:16px}
@@ -3732,7 +3736,12 @@ function paginaTriage() {
   .fotos a{display:block;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:#fff}
   .fotos img{width:100%;height:130px;object-fit:cover;display:block}
   .fotos small{display:block;padding:5px 8px;color:var(--mu);font-size:11px}
-  label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px}
+  /* La clase et viaja con label a propósito: es la misma pieza tipográfica —el
+     rótulo de un dato— y lo único que cambia es que ahí no hay campo que
+     etiquetar. Colgarla aquí evita inventar un tamaño suelto más.
+     (Sin comillas invertidas en este comentario: está dentro de una plantilla
+     del Worker y una sola la cierra. Acaba de pasar.) */
+  label, .et{display:block;font-size:13px;font-weight:600;margin:14px 0 5px}
   /* 16px Y NO 15. Por debajo de 16, iOS Safari HACE ZOOM al enfocar un campo de
      escritura: la pantalla salta, el diseño se descoloca y hay que pellizcar
      para volver — en cada campo. Esta pantalla se usa en un teléfono, lo dice
@@ -3742,7 +3751,10 @@ function paginaTriage() {
      Que es un descuido y no un criterio lo decide el propio archivo: las otras
      DOS hojas de formulario que viven aquí —la de terreno y la del cuestionario
      de la fundación— ya escriben 16px por esta misma razón. Esta se quedó en 15. */
-  input,textarea,select{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:8px;
+  /* min-height junto a los botones: el desplegable de la clasificación se
+     quedaba en 43 px, uno por debajo del mínimo táctil, por el alto que le da
+     el navegador. Un píxel no se ve y se mide igual. */
+  input,textarea,select{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--bd);border-radius:8px;
                         font:inherit;font-size:16px;background:#fff;color:var(--ink)}
   .msg{margin-top:12px;font-size:14px}
   .cargando{color:var(--mu);font-size:14px;padding:20px 0}
@@ -4108,7 +4120,7 @@ function abrir(numero){
       pintarFicha(h).scrollIntoView({ block: "start" });
       return;
     }
-    h += "<label>Tu clasificación</label><select id='t-clas'>"
+    h += "<label for='t-clas'>Tu clasificación</label><select id='t-clas'>"
       +  "<option value='urgente'>Visita urgente</option>"
       +  "<option value='programada'>Visita programada</option>"
       +  "<option value='no_requiere'>No requiere visita</option>"
@@ -4118,12 +4130,12 @@ function abrir(numero){
          concepto salió firmado con un número que no era el comprobado. Lo que se
          enseña aquí es exactamente lo que va a ir impreso. */
       +  (FIRMANTE.verificada
-          ? "<label>Firma</label><p class='sub' style='margin:0 0 10px'><b>"
+          ? "<p class='et'>Firma</p><p class='sub' style='margin:0 0 10px'><b>"
             + esc(FIRMANTE.nombre || "?") + "</b> &middot; matrícula <b>"
             + esc(FIRMANTE.matricula || "?") + "</b><br><small>Del registro, ya verificada. "
             + "Si algo de esto está mal, avisa al equipo: no se corrige desde aquí.</small></p>"
-          : "<label>Tu nombre</label><input id='t-nombre'>"
-            + "<label>Tu matrícula profesional</label><input id='t-mat'>"
+          : "<label for='t-nombre'>Tu nombre</label><input id='t-nombre'>"
+            + "<label for='t-mat'>Tu matrícula profesional</label><input id='t-mat'>"
             + "<p class='sub' style='margin:0 0 10px'><small>Tu matrícula no está verificada todavía, "
             + "así que este concepto no le sale solo a la familia: lo revisa el equipo primero.</small></p>")
       /* CÓMO SE ESCRIBE, no solo para quién.
@@ -4151,10 +4163,10 @@ function abrir(numero){
       +  "<p style='margin:0 0 6px'><b>Menos útil:</b><br><i>Se evidencia fisuración diagonal de tipo cortante en muro portante de mampostería no confinada; se recomienda evaluación estructural detallada.</i></p>"
       +  "<p style='margin:0'><b>Mejor:</b><br><i>La grieta en diagonal del muro de la cocina, el que da al patio, es de las que preocupan: ese muro está cargando parte del techo. Mientras no se repare, no duerman en ese cuarto y no arrimen nada pesado contra él. Para repararlo hay que confinar el muro, que es amarrarlo con columnas y vigas pequeñas de concreto; antes de eso, tapar la grieta solo la esconde.</i></p>"
       +  "</div></details>"
-      +  "<label>Nota técnica — LA LEE LA FAMILIA: es el titular de su informe</label><textarea id='t-nota' rows='4'></textarea>"
+      +  "<label for='t-nota'>Nota técnica — LA LEE LA FAMILIA: es el titular de su informe</label><textarea id='t-nota' rows='4'></textarea>"
       +  "<p class='sub' style='margin:0 0 10px'><small>Sale impresa bajo «CONCEPTO DEL INGENIERO», encima de lo de abajo y firmada con tu nombre y tu matrícula. No es un apunte para el equipo. <b>Una o dos frases</b>: es el titular, y el detalle va en el campo de abajo.</small></p>"
-      +  "<label>Qué hacer, y con qué reparar (OBLIGATORIO, salvo si no puedes evaluar): si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar. Es lo que el sitio le prometió.</label><textarea id='t-rec' rows='5'></textarea>"
-      +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
+      +  "<label for='t-rec'>Qué hacer, y con qué reparar (OBLIGATORIO, salvo si no puedes evaluar): si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar. Es lo que el sitio le prometió.</label><textarea id='t-rec' rows='5'></textarea>"
+      +  "<label for='t-falta'>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
       +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluación</button></p>"
       +  "<p class='msg' id='t-msg'></p></div>";
     pintarFicha(h).scrollIntoView({ block: "start" });
@@ -5800,8 +5812,8 @@ function pintarSecciones(){
         +      '<button type="button"          data-m="SO"  aria-pressed="false">S/O</button>'
         +    "</div>"
         +    '<div class="detalle">'
-        +      '<label>Observaciones</label><textarea data-campo="obs"></textarea>'
-        +      '<label>Foto N.º (los que anotaste en la cámara)</label><input data-campo="fotos" inputmode="numeric" placeholder="3, 4">'
+        +      '<label>Observaciones<textarea data-campo="obs"></textarea></label>'
+        +      '<label>Foto N.º (los que anotaste en la cámara)<input data-campo="fotos" inputmode="numeric" placeholder="3, 4"></label>'
         +    "</div>"
         +  "</div>";
     }
