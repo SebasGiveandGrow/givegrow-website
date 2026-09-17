@@ -13915,8 +13915,12 @@ function paginaRuta() {
   h1{font-size:21px;margin-bottom:2px}
   .sub{color:var(--mu);font-size:13.5px;margin-bottom:14px}
   .secs{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:14px}
+  /* 44px TAMBIÉN AQUÍ. Esta hoja promete arriba «blancos de toque de 44px» y los
+     botones de acción los cumplen, pero los filtros de zona se quedaban en 36:
+     son lo primero que se toca al llegar a un barrio, y de pie. Medido a 393px. */
   .sec{flex:0 0 auto;border:1px solid var(--bd);background:var(--surface);border-radius:999px;
-       padding:9px 15px;font-size:14px;cursor:pointer;white-space:nowrap;color:var(--ink)}
+       padding:9px 15px;min-height:44px;display:inline-flex;align-items:center;
+       font-size:14px;cursor:pointer;white-space:nowrap;color:var(--ink)}
   .sec.on{background:var(--g);color:#fff;border-color:var(--g);font-weight:600}
   .caso{background:var(--surface);border:1px solid var(--bd);border-radius:12px;
         padding:14px 15px;margin-bottom:12px}
@@ -14168,7 +14172,11 @@ document.addEventListener("click", function(e){
   var nota = window.prompt("Visita a " + num +
     ".\\n\\n¿Qué encontraste? Es lo único que va a quedar de que estuviste ahí:",
     NOTAS_SIN_GUARDAR[num] || "");
-  if (!nota) return;
+  /* Y NO PUEDE SER UN ESPACIO. La condición de antes atajaba cancelar y el
+     texto vacío, pero no un espacio suelto — y esto es «lo único que va a
+     quedar de que estuviste ahí», así que guardarlo en blanco es peor que no
+     guardarlo. */
+  if (!nota || !nota.trim()) return;
   var textoOriginal = v.textContent;
   v.disabled = true; v.textContent = "…";
   pedirRuta("/api/admin/caso/" + encodeURIComponent(num) + "/estado", {
