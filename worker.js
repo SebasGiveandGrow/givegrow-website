@@ -108,9 +108,21 @@ const MMC_MANIFIESTO = JSON.stringify({
   theme_color: "#0D3B66",
   lang: "es",
   orientation: "portrait-primary",
+  /* TRES FORMATOS, y no es el mismo archivo escalado tres veces.
+     El SVG es para lo que escala solo. Los PNG cuadrados son los que Android
+     pide de verdad para instalar. Y el `maskable` lleva la casa encogida a la
+     zona segura -el circulo del 80% del lienzo-, porque Android recorta el
+     icono a la forma que use el telefono: sin ese margen, un launcher redondo
+     le corta el tejado.
+
+     Lo que habia antes eran el SVG y `og-mmc.jpg`, que es un BANNER de
+     1200x630. No es cuadrado ni es un icono: puesto de icono, Android lo
+     recorta o lo embucha. */
   icons: [
     { src: "/favicon-mmc.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-    { src: "/img/og-mmc.jpg", sizes: "1200x630", type: "image/jpeg", purpose: "any" }
+    { src: "/img/icon/mmc-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: "/img/icon/mmc-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: "/img/icon/mmc-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
   ]
 }, null, 2);
 
@@ -18048,7 +18060,10 @@ function marcarMarca(respuesta, host) {
        inicio» es la ruta que mas se usa— quien manda son estas dos etiquetas, y
        las dos venian de la fundacion. Sin esto, arreglar solo el manifiesto
        dejaba a la mitad de los telefonos con el icono verde y el nombre ajeno. */
-    .on('link[rel="apple-touch-icon"]', { element(e) { e.setAttribute("href", "/favicon-mmc.svg"); } })
+    /* PNG y no el SVG: iOS NO acepta SVG en apple-touch-icon. Con el SVG, una
+       familia que guardaba Mira Mi Casa en su pantalla de inicio no veia la
+       casita, veia una captura de la pagina. */
+    .on('link[rel="apple-touch-icon"]', { element(e) { e.setAttribute("href", "/img/icon/mmc-180.png"); } })
     .on('link[rel="icon"]', { element(e) { e.setAttribute("href", "/favicon-mmc.svg"); } })
     .on('meta[name="apple-mobile-web-app-title"]', { element(e) { e.setAttribute("content", MMC_OG_TITULO); } })
     /* La barra del navegador pintaba el verde institucional encima de un sitio

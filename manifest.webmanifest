@@ -10,6 +10,8 @@
   "orientation": "portrait-primary",
   "icons": [
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/img/og.jpg", "sizes": "1200x630", "type": "image/jpeg", "purpose": "any" }
+    { "src": "/img/icon/gg-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/img/icon/gg-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/img/icon/gg-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
