@@ -1402,6 +1402,7 @@ var I18N = {
     "ficha.back":"Volver al Hub",
     "ficha.lider":"Dirige",
     "ficha.prog.t":"Programas en marcha",
+    "ficha.lineas.t":"Líneas de trabajo",
     "ficha.imp.t":"Tu aporte aquí, en concreto",
     "ficha.imp.calc":"Con {a} aquí logras aproximadamente {x}.",
     "ficha.imp.min":"Elige un monto para ver el impacto equivalente.",
@@ -4945,6 +4946,26 @@ function renderFicha(fid){
         var g = pr.programs[k];
         var gLogo = g.logo ? '<div class="prog-logo"><img src="'+esc(g.logo)+'" alt="'+esc(g.name)+'" loading="lazy"></div>' : '';
         html += '<div class="card prog-card">'+gLogo+'<h3>'+esc(g.name)+'</h3><p>'+esc((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
+      }
+      html += '</div>';
+    }
+    /* LAS LÍNEAS DE TRABAJO, que no son lo mismo que los programas.
+       ====================================================================
+       Un programa es algo que está corriendo y que se puede contar —«Escuelas»,
+       con sus aulas construidas—. Una línea es el marco que explica POR QUÉ ese
+       programa existe y con qué enfoque se hace.
+
+       Iban mezclados en una sola lista y eso obligaba a elegir: o se perdía el
+       detalle de lo que de verdad se está haciendo, o se perdía la explicación.
+       Separarlos deja las dos cosas, y en este orden: primero lo que hay, después
+       el marco. Evidencia antes que discurso, que es la regla de la casa.
+
+       Es opcional: una aliada sin `lineas` se pinta exactamente como antes. */
+    if (pr.lineas && pr.lineas.length){
+      html += '<h3 style="margin-top:34px">'+t("ficha.lineas.t")+'</h3><div class="grid g2" style="margin-top:16px">';
+      for (var li=0; li<pr.lineas.length; li++){
+        var ln = pr.lineas[li];
+        html += '<div class="card prog-card"><h3>'+esc(ln.name)+'</h3><p>'+esc((ln.desc && (ln.desc[lang]||ln.desc.es))||"")+'</p></div>';
       }
       html += '</div>';
     }

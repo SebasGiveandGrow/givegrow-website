@@ -791,6 +791,7 @@
   "ficha.back": "Back to the Hub",
   "ficha.lider": "Led by",
   "ficha.prog.t": "Programs underway",
+  "ficha.lineas.t": "Lines of work",
   "ficha.imp.t": "Your gift here, in concrete terms",
   "ficha.imp.calc": "With {a} here you achieve approximately {x}.",
   "ficha.imp.min": "Pick an amount to see the equivalent impact.",

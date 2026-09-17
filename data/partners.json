@@ -371,32 +371,81 @@
         },
         "programs": [
           {
-            "name": "Educación y empoderamiento",
+            "name": "Escuelas",
             "desc": {
-              "es": "Cuatro frentes: escuelas —aulas e infraestructura educativa con sistemas modulares y prefabricados en Cesar, Magdalena, La Guajira y Amazonas—, becas de matrícula, materiales y transporte para el acceso a la educación superior, microcréditos a mujeres en situación vulnerable, incluidas mujeres con realidad carcelaria, y apadrinamiento de niñas y niños en Leticia y Medellín con apoyo educativo y atención médica. La fundación reporta 689 aulas, 17 comedores, 15 cocinas y 42 baños construidos desde 2002, con 7.031 estudiantes y docentes beneficiados.",
-              "en": "Four fronts: schools — classrooms and educational infrastructure using modular and prefabricated systems in Cesar, Magdalena, La Guajira and Amazonas —, scholarships covering tuition, materials and transport for access to higher education, microcredit for women in vulnerable situations, including women affected by imprisonment, and sponsorship of children in Leticia and Medellín with educational support and medical care. The foundation reports 689 classrooms, 17 canteens, 15 kitchens and 42 toilets built since 2002, benefiting 7,031 students and teachers."
+              "es": "Aulas e infraestructura educativa con sistemas modulares y prefabricados, que permiten entregar rápido, barato y duradero en zonas remotas. La fundación reporta 689 aulas, 17 comedores, 15 cocinas y 42 baños construidos desde 2002 en Cesar, Magdalena, La Guajira y Amazonas, con 7.031 estudiantes y docentes beneficiados.",
+              "en": "Classrooms and educational infrastructure using modular and prefabricated systems, which allow fast, low-cost and durable delivery in remote areas. The foundation reports 689 classrooms, 17 canteens, 15 kitchens and 42 toilets built since 2002 across Cesar, Magdalena, La Guajira and Amazonas, benefiting 7,031 students and teachers."
             }
           },
           {
-            "name": "Salud y agua",
+            "name": "Becas",
             "desc": {
-              "es": "Acceso a agua segura mediante filtros y acueductos comunitarios, para reducir las enfermedades transmitidas por el agua en zonas rurales donde el acceso sigue siendo limitado. Y brigadas de salud lideradas por voluntarios, con atención médica, apoyo a la niñez y actividades comunitarias.",
-              "en": "Access to safe water through community filters and water systems, to reduce waterborne disease in rural areas where access remains limited. Plus volunteer-led health brigades providing medical care, support for children and community activities."
+              "es": "Matrícula, materiales y transporte para que jóvenes de bajos recursos accedan a la educación superior.",
+              "en": "Tuition, materials and transport so young people with low incomes can access higher education."
             }
           },
           {
-            "name": "Paz y reconciliación",
+            "name": "Microcréditos",
             "desc": {
-              "es": "Reinserción social: acompañamiento a personas privadas de la libertad en su rehabilitación, el fortalecimiento de sus vínculos familiares y su reintegración. Justicia restaurativa: espacios de diálogo entre víctimas, ofensores y comunidades. Y Fútbol por la Paz, que usa el deporte como herramienta de mentoría y prevención de la violencia.",
-              "en": "Social reintegration: support for people deprived of liberty through rehabilitation, strengthening family ties and reintegration. Restorative justice: spaces for dialogue between victims, offenders and communities. And Football for Peace, using sport as a tool for mentoring and violence prevention."
+              "es": "Préstamos pequeños a mujeres en situación de vulnerabilidad, incluidas mujeres con realidad carcelaria, para fortalecer sus negocios y la economía familiar.",
+              "en": "Small loans to women in vulnerable situations, including women affected by imprisonment, to strengthen their businesses and household economy."
+            }
+          },
+          {
+            "name": "Apadrinamiento",
+            "desc": {
+              "es": "En Leticia y Medellín: apoyo educativo, atención médica y acompañamiento a niñas y niños en entornos seguros.",
+              "en": "In Leticia and Medellín: educational support, medical care and mentoring for children in safe environments."
+            }
+          },
+          {
+            "name": "Acceso a agua segura",
+            "desc": {
+              "es": "Filtros y acueductos comunitarios para reducir las enfermedades transmitidas por el agua, sobre todo en zonas rurales donde el acceso sigue siendo limitado.",
+              "en": "Community filters and water systems to reduce waterborne disease, especially in rural areas where access remains limited."
+            }
+          },
+          {
+            "name": "Brigadas de salud",
+            "desc": {
+              "es": "Atención médica, apoyo a la niñez y actividades comunitarias, lideradas por voluntarios.",
+              "en": "Medical care, support for children and community activities, led by volunteers."
+            }
+          },
+          {
+            "name": "Reinserción social",
+            "desc": {
+              "es": "Acompañamiento a personas privadas de la libertad en su rehabilitación, el fortalecimiento de sus vínculos familiares y su reintegración, para reducir la reincidencia.",
+              "en": "Support for people deprived of liberty through rehabilitation, strengthening family ties and reintegration, to reduce reoffending."
+            }
+          },
+          {
+            "name": "Justicia restaurativa",
+            "desc": {
+              "es": "Espacios de diálogo entre víctimas, ofensores y comunidades, para la reconciliación y la convivencia.",
+              "en": "Spaces for dialogue between victims, offenders and communities, for reconciliation and coexistence."
+            }
+          },
+          {
+            "name": "Fútbol por la Paz",
+            "desc": {
+              "es": "El deporte como herramienta de mentoría y desarrollo social, con foco en el trabajo en equipo y la prevención de la violencia.",
+              "en": "Sport as a tool for mentoring and social development, focused on teamwork and violence prevention."
             },
             "formativo": true
           },
           {
-            "name": "Medioambiente",
+            "name": "Conservación de la biodiversidad",
             "desc": {
-              "es": "Conservación de la biodiversidad y uso sostenible de los recursos naturales, con énfasis en la Amazonía colombiana. Junto a organizaciones aliadas y comunidades indígenas, educación ambiental, formación de liderazgo comunitario y proyectos sostenibles que conservan los ecosistemas y generan oportunidades locales.",
-              "en": "Biodiversity conservation and sustainable use of natural resources, with a focus on the Colombian Amazon. Alongside partner organizations and Indigenous communities: environmental education, community leadership training and sustainable projects that protect ecosystems and create local opportunities."
+              "es": "Protección de la biodiversidad y uso sostenible de los recursos naturales, con énfasis en la Amazonía colombiana.",
+              "en": "Biodiversity protection and sustainable use of natural resources, with a focus on the Colombian Amazon."
+            }
+          },
+          {
+            "name": "Educación y liderazgo comunitario",
+            "desc": {
+              "es": "Con organizaciones aliadas y comunidades indígenas: educación ambiental, formación de liderazgo y proyectos sostenibles que conservan ecosistemas y generan oportunidades locales.",
+              "en": "With partner organizations and Indigenous communities: environmental education, leadership training and sustainable projects that protect ecosystems and create local opportunities."
             },
             "formativo": true
           }
@@ -408,7 +457,37 @@
         "quote": {
           "es": "Dignidad. Equidad. Biodiversidad.",
           "en": "Dignity. Equity. Biodiversity."
-        }
+        },
+        "lineas": [
+          {
+            "name": "Educación y empoderamiento",
+            "desc": {
+              "es": "Construir el acceso y sostenerlo: infraestructura donde no la hay, y después las becas, los microcréditos y el apadrinamiento que hacen que ese acceso se convierta en oportunidad económica. La fundación la alinea con los ODS 4, 5 y 8 — educación de calidad, igualdad de género y trabajo decente.",
+              "en": "Build access and then sustain it: infrastructure where there is none, followed by the scholarships, microcredit and sponsorship that turn that access into economic opportunity. The foundation aligns it with SDGs 4, 5 and 8 — quality education, gender equality and decent work."
+            }
+          },
+          {
+            "name": "Salud y agua",
+            "desc": {
+              "es": "Llevar servicios básicos a donde el sistema no llega, con soluciones que quedan instaladas —filtros, acueductos— más atención directa por brigadas. Alineada con los ODS 3 y 6: salud y bienestar, agua limpia y saneamiento.",
+              "en": "Bring basic services where the system does not reach, with solutions that stay in place — filters, water systems — plus direct care through brigades. Aligned with SDGs 3 and 6: good health and wellbeing, clean water and sanitation."
+            }
+          },
+          {
+            "name": "Paz y reconciliación",
+            "desc": {
+              "es": "Trabajar los dos lados del conflicto: quien cumplió una pena y necesita volver, y las comunidades que tienen que recibirlo. El deporte entra aquí como prevención, no como recreación. Alineada con los ODS 11 y 16: comunidades sostenibles, paz, justicia e instituciones sólidas.",
+              "en": "Work both sides of conflict: the person who served a sentence and needs to return, and the communities that must receive them. Sport belongs here as prevention, not recreation. Aligned with SDGs 11 and 16: sustainable communities, peace, justice and strong institutions."
+            }
+          },
+          {
+            "name": "Medioambiente",
+            "desc": {
+              "es": "Conservar con quien vive en el territorio, no a pesar de ellos: liderazgo indígena y proyectos que generan ingresos locales, para que la conservación se sostenga sola. Alineada con el ODS 15, vida de ecosistemas terrestres.",
+              "en": "Conserve with the people who live in the territory, not despite them: Indigenous leadership and projects that generate local income, so conservation can sustain itself. Aligned with SDG 15, life on land."
+            }
+          }
+        ]
       }
     }
   ]
