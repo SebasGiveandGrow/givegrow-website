@@ -593,7 +593,33 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 @media(max-width:880px){
   .nlinks{display:none}
   .burger{display:flex;align-items:center;justify-content:center}
-  .nav-mobile{display:none;position:fixed;inset:calc(78px + env(safe-area-inset-top)) 0 0 0;background:var(--surface);border-bottom:1px solid var(--bd);padding:14px 24px calc(24px + env(safe-area-inset-bottom));flex-direction:column;gap:4px;z-index:199;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* EL CAJÓN, Y DOS COSAS QUE ARREGLAR.
+     ======================================================================
+     1) EL 78 ERA UN NÚMERO ESCRITO A MANO y la barra dejó de medir eso. Al
+        bajar el cuerpo del logotipo, la barra pasó a 68 px en los dos sitios,
+        así que entre ella y el cajón quedaba un HUECO DE 10 PX por el que se
+        veía la página de debajo, con el titular cortado por la mitad. Se ve en
+        cuanto se abre el menú en un teléfono.
+
+        La receta correcta ya estaba escrita en `avisoIdioma`, para la franja de
+        al lado: «el `top` se mide, no se escribe: la barra no mide lo mismo en
+        móvil que en escritorio, y un número fijo aquí deja la franja pisando la
+        barra o flotando separada de ella». Era el único de los tres elementos
+        fijos que seguía con el número a mano. Ahora lo pone `medirNav()` en
+        `--nav-h`, y el 78 se queda solo como valor de respaldo por si el JS no
+        llegó a correr.
+
+     2) `inset: … 0 0 0` LO ESTIRABA HASTA ABAJO SIEMPRE. En el sitio de la
+        fundación no se notaba porque el menú tiene treinta entradas; en Mira Mi
+        Casa son cinco, acaban a 360 px, y debajo quedaban 492 px de panel
+        vacío. Ahora el borde de abajo es `auto`: el cajón mide lo que mide su
+        contenido, con un tope y su propio desplazamiento para cuando no quepa.
+        El `border-bottom` que ya tenía pasa a ser el canto real del panel. */
+  .nav-mobile{display:none;position:fixed;
+    top:calc(var(--nav-h, 78px) + env(safe-area-inset-top));left:0;right:0;bottom:auto;
+    max-height:calc(100vh - var(--nav-h, 78px) - env(safe-area-inset-top));
+    max-height:calc(100dvh - var(--nav-h, 78px) - env(safe-area-inset-top));
+    background:var(--surface);border-bottom:1px solid var(--bd);padding:14px 24px calc(24px + env(safe-area-inset-bottom));flex-direction:column;gap:4px;z-index:199;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .nav-mobile.open{display:flex}
   .nav-mobile a{padding:12px;border-radius:8px;font-weight:600}
   .nav-mobile a:hover{background:var(--gl)}
