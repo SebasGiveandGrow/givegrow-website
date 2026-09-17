@@ -2026,6 +2026,25 @@ async function adminSalud(env) {
     "WHERE estado IN ('recibido','en_revision') " +
     "AND NOT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = casos.numero)",
     "Pantalla /triaje · una familia mandó fotos de su casa y nadie las ha abierto", 20, "/triaje");
+  /* LAS QUE EL AVISO AUTOMÁTICO NO ALCANZA. A los siete días el Worker le
+     escribe a la familia que sigue esperando —ver `avisarEsperaSeptimoDia`—,
+     pero solo puede escribirle a quien dejó correo, y el correo es opcional DE
+     VERDAD porque el identificador del proyecto es el teléfono. O sea que la
+     familia más difícil de alcanzar es justo la que el aviso no alcanza.
+
+     Esta cola es la otra mitad: las lista para que alguien les escriba a mano.
+     Y no es trabajo ciego — desde la ficha del caso, el panel ya tiene el botón
+     que le manda su enlace por WhatsApp a su propio número.
+
+     Va con prioridad 15: entre «un ingeniero dijo urgente y nadie ha ido» y
+     «nadie ha abierto sus fotos». Es menos grave que las dos, y es la única de
+     las tres donde la familia además lleva una semana sin oír nada. */
+  await enCola("espera_sin_correo",
+    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
+    "WHERE estado IN ('recibido','en_revision') " +
+    "AND (contacto_email IS NULL OR TRIM(contacto_email) = '') " +
+    "AND julianday('now') - julianday(creado_en) >= " + DIAS_ESPERA_AVISO,
+    "Panel · llevan más de una semana esperando y no dejaron correo: el aviso automático no les llega, escríbeles por WhatsApp desde su ficha", 15, "#sec-casos");
   /* La peor de las cinco, y por eso va con su propio texto: el sistema dijo
      «vayan ya» y nadie fue. Que exista esta fila es media razón de esta tanda. */
   await enCola("urgentes_sin_visitar",
@@ -3569,6 +3588,119 @@ async function correoCasoCreado(env, x) {
       cierre: "Este mensaje es automático. Si pierdes este correo, escríbenos con tu número de caso."
     }),
     etiqueta: "caso-creado", guia: x.numero
+  });
+}
+
+/* EL AVISO DEL SÉPTIMO DÍA, A LA FAMILIA QUE SIGUE ESPERANDO.
+   ============================================================================
+   EL HUECO QUE CIERRA. Al crear su caso le decimos, con razón, que no hay una
+   fecha prometida: los ingenieros son voluntarios y son menos que las casas, y
+   inventar un plazo sería mentir. Pero entre «no te prometo una fecha» y «no
+   vuelvas a saber de mí nunca» hay una diferencia enorme, y el sistema estaba
+   del lado malo: después del correo de bienvenida, silencio indefinido.
+
+   El silencio se lee como abandono. Y esta es gente que ya subió fotos de su
+   casa rota a un sitio que acababa de conocer.
+
+   NO PROMETE NADA NUEVO. Dice lo que ya es verdad y se puede comprobar: cuántos
+   días lleva, cuántos casos hay sin abrir por delante, y que su enlace sigue
+   ahí. Es exactamente lo que su propia página ya le enseña — la diferencia es
+   que esto va a buscarla en vez de esperar a que ella vuelva.
+
+   A LOS SIETE DÍAS Y UNA SOLA VEZ. Siete porque una semana es cuando alguien
+   empieza a pensar que se olvidaron de él, y una sola vez porque un recordatorio
+   que se repite deja de ser noticia y pasa a ser ruido — y el ruido de un
+   proyecto que no ha resuelto tu caso es peor que su silencio.
+
+   ⚠️ SOLO LLEGA A QUIEN DEJÓ CORREO, y eso es una limitación de fondo que no se
+   puede maquillar: el identificador del proyecto es el TELÉFONO, porque «en
+   estas zonas mucha gente tiene WhatsApp y no correo», así que justo la familia
+   más difícil de alcanzar es la que este aviso NO alcanza. Mandarle un WhatsApp
+   necesitaría la API de WhatsApp Business, que el proyecto no tiene. Lo que sí
+   se puede hacer por ellas está en la otra mitad de este cambio: el panel las
+   lista, y desde la ficha ya hay un botón para escribirles a mano. */
+const DIAS_ESPERA_AVISO = 7;
+
+async function familiasQueEsperan(env, dias) {
+  /* La ventana es de UN día: el caso entra aquí el día que cruza los siete, no
+     todos los días desde entonces. Aun así la idempotencia real la da el rastro
+     de `correos` —ver abajo—, porque una tarea programada puede repetirse. */
+  const r = await env.DB.prepare(
+    "SELECT c.numero, c.token, c.contacto_email, c.contacto_nombre, c.sector, c.creado_en, " +
+    "CAST(julianday('now') - julianday(c.creado_en) AS INTEGER) AS dias " +
+    "FROM casos c WHERE " + SIN_REVISAR + " " +
+    "AND julianday('now') - julianday(c.creado_en) >= ? " +
+    "AND julianday('now') - julianday(c.creado_en) < ? " +
+    "ORDER BY c.creado_en ASC"
+  ).bind(dias, dias + 1).all();
+  return r.results || [];
+}
+
+async function avisarEsperaSeptimoDia(env) {
+  const casos = await familiasQueEsperan(env, DIAS_ESPERA_AVISO);
+  if (!casos.length) return { ok: true, revisados: 0, enviados: 0 };
+
+  /* Cuántos hay sin abrir POR DELANTE. Es el mismo número que la familia ve en
+     su enlace, así que el correo y la página no pueden contradecirse. */
+  const fila = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_REVISAR
+  ).first();
+  const sinAbrir = (fila && Number(fila.n)) || 0;
+
+  let enviados = 0, sinCorreo = 0;
+  for (const c of casos) {
+    if (!c.contacto_email) { sinCorreo++; continue; }
+    /* IDEMPOTENCIA SIN MIGRACIÓN: el rastro de correos ya guarda etiqueta y
+       guía, así que preguntar si este aviso ya salió para este caso cuesta una
+       consulta y no una columna nueva. Una tarea programada que se repita
+       —porque Cloudflare la reintente, o porque alguien la dispare a mano— no
+       le manda dos veces lo mismo a la misma familia. */
+    const ya = await env.DB.prepare(
+      "SELECT 1 FROM correos WHERE etiqueta = 'caso-espera' AND guia = ? LIMIT 1"
+    ).bind(c.numero).first();
+    if (ya) continue;
+    try {
+      await correoCasoEspera(env, { ...c, dias: Number(c.dias) || DIAS_ESPERA_AVISO, sinAbrir });
+      enviados++;
+    } catch (e) {
+      console.error("aviso espera", c.numero, e && e.message);
+    }
+  }
+  return { ok: true, revisados: casos.length, enviados, sinCorreo };
+}
+
+async function correoCasoEspera(env, x) {
+  const enlace = ORIGIN_MMC + "/caso/" + x.numero + "?t=" + x.token;
+  const titulo = "Tu caso sigue en la fila: " + x.numero;
+  const parrafos = [
+    "Te escribimos porque llevas " + x.dias + " días esperando y no queremos que " +
+    "creas que se nos olvidó. No se nos olvidó: tu caso sigue en la fila.",
+    "Seguimos sin poder darte una fecha, y preferimos decírtelo a inventártela. " +
+    "Los ingenieros son voluntarios y son menos que las casas. Lo que sí podemos " +
+    "decirte es cuántos casos hay sin abrir ahora mismo, y ese número está abajo.",
+    "Tu enlace sigue sirviendo para lo mismo de siempre: ver en qué va tu caso y " +
+    "agregar fotos. Si puedes sumar alguna donde se vea mejor el daño, un " +
+    "ingeniero lo puede evaluar antes.",
+    "Y si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien " +
+    "atrapado— esto no es lo que necesitas: llama al 123 y a tu alcaldía."
+  ];
+  const filas = [
+    ["Tu caso", x.numero],
+    ["Sector", x.sector || "—"],
+    ["Días esperando", String(x.dias)],
+    ["Casos sin abrir ahora", String(x.sinAbrir)]
+  ];
+  return enviarCorreo(env, {
+    para: x.contacto_email,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", "Tu enlace: " + enlace, "",
+            filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, filas,
+      boton: { url: enlace, texto: "Abrir mi caso" },
+      cierre: "Este es el único recordatorio automático que te mandamos. No te vamos a escribir cada semana."
+    }),
+    etiqueta: "caso-espera", guia: x.numero
   });
 }
 
@@ -15230,6 +15362,7 @@ var COLA_ES = {
   correos_fallidos: "Correos que no salieron",
   entregas_en_borrador: "Entregas en borrador",
   casos_sin_evaluar: "Casas que nadie ha abierto",
+  espera_sin_correo: "Esperan hace una semana y sin correo",
   urgentes_sin_visitar: "Urgentes sin visitar",
   casos_esperando_fotos: "Esperando fotos de la familia",
   ingenieros_sin_verificar: "Matrículas sin verificar",
@@ -15398,6 +15531,7 @@ var COLA_MOD = {
   correos_fallidos: "salud",
   entregas_en_borrador: "entregas",
   casos_sin_evaluar: "mmc",
+  espera_sin_correo: "mmc",
   urgentes_sin_visitar: "mmc",
   casos_esperando_fotos: "mmc",
   ingenieros_sin_verificar: "mmc",
@@ -17930,6 +18064,28 @@ function marcarMarca(respuesta, host) {
 }
 
 export default {
+  /* LA PRIMERA TAREA PROGRAMADA DEL WORKER. Hasta hoy no había ninguna —está
+     escrito unas líneas más arriba: «el disparador es un COUNT, no un cron»— y
+     por eso una familia que esperaba no recibía nada nunca.
+
+     Una vez al día y no más: lo único que hace es mirar quién cruzó los siete
+     días, y eso no cambia entre una hora y la siguiente. La hora, 14:00 UTC, son
+     las 9 de la mañana en Colombia: un correo que dice «tu caso sigue en la
+     fila» se lee mejor con el día por delante que a medianoche.
+
+     Va envuelta en su propio try: si esto falla, no puede tumbar nada más —no
+     hay nada más en el `scheduled`, pero lo habrá. */
+  async scheduled(evento, env, ctx) {
+    ctx.waitUntil((async () => {
+      try {
+        const r = await avisarEsperaSeptimoDia(env);
+        console.log("aviso septimo dia", JSON.stringify(r));
+      } catch (e) {
+        console.error("aviso septimo dia", e && e.message);
+      }
+    })());
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
     const ruta = url.pathname;
