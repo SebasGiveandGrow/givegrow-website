@@ -326,6 +326,89 @@
           "en": "A school of formation for peace."
         }
       }
+    },
+    {
+      "id": "ancla",
+      "name": "Fundación Ancla Colombia",
+      "type": "foundation",
+      "rol": [
+        "aporta",
+        "recibe"
+      ],
+      "lat": 6.2442,
+      "lng": -75.5812,
+      "area": {
+        "es": "Medellín · presencia en varios departamentos",
+        "en": "Medellín · present in several departments"
+      },
+      "url": "https://www.anclacolombia.org/",
+      "instagram": "https://www.instagram.com/ancla.colombia/",
+      "consent": {
+        "name": true,
+        "logo": false,
+        "photos": false,
+        "minorsImageProtected": "pendiente",
+        "date": "2026-09-17",
+        "source": "Autorizacion escrita del Representante Legal de Fundacion Ancla Colombia, entregada a Give&Grow y en su poder (17 sep 2026). Cubre nombre, descripcion y enlaces. NO cubre logo ni fotografias: por eso logo=false y photos=false. No paso por la Seccion 7 del cuestionario —el Representante Legal no pudo diligenciarlo y autorizo por escrito aparte—, asi que la ficha `fichas_fundacion` sigue vacia y esa es la via si mas adelante se quiere ampliar el alcance. Rastro Ley 1581 en la tabla privada `consentimientos`, sujeto \"aliada ancla\"."
+      },
+      "poblacion": {
+        "es": "≈25.000–28.000 personas al año",
+        "en": "≈25,000–28,000 people a year"
+      },
+      "profile": {
+        "badge": {
+          "es": "Sucursal en Colombia de Ankarstiftelsen (Suecia) · financia y acompaña a organizaciones locales",
+          "en": "Colombian branch of Ankarstiftelsen (Sweden) · funds and supports local organizations"
+        },
+        "years": {
+          "es": "Ancla desde 1996 · sucursal colombiana desde 2025",
+          "en": "Ancla since 1996 · Colombian branch since 2025"
+        },
+        "about": {
+          "es": "Fundación Ancla Colombia es la sucursal colombiana de la Fundación Ancla de Suecia (Ankarstiftelsen), que trabaja desde 1996 por los derechos de las poblaciones más vulnerables y por la biodiversidad del país. No ejecuta directamente: financia, supervisa y acompaña programas liderados por organizaciones locales, y desarrolla las capacidades de sus aliadas. Su trabajo se ordena alrededor de la dignidad humana, la equidad y la protección del medio ambiente, con foco en el empoderamiento de las mujeres, los derechos de los pueblos indígenas, la salud pública y la construcción de paz. Según la información que la fundación entregó en su solicitud de ingreso al HUB, atiende entre 25.000 y 28.000 personas, y lo verifica con informes de gestión y reportes semestrales.",
+          "en": "Fundación Ancla Colombia is the Colombian branch of Sweden's Fundación Ancla (Ankarstiftelsen), which has worked since 1996 for the rights of the most vulnerable populations and for the country's biodiversity. It does not deliver programmes itself: it funds, supervises and supports programmes led by local organizations, and builds those partners' capacity. Its work is organised around human dignity, equity and environmental protection, focusing on women's empowerment, Indigenous peoples' rights, public health and peacebuilding. According to the information the foundation provided in its Hub application, it reaches between 25,000 and 28,000 people, verified through management and six-monthly reports."
+        },
+        "programs": [
+          {
+            "name": "Educación y empoderamiento",
+            "desc": {
+              "es": "Construcción de aulas, microcréditos, becas y apadrinamiento. La fundación reporta 689 aulas, 17 comedores, 15 cocinas y 42 baños construidos desde 2002 en La Guajira, Magdalena, Amazonas, Bolívar, Cesar, Valle del Cauca, Córdoba y Antioquia, con 7.031 estudiantes y docentes beneficiados por esa infraestructura.",
+              "en": "Classroom construction, microcredit, scholarships and sponsorship. The foundation reports 689 classrooms, 17 canteens, 15 kitchens and 42 toilets built since 2002 across La Guajira, Magdalena, Amazonas, Bolívar, Cesar, Valle del Cauca, Córdoba and Antioquia, benefiting 7,031 students and teachers."
+            }
+          },
+          {
+            "name": "Salud y agua",
+            "desc": {
+              "es": "Acceso a agua, saneamiento básico e higiene, y brigadas de salud con atención médica en territorio.",
+              "en": "Access to water, basic sanitation and hygiene, and health brigades providing medical care on the ground."
+            }
+          },
+          {
+            "name": "Paz y reconciliación",
+            "desc": {
+              "es": "Fútbol para la paz, rehabilitación de personas privadas de la libertad y justicia restaurativa.",
+              "en": "Football for peace, rehabilitation for people deprived of liberty, and restorative justice."
+            },
+            "formativo": true
+          },
+          {
+            "name": "Medio ambiente",
+            "desc": {
+              "es": "Conservación de la biodiversidad, formación de liderazgo indígena y conciencia ambiental.",
+              "en": "Biodiversity conservation, Indigenous leadership training and environmental awareness."
+            },
+            "formativo": true
+          }
+        ],
+        "hub": {
+          "es": "A través del HUB SOCIAL, Give&Grow acompaña a la fundación con visibilidad y gestión de donaciones con trazabilidad: acta de recepción, entrega firmada por quien recibe, reporte fotográfico y certificado. Give&Grow no reemplaza su labor, la fortalece.",
+          "en": "Through the Social Hub, Give&Grow supports the foundation with visibility and donation management with full traceability: reception record, delivery signed by the recipient, photo report and certificate. Give&Grow does not replace its work, it strengthens it."
+        },
+        "quote": {
+          "es": "Dignidad. Equidad. Biodiversidad.",
+          "en": "Dignity. Equity. Biodiversity."
+        }
+      }
     }
   ]
 }
