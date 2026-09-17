@@ -343,13 +343,14 @@
       },
       "url": "https://www.anclacolombia.org/",
       "instagram": "https://www.instagram.com/ancla.colombia/",
+      "logo": "/img/ancla_logo.png",
       "consent": {
         "name": true,
-        "logo": false,
+        "logo": true,
         "photos": false,
         "minorsImageProtected": "pendiente",
         "date": "2026-09-17",
-        "source": "Autorizacion escrita del Representante Legal de Fundacion Ancla Colombia, entregada a Give&Grow y en su poder (17 sep 2026). Cubre nombre, descripcion y enlaces. NO cubre logo ni fotografias: por eso logo=false y photos=false. No paso por la Seccion 7 del cuestionario —el Representante Legal no pudo diligenciarlo y autorizo por escrito aparte—, asi que la ficha `fichas_fundacion` sigue vacia y esa es la via si mas adelante se quiere ampliar el alcance. Rastro Ley 1581 en la tabla privada `consentimientos`, sujeto \"aliada ancla\"."
+        "source": "Autorizacion escrita del Representante Legal de Fundacion Ancla Colombia, entregada a Give&Grow y en su poder (17 sep 2026). Cubre nombre, descripcion, enlaces y LOGO. NO cubre fotografias: por eso photos=false, y la galeria queda vacia. No paso por la Seccion 7 del cuestionario —el Representante Legal no pudo diligenciarlo y autorizo por escrito aparte—, asi que `fichas_fundacion` sigue vacia y esa es la via si se quiere ampliar el alcance. El archivo del logo se aloja aqui (/img/ancla_logo.png) y no se enlaza al sitio de la fundacion, que es la regla del esquema. Rastro Ley 1581 en `consentimientos`, sujeto \"aliada ancla\"."
       },
       "poblacion": {
         "es": "≈25.000–28.000 personas al año",
