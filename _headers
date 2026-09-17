@@ -10,11 +10,31 @@
 /
   Cache-Control: no-cache, must-revalidate
 
+# `no-cache` NO significa «no guardes»: significa «guarda, pero pregunta antes
+# de usar». El navegador conserva el archivo y en la visita siguiente manda su
+# ETag; si no cambio, Cloudflare responde 304 sin cuerpo. La frescura es
+# exactamente la misma que con `no-store` —nunca se sirve algo viejo— y lo que
+# se ahorra es el archivo entero. Es lo que la linea de `/` ya hacia aqui arriba.
+#
+# Estaban en `no-store`, que prohibe guardarlo, asi que CADA visita volvia a
+# descargar `partners.json` (10 KB) y, para quien lee en ingles, `en.json`
+# (48 KB). Medido en produccion el 17 sep 2026 recargando la pagina: `app.js` y
+# `styles.css` llegaban con transferSize 0 —cache— y los dos JSON con 10.777 y
+# 48.119 bytes. Peor: `pedirIngles()` en app.js pide ese archivo con
+# `cache: "force-cache"`, o sea que el codigo esperaba justo lo que la cabecera
+# le estaba impidiendo.
+#
+# OJO CON EL ALCANCE, que es lo que hace segura la regla: `_headers` empareja por
+# RUTA, asi que esto solo toca los JSON ESTATICOS —data/ e i18n/, los cuatro
+# publicos—. Las respuestas de /api/* las genera el Worker, no terminan en
+# `.json` y ponen su propio `no-store` en el codigo, que es donde de verdad hace
+# falta. Si algun dia se sirve un .json con datos personales, va en
+# .assetsignore, no aqui.
 /*.html
-  Cache-Control: no-store, must-revalidate
+  Cache-Control: no-cache, must-revalidate
 
 /*.json
-  Cache-Control: no-store, must-revalidate
+  Cache-Control: no-cache, must-revalidate
 
 /sitemap.xml
   Cache-Control: max-age=86400
