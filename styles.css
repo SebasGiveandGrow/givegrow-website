@@ -688,6 +688,25 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 .mnav-g{display:block;font-size:var(--fs-11);letter-spacing:1.2px;text-transform:uppercase;color:var(--acc);font-weight:800;margin:16px 0 4px}
 .pcard{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:16px 18px;transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
 .pcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(31,92,56,.12)}
+/* ── El sello de respaldo ─────────────────────────────────────────────────
+   Un sello de documento, no una insignia de aplicación: regla fina arriba, el
+   logo de quien respalda en su caja blanca —la misma que usa el resto del
+   sitio— y la frase en dos alturas. Sin color propio y sin sombra: lo que
+   certifica no necesita llamar la atención, necesita poder leerse y
+   comprobarse. Por eso el sello entero es un enlace a la ficha de quien
+   respalda: un sello que no se puede verificar no es un sello. */
+.sello{display:flex;align-items:center;gap:13px;margin-top:22px;padding-top:16px;
+  border-top:1.5px solid var(--bd);max-width:62ch;text-decoration:none;color:inherit}
+.sello img{width:44px;height:44px;object-fit:contain;background:var(--logo-bg);
+  padding:4px;box-sizing:border-box;border-radius:10px;border:1px solid var(--bd);flex:0 0 auto}
+.sello span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sello b{font-size:var(--fs-14);font-weight:700;color:var(--ink);line-height:1.3}
+.sello small{font-size:var(--fs-12);color:var(--mu);line-height:1.4}
+.sello-go{display:block;margin-left:auto;color:var(--acc);font-weight:700;flex:0 0 auto}
+.sello:hover b{color:var(--acc)}
+/* En la tarjeta del HUB no cabe el sello entero: solo la línea, y en pequeño. */
+.sello-mini{display:block;font-size:var(--fs-11);font-weight:600;color:var(--acc);margin-top:3px}
+
 .pcard-logo{width:56px;height:56px;object-fit:contain;background:var(--logo-bg);padding:5px;box-sizing:border-box;border-radius:12px;border:1px solid var(--bd);flex:0 0 auto}
 .pcard-body{display:flex;flex-direction:column;gap:2px;min-width:0}
 .pcard-body b{font-family:"Inter",sans-serif;font-weight:700;font-size:var(--fs-16);color:var(--ink);line-height:1.25}

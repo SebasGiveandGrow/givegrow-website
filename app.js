@@ -1402,6 +1402,10 @@ var I18N = {
     "ficha.back":"Volver al Hub",
     "ficha.lider":"Dirige",
     "ficha.prog.t":"Programas en marcha",
+    "ficha.lineas.t":"Líneas de trabajo",
+    "sello.respaldo":"Respaldada por {f}",
+    "sello.nota":"{f} financia, supervisa y acompaña su programa. La organización sigue siendo autónoma.",
+    "sello.red.t":"Organizaciones que respalda",
     "ficha.imp.t":"Tu aporte aquí, en concreto",
     "ficha.imp.calc":"Con {a} aquí logras aproximadamente {x}.",
     "ficha.imp.min":"Elige un monto para ver el impacto equivalente.",
@@ -4749,7 +4753,9 @@ function renderAliadas(){
       html += '<a class="pcard" href="#fundacion/'+encodeURIComponent(p.id)+'">'
             + ((p.logo && canShowLogo(p)) ? '<img class="pcard-logo" src="'+escapeHtml(p.logo)+'" alt="" loading="lazy">' : '')
             + '<span class="pcard-body"><b>'+escapeHtml(p.name)+'</b>'
-            + '<span class="mu">'+escapeHtml(pob+(pob&&area?" · ":"")+area)+'</span></span>'
+            + '<span class="mu">'+escapeHtml(pob+(pob&&area?" · ":"")+area)+'</span>'
+            + (function(){ var r=respaldo(p); return r ? '<span class="sello-mini">'+escapeHtml(t("sello.respaldo").replace("{f}", r.name))+'</span>' : ''; })()
+            + '</span>'
             + '<span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
     }
     html += '<div class="card card-empty"><h3>'+t("hub.aliadas.soon.t")+'</h3><p>'+t("hub.aliadas.soon.p")+'</p></div>';
@@ -4937,6 +4943,16 @@ function renderFicha(fid){
       + (years ? '<span class="eco-chip">'+years+'</span>' : '')
       + (pr.leader ? '<span class="eco-chip">'+t("ficha.lider")+': '+esc(pr.leader)+'</span>' : '')
       + '</div></div></div>'
+      + (function(){
+          var r = respaldo(p); if (!r) return "";
+          var img = (r.logo && canShowLogo(r))
+            ? '<img src="'+esc(r.logo)+'" alt="" loading="lazy">' : '';
+          return '<a class="sello" href="#fundacion/'+encodeURIComponent(r.id)+'">'
+               + img
+               + '<span><b>'+esc(t("sello.respaldo").replace("{f}", r.name))+'</b>'
+               + '<small>'+esc(t("sello.nota").replace("{f}", r.name))+'</small></span>'
+               + '<span class="sello-go" aria-hidden="true">&rarr;</span></a>';
+        })()
       + (about ? '<p class="lead" style="margin-top:22px;max-width:70ch">'+about+'</p>' : '')
       + (quote ? '<blockquote class="ficha-quote">'+quote+'</blockquote>' : '');
     if (pr.programs && pr.programs.length){
@@ -4945,6 +4961,37 @@ function renderFicha(fid){
         var g = pr.programs[k];
         var gLogo = g.logo ? '<div class="prog-logo"><img src="'+esc(g.logo)+'" alt="'+esc(g.name)+'" loading="lazy"></div>' : '';
         html += '<div class="card prog-card">'+gLogo+'<h3>'+esc(g.name)+'</h3><p>'+esc((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
+      }
+      html += '</div>';
+    }
+    /* LAS LÍNEAS DE TRABAJO, que no son lo mismo que los programas.
+       ====================================================================
+       Un programa es algo que está corriendo y que se puede contar —«Escuelas»,
+       con sus aulas construidas—. Una línea es el marco que explica POR QUÉ ese
+       programa existe y con qué enfoque se hace.
+
+       Iban mezclados en una sola lista y eso obligaba a elegir: o se perdía el
+       detalle de lo que de verdad se está haciendo, o se perdía la explicación.
+       Separarlos deja las dos cosas, y en este orden: primero lo que hay, después
+       el marco. Evidencia antes que discurso, que es la regla de la casa.
+
+       Es opcional: una aliada sin `lineas` se pinta exactamente como antes. */
+    if (pr.lineas && pr.lineas.length){
+      html += '<h3 style="margin-top:34px">'+t("ficha.lineas.t")+'</h3><div class="grid g2" style="margin-top:16px">';
+      for (var li=0; li<pr.lineas.length; li++){
+        var ln = pr.lineas[li];
+        html += '<div class="card prog-card"><h3>'+esc(ln.name)+'</h3><p>'+esc((ln.desc && (ln.desc[lang]||ln.desc.es))||"")+'</p></div>';
+      }
+      html += '</div>';
+    }
+    var hijas = respaldadas(p);
+    if (hijas.length){
+      html += '<h3 style="margin-top:34px">'+t("sello.red.t")+'</h3><div class="grid g2" style="margin-top:16px">';
+      for (var hi=0; hi<hijas.length; hi++){
+        var hh = hijas[hi];
+        html += '<a class="card prog-card" href="#fundacion/'+encodeURIComponent(hh.id)+'">'
+              + '<h3>'+esc(hh.name)+'</h3>'
+              + '<p>'+esc((hh.area && (hh.area[lang]||hh.area.es))||"")+'</p></a>';
       }
       html += '</div>';
     }
@@ -4991,6 +5038,46 @@ function canShowGallery(p){
   if (p.type === "hub") return true;
   return !!(p.consent && p.consent.photos === true);
 }
+/* EL SELLO DE RESPALDO.
+   ==========================================================================
+   Una fundación sombrilla —hoy Ancla Colombia— financia, supervisa y acompaña
+   programas de organizaciones locales. Cuando esas organizaciones entren al HUB
+   por su cuenta, su ficha tiene que decir de dónde viene ese respaldo: es la
+   mitad de la información que un donante necesita para entender qué está
+   mirando.
+
+   SE DERIVA, NO SE ESCRIBE. La organización respaldada solo declara
+   `respaldadaPor: "<id>"`. El nombre, el logo y el permiso para enseñarlo salen
+   de la entrada de quien respalda, que es la única fuente. Así, el día que a esa
+   fundación se le retire el consentimiento del logo, el sello se queda sin logo
+   en TODAS partes sin tocar una sola ficha más; y si se la saca de
+   `partners.json`, el sello desaparece entero. Escribir el nombre a mano en cada
+   ficha habría creado tantas copias que revocar como organizaciones respaldadas.
+
+   «RESPALDADA POR» Y NO «PROGRAMA DE», y la diferencia importa. Ancla no ejecuta
+   por ellas: financia y supervisa programas que lideran organizaciones locales
+   —lo dice su propia descripción—. Llamarlas «programa de Ancla» borraría su
+   autonomía, que es justo lo que el HUB existe para no hacer. */
+function respaldo(p){
+  if (!p || !p.respaldadaPor) return null;
+  var lista = PARTNERS_DATA || PARTNERS_FALLBACK || [];
+  for (var i=0;i<lista.length;i++){
+    if (lista[i].id === p.respaldadaPor) return lista[i];
+  }
+  return null;  /* se la sacaron de la red: el sello no se pinta */
+}
+
+/* Las organizaciones que respalda una sombrilla. Se usa en SU ficha, y devuelve
+   vacío mientras no haya ninguna — así no se dibuja una sección prometiendo una
+   red que todavía no existe. */
+function respaldadas(p){
+  var lista = PARTNERS_DATA || PARTNERS_FALLBACK || [], out = [];
+  for (var i=0;i<lista.length;i++){
+    if (lista[i].respaldadaPor === p.id) out.push(lista[i]);
+  }
+  return out;
+}
+
 function canShowLogo(p){
   if (p.type === "hub") return true;
   return !!(p.consent && p.consent.logo === true);
