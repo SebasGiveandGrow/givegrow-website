@@ -4126,8 +4126,33 @@ function abrir(numero){
             + "<label>Tu matrícula profesional</label><input id='t-mat'>"
             + "<p class='sub' style='margin:0 0 10px'><small>Tu matrícula no está verificada todavía, "
             + "así que este concepto no le sale solo a la familia: lo revisa el equipo primero.</small></p>")
+      /* CÓMO SE ESCRIBE, no solo para quién.
+         =====================================================================
+         La pantalla ya decía quién lo lee —«LA LEE LA FAMILIA», «no es un
+         apunte para el equipo»— y eso está bien, pero nombrar al lector no
+         cambia el vocabulario de nadie. Un ingeniero que sabe perfectamente que
+         lo lee una familia sigue escribiendo «fisuración diagonal en muro
+         portante», porque es la lengua en la que aprendió a decirlo bien.
+
+         Lo que faltaba es enseñar cómo se ve uno bueno. Va plegado: se lee la
+         primera vez y después estorba, y quien revisa diez casos seguidos no
+         tiene que volver a pasar por encima.
+
+         ESTE PÁRRAFO ES EL ÚNICO PRODUCTO DEL PROYECTO. Todo lo demás —el
+         formulario, la cola, el registro público, el correo— existe para que
+         alguien con matrícula escriba estas líneas y lleguen a quien vive en
+         esa casa. Si no se entienden, no hubo proyecto. */
+      +  "<details style='margin:6px 0 12px'>"
+      +  "<summary style='cursor:pointer;font-weight:600'>Cómo se escribe esto para que sirva</summary>"
+      +  "<div class='sub' style='margin-top:8px'>"
+      +  "<p style='margin:0 0 8px'><b>Nombra la grieta donde ella puede verla.</b> «El muro de la cocina, el que da al patio» lo encuentra; «muro portante eje B» no, porque no puede ir a buscarlo.</p>"
+      +  "<p style='margin:0 0 8px'><b>Primero qué hacer, después por qué.</b> Va a actuar con la primera frase que entienda.</p>"
+      +  "<p style='margin:0 0 8px'><b>Si usas una palabra del oficio, tradúcela ahí mismo.</b> No la quites: dila y explícala en la misma frase, porque también es el documento con el que ella habla con un maestro de obra.</p>"
+      +  "<p style='margin:0 0 6px'><b>Menos útil:</b><br><i>Se evidencia fisuración diagonal de tipo cortante en muro portante de mampostería no confinada; se recomienda evaluación estructural detallada.</i></p>"
+      +  "<p style='margin:0'><b>Mejor:</b><br><i>La grieta en diagonal del muro de la cocina, el que da al patio, es de las que preocupan: ese muro está cargando parte del techo. Mientras no se repare, no duerman en ese cuarto y no arrimen nada pesado contra él. Para repararlo hay que confinar el muro, que es amarrarlo con columnas y vigas pequeñas de concreto; antes de eso, tapar la grieta solo la esconde.</i></p>"
+      +  "</div></details>"
       +  "<label>Nota técnica — LA LEE LA FAMILIA: es el titular de su informe</label><textarea id='t-nota' rows='4'></textarea>"
-      +  "<p class='sub' style='margin:0 0 10px'><small>Sale impresa bajo «CONCEPTO DEL INGENIERO», encima de lo de abajo y firmada con tu nombre y tu matrícula. No es un apunte para el equipo.</small></p>"
+      +  "<p class='sub' style='margin:0 0 10px'><small>Sale impresa bajo «CONCEPTO DEL INGENIERO», encima de lo de abajo y firmada con tu nombre y tu matrícula. No es un apunte para el equipo. <b>Una o dos frases</b>: es el titular, y el detalle va en el campo de abajo.</small></p>"
       +  "<label>Qué hacer, y con qué reparar (OBLIGATORIO, salvo si no puedes evaluar): si hay señales para no permanecer en la casa o en una parte, qué precauciones tomar, y con qué materiales y en qué orden reparar. Es lo que el sitio le prometió.</label><textarea id='t-rec' rows='5'></textarea>"
       +  "<label>Si no puedes evaluar: qué falta</label><input id='t-falta'>"
       +  "<p><button class='btn' id='t-enviar' style='margin-top:14px'>Guardar evaluación</button></p>"
