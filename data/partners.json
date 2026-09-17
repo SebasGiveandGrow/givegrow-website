@@ -70,20 +70,20 @@
           "enPl": "months of training (Flow Callejero)",
           "monthly": true,
           "aggSemestral": {
-            "es": "semestre de baile",
-            "en": "semester of dance"
+            "es": "semestre de formación",
+            "en": "semester of training"
           },
           "aggAnual": {
-            "es": "año de baile",
-            "en": "year of dance"
+            "es": "año de formación",
+            "en": "year of training"
           },
           "aggSemestralPl": {
-            "es": "semestres de baile",
-            "en": "semesters of dance"
+            "es": "semestres de formación",
+            "en": "semesters of training"
           },
           "aggAnualPl": {
-            "es": "años de baile",
-            "en": "years of dance"
+            "es": "años de formación",
+            "en": "years of training"
           }
         },
         {
@@ -158,8 +158,8 @@
       },
       "profile": {
         "badge": {
-          "es": "Proyecto comunitario de base",
-          "en": "Grassroots community project"
+          "es": "Fundación comunitaria de base",
+          "en": "Grassroots community foundation"
         },
         "tagline": {
           "es": "Formamos a los líderes que la próxima generación necesita.",
@@ -281,7 +281,7 @@
       },
       "profile": {
         "badge": {
-          "es": "Fundación constituida · educación y seguridad alimentaria",
+          "es": "Registro vigente · educación y seguridad alimentaria",
           "en": "Registered nonprofit · education & food security"
         },
         "years": {
@@ -289,15 +289,15 @@
           "en": "Since 2008 · 15+ years on the ground"
         },
         "about": {
-          "es": "Fundación Conciencia formación para la paz es una entidad sin ánimo de lucro constituida en 2008, con certificado de Cámara de Comercio vigente y RUT actualizado. Acompaña a niñez, adolescencia y comunidades en condición de vulnerabilidad en el sector de Nueva Jerusalén (Medellín) y en los municipios de Valencia y La Apartada (Córdoba), tomando la educación como herramienta para la construcción de paz. Según la información entregada por la fundación en su solicitud de ingreso al HUB, atiende cerca de 450 niñas, niños y adolescentes de forma directa.",
-          "en": "Fundación Conciencia formación para la paz is a nonprofit registered in 2008, with a current Chamber of Commerce certificate and up-to-date tax registration (RUT). It works with children, adolescents and vulnerable communities in the Nueva Jerusalén area (Medellín) and in the municipalities of Valencia and La Apartada (Córdoba), using education as a tool for peace-building. According to the information the foundation provided in its Hub application, it serves around 450 children and adolescents directly."
+          "es": "Fundación Conciencia Formación para la Paz es una entidad sin ánimo de lucro constituida en 2008, con certificado de Cámara de Comercio vigente y RUT actualizado. Acompaña a niñez, adolescencia y comunidades en condición de vulnerabilidad en el sector de Nueva Jerusalén (Medellín) y en los municipios de Valencia y La Apartada (Córdoba), tomando la educación como herramienta para la construcción de paz. Según la información entregada por la fundación en su solicitud de ingreso al HUB, atiende cerca de 450 niñas, niños y adolescentes de forma directa.",
+          "en": "Fundación Conciencia Formación para la Paz is a nonprofit registered in 2008, with a current Chamber of Commerce certificate and up-to-date tax registration (RUT). It works with children, adolescents and vulnerable communities in the Nueva Jerusalén area (Medellín) and in the municipalities of Valencia and La Apartada (Córdoba), using education as a tool for peace-building. According to the information the foundation provided in its Hub application, it serves around 450 children and adolescents directly."
         },
         "programs": [
           {
             "name": "Uno Menos con Hambre",
             "desc": {
-              "es": "Comedores comunitarios de seguridad alimentaria en tres sedes (Nueva Jerusalén en Antioquia; Valencia y La Apartada en Córdoba). La fundación reporta más de 9.000 raciones alimentarias al mes y cerca de 450 niñas, niños y adolescentes beneficiarios directos.",
-              "en": "Community canteens for food security across three sites (Nueva Jerusalén in Antioquia; Valencia and La Apartada in Córdoba). The foundation reports over 9,000 meal rations per month and around 450 children and adolescents as direct beneficiaries."
+              "es": "Comedores comunitarios de seguridad alimentaria en tres sedes (Nueva Jerusalén en Antioquia; Valencia y La Apartada en Córdoba). La fundación reporta más de 9.000 raciones alimentarias al mes.",
+              "en": "Community canteens for food security across three sites (Nueva Jerusalén in Antioquia; Valencia and La Apartada in Córdoba). The foundation reports over 9,000 meal rations per month."
             }
           },
           {
@@ -335,6 +335,10 @@
         "aporta",
         "recibe"
       ],
+      "aporta": {
+        "es": "Financiación a organizaciones de base y construcción de escuelas y centros comunitarios.",
+        "en": "Funding for grassroots organizations, and construction of schools and community centres."
+      },
       "lat": 6.2442,
       "lng": -75.5812,
       "area": {
@@ -358,8 +362,8 @@
       },
       "profile": {
         "badge": {
-          "es": "Oficina regional de Ankarstiftelsen (Suecia) · financia a organizaciones locales y construye infraestructura social",
-          "en": "Regional office of Ankarstiftelsen (Sweden) · funds local organizations and builds social infrastructure"
+          "es": "Fundación financiadora · construye infraestructura social",
+          "en": "Funding foundation · builds social infrastructure"
         },
         "years": {
           "es": "Ancla desde 1996 · sucursal colombiana desde 2025",
@@ -451,8 +455,8 @@
           }
         ],
         "hub": {
-          "es": "A través del HUB SOCIAL, Give&Grow acompaña a la fundación con visibilidad y gestión de donaciones con trazabilidad: acta de recepción, entrega firmada por quien recibe, reporte fotográfico y certificado. Give&Grow no reemplaza su labor, la fortalece.",
-          "en": "Through the Social Hub, Give&Grow supports the foundation with visibility and donation management with full traceability: reception record, delivery signed by the recipient, photo report and certificate. Give&Grow does not replace its work, it strengthens it."
+          "es": "Ancla entra al HUB SOCIAL con dos roles. Como aportante, el HUB le acerca organizaciones de base verificadas y con convenio firmado, que es justo el insumo que su modelo necesita. Como aliada, cualquier aporte dirigido a ella se rastrea de principio a fin: acta de recepción, entrega firmada por quien recibe, reporte fotográfico y certificado. Give&Grow no reemplaza su labor, la fortalece.",
+          "en": "Ancla joins the Social Hub in two roles. As a contributing partner, the Hub brings it verified grassroots organizations with a signed agreement — exactly the input its model needs. As a partner foundation, any gift directed to it is traced end to end: reception record, delivery signed by the recipient, photo report and certificate. Give&Grow does not replace its work, it strengthens it."
         },
         "quote": {
           "es": "Dignidad. Equidad. Biodiversidad.",
