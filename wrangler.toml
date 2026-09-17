@@ -35,6 +35,23 @@ html_handling = "auto-trailing-slash"
 # cuatro anteriores: el bloque se lee bien y no se ejecuta.
 run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest"]
 
+# ---------------------------------------------------------------------------
+# LA ÚNICA TAREA PROGRAMADA DEL WORKER, y la primera que tiene.
+# ---------------------------------------------------------------------------
+# Mira quién lleva siete días esperando un concepto y le escribe una vez. Ver
+# `avisarEsperaSeptimoDia` en worker.js para qué dice ese correo y por qué solo
+# alcanza a quien dejó correo.
+#
+# 14:00 UTC son las 9 de la mañana en Colombia. Una vez al día basta: lo único
+# que hace es mirar quién cruzó los siete días, y eso no cambia entre una hora y
+# la siguiente.
+#
+# ⚠️ EL ENTORNO DE PRUEBAS NO LA LLEVA, a propósito: su base tiene casos de
+# ensayo con correos que podrían ser de alguien, y una tarea programada que
+# manda correo sola es exactamente lo que no debe correr ahí.
+[triggers]
+crons = ["0 14 * * *"]
+
 # Base PRIVADA (Ley 1581): donantes, aportes, inscripciones y consentimientos.
 # Nunca se sirve al navegador. Los datos públicos de la red siguen en
 # data/partners.json. Esquema en migrations/0001_inicial.sql.
