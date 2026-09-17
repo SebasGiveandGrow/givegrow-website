@@ -4424,6 +4424,27 @@ function formSend(){
 
 /* ---------- gallery + lightbox ---------- */
 var IMG_BASE = "/img/";
+/* LOS TRES TAMAÑOS DE UNA FOTO DE JORNADA, y por qué hacen falta tres.
+   `thumb/` (400px) ya existía y la rejilla de evidencia lo usaba. El problema
+   lo dio la medición, no la lectura: en un teléfono de 375px con pantalla 2x,
+   esa rejilla dibuja la foto a 345px de CSS, o sea 690 píxeles REALES. Una
+   miniatura de 400 estirada a 690 se ve blanda, y la tira de las fichas ni
+   siquiera usaba la miniatura — cargaba el original de 1400px para pintarlo a
+   268. Medido en producción antes de tocar nada.
+
+   `m/` (800px) es el tamaño que faltaba: cubre los 690 de la rejilla y los 540
+   de la tira, y deja que el navegador elija según la pantalla en vez de que
+   elijamos nosotros por todos. El original se sigue usando en el visor grande,
+   que es donde alguien sí quiere verla completa.
+
+   Siempre .webp aunque el original sea .jpg: `cwebp` los convirtió todos. */
+function fotoSrcset(ruta){
+  var m = /^(.*\/)?jornadas\/(.+)\.[a-z]+$/i.exec(ruta);
+  if (!m) return null;
+  var raiz = m[2];
+  return IMG_BASE + "jornadas/thumb/" + raiz + ".webp 400w, "
+       + IMG_BASE + "jornadas/m/" + raiz + ".webp 800w";
+}
 var GALLERY = [
   /* BRIGADA POR EL SISMO DEL 10 DE AGOSTO DE 2026 · van primero a propósito.
      No es orden de importancia: es la regla que el propio sitio publica en
@@ -4500,13 +4521,29 @@ function initGallery(){
   GALLERY.forEach(function(item, i){
     var cap = item[lang] || item.es;
     // Miniatura ligera (400px) para la grilla; la imagen completa se carga en el lightbox.
-    var thumb = item.f.indexOf("jornadas/")===0 ? item.f.replace("jornadas/","jornadas/thumb/") : item.f;
+    /* SIEMPRE .webp: las seis miniaturas que eran .jpg se convirtieron, y la
+       carpeta ya no tiene ninguna. Si esto volviera a derivar la extensión del
+       original, las de brigada pedirían un .jpg que ya no existe. */
+    var thumb = item.f.indexOf("jornadas/")===0
+      ? item.f.replace("jornadas/","jornadas/thumb/").replace(/\.[a-z]+$/i,".webp")
+      : item.f;
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "gal-item";
     btn.setAttribute("aria-label", cap);
     var img = document.createElement("img");
     img.src = IMG_BASE + thumb;
+    /* EL MISMO `sizes` QUE LA TIRA DE LAS FICHAS, y no es copia-y-pega perezoso.
+       `.gallery` declara tres columnas, pero `.gal-item` está definido DOS veces
+       en styles.css —linea 360 para esta rejilla, linea 737 para la tira— y la
+       segunda gana: `width:min(300px,72vw)` le fija la celda. Medido en el
+       navegador: a 594px de ancho la rejilla reporta una columna de 546px y la
+       foto se dibuja a 298. O sea que hoy las dos galerias miden igual.
+
+       Si algun dia se arregla ese choque de cascada y la rejilla recupera sus
+       tres columnas, ESTE `sizes` hay que cambiarlo con ella. */
+    var ss = fotoSrcset(item.f);
+    if (ss){ img.srcset = ss; img.sizes = "(max-width:416px) 72vw, 300px"; }
     img.alt = cap;
     img.loading = "lazy";
     img.decoding = "async";
@@ -5004,7 +5041,11 @@ function renderFicha(fid){
         for (var gi=0; gi<gal.length; gi++){
           var ph = gal[gi], alt = (ph.alt && (ph.alt[lang]||ph.alt.es)) || "";
           html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openLightbox(\''+esc(p.id)+'\','+gi+')">'
-                + '<img src="'+esc(ph.src)+'" alt="'+esc(alt)+'" loading="lazy"></button>';
+                + '<img src="'+esc(ph.src)+'"'
+                + (function(){ var ss = fotoSrcset(ph.src); return ss
+                    /* .gal-item mide min(300px,72vw); 300/0.72 = 416.7px. */
+                    ? ' srcset="'+esc(ss)+'" sizes="(max-width:416px) 72vw, 300px"' : ''; })()
+                + ' alt="'+esc(alt)+'" loading="lazy"></button>';
         }
         html += '</div>';
       } else {
