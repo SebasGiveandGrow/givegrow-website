@@ -9523,7 +9523,7 @@ async function apiCasosPublicos(env, url) {
 
   return json({
     casos: r.results || [],
-    desde, tope: TOPE_BANCO,
+    desde,
     totales: {
       revisados: (t && t.revisados) || 0,
       urgentes: (t && t.urgentes) || 0,
@@ -17731,10 +17731,18 @@ async function rutaCompartir(env, url, id) {
           "referrer-policy": "strict-origin-when-cross-origin",
           /* SIN CACHÉ PÚBLICA, y esto es la mitad que faltaba de la regla 1.
 
-             `partners.json` —la FUENTE de esta página— se sirve `no-store,
-             must-revalidate` por `_headers`, y el motivo es que la revocación
-             del consentimiento tiene que propagarse en el momento: en cuanto una
-             fundación sale del JSON, deja de aparecer en el sitio.
+             `partners.json` —la FUENTE de esta página— se revalida en cada
+             petición, y el motivo es que la revocación del consentimiento tiene
+             que propagarse en el momento: en cuanto una fundación sale del JSON,
+             deja de aparecer en el sitio.
+
+             OJO SI VUELVES A LEER ESTO: decía «se sirve `no-store` por
+             `_headers`», y desde el 17 sep 2026 esa línea dice `no-cache`. NO
+             es un relajamiento. `no-store` prohibíe guardar el archivo;
+             `no-cache` permite guardarlo pero obliga a preguntar antes de
+             usarlo, así que la garantía que importa aquí —que nadie vea una
+             fundación ya revocada— es idéntica. Lo que cambió es que la
+             respuesta sin cambios ahora es un 304 vacío en vez de 10 KB.
 
              Esta página se construye de ese mismo JSON y se servía `public,
              max-age=3600`. O sea que la fuente se niega a que la guarden y la
@@ -17752,7 +17760,6 @@ async function rutaCompartir(env, url, id) {
              hay página» sea verdad también un minuto después de revocarla. */
           "cache-control": "no-store, must-revalidate",
           "x-content-type-options": "nosniff",
-          "referrer-policy": "strict-origin-when-cross-origin",
           /* LA CSP TAMBIÉN. Esta respuesta se construye desde cero, así que no
              hereda nada de `_headers` —que es de donde el resto del sitio saca
              su CSP y su X-Frame-Options—. El resultado medido: `/f/<id>`, que es
