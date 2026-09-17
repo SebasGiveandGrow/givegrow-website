@@ -554,26 +554,51 @@ try {
    consola y sin nada en los logs del Worker. Un dedazo en un nombre de archivo
    no lo atrapa nadie hasta que alguien mira la galería con sus propios ojos.
 
-   Y la galería tiene DOS archivos por entrada: la imagen y su miniatura, que
-   `initGallery` deriva sola metiendo `thumb/` en la ruta cuando empieza por
-   `jornadas/`. Olvidar la miniatura es el error fácil, porque la grilla es lo
-   único que la usa y la imagen grande del lightbox seguiría bien.
+   Y una foto de jornada tiene TRES archivos, no dos: el original para el visor
+   grande, `thumb/` de 400px y `m/` de 800px, que es lo que `srcset` ofrece al
+   navegador. Olvidar cualquiera de los dos pequeños es el error fácil, porque
+   el lightbox seguiría viéndose bien y nadie se enteraría.
 
-   Se lee el array del propio app.js en vez de mantener una lista aparte: una
-   lista aparte es otra cosa que se desincroniza. */
+   SIEMPRE .webp en los dos tamaños pequeños, aunque el original sea .jpg — que
+   es justo lo que este chequeo dejó pasar al revés: derivaba la miniatura
+   conservando la extensión del original, y cuando las seis de brigada pasaron a
+   webp el gate pidió unos .jpg que ya no existían. El chequeo tiene que
+   reflejar lo que hace `fotoSrcset` en app.js, no lo que hacía antes.
+
+   Se cubren las DOS galerías: el array GALLERY de app.js y las `gallery[]` de
+   partners.json, que desde que existe `fotoSrcset` dependen de los mismos tres
+   archivos. Antes solo se miraba la primera.
+
+   Se leen de sus propias fuentes en vez de mantener una lista aparte: una lista
+   aparte es otra cosa que se desincroniza. */
 {
   const bloque = src.slice(src.indexOf("var GALLERY = ["), src.indexOf("var lbIndex"));
   const rutas = [...bloque.matchAll(/\{f:"([^"]+)"/g)].map((m) => m[1]);
+  /* Las de las fichas llegan con ruta absoluta (/img/jornadas/x.webp); se
+     normalizan a la misma forma relativa que usa GALLERY. */
+  let deFichas = [];
+  try {
+    const pj = JSON.parse(readFileSync("data/partners.json", "utf8"));
+    for (const p of pj.partners || []) {
+      for (const g of p.gallery || []) deFichas.push(String(g.src || "").replace(/^\/img\//, ""));
+    }
+  } catch { err("galería: no se pudo leer data/partners.json"); }
+
   if (!rutas.length) err("galería: no se pudo leer GALLERY de app.js");
   else {
     let faltan = 0;
-    for (const f of rutas) {
-      const mini = f.startsWith("jornadas/") ? f.replace("jornadas/", "jornadas/thumb/") : f;
-      for (const ruta of ["img/" + f, "img/" + mini]) {
+    const todas = [...new Set([...rutas, ...deFichas])].filter(Boolean);
+    for (const f of todas) {
+      const esperadas = ["img/" + f];
+      const m = /^jornadas\/(.+)\.[a-z]+$/i.exec(f);
+      if (m) esperadas.push("img/jornadas/thumb/" + m[1] + ".webp",
+                            "img/jornadas/m/" + m[1] + ".webp");
+      for (const ruta of esperadas) {
         if (!existsSync(ruta)) { err("galería: falta " + ruta); faltan++; }
       }
     }
-    if (!faltan) ok("galería: " + rutas.length + " entradas, imagen y miniatura presentes");
+    if (!faltan) ok("galería: " + todas.length + " fotos (" + rutas.length + " de evidencia + "
+                    + deFichas.length + " de fichas), con sus tres tamaños");
   }
 }
 
