@@ -2220,6 +2220,18 @@ function applyLang(l){
   calcUpdate();
   mmcWhatsApp();
   mmcMiCaso();
+  /* EL CUERPO DE LA PÁGINA DEL CASO SE VUELVE A PINTAR, y esto arregla algo que
+     ya estaba roto antes de tocar nada: todo lo que hay dentro de `mc-cuerpo`
+     lo escribe `mcPinta` con `t(...)` una sola vez, sin `data-i18n`, así que el
+     recorrido del diccionario no lo alcanza. Comprobado: al pasar a inglés, el
+     lead y el título de la página cambiaban y el cuerpo se quedaba en español
+     —«Ese enlace no abre ningún caso»— igual que el concepto del ingeniero y el
+     estado del caso, que es lo que de verdad importa que se lea.
+
+     Repintar cuesta una petición más al cambiar de idioma. Es lo mismo que ya
+     hace un cambio de ruta, y es el precio de que la familia lea su caso en el
+     idioma que eligió. */
+  if (currentRoute === "caso" && MC.caso) mcPinta();
   /* Solo si ya hay dato: repintar sin él borraría la fila al cambiar de idioma. */
   if (FILA_DATO) filaPinta(FILA_DATO.esperando > 0 ? "hay" : "vacia", FILA_DATO);
 }
@@ -3117,7 +3129,24 @@ function mcPinta(aviso, color){
       /* Un caso inexistente y uno ajeno dan el MISMO mensaje, igual que en el
          servidor: distinguirlos dejaría un oráculo de qué casos existen. */
       if (!res.ok || !res.d || res.d.error){
-        cont.innerHTML = '<p class="lead">' + escapeHtml(t("mc.err")) + "</p>";
+        /* EL ENLACE QUE NO ABRE ES EL MOMENTO EN QUE MÁS FALTA HACE UNA SALIDA,
+           y esta página no tenía ninguna: ni un botón, ni un enlace, solo la
+           frase. La recuperación existe desde hace dos cambios —la banda del
+           caso guardado y la línea de «escríbenos y te lo devolvemos»— pero
+           vivían en «Revisa tu casa», que es justo donde esta persona NO está.
+
+           Se pintan las dos, y en este orden: primero lo que el teléfono pueda
+           saber solo —si aquí hay otro caso guardado, ese es probablemente el
+           suyo y está a un toque—, y después el camino por WhatsApp para quien
+           no tenga nada. */
+        cont.innerHTML = '<p class="lead">' + escapeHtml(t("mc.err")) + "</p>"
+          + '<div class="mmc-mio" data-mi-caso hidden></div>'
+          + '<p class="mu mmc-perdido" style="max-width:52ch;margin-top:18px">'
+          +   '<span>' + escapeHtml(t("mmc.perdido.t")) + "</span> "
+          +   '<a id="mmc-perdido-wa" target="_blank" rel="noopener" href="'
+          +   escapeHtml("https://wa.me/573153305028?text=" + encodeURIComponent(t("mmc.perdido.texto")))
+          +   '">' + escapeHtml(t("mmc.perdido.wa")) + "</a></p>";
+        mmcMiCaso();
         return;
       }
       var d = res.d;
