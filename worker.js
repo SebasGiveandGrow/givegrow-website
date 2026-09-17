@@ -1428,6 +1428,32 @@ async function apiInscripcion(request, env, url) {
      decorativa: guardar primero y pedir permiso después invertiría el orden. */
   if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
 
+  /* FRENO POR CORREO, el mismo patron que /api/caso y /api/transferencia.
+     Esta era la UNICA de las tres rutas publicas que escriben en la base sin
+     freno, y es la que mas cuesta: cada POST inserta una fila Y DISPARA DOS
+     CORREOS -uno a quien se inscribe y otro al buzon de alianzas-. El honeypot
+     de mas arriba para al robot tonto; no para a nadie que mire el JSON una vez.
+
+     Y el dano que importa no es la bandeja de Sebas: es la CUOTA DE ENVIO. Si un
+     script la quema, lo que deja de salir es el correo transaccional -el recibo
+     de una donacion, el aviso del septimo dia a una familia que espera-. El
+     abuso de un formulario publico se llevaria por delante el canal del que
+     dependen los envios que si importan.
+
+     Tres en diez minutos: quien se equivoco y reenvia cabe de sobra, y un script
+     se detiene. Como en las otras dos, esto NO detiene a quien rote correos; ese
+     caso es la regla de rate-limit de Cloudflare, que es configuracion y no
+     codigo, y sigue sin confirmarse que exista. */
+  const recientesIns = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM inscripciones WHERE email = ? " +
+    "AND creada_en > datetime('now','-10 minutes')"
+  ).bind(email).first();
+  if (recientesIns && recientesIns.n >= 3) {
+    return json({ error: "demasiadas_inscripciones",
+                  ayuda: "Ya recibimos varias inscripciones desde este correo hace un momento. " +
+                         "Espera unos minutos; si ya enviaste la tuya, te escribiremos a ese mismo correo." }, 429);
+  }
+
   const pisaTerritorio = nivel === "hub" || nivel === "mixto";
   const datos = {
     nivel,
@@ -3377,7 +3403,7 @@ async function apiCasoMedio(request, env, numero, token, url) {
   ).bind(numero).first();
   /* Mismo 403 para caso inexistente y token equivocado: si se distinguieran,
      quedaría un oráculo de qué casos existen. Igual que el recibo. */
-  if (!caso || !token || caso.token !== token) return json({ error: "no_autorizado" }, 403);
+  if (!caso || !caso.token || !igualesSeguro(caso.token, String(token || ""))) return json({ error: "no_autorizado" }, 403);
 
   /* EL ESTADO SE MIRABA Y NO SE USABA. La consulta de arriba trae `estado` desde
      siempre y nadie lo consultaba: el servidor aceptaba fotos en un caso
@@ -3465,7 +3491,7 @@ async function apiCasoEstado(env, numero, token) {
   const c = await env.DB.prepare(
     "SELECT numero, token, estado, clasificacion, sector, creado_en FROM casos WHERE numero = ?"
   ).bind(numero).first();
-  if (!c || !token || c.token !== token) return json({ error: "no_autorizado" }, 403);
+  if (!c || !c.token || !igualesSeguro(c.token, String(token || ""))) return json({ error: "no_autorizado" }, 403);
   const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
 
   /* Lo que el ingeniero dijo, para que la familia lo lea en su página y no solo
@@ -7507,7 +7533,7 @@ async function apiCasoInforme(env, numero, token) {
     "SELECT numero, token, estado, clasificacion, sector, material, pisos, anio_aprox, " +
     "danio_previo, habitada FROM casos WHERE numero = ?"
   ).bind(numero).first();
-  if (!c || !token || c.token !== token) return json({ error: "no_autorizado" }, 403);
+  if (!c || !c.token || !igualesSeguro(c.token, String(token || ""))) return json({ error: "no_autorizado" }, 403);
 
   const e = await evaluacionVigente(env, numero, c.clasificacion, true);
   if (!e) {
