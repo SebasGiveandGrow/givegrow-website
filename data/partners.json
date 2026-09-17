@@ -338,8 +338,8 @@
       "lat": 6.2442,
       "lng": -75.5812,
       "area": {
-        "es": "Medellín · presencia en varios departamentos",
-        "en": "Medellín · present in several departments"
+        "es": "Medellín · Cesar, Magdalena, La Guajira y Amazonas",
+        "en": "Medellín · Cesar, Magdalena, La Guajira and Amazonas"
       },
       "url": "https://www.anclacolombia.org/",
       "instagram": "https://www.instagram.com/ancla.colombia/",
@@ -350,7 +350,7 @@
         "photos": false,
         "minorsImageProtected": "pendiente",
         "date": "2026-09-17",
-        "source": "Autorizacion escrita del Representante Legal de Fundacion Ancla Colombia, entregada a Give&Grow y en su poder (17 sep 2026). Cubre nombre, descripcion, enlaces y LOGO. NO cubre fotografias: por eso photos=false, y la galeria queda vacia. No paso por la Seccion 7 del cuestionario —el Representante Legal no pudo diligenciarlo y autorizo por escrito aparte—, asi que `fichas_fundacion` sigue vacia y esa es la via si se quiere ampliar el alcance. El archivo del logo se aloja aqui (/img/ancla_logo.png) y no se enlaza al sitio de la fundacion, que es la regla del esquema. Rastro Ley 1581 en `consentimientos`, sujeto \"aliada ancla\"."
+        "source": "Autorizacion escrita del Representante Legal de Fundacion Ancla Colombia, entregada a Give&Grow y en su poder (17 sep 2026). Cubre nombre, descripcion, enlaces y LOGO. NO cubre fotografias: por eso photos=false, y la galeria queda vacia. No paso por la Seccion 7 del cuestionario —el Representante Legal no pudo diligenciarlo y autorizo por escrito aparte—, asi que `fichas_fundacion` sigue vacia y esa es la via si se quiere ampliar el alcance. El archivo del logo se aloja aqui (/img/ancla_logo.png) y no se enlaza al sitio de la fundacion, que es la regla del esquema. El perfil se amplio el 17 sep 2026 con el brochure institucional 2026 que la fundacion entrego a Give&Grow; NO se uso su pagina dirigida a un donante corporativo por nombre, que es una propuesta comercial suya y no informacion publica. Rastro Ley 1581 en `consentimientos`, sujeto \"aliada ancla\"."
       },
       "poblacion": {
         "es": "≈25.000–28.000 personas al año",
@@ -358,45 +358,45 @@
       },
       "profile": {
         "badge": {
-          "es": "Sucursal en Colombia de Ankarstiftelsen (Suecia) · financia y acompaña a organizaciones locales",
-          "en": "Colombian branch of Ankarstiftelsen (Sweden) · funds and supports local organizations"
+          "es": "Oficina regional de Ankarstiftelsen (Suecia) · financia a organizaciones locales y construye infraestructura social",
+          "en": "Regional office of Ankarstiftelsen (Sweden) · funds local organizations and builds social infrastructure"
         },
         "years": {
           "es": "Ancla desde 1996 · sucursal colombiana desde 2025",
           "en": "Ancla since 1996 · Colombian branch since 2025"
         },
         "about": {
-          "es": "Fundación Ancla Colombia es la sucursal colombiana de la Fundación Ancla de Suecia (Ankarstiftelsen), que trabaja desde 1996 por los derechos de las poblaciones más vulnerables y por la biodiversidad del país. No ejecuta directamente: financia, supervisa y acompaña programas liderados por organizaciones locales, y desarrolla las capacidades de sus aliadas. Su trabajo se ordena alrededor de la dignidad humana, la equidad y la protección del medio ambiente, con foco en el empoderamiento de las mujeres, los derechos de los pueblos indígenas, la salud pública y la construcción de paz. Según la información que la fundación entregó en su solicitud de ingreso al HUB, atiende entre 25.000 y 28.000 personas, y lo verifica con informes de gestión y reportes semestrales.",
-          "en": "Fundación Ancla Colombia is the Colombian branch of Sweden's Fundación Ancla (Ankarstiftelsen), which has worked since 1996 for the rights of the most vulnerable populations and for the country's biodiversity. It does not deliver programmes itself: it funds, supervises and supports programmes led by local organizations, and builds those partners' capacity. Its work is organised around human dignity, equity and environmental protection, focusing on women's empowerment, Indigenous peoples' rights, public health and peacebuilding. According to the information the foundation provided in its Hub application, it reaches between 25,000 and 28,000 people, verified through management and six-monthly reports."
+          "es": "Fundación Ancla Colombia es la oficina regional en Colombia de la Fundación Ancla de Suecia (Ankarstiftelsen), que trabaja desde 1996 por los derechos de las poblaciones más vulnerables y por la biodiversidad del país. No ejecuta sola: financia, supervisa y acompaña programas liderados por organizaciones locales, y desarrolla las capacidades de sus aliadas. Su trabajo se ordena alrededor de la dignidad humana, la equidad y la protección del medio ambiente, con foco en el empoderamiento de las mujeres, los derechos de los pueblos indígenas, la salud pública y la construcción de paz. Tiene una capacidad propia que la distingue: construcción modular y prefabricada de escuelas y centros comunitarios, que le permite entregar infraestructura social en zonas remotas en poco tiempo y a bajo costo. La fundación alinea sus líneas con los Objetivos de Desarrollo Sostenible 3, 4, 5, 6, 8, 11, 15 y 16. Según la información que entregó en su solicitud de ingreso al HUB, atiende entre 25.000 y 28.000 personas, y lo verifica con informes de gestión y reportes semestrales.",
+          "en": "Fundación Ancla Colombia is the Colombian regional office of Sweden's Fundación Ancla (Ankarstiftelsen), which has worked since 1996 for the rights of the most vulnerable populations and for the country's biodiversity. It does not work alone: it funds, supervises and supports programmes led by local organizations, and builds those partners' capacity. Its work is organised around human dignity, equity and environmental protection, focusing on women's empowerment, Indigenous peoples' rights, public health and peacebuilding. It has one capability of its own that sets it apart: modular, prefabricated construction of schools and community centres, which lets it deliver social infrastructure in remote areas quickly and at low cost. The foundation aligns its work with UN Sustainable Development Goals 3, 4, 5, 6, 8, 11, 15 and 16. According to the information it provided in its Hub application, it reaches between 25,000 and 28,000 people, verified through management and six-monthly reports."
         },
         "programs": [
           {
             "name": "Educación y empoderamiento",
             "desc": {
-              "es": "Construcción de aulas, microcréditos, becas y apadrinamiento. La fundación reporta 689 aulas, 17 comedores, 15 cocinas y 42 baños construidos desde 2002 en La Guajira, Magdalena, Amazonas, Bolívar, Cesar, Valle del Cauca, Córdoba y Antioquia, con 7.031 estudiantes y docentes beneficiados por esa infraestructura.",
-              "en": "Classroom construction, microcredit, scholarships and sponsorship. The foundation reports 689 classrooms, 17 canteens, 15 kitchens and 42 toilets built since 2002 across La Guajira, Magdalena, Amazonas, Bolívar, Cesar, Valle del Cauca, Córdoba and Antioquia, benefiting 7,031 students and teachers."
+              "es": "Cuatro frentes: escuelas —aulas e infraestructura educativa con sistemas modulares y prefabricados en Cesar, Magdalena, La Guajira y Amazonas—, becas de matrícula, materiales y transporte para el acceso a la educación superior, microcréditos a mujeres en situación vulnerable, incluidas mujeres con realidad carcelaria, y apadrinamiento de niñas y niños en Leticia y Medellín con apoyo educativo y atención médica. La fundación reporta 689 aulas, 17 comedores, 15 cocinas y 42 baños construidos desde 2002, con 7.031 estudiantes y docentes beneficiados.",
+              "en": "Four fronts: schools — classrooms and educational infrastructure using modular and prefabricated systems in Cesar, Magdalena, La Guajira and Amazonas —, scholarships covering tuition, materials and transport for access to higher education, microcredit for women in vulnerable situations, including women affected by imprisonment, and sponsorship of children in Leticia and Medellín with educational support and medical care. The foundation reports 689 classrooms, 17 canteens, 15 kitchens and 42 toilets built since 2002, benefiting 7,031 students and teachers."
             }
           },
           {
             "name": "Salud y agua",
             "desc": {
-              "es": "Acceso a agua, saneamiento básico e higiene, y brigadas de salud con atención médica en territorio.",
-              "en": "Access to water, basic sanitation and hygiene, and health brigades providing medical care on the ground."
+              "es": "Acceso a agua segura mediante filtros y acueductos comunitarios, para reducir las enfermedades transmitidas por el agua en zonas rurales donde el acceso sigue siendo limitado. Y brigadas de salud lideradas por voluntarios, con atención médica, apoyo a la niñez y actividades comunitarias.",
+              "en": "Access to safe water through community filters and water systems, to reduce waterborne disease in rural areas where access remains limited. Plus volunteer-led health brigades providing medical care, support for children and community activities."
             }
           },
           {
             "name": "Paz y reconciliación",
             "desc": {
-              "es": "Fútbol para la paz, rehabilitación de personas privadas de la libertad y justicia restaurativa.",
-              "en": "Football for peace, rehabilitation for people deprived of liberty, and restorative justice."
+              "es": "Reinserción social: acompañamiento a personas privadas de la libertad en su rehabilitación, el fortalecimiento de sus vínculos familiares y su reintegración. Justicia restaurativa: espacios de diálogo entre víctimas, ofensores y comunidades. Y Fútbol por la Paz, que usa el deporte como herramienta de mentoría y prevención de la violencia.",
+              "en": "Social reintegration: support for people deprived of liberty through rehabilitation, strengthening family ties and reintegration. Restorative justice: spaces for dialogue between victims, offenders and communities. And Football for Peace, using sport as a tool for mentoring and violence prevention."
             },
             "formativo": true
           },
           {
-            "name": "Medio ambiente",
+            "name": "Medioambiente",
             "desc": {
-              "es": "Conservación de la biodiversidad, formación de liderazgo indígena y conciencia ambiental.",
-              "en": "Biodiversity conservation, Indigenous leadership training and environmental awareness."
+              "es": "Conservación de la biodiversidad y uso sostenible de los recursos naturales, con énfasis en la Amazonía colombiana. Junto a organizaciones aliadas y comunidades indígenas, educación ambiental, formación de liderazgo comunitario y proyectos sostenibles que conservan los ecosistemas y generan oportunidades locales.",
+              "en": "Biodiversity conservation and sustainable use of natural resources, with a focus on the Colombian Amazon. Alongside partner organizations and Indigenous communities: environmental education, community leadership training and sustainable projects that protect ecosystems and create local opportunities."
             },
             "formativo": true
           }
