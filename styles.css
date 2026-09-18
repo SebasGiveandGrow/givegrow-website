@@ -1004,7 +1004,16 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
 .e404-sec{min-height:66vh;display:flex;align-items:center}
 .e404-wrap{text-align:center;max-width:52ch;margin:0 auto}
 .e404-code{font-family:var(--font-display,inherit);font-size:clamp(90px,18vw,180px);font-weight:800;line-height:1;color:var(--gl);letter-spacing:-2px}
-html[data-theme="dark"] .e404-code{color:var(--gd)}
+/* SIN OVERRIDE DE NOCHE, y quitarlo ES el arreglo.
+   Aquí decía `color:var(--gd)`. De noche `--gd` es más OSCURO que `--bg`, así
+   que la marca de agua quedaba por debajo del papel: contraste 1.00, o sea
+   invisible. Medido y comprobado con capturas — de día el «404» se lee detrás
+   del titular, de noche no había nada.
+   `--gl` ya cambia con el tema, así que la regla de arriba se basta sola y da
+   1.30 de noche, del mismo orden que el 1.02 del día. Un token que ya hacía lo
+   correcto, tapado por un override.
+   (Los valores no se escriben aquí a propósito: un hex en un comentario cuenta
+   para el trinquete del check #11 y además se pudre cuando el token cambia.) */
 .e404-title{font-size:clamp(26px,4vw,38px);margin:8px 0 14px}
 .e404-lead{color:var(--ink-soft);font-size:var(--fs-16);line-height:1.6;margin:0 auto 26px}
 .e404-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
