@@ -68,8 +68,17 @@ const fundaciones = () => {
   const j = JSON.parse(readFileSync("data/partners.json", "utf8"));
   return (j.partners || [])
     .filter((p) => p.type === "foundation" && p.consent && p.consent.name === true)
-    .map((p) => ({ loc: APEX + "/f/" + p.id, fuentes: ["data/partners.json"],
-                   freq: "monthly", pri: "0.8" }));
+    /* DOS URLs por fundacion: la ficha en espanol y la misma en ingles. El
+       Worker las sirve desde el mismo `sharePage` y se declaran `hreflang`
+       cruzado, asi que Google indexa las dos y le muestra a cada quien la suya.
+       Si esto listara solo la espanola, la inglesa existiria y nadie la
+       encontraria. */
+    .flatMap((p) => [
+      { loc: APEX + "/f/" + p.id, fuentes: ["data/partners.json"],
+        freq: "monthly", pri: "0.8" },
+      { loc: APEX + "/f/" + p.id + "/en", fuentes: ["data/partners.json"],
+        freq: "monthly", pri: "0.7" }
+    ]);
 };
 
 const armar = () => {
