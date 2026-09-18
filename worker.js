@@ -628,6 +628,15 @@ async function apiCheckout(request, env, url) {
   const centavos = monto * 100;         // Wompi cobra en centavos
   const moneda = "COP";                 // Wompi liquida en COP; el USD del sitio es solo referencia visual
 
+  /* EL FRENO VA AQUÍ, antes de `siguienteGuia`. Un renglón más abajo el número
+     ya está quemado y no vuelve. */
+  const ipCheckout = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+  if (checkoutLimitado(ipCheckout)) {
+    return json({ error: "demasiados_intentos",
+                  ayuda: "Has iniciado varias donaciones seguidas. Espera unos minutos; " +
+                         "si ya llegaste a la pasarela, termina ese pago en vez de empezar otro." }, 429);
+  }
+
   /* --- guía + intención --- */
   const guia = await siguienteGuia(env, anioCO());
 
@@ -8155,19 +8164,47 @@ const ALMA_MAX_CUERPO = 64 * 1024;
 
 /* El límite vive en la memoria del isolate, así que es por isolate y no global.
    No es un control de abuso serio —para eso está la regla de rate limiting del
-   WAF, que es configuración— pero ataja el caso real: alguien dando al botón. */
+   WAF, que es configuración— pero ataja el caso real: alguien dando al botón.
+
+   GENÉRICO PORQUE AHORA SON DOS. Nació para ALMA; `/api/checkout` necesita lo
+   mismo y con otros números, y dos copias de ocho líneas son dos sitios donde
+   arreglar el mismo fallo. La cuenta va por IP porque ninguno de los dos tiene
+   con qué identificar a la persona: ALMA es anónima, y en el checkout el
+   donante todavía no se ha identificado —eso pasa después, en Wompi. */
+function limitadoPorIP(mapa, ip, ventanaMs, max) {
+  const ahora = Date.now();
+  const previos = (mapa.get(ip) || []).filter((t) => ahora - t < ventanaMs);
+  if (previos.length >= max) { mapa.set(ip, previos); return true; }
+  previos.push(ahora);
+  mapa.set(ip, previos);
+  /* Techo de memoria: el isolate no puede crecer sin fin con IPs que ya no
+     vuelven. Vaciar entero es brusco pero correcto — lo peor que pasa es que a
+     alguien se le perdone un golpe. */
+  if (mapa.size > 5000) mapa.clear();
+  return false;
+}
+
 const ALMA_VENTANA_MS = 60000;
 const ALMA_MAX_POR_VENTANA = 10;
 const ALMA_GOLPES = new Map();
-
 function almaLimitada(ip) {
-  const ahora = Date.now();
-  const previos = (ALMA_GOLPES.get(ip) || []).filter((t) => ahora - t < ALMA_VENTANA_MS);
-  if (previos.length >= ALMA_MAX_POR_VENTANA) { ALMA_GOLPES.set(ip, previos); return true; }
-  previos.push(ahora);
-  ALMA_GOLPES.set(ip, previos);
-  if (ALMA_GOLPES.size > 5000) ALMA_GOLPES.clear();
-  return false;
+  return limitadoPorIP(ALMA_GOLPES, ip, ALMA_VENTANA_MS, ALMA_MAX_POR_VENTANA);
+}
+
+/* CHECKOUT. Cada POST que llega aquí QUEMA UN NÚMERO DE GUÍA, y el numerador no
+   se reinicia nunca: es el número que el donante guarda para rastrear su aporte.
+   Era el único endpoint público que escribe sin freno propio — `/api/caso`,
+   `/api/transferencia` y `/api/inscripcion` ya tienen el suyo por identidad.
+
+   Diez cada cinco minutos: quien duda, abandona y vuelve a empezar cabe de
+   sobra, y un script deja de quemar consecutivos a los diez. Es holgado a
+   propósito por el CGNAT de los operadores colombianos, que mete a muchos
+   clientes detrás de la misma IP. */
+const CHECKOUT_VENTANA_MS = 300000;
+const CHECKOUT_MAX_POR_VENTANA = 10;
+const CHECKOUT_GOLPES = new Map();
+function checkoutLimitado(ip) {
+  return limitadoPorIP(CHECKOUT_GOLPES, ip, CHECKOUT_VENTANA_MS, CHECKOUT_MAX_POR_VENTANA);
 }
 
 /* GET /api/trm — la tasa de cambio, de la fuente oficial y no inventada.
