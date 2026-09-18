@@ -571,6 +571,7 @@ try {
 
    Se leen de sus propias fuentes en vez de mantener una lista aparte: una lista
    aparte es otra cosa que se desincroniza. */
+let raicesJornada = [];
 {
   const bloque = src.slice(src.indexOf("var GALLERY = ["), src.indexOf("var lbIndex"));
   const rutas = [...bloque.matchAll(/\{f:"([^"]+)"/g)].map((m) => m[1]);
@@ -593,12 +594,129 @@ try {
       const m = /^jornadas\/(.+)\.[a-z]+$/i.exec(f);
       if (m) esperadas.push("img/jornadas/thumb/" + m[1] + ".webp",
                             "img/jornadas/m/" + m[1] + ".webp");
+      if (m) raicesJornada.push(m[1]);
       for (const ruta of esperadas) {
         if (!existsSync(ruta)) { err("galería: falta " + ruta); faltan++; }
       }
     }
     if (!faltan) ok("galería: " + todas.length + " fotos (" + rutas.length + " de evidencia + "
                     + deFichas.length + " de fichas), con sus tres tamaños");
+  }
+}
+
+/* 3.9b · EL DESCRIPTOR `w` DICE EL ANCHO QUE EL ARCHIVO MIDE DE VERDAD
+   Un `srcset` no es una lista de opciones: es una lista de PROMESAS. El `400w`
+   de una candidata le jura al navegador que ese archivo tiene 400 píxeles de
+   ancho, y el navegador elige con eso y sin abrir nada. Si la promesa es falsa
+   elige mal con total confianza — el mismo modo de fallo que el PR #471 nombró
+   para el `sizes` («un sizes que le miente al navegador es peor que no
+   tenerlo»), pero del otro lado de la coma.
+
+   Medido el 18 sep 2026: CINCO de las 23 miniaturas de jornada anunciaban 400w
+   y no medían 400.
+
+       brigada_manizales_revision   234
+       brigada_aguila_apuntalado    300
+       brigada_aguila_bodega        300
+       brigada_aguila_escombros     300
+       brigada_marsella_equipo      300
+
+   Son las cinco fotos VERTICALES de la brigada: su `thumb/` se generó
+   escalando el LADO LARGO a 400, que en una vertical es la altura, así que el
+   ancho quedó corto. Las de `m/` estaban bien porque se hicieron con
+   `cwebp -resize 800 0`, que fija el ancho. Se regeneraron igual.
+
+   El check 3.9 no podía verlo: comprueba que el archivo EXISTA. Y existía. En
+   pantalla tampoco se ve — la foto sale algo blanda, no rota, y ni el visor ni
+   la rejilla se quejan.
+
+   MIRA LAS DOS FUENTES DE DESCRIPTORES QUE HAY, no una:
+
+   1 · Los que arma `fotoSrcset` en app.js. Las carpetas y sus números se leen
+       del TEXTO de la propia función, no de una lista escrita aquí: si algún
+       día aparece un `l/` de 1200, este check lo sigue solo. Es la misma razón
+       que da 3.9 para leer las rutas de sus fuentes.
+   2 · Los `srcset`/`imagesrcset` literales de index.html — el hero de fútbol,
+       el banner del atardecer y los dos `<picture>` de brigada que añadió el
+       PR #473. Son promesas idénticas y tampoco las miraba nadie. Hoy las
+       nueve son ciertas; el check existe por la décima.
+
+   EL ANCHO SE LEE DE LA CABECERA DEL ARCHIVO, no con `sips`: el gate corre en
+   `ubuntu-latest` y allí no hay `sips` ni `cwebp`. Se parsean las tres formas
+   de WebP (VP8 con pérdida, VP8L sin pérdida, VP8X extendido) y el SOF de
+   JPEG, para que anunciar un `.jpg` no abra un hueco por el que el check
+   pase de largo. Contrastado contra `sips` en los 85 webp y los 18 jpg del
+   repositorio: cero discrepancias. */
+function anchoDeImagen(ruta){
+  let b; try { b = readFileSync(ruta); } catch { return null; }
+  if (b.length > 30 && b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP"){
+    const tipo = b.toString("ascii", 12, 16);
+    /* VP8 : 3 bytes de frame tag, el sync 0x9d 0x01 0x2a, y el ancho en 14 bits. */
+    if (tipo === "VP8 ") return (b[23] === 0x9d && b[24] === 0x01 && b[25] === 0x2a)
+      ? (b.readUInt16LE(26) & 0x3fff) : null;
+    /* VP8L: firma 0x2f y luego ancho-1 en los 14 bits bajos. */
+    if (tipo === "VP8L") return b[20] === 0x2f ? ((b.readUInt32LE(21) & 0x3fff) + 1) : null;
+    /* VP8X: ancho-1 del lienzo, 24 bits little-endian. */
+    if (tipo === "VP8X") return (b[24] | (b[25] << 8) | (b[26] << 16)) + 1;
+    return null;
+  }
+  if (b.length > 4 && b[0] === 0xff && b[1] === 0xd8){
+    let i = 2;
+    while (i < b.length - 9){
+      if (b[i] !== 0xff){ i++; continue; }
+      const marca = b[i + 1];
+      /* Marcas sin longitud: relleno, SOI y los reinicios. */
+      if (marca === 0xd8 || marca === 0x01 || (marca >= 0xd0 && marca <= 0xd7)){ i += 2; continue; }
+      /* SOF0..SOF15 menos DHT (c4), JPG (c8) y DAC (cc): ancho tras alto. */
+      if (marca >= 0xc0 && marca <= 0xcf && marca !== 0xc4 && marca !== 0xc8 && marca !== 0xcc)
+        return b.readUInt16BE(i + 7);
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+  }
+  return null;
+}
+{
+  /* Cada promesa es {ruta, w, donde}. */
+  const promesas = [];
+
+  /* 1 · las que arma fotoSrcset, leídas de su propio cuerpo. */
+  const cuerpo = src.slice(src.indexOf("function fotoSrcset("));
+  const fin = cuerpo.indexOf("\nvar GALLERY");
+  const variantes = [...(fin > 0 ? cuerpo.slice(0, fin) : cuerpo)
+    .matchAll(/jornadas\/([a-z0-9_-]+)\/"[^"]*"\.webp\s+(\d+)w/gi)]
+    .map((m) => ({ dir: m[1], w: +m[2] }));
+  if (!variantes.length) err("3.9b: no pude leer ninguna variante de fotoSrcset en app.js");
+  else for (const raiz of raicesJornada) {
+    for (const v of variantes) promesas.push({
+      ruta: "img/jornadas/" + v.dir + "/" + raiz + ".webp", w: v.w, donde: "fotoSrcset",
+    });
+  }
+
+  /* 2 · los srcset/imagesrcset escritos a mano en index.html. */
+  for (const m of html.matchAll(/\b(?:image)?srcset="([^"]+)"/gi)) {
+    for (const cand of m[1].split(",")) {
+      const c = /^\s*(\S+)\s+(\d+)w\s*$/.exec(cand);
+      if (c) promesas.push({ ruta: c[1].replace(/^\//, ""), w: +c[2], donde: "index.html" });
+    }
+  }
+
+  let mentiras = 0, ilegibles = 0;
+  for (const p of promesas) {
+    if (!existsSync(p.ruta)) continue;   /* la existencia ya la vigila 3.9 */
+    const real = anchoDeImagen(p.ruta);
+    if (real === null) {
+      err("3.9b: no pude leer el ancho de " + p.ruta + " (" + p.donde + "), así que su "
+          + "descriptor " + p.w + "w no lo comprueba nadie");
+      ilegibles++;
+    } else if (real !== p.w) {
+      err("3.9b: " + p.ruta + " anuncia " + p.w + "w (" + p.donde + ") pero mide " + real
+          + "px — el navegador elige esa candidata creyendo que trae " + p.w);
+      mentiras++;
+    }
+  }
+  if (!mentiras && !ilegibles && promesas.length) {
+    ok("descriptores w: " + promesas.length + " promesas (" + variantes.length + " variantes × "
+       + raicesJornada.length + " fotos + literales de index.html) y todas dicen el ancho real");
   }
 }
 
