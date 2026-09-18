@@ -12,7 +12,11 @@ def post(cuerpo):
         except Exception: return e.code, {}
 
 def linea(t, ok, extra=""):
-    print(("  ✓ " if ok else "  ✗ ") + t + (("  " + extra) if extra else "")); return ok
+    # `bool(ok)` y no `ok` a secas: varias llamadas pasan expresiones que al ser
+    # verdaderas devuelven el VALOR, no True — p. ej. `... and d.get("id")`
+    # devuelve el id. Sumando eso, el marcador final decia "23/20 en verde", que
+    # es imposible y hacia inutil el numero justo cuando mas se mira.
+    print(("  ✓ " if ok else "  ✗ ") + t + (("  " + extra) if extra else "")); return bool(ok)
 
 base = {"tipo":"voluntario","nombre":"Ana Prueba","email":"ana@example.com",
         "nivel":"estructura","oficio":"Contabilidad","autoriza_datos":True}
@@ -53,6 +57,25 @@ for nivel, captura, cuidado, imagen in [("hub",False,True,False), ("estructura",
     c = dict(base); c["nivel"] = nivel; c["captura"] = captura; c["email"] = f"{nivel}{captura}@example.com"
     st, d = post(c)
     todo.append(linea(f"nivel={nivel} captura={captura} → se acepta", st == 200, f"http={st}"))
+
+# EL FRENO TIENE QUE ALCANZAR A LAS SEIS PUERTAS, no solo a voluntario.
+# `/api/inscripcion` despacha a seis manejadores, y cinco salen por `return`
+# antes de llegar al cuerpo de voluntario. El 17 sep 2026 el freno nacio DEBAJO
+# de ese despacho: protegia un sexto del endpoint mientras el commit decia que
+# lo cubria entero. Esta prueba existe para que eso no vuelva a colarse.
+freno = "freno-seis-puertas@example.com"
+for i in range(3):
+    post(dict(base, email=freno, nombre=f"Freno {i}"))
+for t in ["especie", "ingeniero", "apadrinamiento", "empresa", "fundacion", "voluntario"]:
+    st, d = post({"tipo": t, "nombre": "Freno", "email": freno, "autoriza_datos": True})
+    todo.append(linea(f"freno alcanza la puerta «{t}»", st == 429,
+                      f"http={st} {d.get('error')}"))
+
+# Y NO puede arrastrar a un correo distinto: se frena por identidad, no en bloque.
+st, d = post({"tipo": "fundacion", "nombre": "Libre", "email": "libre-del-freno@example.com",
+              "autoriza_datos": True})
+todo.append(linea("otro correo NO queda frenado", st == 400 and d.get("error") != "demasiadas_inscripciones",
+                  f"http={st} {d.get('error')}"))
 
 print()
 print(f"  {sum(todo)}/{len(todo)} pruebas en verde")

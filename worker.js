@@ -1417,6 +1417,45 @@ async function apiInscripcion(request, env, url) {
      propio de cada uno — no hacía falta tabla nueva, y por lo tanto tampoco una
      migración más. Con estas, las CINCO puertas de entrada del sitio terminan
      en la misma base y en el mismo panel; ninguna en un tercero. */
+  /* FRENO POR CORREO, Y VA AQUI ARRIBA A PROPOSITO.
+     ------------------------------------------------------------------------
+     Esto NO es un formulario: es SEIS. Las cinco lineas de abajo despachan a su
+     propio manejador y salen por `return`, asi que cualquier cosa escrita mas
+     abajo solo protege a `voluntario`.
+
+     Se puso mal la primera vez. El 17 sep 2026 este freno nacio DENTRO de la
+     rama de voluntario, y el commit decia que cerraba el hueco de
+     `/api/inscripcion`. Cerraba un sexto. Los otros cinco —especie, ingeniero,
+     apadrinamiento, empresa, fundacion— seguian sin nada, y los seis disparan
+     DOS CORREOS por peticion.
+
+     Y el dano que importa no es la bandeja de Sebas: es la CUOTA DE ENVIO. Si un
+     script la quema, lo que deja de salir es el correo transaccional -el recibo
+     de una donacion, el aviso del septimo dia a una familia que espera-. El
+     abuso de un formulario publico se llevaria por delante el canal del que
+     dependen los envios que si importan.
+
+     Tres en diez minutos por correo: quien se equivoco y reenvia cabe de sobra,
+     y un script se detiene. Se cuenta sobre `inscripciones` entera y no por
+     tipo, que es lo correcto: quien abusa no va a quedarse en una sola puerta.
+
+     Sin correo no se frena, porque no hay por donde agarrar. Ninguno de los seis
+     formularios permite hoy enviar sin correo; si alguno llegara a permitirlo,
+     ese caso cae en la regla de rate-limit de Cloudflare -«Escritura publica»,
+     confirmada en el panel el 17 sep 2026-, que cuenta por IP. */
+  const correoIns = String(c.email == null ? "" : c.email).trim().slice(0, 200).toLowerCase();
+  if (correoIns) {
+    const recientesIns = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM inscripciones WHERE LOWER(email) = ? " +
+      "AND creada_en > datetime('now','-10 minutes')"
+    ).bind(correoIns).first();
+    if (recientesIns && recientesIns.n >= 3) {
+      return json({ error: "demasiadas_inscripciones",
+                    ayuda: "Ya recibimos varias inscripciones desde este correo hace un momento. " +
+                           "Espera unos minutos; si ya enviaste la tuya, te escribiremos a ese mismo correo." }, 429);
+    }
+  }
+
   if (c.tipo === "especie")   return await apiOfrecimiento(env, c);
   if (c.tipo === "ingeniero") return await apiIngeniero(env, c);
   if (c.tipo === "apadrinamiento") return await apiApadrinamiento(env, c);
@@ -1439,32 +1478,6 @@ async function apiInscripcion(request, env, url) {
   /* Sin autorización de datos no se guarda NADA. Es Ley 1581, no una casilla
      decorativa: guardar primero y pedir permiso después invertiría el orden. */
   if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
-
-  /* FRENO POR CORREO, el mismo patron que /api/caso y /api/transferencia.
-     Esta era la UNICA de las tres rutas publicas que escriben en la base sin
-     freno, y es la que mas cuesta: cada POST inserta una fila Y DISPARA DOS
-     CORREOS -uno a quien se inscribe y otro al buzon de alianzas-. El honeypot
-     de mas arriba para al robot tonto; no para a nadie que mire el JSON una vez.
-
-     Y el dano que importa no es la bandeja de Sebas: es la CUOTA DE ENVIO. Si un
-     script la quema, lo que deja de salir es el correo transaccional -el recibo
-     de una donacion, el aviso del septimo dia a una familia que espera-. El
-     abuso de un formulario publico se llevaria por delante el canal del que
-     dependen los envios que si importan.
-
-     Tres en diez minutos: quien se equivoco y reenvia cabe de sobra, y un script
-     se detiene. Como en las otras dos, esto NO detiene a quien rote correos; ese
-     caso es la regla de rate-limit de Cloudflare, que es configuracion y no
-     codigo, y sigue sin confirmarse que exista. */
-  const recientesIns = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM inscripciones WHERE email = ? " +
-    "AND creada_en > datetime('now','-10 minutes')"
-  ).bind(email).first();
-  if (recientesIns && recientesIns.n >= 3) {
-    return json({ error: "demasiadas_inscripciones",
-                  ayuda: "Ya recibimos varias inscripciones desde este correo hace un momento. " +
-                         "Espera unos minutos; si ya enviaste la tuya, te escribiremos a ese mismo correo." }, 429);
-  }
 
   const pisaTerritorio = nivel === "hub" || nivel === "mixto";
   const datos = {
