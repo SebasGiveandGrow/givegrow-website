@@ -4533,17 +4533,35 @@ function initGallery(){
     btn.setAttribute("aria-label", cap);
     var img = document.createElement("img");
     img.src = IMG_BASE + thumb;
-    /* EL MISMO `sizes` QUE LA TIRA DE LAS FICHAS, y no es copia-y-pega perezoso.
-       `.gallery` declara tres columnas, pero `.gal-item` está definido DOS veces
-       en styles.css —linea 360 para esta rejilla, linea 737 para la tira— y la
-       segunda gana: `width:min(300px,72vw)` le fija la celda. Medido en el
-       navegador: a 594px de ancho la rejilla reporta una columna de 546px y la
-       foto se dibuja a 298. O sea que hoy las dos galerias miden igual.
+    /* EL `sizes` DE ESTA REJILLA NO ES EL DE LA TIRA DE LAS FICHAS, y la
+       diferencia importa: un `sizes` que le miente al navegador le hace elegir
+       la variante equivocada con total confianza, sin avisar en ninguna parte.
 
-       Si algun dia se arregla ese choque de cascada y la rejilla recupera sus
-       tres columnas, ESTE `sizes` hay que cambiarlo con ella. */
+       Hasta hoy los dos decian lo mismo porque `.gal-item` estaba declarado dos
+       veces en styles.css sin acotar y la regla de la tira ganaba por orden de
+       cascada, imponiendole a la rejilla su ancho de 300px. Ya no: cada bloque
+       lleva su contenedor delante, y la celda vuelve a medir lo que dicta
+       `.gallery`.
+
+       De donde sale cada numero, leido de styles.css y comprobado midiendo:
+
+         hasta 880px   el @media deja UNA columna, ancha como el `.wrap`
+                       -> 100vw menos los 24px de padding de cada lado
+         hasta 1120px  tres columnas dentro del `.wrap`, que todavia crece
+                       -> (100vw - 48 de padding - 28 de los dos gap) / 3
+         mas ancho     el `.wrap` topa en --maxw:1120px y la pista se congela
+                       -> (1120 - 48 - 28) / 3 = 348px
+
+       `fotoSrcset` solo ofrece 400w y 800w, asi que lo unico que decide de
+       verdad es si el numero pasa de 400 (en pantalla 1x) o de 200 (en 2x).
+       Por eso no vale redondear a "33vw": a 1440px eso pediria 475px y en 1x
+       traeria la de 800 para dibujar 348. */
     var ss = fotoSrcset(item.f);
-    if (ss){ img.srcset = ss; img.sizes = "(max-width:416px) 72vw, 300px"; }
+    if (ss){
+      img.srcset = ss;
+      img.sizes = "(max-width:880px) calc(100vw - 48px), "
+                + "(max-width:1120px) calc((100vw - 76px) / 3), 348px";
+    }
     img.alt = cap;
     img.loading = "lazy";
     img.decoding = "async";
