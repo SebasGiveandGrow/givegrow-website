@@ -9252,7 +9252,20 @@ async function almaContextoRed(env, origen) {
     const lineas = [];
     for (const p of partners) {
       const c = p.consent || {};
-      if (p.type === "foundation" && c.name === false) continue;
+      /* `c.name === true` y no «distinto de false». Es la regla 1 del
+         cuestionario —sin `consent.name === true` no hay perfil— y aqui pesa mas
+         que en ningun otro sitio: lo que sale de aqui va al system de un modelo
+         que despues habla en texto libre con el publico. Una aliada sin bloque
+         de consentimiento pasaba la condicion anterior, porque `undefined` no es
+         `false`.
+         Es el MISMO fallo que ya se corrigio en `rutaCompartir` —ver el
+         comentario de la pagina /f/<id>, que lo cuenta— y que sobrevivio aqui.
+         Hoy no hay exposicion real: el check de consentimiento del gate exige
+         `consent.name === true` a todas las entradas de partners.json, asi que
+         ninguna llega sin el. Esto es la segunda cerradura, para la aliada que
+         entre manana. Falla cerrado: si no consta la autorizacion, ALMA no la
+         nombra. */
+      if (p.type === "foundation" && c.name !== true) continue;
       const es = (v) => (v && typeof v === "object" ? v.es : v) || "";
       const partes = ["- " + p.name + " (" + (p.type === "hub" ? "hub" : "fundación aliada") + ")"];
       if (p.area) partes.push("zona: " + es(p.area));
