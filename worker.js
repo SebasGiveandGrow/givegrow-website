@@ -17729,14 +17729,26 @@ abrirDesdeURL();
 
 function sharePage(p) {
   const pr = p.profile || {};
-  const title = p.name + " · Give&Grow International";
+  const title = p.name + " \u00b7 Give&Grow International";
   let desc = (pr.about && pr.about.es) || "";
-  if (desc.length > 155) desc = desc.slice(0, 152).replace(/\s+\S*$/, "") + "…";
+  if (desc.length > 155) desc = desc.slice(0, 152).replace(/\s+\S*$/, "") + "\u2026";
   const consent = p.consent || {};
   const showLogo = p.logo && consent.logo === true;
   const img = showLogo ? ORIGIN + p.logo : ORIGIN + "/img/og.jpg";
   const url = ORIGIN + "/f/" + p.id;
   const spa = "/#fundacion/" + p.id;
+
+  const es = (o) => (o && (o.es || o.en)) || "";
+  const chip = (v) => v ? '<span class="eco-chip">' + esc(v) + '</span>' : "";
+  const tarjetas = (lista) => (lista || []).map((x) =>
+    '<div class="card prog-card"><h3>' + esc(x.name) + '</h3><p>' + esc(es(x.desc)) + '</p></div>'
+  ).join("");
+
+  const programas = (pr.programs && pr.programs.length)
+    ? '<h2>Programas en marcha</h2><div class="grid g2">' + tarjetas(pr.programs) + '</div>' : "";
+  const lineas = (pr.lineas && pr.lineas.length)
+    ? '<h2>L\u00edneas de trabajo</h2><div class="grid g2">' + tarjetas(pr.lineas) + '</div>' : "";
+
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -17754,10 +17766,30 @@ function sharePage(p) {
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="${esc(img)}">
 <link rel="canonical" href="${esc(url)}">
-<meta http-equiv="refresh" content="0;url=${esc(spa)}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<p><a href="${esc(spa)}">${esc(p.name)} — Give&amp;Grow International</a></p>
+<main class="wrap" style="padding-top:34px;padding-bottom:48px">
+  <p><a class="card-link" href="/#hub">&larr; Todas las fundaciones del HUB SOCIAL</a></p>
+  ${showLogo ? '<img src="' + esc(p.logo) + '" alt="" width="120" height="120" style="object-fit:contain;margin-bottom:14px">' : ""}
+  <h1>${esc(p.name)}</h1>
+  ${es(pr.badge) ? '<p><span class="tag">' + esc(es(pr.badge)) + '</span></p>' : ""}
+  <div class="eco-row">${chip(es(p.area))}${chip(es(p.poblacion))}${chip(es(pr.years))}</div>
+  ${es(pr.about) ? '<p class="lead" style="max-width:70ch;margin-top:22px">' + esc(es(pr.about)) + '</p>' : ""}
+  ${es(pr.quote) ? '<blockquote class="ficha-quote">' + esc(es(pr.quote)) + '</blockquote>' : ""}
+  ${programas}
+  ${lineas}
+  ${es(pr.hub) ? '<h2>C\u00f3mo la fortalece el Hub</h2><p style="max-width:70ch">' + esc(es(pr.hub)) + '</p>' : ""}
+  <p style="margin-top:30px">
+    <a class="btn btn-g" href="${esc(spa)}">Ver la ficha interactiva</a>
+  </p>
+  <p class="eco-row" style="margin-top:22px">
+    ${p.url ? '<a class="card-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">Sitio web</a>' : ""}
+    ${p.instagram ? '<a class="card-link" href="' + esc(p.instagram) + '" target="_blank" rel="noopener">Instagram</a>' : ""}
+  </p>
+  <p class="mu" style="margin-top:34px">Fundaci\u00f3n Give&amp;Grow International \u00b7 ESAL \u00b7 NIT 901.948.930-2 \u00b7 Medell\u00edn, Colombia</p>
+</main>
 </body>
 </html>`;
 }
