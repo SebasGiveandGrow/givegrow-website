@@ -17727,30 +17727,56 @@ abrirDesdeURL();
    /f/<id> — página de compartir (sin cambios de comportamiento)
    ======================================================================== */
 
-function sharePage(p) {
+function sharePage(p, lang) {
+  /* BILINGUE, como todo lo demas del sitio. La primera version de esta pagina
+     nacio solo en espanol, y eso incumplia la regla del sistema de diseno: toda
+     pieza nueva nace en ES y EN o no nace. Daba igual cuando eran 100
+     caracteres y una redireccion; dejo de dar igual cuando paso a ser la cara
+     indexable de cada fundacion.
+     Todo el contenido en ingles YA existia en partners.json -los 7 campos y los
+     24 programas y lineas de las tres aliadas-; lo unico que faltaba era
+     elegirlo y traducir los titulos. */
+  const en = lang === "en";
+  const T = en ? {
+    volver: "All the foundations in the Social Hub",
+    programas: "Programs underway",
+    lineas: "Lines of work",
+    hub: "How the Hub strengthens it",
+    ficha: "Open the interactive profile",
+    web: "Website",
+    pie: "Fundaci\u00f3n Give&Grow International \u00b7 Colombian nonprofit \u00b7 NIT 901.948.930-2 \u00b7 Medell\u00edn, Colombia"
+  } : {
+    volver: "Todas las fundaciones del HUB SOCIAL",
+    programas: "Programas en marcha",
+    lineas: "L\u00edneas de trabajo",
+    hub: "C\u00f3mo la fortalece el Hub",
+    ficha: "Ver la ficha interactiva",
+    web: "Sitio web",
+    pie: "Fundaci\u00f3n Give&Grow International \u00b7 ESAL \u00b7 NIT 901.948.930-2 \u00b7 Medell\u00edn, Colombia"
+  };
+
   const pr = p.profile || {};
+  const tx = (o) => (o && ((en ? o.en : o.es) || o.es || o.en)) || "";
   const title = p.name + " \u00b7 Give&Grow International";
-  let desc = (pr.about && pr.about.es) || "";
+  let desc = tx(pr.about);
   if (desc.length > 155) desc = desc.slice(0, 152).replace(/\s+\S*$/, "") + "\u2026";
   const consent = p.consent || {};
   const showLogo = p.logo && consent.logo === true;
   const img = showLogo ? ORIGIN + p.logo : ORIGIN + "/img/og.jpg";
-  const url = ORIGIN + "/f/" + p.id;
+  const urlEs = ORIGIN + "/f/" + p.id;
+  const urlEn = urlEs + "/en";
+  const url = en ? urlEn : urlEs;
   const spa = "/#fundacion/" + p.id;
 
-  const es = (o) => (o && (o.es || o.en)) || "";
   const chip = (v) => v ? '<span class="eco-chip">' + esc(v) + '</span>' : "";
   const tarjetas = (lista) => (lista || []).map((x) =>
-    '<div class="card prog-card"><h3>' + esc(x.name) + '</h3><p>' + esc(es(x.desc)) + '</p></div>'
+    '<div class="card prog-card"><h3>' + esc(x.name) + '</h3><p>' + esc(tx(x.desc)) + '</p></div>'
   ).join("");
-
-  const programas = (pr.programs && pr.programs.length)
-    ? '<h2>Programas en marcha</h2><div class="grid g2">' + tarjetas(pr.programs) + '</div>' : "";
-  const lineas = (pr.lineas && pr.lineas.length)
-    ? '<h2>L\u00edneas de trabajo</h2><div class="grid g2">' + tarjetas(pr.lineas) + '</div>' : "";
+  const bloque = (titulo, lista) => (lista && lista.length)
+    ? '<h2>' + esc(titulo) + '</h2><div class="grid g2">' + tarjetas(lista) + '</div>' : "";
 
   return `<!doctype html>
-<html lang="es">
+<html lang="${en ? "en" : "es"}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17762,39 +17788,43 @@ function sharePage(p) {
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(url)}">
 <meta property="og:image" content="${esc(img)}">
-<meta property="og:locale" content="es_CO">
+<meta property="og:locale" content="${en ? "en_US" : "es_CO"}">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="${esc(img)}">
 <link rel="canonical" href="${esc(url)}">
+<link rel="alternate" hreflang="es" href="${esc(urlEs)}">
+<link rel="alternate" hreflang="en" href="${esc(urlEn)}">
+<link rel="alternate" hreflang="x-default" href="${esc(urlEs)}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <main class="wrap" style="padding-top:34px;padding-bottom:48px">
-  <p><a class="card-link" href="/#hub">&larr; Todas las fundaciones del HUB SOCIAL</a></p>
+  <p><a class="card-link" href="/#hub">&larr; ${esc(T.volver)}</a></p>
   ${showLogo ? '<img src="' + esc(p.logo) + '" alt="" width="120" height="120" style="object-fit:contain;margin-bottom:14px">' : ""}
   <h1>${esc(p.name)}</h1>
-  ${es(pr.badge) ? '<p><span class="tag">' + esc(es(pr.badge)) + '</span></p>' : ""}
-  <div class="eco-row">${chip(es(p.area))}${chip(es(p.poblacion))}${chip(es(pr.years))}</div>
-  ${es(pr.about) ? '<p class="lead" style="max-width:70ch;margin-top:22px">' + esc(es(pr.about)) + '</p>' : ""}
-  ${es(pr.quote) ? '<blockquote class="ficha-quote">' + esc(es(pr.quote)) + '</blockquote>' : ""}
-  ${programas}
-  ${lineas}
-  ${es(pr.hub) ? '<h2>C\u00f3mo la fortalece el Hub</h2><p style="max-width:70ch">' + esc(es(pr.hub)) + '</p>' : ""}
+  ${tx(pr.badge) ? '<p><span class="tag">' + esc(tx(pr.badge)) + '</span></p>' : ""}
+  <div class="eco-row">${chip(tx(p.area))}${chip(tx(p.poblacion))}${chip(tx(pr.years))}</div>
+  ${tx(pr.about) ? '<p class="lead" style="max-width:70ch;margin-top:22px">' + esc(tx(pr.about)) + '</p>' : ""}
+  ${tx(pr.quote) ? '<blockquote class="ficha-quote">' + esc(tx(pr.quote)) + '</blockquote>' : ""}
+  ${bloque(T.programas, pr.programs)}
+  ${bloque(T.lineas, pr.lineas)}
+  ${tx(pr.hub) ? '<h2>' + esc(T.hub) + '</h2><p style="max-width:70ch">' + esc(tx(pr.hub)) + '</p>' : ""}
   <p style="margin-top:30px">
-    <a class="btn btn-g" href="${esc(spa)}">Ver la ficha interactiva</a>
+    <a class="btn btn-g" href="${esc(spa)}">${esc(T.ficha)}</a>
   </p>
   <p class="eco-row" style="margin-top:22px">
-    ${p.url ? '<a class="card-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">Sitio web</a>' : ""}
+    ${p.url ? '<a class="card-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(T.web) + '</a>' : ""}
     ${p.instagram ? '<a class="card-link" href="' + esc(p.instagram) + '" target="_blank" rel="noopener">Instagram</a>' : ""}
+    <a class="card-link" href="${esc(en ? urlEs : urlEn)}">${en ? "Espa\u00f1ol" : "English"}</a>
   </p>
-  <p class="mu" style="margin-top:34px">Fundaci\u00f3n Give&amp;Grow International \u00b7 ESAL \u00b7 NIT 901.948.930-2 \u00b7 Medell\u00edn, Colombia</p>
+  <p class="mu" style="margin-top:34px">${esc(T.pie)}</p>
 </main>
 </body>
 </html>`;
 }
 
-async function rutaCompartir(env, url, id) {
+async function rutaCompartir(env, url, id, lang) {
   try {
     const r = await env.ASSETS.fetch(new URL("/data/partners.json", url.origin));
     const j = await r.json();
@@ -17808,7 +17838,7 @@ async function rutaCompartir(env, url, id) {
       (x) => x.id === id && x.type === "foundation" && x.consent && x.consent.name === true
     );
     if (p) {
-      return new Response(sharePage(p), {
+      return new Response(sharePage(p, lang === "en" ? "en" : "es"), {
         headers: {
           "content-type": "text/html; charset=utf-8",
           "referrer-policy": "strict-origin-when-cross-origin",
@@ -18209,8 +18239,13 @@ export default {
 
   async ruteo(request, env, url, ruta) {
 
-    const compartir = ruta.match(/^\/f\/([a-z0-9-]+)\/?$/);
-    if (compartir) return rutaCompartir(env, url, compartir[1]);
+    /* `/f/<id>` en espanol y `/f/<id>/en` en ingles. DOS URLs y no un parametro
+       ni la cabecera Accept-Language: Google rastrea desde Estados Unidos, asi
+       que negociar por cabecera le daria el ingles y jamas indexaria el
+       espanol. Con dos URLs y `hreflang` cruzado, indexa las dos y le muestra a
+       cada quien la suya. */
+    const compartir = ruta.match(/^\/f\/([a-z0-9-]+)(?:\/(en))?\/?$/);
+    if (compartir) return rutaCompartir(env, url, compartir[1], compartir[2] === "en" ? "en" : "es");
 
     /* El carnet. Fuera de /api/ porque es una página que se abre y se muestra,
        no una respuesta que se consume. */
