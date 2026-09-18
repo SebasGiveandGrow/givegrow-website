@@ -8,7 +8,9 @@ Sebas aprobó una dirección visual institucional que combina tres pilares, insp
 2. **Transparencia financiera como diseño** — el registro, las cifras, los documentos públicos presentados con dignidad tipográfica.
 3. **Estructura editorial** — jerarquía de publicación seria, no de landing de producto.
 
-El ejemplo canónico entregado y aprobado es `givegrow-real-ejemplo.html` (usó contenido y marca reales del sitio). La tipografía Unbounded y el toggle día/noche están aprobados. El siguiente paso estratégico es aplicar esta dirección al sitio vivo.
+El ejemplo canónico entregado y aprobado es `givegrow-real-ejemplo.html` (usó contenido y marca reales del sitio). La tipografía Unbounded y el toggle día/noche están aprobados.
+
+**Ya está aplicada al sitio vivo** (Etapa 1 del rediseño v5 en producción); esta línea decía «el siguiente paso estratégico es aplicar esta dirección», que era cierto cuando se escribió y dejó de serlo. Las etapas 2 y 3 siguen abiertas — ver `CLAUDE.md`, sección CONTINUIDAD.
 
 ## Qué tomar de cada benchmark
 
@@ -29,10 +31,10 @@ De Give&Grow mismo: el verde `#1F5C38` como raíz, el lema "Dar para crecer, cre
 
 ## Fotografía y medios
 
-- Solo medios con consentimiento documentado y fecha de consentimiento registrada (pendiente conocido: foto de fundación NDF).
+- Solo medios con consentimiento documentado y fecha de consentimiento registrada. **Pendiente vigente al 18 sep 2026: la FECHA de NDF** (`consent.date` sigue en `null`). La foto ya no es pendiente: `consent.photos` es `true` y su galería está publicada.
 - Personas retratadas con dignidad y agencia. Prohibido: poses de lástima, primeros planos de sufrimiento, imágenes generadas por IA de personas/comunidades.
 - Formatos: optimizar peso (WebP/AVIF con fallback), lazy-loading fuera del viewport inicial, `alt` bilingüe descriptivo.
-- El banner de fotos es un feature pendiente que requiere media consentida antes de implementarse.
+- ~~El banner de fotos es un feature pendiente~~ — hecho: hay galería con consentimiento verificado en `#impacto` y en la ficha de cada fundación, y solo se pinta si `consent.photos === true`.
 
 ## Voz de copy
 
@@ -46,5 +48,5 @@ De Give&Grow mismo: el verde `#1F5C38` como raíz, el lema "Dar para crecer, cre
 
 ## Piezas futuras ya diseñadas conceptualmente (no implementar sin luz verde)
 
-- **Recibos de donación**: prototipo Wompi completo existe (estética ledger día/noche, numeración GG-YYYY-NNNNNN). Pendiente validación DIAN con contadora antes de comunicar beneficio fiscal.
+- ~~**Recibos de donación**: prototipo~~ — **están en producción** desde la Fase 5: `documentos.js` los arma con `pdf-lib` y el recibo sale solo. Lo que sigue necesitando persona es el **certificado**, que firma la Revisora Fiscal bajo gravedad de juramento desde `/admin`; su articulado vive en dos archivos y el check #10 del gate falla si divergen.
 - **Heros Wall**: tres niveles (anónimos con contador honesto / con nombre / destacados con logo), consentimiento de visibilidad por Ley 1581, tiers orgánicos sin montos individuales. Pendientes decisiones de Sebas sobre tiers visibles y frases de protagonistas.

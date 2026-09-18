@@ -22,13 +22,28 @@
 - Dropdowns señalizados: "El Hub" y "Nosotros" con `toggleDrop()` — click para abrir, click-fuera y ESC para cerrar.
 - Breakpoint de navegación: 1024px. Desplegado en commit `0e1cf9b`.
 
-## Patrón de deploy (GitHub Trees API, commit atómico)
+## Patrón de deploy
 
-1. Sebas provee token de sesión → guardar en `/home/claude/.ghtoken`, `chmod 600`.
-2. Fetch HEAD SHA de `main` → fetch base tree SHA.
-3. Crear blobs de archivos modificados → crear tree con `base_tree` → crear commit → PATCH ref.
-4. Al cierre de sesión: borrar el token del disco; Sebas lo revoca manualmente.
-5. `scripts/validate.mjs` corre como gate de CI antes de cada deploy a Cloudflare — el commit debe pasarlo.
+**La fuente de verdad del flujo es `CLAUDE.md`, no este archivo.** Aquí solo va
+lo imprescindible para no equivocarse de camino:
+
+1. Rama `claude/<tema>`. **Nunca push directo a `main`.**
+2. `node scripts/validate.mjs` antes de cada commit. Se lee por su **código de
+   salida** (`echo $?`), no por grep: el gate escribe sus fallos como `NO OK`,
+   que no cruza un patrón `fail|error`.
+3. PR con la etiqueta `automerge` para el trabajo rutinario; **sin** la etiqueta
+   cuando el cambio necesita el ojo de Sebas — típicamente cualquier cosa que
+   altere cómo se ve una página pública.
+4. El bot fusiona en cuanto el gate está verde y dispara el deploy. Nunca
+   `gh pr merge --auto`.
+5. Comprobar después que el código llegó: `node ops/en-produccion.mjs`.
+
+> **Lo que decía antes este apartado, y por qué se borró.** Describía un flujo de
+> la época del sandbox de claude.ai: pedirle a Sebas un token de GitHub,
+> guardarlo en `/home/claude/.ghtoken` y commitear por la Trees API. Nada de eso
+> aplica —hoy se trabaja con `git` y `gh` en la máquina de Sebas— y además le
+> pedía a una sesión futura que manejara una credencial en disco, que es
+> justamente lo que no se hace.
 
 ## Checklist pre-deploy (obligatorio, en orden)
 
@@ -37,13 +52,36 @@
 3. `node scripts/validate.mjs` pasa localmente.
 4. CSP: ningún recurso nuevo apunta a dominios externos; fuentes/librerías nuevas van a `/vendor/` con hash.
 5. Accesibilidad mínima: contraste AA en ambos modos, focus visible en interactivos nuevos, `prefers-reduced-motion` respetado en animaciones nuevas.
-6. Render check: sin navegador en sandbox (Playwright bloqueado), la verificación visual la hace Sebas — pedirle capturas desktop + móvil post-deploy y revisarlas como imágenes.
-7. Commit atómico via Trees API con mensaje descriptivo.
+6. Render check: **hay navegador propio** (el panel del escritorio). La
+   verificación visual y las mediciones las hace Claude —anchos reales,
+   `transferSize`, qué variante elige un `srcset`, contraste en día y noche— y
+   se reportan medidas, no impresiones. A Sebas solo se le pide lo que el panel
+   no alcanza: Safari en un iPhone real, y el aspecto de algo que cambia de
+   apariencia y es decisión suya. Este punto decía lo contrario («Playwright
+   bloqueado, la verificación la hace Sebas») y devolvía trabajo verificable.
+7. Cache-bust: si se tocó `app.js` o `styles.css`, recalcular su md5 en
+   `index.html` **al final de todo**. Si se tocó `index.html` o
+   `data/partners.json`, regenerar `sitemap.xml` DESPUÉS de commitear —
+   `--check` es un paso aparte del gate y cruzar la medianoche lo rompe solo.
+8. Commit en la rama, con mensaje descriptivo. (Aquí decía «via Trees API»: ver
+   la nota del apartado anterior.)
 
 ## Pendientes conocidos (no olvidar, no implementar sin luz verde)
 
-- Banner de fotos (requiere media consentida).
-- Integraciones Wompi y MercadoPago (esperando confirmación oficial).
-- Foto y fecha de consentimiento de fundación NDF.
-- Parche de red-en-vivo para ALMA.
-- Verificación visual humana de la barra de navegación nueva.
+Revisados contra el código el 18 sep 2026; cada uno dice cómo volver a
+comprobarlo, para que la próxima revisión no dependa de creerle a esta lista.
+
+- ~~Banner de fotos~~ — hay galería con consentimiento verificado en dos sitios:
+  `#impacto` y la ficha de cada fundación. Se pinta solo si
+  `consent.photos === true`.
+- ~~Integración Wompi~~ — **viva en producción** desde agosto de 2026
+  (`WOMPI_PUBLIC_KEY` empieza por `pub_prod_` en `wrangler.toml`). **MercadoPago
+  no existe** y no se anuncia: cero apariciones en `index.html` y `app.js`.
+- **Fecha de consentimiento de NDF: SIGUE PENDIENTE.** La foto ya no —
+  `consent.photos` es `true`— pero `consent.date` es `null`. Es lo único que
+  falta de ese bloque. Comprobar con:
+  `python3 -c "import json;p=json.load(open('data/partners.json'));print([x['consent'] for x in p['partners'] if x['id']=='ndf'][0])"`
+- Parche de red-en-vivo para ALMA — sigue respondiendo con texto fijo, no lee
+  `partners.json`.
+- ~~Verificación visual humana de la barra de navegación~~ — el breakpoint de
+  1024px está en producción y verificado en el navegador.
