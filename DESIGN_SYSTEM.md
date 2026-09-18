@@ -11,8 +11,13 @@ Estas reglas son vinculantes: cualquier trabajo nuevo debe respetarlas.
 - Tipografías: **Unbounded** (display — títulos h1/h2 y cifras clave, con moderación), **Inter** (cuerpo, UI, h3/h4), **Fraunces** italic (acento editorial). Bricolage Grotesque quedó retirada (etapa anterior de marca).
 
 ## Reglas de diseño (nuevas / confirmadas)
-1. **Cero emojis en todo el sitio.** Sin excepción. Todo ícono es SVG line-art.
-2. **Íconos = SVG line-art**: `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-width="1.8"`, `class="ic-svg"`. Badge contenedor `.ic` de 46px, radio 12; el SVG a 24px. Íconos botánicos (seed/sprout/tree/forest) para los niveles de membresía.
+1. **Cero emojis en la interfaz.** Comprobado el 18 sep 2026 recorriendo los
+   rangos Unicode de emoji en `index.html`, `app.js`, `styles.css` y `worker.js`:
+   **no hay ninguno en pantalla**. Los `⚠️` que aparecen al buscar están todos
+   dentro de comentarios de código, que no son interfaz. La regla se cumple.
+   Lo que sí tiene excepciones es «todo ícono es SVG line-art» — ver el punto 2.
+2. **Íconos = SVG line-art**: `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-width="1.8"`, `class="ic-svg"`. Badge contenedor `.ic` de 46px, radio 12; **el SVG se pinta a 30px** (`.ic-svg`), no a 24 — 24 es el viewBox. Íconos botánicos (seed/sprout/tree/forest) para los niveles de membresía.
+   - Excepciones vivas, contadas el 18 sep 2026: **3 SVG con `stroke-width="2"`** (el sol y la luna del interruptor de tema, y uno más) y un puñado de **glifos de texto usados como ícono** — `✓` en la línea de tiempo del rastreo público (`app.js`), y `○ ✓ ▣ ◆ ✉ ⌂ →` en el panel `/admin`. No son emojis, son símbolos tipográficos; pero la regla dice SVG, así que o se migran o esta lista los ampara. Se deja escrita para que no vuelva a parecer que la regla se cumple al 100%.
 3. **Sistema de tarjetas unificado**: `.card` con badge `.ic`, sombra `var(--shadow)` en reposo. Enlaces dentro de tarjeta con `.card-link` (verde, negrita, con flecha `→`).
 4. **Patrón de pasos**: `.steps > .step > .step-n` (círculo verde numerado). El número vive SOLO en `.step-n`; **no** repetirlo en el título (evitar doble numeración).
 5. **Ritmo de secciones**: alternar fondos claro / `.cream` (`--surface-2`) / `.band` (`--ink-deep`, verde-tinta profundo — **no** navy) para dar cadencia visual.
@@ -72,10 +77,20 @@ puntos**: los 72 que había eran deriva de ajustar a ojo.
 (dos capas, con su versión de noche).
 
 ## Deploy y verificación (obligatorio)
-- Deploy vía **GitHub Actions** al llegar a `main`. Rama `claude/<tema>` → PR
-  **sin** `automerge` → lo fusiona Sebas. Nunca push directo a `main`.
-- Gate obligatorio antes de commitear: **`node scripts/validate.mjs`** (21
-  comprobaciones). Exportar antes `PATH="/opt/homebrew/bin:$PATH"`.
+- Deploy vía **GitHub Actions** al llegar a `main`. Rama `claude/<tema>`, nunca
+  push directo a `main`. **El flujo manda en `CLAUDE.md`; si este archivo y aquel
+  discrepan, gana `CLAUDE.md`.**
+- **PR CON la etiqueta `automerge`** para el trabajo rutinario: el bot fusiona en
+  cuanto el gate está verde. **Sin** la etiqueta solo cuando el cambio necesita el
+  ojo de Sebas — típicamente lo que altera cómo se ve una página pública.
+  *(Esta línea decía lo contrario —«PR sin `automerge` → lo fusiona Sebas»— y
+  contradecía a `CLAUDE.md`. Seguirla dejaba PRs abiertos en silencio, que es una
+  cicatriz ya conocida del repositorio.)*
+- Gate obligatorio antes de commitear: **`node scripts/validate.mjs`**. Exportar
+  antes `PATH="/opt/homebrew/bin:$PATH"`. **Se lee por el código de salida**
+  (`node scripts/validate.mjs; echo $?`), nunca por grep: escribe sus fallos como
+  `NO OK`, que no cruza un patrón `fail|error`. Aquí decía «21 comprobaciones» y
+  hoy corre **61** — por eso ya no va el número: lo dice el propio gate al correr.
 - **Cache-bust por hash, no por fecha:** `md5 -q styles.css | cut -c1-8` y lo
   mismo con `app.js`, y ese valor va en el `?v=` de `index.html`. **Recalcularlo
   al final de todo**, nunca a mitad: retocar el CSS después del rebust hace que
