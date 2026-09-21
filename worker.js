@@ -223,6 +223,10 @@ function ambienteWompi(pub) {
   return {
     api: esPrueba ? "https://sandbox.wompi.co/v1" : "https://production.wompi.co/v1",
     checkout: "https://checkout.wompi.co/p/",
+    /* El widget vive en el MISMO host en los dos ambientes: lo que cambia es la
+       llave publica que se le pasa. Se nombra aqui para que la CSP y el <script>
+       lean el origen de un solo sitio. */
+    widget: "https://checkout.wompi.co",
     modo: esPrueba ? "sandbox" : "produccion"
   };
 }
@@ -11710,8 +11714,14 @@ function cspPagina(o) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    "connect-src 'self'",
+    "connect-src " + (op.connect || "'self'"),
     "worker-src 'self'",
+    /* `frame-src` no estaba porque ninguna pagina propia habia necesitado un
+       iframe. El widget de tokenizacion de Wompi si: los campos de la tarjeta
+       los pinta EL, dentro de su iframe, y por eso el numero nunca toca nuestro
+       JavaScript. Sin esta linea el iframe no carga y no hay tokenizacion.
+       Por defecto sigue siendo 'none', asi que ninguna pagina existente cambia. */
+    "frame-src " + (op.frame || "'none'"),
     "form-action " + (op.form || "'none'"),
     "base-uri 'none'",
     "object-src 'none'",
@@ -17777,6 +17787,245 @@ abrirDesdeURL();
    /f/<id> — página de compartir (sin cambios de comportamiento)
    ======================================================================== */
 
+/* ========================================================================
+   FUENTES DE PAGO — registrar un metodo para cobrar despues
+   ========================================================================
+
+   PARA QUE. Una membresia con debito automatico necesita cobrar sin que la
+   persona intervenga cada mes. En Wompi eso se hace con una FUENTE DE PAGO: se
+   registra una vez y despues se cobra con su `payment_source_id`.
+
+   POR QUE EL WIDGET Y NO EL API DIRECTO. Wompi permite las dos cosas. Con el
+   API directo los campos de la tarjeta irian en NUESTRA pagina, el numero
+   pasaria por nuestro JavaScript, y eso mueve a la fundacion de PCI SAQ A a
+   SAQ A-EP: ~139 preguntas anuales en vez de ~22. Con el widget en modo
+   `tokenize` los campos los pinta Wompi dentro de su iframe y el numero NUNCA
+   toca nuestro codigo. Se paga un script de tercero a cambio de no asumir esa
+   carga, y el trato vale la pena.
+
+   LA LINEA QUE NO SE CRUZA: el numero de tarjeta no entra al Worker, ni a los
+   logs, ni a D1. Aqui solo llega un `tok_…` que ya es un token. Si alguien
+   algun dia enruta los datos de la tarjeta por aqui «para simplificar», el
+   alcance salta a PCI DSS completo. Ver migrations/0028.
+
+   LOS DOS TOKENS DE ACEPTACION SON OBLIGATORIOS desde el cambio de API de
+   Wompi, y no son un tramite: uno es la politica de privacidad y el otro la
+   autorizacion de tratamiento de datos (Ley 1581). La persona tiene que ver
+   los dos contratos y aceptarlos explicitamente. Por eso van como dos casillas
+   separadas con su enlace, y no como una sola casilla de «acepto todo». */
+
+async function wompiInfoComercio(env) {
+  const pub = env.WOMPI_PUBLIC_KEY;
+  if (!pub) return null;
+  const amb = ambienteWompi(pub);
+  /* `/merchants/info` con la llave en CABECERA. El endpoint viejo
+     —`/merchants/<llave>`, con la llave en la URL— lo retira Wompi el 31 de
+     octubre de 2026; este nace con el nuevo para no heredar una migracion. */
+  const r = await fetch(amb.api + "/merchants/info", {
+    headers: { "x-merchant-public-key": pub }
+  });
+  if (!r.ok) return null;
+  const j = await r.json();
+  const d = (j && j.data) || {};
+  const a = d.presigned_acceptance || {};
+  const b = d.presigned_personal_data_auth || {};
+  if (!a.acceptance_token || !b.acceptance_token) return null;
+  return {
+    privacidad: { token: a.acceptance_token, enlace: a.permalink },
+    datos:      { token: b.acceptance_token, enlace: b.permalink },
+    metodos:    d.accepted_payment_methods || []
+  };
+}
+
+function paginaMetodoPago(cfg) {
+  const amb = cfg.amb, info = cfg.info;
+  const aviso = cfg.aviso ? '<p class="mu" style="color:var(--err)">' + esc(cfg.aviso) + '</p>' : "";
+  return '<!doctype html>\n'
++ '<html lang="es">\n'
++ '<head>\n'
++ '<meta charset="utf-8">\n'
++ '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
++ '<title>Registrar metodo de pago · Give&amp;Grow International</title>\n'
++ '<meta name="robots" content="noindex, nofollow">\n'
++ '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
++ '<link rel="stylesheet" href="/styles.css">\n'
++ '</head>\n'
++ '<body>\n'
++ '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
++ '  <p><a class="card-link" href="/#membresias">&larr; Volver a membresías</a></p>\n'
++ '  <h1>Registra tu método de pago</h1>\n'
++ '  <p class="lead">Con esto podemos cobrar tu membresía cada mes sin que tengas que entrar otra vez. Puedes retirarlo cuando quieras.</p>\n'
++ '  <p class="mu">Los datos de tu tarjeta los recibe <b>Wompi</b> directamente, dentro de su propia ventana. Give&amp;Grow no los ve, no los recibe y no los guarda: solo guardamos los cuatro últimos dígitos para que reconozcas cuál registraste.</p>\n'
++ aviso
++ '  <form method="POST" action="/api/pago/fuente" class="card" style="margin-top:22px;padding:20px">\n'
++ '    <label class="et" for="fp-email">Tu correo</label>\n'
++ '    <input id="fp-email" name="email" type="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com">\n'
++ '\n'
++ '    <label style="display:flex;gap:10px;align-items:flex-start;margin-top:18px">\n'
++ '      <input type="checkbox" name="acepta_privacidad" value="1" required style="margin-top:4px">\n'
++ '      <span>He leído y acepto la <a href="' + esc(info.privacidad.enlace) + '" target="_blank" rel="noopener">política de privacidad de Wompi</a>.</span>\n'
++ '    </label>\n'
++ '    <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px">\n'
++ '      <input type="checkbox" name="acepta_datos" value="1" required style="margin-top:4px">\n'
++ '      <span>Autorizo el <a href="' + esc(info.datos.enlace) + '" target="_blank" rel="noopener">tratamiento de mis datos personales</a> (Ley 1581).</span>\n'
++ '    </label>\n'
++ '\n'
++ '\n'
++ '    <!-- HIJO DIRECTO DEL <form>, y no es estilo: el widget busca el\n'
++ '         formulario en su elemento PADRE. Envuelto en un <div> falla con\n'
++ '         «El atributo method del <form> debe ser POST» aunque el form lo\n'
++ '         tenga, porque no es el form lo que esta mirando. -->\n'
++ '    <script src="' + esc(amb.widget) + '/widget.js"\n'
++ '      data-render="button"\n'
++ '      data-widget-operation="tokenize"\n'
++ '      data-public-key="' + esc(cfg.pub) + '"></script>\n'
++ '  </form>\n'
++ '  <p class="mu" style="margin-top:22px;font-size:var(--fs-13)">Ambiente: ' + esc(amb.modo) + '</p>\n'
++ '</main>\n'
++ '</body>\n'
++ '</html>';
+}
+
+async function rutaMetodoPago(env, url) {
+  const pub = env.WOMPI_PUBLIC_KEY;
+  if (!pub) return new Response("Pasarela no configurada", { status: 503 });
+  const info = await wompiInfoComercio(env);
+  if (!info) return new Response("No se pudo preparar el formulario. Intenta en unos minutos.", { status: 503 });
+  const amb = ambienteWompi(pub);
+  const html = paginaMetodoPago({ amb, info, pub, aviso: url.searchParams.get("aviso") || "" });
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      /* LA CSP DE ESTA PAGINA, Y SOLO DE ESTA. El sitio publico sigue con
+         `default-src 'self'` y sin scripts de terceros; aqui se abre lo justo
+         para el widget —su script y su iframe— porque es el precio de no
+         alojar nosotros los campos de la tarjeta. Por eso esta pagina la sirve
+         el Worker y no es una seccion del SPA: para que la excepcion no se
+         contagie al resto. */
+      "content-security-policy": cspPagina({
+        script: "'self' " + ambienteWompi(pub).widget,
+        frame:  ambienteWompi(pub).widget,
+        form:   "'self'"
+      }),
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
+async function apiCrearFuentePago(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+  const pub = env.WOMPI_PUBLIC_KEY, prv = env.WOMPI_PRIVATE_KEY;
+  if (!pub || !prv) return json({ error: "pasarela_no_configurada" }, 503);
+
+  /* Llega como envio de FORMULARIO, no como JSON: el widget agrega su campo al
+     form y lo manda. Por eso la respuesta tambien es una redireccion y no un
+     JSON — al otro lado hay un navegador, no nuestro codigo. */
+  let f;
+  try { f = await request.formData(); } catch { return volverAlFormulario(url, "No se pudo leer el formulario."); }
+
+  const email = String(f.get("email") || "").trim().slice(0, 200);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return volverAlFormulario(url, "Revisa tu correo: no parece valido.");
+  }
+  /* Las DOS casillas, y por separado. Son dos contratos distintos —politica de
+     privacidad y Ley 1581— y Wompi exige un token para cada uno. Una sola
+     casilla de «acepto todo» no seria aceptacion explicita de ninguno. */
+  if (!f.get("acepta_privacidad") || !f.get("acepta_datos")) {
+    return volverAlFormulario(url, "Hay que aceptar los dos documentos para continuar.");
+  }
+
+  /* EL NOMBRE DEL CAMPO DEL TOKEN NO ESTA DOCUMENTADO. La guia de Wompi dice
+     «con el token dentro de la respuesta» y no dice como se llama. En vez de
+     adivinar un nombre y romperse en silencio el dia que lo cambien, se busca
+     el valor por su FORMA: un token de tarjeta empieza por `tok_` y uno de
+     Nequi por `nequi_`. Asi funciona con cualquier nombre de campo. */
+  let token = "", tipo = "";
+  for (const [, v] of f.entries()) {
+    const s2 = String(v || "");
+    if (/^tok_[A-Za-z0-9_]+$/.test(s2))   { token = s2; tipo = "CARD";  break; }
+    if (/^nequi_[A-Za-z0-9_]+$/.test(s2)) { token = s2; tipo = "NEQUI"; break; }
+  }
+  if (!token) {
+    /* Se registran los NOMBRES de los campos recibidos, nunca sus valores: por
+       aqui pasa un token de pago y no tiene por que quedar en un log. */
+    console.error("fuente de pago sin token; campos recibidos:", [...f.keys()].join(","));
+    return volverAlFormulario(url, "No recibimos el metodo de pago. Intenta de nuevo.");
+  }
+
+  const info = await wompiInfoComercio(env);
+  if (!info) return volverAlFormulario(url, "No pudimos confirmar los terminos con la pasarela. Intenta en unos minutos.");
+
+  const amb = ambienteWompi(pub);
+  let creada;
+  try {
+    const r = await fetch(amb.api + "/payment_sources", {
+      method: "POST",
+      headers: { "content-type": "application/json", "authorization": "Bearer " + prv },
+      body: JSON.stringify({
+        type: tipo,
+        token: token,
+        customer_email: email,
+        acceptance_token: info.privacidad.token,
+        accept_personal_auth: info.datos.token
+      })
+    });
+    creada = await r.json();
+    if (!r.ok) {
+      /* El motivo de Wompi si se registra —es lo unico que permite entender un
+         rechazo—, pero nunca el cuerpo que enviamos. */
+      console.error("payment_sources", r.status, JSON.stringify(creada && creada.error || {}).slice(0, 300));
+      return volverAlFormulario(url, "La pasarela no acepto el metodo de pago. Revisa los datos e intenta de nuevo.");
+    }
+  } catch (e) {
+    console.error("payment_sources red", e && e.message);
+    return volverAlFormulario(url, "No pudimos contactar la pasarela. Intenta en unos minutos.");
+  }
+
+  const d = (creada && creada.data) || {};
+  const pd = d.public_data || {};
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO fuentes_pago (proveedor, fuente_ref, tipo, estado, email, marca, ultimos_cuatro, exp_mes, exp_anio) " +
+    "VALUES ('wompi', ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(
+    String(d.id || ""), String(d.type || tipo), String(d.status || ""), email,
+    pd.brand || null, pd.last_four || null, pd.exp_month || null, pd.exp_year || null
+  ).run();
+
+  const q = new URLSearchParams({ ok: "1" });
+  if (pd.last_four) q.set("t4", String(pd.last_four));
+  return Response.redirect(ORIGIN + "/pago/listo?" + q.toString(), 303);
+}
+
+/* Se vuelve al formulario con el motivo a la vista. Un 303 y no un JSON porque
+   quien esta al otro lado es un navegador que acaba de enviar un formulario:
+   devolverle `{"error":...}` lo dejaria mirando texto crudo. */
+function volverAlFormulario(url, motivo) {
+  const q = new URLSearchParams({ aviso: motivo });
+  return Response.redirect(new URL("/pago/metodo?" + q.toString(), url.origin).toString(), 303);
+}
+
+function paginaPagoListo(url) {
+  const t4 = String(url.searchParams.get("t4") || "").replace(/[^0-9]/g, "").slice(0, 4);
+  return '<!doctype html>\n'
++ '<html lang="es">\n<head>\n<meta charset="utf-8">\n'
++ '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
++ '<title>Método de pago registrado · Give&amp;Grow International</title>\n'
++ '<meta name="robots" content="noindex, nofollow">\n'
++ '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
++ '<link rel="stylesheet" href="/styles.css">\n</head>\n<body>\n'
++ '<main class="wrap" style="padding-top:40px;padding-bottom:48px;max-width:640px">\n'
++ '  <h1>Listo</h1>\n'
++ '  <p class="lead">Tu método de pago quedó registrado'
++ (t4 ? ' (termina en <b>' + esc(t4) + '</b>)' : '')
++ '. Desde ahora podemos cobrar tu membresía sin que tengas que entrar cada mes.</p>\n'
++ '  <p class="mu">Puedes retirarlo cuando quieras escribiéndonos. Guardamos los cuatro últimos dígitos y la fecha de vencimiento; el número de tu tarjeta no lo tenemos.</p>\n'
++ '  <p style="margin-top:28px"><a class="btn btn-g" href="/#membresias">Volver a membresías</a></p>\n'
++ '</main>\n</body>\n</html>';
+}
+
 function sharePage(p, lang) {
   /* BILINGUE, como todo lo demas del sitio. La primera version de esta pagina
      nacio solo en espanol, y eso incumplia la regla del sistema de diseno: toda
@@ -18562,6 +18811,18 @@ export default {
     /* PayPal. Publicas por necesidad -las llama un navegador que va a pagar, y el
        webhook lo llama PayPal, que no tiene sesion- y las dos son INERTES sin sus
        secretos, asi que estar aqui antes de estar probadas no habilita nada. */
+    /* Registrar un metodo de pago. PUBLICAS a proposito y antes del guardian:
+       las abre un donante sin sesion. Su proteccion no es Access —no hay con
+       que identificarlo todavia— sino que el token que llega ya viene de Wompi
+       y que la llave privada solo vive aqui. */
+    if (ruta === "/pago/metodo")       return await rutaMetodoPago(env, url);
+    if (ruta === "/pago/listo")        return new Response(paginaPagoListo(url), {
+      headers: { "content-type": "text/html; charset=utf-8",
+                 "content-security-policy": cspPagina({}),
+                 "cache-control": "private, no-store",
+                 "x-robots-tag": "noindex, nofollow" } });
+    if (ruta === "/api/pago/fuente")   return await apiCrearFuentePago(request, env, url);
+
     if (ruta === "/api/trm")               return await apiTrm(request);
     if (ruta === "/api/paypal/suscripcion") return await apiPaypalSuscripcion(request, env, url);
     if (ruta === "/api/paypal/webhook")     return await apiPaypalWebhook(request, env);
