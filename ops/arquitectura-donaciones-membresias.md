@@ -131,3 +131,71 @@ la batería exige un `wrangler dev` recién arrancado y lo dice si no lo está.
 `/pago/metodo` ni a `/api/pago/suscribir`, así que hoy nadie llega a este flujo
 por su cuenta. `/pago/listo` enlaza a `/membresia` para que al menos haya una
 puerta.
+
+## 8. El cobro mensual: por qué no puede cobrar dos veces
+
+Este es el único código del proyecto que **mueve dinero solo**, sin que nadie
+mire. Tenía dos fallos, y los dos del mismo tipo que los del aviso del séptimo
+día: el sistema creía que iba bien.
+
+### El doble cobro
+
+`ultimo_cobro_en` solo se escribe cuando el cobro termina bien. Si el `fetch`
+reventaba —un corte, un tiempo de espera— **después** de que Wompi creara la
+transacción, la fila quedaba en `intencion`, la suscripción se quedaba con la
+fecha vieja, y al día siguiente el cron la volvía a elegir y cobraba otra vez,
+con guía nueva. Medido en el banco local: dos aportes, dos consecutivos
+quemados, y con una fuente real **dos cobros el mismo mes**.
+
+**La referencia de Wompi es la llave.** Wompi exige que `reference` sea única
+por comercio y responde `422` si se repite. **No hay forma de consultar una
+transacción por referencia** —solo por su id, que es justo lo que no tenemos
+cuando el fetch revienta— así que esa unicidad es el único mecanismo
+disponible. Y alcanza: **reintentar con la MISMA guía es imposible que cobre dos
+veces.** O Wompi nunca la recibió y el cobro sale, o ya la tiene y la rechaza
+por duplicada, que es como nos enteramos de que ya estaba cobrada.
+
+Esto explica además el `INPUT_VALIDATION_ERROR` que quedó sin explicación en las
+pruebas del 20 sep: era `reference: La referencia ya ha sido usada`.
+
+**El 422 duplicado solo se interpreta como «ya estaba cobrada» en un REINTENTO.**
+En un cobro nuevo significa que nuestro consecutivo chocó con uno ya usado en
+Wompi, y eso tiene que sonar, no callarse.
+
+Lo que decide el camino es el último aporte de los 25 días anteriores:
+
+| Estado del último aporte | Qué hace |
+|---|---|
+| ninguno | cobro nuevo, guía nueva |
+| `rechazada` / `error` | cobro nuevo, guía nueva (una tarjeta caída se reintenta) |
+| `intencion` | **reintento con la misma guía** |
+| cualquier otro (`aprobada`…) | ya está cobrado: pone `ultimo_cobro_en` al día y no cobra |
+
+### El rechazo que no contaba
+
+El tope de tres rechazos vivía dentro de la rama de fallo inmediato. **Con
+tarjeta eso casi nunca ocurre:** Wompi acepta con `201` y deja la transacción en
+`PENDING`; el rechazo llega después, por webhook. Así que `r.ok` era `true`, se
+contaba como cobro bueno, se escribía `ultimo_cobro_en`, y el contador de
+rechazos **no se consultaba jamás**. Una tarjeta que se cae mes tras mes no
+suspendía nada y no avisaba a nadie: la persona seguía figurando como miembro y
+no entraba un peso.
+
+Ahora el tope se mira **antes de cobrar**, sobre el historial grabado —que es lo
+que el webhook actualiza— así que el rechazo cuenta venga de donde venga.
+
+### Los contadores del log
+
+`cobrados` pasó a `creados`, y se le suma `yaEstaban`. Lo que el cron sabe es
+que la transacción existe, no que el dinero llegó; eso lo dice el webhook. El
+nombre viejo hacía leer el log como si fuera dinero cobrado.
+
+### Probarlo
+
+```
+npx wrangler dev --port 8797 --persist-to /tmp/gg-cobro --test-scheduled
+PERSIST=/tmp/gg-cobro python3 ops/probar-cobro-mensual.py
+```
+9 comprobaciones. Contra el código anterior falla 7. **Llama al sandbox de Wompi
+de verdad**, con una fuente falsa que Wompi rechaza: lo que se mide es cuántas
+filas se crean de nuestro lado, y esas se escriben antes de la llamada.
