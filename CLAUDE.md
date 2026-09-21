@@ -113,6 +113,19 @@ Olvidarlo = los usuarios ven la versión vieja hasta 1 año.
 - **Migraciones D1**: `migrations/`. Se aplican A MANO y **antes** de que el
   código llegue a producción — la 0003 añade `aportes.token`, que `/api/checkout`
   escribe; al revés, el checkout se cae. Detalle en `ops/documentos.md`.
+  ```bash
+  npx wrangler d1 migrations apply givegrow-privado --remote
+  npx wrangler d1 migrations list  givegrow-privado --remote   # debe decir "No migrations to apply!"
+  ```
+  **`d1 execute --file` NO sirve para esto.** Ejecuta el SQL pero **no lo
+  registra** en la tabla de migraciones, así que la tabla queda creada y el
+  job `La base está migrada` del deploy la sigue viendo pendiente y **bloquea
+  el despliegue**. Pasó el 21 sep 2026 con la 0028: la tabla existía, el deploy
+  fallaba, y el mensaje —«Hay migraciones SIN APLICAR»— parecía contradecir la
+  realidad. Reaplicar con el comando bueno es seguro si la migración usa
+  `IF NOT EXISTS`, que es otra razón para escribirlas así.
+  Y hay que correrlo **dentro del repo**: sin `wrangler.toml` a la vista falla
+  con «No configuration file found».
 - **El certificado de donación NO se emite solo.** Lo firma la Revisora Fiscal
   bajo la gravedad de juramento; sale de `/admin`, revisado por una persona. Su
   texto lo suministró la contadora: no se edita sin ella.
