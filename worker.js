@@ -17932,6 +17932,254 @@ async function rutaMetodoPago(env, url) {
   });
 }
 
+/* ========================================================================
+   COBRO RECURRENTE CON FUENTE DE PAGO
+   ========================================================================
+
+   ES EL GEMELO DE `apiCheckout`, y a proposito. Misma guia, misma firma de
+   integridad, misma fila en `aportes`, mismo webhook para el estado final. Lo
+   unico que cambia es que no hay redireccion —nadie esta mirando— y que en vez
+   de mandar a la persona a la pasarela se envia `payment_source_id`.
+
+   Reusar ese camino no es pereza: significa que el rastreo por guia, el recibo,
+   el certificado y la pantalla del donante funcionan igual para un cobro
+   automatico que para uno manual, sin una segunda implementacion que se
+   desincronice.
+
+   `recurrent: true` NO es cosmetico. Con VISA y MasterCard sobre RBM activa
+   Credential On File, que sube la tasa de aprobacion; y le dice al emisor que
+   es un cobro periodico autorizado, no una compra sorpresa. */
+
+async function wompiCobrar(env, sub) {
+  const pub = env.WOMPI_PUBLIC_KEY, prv = env.WOMPI_PRIVATE_KEY;
+  const sec = env.WOMPI_INTEGRITY_SECRET;
+  if (!pub || !prv || !sec) return { ok: false, motivo: "pasarela_no_configurada" };
+
+  const fuente = await env.DB.prepare(
+    "SELECT fuente_ref, tipo, estado, email FROM fuentes_pago WHERE id = ?"
+  ).bind(sub.fuente_id).first();
+  if (!fuente) return { ok: false, motivo: "sin_fuente" };
+  if (fuente.estado !== "AVAILABLE") return { ok: false, motivo: "fuente_" + String(fuente.estado || "").toLowerCase() };
+
+  const centavos = Number(sub.monto_centavos || 0);
+  if (!centavos) return { ok: false, motivo: "monto_invalido" };
+  const moneda = String(sub.moneda || "COP");
+
+  /* LA GUIA SE QUEMA AQUI Y NO ANTES. Si algo falla mas arriba —sin fuente,
+     monto malo— no se consume un consecutivo. */
+  const guia = await siguienteGuia(env, anioCO());
+  const amb = ambienteWompi(pub);
+
+  await env.DB.prepare(
+    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
+    "idioma, token, proveedor, suscripcion, donante_id) " +
+    "VALUES (?, 'intencion', ?, ?, 'fondo', ?, ?, ?, 'wompi', ?, ?)"
+  ).bind(guia, centavos, moneda, String(sub.frecuencia || "mensual"),
+         String(sub.idioma || "es"), tokenNuevo(), sub.id, sub.donante_id || null).run();
+
+  const firma = await sha256Hex(guia + centavos + moneda + sec);
+
+  let j;
+  try {
+    const r = await fetch(amb.api + "/transactions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "authorization": "Bearer " + prv },
+      body: JSON.stringify({
+        amount_in_cents: centavos,
+        currency: moneda,
+        signature: firma,
+        customer_email: fuente.email,
+        reference: guia,
+        payment_source_id: Number(fuente.fuente_ref),
+        recurrent: true,
+        /* `installments` solo aplica a tarjeta; con Nequi el objeto sobra. Una
+           donacion recurrente va siempre a una cuota: diferirla le cobraria
+           intereses al donante por un aporte. */
+        ...(fuente.tipo === "CARD" ? { payment_method: { installments: 1 } } : {})
+      })
+    });
+    j = await r.json();
+    if (!r.ok) {
+      /* EL DETALLE, NO SOLO EL TIPO. Wompi manda `error.type` —util para
+         clasificar— y `error.messages`, que es donde dice QUE campo esta mal.
+         La primera version guardaba solo el tipo, y cuando aparecio un
+         INPUT_VALIDATION_ERROR suelto durante las pruebas no hubo manera de
+         saber por que: no se reprodujo en cuatro intentos siguientes y quedo
+         sin explicar. Con los mensajes, el proximo no queda en el aire. */
+      const er = (j && j.error) || {};
+      const msgs = er.messages && typeof er.messages === "object"
+        ? Object.entries(er.messages).map(([k, v]) => k + ": " + [].concat(v).join(", ")).join(" | ")
+        : "";
+      const razon = [er.type || er.reason || ("http_" + r.status), msgs].filter(Boolean).join(" — ");
+      await env.DB.prepare(
+        "UPDATE aportes SET estado = 'rechazada', wompi_estado = ? WHERE guia = ?"
+      ).bind(String(razon).slice(0, 120), guia).run();
+      return { ok: false, motivo: "rechazo_pasarela", guia, detalle: String(razon).slice(0, 120) };
+    }
+  } catch (e) {
+    /* La fila queda en `intencion`: ni cobrada ni rechazada, que es la verdad.
+       Si la transaccion si se creo al otro lado, el webhook la encontrara por
+       la referencia y la pondra al dia. */
+    await env.DB.prepare("UPDATE aportes SET wompi_estado = 'sin_respuesta' WHERE guia = ?").bind(guia).run();
+    return { ok: false, motivo: "sin_respuesta", guia };
+  }
+
+  const tx = (j && j.data) || {};
+  await env.DB.prepare(
+    "UPDATE aportes SET wompi_transaction_id = ?, wompi_estado = ?, proveedor_ref = ? WHERE guia = ?"
+  ).bind(String(tx.id || ""), String(tx.status || ""), String(tx.id || ""), guia).run();
+
+  /* El estado FINAL lo pone el webhook, no esto. Una transaccion recien creada
+     viene en PENDING casi siempre, y darla por aprobada aqui seria contar
+     dinero que todavia no llego. */
+  await env.DB.prepare(
+    "UPDATE suscripciones SET cobros = COALESCE(cobros,0) + 1, ultimo_cobro_en = datetime('now'), " +
+    "actualizada_en = datetime('now') WHERE id = ?"
+  ).bind(sub.id).run();
+
+  return { ok: true, guia, transaccion: String(tx.id || ""), estado: String(tx.status || "") };
+}
+
+/* SUSCRIBIR: atar una fuente de pago a un nivel y cobrar la primera vez.
+   ------------------------------------------------------------------------
+   El primer cobro va AQUI, en el acto, y no lo deja para el cron. Dos razones:
+   la persona esta presente y puede ver si su tarjeta fue rechazada, y una
+   suscripcion que nace sin un cobro exitoso es una promesa sin comprobar. */
+/* EL COBRO DEL MES. Lo dispara la tarea programada, una vez al dia.
+   ------------------------------------------------------------------------
+   IDEMPOTENTE POR CONSTRUCCION: solo entra quien lleva un mes sin cobro, y
+   `wompiCobrar` escribe `ultimo_cobro_en` al terminar bien. Si el cron corre
+   dos veces el mismo dia, la segunda no encuentra a nadie.
+
+   CON TOPE POR EJECUCION. No es por rendimiento: es para acotar el dano. Si
+   algo esta mal —una firma, un secreto rotado, la pasarela caida— el fallo
+   toca 20 suscripciones y no todas, y al dia siguiente se reintenta. Un bucle
+   sin tope sobre dinero ajeno es una decision que nadie tomo a proposito.
+
+   SE SUSPENDE AL TERCER RECHAZO. Sin esto, una tarjeta cancelada se reintenta
+   todos los dias para siempre: le cobra al donante nada, pero nos quema
+   consecutivos de guia y llena el historial de rechazos. Tres en diez dias es
+   una tarjeta que ya no sirve, y suspender es honesto — la persona puede
+   volver a suscribirse con otra.
+
+   OJO CON EL DIA DEL MES: `-1 month` sobre el 31 cae en un dia que no existe y
+   SQLite lo normaliza hacia adelante, asi que quien se suscriba un 31 puede
+   derivar uno o dos dias al ano. Para una donacion es tolerable; si algun dia
+   deja de serlo, hay que guardar el dia de cobro aparte y no derivarlo de la
+   fecha del ultimo. */
+const COBROS_POR_EJECUCION = 20;
+
+async function cobrarSuscripcionesDelMes(env) {
+  if (!env.DB || !env.WOMPI_PRIVATE_KEY) return { ok: true, motivo: "sin_pasarela", cobrados: 0 };
+
+  const { results } = await env.DB.prepare(
+    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id " +
+    "FROM suscripciones " +
+    "WHERE proveedor = 'wompi' AND estado = 'activa' AND fuente_id IS NOT NULL " +
+    "AND (ultimo_cobro_en IS NULL OR ultimo_cobro_en <= datetime('now','-1 month')) " +
+    "ORDER BY ultimo_cobro_en ASC LIMIT ?"
+  ).bind(COBROS_POR_EJECUCION).all();
+
+  const pendientes = results || [];
+  let cobrados = 0, fallidos = 0, suspendidas = 0;
+
+  for (const sub of pendientes) {
+    let r;
+    try { r = await wompiCobrar(env, sub); }
+    catch (e) { r = { ok: false, motivo: "excepcion" }; console.error("cobro", sub.id, e && e.message); }
+
+    if (r.ok) { cobrados++; continue; }
+    fallidos++;
+    console.error("cobro fallido", sub.id, r.motivo, r.detalle || "");
+
+    const rechazos = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM aportes WHERE suscripcion = ? AND estado = 'rechazada' " +
+      "AND creada_en > datetime('now','-10 days')"
+    ).bind(sub.id).first();
+    if (rechazos && rechazos.n >= 3) {
+      await env.DB.prepare(
+        "UPDATE suscripciones SET estado = 'suspendida', cancelada_motivo = 'tres rechazos seguidos', " +
+        "actualizada_en = datetime('now') WHERE id = ?"
+      ).bind(sub.id).run();
+      suspendidas++;
+    }
+  }
+
+  return { ok: true, revisadas: pendientes.length, cobrados, fallidos, suspendidas,
+           tope: COBROS_POR_EJECUCION };
+}
+
+async function apiSuscribir(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+
+  const email = String(c.email || "").trim().slice(0, 200).toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+
+  const monto = c.monto;
+  if (typeof monto !== "number" || !Number.isInteger(monto) || monto < MONTO_MIN || monto > MONTO_MAX) {
+    return json({ error: "monto_invalido", min: MONTO_MIN, max: MONTO_MAX }, 400);
+  }
+
+  /* LA FUENTE SE BUSCA POR CORREO, no se recibe su id. Si el id viniera del
+     cliente, cualquiera podria suscribir la tarjeta de otro poniendo un numero
+     distinto: son consecutivos. Asi solo se puede cobrar a una fuente que se
+     registro con ese mismo correo. */
+  const fuente = await env.DB.prepare(
+    "SELECT id FROM fuentes_pago WHERE LOWER(email) = ? AND estado = 'AVAILABLE' AND retirada_en IS NULL " +
+    "ORDER BY id DESC LIMIT 1"
+  ).bind(email).first();
+  if (!fuente) return json({ error: "sin_metodo_de_pago",
+    ayuda: "Primero registra un metodo de pago con este mismo correo." }, 409);
+
+  /* UNA SUSCRIPCION ACTIVA POR CORREO. Sin esto, dos envios del formulario
+     —o dos pestanas— dejan a la persona pagando dos veces al mes. */
+  const ya = await env.DB.prepare(
+    "SELECT s.id FROM suscripciones s JOIN donantes d ON d.id = s.donante_id " +
+    "WHERE s.proveedor = 'wompi' AND s.estado = 'activa' AND LOWER(d.email) = ? LIMIT 1"
+  ).bind(email).first();
+  if (ya) return json({ error: "ya_suscrito", suscripcion: ya.id,
+    ayuda: "Ya tienes una membresia activa con este correo." }, 409);
+
+  const nivel = nivelPorMensual(Math.round(monto));
+  /* Se reutiliza `donantePorCorreo`, que ya existe y hace justo esto: inserta
+     o actualiza por correo y devuelve el id. */
+  const donante = await donantePorCorreo(env, email, String(c.nombre || '').slice(0, 120));
+
+  /* EL ID LO PONEMOS NOSOTROS. `suscripciones.id` es TEXT y no autoincremental
+     porque PayPal trae el suyo (I-XXXX). Con Wompi no hay id del proveedor —la
+     suscripcion es nuestra, no de ellos— asi que se genera uno con prefijo, que
+     ademas deja ver de un vistazo de que proveedor es cada fila. */
+  const subId = "w-" + tokenNuevo();
+  await env.DB.prepare(
+    "INSERT INTO suscripciones (id, proveedor, estado, nivel, monto_centavos, moneda, frecuencia, " +
+    "donante_id, idioma, quiere_certificado, consent_muro, fuente_id) " +
+    "VALUES (?, 'wompi', 'activa', ?, ?, 'COP', 'mensual', ?, ?, ?, ?, ?)"
+  ).bind(subId, nivel.id, Math.round(monto) * 100, donante, c.idioma === "en" ? "en" : "es",
+         c.certificado ? 1 : 0, ["nombre","anonimo","no"].includes(c.muro) ? c.muro : "no",
+         fuente.id).run();
+  const sub = await env.DB.prepare(
+    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id FROM suscripciones WHERE id = ?"
+  ).bind(subId).first();
+
+  const cobro = await wompiCobrar(env, sub);
+  if (!cobro.ok) {
+    /* La suscripcion NO queda activa si el primer cobro no sale. Dejarla viva
+       seria prometerle a alguien una membresia que nunca se cobro. */
+    await env.DB.prepare(
+      "UPDATE suscripciones SET estado = 'fallida', cancelada_motivo = ?, actualizada_en = datetime('now') WHERE id = ?"
+    ).bind(String(cobro.motivo || "").slice(0, 120), subId).run();
+    return json({ error: "primer_cobro_fallido", motivo: cobro.motivo, detalle: cobro.detalle || null,
+      ayuda: "No pudimos hacer el primer cobro. Revisa tu metodo de pago o prueba con otro." }, 402);
+  }
+
+  return json({ ok: true, suscripcion: subId, nivel: nivel.id, guia: cobro.guia, estado: cobro.estado });
+}
+
 async function apiCrearFuentePago(request, env, url) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   if (!env.DB) return json({ error: "base_no_configurada" }, 503);
@@ -18539,6 +18787,15 @@ export default {
       } catch (e) {
         console.error("aviso septimo dia", e && e.message);
       }
+      /* En su propio try: que un fallo cobrando no impida el aviso a las
+         familias, ni al reves. Son dos trabajos sin relacion que comparten
+         disparador. */
+      try {
+        const c = await cobrarSuscripcionesDelMes(env);
+        console.log("cobro mensual", JSON.stringify(c));
+      } catch (e) {
+        console.error("cobro mensual", e && e.message);
+      }
     })());
   },
 
@@ -18856,6 +19113,7 @@ export default {
                  "cache-control": "private, no-store",
                  "x-robots-tag": "noindex, nofollow" } });
     if (ruta === "/api/pago/fuente")   return await apiCrearFuentePago(request, env, url);
+    if (ruta === "/api/pago/suscribir") return await apiSuscribir(request, env, url);
 
     if (ruta === "/api/trm")               return await apiTrm(request);
     if (ruta === "/api/paypal/suscripcion") return await apiPaypalSuscripcion(request, env, url);
