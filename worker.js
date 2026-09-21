@@ -17814,6 +17814,25 @@ abrirDesdeURL();
    los dos contratos y aceptarlos explicitamente. Por eso van como dos casillas
    separadas con su enlace, y no como una sola casilla de «acepto todo». */
 
+/* LA MARCA SALE DEL BIN, Y EL BIN NO SE GUARDA.
+   Wompi no devuelve `brand` en una fuente de pago —comprobado consultando una
+   real: `public_data` trae bin, last_four, card_holder, validity_ends_at y
+   type—. Los seis primeros digitos si identifican la franquicia, asi que se
+   deduce aqui y se guarda solo el resultado. PCI permite conservar BIN y
+   ultimos cuatro juntos, pero una vez deducida la marca el BIN no sirve para
+   nada, y lo que no se guarda no se filtra. */
+function marcaDesdeBin(bin) {
+  const b = String(bin || "").replace(/\D/g, "");
+  if (!b) return null;
+  if (b[0] === "4") return "VISA";
+  const dos = Number(b.slice(0, 2)), cuatro = Number(b.slice(0, 4));
+  if ((dos >= 51 && dos <= 55) || (cuatro >= 2221 && cuatro <= 2720)) return "MASTERCARD";
+  if (dos === 34 || dos === 37) return "AMEX";
+  if (dos === 36 || dos === 38 || dos === 30) return "DINERS";
+  if (dos === 65 || cuatro === 6011) return "DISCOVER";
+  return null;
+}
+
 async function wompiInfoComercio(env) {
   const pub = env.WOMPI_PUBLIC_KEY;
   if (!pub) return null;
@@ -17986,16 +18005,27 @@ async function apiCrearFuentePago(request, env, url) {
 
   const d = (creada && creada.data) || {};
   const pd = d.public_data || {};
+  /* LOS NOMBRES SALEN DE UNA RESPUESTA REAL, no de la documentacion. La guia de
+     Wompi muestra `public_data: {type: "CARD"}` y nada mas; la respuesta de
+     verdad trae bin, last_four, card_holder y validity_ends_at. La primera
+     version de esto leia `pd.brand`, `pd.exp_month` y `pd.exp_year` —que no
+     existen— y guardo tres columnas vacias sin que nada avisara.
+
+     `validity_ends_at` es la vigencia de la FUENTE, no de la tarjeta: en la
+     prueba vino con seis anios justos por delante. Por eso la columna se llama
+     `vigencia_hasta` y no `vence_en`. Ver migrations/0029. */
   await env.DB.prepare(
-    "INSERT OR IGNORE INTO fuentes_pago (proveedor, fuente_ref, tipo, estado, email, marca, ultimos_cuatro, exp_mes, exp_anio) " +
-    "VALUES ('wompi', ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT OR IGNORE INTO fuentes_pago (proveedor, fuente_ref, tipo, estado, email, marca, ultimos_cuatro, vigencia_hasta) " +
+    "VALUES ('wompi', ?, ?, ?, ?, ?, ?, ?)"
   ).bind(
     String(d.id || ""), String(d.type || tipo), String(d.status || ""), email,
-    pd.brand || null, pd.last_four || null, pd.exp_month || null, pd.exp_year || null
+    marcaDesdeBin(pd.bin), pd.last_four || null, pd.validity_ends_at || null
   ).run();
 
   const q = new URLSearchParams({ ok: "1" });
   if (pd.last_four) q.set("t4", String(pd.last_four));
+  const marca = marcaDesdeBin(pd.bin);
+  if (marca) q.set("m", marca);
   return Response.redirect(ORIGIN + "/pago/listo?" + q.toString(), 303);
 }
 
@@ -18009,6 +18039,10 @@ function volverAlFormulario(url, motivo) {
 
 function paginaPagoListo(url) {
   const t4 = String(url.searchParams.get("t4") || "").replace(/[^0-9]/g, "").slice(0, 4);
+  /* Igual de estricto que con los digitos: solo letras, y de una lista corta.
+     Lo que llega por la URL lo escribe cualquiera. */
+  const mp = String(url.searchParams.get("m") || "").replace(/[^A-Z]/g, "").slice(0, 12);
+  const marca = ["VISA","MASTERCARD","AMEX","DINERS","DISCOVER"].includes(mp) ? mp : "";
   return '<!doctype html>\n'
 + '<html lang="es">\n<head>\n<meta charset="utf-8">\n'
 + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -18019,7 +18053,7 @@ function paginaPagoListo(url) {
 + '<main class="wrap" style="padding-top:40px;padding-bottom:48px;max-width:640px">\n'
 + '  <h1>Listo</h1>\n'
 + '  <p class="lead">Tu método de pago quedó registrado'
-+ (t4 ? ' (termina en <b>' + esc(t4) + '</b>)' : '')
++ (t4 ? ' (' + (marca ? esc(marca) + ' ' : '') + 'termina en <b>' + esc(t4) + '</b>)' : '')
 + '. Desde ahora podemos cobrar tu membresía sin que tengas que entrar cada mes.</p>\n'
 + '  <p class="mu">Puedes retirarlo cuando quieras escribiéndonos. Guardamos los cuatro últimos dígitos y la fecha de vencimiento; el número de tu tarjeta no lo tenemos.</p>\n'
 + '  <p style="margin-top:28px"><a class="btn btn-g" href="/#membresias">Volver a membresías</a></p>\n'
