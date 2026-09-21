@@ -18037,17 +18037,62 @@ async function wompiCobrar(env, sub) {
   if (!centavos) return { ok: false, motivo: "monto_invalido" };
   const moneda = String(sub.moneda || "COP");
 
-  /* LA GUIA SE QUEMA AQUI Y NO ANTES. Si algo falla mas arriba —sin fuente,
-     monto malo— no se consume un consecutivo. */
-  const guia = await siguienteGuia(env, anioCO());
   const amb = ambienteWompi(pub);
 
-  await env.DB.prepare(
-    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
-    "idioma, token, proveedor, suscripcion, donante_id) " +
-    "VALUES (?, 'intencion', ?, ?, 'fondo', ?, ?, ?, 'wompi', ?, ?)"
-  ).bind(guia, centavos, moneda, String(sub.frecuencia || "mensual"),
-         String(sub.idioma || "es"), tokenNuevo(), sub.id, sub.donante_id || null).run();
+  /* ===================================================================
+     NO COBRAR DOS VECES EL MISMO MES
+     ===================================================================
+
+     EL AGUJERO. `ultimo_cobro_en` solo se escribe cuando esto termina bien.
+     Si el `fetch` revienta —un corte de red, un tiempo de espera— DESPUES de
+     que Wompi creo la transaccion, la fila queda en `intencion`, la suscripcion
+     se queda con la fecha vieja, y manana el cron la vuelve a elegir y cobra
+     OTRA VEZ. Medido en el banco local: una suscripcion con un intento de ayer
+     en `sin_respuesta` produjo un segundo aporte al dia siguiente, con guia
+     nueva. Con una fuente real eso son dos cobros en el mismo mes.
+
+     LA REFERENCIA DE WOMPI ES LA LLAVE. Wompi exige que `reference` sea unica
+     por comercio y responde 422 «la referencia ya ha sido usada» si se repite —
+     comprobado sin querer en el banco local, y de paso explica el
+     INPUT_VALIDATION_ERROR que quedo sin explicacion en las pruebas de ayer.
+     No hay forma de consultar una transaccion por referencia (solo por su id,
+     que es justo lo que no tenemos cuando el fetch revento), asi que esa
+     unicidad es el UNICO mecanismo disponible — y alcanza: REINTENTAR CON LA
+     MISMA GUIA es imposible que cobre dos veces. O Wompi nunca la recibio y el
+     cobro sale, o ya la tiene y la rechaza por duplicada, que es como nos
+     enteramos de que ya estaba cobrada.
+
+     Y de paso deja de quemar un consecutivo en cada reintento. */
+  const reciente = await env.DB.prepare(
+    "SELECT guia, estado FROM aportes WHERE suscripcion = ? " +
+    "AND creada_en > datetime('now','-25 days') ORDER BY creada_en DESC LIMIT 1"
+  ).bind(sub.id).first();
+
+  /* Una tarjeta RECHAZADA si se reintenta, y con guia nueva: ahi no hay nada
+     cobrado que proteger, y el tope de tres rechazos limita la insistencia. */
+  const rechazado = reciente && ["rechazada", "error"].includes(String(reciente.estado));
+
+  if (reciente && !rechazado && String(reciente.estado) !== "intencion") {
+    /* Ya hay un cobro VIVO de este periodo —aprobado, o camino de estarlo— y la
+       suscripcion se quedo sin fecha por algun tropiezo. Se pone al dia y no se
+       cobra: el dinero ya salio. */
+    await env.DB.prepare(
+      "UPDATE suscripciones SET ultimo_cobro_en = datetime('now'), actualizada_en = datetime('now') WHERE id = ?"
+    ).bind(sub.id).run();
+    return { ok: true, guia: reciente.guia, yaCobrado: true, estado: String(reciente.estado) };
+  }
+
+  const reintento = !!(reciente && !rechazado && String(reciente.estado) === "intencion");
+  const guia = reintento ? String(reciente.guia) : await siguienteGuia(env, anioCO());
+
+  if (!reintento) {
+    await env.DB.prepare(
+      "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
+      "idioma, token, proveedor, suscripcion, donante_id) " +
+      "VALUES (?, 'intencion', ?, ?, 'fondo', ?, ?, ?, 'wompi', ?, ?)"
+    ).bind(guia, centavos, moneda, String(sub.frecuencia || "mensual"),
+           String(sub.idioma || "es"), tokenNuevo(), sub.id, sub.donante_id || null).run();
+  }
 
   const firma = await sha256Hex(guia + centavos + moneda + sec);
 
@@ -18083,10 +18128,33 @@ async function wompiCobrar(env, sub) {
         ? Object.entries(er.messages).map(([k, v]) => k + ": " + [].concat(v).join(", ")).join(" | ")
         : "";
       const razon = [er.type || er.reason || ("http_" + r.status), msgs].filter(Boolean).join(" — ");
+
+      /* REFERENCIA DUPLICADA EN UN REINTENTO = YA ESTABA COBRADA.
+         Es la respuesta que buscabamos: Wompi confirma que ya tiene esa
+         transaccion, asi que el intento de ayer si llego y lo unico que se
+         perdio fue su respuesta. Se pone la suscripcion al dia y se devuelve
+         ok — tratarlo como rechazo contaria un cobro bueno como fallo y, a los
+         tres, suspenderia a alguien que esta pagando.
+
+         SOLO EN UN REINTENTO, y esto importa. En un cobro NUEVO, una referencia
+         duplicada significa que nuestro consecutivo choco con uno ya usado en
+         Wompi: eso es un problema de verdad y tiene que sonar, no callarse.
+         Es exactamente lo que paso en las pruebas de ayer y quedo sin explicar. */
+      const duplicada = r.status === 422 && er.messages && er.messages.reference;
+      if (reintento && duplicada) {
+        await env.DB.prepare(
+          "UPDATE suscripciones SET cobros = COALESCE(cobros,0) + 1, ultimo_cobro_en = datetime('now'), " +
+          "actualizada_en = datetime('now') WHERE id = ?"
+        ).bind(sub.id).run();
+        console.log("cobro ya estaba en la pasarela", sub.id, guia);
+        return { ok: true, guia, yaEstaba: true };
+      }
+
       await env.DB.prepare(
         "UPDATE aportes SET estado = 'rechazada', wompi_estado = ? WHERE guia = ?"
       ).bind(String(razon).slice(0, 120), guia).run();
-      return { ok: false, motivo: "rechazo_pasarela", guia, detalle: String(razon).slice(0, 120) };
+      return { ok: false, motivo: "rechazo_pasarela", guia, detalle: String(razon).slice(0, 120),
+               reintento };
     }
   } catch (e) {
     /* La fila queda en `intencion`: ni cobrada ni rechazada, que es la verdad.
@@ -18153,31 +18221,50 @@ async function cobrarSuscripcionesDelMes(env) {
   ).bind(COBROS_POR_EJECUCION).all();
 
   const pendientes = results || [];
-  let cobrados = 0, fallidos = 0, suspendidas = 0;
+  let creados = 0, yaEstaban = 0, fallidos = 0, suspendidas = 0;
 
   for (const sub of pendientes) {
+    /* EL TOPE DE RECHAZOS SE MIRA ANTES DE COBRAR, y no solo cuando el cobro
+       falla en el momento. Estaba dentro de la rama de fallo inmediato, y con
+       tarjeta ESO CASI NUNCA OCURRE: Wompi acepta la transaccion con 201 y la
+       deja en PENDING; el rechazo llega despues, por webhook. Asi que
+       `r.ok` era true, se contaba como cobro bueno, se escribia
+       `ultimo_cobro_en` — y el contador de rechazos no se consultaba jamas.
+       Una tarjeta que se cae mes tras mes no suspendia nada y no avisaba a
+       nadie: la persona seguia figurando como miembro y no entraba un peso.
+
+       Consultando el historial GRABADO —que es lo que el webhook actualiza—
+       el rechazo cuenta venga de donde venga. */
+    const rechazos = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM aportes WHERE suscripcion = ? AND estado IN ('rechazada','error') " +
+      "AND creada_en > datetime('now','-100 days')"
+    ).bind(sub.id).first();
+    if (rechazos && Number(rechazos.n) >= 3) {
+      await env.DB.prepare(
+        "UPDATE suscripciones SET estado = 'suspendida', cancelada_motivo = 'tres cobros rechazados', " +
+        "actualizada_en = datetime('now') WHERE id = ?"
+      ).bind(sub.id).run();
+      suspendidas++;
+      console.error("suscripcion suspendida por rechazos", sub.id, rechazos.n);
+      continue;
+    }
+
     let r;
     try { r = await wompiCobrar(env, sub); }
     catch (e) { r = { ok: false, motivo: "excepcion" }; console.error("cobro", sub.id, e && e.message); }
 
-    if (r.ok) { cobrados++; continue; }
+    if (r.ok) {
+      /* `creados` y no `cobrados`: lo que sabemos aqui es que la transaccion
+         existe, no que el dinero llego. Eso lo dice el webhook. El nombre
+         viejo hacia leer el log del cron como si fuera dinero cobrado. */
+      if (r.yaCobrado || r.yaEstaba) yaEstaban++; else creados++;
+      continue;
+    }
     fallidos++;
     console.error("cobro fallido", sub.id, r.motivo, r.detalle || "");
-
-    const rechazos = await env.DB.prepare(
-      "SELECT COUNT(*) AS n FROM aportes WHERE suscripcion = ? AND estado = 'rechazada' " +
-      "AND creada_en > datetime('now','-10 days')"
-    ).bind(sub.id).first();
-    if (rechazos && rechazos.n >= 3) {
-      await env.DB.prepare(
-        "UPDATE suscripciones SET estado = 'suspendida', cancelada_motivo = 'tres rechazos seguidos', " +
-        "actualizada_en = datetime('now') WHERE id = ?"
-      ).bind(sub.id).run();
-      suspendidas++;
-    }
   }
 
-  return { ok: true, revisadas: pendientes.length, cobrados, fallidos, suspendidas,
+  return { ok: true, revisadas: pendientes.length, creados, yaEstaban, fallidos, suspendidas,
            tope: COBROS_POR_EJECUCION };
 }
 
