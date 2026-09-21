@@ -920,6 +920,63 @@ async function avisoSinBuzon(env, etiqueta) {
   return { ok: true, sinDestino: true };
 }
 
+/* ========================================================================
+   EL PRESUPUESTO DIARIO DE CORREO
+   ========================================================================
+
+   POR QUE EXISTE. El plan de Resend son 100 correos al dia para TODO, y
+   `pay-as-you-go` esta apagado a proposito: pasarse no cuesta dinero, cuesta
+   correos que no salen. Hasta aqui, cuando el cupo se agotaba, los envios
+   empezaban a fallar en el orden en que llegaban — o sea, al azar— y el unico
+   rastro era una fila `fallo` que nadie mira. El recibo de alguien que acababa
+   de donar podia perderse para que saliera un aviso interno que el equipo ya
+   veia en el panel.
+
+   LA REGLA. Cuando queda poco, gana quien esta FUERA de la organizacion. El
+   equipo tiene el panel; una familia esperando un concepto, un donante
+   esperando su recibo o un ingeniero voluntario no tienen nada mas.
+
+   SE DECIDE POR DESTINATARIO Y NO POR ETIQUETA, que fue la primera idea. Una
+   lista de etiquetas «criticas» se queda vieja en cuanto alguien anade la
+   numero 34 y se olvida de apuntarla, y el fallo seria silencioso justo el dia
+   malo. Los buzones propios estan en la configuracion y no se multiplican: lo
+   que va a uno de ellos es interno, y todo lo demas va a una persona. Lo
+   desconocido cuenta como persona, que es el lado seguro.
+
+   `sin_cupo` ES UN RESULTADO PROPIO y no un `fallo`. Importa por dos razones:
+   se distingue de un error de Resend al mirar la tabla, y la idempotencia del
+   aviso del septimo dia solo cuenta 'enviado' y 'simulado' — asi que lo que
+   hoy no cupo se reintenta manana en vez de darse por hecho.
+
+   EL DIA ES EL DE UTC, como el de Resend. */
+const CORREO_TOPE_DIA = 95;
+const CORREO_RESERVA_PERSONAS = 25;
+
+async function cupoDeCorreo(env, para) {
+  if (!env.DB) return { hay: true };
+  const buzones = [env.CORREO_AVISOS, env.CORREO_MMC, env.CORREO_ALIANZAS].filter(Boolean);
+  const interno = buzones.includes(para);
+  let hoy = 0;
+  try {
+    /* Solo los ENVIADOS: un `fallo` no consumio cupo en Resend, y contarlo
+       apagaria el correo por un problema que ya se resolvio. */
+    const r = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM correos WHERE resultado = 'enviado' AND intento_en >= date('now')"
+    ).first();
+    hoy = (r && Number(r.n)) || 0;
+  } catch (e) {
+    /* Si la cuenta falla NO se bloquea nada: el presupuesto es una red, no una
+       puerta. Un error aqui no puede impedir que salga un recibo. */
+    console.error("cupo de correo", e && e.message);
+    return { hay: true };
+  }
+  if (hoy >= CORREO_TOPE_DIA) return { hay: false, hoy, motivo: "tope_diario" };
+  if (interno && hoy >= CORREO_TOPE_DIA - CORREO_RESERVA_PERSONAS) {
+    return { hay: false, hoy, motivo: "reserva_para_personas" };
+  }
+  return { hay: true, hoy };
+}
+
 async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos, guia, msTope }) {
   const llave = env.RESEND_API_KEY;
   const desde = env.CORREO_DESDE || CORREO_DESDE_DEF;
@@ -933,6 +990,16 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
     console.log("correo simulado", etiqueta || "", "->", para, "|", asunto);
     await anotarCorreo(env, { ...base, resultado: "simulado" });
     return { ok: true, simulado: true };
+  }
+
+  /* EL PRESUPUESTO SE MIRA AQUI: despues de la simulacion —sin llave no se
+     consume cupo de nada— y antes de gastar una llamada a Resend. */
+  const cupo = await cupoDeCorreo(env, para);
+  if (!cupo.hay) {
+    console.warn("sin cupo de correo", etiqueta || "", cupo.motivo, "hoy:", cupo.hoy);
+    await anotarCorreo(env, { ...base, resultado: "sin_cupo",
+      error: cupo.motivo + " · enviados hoy: " + cupo.hoy + " · tope " + CORREO_TOPE_DIA });
+    return { ok: false, sinCupo: true, motivo: cupo.motivo, hoy: cupo.hoy };
   }
 
   /* AbortController y no AbortSignal.timeout: el patrón que ya usa el resto del

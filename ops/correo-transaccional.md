@@ -248,3 +248,67 @@ anterior falla 5 de sus 11 comprobaciones, así que sirve para lo que dice servi
 **Si algún día hace falta subir el techo:** el plan Pro de Resend son 50.000/mes.
 La decisión es de Sebas y cuesta dinero; mientras tanto el tope es la forma
 honesta de no prometer más correo del que se puede mandar.
+
+---
+
+## El presupuesto diario, y quién gana cuando no alcanza
+
+Poner tope al aviso del séptimo día resolvió al que podía reventar el plan solo.
+No resolvió lo de fondo: **cuando el cupo se agota, los envíos empiezan a fallar
+en el orden en que llegan** —o sea, al azar— y el único rastro es una fila
+`fallo` que nadie mira. El recibo de alguien que acababa de donar podía perderse
+para que saliera un aviso interno que el equipo ya veía en el panel.
+
+**La regla: cuando queda poco, gana quien está fuera de la organización.** El
+equipo tiene el panel. Una familia esperando un concepto, un donante esperando
+su recibo o un ingeniero voluntario no tienen nada más.
+
+```
+CORREO_TOPE_DIA         = 95   (de los 100 del plan, con margen)
+CORREO_RESERVA_PERSONAS = 25   (los últimos 25 son solo para personas)
+```
+
+| Enviados hoy | Interno | A una persona |
+|---|---|---|
+| 0–69 | sale | sale |
+| 70–94 | `sin_cupo` | sale |
+| 95+ | `sin_cupo` | `sin_cupo` |
+
+**Se decide por DESTINATARIO, no por etiqueta.** Fue la primera idea y es la
+equivocada: una lista de etiquetas «críticas» se queda vieja en cuanto alguien
+añade la número 34 y se olvida de apuntarla, y el fallo sería silencioso justo
+el día malo. Los buzones propios —`CORREO_AVISOS`, `CORREO_MMC`,
+`CORREO_ALIANZAS`— están en la configuración y no se multiplican: lo que va a
+uno de ellos es interno, y **todo lo demás cuenta como persona**, que es el lado
+seguro.
+
+**`sin_cupo` es un resultado propio, no un `fallo`.** Importa por dos razones:
+se distingue de un error de Resend al mirar la tabla, y la idempotencia del
+aviso del séptimo día solo cuenta `enviado` y `simulado` — así que **lo que hoy
+no cupo se reintenta mañana** en vez de darse por hecho. Está probado que
+componen bien.
+
+**Un `fallo` no consume cupo**, porque en Resend tampoco lo consumió: la cuenta
+mira solo los `enviado`.
+
+**El presupuesto para el correo, no el trabajo.** Un caso se crea igual aunque
+no salga ni un aviso; una donación se registra igual aunque no salga el recibo.
+Y si la propia cuenta del presupuesto falla, no bloquea nada: es una red, no una
+puerta.
+
+**Probarlo:**
+```
+npx wrangler dev --port 8798 --persist-to /tmp/gg-cupo --test-scheduled \
+    --var RESEND_API_KEY:re_llave_invalida_de_prueba \
+    --var CORREO_AVISOS:equipo@ejemplo.invalid \
+    --var CORREO_MMC:mmc@ejemplo.invalid
+PERSIST=/tmp/gg-cupo python3 ops/probar-cupo-correo.py
+```
+Hace falta una llave FALSA: sin `RESEND_API_KEY` el Worker simula y no llega a
+mirar el presupuesto. Con una inválida sí lo mira, y lo que pasa el filtro acaba
+en `fallo` (401) en vez de `enviado` — que es justo la señal que distingue «pasó
+el presupuesto» de «lo paró el presupuesto». Nada se entrega: Resend rechaza en
+la autenticación.
+
+**Si sube el volumen de verdad**, el plan Pro de Resend son 50.000/mes. Subir
+`CORREO_TOPE_DIA` sin subir el plan solo mueve el punto donde empieza a fallar.
