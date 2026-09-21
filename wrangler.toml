@@ -41,7 +41,7 @@ html_handling = "auto-trailing-slash"
 # wrangler RECHAZA el despliegue si se anade una regla redundante —«rule
 # '/api/*' makes it redundant»—. Se intento anadirla por claridad y la
 # herramienta no dejo, con razon.
-run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest", "/pago/*"]
+run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest", "/pago/*", "/membresia", "/membresia/*"]
 
 # ---------------------------------------------------------------------------
 # LA ÚNICA TAREA PROGRAMADA DEL WORKER, y la primera que tiene.

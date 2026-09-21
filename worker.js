@@ -17932,12 +17932,25 @@ function paginaMetodoPago(cfg) {
 + '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
 + '  <p><a class="card-link" href="/#membresias">&larr; Volver a membresías</a></p>\n'
 + '  <h1>Registra tu método de pago</h1>\n'
-+ '  <p class="lead">Con esto podemos cobrar tu membresía cada mes sin que tengas que entrar otra vez. Puedes retirarlo cuando quieras.</p>\n'
++ '  <p class="lead">Con esto podemos cobrar tu membresía cada mes sin que tengas que entrar otra vez.</p>\n'
+/* «Puedes retirarlo cuando quieras» se quedó corto: era cierto y no decía
+   cómo, y durante unas horas el cómo fue «escríbenos». Ahora se nombra el
+   mecanismo, porque una promesa sin mecanismo se parece demasiado a una
+   promesa sin cumplir. */
++ '  <p class="mu">Puedes retirarlo cuando quieras: al activar tu membresía te llega por correo un enlace propio desde el que puedes terminarla y retirar tu tarjeta, sin escribirle a nadie.</p>\n'
 + '  <p class="mu">Los datos de tu tarjeta los recibe <b>Wompi</b> directamente, dentro de su propia ventana. Give&amp;Grow no los ve, no los recibe y no los guarda: solo guardamos los cuatro últimos dígitos para que reconozcas cuál registraste.</p>\n'
 + aviso
-+ '  <form method="POST" action="/api/pago/fuente" class="card" style="margin-top:22px;padding:20px">\n'
-+ '    <label class="et" for="fp-email">Tu correo</label>\n'
-+ '    <input id="fp-email" name="email" type="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com">\n'
+/* `.ally-form` + `.field` Y NO `.et`, que no existe. La primera version de esta
+   pagina invento esa clase: el navegador la ignoro en silencio y el campo de
+   correo quedo del ancho por defecto —unos 170px— pegado a su etiqueta, sin
+   relleno, sin estado de foco y con fondo blanco en modo noche. Salio asi a
+   produccion. Estas dos clases son las que usa el resto del sitio para lo
+   mismo y traen las cuatro cosas. */
++ '  <form method="POST" action="/api/pago/fuente" class="card ally-form" style="margin-top:22px;padding:20px">\n'
++ '    <div class="field">\n'
++ '      <label for="fp-email">Tu correo</label>\n'
++ '      <input id="fp-email" name="email" type="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com">\n'
++ '    </div>\n'
 + '\n'
 + '    <label style="display:flex;gap:10px;align-items:flex-start;margin-top:18px">\n'
 + '      <input type="checkbox" name="acepta_privacidad" value="1" required style="margin-top:4px">\n'
@@ -18214,13 +18227,18 @@ async function apiSuscribir(request, env, url) {
      suscripcion es nuestra, no de ellos— asi que se genera uno con prefijo, que
      ademas deja ver de un vistazo de que proveedor es cada fila. */
   const subId = "w-" + tokenNuevo();
+  /* EL TOKEN DE LA BAJA. Aparte de `id` a proposito: `id` viaja en la
+     respuesta de la API, en el panel y en los registros, y una clave que se
+     ve en quince sitios no puede ser ademas la que autoriza cancelar.
+     Ver migrations/0031. */
+  const tokenBaja = tokenNuevo();
   await env.DB.prepare(
     "INSERT INTO suscripciones (id, proveedor, estado, nivel, monto_centavos, moneda, frecuencia, " +
-    "donante_id, idioma, quiere_certificado, consent_muro, fuente_id) " +
-    "VALUES (?, 'wompi', 'activa', ?, ?, 'COP', 'mensual', ?, ?, ?, ?, ?)"
+    "donante_id, idioma, quiere_certificado, consent_muro, fuente_id, token) " +
+    "VALUES (?, 'wompi', 'activa', ?, ?, 'COP', 'mensual', ?, ?, ?, ?, ?, ?)"
   ).bind(subId, nivel.id, Math.round(monto) * 100, donante, c.idioma === "en" ? "en" : "es",
          c.certificado ? 1 : 0, ["nombre","anonimo","no"].includes(c.muro) ? c.muro : "no",
-         fuente.id).run();
+         fuente.id, tokenBaja).run();
   const sub = await env.DB.prepare(
     "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id FROM suscripciones WHERE id = ?"
   ).bind(subId).first();
@@ -18236,7 +18254,14 @@ async function apiSuscribir(request, env, url) {
       ayuda: "No pudimos hacer el primer cobro. Revisa tu metodo de pago o prueba con otro." }, 402);
   }
 
-  return json({ ok: true, suscripcion: subId, nivel: nivel.id, guia: cobro.guia, estado: cobro.estado });
+  /* EL ENLACE DE BAJA SE DEVUELVE Y SE ENVIA POR CORREO. Devolverlo solo en
+     el JSON lo dejaria en manos de que la pantalla lo muestre y de que la
+     persona no cierre la pestana; por correo sobrevive a las dos cosas. */
+  await correoEnlaceMembresia(env, { token: tokenBaja, nivel: nivel.id, monto_centavos: Math.round(monto) * 100 },
+                              email, c.idioma === "en" ? "en" : "es");
+
+  return json({ ok: true, suscripcion: subId, nivel: nivel.id, guia: cobro.guia, estado: cobro.estado,
+                membresia: ORIGIN + "/membresia/" + tokenBaja });
 }
 
 async function apiCrearFuentePago(request, env, url) {
@@ -18362,9 +18387,443 @@ function paginaPagoListo(url) {
 + '  <p class="lead">Tu método de pago quedó registrado'
 + (t4 ? ' (' + (marca ? esc(marca) + ' ' : '') + 'termina en <b>' + esc(t4) + '</b>)' : '')
 + '. Desde ahora podemos cobrar tu membresía sin que tengas que entrar cada mes.</p>\n'
-+ '  <p class="mu">Puedes retirarlo cuando quieras escribiéndonos. Guardamos los cuatro últimos dígitos y la fecha de vencimiento; el número de tu tarjeta no lo tenemos.</p>\n'
-+ '  <p style="margin-top:28px"><a class="btn btn-g" href="/#membresias">Volver a membresías</a></p>\n'
++ '  <p class="mu">Puedes retirarlo cuando quieras desde tu membresía: al terminarla lo retiramos con ella. Guardamos la marca y los cuatro últimos dígitos para que reconozcas cuál registraste; el número de tu tarjeta no lo tenemos, y su fecha de vencimiento tampoco.</p>\n'
++ '  <p style="margin-top:28px"><a class="btn btn-g" href="/#membresias">Volver a membresías</a> '
++ '<a class="card-link" href="/membresia" style="margin-left:14px">Buscar mi membresía</a></p>\n'
 + '</main>\n</body>\n</html>';
+}
+
+/* ========================================================================
+   DAR DE BAJA LA MEMBRESIA
+   ========================================================================
+
+   POR QUE ESTO EXISTE. `/pago/metodo` dice «Puedes retirarlo cuando quieras»
+   y `/pago/listo` remataba con «escribiendonos». Las dos frases llevan horas
+   vivas en produccion sobre un debito automatico que, hasta esta pagina, solo
+   se podia parar si alguien del equipo leia un correo y hacia un UPDATE a
+   mano. Contratar tomaba treinta segundos; cancelar dependia de que
+   contestaramos. Esa asimetria siempre juega en contra de quien paga.
+
+   COMO SE IDENTIFICA A LA PERSONA. Con el token de 128 bits de su suscripcion
+   en la URL, igual que el recibo y el carnet. No hay inicio de sesion para
+   donantes y no conviene crearlo por una sola pantalla: seria una contrasena
+   mas que custodiar bajo Ley 1581 a cambio de nada.
+
+   LA BAJA RETIRA TAMBIEN EL METODO DE PAGO, y no es un extra. Lo que la pagina
+   prometio fue poder RETIRAR el metodo de pago; dejar la fuente viva despues
+   de una baja seria conservar la llave de cobro de alguien que acaba de pedir
+   que dejemos de cobrarle. Se retira solo si ninguna otra suscripcion activa
+   la esta usando.
+
+   NO CUBRE PAYPAL, a proposito y con un aviso en pantalla. Esas suscripciones
+   las cobra PayPal desde su propio sistema: apagar nuestra fila dejaria el
+   cobro corriendo y a la persona creyendo lo contrario. Es el unico modo de
+   fallo que seria peor que no tener esta pagina. */
+
+const BAJA_VENTANA_MS = 300000;
+const BAJA_MAX_POR_VENTANA = 5;
+const BAJA_GOLPES = new Map();
+function bajaLimitada(ip) {
+  return limitadoPorIP(BAJA_GOLPES, ip, BAJA_VENTANA_MS, BAJA_MAX_POR_VENTANA);
+}
+
+/* Cascaron comun de las tres pantallas de esta zona. Sin un solo script: lo que
+   hacen es leer un estado y enviar un formulario, y para eso no hace falta
+   JavaScript. La CSP se lo niega entero, como en el carnet. */
+/* DIA O NOCHE SIN UNA LINEA DE JAVASCRIPT.
+   El sitio decide el tema por RELOJ —claro de 6:00 a 18:00, ver `themeByClock`
+   en app.js— y lo aplica con `data-theme` en <html>. Estas paginas se sirven
+   con `script-src 'none'`, asi que esa funcion nunca corre aqui: sin esto se
+   quedarian en modo dia para siempre, como le pasa al carnet y al panel.
+
+   EL RELOJ QUE IMPORTA ES EL DEL VISITANTE, no el del servidor. Cloudflare
+   deduce su zona horaria del punto de entrada y la deja en `request.cf`; con
+   ella se calcula su hora local y sale el mismo tema que veria en el resto del
+   sitio. Sin `cf` —en `wrangler dev`, o si Cloudflare no la trae— se cae a
+   Colombia, que es donde esta la enorme mayoria.
+
+   `hourCycle: "h23"` y no `hour12: false`: con el segundo, la medianoche sale
+   como «24» en algunas versiones de ICU y la comparacion de abajo la tomaria
+   por la tarde. */
+function temaPorReloj(request) {
+  let zona = "America/Bogota";
+  try {
+    const z = request && request.cf && request.cf.timezone;
+    if (typeof z === "string" && z.includes("/")) zona = z;
+  } catch { /* `cf` no existe en local; la zona por defecto ya esta puesta */ }
+  let hora = 12;
+  try {
+    hora = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: zona }).format(new Date()));
+  } catch { hora = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: "America/Bogota" }).format(new Date())); }
+  return hora >= 6 && hora < 18 ? "light" : "dark";
+}
+
+function cascaraBaja(titulo, cuerpo, lang, tema) {
+  return '<!doctype html>\n'
++ '<html lang="' + (lang === "en" ? "en" : "es") + '"' + (tema === "dark" ? ' data-theme="dark"' : '') + '>\n<head>\n<meta charset="utf-8">\n'
++ '<meta name="theme-color" content="' + (tema === "dark" ? "#0F1613" : "#1F5C38") + '">\n'
++ '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
++ '<title>' + esc(titulo) + ' · Give&amp;Grow International</title>\n'
++ '<meta name="robots" content="noindex, nofollow">\n'
++ '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
++ '<link rel="stylesheet" href="/styles.css">\n</head>\n<body>\n'
++ '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
++ cuerpo
++ '</main>\n</body>\n</html>';
+}
+
+function paginaMembresia(m, lang, estado, tema) {
+  const en = lang === "en";
+  const T = en ? {
+    volver: "Back to memberships", titulo: "Your membership",
+    activa: "Active", cancelada: "Cancelled", suspendida: "Suspended",
+    fallida: "Not started", otra: "Under review",
+    nivel: "Level", monto: "Monthly", desde: "Member since",
+    ultimo: "Last charge", metodo: "Payment method", ninguno: "None yet",
+    cabeza: "This is everything we have on your membership, and the button to end it.",
+    bajaT: "End my membership",
+    bajaP: "We stop charging you immediately and we withdraw your payment method: we keep no way of charging you again. Your past gifts and their receipts stay exactly as they are.",
+    boton: "End my membership and withdraw my card",
+    yaT: "Your membership is cancelled",
+    yaP: "We are not charging you any more and your payment method was withdrawn. Nothing else is pending on your side.",
+    hecho: "Done. We stopped the charge and withdrew your payment method. We also sent you an email confirming it.",
+    error: "We could not process it. Write to us and a person will do it.",
+    volverM: "Become a member again",
+    pie: "Fundación Give&Grow International · Colombian nonprofit · NIT 901.948.930-2"
+  } : {
+    volver: "Volver a membresías", titulo: "Tu membresía",
+    activa: "Activa", cancelada: "Cancelada", suspendida: "Suspendida",
+    fallida: "No llegó a empezar", otra: "En revisión",
+    nivel: "Nivel", monto: "Mensual", desde: "Miembro desde",
+    ultimo: "Último cobro", metodo: "Método de pago", ninguno: "Todavía ninguno",
+    cabeza: "Esto es todo lo que tenemos de tu membresía, y el botón para terminarla.",
+    bajaT: "Terminar mi membresía",
+    bajaP: "Dejamos de cobrarte de inmediato y retiramos tu método de pago: no nos queda con qué volver a cobrarte. Tus aportes anteriores y sus recibos se quedan tal como están.",
+    boton: "Terminar mi membresía y retirar mi tarjeta",
+    yaT: "Tu membresía está cancelada",
+    yaP: "Ya no te estamos cobrando y tu método de pago quedó retirado. No queda nada pendiente de tu lado.",
+    hecho: "Listo. Detuvimos el cobro y retiramos tu método de pago. Te enviamos también un correo que lo confirma.",
+    error: "No pudimos procesarlo. Escríbenos y una persona lo hace.",
+    volverM: "Volver a hacerme miembro",
+    pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2"
+  };
+
+  const nombreEstado = T[m.estado] || T.otra;
+  const viva = m.estado === "activa";
+  const nivel = nivelDe(m.nivel);
+  /* «VISA \u00b7\u00b7\u00b7\u00b7 4242» y no «VISA termina en 4242»: en un telefono de 375px
+     la version larga parte en dos lineas y deja «4242» solo, colgando. La forma
+     corta es la que usan los bancos, cabe en una linea y no necesita traducirse.
+     Lo que significa lo dice la etiqueta de la fila, que si esta en los dos
+     idiomas. */
+  const metodo = m.marca || m.ultimos_cuatro
+    ? ((m.marca ? m.marca + " " : "") + (m.ultimos_cuatro ? "\u00b7\u00b7\u00b7\u00b7 " + m.ultimos_cuatro : "")).trim()
+    : T.ninguno;
+
+  /* LA LINEA VA ARRIBA Y NO ABAJO. Con `border-bottom` la ultima fila dibujaba
+     una raya suelta contra el borde de la tarjeta; con `border-top` y la
+     primera fila exenta, las lineas SEPARAN filas en vez de subrayar la ultima.
+     Y EL RELLENO LO PONE LA TARJETA, no la tabla: una tabla con `width:100%`
+     mas `padding` mide 100% MAS el relleno y se sale de su contenedor. Medido
+     en el banco local: los valores de la derecha —el monto, la tarjeta— salian
+     cortados contra el borde de la tarjeta. */
+  const filas = [];
+  const fila = (k, v) => filas.push(
+    '    <tr><td class="mu" style="padding:10px 0' + (filas.length ? ';border-top:1px solid var(--bd)' : '') + '">' + esc(k)
+    + '</td><td style="padding:10px 0' + (filas.length ? ';border-top:1px solid var(--bd)' : '')
+    + ';text-align:right;font-weight:600">' + esc(v) + '</td></tr>\n');
+
+  let cuerpo = ""
+    + '  <p><a class="card-link" href="/#membresias">&larr; ' + esc(T.volver) + '</a></p>\n'
+    + '  <h1>' + esc(T.titulo) + '</h1>\n';
+
+  if (estado === "hecho") {
+    cuerpo += '  <p class="lead">' + esc(T.hecho) + '</p>\n';
+  } else if (estado === "error") {
+    cuerpo += '  <p class="lead" style="color:var(--err)">' + esc(T.error) + '</p>\n';
+  } else {
+    cuerpo += '  <p class="lead">' + esc(T.cabeza) + '</p>\n';
+  }
+
+  fila(en ? "Status" : "Estado", nombreEstado);
+  fila(T.nivel, en ? nivel.en : nivel.es);
+  fila(T.monto, fmtPesos(m.monto_centavos) + " COP");
+  fila(T.desde, String(m.creada_en || "").slice(0, 10));
+  fila(T.ultimo, m.ultimo_cobro_en ? String(m.ultimo_cobro_en).slice(0, 10) : "—");
+  fila(T.metodo, metodo);
+
+  cuerpo += '  <div class="card" style="margin-top:22px;padding:8px 20px">\n'
+    + '  <table style="width:100%;border-collapse:collapse">\n'
+    + filas.join("")
+    + '  </table>\n  </div>\n';
+
+  if (viva) {
+    cuerpo += '  <section class="card" style="margin-top:26px;padding:20px">\n'
+      + '    <h2 style="margin-top:0">' + esc(T.bajaT) + '</h2>\n'
+      + '    <p class="mu">' + esc(T.bajaP) + '</p>\n'
+      + '    <form method="POST" action="/api/pago/baja" style="margin-top:16px">\n'
+      + '      <input type="hidden" name="token" value="' + esc(m.token) + '">\n'
+      + '      <input type="hidden" name="lang" value="' + (en ? "en" : "es") + '">\n'
+      + '      <button class="btn btn-w" type="submit">' + esc(T.boton) + '</button>\n'
+      + '    </form>\n'
+      + '  </section>\n';
+  } else if (m.estado === "cancelada") {
+    cuerpo += '  <section class="card" style="margin-top:26px;padding:20px">\n'
+      + '    <h2 style="margin-top:0">' + esc(T.yaT) + '</h2>\n'
+      + '    <p class="mu">' + esc(T.yaP) + '</p>\n'
+      + '    <p style="margin-top:16px"><a class="btn btn-g" href="/#membresias">' + esc(T.volverM) + '</a></p>\n'
+      + '  </section>\n';
+  }
+
+  cuerpo += '  <p class="mu" style="margin-top:30px;font-size:var(--fs-13)">' + esc(T.pie) + '</p>\n';
+  return cascaraBaja(T.titulo, cuerpo, lang, tema);
+}
+
+/* GET /membresia/<token> */
+async function rutaMembresia(env, token, url, request) {
+  if (!env.DB) return new Response("No disponible", { status: 503 });
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return new Response("No encontrado", { status: 404 });
+
+  const m = await env.DB.prepare(
+    "SELECT s.id, s.token, s.estado, s.nivel, s.monto_centavos, s.creada_en, s.ultimo_cobro_en, " +
+    "s.idioma, f.marca, f.ultimos_cuatro " +
+    "FROM suscripciones s LEFT JOIN fuentes_pago f ON f.id = s.fuente_id " +
+    "WHERE s.token = ?"
+  ).bind(token).first();
+  if (!m) return new Response("No encontrado", { status: 404 });
+
+  /* El idioma sale de la suscripcion —es el que la persona eligio al
+     inscribirse—, y `?lang=` lo puede cambiar por si se equivoco o comparte el
+     enlace. */
+  const q = url.searchParams.get("lang");
+  const lang = q === "en" || q === "es" ? q : (m.idioma === "en" ? "en" : "es");
+  const estado = url.searchParams.get("baja") === "1" ? "hecho"
+               : url.searchParams.get("baja") === "0" ? "error" : "";
+
+  return new Response(paginaMembresia(m, lang, estado, temaPorReloj(request)), {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      /* Sin cache y sin indexar: la URL ES la credencial. Si un intermediario
+         la guardara, la guardaria con el permiso de cancelar dentro. */
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow",
+      "content-security-policy": cspPagina({ script: "'none'", form: "'self'" })
+    }
+  });
+}
+
+/* POST /api/pago/baja — llega de un FORMULARIO, no de nuestro JavaScript, asi
+   que responde con redirecciones y no con JSON. */
+async function apiBajaMembresia(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+  let f;
+  try { f = await request.formData(); } catch { return json({ error: "formulario_invalido" }, 400); }
+  const token = String(f.get("token") || "").trim();
+  const lang = f.get("lang") === "en" ? "en" : "es";
+  if (!/^[a-f0-9]{32}$/.test(token)) return new Response("No encontrado", { status: 404 });
+
+  const destino = (ok) => Response.redirect(
+    ORIGIN + "/membresia/" + token + "?lang=" + lang + "&baja=" + (ok ? "1" : "0"), 303);
+
+  const sub = await env.DB.prepare(
+    "SELECT s.id, s.estado, s.nivel, s.monto_centavos, s.fuente_id, s.idioma, d.email, d.nombre " +
+    "FROM suscripciones s LEFT JOIN donantes d ON d.id = s.donante_id WHERE s.token = ?"
+  ).bind(token).first();
+  if (!sub) return new Response("No encontrado", { status: 404 });
+
+  /* IDEMPOTENTE. Quien recarga la pagina de confirmacion, o pulsa dos veces,
+     no debe ver un error por algo que ya salio bien. */
+  if (sub.estado !== "activa") return destino(true);
+
+  try {
+    await env.DB.prepare(
+      "UPDATE suscripciones SET estado = 'cancelada', cancelada_en = datetime('now'), " +
+      "cancelada_motivo = 'baja pedida por la persona', actualizada_en = datetime('now') " +
+      "WHERE token = ? AND estado = 'activa'"
+    ).bind(token).run();
+
+    /* La fuente se retira SOLO si no queda otra suscripcion viva usandola. Hoy
+       el codigo impide dos activas por correo, pero esa regla vive en
+       `apiSuscribir` y podria cambiar; esta comprobacion no depende de ella. */
+    if (sub.fuente_id) {
+      const otra = await env.DB.prepare(
+        "SELECT id FROM suscripciones WHERE fuente_id = ? AND estado = 'activa' LIMIT 1"
+      ).bind(sub.fuente_id).first();
+      if (!otra) {
+        await env.DB.prepare(
+          "UPDATE fuentes_pago SET retirada_en = datetime('now'), " +
+          "retirada_motivo = 'baja de membresia', actualizada_en = datetime('now') WHERE id = ?"
+        ).bind(sub.fuente_id).run();
+      }
+    }
+
+    /* Queda anotado porque es una peticion del titular sobre sus datos y sobre
+       un cobro: el dia que alguien pregunte «quien paro esto y cuando», la
+       respuesta tiene que estar escrita. Va el id de la suscripcion y no el
+       correo: ese ya vive en `donantes` y no hace falta repetirlo aqui. */
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES ('sistema', 'auditoria', ?)"
+    ).bind("baja de membresia pedida por la persona · suscripcion " + sub.id).run();
+  } catch (e) {
+    console.error("baja membresia", sub.id, e && e.message);
+    return destino(false);
+  }
+
+  await correoBajaConfirmada(env, sub, lang);
+  return destino(true);
+}
+
+/* GET /membresia — para quien perdio el correo con su enlace. */
+function paginaPedirEnlace(lang, enviado, tema) {
+  const en = lang === "en";
+  const T = en ? {
+    titulo: "Find your membership",
+    lead: "Enter the email you signed up with and we send you the link to your membership, where you can end it.",
+    campo: "Your email", boton: "Send me the link",
+    hecho: "If there is an active membership with that email, the link is on its way. Check your inbox and your spam folder.",
+    nota: "We never say whether an email is registered here — that would let anyone use this page to find out who is a member.",
+    paypal: "If you became a member through PayPal, your subscription is cancelled from your own PayPal account: we cannot stop it from here, and we would rather say so than let you believe otherwise.",
+    volver: "Back to memberships"
+  } : {
+    titulo: "Encuentra tu membresía",
+    lead: "Escribe el correo con el que te inscribiste y te enviamos el enlace a tu membresía, desde donde puedes terminarla.",
+    campo: "Tu correo", boton: "Envíame el enlace",
+    hecho: "Si hay una membresía activa con ese correo, el enlace va en camino. Revisa tu bandeja y la carpeta de spam.",
+    nota: "Aquí nunca decimos si un correo está registrado o no — eso convertiría esta página en una forma de averiguar quién es miembro.",
+    paypal: "Si te hiciste miembro por PayPal, esa suscripción se cancela desde tu propia cuenta de PayPal: desde aquí no podemos detenerla, y preferimos decírtelo a que te quedes creyendo que sí.",
+    volver: "Volver a membresías"
+  };
+
+  const cuerpo = ""
+    + '  <p><a class="card-link" href="/#membresias">&larr; ' + esc(T.volver) + '</a></p>\n'
+    + '  <h1>' + esc(T.titulo) + '</h1>\n'
+    + (enviado
+        ? '  <p class="lead">' + esc(T.hecho) + '</p>\n'
+        : '  <p class="lead">' + esc(T.lead) + '</p>\n'
+          + '  <form method="POST" action="/api/pago/baja-enlace" class="card ally-form" style="margin-top:22px;padding:20px">\n'
+          + '    <div class="field">\n'
+          + '      <label for="bm-email">' + esc(T.campo) + '</label>\n'
+          + '      <input id="bm-email" name="email" type="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com">\n'
+          + '    </div>\n'
+          + '    <input type="hidden" name="lang" value="' + (en ? "en" : "es") + '">\n'
+          + '    <p style="margin-top:16px"><button class="btn btn-g" type="submit">' + esc(T.boton) + '</button></p>\n'
+          + '  </form>\n')
+    + '  <p class="mu" style="margin-top:26px">' + esc(T.nota) + '</p>\n'
+    + '  <p class="mu" style="margin-top:14px">' + esc(T.paypal) + '</p>\n';
+
+  return cascaraBaja(T.titulo, cuerpo, lang, tema);
+}
+
+function respuestaPedirEnlace(lang, enviado, request) {
+  return new Response(paginaPedirEnlace(lang, enviado, temaPorReloj(request)), {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow",
+      "content-security-policy": cspPagina({ script: "'none'", form: "'self'" })
+    }
+  });
+}
+
+/* POST /api/pago/baja-enlace */
+async function apiBajaEnlace(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+  let f;
+  try { f = await request.formData(); } catch { return json({ error: "formulario_invalido" }, 400); }
+  const lang = f.get("lang") === "en" ? "en" : "es";
+  const email = String(f.get("email") || "").trim().slice(0, 200).toLowerCase();
+
+  /* EL FRENO VA ANTES DE TOCAR LA BASE Y ANTES DE ENVIAR NADA. Este endpoint
+     manda correo a una direccion que escribe un desconocido: sin tope es un
+     surtidor de correo con nuestro dominio en el remitente, y quien paga la
+     factura de reputacion somos nosotros. Cinco cada cinco minutos por IP.
+     El tope es por IP y en Colombia el CGNAT comparte IP entre muchas casas,
+     asi que se deja holgado: quien de verdad lo necesite pide UNO. */
+  const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+  if (bajaLimitada(ip)) {
+    /* Se responde la MISMA pantalla de siempre. Decir «vas muy rapido» ya seria
+       una senal distinta segun el correo, que es justo lo que no queremos. */
+    return respuestaPedirEnlace(lang, true, request);
+  }
+
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    const sub = await env.DB.prepare(
+      "SELECT s.token, s.nivel, s.monto_centavos, s.idioma, d.nombre " +
+      "FROM suscripciones s JOIN donantes d ON d.id = s.donante_id " +
+      "WHERE s.proveedor = 'wompi' AND s.estado = 'activa' AND s.token IS NOT NULL " +
+      "AND LOWER(d.email) = ? ORDER BY s.creada_en DESC LIMIT 1"
+    ).bind(email).first();
+    if (sub) await correoEnlaceMembresia(env, sub, email, lang);
+  }
+
+  /* SIEMPRE la misma respuesta, haya suscripcion o no, sea el correo valido o
+     no. Cualquier diferencia convierte esta pagina en un buscador de miembros:
+     se prueban correos y el que responda distinto esta registrado. */
+  return respuestaPedirEnlace(lang, true, request);
+}
+
+async function correoEnlaceMembresia(env, sub, email, lang) {
+  const en = lang === "en";
+  const enlace = ORIGIN + "/membresia/" + sub.token + (en ? "?lang=en" : "");
+  const nivel = nivelDe(sub.nivel);
+  return await enviarCorreo(env, {
+    para: email,
+    etiqueta: "membresia_enlace",
+    asunto: en ? "Your membership link" : "El enlace a tu membresía",
+    texto: (en ? "Open your membership here: " : "Abre tu membresía aquí: ") + enlace,
+    html: plantillaCorreo({
+      titulo: en ? "Your membership" : "Tu membresía",
+      parrafos: en ? [
+        "Here is the link to your membership. From there you can see what we charge you and end it whenever you want, with no need to write to anyone.",
+        "Keep this email: the link works for as long as your membership does."
+      ] : [
+        "Este es el enlace a tu membresía. Desde ahí puedes ver qué te cobramos y terminarla cuando quieras, sin escribirle a nadie.",
+        "Guarda este correo: el enlace sirve mientras tu membresía siga viva."
+      ],
+      filas: en
+        ? [["Level", nivel.en], ["Monthly", fmtPesos(sub.monto_centavos) + " COP"]]
+        : [["Nivel", nivel.es], ["Mensual", fmtPesos(sub.monto_centavos) + " COP"]],
+      boton: { url: enlace, texto: en ? "Open my membership" : "Abrir mi membresía" },
+      cierre: en
+        ? "If you did not ask for this email, you can ignore it: nothing changed and nobody can act on your membership without this link."
+        : "Si no pediste este correo, puedes ignorarlo: no cambió nada y nadie puede actuar sobre tu membresía sin este enlace."
+    }),
+    msTope: 8000
+  });
+}
+
+async function correoBajaConfirmada(env, sub, lang) {
+  if (!sub.email) return { ok: true, sinCorreo: true };
+  const en = lang === "en";
+  return await enviarCorreo(env, {
+    para: sub.email,
+    etiqueta: "membresia_baja",
+    asunto: en ? "Your membership is cancelled" : "Tu membresía quedó cancelada",
+    texto: en
+      ? "We stopped charging you and withdrew your payment method."
+      : "Dejamos de cobrarte y retiramos tu método de pago.",
+    html: plantillaCorreo({
+      titulo: en ? "Cancelled. Thank you for the time you gave." : "Cancelada. Gracias por el tiempo que diste.",
+      parrafos: en ? [
+        "We stopped the monthly charge and withdrew your payment method: we no longer hold any way of charging you.",
+        "Everything you gave until today stays recorded, with its tracking numbers and its receipts. Nothing of that is undone.",
+        "You are welcome back whenever you want, and you will not have to explain why you left."
+      ] : [
+        "Detuvimos el cobro mensual y retiramos tu método de pago: ya no conservamos con qué cobrarte.",
+        "Todo lo que aportaste hasta hoy sigue registrado, con sus números de guía y sus recibos. Nada de eso se deshace.",
+        "Puedes volver cuando quieras, y no vas a tener que explicar por qué te fuiste."
+      ],
+      cierre: en
+        ? "This message is automatic and confirms the cancellation you just requested. If it was not you, write to us right away."
+        : "Este mensaje es automático y confirma la baja que acabas de pedir. Si no fuiste tú, escríbenos de inmediato."
+    }),
+    msTope: 8000
+  });
 }
 
 function sharePage(p, lang) {
@@ -19173,6 +19632,17 @@ export default {
                  "x-robots-tag": "noindex, nofollow" } });
     if (ruta === "/api/pago/fuente")   return await apiCrearFuentePago(request, env, url);
     if (ruta === "/api/pago/suscribir") return await apiSuscribir(request, env, url);
+
+    /* Dar de baja. PUBLICAS por la misma razon que las de arriba: al otro lado
+       hay un donante sin sesion. Su credencial es el token de 128 bits que
+       lleva la URL, y sin el no se puede ni mirar ni cancelar nada. */
+    if (ruta === "/membresia" || ruta === "/membresia/") {
+      const lg = url.searchParams.get("lang") === "en" ? "en" : "es";
+      return respuestaPedirEnlace(lg, false, request);
+    }
+    if (ruta.startsWith("/membresia/")) return await rutaMembresia(env, ruta.slice(11), url, request);
+    if (ruta === "/api/pago/baja")        return await apiBajaMembresia(request, env, url);
+    if (ruta === "/api/pago/baja-enlace") return await apiBajaEnlace(request, env, url);
 
     if (ruta === "/api/trm")               return await apiTrm(request);
     if (ruta === "/api/paypal/suscripcion") return await apiPaypalSuscripcion(request, env, url);
