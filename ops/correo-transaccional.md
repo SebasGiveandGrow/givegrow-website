@@ -195,3 +195,56 @@ para lo de siempre: confirmar que las dos patas siguen en pie. Si alguna vez
 falta el SPF de `send.notificaciones.…`, con `sp=reject` el correo del sitio no
 va a spam — **rebota**, y entonces hay que bajar a `sp=quarantine` mientras se
 republica.
+
+---
+
+## El techo de Resend, y quién lo puede reventar
+
+El plan gratis son **100 correos/día, 3.000/mes y 10 por segundo**, y ese techo
+es para **todo** el sistema: confirmaciones de aporte, enlaces de membresía,
+bajas, los doce avisos internos y el aviso del séptimo día de Mira Mi Casa.
+`pay-as-you-go` está **apagado**, así que pasarse no cuesta dinero: cuesta
+correos que no salen.
+
+**El único que puede reventarlo solo es el aviso del séptimo día**, porque es el
+único que escribe a muchas personas de una vez y sin que nadie lo dispare. Mira
+Mi Casa nació para un sismo: el día que importa es justo el día en que 150
+familias cruzan el séptimo día a la vez.
+
+**Tope: `AVISOS_POR_EJECUCION = 60`** en `worker.js`. Deja 40 al día para todo
+lo demás.
+
+**El tope aplaza, no descarta**, y esa es la parte que hay que no romper. La
+consulta mira de 7 a `DIAS_ESPERA_TOPE` (21) días, no un solo día: quien no
+entra hoy entra mañana. Con la ventana de un día que había antes, poner un tope
+habría cambiado un fallo silencioso por otro — el que se quedaba fuera no volvía
+a aparecer nunca.
+
+**La idempotencia cuenta solo los envíos BUENOS.** `anotarCorreo` escribe también
+los intentos fallidos, con su guía. Mientras la comprobación miraba cualquier
+fila, un envío rechazado contaba como «ya salió» y esa familia no se reintentaba
+jamás — y eso se juntaba con el techo de la peor manera posible: el día que el
+cupo se agota, las familias que caen del lado malo del corte quedaban silenciadas
+de forma permanente. Medido en el banco local antes de arreglarlo: con una fila
+`fallo` sembrada, las otras 149 recibieron su aviso y esa se quedó en cero
+reintentos. `'simulado'` sí cuenta como hecho: significa que falta la llave, y
+reintentarlo cada día no manda nada. De eso informa `adminSalud`.
+
+**El log del cron dice la verdad.** Antes el único número era `enviados` y se
+incrementaba detrás del `await` sin mirar el resultado — y `enviarCorreo` no
+lanza cuando Resend responde mal, devuelve `{ok:false}`. Un día de cupo agotado
+quedaba escrito como 150 avisos enviados. Ahora salen `enviados`, `fallidos`,
+`aplazados` y `tope`.
+
+**Probarlo:**
+```
+npx wrangler dev --port 8796 --persist-to /tmp/gg-aviso --test-scheduled
+PERSIST=/tmp/gg-aviso python3 ops/probar-aviso-espera.py
+```
+La batería siembra 150 familias, corre la tarea cuatro veces y comprueba que las
+150 acaban avisadas, ninguna dos veces, y ninguna cero. Contra el código
+anterior falla 5 de sus 11 comprobaciones, así que sirve para lo que dice servir.
+
+**Si algún día hace falta subir el techo:** el plan Pro de Resend son 50.000/mes.
+La decisión es de Sebas y cuesta dinero; mientras tanto el tope es la forma
+honesta de no prometer más correo del que se puede mandar.
