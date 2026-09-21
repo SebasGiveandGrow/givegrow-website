@@ -3685,18 +3685,46 @@ async function correoCasoCreado(env, x) {
    lista, y desde la ficha ya hay un botón para escribirles a mano. */
 const DIAS_ESPERA_AVISO = 7;
 
+/* CUANTOS AVISOS COMO MUCHO POR EJECUCION. El plan de Resend son 100 correos
+   al dia para TODO el sistema —confirmaciones de aporte, enlaces de membresia,
+   los doce avisos internos— asi que el aviso del septimo dia no se puede quedar
+   con la cuota entera. 60 le deja 40 al resto.
+
+   SIN ESTE TOPE, UNA JORNADA GRANDE LO REVIENTA. Medido en el banco local con
+   150 familias cruzando el septimo dia el mismo dia: 150 intentos en una sola
+   ejecucion, seguidos y sin pausa. Las que pasen de 100 las rechaza Resend, y
+   antes de eso el limite de 10 por segundo. Mira Mi Casa nacio para un
+   terremoto: el dia que importe es justo el dia en que llegan de golpe. */
+const AVISOS_POR_EJECUCION = 60;
+
+/* HASTA CUANTOS DIAS SE SIGUE INTENTANDO. */
+const DIAS_ESPERA_TOPE = 21;
+
 async function familiasQueEsperan(env, dias) {
-  /* La ventana es de UN día: el caso entra aquí el día que cruza los siete, no
-     todos los días desde entonces. Aun así la idempotencia real la da el rastro
-     de `correos` —ver abajo—, porque una tarea programada puede repetirse. */
+  /* LA VENTANA ERA DE UN DIA y eso hacia imposible poner un tope: un caso
+     aparecia aqui solo el dia que cruzaba los siete, asi que cualquiera que se
+     quedara fuera del tope no volvia a aparecer NUNCA. El tope habria cambiado
+     un fallo silencioso por otro.
+
+     Con catorce dias de ventana, quien no entra hoy entra manana. Y sigue
+     recibiendo UN SOLO correo, porque lo que impide el duplicado no es la
+     ventana sino el rastro de `correos` —ver abajo—.
+
+     EL LIMITE SUPERIOR NO SE QUITA del todo a proposito. Sin el, el primer
+     despliegue de esto le escribiria de golpe a toda familia que lleve meses
+     esperando; algunas recibirian «llevas 94 dias esperando» sin haber pedido
+     nada. Eso es una decision de comunicacion, no un arreglo tecnico, y no se
+     toma desde aqui. */
   const r = await env.DB.prepare(
     "SELECT c.numero, c.token, c.contacto_email, c.contacto_nombre, c.sector, c.creado_en, " +
     "CAST(julianday('now') - julianday(c.creado_en) AS INTEGER) AS dias " +
     "FROM casos c WHERE " + SIN_REVISAR + " " +
     "AND julianday('now') - julianday(c.creado_en) >= ? " +
     "AND julianday('now') - julianday(c.creado_en) < ? " +
+    /* Los que llevan MAS esperando primero: si el tope corta, corta por los que
+       menos llevan, que son los que mas dias de ventana les quedan. */
     "ORDER BY c.creado_en ASC"
-  ).bind(dias, dias + 1).all();
+  ).bind(dias, DIAS_ESPERA_TOPE).all();
   return r.results || [];
 }
 
@@ -3711,26 +3739,57 @@ async function avisarEsperaSeptimoDia(env) {
   ).first();
   const sinAbrir = (fila && Number(fila.n)) || 0;
 
-  let enviados = 0, sinCorreo = 0;
+  let enviados = 0, fallidos = 0, sinCorreo = 0, aplazados = 0;
   for (const c of casos) {
     if (!c.contacto_email) { sinCorreo++; continue; }
+
+    /* EL TOPE. Lo que no entra hoy NO se pierde: la ventana llega a
+       DIAS_ESPERA_TOPE dias, asi que manana vuelve a salir en la consulta. */
+    if (enviados >= AVISOS_POR_EJECUCION) { aplazados++; continue; }
+
     /* IDEMPOTENCIA SIN MIGRACIÓN: el rastro de correos ya guarda etiqueta y
        guía, así que preguntar si este aviso ya salió para este caso cuesta una
        consulta y no una columna nueva. Una tarea programada que se repita
        —porque Cloudflare la reintente, o porque alguien la dispare a mano— no
-       le manda dos veces lo mismo a la misma familia. */
+       le manda dos veces lo mismo a la misma familia.
+
+       `resultado IN (...)` Y NO CUALQUIER FILA, que era el fallo. `anotarCorreo`
+       escribe tambien los INTENTOS FALLIDOS, con su guia, asi que un envio
+       rechazado contaba como «ya salio» y esa familia no se reintentaba jamas.
+       Medido en el banco local: con una fila 'fallo' sembrada para un caso, las
+       otras 149 recibieron su aviso y esa se quedo en cero reintentos, para
+       siempre y sin que nada lo dijera. Y se juntaba con lo de arriba de la
+       peor manera: el dia que el cupo de Resend se agota, las familias que caen
+       del lado malo del corte quedan silenciadas de forma permanente.
+
+       'simulado' SI cuenta como hecho: significa que no hay RESEND_API_KEY
+       configurada, y reintentar eso cada dia no manda nada y llena la tabla.
+       De esa situacion informa `adminSalud`, que cuenta los 'simulado' aparte
+       precisamente porque en produccion significan que nadie recibio nada. */
     const ya = await env.DB.prepare(
-      "SELECT 1 FROM correos WHERE etiqueta = 'caso-espera' AND guia = ? LIMIT 1"
+      "SELECT 1 FROM correos WHERE etiqueta = 'caso-espera' AND guia = ? " +
+      "AND resultado IN ('enviado','simulado') LIMIT 1"
     ).bind(c.numero).first();
     if (ya) continue;
+
     try {
-      await correoCasoEspera(env, { ...c, dias: Number(c.dias) || DIAS_ESPERA_AVISO, sinAbrir });
-      enviados++;
+      /* SE MIRA EL RESULTADO. `enviarCorreo` NO lanza cuando Resend responde
+         mal: devuelve {ok:false}. El `enviados++` iba suelto detras del await,
+         asi que un dia de cupo agotado se registraba en el log como 150 avisos
+         enviados. El numero que quedaba escrito era justo el contrario del que
+         habria hecho falta para notarlo. */
+      const r = await correoCasoEspera(env, { ...c, dias: Number(c.dias) || DIAS_ESPERA_AVISO, sinAbrir });
+      if (r && r.ok) enviados++; else fallidos++;
     } catch (e) {
+      fallidos++;
       console.error("aviso espera", c.numero, e && e.message);
     }
   }
-  return { ok: true, revisados: casos.length, enviados, sinCorreo };
+
+  /* `fallidos` y `aplazados` salen en el log del cron para que un dia malo se
+     vea. Antes el unico numero era `enviados` y contaba los fallos como exitos. */
+  return { ok: true, revisados: casos.length, enviados, fallidos, aplazados, sinCorreo,
+           tope: AVISOS_POR_EJECUCION };
 }
 
 async function correoCasoEspera(env, x) {
