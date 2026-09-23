@@ -199,3 +199,65 @@ PERSIST=/tmp/gg-cobro python3 ops/probar-cobro-mensual.py
 9 comprobaciones. Contra el código anterior falla 7. **Llama al sandbox de Wompi
 de verdad**, con una fuente falsa que Wompi rechaza: lo que se mide es cuántas
 filas se crean de nuestro lado, y esas se escriben antes de la llamada.
+
+## 9. El QR del rastreo
+
+**Qué hace.** Cada aporte tiene su QR. Lleva a
+`https://www.thegiveandgrowproject.org/?g=<guía>`, y esa URL abre la pantalla de
+rastreo con la guía puesta y la busca sola. Quien escanea desde un recibo no
+teclea catorce caracteres en un teléfono.
+
+**Dónde vive.**
+
+| | |
+|---|---|
+| `qr.js` | El generador, escrito aquí. Modo byte, nivel M, versiones 1–10 |
+| `GET /api/qr/<guía>.svg` | Lo dibuja el Worker y lo sirve cacheado un día |
+| `?g=<guía>` | `app.js` lo lee al arrancar, salta a `#rastrea` y busca |
+| `.track-qr` | La tarjeta del rastreo lo muestra al pie |
+
+**Por qué está escrito a mano.** La regla del proyecto es que `pdf-lib` sea la
+única dependencia npm. Un generador de QR es un algoritmo cerrado de la norma
+ISO/IEC 18004 que no cambia nunca: son trescientas líneas que no se vuelven a
+tocar, y es preferible tenerlas entendidas en casa que actualizadas por otro
+dentro del Worker que mueve el dinero.
+
+**Lo dibuja el servidor, no el navegador.** No hay razón para bajarle a cada
+visitante trescientas líneas de Reed-Solomon.
+
+**El fondo blanco lo trae el SVG, no el CSS.** Así el código es autónomo —se lee
+igual incrustado, descargado o impreso— y no hace falta un color literal fuera
+de los tokens, que el gate impide con razón. Y tiene que ser claro siempre:
+invertirlo en modo noche lo dejaría claro sobre oscuro, que muchos lectores no
+leen.
+
+**El endpoint NO comprueba que la guía exista**, a propósito. Un QR se genera
+para guardarlo, a veces antes de que el webhook confirme el pago; negarlo por
+«todavía no existe» dejaría al donante sin comprobante justo en el minuto en que
+lo quiere. El QR lleva a la pantalla de rastreo, y es esa la que responde.
+
+### Cómo se comprueba
+
+```
+python3 -m venv /tmp/qrv && /tmp/qrv/bin/pip install opencv-python-headless numpy
+REF=/tmp/qrv/bin/python python3 ops/probar-qr.py
+```
+
+**La prueba es DECODIFICAR, no comparar.** La primera versión comparaba la
+matriz módulo a módulo contra otro generador; encontró dos fallos reales, pero
+es demasiado estricta: la norma deja libertad en el relleno tras el terminador y
+en qué máscara elegir, así que dos generadores correctos no tienen por qué dar
+la misma matriz. Lo que importa es que **un lector lea lo que escribimos**, y eso
+se prueba con un decodificador real, a dos tamaños.
+
+**Los dos fallos que encontró, y que se veían perfectos:**
+
+1. El separador del buscador se pintaba oscuro cuando caía alineado con el borde
+   del patrón: la condición no miraba primero si la casilla estaba *dentro* del
+   7×7.
+2. Desde la versión 7 faltaban dos de los seis patrones de alineación —los
+   centrados en la fila 6 y la columna 6, que cruzan la línea de tiempo— porque
+   se omitían por «esta casilla ya tiene valor» en vez de por posición.
+   **La v6 se leía y de la v7 en adelante no se leía ninguna.**
+
+Ninguno de los dos se ve mirando el código generado.

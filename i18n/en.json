@@ -1790,5 +1790,7 @@
   "bc.pagina": "Page {a}–{b} of {t} published homes, ordered by urgency.",
   "bc.mas": "See the next",
   "bc.ant": "Previous",
-  "lang.fallo": "Couldn't load English — check your connection · No se pudo cargar el inglés — revisa tu conexión"
+  "lang.fallo": "Couldn't load English — check your connection · No se pudo cargar el inglés — revisa tu conexión",
+  "track.qr.alt": "QR code that opens the tracking for this gift",
+  "track.qr.p": "Save it or share it: it goes straight to this screen, with no number to type."
 }

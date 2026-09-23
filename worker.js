@@ -31,6 +31,7 @@
       gravedad de juramento. El armado vive en documentos.js.
 */
 
+import { qrSvg } from './qr.js';
 import { recibo, certificado, informeTriage, inspeccionPDF,
          INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT,
          INSPECCION_AYUDA, INSPECCION_ANCHOS, INSPECCION_GLOSARIO,
@@ -19797,6 +19798,41 @@ export default {
     if (ruta.startsWith("/membresia/")) return await rutaMembresia(env, ruta.slice(11), url, request);
     if (ruta === "/api/pago/baja")        return await apiBajaMembresia(request, env, url);
     if (ruta === "/api/pago/baja-enlace") return await apiBajaEnlace(request, env, url);
+
+    /* GET /api/qr/<guia>.svg — el QR que lleva al rastreo de ese aporte.
+       PUBLICA a proposito: la guia ya es publica —el sitio le dice al donante
+       «guarda tu numero y consultalo cuando quieras»— y este endpoint no
+       revela nada que no revele ya `/api/aporte/<guia>`. De hecho revela
+       menos: no toca la base, solo dibuja una URL.
+
+       NO SE COMPRUEBA SI LA GUIA EXISTE, y es deliberado. Un QR se genera para
+       guardarlo o imprimirlo, a veces antes de que el webhook confirme el
+       pago; negarlo por «todavia no existe» dejaria al donante sin comprobante
+       justo en el minuto en que lo quiere. El QR lleva a la pantalla de
+       rastreo, y es ESA la que responde si la guia existe y en que va.
+
+       Se cachea un dia: para una misma guia el dibujo no cambia nunca. */
+    if (ruta.startsWith("/api/qr/") && ruta.endsWith(".svg")) {
+      const guia = decodeURIComponent(ruta.slice(8, -4)).toUpperCase();
+      if (!/^GG-\d{4}-\d{6}$/.test(guia)) return new Response("Guia invalida", { status: 400 });
+      let svg;
+      try {
+        svg = qrSvg(ORIGIN + "/?g=" + guia, { alt: "Codigo QR para rastrear el aporte " + guia });
+      } catch (e) {
+        console.error("qr", guia, e && e.message);
+        return new Response("No se pudo generar", { status: 500 });
+      }
+      return new Response(svg, {
+        headers: {
+          "content-type": "image/svg+xml; charset=utf-8",
+          "cache-control": "public, max-age=86400",
+          /* El SVG no lleva ni un script, asi que se le niega la capacidad
+             entera: si algun dia alguien mete algo ahi, no corre. */
+          "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+          "x-content-type-options": "nosniff"
+        }
+      });
+    }
 
     if (ruta === "/api/trm")               return await apiTrm(request);
     if (ruta === "/api/paypal/suscripcion") return await apiPaypalSuscripcion(request, env, url);
