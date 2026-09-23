@@ -2118,3 +2118,23 @@ section[tabindex="-1"]:focus{ outline:none }
 /* El lema, cerrando. Aquí ya significa algo. */
 .vis-lema{margin-top:34px;font-family:var(--font-display);font-weight:600;
   font-size:var(--fs-h3);line-height:1.25;color:var(--ink);text-wrap:balance}
+
+/* ---------- Hacerse miembro: elegir cuánto ---------- */
+.mb-elige{display:flex;flex-direction:column;gap:18px;margin-top:22px;max-width:620px}
+.mb-montos{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:620px){.mb-montos{grid-template-columns:1fr 1fr}}
+.mb-monto{display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:14px 10px;border:1.5px solid var(--bd);border-radius:12px;background:var(--surface);
+  color:var(--ink);font-family:inherit;cursor:pointer;transition:border-color .15s,background .15s}
+.mb-monto:hover{border-color:var(--gm)}
+.mb-monto b{font-size:var(--fs-16);font-weight:700}
+.mb-monto span{font-size:var(--fs-13);color:var(--mu)}
+/* El seleccionado se marca con BORDE y FONDO, no solo con color: un solo
+   canal deja fuera a quien no distingue el verde. */
+.mb-monto.is-on{border-color:var(--g);background:var(--gl)}
+.mb-monto.is-on span{color:var(--g)}
+.mb-otro{display:flex;flex-direction:column;gap:6px}
+.mb-otro .field{margin-bottom:0}
+/* Un botón de continuar que no puede continuar se apaga, pero NO se oculta:
+   desaparecer un botón deja a la persona sin saber qué le falta. */
+.btn.is-off{opacity:.45;pointer-events:none}

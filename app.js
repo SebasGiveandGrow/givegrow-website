@@ -1516,7 +1516,7 @@ var I18N = {
     "membres.t4.b1":"Reportes de impacto detallados",
     "membres.t4.b2":"Reunión con el equipo directivo",
     "membres.t4.b3":"Membresía honorífica y liderazgo en la comunidad",
-    "membres.cancel":"Puedes pausar o cancelar tu membresía cuando quieras escribiendo a contabilidad@thegiveandgrowproject.org o desde tu pasarela de pago. Aplica al siguiente ciclo, sin penalidades; el certificado tributario cubre lo donado hasta la fecha.",
+    "membres.cancel":"Puedes terminar tu membresía cuando quieras desde tu propia membresía: al activarla te llega por correo un enlace propio, y desde ahí la cancelas y retiramos tu método de pago en un clic. No hay que escribirle a nadie ni hay penalidades; el certificado tributario cubre lo donado hasta la fecha. Si perdiste el enlace, lo recuperas con tu correo.",
     "mi.ey":"Desde el exterior",
     "mi.t":"Membresía en dólares, por PayPal",
     "mi.lead":"Si no estás en Colombia no puedes usar PSE ni Nequi, así que esta es tu puerta: eliges cuánto aportas cada mes y PayPal lo cobra solo. Puedes cancelarla en cualquier momento desde tu propia cuenta de PayPal, sin escribirnos.",
@@ -1561,9 +1561,13 @@ var I18N = {
     "membres.ben.3.p":"Te contamos a dónde llegó tu aporte y a quién ayudó, con evidencia real.",
     "membres.ben.4.t":"Trazabilidad total",
     "membres.ben.4.p":"Cada donación tiene destino, acta y reporte. Sin promesas: evidencia.",
-    "membres.cta.t":"Elige tu nivel.",
-    "membres.cta.p":"Usa el calculador para ver tu aporte, tu beneficio tributario y el nivel de membresía que alcanzas.",
-    "membres.cta.btn":"Calcular mi aporte",
+    "membres.cta.t":"Hazte miembro.",
+    "membres.cta.otro":"O escribe otro monto mensual, en pesos",
+    "membres.cta.calc2":"¿Quieres ver antes tu beneficio tributario? Usa el calculador.",
+    "membres.cta.nivel":"Nivel {n} · {m} al mes",
+    "membres.cta.rango":"El aporte mensual va de {min} a {max}.",
+    "membres.cta.p":"Eliges cuánto, registras tu método de pago una sola vez y el aporte se cobra solo cada mes. Puedes terminarlo cuando quieras desde tu propia membresía.",
+    "membres.cta.btn":"Continuar",
     "emp.why.ey":"Por qué aliarte",
     "emp.why.t":"RSE que se ve, se mide y se siente.",
     "emp.why.1.t":"Beneficio tributario",
@@ -2054,6 +2058,60 @@ function renderFormacion(){
     el.innerHTML = html;
   });
 }
+/* HACERSE MIEMBRO: elegir cuánto y salir hacia la tokenización.
+   ==========================================================================
+   El monto viaja en la URL a `/pago/metodo`, que lo valida otra vez en el
+   servidor — aquí se valida para que la persona vea el nivel y no para
+   confiar: lo que sale de este navegador no es de fiar por definición.
+
+   POR QUÉ NO HAY UN FORMULARIO DE PAGO AQUÍ. Los campos de la tarjeta los
+   aloja Wompi en su propia ventana, dentro de `/pago/metodo`, que es una
+   página del Worker con su CSP propia. Ese es todo el motivo de que la
+   membresía salga del SPA en este punto y no antes. */
+var MB_MIN = 5000, MB_MAX = 20000000;
+function mbNivelDe(cop){
+  if (cop >= 250000) return t("membres.t4.t");
+  if (cop >= 120000) return t("membres.t3.t");
+  if (cop >= 50000)  return t("membres.t2.t");
+  return t("membres.t1.t");
+}
+/* Un monto escrito a la colombiana: «50.000», «$50.000», «50 000». Se queda
+   con los dígitos. Es el mismo problema que costó el campo 5.2 del cuestionario
+   de fundaciones, donde `<input type="number">` se comía los miles. */
+function mbNumero(txt){
+  var d = String(txt == null ? "" : txt).replace(/[^0-9]/g, "");
+  return d ? parseInt(d, 10) : 0;
+}
+function mbPinta(cop){
+  var ir = document.getElementById("mb-ir");
+  var et = document.getElementById("mb-nivel");
+  var ok = cop >= MB_MIN && cop <= MB_MAX;
+  if (ir){
+    ir.setAttribute("href", ok ? "/pago/metodo?monto=" + cop : "/pago/metodo");
+    ir.setAttribute("aria-disabled", ok ? "false" : "true");
+    ir.classList.toggle("is-off", !ok);
+  }
+  if (et){
+    et.textContent = ok
+      ? t("membres.cta.nivel").replace("{n}", mbNivelDe(cop)).replace("{m}", fmtCOP(cop))
+      : (cop ? t("membres.cta.rango").replace("{min}", fmtCOP(MB_MIN)).replace("{max}", fmtCOP(MB_MAX)) : "");
+  }
+}
+function mbMonto(cop){
+  var libre = document.getElementById("mb-libre");
+  if (libre) libre.value = "";
+  var bs = document.querySelectorAll(".mb-monto");
+  for (var i=0;i<bs.length;i++) bs[i].classList.toggle("is-on", Number(bs[i].getAttribute("data-m")) === cop);
+  mbPinta(cop);
+}
+function mbLibre(){
+  var libre = document.getElementById("mb-libre");
+  var cop = mbNumero(libre && libre.value);
+  var bs = document.querySelectorAll(".mb-monto");
+  for (var i=0;i<bs.length;i++) bs[i].classList.remove("is-on");
+  mbPinta(cop);
+}
+
 /* Chips de poblaciones. Fuente única: hub.pob.list — se pintan en #hub y en
    #voluntariado (allí como portafolio de experiencias), así nunca divergen. */
 function renderPobChips(){
@@ -2136,6 +2194,10 @@ function postLang(l){
      que en el subdominio esa precarga no hace falta.
 
      `renderPrivacy` NO va guardado: `privacidad` si es una ruta de MMC. */
+  /* El nivel se pinta al arrancar: sin esto, la etiqueta sale vacía hasta que
+     la persona toca algo, y el botón ya lleva $50.000 puestos. Decir el monto
+     solo después de que lo cambies es justo al revés. */
+  if (document.getElementById("mb-ir")) mbPinta(50000);
   if (!MARCA_MMC){ renderHeroImpact(); renderHomeFundaciones(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
   renderPrivacy();
   /* Va DESPUÉS de applyLang: el repintado de data-i18n devuelve el rango
@@ -3493,6 +3555,7 @@ function cvCopiar(){
 }
 
 var ACT_FNS = {
+  mbMonto:mbMonto, mbLibre:mbLibre,
   cvPaso:cvPaso, cvEnviar:cvEnviar, cvCopiar:cvCopiar, mmcCasoOlvidar:mmcCasoOlvidar,
   irASeccion:irASeccion,
   themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,

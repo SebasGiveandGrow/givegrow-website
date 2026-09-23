@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=068af520">
+<link rel="stylesheet" href="/styles.css?v=f3efb8e7">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=d679d399" defer></script>
+<script src="/app.js?v=3870358e" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -98,7 +98,7 @@
         <button class="nlink ndrop-t" type="button" data-i18n="nav.membres" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Membresías</button>
         <div class="ndrop-menu ndrop-menu-desc">
           <a href="#membresias"><span class="nd-t" data-i18n="nav.membres">Membresías</span><span class="nd-d" data-i18n="nav.d.membres">Los cuatro niveles y sus beneficios</span></a>
-          <a href="#donar"><span class="nd-t" data-i18n="membres.cta.btn">Calcular mi aporte</span><span class="nd-d" data-i18n="nav.d.calc">Simula tu aporte y tu beneficio tributario</span></a>
+          <a href="#donar"><span class="nd-t" data-i18n="membres.cta.btn">Continuar</span><span class="nd-d" data-i18n="nav.d.calc">Simula tu aporte y tu beneficio tributario</span></a>
           <a href="#rastrea"><span class="nd-t" data-i18n="track.t">Rastrea tu donación</span><span class="nd-d" data-i18n="nav.d.track">Sigue tu donación con su número de guía</span></a>
         </div>
       </div>
@@ -160,7 +160,7 @@
   <a href="#aliados" data-i18n="ally.t">Quiero ser aliado</a>
   <span class="mnav-g" data-i18n="nav.membres">Membresías</span>
   <a href="#membresias" data-i18n="nav.membres">Membresías</a>
-  <a href="#donar" data-i18n="membres.cta.btn">Calcular mi aporte</a>
+  <a href="#donar" data-i18n="membres.cta.btn">Continuar</a>
   <a href="#rastrea" data-i18n="track.t">Rastrea tu donación</a>
   <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
   <a href="#origen" data-i18n="nav.origen">Origen</a>
@@ -2110,10 +2110,26 @@
   <section class="cream">
     <div class="wrap center">
       <div class="cta-box rv">
-        <h2 data-i18n="membres.cta.t" class="h-comp3">Elige tu nivel.</h2>
-        <p data-i18n="membres.cta.p">Usa el calculador para ver tu aporte, tu beneficio tributario y el nivel de membresía que alcanzas.</p>
-        <a class="btn btn-g" href="#donar" data-i18n="membres.cta.btn">Calcular mi aporte</a>
-        <p class="cta-note" data-i18n="membres.cancel">Puedes pausar o cancelar tu membresía cuando quieras escribiendo a contabilidad@thegiveandgrowproject.org o desde tu pasarela de pago. Aplica al siguiente ciclo, sin penalidades; el certificado tributario cubre lo donado hasta la fecha.</p>
+        <h2 data-i18n="membres.cta.t" class="h-comp3">Hazte miembro.</h2>
+        <p data-i18n="membres.cta.p">Eliges cuánto, registras tu método de pago una sola vez y el aporte se cobra solo cada mes. Puedes terminarlo cuando quieras desde tu propia membresía.</p>
+        <div class="mb-elige">
+          <div class="mb-montos" role="group" aria-label="Monto mensual">
+            <button type="button" class="mb-monto" data-act="mbMonto(20000)" data-m="20000"><b>$20.000</b><span data-i18n="membres.t1.t">Semilla</span></button>
+            <button type="button" class="mb-monto is-on" data-act="mbMonto(50000)" data-m="50000"><b>$50.000</b><span data-i18n="membres.t2.t">Retoño</span></button>
+            <button type="button" class="mb-monto" data-act="mbMonto(120000)" data-m="120000"><b>$120.000</b><span data-i18n="membres.t3.t">Árbol</span></button>
+            <button type="button" class="mb-monto" data-act="mbMonto(250000)" data-m="250000"><b>$250.000</b><span data-i18n="membres.t4.t">Bosque</span></button>
+          </div>
+          <div class="mb-otro ally-form">
+            <div class="field">
+              <label for="mb-libre" data-i18n="membres.cta.otro">O escribe otro monto mensual, en pesos</label>
+              <input type="text" id="mb-libre" inputmode="numeric" placeholder="50.000" data-input="mbLibre()" autocomplete="off">
+            </div>
+            <p id="mb-nivel" class="mu" aria-live="polite"></p>
+          </div>
+          <a class="btn btn-g" id="mb-ir" href="/pago/metodo?monto=50000" data-i18n="membres.cta.btn">Continuar</a>
+          <p class="mu" data-i18n="membres.cta.calc2">¿Quieres ver antes tu beneficio tributario? Usa el calculador.</p>
+        </div>
+        <p class="cta-note" data-i18n="membres.cancel">Puedes terminar tu membresía cuando quieras desde tu propia membresía: al activarla te llega por correo un enlace propio, y desde ahí la cancelas y retiramos tu método de pago en un clic. No hay que escribirle a nadie ni hay penalidades; el certificado tributario cubre lo donado hasta la fecha. Si perdiste el enlace, lo recuperas con tu correo.</p>
       </div>
     </div>
   </section>
