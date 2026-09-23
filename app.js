@@ -843,6 +843,8 @@ var I18N = {
     "track.mode.dirigida":"Donación dirigida",
     "track.delivered.t":"Entregada con evidencia",
     "track.foot":"Cada cambio de estado queda registrado. Cuando tu donación se entregue, aquí verás el acta y el reporte.",
+    "track.qr.alt":"C\u00f3digo QR que abre el rastreo de este aporte",
+    "track.qr.p":"Gu\u00e1rdalo o comp\u00e1rtelo: lleva directo a esta pantalla, sin teclear la gu\u00eda.",
     "track.ng.t":"¿Perdiste tu número de guía?",
     "track.ng.p":"Escribe el correo con el que donaste y te dejamos el mensaje listo para enviárnoslo. Te respondemos con tu número de guía.",
     "track.ng.btn":"Solicitar mi guía",
@@ -5492,6 +5494,24 @@ function init(){
      que /gracias: el fallback de SPA ya sirvió index.html y aquí se enruta a
      mano. El token se queda en la URL y no se copia a ninguna parte. */
   if (mcArranca()) hash = "caso";
+  /* `?g=<guia>` — lo que lleva dentro el QR del aporte. Abre el rastreo con la
+     guía ya puesta y la busca sola: quien escanea desde un recibo impreso no
+     tiene por qué teclear catorce caracteres en un teléfono.
+
+     Se valida ANTES de tocar nada. Lo que llega por la URL lo escribe
+     cualquiera, y aunque `trackSearch` normaliza y el resultado pasa por
+     `escapeHtml`, una guía con forma buena es la condición para dar el salto
+     de ruta — así un `?g=` inventado no cambia la página de nadie. */
+  var qGuia = (new URLSearchParams(location.search).get("g") || "").toUpperCase();
+  if (/^GG-\d{4}-\d{6}$/.test(qGuia)){
+    hash = "rastrea";
+    setTimeout(function(){
+      var inp = document.getElementById("track-input");
+      if (!inp) return;
+      inp.value = qGuia;
+      trackSearch();
+    }, 0);
+  }
   mmcMarca();
   go(hash, true);
   window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||rutaPorDefecto(); go(h, true); });
@@ -5849,6 +5869,13 @@ function trackRender(d, fuente){
     + '<div class="track-meta"><span>'+tipo+'</span><span>·</span><span>'+modo+'</span>'+(desc?'<span>·</span><span>'+desc+'</span>':'')+'</div>'
     + entrega
     + '<p class="track-foot">'+t("track.foot")+'</p>'
+    /* El QR de ESTA guía. Lo dibuja el Worker —`/api/qr/<guia>.svg`— y no el
+       navegador: el generador vive en `qr.js`, que es un módulo del Worker, y
+       no hay ninguna razón para bajarle trescientas líneas de Reed-Solomon a
+       cada visitante. `loading="lazy"` porque está al final de la tarjeta. */
+    + '<div class="track-qr">'
+    + '<img src="/api/qr/'+encodeURIComponent(d.guia)+'.svg" width="132" height="132" loading="lazy" alt="'+t("track.qr.alt")+'">'
+    + '<p class="mu">'+t("track.qr.p")+'</p></div>'
     + (fuente ? '<p class="track-fuente">'+t(fuente==="sitio"?"track.fuente.sitio":"track.fuente.libro")+'</p>' : "")
     + '</div>'
     /* Las entregas del destino, no de este aporte: contribución, no

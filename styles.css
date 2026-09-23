@@ -2060,3 +2060,14 @@ section[tabindex="-1"]:focus{ outline:none }
   .mmc-portada-in{ grid-template-columns:1fr }
   .mmc-portada-foto img{ aspect-ratio:3/2; max-height:300px; object-position:center 60% }
 }
+
+/* El QR del aporte, al pie de su tarjeta de rastreo.
+   EL FONDO BLANCO NO SE PONE AQUÍ: lo trae el propio SVG, que dibuja su
+   rectángulo claro antes de los módulos. Así el código es autónomo —se lee
+   igual incrustado, descargado o impreso— y de paso no hace falta un color
+   literal fuera de los tokens, que es lo que el gate impide con razón.
+   Y tiene que ser claro SIEMPRE: un QR se lee por contraste, y en modo noche
+   invertirlo lo dejaría claro sobre oscuro, que muchos lectores no leen. */
+.track-qr{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:18px;padding-top:18px;border-top:1px solid var(--bd)}
+.track-qr img{border:1px solid var(--bd);border-radius:10px;padding:6px}
+.track-qr p{font-size:var(--fs-13);text-align:center;max-width:36ch}
