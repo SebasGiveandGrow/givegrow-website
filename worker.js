@@ -2177,6 +2177,38 @@ async function adminSalud(env) {
     "AND (contacto_email IS NULL OR TRIM(contacto_email) = '') " +
     "AND julianday('now') - julianday(creado_en) >= " + DIAS_ESPERA_AVISO,
     "Panel · llevan más de una semana esperando y no dejaron correo: el aviso automático no les llega, escríbeles por WhatsApp desde su ficha", 15, "#sec-casos");
+  /* EL CONCEPTO ESTÁ ESCRITO Y NO CONSTA QUE LA FAMILIA LO SEPA.
+     ------------------------------------------------------------------------
+     El fallo que cierra esta cola es el más callado de todos los del triaje,
+     porque no hay nada roto: un ingeniero abrió el caso, escribió el concepto,
+     el caso pasó a `clasificado` y el panel se quedó tranquilo. Lo único que no
+     pasó es que la familia se enterara.
+
+     PASA PORQUE EL FORMULARIO PIDE WHATSAPP Y EL CORREO ES OPCIONAL —a
+     propósito, «en estas zonas mucha gente tiene WhatsApp y no correo»— y el
+     aviso de que el concepto está listo sale SOLO `if (caso.contacto_email)`.
+
+     Y HAY UN DETALLE PEOR: mientras esa familia esperaba, sí aparecía en
+     `espera_sin_correo`. Al escribirse el concepto el caso deja `en_revision`,
+     así que SALE de aquella cola — la alerta desaparece exactamente en el
+     momento en que por fin hay algo que contarle.
+
+     Medido el 23 sep 2026 sembrando dos familias sin correo de nueve días: la
+     que seguía esperando salía en 2 colas; la que ya tenía su concepto escrito
+     por un ingeniero verificado salía en 0, y con 0 correos.
+
+     SE MIRA EL RASTRO DE CORREOS, NO SI HAY DIRECCIÓN, y eso la hace cubrir dos
+     silencios con una sola condición: la familia que no dejó correo, y aquella
+     a la que se le intentó y no salió —un `fallo` de Resend o un `sin_cupo` del
+     presupuesto diario—. Las dos están igual de a oscuras, y preguntar «¿tiene
+     correo?» solo habría visto a la primera. */
+  await enCola("concepto_sin_avisar",
+    "SELECT COUNT(*) AS n, MIN(c.actualizado_en) AS masViejo FROM casos c " +
+    "WHERE c.estado = 'clasificado' " +
+    "AND EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') " +
+    "AND NOT EXISTS (SELECT 1 FROM correos co WHERE co.guia = c.numero " +
+    "AND (co.etiqueta = 'caso-clasificado' OR co.etiqueta LIKE 'caso-clasificado-%') AND co.resultado IN ('enviado','simulado'))",
+    "Panel · el concepto ya está escrito y no consta que la familia lo sepa: mándaselo por WhatsApp desde su ficha", 12, "#sec-casos");
   /* La peor de las cinco, y por eso va con su propio texto: el sistema dijo
      «vayan ya» y nadie fue. Que exista esta fila es media razón de esta tanda. */
   await enCola("urgentes_sin_visitar",
@@ -7769,7 +7801,14 @@ async function adminCasos(env) {
     "(SELECT e.ing_nombre FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS ing, " +
     "(SELECT e.recomendacion FROM evaluaciones e WHERE e.caso = c.numero ORDER BY e.creado_en DESC LIMIT 1) AS reco, " +
     "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e " +
-    "  WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1) AS discrepa " +
+    "  WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') > 1) AS discrepa, " +
+    /* ¿Consta que la familia se enteró del concepto? Misma condición que la
+       cola `concepto_sin_avisar`, para que el botón aparezca exactamente sobre
+       los casos que esa cola cuenta y desaparezca al registrarlo. Dos
+       condiciones distintas para la misma pregunta se desincronizan solas. */
+    "EXISTS (SELECT 1 FROM correos co WHERE co.guia = c.numero " +
+    "  AND (co.etiqueta = 'caso-clasificado' OR co.etiqueta LIKE 'caso-clasificado-%') " +
+    "  AND co.resultado IN ('enviado','simulado')) AS avisada " +
     "FROM casos c ORDER BY " +
     /* Lo terminado se hunde al fondo. Antes no hacía falta porque nada
        terminaba nunca; ahora sí, y una bandeja que mezcla lo cerrado con lo
@@ -7882,6 +7921,64 @@ const CASO_DESTINOS = {
   descartado:  { desde: CASO_ACTIVOS, motivo: true },
   en_revision: { desde: ["cerrado", "descartado"], motivo: false }
 };
+
+/* ========================================================================
+   POST /api/admin/caso/<n>/avisado — «ya le conté a la familia»
+   ========================================================================
+
+   POR QUÉ HACE FALTA. La cola `concepto_sin_avisar` cuenta los casos cuyo
+   concepto está escrito y de los que NO CONSTA que la familia se haya enterado.
+   Sin una forma de dejar constancia, esa cola sería un número rojo que nunca
+   baja — y una alerta que no se puede cerrar enseña a ignorar el panel entero,
+   que es peor que no tenerla.
+
+   QUÉ ESCRIBE, Y POR QUÉ AHÍ. Una fila en `correos`, que es el registro de «qué
+   le hemos contado a quién» y lo que ya pinta el hilo de la casa. La etiqueta
+   la distingue de un correo de verdad: nadie debe poder leer este renglón y
+   creer que salió un correo cuando lo que hubo fue un WhatsApp.
+
+   NO SE GUARDA EL TELÉFONO. Ya está en `casos.contacto_tel`; repetirlo aquí
+   sería un dato personal más en una tabla más, sin responder ninguna pregunta
+   que el número de caso no responda.
+
+   NO ES IDEMPOTENTE A PROPÓSITO: si alguien avisa dos veces, quedan dos
+   renglones, y eso es lo que pasó de verdad. La cola solo pregunta si hay al
+   menos uno. */
+async function adminCasoAvisado(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+  const caso = await env.DB.prepare(
+    "SELECT numero, estado FROM casos WHERE numero = ?"
+  ).bind(numero).first();
+  if (!caso) return json({ error: "no_encontrado" }, 404);
+
+  /* Solo tiene sentido sobre un caso que YA tiene concepto. Marcar «avisado»
+     antes de que haya algo que contar dejaría la cola limpia y a la familia
+     igual de a oscuras cuando por fin llegue el concepto. */
+  const hay = await env.DB.prepare(
+    "SELECT 1 FROM evaluaciones WHERE caso = ? AND clasificacion <> 'inevaluable' LIMIT 1"
+  ).bind(numero).first();
+  if (!hay) return json({ error: "sin_concepto",
+    ayuda: "Todavia no hay concepto que contarle a esta familia." }, 409);
+
+  const canal = String((await request.json().catch(() => ({}))).canal || "whatsapp")
+    .replace(/[^a-z]/gi, "").slice(0, 20) || "whatsapp";
+
+  await env.DB.prepare(
+    "INSERT INTO correos (etiqueta, para, asunto, guia, resultado) VALUES (?,?,?,?,'enviado')"
+  ).bind("caso-clasificado-" + canal, "(" + canal + ")",
+         "Concepto entregado a la familia por " + canal, numero).run();
+
+  /* Y queda en el registro quién lo dijo. Es una afirmacion sobre algo que
+     ocurrio fuera del sistema: sin nombre detras, no vale nada. */
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES ('sistema', 'auditoria', ?)"
+  ).bind("caso " + numero + " · concepto entregado a la familia por " + canal +
+         " · lo registro " + String(quien || "?").slice(0, 120)).run();
+
+  return json({ ok: true, numero, canal });
+}
 
 async function adminMoverCaso(request, env, numero, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
@@ -16208,6 +16305,17 @@ function cargarCasos(){
             '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="visitado">Visitada</button> ') +
           '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="cerrado">Cerrar…</button> ' +
           '<button class="copy" data-caso="' + esc(c.numero) + '" data-ce="descartado">Descartar…</button>');
+      /* EL BOTON QUE APAGA LA ALERTA. Solo sobre un caso ya clasificado del que
+         no consta que la familia se haya enterado — que es justo lo que cuenta
+         la cola concepto_sin_avisar. Sin el, esa cola seria un numero rojo que
+         nunca baja, y una alerta que no se puede cerrar ensena a ignorar el
+         panel entero.
+         SIN COMILLAS INVERTIDAS: este comentario vive DENTRO de la plantilla
+         del panel, y una sola la corta. El gate lo atrapa, pero cuesta menos
+         no ponerla. */
+      if (c.estado === "clasificado" && !c.avisada){
+        acc += ' <button class="copy" data-avisado="' + esc(c.numero) + '" title="Registra que ya le contaste el concepto a la familia">Ya le avis\u00e9</button>';
+      }
       return "<tr" + (fin ? ' style="opacity:.55"' : "") + ">" +
         "<td><strong>" + esc(c.numero) + "</strong><br><small>" + esc(enCO(c.creado_en, 10)) + "</small>" +
           (c.dup ? '<br><small style="color:#A84D00"><strong>mismo teléfono que ' + esc(c.dup) + "</strong></small>" : "") + "</td>" +
@@ -16748,6 +16856,28 @@ document.addEventListener("click", function(e){
       if (d && d.error) window.alert("No se quitó: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
       abrirCaso(CASO_ABIERTO); cargarCasos();
     }).catch(function(){ abrirCaso(CASO_ABIERTO); });
+    return;
+  }
+
+  /* YA LE AVISE. No manda nada: registra que el concepto ya se le conto a la
+     familia por otro canal —normalmente WhatsApp, porque el formulario pide
+     WhatsApp y el correo es opcional—. Es lo unico que apaga la cola
+     concepto_sin_avisar, y por eso pregunta antes: quien lo pulsa esta
+     afirmando algo que paso fuera del sistema, y queda su nombre detras. */
+  var av = e.target.closest("[data-avisado]");
+  if (av){
+    var numA = av.getAttribute("data-avisado");
+    if (!window.confirm("Registrar que ya le contaste a la familia de " + numA +
+        " el concepto de su casa.\\n\\nQueda en el registro con tu nombre, y el caso" +
+        " sale de la alerta. Solo si de verdad ya lo hiciste.")) return;
+    av.disabled = true; av.textContent = "\u2026";
+    fetch("/api/admin/caso/" + encodeURIComponent(numA) + "/avisado", {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ canal: "whatsapp" })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.error) window.alert("No se registro: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
+      cargarCasos();
+    }).catch(function(){ av.disabled = false; av.textContent = "Ya le avise"; });
     return;
   }
 
@@ -20284,6 +20414,8 @@ export default {
            cualquier otra cosa ni siquiera entra a la función. */
         const mc = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/estado$/i);
         if (mc) return await adminMoverCaso(request, env, mc[1].toUpperCase(), sesion.email);
+        const cav = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/avisado$/i);
+        if (cav) return await adminCasoAvisado(request, env, cav[1].toUpperCase(), sesion.email);
         const cco = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/corregir$/i);
         if (cco) return await adminCorregirCaso(request, env, cco[1].toUpperCase(), sesion.email);
         const cme = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/medio$/i);
