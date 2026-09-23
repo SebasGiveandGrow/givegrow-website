@@ -1445,6 +1445,36 @@ try {
     { nombre: "firma", html: plantilla("paginaFirma"), js: plantilla("firmaJS") }
   ];
 
+  /* ------------------------------------------------------------------
+     CHECK #16 · el «ir a» de cada cola del panel lleva a algún sitio
+
+     Cada alerta del panel trae un destino para que quien la lee pueda ir a
+     arreglarla de un clic. Si ese ancla no existe, el enlace no hace nada y no
+     sale ningún error: la alerta te dice que hay trabajo y te deja en el mismo
+     sitio.
+
+     Nació de encontrar TRES rotos a la vez el 23 sep 2026: `#sec-casos` —que no
+     existe, la sección se llama `sec-casas`— usado por dos colas, y una tercera
+     que copió el mismo destino roto de la primera. Un ancla mala se propaga
+     copiando la cola de al lado, que es exactamente lo que pasó.
+     ------------------------------------------------------------------ */
+  {
+    const ids = new Set([...src.matchAll(/id=\\?"(sec-[a-z]+)\\?"/g)].map((m) => m[1]));
+    const rotos = [];
+    for (const m of src.matchAll(/enCola\(\s*"([a-z_]+)"/g)) {
+      const trozo = src.slice(m.index, m.index + 1600);
+      const d = trozo.match(/,\s*\d+,\s*"(#sec-[a-z]+)"\s*\)/);
+      if (d && !ids.has(d[1].slice(1))) rotos.push(m[1] + " → " + d[1]);
+    }
+    if (rotos.length) {
+      err("check #16 · el «ir a» de " + rotos.length + " cola(s) del panel apunta a un ancla que NO existe, " +
+          "así que el enlace no hace nada y no sale error: " + rotos.join(", ") +
+          ". Las secciones reales son: " + [...ids].sort().join(", "));
+    } else {
+      ok("el «ir a» de cada cola del panel lleva a una sección que existe (" + ids.size + " secciones)");
+    }
+  }
+
   for (const p of pantallas) {
     if (!p.js) { err("check #15: no encontré la plantilla JS de " + p.nombre); continue; }
     const texto = p.html + "\n" + p.js;

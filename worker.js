@@ -2136,6 +2136,21 @@ async function adminSalud(env) {
 
      El registro de esas filas se añadió el 2 sep 2026; sin esta cola se
      escribían y nadie las leía, que es justo el defecto que venían a resolver. */
+  /* LO QUE EL PRESUPUESTO DIARIO DEJÓ FUERA. Cola aparte de `correos_fallidos`
+     porque el arreglo es OTRO: un `fallo` se reenvía y se mira Resend; un
+     `sin_cupo` significa que ese día se agotó la cuota y hay que decidir si el
+     plan se queda corto. Mezclarlos daría un número grande con dos remedios
+     distintos dentro.
+
+     ESTA COLA CIERRA UN AGUJERO QUE ABRÍ YO. El presupuesto de correo se
+     construyó para que la escasez fuera visible y deliberada en vez de aleatoria
+     — y le di a `sin_cupo` un resultado propio justo para eso. Pero no lo
+     miraba nadie: ni esta lista, ni `correos_fallidos` (que solo ve `fallo`),
+     ni el panel de salud. O sea que la escasez pasó de ser aleatoria a ser
+     invisible, que es peor. */
+  await enCola("correos_sin_cupo",
+    "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'sin_cupo'",
+    "El presupuesto diario de correo se agotó y estos avisos no salieron · mándalos a mano, y si se repite, el plan de Resend se quedó corto", 20, null);
   await enCola("correos_sin_buzon",
     "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'sin_destino'",
     "Poner CORREO_MMC o CORREO_AVISOS en la configuración del Worker · mientras estén vacíos ningún aviso interno sale", 15, null);
@@ -2176,7 +2191,7 @@ async function adminSalud(env) {
     "WHERE estado IN ('recibido','en_revision') " +
     "AND (contacto_email IS NULL OR TRIM(contacto_email) = '') " +
     "AND julianday('now') - julianday(creado_en) >= " + DIAS_ESPERA_AVISO,
-    "Panel · llevan más de una semana esperando y no dejaron correo: el aviso automático no les llega, escríbeles por WhatsApp desde su ficha", 15, "#sec-casos");
+    "Panel · llevan más de una semana esperando y no dejaron correo: el aviso automático no les llega, escríbeles por WhatsApp desde su ficha", 15, "#sec-casas");
   /* EL CONCEPTO ESTÁ ESCRITO Y NO CONSTA QUE LA FAMILIA LO SEPA.
      ------------------------------------------------------------------------
      El fallo que cierra esta cola es el más callado de todos los del triaje,
@@ -2208,7 +2223,23 @@ async function adminSalud(env) {
     "AND EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = c.numero AND e.clasificacion <> 'inevaluable') " +
     "AND NOT EXISTS (SELECT 1 FROM correos co WHERE co.guia = c.numero " +
     "AND (co.etiqueta = 'caso-clasificado' OR co.etiqueta LIKE 'caso-clasificado-%') AND co.resultado IN ('enviado','simulado'))",
-    "Panel · el concepto ya está escrito y no consta que la familia lo sepa: mándaselo por WhatsApp desde su ficha", 12, "#sec-casos");
+    "Panel · el concepto ya está escrito y no consta que la familia lo sepa: mándaselo por WhatsApp desde su ficha", 12, "#sec-casas");
+  /* UN CERTIFICADO TRIBUTARIO CIRCULANDO SIN RESPALDO.
+     ------------------------------------------------------------------------
+     `revisarCertificadoPorReversa` marca `revision_en` cuando un pago ya
+     aprobado se cae después en Wompi, sella el PDF y manda un correo al equipo.
+     Ese correo era TODO lo que había: ninguna cola lo miraba, así que el aviso
+     dependía de que un solo mensaje llegara — y ese mensaje es interno, o sea
+     de los primeros que el presupuesto diario deja fuera.
+
+     Lo que hay al otro lado no es una molestia operativa: es un documento que
+     la Revisora Fiscal firmó bajo gravedad de juramento y que alguien puede
+     estar presentando a la DIAN. El sistema no lo anula solo —anular lleva
+     motivo y es un acto de una persona— pero no puede dejar de recordarlo. */
+  await enCola("certificados_en_revision",
+    "SELECT COUNT(*) AS n, MIN(revision_en) AS masViejo FROM certificados " +
+    "WHERE anulado_en IS NULL AND revision_en IS NOT NULL",
+    "Pantalla «Firma» · un certificado ya firmado perdió su respaldo: el pago se cayó después. Decide si se anula", 11, "/firma");
   /* La peor de las cinco, y por eso va con su propio texto: el sistema dijo
      «vayan ya» y nadie fue. Que exista esta fila es media razón de esta tanda. */
   await enCola("urgentes_sin_visitar",
@@ -2339,6 +2370,13 @@ async function adminSalud(env) {
     "SUM(CASE WHEN resultado = 'enviado'  THEN 1 ELSE 0 END) AS enviados, " +
     "SUM(CASE WHEN resultado = 'fallo'    THEN 1 ELSE 0 END) AS fallidos, " +
     "SUM(CASE WHEN resultado = 'simulado' THEN 1 ELSE 0 END) AS simulados, " +
+    /* `sin_cupo` FALTABA, y su ausencia no dejaba un hueco: dejaba una cuenta
+       que no cuadra. El panel decía `total` 3 con enviados+fallidos+simulados
+       = 2, y el que faltaba era justo el aviso de un certificado sin respaldo.
+       Medido el 23 sep 2026. Un resultado que se escribe y no se cuenta en
+       ninguna parte es peor que no escribirlo: el total lo delata y nadie sabe
+       qué es lo que falta. */
+    "SUM(CASE WHEN resultado = 'sin_cupo' THEN 1 ELSE 0 END) AS sin_cupo, " +
     "MAX(intento_en) AS ultimo FROM correos"
   );
 
@@ -2372,6 +2410,7 @@ async function adminSalud(env) {
       enviados: co.enviados || 0,
       fallidos: co.fallidos || 0,
       simulados: co.simulados || 0,
+      sin_cupo: co.sin_cupo || 0,
       ultimo: co.ultimo || null,
       /* La alarma: hay correos anotados y NINGUNO salió de verdad. Casi siempre
          es la llave de Resend sin configurar. */
@@ -16021,6 +16060,11 @@ function cargarSalud(){
     h += pasoEmbudo("enviados", co.enviados, co.ultimo ? "último " + String(co.ultimo).slice(0,16) : "nunca");
     h += pasoEmbudo("fallaron", co.fallidos, co.fallidos ? "revisar" : "");
     h += pasoEmbudo("sin enviar (simulados)", co.simulados);
+    /* Lo que el presupuesto diario dejo fuera. Va en el embudo y no solo en su
+       cola porque aqui es donde la suma tiene que cuadrar: sin este paso, el
+       total no coincidia con enviados+fallaron+simulados y el hueco no tenia
+       nombre. */
+    h += pasoEmbudo("sin cupo del dia", co.sin_cupo, co.sin_cupo ? "mandar a mano" : "");
     h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">El correo nunca tumba un cobro: si Resend falla, el aporte queda igual y el fallo se anota aquí. Por eso hay que mirarlo — nadie se va a quejar de un acuse que no sabe que existía.</p>';
 
     /* 4 · Lo que espera a una persona. */
