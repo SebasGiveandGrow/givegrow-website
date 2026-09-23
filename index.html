@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=f3efb8e7">
+<link rel="stylesheet" href="/styles.css?v=69e302ed">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=3870358e" defer></script>
+<script src="/app.js?v=2336fb82" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1442,6 +1442,7 @@
           <select id="rep-dest">
             <option value="fondo" data-i18n="rep.dest.fondo">Donde más se necesite (fondo general)</option>
             <option value="brigada" data-i18n="rep.dest.brigada">Brigada de atención a emergencia · 5 sectores</option>
+            <option value="miramicasa" data-i18n="rep.dest.mmc">Mira Mi Casa · reparación de viviendas</option>
           </select></div>
         <div class="field"><label for="rep-nombre" data-i18n="rep.nombre">Nombre o razón social</label>
           <input type="text" id="rep-nombre" autocomplete="name" required></div>
@@ -2998,6 +2999,15 @@
       <p style="margin-top:14px;max-width:70ch;padding-top:16px;border-top:1px solid var(--bd)" data-i18n="bc.od.uso">Puedes reutilizar estos datos, incluso con fines comerciales, citando como fuente a Fundación Give&amp;Grow International. Lo que te pedimos a cambio es lo mismo que nos exigimos: no afirmar con ellos más de lo que dicen. Una clasificación es un concepto hecho sobre fotografías, no un dictamen de habitabilidad.</p>
     </div>
   </section>
+  <section class="mmc-donar-sec">
+    <div class="wrap">
+      <div class="mmc-donar">
+        <h2 class="h-sec" data-i18n="mmc.donar.t">Alguien tiene que poner los materiales</h2>
+        <p class="lead" data-i18n="mmc.donar.p">A la familia no se le cobra nada, ni aquí ni nunca. Lo que cuesta reparar lo pone quien puede: tu aporte va al fondo de reparación de Mira Mi Casa, con guía y acta como cualquier otro.</p>
+        <a class="btn btn-g" href="https://www.thegiveandgrowproject.org/?d=miramicasa-reparacion#donar" data-i18n="mmc.donar.btn">Aportar a las reparaciones</a>
+      </div>
+    </div>
+  </section>
 </main>
 
 <main id="page-caso" class="page">
@@ -3057,6 +3067,15 @@
     </div>
   </section>
 
+  <section class="mmc-donar-sec">
+    <div class="wrap">
+      <div class="mmc-donar">
+        <h2 class="h-sec" data-i18n="mmc.donar.t">Alguien tiene que poner los materiales</h2>
+        <p class="lead" data-i18n="mmc.donar.p">A la familia no se le cobra nada, ni aquí ni nunca. Lo que cuesta reparar lo pone quien puede: tu aporte va al fondo de reparación de Mira Mi Casa, con guía y acta como cualquier otro.</p>
+        <a class="btn btn-g" href="https://www.thegiveandgrowproject.org/?d=miramicasa-reparacion#donar" data-i18n="mmc.donar.btn">Aportar a las reparaciones</a>
+      </div>
+    </div>
+  </section>
   <section>
     <div class="wrap">
       <span class="ey rv" data-i18n="ap.ev.ey">Qué vuelve</span>
