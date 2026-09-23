@@ -392,8 +392,10 @@ var I18N = {
     "nav.d.vivienda":"Sube fotos y recibe un concepto: si puedes permanecer y con qué reparar",
     "nav.d.ingenieros":"Postúlate: mira fotos, di qué precauciones tomar y con qué reparar",
     "hero.eyebrow":"Colombia · ESAL · NIT 901.948.930-2",
-    "hero.title":"Dar para crecer, crecer para dar más.",
-    "hero.lead":"Conectamos generosidad con necesidad de forma estratégica y sostenible. No reemplazamos a las fundaciones, las amplificamos. Y aquí, quien da también crece.",
+    "hero.title":"Una alianza, muchas realidades.",
+    "hero.lead":"Conectamos generosidad con necesidad. No reemplazamos a las fundaciones de base: las amplificamos. Y aquí, quien da también crece.",
+    "hero.cta.donar":"Donar",
+    "hero.cta.hub":"Conocer el HUB SOCIAL",
     "path.donar.t":"Quiero donar",
     "path.donar.s":"Como persona natural",
     "path.emp.t":"RSE empresarial",
@@ -406,9 +408,17 @@ var I18N = {
     "stat.fund":"Año de fundación",
     "hub.aliadas.soon.t":"Más fundaciones en camino",
     "hub.aliadas.soon.p":"Cada aliada entra una a una, con verificación y convenio. Estamos sumando con evidencia, no con promesas.",
-    "home.hub.ey":"Nuestro valor diferencial",
-    "home.hub.t":"El HUB SOCIAL: tu donación con nombre y evidencia",
+    "home.hub.ey":"Cómo funciona",
+    "home.hub.t":"Entras una vez. Llegas a varias realidades.",
     "home.hub.p":"No somos otra fundación pidiendo donaciones. Somos el puente que conecta tu generosidad con fundaciones de base verificadas — y te devuelve la prueba de lo que pasó. Cada aporte se rastrea de principio a fin.",
+    "home.vuelta.t":"Y algo te vuelve",
+    "home.vuelta.p":"Una jornada en territorio, tu beneficio tributario y la evidencia de en qué se convirtió tu aporte. Es la parte que casi nadie ofrece.",
+    "home.funds.ey":"La red, hoy",
+    "home.funds.t":"Conoce las fundaciones",
+    "home.funds.p":"Cada una entró tras una visita de contexto y firmó convenio. Su costo por unidad de impacto está contrastado contra su propio soporte, no estimado por nosotros.",
+    "home.funds.btn":"Ver todas en el HUB SOCIAL",
+    "home.funds.una":"Una unidad verificada",
+    "home.funds.vacio":"Estamos sumando las primeras fundaciones aliadas.",
     "home.hub.s1t":"Tú das","home.hub.s1p":"Eliges a dónde va tu aporte, con total claridad.",
     "home.hub.s2t":"El HUB conecta","home.hub.s2p":"Verificamos y canalizamos a una fundación de base real.",
     "home.hub.s3t":"La fundación entrega","home.hub.s3p":"El apoyo llega a la comunidad, con acta y registro.",
@@ -429,6 +439,8 @@ var I18N = {
     "feat.tax.tag":"Para donantes",
     "traz.ey":"Cómo funciona",
     "traz.t":"Trazabilidad completa, de principio a fin.",
+    "traz.btn":"Rastrea tu donación",
+    "vis.lema":"Dar para crecer, crecer para dar más.",
     "traz.1.t":"Visita de contexto",
     "traz.1.p":"Conocemos a la fundación y la comunidad en terreno.",
     "traz.2.t":"Onboarding",
@@ -1624,9 +1636,15 @@ var I18N = {
     "start.fund.t":"Soy fundación",
     "start.fund.p":"Súmate al HUB SOCIAL y recibe donaciones y herramientas, sin costo.",
     "start.fund.btn":"Aplicar al Hub →",
-    "start.vol.t":"Quiero ayudar",
-    "start.vol.p":"Suma tu tiempo o talento al equipo que está construyendo todo esto.",
-    "start.vol.btn":"Escríbenos →",
+    "start.vol.t":"Quiero dar mi tiempo",
+    "start.vol.p":"Voluntariado por oficio y jornadas en territorio con las comunidades.",
+    "start.vol.btn":"Ver voluntariado →",
+    "start.com.t":"Tengo un comercio",
+    "start.com.p":"Aporta un beneficio a la red sin girar dinero, y recibe visibilidad.",
+    "start.com.btn":"Programa de Gratitud →",
+    "start.mmc.t":"Mira Mi Casa",
+    "start.mmc.p":"Reporta tu casa tras el sismo y recibe un concepto técnico, gratis.",
+    "start.mmc.btn":"Revisar mi casa →",
     "brig.ev.ey":"Evidencia",
     "brig.ev.t":"Cada entrega, con su acta.",
     "brig.ev.p":"El documento que vale es el acta en papel que firma quien recibe. Aquí publicamos su foto y lo que dice. Si no quedó documentado, para nosotros no ocurrió.",
@@ -2118,7 +2136,7 @@ function postLang(l){
      que en el subdominio esa precarga no hace falta.
 
      `renderPrivacy` NO va guardado: `privacidad` si es una ruta de MMC. */
-  if (!MARCA_MMC){ renderHeroImpact(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
+  if (!MARCA_MMC){ renderHeroImpact(); renderHomeFundaciones(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
   renderPrivacy();
   /* Va DESPUÉS de applyLang: el repintado de data-i18n devuelve el rango
      estático a su sitio y hay que volver a poner la fase encima. */
@@ -4817,6 +4835,45 @@ function renderAliadas(){
     }
     html += '<div class="card card-empty"><h3>'+t("hub.aliadas.soon.t")+'</h3><p>'+t("hub.aliadas.soon.p")+'</p></div>';
     el.innerHTML = html;
+  });
+}
+/* Las fundaciones EN LA PORTADA. Misma fuente que el muro del HUB
+   —`partners.json` vía `loadPartners()`— y la misma regla de consentimiento,
+   porque quien filtra es `loadPartners`, no esta función.
+
+   LO QUE AÑADE FRENTE A `renderAliadas`: la unidad de impacto MÁS BARATA de
+   cada fundación con su costo. Es el dato que convierte «tenemos aliadas» en
+   «esto cuesta esto», y es el único número de la portada que alguien puede ir
+   a contrastar. Se elige la más barata a propósito: es la que hace pensar
+   «eso lo puedo dar yo».
+
+   Si una aliada todavía no tiene unidad definida, la tarjeta sale igual y sin
+   inventar: se omite la línea del costo. */
+function renderHomeFundaciones(){
+  var el = document.getElementById("home-funds-grid"); if (!el) return;
+  loadPartners().then(function(list){
+    var html = "", n = 0;
+    for (var i=0;i<list.length;i++){
+      var p = list[i];
+      if (p.type !== "foundation" || !fundRecibe(p)) continue;
+      n++;
+      var area = p.area ? (p.area[lang]||p.area.es||"") : "";
+      var pob  = p.poblacion ? (p.poblacion[lang]||p.poblacion.es||"") : "";
+      var us = (p.impactUnits||[]).filter(function(u){ return u && u.cop; });
+      var barata = null;
+      for (var k=0;k<us.length;k++) if (!barata || us[k].cop < barata.cop) barata = us[k];
+      var etiqueta = barata ? (barata[lang]||barata.es||"") : "";
+      html += '<a class="hfund" href="#fundacion/'+encodeURIComponent(p.id)+'">'
+            + '<b>'+escapeHtml(p.name)+'</b>'
+            + (area ? '<span class="mu">'+escapeHtml(area)+'</span>' : '')
+            + (pob ? '<span class="hfund-pob">'+escapeHtml(pob)+'</span>' : '')
+            + (barata && etiqueta
+                ? '<span class="hfund-un"><i>'+escapeHtml(t("home.funds.una"))+'</i>'
+                  + escapeHtml(etiqueta) + ': ' + escapeHtml(fmtCOP(barata.cop)) + '</span>'
+                : '')
+            + '<span class="hfund-go" aria-hidden="true">&rarr;</span></a>';
+    }
+    el.innerHTML = n ? html : '<p class="mu">'+escapeHtml(t("home.funds.vacio"))+'</p>';
   });
 }
 // Muro "Aliadas que aportan" (#hub): fundaciones cuyo rol incluye 'aporta'.

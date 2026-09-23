@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=08c86b8f">
+<link rel="stylesheet" href="/styles.css?v=068af520">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=6352f39c" defer></script>
+<script src="/app.js?v=d679d399" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -196,25 +196,12 @@
     </picture></div>
     <div class="wrap">
       <p class="hero-eyebrow" data-i18n="hero.eyebrow">Colombia · ESAL · NIT 901.948.930-2</p>
-      <h1 data-i18n="hero.title">Dar para crecer, crecer para dar más.</h1>
-      <p class="hero-lead" data-i18n="hero.lead">Conectamos generosidad con necesidad de forma estratégica y sostenible. No reemplazamos a las fundaciones, las amplificamos. Y aquí, quien da también crece.</p>
+      <h1 data-i18n="hero.title">Una alianza, muchas realidades.</h1>
+      <p class="hero-lead" data-i18n="hero.lead">Conectamos generosidad con necesidad. No reemplazamos a las fundaciones de base: las amplificamos. Y aquí, quien da también crece.</p>
       <p class="hero-impact rv d1" id="hero-impact" hidden></p>
-      <div class="paths">
-        <a class="path" href="#donar">
-          <div class="path-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/></svg></div>
-          <h2 data-i18n="path.donar.t" class="h-comp3">Quiero donar</h2>
-          <p data-i18n="path.donar.s">Como persona natural</p>
-        </a>
-        <a class="path" href="#empresas">
-          <div class="path-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M10 8h4M10 12h4M10 16h4"/></svg></div>
-          <h2 data-i18n="path.emp.t" class="h-comp3">RSE empresarial</h2>
-          <p data-i18n="path.emp.s">Para mi empresa</p>
-        </a>
-        <a class="path" href="#fundaciones">
-          <div class="path-ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-          <h2 data-i18n="path.fund.t" class="h-comp3">Somos fundación</h2>
-          <p data-i18n="path.fund.s">Unirme al Hub</p>
-        </a>
+      <div class="hero-cta rv d2">
+        <a class="btn btn-g" href="#donar" data-i18n="hero.cta.donar">Donar</a>
+        <a class="btn btn-w" href="#hub" data-i18n="hero.cta.hub">Conocer el HUB SOCIAL</a>
       </div>
       <a class="hero-tour rv d3" href="#origen"><span data-i18n="hero.tour">¿Primera vez aquí? Haz el recorrido completo</span> &rarr;</a>
     </div>
@@ -233,8 +220,8 @@
 
   <section class="home-hub">
     <div class="wrap">
-      <span class="ey rv" data-i18n="home.hub.ey">Nuestro valor diferencial</span>
-      <h2 class="h-sec rv" data-i18n="home.hub.t">El HUB SOCIAL: tu donación con nombre y evidencia</h2>
+      <span class="ey rv" data-i18n="home.hub.ey">Cómo funciona</span>
+      <h2 class="h-sec rv" data-i18n="home.hub.t">Entras una vez. Llegas a varias realidades.</h2>
       <p class="lead rv d1" data-i18n="home.hub.p">No somos otra fundación pidiendo donaciones. Somos el puente que conecta tu generosidad con fundaciones de base verificadas — y te devuelve la prueba de lo que pasó. Cada aporte se rastrea de principio a fin.</p>
       <div class="hub-flow rv d2">
         <div class="hf-step rv">
@@ -261,6 +248,10 @@
           <p data-i18n="home.hub.s4p">Foto, factura y trazabilidad de vuelta. No promesas.</p>
         </div>
       </div>
+      <div class="hub-vuelta rv d3">
+        <h3 data-i18n="home.vuelta.t">Y algo te vuelve</h3>
+        <p data-i18n="home.vuelta.p">Una jornada en territorio, tu beneficio tributario y la evidencia de en qué se convirtió tu aporte. Es la parte que casi nadie ofrece.</p>
+      </div>
       <a class="btn btn-g rv d3" href="#hub" data-i18n="home.hub.btn">Conoce cómo funciona el HUB</a>
       <!-- OCULTO por decisión de Sebas: contadores de donaciones/entregas en vivo. Se retoma cuando haya más datos. JS (updateLiveStats) es null-safe; claves i18n (live.*) se conservan.
       <div class="live-stats rv d3" id="live-stats" aria-live="polite">
@@ -282,51 +273,17 @@
     </div>
   </section>
 
-  <section class="cream">
+
+  <section id="home-fundaciones">
     <div class="wrap">
-      <span class="ey rv" data-i18n="model.ey">El modelo</span>
-      <h2 class="h-sec rv" data-i18n="model.t">El sector social opera fragmentado. Somos el puente.</h2>
-      <p class="lead rv d1" data-i18n="model.p">Potenciamos fundaciones en campo, conectamos donantes con causas verificadas y creamos un ecosistema donde dar tiene beneficios reales para quien contribuye.</p>
-      <a class="btn btn-g rv d2" href="#hub" data-i18n="model.btn">Ver el HUB SOCIAL</a>
+      <span class="ey rv" data-i18n="home.funds.ey">La red, hoy</span>
+      <h2 class="h-sec rv" data-i18n="home.funds.t">Conoce las fundaciones</h2>
+      <p class="lead rv d1" data-i18n="home.funds.p">Cada una entró tras una visita de contexto y firmó convenio. Su costo por unidad de impacto está contrastado contra su propio soporte, no estimado por nosotros.</p>
+      <div id="home-funds-grid" class="home-funds rv d2"></div>
+      <a class="btn btn-w rv d3" href="#hub" data-i18n="home.funds.btn">Ver todas en el HUB SOCIAL</a>
     </div>
   </section>
 
-  <section>
-    <div class="wrap grid g3">
-      <div class="card rv">
-        <span class="tag" data-i18n="feat.hub.tag">Activo hoy</span>
-        <div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg></div>
-        <h2 data-i18n="feat.hub.t" class="h-comp3">HUB SOCIAL</h2>
-        <p data-i18n="feat.hub.p">Centro operativo. Cinco rutas que conectan alianzas, donaciones e impacto medible.</p>
-      </div>
-      <div class="card rv d1">
-        <span class="tag new" data-i18n="feat.grat.tag">Nuevo</span>
-        <div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div>
-        <h2 data-i18n="feat.grat.t" class="h-comp3">Programa de Gratitud</h2>
-        <p data-i18n="feat.grat.p">Red de empresas aliadas con descuentos exclusivos para todos los miembros activos.</p>
-      </div>
-      <div class="card rv d2">
-        <span class="tag" data-i18n="feat.tax.tag">Para donantes</span>
-        <div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM8 7h8M8 11h8M8 15h5"/></svg></div>
-        <h2 data-i18n="feat.tax.t" class="h-comp3">Beneficio tributario</h2>
-        <p data-i18n="feat.tax.p">Descuento del 25% sobre el impuesto de renta a cargo (Art. 257 ET) por cada donación vía sistema financiero, en los términos y límites que contempla la ley. Aplica solo en Colombia, para contribuyentes del impuesto de renta.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="band">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="traz.ey">Cómo funciona</span>
-      <h2 class="h-sec rv" data-i18n="traz.t">Trazabilidad completa, de principio a fin.</h2>
-      <div class="steps rv d1" style="margin-top:30px;max-width:760px">
-        <div class="step"><div><h3 data-i18n="traz.1.t" class="h-comp4">Visita de contexto</h3><p data-i18n="traz.1.p">Conocemos a la fundación y la comunidad en terreno.</p></div></div>
-        <div class="step"><div><h3 data-i18n="traz.2.t" class="h-comp4">Onboarding</h3><p data-i18n="traz.2.p">Perfil digital y convenio firmado entre las partes.</p></div></div>
-        <div class="step"><div><h3 data-i18n="traz.3.t" class="h-comp4">Gestión de necesidades</h3><p data-i18n="traz.3.p">Conectamos la necesidad concreta con el donante adecuado.</p></div></div>
-        <div class="step"><div><h3 data-i18n="traz.4.t" class="h-comp4">Entrega con acta</h3><p data-i18n="traz.4.p">Cada entrega queda documentada y verificada.</p></div></div>
-        <div class="step"><div><h3 data-i18n="traz.5.t" class="h-comp4">Reporte fotográfico</h3><p data-i18n="traz.5.p">Cuando la fundación aliada entrega, su acta firmada y sus fotos quedan en el rastreo de tu aporte.</p></div></div>
-      </div>
-    </div>
-  </section>
   <section class="foto-banner">
     <picture>
       <source media="(max-width:640px)" type="image/webp" srcset="/img/jornadas/banner_atardecer_movil.webp">
@@ -343,12 +300,28 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="start.ey">¿Por dónde empiezo?</span>
       <h2 class="h-sec rv" data-i18n="start.t">Hay un camino para ti.</h2>
-      <div class="grid g4 rv d1" style="margin-top:28px">
+      <div class="grid g3 rv d1" style="margin-top:28px">
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/></svg></div><h3 data-i18n="start.don.t">Soy donante</h3><p data-i18n="start.don.p">Elige un monto, dona con beneficio tributario y recibe reportes de tu impacto.</p><a class="card-link" href="#donar" data-i18n="start.don.btn">Quiero donar →</a></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M10 8h4M10 12h4M10 16h4"/></svg></div><h3 data-i18n="start.emp.t">Soy empresa</h3><p data-i18n="start.emp.p">Convierte tu RSE en impacto medible y trazable, con beneficios tributarios.</p><a class="card-link" href="#empresas" data-i18n="start.emp.btn">Aliar mi empresa →</a></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="start.fund.t">Soy fundación</h3><p data-i18n="start.fund.p">Súmate al HUB SOCIAL y recibe donaciones y herramientas, sin costo.</p><a class="card-link" href="#fundaciones" data-i18n="start.fund.btn">Aplicar al Hub →</a></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18 9l-4.2 1.3L12 15l-1.8-4.7L6 9l4.2-1.3z"/><path d="M19 14l.8 1.9L22 17l-2.2.7L19 20l-.8-2.3L16 17l2.2-1.1z"/></svg></div><h3 data-i18n="start.vol.t">Quiero ayudar</h3><p data-i18n="start.vol.p">Suma tu tiempo o talento al equipo que está construyendo todo esto.</p><a class="card-link" href="#contacto" data-i18n="start.vol.btn">Escríbenos →</a></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18 9l-4.2 1.3L12 15l-1.8-4.7L6 9l4.2-1.3z"/><path d="M19 14l.8 1.9L22 17l-2.2.7L19 20l-.8-2.3L16 17l2.2-1.1z"/></svg></div><h3 data-i18n="start.vol.t">Quiero dar mi tiempo</h3><p data-i18n="start.vol.p">Voluntariado por oficio y jornadas en territorio con las comunidades.</p><a class="card-link" href="#voluntariado" data-i18n="start.vol.btn">Ver voluntariado →</a></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div><h3 data-i18n="start.com.t">Tengo un comercio</h3><p data-i18n="start.com.p">Aporta un beneficio a la red sin girar dinero, y recibe visibilidad.</p><a class="card-link" href="#gratitud" data-i18n="start.com.btn">Programa de Gratitud →</a></div>
+        <div class="card card-mmc"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg></div><h3 data-i18n="start.mmc.t">Mira Mi Casa</h3><p data-i18n="start.mmc.p">Reporta tu casa tras el sismo y recibe un concepto técnico, gratis.</p><a class="card-link" href="https://miramicasa.org" data-i18n="start.mmc.btn">Revisar mi casa →</a></div>
       </div>
+    </div>
+  </section>
+  <section class="band">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="traz.ey">Cómo funciona</span>
+      <h2 class="h-sec rv" data-i18n="traz.t">Trazabilidad completa, de principio a fin.</h2>
+      <div class="steps rv d1" style="margin-top:30px;max-width:760px">
+        <div class="step"><div><h3 data-i18n="traz.1.t" class="h-comp4">Visita de contexto</h3><p data-i18n="traz.1.p">Conocemos a la fundación y la comunidad en terreno.</p></div></div>
+        <div class="step"><div><h3 data-i18n="traz.2.t" class="h-comp4">Onboarding</h3><p data-i18n="traz.2.p">Perfil digital y convenio firmado entre las partes.</p></div></div>
+        <div class="step"><div><h3 data-i18n="traz.3.t" class="h-comp4">Gestión de necesidades</h3><p data-i18n="traz.3.p">Conectamos la necesidad concreta con el donante adecuado.</p></div></div>
+        <div class="step"><div><h3 data-i18n="traz.4.t" class="h-comp4">Entrega con acta</h3><p data-i18n="traz.4.p">Cada entrega queda documentada y verificada.</p></div></div>
+        <div class="step"><div><h3 data-i18n="traz.5.t" class="h-comp4">Reporte fotográfico</h3><p data-i18n="traz.5.p">Cuando la fundación aliada entrega, su acta firmada y sus fotos quedan en el rastreo de tu aporte.</p></div></div>
+      </div>
+      <a class="btn btn-w rv d2" href="#rastrea" data-i18n="traz.btn" style="margin-top:26px">Rastrea tu donación</a>
     </div>
   </section>
   <section class="cream">
@@ -361,6 +334,7 @@
         <div class="card"><h3 data-i18n="vis.2.t">Fundaciones más fuertes</h3><p data-i18n="vis.2.p">Amplificar a quienes ya trabajan en campo, reduciendo costos y multiplicando su alcance.</p></div>
         <div class="card"><h3 data-i18n="vis.3.t">Generosidad que crece</h3><p data-i18n="vis.3.p">Un modelo donde dar deja una huella real y, a la vez, beneficios para quien contribuye.</p></div>
       </div>
+      <p class="vis-lema rv d3" data-i18n="vis.lema">Dar para crecer, crecer para dar más.</p>
     </div>
   </section>
 </main>
