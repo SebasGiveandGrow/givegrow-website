@@ -1446,7 +1446,7 @@ try {
   ];
 
   /* ------------------------------------------------------------------
-     CHECK #16 · el «ir a» de cada cola del panel lleva a algún sitio
+     CHECK #17 · el «ir a» de cada cola del panel lleva a algún sitio
 
      Cada alerta del panel trae un destino para que quien la lee pueda ir a
      arreglarla de un clic. Si ese ancla no existe, el enlace no hace nada y no
@@ -1467,11 +1467,68 @@ try {
       if (d && !ids.has(d[1].slice(1))) rotos.push(m[1] + " → " + d[1]);
     }
     if (rotos.length) {
-      err("check #16 · el «ir a» de " + rotos.length + " cola(s) del panel apunta a un ancla que NO existe, " +
+      err("check #17 · el «ir a» de " + rotos.length + " cola(s) del panel apunta a un ancla que NO existe, " +
           "así que el enlace no hace nada y no sale error: " + rotos.join(", ") +
           ". Las secciones reales son: " + [...ids].sort().join(", "));
     } else {
       ok("el «ir a» de cada cola del panel lleva a una sección que existe (" + ids.size + " secciones)");
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     CHECK #18 · toda cola del panel tiene nombre y módulo
+
+     Una cola sale del servidor con una clave (`correos_sin_cupo`) y el panel la
+     dibuja con dos tablas escritas a mano: `COLA_ES` le pone el nombre que lee
+     una persona y `COLA_MOD` dice de qué pestaña es. Las dos fallan CALLADAS y
+     de distinta forma:
+
+     · sin `COLA_ES`, el respaldo es «COLA_ES[clave] || clave», así que la alerta
+       sale a pantalla con el nombre de la variable. Se ve, pero no dice qué hacer.
+     · sin `COLA_MOD`, `pintarContadores` hace «if (!m) return;» y la cola NO
+       suma en ninguna insignia — tampoco en la de «hoy», que es el total. O sea
+       que la alerta existe y la consola dice que no hay nada pendiente.
+
+     El propio comentario de `COLA_MOD` cuenta que esto ya pasó una vez: «siete
+     de diecisiete no se contaban». Volvió a pasar el 23 sep 2026 con las TRES
+     colas más nuevas del sistema —las que se añadieron justo para hacer visible
+     lo que fallaba en silencio—, y se encontró a mano. Añadir una cola es tocar
+     tres sitios y el tercero no se nota: por eso lo mira el gate.
+     ------------------------------------------------------------------ */
+  {
+    const claves = [...src.matchAll(/enCola\(\s*"([a-z_]+)"/g)].map((m) => m[1]);
+    const tabla = (nombre) => {
+      const i = src.indexOf("var " + nombre + " = {");
+      if (i < 0) return null;
+      const j = src.indexOf("\n};", i);
+      return new Set([...src.slice(i, j).matchAll(/^\s*([a-z_]+):/gm)].map((m) => m[1]));
+    };
+    const es = tabla("COLA_ES"), mod = tabla("COLA_MOD");
+    if (!es || !mod) {
+      err("check #18: no encontré COLA_ES o COLA_MOD en el panel");
+    } else {
+      const sinNombre = claves.filter((c) => !es.has(c));
+      const sinModulo = claves.filter((c) => !mod.has(c));
+      if (sinNombre.length) {
+        err("check #18 · " + sinNombre.length + " cola(s) sin entrada en COLA_ES: " + sinNombre.join(", ") +
+            " · salen a pantalla con la clave cruda en vez de un nombre que diga qué hacer");
+      }
+      if (sinModulo.length) {
+        err("check #18 · " + sinModulo.length + " cola(s) sin entrada en COLA_MOD: " + sinModulo.join(", ") +
+            " · no suman en NINGUNA insignia, ni en la de «hoy»: la alerta existe y el panel dice que no hay nada");
+      }
+      /* Al revés también: una entrada que sobra es una cola que se borró del
+         servidor y dejó su nombre atrás. No rompe nada, pero es la pista de que
+         estas tablas se quedaron desalineadas. */
+      const sobran = [...es].filter((c) => !claves.includes(c))
+        .concat([...mod].filter((c) => !claves.includes(c)));
+      if (sobran.length) {
+        err("check #18 · COLA_ES/COLA_MOD nombran cola(s) que el servidor ya no emite: " +
+            [...new Set(sobran)].join(", "));
+      }
+      if (!sinNombre.length && !sinModulo.length && !sobran.length) {
+        ok("las " + claves.length + " colas del panel tienen nombre y módulo");
+      }
     }
   }
 
