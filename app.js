@@ -1830,6 +1830,11 @@ var I18N = {
     "calc.brigada.nota":"Todavía no publicamos equivalencias en pesos para esta campaña: el inventario está en cotización. Tu aporte compra insumos de la lista pública, y cada entrega queda con acta firmada.",
     "calc.dest.emergencia":"Emergencia abierta",
     "brigada.opcion":"Brigada de atención a emergencia · 5 sectores",
+    "mmc.donar.opcion":"Mira Mi Casa · reparación de viviendas",
+    "rep.dest.mmc":"Mira Mi Casa · reparación de viviendas",
+    "mmc.donar.t":"Alguien tiene que poner los materiales",
+    "mmc.donar.p":"A la familia no se le cobra nada, ni aquí ni nunca. Lo que cuesta reparar lo pone quien puede: tu aporte va al fondo de reparación de Mira Mi Casa, con guía y acta como cualquier otro.",
+    "mmc.donar.btn":"Aportar a las reparaciones",
     "calc.dest.lbl":"¿A dónde va tu aporte?",
     "calc.note.lbl":"Deja un mensaje o dedicatoria (opcional)",
     "calc.note.ph":"Tu mensaje viajará con tu donación y aparecerá en tu recibo.",
@@ -3836,6 +3841,35 @@ var BRIGADA = {
 };
 function esBrigada(id){ return id === BRIGADA.id; }
 
+/* MIRA MI CASA COMO DESTINO. Igual que la brigada: un destino REAL que no es
+   una fundación aliada, así que no puede salir de `partners.json`.
+
+   POR QUÉ NO ES UNA UNIDAD DE IMPACTO. Las unidades tienen costo contrastado
+   —un plato, $4.000— y aquí no hay tal cosa: lo que cuesta reparar una casa
+   depende de la casa. Publicar una cifra sería inventarla, y es justo lo que
+   `#apadrinar` ya dice que no hace.
+
+   Y NO FUERZA APORTE ÚNICO, a diferencia de la brigada. Aquella era una
+   campaña con fecha de cierre; reparar viviendas no tiene una, así que un
+   aporte mensual dirigido aquí es perfectamente coherente. */
+var MMC_DESTINO = {
+  id: "miramicasa-reparacion",
+  destino: "miramicasa-reparacion"
+};
+function esMMC(id){ return id === MMC_DESTINO.id; }
+
+/* Los destinos que NO son una fundación aliada, en un solo sitio. Antes la
+   brigada se comprobaba con `esBrigada` en cinco puntos distintos y añadir un
+   segundo destino habría significado añadir un segundo `if` en los cinco — y
+   olvidarse de uno hace que el aporte caiga en `fondo` sin que nada avise.
+   Devuelve la cadena que espera la API, o null si el destino es una aliada o
+   el fondo general. */
+function destinoNoAliado(id){
+  if (esBrigada(id)) return BRIGADA.destino;
+  if (esMMC(id)) return MMC_DESTINO.destino;
+  return null;
+}
+
 /* Construye el selector fundación → proyecto a partir de partners.json.
    Cada <option> lleva el id de la unidad de impacto (o 'general' para el fondo). */
 function buildProjectSelect(){
@@ -3847,6 +3881,7 @@ function buildProjectSelect(){
      el valor por defecto — más abajo se fija con sel.value. */
   var html = '<optgroup label="'+escapeHtml(t("calc.dest.emergencia"))+'">' +
              '<option value="'+BRIGADA.id+'" data-partner="">'+escapeHtml(t("brigada.opcion"))+'</option>' +
+             '<option value="'+MMC_DESTINO.id+'" data-partner="">'+escapeHtml(t("mmc.donar.opcion"))+'</option>' +
              '</optgroup>';
   html += '<option value="general" data-partner="">'+(lang==="en"?"Where it's needed most (general fund)":"Donde más se necesite (fondo general)")+'</option>';
   for (var i=0;i<partners.length;i++){
@@ -3895,7 +3930,9 @@ function etiquetaDestino(){
       if (sel.options[i].value === calc.projectId) return sel.options[i].text;
     }
   }
-  return esBrigada(calc.projectId) ? t("brigada.opcion") : calc.projectId;
+  if (esBrigada(calc.projectId)) return t("brigada.opcion");
+  if (esMMC(calc.projectId)) return t("mmc.donar.opcion");
+  return calc.projectId;
 }
 
 /* Abre la calculadora con la brigada ya elegida. Es el destino del enlace
@@ -4057,12 +4094,15 @@ function irAPagar(){
   var frecMap = { m:"mensual", a:"anual", u:"unico" };
   /* La brigada es una donación DIRIGIDA aunque no tenga fundación detrás: sin
      esto caía en `fondo` y el aporte se habría contado como fondo general. */
-  var brig = esBrigada(calc.projectId);
+  /* Un destino que no es aliada —la brigada, Mira Mi Casa— es igualmente una
+     donación DIRIGIDA. Sin esto caía en `fondo` y el aporte se habría contado
+     como fondo general. */
+  var noAliada = destinoNoAliado(calc.projectId);
   var cuerpo = {
     monto: monto,
     frecuencia: frecMap[calc.freq] || "unico",
-    modo: (brig || calc.partnerId) ? "dirigida" : "fondo",
-    destino: brig ? BRIGADA.destino : (calc.partnerId || null),
+    modo: (noAliada || calc.partnerId) ? "dirigida" : "fondo",
+    destino: noAliada || calc.partnerId || null,
     /* `proyecto` es DESCRIPTIVO: es lo que el donante lee en su recibo y lo que
        cita el certificado. Antes viajaba el id de la unidad, así que el recibo
        decía «ndf-plato» en vez del nombre del programa. */
@@ -5622,6 +5662,22 @@ function init(){
      cualquiera, y aunque `trackSearch` normaliza y el resultado pasa por
      `escapeHtml`, una guía con forma buena es la condición para dar el salto
      de ruta — así un `?g=` inventado no cambia la página de nadie. */
+  /* `?d=<destino>` — lo que lleva el botón de donar de Mira Mi Casa, y lo que
+     puede llevar cualquier enlace que quiera traer a alguien con su causa ya
+     elegida. Solo se acepta un destino que EXISTA en el selector: así un `?d=`
+     inventado no deja la calculadora en un estado que no se puede pintar. */
+  var qDest = (new URLSearchParams(location.search).get("d") || "").trim();
+  if (qDest){
+    setTimeout(function(){
+      var sel = document.getElementById("calc-project");
+      if (!sel) return;
+      for (var i=0;i<sel.options.length;i++){
+        if (sel.options[i].value === qDest){ sel.value = qDest; setProject(qDest); break; }
+      }
+    }, 0);
+    hash = "donar";
+  }
+
   var qGuia = (new URLSearchParams(location.search).get("g") || "").toUpperCase();
   if (/^GG-\d{4}-\d{6}$/.test(qGuia)){
     hash = "rastrea";
@@ -6258,6 +6314,10 @@ function repSubmit(ev){
   if (!chk("rep-datos")) return allyMal(note, "rep-datos", "rep.err.datos");
 
   var brigada = val("rep-dest") === "brigada";
+  /* Mira Mi Casa por el mismo camino que la brigada: es un destino real que no
+     es una fundación aliada. `etiquetaDestino()` NO sirve aquí —lee el selector
+     de la calculadora, que es otro— así que la etiqueta se toma de su clave. */
+  var repDestino = val("rep-dest") === "miramicasa" ? MMC_DESTINO.destino : null;
   btn.disabled = true;
   allyMsg(note, t("rep.sending"), true);
 
@@ -6267,9 +6327,9 @@ function repSubmit(ev){
       monto: monto,
       fecha: val("rep-fecha"),
       referencia: val("rep-ref"),
-      modo: brigada ? "dirigida" : "fondo",
-      destino: brigada ? BRIGADA.destino : null,
-      proyecto: brigada ? t("brigada.opcion") : null,
+      modo: (brigada || repDestino) ? "dirigida" : "fondo",
+      destino: repDestino || (brigada ? BRIGADA.destino : null),
+      proyecto: repDestino ? t("mmc.donar.opcion") : (brigada ? t("brigada.opcion") : null),
       nombre: val("rep-nombre"),
       email: val("rep-email"),
       certificado: chk("rep-cert"),

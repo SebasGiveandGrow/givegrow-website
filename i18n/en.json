@@ -1814,5 +1814,10 @@
   "membres.cta.otro": "Or write another monthly amount, in Colombian pesos",
   "membres.cta.calc2": "Want to see your tax benefit first? Use the calculator.",
   "membres.cta.nivel": "{n} level · {m} a month",
-  "membres.cta.rango": "The monthly gift goes from {min} to {max}."
+  "membres.cta.rango": "The monthly gift goes from {min} to {max}.",
+  "mmc.donar.opcion": "Mira Mi Casa · home repairs",
+  "rep.dest.mmc": "Mira Mi Casa · home repairs",
+  "mmc.donar.t": "Someone has to pay for the materials",
+  "mmc.donar.p": "The family is never charged, not here and not ever. What the repair costs is covered by whoever can: your gift goes to the Mira Mi Casa repair fund, with its tracking number and delivery record like any other.",
+  "mmc.donar.btn": "Give towards repairs"
 }

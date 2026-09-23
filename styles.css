@@ -2138,3 +2138,16 @@ section[tabindex="-1"]:focus{ outline:none }
 /* Un botón de continuar que no puede continuar se apaga, pero NO se oculta:
    desaparecer un botón deja a la persona sin saber qué le falta. */
 .btn.is-off{opacity:.45;pointer-events:none}
+
+/* ---------- El aporte a las reparaciones de Mira Mi Casa ----------
+   VIVE SOLO EN #apadrinar Y EN #casas, y eso no es un detalle de maquetación.
+   Mira Mi Casa le promete a la familia, en pantalla, que «este sitio no le
+   cobra nada a una familia en ninguna pantalla». Un botón de donar en el
+   recorrido de la familia —la portada, el formulario de su casa, su propio
+   caso— convierte esa frase en ambigua justo para la persona más vulnerable
+   del sistema. Las dos páginas donde sí va son las de quien viene a ayudar. */
+.mmc-donar-sec{background:var(--gl)}
+.mmc-donar{display:flex;flex-direction:column;align-items:flex-start;gap:12px;
+  padding:34px 0;max-width:62ch}
+.mmc-donar .lead{margin:0}
+.mmc-donar .btn{margin-top:8px}
