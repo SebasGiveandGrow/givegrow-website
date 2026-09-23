@@ -72,6 +72,23 @@ El gate NO ve el enlazado de imports: de eso se encarga el `wrangler deploy
 npm ci && npx wrangler deploy --dry-run --outdir /tmp/gg-bundle
 ```
 
+**EL GATE TAMPOCO VE EL SITEMAP, y ese es el que más veces ha dejado un PR en
+rojo.** `ci.yml` corre aparte `node scripts/sitemap.mjs --check`, y no se puede
+meter en `validate.mjs` porque **no daría el mismo resultado**: los `lastmod`
+salen de `git log -1 --date=short` sobre cada archivo fuente, así que ANTES de
+commitear la fecha nueva todavía no existe y el check dice que todo está al día.
+Se vuelve rojo justo después, cuando el commit ya le puso la fecha de hoy.
+
+Por eso el orden es: **commitear primero, regenerar el sitemap después, y
+committear eso también** — antes de hacer push:
+```bash
+git commit -m "…"
+node scripts/sitemap.mjs        # ahora sí ve la fecha del commit
+git add sitemap.xml && git commit -m "sitemap: lastmod del commit anterior"
+```
+Solo hace falta cuando el cambio toca un archivo que alimenta una página
+(`index.html`, `app.js`, `styles.css`, `data/*.json`…).
+
 **Nota operativa (esta máquina):** `node` y `gh` viven en `/opt/homebrew/bin` y el
 shell no interactivo NO los tiene en el PATH. Exporta antes de correr el gate:
 ```bash
