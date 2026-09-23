@@ -2159,6 +2159,60 @@ async function adminSalud(env) {
     "WHERE publicada_en IS NULL AND anulada_en IS NULL",
     "Bandeja «Entregas» · el acta existe y todavía no la ve nadie", 80, "#sec-entregas");
 
+  /* ── Los dos extremos del enlace entre un aporte y su acta ───────────────
+     `entregas_en_borrador` mira el caso fácil: el acta existe y falta
+     publicarla. Estas dos miran los dos silencios de verdad, que son los que
+     el donante sí ve.
+
+     LA PRIMERA: el aporte quedó marcado «entregada» y no hay acta que enseñarle.
+     El botón «Marcar entregada» del panel y la tabla `entregas` no se conocían,
+     así que el rastreo decía dos cosas a la vez — la insignia «Entregada» con
+     los tres pasos completos y, debajo, «todavía no hay entregas publicadas
+     para este destino». En producción llevaba 27 días así, con un aporte real.
+
+     La consulta hace LA PREGUNTA DEL DONANTE: `a.destino_id IS NULL` cubre el
+     fondo general, cuyo rastreo pide las entregas sin filtro y por tanto ve
+     cualquier acta publicada. Es la misma condición que el aviso de
+     `adminMoverAporte`, escrita en SQL.
+
+     Orden 14: por delante de casi todo lo demás del dinero. Del otro lado hay
+     alguien que ya pagó, al que el sitio le está diciendo que su aporte llegó y
+     que no hay prueba de que llegara, en el mismo recuadro.
+
+     `COALESCE` porque `entregada_en` se añadió después: las filas movidas antes
+     no lo tienen, y sin él la antigüedad saldría en blanco justo en las más
+     viejas, que son las que más llevan esperando. */
+  await enCola("entregadas_sin_acta",
+    "SELECT COUNT(*) AS n, MIN(COALESCE(a.entregada_en, a.aprobada_en, a.creada_en)) AS masViejo " +
+    "FROM aportes a WHERE a.estado = 'entregada' AND NOT EXISTS (" +
+    "SELECT 1 FROM entregas g WHERE g.publicada_en IS NOT NULL AND g.anulada_en IS NULL " +
+    "AND (a.destino_id IS NULL OR g.destino_id = a.destino_id COLLATE NOCASE))",
+    "Su rastreo dice «Entregada» y debajo que no hay entregas publicadas · registra el acta en «Entregas» y publícala",
+    14, "#sec-entregas");
+
+  /* LA SEGUNDA, el mismo enlace roto por el otro extremo: un acta publicada
+     cuyo destino no lo tiene ningún aporte. Casi siempre es una letra —el
+     destino del aporte lo genera el sitio y el del acta lo teclea una persona—,
+     y `apiEntregas` ya ignora la caja justo por eso, pero ignorar la caja
+     arregla «NDF» por «ndf» y no arregla «ndff».
+
+     `adminCrearEntrega` ya lo avisa al registrar, y ese aviso está bien puesto:
+     la persona tiene el dato delante. Pero es un mensaje en pantalla que
+     desaparece al recargar, así que si nadie lo atiende en ese momento no queda
+     nada — y lo que hay al otro lado es un donante leyendo «todavía no hay
+     entregas publicadas para este destino», que es una afirmación falsa sobre
+     el mundo.
+
+     Orden 55: es trabajo de oficina, no hay nadie en riesgo. Pero por debajo de
+     «entregas en borrador» (80), porque aquí el acta ya se publicó creyendo que
+     alguien la vería. */
+  await enCola("actas_sin_donante",
+    "SELECT COUNT(*) AS n, MIN(g.publicada_en) AS masViejo FROM entregas g " +
+    "WHERE g.publicada_en IS NOT NULL AND g.anulada_en IS NULL AND NOT EXISTS (" +
+    "SELECT 1 FROM aportes a WHERE a.destino_id = g.destino_id COLLATE NOCASE)",
+    "Acta publicada con un destino que ningún aporte tiene · no le aparece a nadie, comprueba cómo está escrito",
+    55, "#sec-entregas");
+
   /* ── Las cuatro del triaje de viviendas ────────────────────────────────
      La plataforma entera era INVISIBLE para este panel: vigilaba donaciones,
      correos y entregas, y ni una sola cola de casos. Un caso podía quedarse
@@ -2591,7 +2645,9 @@ async function adminMoverEstado(request, env, guia, quien) {
     return json({ error: "estado_no_permitido", permitidos: ESTADOS_MANUALES }, 400);
   }
 
-  const fila = await env.DB.prepare("SELECT guia, estado FROM aportes WHERE guia = ?").bind(guia).first();
+  const fila = await env.DB.prepare(
+    "SELECT guia, estado, modo, destino_id FROM aportes WHERE guia = ?"
+  ).bind(guia).first();
   if (!fila) return json({ error: "no_encontrada" }, 404);
 
   /* Un aporte que no llegó a aprobarse no puede pasar a distribución: sería
@@ -2611,7 +2667,51 @@ async function adminMoverEstado(request, env, guia, quien) {
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "aporte " + guia + ": " + fila.estado + " -> " + nuevo).run();
 
-  return json({ ok: true, guia, estado: nuevo });
+  /* MARCAR «ENTREGADA» NO COMPRUEBA QUE HAYA UN ACTA, y ese era el hueco.
+     ------------------------------------------------------------------------
+     Este boton y la tabla `entregas` no se conocian. El panel movia el estado y
+     el rastreo del donante quedaba diciendo dos cosas a la vez: la insignia
+     «Entregada» con los tres pasos completos, y debajo, en el mismo recuadro,
+     «Todavia no hay entregas publicadas para este destino».
+
+     Medido contra produccion el 23 sep 2026 — no es hipotetico, lleva casi un
+     mes asi:
+       GET /api/aporte/GG-2026-001007    -> estado "entregada", destino "conciencia"
+       GET /api/entregas?destino=conciencia -> {"entregas":[]}
+
+     Para un sitio cuyo lema es «evidencia, no promesas», esa contradiccion en
+     la misma tarjeta es el peor sitio donde podia estar.
+
+     NO SE BLOQUEA. Una jornada puede estar hecha y su acta todavia sin
+     transcribir, y negarse a registrar lo que si paso en terreno seria peor que
+     avisar. Se avisa, igual que al crear un acta con un destino que nadie tiene:
+     en el momento en que la persona tiene el dato delante.
+
+     LA PREGUNTA ES LA DEL DONANTE, literalmente. El rastreo pide
+     `/api/entregas?destino=<el suyo>` y, cuando el aporte es al fondo general,
+     lo pide SIN destino — o sea que ve todas las actas publicadas. Esta consulta
+     hace lo mismo, asi que lo que responde es «que va a ver el, ahora». */
+  let aviso = null;
+  if (nuevo === "entregada") {
+    const dir = fila.modo === "dirigida" && fila.destino_id ? String(fila.destino_id) : null;
+    const sql = "SELECT COUNT(*) AS n FROM entregas " +
+                "WHERE publicada_en IS NOT NULL AND anulada_en IS NULL" +
+                (dir ? " AND destino_id = ? COLLATE NOCASE" : "");
+    const q = dir ? env.DB.prepare(sql).bind(dir) : env.DB.prepare(sql);
+    const vera = await q.first();
+    if (!vera || !vera.n) {
+      aviso = dir
+        ? "Quedo como entregada, pero no hay ningun acta publicada con el destino «" + dir +
+          "». Su rastreo va a decir «Entregada» y justo debajo «todavia no hay entregas " +
+          "publicadas para este destino». Registra el acta en «Entregas» y publicala — y si ya " +
+          "existe, comprueba como esta escrito el destino."
+        : "Quedo como entregada, pero no hay NINGUNA acta publicada todavia. Como es un aporte al " +
+          "fondo general, su rastreo enseña todas las actas publicadas: va a ver «Entregada» y el " +
+          "recuadro de evidencia vacio.";
+    }
+  }
+
+  return json({ ok: true, guia, estado: nuevo, aviso });
 }
 
 /* ========================================================================
@@ -14383,6 +14483,30 @@ async function adminPublicarEntrega(request, env, numero, quien) {
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "entrega " + numero + (publicar ? " PUBLICADA" : " despublicada")).run();
 
+  /* Y SE VUELVE A MIRAR EL DESTINO, no solo al crear.
+     `adminCrearEntrega` ya avisa si ningún aporte tiene ese destino, y ese aviso
+     está bien puesto: la persona acaba de teclearlo. Pero registrar y publicar
+     son actos distintos —lo dice el comentario de esta función— y PUBLICAR es el
+     momento en que el dato se vuelve una afirmación pública. Entre los dos puede
+     pasar un día, otra persona, y un destino corregido a medias.
+
+     Se pregunta por `destino_id` de la fila y no por el que se tecleó, porque
+     aquí ya no hay formulario: lo que importa es con qué destino va a salir. */
+  if (publicar) {
+    const d = await env.DB.prepare(
+      "SELECT destino_id FROM entregas WHERE numero = ?"
+    ).bind(numero).first();
+    const dest = (d && d.destino_id) || "";
+    const conAporte = dest ? await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM aportes WHERE destino_id = ? COLLATE NOCASE"
+    ).bind(dest).first() : null;
+    if (dest && (!conAporte || !conAporte.n)) {
+      return json({ ok: true, numero, publicada: true,
+        aviso: "Publicada, pero ningún aporte tiene el destino «" + dest + "», así que el acta no va " +
+               "a aparecerle a ningún donante en su rastreo. Comprueba cómo está escrito." });
+    }
+  }
+
   return json({ ok: true, numero, publicada: publicar });
 }
 
@@ -15633,7 +15757,16 @@ document.addEventListener("click", function(e){
     fetch("/api/admin/aporte/" + encodeURIComponent(b.getAttribute("data-guia")) + "/estado", {
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ estado: b.getAttribute("data-a") })
-    }).then(function(r){ return r.json(); }).then(function(){ cargarResumen(); cargarAportes(); })
+    /* LA RESPUESTA SE LEE. Antes era «.then(function(){ ... })» sin argumento:
+       el panel recargaba la bandeja pasara lo que pasara, así que un 409
+       —marcar «entregada» algo que nadie pagó— se veía igual que un acierto, y
+       el aviso nuevo de «no hay acta para esto» se habría perdido igual. */
+    }).then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.error) alert("No se pudo: " + (d.ayuda || d.error));
+        else if (d && d.aviso) alert(d.aviso);
+        cargarResumen(); cargarAportes(); cargarSalud();
+      })
       .catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
   }
 
@@ -15758,6 +15891,8 @@ var COLA_ES = {
      familia no sabe, el certificado que perdio su respaldo, el aviso que no
      salio por cupo— y salian a pantalla con su clave cruda. El check #18 del
      gate mira esta tabla y la de abajo desde hoy. */
+  entregadas_sin_acta: "Marcadas entregadas y sin acta",
+  actas_sin_donante: "Actas que no le aparecen a nadie",
   concepto_sin_avisar: "Conceptos escritos y sin avisar",
   certificados_en_revision: "Certificados que perdieron respaldo",
   correos_sin_cupo: "Avisos que no salieron por cupo"
@@ -15941,6 +16076,8 @@ var COLA_MOD = {
      mmc, «/firma» lo atiende el modulo de dinero —igual que
      "certificados_sin_firmar", que apunta al mismo sitio— y una cola sin
      pantalla va a salud, como las otras dos de correos. */
+  entregadas_sin_acta: "entregas",
+  actas_sin_donante: "entregas",
   concepto_sin_avisar: "mmc",
   certificados_en_revision: "dinero",
   correos_sin_cupo: "salud"
@@ -17518,7 +17655,8 @@ document.addEventListener("click", function(e){
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ publicar: quiere })
     }).then(function(r){ return r.json(); })
-      .then(function(d){ if (d.ayuda) alert(d.ayuda); cargarEntregas(); })
+      .then(function(d){ if (d.ayuda) alert(d.ayuda); else if (d.aviso) alert(d.aviso);
+        cargarEntregas(); cargarSalud(); })
       .catch(function(){ cargarEntregas(); });
   }
 
