@@ -654,7 +654,7 @@
   "membres.t4.b1": "Detailed impact reports",
   "membres.t4.b2": "A meeting with the leadership team",
   "membres.t4.b3": "Honorary membership and community leadership",
-  "membres.cancel": "You can pause or cancel your membership anytime by writing to contabilidad@thegiveandgrowproject.org or from your payment provider. It applies to the next cycle, with no penalties; your tax certificate covers what you've donated so far.",
+  "membres.cancel": "You can end your membership whenever you want, from your own membership: when you activate it we email you your own link, and from there you cancel it and we withdraw your payment method in one click. No need to write to anyone, and no penalties; the tax certificate covers what you gave up to that date. If you lost the link, you can recover it with your email.",
   "membres.extra.ey": "Other ways",
   "membres.extra.t": "Not everything is monthly.",
   "membres.temp.t": "One-time",
@@ -671,9 +671,9 @@
   "membres.ben.3.p": "We show you where your gift went and who it helped, with real evidence.",
   "membres.ben.4.t": "Full traceability",
   "membres.ben.4.p": "Every donation has a destination, a record and a report. No promises: evidence.",
-  "membres.cta.t": "Choose your tier.",
-  "membres.cta.p": "Use the calculator to see your gift, your tax benefit and the membership tier you reach.",
-  "membres.cta.btn": "Calculate my gift",
+  "membres.cta.t": "Become a member.",
+  "membres.cta.p": "You choose how much, register your payment method once, and the gift is charged automatically every month. You can end it whenever you want, from your own membership.",
+  "membres.cta.btn": "Continue",
   "emp.why.ey": "Why partner",
   "emp.why.t": "CSR you can see, measure and feel.",
   "emp.why.1.t": "Tax benefit",
@@ -1810,5 +1810,9 @@
   "start.mmc.p": "Report your house after the earthquake and get a technical opinion, free.",
   "start.mmc.btn": "Check my house →",
   "traz.btn": "Track your gift",
-  "vis.lema": "Give to grow, grow to give more."
+  "vis.lema": "Give to grow, grow to give more.",
+  "membres.cta.otro": "Or write another monthly amount, in Colombian pesos",
+  "membres.cta.calc2": "Want to see your tax benefit first? Use the calculator.",
+  "membres.cta.nivel": "{n} level · {m} a month",
+  "membres.cta.rango": "The monthly gift goes from {min} to {max}."
 }

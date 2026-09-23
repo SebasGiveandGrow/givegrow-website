@@ -18014,7 +18014,15 @@ function paginaMetodoPago(cfg) {
    relleno, sin estado de foco y con fondo blanco en modo noche. Salio asi a
    produccion. Estas dos clases son las que usa el resto del sitio para lo
    mismo y traen las cuatro cosas. */
++ (cfg.monto
+    ? '  <div class="card" style="margin-top:22px;padding:18px 20px;display:flex;flex-direction:column;gap:4px">\n'
+      + '    <span class="et">Tu membres\u00eda</span>\n'
+      + '    <b style="font-size:var(--fs-h3)">' + esc(fmtPesos(cfg.monto * 100)) + ' al mes</b>\n'
+      + '    <span class="mu">Nivel ' + esc(cfg.nivel) + ' \u00b7 se cobra hoy y luego cada mes</span>\n'
+      + '  </div>\n'
+    : '')
 + '  <form method="POST" action="/api/pago/fuente" class="card ally-form" style="margin-top:22px;padding:20px">\n'
++ (cfg.monto ? '    <input type="hidden" name="monto" value="' + esc(String(cfg.monto)) + '">\n' : '')
 + '    <div class="field">\n'
 + '      <label for="fp-email">Tu correo</label>\n'
 + '      <input id="fp-email" name="email" type="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com">\n'
@@ -18051,7 +18059,16 @@ async function rutaMetodoPago(env, url) {
   const info = await wompiInfoComercio(env);
   if (!info) return new Response("No se pudo preparar el formulario. Intenta en unos minutos.", { status: 503 });
   const amb = ambienteWompi(pub);
-  const html = paginaMetodoPago({ amb, info, pub, aviso: url.searchParams.get("aviso") || "" });
+  /* EL MONTO VIENE DE LA PANTALLA DE MEMBRESIAS y se valida aqui, no se
+     confia. Lo que llega por la URL lo escribe cualquiera; si esta fuera de
+     rango o no es un numero, la pagina sigue funcionando como el registro de
+     metodo de pago de siempre, sin monto. */
+  const mTxt = String(url.searchParams.get("monto") || "").replace(/[^0-9]/g, "");
+  const mNum = mTxt ? Number(mTxt) : 0;
+  const monto = (Number.isInteger(mNum) && mNum >= MONTO_MIN && mNum <= MONTO_MAX) ? mNum : 0;
+  const html = paginaMetodoPago({ amb, info, pub, monto,
+    nivel: monto ? nivelPorMensual(monto).es : "",
+    aviso: url.searchParams.get("aviso") || "" });
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -18336,20 +18353,29 @@ async function cobrarSuscripcionesDelMes(env) {
            tope: COBROS_POR_EJECUCION };
 }
 
-async function apiSuscribir(request, env, url) {
-  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
-  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+/* EL NUCLEO DE HACERSE MIEMBRO, fuera de cualquier ruta.
+   ==========================================================================
 
-  let c;
-  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
-  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+   POR QUE SE EXTRAJO. Habia DOS formas de llegar aqui y solo una existia de
+   verdad: `/api/pago/suscribir`, que nadie llamaba. Quien registraba su tarjeta
+   en `/pago/metodo` se quedaba con la fuente creada y SIN suscripcion — el
+   cobro mensual no tenia qué cobrar. Medido en produccion el 23 sep 2026:
+   0 fuentes, 0 suscripciones, con todo el flujo desplegado desde hace dias.
 
-  const email = String(c.email || "").trim().slice(0, 200).toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+   Ahora la tokenizacion crea las dos cosas EN LA MISMA PETICION, asi que ese
+   estado intermedio —tarjeta sin membresia— deja de ser alcanzable por el
+   camino normal. La API sigue existiendo para quien ya tiene su fuente
+   registrada de antes.
 
-  const monto = c.monto;
+   Devuelve un objeto, no una Response: quien llama decide si responde JSON o
+   una redireccion, porque al otro lado hay un navegador o hay codigo. */
+async function crearSuscripcion(env, o) {
+  const email = String(o.email || "").trim().slice(0, 200).toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, motivo: "email_invalido" };
+
+  const monto = o.monto;
   if (typeof monto !== "number" || !Number.isInteger(monto) || monto < MONTO_MIN || monto > MONTO_MAX) {
-    return json({ error: "monto_invalido", min: MONTO_MIN, max: MONTO_MAX }, 400);
+    return { ok: false, motivo: "monto_invalido", min: MONTO_MIN, max: MONTO_MAX };
   }
 
   /* LA FUENTE SE BUSCA POR CORREO, no se recibe su id. Si el id viniera del
@@ -18360,22 +18386,21 @@ async function apiSuscribir(request, env, url) {
     "SELECT id FROM fuentes_pago WHERE LOWER(email) = ? AND estado = 'AVAILABLE' AND retirada_en IS NULL " +
     "ORDER BY id DESC LIMIT 1"
   ).bind(email).first();
-  if (!fuente) return json({ error: "sin_metodo_de_pago",
-    ayuda: "Primero registra un metodo de pago con este mismo correo." }, 409);
+  if (!fuente) return { ok: false, motivo: "sin_metodo_de_pago" };
 
   /* UNA SUSCRIPCION ACTIVA POR CORREO. Sin esto, dos envios del formulario
      —o dos pestanas— dejan a la persona pagando dos veces al mes. */
   const ya = await env.DB.prepare(
-    "SELECT s.id FROM suscripciones s JOIN donantes d ON d.id = s.donante_id " +
+    "SELECT s.id, s.token FROM suscripciones s JOIN donantes d ON d.id = s.donante_id " +
     "WHERE s.proveedor = 'wompi' AND s.estado = 'activa' AND LOWER(d.email) = ? LIMIT 1"
   ).bind(email).first();
-  if (ya) return json({ error: "ya_suscrito", suscripcion: ya.id,
-    ayuda: "Ya tienes una membresia activa con este correo." }, 409);
+  if (ya) return { ok: false, motivo: "ya_suscrito", suscripcion: ya.id, token: ya.token };
 
   const nivel = nivelPorMensual(Math.round(monto));
+  const idioma = o.idioma === "en" ? "en" : "es";
   /* Se reutiliza `donantePorCorreo`, que ya existe y hace justo esto: inserta
      o actualiza por correo y devuelve el id. */
-  const donante = await donantePorCorreo(env, email, String(c.nombre || '').slice(0, 120));
+  const donante = await donantePorCorreo(env, email, String(o.nombre || "").slice(0, 120));
 
   /* EL ID LO PONEMOS NOSOTROS. `suscripciones.id` es TEXT y no autoincremental
      porque PayPal trae el suyo (I-XXXX). Con Wompi no hay id del proveedor —la
@@ -18391,8 +18416,8 @@ async function apiSuscribir(request, env, url) {
     "INSERT INTO suscripciones (id, proveedor, estado, nivel, monto_centavos, moneda, frecuencia, " +
     "donante_id, idioma, quiere_certificado, consent_muro, fuente_id, token) " +
     "VALUES (?, 'wompi', 'activa', ?, ?, 'COP', 'mensual', ?, ?, ?, ?, ?, ?)"
-  ).bind(subId, nivel.id, Math.round(monto) * 100, donante, c.idioma === "en" ? "en" : "es",
-         c.certificado ? 1 : 0, ["nombre","anonimo","no"].includes(c.muro) ? c.muro : "no",
+  ).bind(subId, nivel.id, Math.round(monto) * 100, donante, idioma,
+         o.certificado ? 1 : 0, ["nombre","anonimo","no"].includes(o.muro) ? o.muro : "no",
          fuente.id, tokenBaja).run();
   const sub = await env.DB.prepare(
     "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id FROM suscripciones WHERE id = ?"
@@ -18405,18 +18430,44 @@ async function apiSuscribir(request, env, url) {
     await env.DB.prepare(
       "UPDATE suscripciones SET estado = 'fallida', cancelada_motivo = ?, actualizada_en = datetime('now') WHERE id = ?"
     ).bind(String(cobro.motivo || "").slice(0, 120), subId).run();
-    return json({ error: "primer_cobro_fallido", motivo: cobro.motivo, detalle: cobro.detalle || null,
-      ayuda: "No pudimos hacer el primer cobro. Revisa tu metodo de pago o prueba con otro." }, 402);
+    return { ok: false, motivo: "primer_cobro_fallido", detalle: cobro.detalle || null };
   }
 
-  /* EL ENLACE DE BAJA SE DEVUELVE Y SE ENVIA POR CORREO. Devolverlo solo en
-     el JSON lo dejaria en manos de que la pantalla lo muestre y de que la
+  /* EL ENLACE DE BAJA SE ENVIA POR CORREO ADEMAS DE DEVOLVERSE. Dejarlo solo
+     en la respuesta lo pone en manos de que la pantalla lo muestre y de que la
      persona no cierre la pestana; por correo sobrevive a las dos cosas. */
   await correoEnlaceMembresia(env, { token: tokenBaja, nivel: nivel.id, monto_centavos: Math.round(monto) * 100 },
-                              email, c.idioma === "en" ? "en" : "es");
+                              email, idioma);
 
-  return json({ ok: true, suscripcion: subId, nivel: nivel.id, guia: cobro.guia, estado: cobro.estado,
-                membresia: ORIGIN + "/membresia/" + tokenBaja });
+  return { ok: true, suscripcion: subId, token: tokenBaja, nivel: nivel.id,
+           guia: cobro.guia, estado: cobro.estado };
+}
+
+/* POST /api/pago/suscribir — para quien YA tiene su fuente registrada. El
+   camino normal ya no pasa por aqui: lo hace `apiCrearFuentePago` en la misma
+   peticion de la tokenizacion. */
+async function apiSuscribir(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+
+  const r = await crearSuscripcion(env, c);
+  if (r.ok) {
+    return json({ ok: true, suscripcion: r.suscripcion, nivel: r.nivel, guia: r.guia,
+                  estado: r.estado, membresia: ORIGIN + "/membresia/" + r.token });
+  }
+  const codigos = { email_invalido: 400, monto_invalido: 400, sin_metodo_de_pago: 409,
+                    ya_suscrito: 409, primer_cobro_fallido: 402 };
+  const ayudas = {
+    sin_metodo_de_pago: "Primero registra un metodo de pago con este mismo correo.",
+    ya_suscrito: "Ya tienes una membresia activa con este correo.",
+    primer_cobro_fallido: "No pudimos hacer el primer cobro. Revisa tu metodo de pago o prueba con otro."
+  };
+  return json({ error: r.motivo, detalle: r.detalle || null, min: r.min, max: r.max,
+                ayuda: ayudas[r.motivo] || null }, codigos[r.motivo] || 400);
 }
 
 async function apiCrearFuentePago(request, env, url) {
@@ -18432,15 +18483,21 @@ async function apiCrearFuentePago(request, env, url) {
   let f;
   try { f = await request.formData(); } catch { return volverAlFormulario(url, "No se pudo leer el formulario."); }
 
+  /* EL MONTO SE LEE AQUI ARRIBA Y NO DONDE SE USA, para que cada camino de
+     error lo devuelva con la persona. La primera version lo leia al final: un
+     correo mal escrito la mandaba de vuelta al formulario habiendo perdido la
+     membresia que ya habia elegido, y a elegirla otra vez. */
+  const montoTxt = String(f.get("monto") || "").replace(/[^0-9]/g, "");
+
   const email = String(f.get("email") || "").trim().slice(0, 200);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return volverAlFormulario(url, "Revisa tu correo: no parece valido.");
+    return volverAlFormulario(url, "Revisa tu correo: no parece valido.", montoTxt);
   }
   /* Las DOS casillas, y por separado. Son dos contratos distintos —politica de
      privacidad y Ley 1581— y Wompi exige un token para cada uno. Una sola
      casilla de «acepto todo» no seria aceptacion explicita de ninguno. */
   if (!f.get("acepta_privacidad") || !f.get("acepta_datos")) {
-    return volverAlFormulario(url, "Hay que aceptar los dos documentos para continuar.");
+    return volverAlFormulario(url, "Hay que aceptar los dos documentos para continuar.", montoTxt);
   }
 
   /* EL NOMBRE DEL CAMPO DEL TOKEN NO ESTA DOCUMENTADO. La guia de Wompi dice
@@ -18458,11 +18515,11 @@ async function apiCrearFuentePago(request, env, url) {
     /* Se registran los NOMBRES de los campos recibidos, nunca sus valores: por
        aqui pasa un token de pago y no tiene por que quedar en un log. */
     console.error("fuente de pago sin token; campos recibidos:", [...f.keys()].join(","));
-    return volverAlFormulario(url, "No recibimos el metodo de pago. Intenta de nuevo.");
+    return volverAlFormulario(url, "No recibimos el metodo de pago. Intenta de nuevo.", montoTxt);
   }
 
   const info = await wompiInfoComercio(env);
-  if (!info) return volverAlFormulario(url, "No pudimos confirmar los terminos con la pasarela. Intenta en unos minutos.");
+  if (!info) return volverAlFormulario(url, "No pudimos confirmar los terminos con la pasarela. Intenta en unos minutos.", montoTxt);
 
   const amb = ambienteWompi(pub);
   let creada;
@@ -18483,11 +18540,11 @@ async function apiCrearFuentePago(request, env, url) {
       /* El motivo de Wompi si se registra —es lo unico que permite entender un
          rechazo—, pero nunca el cuerpo que enviamos. */
       console.error("payment_sources", r.status, JSON.stringify(creada && creada.error || {}).slice(0, 300));
-      return volverAlFormulario(url, "La pasarela no acepto el metodo de pago. Revisa los datos e intenta de nuevo.");
+      return volverAlFormulario(url, "La pasarela no acepto el metodo de pago. Revisa los datos e intenta de nuevo.", montoTxt);
     }
   } catch (e) {
     console.error("payment_sources red", e && e.message);
-    return volverAlFormulario(url, "No pudimos contactar la pasarela. Intenta en unos minutos.");
+    return volverAlFormulario(url, "No pudimos contactar la pasarela. Intenta en unos minutos.", montoTxt);
   }
 
   const d = (creada && creada.data) || {};
@@ -18513,14 +18570,47 @@ async function apiCrearFuentePago(request, env, url) {
   if (pd.last_four) q.set("t4", String(pd.last_four));
   const marca = marcaDesdeBin(pd.bin);
   if (marca) q.set("m", marca);
+
+  /* Y AQUI SE CIERRA EL TRAMO QUE FALTABA. Si la persona venia eligiendo un
+     monto —que es el camino normal desde la pantalla de membresias— la
+     suscripcion se crea EN ESTA MISMA PETICION, no en una segunda que nadie
+     hacia. Sin esto quedaba con la tarjeta registrada y sin membresia, y el
+     cobro mensual no tenia qué cobrar.
+
+     Si NO viene monto, esto sigue siendo lo que era: registrar un metodo de
+     pago y nada mas. Ese camino se conserva porque alguien puede querer
+     cambiar de tarjeta sin tocar su membresia. */
+  if (montoTxt) {
+    const sus = await crearSuscripcion(env, {
+      email, monto: Number(montoTxt),
+      nombre: String(f.get("nombre") || "").slice(0, 120),
+      idioma: f.get("idioma") === "en" ? "en" : "es"
+    });
+    if (sus.ok) {
+      q.set("sub", "1");
+      q.set("n", sus.nivel);
+      q.set("t", sus.token);
+    } else {
+      /* NO SE CALLA. La tarjeta quedo registrada y la membresia no arranco:
+         decirle «listo» seria mentir justo en la pantalla del dinero. El
+         motivo viaja para que `/pago/listo` diga qué pasó y qué hacer. */
+      q.set("sub", "0");
+      q.set("e", String(sus.motivo || "").slice(0, 40));
+      if (sus.token) q.set("t", sus.token);
+      console.error("suscripcion tras tokenizar", sus.motivo, sus.detalle || "");
+    }
+  }
   return Response.redirect(ORIGIN + "/pago/listo?" + q.toString(), 303);
 }
 
 /* Se vuelve al formulario con el motivo a la vista. Un 303 y no un JSON porque
    quien esta al otro lado es un navegador que acaba de enviar un formulario:
    devolverle `{"error":...}` lo dejaria mirando texto crudo. */
-function volverAlFormulario(url, motivo) {
+function volverAlFormulario(url, motivo, monto) {
   const q = new URLSearchParams({ aviso: motivo });
+  /* El monto elegido vuelve con la persona. Sin esto, un error de validacion
+     la devolvia al formulario habiendo perdido su membresia a medio elegir. */
+  if (monto) q.set("monto", String(monto));
   return Response.redirect(new URL("/pago/metodo?" + q.toString(), url.origin).toString(), 303);
 }
 
@@ -18530,21 +18620,60 @@ function paginaPagoListo(url) {
      Lo que llega por la URL lo escribe cualquiera. */
   const mp = String(url.searchParams.get("m") || "").replace(/[^A-Z]/g, "").slice(0, 12);
   const marca = ["VISA","MASTERCARD","AMEX","DINERS","DISCOVER"].includes(mp) ? mp : "";
+  const tarjeta = t4 ? ((marca ? esc(marca) + " " : "") + "\u00b7\u00b7\u00b7\u00b7 " + esc(t4)) : "";
+
+  const sub = url.searchParams.get("sub");
+  const tok = String(url.searchParams.get("t") || "");
+  const enlaceBaja = /^[a-f0-9]{32}$/.test(tok) ? "/membresia/" + tok : "";
+  const nivel = String(url.searchParams.get("n") || "").replace(/[^a-z]/g, "").slice(0, 12);
+  const err = String(url.searchParams.get("e") || "").replace(/[^a-z_]/g, "").slice(0, 40);
+
+  /* TRES DESENLACES DISTINTOS Y SE DICEN DISTINTO. La version anterior solo
+     sabia decir «listo»: daba el mismo mensaje a quien quedo de miembro y a
+     quien se quedo con la tarjeta registrada y sin membresia. En la pantalla
+     del dinero eso no es un matiz. */
+  let titulo, lead, extra = "";
+  if (sub === "1") {
+    titulo = "Ya eres miembro";
+    lead = "Tu membres\u00eda qued\u00f3 activa" + (nivel ? " en el nivel <b>" + esc(nivel) + "</b>" : "")
+         + " y el primer cobro ya sali\u00f3"
+         + (tarjeta ? " a tu " + tarjeta : "") + ". El siguiente ser\u00e1 dentro de un mes.";
+    extra = '  <p class="mu">Te enviamos un correo con el enlace a tu membres\u00eda. Desde ah\u00ed puedes verla y terminarla cuando quieras, sin escribirle a nadie.</p>\n';
+  } else if (sub === "0") {
+    titulo = "Tu tarjeta qued\u00f3 registrada, la membres\u00eda no arranc\u00f3";
+    const porques = {
+      ya_suscrito: "Ya tienes una membres\u00eda activa con ese correo, as\u00ed que no creamos otra.",
+      primer_cobro_fallido: "No pudimos hacer el primer cobro. Revisa tu m\u00e9todo de pago o prueba con otro.",
+      monto_invalido: "El monto no era v\u00e1lido.",
+      email_invalido: "El correo no era v\u00e1lido.",
+      sin_metodo_de_pago: "No encontramos el m\u00e9todo de pago reci\u00e9n registrado."
+    };
+    lead = porques[err] || "Algo fall\u00f3 al activar la membres\u00eda y preferimos dec\u00edrtelo a dejarte creyendo que qued\u00f3.";
+    extra = '  <p class="mu">No se te cobr\u00f3 nada por la membres\u00eda. Si quieres, int\u00e9ntalo de nuevo desde membres\u00edas; y si vuelve a fallar, escr\u00edbenos y lo miramos nosotros.</p>\n';
+  } else {
+    titulo = "M\u00e9todo de pago registrado";
+    lead = "Tu m\u00e9todo de pago qued\u00f3 guardado" + (tarjeta ? " (" + tarjeta + ")" : "") + ".";
+    extra = '  <p class="mu">Puedes retirarlo cuando quieras desde tu membres\u00eda. Guardamos la marca y los cuatro \u00faltimos d\u00edgitos para que reconozcas cu\u00e1l registraste; el n\u00famero de tu tarjeta no lo tenemos, y su fecha de vencimiento tampoco.</p>\n';
+  }
+
   return '<!doctype html>\n'
 + '<html lang="es">\n<head>\n<meta charset="utf-8">\n'
 + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-+ '<title>Método de pago registrado · Give&amp;Grow International</title>\n'
++ '<title>' + esc(titulo.replace(/<[^>]*>/g, "")) + ' \u00b7 Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
 + '<link rel="stylesheet" href="/styles.css">\n</head>\n<body>\n'
 + '<main class="wrap" style="padding-top:40px;padding-bottom:48px;max-width:640px">\n'
-+ '  <h1>Listo</h1>\n'
-+ '  <p class="lead">Tu método de pago quedó registrado'
-+ (t4 ? ' (' + (marca ? esc(marca) + ' ' : '') + 'termina en <b>' + esc(t4) + '</b>)' : '')
-+ '. Desde ahora podemos cobrar tu membresía sin que tengas que entrar cada mes.</p>\n'
-+ '  <p class="mu">Puedes retirarlo cuando quieras desde tu membresía: al terminarla lo retiramos con ella. Guardamos la marca y los cuatro últimos dígitos para que reconozcas cuál registraste; el número de tu tarjeta no lo tenemos, y su fecha de vencimiento tampoco.</p>\n'
-+ '  <p style="margin-top:28px"><a class="btn btn-g" href="/#membresias">Volver a membresías</a> '
-+ '<a class="card-link" href="/membresia" style="margin-left:14px">Buscar mi membresía</a></p>\n'
++ '  <h1>' + titulo + '</h1>\n'
++ '  <p class="lead">' + lead + '</p>\n'
++ extra
++ '  <p style="margin-top:28px">'
++ (enlaceBaja
+    ? '<a class="btn btn-g" href="' + esc(enlaceBaja) + '">Ver mi membres\u00eda</a> '
+      + '<a class="card-link" href="/#membresias" style="margin-left:14px">Volver a membres\u00edas</a>'
+    : '<a class="btn btn-g" href="/#membresias">Volver a membres\u00edas</a> '
+      + '<a class="card-link" href="/membresia" style="margin-left:14px">Buscar mi membres\u00eda</a>')
++ '</p>\n'
 + '</main>\n</body>\n</html>';
 }
 
