@@ -15752,7 +15752,15 @@ var COLA_ES = {
   correos_sin_buzon: "Avisos internos sin buzón a donde ir",
   casos_respondieron: "Familias que ya mandaron sus fotos",
   visitadas_sin_materiales: "Visitadas y todavía sin materiales",
-  terreno_sin_atender: "Inspecciones de terreno sin atender"
+  terreno_sin_atender: "Inspecciones de terreno sin atender",
+  /* LAS TRES MAS NUEVAS, y llegaron sin nombre. Son justo las que se añadieron
+     para hacer visible lo que fallaba callado —el concepto escrito que la
+     familia no sabe, el certificado que perdio su respaldo, el aviso que no
+     salio por cupo— y salian a pantalla con su clave cruda. El check #18 del
+     gate mira esta tabla y la de abajo desde hoy. */
+  concepto_sin_avisar: "Conceptos escritos y sin avisar",
+  certificados_en_revision: "Certificados que perdieron respaldo",
+  correos_sin_cupo: "Avisos que no salieron por cupo"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -15923,7 +15931,19 @@ var COLA_MOD = {
   correos_sin_buzon: "salud",
   casos_respondieron: "mmc",
   terreno_sin_atender: "mmc",
-  visitadas_sin_materiales: "entregas"
+  visitadas_sin_materiales: "entregas",
+  /* Y AQUI ESTABA EL FALLO CALLADO DE VERDAD: sin modulo, «pintarContadores»
+     hace «if (!m) return;» y la cola no suma en ninguna insignia. Las tres
+     colas mas nuevas no se contaban en ningun sitio, tampoco en el total de
+     «hoy» — o sea que el panel podia decir que no habia nada pendiente con un
+     certificado sin respaldo esperando.
+     El modulo sale del destino, como dice la regla de arriba: «#sec-casas» es
+     mmc, «/firma» lo atiende el modulo de dinero —igual que
+     "certificados_sin_firmar", que apunta al mismo sitio— y una cola sin
+     pantalla va a salud, como las otras dos de correos. */
+  concepto_sin_avisar: "mmc",
+  certificados_en_revision: "dinero",
+  correos_sin_cupo: "salud"
 };
 
 /* El numero en la pestana es lo que convierte esto en una consola: sin el hay
