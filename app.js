@@ -4909,6 +4909,23 @@ function renderHeroImpact(){
     el.hidden = false;
   });
 }
+/* ALMA SE APARTA DEL HERO EN MÓVIL. El círculo flotante de ALMA va abajo a la
+   izquierda, y en la primera pantalla del celular caía encima del segundo botón
+   del hero. Mientras el hero de la portada está a la vista, el body lleva
+   `hero-vista` y el CSS lo esconde solo por debajo de 768 px; en escritorio no
+   cambia nada. Sin IntersectionObserver no se marca nada y el botón se queda
+   donde estaba, que es el comportamiento de antes. */
+function initFabHero(){
+  var hero = document.querySelector("#page-inicio .hero");
+  if (!hero || !("IntersectionObserver" in window)) return;
+  new IntersectionObserver(function(entries){
+    var e = entries[0];
+    /* Solo cuenta si la portada es la página activa: el hero sigue en el DOM
+       cuando se navega a otra, y ahí ALMA tiene que verse. */
+    var enPortada = hero.closest(".page") && hero.closest(".page").classList.contains("active");
+    document.body.classList.toggle("hero-vista", !!(e.isIntersecting && e.intersectionRatio > 0.35 && enPortada));
+  }, { threshold: [0, 0.35, 0.6] }).observe(hero);
+}
 function initIconDraw(){
   var shapes = document.querySelectorAll(".ic-svg path, .ic-svg circle, .ic-svg rect, .ic-svg line, .ic-svg polyline, .ic-svg polygon");
   for (var i=0;i<shapes.length;i++) shapes[i].setAttribute("pathLength","1");
@@ -5762,6 +5779,7 @@ if (!MARCA_MMC) loadPartners();
 trmCarga();
 if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
+initFabHero();
 
 /* ---------- tema día/noche: automático por reloj + preferencia manual ---------- */
 var THEME_KEY = "gg-theme";
