@@ -1151,6 +1151,53 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
 }
 
 /* ============ Rastrea tu donación ============ */
+/* ===== Rastrea: el buscador en vidrio sobre una jornada real =====
+   Fase 3 de «Vidrio y papel». La foto va a sangre y el panel de vidrio sostiene
+   el buscador: es el vidrio protagonista de esta pantalla. Debajo, en papel, el
+   resultado real y el recorrido de ejemplo. */
+.rastro-hero{position:relative;overflow:hidden;padding:88px 0 80px;color:var(--on-dark)}
+.rastro-foto{position:absolute;inset:0;z-index:0}
+.rastro-foto img{width:100%;height:100%;object-fit:cover;object-position:center 45%;display:block}
+.rastro-hero .wrap{position:relative;z-index:1}
+/* EL CIELO. Medido contra la foto real: en el celular el panel cae sobre el
+   cielo de Marsella, y con el tinte de serie (52 %) la celda más clara dejaba
+   la ceja en 2,44:1 y la entradilla en 3,71:1. La regla del vidrio dice qué
+   hacer: subir el tinte. Solo con el tinte habría que llegar a ~75 % y el
+   vidrio dejaría de verse, así que se reparte: el panel a 66 % y un velo en la
+   foto, fuerte arriba —donde está el cielo— y casi nada abajo, en la calle.
+   Los dos se DERIVAN de --ink-deep con color-mix: ningún color nuevo escrito
+   a mano, que es lo que el trinquete del gate protege. Cada uno lleva antes un
+   respaldo con el token de vidrio para los navegadores sin color-mix (iOS
+   anterior a 16.2): ahí el tinte queda en el 52 % de serie. */
+.rastro-foto::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,var(--vidrio-tinta) 0%,transparent 100%);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--ink-deep) 45%,transparent) 0%,
+    color-mix(in srgb,var(--ink-deep) 30%,transparent) 45%,color-mix(in srgb,var(--ink-deep) 12%,transparent) 100%)}
+.rastro-panel{max-width:600px;padding:32px 32px 26px}
+.rastro-panel.vidrio{background:var(--vidrio-tinta);background:color-mix(in srgb,var(--ink-deep) 66%,transparent)}
+/* Este selector pesa más que los respaldos de .vidrio, así que necesita los
+   suyos: sin ellos, «reducir transparencia» no llegaba a este panel. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.rastro-panel.vidrio{background:var(--ink-deep)}}
+@media (prefers-reduced-transparency:reduce){.rastro-panel.vidrio{background:var(--ink-deep)}}
+.rastro-panel .ey{color:var(--brote)}
+.rastro-panel .h-sec{color:var(--on-dark);margin-bottom:14px}
+.rastro-panel .lead{color:var(--on-dark-2);margin-bottom:0}
+.rastro-panel .track-box{margin-top:22px}
+.rastro-panel .track-noguide{color:var(--on-dark)}
+.rastro-panel .track-noguide:hover{opacity:1;color:var(--brote)}
+@media(max-width:760px){.rastro-hero{padding:40px 0 36px}.rastro-panel{padding:24px 20px 20px}}
+.rastro-cuerpo{padding-top:40px}
+.rastro-ejemplo{max-width:760px}
+.rastro-ejemplo .ey{display:block;margin-bottom:8px}
+.rastro-pasos{list-style:none;counter-reset:paso;margin:22px 0 0;padding:0}
+.rastro-pasos li{display:grid;grid-template-columns:36px 1fr;gap:3px 14px;padding:16px 0;border-top:1px solid var(--bd)}
+.rastro-pasos li::before{counter-increment:paso;content:counter(paso);grid-row:span 2;
+  font-family:var(--font-display);font-weight:600;font-size:var(--fs-17);line-height:1.3;color:var(--acc)}
+.rastro-pasos b{font-size:var(--fs-16)}
+.rastro-pasos span{font-size:var(--fs-15);color:var(--ink-soft);line-height:1.55}
+.rastro-nota{margin-top:4px;padding-top:14px;border-top:1px solid var(--bd);font-size:var(--fs-14);color:var(--mu);max-width:64ch}
+/* Con un resultado real en pantalla, el ejemplo se va: ver trackSearch. */
+.con-resultado .rastro-ejemplo{display:none}
 .track-box{max-width:640px;margin-top:26px}
 /* PUEDE ENVOLVER, Y EL CAMPO PUEDE ENCOGER. Los dos hacen falta: «flex:1» no
    sirve de nada mientras el item conserve «min-width:auto», que es el valor por
