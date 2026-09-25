@@ -28,12 +28,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Give&Grow">
 <link rel="apple-touch-icon" sizes="180x180" href="/img/icon/gg-180.png">
-<script>/* tema antes del primer render: preferencia guardada o reloj local (día 6–18h) */
-(function(){var t="light";try{var s=localStorage.getItem("gg-theme");if(s==="light"||s==="dark"){t=s}else{var h=new Date().getHours();t=(h>=6&&h<18)?"light":"dark"}}catch(e){}document.documentElement.setAttribute("data-theme",t);if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",document.documentElement.getAttribute("data-marca")==="mmc"?"#07131F":"#0F1613")}})();
+<script>/* tema antes del primer render: la preferencia guardada; si no hay, la del dispositivo; y la hora (día 6–18h) solo si el dispositivo no dice nada. La misma cuenta que themeResolve en app.js */
+(function(){var t="light";try{var s=localStorage.getItem("gg-theme");if(s==="light"||s==="dark"){t=s}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches){t="light"}else{var h=new Date().getHours();t=(h>=6&&h<18)?"light":"dark"}}catch(e){}document.documentElement.setAttribute("data-theme",t);if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",document.documentElement.getAttribute("data-marca")==="mmc"?"#07131F":"#0F1613")}})();
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=423bd5ef">
+<link rel="stylesheet" href="/styles.css?v=e4487847">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=42a91fd7" defer></script>
+<script src="/app.js?v=ee352638" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>

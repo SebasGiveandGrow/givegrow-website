@@ -908,7 +908,7 @@ html.theming .band, html.theming section, html.theming .nav-mobile{
   transition:background-color .3s var(--ease),color .3s var(--ease),border-color .3s var(--ease)!important
 }
 
-/* ---------- Toggle día/noche (reloj) ---------- */
+/* ---------- Toggle día/noche: automático (como el dispositivo), claro, oscuro ---------- */
 .theme-toggle{display:inline-flex;align-items:center;gap:7px;border:none;background:none;cursor:pointer;padding:4px 2px;color:var(--ink)}
 .tt-track{position:relative;width:46px;height:24px;border-radius:999px;background:var(--bg2,rgba(0,0,0,.08));border:1px solid var(--bd);display:flex;align-items:center;transition:background .3s}
 .tt-track svg{width:14px;height:14px;position:absolute;top:50%;transform:translateY(-50%);transition:opacity .3s;pointer-events:none}

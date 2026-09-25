@@ -1157,7 +1157,7 @@ var I18N = {
     "journey.next":"Siguiente",
     "journey.done":"Recorrido completo. Gracias por conocernos de principio a fin.",
     "nav.inicio":"Inicio",
-    "theme.auto":"Tema: automático según la hora. Clic para modo claro",
+    "theme.auto":"Tema: automático, como tu dispositivo. Clic para modo claro",
     "theme.light":"Tema: claro. Clic para modo oscuro",
     "theme.dark":"Tema: oscuro. Clic para modo automático",
     "alma.send":"Enviar",
@@ -5803,13 +5803,27 @@ if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
 initFabHero();
 
-/* ---------- tema día/noche: automático por reloj + preferencia manual ---------- */
+/* ---------- tema día/noche: automático + preferencia manual ----------
+   EL AUTOMÁTICO SIGUE AL DISPOSITIVO (decisión de Sebas, 25 sep 2026). Antes
+   seguía la hora del visitante: de 6 a 18 claro, el resto oscuro. Alguien con el
+   teléfono en modo oscuro a mediodía recibía el sitio en claro, que es lo
+   contrario de lo que pidió en su teléfono. Ahora manda `prefers-color-scheme`,
+   y la hora queda solo como respaldo para cuando el sistema no dice nada —en la
+   práctica, casi nunca: los navegadores sin preferencia informan «claro»—.
+   El script en línea de index.html hace la MISMA cuenta antes del primer
+   pintado; si se cambia una, se cambia la otra (y su hash en _headers: check #21). */
 var THEME_KEY = "gg-theme";
 var themeTimer = null;
 function themeStored(){ try { var s = localStorage.getItem(THEME_KEY); return (s==="light"||s==="dark") ? s : "auto"; } catch(e){ return "auto"; } }
 function themeStore(m){ try { if (m==="auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, m); } catch(e){} }
 function themeByClock(){ var h = new Date().getHours(); return (h>=6 && h<18) ? "light" : "dark"; }
-function themeResolve(m){ return m==="auto" ? themeByClock() : m; }
+function themeBySystem(){
+  if (!window.matchMedia) return null;
+  if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+  return null;
+}
+function themeResolve(m){ return m==="auto" ? (themeBySystem() || themeByClock()) : m; }
 function themeApply(mode, anim){
   var root = document.documentElement;
   var res = themeResolve(mode);
@@ -5819,8 +5833,13 @@ function themeApply(mode, anim){
   }
   root.setAttribute("data-theme", res);
   ggMapTiles();
+  /* EL COLOR DE LA BARRA ES DE CADA MARCA. Esto escribía siempre los de
+     Give&Grow, así que en miramicasa.org pisaba el azul que pone el Worker
+     (#0D3B66) y el nocturno del script en línea (#07131F): en el celular, la
+     barra de Mira Mi Casa salía en el verde de la fundación. */
   var mc = document.querySelector('meta[name="theme-color"]');
-  if (mc) mc.setAttribute("content", res==="dark" ? "#0F1613" : "#1F5C38");
+  var mmc = root.getAttribute("data-marca") === "mmc";
+  if (mc) mc.setAttribute("content", res==="dark" ? (mmc ? "#07131F" : "#0F1613") : (mmc ? "#0D3B66" : "#1F5C38"));
   var b = document.getElementById("theme-btn");
   if (b){
     b.setAttribute("data-mode", mode);
@@ -5837,10 +5856,12 @@ function themeApply(mode, anim){
     b.setAttribute("title", label);
   }
   if (themeTimer){ clearInterval(themeTimer); themeTimer = null; }
-  if (mode==="auto"){
+  /* El reloj solo se vigila si es él quien decide: cuando el sistema tiene
+     preferencia, el cambio llega por el evento de abajo. */
+  if (mode==="auto" && !themeBySystem()){
     themeTimer = setInterval(function(){
       var cur = document.documentElement.getAttribute("data-theme");
-      var want = themeByClock();
+      var want = themeResolve("auto");
       if (cur !== want) themeApply("auto", true);
     }, 60000);
   }
@@ -5852,6 +5873,15 @@ function themeCycle(){
   themeApply(next, true);
 }
 themeApply(themeStored(), false);
+/* Si la persona cambia el modo de su teléfono con la página abierta —o el
+   sistema lo cambia solo al anochecer—, el automático lo sigue. Una elección
+   manual guardada no se toca. */
+if (window.matchMedia){
+  var mqTema = window.matchMedia("(prefers-color-scheme: dark)");
+  var alCambiarSistema = function(){ if (themeStored()==="auto") themeApply("auto", true); };
+  if (mqTema.addEventListener) mqTema.addEventListener("change", alCambiarSistema);
+  else if (mqTema.addListener) mqTema.addListener(alCambiarSistema);
+}
 
 /* ---------- barra de recorrido: la fundación de 0 a 100 ---------- */
 var JOURNEY = ["inicio","origen","hub","impacto","fundaciones","empresas","membresias","gratitud","transparencia","faq","contacto","donar"];
