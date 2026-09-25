@@ -385,7 +385,7 @@ section{padding:72px 0}
 .cur-toggle button{padding:5px 16px;border-radius:999px;border:1px solid var(--on-dark-line);color:var(--on-dark-3);font-size:var(--fs-13);font-weight:700}
 .cur-toggle button.on{background:var(--on-dark);color:var(--ink-deep)}
 .calc-amount{text-align:center;margin-bottom:6px}
-#calc-display{font-family:var(--font-display);font-size:clamp(22px,7vw,42px);font-weight:800;color:var(--brote);letter-spacing:-.01em;line-height:1.05;white-space:nowrap}
+#calc-display{font-family:var(--font-display);font-size:clamp(22px,7vw,42px);font-weight:800;color:var(--on-dark);letter-spacing:-.01em;line-height:1.05;white-space:nowrap}
 #calc-manual{width:100%;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-fill);color:var(--on-dark);border-radius:10px;padding:10px;text-align:center;font-size:var(--fs-16);margin:6px 0 4px}
 #calc-rate{font-size:var(--fs-12);color:var(--on-dark-4);text-align:center;margin-bottom:16px;min-height:16px}
 input[type=range]{width:100%;accent-color:var(--brote);margin:8px 0 4px}
@@ -1169,41 +1169,54 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
 }
 
 /* ============ Rastrea tu donación ============ */
-/* ===== Rastrea: el buscador en vidrio sobre una jornada real =====
-   Fase 3 de «Vidrio y papel». La foto va a sangre y el panel de vidrio sostiene
-   el buscador: es el vidrio protagonista de esta pantalla. Debajo, en papel, el
-   resultado real y el recorrido de ejemplo. */
-.rastro-hero{position:relative;overflow:hidden;padding:88px 0 80px;color:var(--on-dark)}
-.rastro-foto{position:absolute;inset:0;z-index:0}
-.rastro-foto img{width:100%;height:100%;object-fit:cover;object-position:center 45%;display:block}
-.rastro-hero .wrap{position:relative;z-index:1}
-/* EL CIELO. Medido contra la foto real: en el celular el panel cae sobre el
-   cielo de Marsella, y con el tinte de serie (52 %) la celda más clara dejaba
-   la ceja en 2,44:1 y la entradilla en 3,71:1. La regla del vidrio dice qué
-   hacer: subir el tinte. Solo con el tinte habría que llegar a ~75 % y el
-   vidrio dejaría de verse, así que se reparte: el panel a 66 % y un velo en la
-   foto, fuerte arriba —donde está el cielo— y casi nada abajo, en la calle.
-   Los dos se DERIVAN de --ink-deep con color-mix: ningún color nuevo escrito
-   a mano, que es lo que el trinquete del gate protege. Cada uno lleva antes un
-   respaldo con el token de vidrio para los navegadores sin color-mix (iOS
-   anterior a 16.2): ahí el tinte queda en el 52 % de serie. */
-.rastro-foto::after{content:"";position:absolute;inset:0;
+/* ===== BANDA DE FOTO CON VIDRIO — Rastrea y Donar =====
+   Fase 3 de «Vidrio y papel». La foto va a sangre y un panel de vidrio sostiene
+   lo que importa de la pantalla: es su vidrio protagonista. Rastrea la estrenó;
+   Donar la reutiliza, así que lo común vive aquí y cada página solo pone lo suyo.
+
+   EL CIELO. Medido contra la foto real: en el celular el panel de Rastrea caía
+   sobre el cielo de Marsella, y con el tinte de serie (52 %) la celda más clara
+   dejaba la ceja en 2,44:1 y la entradilla en 3,71:1. La regla del vidrio dice
+   qué hacer —subir el tinte—, pero solo con el tinte habría que llegar a ~75 %
+   y el vidrio dejaría de verse. Se reparte: el panel a 66 % y un velo en la
+   foto, fuerte arriba y casi nada abajo. Los dos se DERIVAN de --ink-deep con
+   color-mix: ningún color nuevo escrito a mano, que es lo que protege el
+   trinquete del gate. Cada uno lleva antes un respaldo con el token de vidrio
+   para navegadores sin color-mix (iOS anterior a 16.2). */
+.banda-foto{position:relative;overflow:hidden;padding:88px 0 80px;color:var(--on-dark)}
+.foto-banda{position:absolute;inset:0;z-index:0}
+.foto-banda img{width:100%;height:100%;object-fit:cover;object-position:center 45%;display:block}
+.foto-banda::after{content:"";position:absolute;inset:0;
   background:linear-gradient(180deg,var(--vidrio-tinta) 0%,transparent 100%);
   background:linear-gradient(180deg,color-mix(in srgb,var(--ink-deep) 45%,transparent) 0%,
     color-mix(in srgb,var(--ink-deep) 30%,transparent) 45%,color-mix(in srgb,var(--ink-deep) 12%,transparent) 100%)}
-.rastro-panel{max-width:600px;padding:32px 32px 26px}
-.rastro-panel.vidrio{background:var(--vidrio-tinta);background:color-mix(in srgb,var(--ink-deep) 66%,transparent)}
+.banda-foto .wrap{position:relative;z-index:1}
+.banda-foto .vidrio{background:var(--vidrio-tinta);background:color-mix(in srgb,var(--ink-deep) 66%,transparent)}
 /* Este selector pesa más que los respaldos de .vidrio, así que necesita los
-   suyos: sin ellos, «reducir transparencia» no llegaba a este panel. */
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.rastro-panel.vidrio{background:var(--ink-deep)}}
-@media (prefers-reduced-transparency:reduce){.rastro-panel.vidrio{background:var(--ink-deep)}}
-.rastro-panel .ey{color:var(--brote)}
-.rastro-panel .h-sec{color:var(--on-dark);margin-bottom:14px}
-.rastro-panel .lead{color:var(--on-dark-2);margin-bottom:0}
+   suyos: sin ellos, «reducir transparencia» no llegaba a estos paneles. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.banda-foto .vidrio{background:var(--ink-deep)}}
+@media (prefers-reduced-transparency:reduce){.banda-foto .vidrio{background:var(--ink-deep)}}
+.banda-foto .ey{color:var(--brote)}
+.banda-foto .h-sec{color:var(--on-dark);margin-bottom:14px}
+.banda-foto .lead{color:var(--on-dark-2);margin-bottom:0}
+@media(max-width:760px){.banda-foto{padding:40px 0 36px}}
+
+/* Rastrea */
+.rastro-panel{max-width:600px;padding:32px 32px 26px}
 .rastro-panel .track-box{margin-top:22px}
 .rastro-panel .track-noguide{color:var(--on-dark)}
 .rastro-panel .track-noguide:hover{opacity:1;color:var(--brote)}
-@media(max-width:760px){.rastro-hero{padding:40px 0 36px}.rastro-panel{padding:24px 20px 20px}}
+@media(max-width:760px){.rastro-panel,.don-panel{padding:24px 20px 20px}}
+
+/* Donar: la cabecera en vidrio y la tira de confianza en el punto de decisión.
+   La calculadora NO va en vidrio: mide ~1.400 px, lleva el pago y la nota legal
+   del Art. 257 en letra pequeña, y la regla la excluye. */
+.don-panel{max-width:620px;padding:32px 32px 24px}
+.confianza{list-style:none;display:flex;flex-wrap:wrap;gap:8px 20px;margin:22px 0 0;padding:14px 0 0;
+  border-top:1px solid var(--on-dark-line);font-size:var(--fs-13);color:var(--on-dark-2)}
+.confianza li{display:flex;align-items:center;gap:8px}
+.confianza li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--brote);flex:0 0 auto}
+.don-calc{padding-top:48px}
 .rastro-cuerpo{padding-top:40px}
 .rastro-ejemplo{max-width:760px}
 .rastro-ejemplo .ey{display:block;margin-bottom:8px}

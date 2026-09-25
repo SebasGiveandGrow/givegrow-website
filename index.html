@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=36084e70">
+<link rel="stylesheet" href="/styles.css?v=1cd49994">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=c444f65f" defer></script>
+<script src="/app.js?v=42a91fd7" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1476,12 +1476,32 @@
 
 <!-- ============ DONAR ============ -->
 <main id="page-donar" class="page">
-  <section>
-    <div class="wrap center">
-      <span class="ey rv" data-i18n="donar.ey">Donar</span>
-      <h1 class="h-sec rv" data-i18n="donar.t">Tu donación, con destino claro.</h1>
-      <p class="lead rv d1" data-i18n="donar.lead">Calcula tu impacto y tu beneficio tributario, luego elige cómo aportar.</p>
+  <!-- La cabecera en vidrio sobre el territorio, con la tira de confianza en el
+       punto de decisión (Fase 3 de «Vidrio y papel»). La calculadora NO va en
+       vidrio a propósito: mide ~1.400 px, lleva el paso de pago y la nota legal
+       del Art. 257 en letra pequeña, y la regla del vidrio lo excluye («nunca en
+       listas largas ni sobre texto corrido»). -->
+  <section class="banda-foto don-hero">
+    <picture class="foto-banda">
+      <source media="(min-width:760px)" type="image/webp" srcset="/img/jornadas/guajira_territorio_banda_1400.webp">
+      <source type="image/webp" srcset="/img/jornadas/guajira_territorio_banda_800.webp">
+      <img src="/img/jornadas/guajira_territorio_banda_1400.webp" alt="Territorio wayuu en la Alta Guajira, con burros de carga bajo los árboles" data-i18n="donar.foto.alt" data-i18n-attr="alt" fetchpriority="high" decoding="async">
+    </picture>
+    <div class="wrap">
+      <div class="don-panel vidrio">
+        <span class="ey rv" data-i18n="donar.ey">Donar</span>
+        <h1 class="h-sec rv" data-i18n="donar.t">Tu donación, con destino claro.</h1>
+        <p class="lead rv d1" data-i18n="donar.lead">Calcula tu impacto y tu beneficio tributario, luego elige cómo aportar.</p>
+        <ul class="confianza rv d2">
+          <li data-i18n="donar.conf.1">NIT 901.948.930-2</li>
+          <li data-i18n="donar.conf.2">Régimen Tributario Especial</li>
+          <li data-i18n="donar.conf.3">Certificado firmado, si lo pides</li>
+          <li data-i18n="donar.conf.4">Rastreo con número de guía</li>
+        </ul>
+      </div>
     </div>
+  </section>
+  <section class="don-calc">
     <div class="wrap rv d2">
       <div class="calc">
         <div class="calc-cap" id="calc-tipo-lbl" data-i18n="calc.tipo.lbl">¿Aportas como persona o empresa?</div>
@@ -1928,8 +1948,8 @@
        publicada: equipo de la brigada en Marsella, agosto de 2026. El panel va
        sobre la calle, a la izquierda; las personas quedan a la derecha, sin nada
        encima. -->
-  <section class="rastro-hero">
-    <picture class="rastro-foto">
+  <section class="banda-foto rastro-hero">
+    <picture class="foto-banda">
       <source media="(min-width:760px)" type="image/webp" srcset="/img/jornadas/brigada_marsella_equipo_1200.webp">
       <source type="image/webp" srcset="/img/jornadas/m/brigada_marsella_equipo.webp">
       <img src="/img/jornadas/brigada_marsella_equipo.jpg" alt="Equipo de la brigada frente a una vivienda en Marsella, agosto de 2026" data-i18n="track.foto.alt" data-i18n-attr="alt" fetchpriority="high" decoding="async">
