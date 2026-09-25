@@ -844,6 +844,16 @@ var I18N = {
     "calc.manual.aria":"Escribe el monto de tu donación",
     "track.btn":"Rastrear",
     "track.noguide":"No tengo mi guía",
+    "track.foto.alt":"Equipo de la brigada frente a una vivienda en Marsella, agosto de 2026",
+    "track.ej.ey":"Antes de buscar",
+    "track.ej.t":"Así se ve un aporte de principio a fin",
+    "track.ej.1.t":"Recibida",
+    "track.ej.1.p":"Cuando el pago se confirma, te llega el recibo con tu número de guía. Con él vuelves aquí.",
+    "track.ej.2.t":"En distribución",
+    "track.ej.2.p":"Tu aporte pasa a la fundación aliada o al destino que elegiste.",
+    "track.ej.3.t":"Entregada",
+    "track.ej.3.p":"Cuando la aliada entrega, el acta firmada y las fotos de las entregas de tu destino aparecen en tu rastreo.",
+    "track.ej.cert":"Si pediste certificado de donación, se emite aparte: lo firman el Representante Legal y la Revisora Fiscal, y te lo enviamos cuando esté firmado.",
     "track.loading":"Buscando tu donación…",
     "track.err.load":"No pudimos cargar la información en este momento. Intenta de nuevo en un momento.",
     "track.nf.t":"No encontramos esa guía",
@@ -5956,6 +5966,14 @@ function trackSearch(){
   if (!guide){ if(inp) inp.focus(); return; }
   box.style.display = "";
   box.innerHTML = '<p class="track-loading">'+t("track.loading")+'</p>';
+  /* Con un resultado real delante, el recorrido de ejemplo sobra y puede
+     confundirse con el propio aporte: se oculta. Y el resultado vive debajo del
+     hero, así que si quedó fuera de la vista (la guía llegó por el QR, o la
+     pantalla es baja) se baja hasta él. */
+  var pag = document.getElementById("page-rastrea");
+  if (pag) pag.classList.add("con-resultado");
+  var rb = box.getBoundingClientRect();
+  if (rb.top > window.innerHeight * 0.7) window.scrollTo(0, window.scrollY + rb.top - 96);
 
   /* D1 PRIMERO y el libro después. El rastreo leía solo `inventario.json` —lo
      que escribe la automatización de Sheets— así que una donación hecha por el

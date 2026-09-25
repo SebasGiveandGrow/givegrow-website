@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=b8c5d943">
+<link rel="stylesheet" href="/styles.css?v=33bf5210">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=a1382918" defer></script>
+<script src="/app.js?v=c444f65f" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1926,8 +1926,20 @@
 </main>
 
 <main id="page-rastrea" class="page">
-  <section>
+  <!-- EL BUSCADOR EN VIDRIO, sobre una jornada real (Fase 3 de «Vidrio y papel»).
+       Era la página más vacía del sitio —un campo y el pie de página a media
+       pantalla— y es la promesa central de la marca. La foto es de la galería ya
+       publicada: equipo de la brigada en Marsella, agosto de 2026. El panel va
+       sobre la calle, a la izquierda; las personas quedan a la derecha, sin nada
+       encima. -->
+  <section class="rastro-hero">
+    <picture class="rastro-foto">
+      <source media="(min-width:760px)" type="image/webp" srcset="/img/jornadas/brigada_marsella_equipo_1200.webp">
+      <source type="image/webp" srcset="/img/jornadas/m/brigada_marsella_equipo.webp">
+      <img src="/img/jornadas/brigada_marsella_equipo.jpg" alt="Equipo de la brigada frente a una vivienda en Marsella, agosto de 2026" data-i18n="track.foto.alt" data-i18n-attr="alt" fetchpriority="high" decoding="async">
+    </picture>
     <div class="wrap">
+      <div class="rastro-panel vidrio">
       <span class="ey rv" data-i18n="track.ey">Trazabilidad real</span>
       <h1 class="h-sec rv" data-i18n="track.t">Rastrea tu donación</h1>
       <p class="lead rv d1" data-i18n="track.lead">Cada donación tiene un número de guía único. Escríbelo y sigue su recorrido, de principio a fin.</p>
@@ -1939,6 +1951,11 @@
         </div>
         <button type="button" class="track-noguide" data-act="trackNoGuide()" data-i18n="track.noguide">No tengo mi guía</button>
       </div>
+      </div>
+    </div>
+  </section>
+  <section class="rastro-cuerpo">
+    <div class="wrap">
       <div id="track-result" class="track-result" role="status" aria-live="polite" style="display:none"></div>
       <div id="track-noguide-box" class="track-noguide-box" style="display:none">
         <h2 data-i18n="track.ng.t" class="h-comp3">¿Perdiste tu número de guía?</h2>
@@ -1946,6 +1963,20 @@
         <div class="field"><label for="track-ng-email" data-i18n="form.email">Correo</label><input type="email" id="track-ng-email" autocomplete="email"></div>
         <button type="button" class="btn btn-g" data-act="trackNoGuideSend()" data-i18n="track.ng.btn">Solicitar mi guía</button>
         <p id="track-ng-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
+      </div>
+      <!-- EL EJEMPLO, EN PAPEL. Explica qué va a ver alguien antes de que busque. No
+           lleva cifras, fechas ni números de acta: describe el recorrido, no un
+           aporte. Se oculta cuando hay un resultado real, para que nadie confunda
+           el ejemplo con lo suyo. -->
+      <div class="rastro-ejemplo">
+        <span class="ey" data-i18n="track.ej.ey">Antes de buscar</span>
+        <h2 class="h-comp3" data-i18n="track.ej.t">Así se ve un aporte de principio a fin</h2>
+        <ol class="rastro-pasos">
+          <li><b data-i18n="track.ej.1.t">Recibida</b><span data-i18n="track.ej.1.p">Cuando el pago se confirma, te llega el recibo con tu número de guía. Con él vuelves aquí.</span></li>
+          <li><b data-i18n="track.ej.2.t">En distribución</b><span data-i18n="track.ej.2.p">Tu aporte pasa a la fundación aliada o al destino que elegiste.</span></li>
+          <li><b data-i18n="track.ej.3.t">Entregada</b><span data-i18n="track.ej.3.p">Cuando la aliada entrega, el acta firmada y las fotos de las entregas de tu destino aparecen en tu rastreo.</span></li>
+        </ol>
+        <p class="rastro-nota" data-i18n="track.ej.cert">Si pediste certificado de donación, se emite aparte: lo firman el Representante Legal y la Revisora Fiscal, y te lo enviamos cuando esté firmado.</p>
       </div>
     </div>
   </section>
