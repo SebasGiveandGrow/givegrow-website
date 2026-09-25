@@ -1553,12 +1553,19 @@ try {
       try { t = readFileSync(f, "utf8"); } catch { continue; }
       const lineas = t.split("\n");
       lineas.forEach((l, i) => {
-        if (/#4ade80\b|rgba?\(\s*74\s*,\s*222\s*,\s*128/i.test(l) || /var\(--gn\)/.test(l)) neon.push(f + ":" + (i + 1));
+        /* `--gn:` también: el nombre se retiró, y una DEFINICIÓN que sobrevive
+           no rompe nada visible por sí sola, pero deja a una marca sin su color.
+           Pasó el 25 sep 2026: Mira Mi Casa seguía definiendo `--gn` en azul,
+           nadie lo leía, y sus acentos salieron en el verde de Give&Grow. Se
+           ignoran las líneas de comentario que solo cuentan la historia. */
+        const comentario = /^\s*(\/\*|\*|\/\/)/.test(l) || /^\s*[A-Za-zÁÉÍÓÚáéíóúñ«`(—-]/.test(l) && !/[:;{}]/.test(l);
+        if (/#4ade80\b|rgba?\(\s*74\s*,\s*222\s*,\s*128/i.test(l) || /var\(--gn\)/.test(l) ||
+            (!comentario && /--gn\s*:/.test(l))) neon.push(f + ":" + (i + 1));
       });
     }
     if (neon.length) {
-      err("check #19 · volvió el verde neón (green-400 de Tailwind o var(--gn)) en " + neon.join(", ") +
-          " · usa var(--brote), el verde claro de marca para superficies oscuras");
+      err("check #19 · volvió el verde neón (green-400 de Tailwind) o el token retirado --gn en " + neon.join(", ") +
+          " · usa --brote: el color claro de marca sobre superficies oscuras, que cada marca redefine");
     } else {
       ok("sin rastro del verde neón en " + fuentes.length + " archivos");
     }
@@ -1613,7 +1620,7 @@ try {
       "ev-fecha": "la fecha del acta: hereda de .ev-cab (versalitas, tenue)",
       "mmc-perdido": "aviso de caso perdido: lleva .mu y estilo en línea"
     };
-    const TECHO_CSS_MUERTO = 9;
+    const TECHO_CSS_MUERTO = 0;   // 9 → 0 el 25 sep 2026: limpieza del CSS muerto
 
     const html = readFileSync("index.html", "utf8");
     const js = readFileSync("app.js", "utf8");
