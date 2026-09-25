@@ -1579,6 +1579,105 @@ try {
     }
   }
 
+  /* ------------------------------------------------------------------
+     CHECK #20 · toda clase que pinta el sitio tiene quien la lea
+
+     Nació de un fallo del 25 sep 2026, a mitad de la Fase 3 del plan «Vidrio y
+     papel»: un script renombró la clase de la foto de Rastrea en index.html y
+     falló ANTES de escribir styles.css. La página se quedaba sin estilos de
+     foto —ni posición, ni recorte, ni velo— y este gate pasaba en verde, porque
+     nada miraba si una clase del HTML tenía alguna regla. Se encontró midiendo.
+
+     Dos direcciones, con dos rigores distintos:
+
+     · ESTRICTA: una clase usada en index.html o escrita por app.js tiene que
+       aparecer en algún selector de CSS o en una consulta del JS
+       (querySelector, closest, classList.contains…). Si no, casi siempre es un
+       nombre que cambió de un lado y no del otro. Los prefijos que el JS
+       completa («track-badge-» + estado) valen si alguna regla empieza por
+       ellos. Y hay clases que son SOLO NOMBRE —heredan su estilo del
+       contenedor—: van en la lista de abajo, cada una con su motivo, para que
+       añadir una sea una decisión y no un descuido.
+
+     · TRINQUETE: una regla de CSS cuya clase no usa nadie es CSS muerto. Aquí
+       hay excepciones legítimas —las secciones ocultas a propósito de
+       index.html (CLAUDE.md pide no borrarlas), las páginas que genera
+       worker.js con /styles.css, las clases que pone Leaflet— y por eso no es
+       estricta: el número solo puede bajar.
+     ------------------------------------------------------------------ */
+  {
+    const SOLO_NOMBRE = {
+      "ally-note": "línea de estado de los formularios: hereda del contenedor, el JS escribe el texto",
+      "cv-paso": "cada paso del flujo del caso: se muestra y oculta por id",
+      "eco-item": "una cifra de la tira del ecosistema: la maqueta la pone .eco-row",
+      "ev-fecha": "la fecha del acta: hereda de .ev-cab (versalitas, tenue)",
+      "mmc-perdido": "aviso de caso perdido: lleva .mu y estilo en línea"
+    };
+    const TECHO_CSS_MUERTO = 9;
+
+    const html = readFileSync("index.html", "utf8");
+    const js = readFileSync("app.js", "utf8");
+    let worker = "";
+    try { worker = readFileSync("worker.js", "utf8"); } catch { /* sin worker, sin páginas generadas */ }
+    const hoja = readFileSync("styles.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    const htmlVivo = html.replace(/<!--[\s\S]*?-->/g, "");
+
+    const clasesDe = (t) => {
+      const out = new Set();
+      for (const m of t.matchAll(/class=\\?["']([^"']*)["']/g)) {
+        for (const c of m[1].split(/\s+/)) if (/^[a-zA-Z][\w-]*$/.test(c)) out.add(c);
+      }
+      return out;
+    };
+    const usadas = new Set([...clasesDe(htmlVivo), ...clasesDe(js)]);
+    for (const m of js.matchAll(/classList\.(?:add|toggle|remove)\(\s*["']([\w-]+)/g)) usadas.add(m[1]);
+
+    const estilosHtml = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join("\n");
+    const selectores = [...(hoja + "\n" + estilosHtml).matchAll(/([^{}]+)\{/g)].map((m) => m[1]).join(" ");
+    const conRegla = new Set([...selectores.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]));
+    const ganchos = new Set();
+    for (const re of [/(?:querySelector(?:All)?|closest|matches)\(\s*["'][^"']*?\.([\w-]+)/g,
+                      /classList\.contains\(\s*["']([\w-]+)/g,
+                      /getElementsByClassName\(\s*["']([\w-]+)/g]) {
+      for (const m of js.matchAll(re)) ganchos.add(m[1]);
+    }
+    const esPrefijoConRegla = (c) => c.endsWith("-") && [...conRegla].some((r) => r.startsWith(c));
+
+    const huerfanas = [...usadas].filter((c) =>
+      !conRegla.has(c) && !ganchos.has(c) && !esPrefijoConRegla(c) && !(c in SOLO_NOMBRE)).sort();
+    if (huerfanas.length) {
+      err("check #20 · " + huerfanas.length + " clase(s) en el HTML o el JS sin NINGUNA regla ni gancho: " +
+          huerfanas.join(", ") + " · casi siempre es un nombre que cambió en un lado y no en el otro. " +
+          "Si de verdad solo es un nombre, añádela a SOLO_NOMBRE en validate.mjs con su motivo.");
+    } else {
+      ok("las " + usadas.size + " clases del sitio tienen regla, gancho o motivo escrito");
+    }
+    const sobranMotivos = Object.keys(SOLO_NOMBRE).filter((c) => !usadas.has(c) || conRegla.has(c));
+    if (sobranMotivos.length) {
+      err("check #20 · SOLO_NOMBRE lista clase(s) que ya no hacen falta ahí (no se usan, o ya tienen regla): " +
+          sobranMotivos.join(", "));
+    }
+
+    /* El trinquete. «Usada» aquí es más amplio: cuenta el HTML entero con sus
+       secciones ocultas, worker.js, y los prefijos que el JS completa. */
+    const todoTexto = html + "\n" + js + "\n" + worker;
+    const usadasAmplio = new Set([...clasesDe(html), ...clasesDe(js), ...clasesDe(worker), ...usadas]);
+    const prefijosJS = [...todoTexto.matchAll(/["'\s]([a-z][\w-]*-)["']\s*\+/g)].map((m) => m[1]);
+    const muertas = [...conRegla].filter((c) =>
+      !usadasAmplio.has(c) && !ganchos.has(c) && !c.startsWith("leaflet-") &&
+      !prefijosJS.some((p) => c.startsWith(p)) &&
+      !new RegExp("[\"'`\\s.]" + c.replace(/[-]/g, "\\-") + "[\"'`\\s]").test(todoTexto)).sort();
+    if (muertas.length > TECHO_CSS_MUERTO) {
+      err("check #20 · CSS muerto: " + muertas.length + " clase(s) con regla que nadie usa, y el techo es " +
+          TECHO_CSS_MUERTO + ". Las nuevas: revisa si renombraste una clase en el HTML y dejaste la regla vieja. " +
+          "Lista: " + muertas.join(", "));
+    } else if (muertas.length < TECHO_CSS_MUERTO) {
+      ok("CSS muerto: " + muertas.length + " — BAJÓ del techo " + TECHO_CSS_MUERTO + ". Actualiza TECHO_CSS_MUERTO a " + muertas.length);
+    } else {
+      ok("CSS muerto: " + muertas.length + ", en el techo (" + muertas.join(", ") + ")");
+    }
+  }
+
   for (const p of pantallas) {
     if (!p.js) { err("check #15: no encontré la plantilla JS de " + p.nombre); continue; }
     const texto = p.html + "\n" + p.js;

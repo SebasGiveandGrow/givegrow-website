@@ -1874,7 +1874,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 
   /* Fuera del papel: nada de esto sirve impreso y todo estorba. */
   nav, .nav, footer, #journey-nav, .alma-fab, #alma-panel, .wa,
-  .skip-link, .drawer, .theme, #lang, .pay-tabs, .track-noguide,
+  .skip-link, .drawer, .theme-toggle, .lang, .pay-tabs, .track-noguide,
   form, button, input, select, textarea { display:none !important; }
 
   /* Los enlaces con pinta de botón NO se esconden: «Consultar en el RUES» es
