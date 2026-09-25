@@ -1120,7 +1120,7 @@ try {
    cuentan, igual que ya contaban los de `--g`, `--acc` y `--amber` que
    estan a su lado. Subir el trinquete es lo correcto aqui: el numero no
    empeoro por una fuga, sino por un token mas. */
-const TECHO_COLORES = 72;
+const TECHO_COLORES = 68;   // 72 → 68 el 25 sep 2026: la Fase 2 quitó los rellenos rgba de los pasos de la portada
 const TECHO_FUENTES = 21;
 /* Y LOS DEL WORKER, que este trinquete nunca habia contado. Sus siete bloques
    <style> son 30.000 caracteres de CSS —el panel, el triaje, terreno, ruta,

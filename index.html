@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=dc76d281">
+<link rel="stylesheet" href="/styles.css?v=b8c5d943">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=5e7a53c5" defer></script>
+<script src="/app.js?v=a1382918" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -242,7 +242,7 @@
         <div class="hf-step hf-hub rv d1">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19"/></svg></div>
           <h3 data-i18n="home.hub.s2t">El HUB conecta</h3>
-          <p data-i18n="home.hub.s2p">Verificamos y canalizamos a una fundación de base real.</p>
+          <p data-i18n="home.hub.s2p">Visitamos a cada fundación en territorio y firmamos convenio antes de canalizar tu aporte.</p>
         </div>
         <div class="hf-arrow" aria-hidden="true">&rarr;</div>
         <div class="hf-step rv d2">
@@ -251,17 +251,20 @@
           <p data-i18n="home.hub.s3p">El apoyo llega a la comunidad, con acta y registro.</p>
         </div>
         <div class="hf-arrow hf-back" aria-hidden="true">&larr;</div>
-        <div class="hf-step hf-ev rv d3">
+        <div class="hf-step rv d3">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
           <h3 data-i18n="home.hub.s4t">Recibes la evidencia</h3>
-          <p data-i18n="home.hub.s4p">Foto, factura y trazabilidad de vuelta. No promesas.</p>
+          <p data-i18n="home.hub.s4p">Recibo, acta firmada y fotos de vuelta. No promesas.</p>
         </div>
       </div>
       <div class="hub-vuelta rv d3">
         <h3 data-i18n="home.vuelta.t">Y algo te vuelve</h3>
         <p data-i18n="home.vuelta.p">Una jornada en territorio, tu beneficio tributario y la evidencia de en qué se convirtió tu aporte. Es la parte que casi nadie ofrece.</p>
       </div>
-      <a class="btn btn-g rv d3" href="#hub" data-i18n="home.hub.btn">Conoce cómo funciona el HUB</a>
+      <div class="hub-acciones rv d3">
+        <a class="btn btn-g" href="#hub" data-i18n="home.hub.btn">Conoce cómo funciona el HUB</a>
+        <a class="btn btn-w" href="#rastrea" data-i18n="traz.btn">Rastrea tu donación</a>
+      </div>
       <!-- OCULTO por decisión de Sebas: contadores de donaciones/entregas en vivo. Se retoma cuando haya más datos. JS (updateLiveStats) es null-safe; claves i18n (live.*) se conservan.
       <div class="live-stats rv d3" id="live-stats" aria-live="polite">
         <div class="live-stat">
@@ -319,29 +322,19 @@
       </div>
     </div>
   </section>
-  <section class="band">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="traz.ey">Cómo funciona</span>
-      <h2 class="h-sec rv" data-i18n="traz.t">Trazabilidad completa, de principio a fin.</h2>
-      <div class="steps rv d1" style="margin-top:30px;max-width:760px">
-        <div class="step"><div><h3 data-i18n="traz.1.t" class="h-comp4">Visita de contexto</h3><p data-i18n="traz.1.p">Conocemos a la fundación y la comunidad en terreno.</p></div></div>
-        <div class="step"><div><h3 data-i18n="traz.2.t" class="h-comp4">Onboarding</h3><p data-i18n="traz.2.p">Perfil digital y convenio firmado entre las partes.</p></div></div>
-        <div class="step"><div><h3 data-i18n="traz.3.t" class="h-comp4">Gestión de necesidades</h3><p data-i18n="traz.3.p">Conectamos la necesidad concreta con el donante adecuado.</p></div></div>
-        <div class="step"><div><h3 data-i18n="traz.4.t" class="h-comp4">Entrega con acta</h3><p data-i18n="traz.4.p">Cada entrega queda documentada y verificada.</p></div></div>
-        <div class="step"><div><h3 data-i18n="traz.5.t" class="h-comp4">Reporte fotográfico</h3><p data-i18n="traz.5.p">Cuando la fundación aliada entrega, su acta firmada y sus fotos quedan en el rastreo de tu aporte.</p></div></div>
-      </div>
-      <a class="btn btn-w rv d2" href="#rastrea" data-i18n="traz.btn" style="margin-top:26px">Rastrea tu donación</a>
-    </div>
-  </section>
+  <!-- «Trazabilidad completa» (traz.*) salió de la portada en la Fase 2 del plan
+       «Vidrio y papel»: era un segundo «Cómo funciona». Lo que aportaba —visita en
+       terreno y convenio firmado— vive ahora en el paso 2 de arriba, y el proceso
+       completo con cada fundación sigue en #fundaciones. Las claves se conservan. -->
   <section class="cream">
     <div class="wrap">
       <span class="ey rv" data-i18n="vis.ey">Hacia dónde vamos</span>
       <h2 class="h-sec rv" data-i18n="vis.t">Que dar sea transparente, medible y mutuo.</h2>
       <p class="lead rv d1" data-i18n="vis.p">Nuestra meta es construir la red de impacto social más confiable de Colombia: que cada aporte transforme una vida con trazabilidad total y que, al hacerlo, también haga crecer a quien da. Empezamos en Medellín; el horizonte es Latinoamérica.</p>
-      <div class="grid g3 rv d2" style="margin-top:30px">
-        <div class="card"><h3 data-i18n="vis.1.t">Impacto verificable</h3><p data-i18n="vis.1.p">Que cada donación tenga destino, evidencia y un resultado medible, no promesas.</p></div>
-        <div class="card"><h3 data-i18n="vis.2.t">Fundaciones más fuertes</h3><p data-i18n="vis.2.p">Amplificar a quienes ya trabajan en campo, reduciendo costos y multiplicando su alcance.</p></div>
-        <div class="card"><h3 data-i18n="vis.3.t">Generosidad que crece</h3><p data-i18n="vis.3.p">Un modelo donde dar deja una huella real y, a la vez, beneficios para quien contribuye.</p></div>
+      <div class="grid g3 metas rv d2">
+        <div class="meta"><h3 data-i18n="vis.1.t">Impacto verificable</h3><p data-i18n="vis.1.p">Que cada donación tenga destino, evidencia y un resultado medible, no promesas.</p></div>
+        <div class="meta"><h3 data-i18n="vis.2.t">Fundaciones más fuertes</h3><p data-i18n="vis.2.p">Amplificar a quienes ya trabajan en campo, reduciendo costos y multiplicando su alcance.</p></div>
+        <div class="meta"><h3 data-i18n="vis.3.t">Generosidad que crece</h3><p data-i18n="vis.3.p">Un modelo donde dar deja una huella real y, a la vez, beneficios para quien contribuye.</p></div>
       </div>
       <p class="vis-lema rv d3" data-i18n="vis.lema">Dar para crecer, crecer para dar más.</p>
     </div>
