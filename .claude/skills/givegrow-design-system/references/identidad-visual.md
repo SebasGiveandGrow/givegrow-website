@@ -29,6 +29,22 @@ De Give&Grow mismo: el verde `#1F5C38` como raíz, el lema "Dar para crecer, cre
 - Ambos modos con contraste WCAG AA mínimo en todo texto. Verificar especialmente los acentos verdes sobre fondos oscuros.
 - Persistir preferencia del usuario; respetar `prefers-color-scheme` como default inicial.
 
+## Vidrio (glassmorphism con regla)
+
+Aprobado por Sebas el 25 sep 2026. Antes el skill lo prohibía; su palabra manda.
+
+**La regla: «Lo que se mira a través es vidrio. Lo que se firma es papel.»** El vidrio es una ventana al territorio: va sobre la fotografía de terreno o sobre el mapa de la red, y deja ver lo que hay detrás mientras sostiene un dato. Los documentos que alguien firma —acta de entrega, certificado de donación, registro de Transparencia— son papel: su valor está en ser sólidos.
+
+- **Solo sobre foto o mapa.** Sobre un color plano el desenfoque no tiene qué desenfocar y se ve como una caja gris: ese componente es papel. Única excepción: la barra de navegación, porque el contenido pasa por debajo.
+- **Un vidrio protagonista por pantalla.** Es el elemento firma de esa zona.
+- **Contraste medido sobre la zona más clara de la foto**, no sobre el papel: el medidor de siempre no ve la imagen. Si no llega a 4,5:1 (3:1 en texto grande), sube el tinte o el panel se mueve a la zona oscura.
+- **Dos respaldos obligatorios, opacos:** `@supports not (backdrop-filter…)` y `prefers-reduced-transparency: reduce` → `var(--ink-deep)`.
+- **Siempre con `-webkit-backdrop-filter`** (iOS 17 o anterior). El check #19 del gate lo exige.
+- **Nunca** en listas largas ni sobre texto corrido, ni con degradados decorativos fabricados para tener algo detrás, ni sobre fotos con rostros de menores identificables. Máximo dos capas con blur visibles a la vez.
+- **Sin sombra difusa**: lo que lo hace vidrio es el filo de luz de 1 px arriba.
+
+Tokens (en `styles.css`, `:root`): `--vidrio-tinta` (verde-tinta al 52 %), `--vidrio-blur` (18px), `--vidrio-filo`, `--vidrio-luz`, y `--brote` (#9CCBA9) para el texto claro de marca encima. Componente: `.vidrio`. Primer uso: la credencial del hero (`.hero-cred`), solo desde 1000 px. Plan de las piezas siguientes (Rastrea, calculadora de Donar, mapa, galería): artefacto «Vidrio y papel».
+
 ## Fotografía y medios
 
 - Solo medios con consentimiento documentado y fecha de consentimiento registrada. **Pendiente vigente al 18 sep 2026: la FECHA de NDF** (`consent.date` sigue en `null`). La foto ya no es pendiente: `consent.photos` es `true` y su galería está publicada.

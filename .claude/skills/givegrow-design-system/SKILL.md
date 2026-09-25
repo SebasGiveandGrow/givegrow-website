@@ -25,7 +25,8 @@ Trabaja como el director de diseño de una fundación institucional seria, no co
 - Verde institucional: `#1F5C38` (confirmado como theme-color en producción). Es el ancla de la paleta.
 - Antes de tocar CSS en una sesión nueva: verificar los tokens vigentes leyendo el CSS real del repo o del sitio en producción. Este documento da la dirección; el código vivo da el estado exacto.
 - La paleta debe leerse como institución financieramente seria con raíz en territorio colombiano: verdes profundos, neutros cálidos de papel/documento, tinta oscura. Acentos con moderación.
-- PROHIBIDO: gradientes llamativos multicolor, neones, glassmorphism, el terracota `#D97757` (tell de diseño-IA), acid green sobre negro.
+- PROHIBIDO: gradientes llamativos multicolor, neones, el terracota `#D97757` (tell de diseño-IA), acid green sobre negro — incluido el green-400 de Tailwind que fue `--gn` hasta el 25 sep 2026; el verde claro sobre oscuro es `--brote` y el check #19 del gate vigila que el viejo no vuelva.
+- **Glassmorphism: SÍ, con regla** (pedido expreso de Sebas, 25 sep 2026; antes figuraba como prohibido). «Lo que se mira a través es vidrio. Lo que se firma es papel.» El vidrio va solo sobre fotografía o mapa; sobre color plano, papel. Detalle, tokens y componente en `references/identidad-visual.md`, sección «Vidrio».
 
 **Tipografía**
 - Display institucional: **Unbounded** (aprobada por Sebas para la dirección institucional). Usar con moderación y peso intencional — titulares, cifras clave, momentos de identidad.

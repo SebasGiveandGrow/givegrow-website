@@ -1532,6 +1532,53 @@ try {
     }
   }
 
+  /* ------------------------------------------------------------------
+     CHECK #19 · el verde neón no vuelve, y ningún vidrio va sin prefijo
+
+     El 25 sep 2026 se retiró `--gn`, que era el green-400 de Tailwind: el
+     acento ácido que la guía de marca identifica como firma de diseño hecho por
+     IA. Lo reemplaza `--brote`. Un verde así vuelve solo, copiando un color de
+     un ejemplo o de otra página, y nadie lo nota hasta que alguien lo mira de
+     noche: por eso el gate lo busca en todo lo que pinta el sitio.
+
+     Y cada `backdrop-filter` va con su `-webkit-`. Sin él, en iPhone con iOS 17
+     o anterior el vidrio no desenfoca y el texto queda sobre la foto a secas.
+     Antes de este check había CUATRO desenfoques y tres iban sin prefijo.
+     ------------------------------------------------------------------ */
+  {
+    const fuentes = ["styles.css", "app.js", "index.html", "worker.js", "documentos.js"];
+    const neon = [];
+    for (const f of fuentes) {
+      let t = "";
+      try { t = readFileSync(f, "utf8"); } catch { continue; }
+      const lineas = t.split("\n");
+      lineas.forEach((l, i) => {
+        if (/#4ade80\b|rgba?\(\s*74\s*,\s*222\s*,\s*128/i.test(l) || /var\(--gn\)/.test(l)) neon.push(f + ":" + (i + 1));
+      });
+    }
+    if (neon.length) {
+      err("check #19 · volvió el verde neón (green-400 de Tailwind o var(--gn)) en " + neon.join(", ") +
+          " · usa var(--brote), el verde claro de marca para superficies oscuras");
+    } else {
+      ok("sin rastro del verde neón en " + fuentes.length + " archivos");
+    }
+
+    const hoja = readFileSync("styles.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    const sinPrefijo = [];
+    for (const m of hoja.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+      const cuerpo = m[2];
+      if (/(^|[^-])backdrop-filter\s*:/.test(cuerpo) && !/-webkit-backdrop-filter\s*:/.test(cuerpo)) {
+        sinPrefijo.push(m[1].trim().split("\n").pop().slice(0, 60));
+      }
+    }
+    if (sinPrefijo.length) {
+      err("check #19 · " + sinPrefijo.length + " regla(s) con backdrop-filter y sin -webkit-backdrop-filter: " +
+          sinPrefijo.join(" | ") + " · en iOS 17 o anterior ese vidrio no desenfoca");
+    } else {
+      ok("todo backdrop-filter lleva su -webkit-");
+    }
+  }
+
   for (const p of pantallas) {
     if (!p.js) { err("check #15: no encontré la plantilla JS de " + p.nombre); continue; }
     const texto = p.html + "\n" + p.js;

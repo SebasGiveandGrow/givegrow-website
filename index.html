@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=24cd1392">
+<link rel="stylesheet" href="/styles.css?v=dc76d281">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=ccdc00a4" defer></script>
+<script src="/app.js?v=5e7a53c5" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -204,6 +204,15 @@
         <a class="btn btn-w" href="#hub" data-i18n="hero.cta.hub">Conocer el HUB SOCIAL</a>
       </div>
       <a class="hero-tour rv d3" href="#origen"><span data-i18n="hero.tour">¿Primera vez aquí? Haz el recorrido completo</span> &rarr;</a>
+      <aside class="hero-cred vidrio rv d3" aria-labelledby="hero-cred-t">
+        <span class="ey" data-i18n="hero.cred.ey">Entidad verificable</span>
+        <b id="hero-cred-t" data-i18n="hero.cred.t">Fundación Give&amp;Grow International</b>
+        <dl>
+          <dt data-i18n="hero.cred.nat.k">Naturaleza</dt><dd data-i18n="hero.cred.nat.v">ESAL · Régimen Tributario Especial</dd>
+          <dt data-i18n="hero.cred.vig.k">Vigilada por</dt><dd data-i18n="hero.cred.vig.v">Gobernación de Antioquia</dd>
+        </dl>
+        <a href="#transparencia" data-i18n="hero.cred.link">Ver registro y gobernanza →</a>
+      </aside>
     </div>
   </section>
 
@@ -3149,7 +3158,7 @@
   <div class="wrap">
     <div class="foot-grid">
       <div>
-        <div class="nlogo" style="color:#fff;margin-bottom:10px">Give<em style="color:var(--gn)">&</em>Grow</div>
+        <div class="nlogo" style="color:#fff;margin-bottom:10px">Give<em style="color:var(--brote)">&</em>Grow</div>
         <p data-i18n="foot.tagline">Dar para crecer, crecer para dar más.</p>
         <!-- El aval de Mira Mi Casa. Va donde se ve, no en letra chica: una
              marca nueva pidiendo fotos de tu casa en zona de desastre se parece
