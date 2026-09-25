@@ -10811,7 +10811,7 @@ cargar();
 
 function paginaCarnet(c) {
   const estado = c.vigente ? "Vigente" : "No vigente";
-  const color = c.vigente ? "#4ade80" : "#E8A24C";
+  const color = c.vigente ? "#9CCBA9" : "#E8A24C";   // --brote: el verde claro de marca sobre --ink-deep
   return `<!doctype html>
 <html lang="es"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
