@@ -14,7 +14,7 @@
   /* VIDRIO — solo sobre fotografía o mapa. La regla completa está en el skill
      de marca: «lo que se mira a través es vidrio, lo que se firma es papel».
      Sobre un color plano el desenfoque no tiene qué desenfocar y se ve como una
-     caja gris; eso es lo que le pasaba a `.path`. */
+     caja gris. */
   --vidrio-tinta:rgba(14,33,24,.52);
   --vidrio-blur:18px;
   --vidrio-filo:rgba(255,255,255,.18);
@@ -109,13 +109,11 @@
   --ink:#191813;--ink-soft:#47443B;
   --acc:#1F5C38;--acc-2:#2E7D4F;
   --nav-bg:rgba(243,239,230,.90);
-  /* EL VELO DEL HERO Y EL ICONO DE `.path`, que estaban escritos sueltos.
+  /* EL VELO DEL HERO, que estaba escrito suelto.
      Se vuelven tokens porque Mira Mi Casa los necesita en otro color: sobre
-     su paleta azul, un velo verde tinta y un icono verde claro se leen como
-     un despiste. Van en tripleta RGB y no en hex porque el degradado les
-     pone alfa. */
+     su paleta azul, un velo verde tinta se lee como un despiste. Va en
+     tripleta RGB y no en hex porque el degradado le pone alfa. */
   --hero-velo:14,33,24;
-  --ic-path:#cfeede;
   --skel-a:#ece9e2;--skel-b:#f7f5ef;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -151,7 +149,6 @@ h3,h4{font-family:"Inter",sans-serif;line-height:var(--lh-tight);letter-spacing:
    reglas escritas para `h3` que antes no los veían. Medido: los tres peldaños
    de Medición viven dentro de un `.os-row` y se llevaban su tamaño; el titular
    de la brigada, dentro de un `.prose` y se llevaba sus márgenes. */
-em.fr{font-family:"Fraunces",serif;font-style:italic;font-weight:400}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;cursor:pointer;border:none;background:none}
 img{display:block;max-width:100%;object-fit:cover}
@@ -246,8 +243,6 @@ section{padding:72px 0}
 .figure-xl .u{font-size:.42em;font-weight:600;letter-spacing:-.01em}
 .figure-lab{display:block;font-size:var(--fs-eyebrow);font-weight:800;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--mu);margin-top:8px}
 
-/* Momento editorial Fraunces — cita/lead destacado, uso puntual */
-.pull{font-family:"Fraunces",serif;font-style:italic;font-weight:400;font-size:var(--fs-h3);line-height:var(--lh-snug);color:var(--ink-soft);max-width:32ch}
 
 /* reveal */
 .rv{opacity:0;transform:translateY(22px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
@@ -263,12 +258,6 @@ section{padding:72px 0}
 .hero h1{font-size:var(--fs-h1);line-height:var(--lh-tight);letter-spacing:var(--tr-display);max-width:14ch;margin-bottom:22px}
 .hero h1 em{color:var(--brote)}
 .hero-lead{font-family:var(--font-display);font-weight:300;font-size:clamp(15px,1.5vw,17px);line-height:1.55;letter-spacing:-.01em;max-width:44ch;color:var(--on-dark-2);margin-bottom:34px}
-.paths{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:760px}
-.path{background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);border-radius:var(--rl);padding:22px;text-align:left;transition:transform .2s var(--ease),background .2s}
-.path:hover{transform:translateY(-4px);background:var(--on-dark-fill)}
-.path-ic{width:46px;height:46px;border-radius:12px;background:var(--on-dark-fill);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
-.path :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:18px;margin-bottom:4px}
-.path p{font-size:var(--fs-14);color:var(--on-dark-3)}
 
 /* ===== STATS ===== */
 .stats{display:grid;grid-template-columns:1.35fr 1fr 1fr 1fr;gap:16px;text-align:left}
@@ -300,8 +289,6 @@ section{padding:72px 0}
 .tier-ben li::before{content:"";position:absolute;left:2px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--bg);border:2px solid var(--acc)}
 .cta-note{font-size:var(--fs-13);color:var(--mu);max-width:480px;margin:22px auto 0;line-height:1.5}
 .card .ic{width:46px;height:46px;border-radius:12px;background:var(--gl);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
-.partner-logo{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border:1px solid var(--bd);border-radius:14px;background:var(--logo-bg);margin-bottom:14px}
-.partner-logo img{display:block;width:auto;height:auto;max-width:200px;max-height:88px}
 .card :is(h3:not(:where(.h-comp4)),:where(.h-comp3)){font-size:19px;margin-bottom:8px}
 .card p{font-size:var(--fs-15);color:var(--mu)}
 .card .eco-row{justify-content:flex-start;margin-left:0;margin-right:0}
@@ -320,13 +307,6 @@ section{padding:72px 0}
 
 /* banded section */
 .band{background:var(--ink-deep);color:var(--on-dark)}
-/* `.path` llevaba blur(6px) y se le quitó. OJO: no la usa ninguna página —ni
-   index.html ni app.js la escriben—, así que el desenfoque no pintaba nada. Se
-   quita igual para que ninguna regla de esta hoja contradiga la del vidrio
-   (solo sobre foto o mapa). Borrar `.path`/`.paths` enteras queda pendiente
-   como limpieza de CSS muerto. Los pasos de «Entras una vez» son `.hf-step`:
-   relleno translúcido SIN desenfoque, que sobre un color plano es un color
-   sólido y ya es papel nocturno. */
 /* --mu es un gris para PAPEL. Dentro de .band quedaba a 2,78:1 sobre el
    verde-tinta: las cinco explicaciones de «Trazabilidad completa» no se leían.
    Sobre oscuro, el texto de apoyo tiene su propio paso de la escala. */
@@ -701,7 +681,7 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
   .nav-mobile a:hover{background:var(--gl)}
   /* con el menú abierto, ocultar flotantes para que no tapen los ítems */
   body.menu-open .wa, body.menu-open .alma-fab{display:none!important}
-  .paths,.gallery,#blog-grid{grid-template-columns:1fr}
+  .gallery,#blog-grid{grid-template-columns:1fr}
   .g2,.g3{grid-template-columns:repeat(2,1fr)}
   .stats{grid-template-columns:repeat(2,1fr)}
   .foot-grid{grid-template-columns:1fr}
@@ -711,7 +691,6 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 
 /* ---- SVG line icons ---- */
 .ic-svg{width:30px;height:30px;display:block}
-.path-ic .ic-svg{width:24px;height:24px;color:var(--ic-path)}
 .card .ic .ic-svg{width:24px;height:24px;color:var(--acc)}
 /* ---- chips de ecosistema (usados en #hub y #gratitud) ---- */
 .eco-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
@@ -750,7 +729,7 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 @media (prefers-reduced-motion:reduce){#page-origen .step{animation:none!important}}
 
 .ic-svg path,.ic-svg circle,.ic-svg rect,.ic-svg line,.ic-svg polyline,.ic-svg polygon{stroke-dasharray:1;stroke-dashoffset:0}
-.card:hover .ic-svg *,.path:hover .ic-svg *{animation:draw .8s var(--ease) both}
+.card:hover .ic-svg *{animation:draw .8s var(--ease) both}
 @keyframes draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
 .routes{display:grid;grid-auto-flow:column;grid-auto-columns:min(80vw,320px);gap:20px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:6px 4px 20px;scrollbar-width:thin;scrollbar-color:var(--bd) transparent}
 .routes>.card{scroll-snap-align:start;position:relative}
@@ -809,7 +788,7 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 /* Mira Mi Casa tiene su propio azul y su propia portada: la credencial es de
    Give&Grow y no se mezcla con esa marca. */
 html[data-marca="mmc"] .hero-cred{display:none}
-@media (prefers-reduced-motion:reduce){.card:hover .ic-svg *,.path:hover .ic-svg *{animation:none}.stats .stat:hover{transform:none}}
+@media (prefers-reduced-motion:reduce){.card:hover .ic-svg *{animation:none}.stats .stat:hover{transform:none}}
 .btn-nav{background:var(--g);color:var(--on-dark);padding:9px 20px;border-radius:999px;font-weight:700;font-size:var(--fs-14);white-space:nowrap;transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
 .btn-nav:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(31,92,56,.35)}
 @media (max-width:600px){.btn-nav{padding:8px 14px;font-size:var(--fs-13)}}
@@ -936,15 +915,13 @@ html.theming .band, html.theming section, html.theming .nav-mobile{
 .tt-sun{left:6px;color:#E8A33D;opacity:1}
 .tt-moon{right:6px;color:#6FB08D;opacity:.35}
 .tt-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--on-dark);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .3s cubic-bezier(.4,0,.2,1)}
-.tt-auto{display:none}
 .theme-toggle[data-mode="auto"] .tt-knob::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--acc)}
 /* estado oscuro: perilla a la derecha, luna activa */
 html[data-theme="dark"] .tt-track{background:rgba(255,255,255,.12)}
 html[data-theme="dark"] .tt-knob{transform:translateX(22px)}
 html[data-theme="dark"] .tt-sun{opacity:.35}
 html[data-theme="dark"] .tt-moon{opacity:1}
-/* modo auto: muestra la etiqueta "auto" y un borde de acento sutil */
-.theme-toggle[data-mode="auto"] .tt-auto{opacity:1}
+/* modo auto: un borde de acento sutil (y el punto en la perilla, arriba) */
 .theme-toggle[data-mode="auto"] .tt-track{border-color:var(--acc)}
 
 /* ---------- Foto-banner editorial (pausa fotográfica) ---------- */
@@ -1260,9 +1237,10 @@ html[data-theme="dark"] .track-noguide{color:var(--brote)}
    esta documentada, y esta insignia es la unica de las tres que usa tokens: las
    otras dos (`en_distribucion` y `entregada`) se escribieron con hex claros y
    por eso sobrevivieron al modo noche.
-   Medido en la pagina real, modo oscuro: #0C1710 sobre #1D2F24. `--gn` es el
-   token que el sistema define para esto — verde que se aclara lo justo sobre
-   superficie oscura — y sirve para las dos marcas. */
+   Medido en la pagina real, modo oscuro: #0C1710 sobre #1D2F24. `--brote` es
+   el token que el sistema define para esto —el color claro de marca sobre
+   superficie oscura— y cada marca lo redefine: verde en Give&Grow, azul en
+   Mira Mi Casa. */
 html[data-theme="dark"] .track-badge-recibida{color:var(--brote)}
 .track-badge-en_distribucion{background:#FEF3C7;color:#92400E}
 .track-badge-entregada{background:#D1FAE5;color:#065F46}
@@ -1780,11 +1758,6 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .ev-vacio{font-size:var(--fs-15);line-height:1.6;color:var(--ink-soft);max-width:60ch;margin-top:22px;
   padding-left:14px;border-left:3px solid var(--bd)}
 
-/* Segundo contacto de acopio. El número manda y quién lo atiende va detrás, en
-   voz baja: dos líneas de igual peso harían dudar a cuál escribir. */
-.brig-quien{font-family:"Inter",sans-serif;font-weight:600;font-size:var(--fs-13);
-  letter-spacing:.02em;color:var(--mu);text-transform:none}
-
 /* Formulario de ofrecimiento en especie: vive dentro del bloque de acopios, así
    que se separa con una regla en vez de con una tarjeta. */
 .of-t{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h4);
@@ -1905,21 +1878,21 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
      `rgba(255,255,255,…)` a nivel de contenedor — no de ir arreglando páginas
      una por una, que es como se quedan tres sueltas. */
   .band, .band *, .calc, .calc *, .hero, .hero *, .home-hub, .home-hub *,
-  .foto-banner, .foto-banner *, .path, .path *, .stats, .stats *,
+  .foto-banner, .foto-banner *, .stats, .stats *,
   .brig-aviso, .brig-aviso *, .live-stat, .live-stat *, .carnet, .carnet *,
   .pay-now-t, .pay-now-p, .pay-now-msg, .pay-now-rec, .gal-cap, .track-ev-ic {
     color:#111 !important; background:transparent !important;
     text-shadow:none !important; box-shadow:none !important;
   }
   .band .lead, .band .mu, .calc .mu, .hero-lead, .home-hub .lead,
-  .path p, .live-note { color:#333 !important; }
+  .live-note { color:#333 !important; }
   /* Las flechas del diagrama de doble vía no dicen nada sin su contexto visual. */
   .hf-arrow { color:#555 !important }
 
   /* Tarjetas → reglas finas. Una hoja institucional no lleva cajas redondeadas:
      es la misma conversión tarjetas→reglas que pide el plan v5, aplicada aquí
      porque en papel una tarjeta es un marco que no aporta nada. */
-  .card, .rec-ledger, .transp-caja, .grid > div {
+  .card, .rec-ledger, .grid > div {
     border:0 !important; border-radius:0 !important; box-shadow:none !important;
     background:transparent !important; padding:0 !important;
   }
@@ -1991,7 +1964,10 @@ html[data-marca="mmc"]{
      emergencia sin ser la autoridad. */
   --acc:#0D3B66;  --acc-2:#12507F;
   --g:#0D3B66;    --gm:#12507F;   --gl:#E7EFF6;  --gd:#082742;
-  --gn:#8FBFE0;
+  /* Era `--gn`. En la Fase 1 el sitio pasó a leer `--brote` y esta línea se quedó
+     definiendo un token que ya nadie leía: Mira Mi Casa pintó unas horas en el
+     verde de Give&Grow —el «Mi» del logo, una ceja, un enlace—. */
+  --brote:#8FBFE0;
   --ink-deep:#0B2135;
 
   --bg:#FBFAF7;   --surface:#FFFFFF;  --surface-2:#F4F6F8;  --cream:#F4F6F8;
@@ -2013,9 +1989,8 @@ html[data-marca="mmc"]{
   --skel-a:#EEF1F4; --skel-b:#F8FAFB;
 
   /* El velo del hero en el azul de documento, no en el verde de la
-     fundación; y el icono de `.path` en el azul claro que ya usa el pie. */
+     fundación. */
   --hero-velo:11,33,53;
-  --ic-path:#8FBFE0;
 }
 
 
@@ -2029,7 +2004,7 @@ html[data-marca="mmc"][data-theme="dark"]{
      negro sin dejar de sostener tinta blanca. */
   --acc:#6FA8D0;  --acc-2:#8FBFE0;
   --g:#12507F;    --gm:#1A6398;   --gl:#122C41;  --gd:#061019;
-  --gn:#8FBFE0;
+  --brote:#8FBFE0;
   --ink-deep:#0B2135;
 
   --bg:#07131F;   --surface:#0F2436;  --surface-2:#0B1B29;  --cream:#0B1B29;
@@ -2040,11 +2015,6 @@ html[data-marca="mmc"][data-theme="dark"]{
   --nav-bg:rgba(7,19,31,.94);
   --skel-a:#0F2436; --skel-b:#152C40;
 
-  /* El ámbar NO se aclara de noche: sobre fondo oscuro ya rinde de sobra con su
-     tinta, y moverlo rompería que «urgente» se vea igual en los dos modos. El
-     azul de campo sí sube, porque el de día se hunde contra el fondo. */
-  --pri-urg:#F2B705;  --pri-urg-ink:#082742;
-  --pri-prog:#2E6C9E; --pri-prog-ink:#FFFFFF;
 }
 
 /* ── La nav: esto no es la fundación ──────────────────────────────────────
@@ -2214,18 +2184,6 @@ section[tabindex="-1"]:focus{ outline:none }
 .mmc-mio-nota{ margin:12px 0 0; font-size:var(--fs-11); line-height:1.4;
   color:var(--mu) }
 
-.mmc-pri{ display:flex; flex-direction:column; gap:5px;
-  padding:16px 18px; border-radius:3px; border:1.5px solid var(--bd);
-  background:var(--surface); color:var(--ink) }
-.mmc-pri .k{ font-size:var(--fs-11); letter-spacing:.13em; text-transform:uppercase;
-  font-weight:700; opacity:.86 }
-.mmc-pri .t{ font-family:var(--font-display); font-size:var(--fs-17);
-  font-weight:700; letter-spacing:-.01em; line-height:1.2 }
-.mmc-pri.urgente{ background:var(--pri-urg); border-color:var(--pri-urg);
-  color:var(--pri-urg-ink) }
-.mmc-pri.programada{ background:var(--pri-prog); border-color:var(--pri-prog);
-  color:var(--pri-prog-ink) }
-.mmc-pri.inevaluable{ background:transparent; border-style:dashed }
 
 /* ── La portada partida ───────────────────────────────────────────────────
    La foto al lado del texto y no debajo de él. Nace de una medición: con el
