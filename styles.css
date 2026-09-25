@@ -59,7 +59,11 @@
   --logo-bg:#fff;
   --fab-shadow:0 1px 2px rgba(14,33,24,.16), 0 6px 18px rgba(14,33,24,.14);
   --fab-shadow-hover:0 2px 4px rgba(14,33,24,.20), 0 12px 28px rgba(14,33,24,.22);
-  --r:12px;--rl:13px;
+  /* UN SOLO RADIO. --r (12) y --rl (13) eran el mismo radio con un píxel de
+     deriva, y la portada además pintaba 14 y 16 a mano: cuatro esquinas que no
+     se distinguen a simple vista y que juntas se leen como descuido. --r queda
+     como alias para no reescribir sus usos. */
+  --rl:13px;--r:var(--rl);
   --ease:cubic-bezier(.16,1,.3,1);
   --shadow:0 2px 8px rgba(0,0,0,.06);
   --shadow-lg:0 10px 30px rgba(0,0,0,.10);
@@ -345,6 +349,14 @@ section{padding:72px 0}
    sin que se notara: la primera que lo pusiera se llevaba el enlace invisible. */
 .band .card-link{color:var(--brote)}
 .cream{background:var(--surface-2)}
+/* «Hacia dónde vamos» como texto de informe y no como tres tarjetas más: son
+   metas, no cosas que se eligen. La portada tenía cuatro bloques de tarjetas
+   seguidos; las tarjetas se quedan donde hay algo que abrir (fundaciones y
+   caminos) y aquí manda una regla fina arriba de cada columna. */
+.metas{margin-top:34px;gap:0 36px}
+.meta{border-top:1px solid var(--bd);padding-top:16px}
+.meta h3{font-size:var(--fs-17);margin-bottom:6px}
+.meta p{font-size:var(--fs-15);color:var(--ink-soft);line-height:1.55}
 
 /* ===== CALCULATOR ===== */
 .calc{background:var(--ink-deep);color:var(--on-dark);border-radius:16px;padding:32px;max-width:560px;margin:0 auto}
@@ -746,7 +758,7 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
   backdrop-filter:blur(var(--vidrio-blur)) saturate(1.25);
   border:1px solid var(--vidrio-filo);
   box-shadow:inset 0 1px 0 var(--vidrio-luz);
-  border-radius:14px;color:var(--on-dark)}
+  border-radius:var(--rl);color:var(--on-dark)}
 /* Los dos respaldos son OPACOS y con un token que ya existía: quien pide
    «reducir transparencia» quiere justo eso, y un sexto token no estaba aprobado. */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
@@ -937,7 +949,7 @@ html[data-theme="dark"] .alma-fab:hover{background:var(--acc-2);border-color:var
 /* ---------- barra de recorrido (0 a 100) ---------- */
 /* El Recorrido — riel de progreso sutil de la guía de 12 paradas (v5) */
 .journey{margin-top:40px;border-top:1px solid var(--bd);padding:15px 0 2px;display:flex;flex-direction:column;gap:8px}
-.j-meta{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mu)}
+.j-meta{font-size:var(--fs-11);font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mu)}
 .j-meta b{color:var(--acc)}
 .j-track{display:flex;gap:4px}
 .j-seg{flex:1;height:2px;border-radius:2px;background:var(--bd);transition:background .35s var(--ease)}
@@ -1057,10 +1069,14 @@ main.page:focus{outline:none}
 .home-hub .h-sec{color:var(--on-dark);max-width:20ch}
 .home-hub .lead{color:var(--on-dark-2);max-width:60ch}
 .hub-flow{display:flex;align-items:stretch;gap:12px;margin:34px 0 30px;flex-wrap:wrap}
-.hf-step{flex:1;min-width:200px;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-fill);border-radius:16px;padding:22px 18px;transition:transform .25s,background .25s}
-.hf-step:hover{transform:translateY(-4px);background:var(--on-dark-fill-2)}
-.hf-hub{background:rgba(156,203,169,.12);border-color:rgba(156,203,169,.4)}
-.hf-ev{background:rgba(156,203,169,.08);border-color:rgba(156,203,169,.3)}
+/* LOS PASOS NO SON TARJETAS. Eran cuatro cajas que además subían 4px al pasar
+   el cursor —la señal de «esto se abre»— y no se abría nada. Lo que se cuenta
+   aquí es un recorrido, no un menú: van en columnas con una regla fina arriba,
+   y el paso del HUB conserva su énfasis en la regla, en --brote, que es lo que
+   el HUB pone en medio. Las tarjetas de la portada quedan para lo que se
+   elige: las fundaciones y los seis caminos. */
+.hf-step{flex:1;min-width:200px;border-top:1px solid var(--on-dark-line);padding:18px 4px 0}
+.hf-hub{border-top:2px solid var(--brote);padding-top:17px}
 .hf-ic{width:44px;height:44px;border-radius:12px;background:var(--on-dark-fill-2);display:flex;align-items:center;justify-content:center;margin-bottom:14px;color:var(--brote)}
 .hf-ic svg{width:24px;height:24px}
 .hf-step h3{font-size:var(--fs-16);font-weight:700;margin:0 0 6px;color:var(--on-dark)}
@@ -1069,9 +1085,14 @@ main.page:focus{outline:none}
 .hf-back{color:var(--on-dark-4)}
 .home-hub .btn-g{background:var(--brote);color:var(--gd);font-weight:700}
 .home-hub .btn-g:hover{background:var(--on-dark)}
+.hub-acciones{display:flex;flex-wrap:wrap;gap:12px}
 @media(max-width:860px){
   .hub-flow{flex-direction:column;gap:8px}
   .hf-arrow{transform:rotate(90deg);padding:2px 0}
+  /* La flecha de vuelta es «←» y al girarla con las demás quedaba «↑», o sea
+     apuntando al paso anterior: en una columna se leía como «vuelve atrás». La
+     evidencia te llega a ti, que en el celular es hacia abajo. */
+  .hf-back{transform:rotate(-90deg)}
   .hf-step{min-width:0}
 }
 
@@ -2182,7 +2203,7 @@ section[tabindex="-1"]:focus{ outline:none }
    arriba es el camino de ida, y esto es lo que regresa. Si fuera del mismo
    color se leería como un quinto paso. */
 .hub-vuelta{margin-top:26px;padding:16px 20px;border-left:3px solid var(--amber);
-  background:var(--amberl);border-radius:0 12px 12px 0;max-width:720px}
+  background:var(--amberl);border-radius:0 var(--rl) var(--rl) 0;max-width:720px}
 .hub-vuelta h3{margin:0 0 4px;font-size:var(--fs-16);font-weight:700;color:var(--ink)}
 .hub-vuelta p{margin:0;font-size:var(--fs-15);line-height:1.5;color:var(--ink-soft)}
 
@@ -2191,7 +2212,7 @@ section[tabindex="-1"]:focus{ outline:none }
 @media(max-width:860px){.home-funds{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.home-funds{grid-template-columns:1fr}}
 .hfund{position:relative;display:flex;flex-direction:column;gap:5px;padding:20px 20px 22px;
-  background:var(--surface);border:1px solid var(--bd);border-radius:14px;
+  background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);
   text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
 .hfund:hover{border-color:var(--g);transform:translateY(-2px)}
 .hfund b{font-size:var(--fs-16);line-height:1.3}
