@@ -1080,7 +1080,11 @@ main.page:focus{outline:none}
 .hf-back{color:var(--on-dark-4)}
 .home-hub .btn-g{background:var(--brote);color:var(--gd);font-weight:700}
 .home-hub .btn-g:hover{background:var(--on-dark)}
-.hub-acciones{display:flex;flex-wrap:wrap;gap:12px}
+.hub-acciones{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+/* El segundo botón en contorno: dos rellenos claros uno al lado del otro
+   compiten sobre el verde y ninguno manda. */
+.home-hub .btn-w{background:transparent;color:var(--on-dark);border-color:var(--on-dark-4)}
+.home-hub .btn-w:hover{border-color:var(--on-dark);color:var(--on-dark)}
 @media(max-width:860px){
   .hub-flow{flex-direction:column;gap:8px}
   .hf-arrow{transform:rotate(90deg);padding:2px 0}
@@ -2235,13 +2239,20 @@ section[tabindex="-1"]:focus{ outline:none }
    botón, y quien no lo sabe tiene el otro justo al lado. */
 .hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
 
-/* La vía de vuelta. Va en ámbar y no en verde a propósito: todo el diagrama de
-   arriba es el camino de ida, y esto es lo que regresa. Si fuera del mismo
-   color se leería como un quinto paso. */
-.hub-vuelta{margin-top:26px;padding:16px 20px;border-left:3px solid var(--amber);
-  background:var(--amberl);border-radius:0 var(--rl) var(--rl) 0;max-width:720px}
-.hub-vuelta h3{margin:0 0 4px;font-size:var(--fs-16);font-weight:700;color:var(--ink)}
-.hub-vuelta p{margin:0;font-size:var(--fs-15);line-height:1.5;color:var(--ink-soft)}
+/* LA VÍA DE VUELTA, SIN CAJA. Era una tarjeta crema con una barra ámbar a la
+   izquierda, pegada sobre el verde: el patrón de «tarjeta con barra de acento»
+   que la auditoría visual marcó, y además se leía como un recorte pegado.
+   La barra existía para que esto no se leyera como un quinto paso. Desde la
+   Fase 2 los pasos son columnas con icono y regla fina, así que un bloque de
+   ancho completo, con la flecha de vuelta, ya se distingue solo. No hay un
+   ámbar que se lea sobre este verde en los dos temas (de día --amber es un
+   ámbar oscuro, pensado para papel), así que la flecha va en --brote.
+   El aire con los botones faltaba desde la Fase 2: los metí en .hub-acciones
+   y el margen que tenía el botón suelto no pasó al contenedor. */
+.hub-vuelta{margin-top:30px;padding-top:18px;border-top:1px solid var(--on-dark-line);max-width:720px}
+.hub-vuelta h3{margin:0 0 6px;font-size:var(--fs-16);font-weight:700;color:var(--on-dark);display:flex;align-items:baseline;gap:10px}
+.hub-vuelta h3::before{content:"↩";color:var(--brote);font-weight:700}
+.hub-vuelta p{margin:0;font-size:var(--fs-15);line-height:1.55;color:var(--on-dark-2)}
 
 /* Las fundaciones en la portada. */
 .home-funds{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
