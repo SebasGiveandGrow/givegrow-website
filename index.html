@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=33bf5210">
+<link rel="stylesheet" href="/styles.css?v=36084e70">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -1803,20 +1803,16 @@
   <section class="cream">
     <div class="wrap">
       <h2 class="h-comp3 rv" data-i18n="transp.reg.t" style="margin-bottom:20px">Registro oficial</h2>
-      <div class="grid g2 rv d1">
-        <div class="card">
-          <p><strong data-i18n="transp.reg.razon">Razón social</strong><br>Fundación Give&Grow International</p>
-          <p style="margin-top:14px"><strong data-i18n="transp.reg.nit">NIT</strong><br>901.948.930-2</p>
-          <p style="margin-top:14px"><strong data-i18n="transp.reg.nat">Naturaleza jurídica</strong><br><span data-i18n="transp.reg.nat.v">ESAL - Régimen Tributario Especial (Código 04, DIAN)</span></p>
-          <p style="margin-top:14px"><strong data-i18n="transp.reg.insc">Inscripción Cámara de Comercio</strong><br>21-022354-22</p>
-        </div>
-        <div class="card">
-          <p><strong data-i18n="transp.reg.const">Constitución</strong><br><span data-i18n="transp.reg.const.v">Documento privado del 11 de abril de 2025, registrado el 19 de mayo de 2025 (No. 1889, Libro I).</span></p>
-          <p style="margin-top:14px"><strong data-i18n="transp.reg.dom">Domicilio principal</strong><br>Carrera 82 A # 9 A Sur 28, Medellín</p>
-          <p style="margin-top:14px"><strong data-i18n="transp.reg.dur">Duración</strong><br><span data-i18n="transp.reg.dur.v">Indefinida</span></p>
-          <p style="margin-top:14px"><strong data-i18n="transp.reg.niif">Grupo NIIF</strong><br><span data-i18n="transp.reg.niif.v">Grupo II</span></p>
-        </div>
-      </div>
+      <dl class="libro rv d1">
+          <div class="libro-fila"><dt data-i18n="transp.reg.razon">Razón social</dt><dd>Fundación Give&Grow International</dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.reg.nit">NIT</dt><dd class="transp-fila">901.948.930-2</dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.reg.nat">Naturaleza jurídica</dt><dd><span data-i18n="transp.reg.nat.v">ESAL - Régimen Tributario Especial (Código 04, DIAN)</span></dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.reg.insc">Inscripción Cámara de Comercio</dt><dd class="transp-fila">21-022354-22</dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.reg.const">Constitución</dt><dd><span data-i18n="transp.reg.const.v">Documento privado del 11 de abril de 2025, registrado el 19 de mayo de 2025 (No. 1889, Libro I).</span></dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.reg.dom">Domicilio principal</dt><dd>Carrera 82 A # 9 A Sur 28, Medellín</dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.reg.dur">Duración</dt><dd><span data-i18n="transp.reg.dur.v">Indefinida</span></dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.reg.niif">Grupo NIIF</dt><dd><span data-i18n="transp.reg.niif.v">Grupo II</span></dd></div>
+        </dl>
     </div>
   </section>
 
@@ -1824,12 +1820,12 @@
     <div class="wrap">
       <h2 class="h-comp3 rv" data-i18n="transp.gov.t" style="margin-bottom:14px">Gobernanza y control</h2>
       <p class="lead rv d1" data-i18n="transp.gov.p">La Fundación no puede distribuir excedentes: la totalidad de su patrimonio se destina a su objeto social.</p>
-      <div class="grid g2 rv d2" style="margin-top:26px">
-        <div class="card"><p><strong data-i18n="transp.gov.rep">Representante legal y fundador</strong><br>Juan Sebastian Navarro Osorio</p></div>
-        <div class="card"><p><strong data-i18n="transp.gov.rf">Revisora Fiscal</strong><br>Manuela Londoño Arboleda - T.P. 244894-T</p></div>
-        <div class="card"><p><strong data-i18n="transp.gov.over">Inspección, vigilancia y control</strong><br><span data-i18n="transp.gov.over.v">Gobernación de Antioquia</span></p></div>
-        <div class="card"><p><strong data-i18n="transp.gov.surplus">Destinación de excedentes</strong><br><span data-i18n="transp.gov.surplus.v">Prohibida su distribución. 100% al objeto social.</span></p></div>
-      </div>
+      <dl class="libro rv d2" style="margin-top:26px">
+          <div class="libro-fila"><dt data-i18n="transp.gov.rep">Representante legal y fundador</dt><dd>Juan Sebastian Navarro Osorio</dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.gov.rf">Revisora Fiscal</dt><dd class="transp-fila">Manuela Londoño Arboleda - T.P. 244894-T</dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.gov.over">Inspección, vigilancia y control</dt><dd><span data-i18n="transp.gov.over.v">Gobernación de Antioquia</span></dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.gov.surplus">Destinación de excedentes</dt><dd><span data-i18n="transp.gov.surplus.v">Prohibida su distribución. 100% al objeto social.</span></dd></div>
+        </dl>
     </div>
   </section>
 

@@ -349,6 +349,24 @@ section{padding:72px 0}
    sin que se notara: la primera que lo pusiera se llevaba el enlace invisible. */
 .band .card-link{color:var(--brote)}
 .cream{background:var(--surface-2)}
+/* ===== EL LIBRO: lo que se firma es papel =====
+   Transparencia listaba su registro en tarjetas con etiqueta y valor en
+   párrafos, que se leían como campos de formulario, y la gobernanza en
+   tarjetas translúcidas sobre verde. La hoja de impresión ya las convertía en
+   reglas finas («en papel una tarjeta es un marco que no aporta nada»): la
+   pantalla adopta la misma decisión. Una regla fuerte arriba, como el
+   encabezado de un libro contable, y una fina entre asientos. Dos columnas de
+   asientos en ancho, una en angosto. */
+.libro{margin:0;display:grid;grid-template-columns:1fr 1fr;column-gap:40px;border-top:1.5px solid var(--ink)}
+.libro-fila{display:grid;grid-template-columns:minmax(140px,40%) 1fr;gap:4px 18px;padding:13px 0;border-bottom:1px solid var(--bd)}
+.libro dt{font-size:var(--fs-13);font-weight:600;color:var(--mu);line-height:1.45}
+.libro dd{margin:0;font-size:var(--fs-15);color:var(--ink);line-height:1.5}
+.band .libro{border-top-color:var(--on-dark-4)}
+.band .libro-fila{border-bottom-color:var(--on-dark-line)}
+.band .libro dt{color:var(--on-dark-3)}
+.band .libro dd{color:var(--on-dark)}
+@media(max-width:760px){.libro{grid-template-columns:1fr}}
+@media(max-width:460px){.libro-fila{grid-template-columns:1fr;gap:2px}}
 /* «Hacia dónde vamos» como texto de informe y no como tres tarjetas más: son
    metas, no cosas que se eligen. La portada tenía cuatro bloques de tarjetas
    seguidos; las tarjetas se quedan donde hay algo que abrir (fundaciones y
