@@ -1685,6 +1685,55 @@ try {
     }
   }
 
+  /* ------------------------------------------------------------------
+     CHECK #21 · cada script en línea tiene su hash en la CSP
+
+     La CSP de `_headers` no permite 'unsafe-inline': cada <script> en línea de
+     index.html entra solo si su sha256 exacto está en script-src. Cambiar UNA
+     letra del script cambia el hash, y el navegador lo bloquea sin decírselo a
+     nadie —solo a la consola de quien la abra—.
+
+     Pasó el 16 sep 2026 (#446): se editó el script que fija el tema antes del
+     primer pintado —para darle a Mira Mi Casa su color de barra nocturno— y el
+     hash no se actualizó. Nueve días bloqueado en producción: el tema lo ponía
+     app.js después, así que de noche la página cargaba un instante en claro, y
+     Mira Mi Casa nunca tuvo su color de barra. Se encontró por casualidad,
+     leyendo la consola en otra verificación.
+
+     Y al revés: un hash en la CSP que ya no corresponde a ningún script es un
+     permiso huérfano. No rompe nada hoy, pero autoriza código que no existe.
+     ------------------------------------------------------------------ */
+  {
+    const { createHash } = await import("node:crypto");
+    const html = readFileSync("index.html", "utf8");
+    const cab = readFileSync("_headers", "utf8");
+    const linea = cab.split("\n").find((l) => /Content-Security-Policy:/i.test(l)) || "";
+    const scriptSrc = (linea.match(/script-src([^;]*)/) || [, ""])[1];
+    const permitidos = new Set([...scriptSrc.matchAll(/'sha256-([^']+)'/g)].map((m) => m[1]));
+    const ejecutables = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)]
+      .filter((m) => !/type=["']?application\/(ld\+)?json/i.test(m[1]));
+    const hashes = ejecutables.map((m) => ({
+      h: createHash("sha256").update(m[2], "utf8").digest("base64"),
+      inicio: m[2].trim().slice(0, 50).replace(/\s+/g, " ")
+    }));
+    const bloqueados = hashes.filter((x) => !permitidos.has(x.h));
+    if (!linea) {
+      err("check #21: no encontré la línea Content-Security-Policy en _headers");
+    } else if (bloqueados.length) {
+      err("check #21 · " + bloqueados.length + " script(s) en línea de index.html que la CSP BLOQUEA (su hash no está en script-src): " +
+          bloqueados.map((x) => "«" + x.inicio + "…» → 'sha256-" + x.h + "'").join(" · ") +
+          " · pon ese hash en _headers; el navegador no avisa a nadie");
+    } else {
+      ok("los " + hashes.length + " scripts en línea de index.html tienen su hash en la CSP");
+    }
+    const vivos = new Set(hashes.map((x) => x.h));
+    const huerfanos = [...permitidos].filter((h) => !vivos.has(h));
+    if (huerfanos.length) {
+      err("check #21 · la CSP autoriza " + huerfanos.length + " hash(es) que no son de ningún script de index.html: " +
+          huerfanos.map((h) => h.slice(0, 12) + "…").join(", ") + " · es un permiso para código que ya no existe; quítalo");
+    }
+  }
+
   for (const p of pantallas) {
     if (!p.js) { err("check #15: no encontré la plantilla JS de " + p.nombre); continue; }
     const texto = p.html + "\n" + p.js;
