@@ -1734,6 +1734,155 @@ try {
     }
   }
 
+  /* ------------------------------------------------------------------
+     CHECK #22 · cada aliado que se carga a mano, bien cargado
+
+     Fundaciones, empresas y comercios entran copiando un objeto en
+     data/partners.json o data/gratitud.json. Son archivos PÚBLICOS: se sirven
+     tal cual, y el sitio los pinta sin mirar. Un error de carga no rompe el
+     build; aparece en la ficha, delante de todo el mundo —o peor, publica algo
+     que no debía—. Esto lo mira antes, con un mensaje que dice qué arreglar y
+     dónde.
+
+     Nació el 26 sep 2026, la semana en que entraban varias aliadas a la vez.
+     Lo que comprueba:
+
+     · identidad: id único con forma de slug, tipo conocido, nombre;
+     · los dos idiomas: todo texto {es,en} con un lado lleno tiene el otro;
+     · logo y fotos que EXISTEN (una ruta mala responde 200 con el HTML del
+       sitio, así que en pantalla es un icono roto sin error en la consola);
+     · FOTOS SOLO CON PERMISO: una gallery[] sin consent.photos===true no se
+       pinta, pero los archivos están en /img y se sirven igual a quien tenga
+       la URL. Así que ni siquiera se sube;
+     · fecha de consentimiento con forma AAAA-MM-DD (o null, pendiente);
+     · NINGÚN DATO PERSONAL: ni quién autorizó, ni correos, ni teléfonos, ni
+       documentos. El _doc lo exige y un archivo público lo publica;
+     · coordenadas en Colombia, y las de fundaciones con 3 decimales como
+       mucho (unos 110 m): a nivel de zona, nunca la casa. Los comercios sí
+       llevan su dirección, que es pública;
+     · unidades de impacto con costo positivo y sus cuatro textos;
+     · modalidades de empresa y roles de fundación conocidos, y un
+       `respaldadaPor` que apunte a alguien que existe;
+     · comercios: estado activa|borrador, categoría existente y, si está
+       activo, un beneficio escrito en los dos idiomas.
+     ------------------------------------------------------------------ */
+  {
+    const fallos = [];
+    const f = (donde, que) => fallos.push(donde + " · " + que);
+    const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    const PERSONALES = /^(grantedBy|email|correo|e-?mail|telefono|teléfono|phone|celular|whatsapp|cedula|cédula|documento|nit_persona)$/i;
+    const existe = (ruta) => !!ruta && existsSync(String(ruta).replace(/^\//, ""));
+    const decimales = (n) => { const t = String(n); return t.includes(".") ? t.split(".")[1].length : 0; };
+
+    /* Recorre un objeto buscando textos bilingües a medias y claves personales. */
+    const revisar = (obj, camino, donde) => {
+      if (Array.isArray(obj)) { obj.forEach((v, i) => revisar(v, camino + "[" + i + "]", donde)); return; }
+      if (!obj || typeof obj !== "object") return;
+      for (const k of Object.keys(obj)) if (PERSONALES.test(k)) f(donde, "«" + camino + "." + k + "» es un dato personal en un archivo público: quítalo (el rastro de Ley 1581 va en la tabla privada `consentimientos`)");
+      if ("es" in obj && "en" in obj && typeof obj.es === "string" && typeof obj.en === "string") {
+        const es = obj.es.trim(), en = obj.en.trim();
+        if (!!es !== !!en) f(donde, "«" + camino + "» tiene " + (es ? "español y no inglés" : "inglés y no español") + ": todo texto nace en los dos idiomas");
+        return;
+      }
+      for (const [k, v] of Object.entries(obj)) if (k !== "_doc") revisar(v, camino ? camino + "." + k : k, donde);
+    };
+    const revisarConsent = (c, donde) => {
+      if (!c) return;
+      if (c.date != null && !/^\d{4}-\d{2}-\d{2}$/.test(String(c.date))) f(donde, "consent.date «" + c.date + "» no es AAAA-MM-DD (o null si está pendiente)");
+    };
+    const revisarGaleria = (x, donde) => {
+      const gal = x.gallery || [];
+      if (gal.length && x.type !== "hub" && !(x.consent && x.consent.photos === true))
+        f(donde, gal.length + " foto(s) en gallery[] sin consent.photos === true: no se pintan, pero los archivos de /img se sirven igual a quien tenga la URL. No se suben sin permiso");
+      gal.forEach((g, i) => {
+        if (!existe(g.src)) f(donde, "gallery[" + i + "] «" + g.src + "» no existe");
+        const alt = g.alt || {};
+        /* Solo si faltan LOS DOS: el alt a medias ya lo reporta la revisión de idiomas. */
+        if (!String(alt.es || "").trim() && !String(alt.en || "").trim()) f(donde, "gallery[" + i + "] no tiene alt: es lo que lee un lector de pantalla, en español e inglés");
+      });
+    };
+
+    let pj = null, gj = null;
+    try { pj = JSON.parse(readFileSync("data/partners.json", "utf8")); } catch { f("data/partners.json", "no es JSON válido"); }
+    try { gj = JSON.parse(readFileSync("data/gratitud.json", "utf8")); } catch { f("data/gratitud.json", "no es JSON válido"); }
+
+    if (pj) {
+      const lista = pj.partners || [];
+      const ids = new Set();
+      for (const x of lista) {
+        const donde = "partners.json → " + (x.id || "(sin id)");
+        if (!x.id || !slug.test(x.id)) f(donde, "el id tiene que ser un slug: minúsculas, números y guiones (es la URL de la ficha)");
+        else if (ids.has(x.id)) f(donde, "id repetido: dos aliadas no pueden compartir URL");
+        ids.add(x.id);
+        if (!["foundation", "company", "hub"].includes(x.type)) f(donde, "type «" + x.type + "» no existe (foundation | company | hub)");
+        if (!String(x.name || "").trim()) f(donde, "falta el nombre");
+        revisar(x, "", donde);
+        revisarConsent(x.consent, donde);
+        revisarGaleria(x, donde);
+        if (x.logo && !existe(x.logo)) f(donde, "el logo «" + x.logo + "» no existe");
+        const lat = x.lat != null ? x.lat : x.coords && x.coords.lat;
+        const lng = x.lng != null ? x.lng : x.coords && x.coords.lng;
+        if (lat != null || lng != null) {
+          if (typeof lat !== "number" || typeof lng !== "number" || lat < -4.3 || lat > 13.5 || lng < -82 || lng > -66)
+            f(donde, "coordenadas fuera de Colombia o no numéricas (" + lat + ", " + lng + ")");
+          /* Solo fundaciones: el HUB es nuestro y su dirección es pública
+             (Transparencia), y una empresa puede llevar la suya. */
+          else if (x.type === "foundation" && (decimales(lat) > 3 || decimales(lng) > 3))
+            f(donde, "coordenadas con más de 3 decimales (" + lat + ", " + lng + "): eso ubica un edificio. Una fundación va a nivel de zona o barrio");
+        }
+        const uids = new Set();
+        (x.impactUnits || []).forEach((u, i) => {
+          if (!u.id || uids.has(u.id)) f(donde, "impactUnits[" + i + "] sin id o con id repetido");
+          uids.add(u.id);
+          if (!Number.isInteger(u.cop) || u.cop <= 0) f(donde, "impactUnits[" + i + "] necesita un costo `cop` entero y positivo");
+          for (const k of ["es", "esPl", "en", "enPl"]) if (!String(u[k] || "").trim()) f(donde, "impactUnits[" + i + "] le falta «" + k + "» (singular y plural en los dos idiomas)");
+        });
+        if (x.type === "company") {
+          const malas = (x.modalidad || []).filter((m) => !["padrinazgo", "journey", "alianza", "gratitud"].includes(m));
+          if (malas.length) f(donde, "modalidad desconocida: " + malas.join(", ") + " (padrinazgo | journey | alianza | gratitud)");
+        }
+        if (x.rol) {
+          const malos = [].concat(x.rol).filter((r) => !["recibe", "aporta"].includes(r));
+          if (malos.length) f(donde, "rol desconocido: " + malos.join(", ") + " (recibe | aporta)");
+        }
+      }
+      for (const x of lista) if (x.respaldadaPor && !ids.has(x.respaldadaPor))
+        f("partners.json → " + x.id, "respaldadaPor «" + x.respaldadaPor + "» no es ninguna aliada");
+    }
+
+    if (gj) {
+      const cats = Object.keys(gj.categorias || {});
+      const ids = new Set();
+      for (const c of gj.comercios || []) {
+        const donde = "gratitud.json → " + (c.id || "(sin id)");
+        if (!c.id || !slug.test(c.id)) f(donde, "el id tiene que ser un slug (es la URL de la ficha)");
+        else if (ids.has(c.id)) f(donde, "id repetido");
+        ids.add(c.id);
+        if (!String(c.name || "").trim()) f(donde, "falta el nombre");
+        if (!["activa", "borrador"].includes(c.status)) f(donde, "status «" + c.status + "» no existe (activa | borrador)");
+        if (c.categoria && !cats.includes(c.categoria)) f(donde, "categoría «" + c.categoria + "» no está en `categorias` (" + cats.join(", ") + ")");
+        revisar(c, "", donde);
+        revisarConsent(c.consent, donde);
+        revisarGaleria(Object.assign({ type: "comercio" }, c), donde);
+        if (c.logo && !existe(c.logo)) f(donde, "el logo «" + c.logo + "» no existe");
+        if (c.status === "activa") {
+          const b = c.beneficio || {};
+          if (!String(b.es || "").trim() || !String(b.en || "").trim()) f(donde, "está activo y no tiene el beneficio escrito en español e inglés: es lo único que su ficha promete");
+        }
+        if (c.coords && (typeof c.coords.lat !== "number" || typeof c.coords.lng !== "number" ||
+            c.coords.lat < -4.3 || c.coords.lat > 13.5 || c.coords.lng < -82 || c.coords.lng > -66))
+          f(donde, "coordenadas fuera de Colombia o no numéricas");
+      }
+    }
+
+    if (fallos.length) {
+      err("check #22 · " + fallos.length + " problema(s) en los datos de aliados:\n        " + fallos.join("\n        "));
+    } else {
+      const n = (pj ? (pj.partners || []).length : 0) + (gj ? (gj.comercios || []).length : 0);
+      ok("los " + n + " aliados de partners.json y gratitud.json están bien cargados");
+    }
+  }
+
   for (const p of pantallas) {
     if (!p.js) { err("check #15: no encontré la plantilla JS de " + p.nombre); continue; }
     const texto = p.html + "\n" + p.js;
