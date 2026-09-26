@@ -828,13 +828,76 @@ html[data-marca="mmc"] .hero-cred{display:none}
 .emp-recip{font-size:var(--fs-13);color:var(--ink-soft);line-height:1.35}
 .emp-recip i{font-style:normal;font-weight:700;color:var(--acc);margin-right:4px}
 html[data-theme="dark"] .emp-mod{background:rgba(224,150,50,.14);color:#e6a44e;border-color:rgba(224,150,50,.35)}
-.ficha-head{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:18px}
-.ficha-logo{width:110px;height:110px;object-fit:contain;padding:10px;box-sizing:border-box;border-radius:18px;border:1px solid var(--bd);background:var(--logo-bg)}
-.ficha-name{font-size:clamp(26px,4vw,40px);margin:0 0 8px}
+/* ===== LA FICHA COMO REGISTRO (fundaciones y comercios) =====
+   Ver el comentario de `fichaDatos` en app.js. Encabezado alineado a una
+   rejilla —logo | texto—, franja de datos con regla fuerte (papel, como
+   Transparencia), y cuerpo en dos columnas con la pieza firma en la lateral. */
+.ficha-volver{margin-top:0}
+.ficha-head{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:26px;margin-top:22px}
+.ficha-head.sin-logo{grid-template-columns:minmax(0,1fr)}
+.ficha-logo{width:104px;height:104px;object-fit:contain;padding:12px;box-sizing:border-box;border-radius:var(--rl);border:1px solid var(--bd);background:var(--logo-bg)}
+.ficha-titulo .ey{display:block;margin-bottom:10px}
+.ficha-name{font-size:clamp(30px,4.4vw,50px);line-height:1.05;margin:0}
 /* descripción propia de la fundación, bajo el nombre */
-.ficha-tagline{font-size:var(--fs-17);line-height:1.45;color:var(--ink-soft);margin:0 0 12px;max-width:54ch}
-.ficha-impact{border-left:4px solid var(--g)}
-.ficha-cta-btn{display:inline-block;margin-top:14px;background:var(--g);color:var(--on-dark);padding:12px 26px;border-radius:999px;font-weight:700}
+.ficha-tagline{font-size:var(--fs-17);line-height:1.5;color:var(--ink-soft);margin:12px 0 0;max-width:54ch}
+@media(max-width:600px){.ficha-head{grid-template-columns:auto minmax(0,1fr);gap:16px}.ficha-logo{width:72px;height:72px;padding:8px}}
+
+.ficha-datos{margin:30px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  border-top:1.5px solid var(--ink);border-bottom:1px solid var(--bd)}
+.ficha-datos > div{padding:14px 20px 16px 0}
+.ficha-datos > div + div{padding-left:20px;border-left:1px solid var(--bd)}
+.ficha-datos dt{font-size:var(--fs-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin-bottom:5px}
+.ficha-datos dd{margin:0;font-size:var(--fs-15);color:var(--ink);line-height:1.45}
+.ficha-mapa{display:inline-block;margin-left:6px;color:var(--acc);font-weight:600;white-space:nowrap}
+.ficha-mapa:hover{text-decoration:underline}
+/* En angosto los datos pasan a una columna: la regla lateral sobra y se
+   cambia por una fina entre filas. */
+@media(max-width:600px){
+  .ficha-datos{grid-template-columns:1fr}
+  .ficha-datos > div, .ficha-datos > div + div{padding:12px 0;border-left:0}
+  .ficha-datos > div + div{border-top:1px solid var(--bd)}
+}
+
+.ficha-cuerpo{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:56px;align-items:start;margin-top:34px}
+.ficha-cuerpo.solo{grid-template-columns:minmax(0,560px)}
+.ficha-aside{position:sticky;top:96px;display:grid;gap:16px}
+@media(max-width:960px){
+  .ficha-cuerpo{grid-template-columns:minmax(0,1fr);gap:34px}
+  .ficha-aside{position:static}
+  /* En un comercio el cupón ES la razón de la página: en angosto va primero. */
+  .ficha-cuerpo.es-comercio .ficha-aside{order:-1}
+}
+.ficha-about{font-size:var(--fs-17);line-height:1.65;color:var(--ink);max-width:62ch;margin:0}
+.ficha-texto{font-size:var(--fs-16);line-height:1.6;color:var(--ink-soft);max-width:62ch;margin:0}
+.ficha-sec{font-family:"Inter",sans-serif;font-size:var(--fs-12);font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--acc);margin:38px 0 14px}
+.ficha-main > .sello:first-child{margin-top:0}
+.ficha-vacio{max-width:62ch;color:var(--mu);font-size:var(--fs-15);line-height:1.55;margin:0}
+.ficha-prog{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 32px}
+.fprog{display:block;border-top:1px solid var(--bd);padding:16px 0 18px;color:inherit;text-decoration:none}
+.fprog h3{font-size:var(--fs-16);margin:0 0 6px;color:var(--ink)}
+.fprog p{font-size:var(--fs-15);line-height:1.55;color:var(--ink-soft);margin:0}
+/* El logo de un programa es su marca, no una foto: va en una placa a su
+   medida y no a todo el ancho. A todo el ancho eran planchas negras, y como no
+   todos los programas tienen logo, las filas quedaban desparejas. */
+.fprog .prog-logo{display:inline-flex;width:auto;height:52px;margin:0 0 12px;padding:8px 14px}
+.fprog .prog-logo img{max-width:140px}
+.fprog-link:hover h3{color:var(--acc)}
+.ficha-enlaces{display:flex;flex-wrap:wrap;gap:10px 22px;margin:34px 0 0;padding-top:18px;border-top:1px solid var(--bd);font-size:var(--fs-14);font-weight:700}
+.ficha-enlaces a, .ficha-enlaces button{color:var(--acc);text-decoration:none}
+.ficha-enlaces a:hover, .ficha-enlaces button:hover{text-decoration:underline}
+.ficha-aside > .ficha-enlaces{margin-top:4px}
+
+/* La lateral de una fundación: lo que logra tu aporte. Es un objeto —tiene
+   controles—, así que aquí sí va como tarjeta. */
+.ficha-apoyo{background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:22px 22px 20px}
+.ficha-apoyo .ey{display:block;margin-bottom:8px}
+.ficha-apoyo h2{font-family:"Inter",sans-serif;font-size:var(--fs-h4);line-height:1.25;margin:0}
+.ficha-apoyo .ficha-cta-btn{display:block;text-align:center}
+.ficha-apoyo-nota{font-size:var(--fs-13);line-height:1.5;color:var(--mu);margin:12px 0 0}
+.ficha-apoyo-plano{background:transparent;border:0;padding:4px 2px 0}
+.ficha-apoyo-plano .ficha-apoyo-nota{margin:0 0 4px}
+.ficha-cta-btn{display:inline-block;margin-top:16px;background:var(--g);color:var(--on-dark);padding:12px 26px;border-radius:999px;font-weight:700}
 .cta-box{position:relative;overflow:hidden}
 .cta-box>*{position:relative;z-index:1}
 .cta-box::before{content:"";position:absolute;inset:-40%;z-index:0;background:radial-gradient(42% 55% at 28% 28%,rgba(31,92,56,.08),transparent 62%),radial-gradient(34% 48% at 74% 68%,rgba(180,105,14,.05),transparent 62%);pointer-events:none}
@@ -850,7 +913,6 @@ html[data-theme="dark"] .emp-mod{background:rgba(224,150,50,.14);color:#e6a44e;b
 .gal-strip .gal-item:focus-visible{outline:3px solid var(--gm);outline-offset:2px}
 .gal-strip .gal-item:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
 .gal-strip .gal-item img{width:100%;height:100%;object-fit:cover;display:block}
-.gal-empty{margin-top:14px;max-width:70ch}
 .gal-lb{border:none;border-radius:var(--rl);padding:0;background:transparent;max-width:min(960px,92vw);overflow:visible;margin:auto;width:fit-content;position:fixed;inset:0}
 .gal-lb::backdrop{background:rgba(14,33,24,.82);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .gal-lb-fig{margin:0;background:var(--surface);border-radius:var(--rl);overflow:hidden;box-shadow:var(--shadow-lg)}
@@ -867,10 +929,13 @@ html[data-theme="dark"] .emp-mod{background:rgba(224,150,50,.14);color:#e6a44e;b
   .gal-lb-prev{left:2px;top:auto;bottom:-56px;transform:none}
   .gal-lb-next{right:2px;top:auto;bottom:-56px;transform:none}
 }
-.ficha-share{background:none;border:none;cursor:pointer;font:inherit;padding:0;margin-left:18px}
+.ficha-share{background:none;border:none;cursor:pointer;font:inherit;padding:0}
 
-/* Frase de la fundación (profile.quote, llega con el cuestionario) */
-.ficha-quote{margin:26px 0 0;padding:4px 0 4px 22px;border-left:3px solid var(--g);font-family:"Fraunces",serif;font-size:21px;line-height:1.4;color:var(--ink);max-width:56ch}
+/* Frase de la fundación (profile.quote, llega con el cuestionario). Sin barra
+   de acento: la comilla grande colgada a la izquierda dice «esto es su voz». */
+.ficha-quote{position:relative;margin:30px 0 0;padding:0 0 0 34px;font-family:"Fraunces",serif;font-style:italic;
+  font-size:var(--fs-h4);line-height:1.45;color:var(--ink);max-width:52ch}
+.ficha-quote::before{content:"\201C";position:absolute;left:0;top:-.12em;font-size:2.4em;line-height:1;color:var(--acc);font-style:normal}
 
 /* ---------- Modo noche (tokens del handoff: #0F1613/#1A231D/#EFEDE6/#6FB08D) ----------
    Activado por data-theme="dark" en <html>. El modo por defecto es automático
@@ -1403,18 +1468,23 @@ html[data-theme="dark"] .grat-card-head h3 a:hover{color:var(--brote)}
 .grat-meta dt{font-size:var(--fs-12);font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mu)}
 .grat-meta dd{margin:0;font-size:var(--fs-14);color:var(--ink-soft);line-height:1.4}
 /* Cupón institucional de beneficio (ficha de comercio) — elemento firma */
-.benefit-coupon{position:relative;margin-top:26px;border:1.5px solid var(--bd);border-radius:16px;background:var(--surface);overflow:hidden}
-.benefit-coupon::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--g)}
-.bc-main{padding:28px 30px 22px 34px}
+/* EL CUPÓN, con troquel. Era una tarjeta con barra verde a la izquierda y un
+   titular de 30px en Unbounded: gritaba. Ahora es un vale: dos muescas en la
+   línea punteada que separa el beneficio de sus condiciones. */
+.benefit-coupon{position:relative;border:1.5px solid var(--bd);border-radius:var(--rl);background:var(--surface);overflow:hidden}
+.bc-main{padding:24px 24px 20px}
 .bc-eyebrow{display:block;font-size:var(--fs-12);font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--acc);margin-bottom:12px}
-.bc-benefit{font-family:var(--font-display,inherit);font-size:clamp(21px,3.4vw,30px);line-height:1.16;font-weight:700;color:var(--ink);margin:0}
+.bc-benefit{font-family:var(--font-display,inherit);font-size:var(--fs-h4);line-height:1.25;font-weight:600;color:var(--ink);margin:0}
 .bc-level{display:inline-flex;align-items:center;gap:8px;margin-top:18px;padding:7px 15px;border-radius:999px;background:var(--gl);color:var(--acc);font-size:var(--fs-13);font-weight:700}
 .bc-level::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
-.bc-perf{height:0;border-top:2px dashed var(--bd);margin:0 30px 0 34px}
-.bc-terms{margin:0;padding:22px 30px 26px 34px;display:grid;gap:16px}
+.bc-perf{position:relative;height:0;border-top:2px dashed var(--bd);margin:0 24px}
+.bc-perf::before,.bc-perf::after{content:"";position:absolute;top:-11px;width:20px;height:20px;border-radius:50%;
+  background:var(--bg);border:1.5px solid var(--bd)}
+.bc-perf::before{left:-36px}
+.bc-perf::after{right:-36px}
+.bc-terms{margin:0;padding:20px 24px 22px;display:grid;gap:14px}
 .bc-terms dt{font-size:var(--fs-12);font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mu);margin-bottom:4px}
 .bc-terms dd{margin:0;font-size:var(--fs-15);color:var(--ink-soft);line-height:1.5}
-.com-address{margin-top:14px;font-size:var(--fs-15);color:var(--mu)}
 .grat-empty{text-align:center;max-width:52ch;margin:26px auto 0;padding:32px;background:var(--cream);border:1px dashed var(--bd);border-radius:16px}
 .grat-empty p{color:var(--ink-soft);margin:0 0 18px}
 /* "La red ya forma" (#hub): el programa arriba, la fundación que lo ejecuta debajo */
@@ -1604,7 +1674,6 @@ html[data-theme="dark"] .grat-empty{background:rgba(255,255,255,.03)}
 html[data-theme="dark"] .grat-card-more{color:var(--brote)}
 .grat-card-link:hover .grat-card-more{text-decoration:underline}
 /* logo de comercio en la ficha: fondo claro (logos suelen ser oscuros) */
-.ficha-logo-light{background:var(--logo-bg);border:1px solid var(--bd);object-fit:contain;padding:6px}
 /* Mini-calculadora de impacto en ficha de fundación */
 .fimp-row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 12px}
 .fimp-q{padding:8px 16px;border-radius:999px;border:1.5px solid var(--bd);background:var(--surface);color:var(--ink-soft);font-size:var(--fs-14);font-weight:700;font-family:inherit;cursor:pointer}
