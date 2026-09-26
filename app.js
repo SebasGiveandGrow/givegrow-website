@@ -929,6 +929,15 @@ var I18N = {
     "emp.mod.journey":"Impact Journey",
     "emp.mod.alianza":"Alianza a medida",
     "emp.mod.gratitud":"Programa de Gratitud",
+    "emp.back":"Volver a Empresas",
+    "emp.tipo":"Empresa aliada",
+    "emp.k.sector":"Sector",
+    "emp.k.mod":"Cómo participa",
+    "emp.alianza.t":"La alianza",
+    "empf.cta.ey":"Empresas con propósito",
+    "empf.cta.t":"¿Tu empresa también quiere sumarse?",
+    "empf.cta.p":"Padrinazgo de Impacto, Impact Journey o una alianza a medida: todas con trazabilidad y beneficio tributario.",
+    "empf.cta.btn":"Aliar mi empresa",
     "emp.p1.t":"Padrinazgo de Impacto",
     "emp.p1.p":"Defines un presupuesto y, con la Calculadora de Impacto, lo traduces en unidades reales y verificables. Recibes certificado de donación y reporte de impacto con evidencia.",
     "emp.p2.t":"Impact Journey",
@@ -1997,6 +2006,15 @@ function applyRouteMeta(id){
     }
     return; /* renderComercio la aplica cuando cargan los datos */
   }
+  if (id.indexOf("empresa/")===0){
+    var eid = id.split("/")[1];
+    if (PARTNERS_DATA){
+      for (var ei=0; ei<PARTNERS_DATA.length; ei++){
+        if (PARTNERS_DATA[ei].id===eid && PARTNERS_DATA[ei].type==="company"){ applyEmpresaMeta(PARTNERS_DATA[ei]); return; }
+      }
+    }
+    return; /* renderEmpresa la aplica cuando cargan los datos */
+  }
   var m = ROUTE_META[id] || ROUTE_META.inicio;
   var ti = m.t[lang]||m.t.es, de = m.d[lang]||m.d.es;
   document.title = ti;
@@ -2036,6 +2054,16 @@ function applyFichaMeta(p){
      de verdad describe a un comercio del Programa de Gratitud;
    · `og:url` es la ruta con almohadilla y no `/f/<id>`: esa ruta del Worker solo
      existe para fundaciones. Queda anotado como lo que es. */
+function applyEmpresaMeta(p){
+  var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
+  var sector = pick(p.sector);
+  var desc = pick(p.profile && p.profile.about) || (t("emp.tipo") + (sector ? " · " + sector : ""));
+  if (desc.length > 155) desc = desc.slice(0, 152).replace(/\s+\S*$/, "") + "…";
+  document.title = p.name + " · Give&Grow International";
+  setMetaTag("name","description",desc);
+  setMetaTag("property","og:title",p.name + " · Give&Grow International");
+  setMetaTag("property","og:description",desc);
+}
 function applyComercioMeta(c){
   var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
   var ti = c.name + " · Give&Grow International";
@@ -2056,8 +2084,12 @@ function applyComercioMeta(c){
   setMetaTag("name","twitter:description",de);
   setMetaTag("name","robots","index, follow");
 }
-function shareFicha(pid){
-  var url = "https://www.thegiveandgrowproject.org/f/"+pid;
+function shareFicha(pid, tipo){
+  /* `/f/<id>` es la versión estática que genera el Worker, y solo existe para
+     fundaciones. Una empresa comparte la ruta de su ficha en el sitio. */
+  var url = tipo === "empresa"
+    ? "https://www.thegiveandgrowproject.org/#empresa/"+pid
+    : "https://www.thegiveandgrowproject.org/f/"+pid;
   if (navigator.share){ navigator.share({url:url}).catch(function(){}); return false; }
   if (navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url).then(function(){
@@ -2243,6 +2275,7 @@ function postLang(l){
   try{ buildProjectSelect(); calcUpdate(); }catch(e){}
   if (currentRoute.indexOf("fundacion/")===0) renderFicha(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
+  if (currentRoute.indexOf("empresa/")===0) renderEmpresa(currentRoute.split("/")[1]);
   if (currentRoute==="gratitud") renderGratitudComercios();
   document.querySelectorAll(".faq-a").forEach(function(a){ if(a.parentElement.classList.contains("open")) a.style.maxHeight = a.scrollHeight + "px"; });
   /* El nombre de la region sale del diccionario, asi que hay que volver a
@@ -2379,7 +2412,7 @@ function applyLang(l){
 /* ---------- SPA routing ---------- */
 function isSpaRoute(id){
   if (!id) return false;
-  if (id.indexOf("fundacion/")===0 || id.indexOf("comercio/")===0) return true;
+  if (id.indexOf("fundacion/")===0 || id.indexOf("comercio/")===0 || id.indexOf("empresa/")===0) return true;
   return !!document.getElementById("page-"+id);
 }
 /* Despachador de acciones por delegación (CSP fase 2): reemplaza los on* inline.
@@ -3672,6 +3705,10 @@ function go(id, fromPop){
   if (!target && id.indexOf("comercio/")===0){
     target = document.getElementById("page-comercio");
     if (target) renderComercio(id.split("/")[1]);
+  }
+  if (!target && id.indexOf("empresa/")===0){
+    target = document.getElementById("page-empresa");
+    if (target) renderEmpresa(id.split("/")[1]);
   }
   if (!target){ id = "e404"; target = ensureE404(); }
   if (!target){ id = "inicio"; target = document.getElementById("page-inicio"); }
@@ -5074,12 +5111,11 @@ function renderEmpresas(){
         + (tags ? '<span class="emp-mods">'+tags+'</span>' : '')
         + (recip ? '<span class="emp-recips">'+recip+'</span>' : '')
         + '</span>';
-      if (p.url){
-        html += '<a class="pcard pcard-emp" href="'+escapeHtml(p.url)+'" target="_blank" rel="noopener">'+inner
-          + '<span class="pcard-go" aria-hidden="true">&#8599;</span></a>';
-      } else {
-        html += '<div class="pcard pcard-emp">'+inner+'</div>';
-      }
+      /* A LA FICHA, no a su sitio web. Antes la tarjeta saltaba fuera del sitio
+         —o no llevaba a ninguna parte si la empresa no tenía web—; ahora abre su
+         ficha, y su web va dentro, en los enlaces. */
+      html += '<a class="pcard pcard-emp" href="#empresa/'+encodeURIComponent(p.id)+'">'+inner
+        + '<span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
     }
     el.innerHTML = html;
     el.style.display = n ? "" : "none";
@@ -5460,7 +5496,9 @@ function initMap(){
       var html="<b>"+escapeHtml(pt.name)+"</b>"+(area?("<br>"+escapeHtml(area)):"");
       if (pt.type==="company"){
         if (pt.direccion) html += "<br>"+escapeHtml(pt.direccion);
-        html += '<br><a href="'+escapeHtml(pt.ficha)+'">'+t("map.biz")+"</a>";
+        /* Los pines de empresa traían `ficha` solo si venían de Gratitud; una
+           empresa aliada de partners.json con coordenadas enlazaba a «undefined». */
+        html += '<br><a href="'+escapeHtml(pt.ficha || ("#empresa/"+encodeURIComponent(pt.id)))+'">'+t("map.biz")+"</a>";
         if (pt.direccion) html += ' &middot; <a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(pt.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+"</a>";
       } else if (pt.url){
         html += '<br><a href="'+escapeHtml(pt.url)+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>";
@@ -7069,6 +7107,80 @@ function renderComercio(cid){
 
     /* CTA: hacerse miembro (NO donar; la empresa ofrece, el miembro disfruta) */
     html += fichaCuerpo(main, lat, "es-comercio");
+    el.innerHTML = html;
+  });
+}
+/* LA FICHA DE UNA EMPRESA ALIADA (type:company en partners.json).
+   ==========================================================================
+   Hasta el 26 sep 2026 la tarjeta de una empresa llevaba directo a su sitio
+   web, y si no tenía web no llevaba a ninguna parte. Usa la misma estructura de
+   registro que las fichas de fundación y de comercio (ver `fichaDatos`).
+
+   Lo propio de una empresa es la RECIPROCIDAD: qué aporta y qué recibe. Va en
+   el cuerpo como dos columnas. La lateral invita a otras empresas a sumarse.
+
+   Campos: los de siempre (name, logo+consent.logo, sector, modalidad[], aporta,
+   recibe, url) y, opcionales, ciudad, instagram, profile.tagline,
+   profile.about y gallery[] con consent.photos. Todo es opcional salvo el
+   nombre: una empresa con solo nombre y modalidad se ve completa. */
+function renderEmpresa(eid){
+  var el = document.getElementById("empresa-body"); if (!el) return;
+  loadPartners().then(function(list){
+    var p = null;
+    for (var i=0;i<list.length;i++){ if (list[i].id === eid && list[i].type === "company"){ p = list[i]; break; } }
+    if (!p){ go("empresas"); return; }
+    applyEmpresaMeta(p);
+    var esc = escapeHtml;
+    var pick = function(o){ return o ? esc(o[lang]||o.es||"") : ""; };
+    var pr = p.profile || {};
+    var sector = pick(p.sector), aporta = pick(p.aporta), recibe = pick(p.recibe),
+        about = pick(pr.about), tagline = pick(pr.tagline);
+    var mods = (Array.isArray(p.modalidad) ? p.modalidad : []).map(function(m){ return esc(t("emp.mod."+m)); });
+
+    var html = fichaCabecera({
+      backHref: "#empresas", backLabel: t("emp.back"),
+      logo: (p.logo && canShowLogo(p)) ? esc(p.logo) : "", logoAlt: esc(p.name),
+      ceja: esc(t("emp.tipo")), nombre: esc(p.name), entradilla: tagline
+    });
+    html += fichaDatos([
+      [t("emp.k.sector"), sector],
+      [t("emp.k.mod"), mods.join(" · ")],
+      [t("com.k.ciudad"), esc(p.ciudad || "")]
+    ]);
+
+    var main = "";
+    if (about) main += '<p class="ficha-about">'+about+'</p>';
+    main += fichaBloques(t("emp.alianza.t"), [
+      aporta ? '<div class="fprog"><h3>'+esc(t("emp.card.aporta"))+'</h3><p>'+aporta+'</p></div>' : '',
+      recibe ? '<div class="fprog"><h3>'+esc(t("emp.card.recibe"))+'</h3><p>'+recibe+'</p></div>' : ''
+    ].filter(Boolean));
+    var gal = (p.consent && p.consent.photos === true && p.gallery && p.gallery.length) ? p.gallery : null;
+    if (gal){
+      main += '<h2 class="ficha-sec">'+t("ficha.gal.t")+'</h2><div class="gal-strip" role="list">';
+      for (var gi=0; gi<gal.length; gi++){
+        var ph = gal[gi], alt = (ph.alt && (ph.alt[lang]||ph.alt.es)) || "";
+        main += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openLightbox(\''+esc(p.id)+'\','+gi+')">'
+              + '<img src="'+esc(ph.src)+'"'
+              + (function(){ var ss = fotoSrcset(ph.src); return ss ? ' srcset="'+esc(ss)+'" sizes="(max-width:416px) 72vw, 300px"' : ''; })()
+              + ' alt="'+esc(alt)+'" loading="lazy"></button>';
+      }
+      main += '</div>';
+    }
+    var enlaces = fichaEnlaces([
+      p.url ? '<a href="'+esc(p.url)+'" target="_blank" rel="noopener">'+t("ficha.web")+' &#8599;</a>' : '',
+      p.instagram ? '<a href="'+esc(p.instagram)+'" target="_blank" rel="noopener">Instagram &#8599;</a>' : '',
+      '<button type="button" id="ficha-share" class="ficha-share" data-act="shareFicha(\''+esc(p.id)+'\',\'empresa\')">'+t("ficha.share")+'</button>'
+    ]);
+    if (main) main += enlaces;
+
+    var lat = '<div class="ficha-apoyo">'
+      + '<span class="ey">'+t("empf.cta.ey")+'</span>'
+      + '<h2>'+t("empf.cta.t")+'</h2>'
+      + '<p class="ficha-apoyo-nota">'+t("empf.cta.p")+'</p>'
+      + '<a class="ficha-cta-btn" href="#empresas">'+t("empf.cta.btn")+'</a></div>'
+      + (main ? '' : enlaces);
+
+    html += fichaCuerpo(main, lat, "");
     el.innerHTML = html;
   });
 }
