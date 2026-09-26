@@ -1437,6 +1437,12 @@ var I18N = {
     "nav.g.nosotros":"Nosotros","nav.cta":"Donar",
     "ficha.back":"Volver al Hub",
     "ficha.lider":"Dirige",
+    "ficha.k.zona":"Territorio",
+    "ficha.k.pob":"A quién acompaña",
+    "ficha.k.anios":"Trayectoria",
+    "ficha.aside.ey":"Dona con destino",
+    "com.k.ciudad":"Ciudad",
+    "com.k.dir":"Dirección",
     "ficha.prog.t":"Programas en marcha",
     "ficha.lineas.t":"Líneas de trabajo",
     "sello.respaldo":"Respaldada por {f}",
@@ -5173,6 +5179,60 @@ function renderPrivacy(){
   var el = document.getElementById("privacy-body"); if (!el) return;
   el.innerHTML = PRIVACY[lang] || PRIVACY.es;
 }
+/* ═══ LA FICHA COMO REGISTRO — fundaciones y comercios ═══════════════════
+   Rediseño del 26 sep 2026, a pedido de Sebas («no se ve bien»). Lo que había:
+   · las etiquetas del encabezado (zona, población, años) iban en un .eco-row,
+     que CENTRA su contenido: quedaban corridas hacia dentro, sin alinearse ni
+     con el título ni con el logo. Y tenían forma de botón sin serlo.
+   · el texto largo corría a ~120 caracteres por línea, en gris y en tamaño de
+     entradilla: difícil de leer.
+   · barras de acento a la izquierda en la cita y en el cupón, el patrón que la
+     auditoría visual marcó; y en el comercio, «Instagram» centrado y suelto
+     por el mismo .eco-row.
+
+   Ahora las dos fichas comparten una estructura: encabezado (logo, ceja con el
+   tipo, nombre, entradilla), una franja de DATOS con regla fuerte —la misma
+   gramática de libro que Transparencia: una ficha es papel, no vidrio—, y un
+   cuerpo en dos columnas cuya columna lateral lleva la pieza firma de cada
+   tipo: lo que logra tu aporte en una fundación, el cupón en un comercio.
+
+   ESCALA. Todo sale de partners.json y gratitud.json y cada bloque es
+   opcional: una aliada nueva con la mitad de los campos se ve completa, no
+   rota. Si una ficha no tiene texto ni galería, el cuerpo pasa a una columna
+   para no dejar una columna vacía al lado de la lateral. */
+function fichaDatos(pares){
+  var filas = pares.filter(function(x){ return x && x[1]; });
+  if (!filas.length) return "";
+  return '<dl class="ficha-datos">' + filas.map(function(x){
+    return '<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>';
+  }).join("") + '</dl>';
+}
+/* Los valores llegan YA escapados: esta función solo arma. */
+function fichaCabecera(o){
+  return '<a class="card-link ficha-volver" href="'+o.backHref+'">&larr; '+o.backLabel+'</a>'
+    + '<header class="ficha-head'+(o.logo ? '' : ' sin-logo')+'">'
+    + (o.logo ? '<img class="ficha-logo" src="'+o.logo+'" alt="'+(o.logoAlt||"")+'">' : '')
+    + '<div class="ficha-titulo">'
+    + (o.ceja ? '<span class="ey">'+o.ceja+'</span>' : '')
+    + '<h1 class="ficha-name">'+o.nombre+'</h1>'
+    + (o.entradilla ? '<p class="ficha-tagline">'+o.entradilla+'</p>' : '')
+    + '</div></header>';
+}
+function fichaCuerpo(principal, lateral, extra){
+  var solo = !principal.replace(/<[^>]*>/g, "").trim();
+  return '<div class="ficha-cuerpo'+(solo ? ' solo' : '')+(extra ? ' '+extra : '')+'">'
+    + (solo ? '' : '<div class="ficha-main">'+principal+'</div>')
+    + '<aside class="ficha-aside">'+lateral+'</aside></div>';
+}
+function fichaEnlaces(links){
+  var l = links.filter(Boolean);
+  return l.length ? '<p class="ficha-enlaces">'+l.join("")+'</p>' : "";
+}
+function fichaBloques(titulo, items){
+  if (!items || !items.length) return "";
+  return '<h2 class="ficha-sec">'+titulo+'</h2><div class="ficha-prog">'+items.join("")+'</div>';
+}
+
 function renderFicha(fid){
   var el = document.getElementById("ficha-body"); if (!el) return;
   loadPartners().then(function(list){
@@ -5187,107 +5247,89 @@ function renderFicha(fid){
         years = pick(pr.years), about = pick(pr.about), hubTxt = pick(pr.hub),
         quote = pick(pr.quote), tagline = pick(pr.tagline);
     var u = (p.impactUnits && p.impactUnits[0]) || null;
-    var html = '<a class="card-link" href="#hub">&larr; '+t("ficha.back")+'</a>'
-      + '<div class="ficha-head">'
-      + ((p.logo && canShowLogo(p)) ? '<img class="ficha-logo" src="'+esc(p.logo)+'" alt="">' : '')
-      + '<div><h1 class="ficha-name">'+esc(p.name)+'</h1>'
-      + (tagline ? '<p class="ficha-tagline">'+tagline+'</p>' : '')
-      + (badge ? '<span class="tag">'+badge+'</span>' : '')
-      + '<div class="eco-row" style="margin-top:12px">'
-      + (area ? '<span class="eco-chip">'+area+'</span>' : '')
-      + (pob ? '<span class="eco-chip">'+pob+'</span>' : '')
-      + (years ? '<span class="eco-chip">'+years+'</span>' : '')
-      + (pr.leader ? '<span class="eco-chip">'+t("ficha.lider")+': '+esc(pr.leader)+'</span>' : '')
-      + '</div></div></div>'
-      + (function(){
-          var r = respaldo(p); if (!r) return "";
-          var img = (r.logo && canShowLogo(r))
-            ? '<img src="'+esc(r.logo)+'" alt="" loading="lazy">' : '';
-          return '<a class="sello" href="#fundacion/'+encodeURIComponent(r.id)+'">'
-               + img
-               + '<span><b>'+esc(t("sello.respaldo").replace("{f}", r.name))+'</b>'
-               + '<small>'+esc(t("sello.nota").replace("{f}", r.name))+'</small></span>'
-               + '<span class="sello-go" aria-hidden="true">&rarr;</span></a>';
-        })()
-      + (about ? '<p class="lead" style="margin-top:22px;max-width:70ch">'+about+'</p>' : '')
-      + (quote ? '<blockquote class="ficha-quote">'+quote+'</blockquote>' : '');
-    if (pr.programs && pr.programs.length){
-      html += '<h3 style="margin-top:34px">'+t("ficha.prog.t")+'</h3><div class="grid g2" style="margin-top:16px">';
-      for (var k=0;k<pr.programs.length;k++){
-        var g = pr.programs[k];
-        var gLogo = g.logo ? '<div class="prog-logo"><img src="'+esc(g.logo)+'" alt="'+esc(g.name)+'" loading="lazy"></div>' : '';
-        html += '<div class="card prog-card">'+gLogo+'<h3>'+esc(g.name)+'</h3><p>'+esc((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
-      }
-      html += '</div>';
-    }
-    /* LAS LÍNEAS DE TRABAJO, que no son lo mismo que los programas.
-       ====================================================================
-       Un programa es algo que está corriendo y que se puede contar —«Escuelas»,
-       con sus aulas construidas—. Una línea es el marco que explica POR QUÉ ese
-       programa existe y con qué enfoque se hace.
 
-       Iban mezclados en una sola lista y eso obligaba a elegir: o se perdía el
-       detalle de lo que de verdad se está haciendo, o se perdía la explicación.
-       Separarlos deja las dos cosas, y en este orden: primero lo que hay, después
-       el marco. Evidencia antes que discurso, que es la regla de la casa.
+    var html = fichaCabecera({
+      backHref: "#hub", backLabel: t("ficha.back"),
+      logo: (p.logo && canShowLogo(p)) ? esc(p.logo) : "",
+      ceja: badge, nombre: esc(p.name), entradilla: tagline
+    });
+    html += fichaDatos([
+      [t("ficha.k.zona"), area],
+      [t("ficha.k.pob"), pob],
+      [t("ficha.k.anios"), years],
+      [t("ficha.lider"), pr.leader ? esc(pr.leader) : ""]
+    ]);
 
-       Es opcional: una aliada sin `lineas` se pinta exactamente como antes. */
-    if (pr.lineas && pr.lineas.length){
-      html += '<h3 style="margin-top:34px">'+t("ficha.lineas.t")+'</h3><div class="grid g2" style="margin-top:16px">';
-      for (var li=0; li<pr.lineas.length; li++){
-        var ln = pr.lineas[li];
-        html += '<div class="card prog-card"><h3>'+esc(ln.name)+'</h3><p>'+esc((ln.desc && (ln.desc[lang]||ln.desc.es))||"")+'</p></div>';
-      }
-      html += '</div>';
-    }
-    var hijas = respaldadas(p);
-    if (hijas.length){
-      html += '<h3 style="margin-top:34px">'+t("sello.red.t")+'</h3><div class="grid g2" style="margin-top:16px">';
-      for (var hi=0; hi<hijas.length; hi++){
-        var hh = hijas[hi];
-        html += '<a class="card prog-card" href="#fundacion/'+encodeURIComponent(hh.id)+'">'
-              + '<h3>'+esc(hh.name)+'</h3>'
-              + '<p>'+esc((hh.area && (hh.area[lang]||hh.area.es))||"")+'</p></a>';
-      }
-      html += '</div>';
-    }
+    var main = "";
+    main += (function(){
+      var r = respaldo(p); if (!r) return "";
+      var img = (r.logo && canShowLogo(r)) ? '<img src="'+esc(r.logo)+'" alt="" loading="lazy">' : '';
+      return '<a class="sello" href="#fundacion/'+encodeURIComponent(r.id)+'">'
+           + img
+           + '<span><b>'+esc(t("sello.respaldo").replace("{f}", r.name))+'</b>'
+           + '<small>'+esc(t("sello.nota").replace("{f}", r.name))+'</small></span>'
+           + '<span class="sello-go" aria-hidden="true">&rarr;</span></a>';
+    })();
+    if (about) main += '<p class="ficha-about">'+about+'</p>';
+    if (quote) main += '<blockquote class="ficha-quote">'+quote+'</blockquote>';
+    main += fichaBloques(t("ficha.prog.t"), (pr.programs||[]).map(function(g){
+      var gLogo = g.logo ? '<div class="prog-logo"><img src="'+esc(g.logo)+'" alt="'+esc(g.name)+'" loading="lazy"></div>' : '';
+      return '<div class="fprog">'+gLogo+'<h3>'+esc(g.name)+'</h3><p>'+esc((g.desc && (g.desc[lang]||g.desc.es))||"")+'</p></div>';
+    }));
+    /* LAS LÍNEAS DE TRABAJO, que no son lo mismo que los programas: un programa
+       es algo que está corriendo y se puede contar; una línea es el marco que
+       explica por qué existe. Primero lo que hay, después el marco. Opcional. */
+    main += fichaBloques(t("ficha.lineas.t"), (pr.lineas||[]).map(function(ln){
+      return '<div class="fprog"><h3>'+esc(ln.name)+'</h3><p>'+esc((ln.desc && (ln.desc[lang]||ln.desc.es))||"")+'</p></div>';
+    }));
+    main += fichaBloques(t("sello.red.t"), respaldadas(p).map(function(hh){
+      return '<a class="fprog fprog-link" href="#fundacion/'+encodeURIComponent(hh.id)+'">'
+           + '<h3>'+esc(hh.name)+' <span aria-hidden="true">&rarr;</span></h3>'
+           + '<p>'+esc((hh.area && (hh.area[lang]||hh.area.es))||"")+'</p></a>';
+    }));
     /* Galería curada auto-alojada (consentimiento verificado en canShowGallery) */
     if (p.type === "foundation"){
-      html += '<h3 style="margin-top:34px">'+t("ficha.gal.t")+'</h3>';
       var gal = (canShowGallery(p) && p.gallery && p.gallery.length) ? p.gallery : null;
+      main += '<h2 class="ficha-sec">'+t("ficha.gal.t")+'</h2>';
       if (gal){
-        html += '<div class="gal-strip" role="list">';
+        main += '<div class="gal-strip" role="list">';
         for (var gi=0; gi<gal.length; gi++){
           var ph = gal[gi], alt = (ph.alt && (ph.alt[lang]||ph.alt.es)) || "";
-          html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openLightbox(\''+esc(p.id)+'\','+gi+')">'
+          main += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openLightbox(\''+esc(p.id)+'\','+gi+')">'
                 + '<img src="'+esc(ph.src)+'"'
                 + (function(){ var ss = fotoSrcset(ph.src); return ss
                     /* .gal-item mide min(300px,72vw); 300/0.72 = 416.7px. */
                     ? ' srcset="'+esc(ss)+'" sizes="(max-width:416px) 72vw, 300px"' : ''; })()
                 + ' alt="'+esc(alt)+'" loading="lazy"></button>';
         }
-        html += '</div>';
+        main += '</div>';
       } else {
-        html += '<div class="card card-empty gal-empty"><p>'+t("ficha.gal.empty")+'</p></div>';
+        main += '<p class="ficha-vacio">'+t("ficha.gal.empty")+'</p>';
       }
     }
+    if (hubTxt) main += '<h2 class="ficha-sec">'+t("ficha.hub.t")+'</h2><p class="ficha-texto">'+hubTxt+'</p>';
+    main += fichaEnlaces([
+      p.url ? '<a href="'+esc(p.url)+'" target="_blank" rel="noopener">'+t("ficha.web")+' &#8599;</a>' : '',
+      p.instagram ? '<a href="'+esc(p.instagram)+'" target="_blank" rel="noopener">Instagram &#8599;</a>' : '',
+      '<button type="button" id="ficha-share" class="ficha-share" data-act="shareFicha(\''+esc(p.id)+'\')">'+t("ficha.share")+'</button>'
+    ]);
+
+    /* LA PIEZA FIRMA: lo que logra tu aporte aquí, con la unidad real de la
+       aliada. Sin unidad definida, la lateral queda con la invitación a donar
+       y sin inventar una cifra. */
+    var lat = '<div class="ficha-apoyo">'
+      + '<span class="ey">'+t("ficha.aside.ey")+'</span>'
+      + '<h2>'+(u ? t("ficha.imp.t") : t("ficha.cta.t"))+'</h2>';
     if (u){
       var qs = [10000, 20000, 50000, 100000];
-      var chips = qs.map(function(q,qi){
+      lat += '<div class="fimp-row">' + qs.map(function(q,qi){
         return '<button type="button" class="fimp-q'+(qi===1?' on':'')+'" data-cop="'+q+'" data-act="fichaImpCalc(this,\''+esc(p.id)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
-      }).join('');
-      html += '<div class="card ficha-impact" style="margin-top:26px"><h3>'+t("ficha.imp.t")+'</h3>'
-        + '<div class="fimp-row">'+chips+'</div>'
-        + '<p id="fimp-out" data-fid="'+esc(p.id)+'"></p></div>';
+      }).join('') + '</div><p id="fimp-out" data-fid="'+esc(p.id)+'"></p>';
     }
-    if (hubTxt) html += '<h3 style="margin-top:34px">'+t("ficha.hub.t")+'</h3><p style="max-width:70ch">'+hubTxt+'</p>';
-    html += '<div class="eco-row" style="margin-top:26px">'
-      + (p.url ? '<a class="card-link" href="'+esc(p.url)+'" target="_blank" rel="noopener">'+t("ficha.web")+'</a>' : '')
-      + (p.instagram ? '<a class="card-link" style="margin-left:18px" href="'+esc(p.instagram)+'" target="_blank" rel="noopener">Instagram</a>' : '')
-      + '<button type="button" id="ficha-share" class="card-link ficha-share" data-act="shareFicha(\''+esc(p.id)+'\')">'+t("ficha.share")+'</button>'
-      + '</div>'
-      + '<div class="cta-box" style="margin-top:36px"><h2>'+t("ficha.cta.t")+'</h2><p class="mu">'+t("ficha.cta.p")+'</p>'
-      + '<a class="ficha-cta-btn" href="#donar"'+(u ? ' data-act="donarA(\''+esc(u.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a></div>';
+    lat += '<a class="ficha-cta-btn" href="#donar"'+(u ? ' data-act="donarA(\''+esc(u.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a>'
+      + '<p class="ficha-apoyo-nota">'+t("ficha.cta.p")+'</p></div>';
+
+    html += fichaCuerpo(main, lat, "");
     el.innerHTML = html;
     var q0 = el.querySelector(".fimp-q.on");
     if (q0) fichaImpCalc(q0, p.id);
@@ -6964,63 +7006,69 @@ function renderComercio(cid){
     /* Igual que `renderFicha`: al llegar por enlace directo, applyRouteMeta se
        ejecuta ANTES de que existan los datos y se sale sin tocar nada. */
     applyComercioMeta(c);
+    var esc = escapeHtml;
     var cats = (data && data.categorias) || {};
     var pick = function(o){ return o ? (o[lang]||o.es||"") : ""; };
     var catLabel = cats[c.categoria] ? pick(cats[c.categoria]) : "";
     var about = pick(c.about), ben = pick(c.beneficio), cond = pick(c.condiciones), redime = pick(c.redime);
     var showLogo = c.logo && c.consent && c.consent.logo;
 
-    var html = '<a class="card-link" href="#gratitud">&larr; '+t("com.back")+'</a>'
-      + '<div class="ficha-head">'
-      + (showLogo ? '<img class="ficha-logo ficha-logo-light" src="'+escapeHtml(c.logo)+'" alt="'+escapeHtml(c.name)+'">' : '')
-      + '<div><h1 class="ficha-name">'+escapeHtml(c.name)+'</h1>'
-      + '<div class="eco-row" style="margin-top:12px">'
-      + (catLabel ? '<span class="eco-chip">'+escapeHtml(catLabel)+'</span>' : '')
-      + (c.ciudad ? '<span class="eco-chip">'+escapeHtml(c.ciudad)+'</span>' : '')
-      + '<span class="eco-chip">'+t("com.aliado")+'</span>'
-      + '</div></div></div>';
+    var html = fichaCabecera({
+      backHref: "#gratitud", backLabel: t("com.back"),
+      logo: showLogo ? esc(c.logo) : "", logoAlt: esc(c.name),
+      ceja: esc(t("com.aliado") + (catLabel ? " · " + catLabel : "")),
+      nombre: esc(c.name), entradilla: ""
+    });
+    /* La categoría ya va en la ceja («Comercio aliado · Belleza»): repetirla
+       aquí era decir lo mismo dos veces en diez centímetros. */
+    html += fichaDatos([
+      [t("com.k.ciudad"), esc(c.ciudad || "")],
+      [t("com.k.dir"), c.direccion ? esc(c.direccion)
+        + ' <a class="ficha-mapa" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+' &#8599;</a>' : ""]
+    ]);
 
-    if (c.direccion) html += '<p class="com-address">'+escapeHtml(c.direccion)
-      + ' · <a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+'</a></p>';
-
-    if (about) html += '<p class="lead" style="margin-top:22px;max-width:70ch">'+escapeHtml(about)+'</p>';
-
-    /* Beneficio para miembros — cupón institucional (elemento firma de la ficha) */
-    html += '<div class="benefit-coupon"><div class="bc-main">'
-      + '<span class="bc-eyebrow">'+t("com.benefit.t")+'</span>'
-      + (ben ? '<p class="bc-benefit">'+escapeHtml(ben)+'</p>' : '')
-      + (c.nivelDesde ? '<span class="bc-level">'+t("grat.card.nivel")+' · '+escapeHtml(c.nivelDesde)+'</span>' : '')
-      + '</div>';
-    if (redime || cond){
-      html += '<div class="bc-perf" aria-hidden="true"></div><dl class="bc-terms">'
-        + (redime ? '<div><dt>'+t("grat.card.redime")+'</dt><dd>'+escapeHtml(redime)+'</dd></div>' : '')
-        + (cond ? '<div><dt>'+t("grat.card.cond")+'</dt><dd>'+escapeHtml(cond)+'</dd></div>' : '')
-        + '</dl>';
-    }
-    html += '</div>';
-
+    var main = "";
+    if (about) main += '<p class="ficha-about">'+esc(about)+'</p>';
     /* Galería (solo con consentimiento explícito de fotos) */
     var gal = (c.consent && c.consent.photos && c.gallery && c.gallery.length) ? c.gallery : null;
     if (gal){
-      html += '<h3 style="margin-top:34px">'+t("com.gal.t")+'</h3><div class="gal-strip" role="list">';
+      main += '<h2 class="ficha-sec">'+t("com.gal.t")+'</h2><div class="gal-strip" role="list">';
       for (var gi=0; gi<gal.length; gi++){
         var ph = gal[gi], alt = pick(ph.alt);
-        html += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openComercioLb(\''+escapeHtml(c.id)+'\','+gi+')">'
-              + '<img src="'+escapeHtml(ph.src)+'" alt="'+escapeHtml(alt)+'" loading="lazy"></button>';
+        main += '<button type="button" class="gal-item" role="listitem" aria-label="'+t("ficha.gal.open")+'" data-act="openComercioLb(\''+esc(c.id)+'\','+gi+')">'
+              + '<img src="'+esc(ph.src)+'" alt="'+esc(alt)+'" loading="lazy"></button>';
       }
-      html += '</div>';
+      main += '</div>';
     }
+    var enlaces = fichaEnlaces([
+      c.web ? '<a href="'+esc(c.web)+'" target="_blank" rel="noopener">'+t("ficha.web")+' &#8599;</a>' : '',
+      c.instagram ? '<a href="'+esc(c.instagram)+'" target="_blank" rel="noopener">Instagram &#8599;</a>' : ''
+    ]);
+    /* Los enlaces solos no justifican una columna: sin texto ni galería, van
+       debajo del cupón y el cuerpo queda en una sola columna. */
+    if (main) main += enlaces;
 
-    /* Redes y compartir */
-    html += '<div class="eco-row" style="margin-top:30px">'
-      + (c.web ? '<a class="card-link" href="'+escapeHtml(c.web)+'" target="_blank" rel="noopener">'+t("ficha.web")+'</a>' : '')
-      + (c.instagram ? '<a class="card-link" style="margin-left:18px" href="'+escapeHtml(c.instagram)+'" target="_blank" rel="noopener">Instagram</a>' : '')
+    /* LA PIEZA FIRMA: el cupón. Un vale con su troquel —dos muescas y una
+       línea punteada—, no una tarjeta con barra de acento. */
+    var lat = '<div class="benefit-coupon"><div class="bc-main">'
+      + '<span class="bc-eyebrow">'+t("com.benefit.t")+'</span>'
+      + (ben ? '<p class="bc-benefit">'+esc(ben)+'</p>' : '')
+      + (c.nivelDesde ? '<span class="bc-level">'+t("grat.card.nivel")+' · '+esc(c.nivelDesde)+'</span>' : '')
       + '</div>';
+    if (redime || cond){
+      lat += '<div class="bc-perf" aria-hidden="true"></div><dl class="bc-terms">'
+        + (redime ? '<div><dt>'+t("grat.card.redime")+'</dt><dd>'+esc(redime)+'</dd></div>' : '')
+        + (cond ? '<div><dt>'+t("grat.card.cond")+'</dt><dd>'+esc(cond)+'</dd></div>' : '')
+        + '</dl>';
+    }
+    lat += '</div>'
+      + '<div class="ficha-apoyo ficha-apoyo-plano">'
+      + '<p class="ficha-apoyo-nota">'+t("com.cta.p")+'</p>'
+      + '<a class="ficha-cta-btn" href="#membresias">'+t("com.cta.btn")+'</a></div>'
+      + (main ? '' : enlaces);
 
     /* CTA: hacerse miembro (NO donar; la empresa ofrece, el miembro disfruta) */
-    html += '<div class="cta-box" style="margin-top:36px"><h2>'+t("com.cta.t")+'</h2><p class="mu">'+t("com.cta.p")+'</p>'
-      + '<a class="ficha-cta-btn" href="#membresias">'+t("com.cta.btn")+'</a></div>';
-
+    html += fichaCuerpo(main, lat, "es-comercio");
     el.innerHTML = html;
   });
 }
