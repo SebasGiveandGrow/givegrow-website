@@ -162,6 +162,12 @@ Olvidarlo = los usuarios ven la versión vieja hasta 1 año.
   zona/barrio, nunca direcciones exactas. Comercios sí llevan dirección pública.
 - `data/gratitud.json` — comercios del Programa de Gratitud. Un comercio solo
   aparece públicamente si `status === "activa"` (convenio firmado).
+- **Alta de un aliado = copiar un objeto en uno de esos dos archivos, y correr
+  el gate.** El check #22 revisa cada aliado: id con forma de slug, los dos
+  idiomas completos, logo y fotos que existan, fotos solo con
+  `consent.photos === true`, ningún dato personal (ni quién autorizó), fecha
+  AAAA-MM-DD y coordenadas de fundación con 3 decimales como mucho. Dice qué
+  arreglar y dónde. Para las fotos de galería, `node scripts/fotos-galeria.mjs`.
 - `inventario.json` — lo escribe la automatización de Apps Script; el sitio aún
   no lo consume del todo. NO confundir con partners.json.
 - i18n: diccionario ES embebido en `app.js`; EN en `i18n/en.json` (lazy fetch).
