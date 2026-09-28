@@ -2563,6 +2563,24 @@ async function adminSalud(env) {
   });
 }
 
+/* Cuanto hay en cada tramo del certificado, para la franja de estado de la
+   lista de aportes. Sin esto, «no veo certificados» no se distinguia de
+   «no hay ninguno» (28 sep 2026: no habia ninguno). */
+async function conteoCertificados(env) {
+  const PAGADA = "estado IN ('aprobada','en_distribucion','entregada')";
+  const r = await env.DB.prepare(
+    "SELECT " +
+    "(SELECT COUNT(*) FROM aportes a WHERE a.quiere_certificado = 1 AND a." + PAGADA + " AND NOT EXISTS " +
+    " (SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)) AS por_emitir, " +
+    "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND revision_en IS NULL AND enviado_en IS NULL AND firma_rl_en IS NULL) AS sin_rl, " +
+    "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND revision_en IS NULL AND enviado_en IS NULL AND firma_rf_en IS NULL) AS sin_rf, " +
+    "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND revision_en IS NULL AND enviado_en IS NULL " +
+    " AND firma_rl_en IS NOT NULL AND firma_rf_en IS NOT NULL) AS sin_salir, " +
+    "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL) AS vivos"
+  ).first();
+  return r || {};
+}
+
 async function adminAportes(env, url, quien) {
   const estado = url.searchParams.get("estado");
   const limite = entero(url.searchParams.get("limite"), 50, 1, 200);
@@ -2611,6 +2629,8 @@ async function adminAportes(env, url, quien) {
                 /* Que casilla puede firmar quien mira el panel: «rl», «rf» o null.
                    Es lo mismo que `/firma` le dice a su pantalla. */
                 firmante: quienFirma(env, quien),
+                firma_falta: firmaFaltantes(env),
+                certs: await conteoCertificados(env),
                 total: (tot && tot.n) || 0, tope: limite });
 }
 
@@ -2877,6 +2897,14 @@ function quienFirma(env, email) {
   if (rf && e === rf) return "rf";
   return null;
 }
+/* QUE FALTA, POR NOMBRE. «No esta configurada» sin decir cual de las dos
+   variables falta obligaba a adivinar —el 28 sep 2026 faltaba solo la de la
+   Revisora Fiscal—. Se dan los NOMBRES de las variables, nunca sus valores:
+   son correos de personas y el repositorio es publico. */
+function firmaFaltantes(env) {
+  return [["FIRMA_RL_EMAIL", env.FIRMA_RL_EMAIL], ["FIRMA_RF_EMAIL", env.FIRMA_RF_EMAIL]]
+    .filter(([, v]) => !String(v || "").trim()).map(([k]) => k);
+}
 function firmaConfigurada(env) {
   return !!(String(env.FIRMA_RL_EMAIL || "").trim() && String(env.FIRMA_RF_EMAIL || "").trim());
 }
@@ -2904,6 +2932,7 @@ async function firmaPendientes(env, sesion) {
   const papel = quienFirma(env, sesion && sesion.email);
   return json({
     configurado: firmaConfigurada(env),
+    falta: firmaFaltantes(env),
     /* Qué casilla puede firmar QUIEN PREGUNTA. Sin esto la pantalla tendría que
        adivinarlo, y acabaría enseñando un botón que el servidor va a rechazar. */
     puede_firmar: papel,
@@ -10987,6 +11016,18 @@ var PUEDE = null;
 
 function cargar(){
   fetch("/api/firma/pendientes").then(function(r){ return r.json(); }).then(function(d){
+    /* EL RECHAZO SE DICE COMO RECHAZO. Antes este 403 se pintaba como
+       «observador · no configurada · nada esperando»: tres frases ciertas en
+       otro caso y ninguna era la razon. */
+    if (d.error === "no_firmante"){
+      document.getElementById("quien").textContent = "Tu correo no es el de ninguno de los dos firmantes.";
+      document.getElementById("aviso").innerHTML = '<p class="f-aviso"><strong>Entraste como ' + esc(d.correo || "?") +
+        '</strong>, y ese correo no coincide con el del Representante Legal ni con el de la Revisora Fiscal configurados' +
+        ((d.falta || []).length ? " (además, falta " + esc(d.falta.join(" y ")) + ")" : "") +
+        '. Si eres uno de los dos, el correo guardado en Cloudflare no es exactamente este: avisa al equipo.</p>';
+      document.getElementById("cola").innerHTML = "";
+      return;
+    }
     PUEDE = d.puede_firmar;
     var q = document.getElementById("quien");
     q.textContent = PUEDE === "rl" ? "Entras como Representante Legal."
@@ -10995,10 +11036,9 @@ function cargar(){
 
     var av = document.getElementById("aviso");
     av.innerHTML = d.configurado ? "" :
-      '<p class="f-aviso"><strong>La firma todavía no está configurada.</strong> Faltan los correos de ' +
-      'quién firma cada casilla, así que los certificados siguen saliendo como antes — con los dos ' +
-      'nombres impresos y sin que nadie los haya firmado. Se configura con <code>wrangler secret put ' +
-      'FIRMA_RL_EMAIL</code> y <code>FIRMA_RF_EMAIL</code>.</p>';
+      '<p class="f-aviso"><strong>La firma todavía no está configurada.</strong> Falta ' +
+      esc((d.falta || ["FIRMA_RL_EMAIL", "FIRMA_RF_EMAIL"]).join(" y ")) + ', así que los certificados siguen saliendo como antes — con los dos ' +
+      'nombres impresos y sin que nadie los haya firmado. Se configura con <code>wrangler secret put</code>.</p>';
 
     var c = document.getElementById("cola");
     var l = d.pendientes || [];
@@ -15433,6 +15473,10 @@ textarea { font-size: 16px }
   font-size:var(--fs-14);background:var(--amberl)}
 /* Una lista que no llego (pedirJSON). Mismo lenguaje que la alarma: no es un
    vacio, es algo que hay que mirar. */
+/* Franja de estado de los certificados, arriba de la lista de aportes. */
+.cert-estado{border-left:3px solid var(--g);padding:10px 14px;margin:0 0 16px;background:var(--surface);font-size:var(--fs-14);max-width:80ch}
+.cert-estado p{margin:0}
+.cert-estado p+p{margin-top:4px;font-size:var(--fs-13)}
 /* La lista de pasos de un voluntario, dentro de su fila. */
 .vpasos{margin-top:8px;line-height:1.9}
 .vpasos .copy{font-size:var(--fs-12)}
@@ -15517,6 +15561,7 @@ donde falta el dato dice «sin datos», no «0 %».</p>
 <div class="mod" data-mod="dinero" hidden>
 <h2 id="sec-aportes" class="h-sec" style="margin:8px 0 6px;font-size:26px">Aportes</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">El libro de todo lo que ha entrado. Vivia sin encabezado propio, colgando de «Salud del ecosistema», que es de donde venia que los avisos de un aporte te mandaran a mirar la salud del sitio.</p>
+<div id="cert-estado" class="cert-estado" aria-live="polite"></div>
 <div class="pay-tabs" role="group" aria-label="Filtrar por estado" style="margin-bottom:18px">
   <button type="button" class="pay-tab on" data-estado="">Todos</button>
   <button type="button" class="pay-tab" data-estado="aprobada">Aprobados</button>
@@ -16172,6 +16217,35 @@ document.addEventListener("click", function(e){
   }).catch(function(){ b.disabled = false; });
 });
 
+/* LA FRANJA DE CERTIFICADOS, arriba de la lista. Dice en que mundo esta la
+   firma, que papel tiene quien mira y cuanto hay en cada tramo. Los ceros se
+   dicen: «0 por emitir» es la respuesta a «no veo certificados». */
+function pintarEstadoCert(d){
+  var box = document.getElementById("cert-estado"); if (!box) return;
+  var c = d.certs || {};
+  var papel = FIRMANTE ? PAPEL_ES[FIRMANTE] : null;
+  var linea1 = d.firma_activa
+    ? "<strong>Firma de certificados encendida.</strong> " + (papel
+        ? "Firmas como " + esc(papel) + ", aquí mismo en cada fila."
+        : "Tu correo no es el de ninguno de los dos firmantes: puedes emitir, no firmar.")
+    : "<strong>Firma de certificados apagada.</strong> Falta " + esc((d.firma_falta || []).join(" y ") || "configurar") +
+      ": al emitir, el certificado sale con los dos nombres impresos y sin firmas registradas. " + (papel
+        ? "Cuando se encienda, firmarás como " + esc(papel) + " desde aquí."
+        : (((d.firma_falta || []).indexOf("FIRMA_RL_EMAIL") < 0)
+            ? "Ojo: tu correo no coincide con el del Representante Legal ni con el de la Revisora Fiscal configurados."
+            : ""));
+  var n = function(x){ return Number(x || 0); };
+  var partes = [n(c.por_emitir) + " por emitir"];
+  if (d.firma_activa){
+    partes.push(n(c.sin_rl) + " sin la firma del Representante Legal");
+    partes.push(n(c.sin_rf) + " sin la de la Revisora Fiscal");
+    partes.push(n(c.sin_salir) + " firmados que no salieron");
+  }
+  partes.push(n(c.vivos) + " emitidos en total");
+  box.innerHTML = "<p>" + linea1 + "</p>" + '<p class="mu">' + esc(partes.join(" · ")) +
+    (n(c.por_emitir) + n(c.vivos) === 0 ? ". Ninguna donación aprobada ha pedido certificado todavía; cuando una lo pida, su fila trae «Emitir…»." : ".") + "</p>";
+}
+
 /* Firmar: el mismo acto que en /firma, con la sesion del panel. */
 function firmarCert(num){
   return fetch("/api/admin/certificado/" + encodeURIComponent(num) + "/firmar", { method: "POST" })
@@ -16277,6 +16351,7 @@ function cargarAportes(){
   pedirJSON("/api/admin/aportes?limite=100" + (FILTRO ? "&estado=" + encodeURIComponent(FILTRO) : ""), "filas")
     .then(function(d){
       FIRMA_ACTIVA = !!d.firma_activa; FIRMANTE = d.firmante || null; pintarFilas(d.aportes || []);
+      pintarEstadoCert(d);
       var tb = document.getElementById("filas");
       if (tb && (d.aportes || []).length) tb.insertAdjacentHTML("afterbegin", filaTope(d, 9, "aportes",
         "Van los más recientes primero, así que lo que falta es lo MÁS VIEJO. Filtra por estado arriba."));
@@ -21271,8 +21346,12 @@ export default {
          —los numeros son consecutivos—, anulados incluidos. El equipo (audiencia
          del panel) sigue entrando a mirar, como decia la nota de la zona. */
       if (ruta.startsWith("/api/firma/") && !sesion.equipo && !quienFirma(env, sesion.email)) {
-        return json({ error: "no_firmante",
-          ayuda: "Tu correo no es el de quien firma los certificados. Si debería serlo, avisa al equipo." }, 403);
+        /* Con el correo de la sesion —es el suyo— y lo que falta configurar: sin
+           eso la pantalla pintaba este 403 como «observador · no configurada ·
+           nada esperando», tres cosas que no eran la razon. */
+        return json({ error: "no_firmante", correo: sesion.email || null,
+          configurado: firmaConfigurada(env), falta: firmaFaltantes(env),
+          ayuda: "Tu correo no coincide con el de ninguno de los dos firmantes configurados." }, 403);
       }
       if (ruta === "/api/firma/pendientes") return await firmaPendientes(env, sesion);
       /* EL DOCUMENTO, DENTRO DE LA ZONA DE FIRMA. La pantalla enlazaba el PDF
