@@ -1545,6 +1545,11 @@ html[data-theme="dark"] .mira-hv{color:#e6a44e}
 .vf-set{border:0;padding:0;margin:6px 0 18px}
 .vf-set legend{font-size:var(--fs-13);font-weight:700;color:var(--ink-soft);padding:0;margin-bottom:6px}
 .vf-help{margin:0 0 12px;font-size:var(--fs-14);line-height:1.55;color:var(--mu);max-width:64ch}
+/* Contador de caracteres (app.js, contarCaracteres): aparece al 60 % del tope.
+   Ámbar y no rojo al llegar: no es un error, es un aviso de que no cabe más. */
+.contador{display:block;margin-top:4px;text-align:right;font-size:var(--fs-13);color:var(--mu);font-variant-numeric:tabular-nums}
+.contador[hidden]{display:none}
+.contador.lleno{color:var(--amber);font-weight:600;text-align:left}
 /* El aviso de terreno lleva regla ámbar: no es una alerta, es una condición del
    programa que conviene leer antes de enviar. */
 .vf-aviso{margin:14px 0 0;padding-left:14px;border-left:3px solid var(--amber);

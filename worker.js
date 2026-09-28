@@ -1524,7 +1524,11 @@ async function apiInscripcion(request, env, url) {
      formularios permite hoy enviar sin correo; si alguno llegara a permitirlo,
      ese caso cae en la regla de rate-limit de Cloudflare -«Escritura publica»,
      confirmada en el panel el 17 sep 2026-, que cuenta por IP. */
-  const correoIns = String(c.email == null ? "" : c.email).trim().slice(0, 200).toLowerCase();
+  /* `c.email || c.correo`: el formulario de EMPRESAS llama al campo `correo`
+     (viene de la hoja de cálculo de antes) y los otros cinco lo llaman `email`.
+     Leyendo solo `email`, este freno dejaba pasar sin tope justo a esa puerta
+     —medido el 28 sep 2026—. */
+  const correoIns = String(c.email || c.correo || "").trim().slice(0, 200).toLowerCase();
   if (correoIns) {
     const recientesIns = await env.DB.prepare(
       "SELECT COUNT(*) AS n FROM inscripciones WHERE LOWER(email) = ? " +
@@ -11248,8 +11252,8 @@ async function apiAliado(env, c) {
   /* Las condicionales se validan también aquí, no solo en el navegador: marcar
      Gratitud sin decir qué beneficio deja una solicitud que no se puede
      responder, y el cliente es opcional para cualquiera que sepa hacer un POST. */
-  const benBeneficio = limpio(c.benBeneficio, 200);
-  const servDetalle  = limpio(c.servDetalle, 300);
+  const benBeneficio = limpio(c.benBeneficio, 300);
+  const servDetalle  = limpio(c.servDetalle, 600);
   if (c.modGratitud && !benBeneficio) return json({ error: "beneficio_requerido" }, 400);
   if (c.modServicios && !servDetalle) return json({ error: "servicio_requerido" }, 400);
 
@@ -11266,10 +11270,22 @@ async function apiAliado(env, c) {
     cedula: limpio(c.cedula, 40),
     contacto: limpio(c.contacto, 160),
     direccion: limpio(c.direccion, 200),
-    sector: limpio(c.sector, 80),
+    /* «Otro» sin decir cuál no le sirve a nadie: la lista se armó pensando en
+       comercios, y una constructora o un banco que llegan por RSE caen ahí. Se
+       guarda junto, «Otro: Construcción», para que el panel y el aviso lo
+       muestren sin tocar nada más. */
+    sector: c.sector === "Otro" && limpio(c.sector_otro, 80)
+      ? "Otro: " + limpio(c.sector_otro, 80) : limpio(c.sector, 80),
     web: limpio(c.web, 200),
     instagram: limpio(c.instagram, 120),
-    descripcion: limpio(c.descripcion, 900),
+    /* LOS TOPES DE AQUÍ SON LOS `maxlength` DEL FORMULARIO, uno a uno. Si el
+       servidor corta más corto que el navegador, el final del texto se pierde
+       sin que nadie lo vea: pasó con una fundación el 4 sep 2026. Quien cambie
+       un número lo cambia en los dos sitios. */
+    descripcion: limpio(c.descripcion, 1200),
+    /* Por qué se alían. Es el `profile.about` de la ficha de empresa (#509):
+       sin preguntarlo había que inventarlo o volver a escribirles. */
+    porque: limpio(c.porque, 800),
     aporta: limpio(c.aporta, 90),
     modalidades: mods,
     benBeneficio,
@@ -11358,8 +11374,12 @@ async function correoAliado(env, a) {
 
 /* Aviso interno: lo que hace falta para responder y para armar la ficha si se
    aprueba. Incluye los tres campos que la hoja de cálculo perdía. */
+/* AL BUZÓN DE ALIANZAS, no al de contabilidad. Una empresa que pide aliarse es
+   la misma conversación que una fundación que aplica: la lleva Sebas. Medido el
+   28 sep 2026: los tres avisos de fundación que habían entrado cayeron en
+   contabilidad, y dos seguían sin respuesta —una desde hacía 24 días—. */
 async function correoAvisoAliado(env, a) {
-  const para = env.CORREO_AVISOS;
+  const para = correoAlianzas(env);
   if (!para) return avisoSinBuzon(env, "aviso-aliado");
   const filas = [
     ["Empresa", a.razon],
@@ -11387,10 +11407,14 @@ async function correoAvisoAliado(env, a) {
     para,
     asunto: "Solicitud de alianza: " + a.razon,
     texto: filas.map(([k, v]) => k + ": " + v).join("\n") +
-           (a.descripcion ? "\n\nDescripción del negocio:\n" + a.descripcion : ""),
+           (a.descripcion ? "\n\nDescripción del negocio:\n" + a.descripcion : "") +
+           (a.porque ? "\n\nPor qué quieren aliarse:\n" + a.porque : ""),
     html: plantillaCorreo({
       titulo: "Solicitud de alianza: " + a.razon,
-      parrafos: a.descripcion ? ["Cómo se describen: «" + a.descripcion + "»"] : ["Sin descripción del negocio."],
+      parrafos: [
+        a.descripcion ? "Cómo se describen: «" + a.descripcion + "»" : "Sin descripción del negocio.",
+        a.porque ? "Por qué quieren aliarse: «" + a.porque + "»" : ""
+      ].filter(Boolean),
       filas,
       cierre: "Está en el panel, en solicitudes por revisar. El Convenio Marco lo envías tú."
     }),
@@ -11435,7 +11459,9 @@ async function apiFundacion(env, c) {
   const lider  = limpio(c.lider, 120);
   const zona   = limpio(c.zona, 160);
   const historia = limpio(c.historia, 1500);
-  const mision   = limpio(c.mision, 600);
+  /* Topes = `maxlength` del formulario (ver la nota de `apiAliado`). La misión
+     subió de 600 a 800: una de las tres primeras llegó en 599. */
+  const mision   = limpio(c.mision, 800);
   const atiende  = limpio(c.atiende, 160);
 
   if (!nombre) return json({ error: "nombre_requerido" }, 400);
@@ -11474,10 +11500,10 @@ async function apiFundacion(env, c) {
     /* Cómo llevan la cuenta decide si la cifra se publica exacta o con «≈».
        Es la pregunta 3.3 del cuestionario y la razón por la que sobrevive aquí:
        sin ella, cualquier número que nos den se vuelve un claim sin respaldo. */
-    conteo: limpio(c.conteo, 160),
+    conteo: limpio(c.conteo, 400),
     programa: limpio(c.programa, 160),
     programa_desc: limpio(c.programa_desc, 900),
-    evidencia: limpio(c.evidencia, 400),
+    evidencia: limpio(c.evidencia, 900),
     web: limpio(c.web, 200),
     instagram: limpio(c.instagram, 120),
     idioma: c.idioma === "en" ? "en" : "es"
@@ -12458,8 +12484,9 @@ const ETIQUETA_PERS = {
   nit: "Sí, con NIT", tramite: "En trámite", base: "Proyecto comunitario de base"
 };
 
+/* Al buzón de alianzas: ver la nota de `correoAvisoAliado`. */
 async function correoAvisoFundacion(env, f) {
-  const para = env.CORREO_AVISOS;
+  const para = correoAlianzas(env);
   if (!para) return avisoSinBuzon(env, "aviso-fundacion");
   const pob = (f.poblacion || []).map(p => ETIQUETA_POB[p] || p).join(", ") +
               (f.poblacion_otra ? " · " + f.poblacion_otra : "");
