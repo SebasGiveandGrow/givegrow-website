@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=ae22db9b" defer></script>
+<script src="/app.js?v=74c2ec7d" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -1935,6 +1935,7 @@
         <div>
           <div class="field"><label for="cf-name" data-i18n="form.name">Nombre</label><input type="text" id="cf-name"></div>
           <div class="field"><label for="cf-email" data-i18n="form.email">Correo</label><input type="email" id="cf-email"></div>
+          <div class="field"><label for="cf-tel" data-i18n="form.tel">Celular o WhatsApp</label><input type="tel" id="cf-tel" maxlength="40" autocomplete="tel" required></div>
           <div class="field"><label for="cf-msg" data-i18n="form.msg">Mensaje</label><textarea rows="4" id="cf-msg"></textarea></div>
           <button type="button" class="btn btn-g" data-act="formSend()" data-i18n="form.send">Enviar mensaje</button>
           <p id="cf-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
@@ -1985,6 +1986,7 @@
         <h2 data-i18n="track.ng.t" class="h-comp3">¿Perdiste tu número de guía?</h2>
         <p data-i18n="track.ng.p">Escribe el correo con el que donaste y te dejamos el mensaje listo para enviárnoslo. Te respondemos con tu número de guía.</p>
         <div class="field"><label for="track-ng-email" data-i18n="form.email">Correo</label><input type="email" id="track-ng-email" autocomplete="email"></div>
+        <div class="field"><label for="track-ng-tel" data-i18n="form.tel">Celular o WhatsApp</label><input type="tel" id="track-ng-tel" maxlength="40" autocomplete="tel" required></div>
         <button type="button" class="btn btn-g" data-act="trackNoGuideSend()" data-i18n="track.ng.btn">Solicitar mi guía</button>
         <p id="track-ng-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
       </div>
