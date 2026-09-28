@@ -1029,6 +1029,7 @@ var I18N = {
     "rep.tel":"Celular o WhatsApp",
     "mi.tel":"Celular o WhatsApp, con el código de tu país",
     "form.err.tel":"Déjanos un celular o WhatsApp: es por donde te escribimos más rápido.",
+    "form.tel":"Celular o WhatsApp",
     "vol.mira.ey":"El método",
     "vol.mira.t":"MIRA: dos miradas que se amplían",
     "vol.mira.p":"Le llamamos MIRA porque de eso se trata: ampliar la mirada. Y porque la sigla nombra sus cuatro fases — Marco, Inmersión, Reflexión y Anclaje.",
@@ -4671,13 +4672,16 @@ function copyAccount(){
 
 function formSend(){
   var g=function(id){var el=document.getElementById(id);return el?(el.value||"").trim():"";};
-  var n=g("cf-name"), e=g("cf-email"), m=g("cf-msg");
+  var n=g("cf-name"), e=g("cf-email"), m=g("cf-msg"), tel=g("cf-tel");
   var note=document.getElementById("cf-note");
   var es=(typeof lang!=="undefined" && lang==="es");
   function show(t,ok){ if(!note)return; note.style.display="block"; note.style.color= ok?"var(--g)":"#b00020"; note.textContent=t; }
   if(!e || !m){ show(es?"Escribe tu correo y un mensaje, por favor.":"Please enter your email and a message.", false); return; }
+  /* El celular también aquí (decisión de Sebas, 28 sep 2026): el mensaje llega
+     por correo, y la respuesta más rápida muchas veces es por WhatsApp. */
+  if(!telOk(tel)){ show(t("form.err.tel"), false); var ct=document.getElementById("cf-tel"); if (ct) ct.focus(); return; }
   var subject=encodeURIComponent((es?"Contacto web — ":"Web contact — ")+(n||e));
-  var body=encodeURIComponent((es?"Nombre: ":"Name: ")+n+"\n"+(es?"Correo: ":"Email: ")+e+"\n\n"+m);
+  var body=encodeURIComponent((es?"Nombre: ":"Name: ")+n+"\n"+(es?"Correo: ":"Email: ")+e+"\n"+(es?"Celular: ":"Mobile: ")+tel+"\n\n"+m);
   window.location.href="mailto:sebas@thegiveandgrowproject.org?subject="+subject+"&body="+body;
   show(es?"Abrimos tu app de correo con el mensaje listo para enviar.":"We opened your email app with the message ready to send.", true);
 }
@@ -6305,9 +6309,14 @@ function trackNoGuideSend(){
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
     note.style.display=""; note.style.color="var(--err,#c0392b)"; note.textContent = t("track.ng.invalid"); return;
   }
+  var tel = (document.getElementById("track-ng-tel").value||"").trim();
+  if (!telOk(tel)){
+    note.style.display=""; note.style.color="var(--err,#c0392b)"; note.textContent = t("form.err.tel");
+    document.getElementById("track-ng-tel").focus(); return;
+  }
   // Puente humano: abre correo prellenado a contabilidad para que Sebas responda con la guía.
   var subject = encodeURIComponent(t("track.ng.mailsubj"));
-  var body = encodeURIComponent(t("track.ng.mailbody").replace("{email}", email));
+  var body = encodeURIComponent(t("track.ng.mailbody").replace("{email}", email) + "\n\n" + t("form.tel") + ": " + tel);
   window.location.href = "mailto:contabilidad@thegiveandgrowproject.org?subject="+subject+"&body="+body;
   note.style.display=""; note.style.color="var(--g)"; note.textContent = t("track.ng.sent");
 }

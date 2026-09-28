@@ -1927,5 +1927,6 @@
   "vf.err.acu.sabe": "Your guardian needs to know you are signing up.",
   "rep.tel": "Mobile or WhatsApp",
   "mi.tel": "Mobile or WhatsApp, with your country code",
-  "form.err.tel": "Leave us a mobile or WhatsApp number: it's the fastest way for us to reach you."
+  "form.err.tel": "Leave us a mobile or WhatsApp number: it's the fastest way for us to reach you.",
+  "form.tel": "Mobile or WhatsApp"
 }
