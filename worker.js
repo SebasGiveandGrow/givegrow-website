@@ -2138,7 +2138,9 @@ async function adminSalud(env) {
   await enCola("certificados_sin_firmar",
     "SELECT COUNT(*) AS n, MIN(emitido_en) AS masViejo FROM certificados " +
     "WHERE anulado_en IS NULL AND (firma_rl_en IS NULL OR firma_rf_en IS NULL)",
-    "Pantalla «Firma» · emitido no es firmado: sin las dos firmas no sale al donante", 68, "/firma");
+    /* A la lista de aportes y no a /firma: el Representante Legal firma ahi
+       desde el panel; la Revisora Fiscal sigue entrando por /firma. */
+    "Lista de aportes (Representante Legal) o pantalla «Firma» (Revisora Fiscal) · sin las dos firmas no sale al donante", 68, "#sec-aportes");
   /* LAS TRES COLAS DE PAYPAL. El panel ya tiene las bandejas —membresias,
      donaciones del boton y eventos sin casa— pero `salud` es lo que DICE que
      algo necesita atencion, y no las miraba. Una bandeja que hay que acordarse
@@ -2520,7 +2522,7 @@ async function adminSalud(env) {
   });
 }
 
-async function adminAportes(env, url) {
+async function adminAportes(env, url, quien) {
   const estado = url.searchParams.get("estado");
   const limite = entero(url.searchParams.get("limite"), 50, 1, 200);
   const where = estado ? " WHERE a.estado = ?" : "";
@@ -2542,6 +2544,10 @@ async function adminAportes(env, url) {
     "        (CASE WHEN c.firma_rf_en IS NOT NULL THEN 1 ELSE 0 END) " +
     " FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_firmas, " +
     "(SELECT c.enviado_en FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_enviado, " +
+    /* CUAL de las dos falta, no solo cuantas: el boton «Firmar» solo se le
+       enseña a quien le falta SU firma. */
+    "(SELECT (c.firma_rl_en IS NOT NULL) FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_rl, " +
+    "(SELECT (c.firma_rf_en IS NOT NULL) FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS cert_rf, " +
     /* El último intento de mandarle el recibo. Es lo que permite contestar «no me
        llegó» sin salir del panel: si dice `fallo` o `simulado`, no llegó y ya
        sabemos por qué. */
@@ -2561,6 +2567,9 @@ async function adminAportes(env, url) {
   const cuenta = "SELECT COUNT(*) AS n FROM aportes a" + where;
   const tot = await (estado ? env.DB.prepare(cuenta).bind(estado) : env.DB.prepare(cuenta)).first();
   return json({ aportes: r.results || [], firma_activa: firmaConfigurada(env),
+                /* Que casilla puede firmar quien mira el panel: «rl», «rf» o null.
+                   Es lo mismo que `/firma` le dice a su pantalla. */
+                firmante: quienFirma(env, quien),
                 total: (tot && tot.n) || 0, tope: limite });
 }
 
@@ -2920,6 +2929,18 @@ async function firmaFirmar(request, env, numero, sesion) {
   /* CUANDO ESTÁN LAS DOS, SALE. Ni antes —el donante recibiría un borrador con
      dos nombres que nadie puso— ni por un camino aparte que haya que acordarse
      de disparar. */
+  const salida = await enviarCertificadoFirmado(env, numero);
+  return json({ ok: true, numero, papel, huella: huella.slice(0, 16),
+                completo: salida.completo, enviado: salida.enviado,
+                correo: salida.correo });
+}
+
+/* EL ENVIO DE UN CERTIFICADO YA FIRMADO, aparte de la firma. Nacio dentro de
+   `firmaFirmar` y ahi sigue llamandose; se saco para que el panel pueda
+   REINTENTARLO cuando la segunda firma se registro pero el correo no salio
+   —«firmado, no salio», que hasta hoy no tenia boton—. Sale solo con las dos
+   firmas y solo una vez (la reserva de `enviado_en`). */
+async function enviarCertificadoFirmado(env, numero) {
   const ya = await env.DB.prepare(
     "SELECT firma_rl_en, firma_rf_en, enviado_en, datos FROM certificados WHERE numero = ?"
   ).bind(numero).first();
@@ -2963,9 +2984,54 @@ async function firmaFirmar(request, env, numero, sesion) {
     }
   }
 
-  return json({ ok: true, numero, papel, huella: huella.slice(0, 16),
-                completo: !!(ya && ya.firma_rl_en && ya.firma_rf_en), enviado,
-                correo: correoDonante });
+  return { completo: !!(ya && ya.firma_rl_en && ya.firma_rf_en), enviado, correo: correoDonante };
+}
+
+/* POST /api/admin/certificado/<n>/enviar — mandarlo al donante desde el panel.
+   Dos mundos, los mismos que al emitir:
+   · Con el flujo de firma ENCENDIDO solo sale si tiene las dos firmas. Es el
+     reintento de «firmado, no salio».
+   · APAGADO, es el «Enviarlo» que no se marco al emitir: hasta hoy un
+     certificado emitido sin enviar no tenia como salir despues. */
+async function adminEnviarCertificado(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const c = await env.DB.prepare(
+    "SELECT numero, guia, datos, anulado_en, revision_en, firma_rl_en, firma_rf_en, enviado_en FROM certificados WHERE numero = ?"
+  ).bind(numero).first();
+  if (!c) return json({ error: "no_encontrado" }, 404);
+  if (c.anulado_en) return json({ error: "esta_anulado", ayuda: "Un certificado anulado no se envía." }, 409);
+  if (c.revision_en) return json({ error: "sin_respaldo",
+    ayuda: "Perdió su respaldo: el pago se revirtió después de emitirlo. No se envía mientras esté en revisión." }, 409);
+  if (c.enviado_en) return json({ error: "ya_enviado", ayuda: "Ya salió al donante." }, 409);
+
+  let salida;
+  if (firmaConfigurada(env)) {
+    if (!c.firma_rl_en || !c.firma_rf_en) {
+      return json({ error: "faltan_firmas",
+        ayuda: "Sale cuando lo firmen el Representante Legal y la Revisora Fiscal: faltan " +
+               [!c.firma_rl_en ? "la del Representante Legal" : "", !c.firma_rf_en ? "la de la Revisora Fiscal" : ""]
+                 .filter(Boolean).join(" y ") + "." }, 409);
+    }
+    salida = await enviarCertificadoFirmado(env, numero);
+  } else {
+    let d = {};
+    try { d = JSON.parse(c.datos) || {}; } catch (e) { /* nada */ }
+    const a = await env.DB.prepare("SELECT email FROM donantes d JOIN aportes a ON a.donante_id = d.id WHERE a.guia = ?")
+      .bind(c.guia).first();
+    const correo = (a && a.email) || null;
+    if (!correo) return json({ error: "sin_correo", ayuda: "El donante no tiene correo registrado: descárgalo y entrégalo tú." }, 409);
+    const envio = await correoCertificado(env, d, correo);
+    if (envio && envio.ok) {
+      await env.DB.prepare("UPDATE certificados SET enviado_en = datetime('now'), enviado_a = ? WHERE numero = ? AND enviado_en IS NULL")
+        .bind(correo, numero).run();
+    }
+    salida = { enviado: !!(envio && envio.ok), correo };
+  }
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "certificado " + numero + (salida.enviado ? " ENVIADO al donante desde el panel" : " · envío desde el panel NO salió")).run();
+  return json({ ok: true, numero, enviado: salida.enviado, correo: salida.correo || null,
+                ...(salida.enviado ? {} : { ayuda: "No salió: mira la cola de correos en Salud." }) });
 }
 
 async function adminEmitirCertificado(request, env, guia, quien) {
@@ -15879,8 +15945,12 @@ function celdaCert(a){
        van, porque una de dos no es cero. No es alarma —es el estado correcto—,
        por eso va en gris apagado y no en el ámbar de arriba. */
     if (FIRMA_ACTIVA && !a.cert_enviado && Number(a.cert_firmas || 0) < 2){
+      /* Si la que falta es LA TUYA, el boton esta aqui mismo. */
+      var falta = (FIRMANTE === "rl" && !Number(a.cert_rl)) || (FIRMANTE === "rf" && !Number(a.cert_rf));
       return enlace + '<br><span class="mu" style="font-size:12px">esperando firma &middot; ' +
-        Number(a.cert_firmas || 0) + ' de 2</span>' + anular;
+        Number(a.cert_firmas || 0) + ' de 2</span>' +
+        (falta ? '<br><button class="copy" data-cfirmar="' + esc(a.certificado) + '">Firmar como ' + esc(PAPEL_ES[FIRMANTE]) + '&hellip;</button>' : "") +
+        anular;
     }
     /* FIRMADO Y NO SALIO. firmaFirmar manda el certificado al registrarse la
        segunda firma; si ese envio falla, lo unico que pasa es un console.error.
@@ -15888,7 +15958,13 @@ function celdaCert(a){
        lo mostraba igual que uno entregado. Es el peor de los desenlaces —el
        tramite entero se completo y el donante no tiene nada— asi que grita. */
     if (FIRMA_ACTIVA && Number(a.cert_firmas || 0) >= 2 && !a.cert_enviado){
-      return enlace + '<br><strong style="color:#A84D00">firmado, no salió</strong>' + anular;
+      return enlace + '<br><strong style="color:#A84D00">firmado, no salió</strong>' +
+        (a.correo ? '<br><button class="copy" data-cenviar="' + esc(a.certificado) + '">Reenviar al donante</button>' : "") + anular;
+    }
+    /* Flujo apagado y emitido sin enviar: antes no habia como mandarlo despues. */
+    if (!FIRMA_ACTIVA && !a.cert_enviado && a.correo){
+      return enlace + '<br><span class="mu" style="font-size:12px">no se ha enviado</span>' +
+        '<br><button class="copy" data-cenviar="' + esc(a.certificado) + '">Enviar al donante</button>' + anular;
     }
     return enlace + anular;
   }
@@ -15954,6 +16030,14 @@ function abrirCert(guia){
         '<input type="checkbox" id="c-enviar"' + (a.correo ? " checked" : " disabled") + '> ' +
         (a.correo ? "Enviarlo a " + esc(a.correo) : "Sin correo del donante: solo se emite") +
       '</label>' +
+      /* Con el flujo de firma encendido, quien emite y firma puede hacer las dos
+         cosas de una vez. Queda marcada: si lo revisaste para emitirlo, lo
+         revisaste para firmarlo. Se puede desmarcar. */
+      (FIRMA_ACTIVA && FIRMANTE
+        ? '<label style="display:flex;gap:8px;align-items:center;margin:0 0 14px;font-size:14px">' +
+            '<input type="checkbox" id="c-firmar" checked> Firmarlo yo ahora como ' + esc(PAPEL_ES[FIRMANTE]) +
+          '</label>'
+        : "") +
       '<p id="c-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>' +
       '<div style="display:flex;gap:10px;margin-top:8px">' +
         '<button class="btn btn-g" id="c-ok" data-emitir="' + esc(guia) + '">Emitir</button>' +
@@ -15962,6 +16046,45 @@ function abrirCert(guia){
     '</div>';
   caja.style.display = "block";
 }
+/* Firmar: el mismo acto que en /firma, con la sesion del panel. */
+function firmarCert(num){
+  return fetch("/api/admin/certificado/" + encodeURIComponent(num) + "/firmar", { method: "POST" })
+    .then(function(r){ return r.json().catch(function(){ return { error: "http_" + r.status }; }); })
+    .catch(function(){ return { error: "sin_conexion" }; });
+}
+document.addEventListener("click", function(e){
+  var bf = e.target.closest ? e.target.closest("[data-cfirmar]") : null;
+  if (bf){
+    var num = bf.getAttribute("data-cfirmar");
+    /* LO QUE SE FIRMA SE DICE. El certificado dice «bajo la gravedad de
+       juramento»: la confirmacion no es un tramite, es la ultima vez que alguien
+       mira el documento antes de que lleve tu nombre. */
+    if (!confirm("Vas a firmar " + num + " como " + PAPEL_ES[FIRMANTE] + ".\\n\\nTu firma queda registrada con la huella del documento, y el certificado la presenta bajo la gravedad de juramento. ¿Revisaste el PDF?")) return;
+    bf.disabled = true; bf.textContent = "Firmando…";
+    firmarCert(num).then(function(f){
+      if (!f || !f.ok){ bf.disabled = false; bf.textContent = "Firmar…"; alert("No quedó firmado: " + ((f && (f.ayuda || f.error)) || "sin respuesta")); return; }
+      alert(f.completo
+        ? (f.enviado ? "Firmado. Con las dos firmas, salió a " + (f.correo || "el donante") + "."
+                     : "Firmado por los dos, pero el correo no salió: usa «Reenviar al donante».")
+        : "Firmado. Sale al donante cuando firme " + (FIRMANTE === "rl" ? "la Revisora Fiscal" : "el Representante Legal") + ".");
+      cargarAportes(); cargarSalud();
+    });
+    return;
+  }
+  var be = e.target.closest ? e.target.closest("[data-cenviar]") : null;
+  if (be){
+    var n2 = be.getAttribute("data-cenviar");
+    if (!confirm("¿Enviar " + n2 + " al donante ahora?")) return;
+    be.disabled = true; be.textContent = "Enviando…";
+    fetch("/api/admin/certificado/" + encodeURIComponent(n2) + "/enviar", { method: "POST" })
+      .then(conEstado).then(function(res){
+        if (fallo(res.http, res.d)){ be.disabled = false; be.textContent = "Reintentar"; return; }
+        alert(res.d.enviado ? "Salió a " + (res.d.correo || "el donante") + "." : (res.d.ayuda || "No salió."));
+        cargarAportes(); cargarSalud();
+      }).catch(function(){ be.disabled = false; be.textContent = "Reintentar"; });
+  }
+});
+
 function campo(id, etiqueta, valor){
   return '<label style="display:block;margin-bottom:10px;font-size:13px;font-weight:600">' + esc(etiqueta) +
     '<input id="' + id + '" value="' + esc(valor || "") + '" ' +
@@ -16020,10 +16143,14 @@ function cargarResumen(){
 }
 
 var FIRMA_ACTIVA = false;
+/* Que casilla firma quien mira el panel («rl», «rf» o null). Lo dice el
+   servidor, que es quien lo vuelve a comprobar al firmar. */
+var FIRMANTE = null;
+var PAPEL_ES = { rl: "Representante Legal", rf: "Revisora Fiscal" };
 function cargarAportes(){
   pedirJSON("/api/admin/aportes?limite=100" + (FILTRO ? "&estado=" + encodeURIComponent(FILTRO) : ""), "filas")
     .then(function(d){
-      FIRMA_ACTIVA = !!d.firma_activa; pintarFilas(d.aportes || []);
+      FIRMA_ACTIVA = !!d.firma_activa; FIRMANTE = d.firmante || null; pintarFilas(d.aportes || []);
       var tb = document.getElementById("filas");
       if (tb && (d.aportes || []).length) tb.insertAdjacentHTML("afterbegin", filaTope(d, 9, "aportes",
         "Van los más recientes primero, así que lo que falta es lo MÁS VIEJO. Filtra por estado arriba."));
@@ -16112,6 +16239,21 @@ document.addEventListener("click", function(e){
         /* Se recuerda si se PIDIO enviarlo: si no, «no se envio» es lo esperado
            y no un correo caido (antes salia en rojo diciendo que fallo). */
         res.d.sin_pedir = !(env && env.checked && !env.disabled);
+        var fir = document.getElementById("c-firmar");
+        if (fir && fir.checked && res.d.numero){
+          return firmarCert(res.d.numero).then(function(f){
+            if (f && f.ok){
+              res.d.ayuda = f.completo
+                ? (f.enviado ? "Emitido y firmado. Con las dos firmas, salió a " + (f.correo || "el donante") + "."
+                             : "Emitido y firmado por los dos, pero el correo no salió: usa «Reenviar al donante».")
+                : "Emitido y firmado por ti. Sale al donante cuando firme " + (FIRMANTE === "rl" ? "la Revisora Fiscal" : "el Representante Legal") + ".";
+            } else {
+              res.d.ayuda = "Emitido, pero tu firma NO quedó: " + ((f && (f.ayuda || f.error)) || "sin respuesta") + ". Fírmalo desde la fila.";
+            }
+            cargarAportes(); cargarSalud();
+            cerrarCert(res.d);
+          });
+        }
         cerrarCert(res.d);
       })
       .catch(function(){ ok.disabled = false; ok.textContent = "Reintentar"; });
@@ -21194,7 +21336,7 @@ export default {
         if (cbo) return await adminBorrarMedio(request, env, cbo[1].toUpperCase(), Number(cbo[2]), sesion.email);
         const cfi = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})$/i);
         if (cfi) return await adminCasoFicha(env, cfi[1].toUpperCase());
-        if (ruta === "/api/admin/aportes")  return await adminAportes(env, url);
+        if (ruta === "/api/admin/aportes")  return await adminAportes(env, url, sesion.email);
         const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
         if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
         const cw = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/conciliar$/);
@@ -21208,6 +21350,15 @@ export default {
         if (cp) return await adminCertificadoPdf(env, cp[1].toUpperCase());
         const ca = ruta.match(/^\/api\/admin\/certificado\/(CD-\d{4}-\d{6})\/anular$/i);
         if (ca) return await adminAnularCertificado(request, env, ca[1].toUpperCase(), sesion.email);
+        /* FIRMAR DESDE EL PANEL. Es el mismo `firmaFirmar` de /firma, con la sesion
+           del panel: quien firma lo sigue decidiendo `quienFirma` por correo, no
+           la audiencia. El Representante Legal ya esta en el panel; mandarlo a
+           otra pantalla con otra aplicacion de Access para un clic era el rodeo.
+           La Revisora Fiscal sigue en /firma, sin ver donantes ni comprobantes. */
+        const cf = ruta.match(/^\/api\/admin\/certificado\/(CD-\d{4}-\d{6})\/firmar$/i);
+        if (cf) return await firmaFirmar(request, env, cf[1].toUpperCase(), sesion);
+        const cv = ruta.match(/^\/api\/admin\/certificado\/(CD-\d{4}-\d{6})\/enviar$/i);
+        if (cv) return await adminEnviarCertificado(request, env, cv[1].toUpperCase(), sesion.email);
 
         /* Entregas (Fase 6). El borrador y sus fotos viven tras Access hasta que
            alguien las publica: en terreno se registra rápido y se revisa después. */
