@@ -2887,7 +2887,20 @@ async function firmaFirmar(request, env, numero, sesion) {
      porque fallo el envio" de "no salio porque el donante no tiene correo". Son
      dos cosas distintas y solo una es un fallo. */
   let correoDonante = null;
+  /* SE RESERVA ANTES DE ENVIAR. Si las dos firmas llegan a la vez, las dos
+     peticiones leen «firmado por ambos y sin enviar» y el donante recibia el
+     certificado DOS veces. Ahora gana UNA: la que logra marcar `enviado_en`
+     mientras seguia NULL (con `enviado_a = 'enviando'` hasta saber a quien
+     salio). Si el correo no sale, se suelta la reserva para que se pueda
+     reintentar. */
+  let reservado = false;
   if (ya && ya.firma_rl_en && ya.firma_rf_en && !ya.enviado_en) {
+    const r = await env.DB.prepare(
+      "UPDATE certificados SET enviado_en = datetime('now'), enviado_a = 'enviando' WHERE numero = ? AND enviado_en IS NULL"
+    ).bind(numero).run();
+    reservado = !!(r.meta && r.meta.changes);
+  }
+  if (reservado) {
     try {
       const d = JSON.parse(ya.datos);
       const a = await env.DB.prepare("SELECT email FROM donantes d JOIN aportes a ON a.donante_id = d.id WHERE a.guia = ?")
@@ -2902,6 +2915,11 @@ async function firmaFirmar(request, env, numero, sesion) {
         enviado = true;
       }
     } catch (e) { console.error("correo tras firmar", numero, e && e.message); }
+    if (!enviado) {
+      await env.DB.prepare(
+        "UPDATE certificados SET enviado_en = NULL, enviado_a = NULL WHERE numero = ? AND enviado_a = 'enviando'"
+      ).bind(numero).run();
+    }
   }
 
   return json({ ok: true, numero, papel, huella: huella.slice(0, 16),
@@ -10411,10 +10429,22 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
   }, 409);
 
   if (c.descartar) {
-    const motivo = limpiar(c.motivo, 280) || "sin motivo";
-    await env.DB.prepare(
-      "UPDATE aportes SET estado = 'rechazada', wompi_estado = ?, actualizada_en = datetime('now') WHERE guia = ?"
+    /* CON MOTIVO Y CON «reportada» EN EL WHERE, igual que confirmar. Sin lo
+       segundo, dos pestañas: una confirma —el recibo ya salio al donante— y la
+       otra descarta desde una lectura vieja, y el aporte quedaba «rechazada»
+       con su recibo en la bandeja del donante. Y descartar no se deshace: como
+       anular un certificado o un egreso, pide decir por que. */
+    const motivo = limpiar(c.motivo, 280);
+    if (!motivo) return json({ error: "motivo_requerido",
+      ayuda: "Escribe por qué se descarta: por ejemplo, «no aparece en el extracto del 25 al 28 de septiembre»." }, 400);
+    const des = await env.DB.prepare(
+      "UPDATE aportes SET estado = 'rechazada', wompi_estado = ?, actualizada_en = datetime('now') " +
+      "WHERE guia = ? AND estado = 'reportada'"
     ).bind("DESCARTADA_MANUAL: " + motivo, guia).run();
+    if (!des.meta || !des.meta.changes) {
+      return json({ error: "estado_no_permite",
+        ayuda: "Otra persona u otra pestaña la movió mientras tanto. Recarga la tabla antes de decidir." }, 409);
+    }
     await env.DB.prepare(
       "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
     ).bind(quien || "?", "transferencia " + guia + " DESCARTADA: " + motivo).run();
@@ -10427,6 +10457,25 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
       error: "referencia_requerida",
       ayuda: "Escribe el número del comprobante bancario: es el que cita el certificado, y no puede ser un id de Wompi que no existe."
     }, 422);
+  }
+
+  /* UNA LINEA DEL EXTRACTO, UN APORTE. Nada impedia confirmar dos guias con la
+     misma referencia: un donante que reporta dos veces la misma transferencia
+     —el freno por correo se salta en paralelo, ya medido— y dos confirmaciones
+     contra el mismo renglon daban dos recibos y dos certificados por un solo
+     deposito, con esa referencia citada en los dos. Puede ser legitimo (el
+     banco repite referencias genericas), asi que no se prohibe: se pregunta, y
+     si se sigue, queda escrito por que. */
+  const gemela = await env.DB.prepare(
+    "SELECT guia FROM aportes WHERE LOWER(referencia_pago) = LOWER(?) AND guia <> ? LIMIT 1"
+  ).bind(refer, guia).first();
+  const porQueRepite = limpiar(c.referencia_repetida_motivo, 200);
+  if (gemela && !porQueRepite) {
+    return json({
+      error: "referencia_repetida", guia_anterior: gemela.guia,
+      ayuda: "La referencia «" + refer + "» ya confirmó la guía " + gemela.guia +
+             ". Si en el extracto son DOS depósitos distintos, escribe por qué y confirma otra vez."
+    }, 409);
   }
 
   const hecho = await env.DB.prepare(
@@ -10449,7 +10498,8 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
   }
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
-  ).bind(quien || "?", "transferencia " + guia + " CONFIRMADA contra extracto · ref " + refer).run();
+  ).bind(quien || "?", "transferencia " + guia + " CONFIRMADA contra extracto · ref " + refer +
+         (gemela ? " · REPITE la ref de " + gemela.guia + ": " + porQueRepite : "")).run();
 
   /* Ahora sí hay dinero: el donante recibe lo mismo que quien paga por la
      pasarela — su recibo con la guía. */
@@ -12790,11 +12840,21 @@ async function adminEgresoSoporte(request, env, numero, quien) {
   const bien = spec.ext === "pdf" ? cabeza.indexOf("%PDF") === 0 : /^\s*</.test(cabeza);
   if (!bien) return json({ error: "no_es_lo_que_dice", ayuda: "El archivo no parece " + spec.ext.toUpperCase() + "." }, 415);
 
-  const clave = "egresos/" + numero + "/soporte." + spec.ext;
+  /* CLAVE PROPIA POR SUBIDA, y el archivo solo se queda si la base lo acepta.
+     Con una clave fija, dos subidas a la vez escribian el mismo objeto: la
+     segunda pisaba el XML de la DIAN que ya estaba guardado, el UPDATE
+     condicional no cambiaba nada y aun asi se decia «guardado». El soporte de
+     un gasto no se reemplaza en silencio. */
+  const clave = "egresos/" + numero + "/soporte-" + tokenNuevo().slice(0, 8) + "." + spec.ext;
   await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
-  await env.DB.prepare(
+  const puesto = await env.DB.prepare(
     "UPDATE egresos SET soporte_key = ?, actualizado_en = datetime('now') WHERE numero = ? AND soporte_key IS NULL"
   ).bind(clave, numero).run();
+  if (!puesto.meta || !puesto.meta.changes) {
+    await env.MEDIA.delete(clave);
+    return json({ error: "ya_tiene_soporte",
+      ayuda: "Este egreso ya tiene su archivo. Un soporte no se reemplaza: si el guardado es el equivocado, anula el egreso y regístralo de nuevo." }, 409);
+  }
 
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
@@ -13002,7 +13062,7 @@ const RECHAZO_EN_CASTELLANO = {
     "El registro no se pudo leer. Probablemente el archivo llegó cortado por WhatsApp."
 };
 
-async function adminInspeccionesImportar(request, env) {
+async function adminInspeccionesImportar(request, env, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
@@ -13067,6 +13127,16 @@ async function adminInspeccionesImportar(request, env) {
       informe.push({ familia: etiqueta, numero: d.numero, repetida: true });
       continue;
     }
+
+    /* QUIEN LA CARGO, NO SOLO A NOMBRE DE QUIEN. Las filas de auditoria que deja
+       `triageInspeccionRecibir` —la inspeccion, y el caso que pasa a
+       «visitado»— llevan el correo del ingeniero, que es de quien responde por
+       lo que dice. Pero la carga la hizo otra persona desde el panel, y sin
+       esta linea cualquier cuenta del panel podia dejar una inspeccion firmada
+       a nombre de cualquier ingeniero sin rastro de quien fue. */
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(quien || "?", "inspeccion " + d.numero + " IMPORTADA desde respaldo a nombre de " + correo).run();
 
     let subidas = 0, fallidas = 0;
     for (const f of fotos) {
@@ -13746,14 +13816,54 @@ async function adminBorrarInscripcion(request, env, id, quien) {
                   ayuda: "Escribe por que se borra. Es lo unico que va a quedar de esta fila." }, 400);
   }
 
-  /* Se lee ANTES de borrar, y solo el tipo: es lo que la auditoria necesita y
-     lo unico que puede conservarse sin deshacer la supresion. */
-  const f = await env.DB.prepare("SELECT id, tipo FROM inscripciones WHERE id = ?").bind(id).first();
+  /* Se lee ANTES de borrar el tipo —lo unico que la auditoria conserva— y el
+     correo, que no se guarda: sirve para encontrar las otras filas donde vive. */
+  const f = await env.DB.prepare("SELECT id, tipo, email FROM inscripciones WHERE id = ?").bind(id).first();
   if (!f) return json({ error: "no_encontrada" }, 404);
 
+  /* TODO O NADA, Y TODO LO QUE ES SUYO. Hasta el 28 sep 2026 eran dos DELETE
+     sueltos: primero los consentimientos, despues la fila. Con una fundacion
+     que ya tenia cuestionario, el segundo fallaba por la llave de
+     `fichas_fundacion` —reproducido en el banco local: 500, la fila con sus
+     datos intacta y la PRUEBA del consentimiento ya borrada—. Lo peor de los
+     dos mundos. Ahora va en un `batch`, que D1 corre como una transaccion.
+
+     Y se lleva lo que quedaba fuera: la ficha del cuestionario, los rastros
+     con su correo como sujeto (la verificacion de matricula de un ingeniero lo
+     usa) y el registro de los correos que se le mandaron por esta via. Los
+     correos atados a una GUIA no se tocan: son la prueba de que a un donante le
+     llego su recibo, y esa persona puede ser donante tambien. */
   const sujeto = "inscripcion " + id;
-  await env.DB.prepare("DELETE FROM consentimientos WHERE sujeto = ?").bind(sujeto).run();
-  await env.DB.prepare("DELETE FROM inscripciones WHERE id = ?").bind(id).run();
+  const correo = String(f.email || "").trim().toLowerCase();
+  const pasos = [
+    env.DB.prepare("DELETE FROM fichas_fundacion WHERE inscripcion = ?").bind(id),
+    env.DB.prepare("DELETE FROM consentimientos WHERE sujeto = ?").bind(sujeto)
+  ];
+  if (correo) {
+    pasos.push(env.DB.prepare("DELETE FROM consentimientos WHERE LOWER(sujeto) = ?").bind(correo));
+    pasos.push(env.DB.prepare("DELETE FROM correos WHERE LOWER(para) = ? AND guia IS NULL").bind(correo));
+  }
+  pasos.push(env.DB.prepare("DELETE FROM inscripciones WHERE id = ?").bind(id));
+  await env.DB.batch(pasos);
+
+  /* Los archivos del cuestionario (logo, fotos, soportes) DESPUES de la base:
+     si R2 falla, la persona ya no esta en ninguna tabla y se dice cuantos
+     archivos quedaron, en vez de callarlo. */
+  let archivosPendientes = 0;
+  if (env.MEDIA) {
+    try {
+      let cursor;
+      do {
+        const lista = await env.MEDIA.list({ prefix: "fichas/" + id + "/", cursor });
+        const claves = (lista.objects || []).map(o => o.key);
+        if (claves.length) await env.MEDIA.delete(claves);
+        cursor = lista.truncated ? lista.cursor : undefined;
+      } while (cursor);
+    } catch (e) {
+      console.error("supresion R2", id, e && e.message);
+      archivosPendientes = -1;
+    }
+  }
 
   /* La auditoria va DESPUES del borrado, para que no quede una linea diciendo
      que se borro algo que luego fallo al borrarse. */
@@ -13761,7 +13871,9 @@ async function adminBorrarInscripcion(request, env, id, quien) {
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "inscripcion " + id + " (" + (f.tipo || "?") + ") SUPRIMIDA · " + motivo).run();
 
-  return json({ ok: true, id, suprimida: true });
+  return json({ ok: true, id, suprimida: true,
+                ...(archivosPendientes ? { aviso: "archivos_pendientes",
+                  ayuda: "Se borro de la base, pero los archivos del cuestionario (fichas/" + id + "/) no se pudieron borrar de R2. Hay que borrarlos a mano." } : {}) });
 }
 
 /* ========================================================================
@@ -14445,12 +14557,23 @@ async function adminCrearEntrega(request, env, quien) {
   });
 }
 
-async function adminSubirFoto(request, env, numero, url) {
+async function adminSubirFoto(request, env, numero, url, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
 
-  const e = await env.DB.prepare("SELECT numero, fotos FROM entregas WHERE numero = ?").bind(numero).first();
+  const e = await env.DB.prepare(
+    "SELECT numero, fotos, publicada_en, anulada_en FROM entregas WHERE numero = ?"
+  ).bind(numero).first();
   if (!e) return json({ error: "no_encontrada" }, 404);
+  /* A UN ACTA PUBLICADA NO SE LE AGREGAN FOTOS EN CALIENTE. /evidencia/ sirve
+     al instante lo que tiene un acta publicada, y publicar existe justo para
+     que alguien mire antes que no salga nada que no deba —una cara de un
+     menor, una direccion en una pared—. Subir despues se saltaba esa mirada.
+     Se despublica, se sube, se revisa y se vuelve a publicar. */
+  if (e.anulada_en) return json({ error: "entrega_anulada",
+    ayuda: "Esta acta está anulada: no se le agregan fotos." }, 409);
+  if (e.publicada_en) return json({ error: "entrega_publicada",
+    ayuda: "Esta acta ya está publicada y las fotos salen al sitio al instante. Despublícala, sube la foto, revísala y vuelve a publicar." }, 409);
 
   const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
   const ext = TIPOS_FOTO[tipo];
@@ -14459,6 +14582,8 @@ async function adminSubirFoto(request, env, numero, url) {
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
   if (bytes.length > MAX_FOTO) return json({ error: "archivo_muy_grande", max_mb: 8 }, 413);
+  /* Lo que dice ser, como en las fotos de casos y de inspecciones. */
+  if (noEsLoQueDice(tipo, bytes)) return rechazoNoEsFoto();
 
   let fotos = [];
   try { fotos = JSON.parse(e.fotos || "[]"); } catch (x) { /* nada */ }
@@ -14473,6 +14598,9 @@ async function adminSubirFoto(request, env, numero, url) {
   await env.DB.prepare(
     "UPDATE entregas SET fotos = ?, actualizada_en = datetime('now') WHERE numero = ?"
   ).bind(JSON.stringify(fotos), numero).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "entrega " + numero + " · foto " + archivo + " agregada").run();
 
   return json({ ok: true, archivo, total: fotos.length });
 }
@@ -15951,14 +16079,25 @@ document.addEventListener("click", function(e){
     var ref = window.prompt("Confirmar " + g + " contra el extracto.\\n\\nNúmero del comprobante bancario (lo cita el certificado):");
     if (!ref) return;
     cf.disabled = true; cf.textContent = "…";
-    fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
-      method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ referencia: ref })
-    }).then(conEstado)
-      .then(function(res){
-        if (fallo(res.http, res.d)){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); return; }
-        cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
-      })
-      .catch(function(){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); });
+    /* Si la referencia ya confirmo otra guia, el servidor pregunta (409) y aqui
+       se le pregunta a la persona: solo con un motivo escrito se confirma. */
+    var confirmar = function(porQue){
+      fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
+        method:"POST", headers:{"content-type":"application/json"},
+        body: JSON.stringify({ referencia: ref, referencia_repetida_motivo: porQue || "" })
+      }).then(conEstado)
+        .then(function(res){
+          if (res.http === 409 && res.d && res.d.error === "referencia_repetida"){
+            var m = window.prompt(res.d.ayuda + "\\n\\n¿Por qué son dos depósitos distintos? (vacío = no confirmar)");
+            if (m) return confirmar(m);
+            cf.disabled = false; cf.textContent = "Confirmar"; return;
+          }
+          if (fallo(res.http, res.d)){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); return; }
+          cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
+        })
+        .catch(function(){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); });
+    };
+    confirmar("");
     return;
   }
   var ds = e.target.closest("[data-desc]");
@@ -17437,6 +17576,7 @@ document.addEventListener("click", function(e){
       body: JSON.stringify({ motivo: mot })
     }).then(function(r){ return r.json(); }).then(function(d){
       if (d && d.error) { alert("No se pudo suprimir: " + (d.ayuda || d.error)); }
+      else if (d && d.aviso) { alert(d.ayuda || d.aviso); }
       cargarInscripciones(); cargarSalud();
     }).catch(function(){ cargarInscripciones(); });
     return;
@@ -17779,7 +17919,7 @@ document.addEventListener("change", function(e){
         encodeURIComponent(f.name.replace(/\\.[a-z0-9]+$/i,"")), {
     method: "POST", headers: {"content-type": f.type}, body: f
   }).then(function(r){ return r.json(); })
-    .then(function(d){ if (d.error) alert("No se pudo subir: " + d.error); cargarEntregas(); })
+    .then(function(d){ if (d.error) alert("No se pudo subir: " + (d.ayuda || d.error)); cargarEntregas(); })
     .catch(function(){ alert("No se pudo subir la foto."); });
 });
 
@@ -20539,6 +20679,27 @@ export default {
         : esFirma
           ? [env.ACCESS_AUD_FIRMA, env.ACCESS_AUD]
           : [env.ACCESS_AUD];
+      /* LA ESCRITURA SOLO DESDE LA MISMA PÁGINA. El Worker acepta el token de
+         Access también de la cookie CF_Authorization, y `request.json()` lee un
+         cuerpo `text/plain`: con eso, un formulario de OTRO sitio podía hacer
+         que el navegador de alguien con sesión abierta enviara un POST
+         «simple» —y «Marcar verificada» con cuerpo vacío es justo el acto que le
+         abre el triaje a un ingeniero—. Que funcione depende de cómo Access
+         pone su cookie, que no se ve desde aquí; así que se cierra aquí.
+
+         El navegador SIEMPRE manda `Origin` en un POST/DELETE, y una página
+         del propio panel lo manda igual a este host. Sin `Origin` (curl, un
+         script con token de servicio) no hay navegador ajeno que engañar y
+         se deja pasar. Todas las pantallas llaman a su propio host con rutas
+         relativas —también las de miramicasa.org—, así que comparar contra
+         `url.origin` no deja fuera a ninguna. */
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        const origen = request.headers.get("origin");
+        if (origen && origen !== url.origin) {
+          return json({ error: "origen_no_permitido",
+                        ayuda: "Esta acción solo se puede hacer desde el propio panel." }, 403);
+        }
+      }
       const sesion = await verificarAccess(request, env, audsZona);
       if (!sesion.ok) {
         /* Sin Access configurado no se sirve nada: 503 y una explicación, no un
@@ -20589,6 +20750,16 @@ export default {
           headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
         });
       }
+      /* CON LA AUDIENCIA DE FIRMA SE ENTRA SOLO SI SE FIRMA. La aplicacion de
+         Access dice quien pasa la puerta; `quienFirma` dice quien firma. Sin esto,
+         cualquier correo que la politica de firma dejara pasar veia la cola con
+         nombre y documento de cada donante, y podia leer CUALQUIER certificado
+         —los numeros son consecutivos—, anulados incluidos. El equipo (audiencia
+         del panel) sigue entrando a mirar, como decia la nota de la zona. */
+      if (ruta.startsWith("/api/firma/") && !sesion.equipo && !quienFirma(env, sesion.email)) {
+        return json({ error: "no_firmante",
+          ayuda: "Tu correo no es el de quien firma los certificados. Si debería serlo, avisa al equipo." }, 403);
+      }
       if (ruta === "/api/firma/pendientes") return await firmaPendientes(env, sesion);
       /* EL DOCUMENTO, DENTRO DE LA ZONA DE FIRMA. La pantalla enlazaba el PDF
          por `/api/admin/certificado/<n>.pdf`, y esa ruta NO es zona de firma:
@@ -20608,7 +20779,17 @@ export default {
          No expone nada nuevo: la cola de esta misma pantalla ya muestra nombre
          del donante, documento, monto y guia de cada certificado que lista. */
       const fpdf = ruta.match(/^\/api\/firma\/(CD-\d{4}-\d{6})\.pdf$/i);
-      if (fpdf) return await adminCertificadoPdf(env, fpdf[1].toUpperCase());
+      if (fpdf) {
+        /* Quien firma lee lo que esta por firmar o lo que ya firmo, no el archivo
+           entero: un certificado anulado no se le sirve a la zona de firma. */
+        if (!sesion.equipo) {
+          const vivo = await env.DB.prepare(
+            "SELECT 1 AS s FROM certificados WHERE numero = ? AND anulado_en IS NULL"
+          ).bind(fpdf[1].toUpperCase()).first();
+          if (!vivo) return json({ error: "no_encontrado" }, 404);
+        }
+        return await adminCertificadoPdf(env, fpdf[1].toUpperCase());
+      }
       const fir = ruta.match(/^\/api\/firma\/(CD-\d{4}-\d{6})$/i);
       if (fir) return await firmaFirmar(request, env, fir[1].toUpperCase(), sesion);
 
@@ -20848,7 +21029,7 @@ export default {
         if (ruta === "/api/admin/egresos.csv") return await adminEgresosCSV(env, url);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env, url);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
-        if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
+        if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env, sesion.email);
         if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env, url);
         const mip = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/pdf$/);
         if (mip) return await adminInspeccionEmitirPDF(request, env, mip[1]);
@@ -20877,7 +21058,7 @@ export default {
         if (mec) return await adminEntregaCaso(request, env, mec[1].toUpperCase(), sesion.email);
         if (ruta === "/api/admin/entrega")  return await adminCrearEntrega(request, env, sesion.email);
         const ef = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/foto$/i);
-        if (ef) return await adminSubirFoto(request, env, ef[1].toUpperCase(), url);
+        if (ef) return await adminSubirFoto(request, env, ef[1].toUpperCase(), url, sesion.email);
         const ep = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/publicar$/i);
         if (ep) return await adminPublicarEntrega(request, env, ep[1].toUpperCase(), sesion.email);
         const ea = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/anular$/i);
