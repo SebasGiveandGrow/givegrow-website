@@ -2576,7 +2576,13 @@ async function conteoCertificados(env) {
     "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND revision_en IS NULL AND enviado_en IS NULL AND firma_rf_en IS NULL) AS sin_rf, " +
     "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND revision_en IS NULL AND enviado_en IS NULL " +
     " AND firma_rl_en IS NOT NULL AND firma_rf_en IS NOT NULL) AS sin_salir, " +
-    "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL) AS vivos"
+    "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL) AS vivos, " +
+    "(SELECT COUNT(*) FROM aportes a WHERE a.quiere_certificado = 0 AND a." + PAGADA + " AND NOT EXISTS " +
+    " (SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)) AS sin_pedir, " +
+    /* Transferencias que PIDIERON certificado y siguen sin verificarse: sin
+       confirmar contra el extracto no hay recibo, y sin recibo no hay nada que
+       emitir. Es el cuello de botella real, y la franja lo tiene que decir. */
+    "(SELECT COUNT(*) FROM aportes WHERE estado = 'reportada' AND quiere_certificado = 1) AS reportadas_piden"
   ).first();
   return r || {};
 }
@@ -16125,6 +16131,16 @@ function celdaCert(a){
   if (a.quiere_certificado && APROBADOS.indexOf(a.estado) >= 0){
     return '<button class="copy" data-cert="' + esc(a.guia) + '">Emitir&hellip;</button>';
   }
+  /* PAGADO Y SIN PEDIRLO. El servidor siempre dejo emitir sobre cualquier
+     aporte con recibo; el panel escondia el boton si al donar no se marco la
+     casilla. Pero el certificado lo puede pedir despues —por correo, al hacer
+     su declaracion— y hasta hoy no habia desde donde (28 sep 2026: las tres
+     donaciones pagadas eran de este tipo). Se ofrece, y se dice que no lo pidio,
+     para que emitirlo sea una decision y no un reflejo. */
+  if (APROBADOS.indexOf(a.estado) >= 0){
+    return '<button class="copy" data-cert="' + esc(a.guia) + '">Emitir&hellip;</button>' +
+      '<br><small class="mu">no lo pidió al donar</small>';
+  }
   return a.quiere_certificado ? "pedido" : "—";
 }
 
@@ -16170,6 +16186,10 @@ function abrirCert(guia){
       '<h3 style="margin-bottom:4px">Emitir certificado</h3>' +
       '<p class="mu" style="font-size:13px;margin-bottom:16px">Aporte ' + esc(guia) + ' · ' + pesos(a.monto_centavos) +
         '. Firman el Representante Legal y la Revisora Fiscal: revisa los datos antes de emitir.</p>' +
+      (a.quiere_certificado ? "" :
+        '<p style="font-size:13px;margin:-8px 0 16px;border-left:3px solid var(--amber);padding-left:10px">' +
+        '<strong>Al donar no pidió certificado.</strong> Emítelo si te lo pidió después. Necesita su documento (NIT o C.C.): ' +
+        'si no lo tienes, pídeselo antes de emitir.</p>') +
       campo("c-nombre", "Nombre o razón social", a.donante) +
       campo("c-doc", "Documento (NIT o C.C.)", a.doc_numero) +
       campo("c-ciudad", "Domicilio del donante", a.ciudad) +
@@ -16242,8 +16262,12 @@ function pintarEstadoCert(d){
     partes.push(n(c.sin_salir) + " firmados que no salieron");
   }
   partes.push(n(c.vivos) + " emitidos en total");
-  box.innerHTML = "<p>" + linea1 + "</p>" + '<p class="mu">' + esc(partes.join(" · ")) +
-    (n(c.por_emitir) + n(c.vivos) === 0 ? ". Ninguna donación aprobada ha pedido certificado todavía; cuando una lo pida, su fila trae «Emitir…»." : ".") + "</p>";
+  if (n(c.sin_pedir)) partes.push(n(c.sin_pedir) + " pagadas que no lo pidieron (también se pueden emitir)");
+  box.innerHTML = "<p>" + linea1 + "</p>" + '<p class="mu">' + esc(partes.join(" · ")) + ".</p>" +
+    (n(c.reportadas_piden)
+      ? '<p><strong>' + esc(String(n(c.reportadas_piden))) + (n(c.reportadas_piden) === 1 ? " transferencia pide certificado y sigue" : " transferencias piden certificado y siguen") +
+        ' sin verificar.</strong> Confírmalas contra el extracto en <a href="#sec-transferencias">Transferencias</a>: sin eso no hay recibo ni certificado.</p>'
+      : "");
 }
 
 /* Firmar: el mismo acto que en /firma, con la sesion del panel. */
