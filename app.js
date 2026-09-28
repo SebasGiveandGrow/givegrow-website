@@ -489,6 +489,17 @@ var I18N = {
     "ally.sector.serv":"Servicios profesionales",
     "ally.sector.comercio":"Comercio y retail",
     "ally.sector.otro":"Otro",
+    "ally.sector.edu":"Educación",
+    "ally.sector.tec":"Tecnología",
+    "ally.sector.cons":"Construcción e inmobiliario",
+    "ally.sector.ind":"Industria y manufactura",
+    "ally.sector.fin":"Financiero y seguros",
+    "ally.sector.log":"Energía, transporte y logística",
+    "ally.sector.agro":"Agro y alimentos",
+    "ally.f.sector.otro":"¿Cuál?",
+    "ally.f.porque":"¿Por qué quieren aliarse? (opcional)",
+    "ally.porque.ph":"Qué los mueve a apoyar, y si hay una causa o un territorio que les importe en particular.",
+    "ally.porque.help":"Si la alianza se firma, esto es lo que cuenta tu ficha en el sitio. Con tus palabras es mejor que con las nuestras.",
     "ally.f.aporta":"En una frase, ¿qué aporta tu empresa?",
     "ally.f.aporta.ph":"Ej. Padrinazgo de 200 platos al mes",
     "ally.f.desc":"Descripción del negocio (en tus propias palabras)",
@@ -524,7 +535,11 @@ var I18N = {
     "ally.err.mod":"Marca al menos una forma de apoyar.",
     "ally.err.ben":"Cuéntanos qué beneficio ofreces para el Programa de Gratitud.",
     "ally.err.serv":"Describe el servicio que ofreces a la población vulnerable.",
-    "ally.err.send":"No pudimos enviar tu solicitud. Intenta de nuevo o escríbenos a contabilidad@thegiveandgrowproject.org.",
+    "ally.err.send":"No pudimos enviar tu solicitud. Vuelve a intentarlo en un momento, o escríbenos a sebas@thegiveandgrowproject.org.",
+    "ally.err.razon":"Nos falta la razón social o el nombre del emprendimiento.",
+    "ally.err.email":"Revisa el correo: parece que tiene algo raro.",
+    "form.err.muchas":"Ya recibimos varios envíos desde este correo hace un momento. Si ya mandaste el tuyo, no hace falta repetirlo: te escribimos a ese correo. Si no, espera unos minutos y vuelve a intentarlo.",
+    "form.lim.lleno":"llegaste al límite. Si pegaste un texto, revisa que no se haya cortado el final.",
     "rep.ey":"Ya transferí",
     "rep.t":"Repórtanos tu transferencia",
     "rep.lead":"Una transferencia no nos avisa sola. Repórtala aquí y te damos un número de guía al instante: con él sigues tu aporte, y cuando la verifiquemos contra el extracto te llega el recibo — y el certificado, si lo pediste.",
@@ -1098,7 +1113,7 @@ var I18N = {
     "ff.despues":"Todavía no pedimos logo, fotos ni soportes de costos. Eso viene después de la visita de contexto, junto con las autorizaciones de derechos de imagen — la imagen de los menores está protegida por la Ley 1098 y no publicamos nada sin consentimiento escrito.",
     "ff.submit":"Enviar la aplicación",
     "ff.sending":"Enviando…",
-    "ff.ok":"Recibimos su aplicación. Le llega un correo de confirmación y una persona de Give&Grow le escribe para seguir la conversación.",
+    "ff.ok":"Recibimos tu aplicación. Te llega un correo de confirmación y una persona de Give&Grow te escribe para seguir la conversación.",
     "ff.legal":"Aplicar no es entrar. Lo que sigue es la revisión, la visita de contexto y, si encajamos, el convenio de cooperación — gratuito, como todo lo demás.",
     "ff.err.nombre":"Nos falta el nombre de la fundación.",
     "ff.err.email":"Revisa el correo: parece que tiene algo raro.",
@@ -3631,7 +3646,7 @@ var ACT_FNS = {
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
-  donarBrigada:donarBrigada, allySubmit:allySubmit,
+  donarBrigada:donarBrigada, allySubmit:allySubmit, allySector:allySector,
   irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit, apSubmit:apSubmit, apQuien:apQuien,
   fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
   ingSubmit:ingSubmit, ingEsp:ingEsp,
@@ -6291,6 +6306,14 @@ function allyToggleServ(){
   var on = document.getElementById("mod-servicios").checked;
   document.getElementById("ally-servbox").style.display = on ? "" : "none";
 }
+/* «Otro» abre «¿Cuál?». La lista nació pensando en comercios del Programa de
+   Gratitud; la que entra por RSE puede ser de cualquier sector, y «Otro» a secas
+   es lo que después sale en su ficha. */
+function allySector(){
+  var sel = document.getElementById("ally-sector");
+  var box = document.getElementById("ally-sector-otro-box");
+  if (sel && box) box.style.display = sel.value === "Otro" ? "" : "none";
+}
 // Mapeo intake -> modalidad pública de la tarjeta (partners.json type:company):
 //   modDonacion|modRse -> "padrinazgo" ; modServicios|modDifusion -> "alianza" ;
 //   modVoluntariado -> "journey" ; modGratitud -> "gratitud".
@@ -6304,7 +6327,7 @@ function allySubmit(ev){
 
   // Honeypot: si el campo trampa viene lleno, es un bot. Fingimos éxito y no enviamos.
   if (val("ally-website2")){
-    document.getElementById("ally-form").reset(); allyToggleGrat(); allyToggleServ();
+    document.getElementById("ally-form").reset(); allyToggleGrat(); allyToggleServ(); allySector();
     return allyMsg(note, t("ally.ok"), true);
   }
   // Al menos una forma de apoyar
@@ -6323,8 +6346,9 @@ function allySubmit(ev){
   var payload = {
     razon:val("ally-razon"), nit:val("ally-nit"), representante:val("ally-rep"), cedula:val("ally-cedula"),
     contacto:val("ally-contacto"), correo:val("ally-correo"), telefono:val("ally-tel"),
-    ciudad:val("ally-ciudad"), sector:val("ally-sector"), direccion:val("ally-dir"),
+    ciudad:val("ally-ciudad"), sector:val("ally-sector"), sector_otro:val("ally-sector-otro"), direccion:val("ally-dir"),
     web:val("ally-web"), instagram:val("ally-instagram"), descripcion:val("ally-desc"), aporta:val("ally-aporta"),
+    porque:val("ally-porque"),
     modDonacion:chk("mod-donacion"), modRse:chk("mod-rse"), modGratitud:chk("mod-gratitud"),
     modServicios:chk("mod-servicios"), modVoluntariado:chk("mod-voluntariado"), modDifusion:chk("mod-difusion"),
     benBeneficio:val("ally-ben"), benNivel:val("ally-nivel"), benCondiciones:val("ally-cond"), benRedime:val("ally-redime"),
@@ -6338,14 +6362,14 @@ function allySubmit(ev){
     method:"POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
-  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+  }).then(formRespuesta)
     .then(function(){
       document.getElementById("ally-form").reset();
-      allyToggleGrat(); allyToggleServ();
+      allyToggleGrat(); allyToggleServ(); allySector();
       btn.disabled = false;
       allyMsg(note, t("ally.ok"), true);
     })
-    .catch(function(){ btn.disabled = false; allyMsg(note, t("ally.err.send"), false); });
+    .catch(function(err){ btn.disabled = false; formFallo(note, err, ALLY_ERRS, "ally.err.send"); });
   return false;
 }
 
@@ -6401,13 +6425,13 @@ function fundSubmit(ev){
       autoriza_datos: true, declara_veraz: true,
       idioma: lang === "en" ? "en" : "es"
     })
-  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+  }).then(formRespuesta)
     .then(function(){
       document.getElementById("ff").reset(); fundPobOtra();
       btn.disabled = false;
       allyMsg(note, t("ff.ok"), true);
     })
-    .catch(function(){ btn.disabled = false; allyMsg(note, t("ff.err.send"), false); });
+    .catch(function(err){ btn.disabled = false; formFallo(note, err, FF_ERRS, "ff.err.send"); });
   return false;
 }
 
@@ -6434,6 +6458,90 @@ function fundPobOtra(){
   if (box) box.style.display = (on && on.checked) ? "" : "none";
 }
 function fundOtra(){ setTimeout(fundPobOtra, 0); }
+
+/* ---------- lo que responde el servidor, dicho en palabras ----------
+   Antes, CUALQUIER respuesta que no fuera 200 decía «no pudimos enviar, intenta
+   de nuevo». Para el tope de envíos (429) eso es exactamente el consejo
+   equivocado: reintentar vuelve a chocar con el tope. Y si el servidor rechaza
+   un dato que el navegador dejó pasar, lo útil es llevar al campo, no pedir que
+   se repita todo.
+   Las tablas dicen, por cada código de error del servidor, a qué campo llevar y
+   con qué mensaje. Son los mismos mensajes que ya usa la validación del
+   navegador: el servidor y el cliente dicen lo mismo con las mismas palabras. */
+var ALLY_ERRS = {
+  razon_requerida: ["#ally-razon", "ally.err.razon"],
+  email_invalido: ["#ally-correo", "ally.err.email"],
+  modalidad_requerida: ["#mod-donacion", "ally.err.mod"],
+  beneficio_requerido: ["#ally-ben", "ally.err.ben"],
+  servicio_requerido: ["#ally-servdet", "ally.err.serv"],
+  autorizacion_requerida: ["#aut-marca", "ally.err.aut"]
+};
+var FF_ERRS = {
+  nombre_requerido: ["#ff-nombre", "ff.err.nombre"],
+  email_invalido: ["#ff-email", "ff.err.email"],
+  lider_requerido: ["#ff-lider", "ff.err.lider"],
+  personeria_requerida: ['input[name="ff-pers"]', "ff.err.pers"],
+  zona_requerida: ["#ff-zona", "ff.err.zona"],
+  historia_requerida: ["#ff-historia", "ff.err.historia"],
+  mision_requerida: ["#ff-mision", "ff.err.mision"],
+  poblacion_requerida: ['input[name="ff-pob"]', "ff.err.pob"],
+  atiende_requerido: ["#ff-atiende", "ff.err.atiende"],
+  autorizacion_requerida: ["#ff-datos", "ff.err.datos"],
+  declaracion_requerida: ["#ff-veraz", "ff.err.veraz"]
+};
+function formRespuesta(r){
+  if (r.ok) return r.json();
+  return r.json().catch(function(){ return {}; }).then(function(d){
+    var e = new Error("http_" + r.status);
+    e.status = r.status; e.codigo = d && d.error;
+    throw e;
+  });
+}
+function formFallo(note, err, tabla, claveEnvio){
+  /* 429 sin código también: la regla por IP de Cloudflare responde sin JSON. */
+  if (err && (err.codigo === "demasiadas_inscripciones" || err.status === 429)){
+    return allyMsg(note, t("form.err.muchas"), false);
+  }
+  var c = err && err.codigo && tabla[err.codigo];
+  if (c) return allyMal(note, document.querySelector(c[0]), c[1]);
+  return allyMsg(note, t(claveEnvio), false);
+}
+
+/* ---------- contador de caracteres ----------
+   EL SERVIDOR CORTA CADA CAMPO A UN LARGO, y hasta el 28 sep 2026 casi ningún
+   campo lo decía: la persona escribía todo y el final se perdía sin aviso. Así
+   llegó la primera respuesta a «¿cómo llevan esa cuenta?» —en 160 caracteres
+   exactos, cortada—. Ahora cada campo lleva su `maxlength`, igual al tope del
+   servidor, y este contador aparece cuando se ha usado el 60 %: antes estorba.
+   `maxlength` impide escribir de más, pero un texto PEGADO se corta en silencio;
+   por eso al llegar al tope el aviso lo dice, también al lector de pantalla. */
+function contarCaracteres(e){
+  var c = e.target;
+  if (!c || !c.closest || !c.closest(".ally-form")) return;
+  var max = parseInt(c.getAttribute("maxlength"), 10);
+  if (!(max >= 40)) return;
+  var n = c.value.length;
+  var box = c.parentNode.querySelector('.contador[data-de="' + c.id + '"]');
+  if (n < max * 0.6){ if (box) box.hidden = true; return; }
+  if (!box){
+    box = document.createElement("small");
+    box.className = "contador";
+    box.setAttribute("data-de", c.id);
+    box.innerHTML = '<span aria-hidden="true"></span><span class="sr-only" aria-live="polite"></span>';
+    c.insertAdjacentElement("afterend", box);
+  }
+  var lleno = n >= max;
+  box.hidden = false;
+  box.classList.toggle("lleno", lleno);
+  box.firstChild.textContent = n + " / " + max + (lleno ? " · " + t("form.lim.lleno") : "");
+  box.lastChild.textContent = lleno ? t("form.lim.lleno") : "";
+}
+document.addEventListener("input", contarCaracteres);
+/* Al vaciar el formulario (envío correcto) los contadores se van con él. */
+document.addEventListener("reset", function(e){
+  var f = e.target;
+  if (f && f.querySelectorAll) [].forEach.call(f.querySelectorAll(".contador"), function(b){ b.hidden = true; });
+});
 /* ---------- formulario de voluntariado ----------
    El aviso de terreno aparece según el nivel elegido, no al final: quien va a
    pisar territorio debe saber ANTES de enviar que hay dos verificaciones y una

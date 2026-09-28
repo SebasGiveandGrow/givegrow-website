@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=d36febcc">
+<link rel="stylesheet" href="/styles.css?v=92a5b825">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=870aa23b" defer></script>
+<script src="/app.js?v=d7f8cfe9" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -577,26 +577,26 @@
         <h3 class="ally-sec" data-i18n="ff.s.id">Quiénes son</h3>
         <div class="ally-grid">
           <div class="field ally-wide"><label for="ff-nombre" data-i18n="ff.nombre">Nombre oficial de la fundación</label>
-            <input type="text" id="ff-nombre" required>
+            <input type="text" id="ff-nombre" maxlength="160" required>
             <small class="vf-help" data-i18n="ff.nombre.help">Tal como debe aparecer publicado si algún día publicamos su perfil.</small></div>
           <div class="field"><label for="ff-sigla" data-i18n="ff.sigla">Nombre corto o sigla (opcional)</label>
-            <input type="text" id="ff-sigla"></div>
+            <input type="text" id="ff-sigla" maxlength="60"></div>
           <div class="field"><label for="ff-anio" data-i18n="ff.anio">¿Desde qué año trabajan? (opcional)</label>
             <input type="text" id="ff-anio" inputmode="numeric" maxlength="4"></div>
           <div class="field"><label for="ff-lider" data-i18n="ff.lider">Quién lidera la fundación</label>
-            <input type="text" id="ff-lider" required></div>
+            <input type="text" id="ff-lider" maxlength="120" required></div>
           <div class="field"><label for="ff-cargo" data-i18n="ff.cargo">Su cargo (opcional)</label>
-            <input type="text" id="ff-cargo" data-i18n="ff.cargo.ph" data-i18n-attr="placeholder" placeholder="Directora y fundadora, representante legal…"></div>
+            <input type="text" id="ff-cargo" maxlength="120" data-i18n="ff.cargo.ph" data-i18n-attr="placeholder" placeholder="Directora y fundadora, representante legal…"></div>
           <div class="field"><label for="ff-email" data-i18n="ff.email">Correo de contacto</label>
-            <input type="email" id="ff-email" autocomplete="email" required></div>
+            <input type="email" id="ff-email" maxlength="200" autocomplete="email" required></div>
           <div class="field"><label for="ff-tel" data-i18n="ff.tel">Teléfono o WhatsApp (opcional)</label>
-            <input type="tel" id="ff-tel" autocomplete="tel">
+            <input type="tel" id="ff-tel" maxlength="40" autocomplete="tel">
             <small class="vf-help" data-i18n="ff.tel.help">Los datos de contacto son para coordinar entre nosotros. No se publican en el sitio.</small></div>
           <div class="field ally-wide"><label for="ff-zona" data-i18n="ff.zona">Barrio o sector y ciudad donde trabajan</label>
-            <input type="text" id="ff-zona" data-i18n="ff.zona.ph" data-i18n-attr="placeholder" placeholder="Ej. La Honda, Manrique, Medellín" required>
+            <input type="text" id="ff-zona" maxlength="160" data-i18n="ff.zona.ph" data-i18n-attr="placeholder" placeholder="Ej. La Honda, Manrique, Medellín" required>
             <small class="vf-help" data-i18n="ff.zona.help">El sector, no la dirección exacta. En el mapa de la red el pin va a nivel de barrio, nunca a la puerta.</small></div>
           <div class="field"><label for="ff-ciudad" data-i18n="ff.ciudad">Ciudad (opcional)</label>
-            <input type="text" id="ff-ciudad" autocomplete="address-level2"></div>
+            <input type="text" id="ff-ciudad" maxlength="80" autocomplete="address-level2"></div>
         </div>
 
         <fieldset class="vf-set">
@@ -612,7 +612,7 @@
           <div class="field ally-wide"><label for="ff-historia" data-i18n="ff.historia">La historia de la fundación, en un párrafo</label>
             <textarea id="ff-historia" rows="5" maxlength="1500" data-i18n="ff.historia.ph" data-i18n-attr="placeholder" placeholder="Cómo nació, quién la lidera, a quién sirve y qué la hace distinta." required></textarea></div>
           <div class="field ally-wide"><label for="ff-mision" data-i18n="ff.mision">La misión, en una o dos frases</label>
-            <textarea id="ff-mision" rows="2" maxlength="600" required></textarea></div>
+            <textarea id="ff-mision" rows="2" maxlength="800" required></textarea></div>
         </div>
 
         <h3 class="ally-sec" data-i18n="ff.s.pob">A quién llegan</h3>
@@ -631,14 +631,14 @@
           </div>
           <div class="field" id="ff-pob-otra-box" style="display:none;margin-top:12px">
             <label for="ff-pob-otra" data-i18n="ff.pob.otra.lbl">¿Cuál?</label>
-            <input type="text" id="ff-pob-otra"></div>
+            <input type="text" id="ff-pob-otra" maxlength="120"></div>
         </fieldset>
         <div class="ally-grid">
           <div class="field ally-wide"><label for="ff-atiende" data-i18n="ff.atiende">¿A cuántas personas atienden de forma regular?</label>
-            <input type="text" id="ff-atiende" required>
+            <input type="text" id="ff-atiende" maxlength="160" required>
             <small class="vf-help" data-i18n="ff.atiende.help">El número real, aunque sea aproximado. Si es estimado lo publicamos con «≈»: preferimos un número honesto a uno redondo.</small></div>
           <div class="field ally-wide"><label for="ff-conteo" data-i18n="ff.conteo">¿Cómo llevan esa cuenta? (opcional)</label>
-            <input type="text" id="ff-conteo" data-i18n="ff.conteo.ph" data-i18n-attr="placeholder" placeholder="Planillas de asistencia, registro digital, listados por programa, conteo aproximado…">
+            <input type="text" id="ff-conteo" maxlength="400" data-i18n="ff.conteo.ph" data-i18n-attr="placeholder" placeholder="Planillas de asistencia, registro digital, listados por programa, conteo aproximado…">
             <small class="vf-help" data-i18n="ff.conteo.help">Esto decide si la cifra se publica exacta o con «≈». No es una prueba: es lo que nos permite no inflar su trabajo.</small></div>
         </div>
 
@@ -646,19 +646,19 @@
         <p class="vf-help" data-i18n="ff.prog.help">El que mejor represente su labor diaria. Los demás los vemos cuando nos conozcamos.</p>
         <div class="ally-grid">
           <div class="field ally-wide"><label for="ff-prog" data-i18n="ff.prog">Nombre del programa (opcional)</label>
-            <input type="text" id="ff-prog" data-i18n="ff.prog.ph" data-i18n-attr="placeholder" placeholder="Ej. Chefs del Futuro"></div>
+            <input type="text" id="ff-prog" maxlength="160" data-i18n="ff.prog.ph" data-i18n-attr="placeholder" placeholder="Ej. Chefs del Futuro"></div>
           <div class="field ally-wide"><label for="ff-prog-desc" data-i18n="ff.prog.desc">¿Qué hace y a cuántas personas llega? (opcional)</label>
             <textarea id="ff-prog-desc" rows="3" maxlength="900" data-i18n="ff.prog.desc.ph" data-i18n-attr="placeholder" placeholder="Con números reales y frecuencia. Ej. cerca de 100 niños reciben almuerzo cada día, de lunes a viernes."></textarea></div>
           <div class="field ally-wide"><label for="ff-evid" data-i18n="ff.evid">¿Qué evidencia tienen de que funciona? (opcional)</label>
-            <input type="text" id="ff-evid" data-i18n="ff.evid.ph" data-i18n-attr="placeholder" placeholder="Registro fotográfico, planillas de asistencia, facturas, testimonios, informes…"></div>
+            <textarea id="ff-evid" rows="2" maxlength="900" data-i18n="ff.evid.ph" data-i18n-attr="placeholder" placeholder="Registro fotográfico, planillas de asistencia, facturas, testimonios, informes…"></textarea></div>
         </div>
 
         <h3 class="ally-sec" data-i18n="ff.s.red">Dónde encontrarlos</h3>
         <div class="ally-grid">
           <div class="field"><label for="ff-web" data-i18n="ff.web">Página web (opcional)</label>
-            <input type="url" id="ff-web" placeholder="https://tufundacion.org" data-i18n="ff.web.ph" data-i18n-attr="placeholder"></div>
+            <input type="url" id="ff-web" maxlength="200" placeholder="https://tufundacion.org" data-i18n="ff.web.ph" data-i18n-attr="placeholder"></div>
           <div class="field"><label for="ff-instagram" data-i18n="ff.instagram">Instagram (opcional)</label>
-            <input type="text" id="ff-instagram" placeholder="@tufundacion" data-i18n="ff.instagram.ph" data-i18n-attr="placeholder"></div>
+            <input type="text" id="ff-instagram" maxlength="120" placeholder="@tufundacion" data-i18n="ff.instagram.ph" data-i18n-attr="placeholder"></div>
         </div>
 
         <h3 class="ally-sec" data-i18n="ff.s.aut">Antes de enviar</h3>
@@ -2019,29 +2019,39 @@
         </div>
         <h2 class="h-comp3 ally-sec" data-i18n="ally.s.empresa">Datos de la empresa</h2>
         <div class="ally-grid">
-          <div class="field"><label for="ally-razon" data-i18n="ally.f.razon">Razón social o nombre del emprendimiento *</label><input type="text" id="ally-razon" required></div>
-          <div class="field"><label for="ally-nit" data-i18n="ally.f.nit">NIT o documento</label><input type="text" id="ally-nit"></div>
-          <div class="field"><label for="ally-rep" data-i18n="ally.f.rep">Representante legal</label><input type="text" id="ally-rep"></div>
-          <div class="field"><label for="ally-cedula" data-i18n="ally.f.cedula">Cédula del representante</label><input type="text" id="ally-cedula"></div>
-          <div class="field"><label for="ally-contacto" data-i18n="ally.f.contacto">Contacto (nombre y cargo)</label><input type="text" id="ally-contacto"></div>
-          <div class="field"><label for="ally-correo" data-i18n="ally.f.correo">Correo *</label><input type="email" id="ally-correo" required autocomplete="email"></div>
-          <div class="field"><label for="ally-tel" data-i18n="ally.f.tel">Teléfono</label><input type="tel" id="ally-tel"></div>
-          <div class="field"><label for="ally-ciudad" data-i18n="ally.f.ciudad">Ciudad</label><input type="text" id="ally-ciudad"></div>
-          <div class="field"><label for="ally-sector" data-i18n="ally.f.sector">Sector o industria</label><select id="ally-sector">
+          <div class="field"><label for="ally-razon" data-i18n="ally.f.razon">Razón social o nombre del emprendimiento *</label><input type="text" id="ally-razon" maxlength="160" required></div>
+          <div class="field"><label for="ally-nit" data-i18n="ally.f.nit">NIT o documento</label><input type="text" id="ally-nit" maxlength="40"></div>
+          <div class="field"><label for="ally-rep" data-i18n="ally.f.rep">Representante legal</label><input type="text" id="ally-rep" maxlength="120"></div>
+          <div class="field"><label for="ally-cedula" data-i18n="ally.f.cedula">Cédula del representante</label><input type="text" id="ally-cedula" maxlength="40"></div>
+          <div class="field"><label for="ally-contacto" data-i18n="ally.f.contacto">Contacto (nombre y cargo)</label><input type="text" id="ally-contacto" maxlength="160"></div>
+          <div class="field"><label for="ally-correo" data-i18n="ally.f.correo">Correo *</label><input type="email" id="ally-correo" maxlength="200" required autocomplete="email"></div>
+          <div class="field"><label for="ally-tel" data-i18n="ally.f.tel">Teléfono</label><input type="tel" id="ally-tel" maxlength="40"></div>
+          <div class="field"><label for="ally-ciudad" data-i18n="ally.f.ciudad">Ciudad</label><input type="text" id="ally-ciudad" maxlength="80"></div>
+          <div class="field"><label for="ally-sector" data-i18n="ally.f.sector">Sector o industria</label><select id="ally-sector" data-change="allySector()">
             <option value="" data-i18n="ally.sector.ph">Selecciona…</option>
             <option value="Gastronomía" data-i18n="ally.sector.gastro">Gastronomía</option>
             <option value="Moda" data-i18n="ally.sector.moda">Moda</option>
             <option value="Belleza y bienestar" data-i18n="ally.sector.belleza">Belleza y bienestar</option>
             <option value="Salud y odontología" data-i18n="ally.sector.salud">Salud y odontología</option>
+            <option value="Educación" data-i18n="ally.sector.edu">Educación</option>
+            <option value="Tecnología" data-i18n="ally.sector.tec">Tecnología</option>
+            <option value="Construcción e inmobiliario" data-i18n="ally.sector.cons">Construcción e inmobiliario</option>
+            <option value="Industria y manufactura" data-i18n="ally.sector.ind">Industria y manufactura</option>
+            <option value="Financiero y seguros" data-i18n="ally.sector.fin">Financiero y seguros</option>
+            <option value="Energía, transporte y logística" data-i18n="ally.sector.log">Energía, transporte y logística</option>
+            <option value="Agro y alimentos" data-i18n="ally.sector.agro">Agro y alimentos</option>
             <option value="Servicios profesionales" data-i18n="ally.sector.serv">Servicios profesionales</option>
             <option value="Comercio y retail" data-i18n="ally.sector.comercio">Comercio y retail</option>
             <option value="Otro" data-i18n="ally.sector.otro">Otro</option>
           </select></div>
-          <div class="field ally-wide"><label for="ally-dir" data-i18n="ally.f.dir">Dirección</label><input type="text" id="ally-dir"></div>
-          <div class="field"><label for="ally-web" data-i18n="ally.f.web">Sitio web</label><input type="url" id="ally-web" placeholder="https://tuempresa.com" data-i18n="ally.web.ph" data-i18n-attr="placeholder"></div>
-          <div class="field"><label for="ally-instagram" data-i18n="ally.f.instagram">Instagram</label><input type="text" id="ally-instagram" placeholder="@tuempresa" data-i18n="ally.instagram.ph" data-i18n-attr="placeholder"></div>
-          <div class="field ally-wide"><label for="ally-desc" data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" rows="4" placeholder="En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud." data-i18n="ally.desc.ph" data-i18n-attr="placeholder"></textarea></div>
+          <div class="field" id="ally-sector-otro-box" style="display:none"><label for="ally-sector-otro" data-i18n="ally.f.sector.otro">¿Cuál?</label><input type="text" id="ally-sector-otro" maxlength="80"></div>
+          <div class="field ally-wide"><label for="ally-dir" data-i18n="ally.f.dir">Dirección</label><input type="text" id="ally-dir" maxlength="200"></div>
+          <div class="field"><label for="ally-web" data-i18n="ally.f.web">Sitio web</label><input type="url" id="ally-web" maxlength="200" placeholder="https://tuempresa.com" data-i18n="ally.web.ph" data-i18n-attr="placeholder"></div>
+          <div class="field"><label for="ally-instagram" data-i18n="ally.f.instagram">Instagram</label><input type="text" id="ally-instagram" maxlength="120" placeholder="@tuempresa" data-i18n="ally.instagram.ph" data-i18n-attr="placeholder"></div>
+          <div class="field ally-wide"><label for="ally-desc" data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" maxlength="1200" rows="4" placeholder="En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud." data-i18n="ally.desc.ph" data-i18n-attr="placeholder"></textarea></div>
           <div class="field ally-wide"><label for="ally-aporta" data-i18n="ally.f.aporta">En una frase, ¿qué aporta tu empresa?</label><input type="text" id="ally-aporta" maxlength="90" data-i18n="ally.f.aporta.ph" data-i18n-attr="placeholder" placeholder="Ej. Padrinazgo de 200 platos al mes"></div>
+          <div class="field ally-wide"><label for="ally-porque" data-i18n="ally.f.porque">¿Por qué quieren aliarse? (opcional)</label><textarea id="ally-porque" rows="3" maxlength="800" data-i18n="ally.porque.ph" data-i18n-attr="placeholder" placeholder="Qué los mueve a apoyar, y si hay una causa o un territorio que les importe en particular."></textarea>
+            <small class="vf-help" data-i18n="ally.porque.help">Si la alianza se firma, esto es lo que cuenta tu ficha en el sitio. Con tus palabras es mejor que con las nuestras.</small></div>
         </div>
 
         <h2 class="h-comp3 ally-sec" data-i18n="ally.s.mods">¿Cómo quieres apoyar? (elige una o varias)</h2>
@@ -2057,16 +2067,16 @@
         <div id="ally-gratbox" class="ally-cond" style="display:none">
           <h2 class="h-comp3 ally-sec" data-i18n="ally.s.ficha">Ficha del Beneficio (Programa de Gratitud)</h2>
           <div class="ally-grid">
-            <div class="field ally-wide"><label for="ally-ben" data-i18n="ally.f.ben">¿Qué beneficio ofreces?</label><input type="text" id="ally-ben" placeholder="Ej. 15% de descuento, un postre de cortesía…" data-i18n="ally.ben.ph" data-i18n-attr="placeholder"></div>
-            <div class="field"><label for="ally-nivel" data-i18n="ally.f.nivel">¿Desde qué nivel de membresía?</label><input type="text" id="ally-nivel" placeholder="Ej. Retoño en adelante" data-i18n="ally.nivel.ph" data-i18n-attr="placeholder"></div>
-            <div class="field"><label for="ally-redime" data-i18n="ally.f.redime">¿Cómo se redime?</label><input type="text" id="ally-redime" placeholder="Ej. mostrando la credencial digital" data-i18n="ally.redime.ph" data-i18n-attr="placeholder"></div>
-            <div class="field ally-wide"><label for="ally-cond" data-i18n="ally.f.cond">Condiciones o vigencia</label><input type="text" id="ally-cond"></div>
+            <div class="field ally-wide"><label for="ally-ben" data-i18n="ally.f.ben">¿Qué beneficio ofreces?</label><input type="text" id="ally-ben" maxlength="300" placeholder="Ej. 15% de descuento, un postre de cortesía…" data-i18n="ally.ben.ph" data-i18n-attr="placeholder"></div>
+            <div class="field"><label for="ally-nivel" data-i18n="ally.f.nivel">¿Desde qué nivel de membresía?</label><input type="text" id="ally-nivel" maxlength="120" placeholder="Ej. Retoño en adelante" data-i18n="ally.nivel.ph" data-i18n-attr="placeholder"></div>
+            <div class="field"><label for="ally-redime" data-i18n="ally.f.redime">¿Cómo se redime?</label><input type="text" id="ally-redime" maxlength="200" placeholder="Ej. mostrando la credencial digital" data-i18n="ally.redime.ph" data-i18n-attr="placeholder"></div>
+            <div class="field ally-wide"><label for="ally-cond" data-i18n="ally.f.cond">Condiciones o vigencia</label><input type="text" id="ally-cond" maxlength="300"></div>
           </div>
         </div>
 
         <div id="ally-servbox" class="ally-cond" style="display:none">
           <h2 class="h-comp3 ally-sec" data-i18n="ally.s.serv">Servicio para población vulnerable</h2>
-          <div class="field ally-wide"><label for="ally-servdet" data-i18n="ally.f.servdet">Describe el servicio</label><input type="text" id="ally-servdet"></div>
+          <div class="field ally-wide"><label for="ally-servdet" data-i18n="ally.f.servdet">Describe el servicio</label><textarea id="ally-servdet" rows="2" maxlength="600"></textarea></div>
         </div>
 
         <h2 class="h-comp3 ally-sec" data-i18n="ally.s.aut">Autorizaciones (requeridas)</h2>
