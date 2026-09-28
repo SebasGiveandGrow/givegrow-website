@@ -1564,6 +1564,25 @@ async function apiInscripcion(request, env, url) {
      decorativa: guardar primero y pedir permiso después invertiría el orden. */
   if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
 
+  /* LA EDAD (decision de Sebas, 28 sep 2026): desde los 18 por su cuenta; un
+     menor, con su acudiente o con su autorizacion firmada. Si dice que es menor,
+     sin nombre y contacto del acudiente no se guarda: los datos de un menor los
+     autoriza su representante (Ley 1581, art. 7), y sin saber quien es no hay a
+     quien pedirle esa autorizacion.
+     `mayor_edad` ausente (una pestaña con el formulario de antes) se guarda como
+     «no dijo», no se rechaza: no se le puede pedir un campo que no vio. */
+  const mayor = c.mayor_edad === true ? true : c.mayor_edad === false ? false : null;
+  const acudiente = mayor === false ? {
+    nombre: limpio(c.acudiente_nombre, 120),
+    contacto: limpio(c.acudiente_contacto, 200),
+    modo: ["acompana", "autoriza"].includes(c.acudiente_modo) ? c.acudiente_modo : null,
+    sabe: !!c.acudiente_sabe
+  } : null;
+  if (acudiente && (!acudiente.nombre || !acudiente.contacto || !acudiente.modo || !acudiente.sabe)) {
+    return json({ error: "acudiente_requerido",
+      ayuda: "Siendo menor de edad necesitamos el nombre y un contacto de tu acudiente, cómo vendrías y que tu acudiente sepa que te inscribes." }, 400);
+  }
+
   const pisaTerritorio = nivel === "hub" || nivel === "mixto";
   const datos = {
     nivel,
@@ -1575,6 +1594,10 @@ async function apiInscripcion(request, env, url) {
        sino para quien lo reciba: son la lista de lo que hay que cumplir antes. */
     protocolo_cuidado: pisaTerritorio,
     protocolo_imagen: !!c.captura,
+    mayor_edad: mayor,
+    /* Un menor dispara su propio requisito: la autorizacion escrita del
+       acudiente, antes de cualquier actividad (y de cualquier jornada). */
+    ...(acudiente ? { acudiente, autorizacion_acudiente_pendiente: true } : {}),
     /* De dónde salió la inscripción. Sin esto, quien se ofrece para el acopio de
        la brigada llega indistinguible de quien se apunta al programa de todo el
        año, y son dos conversaciones distintas con dos urgencias distintas. */
@@ -1608,9 +1631,9 @@ async function correoInscripcionVoluntario(env, v) {
   const titulo = en ? "We got your details. Welcome." : "Recibimos tus datos. Bienvenido.";
 
   const nivelTexto = {
-    hub:        en ? "In the field, alongside a partner foundation" : "En terreno, junto a una fundación aliada",
-    estructura: en ? "In the structure, without setting foot in the field" : "En la estructura, sin pisar territorio",
-    mixto:      en ? "Mixed: part structure, part field" : "Mixto: parte estructura, parte terreno"
+    hub:        en ? "In the field, with a HUB foundation" : "En terreno, con una fundación del HUB",
+    estructura: en ? "Administrative, at the Give&Grow office" : "Administrativo, en la sede de Give&Grow",
+    mixto:      en ? "Both: in the field and at the office" : "Las dos: en terreno y en la sede"
   }[v.nivel];
 
   const parrafos = en ? [
@@ -1621,6 +1644,9 @@ async function correoInscripcionVoluntario(env, v) {
     v.protocolo_imagen
       ? "You told us you plan to photograph or record. That has its own protocol, and one rule that never bends: consent comes before the camera. The foundation and the families decide, never the person visiting."
       : "",
+    v.acudiente
+      ? "Since you are under 18, before any activity we will ask " + v.acudiente.nombre + " —your guardian— to authorise your sign-up in writing, and you will come " + (v.acudiente.modo === "acompana" ? "with them." : "with their signed authorisation.")
+      : "",
     "Nothing about this is charged, in either direction."
   ] : [
     "Gracias por ofrecer tu tiempo y tu oficio. Alguien de Give&Grow te escribe para conocerte y para ver juntos dónde encajas mejor.",
@@ -1629,6 +1655,9 @@ async function correoInscripcionVoluntario(env, v) {
       : "Tu aporte ocurre fuera del territorio, así que el camino es más corto: solo necesitamos conocerte y encontrar dónde encaja tu oficio.",
     v.protocolo_imagen
       ? "Nos dijiste que piensas fotografiar o grabar. Eso tiene su propio protocolo, y una regla que no se negocia: el consentimiento va primero que la cámara. Lo deciden la fundación y las familias, nunca quien visita."
+      : "",
+    v.acudiente
+      ? "Como eres menor de edad, antes de cualquier actividad le pedimos a " + v.acudiente.nombre + " —tu acudiente— que autorice tu inscripción por escrito, y vendrás " + (v.acudiente.modo === "acompana" ? "con tu acudiente." : "con su autorización firmada.")
       : "",
     "Nada de esto se cobra, en ninguna dirección."
   ];
@@ -1654,7 +1683,7 @@ async function correoInscripcionVoluntario(env, v) {
 async function correoAvisoInscripcion(env, v) {
   const para = correoAlianzas(env);
   if (!para) return avisoSinBuzon(env, "aviso-inscripcion");
-  const nivel = { hub: "Con el HUB (terreno)", estructura: "Con Give&Grow (estructura)", mixto: "Mixto" }[v.nivel];
+  const nivel = { hub: "En terreno (HUB)", estructura: "Administrativo (sede)", mixto: "Las dos" }[v.nivel];
   const filas = [
     ["Nombre", v.nombre],
     ["Correo", v.email],
@@ -1664,7 +1693,12 @@ async function correoAvisoInscripcion(env, v) {
     ["Oficio", v.oficio],
     ["Disponibilidad", v.disponibilidad || "(no dijo)"],
     ["Protocolo de cuidado", v.protocolo_cuidado ? "SÍ — pisa territorio, requiere doble verificación y Marco" : "no aplica"],
-    ["Protocolo de imagen", v.protocolo_imagen ? "SÍ — va a fotografiar o grabar" : "no aplica"]
+    ["Protocolo de imagen", v.protocolo_imagen ? "SÍ — va a fotografiar o grabar" : "no aplica"],
+    ["Edad", v.mayor_edad === true ? "18 o más"
+           : v.mayor_edad === false ? "MENOR DE EDAD — pedir autorización escrita del acudiente antes de cualquier actividad"
+           : "(no dijo: formulario anterior)"],
+    ...(v.acudiente ? [["Acudiente", v.acudiente.nombre + " · " + v.acudiente.contacto + " · " +
+      (v.acudiente.modo === "acompana" ? "viene con él/ella" : "viene con su autorización firmada")]] : [])
   ];
   return enviarCorreo(env, {
     para,
