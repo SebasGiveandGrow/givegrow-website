@@ -2140,6 +2140,13 @@ async function adminSalud(env) {
     "Bandeja «Quién quiere entrar» · alguien quiere aportar y espera que le escribamos", 55, "#sec-entrar", 3);
   await enCola("voluntarios_sin_respuesta", sinResponder("voluntario"),
     "Bandeja «Quién quiere entrar» · alguien ofreció su tiempo", 88, "#sec-entrar", 5);
+  /* Aceptado y sin avanzar: dijimos «seguimos» y la lista de pasos lleva dos
+     semanas quieta. Cuenta desde el ultimo movimiento (estado o paso). */
+  await enCola("voluntarios_detenidos",
+    "SELECT COUNT(*) AS n, MIN(actualizada_en) AS masViejo FROM inscripciones " +
+    "WHERE tipo = 'voluntario' AND estado = 'aceptada' AND COALESCE(json_extract(datos, '$.listo'), 0) <> 1 " +
+    "AND actualizada_en < datetime('now','-14 days')",
+    "Bandeja «Quién quiere entrar» · aceptados cuya lista de pasos lleva dos semanas quieta", 89, "#sec-entrar");
   /* Y DESPUES DE «nueva». Mover una fundacion a «en revision» la sacaba de toda
      cola para siempre, y lo mismo aceptada sin visita o visitada sin
      cuestionario: el proceso de cinco pasos se podia quedar parado en
@@ -13893,6 +13900,71 @@ async function adminEntregaCaso(request, env, entrega, quien) {
    cuestionario, y por eso el estado existe. */
 const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "visitada", "archivada"];
 
+/* LA LISTA DE UN VOLUNTARIO, antes de su primera jornada.
+   ============================================================================
+   «Aceptada» decia «seguimos» y nada mas: no habia donde anotar que alguien ya
+   paso la verificacion o hizo el Marco, asi que no se sabia quien estaba listo
+   para ir a terreno. La lista sale de VOLUNTARIADO.md §3 y §4:
+   · En terreno (hub o mixto): identidad, antecedentes, acuerdo y protocolo de
+     proteccion firmados, el visto bueno de la fundacion y la sesion de Marco.
+   · Administrativo (estructura): el acuerdo firmado.
+   · Y si es MENOR de edad, en cualquier caso: la autorizacion escrita del
+     acudiente (Ley 1581, art. 7).
+   Cada paso guarda cuando y quien lo marco. `listo` es la consecuencia, y la
+   calcula el servidor: el panel no decide cuando alguien esta listo. */
+const PASOS_VOLUNTARIO = ["identidad", "antecedentes", "acuerdo", "fundacion", "marco", "acudiente"];
+function pasosRequeridos(x) {
+  const terreno = x.nivel === "hub" || x.nivel === "mixto";
+  const p = terreno ? ["identidad", "antecedentes", "acuerdo", "fundacion", "marco"] : ["acuerdo"];
+  if (x.mayor_edad === false) p.push("acudiente");
+  return p;
+}
+
+/* POST /api/admin/inscripcion/<id>/paso  { paso, hecho } */
+async function adminPasoVoluntario(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const paso = String(c.paso || "");
+  if (!PASOS_VOLUNTARIO.includes(paso)) return json({ error: "paso_no_valido", permitidos: PASOS_VOLUNTARIO }, 400);
+
+  const f = await env.DB.prepare("SELECT id, tipo, estado, datos FROM inscripciones WHERE id = ?").bind(id).first();
+  if (!f) return json({ error: "no_encontrada" }, 404);
+  if (f.tipo !== "voluntario") return json({ error: "no_es_voluntario" }, 400);
+  if (f.estado === "archivada") return json({ error: "archivada",
+    ayuda: "Está archivada: reábrela antes de anotarle pasos." }, 409);
+  let x = {};
+  try { x = JSON.parse(f.datos || "{}") || {}; } catch (e) { /* nada */ }
+  if (!pasosRequeridos(x).includes(paso)) return json({ error: "paso_no_aplica",
+    ayuda: "Ese paso no aplica a esta persona (depende de si va a terreno y de su edad)." }, 400);
+
+  /* json_set / json_remove en la base y no leer-modificar-escribir en el
+     Worker: dos clics seguidos en pasos distintos no se pisan. */
+  if (c.hecho) {
+    await env.DB.prepare(
+      "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.pasos.' || ?, json_object('en', datetime('now'), 'por', ?)), " +
+      "actualizada_en = datetime('now') WHERE id = ?"
+    ).bind(paso, quien || "?", id).run();
+  } else {
+    await env.DB.prepare(
+      "UPDATE inscripciones SET datos = json_remove(COALESCE(datos, '{}'), '$.pasos.' || ?), actualizada_en = datetime('now') WHERE id = ?"
+    ).bind(paso, id).run();
+  }
+  const g = await env.DB.prepare("SELECT datos FROM inscripciones WHERE id = ?").bind(id).first();
+  let y = {};
+  try { y = JSON.parse((g && g.datos) || "{}") || {}; } catch (e) { /* nada */ }
+  const pasos = y.pasos || {};
+  const listo = pasosRequeridos(y).every(k => pasos[k]);
+  await env.DB.prepare(
+    "UPDATE inscripciones SET datos = json_set(datos, '$.listo', json(?), '$.autorizacion_acudiente_pendiente', json(?)) WHERE id = ?"
+  ).bind(listo ? "true" : "false", y.mayor_edad === false && !pasos.acudiente ? "true" : "false", id).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "voluntario " + id + " · paso «" + paso + "» " + (c.hecho ? "marcado" : "desmarcado") + (listo ? " · LISTO" : "")).run();
+  return json({ ok: true, id, pasos, listo });
+}
+
 async function adminMoverInscripcion(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -15361,6 +15433,9 @@ textarea { font-size: 16px }
   font-size:var(--fs-14);background:var(--amberl)}
 /* Una lista que no llego (pedirJSON). Mismo lenguaje que la alarma: no es un
    vacio, es algo que hay que mirar. */
+/* La lista de pasos de un voluntario, dentro de su fila. */
+.vpasos{margin-top:8px;line-height:1.9}
+.vpasos .copy{font-size:var(--fs-12)}
 .carga-fallo{border-left:3px solid var(--amber);padding:9px 13px;margin:0;
   font-size:var(--fs-14);background:var(--amberl)}
 .dec-lista{list-style:none;margin:0;padding:0}
@@ -16080,6 +16155,23 @@ function abrirCert(guia){
     '</div>';
   caja.style.display = "block";
 }
+/* Un paso de la lista de un voluntario. Desmarcar pide confirmar: deshace
+   algo que alguien anoto, y queda en la auditoria igual. */
+document.addEventListener("click", function(e){
+  var b = e.target.closest ? e.target.closest("[data-vpaso]") : null;
+  if (!b) return;
+  var hecho = b.getAttribute("data-hecho") === "1";
+  if (!hecho && !confirm("¿Desmarcar «" + (PASO_ES[b.getAttribute("data-paso")] || "") + "»?")) return;
+  b.disabled = true;
+  fetch("/api/admin/inscripcion/" + encodeURIComponent(b.getAttribute("data-vpaso")) + "/paso", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ paso: b.getAttribute("data-paso"), hecho: hecho })
+  }).then(conEstado).then(function(res){
+    if (fallo(res.http, res.d)){ b.disabled = false; return; }
+    cargarInscripciones(); cargarSalud();
+  }).catch(function(){ b.disabled = false; });
+});
+
 /* Firmar: el mismo acto que en /firma, con la sesion del panel. */
 function firmarCert(num){
   return fetch("/api/admin/certificado/" + encodeURIComponent(num) + "/firmar", { method: "POST" })
@@ -16422,6 +16514,7 @@ var COLA_ES = {
   apadrinamientos_sin_respuesta: "Quieren apadrinar y esperan respuesta",
   voluntarios_sin_respuesta: "Voluntarios sin responder",
   fundaciones_detenidas: "Fundaciones detenidas a mitad del proceso",
+  voluntarios_detenidos: "Voluntarios aceptados que no avanzan",
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
   certificados_sin_firmar: "Certificados esperando firma",
@@ -16606,6 +16699,7 @@ var COLA_MOD = {
   apadrinamientos_sin_respuesta: "red",
   voluntarios_sin_respuesta: "red",
   fundaciones_detenidas: "red",
+  voluntarios_detenidos: "red",
   transferencias_sin_verificar: "dinero",
   certificados_por_emitir: "dinero",
   certificados_sin_firmar: "dinero",
@@ -16842,7 +16936,37 @@ var POB_ES = { ninos:"niños", adolescentes:"adolescentes", jovenes:"jóvenes",
   migrante:"migrantes", discapacidad:"personas con discapacidad", otra:"otra" };
 var MOD_ES = { modDonacion:"Donación", modRse:"RSE", modGratitud:"Gratitud",
   modServicios:"Servicios", modVoluntariado:"Voluntariado", modDifusion:"Difusión" };
-var NIVEL_ES = { hub:"terreno con el HUB", estructura:"estructura", mixto:"mixto" };
+var NIVEL_ES = { hub:"en terreno", estructura:"administrativo (sede)", mixto:"terreno y sede" };
+/* Los pasos de un voluntario antes de empezar. La MISMA regla que
+   pasosRequeridos en el servidor, que es quien la hace cumplir. */
+var PASO_ES = { identidad:"Identidad verificada", antecedentes:"Antecedentes revisados",
+                acuerdo:"Acuerdo y protocolo firmados", fundacion:"Visto bueno de la fundación",
+                marco:"Sesión de Marco hecha", acudiente:"Autorización del acudiente" };
+function pasosDe(x){
+  var terreno = x.nivel === "hub" || x.nivel === "mixto";
+  var p = terreno ? ["identidad", "antecedentes", "acuerdo", "fundacion", "marco"] : ["acuerdo"];
+  if (x.mayor_edad === false) p.push("acudiente");
+  return p;
+}
+/* La lista, en la fila. Solo cuando ya hubo conversación (en revisión o
+   aceptada): antes no hay nada que verificar, y archivada ya no importa. */
+function listaVoluntario(i, x){
+  if (i.estado !== "en_revision" && i.estado !== "aceptada") return "";
+  var hechos = x.pasos || {};
+  var req = pasosDe(x);
+  var n = req.filter(function(k){ return hechos[k]; }).length;
+  var terreno = x.nivel === "hub" || x.nivel === "mixto";
+  var h = '<div class="vpasos"><small><strong>' + (n === req.length
+      ? (terreno ? "Lista para su primera jornada" : "Lista para empezar en la sede")
+      : "Antes de empezar: " + n + " de " + req.length) + '</strong></small>';
+  h += req.map(function(k){
+    var hecho = hechos[k];
+    return '<br><button class="copy" data-vpaso="' + i.id + '" data-paso="' + k + '" data-hecho="' + (hecho ? "0" : "1") + '"'
+      + (hecho ? ' title="Marcado el ' + esc(enCO(hecho.en, 10)) + ' por ' + esc(hecho.por || "?") + '"' : "") + '>'
+      + (hecho ? "✓ " : "○ ") + esc(k === "acuerdo" && !terreno ? "Acuerdo firmado" : PASO_ES[k]) + "</button>";
+  }).join("");
+  return h + "</div>";
+}
 var ESP_ING = { estructural:"Ing. estructural", civil:"Ing. civil", geotecnia:"Geotecnia",
   arquitectura:"Arquitectura", otra:"Otra especialidad" };
 
@@ -16850,13 +16974,19 @@ var ESP_ING = { estructural:"Ing. estructural", civil:"Ing. civil", geotecnia:"G
    de un voluntario lo primero es si pisa territorio (dispara dos protocolos); de
    una fundación, a cuántos llega y cómo lleva la cuenta (decide si su cifra se
    publica exacta o con «≈»); de una empresa, qué modalidad pidió. */
-function resumenInscripcion(tipo, x){
+function resumenInscripcion(tipo, x, i){
   if (tipo === "voluntario"){
     var p = [esc(x.oficio || "?") + " · " + esc(NIVEL_ES[x.nivel] || x.nivel || "?")];
     if (x.protocolo_cuidado) p.push("<strong>protocolo de cuidado</strong>");
     if (x.protocolo_imagen) p.push("<strong>protocolo de imagen</strong>");
     if (x.origen) p.push('<strong style="color:#A84D00">' + esc(x.origen) + "</strong>");
-    return p.join(" · ");
+    /* Un menor se ve a la primera, con su acudiente: es a quien hay que pedirle
+       la autorizacion escrita antes de cualquier actividad. */
+    var menor = x.mayor_edad === false && x.acudiente
+      ? '<br><strong style="color:#A84D00">Menor de edad</strong> <small>· acudiente: ' + esc(x.acudiente.nombre || "?")
+        + " (" + esc(x.acudiente.contacto || "?") + ") · " + (x.acudiente.modo === "acompana" ? "viene con él/ella" : "viene con su autorización") + "</small>"
+      : "";
+    return p.join(" · ") + menor + (i ? listaVoluntario(i, x) : "");
   }
   if (tipo === "ingeniero"){
     /* La matrícula va primero y en grande porque es lo ÚNICO que hay que ir a
@@ -17091,7 +17221,7 @@ function cargarInscripciones(){
         "<td><strong>" + esc(i.nombre||"") + "</strong>" +
           (x.lider ? "<br><small>" + esc(x.lider) + (x.cargo ? " · " + esc(x.cargo) : "") + "</small>" : "") +
           (x.contacto ? "<br><small>" + esc(x.contacto) + "</small>" : "") + "</td>" +
-        "<td>" + resumenInscripcion(i.tipo, x) + "</td>" +
+        "<td>" + resumenInscripcion(i.tipo, x, i) + "</td>" +
         "<td>" + esc(i.email||"") + (i.telefono ? "<br><small>" + esc(i.telefono) + "</small>" : "") +
           (i.ciudad ? "<br><small>" + esc(i.ciudad) + "</small>" : "") +
           (enlaces.length ? "<br><small>" + enlaces.join(" · ") + "</small>" : "") +
@@ -21446,6 +21576,8 @@ export default {
         if (mm) return await adminVerificarMatricula(request, env, Number(mm[1]), sesion.email);
         const ma = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/avisar$/);
         if (ma) return await adminAvisarIngeniero(request, env, Number(ma[1]), sesion.email);
+        const mpv = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/paso$/);
+        if (mpv) return await adminPasoVoluntario(request, env, Number(mpv[1]), sesion.email);
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
         const mec = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/caso$/i);
         if (mec) return await adminEntregaCaso(request, env, mec[1].toUpperCase(), sesion.email);
