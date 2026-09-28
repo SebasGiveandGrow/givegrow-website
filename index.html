@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=92a5b825">
+<link rel="stylesheet" href="/styles.css?v=361c35c5">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=d7f8cfe9" defer></script>
+<script src="/app.js?v=def1e04d" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -2250,18 +2250,99 @@
       <span class="ey rv" data-i18n="vol.ey">Voluntariado</span>
       <h1 class="h-sec rv" data-i18n="vol.t">Aquí nadie viene a mirar.</h1>
       <p class="lead rv d1" data-i18n="vol.lead">Buscamos que quien llega amplíe su mirada, y que la fundación quede con algo que antes no tenía. Las dos cosas, en la misma jornada.</p>
+      <!-- El botón ARRIBA: quien ya decidió no tiene por qué recorrer la teoría
+           de MIRA para llegar al formulario. -->
+      <div class="rv d2" style="margin-top:22px;display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn btn-g" href="#vol-form" data-act="volIrForm('')" data-i18n="vol.cta">Quiero participar</a>
+        <a class="btn btn-w" href="#aliados" data-act="irAAliadosVoluntariado()" data-i18n="vol.cta.emp">Vengo con mi empresa</a>
+      </div>
     </div>
   </section>
 
-  <section class="cream">
+  <!-- LAS CINCO PUERTAS (decisión de Sebas, 28 sep 2026). Se entra por lo que
+       eres, no por un «nivel»: la empresa por Impact Journey —el voluntariado en
+       doble vía—, la persona por terreno o por la sede, el ingeniero por Mira Mi
+       Casa, y cualquiera por la emergencia cuando la hay. El «nivel» sigue
+       existiendo en el formulario porque es lo que dispara el protocolo de
+       cuidado (VOLUNTARIADO.md), pero ya no es la forma de presentarse. -->
+  <section class="cream" id="vol-puertas">
     <div class="wrap">
-      <span class="ey rv" data-i18n="vol.niv.ey">Cómo participar</span>
-      <h2 class="h-sec rv" data-i18n="vol.niv.t">Hay tres maneras de estar</h2>
-      <p class="lead rv d1" data-i18n="vol.niv.p">El nivel no lo define tu oficio: lo define si pisas el territorio. Puedes aportar solo desde la estructura, solo en terreno, o partir tu tiempo entre las dos.</p>
-      <div class="grid g3 rv d2" style="margin-top:28px">
-        <div class="card"><h3 data-i18n="vol.n1.t">Con el HUB SOCIAL</h3><p data-i18n="vol.n1.p">En terreno, junto a una fundación aliada y su equipo. Ellos conocen a su comunidad: definen cuándo una visita suma y qué espacios se comparten.</p></div>
-        <div class="card"><h3 data-i18n="vol.n2.t">Con Give&amp;Grow</h3><p data-i18n="vol.n2.p">Tu oficio fortalece la estructura que sostiene la red — derecho, contabilidad, desarrollo, diseño, formación. Ocurre fuera del territorio.</p></div>
-        <div class="card"><h3 data-i18n="vol.n3.t">Mixto · HUB y Give&amp;Grow</h3><p data-i18n="vol.n3.p">Combinas las dos, en la proporción que tú definas. Un diseñador que trabaja en la web y también va a una jornada; alguien de comunicaciones que documenta lo que pasa.</p></div>
+      <span class="ey rv" data-i18n="vol.pu.ey">Cómo sumarte</span>
+      <h2 class="h-sec rv" data-i18n="vol.pu.t">Cinco puertas</h2>
+      <p class="lead rv d1" data-i18n="vol.pu.p">Entras por lo que eres: con tu empresa, por tu cuenta, con tu oficio técnico o cuando pasa una emergencia.</p>
+      <div class="vol-puertas rv d2">
+        <div class="card vol-ij">
+          <span class="tag" data-i18n="vol.pu.ij.tag">Para empresas</span>
+          <h3 data-i18n="vol.pu.ij.t">Impact Journey</h3>
+          <p class="vol-sub" data-i18n="vol.pu.ij.s">Voluntariado en doble vía</p>
+          <p data-i18n="vol.pu.ij.p">Tu equipo y una comunidad del HUB se encuentran en una ruta diseñada con MIRA. No es una visita: es un intercambio, y las dos partes salen con algo que no tenían.</p>
+          <a class="card-link" href="#aliados" data-act="irAAliadosVoluntariado()"><span data-i18n="vol.pu.ij.cta">Traer a mi equipo</span> <span aria-hidden="true">&rarr;</span></a>
+        </div>
+        <div class="grid g2">
+          <div class="card">
+            <span class="tag" data-i18n="vol.pu.per">Para personas</span>
+            <h3 data-i18n="vol.pu.te.t">En terreno</h3>
+            <p data-i18n="vol.pu.te.p">Con una fundación del HUB, en su territorio y junto a su equipo. Ellos conocen a su comunidad y deciden cuándo una visita suma.</p>
+            <a class="card-link" href="#vol-form" data-act="volIrForm('hub')"><span data-i18n="vol.pu.te.cta">Inscribirme en terreno</span> <span aria-hidden="true">&rarr;</span></a>
+          </div>
+          <div class="card">
+            <span class="tag" data-i18n="vol.pu.per">Para personas</span>
+            <h3 data-i18n="vol.pu.ad.t">Administrativo</h3>
+            <p data-i18n="vol.pu.ad.p">En la sede de Give&amp;Grow. Derecho, contabilidad, diseño, desarrollo, comunicación o formación: tu oficio sostiene la red que hace posible todo lo demás.</p>
+            <a class="card-link" href="#vol-form" data-act="volIrForm('estructura')"><span data-i18n="vol.pu.ad.cta">Inscribirme en la sede</span> <span aria-hidden="true">&rarr;</span></a>
+          </div>
+          <div class="card">
+            <span class="tag" data-i18n="vol.pu.ing">Para ingenieros</span>
+            <h3 data-i18n="vol.pu.tec.t">Técnico · Mira Mi Casa</h3>
+            <p data-i18n="vol.pu.tec.p">Con tu matrícula del COPNIA, das un concepto a distancia, sobre fotos, a familias cuya casa se afectó con el sismo.</p>
+            <a class="card-link" href="#ingenieros"><span data-i18n="vol.pu.tec.cta">Postularme como ingeniero</span> <span aria-hidden="true">&rarr;</span></a>
+          </div>
+          <div class="card">
+            <span class="tag" data-i18n="vol.pu.cua">Cuando pasa algo</span>
+            <h3 data-i18n="vol.pu.em.t">De emergencia</h3>
+            <p data-i18n="vol.pu.em.p">Acopio y brigadas. Se abre solo cuando hay una emergencia activa; la última fue la brigada del sismo de agosto de 2026.</p>
+            <a class="card-link" href="#brigada"><span data-i18n="vol.pu.em.cta">Cómo fue la brigada</span> <span aria-hidden="true">&rarr;</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LA RUTA. Estaba escrita en VOLUNTARIADO.md §9 y no en la página: el sitio
+       decía «hay una conversación antes» y nada más, mientras que a las
+       fundaciones les muestra sus cinco pasos. Quien va a terreno tiene que
+       saber ANTES de inscribirse que le van a pedir antecedentes y firmar un
+       protocolo; enterarse después se sentiría como un filtro escondido. -->
+  <section id="vol-ruta">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="vol.ru.ey">Qué pasa después</span>
+      <h2 class="h-sec rv" data-i18n="vol.ru.t">La ruta, paso a paso</h2>
+      <p class="lead rv d1" data-i18n="vol.ru.p">Te escribimos en máximo cinco días. Lo que sigue depende de dónde vas a estar.</p>
+      <div class="vol-rutas rv d2">
+        <div>
+          <h3 class="h-comp3" data-i18n="vol.ru.te.t">En terreno e Impact Journey</h3>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div><h4 data-i18n="vol.ru.te.1.t">Te inscribes</h4><p data-i18n="vol.ru.te.1.p">Con el formulario de abajo. Las empresas, con el de alianza.</p></div></div>
+            <div class="step"><div class="step-n">2</div><div><h4 data-i18n="vol.ru.te.2.t">Conversamos</h4><p data-i18n="vol.ru.te.2.p">Te conocemos y vemos juntos qué experiencia encaja contigo.</p></div></div>
+            <div class="step"><div class="step-n">3</div><div><h4 data-i18n="vol.ru.te.3.t">Nuestra verificación</h4><p data-i18n="vol.ru.te.3.p">Identidad, antecedentes según lo que exige la ley para trabajar con niñas, niños y jóvenes, y la firma del acuerdo de voluntariado y del protocolo de protección.</p></div></div>
+            <div class="step"><div class="step-n">4</div><div><h4 data-i18n="vol.ru.te.4.t">La de la fundación</h4><p data-i18n="vol.ru.te.4.p">Define la actividad, cuántas personas, el momento y quién te acompaña durante toda la jornada.</p></div></div>
+            <div class="step"><div class="step-n">5</div><div><h4 data-i18n="vol.ru.te.5.t">Sesión de Marco</h4><p data-i18n="vol.ru.te.5.p">Obligatoria antes de pisar terreno: el contexto real, el protocolo y el reto.</p></div></div>
+            <div class="step"><div class="step-n">6</div><div><h4 data-i18n="vol.ru.te.6.t">La jornada</h4><p data-i18n="vol.ru.te.6.p">Inmersión, Reflexión y Anclaje: la vives, la pones en palabras y te llevas un compromiso pequeño.</p></div></div>
+          </div>
+        </div>
+        <div>
+          <h3 class="h-comp3" data-i18n="vol.ru.ad.t">Administrativo, en la sede</h3>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div><h4 data-i18n="vol.ru.te.1.t">Te inscribes</h4><p data-i18n="vol.ru.ad.1.p">Con el formulario de abajo.</p></div></div>
+            <div class="step"><div class="step-n">2</div><div><h4 data-i18n="vol.ru.te.2.t">Conversamos</h4><p data-i18n="vol.ru.ad.2.p">Qué sabes hacer y qué necesita la red ahora.</p></div></div>
+            <div class="step"><div class="step-n">3</div><div><h4 data-i18n="vol.ru.ad.3.t">El acuerdo</h4><p data-i18n="vol.ru.ad.3.p">Firmas el acuerdo de voluntariado: qué vas a hacer, cuánto tiempo y con quién.</p></div></div>
+            <div class="step"><div class="step-n">4</div><div><h4 data-i18n="vol.ru.ad.4.t">Empiezas</h4><p data-i18n="vol.ru.ad.4.p">En la sede de Give&amp;Grow, con una persona del equipo que te acompaña.</p></div></div>
+          </div>
+          <div class="vol-edad">
+            <h4 data-i18n="vol.edad.t">La edad</h4>
+            <p data-i18n="vol.edad.p">Desde los 18 años puedes venir por tu cuenta. Si eres menor de edad, vienes con tu acudiente o con su autorización firmada, y es tu acudiente quien autoriza este registro.</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -2350,8 +2431,8 @@
     <div class="wrap center">
       <span class="ey rv" data-i18n="vol.hoy.ey">Dónde estamos hoy</span>
       <h2 class="h-comp3 rv" data-i18n="vol.hoy.t" style="margin-bottom:14px">Contado sin adornos</h2>
-      <p class="lead rv d1" data-i18n="vol.hoy.p" style="margin-left:auto;margin-right:auto">Ya hicimos las primeras jornadas con donantes y aliados. Con equipos de empresa estamos abriendo el formato: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.</p>
-      <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="#vol-form" data-nav="voluntariado" data-i18n="vol.cta">Quiero participar</a></div>
+      <p class="lead rv d1" data-i18n="vol.hoy.p" style="margin-left:auto;margin-right:auto">Ya hicimos las primeras jornadas con donantes y aliados. Con equipos de empresa estamos abriendo Impact Journey: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.</p>
+      <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="#vol-form" data-act="volIrForm('')" data-i18n="vol.cta">Quiero participar</a></div>
     </div>
   </section>
 
@@ -2377,15 +2458,36 @@
         <div class="field"><label for="vf-ciudad" data-i18n="vf.ciudad">Ciudad (opcional)</label>
           <input type="text" id="vf-ciudad" autocomplete="address-level2"></div>
 
-        <p class="vf-aviso" id="vf-origen" style="display:none" data-i18n="vf.origen.brig">Vienes de la brigada del terremoto. Te marcamos «en la estructura» porque es lo que se puede sumar a tiempo: el acopio de Medellín, del 24 al 28 de agosto. Puedes cambiarlo si prefieres el programa de todo el año.</p>
+        <p class="vf-aviso" id="vf-origen" style="display:none" data-i18n="vf.origen.brig">Vienes de la brigada del terremoto. Te marcamos «Administrativo» porque es lo que se puede sumar a tiempo: el acopio de Medellín, del 24 al 28 de agosto. Puedes cambiarlo si prefieres el programa de todo el año.</p>
 
         <fieldset class="vf-set">
-          <legend data-i18n="vf.nivel.lbl">¿Cómo quieres participar?</legend>
-          <p class="vf-help" data-i18n="vf.nivel.help">El nivel no lo define tu oficio: lo define si pisas el territorio. Un diseñador puede aportar solo en la estructura, solo en terreno, o partir su tiempo entre las dos.</p>
-          <label class="ally-check"><input type="radio" name="vf-nivel" value="hub" data-act="volNivel()"><span data-i18n="vf.nivel.hub">Con el HUB SOCIAL — en terreno, junto a una fundación aliada</span></label>
-          <label class="ally-check"><input type="radio" name="vf-nivel" value="estructura" data-act="volNivel()"><span data-i18n="vf.nivel.est">Con Give&amp;Grow — en la estructura, sin pisar territorio</span></label>
-          <label class="ally-check"><input type="radio" name="vf-nivel" value="mixto" data-act="volNivel()"><span data-i18n="vf.nivel.mix">Mixto — parte estructura, parte terreno</span></label>
+          <legend data-i18n="vf.nivel.lbl">¿Dónde quieres estar?</legend>
+          <p class="vf-help" data-i18n="vf.nivel.help">Tu oficio puede ser el mismo en las dos: lo que cambia es si vas al territorio. Ir a terreno tiene su propia ruta, con verificaciones y sesión de Marco.</p>
+          <label class="ally-check"><input type="radio" name="vf-nivel" value="hub" data-act="volNivel()"><span data-i18n="vf.nivel.hub">En terreno — con una fundación del HUB</span></label>
+          <label class="ally-check"><input type="radio" name="vf-nivel" value="estructura" data-act="volNivel()"><span data-i18n="vf.nivel.est">Administrativo — en la sede de Give&amp;Grow</span></label>
+          <label class="ally-check"><input type="radio" name="vf-nivel" value="mixto" data-act="volNivel()"><span data-i18n="vf.nivel.mix">Las dos</span></label>
           <p class="vf-aviso" id="vf-terreno" style="display:none" data-i18n="vf.terreno.aviso">Como estarías en terreno, antes de cualquier jornada pasan dos verificaciones —la nuestra y la de la fundación que acompaña a esa comunidad— y una sesión de Marco. La fundación tiene la última palabra sobre cuándo una visita suma: no es un filtro, es la anfitriona.</p>
+        </fieldset>
+
+        <!-- LA EDAD. Desde los 18 por su cuenta; menores, con su acudiente o con su
+             autorización firmada (decisión de Sebas, 28 sep 2026). Y los datos de
+             un menor los autoriza su representante (Ley 1581, art. 7): por eso se
+             piden los del acudiente aquí mismo, y la autorización escrita se
+             recoge antes de cualquier actividad. -->
+        <fieldset class="vf-set">
+          <legend data-i18n="vf.edad.lbl">¿Tienes 18 años o más?</legend>
+          <label class="ally-check"><input type="radio" name="vf-edad" value="si" data-act="volEdad()"><span data-i18n="vf.edad.si">Sí</span></label>
+          <label class="ally-check"><input type="radio" name="vf-edad" value="no" data-act="volEdad()"><span data-i18n="vf.edad.no">No, soy menor de edad</span></label>
+          <div id="vf-menor" style="display:none">
+            <p class="vf-aviso" data-i18n="vf.menor.aviso">Vienes con tu acudiente o con su autorización firmada. La ley protege de forma especial los datos de un menor, así que antes de cualquier actividad le pedimos a tu acudiente que autorice este registro por escrito.</p>
+            <div class="field" style="margin-top:14px"><label for="vf-acu-nombre" data-i18n="vf.acu.nombre">Nombre de tu acudiente</label>
+              <input type="text" id="vf-acu-nombre" maxlength="120"></div>
+            <div class="field"><label for="vf-acu-contacto" data-i18n="vf.acu.contacto">Correo o teléfono de tu acudiente</label>
+              <input type="text" id="vf-acu-contacto" maxlength="200"></div>
+            <label class="ally-check"><input type="radio" name="vf-acu-modo" value="acompana"><span data-i18n="vf.acu.acompana">Vendré con mi acudiente</span></label>
+            <label class="ally-check"><input type="radio" name="vf-acu-modo" value="autoriza"><span data-i18n="vf.acu.autoriza">Vendré con su autorización firmada</span></label>
+            <label class="ally-check"><input type="checkbox" id="vf-acu-sabe"><span data-i18n="vf.acu.sabe">Mi acudiente sabe que me estoy inscribiendo</span></label>
+          </div>
         </fieldset>
 
         <div class="field"><label for="vf-oficio" data-i18n="vf.oficio">Tu oficio o área</label>

@@ -57,6 +57,24 @@ No se amarran al nivel, porque eso dejaría huecos (p. ej. alguien del nivel HUB
 
 ---
 
+## 2.1 Las cinco puertas y la edad (decisión de Sebas, 28 sep 2026)
+
+El sitio presenta el voluntariado por **quién llega**, no por nivel. El nivel sigue existiendo
+en el formulario porque es lo que dispara el protocolo de cuidado.
+
+| Puerta | Para quién | Nivel en el formulario |
+|---|---|---|
+| **Impact Journey** · voluntariado en doble vía | Empresas y sus equipos (formulario de alianza, «Voluntariado corporativo») | — |
+| **En terreno** | Personas, con las fundaciones del HUB | `hub` |
+| **Administrativo** | Personas, en la sede de Give&Grow | `estructura` |
+| **Técnico** · Mira Mi Casa | Ingenieros con matrícula del COPNIA | (su propio formulario) |
+| **De emergencia** | Cualquiera, solo con una emergencia activa | (origen de campaña) |
+
+**Edad:** desde los 18 años por cuenta propia. Menores de edad, con su acudiente o con su
+autorización firmada. Los datos de un menor los autoriza su representante (Ley 1581, art. 7):
+el formulario pide nombre y contacto del acudiente, y la autorización escrita se recoge
+**antes de cualquier actividad**, en cualquier puerta.
+
 ## 3. Protocolo de cuidado
 
 **Disparador: pisar el territorio.** Aplica a los niveles *con el HUB* y *Mixto*, sin importar el

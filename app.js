@@ -964,15 +964,68 @@ var I18N = {
     "vol.ey":"Voluntariado",
     "vol.t":"Aquí nadie viene a mirar.",
     "vol.lead":"Buscamos que quien llega amplíe su mirada, y que la fundación quede con algo que antes no tenía. Las dos cosas, en la misma jornada.",
-    "vol.niv.ey":"Cómo participar",
-    "vol.niv.t":"Hay tres maneras de estar",
-    "vol.niv.p":"El nivel no lo define tu oficio: lo define si pisas el territorio. Puedes aportar solo desde la estructura, solo en terreno, o partir tu tiempo entre las dos.",
-    "vol.n1.t":"Con el HUB SOCIAL",
-    "vol.n1.p":"En terreno, junto a una fundación aliada y su equipo. Ellos conocen a su comunidad: definen cuándo una visita suma y qué espacios se comparten.",
-    "vol.n2.t":"Con Give&Grow",
-    "vol.n2.p":"Tu oficio fortalece la estructura que sostiene la red — derecho, contabilidad, desarrollo, diseño, formación. Ocurre fuera del territorio.",
-    "vol.n3.t":"Mixto · HUB y Give&Grow",
-    "vol.n3.p":"Combinas las dos, en la proporción que tú definas. Un diseñador que trabaja en la web y también va a una jornada; alguien de comunicaciones que documenta lo que pasa.",
+    "vol.cta.emp":"Vengo con mi empresa",
+    "vol.pu.ey":"Cómo sumarte",
+    "vol.pu.t":"Cinco puertas",
+    "vol.pu.p":"Entras por lo que eres: con tu empresa, por tu cuenta, con tu oficio técnico o cuando pasa una emergencia.",
+    "vol.pu.ij.tag":"Para empresas",
+    "vol.pu.ij.t":"Impact Journey",
+    "vol.pu.ij.s":"Voluntariado en doble vía",
+    "vol.pu.ij.p":"Tu equipo y una comunidad del HUB se encuentran en una ruta diseñada con MIRA. No es una visita: es un intercambio, y las dos partes salen con algo que no tenían.",
+    "vol.pu.ij.cta":"Traer a mi equipo",
+    "vol.pu.per":"Para personas",
+    "vol.pu.te.t":"En terreno",
+    "vol.pu.te.p":"Con una fundación del HUB, en su territorio y junto a su equipo. Ellos conocen a su comunidad y deciden cuándo una visita suma.",
+    "vol.pu.te.cta":"Inscribirme en terreno",
+    "vol.pu.ad.t":"Administrativo",
+    "vol.pu.ad.p":"En la sede de Give&Grow. Derecho, contabilidad, diseño, desarrollo, comunicación o formación: tu oficio sostiene la red que hace posible todo lo demás.",
+    "vol.pu.ad.cta":"Inscribirme en la sede",
+    "vol.pu.ing":"Para ingenieros",
+    "vol.pu.tec.t":"Técnico · Mira Mi Casa",
+    "vol.pu.tec.p":"Con tu matrícula del COPNIA, das un concepto a distancia, sobre fotos, a familias cuya casa se afectó con el sismo.",
+    "vol.pu.tec.cta":"Postularme como ingeniero",
+    "vol.pu.cua":"Cuando pasa algo",
+    "vol.pu.em.t":"De emergencia",
+    "vol.pu.em.p":"Acopio y brigadas. Se abre solo cuando hay una emergencia activa; la última fue la brigada del sismo de agosto de 2026.",
+    "vol.pu.em.cta":"Cómo fue la brigada",
+    "vol.ru.ey":"Qué pasa después",
+    "vol.ru.t":"La ruta, paso a paso",
+    "vol.ru.p":"Te escribimos en máximo cinco días. Lo que sigue depende de dónde vas a estar.",
+    "vol.ru.te.t":"En terreno e Impact Journey",
+    "vol.ru.te.1.t":"Te inscribes",
+    "vol.ru.te.1.p":"Con el formulario de abajo. Las empresas, con el de alianza.",
+    "vol.ru.te.2.t":"Conversamos",
+    "vol.ru.te.2.p":"Te conocemos y vemos juntos qué experiencia encaja contigo.",
+    "vol.ru.te.3.t":"Nuestra verificación",
+    "vol.ru.te.3.p":"Identidad, antecedentes según lo que exige la ley para trabajar con niñas, niños y jóvenes, y la firma del acuerdo de voluntariado y del protocolo de protección.",
+    "vol.ru.te.4.t":"La de la fundación",
+    "vol.ru.te.4.p":"Define la actividad, cuántas personas, el momento y quién te acompaña durante toda la jornada.",
+    "vol.ru.te.5.t":"Sesión de Marco",
+    "vol.ru.te.5.p":"Obligatoria antes de pisar terreno: el contexto real, el protocolo y el reto.",
+    "vol.ru.te.6.t":"La jornada",
+    "vol.ru.te.6.p":"Inmersión, Reflexión y Anclaje: la vives, la pones en palabras y te llevas un compromiso pequeño.",
+    "vol.ru.ad.t":"Administrativo, en la sede",
+    "vol.ru.ad.1.p":"Con el formulario de abajo.",
+    "vol.ru.ad.2.p":"Qué sabes hacer y qué necesita la red ahora.",
+    "vol.ru.ad.3.t":"El acuerdo",
+    "vol.ru.ad.3.p":"Firmas el acuerdo de voluntariado: qué vas a hacer, cuánto tiempo y con quién.",
+    "vol.ru.ad.4.t":"Empiezas",
+    "vol.ru.ad.4.p":"En la sede de Give&Grow, con una persona del equipo que te acompaña.",
+    "vol.edad.t":"La edad",
+    "vol.edad.p":"Desde los 18 años puedes venir por tu cuenta. Si eres menor de edad, vienes con tu acudiente o con su autorización firmada, y es tu acudiente quien autoriza este registro.",
+    "vf.edad.lbl":"¿Tienes 18 años o más?",
+    "vf.edad.si":"Sí",
+    "vf.edad.no":"No, soy menor de edad",
+    "vf.menor.aviso":"Vienes con tu acudiente o con su autorización firmada. La ley protege de forma especial los datos de un menor, así que antes de cualquier actividad le pedimos a tu acudiente que autorice este registro por escrito.",
+    "vf.acu.nombre":"Nombre de tu acudiente",
+    "vf.acu.contacto":"Correo o teléfono de tu acudiente",
+    "vf.acu.acompana":"Vendré con mi acudiente",
+    "vf.acu.autoriza":"Vendré con su autorización firmada",
+    "vf.acu.sabe":"Mi acudiente sabe que me estoy inscribiendo",
+    "vf.err.edad":"Dinos si tienes 18 años o más.",
+    "vf.err.acu":"Necesitamos el nombre y un contacto de tu acudiente.",
+    "vf.err.acu.modo":"Dinos si vendrás con tu acudiente o con su autorización firmada.",
+    "vf.err.acu.sabe":"Tu acudiente tiene que saber que te estás inscribiendo.",
     "vol.mira.ey":"El método",
     "vol.mira.t":"MIRA: dos miradas que se amplían",
     "vol.mira.p":"Le llamamos MIRA porque de eso se trata: ampliar la mirada. Y porque la sigla nombra sus cuatro fases — Marco, Inmersión, Reflexión y Anclaje.",
@@ -1017,7 +1070,7 @@ var I18N = {
     "vol.port.note":"Así está diseñado el modelo. Cada experiencia se abre cuando hay una fundación aliada verificada para esa población — y la red crece una alianza a la vez.",
     "vol.hoy.ey":"Dónde estamos hoy",
     "vol.hoy.t":"Contado sin adornos",
-    "vol.hoy.p":"Ya hicimos las primeras jornadas con donantes y aliados. Con equipos de empresa estamos abriendo el formato: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.",
+    "vol.hoy.p":"Ya hicimos las primeras jornadas con donantes y aliados. Con equipos de empresa estamos abriendo Impact Journey: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.",
     "vol.cta":"Quiero participar",
     "vf.ey":"Sumarte",
     "vf.t":"Cuéntanos quién eres",
@@ -1026,11 +1079,11 @@ var I18N = {
     "vf.email":"Correo",
     "vf.tel":"Teléfono o WhatsApp (opcional)",
     "vf.ciudad":"Ciudad (opcional)",
-    "vf.nivel.lbl":"¿Cómo quieres participar?",
-    "vf.nivel.help":"El nivel no lo define tu oficio: lo define si pisas el territorio. Un diseñador puede aportar solo en la estructura, solo en terreno, o partir su tiempo entre las dos.",
-    "vf.nivel.hub":"Con el HUB SOCIAL — en terreno, junto a una fundación aliada",
-    "vf.nivel.est":"Con Give&Grow — en la estructura, sin pisar territorio",
-    "vf.nivel.mix":"Mixto — parte estructura, parte terreno",
+    "vf.nivel.lbl":"¿Dónde quieres estar?",
+    "vf.nivel.help":"Tu oficio puede ser el mismo en las dos: lo que cambia es si vas al territorio. Ir a terreno tiene su propia ruta, con verificaciones y sesión de Marco.",
+    "vf.nivel.hub":"En terreno — con una fundación del HUB",
+    "vf.nivel.est":"Administrativo — en la sede de Give&Grow",
+    "vf.nivel.mix":"Las dos",
     "vf.oficio":"Tu oficio o área",
     "vf.oficio.ph":"Derecho, contabilidad, salud, desarrollo, docencia, comunicación…",
     "vf.disp":"Disponibilidad (opcional)",
@@ -1051,7 +1104,7 @@ var I18N = {
     "vf.err.datos":"Necesitamos tu autorización para guardar tus datos y poder escribirte.",
     "vf.err.send":"No pudimos enviar tus datos. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
     "vf.nada":"Nada de esto se cobra, en ninguna dirección.",
-    "vf.origen.brig":"Vienes de la brigada del terremoto. Te marcamos «en la estructura» porque es lo que se puede sumar a tiempo: el acopio de Medellín, del 24 al 28 de agosto. Puedes cambiarlo si prefieres el programa de todo el año.",
+    "vf.origen.brig":"Vienes de la brigada del terremoto. Te marcamos «Administrativo» porque es lo que se puede sumar a tiempo: el acopio de Medellín, del 24 al 28 de agosto. Puedes cambiarlo si prefieres el programa de todo el año.",
     "ff.ey":"Aplicar al HUB",
     "ff.t":"Cuéntanos quién es tu fundación",
     "ff.lead":"Esto es la aplicación, no la vinculación: con lo que escribas aquí revisamos si encajamos, y si encajamos vamos a conocerte a tu territorio. Solo te pedimos texto — el logo, las fotos y las cifras de costos se ven después, cuando ya nos conozcamos.",
@@ -3657,6 +3710,7 @@ var ACT_FNS = {
   setPagoVia:setPagoVia,
   mcEnviar:mcEnviar,
   irAVoluntariadoBrigada:irAVoluntariadoBrigada,
+  volEdad:volEdad, volIrForm:volIrForm, irAAliadosVoluntariado:irAAliadosVoluntariado,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
@@ -6719,6 +6773,44 @@ function irAVoluntariadoBrigada(){
   if (primero) setTimeout(function(){ primero.focus({ preventScroll: true }); }, suave ? 500 : 0);
 }
 
+/* La edad abre los datos del acudiente. Mismo patrón que el nivel: el detalle
+   aparece cuando hace falta, no antes. */
+function volEdad(){
+  setTimeout(function(){
+    var e = document.querySelector('input[name="vf-edad"]:checked');
+    var box = document.getElementById("vf-menor");
+    if (box) box.style.display = (e && e.value === "no") ? "" : "none";
+  }, 0);
+}
+
+/* Las puertas de «En terreno» y «Administrativo» llevan al formulario con su
+   opción ya marcada. Sin nivel (''), solo baja. Mismo porqué que
+   irAFormFund: `go()` termina con un scrollTo(0,0) y un ancla nativa se
+   resolvería como ruta. */
+function volIrForm(nivel){
+  if (currentRoute !== "voluntariado") go("voluntariado");
+  if (nivel){
+    var r = document.querySelector('input[name="vf-nivel"][value="' + nivel + '"]');
+    if (r){ r.checked = true; volNivel(); }
+  }
+  var s = document.getElementById("vol-form");
+  if (!s) return;
+  var suave = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  s.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+  var primero = document.getElementById("vf-nombre");
+  if (primero) setTimeout(function(){ primero.focus({ preventScroll: true }); }, suave ? 500 : 0);
+}
+
+/* Impact Journey es voluntariado de EMPRESA: su puerta es el formulario de
+   alianza, con «Voluntariado corporativo» ya marcado. */
+function irAAliadosVoluntariado(){
+  if (currentRoute !== "aliados") go("aliados");
+  var c = document.getElementById("mod-voluntariado");
+  if (c) c.checked = true;
+  var f = document.getElementById("ally-form");
+  if (f) f.scrollIntoView({ block: "start" });
+}
+
 function volSubmit(ev){
   ev.preventDefault();
   var note = document.getElementById("vf-note");
@@ -6733,6 +6825,16 @@ function volSubmit(ev){
   if (!val("vf-nombre")) return allyMal(note, "vf-nombre", "vf.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("vf-email"))) return allyMal(note, "vf-email", "vf.err.email");
   if (!nivelEl) return allyMal(note, document.querySelector('input[name="vf-nivel"]'), "vf.err.nivel");
+  var edadEl = document.querySelector('input[name="vf-edad"]:checked');
+  if (!edadEl) return allyMal(note, document.querySelector('input[name="vf-edad"]'), "vf.err.edad");
+  var menor = edadEl.value === "no";
+  var acuModo = document.querySelector('input[name="vf-acu-modo"]:checked');
+  if (menor){
+    if (!val("vf-acu-nombre")) return allyMal(note, "vf-acu-nombre", "vf.err.acu");
+    if (!val("vf-acu-contacto")) return allyMal(note, "vf-acu-contacto", "vf.err.acu");
+    if (!acuModo) return allyMal(note, document.querySelector('input[name="vf-acu-modo"]'), "vf.err.acu.modo");
+    if (!chk("vf-acu-sabe")) return allyMal(note, "vf-acu-sabe", "vf.err.acu.sabe");
+  }
   if (!val("vf-oficio")) return allyMal(note, "vf-oficio", "vf.err.oficio");
   if (!chk("vf-datos")) return allyMal(note, "vf-datos", "vf.err.datos");
 
@@ -6753,6 +6855,11 @@ function volSubmit(ev){
       disponibilidad: val("vf-disp"),
       mensaje: val("vf-msg"),
       captura: chk("vf-captura"),
+      mayor_edad: !menor,
+      acudiente_nombre: menor ? val("vf-acu-nombre") : "",
+      acudiente_contacto: menor ? val("vf-acu-contacto") : "",
+      acudiente_modo: menor && acuModo ? acuModo.value : "",
+      acudiente_sabe: menor ? chk("vf-acu-sabe") : false,
       origen: VOL_ORIGEN || "",
       autoriza_datos: true,
       web2: val("vf-web2"),
@@ -6760,7 +6867,7 @@ function volSubmit(ev){
     })
   }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
     .then(function(){
-      document.getElementById("vf").reset(); volNivel();
+      document.getElementById("vf").reset(); volNivel(); volEdad();
       /* Se limpia el origen: si la misma persona vuelve a inscribir a alguien
          más desde otra ruta, esa inscripción no debe heredar la brigada. */
       VOL_ORIGEN = null;
