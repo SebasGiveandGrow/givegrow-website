@@ -1648,8 +1648,11 @@ async function correoInscripcionVoluntario(env, v) {
 
 /* Aviso interno: lo que hay que saber para responderle, y los protocolos que
    quedaron disparados. */
+/* Al buzon de alianzas desde el 28 sep 2026, decision de Sebas: quien se
+   ofrece de voluntario es la misma conversacion que una fundacion o una
+   empresa que llega, y la atiende el. Ver `correoAvisoAliado`. */
 async function correoAvisoInscripcion(env, v) {
-  const para = env.CORREO_AVISOS;
+  const para = correoAlianzas(env);
   if (!para) return avisoSinBuzon(env, "aviso-inscripcion");
   const nivel = { hub: "Con el HUB (terreno)", estructura: "Con Give&Grow (estructura)", mixto: "Mixto" }[v.nivel];
   const filas = [
@@ -11335,8 +11338,9 @@ async function correoOfrecimiento(env, o) {
   });
 }
 
+/* Al buzon de alianzas, como los voluntarios (decision de Sebas, 28 sep 2026). */
 async function correoAvisoOfrecimiento(env, o) {
-  const para = env.CORREO_AVISOS;
+  const para = correoAlianzas(env);
   if (!para) return avisoSinBuzon(env, "aviso-ofrecimiento");
   const titulo = "Ofrecimiento en especie: " + (ETIQUETA_CAT.es[o.categoria] || o.categoria);
   const filas = [
