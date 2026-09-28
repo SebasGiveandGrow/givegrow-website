@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=def1e04d" defer></script>
+<script src="/app.js?v=ae22db9b" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -589,8 +589,8 @@
             <input type="text" id="ff-cargo" maxlength="120" data-i18n="ff.cargo.ph" data-i18n-attr="placeholder" placeholder="Directora y fundadora, representante legal…"></div>
           <div class="field"><label for="ff-email" data-i18n="ff.email">Correo de contacto</label>
             <input type="email" id="ff-email" maxlength="200" autocomplete="email" required></div>
-          <div class="field"><label for="ff-tel" data-i18n="ff.tel">Teléfono o WhatsApp (opcional)</label>
-            <input type="tel" id="ff-tel" maxlength="40" autocomplete="tel">
+          <div class="field"><label for="ff-tel" data-i18n="ff.tel">Celular o WhatsApp</label>
+            <input type="tel" id="ff-tel" maxlength="40" autocomplete="tel" required>
             <small class="vf-help" data-i18n="ff.tel.help">Los datos de contacto son para coordinar entre nosotros. No se publican en el sitio.</small></div>
           <div class="field ally-wide"><label for="ff-zona" data-i18n="ff.zona">Barrio o sector y ciudad donde trabajan</label>
             <input type="text" id="ff-zona" maxlength="160" data-i18n="ff.zona.ph" data-i18n-attr="placeholder" placeholder="Ej. La Honda, Manrique, Medellín" required>
@@ -1351,8 +1351,8 @@
             <input type="text" id="of-nombre" autocomplete="name" required></div>
           <div class="field"><label for="of-email" data-i18n="of.email">Correo</label>
             <input type="email" id="of-email" autocomplete="email" required></div>
-          <div class="field"><label for="of-tel" data-i18n="of.tel">Teléfono o WhatsApp (opcional)</label>
-            <input type="tel" id="of-tel" autocomplete="tel"></div>
+          <div class="field"><label for="of-tel" data-i18n="of.tel">Celular o WhatsApp</label>
+            <input type="tel" id="of-tel" autocomplete="tel" required></div>
           <div class="field"><label for="of-ciudad" data-i18n="of.ciudad">Ciudad (opcional)</label>
             <input type="text" id="of-ciudad" autocomplete="address-level2"></div>
 
@@ -1456,6 +1456,8 @@
           <input type="text" id="rep-nombre" autocomplete="name" required></div>
         <div class="field"><label for="rep-email" data-i18n="rep.email">Correo</label>
           <input type="email" id="rep-email" autocomplete="email" required></div>
+        <div class="field"><label for="rep-tel" data-i18n="rep.tel">Celular o WhatsApp</label>
+          <input type="tel" id="rep-tel" maxlength="40" autocomplete="tel" required></div>
 
         <input type="text" id="rep-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
 
@@ -2025,7 +2027,7 @@
           <div class="field"><label for="ally-cedula" data-i18n="ally.f.cedula">Cédula del representante</label><input type="text" id="ally-cedula" maxlength="40"></div>
           <div class="field"><label for="ally-contacto" data-i18n="ally.f.contacto">Contacto (nombre y cargo)</label><input type="text" id="ally-contacto" maxlength="160"></div>
           <div class="field"><label for="ally-correo" data-i18n="ally.f.correo">Correo *</label><input type="email" id="ally-correo" maxlength="200" required autocomplete="email"></div>
-          <div class="field"><label for="ally-tel" data-i18n="ally.f.tel">Teléfono</label><input type="tel" id="ally-tel" maxlength="40"></div>
+          <div class="field"><label for="ally-tel" data-i18n="ally.f.tel">Celular o WhatsApp *</label><input type="tel" id="ally-tel" maxlength="40" autocomplete="tel" required></div>
           <div class="field"><label for="ally-ciudad" data-i18n="ally.f.ciudad">Ciudad</label><input type="text" id="ally-ciudad" maxlength="80"></div>
           <div class="field"><label for="ally-sector" data-i18n="ally.f.sector">Sector o industria</label><select id="ally-sector" data-change="allySector()">
             <option value="" data-i18n="ally.sector.ph">Selecciona…</option>
@@ -2230,6 +2232,8 @@
           <input type="text" id="mif-nombre" autocomplete="name" required></div>
         <div class="field"><label for="mif-email" data-i18n="mi.email">Correo</label>
           <input type="email" id="mif-email" autocomplete="email" required></div>
+        <div class="field"><label for="mif-tel" data-i18n="mi.tel">Celular o WhatsApp, con el código de tu país</label>
+          <input type="tel" id="mif-tel" maxlength="40" autocomplete="tel" placeholder="+1 555 123 4567" required></div>
 
         <label class="ally-check"><input type="checkbox" id="mif-datos"><span><b data-i18n="mi.datos">Autorizo el tratamiento de mis datos para gestionar mi membresía y enviarme el recibo de cada aporte, conforme a la Ley 1581 de 2012.</b><small data-i18n="mi.datos.h">Puedes pedir que los borremos escribiendo a privacidad@thegiveandgrowproject.org.</small></span></label>
 
@@ -2453,8 +2457,8 @@
           <input type="text" id="vf-nombre" autocomplete="name" required></div>
         <div class="field"><label for="vf-email" data-i18n="vf.email">Correo</label>
           <input type="email" id="vf-email" autocomplete="email" required></div>
-        <div class="field"><label for="vf-tel" data-i18n="vf.tel">Teléfono o WhatsApp (opcional)</label>
-          <input type="tel" id="vf-tel" autocomplete="tel"></div>
+        <div class="field"><label for="vf-tel" data-i18n="vf.tel">Celular o WhatsApp</label>
+          <input type="tel" id="vf-tel" autocomplete="tel" required></div>
         <div class="field"><label for="vf-ciudad" data-i18n="vf.ciudad">Ciudad (opcional)</label>
           <input type="text" id="vf-ciudad" autocomplete="address-level2"></div>
 
@@ -3036,8 +3040,8 @@
         <div class="field"><label for="inf-email" data-i18n="ing.email">Correo</label>
           <input type="email" id="inf-email" autocomplete="email" required>
           <small class="mu" data-i18n="ing.email.h">Con este mismo correo entrarías a la plataforma. Puede ser de universidad, de empresa o particular.</small></div>
-        <div class="field"><label for="inf-tel" data-i18n="ing.tel">Teléfono o WhatsApp (opcional)</label>
-          <input type="tel" id="inf-tel" autocomplete="tel"></div>
+        <div class="field"><label for="inf-tel" data-i18n="ing.tel">Celular o WhatsApp</label>
+          <input type="tel" id="inf-tel" autocomplete="tel" required></div>
         <div class="field"><label for="inf-ciudad" data-i18n="ing.ciudad">Ciudad</label>
           <input type="text" id="inf-ciudad" autocomplete="address-level2" required></div>
         <div class="field"><label for="inf-mat" data-i18n="ing.matricula">Matrícula profesional</label>
@@ -3263,8 +3267,8 @@
           <input type="text" id="apf-nombre" autocomplete="name" required></div>
         <div class="field"><label for="apf-email" data-i18n="ap.email">Correo</label>
           <input type="email" id="apf-email" autocomplete="email" required></div>
-        <div class="field"><label for="apf-tel" data-i18n="ap.tel">Teléfono o WhatsApp (opcional)</label>
-          <input type="tel" id="apf-tel" autocomplete="tel"></div>
+        <div class="field"><label for="apf-tel" data-i18n="ap.tel">Celular o WhatsApp</label>
+          <input type="tel" id="apf-tel" autocomplete="tel" required></div>
         <div class="field"><label for="apf-ciudad" data-i18n="ap.ciudad">Desde qué ciudad escribes (opcional)</label>
           <input type="text" id="apf-ciudad" autocomplete="address-level2"></div>
         <div class="field"><label for="apf-quien" data-i18n="ap.quien">Escribes como</label>

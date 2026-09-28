@@ -1481,6 +1481,18 @@ async function apiAporte(env, guia) {
 
 const NIVELES = ["hub", "estructura", "mixto"];
 
+/* EL CELULAR, OBLIGATORIO en todas las puertas de entrada desde el 28 sep 2026
+   (decision de Sebas). Entre 7 y 15 digitos, que es lo que cabe en un celular
+   colombiano y en uno con codigo de pais; lo demas (espacios, «+», guiones) se
+   guarda tal como se escribio. Devuelve el numero limpio o null. La misma regla
+   esta en el navegador (telOk en app.js). */
+function telefonoContacto(v) {
+  const t = String(v == null ? "" : v).trim().slice(0, 40);
+  const dig = t.replace(/\D/g, "");
+  return dig.length >= 7 && dig.length <= 15 ? t : null;
+}
+const AYUDA_TEL = "Déjanos un celular o WhatsApp: es por donde te escribimos más rápido.";
+
 async function apiInscripcion(request, env, url) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
 
@@ -1539,6 +1551,11 @@ async function apiInscripcion(request, env, url) {
                     ayuda: "Ya recibimos varias inscripciones desde este correo hace un momento. " +
                            "Espera unos minutos; si ya enviaste la tuya, te escribiremos a ese mismo correo." }, 429);
     }
+  }
+
+  /* Aqui y no en cada manejador: las seis puertas pasan por este punto. */
+  if (!telefonoContacto(c.telefono)) {
+    return json({ error: "telefono_requerido", ayuda: AYUDA_TEL }, 400);
   }
 
   if (c.tipo === "especie")   return await apiOfrecimiento(env, c);
@@ -2594,7 +2611,7 @@ async function adminAportes(env, url, quien) {
   const sql =
     "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.frecuencia, " +
     "a.quiere_certificado, a.consent_muro, a.idioma, a.nota, a.metodo_pago, a.creada_en, " +
-    "a.aprobada_en, a.entregada_en, d.nombre AS donante, d.email AS correo, " +
+    "a.aprobada_en, a.entregada_en, d.nombre AS donante, d.email AS correo, d.telefono AS telefono, " +
     "d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, d.ciudad AS ciudad, a.token, " +
     /* El certificado vigente viaja con la fila para que el panel sepa, sin una
        segunda consulta, si el botón debe decir "Emitir" o "Ver" — y si el que
@@ -3456,6 +3473,8 @@ async function apiReportarTransferencia(request, env, url) {
 
   if (!nombre) return json({ error: "nombre_requerido" }, 400);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  const telefono = telefonoContacto(c.telefono);
+  if (!telefono) return json({ error: "telefono_requerido", ayuda: AYUDA_TEL }, 400);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ error: "fecha_invalida" }, 400);
   /* Una transferencia con fecha futura no ocurrió. Mismo criterio que las actas. */
   if (fechaEnFuturo(fecha)) return json({ error: "fecha_futura" }, 422);
@@ -3497,7 +3516,7 @@ async function apiReportarTransferencia(request, env, url) {
                          "en el correo que te llego." }, 429);
   }
 
-  const donanteId = await donantePorCorreo(env, email, nombre);
+  const donanteId = await donantePorCorreo(env, email, nombre, telefono);
   const guia = await siguienteGuia(env, anioCO());
   const token = tokenNuevo();
 
@@ -3526,7 +3545,7 @@ async function apiReportarTransferencia(request, env, url) {
 
   try {
     await correoTransferenciaReportada(env, { guia, monto, email, nombre, fecha, refer, idioma: c.idioma });
-    await correoAvisoTransferencia(env, { guia, monto, email, nombre, fecha, refer, destino });
+    await correoAvisoTransferencia(env, { guia, monto, email, nombre, telefono, fecha, refer, destino });
   } catch (e) { console.error("correo transferencia", e && e.message); }
 
   /* El token vuelve al navegador SOLO para que pueda subir su comprobante en el
@@ -3537,11 +3556,14 @@ async function apiReportarTransferencia(request, env, url) {
 /* Un donante que transfiere no pasa por Wompi, así que su fila en `donantes` la
    creamos aquí — con lo mínimo, igual que hace guardarDonante con lo de la
    pasarela. */
-async function donantePorCorreo(env, email, nombre) {
+async function donantePorCorreo(env, email, nombre, telefono) {
+  /* El telefono solo se escribe si llega: un camino que no lo pide (la
+     suscripcion con Wompi) no puede borrar el que ya estaba. */
   await env.DB.prepare(
-    "INSERT INTO donantes (email, nombre) VALUES (?,?) ON CONFLICT(email) DO UPDATE SET " +
-    "nombre = COALESCE(excluded.nombre, nombre), actualizado_en = datetime('now')"
-  ).bind(email, nombre || null).run();
+    "INSERT INTO donantes (email, nombre, telefono) VALUES (?,?,?) ON CONFLICT(email) DO UPDATE SET " +
+    "nombre = COALESCE(excluded.nombre, nombre), telefono = COALESCE(excluded.telefono, telefono), " +
+    "actualizado_en = datetime('now')"
+  ).bind(email, nombre || null, telefono || null).run();
   const f = await env.DB.prepare("SELECT id FROM donantes WHERE email = ?").bind(email).first();
   return f ? f.id : null;
 }
@@ -9074,6 +9096,8 @@ async function apiPaypalSuscripcion(request, env, url) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
   const nombre = limpiar(c.nombre, 120);
   if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  const telefono = telefonoContacto(c.telefono);
+  if (!telefono) return json({ error: "telefono_requerido", ayuda: AYUDA_TEL }, 400);
   if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
 
   const idioma = c.idioma === "en" ? "en" : "es";
@@ -9169,7 +9193,7 @@ async function apiPaypalSuscripcion(request, env, url) {
      un miembro sin correo enlazado -que se puede reparar mirando el panel- que
      perder una suscripcion que PayPal ya creo. */
   let donanteId = null;
-  try { donanteId = await donantePorCorreo(env, email, nombre); }
+  try { donanteId = await donantePorCorreo(env, email, nombre, telefono); }
   catch (e) { console.error("paypal donante", e && e.message); }
 
   await env.DB.prepare(
@@ -10631,7 +10655,7 @@ async function adminComprobante(env, guia) {
 async function adminReportadas(env) {
   const r = await env.DB.prepare(
     "SELECT a.guia, a.monto_centavos, a.modo, a.destino_id, a.proyecto, a.quiere_certificado, " +
-    "a.referencia_pago, a.comprobante, a.creada_en, d.nombre, d.email, " +
+    "a.referencia_pago, a.comprobante, a.creada_en, d.nombre, d.email, d.telefono, " +
     /* LA EDAD, y no es cosmetica: al auditar habia tres transferencias
        reportadas de 15, 20 y 22 dias —$630.000 en total, dos pidiendo
        certificado— y la bandeja solo mostraba la fecha. Una fecha no grita;
@@ -10789,7 +10813,7 @@ async function correoAvisoTransferencia(env, x) {
     ["Guía", x.guia], ["Monto", fmtPesos(x.monto * 100) + " COP"],
     ["Fecha que reporta", x.fecha], ["Referencia", x.refer || "(no dio)"],
     ["Destino", x.destino || "Fondo general"],
-    ["Donante", x.nombre], ["Correo", x.email]
+    ["Donante", x.nombre], ["Correo", x.email], ["Celular", x.telefono || "(no dejó)"]
   ];
   return enviarCorreo(env, {
     para, asunto: titulo,
@@ -16144,6 +16168,15 @@ function celdaCert(a){
   return a.quiere_certificado ? "pedido" : "—";
 }
 
+/* El celular del donante, con WhatsApp a un clic: para eso se empezo a pedir
+   (28 sep 2026). Un celular colombiano de 10 digitos recibe el 57 delante. */
+function celDonante(tel){
+  if (!tel) return "";
+  var dig = String(tel).replace(/[^0-9]/g, "");
+  if (dig.length === 10 && dig.charAt(0) === "3") dig = "57" + dig;
+  return "<br><small>" + esc(tel) + (dig.length >= 11 && dig.length <= 15
+    ? ' · <a href="https://wa.me/' + dig + '" target="_blank" rel="noopener">WhatsApp</a>' : "") + "</small>";
+}
 function pintarFilas(l){
   var tb = document.getElementById("filas");
   if (!l.length){ tb.innerHTML = '<tr><td colspan="9">Nada con ese filtro.</td></tr>'; return; }
@@ -16164,7 +16197,7 @@ function pintarFilas(l){
       "<td>" + esc(a.estado) + "</td>" +
       "<td>" + pesos(a.monto_centavos) + "</td>" +
       "<td>" + esc(a.modo === "dirigida" ? (a.destino_id||"?") : "Fondo general") + "</td>" +
-      "<td>" + esc(a.donante || "—") + (a.correo ? "<br><small>" + esc(a.correo) + "</small>" : "") + "</td>" +
+      "<td>" + esc(a.donante || "—") + (a.correo ? "<br><small>" + esc(a.correo) + "</small>" : "") + celDonante(a.telefono) + "</td>" +
       "<td>" + recibo + "</td>" +
       "<td>" + celdaCert(a) + "</td>" +
       "<td>" + esc(enCO(a.creada_en, 16)) + "</td>" +
@@ -16542,7 +16575,7 @@ function cargarReportadas(){
         "</small></td>" +
         "<td>" + pesos(a.monto_centavos) + "</td>" +
         "<td>" + esc(a.modo === "dirigida" ? (a.proyecto || a.destino_id || "?") : "Fondo general") + "</td>" +
-        "<td>" + esc(a.nombre || "—") + (a.email ? "<br><small>" + esc(a.email) + "</small>" : "") + "</td>" +
+        "<td>" + esc(a.nombre || "—") + (a.email ? "<br><small>" + esc(a.email) + "</small>" : "") + celDonante(a.telefono) + "</td>" +
         "<td>" + esc(a.referencia_pago || "—") + "</td>" +
         "<td>" + (a.comprobante
           ? '<a href="/api/admin/comprobante/' + esc(a.guia) + '" target="_blank" rel="noopener">ver</a>'

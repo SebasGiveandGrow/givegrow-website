@@ -475,7 +475,7 @@ var I18N = {
     "ally.f.cedula":"Cédula del representante",
     "ally.f.contacto":"Contacto (nombre y cargo)",
     "ally.f.correo":"Correo *",
-    "ally.f.tel":"Teléfono",
+    "ally.f.tel":"Celular o WhatsApp *",
     "ally.f.ciudad":"Ciudad",
     "ally.f.dir":"Dirección",
     "ally.f.web":"Sitio web",
@@ -752,7 +752,7 @@ var I18N = {
     "ing.nombre":"Nombre completo",
     "ing.email":"Correo",
     "ing.email.h":"Con este mismo correo entrarías a la plataforma. Puede ser de universidad, de empresa o particular.",
-    "ing.tel":"Teléfono o WhatsApp (opcional)",
+    "ing.tel":"Celular o WhatsApp",
     "ing.ciudad":"Ciudad",
     "ing.matricula":"Matrícula profesional",
     "ing.matricula.h":"La que aparece en tu tarjeta del COPNIA. Es lo que vamos a verificar en su registro público.",
@@ -812,7 +812,7 @@ var I18N = {
     "ap.form.lead":"No hay mínimo. Un bulto de cemento sirve, y una empresa que done treinta también.",
     "ap.nombre":"Nombre completo",
     "ap.email":"Correo",
-    "ap.tel":"Teléfono o WhatsApp (opcional)",
+    "ap.tel":"Celular o WhatsApp",
     "ap.ciudad":"Desde qué ciudad escribes (opcional)",
     "ap.quien":"Escribes como",
     "ap.quien.persona":"Persona",
@@ -1026,6 +1026,9 @@ var I18N = {
     "vf.err.acu":"Necesitamos el nombre y un contacto de tu acudiente.",
     "vf.err.acu.modo":"Dinos si vendrás con tu acudiente o con su autorización firmada.",
     "vf.err.acu.sabe":"Tu acudiente tiene que saber que te estás inscribiendo.",
+    "rep.tel":"Celular o WhatsApp",
+    "mi.tel":"Celular o WhatsApp, con el código de tu país",
+    "form.err.tel":"Déjanos un celular o WhatsApp: es por donde te escribimos más rápido.",
     "vol.mira.ey":"El método",
     "vol.mira.t":"MIRA: dos miradas que se amplían",
     "vol.mira.p":"Le llamamos MIRA porque de eso se trata: ampliar la mirada. Y porque la sigla nombra sus cuatro fases — Marco, Inmersión, Reflexión y Anclaje.",
@@ -1077,7 +1080,7 @@ var I18N = {
     "vf.lead":"No hay mínimo de horas ni compromiso obligado. Lo que sí hay es una conversación antes de empezar: queremos conocerte y encontrar juntos dónde encajas mejor.",
     "vf.nombre":"Nombre completo",
     "vf.email":"Correo",
-    "vf.tel":"Teléfono o WhatsApp (opcional)",
+    "vf.tel":"Celular o WhatsApp",
     "vf.ciudad":"Ciudad (opcional)",
     "vf.nivel.lbl":"¿Dónde quieres estar?",
     "vf.nivel.help":"Tu oficio puede ser el mismo en las dos: lo que cambia es si vas al territorio. Ir a terreno tiene su propia ruta, con verificaciones y sesión de Marco.",
@@ -1126,7 +1129,7 @@ var I18N = {
     "ff.zona.help":"El sector, no la dirección exacta. En el mapa de la red el pin va a nivel de barrio, nunca a la puerta.",
     "ff.ciudad":"Ciudad (opcional)",
     "ff.email":"Correo de contacto",
-    "ff.tel":"Teléfono o WhatsApp (opcional)",
+    "ff.tel":"Celular o WhatsApp",
     "ff.tel.help":"Los datos de contacto son para coordinar entre nosotros. No se publican en el sitio.",
     "ff.s.hist":"Qué hacen y por qué",
     "ff.historia":"La historia de la fundación, en un párrafo",
@@ -1897,7 +1900,7 @@ var I18N = {
     "of.quien.empresa":"Empresa",
     "of.nombre":"Nombre o razón social",
     "of.email":"Correo",
-    "of.tel":"Teléfono o WhatsApp (opcional)",
+    "of.tel":"Celular o WhatsApp",
     "of.ciudad":"Ciudad (opcional)",
     "of.datos":"Autorizo el tratamiento de mis datos para coordinar este aporte, conforme a la Política de Privacidad.",
     "of.btn":"Enviar el ofrecimiento",
@@ -6352,6 +6355,17 @@ function renderAlmaChips(){
    un Apps Script que escribía una hoja de cálculo: la hoja no tenía columna para
    `sector`, `aporta` ni `instagram`, así que esos tres campos —los que arman la
    tarjeta de reciprocidad de #empresas— se enviaban y se perdían. */
+/* EL CELULAR, OBLIGATORIO EN TODOS LOS FORMULARIOS DE ENTRADA (decision de
+   Sebas, 28 sep 2026: «para poder comunicarme facilmente»). Ese dia las tres
+   transferencias reportadas no tenian telefono —el formulario ni lo pedia— y
+   el unico camino hacia esos donantes era el correo. Entre 7 y 15 digitos:
+   cabe un celular de Colombia y uno con codigo de otro pais; los espacios, los
+   guiones y el «+» se aceptan porque asi se escribe un numero. La misma regla
+   vive en el servidor (telefonoContacto). */
+function telOk(v){
+  var d = String(v || "").replace(/[^0-9]/g, "");
+  return d.length >= 7 && d.length <= 15;
+}
 function allyToggleGrat(){
   var on = document.getElementById("mod-gratitud").checked;
   document.getElementById("ally-gratbox").style.display = on ? "" : "none";
@@ -6384,6 +6398,7 @@ function allySubmit(ev){
     document.getElementById("ally-form").reset(); allyToggleGrat(); allyToggleServ(); allySector();
     return allyMsg(note, t("ally.ok"), true);
   }
+  if (!telOk(val("ally-tel"))) return allyMal(note, "ally-tel", "form.err.tel");
   // Al menos una forma de apoyar
   var anyMod = chk("mod-donacion")||chk("mod-rse")||chk("mod-gratitud")||chk("mod-servicios")||chk("mod-voluntariado")||chk("mod-difusion");
   if (!anyMod) return allyMal(note, "mod-donacion", "ally.err.mod");
@@ -6449,6 +6464,7 @@ function fundSubmit(ev){
 
   if (!val("ff-nombre")) return allyMal(note, "ff-nombre", "ff.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("ff-email"))) return allyMal(note, "ff-email", "ff.err.email");
+  if (!telOk(val("ff-tel"))) return allyMal(note, "ff-tel", "form.err.tel");
   if (!val("ff-lider")) return allyMal(note, "ff-lider", "ff.err.lider");
   if (!pers) return allyMal(note, document.querySelector('input[name="ff-pers"]'), "ff.err.pers");
   if (!val("ff-zona")) return allyMal(note, "ff-zona", "ff.err.zona");
@@ -6524,6 +6540,7 @@ function fundOtra(){ setTimeout(fundPobOtra, 0); }
    navegador: el servidor y el cliente dicen lo mismo con las mismas palabras. */
 var ALLY_ERRS = {
   razon_requerida: ["#ally-razon", "ally.err.razon"],
+  telefono_requerido: ["#ally-tel", "form.err.tel"],
   email_invalido: ["#ally-correo", "ally.err.email"],
   modalidad_requerida: ["#mod-donacion", "ally.err.mod"],
   beneficio_requerido: ["#ally-ben", "ally.err.ben"],
@@ -6532,6 +6549,7 @@ var ALLY_ERRS = {
 };
 var FF_ERRS = {
   nombre_requerido: ["#ff-nombre", "ff.err.nombre"],
+  telefono_requerido: ["#ff-tel", "form.err.tel"],
   email_invalido: ["#ff-email", "ff.err.email"],
   lider_requerido: ["#ff-lider", "ff.err.lider"],
   personeria_requerida: ['input[name="ff-pers"]', "ff.err.pers"],
@@ -6631,6 +6649,7 @@ function repSubmit(ev){
   if (!val("rep-fecha")) return allyMal(note, "rep-fecha", "rep.err.fecha");
   if (!val("rep-nombre")) return allyMal(note, "rep-nombre", "rep.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("rep-email"))) return allyMal(note, "rep-email", "rep.err.email");
+  if (!telOk(val("rep-tel"))) return allyMal(note, "rep-tel", "form.err.tel");
   if (!chk("rep-datos")) return allyMal(note, "rep-datos", "rep.err.datos");
 
   var brigada = val("rep-dest") === "brigada";
@@ -6652,6 +6671,7 @@ function repSubmit(ev){
       proyecto: repDestino ? t("mmc.donar.opcion") : (brigada ? t("brigada.opcion") : null),
       nombre: val("rep-nombre"),
       email: val("rep-email"),
+      telefono: val("rep-tel"),
       certificado: chk("rep-cert"),
       autoriza_datos: true,
       idioma: lang
@@ -6672,6 +6692,7 @@ function repSubmit(ev){
         var texto = t("rep.err");
         if (d.error === "demasiados_reportes")     texto = t("rep.err.espera");
         else if (d.error === "email_invalido")     texto = t("rep.err.email");
+        else if (d.error === "telefono_requerido") texto = t("form.err.tel");
         else if (d.error === "fecha_invalida" ||
                  d.error === "fecha_futura")       texto = t("rep.err.fecha");
         else if (d.error === "monto_invalido")     texto = t("rep.err.monto");
@@ -6720,6 +6741,7 @@ function ofSubmit(ev){
   if (!val("of-detalle")) return allyMal(note, "of-detalle", "of.err.detalle");
   if (!val("of-nombre")) return allyMal(note, "of-nombre", "of.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("of-email"))) return allyMal(note, "of-email", "of.err.email");
+  if (!telOk(val("of-tel"))) return allyMal(note, "of-tel", "form.err.tel");
   var ok = document.getElementById("of-datos");
   if (!ok || !ok.checked) return allyMal(note, ok || "of-datos", "of.err.datos");
 
@@ -6824,6 +6846,7 @@ function volSubmit(ev){
   var nivelEl = document.querySelector('input[name="vf-nivel"]:checked');
   if (!val("vf-nombre")) return allyMal(note, "vf-nombre", "vf.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("vf-email"))) return allyMal(note, "vf-email", "vf.err.email");
+  if (!telOk(val("vf-tel"))) return allyMal(note, "vf-tel", "form.err.tel");
   if (!nivelEl) return allyMal(note, document.querySelector('input[name="vf-nivel"]'), "vf.err.nivel");
   var edadEl = document.querySelector('input[name="vf-edad"]:checked');
   if (!edadEl) return allyMal(note, document.querySelector('input[name="vf-edad"]'), "vf.err.edad");
@@ -7026,6 +7049,7 @@ function miSubmit(ev){
   if (cargo > 2000) return allyMal(note, "mif-monto", "mi.err.max.cubre");
   if (!val("mif-nombre")) return allyMal(note, "mif-nombre", "mi.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("mif-email"))) return allyMal(note, "mif-email", "mi.err.email");
+  if (!telOk(val("mif-tel"))) return allyMal(note, "mif-tel", "form.err.tel");
   var ok = document.getElementById("mif-datos");
   if (!ok || !ok.checked) return allyMal(note, ok || "mif-datos", "mi.err.datos");
 
@@ -7033,7 +7057,7 @@ function miSubmit(ev){
   allyMsg(note, t("mi.enviando"), true);
   fetch("/api/paypal/suscripcion", {
     method: "POST", headers: {"content-type":"application/json"},
-    body: JSON.stringify({ monto: cargo, nombre: val("mif-nombre"), email: val("mif-email"),
+    body: JSON.stringify({ monto: cargo, nombre: val("mif-nombre"), email: val("mif-email"), telefono: val("mif-tel"),
                            idioma: lang, autoriza_datos: true })
   }).then(function(r){ return r.json(); }).then(function(d){
     /* SE VA A PAYPAL, no se dibuja nada de PayPal aqui: la CSP prohibe su SDK,
@@ -7046,6 +7070,7 @@ function miSubmit(ev){
     var texto = d && d.error === "monto_muy_bajo"  ? t("mi.err.min")
               : d && d.error === "monto_muy_alto"  ? t("mi.err.max")
               : d && d.error === "email_invalido"  ? t("mi.err.email")
+              : d && d.error === "telefono_requerido" ? t("form.err.tel")
               : d && d.error === "paypal_no_configurado" ? t("mi.err.cerrado")
               : t("mi.err.envio");
     allyMsg(note, texto, false);
@@ -7090,6 +7115,7 @@ function apSubmit(ev){
 
   if (!val("apf-nombre")) return allyMal(note, "apf-nombre", "ap.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("apf-email"))) return allyMal(note, "apf-email", "ap.err.email");
+  if (!telOk(val("apf-tel"))) return allyMal(note, "apf-tel", "form.err.tel");
   if (!val("apf-detalle")) return allyMal(note, "apf-detalle", "ap.err.detalle");
   if (!chk("apf-concepto")) return allyMal(note, "apf-concepto", "ap.err.concepto");
   if (!chk("apf-datos")) return allyMal(note, "apf-datos", "ap.err.datos");
@@ -7139,6 +7165,7 @@ function ingSubmit(ev){
 
   if (!val("inf-nombre")) return allyMal(note, "inf-nombre", "ing.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("inf-email"))) return allyMal(note, "inf-email", "ing.err.email");
+  if (!telOk(val("inf-tel"))) return allyMal(note, "inf-tel", "form.err.tel");
   if (!val("inf-ciudad")) return allyMal(note, "inf-ciudad", "ing.err.ciudad");
   if (!val("inf-mat")) return allyMal(note, "inf-mat", "ing.err.matricula");
   if (!val("inf-esp")) return allyMal(note, "inf-esp", "ing.err.esp");
