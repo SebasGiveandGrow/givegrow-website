@@ -2513,7 +2513,14 @@ async function adminAportes(env, url) {
   /* Con el flujo de firma APAGADO ningun certificado tendra firmas nunca, asi
      que sin este dato la tabla diria «esperando firma» de todos para siempre.
      Que el panel sepa en que mundo esta es mas barato que adivinarlo. */
-  return json({ aportes: r.results || [], firma_activa: firmaConfigurada(env) });
+  /* EL TOTAL, para que el panel pueda decir que se corto. La lista trae los
+     `limite` mas recientes y hasta hoy callaba el resto: el aporte 101 —justo
+     el mas viejo, el que mas lleva esperando su certificado— no existia para
+     nadie. Mismo patron que `filaTope` en las otras bandejas. */
+  const cuenta = "SELECT COUNT(*) AS n FROM aportes a" + where;
+  const tot = await (estado ? env.DB.prepare(cuenta).bind(estado) : env.DB.prepare(cuenta)).first();
+  return json({ aportes: r.results || [], firma_activa: firmaConfigurada(env),
+                total: (tot && tot.n) || 0, tope: limite });
 }
 
 /* Solo se permiten los dos pasos que ocurren en terreno. Los estados de pago los
@@ -12776,7 +12783,10 @@ async function adminEgresoSoporte(request, env, numero, quien) {
   /* Que sea lo que dice ser, igual que con las fotos. Un XML empieza por «<» y
      un PDF por «%PDF»; no es una validacion profunda, pero corta el caso de
      subir cualquier cosa con la cabecera cambiada. */
-  const cabeza = String.fromCharCode.apply(null, bytes.subarray(0, 5));
+  /* Sin la marca BOM de UTF-8 (EF BB BF) delante: varios facturadores la
+     ponen, el lector del panel la ignora y aqui hacia fallar «empieza por <». */
+  const bom = bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF ? 3 : 0;
+  const cabeza = String.fromCharCode.apply(null, bytes.subarray(bom, bom + 5));
   const bien = spec.ext === "pdf" ? cabeza.indexOf("%PDF") === 0 : /^\s*</.test(cabeza);
   if (!bien) return json({ error: "no_es_lo_que_dice", ayuda: "El archivo no parece " + spec.ext.toUpperCase() + "." }, 415);
 
@@ -13616,7 +13626,10 @@ async function adminMoverInscripcion(request, env, id, quien) {
   /* Se traen tipo, correo y datos: sin eso no se puede avisar a nadie, y avisar
      es justo lo que faltaba. */
   const f = await env.DB.prepare(
-    "SELECT id, tipo, estado, nombre, email, datos FROM inscripciones WHERE id = ?"
+    /* `token` va en la lista: sin el, `f.token` era siempre undefined y cada
+       paso por «visitada» (archivar, reabrir, volver a marcarla) generaba un
+       enlace nuevo y dejaba muerto el que la fundacion ya tenia. */
+    "SELECT id, tipo, estado, nombre, email, datos, token FROM inscripciones WHERE id = ?"
   ).bind(id).first();
   if (!f) return json({
     error: "no_encontrada",
@@ -13668,14 +13681,24 @@ async function adminMoverInscripcion(request, env, id, quien) {
     }
   }
 
-  if (nuevo === "aceptada" && f.estado !== "aceptada" && f.tipo === "fundacion" && f.email) {
-    let x = {};
-    try { x = JSON.parse(f.datos || "{}"); } catch (e) { /* nada */ }
+  /* «Solo si NO estaba ya aceptada» no bastaba: aceptada → archivada →
+     reabierta → aceptada volvia a mandar el mismo correo. Se deja la marca
+     `aceptacion_enviada` en `datos` cuando sale, y es esa la que manda. */
+  let xAcep = {};
+  try { xAcep = JSON.parse(f.datos || "{}"); } catch (e) { /* nada */ }
+  if (nuevo === "aceptada" && f.estado !== "aceptada" && f.tipo === "fundacion" && f.email &&
+      !xAcep.aceptacion_enviada) {
+    const x = xAcep;
     const datos = { nombre: f.nombre || "", email: f.email, zona: x.zona || "", idioma: x.idioma === "en" ? "en" : "es" };
     try {
       const r = await correoFundacionAceptada(env, datos);
       await correoVisitaPendiente(env, datos);
       aviso = r && r.ok ? "correo_enviado" : "correo_fallo";
+      if (r && r.ok) {
+        await env.DB.prepare(
+          "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.aceptacion_enviada', datetime('now')) WHERE id = ?"
+        ).bind(id).run();
+      }
     } catch (e) {
       console.error("correo aceptacion fundacion", id, e && e.message);
       aviso = "correo_fallo";
@@ -14996,6 +15019,10 @@ textarea { font-size: 16px }
 .dec-t{font-size:var(--fs-h4);margin:0 0 14px;letter-spacing:.01em}
 .dec-alarma{border-left:3px solid var(--amber);padding:9px 13px;margin:0 0 12px;
   font-size:var(--fs-14);background:var(--amberl)}
+/* Una lista que no llego (pedirJSON). Mismo lenguaje que la alarma: no es un
+   vacio, es algo que hay que mirar. */
+.carga-fallo{border-left:3px solid var(--amber);padding:9px 13px;margin:0;
+  font-size:var(--fs-14);background:var(--amberl)}
 .dec-lista{list-style:none;margin:0;padding:0}
 .dec-fila{display:grid;grid-template-columns:9.5rem 3rem 1fr auto;gap:14px;align-items:baseline;
   padding:11px 0;border-top:1px solid var(--bd)}
@@ -15023,7 +15050,7 @@ textarea { font-size: 16px }
 </head><body>
 <main class="page active"><section><div class="wrap">
 <span class="ey">Interno</span>
-<h1 class="h-sec" style="margin-bottom:6px">Panel de aportes</h1>
+<h1 class="h-sec" style="margin-bottom:6px">Panel</h1>
 <p class="lead" id="quien" style="margin-bottom:26px">Cargando…</p>
 
 <div id="resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:26px"></div>
@@ -15475,6 +15502,52 @@ function fallo(http, d){
 }
 /* Los cuatro sitios repiten el mismo gesto: leer estado y cuerpo a la vez. */
 function conEstado(r){ return r.json().then(function(d){ return { http: r.status, d: d }; }); }
+
+/* UNA LISTA QUE NO LLEGA NO ESTA VACIA. Hasta el 28 sep 2026 cada bandeja hacia
+   «fetch().then(r.json())» sin mirar el estado: si /api/admin/salud respondia
+   500 —basta con que falle UNA de sus veinticuatro consultas— o 403 porque la
+   sesion de Access vencio, «d.cola» llegaba vacio y la portada decia «Nada
+   esperando · Las 0 colas estan en cero». Una falsa calma en la pantalla que
+   existe para decir que hay que hacer. Lo mismo en las tablas: «Todavia no ha
+   aplicado nadie» cuando lo que pasaba era que no se pudo preguntar.
+
+   pedirJSON devuelve los datos SOLO si la respuesta es buena. Si no, escribe el
+   fallo DONDE iba la lista —con el codigo, para poder buscarlo— y deja la
+   bandeja lista para pedirse otra vez; la cadena se detiene ahi, sin pintar un
+   vacio encima del aviso. */
+function pedirJSON(url, donde){
+  return fetch(url).then(function(r){
+    return r.json().catch(function(){ return null; }).then(function(d){
+      if (r.ok && d && !d.error) return d;
+      falloCarga(donde, r.status, d);
+      return new Promise(function(){});
+    });
+  }, function(){
+    falloCarga(donde, 0, null);
+    return new Promise(function(){});
+  });
+}
+function falloCarga(donde, http, d){
+  /* Varios sitios a la vez: la portada y la seccion Salud salen de la misma
+     respuesta, y las dos tienen que decir que no llego. */
+  if (Array.isArray(donde)){ donde.forEach(function(x){ falloCarga(x, http, d); }); return; }
+  var el = document.getElementById(donde);
+  if (!el) return;
+  var sinSesion = http === 0 || http === 401 || http === 403 || !d;
+  var txt = sinSesion
+    ? "No hubo respuesta que el panel pueda leer. Si llevas rato con el panel abierto, la sesion de Access pudo vencer: recarga la pagina para volver a entrar."
+    : "No es que este vacia: el servidor respondio con un error. Recarga, y si se repite mira Salud.";
+  var cod = http ? "HTTP " + http + (d && d.error ? " · " + d.error : "") : "sin respuesta";
+  var aviso = '<strong>No se pudo cargar.</strong> ' + esc(txt) + ' <small>(' + esc(cod) + ')</small>';
+  if (el.tagName === "TBODY"){
+    var tabla = el.closest("table");
+    var cols = (tabla && tabla.querySelectorAll("thead th").length) || 1;
+    el.innerHTML = '<tr><td colspan="' + cols + '" class="carga-fallo">' + aviso + '</td></tr>';
+  } else {
+    el.innerHTML = '<p class="carga-fallo">' + aviso + '</p>';
+  }
+  if (typeof PEDIDAS === "object") delete PEDIDAS[donde];
+}
 /* HORA DE COLOMBIA. El panel leia estas marcas tal como las guarda D1, que es
    UTC, asi que TODO el registro operativo iba corrido cinco horas: un caso
    reportado a las 10:47 de la manana se leia «15:47», y cualquier cosa de
@@ -15647,6 +15720,16 @@ function campo(id, etiqueta, valor){
     '<input id="' + id + '" value="' + esc(valor || "") + '" ' +
     'style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)"></label>';
 }
+/* Para lo que viene de un <textarea> publico. Un <input> se come los saltos de
+   linea: la nota de la familia llegaba «salaY en la cocina», el servidor la veia
+   distinta, la guardaba asi y anotaba «nota» como corregida sin que nadie la
+   tocara. */
+function campoLargo(id, etiqueta, valor){
+  return '<label style="display:block;margin-bottom:10px;font-size:13px;font-weight:600">' + esc(etiqueta) +
+    '<textarea id="' + id + '" rows="4" ' +
+    'style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)">' +
+    esc(valor || "") + '</textarea></label>';
+}
 function cerrarCert(hecho){
   var caja = document.getElementById("dlg");
   if (!hecho){ caja.style.display = "none"; caja.innerHTML = ""; return; }
@@ -15660,6 +15743,9 @@ function cerrarCert(hecho){
   } else if (hecho.enviado){
     linea = "Emitido y enviado a " + esc(hecho.correo || "");
     tono = "var(--ok)";
+  } else if (hecho.sin_pedir){
+    linea = "Emitido. No se envió porque no marcaste «Enviarlo»: descárgalo o envíalo tú.";
+    tono = "#b7791f";
   } else {
     linea = hecho.correo
       ? "Emitido. NO se envio: el correo no salio, mira la cola de correos."
@@ -15683,14 +15769,18 @@ function cerrarCert(hecho){
    larga que casi siempre queda por debajo del pliegue. Antes viajaban juntas y
    la segunda se pedia siempre. */
 function cargarResumen(){
-  fetch("/api/admin/resumen").then(function(r){ return r.json(); }).then(pintarResumen);
+  pedirJSON("/api/admin/resumen", "resumen").then(pintarResumen);
 }
 
 var FIRMA_ACTIVA = false;
 function cargarAportes(){
-  fetch("/api/admin/aportes?limite=100" + (FILTRO ? "&estado=" + encodeURIComponent(FILTRO) : ""))
-    .then(function(r){ return r.json(); })
-    .then(function(d){ FIRMA_ACTIVA = !!d.firma_activa; pintarFilas(d.aportes || []); });
+  pedirJSON("/api/admin/aportes?limite=100" + (FILTRO ? "&estado=" + encodeURIComponent(FILTRO) : ""), "filas")
+    .then(function(d){
+      FIRMA_ACTIVA = !!d.firma_activa; pintarFilas(d.aportes || []);
+      var tb = document.getElementById("filas");
+      if (tb && (d.aportes || []).length) tb.insertAdjacentHTML("afterbegin", filaTope(d, 9, "aportes",
+        "Van los más recientes primero, así que lo que falta es lo MÁS VIEJO. Filtra por estado arriba."));
+    });
 }
 
 document.addEventListener("click", function(e){
@@ -15721,7 +15811,7 @@ document.addEventListener("click", function(e){
       body: JSON.stringify({ motivo: motivo })
     }).then(conEstado).then(function(res){
       if (fallo(res.http, res.d)){ an.disabled = false; an.textContent = "Anular"; return; }
-      cargarResumen(); cargarAportes();
+      cargarResumen(); cargarAportes(); cargarSalud();
     }).catch(function(){ an.disabled = false; an.textContent = "Reintentar"; });
     return;
   }
@@ -15771,7 +15861,10 @@ document.addEventListener("click", function(e){
            lleva el sello «SIN FIRMAR», abrirlo solo era util cuando emitir y
            mandar eran el mismo acto. Queda como enlace, que ademas no lo bloquea
            el navegador. */
-        cargarResumen(); cargarAportes();
+        cargarResumen(); cargarAportes(); cargarSalud();
+        /* Se recuerda si se PIDIO enviarlo: si no, «no se envio» es lo esperado
+           y no un correo caido (antes salia en rojo diciendo que fallo). */
+        res.d.sin_pedir = !(env && env.checked && !env.disabled);
         cerrarCert(res.d);
       })
       .catch(function(){ ok.disabled = false; ok.textContent = "Reintentar"; });
@@ -15821,7 +15914,7 @@ document.addEventListener("click", function(e){
 
 /* ---------------- transferencias por verificar ---------------- */
 function cargarReportadas(){
-  fetch("/api/admin/reportadas").then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/reportadas", "t-filas").then(function(d){
     var tb = document.getElementById("t-filas"); if (!tb) return;
     var l = d.reportadas || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Ninguna esperando verificación.</td></tr>'; return; }
@@ -15863,7 +15956,7 @@ document.addEventListener("click", function(e){
     }).then(conEstado)
       .then(function(res){
         if (fallo(res.http, res.d)){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); return; }
-        cargarReportadas(); cargarResumen(); cargarAportes();
+        cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
       })
       .catch(function(){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); });
     return;
@@ -15878,7 +15971,7 @@ document.addEventListener("click", function(e){
       method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ descartar:true, motivo: motivo })
     }).then(conEstado).then(function(res){
       if (fallo(res.http, res.d)){ ds.disabled = false; ds.textContent = "Descartar"; cargarReportadas(); return; }
-      cargarReportadas(); cargarResumen(); cargarAportes();
+      cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
     }).catch(function(){ ds.disabled = false; ds.textContent = "Descartar"; cargarReportadas(); });
   }
 });
@@ -16078,8 +16171,11 @@ var COLA_MOD = {
   espera_sin_correo: "mmc",
   urgentes_sin_visitar: "mmc",
   casos_esperando_fotos: "mmc",
-  ingenieros_sin_verificar: "mmc",
-  conceptos_sin_respaldo: "mmc",
+  /* «red» y no «mmc»: el «Ir» de las dos lleva a #sec-entrar, que vive en Red.
+     Con «mmc» la insignia de Mira Mi Casa contaba algo que no estaba ahi y la
+     de Red, a donde de verdad se iba, decia cero. */
+  ingenieros_sin_verificar: "red",
+  conceptos_sin_respaldo: "red",
   /* Y SUS MODULOS, que es lo que de verdad faltaba: «pintarContadores» hace
      «if (!m) return;», asi que una cola sin entrada aqui no suma en ninguna
      insignia — tampoco en la de «hoy», que es el total. Siete de diecisiete no
@@ -16190,7 +16286,7 @@ function pintarDecisiones(d){
 }
 
 function cargarSalud(){
-  fetch("/api/admin/salud").then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/salud", ["decisiones", "salud"]).then(function(d){
     /* Se pinta con los MISMOS datos y sin una petición más: la portada y esta
        sección salen del mismo /api/admin/salud. */
     pintarDecisiones(d);
@@ -16256,7 +16352,7 @@ function cargarSalud(){
     var cola = d.cola || [];
     var pend = cola.filter(function(c){ return c.n > 0; });
     if (!pend.length){
-      h += '<p class="mu" style="font-size:13.5px;margin:0 0 20px">Nada pendiente: ninguna de las cuatro colas tiene algo esperando.</p>';
+      h += '<p class="mu" style="font-size:13.5px;margin:0 0 20px">Nada pendiente: ninguna cola tiene algo esperando.</p>';
     } else {
       h += '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Qué</th><th scope="col">Cuántos</th><th scope="col">El más viejo</th><th scope="col">Dónde se resuelve</th></tr></thead><tbody>';
       h += pend.map(function(c){
@@ -16418,10 +16514,16 @@ function cargarInscripciones(){
   var q = "?desde=" + INSC_DESDE
         + (INSC_TIPO ? "&tipo=" + encodeURIComponent(INSC_TIPO) : "")
         + (INSC_PEND ? "&pendiente=" + encodeURIComponent(INSC_PEND) : "");
-  fetch("/api/admin/inscripciones" + q).then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/inscripciones" + q, "i-filas").then(function(d){
     var tb = document.getElementById("i-filas"); if (!tb) return;
     var l = d.inscripciones || [];
     pintarFiltrosInsc(d);
+    /* Pagina que se quedo vacia —suprimiste su unica fila— no es «no ha
+       aplicado nadie»: se vuelve una pagina atras en vez de dejar un callejon
+       sin boton de «anteriores». */
+    if (!l.length && INSC_DESDE > 0 && d.total){
+      INSC_DESDE = Math.max(0, INSC_DESDE - (d.tope || 200)); cargarInscripciones(); return;
+    }
     if (!l.length){
       tb.innerHTML = '<tr><td colspan="7">' +
         (INSC_PEND ? "Ninguna matrícula esperando verificación. Está todo al día."
@@ -16498,7 +16600,7 @@ var CAT_ES = { agua:"Agua segura", alimento:"Comida sin cocina", higiene:"Higien
   panales:"Pañales", descanso:"Descanso", energia:"Luz y carga", brigada:"Equipo de brigada", otra:"Otra" };
 
 function cargarCasos(){
-  fetch("/api/admin/casos").then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/casos", "cs-filas").then(function(d){
     var tb = document.getElementById("cs-filas"); if (!tb) return;
     var l = d.casos || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no hay casos.</td></tr>'; return; }
@@ -16595,6 +16697,12 @@ function abrirCaso(numero){
 
     var mat = '<label style="display:block;margin-bottom:10px;font-size:13px;font-weight:600">Muros' +
       '<select id="f-material" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)">';
+    /* «(sin dato)» primero y elegido cuando el caso no tiene material. Sin esta
+       opcion el navegador mostraba «ladrillo» —la primera— y guardar la ficha
+       para corregir un digito del telefono escribia material='ladrillo' en un
+       dato que el ingeniero usa para clasificar. El servidor ya convierte el
+       valor vacio en NULL. */
+    mat += '<option value=""' + (c.material ? "" : " selected") + '>(sin dato)</option>';
     ["ladrillo","adobe","bahareque","prefabricado","madera","no_se"].forEach(function(k){
       mat += '<option value="' + k + '"' + (c.material === k ? " selected" : "") + ">" + esc(MAT_ES[k]) + "</option>";
     });
@@ -16696,7 +16804,7 @@ function abrirCaso(numero){
         casilla("f-habitada", "Vive alguien ahí", c.habitada) +
         casilla("f-heridos", "Hubo heridos", c.heridos) +
         casilla("f-filtra_agua", "Le entra agua", c.filtra_agua) +
-        campo("f-nota", "Lo que contó la familia", c.nota) +
+        campoLargo("f-nota", "Lo que contó la familia", c.nota) +
         /* Solo aparece si está concedido, y solo se puede quitar. Marcarlo
            desde aquí sería fabricar un consentimiento que la familia no dio. */
         (c.consent_publico
@@ -16806,7 +16914,7 @@ function guardarCaso(numero){
         (d.error + (d.campo ? " (" + d.campo + ")" : ""));
       return;
     }
-    cargarCasos(); abrirCaso(numero);
+    cargarCasos(); abrirCaso(numero); cargarSalud();
   }).catch(function(){
     btn.disabled = false; btn.textContent = "Guardar";
     err.style.display = "block"; err.textContent = "No se pudo guardar.";
@@ -16949,9 +17057,12 @@ function paginaInsp(d, columnas){
 }
 
 function cargarInspecciones(){
-  fetch("/api/admin/inspecciones?desde=" + INSP_DESDE).then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/inspecciones?desde=" + INSP_DESDE, "ins-filas").then(function(d){
     var tb = document.getElementById("ins-filas"); if (!tb) return;
     var l = d.inspecciones || [];
+    if (!l.length && INSP_DESDE > 0 && d.total){
+      INSP_DESDE = Math.max(0, INSP_DESDE - (d.tope || 200)); cargarInspecciones(); return;
+    }
     if (!l.length){ tb.innerHTML = '<tr><td colspan="8">' + (INSP_DESDE ? "No hay mas inspecciones en esta pagina." : "Todavía no ha llegado ninguna inspección de terreno.") + '</td></tr>'; return; }
     tb.innerHTML = paginaInsp(d, 8) + l.map(function(v){
       var m = v.marcas || {};
@@ -17033,7 +17144,7 @@ function cargarInspecciones(){
 }
 
 function cargarOfrecimientos(){
-  fetch("/api/admin/ofrecimientos").then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/ofrecimientos", "o-filas").then(function(d){
     var tb = document.getElementById("o-filas"); if (!tb) return;
     var l = d.ofrecimientos || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no hay ofrecimientos.</td></tr>'; return; }
@@ -17104,12 +17215,16 @@ document.addEventListener("click", function(e){
       body: JSON.stringify({ canal: "whatsapp" })
     }).then(function(r){ return r.json(); }).then(function(d){
       if (d && d.error) window.alert("No se registro: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
-      cargarCasos();
+      cargarCasos(); cargarSalud();
     }).catch(function(){ av.disabled = false; av.textContent = "Ya le avise"; });
     return;
   }
 
-  var cs = e.target.closest("[data-caso]");
+  /* CON data-ce, no solo data-caso. El boton «quitar» de una entrega tambien
+     lleva data-caso —es la casa que suelta—, y como este bloque va antes, se
+     quedaba con el clic: mandaba {estado:null} a mover el caso, el servidor
+     respondia estado_no_permitido y la casa nunca se soltaba (28 sep 2026). */
+  var cs = e.target.closest("[data-caso][data-ce]");
   if (cs){
     var num = cs.getAttribute("data-caso");
     var dest = cs.getAttribute("data-ce");
@@ -17126,7 +17241,7 @@ document.addEventListener("click", function(e){
       body: JSON.stringify({ estado: dest, motivo: motivo })
     }).then(function(r){ return r.json(); }).then(function(d){
       if (d && d.error) window.alert("No se movió: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
-      cargarCasos();
+      cargarCasos(); cargarSalud();
     }).catch(function(){ cargarCasos(); });
     return;
   }
@@ -17267,6 +17382,9 @@ document.addEventListener("click", function(e){
       /* SI EL AVISO NO SALIÓ, SE DICE. La verificación sí quedó guardada —eso es
          lo que abre la puerta— pero la persona sigue sin saberlo, y eso hay que
          verlo aquí y no en la cola de correos. */
+      /* Y si el SERVIDOR dijo que no, tambien: antes se recargaba la tabla y el
+         error se perdia, como si la verificacion hubiera quedado. */
+      if (d && d.error){ alert("No quedó verificada: " + (d.ayuda || d.error)); cargarInscripciones(); return; }
       if (d && d.aviso === "fallo") alert("Quedó verificada, pero el correo de aviso NO salió. Usa «Avisarle que ya puede entrar» en su fila, o revisa la cola de correos fallidos.");
       if (d && d.aviso === "simulado") alert("Quedó verificada. El correo quedó como SIMULADO: falta configurar RESEND_API_KEY, así que la persona no recibió nada.");
       cargarInscripciones(); cargarSalud();
@@ -17319,7 +17437,7 @@ document.addEventListener("click", function(e){
       body: JSON.stringify({ motivo: mot })
     }).then(function(r){ return r.json(); }).then(function(d){
       if (d && d.error) { alert("No se pudo suprimir: " + (d.ayuda || d.error)); }
-      cargarInscripciones();
+      cargarInscripciones(); cargarSalud();
     }).catch(function(){ cargarInscripciones(); });
     return;
   }
@@ -17332,13 +17450,22 @@ document.addEventListener("click", function(e){
     body: JSON.stringify({ estado: b.getAttribute("data-e") })
   }).then(conEstado).then(function(res){
     if (fallo(res.http, res.d)){ b.disabled = false; b.textContent = "Reintentar"; cargarInscripciones(); return; }
+    /* La bandeja de inscripciones y la portada TAMBIEN: sin esto la fila se
+       quedaba con su estado viejo y el boton en «…», y «Hoy» seguia contando
+       la solicitud que acababas de atender. */
+    cargarInscripciones(); cargarSalud();
     cargarOfrecimientos(); cargarReportadas(); cargarResumen(); cargarAportes();
+    /* El estado ya se movio; lo que puede faltar es el correo que el acuse le
+       prometio a la fundacion. Callarlo es dejarla esperando sin saberlo. */
+    if (res.d && res.d.aviso === "correo_fallo"){
+      alert("El estado quedó en «" + (res.d.estado || "") + "», pero el correo a la fundación NO salió. Escríbele tú, o mira la cola de correos en Salud.");
+    }
   }).catch(function(){ cargarOfrecimientos(); cargarInscripciones(); });
 });
 
 /* ---------------- pagos sin aporte ---------------- */
 function cargarSueltos(){
-  fetch("/api/admin/pagos-sueltos").then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/pagos-sueltos", "p-filas").then(function(d){
     var tb = document.getElementById("p-filas"); if (!tb) return;
     var l = d.pagos || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="5">Ninguno: todo lo cobrado tiene su aporte.</td></tr>'; return; }
@@ -17356,7 +17483,7 @@ function cargarSueltos(){
 
 /* ---------------- donaciones por el boton de PayPal (IPN) ---------------- */
 function cargarIpn(){
-  fetch("/api/admin/ipn").then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/ipn", "ipn-filas").then(function(d){
     var tb = document.getElementById("ipn-filas"); if (!tb) return;
     var l = d.ipn || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguna todavia. Si el boton ya recibio donaciones y esto sigue vacio, el notify_url no esta puesto.</td></tr>'; return; }
@@ -17460,7 +17587,7 @@ function verFicha(id){
 
 /* ---------------- membresias internacionales ---------------- */
 function cargarSuscripciones(){
-  fetch("/api/admin/suscripciones").then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/suscripciones", "sus-filas").then(function(d){
     var tb = document.getElementById("sus-filas"); if (!tb) return;
     var l = d.suscripciones || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguna todavia.</td></tr>'; return; }
@@ -17491,7 +17618,7 @@ function cargarSuscripciones(){
 
 /* ---------------- eventos de PayPal sin casa ---------------- */
 function cargarPaypalSueltos(){
-  fetch("/api/admin/paypal-sueltos").then(function(r){ return r.json(); }).then(function(d){
+  pedirJSON("/api/admin/paypal-sueltos", "pps-filas").then(function(d){
     var tb = document.getElementById("pps-filas"); if (!tb) return;
     var l = d.eventos || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="5">Ninguno: todo lo que llego de PayPal tiene donde ir.</td></tr>'; return; }
@@ -17618,9 +17745,25 @@ function pintarEntregas(l, sobre){
 }
 
 function cargarEntregas(){
-  fetch("/api/admin/entregas").then(function(r){ return r.json(); })
+  pedirJSON("/api/admin/entregas", "e-filas")
     .then(function(d){ pintarEntregas(d.entregas || [], d); });
 }
+
+/* El soporte que se sube desde la fila de un egreso ya registrado. Mismo
+   endpoint y misma regla de tipo que el alta. */
+document.addEventListener("change", function(e){
+  var inp = e.target.closest ? e.target.closest("[data-eg-soporte]") : null;
+  if (!inp || !inp.files || !inp.files[0]) return;
+  var f = inp.files[0], num = inp.getAttribute("data-eg-soporte");
+  var tipo = /\\.xml$/i.test(f.name) ? "application/xml" : "application/pdf";
+  inp.disabled = true;
+  fetch("/api/admin/egreso/" + encodeURIComponent(num) + "/soporte", {
+    method: "POST", headers: { "content-type": tipo }, body: f
+  }).then(conEstado).then(function(r){
+    if (fallo(r.http, r.d)){ inp.disabled = false; inp.value = ""; return; }
+    cargarEgresos();
+  }).catch(function(){ inp.disabled = false; alert("No se pudo subir: revisa la conexión."); });
+});
 
 document.addEventListener("change", function(e){
   /* Al elegir el archivo se lee ANTES de cargar nada, por dos razones: rellenar
@@ -17682,7 +17825,9 @@ document.addEventListener("click", function(e){
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ publicar: quiere })
     }).then(function(r){ return r.json(); })
-      .then(function(d){ if (d.ayuda) alert(d.ayuda); else if (d.aviso) alert(d.aviso);
+      .then(function(d){
+        /* Un error sin «ayuda» (no_encontrada, por ejemplo) se callaba. */
+        if (d.ayuda) alert(d.ayuda); else if (d.error) alert("No se pudo: " + d.error); else if (d.aviso) alert(d.aviso);
         cargarEntregas(); cargarSalud(); })
       .catch(function(){ cargarEntregas(); });
   }
@@ -17944,7 +18089,14 @@ function cargarEgresos(){
                      buscar a otro sitio es un soporte que no se mira. */
                   + (e.tiene_archivo
                       ? ' <a href="/api/admin/egreso/' + esc(e.numero) + '/soporte.ver" target="_blank" rel="noopener">ver</a>'
-                      : ' <span class="mu">sin archivo</span>')) + "</td>"
+                      /* Sin archivo, se puede subir DESDE LA FILA. El aviso de
+                         «el archivo no subio» decia «reintenta desde la fila» y
+                         la fila no tenia como: un papel que llega tarde, o una
+                         subida que fallo, no se podia adjuntar nunca. */
+                      : ' <span class="mu">sin archivo</span>'
+                        + (e.anulado_en ? "" : ' <label class="copy" style="cursor:pointer">subir'
+                          + '<input type="file" accept=".pdf,.xml,application/pdf,application/xml,text/xml" data-eg-soporte="'
+                          + esc(e.numero) + '" style="display:none"></label>'))) + "</td>"
             + "<td>" + esc(e.centro || "—") + "</td>"
             + "<td>" + (e.entrega ? esc(e.entrega) : '<span class="mu">—</span>') + "</td>"
             /* El motivo de la anulación se enseña EN la fila. Un renglón tachado
