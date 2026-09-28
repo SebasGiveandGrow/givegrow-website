@@ -1648,8 +1648,11 @@ async function correoInscripcionVoluntario(env, v) {
 
 /* Aviso interno: lo que hay que saber para responderle, y los protocolos que
    quedaron disparados. */
+/* Al buzon de alianzas desde el 28 sep 2026, decision de Sebas: quien se
+   ofrece de voluntario es la misma conversacion que una fundacion o una
+   empresa que llega, y la atiende el. Ver `correoAvisoAliado`. */
 async function correoAvisoInscripcion(env, v) {
-  const para = env.CORREO_AVISOS;
+  const para = correoAlianzas(env);
   if (!para) return avisoSinBuzon(env, "aviso-inscripcion");
   const nivel = { hub: "Con el HUB (terreno)", estructura: "Con Give&Grow (estructura)", mixto: "Mixto" }[v.nivel];
   const filas = [
@@ -2061,22 +2064,60 @@ async function adminSalud(env) {
      `destino` es a dónde va quien decide atenderla. Cuando no hay pantalla
      —los correos fallidos se arreglan en Resend— se deja vacío en vez de
      inventar un enlace que no lleva a ninguna parte. */
-  const enCola = async (clave, sql, comoSeArregla, orden, destino) => {
+  /* `plazo` (dias, opcional) es la promesa hecha: cuanto puede esperar lo mas
+     viejo de la cola antes de que la espera sea un incumplimiento. Pasado el
+     plazo la cola sale `vencida`, sube al principio de la portada y entra en el
+     resumen diario por correo. Sin plazo, la cola se comporta como siempre. */
+  const enCola = async (clave, sql, comoSeArregla, orden, destino, plazo) => {
     const r = await uno(sql);
+    const dias = r.n ? Math.floor((Date.now() - Date.parse((r.masViejo || "").replace(" ", "T") + "Z")) / 86400000) : null;
     cola.push({
       clave, n: r.n || 0,
-      dias: r.n ? Math.floor((Date.now() - Date.parse((r.masViejo || "").replace(" ", "T") + "Z")) / 86400000) : null,
+      dias,
       arreglo: comoSeArregla,
-      orden: orden, destino: destino || null
+      orden: orden, destino: destino || null,
+      plazo: plazo == null ? null : plazo,
+      vencida: plazo != null && dias != null && dias > plazo
     });
   };
   /* Sin los ingenieros: tienen su propia cola, con su propio «cómo se arregla»
      —buscar la matrícula en el COPNIA—, y contarlos dos veces inflaba el panel
      justo en el número que sirve para decidir a qué dedicarle la tarde. */
-  await enCola("inscripciones_sin_tocar",
-    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones " +
-    "WHERE estado = 'nueva' AND tipo <> 'ingeniero'",
-    "Bandeja «Quién quiere entrar» · a alguien le prometimos que le escribíamos", 90, "#sec-entrar");
+  /* QUIEN QUIERE ENTRAR, POR TIPO Y CON PLAZO. Era UNA cola —«inscripciones
+     sin tocar», orden 90, penultima— que sumaba fundaciones, empresas,
+     voluntarios, apadrinamientos y ofrecimientos en especie. Asi paso que dos
+     fundaciones esperaron 24 y 6 dias (medido el 28 sep 2026): su fila se veia
+     igual de ambar a los 3 dias que a los 24, debajo de los certificados.
+
+     Cada tipo tiene ahora su promesa. A una fundacion y a una empresa el acuse
+     les dice que una persona les escribe: dos dias. Un ofrecimiento en especie
+     tambien, porque el acuse le pide esperar antes de comprar. Un voluntario
+     puede esperar un poco mas. Los ingenieros siguen en su propia cola, la de la
+     matricula. */
+  const sinResponder = (tipo) =>
+    "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM inscripciones WHERE estado = 'nueva' AND tipo = '" + tipo + "'";
+  await enCola("fundaciones_sin_respuesta", sinResponder("fundacion"),
+    "Bandeja «Quién quiere entrar» · el acuse le prometió que una persona le escribe", 25, "#sec-entrar", 2);
+  await enCola("empresas_sin_respuesta", sinResponder("empresa"),
+    "Bandeja «Quién quiere entrar» · espera el Convenio Marco que el acuse le prometió", 26, "#sec-entrar", 2);
+  await enCola("ofrecimientos_sin_respuesta", sinResponder("especie"),
+    "Bandeja «Ofrecimientos» · el acuse le pidió esperar antes de comprar", 40, "#sec-ofrecimientos", 2);
+  await enCola("apadrinamientos_sin_respuesta", sinResponder("apadrinamiento"),
+    "Bandeja «Quién quiere entrar» · alguien quiere aportar y espera que le escribamos", 55, "#sec-entrar", 3);
+  await enCola("voluntarios_sin_respuesta", sinResponder("voluntario"),
+    "Bandeja «Quién quiere entrar» · alguien ofreció su tiempo", 88, "#sec-entrar", 5);
+  /* Y DESPUES DE «nueva». Mover una fundacion a «en revision» la sacaba de toda
+     cola para siempre, y lo mismo aceptada sin visita o visitada sin
+     cuestionario: el proceso de cinco pasos se podia quedar parado en
+     cualquiera sin que nada lo dijera. Cuenta desde el ultimo cambio de estado. */
+  await enCola("fundaciones_detenidas",
+    "SELECT COUNT(*) AS n, MIN(i.actualizada_en) AS masViejo FROM inscripciones i " +
+    "LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
+    "WHERE i.tipo = 'fundacion' AND (" +
+    "(i.estado = 'en_revision' AND i.actualizada_en < datetime('now','-7 days')) OR " +
+    "(i.estado = 'aceptada' AND i.actualizada_en < datetime('now','-14 days')) OR " +
+    "(i.estado = 'visitada' AND COALESCE(f.estado, '') <> 'enviada' AND i.actualizada_en < datetime('now','-21 days')))",
+    "Bandeja «Quién quiere entrar» · en revisión +7 días, aceptada sin visita +14, o visitada sin cuestionario +21", 27, "#sec-entrar");
   await enCola("transferencias_sin_verificar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
     "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado", 60, "#sec-transferencias");
@@ -2887,7 +2928,20 @@ async function firmaFirmar(request, env, numero, sesion) {
      porque fallo el envio" de "no salio porque el donante no tiene correo". Son
      dos cosas distintas y solo una es un fallo. */
   let correoDonante = null;
+  /* SE RESERVA ANTES DE ENVIAR. Si las dos firmas llegan a la vez, las dos
+     peticiones leen «firmado por ambos y sin enviar» y el donante recibia el
+     certificado DOS veces. Ahora gana UNA: la que logra marcar `enviado_en`
+     mientras seguia NULL (con `enviado_a = 'enviando'` hasta saber a quien
+     salio). Si el correo no sale, se suelta la reserva para que se pueda
+     reintentar. */
+  let reservado = false;
   if (ya && ya.firma_rl_en && ya.firma_rf_en && !ya.enviado_en) {
+    const r = await env.DB.prepare(
+      "UPDATE certificados SET enviado_en = datetime('now'), enviado_a = 'enviando' WHERE numero = ? AND enviado_en IS NULL"
+    ).bind(numero).run();
+    reservado = !!(r.meta && r.meta.changes);
+  }
+  if (reservado) {
     try {
       const d = JSON.parse(ya.datos);
       const a = await env.DB.prepare("SELECT email FROM donantes d JOIN aportes a ON a.donante_id = d.id WHERE a.guia = ?")
@@ -2902,6 +2956,11 @@ async function firmaFirmar(request, env, numero, sesion) {
         enviado = true;
       }
     } catch (e) { console.error("correo tras firmar", numero, e && e.message); }
+    if (!enviado) {
+      await env.DB.prepare(
+        "UPDATE certificados SET enviado_en = NULL, enviado_a = NULL WHERE numero = ? AND enviado_a = 'enviando'"
+      ).bind(numero).run();
+    }
   }
 
   return json({ ok: true, numero, papel, huella: huella.slice(0, 16),
@@ -3976,6 +4035,67 @@ async function familiasQueEsperan(env, dias) {
     "ORDER BY c.creado_en ASC"
   ).bind(dias, DIAS_ESPERA_TOPE).all();
   return r.results || [];
+}
+
+/* EL RESUMEN DIARIO AL EQUIPO — solo cuando algo paso su plazo.
+   ============================================================================
+   Una bandeja que hay que acordarse de abrir no es una alarma: este archivo lo
+   repite desde hace meses, y aun asi las colas de «Hoy» solo existian para
+   quien abria el panel. Dos fundaciones esperaron 24 y 6 dias asi.
+
+   SOLO SI HAY ALGO VENCIDO, y es la decision que hace que sirva. Un correo que
+   llega todos los dias diciendo «hay 3 cosas» se aprende a ignorar en una
+   semana; uno que llega solo cuando se rompio una promesa se abre. Lo que no
+   tiene plazo sigue viviendo en el panel, que es donde ya estaba.
+
+   Una vez al dia (UTC, como el cupo de Resend): si ya salio hoy no se repite,
+   aunque el cron corra dos veces. Va al buzon de alianzas, que es quien atiende
+   estas colas, y cuenta como interno para el presupuesto de correo: si el dia
+   viene justo, gana el recibo de un donante, que es lo correcto. */
+const NOMBRE_COLA_PLAZO = {
+  fundaciones_sin_respuesta: "Fundaciones que aplicaron y esperan respuesta",
+  empresas_sin_respuesta: "Empresas que pidieron alianza y esperan respuesta",
+  ofrecimientos_sin_respuesta: "Ofrecimientos en especie sin responder",
+  apadrinamientos_sin_respuesta: "Quieren apadrinar y esperan respuesta",
+  voluntarios_sin_respuesta: "Voluntarios sin responder"
+};
+async function resumenDiarioEquipo(env) {
+  const para = correoAlianzas(env);
+  if (!para) return { saltado: "sin_buzon" };
+  const ya = await env.DB.prepare(
+    "SELECT 1 AS s FROM correos WHERE etiqueta = 'resumen-diario' " +
+    "AND resultado IN ('enviado','simulado') AND intento_en >= date('now') LIMIT 1"
+  ).first();
+  if (ya) return { saltado: "ya_salio_hoy" };
+
+  const salud = await (await adminSalud(env)).json();
+  const cola = (salud && salud.cola) || [];
+  const vencidas = cola.filter(c => c.n > 0 && c.vencida);
+  if (!vencidas.length) return { saltado: "nada_vencido" };
+  const otras = cola.filter(c => c.n > 0 && !c.vencida).length;
+
+  const total = vencidas.reduce((t, c) => t + c.n, 0);
+  const titulo = total === 1
+    ? "Una persona espera una respuesta que ya pasó su plazo"
+    : total + " personas esperan una respuesta que ya pasó su plazo";
+  const filas = vencidas.map(c => [
+    NOMBRE_COLA_PLAZO[c.clave] || c.clave,
+    c.n + " · la más vieja hace " + c.dias + " días (plazo " + c.plazo + ")"
+  ]);
+  const parrafos = [
+    "A cada una el acuse le prometió que una persona le escribe. Desde el panel, en «Quién quiere entrar», el filtro «Sin responder» las ordena de la más vieja a la más nueva, y cada fila trae un borrador de respuesta.",
+    otras ? "Además hay " + otras + (otras === 1 ? " cola" : " colas") + " con trabajo pendiente que todavía no pasa su plazo: están en «Hoy»." : ""
+  ].filter(Boolean);
+  const r = await enviarCorreo(env, {
+    para,
+    asunto: "Panel · " + titulo,
+    texto: [titulo, "", ...parrafos, "", ...filas.map(([k, v]) => k + ": " + v), "",
+            "https://thegiveandgrowproject.org/admin#hoy"].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas,
+      boton: { url: "https://thegiveandgrowproject.org/admin#hoy", texto: "Abrir el panel" } }),
+    etiqueta: "resumen-diario"
+  });
+  return { enviado: !!(r && r.ok), vencidas: vencidas.length, personas: total };
 }
 
 async function avisarEsperaSeptimoDia(env) {
@@ -10411,10 +10531,22 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
   }, 409);
 
   if (c.descartar) {
-    const motivo = limpiar(c.motivo, 280) || "sin motivo";
-    await env.DB.prepare(
-      "UPDATE aportes SET estado = 'rechazada', wompi_estado = ?, actualizada_en = datetime('now') WHERE guia = ?"
+    /* CON MOTIVO Y CON «reportada» EN EL WHERE, igual que confirmar. Sin lo
+       segundo, dos pestañas: una confirma —el recibo ya salio al donante— y la
+       otra descarta desde una lectura vieja, y el aporte quedaba «rechazada»
+       con su recibo en la bandeja del donante. Y descartar no se deshace: como
+       anular un certificado o un egreso, pide decir por que. */
+    const motivo = limpiar(c.motivo, 280);
+    if (!motivo) return json({ error: "motivo_requerido",
+      ayuda: "Escribe por qué se descarta: por ejemplo, «no aparece en el extracto del 25 al 28 de septiembre»." }, 400);
+    const des = await env.DB.prepare(
+      "UPDATE aportes SET estado = 'rechazada', wompi_estado = ?, actualizada_en = datetime('now') " +
+      "WHERE guia = ? AND estado = 'reportada'"
     ).bind("DESCARTADA_MANUAL: " + motivo, guia).run();
+    if (!des.meta || !des.meta.changes) {
+      return json({ error: "estado_no_permite",
+        ayuda: "Otra persona u otra pestaña la movió mientras tanto. Recarga la tabla antes de decidir." }, 409);
+    }
     await env.DB.prepare(
       "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
     ).bind(quien || "?", "transferencia " + guia + " DESCARTADA: " + motivo).run();
@@ -10427,6 +10559,25 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
       error: "referencia_requerida",
       ayuda: "Escribe el número del comprobante bancario: es el que cita el certificado, y no puede ser un id de Wompi que no existe."
     }, 422);
+  }
+
+  /* UNA LINEA DEL EXTRACTO, UN APORTE. Nada impedia confirmar dos guias con la
+     misma referencia: un donante que reporta dos veces la misma transferencia
+     —el freno por correo se salta en paralelo, ya medido— y dos confirmaciones
+     contra el mismo renglon daban dos recibos y dos certificados por un solo
+     deposito, con esa referencia citada en los dos. Puede ser legitimo (el
+     banco repite referencias genericas), asi que no se prohibe: se pregunta, y
+     si se sigue, queda escrito por que. */
+  const gemela = await env.DB.prepare(
+    "SELECT guia FROM aportes WHERE LOWER(referencia_pago) = LOWER(?) AND guia <> ? LIMIT 1"
+  ).bind(refer, guia).first();
+  const porQueRepite = limpiar(c.referencia_repetida_motivo, 200);
+  if (gemela && !porQueRepite) {
+    return json({
+      error: "referencia_repetida", guia_anterior: gemela.guia,
+      ayuda: "La referencia «" + refer + "» ya confirmó la guía " + gemela.guia +
+             ". Si en el extracto son DOS depósitos distintos, escribe por qué y confirma otra vez."
+    }, 409);
   }
 
   const hecho = await env.DB.prepare(
@@ -10449,7 +10600,8 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
   }
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
-  ).bind(quien || "?", "transferencia " + guia + " CONFIRMADA contra extracto · ref " + refer).run();
+  ).bind(quien || "?", "transferencia " + guia + " CONFIRMADA contra extracto · ref " + refer +
+         (gemela ? " · REPITE la ref de " + gemela.guia + ": " + porQueRepite : "")).run();
 
   /* Ahora sí hay dinero: el donante recibe lo mismo que quien paga por la
      pasarela — su recibo con la guía. */
@@ -11186,8 +11338,9 @@ async function correoOfrecimiento(env, o) {
   });
 }
 
+/* Al buzon de alianzas, como los voluntarios (decision de Sebas, 28 sep 2026). */
 async function correoAvisoOfrecimiento(env, o) {
-  const para = env.CORREO_AVISOS;
+  const para = correoAlianzas(env);
   if (!para) return avisoSinBuzon(env, "aviso-ofrecimiento");
   const titulo = "Ofrecimiento en especie: " + (ETIQUETA_CAT.es[o.categoria] || o.categoria);
   const filas = [
@@ -12790,11 +12943,21 @@ async function adminEgresoSoporte(request, env, numero, quien) {
   const bien = spec.ext === "pdf" ? cabeza.indexOf("%PDF") === 0 : /^\s*</.test(cabeza);
   if (!bien) return json({ error: "no_es_lo_que_dice", ayuda: "El archivo no parece " + spec.ext.toUpperCase() + "." }, 415);
 
-  const clave = "egresos/" + numero + "/soporte." + spec.ext;
+  /* CLAVE PROPIA POR SUBIDA, y el archivo solo se queda si la base lo acepta.
+     Con una clave fija, dos subidas a la vez escribian el mismo objeto: la
+     segunda pisaba el XML de la DIAN que ya estaba guardado, el UPDATE
+     condicional no cambiaba nada y aun asi se decia «guardado». El soporte de
+     un gasto no se reemplaza en silencio. */
+  const clave = "egresos/" + numero + "/soporte-" + tokenNuevo().slice(0, 8) + "." + spec.ext;
   await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
-  await env.DB.prepare(
+  const puesto = await env.DB.prepare(
     "UPDATE egresos SET soporte_key = ?, actualizado_en = datetime('now') WHERE numero = ? AND soporte_key IS NULL"
   ).bind(clave, numero).run();
+  if (!puesto.meta || !puesto.meta.changes) {
+    await env.MEDIA.delete(clave);
+    return json({ error: "ya_tiene_soporte",
+      ayuda: "Este egreso ya tiene su archivo. Un soporte no se reemplaza: si el guardado es el equivocado, anula el egreso y regístralo de nuevo." }, 409);
+  }
 
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
@@ -13002,7 +13165,7 @@ const RECHAZO_EN_CASTELLANO = {
     "El registro no se pudo leer. Probablemente el archivo llegó cortado por WhatsApp."
 };
 
-async function adminInspeccionesImportar(request, env) {
+async function adminInspeccionesImportar(request, env, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
@@ -13067,6 +13230,16 @@ async function adminInspeccionesImportar(request, env) {
       informe.push({ familia: etiqueta, numero: d.numero, repetida: true });
       continue;
     }
+
+    /* QUIEN LA CARGO, NO SOLO A NOMBRE DE QUIEN. Las filas de auditoria que deja
+       `triageInspeccionRecibir` —la inspeccion, y el caso que pasa a
+       «visitado»— llevan el correo del ingeniero, que es de quien responde por
+       lo que dice. Pero la carga la hizo otra persona desde el panel, y sin
+       esta linea cualquier cuenta del panel podia dejar una inspeccion firmada
+       a nombre de cualquier ingeniero sin rastro de quien fue. */
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(quien || "?", "inspeccion " + d.numero + " IMPORTADA desde respaldo a nombre de " + correo).run();
 
     let subidas = 0, fallidas = 0;
     for (const f of fotos) {
@@ -13296,6 +13469,10 @@ async function adminInscripciones(env, url) {
   const tipo = TIPOS_INSC.includes(url && url.searchParams.get("tipo"))
     ? url.searchParams.get("tipo") : "";
   const soloSinVerificar = url && url.searchParams.get("pendiente") === "matricula";
+  /* «Sin responder»: las nuevas que no son ingenieros —esos tienen su propio
+     filtro—, de la MAS VIEJA a la mas nueva. Es la bandeja del plazo: quien
+     mas lleva esperando, arriba. */
+  const soloSinResponder = url && url.searchParams.get("pendiente") === "respuesta";
   const desde = desplazamiento(url);
 
   const cond = ["i.tipo IN ('" + TIPOS_INSC.join("','") + "')"];
@@ -13306,6 +13483,10 @@ async function adminInscripciones(env, url) {
     cond.push("i.estado <> 'archivada'");
     cond.push("COALESCE(json_extract(i.datos, '$.matricula_verificada'), 0) <> 1");
   }
+  if (soloSinResponder) {
+    cond.push("i.estado = 'nueva'");
+    cond.push("i.tipo <> 'ingeniero'");
+  }
   const donde = " WHERE " + cond.join(" AND ");
 
   const r = await env.DB.prepare(
@@ -13315,7 +13496,7 @@ async function adminInscripciones(env, url) {
     /* Las que esperan verificación van de la MÁS VIEJA a la más nueva: quien
        lleva más tiempo esperando se atiende primero. El resto, al revés, que es
        lo que sirve para ver lo que acaba de entrar. */
-    " ORDER BY i.creada_en " + (soloSinVerificar ? "ASC" : "DESC") +
+    " ORDER BY i.creada_en " + (soloSinVerificar || soloSinResponder ? "ASC" : "DESC") +
     " LIMIT " + TOPE_COLA + " OFFSET " + desde
   ).bind(...args).all();
 
@@ -13332,7 +13513,8 @@ async function adminInscripciones(env, url) {
   ).first();
 
   return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0,
-                tope: TOPE_COLA, desde, tipo, pendiente: soloSinVerificar ? "matricula" : "",
+                tope: TOPE_COLA, desde, tipo,
+                pendiente: soloSinVerificar ? "matricula" : soloSinResponder ? "respuesta" : "",
                 sinVerificar: (pend && pend.n) || 0 });
 }
 
@@ -13746,14 +13928,54 @@ async function adminBorrarInscripcion(request, env, id, quien) {
                   ayuda: "Escribe por que se borra. Es lo unico que va a quedar de esta fila." }, 400);
   }
 
-  /* Se lee ANTES de borrar, y solo el tipo: es lo que la auditoria necesita y
-     lo unico que puede conservarse sin deshacer la supresion. */
-  const f = await env.DB.prepare("SELECT id, tipo FROM inscripciones WHERE id = ?").bind(id).first();
+  /* Se lee ANTES de borrar el tipo —lo unico que la auditoria conserva— y el
+     correo, que no se guarda: sirve para encontrar las otras filas donde vive. */
+  const f = await env.DB.prepare("SELECT id, tipo, email FROM inscripciones WHERE id = ?").bind(id).first();
   if (!f) return json({ error: "no_encontrada" }, 404);
 
+  /* TODO O NADA, Y TODO LO QUE ES SUYO. Hasta el 28 sep 2026 eran dos DELETE
+     sueltos: primero los consentimientos, despues la fila. Con una fundacion
+     que ya tenia cuestionario, el segundo fallaba por la llave de
+     `fichas_fundacion` —reproducido en el banco local: 500, la fila con sus
+     datos intacta y la PRUEBA del consentimiento ya borrada—. Lo peor de los
+     dos mundos. Ahora va en un `batch`, que D1 corre como una transaccion.
+
+     Y se lleva lo que quedaba fuera: la ficha del cuestionario, los rastros
+     con su correo como sujeto (la verificacion de matricula de un ingeniero lo
+     usa) y el registro de los correos que se le mandaron por esta via. Los
+     correos atados a una GUIA no se tocan: son la prueba de que a un donante le
+     llego su recibo, y esa persona puede ser donante tambien. */
   const sujeto = "inscripcion " + id;
-  await env.DB.prepare("DELETE FROM consentimientos WHERE sujeto = ?").bind(sujeto).run();
-  await env.DB.prepare("DELETE FROM inscripciones WHERE id = ?").bind(id).run();
+  const correo = String(f.email || "").trim().toLowerCase();
+  const pasos = [
+    env.DB.prepare("DELETE FROM fichas_fundacion WHERE inscripcion = ?").bind(id),
+    env.DB.prepare("DELETE FROM consentimientos WHERE sujeto = ?").bind(sujeto)
+  ];
+  if (correo) {
+    pasos.push(env.DB.prepare("DELETE FROM consentimientos WHERE LOWER(sujeto) = ?").bind(correo));
+    pasos.push(env.DB.prepare("DELETE FROM correos WHERE LOWER(para) = ? AND guia IS NULL").bind(correo));
+  }
+  pasos.push(env.DB.prepare("DELETE FROM inscripciones WHERE id = ?").bind(id));
+  await env.DB.batch(pasos);
+
+  /* Los archivos del cuestionario (logo, fotos, soportes) DESPUES de la base:
+     si R2 falla, la persona ya no esta en ninguna tabla y se dice cuantos
+     archivos quedaron, en vez de callarlo. */
+  let archivosPendientes = 0;
+  if (env.MEDIA) {
+    try {
+      let cursor;
+      do {
+        const lista = await env.MEDIA.list({ prefix: "fichas/" + id + "/", cursor });
+        const claves = (lista.objects || []).map(o => o.key);
+        if (claves.length) await env.MEDIA.delete(claves);
+        cursor = lista.truncated ? lista.cursor : undefined;
+      } while (cursor);
+    } catch (e) {
+      console.error("supresion R2", id, e && e.message);
+      archivosPendientes = -1;
+    }
+  }
 
   /* La auditoria va DESPUES del borrado, para que no quede una linea diciendo
      que se borro algo que luego fallo al borrarse. */
@@ -13761,7 +13983,9 @@ async function adminBorrarInscripcion(request, env, id, quien) {
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "inscripcion " + id + " (" + (f.tipo || "?") + ") SUPRIMIDA · " + motivo).run();
 
-  return json({ ok: true, id, suprimida: true });
+  return json({ ok: true, id, suprimida: true,
+                ...(archivosPendientes ? { aviso: "archivos_pendientes",
+                  ayuda: "Se borro de la base, pero los archivos del cuestionario (fichas/" + id + "/) no se pudieron borrar de R2. Hay que borrarlos a mano." } : {}) });
 }
 
 /* ========================================================================
@@ -14445,12 +14669,23 @@ async function adminCrearEntrega(request, env, quien) {
   });
 }
 
-async function adminSubirFoto(request, env, numero, url) {
+async function adminSubirFoto(request, env, numero, url, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
 
-  const e = await env.DB.prepare("SELECT numero, fotos FROM entregas WHERE numero = ?").bind(numero).first();
+  const e = await env.DB.prepare(
+    "SELECT numero, fotos, publicada_en, anulada_en FROM entregas WHERE numero = ?"
+  ).bind(numero).first();
   if (!e) return json({ error: "no_encontrada" }, 404);
+  /* A UN ACTA PUBLICADA NO SE LE AGREGAN FOTOS EN CALIENTE. /evidencia/ sirve
+     al instante lo que tiene un acta publicada, y publicar existe justo para
+     que alguien mire antes que no salga nada que no deba —una cara de un
+     menor, una direccion en una pared—. Subir despues se saltaba esa mirada.
+     Se despublica, se sube, se revisa y se vuelve a publicar. */
+  if (e.anulada_en) return json({ error: "entrega_anulada",
+    ayuda: "Esta acta está anulada: no se le agregan fotos." }, 409);
+  if (e.publicada_en) return json({ error: "entrega_publicada",
+    ayuda: "Esta acta ya está publicada y las fotos salen al sitio al instante. Despublícala, sube la foto, revísala y vuelve a publicar." }, 409);
 
   const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
   const ext = TIPOS_FOTO[tipo];
@@ -14459,6 +14694,8 @@ async function adminSubirFoto(request, env, numero, url) {
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
   if (bytes.length > MAX_FOTO) return json({ error: "archivo_muy_grande", max_mb: 8 }, 413);
+  /* Lo que dice ser, como en las fotos de casos y de inspecciones. */
+  if (noEsLoQueDice(tipo, bytes)) return rechazoNoEsFoto();
 
   let fotos = [];
   try { fotos = JSON.parse(e.fotos || "[]"); } catch (x) { /* nada */ }
@@ -14473,6 +14710,9 @@ async function adminSubirFoto(request, env, numero, url) {
   await env.DB.prepare(
     "UPDATE entregas SET fotos = ?, actualizada_en = datetime('now') WHERE numero = ?"
   ).bind(JSON.stringify(fotos), numero).run();
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "entrega " + numero + " · foto " + archivo + " agregada").run();
 
   return json({ ok: true, archivo, total: fotos.length });
 }
@@ -15029,6 +15269,13 @@ textarea { font-size: 16px }
 .dec-fila:first-child{border-top:0}
 .dec-cuando{font-size:var(--fs-13);color:var(--mu);font-variant-numeric:tabular-nums}
 .dec-viejo .dec-cuando{color:var(--amber);font-weight:600}
+/* Plazo vencido: una promesa a alguien de fuera que ya no se cumplio. Rojo de
+   error (--err, definido en los dos temas) y un filete, para que se lea sin
+   depender solo del color. */
+.dec-cuando small{display:block;font-size:var(--fs-12);font-weight:400;color:var(--mu)}
+.dec-vencida{border-left:3px solid var(--err);padding-left:10px}
+.dec-vencida .dec-cuando{color:var(--err);font-weight:700}
+.dec-vencida .dec-cuando small{color:var(--err)}
 .dec-n{font-size:var(--fs-17);font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
 .dec-que{display:block;min-width:0}
 .dec-que strong{display:block;font-size:var(--fs-15);font-weight:600}
@@ -15591,9 +15838,9 @@ function pintarResumen(d){
   });
   if (d.certificados_pendientes) chips.push('<span class="eco-chip">certificados por emitir: ' + d.certificados_pendientes + '</span>');
   if (d.esperando_recurrencia) chips.push('<span class="eco-chip">esperan débito automático: ' + d.esperando_recurrencia + '</span>');
-  (d.inscripciones_nuevas||[]).forEach(function(x){
-    chips.push('<span class="eco-chip">' + esc(x.tipo) + ' por revisar: ' + x.n + '</span>');
-  });
+  /* Las inscripciones nuevas ya NO van aqui: «Hoy» las cuenta por tipo y con
+     su plazo, y dos numeros distintos para lo mismo en la misma pantalla
+     obligaban a adivinar cual creer (el de aqui sumaba ingenieros y especie). */
   box.innerHTML = chips.join("") || '<span class="eco-chip">sin datos todavía</span>';
 }
 
@@ -15951,14 +16198,25 @@ document.addEventListener("click", function(e){
     var ref = window.prompt("Confirmar " + g + " contra el extracto.\\n\\nNúmero del comprobante bancario (lo cita el certificado):");
     if (!ref) return;
     cf.disabled = true; cf.textContent = "…";
-    fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
-      method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ referencia: ref })
-    }).then(conEstado)
-      .then(function(res){
-        if (fallo(res.http, res.d)){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); return; }
-        cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
-      })
-      .catch(function(){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); });
+    /* Si la referencia ya confirmo otra guia, el servidor pregunta (409) y aqui
+       se le pregunta a la persona: solo con un motivo escrito se confirma. */
+    var confirmar = function(porQue){
+      fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
+        method:"POST", headers:{"content-type":"application/json"},
+        body: JSON.stringify({ referencia: ref, referencia_repetida_motivo: porQue || "" })
+      }).then(conEstado)
+        .then(function(res){
+          if (res.http === 409 && res.d && res.d.error === "referencia_repetida"){
+            var m = window.prompt(res.d.ayuda + "\\n\\n¿Por qué son dos depósitos distintos? (vacío = no confirmar)");
+            if (m) return confirmar(m);
+            cf.disabled = false; cf.textContent = "Confirmar"; return;
+          }
+          if (fallo(res.http, res.d)){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); return; }
+          cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
+        })
+        .catch(function(){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); });
+    };
+    confirmar("");
     return;
   }
   var ds = e.target.closest("[data-desc]");
@@ -15982,7 +16240,12 @@ document.addEventListener("click", function(e){
    conteo — porque lo que importa de una cola no es cuántos hay sino desde
    cuándo esperan. */
 var COLA_ES = {
-  inscripciones_sin_tocar: "Inscripciones sin tocar",
+  fundaciones_sin_respuesta: "Fundaciones que aplicaron y esperan respuesta",
+  empresas_sin_respuesta: "Empresas que pidieron alianza y esperan respuesta",
+  ofrecimientos_sin_respuesta: "Ofrecimientos en especie sin responder",
+  apadrinamientos_sin_respuesta: "Quieren apadrinar y esperan respuesta",
+  voluntarios_sin_respuesta: "Voluntarios sin responder",
+  fundaciones_detenidas: "Fundaciones detenidas a mitad del proceso",
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
   certificados_sin_firmar: "Certificados esperando firma",
@@ -16161,7 +16424,12 @@ window.addEventListener("hashchange", abrirDesdeURL);
    escribe a mano, porque una cola no es un elemento del DOM del que se pueda
    deducir donde vive. */
 var COLA_MOD = {
-  inscripciones_sin_tocar: "red",
+  fundaciones_sin_respuesta: "red",
+  empresas_sin_respuesta: "red",
+  ofrecimientos_sin_respuesta: "red",
+  apadrinamientos_sin_respuesta: "red",
+  voluntarios_sin_respuesta: "red",
+  fundaciones_detenidas: "red",
   transferencias_sin_verificar: "dinero",
   certificados_por_emitir: "dinero",
   certificados_sin_firmar: "dinero",
@@ -16243,8 +16511,13 @@ function pintarDecisiones(d){
     alarmas.push("Ningún correo ha salido de verdad. Quien donó, se ofreció o aplicó no recibió nada.");
   }
 
+  /* LO VENCIDO PRIMERO. Una cola que ya paso su plazo es una promesa rota a
+     alguien de fuera, y va arriba sin importar su orden de siempre; entre
+     vencidas, y entre las demas, manda el orden de siempre. */
   var pend = (d.cola || []).filter(function(c){ return c.n > 0; })
-    .sort(function(a,b){ return (a.orden || 999) - (b.orden || 999); });
+    .sort(function(a,b){
+      return (b.vencida ? 1 : 0) - (a.vencida ? 1 : 0) || (a.orden || 999) - (b.orden || 999);
+    });
   /* Los contadores salen de la MISMA lista ya filtrada que pinta la portada:
      si algun dia cambia la regla de que cuenta como pendiente, cambia en un
      solo sitio y la barra no se queda diciendo otra cosa. */
@@ -16266,10 +16539,13 @@ function pintarDecisiones(d){
   if (pend.length){
     h += '<ul class="dec-lista">';
     h += pend.map(function(c){
-      /* El mismo umbral que la tabla de abajo: tres días o más se marca. */
+      /* El mismo umbral que la tabla de abajo: tres días o más se marca. Si la
+         cola tiene plazo, manda el plazo: vencida es otra cosa que «vieja». */
       var viejo = c.dias !== null && c.dias >= 3;
-      return '<li class="dec-fila' + (viejo ? " dec-viejo" : "") + '">'
-        + '<span class="dec-cuando">' + esc(antiguedad(c.dias)) + '</span>'
+      return '<li class="dec-fila' + (c.vencida ? " dec-vencida" : viejo ? " dec-viejo" : "") + '">'
+        + '<span class="dec-cuando">' + esc(antiguedad(c.dias))
+        + (c.plazo != null ? '<small>' + (c.vencida ? "plazo vencido · " : "plazo ") + esc(String(c.plazo)) + (c.plazo === 1 ? " día" : " días") + '</small>' : "")
+        + '</span>'
         + '<span class="dec-n">' + esc(String(c.n)) + '</span>'
         + '<span class="dec-que"><strong>' + esc(COLA_ES[c.clave] || c.clave) + '</strong>'
         + '<small>' + esc(c.arreglo) + '</small></span>'
@@ -16473,6 +16749,66 @@ var ETIQ_INSC = { voluntario:"Voluntarios", fundacion:"Fundaciones", empresa:"Em
 /* Los botones del filtro. El de «matriculas por verificar» va PRIMERO y con su
    contador: es el unico que bloquea que el concepto de un ingeniero llegue a una
    familia, asi que es lo que hay que ver al abrir la bandeja. */
+/* LOS PLAZOS DE LA BANDEJA, los mismos de las colas de «Hoy» (adminSalud). */
+var PLAZO_INSC = { fundacion: 2, empresa: 2, apadrinamiento: 3, voluntario: 5 };
+var ESTADO_INSC_ES = { nueva: "Nueva", en_revision: "En revisión", aceptada: "Aceptada",
+                       visitada: "Visitada", archivada: "Archivada" };
+function diasDesde(v){
+  if (!v) return null;
+  var t = Date.parse(String(v).trim().replace(" ", "T") + (/[Zz]$/.test(v) ? "" : "Z"));
+  return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400000);
+}
+/* RESPONDER DESDE LA FILA. El correo de quien aplico era texto plano: para
+   escribirle habia que copiarlo, abrir el correo y empezar de cero, y eso es
+   friccion justo en el paso que se quedaba sin hacer. Ahora hay un borrador
+   con su nombre y en su idioma, y WhatsApp si dejo un numero. Se abre en TU
+   correo: nada sale solo, y el texto se puede cambiar antes de enviar. */
+function borradorRespuesta(i, x){
+  var en = x.idioma === "en";
+  var quien = x.lider || x.contacto || x.representante || i.nombre || "";
+  var saludo = (en ? "Hello" : "Hola") + (quien ? " " + quien : "") + ",";
+  var asunto, cuerpo;
+  if (i.tipo === "fundacion"){
+    asunto = en ? "Your application to the HUB SOCIAL · Give&Grow" : "Tu aplicación al HUB SOCIAL · Give&Grow";
+    cuerpo = en
+      ? "Thank you for applying to the HUB SOCIAL with " + i.nombre + ". We read your application and would like to get to know you better. Do you have 20 minutes this week for a call?"
+      : "Gracias por aplicar al HUB SOCIAL con " + i.nombre + ". Leímos su aplicación y queremos conocerlos mejor. ¿Tienen 20 minutos esta semana para una llamada?";
+  } else if (i.tipo === "empresa"){
+    asunto = en ? "Your alliance request · Give&Grow" : "Tu solicitud de alianza · Give&Grow";
+    cuerpo = en
+      ? "Thank you for wanting to partner with Give&Grow. We read your request and would like to talk about how you want to support. Do you have a moment this week for a short call? Afterwards we will send you the Framework Agreement to review."
+      : "Gracias por querer aliarte con Give&Grow. Leímos tu solicitud y queremos conversar sobre cómo quieres apoyar. ¿Tienes un espacio esta semana para una llamada corta? Después te enviamos el Convenio Marco para revisar.";
+  } else if (i.tipo === "voluntario"){
+    asunto = en ? "Volunteering with Give&Grow" : "Tu voluntariado con Give&Grow";
+    cuerpo = en
+      ? "Thank you for offering your time. We would like to get to know you and find where your trade fits best. When could we talk?"
+      : "Gracias por ofrecer tu tiempo. Queremos conocerte y ver juntos dónde encaja mejor tu oficio. ¿Cuándo podemos hablar?";
+  } else {
+    asunto = en ? "Your message to Give&Grow" : "Tu mensaje a Give&Grow";
+    cuerpo = en ? "Thank you for writing to us. When could we talk?" : "Gracias por escribirnos. ¿Cuándo podemos hablar?";
+  }
+  var texto = saludo + "\\n\\n" + cuerpo + "\\n\\n" + (en ? "Best regards," : "Un abrazo,") + "\\nGive&Grow International";
+  var enlaces = [];
+  if (i.email) enlaces.push('<a href="mailto:' + esc(i.email) + "?subject=" + esc(encodeURIComponent(asunto))
+    + "&body=" + esc(encodeURIComponent(texto)) + '">Escribirle</a>');
+  var dig = String(i.telefono || "").replace(/[^0-9]/g, "");
+  if (dig.length === 10 && dig.charAt(0) === "3") dig = "57" + dig;
+  if (dig.length >= 11 && dig.length <= 15) enlaces.push('<a href="https://wa.me/' + dig + "?text="
+    + esc(encodeURIComponent(texto)) + '" target="_blank" rel="noopener">WhatsApp</a>');
+  return enlaces.length ? "<br><small>" + enlaces.join(" · ") + "</small>" : "";
+}
+
+/* Cuantos dias lleva esperando una NUEVA, y si ya paso su plazo. */
+function fechaConPlazo(i){
+  if (i.estado !== "nueva" || PLAZO_INSC[i.tipo] == null) return "";
+  var d = diasDesde(i.creada_en);
+  if (d == null) return "";
+  var vencida = d > PLAZO_INSC[i.tipo];
+  return '<br><small' + (vencida ? ' style="color:var(--err);font-weight:700"' : ' class="mu"') + '>'
+    + (d === 0 ? "hoy" : "hace " + d + (d === 1 ? " día" : " días"))
+    + (vencida ? " · plazo " + PLAZO_INSC[i.tipo] + " vencido" : "") + "</small>";
+}
+
 function pintarFiltrosInsc(d){
   var c = document.getElementById("i-filtros"); if (!c) return;
   var b = function(tipo, pend, texto, extra){
@@ -16481,7 +16817,9 @@ function pintarFiltrosInsc(d){
          + (on ? ' style="background:var(--acc);color:#fff"' : "") + '>'
          + texto + (extra || "") + "</button>";
   };
-  var h = b("ingeniero", "matricula", "Matrículas por verificar",
+  /* «Sin responder» va primero: es la que tiene plazo. */
+  var h = b("", "respuesta", "Sin responder, las más viejas primero");
+  h += " " + b("ingeniero", "matricula", "Matrículas por verificar",
             d.sinVerificar ? " (" + d.sinVerificar + ")" : " (0)");
   h += " " + b("", "", "Todas");
   for (var k in ETIQ_INSC) if (ETIQ_INSC.hasOwnProperty(k)) h += " " + b(k, "", ETIQ_INSC[k]);
@@ -16580,9 +16918,10 @@ function cargarInscripciones(){
         "<td>" + resumenInscripcion(i.tipo, x) + "</td>" +
         "<td>" + esc(i.email||"") + (i.telefono ? "<br><small>" + esc(i.telefono) + "</small>" : "") +
           (i.ciudad ? "<br><small>" + esc(i.ciudad) + "</small>" : "") +
-          (enlaces.length ? "<br><small>" + enlaces.join(" · ") + "</small>" : "") + "</td>" +
-        "<td>" + esc(enCO(i.creada_en, 10)) + "</td>" +
-        "<td>" + esc(i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
+          (enlaces.length ? "<br><small>" + enlaces.join(" · ") + "</small>" : "") +
+          (i.tipo === "ingeniero" ? "" : borradorRespuesta(i, x)) + "</td>" +
+        "<td>" + esc(enCO(i.creada_en, 10)) + fechaConPlazo(i) + "</td>" +
+        "<td>" + esc(ESTADO_INSC_ES[i.estado] || i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
         "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") +
           (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") +
           ficha +
@@ -17437,6 +17776,7 @@ document.addEventListener("click", function(e){
       body: JSON.stringify({ motivo: mot })
     }).then(function(r){ return r.json(); }).then(function(d){
       if (d && d.error) { alert("No se pudo suprimir: " + (d.ayuda || d.error)); }
+      else if (d && d.aviso) { alert(d.ayuda || d.aviso); }
       cargarInscripciones(); cargarSalud();
     }).catch(function(){ cargarInscripciones(); });
     return;
@@ -17779,7 +18119,7 @@ document.addEventListener("change", function(e){
         encodeURIComponent(f.name.replace(/\\.[a-z0-9]+$/i,"")), {
     method: "POST", headers: {"content-type": f.type}, body: f
   }).then(function(r){ return r.json(); })
-    .then(function(d){ if (d.error) alert("No se pudo subir: " + d.error); cargarEntregas(); })
+    .then(function(d){ if (d.error) alert("No se pudo subir: " + (d.ayuda || d.error)); cargarEntregas(); })
     .catch(function(){ alert("No se pudo subir la foto."); });
 });
 
@@ -20109,6 +20449,14 @@ export default {
       } catch (e) {
         console.error("cobro mensual", e && e.message);
       }
+      /* El ultimo y en su propio try: es un aviso interno, y nada de lo de
+         arriba —familias, cobros— puede depender de que salga. */
+      try {
+        const rd = await resumenDiarioEquipo(env);
+        console.log("resumen diario", JSON.stringify(rd));
+      } catch (e) {
+        console.error("resumen diario", e && e.message);
+      }
     })());
   },
 
@@ -20539,6 +20887,27 @@ export default {
         : esFirma
           ? [env.ACCESS_AUD_FIRMA, env.ACCESS_AUD]
           : [env.ACCESS_AUD];
+      /* LA ESCRITURA SOLO DESDE LA MISMA PÁGINA. El Worker acepta el token de
+         Access también de la cookie CF_Authorization, y `request.json()` lee un
+         cuerpo `text/plain`: con eso, un formulario de OTRO sitio podía hacer
+         que el navegador de alguien con sesión abierta enviara un POST
+         «simple» —y «Marcar verificada» con cuerpo vacío es justo el acto que le
+         abre el triaje a un ingeniero—. Que funcione depende de cómo Access
+         pone su cookie, que no se ve desde aquí; así que se cierra aquí.
+
+         El navegador SIEMPRE manda `Origin` en un POST/DELETE, y una página
+         del propio panel lo manda igual a este host. Sin `Origin` (curl, un
+         script con token de servicio) no hay navegador ajeno que engañar y
+         se deja pasar. Todas las pantallas llaman a su propio host con rutas
+         relativas —también las de miramicasa.org—, así que comparar contra
+         `url.origin` no deja fuera a ninguna. */
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        const origen = request.headers.get("origin");
+        if (origen && origen !== url.origin) {
+          return json({ error: "origen_no_permitido",
+                        ayuda: "Esta acción solo se puede hacer desde el propio panel." }, 403);
+        }
+      }
       const sesion = await verificarAccess(request, env, audsZona);
       if (!sesion.ok) {
         /* Sin Access configurado no se sirve nada: 503 y una explicación, no un
@@ -20589,6 +20958,16 @@ export default {
           headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
         });
       }
+      /* CON LA AUDIENCIA DE FIRMA SE ENTRA SOLO SI SE FIRMA. La aplicacion de
+         Access dice quien pasa la puerta; `quienFirma` dice quien firma. Sin esto,
+         cualquier correo que la politica de firma dejara pasar veia la cola con
+         nombre y documento de cada donante, y podia leer CUALQUIER certificado
+         —los numeros son consecutivos—, anulados incluidos. El equipo (audiencia
+         del panel) sigue entrando a mirar, como decia la nota de la zona. */
+      if (ruta.startsWith("/api/firma/") && !sesion.equipo && !quienFirma(env, sesion.email)) {
+        return json({ error: "no_firmante",
+          ayuda: "Tu correo no es el de quien firma los certificados. Si debería serlo, avisa al equipo." }, 403);
+      }
       if (ruta === "/api/firma/pendientes") return await firmaPendientes(env, sesion);
       /* EL DOCUMENTO, DENTRO DE LA ZONA DE FIRMA. La pantalla enlazaba el PDF
          por `/api/admin/certificado/<n>.pdf`, y esa ruta NO es zona de firma:
@@ -20608,7 +20987,17 @@ export default {
          No expone nada nuevo: la cola de esta misma pantalla ya muestra nombre
          del donante, documento, monto y guia de cada certificado que lista. */
       const fpdf = ruta.match(/^\/api\/firma\/(CD-\d{4}-\d{6})\.pdf$/i);
-      if (fpdf) return await adminCertificadoPdf(env, fpdf[1].toUpperCase());
+      if (fpdf) {
+        /* Quien firma lee lo que esta por firmar o lo que ya firmo, no el archivo
+           entero: un certificado anulado no se le sirve a la zona de firma. */
+        if (!sesion.equipo) {
+          const vivo = await env.DB.prepare(
+            "SELECT 1 AS s FROM certificados WHERE numero = ? AND anulado_en IS NULL"
+          ).bind(fpdf[1].toUpperCase()).first();
+          if (!vivo) return json({ error: "no_encontrado" }, 404);
+        }
+        return await adminCertificadoPdf(env, fpdf[1].toUpperCase());
+      }
       const fir = ruta.match(/^\/api\/firma\/(CD-\d{4}-\d{6})$/i);
       if (fir) return await firmaFirmar(request, env, fir[1].toUpperCase(), sesion);
 
@@ -20848,7 +21237,7 @@ export default {
         if (ruta === "/api/admin/egresos.csv") return await adminEgresosCSV(env, url);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env, url);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
-        if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env);
+        if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env, sesion.email);
         if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env, url);
         const mip = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/pdf$/);
         if (mip) return await adminInspeccionEmitirPDF(request, env, mip[1]);
@@ -20877,7 +21266,7 @@ export default {
         if (mec) return await adminEntregaCaso(request, env, mec[1].toUpperCase(), sesion.email);
         if (ruta === "/api/admin/entrega")  return await adminCrearEntrega(request, env, sesion.email);
         const ef = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/foto$/i);
-        if (ef) return await adminSubirFoto(request, env, ef[1].toUpperCase(), url);
+        if (ef) return await adminSubirFoto(request, env, ef[1].toUpperCase(), url, sesion.email);
         const ep = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/publicar$/i);
         if (ep) return await adminPublicarEntrega(request, env, ep[1].toUpperCase(), sesion.email);
         const ea = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/anular$/i);
