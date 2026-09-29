@@ -2052,4 +2052,65 @@ try {
   else if (!sucias) ok("metadatos: las " + vistas + " imágenes de img/ van sin EXIF ni XMP");
 } catch (e) { err("no se pudieron revisar los metadatos de img/: " + e.message); }
 
+/* ── check #24 · TODA FOTO DE PERSONAS TIENE SU ENTRADA EN EL REGISTRO ──────
+   `ops/consentimientos-medios.json` dice, en su regla, que ningún medio con
+   rostros identificables se publica sin entrada. Hasta el 29 sep 2026 eso lo
+   sostenía la memoria de quien subía la foto, y la auditoría previa al
+   lanzamiento encontró lo que suele encontrar una regla sin guardián: cinco
+   fotos de la galería general —cuatro con niñas y niños— y las de la brigada,
+   el héroe y el banner, publicadas sin entrada; y cuatro entradas apuntando a
+   un héroe que ya no existía. Las autorizaciones sí existían (en papel, en el
+   archivo de la fundación); lo que faltaba era que el registro lo dijera.
+
+   Mira dos direcciones:
+     1 · cada imagen de img/jornadas/ (con sus variantes m/ y thumb/) y cada
+         img/benef_* e img/campo_* tiene entrada. Las variantes se reconocen por
+         el nombre raíz: «hero_futbol_1400.webp» y «thumb/hero_futbol_800.webp»
+         son la misma foto.
+     2 · cada archivo que una entrada publicada nombra existe. Una entrada que
+         apunta a nada no protege nada y hace creer que el registro está al día.
+   Las entradas con `publicado: false` (videos de la Sierra) se saltan la 2.
+
+   NO mira las galerías de aliadas fuera de img/jornadas/ ni los logos: esas
+   van por `consent` en data/partners.json y las vigila el check #22. */
+try {
+  const reg = JSON.parse(readFileSync("ops/consentimientos-medios.json", "utf8"));
+  const raiz = (n) => {
+    /* Solo sufijos de ANCHO (3 o 4 cifras) y «_movil»: con «_\d+» a secas,
+       «benef_01» y «campo_04» quedaban en «benef» y «campo», y una
+       «campo_99» nueva pasaba cubierta por la entrada de otra foto. */
+    let r = n.split("/").pop().replace(/\.[a-z0-9]+$/i, "");
+    for (let k = 0; k < 3; k++) r = r.replace(/_(\d{3,4}|movil)$/i, "");
+    return r;
+  };
+  const cubiertas = new Set(), fallos = [];
+  for (const j of reg.jornadas || []) {
+    for (const a of j.archivos || []) {
+      cubiertas.add(raiz(a));
+      if (j.publicado !== false && !existsSync("img/jornadas/" + a) && !existsSync("img/" + a)) {
+        fallos.push("la entrada «" + j.id + "» nombra " + a + ", que no existe: quítalo o muévelo a «retirados»");
+      }
+    }
+  }
+  const fotos = [];
+  const recorrer = (d) => {
+    for (const n of readdirSync(d)) {
+      const r = d + "/" + n;
+      if (statSync(r).isDirectory()) recorrer(r);
+      else if (/\.(jpe?g|png|webp|heic)$/i.test(n)) fotos.push(r);
+    }
+  };
+  recorrer("img/jornadas");
+  for (const n of readdirSync("img")) if (/^(benef|campo)_.*\.(jpe?g|png|webp)$/i.test(n)) fotos.push("img/" + n);
+  for (const f of fotos) {
+    if (!cubiertas.has(raiz(f))) {
+      fallos.push(f + " no tiene entrada en el registro. Si retrata personas, añade su jornada con la " +
+                  "fuente de la autorización (sin nombres); si no, añádela igual y dilo en la descripción");
+    }
+  }
+  if (fallos.length) err("check #24 · " + fallos.length + " problema(s) en ops/consentimientos-medios.json:\n        " + fallos.join("\n        "));
+  else if (!fotos.length) err("check #24: no encontré ninguna foto en img/jornadas/ — el recorrido se rompió");
+  else ok("consentimientos: las " + fotos.length + " fotos de img/jornadas/ y la galería general tienen entrada");
+} catch (e) { err("no se pudo revisar el registro de consentimientos: " + e.message); }
+
 process.exit(fail);
