@@ -5225,10 +5225,11 @@ const MATRICULA_OK = (col) =>
 
 /* QUIÉN FIRMA, según el registro y no según lo que alguien teclee.
 
-   Camila declaró `091037-0518660 CND` al inscribirse —la matrícula que se
-   comprobó en el COPNIA— y escribió `24579` en su evaluación. `24579` es lo que
-   iba impreso como firma en el PDF de la familia, y nada cruzaba los dos
-   valores. No era mala fe: es un número largo que el formulario pedía otra vez,
+   Una ingeniera declaró su matrícula completa al inscribirse —la que se
+   comprobó en el COPNIA— y escribió otro número, de cinco cifras, en su
+   evaluación. Ese otro número es lo que iba impreso como firma en el PDF de la
+   familia, y nada cruzaba los dos valores. (Nombre y matrícula retirados de
+   este comentario el 28 sep 2026: el repositorio es público.) No era mala fe: es un número largo que el formulario pedía otra vez,
    de memoria, cada vez que se evalúa un caso.
 
    La salida no es comprobar y avisar del desajuste, es NO PREGUNTAR. El sistema
