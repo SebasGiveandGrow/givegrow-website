@@ -1680,6 +1680,7 @@ var I18N = {
     "mi.lead":"Si no estás en Colombia, esta es tu puerta: eliges cuánto aportas cada mes y PayPal lo cobra solo. Puedes cancelarla en cualquier momento desde tu propia cuenta de PayPal, sin escribirnos.",
     "mi.aviso":"Dos cosas de frente. El descuento del Art. 257 ET es para contribuyentes de renta en Colombia, así que probablemente no aplica en tu caso. Y la comisión internacional de PayPal se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más.",
     "mi.monto":"Cuánto quieres aportar cada mes, en dólares",
+    "mi.dest.h":"Los mismos programas de la membresía en pesos. Cada cobro de PayPal queda registrado con este destino y su propio número de guía.",
     "mi.calc":"Nivel {nivel}. De lo que aportes llegan {neto} a la fundación: PayPal se lleva el {pct} % en comisión y conversión.",
     "mi.cubre":"Súmale la comisión de PayPal, para que a la fundación le llegue completo",
     "mi.cubre.h":"Opcional. Te cobran un poco más cada mes y tu aporte llega íntegro.",
@@ -1733,6 +1734,7 @@ var I18N = {
     "membres.cta.dest":"A qué programa va",
     "membres.cta.dest.general":"Donde más se necesite (fondo general)",
     "membres.cta.dest.h":"Son los mismos destinos de Donar. Cada cobro mensual queda registrado con este destino y su propio número de guía.",
+    "membres.cta.dest.brigada":"La brigada del sismo fue una campaña de aporte único y ya cerró, así que no se ofrece como aporte mensual.",
     "membres.cta.res":"Tu aporte mensual",
     "membres.cta.btn":"Continuar a registrar tu tarjeta","membres.prep":"En preparación","nav.calc":"Calcular mi aporte",
     "emp.why.ey":"Por qué aliarte",
@@ -2318,6 +2320,9 @@ function mbDestino(v){
    aqui la opcion por defecto de un compromiso mensual es la que da mas margen a
    la fundacion, y es la que la persona ve sin abrir la lista. */
 function buildMbDestino(){
+  /* El de PayPal se repinta en el mismo momento y con las mismas opciones: es
+     la misma membresia, cobrada en otra moneda. */
+  try { buildMiDestino(); } catch(e){}
   var sel = document.getElementById("mb-destino");
   if (!sel) return;
   var previo = MB_DEST;
@@ -2327,6 +2332,18 @@ function buildMbDestino(){
      otra— no deja el selector en blanco: vuelve al fondo general, y lo dice. */
   if (sel.value !== previo){ sel.value = "general"; MB_DEST = "general"; }
   mbPinta();
+}
+/* EL SELECTOR DE LA MEMBRESIA EN DOLARES (#membres-intl). No guarda estado
+   propio como `MB_DEST`: el formulario se lee al enviarlo, asi que basta con
+   conservar lo elegido al repintar —cambio de idioma, llegada tardia de
+   `partners.json`— y volver al fondo general si esa opcion desaparecio. */
+function buildMiDestino(){
+  var sel = document.getElementById("mif-destino");
+  if (!sel) return;
+  var previo = sel.value || "general";
+  sel.innerHTML = opcionesDestino(false);
+  sel.value = previo;
+  if (sel.value !== previo) sel.value = "general";
 }
 function mbMonto(cop){
   var libre = document.getElementById("mb-libre");
@@ -4458,6 +4475,15 @@ function irAPagarPaypal(){
      aqui los campos y la casilla de Ley 1581. */
   var campo = document.getElementById("mif-monto");
   if (campo){ campo.value = usd.toFixed(2); }
+  /* Y EL PROGRAMA que se eligio en la calculadora, si el selector de PayPal lo
+     tiene. La brigada no puede llegar aqui —con ella la calculadora fuerza
+     aporte unico—, y si algo que no esta llegara, el selector se queda en el
+     fondo general en vez de quedar en blanco. */
+  var dsel = document.getElementById("mif-destino");
+  if (dsel){
+    dsel.value = calc.projectId || "general";
+    if (dsel.value !== (calc.projectId || "general")) dsel.value = "general";
+  }
   go("membresias");
   setTimeout(function(){
     var sec = document.getElementById("membres-intl");
@@ -7512,8 +7538,10 @@ function miSubmit(ev){
   allyMsg(note, t("mi.enviando"), true);
   fetch("/api/paypal/suscripcion", {
     method: "POST", headers: {"content-type":"application/json"},
+    /* `destino` es el value del <option> —un id de programa o «general»—, nunca
+       su texto. El Worker lo valida contra la lista cerrada. */
     body: JSON.stringify({ monto: cargo, nombre: val("mif-nombre"), email: val("mif-email"), telefono: val("mif-tel"),
-                           idioma: lang, autoriza_datos: true })
+                           idioma: lang, autoriza_datos: true, destino: val("mif-destino") || "general" })
   }).then(function(r){ return r.json(); }).then(function(d){
     /* SE VA A PAYPAL, no se dibuja nada de PayPal aqui: la CSP prohibe su SDK,
        su boton y su iframe, y esa es tambien la forma segura — nadie de fuera

@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=f1036ac1" defer></script>
+<script src="/app.js?v=687ca7b2" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -2260,6 +2260,9 @@
               <option value="general" data-i18n="membres.cta.dest.general">Donde más se necesite (fondo general)</option>
             </select>
             <p class="mb-ayuda" data-i18n="membres.cta.dest.h">Son los mismos destinos de Donar. Cada cobro mensual queda registrado con este destino y su propio número de guía.</p>
+            <!-- Por que no esta la brigada, dicho donde se elige: quien la busca
+                 en la lista no tiene por que adivinar que cerro. -->
+            <p class="mb-ayuda" data-i18n="membres.cta.dest.brigada">La brigada del sismo fue una campaña de aporte único y ya cerró, así que no se ofrece como aporte mensual.</p>
           </div>
           <div class="mb-resumen">
             <span class="mb-res-eti" data-i18n="membres.cta.res">Tu aporte mensual</span>
@@ -2299,6 +2302,19 @@
              tiene que ser una decision suya. Precargada seria cobrarle un
              sobrecosto que no eligio. -->
         <label class="ally-check"><input type="checkbox" id="mif-cubre" data-change="miCalcula()"><span><b data-i18n="mi.cubre">Súmale la comisión de PayPal, para que a la fundación le llegue completo</b><small data-i18n="mi.cubre.h">Opcional. Te cobran un poco más cada mes y tu aporte llega íntegro.</small></span></label>
+
+        <!-- EL PROGRAMA, el mismo selector de la membresia en pesos: lo arma
+             `opcionesDestino(false)` —mismos valores, fondo general por
+             defecto, sin la brigada— y el Worker lo valida otra vez contra
+             `destinoMembresia`. Va con el monto y la comision porque es parte de
+             lo que se elige, no de los datos de contacto. -->
+        <div class="field"><label for="mif-destino" data-i18n="membres.cta.dest">A qué programa va</label>
+          <select id="mif-destino">
+            <option value="general" data-i18n="membres.cta.dest.general">Donde más se necesite (fondo general)</option>
+          </select>
+          <p class="mb-ayuda" data-i18n="mi.dest.h">Los mismos programas de la membresía en pesos. Cada cobro de PayPal queda registrado con este destino y su propio número de guía.</p>
+          <p class="mb-ayuda" data-i18n="membres.cta.dest.brigada">La brigada del sismo fue una campaña de aporte único y ya cerró, así que no se ofrece como aporte mensual.</p>
+        </div>
 
         <div class="field"><label for="mif-nombre" data-i18n="mi.nombre">Nombre completo</label>
           <input type="text" id="mif-nombre" autocomplete="name" required></div>

@@ -10282,6 +10282,13 @@ async function apiPaypalSuscripcion(request, env, url) {
   const idioma = c.idioma === "en" ? "en" : "es";
   const quiereCert = c.quiere_certificado ? 1 : 0;
   const muro = c.consent_muro === "si" ? "si" : "no";
+  /* EL PROGRAMA, con la misma lista cerrada que la membresia en pesos
+     (`destinoMembresia`, migrations/0035). Lo manda el navegador, asi que un id
+     que no esta en ella —uno viejo, uno inventado, la brigada— no es un error
+     que devolver: es el fondo general, lo que la persona tendria sin elegir. Se
+     valida ANTES de hablar con PayPal para no crear alla una suscripcion cuya
+     fila aqui no pudiera guardarse. */
+  const destino = await destinoMembresia(env, c.destino);
 
   /* NUESTRO id, que viaja como `custom_id` y vuelve en cada webhook. Es lo que
      permite reconocer una suscripcion sin fiarse del correo -que la persona puede
@@ -10377,9 +10384,10 @@ async function apiPaypalSuscripcion(request, env, url) {
 
   await env.DB.prepare(
     "INSERT INTO suscripciones (id, proveedor, plan_ref, estado, nivel, monto_centavos, " +
-    "moneda, frecuencia, idioma, quiere_certificado, consent_muro, donante_id) " +
-    "VALUES (?, 'paypal', ?, 'aprobacion_pendiente', ?, ?, 'USD', 'mensual', ?, ?, ?, ?)"
-  ).bind(r.d.id, planId, nivel.nombre, Math.round(usd * 100), idioma, quiereCert, muro, donanteId).run();
+    "moneda, frecuencia, idioma, quiere_certificado, consent_muro, donante_id, destino) " +
+    "VALUES (?, 'paypal', ?, 'aprobacion_pendiente', ?, ?, 'USD', 'mensual', ?, ?, ?, ?, ?)"
+  ).bind(r.d.id, planId, nivel.nombre, Math.round(usd * 100), idioma, quiereCert, muro, donanteId,
+         destino ? destino.id : null).run();
 
   /* La autorizacion de Ley 1581 se anota como en los otros formularios: es la
      misma obligacion, no una excepcion porque el dinero venga de fuera. */
@@ -10940,7 +10948,7 @@ async function correoReversaPaypal(env, a, tipo, devuelto) {
 
 async function paypalCobro(env, suscripcionId, recurso) {
   const sub = await env.DB.prepare(
-    "SELECT id, nivel, idioma, quiere_certificado, consent_muro, donante_id " +
+    "SELECT id, nivel, idioma, quiere_certificado, consent_muro, donante_id, destino " +
     "FROM suscripciones WHERE id = ?"
   ).bind(suscripcionId).first();
   if (!sub) return "suscripcion_desconocida";
@@ -10975,14 +10983,38 @@ async function paypalCobro(env, suscripcionId, recurso) {
     if (ya) return "cobro_ya_registrado " + ya.guia;
   }
 
+  /* EL DESTINO VIAJA de la suscripcion a cada cobro, igual que en `wompiCobrar`
+     y con las mismas dos reglas: se escribe lo MISMO que escribe Donar para ese
+     programa —`dirigida`, el id de la fundacion, el nombre del programa— para
+     que el rastreo y las actas de entrega lo encuentren; y si el programa ya no
+     esta en `partners.json`, el cobro va al fondo general y QUEDA UN INCIDENTE.
+     Aqui con mas razon no se deja de registrar: PayPal ya cobro, el dinero
+     existe, y lo unico que falta decidir —que hacer con la eleccion— es de una
+     persona. Va antes de `siguienteGuia`, que no depende de esto, para que un
+     tropiezo al leer `partners.json` no queme un consecutivo. */
+  let dest = null;
+  if (sub.destino) {
+    dest = await destinoMembresia(env, sub.destino);
+    if (!dest) {
+      console.error("membresia paypal con destino que ya no existe", sub.id, sub.destino);
+      await anotarIncidente(env, "membresia-destino", "",
+        "el programa " + String(sub.destino).slice(0, 60) + " de la suscripcion " + sub.id +
+        " no esta en partners.json: el cobro de PayPal se registro al fondo general");
+    }
+  }
+  const modo = dest ? "dirigida" : "fondo";
+  const destinoId = dest ? dest.destino_id : null;
+  const proyecto = dest ? (String(sub.idioma || "es") === "en" ? dest.en : dest.es) : null;
+
   const guia = await siguienteGuia(env, anioCO());
   const token = tokenNuevo();
   await env.DB.prepare(
-    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
+    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, frecuencia, " +
     "quiere_certificado, consent_muro, idioma, token, proveedor, proveedor_ref, suscripcion, " +
     "donante_id, aprobada_en) " +
-    "VALUES (?, 'aprobada', ?, ?, 'fondo', 'mensual', ?, ?, ?, ?, 'paypal', ?, ?, ?, datetime('now'))"
-  ).bind(guia, centavos, moneda, sub.quiere_certificado, sub.consent_muro, sub.idioma,
+    "VALUES (?, 'aprobada', ?, ?, ?, ?, ?, 'mensual', ?, ?, ?, ?, 'paypal', ?, ?, ?, datetime('now'))"
+  ).bind(guia, centavos, moneda, modo, destinoId, proyecto,
+         sub.quiere_certificado, sub.consent_muro, sub.idioma,
          token, String((recurso && recurso.id) || ""), suscripcionId, sub.donante_id).run();
 
   /* UN COBRO ES PRUEBA DE ACTIVACION, y por eso se marca aqui tambien.
@@ -11019,7 +11051,7 @@ async function paypalCobro(env, suscripcionId, recurso) {
     if (d && d.email) {
       await correoAporteAprobado(env, {
         guia, monto_centavos: centavos, moneda, idioma: sub.idioma,
-        modo: "fondo", destino_id: null, frecuencia: "mensual", token
+        modo, destino_id: destinoId, frecuencia: "mensual", token
       }, d.email, d.nombre);
     } else {
       /* Se DICE que no se mando y por que. Una membresia sin correo enlazado es
@@ -11044,12 +11076,12 @@ async function paypalCobro(env, suscripcionId, recurso) {
        salvo que alguien abra el panel. El de Wompi lleva anios mandandolo. */
     await correoAvisoInterno(env, {
       guia, monto_centavos: centavos, moneda,
-      modo: "fondo", destino_id: null, frecuencia: "mensual"
+      modo, destino_id: destinoId, frecuencia: "mensual"
     }, d && d.email, d && d.nombre);
 
     const carnet = await carnetTrasAporte(
       env,
-      { frecuencia: "mensual", monto_centavos: centavos, destino_id: null },
+      { frecuencia: "mensual", monto_centavos: centavos, destino_id: destinoId },
       sub.donante_id, sub.nivel
     );
     if (carnet && carnet.nuevo && d && d.email) {
