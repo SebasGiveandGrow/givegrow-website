@@ -19556,7 +19556,10 @@ async function rutaMetodoPago(env, url) {
   const monto = (Number.isInteger(mNum) && mNum >= MONTO_MIN && mNum <= MONTO_MAX) ? mNum : 0;
   const html = paginaMetodoPago({ amb, info, pub, monto,
     nivel: monto ? nivelPorMensual(monto).es : "",
-    aviso: url.searchParams.get("aviso") || "" });
+    /* hasOwn y no AVISOS_METODO[k] a secas: «?aviso=constructor» devolvería
+       la función de Object.prototype. */
+    aviso: Object.hasOwn(AVISOS_METODO, String(url.searchParams.get("aviso") || ""))
+      ? AVISOS_METODO[url.searchParams.get("aviso")] : "" });
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -19993,7 +19996,7 @@ async function apiCrearFuentePago(request, env, url) {
      form y lo manda. Por eso la respuesta tambien es una redireccion y no un
      JSON — al otro lado hay un navegador, no nuestro codigo. */
   let f;
-  try { f = await request.formData(); } catch { return volverAlFormulario(url, "No se pudo leer el formulario."); }
+  try { f = await request.formData(); } catch { return volverAlFormulario(url, "formulario"); }
 
   /* EL MONTO SE LEE AQUI ARRIBA Y NO DONDE SE USA, para que cada camino de
      error lo devuelva con la persona. La primera version lo leia al final: un
@@ -20003,13 +20006,13 @@ async function apiCrearFuentePago(request, env, url) {
 
   const email = String(f.get("email") || "").trim().slice(0, 200);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return volverAlFormulario(url, "Revisa tu correo: no parece valido.", montoTxt);
+    return volverAlFormulario(url, "correo", montoTxt);
   }
   /* Las DOS casillas, y por separado. Son dos contratos distintos —politica de
      privacidad y Ley 1581— y Wompi exige un token para cada uno. Una sola
      casilla de «acepto todo» no seria aceptacion explicita de ninguno. */
   if (!f.get("acepta_privacidad") || !f.get("acepta_datos")) {
-    return volverAlFormulario(url, "Hay que aceptar los dos documentos para continuar.", montoTxt);
+    return volverAlFormulario(url, "aceptar", montoTxt);
   }
 
   /* EL NOMBRE DEL CAMPO DEL TOKEN NO ESTA DOCUMENTADO. La guia de Wompi dice
@@ -20027,11 +20030,11 @@ async function apiCrearFuentePago(request, env, url) {
     /* Se registran los NOMBRES de los campos recibidos, nunca sus valores: por
        aqui pasa un token de pago y no tiene por que quedar en un log. */
     console.error("fuente de pago sin token; campos recibidos:", [...f.keys()].join(","));
-    return volverAlFormulario(url, "No recibimos el metodo de pago. Intenta de nuevo.", montoTxt);
+    return volverAlFormulario(url, "sin_metodo", montoTxt);
   }
 
   const info = await wompiInfoComercio(env);
-  if (!info) return volverAlFormulario(url, "No pudimos confirmar los terminos con la pasarela. Intenta en unos minutos.", montoTxt);
+  if (!info) return volverAlFormulario(url, "terminos", montoTxt);
 
   const amb = ambienteWompi(pub);
   let creada;
@@ -20052,11 +20055,11 @@ async function apiCrearFuentePago(request, env, url) {
       /* El motivo de Wompi si se registra —es lo unico que permite entender un
          rechazo—, pero nunca el cuerpo que enviamos. */
       console.error("payment_sources", r.status, JSON.stringify(creada && creada.error || {}).slice(0, 300));
-      return volverAlFormulario(url, "La pasarela no acepto el metodo de pago. Revisa los datos e intenta de nuevo.", montoTxt);
+      return volverAlFormulario(url, "rechazado", montoTxt);
     }
   } catch (e) {
     console.error("payment_sources red", e && e.message);
-    return volverAlFormulario(url, "No pudimos contactar la pasarela. Intenta en unos minutos.", montoTxt);
+    return volverAlFormulario(url, "pasarela", montoTxt);
   }
 
   const d = (creada && creada.data) || {};
@@ -20114,6 +20117,23 @@ async function apiCrearFuentePago(request, env, url) {
   }
   return Response.redirect(ORIGIN + "/pago/listo?" + q.toString(), 303);
 }
+
+/* LA URL LLEVA UN CÓDIGO, NO EL TEXTO. Hasta el 28 sep 2026 el aviso viajaba
+   entero en `?aviso=` y la página lo pintaba tal cual —escapado, así que no
+   era XSS—, pero cualquiera podía armar un enlace a la página de la tarjeta,
+   en el dominio de la fundación, con el texto que quisiera: «Tu pago falló,
+   escríbenos al 300…». Es la página donde la gente pone su tarjeta, y la más
+   rentable de suplantar. Ahora el enlace solo puede elegir entre estos
+   mensajes; un código desconocido no pinta nada. */
+const AVISOS_METODO = Object.freeze({
+  formulario: "No se pudo leer el formulario.",
+  correo: "Revisa tu correo: no parece valido.",
+  aceptar: "Hay que aceptar los dos documentos para continuar.",
+  sin_metodo: "No recibimos el metodo de pago. Intenta de nuevo.",
+  terminos: "No pudimos confirmar los terminos con la pasarela. Intenta en unos minutos.",
+  rechazado: "La pasarela no acepto el metodo de pago. Revisa los datos e intenta de nuevo.",
+  pasarela: "No pudimos contactar la pasarela. Intenta en unos minutos."
+});
 
 /* Se vuelve al formulario con el motivo a la vista. Un 303 y no un JSON porque
    quien esta al otro lado es un navegador que acaba de enviar un formulario:
