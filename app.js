@@ -218,6 +218,8 @@ var I18N = {
     "nav.d.membres":"Los cuatro niveles y sus beneficios",
     "nav.d.calc":"Simula tu aporte y tu beneficio tributario",
     "nav.d.track":"Sigue tu donación con su número de guía",
+    "nav.miaporte":"Mi aporte",
+    "nav.d.miaporte":"Rastrea tu donación y gestiona tu membresía",
     "nav.d.origen":"Cómo y por qué nació la fundación",
     "nav.d.impacto":"Fotos, mapa e historias verificables",
     "nav.d.impactos":"El sistema que registra cada aporte",
@@ -910,6 +912,22 @@ var I18N = {
     "track.ng.sent":"Abrimos tu correo con la solicitud lista para enviar. Te responderemos con tu guía.",
     "track.ng.mailsubj":"Solicitud de guía de donación",
     "track.ng.mailbody":"Hola, hice una donación con el correo {email} y quiero solicitar mi número de guía para rastrearla. Gracias.",
+    "ma.ey":"Para quien ya aportó",
+    "ma.t":"Mi aporte",
+    "ma.lead":"Lo tuyo, en un solo lugar: el recorrido de cada donación, tu membresía y tu certificado. No hay cuenta ni contraseña que recordar: basta tu número de guía o el correo con el que te inscribiste.",
+    "ma.track.t":"Rastrear mi donación",
+    "ma.track.p":"Escribe el número de guía que llegó con tu recibo y mira en qué va: recibida, en distribución o entregada, con el acta firmada cuando la fundación entrega.",
+    "ma.track.ng":"¿No tienes tu guía? Pídela aquí →",
+    "ma.mem.t":"Mi membresía",
+    "ma.mem.p":"Escribe el correo con el que te inscribiste y te enviamos un enlace privado a tu membresía. Desde ahí ves su estado, el último cobro y la tarjeta, y la terminas cuando quieras, sin escribirle a nadie.",
+    "ma.mem.btn":"Recibir el enlace",
+    "ma.mem.href":"/membresia",
+    "ma.mem.tarjeta":"¿Cambiaste de tarjeta? Actualízala →",
+    "ma.mem.paypal":"Si te hiciste miembro por PayPal, tu suscripción se gestiona desde tu propia cuenta de PayPal: desde aquí no podemos detenerla.",
+    "ma.cert.t":"¿Necesitas tu certificado de donación?",
+    "ma.cert.p":"Se pide al donar, marcando «Quiero certificado de donación». No sale automático: lo firman el Representante Legal y la Revisora Fiscal, y te lo enviamos al correo cuando está firmado. Aplica a donaciones en pesos, para el impuesto de renta en Colombia.",
+    "ma.cert.p2":"¿No lo marcaste, o ya pasó un tiempo y no te ha llegado? Escríbenos con tu número de guía y lo revisamos.",
+    "ma.cert.btn":"Escribirnos →",
     "a11y.skip":"Saltar al contenido",
     "hub.intro.ey":"El HUB SOCIAL",
     "hub.intro.t":"¿Qué es un HUB?",
@@ -1337,6 +1355,7 @@ var I18N = {
     "gracias.save":"Guarda tu número de guía. Es el mismo con el que puedes rastrear tu aporte de principio a fin.",
     "gracias.track":"Rastrear mi aporte",
     "gracias.home":"Volver al inicio",
+    "gracias.miaporte":"Tu membresía, tu certificado y el rastreo de tus aportes están en Mi aporte →",
     "gracias.sub.t":"Tu membresía quedó registrada.",
     "gracias.sub.p":"PayPal confirma el primer cobro y ahí te llega el recibo con tu número de guía. No es inmediato, así que preferimos decírtelo en vez de darte las gracias por algo que todavía no está cobrado. Puedes cancelarla cuando quieras desde tu propia cuenta de PayPal.",
     "gracias.pp.t":"Gracias. Tu donación quedó en PayPal.",
@@ -2027,6 +2046,7 @@ var ROUTE_META = {
      `gracias` es donde Wompi devuelve a quien acaba de pagar — las dos vistas
      que más se comparten por mensaje. */
   rastrea:{t:{es:"Rastrea tu donación · Give&Grow International",en:"Track your gift · Give&Grow International"},d:{es:"Escribe tu número de guía y sigue tu aporte de principio a fin: estado, destino y el acta de entrega cuando la fundación aliada entrega.",en:"Enter your tracking number and follow your gift from start to finish: status, destination and the delivery record once the partner foundation delivers."}},
+  "mi-aporte":{t:{es:"Mi aporte · Give&Grow International",en:"My giving · Give&Grow International"},d:{es:"Lo de quien ya donó, en un solo lugar: rastrea tu donación con su número de guía, recibe el enlace a tu membresía y entérate de cómo se pide el certificado de donación.",en:"Everything for people who have already given, in one place: track your donation with its tracking number, get the link to your membership and find out how to request your donation certificate."}},
   gracias:{t:{es:"Gracias por tu aporte · Give&Grow International",en:"Thank you for your gift · Give&Grow International"},d:{es:"Recibimos tu aporte y lo estamos confirmando. Guarda tu número de guía: con él puedes seguirlo hasta la entrega.",en:"We received your gift and we are confirming it. Keep your tracking number: it lets you follow the gift through to delivery."}},
   aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
@@ -3832,6 +3852,7 @@ var ACT_FNS = {
   bcPaso:bcPaso,
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
+  maRastrear:maRastrear,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
   donarBrigada:donarBrigada, allySubmit:allySubmit, allySector:allySector,
   irAPagar:irAPagar, payCert:payCert, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit, apSubmit:apSubmit, apQuien:apQuien,
@@ -6396,6 +6417,20 @@ var TRACK_LABELS = {
 function normalizeGuide(s){
   return String(s||"").toUpperCase().replace(/\s+/g,"").trim();
 }
+/* LA CASILLA DE #mi-aporte NO BUSCA: le pasa la guía a #rastrea. Así hay una
+   sola búsqueda en todo el sitio —la de `trackSearch`, con su lectura de D1,
+   su respaldo en el libro y su «no pude preguntar»— y el resultado aparece
+   donde siempre, con el ejemplo oculto y el QR. Duplicarla aquí sería tener dos
+   rastreos que un día dirían cosas distintas sobre la misma guía. */
+function maRastrear(){
+  var src = document.getElementById("ma-guia");
+  var dst = document.getElementById("track-input");
+  if (!src || !dst) return;
+  if (!normalizeGuide(src.value)){ src.focus(); return; }
+  dst.value = src.value;
+  go("rastrea");
+  trackSearch();
+}
 function trackSearch(){
   var inp = document.getElementById("track-input");
   var box = document.getElementById("track-result");
@@ -6596,6 +6631,7 @@ var ALMA_CHIPS = {
   "fundaciones": ["alma.chip4","alma.c.hub1","alma.c.donar1","alma.chip1"],
   "gratitud":    ["alma.c.gratitud","alma.c.membresia","alma.chip3","alma.chip1"],
   "rastrea":     ["alma.c.track","alma.chip1","alma.c.donar1","alma.chip2"],
+  "mi-aporte":   ["alma.c.track","alma.chip1","alma.c.donar1","alma.chip2"],
   "transparencia":["alma.c.evidencia","alma.chip1","alma.chip2","alma.chip4"]
 };
 function renderAlmaChips(){

@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=2c14f94b" defer></script>
+<script src="/app.js?v=41af2923" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -102,7 +102,10 @@
         <div class="ndrop-menu ndrop-menu-desc">
           <a href="#membresias"><span class="nd-t" data-i18n="nav.membres">Membresías</span><span class="nd-d" data-i18n="nav.d.membres">Los cuatro niveles y sus beneficios</span></a>
           <a href="#donar"><span class="nd-t" data-i18n="nav.calc">Calcular mi aporte</span><span class="nd-d" data-i18n="nav.d.calc">Simula tu aporte y tu beneficio tributario</span></a>
-          <a href="#rastrea"><span class="nd-t" data-i18n="track.t">Rastrea tu donación</span><span class="nd-d" data-i18n="nav.d.track">Sigue tu donación con su número de guía</span></a>
+          <!-- «Mi aporte» sustituye aquí a «Rastrea tu donación»: la lleva dentro, con
+               la casilla de la guía, y además la membresía y el certificado. Dos
+               entradas al mismo rastreo en un menú de tres era ruido. -->
+          <a href="#mi-aporte"><span class="nd-t" data-i18n="nav.miaporte">Mi aporte</span><span class="nd-d" data-i18n="nav.d.miaporte">Rastrea tu donación y gestiona tu membresía</span></a>
         </div>
       </div>
       <div class="ndrop">
@@ -164,7 +167,7 @@
   <span class="mnav-g" data-i18n="nav.membres">Membresías</span>
   <a href="#membresias" data-i18n="nav.membres">Membresías</a>
   <a href="#donar" data-i18n="nav.calc">Calcular mi aporte</a>
-  <a href="#rastrea" data-i18n="track.t">Rastrea tu donación</a>
+  <a href="#mi-aporte" data-i18n="nav.miaporte">Mi aporte</a>
   <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
   <a href="#origen" data-i18n="nav.origen">Origen</a>
   <a href="#impacto" data-i18n="nav.impacto">Evidencia</a>
@@ -935,6 +938,8 @@
         <a class="btn btn-g" href="#rastrea" id="gracias-track" data-i18n="gracias.track">Rastrear mi aporte</a>
         <a class="btn btn-o" href="#inicio" data-i18n="gracias.home">Volver al inicio</a>
       </div>
+      <!-- Para volver después: la membresía y el certificado viven en #mi-aporte. -->
+      <p class="rv d2" style="margin-top:18px"><a class="card-link" href="#mi-aporte" data-i18n="gracias.miaporte">Tu membresía, tu certificado y el rastreo de tus aportes están en Mi aporte →</a></p>
     </div>
   </section>
 </main>
@@ -1976,6 +1981,63 @@
           <li><b data-i18n="track.ej.3.t">Entregada</b><span data-i18n="track.ej.3.p">Cuando la aliada entrega, el acta firmada y las fotos de las entregas de tu destino aparecen en tu rastreo.</span></li>
         </ol>
         <p class="rastro-nota" data-i18n="track.ej.cert">Si pediste certificado de donación, se emite aparte: lo firman el Representante Legal y la Revisora Fiscal, y te lo enviamos cuando esté firmado.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ MI APORTE ============
+     LA PUERTA DE QUIEN YA DONÓ. Lo suyo existía, pero repartido: el rastreo en
+     #rastrea, la membresía en /membresia (una página del Worker que solo se
+     encontraba desde un correo o desde /pago/listo) y el certificado explicado
+     en cuatro sitios distintos. Aquí no se construye nada nuevo: cada tarjeta
+     lleva a lo que ya existe.
+
+     - El rastreo NO se duplica. La casilla de aquí copia la guía en
+       `#track-input`, salta a #rastrea y llama a `trackSearch()` —ver
+       `maRastrear` en app.js—: una sola lógica de búsqueda en todo el sitio.
+     - La membresía va a /membresia, que pide el correo y manda el enlace
+       privado. No se toca el modelo del token: sin ese enlace nadie ve ni
+       cancela nada. El `href` cambia con el idioma por el diccionario
+       (`ma.mem.href`), porque esa página se sirve sin JavaScript y decide su
+       idioma por `?lang=`.
+     - El certificado NO tiene puerta propia para el público, a propósito: lo
+       firman el Representante Legal y la Revisora Fiscal, y sale de /admin
+       revisado por una persona. Esta tarjeta dice cómo se pide y a quién
+       escribir, sin prometer una emisión que no existe. -->
+<main id="page-mi-aporte" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="ma.ey">Para quien ya aportó</span>
+      <h1 class="h-sec rv" data-i18n="ma.t">Mi aporte</h1>
+      <p class="lead rv d1" data-i18n="ma.lead">Lo tuyo, en un solo lugar: el recorrido de cada donación, tu membresía y tu certificado. No hay cuenta ni contraseña que recordar: basta tu número de guía o el correo con el que te inscribiste.</p>
+      <div class="grid g3 rv d2" style="margin-top:28px">
+        <div class="card">
+          <div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+          <h2 class="h-comp3" data-i18n="ma.track.t">Rastrear mi donación</h2>
+          <p data-i18n="ma.track.p">Escribe el número de guía que llegó con tu recibo y mira en qué va: recibida, en distribución o entregada, con el acta firmada cuando la fundación entrega.</p>
+          <div class="field" style="margin-top:16px;margin-bottom:10px">
+            <label for="ma-guia" data-i18n="track.aria">Número de guía de tu donación</label>
+            <input type="text" id="ma-guia" placeholder="GG-2026-000001" data-i18n="track.ph" data-i18n-attr="placeholder" data-enter="maRastrear()" autocomplete="off" spellcheck="false">
+          </div>
+          <button type="button" class="btn btn-g" data-act="maRastrear()" data-i18n="track.btn">Rastrear</button>
+          <p><a class="card-link" href="#rastrea" data-i18n="ma.track.ng">¿No tienes tu guía? Pídela aquí →</a></p>
+        </div>
+        <div class="card">
+          <div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22V11"/><path d="M12 11C12 7 9 4 4 4c0 5 3 7 8 7z"/><path d="M12 14c0-3.5 2.5-6 8-6 0 4.5-3 6-8 6z"/></svg></div>
+          <h2 class="h-comp3" data-i18n="ma.mem.t">Mi membresía</h2>
+          <p data-i18n="ma.mem.p">Escribe el correo con el que te inscribiste y te enviamos un enlace privado a tu membresía. Desde ahí ves su estado, el último cobro y la tarjeta, y la terminas cuando quieras, sin escribirle a nadie.</p>
+          <p style="margin-top:16px"><a class="btn btn-g" href="/membresia" data-i18n="ma.mem.href" data-i18n-attr="href"><span data-i18n="ma.mem.btn">Recibir el enlace</span></a></p>
+          <p><a class="card-link" href="/pago/metodo" data-i18n="ma.mem.tarjeta">¿Cambiaste de tarjeta? Actualízala →</a></p>
+          <p class="mu" style="margin-top:14px;font-size:var(--fs-13)" data-i18n="ma.mem.paypal">Si te hiciste miembro por PayPal, tu suscripción se gestiona desde tu propia cuenta de PayPal: desde aquí no podemos detenerla.</p>
+        </div>
+        <div class="card">
+          <div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM8 7h8M8 11h8M8 15h5"/></svg></div>
+          <h2 class="h-comp3" data-i18n="ma.cert.t">¿Necesitas tu certificado de donación?</h2>
+          <p data-i18n="ma.cert.p">Se pide al donar, marcando «Quiero certificado de donación». No sale automático: lo firman el Representante Legal y la Revisora Fiscal, y te lo enviamos al correo cuando está firmado. Aplica a donaciones en pesos, para el impuesto de renta en Colombia.</p>
+          <p style="margin-top:12px" data-i18n="ma.cert.p2">¿No lo marcaste, o ya pasó un tiempo y no te ha llegado? Escríbenos con tu número de guía y lo revisamos.</p>
+          <p><a class="card-link" href="#contacto" data-i18n="ma.cert.btn">Escribirnos →</a></p>
+        </div>
       </div>
     </div>
   </section>
@@ -3323,7 +3385,7 @@
         <h2 data-i18n="foot.explore">Explorar</h2>
         <a href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
         <a href="#donar" data-i18n="nav.donar">Donar</a>
-        <a href="#rastrea" data-i18n="track.t">Rastrea tu donación</a>
+        <a href="#mi-aporte" data-i18n="nav.miaporte">Mi aporte</a>
         <a href="#aliados" data-i18n="ally.t">Quiero ser aliado</a>
         <a href="#fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
         <a href="#faq" data-i18n="nav.faq">FAQ</a>
