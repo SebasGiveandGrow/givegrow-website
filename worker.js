@@ -19325,6 +19325,12 @@ function paginaMetodoPago(cfg) {
 + '      <input type="checkbox" name="acepta_datos" value="1" required style="margin-top:4px">\n'
 + '      <span>Autorizo el <a href="' + esc(info.datos.enlace) + '" target="_blank" rel="noopener">tratamiento de mis datos personales</a> (Ley 1581).</span>\n'
 + '    </label>\n'
+/* LOS TERMINOS DE LA FUNDACION, justo encima del boton de Wompi. Las dos
+   casillas de arriba son los contratos de WOMPI; los de Give&Grow —cobro
+   mensual, cancelacion, cobros rechazados, reembolsos— estaban solo en la
+   SPA. Va antes del boton, no despues: se lee antes de registrar la tarjeta.
+   Nueva pestaña para no perder lo que ya se escribio en el formulario. */
++ '    <p class="mu" style="margin-top:14px">Al registrar tu método de pago aceptas los <a href="/#terminos" target="_blank" rel="noopener">términos y condiciones de donación</a> de Give&amp;Grow, y el tratamiento de tus datos según nuestra <a href="/#privacidad" target="_blank" rel="noopener">política de privacidad</a>.</p>\n'
 + '\n'
 + '\n'
 + '    <!-- HIJO DIRECTO DEL <form>, y no es estilo: el widget busca el\n'

@@ -1570,6 +1570,10 @@ var I18N = {
     "priv.t":"Política de Privacidad y Tratamiento de Datos",
     "priv.lead":"Cómo protegemos y tratamos tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR — y cómo puedes ejercer tus derechos.",
     "ally.a.datos.link":"Ver Política de Privacidad",
+    "foot.terms":"Términos de donación",
+    "ter.t":"Términos y condiciones de donación",
+    "ter.lead":"Qué pasa con tu aporte desde que lo haces: quién lo recibe, cómo se cobra, qué documentos te llegan y qué hacer si algo sale mal.",
+    "ter.link":"Términos y condiciones de donación",
     "emp.cta.t":"Hablemos de tu alianza",
     "emp.cta.p":"Diseñamos el aporte a la medida de tu empresa, con beneficio tributario y reportes verificables. Cuéntanos tu objetivo y construimos la ruta juntos.",
     "emp.cta.btn":"Quiero conversar",
@@ -2026,6 +2030,7 @@ var ROUTE_META = {
   proyecto:{t:{es:"Qué es y cómo funciona · Give&Grow International",en:"What it is and how it works · Give&Grow International"},d:{es:"Un ingeniero voluntario con matrícula mira las fotos de tu casa y escribe qué hacer con ella: si puedes permanecer, qué precauciones tomar y con qué reparar. Gratis y a distancia. Las tres formas de participar: reportar tu casa, dar conceptos o apadrinar una reparación.",en:"A licensed volunteer engineer looks at photos of your home and writes what to do with it: whether you can stay, what precautions to take and what to repair with. Free and remote. The three ways to take part: report your home, give opinions or sponsor a repair."}},
   vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario te da un concepto: si puedes permanecer, qué precauciones tomar y con qué reparar. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer gives you an opinion: whether you can stay, what precautions to take and what to repair with. It does not replace the official assessment."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
+  terminos:{t:{es:"Términos y condiciones de donación · Give&Grow International",en:"Donation terms and conditions · Give&Grow International"},d:{es:"Quién recibe tu donación, cómo funcionan la donación única y la membresía mensual, recibos, certificado tributario, reembolsos y qué pasa si la fundación que elegiste sale de la red.",en:"Who receives your donation, how one-off gifts and monthly memberships work, receipts, the tax certificate, refunds and what happens if the foundation you chose leaves the network."}},
   /* Estas cuatro faltaban y caían al `|| ROUTE_META.inicio`, así que se
      presentaban con el título y la descripción de la portada. No era cosmético:
      `rastrea` es la ruta a la que apunta el correo del recibo de cada donante y
@@ -2337,6 +2342,7 @@ function postLang(l){
   if (document.getElementById("mb-ir")) mbPinta(50000);
   if (!MARCA_MMC){ renderHeroImpact(); renderHomeFundaciones(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
   renderPrivacy();
+  renderTerms();
   /* Va DESPUÉS de applyLang: el repintado de data-i18n devuelve el rango
      estático a su sitio y hay que volver a poner la fase encima. */
   pintarBrigadaEstado();
@@ -5198,98 +5204,471 @@ function renderEmpresas(){
     if (empty) empty.style.display = n ? "none" : "";
   });
 }
-// Política de Privacidad (#privacidad). Contenido bilingüe inyectado (no i18n key-a-key
-// por ser documento largo). Adaptado del doc legal v1.0: cookies = realidad del sitio
-// (Cloudflare sin cookies), sin citar % tributario para no reabrir la inconsistencia.
+/* ═══ DOCUMENTOS LEGALES: política de privacidad (#privacidad) y términos de
+   donación (#terminos) ═══════════════════════════════════════════════════
+   Contenido bilingüe inyectado, no clave a clave: son documentos largos y se
+   leen enteros. Por eso no pasan por el diccionario ni por en.json, igual que
+   la v1.0.
+
+   LA POLÍTICA DESCRIBE LO QUE EL CÓDIGO HACE HOY, no lo que quisiéramos que
+   hiciera. La v1.1 (29 sep 2026) salió de leer cada formulario y cada ruta del
+   Worker: qué campos pide, a qué tabla van, quién los ve. Si mañana un
+   formulario pide un dato nuevo, o entra un proveedor nuevo, esta página
+   tiene que cambiar en el mismo PR — y subir de versión.
+
+   Los PLAZOS DE CONSERVACIÓN y las reglas de reembolso son propuestas que
+   Sebas confirma con asesoría legal; nada de lo que aquí se promete puede
+   depender de un borrado automático que no existe: la supresión la hace una
+   persona desde /admin. */
 var PRIVACY = {
-  es: `<p class="legal-meta">Versión 1.0 · Vigente desde su publicación · Conforme a la Ley 1581 de 2012 (Colombia), su Decreto 1377 de 2013 y el Reglamento General de Protección de Datos (GDPR, Unión Europea).</p>
-<h3>1. Responsable del tratamiento</h3>
+  es: `<p class="legal-meta">Versión 1.1 · Vigente desde el 29 de septiembre de 2026 · Conforme a la Ley 1581 de 2012, el Decreto 1377 de 2013 (compilado en el Decreto 1074 de 2015) y, para personas en la Unión Europea, el Reglamento General de Protección de Datos (RGPD).</p>
+<p>Esta política explica qué datos personales recogemos en <strong>thegiveandgrowproject.org</strong> y en <strong>miramicasa.org</strong>, para qué los usamos, con quién los compartimos, cuánto tiempo los guardamos y cómo puedes ejercer tus derechos. Las dos son marcas de la misma entidad, que es la responsable de todo lo que aquí se describe.</p>
+
+<h2>1. Quién es responsable de tus datos</h2>
 <ul>
-<li><strong>Razón social:</strong> Fundación Give&amp;Grow International</li>
+<li><strong>Responsable:</strong> Fundación Give&amp;Grow International, entidad sin ánimo de lucro del Régimen Tributario Especial</li>
 <li><strong>NIT:</strong> 901.948.930-2</li>
-<li><strong>Domicilio:</strong> Carrera 82A #9A Sur 28, Medellín, Antioquia, Colombia</li>
-<li><strong>Correo de privacidad:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
+<li><strong>Domicilio:</strong> Carrera 82 A # 9 A Sur 28, Medellín (Antioquia), Colombia</li>
+<li><strong>Canal para temas de datos personales:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
+<li><strong>Teléfono y WhatsApp:</strong> +57 315 330 5028</li>
 <li><strong>Representante Legal:</strong> Juan Sebastián Navarro Osorio</li>
-<li><strong>Autoridad de vigilancia:</strong> Superintendencia de Industria y Comercio (SIC), Colombia</li>
+<li><strong>Autoridad de protección de datos:</strong> Superintendencia de Industria y Comercio (SIC)</li>
 </ul>
-<h3>2. Qué datos tratamos y con qué finalidad</h3>
-<p>Tratamos únicamente los datos necesarios para cumplir nuestra labor, según quién nos los entregue:</p>
+
+<h2>2. Qué datos recogemos, de quién y para qué</h2>
+<p>Solo pedimos lo que necesitamos para la actividad concreta. Esto es lo que recoge hoy cada parte de la plataforma.</p>
+
+<h3>2.1 Donantes</h3>
 <ul>
-<li><strong>Donantes (personas y empresas):</strong> nombre o razón social, identificación, correo, teléfono, ciudad y monto o historial de aportes — para emitir tu certificado de donación con el beneficio tributario que contempla la ley, llevar la contabilidad, gestionar tu membresía y enviarte los reportes de impacto. No almacenamos datos de tarjetas de pago.</li>
-<li><strong>Empresas y comercios aliados:</strong> datos de la empresa, del representante y de contacto — para la debida diligencia, la firma del convenio y la trazabilidad de la alianza.</li>
-<li><strong>Voluntarios:</strong> datos de identificación y profesionales — para verificar idoneidad y asignarte a los programas.</li>
-<li><strong>Beneficiarios de programas:</strong> datos entregados por las fundaciones aliadas para ejecutar y documentar el impacto. Los datos de niñas, niños y adolescentes reciben protección reforzada y solo se tratan con autorización de su representante legal.</li>
+<li><strong>Pago con tarjeta o Botón Bancolombia (Wompi):</strong> la pasarela nos entrega tu nombre, correo, celular y, si lo diste allí, tu tipo y número de documento. Guardamos además el monto, el destino que elegiste, la fecha, el medio de pago usado y, si la escribiste, tu dedicatoria.</li>
+<li><strong>Membresía mensual con tarjeta:</strong> tu correo y una referencia de la tarjeta que registraste. <strong>Los datos de la tarjeta los recibe Wompi directamente, dentro de su propia ventana; nosotros no vemos ni guardamos el número.</strong> Conservamos solo la franquicia, los cuatro últimos dígitos y el mes y año de vencimiento, para que reconozcas cuál registraste y para avisarte antes de que venza.</li>
+<li><strong>PayPal (desde el exterior):</strong> nombre, correo y celular en nuestro formulario de membresía, y lo que PayPal nos informa de cada cobro (correo, nombre, monto). PayPal trata los datos de tu tarjeta o cuenta; nosotros no los recibimos.</li>
+<li><strong>Transferencia bancaria:</strong> nombre o razón social, correo, celular, monto, fecha, número del comprobante si lo das y el comprobante (imagen o PDF) si lo subes.</li>
+<li><strong>Certificado de donación:</strong> si lo pides, además tu documento y tu ciudad, porque el certificado los exige.</li>
+<li><strong>Reconocimiento público:</strong> guardamos si quieres aparecer con tu nombre, de forma anónima o no aparecer. Tu nombre solo se publica si lo eliges.</li>
 </ul>
-<h3>3. Base legal</h3>
-<p>Tratamos tus datos con tu <strong>autorización previa, expresa e informada</strong>, que recogemos por formulario físico o digital (con registro de fecha). Puedes revocarla en cualquier momento. Para titulares en la Unión Europea aplicamos las bases del Artículo 6 del GDPR (consentimiento, ejecución de un contrato, obligación legal o interés legítimo, según el caso).</p>
-<h3>4. Tus derechos</h3>
-<p>Como titular de los datos puedes, en cualquier momento:</p>
+<p><strong>Para qué:</strong> procesar y confirmar tu aporte, enviarte el recibo y el número de guía, emitir el certificado si lo pides, cobrar la membresía cada mes, llevar la contabilidad que exige la ley, mostrarte en el rastreo a dónde llegó tu aporte y responder tus preguntas.</p>
+
+<h3>2.2 Miembros</h3>
+<p>Si tus aportes te dan un nivel de membresía, guardamos tu número de miembro, tu nivel y su vigencia para expedir tu carnet digital. El carnet muestra tu nombre y tu nivel a quien tenga el enlace, por ejemplo un comercio del Programa de Gratitud.</p>
+
+<h3>2.3 Empresas aliadas</h3>
+<p>Del formulario de alianza: razón social, NIT, sector, dirección, representante legal y su documento, persona de contacto, correo, celular, ciudad, sitio web y redes, y lo que la empresa quiere aportar. <strong>Para qué:</strong> la debida diligencia, el convenio y la difusión de la alianza, que autorizas en una casilla aparte.</p>
+
+<h3>2.4 Fundaciones</h3>
 <ul>
-<li><strong>Conocer y acceder</strong> a los datos que tratamos sobre ti.</li>
-<li><strong>Rectificar</strong> datos inexactos o desactualizados.</li>
-<li><strong>Solicitar la supresión</strong> ("derecho al olvido") cuando no exista un deber legal de conservarlos.</li>
-<li><strong>Revocar la autorización</strong> que nos diste.</li>
-<li><strong>Oponerte</strong> a ciertos tratamientos y solicitar la <strong>portabilidad</strong> de tus datos.</li>
-<li><strong>Presentar una queja</strong> ante la SIC (Colombia) o la autoridad de control europea que corresponda.</li>
+<li><strong>Aplicación al HUB SOCIAL:</strong> nombre y datos de la fundación, persona que la dirige y su cargo, correo, celular, ciudad, zona, población que atiende y programas.</li>
+<li><strong>Cuestionario tras la visita de contexto:</strong> dirección, historia, costos de sus unidades de impacto con sus soportes, redes, y el logo y las fotos que decida subir.</li>
+<li><strong>Imagen:</strong> el nombre, el logo y las fotos de una fundación solo se publican con su autorización expresa, casilla por casilla. Si en las fotos aparecen niñas, niños o adolescentes, la fundación debe declarar que cuenta con la autorización de sus representantes legales.</li>
 </ul>
-<h3>5. Cómo ejercer tus derechos</h3>
-<p>Escríbenos a <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> con tu nombre, tu documento y la solicitud. Acusamos recibo en <strong>2 días hábiles</strong>; respondemos las consultas de acceso en <strong>10 días hábiles</strong> y los reclamos (rectificación, supresión, revocación) en <strong>15 días hábiles</strong>.</p>
-<h3>6. Conservación de los datos</h3>
-<p>Guardamos cada dato solo el tiempo necesario o el que exige la ley: los soportes de donaciones <strong>10 años</strong> (obligación tributaria y contable); los datos de beneficiarios, la duración del programa más 5 años; los de voluntarios, la vinculación más 3 años. Cumplido el plazo, se eliminan de forma segura.</p>
-<h3>7. Transferencias internacionales</h3>
-<p>Podemos compartir datos con encargados o aliados en otros países (por ejemplo, proveedores tecnológicos o fundaciones de cooperación), siempre con garantías adecuadas: cláusulas contractuales, acuerdos de encargo del tratamiento y el mínimo de datos necesarios, anonimizados cuando es posible.</p>
-<h3>8. Seguridad de la información</h3>
-<p>Protegemos tus datos con cifrado en tránsito, control de acceso por roles, registros de auditoría y protocolos de gestión de incidentes. Ningún sistema es infalible, pero aplicamos estándares reconocidos para reducir el riesgo.</p>
-<h3>9. Cookies y analítica</h3>
-<p>Este sitio <strong>no usa cookies de rastreo ni de marketing, ni píxeles de terceros.</strong> Para entender el uso del sitio empleamos <strong>Cloudflare Web Analytics, que no instala cookies ni identifica a las personas.</strong> Solo guardamos tu <strong>preferencia de tema (claro u oscuro)</strong> localmente en tu navegador; no es una cookie de seguimiento ni se envía a ningún servidor.</p>
-<h3>10. Vigencia y cambios</h3>
-<p>Esta política (Versión 1.0) rige desde su publicación y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>`,
-  en: `<p class="legal-meta">Version 1.0 · Effective upon publication · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
-<h3>1. Data controller</h3>
+
+<h3>2.5 Voluntarios</h3>
+<p>Nombre, correo, celular, ciudad, oficio, disponibilidad, el tipo de voluntariado que eliges, si llevarías cámara y tu mensaje. Preguntamos si eres mayor de edad.</p>
+<p><strong>Si eres menor de 18 años</strong>, pedimos además el nombre y un contacto de tu madre, padre o acudiente, si te acompañaría o te autoriza a venir, y que confirmes que sabe que te inscribes. Sin esos datos no guardamos la inscripción. Tus datos solo se usan para tramitar la autorización de tu acudiente: se la pedimos por un enlace propio, y no participas en ninguna actividad sin esa autorización escrita. Si pasan 30 días sin que la recibamos, eliminamos la inscripción.</p>
+
+<h3>2.6 Ingenieros voluntarios de Mira Mi Casa</h3>
+<p>Nombre, correo, celular, ciudad, número de matrícula profesional, especialidad, formación y disponibilidad. Una persona verifica la matrícula en el registro público del COPNIA antes de darte acceso. <strong>Tu nombre y tu matrícula aparecen en el concepto que recibe la familia</strong>: es lo que le permite saber quién lo firma. Para entrar a revisar casos usas tu correo, verificado por Cloudflare Access.</p>
+
+<h3>2.7 Familias de Mira Mi Casa</h3>
 <ul>
-<li><strong>Legal name:</strong> Fundación Give&amp;Grow International</li>
+<li><strong>Lo que pedimos:</strong> nombre, celular, sector y dirección o referencia para llegar; el correo es opcional. Datos de la casa (material, pisos, antigüedad aproximada, si ya tenía daños, si está habitada, si filtra agua), lo que quieras contarnos, y fotos y videos de la vivienda.</li>
+<li><strong>Dato sensible:</strong> la pregunta «¿Alguien se lastimó?» es un dato relativo a la salud. <strong>Es opcional</strong> y la usamos solo para dar prioridad al caso (Ley 1581, arts. 5 y 6).</li>
+<li><strong>Dos autorizaciones separadas:</strong> la primera, obligatoria para revisar el caso, permite que un ingeniero voluntario vea tus fotos y escriba un concepto. La segunda, opcional, permite que tu casa aparezca en el registro público de casas revisadas, <strong>sin tu nombre ni tu dirección</strong>. En ese registro solo salen el número de caso, el sector, la clasificación, el material y el número de pisos: nunca las fotos ni lo que escribiste. Puedes retirar la segunda autorización cuando quieras sin perder tu caso.</li>
+<li><strong>Quién ve qué:</strong> el ingeniero ve el sector, los datos de la casa, las fotos y videos y lo que escribiste, pero <strong>no ve tu nombre, tu teléfono, tu correo ni tu dirección</strong>. Solo el equipo de la Fundación ve tus datos de contacto, para coordinar una visita o avisarte cuando hay concepto. Por eso te pedimos que no escribas datos personales en el campo libre.</li>
+<li><strong>Tu enlace privado:</strong> con tu número de caso recibes un enlace con un código propio. Cualquiera que tenga ese enlace puede ver tu caso: guárdalo como guardarías una llave.</li>
+<li><strong>Avisos:</strong> si dejaste correo, te escribimos cuando tu caso lleva siete días esperando concepto. También podemos escribirte por WhatsApp al número que diste.</li>
+</ul>
+
+<h3>2.8 Ofrecimientos y apadrinamientos</h3>
+<p>Si ofreces bienes, materiales, mano de obra o transporte (por ejemplo para una brigada o para reparar casas de Mira Mi Casa): nombre, correo, celular, ciudad, organización si la hay, y el detalle de lo que ofreces. Solo para coordinar ese aporte.</p>
+
+<h3>2.9 Formulario de contacto</h3>
+<p>El formulario de contacto no guarda nada en nuestros servidores: abre tu aplicación de correo con el mensaje listo, y lo que envías llega a nuestro buzón como cualquier correo.</p>
+
+<h3>2.10 ALMA, el asistente del sitio</h3>
+<p>Lo que escribes en ALMA se envía a <strong>Anthropic</strong>, un proveedor de inteligencia artificial con sede en Estados Unidos, para generar la respuesta. Nosotros no guardamos esas conversaciones. Como es una transferencia internacional, <strong>te pedimos no escribir en ALMA datos personales</strong> (nombres, documentos, teléfonos, direcciones, datos de salud). Para un trámite con tus datos, escríbenos directamente.</p>
+
+<h2>3. Base legal</h2>
+<p>Tratamos tus datos con tu <strong>autorización previa, expresa e informada</strong>, que das en la casilla de cada formulario y de la que guardamos registro con su fecha. Algunos tratamientos se apoyan además en <strong>obligaciones legales</strong> (contabilidad, soportes tributarios y certificados de donación) y en la <strong>ejecución de lo que nos pides</strong> (procesar un pago, cobrar una membresía). Para personas en la Unión Europea, las bases equivalentes del artículo 6 del RGPD.</p>
+
+<h2>4. Datos sensibles</h2>
+<p>La Ley 1581 (art. 5) considera sensibles, entre otros, los datos de salud y los biométricos. Solo recogemos uno: la pregunta sobre personas lesionadas en Mira Mi Casa. <strong>No estás obligado a responder preguntas sobre datos sensibles</strong> (art. 6), y responderla o no, no cambia que tu caso se revise. Las fotos de tu vivienda no son datos sensibles, pero pueden mostrar personas: te recomendamos tomarlas sin gente.</p>
+
+<h2>5. Niñas, niños y adolescentes</h2>
+<p>Tratamos datos de menores de edad solo cuando responde a su interés superior y con respeto de sus derechos fundamentales (Ley 1581, art. 7, y Ley 1098 de 2006). La autorización la da su representante legal. En la práctica: un menor puede inscribirse como voluntario solo con los datos de su acudiente y no participa sin su autorización escrita; y no publicamos imágenes de menores sin la autorización de sus representantes.</p>
+
+<h2>6. Con quién compartimos tus datos</h2>
+<p><strong>No vendemos ni cedemos tus datos.</strong> Los compartimos solo con estos proveedores, que los tratan por encargo nuestro o prestan el servicio de pago que eliges:</p>
+<ul>
+<li><strong>Cloudflare</strong> (Estados Unidos): aloja el sitio y la base de datos (Workers, D1), guarda fotos, comprobantes y evidencias (R2), controla el acceso del equipo, los ingenieros y los firmantes (Access) y mide visitas sin cookies (Web Analytics).</li>
+<li><strong>Resend</strong> (Estados Unidos): envía los correos del sistema (recibos, certificados, avisos de tu caso) desde no-responder@notificaciones.thegiveandgrowproject.org.</li>
+<li><strong>Wompi</strong> (Bancolombia, Colombia): procesa los pagos en pesos y guarda tu tarjeta tokenizada si te haces miembro. Te pide aceptar su propia política de privacidad.</li>
+<li><strong>PayPal</strong> (internacional): procesa las donaciones y membresías en dólares.</li>
+<li><strong>Anthropic</strong> (Estados Unidos): genera las respuestas de ALMA a partir de lo que escribes.</li>
+<li><strong>CARTO y OpenStreetMap</strong>: sirven las imágenes de los mapas. Al cargarlas, tu navegador les envía tu dirección IP, como con cualquier imagen de internet.</li>
+<li><strong>WhatsApp (Meta)</strong>: solo si nos escribes o te escribimos por ahí.</li>
+</ul>
+<p>Además, dentro de la Fundación: los ingenieros voluntarios ven lo descrito en el punto 2.7, la Revisora Fiscal ve los datos de los certificados que firma, y la fundación aliada que recibe una donación dirigida no recibe tus datos, salvo que tú lo autorices.</p>
+
+<h2>7. Transferencias internacionales</h2>
+<p>Varios de esos proveedores tienen servidores fuera de Colombia, sobre todo en Estados Unidos. Al autorizar el tratamiento aceptas esa transferencia, que se hace con proveedores que ofrecen garantías contractuales de protección y solo con los datos necesarios para cada servicio (Ley 1581, art. 26).</p>
+
+<h2>8. Lo que se guarda en tu navegador</h2>
+<p>El sitio <strong>no usa cookies de rastreo ni de publicidad, ni píxeles de terceros</strong>. Cloudflare Web Analytics cuenta visitas sin cookies y sin identificarte. Lo único que guardamos en tu navegador es:</p>
+<ul>
+<li><strong>gg-theme</strong> (almacenamiento local): tu preferencia de tema claro u oscuro, si la cambiaste.</li>
+<li><strong>mmc-caso</strong> (almacenamiento local, solo en miramicasa.org): tu número de caso, el enlace privado de tu caso con su código de acceso y la fecha, para que puedas volver a abrirlo desde el mismo teléfono. Quien use ese teléfono puede abrir tu caso: tienes un botón para que el navegador lo olvide.</li>
+<li><strong>gg_guia</strong> (almacenamiento de sesión): tu número de guía mientras vas y vuelves de la pasarela de pago. Se borra al cerrar la pestaña.</li>
+<li><strong>Personas autorizadas</strong> (equipo, ingenieros, firmantes): Cloudflare Access usa una cookie de sesión para mantenerte dentro del panel, y la herramienta de inspección en terreno guarda en el teléfono los borradores y tu nombre y matrícula para poder trabajar sin señal.</li>
+</ul>
+<p>Nada de esto se usa para seguirte ni se comparte con terceros. Puedes borrarlo desde la configuración de tu navegador.</p>
+
+<h2>9. Cuánto tiempo guardamos los datos</h2>
+<ul>
+<li><strong>Donaciones, recibos, certificados, comprobantes y datos del donante asociados:</strong> 10 años desde el último asiento, por la obligación de conservar los libros y sus soportes (Código de Comercio, art. 60) y las normas tributarias.</li>
+<li><strong>Referencia de la tarjeta de una membresía:</strong> deja de usarse cuando cancelas; el registro se conserva con la contabilidad de los cobros que se hicieron.</li>
+<li><strong>Inscripciones que no avanzan</strong> (voluntarios, fundaciones, empresas, ingenieros, ofrecimientos): 2 años desde el último contacto.</li>
+<li><strong>Inscripciones aceptadas:</strong> mientras dure la relación y 3 años más.</li>
+<li><strong>Inscripciones de menores sin autorización del acudiente:</strong> 30 días.</li>
+<li><strong>Casos de Mira Mi Casa:</strong> mientras el caso esté abierto y 2 años después de cerrado. Luego se eliminan el nombre, el teléfono, el correo, la dirección, las fotos y los videos, y queda solo el registro anónimo (sector, clasificación y datos de la casa).</li>
+<li><strong>Registro de autorizaciones y de acciones sobre tus datos:</strong> mientras se conserven los datos a los que se refieren.</li>
+<li><strong>Correos que nos escribes:</strong> 2 años desde que se cierra el asunto.</li>
+</ul>
+<p>La eliminación no es automática: la hace una persona del equipo, desde el panel interno, al cumplirse el plazo o cuando la pides. Queda registrado quién la hizo, cuándo y por qué, sin tus datos.</p>
+
+<h2>10. Tus derechos</h2>
+<p>Como titular de los datos puedes, en cualquier momento (Ley 1581, art. 8):</p>
+<ul>
+<li><strong>Conocer</strong> qué datos tuyos tratamos y pedir prueba de la autorización que nos diste.</li>
+<li><strong>Actualizar y rectificar</strong> datos incompletos, inexactos o desactualizados.</li>
+<li><strong>Pedir la supresión</strong> de tus datos cuando no exista un deber legal o contractual de conservarlos. Los registros de donaciones, por ejemplo, deben guardarse el plazo legal aunque pidas suprimirlos: en ese caso dejamos de usarlos para cualquier otra cosa.</li>
+<li><strong>Revocar la autorización</strong> que nos diste, total o parcialmente (por ejemplo, retirar tu casa del registro público o tu nombre del reconocimiento público).</li>
+<li><strong>Presentar una queja ante la SIC</strong>, después de haber hecho tu consulta o reclamo ante nosotros.</li>
+</ul>
+
+<h2>11. Cómo ejercerlos y en cuánto tiempo respondemos</h2>
+<p>Escribe a <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> con tu nombre, cómo te podemos contactar y qué pides. Para proteger tus datos podemos pedirte que confirmes que eres el titular, por ejemplo desde el mismo correo o celular que registraste.</p>
+<ul>
+<li><strong>Consultas</strong> (saber qué datos tenemos): respondemos en máximo <strong>10 días hábiles</strong>. Si no alcanzamos, te decimos por qué y respondemos en máximo 5 días hábiles más (Ley 1581, art. 14).</li>
+<li><strong>Reclamos</strong> (rectificar, actualizar, suprimir o revocar): respondemos en máximo <strong>15 días hábiles</strong>, prorrogables 8 días hábiles más con aviso. Si al reclamo le falta información, te la pedimos en los 5 días siguientes; si no la recibimos en 2 meses, entendemos que desististe (Ley 1581, art. 15).</li>
+</ul>
+<p>Si no quedas satisfecho con la respuesta, puedes acudir a la <strong>Superintendencia de Industria y Comercio</strong> (www.sic.gov.co). Si estás en la Unión Europea, también a la autoridad de control de tu país.</p>
+
+<h2>12. Seguridad</h2>
+<p>La información viaja cifrada, la base de datos no se expone al navegador, el acceso interno exige identificarse y está separado por funciones (el ingeniero no entra al panel de donantes; la Revisora Fiscal solo ve lo que firma), y cada acción sobre datos personales queda registrada. Ningún sistema es infalible; si ocurre un incidente que afecte tus datos, lo informaremos a la SIC y a las personas afectadas.</p>
+
+<h2>13. Cambios a esta política</h2>
+<p>La revisamos al menos una vez al año y cada vez que cambie lo que recogemos o los proveedores que usamos. Publicamos cada versión aquí, con su fecha. Si un cambio afecta la finalidad para la que diste tu autorización, te la volveremos a pedir.</p>
+<ul>
+<li><strong>Versión 1.0</strong> · 23 de julio de 2026 · Primera publicación.</li>
+<li><strong>Versión 1.1</strong> · 29 de septiembre de 2026 · Se detalla qué datos se recogen de cada titular, incluidos los menores, los ingenieros y las familias de Mira Mi Casa; se nombran los proveedores; se corrige lo que se guarda en el navegador; se proponen plazos de conservación por categoría; y se precisan los plazos de respuesta.</li>
+</ul>`,
+  en: `<p class="legal-meta">Version 1.1 · Effective September 29, 2026 · In accordance with Colombia's Law 1581 of 2012, Decree 1377 of 2013 (compiled in Decree 1074 of 2015) and, for people in the European Union, the General Data Protection Regulation (GDPR).</p>
+<p>This policy explains which personal data we collect on <strong>thegiveandgrowproject.org</strong> and <strong>miramicasa.org</strong>, what we use it for, who we share it with, how long we keep it and how you can exercise your rights. Both are brands of the same entity, which is the controller for everything described here.</p>
+
+<h2>1. Who is responsible for your data</h2>
+<ul>
+<li><strong>Controller:</strong> Fundación Give&amp;Grow International, a non-profit under Colombia's Special Tax Regime</li>
 <li><strong>Tax ID (NIT):</strong> 901.948.930-2</li>
-<li><strong>Address:</strong> Carrera 82A #9A Sur 28, Medellín, Antioquia, Colombia</li>
-<li><strong>Privacy email:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
+<li><strong>Address:</strong> Carrera 82 A # 9 A Sur 28, Medellín (Antioquia), Colombia</li>
+<li><strong>Channel for personal-data matters:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
+<li><strong>Phone and WhatsApp:</strong> +57 315 330 5028</li>
 <li><strong>Legal Representative:</strong> Juan Sebastián Navarro Osorio</li>
-<li><strong>Supervisory authority:</strong> Superintendence of Industry and Commerce (SIC), Colombia</li>
+<li><strong>Data protection authority:</strong> Superintendence of Industry and Commerce (SIC), Colombia</li>
 </ul>
-<h3>2. What data we process and why</h3>
-<p>We process only the data needed to carry out our work, depending on who provides it:</p>
+
+<h2>2. What data we collect, from whom and why</h2>
+<p>We only ask for what we need for each specific activity. This is what each part of the platform collects today.</p>
+
+<h3>2.1 Donors</h3>
 <ul>
-<li><strong>Donors (individuals and companies):</strong> name or legal name, ID, email, phone, city and donation amount or history — to issue your donation certificate with the tax benefit provided by law, keep our accounting, manage your membership and send you impact reports. We do not store payment-card data.</li>
-<li><strong>Partner companies and businesses:</strong> company, representative and contact details — for due diligence, signing the agreement and alliance traceability.</li>
-<li><strong>Volunteers:</strong> identification and professional data — to verify suitability and assign you to programs.</li>
-<li><strong>Program beneficiaries:</strong> data provided by partner foundations to deliver and document impact. Data of children and adolescents receives reinforced protection and is processed only with their legal guardian's authorization.</li>
+<li><strong>Card or Bancolombia Button payments (Wompi):</strong> the gateway gives us your name, email, mobile number and, if you entered it there, your ID type and number. We also keep the amount, the destination you chose, the date, the payment method used and your dedication, if you wrote one.</li>
+<li><strong>Monthly card membership:</strong> your email and a reference to the card you registered. <strong>Your card details go directly to Wompi, inside its own window; we never see or store the number.</strong> We keep only the card brand, the last four digits and the expiry month and year, so you can recognize which card you registered and so we can warn you before it expires.</li>
+<li><strong>PayPal (from abroad):</strong> name, email and mobile number in our membership form, and what PayPal reports about each charge (email, name, amount). PayPal handles your card or account details; we do not receive them.</li>
+<li><strong>Bank transfer:</strong> name or company name, email, mobile number, amount, date, the receipt number if you give it, and the receipt itself (image or PDF) if you upload it.</li>
+<li><strong>Donation certificate:</strong> if you ask for one, also your ID number and city, because the certificate requires them.</li>
+<li><strong>Public recognition:</strong> we record whether you want to appear by name, anonymously or not at all. Your name is only published if you choose so.</li>
 </ul>
-<h3>3. Legal basis</h3>
-<p>We process your data with your <strong>prior, express and informed authorization</strong>, collected through a physical or digital form (with a timestamp). You may revoke it at any time. For data subjects in the European Union we rely on the bases in Article 6 of the GDPR (consent, performance of a contract, legal obligation or legitimate interest, as applicable).</p>
-<h3>4. Your rights</h3>
-<p>As a data subject you may, at any time:</p>
+<p><strong>Why:</strong> to process and confirm your gift, send you the receipt and tracking number, issue the certificate if you ask for it, charge your membership every month, keep the accounts the law requires, show you in the tracker where your gift went, and answer your questions.</p>
+
+<h3>2.2 Members</h3>
+<p>If your gifts give you a membership tier, we keep your member number, tier and its validity to issue your digital member card. The card shows your name and tier to anyone who has the link, for example a business in the Gratitude Program.</p>
+
+<h3>2.3 Partner companies</h3>
+<p>From the partnership form: company name, tax ID, sector, address, legal representative and their ID, contact person, email, mobile number, city, website and social media, and what the company wants to contribute. <strong>Why:</strong> due diligence, the agreement, and publicizing the partnership, which you authorize in a separate checkbox.</p>
+
+<h3>2.4 Foundations</h3>
 <ul>
-<li><strong>Know and access</strong> the data we process about you.</li>
-<li><strong>Rectify</strong> inaccurate or outdated data.</li>
-<li><strong>Request erasure</strong> ("right to be forgotten") where there is no legal duty to keep it.</li>
-<li><strong>Withdraw the authorization</strong> you gave us.</li>
-<li><strong>Object</strong> to certain processing and request the <strong>portability</strong> of your data.</li>
-<li><strong>File a complaint</strong> with the SIC (Colombia) or the relevant European supervisory authority.</li>
+<li><strong>Application to the Social Hub:</strong> the foundation's name and details, the person who leads it and their role, email, mobile number, city, area, population served and programs.</li>
+<li><strong>Questionnaire after the context visit:</strong> address, history, the costs of its impact units with supporting documents, social media, and the logo and photos it chooses to upload.</li>
+<li><strong>Image:</strong> a foundation's name, logo and photos are only published with its express authorization, checkbox by checkbox. If children or adolescents appear in the photos, the foundation must state that it has the authorization of their legal guardians.</li>
 </ul>
-<h3>5. How to exercise your rights</h3>
-<p>Write to <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> with your name, ID and request. We acknowledge receipt within <strong>2 business days</strong>; we answer access requests within <strong>10 business days</strong> and claims (rectification, erasure, withdrawal) within <strong>15 business days</strong>.</p>
-<h3>6. Data retention</h3>
-<p>We keep each piece of data only as long as necessary or as required by law: donation records for <strong>10 years</strong> (tax and accounting duty); beneficiary data for the duration of the program plus 5 years; volunteer data for the engagement plus 3 years. Once the term ends, data is securely deleted.</p>
-<h3>7. International transfers</h3>
-<p>We may share data with processors or partners in other countries (for example, technology providers or cooperation foundations), always with adequate safeguards: contractual clauses, data-processing agreements and the minimum data necessary, anonymized where possible.</p>
-<h3>8. Information security</h3>
-<p>We protect your data with encryption in transit, role-based access control, audit logs and incident-management protocols. No system is infallible, but we apply recognized standards to reduce risk.</p>
-<h3>9. Cookies and analytics</h3>
-<p>This site <strong>uses no tracking or marketing cookies, and no third-party pixels.</strong> To understand site usage we use <strong>Cloudflare Web Analytics, which sets no cookies and does not identify individuals.</strong> We only store your <strong>theme preference (light or dark)</strong> locally in your browser; it is not a tracking cookie and is not sent to any server.</p>
-<h3>10. Term and changes</h3>
-<p>This policy (Version 1.0) is effective upon publication and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>`
+
+<h3>2.5 Volunteers</h3>
+<p>Name, email, mobile number, city, occupation, availability, the kind of volunteering you choose, whether you would bring a camera, and your message. We ask whether you are of legal age.</p>
+<p><strong>If you are under 18</strong>, we also ask for the name and a contact of your parent or guardian, whether they would come with you or authorize you to come, and your confirmation that they know you are signing up. Without that information we do not save the sign-up. Your data is used only to obtain your guardian's authorization: we request it through a dedicated link, and you do not take part in any activity without that written authorization. If 30 days pass without receiving it, we delete the sign-up.</p>
+
+<h3>2.6 Mira Mi Casa volunteer engineers</h3>
+<p>Name, email, mobile number, city, professional license number, specialty, training and availability. A person checks the license in COPNIA's public register before giving you access. <strong>Your name and license number appear on the opinion the family receives</strong>: that is how they know who signed it. To review cases you sign in with your email, verified by Cloudflare Access.</p>
+
+<h3>2.7 Mira Mi Casa families</h3>
+<ul>
+<li><strong>What we ask for:</strong> name, mobile number, area and an address or directions to get there; email is optional. Details about the house (material, floors, approximate age, whether it was already damaged, whether it is lived in, whether water leaks in), anything you want to tell us, and photos and videos of the home.</li>
+<li><strong>Sensitive data:</strong> the question "Was anyone hurt?" is health-related data. <strong>It is optional</strong> and we use it only to prioritize the case (Law 1581, arts. 5 and 6).</li>
+<li><strong>Two separate authorizations:</strong> the first, required to review the case, lets a volunteer engineer see your photos and write an opinion. The second, optional, lets your home appear in the public register of reviewed homes, <strong>without your name or address</strong>. That register shows only the case number, area, classification, material and number of floors: never the photos or what you wrote. You can withdraw the second authorization at any time without losing your case.</li>
+<li><strong>Who sees what:</strong> the engineer sees the area, the house details, the photos and videos and what you wrote, but <strong>not your name, phone, email or address</strong>. Only the Foundation's team sees your contact details, to arrange a visit or tell you when there is an opinion. That is why we ask you not to write personal data in the free-text field.</li>
+<li><strong>Your private link:</strong> with your case number you get a link with its own code. Anyone with that link can see your case: keep it as you would keep a key.</li>
+<li><strong>Notices:</strong> if you left an email, we write to you when your case has been waiting seven days for an opinion. We may also contact you by WhatsApp at the number you gave.</li>
+</ul>
+
+<h3>2.8 Offers and sponsorships</h3>
+<p>If you offer goods, materials, labour or transport (for example for a relief brigade or to repair Mira Mi Casa homes): name, email, mobile number, city, organization if any, and the details of what you offer. Only to coordinate that contribution.</p>
+
+<h3>2.9 Contact form</h3>
+<p>The contact form stores nothing on our servers: it opens your email app with the message ready, and what you send reaches our mailbox like any other email.</p>
+
+<h3>2.10 ALMA, the site assistant</h3>
+<p>What you type into ALMA is sent to <strong>Anthropic</strong>, an artificial-intelligence provider based in the United States, to generate the answer. We do not store those conversations. Because this is an international transfer, <strong>please do not type personal data into ALMA</strong> (names, ID numbers, phone numbers, addresses, health data). For anything involving your data, write to us directly.</p>
+
+<h2>3. Legal basis</h2>
+<p>We process your data with your <strong>prior, express and informed authorization</strong>, which you give in each form's checkbox and which we record with its date. Some processing also rests on <strong>legal obligations</strong> (accounting, tax records and donation certificates) and on <strong>carrying out what you ask us to do</strong> (processing a payment, charging a membership). For people in the European Union, the equivalent bases in Article 6 of the GDPR.</p>
+
+<h2>4. Sensitive data</h2>
+<p>Law 1581 (art. 5) treats health and biometric data, among others, as sensitive. We collect only one such item: the question about injured people in Mira Mi Casa. <strong>You are not required to answer questions about sensitive data</strong> (art. 6), and answering it or not does not change whether your case is reviewed. Photos of your home are not sensitive data, but they may show people: we recommend taking them without anyone in the frame.</p>
+
+<h2>5. Children and adolescents</h2>
+<p>We process data about minors only when it serves their best interests and respects their fundamental rights (Law 1581, art. 7, and Law 1098 of 2006). Authorization is given by their legal representative. In practice: a minor can sign up as a volunteer only with their guardian's details and does not take part without the guardian's written authorization; and we do not publish images of minors without their guardians' authorization.</p>
+
+<h2>6. Who we share your data with</h2>
+<p><strong>We do not sell or hand over your data.</strong> We share it only with these providers, who process it on our behalf or provide the payment service you choose:</p>
+<ul>
+<li><strong>Cloudflare</strong> (United States): hosts the site and the database (Workers, D1), stores photos, receipts and evidence (R2), controls access for the team, engineers and signatories (Access), and counts visits without cookies (Web Analytics).</li>
+<li><strong>Resend</strong> (United States): sends the system's emails (receipts, certificates, case notices) from no-responder@notificaciones.thegiveandgrowproject.org.</li>
+<li><strong>Wompi</strong> (Bancolombia, Colombia): processes payments in pesos and keeps your tokenized card if you become a member. It asks you to accept its own privacy policy.</li>
+<li><strong>PayPal</strong> (international): processes gifts and memberships in dollars.</li>
+<li><strong>Anthropic</strong> (United States): generates ALMA's answers from what you type.</li>
+<li><strong>CARTO and OpenStreetMap</strong>: serve the map images. When loading them, your browser sends them your IP address, as with any image on the internet.</li>
+<li><strong>WhatsApp (Meta)</strong>: only if you write to us, or we write to you, there.</li>
+</ul>
+<p>Within the Foundation: volunteer engineers see what is described in section 2.7, the Statutory Auditor sees the data on the certificates she signs, and the partner foundation that receives a directed gift does not receive your data unless you authorize it.</p>
+
+<h2>7. International transfers</h2>
+<p>Several of those providers have servers outside Colombia, mainly in the United States. By authorizing the processing you accept that transfer, which is made with providers that offer contractual data-protection guarantees and only with the data each service needs (Law 1581, art. 26).</p>
+
+<h2>8. What is stored in your browser</h2>
+<p>The site <strong>uses no tracking or advertising cookies, and no third-party pixels</strong>. Cloudflare Web Analytics counts visits without cookies and without identifying you. The only things we store in your browser are:</p>
+<ul>
+<li><strong>gg-theme</strong> (local storage): your light or dark theme preference, if you changed it.</li>
+<li><strong>mmc-caso</strong> (local storage, only on miramicasa.org): your case number, your case's private link with its access code, and the date, so you can reopen it from the same phone. Anyone using that phone can open your case: there is a button to make the browser forget it.</li>
+<li><strong>gg_guia</strong> (session storage): your tracking number while you go to and return from the payment gateway. It is deleted when you close the tab.</li>
+<li><strong>Authorized people</strong> (team, engineers, signatories): Cloudflare Access uses a session cookie to keep you signed in, and the field-inspection tool stores drafts and your name and license number on the phone so you can work without signal.</li>
+</ul>
+<p>None of this is used to track you or shared with third parties. You can delete it from your browser settings.</p>
+
+<h2>9. How long we keep data</h2>
+<ul>
+<li><strong>Donations, receipts, certificates, payment proofs and the related donor data:</strong> 10 years from the last entry, because of the duty to keep the books and their supporting documents (Commercial Code, art. 60) and tax rules.</li>
+<li><strong>Card reference for a membership:</strong> stops being used when you cancel; the record is kept with the accounts of the charges that were made.</li>
+<li><strong>Sign-ups that do not move forward</strong> (volunteers, foundations, companies, engineers, offers): 2 years from the last contact.</li>
+<li><strong>Accepted sign-ups:</strong> for as long as the relationship lasts, plus 3 years.</li>
+<li><strong>Sign-ups by minors without the guardian's authorization:</strong> 30 days.</li>
+<li><strong>Mira Mi Casa cases:</strong> while the case is open and for 2 years after it closes. After that, the name, phone, email, address, photos and videos are deleted, and only the anonymous record remains (area, classification and house details).</li>
+<li><strong>Record of authorizations and of actions on your data:</strong> for as long as the data they refer to is kept.</li>
+<li><strong>Emails you send us:</strong> 2 years after the matter is closed.</li>
+</ul>
+<p>Deletion is not automatic: a team member does it from the internal panel when the term ends or when you ask. A record is kept of who did it, when and why, without your data.</p>
+
+<h2>10. Your rights</h2>
+<p>As a data subject you may, at any time (Law 1581, art. 8):</p>
+<ul>
+<li><strong>Know</strong> which of your data we process and ask for proof of the authorization you gave us.</li>
+<li><strong>Update and rectify</strong> incomplete, inaccurate or outdated data.</li>
+<li><strong>Request erasure</strong> of your data when there is no legal or contractual duty to keep it. Donation records, for example, must be kept for the legal term even if you ask for erasure: in that case we stop using them for anything else.</li>
+<li><strong>Withdraw the authorization</strong> you gave us, fully or partly (for example, removing your home from the public register or your name from public recognition).</li>
+<li><strong>File a complaint with the SIC</strong>, after first making your request or claim to us.</li>
+</ul>
+
+<h2>11. How to exercise them and how fast we answer</h2>
+<p>Write to <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> with your name, how we can reach you and what you are asking for. To protect your data we may ask you to confirm you are the data subject, for example from the same email or mobile number you registered.</p>
+<ul>
+<li><strong>Requests</strong> (to know what data we hold): we answer within <strong>10 business days</strong>. If we cannot, we tell you why and answer within 5 more business days (Law 1581, art. 14).</li>
+<li><strong>Claims</strong> (to rectify, update, erase or withdraw): we answer within <strong>15 business days</strong>, extendable by 8 more business days with notice. If the claim is missing information, we ask for it within 5 days; if we do not receive it within 2 months, we consider the claim withdrawn (Law 1581, art. 15).</li>
+</ul>
+<p>If you are not satisfied with the answer, you can go to the <strong>Superintendence of Industry and Commerce</strong> (www.sic.gov.co). If you are in the European Union, also to your country's supervisory authority.</p>
+
+<h2>12. Security</h2>
+<p>Information travels encrypted, the database is never exposed to the browser, internal access requires signing in and is separated by role (engineers cannot enter the donor panel; the Statutory Auditor only sees what she signs), and every action on personal data is logged. No system is infallible; if an incident affects your data, we will report it to the SIC and to the people affected.</p>
+
+<h2>13. Changes to this policy</h2>
+<p>We review it at least once a year and whenever what we collect or the providers we use change. Each version is published here with its date. If a change affects the purpose for which you gave your authorization, we will ask for it again.</p>
+<ul>
+<li><strong>Version 1.0</strong> · July 23, 2026 · First publication.</li>
+<li><strong>Version 1.1</strong> · September 29, 2026 · Details the data collected from each data subject, including minors, engineers and Mira Mi Casa families; names the providers; corrects what is stored in the browser; proposes retention periods by category; and specifies response times.</li>
+</ul>`
 };
 function renderPrivacy(){
   var el = document.getElementById("privacy-body"); if (!el) return;
   el.innerHTML = PRIVACY[lang] || PRIVACY.es;
+}
+/* Términos y condiciones de donación (#terminos). Mismo molde que PRIVACY.
+   Dicen cómo funciona HOY el sistema —el cobro mensual lo dispara la tarea
+   programada del Worker, la membresía se suspende al tercer rechazo, el
+   certificado solo sale en pesos y lo firman dos personas— y cada una de esas
+   frases tiene su código detrás. Las cláusulas de reembolso, de fundación que
+   sale de la red y de plazo del certificado son PROPUESTAS de política: van en
+   el PR para que Sebas las confirme con asesoría legal.
+
+   La frase tributaria es la del certificado: Art. 257 y 25 %, con el límite
+   del Art. 258. No se cambia aquí sin cambiarla allá (check #10 del gate). */
+var TERMS = {
+  es: `<p class="legal-meta">Versión 1.0 · Vigente desde el 29 de septiembre de 2026 · Se aplican a las donaciones hechas a través de thegiveandgrowproject.org y miramicasa.org.</p>
+<p>Al hacer una donación por cualquiera de nuestros canales aceptas estos términos. Están escritos para que sepas qué pasa con tu aporte en cada paso; si algo no está claro, escríbenos antes de donar.</p>
+
+<h2>1. Quién recibe tu donación</h2>
+<p>Tu donación la recibe <strong>Fundación Give&amp;Grow International</strong>, NIT 901.948.930-2, entidad sin ánimo de lucro del Régimen Tributario Especial con domicilio en Medellín. Mira Mi Casa es un proyecto de la misma Fundación: lo que aportas desde miramicasa.org lo recibe la misma entidad. La Fundación administra el aporte y lo destina a lo que elegiste, conforme a su objeto social y a sus estatutos.</p>
+
+<h2>2. A qué va tu donación</h2>
+<ul>
+<li><strong>Fondo general:</strong> la Fundación lo destina a donde más se necesite dentro de su trabajo.</li>
+<li><strong>Donación dirigida:</strong> eliges una fundación verificada de la red, un programa o un proyecto (por ejemplo, la brigada de emergencia o las reparaciones de Mira Mi Casa), y el aporte se destina a ese fin.</li>
+</ul>
+<p>En línea, el aporte mínimo es de $5.000 y el máximo de $20.000.000 por transacción. Para montos mayores, escríbenos y lo coordinamos.</p>
+
+<h2>3. Donación única</h2>
+<p>Pagas una sola vez en Wompi, la pasarela de pagos de Bancolombia, con tarjeta o Botón Bancolombia, y vuelves al sitio con tu número de guía. Si en la calculadora eliges «mensual» o «anual», hoy se procesa solo ese primer aporte y queda registrada tu intención: no se hace ningún cobro automático por ese camino. El cobro recurrente existe solo con la membresía.</p>
+
+<h2>4. Membresía mensual</h2>
+<ul>
+<li><strong>Cómo se registra:</strong> desde <a href="#membresias">Membresías</a> eliges el monto y registras tu tarjeta una sola vez. Los datos de la tarjeta los recibe Wompi dentro de su propia ventana y quedan <strong>tokenizados</strong> en Wompi: la Fundación no ve ni guarda el número, solo la franquicia y los cuatro últimos dígitos.</li>
+<li><strong>Cuándo se cobra:</strong> el primer aporte se cobra en el momento del registro, y después uno cada mes, en pesos colombianos, por el mismo monto. La fecha puede correrse uno o dos días según el calendario.</li>
+<li><strong>Cómo cancelarla:</strong> al activarla te llega por correo un enlace propio. Desde ahí terminas la membresía en un clic, <strong>sin escribirle a nadie y sin penalidad</strong>, y dejamos de usar tu método de pago. Si perdiste el enlace, lo pides con tu correo en <a href="/membresia">thegiveandgrowproject.org/membresia</a>. Cancelar detiene los cobros siguientes; no devuelve los que ya se hicieron.</li>
+<li><strong>Cobros rechazados:</strong> si tu banco rechaza un cobro, no se te cobra nada por ese intento. Si se rechazan tres cobros en un periodo de unos cien días, la membresía se suspende y no se vuelve a intentar. Puedes volver a hacerte miembro con otro medio de pago.</li>
+</ul>
+
+<h2>5. Donaciones desde el exterior (PayPal)</h2>
+<p>Si no estás en Colombia puedes donar por PayPal, en dólares. La membresía por PayPal convierte el monto con la TRM oficial del día y la cobra PayPal cada mes; la cancelas cuando quieras desde tu propia cuenta de PayPal. También puedes hacer una donación única con el botón de donaciones de PayPal. PayPal cobra una comisión internacional cercana al 10 %, que puedes sumar a tu aporte si quieres que llegue completo. Las donaciones en dólares no dan derecho al certificado tributario colombiano (ver punto 8).</p>
+
+<h2>6. Transferencias bancarias</h2>
+<p>Si transfieres a la cuenta de la Fundación en Bancolombia, repórtalo en la página <a href="#donar">Donar</a>: recibes un número de guía al instante y puedes subir ahí tu comprobante. <strong>Una transferencia reportada no es todavía una donación recibida</strong>: la confirmamos contra el extracto bancario y solo entonces queda como recibida, se emite el recibo y, si lo pediste, se tramita el certificado. Si no la encontramos en el extracto, te escribimos.</p>
+
+<h2>7. Recibo y número de guía</h2>
+<p>Cada donación tiene un número de guía (por ejemplo, GG-2026-000123). Cuando el pago se confirma te enviamos por correo el recibo, que puedes descargar cuando quieras desde el enlace del correo. Con el número de guía sigues tu aporte en <a href="#rastrea">Rastrea tu donación</a>: ahí se ven su estado y su destino, nunca tu nombre ni tu correo. El recibo no es el certificado tributario.</p>
+
+<h2>8. Certificado de donación</h2>
+<ul>
+<li><strong>Solo si lo pides</strong>, al donar o después, escribiéndonos.</li>
+<li><strong>Lo firman el Representante Legal y la Revisora Fiscal</strong> de la Fundación. Lo emite una persona, no el sistema, y por eso no es inmediato: lo enviamos por correo dentro de los 15 días hábiles siguientes a que el pago esté confirmado y tengamos tus datos completos.</li>
+<li><strong>Necesita tu número de documento y tu ciudad.</strong> Si faltan, te los pedimos.</li>
+<li><strong>Solo para donaciones en pesos colombianos recibidas en Colombia</strong>: pagos por Wompi y transferencias a la cuenta de la Fundación en Bancolombia. Las donaciones en especie se certifican aparte, con su propio soporte.</li>
+<li><strong>Beneficio tributario:</strong> el certificado puede darte derecho a un descuento en renta equivalente al 25 % del valor donado (Art. 257 ET), con el límite del Art. 258, si eres contribuyente en Colombia. Te recomendamos confirmarlo con tu contador: depende de tu situación tributaria.</li>
+<li>Si el pago se revierte después de emitido el certificado, el certificado queda en revisión y puede anularse, porque deja de tener respaldo.</li>
+</ul>
+
+<h2>9. Si la fundación que elegiste sale de la red</h2>
+<p>Si una fundación a la que dirigiste tu donación deja de ser parte de la red antes de recibirla, destinaremos tu aporte al mismo propósito a través de otra fundación verificada o, si no la hay, al fondo general, y te informaremos por correo a dónde fue.</p>
+
+<h2>10. Devoluciones y reversiones</h2>
+<ul>
+<li><strong>Errores y cobros duplicados:</strong> si se te cobró dos veces o un monto que no era, escríbenos a <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a> dentro de los 30 días calendario siguientes al cobro, con tu número de guía. Lo verificamos y, si procede, devolvemos el valor por el mismo medio de pago cuando la pasarela lo permita.</li>
+<li><strong>Fuera de esos casos</strong>, la donación es un acto de liberalidad y no es reembolsable una vez distribuida. Antes de distribuirse, una solicitud de devolución se estudia caso por caso.</li>
+<li><strong>Contracargos:</strong> si desconoces un cobro ante tu banco o la pasarela lo reversa, el aporte deja de contarse como recibido y el certificado que se hubiera emitido queda en revisión.</li>
+<li>Una devolución anula el recibo y el certificado de esa donación.</li>
+</ul>
+
+<h2>11. Transparencia y evidencia</h2>
+<p>Cuando la fundación aliada entrega lo que financió tu aporte, levantamos un acta de entrega y la publicamos en el rastreo de tu guía, con sus fotos cuando las hay. No prometemos fechas de entrega ni reportes periódicos: lo que publicamos es lo que ya ocurrió.</p>
+
+<h2>12. Tus datos personales</h2>
+<p>Los datos que nos das al donar se tratan según nuestra <a href="#privacidad">Política de Privacidad y Tratamiento de Datos</a>.</p>
+
+<h2>13. Contacto</h2>
+<ul>
+<li><strong>Pagos, recibos, certificados y devoluciones:</strong> <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a></li>
+<li><strong>Datos personales:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
+<li><strong>Teléfono y WhatsApp:</strong> +57 315 330 5028</li>
+</ul>
+
+<h2>14. Ley aplicable</h2>
+<p>Estos términos se rigen por las leyes de la República de Colombia. Cualquier diferencia la intentaremos resolver primero de forma directa contigo; si no es posible, la conocerán los jueces competentes de Medellín.</p>
+
+<h2>15. Cambios</h2>
+<p>Publicamos aquí cada versión con su fecha. Un cambio no afecta las donaciones hechas antes de su publicación.</p>`,
+  en: `<p class="legal-meta">Version 1.0 · Effective September 29, 2026 · Apply to donations made through thegiveandgrowproject.org and miramicasa.org.</p>
+<p>By making a donation through any of our channels you accept these terms. They are written so you know what happens to your gift at every step; if anything is unclear, write to us before giving.</p>
+
+<h2>1. Who receives your donation</h2>
+<p>Your donation is received by <strong>Fundación Give&amp;Grow International</strong>, tax ID (NIT) 901.948.930-2, a non-profit under Colombia's Special Tax Regime, based in Medellín. Mira Mi Casa is a project of the same Foundation: what you give from miramicasa.org is received by the same entity. The Foundation manages the gift and applies it to what you chose, in line with its corporate purpose and bylaws.</p>
+
+<h2>2. What your donation goes to</h2>
+<ul>
+<li><strong>General fund:</strong> the Foundation applies it where it is most needed within its work.</li>
+<li><strong>Directed donation:</strong> you choose a verified foundation in the network, a program or a project (for example, the emergency brigade or Mira Mi Casa repairs), and the gift goes to that purpose.</li>
+</ul>
+<p>Online, the minimum gift is COP 5,000 and the maximum COP 20,000,000 per transaction. For larger amounts, write to us and we will arrange it.</p>
+
+<h2>3. One-off donation</h2>
+<p>You pay once through Wompi, Bancolombia's payment gateway, by card or Bancolombia Button, and return to the site with your tracking number. If you choose "monthly" or "yearly" in the calculator, only that first gift is processed today and your intention is recorded: no automatic charge is made that way. Recurring charges exist only through the membership.</p>
+
+<h2>4. Monthly membership</h2>
+<ul>
+<li><strong>How to register:</strong> from <a href="#membresias">Memberships</a> you choose the amount and register your card once. Your card details go to Wompi inside its own window and are <strong>tokenized</strong> by Wompi: the Foundation never sees or stores the number, only the card brand and the last four digits.</li>
+<li><strong>When you are charged:</strong> the first gift is charged when you register, and then once a month, in Colombian pesos, for the same amount. The date may shift by a day or two depending on the calendar.</li>
+<li><strong>How to cancel:</strong> when you activate it we email you your own link. From there you end the membership in one click, <strong>without writing to anyone and with no penalty</strong>, and we stop using your payment method. If you lost the link, request it with your email at <a href="/membresia">thegiveandgrowproject.org/membresia</a>. Cancelling stops future charges; it does not refund those already made.</li>
+<li><strong>Declined charges:</strong> if your bank declines a charge, nothing is charged for that attempt. If three charges are declined within roughly one hundred days, the membership is suspended and no further attempts are made. You can become a member again with another payment method.</li>
+</ul>
+
+<h2>5. Donations from abroad (PayPal)</h2>
+<p>If you are not in Colombia you can give through PayPal, in dollars. The PayPal membership converts the amount at the official exchange rate of the day and PayPal charges it every month; you cancel it whenever you want from your own PayPal account. You can also make a one-off donation with the PayPal donate button. PayPal charges an international fee of about 10 %, which you can add to your gift if you want it to arrive in full. Donations in dollars do not qualify for the Colombian tax certificate (see section 8).</p>
+
+<h2>6. Bank transfers</h2>
+<p>If you transfer to the Foundation's Bancolombia account, report it on the <a href="#donar">Donate</a> page: you get a tracking number instantly and can upload your receipt there. <strong>A reported transfer is not yet a received donation</strong>: we confirm it against the bank statement, and only then is it marked as received, the receipt issued and, if you asked for it, the certificate processed. If we cannot find it in the statement, we will write to you.</p>
+
+<h2>7. Receipt and tracking number</h2>
+<p>Every donation has a tracking number (for example, GG-2026-000123). When the payment is confirmed we email you the receipt, which you can download at any time from the link in the email. With the tracking number you can follow your gift in <a href="#rastrea">Track your gift</a>: it shows its status and destination, never your name or email. The receipt is not the tax certificate.</p>
+
+<h2>8. Donation certificate</h2>
+<ul>
+<li><strong>Only if you ask for it</strong>, when donating or later by writing to us.</li>
+<li><strong>It is signed by the Foundation's Legal Representative and Statutory Auditor.</strong> A person issues it, not the system, so it is not instant: we email it within 15 business days after the payment is confirmed and we have your complete details.</li>
+<li><strong>It requires your ID number and city.</strong> If they are missing, we will ask you for them.</li>
+<li><strong>Only for donations in Colombian pesos received in Colombia</strong>: Wompi payments and transfers to the Foundation's Bancolombia account. In-kind donations are certified separately, with their own supporting document.</li>
+<li><strong>Tax benefit:</strong> if you are a taxpayer in Colombia, the certificate may entitle you to an income-tax discount equal to 25 % of the amount donated (Art. 257 of the Tax Code), within the limit of Art. 258. We recommend confirming it with your accountant: it depends on your tax situation.</li>
+<li>If the payment is reversed after the certificate was issued, the certificate is placed under review and may be annulled, because it no longer has backing.</li>
+</ul>
+
+<h2>9. If the foundation you chose leaves the network</h2>
+<p>If a foundation you directed your gift to leaves the network before receiving it, we will apply your gift to the same purpose through another verified foundation or, if there is none, to the general fund, and we will email you where it went.</p>
+
+<h2>10. Refunds and reversals</h2>
+<ul>
+<li><strong>Errors and duplicate charges:</strong> if you were charged twice or the wrong amount, write to <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a> within 30 calendar days of the charge, with your tracking number. We check it and, where appropriate, refund the amount through the same payment method when the gateway allows it.</li>
+<li><strong>Outside those cases</strong>, a donation is a gift and is not refundable once distributed. Before it is distributed, a refund request is considered case by case.</li>
+<li><strong>Chargebacks:</strong> if you dispute a charge with your bank or the gateway reverses it, the gift is no longer counted as received and any certificate issued for it is placed under review.</li>
+<li>A refund cancels the receipt and the certificate for that donation.</li>
+</ul>
+
+<h2>11. Transparency and evidence</h2>
+<p>When the partner foundation delivers what your gift funded, we draw up a delivery record and publish it in your tracking page, with photos when there are any. We do not promise delivery dates or periodic reports: what we publish is what has already happened.</p>
+
+<h2>12. Your personal data</h2>
+<p>The data you give us when donating is processed under our <a href="#privacidad">Privacy &amp; Data Protection Policy</a>.</p>
+
+<h2>13. Contact</h2>
+<ul>
+<li><strong>Payments, receipts, certificates and refunds:</strong> <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a></li>
+<li><strong>Personal data:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
+<li><strong>Phone and WhatsApp:</strong> +57 315 330 5028</li>
+</ul>
+
+<h2>14. Applicable law</h2>
+<p>These terms are governed by the laws of the Republic of Colombia. We will first try to resolve any disagreement directly with you; if that is not possible, it will be heard by the competent courts of Medellín.</p>
+
+<h2>15. Changes</h2>
+<p>Each version is published here with its date. A change does not affect donations made before it was published.</p>`
+};
+function renderTerms(){
+  var el = document.getElementById("terms-body"); if (!el) return;
+  el.innerHTML = TERMS[lang] || TERMS.es;
 }
 /* ═══ LA FICHA COMO REGISTRO — fundaciones y comercios ═══════════════════
    Rediseño del 26 sep 2026, a pedido de Sebas («no se ve bien»). Lo que había:
@@ -5891,6 +6270,12 @@ function init(){
   document.addEventListener("click", function(e){
     var el = e.target.closest("[data-nav], a[href^='#']");
     if (!el || el.getAttribute("onclick") || el.hasAttribute("data-act")) return;
+    /* Un enlace con target="_blank" abre OTRA pestaña, y así debe quedar: es el
+       «Ver Política de Privacidad» junto a cada casilla de autorización. Si este
+       manejador lo interceptara, navegaría en la misma pestaña y la persona
+       saldría del formulario a medio llenar — en Mira Mi Casa, con las fotos
+       todavía en memoria. */
+    if (el.getAttribute("target") === "_blank") return;
     var route = el.getAttribute("data-nav") || (el.getAttribute("href")||"").slice(1);
     if (!isSpaRoute(route)) return;   // deja pasar skip-link (#), anclas internas, etc.
     e.preventDefault();
