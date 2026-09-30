@@ -19768,9 +19768,12 @@ async function wompiCobrar(env, sub) {
   if (!pub || !prv || !sec) return { ok: false, motivo: "pasarela_no_configurada" };
 
   const fuente = await env.DB.prepare(
-    "SELECT fuente_ref, tipo, estado, email FROM fuentes_pago WHERE id = ?"
+    "SELECT fuente_ref, tipo, estado, email, retirada_en FROM fuentes_pago WHERE id = ?"
   ).bind(sub.fuente_id).first();
   if (!fuente) return { ok: false, motivo: "sin_fuente" };
+  /* Retirada es retirada: el correo de baja le dice al donante «ya no
+     conservamos con qué cobrarte», y el cobro no puede contradecirlo. */
+  if (fuente.retirada_en) return { ok: false, motivo: "fuente_retirada" };
   if (fuente.estado !== "AVAILABLE") return { ok: false, motivo: "fuente_" + String(fuente.estado || "").toLowerCase() };
 
   const centavos = Number(sub.monto_centavos || 0);
@@ -20046,10 +20049,20 @@ async function crearSuscripcion(env, o) {
   /* UNA SUSCRIPCION ACTIVA POR CORREO. Sin esto, dos envios del formulario
      —o dos pestanas— dejan a la persona pagando dos veces al mes. */
   const ya = await env.DB.prepare(
-    "SELECT s.id, s.token FROM suscripciones s JOIN donantes d ON d.id = s.donante_id " +
+    "SELECT s.id, s.token, s.nivel, s.monto_centavos, s.idioma, d.nombre FROM suscripciones s " +
+    "JOIN donantes d ON d.id = s.donante_id " +
     "WHERE s.proveedor = 'wompi' AND s.estado = 'activa' AND LOWER(d.email) = ? LIMIT 1"
   ).bind(email).first();
-  if (ya) return { ok: false, motivo: "ya_suscrito", suscripcion: ya.id, token: ya.token };
+  /* EL TOKEN NO SE DEVUELVE. Iba en la redireccion a /pago/listo, y quien
+     tokenizaba SU tarjeta escribiendo el correo de OTRO miembro recibia el
+     enlace a la membresia ajena: nivel, monto, ultimos cuatro digitos y el boton
+     de cancelarla (auditoria del 28 sep 2026). Ahora el enlace sale por correo,
+     a la direccion registrada, que es la unica prueba de que es suya. */
+  if (ya) {
+    try { if (ya.token) await correoEnlaceMembresia(env, ya, email, ya.idioma === "en" ? "en" : "es"); }
+    catch (e) { console.error("enlace a membresia existente", e && e.message); }
+    return { ok: false, motivo: "ya_suscrito" };
+  }
 
   const nivel = nivelPorMensual(Math.round(monto));
   const idioma = o.idioma === "en" ? "en" : "es";
@@ -20102,6 +20115,17 @@ async function crearSuscripcion(env, o) {
    camino normal ya no pasa por aqui: lo hace `apiCrearFuentePago` en la misma
    peticion de la tokenizacion. */
 async function apiSuscribir(request, env, url) {
+  /* CERRADA el 28 sep 2026 (auditoría previa al lanzamiento). Buscaba la tarjeta
+     SOLO por correo y cobraba en el acto el monto que pidiera quien llamara —
+     hasta MONTO_MAX—, sin nada que probara que el correo era suyo: bastaba
+     saber el correo de alguien con tarjeta registrada y sin membresía activa
+     (cambio de tarjeta, primer cobro fallido, membresía suspendida) para
+     cobrarle cada mes. Ninguna pantalla la usa: la tokenización de /pago/metodo
+     crea la suscripción en la misma petición, con la tarjeta recién puesta por
+     esa misma persona. Se deja la función para que se lea qué hacía. */
+  return json({ error: "ruta_cerrada",
+    ayuda: "Para hacerte miembro registra tu tarjeta en /pago/metodo." }, 410);
+  // eslint-disable-next-line no-unreachable
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   if (!env.DB) return json({ error: "base_no_configurada" }, 503);
 
@@ -20297,7 +20321,7 @@ function paginaPagoListo(url) {
   } else if (sub === "0") {
     titulo = "Tu tarjeta qued\u00f3 registrada, la membres\u00eda no arranc\u00f3";
     const porques = {
-      ya_suscrito: "Ya tienes una membres\u00eda activa con ese correo, as\u00ed que no creamos otra.",
+      ya_suscrito: "Ya hay una membres\u00eda activa con ese correo, as\u00ed que no creamos otra. Le enviamos a ese correo el enlace para verla.",
       primer_cobro_fallido: "No pudimos hacer el primer cobro. Revisa tu m\u00e9todo de pago o prueba con otro.",
       monto_invalido: "El monto no era v\u00e1lido.",
       email_invalido: "El correo no era v\u00e1lido.",
