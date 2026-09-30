@@ -37,7 +37,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=9c80cbf4">
+<link rel="stylesheet" href="/styles.css?v=1e8384e1">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=2c14f94b" defer></script>
+<script src="/app.js?v=7f6cd939" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -2154,29 +2154,60 @@
       </div>
     </div>
   </section>
-  <section class="cream">
-    <div class="wrap center">
-      <div class="cta-box rv">
-        <h2 data-i18n="membres.cta.t" class="h-comp3">Hazte miembro.</h2>
-        <p data-i18n="membres.cta.p">Eliges cuánto, registras tu método de pago una sola vez y el aporte se cobra solo cada mes. Puedes terminarlo cuando quieras desde tu propia membresía.</p>
-        <div class="mb-elige">
-          <div class="mb-montos" role="group" aria-label="Monto mensual">
-            <button type="button" class="mb-monto" data-act="mbMonto(20000)" data-m="20000"><b>$20.000</b><span data-i18n="membres.t1.t">Semilla</span></button>
-            <button type="button" class="mb-monto is-on" data-act="mbMonto(50000)" data-m="50000"><b>$50.000</b><span data-i18n="membres.t2.t">Retoño</span></button>
-            <button type="button" class="mb-monto" data-act="mbMonto(120000)" data-m="120000"><b>$120.000</b><span data-i18n="membres.t3.t">Árbol</span></button>
-            <button type="button" class="mb-monto" data-act="mbMonto(250000)" data-m="250000"><b>$250.000</b><span data-i18n="membres.t4.t">Bosque</span></button>
-          </div>
-          <div class="mb-otro ally-form">
-            <div class="field">
-              <label for="mb-libre" data-i18n="membres.cta.otro">O escribe otro monto mensual, en pesos</label>
-              <input type="text" id="mb-libre" inputmode="numeric" placeholder="50.000" data-input="mbLibre()" autocomplete="off">
-            </div>
-            <p id="mb-nivel" class="mu" aria-live="polite"></p>
-          </div>
-          <a class="btn btn-g" id="mb-ir" href="/pago/metodo?monto=50000" data-i18n="membres.cta.btn">Continuar</a>
-          <p class="mu" data-i18n="membres.cta.calc2">¿Quieres ver antes tu beneficio tributario? Usa el calculador.</p>
+  <!-- HAZTE MIEMBRO (30 sep 2026). Era una caja centrada con cuatro montos y un
+       botón; ahora es una hoja en dos columnas: a la izquierda lo que se
+       promete, a la derecha lo que se elige. Y se elige una cosa más que antes:
+       el PROGRAMA al que va cada aporte mensual, con los mismos destinos que
+       ofrece Donar (salvo la brigada, que es aporte único). El destino viaja en
+       la URL a /pago/metodo, que lo vuelve a validar en el servidor contra
+       partners.json: lo que sale de aquí no es de fiar por definición.
+       La cifra del resumen es el único elemento firma de la sección. -->
+  <section class="cream" id="hazte-miembro">
+    <div class="wrap">
+      <div class="mb-hoja rv">
+        <div class="mb-intro">
+          <span class="ey" data-i18n="membres.cta.ey">Membresía mensual</span>
+          <h2 data-i18n="membres.cta.t" class="h-sec">Hazte miembro.</h2>
+          <p class="mb-intro-p" data-i18n="membres.cta.p">Eliges cuánto y a qué programa, registras tu método de pago una sola vez y el aporte se cobra solo cada mes. Puedes terminarlo cuando quieras desde tu propia membresía.</p>
+          <ul class="mb-garantias">
+            <li data-i18n="membres.cta.g1">Recibo y número de guía con cada aporte mensual</li>
+            <li data-i18n="membres.cta.g2">Tu tarjeta la recibe Wompi, la pasarela de Bancolombia: nosotros no vemos su número</li>
+            <li data-i18n="membres.cta.g3">Terminas cuando quieras, en un clic y sin penalidades</li>
+          </ul>
+          <p class="cta-note" data-i18n="membres.cancel">Puedes terminar tu membresía cuando quieras desde tu propia membresía: al activarla te llega por correo un enlace propio, y desde ahí la cancelas y retiramos tu método de pago en un clic. No hay que escribirle a nadie ni hay penalidades; el certificado tributario cubre lo donado hasta la fecha. Si perdiste el enlace, lo recuperas con tu correo.</p>
         </div>
-        <p class="cta-note" data-i18n="membres.cancel">Puedes terminar tu membresía cuando quieras desde tu propia membresía: al activarla te llega por correo un enlace propio, y desde ahí la cancelas y retiramos tu método de pago en un clic. No hay que escribirle a nadie ni hay penalidades; el certificado tributario cubre lo donado hasta la fecha. Si perdiste el enlace, lo recuperas con tu correo.</p>
+        <div class="mb-elige">
+          <fieldset class="mb-grupo">
+            <legend class="mb-leg" data-i18n="membres.cta.monto">Cuánto al mes</legend>
+            <div class="mb-montos">
+              <button type="button" class="mb-monto" data-act="mbMonto(20000)" data-m="20000"><b>$20.000</b><span data-i18n="membres.t1.t">Semilla</span></button>
+              <button type="button" class="mb-monto is-on" data-act="mbMonto(50000)" data-m="50000"><b>$50.000</b><span data-i18n="membres.t2.t">Retoño</span></button>
+              <button type="button" class="mb-monto" data-act="mbMonto(120000)" data-m="120000"><b>$120.000</b><span data-i18n="membres.t3.t">Árbol</span></button>
+              <button type="button" class="mb-monto" data-act="mbMonto(250000)" data-m="250000"><b>$250.000</b><span data-i18n="membres.t4.t">Bosque</span></button>
+            </div>
+            <div class="mb-otro ally-form">
+              <div class="field">
+                <label for="mb-libre" data-i18n="membres.cta.otro">O escribe otro monto mensual, en pesos</label>
+                <input type="text" id="mb-libre" inputmode="numeric" placeholder="50.000" data-input="mbLibre()" autocomplete="off">
+              </div>
+            </div>
+          </fieldset>
+          <div class="mb-grupo field">
+            <label for="mb-destino" class="mb-leg" data-i18n="membres.cta.dest">A qué programa va</label>
+            <select id="mb-destino" data-change="mbDestino(this.value)">
+              <option value="general" data-i18n="membres.cta.dest.general">Donde más se necesite (fondo general)</option>
+            </select>
+            <p class="mb-ayuda" data-i18n="membres.cta.dest.h">Son los mismos destinos de Donar. Cada cobro mensual queda registrado con este destino y su propio número de guía.</p>
+          </div>
+          <div class="mb-resumen">
+            <span class="mb-res-eti" data-i18n="membres.cta.res">Tu aporte mensual</span>
+            <b class="mb-res-cifra" id="mb-cifra">$50.000</b>
+            <p id="mb-nivel" class="mb-res-l" aria-live="polite">Nivel Retoño · $50.000 al mes</p>
+            <p id="mb-dest-res" class="mb-res-l">Donde más se necesite (fondo general)</p>
+          </div>
+          <a class="btn btn-g mb-ir" id="mb-ir" href="/pago/metodo?monto=50000" data-i18n="membres.cta.btn">Continuar a registrar tu tarjeta</a>
+          <p class="mb-ayuda" data-i18n="membres.cta.calc2">¿Quieres ver antes tu beneficio tributario? Usa el calculador.</p>
+        </div>
       </div>
     </div>
   </section>
