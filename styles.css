@@ -1106,6 +1106,10 @@ html[data-theme="dark"] .prog-logo{background:#000}
 .pay-now-btn:hover{background:#37955F}
 .pay-now-btn:disabled{opacity:.6;cursor:default}
 .pay-now-msg{margin:12px 0 0;font-size:var(--fs-14);color:var(--on-dark-3)}
+/* Los términos, a un paso del botón de pago: se leen ANTES de pagar, no después.
+   Panel oscuro en los dos temas, igual que el resto de .pay-now. */
+.pay-now-ter{margin:12px 0 0;font-size:var(--fs-13);line-height:1.5;color:var(--on-dark-3)}
+.pay-now-ter a{color:var(--brote);font-weight:600;text-decoration:underline}
 .pay-now-msg.err{color:#f0857a}
 
 /* skip link accesible: invisible hasta recibir foco de teclado */
@@ -1675,7 +1679,10 @@ html[data-theme="dark"] .rep-note{border-left-color:var(--acc)}
 
 /* documento legal (#privacidad): lectura cómoda, tono institucional, día/noche */
 .legal-doc{max-width:72ch;margin-top:24px}
-.legal-doc h3{font-family:"Inter",sans-serif;font-size:var(--fs-17);font-weight:700;color:var(--ink);margin:30px 0 8px;letter-spacing:-.01em}
+/* h2 = sección del documento; h3 = apartado dentro de ella (por titular de los
+   datos, en la política). Antes el documento saltaba de h1 a h3. */
+.legal-doc h2{font-family:"Inter",sans-serif;font-size:var(--fs-17);font-weight:700;color:var(--ink);margin:30px 0 8px;letter-spacing:-.01em}
+.legal-doc h3{font-family:"Inter",sans-serif;font-size:var(--fs-15);font-weight:700;color:var(--ink);margin:20px 0 6px}
 .legal-doc p{color:var(--ink-soft);line-height:1.65;margin:0 0 12px}
 .legal-doc ul{margin:0 0 14px;padding-left:20px;color:var(--ink-soft);line-height:1.6}
 .legal-doc li{margin:5px 0}
@@ -1973,7 +1980,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
   .band, .band *, .calc, .calc *, .hero, .hero *, .home-hub, .home-hub *,
   .foto-banner, .foto-banner *, .stats, .stats *,
   .brig-aviso, .brig-aviso *, .live-stat, .live-stat *, .carnet, .carnet *,
-  .pay-now-t, .pay-now-p, .pay-now-msg, .pay-now-rec, .gal-cap, .track-ev-ic {
+  .pay-now-t, .pay-now-p, .pay-now-msg, .pay-now-rec, .pay-now-ter, .gal-cap, .track-ev-ic {
     color:#111 !important; background:transparent !important;
     text-shadow:none !important; box-shadow:none !important;
   }
