@@ -99,8 +99,8 @@ documentos). Por eso:
 
 - **No se commitea nunca** y no se sube a ningún servicio sin cifrar. Se guarda
   fuera del repo porque la carpeta del repo ES la de assets del Worker: un
-  archivo ahí se publica en el próximo deploy (el PR #524 añade `respaldo-*` a
-  `.assetsignore` como segunda red, no como la primera).
+  archivo ahí se publica en el próximo deploy. `respaldo-*` está en
+  `.assetsignore` desde el PR #524, pero eso es la segunda red, no la primera.
 - **No se automatiza en GitHub Actions todavía**, a propósito: un artefacto de
   Actions de un repositorio público con la base en claro es una fuga esperando
   pasar.
