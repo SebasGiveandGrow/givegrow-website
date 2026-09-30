@@ -1724,8 +1724,17 @@ var I18N = {
     "membres.cta.calc2":"¿Quieres ver antes tu beneficio tributario? Usa el calculador.",
     "membres.cta.nivel":"Nivel {n} · {m} al mes",
     "membres.cta.rango":"El aporte mensual va de {min} a {max}.",
-    "membres.cta.p":"Eliges cuánto, registras tu método de pago una sola vez y el aporte se cobra solo cada mes. Puedes terminarlo cuando quieras desde tu propia membresía.",
-    "membres.cta.btn":"Continuar","membres.prep":"En preparación","nav.calc":"Calcular mi aporte",
+    "membres.cta.p":"Eliges cuánto y a qué programa, registras tu método de pago una sola vez y el aporte se cobra solo cada mes. Puedes terminarlo cuando quieras desde tu propia membresía.",
+    "membres.cta.ey":"Membresía mensual",
+    "membres.cta.g1":"Recibo y número de guía con cada aporte mensual",
+    "membres.cta.g2":"Tu tarjeta la recibe Wompi, la pasarela de Bancolombia: nosotros no vemos su número",
+    "membres.cta.g3":"Terminas cuando quieras, en un clic y sin penalidades",
+    "membres.cta.monto":"Cuánto al mes",
+    "membres.cta.dest":"A qué programa va",
+    "membres.cta.dest.general":"Donde más se necesite (fondo general)",
+    "membres.cta.dest.h":"Son los mismos destinos de Donar. Cada cobro mensual queda registrado con este destino y su propio número de guía.",
+    "membres.cta.res":"Tu aporte mensual",
+    "membres.cta.btn":"Continuar a registrar tu tarjeta","membres.prep":"En preparación","nav.calc":"Calcular mi aporte",
     "emp.why.ey":"Por qué aliarte",
     "emp.why.t":"RSE que se ve, se mide y se siente.",
     "emp.why.1.t":"Beneficio tributario",
@@ -2234,20 +2243,90 @@ function mbNumero(txt){
   var d = String(txt == null ? "" : txt).replace(/[^0-9]/g, "");
   return d ? parseInt(d, 10) : 0;
 }
+/* EL ESTADO DE LA ELECCION vive aqui y no en el DOM, por la misma razon que
+   `PAGO_VIA`: `mbPinta` se llama desde tres sitios —el monto, el destino y el
+   cambio de idioma— y ninguno deberia tener que leer clases para saber que
+   eligio la persona. */
+var MB_COP = 50000, MB_DEST = "general";
+
+/* EL URL DE SALIDA, armado en un solo sitio. `destino` solo viaja si no es el
+   fondo general: «general» es lo que el servidor asume cuando no llega nada, y
+   un parametro que dice lo mismo que su ausencia es ruido en un enlace que la
+   gente copia. `lang` viaja porque /pago/metodo es una pagina del Worker y no
+   ve el idioma del SPA: sin el, quien venia leyendo en ingles caia en espanol
+   justo en la pantalla de la tarjeta. */
+function mbUrl(cop){
+  var q = "monto=" + cop;
+  if (MB_DEST && MB_DEST !== "general") q += "&destino=" + encodeURIComponent(MB_DEST);
+  if (lang === "en") q += "&lang=en";
+  return "/pago/metodo?" + q;
+}
 function mbPinta(cop){
+  if (typeof cop === "number") MB_COP = cop;
+  cop = MB_COP;
   var ir = document.getElementById("mb-ir");
   var et = document.getElementById("mb-nivel");
+  var cifra = document.getElementById("mb-cifra");
+  var dres = document.getElementById("mb-dest-res");
   var ok = cop >= MB_MIN && cop <= MB_MAX;
   if (ir){
-    ir.setAttribute("href", ok ? "/pago/metodo?monto=" + cop : "/pago/metodo");
+    ir.setAttribute("href", ok ? mbUrl(cop) : "/pago/metodo" + (lang === "en" ? "?lang=en" : ""));
     ir.setAttribute("aria-disabled", ok ? "false" : "true");
     ir.classList.toggle("is-off", !ok);
   }
+  /* La cifra grande dice el monto SOLO si es valido. Un «$3» monumental
+     mientras alguien esta escribiendo «30.000» es una cifra que nadie eligio;
+     el guion dice «todavia no» sin inventar nada. */
+  if (cifra) cifra.textContent = ok ? fmtCOP(cop) : "—";
   if (et){
     et.textContent = ok
       ? t("membres.cta.nivel").replace("{n}", mbNivelDe(cop)).replace("{m}", fmtCOP(cop))
       : (cop ? t("membres.cta.rango").replace("{min}", fmtCOP(MB_MIN)).replace("{max}", fmtCOP(MB_MAX)) : "");
   }
+  if (dres) dres.textContent = mbEtiquetaDestino();
+}
+/* El nombre del destino tal como lo lee la persona, sacado del <option>
+   visible —que ya esta en su idioma— y con la fundacion delante cuando la hay:
+   «Borboletas» a secas no dice de quien es el programa, y el credito es de la
+   aliada. */
+function mbEtiquetaDestino(){
+  var sel = document.getElementById("mb-destino");
+  if (sel && sel.selectedIndex >= 0){
+    var opt = sel.options[sel.selectedIndex];
+    var grupo = opt.parentNode && opt.parentNode.tagName === "OPTGROUP" ? opt.parentNode.getAttribute("label") : "";
+    var fund = opt.getAttribute("data-partner") ? grupo : "";
+    return (fund ? fund + " · " : "") + opt.text;
+  }
+  return t("membres.cta.dest.general");
+}
+function mbDestino(v){
+  MB_DEST = v || "general";
+  mbPinta();
+}
+/* EL SELECTOR DE PROGRAMA DE LA MEMBRESIA: los MISMOS destinos que Donar, del
+   mismo `partners.json`, con los mismos valores en cada <option>. Por eso lo
+   arma `opcionesDestino`, que es tambien la que arma el de la calculadora: dos
+   listas escritas a mano son dos listas que un dia dicen cosas distintas.
+
+   SIN LA BRIGADA, a proposito. La calculadora ya fuerza aporte UNICO cuando se
+   elige la brigada —«ofrecer mensual seria cobrar todos los meses por una
+   emergencia que termina»—, y una membresia es exactamente eso. Mira Mi Casa si
+   entra: reparar viviendas no tiene fecha de cierre.
+
+   Y EL FONDO GENERAL VA PRIMERO, no despues del grupo del sismo como en Donar.
+   Alli la emergencia se pone arriba porque era lo urgente de un aporte unico;
+   aqui la opcion por defecto de un compromiso mensual es la que da mas margen a
+   la fundacion, y es la que la persona ve sin abrir la lista. */
+function buildMbDestino(){
+  var sel = document.getElementById("mb-destino");
+  if (!sel) return;
+  var previo = MB_DEST;
+  sel.innerHTML = opcionesDestino(false);
+  sel.value = previo;
+  /* Un destino que ya no existe —la aliada salio de la red entre una carga y la
+     otra— no deja el selector en blanco: vuelve al fondo general, y lo dice. */
+  if (sel.value !== previo){ sel.value = "general"; MB_DEST = "general"; }
+  mbPinta();
 }
 function mbMonto(cop){
   var libre = document.getElementById("mb-libre");
@@ -2314,7 +2393,7 @@ function postLang(l){
   /* El nivel se pinta al arrancar: sin esto, la etiqueta sale vacía hasta que
      la persona toca algo, y el botón ya lleva $50.000 puestos. Decir el monto
      solo después de que lo cambies es justo al revés. */
-  if (document.getElementById("mb-ir")) mbPinta(50000);
+  if (document.getElementById("mb-ir")) mbPinta();
   if (!MARCA_MMC){ renderHeroImpact(); renderHomeFundaciones(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
   renderPrivacy();
   /* Por lo mismo que la linea de arriba: `applyLang` acaba de repintar los
@@ -3842,7 +3921,7 @@ function cvCopiar(){
 }
 
 var ACT_FNS = {
-  mbMonto:mbMonto, mbLibre:mbLibre,
+  mbMonto:mbMonto, mbLibre:mbLibre, mbDestino:mbDestino,
   cvPaso:cvPaso, cvEnviar:cvEnviar, cvCopiar:cvCopiar, mmcCasoOlvidar:mmcCasoOlvidar,
   cvReintentar:cvReintentar, mcReintentar:mcReintentar,
   irASeccion:irASeccion,
@@ -4164,18 +4243,28 @@ function destinoNoAliado(id){
 
 /* Construye el selector fundación → proyecto a partir de partners.json.
    Cada <option> lleva el id de la unidad de impacto (o 'general' para el fondo). */
-function buildProjectSelect(){
-  var sel = document.getElementById("calc-project");
-  if (!sel) return;
+/* Las <option> de los destinos, para la calculadora (`conBrigada`) y para la
+   membresia (sin ella: ver `buildMbDestino`). El texto del fondo general sale
+   del diccionario y ya no de un ternario en linea, porque ahora lo leen dos
+   selectores y la membresia lo muestra tambien en su resumen. */
+function opcionesDestino(conBrigada){
   var partners = (PARTNERS_DATA || PARTNERS_FALLBACK).filter(function(p){ return p.type==="foundation" && p.impactUnits && p.impactUnits.length; });
-  /* La brigada va de primera y en su propio grupo: es lo urgente, y mezclarla
-     entre los programas de las fundaciones la escondería. `general` sigue siendo
-     el valor por defecto — más abajo se fija con sel.value. */
-  var html = '<optgroup label="'+escapeHtml(t("calc.dest.emergencia"))+'">' +
-             '<option value="'+BRIGADA.id+'" data-partner="">'+escapeHtml(t("brigada.opcion"))+'</option>' +
-             '<option value="'+MMC_DESTINO.id+'" data-partner="">'+escapeHtml(t("mmc.donar.opcion"))+'</option>' +
-             '</optgroup>';
-  html += '<option value="general" data-partner="">'+(lang==="en"?"Where it's needed most (general fund)":"Donde más se necesite (fondo general)")+'</option>';
+  var general = '<option value="general" data-partner="">'+escapeHtml(t("membres.cta.dest.general"))+'</option>';
+  var html = "";
+  if (conBrigada){
+    /* La brigada va de primera y en su propio grupo: es lo urgente, y mezclarla
+       entre los programas de las fundaciones la escondería. `general` sigue siendo
+       el valor por defecto — quien llama lo fija con sel.value. */
+    html = '<optgroup label="'+escapeHtml(t("calc.dest.emergencia"))+'">' +
+           '<option value="'+BRIGADA.id+'" data-partner="">'+escapeHtml(t("brigada.opcion"))+'</option>' +
+           '<option value="'+MMC_DESTINO.id+'" data-partner="">'+escapeHtml(t("mmc.donar.opcion"))+'</option>' +
+           '</optgroup>' + general;
+  } else {
+    html = general +
+           '<optgroup label="'+escapeHtml(t("calc.dest.emergencia"))+'">' +
+           '<option value="'+MMC_DESTINO.id+'" data-partner="">'+escapeHtml(t("mmc.donar.opcion"))+'</option>' +
+           '</optgroup>';
+  }
   for (var i=0;i<partners.length;i++){
     var p = partners[i];
     html += '<optgroup label="'+escapeHtml(p.name)+'">';
@@ -4186,7 +4275,16 @@ function buildProjectSelect(){
     }
     html += '</optgroup>';
   }
-  sel.innerHTML = html;
+  return html;
+}
+function buildProjectSelect(){
+  var sel = document.getElementById("calc-project");
+  /* La membresia se repinta en el mismo momento que la calculadora: las dos
+     dependen de que `partners.json` haya llegado, y este es el punto por el
+     que pasan las dos cargas —la del arranque y la del cambio de idioma—. */
+  try { buildMbDestino(); } catch(e){}
+  if (!sel) return;
+  sel.innerHTML = opcionesDestino(true);
   sel.value = calc.projectId || "general";
 }
 function setProject(unitId){
@@ -4406,7 +4504,17 @@ function irAPagar(){
      esa pagina registra la tarjeta en la ventana de Wompi y crea la
      membresia, con su propia casilla de certificado. */
   if (calc.freq === "m"){
-    window.location.href = "/pago/metodo?monto=" + encodeURIComponent(String(monto));
+    /* Y CON EL DESTINO. Hasta el 30 sep 2026 viajaba solo el monto: quien
+       elegia Borboletas en la calculadora y marcaba «mensual» terminaba con una
+       membresia al fondo general sin que nada se lo dijera. El id es el mismo
+       valor del <option>, que es lo que /pago/metodo valida contra
+       partners.json. La brigada no llega aqui: fuerza aporte unico. */
+    var q = "monto=" + encodeURIComponent(String(monto));
+    if (calc.projectId && calc.projectId !== "general" && !esBrigada(calc.projectId)) {
+      q += "&destino=" + encodeURIComponent(calc.projectId);
+    }
+    if (lang === "en") q += "&lang=en";
+    window.location.href = "/pago/metodo?" + q;
     return;
   }
 
