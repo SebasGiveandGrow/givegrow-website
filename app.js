@@ -1276,9 +1276,20 @@ var I18N = {
     "pay.now.err":"No pudimos abrir la pasarela. Vuelve a intentarlo, o aporta por transferencia con los datos de abajo.",
     "pay.now.cerrado":"El pago en línea está cerrado en este momento, así que reintentar no va a servir. Aporta por transferencia con los datos de abajo: recibes tu número de guía al instante y subes ahí mismo el comprobante.",
     "pay.now.monto":"Ese monto está fuera de lo que acepta la pasarela: el mínimo es $5.000 y el máximo $20.000.000. Si quieres aportar más, escríbenos y lo coordinamos.",
-    "pay.now.rec":"Elegiste un aporte {frec}. Por ahora procesamos este primer aporte y dejamos registrada tu intención: cuando habilitemos el débito automático te escribimos para activarlo, sin que tengas que empezar de nuevo.",
-    "pay.now.rec.m":"mensual",
-    "pay.now.rec.a":"anual",
+    "pay.now.rec.m":"La membresía mensual es un débito automático de verdad: al continuar registras tu tarjeta en la página segura de Wompi, el primer cobro sale hoy y los siguientes cada mes. Va al fondo general y la terminas cuando quieras.",
+    "pay.now.rec.a":"Un aporte anual se cobra una sola vez, hoy: no es un débito automático. Si quieres repetirlo el año que viene, vuelves y lo haces de nuevo.",
+    "pay.cert":"Quiero certificado de donación",
+    "pay.cert.h":"Opcional. Sirve para el descuento tributario en Colombia y lo firman el Representante Legal y la Revisora Fiscal.",
+    "pay.cert.tipo":"Tipo de documento",
+    "pay.cert.cc":"Cédula de ciudadanía",
+    "pay.cert.ce":"Cédula de extranjería",
+    "pay.cert.nit":"NIT (empresa)",
+    "pay.cert.pp":"Pasaporte",
+    "pay.cert.ti":"Tarjeta de identidad",
+    "pay.cert.ppt":"Permiso por protección temporal",
+    "pay.cert.num":"Número de documento",
+    "pay.cert.ciudad":"Ciudad de domicilio",
+    "pay.cert.err":"Para el certificado necesitamos el número de documento (solo números y letras) y tu ciudad.",
     "pay.other":"Otras formas de aportar",
     "pay.other.p":"Si prefieres no pagar en línea, o si tu aporte no es dinero.",
     "pay.other.money":"Transferencia o PayPal",
@@ -1313,7 +1324,7 @@ var I18N = {
     "gracias.sub.t":"Tu membresía quedó registrada.",
     "gracias.sub.p":"PayPal confirma el primer cobro y ahí te llega el recibo con tu número de guía. No es inmediato, así que preferimos decírtelo en vez de darte las gracias por algo que todavía no está cobrado. Puedes cancelarla cuando quieras desde tu propia cuenta de PayPal.",
     "gracias.pp.t":"Gracias. Tu donación quedó en PayPal.",
-    "gracias.pp.p":"Por este camino tu aporte no lleva número de guía nuestro: el comprobante te lo envía PayPal a tu correo. Si la hiciste mensual, la pausas o la cancelas desde tu propia cuenta de PayPal, sin escribirnos. Y si quieres tu certificado de donación, escríbenos a contabilidad@thegiveandgrowproject.org.",
+    "gracias.pp.p":"Por este camino tu aporte no lleva número de guía nuestro: el comprobante te lo envía PayPal a tu correo. Si la hiciste mensual, la pausas o la cancelas desde tu propia cuenta de PayPal, sin escribirnos. El certificado de donación aplica a donaciones en pesos colombianos para el impuesto de renta en Colombia, así que un aporte en dólares por PayPal no lo lleva.",
     "gracias.lost.t":"No encontramos esa transacción.",
     "gracias.lost.p":"Puede que el enlace haya perdido su identificador. Si hiciste un aporte, busca tu número de guía en el correo de confirmación y consúltalo en «Rastrea tu donación».",
     "pay.tab.banco":"Bancolombia",
@@ -3710,7 +3721,7 @@ var ACT_FNS = {
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
   donarBrigada:donarBrigada, allySubmit:allySubmit, allySector:allySector,
-  irAPagar:irAPagar, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit, apSubmit:apSubmit, apQuien:apQuien,
+  irAPagar:irAPagar, payCert:payCert, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit, apSubmit:apSubmit, apQuien:apQuien,
   fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
   ingSubmit:ingSubmit, ingEsp:ingEsp,
   /* Sin estas dos, el boton de la membresia internacional no hacia NADA: la
@@ -3914,7 +3925,10 @@ function animateCounters(){
 }
 
 /* ---------- calculator ---------- */
-var calc = { cur:"COP", freq:"m", val:200000, mode:"ind", partnerId:"", projectId:"general", note:"" };
+/* `freq:"u"` y no "m" (auditoria del 28 sep 2026): la calculadora abria en
+   Mensual y cobraba UNA vez, mientras el debito automatico de verdad vive en
+   /pago/metodo. Arranca en Unico; Mensual lleva alla. */
+var calc = { cur:"COP", freq:"u", val:200000, mode:"ind", partnerId:"", projectId:"general", note:"" };
 /* LA TASA LA TRAE EL SERVIDOR, de la TRM oficial. Este numero era 4200 y la TRM
    del 3 sep 2026 es 3140,55: un 34% de error en un dato con el que alguien decide
    cuanto donar.
@@ -4165,6 +4179,7 @@ function setPagoVia(v){
   var pd = document.querySelector(".pay-now-p");
   if (tt) tt.textContent = t(PAGO_VIA === "paypal" ? "pay.now.t.pp" : "pay.now.t");
   if (pd) pd.textContent = t(PAGO_VIA === "paypal" ? "pay.now.p.pp" : "pay.now.p");
+
   var msg = document.getElementById("pay-msg");
   if (msg){ msg.style.display = "none"; msg.textContent = ""; }
   calcUpdate();
@@ -4220,6 +4235,25 @@ function irAPagarPaypal(){
     if (n) n.focus();
   }, 60);
 }
+/* La casilla del certificado abre sus tres campos; sin marcarla no se ve un
+   formulario de mas. */
+function payCert(){
+  var si = document.getElementById("pay-cert-si");
+  var f = document.getElementById("pay-cert-f");
+  if (f) f.style.display = (si && si.checked) ? "" : "none";
+  if (si && si.checked){ var n = document.getElementById("pay-cert-num"); if (n) n.focus(); }
+}
+/* Lo que viaja al servidor si se pidio certificado, o null si no. Misma regla
+   que valida el servidor: documento de 3 a 25 letras o numeros, y ciudad. */
+function payCertDatos(){
+  var si = document.getElementById("pay-cert-si");
+  if (!si || !si.checked) return null;
+  var tipo = (document.getElementById("pay-cert-tipo") || {}).value || "CC";
+  var num = ((document.getElementById("pay-cert-num") || {}).value || "").trim();
+  var ciudad = ((document.getElementById("pay-cert-ciudad") || {}).value || "").trim();
+  if (!/^[0-9A-Za-z][0-9A-Za-z.\- ]{2,24}$/.test(num) || ciudad.length < 2) return false;
+  return { tipo: tipo, num: num, ciudad: ciudad };
+}
 function irAPagar(){
   var btn = document.getElementById("pay-go");
   var msg = document.getElementById("pay-msg");
@@ -4229,6 +4263,23 @@ function irAPagar(){
   var monto = Math.round(Number(calc.val) || 0);   // calc.val siempre está en COP
   if (!(monto >= 5000 && monto <= 20000000)){
     if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = t("pay.now.err"); }
+    return;
+  }
+
+  /* MENSUAL ES LA MEMBRESIA DE VERDAD (auditoria del 28 sep 2026). Por aqui
+     se cobraba una vez y se prometia un debito «cuando lo habilitemos», con el
+     debito ya habilitado en /pago/metodo. Se lleva alla con el monto puesto:
+     esa pagina registra la tarjeta en la ventana de Wompi y crea la
+     membresia, con su propia casilla de certificado. */
+  if (calc.freq === "m"){
+    window.location.href = "/pago/metodo?monto=" + encodeURIComponent(String(monto));
+    return;
+  }
+
+  var cert = payCertDatos();
+  if (cert === false){
+    if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = t("pay.cert.err"); }
+    var cn = document.getElementById("pay-cert-num"); if (cn) cn.focus();
     return;
   }
 
@@ -4254,6 +4305,12 @@ function irAPagar(){
     nota: calc.note || null,
     idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
   };
+  if (cert){
+    cuerpo.certificado = true;
+    cuerpo.cert_doc_tipo = cert.tipo;
+    cuerpo.cert_doc_numero = cert.num;
+    cuerpo.cert_ciudad = cert.ciudad;
+  }
 
   fetch("/api/checkout", {
     method: "POST",
@@ -4283,19 +4340,26 @@ function irAPagar(){
       var codigo = e && e.message;
       var texto = codigo === "pasarela_no_configurada" ? t("pay.now.cerrado")
                 : codigo === "monto_invalido"          ? t("pay.now.monto")
+                : codigo === "certificado_datos_invalidos" ? t("pay.cert.err")
                 : t("pay.now.err");
       if (msg){ msg.style.display=""; msg.className="pay-now-msg err"; msg.textContent = texto; }
     });
 }
 
-/* Aviso honesto cuando se elige mensual o anual: hoy se cobra una vez y la
-   intención queda registrada. No prometemos un débito automático que no existe. */
+/* Que va a pasar al continuar, dicho antes de continuar. Mensual lleva a la
+   membresia con debito automatico; anual es UN cobro. Con PayPal no se dice
+   nada aqui: su camino tiene su propio texto. */
 function payRecNote(){
+  /* La casilla del certificado es solo del aporte unico o anual en pesos. Con
+     PayPal no: la minuta certifica pesos colombianos y PayPal cobra en
+     dolares, y ofrecerla seria prometer un papel que no se puede emitir. En
+     Mensual tampoco aqui: /pago/metodo tiene la suya. */
+  var pc = document.getElementById("pay-cert");
+  if (pc) pc.style.display = (PAGO_VIA === "paypal" || calc.freq === "m") ? "none" : "";
   var n = document.getElementById("pay-rec-note");
   if (!n) return;
-  if (calc.freq === "u"){ n.style.display = "none"; n.textContent = ""; return; }
-  var etiqueta = t(calc.freq === "a" ? "pay.now.rec.a" : "pay.now.rec.m");
-  n.textContent = t("pay.now.rec").replace("{frec}", etiqueta);
+  if (calc.freq === "u" || PAGO_VIA === "paypal"){ n.style.display = "none"; n.textContent = ""; return; }
+  n.textContent = t(calc.freq === "a" ? "pay.now.rec.a" : "pay.now.rec.m");
   n.style.display = "";
 }
 
@@ -4393,6 +4457,12 @@ function graciasPinta(d){
   var set = function(id, txt){ var e=document.getElementById(id); if(e) e.textContent = txt; };
 
   set("gr-guia", d.guia || "—");
+  /* «Rastrear mi aporte» CON LA GUIA PUESTA (auditoria del 28 sep 2026). Iba a
+     un «#rastrea» pelado y el donante tenia que copiar a mano el numero que
+     tenia en pantalla. `?g=` es lo que ya lee el arranque para el QR del
+     recibo: abre el rastreo y lo busca solo. Solo con una guia de forma valida. */
+  var tr = document.getElementById("gracias-track");
+  if (tr && /^GG-\d{4}-\d{6}$/.test(String(d.guia || ""))) tr.setAttribute("href", "/?g=" + encodeURIComponent(d.guia) + "#rastrea");
   /* UN MONTO AUSENTE ES «—», NO «$0». Mientras el pago no esta confirmado el
      servidor ya no publica la cifra, y `(d.monto_centavos||0)` la habria pintado
      como cero: decirle «$0 COP» a alguien que acaba de pagar es peor que no
@@ -5969,7 +6039,7 @@ function init(){
   // slider initial
   syncSlider();
   setCur("COP");
-  setFreq("m");
+  setFreq("u");
   setCalcMode("ind");
   calcUpdate();
   // ALMA greeting

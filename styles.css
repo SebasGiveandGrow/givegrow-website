@@ -1111,6 +1111,26 @@ html[data-theme="dark"] .prog-logo{background:#000}
 .pay-now-btn:disabled{opacity:.6;cursor:default}
 .pay-now-msg{margin:12px 0 0;font-size:var(--fs-14);color:var(--on-dark-3)}
 .pay-now-msg.err{color:#f0857a}
+/* CERTIFICADO DESDE LA CALCULADORA (28 sep 2026). Hasta hoy un donante en linea
+   no tenia como pedirlo. Mismo lenguaje que `.calc-note` —el panel es oscuro en
+   los dos temas, asi que nada de --surface ni --ink—, y los campos solo aparecen
+   al marcar la casilla: quien no lo quiere no ve un formulario de mas. */
+.pay-cert{margin-top:16px}
+.pay-cert-chk{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-14);line-height:1.45;color:var(--on-dark-2);cursor:pointer}
+.pay-cert-chk input{margin-top:3px;flex:none;accent-color:var(--gm)}
+.pay-cert-chk small{display:block;margin-top:2px;font-size:var(--fs-13);color:var(--on-dark-4)}
+.pay-cert-f{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.pay-cert-f label{display:block;font-size:var(--fs-13);font-weight:700;color:var(--on-dark-2);margin-bottom:6px}
+.pay-cert-f select,.pay-cert-f input{width:100%;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);color:var(--on-dark);border-radius:10px;padding:10px 12px;font-size:var(--fs-14);font-family:inherit;box-sizing:border-box}
+.pay-cert-f select:focus,.pay-cert-f input:focus{outline:none;border-color:var(--on-dark-4)}
+/* La lista desplegable la pinta el sistema: sin un par de colores propio las
+   opciones heredaban el blanco del panel sobre un fondo claro. */
+.pay-cert-f option{color:var(--ink);background:var(--surface)}
+.pay-cert-full{grid-column:1/-1}
+@media(max-width:640px){
+  .pay-cert-f{grid-template-columns:1fr}
+  .pay-cert-f select,.pay-cert-f input{font-size:var(--fs-16)}
+}
 
 /* skip link accesible: invisible hasta recibir foco de teclado */
 /* oculto visualmente pero disponible para lectores de pantalla */
