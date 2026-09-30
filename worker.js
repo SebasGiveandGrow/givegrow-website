@@ -10402,6 +10402,90 @@ async function apiPaypalSuscripcion(request, env, url) {
                 nivel: nivel.nombre, monto: usd });
 }
 
+/* GET /api/paypal/membresia?sub=GG-SUB-…&id=I-… — el programa y el estado de
+   una membresia de PayPal, para la pantalla de regreso (`/gracias?sub=`).
+
+   POR QUE HACE FALTA. Esa pantalla decia «tu membresia quedo registrada» y no
+   decia A QUE. La persona eligio un programa en el formulario (desde el 30 sep
+   2026) y lo unico que volvia a ver de su eleccion era el recibo del primer
+   cobro, dias despues.
+
+   EL PROGRAMA SALE DE LA FILA, NUNCA DE LA URL. Un `?programa=` en el
+   `return_url` seria pintar, en el dominio de la fundacion, lo que cualquiera
+   escriba en un enlace. Aqui la URL solo trae dos identificadores y la
+   respuesta es lo que quedo guardado.
+
+   LOS DOS IDENTIFICADORES Y POR QUE LOS DOS. `id` es el de PayPal (I-…), que
+   PayPal pega al volver como `subscription_id`: es la llave de la fila. Pero
+   por si solo no prueba nada —aparece en los correos de PayPal y en su panel—,
+   y con el bastaria para mirar el programa de la membresia de otro. `sub` es
+   NUESTRO `custom_id`, que solo viaja en el `return_url` de quien aprobo. No
+   lo guardamos en la base (no hay columna, y no vale una migracion para esto),
+   asi que el cruce se le pregunta a PayPal: su suscripcion trae el
+   `custom_id` con que la creamos. Si no coinciden, la respuesta es la misma que
+   si no existiera.
+
+   Se recuerda el cruce ya comprobado unos minutos en el isolate: la pantalla
+   se recarga y cambia de idioma, y no tiene por que llamar a PayPal cada vez.
+   Y hay freno por IP, porque cada consulta nueva le cuesta una llamada a
+   PayPal. Todo lo que falle —PayPal caido, sin configurar— deja la pantalla
+   como estaba: el mensaje general, sin programa. */
+const PP_CRUCE_TTL_MS = 600000;
+const PP_CRUCE = new Map();        // id de PayPal -> { sub, en }
+const PP_MB_GOLPES = new Map();
+
+async function apiPaypalMembresia(request, env, url) {
+  if (request.method !== "GET") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.DB) return json({ error: "base_no_configurada" }, 503);
+  const sub = String(url.searchParams.get("sub") || "");
+  const id = String(url.searchParams.get("id") || "");
+  if (!/^GG-SUB-[a-f0-9]{12}$/.test(sub) || !/^I-[A-Z0-9]{6,30}$/.test(id)) {
+    return json({ error: "no_encontrada" }, 404);
+  }
+  const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+  if (limitadoPorIP(PP_MB_GOLPES, ip, 300000, 20)) return json({ error: "demasiadas" }, 429);
+
+  const fila = await env.DB.prepare(
+    "SELECT estado, destino FROM suscripciones WHERE id = ? AND proveedor = 'paypal' LIMIT 1"
+  ).bind(id).first();
+  if (!fila) return json({ error: "no_encontrada" }, 404);
+
+  const visto = PP_CRUCE.get(id);
+  if (!(visto && visto.sub === sub && Date.now() - visto.en < PP_CRUCE_TTL_MS)) {
+    const cfg = paypalConfig(env);
+    if (!cfg) return json({ error: "paypal_no_configurado" }, 503);
+    let custom = "";
+    try {
+      const tk = await paypalToken(cfg);
+      const r = await fetch(cfg.base + "/v1/billing/subscriptions/" + encodeURIComponent(id), {
+        headers: { authorization: "Bearer " + tk, accept: "application/json" }
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        console.error("paypal membresia consulta", r.status);
+        return json({ error: "paypal_sin_respuesta" }, 502);
+      }
+      custom = String((d && d.custom_id) || "");
+    } catch (e) {
+      console.error("paypal membresia red", e && e.message);
+      return json({ error: "paypal_sin_respuesta" }, 502);
+    }
+    if (custom !== sub) return json({ error: "no_encontrada" }, 404);
+    PP_CRUCE.set(id, { sub, en: Date.now() });
+  }
+
+  /* Los DOS nombres, ya armados con la misma funcion que usan /pago/listo, el
+     panel y el correo: la pantalla cambia de idioma sin volver a preguntar, y
+     no hay una segunda lista de programas en el navegador que un dia diga otra
+     cosa. Un id que ya no esta en `partners.json` se dice fondo general, que es
+     a donde van a ir sus cobros (ver `paypalCobro`). */
+  const dest = fila.destino ? await destinoMembresia(env, fila.destino) : null;
+  return json({
+    estado: String(fila.estado || ""),
+    programa: { es: nombreDestinoMb(dest, false), en: nombreDestinoMb(dest, true) }
+  }, 200, { "cache-control": "private, no-store" });
+}
+
 /* POST /api/paypal/webhook — lo que PayPal nos cuenta.
 
    TRES REGLAS, Y LAS TRES SON CICATRICES DE ESTA CASA:
@@ -23549,6 +23633,7 @@ export default {
 
     if (ruta === "/api/trm")               return await apiTrm(request);
     if (ruta === "/api/paypal/suscripcion") return await apiPaypalSuscripcion(request, env, url);
+    if (ruta === "/api/paypal/membresia")   return await apiPaypalMembresia(request, env, url);
     if (ruta === "/api/paypal/webhook")     return await apiPaypalWebhook(request, env);
     if (ruta === "/api/paypal/ipn")         return await apiPaypalIpn(request, env);
     if (ruta === "/api/alma")           return await apiAlma(request, env, url);
