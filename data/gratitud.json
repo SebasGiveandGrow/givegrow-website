@@ -1,5 +1,5 @@
 {
-  "_doc": "Comercios aliados del Programa de Gratitud. Un comercio SOLO aparece si status==='activa'. 'borrador' queda preparado pero invisible. Mismo criterio que las fundaciones del HUB: evidencia, no promesas. PENDIENTE Kore: (1) reemplazar textos de beneficio/condiciones/redencion por los reales que defina Sebas; (2) confirmar convenio firmado. Visible por decision de Sebas.",
+  "_doc": "Comercios aliados del Programa de Gratitud. Un comercio SOLO aparece si status==='activa' (convenio firmado). 'borrador' queda preparado pero invisible. Mismo criterio que las fundaciones del HUB SOCIAL: evidencia, no promesas. Kore Makeup Academy pasó a 'borrador' el 29 sep 2026 por decisión de Sebas: todavía no hay convenio firmado (se acuerda la semana siguiente). Sus datos se conservan; al firmar, volver a 'activa' y reemplazar los textos de beneficio/condiciones/redención por los reales.",
   "categorias": {
     "gastronomia": {
       "es": "Gastronomía",
@@ -25,7 +25,7 @@
   "comercios": [
     {
       "id": "kore-makeup",
-      "status": "activa",
+      "status": "borrador",
       "name": "Kore Makeup Academy",
       "categoria": "belleza",
       "ciudad": "Envigado",
