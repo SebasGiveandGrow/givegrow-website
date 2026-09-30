@@ -22852,11 +22852,16 @@ export default {
        familia abre su caso.
 
        Solo en los hosts de Mira Mi Casa: el sitio de la fundación es `www.` a
-       propósito y su `ORIGIN` lo dice. */
+       propósito y su `ORIGIN` lo dice.
+
+       301 y no 302 (30 sep 2026): la cicatriz de arriba es la de una RUTA que
+       todavía puede moverse; esto es el HOST, y la decisión de que el ápex es
+       el canónico ya está tomada. Con 302 el buscador sigue tratando las dos
+       puertas como distintas, que es justo lo que este bloque quiere evitar. */
     if (/^www\./i.test(url.hostname) && HOST_MMC.test(url.hostname)) {
       const sinWww = new URL(url.toString());
       sinWww.hostname = url.hostname.replace(/^www\./i, "");
-      return Response.redirect(sinWww.toString(), 302);
+      return Response.redirect(sinWww.toString(), 301);
     }
 
     /* El manifiesto de Mira Mi Casa. Ver `MMC_MANIFIESTO` arriba para el motivo.
