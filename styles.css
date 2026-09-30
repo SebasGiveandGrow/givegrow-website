@@ -2431,3 +2431,94 @@ section[tabindex="-1"]:focus{ outline:none }
   padding:34px 0;max-width:62ch}
 .mmc-donar .lead{margin:0}
 .mmc-donar .btn{margin-top:8px}
+
+/* ---------- Hazte miembro: la hoja (30 sep 2026) ----------
+   Era una caja centrada con un radial de fondo; ahora es una hoja en dos
+   columnas: a la izquierda lo que se promete, a la derecha lo que se elige.
+   PAPEL SOBRE PAPEL: la columna de la derecha es una superficie con su filo,
+   sin sombra difusa y sin vidrio —no hay foto detrás que mirar—.
+   El único elemento firma es la cifra del resumen, en Unbounded: es lo que la
+   persona está a punto de comprometer cada mes y tiene que leerse sin buscarla.
+   Todo el color de texto va con --acc y no con --g: de noche --g no se aclara
+   (ver .mb-monto.is-on span). */
+.mb-hoja{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:56px;align-items:start}
+@media(max-width:900px){.mb-hoja{grid-template-columns:1fr;gap:30px}}
+.mb-intro .h-sec{margin-bottom:14px}
+.mb-intro-p{color:var(--ink-soft);font-size:var(--fs-17);max-width:46ch}
+.mb-garantias{list-style:none;margin:26px 0 0;padding:0;max-width:46ch}
+.mb-garantias li{position:relative;padding:12px 0 12px 22px;border-top:1px solid var(--bd);
+  font-size:var(--fs-15);color:var(--ink-soft);line-height:1.45}
+.mb-garantias li:last-child{border-bottom:1px solid var(--bd)}
+/* Un filo corto y no una viñeta de app: marca la línea sin decorarla. */
+.mb-garantias li::before{content:"";position:absolute;left:0;top:22px;width:10px;height:2px;background:var(--acc)}
+.mb-intro .cta-note{margin:20px 0 0;max-width:52ch}
+.mb-hoja .mb-elige{margin-top:0;max-width:none;gap:24px;background:var(--surface);
+  border:1px solid var(--bd);border-radius:var(--rl);padding:28px}
+@media(max-width:520px){.mb-hoja .mb-elige{padding:22px 18px}}
+.mb-grupo{border:0;margin:0;padding:0;min-width:0}
+.mb-grupo .mb-otro{margin-top:14px}
+/* Rótulo de cada decisión, en versalitas como los eyebrows del sitio. Con
+   (0,2,0) le gana a `.field label`, que lo dejaría en negrita de formulario. */
+.mb-grupo .mb-leg{display:block;padding:0;margin-bottom:12px;font-size:var(--fs-12);font-weight:700;
+  letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--ink-soft)}
+.mb-grupo.field{margin-bottom:0}
+.mb-ayuda{margin:8px 0 0;font-size:var(--fs-13);color:var(--mu);line-height:1.45}
+.mb-resumen{display:flex;flex-direction:column;padding-top:22px;border-top:1px solid var(--bd)}
+.mb-res-eti{font-size:var(--fs-12);font-weight:700;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--mu)}
+.mb-res-cifra{display:block;margin:8px 0 10px;font-family:var(--font-display);font-weight:700;
+  font-size:var(--fs-h2);line-height:var(--lh-display);letter-spacing:var(--tr-display);
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.mb-res-l{margin:0;font-size:var(--fs-15);color:var(--ink-soft)}
+#mb-dest-res{margin-top:4px;font-weight:600;color:var(--acc)}
+.mb-ir{align-self:flex-start}
+@media(max-width:520px){.mb-ir{align-self:stretch;justify-content:center;text-align:center}}
+
+/* ---------- /pago/metodo: registrar la tarjeta (30 sep 2026) ----------
+   Página del WORKER, no del SPA: se sirve con su propia CSP para que el widget
+   de Wompi —su script y su iframe— no contagie al resto del sitio. Solo usa
+   esta hoja, así que todo lo que necesita vive aquí y no en atributos style=.
+   La misma familia que la hoja de membresía: papel, filos finos, una sola
+   cifra en Unbounded. Los pasos van numerados porque SON una secuencia real
+   —correo, tarjeta, primer cobro— y en ese orden ocurren. */
+.pm{max-width:720px;padding-top:34px;padding-bottom:56px}
+.pm-top{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
+.pm-top .card-link{margin-top:0}
+.pm-t{margin:22px 0 12px;font-size:var(--fs-h2);max-width:18ch}
+.pm-aviso{margin:18px 0 0;padding:12px 16px;border-left:3px solid var(--err);background:var(--surface);
+  color:var(--err);font-weight:600;font-size:var(--fs-15)}
+/* Una sola columna a propósito: en dos, el valor de cada fila partía en dos
+   líneas contra su etiqueta («Around October 30, 2026, and then every / month»)
+   y el ledger dejaba de leerse como ledger. La cifra arriba, las filas debajo. */
+.pm-resumen{margin-top:26px;display:flex;flex-direction:column;gap:6px;
+  background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:24px 26px}
+@media(max-width:620px){.pm-resumen{padding:20px}}
+.pm-resumen .ey{margin-bottom:0}
+.pm-cifra{display:block;margin-top:8px;font-family:var(--font-display);font-weight:700;font-size:var(--fs-h2);
+  line-height:var(--lh-display);letter-spacing:var(--tr-display);color:var(--ink);font-variant-numeric:tabular-nums}
+.pm-cifra-u{display:block;margin-top:8px;font-size:var(--fs-14);color:var(--mu)}
+.pm-dl{margin:12px 0 0;border-top:1px solid var(--bd)}
+.pm-dl dd{overflow-wrap:anywhere}
+.pm-cambiar{margin:0}
+.pm-form{margin-top:26px;display:flex;flex-direction:column;max-width:none}
+.pm-paso{display:grid;grid-template-columns:32px minmax(0,1fr);gap:4px 14px;align-items:start}
+.pm-paso + .pm-paso,.pm-paso-sig{margin-top:26px;padding-top:22px;border-top:1px solid var(--bd)}
+.pm-n{grid-row:span 2;width:32px;height:32px;border-radius:50%;background:var(--g);color:var(--on-dark);
+  font-family:var(--font-display);font-weight:800;font-size:var(--fs-14);display:flex;align-items:center;justify-content:center}
+.pm-paso-t{margin:4px 0 0;font-family:"Inter",sans-serif;font-size:var(--fs-17);font-weight:700;letter-spacing:var(--tr-heading);color:var(--ink)}
+.pm-paso-p{margin:0;font-size:var(--fs-14);color:var(--mu);line-height:1.5}
+.pm-campos{grid-column:2;display:flex;flex-direction:column;gap:12px;margin-top:14px}
+@media(max-width:520px){.pm-campos{grid-column:1/-1}}
+.pm-campos .field{margin-bottom:0}
+/* Los dos documentos de Wompi son ENLACES que la persona tiene que poder ver
+   antes de aceptar: `a{color:inherit}` los dejaba indistinguibles del texto. */
+.pm-campos .ally-check a{color:var(--acc);text-decoration:underline;text-underline-offset:2px}
+/* El botón del widget lo pinta Wompi justo donde está su <script>, que tiene
+   que ser hijo DIRECTO del <form>. No se le puede envolver para alinearlo; se
+   le da aire con el margen del paso que lo anuncia. */
+.pm-paso-tarjeta{margin-bottom:16px}
+.pm-seguro{margin-top:26px;display:grid;grid-template-columns:24px minmax(0,1fr);gap:4px 14px;
+  padding:20px 0 0;border-top:1px solid var(--bd)}
+.pm-seguro svg{width:22px;height:22px;color:var(--acc);margin-top:2px}
+.pm-seguro h2{margin:0;font-family:"Inter",sans-serif;font-size:var(--fs-15);font-weight:700;letter-spacing:0;color:var(--ink)}
+.pm-seguro p{grid-column:2;margin:4px 0 0;font-size:var(--fs-14);color:var(--mu);line-height:1.5}
+.pm-pie{margin-top:30px;font-size:var(--fs-13);color:var(--mu)}
