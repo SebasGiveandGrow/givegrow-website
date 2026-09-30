@@ -7,7 +7,7 @@
 # `_headers` NO va aquí: Cloudflare ya lo excluye solo (verificado) y ponerlo
 # arriesgaría que deje de procesarse, y con él se iría la CSP.
 #
-# Se sirve, a propósito: index.html, app.js, styles.css, favicon.svg,
+# Se sirve, a propósito: index.html, 404.html, app.js, styles.css, favicon.svg,
 # manifest.webmanifest, robots.txt, sitemap.xml, img/, vendor/, docs/, data/,
 # i18n/ y .well-known/.
 

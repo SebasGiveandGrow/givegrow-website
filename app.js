@@ -1242,6 +1242,9 @@ var I18N = {
     "theme.light":"Tema: claro. Clic para modo oscuro",
     "theme.dark":"Tema: oscuro. Clic para modo automático",
     "alma.send":"Enviar",
+    "alma.err.red":"Lo siento, no pude conectarme ahora. Puedes reintentar o escribirnos por",
+    "alma.err.contacto":"Contacto",
+    "alma.retry":"Reintentar",
     "alma.hello":"Hola, soy ALMA. Puedo contarte cómo donar, los beneficios tributarios, las membresías o cómo aplica tu fundación al Hub. ¿En qué te ayudo?",
     "donar.ey":"Donar",
     "donar.t":"Tu donación, con destino claro.",
@@ -2458,8 +2461,11 @@ function applyLang(l){
     }
   }
   var on = lang;
-  ["lang-es","dlang-es"].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("on",on==="es");});
-  ["lang-en","dlang-en"].forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("on",on==="en");});
+  /* aria-pressed además de la clase (auditoría 28 sep 2026): «on» solo se VE; un
+     lector de pantalla anunciaba ES y EN como dos botones iguales, sin decir cuál
+     es el idioma activo. */
+  ["lang-es","dlang-es"].forEach(function(id){var e=document.getElementById(id);if(e){e.classList.toggle("on",on==="es");e.setAttribute("aria-pressed",on==="es"?"true":"false");}});
+  ["lang-en","dlang-en"].forEach(function(id){var e=document.getElementById(id);if(e){e.classList.toggle("on",on==="en");e.setAttribute("aria-pressed",on==="en"?"true":"false");}});
   renderPobChips();
   applyRouteMeta(currentRoute);
   calcUpdate();
@@ -3528,7 +3534,7 @@ function mcPinta(aviso, color){
          color de que todo salió bien. */
       if (aviso){
         var m = document.getElementById("mc-msg");
-        if (m){ m.textContent = aviso; m.style.color = color || "var(--g)"; }
+        if (m){ m.textContent = aviso; m.style.color = color || "var(--ok)"; }
       }
     })
     .catch(function(){
@@ -3651,7 +3657,7 @@ function mcSubirCola(){
        contador de fotos cuadre con lo que se guardó. El color va con el mensaje:
        antes se pintaba todo en verde. */
     if (!MC.total)          mcPinta();
-    else if (!MC.fallidas)  mcPinta(t("mc.add.ok"), "var(--g)");
+    else if (!MC.fallidas)  mcPinta(t("mc.add.ok"), "var(--ok)");
     else if (MC.hechas)     mcPinta(t("mc.sub.parcial").replace("{n}", MC.hechas).replace("{t}", MC.total), "var(--amber)");
     else                    mcPinta(t("mc.sub.nada"), "var(--err)");
     return;
@@ -4675,7 +4681,7 @@ function formSend(){
   var n=g("cf-name"), e=g("cf-email"), m=g("cf-msg"), tel=g("cf-tel");
   var note=document.getElementById("cf-note");
   var es=(typeof lang!=="undefined" && lang==="es");
-  function show(t,ok){ if(!note)return; note.style.display="block"; note.style.color= ok?"var(--g)":"#b00020"; note.textContent=t; }
+  function show(t,ok){ if(!note)return; note.style.display="block"; note.style.color= ok?"var(--ok)":"var(--err,#c0392b)"; note.textContent=t; }
   if(!e || !m){ show(es?"Escribe tu correo y un mensaje, por favor.":"Please enter your email and a message.", false); return; }
   /* El celular también aquí (decisión de Sebas, 28 sep 2026): el mensaje llega
      por correo, y la respuesta más rápida muchas veces es por WhatsApp. */
@@ -5203,7 +5209,7 @@ function renderEmpresas(){
 // (Cloudflare sin cookies), sin citar % tributario para no reabrir la inconsistencia.
 var PRIVACY = {
   es: `<p class="legal-meta">Versión 1.0 · Vigente desde su publicación · Conforme a la Ley 1581 de 2012 (Colombia), su Decreto 1377 de 2013 y el Reglamento General de Protección de Datos (GDPR, Unión Europea).</p>
-<h3>1. Responsable del tratamiento</h3>
+<h2>1. Responsable del tratamiento</h2>
 <ul>
 <li><strong>Razón social:</strong> Fundación Give&amp;Grow International</li>
 <li><strong>NIT:</strong> 901.948.930-2</li>
@@ -5212,7 +5218,7 @@ var PRIVACY = {
 <li><strong>Representante Legal:</strong> Juan Sebastián Navarro Osorio</li>
 <li><strong>Autoridad de vigilancia:</strong> Superintendencia de Industria y Comercio (SIC), Colombia</li>
 </ul>
-<h3>2. Qué datos tratamos y con qué finalidad</h3>
+<h2>2. Qué datos tratamos y con qué finalidad</h2>
 <p>Tratamos únicamente los datos necesarios para cumplir nuestra labor, según quién nos los entregue:</p>
 <ul>
 <li><strong>Donantes (personas y empresas):</strong> nombre o razón social, identificación, correo, teléfono, ciudad y monto o historial de aportes — para emitir tu certificado de donación con el beneficio tributario que contempla la ley, llevar la contabilidad, gestionar tu membresía y enviarte los reportes de impacto. No almacenamos datos de tarjetas de pago.</li>
@@ -5220,9 +5226,9 @@ var PRIVACY = {
 <li><strong>Voluntarios:</strong> datos de identificación y profesionales — para verificar idoneidad y asignarte a los programas.</li>
 <li><strong>Beneficiarios de programas:</strong> datos entregados por las fundaciones aliadas para ejecutar y documentar el impacto. Los datos de niñas, niños y adolescentes reciben protección reforzada y solo se tratan con autorización de su representante legal.</li>
 </ul>
-<h3>3. Base legal</h3>
+<h2>3. Base legal</h2>
 <p>Tratamos tus datos con tu <strong>autorización previa, expresa e informada</strong>, que recogemos por formulario físico o digital (con registro de fecha). Puedes revocarla en cualquier momento. Para titulares en la Unión Europea aplicamos las bases del Artículo 6 del GDPR (consentimiento, ejecución de un contrato, obligación legal o interés legítimo, según el caso).</p>
-<h3>4. Tus derechos</h3>
+<h2>4. Tus derechos</h2>
 <p>Como titular de los datos puedes, en cualquier momento:</p>
 <ul>
 <li><strong>Conocer y acceder</strong> a los datos que tratamos sobre ti.</li>
@@ -5232,20 +5238,20 @@ var PRIVACY = {
 <li><strong>Oponerte</strong> a ciertos tratamientos y solicitar la <strong>portabilidad</strong> de tus datos.</li>
 <li><strong>Presentar una queja</strong> ante la SIC (Colombia) o la autoridad de control europea que corresponda.</li>
 </ul>
-<h3>5. Cómo ejercer tus derechos</h3>
+<h2>5. Cómo ejercer tus derechos</h2>
 <p>Escríbenos a <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> con tu nombre, tu documento y la solicitud. Acusamos recibo en <strong>2 días hábiles</strong>; respondemos las consultas de acceso en <strong>10 días hábiles</strong> y los reclamos (rectificación, supresión, revocación) en <strong>15 días hábiles</strong>.</p>
-<h3>6. Conservación de los datos</h3>
+<h2>6. Conservación de los datos</h2>
 <p>Guardamos cada dato solo el tiempo necesario o el que exige la ley: los soportes de donaciones <strong>10 años</strong> (obligación tributaria y contable); los datos de beneficiarios, la duración del programa más 5 años; los de voluntarios, la vinculación más 3 años. Cumplido el plazo, se eliminan de forma segura.</p>
-<h3>7. Transferencias internacionales</h3>
+<h2>7. Transferencias internacionales</h2>
 <p>Podemos compartir datos con encargados o aliados en otros países (por ejemplo, proveedores tecnológicos o fundaciones de cooperación), siempre con garantías adecuadas: cláusulas contractuales, acuerdos de encargo del tratamiento y el mínimo de datos necesarios, anonimizados cuando es posible.</p>
-<h3>8. Seguridad de la información</h3>
+<h2>8. Seguridad de la información</h2>
 <p>Protegemos tus datos con cifrado en tránsito, control de acceso por roles, registros de auditoría y protocolos de gestión de incidentes. Ningún sistema es infalible, pero aplicamos estándares reconocidos para reducir el riesgo.</p>
-<h3>9. Cookies y analítica</h3>
+<h2>9. Cookies y analítica</h2>
 <p>Este sitio <strong>no usa cookies de rastreo ni de marketing, ni píxeles de terceros.</strong> Para entender el uso del sitio empleamos <strong>Cloudflare Web Analytics, que no instala cookies ni identifica a las personas.</strong> Solo guardamos tu <strong>preferencia de tema (claro u oscuro)</strong> localmente en tu navegador; no es una cookie de seguimiento ni se envía a ningún servidor.</p>
-<h3>10. Vigencia y cambios</h3>
+<h2>10. Vigencia y cambios</h2>
 <p>Esta política (Versión 1.0) rige desde su publicación y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>`,
   en: `<p class="legal-meta">Version 1.0 · Effective upon publication · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
-<h3>1. Data controller</h3>
+<h2>1. Data controller</h2>
 <ul>
 <li><strong>Legal name:</strong> Fundación Give&amp;Grow International</li>
 <li><strong>Tax ID (NIT):</strong> 901.948.930-2</li>
@@ -5254,7 +5260,7 @@ var PRIVACY = {
 <li><strong>Legal Representative:</strong> Juan Sebastián Navarro Osorio</li>
 <li><strong>Supervisory authority:</strong> Superintendence of Industry and Commerce (SIC), Colombia</li>
 </ul>
-<h3>2. What data we process and why</h3>
+<h2>2. What data we process and why</h2>
 <p>We process only the data needed to carry out our work, depending on who provides it:</p>
 <ul>
 <li><strong>Donors (individuals and companies):</strong> name or legal name, ID, email, phone, city and donation amount or history — to issue your donation certificate with the tax benefit provided by law, keep our accounting, manage your membership and send you impact reports. We do not store payment-card data.</li>
@@ -5262,9 +5268,9 @@ var PRIVACY = {
 <li><strong>Volunteers:</strong> identification and professional data — to verify suitability and assign you to programs.</li>
 <li><strong>Program beneficiaries:</strong> data provided by partner foundations to deliver and document impact. Data of children and adolescents receives reinforced protection and is processed only with their legal guardian's authorization.</li>
 </ul>
-<h3>3. Legal basis</h3>
+<h2>3. Legal basis</h2>
 <p>We process your data with your <strong>prior, express and informed authorization</strong>, collected through a physical or digital form (with a timestamp). You may revoke it at any time. For data subjects in the European Union we rely on the bases in Article 6 of the GDPR (consent, performance of a contract, legal obligation or legitimate interest, as applicable).</p>
-<h3>4. Your rights</h3>
+<h2>4. Your rights</h2>
 <p>As a data subject you may, at any time:</p>
 <ul>
 <li><strong>Know and access</strong> the data we process about you.</li>
@@ -5274,17 +5280,17 @@ var PRIVACY = {
 <li><strong>Object</strong> to certain processing and request the <strong>portability</strong> of your data.</li>
 <li><strong>File a complaint</strong> with the SIC (Colombia) or the relevant European supervisory authority.</li>
 </ul>
-<h3>5. How to exercise your rights</h3>
+<h2>5. How to exercise your rights</h2>
 <p>Write to <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> with your name, ID and request. We acknowledge receipt within <strong>2 business days</strong>; we answer access requests within <strong>10 business days</strong> and claims (rectification, erasure, withdrawal) within <strong>15 business days</strong>.</p>
-<h3>6. Data retention</h3>
+<h2>6. Data retention</h2>
 <p>We keep each piece of data only as long as necessary or as required by law: donation records for <strong>10 years</strong> (tax and accounting duty); beneficiary data for the duration of the program plus 5 years; volunteer data for the engagement plus 3 years. Once the term ends, data is securely deleted.</p>
-<h3>7. International transfers</h3>
+<h2>7. International transfers</h2>
 <p>We may share data with processors or partners in other countries (for example, technology providers or cooperation foundations), always with adequate safeguards: contractual clauses, data-processing agreements and the minimum data necessary, anonymized where possible.</p>
-<h3>8. Information security</h3>
+<h2>8. Information security</h2>
 <p>We protect your data with encryption in transit, role-based access control, audit logs and incident-management protocols. No system is infallible, but we apply recognized standards to reduce risk.</p>
-<h3>9. Cookies and analytics</h3>
+<h2>9. Cookies and analytics</h2>
 <p>This site <strong>uses no tracking or marketing cookies, and no third-party pixels.</strong> To understand site usage we use <strong>Cloudflare Web Analytics, which sets no cookies and does not identify individuals.</strong> We only store your <strong>theme preference (light or dark)</strong> locally in your browser; it is not a tracking cookie and is not sent to any server.</p>
-<h3>10. Term and changes</h3>
+<h2>10. Term and changes</h2>
 <p>This policy (Version 1.0) is effective upon publication and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>`
 };
 function renderPrivacy(){
@@ -5734,6 +5740,15 @@ function almaSetBusy(b){
    ALMA dejó de ser una página (v5 Fase 2): es una columna disponible en cualquier
    ruta. Maneja foco (trampa + retorno al disparador), Esc y el estado aria. */
 var almaLastFocus = null;
+/* EN UN TELÉFONO NO SE ENFOCA LA CAJA SOLA (auditoría 28 sep 2026). Enfocarla
+   abre el teclado, que tapa media pantalla justo cuando la persona iba a leer el
+   saludo y los chips; y en iOS, con letra menor de 16px, además hacía zoom. Con
+   ratón o teclado sí se enfoca: ahí no hay teclado que aparezca y ahorra un clic.
+   Se pregunta por el PUNTERO y no por el ancho, porque una tableta ancha también
+   saca el teclado. */
+function almaTactil(){
+  try { return !!(window.matchMedia && window.matchMedia("(pointer:coarse)").matches); } catch (e) { return false; }
+}
 function almaPanel(open){
   var p = document.getElementById("alma-panel");
   if (!p) return false;
@@ -5748,7 +5763,7 @@ function almaPanel(open){
     if (b) b.setAttribute("aria-expanded","true");
     document.body.classList.add("alma-lock");
     var i = document.getElementById("alma-input");
-    if (i) setTimeout(function(){ i.focus(); }, 60);
+    if (i && !almaTactil()) setTimeout(function(){ i.focus(); }, 60);
   } else {
     p.classList.remove("open"); if (s) s.classList.remove("open");
     if (b) b.setAttribute("aria-expanded","false");
@@ -5780,10 +5795,19 @@ function almaSend(){
   almaHistory.push({role:"user", content:text});
   var thinking = almaPush("bot", '<span class="alma-typing" aria-label="' + (lang === "en" ? "Typing" : "Escribiendo") + '"><i></i><i></i><i></i></span>');
   almaSetBusy(true);
+  /* UN TOPE DE 20 SEGUNDOS (auditoría 28 sep 2026). Sin él, con mala señal —la
+     de una familia en zona de sismo— el fetch se quedaba colgado y los tres
+     puntos de «escribiendo» no se iban nunca: la caja seguía bloqueada y no
+     había forma de volver a preguntar sin recargar. 20 s cubre una respuesta
+     larga del modelo con holgura; pasado eso, lo honesto es decir que falló. */
+  var ctl = (typeof AbortController === "function") ? new AbortController() : null;
+  var tope = ctl ? setTimeout(function(){ ctl.abort(); }, 20000) : null;
+  var turno = almaHistory.length - 1;
   fetch("/api/alma", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ messages: almaHistory })
+    body: JSON.stringify({ messages: almaHistory }),
+    signal: ctl ? ctl.signal : undefined
   })
   .then(function(r){ return r.json(); })
   .then(function(data){
@@ -5822,14 +5846,51 @@ function almaSend(){
        igual que un mensaje suyo, así que en el turno siguiente se le mandaba de
        vuelta al modelo como si lo hubiera dicho él. */
     if (esRespuesta) almaHistory.push({role:"assistant", content:reply});
+    else { almaOlvidaTurno(turno, text); almaReintentar(thinking, text); }
     document.getElementById("alma-msgs").scrollTop = 99999;
   })
   .catch(function(){
-    thinking.innerHTML = almaFmt(lang==="en"
-      ? "Sorry, I could not connect right now. Write to sebas@thegiveandgrowproject.org."
-      : "Lo siento, no pude conectarme ahora. Escribe a sebas@thegiveandgrowproject.org.");
+    /* Sin red, o el tope de arriba. Antes remitía al correo personal de una
+       persona: un buzón que no es de la fundación y que no se atiende en
+       horario. #contacto es el canal institucional y sigue ahí cuando ALMA no. */
+    almaOlvidaTurno(turno, text);
+    thinking.innerHTML = "";
+    var p = document.createElement("p");
+    p.appendChild(document.createTextNode(t("alma.err.red") + " "));
+    var a = document.createElement("a");
+    a.href = "#contacto"; a.textContent = t("alma.err.contacto");
+    a.addEventListener("click", function(){ almaPanel(false); });
+    p.appendChild(a); p.appendChild(document.createTextNode("."));
+    thinking.appendChild(p);
+    almaReintentar(thinking, text);
   })
-  .then(function(){ almaSetBusy(false); var inp = document.getElementById("alma-input"); if (inp) inp.focus(); });
+  .then(function(){
+    if (tope) clearTimeout(tope);
+    almaSetBusy(false);
+    var inp = document.getElementById("alma-input");
+    if (inp && !almaTactil()) inp.focus();
+  });
+}
+/* EL TURNO QUE FALLÓ SE SACA DEL HISTORIAL. Si se quedaba, la pregunta siguiente
+   viajaba detrás de una pregunta sin respuesta —dos turnos de usuario seguidos—
+   y el modelo contestaba a las dos, o a la equivocada. Solo se quita si sigue
+   siendo el último y es el mismo texto: nunca se borra otra cosa. */
+function almaOlvidaTurno(i, text){
+  var h = almaHistory[i];
+  if (i === almaHistory.length - 1 && h && h.role === "user" && h.content === text) almaHistory.pop();
+}
+/* Un chip «Reintentar» debajo del aviso: vuelve a mandar la MISMA pregunta, sin
+   obligar a escribirla otra vez en un teléfono. Se crea con addEventListener y
+   no con data-act porque lleva el texto en el cierre, no en el HTML. */
+function almaReintentar(burbuja, text){
+  var b = document.createElement("button");
+  b.type = "button"; b.className = "alma-chip alma-retry"; b.textContent = t("alma.retry");
+  b.addEventListener("click", function(){
+    if (almaBusy) return;
+    b.remove();
+    almaAsk(text);
+  });
+  burbuja.appendChild(b);
 }
 
 /* ---------- init ---------- */
@@ -6318,7 +6379,7 @@ function trackNoGuideSend(){
   var subject = encodeURIComponent(t("track.ng.mailsubj"));
   var body = encodeURIComponent(t("track.ng.mailbody").replace("{email}", email) + "\n\n" + t("form.tel") + ": " + tel);
   window.location.href = "mailto:contabilidad@thegiveandgrowproject.org?subject="+subject+"&body="+body;
-  note.style.display=""; note.style.color="var(--g)"; note.textContent = t("track.ng.sent");
+  note.style.display=""; note.style.color="var(--ok)"; note.textContent = t("track.ng.sent");
 }
 
 /* ============ contadores en vivo (leen del inventario real) ============ */
@@ -6913,7 +6974,10 @@ function volSubmit(ev){
 
 function allyMsg(el, msg, ok){
   el.style.display = ""; el.textContent = msg;
-  el.style.color = ok ? "var(--g)" : "var(--err,#c0392b)";
+  /* --ok y no --g (auditoría 28 sep 2026): --g no se aclara de noche y el «te
+     escribimos pronto» quedaba verde oscuro sobre verde oscuro. --ok vale lo
+     mismo de día y se aclara de noche, igual que --err en la otra rama. */
+  el.style.color = ok ? "var(--ok)" : "var(--err,#c0392b)";
   /* Al dejar de fallar se BORRAN las marcas. Sin esto un campo ya corregido se
      quedaba con `aria-invalid="true"` puesto, y un lector de pantalla seguiria
      anunciandolo como invalido para siempre — peor que no marcar nada. Vale
