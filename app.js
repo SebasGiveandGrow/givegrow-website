@@ -1358,6 +1358,12 @@ var I18N = {
     "gracias.miaporte":"Tu membresía, tu certificado y el rastreo de tus aportes están en Mi aporte →",
     "gracias.sub.t":"Tu membresía quedó registrada.",
     "gracias.sub.p":"PayPal confirma el primer cobro y ahí te llega el recibo con tu número de guía. No es inmediato, así que preferimos decírtelo en vez de darte las gracias por algo que todavía no está cobrado. Puedes cancelarla cuando quieras desde tu propia cuenta de PayPal.",
+    "gracias.sub.programa":"Programa",
+    "gracias.sub.e.pendiente":"Esperando el primer cobro",
+    "gracias.sub.e.activa":"Activa",
+    "gracias.sub.e.suspendida":"Suspendida",
+    "gracias.sub.e.cerrada":"Cancelada",
+    "gracias.sub.e.otra":"En revisión",
     "gracias.pp.t":"Gracias. Tu donación quedó en PayPal.",
     "gracias.pp.p":"Por este camino tu aporte no lleva número de guía nuestro: el comprobante te lo envía PayPal a tu correo. Si la hiciste mensual, la pausas o la cancelas desde tu propia cuenta de PayPal, sin escribirnos. El certificado de donación aplica a donaciones en pesos colombianos para el impuesto de renta en Colombia, así que un aporte en dólares por PayPal no lo lleva.",
     "gracias.lost.t":"No encontramos esa transacción.",
@@ -2411,6 +2417,11 @@ function postLang(l){
      la persona toca algo, y el botón ya lleva $50.000 puestos. Decir el monto
      solo después de que lo cambies es justo al revés. */
   if (document.getElementById("mb-ir")) mbPinta();
+  /* Y LA LINEA DEL CALCULO DE PAYPAL (#mif-calc), por lo mismo: la arma
+     `miCalcula` con `t()` y no lleva `data-i18n`, asi que `applyLang` no la
+     toca. Sin esto, quien cambiaba a ingles seguia leyendo «Nivel Retoño. De
+     lo que aportes llegan…» hasta que tocaba el monto. */
+  try { miCalcula(); } catch(e){}
   if (!MARCA_MMC){ renderHeroImpact(); renderHomeFundaciones(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
   renderPrivacy();
   /* Por lo mismo que la linea de arriba: `applyLang` acaba de repintar los
@@ -4641,6 +4652,10 @@ function payRecNote(){
    Wompi vuelve con SU id, no con nuestra guía. El Worker traduce uno en otra y
    devuelve NUESTRO estado, que es el que trae el webhook. */
 var GRACIAS = { id:null, guia:null, intentos:0, timer:null };
+/* La membresia de PayPal que vuelve por `?sub=`: lo que respondio el servidor
+   (`d`), si ya se pidio, y cuantas veces. Se guarda para repintarla al cambiar
+   de idioma sin volver a preguntar: la respuesta trae el programa en los dos. */
+var GRACIAS_SUB = { d:null, pedido:false, intentos:0 };
 
 /* LOS MENSAJES FIJOS DE ESTA PANTALLA, y viven aparte porque hay que volver a
    ponerlos.
@@ -4679,7 +4694,63 @@ function graciasFijo(){
      rastrear. Un boton que no puede cumplir es peor que no tenerlo. */
   var tr = document.getElementById("gracias-track");
   if (tr) tr.style.display = (clave === "pp") ? "none" : "";
+
+  /* EL PROGRAMA DE LA MEMBRESIA, que esta pantalla no decia. Se pide UNA vez
+     —`graciasFijo` corre tambien en cada cambio de idioma— y despues solo se
+     repinta lo que ya llego. */
+  if (clave === "sub"){
+    graciasSubPinta();
+    if (!GRACIAS_SUB.pedido){ GRACIAS_SUB.pedido = true; graciasSubConsulta(); }
+  }
   return true;
+}
+
+/* LOS DOS IDENTIFICADORES, sacados por patron y no con URLSearchParams por lo
+   mismo que arriba: PayPal pega los suyos al volver y no siempre respeta el
+   `&`. `sub` es nuestro `custom_id`; `subscription_id` lo pone PayPal. El
+   servidor exige los dos y comprueba con PayPal que son la misma suscripcion:
+   el programa sale de la fila, nunca de esta URL (ver `apiPaypalMembresia`). */
+function graciasSubConsulta(){
+  var ms = location.search.match(/[?&]sub=(GG-SUB-[a-f0-9]{12})/);
+  var mi = location.search.match(/subscription_id=(I-[A-Z0-9]{6,30})/);
+  if (!ms || !mi || location.pathname.replace(/\/$/, "") !== "/gracias") return;
+  fetch("/api/paypal/membresia?sub=" + encodeURIComponent(ms[1]) + "&id=" + encodeURIComponent(mi[1]))
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      /* Sin respuesta la pantalla se queda como estaba: el mensaje general es
+         cierto por si solo, y un «—» en el programa no le diria nada a nadie. */
+      if (!d || !d.programa) return;
+      GRACIAS_SUB.d = d;
+      graciasSubPinta();
+      /* El primer cobro llega por el webhook, a veces en segundos. Se vuelve a
+         mirar unas pocas veces mientras siga pendiente —el cruce con PayPal ya
+         quedo hecho en el servidor, asi que esto solo lee la base— y luego se
+         deja: el mensaje ya dice que no es inmediato. */
+      GRACIAS_SUB.intentos++;
+      if (d.estado === "aprobacion_pendiente" && GRACIAS_SUB.intentos < 6) setTimeout(graciasSubConsulta, 5000);
+    })
+    .catch(function(){});
+}
+
+function graciasSubPinta(){
+  var caja = document.getElementById("gracias-sub");
+  var d = GRACIAS_SUB.d;
+  if (!caja || !d) return;
+  caja.style.display = "";
+  caja.classList.add("in");
+  var prog = document.getElementById("gr-sub-programa");
+  if (prog) prog.textContent = (lang === "en" ? d.programa.en : d.programa.es) || t("membres.cta.dest.general");
+  var clave = { aprobacion_pendiente:"pendiente", activa:"activa", suspendida:"suspendida",
+                cancelada:"cerrada", expirada:"cerrada" }[d.estado] || "otra";
+  var pill = { activa:"is-on", suspendida:"is-none", cerrada:"is-none" }[clave] || "is-wip";
+  var ee = document.getElementById("gr-sub-estado");
+  if (ee){
+    ee.textContent = "";
+    var s = document.createElement("span");
+    s.className = "med-step-s " + pill;
+    s.textContent = t("gracias.sub.e." + clave);
+    ee.appendChild(s);
+  }
 }
 
 function graciasArranca(){

@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=8f9d6fa2" defer></script>
+<script src="/app.js?v=ca4a0b5b" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -932,6 +932,16 @@
           <div class="rec-item"><dt data-i18n="gracias.destino">Destino</dt><dd id="gr-destino">—</dd></div>
         </dl>
         <p class="rec-note mu" data-i18n="gracias.save">Guarda tu número de guía. Es el mismo con el que puedes rastrear tu aporte de principio a fin.</p>
+      </div>
+      <!-- LA MEMBRESIA DE PAYPAL que vuelve por `?sub=`: el programa que eligio
+           y el estado de la suscripcion, leidos de la base por el servidor
+           (`/api/paypal/membresia`). Sin guia ni monto: la guia nace con el
+           primer cobro, y la trae el recibo. -->
+      <div class="rec-ledger rv d2" id="gracias-sub" style="display:none">
+        <dl class="rec-list">
+          <div class="rec-item"><dt data-i18n="gracias.sub.programa">Programa</dt><dd id="gr-sub-programa">—</dd></div>
+          <div class="rec-item"><dt data-i18n="gracias.estado">Estado</dt><dd id="gr-sub-estado">—</dd></div>
+        </dl>
       </div>
       <p class="mu rv d2" id="gracias-nota" style="display:none;margin-top:16px;max-width:70ch"></p>
       <div class="cta-actions rv d2" style="justify-content:flex-start;margin-top:24px">
