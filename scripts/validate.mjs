@@ -2140,4 +2140,73 @@ try {
   else ok("consentimientos: las " + fotos.length + " fotos de img/jornadas/ y la galería general tienen entrada");
 } catch (e) { err("no se pudo revisar el registro de consentimientos: " + e.message); }
 
+/* ── check #26 · EL INVENTARIO QUE ESCRIBE LA HOJA TIENE LA FORMA QUE LEE app.js ──
+   `data/inventario.json` no lo escribe una persona ni un PR: lo empuja a `main`
+   la automatización de Apps Script, directo y sin revisión (ver
+   ops/inventario-guard.gs). Hasta el 28 sep 2026 el gate solo miraba que fuera
+   JSON válido, así que una exportación rota —una columna corrida, `donaciones`
+   convertido en objeto, una guía con espacios— se desplegaba igual y el
+   rastreo de #rastrea dejaba de encontrar las guías de los donantes, en
+   silencio: `trackRender` pinta «Recibida» a cualquier estado que no conoce.
+
+   Con esto la exportación rota FALLA EL DEPLOY y producción se queda con el
+   inventario anterior, que es el lado bueno del error.
+
+   LA LISTA DE ESTADOS NO SE COPIA A MANO: se lee de `TRACK_STEPS` en app.js,
+   para que añadir un paso allí no deje este check desactualizado (pregunta 2
+   de la cabecera de este archivo). Los campos de texto pueden venir vacíos —la
+   hoja tiene filas a medio llenar, y app.js las tolera—; lo que no puede pasar
+   es que falten la guía o que un campo cambie de tipo. */
+try {
+  const inv = JSON.parse(readFileSync("data/inventario.json", "utf8"));
+  const appTxt = readFileSync("app.js", "utf8");
+  const mPasos = appTxt.match(/var TRACK_STEPS\s*=\s*\[([^\]]*)\]/);
+  const pasos = mPasos ? [...mPasos[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]) : [];
+  const fallos = [];
+  if (!pasos.length) fallos.push("no encontré `var TRACK_STEPS = [...]` en app.js: este check lee de ahí los estados válidos");
+  if (!inv || typeof inv !== "object" || Array.isArray(inv)) fallos.push("la raíz no es un objeto");
+  else {
+    if (typeof inv.actualizado !== "string" || isNaN(Date.parse(inv.actualizado))) {
+      fallos.push("`actualizado` no es una fecha legible (el guard de deploy.yml la ignora, pero tiene que existir)");
+    }
+    if (!Array.isArray(inv.donaciones)) fallos.push("`donaciones` no es una lista: #rastrea no encontraría ninguna guía");
+    for (const k of ["entregas", "fondos"]) {
+      if (inv[k] !== undefined && !Array.isArray(inv[k])) fallos.push("`" + k + "` existe y no es una lista");
+    }
+    const vistas = new Set();
+    (Array.isArray(inv.donaciones) ? inv.donaciones : []).forEach((d, i) => {
+      const donde = "donaciones[" + i + "]";
+      if (!d || typeof d !== "object" || Array.isArray(d)) { fallos.push(donde + " no es un objeto"); return; }
+      /* La misma normalización que `normalizeGuide` de app.js: mayúsculas y sin
+         espacios. Si normalizada no tiene forma de guía, el donante no la
+         encuentra nunca. */
+      const g = String(d.guia == null ? "" : d.guia).toUpperCase().replace(/\s+/g, "");
+      if (!/^GG-\d{4}-\d{6}$/.test(g)) fallos.push(donde + ": guía «" + d.guia + "» no tiene la forma GG-AAAA-NNNNNN");
+      else if (vistas.has(g)) fallos.push(donde + ": guía " + g + " repetida — #rastrea mostraría solo la primera");
+      vistas.add(g);
+      for (const c of ["fecha", "tipo", "modo", "destino", "desc", "estado", "entrega"]) {
+        if (d[c] !== undefined && d[c] !== null && typeof d[c] !== "string") fallos.push(donde + ": `" + c + "` no es texto");
+      }
+      if (d.fecha && !/^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) fallos.push(donde + ": fecha «" + d.fecha + "» no es AAAA-MM-DD");
+      if (d.tipo && !["dinero", "especie"].includes(d.tipo)) fallos.push(donde + ": tipo «" + d.tipo + "» (se espera dinero o especie)");
+      if (d.modo && !["dirigida", "fondo"].includes(d.modo)) fallos.push(donde + ": modo «" + d.modo + "» (se espera dirigida o fondo)");
+      if (d.estado && pasos.length && !pasos.includes(d.estado)) {
+        fallos.push(donde + ": estado «" + d.estado + "» no es un paso de TRACK_STEPS (" + pasos.join(", ") + ")");
+      }
+    });
+    (Array.isArray(inv.fondos) ? inv.fondos : []).forEach((f, i) => {
+      if (!f || typeof f !== "object" || typeof f.id !== "string" || !f.id) fallos.push("fondos[" + i + "] sin `id` de texto");
+    });
+    (Array.isArray(inv.entregas) ? inv.entregas : []).forEach((e, i) => {
+      if (!e || typeof e !== "object" || Array.isArray(e)) fallos.push("entregas[" + i + "] no es un objeto");
+    });
+  }
+  if (fallos.length) {
+    err("check #26 · data/inventario.json tiene " + fallos.length + " problema(s) — la exportación de la hoja salió rota:\n        " +
+        fallos.slice(0, 20).join("\n        ") + (fallos.length > 20 ? "\n        …y " + (fallos.length - 20) + " más" : ""));
+  } else {
+    ok("inventario.json con la forma que lee app.js (" + (inv.donaciones || []).length + " donaciones)");
+  }
+} catch (e) { err("check #26 · no se pudo leer data/inventario.json: " + e.message); }
+
 process.exit(fail);

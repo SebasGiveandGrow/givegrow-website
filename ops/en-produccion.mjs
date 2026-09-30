@@ -27,11 +27,21 @@
    es justo lo que el guard busca.
 
    Uso:  node ops/en-produccion.mjs
+         node ops/en-produccion.mjs --margen 45   (lo que usa el vigilante horario)
+
+   `--margen N` (auditoría del 28 sep 2026): no cuenta los commits de código de
+   los últimos N minutos. El vigilante horario de GitHub
+   (.github/workflows/vigilante.yml) corre esto cada hora, y un PR recién
+   fusionado cuyo deploy todavía está corriendo no es un fallo: es un deploy en
+   camino. Sin el margen, cada fusión haría sonar la alarma una vez en falso, y
+   una alarma que suena en falso se aprende a ignorar.
 */
 
 import { execSync } from "node:child_process";
 
 const sh = (c) => execSync(c, { encoding: "utf8" }).trim();
+const iMargen = process.argv.indexOf("--margen");
+const MARGEN_MIN = iMargen > 0 ? Number(process.argv[iMargen + 1]) || 0 : 0;
 const TOPE = 120;   // runs hacia atrás antes de rendirse
 
 const main = sh("git rev-parse origin/main");
@@ -54,8 +64,10 @@ if (!real) {
 }
 
 const delante = sh(`git rev-list --count ${real.headSha}..origin/main`);
+/* Con margen: solo los commits cuya fecha de commit es anterior al corte. */
+const corte = MARGEN_MIN ? `--until="${MARGEN_MIN} minutes ago"` : "";
 const codigo = Number(sh(
-  `git log --format=%s ${real.headSha}..origin/main | grep -vc Inventario || true`
+  `git log ${corte} --format=%s ${real.headSha}..origin/main | grep -vc Inventario || true`
 ) || 0);
 
 console.log(`main                 ${main.slice(0, 7)}`);
