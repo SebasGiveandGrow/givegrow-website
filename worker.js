@@ -40,6 +40,20 @@ import { recibo, certificado, informeTriage, inspeccionPDF,
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
 
+/* LA VERSIÓN DE styles.css QUE ENLAZAN LAS PÁGINAS DEL WORKER (auditoría 28 sep
+   2026). `_headers` sirve /styles.css con «immutable» durante un año, y el panel,
+   la firma, el carnet, la ficha, /pago y /membresia la enlazaban SIN `?v=`: un
+   navegador que ya la tuviera guardada no volvía a pedirla nunca, así que un
+   arreglo de CSS podía no llegarle jamás. `index.html` no tenía el problema
+   porque lleva su hash desde siempre.
+
+   Es el MISMO hash de `index.html` (md5 de styles.css, 8 caracteres) y el gate
+   lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
+   `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
+   porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
+const STYLES_V = "10c32dfc";
+const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
+
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
    no como un cambio de `ORIGIN` a propósito: `ORIGIN` lo usan el recibo, el
    carnet y las tarjetas de compartir, que son de la FUNDACIÓN. Tocarlo mandaría
@@ -4084,6 +4098,147 @@ function noEsLoQueDice(tipo, bytes) {
   return comprueba ? !comprueba(bytes) : false;
 }
 
+/* ── METADATOS FUERA, TAMBIÉN DEL LADO DEL SERVIDOR ────────────────────────
+   Las fotos de las actas de entrega se publican en /evidencia, y la foto cruda
+   de un teléfono lleva en su EXIF la latitud y longitud de donde se tomó: la
+   casa de la familia que recibió. La auditoría del 28 sep 2026 lo encontró en
+   diez fotos del propio sitio. El panel ya redibuja la foto en un lienzo antes
+   de subirla, pero eso es el navegador de quien sube, y aquí se repite por
+   dos razones: una llamada directa a la API no pasa por el lienzo, y las fotos
+   subidas ANTES de este cambio siguen crudas en R2 — por eso se limpia también
+   al servir, no solo al guardar.
+
+   Se hace sin re-codificar: se quitan segmentos enteros (APP1 EXIF/XMP, APP13
+   IPTC y COM en JPEG; eXIf/iTXt/tEXt/zTXt/tIME en PNG; EXIF/XMP en WebP) y los
+   píxeles quedan byte a byte. La única pieza del EXIF que el navegador usa es
+   la orientación; si no es 1, se reescribe un EXIF mínimo que solo la lleva,
+   para que una foto vieja no salga acostada.
+
+   Devuelve null si el archivo no se deja recorrer: quien llama decide, y las
+   dos llamadas eligen no publicar antes que publicar algo sin limpiar. */
+function unirBytes(partes) {
+  let n = 0;
+  for (const p of partes) n += p.length;
+  const out = new Uint8Array(n);
+  let k = 0;
+  for (const p of partes) { out.set(p, k); k += p.length; }
+  return out;
+}
+
+function orientacionExif(seg) {
+  /* seg = «Exif\0\0» + TIFF. Solo se lee la etiqueta 0x0112 del IFD0. */
+  if (seg.length < 14) return 1;
+  const t = seg.subarray(6);
+  const le = t[0] === 0x49;
+  const u16 = (o) => le ? (t[o] | (t[o + 1] << 8)) : ((t[o] << 8) | t[o + 1]);
+  const u32 = (o) => le ? (t[o] | (t[o + 1] << 8) | (t[o + 2] << 16)) + t[o + 3] * 0x1000000
+                        : t[o] * 0x1000000 + ((t[o + 1] << 16) | (t[o + 2] << 8) | t[o + 3]);
+  const ifd = u32(4);
+  if (ifd + 2 > t.length) return 1;
+  const n = u16(ifd);
+  for (let i = 0; i < n; i++) {
+    const e = ifd + 2 + 12 * i;
+    if (e + 12 > t.length) break;
+    if (u16(e) === 0x0112) { const o = u16(e + 8); return o >= 1 && o <= 8 ? o : 1; }
+  }
+  return 1;
+}
+
+function exifSoloOrientacion(o) {
+  /* APP1 de 34 bytes: TIFF big-endian con un IFD de una sola entrada. */
+  return new Uint8Array([
+    0xff, 0xe1, 0x00, 0x22, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00,
+    0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08,
+    0x00, 0x01, 0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, o, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00
+  ]);
+}
+
+function jpegSinMetadatos(b) {
+  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
+  const partes = [b.subarray(0, 2)];
+  let i = 2, orient = 1, scan = false;
+  while (i + 4 <= b.length) {
+    if (b[i] !== 0xff) return null;
+    const m = b[i + 1];
+    if (m === 0xff) { i++; continue; }
+    if (m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { partes.push(b.subarray(i, i + 2)); i += 2; continue; }
+    /* Desde el inicio del scan ya no hay metadatos: el resto va tal cual. */
+    if (m === 0xda) { partes.push(b.subarray(i)); scan = true; break; }
+    const fin = i + 2 + ((b[i + 2] << 8) | b[i + 3]);
+    if (fin > b.length) return null;
+    if (m === 0xe1) {
+      const seg = b.subarray(i + 4, fin);
+      if (seg[0] === 0x45 && seg[1] === 0x78 && seg[2] === 0x69 && seg[3] === 0x66) orient = orientacionExif(seg);
+    } else if (m !== 0xed && m !== 0xfe) {
+      partes.push(b.subarray(i, fin));
+    }
+    i = fin;
+  }
+  if (!scan) return null;
+  if (orient !== 1) {
+    /* Tras el APP0 (JFIF) si lo hay, que es donde lo espera un lector estricto. */
+    const tras = partes[1] && partes[1][1] === 0xe0 ? 2 : 1;
+    partes.splice(tras, 0, exifSoloOrientacion(orient));
+  }
+  return unirBytes(partes);
+}
+
+function pngSinMetadatos(b) {
+  if (b.length < 8 || b[1] !== 0x50 || b[2] !== 0x4e || b[3] !== 0x47) return null;
+  const fuera = new Set(["eXIf", "iTXt", "tEXt", "zTXt", "tIME"]);
+  const partes = [b.subarray(0, 8)];
+  let i = 8, fin = false;
+  while (i + 12 <= b.length) {
+    const L = ((b[i] << 24) >>> 0) + ((b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]);
+    const t = String.fromCharCode(b[i + 4], b[i + 5], b[i + 6], b[i + 7]);
+    const hasta = i + 12 + L;
+    if (hasta > b.length) return null;
+    if (!fuera.has(t)) partes.push(b.subarray(i, hasta));
+    i = hasta;
+    if (t === "IEND") { fin = true; break; }
+  }
+  return fin ? unirBytes(partes) : null;
+}
+
+function webpSinMetadatos(b) {
+  if (b.length < 20 || b[8] !== 0x57 || b[9] !== 0x45 || b[10] !== 0x42 || b[11] !== 0x50) return null;
+  const partes = [];
+  let i = 12;
+  while (i + 8 <= b.length) {
+    const t = String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]);
+    const L = b[i + 4] | (b[i + 5] << 8) | (b[i + 6] << 16) | (b[i + 7] << 24 >>> 0);
+    const hasta = i + 8 + L + (L & 1);
+    if (i + 8 + L > b.length) return null;
+    if (t === "VP8X") {
+      /* Se apagan las banderas de EXIF (0x08) y XMP (0x04): anunciarlas sin
+         los chunks deja el archivo inválido para un lector estricto. */
+      const c = b.slice(i, Math.min(hasta, b.length));
+      c[8] &= ~0x0c;
+      partes.push(c);
+    } else if (t !== "EXIF" && t !== "XMP ") {
+      partes.push(b.subarray(i, Math.min(hasta, b.length)));
+    }
+    i = hasta;
+  }
+  const cuerpo = unirBytes(partes);
+  const out = new Uint8Array(12 + cuerpo.length);
+  out.set(b.subarray(0, 12), 0);
+  out.set(cuerpo, 12);
+  const tam = out.length - 8;
+  out[4] = tam & 0xff; out[5] = (tam >> 8) & 0xff; out[6] = (tam >> 16) & 0xff; out[7] = (tam >>> 24) & 0xff;
+  return out;
+}
+
+function sinMetadatosFoto(tipo, bytes) {
+  try {
+    if (tipo === "image/jpeg") return jpegSinMetadatos(bytes);
+    if (tipo === "image/png") return pngSinMetadatos(bytes);
+    if (tipo === "image/webp") return webpSinMetadatos(bytes);
+  } catch (x) { /* un archivo que no se deja recorrer: abajo */ }
+  return null;
+}
+
 /* El mismo rechazo en los tres sitios que aceptan fotos. Se responde 400 y no
    415: el tipo SI esta permitido, lo que no cuadra es el contenido. El cliente
    ya trata cualquier rechazo del servidor como definitivo -no reintenta, lo
@@ -5460,10 +5615,11 @@ const MATRICULA_OK = (col) =>
 
 /* QUIÉN FIRMA, según el registro y no según lo que alguien teclee.
 
-   Camila declaró `091037-0518660 CND` al inscribirse —la matrícula que se
-   comprobó en el COPNIA— y escribió `24579` en su evaluación. `24579` es lo que
-   iba impreso como firma en el PDF de la familia, y nada cruzaba los dos
-   valores. No era mala fe: es un número largo que el formulario pedía otra vez,
+   Una ingeniera declaró su matrícula completa al inscribirse —la que se
+   comprobó en el COPNIA— y escribió otro número, de cinco cifras, en su
+   evaluación. Ese otro número es lo que iba impreso como firma en el PDF de la
+   familia, y nada cruzaba los dos valores. (Nombre y matrícula retirados de
+   este comentario el 28 sep 2026: el repositorio es público.) No era mala fe: es un número largo que el formulario pedía otra vez,
    de memoria, cada vez que se evalúa un caso.
 
    La salida no es comprobar y avisar del desajuste, es NO PREGUNTAR. El sistema
@@ -11379,7 +11535,7 @@ function paginaFirma() {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Firma de certificados · Give&Grow</title>
-<link rel="stylesheet" href="/styles.css">
+${HOJA_CSS}
 <style>
   .wrap{max-width:820px;margin:0 auto;padding:28px 20px 80px}
   input,select,textarea{font-size:16px}
@@ -11533,7 +11689,7 @@ function paginaCarnet(c) {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Carnet de miembro · ${esc(c.codigo)} · Give&Grow</title>
-<link rel="stylesheet" href="/styles.css">
+${HOJA_CSS}
 </head><body style="background:#0E2118;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
 <main class="carnet">
   <div class="carnet-top">
@@ -15113,9 +15269,18 @@ async function rutaEvidencia(env, numero, archivo) {
 
   const obj = await env.MEDIA.get("entregas/" + numero + "/" + archivo);
   if (!obj) return json({ error: "no_encontrada" }, 404);
-  return new Response(obj.body, {
+  const tipo = obj.httpMetadata && obj.httpMetadata.contentType || "application/octet-stream";
+  /* Las fotos subidas antes del 28 sep 2026 están crudas en R2, con el GPS de
+     la casa. Se limpian al servir; si una no se deja limpiar, no se sirve: una
+     foto rota en /evidencia se ve y se arregla, una ubicación publicada no. */
+  let cuerpo = obj.body;
+  if (TIPOS_FOTO[tipo]) {
+    cuerpo = sinMetadatosFoto(tipo, new Uint8Array(await obj.arrayBuffer()));
+    if (!cuerpo) return json({ error: "foto_ilegible" }, 404);
+  }
+  return new Response(cuerpo, {
     headers: {
-      "content-type": obj.httpMetadata && obj.httpMetadata.contentType || "application/octet-stream",
+      "content-type": tipo,
       /* La clave nunca cambia de contenido: si se reemplaza la foto, cambia el
          nombre del archivo. Eso sigue siendo cierto y por eso esta respuesta se
          puede cachear — pero lo que se cacheaba no era solo el contenido, era
@@ -15314,6 +15479,9 @@ async function adminSubirFoto(request, env, numero, url, quien) {
   if (bytes.length > MAX_FOTO) return json({ error: "archivo_muy_grande", max_mb: 8 }, 413);
   /* Lo que dice ser, como en las fotos de casos y de inspecciones. */
   if (noEsLoQueDice(tipo, bytes)) return rechazoNoEsFoto();
+  /* Se guarda YA sin EXIF: esta foto se va a publicar (ver sinMetadatosFoto). */
+  const limpia = sinMetadatosFoto(tipo, bytes);
+  if (!limpia) return rechazoNoEsFoto();
 
   let fotos = [];
   try { fotos = JSON.parse(e.fotos || "[]"); } catch (x) { /* nada */ }
@@ -15321,7 +15489,7 @@ async function adminSubirFoto(request, env, numero, url, quien) {
      es una ruta que llega del cliente. */
   const archivo = (fotos.length + 1) + "-" + tokenNuevo().slice(0, 8) + "." + ext;
 
-  await env.MEDIA.put("entregas/" + numero + "/" + archivo, bytes, {
+  await env.MEDIA.put("entregas/" + numero + "/" + archivo, limpia, {
     httpMetadata: { contentType: tipo }
   });
   fotos.push({ k: archivo, alt: limpiar(url.searchParams.get("alt"), 200) });
@@ -15752,13 +15920,14 @@ function paginaAdmin() {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Panel · Give&Grow</title>
-<link rel="stylesheet" href="/styles.css">
+${HOJA_CSS}
 <style>
 /* ---- Portada de decisiones ----
-   VA AQUÍ Y NO EN styles.css, y es deliberado. El panel enlaza /styles.css SIN
-   versión, y esa URL se sirve «Cache-Control: immutable» durante un año: un
-   cambio de CSS para el panel puede no llegarle nunca al navegador que ya la
-   tiene guardada. Esta página, en cambio, se sirve «no-store», así que lo que
+   VA AQUÍ Y NO EN styles.css, y es deliberado. El panel enlazaba /styles.css
+   SIN versión, y esa URL se sirve «Cache-Control: immutable» durante un año: un
+   cambio de CSS para el panel podía no llegarle nunca al navegador que ya la
+   tenía guardada. Desde el 28 sep 2026 lleva ?v= (ver STYLES_V), pero la
+   razón de fondo sigue: esta página se sirve «no-store», así que lo que
    viaja aquí llega siempre. De paso, son bytes que no paga cada visitante del
    sitio público por una pantalla que nunca va a abrir.
 
@@ -18973,15 +19142,60 @@ document.addEventListener("change", function(e){
   var inp = e.target.closest("[data-foto]");
   if (!inp || !inp.files || !inp.files[0]) return;
   var f = inp.files[0];
+  inp.value = "";
+  /* EL TEXTO ALTERNATIVO SE PREGUNTA; YA NO SALE DEL NOMBRE DEL ARCHIVO.
+     Antes el alt era el nombre sin extension, y ese nombre sale publicado en
+     /evidencia: «IMG_4821» no describe nada, y «casa_de_Maria_calle_12» dice
+     justo lo que el acta promete no decir. Auditoria del 28 sep 2026.
+     Cancelar no sube nada; dejarlo vacio sube la foto sin descripcion. */
+  var alt = window.prompt("Describe la foto en una frase corta. Sale como texto alternativo en la " +
+    "página pública de evidencia: sin nombres de personas ni direcciones.\\n\\nPuedes dejarlo vacío.", "");
+  if (alt === null) return;
   /* El cuerpo va crudo con su content-type: sin multipart no hay que parsear
      nada en el Worker, y el nombre del archivo lo pone el servidor. */
-  fetch("/api/admin/entrega/" + encodeURIComponent(inp.getAttribute("data-foto")) + "/foto?alt=" +
-        encodeURIComponent(f.name.replace(/\\.[a-z0-9]+$/i,"")), {
-    method: "POST", headers: {"content-type": f.type}, body: f
+  fotoSinMetadatos(f).then(function(limpia){
+    return fetch("/api/admin/entrega/" + encodeURIComponent(inp.getAttribute("data-foto")) + "/foto?alt=" +
+          encodeURIComponent(String(alt).trim()), {
+      method: "POST", headers: {"content-type": "image/jpeg"}, body: limpia
+    });
+  }, function(){
+    throw new Error("lienzo");
   }).then(function(r){ return r.json(); })
     .then(function(d){ if (d.error) alert("No se pudo subir: " + (d.ayuda || d.error)); cargarEntregas(); })
-    .catch(function(){ alert("No se pudo subir la foto."); });
+    .catch(function(x){
+      alert(String(x && x.message) === "lienzo"
+        ? "Este navegador no pudo leer la foto (¿HEIC?). Expórtala como JPG y vuelve a subirla."
+        : "No se pudo subir la foto.");
+    });
 });
+
+/* LA FOTO DE EVIDENCIA PASA POR UN LIENZO ANTES DE SALIR DEL NAVEGADOR.
+   Estas fotos se publican en /evidencia, y la foto cruda de un telefono trae
+   en su EXIF la latitud y longitud de donde se tomo: la casa de la familia
+   que recibio. La auditoria del 28 sep 2026 encontro diez fotos del sitio
+   con ese bloque intacto. Redibujar en un canvas y exportar JPEG deja solo
+   los pixeles; imageOrientation hornea el giro del EXIF para que la foto no
+   salga acostada al perderlo.
+   A diferencia de comprimirEnRuta, aqui NO hay plan B con el original: si el
+   navegador no puede decodificarla, no se sube. Alli la foto es privada y
+   perderla es peor; aqui es publica y lo peor es publicar la ubicacion.
+   El servidor vuelve a limpiarla al guardarla y al servirla (sinMetadatosFoto). */
+function fotoSinMetadatos(file){
+  if (typeof createImageBitmap !== "function") return Promise.reject(new Error("lienzo"));
+  return createImageBitmap(file, { imageOrientation: "from-image" }).then(function(bm){
+    var k = Math.min(1, 2000 / Math.max(bm.width, bm.height));
+    var cv = document.createElement("canvas");
+    cv.width = Math.round(bm.width * k); cv.height = Math.round(bm.height * k);
+    var cx = cv.getContext("2d");
+    /* Fondo blanco: un PNG con transparencia saldria negro en JPEG. */
+    cx.fillStyle = "#fff"; cx.fillRect(0, 0, cv.width, cv.height);
+    cx.drawImage(bm, 0, 0, cv.width, cv.height);
+    if (bm.close) bm.close();
+    return new Promise(function(res, rej){
+      cv.toBlob(function(b){ if (b) res(b); else rej(new Error("lienzo")); }, "image/jpeg", 0.85);
+    });
+  });
+}
 
 document.addEventListener("click", function(e){
   if (e.target.id === "e-crear"){
@@ -19705,7 +19919,7 @@ function paginaMetodoPago(cfg) {
 + '<title>Registrar metodo de pago · Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-+ '<link rel="stylesheet" href="/styles.css">\n'
++ HOJA_CSS + '\n'
 + '</head>\n'
 + '<body>\n'
 + '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
@@ -19779,7 +19993,10 @@ async function rutaMetodoPago(env, url) {
   const monto = (Number.isInteger(mNum) && mNum >= MONTO_MIN && mNum <= MONTO_MAX) ? mNum : 0;
   const html = paginaMetodoPago({ amb, info, pub, monto,
     nivel: monto ? nivelPorMensual(monto).es : "",
-    aviso: url.searchParams.get("aviso") || "" });
+    /* hasOwn y no AVISOS_METODO[k] a secas: «?aviso=constructor» devolvería
+       la función de Object.prototype. */
+    aviso: Object.hasOwn(AVISOS_METODO, String(url.searchParams.get("aviso") || ""))
+      ? AVISOS_METODO[url.searchParams.get("aviso")] : "" });
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -20237,7 +20454,7 @@ async function apiCrearFuentePago(request, env, url) {
      form y lo manda. Por eso la respuesta tambien es una redireccion y no un
      JSON — al otro lado hay un navegador, no nuestro codigo. */
   let f;
-  try { f = await request.formData(); } catch { return volverAlFormulario(url, "No se pudo leer el formulario."); }
+  try { f = await request.formData(); } catch { return volverAlFormulario(url, "formulario"); }
 
   /* EL MONTO SE LEE AQUI ARRIBA Y NO DONDE SE USA, para que cada camino de
      error lo devuelva con la persona. La primera version lo leia al final: un
@@ -20247,13 +20464,13 @@ async function apiCrearFuentePago(request, env, url) {
 
   const email = String(f.get("email") || "").trim().slice(0, 200);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return volverAlFormulario(url, "Revisa tu correo: no parece valido.", montoTxt);
+    return volverAlFormulario(url, "correo", montoTxt);
   }
   /* Las DOS casillas, y por separado. Son dos contratos distintos —politica de
      privacidad y Ley 1581— y Wompi exige un token para cada uno. Una sola
      casilla de «acepto todo» no seria aceptacion explicita de ninguno. */
   if (!f.get("acepta_privacidad") || !f.get("acepta_datos")) {
-    return volverAlFormulario(url, "Hay que aceptar los dos documentos para continuar.", montoTxt);
+    return volverAlFormulario(url, "aceptar", montoTxt);
   }
 
   /* EL NOMBRE DEL CAMPO DEL TOKEN NO ESTA DOCUMENTADO. La guia de Wompi dice
@@ -20271,11 +20488,11 @@ async function apiCrearFuentePago(request, env, url) {
     /* Se registran los NOMBRES de los campos recibidos, nunca sus valores: por
        aqui pasa un token de pago y no tiene por que quedar en un log. */
     console.error("fuente de pago sin token; campos recibidos:", [...f.keys()].join(","));
-    return volverAlFormulario(url, "No recibimos el metodo de pago. Intenta de nuevo.", montoTxt);
+    return volverAlFormulario(url, "sin_metodo", montoTxt);
   }
 
   const info = await wompiInfoComercio(env);
-  if (!info) return volverAlFormulario(url, "No pudimos confirmar los terminos con la pasarela. Intenta en unos minutos.", montoTxt);
+  if (!info) return volverAlFormulario(url, "terminos", montoTxt);
 
   const amb = ambienteWompi(pub);
   let creada;
@@ -20296,11 +20513,11 @@ async function apiCrearFuentePago(request, env, url) {
       /* El motivo de Wompi si se registra —es lo unico que permite entender un
          rechazo—, pero nunca el cuerpo que enviamos. */
       console.error("payment_sources", r.status, JSON.stringify(creada && creada.error || {}).slice(0, 300));
-      return volverAlFormulario(url, "La pasarela no acepto el metodo de pago. Revisa los datos e intenta de nuevo.", montoTxt);
+      return volverAlFormulario(url, "rechazado", montoTxt);
     }
   } catch (e) {
     console.error("payment_sources red", e && e.message);
-    return volverAlFormulario(url, "No pudimos contactar la pasarela. Intenta en unos minutos.", montoTxt);
+    return volverAlFormulario(url, "pasarela", montoTxt);
   }
 
   const d = (creada && creada.data) || {};
@@ -20358,6 +20575,23 @@ async function apiCrearFuentePago(request, env, url) {
   }
   return Response.redirect(ORIGIN + "/pago/listo?" + q.toString(), 303);
 }
+
+/* LA URL LLEVA UN CÓDIGO, NO EL TEXTO. Hasta el 28 sep 2026 el aviso viajaba
+   entero en `?aviso=` y la página lo pintaba tal cual —escapado, así que no
+   era XSS—, pero cualquiera podía armar un enlace a la página de la tarjeta,
+   en el dominio de la fundación, con el texto que quisiera: «Tu pago falló,
+   escríbenos al 300…». Es la página donde la gente pone su tarjeta, y la más
+   rentable de suplantar. Ahora el enlace solo puede elegir entre estos
+   mensajes; un código desconocido no pinta nada. */
+const AVISOS_METODO = Object.freeze({
+  formulario: "No se pudo leer el formulario.",
+  correo: "Revisa tu correo: no parece valido.",
+  aceptar: "Hay que aceptar los dos documentos para continuar.",
+  sin_metodo: "No recibimos el metodo de pago. Intenta de nuevo.",
+  terminos: "No pudimos confirmar los terminos con la pasarela. Intenta en unos minutos.",
+  rechazado: "La pasarela no acepto el metodo de pago. Revisa los datos e intenta de nuevo.",
+  pasarela: "No pudimos contactar la pasarela. Intenta en unos minutos."
+});
 
 /* Se vuelve al formulario con el motivo a la vista. Un 303 y no un JSON porque
    quien esta al otro lado es un navegador que acaba de enviar un formulario:
@@ -20418,7 +20652,7 @@ function paginaPagoListo(url) {
 + '<title>' + esc(titulo.replace(/<[^>]*>/g, "")) + ' \u00b7 Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-+ '<link rel="stylesheet" href="/styles.css">\n</head>\n<body>\n'
++ HOJA_CSS + '\n</head>\n<body>\n'
 + '<main class="wrap" style="padding-top:40px;padding-bottom:48px;max-width:640px">\n'
 + '  <h1>' + titulo + '</h1>\n'
 + '  <p class="lead">' + lead + '</p>\n'
@@ -20506,7 +20740,7 @@ function cascaraBaja(titulo, cuerpo, lang, tema) {
 + '<title>' + esc(titulo) + ' · Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-+ '<link rel="stylesheet" href="/styles.css">\n</head>\n<body>\n'
++ HOJA_CSS + '\n</head>\n<body>\n'
 + '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
 + cuerpo
 + '</main>\n</body>\n</html>';
@@ -20935,7 +21169,7 @@ function sharePage(p, lang) {
 <link rel="alternate" hreflang="en" href="${esc(urlEn)}">
 <link rel="alternate" hreflang="x-default" href="${esc(urlEs)}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/styles.css">
+${HOJA_CSS}
 </head>
 <body>
 <main class="wrap" style="padding-top:34px;padding-bottom:48px">
@@ -21078,10 +21312,38 @@ function marcarPruebas(respuesta, host) {
 
    Va en el UNICO sitio por donde salen todas, y no en cada ruta: asi la proxima
    ruta que alguien escriba nace protegida en vez de olvidarse. */
-function sinOlfato(respuesta) {
-  if (respuesta.headers.get("x-content-type-options")) return respuesta;
+/* Y LAS OTRAS TRES CABECERAS QUE `_headers` DA A LOS ASSETS (28 sep 2026).
+   La auditoría previa al lanzamiento encontró que /pago/*, /membresia/*,
+   /carnet/* y /ficha/* —páginas que genera el Worker, dos de ellas con token en
+   la URL y una donde se pone la tarjeta— salían sin HSTS, sin Referrer-Policy
+   y sin Permissions-Policy: el mismo hueco de arriba, con otras tres cabeceras.
+   Va en el mismo sitio y por la misma razón.
+
+   SOLO SE PONE LA QUE FALTA. Varias rutas ya llevan su propia
+   `referrer-policy` o su CSP a la medida; esas mandan, y esta envoltura no
+   las pisa nunca.
+
+   LA EXCEPCIÓN DE PERMISOS ES /triaje/inspeccion: la herramienta de terreno
+   pide la ubicación del teléfono (navigator.geolocation) y es la razón de
+   ser de su formulario. Ahí va `geolocation=(self)`, y `camera=(self)` por
+   prudencia con la foto de la visita. En el resto, nada: el formulario de la
+   familia usa un input de archivo con `capture`, que abre la cámara del
+   sistema y no pasa por esta política — el sitio estático ya sirve
+   `camera=()` en `_headers` y las familias suben fotos igual. */
+const PERMISOS_WORKER = "geolocation=(), microphone=(), camera=()";
+const PERMISOS_TERRENO = "geolocation=(self), microphone=(), camera=(self)";
+
+function sinOlfato(respuesta, ruta) {
+  const faltan = {
+    "x-content-type-options": "nosniff",
+    "strict-transport-security": "max-age=31536000; includeSubDomains",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": String(ruta || "").startsWith("/triaje/inspeccion") ? PERMISOS_TERRENO : PERMISOS_WORKER
+  };
+  const nombres = Object.keys(faltan).filter((k) => !respuesta.headers.has(k));
+  if (!nombres.length) return respuesta;
   const r = new Response(respuesta.body, respuesta);
-  r.headers.set("x-content-type-options", "nosniff");
+  for (const k of nombres) r.headers.set(k, faltan[k]);
   return r;
 }
 
@@ -21322,6 +21584,16 @@ function marcarMarca(respuesta, host) {
       e.setAttribute("loading", "lazy");
       e.removeAttribute("fetchpriority");
     } })
+    /* Y AL REVÉS CON LA FOTO DE LA PORTADA DE MIRA MI CASA (auditoría 28 sep
+       2026). En `index.html` ahora va `loading="lazy"`: en el ápex esa página
+       está oculta y, con `fetchpriority="high"`, competía con el hero de la
+       fundación por el ancho de banda de la primera carga sin mostrarse nunca.
+       Aquí es lo contrario: `#proyecto` es la ruta por defecto del subdominio y
+       esta foto es su LCP, así que recupera la carga inmediata y la prioridad. */
+    .on("figure.mmc-portada-foto img", { element(e) {
+      e.removeAttribute("loading");
+      e.setAttribute("fetchpriority", "high");
+    } })
     .transform(respuesta);
 }
 
@@ -21354,6 +21626,29 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const ruta = url.pathname;
+    /* HTTP → HTTPS, COMO RED DE ÚLTIMO RECURSO (28 sep 2026).
+       La auditoría previa al lanzamiento encontró que los dominios de
+       producción respondían 200 por http:// plano: la página de la tarjeta, el
+       rastreo con su guía y la página de la familia con su token en la URL,
+       todo legible y alterable en el camino. El arreglo de verdad es «Always
+       Use HTTPS» en el panel de Cloudflare, que actúa antes de todo; esto solo
+       cubre lo que llega al Worker. Los assets que el runtime sirve sin
+       pasar por aquí (lo que no está en `run_worker_first` de wrangler.toml)
+       quedan fuera de esta red.
+       Misma ruta y query. Local y *.localhost se quedan en http: ahí
+       no hay certificado y `wrangler dev` sirve así. */
+    if (url.protocol === "http:" &&
+        !/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(url.hostname) && !/\.localhost$/i.test(url.hostname)) {
+      const segura = new URL(request.url);
+      segura.protocol = "https:";
+      /* Un POST por http (un webhook mal configurado) recibe 308, que conserva
+         el método y el cuerpo; con 301 el cliente lo repetiría como GET. */
+      const lectura = request.method === "GET" || request.method === "HEAD";
+      return new Response(null, {
+        status: lectura ? 301 : 308,
+        headers: { "location": segura.toString(), "cache-control": "public, max-age=3600" }
+      });
+    }
     /* LA RED VA AQUÍ Y NO EN CADA RAMA. Había un try/catch que cubría
        `/api/…` y otro que cubría el panel, pero SIETE rutas se resuelven antes
        de llegar a ellos —`/api/trm`, las tres de PayPal, `/api/alma` y las dos
@@ -21368,11 +21663,11 @@ export default {
       const esPruebas = /\.workers\.dev$/i.test(url.hostname);
       if (esPruebas) {
         /* Se responde a través del marcador para no repetirlo en cada rama. */
-        return sinOlfato(marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
+        return sinOlfato(marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta), ruta);
       }
       /* Igual que arriba: se envuelve la respuesta entera en vez de tocar cada
          rama. Fuera del subdominio devuelve exactamente lo que recibió. */
-      return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
+      return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta), ruta);
     } catch (e) {
       console.error("sin_capturar", ruta, e && e.message);
       /* Y AHORA QUEDA ESCRITO: un 500 que solo vive en la consola no lo ve
@@ -22267,6 +22562,30 @@ export default {
             "form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
         }
       });
+    }
+
+    /* LAS DOS RUTAS CON PATH DE LA SPA (auditoría 28 sep 2026).
+       ========================================================================
+       Hasta hoy `not_found_handling` era «single-page-application»: CUALQUIER
+       dirección que no fuera un archivo devolvía la portada con un 200. Un
+       enlace roto, una imagen mal escrita, `/lo-que-sea`: todo «existía», y
+       Google indexaba copias de la portada bajo nombres inventados (el «soft
+       404» que marca Search Console). Ahora es «404-page» y lo que no existe
+       responde 404 con `404.html`.
+
+       Pero la SPA vive de dos rutas con PATH que no son archivos y que antes
+       salían gratis del comodín:
+         · `/gracias` — a donde Wompi y PayPal devuelven al donante (ver
+           `redirect-url` y `return_url` más arriba). app.js la lee de
+           `location.pathname`.
+         · `/caso/CV-…` — el enlace de seguimiento de cada familia en Mira Mi
+           Casa, que ya estaba en `run_worker_first` por `marcarCaso`.
+       Sin esto, el donante que acaba de pagar aterrizaría en un 404. Por eso
+       las dos se sirven AQUÍ con el `index.html` de la raíz, y `/gracias` entra
+       en `run_worker_first` el mismo día. Cualquier ruta con path nueva en la
+       SPA tiene que añadirse a las dos listas. */
+    if (ruta === "/gracias" || ruta === "/gracias/" || ruta.startsWith("/caso/")) {
+      return env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
     }
 
     return env.ASSETS.fetch(request);

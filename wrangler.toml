@@ -5,7 +5,16 @@ compatibility_date = "2024-11-01"
 [assets]
 directory = "."
 binding = "ASSETS"
-not_found_handling = "single-page-application"
+# "404-page" y no "single-page-application" desde el 28 sep 2026 (auditoría previa
+# al lanzamiento). Con la SPA, CUALQUIER dirección que no fuera un archivo devolvía
+# la portada con 200: `/no-existe`, `/img/foto-mal-escrita.jpg`… Google lo marca
+# como «soft 404» e indexa copias de la portada con nombres inventados. Ahora lo
+# que no existe responde 404 con `404.html` (estático, sin scripts).
+# La SPA enruta por HASH, así que el comodín solo lo usaban DOS rutas con path:
+# `/gracias` (retorno de Wompi y PayPal) y `/caso/*` (Mira Mi Casa). Las dos van
+# en `run_worker_first` y el Worker les sirve `index.html` a mano — ver el final
+# de `ruteo` en worker.js. UNA RUTA CON PATH NUEVA EN LA SPA VA EN LOS DOS SITIOS.
+not_found_handling = "404-page"
 html_handling = "auto-trailing-slash"
 # Estas rutas DEBEN estar aquí: sin ellas, `not_found_handling =
 # single-page-application` se las traga y devuelve index.html en lugar de invocar
@@ -41,7 +50,7 @@ html_handling = "auto-trailing-slash"
 # wrangler RECHAZA el despliegue si se anade una regla redundante —«rule
 # '/api/*' makes it redundant»—. Se intento anadirla por claridad y la
 # herramienta no dejo, con razon.
-run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest", "/pago/*", "/membresia", "/membresia/*"]
+run_worker_first = ["/", "/gracias", "/gracias/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest", "/pago/*", "/membresia", "/membresia/*"]
 
 # ---------------------------------------------------------------------------
 # LA ÚNICA TAREA PROGRAMADA DEL WORKER, y la primera que tiene.
@@ -201,7 +210,9 @@ workers_dev = true
 [env.sandbox.assets]
 directory = "."
 binding = "ASSETS"
-not_found_handling = "single-page-application"
+# Igual que producción (28 sep 2026): si pruebas siguiera en SPA, un 404 que solo
+# existe allí no se vería nunca antes de desplegar.
+not_found_handling = "404-page"
 html_handling = "auto-trailing-slash"
 # `true` y no una lista, a diferencia de producción: aquí TODA petición pasa por
 # el Worker para que pueda marcar noindex. Con la lista, las peticiones a assets

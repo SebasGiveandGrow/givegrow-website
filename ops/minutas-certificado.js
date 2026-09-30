@@ -14,7 +14,7 @@
    check #10 de `validate.mjs` falla el build si alguien toca uno y no el otro.
 
    POR QUÉ LOS .docx NO SE COMMITEAN
-   Este repositorio es público. Las cédulas y el articulado ya lo son (viven en
+   Este repositorio es público. El articulado ya lo es (vive en
    `documentos.js`), así que un .docx no revelaría nada nuevo; lo que sí dejaría
    es una plantilla EDITABLE y lista para llenar de un documento que se rinde
    bajo la gravedad de juramento y que compromete a la Revisora Fiscal. El
@@ -140,7 +140,31 @@ function membrete() {
   ];
 }
 
+/* LAS CÉDULAS NO VIVEN EN ESTE ARCHIVO (retiradas el 28 sep 2026).
+   Estuvieron escritas aquí, y el repositorio es público: la de la Revisora
+   Fiscal es dato personal de un tercero, indexable y permanente. `documentos.js`
+   ya las había quitado por la misma razón; esta era la copia que quedaba.
+
+   La minuta se firma a mano, así que la cédula puede escribirse a mano. Si se
+   quiere impresa, se le pasa a esta corrida por UNA de dos vías:
+     · variables de entorno:
+         GG_CC_REP_LEGAL="1.234.567" GG_CC_REVISORA="7.654.321" node ops/minutas-certificado.js
+     · o un archivo local `ops/firmantes.local.json` (está en .gitignore):
+         { "repLegal": "1.234.567", "revisora": "7.654.321" }
+   Sin ninguna de las dos, sale la línea en blanco para llenar a mano. */
+function cedulasLocales() {
+  let archivo = {};
+  const ruta = path.join(path.dirname(new URL(import.meta.url).pathname), "firmantes.local.json");
+  try { archivo = JSON.parse(fs.readFileSync(ruta, "utf8")); } catch { /* no hay archivo: se sigue */ }
+  const linea = (v) => "C.C. " + (v ? String(v).trim() : "______________________");
+  return {
+    repLegal: linea(process.env.GG_CC_REP_LEGAL || archivo.repLegal),
+    revisora: linea(process.env.GG_CC_REVISORA || archivo.revisora)
+  };
+}
+
 function firmas() {
+  const cc = cedulasLocales();
   const col = (nombre, cargo, lineas) => new TableCell({
     width: { size: 4400, type: WidthType.DXA },
     margins: { top: 60, bottom: 0, left: 0, right: 120 },
@@ -160,8 +184,8 @@ function firmas() {
       borders: NADA,
       rows: [new TableRow({
         children: [
-          col("JUAN SEBASTIÁN NAVARRO OSORIO", "Representante Legal", ["C.C. 1.007.420.930"]),
-          col("MANUELA LONDOÑO ARBOLEDA", "Revisora Fiscal", ["C.C. 1.040.745.501", "T.P. 244894-T"])
+          col("JUAN SEBASTIÁN NAVARRO OSORIO", "Representante Legal", [cc.repLegal]),
+          col("MANUELA LONDOÑO ARBOLEDA", "Revisora Fiscal", [cc.revisora, "T.P. 244894-T"])
         ]
       })]
     })
