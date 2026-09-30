@@ -143,8 +143,8 @@ Olvidarlo = los usuarios ven la versión vieja hasta 1 año.
   `IF NOT EXISTS`, que es otra razón para escribirlas así.
   Y hay que correrlo **dentro del repo**: sin `wrangler.toml` a la vista falla
   con «No configuration file found».
-- **El certificado de donación NO se emite solo.** Lo firma la Revisora Fiscal
-  bajo la gravedad de juramento; sale de `/admin`, revisado por una persona. Su
+- **El certificado de donación NO se emite solo.** Lo firman el Representante
+  Legal y la Revisora Fiscal bajo la gravedad de juramento; sale de `/admin`, revisado por una persona. Su
   texto lo suministró la contadora: no se edita sin ella.
 - **Su articulado está en DOS archivos y el gate lo vigila.** `documentos.js`
   arma el PDF del sistema; `ops/minutas-certificado.js` genera las minutas en
@@ -188,8 +188,15 @@ Olvidarlo = los usuarios ven la versión vieja hasta 1 año.
 
 - **"Evidencia, no promesas"**: nada de cifras no verificables ni promesas sin
   respaldo. Cifras reportadas por terceros se redactan como "reportadas".
-- **Transparencia SIN datos financieros** (ingresos/gastos/totales, ni ceros)
-  hasta el cierre del año 2025. Decisión de Sebas.
+- **Cifras financieras: solo las de estados financieros FIRMADOS.** Desde el 29
+  sep 2026 se publican los estados financieros 2025 firmados por el Representante
+  Legal y la Revisora Fiscal (`docs/estados-financieros-2025.pdf`: año de
+  constitución, sin operación). Fuera de esos documentos firmados, ninguna cifra
+  financiera ni porcentaje de destino de fondos sin validar la Revisora Fiscal.
+  Decisión de Sebas.
+- **Gobierno:** no hay junta directiva. El máximo órgano de dirección es el que
+  definen los estatutos (hoy, el fundador), con Representante Legal y Revisora
+  Fiscal. No escribir «la junta» ni «el consejo» como si existieran.
 - **Derechos de imagen**: fotos subidas por las fundaciones = de ellas, solo con
   consentimiento registrado en `consent{}` (menores: protección especial, Ley
   1581). Imágenes que Sebas aporta para la web = uso libre.

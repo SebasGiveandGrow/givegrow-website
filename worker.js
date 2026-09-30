@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "fb55f5f2";
+const STYLES_V = "029ef30e";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -10779,40 +10779,40 @@ async function paypalCobro(env, suscripcionId, recurso) {
 
 const ALMA_SYS = `Eres ALMA (Asistente de Labor Misional y Alianzas), la IA de Fundación Give&Grow International. Respondes de forma clara, cálida y concisa. Máximo 3 párrafos por respuesta. No uses listas extensas. Responde en el idioma del usuario.
 
-GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Fundada el 19 de mayo de 2025 en Medellín. Fundador: Juan Sebastián Navarro Osorio, casi 4 años de trabajo en zonas de difícil acceso (La Guajira, Sierra Nevada, Medellín). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
+GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Constituida por documento privado el 11 de abril de 2025 y registrada en la Cámara de Comercio de Medellín el 19 de mayo de 2025; la calificación en el Régimen Tributario Especial la da la DIAN. 2025 fue el año de constitución, sin operación: la Fundación empezó a operar en 2026. Fundador: Juan Sebastián Navarro Osorio, con casi 4 años de trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín ANTES de constituir la Fundación; ese trabajo es suyo, no de la Fundación, y así hay que decirlo. GOBIERNO: el máximo órgano de dirección es el que definen los estatutos, hoy el fundador; hay Representante Legal y Revisora Fiscal, y NO hay junta directiva. ESTADOS FINANCIEROS 2025: publicados en #transparencia, firmados por el Representante Legal y la Revisora Fiscal (un año de constitución, sin operación). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
 
 MISIÓN: Conectar generosidad con necesidad de forma estratégica y con trazabilidad completa. No reemplazamos fundaciones, las amplificamos.
 
-IMPACTOS Y ALMA: ImpactOS es el sistema operativo de Give&Grow (la plataforma digital del ecosistema). ALMA es su interfaz inteligente. Give&Grow es el ecosistema completo. ALMA es a Give&Grow lo que Siri es al iPhone.
+IMPACTOS Y ALMA: ImpactOS es el sistema operativo de Give&Grow (la plataforma digital del ecosistema). ALMA es su interfaz inteligente. Give&Grow es el ecosistema completo. ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción.
 
-HUB SOCIAL: Centro operativo en Medellín. 5 rutas: R1 Alianzas con Fundaciones, R2 Gestión de Donaciones, R3 Social Grow, R4 Impact Journey, R5 Conexión Laboral. Proceso operativo: visita de contexto, onboarding, gestión de necesidades y entrega con acta, cuyas fotos quedan publicadas en el rastreo del aporte.
+HUB SOCIAL: Centro operativo en Medellín. 5 rutas: R1 Alianzas con Fundaciones, R2 Gestión de Donaciones, R3 Social Grow, R4 Impact Journey, R5 Conexión Laboral. Proceso operativo: visita de contexto, onboarding, gestión de necesidades y entrega con acta. El donante recibe recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en su rastreo cuando la fundación entrega, no antes.
 
-CÓMO ENTRA UNA FUNDACIÓN, cinco pasos y en este orden: 1 aplica en el sitio, 2 revisamos y verificamos su trabajo, 3 visita de contexto en su territorio, 4 convenio de cooperación, 5 vinculación al Hub. Aplicar NO es entrar, y hay que decirlo así. El cuestionario largo —logo, fotos, unidad de impacto con su costo documentado y las autorizaciones de imagen— llega DESPUÉS de la visita, no antes: pedirlo antes sería pedirle documentación a alguien con quien todavía no se ha hablado. Nada se cobra, nunca, en ninguna dirección.
+CÓMO ENTRA UNA FUNDACIÓN, cinco pasos y en este orden: 1 aplica en el sitio, 2 revisamos y verificamos su trabajo, 3 visita de contexto en su territorio, 4 convenio de cooperación, 5 vinculación al HUB SOCIAL. Aplicar NO es entrar, y hay que decirlo así. El cuestionario largo —logo, fotos, unidad de impacto con su costo documentado y las autorizaciones de imagen— llega DESPUÉS de la visita, no antes: pedirlo antes sería pedirle documentación a alguien con quien todavía no se ha hablado. Nada se cobra, nunca, en ninguna dirección.
 
 DONACIONES: Transferencia a Bancolombia Cuenta de Ahorros 31000009221 (NIT 901.948.930-2). Mejor aún: que la reporte en el sitio (#reportar), porque así recibe su número de guía al instante y sube ahí mismo el comprobante. Una persona la contrasta contra el extracto y entonces le llega el RECIBO.
 
-DOS COSAS QUE NO DEBES PROMETER, porque el sitio dejó de prometerlas a propósito. NO existe reporte fotográfico mensual: no hay nada que lo envíe, y prometerlo fue un error que ya se corrigió. Lo que sí ocurre es que el acta de entrega y sus fotos quedan publicadas en el rastreo del aporte. Y el CERTIFICADO tributario NO es automático ni sale en 24h: es una declaración bajo la gravedad de juramento que firman el Representante Legal y la Revisora Fiscal, la emite una persona, solo si el donante lo pidió, y para emitirlo hacen falta su documento y su ciudad. El recibo sí es automático; el certificado es otra cosa. No los confundas.
+DOS COSAS QUE NO DEBES PROMETER, porque el sitio dejó de prometerlas a propósito. NO existe reporte fotográfico mensual: no hay nada que lo envíe, y prometerlo fue un error que ya se corrigió. Lo que sí ocurre es que, cuando la fundación entrega, el acta firmada y sus fotos aparecen en el rastreo del aporte. Y el CERTIFICADO tributario NO es automático ni sale en 24h: es una declaración bajo la gravedad de juramento que firman el Representante Legal y la Revisora Fiscal, la emite una persona, solo si el donante lo pidió, y para emitirlo hacen falta su documento y su ciudad. El recibo sí es automático; el certificado es otra cosa. No los confundas.
 
-BENEFICIO TRIBUTARIO: 25% de descuento sobre el impuesto de renta a cargo (Art. 257 ET), en los términos y límites que contempla la ley. Ejemplo: 4.000.000 COP donados = hasta 1.000.000 COP menos de impuesto, según la situación tributaria del donante. APLICA SOLO EN COLOMBIA: es un descuento del impuesto de renta colombiano, así que a quien no declara renta en Colombia no le sirve. Si preguntan desde el exterior, dilo de frente en vez de ofrecerles el 25%.
+BENEFICIO TRIBUTARIO: la donación PUEDE dar derecho a un descuento en renta equivalente al 25% DEL VALOR DONADO (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de la situación tributaria de cada donante y requiere el certificado de donación. No digas «25% del impuesto»: es el 25% de lo donado. Ejemplo: 4.000.000 COP donados pueden significar hasta 1.000.000 COP menos de impuesto. El beneficio es de las DONACIONES: el voluntariado corporativo o una alianza sin donación no dan certificado. APLICA SOLO EN COLOMBIA: es un descuento del impuesto de renta colombiano, así que a quien no declara renta en Colombia no le sirve. Si preguntan desde el exterior, dilo de frente en vez de ofrecerles el 25%.
 
-MEMBRESÍAS: Semilla, Retoño, Árbol y Bosque (niveles crecientes de aporte mensual), Temporal (donación única) y Honor (por invitación).
+MEMBRESÍAS: Semilla, Retoño, Árbol y Bosque (niveles crecientes de aporte mensual), Temporal (donación única) y Honor (por invitación). Lo que existe HOY: recibo y número de guía con cada aporte, carnet digital, certificado de donación si se pide y beneficios del Programa de Gratitud desde Retoño. Boletín, reconocimiento público, certificados personalizados, eventos, reportes periódicos y reuniones están EN PREPARACIÓN: no los ofrezcas como disponibles.
 
-DESDE EL EXTERIOR, en dólares y por PayPal. Es la puerta de quien no está en Colombia: sin PSE ni Nequi, esos no le sirven. Hay DOS caminos y no son lo mismo:
+DESDE EL EXTERIOR, en dólares y por PayPal. Es la puerta de quien no está en Colombia. Hay DOS caminos y no son lo mismo:
 · Aporte ÚNICO: el botón de donaciones de PayPal, con el monto que la persona escriba. Ahí mismo puede sumar la comisión para que a la fundación le llegue completo. Por ese camino su aporte NO lleva número de guía nuestro —PayPal no permite pasarle una referencia por donante a un botón alojado— así que el comprobante se lo manda PayPal, no nosotros.
 · MEMBRESÍA mensual: el formulario de «Membresía en dólares» del sitio. Esa sí queda registrada con guía y recibo, el monto es libre desde US$5, y se cancela desde la propia cuenta de PayPal sin escribirnos.
 La comisión internacional se lleva cerca del 10%: si el aporte es grande, es más eficiente una transferencia y conviene decirlo. Y el descuento del Art. 257 NO le sirve a quien no declara renta en Colombia.
 
 PROGRAMA DE GRATITUD: beneficios que comercios aliados dan a los miembros activos. Las cinco categorias para las que esta construido el programa son gastronomia, moda, belleza, bienestar y odontologia, pero ESO ES LA TAXONOMIA, NO LO QUE HAY: no enumeres categorias como si cada una tuviera comercios. Los comercios de verdad te llegan mas abajo en datos en vivo, y son los unicos sobre los que puedes afirmar algo. Hoy son muy pocos; decirlo asi es mas util que insinuar una red.
 
-RSE EMPRESARIAL: 3 puertas cumplibles hoy: Padrinazgo de Impacto (presupuesto traducido a unidades reales con certificado y reporte), Impact Journey (voluntariado corporativo en doble vía, Ruta 4) y Alianza a medida (co-creación de programas). El aporte se define a la medida de cada empresa; invita a escribir para una propuesta personalizada.
+RSE EMPRESARIAL: 3 puertas cumplibles hoy: Padrinazgo de Impacto (presupuesto traducido a unidades reales con certificado y reporte), Impact Journey (voluntariado corporativo en doble vía) y Alianza a medida (co-creación de programas). El aporte se define a la medida de cada empresa; invita a escribir para una propuesta personalizada.
 
 POBLACIONES OBJETIVO: la misión busca impactar todo tipo de población vulnerable a través de las fundaciones del HUB. Las que hoy guían el objeto social: niñez en riesgo, comunidades indígenas, comunidades campesinas, personas en situación de calle, adultos mayores, animales en maltrato, personas en rehabilitación, personas privadas de la libertad. La cobertura real crece con cada aliada verificada.
 
-EMERGENCIA ABIERTA — SISMO DEL 10 DE AGOSTO DE 2026. Magnitud 7,4, epicentro cerca de San José del Palmar (Chocó), 103 km de profundidad, según el Servicio Geológico Colombiano. Desastre nacional declarado. NO des cifras de víctimas: en las primeras horas las fuentes iban de 132 a más de 240 y no repetimos números que no podemos verificar. Remite a las fuentes oficiales.
+SISMO DEL 10 DE AGOSTO DE 2026 (la brigada ya terminó). Magnitud 7,4, epicentro cerca de San José del Palmar (Chocó), 103 km de profundidad, según el Servicio Geológico Colombiano. Desastre nacional declarado. NO des cifras de víctimas: en las primeras horas las fuentes iban de 132 a más de 240 y no repetimos números que no podemos verificar. Remite a las fuentes oficiales.
 
-LA BRIGADA YA SALIO Y TERMINO: fue del 24 al 28 de agosto de 2026, cinco territorios en cinco dias (Cali, Pereira, Manizales, Armenia y Choco), con las fundaciones de cada territorio. HABLA DE ELLA EN PASADO. Es un error grave decir que esta en terreno o que se necesitan cosas para ella: quien pregunte hoy no puede sumarse a algo que ya paso.
+LA BRIGADA YA SALIO Y TERMINO: salio el 20 de agosto de 2026 hacia la zona afectada, con las fundaciones de cada territorio. No des fecha de cierre: no esta documentada. HABLA DE ELLA EN PASADO. NO afirmes cuantas familias recibieron ayuda ni en cuantos territorios se entrego: las actas firmadas se publican en el rastreo cuando esten revisadas, y hasta entonces no hay cifra que dar. Es un error grave decir que esta en terreno o que se necesitan cosas para ella: quien pregunte hoy no puede sumarse a algo que ya paso.
 
-SI ALGUIEN QUIERE AYUDAR HOY, lo que esta activo es MIRA MI CASA, no la brigada. Sus tres puertas: una familia publica su casa, un ingeniero voluntario la diagnostica, y alguien apadrina la reparacion (materiales, mano de obra, transporte o dinero). Manda a la puerta que corresponda segun quien te habla.
+SI ALGUIEN QUIERE AYUDAR HOY, lo que esta activo es MIRA MI CASA, no la brigada. Sus tres puertas: una familia reporta su casa, un ingeniero voluntario da un concepto, y alguien apadrina la reparacion (materiales, mano de obra, transporte o dinero). Manda a la puerta que corresponda segun quien te habla.
 
 Y AL HABLAR DE APADRINAR, DOS COSAS SIN EXCEPCION, porque son la condicion del proyecto y estan escritas en la pagina: APADRINAR NO RESERVA UNA CASA CONCRETA —quien decide que viviendas se atienden son los conceptos escritos de los ingenieros, no quien aporta— y NO SE COBRA NADA EN LINEA: el formulario registra el ofrecimiento y despues una persona del equipo escribe para acordar los detalles. Nunca digas «apadrina una casa concreta» ni nada que suene a elegirla; se dice «aportar a la reparacion de viviendas». Es el mismo limite que el punto 4 de abajo, repetido aqui a proposito: al describir las tres puertas es facil prometer justo eso sin darse cuenta.
 
@@ -10835,7 +10835,7 @@ LOS LÍMITES DE MIRA MI CASA, Y ESTOS NO SE NEGOCIAN NI SE SUAVIZAN:
 
 INGENIEROS: quien quiera ser voluntario se postula en la página "Ingenieros voluntarios" con su matrícula del COPNIA. La verificacion la hace una persona contra el registro publico del COPNIA, asi que no es inmediata; pero en cuanto la matricula queda verificada el acceso se abre solo, sin que nadie tenga que habilitarlo a mano. Puede ser correo de universidad, de empresa o particular.
 
-Más de 25 fundaciones preaprobadas en la red de espera; la vinculación formal se confirma una a una con verificación. Hoy el muro muestra las aliadas ya verificadas.`;
+Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. Cada una entra una a una, con verificación y convenio. No hables de fundaciones «preaprobadas» ni de una red de espera: no hay respaldo para esa cifra.`;
 
 /* La red viva sale de partners.json, que es un ASSET de este mismo Worker: se
    lee por el binding y no saliendo a internet a buscar nuestro propio archivo.
@@ -12279,11 +12279,11 @@ async function correoApadrinamiento(env, a) {
       parrafos: en ? [
         "Someone from the team will write to you to agree on the details. Nothing is charged from this form.",
         "One thing so there is no misunderstanding: sponsoring does not reserve a particular home. Which homes are attended is decided with the engineers' written opinions, because the need has an order and a photograph is not that order.",
-        "What you do get back is evidence: every delivery we make is published with its record."
+        "What you do get back is evidence: a receipt and tracking number once a payment clears; the signed handover record and its photos appear in the tracking page when the delivery is made."
       ] : [
         "Alguien del equipo te va a escribir para acordar los detalles. Desde este formulario no se cobra nada.",
         "Una cosa para que no haya malentendido: apadrinar no reserva una casa concreta. Qué casas se atienden se decide con los conceptos escritos de los ingenieros, porque la necesidad tiene un orden y una fotografía no es ese orden.",
-        "Lo que sí vuelve es evidencia: cada entrega que hacemos se publica con su acta."
+        "Lo que sí vuelve es evidencia: recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo cuando se entrega."
       ],
       filas: [
         [en ? "What you offer" : "Qué ofreces", (ETIQUETA_APORTE[en ? "en" : "es"][a.aporte] || a.aporte)],
@@ -12492,10 +12492,11 @@ async function apiAliado(env, c) {
   if (c.modGratitud && !benBeneficio) return json({ error: "beneficio_requerido" }, 400);
   if (c.modServicios && !servDetalle) return json({ error: "servicio_requerido" }, 400);
 
-  /* Las tres autorizaciones son la condición para guardar. La de datos es Ley
-     1581; la de marca y la de licitud son lo que permite publicar la alianza y
-     lo que la fundación necesita declarar recibido. Sin ellas no se guarda. */
-  if (!c.autMarca || !c.autDatos || !c.autLicitud) {
+  /* Datos (Ley 1581) y licitud son la condición para guardar. LA DE MARCA ES
+     OPCIONAL desde el 29 sep 2026: una empresa puede aportar sin que la
+     mostremos, y exigirla dejaba fuera a quien quiere dar en silencio. Se guarda
+     tal como vino, y sin ella no se publica ni el nombre ni el logo. */
+  if (!c.autDatos || !c.autLicitud) {
     return json({ error: "autorizacion_requerida" }, 400);
   }
 
@@ -12528,7 +12529,7 @@ async function apiAliado(env, c) {
     benCondiciones: limpio(c.benCondiciones, 300),
     benRedime: limpio(c.benRedime, 200),
     servDetalle,
-    autMarca: true, autDatos: true, autLicitud: true,
+    autMarca: !!c.autMarca, autDatos: true, autLicitud: true,
     idioma: c.idioma === "en" ? "en" : "es"
   };
 
@@ -12558,7 +12559,7 @@ async function apiAliado(env, c) {
   }
 
   await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "empresa",
-    "ally.a.marca + ally.a.datos + ally.a.licitud");
+    (datos.autMarca ? "ally.a.marca + " : "") + "ally.a.datos + ally.a.licitud");
 
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
 }
@@ -12628,7 +12629,8 @@ async function correoAvisoAliado(env, a) {
     ["Qué aporta", a.aporta || "(no dice)"],
     ["Web", a.web || "—"],
     ["Instagram", a.instagram || "—"],
-    ["Modalidades", (a.modalidades || []).map(k => ETIQUETA_MOD.es[k] || k).join(", ")]
+    ["Modalidades", (a.modalidades || []).map(k => ETIQUETA_MOD.es[k] || k).join(", ")],
+    ["Uso de marca", a.autMarca ? "Autorizado" : "NO autorizado — aporte anónimo: no publicar nombre ni logo"]
   ];
   if (a.benBeneficio) {
     filas.push(["Beneficio ofrecido", a.benBeneficio]);

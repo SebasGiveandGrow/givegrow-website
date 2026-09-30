@@ -40,14 +40,14 @@ var I18N = {
     "ff.instagram.ph": "@tufundacion",
     "ally.web.ph": "https://tuempresa.com",
     "ally.instagram.ph": "@tuempresa",
-    "ally.desc.ph": "En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud.",
+    "ally.desc.ph":"En tus propias palabras: quién es y qué hace tu empresa. Aparecerá en la ficha pública de tu empresa si se suma al Programa de Gratitud.",
     "ally.ben.ph": "Ej. 15% de descuento, un postre de cortesía…",
     "ally.nivel.ph": "Ej. Retoño en adelante",
     "ally.redime.ph": "Ej. mostrando la credencial digital",
     "nav.impactos":"ImpactOS",
     "impactos.ey":"La plataforma",
     "impactos.t":"ImpactOS: el registro detrás de cada aporte.",
-    "impactos.lead":"No es una promesa a futuro. Es la capa que convierte una intención de donar en un registro con destino, evidencia y certificado — y que ya está operando en este sitio.",
+    "impactos.lead":"ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción. Es la capa que convierte una intención de donar en un registro con destino, evidencia y certificado.",
     "impactos.why.t":"Por qué existe",
     "impactos.why.p":"El problema del sector no es la falta de generosidad: es que casi nadie sostiene el registro. Sin un sistema, cada donación es un favor irrepetible — imposible de auditar, de repetir y de contar con precisión. ImpactOS existe para que dar deje de depender de la memoria de alguien.",
     "impactos.os.t":"Qué es",
@@ -71,7 +71,7 @@ var I18N = {
     "impactos.rec.t":"Anatomía de un registro",
     "impactos.rec.p":"Esto es lo que ImpactOS guarda de una donación. La primera parte la armas tú con el sitio; la segunda la produce el HUB SOCIAL en terreno.",
     "impactos.rec.a":"Lo que armas con el sitio",
-    "impactos.rec.b":"Lo que produce el HUB en terreno",
+    "impactos.rec.b":"Lo que produce el HUB SOCIAL en terreno",
     "impactos.rec.r1.k":"Monto y moneda",
     "impactos.rec.r1.v":"$200.000 COP",
     "impactos.rec.r2.k":"Frecuencia",
@@ -83,7 +83,7 @@ var I18N = {
     "impactos.rec.r5.k":"Equivalencia verificada",
     "impactos.rec.r5.v":"≈ 50 platos de comida al mes",
     "impactos.rec.r6.k":"Beneficio tributario",
-    "impactos.rec.r6.v":"25% sobre el impuesto a cargo en Colombia (Art. 257 ET)",
+    "impactos.rec.r6.v":"Descuento en renta del 25% del valor donado (Art. 257 ET), con el límite del Art. 258, si te aplica",
     "impactos.rec.r7.k":"Acta de recepción",
     "impactos.rec.r7.v":"Con foto de lo recibido",
     "impactos.rec.r8.k":"Acta de entrega",
@@ -100,9 +100,9 @@ var I18N = {
     "impactos.jor.r1.k":"Fundación anfitriona",
     "impactos.jor.r1.v":"La que acompaña a esa comunidad",
     "impactos.jor.r2.k":"Población acompañada",
-    "impactos.jor.r2.v":"Del portafolio del HUB",
+    "impactos.jor.r2.v":"Del portafolio del HUB SOCIAL",
     "impactos.jor.r3.k":"Nivel de participación",
-    "impactos.jor.r3.v":"Con el HUB, con Give&Grow o mixto",
+    "impactos.jor.r3.v":"Con el HUB SOCIAL, con Give&Grow o mixto",
     "impactos.jor.r4.k":"Verificaciones",
     "impactos.jor.r4.v":"La nuestra y la de la fundación",
     "impactos.jor.r5.k":"Registro de jornada",
@@ -225,7 +225,7 @@ var I18N = {
     "nav.d.medicion":"Hasta dónde podemos afirmar, y con qué respaldo",
     "nav.d.transp":"Registros oficiales y documentos públicos",
     "nav.d.faq":"Respuestas a las dudas más comunes",
-    "nav.d.contacto":"Escríbenos o pasa por el Hub",
+    "nav.d.contacto":"Escríbenos o pasa por el HUB SOCIAL",
     "nav.transp":"Transparencia",
     "nav.contacto":"Contacto",
     "nav.faq":"FAQ",
@@ -387,8 +387,8 @@ var I18N = {
     "nav.estandares":"Marco de actuación",
     "nav.d.estandares":"Bajo qué normas trabajamos, y qué no afirmamos",
     "nav.g.emergencia":"Emergencia",
-    "nav.brigada":"Brigada de emergencia",
-    "nav.d.brigada":"Los cinco territorios, qué se necesita y cómo aportar",
+    "nav.brigada":"Brigada del sismo, agosto 2026",
+    "nav.d.brigada":"El informe: qué se llevó y cómo se entregó",
     "nav.d.vivienda":"Sube fotos y recibe un concepto: si hay señales para no permanecer y con qué reparar",
     "nav.d.ingenieros":"Postúlate: mira fotos, di qué precauciones tomar y con qué reparar",
     "hero.eyebrow":"Colombia · ESAL · NIT 901.948.930-2",
@@ -401,7 +401,7 @@ var I18N = {
     "path.emp.t":"RSE empresarial",
     "path.emp.s":"Para mi empresa",
     "path.fund.t":"Somos fundación",
-    "path.fund.s":"Unirme al Hub",
+    "path.fund.s":"Unirme al HUB SOCIAL",
     "stat.rutas":"Rutas del modelo",
     "stat.pobl":"Poblaciones que buscamos alcanzar",
     "stat.traz":"Trazabilidad",
@@ -410,20 +410,20 @@ var I18N = {
     "hub.aliadas.soon.p":"Cada aliada entra una a una, con verificación y convenio. Estamos sumando con evidencia, no con promesas.",
     "home.hub.ey":"Cómo funciona",
     "home.hub.t":"Entras una vez. Llegas a varias realidades.",
-    "home.hub.p":"No somos otra fundación pidiendo donaciones. Somos el puente que conecta tu generosidad con fundaciones de base verificadas — y te devuelve la prueba de lo que pasó. Cada aporte se rastrea de principio a fin.",
+    "home.hub.p":"Somos el puente entre tu aporte y fundaciones de base verificadas. Ese puente es el HUB SOCIAL, nuestra red de fundaciones verificadas, y cada aporte se rastrea con su número de guía.",
     "home.vuelta.t":"Y algo te vuelve",
-    "home.vuelta.p":"Una jornada en territorio, tu beneficio tributario y la evidencia de en qué se convirtió tu aporte. Es la parte que casi nadie ofrece.",
+    "home.vuelta.p":"Tu beneficio tributario, la evidencia de tu aporte y, si quieres, la invitación a una jornada.",
     "home.funds.ey":"La red, hoy",
     "home.funds.t":"Conoce las fundaciones",
-    "home.funds.p":"Cada una entró tras una visita de contexto y firmó convenio. Su costo por unidad de impacto está contrastado contra su propio soporte, no estimado por nosotros.",
+    "home.funds.p":"Cada una entra con verificación y convenio; algunas son proyectos comunitarios de base, y lo decimos en su ficha. Su costo por unidad de impacto está contrastado contra su propio soporte, no estimado por nosotros.",
     "home.funds.btn":"Ver todas en el HUB SOCIAL",
     "home.funds.una":"Una unidad verificada",
     "home.funds.vacio":"Estamos sumando las primeras fundaciones aliadas.",
     "home.hub.s1t":"Tú das","home.hub.s1p":"Eliges a dónde va tu aporte, con total claridad.",
-    "home.hub.s2t":"El HUB conecta","home.hub.s2p":"Visitamos a cada fundación en territorio y firmamos convenio antes de canalizar tu aporte.",
+    "home.hub.s2t":"El HUB SOCIAL conecta","home.hub.s2p":"Visitamos a cada fundación en territorio y firmamos convenio antes de canalizar tu aporte.",
     "home.hub.s3t":"La fundación entrega","home.hub.s3p":"El apoyo llega a la comunidad, con acta y registro.",
-    "home.hub.s4t":"Recibes la evidencia","home.hub.s4p":"Recibo, acta firmada y fotos de vuelta. No promesas.",
-    "home.hub.btn":"Conoce cómo funciona el HUB",
+    "home.hub.s4t":"Recibes la evidencia","home.hub.s4p":"Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega.",
+    "home.hub.btn":"Conoce cómo funciona el HUB SOCIAL",
     "model.ey":"El modelo",
     "model.t":"El sector social opera fragmentado. Somos el puente.",
     "model.p":"Potenciamos fundaciones en campo, conectamos donantes con causas verificadas y creamos un ecosistema donde dar tiene beneficios reales para quien contribuye.",
@@ -435,7 +435,7 @@ var I18N = {
     "feat.grat.p":"Red de empresas aliadas con descuentos exclusivos para todos los miembros activos.",
     "feat.grat.tag":"Nuevo",
     "feat.tax.t":"Beneficio tributario",
-    "feat.tax.p":"Descuento del 25% sobre el impuesto de renta a cargo (Art. 257 ET) por cada donación vía sistema financiero, en los términos y límites que contempla la ley. Aplica solo en Colombia, para contribuyentes del impuesto de renta.",
+    "feat.tax.p":"Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.",
     "feat.tax.tag":"Para donantes",
     "traz.ey":"Cómo funciona",
     "traz.t":"Trazabilidad completa, de principio a fin.",
@@ -454,10 +454,10 @@ var I18N = {
     "origen.ey":"Nuestro origen",
     "origen.t":"Todo empezó con una tonelada de comida.",
     "origen.p1":"Tras semanas de gestión, una campaña alcanzó su meta: una tonelada de alimento para entregar a una fundación. Pero al llegar, la fundación no tenía cómo almacenar ni repartir todo ese alimento. Casi la mitad se perdió. Ver esa comida desperdiciarse —comida que a pocas cuadras alguien necesitaba— dejó una pregunta que no soltó al fundador: ¿cómo cierro la brecha entre los recursos y la necesidad, con lo que tengo a la mano?",
-    "origen.p2":"Esa pregunta se volvió método. Give&Grow International nace de casi cuatro años de experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín, y se constituye por documento privado el 11 de abril de 2025, con registro en la Cámara de Comercio de Medellín el 19 de mayo de 2025, como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: restaurar la confianza en el acto de dar, con trazabilidad y sin intermediarios opacos.",
+    "origen.p2":"Esa pregunta se volvió método. Give&Grow International nace de casi cuatro años de experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín, anteriores a la Fundación. Se constituye por documento privado el 11 de abril de 2025, con registro en la Cámara de Comercio de Medellín el 19 de mayo de 2025, como Entidad Sin Ánimo de Lucro (ESAL), y la DIAN la califica en el Régimen Tributario Especial. El propósito: restaurar la confianza en el acto de dar, con trazabilidad y sin intermediarios opacos.",
     "e404.t":"Esta página no existe (todavía)",
     "e404.p":"El enlace que seguiste no lleva a ningún lugar de nuestro ecosistema. Pero cada camino aquí lleva a algo que sí importa.",
-    "e404.home":"Volver al inicio","e404.hub":"Conocer el HUB",
+    "e404.home":"Volver al inicio","e404.hub":"Conocer el HUB SOCIAL",
     "live.donaciones":"Donaciones registradas",
     "live.entregas":"Entregas con evidencia",
     "live.trazable":"Cada una, rastreable",
@@ -472,12 +472,10 @@ var I18N = {
     "ally.f.razon":"Razón social o nombre del emprendimiento *",
     "ally.f.nit":"NIT o documento",
     "ally.f.rep":"Representante legal",
-    "ally.f.cedula":"Cédula del representante",
     "ally.f.contacto":"Contacto (nombre y cargo)",
     "ally.f.correo":"Correo *",
     "ally.f.tel":"Celular o WhatsApp *",
     "ally.f.ciudad":"Ciudad",
-    "ally.f.dir":"Dirección",
     "ally.f.web":"Sitio web",
     "ally.f.instagram":"Instagram",
     "ally.f.sector":"Sector o industria",
@@ -497,9 +495,9 @@ var I18N = {
     "ally.sector.log":"Energía, transporte y logística",
     "ally.sector.agro":"Agro y alimentos",
     "ally.f.sector.otro":"¿Cuál?",
-    "ally.f.porque":"¿Por qué quieren aliarse? (opcional)",
-    "ally.porque.ph":"Qué los mueve a apoyar, y si hay una causa o un territorio que les importe en particular.",
-    "ally.porque.help":"Si la alianza se firma, esto es lo que cuenta tu ficha en el sitio. Con tus palabras es mejor que con las nuestras.",
+    "ally.f.porque":"¿Por qué quiere aliarse tu empresa? (opcional)",
+    "ally.porque.ph":"Qué mueve a tu empresa a apoyar, y si hay una causa o un territorio que le importe en particular.",
+    "ally.porque.help":"Si la alianza se firma, esto es lo que cuenta la ficha de tu empresa en el sitio. Con tus palabras es mejor que con las nuestras.",
     "ally.f.aporta":"En una frase, ¿qué aporta tu empresa?",
     "ally.f.aporta.ph":"Ej. Padrinazgo de 200 platos al mes",
     "ally.f.desc":"Descripción del negocio (en tus propias palabras)",
@@ -523,15 +521,15 @@ var I18N = {
     "ally.f.cond":"Condiciones o vigencia",
     "ally.s.serv":"Servicio para población vulnerable",
     "ally.f.servdet":"Describe el servicio",
-    "ally.s.aut":"Autorizaciones (requeridas)",
-    "ally.a.marca":"Autorizo mostrar públicamente el nombre, logo y redes de mi empresa para difundir la alianza.",
+    "ally.s.aut":"Autorizaciones",
+    "ally.a.marca":"Autorizo mostrar públicamente el nombre, el logo y las redes de mi empresa para difundir la alianza. (Opcional: si no la marcas, tu empresa puede aportar de forma anónima.)",
     "ally.a.datos":"Autorizo el tratamiento de los datos conforme a la Ley 1581 de 2012.",
     "ally.a.licitud":"Declaro que la información es veraz y que los recursos y la actividad son de origen lícito.",
     "ally.submit":"Enviar solicitud",
     "ally.legal":"Enviar esta solicitud no constituye la alianza. La alianza se perfecciona con la firma del Convenio Marco, que te enviaremos a tu correo.",
     "ally.sending":"Enviando tu solicitud…",
     "ally.ok":"¡Recibimos tu solicitud! Te enviamos un correo de confirmación y pronto recibirás el Convenio Marco para firmar.",
-    "ally.err.aut":"Para continuar, marca las tres autorizaciones requeridas.",
+    "ally.err.aut":"Para continuar, marca las dos autorizaciones obligatorias: la de datos y la de licitud.",
     "ally.err.mod":"Marca al menos una forma de apoyar.",
     "ally.err.ben":"Cuéntanos qué beneficio ofreces para el Programa de Gratitud.",
     "ally.err.serv":"Describe el servicio que ofreces a la población vulnerable.",
@@ -823,7 +821,7 @@ var I18N = {
     "ap.no.3.p":"Este formulario no pide datos de pago ni cobra nada. Registra lo que ofreces y una persona del equipo te contacta para acordar los detalles.",
     "ap.ev.ey":"Qué vuelve",
     "ap.ev.t":"Evidencia, no un agradecimiento",
-    "ap.ev.p":"Cada entrega que hacemos se publica con su acta: qué se entregó, dónde y con qué fundación del territorio. No prometemos una casa con tu nombre; publicamos lo que efectivamente se hizo.",
+    "ap.ev.p":"Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo cuando la fundación entrega: qué se entregó, dónde y con qué fundación del territorio. No prometemos una casa con tu nombre; publicamos lo que efectivamente se hizo.",
     "ap.ev.link":"Ver las casas revisadas",
     "ap.form.ey":"Tu ofrecimiento",
     "ap.form.t":"Cuéntanos qué puedes aportar",
@@ -862,7 +860,7 @@ var I18N = {
     "ap.nada":"Este formulario no cobra nada ni pide datos de pago.",
     "ap.sending":"Enviando…",
     "ap.ok":"Recibimos tu ofrecimiento. Alguien del equipo te escribe para acordar los detalles.",
-    "ap.err.nombre":"Falta tu nombre.",
+    "ap.err.nombre":"Falta tu nombre.","ap.err.aporte":"Elige qué puedes aportar: materiales, mano de obra, transporte o dinero.",
     "ap.err.email":"Revisa tu correo: no parece una dirección válida.",
     "ap.err.detalle":"Cuéntanos qué puedes aportar, aunque sea en una línea.",
     "ap.err.concepto":"Necesitamos que confirmes esto: apadrinar no reserva una casa concreta.",
@@ -917,14 +915,14 @@ var I18N = {
     "hub.intro.t":"¿Qué es un HUB?",
     "hub.intro.p1":"Un HUB es un punto de encuentro: un lugar donde se conectan personas, recursos y capacidades que por separado no se encontrarían. No reemplaza a quienes ya trabajan; los articula para que su esfuerzo llegue más lejos.",
     "hub.intro.t2":"Entonces, ¿qué es el HUB SOCIAL de Give&Grow?",
-    "hub.intro.p2":"Es nuestro motor operativo en terreno: el puente que conecta la generosidad de donantes y empresas con fundaciones de base verificadas, de forma trazable y sostenible. Aquí, quien da también crece, y cada aporte llega con evidencia: acta, foto y factura.",
-    "hub.found.ey":"Fundaciones del HUB",
+    "hub.intro.p2":"Es nuestro motor operativo en terreno: el puente que conecta la generosidad de donantes y empresas con fundaciones de base verificadas, de forma trazable y sostenible. Recibes recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega.",
+    "hub.found.ey":"Fundaciones del HUB SOCIAL",
     "hub.found.t":"Quiénes forman la red hoy",
-    "hub.found.p":"Empezamos con una fundación aliada y una red en proceso de vinculación formal. Cada una entra una a una, con verificación y convenio — sin nombres ni cifras infladas.",
+    "hub.found.p":"Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. Cada una entra una a una, con verificación y convenio — sin nombres ni cifras infladas.",
     "hub.aporta.ey":"Aliadas que aportan",
-    "hub.aporta.t":"Fundaciones que fortalecen el Hub",
+    "hub.aporta.t":"Fundaciones que fortalecen el HUB SOCIAL",
     "hub.aporta.p":"No todas las aliadas entran a recibir. Algunas fundaciones suman capacidades, servicios y conocimiento que hacen más fuerte al HUB SOCIAL y a Give&Grow — y así llegan mejor a las comunidades.",
-    "hub.aporta.empty":"Estamos formalizando las primeras aliadas que aportan al Hub. Aquí verás qué le entrega cada una — con evidencia, no promesas.",
+    "hub.aporta.empty":"Estamos formalizando las primeras aliadas que aportan al HUB SOCIAL. Aquí verás qué le entrega cada una — con evidencia, no promesas.",
     "net.type.foundation.aporta":"Aliada que aporta",
     "hub.routes.ey":"Cómo operamos",
     "hub.t":"Cinco rutas. Un solo propósito.",
@@ -946,11 +944,11 @@ var I18N = {
     "hub.r5.t":"R5 - Conexión Laboral",
     "hub.r5.p":"Puente hacia el empleo para poblaciones vulnerables. Fase futura. Ejemplo: acompañamiento de 12 a 18 meses a una persona saliendo de reclusión, conectada con formación (R3) y con las empresas aliadas de la red.",
     "hub.pob.t":"Las poblaciones que queremos alcanzar",
-    "hub.pob.note":"Nuestra misión apunta a impactar todo tipo de población vulnerable a través de las fundaciones que se suman al HUB. Estas son las que hoy guían nuestro objeto social; la cobertura real crece con cada aliada que entra con trabajo y evidencia.",
+    "hub.pob.note":"Nuestra misión apunta a impactar todo tipo de población vulnerable a través de las fundaciones que se suman al HUB SOCIAL. Estas son las que hoy guían nuestro objeto social; la cobertura real crece con cada aliada que entra con trabajo y evidencia.",
     "hub.pob.list":"Niñez en riesgo - Comunidades indígenas - Comunidades campesinas - Personas en situación de calle - Adultos mayores - Animales en maltrato - Personas en rehabilitación - Personas privadas de la libertad",
     "emp.ey":"RSE empresarial",
     "emp.t":"Tu empresa, con propósito y trazabilidad.",
-    "emp.lead":"Tres formas de aliarte. Cada una con beneficio tributario y reporte verificable.",
+    "emp.lead":"Tres formas de aliarte, todas con reporte verificable. Las donaciones, además, dan derecho a certificado.",
     "emp.aliadas.ey":"Red de empresas aliadas",
     "emp.aliadas.t":"Empresas que crecen dando",
     "emp.aliadas.lead":"Cada alianza entra con convenio firmado. Aquí verás las empresas que ya suman al impacto — con trazabilidad y reconocimiento.",
@@ -969,16 +967,16 @@ var I18N = {
     "emp.alianza.t":"La alianza",
     "empf.cta.ey":"Empresas con propósito",
     "empf.cta.t":"¿Tu empresa también quiere sumarse?",
-    "empf.cta.p":"Padrinazgo de Impacto, Impact Journey o una alianza a medida: todas con trazabilidad y beneficio tributario.",
+    "empf.cta.p":"Padrinazgo de Impacto, Impact Journey o una alianza a medida: todas con reporte verificable. Las donaciones, además, dan derecho a certificado.",
     "empf.cta.btn":"Aliar mi empresa",
     "emp.p1.t":"Padrinazgo de Impacto",
     "emp.p1.p":"Defines un presupuesto y, con la Calculadora de Impacto, lo traduces en unidades reales y verificables. Recibes certificado de donación y reporte de impacto con evidencia.",
     "emp.p2.t":"Impact Journey",
-    "emp.p2.p":"Voluntariado corporativo en doble vía (Ruta 4): tu equipo vive la realidad de las comunidades que apoya, y la comunidad también gana. Ya hicimos las primeras jornadas con donantes y aliados; ahora estamos abriendo el formato a equipos de empresa — escríbenos para diseñar la primera.",
+    "emp.p2.p":"Voluntariado corporativo en doble vía: tu equipo vive la realidad de las comunidades que apoya, y la comunidad también gana. Ya hicimos las primeras jornadas con donantes y aliados; ahora estamos abriendo el formato a equipos de empresa — escríbenos para diseñar la primera.",
     "emp.p3.t":"Alianza a medida",
     "emp.p3.p":"Un canal abierto para co-crear juntos programas, campañas o formas de cooperación ajustadas a la realidad de tu empresa.",
     "nav.voluntariado":"Voluntariado e Impact Journey",
-    "nav.d.voluntariado":"Cómo participar en terreno, en tres niveles",
+    "nav.d.voluntariado":"Cinco formas de participar",
     "vol.ey":"Voluntariado",
     "vol.t":"Aquí nadie viene a mirar.",
     "vol.lead":"Buscamos que quien llega amplíe su mirada, y que la fundación quede con algo que antes no tenía. Las dos cosas, en la misma jornada.",
@@ -989,11 +987,11 @@ var I18N = {
     "vol.pu.ij.tag":"Para empresas",
     "vol.pu.ij.t":"Impact Journey",
     "vol.pu.ij.s":"Voluntariado en doble vía",
-    "vol.pu.ij.p":"Tu equipo y una comunidad del HUB se encuentran en una ruta diseñada con MIRA. No es una visita: es un intercambio, y las dos partes salen con algo que no tenían.",
+    "vol.pu.ij.p":"Tu equipo y una comunidad del HUB SOCIAL se encuentran en una ruta diseñada con MIRA. No es una visita: es un intercambio, y las dos partes salen con algo que no tenían.",
     "vol.pu.ij.cta":"Traer a mi equipo",
     "vol.pu.per":"Para personas",
     "vol.pu.te.t":"En terreno",
-    "vol.pu.te.p":"Con una fundación del HUB, en su territorio y junto a su equipo. Ellos conocen a su comunidad y deciden cuándo una visita suma.",
+    "vol.pu.te.p":"Con una fundación del HUB SOCIAL, en su territorio y junto a su equipo. Ellos conocen a su comunidad y deciden cuándo una visita suma.",
     "vol.pu.te.cta":"Inscribirme en terreno",
     "vol.pu.ad.t":"Administrativo",
     "vol.pu.ad.p":"En la sede de Give&Grow. Derecho, contabilidad, diseño, desarrollo, comunicación o formación: tu oficio sostiene la red que hace posible todo lo demás.",
@@ -1103,7 +1101,7 @@ var I18N = {
     "vf.ciudad":"Ciudad (opcional)",
     "vf.nivel.lbl":"¿Dónde quieres estar?",
     "vf.nivel.help":"Tu oficio puede ser el mismo en las dos: lo que cambia es si vas al territorio. Ir a terreno tiene su propia ruta, con verificaciones y sesión de Marco.",
-    "vf.nivel.hub":"En terreno — con una fundación del HUB",
+    "vf.nivel.hub":"En terreno — con una fundación del HUB SOCIAL",
     "vf.nivel.est":"Administrativo — en la sede de Give&Grow",
     "vf.nivel.mix":"Las dos",
     "vf.oficio":"Tu oficio o área",
@@ -1126,8 +1124,8 @@ var I18N = {
     "vf.err.datos":"Necesitamos tu autorización para guardar tus datos y poder escribirte.",
     "vf.err.send":"No pudimos enviar tus datos. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
     "vf.nada":"Nada de esto se cobra, en ninguna dirección.",
-    "vf.origen.brig":"Vienes de la brigada del terremoto. Te marcamos «Administrativo» porque es lo que se puede sumar a tiempo: el acopio de Medellín, del 24 al 28 de agosto. Puedes cambiarlo si prefieres el programa de todo el año.",
-    "ff.ey":"Aplicar al HUB",
+    "vf.origen.brig":"Vienes de la página de la brigada del terremoto, que ya terminó. Te marcamos «Administrativo»; puedes cambiarlo si prefieres otro nivel.",
+    "ff.ey":"Aplicar al HUB SOCIAL",
     "ff.t":"Cuéntanos quién es tu fundación",
     "ff.lead":"Esto es la aplicación, no la vinculación: con lo que escribas aquí revisamos si encajamos, y si encajamos vamos a conocerte a tu territorio. Solo te pedimos texto — el logo, las fotos y las cifras de costos se ven después, cuando ya nos conozcamos.",
     "ff.s.id":"Quiénes son",
@@ -1137,24 +1135,24 @@ var I18N = {
     "ff.lider":"Quién lidera la fundación",
     "ff.cargo":"Su cargo (opcional)",
     "ff.cargo.ph":"Directora y fundadora, representante legal…",
-    "ff.anio":"¿Desde qué año trabajan? (opcional)",
+    "ff.anio":"¿Desde qué año trabaja? (opcional)",
     "ff.pers.lbl":"¿Tiene personería jurídica?",
-    "ff.pers.help":"Cualquier respuesta sirve para aplicar. Esto no define si entran: define cómo describimos a la organización si algún día publicamos su perfil.",
+    "ff.pers.help":"Cualquier respuesta sirve para aplicar. Esto no define si entra: define cómo describimos a la organización si algún día publicamos su perfil.",
     "ff.pers.nit":"Sí, con NIT",
     "ff.pers.tramite":"En trámite",
     "ff.pers.base":"No — es un proyecto comunitario de base",
-    "ff.zona":"Barrio o sector y ciudad donde trabajan",
+    "ff.zona":"Barrio o sector y ciudad donde trabaja",
     "ff.zona.ph":"Ej. La Honda, Manrique, Medellín",
     "ff.zona.help":"El sector, no la dirección exacta. En el mapa de la red el pin va a nivel de barrio, nunca a la puerta.",
     "ff.ciudad":"Ciudad (opcional)",
     "ff.email":"Correo de contacto",
     "ff.tel":"Celular o WhatsApp",
     "ff.tel.help":"Los datos de contacto son para coordinar entre nosotros. No se publican en el sitio.",
-    "ff.s.hist":"Qué hacen y por qué",
+    "ff.s.hist":"Qué hace y por qué",
     "ff.historia":"La historia de la fundación, en un párrafo",
     "ff.historia.ph":"Cómo nació, quién la lidera, a quién sirve y qué la hace distinta.",
     "ff.mision":"La misión, en una o dos frases",
-    "ff.s.pob":"A quién llegan",
+    "ff.s.pob":"A quién llega",
     "ff.pob.lbl":"¿A quiénes atiende la fundación?",
     "ff.pob.ninos":"Niños y niñas",
     "ff.pob.adolescentes":"Adolescentes",
@@ -1166,9 +1164,9 @@ var I18N = {
     "ff.pob.discapacidad":"Personas con discapacidad",
     "ff.pob.otra":"Otra",
     "ff.pob.otra.lbl":"¿Cuál?",
-    "ff.atiende":"¿A cuántas personas atienden de forma regular?",
+    "ff.atiende":"¿A cuántas personas atiende de forma regular?",
     "ff.atiende.help":"El número real, aunque sea aproximado. Si es estimado lo publicamos con «≈»: preferimos un número honesto a uno redondo.",
-    "ff.conteo":"¿Cómo llevan esa cuenta? (opcional)",
+    "ff.conteo":"¿Cómo lleva esa cuenta? (opcional)",
     "ff.conteo.ph":"Planillas de asistencia, registro digital, listados por programa, conteo aproximado…",
     "ff.conteo.help":"Esto decide si la cifra se publica exacta o con «≈». No es una prueba: es lo que nos permite no inflar su trabajo.",
     "ff.s.prog":"Un programa",
@@ -1177,9 +1175,9 @@ var I18N = {
     "ff.prog.ph":"Ej. Chefs del Futuro",
     "ff.prog.desc":"¿Qué hace y a cuántas personas llega? (opcional)",
     "ff.prog.desc.ph":"Con números reales y frecuencia. Ej. cerca de 100 niños reciben almuerzo cada día, de lunes a viernes.",
-    "ff.evid":"¿Qué evidencia tienen de que funciona? (opcional)",
+    "ff.evid":"¿Qué evidencia tiene de que funciona? (opcional)",
     "ff.evid.ph":"Registro fotográfico, planillas de asistencia, facturas, testimonios, informes…",
-    "ff.s.red":"Dónde encontrarlos",
+    "ff.s.red":"Dónde encontrarla",
     "ff.web":"Página web (opcional)",
     "ff.instagram":"Instagram (opcional)",
     "ff.s.aut":"Antes de enviar",
@@ -1194,24 +1192,24 @@ var I18N = {
     "ff.err.email":"Revisa el correo: parece que tiene algo raro.",
     "ff.err.lider":"Cuéntanos quién lidera la fundación.",
     "ff.err.pers":"Elige una opción de personería jurídica. Cualquiera sirve.",
-    "ff.err.zona":"Dinos el barrio o sector y la ciudad donde trabajan.",
+    "ff.err.zona":"Dinos el barrio o sector y la ciudad donde trabaja.",
     "ff.err.historia":"Cuéntanos la historia de la fundación, aunque sea en pocas líneas.",
     "ff.err.mision":"Nos falta la misión.",
-    "ff.err.pob":"Marca al menos una población que atiendan.",
-    "ff.err.atiende":"Dinos a cuántas personas llegan, aunque sea aproximado.",
-    "ff.err.datos":"Necesitamos la autorización de datos para poder escribirles.",
+    "ff.err.pob":"Marca al menos una población que atienda.",
+    "ff.err.atiende":"Dinos a cuántas personas llega, aunque sea aproximado.",
+    "ff.err.datos":"Necesitamos la autorización de datos para poder escribirte.",
     "ff.err.veraz":"Necesitamos la declaración de veracidad para recibir la aplicación.",
     "ff.err.send":"No pudimos enviar la aplicación. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
     "vol.link":"Ver el programa de voluntariado",
     "fund.ey":"Para fundaciones",
     "fund.t":"Aplica al HUB SOCIAL.",
-    "fund.lead":"Más de 25 fundaciones preaprobadas en nuestra red de espera: su vinculación formal se confirma una a una, con verificación y evidencia.",
+    "fund.lead":"Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. Cada una entra una a una, con verificación y convenio.",
     "fund.req.t":"Qué buscamos",
-    "fund.req.p":"Fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad.",
+    "fund.req.p":"Fundaciones y proyectos comunitarios de base, con trabajo verificable en campo y disposición a la trazabilidad. Cada una entra con verificación y convenio; algunas son proyectos comunitarios de base, y lo decimos en su ficha.",
     "fund.give.t":"Aliadas que aportan",
-    "fund.give.p":"Un modelo novedoso: algunas fundaciones contribuyen servicios al Hub en lugar de solo recibir.",
+    "fund.give.p":"Algunas fundaciones aportan servicios al HUB SOCIAL, además de recibir apoyo.",
     "fund.proto.t":"Protocolo de cumplimiento",
-    "fund.proto.p":"Faltas leves van a revisión de comité con tres oportunidades; faltas gravísimas, como el mal uso de fondos, implican expulsión inmediata y acción legal.",
+    "fund.proto.p":"Faltas leves van a revisión de comité con tres oportunidades; las faltas graves, como el mal uso de recursos, terminan la alianza.",
     "fund.btn":"Quiero aplicar",
     "grat.ey":"Programa de Gratitud",
     "grat.t":"Quien da, también recibe.",
@@ -1223,8 +1221,8 @@ var I18N = {
     "imp.tab.blog":"Historias",
     "alma.placeholder":"Escribe tu pregunta...",
     "hero.imgalt":"Padre e hijo juegan con un balón entregado en jornada, en su comunidad wayuu de la Alta Guajira",
-    "banner.ey":"La Guajira · Enero 2025",
-    "banner.quote":"Esto también es evidencia.",
+    "banner.ey":"La Guajira · enero de 2025 · trabajo de campo del fundador, antes de constituir la Fundación",
+    "banner.quote":"De aquí viene la pregunta que hoy es la Fundación.",
     "banner.link":"Ver más evidencia",
     "banner.imgalt":"Niña wayuu a contraluz durante una jornada al atardecer en la Alta Guajira",
     "hero.tour":"¿Primera vez aquí? Haz el recorrido completo",
@@ -1235,9 +1233,9 @@ var I18N = {
     "hero.cred.vig.k":"Vigilada por",
     "hero.cred.vig.v":"Gobernación de Antioquia",
     "hero.cred.link":"Ver registro y gobernanza →",
-    "hub.cta.t":"El Hub crece con cada aliado.",
+    "hub.cta.t":"El HUB SOCIAL crece con cada aliado.",
     "hub.cta.p":"Si diriges una fundación, este puente es para ti. Y si quieres fortalecer la red, tu aporte la hace crecer.",
-    "hub.cta.b1":"Quiero aplicar al Hub",
+    "hub.cta.b1":"Quiero aplicar al HUB SOCIAL",
     "hub.cta.b2":"Quiero donar",
     "imp.cta.t":"La evidencia crece contigo.",
     "imp.cta.p":"Cada aporte se convierte en un dato verificable más: un plato, un kit, una jornada con acta y foto.",
@@ -1263,16 +1261,16 @@ var I18N = {
     "alma.err.red":"Lo siento, no pude conectarme ahora. Puedes reintentar o escribirnos por",
     "alma.err.contacto":"Contacto",
     "alma.retry":"Reintentar",
-    "alma.hello":"Hola, soy ALMA. Puedo contarte cómo donar, los beneficios tributarios, las membresías o cómo aplica tu fundación al Hub. ¿En qué te ayudo?",
+    "alma.hello":"Hola, soy ALMA. Puedo contarte cómo donar, los beneficios tributarios, las membresías o cómo aplica tu fundación al HUB SOCIAL. ¿En qué te ayudo?",
     "donar.ey":"Donar",
     "donar.t":"Tu donación, con destino claro.",
     "donar.lead":"Calcula tu impacto y tu beneficio tributario, luego elige cómo aportar.",
     "calc.tipo.lbl":"¿Aportas como persona o empresa?",
     "calc.tab.ind":"Persona",
     "calc.tab.emp":"Empresa",
-    "calc.tax":"Beneficio tributario (25%)",
-    "calc.tax.legal":"El descuento del 25% (Art. 257 ET) aplica solo en Colombia, para contribuyentes del impuesto de renta, y según los términos, requisitos y límites que contempla la ley; su procedencia depende de la situación tributaria de cada donante.",
-    "calc.net":"Costo neto de tu donación",
+    "calc.tax":"Descuento posible (25% del valor donado)",
+    "calc.tax.legal":"Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.",
+    "calc.net":"Costo neto estimado, si te aplica",
     "calc.annual":"Equivalente anual",
     "calc.freq.m":"Mensual",
     "calc.freq.a":"Anual",
@@ -1383,15 +1381,15 @@ var I18N = {
     "std.chs.c4":"4 · Comunicación y participación",
     "std.chs.c4.p":"Cada familia recibe un enlace privado donde ve en qué va su caso y puede sumar material si se lo piden. Y publicamos lo que NO va a recibir con el mismo énfasis que lo que sí: no hay letra chica al final.",
     "std.chs.c5":"5 · Quejas atendidas",
-    "std.chs.c5.p":"Hoy solo existe la ruta de protección de datos ante la Superintendencia de Industria y Comercio. El mecanismo general, con una ruta confidencial separada de la ordinaria, está redactado y pendiente de adopción por la junta.",
+    "std.chs.c5.p":"Hoy solo existe la ruta de protección de datos ante la Superintendencia de Industria y Comercio. El mecanismo general, con una ruta confidencial separada de la ordinaria, está redactado y pendiente de adopción por el máximo órgano de dirección que definen los estatutos, que hoy es el fundador: la Fundación todavía no tiene junta directiva.",
     "std.chs.c6":"6 · Respuesta coordinada",
     "std.chs.c6.p":"Trabajamos con fundaciones aliadas verificadas y remitimos a la autoridad municipal lo que le corresponde. Todavía no participamos en mecanismos formales de coordinación humanitaria.",
     "std.chs.c7":"7 · Aprendizaje continuo",
     "std.chs.c7.p":"El sistema registra los casos que un ingeniero no pudo evaluar y qué material faltaba, y eso realimenta lo que se le pide a la siguiente familia. No hay todavía un ciclo de evaluación externa.",
     "std.chs.c8":"8 · Personal competente",
-    "std.chs.c8.p":"La matrícula de cada ingeniero se verifica a mano en el registro público del COPNIA. Es el único filtro del proyecto y no lo queremos automático. El código de conducta está redactado y pendiente de adopción.",
+    "std.chs.c8.p":"La matrícula de cada ingeniero se verifica a mano en el registro público del COPNIA. Es el único filtro del proyecto y no lo queremos automático. El código de conducta está redactado y pendiente de adopción por el máximo órgano de dirección que definen los estatutos (hoy, el fundador).",
     "std.chs.c9":"9 · Recursos bien manejados",
-    "std.chs.c9.p":"Ningún voluntario recibe ni custodia dinero: todo aporte entra por pasarela o por cuenta bancaria a nombre de la Fundación, genera número de guía y su entrega se documenta con acta firmada por quien recibe. El certificado de donación lo firma la Revisora Fiscal bajo la gravedad de juramento.",
+    "std.chs.c9.p":"Ningún voluntario recibe ni custodia dinero: todo aporte entra por pasarela o por cuenta bancaria a nombre de la Fundación, genera número de guía y su entrega se documenta con acta firmada por quien recibe. El certificado de donación lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento.",
     "std.chs.nota":"Ningún compromiso aparece aquí como cumplido si no podemos mostrar con qué. Tres van a medias y uno no existe todavía: decirlo es más útil, para quien nos evalúa y para nosotros, que un cuadro entero en verde que no resistiría diez minutos de comprobación.",
 
     "std.dnh.ey":"El límite que nos pusimos",
@@ -1409,7 +1407,7 @@ var I18N = {
     "std.no.ey":"Los límites de lo que decimos",
     "std.no.t":"Lo que no vamos a afirmar",
     "std.no.1.t":"Cifras financieras",
-    "std.no.1.p":"No publicamos ingresos, gastos ni totales hasta el cierre contable de 2025, firmado por la Revisora Fiscal. Publicar una cifra provisional y corregirla después vale menos que esperar.",
+    "std.no.1.p":"Publicamos los estados financieros 2025 firmados por el Representante Legal y la Revisora Fiscal. Son los de un año de constitución, sin operación: la Fundación empezó a operar en 2026. No publicamos cifras de impacto que no estén respaldadas.",
     "std.no.2.t":"Cifras de impacto",
     "std.no.2.p":"Solo publicamos lo que podemos probar con un documento. Lo que reporta un tercero se marca como reportado por un tercero, y no lo presentamos como nuestro.",
     "std.no.3.t":"Nuestro tamaño",
@@ -1437,21 +1435,21 @@ var I18N = {
     "transp.reg.niif":"Grupo NIIF",
     "transp.reg.niif.v":"Grupo II",
     "transp.gov.t":"Gobernanza y control",
-    "transp.gov.p":"La Fundación no puede distribuir excedentes: la totalidad de su patrimonio se destina a su objeto social.",
+    "transp.gov.p":"La Fundación no puede distribuir excedentes: la totalidad de su patrimonio se destina a su objeto social. Su máximo órgano de dirección es el que definen sus estatutos: hoy, el fundador. Tiene Representante Legal y Revisora Fiscal, y todavía no tiene junta directiva.",
     "transp.gov.rep":"Representante legal y fundador",
     "transp.gov.rf":"Revisora Fiscal",
     "transp.gov.over":"Inspección, vigilancia y control",
     "transp.gov.over.v":"Gobernación de Antioquia",
     "transp.gov.surplus":"Destinación de excedentes",
-    "transp.gov.surplus.v":"Prohibida su distribución. 100% al objeto social.",
+    "transp.gov.surplus.v":"Prohibida su distribución; los excedentes se reinvierten en el objeto social, como exige la ley.",
     "transp.fin.t":"Compromiso financiero",
     "transp.fin.p":"Cumplimos las obligaciones de una ESAL bajo Régimen Tributario Especial:",
-    "transp.fin.1":"Estados financieros bajo NIIF (Grupo II), firmados por la Revisora Fiscal Manuela Londoño Arboleda (T.P. 244894-T).",
+    "transp.fin.1":"Estados financieros bajo NIIF (Grupo II), firmados por el Representante Legal y por la Revisora Fiscal Manuela Londoño Arboleda (T.P. 244894-T).",
     "transp.fin.2":"Declaración de renta anual ante la DIAN (Formulario 110).",
     "transp.fin.3":"Actualización anual del Registro Web RTE (Formato 5245).",
     "transp.fin.4":"Certificado de donación expedido conforme a la ley, por cada aporte que lo solicite.",
     "transp.trace.t":"Trazabilidad de cada aporte",
-    "transp.trace.p":"Recibo con número de guía al confirmarse el pago, certificado de donación revisado y firmado, y acta de entrega con fotos publicada en el rastreo de tu aporte.",
+    "transp.trace.p":"Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega. Si pides certificado de donación, se emite revisado y firmado.",
     "transp.verify.t":"Verifícalo tú mismo",
     "transp.verify.p":"Nuestro Certificado de Existencia y Representación Legal es público. Puedes consultar la entidad en el RUES con el NIT 901.948.930-2.",
     "transp.verify.btn":"Consultar en el RUES",
@@ -1459,9 +1457,9 @@ var I18N = {
     "transp.docs.p":"Descarga los disponibles; el resto, a solicitud por correo:",
     "transp.docs.1":"Certificado de Existencia y Representación Legal",
     "transp.docs.2":"Registro Único Tributario (RUT)",
-    "transp.docs.3":"Estados financieros 2025 (PDF)",
+    "transp.docs.3":"Estados financieros 2025, firmados por el Representante Legal y la Revisora Fiscal (PDF)",
     "transp.docs.4":"Declaración de renta (Formulario 110)",
-    "transp.docs.5":"Informe de gestión 2025 (PDF)",
+    "transp.docs.5":"Informe de gestión 2025: año de constitución, sin proyectos ejecutados (PDF)",
     "transp.docs.btn":"Solicitar documentos",
     "contacto.ey":"Contacto",
     "contacto.t":"Hablemos.",
@@ -1489,17 +1487,17 @@ var I18N = {
     "faq.q2":"¿Qué es el Programa de Gratitud?",
     "faq.a2":"Es un programa de beneficios: comercios aliados dan descuentos a los miembros activos, desde el nivel Retoño, y ganan visibilidad como negocios con propósito. La red está empezando, así que preferimos decirlo: los comercios que ya dan beneficio son los que aparecen en la página del programa, y son los únicos. Está construido para cinco categorías —gastronomía, moda, belleza, bienestar y odontología— y se van sumando de a uno.",
     "faq.q3":"¿Cómo funciona el beneficio tributario?",
-    "faq.a3":"Por cada donación realizada a través del sistema financiero accedes a un descuento del 25% sobre el impuesto de renta a cargo (Art. 257 ET), con el límite que fija el Art. 258. Por ejemplo, $4.000.000 COP donados pueden significar hasta $1.000.000 COP menos en tu impuesto, según tu situación tributaria. Es un beneficio de la ley colombiana: aplica solo si declaras renta en Colombia. No somos asesores tributarios: confírmalo con tu contador.",
+    "faq.a3":"Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación. Si donas en dinero, el aporte debe pasar por el sistema financiero. Por ejemplo, $4.000.000 COP donados pueden significar hasta $1.000.000 COP menos en tu impuesto. No somos asesores tributarios: confírmalo con tu contador.",
     "faq.q4":"¿Puedo ser voluntario?",
-    "faq.a4":"Sí. Puedes aportar desde tu oficio —salud, derecho, contabilidad, comunicación, desarrollo, docencia y más— en terreno junto a una fundación aliada, en la estructura del Hub, o combinando las dos. Cuéntanos tu área y tu disponibilidad.",
-    "faq.q5":"¿Mi fundación puede aplicar al Hub?",
-    "faq.a5":"Sí. Buscamos fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad. Algunas aliadas contribuyen servicios al Hub en lugar de solo recibir.",
+    "faq.a4":"Sí. Puedes aportar desde tu oficio —salud, derecho, contabilidad, comunicación, desarrollo, docencia y más— en terreno junto a una fundación aliada, en la estructura del HUB SOCIAL, o combinando las dos. Cuéntanos tu área y tu disponibilidad.",
+    "faq.q5":"¿Mi fundación puede aplicar al HUB SOCIAL?",
+    "faq.a5":"Sí. Buscamos fundaciones y proyectos comunitarios de base, con trabajo verificable en campo y disposición a la trazabilidad. Cada una entra con verificación y convenio; si es un proyecto comunitario de base, lo decimos en su ficha. Algunas aliadas aportan servicios al HUB SOCIAL, además de recibir.",
     "faq.q6":"¿Qué hace único al HUB SOCIAL?",
     "grat.cats.note":"Estamos sumando comercios aliados; estas son las categorías que priorizamos. Los beneficios concretos se anuncian a medida que se confirman.",
     "grat.biz.ey":"Comercios aliados",
     "grat.biz.t":"Los comercios que van entrando",
     "grat.biz.lead":"El programa se arma comercio a comercio. Cada ficha dice qué ofrece ese negocio y bajo qué condiciones, y los beneficios se publican a medida que cada comercio los confirma.",
-    "grat.biz.empty":"Estamos sumando los primeros comercios aliados. Muy pronto verás aquí sus beneficios — con evidencia, no promesas.",
+    "grat.biz.empty":"Todavía no hay comercios con convenio firmado. Cada comercio aparece aquí cuando firma su convenio, con su beneficio y sus condiciones.",
     "grat.biz.cta":"¿Tienes un negocio? Alíate",
     "grat.card.nivel":"Desde nivel",
     "grat.card.redime":"Cómo redimir",
@@ -1513,16 +1511,16 @@ var I18N = {
     "com.cta.p":"Este beneficio es para los miembros de Give&Grow. Hazte miembro y accede a esta y otras alianzas.",
     "com.cta.btn":"Quiero ser miembro",
     "faq.q7":"¿Puedo hacer un aporte único en lugar de mensual?",
-    "faq.a7":"Sí. En la calculadora puedes elegir Único para una donación puntual, o Mensual/Anual. Ojo con lo segundo, porque conviene saberlo antes: el débito automático todavía no existe. Hoy procesamos ese primer aporte y dejamos registrada tu intención, y te escribimos para activarlo cuando lo habilitemos, sin que tengas que empezar de nuevo. En todos los casos recibes tu recibo con número de guía al confirmarse el pago. El certificado de donación para efectos tributarios es aparte: lo pides al donar, lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, y lo emite una persona — por eso necesitamos tu documento y tu ciudad.",
+    "faq.a7":"Sí. En Membresías registras tu tarjeta una vez y se cobra sola cada mes. Si eliges un aporte único en Donar, se procesa una sola vez. En todos los casos recibes tu recibo con número de guía al confirmarse el pago. El certificado de donación para efectos tributarios es aparte: lo pides al donar, lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, y lo emite una persona — por eso necesitamos tu documento y tu ciudad.",
     "faq.q8":"¿Puedo donar desde el exterior?",
     "faq.a8":"Sí. En la pestaña de PayPal del formulario de donación hay un enlace directo, en dólares. Ten en cuenta que su comisión internacional se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más. Ten en cuenta que el descuento del Art. 257 ET aplica a contribuyentes del impuesto de renta en Colombia.",
     "faq.q9":"¿Cómo sé a dónde fue mi aporte?",
-    "faq.a9":"Con evidencia, no promesas. Cada aporte sigue nuestra trazabilidad: recibo con número de guía al confirmarse el pago, acta de entrega firmada por quien recibe, y sus fotos publicadas en el rastreo de tu aporte. Si pediste certificado de donación, se emite revisado y firmado. Te contamos a dónde llegó y a quién ayudó.",
+    "faq.a9":"Con evidencia, no promesas. Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega. Si pediste certificado de donación, se emite revisado y firmado.",
     "faq.q10":"¿Qué son ImpactOS y ALMA?",
-    "faq.a10":"ImpactOS es el sistema con el que damos trazabilidad y visibilidad al impacto del Hub. ALMA es la asistente que responde tus dudas sobre la fundación aquí en el sitio. Ambos están en construcción y crecen con la red.",
+    "faq.a10":"ImpactOS es el sistema con el que damos trazabilidad al impacto del HUB SOCIAL: ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción. ALMA es la asistente que responde tus dudas sobre la fundación aquí en el sitio.",
     "ndf.badge":"Proyecto comunitario de base",
     "faq.cta.emp":"Explora las alianzas empresariales →",
-    "faq.cta.fund":"Vincula tu fundación al Hub →",
+    "faq.cta.fund":"Vincula tu fundación al HUB SOCIAL →",
     "map.visit":"Ver sitio web",
     "map.leg.f":"Fundaciones aliadas",
     "map.leg.c":"Empresas aliadas",
@@ -1537,7 +1535,7 @@ var I18N = {
     "map.area.med":"Medellín · centro operativo",
     "net.hub":"Conoce una por una a las fundaciones que forman la red",
     "nav.g.nosotros":"Nosotros","nav.cta":"Donar",
-    "ficha.back":"Volver al Hub",
+    "ficha.back":"Volver al HUB SOCIAL",
     "ficha.lider":"Dirige",
     "ficha.k.zona":"Territorio",
     "ficha.k.pob":"A quién acompaña",
@@ -1553,7 +1551,7 @@ var I18N = {
     "ficha.imp.t":"Tu aporte aquí, en concreto",
     "ficha.imp.calc":"Con {a} aquí logras aproximadamente {x}.",
     "ficha.imp.min":"Elige un monto para ver el impacto equivalente.",
-    "ficha.hub.t":"Cómo la fortalece el Hub",
+    "ficha.hub.t":"Cómo la fortalece el HUB SOCIAL",
     "ficha.web":"Ver sitio web",
     "ficha.cta.t":"Dona con destino a esta fundación.",
     "ficha.cta.p":"Puedes dirigir tu aporte a esta fundación al donar, con trazabilidad completa de principio a fin.",
@@ -1562,26 +1560,26 @@ var I18N = {
     "map.area.ndf":"Manrique · La Honda, Medellín",
     "transp.funds.ey":"A dónde va tu aporte",
     "transp.funds.t":"Tu aporte, con destino claro.",
-    "transp.funds.p":"Somos una fundación joven y transparente: hoy buena parte del apoyo llega en especie (Ruta 2), y el destino de cada aporte se respalda con actas, fotos y reportes. Estos son nuestros principios y nuestro compromiso.",
+    "transp.funds.p":"Somos una fundación joven: el destino de cada aporte se respalda con su recibo y, cuando la fundación entrega, con el acta firmada y sus fotos en el rastreo. Estos son nuestros principios y nuestro compromiso.",
     "transp.funds.model.t":"Fondo común, con opción de dirigir",
     "transp.funds.model.p":"Por defecto tu aporte va a un fondo común que asignamos a la necesidad más urgente. Si lo prefieres, puedes dirigirlo a una fundación o ruta específica.",
     "transp.funds.commit.t":"Nuestro compromiso",
-    "transp.funds.a":"La mayor parte de cada aporte va directo a la misión: fundaciones, comunidades y logística de entrega.",
-    "transp.funds.b":"Una parte acotada sostiene la operación del Hub: bodega, transporte, verificación y trazabilidad.",
-    "transp.funds.c":"La administración se mantiene al mínimo indispensable.",
-    "transp.funds.note":"Estamos definiendo el marco exacto de asignación —qué proporción va a la misión, a la operación y a la administración— junto con nuestra Revisora Fiscal y el consejo. Publicaremos las cifras precisas solo cuando estén validadas: evidencia, no promesas.",
+    "transp.funds.a":"La misión: fundaciones, comunidades y logística de entrega.",
+    "transp.funds.b":"La operación del HUB SOCIAL: bodega, transporte, verificación y trazabilidad.",
+    "transp.funds.c":"La administración indispensable. La proporción entre misión, operación y administración la publicaremos cuando la valide la Revisora Fiscal.",
+    "transp.funds.note":"Estamos definiendo el marco exacto de asignación —qué proporción va a la misión, a la operación y a la administración— con nuestra Revisora Fiscal. Publicaremos las cifras precisas solo cuando estén validadas: evidencia, no promesas.",
     "pay.how.ey":"Pago seguro",
-    "pay.how.t":"Cómo pagar tu membresía, paso a paso.",
-    "pay.how.p":"Tu seguridad primero. Así funciona el pago en línea hoy, y así funcionará el débito automático cuando lo habilitemos.",
+    "pay.how.t":"Cómo pagar, paso a paso.",
+    "pay.how.p":"Tu seguridad primero. Así funciona el pago en línea hoy, para un aporte único y para una membresía.",
     "pay.how.s1.t":"Elige tu nivel y monto",
     "pay.how.s1.p":"Usa la calculadora para ver tu aporte, tu beneficio tributario y tu nivel. Puedes elegir mensual, anual o único.",
     "pay.how.s2.t":"Paga por un canal seguro",
-    "pay.how.s2.p":"Hoy: pagas en línea con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía. También puedes transferir y enviar el comprobante, o pagar con PayPal si estás fuera de Colombia. El débito automático para membresías llega después.",
+    "pay.how.s2.p":"Pagas en línea con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía. También puedes transferir y reportar el comprobante, o pagar con PayPal si estás fuera de Colombia. En Membresías registras tu tarjeta una vez y el aporte se cobra solo cada mes.",
     "pay.how.s3.t":"Recibe tu recibo, y después tu certificado",
     "pay.how.s3.p":"El recibo con tu número de guía te llega apenas se confirma el pago, automático. El certificado de donación (Art. 257 ET) es distinto: lo revisamos y lo firman el Representante Legal y la Revisora Fiscal, así que no es inmediato.",
     "pay.how.sec.t":"Consejos de seguridad",
-    "pay.how.sec.p":"Nunca compartas tus claves con nadie y verifica que la página tenga candado (https). Give&Grow no pide contraseñas por WhatsApp ni correo. Puedes pausar o cancelar tu débito cuando quieras.",
-    "faq.a6":"El HUB SOCIAL no es solo un canal para donar: es un centro operativo con cinco rutas que conectan alianzas, donaciones e impacto medible. Tres cosas nos diferencian. Primero, trazabilidad real: tu aporte tiene número de guía, recibo automático, certificado de donación firmado y acta de entrega con fotos que puedes ver en el rastreo. Segundo, evidencia, no promesas: somos una fundación joven y transparente que muestra lo que puede probar, sin cifras infladas, y trabajamos con fundaciones aliadas verificadas en territorio. Tercero, reciprocidad: quien da también crece — los miembros acceden a los beneficios del Programa de Gratitud y las empresas ganan visibilidad como negocios con propósito. Es lo que resume nuestro lema: «Dar para crecer, crecer para dar más».",
+    "pay.how.sec.p":"Nunca compartas tus claves con nadie y verifica que la página tenga candado (https). Give&Grow no pide contraseñas por WhatsApp ni correo. Si tienes una membresía, puedes terminarla cuando quieras desde el enlace de tu propia membresía.",
+    "faq.a6":"El HUB SOCIAL no es solo un canal para donar: es un centro operativo con cinco rutas que conectan alianzas, donaciones e impacto medible. Tres cosas lo definen. Primero, trazabilidad: tu aporte tiene número de guía y recibo automático; si lo pides, certificado de donación firmado; y cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Segundo, evidencia, no promesas: somos una fundación joven que muestra lo que puede probar, sin cifras infladas, y trabajamos con fundaciones aliadas verificadas en territorio. Tercero, reciprocidad: quien da también crece — los miembros acceden a los beneficios del Programa de Gratitud y las empresas ganan visibilidad como negocios con propósito. Es lo que resume nuestro lema: «Dar para crecer, crecer para dar más».",
     "foot.tagline":"Dar para crecer, crecer para dar más.",
     "foot.explore":"Explorar",
     "foot.legal":"Entidad",
@@ -1601,7 +1599,7 @@ var I18N = {
     "alma.c.padrinazgo":"¿Qué es el Padrinazgo de Impacto?",
     "alma.c.rse":"Opciones de RSE para mi empresa",
     "alma.c.gratitud":"¿Qué es el Programa de Gratitud?",
-    "alma.c.hub1":"¿Cómo funciona el HUB?",
+    "alma.c.hub1":"¿Cómo funciona el HUB SOCIAL?",
     "alma.c.rutas":"¿Cuáles son las 5 rutas?",
     "alma.c.evidencia":"¿Cómo garantizan la trazabilidad?",
     "alma.chip2":"Beneficio tributario",
@@ -1609,7 +1607,7 @@ var I18N = {
     "alma.chip4":"¿Aplica mi fundación?",
     "vis.ey":"Hacia dónde vamos",
     "vis.t":"Que dar sea transparente, medible y mutuo.",
-    "vis.p":"Nuestra meta es construir la red de impacto social más confiable de Colombia: que cada aporte transforme una vida con trazabilidad total y que, al hacerlo, también haga crecer a quien da. Empezamos en Medellín; el horizonte es Latinoamérica.",
+    "vis.p":"Queremos que dar en Colombia sea verificable: que cada aporte tenga destino, evidencia y reporte.",
     "vis.1.t":"Impacto verificable",
     "vis.1.p":"Que cada donación tenga destino, evidencia y un resultado medible, no promesas.",
     "vis.2.t":"Fundaciones más fuertes",
@@ -1630,26 +1628,26 @@ var I18N = {
     "membres.t3.p":"Un compromiso firme que sostiene proyectos completos.",
     "membres.t4.t":"Bosque",
     "membres.t4.p":"El nivel más alto: tu generosidad multiplica toda la red.",
-    "membres.t1.price":"$20.000","membres.t1.priceu":"/ mes · ≈US$5",
+    "membres.t1.price":"$20.000","membres.t1.priceu":"/ mes · o US$5 por PayPal","membres.t1.b0":"Recibo y número de guía con cada aporte, y carnet digital",
     "membres.t1.b1":"Boletín de impacto con historias reales",
-    "membres.t1.b2":"Certificado tributario (Art. 257 ET, solo Colombia)",
+    "membres.t1.b2":"Certificado de donación si lo pides (Art. 257 ET, solo Colombia)",
     "membres.t1.b3":"Reconocimiento en web y redes",
-    "membres.t2.price":"$50.000","membres.t2.priceu":"/ mes · ≈US$15","membres.t2.more":"Todo lo de Semilla, y además:",
+    "membres.t2.price":"$50.000","membres.t2.priceu":"/ mes · o US$15 por PayPal","membres.t2.more":"Todo lo de Semilla, y además:",
     "membres.t2.b1":"Acceso al Programa de Gratitud",
     "membres.t2.b2":"Certificado de agradecimiento personalizado",
     "membres.t2.b3":"Contenido especial de voluntariado e impacto",
-    "membres.t3.price":"$120.000","membres.t3.priceu":"/ mes · ≈US$35","membres.t3.more":"Todo lo de Retoño, y además:",
+    "membres.t3.price":"$120.000","membres.t3.priceu":"/ mes · o US$35 por PayPal","membres.t3.more":"Todo lo de Retoño, y además:",
     "membres.t3.b1":"Invitación a eventos y sesiones en vivo",
     "membres.t3.b2":"Acceso prioritario a Impact Journey",
     "membres.t3.b3":"Certificado de impacto personalizado",
-    "membres.t4.price":"$250.000+","membres.t4.priceu":"/ mes · ≈US$75+","membres.t4.more":"Todo lo de Árbol, y además:",
+    "membres.t4.price":"$250.000+","membres.t4.priceu":"/ mes · o US$75+ por PayPal","membres.t4.more":"Todo lo de Árbol, y además:",
     "membres.t4.b1":"Reportes de impacto detallados",
-    "membres.t4.b2":"Reunión con el equipo directivo",
+    "membres.t4.b2":"Reunión con el fundador",
     "membres.t4.b3":"Membresía honorífica y liderazgo en la comunidad",
     "membres.cancel":"Puedes terminar tu membresía cuando quieras desde tu propia membresía: al activarla te llega por correo un enlace propio, y desde ahí la cancelas y retiramos tu método de pago en un clic. No hay que escribirle a nadie ni hay penalidades; el certificado tributario cubre lo donado hasta la fecha. Si perdiste el enlace, lo recuperas con tu correo.",
     "mi.ey":"Desde el exterior",
     "mi.t":"Membresía en dólares, por PayPal",
-    "mi.lead":"Si no estás en Colombia no puedes usar PSE ni Nequi, así que esta es tu puerta: eliges cuánto aportas cada mes y PayPal lo cobra solo. Puedes cancelarla en cualquier momento desde tu propia cuenta de PayPal, sin escribirnos.",
+    "mi.lead":"Si no estás en Colombia, esta es tu puerta: eliges cuánto aportas cada mes y PayPal lo cobra solo. Puedes cancelarla en cualquier momento desde tu propia cuenta de PayPal, sin escribirnos.",
     "mi.aviso":"Dos cosas de frente. El descuento del Art. 257 ET es para contribuyentes de renta en Colombia, así que probablemente no aplica en tu caso. Y la comisión internacional de PayPal se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más.",
     "mi.monto":"Cuánto quieres aportar cada mes, en dólares",
     "mi.calc":"Nivel {nivel}. De lo que aportes llegan {neto} a la fundación: PayPal se lleva el {pct} % en comisión y conversión.",
@@ -1678,7 +1676,7 @@ var I18N = {
     "membres.extra.ey":"Otras formas",
     "membres.extra.t":"No todo es mensual.",
     "membres.temp.t":"Temporal",
-    "membres.temp.p":"Una donación única, sin compromiso recurrente. Igual recibes tu certificado y, si declaras renta en Colombia, el beneficio tributario.",
+    "membres.temp.p":"Una donación única, sin compromiso recurrente. Igual puedes pedir tu certificado de donación y, si declaras renta en Colombia, el descuento del Art. 257 ET puede aplicarte.",
     "membres.honor.t":"Honor",
     "membres.honor.p":"Un reconocimiento por invitación, para aliados y personas que dejan una huella excepcional en el ecosistema.",
     "membres.ben.ey":"Lo que recibes",
@@ -1688,20 +1686,20 @@ var I18N = {
     "membres.ben.2.t":"Certificado y carnet",
     "membres.ben.2.p":"Tu certificado de donación para el beneficio tributario en Colombia y tu carnet digital de miembro, que se renueva con cada aporte.",
     "membres.ben.3.t":"Reportes de impacto",
-    "membres.ben.3.p":"Te contamos a dónde llegó tu aporte y a quién ayudó, con evidencia real.",
+    "membres.ben.3.p":"Te contamos a dónde llegó tu aporte, con evidencia: cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Los reportes periódicos de impacto están en preparación.",
     "membres.ben.4.t":"Trazabilidad total",
-    "membres.ben.4.p":"Cada donación tiene destino, acta y reporte. Sin promesas: evidencia.",
+    "membres.ben.4.p":"Cada donación tiene destino y número de guía; el acta y sus fotos se suman a tu rastreo cuando la fundación entrega. Sin promesas: evidencia.",
     "membres.cta.t":"Hazte miembro.",
     "membres.cta.otro":"O escribe otro monto mensual, en pesos",
     "membres.cta.calc2":"¿Quieres ver antes tu beneficio tributario? Usa el calculador.",
     "membres.cta.nivel":"Nivel {n} · {m} al mes",
     "membres.cta.rango":"El aporte mensual va de {min} a {max}.",
     "membres.cta.p":"Eliges cuánto, registras tu método de pago una sola vez y el aporte se cobra solo cada mes. Puedes terminarlo cuando quieras desde tu propia membresía.",
-    "membres.cta.btn":"Continuar",
+    "membres.cta.btn":"Continuar","membres.prep":"En preparación","nav.calc":"Calcular mi aporte",
     "emp.why.ey":"Por qué aliarte",
     "emp.why.t":"RSE que se ve, se mide y se siente.",
     "emp.why.1.t":"Beneficio tributario",
-    "emp.why.1.p":"Hasta 25% de descuento en renta (Art. 257 ET) por tus donaciones, con certificado. Solo en Colombia, para empresas contribuyentes de renta.",
+    "emp.why.1.p":"Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.",
     "emp.why.2.t":"Trazabilidad real",
     "emp.why.2.p":"Cada aporte con destino, acta y reporte verificable. Evidencia, no promesas.",
     "emp.why.3.t":"Marca con propósito",
@@ -1750,26 +1748,26 @@ var I18N = {
     "grat.cta.biz":"Quiero ser comercio aliado",
     "imp.lead":"Somos una fundación joven y transparente: en lugar de cifras infladas, te mostramos lo que sí podemos probar — el trabajo en campo, las rutas donde operamos y cómo documentamos cada entrega.",
     "imp.pr1.t":"Fotografías reales",
-    "imp.pr1.p":"Cada imagen es de nuestro trabajo en terreno. Sin bancos de fotos ni montajes.",
+    "imp.pr1.p":"Cada imagen es real: la de 2026, de la Fundación en terreno; la anterior a abril de 2025, del trabajo de campo del fundador antes de constituirla. Sin bancos de fotos ni montajes.",
     "imp.pr2.t":"Rutas en territorio",
-    "imp.pr2.p":"Operamos en La Guajira, la Sierra Nevada y las comunas de Medellín. Mira dónde llegamos.",
+    "imp.pr2.p":"El fundador trabajó casi cuatro años en La Guajira, la Sierra Nevada y las comunas de Medellín; hoy la red opera en Medellín.",
     "imp.pr3.t":"Acta por entrega",
-    "imp.pr3.p":"Cada entrega queda documentada con su acta firmada y sus fotos, y aparece en el rastreo de quien aportó a ese destino.",
+    "imp.pr3.p":"Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo de quien aportó a ese destino cuando la fundación entrega.",
     "imp.ev.ey":"La evidencia",
     "imp.ev.t":"Compruébalo tú mismo.",
     "imp.soon.t":"Estamos documentando las primeras historias.",
-    "imp.soon.p":"A medida que el Hub Social crece, este espacio se llenará de historias reales del terreno — sin inventar nada. Síguenos para no perdértelas.",
+    "imp.soon.p":"A medida que el HUB SOCIAL crece, este espacio se llenará de historias reales del terreno — sin inventar nada. Síguenos para no perdértelas.",
     "start.ey":"¿Por dónde empiezo?",
     "start.t":"Hay un camino para ti.",
     "start.don.t":"Soy donante",
-    "start.don.p":"Elige un monto, dona con beneficio tributario y recibe reportes de tu impacto.",
+    "start.don.p":"Elige un monto, pide tu certificado si declaras renta en Colombia y sigue tu aporte con su número de guía.",
     "start.don.btn":"Quiero donar →",
     "start.emp.t":"Soy empresa",
     "start.emp.p":"Convierte tu RSE en impacto medible y trazable, con beneficios tributarios.",
     "start.emp.btn":"Aliar mi empresa →",
     "start.fund.t":"Soy fundación",
     "start.fund.p":"Súmate al HUB SOCIAL y recibe donaciones y herramientas, sin costo.",
-    "start.fund.btn":"Aplicar al Hub →",
+    "start.fund.btn":"Aplicar al HUB SOCIAL →",
     "start.vol.t":"Quiero dar mi tiempo",
     "start.vol.p":"Voluntariado por oficio y jornadas en territorio con las comunidades.",
     "start.vol.btn":"Ver voluntariado →",
@@ -1797,25 +1795,11 @@ var I18N = {
     "track.ev.t":"Entregas de tu destino",
     "track.ev.p":"Tu aporte se suma al fondo de este destino. Estas son las entregas que ese fondo hizo posibles — no te atribuimos una en particular, porque el dinero se reúne y las jornadas se pagan entre varios aportes.",
     "brig.ey":"Brigada de atención a emergencia",
-    "brig.t":"Terremoto del 10 de agosto. Cinco territorios, del 24 al 28.",
-    "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Del 24 al 28 de agosto entregamos en cinco territorios, junto a las fundaciones que ya trabajan en cada uno. Se puede seguir ayudando de cuatro formas, y ninguna vale menos que las otras.",
-    "brig.est.rango":"Del 24 al 28 de agosto de 2026",
-    "brig.est.antes":"Faltan {n} días.",
-    "brig.est.antes1":"Falta 1 día.",
-    "brig.est.hoy":"Empieza hoy.",
-    "brig.est.curso":"En curso: día {n} de cinco.",
-    "brig.est.despues":"Las cinco jornadas terminaron.",
-    "brig.est.p":"Todo lo que llegue antes del 24 viaja con la brigada. Lo que llegue después va a la siguiente jornada — no se devuelve y no se pierde.",
-    "brig.est.p.despues":"Cada entrega se publica aquí con su acta firmada. Lo que llegue ahora va a la siguiente jornada.",
-    "brig.nec4.cap":"Cuatro formas de ayudar, y todas hacen falta",
-    "brig.n1.t":"Con dinero",
-    "brig.n1.d":"Es lo que nos deja comprar lo que falta de verdad, en la talla y la presentación que sirve. Transferencia a la cuenta, o en línea: si es en línea vuelves con un número de guía y puedes seguir tu aporte hasta el acta que firma quien recibe.",
-    "brig.n2.t":"Con insumos",
-    "brig.n2.d":"Escríbenos antes de comprar. Suena a trámite y es al contrario: te decimos qué falta hoy, para que tu plata no acabe en algo que no se puede entregar.",
-    "brig.n3.t":"Con tus manos",
-    "brig.n3.d":"En Envigado hay cajas que alguien tiene que recibir, revisar y empacar. No hace falta experiencia ni un día entero: hace falta estar.",
-    "brig.n4.t":"Con una llamada",
-    "brig.n4.d":"Si no puedes dar, puedes abrir una puerta: una bodega, un camión que suba a la zona cafetera, una empresa que preste su sede. Un mensaje tuyo a la persona correcta mueve tanto como una donación.",
+    "brig.t":"Terremoto del 10 de agosto. La brigada salió el 20 de agosto de 2026.",
+    "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 20 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo: las actas firmadas de las entregas se publican en el rastreo cuando estén listas. Lo que sigue abierto es Mira Mi Casa.",
+    "brig.est.rango":"Desde el 20 de agosto de 2026",
+    "brig.est.despues":"La brigada terminó.",
+    "brig.est.p":"Las actas firmadas de las entregas se publican aquí y en el rastreo cuando estén revisadas, no antes. Lo que sigue abierto es Mira Mi Casa.",
     "brig.hechos.cap":"El sismo",
     "brig.h1.k":"Magnitud",
     "brig.h1.v":"7,4",
@@ -1831,12 +1815,12 @@ var I18N = {
     "brig.h6.v":"Desastre nacional declarado",
     "brig.hechos.nota":"Las cifras de víctimas y damnificados cambian hora a hora y las publica la UNGRD. No las repetimos aquí: sería publicar un número que mañana es falso.",
     "brig.mmc.ey":"Qué sigue",
-    "brig.mmc.t":"Arranca Mira Mi Casa. Para que una casa avance hacen falta tres personas distintas.",
+    "brig.mmc.t":"Lo que sigue es Mira Mi Casa. Para que una casa avance hacen falta tres personas distintas.",
     "brig.mmc.p":"La brigada llevó lo que cabe en un camión. Lo que sigue no se carga: es el concepto de un ingeniero sobre una casa concreta, y los materiales para repararla en el orden correcto. Eso pide tres papeles, y cada uno entra por su propia puerta.",
-    "brig.mmc1.t":"La familia publica su casa.",
+    "brig.mmc1.t":"La familia reporta su casa.",
     "brig.mmc1.d":"Sube fotos desde el teléfono, sin cuenta y sin contraseña. Recibe un número de caso y un enlace privado con el que vuelve a ver en qué va y puede sumar más fotos si le piden.",
     "brig.mmc1.cta":"Revisa tu casa",
-    "brig.mmc2.t":"Un ingeniero voluntario la diagnostica.",
+    "brig.mmc2.t":"Un ingeniero voluntario da un concepto.",
     "brig.mmc2.d":"Mira esas fotos y da un concepto a distancia: si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla. Con matrícula verificada en el registro público del COPNIA. No declara si una casa es habitable: eso le corresponde a la autoridad municipal.",
     "brig.mmc2.cta":"Postularme como ingeniero",
     "brig.mmc3.t":"Alguien apadrina la reparación.",
@@ -1844,18 +1828,16 @@ var I18N = {
     "brig.mmc3.cta":"Quiero apadrinar",
     "brig.mmc.cierre":"Ninguna de las tres funciona sola: sin fotos no hay concepto, sin concepto no se sabe qué comprar, y sin materiales el concepto se queda en un papel.",
     "brig.plan.ey":"Cómo se armó",
-    "brig.plan.t":"Siete personas, cinco sectores, más de cien familias en cada uno.",
-    "brig.plan.p":"La recolección se hizo en centros de acopio de empresas y amigos. De ahí salió la carga con el equipo, por carretera, el 24 de agosto.",
-    "brig.sec.cap":"Los cinco sectores",
-    "brig.sec.meta":"Más de 100 familias",
-    "brig.sec.zona":"zona por confirmar",
-    "brig.sec.nota":"Las zonas exactas y los puntos de entrega se fijan con el Consejo Municipal de Gestión del Riesgo de cada ciudad y con la fundación aliada del territorio. Las cantidades están calculadas para 100 familias por sector y se ajustan contra el listado oficial de necesidades antes de comprar.",
+    "brig.plan.t":"Siete personas y cinco sectores.",
+    "brig.plan.p":"La recolección se hizo en centros de acopio de empresas y amigos en Envigado. De ahí salió la carga con el equipo, por carretera, desde el 20 de agosto de 2026.",
+    "brig.sec.cap":"Los cinco sectores del plan",
+    "brig.sec.nota":"Las zonas y los puntos de entrega se acordaron con los Consejos Municipales de Gestión del Riesgo y con las fundaciones de cada territorio. Lo que se entregó en cada sector, y a cuántas familias, se publica con su acta firmada cuando esté revisada: antes no lo afirmamos.",
     "brig.hub.ey":"Cómo entregamos",
     "brig.hub.t":"No llegamos a repartir por nuestra cuenta.",
-    "brig.hub.p":"Entregamos junto a fundaciones que ya trabajan en cada territorio y que conocen a las familias: ellas ponen el criterio y la relación, nosotros la logística, los insumos y el registro. Es la misma modalidad HUB con la que operamos todo el año, aplicada a una emergencia.",
-    "brig.nec.ey":"Qué se necesita",
-    "brig.nec.t":"La lista es pública.",
-    "brig.nec.p":"El inventario completo tiene más de cien ítems en trece categorías, veinticuatro de ellos críticos. Esto es lo que agrupan, y por qué.",
+    "brig.hub.p":"Entregamos junto a fundaciones que ya trabajaban en cada territorio y conocían a las familias: ellas pusieron el criterio y la relación, nosotros la logística, los insumos y el registro. Es la misma modalidad del HUB SOCIAL con la que operamos todo el año, aplicada a una emergencia.",
+    "brig.nec.ey":"Qué se llevó",
+    "brig.nec.t":"La lista fue pública.",
+    "brig.nec.p":"El inventario tenía más de cien ítems en trece categorías, veinticuatro de ellos críticos. Esto es lo que agrupaban, y por qué.",
     "brig.c1.t":"Agua segura",
     "brig.c1.r":"Sin tapa, el agua se recontamina en horas.",
     "brig.c1.d":"Pastillas potabilizadoras, baldes herméticos, filtros por gravedad y manejo de residuos.",
@@ -1888,18 +1870,10 @@ var I18N = {
     "brig.dar.qr.k":"En dinero · pago directo (QR de la campaña)",
     "brig.dar.qr.v":"checkout.wompi.co/l/c5Ym2E",
     "brig.dar.qr.p":"El QR impreso y este enlace llevan a la misma cuenta y a la misma pasarela. Es más directo, pero no genera número de guía: no podrías seguir tu aporte, y para el certificado tendrías que escribirnos con el comprobante. Si ya estás aquí, el botón de arriba te deja mejor acompañado.",
-    "brig.dar.especie.k":"En especie · dónde llevarlo",
-    "brig.dar.especie.v":"WhatsApp 315 330 5028",
-    "brig.dar.especie.p":"Escríbenos antes de comprar y te decimos qué falta hoy y en qué presentación sirve. Te lo pedimos para cuidar tu plata: el inventario cambia todos los días, y lo que sobra en un sector falta en otro.",
-    "brig.dar.especie.aviso":"Los dos son sedes prestadas, no bodegas con horario de atención. Escribe antes de ir y te confirmamos que haya alguien para recibirte — así no cargas el carro para encontrar la puerta cerrada.",
-    "brig.dar.especie.a1.n":"Esmeraldas Colombia · Envigado",
-    "brig.dar.especie.a1.dir":"Carrera 48 # 37 Sur 56, frente al rompoy de Viva Envigado",
-    "brig.dar.especie.a2.n":"Club Nativos · Envigado",
-    "brig.dar.especie.a2.dir":"Sector El Salado",
-    "brig.dar.especie.maps":"Cómo llegar",
-    "brig.dar.especie.v2":"WhatsApp 312 302 3790",
+    "brig.dar.especie.k":"En especie",
+    "brig.dar.especie.p":"Escríbenos antes de comprar: te decimos si hace falta y en qué presentación sirve. Con la brigada cerrada, cada ofrecimiento se coordina caso por caso.",
     "brig.dar.cert.t":"Certificado de donación",
-    "brig.dar.cert.p":"Somos una entidad sin ánimo de lucro vigente en el Régimen Tributario Especial. Tu donación da derecho a un descuento del 25% del valor donado sobre el impuesto de renta en Colombia (Art. 257 del Estatuto Tributario), sujeto al límite del Art. 258. Su procedencia depende de tu situación tributaria: consúltalo con tu asesor. Lo expedimos firmado por el Representante Legal y la Revisora Fiscal.",
+    "brig.dar.cert.p":"Somos una entidad sin ánimo de lucro vigente en el Régimen Tributario Especial. Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación, que expedimos firmado por el Representante Legal y la Revisora Fiscal.",
     "of.t":"O déjanos los datos y te escribimos",
     "of.p":"Si prefieres no escribir por WhatsApp. Lo importante es lo mismo: cuéntanos antes de comprar.",
     "of.cat":"¿De qué categoría?",
@@ -1937,28 +1911,17 @@ var I18N = {
     "brig.no.ey":"Reglas de la brigada",
     "brig.no.t":"Lo que no vamos a hacer.",
     "brig.no1.t":"No entramos sin coordinación.",
-    "brig.no1.d":"Nada se despliega sin el aval del Consejo Municipal de Gestión del Riesgo y de la fundación del territorio.",
+    "brig.no1.d":"Nada se desplegó sin el aval del Consejo Municipal de Gestión del Riesgo y de la fundación del territorio.",
     "brig.no2.t":"La brigada no consume lo de las familias.",
-    "brig.no2.d":"Su alimentación, alojamiento y equipo se presupuestan aparte y se reportan aparte.",
+    "brig.no2.d":"Su alimentación, alojamiento y equipo se presupuestaron aparte y se reportan aparte.",
     "brig.no3.t":"No prometemos cifras que no tenemos.",
-    "brig.no3.d":"El inventario está en cotización. Cuando haya costos verificados, se publican.",
-    "brig.mc.ey":"Sumarse",
-    "brig.mc.t":"También hacen falta manos y contactos.",
-    "brig.mc.p":"No todo se resuelve con plata. Dos cosas que necesitamos y que casi nadie ofrece, porque casi nadie las pide.",
-    "brig.mc.manos.t":"Manos en la estructura",
-    "brig.mc.manos.p":"El equipo que viaja ya está cerrado en siete personas: ir a terreno exige doble verificación —la nuestra y la de la fundación del territorio— y una sesión de Marco, y eso no cabe en los días que quedan. Lo que sí necesitamos es gente en Envigado para recibir, clasificar y empacar lo que llega a los acopios. En el formulario, elige «Con Give&Grow — en la estructura».",
-    "brig.mc.manos.btn":"Ofrecer mi tiempo",
-    "brig.mc.cont.t":"Contactos que abren puertas",
-    "brig.mc.cont.p":"Lo más útil que puedes mandarnos si no vas a donar, y es gratis: una bodega o parqueadero en Envigado o alrededores donde clasificar; un camión o furgón que suba a Cali, Pereira, Manizales, Armenia o Chocó entre el 24 y el 28; una empresa que preste su sede como centro de acopio; o una fundación que ya trabaje en alguno de los cinco territorios.",
-    "brig.mc.cont.btn":"Escribir por WhatsApp",
+    "brig.no3.d":"No publicamos costos ni equivalencias en pesos sin un soporte verificado.",
     "brig.cierre":"Sin acta firmada, para nosotros no ocurrió.",
-    "brig.aviso.strong":"Terremoto del 10 de agosto",
-    "brig.aviso.txt":"Qué hicimos en cinco territorios, y cómo sigue con Mira Mi Casa",
     "calc.brigada.unico":"Aporte único: la brigada es una operación puntual, no una membresía.",
     "calc.trm":"1 USD = {v} COP · TRM oficial del {f}",
     "calc.trm.no":"No pudimos consultar la TRM en este momento.",
-    "calc.brigada.nota":"Todavía no publicamos equivalencias en pesos para esta campaña: el inventario está en cotización. Tu aporte compra insumos de la lista pública, y cada entrega queda con acta firmada.",
-    "calc.dest.emergencia":"Emergencia abierta",
+    "calc.brigada.nota":"La brigada ya terminó. Lo que se entregó se publica con su acta firmada en el rastreo cuando esté revisada.",
+    "calc.dest.emergencia":"Sismo del 10 de agosto",
     "brigada.opcion":"Brigada de atención a emergencia · 5 sectores",
     "mmc.donar.opcion":"Mira Mi Casa · reparación de viviendas",
     "rep.dest.mmc":"Mira Mi Casa · reparación de viviendas",
@@ -1969,7 +1932,7 @@ var I18N = {
     "calc.note.lbl":"Deja un mensaje o dedicatoria (opcional)",
     "calc.note.ph":"Tu mensaje viajará con tu donación y aparecerá en tu recibo.",
     "calc.impact":"Tu impacto",
-    "calc.impact.note":"Equivalencia aproximada, según datos de las fundaciones del Hub.",
+    "calc.impact.note":"Equivalencia aproximada, según datos de las fundaciones del HUB SOCIAL.",
     "origen.imgalt":"El fundador con la comunidad de niños y niñas en una jornada en La Guajira",
     "origen.tl.ey":"El recorrido",
     "origen.tl.t":"De caminar el territorio a fundar una red.",
@@ -1978,9 +1941,9 @@ var I18N = {
     "origen.ms2.t":"Abril 2025 · Nace Give&Grow",
     "origen.ms2.p":"La experiencia se formaliza: se constituye como Entidad Sin Ánimo de Lucro en Medellín.",
     "origen.ms3.t":"19 mayo 2025 · Registro en Cámara",
-    "origen.ms3.p":"Queda inscrita ante la Cámara de Comercio de Medellín, bajo el Régimen Tributario Especial. En 2025 arranca el primer período operativo.",
+    "origen.ms3.p":"Constituida por documento privado el 11 de abril de 2025, queda inscrita ante la Cámara de Comercio de Medellín el 19 de mayo. La calificación en el Régimen Tributario Especial la otorga la DIAN. 2025 es el año de constitución, sin operación: la Fundación empieza a operar en 2026.",
     "origen.ms4.t":"2026 · Primera aliada e Impact Journey",
-    "origen.ms4.p":"Sumamos la primera fundación aliada al Muro de Héroes y activamos Impact Journey, mientras construimos ImpactOS para dar trazabilidad al impacto.",
+    "origen.ms4.p":"Sumamos la primera fundación aliada y activamos Impact Journey. ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción.",
     "origen.cta.btn":"Ver el HUB SOCIAL",
     "fund.proc.ey":"El proceso",
     "fund.proc.t":"De la aplicación a la vinculación.",
@@ -1992,7 +1955,7 @@ var I18N = {
     "fund.s3.p":"Nos conocemos en territorio para entender tu operación y tus necesidades reales.",
     "fund.s4.t":"Convenio de cooperación",
     "fund.s4.p":"Formalizamos la alianza con un convenio claro — gratuito y transparente.",
-    "fund.s5.t":"Vinculación al Hub",
+    "fund.s5.t":"Vinculación al HUB SOCIAL",
     "fund.s5.p":"Tu fundación entra a la red y empieza a recibir donaciones, herramientas y acompañamiento.",
     "fund.free.t":"Sin costo. Sin intermediarios opacos.",
     "fund.free.p":"Vincularte al HUB SOCIAL es y será siempre gratuito. Solo te pedimos una cosa a cambio: trazabilidad, que cada apoyo llegue documentado a quien lo necesita.",
@@ -2279,47 +2242,12 @@ function renderPobChips(){
     var el=document.getElementById(id); if(el) el.innerHTML = html;
   });
 }
-/* ============ Brigada: en qué momento estamos ============
-   La página tiene que decir la verdad el 12 de agosto, el 26 y el 3 de
-   septiembre, sin que nadie entre a editarla. Un «faltan 12 días» escrito a
-   mano se vuelve mentira el día siguiente, y un contador que no contempla el
-   después acabaría diciendo «faltan -6 días».
-
-   Tres fases, y la del medio importa tanto como las otras: mientras la brigada
-   está en terreno, la página debe decir que está en terreno.
-
-   Colombia es UTC-5 todo el año —no hay horario de verano—, así que la fecha
-   local se saca con una resta fija y no con la zona del navegador: si no, un
-   donante en Madrid vería el cambio de día seis horas antes que la brigada. */
-var BRIGADA_DESDE = "2026-08-24", BRIGADA_HASTA = "2026-08-28", BRIGADA_DIAS = 5;
-
-function diaBogota(){
-  return new Date(Date.now() - 5*3600*1000).toISOString().slice(0,10);
-}
-function brigadaFase(){
-  var hoy = diaBogota();
-  var dia = function(s){ return Date.parse(s + "T00:00:00Z"); };
-  if (hoy < BRIGADA_DESDE){
-    return { fase:"antes", n: Math.round((dia(BRIGADA_DESDE) - dia(hoy)) / 86400000) };
-  }
-  if (hoy > BRIGADA_HASTA) return { fase:"despues" };
-  return { fase:"curso", n: Math.round((dia(hoy) - dia(BRIGADA_DESDE)) / 86400000) + 1 };
-}
-function pintarBrigadaEstado(){
-  var cifra = document.getElementById("brig-cifra");
-  var nota  = document.getElementById("brig-est-p");
-  if (!cifra) return;
-  var f = brigadaFase();
-  var txt = f.fase === "despues" ? t("brig.est.despues")
-          : f.fase === "curso"   ? t("brig.est.curso").replace("{n}", String(f.n))
-          : f.n === 0            ? t("brig.est.hoy")
-          : f.n === 1            ? t("brig.est.antes1")
-          :                        t("brig.est.antes").replace("{n}", String(f.n));
-  cifra.textContent = txt;
-  /* El aviso de abajo cambia con la fase: antes promete que lo que llegue
-     viaja; después ya no puede prometer eso. */
-  if (nota) nota.textContent = f.fase === "despues" ? t("brig.est.p.despues") : t("brig.est.p");
-}
+/* ============ Brigada: ya no hay «en qué momento estamos» ============
+   Aquí vivía un contador de fases (antes / en curso / después) con las fechas
+   del 24 al 28 de agosto. La brigada terminó —Sebas confirmó que salió el 20 de
+   agosto de 2026— y desde el 29 sep 2026 su página es un informe cerrado con
+   texto estático: un contador ya no tiene nada verdadero que calcular, y sus
+   fechas eran las equivocadas. */
 
 /* La hoja imprime SU PROPIA fecha. Una copia de hace tres meses circulando como
    si fuera actual es el problema que esto evita: la fecha en el papel la delata
@@ -2358,9 +2286,6 @@ function postLang(l){
   if (document.getElementById("mb-ir")) mbPinta(50000);
   if (!MARCA_MMC){ renderHeroImpact(); renderHomeFundaciones(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
   renderPrivacy();
-  /* Va DESPUÉS de applyLang: el repintado de data-i18n devuelve el rango
-     estático a su sitio y hay que volver a poner la fase encima. */
-  pintarBrigadaEstado();
   /* Por lo mismo que la linea de arriba: `applyLang` acaba de repintar los
      `data-i18n` y se lleva por delante el mensaje de membresia. */
   graciasFijo();
@@ -3985,7 +3910,7 @@ function go(id, fromPop){
   applyRouteMeta(id);
   renderJourney(id);
   if (id==="impacto") initGallery();
-  if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); pintarBrigadaEstado(); }
+  if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); }
   if (id==="transparencia") pintarFechaImpresion();
   if (id==="caso" && MC.caso) mcPinta();
   if (id==="casas") bcPinta();
@@ -4499,7 +4424,7 @@ var GRACIAS = { id:null, guia:null, intentos:0, timer:null };
    texto del diccionario. Como `setLang` es ASINCRONO, ese repintado ocurre
    DESPUES de `graciasArranca` y borraba lo que acababa de escribirse: la pantalla
    volvia a decir «Estamos confirmando tu pago». Por eso se llama en los dos
-   sitios, igual que `pintarBrigadaEstado`, que existe por lo mismo.
+   sitios (el contador de la brigada hacía lo mismo hasta que se retiró, 29 sep 2026).
 
    Devuelve true si el caso ya quedo resuelto aqui, para que quien llama no siga
    con la consulta del aporte unico. */
@@ -4952,9 +4877,13 @@ var GALLERY = [
   {f:"benef_01.jpg", es:"Comunidad acompañada en terreno", en:"Community accompanied in the field"},
   {f:"benef_02.jpg", es:"Entrega documentada con acta", en:"Delivery documented with a record"},
   {f:"benef_03.jpg", es:"Impacto medible, personas reales", en:"Measurable impact, real people"},
-  {f:"campo_01.jpg", es:"Trabajo de campo en La Guajira", en:"Field work in La Guajira"},
+  /* LAS DE LA GUAJIRA SON ANTERIORES A LA FUNDACIÓN (constituida el 11 abr 2025,
+     sin operación ese año). Son trabajo de campo del fundador, y el pie lo dice:
+     presentarlas como obra de la Fundación sería atribuirle lo que no hizo.
+     Decisión de Sebas, 29 sep 2026. */
+  {f:"campo_01.jpg", es:"Trabajo de campo del fundador en La Guajira, antes de constituir la Fundación", en:"The founder's field work in La Guajira, before the Foundation was constituted"},
   {f:"campo_04.jpg", es:"Acompañamiento continuo", en:"Continuous accompaniment"},
-  {f:"jornadas/guajira_nina_naranja.webp", es:"La Guajira, enero 2025", en:"La Guajira, January 2025"},
+  {f:"jornadas/guajira_nina_naranja.webp", es:"La Guajira · enero de 2025 · trabajo de campo del fundador, antes de constituir la Fundación", en:"La Guajira · January 2025 · the founder's field work, before the Foundation was constituted"},
   {f:"jornadas/guajira_abuela.webp", es:"Tres generaciones bajo la enramada", en:"Three generations under the enramada"},
   {f:"jornadas/guajira_retrato_azul.webp", es:"Niñez wayuu, Alta Guajira", en:"Wayuu childhood, Alta Guajira"},
   {f:"jornadas/guajira_futbol.webp", es:"El juego también es acompañamiento", en:"Play is also accompaniment"},
@@ -6663,17 +6592,21 @@ function allySubmit(ev){
   // Condicionales: la modalidad marcada exige su detalle
   if (chk("mod-gratitud") && !val("ally-ben")) return allyMal(note, "ally-ben", "ally.err.ben");
   if (chk("mod-servicios") && !val("ally-servdet")) return allyMal(note, "ally-servdet", "ally.err.serv");
-  // Autorizaciones (Ley 1581 + licitud + uso de marca)
-  if (!chk("aut-marca") || !chk("aut-datos") || !chk("aut-licitud")){
-    /* A la PRIMERA sin marcar. Son tres casillas distintas -marca, datos y
-       licitud- y llevar siempre a la misma haria buscar cual falta. */
-    var faltaAut = ["aut-marca", "aut-datos", "aut-licitud"].filter(function(id){ return !chk(id); })[0];
+  /* Autorizaciones obligatorias: Ley 1581 y licitud. LA DE MARCA ES OPCIONAL
+     desde el 29 sep 2026: una empresa puede donar sin que la mostremos, y
+     exigirla para enviar dejaba fuera justo a quien quiere aportar en silencio.
+     Si no la marca, simplemente no se publica su nombre ni su logo. */
+  if (!chk("aut-datos") || !chk("aut-licitud")){
+    /* A la PRIMERA sin marcar: llevar siempre a la misma haria buscar cual falta. */
+    var faltaAut = ["aut-datos", "aut-licitud"].filter(function(id){ return !chk(id); })[0];
     return allyMal(note, faltaAut, "ally.err.aut");
   }
   var payload = {
-    razon:val("ally-razon"), nit:val("ally-nit"), representante:val("ally-rep"), cedula:val("ally-cedula"),
+    /* Sin cédula ni dirección desde el 29 sep 2026: se piden al preparar el
+       convenio, no en el primer contacto. El servidor sigue aceptándolas. */
+    razon:val("ally-razon"), nit:val("ally-nit"), representante:val("ally-rep"),
     contacto:val("ally-contacto"), correo:val("ally-correo"), telefono:val("ally-tel"),
-    ciudad:val("ally-ciudad"), sector:val("ally-sector"), sector_otro:val("ally-sector-otro"), direccion:val("ally-dir"),
+    ciudad:val("ally-ciudad"), sector:val("ally-sector"), sector_otro:val("ally-sector-otro"),
     web:val("ally-web"), instagram:val("ally-instagram"), descripcion:val("ally-desc"), aporta:val("ally-aporta"),
     porque:val("ally-porque"),
     modDonacion:chk("mod-donacion"), modRse:chk("mod-rse"), modGratitud:chk("mod-gratitud"),
@@ -6681,6 +6614,9 @@ function allySubmit(ev){
     benBeneficio:val("ally-ben"), benNivel:val("ally-nivel"), benCondiciones:val("ally-cond"), benRedime:val("ally-redime"),
     servDetalle:val("ally-servdet"),
     autMarca:chk("aut-marca"), autDatos:chk("aut-datos"), autLicitud:chk("aut-licitud"),
+    /* El honeypot viaja también al servidor, que descarta si `web2` llega
+       lleno: el atajo de arriba solo cubre a quien ejecuta este script. */
+    web2: val("ally-website2"),
     tipo:"empresa", idioma: lang === "en" ? "en" : "es"
   };
   btn.disabled = true;
@@ -6803,7 +6739,7 @@ var ALLY_ERRS = {
   modalidad_requerida: ["#mod-donacion", "ally.err.mod"],
   beneficio_requerido: ["#ally-ben", "ally.err.ben"],
   servicio_requerido: ["#ally-servdet", "ally.err.serv"],
-  autorizacion_requerida: ["#aut-marca", "ally.err.aut"]
+  autorizacion_requerida: ["#aut-datos", "ally.err.aut"]
 };
 var FF_ERRS = {
   nombre_requerido: ["#ff-nombre", "ff.err.nombre"],
@@ -6818,6 +6754,50 @@ var FF_ERRS = {
   atiende_requerido: ["#ff-atiende", "ff.err.atiende"],
   autorizacion_requerida: ["#ff-datos", "ff.err.datos"],
   declaracion_requerida: ["#ff-veraz", "ff.err.veraz"]
+};
+/* LOS OTROS CUATRO FORMULARIOS (voluntariado, especie, apadrinamiento e
+   ingenieros) convertían CUALQUIER fallo en «intenta de nuevo» —incluido el tope
+   de 429, donde reintentar es justo lo que no sirve—. Desde el 28 sep 2026 usan
+   las mismas `formRespuesta` + `formFallo` que aliados y fundaciones. Los códigos
+   salen de cada manejador de worker.js (apiInscripcion para voluntario,
+   apiOfrecimiento, apiApadrinamiento, apiIngeniero); `demasiadas_inscripciones`
+   y `telefono_requerido` los comparten los seis porque se validan antes de
+   despachar. */
+var VF_ERRS = {
+  nombre_requerido: ["#vf-nombre", "vf.err.nombre"],
+  telefono_requerido: ["#vf-tel", "form.err.tel"],
+  email_invalido: ["#vf-email", "vf.err.email"],
+  nivel_requerido: ['input[name="vf-nivel"]', "vf.err.nivel"],
+  oficio_requerido: ["#vf-oficio", "vf.err.oficio"],
+  acudiente_requerido: ["#vf-acu-nombre", "vf.err.acu"],
+  autorizacion_requerida: ["#vf-datos", "vf.err.datos"]
+};
+var OF_ERRS = {
+  nombre_requerido: ["#of-nombre", "of.err.nombre"],
+  telefono_requerido: ["#of-tel", "form.err.tel"],
+  email_invalido: ["#of-email", "of.err.email"],
+  categoria_requerida: ["#of-cat", "of.err.cat"],
+  detalle_requerido: ["#of-detalle", "of.err.detalle"],
+  autorizacion_requerida: ["#of-datos", "of.err.datos"]
+};
+var AP_ERRS = {
+  nombre_requerido: ["#apf-nombre", "ap.err.nombre"],
+  telefono_requerido: ["#apf-tel", "form.err.tel"],
+  email_invalido: ["#apf-email", "ap.err.email"],
+  aporte_requerido: ["#apf-aporte", "ap.err.aporte"],
+  detalle_requerido: ["#apf-detalle", "ap.err.detalle"],
+  concepto_requerido: ["#apf-concepto", "ap.err.concepto"],
+  autorizacion_requerida: ["#apf-datos", "ap.err.datos"]
+};
+var ING_ERRS = {
+  nombre_requerido: ["#inf-nombre", "ing.err.nombre"],
+  telefono_requerido: ["#inf-tel", "form.err.tel"],
+  email_invalido: ["#inf-email", "ing.err.email"],
+  matricula_requerida: ["#inf-mat", "ing.err.matricula"],
+  especialidad_requerida: ["#inf-esp", "ing.err.esp"],
+  ciudad_requerida: ["#inf-ciudad", "ing.err.ciudad"],
+  alcance_requerido: ["#inf-alcance", "ing.err.alcance"],
+  autorizacion_requerida: ["#inf-datos", "ing.err.datos"]
 };
 function formRespuesta(r){
   if (r.ok) return r.json();
@@ -7025,9 +7005,9 @@ function ofSubmit(ev){
       autoriza_datos: true,
       idioma: lang
     })
-  }).then(function(r){ return r.ok ? r.json() : r.json().then(function(j){ throw new Error(j.error||"http"); }); })
+  }).then(formRespuesta)
     .then(function(){ document.getElementById("of").reset(); btn.disabled = false; allyMsg(note, t("of.ok"), true); })
-    .catch(function(){ btn.disabled = false; allyMsg(note, t("of.err"), false); });
+    .catch(function(err){ btn.disabled = false; formFallo(note, err, OF_ERRS, "of.err"); });
 }
 
 /* De la brigada al formulario de voluntariado, sin perder de dónde viene.
@@ -7146,7 +7126,7 @@ function volSubmit(ev){
       web2: val("vf-web2"),
       idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
     })
-  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+  }).then(formRespuesta)
     .then(function(){
       document.getElementById("vf").reset(); volNivel(); volEdad();
       /* Se limpia el origen: si la misma persona vuelve a inscribir a alguien
@@ -7156,7 +7136,7 @@ function volSubmit(ev){
       btn.disabled = false;
       allyMsg(note, t("vf.ok"), true);
     })
-    .catch(function(){ btn.disabled = false; allyMsg(note, t("vf.err.send"), false); });
+    .catch(function(err){ btn.disabled = false; formFallo(note, err, VF_ERRS, "vf.err.send"); });
   return false;
 }
 
@@ -7404,13 +7384,13 @@ function apSubmit(ev){
       web2: val("apf-web2"),
       idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
     })
-  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+  }).then(formRespuesta)
     .then(function(){
       document.getElementById("apf").reset(); apQuien();
       btn.disabled = false;
       allyMsg(note, t("ap.ok"), true);
     })
-    .catch(function(){ btn.disabled = false; allyMsg(note, t("ap.err.send"), false); });
+    .catch(function(err){ btn.disabled = false; formFallo(note, err, AP_ERRS, "ap.err.send"); });
   return false;
 }
 
@@ -7459,13 +7439,13 @@ function ingSubmit(ev){
       web2: val("inf-web2"),
       idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"
     })
-  }).then(function(r){ if (!r.ok) throw new Error("http_"+r.status); return r.json(); })
+  }).then(formRespuesta)
     .then(function(){
       document.getElementById("inf").reset(); ingEsp();
       btn.disabled = false;
       allyMsg(note, t("ing.ok"), true);
     })
-    .catch(function(){ btn.disabled = false; allyMsg(note, t("ing.err.send"), false); });
+    .catch(function(err){ btn.disabled = false; formFallo(note, err, ING_ERRS, "ing.err.send"); });
   return false;
 }
 

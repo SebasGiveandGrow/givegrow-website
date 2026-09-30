@@ -37,7 +37,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=fb55f5f2">
+<link rel="stylesheet" href="/styles.css?v=029ef30e">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=8cdb0d61" defer></script>
+<script src="/app.js?v=221c3fc9" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -62,16 +62,14 @@
   <div class="nav-in">
     <a class="nlogo" href="#inicio">Give<em>&</em>Grow</a>
     <div class="nlinks">
-      <!-- La emergencia va primero, y es lo único que se salta el orden
-           institucional del menú: mientras esté abierta, es lo más urgente que
-           el sitio tiene que ofrecer. Sus tres páginas existían y no había un
-           solo enlace hacia ellas en la navegación — a #brigada se llegaba por
-           el aviso de la portada, y a #vivienda y #ingenieros solo por enlace
-           directo. -->
+      <!-- El grupo de emergencia va primero porque Mira Mi Casa sigue abierta.
+           La brigada del sismo YA TERMINÓ (salió el 20 ago 2026): desde el 29 sep
+           2026 su página es un informe cerrado y su enlace vive en «Nosotros»,
+           junto a Evidencia, y no aquí ni en un aviso de portada. Una campaña
+           cerrada presentada como urgente es una promesa vencida. -->
       <div class="ndrop">
         <button class="nlink ndrop-t" type="button" data-i18n="nav.g.emergencia" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Emergencia</button>
         <div class="ndrop-menu ndrop-menu-desc">
-          <a href="#brigada"><span class="nd-t" data-i18n="nav.brigada">Brigada de emergencia</span><span class="nd-d" data-i18n="nav.d.brigada">Los cinco territorios, qué se necesita y cómo aportar</span></a>
           <!-- Los tres del triaje son enlaces EXTERNOS, no rutas de la SPA: esas
                páginas viven en Mira Mi Casa. `app.js` redirige igualmente si
                alguien llega por un enlace viejo, pero eso es una red de
@@ -95,7 +93,7 @@
         <div class="ndrop-menu ndrop-menu-desc">
           <a href="#empresas"><span class="nd-t" data-i18n="nav.empresas">Empresas</span><span class="nd-d" data-i18n="nav.d.empresas">RSE, alianzas y empresas aliadas</span></a>
           <a href="#gratitud"><span class="nd-t" data-i18n="nav.gratitud">Programa de Gratitud</span><span class="nd-d" data-i18n="nav.d.gratitud">Beneficios de comercios para los miembros</span></a>
-          <a href="#voluntariado"><span class="nd-t" data-i18n="nav.voluntariado">Voluntariado e Impact Journey</span><span class="nd-d" data-i18n="nav.d.voluntariado">Cómo participar en terreno, en tres niveles</span></a>
+          <a href="#voluntariado"><span class="nd-t" data-i18n="nav.voluntariado">Voluntariado e Impact Journey</span><span class="nd-d" data-i18n="nav.d.voluntariado">Cinco formas de participar</span></a>
           <a href="#aliados"><span class="nd-t" data-i18n="ally.t">Quiero ser aliado</span><span class="nd-d" data-i18n="nav.d.aliados">El formulario para sumar tu empresa</span></a>
         </div>
       </div>
@@ -103,7 +101,7 @@
         <button class="nlink ndrop-t" type="button" data-i18n="nav.membres" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Membresías</button>
         <div class="ndrop-menu ndrop-menu-desc">
           <a href="#membresias"><span class="nd-t" data-i18n="nav.membres">Membresías</span><span class="nd-d" data-i18n="nav.d.membres">Los cuatro niveles y sus beneficios</span></a>
-          <a href="#donar"><span class="nd-t" data-i18n="membres.cta.btn">Continuar</span><span class="nd-d" data-i18n="nav.d.calc">Simula tu aporte y tu beneficio tributario</span></a>
+          <a href="#donar"><span class="nd-t" data-i18n="nav.calc">Calcular mi aporte</span><span class="nd-d" data-i18n="nav.d.calc">Simula tu aporte y tu beneficio tributario</span></a>
           <a href="#rastrea"><span class="nd-t" data-i18n="track.t">Rastrea tu donación</span><span class="nd-d" data-i18n="nav.d.track">Sigue tu donación con su número de guía</span></a>
         </div>
       </div>
@@ -112,12 +110,13 @@
         <div class="ndrop-menu ndrop-menu-desc">
           <a href="#origen"><span class="nd-t" data-i18n="nav.origen">Origen</span><span class="nd-d" data-i18n="nav.d.origen">Cómo y por qué nació la fundación</span></a>
           <a href="#impacto"><span class="nd-t" data-i18n="nav.impacto">Evidencia</span><span class="nd-d" data-i18n="nav.d.impacto">Fotos, mapa e historias verificables</span></a>
+          <a href="#brigada"><span class="nd-t" data-i18n="nav.brigada">Brigada del sismo, agosto 2026</span><span class="nd-d" data-i18n="nav.d.brigada">El informe: qué se llevó y cómo se entregó</span></a>
           <a href="#impactos"><span class="nd-t" data-i18n="nav.impactos">ImpactOS</span><span class="nd-d" data-i18n="nav.d.impactos">El sistema que registra cada aporte</span></a>
           <a href="#medicion"><span class="nd-t" data-i18n="nav.medicion">Cómo medimos</span><span class="nd-d" data-i18n="nav.d.medicion">Hasta dónde podemos afirmar, y con qué respaldo</span></a>
           <a href="#transparencia"><span class="nd-t" data-i18n="nav.transp">Transparencia</span><span class="nd-d" data-i18n="nav.d.transp">Registros oficiales y documentos públicos</span></a>
           <a href="#estandares"><span class="nd-t" data-i18n="nav.estandares">Marco de actuación</span><span class="nd-d" data-i18n="nav.d.estandares">Bajo qué normas trabajamos, y qué no afirmamos</span></a>
           <a href="#faq"><span class="nd-t" data-i18n="nav.faq">FAQ</span><span class="nd-d" data-i18n="nav.d.faq">Respuestas a las dudas más comunes</span></a>
-          <a href="#contacto"><span class="nd-t" data-i18n="nav.contacto">Contacto</span><span class="nd-d" data-i18n="nav.d.contacto">Escríbenos o pasa por el Hub</span></a>
+          <a href="#contacto"><span class="nd-t" data-i18n="nav.contacto">Contacto</span><span class="nd-d" data-i18n="nav.d.contacto">Escríbenos o pasa por el HUB SOCIAL</span></a>
         </div>
       </div>
     </div>
@@ -151,7 +150,6 @@
   <a class="mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
   <a class="mmc-nav" href="#apadrinar" data-i18n="mmc.nav.apad">Apadrinar</a>
   <span class="mnav-g" data-i18n="nav.g.emergencia">Emergencia</span>
-  <a href="#brigada" data-i18n="nav.brigada">Brigada de emergencia</a>
   <!-- Externos, igual que en la barra: el triaje vive en Mira Mi Casa. -->
   <a href="https://miramicasa.org/#vivienda" data-i18n="cv.t">Revisa tu casa</a>
   <a href="https://miramicasa.org/#ingenieros" data-i18n="ing.ey">Ingenieros voluntarios</a>
@@ -165,11 +163,12 @@
   <a href="#aliados" data-i18n="ally.t">Quiero ser aliado</a>
   <span class="mnav-g" data-i18n="nav.membres">Membresías</span>
   <a href="#membresias" data-i18n="nav.membres">Membresías</a>
-  <a href="#donar" data-i18n="membres.cta.btn">Continuar</a>
+  <a href="#donar" data-i18n="nav.calc">Calcular mi aporte</a>
   <a href="#rastrea" data-i18n="track.t">Rastrea tu donación</a>
   <span class="mnav-g" data-i18n="nav.g.nosotros">Nosotros</span>
   <a href="#origen" data-i18n="nav.origen">Origen</a>
   <a href="#impacto" data-i18n="nav.impacto">Evidencia</a>
+  <a href="#brigada" data-i18n="nav.brigada">Brigada del sismo, agosto 2026</a>
   <a href="#impactos" data-i18n="nav.impactos">ImpactOS</a>
   <a href="#medicion" data-i18n="nav.medicion">Cómo medimos</a>
   <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
@@ -190,10 +189,6 @@
 
 <!-- ============ INICIO ============ -->
 <main id="page-inicio" class="page active">
-  <a class="brig-aviso" href="#brigada" data-nav="brigada">
-    <strong data-i18n="brig.aviso.strong">Terremoto del 10 de agosto</strong>
-    <span data-i18n="brig.aviso.txt">Qué hicimos en cinco territorios, y cómo sigue con Mira Mi Casa</span>
-  </a>
   <section class="hero">
     <div class="hero-bg"><picture>
       <source type="image/webp" srcset="/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w" sizes="100vw">
@@ -236,7 +231,7 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="home.hub.ey">Cómo funciona</span>
       <h2 class="h-sec rv" data-i18n="home.hub.t">Entras una vez. Llegas a varias realidades.</h2>
-      <p class="lead rv d1" data-i18n="home.hub.p">No somos otra fundación pidiendo donaciones. Somos el puente que conecta tu generosidad con fundaciones de base verificadas — y te devuelve la prueba de lo que pasó. Cada aporte se rastrea de principio a fin.</p>
+      <p class="lead rv d1" data-i18n="home.hub.p">Somos el puente entre tu aporte y fundaciones de base verificadas. Ese puente es el HUB SOCIAL, nuestra red de fundaciones verificadas, y cada aporte se rastrea con su número de guía.</p>
       <div class="hub-flow rv d2">
         <div class="hf-step rv">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></div>
@@ -246,7 +241,7 @@
         <div class="hf-arrow" aria-hidden="true">&rarr;</div>
         <div class="hf-step hf-hub rv d1">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19"/></svg></div>
-          <h3 data-i18n="home.hub.s2t">El HUB conecta</h3>
+          <h3 data-i18n="home.hub.s2t">El HUB SOCIAL conecta</h3>
           <p data-i18n="home.hub.s2p">Visitamos a cada fundación en territorio y firmamos convenio antes de canalizar tu aporte.</p>
         </div>
         <div class="hf-arrow" aria-hidden="true">&rarr;</div>
@@ -259,15 +254,15 @@
         <div class="hf-step rv d3">
           <div class="hf-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
           <h3 data-i18n="home.hub.s4t">Recibes la evidencia</h3>
-          <p data-i18n="home.hub.s4p">Recibo, acta firmada y fotos de vuelta. No promesas.</p>
+          <p data-i18n="home.hub.s4p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega.</p>
         </div>
       </div>
       <div class="hub-vuelta rv d3">
         <h3 data-i18n="home.vuelta.t">Y algo te vuelve</h3>
-        <p data-i18n="home.vuelta.p">Una jornada en territorio, tu beneficio tributario y la evidencia de en qué se convirtió tu aporte. Es la parte que casi nadie ofrece.</p>
+        <p data-i18n="home.vuelta.p">Tu beneficio tributario, la evidencia de tu aporte y, si quieres, la invitación a una jornada.</p>
       </div>
       <div class="hub-acciones rv d3">
-        <a class="btn btn-g" href="#hub" data-i18n="home.hub.btn">Conoce cómo funciona el HUB</a>
+        <a class="btn btn-g" href="#hub" data-i18n="home.hub.btn">Conoce cómo funciona el HUB SOCIAL</a>
         <a class="btn btn-w" href="#rastrea" data-i18n="traz.btn">Rastrea tu donación</a>
       </div>
       <!-- OCULTO por decisión de Sebas: contadores de donaciones/entregas en vivo. Se retoma cuando haya más datos. JS (updateLiveStats) es null-safe; claves i18n (live.*) se conservan.
@@ -295,7 +290,7 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="home.funds.ey">La red, hoy</span>
       <h2 class="h-sec rv" data-i18n="home.funds.t">Conoce las fundaciones</h2>
-      <p class="lead rv d1" data-i18n="home.funds.p">Cada una entró tras una visita de contexto y firmó convenio. Su costo por unidad de impacto está contrastado contra su propio soporte, no estimado por nosotros.</p>
+      <p class="lead rv d1" data-i18n="home.funds.p">Cada una entra con verificación y convenio; algunas son proyectos comunitarios de base, y lo decimos en su ficha. Su costo por unidad de impacto está contrastado contra su propio soporte, no estimado por nosotros.</p>
       <div id="home-funds-grid" class="home-funds rv d2"></div>
       <a class="btn btn-w rv d3" href="#hub" data-i18n="home.funds.btn">Ver todas en el HUB SOCIAL</a>
     </div>
@@ -308,8 +303,8 @@
       <img src="/img/jornadas/banner_atardecer_1200.webp" alt="Niña wayuu a contraluz durante una jornada al atardecer en la Alta Guajira" loading="lazy" decoding="async" data-i18n="banner.imgalt" data-i18n-attr="alt">
     </picture>
     <div class="fb-in">
-      <span class="fb-ey rv" data-i18n="banner.ey">La Guajira · Enero 2025</span>
-      <p class="fb-quote rv d1" data-i18n="banner.quote">Esto también es evidencia.</p>
+      <span class="fb-ey rv" data-i18n="banner.ey">La Guajira · enero de 2025 · trabajo de campo del fundador, antes de constituir la Fundación</span>
+      <p class="fb-quote rv d1" data-i18n="banner.quote">De aquí viene la pregunta que hoy es la Fundación.</p>
       <a class="fb-link rv d2" href="#impacto" data-i18n="banner.link">Ver más evidencia</a>
     </div>
   </section>
@@ -318,9 +313,9 @@
       <span class="ey rv" data-i18n="start.ey">¿Por dónde empiezo?</span>
       <h2 class="h-sec rv" data-i18n="start.t">Hay un camino para ti.</h2>
       <div class="grid g3 rv d1" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/></svg></div><h3 data-i18n="start.don.t">Soy donante</h3><p data-i18n="start.don.p">Elige un monto, dona con beneficio tributario y recibe reportes de tu impacto.</p><a class="card-link" href="#donar" data-i18n="start.don.btn">Quiero donar →</a></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/></svg></div><h3 data-i18n="start.don.t">Soy donante</h3><p data-i18n="start.don.p">Elige un monto, pide tu certificado si declaras renta en Colombia y sigue tu aporte con su número de guía.</p><a class="card-link" href="#donar" data-i18n="start.don.btn">Quiero donar →</a></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M10 8h4M10 12h4M10 16h4"/></svg></div><h3 data-i18n="start.emp.t">Soy empresa</h3><p data-i18n="start.emp.p">Convierte tu RSE en impacto medible y trazable, con beneficios tributarios.</p><a class="card-link" href="#empresas" data-i18n="start.emp.btn">Aliar mi empresa →</a></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="start.fund.t">Soy fundación</h3><p data-i18n="start.fund.p">Súmate al HUB SOCIAL y recibe donaciones y herramientas, sin costo.</p><a class="card-link" href="#fundaciones" data-i18n="start.fund.btn">Aplicar al Hub →</a></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="start.fund.t">Soy fundación</h3><p data-i18n="start.fund.p">Súmate al HUB SOCIAL y recibe donaciones y herramientas, sin costo.</p><a class="card-link" href="#fundaciones" data-i18n="start.fund.btn">Aplicar al HUB SOCIAL →</a></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18 9l-4.2 1.3L12 15l-1.8-4.7L6 9l4.2-1.3z"/><path d="M19 14l.8 1.9L22 17l-2.2.7L19 20l-.8-2.3L16 17l2.2-1.1z"/></svg></div><h3 data-i18n="start.vol.t">Quiero dar mi tiempo</h3><p data-i18n="start.vol.p">Voluntariado por oficio y jornadas en territorio con las comunidades.</p><a class="card-link" href="#voluntariado" data-i18n="start.vol.btn">Ver voluntariado →</a></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div><h3 data-i18n="start.com.t">Tengo un comercio</h3><p data-i18n="start.com.p">Aporta un beneficio a la red sin girar dinero, y recibe visibilidad.</p><a class="card-link" href="#gratitud" data-i18n="start.com.btn">Programa de Gratitud →</a></div>
         <div class="card card-mmc"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg></div><h3 data-i18n="start.mmc.t">Mira Mi Casa</h3><p data-i18n="start.mmc.p">Reporta tu casa tras el sismo y recibe un concepto técnico, gratis.</p><a class="card-link" href="https://miramicasa.org" data-i18n="start.mmc.btn">Revisar mi casa →</a></div>
@@ -335,7 +330,7 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="vis.ey">Hacia dónde vamos</span>
       <h2 class="h-sec rv" data-i18n="vis.t">Que dar sea transparente, medible y mutuo.</h2>
-      <p class="lead rv d1" data-i18n="vis.p">Nuestra meta es construir la red de impacto social más confiable de Colombia: que cada aporte transforme una vida con trazabilidad total y que, al hacerlo, también haga crecer a quien da. Empezamos en Medellín; el horizonte es Latinoamérica.</p>
+      <p class="lead rv d1" data-i18n="vis.p">Queremos que dar en Colombia sea verificable: que cada aporte tenga destino, evidencia y reporte.</p>
       <div class="grid g3 metas rv d2">
         <div class="meta"><h3 data-i18n="vis.1.t">Impacto verificable</h3><p data-i18n="vis.1.p">Que cada donación tenga destino, evidencia y un resultado medible, no promesas.</p></div>
         <div class="meta"><h3 data-i18n="vis.2.t">Fundaciones más fuertes</h3><p data-i18n="vis.2.p">Amplificar a quienes ya trabajan en campo, reduciendo costos y multiplicando su alcance.</p></div>
@@ -353,7 +348,7 @@
       <span class="ey rv" data-i18n="origen.ey">Nuestro origen</span>
       <h1 class="h-sec rv" data-i18n="origen.t">Todo empezó con una tonelada de comida.</h1>
       <p class="rv d1" data-i18n="origen.p1">Tras semanas de gestión, una campaña alcanzó su meta: una tonelada de alimento para entregar a una fundación. Pero al llegar, la fundación no tenía cómo almacenar ni repartir todo ese alimento. Casi la mitad se perdió. Ver esa comida desperdiciarse —comida que a pocas cuadras alguien necesitaba— dejó una pregunta que no soltó al fundador: ¿cómo cierro la brecha entre los recursos y la necesidad, con lo que tengo a la mano?</p>
-      <p class="rv d2" data-i18n="origen.p2">Esa pregunta se volvió método. Give&amp;Grow International nace de casi cuatro años de experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín, y se constituye por documento privado el 11 de abril de 2025, con registro en la Cámara de Comercio de Medellín el 19 de mayo de 2025, como Entidad Sin Ánimo de Lucro (ESAL) bajo el Régimen Tributario Especial. El propósito: restaurar la confianza en el acto de dar, con trazabilidad y sin intermediarios opacos.</p>
+      <p class="rv d2" data-i18n="origen.p2">Esa pregunta se volvió método. Give&amp;Grow International nace de casi cuatro años de experiencia de campo de Juan Sebastián Navarro Osorio en La Guajira, la Sierra Nevada y las comunas de Medellín, anteriores a la Fundación. Se constituye por documento privado el 11 de abril de 2025, con registro en la Cámara de Comercio de Medellín el 19 de mayo de 2025, como Entidad Sin Ánimo de Lucro (ESAL), y la DIAN la califica en el Régimen Tributario Especial. El propósito: restaurar la confianza en el acto de dar, con trazabilidad y sin intermediarios opacos.</p>
     </div>
   </section>
   <section style="padding-top:0">
@@ -368,8 +363,8 @@
       <div class="steps rv d1" style="margin-top:24px">
         <div class="step"><div class="step-n">1</div><div><h3 data-i18n="origen.ms1.t">Años en terreno</h3><p data-i18n="origen.ms1.p">Casi cuatro años de trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín, donde la confianza se gana caminando.</p></div></div>
         <div class="step"><div class="step-n">2</div><div><h3 data-i18n="origen.ms2.t">Abril 2025 · Nace Give&amp;Grow</h3><p data-i18n="origen.ms2.p">La experiencia se formaliza: se constituye como Entidad Sin Ánimo de Lucro en Medellín.</p></div></div>
-        <div class="step"><div class="step-n">3</div><div><h3 data-i18n="origen.ms3.t">19 mayo 2025 · Registro en Cámara</h3><p data-i18n="origen.ms3.p">Queda inscrita ante la Cámara de Comercio de Medellín, bajo el Régimen Tributario Especial. En 2025 arranca el primer período operativo.</p></div></div>
-        <div class="step"><div class="step-n">4</div><div><h3 data-i18n="origen.ms4.t">2026 · Primera aliada e Impact Journey</h3><p data-i18n="origen.ms4.p">Sumamos la primera fundación aliada al Muro de Héroes y activamos Impact Journey, mientras construimos ImpactOS para dar trazabilidad al impacto.</p></div></div>
+        <div class="step"><div class="step-n">3</div><div><h3 data-i18n="origen.ms3.t">19 mayo 2025 · Registro en Cámara</h3><p data-i18n="origen.ms3.p">Constituida por documento privado el 11 de abril de 2025, queda inscrita ante la Cámara de Comercio de Medellín el 19 de mayo. La calificación en el Régimen Tributario Especial la otorga la DIAN. 2025 es el año de constitución, sin operación: la Fundación empieza a operar en 2026.</p></div></div>
+        <div class="step"><div class="step-n">4</div><div><h3 data-i18n="origen.ms4.t">2026 · Primera aliada e Impact Journey</h3><p data-i18n="origen.ms4.p">Sumamos la primera fundación aliada y activamos Impact Journey. ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción.</p></div></div>
       </div>
       <div class="rv d2" style="margin-top:26px"><a class="btn btn-g" href="#hub" data-i18n="origen.cta.btn">Ver el HUB SOCIAL</a></div>
     </div>
@@ -385,26 +380,26 @@
       <div class="prose rv d1" style="margin-top:16px">
         <p data-i18n="hub.intro.p1">Un HUB es un punto de encuentro: un lugar donde se conectan personas, recursos y capacidades que por separado no se encontrarían. No reemplaza a quienes ya trabajan; los articula para que su esfuerzo llegue más lejos.</p>
         <h2 style="margin-top:26px" data-i18n="hub.intro.t2" class="h-comp3">Entonces, ¿qué es el HUB SOCIAL de Give&amp;Grow?</h2>
-        <p data-i18n="hub.intro.p2">Es nuestro motor operativo en terreno: el puente que conecta la generosidad de donantes y empresas con fundaciones de base verificadas, de forma trazable y sostenible. Aquí, quien da también crece, y cada aporte llega con evidencia: acta, foto y factura.</p>
+        <p data-i18n="hub.intro.p2">Es nuestro motor operativo en terreno: el puente que conecta la generosidad de donantes y empresas con fundaciones de base verificadas, de forma trazable y sostenible. Recibes recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega.</p>
       </div>
     </div>
   </section>
   <section class="cream">
     <div class="wrap">
-      <span class="ey rv" data-i18n="hub.found.ey">Fundaciones del HUB</span>
+      <span class="ey rv" data-i18n="hub.found.ey">Fundaciones del HUB SOCIAL</span>
       <h2 class="h-sec rv" data-i18n="hub.found.t">Quiénes forman la red hoy</h2>
-      <p class="lead rv d1" data-i18n="hub.found.p">Empezamos con una fundación aliada y una red en proceso de vinculación formal. Cada una entra una a una, con verificación y convenio — sin nombres ni cifras infladas.</p>
+      <p class="lead rv d1" data-i18n="hub.found.p">Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. Cada una entra una a una, con verificación y convenio — sin nombres ni cifras infladas.</p>
       <div id="aliadas-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
     </div>
   </section>
   <section id="hub-aportan-sec">
     <div class="wrap">
       <span class="ey rv" data-i18n="hub.aporta.ey">Aliadas que aportan</span>
-      <h2 class="h-sec rv" data-i18n="hub.aporta.t">Fundaciones que fortalecen el Hub</h2>
+      <h2 class="h-sec rv" data-i18n="hub.aporta.t">Fundaciones que fortalecen el HUB SOCIAL</h2>
       <p class="lead rv d1" data-i18n="hub.aporta.p">No todas las aliadas entran a recibir. Algunas fundaciones suman capacidades, servicios y conocimiento que hacen más fuerte al HUB SOCIAL y a Give&amp;Grow — y así llegan mejor a las comunidades.</p>
       <div id="aportantes-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
       <div id="aportantes-empty" class="grat-empty rv d2" style="display:none">
-        <p data-i18n="hub.aporta.empty">Estamos formalizando las primeras aliadas que aportan al Hub. Aquí verás qué le entrega cada una — con evidencia, no promesas.</p>
+        <p data-i18n="hub.aporta.empty">Estamos formalizando las primeras aliadas que aportan al HUB SOCIAL. Aquí verás qué le entrega cada una — con evidencia, no promesas.</p>
       </div>
     </div>
   </section>
@@ -434,17 +429,17 @@
   <section class="cream">
     <div class="wrap prose">
       <h2 class="h-comp3 rv" data-i18n="hub.pob.t">Las poblaciones que queremos alcanzar</h2>
-      <p class="rv d1" data-i18n="hub.pob.note" style="margin-top:12px;max-width:60ch">Nuestra misión apunta a impactar todo tipo de población vulnerable a través de las fundaciones que se suman al HUB. Estas son las que hoy guían nuestro objeto social; la cobertura real crece con cada aliada que entra con trabajo y evidencia.</p>
+      <p class="rv d1" data-i18n="hub.pob.note" style="margin-top:12px;max-width:60ch">Nuestra misión apunta a impactar todo tipo de población vulnerable a través de las fundaciones que se suman al HUB SOCIAL. Estas son las que hoy guían nuestro objeto social; la cobertura real crece con cada aliada que entra con trabajo y evidencia.</p>
       <div class="eco-row rv d2" id="hub-pob" style="margin-top:18px"></div>
     </div>
   </section>
   <section>
     <div class="wrap">
       <div class="cta-box rv">
-        <h2 data-i18n="hub.cta.t" class="h-comp3">El Hub crece con cada aliado.</h2>
+        <h2 data-i18n="hub.cta.t" class="h-comp3">El HUB SOCIAL crece con cada aliado.</h2>
         <p data-i18n="hub.cta.p">Si diriges una fundación, este puente es para ti. Y si quieres fortalecer la red, tu aporte la hace crecer.</p>
         <div class="cta-actions">
-          <a class="btn btn-g" href="#fundaciones" data-i18n="hub.cta.b1">Quiero aplicar al Hub</a>
+          <a class="btn btn-g" href="#fundaciones" data-i18n="hub.cta.b1">Quiero aplicar al HUB SOCIAL</a>
           <a class="btn btn-o" href="#donar" data-i18n="hub.cta.b2">Quiero donar</a>
         </div>
       </div>
@@ -458,7 +453,7 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="emp.ey">RSE empresarial</span>
       <h1 class="h-sec rv" data-i18n="emp.t">Tu empresa, con propósito y trazabilidad.</h1>
-      <p class="lead rv d1" data-i18n="emp.lead">Tres formas de aliarte. Cada una con beneficio tributario y reporte verificable.</p>
+      <p class="lead rv d1" data-i18n="emp.lead">Tres formas de aliarte, todas con reporte verificable. Las donaciones, además, dan derecho a certificado.</p>
     </div>
   </section>
   <section id="empresas-aliadas-sec">
@@ -478,7 +473,7 @@
       <span class="ey rv" data-i18n="emp.why.ey">Por qué aliarte</span>
       <h2 class="h-sec rv" data-i18n="emp.why.t">RSE que se ve, se mide y se siente.</h2>
       <div class="grid g4 rv d1" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM8 7h8M8 11h8M8 15h5"/></svg></div><h3 data-i18n="emp.why.1.t">Beneficio tributario</h3><p data-i18n="emp.why.1.p">Hasta 25% de descuento en renta (Art. 257 ET) por tus donaciones, con certificado. Solo en Colombia, para empresas contribuyentes de renta.</p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM8 7h8M8 11h8M8 15h5"/></svg></div><h3 data-i18n="emp.why.1.t">Beneficio tributario</h3><p data-i18n="emp.why.1.p">Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.</p></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg></div><h3 data-i18n="emp.why.2.t">Trazabilidad real</h3><p data-i18n="emp.why.2.p">Cada aporte con destino, acta y reporte verificable. Evidencia, no promesas.</p></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18 9l-4.2 1.3L12 15l-1.8-4.7L6 9l4.2-1.3z"/><path d="M19 14l.8 1.9L22 17l-2.2.7L19 20l-.8-2.3L16 17l2.2-1.1z"/></svg></div><h3 data-i18n="emp.why.3.t">Marca con propósito</h3><p data-i18n="emp.why.3.p">Reconocimiento como empresa aliada y visibilidad ante una comunidad que valora el propósito.</p></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="emp.why.4.t">Impact Journey</h3><p data-i18n="emp.why.4.p">Un día en campo para tu equipo, con comunidades reales. RSE que se vive.</p></div>
@@ -491,7 +486,7 @@
       <h2 class="h-sec rv" data-i18n="emp.levels.t">Elige el nivel de tu alianza.</h2>
       <div class="grid g3 rv d1" style="margin-top:28px">
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/></svg></div><h3 data-i18n="emp.p1.t">Padrinazgo de Impacto</h3><p data-i18n="emp.p1.p">Defines un presupuesto y, con la Calculadora de Impacto, lo traduces en unidades reales y verificables. Recibes certificado de donación y reporte de impacto con evidencia.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="emp.p2.t">Impact Journey</h3><p data-i18n="emp.p2.p">Voluntariado corporativo en doble vía (Ruta 4): tu equipo vive la realidad de las comunidades que apoya, y la comunidad también gana. Ya hicimos las primeras jornadas con donantes y aliados; ahora estamos abriendo el formato a equipos de empresa — escríbenos para diseñar la primera.</p><p style="margin-top:10px"><a class="card-link" href="#voluntariado"><span data-i18n="vol.link">Ver el programa de voluntariado</span> <span aria-hidden="true">&rarr;</span></a></p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="emp.p2.t">Impact Journey</h3><p data-i18n="emp.p2.p">Voluntariado corporativo en doble vía: tu equipo vive la realidad de las comunidades que apoya, y la comunidad también gana. Ya hicimos las primeras jornadas con donantes y aliados; ahora estamos abriendo el formato a equipos de empresa — escríbenos para diseñar la primera.</p><p style="margin-top:10px"><a class="card-link" href="#voluntariado"><span data-i18n="vol.link">Ver el programa de voluntariado</span> <span aria-hidden="true">&rarr;</span></a></p></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M8 6h8M7.6 7.8 10.8 16M16.4 7.8 13.2 16"/></svg></div><h3 data-i18n="emp.p3.t">Alianza a medida</h3><p data-i18n="emp.p3.p">Un canal abierto para co-crear juntos programas, campañas o formas de cooperación ajustadas a la realidad de tu empresa.</p></div>
       </div>
     </div>
@@ -533,11 +528,11 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="fund.ey">Para fundaciones</span>
       <h1 class="h-sec rv" data-i18n="fund.t">Aplica al HUB SOCIAL.</h1>
-      <p class="lead rv d1" data-i18n="fund.lead">Más de 25 fundaciones preaprobadas en nuestra red de espera: su vinculación formal se confirma una a una, con verificación y evidencia.</p>
+      <p class="lead rv d1" data-i18n="fund.lead">Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. Cada una entra una a una, con verificación y convenio.</p>
       <div class="grid g3 rv d2" style="margin-top:30px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h2 data-i18n="fund.req.t" class="h-comp3">Qué buscamos</h2><p data-i18n="fund.req.p">Fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div><h2 data-i18n="fund.give.t" class="h-comp3">Aliadas que aportan</h2><p data-i18n="fund.give.p">Un modelo novedoso: algunas fundaciones contribuyen servicios al Hub en lugar de solo recibir.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div><h2 data-i18n="fund.proto.t" class="h-comp3">Protocolo de cumplimiento</h2><p data-i18n="fund.proto.p">Faltas leves van a revisión de comité con tres oportunidades; faltas gravísimas, como el mal uso de fondos, implican expulsión inmediata y acción legal.</p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h2 data-i18n="fund.req.t" class="h-comp3">Qué buscamos</h2><p data-i18n="fund.req.p">Fundaciones y proyectos comunitarios de base, con trabajo verificable en campo y disposición a la trazabilidad. Cada una entra con verificación y convenio; algunas son proyectos comunitarios de base, y lo decimos en su ficha.</p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div><h2 data-i18n="fund.give.t" class="h-comp3">Aliadas que aportan</h2><p data-i18n="fund.give.p">Algunas fundaciones aportan servicios al HUB SOCIAL, además de recibir apoyo.</p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div><h2 data-i18n="fund.proto.t" class="h-comp3">Protocolo de cumplimiento</h2><p data-i18n="fund.proto.p">Faltas leves van a revisión de comité con tres oportunidades; las faltas graves, como el mal uso de recursos, terminan la alianza.</p></div>
       </div>
     </div>
   </section>
@@ -550,7 +545,7 @@
         <div class="step"><div class="step-n">2</div><div><h3 data-i18n="fund.s2.t">Revisamos</h3><p data-i18n="fund.s2.p">Estudiamos tu información y verificamos tu trabajo en campo.</p></div></div>
         <div class="step"><div class="step-n">3</div><div><h3 data-i18n="fund.s3.t">Visita de contexto</h3><p data-i18n="fund.s3.p">Nos conocemos en territorio para entender tu operación y tus necesidades reales.</p></div></div>
         <div class="step"><div class="step-n">4</div><div><h3 data-i18n="fund.s4.t">Convenio de cooperación</h3><p data-i18n="fund.s4.p">Formalizamos la alianza con un convenio claro — gratuito y transparente.</p></div></div>
-        <div class="step"><div class="step-n">5</div><div><h3 data-i18n="fund.s5.t">Vinculación al Hub</h3><p data-i18n="fund.s5.p">Tu fundación entra a la red y empieza a recibir donaciones, herramientas y acompañamiento.</p></div></div>
+        <div class="step"><div class="step-n">5</div><div><h3 data-i18n="fund.s5.t">Vinculación al HUB SOCIAL</h3><p data-i18n="fund.s5.p">Tu fundación entra a la red y empieza a recibir donaciones, herramientas y acompañamiento.</p></div></div>
       </div>
     </div>
   </section>
@@ -574,7 +569,7 @@
        sale una ficha pública: sale una solicitud. -->
   <section id="fund-form">
     <div class="wrap">
-      <span class="ey rv" data-i18n="ff.ey">Aplicar al HUB</span>
+      <span class="ey rv" data-i18n="ff.ey">Aplicar al HUB SOCIAL</span>
       <h2 class="h-sec rv" data-i18n="ff.t">Cuéntanos quién es tu fundación</h2>
       <p class="lead rv d1" data-i18n="ff.lead">Esto es la aplicación, no la vinculación: con lo que escribas aquí revisamos si encajamos, y si encajamos vamos a conocerte a tu territorio. Solo te pedimos texto — el logo, las fotos y las cifras de costos se ven después, cuando ya nos conozcamos.</p>
 
@@ -586,7 +581,7 @@
             <small class="vf-help" data-i18n="ff.nombre.help">Tal como debe aparecer publicado si algún día publicamos su perfil.</small></div>
           <div class="field"><label for="ff-sigla" data-i18n="ff.sigla">Nombre corto o sigla (opcional)</label>
             <input type="text" id="ff-sigla" maxlength="60"></div>
-          <div class="field"><label for="ff-anio" data-i18n="ff.anio">¿Desde qué año trabajan? (opcional)</label>
+          <div class="field"><label for="ff-anio" data-i18n="ff.anio">¿Desde qué año trabaja? (opcional)</label>
             <input type="text" id="ff-anio" inputmode="numeric" maxlength="4"></div>
           <div class="field"><label for="ff-lider" data-i18n="ff.lider">Quién lidera la fundación</label>
             <input type="text" id="ff-lider" maxlength="120" required></div>
@@ -597,7 +592,7 @@
           <div class="field"><label for="ff-tel" data-i18n="ff.tel">Celular o WhatsApp</label>
             <input type="tel" id="ff-tel" maxlength="40" autocomplete="tel" required>
             <small class="vf-help" data-i18n="ff.tel.help">Los datos de contacto son para coordinar entre nosotros. No se publican en el sitio.</small></div>
-          <div class="field ally-wide"><label for="ff-zona" data-i18n="ff.zona">Barrio o sector y ciudad donde trabajan</label>
+          <div class="field ally-wide"><label for="ff-zona" data-i18n="ff.zona">Barrio o sector y ciudad donde trabaja</label>
             <input type="text" id="ff-zona" maxlength="160" data-i18n="ff.zona.ph" data-i18n-attr="placeholder" placeholder="Ej. La Honda, Manrique, Medellín" required>
             <small class="vf-help" data-i18n="ff.zona.help">El sector, no la dirección exacta. En el mapa de la red el pin va a nivel de barrio, nunca a la puerta.</small></div>
           <div class="field"><label for="ff-ciudad" data-i18n="ff.ciudad">Ciudad (opcional)</label>
@@ -606,13 +601,13 @@
 
         <fieldset class="vf-set">
           <legend data-i18n="ff.pers.lbl">¿Tiene personería jurídica?</legend>
-          <p class="vf-help" data-i18n="ff.pers.help">Cualquier respuesta sirve para aplicar. Esto no define si entran: define cómo describimos a la organización si algún día publicamos su perfil.</p>
+          <p class="vf-help" data-i18n="ff.pers.help">Cualquier respuesta sirve para aplicar. Esto no define si entra: define cómo describimos a la organización si algún día publicamos su perfil.</p>
           <label class="ally-check"><input type="radio" name="ff-pers" value="nit"><span data-i18n="ff.pers.nit">Sí, con NIT</span></label>
           <label class="ally-check"><input type="radio" name="ff-pers" value="tramite"><span data-i18n="ff.pers.tramite">En trámite</span></label>
           <label class="ally-check"><input type="radio" name="ff-pers" value="base"><span data-i18n="ff.pers.base">No — es un proyecto comunitario de base</span></label>
         </fieldset>
 
-        <h3 class="ally-sec" data-i18n="ff.s.hist">Qué hacen y por qué</h3>
+        <h3 class="ally-sec" data-i18n="ff.s.hist">Qué hace y por qué</h3>
         <div class="ally-grid">
           <div class="field ally-wide"><label for="ff-historia" data-i18n="ff.historia">La historia de la fundación, en un párrafo</label>
             <textarea id="ff-historia" rows="5" maxlength="1500" data-i18n="ff.historia.ph" data-i18n-attr="placeholder" placeholder="Cómo nació, quién la lidera, a quién sirve y qué la hace distinta." required></textarea></div>
@@ -620,7 +615,7 @@
             <textarea id="ff-mision" rows="2" maxlength="800" required></textarea></div>
         </div>
 
-        <h3 class="ally-sec" data-i18n="ff.s.pob">A quién llegan</h3>
+        <h3 class="ally-sec" data-i18n="ff.s.pob">A quién llega</h3>
         <fieldset class="vf-set">
           <legend data-i18n="ff.pob.lbl">¿A quiénes atiende la fundación?</legend>
           <div class="ally-mods">
@@ -639,10 +634,10 @@
             <input type="text" id="ff-pob-otra" maxlength="120"></div>
         </fieldset>
         <div class="ally-grid">
-          <div class="field ally-wide"><label for="ff-atiende" data-i18n="ff.atiende">¿A cuántas personas atienden de forma regular?</label>
+          <div class="field ally-wide"><label for="ff-atiende" data-i18n="ff.atiende">¿A cuántas personas atiende de forma regular?</label>
             <input type="text" id="ff-atiende" maxlength="160" required>
             <small class="vf-help" data-i18n="ff.atiende.help">El número real, aunque sea aproximado. Si es estimado lo publicamos con «≈»: preferimos un número honesto a uno redondo.</small></div>
-          <div class="field ally-wide"><label for="ff-conteo" data-i18n="ff.conteo">¿Cómo llevan esa cuenta? (opcional)</label>
+          <div class="field ally-wide"><label for="ff-conteo" data-i18n="ff.conteo">¿Cómo lleva esa cuenta? (opcional)</label>
             <input type="text" id="ff-conteo" maxlength="400" data-i18n="ff.conteo.ph" data-i18n-attr="placeholder" placeholder="Planillas de asistencia, registro digital, listados por programa, conteo aproximado…">
             <small class="vf-help" data-i18n="ff.conteo.help">Esto decide si la cifra se publica exacta o con «≈». No es una prueba: es lo que nos permite no inflar su trabajo.</small></div>
         </div>
@@ -654,11 +649,11 @@
             <input type="text" id="ff-prog" maxlength="160" data-i18n="ff.prog.ph" data-i18n-attr="placeholder" placeholder="Ej. Chefs del Futuro"></div>
           <div class="field ally-wide"><label for="ff-prog-desc" data-i18n="ff.prog.desc">¿Qué hace y a cuántas personas llega? (opcional)</label>
             <textarea id="ff-prog-desc" rows="3" maxlength="900" data-i18n="ff.prog.desc.ph" data-i18n-attr="placeholder" placeholder="Con números reales y frecuencia. Ej. cerca de 100 niños reciben almuerzo cada día, de lunes a viernes."></textarea></div>
-          <div class="field ally-wide"><label for="ff-evid" data-i18n="ff.evid">¿Qué evidencia tienen de que funciona? (opcional)</label>
+          <div class="field ally-wide"><label for="ff-evid" data-i18n="ff.evid">¿Qué evidencia tiene de que funciona? (opcional)</label>
             <textarea id="ff-evid" rows="2" maxlength="900" data-i18n="ff.evid.ph" data-i18n-attr="placeholder" placeholder="Registro fotográfico, planillas de asistencia, facturas, testimonios, informes…"></textarea></div>
         </div>
 
-        <h3 class="ally-sec" data-i18n="ff.s.red">Dónde encontrarlos</h3>
+        <h3 class="ally-sec" data-i18n="ff.s.red">Dónde encontrarla</h3>
         <div class="ally-grid">
           <div class="field"><label for="ff-web" data-i18n="ff.web">Página web (opcional)</label>
             <input type="url" id="ff-web" maxlength="200" placeholder="https://tufundacion.org" data-i18n="ff.web.ph" data-i18n-attr="placeholder"></div>
@@ -725,7 +720,7 @@
       <p class="lead rv d1" data-i18n="grat.biz.lead">El programa se arma comercio a comercio. Cada ficha dice qué ofrece ese negocio y bajo qué condiciones, y los beneficios se publican a medida que cada comercio los confirma.</p>
       <div id="grat-grid" class="grat-grid rv d2"></div>
       <div id="grat-empty" class="grat-empty rv d2" style="display:none">
-        <p data-i18n="grat.biz.empty">Estamos sumando los primeros comercios aliados. Muy pronto verás aquí sus beneficios — con evidencia, no promesas.</p>
+        <p data-i18n="grat.biz.empty">Todavía no hay comercios con convenio firmado. Cada comercio aparece aquí cuando firma su convenio, con su beneficio y sus condiciones.</p>
         <a class="btn btn-g" href="#aliados" data-i18n="grat.biz.cta">¿Tienes un negocio? Alíate</a>
       </div>
     </div>
@@ -760,9 +755,9 @@
       <h1 class="h-sec rv" data-i18n="imp.t">Evidencia, no promesas.</h1>
       <p class="lead rv d1" data-i18n="imp.lead">Somos una fundación joven y transparente: en lugar de cifras infladas, te mostramos lo que sí podemos probar — el trabajo en campo, las rutas donde operamos y cómo documentamos cada entrega.</p>
       <div class="grid g3 rv d2" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></svg></div><h2 data-i18n="imp.pr1.t" class="h-comp3">Fotografías reales</h2><p data-i18n="imp.pr1.p">Cada imagen es de nuestro trabajo en terreno. Sin bancos de fotos ni montajes.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div><h2 data-i18n="imp.pr2.t" class="h-comp3">Rutas en territorio</h2><p data-i18n="imp.pr2.p">Operamos en La Guajira, la Sierra Nevada y las comunas de Medellín. Mira dónde llegamos.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM8 7h8M8 11h8M8 15h5"/></svg></div><h2 data-i18n="imp.pr3.t" class="h-comp3">Acta por entrega</h2><p data-i18n="imp.pr3.p">Cada entrega queda documentada con su acta firmada y sus fotos, y aparece en el rastreo de quien aportó a ese destino.</p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></svg></div><h2 data-i18n="imp.pr1.t" class="h-comp3">Fotografías reales</h2><p data-i18n="imp.pr1.p">Cada imagen es real: la de 2026, de la Fundación en terreno; la anterior a abril de 2025, del trabajo de campo del fundador antes de constituirla. Sin bancos de fotos ni montajes.</p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div><h2 data-i18n="imp.pr2.t" class="h-comp3">Rutas en territorio</h2><p data-i18n="imp.pr2.p">El fundador trabajó casi cuatro años en La Guajira, la Sierra Nevada y las comunas de Medellín; hoy la red opera en Medellín.</p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM8 7h8M8 11h8M8 15h5"/></svg></div><h2 data-i18n="imp.pr3.t" class="h-comp3">Acta por entrega</h2><p data-i18n="imp.pr3.p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo de quien aportó a ese destino cuando la fundación entrega.</p></div>
       </div>
     </div>
   </section>
@@ -819,7 +814,7 @@
     <div class="wrap prose">
       <span class="ey rv" data-i18n="impactos.ey">La plataforma</span>
       <h1 class="h-sec rv" data-i18n="impactos.t">ImpactOS: el registro detrás de cada aporte.</h1>
-      <p class="lead rv d1" data-i18n="impactos.lead">No es una promesa a futuro. Es la capa que convierte una intención de donar en un registro con destino, evidencia y certificado — y que ya está operando en este sitio.</p>
+      <p class="lead rv d1" data-i18n="impactos.lead">ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción. Es la capa que convierte una intención de donar en un registro con destino, evidencia y certificado.</p>
 
       <div class="os-rows rv d2">
         <div class="os-row">
@@ -871,9 +866,9 @@
               <div class="rec-item"><dt data-i18n="impactos.rec.r3.k">Destino</dt><dd data-i18n="impactos.rec.r3.v">Dirigida a una fundación o al fondo general</dd></div>
               <div class="rec-item"><dt data-i18n="impactos.rec.r4.k">Proyecto</dt><dd data-i18n="impactos.rec.r4.v">Chefs del Futuro</dd></div>
               <div class="rec-item"><dt data-i18n="impactos.rec.r5.k">Equivalencia verificada</dt><dd data-i18n="impactos.rec.r5.v">≈ 50 platos de comida al mes</dd></div>
-              <div class="rec-item"><dt data-i18n="impactos.rec.r6.k">Beneficio tributario</dt><dd data-i18n="impactos.rec.r6.v">25% sobre el impuesto a cargo en Colombia (Art. 257 ET)</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.rec.r6.k">Beneficio tributario</dt><dd data-i18n="impactos.rec.r6.v">Descuento en renta del 25% del valor donado (Art. 257 ET), con el límite del Art. 258, si te aplica</dd></div>
             </dl>
-            <p class="rec-cap" data-i18n="impactos.rec.b">Lo que produce el HUB en terreno</p>
+            <p class="rec-cap" data-i18n="impactos.rec.b">Lo que produce el HUB SOCIAL en terreno</p>
             <dl class="rec-list">
               <div class="rec-item"><dt data-i18n="impactos.rec.r7.k">Acta de recepción</dt><dd data-i18n="impactos.rec.r7.v">Con foto de lo recibido</dd></div>
               <div class="rec-item"><dt data-i18n="impactos.rec.r8.k">Acta de entrega</dt><dd data-i18n="impactos.rec.r8.v">Firmada por quien recibe</dd></div>
@@ -890,8 +885,8 @@
             <p class="rec-cap" data-i18n="impactos.jor.a">Lo que se acuerda antes</p>
             <dl class="rec-list">
               <div class="rec-item"><dt data-i18n="impactos.jor.r1.k">Fundación anfitriona</dt><dd data-i18n="impactos.jor.r1.v">La que acompaña a esa comunidad</dd></div>
-              <div class="rec-item"><dt data-i18n="impactos.jor.r2.k">Población acompañada</dt><dd data-i18n="impactos.jor.r2.v">Del portafolio del HUB</dd></div>
-              <div class="rec-item"><dt data-i18n="impactos.jor.r3.k">Nivel de participación</dt><dd data-i18n="impactos.jor.r3.v">Con el HUB, con Give&amp;Grow o mixto</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.jor.r2.k">Población acompañada</dt><dd data-i18n="impactos.jor.r2.v">Del portafolio del HUB SOCIAL</dd></div>
+              <div class="rec-item"><dt data-i18n="impactos.jor.r3.k">Nivel de participación</dt><dd data-i18n="impactos.jor.r3.v">Con el HUB SOCIAL, con Give&amp;Grow o mixto</dd></div>
               <div class="rec-item"><dt data-i18n="impactos.jor.r4.k">Verificaciones</dt><dd data-i18n="impactos.jor.r4.v">La nuestra y la de la fundación</dd></div>
             </dl>
             <p class="rec-cap" data-i18n="impactos.jor.b">Lo que queda al cerrar</p>
@@ -1128,28 +1123,20 @@
   <section>
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.ey">Brigada de atención a emergencia</span>
-      <h1 class="h-sec rv" data-i18n="brig.t">Terremoto del 10 de agosto. Cinco territorios, del 24 al 28.</h1>
-      <p class="lead rv d1" data-i18n="brig.lead">Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. Del 24 al 28 de agosto entregamos en cinco territorios, junto a las fundaciones que ya trabajan en cada uno. Se puede seguir ayudando de cuatro formas, y ninguna vale menos que las otras.</p>
+      <h1 class="h-sec rv" data-i18n="brig.t">Terremoto del 10 de agosto. La brigada salió el 20 de agosto de 2026.</h1>
+      <p class="lead rv d1" data-i18n="brig.lead">Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 20 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo: las actas firmadas de las entregas se publican en el rastreo cuando estén listas. Lo que sigue abierto es Mira Mi Casa.</p>
 
-      <!-- Estado de la brigada. Va ANTES de los hechos del sismo a propósito: la
-           página estaba escrita como justificación institucional y el lector no
-           sabía para cuándo era ni qué hacer. El argumento sigue abajo, intacto.
-           La cifra la escribe pintarBrigadaEstado() en app.js — el texto estático
-           es el rango, que es verdad en las tres fases y es lo que leen los
-           crawlers. -->
+      <!-- LA BRIGADA TERMINÓ, y la página es su informe (29 sep 2026). Antes aquí
+           iba un contador de fases —antes, en curso, después— y cuatro formas de
+           ayudar con fechas del 24 al 28 de agosto. Sebas confirmó que la salida
+           fue el 20 de agosto; la fecha de cierre no se afirma porque no está
+           documentada. Lo único que se promete es lo verificable: las actas
+           firmadas aparecen cuando estén revisadas. -->
       <div class="brig-estado rv d1">
-        <p class="rec-cap" data-i18n="brig.est.rango">Del 24 al 28 de agosto de 2026</p>
-        <p class="brig-cifra" id="brig-cifra" data-i18n="brig.est.rango">Del 24 al 28 de agosto de 2026</p>
-        <p class="brig-est-p" id="brig-est-p" data-i18n="brig.est.p">Todo lo que llegue antes del 24 viaja con la brigada. Lo que llegue después va a la siguiente jornada — no se devuelve y no se pierde.</p>
-        <p class="rec-cap brig-nec-cap" data-i18n="brig.nec4.cap">Cuatro formas de ayudar, y todas hacen falta</p>
-        <div class="brig-nec4">
-          <div class="brig-n"><b data-i18n="brig.n1.t">Con dinero</b><small data-i18n="brig.n1.d">Es lo que nos deja comprar lo que falta de verdad, en la talla y la presentación que sirve. Transferencia a la cuenta, o en línea: si es en línea vuelves con un número de guía y puedes seguir tu aporte hasta el acta que firma quien recibe.</small></div>
-          <div class="brig-n"><b data-i18n="brig.n2.t">Con insumos</b><small data-i18n="brig.n2.d">Escríbenos antes de comprar. Suena a trámite y es al contrario: te decimos qué falta hoy, para que tu plata no acabe en algo que no se puede entregar.</small></div>
-          <div class="brig-n"><b data-i18n="brig.n3.t">Con tus manos</b><small data-i18n="brig.n3.d">En Envigado hay cajas que alguien tiene que recibir, revisar y empacar. No hace falta experiencia ni un día entero: hace falta estar.</small></div>
-          <div class="brig-n"><b data-i18n="brig.n4.t">Con una llamada</b><small data-i18n="brig.n4.d">Si no puedes dar, puedes abrir una puerta: una bodega, un camión que suba a la zona cafetera, una empresa que preste su sede. Un mensaje tuyo a la persona correcta mueve tanto como una donación.</small></div>
-        </div>
+        <p class="rec-cap" data-i18n="brig.est.rango">Desde el 20 de agosto de 2026</p>
+        <p class="brig-cifra" data-i18n="brig.est.despues">La brigada terminó.</p>
+        <p class="brig-est-p" data-i18n="brig.est.p">Las actas firmadas de las entregas se publican aquí y en el rastreo cuando estén revisadas, no antes. Lo que sigue abierto es Mira Mi Casa.</p>
       </div>
-
       <div class="rec-ledger rv d2">
         <p class="rec-cap" data-i18n="brig.hechos.cap">El sismo</p>
         <dl class="rec-list"><div class="rec-item"><dt data-i18n="brig.h1.k">Magnitud</dt><dd data-i18n="brig.h1.v">7,4</dd></div><div class="rec-item"><dt data-i18n="brig.h2.k">Fecha y hora</dt><dd data-i18n="brig.h2.v">10 de agosto de 2026, 7:34 a. m.</dd></div><div class="rec-item"><dt data-i18n="brig.h3.k">Epicentro</dt><dd data-i18n="brig.h3.v">San José del Palmar, Chocó</dd></div><div class="rec-item"><dt data-i18n="brig.h4.k">Profundidad</dt><dd data-i18n="brig.h4.v">103 km</dd></div><div class="rec-item"><dt data-i18n="brig.h5.k">Fuente</dt><dd data-i18n="brig.h5.v">Servicio Geológico Colombiano</dd></div><div class="rec-item"><dt data-i18n="brig.h6.k">Estado</dt><dd data-i18n="brig.h6.v">Desastre nacional declarado</dd></div></dl>
@@ -1161,14 +1148,14 @@
   <section class="cream">
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.plan.ey">Cómo se armó</span>
-      <h2 class="h-comp3 rv" data-i18n="brig.plan.t">Siete personas, cinco sectores, más de cien familias en cada uno.</h2>
-      <p class="lead rv d1" data-i18n="brig.plan.p">La recolección se hizo en centros de acopio de empresas y amigos. De ahí salió la carga con el equipo, por carretera, el 24 de agosto.</p>
+      <h2 class="h-comp3 rv" data-i18n="brig.plan.t">Siete personas y cinco sectores.</h2>
+      <p class="lead rv d1" data-i18n="brig.plan.p">La recolección se hizo en centros de acopio de empresas y amigos en Envigado. De ahí salió la carga con el equipo, por carretera, desde el 20 de agosto de 2026.</p>
 
       <div class="brig-sec rv d2">
-        <p class="rec-cap" data-i18n="brig.sec.cap">Los cinco sectores</p>
-        <div class="sec-fila"><span class="sec-ciudad">Cali</span><span class="sec-meta" data-i18n="brig.sec.meta">Más de 100 familias</span><span class="sec-estado" data-i18n="brig.sec.zona">zona por confirmar</span></div><div class="sec-fila"><span class="sec-ciudad">Pereira</span><span class="sec-meta" data-i18n="brig.sec.meta">Más de 100 familias</span><span class="sec-estado" data-i18n="brig.sec.zona">zona por confirmar</span></div><div class="sec-fila"><span class="sec-ciudad">Manizales</span><span class="sec-meta" data-i18n="brig.sec.meta">Más de 100 familias</span><span class="sec-estado" data-i18n="brig.sec.zona">zona por confirmar</span></div><div class="sec-fila"><span class="sec-ciudad">Armenia</span><span class="sec-meta" data-i18n="brig.sec.meta">Más de 100 familias</span><span class="sec-estado" data-i18n="brig.sec.zona">zona por confirmar</span></div><div class="sec-fila"><span class="sec-ciudad">Chocó</span><span class="sec-meta" data-i18n="brig.sec.meta">Más de 100 familias</span><span class="sec-estado" data-i18n="brig.sec.zona">zona por confirmar</span></div>
+        <p class="rec-cap" data-i18n="brig.sec.cap">Los cinco sectores del plan</p>
+        <div class="sec-fila"><span class="sec-ciudad">Cali</span></div><div class="sec-fila"><span class="sec-ciudad">Pereira</span></div><div class="sec-fila"><span class="sec-ciudad">Manizales</span></div><div class="sec-fila"><span class="sec-ciudad">Armenia</span></div><div class="sec-fila"><span class="sec-ciudad">Chocó</span></div>
       </div>
-      <p class="mu rv d2 brig-nota" data-i18n="brig.sec.nota">Las zonas exactas y los puntos de entrega se fijan con el Consejo Municipal de Gestión del Riesgo de cada ciudad y con la fundación aliada del territorio. Las cantidades están calculadas para 100 familias por sector y se ajustan contra el listado oficial de necesidades antes de comprar.</p>
+      <p class="mu rv d2 brig-nota" data-i18n="brig.sec.nota">Las zonas y los puntos de entrega se acordaron con los Consejos Municipales de Gestión del Riesgo y con las fundaciones de cada territorio. Lo que se entregó en cada sector, y a cuántas familias, se publica con su acta firmada cuando esté revisada: antes no lo afirmamos.</p>
     </div>
   </section>
 
@@ -1193,17 +1180,17 @@
   <section class="cream">
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.mmc.ey">Qué sigue</span>
-      <h2 class="h-comp3 rv" data-i18n="brig.mmc.t">Arranca Mira Mi Casa. Para que una casa avance hacen falta tres personas distintas.</h2>
+      <h2 class="h-comp3 rv" data-i18n="brig.mmc.t">Lo que sigue es Mira Mi Casa. Para que una casa avance hacen falta tres personas distintas.</h2>
       <p class="lead rv d1" data-i18n="brig.mmc.p">La brigada llevó lo que cabe en un camión. Lo que sigue no se carga: es el concepto de un ingeniero sobre una casa concreta, y los materiales para repararla en el orden correcto. Eso pide tres papeles, y cada uno entra por su propia puerta.</p>
 
       <div class="brig-nos rv d2">
         <div class="brig-no">
-          <p class="brig-no-t" data-i18n="brig.mmc1.t">La familia publica su casa.</p>
+          <p class="brig-no-t" data-i18n="brig.mmc1.t">La familia reporta su casa.</p>
           <p class="brig-no-d" data-i18n="brig.mmc1.d">Sube fotos desde el teléfono, sin cuenta y sin contraseña. Recibe un número de caso y un enlace privado con el que vuelve a ver en qué va y puede sumar más fotos si le piden.</p>
           <p style="margin-top:8px"><a class="card-link" href="https://miramicasa.org/#vivienda"><span data-i18n="brig.mmc1.cta">Revisa tu casa</span> <span aria-hidden="true">&rarr;</span></a></p>
         </div>
         <div class="brig-no">
-          <p class="brig-no-t" data-i18n="brig.mmc2.t">Un ingeniero voluntario la diagnostica.</p>
+          <p class="brig-no-t" data-i18n="brig.mmc2.t">Un ingeniero voluntario da un concepto.</p>
           <p class="brig-no-d" data-i18n="brig.mmc2.d">Mira esas fotos y da un concepto a distancia: si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla. Con matrícula verificada en el registro público del COPNIA. No declara si una casa es habitable: eso le corresponde a la autoridad municipal.</p>
           <p style="margin-top:8px"><a class="card-link" href="https://miramicasa.org/#ingenieros"><span data-i18n="brig.mmc2.cta">Postularme como ingeniero</span> <span aria-hidden="true">&rarr;</span></a></p>
         </div>
@@ -1220,15 +1207,15 @@
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.hub.ey">Cómo entregamos</span>
       <h2 class="h-comp3 rv" data-i18n="brig.hub.t">No llegamos a repartir por nuestra cuenta.</h2>
-      <p class="lead rv d1" data-i18n="brig.hub.p">Entregamos junto a fundaciones que ya trabajan en cada territorio y que conocen a las familias: ellas ponen el criterio y la relación, nosotros la logística, los insumos y el registro. Es la misma modalidad HUB con la que operamos todo el año, aplicada a una emergencia.</p>
+      <p class="lead rv d1" data-i18n="brig.hub.p">Entregamos junto a fundaciones que ya trabajaban en cada territorio y conocían a las familias: ellas pusieron el criterio y la relación, nosotros la logística, los insumos y el registro. Es la misma modalidad del HUB SOCIAL con la que operamos todo el año, aplicada a una emergencia.</p>
     </div>
   </section>
 
   <section class="cream">
     <div class="wrap">
-      <span class="ey rv" data-i18n="brig.nec.ey">Qué se necesita</span>
-      <h2 class="h-comp3 rv" data-i18n="brig.nec.t">La lista es pública.</h2>
-      <p class="lead rv d1" data-i18n="brig.nec.p">El inventario completo tiene más de cien ítems en trece categorías, veinticuatro de ellos críticos. Esto es lo que agrupan, y por qué.</p>
+      <span class="ey rv" data-i18n="brig.nec.ey">Qué se llevó</span>
+      <h2 class="h-comp3 rv" data-i18n="brig.nec.t">La lista fue pública.</h2>
+      <p class="lead rv d1" data-i18n="brig.nec.p">El inventario tenía más de cien ítems en trece categorías, veinticuatro de ellos críticos. Esto es lo que agrupaban, y por qué.</p>
       <div class="brig-cats rv d2">
         <div class="brig-cat">
           <span class="brig-num">01</span>
@@ -1306,25 +1293,8 @@
       </div>
 
       <div class="brig-via rv d2">
-        <p class="rec-cap" data-i18n="brig.dar.especie.k">En especie · dónde llevarlo</p>
-        <!-- Los dos acopios, con dirección. Antes decía «escríbenos y te decimos a
-             cuál llevarlo»: honesto sin los datos, pero era la fricción más grande
-             de la campaña — cada donante en especie necesitaba una conversación.
-             Y OJO: están en ENVIGADO, no en Medellín. Son municipios distintos. -->
-        <div class="brig-acopio">
-          <p class="brig-acopio-n" data-i18n="brig.dar.especie.a1.n">Esmeraldas Colombia · Envigado</p>
-          <p class="brig-acopio-d" data-i18n="brig.dar.especie.a1.dir">Carrera 48 # 37 Sur 56, frente al rompoy de Viva Envigado</p>
-          <p class="brig-acopio-c"><a href="https://wa.me/573153305028" target="_blank" rel="noopener" data-i18n="brig.dar.especie.v">WhatsApp 315 330 5028</a>
-            · <a href="https://www.google.com/maps/search/?api=1&amp;query=Carrera+48+%2337+Sur+56+Envigado+Antioquia" target="_blank" rel="noopener" data-i18n="brig.dar.especie.maps">Cómo llegar</a></p>
-        </div>
-        <div class="brig-acopio">
-          <p class="brig-acopio-n" data-i18n="brig.dar.especie.a2.n">Club Nativos · Envigado</p>
-          <p class="brig-acopio-d" data-i18n="brig.dar.especie.a2.dir">Sector El Salado</p>
-          <p class="brig-acopio-c"><a href="https://wa.me/573123023790" target="_blank" rel="noopener" data-i18n="brig.dar.especie.v2">WhatsApp 312 302 3790</a>
-            · <a href="https://www.google.com/maps/search/?api=1&amp;query=Club+Nativos+El+Salado+Envigado+Antioquia" target="_blank" rel="noopener" data-i18n="brig.dar.especie.maps">Cómo llegar</a></p>
-        </div>
-        <p class="brig-via-p brig-acopio-aviso" data-i18n="brig.dar.especie.aviso">Los dos son sedes prestadas, no bodegas con horario de atención. Escribe antes de ir y te confirmamos que haya alguien para recibirte — así no cargas el carro para encontrar la puerta cerrada.</p>
-        <p class="brig-via-p" data-i18n="brig.dar.especie.p">Escríbenos antes de comprar y te decimos qué falta hoy y en qué presentación sirve. Te lo pedimos para cuidar tu plata: el inventario cambia todos los días, y lo que sobra en un sector falta en otro.</p>
+        <p class="rec-cap" data-i18n="brig.dar.especie.k">En especie</p>
+        <p class="brig-via-p" data-i18n="brig.dar.especie.p">Escríbenos antes de comprar: te decimos si hace falta y en qué presentación sirve. Con la brigada cerrada, cada ofrecimiento se coordina caso por caso.</p>
         <h3 class="h-comp4 of-t" data-i18n="of.t">O déjanos los datos y te escribimos</h3>
         <p class="brig-via-p" data-i18n="of.p">Si prefieres no escribir por WhatsApp. Lo importante es lo mismo: cuéntanos antes de comprar.</p>
         <form id="of" class="ally-form" data-submit="ofSubmit(event)">
@@ -1357,7 +1327,7 @@
           <div class="field"><label for="of-email" data-i18n="of.email">Correo</label>
             <input type="email" id="of-email" autocomplete="email" required></div>
           <div class="field"><label for="of-tel" data-i18n="of.tel">Celular o WhatsApp</label>
-            <input type="tel" id="of-tel" autocomplete="tel" required></div>
+            <input type="tel" id="of-tel" maxlength="40" autocomplete="tel" required></div>
           <div class="field"><label for="of-ciudad" data-i18n="of.ciudad">Ciudad (opcional)</label>
             <input type="text" id="of-ciudad" autocomplete="address-level2"></div>
 
@@ -1376,36 +1346,11 @@
 
       <div class="card rv d2 brig-cert">
         <h2 data-i18n="brig.dar.cert.t" class="h-comp3">Certificado de donación</h2>
-        <p data-i18n="brig.dar.cert.p">Somos una entidad sin ánimo de lucro vigente en el Régimen Tributario Especial. Tu donación da derecho a un descuento del 25% del valor donado sobre el impuesto de renta en Colombia (Art. 257 del Estatuto Tributario), sujeto al límite del Art. 258. Su procedencia depende de tu situación tributaria: consúltalo con tu asesor. Lo expedimos firmado por el Representante Legal y la Revisora Fiscal.</p>
+        <p data-i18n="brig.dar.cert.p">Somos una entidad sin ánimo de lucro vigente en el Régimen Tributario Especial. Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación, que expedimos firmado por el Representante Legal y la Revisora Fiscal.</p>
       </div>
     </div>
   </section>
 
-  <!-- Manos y contactos. No existían: la página pedía plata e insumos, y la
-       mitad de lo que la brigada necesita son personas y puertas. El bloque de
-       manos dice por qué el equipo de terreno está cerrado —doble verificación
-       más sesión de Marco no caben en los días que quedan— en vez de invitar a
-       algo que no se puede cumplir. -->
-  <section>
-    <div class="wrap prose">
-      <span class="ey rv" data-i18n="brig.mc.ey">Sumarse</span>
-      <h2 class="h-comp3 rv" data-i18n="brig.mc.t">También hacen falta manos y contactos.</h2>
-      <p class="lead rv d1" data-i18n="brig.mc.p">No todo se resuelve con plata. Dos cosas que necesitamos y que casi nadie ofrece, porque casi nadie las pide.</p>
-
-      <div class="brig-mc rv d2">
-        <div class="brig-mc-b">
-          <h3 data-i18n="brig.mc.manos.t" class="h-comp4">Manos en la estructura</h3>
-          <p data-i18n="brig.mc.manos.p">El equipo que viaja ya está cerrado en siete personas: ir a terreno exige doble verificación —la nuestra y la de la fundación del territorio— y una sesión de Marco, y eso no cabe en los días que quedan. Lo que sí necesitamos es gente en Envigado para recibir, clasificar y empacar lo que llega a los acopios. En el formulario, elige «Con Give&amp;Grow — en la estructura».</p>
-          <a class="btn btn-o" href="#voluntariado" data-act="irAVoluntariadoBrigada()" data-i18n="brig.mc.manos.btn">Ofrecer mi tiempo</a>
-        </div>
-        <div class="brig-mc-b">
-          <h3 data-i18n="brig.mc.cont.t" class="h-comp4">Contactos que abren puertas</h3>
-          <p data-i18n="brig.mc.cont.p">Lo más útil que puedes mandarnos si no vas a donar, y es gratis: una bodega o parqueadero en Envigado o alrededores donde clasificar; un camión o furgón que suba a Cali, Pereira, Manizales, Armenia o Chocó entre el 24 y el 28; una empresa que preste su sede como centro de acopio; o una fundación que ya trabaje en alguno de los cinco territorios.</p>
-          <a class="btn btn-o" href="https://wa.me/573153305028" target="_blank" rel="noopener" data-i18n="brig.mc.cont.btn">Escribir por WhatsApp</a>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <section>
     <div class="wrap">
@@ -1423,9 +1368,9 @@
       <span class="ey rv" data-i18n="brig.no.ey">Reglas de la brigada</span>
       <h2 class="h-comp3 rv" data-i18n="brig.no.t">Lo que no vamos a hacer.</h2>
       <div class="brig-nos rv d1">
-        <div class="brig-no"><p class="brig-no-t" data-i18n="brig.no1.t">No entramos sin coordinación.</p><p class="brig-no-d" data-i18n="brig.no1.d">Nada se despliega sin el aval del Consejo Municipal de Gestión del Riesgo y de la fundación del territorio.</p></div>
-        <div class="brig-no"><p class="brig-no-t" data-i18n="brig.no2.t">La brigada no consume lo de las familias.</p><p class="brig-no-d" data-i18n="brig.no2.d">Su alimentación, alojamiento y equipo se presupuestan aparte y se reportan aparte.</p></div>
-        <div class="brig-no"><p class="brig-no-t" data-i18n="brig.no3.t">No prometemos cifras que no tenemos.</p><p class="brig-no-d" data-i18n="brig.no3.d">El inventario está en cotización. Cuando haya costos verificados, se publican.</p></div>
+        <div class="brig-no"><p class="brig-no-t" data-i18n="brig.no1.t">No entramos sin coordinación.</p><p class="brig-no-d" data-i18n="brig.no1.d">Nada se desplegó sin el aval del Consejo Municipal de Gestión del Riesgo y de la fundación del territorio.</p></div>
+        <div class="brig-no"><p class="brig-no-t" data-i18n="brig.no2.t">La brigada no consume lo de las familias.</p><p class="brig-no-d" data-i18n="brig.no2.d">Su alimentación, alojamiento y equipo se presupuestaron aparte y se reportan aparte.</p></div>
+        <div class="brig-no"><p class="brig-no-t" data-i18n="brig.no3.t">No prometemos cifras que no tenemos.</p><p class="brig-no-d" data-i18n="brig.no3.d">No publicamos costos ni equivalencias en pesos sin un soporte verificado.</p></div>
       </div>
       <p class="brig-cierre rv d2" data-i18n="brig.cierre">Sin acta firmada, para nosotros no ocurrió.</p>
     </div>
@@ -1557,13 +1502,13 @@
              guiones, para que el HTML servido nunca muestre campos vacíos en la página donde se
              pide dinero. co-impact queda vacío a propósito: depende de datos de partners.json. -->
         <div class="calc-out">
-          <div class="calc-row"><span data-i18n="calc.tax">Beneficio tributario (25%)</span><b id="co-tax">$50.000</b></div>
-          <p class="calc-legal" data-i18n="calc.tax.legal">El descuento del 25% (Art. 257 ET) aplica solo en Colombia, para contribuyentes del impuesto de renta, y según los términos, requisitos y límites que contempla la ley; su procedencia depende de la situación tributaria de cada donante.</p>
-          <div class="calc-row"><span data-i18n="calc.net">Costo neto de tu donación</span><b id="co-net">$150.000</b></div>
+          <div class="calc-row"><span data-i18n="calc.tax">Descuento posible (25% del valor donado)</span><b id="co-tax">$50.000</b></div>
+          <p class="calc-legal" data-i18n="calc.tax.legal">Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.</p>
+          <div class="calc-row"><span data-i18n="calc.net">Costo neto estimado, si te aplica</span><b id="co-net">$150.000</b></div>
           <div class="calc-row" id="calc-annual-row"><span data-i18n="calc.annual">Equivalente anual</span><b id="calc-annual">$2.400.000</b></div>
           <div class="calc-row" id="co-impact-row" style="display:none"><span data-i18n="calc.impact">Tu impacto</span><b id="co-impact"></b></div>
           <div class="member" id="calc-member"><span id="m-ic"></span><div><div id="m-name">Árbol</div><div id="m-sub">~ 48 USD / mes</div></div></div>
-          <p class="mu" id="calc-impact-note" style="display:none;font-size:13px;margin-top:10px" data-i18n="calc.impact.note">Equivalencia aproximada, según datos de las fundaciones del Hub.</p>
+          <p class="mu" id="calc-impact-note" style="display:none;font-size:13px;margin-top:10px" data-i18n="calc.impact.note">Equivalencia aproximada, según datos de las fundaciones del HUB SOCIAL.</p>
           <div class="calc-note">
             <label for="calc-msg" data-i18n="calc.note.lbl">Deja un mensaje o dedicatoria (opcional)</label>
             <textarea id="calc-msg" rows="2" maxlength="280" data-input="onNote(this.value)" data-i18n="calc.note.ph" data-i18n-attr="placeholder" placeholder="Tu mensaje viajará con tu donación y aparecerá en tu recibo."></textarea>
@@ -1648,14 +1593,14 @@
   <section>
     <div class="wrap">
       <span class="ey rv" data-i18n="pay.how.ey">Pago seguro</span>
-      <h2 class="h-comp3 rv" data-i18n="pay.how.t">Cómo pagar tu membresía, paso a paso.</h2>
-      <p class="lead rv d1" data-i18n="pay.how.p">Tu seguridad primero. Así funciona el pago en línea hoy, y así funcionará el débito automático cuando lo habilitemos.</p>
+      <h2 class="h-comp3 rv" data-i18n="pay.how.t">Cómo pagar, paso a paso.</h2>
+      <p class="lead rv d1" data-i18n="pay.how.p">Tu seguridad primero. Así funciona el pago en línea hoy, para un aporte único y para una membresía.</p>
       <div class="steps rv d1" style="margin-top:24px;max-width:760px">
         <div class="step"><div><h3 data-i18n="pay.how.s1.t" class="h-comp4">Elige tu nivel y monto</h3><p data-i18n="pay.how.s1.p">Usa la calculadora para ver tu aporte, tu beneficio tributario y tu nivel. Puedes elegir mensual, anual o único.</p></div></div>
-        <div class="step"><div><h3 data-i18n="pay.how.s2.t" class="h-comp4">Paga por un canal seguro</h3><p data-i18n="pay.how.s2.p">Hoy: pagas en línea con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía. También puedes transferir y enviar el comprobante, o pagar con PayPal si estás fuera de Colombia. El débito automático para membresías llega después.</p></div></div>
+        <div class="step"><div><h3 data-i18n="pay.how.s2.t" class="h-comp4">Paga por un canal seguro</h3><p data-i18n="pay.how.s2.p">Pagas en línea con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía. También puedes transferir y reportar el comprobante, o pagar con PayPal si estás fuera de Colombia. En Membresías registras tu tarjeta una vez y el aporte se cobra solo cada mes.</p></div></div>
         <div class="step"><div><h3 data-i18n="pay.how.s3.t" class="h-comp4">Recibe tu recibo, y después tu certificado</h3><p data-i18n="pay.how.s3.p">El recibo con tu número de guía te llega apenas se confirma el pago, automático. El certificado de donación (Art. 257 ET) es distinto: lo revisamos y lo firman el Representante Legal y la Revisora Fiscal, así que no es inmediato.</p></div></div>
       </div>
-      <div class="card rv d2" style="margin-top:24px"><h2 data-i18n="pay.how.sec.t" class="h-comp3">Consejos de seguridad</h2><p data-i18n="pay.how.sec.p">Nunca compartas tus claves con nadie y verifica que la página tenga candado (https). Give&amp;Grow no pide contraseñas por WhatsApp ni correo. Puedes pausar o cancelar tu débito cuando quieras.</p></div>
+      <div class="card rv d2" style="margin-top:24px"><h2 data-i18n="pay.how.sec.t" class="h-comp3">Consejos de seguridad</h2><p data-i18n="pay.how.sec.p">Nunca compartas tus claves con nadie y verifica que la página tenga candado (https). Give&amp;Grow no pide contraseñas por WhatsApp ni correo. Si tienes una membresía, puedes terminarla cuando quieras desde el enlace de tu propia membresía.</p></div>
       <div class="track-cta rv d2">
         <div>
           <h2 data-i18n="track.cta.t" class="h-comp3">¿Ya donaste? Sigue tu donación</h2>
@@ -1741,7 +1686,7 @@
             </tr>
             <tr>
               <td data-i18n="std.chs.c5">5 · Quejas atendidas</td>
-              <td data-i18n="std.chs.c5.p">Hoy solo existe la ruta de protección de datos ante la Superintendencia de Industria y Comercio. El mecanismo general, con una ruta confidencial separada de la ordinaria, está redactado y pendiente de adopción por la junta.</td>
+              <td data-i18n="std.chs.c5.p">Hoy solo existe la ruta de protección de datos ante la Superintendencia de Industria y Comercio. El mecanismo general, con una ruta confidencial separada de la ordinaria, está redactado y pendiente de adopción por el máximo órgano de dirección que definen los estatutos, que hoy es el fundador: la Fundación todavía no tiene junta directiva.</td>
               <td><span class="tag soon" data-i18n="std.est.con">En construcción</span></td>
             </tr>
             <tr>
@@ -1756,12 +1701,12 @@
             </tr>
             <tr>
               <td data-i18n="std.chs.c8">8 · Personal competente</td>
-              <td data-i18n="std.chs.c8.p">La matrícula de cada ingeniero se verifica a mano en el registro público del COPNIA. Es el único filtro del proyecto y no lo queremos automático. El código de conducta está redactado y pendiente de adopción.</td>
+              <td data-i18n="std.chs.c8.p">La matrícula de cada ingeniero se verifica a mano en el registro público del COPNIA. Es el único filtro del proyecto y no lo queremos automático. El código de conducta está redactado y pendiente de adopción por el máximo órgano de dirección que definen los estatutos (hoy, el fundador).</td>
               <td><span class="tag" data-i18n="std.est.op">Operando</span></td>
             </tr>
             <tr>
               <td data-i18n="std.chs.c9">9 · Recursos bien manejados</td>
-              <td data-i18n="std.chs.c9.p">Ningún voluntario recibe ni custodia dinero: todo aporte entra por pasarela o por cuenta bancaria a nombre de la Fundación, genera número de guía y su entrega se documenta con acta firmada por quien recibe. El certificado de donación lo firma la Revisora Fiscal bajo la gravedad de juramento.</td>
+              <td data-i18n="std.chs.c9.p">Ningún voluntario recibe ni custodia dinero: todo aporte entra por pasarela o por cuenta bancaria a nombre de la Fundación, genera número de guía y su entrega se documenta con acta firmada por quien recibe. El certificado de donación lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento.</td>
               <td><span class="tag" data-i18n="std.est.op">Operando</span></td>
             </tr>
           </tbody>
@@ -1799,7 +1744,7 @@
       <span class="ey rv" data-i18n="std.no.ey">Los límites de lo que decimos</span>
       <h2 class="h-sec rv" data-i18n="std.no.t">Lo que no vamos a afirmar</h2>
       <div class="grid g3 rv d2" style="margin-top:26px">
-        <div class="card"><h3 class="h-comp3" data-i18n="std.no.1.t">Cifras financieras</h3><p data-i18n="std.no.1.p">No publicamos ingresos, gastos ni totales hasta el cierre contable de 2025, firmado por la Revisora Fiscal. Publicar una cifra provisional y corregirla después vale menos que esperar.</p></div>
+        <div class="card"><h3 class="h-comp3" data-i18n="std.no.1.t">Cifras financieras</h3><p data-i18n="std.no.1.p">Publicamos los estados financieros 2025 firmados por el Representante Legal y la Revisora Fiscal. Son los de un año de constitución, sin operación: la Fundación empezó a operar en 2026. No publicamos cifras de impacto que no estén respaldadas.</p></div>
         <div class="card"><h3 class="h-comp3" data-i18n="std.no.2.t">Cifras de impacto</h3><p data-i18n="std.no.2.p">Solo publicamos lo que podemos probar con un documento. Lo que reporta un tercero se marca como reportado por un tercero, y no lo presentamos como nuestro.</p></div>
         <div class="card"><h3 class="h-comp3" data-i18n="std.no.3.t">Nuestro tamaño</h3><p data-i18n="std.no.3.p">Somos una fundación joven, constituida en 2025. No tenemos una década de programas ni un equipo grande, y preferimos decirlo antes que se note.</p></div>
       </div>
@@ -1852,12 +1797,12 @@
   <section class="band">
     <div class="wrap">
       <h2 class="h-comp3 rv" data-i18n="transp.gov.t" style="margin-bottom:14px">Gobernanza y control</h2>
-      <p class="lead rv d1" data-i18n="transp.gov.p">La Fundación no puede distribuir excedentes: la totalidad de su patrimonio se destina a su objeto social.</p>
+      <p class="lead rv d1" data-i18n="transp.gov.p">La Fundación no puede distribuir excedentes: la totalidad de su patrimonio se destina a su objeto social. Su máximo órgano de dirección es el que definen sus estatutos: hoy, el fundador. Tiene Representante Legal y Revisora Fiscal, y todavía no tiene junta directiva.</p>
       <dl class="libro rv d2" style="margin-top:26px">
           <div class="libro-fila"><dt data-i18n="transp.gov.rep">Representante legal y fundador</dt><dd>Juan Sebastian Navarro Osorio</dd></div>
           <div class="libro-fila"><dt data-i18n="transp.gov.rf">Revisora Fiscal</dt><dd class="transp-fila">Manuela Londoño Arboleda - T.P. 244894-T</dd></div>
           <div class="libro-fila"><dt data-i18n="transp.gov.over">Inspección, vigilancia y control</dt><dd><span data-i18n="transp.gov.over.v">Gobernación de Antioquia</span></dd></div>
-          <div class="libro-fila"><dt data-i18n="transp.gov.surplus">Destinación de excedentes</dt><dd><span data-i18n="transp.gov.surplus.v">Prohibida su distribución. 100% al objeto social.</span></dd></div>
+          <div class="libro-fila"><dt data-i18n="transp.gov.surplus">Destinación de excedentes</dt><dd><span data-i18n="transp.gov.surplus.v">Prohibida su distribución; los excedentes se reinvierten en el objeto social, como exige la ley.</span></dd></div>
         </dl>
     </div>
   </section>
@@ -1867,7 +1812,7 @@
       <h2 class="h-comp3 rv" data-i18n="transp.fin.t">Compromiso financiero</h2>
       <p class="rv d1" data-i18n="transp.fin.p">Cumplimos las obligaciones de una ESAL bajo Régimen Tributario Especial:</p>
       <ul class="rv d1">
-        <li data-i18n="transp.fin.1">Estados financieros bajo NIIF (Grupo II), firmados por la Revisora Fiscal Manuela Londoño Arboleda (T.P. 244894-T).</li>
+        <li data-i18n="transp.fin.1">Estados financieros bajo NIIF (Grupo II), firmados por el Representante Legal y por la Revisora Fiscal Manuela Londoño Arboleda (T.P. 244894-T).</li>
         <li data-i18n="transp.fin.2">Declaración de renta anual ante la DIAN (Formulario 110).</li>
         <li data-i18n="transp.fin.3">Actualización anual del Registro Web RTE (Formato 5245).</li>
         <li data-i18n="transp.fin.4">Certificado de donación expedido conforme a la ley, por cada aporte que lo solicite.</li>
@@ -1879,19 +1824,19 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="transp.funds.ey">A dónde va tu aporte</span>
       <h2 class="h-comp3 rv" data-i18n="transp.funds.t">Tu aporte, con destino claro.</h2>
-      <p class="rv d1" data-i18n="transp.funds.p">Somos una fundación joven y transparente: hoy buena parte del apoyo llega en especie (Ruta 2), y el destino de cada aporte se respalda con actas, fotos y reportes. Estos son nuestros principios y nuestro compromiso.</p>
+      <p class="rv d1" data-i18n="transp.funds.p">Somos una fundación joven: el destino de cada aporte se respalda con su recibo y, cuando la fundación entrega, con el acta firmada y sus fotos en el rastreo. Estos son nuestros principios y nuestro compromiso.</p>
       <div class="grid g2 rv d2" style="margin-top:22px">
         <div class="card"><h2 data-i18n="transp.funds.model.t" class="h-comp3">Fondo común, con opción de dirigir</h2><p data-i18n="transp.funds.model.p">Por defecto tu aporte va a un fondo común que asignamos a la necesidad más urgente. Si lo prefieres, puedes dirigirlo a una fundación o ruta específica.</p></div>
-        <div class="card"><h2 data-i18n="transp.funds.commit.t" class="h-comp3">Nuestro compromiso</h2><ul class="tier-ben" style="margin-top:12px"><li data-i18n="transp.funds.a">La mayor parte de cada aporte va directo a la misión: fundaciones, comunidades y logística de entrega.</li><li data-i18n="transp.funds.b">Una parte acotada sostiene la operación del Hub: bodega, transporte, verificación y trazabilidad.</li><li data-i18n="transp.funds.c">La administración se mantiene al mínimo indispensable.</li></ul></div>
+        <div class="card"><h2 data-i18n="transp.funds.commit.t" class="h-comp3">Nuestro compromiso</h2><ul class="tier-ben" style="margin-top:12px"><li data-i18n="transp.funds.a">La misión: fundaciones, comunidades y logística de entrega.</li><li data-i18n="transp.funds.b">La operación del HUB SOCIAL: bodega, transporte, verificación y trazabilidad.</li><li data-i18n="transp.funds.c">La administración indispensable. La proporción entre misión, operación y administración la publicaremos cuando la valide la Revisora Fiscal.</li></ul></div>
       </div>
-      <p class="mu rv d2" style="margin-top:16px;font-size:14px" data-i18n="transp.funds.note">Estamos definiendo el marco exacto de asignación —qué proporción va a la misión, a la operación y a la administración— junto con nuestra Revisora Fiscal y el consejo. Publicaremos las cifras precisas solo cuando estén validadas: evidencia, no promesas.</p>
+      <p class="mu rv d2" style="margin-top:16px;font-size:14px" data-i18n="transp.funds.note">Estamos definiendo el marco exacto de asignación —qué proporción va a la misión, a la operación y a la administración— con nuestra Revisora Fiscal. Publicaremos las cifras precisas solo cuando estén validadas: evidencia, no promesas.</p>
     </div>
   </section>
 
   <section class="cream">
     <div class="wrap prose">
       <h2 class="h-comp3 rv" data-i18n="transp.trace.t">Trazabilidad de cada aporte</h2>
-      <p class="rv d1" data-i18n="transp.trace.p">Recibo con número de guía al confirmarse el pago, certificado de donación revisado y firmado, y acta de entrega con fotos publicada en el rastreo de tu aporte.</p>
+      <p class="rv d1" data-i18n="transp.trace.p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega. Si pides certificado de donación, se emite revisado y firmado.</p>
     </div>
   </section>
 
@@ -1907,8 +1852,8 @@
           <h2 data-i18n="transp.docs.t" class="h-comp3">Documentos públicos</h2>
           <p data-i18n="transp.docs.p">Descarga los disponibles; el resto, a solicitud por correo:</p>
           <ul style="margin:10px 0 16px 18px;color:var(--mu);font-size:15px">
-            <li><a href="/docs/estados-financieros-2025.pdf" target="_blank" rel="noopener" style="color:var(--acc);font-weight:600" data-i18n="transp.docs.3">Estados financieros 2025 (PDF)</a></li>
-            <li><a href="/docs/informe-gestion-2025.pdf" target="_blank" rel="noopener" style="color:var(--acc);font-weight:600" data-i18n="transp.docs.5">Informe de gestión 2025 (PDF)</a></li>
+            <li><a href="/docs/estados-financieros-2025.pdf" target="_blank" rel="noopener" style="color:var(--acc);font-weight:600" data-i18n="transp.docs.3">Estados financieros 2025, firmados por el Representante Legal y la Revisora Fiscal (PDF)</a></li>
+            <li><a href="/docs/informe-gestion-2025.pdf" target="_blank" rel="noopener" style="color:var(--acc);font-weight:600" data-i18n="transp.docs.5">Informe de gestión 2025: año de constitución, sin proyectos ejecutados (PDF)</a></li>
             <li data-i18n="transp.docs.1">Certificado de Existencia y Representación Legal</li>
             <li data-i18n="transp.docs.2">Registro Único Tributario (RUT)</li>
             <li data-i18n="transp.docs.4">Declaración de renta (Formulario 110)</li>
@@ -2031,7 +1976,6 @@
           <div class="field"><label for="ally-razon" data-i18n="ally.f.razon">Razón social o nombre del emprendimiento *</label><input type="text" id="ally-razon" maxlength="160" required></div>
           <div class="field"><label for="ally-nit" data-i18n="ally.f.nit">NIT o documento</label><input type="text" id="ally-nit" maxlength="40"></div>
           <div class="field"><label for="ally-rep" data-i18n="ally.f.rep">Representante legal</label><input type="text" id="ally-rep" maxlength="120"></div>
-          <div class="field"><label for="ally-cedula" data-i18n="ally.f.cedula">Cédula del representante</label><input type="text" id="ally-cedula" maxlength="40"></div>
           <div class="field"><label for="ally-contacto" data-i18n="ally.f.contacto">Contacto (nombre y cargo)</label><input type="text" id="ally-contacto" maxlength="160"></div>
           <div class="field"><label for="ally-correo" data-i18n="ally.f.correo">Correo *</label><input type="email" id="ally-correo" maxlength="200" required autocomplete="email"></div>
           <div class="field"><label for="ally-tel" data-i18n="ally.f.tel">Celular o WhatsApp *</label><input type="tel" id="ally-tel" maxlength="40" autocomplete="tel" required></div>
@@ -2054,13 +1998,12 @@
             <option value="Otro" data-i18n="ally.sector.otro">Otro</option>
           </select></div>
           <div class="field" id="ally-sector-otro-box" style="display:none"><label for="ally-sector-otro" data-i18n="ally.f.sector.otro">¿Cuál?</label><input type="text" id="ally-sector-otro" maxlength="80"></div>
-          <div class="field ally-wide"><label for="ally-dir" data-i18n="ally.f.dir">Dirección</label><input type="text" id="ally-dir" maxlength="200"></div>
           <div class="field"><label for="ally-web" data-i18n="ally.f.web">Sitio web</label><input type="url" id="ally-web" maxlength="200" placeholder="https://tuempresa.com" data-i18n="ally.web.ph" data-i18n-attr="placeholder"></div>
           <div class="field"><label for="ally-instagram" data-i18n="ally.f.instagram">Instagram</label><input type="text" id="ally-instagram" maxlength="120" placeholder="@tuempresa" data-i18n="ally.instagram.ph" data-i18n-attr="placeholder"></div>
-          <div class="field ally-wide"><label for="ally-desc" data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" maxlength="1200" rows="4" placeholder="En tus propias palabras: quiénes son y qué hacen. Aparecerá en tu ficha pública si te sumas al Programa de Gratitud." data-i18n="ally.desc.ph" data-i18n-attr="placeholder"></textarea></div>
+          <div class="field ally-wide"><label for="ally-desc" data-i18n="ally.f.desc">Descripción del negocio (en tus propias palabras)</label><textarea id="ally-desc" maxlength="1200" rows="4" placeholder="En tus propias palabras: quién es y qué hace tu empresa. Aparecerá en la ficha pública de tu empresa si se suma al Programa de Gratitud." data-i18n="ally.desc.ph" data-i18n-attr="placeholder"></textarea></div>
           <div class="field ally-wide"><label for="ally-aporta" data-i18n="ally.f.aporta">En una frase, ¿qué aporta tu empresa?</label><input type="text" id="ally-aporta" maxlength="90" data-i18n="ally.f.aporta.ph" data-i18n-attr="placeholder" placeholder="Ej. Padrinazgo de 200 platos al mes"></div>
-          <div class="field ally-wide"><label for="ally-porque" data-i18n="ally.f.porque">¿Por qué quieren aliarse? (opcional)</label><textarea id="ally-porque" rows="3" maxlength="800" data-i18n="ally.porque.ph" data-i18n-attr="placeholder" placeholder="Qué los mueve a apoyar, y si hay una causa o un territorio que les importe en particular."></textarea>
-            <small class="vf-help" data-i18n="ally.porque.help">Si la alianza se firma, esto es lo que cuenta tu ficha en el sitio. Con tus palabras es mejor que con las nuestras.</small></div>
+          <div class="field ally-wide"><label for="ally-porque" data-i18n="ally.f.porque">¿Por qué quiere aliarse tu empresa? (opcional)</label><textarea id="ally-porque" rows="3" maxlength="800" data-i18n="ally.porque.ph" data-i18n-attr="placeholder" placeholder="Qué mueve a tu empresa a apoyar, y si hay una causa o un territorio que le importe en particular."></textarea>
+            <small class="vf-help" data-i18n="ally.porque.help">Si la alianza se firma, esto es lo que cuenta la ficha de tu empresa en el sitio. Con tus palabras es mejor que con las nuestras.</small></div>
         </div>
 
         <h2 class="h-comp3 ally-sec" data-i18n="ally.s.mods">¿Cómo quieres apoyar? (elige una o varias)</h2>
@@ -2088,9 +2031,9 @@
           <div class="field ally-wide"><label for="ally-servdet" data-i18n="ally.f.servdet">Describe el servicio</label><textarea id="ally-servdet" rows="2" maxlength="600"></textarea></div>
         </div>
 
-        <h2 class="h-comp3 ally-sec" data-i18n="ally.s.aut">Autorizaciones (requeridas)</h2>
+        <h2 class="h-comp3 ally-sec" data-i18n="ally.s.aut">Autorizaciones</h2>
         <div class="ally-auts">
-          <label class="ally-check"><input type="checkbox" id="aut-marca" required><span data-i18n="ally.a.marca">Autorizo mostrar públicamente el nombre, logo y redes de mi empresa para difundir la alianza.</span></label>
+          <label class="ally-check"><input type="checkbox" id="aut-marca"><span data-i18n="ally.a.marca">Autorizo mostrar públicamente el nombre, el logo y las redes de mi empresa para difundir la alianza. (Opcional: si no la marcas, tu empresa puede aportar de forma anónima.)</span></label>
           <label class="ally-check"><input type="checkbox" id="aut-datos" required><span data-i18n="ally.a.datos">Autorizo el tratamiento de los datos conforme a la Ley 1581 de 2012.</span></label>
           <a class="ally-policy-link" href="#privacidad" target="_blank" rel="noopener" data-i18n="ally.a.datos.link">Ver Política de Privacidad</a>
           <label class="ally-check"><input type="checkbox" id="aut-licitud" required><span data-i18n="ally.a.licitud">Declaro que la información es veraz y que los recursos y la actividad son de origen lícito.</span></label>
@@ -2116,16 +2059,16 @@
         <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q13">¿Me van a reparar la casa o darme los materiales?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a13">No podemos comprometerlo casa por casa, y preferimos decírtelo antes que prometerte algo que no depende solo de nosotros. Como fundación vamos a buscar gestionar ayuda para todas las casas que podamos. Lo que sí recibes con seguridad es el concepto: con qué materiales y en qué orden conviene reparar, para que sepas por dónde empezar incluso si los consigues por tu cuenta.</div></div></div>
         <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q14">¿Cuánto tarda?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a14">No hay fecha, y prometerte una sería peor. Los ingenieros son voluntarios y los casos más graves se miran primero. Lo que sí te damos son dos datos verificables en tu enlace: los días que llevas esperando y cuántos casos siguen sin abrir. Guarda ese enlace: es donde ves en qué va tu caso y donde subes más fotos si te las piden.</div></div></div>
         <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q15">Soy ingeniero. ¿Cómo ayudo?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a15">Te postulas en «Ingenieros voluntarios» con tu matrícula del COPNIA. La verificamos a mano en el registro público del COPNIA —lo hace una persona, así que no es inmediato—, y en cuanto queda verificada el acceso se abre solo. Lo que vas a hacer es dar un concepto a distancia sobre fotos —permanencia, precauciones, materiales y prioridad de visita—, nunca un dictamen de habitabilidad. No ves el contacto ni la dirección de la familia: para dar el concepto no hacen falta.</div></div></div>
-        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q6">¿Qué hace único al HUB SOCIAL?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a6">El HUB SOCIAL no es solo un canal para donar: es un centro operativo con cinco rutas que conectan alianzas, donaciones e impacto medible. Tres cosas nos diferencian. Primero, trazabilidad real: tu aporte tiene número de guía, recibo automático, certificado de donación firmado y acta de entrega con fotos que puedes ver en el rastreo. Segundo, evidencia, no promesas: somos una fundación joven y transparente que muestra lo que puede probar, sin cifras infladas, y trabajamos con fundaciones aliadas verificadas en territorio. Tercero, reciprocidad: quien da también crece — los miembros acceden a los beneficios del Programa de Gratitud y las empresas ganan visibilidad como negocios con propósito. Es lo que resume nuestro lema: «Dar para crecer, crecer para dar más».</div><a class="faq-cta" href="#fundaciones" data-i18n="faq.cta.fund">Vincula tu fundación al Hub →</a></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q6">¿Qué hace único al HUB SOCIAL?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a6">El HUB SOCIAL no es solo un canal para donar: es un centro operativo con cinco rutas que conectan alianzas, donaciones e impacto medible. Tres cosas lo definen. Primero, trazabilidad: tu aporte tiene número de guía y recibo automático; si lo pides, certificado de donación firmado; y cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Segundo, evidencia, no promesas: somos una fundación joven que muestra lo que puede probar, sin cifras infladas, y trabajamos con fundaciones aliadas verificadas en territorio. Tercero, reciprocidad: quien da también crece — los miembros acceden a los beneficios del Programa de Gratitud y las empresas ganan visibilidad como negocios con propósito. Es lo que resume nuestro lema: «Dar para crecer, crecer para dar más».</div><a class="faq-cta" href="#fundaciones" data-i18n="faq.cta.fund">Vincula tu fundación al HUB SOCIAL →</a></div></div>
         <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q1">¿Cómo hago una donación?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a1">En la calculadora eliges tu monto y continúas al pago: pagas con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía para seguir tu aporte. Si prefieres transferir, la cuenta de ahorros Bancolombia es la 31000009221 a nombre de Fundación Give&amp;Grow International (NIT 901.948.930-2); repórtala después en el sitio: recibes tu número de guía al instante y subes ahí mismo el comprobante. Es mejor que mandarlo por correo, porque así tu aporte queda registrado y rastreable desde el primer minuto.</div></div></div>
         <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q2">¿Qué es el Programa de Gratitud?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a2">Es un programa de beneficios: comercios aliados dan descuentos a los miembros activos, desde el nivel Retoño, y ganan visibilidad como negocios con propósito. La red está empezando, así que preferimos decirlo: los comercios que ya dan beneficio son los que aparecen en la página del programa, y son los únicos. Está construido para cinco categorías —gastronomía, moda, belleza, bienestar y odontología— y se van sumando de a uno.</div><a class="faq-cta" href="#empresas" data-i18n="faq.cta.emp">Explora las alianzas empresariales →</a></div></div>
-        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q3">¿Cómo funciona el beneficio tributario?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a3">Por cada donación realizada a través del sistema financiero accedes a un descuento del 25% sobre el impuesto de renta a cargo (Art. 257 ET), con el límite que fija el Art. 258. Por ejemplo, $4.000.000 COP donados pueden significar hasta $1.000.000 COP menos en tu impuesto, según tu situación tributaria. Es un beneficio de la ley colombiana: aplica solo si declaras renta en Colombia. No somos asesores tributarios: confírmalo con tu contador.</div></div></div>
-        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q4">¿Puedo ser voluntario?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a4">Sí. Puedes aportar desde tu oficio —salud, derecho, contabilidad, comunicación, desarrollo, docencia y más— en terreno junto a una fundación aliada, en la estructura del Hub, o combinando las dos. Cuéntanos tu área y tu disponibilidad.</div><p style="margin-top:10px"><a class="card-link" href="#voluntariado"><span data-i18n="vol.link">Ver el programa de voluntariado</span> <span aria-hidden="true">&rarr;</span></a></p></div></div>
-        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q5">¿Mi fundación puede aplicar al Hub?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a5">Sí. Buscamos fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad. Algunas aliadas contribuyen servicios al Hub en lugar de solo recibir.</div><a class="faq-cta" href="#fundaciones" data-i18n="faq.cta.fund">Vincula tu fundación al Hub →</a></div></div>
-        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q7">¿Puedo hacer un aporte único en lugar de mensual?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a7">Sí. En la calculadora puedes elegir Único para una donación puntual, o Mensual/Anual. Ojo con lo segundo, porque conviene saberlo antes: el débito automático todavía no existe. Hoy procesamos ese primer aporte y dejamos registrada tu intención, y te escribimos para activarlo cuando lo habilitemos, sin que tengas que empezar de nuevo. En todos los casos recibes tu recibo con número de guía al confirmarse el pago. El certificado de donación para efectos tributarios es aparte: lo pides al donar, lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, y lo emite una persona — por eso necesitamos tu documento y tu ciudad.</div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q3">¿Cómo funciona el beneficio tributario?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a3">Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación. Si donas en dinero, el aporte debe pasar por el sistema financiero. Por ejemplo, $4.000.000 COP donados pueden significar hasta $1.000.000 COP menos en tu impuesto. No somos asesores tributarios: confírmalo con tu contador.</div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q4">¿Puedo ser voluntario?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a4">Sí. Puedes aportar desde tu oficio —salud, derecho, contabilidad, comunicación, desarrollo, docencia y más— en terreno junto a una fundación aliada, en la estructura del HUB SOCIAL, o combinando las dos. Cuéntanos tu área y tu disponibilidad.</div><p style="margin-top:10px"><a class="card-link" href="#voluntariado"><span data-i18n="vol.link">Ver el programa de voluntariado</span> <span aria-hidden="true">&rarr;</span></a></p></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q5">¿Mi fundación puede aplicar al HUB SOCIAL?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a5">Sí. Buscamos fundaciones y proyectos comunitarios de base, con trabajo verificable en campo y disposición a la trazabilidad. Cada una entra con verificación y convenio; si es un proyecto comunitario de base, lo decimos en su ficha. Algunas aliadas aportan servicios al HUB SOCIAL, además de recibir.</div><a class="faq-cta" href="#fundaciones" data-i18n="faq.cta.fund">Vincula tu fundación al HUB SOCIAL →</a></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q7">¿Puedo hacer un aporte único en lugar de mensual?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a7">Sí. En Membresías registras tu tarjeta una vez y se cobra sola cada mes. Si eliges un aporte único en Donar, se procesa una sola vez. En todos los casos recibes tu recibo con número de guía al confirmarse el pago. El certificado de donación para efectos tributarios es aparte: lo pides al donar, lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, y lo emite una persona — por eso necesitamos tu documento y tu ciudad.</div></div></div>
         <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q8">¿Puedo donar desde el exterior?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a8">Sí. En la pestaña de PayPal del formulario de donación hay un enlace directo, en dólares. Ten en cuenta que su comisión internacional se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más. Ten en cuenta que el descuento del Art. 257 ET aplica a contribuyentes del impuesto de renta en Colombia.</div></div></div>
-        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q9">¿Cómo sé a dónde fue mi aporte?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a9">Con evidencia, no promesas. Cada aporte sigue nuestra trazabilidad: recibo con número de guía al confirmarse el pago, acta de entrega firmada por quien recibe, y sus fotos publicadas en el rastreo de tu aporte. Si pediste certificado de donación, se emite revisado y firmado. Te contamos a dónde llegó y a quién ayudó.</div><a class="faq-cta" href="#empresas" data-i18n="faq.cta.emp">Explora las alianzas empresariales →</a></div></div>
-        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q10">¿Qué son ImpactOS y ALMA?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a10">ImpactOS es el sistema con el que damos trazabilidad y visibilidad al impacto del Hub. ALMA es la asistente que responde tus dudas sobre la fundación aquí en el sitio. Ambos están en construcción y crecen con la red.</div></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q9">¿Cómo sé a dónde fue mi aporte?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a9">Con evidencia, no promesas. Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega. Si pediste certificado de donación, se emite revisado y firmado.</div><a class="faq-cta" href="#empresas" data-i18n="faq.cta.emp">Explora las alianzas empresariales →</a></div></div>
+        <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="faq.q10">¿Qué son ImpactOS y ALMA?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="faq.a10">ImpactOS es el sistema con el que damos trazabilidad al impacto del HUB SOCIAL: ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción. ALMA es la asistente que responde tus dudas sobre la fundación aquí en el sitio.</div></div></div>
       </div>
       <div class="cta-box rv">
         <h2 data-i18n="faq.cta2.t" class="h-comp3">¿Quedó alguna pregunta?</h2>
@@ -2152,11 +2095,17 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="membres.tiers.ey">Tu recorrido</span>
       <h2 class="h-sec rv" data-i18n="membres.tiers.t">De semilla a bosque.</h2>
+      <!-- «EN PREPARACIÓN» marca cada beneficio que todavía no tiene cómo
+           entregarse: no hay boletín, ni reconocimiento publicado, ni eventos, ni
+           reportes periódicos, ni certificados personalizados. Lo que sí existe
+           hoy va sin marca: recibo y número de guía, carnet, certificado de
+           donación si se pide y Gratitud desde Retoño. Decisión de Sebas, 29 sep
+           2026. Cuando uno exista, se le quita la marca, no antes. -->
       <div class="grid g4 rv d1" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c-.6-3-3.2-4.6-6.3-4 .3 3 2.6 4.8 6.3 4z"/></svg></div><h3 data-i18n="membres.t1.t">Semilla</h3><div class="tier-price"><b data-i18n="membres.t1.price">$20.000</b><span data-i18n="membres.t1.priceu">/ mes · ≈US$5</span></div><p data-i18n="membres.t1.p">El primer paso: empiezas a sembrar impacto cada mes.</p><ul class="tier-ben"><li data-i18n="membres.t1.b1">Boletín de impacto con historias reales</li><li data-i18n="membres.t1.b2">Certificado tributario (Art. 257 ET, solo Colombia)</li><li data-i18n="membres.t1.b3">Reconocimiento en web y redes</li></ul></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 15c-.6-2.6-3-4-6-3.4.3 2.7 2.6 4.2 6 3.4z"/><path d="M12 13c.6-2.6 3-4 6-3.4-.3 2.7-2.6 4.2-6 3.4z"/></svg></div><h3 data-i18n="membres.t2.t">Retoño</h3><div class="tier-price"><b data-i18n="membres.t2.price">$50.000</b><span data-i18n="membres.t2.priceu">/ mes · ≈US$15</span></div><p data-i18n="membres.t2.p">Tu aporte crece y sostiene programas con más alcance.</p><p class="tier-more" data-i18n="membres.t2.more">Todo lo de Semilla, y además:</p><ul class="tier-ben"><li data-i18n="membres.t2.b1">Acceso al Programa de Gratitud</li><li data-i18n="membres.t2.b2">Certificado de agradecimiento personalizado</li><li data-i18n="membres.t2.b3">Contenido especial de voluntariado e impacto</li></ul></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><circle cx="12" cy="9.5" r="6"/></svg></div><h3 data-i18n="membres.t3.t">Árbol</h3><div class="tier-price"><b data-i18n="membres.t3.price">$120.000</b><span data-i18n="membres.t3.priceu">/ mes · ≈US$35</span></div><p data-i18n="membres.t3.p">Un compromiso firme que sostiene proyectos completos.</p><p class="tier-more" data-i18n="membres.t3.more">Todo lo de Retoño, y además:</p><ul class="tier-ben"><li data-i18n="membres.t3.b1">Invitación a eventos y sesiones en vivo</li><li data-i18n="membres.t3.b2">Acceso prioritario a Impact Journey</li><li data-i18n="membres.t3.b3">Certificado de impacto personalizado</li></ul></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 22v-3M17 22v-3M12 22v-4"/><circle cx="7" cy="13" r="4"/><circle cx="17" cy="13" r="4"/><circle cx="12" cy="9" r="4.5"/></svg></div><h3 data-i18n="membres.t4.t">Bosque</h3><div class="tier-price"><b data-i18n="membres.t4.price">$250.000+</b><span data-i18n="membres.t4.priceu">/ mes · ≈US$75+</span></div><p data-i18n="membres.t4.p">El nivel más alto: tu generosidad multiplica toda la red.</p><p class="tier-more" data-i18n="membres.t4.more">Todo lo de Árbol, y además:</p><ul class="tier-ben"><li data-i18n="membres.t4.b1">Reportes de impacto detallados</li><li data-i18n="membres.t4.b2">Reunión con el equipo directivo</li><li data-i18n="membres.t4.b3">Membresía honorífica y liderazgo en la comunidad</li></ul></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c-.6-3-3.2-4.6-6.3-4 .3 3 2.6 4.8 6.3 4z"/></svg></div><h3 data-i18n="membres.t1.t">Semilla</h3><div class="tier-price"><b data-i18n="membres.t1.price">$20.000</b><span data-i18n="membres.t1.priceu">/ mes · o US$5 por PayPal</span></div><p data-i18n="membres.t1.p">El primer paso: empiezas a sembrar impacto cada mes.</p><ul class="tier-ben"><li data-i18n="membres.t1.b0">Recibo y número de guía con cada aporte, y carnet digital</li><li><span data-i18n="membres.t1.b1">Boletín de impacto con historias reales</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li data-i18n="membres.t1.b2">Certificado de donación si lo pides (Art. 257 ET, solo Colombia)</li><li><span data-i18n="membres.t1.b3">Reconocimiento en web y redes</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li></ul></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 15c-.6-2.6-3-4-6-3.4.3 2.7 2.6 4.2 6 3.4z"/><path d="M12 13c.6-2.6 3-4 6-3.4-.3 2.7-2.6 4.2-6 3.4z"/></svg></div><h3 data-i18n="membres.t2.t">Retoño</h3><div class="tier-price"><b data-i18n="membres.t2.price">$50.000</b><span data-i18n="membres.t2.priceu">/ mes · o US$15 por PayPal</span></div><p data-i18n="membres.t2.p">Tu aporte crece y sostiene programas con más alcance.</p><p class="tier-more" data-i18n="membres.t2.more">Todo lo de Semilla, y además:</p><ul class="tier-ben"><li data-i18n="membres.t2.b1">Acceso al Programa de Gratitud</li><li><span data-i18n="membres.t2.b2">Certificado de agradecimiento personalizado</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t2.b3">Contenido especial de voluntariado e impacto</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li></ul></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><circle cx="12" cy="9.5" r="6"/></svg></div><h3 data-i18n="membres.t3.t">Árbol</h3><div class="tier-price"><b data-i18n="membres.t3.price">$120.000</b><span data-i18n="membres.t3.priceu">/ mes · o US$35 por PayPal</span></div><p data-i18n="membres.t3.p">Un compromiso firme que sostiene proyectos completos.</p><p class="tier-more" data-i18n="membres.t3.more">Todo lo de Retoño, y además:</p><ul class="tier-ben"><li><span data-i18n="membres.t3.b1">Invitación a eventos y sesiones en vivo</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t3.b2">Acceso prioritario a Impact Journey</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t3.b3">Certificado de impacto personalizado</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li></ul></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 22v-3M17 22v-3M12 22v-4"/><circle cx="7" cy="13" r="4"/><circle cx="17" cy="13" r="4"/><circle cx="12" cy="9" r="4.5"/></svg></div><h3 data-i18n="membres.t4.t">Bosque</h3><div class="tier-price"><b data-i18n="membres.t4.price">$250.000+</b><span data-i18n="membres.t4.priceu">/ mes · o US$75+ por PayPal</span></div><p data-i18n="membres.t4.p">El nivel más alto: tu generosidad multiplica toda la red.</p><p class="tier-more" data-i18n="membres.t4.more">Todo lo de Árbol, y además:</p><ul class="tier-ben"><li><span data-i18n="membres.t4.b1">Reportes de impacto detallados</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t4.b2">Reunión con el fundador</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t4.b3">Membresía honorífica y liderazgo en la comunidad</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li></ul></div>
       </div>
     </div>
   </section>
@@ -2165,7 +2114,7 @@
       <span class="ey rv" data-i18n="membres.extra.ey">Otras formas</span>
       <h2 class="h-sec rv" data-i18n="membres.extra.t">No todo es mensual.</h2>
       <div class="grid g2 rv d1" style="margin-top:24px">
-        <div class="card"><h3 data-i18n="membres.temp.t">Temporal</h3><p data-i18n="membres.temp.p">Una donación única, sin compromiso recurrente. Igual recibes tu certificado y, si declaras renta en Colombia, el beneficio tributario.</p></div>
+        <div class="card"><h3 data-i18n="membres.temp.t">Temporal</h3><p data-i18n="membres.temp.p">Una donación única, sin compromiso recurrente. Igual puedes pedir tu certificado de donación y, si declaras renta en Colombia, el descuento del Art. 257 ET puede aplicarte.</p></div>
         <div class="card"><h3 data-i18n="membres.honor.t">Honor</h3><p data-i18n="membres.honor.p">Un reconocimiento por invitación, para aliados y personas que dejan una huella excepcional en el ecosistema.</p></div>
       </div>
     </div>
@@ -2177,8 +2126,8 @@
       <div class="grid g2 rv d1" style="margin-top:22px">
         <div class="card card-d"><h3 data-i18n="membres.ben.1.t">Programa de Gratitud</h3><p data-i18n="membres.ben.1.p">Beneficios que empresas aliadas ofrecen de forma voluntaria, en gratitud por el impacto. Disponible desde el nivel Retoño; estamos sumando aliados.</p></div>
         <div class="card card-d"><h3 data-i18n="membres.ben.2.t">Certificado y carnet</h3><p data-i18n="membres.ben.2.p">Tu certificado de donación para el beneficio tributario en Colombia y tu carnet digital de miembro, que se renueva con cada aporte.</p></div>
-        <div class="card card-d"><h3 data-i18n="membres.ben.3.t">Reportes de impacto</h3><p data-i18n="membres.ben.3.p">Te contamos a dónde llegó tu aporte y a quién ayudó, con evidencia real.</p></div>
-        <div class="card card-d"><h3 data-i18n="membres.ben.4.t">Trazabilidad total</h3><p data-i18n="membres.ben.4.p">Cada donación tiene destino, acta y reporte. Sin promesas: evidencia.</p></div>
+        <div class="card card-d"><span class="tag soon" data-i18n="membres.prep">En preparación</span><h3 data-i18n="membres.ben.3.t">Reportes de impacto</h3><p data-i18n="membres.ben.3.p">Te contamos a dónde llegó tu aporte, con evidencia: cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Los reportes periódicos de impacto están en preparación.</p></div>
+        <div class="card card-d"><h3 data-i18n="membres.ben.4.t">Trazabilidad total</h3><p data-i18n="membres.ben.4.p">Cada donación tiene destino y número de guía; el acta y sus fotos se suman a tu rastreo cuando la fundación entrega. Sin promesas: evidencia.</p></div>
       </div>
     </div>
   </section>
@@ -2222,7 +2171,7 @@
     <div class="wrap">
       <p class="ey rv" data-i18n="mi.ey">Desde el exterior</p>
       <h2 class="h-sec rv" data-i18n="mi.t">Membresía en dólares, por PayPal</h2>
-      <p class="lead rv d1" data-i18n="mi.lead">Si no estás en Colombia no puedes usar PSE ni Nequi, así que esta es tu puerta: eliges cuánto aportas cada mes y PayPal lo cobra solo. Puedes cancelarla en cualquier momento desde tu propia cuenta de PayPal, sin escribirnos.</p>
+      <p class="lead rv d1" data-i18n="mi.lead">Si no estás en Colombia, esta es tu puerta: eliges cuánto aportas cada mes y PayPal lo cobra solo. Puedes cancelarla en cualquier momento desde tu propia cuenta de PayPal, sin escribirnos.</p>
       <p class="mu rv d1" style="max-width:62ch;margin-top:14px" data-i18n="mi.aviso">Dos cosas de frente. El descuento del Art. 257 ET es para contribuyentes de renta en Colombia, así que probablemente no aplica en tu caso. Y la comisión internacional de PayPal se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más.</p>
 
       <form id="mif" class="ally-form rv d2" data-submit="miSubmit(event)">
@@ -2286,14 +2235,14 @@
           <span class="tag" data-i18n="vol.pu.ij.tag">Para empresas</span>
           <h3 data-i18n="vol.pu.ij.t">Impact Journey</h3>
           <p class="vol-sub" data-i18n="vol.pu.ij.s">Voluntariado en doble vía</p>
-          <p data-i18n="vol.pu.ij.p">Tu equipo y una comunidad del HUB se encuentran en una ruta diseñada con MIRA. No es una visita: es un intercambio, y las dos partes salen con algo que no tenían.</p>
+          <p data-i18n="vol.pu.ij.p">Tu equipo y una comunidad del HUB SOCIAL se encuentran en una ruta diseñada con MIRA. No es una visita: es un intercambio, y las dos partes salen con algo que no tenían.</p>
           <a class="card-link" href="#aliados" data-act="irAAliadosVoluntariado()"><span data-i18n="vol.pu.ij.cta">Traer a mi equipo</span> <span aria-hidden="true">&rarr;</span></a>
         </div>
         <div class="grid g2">
           <div class="card">
             <span class="tag" data-i18n="vol.pu.per">Para personas</span>
             <h3 data-i18n="vol.pu.te.t">En terreno</h3>
-            <p data-i18n="vol.pu.te.p">Con una fundación del HUB, en su territorio y junto a su equipo. Ellos conocen a su comunidad y deciden cuándo una visita suma.</p>
+            <p data-i18n="vol.pu.te.p">Con una fundación del HUB SOCIAL, en su territorio y junto a su equipo. Ellos conocen a su comunidad y deciden cuándo una visita suma.</p>
             <a class="card-link" href="#vol-form" data-act="volIrForm('hub')"><span data-i18n="vol.pu.te.cta">Inscribirme en terreno</span> <span aria-hidden="true">&rarr;</span></a>
           </div>
           <div class="card">
@@ -2465,16 +2414,16 @@
         <div class="field"><label for="vf-email" data-i18n="vf.email">Correo</label>
           <input type="email" id="vf-email" autocomplete="email" required></div>
         <div class="field"><label for="vf-tel" data-i18n="vf.tel">Celular o WhatsApp</label>
-          <input type="tel" id="vf-tel" autocomplete="tel" required></div>
+          <input type="tel" id="vf-tel" maxlength="40" autocomplete="tel" required></div>
         <div class="field"><label for="vf-ciudad" data-i18n="vf.ciudad">Ciudad (opcional)</label>
           <input type="text" id="vf-ciudad" autocomplete="address-level2"></div>
 
-        <p class="vf-aviso" id="vf-origen" style="display:none" data-i18n="vf.origen.brig">Vienes de la brigada del terremoto. Te marcamos «Administrativo» porque es lo que se puede sumar a tiempo: el acopio de Medellín, del 24 al 28 de agosto. Puedes cambiarlo si prefieres el programa de todo el año.</p>
+        <p class="vf-aviso" id="vf-origen" style="display:none" data-i18n="vf.origen.brig">Vienes de la página de la brigada del terremoto, que ya terminó. Te marcamos «Administrativo»; puedes cambiarlo si prefieres otro nivel.</p>
 
         <fieldset class="vf-set">
           <legend data-i18n="vf.nivel.lbl">¿Dónde quieres estar?</legend>
           <p class="vf-help" data-i18n="vf.nivel.help">Tu oficio puede ser el mismo en las dos: lo que cambia es si vas al territorio. Ir a terreno tiene su propia ruta, con verificaciones y sesión de Marco.</p>
-          <label class="ally-check"><input type="radio" name="vf-nivel" value="hub" data-act="volNivel()"><span data-i18n="vf.nivel.hub">En terreno — con una fundación del HUB</span></label>
+          <label class="ally-check"><input type="radio" name="vf-nivel" value="hub" data-act="volNivel()"><span data-i18n="vf.nivel.hub">En terreno — con una fundación del HUB SOCIAL</span></label>
           <label class="ally-check"><input type="radio" name="vf-nivel" value="estructura" data-act="volNivel()"><span data-i18n="vf.nivel.est">Administrativo — en la sede de Give&amp;Grow</span></label>
           <label class="ally-check"><input type="radio" name="vf-nivel" value="mixto" data-act="volNivel()"><span data-i18n="vf.nivel.mix">Las dos</span></label>
           <p class="vf-aviso" id="vf-terreno" style="display:none" data-i18n="vf.terreno.aviso">Como estarías en terreno, antes de cualquier jornada pasan dos verificaciones —la nuestra y la de la fundación que acompaña a esa comunidad— y una sesión de Marco. La fundación tiene la última palabra sobre cuándo una visita suma: no es un filtro, es la anfitriona.</p>
@@ -2547,7 +2496,7 @@
       <p class="e404-lead" data-i18n="e404.p">El enlace que seguiste no lleva a ningún lugar de nuestro ecosistema. Pero cada camino aquí lleva a algo que sí importa.</p>
       <div class="e404-actions">
         <a class="btn btn-g" href="#inicio" data-i18n="e404.home">Volver al inicio</a>
-        <a class="btn btn-o" href="#hub" data-i18n="e404.hub">Conocer el HUB</a>
+        <a class="btn btn-o" href="#hub" data-i18n="e404.hub">Conocer el HUB SOCIAL</a>
       </div>
     </div>
   </section>
@@ -3061,7 +3010,7 @@
           <input type="email" id="inf-email" autocomplete="email" required>
           <small class="mu" data-i18n="ing.email.h">Con este mismo correo entrarías a la plataforma. Puede ser de universidad, de empresa o particular.</small></div>
         <div class="field"><label for="inf-tel" data-i18n="ing.tel">Celular o WhatsApp</label>
-          <input type="tel" id="inf-tel" autocomplete="tel" required></div>
+          <input type="tel" id="inf-tel" maxlength="40" autocomplete="tel" required></div>
         <div class="field"><label for="inf-ciudad" data-i18n="ing.ciudad">Ciudad</label>
           <input type="text" id="inf-ciudad" autocomplete="address-level2" required></div>
         <div class="field"><label for="inf-mat" data-i18n="ing.matricula">Matrícula profesional</label>
@@ -3271,7 +3220,7 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="ap.ev.ey">Qué vuelve</span>
       <h2 class="h-sec rv d1" data-i18n="ap.ev.t">Evidencia, no un agradecimiento</h2>
-      <p class="lead rv d2" data-i18n="ap.ev.p">Cada entrega que hacemos se publica con su acta: qué se entregó, dónde y con qué fundación del territorio. No prometemos una casa con tu nombre; publicamos lo que efectivamente se hizo.</p>
+      <p class="lead rv d2" data-i18n="ap.ev.p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo cuando la fundación entrega: qué se entregó, dónde y con qué fundación del territorio. No prometemos una casa con tu nombre; publicamos lo que efectivamente se hizo.</p>
       <p class="rv d3" style="margin-top:16px"><a href="#casas" data-i18n="ap.ev.link">Ver las casas revisadas</a></p>
     </div>
   </section>
@@ -3288,7 +3237,7 @@
         <div class="field"><label for="apf-email" data-i18n="ap.email">Correo</label>
           <input type="email" id="apf-email" autocomplete="email" required></div>
         <div class="field"><label for="apf-tel" data-i18n="ap.tel">Celular o WhatsApp</label>
-          <input type="tel" id="apf-tel" autocomplete="tel" required></div>
+          <input type="tel" id="apf-tel" maxlength="40" autocomplete="tel" required></div>
         <div class="field"><label for="apf-ciudad" data-i18n="ap.ciudad">Desde qué ciudad escribes (opcional)</label>
           <input type="text" id="apf-ciudad" autocomplete="address-level2"></div>
         <div class="field"><label for="apf-quien" data-i18n="ap.quien">Escribes como</label>
@@ -3459,6 +3408,6 @@
      nada. Google lo lee igual en cualquier parte del documento. No es un script
      ejecutable (application/ld+json), así que no necesita hash en la CSP. Su texto lo
      escribe `hydrate-i18n.mjs` desde el diccionario y el gate lo compara. -->
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Mi casa se afectó por el sismo. ¿Qué hacen ustedes?","acceptedAnswer":{"@type":"Answer","text":"Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— llama al 123 y a tu alcaldía: eso no espera. Para lo demás existe Mira Mi Casa: subes fotos de tu casa y un ingeniero voluntario con matrícula te da un concepto a distancia, sin costo. Te dice si hay señales para no permanecer en la casa o en alguna parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla."}},{"@type":"Question","name":"¿Me van a decir si mi casa es habitable?","acceptedAnswer":{"@type":"Answer","text":"No, y conviene que sepas por qué. Por fotos no se ve la cimentación, ni el suelo, ni si esa grieta está en un muro que carga. Y la declaratoria con efectos —evacuar, demoler— es de la autoridad de tu municipio y no de un privado: lo fija la Ley 1523 de 2012. Lo que sí te damos es un concepto sobre lo que las fotos permiten ver. Y si te recomendamos no usar una parte de la casa mientras la revisan, eso es una precaución, no una declaratoria de inhabitabilidad."}},{"@type":"Question","name":"¿Me van a reparar la casa o darme los materiales?","acceptedAnswer":{"@type":"Answer","text":"No podemos comprometerlo casa por casa, y preferimos decírtelo antes que prometerte algo que no depende solo de nosotros. Como fundación vamos a buscar gestionar ayuda para todas las casas que podamos. Lo que sí recibes con seguridad es el concepto: con qué materiales y en qué orden conviene reparar, para que sepas por dónde empezar incluso si los consigues por tu cuenta."}},{"@type":"Question","name":"¿Cuánto tarda?","acceptedAnswer":{"@type":"Answer","text":"No hay fecha, y prometerte una sería peor. Los ingenieros son voluntarios y los casos más graves se miran primero. Lo que sí te damos son dos datos verificables en tu enlace: los días que llevas esperando y cuántos casos siguen sin abrir. Guarda ese enlace: es donde ves en qué va tu caso y donde subes más fotos si te las piden."}},{"@type":"Question","name":"Soy ingeniero. ¿Cómo ayudo?","acceptedAnswer":{"@type":"Answer","text":"Te postulas en «Ingenieros voluntarios» con tu matrícula del COPNIA. La verificamos a mano en el registro público del COPNIA —lo hace una persona, así que no es inmediato—, y en cuanto queda verificada el acceso se abre solo. Lo que vas a hacer es dar un concepto a distancia sobre fotos —permanencia, precauciones, materiales y prioridad de visita—, nunca un dictamen de habitabilidad. No ves el contacto ni la dirección de la familia: para dar el concepto no hacen falta."}},{"@type":"Question","name":"¿Qué hace único al HUB SOCIAL?","acceptedAnswer":{"@type":"Answer","text":"El HUB SOCIAL no es solo un canal para donar: es un centro operativo con cinco rutas que conectan alianzas, donaciones e impacto medible. Tres cosas nos diferencian. Primero, trazabilidad real: tu aporte tiene número de guía, recibo automático, certificado de donación firmado y acta de entrega con fotos que puedes ver en el rastreo. Segundo, evidencia, no promesas: somos una fundación joven y transparente que muestra lo que puede probar, sin cifras infladas, y trabajamos con fundaciones aliadas verificadas en territorio. Tercero, reciprocidad: quien da también crece — los miembros acceden a los beneficios del Programa de Gratitud y las empresas ganan visibilidad como negocios con propósito. Es lo que resume nuestro lema: «Dar para crecer, crecer para dar más»."}},{"@type":"Question","name":"¿Cómo hago una donación?","acceptedAnswer":{"@type":"Answer","text":"En la calculadora eliges tu monto y continúas al pago: pagas con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía para seguir tu aporte. Si prefieres transferir, la cuenta de ahorros Bancolombia es la 31000009221 a nombre de Fundación Give&Grow International (NIT 901.948.930-2); repórtala después en el sitio: recibes tu número de guía al instante y subes ahí mismo el comprobante. Es mejor que mandarlo por correo, porque así tu aporte queda registrado y rastreable desde el primer minuto."}},{"@type":"Question","name":"¿Qué es el Programa de Gratitud?","acceptedAnswer":{"@type":"Answer","text":"Es un programa de beneficios: comercios aliados dan descuentos a los miembros activos, desde el nivel Retoño, y ganan visibilidad como negocios con propósito. La red está empezando, así que preferimos decirlo: los comercios que ya dan beneficio son los que aparecen en la página del programa, y son los únicos. Está construido para cinco categorías —gastronomía, moda, belleza, bienestar y odontología— y se van sumando de a uno."}},{"@type":"Question","name":"¿Cómo funciona el beneficio tributario?","acceptedAnswer":{"@type":"Answer","text":"Por cada donación realizada a través del sistema financiero accedes a un descuento del 25% sobre el impuesto de renta a cargo (Art. 257 ET), con el límite que fija el Art. 258. Por ejemplo, $4.000.000 COP donados pueden significar hasta $1.000.000 COP menos en tu impuesto, según tu situación tributaria. Es un beneficio de la ley colombiana: aplica solo si declaras renta en Colombia. No somos asesores tributarios: confírmalo con tu contador."}},{"@type":"Question","name":"¿Puedo ser voluntario?","acceptedAnswer":{"@type":"Answer","text":"Sí. Puedes aportar desde tu oficio —salud, derecho, contabilidad, comunicación, desarrollo, docencia y más— en terreno junto a una fundación aliada, en la estructura del Hub, o combinando las dos. Cuéntanos tu área y tu disponibilidad."}},{"@type":"Question","name":"¿Mi fundación puede aplicar al Hub?","acceptedAnswer":{"@type":"Answer","text":"Sí. Buscamos fundaciones legalmente constituidas, con trabajo verificable en campo y disposición a la trazabilidad. Algunas aliadas contribuyen servicios al Hub en lugar de solo recibir."}},{"@type":"Question","name":"¿Puedo hacer un aporte único en lugar de mensual?","acceptedAnswer":{"@type":"Answer","text":"Sí. En la calculadora puedes elegir Único para una donación puntual, o Mensual/Anual. Ojo con lo segundo, porque conviene saberlo antes: el débito automático todavía no existe. Hoy procesamos ese primer aporte y dejamos registrada tu intención, y te escribimos para activarlo cuando lo habilitemos, sin que tengas que empezar de nuevo. En todos los casos recibes tu recibo con número de guía al confirmarse el pago. El certificado de donación para efectos tributarios es aparte: lo pides al donar, lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, y lo emite una persona — por eso necesitamos tu documento y tu ciudad."}},{"@type":"Question","name":"¿Puedo donar desde el exterior?","acceptedAnswer":{"@type":"Answer","text":"Sí. En la pestaña de PayPal del formulario de donación hay un enlace directo, en dólares. Ten en cuenta que su comisión internacional se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más. Ten en cuenta que el descuento del Art. 257 ET aplica a contribuyentes del impuesto de renta en Colombia."}},{"@type":"Question","name":"¿Cómo sé a dónde fue mi aporte?","acceptedAnswer":{"@type":"Answer","text":"Con evidencia, no promesas. Cada aporte sigue nuestra trazabilidad: recibo con número de guía al confirmarse el pago, acta de entrega firmada por quien recibe, y sus fotos publicadas en el rastreo de tu aporte. Si pediste certificado de donación, se emite revisado y firmado. Te contamos a dónde llegó y a quién ayudó."}},{"@type":"Question","name":"¿Qué son ImpactOS y ALMA?","acceptedAnswer":{"@type":"Answer","text":"ImpactOS es el sistema con el que damos trazabilidad y visibilidad al impacto del Hub. ALMA es la asistente que responde tus dudas sobre la fundación aquí en el sitio. Ambos están en construcción y crecen con la red."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Mi casa se afectó por el sismo. ¿Qué hacen ustedes?","acceptedAnswer":{"@type":"Answer","text":"Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— llama al 123 y a tu alcaldía: eso no espera. Para lo demás existe Mira Mi Casa: subes fotos de tu casa y un ingeniero voluntario con matrícula te da un concepto a distancia, sin costo. Te dice si hay señales para no permanecer en la casa o en alguna parte de ella, qué precauciones tomar mientras tanto, y con qué materiales y en qué orden conviene repararla."}},{"@type":"Question","name":"¿Me van a decir si mi casa es habitable?","acceptedAnswer":{"@type":"Answer","text":"No, y conviene que sepas por qué. Por fotos no se ve la cimentación, ni el suelo, ni si esa grieta está en un muro que carga. Y la declaratoria con efectos —evacuar, demoler— es de la autoridad de tu municipio y no de un privado: lo fija la Ley 1523 de 2012. Lo que sí te damos es un concepto sobre lo que las fotos permiten ver. Y si te recomendamos no usar una parte de la casa mientras la revisan, eso es una precaución, no una declaratoria de inhabitabilidad."}},{"@type":"Question","name":"¿Me van a reparar la casa o darme los materiales?","acceptedAnswer":{"@type":"Answer","text":"No podemos comprometerlo casa por casa, y preferimos decírtelo antes que prometerte algo que no depende solo de nosotros. Como fundación vamos a buscar gestionar ayuda para todas las casas que podamos. Lo que sí recibes con seguridad es el concepto: con qué materiales y en qué orden conviene reparar, para que sepas por dónde empezar incluso si los consigues por tu cuenta."}},{"@type":"Question","name":"¿Cuánto tarda?","acceptedAnswer":{"@type":"Answer","text":"No hay fecha, y prometerte una sería peor. Los ingenieros son voluntarios y los casos más graves se miran primero. Lo que sí te damos son dos datos verificables en tu enlace: los días que llevas esperando y cuántos casos siguen sin abrir. Guarda ese enlace: es donde ves en qué va tu caso y donde subes más fotos si te las piden."}},{"@type":"Question","name":"Soy ingeniero. ¿Cómo ayudo?","acceptedAnswer":{"@type":"Answer","text":"Te postulas en «Ingenieros voluntarios» con tu matrícula del COPNIA. La verificamos a mano en el registro público del COPNIA —lo hace una persona, así que no es inmediato—, y en cuanto queda verificada el acceso se abre solo. Lo que vas a hacer es dar un concepto a distancia sobre fotos —permanencia, precauciones, materiales y prioridad de visita—, nunca un dictamen de habitabilidad. No ves el contacto ni la dirección de la familia: para dar el concepto no hacen falta."}},{"@type":"Question","name":"¿Qué hace único al HUB SOCIAL?","acceptedAnswer":{"@type":"Answer","text":"El HUB SOCIAL no es solo un canal para donar: es un centro operativo con cinco rutas que conectan alianzas, donaciones e impacto medible. Tres cosas lo definen. Primero, trazabilidad: tu aporte tiene número de guía y recibo automático; si lo pides, certificado de donación firmado; y cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Segundo, evidencia, no promesas: somos una fundación joven que muestra lo que puede probar, sin cifras infladas, y trabajamos con fundaciones aliadas verificadas en territorio. Tercero, reciprocidad: quien da también crece — los miembros acceden a los beneficios del Programa de Gratitud y las empresas ganan visibilidad como negocios con propósito. Es lo que resume nuestro lema: «Dar para crecer, crecer para dar más»."}},{"@type":"Question","name":"¿Cómo hago una donación?","acceptedAnswer":{"@type":"Answer","text":"En la calculadora eliges tu monto y continúas al pago: pagas con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía para seguir tu aporte. Si prefieres transferir, la cuenta de ahorros Bancolombia es la 31000009221 a nombre de Fundación Give&Grow International (NIT 901.948.930-2); repórtala después en el sitio: recibes tu número de guía al instante y subes ahí mismo el comprobante. Es mejor que mandarlo por correo, porque así tu aporte queda registrado y rastreable desde el primer minuto."}},{"@type":"Question","name":"¿Qué es el Programa de Gratitud?","acceptedAnswer":{"@type":"Answer","text":"Es un programa de beneficios: comercios aliados dan descuentos a los miembros activos, desde el nivel Retoño, y ganan visibilidad como negocios con propósito. La red está empezando, así que preferimos decirlo: los comercios que ya dan beneficio son los que aparecen en la página del programa, y son los únicos. Está construido para cinco categorías —gastronomía, moda, belleza, bienestar y odontología— y se van sumando de a uno."}},{"@type":"Question","name":"¿Cómo funciona el beneficio tributario?","acceptedAnswer":{"@type":"Answer","text":"Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación. Si donas en dinero, el aporte debe pasar por el sistema financiero. Por ejemplo, $4.000.000 COP donados pueden significar hasta $1.000.000 COP menos en tu impuesto. No somos asesores tributarios: confírmalo con tu contador."}},{"@type":"Question","name":"¿Puedo ser voluntario?","acceptedAnswer":{"@type":"Answer","text":"Sí. Puedes aportar desde tu oficio —salud, derecho, contabilidad, comunicación, desarrollo, docencia y más— en terreno junto a una fundación aliada, en la estructura del HUB SOCIAL, o combinando las dos. Cuéntanos tu área y tu disponibilidad."}},{"@type":"Question","name":"¿Mi fundación puede aplicar al HUB SOCIAL?","acceptedAnswer":{"@type":"Answer","text":"Sí. Buscamos fundaciones y proyectos comunitarios de base, con trabajo verificable en campo y disposición a la trazabilidad. Cada una entra con verificación y convenio; si es un proyecto comunitario de base, lo decimos en su ficha. Algunas aliadas aportan servicios al HUB SOCIAL, además de recibir."}},{"@type":"Question","name":"¿Puedo hacer un aporte único en lugar de mensual?","acceptedAnswer":{"@type":"Answer","text":"Sí. En Membresías registras tu tarjeta una vez y se cobra sola cada mes. Si eliges un aporte único en Donar, se procesa una sola vez. En todos los casos recibes tu recibo con número de guía al confirmarse el pago. El certificado de donación para efectos tributarios es aparte: lo pides al donar, lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, y lo emite una persona — por eso necesitamos tu documento y tu ciudad."}},{"@type":"Question","name":"¿Puedo donar desde el exterior?","acceptedAnswer":{"@type":"Answer","text":"Sí. En la pestaña de PayPal del formulario de donación hay un enlace directo, en dólares. Ten en cuenta que su comisión internacional se lleva cerca del 10 %: si tu aporte es grande, escríbenos y te pasamos los datos bancarios, porque así llega más. Ten en cuenta que el descuento del Art. 257 ET aplica a contribuyentes del impuesto de renta en Colombia."}},{"@type":"Question","name":"¿Cómo sé a dónde fue mi aporte?","acceptedAnswer":{"@type":"Answer","text":"Con evidencia, no promesas. Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega. Si pediste certificado de donación, se emite revisado y firmado."}},{"@type":"Question","name":"¿Qué son ImpactOS y ALMA?","acceptedAnswer":{"@type":"Answer","text":"ImpactOS es el sistema con el que damos trazabilidad al impacto del HUB SOCIAL: ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción. ALMA es la asistente que responde tus dudas sobre la fundación aquí en el sitio."}}]}</script>
 </body>
 </html>
