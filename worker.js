@@ -1553,8 +1553,13 @@ async function apiInscripcion(request, env, url) {
     }
   }
 
-  /* Aqui y no en cada manejador: las seis puertas pasan por este punto. */
-  if (!telefonoContacto(c.telefono)) {
+  /* Aqui y no en cada manejador: las seis puertas pasan por este punto.
+     La UNICA excepcion, desde el 29 sep 2026: un voluntario menor de edad. Su
+     celular no se guarda hasta que su acudiente autorice (ver la rama de
+     voluntario), y no se le puede exigir un dato que no vamos a guardar. El
+     contacto que si se exige es el del acudiente. */
+  const menorVol = c.tipo === "voluntario" && c.mayor_edad === false;
+  if (!menorVol && !telefonoContacto(c.telefono)) {
     return json({ error: "telefono_requerido", ayuda: AYUDA_TEL }, 400);
   }
 
@@ -1599,13 +1604,53 @@ async function apiInscripcion(request, env, url) {
     return json({ error: "acudiente_requerido",
       ayuda: "Siendo menor de edad necesitamos el nombre y un contacto de tu acudiente, cómo vendrías y que tu acudiente sepa que te inscribes." }, 400);
   }
+  /* EL CONTACTO DEL ACUDIENTE TIENE QUE SERVIR PARA ALGO (29 sep 2026). Desde
+     hoy es por donde le llega el enlace para autorizar: un correo lo recibe
+     solo; un celular, por WhatsApp desde el panel. Un texto que no es ninguno
+     de los dos dejaria la inscripcion esperando una autorizacion que nadie
+     puede pedir, y a los 30 dias se borraria sin que el acudiente supiera nada.
+     Y no puede ser el mismo correo o celular del menor: seria el menor
+     autorizandose a si mismo, que es justo lo que la ley no admite. */
+  const contactoAcu = acudiente ? contactoAcudiente(acudiente.contacto) : null;
+  if (acudiente && !contactoAcu) {
+    return json({ error: "acudiente_contacto_invalido",
+      ayuda: "Escribe el correo o el celular de tu acudiente: es por donde le enviamos el enlace para que autorice tu inscripción." }, 400);
+  }
+  if (contactoAcu && (
+      (contactoAcu.tipo === "email" && contactoAcu.valor.toLowerCase() === email.toLowerCase()) ||
+      (contactoAcu.tipo === "tel" && soloDigitos(contactoAcu.valor).slice(-10) === soloDigitos(c.telefono).slice(-10)))) {
+    return json({ error: "acudiente_contacto_propio",
+      ayuda: "El contacto de tu acudiente no puede ser tu mismo correo o celular: el enlace para autorizar es para él o ella." }, 400);
+  }
 
   const pisaTerritorio = nivel === "hub" || nivel === "mixto";
+  /* LO QUE SE GUARDA DE UN MENOR MIENTRAS SU ACUDIENTE NO AUTORIZA (decision de
+     Sebas, 29 sep 2026: enlace al acudiente, y si no autoriza, se borra).
+     ------------------------------------------------------------------------
+     Ley 1581 art. 7 y Decreto 1377 de 2013 art. 12: los datos de un menor se
+     tratan con la autorizacion de su representante, y ANTES, no despues.
+     Guardar es tratar. Asi que hasta que esa autorizacion llegue se guarda solo
+     lo imprescindible para dos cosas: pedirsela al acudiente y que el equipo vea
+     la fila pendiente en el panel.
+     · SE GUARDA: nombre y correo del menor (quien es, y a donde va su acuse),
+       como quiere participar y su oficio (es lo que el acudiente autoriza, y se
+       lo mostramos), las casillas de protocolo, y los datos del acudiente.
+     · NO SE GUARDA —ni ahora ni despues—: el celular y la ciudad del menor, su
+       disponibilidad y su mensaje. Son opcionales o no hacen falta para pedir la
+       autorizacion, y el texto libre es justo donde un menor escribe su colegio,
+       su barrio o su salud. Se eligio NO guardarlos en vez de guardarlos y
+       purgarlos al vencer: purgar despues seguiria siendo haberlos tratado sin
+       autorizacion durante 30 dias. Lo que falte se pregunta en la primera
+       conversacion, que para un menor es ya con su acudiente.
+     El navegador tampoco los manda (ver volSubmit en app.js); esto es la misma
+     regla del lado que no se puede saltar. */
   const datos = {
     nivel,
     oficio,
-    disponibilidad: limpio(c.disponibilidad, 280),
-    mensaje: limpio(c.mensaje, 600),
+    ...(acudiente ? {} : {
+      disponibilidad: limpio(c.disponibilidad, 280),
+      mensaje: limpio(c.mensaje, 600)
+    }),
     captura: !!c.captura,
     /* Se guardan los protocolos que quedan disparados, no para el voluntario
        sino para quien lo reciba: son la lista de lo que hay que cumplir antes. */
@@ -1614,7 +1659,11 @@ async function apiInscripcion(request, env, url) {
     mayor_edad: mayor,
     /* Un menor dispara su propio requisito: la autorizacion escrita del
        acudiente, antes de cualquier actividad (y de cualquier jornada). */
-    ...(acudiente ? { acudiente, autorizacion_acudiente_pendiente: true } : {}),
+    /* `acudiente_pedida_en` es desde cuando corre el plazo de 30 dias: no se
+       mide con `creada_en` porque una inscripcion anterior a este flujo recibe
+       su enlace el dia que el cron se lo genera, y su plazo empieza ahi. */
+    ...(acudiente ? { acudiente, autorizacion_acudiente_pendiente: true,
+                      acudiente_pedida_en: ahoraSQL() } : {}),
     /* De dónde salió la inscripción. Sin esto, quien se ofrece para el acopio de
        la brigada llega indistinguible de quien se apunta al programa de todo el
        año, y son dos conversaciones distintas con dos urgencias distintas. */
@@ -1622,22 +1671,44 @@ async function apiInscripcion(request, env, url) {
     idioma: c.idioma === "en" ? "en" : "es"
   };
 
+  /* El token del enlace del acudiente va en `inscripciones.token`, la columna
+     de la 0023 que hasta hoy solo usaba el cuestionario de las fundaciones. Se
+     comparte sin cruce posible: `fichaPorToken` exige tipo 'fundacion' y
+     `autorizacionPorToken` exige 'voluntario', el indice UNIQUE parcial admite
+     los NULL de todos los demas, y la unica escritura de esa columna fuera de
+     aqui (`adminMoverInscripcion`) solo toca fundaciones. En el JSON de `datos`
+     no habria indice: cada apertura del enlace seria recorrer la tabla. */
+  const tokenAcu = acudiente ? tokenNuevo() : null;
+  const telefono = acudiente ? null : (limpio(c.telefono, 40) || null);
   const ins = await env.DB.prepare(
-    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
-    "VALUES (?, 'nueva', ?, ?, ?, ?, ?)"
-  ).bind(tipo, nombre, email, limpio(c.telefono, 40) || null, limpio(c.ciudad, 80) || null,
-         JSON.stringify(datos)).run();
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos, token) " +
+    "VALUES (?, 'nueva', ?, ?, ?, ?, ?, ?)"
+  ).bind(tipo, nombre, email, telefono, acudiente ? null : (limpio(c.ciudad, 80) || null),
+         JSON.stringify(datos), tokenAcu).run();
+  const id = ins.meta ? ins.meta.last_row_id : null;
 
   /* El correo no puede tumbar la inscripción: si falla, la persona ya quedó
      registrada y eso es lo que importa. Misma regla que en los aportes. */
   try {
-    await correoInscripcionVoluntario(env, { nombre, email, ...datos });
-    await correoAvisoInscripcion(env, { nombre, email, telefono: limpio(c.telefono, 40), ...datos });
+    await correoInscripcionVoluntario(env, { nombre, email, contactoAcu, ...datos });
+    await correoAvisoInscripcion(env, { id, nombre, email, telefono, contactoAcu, ...datos });
   } catch (e) {
     console.error("correo inscripción", e && e.message);
   }
+  /* El enlace al acudiente en su propio try: que falle el acuse no puede
+     impedir que el acudiente reciba lo unico que salva la inscripcion. Si el
+     contacto es un celular no sale nada de aqui: lo manda el equipo por
+     WhatsApp desde la fila del panel. */
+  if (contactoAcu && contactoAcu.tipo === "email") {
+    try {
+      await correoAutorizacionAcudiente(env, { id, nombre, nivel, oficio, acudiente,
+        para: contactoAcu.valor, token: tokenAcu, idioma: datos.idioma, pedida: datos.acudiente_pedida_en });
+    } catch (e) {
+      console.error("correo acudiente", e && e.message);
+    }
+  }
 
-  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+  return json({ ok: true, id });
 }
 
 /* Acuse al voluntario. El tono lo fija una decisión de marca que no se debe
@@ -1661,8 +1732,11 @@ async function correoInscripcionVoluntario(env, v) {
     v.protocolo_imagen
       ? "You told us you plan to photograph or record. That has its own protocol, and one rule that never bends: consent comes before the camera. The foundation and the families decide, never the person visiting."
       : "",
+    /* Desde el 29 sep 2026 el menor sabe COMO llega la autorizacion y que
+       pasa si no llega: sin eso, a los 30 dias su inscripcion desaparece y el
+       no sabria por que. */
     v.acudiente
-      ? "Since you are under 18, before any activity we will ask " + v.acudiente.nombre + " —your guardian— to authorise your sign-up in writing, and you will come " + (v.acudiente.modo === "acompana" ? "with them." : "with their signed authorisation.")
+      ? "Since you are under 18, the law asks for your guardian's authorisation before we can keep your details. " + v.acudiente.nombre + " will receive a link " + (v.contactoAcu && v.contactoAcu.tipo === "tel" ? "by WhatsApp, from our team," : "by email") + " to authorise your sign-up. Without that authorisation, we delete your registration after " + AUT_ACU_DIAS + " days. You will come " + (v.acudiente.modo === "acompana" ? "with them." : "with their signed authorisation.")
       : "",
     "Nothing about this is charged, in either direction."
   ] : [
@@ -1674,7 +1748,7 @@ async function correoInscripcionVoluntario(env, v) {
       ? "Nos dijiste que piensas fotografiar o grabar. Eso tiene su propio protocolo, y una regla que no se negocia: el consentimiento va primero que la cámara. Lo deciden la fundación y las familias, nunca quien visita."
       : "",
     v.acudiente
-      ? "Como eres menor de edad, antes de cualquier actividad le pedimos a " + v.acudiente.nombre + " —tu acudiente— que autorice tu inscripción por escrito, y vendrás " + (v.acudiente.modo === "acompana" ? "con tu acudiente." : "con su autorización firmada.")
+      ? "Como eres menor de edad, la ley nos pide la autorización de tu acudiente antes de poder guardar tus datos. " + v.acudiente.nombre + " va a recibir un enlace " + (v.contactoAcu && v.contactoAcu.tipo === "tel" ? "por WhatsApp, de nuestro equipo," : "por correo") + " para autorizar tu inscripción. Sin esa autorización, la borramos a los " + AUT_ACU_DIAS + " días. Vendrás " + (v.acudiente.modo === "acompana" ? "con tu acudiente." : "con su autorización firmada.")
       : "",
     "Nada de esto se cobra, en ninguna dirección."
   ];
@@ -1704,7 +1778,7 @@ async function correoAvisoInscripcion(env, v) {
   const filas = [
     ["Nombre", v.nombre],
     ["Correo", v.email],
-    ["Teléfono", v.telefono || "(no dejó)"],
+    ["Teléfono", v.telefono || (v.acudiente ? "(de un menor no se guarda)" : "(no dejó)")],
     ...(v.origen ? [["Viene de", "la campaña " + v.origen + " — responder con esa urgencia"]] : []),
     ["Nivel", nivel],
     ["Oficio", v.oficio],
@@ -1712,10 +1786,13 @@ async function correoAvisoInscripcion(env, v) {
     ["Protocolo de cuidado", v.protocolo_cuidado ? "SÍ — pisa territorio, requiere doble verificación y Marco" : "no aplica"],
     ["Protocolo de imagen", v.protocolo_imagen ? "SÍ — va a fotografiar o grabar" : "no aplica"],
     ["Edad", v.mayor_edad === true ? "18 o más"
-           : v.mayor_edad === false ? "MENOR DE EDAD — pedir autorización escrita del acudiente antes de cualquier actividad"
+           : v.mayor_edad === false ? "MENOR DE EDAD — autorización del acudiente pendiente; sin ella se borra a los " + AUT_ACU_DIAS + " días"
            : "(no dijo: formulario anterior)"],
     ...(v.acudiente ? [["Acudiente", v.acudiente.nombre + " · " + v.acudiente.contacto + " · " +
-      (v.acudiente.modo === "acompana" ? "viene con él/ella" : "viene con su autorización firmada")]] : [])
+      (v.acudiente.modo === "acompana" ? "viene con él/ella" : "viene con su autorización firmada")],
+      ["Enlace para autorizar", v.contactoAcu && v.contactoAcu.tipo === "tel"
+        ? "HAY QUE ENVIARLO POR WHATSAPP: está en su fila del panel"
+        : "enviado a su correo"]] : [])
   ];
   return enviarCorreo(env, {
     para,
@@ -1725,10 +1802,507 @@ async function correoAvisoInscripcion(env, v) {
       titulo: "Nuevo voluntario: " + v.nombre,
       parrafos: v.mensaje ? ["Lo que escribió: «" + v.mensaje + "»"] : ["Sin mensaje."],
       filas,
-      cierre: "Está en el panel, en inscripciones por revisar."
+      cierre: v.acudiente
+        ? "Está en el panel, en inscripciones por revisar. De un menor solo guardamos lo mínimo hasta que su acudiente autorice: su celular, ciudad, disponibilidad y mensaje no se guardan."
+        : "Está en el panel, en inscripciones por revisar."
     }),
     etiqueta: "aviso-inscripcion"
   });
+}
+
+/* ========================================================================
+   LA AUTORIZACION DEL ACUDIENTE, POR ENLACE (decision de Sebas, 29 sep 2026)
+   ========================================================================
+   Un menor puede inscribirse de voluntario desde el 28 sep 2026, con su
+   acudiente o con su autorizacion firmada. Pero sus datos quedaban guardados
+   ANTES de que el acudiente autorizara nada, y la Ley 1581 (art. 7) y el
+   Decreto 1377 de 2013 (art. 12) piden lo contrario: los datos de un nino,
+   nina o adolescente se tratan con la autorizacion de su representante, previa.
+
+   Lo decidido: al acudiente le llega un enlace para autorizar, y si la
+   autorizacion no llega, la inscripcion se borra.
+   · Contacto con correo → el enlace sale solo, con un recordatorio al dia 7.
+   · Contacto con celular → el panel ofrece el WhatsApp con el enlace escrito,
+     y lo manda una persona del equipo (no tenemos por donde mandarlo solos).
+   · El enlace vive en `inscripciones.token` y se anula al usarse.
+   · A los 30 dias sin autorizacion, el cron suprime la fila con la MISMA
+     funcion que el boton «Suprimir» del panel, y queda solo una linea de
+     auditoria sin datos personales.
+   · La autorizacion en papel sigue valiendo: el paso «acudiente» del panel se
+     marca a mano como siempre, con el correo de quien lo marca.
+
+   La redaccion legal que ve el acudiente vive en `textosAutorizacion`, con su
+   version en AUT_ACU_VERSION: si cambia el texto, cambia la version, y la fila
+   de `consentimientos` dice cual acepto cada quien. */
+const AUT_ACU_DIAS = 30;
+const AUT_ACU_RECORDATORIO_DIAS = 7;
+const AUT_ACU_VERSION = "aut-acudiente-2026-09-29";
+/* Tres enlaces al dia por direccion de acudiente. El formulario es publico y
+   este es un correo a una direccion que escribe un desconocido: sin tope seria
+   un surtidor de correo con nuestro remitente. Tres alcanzan para hermanos que
+   se inscriben el mismo dia con el mismo acudiente. Pasado el tope, la fila del
+   panel sigue teniendo el enlace para mandarlo a mano. */
+const AUT_ACU_TOPE_DIA = 3;
+const PARENTESCOS_ACU = ["madre", "padre", "custodia"];
+
+function ahoraSQL() { return new Date().toISOString().slice(0, 19).replace("T", " "); }
+function soloDigitos(v) { return String(v == null ? "" : v).replace(/\D/g, ""); }
+function primerNombre(n) { return String(n || "").trim().split(/\s+/)[0] || ""; }
+
+/* Correo o celular: es lo unico que sirve para hacerle llegar el enlace. */
+function contactoAcudiente(v) {
+  const t = String(v == null ? "" : v).trim().slice(0, 200);
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t)) return { tipo: "email", valor: t };
+  const tel = telefonoContacto(t);
+  return tel ? { tipo: "tel", valor: tel } : null;
+}
+
+function urlAutorizacion(token, idioma) {
+  return ORIGIN + "/autorizacion/" + token + (idioma === "en" ? "?lang=en" : "");
+}
+
+/* Hasta cuando vale el enlace. Cuenta desde `acudiente_pedida_en` (cuando se
+   genero el enlace) y cae a `creada_en` por si acaso. */
+function venceAutorizacion(pedida) {
+  const t = Date.parse(String(pedida || "").replace(" ", "T") + "Z");
+  return isNaN(t) ? null : new Date(t + AUT_ACU_DIAS * 86400000);
+}
+function fechaLarga(d, en) {
+  if (!d) return "";
+  return d.toLocaleDateString(en ? "en-GB" : "es-CO",
+    { day: "numeric", month: "long", year: "numeric", timeZone: "America/Bogota" });
+}
+
+const NIVEL_ACU = {
+  hub:        { es: "En terreno, acompañando a una fundación aliada del HUB en su comunidad",
+                en: "In the field, alongside a HUB partner foundation in its community" },
+  estructura: { es: "Administrativo, en la sede de Give&Grow en Medellín",
+                en: "Administrative, at the Give&Grow office in Medellín" },
+  mixto:      { es: "En terreno y en la sede", en: "Both in the field and at the office" }
+};
+
+/* EL TEXTO QUE SE AUTORIZA, en un solo lugar: lo usan el correo y la pagina, y
+   lo que acepta el acudiente tiene que ser exactamente lo que se le explico. */
+function textosAutorizacion(en, menor) {
+  const n = menor || (en ? "the minor" : "la persona menor de edad");
+  return en ? {
+    quienes: "Fundación Give&Grow International is a Colombian nonprofit (NIT 901.948.930-2, Medellín) that connects people and companies with partner foundations that work in their own communities. Volunteers give their time and their trade, always alongside those foundations.",
+    datos: [
+      n + "'s name and email address",
+      "How " + n + " wants to take part, and their trade or area",
+      "Your name and contact as their guardian, and how " + n + " would come (with you or with your signed authorisation)"
+    ],
+    noDatos: "Nothing else. We did not keep " + n + "'s phone number, city, availability or message: whatever is needed later we ask for with you.",
+    fines: [
+      "Contacting " + n + ", through you, to organise their volunteering",
+      "Checking the requirements before any activity (a signed agreement and, for the field, our checks and a preparation session)",
+      "Keeping the record of their participation"
+    ],
+    noFines: "We do not sell or share these details. This authorisation does not cover the use of their image: if that were ever needed, it is asked for separately.",
+    base: "Colombian law (Ley 1581 de 2012, art. 7, and Decreto 1377 de 2013, art. 12) allows a minor's data to be processed only with the authorisation of their legal representative, respecting their best interest and fundamental rights, and after hearing their opinion. Ley 1098 de 2006 (the Children and Adolescents Code) is the protection framework we follow in everything we do with minors.",
+    plazo: "Without this authorisation, we delete the registration " + AUT_ACU_DIAS + " days after we asked for it.",
+    autorizo: "I authorise Fundación Give&Grow International (NIT 901.948.930-2) to process the details of " + n + " listed above, for the purposes stated, under Ley 1581 de 2012 and its Privacy Policy. I declare that I am their legal representative or the person legally responsible for their care, that " + n + " told me about this sign-up and that I took their opinion into account. I know I can access, correct or ask for the deletion of these details, and withdraw this authorisation, by writing to privacidad@thegiveandgrowproject.org."
+  } : {
+    quienes: "Fundación Give&Grow International es una entidad sin ánimo de lucro colombiana (NIT 901.948.930-2, Medellín) que conecta a personas y empresas con fundaciones aliadas que trabajan en sus propias comunidades. Los voluntarios aportan su tiempo y su oficio, siempre de la mano de esas fundaciones.",
+    datos: [
+      "El nombre y el correo de " + n,
+      "Cómo quiere participar " + n + " y su oficio o área",
+      "Tu nombre y tu contacto como acudiente, y cómo vendría " + n + " (contigo o con tu autorización firmada)"
+    ],
+    noDatos: "Nada más. No guardamos el celular, la ciudad, la disponibilidad ni el mensaje de " + n + ": lo que haga falta después te lo preguntamos a ti.",
+    fines: [
+      "Contactar a " + n + ", a través de ti, para organizar su voluntariado",
+      "Verificar los requisitos antes de cualquier actividad (un acuerdo firmado y, si va a terreno, nuestras verificaciones y una sesión de preparación)",
+      "Llevar el registro de su participación"
+    ],
+    noFines: "No vendemos ni compartimos estos datos. Esta autorización no incluye el uso de su imagen: si alguna vez hiciera falta, se pide aparte.",
+    base: "La ley colombiana (Ley 1581 de 2012, art. 7, y Decreto 1377 de 2013, art. 12) permite tratar los datos de un niño, niña o adolescente solo con la autorización de su representante legal, respetando su interés superior y sus derechos fundamentales, y después de escuchar su opinión. La Ley 1098 de 2006 (Código de la Infancia y la Adolescencia) es el marco de protección que seguimos en todo lo que hacemos con menores.",
+    plazo: "Sin esta autorización, borramos la inscripción " + AUT_ACU_DIAS + " días después de habértela pedido.",
+    autorizo: "Autorizo a Fundación Give&Grow International (NIT 901.948.930-2) a tratar los datos de " + n + " descritos arriba, para las finalidades indicadas, conforme a la Ley 1581 de 2012 y a su Política de Privacidad. Declaro que soy su representante legal o la persona que tiene legalmente su cuidado, que " + n + " me contó de esta inscripción y que tuve en cuenta su opinión. Sé que puedo consultar, corregir o pedir que se borren estos datos, y revocar esta autorización, escribiendo a privacidad@thegiveandgrowproject.org."
+  };
+}
+
+/* EL CORREO AL ACUDIENTE: el primero y, al dia 7, el recordatorio.
+   Solo el PRIMER NOMBRE del menor: la direccion la escribio el menor y puede
+   estar mal; si le llega a un desconocido, que no se lleve el nombre completo. */
+async function correoAutorizacionAcudiente(env, v) {
+  const para = String(v.para || "").trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(para)) return { ok: false, sinCorreo: true };
+  /* El freno cuenta en `correos`, que es donde ya queda cada intento. */
+  const hoy = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM correos WHERE LOWER(para) = ? AND etiqueta LIKE 'autorizacion-acudiente%' " +
+    "AND intento_en > datetime('now','-1 day')"
+  ).bind(para.toLowerCase()).first();
+  if (hoy && hoy.n >= AUT_ACU_TOPE_DIA) {
+    console.warn("autorizacion acudiente: tope diario", v.id);
+    return { ok: false, tope: true };
+  }
+
+  const en = v.idioma === "en";
+  const menor = primerNombre(v.nombre);
+  const T = textosAutorizacion(en, menor);
+  const vence = fechaLarga(venceAutorizacion(v.pedida), en);
+  const nivel = (NIVEL_ACU[v.nivel] || {})[en ? "en" : "es"] || "";
+  const url = urlAutorizacion(v.token, v.idioma);
+  const hola = v.acudiente && v.acudiente.nombre ? primerNombre(v.acudiente.nombre) : "";
+
+  const titulo = v.recordatorio
+    ? (en ? menor + "'s sign-up is still waiting for you" : "La inscripción de " + menor + " sigue esperándote")
+    : (en ? menor + " signed up to volunteer with us" : menor + " se inscribió en nuestro voluntariado");
+  const parrafos = en ? [
+    (hola ? "Hello " + hola + ". " : "Hello. ") + menor + " signed up to volunteer with Give&Grow and gave us your contact as their guardian. Because " + menor + " is under 18, we need your authorisation before we can keep their details.",
+    T.quienes,
+    "What we hold: " + T.datos.join("; ") + ". " + T.noDatos,
+    "What for: " + T.fines.join("; ") + ". " + T.noFines,
+    T.base,
+    "The button takes you to a short page where you review this and authorise it. The link is valid until " + vence + "; without the authorisation, we delete the registration on that date. If you do not recognise this sign-up, ignore this email and the details will be deleted."
+  ] : [
+    (hola ? "Hola, " + hola + ". " : "Hola. ") + menor + " se inscribió en el voluntariado de Give&Grow y nos dejó tu contacto como su acudiente. Como " + menor + " es menor de edad, necesitamos tu autorización antes de poder guardar sus datos.",
+    T.quienes,
+    "Lo que tenemos: " + T.datos.join("; ") + ". " + T.noDatos,
+    "Para qué: " + T.fines.join("; ") + ". " + T.noFines,
+    T.base,
+    "El botón te lleva a una página corta donde revisas esto y lo autorizas. El enlace vale hasta el " + vence + "; sin la autorización, ese día borramos la inscripción. Si no reconoces esta inscripción, ignora este correo y los datos se borrarán."
+  ];
+  const filas = en
+    ? [["Volunteer", menor], ["How they want to take part", nivel], ["Link valid until", vence]]
+    : [["Quién se inscribió", menor], ["Cómo quiere participar", nivel], ["El enlace vale hasta", vence]];
+  const boton = { url, texto: en ? "Review and authorise" : "Revisar y autorizar" };
+  const cierre = en
+    ? "Questions, or you want the details deleted now: privacidad@thegiveandgrowproject.org."
+    : "¿Dudas, o quieres que borremos los datos ya? privacidad@thegiveandgrowproject.org.";
+
+  return enviarCorreo(env, {
+    para,
+    asunto: v.recordatorio
+      ? (en ? "Reminder: " + menor + "'s volunteer sign-up needs your authorisation" : "Recordatorio: la inscripción de " + menor + " necesita tu autorización")
+      : (en ? menor + "'s volunteer sign-up needs your authorisation" : "La inscripción de " + menor + " en el voluntariado necesita tu autorización"),
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, x]) => k + ": " + x).join("\n"), "",
+            boton.texto + ": " + url, "", cierre].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, boton, cierre }),
+    etiqueta: v.recordatorio ? "autorizacion-acudiente-recordatorio" : "autorizacion-acudiente"
+  });
+}
+
+/* El texto que el equipo le manda por WhatsApp a un acudiente con celular. Lo
+   arma el servidor y el panel solo lo pone en el enlace: asi la URL del sitio
+   no se escribe dos veces (ver la regla de `adminJS` sobre interpolaciones). */
+function mensajeWhatsAppAcudiente(nombre, token, idioma, vence) {
+  const menor = primerNombre(nombre);
+  return idioma === "en"
+    ? "Hello, this is Give&Grow International. " + menor + " signed up to volunteer with us and gave your number as their guardian. Because " + menor + " is under 18, we need your authorisation before we can keep their details. You can review and authorise it here: " + urlAutorizacion(token, idioma) + " (valid until " + fechaLarga(vence, true) + "; without it, we delete the registration)."
+    : "Hola, te escribimos de Give&Grow International. " + menor + " se inscribió en nuestro voluntariado y nos dejó tu número como su acudiente. Como es menor de edad, necesitamos tu autorización antes de poder guardar sus datos. Puedes revisarla y autorizarla aquí: " + urlAutorizacion(token, idioma) + " (vale hasta el " + fechaLarga(vence, false) + "; sin ella, borramos la inscripción).";
+}
+
+/* El enlace solo abre si: el token tiene forma, es de un VOLUNTARIO, la
+   autorizacion sigue pendiente y no ha vencido. Cualquier otra cosa devuelve
+   null, y la pagina responde lo mismo en todos los casos: distinguir «vencido»
+   de «no existe» le diria a quien prueba tokens cuales existieron. */
+async function autorizacionPorToken(env, token) {
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return null;
+  const i = await env.DB.prepare(
+    "SELECT id, tipo, nombre, email, creada_en, datos FROM inscripciones WHERE token = ?"
+  ).bind(token).first();
+  if (!i || i.tipo !== "voluntario") return null;
+  let x = {};
+  try { x = JSON.parse(i.datos || "{}") || {}; } catch (e) { return null; }
+  if (x.mayor_edad !== false || x.autorizacion_acudiente_pendiente !== true || !x.acudiente) return null;
+  if (x.pasos && x.pasos.acudiente) return null;
+  const vence = venceAutorizacion(x.acudiente_pedida_en || i.creada_en);
+  if (!vence || vence.getTime() <= Date.now()) return null;
+  return { id: i.id, nombre: i.nombre, email: i.email, x, vence };
+}
+
+function cabecerasAutorizacion() {
+  return {
+    "content-type": "text/html; charset=utf-8",
+    "referrer-policy": "no-referrer",
+    /* Sin cache y sin indexar: la URL ES la credencial, igual que en
+       /membresia. Sin un solo script: leer y enviar un formulario no lo pide. */
+    "cache-control": "private, no-store",
+    "x-robots-tag": "noindex, nofollow",
+    "content-security-policy": cspPagina({ script: "'none'", form: "'self'" })
+  };
+}
+
+function paginaAutorizacionNeutra(lang, tema) {
+  const en = lang === "en";
+  const t = en ? "This link is not active" : "Este enlace no está activo";
+  const cuerpo = ""
+    + '  <h1>' + esc(t) + '</h1>\n'
+    + '  <p class="lead">' + esc(en
+        ? "It may have been used already, expired, or be incomplete. If you are the guardian of someone who signed up to volunteer and you still need to authorise it, write to us and a person will help you."
+        : "Puede que ya se haya usado, que haya vencido o que esté incompleto. Si eres acudiente de alguien que se inscribió en el voluntariado y todavía necesitas autorizarlo, escríbenos y una persona te ayuda.") + '</p>\n'
+    + '  <p><a class="card-link" href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></p>\n'
+    + '  <p class="mu" style="margin-top:30px;font-size:var(--fs-13)">Fundación Give&amp;Grow International · NIT 901.948.930-2</p>\n';
+  return cascaraBaja(t, cuerpo, lang, tema);
+}
+
+function paginaAutorizacionHecha(lang, tema) {
+  const en = lang === "en";
+  const t = en ? "Thank you. Your authorisation is recorded" : "Gracias. Quedó registrada tu autorización";
+  const cuerpo = ""
+    + '  <h1>' + esc(t) + '</h1>\n'
+    + '  <p class="lead">' + esc(en
+        ? "From here, someone from Give&Grow gets in touch to organise the volunteering. Before any activity there is still a signed agreement and, for the field, our checks and a preparation session. You can withdraw this authorisation whenever you want by writing to privacidad@thegiveandgrowproject.org."
+        : "Desde aquí, alguien de Give&Grow se pone en contacto para organizar el voluntariado. Antes de cualquier actividad sigue habiendo un acuerdo firmado y, si va a terreno, nuestras verificaciones y una sesión de preparación. Puedes revocar esta autorización cuando quieras escribiendo a privacidad@thegiveandgrowproject.org.") + '</p>\n'
+    + '  <p style="margin-top:20px"><a class="btn btn-g" href="/#voluntariado">' + esc(en ? "About volunteering" : "Sobre el voluntariado") + '</a></p>\n'
+    + '  <p class="mu" style="margin-top:30px;font-size:var(--fs-13)">Fundación Give&amp;Grow International · NIT 901.948.930-2</p>\n';
+  return cascaraBaja(t, cuerpo, lang, tema);
+}
+
+function paginaAutorizacion(a, token, lang, tema, error, previo) {
+  const en = lang === "en";
+  const menor = primerNombre(a.nombre);
+  const T = textosAutorizacion(en, menor);
+  const nivel = (NIVEL_ACU[a.x.nivel] || {})[en ? "en" : "es"] || "";
+  const p = previo || {};
+  const li = (l) => l.map((x) => '      <li>' + esc(x) + '</li>\n').join("");
+  const PAR = en
+    ? { madre: "Mother", padre: "Father", custodia: "Another relative or person with legal custody" }
+    : { madre: "Madre", padre: "Padre", custodia: "Otro familiar o persona con su custodia legal" };
+  const titulo = en ? "Authorise " + menor + "'s sign-up" : "Autoriza la inscripción de " + menor;
+
+  const cuerpo = ""
+    + '  <p class="mu" style="font-size:var(--fs-13)">' + (en
+        ? '<a class="card-link" href="/autorizacion/' + esc(token) + '">Español</a>'
+        : '<a class="card-link" href="/autorizacion/' + esc(token) + '?lang=en">English</a>') + '</p>\n'
+    + '  <h1>' + esc(titulo) + '</h1>\n'
+    + '  <p class="lead">' + esc(en
+        ? menor + " signed up to volunteer with Give&Grow and gave us your contact as their guardian. Because " + menor + " is under 18, we need your authorisation before we can keep their details."
+        : menor + " se inscribió en el voluntariado de Give&Grow y nos dejó tu contacto como su acudiente. Como " + menor + " es menor de edad, necesitamos tu autorización antes de poder guardar sus datos.") + '</p>\n'
+    + (error ? '  <p class="lead" role="alert" style="color:var(--err)">' + esc(error) + '</p>\n' : '')
+    + '  <section class="card" style="margin-top:22px;padding:20px">\n'
+    + '    <h2 style="margin-top:0">' + esc(en ? "Who we are" : "Quiénes somos") + '</h2>\n'
+    + '    <p>' + esc(T.quienes) + '</p>\n'
+    + '    <p><strong>' + esc(en ? "What " + menor + " signed up for:" : "A qué se inscribió " + menor + ":") + '</strong> ' + esc(nivel) + '</p>\n'
+    + '    <h2>' + esc(en ? "What we hold" : "Lo que tenemos") + '</h2>\n'
+    + '    <ul>\n' + li(T.datos) + '    </ul>\n'
+    + '    <p class="mu">' + esc(T.noDatos) + '</p>\n'
+    + '    <h2>' + esc(en ? "What for" : "Para qué") + '</h2>\n'
+    + '    <ul>\n' + li(T.fines) + '    </ul>\n'
+    + '    <p class="mu">' + esc(T.noFines) + '</p>\n'
+    + '    <h2>' + esc(en ? "Why we ask you" : "Por qué te lo pedimos") + '</h2>\n'
+    + '    <p>' + esc(T.base) + '</p>\n'
+    + '    <p class="mu">' + esc(T.plazo) + ' ' + esc(en ? "This link is valid until " + fechaLarga(a.vence, true) + "." : "Este enlace vale hasta el " + fechaLarga(a.vence, false) + ".") + '</p>\n'
+    + '  </section>\n'
+    + '  <form method="POST" action="/autorizacion/' + esc(token) + '" class="card ally-form" style="margin-top:22px;padding:20px">\n'
+    + '    <div class="field">\n'
+    + '      <label for="au-nombre">' + esc(en ? "Your full name" : "Tu nombre completo") + '</label>\n'
+    + '      <input id="au-nombre" name="nombre" type="text" required maxlength="120" autocomplete="name" value="' + esc(p.nombre || "") + '">\n'
+    + '    </div>\n'
+    + '    <div class="field">\n'
+    + '      <label for="au-parentesco">' + esc(en ? "Your relationship to " + menor : "Tu relación con " + menor) + '</label>\n'
+    + '      <select id="au-parentesco" name="parentesco" required>\n'
+    + '        <option value="">' + esc(en ? "Choose one" : "Elige una") + '</option>\n'
+    + PARENTESCOS_ACU.map((k) => '        <option value="' + k + '"' + (p.parentesco === k ? " selected" : "") + '>' + esc(PAR[k]) + '</option>\n').join("")
+    + '      </select>\n'
+    + '    </div>\n'
+    + '    <label class="ally-check"><input type="checkbox" name="autorizo" value="si" required><span>' + esc(T.autorizo) + '</span></label>\n'
+    + '    <input type="hidden" name="lang" value="' + (en ? "en" : "es") + '">\n'
+    + '    <p style="margin-top:16px"><button class="btn btn-g" type="submit">' + esc(en ? "Authorise" : "Autorizar") + '</button></p>\n'
+    + '  </form>\n'
+    + '  <p class="mu" style="margin-top:22px">' + esc(en
+        ? "If you do not want to authorise it, you do not need to do anything: the registration is deleted when the link expires. If you want it deleted now, write to privacidad@thegiveandgrowproject.org."
+        : "Si no quieres autorizarlo, no tienes que hacer nada: la inscripción se borra cuando vence el enlace. Si quieres que la borremos ya, escribe a privacidad@thegiveandgrowproject.org.") + '</p>\n'
+    + '  <p class="mu" style="margin-top:30px;font-size:var(--fs-13)">Fundación Give&amp;Grow International · NIT 901.948.930-2 · Medellín</p>\n';
+  return cascaraBaja(titulo, cuerpo, lang, tema);
+}
+
+/* GET y POST /autorizacion/<token>. El POST llega de un FORMULARIO sin
+   JavaScript, asi que responde con paginas y redirecciones, no con JSON. */
+async function rutaAutorizacion(request, env, resto, url) {
+  const tema = temaPorReloj(request);
+  const qlang = url.searchParams.get("lang");
+  const neutra = (lg) => new Response(paginaAutorizacionNeutra(lg, tema), { status: 404, headers: cabecerasAutorizacion() });
+  if (!env.DB) return new Response("No disponible", { status: 503 });
+
+  const token = String(resto || "").replace(/\/+$/, "");
+  if (token === "listo") {
+    return new Response(paginaAutorizacionHecha(qlang === "en" ? "en" : "es", tema), { headers: cabecerasAutorizacion() });
+  }
+  if (request.method !== "GET" && request.method !== "POST") {
+    return new Response("Método no permitido", { status: 405, headers: { allow: "GET, POST" } });
+  }
+
+  const a = await autorizacionPorToken(env, token);
+  const lang = qlang === "en" || qlang === "es" ? qlang : (a && a.x.idioma === "en" ? "en" : "es");
+  if (request.method === "GET") {
+    if (!a) return neutra(lang);
+    return new Response(paginaAutorizacion(a, token, lang, tema), { headers: cabecerasAutorizacion() });
+  }
+
+  let f;
+  try { f = await request.formData(); } catch { return neutra(lang); }
+  const lg = f.get("lang") === "en" ? "en" : "es";
+  if (!a) return neutra(lg);
+  const en = lg === "en";
+  const nombre = limpiar(f.get("nombre"), 120);
+  const parentesco = PARENTESCOS_ACU.includes(String(f.get("parentesco") || "")) ? String(f.get("parentesco")) : "";
+  const autorizo = f.get("autorizo") === "si";
+  const falta = !nombre ? (en ? "Write your full name." : "Escribe tu nombre completo.")
+              : !parentesco ? (en ? "Choose your relationship." : "Elige tu relación con quien se inscribió.")
+              : !autorizo ? (en ? "To authorise, tick the box with the authorisation text." : "Para autorizar, marca la casilla con el texto de la autorización.")
+              : "";
+  if (falta) {
+    return new Response(paginaAutorizacion(a, token, lg, tema, falta, { nombre, parentesco }),
+      { status: 400, headers: cabecerasAutorizacion() });
+  }
+
+  /* UNA SOLA ESCRITURA Y CONDICIONADA. Marca el paso, apaga el pendiente,
+     guarda quien autorizo y ANULA el token, todo a la vez; y solo si la fila
+     sigue pendiente con ese mismo token. Dos envios seguidos (doble clic, o el
+     acudiente y el equipo a la vez) no dejan dos autorizaciones: el segundo
+     encuentra `changes = 0` y ve la pagina neutra.
+     El nombre y el parentesco del acudiente viven en la FILA de la inscripcion,
+     no en `consentimientos`: asi se van con ella si se suprime, que es el
+     criterio de `anotarAutorizacion`. */
+  const r = await env.DB.prepare(
+    "UPDATE inscripciones SET token = NULL, actualizada_en = datetime('now'), datos = json_set(COALESCE(datos, '{}'), " +
+    "'$.pasos.acudiente', json_object('en', datetime('now'), 'por', 'acudiente'), " +
+    "'$.autorizacion_acudiente_pendiente', json('false'), " +
+    "'$.acudiente.autorizo', json_object('nombre', ?, 'parentesco', ?, 'en', datetime('now'), 'version', ?)) " +
+    "WHERE id = ? AND token = ? AND tipo = 'voluntario' AND json_extract(datos, '$.autorizacion_acudiente_pendiente') = 1"
+  ).bind(nombre, parentesco, AUT_ACU_VERSION, a.id, token).run();
+  if (!r.meta || r.meta.changes !== 1) return neutra(lg);
+
+  await recalcularListoVoluntario(env, a.id);
+  await anotarAutorizacion(env, a.id, "voluntario_acudiente", AUT_ACU_VERSION + " · " + parentesco);
+  try {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES ('acudiente', 'auditoria', ?)"
+    ).bind("voluntario " + a.id + " · paso «acudiente» marcado por el acudiente desde su enlace").run();
+  } catch (e) { console.error("auditoria acudiente", a.id, e && e.message); }
+
+  /* Los correos no pueden deshacer la autorizacion: ya quedo escrita. */
+  try {
+    const c = contactoAcudiente(a.x.acudiente.contacto);
+    if (c && c.tipo === "email") await correoAutorizacionConfirmada(env, { para: c.valor, nombre: a.nombre, acudiente: nombre, idioma: lg });
+  } catch (e) { console.error("correo confirmacion acudiente", e && e.message); }
+  try {
+    await correoAvisoAutorizacion(env, { id: a.id, nombre: a.nombre, parentesco });
+  } catch (e) { console.error("aviso autorizacion acudiente", e && e.message); }
+
+  return Response.redirect(ORIGIN + "/autorizacion/listo?lang=" + lg, 303);
+}
+
+async function correoAutorizacionConfirmada(env, v) {
+  const en = v.idioma === "en";
+  const menor = primerNombre(v.nombre);
+  const hoy = fechaLarga(new Date(), en);
+  const titulo = en ? "Your authorisation is recorded" : "Quedó registrada tu autorización";
+  const parrafos = en ? [
+    "Thank you, " + primerNombre(v.acudiente) + ". On " + hoy + " you authorised Give&Grow to process " + menor + "'s details for their volunteering, under Ley 1581 de 2012.",
+    "From here, someone from our team gets in touch to organise it. Before any activity there is still a signed agreement and, for the field, our checks and a preparation session.",
+    "You can access, correct or ask us to delete these details, and withdraw this authorisation, whenever you want."
+  ] : [
+    "Gracias, " + primerNombre(v.acudiente) + ". El " + hoy + " autorizaste a Give&Grow a tratar los datos de " + menor + " para su voluntariado, conforme a la Ley 1581 de 2012.",
+    "Desde aquí, alguien de nuestro equipo se pone en contacto para organizarlo. Antes de cualquier actividad sigue habiendo un acuerdo firmado y, si va a terreno, nuestras verificaciones y una sesión de preparación.",
+    "Puedes consultar, corregir o pedirnos que borremos estos datos, y revocar esta autorización, cuando quieras."
+  ];
+  const cierre = "privacidad@thegiveandgrowproject.org";
+  return enviarCorreo(env, {
+    para: v.para,
+    asunto: en ? "Authorisation recorded: " + menor + "'s volunteering" : "Autorización registrada: el voluntariado de " + menor,
+    texto: [titulo, "", ...parrafos, "", cierre].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, cierre }),
+    etiqueta: "autorizacion-acudiente-confirmada"
+  });
+}
+
+/* Aviso interno: sin el nombre del acudiente, que ya esta en la fila. */
+async function correoAvisoAutorizacion(env, v) {
+  const para = correoAlianzas(env);
+  if (!para) return avisoSinBuzon(env, "aviso-autorizacion-acudiente");
+  const par = { madre: "la madre", padre: "el padre", custodia: "otro familiar o persona con su custodia" }[v.parentesco] || "?";
+  const titulo = "Autorizó el acudiente: " + v.nombre;
+  const parrafos = [
+    "El acudiente de " + v.nombre + " (voluntario #" + v.id + ", menor de edad) autorizó el tratamiento de sus datos desde su enlace. Lo hizo " + par + ".",
+    "El paso «Autorización del acudiente» quedó marcado solo. Ya se le pueden pedir los datos que faltan —celular, disponibilidad— en la primera conversación, que es con su acudiente."
+  ];
+  return enviarCorreo(env, {
+    para,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, cierre: "Está en el panel, en «Quién quiere entrar»." }),
+    etiqueta: "aviso-autorizacion-acudiente"
+  });
+}
+
+/* EL CRON: enlaces que faltan, recordatorio del dia 7 y supresion del dia 30.
+   Idempotente por construccion: cada paso filtra por lo que el anterior dejo
+   escrito (`token`, `acudiente_recordado_en`) o por la fila que ya no existe.
+   Tope de 50 por paso y por dia: hoy son unas pocas filas, y un tope evita que
+   un dia raro se coma el tiempo del `scheduled` que comparten otras tareas. */
+async function vencerAutorizacionesAcudiente(env) {
+  if (!env.DB) return { omitido: "sin_base" };
+  const pend = "FROM inscripciones WHERE tipo = 'voluntario' " +
+    "AND json_extract(datos, '$.autorizacion_acudiente_pendiente') = 1 " +
+    "AND json_extract(datos, '$.pasos.acudiente') IS NULL";
+  const pedida = "COALESCE(json_extract(datos, '$.acudiente_pedida_en'), creada_en)";
+  const out = { enlaces: 0, suprimidas: 0, recordatorios: 0 };
+
+  /* 1. LAS DE ANTES DE ESTE FLUJO (28 y 29 sep 2026) no tienen enlace: se les
+        genera y su plazo empieza hoy. Sin esto el paso 3 las borraria sin que su
+        acudiente hubiera recibido nada. Tambien cubre una que el panel reabrio
+        desmarcando el paso despues de usado el enlace. */
+  const sinEnlace = await env.DB.prepare(
+    "SELECT id, nombre, datos " + pend + " AND token IS NULL LIMIT 50").all();
+  for (const f of sinEnlace.results || []) {
+    let x = {};
+    try { x = JSON.parse(f.datos || "{}") || {}; } catch (e) { continue; }
+    const tok = tokenNuevo();
+    const ahora = ahoraSQL();
+    const u = await env.DB.prepare(
+      "UPDATE inscripciones SET token = ?, datos = json_set(datos, '$.acudiente_pedida_en', ?) WHERE id = ? AND token IS NULL"
+    ).bind(tok, ahora, f.id).run();
+    if (!u.meta || u.meta.changes !== 1) continue;
+    out.enlaces++;
+    const c = contactoAcudiente(x.acudiente && x.acudiente.contacto);
+    if (c && c.tipo === "email") {
+      try {
+        await correoAutorizacionAcudiente(env, { id: f.id, nombre: f.nombre, nivel: x.nivel, acudiente: x.acudiente,
+          para: c.valor, token: tok, idioma: x.idioma, pedida: ahora });
+      } catch (e) { console.error("enlace acudiente", f.id, e && e.message); }
+    }
+  }
+
+  /* 2. VENCIDAS: la supresion de Ley 1581, con la misma funcion del panel. */
+  const vencidas = await env.DB.prepare(
+    "SELECT id " + pend + " AND " + pedida + " <= datetime('now', '-" + AUT_ACU_DIAS + " days') LIMIT 50").all();
+  for (const f of vencidas.results || []) {
+    try {
+      const s = await suprimirInscripcion(env, f.id, "cron",
+        "sin autorización del acudiente en " + AUT_ACU_DIAS + " días (Ley 1581 art. 7; decisión del 29 sep 2026)");
+      if (s) out.suprimidas++;
+    } catch (e) { console.error("suprimir sin autorizacion", f.id, e && e.message); }
+  }
+
+  /* 3. UN recordatorio, al dia 7, solo a quien dejo correo. Se anota despues de
+        un envio que salio (o simulado): si Resend falla, se reintenta manana. */
+  const recordar = await env.DB.prepare(
+    "SELECT id, nombre, datos, token " + pend + " AND token IS NOT NULL " +
+    "AND json_extract(datos, '$.acudiente_recordado_en') IS NULL " +
+    "AND json_extract(datos, '$.acudiente.contacto') LIKE '%@%' " +
+    "AND " + pedida + " <= datetime('now', '-" + AUT_ACU_RECORDATORIO_DIAS + " days') " +
+    "AND " + pedida + " > datetime('now', '-" + AUT_ACU_DIAS + " days') LIMIT 50").all();
+  for (const f of recordar.results || []) {
+    let x = {};
+    try { x = JSON.parse(f.datos || "{}") || {}; } catch (e) { continue; }
+    const c = contactoAcudiente(x.acudiente && x.acudiente.contacto);
+    if (!c || c.tipo !== "email") continue;
+    try {
+      const r = await correoAutorizacionAcudiente(env, { id: f.id, nombre: f.nombre, nivel: x.nivel, acudiente: x.acudiente,
+        para: c.valor, token: f.token, idioma: x.idioma, pedida: x.acudiente_pedida_en, recordatorio: true });
+      if (r && r.ok) {
+        await env.DB.prepare(
+          "UPDATE inscripciones SET datos = json_set(datos, '$.acudiente_recordado_en', datetime('now')) WHERE id = ?"
+        ).bind(f.id).run();
+        out.recordatorios++;
+      }
+    } catch (e) { console.error("recordatorio acudiente", f.id, e && e.message); }
+  }
+  return out;
 }
 
 /* ========================================================================
@@ -13689,7 +14263,34 @@ async function adminInscripciones(env, url) {
     "AND COALESCE(json_extract(datos, '$.matricula_verificada'), 0) <> 1"
   ).first();
 
-  return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0,
+  /* EL ESTADO DE LA AUTORIZACION DEL ACUDIENTE, ya armado (29 sep 2026): el
+     vencimiento, el enlace y el texto de WhatsApp salen de aqui porque el panel
+     no puede interpolar la URL del sitio (regla de `adminJS`), y asi la fecha
+     que ve el equipo es la misma que decide el cron. */
+  const filas = (r.results || []).map((i) => {
+    if (i.tipo !== "voluntario") return i;
+    let x = {};
+    try { x = JSON.parse(i.datos || "{}") || {}; } catch (e) { return i; }
+    if (x.mayor_edad !== false || !x.acudiente) return i;
+    const paso = x.pasos && x.pasos.acudiente;
+    if (paso) {
+      return { ...i, autorizacion: { estado: "autorizada", en: paso.en, por: paso.por || "?",
+        parentesco: (x.acudiente.autorizo && x.acudiente.autorizo.parentesco) || "" } };
+    }
+    const vence = venceAutorizacion(x.acudiente_pedida_en || i.creada_en);
+    const c = contactoAcudiente(x.acudiente.contacto);
+    return { ...i, autorizacion: {
+      estado: "pendiente",
+      vence: vence ? vence.toISOString().slice(0, 10) : "",
+      canal: c ? c.tipo : "",
+      tel: c && c.tipo === "tel" ? c.valor : "",
+      url: i.token ? urlAutorizacion(i.token, x.idioma) : "",
+      whatsapp: i.token && c && c.tipo === "tel" ? mensajeWhatsAppAcudiente(i.nombre, i.token, x.idioma, vence) : "",
+      recordado: x.acudiente_recordado_en || ""
+    } };
+  });
+
+  return json({ inscripciones: filas, total: (tot && tot.n) || 0,
                 tope: TOPE_COLA, desde, tipo,
                 pendiente: soloSinVerificar ? "matricula" : soloSinResponder ? "respuesta" : "",
                 sinVerificar: (pend && pend.n) || 0 });
@@ -13990,6 +14591,22 @@ function pasosRequeridos(x) {
   return p;
 }
 
+/* `listo` y el pendiente del acudiente son CONSECUENCIA de los pasos, y los
+   recalcula siempre el servidor. Aparte desde el 29 sep 2026 porque hay dos
+   caminos que marcan el paso «acudiente»: el panel (en papel, con el correo de
+   quien lo marca) y el enlace del propio acudiente. */
+async function recalcularListoVoluntario(env, id) {
+  const g = await env.DB.prepare("SELECT datos FROM inscripciones WHERE id = ?").bind(id).first();
+  let y = {};
+  try { y = JSON.parse((g && g.datos) || "{}") || {}; } catch (e) { /* nada */ }
+  const pasos = y.pasos || {};
+  const listo = pasosRequeridos(y).every(k => pasos[k]);
+  await env.DB.prepare(
+    "UPDATE inscripciones SET datos = json_set(datos, '$.listo', json(?), '$.autorizacion_acudiente_pendiente', json(?)) WHERE id = ?"
+  ).bind(listo ? "true" : "false", y.mayor_edad === false && !pasos.acudiente ? "true" : "false", id).run();
+  return { pasos, listo };
+}
+
 /* POST /api/admin/inscripcion/<id>/paso  { paso, hecho } */
 async function adminPasoVoluntario(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
@@ -14021,14 +14638,7 @@ async function adminPasoVoluntario(request, env, id, quien) {
       "UPDATE inscripciones SET datos = json_remove(COALESCE(datos, '{}'), '$.pasos.' || ?), actualizada_en = datetime('now') WHERE id = ?"
     ).bind(paso, id).run();
   }
-  const g = await env.DB.prepare("SELECT datos FROM inscripciones WHERE id = ?").bind(id).first();
-  let y = {};
-  try { y = JSON.parse((g && g.datos) || "{}") || {}; } catch (e) { /* nada */ }
-  const pasos = y.pasos || {};
-  const listo = pasosRequeridos(y).every(k => pasos[k]);
-  await env.DB.prepare(
-    "UPDATE inscripciones SET datos = json_set(datos, '$.listo', json(?), '$.autorizacion_acudiente_pendiente', json(?)) WHERE id = ?"
-  ).bind(listo ? "true" : "false", y.mayor_edad === false && !pasos.acudiente ? "true" : "false", id).run();
+  const { pasos, listo } = await recalcularListoVoluntario(env, id);
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "voluntario " + id + " · paso «" + paso + "» " + (c.hecho ? "marcado" : "desmarcado") + (listo ? " · LISTO" : "")).run();
@@ -14170,10 +14780,23 @@ async function adminBorrarInscripcion(request, env, id, quien) {
                   ayuda: "Escribe por que se borra. Es lo unico que va a quedar de esta fila." }, 400);
   }
 
+  const r = await suprimirInscripcion(env, id, quien, motivo);
+  if (!r) return json({ error: "no_encontrada" }, 404);
+  return json({ ok: true, id, suprimida: true,
+                ...(r.archivosPendientes ? { aviso: "archivos_pendientes",
+                  ayuda: "Se borro de la base, pero los archivos del cuestionario (fichas/" + id + "/) no se pudieron borrar de R2. Hay que borrarlos a mano." } : {}) });
+}
+
+/* LA SUPRESION EN SI, aparte del endpoint desde el 29 sep 2026: la usan el
+   boton «Suprimir» del panel y el cron que borra a los menores cuyo acudiente
+   no autorizo en 30 dias. Una sola funcion para que las dos supresiones borren
+   exactamente lo mismo y dejen la misma linea de auditoria sin datos. Devuelve
+   null si la fila no existe. */
+async function suprimirInscripcion(env, id, quien, motivo) {
   /* Se lee ANTES de borrar el tipo —lo unico que la auditoria conserva— y el
      correo, que no se guarda: sirve para encontrar las otras filas donde vive. */
-  const f = await env.DB.prepare("SELECT id, tipo, email FROM inscripciones WHERE id = ?").bind(id).first();
-  if (!f) return json({ error: "no_encontrada" }, 404);
+  const f = await env.DB.prepare("SELECT id, tipo, email, datos FROM inscripciones WHERE id = ?").bind(id).first();
+  if (!f) return null;
 
   /* TODO O NADA, Y TODO LO QUE ES SUYO. Hasta el 28 sep 2026 eran dos DELETE
      sueltos: primero los consentimientos, despues la fila. Con una fundacion
@@ -14196,6 +14819,17 @@ async function adminBorrarInscripcion(request, env, id, quien) {
   if (correo) {
     pasos.push(env.DB.prepare("DELETE FROM consentimientos WHERE LOWER(sujeto) = ?").bind(correo));
     pasos.push(env.DB.prepare("DELETE FROM correos WHERE LOWER(para) = ? AND guia IS NULL").bind(correo));
+  }
+  /* El correo del ACUDIENTE de un menor tambien quedo en `correos`: el enlace,
+     el recordatorio, la confirmacion. Solo esas filas, por su etiqueta: el
+     acudiente puede ser a su vez donante o voluntario, y lo suyo no se toca. */
+  let xs = {};
+  try { xs = JSON.parse(f.datos || "{}") || {}; } catch (e) { /* nada */ }
+  const acu = xs.acudiente ? contactoAcudiente(xs.acudiente.contacto) : null;
+  if (acu && acu.tipo === "email") {
+    pasos.push(env.DB.prepare(
+      "DELETE FROM correos WHERE LOWER(para) = ? AND etiqueta LIKE 'autorizacion-acudiente%' AND guia IS NULL"
+    ).bind(acu.valor.toLowerCase()));
   }
   pasos.push(env.DB.prepare("DELETE FROM inscripciones WHERE id = ?").bind(id));
   await env.DB.batch(pasos);
@@ -14225,9 +14859,7 @@ async function adminBorrarInscripcion(request, env, id, quien) {
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "inscripcion " + id + " (" + (f.tipo || "?") + ") SUPRIMIDA · " + motivo).run();
 
-  return json({ ok: true, id, suprimida: true,
-                ...(archivosPendientes ? { aviso: "archivos_pendientes",
-                  ayuda: "Se borro de la base, pero los archivos del cuestionario (fichas/" + id + "/) no se pudieron borrar de R2. Hay que borrarlos a mano." } : {}) });
+  return { id, tipo: f.tipo, archivosPendientes };
 }
 
 /* ========================================================================
@@ -16170,11 +16802,15 @@ function celdaCert(a){
 
 /* El celular del donante, con WhatsApp a un clic: para eso se empezo a pedir
    (28 sep 2026). Un celular colombiano de 10 digitos recibe el 57 delante. */
+function waDig(tel){
+  var dig = String(tel || "").replace(/[^0-9]/g, "");
+  if (dig.length === 10 && dig.charAt(0) === "3") dig = "57" + dig;
+  return dig.length >= 11 && dig.length <= 15 ? dig : "";
+}
 function celDonante(tel){
   if (!tel) return "";
-  var dig = String(tel).replace(/[^0-9]/g, "");
-  if (dig.length === 10 && dig.charAt(0) === "3") dig = "57" + dig;
-  return "<br><small>" + esc(tel) + (dig.length >= 11 && dig.length <= 15
+  var dig = waDig(tel);
+  return "<br><small>" + esc(tel) + (dig
     ? ' · <a href="https://wa.me/' + dig + '" target="_blank" rel="noopener">WhatsApp</a>' : "") + "</small>";
 }
 function pintarFilas(l){
@@ -17080,6 +17716,32 @@ function pasosDe(x){
   if (x.mayor_edad === false) p.push("acudiente");
   return p;
 }
+/* LA AUTORIZACION DEL ACUDIENTE, en la fila y en CUALQUIER estado (29 sep
+   2026): mientras falte, la inscripcion tiene fecha de borrado, y eso se ve
+   tambien en una «nueva». El servidor manda el estado ya armado. Si el
+   acudiente dejo celular, el WhatsApp lleva el enlace escrito y lo manda una
+   persona; la autorizacion en papel se sigue marcando en la lista de pasos. */
+var PAR_ES = { madre:"la madre", padre:"el padre", custodia:"familiar o custodio" };
+function autorizacionAcudiente(a){
+  if (!a) return "";
+  if (a.estado === "autorizada"){
+    return '<br><small><strong>Autorización del acudiente:</strong> autorizada el ' + esc(enCO(a.en, 10))
+      + (a.por === "acudiente" ? " desde su enlace" + (a.parentesco ? " (" + esc(PAR_ES[a.parentesco] || a.parentesco) + ")" : "")
+                               : " · marcada por " + esc(a.por)) + "</small>";
+  }
+  var h = '<br><small><strong style="color:#A84D00">Autorización del acudiente: pendiente</strong>'
+    + (a.vence ? " (vence el " + esc(a.vence) + "; ese día se borra)" : "");
+  if (a.canal === "email") h += " · enlace enviado por correo" + (a.recordado ? " · recordado el " + esc(enCO(a.recordado, 10)) : "");
+  var dig = a.canal === "tel" ? waDig(a.tel) : "";
+  if (dig && a.whatsapp){
+    h += ' · <a href="https://wa.me/' + dig + '?text=' + encodeURIComponent(a.whatsapp) + '" target="_blank" rel="noopener">enviarle el enlace por WhatsApp</a>';
+  } else if (a.canal !== "email"){
+    h += " · hay que enviarle el enlace a mano";
+  }
+  if (a.url) h += ' · <a href="' + esc(a.url) + '" target="_blank" rel="noopener">enlace</a>';
+  else h += " · el enlace nuevo lo genera el cron de mañana";
+  return h + "</small>";
+}
 /* La lista, en la fila. Solo cuando ya hubo conversación (en revisión o
    aceptada): antes no hay nada que verificar, y archivada ya no importa. */
 function listaVoluntario(i, x){
@@ -17117,6 +17779,7 @@ function resumenInscripcion(tipo, x, i){
     var menor = x.mayor_edad === false && x.acudiente
       ? '<br><strong style="color:#A84D00">Menor de edad</strong> <small>· acudiente: ' + esc(x.acudiente.nombre || "?")
         + " (" + esc(x.acudiente.contacto || "?") + ") · " + (x.acudiente.modo === "acompana" ? "viene con él/ella" : "viene con su autorización") + "</small>"
+        + (i ? autorizacionAcudiente(i.autorizacion) : "")
       : "";
     return p.join(" · ") + menor + (i ? listaVoluntario(i, x) : "");
   }
@@ -17334,7 +17997,9 @@ function cargarInscripciones(){
                  : (i.estado === "aceptada" || i.estado === "visitada") ? ["archivada","Archivar"] : null;
       /* El enlace del cuestionario se muestra para poder reenviarlo a mano si el
          correo no llego: el token ya existe y esconderlo no lo hace mas secreto. */
-      var ficha = (i.estado === "visitada" && i.token)
+      /* «esFund» desde el 29 sep 2026: el token de un voluntario menor es el
+         de la autorizacion de su acudiente, no un cuestionario. */
+      var ficha = (esFund && i.estado === "visitada" && i.token)
         ? '<br><small><a href="/ficha/' + esc(i.token) + '" target="_blank" rel="noopener">enlace</a>' +
           (i.ficha_estado
             ? ' · <button class="copy" data-verficha="' + i.id + '">ver respuestas (' + esc(i.ficha_estado) + ")</button>"
@@ -20895,6 +21560,16 @@ export default {
       } catch (e) {
         console.error("resumen diario", e && e.message);
       }
+      /* Autorizaciones de acudientes (29 sep 2026): enlaces que faltan, el
+         recordatorio del dia 7 y la supresion del dia 30. En su propio try y al
+         final: borrar lo que no se autorizo no puede depender de nada de arriba,
+         ni lo de arriba de esto. */
+      try {
+        const au = await vencerAutorizacionesAcudiente(env);
+        console.log("autorizaciones acudiente", JSON.stringify(au));
+      } catch (e) {
+        console.error("autorizaciones acudiente", e && e.message);
+      }
     })());
   },
 
@@ -21222,6 +21897,15 @@ export default {
       return respuestaPedirEnlace(lg, false, request);
     }
     if (ruta.startsWith("/membresia/")) return await rutaMembresia(env, ruta.slice(11), url, request);
+
+    /* La autorizacion del acudiente de un menor (29 sep 2026). PUBLICA por la
+       misma razon que /membresia: al otro lado hay un padre o una madre sin
+       sesion, y su credencial es el token de 128 bits de la URL. Atrapa
+       cualquier /autorizacion/… y valida dentro: un enlace mal copiado ve la
+       pagina neutra, no la portada de la SPA. */
+    if (ruta === "/autorizacion" || ruta.startsWith("/autorizacion/")) {
+      return await rutaAutorizacion(request, env, ruta.slice(14), url);
+    }
     if (ruta === "/api/pago/baja")        return await apiBajaMembresia(request, env, url);
     if (ruta === "/api/pago/baja-enlace") return await apiBajaEnlace(request, env, url);
 

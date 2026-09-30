@@ -1016,7 +1016,7 @@ var I18N = {
     "vf.edad.lbl":"¿Tienes 18 años o más?",
     "vf.edad.si":"Sí",
     "vf.edad.no":"No, soy menor de edad",
-    "vf.menor.aviso":"Vienes con tu acudiente o con su autorización firmada. La ley protege de forma especial los datos de un menor, así que antes de cualquier actividad le pedimos a tu acudiente que autorice este registro por escrito.",
+    "vf.menor.aviso":"Vienes con tu acudiente o con su autorización firmada. La ley protege de forma especial los datos de un menor: tu acudiente recibe un enlace para autorizar esta inscripción —por correo, o por WhatsApp de nuestro equipo si nos dejas su celular— y sin su autorización la borramos a los 30 días. Hasta entonces guardamos solo lo mínimo: tu celular, tu ciudad, tu disponibilidad y tu mensaje no los guardamos.",
     "vf.acu.nombre":"Nombre de tu acudiente",
     "vf.acu.contacto":"Correo o teléfono de tu acudiente",
     "vf.acu.acompana":"Vendré con mi acudiente",
@@ -1026,6 +1026,8 @@ var I18N = {
     "vf.err.acu":"Necesitamos el nombre y un contacto de tu acudiente.",
     "vf.err.acu.modo":"Dinos si vendrás con tu acudiente o con su autorización firmada.",
     "vf.err.acu.sabe":"Tu acudiente tiene que saber que te estás inscribiendo.",
+    "vf.err.acu.contacto":"Escribe el correo o el celular de tu acudiente: por ahí le llega el enlace para autorizar.",
+    "vf.err.acu.propio":"El contacto de tu acudiente no puede ser tu mismo correo o celular.",
     "rep.tel":"Celular o WhatsApp",
     "mi.tel":"Celular o WhatsApp, con el código de tu país",
     "form.err.tel":"Déjanos un celular o WhatsApp: es por donde te escribimos más rápido.",
@@ -1101,6 +1103,7 @@ var I18N = {
     "vf.submit":"Enviar mis datos",
     "vf.sending":"Enviando…",
     "vf.ok":"Listo. Te escribimos pronto al correo que dejaste, y ahí te contamos los siguientes pasos.",
+    "vf.ok.menor":"Listo. Tu acudiente va a recibir el enlace para autorizar tu inscripción; sin su autorización, la borramos a los 30 días. Te escribimos al correo que dejaste.",
     "vf.err.nombre":"Nos falta tu nombre.",
     "vf.err.email":"Revisa el correo: parece que tiene algo raro.",
     "vf.err.nivel":"Elige cómo quieres participar.",
@@ -6810,7 +6813,12 @@ function volEdad(){
   setTimeout(function(){
     var e = document.querySelector('input[name="vf-edad"]:checked');
     var box = document.getElementById("vf-menor");
-    if (box) box.style.display = (e && e.value === "no") ? "" : "none";
+    var menor = e && e.value === "no";
+    if (box) box.style.display = menor ? "" : "none";
+    /* De un menor no se guarda el celular hasta que su acudiente autorice
+       (29 sep 2026): no se le puede exigir un campo que no vamos a guardar. */
+    var tel = document.getElementById("vf-tel");
+    if (tel) tel.required = !menor;
   }, 0);
 }
 
@@ -6855,15 +6863,25 @@ function volSubmit(ev){
   var nivelEl = document.querySelector('input[name="vf-nivel"]:checked');
   if (!val("vf-nombre")) return allyMal(note, "vf-nombre", "vf.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("vf-email"))) return allyMal(note, "vf-email", "vf.err.email");
-  if (!telOk(val("vf-tel"))) return allyMal(note, "vf-tel", "form.err.tel");
-  if (!nivelEl) return allyMal(note, document.querySelector('input[name="vf-nivel"]'), "vf.err.nivel");
   var edadEl = document.querySelector('input[name="vf-edad"]:checked');
+  var menor = !!edadEl && edadEl.value === "no";
+  if (!menor && !telOk(val("vf-tel"))) return allyMal(note, "vf-tel", "form.err.tel");
+  if (!nivelEl) return allyMal(note, document.querySelector('input[name="vf-nivel"]'), "vf.err.nivel");
   if (!edadEl) return allyMal(note, document.querySelector('input[name="vf-edad"]'), "vf.err.edad");
-  var menor = edadEl.value === "no";
   var acuModo = document.querySelector('input[name="vf-acu-modo"]:checked');
   if (menor){
     if (!val("vf-acu-nombre")) return allyMal(note, "vf-acu-nombre", "vf.err.acu");
     if (!val("vf-acu-contacto")) return allyMal(note, "vf-acu-contacto", "vf.err.acu");
+    /* Por ese contacto le llega el enlace para autorizar: tiene que ser un
+       correo o un celular, y no el del propio menor. Misma regla que el
+       servidor (contactoAcudiente en worker.js). */
+    var acuC = val("vf-acu-contacto");
+    var acuMail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(acuC);
+    if (!acuMail && !telOk(acuC)) return allyMal(note, "vf-acu-contacto", "vf.err.acu.contacto");
+    var dig = function(v){ return String(v || "").replace(/[^0-9]/g, "").slice(-10); };
+    if ((acuMail && acuC.toLowerCase() === val("vf-email").toLowerCase()) ||
+        (!acuMail && dig(val("vf-tel")) && dig(acuC) === dig(val("vf-tel"))))
+      return allyMal(note, "vf-acu-contacto", "vf.err.acu.propio");
     if (!acuModo) return allyMal(note, document.querySelector('input[name="vf-acu-modo"]'), "vf.err.acu.modo");
     if (!chk("vf-acu-sabe")) return allyMal(note, "vf-acu-sabe", "vf.err.acu.sabe");
   }
@@ -6880,12 +6898,14 @@ function volSubmit(ev){
       tipo: "voluntario",
       nombre: val("vf-nombre"),
       email: val("vf-email"),
-      telefono: val("vf-tel"),
-      ciudad: val("vf-ciudad"),
+      /* De un menor, hasta que su acudiente autorice, no sale del navegador
+         nada que no haga falta para pedirle esa autorizacion (29 sep 2026). */
+      telefono: menor ? "" : val("vf-tel"),
+      ciudad: menor ? "" : val("vf-ciudad"),
       nivel: nivelEl.value,
       oficio: val("vf-oficio"),
-      disponibilidad: val("vf-disp"),
-      mensaje: val("vf-msg"),
+      disponibilidad: menor ? "" : val("vf-disp"),
+      mensaje: menor ? "" : val("vf-msg"),
       captura: chk("vf-captura"),
       mayor_edad: !menor,
       acudiente_nombre: menor ? val("vf-acu-nombre") : "",
@@ -6905,7 +6925,7 @@ function volSubmit(ev){
       VOL_ORIGEN = null;
       var av = document.getElementById("vf-origen"); if (av) av.style.display = "none";
       btn.disabled = false;
-      allyMsg(note, t("vf.ok"), true);
+      allyMsg(note, t(menor ? "vf.ok.menor" : "vf.ok"), true);
     })
     .catch(function(){ btn.disabled = false; allyMsg(note, t("vf.err.send"), false); });
   return false;
