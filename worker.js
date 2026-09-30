@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "029ef30e";
+const STYLES_V = "9c80cbf4";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -633,6 +633,23 @@ async function apiCheckout(request, env, url) {
      el PDF, importada arriba, y sombrearla dentro de esta función es pedir un
      error el día que alguien la invoque aquí. */
   const quiereCert = cuerpo.certificado ? 1 : 0;
+  /* LOS DATOS DEL CERTIFICADO, que la calculadora no pedia (auditoria del 28
+     sep 2026): esta linea leia `cuerpo.certificado` y ningun navegador lo
+     mandaba nunca, asi que un donante en linea no tenia como pedirlo. Ahora la
+     casilla trae tipo y numero de documento y ciudad. Se guardan EN EL APORTE
+     y no en `donantes`: los escribe un formulario sin autenticacion, y solo
+     sirven para proponerlos en el panel, donde una persona los revisa. */
+  let certDatos = null;
+  if (quiereCert) {
+    const tipo = tipoDocumento(cuerpo.cert_doc_tipo);
+    const num = limpiar(cuerpo.cert_doc_numero, 40);
+    const ciudadCert = limpiar(cuerpo.cert_ciudad, 120);
+    if (!TIPOS_DOC.includes(tipo) || !/^[0-9A-Za-z][0-9A-Za-z.\- ]{2,24}$/.test(num) || ciudadCert.length < 2) {
+      return json({ error: "certificado_datos_invalidos",
+        ayuda: "Para el certificado hacen falta el tipo y el número de documento y la ciudad." }, 400);
+    }
+    certDatos = JSON.stringify({ doc_tipo: tipo, doc_numero: num, ciudad: ciudadCert });
+  }
   /* Único momento en que sabemos con certeza en qué idioma está el donante.
      Wompi no lo entrega, así que sin esto el correo saldría siempre en español. */
   const idioma     = cuerpo.idioma === "en" ? "en" : "es";
@@ -661,9 +678,10 @@ async function apiCheckout(request, env, url) {
 
   await env.DB.prepare(
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
-    "frecuencia, quiere_certificado, consent_muro, nota, idioma, token) " +
-    "VALUES (?, 'intencion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(guia, centavos, moneda, modo, destino, proyecto, frecuencia, quiereCert, muro, nota, idioma, tokenNuevo()).run();
+    "frecuencia, quiere_certificado, consent_muro, nota, idioma, token, certificado_datos) " +
+    "VALUES (?, 'intencion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(guia, centavos, moneda, modo, destino, proyecto, frecuencia, quiereCert, muro, nota, idioma, tokenNuevo(),
+         certDatos).run();
 
   /* --- firma de integridad ---
      Orden verificado contra el ejemplo de la documentación:
@@ -1014,10 +1032,40 @@ async function cupoDeCorreo(env, para, etiqueta) {
   return { hay: true, hoy };
 }
 
-async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos, guia, msTope }) {
+/* A QUIEN LE LLEGA LA RESPUESTA. El remitente es `no-responder@…` y hasta el
+   28 sep 2026 (auditoria previa al lanzamiento) ningun correo llevaba Reply-To,
+   mientras dos de ellos —el reporte de una transferencia y el del ingeniero
+   verificado— le piden a la persona «responde este correo». Esa respuesta se
+   perdia en un buzon que no lee nadie.
+
+   Se decide aqui, en un solo lugar, por la ETIQUETA, y quien llama puede
+   imponer otro con `responderA`. Lo desconocido cae en contabilidad, que es el
+   buzon que ya recibe los avisos: mejor que llegue a alguien. Lo que va a un
+   buzon propio no lleva Reply-To: es el equipo hablandose a si mismo. */
+function buzonDeRespuesta(env, etiqueta) {
+  const e = String(etiqueta || "");
+  if (/^(caso-|discrepancia-triaje|ingeniero-|postulacion-ingeniero)/.test(e)) return correoMMC(env);
+  if (/^(apadrinamiento|aplicacion-fundacion|ficha-fundacion|fundacion-|inscripcion-|ofrecimiento-|solicitud-aliado)/.test(e)) {
+    return correoAlianzas(env);
+  }
+  return env.CORREO_AVISOS || null;
+}
+
+async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos, guia, msTope, responderA }) {
   const llave = env.RESEND_API_KEY;
   const desde = env.CORREO_DESDE || CORREO_DESDE_DEF;
   const base = { etiqueta, para, asunto, guia };
+  const internos = [env.CORREO_AVISOS, env.CORREO_MMC, env.CORREO_ALIANZAS].filter(Boolean);
+  const responder = internos.includes(para) ? null : (responderA || buzonDeRespuesta(env, etiqueta));
+  /* La direccion de contacto va tambien al PIE del correo: un cliente que no
+     respeta Reply-To —o una persona que reenvia el correo— sigue sabiendo a
+     donde escribir. `plantillaCorreo` deja la marca y aqui se llena, porque es
+     aqui donde se sabe cual es. */
+  if (html) {
+    html = html.replace("<!--contacto-->", responder
+      ? " · Contacto / Contact: " + esc(responder) : "");
+  }
+  if (texto && responder) texto = texto + "\n\n--\nContacto / Contact: " + responder;
 
   /* Sin credencial no se falla: se simula. Pero AHORA queda escrito como
      `simulado`, que es distinto de `enviado`: si esto aparece en producción,
@@ -1049,6 +1097,7 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
       headers: { authorization: "Bearer " + llave, "content-type": "application/json" },
       body: JSON.stringify({
         from: desde, to: [para], subject: asunto, text: texto, html,
+        ...(responder ? { reply_to: responder } : {}),
         ...(adjuntos && adjuntos.length ? { attachments: adjuntos } : {})
       }),
       ...(corte ? { signal: corte.signal } : {})
@@ -1442,7 +1491,7 @@ ${p}
 ${f ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:18px 0">${f}</table>` : ""}
 ${boton ? `<p style="margin:20px 0 0"><a href="${esc(boton.url)}" style="display:inline-block;background:#1F5C38;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:999px">${esc(boton.texto)}</a></p>` : ""}
 ${cierre ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.55;color:#5C636F">${esc(cierre)}</p>` : ""}
-<p style="margin:22px 0 0;font-size:12px;color:#5C636F">Fundación Give&amp;Grow International · NIT 901.948.930-2 · Medellín, Colombia</p>
+<p style="margin:22px 0 0;font-size:12px;color:#5C636F">Fundación Give&amp;Grow International · NIT 901.948.930-2 · Medellín, Colombia<!--contacto--></p>
 </td></tr></table></body></html>`;
 }
 
@@ -1453,8 +1502,17 @@ async function correoAporteAprobado(env, aporte, email, nombre) {
   if (!email) return { ok: true, sinCorreo: true };
   const en = aporte.idioma === "en";
   const guia = aporte.guia;
-  const enlace = ORIGIN + "/#rastrea";
-  const monto = fmtPesos(aporte.monto_centavos) + " COP";
+  /* EL ENLACE LLEVA LA GUIA: `?g=` abre el rastreo con ella puesta y buscada.
+     Un «/#rastrea» pelado obligaba a copiarla a mano desde este mismo correo. */
+  const enlace = ORIGIN + "/?g=" + encodeURIComponent(guia) + "#rastrea";
+  /* LA MONEDA DE VERDAD, igual que en el aviso interno. El cobro de PayPal
+     llega en centavos de DOLAR y este correo decia siempre «COP»: US$15 le
+     llegaba al donante como «$15 COP» — su propio recibo por correo con un
+     monto y una moneda que no son los que pago (auditoria del 28 sep 2026). */
+  const enUsd = String(aporte.moneda || "COP").toUpperCase() === "USD";
+  const monto = enUsd
+    ? "US$" + (Number(aporte.monto_centavos || 0) / 100).toFixed(2)
+    : fmtPesos(aporte.monto_centavos) + " COP";
 
   const asunto = en
     ? `Your gift is confirmed · ${guia}`
@@ -1539,11 +1597,44 @@ async function correoAvisoInterno(env, aporte, email, nombre) {
 async function aplicarEstado(env, guia, tx, estado) {
   const fila = await env.DB.prepare(
     "SELECT guia, monto_centavos, moneda, estado, idioma, modo, destino_id, proyecto, frecuencia, " +
-    "nota, metodo_pago, quiere_certificado, aprobada_en, token, creada_en FROM aportes WHERE guia = ?"
+    "nota, metodo_pago, quiere_certificado, aprobada_en, token, creada_en, wompi_transaction_id, " +
+    "suscripcion, proveedor FROM aportes WHERE guia = ?"
   ).bind(guia).first();
 
   /* Referencia que no conocemos: se queda en la bitácora y no se inventa nada. */
   if (!fila) return;
+
+  /* --- UN APORTE APROBADO SOLO SE MUEVE POR UNA REVERSA DE SU PROPIO PAGO ---
+     Auditoria del 28 sep 2026. Wompi reintenta cada evento hasta cuatro veces y
+     en ventanas de horas, y una misma referencia puede tener varias
+     transacciones (quien reintenta dentro del checkout tras un rechazo). Asi que
+     un PENDING o un DECLINED viejo podia llegar DESPUES del APPROVED y bajar el
+     aporte a «pendiente» o «rechazada»: un dinero que si entro, con recibo en la
+     bandeja del donante, figurando como no recibido — y con el certificado
+     marcado sin respaldo por el guardian de abajo.
+
+     La regla: una vez aprobado (o en terreno), solo cuentan VOIDED o REFUNDED, y
+     solo de LA MISMA transaccion que se aprobo. Todo lo demas se ignora y queda
+     escrito. Va ANTES del control de monto porque ese control tambien bajaba el
+     estado —a «error»— y un evento tardio de otra transaccion no puede hacerlo.
+
+     Antes de aprobarse NO se exige el mismo id: ahi un id distinto es justo el
+     reintento legitimo dentro del checkout, y rechazarlo perderia un pago. */
+  const txIdEv = String(tx.id || "");
+  if (ESTADOS_CON_RECIBO.includes(fila.estado) || fila.aprobada_en) {
+    const esReversa = estado === "VOIDED" || estado === "REFUNDED";
+    const mismaTx = !fila.wompi_transaction_id || fila.wompi_transaction_id === txIdEv;
+    if (!esReversa || !mismaTx) {
+      console.warn("evento tardio ignorado", guia, estado, txIdEv, "aprobada con", fila.wompi_transaction_id);
+      try {
+        await env.DB.prepare(
+          "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES ('sistema', 'auditoria', ?)"
+        ).bind("aporte " + guia + " (" + fila.estado + "): evento " + estado + " de la tx " + (txIdEv || "?") +
+               " IGNORADO" + (mismaTx ? "" : " · la aprobada es " + fila.wompi_transaction_id)).run();
+      } catch (e) { /* la bitacora no puede tumbar el webhook */ }
+      return;
+    }
+  }
 
   /* El monto que confirma Wompi tiene que ser el que guardamos ANTES de
      redirigir. Si no coincide, alguien tocó la URL: no se aprueba. */
@@ -1560,6 +1651,9 @@ async function aplicarEstado(env, guia, tx, estado) {
     APPROVED: "aprobada",
     DECLINED: "rechazada",
     VOIDED:   "rechazada",
+    /* REFUNDED no estaba y caia en «pendiente»: una devolucion dejaba el aporte
+       como si el pago siguiera en curso. Es una reversa, igual que VOIDED. */
+    REFUNDED: "rechazada",
     ERROR:    "error",
     PENDING:  "pendiente"
   };
@@ -1584,13 +1678,30 @@ async function aplicarEstado(env, guia, tx, estado) {
 
   const donanteId = await guardarDonante(env, tx);
 
+  /* LA IDENTIDAD DE ESTE PAGO, congelada en el aporte al aprobarse (ver
+     migrations/0034). `donantes` es la ficha de una persona y la puede tocar
+     mas de un camino; esto es lo que la pasarela entrego para ESTA transaccion,
+     y es contra lo que el certificado mide la divergencia. Solo se escribe una
+     vez: un evento posterior no la reescribe. */
+  const cd = tx.customer_data || {};
+  const identidad = (nuevo === "aprobada" && (cd.full_name || cd.legal_id)) ? JSON.stringify({
+    nombre: cd.full_name ? String(cd.full_name).slice(0, 200) : null,
+    doc_tipo: cd.legal_id_type ? String(cd.legal_id_type).slice(0, 10) : null,
+    doc_numero: cd.legal_id ? String(cd.legal_id).slice(0, 40) : null
+  }) : null;
+
+  /* `aprobada_en` NO se pisa. Con el CASE de antes, un segundo APPROVED de otra
+     transaccion le cambiaba la fecha — y con ella el año gravable del
+     certificado. La primera aprobacion es la que vale. */
   await env.DB.prepare(
     "UPDATE aportes SET estado=?, wompi_estado=?, wompi_transaction_id=?, metodo_pago=?, " +
-    "donante_id=COALESCE(?, donante_id), aprobada_en=CASE WHEN ?='aprobada' THEN datetime('now') ELSE aprobada_en END, " +
+    "donante_id=COALESCE(?, donante_id), " +
+    "aprobada_en=CASE WHEN ?='aprobada' THEN COALESCE(aprobada_en, datetime('now')) ELSE aprobada_en END, " +
+    "identidad_pasarela=COALESCE(identidad_pasarela, ?), " +
     "actualizada_en=datetime('now') WHERE guia=?"
   ).bind(
-    nuevo, estado, String(tx.id || ""), tx.payment_method_type ? String(tx.payment_method_type) : null,
-    donanteId, nuevo, guia
+    nuevo, estado, txIdEv, tx.payment_method_type ? String(tx.payment_method_type) : null,
+    donanteId, nuevo, identidad, guia
   ).run();
 
   /* Deja constancia de QUIÉN dio la certeza. Una transferencia también acaba en
@@ -1616,6 +1727,7 @@ async function aplicarEstado(env, guia, tx, estado) {
       const datos = {
         guia,
         monto_centavos: fila.monto_centavos,
+        moneda: fila.moneda,
         idioma: fila.idioma,
         modo: fila.modo,
         destino_id: fila.destino_id,
@@ -1632,6 +1744,18 @@ async function aplicarEstado(env, guia, tx, estado) {
     } catch (e) {
       console.error("correo tras aprobar", guia, e && e.message);
     }
+  }
+
+  /* LA MEMBRESIA SE DECIDE AQUI, con el resultado de verdad. Hasta el 28 sep
+     2026 se daba por activa en cuanto Wompi ACEPTABA crear el primer cobro —un
+     201 con PENDING—, y la pantalla decia «el primer cobro ya salio» sobre un
+     dinero que todavia no se sabia si iba a entrar. Ahora nace `pendiente` y es
+     este evento —firmado, o leido de la API al conciliar— el que la activa o la
+     da por fallida. Y el cobro mensual rechazado, que antes no le decia nada a
+     nadie, se le avisa al donante con un reintento. */
+  if (fila.suscripcion && fila.proveedor === "wompi") {
+    try { await membresiaTrasCobro(env, fila, nuevo); }
+    catch (e) { console.error("membresia tras cobro", guia, e && e.message); }
   }
 }
 
@@ -1678,6 +1802,13 @@ async function revisarCertificadoPorReversa(env, guia, estadoWompi) {
 
 /* Los datos personales entran SOLO aquí (Ley 1581). Nunca el medio de pago:
    eso queda tokenizado en Wompi y no tiene por qué salir de allá. */
+/* LA IDENTIDAD SOLO SE RELLENA, NO SE REESCRIBE (auditoria del 28 sep 2026).
+   Aqui llega lo que la persona escribio en el checkout de Wompi, y a ese
+   checkout se entra con cualquier correo: bastaba pagar $5.000 con el correo de
+   otro donante y otro nombre para que su siguiente certificado saliera a nombre
+   ajeno. La ficha se completa donde esta vacia; lo que valio para ESTE pago se
+   congela aparte, en `aportes.identidad_pasarela`, que es lo que mira el
+   certificado. Corregir la ficha de verdad es un acto del panel, con motivo. */
 async function guardarDonante(env, tx) {
   const email = tx.customer_email ? String(tx.customer_email).slice(0, 200) : null;
   if (!email) return null;
@@ -1685,8 +1816,9 @@ async function guardarDonante(env, tx) {
   await env.DB.prepare(
     "INSERT INTO donantes (email, nombre, telefono, doc_tipo, doc_numero) VALUES (?,?,?,?,?) " +
     "ON CONFLICT(email) DO UPDATE SET " +
-    "nombre=COALESCE(excluded.nombre, nombre), telefono=COALESCE(excluded.telefono, telefono), " +
-    "doc_tipo=COALESCE(excluded.doc_tipo, doc_tipo), doc_numero=COALESCE(excluded.doc_numero, doc_numero), " +
+    "nombre=COALESCE(NULLIF(nombre,''), excluded.nombre), telefono=COALESCE(excluded.telefono, telefono), " +
+    "doc_tipo=COALESCE(NULLIF(doc_tipo,''), excluded.doc_tipo), " +
+    "doc_numero=COALESCE(NULLIF(doc_numero,''), excluded.doc_numero), " +
     "actualizado_en=datetime('now')"
   ).bind(
     email,
@@ -1721,7 +1853,7 @@ async function apiRecibo(env, guia, token) {
 
   const a = await env.DB.prepare(
     "SELECT guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, frecuencia, " +
-    "nota, idioma, metodo_pago, creada_en, aprobada_en, token FROM aportes WHERE guia = ?"
+    "nota, idioma, metodo_pago, creada_en, aprobada_en, token, fecha_pago FROM aportes WHERE guia = ?"
   ).bind(g).first();
 
   /* Mismo 403 exista o no la guía: distinguirlos convertiría este endpoint en un
@@ -3006,6 +3138,7 @@ async function adminAportes(env, url, quien) {
     "a.quiere_certificado, a.consent_muro, a.idioma, a.nota, a.metodo_pago, a.creada_en, " +
     "a.aprobada_en, a.entregada_en, d.nombre AS donante, d.email AS correo, d.telefono AS telefono, " +
     "d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, d.ciudad AS ciudad, a.token, " +
+    "a.identidad_pasarela, a.certificado_datos, " +
     /* El certificado vigente viaja con la fila para que el panel sepa, sin una
        segunda consulta, si el botón debe decir "Emitir" o "Ver" — y si el que
        hay quedó sin respaldo tras una reversa. */
@@ -3032,6 +3165,14 @@ async function adminAportes(env, url, quien) {
     " ORDER BY a.creada_en DESC LIMIT " + limite;
   const q = estado ? env.DB.prepare(sql).bind(estado) : env.DB.prepare(sql);
   const r = await q.all();
+  /* Lo que el formulario de emision propone, ya resuelto aqui con la misma
+     regla que usara la emision. Los dos JSON crudos no viajan al panel. */
+  for (const f of (r.results || [])) {
+    const pre = precertificado({ ...f, nombre: f.donante });
+    f.cert_pre = { nombre: pre.nombre, doc_tipo: pre.doc_tipo, doc_numero: pre.doc_numero, ciudad: pre.ciudad,
+                   referencia: pre.fuenteReferencia };
+    delete f.identidad_pasarela; delete f.certificado_datos;
+  }
   /* Con el flujo de firma APAGADO ningun certificado tendra firmas nunca, asi
      que sin este dato la tabla diria «esperando firma» de todos para siempre.
      Que el panel sepa en que mundo esta es mas barato que adivinarlo. */
@@ -3267,6 +3408,45 @@ async function adminMoverEstado(request, env, guia, quien) {
 /* Frase del numeral 6 del certificado. Se arma desde el destino real del aporte
    y no de un texto libre: el numeral declara a qué se destinó el dinero, y eso
    ya está en la base. */
+/* EL TIPO DE DOCUMENTO, en uno de los codigos que el certificado sabe
+   nombrar. Llega de tres lados —Wompi (`legal_id_type`), la calculadora y el
+   panel— y cada uno lo escribe a su manera. Lo desconocido se conserva en
+   mayusculas: `documentos.js` lo imprime como «Documento de identificacion»
+   en vez de inventarle un nombre. */
+const TIPOS_DOC = ["CC", "CE", "NIT", "PP", "TI", "PEP", "PPT", "DNI"];
+function tipoDocumento(x) {
+  const t = String(x || "").toUpperCase().replace(/[^A-Z]/g, "");
+  if (!t) return "";
+  const alias = { CEDULA: "CC", PASAPORTE: "PP", PA: "PP", PASSPORT: "PP", RUT: "NIT" };
+  return alias[t] || t.slice(0, 10);
+}
+
+/* LO QUE SE PROPONE AL EMITIR y CONTRA QUE SE MIDE LA DIVERGENCIA, en un solo
+   sitio porque lo usan el formulario del panel (`adminAportes`) y la emision
+   (`adminEmitirCertificado`), y si divergieran el panel propondria unos datos
+   y el servidor mediria contra otros. Auditoria del 28 sep 2026.
+
+   · `referencia` — la identidad que la pasarela entrego para ESTE pago
+     (`identidad_pasarela`); sin ella (transferencia, o aporte anterior a la
+     0034), la ficha del donante.
+   · El documento y la ciudad que el donante escribio al pedir el certificado
+     (`certificado_datos`) van primero: es lo que pidio que dijera su papel. Si
+     contradicen a la pasarela, la emision pide motivo, que es lo correcto. */
+function precertificado(a) {
+  const leer = (t) => { try { const o = t ? JSON.parse(t) : null; return esObjeto(o) ? o : null; } catch (e) { return null; } };
+  const pas = leer(a.identidad_pasarela);
+  const pide = leer(a.certificado_datos) || {};
+  const referencia = pas || { nombre: a.nombre, doc_tipo: a.doc_tipo, doc_numero: a.doc_numero };
+  return {
+    nombre: limpiar(referencia.nombre, 200) || limpiar(a.nombre, 200),
+    doc_tipo: tipoDocumento(pide.doc_tipo) || tipoDocumento(referencia.doc_tipo) || tipoDocumento(a.doc_tipo),
+    doc_numero: limpiar(pide.doc_numero, 40) || limpiar(referencia.doc_numero, 40) || limpiar(a.doc_numero, 40),
+    ciudad: limpiar(pide.ciudad, 120) || limpiar(a.ciudad, 120),
+    referencia,
+    fuenteReferencia: pas ? "pasarela" : "ficha"
+  };
+}
+
 function destinacionDe(a) {
   if (a.modo === "dirigida") {
     const p = a.proyecto || a.destino_id;
@@ -3528,7 +3708,7 @@ async function adminEmitirCertificado(request, env, guia, quien) {
   const a = await env.DB.prepare(
     "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.proyecto, " +
     "a.quiere_certificado, a.aprobada_en, a.wompi_transaction_id, a.donante_id, " +
-    "a.confirmacion, a.referencia_pago, " +
+    "a.confirmacion, a.referencia_pago, a.metodo_pago, a.fecha_pago, a.identidad_pasarela, a.certificado_datos, " +
     "d.nombre AS nombre, d.email AS email, d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, " +
     "d.ciudad AS ciudad FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?"
   ).bind(guia).first();
@@ -3577,10 +3757,17 @@ async function adminEmitirCertificado(request, env, guia, quien) {
      que pide ops/arquitectura-donaciones-membresias.md §5, no un botón de
      "aprobar" sin mirar. Lo que se corrija aquí se guarda también en `donantes`,
      porque si faltaba para este certificado faltará para el siguiente. */
-  const nombre    = limpiar(cuerpo.nombre, 200)    || limpiar(a.nombre, 200);
-  const docTipo   = limpiar(cuerpo.doc_tipo, 10)   || limpiar(a.doc_tipo, 10) || "CC";
-  const docNumero = limpiar(cuerpo.doc_numero, 40) || limpiar(a.doc_numero, 40);
-  const ciudad    = limpiar(cuerpo.ciudad, 120)    || limpiar(a.ciudad, 120);
+  /* DE DONDE SALE CADA DATO, en orden (auditoria del 28 sep 2026):
+     1. lo que escribe en el panel quien emite, que es la revision humana;
+     2. lo que el donante pidio al donar (`certificado_datos`, calculadora);
+     3. la identidad que la pasarela entrego para ESTE pago;
+     4. la ficha del donante.
+     `precertificado` hace la misma cuenta para pintar el formulario. */
+  const pre = precertificado(a);
+  const nombre    = limpiar(cuerpo.nombre, 200)    || pre.nombre;
+  const docTipo   = tipoDocumento(limpiar(cuerpo.doc_tipo, 10) || pre.doc_tipo) || "CC";
+  const docNumero = limpiar(cuerpo.doc_numero, 40) || pre.doc_numero;
+  const ciudad    = limpiar(cuerpo.ciudad, 120)    || pre.ciudad;
 
   const faltan = [];
   if (!nombre)    faltan.push("nombre");
@@ -3603,10 +3790,17 @@ async function adminEmitirCertificado(request, env, guia, quien) {
      No se prohíbe: se exige MOTIVO y se deja rastro. Un error de digitación se
      explica en una línea; un cambio de beneficiario no. El domicilio no cuenta
      como divergencia porque Wompi sencillamente no lo entrega. */
+  /* CONTRA LA COPIA DEL PAGO, NO CONTRA LA FICHA. Comparaba con `donantes`,
+     que un formulario publico podia reescribir con solo saber el correo: quien
+     cambiaba el nombre ahi dejaba el certificado «sin divergencia». La copia
+     que congelo el webhook al aprobar (`identidad_pasarela`) no la toca nadie.
+     Un aporte anterior a la 0034, o una transferencia, no tiene copia: ahi se
+     sigue midiendo contra la ficha, que es lo unico que hay. */
+  const ref = pre.referencia;
   const divergencia = [];
-  if (a.nombre && nombre !== a.nombre) divergencia.push({ campo: "nombre", wompi: a.nombre, emitido: nombre });
-  if (a.doc_numero && docNumero !== a.doc_numero) divergencia.push({ campo: "doc_numero", wompi: a.doc_numero, emitido: docNumero });
-  if (a.doc_tipo && docTipo !== a.doc_tipo) divergencia.push({ campo: "doc_tipo", wompi: a.doc_tipo, emitido: docTipo });
+  if (ref.nombre && nombre !== ref.nombre) divergencia.push({ campo: "nombre", wompi: ref.nombre, emitido: nombre });
+  if (ref.doc_numero && docNumero !== ref.doc_numero) divergencia.push({ campo: "doc_numero", wompi: ref.doc_numero, emitido: docNumero });
+  if (ref.doc_tipo && docTipo !== tipoDocumento(ref.doc_tipo)) divergencia.push({ campo: "doc_tipo", wompi: ref.doc_tipo, emitido: docTipo });
 
   const motivoCambio = limpiar(cuerpo.motivo_cambio, 280);
   if (divergencia.length && !motivoCambio) {
@@ -3625,15 +3819,24 @@ async function adminEmitirCertificado(request, env, guia, quien) {
   }
 
   /* EL AÑO GRAVABLE sale del dia COLOMBIANO en que se aprobo, no del UTC en
-     que quedo guardado. Es el dato del que depende la deduccion del donante. */
-  const anio = a.aprobada_en ? anioCO(a.aprobada_en) : anioCO();
-  const numero = await siguienteCertificado(env, anio);
+     que quedo guardado. Es el dato del que depende la deduccion del donante.
+
+     Y EN UNA TRANSFERENCIA, del dia del EXTRACTO (`fecha_pago`, que escribe
+     quien confirma). La confirmacion puede caer dias despues del movimiento, y
+     una transferencia del 30 de diciembre confirmada el 3 de enero se estaba
+     certificando en el año siguiente (auditoria del 28 sep 2026). `fecha_pago`
+     ya es un dia civil colombiano: NO pasa por `fechaCO`, que lo leeria como
+     medianoche UTC y lo correria al dia anterior. */
+  const fechaDon = a.fecha_pago && /^\d{4}-\d{2}-\d{2}$/.test(a.fecha_pago)
+    ? a.fecha_pago : (a.aprobada_en ? fechaCO(a.aprobada_en) : "");
+  const anio = fechaDon ? Number(fechaDon.slice(0, 4)) : anioCO();
 
   /* El snapshot se congela AQUÍ. Volver a descargar el certificado dentro de un
      año debe devolver exactamente el mismo papel, aunque el donante haya
-     corregido su nombre entretanto. */
+     corregido su nombre entretanto. El numero se pone dentro de la base, en la
+     misma transaccion que lo asigna — ver abajo. */
   const datos = {
-    numero, guia: a.guia,
+    numero: "", guia: a.guia,
     donante_nombre: nombre, doc_tipo: docTipo, doc_numero: docNumero, donante_ciudad: ciudad,
     monto_centavos: a.monto_centavos,
     /* EN DIA COLOMBIANO, igual que el año gravable de tres lineas arriba y que
@@ -3645,12 +3848,17 @@ async function adminEmitirCertificado(request, env, guia, quien) {
        dia siguiente en un documento que se firma bajo juramento. Y en la ultima
        noche del año el papel se contradecia solo: el año gravable, calculado con
        `anioCO`, decia 2026, y la fecha impresa 1 de enero de 2027. */
-    fecha_donacion: a.aprobada_en ? fechaCO(a.aprobada_en) : "",
+    fecha_donacion: fechaDon,
     /* El numeral 5 dice «mediante transferencia electrónica No. …». Para un pago
        por pasarela ese número es el id de Wompi; para una transferencia real es
        el del comprobante bancario, y citar un id de Wompi inexistente sería
        falso en un documento que se firma bajo juramento. */
     transaccion: (a.confirmacion === "manual" ? a.referencia_pago : a.wompi_transaction_id) || "",
+    /* CON QUE SE PAGO, para que el numeral 5 no jure «transferencia
+       electronica a la cuenta de ahorros» sobre un pago con tarjeta. Una
+       confirmacion manual es siempre una transferencia, diga lo que diga la
+       columna. Ver `maneraDePago` en documentos.js. */
+    metodo_pago: a.confirmacion === "manual" ? "TRANSFERENCIA" : (a.metodo_pago || "PASARELA"),
     destinacion: destinacionDe(a),
     /* La fecha que va impresa y que queda congelada en el snapshot: el dia
        colombiano en que se firmo, no el UTC. Hoy no hay ningun certificado
@@ -3658,15 +3866,58 @@ async function adminEmitirCertificado(request, env, guia, quien) {
     emitido_en: selloCO()
   };
 
-  await env.DB.prepare(
-    "INSERT INTO certificados (numero, guia, datos, emitido_por, emitido_en, " +
-    "wompi_identidad, divergencia, divergencia_motivo) VALUES (?,?,?,?,?,?,?,?)"
-  ).bind(
-    numero, a.guia, JSON.stringify(datos), quien || "?", datos.emitido_en,
-    JSON.stringify({ nombre: a.nombre, doc_tipo: a.doc_tipo, doc_numero: a.doc_numero }),
-    divergencia.length ? JSON.stringify(divergencia) : null,
-    divergencia.length ? motivoCambio : null
-  ).run();
+  /* EL NUMERO Y LA FILA, EN UNA SOLA TRANSACCION (auditoria del 28 sep 2026).
+     Antes el consecutivo se pedia primero y la fila se insertaba despues: con
+     un doble clic, las dos peticiones pasaban el `yaHay` de arriba, las dos
+     quemaban un numero, y la segunda chocaba con `ux_certificados_guia_vigente`
+     — un CD-… consumido que no existia en ninguna parte. En una serie que
+     «conserva el hueco a proposito» porque cada hueco se explica, ese no tenia
+     explicacion.
+
+     `batch` es una transaccion en D1: si el INSERT falla, el incremento del
+     numerador se deshace con el. Asi el numero solo existe si existe su
+     certificado, y el doble clic no deja hueco. El numero se calcula DENTRO de
+     la base, leyendo el numerador en la misma transaccion, y se escribe en el
+     snapshot con json_set para que `datos` lo lleve igual que antes. */
+  const NUMERO_SQL = "'CD-' || n.anio || '-' || printf('%06d', n.ultimo)";
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO numerador_cert (anio, ultimo) VALUES (?, 1) " +
+        "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1"
+      ).bind(anio),
+      env.DB.prepare(
+        "INSERT INTO certificados (numero, guia, datos, emitido_por, emitido_en, " +
+        "wompi_identidad, divergencia, divergencia_motivo) " +
+        "SELECT " + NUMERO_SQL + ", ?, json_set(?, '$.numero', " + NUMERO_SQL + "), ?, ?, ?, ?, ? " +
+        "FROM numerador_cert n WHERE n.anio = ?"
+      ).bind(
+        a.guia, JSON.stringify(datos), quien || "?", datos.emitido_en,
+        JSON.stringify({ nombre: ref.nombre || null, doc_tipo: ref.doc_tipo || null, doc_numero: ref.doc_numero || null,
+                         fuente: pre.fuenteReferencia }),
+        divergencia.length ? JSON.stringify(divergencia) : null,
+        divergencia.length ? motivoCambio : null,
+        anio
+      )
+    ]);
+  } catch (e) {
+    /* El otro clic gano: ya hay un certificado vigente para esta guia, y el
+       numerador volvio a donde estaba. */
+    if (/UNIQUE/i.test(String(e && e.message))) {
+      const gano = await env.DB.prepare(
+        "SELECT numero FROM certificados WHERE guia = ? AND anulado_en IS NULL"
+      ).bind(guia).first();
+      return json({ error: "ya_emitido", numero: gano ? gano.numero : null,
+        ayuda: "Otra petición lo emitió al mismo tiempo (¿doble clic?). No se consumió ningún número de más." }, 409);
+    }
+    throw e;
+  }
+  const emitido = await env.DB.prepare(
+    "SELECT numero FROM certificados WHERE guia = ? AND anulado_en IS NULL"
+  ).bind(a.guia).first();
+  const numero = emitido && emitido.numero;
+  if (!numero) throw new Error("el certificado no quedó escrito");
+  datos.numero = numero;
 
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
@@ -3780,13 +4031,32 @@ async function adminAnularCertificado(request, env, numero, quien) {
 /* El certificado sí viaja ADJUNTO: es el papel que el donante archiva para su
    declaración, y un enlace que caduca o se pierde no sirve para eso. */
 async function correoCertificado(env, datos, email) {
-  const titulo = "Tu certificado de donación";
-  const parrafos = [
+  /* EN EL IDIOMA DEL DONANTE (auditoria del 28 sep 2026). Era el unico correo
+     al donante que salia siempre en español. El CERTIFICADO adjunto sigue en
+     español, y a proposito: es un documento tributario colombiano con texto
+     suministrado por la contadora. Lo que se traduce es la carta que lo lleva,
+     y la carta dice por que el papel no se traduce. */
+  let en = false;
+  try {
+    const i = await env.DB.prepare("SELECT idioma FROM aportes WHERE guia = ?").bind(datos.guia).first();
+    en = !!(i && i.idioma === "en");
+  } catch (e) { /* sin idioma, español: es el del documento */ }
+  const titulo = en ? "Your donation certificate" : "Tu certificado de donación";
+  const parrafos = en ? [
+    "Attached is your donation certificate " + datos.numero + ", for the gift " + datos.guia + ".",
+    "It is signed by the Foundation's Legal Representative and Statutory Auditor and supports the tax credit of article 257 of the Colombian Tax Code (Estatuto Tributario). It is in Spanish because it is a Colombian tax document.",
+    "Whether the credit applies, and for how much, depends on your tax situation in Colombia: check with your advisor."
+  ] : [
     "Adjuntamos tu certificado de donación " + datos.numero + ", correspondiente al aporte " + datos.guia + ".",
     "Está firmado por el Representante Legal y la Revisora Fiscal de la Fundación y sirve como soporte del descuento tributario del artículo 257 del Estatuto Tributario.",
     "La procedencia y el monto efectivo del descuento dependen de tu situación tributaria: consúltalo con tu asesor."
   ];
-  const filas = [
+  const filas = en ? [
+    ["Certificate", datos.numero],
+    ["Gift", datos.guia],
+    ["Amount", fmtPesos(datos.monto_centavos) + " COP"],
+    ["Date of the gift", String(datos.fecha_donacion || "")]
+  ] : [
     ["Certificado", datos.numero],
     ["Aporte", datos.guia],
     ["Valor", fmtPesos(datos.monto_centavos) + " COP"],
@@ -3920,13 +4190,18 @@ async function apiReportarTransferencia(request, env, url) {
   const token = tokenNuevo();
 
   await env.DB.prepare(
+    /* `fecha_pago` GUARDA LA FECHA QUE REPORTA EL DONANTE. Se validaba dos
+       lineas arriba —formato, que no sea futura— y despues se tiraba: el
+       certificado y el recibo salian con la fecha de la CONFIRMACION, que
+       puede caer dias despues y hasta en otro año gravable (auditoria del 28
+       sep 2026). Al confirmar, la reemplaza la del extracto. */
     "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
-    "frecuencia, quiere_certificado, nota, idioma, token, donante_id, metodo_pago, referencia_pago) " +
-    "VALUES (?, 'reportada', ?, 'COP', ?, ?, ?, 'unico', ?, ?, ?, ?, ?, 'TRANSFERENCIA', ?)"
+    "frecuencia, quiere_certificado, nota, idioma, token, donante_id, metodo_pago, referencia_pago, fecha_pago) " +
+    "VALUES (?, 'reportada', ?, 'COP', ?, ?, ?, 'unico', ?, ?, ?, ?, ?, 'TRANSFERENCIA', ?, ?)"
   ).bind(
     guia, monto * 100, modo, destino, limpiar(c.proyecto, 120) || null,
     c.certificado ? 1 : 0, limpiar(c.nota, 280) || null,
-    c.idioma === "en" ? "en" : "es", token, donanteId, refer || null
+    c.idioma === "en" ? "en" : "es", token, donanteId, refer || null, fecha
   ).run();
 
   /* LA AUTORIZACION SE ANOTA, y faltaba. Este formulario EXIGE la casilla de Ley
@@ -3957,10 +4232,18 @@ async function apiReportarTransferencia(request, env, url) {
    pasarela. */
 async function donantePorCorreo(env, email, nombre, telefono) {
   /* El telefono solo se escribe si llega: un camino que no lo pide (la
-     suscripcion con Wompi) no puede borrar el que ya estaba. */
+     suscripcion con Wompi) no puede borrar el que ya estaba.
+
+     EL NOMBRE SOLO SE RELLENA, NO SE PISA (auditoria del 28 sep 2026). Los
+     tres caminos que llegan aqui —reporte de transferencia, membresia con
+     tarjeta y membresia de PayPal— son formularios publicos sin ninguna prueba
+     de que el correo sea de quien escribe. Con el COALESCE de antes, cualquiera
+     que supiera el correo de un donante le cambiaba el nombre con el que se le
+     emite el certificado. Corregirlo de verdad se hace en el panel, al emitir,
+     con motivo si se aparta de lo que valido la pasarela. */
   await env.DB.prepare(
     "INSERT INTO donantes (email, nombre, telefono) VALUES (?,?,?) ON CONFLICT(email) DO UPDATE SET " +
-    "nombre = COALESCE(excluded.nombre, nombre), telefono = COALESCE(excluded.telefono, telefono), " +
+    "nombre = COALESCE(NULLIF(nombre, ''), excluded.nombre), telefono = COALESCE(excluded.telefono, telefono), " +
     "actualizado_en = datetime('now')"
   ).bind(email, nombre || null, telefono || null).run();
   const f = await env.DB.prepare("SELECT id FROM donantes WHERE email = ?").bind(email).first();
@@ -10735,7 +11018,7 @@ async function paypalCobro(env, suscripcionId, recurso) {
       : null;
     if (d && d.email) {
       await correoAporteAprobado(env, {
-        guia, monto_centavos: centavos, idioma: sub.idioma,
+        guia, monto_centavos: centavos, moneda, idioma: sub.idioma,
         modo: "fondo", destino_id: null, frecuencia: "mensual", token
       }, d.email, d.nombre);
     } else {
@@ -11553,7 +11836,7 @@ async function adminComprobante(env, guia) {
 async function adminReportadas(env) {
   const r = await env.DB.prepare(
     "SELECT a.guia, a.monto_centavos, a.modo, a.destino_id, a.proyecto, a.quiere_certificado, " +
-    "a.referencia_pago, a.comprobante, a.creada_en, d.nombre, d.email, d.telefono, " +
+    "a.referencia_pago, a.comprobante, a.creada_en, a.fecha_pago, d.nombre, d.email, d.telefono, " +
     /* LA EDAD, y no es cosmetica: al auditar habia tres transferencias
        reportadas de 15, 20 y 22 dias —$630.000 en total, dos pidiendo
        certificado— y la bandeja solo mostraba la fecha. Una fecha no grita;
@@ -11580,7 +11863,7 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
   if (!esObjeto(c)) c = {};
 
   const a = await env.DB.prepare(
-    "SELECT guia, estado, monto_centavos, modo, destino_id, frecuencia, idioma, token, donante_id " +
+    "SELECT guia, estado, monto_centavos, modo, destino_id, frecuencia, idioma, token, donante_id, fecha_pago " +
     "FROM aportes WHERE guia = ?"
   ).bind(guia).first();
   if (!a) return json({ error: "no_encontrada" }, 404);
@@ -11625,6 +11908,43 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
     }, 422);
   }
 
+  /* LA FECHA Y EL MONTO DEL EXTRACTO, no los del reporte (auditoria del 28 sep
+     2026). Confirmar solo pedia la referencia y dejaba intactos el monto que
+     el donante DIJO haber transferido y, como fecha, el instante de la
+     confirmacion. Pero el certificado jura el valor RECIBIDO y la fecha en que
+     se efectuo la donacion: si el donante escribio $500.000 y entraron
+     $50.000, el papel juraba diez veces lo que llego; y una transferencia del
+     30 de diciembre confirmada el 3 de enero cambiaba de año gravable.
+
+     Ahora las dos se exigen, y el panel propone las del reporte para que se
+     comparen contra el extracto y no se tecleen de memoria. La fecha no puede
+     ser futura. El monto,
+     si no coincide con el reportado, solo pasa con un motivo escrito: el aporte
+     queda con lo que ENTRO, que es lo unico que se puede certificar, y la
+     diferencia queda en la auditoria. */
+  const fechaExt = limpiar(c.fecha, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaExt) || isNaN(Date.parse(fechaExt + "T00:00:00Z"))) {
+    return json({ error: "fecha_requerida",
+      ayuda: "Escribe la fecha en que el dinero aparece en el extracto, como AAAA-MM-DD. Es la que va en el certificado." }, 422);
+  }
+  if (fechaEnFuturo(fechaExt)) return json({ error: "fecha_futura",
+    ayuda: "Esa fecha es posterior a hoy: un movimiento del extracto no puede ser del futuro." }, 422);
+
+  const montoExt = Number(String(c.monto == null ? "" : c.monto).replace(/[^0-9]/g, ""));
+  if (!Number.isInteger(montoExt) || montoExt < 1 || montoExt > MONTO_MAX) {
+    return json({ error: "monto_requerido",
+      ayuda: "Escribe el monto que aparece en el extracto, en pesos y sin puntos. Es el que se certifica." }, 422);
+  }
+  const montoReportado = Math.round(Number(a.monto_centavos) / 100);
+  const porQueMonto = limpiar(c.monto_motivo, 200);
+  if (montoExt !== montoReportado && !porQueMonto) {
+    return json({
+      error: "monto_distinto", reportado: montoReportado, extracto: montoExt,
+      ayuda: "El donante reportó " + fmtPesos(montoReportado * 100) + " y en el extracto escribiste " +
+             fmtPesos(montoExt * 100) + ". Si es correcto, escribe por qué difieren: el aporte quedará con lo que entró."
+    }, 409);
+  }
+
   /* UNA LINEA DEL EXTRACTO, UN APORTE. Nada impedia confirmar dos guias con la
      misma referencia: un donante que reporta dos veces la misma transferencia
      —el freno por correo se salta en paralelo, ya medido— y dos confirmaciones
@@ -11656,8 +11976,9 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
        donante guarda y con el que cuadra su declaración. */
     "UPDATE aportes SET estado = 'aprobada', confirmacion = 'manual', confirmado_por = ?, " +
     "confirmado_en = datetime('now'), referencia_pago = ?, aprobada_en = datetime('now'), " +
+    "fecha_pago = ?, monto_centavos = ?, " +
     "actualizada_en = datetime('now') WHERE guia = ? AND estado = 'reportada'"
-  ).bind(quien || "?", refer, guia).run();
+  ).bind(quien || "?", refer, fechaExt, montoExt * 100, guia).run();
   if (!hecho.meta || !hecho.meta.changes) {
     return json({ error: "estado_no_permite", estado: "aprobada",
                   ayuda: "Alguien la confirmó mientras mirabas. Recarga la bandeja." }, 409);
@@ -11665,6 +11986,11 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
   await env.DB.prepare(
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "transferencia " + guia + " CONFIRMADA contra extracto · ref " + refer +
+         " · fecha del extracto " + fechaExt +
+         (a.fecha_pago && a.fecha_pago !== fechaExt ? " (el donante reportó " + a.fecha_pago + ")" : "") +
+         " · monto " + fmtPesos(montoExt * 100) +
+         (montoExt !== montoReportado
+           ? " · DIFIERE del reportado " + fmtPesos(montoReportado * 100) + ": " + porQueMonto : "") +
          (gemela ? " · REPITE la ref de " + gemela.guia + ": " + porQueRepite : "")).run();
 
   /* Ahora sí hay dinero: el donante recibe lo mismo que quien paga por la
@@ -11672,7 +11998,7 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
   try {
     const d = await env.DB.prepare("SELECT nombre, email FROM donantes WHERE id = ?").bind(a.donante_id).first();
     await correoAporteAprobado(env, {
-      guia: a.guia, monto_centavos: a.monto_centavos, idioma: a.idioma,
+      guia: a.guia, monto_centavos: montoExt * 100, idioma: a.idioma,
       modo: a.modo, destino_id: a.destino_id, frecuencia: a.frecuencia, token: a.token
     }, d && d.email, d && d.nombre);
   } catch (e) { console.error("correo tras confirmar", guia, e && e.message); }
@@ -17134,11 +17460,16 @@ function abrirCert(guia){
         '. Firman el Representante Legal y la Revisora Fiscal: revisa los datos antes de emitir.</p>' +
       (a.quiere_certificado ? "" :
         '<p style="font-size:13px;margin:-8px 0 16px;border-left:3px solid var(--amber);padding-left:10px">' +
-        '<strong>Al donar no pidió certificado.</strong> Emítelo si te lo pidió después. Necesita su documento (NIT o C.C.): ' +
+        '<strong>Al donar no pidió certificado.</strong> Emítelo si te lo pidió después. Necesita su documento de identidad: ' +
         'si no lo tienes, pídeselo antes de emitir.</p>') +
-      campo("c-nombre", "Nombre o razón social", a.donante) +
-      campo("c-doc", "Documento (NIT o C.C.)", a.doc_numero) +
-      campo("c-ciudad", "Domicilio del donante", a.ciudad) +
+      /* LO QUE PROPONE EL SERVIDOR (cert_pre), con la misma regla con la que
+         emitira: lo que el donante pidio al donar, la identidad de la pasarela
+         para este pago y, sin ella, la ficha. Y EL TIPO DE DOCUMENTO se elige:
+         antes no habia campo y todo lo que no era NIT salia «C.C.» en el papel. */
+      campo("c-nombre", "Nombre o razón social", (a.cert_pre || {}).nombre || a.donante) +
+      selectorDoc((a.cert_pre || {}).doc_tipo || a.doc_tipo || "CC") +
+      campo("c-doc", "Número de documento", (a.cert_pre || {}).doc_numero || a.doc_numero) +
+      campo("c-ciudad", "Domicilio del donante", (a.cert_pre || {}).ciudad || a.ciudad) +
       /* Solo aparece si el emisor se aparta de lo que validó Wompi. Pedirlo
          siempre lo convertiría en un campo que se rellena en automático. */
       '<div id="c-div" style="display:none;border-left:3px solid #A84D00;padding-left:12px;margin:12px 0">' +
@@ -17165,6 +17496,18 @@ function abrirCert(guia){
       '</div>' +
     '</div>';
   caja.style.display = "block";
+}
+var TIPOS_DOC_ES = [["CC","Cédula de ciudadanía"],["CE","Cédula de extranjería"],["NIT","NIT"],
+  ["PP","Pasaporte"],["TI","Tarjeta de identidad"],["PEP","Permiso especial de permanencia"],
+  ["PPT","Permiso por protección temporal"],["DNI","Documento extranjero (DNI)"]];
+function selectorDoc(actual){
+  var hay = TIPOS_DOC_ES.some(function(x){ return x[0] === actual; });
+  var ops = TIPOS_DOC_ES.map(function(x){
+    return '<option value="' + x[0] + '"' + (x[0] === actual ? " selected" : "") + ">" + esc(x[1]) + "</option>";
+  }).join("") + (hay ? "" : '<option value="' + esc(actual) + '" selected>' + esc(actual) + "</option>");
+  return '<label style="display:block;margin-bottom:10px;font-size:13px;font-weight:600">Tipo de documento' +
+    '<select id="c-doctipo" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)">' +
+    ops + "</select></label>";
 }
 /* Un paso de la lista de un voluntario. Desmarcar pide confirmar: deshace
    algo que alguien anoto, y queda en la auditoria igual. */
@@ -17373,6 +17716,7 @@ document.addEventListener("click", function(e){
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({
         nombre: document.getElementById("c-nombre").value,
+        doc_tipo: (document.getElementById("c-doctipo") || {}).value || "",
         doc_numero: document.getElementById("c-doc").value,
         ciudad: document.getElementById("c-ciudad").value,
         motivo_cambio: (document.getElementById("c-motivo") || {}).value || "",
@@ -17473,17 +17817,23 @@ document.addEventListener("click", function(e){
 });
 
 /* ---------------- transferencias por verificar ---------------- */
+/* Lo que reporto cada donante, para PROPONERLO al confirmar: la fecha y el
+   monto se comparan contra el extracto, no se teclean de memoria. */
+var REPORTADAS = {};
 function cargarReportadas(){
   pedirJSON("/api/admin/reportadas", "t-filas").then(function(d){
     var tb = document.getElementById("t-filas"); if (!tb) return;
     var l = d.reportadas || [];
     if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Ninguna esperando verificación.</td></tr>'; return; }
     /* Esta va ASC: lo que el tope esconde es lo mas RECIENTE, no lo mas viejo. */
+    REPORTADAS = {};
     tb.innerHTML = filaTope(d, 8, "transferencias",
       "Van de la mas antigua a la mas nueva, asi que lo que falta es lo que acaba de llegar.")
       + l.map(function(a){
+      REPORTADAS[a.guia] = a;
       return "<tr>" +
         "<td>" + esc(a.guia) + "<br><small>" + esc(enCO(a.creada_en, 16)) +
+          (a.fecha_pago ? "<br>dice que transfirió el " + esc(a.fecha_pago) : "") +
           (a.dias >= 3 ? '<br><strong style="color:#A84D00">esperando ' + a.dias + " dia(s)</strong>" : "") +
         "</small></td>" +
         "<td>" + pesos(a.monto_centavos) + "</td>" +
@@ -17510,18 +17860,35 @@ document.addEventListener("click", function(e){
        línea real dentro de una cadena entre comillas — sin cerrar. */
     var ref = window.prompt("Confirmar " + g + " contra el extracto.\\n\\nNúmero del comprobante bancario (lo cita el certificado):");
     if (!ref) return;
+    /* LA FECHA Y EL MONTO DEL EXTRACTO (auditoria del 28 sep 2026). Se
+       proponen los que reporto el donante; quien confirma los cambia si el
+       extracto dice otra cosa. Van al certificado tal cual. */
+    var rep = REPORTADAS[g] || {};
+    var fechaExt = window.prompt("Fecha del movimiento en el extracto (AAAA-MM-DD).\\n\\nEs la fecha que va en el recibo y en el certificado, y la que decide el año gravable. El donante reportó: " + (rep.fecha_pago || "(sin fecha)"), rep.fecha_pago || "");
+    if (!fechaExt) return;
+    var montoRep = rep.monto_centavos ? String(Math.round(rep.monto_centavos / 100)) : "";
+    var montoExt = window.prompt("Monto que ENTRÓ según el extracto, en pesos y sin puntos.\\n\\nEl donante reportó: " + (montoRep || "?"), montoRep);
+    if (!montoExt) return;
     cf.disabled = true; cf.textContent = "…";
     /* Si la referencia ya confirmo otra guia, el servidor pregunta (409) y aqui
-       se le pregunta a la persona: solo con un motivo escrito se confirma. */
-    var confirmar = function(porQue){
+       se le pregunta a la persona: solo con un motivo escrito se confirma. Lo
+       mismo si el monto no coincide con el reportado. */
+    var porQueRef = "", porQueMonto = "";
+    var confirmar = function(){
       fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
         method:"POST", headers:{"content-type":"application/json"},
-        body: JSON.stringify({ referencia: ref, referencia_repetida_motivo: porQue || "" })
+        body: JSON.stringify({ referencia: ref, referencia_repetida_motivo: porQueRef,
+                               fecha: fechaExt.trim(), monto: montoExt, monto_motivo: porQueMonto })
       }).then(conEstado)
         .then(function(res){
           if (res.http === 409 && res.d && res.d.error === "referencia_repetida"){
             var m = window.prompt(res.d.ayuda + "\\n\\n¿Por qué son dos depósitos distintos? (vacío = no confirmar)");
-            if (m) return confirmar(m);
+            if (m){ porQueRef = m; return confirmar(); }
+            cf.disabled = false; cf.textContent = "Confirmar"; return;
+          }
+          if (res.http === 409 && res.d && res.d.error === "monto_distinto"){
+            var mm = window.prompt(res.d.ayuda + "\\n\\n¿Por qué difieren? (vacío = no confirmar)");
+            if (mm){ porQueMonto = mm; return confirmar(); }
             cf.disabled = false; cf.textContent = "Confirmar"; return;
           }
           if (fallo(res.http, res.d)){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); return; }
@@ -17529,7 +17896,7 @@ document.addEventListener("click", function(e){
         })
         .catch(function(){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); });
     };
-    confirmar("");
+    confirmar();
     return;
   }
   var ds = e.target.closest("[data-desc]");
@@ -20329,6 +20696,16 @@ function paginaMetodoPago(cfg) {
 + '      <input type="checkbox" name="acepta_datos" value="1" required style="margin-top:4px">\n'
 + '      <span>Autorizo el <a href="' + esc(info.datos.enlace) + '" target="_blank" rel="noopener">tratamiento de mis datos personales</a> (Ley 1581).</span>\n'
 + '    </label>\n'
+/* LA CASILLA DEL CERTIFICADO, que en la membresia con tarjeta no existia
+   (auditoria del 28 sep 2026): el deseo de certificado no llegaba a ningun
+   aporte. Opcional, y solo con monto: sin membresia no hay aporte que
+   certificar. El documento y la ciudad los pide una persona antes de emitir. */
++ (cfg.monto
+    ? '    <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px">\n'
+      + '      <input type="checkbox" name="certificado" value="1" style="margin-top:4px">\n'
+      + '      <span>Quiero certificado de donaci\u00f3n por mis aportes (sirve para el descuento tributario en Colombia). Te pediremos el documento y la ciudad antes de emitirlo.</span>\n'
+      + '    </label>\n'
+    : '')
 + '\n'
 + '\n'
 + '    <!-- HIJO DIRECTO DEL <form>, y no es estilo: el widget busca el\n'
@@ -20470,12 +20847,17 @@ async function wompiCobrar(env, sub) {
   const guia = reintento ? String(reciente.guia) : await siguienteGuia(env, anioCO());
 
   if (!reintento) {
+    /* `quiere_certificado` VIAJA de la suscripcion a cada aporte, como ya lo
+       hacia PayPal. Sin esto la casilla de la membresia no llegaba a ningun
+       aporte y el panel nunca contaba un certificado por emitir de un miembro
+       (auditoria del 28 sep 2026). */
     await env.DB.prepare(
       "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
-      "idioma, token, proveedor, suscripcion, donante_id) " +
-      "VALUES (?, 'intencion', ?, ?, 'fondo', ?, ?, ?, 'wompi', ?, ?)"
+      "idioma, token, proveedor, suscripcion, donante_id, quiere_certificado) " +
+      "VALUES (?, 'intencion', ?, ?, 'fondo', ?, ?, ?, 'wompi', ?, ?, ?)"
     ).bind(guia, centavos, moneda, String(sub.frecuencia || "mensual"),
-           String(sub.idioma || "es"), tokenNuevo(), sub.id, sub.donante_id || null).run();
+           String(sub.idioma || "es"), tokenNuevo(), sub.id, sub.donante_id || null,
+           sub.quiere_certificado ? 1 : 0).run();
   }
 
   const firma = await sha256Hex(guia + centavos + moneda + sec);
@@ -20617,12 +20999,15 @@ async function cobrarSuscripcionesDelMes(env) {
     return { ok: true, motivo: "sin_pasarela", cobrados: 0 };
   }
 
+  /* LE TOCA A QUIEN LLEVA UN MES SIN COBRO, O A QUIEN TIENE UN REINTENTO
+     VENCIDO: un cobro de este mes que la pasarela rechazo y que se repite una
+     vez, unos dias despues (ver `membresiaTrasCobro`). */
+  const TOCA = "proveedor = 'wompi' AND estado = 'activa' AND fuente_id IS NOT NULL " +
+    "AND (ultimo_cobro_en IS NULL OR ultimo_cobro_en <= datetime('now','-1 month') " +
+    "     OR (reintento_en IS NOT NULL AND reintento_en <= datetime('now')))";
   const { results } = await env.DB.prepare(
-    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id " +
-    "FROM suscripciones " +
-    "WHERE proveedor = 'wompi' AND estado = 'activa' AND fuente_id IS NOT NULL " +
-    "AND (ultimo_cobro_en IS NULL OR ultimo_cobro_en <= datetime('now','-1 month')) " +
-    "ORDER BY ultimo_cobro_en ASC LIMIT ?"
+    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id, quiere_certificado, reintento_en " +
+    "FROM suscripciones WHERE " + TOCA + " ORDER BY ultimo_cobro_en ASC LIMIT ?"
   ).bind(COBROS_POR_EJECUCION).all();
 
   const pendientes = results || [];
@@ -20654,9 +21039,36 @@ async function cobrarSuscripcionesDelMes(env) {
       continue;
     }
 
+    /* EL CANDADO, POR SUSCRIPCION Y ANTES DE COBRAR (auditoria del 28 sep
+       2026). La lista de arriba se leyo al empezar, y Cloudflare no garantiza
+       que el cron corra exactamente una vez: dos ejecuciones solapadas leian la
+       misma lista y las dos cobraban. La referencia unica de Wompi solo salva el
+       caso del reintento con la MISMA guia; dos ejecuciones nuevas sacan dos
+       guias distintas y son dos cobros de verdad.
+
+       Se toma con un UPDATE que repite la condicion de «le toca» y exige el
+       candado libre: solo una ejecucion logra cambiar la fila. Caduca a la hora
+       para que una ejecucion que muere con el candado puesto no deje a nadie
+       sin cobrar para siempre. */
+    const toma = await env.DB.prepare(
+      "UPDATE suscripciones SET cobrando_en = datetime('now') WHERE id = ? AND " + TOCA +
+      " AND (cobrando_en IS NULL OR cobrando_en < datetime('now','-1 hour'))"
+    ).bind(sub.id).run();
+    if (!toma.meta || !toma.meta.changes) { yaEstaban++; continue; }
+
     let r;
     try { r = await wompiCobrar(env, sub); }
     catch (e) { r = { ok: false, motivo: "excepcion" }; console.error("cobro", sub.id, e && e.message); }
+
+    /* Se suelta el candado y, si esto era el reintento, se consume: hay UN
+       reintento por mes, no uno cada dia hasta que salga. */
+    try {
+      await env.DB.prepare(
+        "UPDATE suscripciones SET cobrando_en = NULL, " +
+        "reintento_en = CASE WHEN reintento_en IS NOT NULL AND reintento_en <= datetime('now') THEN NULL ELSE reintento_en END " +
+        "WHERE id = ?"
+      ).bind(sub.id).run();
+    } catch (e) { console.error("soltar candado", sub.id, e && e.message); }
 
     if (r.ok) {
       /* `creados` y no `cobrados`: lo que sabemos aqui es que la transaccion
@@ -20671,6 +21083,126 @@ async function cobrarSuscripcionesDelMes(env) {
 
   return { ok: true, revisadas: pendientes.length, creados, yaEstaban, fallidos, suspendidas,
            tope: COBROS_POR_EJECUCION };
+}
+
+/* LO QUE UN COBRO DE MEMBRESIA LE HACE A LA MEMBRESIA. Lo llama
+   `aplicarEstado` —webhook o conciliacion— con el aporte ANTES de moverlo
+   (`fila`) y el estado nuevo. Auditoria del 28 sep 2026:
+
+   · PRIMER COBRO. La membresia nace `pendiente`. Aprobado → `activa`, y ahi
+     sale el correo con su enlace. Rechazado → `fallida`, y se le dice a la
+     persona, que ya cerro la pestaña de /pago/listo creyendo que estaba hecho.
+   · COBRO DEL MES RECHAZADO. Antes no pasaba nada: el cron ya habia escrito
+     `ultimo_cobro_en` al crear la transaccion, asi que no se reintentaba hasta
+     el mes siguiente y nadie le avisaba al donante. Ahora se le escribe con el
+     enlace para cambiar la tarjeta y se programa UN reintento a los tres dias.
+     Un segundo rechazo en el mismo ciclo no programa otro: se avisa y se
+     espera al mes siguiente. El tope de tres rechazos en cien dias sigue
+     siendo el que suspende.
+   · Una reversa de un cobro que YA estaba aprobado no es un rechazo: eso lo
+     atiende el guardian de certificados, no esto. */
+async function membresiaTrasCobro(env, fila, nuevo) {
+  const sub = await env.DB.prepare(
+    "SELECT s.id, s.estado, s.token, s.nivel, s.monto_centavos, s.idioma, d.email, d.nombre " +
+    "FROM suscripciones s LEFT JOIN donantes d ON d.id = s.donante_id WHERE s.id = ?"
+  ).bind(fila.suscripcion).first();
+  if (!sub) return;
+  const lang = sub.idioma === "en" ? "en" : "es";
+
+  if (nuevo === "aprobada") {
+    const act = await env.DB.prepare(
+      "UPDATE suscripciones SET estado = 'activa', reintento_en = NULL, actualizada_en = datetime('now') " +
+      "WHERE id = ? AND estado = 'pendiente'"
+    ).bind(sub.id).run();
+    if (act.meta && act.meta.changes) {
+      if (sub.token && sub.email) await correoEnlaceMembresia(env, sub, sub.email, lang);
+    } else {
+      /* Un reintento que salio: ya no hay nada pendiente este mes. */
+      await env.DB.prepare("UPDATE suscripciones SET reintento_en = NULL WHERE id = ?").bind(sub.id).run();
+    }
+    return;
+  }
+
+  if (nuevo !== "rechazada" && nuevo !== "error") return;
+  if (fila.aprobada_en) return;
+
+  if (sub.estado === "pendiente") {
+    const f = await env.DB.prepare(
+      "UPDATE suscripciones SET estado = 'fallida', cancelada_motivo = 'primer cobro rechazado por la pasarela', " +
+      "actualizada_en = datetime('now') WHERE id = ? AND estado = 'pendiente'"
+    ).bind(sub.id).run();
+    if (f.meta && f.meta.changes) await correoCobroRechazado(env, sub, fila.guia, { primero: true, lang });
+    return;
+  }
+  if (sub.estado !== "activa") return;
+
+  const otros = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM aportes WHERE suscripcion = ? AND guia <> ? " +
+    "AND estado IN ('rechazada','error') AND creada_en > datetime('now','-25 days')"
+  ).bind(sub.id, fila.guia).first();
+  let reintento = null;
+  if (!(otros && Number(otros.n) > 0)) {
+    await env.DB.prepare(
+      "UPDATE suscripciones SET reintento_en = datetime('now','+3 days'), actualizada_en = datetime('now') " +
+      "WHERE id = ? AND reintento_en IS NULL"
+    ).bind(sub.id).run();
+    const r = await env.DB.prepare("SELECT reintento_en FROM suscripciones WHERE id = ?").bind(sub.id).first();
+    reintento = r && r.reintento_en ? fechaCO(r.reintento_en) : null;
+  }
+  await correoCobroRechazado(env, sub, fila.guia, { primero: false, reintento, lang });
+}
+
+/* El aviso de un cobro rechazado. UNA vez por aporte: si ya salio (o se
+   simulo) para esta guia no se repite, porque Wompi reintenta sus eventos y un
+   DECLINED seguido de un ERROR del mismo cobro son el mismo rechazo. */
+async function correoCobroRechazado(env, sub, guia, o) {
+  if (!sub.email) return { ok: true, sinCorreo: true };
+  const ya = await env.DB.prepare(
+    "SELECT 1 FROM correos WHERE etiqueta = 'cobro-rechazado' AND guia = ? AND resultado IN ('enviado','simulado') LIMIT 1"
+  ).bind(guia).first();
+  if (ya) return { ok: true, repetido: true };
+
+  const en = o.lang === "en";
+  const pesosMes = Math.round(Number(sub.monto_centavos || 0) / 100);
+  const monto = fmtPesos(sub.monto_centavos) + " COP";
+  const enlaceMembresia = sub.token ? ORIGIN + "/membresia/" + sub.token + (en ? "?lang=en" : "") : null;
+  let titulo, parrafos, boton;
+  if (o.primero) {
+    titulo = en ? "Your membership did not start" : "Tu membresía no arrancó";
+    parrafos = en ? [
+      "The payment gateway declined the first charge of your membership, so it did not start and you were not charged.",
+      "You can try again with another card. If it keeps happening, reply to this email and a person will look into it."
+    ] : [
+      "La pasarela rechazó el primer cobro de tu membresía, así que no quedó activa y no se te cobró.",
+      "Puedes intentarlo de nuevo con otra tarjeta. Si vuelve a pasar, responde este correo y una persona lo revisa."
+    ];
+    boton = { url: ORIGIN + "/pago/metodo?monto=" + pesosMes, texto: en ? "Try with another card" : "Intentar con otra tarjeta" };
+  } else {
+    titulo = en ? "We could not collect this month's gift" : "No pudimos hacer el cobro de este mes";
+    parrafos = en ? [
+      "The payment gateway declined this month's charge for your membership, so you were not charged. Your membership is still active.",
+      o.reintento
+        ? "We will try once more on " + o.reintento + ". If your card changed or expired, register the new one before then: the next charge will use it."
+        : "We will not try again this month; the next charge is next month. If your card changed or expired, register the new one: the next charge will use it."
+    ] : [
+      "La pasarela rechazó el cobro de este mes de tu membresía, así que no se te cobró. Tu membresía sigue activa.",
+      o.reintento
+        ? "Lo intentaremos una vez más el " + fechaLargaISO(o.reintento) + ". Si tu tarjeta cambió o venció, registra la nueva antes: el próximo cobro saldrá de ella."
+        : "No lo volveremos a intentar este mes; el próximo cobro será el mes que viene. Si tu tarjeta cambió o venció, registra la nueva: el próximo cobro saldrá de ella."
+    ];
+    if (enlaceMembresia) parrafos.push(en
+      ? "If you would rather end your membership, you can do it from your membership page: " + enlaceMembresia
+      : "Si prefieres terminar tu membresía, puedes hacerlo desde su página: " + enlaceMembresia);
+    boton = { url: ORIGIN + "/pago/metodo", texto: en ? "Update my card" : "Actualizar mi tarjeta" };
+  }
+  const filas = en ? [["Reference", guia], ["Monthly", monto]] : [["Guía", guia], ["Mensual", monto]];
+  return enviarCorreo(env, {
+    para: sub.email,
+    asunto: titulo + " · " + guia,
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "", boton.texto + ": " + boton.url].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, boton }),
+    etiqueta: "cobro-rechazado", guia
+  });
 }
 
 /* EL NUCLEO DE HACERSE MIEMBRO, fuera de cualquier ruta.
@@ -20728,6 +21260,20 @@ async function crearSuscripcion(env, o) {
 
   const nivel = nivelPorMensual(Math.round(monto));
   const idioma = o.idioma === "en" ? "en" : "es";
+
+  /* UNA EN CAMINO TAMBIEN CUENTA. Desde el 28 sep 2026 la membresia nace
+     `pendiente` hasta que el webhook confirma el primer cobro, y el freno de
+     arriba solo mira las activas: dos envios seguidos del formulario habrian
+     creado DOS primeros cobros en la ventana de minutos que tarda la pasarela.
+     Se mira un dia hacia atras: una pendiente mas vieja es una que quedo sin
+     respuesta y ya esta en manos de una persona. */
+  const enCamino = await env.DB.prepare(
+    "SELECT s.id FROM suscripciones s JOIN donantes d ON d.id = s.donante_id " +
+    "WHERE s.proveedor = 'wompi' AND s.estado = 'pendiente' AND LOWER(d.email) = ? " +
+    "AND s.creada_en > datetime('now','-1 day') LIMIT 1"
+  ).bind(email).first();
+  if (enCamino) return { ok: false, motivo: "en_proceso" };
+
   /* Se reutiliza `donantePorCorreo`, que ya existe y hace justo esto: inserta
      o actualiza por correo y devuelve el id. */
   const donante = await donantePorCorreo(env, email, String(o.nombre || "").slice(0, 120));
@@ -20745,15 +21291,25 @@ async function crearSuscripcion(env, o) {
   await env.DB.prepare(
     "INSERT INTO suscripciones (id, proveedor, estado, nivel, monto_centavos, moneda, frecuencia, " +
     "donante_id, idioma, quiere_certificado, consent_muro, fuente_id, token) " +
-    "VALUES (?, 'wompi', 'activa', ?, ?, 'COP', 'mensual', ?, ?, ?, ?, ?, ?)"
+    "VALUES (?, 'wompi', 'pendiente', ?, ?, 'COP', 'mensual', ?, ?, ?, ?, ?, ?)"
   ).bind(subId, nivel.id, Math.round(monto) * 100, donante, idioma,
          o.certificado ? 1 : 0, ["nombre","anonimo","no"].includes(o.muro) ? o.muro : "no",
          fuente.id, tokenBaja).run();
   const sub = await env.DB.prepare(
-    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id FROM suscripciones WHERE id = ?"
+    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id, quiere_certificado " +
+    "FROM suscripciones WHERE id = ?"
   ).bind(subId).first();
 
   const cobro = await wompiCobrar(env, sub);
+  /* SIN RESPUESTA NO ES UN RECHAZO. Se corto la red DESPUES de mandar el
+     cobro: puede que Wompi lo haya creado y puede que no. Darla por fallida y
+     decirle «no se te cobro nada» podia ser falso; el webhook —que encuentra el
+     aporte por la guia— o la conciliacion desde el panel deciden. Mientras
+     tanto queda `pendiente`, y la pantalla dice que se esta verificando. */
+  if (!cobro.ok && cobro.motivo === "sin_respuesta") {
+    return { ok: true, pendiente: true, verificando: true, suscripcion: subId, token: tokenBaja,
+             nivel: nivel.id, guia: cobro.guia };
+  }
   if (!cobro.ok) {
     /* La suscripcion NO queda activa si el primer cobro no sale. Dejarla viva
        seria prometerle a alguien una membresia que nunca se cobro. */
@@ -20763,13 +21319,11 @@ async function crearSuscripcion(env, o) {
     return { ok: false, motivo: "primer_cobro_fallido", detalle: cobro.detalle || null };
   }
 
-  /* EL ENLACE DE BAJA SE ENVIA POR CORREO ADEMAS DE DEVOLVERSE. Dejarlo solo
-     en la respuesta lo pone en manos de que la pantalla lo muestre y de que la
-     persona no cierre la pestana; por correo sobrevive a las dos cosas. */
-  await correoEnlaceMembresia(env, { token: tokenBaja, nivel: nivel.id, monto_centavos: Math.round(monto) * 100 },
-                              email, idioma);
-
-  return { ok: true, suscripcion: subId, token: tokenBaja, nivel: nivel.id,
+  /* EL ENLACE A LA MEMBRESIA YA NO SALE AQUI: sale cuando el webhook confirma
+     el primer cobro y la activa (`membresiaTrasCobro`). Mandarlo ahora era
+     escribirle «tu membresia» a alguien cuyo cobro todavia podia rechazarse.
+     El enlace igual vuelve en la respuesta, para que la pantalla lo muestre. */
+  return { ok: true, pendiente: true, suscripcion: subId, token: tokenBaja, nivel: nivel.id,
            guia: cobro.guia, estado: cobro.estado };
 }
 
@@ -20925,12 +21479,17 @@ async function apiCrearFuentePago(request, env, url) {
     const sus = await crearSuscripcion(env, {
       email, monto: Number(montoTxt),
       nombre: String(f.get("nombre") || "").slice(0, 120),
-      idioma: f.get("idioma") === "en" ? "en" : "es"
+      idioma: f.get("idioma") === "en" ? "en" : "es",
+      /* La casilla existe en /pago/metodo desde el 28 sep 2026. `crearSuscripcion`
+         ya sabia guardarla; nadie se la pasaba. */
+      certificado: !!f.get("certificado")
     });
     if (sus.ok) {
       q.set("sub", "1");
       q.set("n", sus.nivel);
       q.set("t", sus.token);
+      /* «v» = verificando: el primer cobro se mando y no hubo respuesta. */
+      if (sus.verificando) q.set("v", "1");
     } else {
       /* NO SE CALLA. La tarjeta quedo registrada y la membresia no arranco:
          decirle «listo» seria mentir justo en la pantalla del dinero. El
@@ -20940,6 +21499,33 @@ async function apiCrearFuentePago(request, env, url) {
       if (sus.token) q.set("t", sus.token);
       console.error("suscripcion tras tokenizar", sus.motivo, sus.detalle || "");
     }
+  }
+  /* CAMBIAR DE TARJETA SIN TOCAR LA MEMBRESIA, que es lo que promete el
+     correo de un cobro rechazado («registra la nueva: el proximo cobro saldra
+     de ella»). Sin monto, esto solo registraba la fuente: la membresia seguia
+     atada a la tarjeta vieja y el reintento volvia a caer en ella.
+
+     Se re-ata SOLO la membresia viva de ese mismo correo. Quien lo hace con el
+     correo de otro no gana nada: la tarjeta que queda es la SUYA, y el cobro
+     sale de su bolsillo. */
+  if (!montoTxt) {
+    try {
+      const nueva = await env.DB.prepare(
+        "SELECT id FROM fuentes_pago WHERE fuente_ref = ? AND LOWER(email) = LOWER(?) LIMIT 1"
+      ).bind(String(d.id || ""), email).first();
+      if (nueva) {
+        const re = await env.DB.prepare(
+          "UPDATE suscripciones SET fuente_id = ?, actualizada_en = datetime('now') WHERE proveedor = 'wompi' " +
+          "AND estado = 'activa' AND donante_id IN (SELECT id FROM donantes WHERE LOWER(email) = LOWER(?))"
+        ).bind(nueva.id, email).run();
+        if (re.meta && re.meta.changes) {
+          q.set("r", "1");
+          await env.DB.prepare(
+            "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES ('sistema', 'auditoria', ?)"
+          ).bind("membresia re-atada a la fuente " + nueva.id + " al registrar una tarjeta nueva").run();
+        }
+      }
+    } catch (e) { console.error("re-atar fuente", e && e.message); }
   }
   return Response.redirect(ORIGIN + "/pago/listo?" + q.toString(), 303);
 }
@@ -20991,12 +21577,20 @@ function paginaPagoListo(url) {
      quien se quedo con la tarjeta registrada y sin membresia. En la pantalla
      del dinero eso no es un matiz. */
   let titulo, lead, extra = "";
-  if (sub === "1") {
-    titulo = "Ya eres miembro";
-    lead = "Tu membres\u00eda qued\u00f3 activa" + (nivel ? " en el nivel <b>" + esc(nivel) + "</b>" : "")
-         + " y el primer cobro ya sali\u00f3"
-         + (tarjeta ? " a tu " + tarjeta : "") + ". El siguiente ser\u00e1 dentro de un mes.";
-    extra = '  <p class="mu">Te enviamos un correo con el enlace a tu membres\u00eda. Desde ah\u00ed puedes verla y terminarla cuando quieras, sin escribirle a nadie.</p>\n';
+  /* «PROCESANDO», NO «YA SALIO» (auditoria del 28 sep 2026). Cuando se llega
+     aqui Wompi solo ACEPTO crear el primer cobro; si el dinero entra lo dice el
+     webhook minutos despues. La pantalla del dinero no puede adelantarse. */
+  if (sub === "1" && url.searchParams.get("v") === "1") {
+    titulo = "Estamos verificando tu primer cobro";
+    lead = "Mandamos el primer cobro de tu membres\u00eda" + (tarjeta ? " a tu " + tarjeta : "")
+         + " y la pasarela no alcanz\u00f3 a respondernos. No sabemos todav\u00eda si sali\u00f3.";
+    extra = '  <p class="mu">No lo intentes otra vez mientras tanto, para no cobrarte dos veces. En cuanto la pasarela confirme, te escribimos: si sali\u00f3, con el enlace a tu membres\u00eda; si no, para que lo intentes de nuevo.</p>\n';
+  } else if (sub === "1") {
+    titulo = "Estamos procesando tu primer aporte";
+    lead = "Tu membres\u00eda" + (nivel ? " en el nivel <b>" + esc(nivel) + "</b>" : "")
+         + " queda activa en cuanto la pasarela confirme el primer cobro"
+         + (tarjeta ? " a tu " + tarjeta : "") + ". Suele tardar unos minutos.";
+    extra = '  <p class="mu">Te escribimos al correo cuando se confirme, con el enlace a tu membres\u00eda: desde ah\u00ed puedes verla y terminarla cuando quieras, sin escribirle a nadie. Si el cobro no sale, tambi\u00e9n te avisamos.</p>\n';
   } else if (sub === "0") {
     titulo = "Tu tarjeta qued\u00f3 registrada, la membres\u00eda no arranc\u00f3";
     const porques = {
@@ -21007,10 +21601,18 @@ function paginaPagoListo(url) {
       sin_metodo_de_pago: "No encontramos el m\u00e9todo de pago reci\u00e9n registrado."
     };
     lead = porques[err] || "Algo fall\u00f3 al activar la membres\u00eda y preferimos dec\u00edrtelo a dejarte creyendo que qued\u00f3.";
-    extra = '  <p class="mu">No se te cobr\u00f3 nada por la membres\u00eda. Si quieres, int\u00e9ntalo de nuevo desde membres\u00edas; y si vuelve a fallar, escr\u00edbenos y lo miramos nosotros.</p>\n';
+    /* `en_proceso`: ya hay un primer cobro de ese correo esperando respuesta.
+       Se dice sin confirmar que ese correo tenga membresia —lo teclea
+       cualquiera— y sobre todo sin decir «no se te cobro nada», que aqui
+       podria no ser cierto. */
+    extra = err === "en_proceso"
+      ? '  <p class="mu">Si ya lo intentaste hace un momento, espera el correo de confirmaci\u00f3n antes de volver a intentarlo, para no cobrarte dos veces.</p>\n'
+      : '  <p class="mu">No se te cobr\u00f3 nada por la membres\u00eda. Si quieres, int\u00e9ntalo de nuevo desde membres\u00edas; y si vuelve a fallar, escr\u00edbenos y lo miramos nosotros.</p>\n';
+    if (err === "en_proceso") lead = "No pudimos arrancar esta membres\u00eda ahora.";
   } else {
     titulo = "M\u00e9todo de pago registrado";
-    lead = "Tu m\u00e9todo de pago qued\u00f3 guardado" + (tarjeta ? " (" + tarjeta + ")" : "") + ".";
+    lead = "Tu m\u00e9todo de pago qued\u00f3 guardado" + (tarjeta ? " (" + tarjeta + ")" : "") + "."
+         + (url.searchParams.get("r") === "1" ? " Tu membres\u00eda usar\u00e1 esta tarjeta desde el pr\u00f3ximo cobro." : "");
     extra = '  <p class="mu">Puedes retirarlo cuando quieras desde tu membres\u00eda. Guardamos la marca y los cuatro \u00faltimos d\u00edgitos para que reconozcas cu\u00e1l registraste; el n\u00famero de tu tarjeta no lo tenemos, y su fecha de vencimiento tampoco.</p>\n';
   }
 
@@ -21119,7 +21721,7 @@ function paginaMembresia(m, lang, estado, tema) {
   const T = en ? {
     volver: "Back to memberships", titulo: "Your membership",
     activa: "Active", cancelada: "Cancelled", suspendida: "Suspended",
-    fallida: "Not started", otra: "Under review",
+    fallida: "Not started", otra: "Under review", pendiente: "Confirming the first charge",
     nivel: "Level", monto: "Monthly", desde: "Member since",
     ultimo: "Last charge", metodo: "Payment method", ninguno: "None yet",
     cabeza: "This is everything we have on your membership, and the button to end it.",
@@ -21135,7 +21737,7 @@ function paginaMembresia(m, lang, estado, tema) {
   } : {
     volver: "Volver a membresías", titulo: "Tu membresía",
     activa: "Activa", cancelada: "Cancelada", suspendida: "Suspendida",
-    fallida: "No llegó a empezar", otra: "En revisión",
+    fallida: "No llegó a empezar", otra: "En revisión", pendiente: "Confirmando el primer cobro",
     nivel: "Nivel", monto: "Mensual", desde: "Miembro desde",
     ultimo: "Último cobro", metodo: "Método de pago", ninguno: "Todavía ninguno",
     cabeza: "Esto es todo lo que tenemos de tu membresía, y el botón para terminarla.",
@@ -21151,7 +21753,9 @@ function paginaMembresia(m, lang, estado, tema) {
   };
 
   const nombreEstado = T[m.estado] || T.otra;
-  const viva = m.estado === "activa";
+  /* `pendiente` tambien se puede terminar: el primer cobro esta en camino y
+     quien se arrepiente en esos minutos no tiene por que esperar a que salga. */
+  const viva = m.estado === "activa" || m.estado === "pendiente";
   const nivel = nivelDe(m.nivel);
   /* «VISA \u00b7\u00b7\u00b7\u00b7 4242» y no «VISA termina en 4242»: en un telefono de 375px
      la version larga parte en dos lineas y deja «4242» solo, colgando. La forma
@@ -21278,13 +21882,13 @@ async function apiBajaMembresia(request, env, url) {
 
   /* IDEMPOTENTE. Quien recarga la pagina de confirmacion, o pulsa dos veces,
      no debe ver un error por algo que ya salio bien. */
-  if (sub.estado !== "activa") return destino(true);
+  if (sub.estado !== "activa" && sub.estado !== "pendiente") return destino(true);
 
   try {
     await env.DB.prepare(
       "UPDATE suscripciones SET estado = 'cancelada', cancelada_en = datetime('now'), " +
       "cancelada_motivo = 'baja pedida por la persona', actualizada_en = datetime('now') " +
-      "WHERE token = ? AND estado = 'activa'"
+      "WHERE token = ? AND estado IN ('activa','pendiente')"
     ).bind(token).run();
 
     /* La fuente se retira SOLO si no queda otra suscripcion viva usandola. Hoy

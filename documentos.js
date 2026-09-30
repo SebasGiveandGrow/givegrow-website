@@ -562,6 +562,7 @@ const T = {
     cintilloGuia: "Número de guía",
     aviso: "Este documento confirma la recepción de tu aporte. No es el certificado de donación para efectos tributarios: ese se expide aparte, firmado por el Representante Legal y la Revisora Fiscal.",
     fecha: "Fecha de confirmación",
+    fechaPago: "Fecha de la transferencia",
     monto: "Monto",
     frecuencia: "Frecuencia",
     destino: "Destino",
@@ -582,6 +583,7 @@ const T = {
     cintilloGuia: "Tracking number",
     aviso: "This document confirms we received your gift. It is not the donation certificate for tax purposes: that one is issued separately, signed by the Legal Representative and the Statutory Auditor.",
     fecha: "Confirmed on",
+    fechaPago: "Transfer date",
     monto: "Amount",
     frecuencia: "Frequency",
     destino: "Destination",
@@ -599,7 +601,8 @@ const T = {
 
 const METODOS = {
   CARD: "Tarjeta", BANCOLOMBIA_TRANSFER: "Botón Bancolombia", NEQUI: "Nequi",
-  PSE: "PSE", BANCOLOMBIA_COLLECT: "Corresponsal Bancolombia"
+  PSE: "PSE", BANCOLOMBIA_COLLECT: "Corresponsal Bancolombia",
+  TRANSFERENCIA: "Transferencia bancaria"
 };
 
 export async function recibo(a, hoyISO) {
@@ -621,6 +624,10 @@ export async function recibo(a, hoyISO) {
 
   h.regla({ despues: 16 });
   h.fila(t.fecha, fechaLarga(a.aprobada_en || a.creada_en));
+  /* EL DIA DEL MOVIMIENTO, aparte del de la confirmacion. En una transferencia
+     son dos fechas distintas y la que cuenta para el donante —y la que dice su
+     certificado— es la del extracto (auditoria del 28 sep 2026). */
+  if (a.fecha_pago) h.fila(t.fechaPago, fechaLarga(a.fecha_pago));
   h.fila(t.monto, pesos(a.monto_centavos, a.moneda || "COP"));
   h.fila(t.frecuencia, t.freq[a.frecuencia] || a.frecuencia);
   h.fila(t.destino, a.modo === "dirigida" ? (a.proyecto || a.destino_id || "-") : t.fondo);
@@ -1365,7 +1372,7 @@ export async function certificado(c, hoyISO) {
 
   seccion(h, f, "I", "IDENTIFICACIÓN DEL DONANTE");
   h.fila("Nombre o razón social", c.donante_nombre || "-");
-  h.fila((c.doc_tipo === "NIT" ? "NIT" : "C.C.") + " No.", c.doc_numero || "-");
+  h.fila(nombreDocumento(c.doc_tipo) + " No.", c.doc_numero || "-");
   h.fila("Domicilio", c.donante_ciudad || "-");
   h.salto(14);
 
@@ -1379,11 +1386,7 @@ export async function certificado(c, hoyISO) {
   h.numeral(4,
     "Valor de la donación: " + pesos(c.monto_centavos) + " (" +
     pesosEnLetras(Math.round(Number(c.monto_centavos) / 100)) + " M/cte.).");
-  h.numeral(5,
-    "Manera en que se efectuó la donación: mediante transferencia electrónica No. " +
-    (c.transaccion || "-") + " del " + fechaLarga(c.fecha_donacion) + ", realizada a través del " +
-    "sistema financiero en la " + ENTIDAD.cuenta + " de " + ENTIDAD.banco + ", en cumplimiento de " +
-    "lo previsto en el numeral 1 del artículo 125-2 del Estatuto Tributario.");
+  h.numeral(5, "Manera en que se efectuó la donación: " + maneraDePago(c) + ".");
   h.numeral(6,
     "Destinación de la donación: los recursos donados fueron incorporados al patrimonio de la " +
     "Fundación y destinados exclusivamente al desarrollo de su objeto social y de su actividad " +
@@ -1505,6 +1508,59 @@ export async function certificado(c, hoyISO) {
 /* Los motivos los escribe una persona en un campo libre, así que unos traen
    punto final y otros no. Sin normalizar, el sello salía con «aprobada.. No
    debe usarse». */
+/* EL TIPO DE DOCUMENTO CON SU NOMBRE (auditoria del 28 sep 2026). Imprimia
+   «NIT» o «C.C.» y nada mas: una cédula de extranjería o un pasaporte salian
+   como cédula de ciudadanía, en un documento que identifica al donante ante la
+   DIAN. Lo que no se reconoce no se disfraza de cédula: se nombra en genérico. */
+export const NOMBRES_DOCUMENTO = {
+  CC: "Cédula de ciudadanía", CE: "Cédula de extranjería", NIT: "NIT",
+  PP: "Pasaporte", TI: "Tarjeta de identidad", PEP: "Permiso especial de permanencia",
+  PPT: "Permiso por protección temporal", DNI: "Documento de identidad extranjero"
+};
+export function nombreDocumento(tipo) {
+  const t = String(tipo || "").toUpperCase();
+  /* Un certificado sin tipo guardado es de antes de que el panel lo pidiera, y
+     esos se emitían con «CC» por defecto: se respeta lo que ya se decía. */
+  if (!t) return NOMBRES_DOCUMENTO.CC;
+  return NOMBRES_DOCUMENTO[t] || "Documento de identificación";
+}
+
+/* EL NUMERAL 5 SEGUN COMO SE PAGO DE VERDAD (auditoria del 28 sep 2026).
+   Decia SIEMPRE «mediante transferencia electrónica … en la cuenta de ahorros
+   … de Bancolombia», tambien para un pago con tarjeta por la pasarela: una
+   afirmacion falsa bajo la gravedad de juramento. Las dos formas caben en el
+   numeral 1 del art. 125-2 ET («por medio de cheque, tarjeta de crédito o a
+   través de un intermediario financiero»); lo que cambia es la descripcion.
+
+   ⚠️ REDACCION PENDIENTE DE LA REVISORA FISCAL. El texto de la transferencia es
+   el suyo, intacto. Las variantes de pasarela son sobrias y solo describen el
+   hecho; antes de emitir el primer certificado de un pago en linea, ella tiene
+   que aprobarlas o reescribirlas aqui.
+
+   Sin `metodo_pago` en el snapshot (certificados emitidos antes de este
+   cambio) sale el texto de siempre: volver a descargar un certificado tiene que
+   devolver el mismo papel. */
+const PASARELA_FRASE = {
+  CARD: "pago con tarjeta",
+  BANCOLOMBIA_TRANSFER: "transferencia desde cuenta Bancolombia con el Botón Bancolombia",
+  PSE: "pago electrónico PSE",
+  NEQUI: "pago desde Nequi",
+  BANCOLOMBIA_COLLECT: "pago en corresponsal Bancolombia"
+};
+export function maneraDePago(c) {
+  const mp = String(c.metodo_pago || "").toUpperCase();
+  const tx = c.transaccion || "-";
+  const fecha = fechaLarga(c.fecha_donacion);
+  const cierre = ", en cumplimiento de lo previsto en el numeral 1 del artículo 125-2 del Estatuto Tributario";
+  if (!mp || mp === "TRANSFERENCIA") {
+    return "mediante transferencia electrónica No. " + tx + " del " + fecha + ", realizada a través del " +
+      "sistema financiero en la " + ENTIDAD.cuenta + " de " + ENTIDAD.banco + cierre;
+  }
+  const medio = PASARELA_FRASE[mp] || "pago electrónico";
+  return "mediante " + medio + ", procesado a través de la pasarela de pagos Wompi con la transacción No. " +
+    tx + " del " + fecha + ", por medio del sistema financiero" + cierre;
+}
+
 function motivoFrase(motivo) {
   const m = String(motivo || "").trim().replace(/[.\s]+$/, "");
   return m ? ". Motivo: " + m + "." : ".";

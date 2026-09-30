@@ -37,7 +37,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=029ef30e">
+<link rel="stylesheet" href="/styles.css?v=9c80cbf4">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=221c3fc9" defer></script>
+<script src="/app.js?v=2c14f94b" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1489,9 +1489,9 @@
           <button class="qbtn" data-act="setQuick(20000000)">$20M</button>
         </div>
         <div class="cur-toggle" id="calc-freq">
-          <button id="freq-m" class="on" data-act="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
+          <button id="freq-m" data-act="setFreq('m')" data-i18n="calc.freq.m">Mensual</button>
           <button id="freq-a" data-act="setFreq('a')" data-i18n="calc.freq.a">Anual</button>
-          <button id="freq-u" data-act="setFreq('u')" data-i18n="calc.freq.u">Único</button>
+          <button id="freq-u" class="on" data-act="setFreq('u')" data-i18n="calc.freq.u">Único</button>
         </div>
         <!-- Reemplaza al selector de frecuencia cuando el destino es una campaña
              puntual: ahí el aporte es único y ofrecer «mensual» sería cobrar
@@ -1533,6 +1533,29 @@
               </div>
           <h2 class="h-comp4 pay-now-t" data-i18n="pay.now.t">Tarjeta o Botón Bancolombia</h2>
           <p class="pay-now-p" data-i18n="pay.now.p">Sales a Wompi, la pasarela de pagos de Bancolombia, y vuelves con tu número de guía. Nosotros nunca vemos ni guardamos los datos de tu medio de pago.</p>
+          <!-- CERTIFICADO DE DONACION, opcional (28 sep 2026). El servidor ya
+               leia la casilla y la calculadora nunca la mandaba. Los datos van
+               al aporte, no a la ficha del donante: los revisa una persona antes
+               de emitir. Solo con la pasarela en pesos: con PayPal no hay
+               certificado (la minuta es para donaciones en COP). -->
+          <div class="pay-cert" id="pay-cert">
+            <label class="pay-cert-chk"><input type="checkbox" id="pay-cert-si" data-change="payCert()"><span><b data-i18n="pay.cert">Quiero certificado de donación</b><small data-i18n="pay.cert.h">Opcional. Sirve para el descuento tributario en Colombia y lo firman el Representante Legal y la Revisora Fiscal.</small></span></label>
+            <div class="pay-cert-f" id="pay-cert-f" style="display:none">
+              <div><label for="pay-cert-tipo" data-i18n="pay.cert.tipo">Tipo de documento</label>
+                <select id="pay-cert-tipo">
+                  <option value="CC" data-i18n="pay.cert.cc">Cédula de ciudadanía</option>
+                  <option value="CE" data-i18n="pay.cert.ce">Cédula de extranjería</option>
+                  <option value="NIT" data-i18n="pay.cert.nit">NIT (empresa)</option>
+                  <option value="PP" data-i18n="pay.cert.pp">Pasaporte</option>
+                  <option value="TI" data-i18n="pay.cert.ti">Tarjeta de identidad</option>
+                  <option value="PPT" data-i18n="pay.cert.ppt">Permiso por protección temporal</option>
+                </select></div>
+              <div><label for="pay-cert-num" data-i18n="pay.cert.num">Número de documento</label>
+                <input type="text" id="pay-cert-num" maxlength="25" autocomplete="off" inputmode="text"></div>
+              <div class="pay-cert-full"><label for="pay-cert-ciudad" data-i18n="pay.cert.ciudad">Ciudad de domicilio</label>
+                <input type="text" id="pay-cert-ciudad" maxlength="120" autocomplete="address-level2"></div>
+            </div>
+          </div>
           <p class="pay-now-rec" id="pay-rec-note" style="display:none"></p>
           <button type="button" class="btn btn-g pay-now-btn" id="pay-go" data-act="irAPagar()" data-i18n="pay.now.btn">Continuar al pago</button>
           <p class="pay-now-msg" id="pay-msg" role="status" aria-live="polite" style="display:none"></p>
