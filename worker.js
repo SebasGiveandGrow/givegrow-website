@@ -2327,11 +2327,17 @@ async function adminSalud(env) {
      Es justo lo que este panel existe para impedir, y ahora importa más que
      nunca: la brigada visita cinco territorios y todavía no hay ingenieros
      aprobados. */
+  /* PLAZO DE DOS DÍAS (auditoría del 28 sep 2026). Sin plazo esta cola no
+     entraba nunca al resumen diario, así que unas fotos que nadie abría solo
+     las veía quien entrara al panel. Dos días es lo que una familia con la casa
+     agrietada puede esperar sin empezar a pensar que nadie va a mirar.
+
+     «Sin abrir» es `SIN_ABRIR`, la misma definición que la familia lee en su
+     enlace y que decide el aviso a los ingenieros: si cada sitio contara otra
+     cosa, el número de la familia y el del panel no cuadrarían. */
   await enCola("casos_sin_evaluar",
-    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
-    "WHERE estado IN ('recibido','en_revision') " +
-    "AND NOT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = casos.numero)",
-    "Pantalla /triaje · una familia mandó fotos de su casa y nadie las ha abierto", 20, "/triaje");
+    "SELECT COUNT(*) AS n, MIN(c.creado_en) AS masViejo FROM casos c WHERE " + SIN_ABRIR,
+    "Pantalla /triaje · una familia mandó fotos de su casa y nadie las ha abierto", 20, "/triaje", 2);
   /* LAS QUE EL AVISO AUTOMÁTICO NO ALCANZA. A los siete días el Worker le
      escribe a la familia que sigue esperando —ver `avisarEsperaSeptimoDia`—,
      pero solo puede escribirle a quien dejó correo, y el correo es opcional DE
@@ -2401,10 +2407,16 @@ async function adminSalud(env) {
     "Pantalla «Firma» · un certificado ya firmado perdió su respaldo: el pago se cayó después. Decide si se anula", 11, "/firma");
   /* La peor de las cinco, y por eso va con su propio texto: el sistema dijo
      «vayan ya» y nadie fue. Que exista esta fila es media razón de esta tanda. */
+  /* PLAZO DE UN DÍA, contado desde que un ingeniero lo marcó urgente y no desde
+     que la familia lo mandó (auditoría del 28 sep 2026). Con la fecha del caso,
+     uno que esperó cinco días en la fila nacía vencido el mismo día en que por
+     fin alguien lo miró, y la alarma perdía el dato que la hace útil: cuánto
+     lleva el sistema diciendo «vayan ya». */
   await enCola("urgentes_sin_visitar",
-    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
-    "WHERE clasificacion = 'urgente' AND estado NOT IN ('visitado','cerrado','descartado')",
-    "Pantalla /ruta · un ingeniero dijo que era urgente y todavía no ha ido nadie", 10, "/admin/ruta");
+    "SELECT COUNT(*) AS n, MIN(COALESCE((SELECT MIN(e.creado_en) FROM evaluaciones e " +
+    "WHERE e.caso = c.numero AND e.clasificacion = 'urgente'), c.creado_en)) AS masViejo FROM casos c " +
+    "WHERE c.clasificacion = 'urgente' AND c.estado NOT IN ('visitado','cerrado','descartado')",
+    "Pantalla /ruta · un ingeniero dijo que era urgente y todavía no ha ido nadie", 10, "/admin/ruta", 1);
   /* ESTA COLA NO SE LIMPIABA CUANDO LAS FOTOS LLEGABAN. Contaba cualquier caso en
      `en_revision` que hubiera recibido un «no puedo evaluar» alguna vez, y subir
      material solo toca `actualizado_en`: así que una familia que respondía seguía
@@ -4003,7 +4015,13 @@ async function apiCasoEstado(env, numero, token) {
     "SELECT numero, token, estado, clasificacion, sector, creado_en FROM casos WHERE numero = ?"
   ).bind(numero).first();
   if (!c || !c.token || !igualesSeguro(c.token, String(token || ""))) return json({ error: "no_autorizado" }, 403);
-  const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
+  /* SOLO LO QUE MANDÓ LA FAMILIA (auditoría del 28 sep 2026). Contaba también
+     las fotos que sube el equipo en la visita, así que «Fotos que enviaste» y el
+     conteo del informe decían un número que la familia no reconocía. Misma
+     regla que `cupoFamilia`, que ya las separaba. */
+  const m = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ? AND COALESCE(categoria,'') <> ?"
+  ).bind(numero, CATEGORIA_VISITA).first();
 
   /* Lo que el ingeniero dijo, para que la familia lo lea en su página y no solo
      en un correo que pudo no llegarle — el correo es opcional de verdad, así
@@ -4047,9 +4065,11 @@ async function apiCasoEstado(env, numero, token) {
      marca prohíbe. Se dan los dos hechos verificables que sí existen: los días
      que lleva y cuántos casos siguen sin abrir. El segundo explica el primero
      mejor que cualquier disculpa. */
+  /* `SIN_ABRIR`: la misma cuenta que el correo del séptimo día y el panel
+     (auditoría del 28 sep 2026). Esta ya excluía lo evaluado, pero contaba los
+     casos que un ingeniero tiene tomados — y esos ya los está mirando alguien. */
   const espera = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM casos WHERE estado IN ('recibido','en_revision') " +
-    "AND NOT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = casos.numero)"
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_ABRIR
   ).first();
 
   return json({
@@ -4084,8 +4104,37 @@ async function apiCasoEstado(env, numero, token) {
        `tope_medios` se queda por si un navegador conserva un app.js viejo: con él
        vuelve al comportamiento anterior en vez de romperse. */
     cupo: { usados: cupo.usados, tope: cupo.tope, queda: cupo.queda, pedidas: cupo.pedidas },
-    tope_medios: MAX_MEDIOS
+    tope_medios: MAX_MEDIOS,
+    /* SI SE DESCARTÓ POR DUPLICADO, CUÁL ES EL QUE SIGUE (auditoría del 28 sep
+       2026). La página de un caso descartado decía lo mismo que la de uno
+       cerrado, y la familia que envió dos veces leía que «su caso» estaba
+       terminado sin saber que el otro seguía vivo. Solo el NÚMERO, nunca el
+       enlace ni el motivo que escribió el equipo. */
+    duplicado_de: c.estado === "descartado" ? await casoQueSigue(env, numero) : null
   });
+}
+
+/* El número de caso que el equipo citó al descartar este, si existe. Sale del
+   motivo que `adminMoverCaso` deja en la auditoría —«duplicado de CV-…»—: no hay
+   columna para esto y una migración para un dato que ya está escrito no se
+   justifica. Se comprueba que el citado exista y siga abierto; si no, nada. */
+async function casoQueSigue(env, numero) {
+  try {
+    const a = await env.DB.prepare(
+      "SELECT detalle FROM consentimientos WHERE tipo = 'auditoria' AND detalle LIKE ? " +
+      "ORDER BY id DESC LIMIT 1"
+    ).bind("caso " + numero + " % -> descartado%").first();
+    const citados = (String((a && a.detalle) || "").match(/CV-\d{4}-\d{6}/g) || [])
+      .filter((n) => n !== numero);
+    if (!citados.length) return null;
+    const otro = await env.DB.prepare(
+      "SELECT numero FROM casos WHERE numero = ? AND estado NOT IN ('cerrado','descartado')"
+    ).bind(citados[0]).first();
+    return otro ? otro.numero : null;
+  } catch (e) {
+    console.error("caso que sigue", numero, e && e.message);
+    return null;
+  }
 }
 
 /* El correo que la familia recibe al crear su caso: su número y su enlace.
@@ -4189,8 +4238,15 @@ async function familiasQueEsperan(env, dias) {
      nada. Eso es una decision de comunicacion, no un arreglo tecnico, y no se
      toma desde aqui. */
   const r = await env.DB.prepare(
+    /* `pide_material`: el siguiente paso es de la FAMILIA (auditoría del 28 sep
+       2026). Un ingeniero ya miró y pidió algo que no ha llegado; decirle «tu
+       caso sigue en la fila» es falso y además la deja esperando algo que solo
+       ella puede destrabar. A esas se les recuerda qué fotos faltan. */
     "SELECT c.numero, c.token, c.contacto_email, c.contacto_nombre, c.sector, c.creado_en, " +
-    "CAST(julianday('now') - julianday(c.creado_en) AS INTEGER) AS dias " +
+    "CAST(julianday('now') - julianday(c.creado_en) AS INTEGER) AS dias, " +
+    "(CASE WHEN " + PIDIERON_MATERIAL + " AND NOT " + RESPONDIO_TRAS_PEDIDO + " THEN 1 ELSE 0 END) AS pide_material, " +
+    "(SELECT e3.falta FROM evaluaciones e3 WHERE e3.caso = c.numero AND e3.clasificacion = 'inevaluable' " +
+    " ORDER BY e3.creado_en DESC, e3.id DESC LIMIT 1) AS falta " +
     "FROM casos c WHERE " + SIN_REVISAR + " " +
     "AND julianday('now') - julianday(c.creado_en) >= ? " +
     "AND julianday('now') - julianday(c.creado_en) < ? " +
@@ -4214,52 +4270,88 @@ async function familiasQueEsperan(env, dias) {
 
    Una vez al dia (UTC, como el cupo de Resend): si ya salio hoy no se repite,
    aunque el cron corra dos veces. Va al buzon de alianzas, que es quien atiende
-   estas colas, y cuenta como interno para el presupuesto de correo: si el dia
+   estas colas —lo de casas, al de Mira Mi Casa: ver `COLAS_PLAZO_MMC`—, y cuenta como interno para el presupuesto de correo: si el dia
    viene justo, gana el recibo de un donante, que es lo correcto. */
 const NOMBRE_COLA_PLAZO = {
   fundaciones_sin_respuesta: "Fundaciones que aplicaron y esperan respuesta",
   empresas_sin_respuesta: "Empresas que pidieron alianza y esperan respuesta",
   ofrecimientos_sin_respuesta: "Ofrecimientos en especie sin responder",
   apadrinamientos_sin_respuesta: "Quieren apadrinar y esperan respuesta",
-  voluntarios_sin_respuesta: "Voluntarios sin responder"
+  voluntarios_sin_respuesta: "Voluntarios sin responder",
+  urgentes_sin_visitar: "Casos urgentes que nadie ha visitado",
+  casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto"
 };
+/* LAS COLAS DE MIRA MI CASA VAN A SU PROPIO BUZÓN (auditoría del 28 sep 2026).
+   Hasta hoy ninguna cola de casos tenía plazo, así que ninguna llegaba nunca a
+   este resumen: un urgente sin visitar esperaba a que alguien abriera el panel.
+   Ahora tienen plazo, y su aviso va a `correoMMC` —quien atiende la ruta y el
+   triaje— y no al de alianzas, que es quien contesta a fundaciones y empresas.
+   Mezclarlos haría que cada buzón leyera avisos que no le tocan y dejara de
+   abrirlos. Cada uno se deduplica por su propia etiqueta. */
+const COLAS_PLAZO_MMC = ["urgentes_sin_visitar", "casos_sin_evaluar"];
 async function resumenDiarioEquipo(env) {
-  const para = correoAlianzas(env);
-  if (!para) return { saltado: "sin_buzon" };
-  const ya = await env.DB.prepare(
-    "SELECT 1 AS s FROM correos WHERE etiqueta = 'resumen-diario' " +
-    "AND resultado IN ('enviado','simulado') AND intento_en >= date('now') LIMIT 1"
-  ).first();
-  if (ya) return { saltado: "ya_salio_hoy" };
-
   const salud = await (await adminSalud(env)).json();
   const cola = (salud && salud.cola) || [];
   const vencidas = cola.filter(c => c.n > 0 && c.vencida);
   if (!vencidas.length) return { saltado: "nada_vencido" };
+  const deMMC = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) >= 0);
+  const deAlianzas = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) < 0);
   const otras = cola.filter(c => c.n > 0 && !c.vencida).length;
+  const out = {};
+  if (deAlianzas.length) {
+    out.alianzas = await enviarResumenVencidas(env, {
+      para: correoAlianzas(env), etiqueta: "resumen-diario", vencidas: deAlianzas,
+      titulo: (n) => n === 1
+        ? "Una persona espera una respuesta que ya pasó su plazo"
+        : n + " personas esperan una respuesta que ya pasó su plazo",
+      parrafos: [
+        "A cada una el acuse le prometió que una persona le escribe. Desde el panel, en «Quién quiere entrar», el filtro «Sin responder» las ordena de la más vieja a la más nueva, y cada fila trae un borrador de respuesta.",
+        otras ? "Además hay " + otras + (otras === 1 ? " cola" : " colas") + " con trabajo pendiente que todavía no pasa su plazo: están en «Hoy»." : ""
+      ],
+      boton: { url: "https://thegiveandgrowproject.org/admin#hoy", texto: "Abrir el panel" }
+    });
+  }
+  if (deMMC.length) {
+    out.mmc = await enviarResumenVencidas(env, {
+      para: correoMMC(env), etiqueta: "resumen-diario-mmc", vencidas: deMMC,
+      titulo: (n) => n === 1
+        ? "Una casa de Mira Mi Casa pasó su plazo"
+        : n + " casas de Mira Mi Casa pasaron su plazo",
+      parrafos: [
+        "Un urgente sin visitar vence al día; unas fotos que ningún ingeniero ha abierto, a los dos días. Cada fila de abajo es una familia que espera.",
+        "Los urgentes se atienden desde la ruta de visitas. Si hay riesgo para la vida, lo que corresponde es avisar a la alcaldía o al consejo municipal de gestión del riesgo, y al 123. Las fotos sin abrir se destraban escribiendo a los ingenieros verificados o abriéndolas desde /triaje."
+      ],
+      boton: { url: "https://thegiveandgrowproject.org/admin/ruta", texto: "Abrir la ruta de visitas" }
+    });
+  }
+  return out;
+}
 
-  const total = vencidas.reduce((t, c) => t + c.n, 0);
-  const titulo = total === 1
-    ? "Una persona espera una respuesta que ya pasó su plazo"
-    : total + " personas esperan una respuesta que ya pasó su plazo";
-  const filas = vencidas.map(c => [
+/* Un resumen, a un buzón, una vez al día (UTC, como el cupo de Resend): si ya
+   salió hoy con esa etiqueta no se repite, aunque el cron corra dos veces. */
+async function enviarResumenVencidas(env, x) {
+  if (!x.para) return { saltado: "sin_buzon" };
+  const ya = await env.DB.prepare(
+    "SELECT 1 AS s FROM correos WHERE etiqueta = ? " +
+    "AND resultado IN ('enviado','simulado') AND intento_en >= date('now') LIMIT 1"
+  ).bind(x.etiqueta).first();
+  if (ya) return { saltado: "ya_salio_hoy" };
+  const total = x.vencidas.reduce((t, c) => t + c.n, 0);
+  const titulo = x.titulo(total);
+  const filas = x.vencidas.map(c => [
     NOMBRE_COLA_PLAZO[c.clave] || c.clave,
     c.n + " · la más vieja hace " + c.dias + " días (plazo " + c.plazo + ")"
   ]);
-  const parrafos = [
-    "A cada una el acuse le prometió que una persona le escribe. Desde el panel, en «Quién quiere entrar», el filtro «Sin responder» las ordena de la más vieja a la más nueva, y cada fila trae un borrador de respuesta.",
-    otras ? "Además hay " + otras + (otras === 1 ? " cola" : " colas") + " con trabajo pendiente que todavía no pasa su plazo: están en «Hoy»." : ""
-  ].filter(Boolean);
+  const parrafos = x.parrafos.filter(Boolean);
   const r = await enviarCorreo(env, {
-    para,
+    para: x.para,
     asunto: "Panel · " + titulo,
     texto: [titulo, "", ...parrafos, "", ...filas.map(([k, v]) => k + ": " + v), "",
-            "https://thegiveandgrowproject.org/admin#hoy"].join("\n"),
-    html: plantillaCorreo({ titulo, parrafos, filas,
-      boton: { url: "https://thegiveandgrowproject.org/admin#hoy", texto: "Abrir el panel" } }),
-    etiqueta: "resumen-diario"
+            x.boton.url].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, boton: x.boton }),
+    etiqueta: x.etiqueta
   });
-  return { enviado: !!(r && r.ok), vencidas: vencidas.length, personas: total };
+  return { enviado: !!(r && r.ok), vencidas: x.vencidas.length, personas: total };
 }
 
 async function avisarEsperaSeptimoDia(env) {
@@ -4267,9 +4359,11 @@ async function avisarEsperaSeptimoDia(env) {
   if (!casos.length) return { ok: true, revisados: 0, enviados: 0 };
 
   /* Cuántos hay sin abrir POR DELANTE. Es el mismo número que la familia ve en
-     su enlace, así que el correo y la página no pueden contradecirse. */
+     su enlace, así que el correo y la página no pueden contradecirse — por eso
+     los dos usan `SIN_ABRIR` (antes este contaba con `SIN_REVISAR` y la página
+     con otra condición, y no cuadraban). */
   const fila = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_REVISAR
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_ABRIR
   ).first();
   const sinAbrir = (fila && Number(fila.n)) || 0;
 
@@ -4300,11 +4394,27 @@ async function avisarEsperaSeptimoDia(env) {
        configurada, y reintentar eso cada dia no manda nada y llena la tabla.
        De esa situacion informa `adminSalud`, que cuenta los 'simulado' aparte
        precisamente porque en produccion significan que nadie recibio nada. */
-    const ya = await env.DB.prepare(
+    /* SE RECLAMA ANTES DE ENVIAR, en una sola sentencia (auditoría del 28 sep
+       2026). Antes era «¿ya salió? → enviar»: dos ejecuciones del cron a la vez
+       —un reintento de Cloudflare, o alguien disparándolo a mano mientras
+       corría— pasaban las dos la pregunta antes de que ninguna anotara nada, y
+       la familia recibía dos veces el mismo aviso. Es la carrera que ya se
+       midió en los frenos anti-duplicado.
+
+       Ahora la pregunta y la reserva son el mismo INSERT ... WHERE NOT EXISTS:
+       solo una ejecución cambia una fila. La reserva es transitoria —se borra
+       en cuanto `enviarCorreo` deja su propia fila `enviado`/`fallo`— y caduca
+       a los 30 minutos, para que un Worker que muera entre reservar y enviar no
+       deje a esa familia bloqueada para siempre. */
+    const reserva = await env.DB.prepare(
+      "INSERT INTO correos (etiqueta, para, guia, resultado) " +
+      "SELECT 'caso-espera', ?, ?, 'reservado' WHERE NOT EXISTS (" +
       "SELECT 1 FROM correos WHERE etiqueta = 'caso-espera' AND guia = ? " +
-      "AND resultado IN ('enviado','simulado') LIMIT 1"
-    ).bind(c.numero).first();
-    if (ya) continue;
+      "AND (resultado IN ('enviado','simulado') OR " +
+      "(resultado = 'reservado' AND intento_en > datetime('now','-30 minutes'))))"
+    ).bind(c.contacto_email, c.numero, c.numero).run();
+    if (!reserva.meta || !reserva.meta.changes) continue;
+    const idReserva = reserva.meta.last_row_id;
 
     try {
       /* SE MIRA EL RESULTADO. `enviarCorreo` NO lanza cuando Resend responde
@@ -4317,6 +4427,12 @@ async function avisarEsperaSeptimoDia(env) {
     } catch (e) {
       fallidos++;
       console.error("aviso espera", c.numero, e && e.message);
+    } finally {
+      /* La reserva ya cumplió: lo que queda escrito es la fila real del envío. */
+      try {
+        await env.DB.prepare("DELETE FROM correos WHERE id = ? AND resultado = 'reservado'")
+          .bind(idReserva).run();
+      } catch (e) { console.error("soltar reserva aviso espera", c.numero, e && e.message); }
     }
   }
 
@@ -4328,6 +4444,7 @@ async function avisarEsperaSeptimoDia(env) {
 
 async function correoCasoEspera(env, x) {
   const enlace = ORIGIN_MMC + "/caso/" + x.numero + "?t=" + x.token;
+  if (x.pide_material) return correoCasoEsperaFotos(env, x, enlace);
   const titulo = "Tu caso sigue en la fila: " + x.numero;
   const parrafos = [
     "Te escribimos porque llevas " + x.dias + " días esperando y no queremos que " +
@@ -4355,6 +4472,33 @@ async function correoCasoEspera(env, x) {
     html: plantillaCorreo({
       titulo, parrafos, filas,
       boton: { url: enlace, texto: "Abrir mi caso" },
+      cierre: "Este es el único recordatorio automático que te mandamos. No te vamos a escribir cada semana."
+    }),
+    etiqueta: "caso-espera", guia: x.numero
+  });
+}
+
+/* EL MISMO AVISO, CUANDO EL SIGUIENTE PASO ES DE LA FAMILIA (auditoría del 28
+   sep 2026). Un ingeniero ya miró su caso y pidió algo que no ha llegado: «sigue
+   en la fila» sería mentira, y la dejaría esperando algo que solo ella puede
+   destrabar. Misma etiqueta `caso-espera`, así que sigue siendo UN solo aviso. */
+async function correoCasoEsperaFotos(env, x, enlace) {
+  const titulo = "Nos faltan unas fotos de tu casa: " + x.numero;
+  const parrafos = [
+    "Te escribimos porque un ingeniero voluntario ya miró tu caso, pero con las fotos que llegaron no pudo darte un concepto. Mientras no lleguen las que faltan, tu caso no puede avanzar.",
+    "Esto es lo que pidió: " + (x.falta || "más fotografías de los daños."),
+    "Las subes desde tu enlace, el mismo de siempre. No hace falta empezar de nuevo.",
+    "No entres a la casa si ves muros caídos, techos hundidos o columnas partidas: ninguna foto vale un accidente. Y si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— llama al 123 y a tu alcaldía."
+  ];
+  const filas = [["Tu caso", x.numero], ["Sector", x.sector || "—"], ["Días desde que lo enviaste", String(x.dias)]];
+  return enviarCorreo(env, {
+    para: x.contacto_email,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", "Tu enlace: " + enlace, "",
+            filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, filas,
+      boton: { url: enlace, texto: "Agregar las fotos que faltan" },
       cierre: "Este es el único recordatorio automático que te mandamos. No te vamos a escribir cada semana."
     }),
     etiqueta: "caso-espera", guia: x.numero
@@ -4389,8 +4533,12 @@ async function correoCasoEspera(env, x) {
    le escribe, para que sepa que no va a recibir uno por cada caso.
    ============================================================================ */
 async function avisarIngenierosFilaDespierta(env, x) {
+  /* `SIN_ABRIR` y no `SIN_REVISAR` (auditoría del 28 sep 2026): un caso que
+     espera fotos de la familia, o que otro ingeniero ya tomó, no es trabajo
+     esperando a un ingeniero, y contarlo callaba este aviso justo cuando la
+     fila de verdad pasaba de vacía a tener algo. */
   const fila = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_REVISAR
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_ABRIR
   ).first();
   /* Exactamente 1 = el que se acaba de crear es el único esperando. Si hay más,
      alguien ya tenía trabajo pendiente y este correo no aporta. */
@@ -4884,7 +5032,11 @@ function abrir(numero){
       var src = "/api/triage/medio/" + m[j].id;
       h += "<a href='" + src + "' target='_blank' rel='noopener'>";
       h += m[j].clase === "video"
-         ? "<video src='" + src + "' style='width:100%;height:130px;object-fit:cover' muted></video>"
+         /* preload='none' (auditoría del 28 sep 2026): sin él, abrir la ficha
+            bajaba enteros los videos de la familia —hasta 60 MB cada uno— antes
+            de que nadie pulsara reproducir, y el ingeniero revisa desde un
+            teléfono con datos. El enlace de alrededor abre el video completo. */
+         ? "<video src='" + src + "' preload='none' style='width:100%;height:130px;object-fit:cover;background:#1A1D21' muted></video>"
          : "<img src='" + src + "' alt='' loading='lazy'>";
       h += "<small>" + esc(m[j].categoria || m[j].clase) + "</small></a>";
     }
@@ -4909,10 +5061,16 @@ function abrir(numero){
       pintarFicha(h).scrollIntoView({ block: "start" });
       return;
     }
-    h += "<label for='t-clas'>Tu clasificación</label><select id='t-clas'>"
-      +  "<option value='urgente'>Visita urgente</option>"
-      +  "<option value='programada'>Visita programada</option>"
-      +  "<option value='no_requiere'>No requiere visita</option>"
+    /* SIN VALOR POR DEFECTO (auditoría del 28 sep 2026). El desplegable abría
+       en «Visita urgente», así que quien guardaba sin tocarlo firmaba un
+       urgente que no había decidido — y sobre un urgente se mueve una brigada y
+       ahora sale un correo al equipo. La primera opción está vacía y el envío
+       se para si sigue ahí; el servidor rechaza igual una clasificación vacía. */
+    h += "<label for='t-clas'>Tu clasificación</label><select id='t-clas' required>"
+      +  "<option value='' selected>Elige una clasificación…</option>"
+      +  "<option value='urgente'>Prioridad de visita alta (urgente)</option>"
+      +  "<option value='programada'>Prioridad de visita media (programada)</option>"
+      +  "<option value='no_requiere'>Visita no prioritaria</option>"
       +  "<option value='inevaluable'>No puedo evaluar con esto</option></select>"
       /* NO SE PREGUNTAN si el registro ya los tiene verificados. El número de
          matrícula es largo y se pedía de memoria en cada caso; así fue como un
@@ -4972,6 +5130,13 @@ var ENVIANDO = false;
 function enviar(){
   var msg = el("t-msg");
   if (ENVIANDO) return;
+  var clas = el("t-clas");
+  if (!clas || !clas.value){
+    msg.textContent = "Elige una clasificación antes de guardar.";
+    msg.style.color = "#8C2F1E";
+    if (clas) clas.focus();
+    return;
+  }
   ENVIANDO = true;
   var soltar = function(){
     ENVIANDO = false;
@@ -5136,6 +5301,27 @@ async function firmanteVerificado(env, email) {
    `TERRENO_URGE`, y por la misma razón. */
 const SIN_REVISAR = "c.estado IN ('recibido','en_revision')";
 
+/* LO QUE PARECE MÁS GRAVE, PRIMERO (auditoría del 28 sep 2026).
+   El sitio le dice a la familia «no es orden de llegada: se mira primero lo
+   que parece más grave», y la fila del ingeniero era `ORDER BY creado_en ASC`:
+   orden de llegada puro. Una promesa publicada sin una función detrás.
+
+   Antes de que un ingeniero mire, lo único que se sabe es lo que la familia
+   contestó, así que el orden sale de ahí y de nada inventado:
+     1. hubo heridos — la señal más fuerte de que la casa falló de verdad;
+     2. vive gente ahí ahora — el riesgo es para alguien que duerme adentro;
+     3. muros de adobe o bahareque — los que peor responden a un sismo;
+     4. hay fotos de la familia — sin fotos no hay nada que evaluar todavía;
+     5. y a igualdad, el que más lleva esperando.
+   Es una función porque cada consulta tiene su forma de saber si hay fotos: la
+   bandeja ya calcula `medios` y la ruta no. */
+const ORDEN_GRAVEDAD = (hayFotos) =>
+  "COALESCE(c.heridos,0) DESC, COALESCE(c.habitada,0) DESC, " +
+  "(CASE WHEN c.material IN ('adobe','bahareque') THEN 1 ELSE 0 END) DESC, " +
+  "(" + hayFotos + ") DESC, c.creado_en ASC";
+const HAY_FOTOS_FAMILIA =
+  "EXISTS (SELECT 1 FROM caso_medios mo WHERE mo.caso = c.numero AND COALESCE(mo.categoria,'') <> 'visita')";
+
 const CONFIRMAR = () =>
   "((c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA + " OR " + SIN_RESPALDO + ")" +
   /* Y NO LO TERMINADO. La pestaña enseñaba casos cerrados y descartados, así que
@@ -5221,6 +5407,21 @@ const TOMA_MAX = 10;
    caso esta libre aunque la columna siga escrita. */
 const TOMA_VIGENTE =
   "(c.tomado_por IS NOT NULL AND c.tomado_en > datetime('now','-" + TOMA_HORAS + " hours'))";
+/* «SIN ABRIR», en un solo sitio (auditoría del 28 sep 2026). `SIN_REVISAR` es
+   la pestaña del ingeniero y cuenta de más para esta pregunta: incluye los
+   casos donde el siguiente paso es de la FAMILIA —se le pidió material— y los
+   que un ingeniero ya tiene tomados. Así el aviso «la fila despertó» se callaba
+   porque había un caso esperando fotos, el correo del séptimo día le decía «tu
+   caso sigue en la fila» a quien en realidad le tocaba mandar fotos, y el
+   «casos sin abrir» de la familia contaba casos que alguien ya estaba mirando.
+
+   Sin abrir = en fila, sin NINGUNA evaluación (ni siquiera un «no puedo
+   evaluar», que es lo que convierte el siguiente paso en de la familia) y sin
+   una toma vigente. */
+const SIN_ABRIR =
+  "c.estado IN ('recibido','en_revision') " +
+  "AND NOT EXISTS (SELECT 1 FROM evaluaciones e0 WHERE e0.caso = c.numero) " +
+  "AND NOT " + TOMA_VIGENTE;
 /* Lo que otro tiene tomado ahora mismo. `?` es el correo de quien mira. */
 const TOMADO_POR_OTRO = "(" + TOMA_VIGENTE + " AND c.tomado_por <> ?)";
 /* QUÉ CUENTA COMO SEÑAL DE TERRENO QUE NO ESPERA, en un solo sitio.
@@ -5306,7 +5507,7 @@ async function triageCasos(env, url, email) {
     DISCREPA + " AS discrepa, " + FIRMES + " AS firmes, " + SIN_RESPALDO + " AS sin_respaldo, " +
     "c.tomado_por, c.tomado_en " +
     "FROM casos c " + filtro + oculto +
-    " ORDER BY c.creado_en ASC LIMIT " + TOPE_COLA + " OFFSET " + desde
+    " ORDER BY " + ORDEN_GRAVEDAD(HAY_FOTOS_FAMILIA) + " LIMIT " + TOPE_COLA + " OFFSET " + desde
   ).bind(...args).all();
 
   /* EL TOTAL, con el MISMO filtro que la lista. Sin esto la cola termina en el
@@ -5445,7 +5646,8 @@ async function triageEvaluar(request, env, numero, email) {
   if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const caso = await env.DB.prepare(
-    "SELECT numero, estado, contacto_email, token, sector FROM casos WHERE numero = ?"
+    "SELECT numero, estado, clasificacion, contacto_email, token, sector, material, " +
+    "habitada, heridos FROM casos WHERE numero = ?"
   ).bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
 
@@ -5475,7 +5677,11 @@ async function triageEvaluar(request, env, numero, email) {
 
   const clasificacion = String(c.clasificacion || "");
   if (!CLASIFICACIONES.includes(clasificacion)) {
-    return json({ error: "clasificacion_invalida", permitidas: CLASIFICACIONES }, 422);
+    /* Vacía o inventada, se rechaza igual (auditoría del 28 sep 2026): desde
+       que el desplegable no trae valor por defecto, una clasificación vacía es
+       «no decidió», y eso no se puede guardar como si fuera un veredicto. */
+    return json({ error: "clasificacion_invalida", permitidas: CLASIFICACIONES,
+                  ayuda: "Elige una clasificación antes de guardar." }, 422);
   }
   /* LA FIRMA SALE DEL REGISTRO, NO DEL FORMULARIO. Ver `firmanteVerificado`:
      lo que se teclea solo se usa si no hay inscripción verificada para ese
@@ -5613,6 +5819,30 @@ async function triageEvaluar(request, env, numero, email) {
     }
   } catch (e) { console.error("correo caso clasificado", numero, e && e.message); }
 
+  /* EL URGENTE LE LLEGA AL EQUIPO EN EL ACTO (auditoría del 28 sep 2026).
+     Hasta hoy marcar un caso `urgente` no avisaba a NADIE: el caso entraba a la
+     cola `urgentes_sin_visitar` y esperaba a que alguien abriera el panel. Y el
+     urgente es justo lo único que no puede esperar a que alguien se acuerde —
+     el comentario de esa cola lo dice: «el sistema dijo "vayan ya" y nadie
+     fue».
+
+     Solo en la TRANSICIÓN a urgente, no en cada evaluación de un caso que ya lo
+     era: el segundo ingeniero que confirma no trae noticia nueva, y un buzón
+     que recibe el mismo aviso dos veces aprende a ignorarlo. Sale con o sin
+     respaldo de matrícula y con o sin discrepancia: esas dos cosas deciden qué
+     se le dice a la FAMILIA; al equipo le basta con que alguien con criterio
+     vio señales graves. Va después de todo lo escrito y en su propio try, por
+     la misma regla dura de siempre: un correo no tumba una evaluación. */
+  if (veredicto.clasificacion === "urgente" && caso.clasificacion !== "urgente") {
+    try {
+      await correoCasoUrgente(env, {
+        numero, sector: caso.sector, material: caso.material,
+        habitada: caso.habitada, heridos: caso.heridos,
+        ing: nombre, conRespaldo, discrepa: veredicto.discrepa
+      });
+    } catch (e) { console.error("aviso urgente", numero, e && e.message); }
+  }
+
   return json({ ok: true, numero, estado: nuevoEstado,
                 clasificacion: nuevoEstado === "clasificado" ? veredicto.clasificacion : null,
                 discrepa: veredicto.discrepa, con_respaldo: conRespaldo });
@@ -5682,23 +5912,35 @@ self.addEventListener("fetch", (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== "GET") return;
   if (u.pathname !== "/triaje/inspeccion" && u.pathname !== "/triaje/inspeccion.js") return;
-  e.respondWith(
-    fetch(e.request).then((r) => {
-      /* Detrás de Access, una sesión expirada devuelve el HTML del login. Eso NO
-         se guarda en caché: sustituiría el formulario por una pantalla de
-         entrada, justo cuando no hay señal para volver a entrar. */
-      const ct = r.headers.get("content-type") || "";
-      const esLogin = r.redirected || (u.pathname.endsWith(".js") && !ct.includes("javascript"));
-      if (r.ok && !esLogin) {
-        const copia = r.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copia));
-      }
-      return r;
-    }).catch(() => caches.match(e.request).then((c) => c || new Response(
-      "Sin señal y sin copia guardada. Abre esta pantalla una vez con internet antes de salir.",
-      { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } }
-    )))
+  /* RED CON RELOJ (auditoría del 28 sep 2026). Era «red primero» sin tope: con
+     una barra de señal la petición no falla, se queda colgada, y el formulario
+     no abría nunca aunque estuviera guardado — el peor caso posible para una
+     pantalla hecha para las veredas. Ahora la red tiene 3,5 s; si no contesta,
+     sale la copia guardada y la respuesta de red, si llega después, igual
+     refresca la caché para la próxima vez. */
+  const red = fetch(e.request).then((r) => {
+    /* Detrás de Access, una sesión expirada devuelve el HTML del login. Eso NO
+       se guarda en caché: sustituiría el formulario por una pantalla de
+       entrada, justo cuando no hay señal para volver a entrar. */
+    const ct = r.headers.get("content-type") || "";
+    const esLogin = r.redirected || (u.pathname.endsWith(".js") && !ct.includes("javascript"));
+    if (r.ok && !esLogin) {
+      const copia = r.clone();
+      caches.open(CACHE).then((c) => c.put(e.request, copia));
+    }
+    return r;
+  });
+  const sinCopia = () => new Response(
+    "Sin señal y sin copia guardada. Abre esta pantalla una vez con internet antes de salir.",
+    { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } }
   );
+  const reloj = new Promise((res) => setTimeout(res, 3500)).then(() =>
+    caches.match(e.request).then((c) => c || red));
+  e.respondWith(
+    Promise.race([red, reloj])
+      .catch(() => caches.match(e.request).then((c) => c || sinCopia()))
+  );
+  e.waitUntil(red.catch(() => null));
 });
 `;
 }
@@ -8102,13 +8344,55 @@ async function correoDiscrepancia(env, x) {
   });
 }
 
+/* EL AVISO DEL URGENTE, al buzón de Mira Mi Casa (auditoría del 28 sep 2026).
+   Sin nombre, teléfono ni dirección de la familia, a propósito: ya están en el
+   panel, detrás de Access, y un correo se reenvía. Lo que tiene que lograr es
+   que alguien abra la ruta hoy, y para eso bastan el número, el sector y lo que
+   la familia contó que hace grave el caso. */
+async function correoCasoUrgente(env, x) {
+  const para = correoMMC(env);
+  if (!para) return avisoSinBuzon(env, "caso-urgente");
+  const si = (v) => (v ? "Sí" : "No");
+  const filas = [
+    ["Caso", x.numero],
+    ["Sector", x.sector || "—"],
+    ["Muros", x.material || "no dijo"],
+    ["Vive gente ahí ahora", si(x.habitada)],
+    ["Hubo heridos", si(x.heridos)],
+    ["Lo marcó", (x.ing || "un ingeniero") + (x.conRespaldo ? "" : " · matrícula SIN verificar")]
+  ];
+  const parrafos = [
+    "Un ingeniero acaba de marcar este caso como prioridad de visita ALTA. Entra a la cola «Urgentes sin visitar» y vence en un día: si mañana nadie ha ido, sale en el resumen diario.",
+    x.conRespaldo ? null : "La matrícula de quien lo marcó todavía no está verificada, así que a la familia no se le ha escrito: verifícala o pide una segunda opinión desde «Piden confirmación».",
+    x.discrepa ? "Hay otra opinión distinta sobre este caso. El caso se queda con la más grave mientras se resuelve." : null,
+    "Recuerda lo que la plataforma NO hace: no declara habitabilidad ni promete la visita a la familia. Si hay riesgo para la vida, lo que corresponde es avisar a la alcaldía o al consejo municipal de gestión del riesgo (Ley 1523 de 2012), y al 123."
+  ].filter(Boolean);
+  return enviarCorreo(env, {
+    para,
+    asunto: "URGENTE · " + x.numero + (x.sector ? " · " + x.sector : ""),
+    texto: [...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "",
+            "https://thegiveandgrowproject.org/admin/ruta"].join("\n"),
+    html: plantillaCorreo({
+      titulo: "Caso urgente: " + x.numero,
+      parrafos, filas,
+      boton: { url: "https://thegiveandgrowproject.org/admin/ruta", texto: "Abrir la ruta de visitas" }
+    }),
+    etiqueta: "caso-urgente", guia: x.numero
+  });
+}
+
 /* El aviso va en español y no bilingüe: esta plataforma atiende a familias en
    Colombia y el caso no guarda idioma. Si algún día hace falta, se añade el
    campo, no se adivina. */
+/* «PRIORIDAD DE VISITA», no «Visita urgente» (auditoría del 28 sep 2026).
+   Leído por una familia, «Visita urgente» es una promesa: alguien viene, y
+   pronto. La plataforma no agenda visitas ni las promete; lo que el ingeniero
+   dice es cuánta prioridad tendría ir. La etiqueta dice eso y nada más, y el
+   correo añade que no se agendó nada. */
 const TRIAJE_ET = {
-  urgente: "Visita urgente",
-  programada: "Visita programada",
-  no_requiere: "No requiere visita por ahora",
+  urgente: "Prioridad de visita: alta",
+  programada: "Prioridad de visita: media",
+  no_requiere: "Prioridad de visita: no prioritaria",
   inevaluable: "No se pudo evaluar con las fotos enviadas"
 };
 
@@ -8129,6 +8413,12 @@ async function correoCasoClasificado(env, x) {
     "Un ingeniero voluntario revisó las fotos de tu casa y ya hay un concepto.",
     x.recomendacion ? "Qué hacer, y con qué reparar: " + x.recomendacion : null,
     "Esto no reemplaza una visita ni la declaratoria de tu municipio: es un concepto hecho a distancia, sobre las fotos que enviaste.",
+    "La prioridad de visita que ves abajo NO agenda una visita: dice qué tan pronto convendría que alguien fuera, no que alguien vaya a ir.",
+    /* Con prioridad alta, a quién acudir: la plataforma no va a ir por su
+       cuenta, y quien sí puede actuar sobre la casa es el municipio (Ley 1523). */
+    x.clasificacion === "urgente"
+      ? "Como la prioridad es alta, informa a tu alcaldía o al consejo municipal de gestión del riesgo de tu municipio. Y si las cosas empeoran —la grieta crece, algo cruje, hay olor a gas— sal de la casa y llama al 123."
+      : null,
     "Buscaremos gestionar ayuda para todas las casas que podamos, y no podemos comprometerla casa por casa."
   ].filter(Boolean);
 
@@ -8182,7 +8472,13 @@ async function apiCasoInforme(env, numero, token) {
           ayuda: "Todavía ningún ingeniero ha revisado este caso." }, 409);
   }
 
-  const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
+  /* SOLO LO QUE MANDÓ LA FAMILIA (auditoría del 28 sep 2026). Contaba también
+     las fotos que sube el equipo en la visita, así que «Fotos que enviaste» y el
+     conteo del informe decían un número que la familia no reconocía. Misma
+     regla que `cupoFamilia`, que ya las separaba. */
+  const m = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ? AND COALESCE(categoria,'') <> ?"
+  ).bind(numero, CATEGORIA_VISITA).first();
   const hoy = fechaCO();
   const bytes = await informeTriage({
     numero: c.numero, sector: c.sector, material: c.material, pisos: c.pisos,
@@ -8251,7 +8547,10 @@ async function adminCasos(env) {
     /* Urgentes primero, y dentro de cada grupo el más viejo antes: en una
        emergencia el orden es la gravedad y luego la espera, nunca la novedad. */
     "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
-    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT " + TOPE_COLA
+    "WHEN 'no_requiere' THEN 3 ELSE 2 END, " +
+    /* Y dentro de cada clasificación, lo que la familia contó que es grave
+       (auditoría del 28 sep 2026) — misma clave que la fila del ingeniero. */
+    ORDEN_GRAVEDAD(HAY_FOTOS_FAMILIA) + " LIMIT " + TOPE_COLA
   ).all();
 
   /* POSIBLE DUPLICADO, y se calcula AQUÍ y no en SQL.
@@ -8425,7 +8724,7 @@ async function adminMoverCaso(request, env, numero, quien) {
   if (!regla) return json({ error: "estado_no_permitido", permitidos: Object.keys(CASO_DESTINOS) }, 400);
 
   const caso = await env.DB.prepare(
-    "SELECT numero, estado, tomado_por FROM casos WHERE numero = ?"
+    "SELECT numero, estado, tomado_por, token, contacto_email FROM casos WHERE numero = ?"
   ).bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
   if (caso.estado === nuevo) return json({ error: "sin_cambio", estado: caso.estado }, 409);
@@ -8486,8 +8785,70 @@ async function adminMoverCaso(request, env, numero, quien) {
             desaparecer un caso de su lista y el registro no dice por qué. */
          (suelta && caso.tomado_por ? " · se soltó de " + caso.tomado_por : "")).run();
 
+  /* LA FAMILIA SE ENTERA DE QUE SU CASO TERMINÓ (auditoría del 28 sep 2026).
+     Hasta hoy cerrar o descartar no le decía nada a nadie de fuera: la familia
+     que había dejado correo seguía esperando un concepto que ya no iba a
+     llegar, o leía en su enlace que estaba «cerrado» sin que nadie se lo
+     hubiera contado. Solo si dejó correo —es opcional DE VERDAD— y después de
+     escribir, en su propio try: el correo no puede deshacer el movimiento. Va
+     SIN el motivo, que es una nota del equipo y puede nombrar a otras
+     personas; si es un duplicado, sí va el número del caso que sigue. */
+  if (suelta && caso.contacto_email) {
+    try {
+      await correoCasoTerminado(env, {
+        numero, token: caso.token, email: caso.contacto_email, estado: nuevo,
+        sigue: nuevo === "descartado" ? await casoQueSigue(env, numero) : null
+      });
+    } catch (e) { console.error("correo caso terminado", numero, e && e.message); }
+  }
+
   return json({ ok: true, numero, estado: nuevo, anterior: caso.estado,
                 soltado_de: suelta ? (caso.tomado_por || null) : null });
+}
+
+/* El aviso de cierre, en los DOS idiomas y en ese orden. `casos` no guarda
+   idioma y el resto de correos a familias van solo en castellano por eso mismo
+   —«se añade el campo, no se adivina»—; aquí, que es una mala noticia posible,
+   se ponen las dos versiones completas en vez de adivinar. Sobrio a propósito:
+   no es un veredicto sobre la casa y no puede sonar a uno. */
+async function correoCasoTerminado(env, x) {
+  const enlace = ORIGIN_MMC + "/caso/" + x.numero + "?t=" + x.token;
+  const cerrado = x.estado === "cerrado";
+  const titulo = (cerrado ? "Tu caso quedó cerrado: " : "Tu caso no siguió adelante: ") + x.numero;
+  const es = cerrado ? [
+    "El equipo de Mira Mi Casa cerró tu caso " + x.numero + ". Cerrarlo no es un concepto sobre tu casa ni dice si se puede habitar: significa que desde aquí no hay un paso más que dar con él.",
+    "Si ya tenías un concepto, sigue en tu enlace y lo puedes descargar cuando quieras.",
+    "Si algo cambió en tu casa, escríbenos por WhatsApp con tu número de caso: el equipo revisa si corresponde reabrirlo."
+  ] : [
+    "El equipo de Mira Mi Casa no siguió adelante con el caso " + x.numero + ".",
+    x.sigue
+      ? "Tenemos otro caso tuyo, el " + x.sigue + ", y ese es el que sigue abierto: ahí aparece el concepto cuando esté. Si tienes su enlace, ábrelo ahí."
+      : "Si crees que es un error, escríbenos por WhatsApp con tu número de caso y lo revisamos."
+  ];
+  es.push("Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— llama al 123 y avisa a tu alcaldía o al consejo municipal de gestión del riesgo.");
+  const en = cerrado ? [
+    "The Mira Mi Casa team closed your case " + x.numero + ". Closing it is not an opinion on your home and does not say whether it can be lived in: it means there is no further step to take with it from here.",
+    "If you already had an opinion, it is still on your link and you can download it any time.",
+    "If something changed in your home, write to us on WhatsApp with your case number: the team will check whether it should be reopened."
+  ] : [
+    "The Mira Mi Casa team did not continue with case " + x.numero + ".",
+    x.sigue
+      ? "We have another case of yours, " + x.sigue + ", and that is the one still open: the opinion will appear there when it is ready."
+      : "If you think this is a mistake, write to us on WhatsApp with your case number and we will look into it."
+  ];
+  en.push("If the danger is happening NOW —a wall about to fall, a smell of gas, someone trapped— call 123 and tell your municipality or its disaster risk council.");
+  const parrafos = [...es, "— English —", ...en];
+  return enviarCorreo(env, {
+    para: x.email,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", "Tu enlace / Your link: " + enlace].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, filas: [["Tu caso · Your case", x.numero]],
+      boton: { url: enlace, texto: "Abrir mi caso · Open my case" },
+      cierre: "Este mensaje es automático. · This is an automatic message."
+    }),
+    etiqueta: "caso-terminado", guia: x.numero
+  });
 }
 
 /* POST /api/admin/inspeccion/<numero>/atendida — cerrar una señal de terreno.
@@ -8637,7 +8998,10 @@ async function adminRuta(env, url) {
        se hunde: sigue en la lista porque falta cerrarlo, pero no es una parada. */
     "CASE WHEN c.estado = 'visitado' THEN 1 ELSE 0 END, " +
     "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
-    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT " + TOPE_RUTA
+    "WHEN 'no_requiere' THEN 3 ELSE 2 END, " +
+    /* Entre dos urgentes, primero donde hubo heridos o vive gente (auditoría
+       del 28 sep 2026): misma clave que la fila del ingeniero. */
+    ORDEN_GRAVEDAD(HAY_FOTOS_FAMILIA) + " LIMIT " + TOPE_RUTA
   );
   const r = await (sector ? q.bind(sector) : q).all();
 
@@ -10231,8 +10595,10 @@ async function apiAlma(request, env, url) {
    exactamente cuando pasa de vacía a tener algo. */
 async function apiFilaTriaje(env) {
   const f = await env.DB.prepare(
+    /* `SIN_ABRIR`, la misma que decide el aviso de «la fila despertó»: el
+       comentario de arriba promete que los dos van juntos. */
     "SELECT COUNT(*) AS esperando, MIN(c.creado_en) AS mas_viejo " +
-    "FROM casos c WHERE " + SIN_REVISAR
+    "FROM casos c WHERE " + SIN_ABRIR
   ).first();
 
   const esperando = (f && Number(f.esperando)) || 0;

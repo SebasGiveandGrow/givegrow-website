@@ -33,7 +33,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=361c35c5">
+<link rel="stylesheet" href="/styles.css?v=b507b827">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -41,7 +41,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=74c2ec7d" defer></script>
+<script src="/app.js?v=4136c9c6" defer></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"NGO","name":"Fundación Give&Grow International","alternateName":"Give&Grow International","url":"https://www.thegiveandgrowproject.org","logo":"https://www.thegiveandgrowproject.org/img/og.jpg","email":"sebas@thegiveandgrowproject.org","telephone":"+57 315 330 5028","foundingDate":"2025-05-19","address":{"@type":"PostalAddress","streetAddress":"Carrera 82 A # 9 A Sur 28","addressLocality":"Medellín","addressRegion":"Antioquia","addressCountry":"CO"},"taxID":"901.948.930-2","identifier":{"@type":"PropertyValue","propertyID":"NIT","value":"901.948.930-2"},"areaServed":"CO","slogan":"Dar para crecer, crecer para dar más"}
 </script>
@@ -71,7 +71,7 @@
                páginas viven en Mira Mi Casa. `app.js` redirige igualmente si
                alguien llega por un enlace viejo, pero eso es una red de
                seguridad — desde el menú se va directo, sin el salto de más. -->
-          <a href="https://miramicasa.org/#vivienda"><span class="nd-t" data-i18n="cv.t">Revisa tu casa</span><span class="nd-d" data-i18n="nav.d.vivienda">Sube fotos y recibe un concepto: si puedes permanecer y con qué reparar</span></a>
+          <a href="https://miramicasa.org/#vivienda"><span class="nd-t" data-i18n="cv.t">Revisa tu casa</span><span class="nd-d" data-i18n="nav.d.vivienda">Sube fotos y recibe un concepto: si hay señales para no permanecer y con qué reparar</span></a>
           <a href="https://miramicasa.org/#ingenieros"><span class="nd-t" data-i18n="ing.ey">Ingenieros voluntarios</span><span class="nd-d" data-i18n="nav.d.ingenieros">Postúlate: mira fotos, di qué precauciones tomar y con qué reparar</span></a>
           <a href="https://miramicasa.org/#casas"><span class="nd-t" data-i18n="nav.casas">Casas revisadas</span><span class="nd-d" data-i18n="nav.d.casas">El registro público del triaje, sin nombres ni direcciones</span></a>
         </div>
@@ -2593,7 +2593,7 @@
       <div>
         <span class="ey rv" data-i18n="mmc.p.hero.ey">Tras el sismo del 10 de agosto</span>
         <h1 class="h-sec rv" data-i18n="mmc.p.t">Tu casa, revisada por un ingeniero.</h1>
-        <p class="lead rv d1" data-i18n="mmc.p.lead">Sin costo y sin que nadie tenga que venir. Subes fotos desde el teléfono y un ingeniero voluntario con matrícula te escribe si puedes permanecer, qué precauciones tomar y con qué materiales conviene reparar.</p>
+        <p class="lead rv d1" data-i18n="mmc.p.lead">Sin costo y desde tu teléfono. Subes fotos y un ingeniero voluntario con matrícula te escribe si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar y con qué materiales conviene reparar.</p>
         <!-- QUIEN VUELVE NO VIENE A ELEGIR PUERTA. Ver `mmcMiCaso` en app.js:
              el enlace del caso es la única llave de la familia y no había
              ninguna forma de recuperarlo. Va ANTES de los tres botones porque
@@ -2737,7 +2737,7 @@
       <h2 class="h-sec rv" data-i18n="mmc.p.pas.t">Del teléfono de una familia al concepto de un ingeniero</h2>
       <div class="steps rv d1" style="margin-top:24px">
         <div class="step"><div class="step-n">1</div><div><h3 data-i18n="mmc.p.pas1.t">Reportas tu casa</h3><p data-i18n="mmc.p.pas1.p">Unos datos, unas fotos y dos autorizaciones. Al final te quedan tu número de caso y tu enlace privado. Guárdalo: es con lo que vuelves.</p></div></div>
-        <div class="step"><div class="step-n">2</div><div><h3 data-i18n="mmc.p.pas2.t">Tu caso entra a la fila</h3><p data-i18n="mmc.p.pas2.p">No es orden de llegada: se mira primero lo que parece más grave. Tu enlace te dice dos datos que puedes comprobar — cuántos días llevas esperando y cuántos casos siguen sin abrir.</p></div></div>
+        <div class="step"><div class="step-n">2</div><div><h3 data-i18n="mmc.p.pas2.t">Tu caso entra a la fila</h3><p data-i18n="mmc.p.pas2.p">No es orden de llegada: se mira primero lo que parece más grave según lo que contaste —si hubo heridos, si vive gente ahí, de qué son los muros—. Tu enlace te dice dos datos que puedes comprobar — cuántos días llevas esperando y cuántos casos siguen sin abrir.</p></div></div>
         <div class="step"><div class="step-n">3</div><div><h3 data-i18n="mmc.p.pas3.t">Un ingeniero lo abre</h3><p data-i18n="mmc.p.pas3.p">Mira tus fotos y escribe el concepto. Si con lo que enviaste no alcanza, marca que no puede evaluar y te pedimos exactamente lo que falta: por eso el enlace también sirve para subir más.</p></div></div>
         <div class="step"><div class="step-n">4</div><div><h3 data-i18n="mmc.p.pas4.t">El concepto llega a tu enlace</h3><p data-i18n="mmc.p.pas4.p">Con el nombre y la matrícula de quien lo firmó. A partir de ahí tu casa tiene algo concreto que pedir, y es lo que le mostramos a quien quiera apadrinar una reparación.</p></div></div>
       </div>
@@ -2842,9 +2842,15 @@
           <div class="field"><label for="cv-anio" data-i18n="cv.anio">¿De qué año es, más o menos?</label><input type="text" id="cv-anio"><small class="mu" data-i18n="cv.anio.h">Sirve una respuesta como «hace unos 20 años».</small></div>
           <label class="ally-check"><input type="checkbox" id="cv-previo"><span><b data-i18n="cv.previo">¿Tenía grietas ANTES del sismo?</b></span></label>
           <label class="ally-check"><input type="checkbox" id="cv-habitada"><span><b data-i18n="cv.habitada">¿Vive alguien ahí ahora?</b></span></label>
-          <label class="ally-check"><input type="checkbox" id="cv-heridos"><span><b data-i18n="cv.heridos">¿Alguien se lastimó?</b></span></label>
+          <!-- OPCIONAL Y DICHO (auditoría del 28 sep 2026): es un dato de salud, sensible
+               para la Ley 1581 (art. 6), así que la familia tiene que saber que puede no
+               contestarlo. Y se le dice para qué sirve: ordena la fila. -->
+          <label class="ally-check"><input type="checkbox" id="cv-heridos"><span><b data-i18n="cv.heridos">¿Alguien se lastimó? (opcional)</b><small data-i18n="cv.heridos.h">Es un dato de salud, así que contestarlo es opcional. Si lo marcas, tu caso se mira antes.</small></span></label>
           <label class="ally-check"><input type="checkbox" id="cv-filtra"><span><b data-i18n="cv.filtra">¿Le entra agua cuando llueve?</b></span></label>
-          <div class="field"><label for="cv-nota" data-i18n="cv.nota">¿Algo más que quieras contarnos?</label><textarea id="cv-nota" rows="3"></textarea></div>
+          <!-- Esta nota la lee el INGENIERO, que no debe ver nombre, teléfono ni
+               dirección (auditoría del 28 sep 2026): se le pide a la familia que no los
+               escriba aquí, donde el filtro del triaje no los puede quitar. -->
+          <div class="field"><label for="cv-nota" data-i18n="cv.nota">¿Algo más que quieras contarnos?</label><textarea id="cv-nota" rows="3" aria-describedby="cv-nota-h"></textarea><small class="vf-help" id="cv-nota-h" data-i18n="cv.nota.h">Esto lo lee el ingeniero: no escribas aquí nombres, teléfonos ni direcciones.</small></div>
           <input type="text" id="cv-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
         </div>
         <button type="button" class="btn btn-g" style="margin-top:18px" data-act="cvPaso(3)" data-i18n="cv.s2.btn">Siguiente</button>
@@ -2861,7 +2867,7 @@
       <!-- PASO 3 · fotos -->
       <div id="cv-p3" class="cv-paso" style="display:none;margin-top:30px">
         <h2 data-i18n="cv.s3.t" class="h-comp3">Las fotos</h2>
-        <p class="mu" style="margin-top:8px" data-i18n="cv.s3.h">Las fotos se envían al final, cuando toques «Enviar mi caso». Mientras llegues hasta allá sin cerrar la página, no pierdes nada.</p>
+        <p class="mu" style="margin-top:8px" data-i18n="cv.s3.h">Las fotos se envían al final, cuando toques «Enviar mi caso». Mientras llegues hasta allá sin cerrar la página, no pierdes nada. Que no salgan personas en las fotos, y menos niños o niñas: lo que se necesita ver es la casa.</p>
         <!-- QUÉ FOTO SIRVE · va en el paso de las fotos, no en el de seguridad.
              El paso 1 es el de «no te subas al techo» y su fuerza está en ser
              seco; meterle cuatro imágenes lo diluiría. Aquí la familia está a
@@ -2919,7 +2925,7 @@
         </div>
         <p style="margin-top:14px;font-weight:700" data-i18n="cv.ej.fin">Si no puedes tomar alguna sin arriesgarte, no lo hagas: cuéntalo en las observaciones y ya.</p>
         <div id="cv-cats" style="margin-top:18px;display:flex;flex-direction:column;gap:16px"></div>
-        <p class="mu" style="margin-top:14px" data-i18n="cv.video.h">También puedes subir un video corto, de unos 30 segundos.</p>
+        <p class="mu" style="margin-top:14px" data-i18n="cv.video.h">También puedes subir un video corto, de unos 30 segundos. Ojo: un video puede guardar el lugar donde se grabó; las fotos no, porque se lo quitamos antes de enviarlas.</p>
         <button type="button" class="btn btn-g" style="margin-top:18px" data-act="cvPaso(4)" data-i18n="cv.s3.btn">Siguiente</button>
       </div>
 
@@ -2929,6 +2935,9 @@
         <div class="ally-form ally-auts" style="margin-top:16px">
           <label class="ally-check"><input type="checkbox" id="cv-c1"><span><b data-i18n="cv.c1">Autorizo que un ingeniero voluntario revise mis fotos para darme un concepto sobre mi casa: si hay señales para no permanecer en ella, qué precauciones tomar, con qué materiales conviene repararla, y con qué prioridad conviene visitarla.</b><small data-i18n="cv.c1.h">Necesario para poder revisar tu caso.</small></span></label>
           <label class="ally-check"><input type="checkbox" id="cv-c2"><span><b data-i18n="cv.c2">Autorizo que mi caso aparezca, SIN mi nombre ni mi dirección, para buscar quién pueda ayudar con la reparación.</b><small data-i18n="cv.c2.h">Opcional. Puedes retirarlo cuando quieras escribiéndonos.</small></span></label>
+          <!-- La autorización sin la política al lado no es informada (auditoría
+               del 28 sep 2026). En otra pestaña, para no perder lo ya llenado. -->
+          <a class="ally-policy-link" href="#privacidad" target="_blank" rel="noopener" data-i18n="ally.a.datos.link">Ver Política de Privacidad</a>
         </div>
         <button type="button" class="btn btn-g" style="margin-top:18px" data-act="cvEnviar()" data-i18n="cv.enviar">Enviar mi caso</button>
         <p id="cv-msg" role="status" aria-live="polite" class="mu" style="margin-top:12px"></p>
@@ -2939,6 +2948,10 @@
         <h2 data-i18n="cv.ok.t" class="h-comp3">Listo. Este es tu número de caso</h2>
         <p id="cv-num" class="figure-xl" style="margin:10px 0"></p>
         <p id="cv-sub" role="status" aria-live="polite" style="margin:6px 0 0;font-weight:600;font-size:var(--fs-15)"></p>
+        <!-- Los motivos de lo que no entró, uno por línea, y el reintento a mano
+             mientras haya fotos esperando señal (auditoría del 28 sep 2026). -->
+        <p id="cv-sub-mot" class="mu" style="margin:6px 0 0;white-space:pre-line"></p>
+        <button type="button" class="btn btn-o" id="cv-reintentar" hidden style="margin-top:10px" data-act="cvReintentar()" data-i18n="cv.sub.reintentar">Reintentar ahora</button>
         <p data-i18n="cv.ok.p">Guárdalo. Con él puedes consultar tu caso cuando quieras.</p>
         <p class="mu" style="margin-top:10px" data-i18n="cv.ok.espera">Un ingeniero voluntario lo va a revisar. Cuando tenga su concepto, aparecerá en tu enlace.</p>
         <p style="margin-top:16px" data-i18n="cv.ok.enlace">Este es el enlace de tu caso. Guárdalo o mándatelo por WhatsApp: cuando un ingeniero lo revise, aquí aparecerá su concepto.</p>
@@ -2956,7 +2969,7 @@
              formulario de arriba pide el teléfono—, así que mandárselo por ahí
              conserva el enlace mucho mejor que un portapapeles que se pierde en
              el siguiente copiado. -->
-        <a id="cv-wa" class="btn btn-g" style="margin-top:16px" href="https://wa.me/" target="_blank" rel="noopener" data-i18n="cv.ok.wa">Mandármelo por WhatsApp</a>
+        <a id="cv-wa" class="btn btn-g" hidden style="margin-top:16px" href="https://wa.me/" target="_blank" rel="noopener" data-i18n="cv.ok.wa">Mandármelo por WhatsApp</a>
         <button type="button" class="btn btn-o" style="margin-top:16px" data-act="cvCopiar()" data-i18n="cv.ok.copiar">Copiar mi enlace</button>
       </div>
 

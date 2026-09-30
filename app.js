@@ -242,9 +242,9 @@ var I18N = {
     "bc.tabla.casa":"La casa",
     "bc.tabla.pri":"Prioridad",
     "bc.tope":"Aquí se enseñan {v} de {t} casas publicadas. Van ordenadas por urgencia, así que las que no aparecen son las menos urgentes.",
-    "bc.cl.urgente":"Visita urgente",
-    "bc.cl.programada":"Visita programada",
-    "bc.cl.no_requiere":"No requiere visita por ahora",
+    "bc.cl.urgente":"Prioridad de visita: alta",
+    "bc.cl.programada":"Prioridad de visita: media",
+    "bc.cl.no_requiere":"Prioridad de visita: no prioritaria",
     "bc.piso":"piso",
     "bc.pisos":"pisos",
     "bc.vacio":"Todavía no hay casos públicos. Aparecen cuando un ingeniero los clasifica y la familia autoriza que se muestren.",
@@ -329,7 +329,7 @@ var I18N = {
     "mmc.p.pas.alt":"Edificio apuntalado con maderos y acordonado con cinta en El Águila, agosto de 2026",
     "mmc.p.pas.pie":"El Águila, agosto de 2026. Un muro apuntalado es exactamente el tipo de precaución que un ingeniero escribe en su concepto.",
     "mmc.p.t":"Tu casa, revisada por un ingeniero.",
-    "mmc.p.lead":"Sin costo y sin que nadie tenga que venir. Subes fotos desde el teléfono y un ingeniero voluntario con matrícula te escribe si puedes permanecer, qué precauciones tomar y con qué materiales conviene reparar.",
+    "mmc.p.lead":"Sin costo y desde tu teléfono. Subes fotos y un ingeniero voluntario con matrícula te escribe si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar y con qué materiales conviene reparar.",
 
     "mmc.p.rol.ey":"Quién hace qué",
     "mmc.p.rol.t":"Para que una casa avance hacen falta tres personas distintas",
@@ -374,7 +374,7 @@ var I18N = {
     "mmc.p.pas1.t":"Reportas tu casa",
     "mmc.p.pas1.p":"Unos datos, unas fotos y dos autorizaciones. Al final te quedan tu número de caso y tu enlace privado. Guárdalo: es con lo que vuelves.",
     "mmc.p.pas2.t":"Tu caso entra a la fila",
-    "mmc.p.pas2.p":"No es orden de llegada: se mira primero lo que parece más grave. Tu enlace te dice dos datos que puedes comprobar — cuántos días llevas esperando y cuántos casos siguen sin abrir.",
+    "mmc.p.pas2.p":"No es orden de llegada: se mira primero lo que parece más grave según lo que contaste —si hubo heridos, si vive gente ahí, de qué son los muros—. Tu enlace te dice dos datos que puedes comprobar — cuántos días llevas esperando y cuántos casos siguen sin abrir.",
     "mmc.p.pas3.t":"Un ingeniero lo abre",
     "mmc.p.pas3.p":"Mira tus fotos y escribe el concepto. Si con lo que enviaste no alcanza, marca que no puede evaluar y te pedimos exactamente lo que falta: por eso el enlace también sirve para subir más.",
     "mmc.p.pas4.t":"El concepto llega a tu enlace",
@@ -389,7 +389,7 @@ var I18N = {
     "nav.g.emergencia":"Emergencia",
     "nav.brigada":"Brigada de emergencia",
     "nav.d.brigada":"Los cinco territorios, qué se necesita y cómo aportar",
-    "nav.d.vivienda":"Sube fotos y recibe un concepto: si puedes permanecer y con qué reparar",
+    "nav.d.vivienda":"Sube fotos y recibe un concepto: si hay señales para no permanecer y con qué reparar",
     "nav.d.ingenieros":"Postúlate: mira fotos, di qué precauciones tomar y con qué reparar",
     "hero.eyebrow":"Colombia · ESAL · NIT 901.948.930-2",
     "hero.title":"Una alianza, muchas realidades.",
@@ -604,12 +604,14 @@ var I18N = {
     "cv.anio.h":"Sirve una respuesta como «hace unos 20 años».",
     "cv.previo":"¿Tenía grietas ANTES del sismo?",
     "cv.habitada":"¿Vive alguien ahí ahora?",
-    "cv.heridos":"¿Alguien se lastimó?",
+    "cv.heridos":"¿Alguien se lastimó? (opcional)",
+    "cv.heridos.h":"Es un dato de salud, así que contestarlo es opcional. Si lo marcas, tu caso se mira antes.",
     "cv.filtra":"¿Le entra agua cuando llueve?",
     "cv.nota":"¿Algo más que quieras contarnos?",
+    "cv.nota.h":"Esto lo lee el ingeniero: no escribas aquí nombres, teléfonos ni direcciones.",
     "cv.s2.btn":"Siguiente",
     "cv.s3.t":"Las fotos",
-    "cv.s3.h":"Las fotos se envían al final, cuando toques «Enviar mi caso». Mientras llegues hasta allá sin cerrar la página, no pierdes nada.",
+    "cv.s3.h":"Las fotos se envían al final, cuando toques «Enviar mi caso». Mientras llegues hasta allá sin cerrar la página, no pierdes nada. Que no salgan personas en las fotos, y menos niños o niñas: lo que se necesita ver es la casa.",
     "cv.ej.h":"Estas cuatro son de casas que visitamos. Las dos primeras se pueden leer; las otras dos no, y con ellas habría que pedirte más.",
     "cv.ej.si":"SIRVE",
     "cv.ej.no":"NO ALCANZA",
@@ -627,19 +629,26 @@ var I18N = {
     "cv.cat.entorno":"El terreno alrededor",
     "cv.cat.entorno.h":"Si hay grietas en el suelo o un talud cerca.",
     "cv.add":"Agregar",
-    "cv.video.h":"También puedes subir un video corto, de unos 30 segundos.",
+    "cv.video.h":"También puedes subir un video corto, de unos 30 segundos. Ojo: un video puede guardar el lugar donde se grabó; las fotos no, porque se lo quitamos antes de enviarlas.",
     "cv.subiendo":"Subiendo…",
-    "cv.sub.prog":"Enviando tus fotos: {n} de {t}. No cierres esta página.",
+    "cv.sub.prog":"Enviando tus fotos: {n} de {t}. No cierres esta página. El botón para mandarte el enlace por WhatsApp aparece al terminar.",
     "cv.sub.ok":"Listas. Ya tenemos tus {t} fotos.",
-    "cv.sub.parcial":"Guardamos {n} de {t}. Las que faltan puedes agregarlas desde tu enlace, aquí abajo.",
-    "cv.sub.nada":"No pudimos enviar tus fotos, pero tu caso quedó creado. Entra a tu enlace de aquí abajo y agrégalas cuando tengas mejor señal.",
+    "cv.sub.parcial":"Guardamos {n} de {t}. Aquí abajo te decimos cuáles no entraron y por qué; las puedes agregar desde tu enlace.",
+    "cv.sub.nada":"No pudimos guardar tus fotos, pero tu caso quedó creado. Aquí abajo te decimos por qué; puedes agregarlas desde tu enlace.",
+    "cv.sub.espera":"Sin señal por ahora: quedan {n} por enviar. Seguimos intentando solos; no cierres esta página.",
+    "cv.sub.reintentar":"Reintentar ahora",
     "cv.err.sinfotos":"Sin fotos un ingeniero no puede evaluar tu casa. ¿Seguro que quieres enviarlo así?",
     "cv.err.espera":"Ya recibimos varios casos desde este número hace un momento. Espera unos minutos; si ya enviaste el tuyo, revisa el enlace que te dimos.",
     "cv.err.correo":"Revisa tu correo: parece incompleto. También puedes dejarlo vacío.",
 
     "cv.subido":"Guardada",
-    "cv.err.grande":"El archivo pesa demasiado. Si es video, grábalo más corto.",
-    "cv.err.subir":"No se pudo subir. Intenta otra vez.",
+    "cv.err.grande":"pesa más de {mb} MB, que es el máximo. Si es video, grábalo más corto, de unos 30 segundos.",
+    "cv.err.subir":"no se pudo subir. Intenta otra vez.",
+    "cv.err.heic":"es una foto HEIC y este navegador no la puede leer. En el iPhone ve a Ajustes › Cámara › Formatos y elige «Más compatible», o toma una captura de pantalla de la foto y sube esa.",
+    "cv.err.tipo":"ese formato no lo podemos recibir. Sirven fotos JPG, PNG o WebP y videos MP4 o MOV.",
+    "cv.err.nofoto":"no se pudo leer como foto. Vuelve a tomarla con la cámara del teléfono y súbela otra vez.",
+    "cv.err.cerrado":"el caso está cerrado y ya no recibe fotos.",
+    "cv.err.archivo":"Un archivo",
     "cv.s3.btn":"Siguiente",
     "cv.s4.t":"Permisos",
     "cv.c1":"Autorizo que un ingeniero voluntario revise mis fotos para darme un concepto sobre mi casa: si hay señales para no permanecer en ella, qué precauciones tomar, con qué materiales conviene repararla, y con qué prioridad conviene visitarla.",
@@ -672,7 +681,7 @@ var I18N = {
     "mc.donde":"Dónde",
     "mc.fotos":"Fotos que enviaste",
     "mc.sin.t":"Todavía no lo ha revisado un ingeniero",
-    "mc.sin.p":"Los casos se revisan por orden de gravedad y luego de espera. Cuando un ingeniero voluntario lo mire, la respuesta aparece en esta misma página.",
+    "mc.sin.p":"Los casos se ordenan por lo que parece más grave según lo que contaste —si hubo heridos, si vive gente ahí, de qué son los muros— y después por espera. Cuando un ingeniero voluntario lo mire, la respuesta aparece en esta misma página.",
     "mc.falta.t":"Necesitamos un par de fotos más",
     "mc.falta.p":"Un ingeniero miró tu caso, pero con estas fotos no puede formarse un criterio. Esto es lo que hace falta:",
     "mc.res.t":"Un ingeniero ya revisó tu caso",
@@ -681,27 +690,36 @@ var I18N = {
     "mc.respaldo.t":"Ya lo revisó un ingeniero.",
     "mc.respaldo.p":"Antes de entregarte el concepto estamos comprobando su matrícula en el registro del COPNIA, y eso lo hace una persona. En cuanto quede verificada, el concepto aparece aquí — no tienes que hacer nada.",
         "mc.informe":"Ver mi concepto en PDF",
-    "mc.cl.urgente":"Visita urgente",
-    "mc.cl.programada":"Visita programada",
-    "mc.cl.no_requiere":"No requiere visita por ahora",
+    "mc.cl.urgente":"Prioridad de visita: alta",
+    "mc.cl.programada":"Prioridad de visita: media",
+    "mc.cl.no_requiere":"Prioridad de visita: no prioritaria",
     "mc.cl.inevaluable":"No se pudo evaluar con las fotos enviadas",
+    "mc.cl.nota":"Esto no agenda una visita: dice qué tan pronto convendría que alguien fuera, no que alguien vaya a ir.",
+    "mc.cl.urge":"Como la prioridad es alta, informa a tu alcaldía o al consejo municipal de gestión del riesgo. Si las cosas empeoran —la grieta crece, algo cruje, hay olor a gas— sal de la casa y llama al 123.",
     "mc.add.t":"Agregar fotos",
     "mc.add.p":"Puedes sumar fotos cuando quieras: si te pidieron algo, si el daño cambió, o si te faltó una parte de la casa.",
-    "mc.add.seg":"Antes de tomarlas, lo mismo de siempre: no entres si ves muros caídos, techos hundidos o columnas partidas, no te subas al techo y no muevas escombros. Mejor una foto de menos que un accidente.",
+    "mc.add.seg":"Antes de tomarlas, lo mismo de siempre: no entres si ves muros caídos, techos hundidos o columnas partidas, no te subas al techo y no muevas escombros. Mejor una foto de menos que un accidente. Y que no salgan personas, sobre todo niños o niñas.",
     "mc.add.enviar":"Enviar las fotos",
     "mc.add.nada":"Elige al menos una foto.",
     "mc.add.subiendo":"Subiendo tus fotos… no cierres esta página.",
     "mc.add.ok":"Listo, ya las tenemos. Un ingeniero las va a ver.",
     "mc.add.pasa":"Elegiste {n} y solo caben {q} más. Quita algunas, o mándalas en dos veces.",
     "mc.sub.prog":"Enviando: {n} de {t}. No cierres esta página.",
-    "mc.sub.parcial":"Guardamos {n} de {t}. Vuelve a elegir las que faltan cuando tengas mejor señal.",
-    "mc.sub.nada":"No pudimos enviar ninguna. Tu caso está bien; vuelve a intentarlo cuando tengas mejor señal.",
+    "mc.sub.parcial":"Guardamos {n} de {t}. Estas no entraron:",
+    "mc.sub.nada":"No pudimos guardar ninguna. Tu caso está bien. Esto fue lo que pasó:",
     "mc.add.tope":"Este caso ya llegó al máximo de archivos. Escríbenos si necesitas cambiar alguno.",
-    "mc.cerrado":"Este caso está cerrado. Si algo cambió, escríbenos y lo reabrimos.",
+    "mc.cerrado":"Este caso está cerrado. Si algo cambió en tu casa, escríbenos por WhatsApp con tu número de caso: el equipo revisa si corresponde reabrirlo.",
+    "mc.fin.cerrado.t":"Este caso está cerrado",
+    "mc.fin.cerrado.p":"Cerrarlo no es un concepto sobre tu casa ni dice si se puede habitar: significa que desde aquí no hay un paso más que dar con él. Si ya tenías un concepto, sigue abajo.",
+    "mc.fin.descartado.t":"Este caso no siguió adelante",
+    "mc.fin.descartado.p":"El equipo no continuó con este caso. Si crees que es un error, escríbenos por WhatsApp con tu número de caso y lo revisamos.",
+    "mc.fin.dup":"Tenemos otro caso tuyo, el {n}, y ese es el que sigue abierto: el concepto aparece allí cuando esté. Si tienes su enlace, ábrelo ahí.",
+    "mc.fin.visitado.t":"Alguien del equipo ya estuvo en tu casa",
+    "mc.fin.visitado.p":"La visita quedó registrada. Lo que se vio allí lo tiene el equipo; si hay un concepto de las fotos, aparece en esta página.",
     "mc.espera.hoy":"Lo enviaste hoy.",
     "mc.espera.dia":"Lleva un día esperando.",
     "mc.espera.dias":"Lleva {d} días esperando.",
-    "mc.espera.cola":"Ahora mismo hay {n} casos sin abrir. Se revisan por gravedad primero y por antigüedad después, no por turno de llegada.",
+    "mc.espera.cola":"Ahora mismo hay {n} casos sin abrir. Se ordenan por lo que parece más grave y después por antigüedad, no por turno de llegada.",
     "mc.espera.solo":"Es el único caso sin abrir en este momento.",
     "mc.espera.sin":"No te damos una fecha porque no la tenemos, y prometerte una sería peor que decírtelo así.",
     "cv.ing.link":"¿Eres ingeniero o arquitecto y quieres revisar casos?",
@@ -2023,8 +2041,8 @@ var ROUTE_META = {
   caso:{t:{es:"Tu caso · Give&Grow International",en:"Your case · Give&Grow International"},d:{es:"Consulta en qué va tu caso de vivienda y agrega las fotos que te pidieron.",en:"Check where your housing case stands and add the photos you were asked for."}},
   apadrinar:{t:{es:"Apadrinar una casa · Give&Grow International",en:"Sponsor a home · Give&Grow International"},d:{es:"Aporta materiales, mano de obra o transporte para reparar viviendas afectadas por el sismo. Registra lo que puedes dar: no reserva una casa concreta ni declara habitabilidad.",en:"Contribute materials, labour or transport to repair homes hit by the earthquake. Register what you can give: it does not reserve a particular home and does not rule on habitability."}},
   ingenieros:{t:{es:"Ingenieros voluntarios · Give&Grow International",en:"Volunteer engineers · Give&Grow International"},d:{es:"Postúlate al triaje estructural: mira fotos de casas afectadas por el sismo y da un concepto sobre permanencia, precauciones y materiales. Es orientación, no un dictamen de habitabilidad.",en:"Apply to the structural triage: review photos of homes hit by the earthquake and give an opinion on staying, precautions and materials. It is guidance, not a habitability ruling."}},
-  proyecto:{t:{es:"Qué es y cómo funciona · Give&Grow International",en:"What it is and how it works · Give&Grow International"},d:{es:"Un ingeniero voluntario con matrícula mira las fotos de tu casa y escribe qué hacer con ella: si puedes permanecer, qué precauciones tomar y con qué reparar. Gratis y a distancia. Las tres formas de participar: reportar tu casa, dar conceptos o apadrinar una reparación.",en:"A licensed volunteer engineer looks at photos of your home and writes what to do with it: whether you can stay, what precautions to take and what to repair with. Free and remote. The three ways to take part: report your home, give opinions or sponsor a repair."}},
-  vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario te da un concepto: si puedes permanecer, qué precauciones tomar y con qué reparar. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer gives you an opinion: whether you can stay, what precautions to take and what to repair with. It does not replace the official assessment."}},
+  proyecto:{t:{es:"Qué es y cómo funciona · Give&Grow International",en:"What it is and how it works · Give&Grow International"},d:{es:"Un ingeniero voluntario con matrícula mira las fotos de tu casa y escribe qué hacer con ella: si hay señales para no permanecer, qué precauciones tomar y con qué reparar. Gratis y a distancia. Las tres formas de participar: reportar tu casa, dar conceptos o apadrinar una reparación.",en:"A licensed volunteer engineer looks at photos of your home and writes what to do with it: whether there are signs you should not stay, what precautions to take and what to repair with. Free and remote. The three ways to take part: report your home, give opinions or sponsor a repair."}},
+  vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario te da un concepto: si hay señales para no permanecer, qué precauciones tomar y con qué reparar. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer gives you an opinion: whether there are signs you should not stay, what precautions to take and what to repair with. It does not replace the official assessment."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
   /* Estas cuatro faltaban y caían al `|| ROUTE_META.inicio`, así que se
      presentaban con el título y la descripción de la portada. No era cosmético:
@@ -2703,7 +2721,7 @@ function cvEnviar(){
   });
 }
 
-/* ===== Comprimir la foto ANTES de subirla =====
+/* ===== Preparar el archivo ANTES de subirlo =====
    Lo que arregla: un teléfono de hoy saca fotos de 3 a 5 MB. Con veinte
    archivos por caso, una familia podía estar subiendo 40 u 80 MB por la red de
    una zona a la que se le acaba de caer media torre. Suben de a una y en serie
@@ -2714,29 +2732,59 @@ function cvEnviar(){
    fotografiada con una moneda al lado se lee perfectamente a ese tamaño, y es
    lo que la guía pide mirar. Lo que se tira es resolución que nadie iba a usar.
 
-   TRES REGLAS QUE NO SE DEBEN AFLOJAR:
+   LAS REGLAS, reescritas en la auditoría del 28 sep 2026:
 
-   1. Si algo falla, se sube el ORIGINAL. Jamás se pierde una foto porque la
-      compresión no pudo: el navegador de gama baja que no tenga
-      `createImageBitmap`, el archivo raro, el canvas que se queda sin memoria
-      — todos caen al original y siguen.
-   2. `imageOrientation:"from-image"` no es opcional. Sin eso, las fotos
+   1. TODA FOTO PASA POR EL CANVAS, aunque ya sea pequeña. Antes, si la versión
+      comprimida pesaba más, se subía el original — y el original lleva el EXIF,
+      con las coordenadas GPS de la casa. La dirección de la familia es lo único
+      que el sitio promete no publicar nunca, y el ingeniero no la ve; no puede
+      llegarle metida dentro de una foto. Redibujar en el canvas descarta el EXIF
+      entero.
+   2. Si el canvas NO puede —navegador viejo, archivo raro, sin memoria— el
+      original solo sale si el servidor lo acepta, y si es JPEG se le arrancan
+      antes sus bloques EXIF (`quitarExifJpeg`). Lo que el servidor va a rechazar
+      se para AQUÍ, con su motivo, en vez de gastar los datos de la familia en
+      subirlo para oír un «no» que antes nadie le traducía.
+   3. HEIC: el iPhone lo guarda así. Safari lo sabe dibujar y sale como JPEG;
+      Chrome no, y ahí se le dice a la familia qué hacer en vez de callar.
+   4. `imageOrientation:"from-image"` no es opcional. Sin eso, las fotos
       tomadas en vertical llegan giradas 90°, porque el dato de rotación vive
-      en el EXIF y el canvas lo descarta al dibujar. Un ingeniero mirando una
-      fachada acostada es un caso que se devuelve como inevaluable.
-   3. Los VIDEOS no se tocan. Comprimir video en el navegador es caro, lento y
-      se come la batería; su tope de 60 MB ya lo acota. */
+      en el EXIF y el canvas lo descarta al dibujar.
+   5. Los VIDEOS no se tocan: comprimir video en el navegador es caro, lento y
+      se come la batería. Y pueden llevar la ubicación, así que el formulario lo
+      advierte al lado del botón. */
 
 var FOTO_LADO = 1600;
 var FOTO_CALIDAD = 0.8;
+/* Lo mismo que acepta `TIPOS_MEDIO` en worker.js, con sus mismos topes en MB.
+   Si uno cambia, el otro también: la pantalla no puede dejar pasar lo que el
+   servidor va a rechazar. */
+var MEDIO_TIPOS = { "image/jpeg": 8, "image/png": 8, "image/webp": 8, "video/mp4": 60, "video/quicktime": 60 };
 
-function comprimirFoto(file){
-  /* Solo imágenes, y solo si el navegador trae las dos piezas necesarias. */
-  if (!file || file.type.indexOf("image/") !== 0) return Promise.resolve(file);
+function esHeic(f){
+  return /image\/hei[cf]/i.test((f && f.type) || "") || /\.hei[cf]$/i.test((f && f.name) || "");
+}
+function tipoDe(f){
+  if (f.type) return f.type;
+  /* Algunos Android entregan el archivo sin tipo. Sin él la cabecera sale vacía
+     y el servidor lo rechaza con un 415 que la familia no entendería. */
+  if (/\.mp4$/i.test(f.name || "")) return "video/mp4";
+  if (/\.mov$/i.test(f.name || "")) return "video/quicktime";
+  if (/\.jpe?g$/i.test(f.name || "")) return "image/jpeg";
+  return "";
+}
+function rechazoLocal(clave, mb){
+  var e = new Error(clave); e.motivo = clave; e.mb = mb; return e;
+}
+
+function redibujarFoto(file){
   if (typeof createImageBitmap !== "function" || !document.createElement("canvas").toBlob) {
-    return Promise.resolve(file);
+    return Promise.reject(new Error("sin canvas"));
   }
   return createImageBitmap(file, { imageOrientation: "from-image" })
+    /* Hay Safari que no acepta el segundo argumento: se intenta sin él antes de
+       rendirse, porque ahí la orientación ya la aplica el propio navegador. */
+    .catch(function(){ return createImageBitmap(file); })
     .then(function(img){
       var lado = Math.max(img.width, img.height);
       var escala = lado > FOTO_LADO ? FOTO_LADO / lado : 1;
@@ -2745,51 +2793,179 @@ function comprimirFoto(file){
       cv.width = w; cv.height = h;
       cv.getContext("2d").drawImage(img, 0, 0, w, h);
       if (img.close) img.close();
-      return new Promise(function(res){
-        cv.toBlob(function(blob){
-          /* Si el "comprimido" pesa más que el original —pasa con imágenes ya
-             pequeñas o con PNG de pocos colores— se queda el original. */
-          res(blob && blob.size < file.size ? blob : file);
-        }, "image/jpeg", FOTO_CALIDAD);
+      return new Promise(function(res, rej){
+        cv.toBlob(function(blob){ if (blob && blob.size) res(blob); else rej(new Error("toBlob vacio")); },
+                  "image/jpeg", FOTO_CALIDAD);
       });
-    })
-    .catch(function(){ return file; });
+    });
+}
+
+/* Último recurso para un JPEG que el canvas no pudo redibujar: se copian sus
+   segmentos saltando los APP1 (EXIF y XMP, que es donde viaja el GPS). La
+   imagen en sí no se toca: desde el inicio del barrido se copia tal cual. */
+function quitarExifJpeg(file){
+  if (!file.arrayBuffer) return Promise.resolve(file);
+  return file.arrayBuffer().then(function(buf){
+    var b = new Uint8Array(buf);
+    if (b.length < 4 || b[0] !== 0xFF || b[1] !== 0xD8) return file;
+    var partes = [b.subarray(0, 2)], i = 2;
+    while (i + 4 <= b.length && b[i] === 0xFF){
+      var m = b[i + 1];
+      if (m === 0xDA) break;                       /* empieza la imagen: se copia todo */
+      var largo = (b[i + 2] << 8) + b[i + 3];
+      if (largo < 2 || i + 2 + largo > b.length) return file;   /* raro: mejor no tocar */
+      if (m !== 0xE1) partes.push(b.subarray(i, i + 2 + largo));
+      i += 2 + largo;
+    }
+    partes.push(b.subarray(i));
+    return new Blob(partes, { type: "image/jpeg" });
+  }).catch(function(){ return file; });
+}
+
+function prepararArchivo(file){
+  var tipo = tipoDe(file);
+  if (tipo.indexOf("video/") === 0){
+    if (!MEDIO_TIPOS[tipo]) return Promise.reject(rechazoLocal("tipo"));
+    if (file.size > MEDIO_TIPOS[tipo] * 1048576) return Promise.reject(rechazoLocal("grande", MEDIO_TIPOS[tipo]));
+    return Promise.resolve(file.type ? file : new Blob([file], { type: tipo }));
+  }
+  return redibujarFoto(file).catch(function(){
+    if (esHeic(file)) throw rechazoLocal("heic");
+    if (!MEDIO_TIPOS[tipo]) throw rechazoLocal("tipo");
+    if (file.size > MEDIO_TIPOS[tipo] * 1048576) throw rechazoLocal("grande", MEDIO_TIPOS[tipo]);
+    return tipo === "image/jpeg" ? quitarExifJpeg(file) : file;
+  });
 }
 
 /* Una sola función de subida para las DOS pantallas que suben fotos: la del
-   formulario y la de «mi caso». Antes eran dos copias del mismo bucle, y una
-   mejora como esta habría que acordarse de hacerla dos veces. */
+   formulario y la de «mi caso». Devuelve también el `status`, que es lo que
+   distingue «el servidor dijo que no» de «el servidor no estaba». */
 function subirMedio(caso, token, item){
-  return comprimirFoto(item.file).then(function(archivo){
+  return prepararArchivo(item.file).then(function(archivo){
     var url = "/api/caso/" + encodeURIComponent(caso) + "/medio?t=" + encodeURIComponent(token)
             + (item.cat ? "&cat=" + encodeURIComponent(item.cat) : "");
     return fetch(url, {
       method: "POST",
-      headers: { "content-type": archivo.type || item.file.type },
+      headers: { "content-type": archivo.type || tipoDe(item.file) },
       body: archivo
-    }).then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); });
+    }).then(function(r){ return r.json().then(function(d){ return { ok: r.ok, status: r.status, d: d }; }); });
   });
 }
 
-/* De a una y en serie. En serie a propósito: con señal mala, siete subidas en
-   paralelo se pisan y fallan todas.
+/* Qué se le dice a la familia de un archivo que no entró, con la razón que dio
+   el servidor —o la que vimos antes de subirlo— y lo que puede hacer. Antes los
+   rechazos solo se contaban: «guardamos 3 de 5», sin decir cuáles ni por qué,
+   y la clave `cv.err.grande` existía sin que nada la usara. */
+function motivoSubida(item, clave, mb){
+  var nombre = (item.file && item.file.name) || t("cv.err.archivo");
+  var txt = clave === "heic"    ? t("cv.err.heic")
+          : clave === "grande"  ? t("cv.err.grande").replace("{mb}", mb || "")
+          : clave === "tipo"    ? t("cv.err.tipo")
+          : clave === "nofoto"  ? t("cv.err.nofoto")
+          : clave === "tope"    ? t("mc.add.tope")
+          : clave === "cerrado" ? t("cv.err.cerrado")
+          : t("cv.err.subir");
+  return nombre + ": " + txt;
+}
+function motivoServidor(item, res){
+  var d = res.d || {};
+  if (res.status === 413 || d.error === "archivo_muy_grande") return motivoSubida(item, "grande", d.max_mb);
+  if (res.status === 415 || d.error === "tipo_no_permitido") return motivoSubida(item, esHeic(item.file) ? "heic" : "tipo");
+  if (d.error === "archivo_no_es_foto") return motivoSubida(item, "nofoto");
+  if (d.error === "demasiados_medios") return motivoSubida(item, "tope");
+  if (d.error === "caso_terminado") return motivoSubida(item, "cerrado");
+  return motivoSubida(item, "");
+}
+/* Lo que se arregla solo esperando: el servidor caído, el tope de peticiones.
+   Todo lo demás es un «no» sobre el archivo, y reintentarlo no lo cambia. */
+function esPasajero(res){ return !res || !res.status || res.status >= 500 || res.status === 429 || res.status === 408; }
 
-   REESCRITA EL 20 AGO 2026, ANTES DEL PRIMER PILOTO CON FAMILIAS REALES.
-   La versión anterior tenía tres defectos que se sumaban en el peor resultado
-   posible del sistema: CASO CREADO, CERO FOTOS, Y LA FAMILIA VIENDO «LISTO».
+/* ===== LA COLA DE SUBIDA, compartida por las dos pantallas =====
+   REESCRITA EN LA AUDITORÍA DEL 28 SEP 2026. La anterior reintentaba UNA vez a
+   los 1,2 s y después daba el archivo por perdido: en una vereda donde la señal
+   va y viene cada pocos minutos, eso descartaba casi todo lo que no subiera al
+   primer intento, y la familia tenía que volver a elegir las fotos una a una.
 
-   1. Hacía `cola.shift()` ANTES de intentar la subida, así que un fallo de red
-      —lo normal en zona de desastre— borraba el archivo de la única copia que
-      existía. No había reintento de ninguna clase.
-   2. El único error que miraba lo mandaba a `console.warn`. La familia no tiene
-      consola. Los 415, 409, 503 y 500 del servidor no se miraban siquiera.
-   3. No había ni progreso ni advertencia de no cerrar la página, y la pantalla
-      ya decía «Listo» mientras la subida seguía corriendo minutos.
+   Ahora un fallo de RED no saca el archivo de la cola nunca: se reintenta con
+   espera creciente (2, 4, 8… hasta 60 s), y además en el acto cuando vuelve la
+   conexión (`online`) o cuando la familia vuelve a la pestaña
+   (`visibilitychange`), que es lo que hace quien salió a buscar señal. Mientras
+   quede algo, un botón «Reintentar ahora» y el aviso del navegador al cerrar la
+   página. Lo que el servidor RECHAZA por lo que el archivo es sí sale, con su
+   motivo escrito.
 
-   Ahora: el archivo NO sale de la cola hasta que se guarda, un reintento por
-   archivo, progreso visible, y al final se dice la verdad — cuántas llegaron y
-   qué hacer con las que no. Los textos ya existían sin usarse desde que se
-   construyó la pantalla. */
+   `st` es el estado de cada pantalla (CV o MC) y `ui` lo que cada una pinta. */
+var SUBIDAS = [];
+
+function subidaEmpezar(st, ui){
+  st.ui = ui;
+  st.total = st.cola.length; st.hechas = 0; st.fallidas = 0; st.motivos = []; st.fallosRed = 0;
+  if (SUBIDAS.indexOf(st) < 0) SUBIDAS.push(st);
+  subidaPaso(st);
+}
+
+function subidaPaso(st){
+  if (st.corriendo || !st.ui) return;
+  if (st.espera){ clearTimeout(st.espera); st.espera = null; }
+  subidaBoton(st, false);
+  if (!st.cola.length){ st.ui.fin(st); return; }
+
+  var item = st.cola[0];            /* NO se saca hasta que se guarda o se rechaza */
+  st.corriendo = true;
+  st.ui.prog(st.ui.textoProg(st.hechas + st.fallidas + 1, st.total));
+
+  subirMedio(st.caso, st.token, item)
+    .then(function(res){
+      st.corriendo = false;
+      if (res.ok){ st.cola.shift(); st.hechas++; st.fallosRed = 0; subidaPaso(st); return; }
+      if (esPasajero(res)){ subidaEsperar(st); return; }
+      st.cola.shift(); st.fallidas++; st.motivos.push(motivoServidor(item, res));
+      subidaPaso(st);
+    })
+    .catch(function(e){
+      st.corriendo = false;
+      if (e && e.motivo){
+        st.cola.shift(); st.fallidas++; st.motivos.push(motivoSubida(item, e.motivo, e.mb));
+        subidaPaso(st);
+        return;
+      }
+      subidaEsperar(st);
+    });
+}
+
+function subidaEsperar(st){
+  st.fallosRed = (st.fallosRed || 0) + 1;
+  var ms = Math.min(60000, 2000 * Math.pow(2, st.fallosRed - 1));
+  st.ui.prog(t("cv.sub.espera").replace("{n}", st.cola.length), "var(--amber)");
+  subidaBoton(st, true);
+  st.espera = setTimeout(function(){ st.espera = null; subidaPaso(st); }, ms);
+}
+
+function subidaBoton(st, ver){
+  var b = st.ui && document.getElementById(st.ui.boton);
+  if (b) b.hidden = !ver;
+}
+
+/* Lo que queda por subir en cualquiera de las dos pantallas. */
+function subidaPendiente(){
+  for (var i = 0; i < SUBIDAS.length; i++) if (SUBIDAS[i].cola.length && SUBIDAS[i].ui) return true;
+  return false;
+}
+function subidaYa(){
+  for (var i = 0; i < SUBIDAS.length; i++){
+    var st = SUBIDAS[i];
+    if (st.cola.length && st.ui && !st.corriendo){ st.fallosRed = 0; subidaPaso(st); }
+  }
+}
+window.addEventListener("online", subidaYa);
+document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "visible") subidaYa(); });
+window.addEventListener("beforeunload", function(ev){
+  if (!subidaPendiente()) return;
+  /* El texto lo pone el navegador; pedir la confirmación es lo único que se puede. */
+  ev.preventDefault();
+  ev.returnValue = "";
+});
+
 function cvProg(txt, color){
   var e = document.getElementById("cv-sub");
   if (!e) return;
@@ -2797,45 +2973,31 @@ function cvProg(txt, color){
   e.style.color = color || "var(--mu)";
 }
 
+/* El formulario: al terminar dice la verdad —cuántas llegaron y por qué no
+   las otras— y SOLO ENTONCES enseña el botón de WhatsApp. Tocarlo abre otra
+   aplicación, y en un teléfono con poca memoria el sistema puede matar la
+   pestaña que estaba subiendo: con el botón a la vista a mitad de la subida,
+   la familia perdía justo las fotos que faltaban. */
 function cvSubirCola(){
   if (!CV.caso) return;
-  if (!CV.total) { CV.total = CV.cola.length; CV.hechas = 0; CV.fallidas = 0; }
-  if (!CV.cola.length){
-    /* El cierre dice lo que de verdad pasó. Un «listo» cuando no llegó nada es
-       la mentira que deja al ingeniero abriendo un caso vacío. */
-    if (!CV.total)             cvProg("");
-    else if (!CV.fallidas)     cvProg(t("cv.sub.ok").replace("{t}", CV.total), "var(--ok)");
-    else if (CV.hechas)        cvProg(t("cv.sub.parcial").replace("{n}", CV.hechas).replace("{t}", CV.total), "var(--amber)");
-    else                       cvProg(t("cv.sub.nada"), "var(--err)");
-    return;
-  }
-
-  var item = CV.cola[0];            /* NO se saca hasta que se guarda */
-  cvProg(t("cv.sub.prog").replace("{n}", CV.hechas + 1).replace("{t}", CV.total));
-
-  subirMedio(CV.caso, CV.token, item)
-    .then(function(res){
-      if (res.ok){
-        CV.cola.shift(); CV.hechas++;
-        cvSubirCola();
-        return;
-      }
-      /* Un archivo que el servidor RECHAZA por lo que es —demasiado grande, tipo
-         no permitido, tope de medios— no mejora reintentando. Se descarta, pero
-         contado, no en silencio. */
-      CV.cola.shift(); CV.fallidas++;
-      cvSubirCola();
-    })
-    .catch(function(){
-      /* Fallo de RED. Este sí merece otra oportunidad: es el caso de la señal
-         que se va un segundo, que es lo que pasa en terreno. Un reintento y no
-         más — insistir en bucle deja a la familia esperando sin saberlo. */
-      item.intentos = (item.intentos || 0) + 1;
-      if (item.intentos < 2){ setTimeout(cvSubirCola, 1200); return; }
-      CV.cola.shift(); CV.fallidas++;
-      cvSubirCola();
-    });
+  var wa = document.getElementById("cv-wa");
+  if (wa) wa.hidden = true;
+  subidaEmpezar(CV, {
+    boton: "cv-reintentar",
+    prog: cvProg,
+    textoProg: function(n, tt){ return t("cv.sub.prog").replace("{n}", n).replace("{t}", tt); },
+    fin: function(st){
+      if (!st.total)             cvProg("");
+      else if (!st.fallidas)     cvProg(t("cv.sub.ok").replace("{t}", st.total), "var(--ok)");
+      else if (st.hechas)        cvProg(t("cv.sub.parcial").replace("{n}", st.hechas).replace("{t}", st.total), "var(--amber)");
+      else                       cvProg(t("cv.sub.nada"), "var(--err)");
+      var mot = document.getElementById("cv-sub-mot");
+      if (mot) mot.textContent = st.motivos.join("\n");
+      if (wa) wa.hidden = false;
+    }
+  });
 }
+function cvReintentar(){ CV.fallosRed = 0; subidaPaso(CV); }
 
 /* ===== Mira Mi Casa: la misma plataforma, con su propia marca =====
    El Worker marca el <html> con data-marca="mmc" cuando el Host es el
@@ -3439,13 +3601,42 @@ function mcPinta(aviso, color){
          va primero porque es a lo que vino. */
       var tieneConcepto = !!(d.evaluado && d.clasificacion);
       var falta = d.falta_pendiente;
-      var pideFotos = !!falta;
+      /* UN CASO TERMINADO NO ESPERA NADA (auditoría del 28 sep 2026). La página
+         miraba el estado solo al final, para esconder el formulario, así que un
+         caso cerrado seguía diciendo arriba «todavía no lo ha revisado un
+         ingeniero · hay 12 casos sin abrir» y abajo «este caso está cerrado». Se
+         contradecía a sí misma, y la parte de arriba es la que se lee. El estado
+         se mira PRIMERO y decide qué tarjeta de espera sale — ninguna, si ya
+         terminó —. El concepto, si lo hubo, se sigue enseñando: es suyo. */
+      var terminado = d.estado === "cerrado" || d.estado === "descartado";
+      var pideFotos = !!falta && !terminado;
+
+      if (terminado){
+        var fin = d.estado === "cerrado" ? "cerrado" : "descartado";
+        h += '<div class="card" style="margin-top:22px;text-align:left">'
+          +  "<h3>" + escapeHtml(t("mc.fin." + fin + ".t")) + "</h3>"
+          +  "<p>" + escapeHtml(t("mc.fin." + fin + ".p")) + "</p>"
+          +  (fin === "descartado" && d.duplicado_de
+              ? '<p style="margin-top:8px;font-weight:700">' + escapeHtml(t("mc.fin.dup").replace("{n}", d.duplicado_de)) + "</p>"
+              : "")
+          +  "</div>";
+      } else if (d.estado === "visitado"){
+        h += '<div class="card" style="margin-top:22px;text-align:left">'
+          +  "<h3>" + escapeHtml(t("mc.fin.visitado.t")) + "</h3>"
+          +  "<p>" + escapeHtml(t("mc.fin.visitado.p")) + "</p></div>";
+      }
 
       if (tieneConcepto){
         h += '<div class="card" style="margin-top:22px;text-align:left">'
           +  "<h3>" + escapeHtml(t("mc.res.t")) + "</h3>"
           +  '<p style="margin-top:6px;font-weight:700">'
           +  escapeHtml(t("mc.cl." + d.clasificacion) || d.clasificacion) + "</p>"
+          /* La prioridad NO es una cita (auditoría del 28 sep 2026), y con
+             prioridad alta se dice a quién acudir, que no somos nosotros. */
+          +  '<p class="mu" style="margin-top:4px">' + escapeHtml(t("mc.cl.nota")) + "</p>"
+          +  (d.clasificacion === "urgente"
+              ? '<p style="margin-top:8px;font-weight:600">' + escapeHtml(t("mc.cl.urge")) + "</p>"
+              : "")
           +  (d.ultima && d.ultima.recomendacion
               ? "<p style='margin-top:8px'>" + escapeHtml(t("mc.res.reco")) + " "
                 + escapeHtml(d.ultima.recomendacion) + "</p>"
@@ -3478,7 +3669,9 @@ function mcPinta(aviso, color){
          si lo hicieron: lo que falta es que alguien confirme su matricula en el
          COPNIA. Decirle lo primero seria mentirle, y ademas le quitaria el unico
          dato que explica por que sigue esperando. */
-      if (!tieneConcepto && !pideFotos && d.esperando_respaldo){
+      if (terminado || d.estado === "visitado"){
+        /* Ya dicho arriba: aquí no hay espera que contar. */
+      } else if (!tieneConcepto && !pideFotos && d.esperando_respaldo){
         h += '<div class="card" style="margin-top:22px;text-align:left">'
           +  "<h3>" + escapeHtml(t("mc.respaldo.t")) + "</h3>"
           +  "<p>" + escapeHtml(t("mc.respaldo.p")) + "</p></div>";
@@ -3514,8 +3707,8 @@ function mcPinta(aviso, color){
          que sí existe. El respaldo al cálculo viejo es para un navegador con un
          app.js viejo hablando con la API nueva. */
       var queda = d.cupo ? d.cupo.queda : Math.max(0, MC.tope - (d.medios || 0));
-      if (d.estado === "cerrado" || d.estado === "descartado"){
-        h += '<p class="mu" style="margin-top:22px">' + escapeHtml(t("mc.cerrado")) + "</p>";
+      if (terminado){
+        if (d.estado === "cerrado") h += '<p class="mu" style="margin-top:22px">' + escapeHtml(t("mc.cerrado")) + "</p>";
       } else if (queda <= 0){
         h += '<p class="mu" style="margin-top:22px">' + escapeHtml(t("mc.add.tope")) + "</p>";
       } else {
@@ -3553,9 +3746,13 @@ function mcFormFotos(){
     +  '<p class="mu" style="margin-top:8px">' + escapeHtml(t("mc.add.p")) + "</p>"
     +  '<p style="margin-top:10px;font-weight:700">' + escapeHtml(t("mc.add.seg")) + "</p>"
     +  '<div id="mc-cats" style="margin-top:18px;display:flex;flex-direction:column;gap:16px"></div>'
+    +  '<p class="mu" style="margin-top:14px">' + escapeHtml(t("cv.video.h")) + "</p>"
     +  '<button type="button" class="btn btn-g" style="margin-top:18px" data-act="mcEnviar()">'
     +  escapeHtml(t("mc.add.enviar")) + "</button>"
-    +  '<p id="mc-msg" role="status" aria-live="polite" class="mu" style="margin-top:12px"></p></div>';
+    +  '<p id="mc-msg" role="status" aria-live="polite" class="mu" style="margin-top:12px;white-space:pre-line"></p>'
+    /* Solo se ve mientras hay archivos esperando señal: ver `subidaEsperar`. */
+    +  '<button type="button" class="btn btn-o" id="mc-reintentar" hidden style="margin-top:10px" data-act="mcReintentar()">'
+    +  escapeHtml(t("cv.sub.reintentar")) + "</button></div>";
 }
 
 /* Las MISMAS cuatro categorías del formulario, leídas de la misma constante.
@@ -3612,7 +3809,14 @@ function mcEnviar(){
   /* Se reinician EN CADA TANDA. `mcPinta` vuelve a dibujar la página al
      terminar, así que puede haber una segunda subida en la misma visita y los
      contadores de la anterior mentirían. */
-  MC.total = MC.cola.length; MC.hechas = 0; MC.fallidas = 0;
+  /* SI YA HAY UNA TANDA ESPERANDO SEÑAL, lo nuevo se suma a ella en vez de
+     reiniciar los contadores: reiniciarlos a mitad haría que el cierre dijera
+     «guardamos 2 de 3» cuando fueron 5 de 6. */
+  if (MC.ui && (MC.corriendo || MC.espera)){
+    MC.total = MC.hechas + MC.fallidas + MC.cola.length;
+    subidaPaso(MC);
+    return;
+  }
   if (msg){ msg.textContent = t("mc.add.subiendo"); msg.style.color = "var(--mu)"; }
   mcSubirCola();
 }
@@ -3637,6 +3841,11 @@ function mcEnviar(){
 
    Mismo contrato que `cvSubirCola`, a propósito: si algún día cambia el trato con
    la familia, que cambie en los dos o en ninguno. */
+/* «Mi caso» usa la MISMA cola que el formulario (`subidaEmpezar`), a propósito:
+   el 31 ago ya se corrigió aquí un bucle que se había quedado atrás del otro, y
+   con una sola cola eso no puede volver a pasar. Al terminar se repinta la
+   página, así el contador de fotos dice la verdad sin recargar, y los motivos
+   de lo que no entró van en el mismo aviso. */
 function mcProg(txt, color){
   var e = document.getElementById("mc-msg");
   if (!e) return;
@@ -3646,42 +3855,20 @@ function mcProg(txt, color){
 
 function mcSubirCola(){
   if (!MC.caso) return;
-  if (!MC.cola.length){
-    /* El cierre dice lo que de verdad pasó, y repinta la página para que el
-       contador de fotos cuadre con lo que se guardó. El color va con el mensaje:
-       antes se pintaba todo en verde. */
-    if (!MC.total)          mcPinta();
-    else if (!MC.fallidas)  mcPinta(t("mc.add.ok"), "var(--g)");
-    else if (MC.hechas)     mcPinta(t("mc.sub.parcial").replace("{n}", MC.hechas).replace("{t}", MC.total), "var(--amber)");
-    else                    mcPinta(t("mc.sub.nada"), "var(--err)");
-    return;
-  }
-
-  var item = MC.cola[0];            /* NO se saca hasta que se guarda */
-  mcProg(t("mc.sub.prog").replace("{n}", MC.hechas + MC.fallidas + 1).replace("{t}", MC.total));
-
-  subirMedio(MC.caso, MC.token, item)
-    .then(function(res){
-      if (res.ok){
-        MC.cola.shift(); MC.hechas++;
-        mcSubirCola();
-        return;
-      }
-      /* Rechazo del servidor por lo que el archivo ES —demasiado grande, tipo no
-         permitido, tope de medios—: reintentar no lo mejora. Se descarta, pero
-         CONTADO, que es lo que faltaba. */
-      MC.cola.shift(); MC.fallidas++;
-      mcSubirCola();
-    })
-    .catch(function(){
-      /* Fallo de RED, el de la señal que se va un segundo. Un reintento y no
-         más: insistir en bucle deja a la familia esperando sin saberlo. */
-      item.intentos = (item.intentos || 0) + 1;
-      if (item.intentos < 2){ setTimeout(mcSubirCola, 1200); return; }
-      MC.cola.shift(); MC.fallidas++;
-      mcSubirCola();
-    });
+  subidaEmpezar(MC, {
+    boton: "mc-reintentar",
+    prog: mcProg,
+    textoProg: function(n, tt){ return t("mc.sub.prog").replace("{n}", n).replace("{t}", tt); },
+    fin: function(st){
+      var mot = st.motivos.length ? "\n" + st.motivos.join("\n") : "";
+      if (!st.total)          mcPinta();
+      else if (!st.fallidas)  mcPinta(t("mc.add.ok"), "var(--g)");
+      else if (st.hechas)     mcPinta(t("mc.sub.parcial").replace("{n}", st.hechas).replace("{t}", st.total) + mot, "var(--amber)");
+      else                    mcPinta(t("mc.sub.nada") + mot, "var(--err)");
+    }
+  });
 }
+function mcReintentar(){ MC.fallosRed = 0; subidaPaso(MC); }
 
 function cvCopiar(){
   if (!CV.enlace) return;
@@ -3695,6 +3882,7 @@ function cvCopiar(){
 var ACT_FNS = {
   mbMonto:mbMonto, mbLibre:mbLibre,
   cvPaso:cvPaso, cvEnviar:cvEnviar, cvCopiar:cvCopiar, mmcCasoOlvidar:mmcCasoOlvidar,
+  cvReintentar:cvReintentar, mcReintentar:mcReintentar,
   irASeccion:irASeccion,
   themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,
   payMethod:payMethod, accTab:accTab, setQuick:setQuick, lbStep:lbStep, toggleFaq:toggleFaq,
