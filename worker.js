@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "fe113c7b";
+const STYLES_V = "983f8f8e";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -10282,6 +10282,13 @@ async function apiPaypalSuscripcion(request, env, url) {
   const idioma = c.idioma === "en" ? "en" : "es";
   const quiereCert = c.quiere_certificado ? 1 : 0;
   const muro = c.consent_muro === "si" ? "si" : "no";
+  /* EL PROGRAMA, con la misma lista cerrada que la membresia en pesos
+     (`destinoMembresia`, migrations/0035). Lo manda el navegador, asi que un id
+     que no esta en ella —uno viejo, uno inventado, la brigada— no es un error
+     que devolver: es el fondo general, lo que la persona tendria sin elegir. Se
+     valida ANTES de hablar con PayPal para no crear alla una suscripcion cuya
+     fila aqui no pudiera guardarse. */
+  const destino = await destinoMembresia(env, c.destino);
 
   /* NUESTRO id, que viaja como `custom_id` y vuelve en cada webhook. Es lo que
      permite reconocer una suscripcion sin fiarse del correo -que la persona puede
@@ -10377,9 +10384,10 @@ async function apiPaypalSuscripcion(request, env, url) {
 
   await env.DB.prepare(
     "INSERT INTO suscripciones (id, proveedor, plan_ref, estado, nivel, monto_centavos, " +
-    "moneda, frecuencia, idioma, quiere_certificado, consent_muro, donante_id) " +
-    "VALUES (?, 'paypal', ?, 'aprobacion_pendiente', ?, ?, 'USD', 'mensual', ?, ?, ?, ?)"
-  ).bind(r.d.id, planId, nivel.nombre, Math.round(usd * 100), idioma, quiereCert, muro, donanteId).run();
+    "moneda, frecuencia, idioma, quiere_certificado, consent_muro, donante_id, destino) " +
+    "VALUES (?, 'paypal', ?, 'aprobacion_pendiente', ?, ?, 'USD', 'mensual', ?, ?, ?, ?, ?)"
+  ).bind(r.d.id, planId, nivel.nombre, Math.round(usd * 100), idioma, quiereCert, muro, donanteId,
+         destino ? destino.id : null).run();
 
   /* La autorizacion de Ley 1581 se anota como en los otros formularios: es la
      misma obligacion, no una excepcion porque el dinero venga de fuera. */
@@ -10940,7 +10948,7 @@ async function correoReversaPaypal(env, a, tipo, devuelto) {
 
 async function paypalCobro(env, suscripcionId, recurso) {
   const sub = await env.DB.prepare(
-    "SELECT id, nivel, idioma, quiere_certificado, consent_muro, donante_id " +
+    "SELECT id, nivel, idioma, quiere_certificado, consent_muro, donante_id, destino " +
     "FROM suscripciones WHERE id = ?"
   ).bind(suscripcionId).first();
   if (!sub) return "suscripcion_desconocida";
@@ -10975,14 +10983,38 @@ async function paypalCobro(env, suscripcionId, recurso) {
     if (ya) return "cobro_ya_registrado " + ya.guia;
   }
 
+  /* EL DESTINO VIAJA de la suscripcion a cada cobro, igual que en `wompiCobrar`
+     y con las mismas dos reglas: se escribe lo MISMO que escribe Donar para ese
+     programa —`dirigida`, el id de la fundacion, el nombre del programa— para
+     que el rastreo y las actas de entrega lo encuentren; y si el programa ya no
+     esta en `partners.json`, el cobro va al fondo general y QUEDA UN INCIDENTE.
+     Aqui con mas razon no se deja de registrar: PayPal ya cobro, el dinero
+     existe, y lo unico que falta decidir —que hacer con la eleccion— es de una
+     persona. Va antes de `siguienteGuia`, que no depende de esto, para que un
+     tropiezo al leer `partners.json` no queme un consecutivo. */
+  let dest = null;
+  if (sub.destino) {
+    dest = await destinoMembresia(env, sub.destino);
+    if (!dest) {
+      console.error("membresia paypal con destino que ya no existe", sub.id, sub.destino);
+      await anotarIncidente(env, "membresia-destino", "",
+        "el programa " + String(sub.destino).slice(0, 60) + " de la suscripcion " + sub.id +
+        " no esta en partners.json: el cobro de PayPal se registro al fondo general");
+    }
+  }
+  const modo = dest ? "dirigida" : "fondo";
+  const destinoId = dest ? dest.destino_id : null;
+  const proyecto = dest ? (String(sub.idioma || "es") === "en" ? dest.en : dest.es) : null;
+
   const guia = await siguienteGuia(env, anioCO());
   const token = tokenNuevo();
   await env.DB.prepare(
-    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
+    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, frecuencia, " +
     "quiere_certificado, consent_muro, idioma, token, proveedor, proveedor_ref, suscripcion, " +
     "donante_id, aprobada_en) " +
-    "VALUES (?, 'aprobada', ?, ?, 'fondo', 'mensual', ?, ?, ?, ?, 'paypal', ?, ?, ?, datetime('now'))"
-  ).bind(guia, centavos, moneda, sub.quiere_certificado, sub.consent_muro, sub.idioma,
+    "VALUES (?, 'aprobada', ?, ?, ?, ?, ?, 'mensual', ?, ?, ?, ?, 'paypal', ?, ?, ?, datetime('now'))"
+  ).bind(guia, centavos, moneda, modo, destinoId, proyecto,
+         sub.quiere_certificado, sub.consent_muro, sub.idioma,
          token, String((recurso && recurso.id) || ""), suscripcionId, sub.donante_id).run();
 
   /* UN COBRO ES PRUEBA DE ACTIVACION, y por eso se marca aqui tambien.
@@ -11019,7 +11051,7 @@ async function paypalCobro(env, suscripcionId, recurso) {
     if (d && d.email) {
       await correoAporteAprobado(env, {
         guia, monto_centavos: centavos, moneda, idioma: sub.idioma,
-        modo: "fondo", destino_id: null, frecuencia: "mensual", token
+        modo, destino_id: destinoId, frecuencia: "mensual", token
       }, d.email, d.nombre);
     } else {
       /* Se DICE que no se mando y por que. Una membresia sin correo enlazado es
@@ -11044,12 +11076,12 @@ async function paypalCobro(env, suscripcionId, recurso) {
        salvo que alguien abra el panel. El de Wompi lleva anios mandandolo. */
     await correoAvisoInterno(env, {
       guia, monto_centavos: centavos, moneda,
-      modo: "fondo", destino_id: null, frecuencia: "mensual"
+      modo, destino_id: destinoId, frecuencia: "mensual"
     }, d && d.email, d && d.nombre);
 
     const carnet = await carnetTrasAporte(
       env,
-      { frecuencia: "mensual", monto_centavos: centavos, destino_id: null },
+      { frecuencia: "mensual", monto_centavos: centavos, destino_id: destinoId },
       sub.donante_id, sub.nivel
     );
     if (carnet && carnet.nuevo && d && d.email) {
@@ -20743,8 +20775,11 @@ const MESES_EN_LARGO = ["January", "February", "March", "April", "May", "June",
    y la tarea corre una vez al dia: por eso la pagina dice «hacia el», no
    «el». El desborde de fin de mes —un 31 que cae en marzo— se deja igual que
    lo normaliza SQLite, para que la pagina y el cobro digan la misma fecha. */
-function proximoCobroISO() {
-  const hoy = enColombia();
+/* `desde` es opcional: sin el, hoy (lo que muestra /pago/metodo antes de
+   existir la membresia); con el, su `creada_en`, para que /pago/listo diga la
+   misma fecha aunque se recargue dias despues. `enColombia` ya acepta ambos. */
+function proximoCobroISO(desde) {
+  const hoy = enColombia(desde);
   const d = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() + 1, hoy.getUTCDate()));
   return d.toISOString().slice(0, 10);
 }
@@ -21843,6 +21878,9 @@ async function apiCrearFuentePago(request, env, url) {
       }
     } catch (e) { console.error("re-atar fuente", e && e.message); }
   }
+  /* EL IDIOMA VIAJA a /pago/listo como viajo hasta aqui. Sin esto, quien hizo
+     todo el recorrido en ingles leia la confirmacion del dinero en espanol. */
+  if (vuelta.lang === "en") q.set("lang", "en");
   return Response.redirect(ORIGIN + "/pago/listo?" + q.toString(), 303);
 }
 
@@ -21882,82 +21920,270 @@ function volverAlFormulario(url, motivo, monto, extra) {
   return Response.redirect(new URL("/pago/metodo?" + q.toString(), url.origin).toString(), 303);
 }
 
-function paginaPagoListo(url) {
+/* LOS TEXTOS DE /pago/listo, en los dos idiomas (30 sep 2026).
+   Es la pagina que sigue a /pago/metodo, y hasta hoy solo hablaba espanol: quien
+   hacia todo el recorrido en ingles registraba su tarjeta leyendo en su idioma y
+   aterrizaba aqui, en la confirmacion del dinero, en uno que quiza no lee. Mismo
+   patron que `TXT_METODO`: un diccionario por idioma, elegido por `?lang=`, y
+   `esc()` en todo lo que se pinta. Las funciones reciben piezas YA escapadas
+   (la tarjeta) o las escapan ellas; ninguna devuelve HTML crudo de la URL. */
+const TXT_LISTO = Object.freeze({
+  es: {
+    htmlLang: "es", otroIdioma: "English", otroLang: "en",
+    volver: "Volver a membresías",
+    tVerif: "Estamos verificando tu primer cobro",
+    lVerif: (tj) => "Mandamos el primer cobro de tu membresía" + (tj ? " a tu " + tj : "")
+      + " y la pasarela no alcanzó a respondernos. No sabemos todavía si salió.",
+    nVerif: "No lo intentes otra vez mientras tanto, para no cobrarte dos veces. En cuanto la pasarela confirme, te escribimos: si salió, con el enlace a tu membresía; si no, para que lo intentes de nuevo.",
+    tProc: "Estamos procesando tu primer aporte",
+    lProc: (niv, tj) => "Tu membresía" + (niv ? " en el nivel " + niv : "")
+      + " queda activa en cuanto la pasarela confirme el primer cobro" + (tj ? " a tu " + tj : "")
+      + ". Suele tardar unos minutos.",
+    nProc: "Te escribimos al correo cuando se confirme, con el enlace a tu membresía: desde ahí puedes verla y terminarla cuando quieras, sin escribirle a nadie. Si el cobro no sale, también te avisamos.",
+    tActiva: "Tu membresía está activa",
+    lActiva: "La pasarela confirmó el primer cobro. Te enviamos al correo el recibo y el enlace propio de tu membresía.",
+    nActiva: "Desde ese enlace puedes verla y terminarla cuando quieras, sin escribirle a nadie.",
+    tFallo: "Tu tarjeta quedó registrada, la membresía no arrancó",
+    porques: {
+      ya_suscrito: "Ya hay una membresía activa con ese correo, así que no creamos otra. Le enviamos a ese correo el enlace para verla.",
+      primer_cobro_fallido: "No pudimos hacer el primer cobro. Revisa tu método de pago o prueba con otro.",
+      monto_invalido: "El monto no era válido.",
+      email_invalido: "El correo no era válido.",
+      sin_metodo_de_pago: "No encontramos el método de pago recién registrado."
+    },
+    porqueOtro: "Algo falló al activar la membresía y preferimos decírtelo a dejarte creyendo que quedó.",
+    lEnProceso: "No pudimos arrancar esta membresía ahora.",
+    nEnProceso: "Si ya lo intentaste hace un momento, espera el correo de confirmación antes de volver a intentarlo, para no cobrarte dos veces.",
+    nFallo: "No se te cobró nada por la membresía. Si quieres, inténtalo de nuevo desde membresías; y si vuelve a fallar, escríbenos y lo miramos nosotros.",
+    tTarjeta: "Método de pago registrado",
+    lTarjeta: (tj, reatada) => "Tu método de pago quedó guardado" + (tj ? " (" + tj + ")" : "") + "."
+      + (reatada ? " Tu membresía usará esta tarjeta desde el próximo cobro." : ""),
+    nTarjeta: "Puedes retirarlo cuando quieras desde tu membresía. Guardamos la marca y los cuatro últimos dígitos para que reconozcas cuál registraste; el número de tu tarjeta no lo tenemos, y su fecha de vencimiento tampoco.",
+    resEy: "Tu membresía", alMes: "COP al mes",
+    nivel: "Nivel", programa: "Programa", primero: "Primer cobro", proximo: "Próximo cobro",
+    primeroProc: "En confirmación con la pasarela",
+    primeroVerif: "Esperando respuesta de la pasarela",
+    primeroOk: "Confirmado",
+    proximoV: (f) => "Hacia el " + f + ", y luego cada mes",
+    verMembresia: "Ver mi membresía", miAporte: "Ir a Mi aporte", buscar: "Buscar mi membresía",
+    pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2"
+  },
+  en: {
+    htmlLang: "en", otroIdioma: "Español", otroLang: "es",
+    volver: "Back to memberships",
+    tVerif: "We are checking your first charge",
+    lVerif: (tj) => "We sent the first charge of your membership" + (tj ? " to your " + tj : "")
+      + " and the payment gateway did not answer in time. We do not know yet whether it went through.",
+    nVerif: "Please do not try again in the meantime, so you are not charged twice. As soon as the gateway confirms, we will email you: if it went through, with the link to your membership; if not, so you can try again.",
+    tProc: "We are processing your first gift",
+    lProc: (niv, tj) => "Your membership" + (niv ? " at the " + niv + " level" : "")
+      + " becomes active as soon as the payment gateway confirms the first charge" + (tj ? " to your " + tj : "")
+      + ". It usually takes a few minutes.",
+    nProc: "We will email you once it is confirmed, with the link to your membership: from there you can see it and end it whenever you want, with no need to write to anyone. If the charge does not go through, we will let you know too.",
+    tActiva: "Your membership is active",
+    lActiva: "The payment gateway confirmed the first charge. We have emailed you the receipt and your membership's own link.",
+    nActiva: "From that link you can see it and end it whenever you want, with no need to write to anyone.",
+    tFallo: "Your card was registered, but the membership did not start",
+    porques: {
+      ya_suscrito: "There is already an active membership with that email, so we did not create another one. We have sent the link to see it to that email.",
+      primer_cobro_fallido: "We could not make the first charge. Check your payment method or try another one.",
+      monto_invalido: "The amount was not valid.",
+      email_invalido: "The email was not valid.",
+      sin_metodo_de_pago: "We could not find the payment method you just registered."
+    },
+    porqueOtro: "Something failed while starting the membership, and we would rather tell you than leave you thinking it worked.",
+    lEnProceso: "We could not start this membership right now.",
+    nEnProceso: "If you already tried a moment ago, wait for the confirmation email before trying again, so you are not charged twice.",
+    nFallo: "You were not charged anything for the membership. If you like, try again from memberships; and if it fails again, write to us and we will look into it.",
+    tTarjeta: "Payment method registered",
+    lTarjeta: (tj, reatada) => "Your payment method has been saved" + (tj ? " (" + tj + ")" : "") + "."
+      + (reatada ? " Your membership will use this card from the next charge." : ""),
+    nTarjeta: "You can withdraw it whenever you want from your membership. We keep the brand and the last four digits so you can tell which card you registered; we do not have your card number, nor its expiry date.",
+    resEy: "Your membership", alMes: "COP a month",
+    nivel: "Level", programa: "Programme", primero: "First charge", proximo: "Next charge",
+    primeroProc: "Being confirmed with the gateway",
+    primeroVerif: "Waiting for the gateway to answer",
+    primeroOk: "Confirmed",
+    proximoV: (f) => "Around " + f + ", and then every month",
+    verMembresia: "See my membership", miAporte: "Go to My giving", buscar: "Find my membership",
+    pie: "Fundación Give&Grow International · Colombian nonprofit · NIT 901.948.930-2"
+  }
+});
+
+/* GET /pago/listo. Antes la ruta llamaba a la pagina directamente; ahora pasa
+   por aqui porque hace falta la base —para el resumen— y el reloj del
+   visitante, para el tema.
+
+   EL RESUMEN SALE DE LA BASE, NO DE LA URL. La redireccion podria traer el
+   monto y el programa en la query, pero eso seria pintar en la pantalla del
+   dinero lo que cualquiera escribe en un enlace. Lo que trae es el token de 128
+   bits de la membresia —que ya estaba, y que ya abre /membresia/<token>—, y con
+   el se lee la fila tal como quedo guardada: el monto que se va a cobrar, el
+   nivel y el programa que `crearSuscripcion` valido. Asi esta pagina no puede
+   decir una cosa y el cobro del mes otra. */
+async function rutaPagoListo(env, url, request) {
+  const tok = String(url.searchParams.get("t") || "");
+  let fila = null;
+  if (url.searchParams.get("sub") === "1" && /^[a-f0-9]{32}$/.test(tok) && env.DB) {
+    try {
+      fila = await env.DB.prepare(
+        "SELECT estado, nivel, monto_centavos, destino, idioma, creada_en FROM suscripciones " +
+        "WHERE token = ? AND proveedor = 'wompi' LIMIT 1"
+      ).bind(tok).first();
+    } catch (e) { console.error("pago listo: leer membresia", e && e.message); }
+  }
+  /* `?lang=` manda; sin el, el idioma en que nacio la membresia; y si no hay
+     fila, espanol. Es el mismo orden que usa `rutaMembresia`. */
+  const q = url.searchParams.get("lang");
+  const lang = q === "en" || q === "es" ? q : (fila && fila.idioma === "en" ? "en" : "es");
+  /* El programa se resuelve aqui, que es async, como en `rutaMembresia`: la
+     pagina sigue siendo una funcion pura de sus datos. Un id que ya no esta en
+     la lista cerrada se pinta como fondo general, que es a donde va a ir el
+     cobro (ver `wompiCobrar`). */
+  const programa = fila && fila.destino ? await destinoMembresia(env, fila.destino) : null;
+  return new Response(paginaPagoListo(url, { lang, fila, programa, tema: temaPorReloj(request) }), {
+    headers: { "content-type": "text/html; charset=utf-8",
+               /* La CSP de siempre, sin anadirle nada: la pagina no tiene un solo
+                  script y sus estilos salen de /styles.css. */
+               "content-security-policy": cspPagina({}),
+               "cache-control": "private, no-store",
+               "x-robots-tag": "noindex, nofollow" } });
+}
+
+function paginaPagoListo(url, cfg) {
+  const c = cfg || {};
+  const en = c.lang === "en";
+  const T = en ? TXT_LISTO.en : TXT_LISTO.es;
+  const fila = c.fila || null;
+
   const t4 = String(url.searchParams.get("t4") || "").replace(/[^0-9]/g, "").slice(0, 4);
   /* Igual de estricto que con los digitos: solo letras, y de una lista corta.
      Lo que llega por la URL lo escribe cualquiera. */
   const mp = String(url.searchParams.get("m") || "").replace(/[^A-Z]/g, "").slice(0, 12);
   const marca = ["VISA","MASTERCARD","AMEX","DINERS","DISCOVER"].includes(mp) ? mp : "";
-  const tarjeta = t4 ? ((marca ? esc(marca) + " " : "") + "\u00b7\u00b7\u00b7\u00b7 " + esc(t4)) : "";
+  const tarjeta = t4 ? ((marca ? marca + " " : "") + "···· " + t4) : "";
 
   const sub = url.searchParams.get("sub");
+  const sub1 = sub === "1", sub0 = sub === "0";
+  const verif = sub1 && url.searchParams.get("v") === "1";
+  const reatada = url.searchParams.get("r") === "1";
   const tok = String(url.searchParams.get("t") || "");
-  const enlaceBaja = /^[a-f0-9]{32}$/.test(tok) ? "/membresia/" + tok : "";
-  const nivel = String(url.searchParams.get("n") || "").replace(/[^a-z]/g, "").slice(0, 12);
+  const tokOk = /^[a-f0-9]{32}$/.test(tok);
+  const enlaceBaja = tokOk ? "/membresia/" + tok + (en ? "?lang=en" : "") : "";
+  const nParam = String(url.searchParams.get("n") || "").replace(/[^a-z]/g, "").slice(0, 12);
+  /* El nivel, de la fila si la hay; si no, del id que trae la URL, pero solo
+     si es uno de los cuatro: `nivelDe` con un id desconocido devolveria Semilla,
+     que seria afirmar un nivel que nadie eligio. */
+  const nivelObj = fila ? nivelDe(fila.nivel)
+                 : (NIVELES_MB.some((x) => x.id === nParam) ? nivelDe(nParam) : null);
+  const nivelTxt = nivelObj ? (en ? nivelObj.en : nivelObj.es) : "";
   const err = String(url.searchParams.get("e") || "").replace(/[^a-z_]/g, "").slice(0, 40);
+  const activa = !!(fila && fila.estado === "activa");
 
   /* TRES DESENLACES DISTINTOS Y SE DICEN DISTINTO. La version anterior solo
      sabia decir «listo»: daba el mismo mensaje a quien quedo de miembro y a
      quien se quedo con la tarjeta registrada y sin membresia. En la pantalla
      del dinero eso no es un matiz. */
-  let titulo, lead, extra = "";
+  let titulo, lead, nota;
   /* «PROCESANDO», NO «YA SALIO» (auditoria del 28 sep 2026). Cuando se llega
      aqui Wompi solo ACEPTO crear el primer cobro; si el dinero entra lo dice el
-     webhook minutos despues. La pantalla del dinero no puede adelantarse. */
-  if (sub === "1" && url.searchParams.get("v") === "1") {
-    titulo = "Estamos verificando tu primer cobro";
-    lead = "Mandamos el primer cobro de tu membres\u00eda" + (tarjeta ? " a tu " + tarjeta : "")
-         + " y la pasarela no alcanz\u00f3 a respondernos. No sabemos todav\u00eda si sali\u00f3.";
-    extra = '  <p class="mu">No lo intentes otra vez mientras tanto, para no cobrarte dos veces. En cuanto la pasarela confirme, te escribimos: si sali\u00f3, con el enlace a tu membres\u00eda; si no, para que lo intentes de nuevo.</p>\n';
-  } else if (sub === "1") {
-    titulo = "Estamos procesando tu primer aporte";
-    lead = "Tu membres\u00eda" + (nivel ? " en el nivel <b>" + esc(nivel) + "</b>" : "")
-         + " queda activa en cuanto la pasarela confirme el primer cobro"
-         + (tarjeta ? " a tu " + tarjeta : "") + ". Suele tardar unos minutos.";
-    extra = '  <p class="mu">Te escribimos al correo cuando se confirme, con el enlace a tu membres\u00eda: desde ah\u00ed puedes verla y terminarla cuando quieras, sin escribirle a nadie. Si el cobro no sale, tambi\u00e9n te avisamos.</p>\n';
-  } else if (sub === "0") {
-    titulo = "Tu tarjeta qued\u00f3 registrada, la membres\u00eda no arranc\u00f3";
-    const porques = {
-      ya_suscrito: "Ya hay una membres\u00eda activa con ese correo, as\u00ed que no creamos otra. Le enviamos a ese correo el enlace para verla.",
-      primer_cobro_fallido: "No pudimos hacer el primer cobro. Revisa tu m\u00e9todo de pago o prueba con otro.",
-      monto_invalido: "El monto no era v\u00e1lido.",
-      email_invalido: "El correo no era v\u00e1lido.",
-      sin_metodo_de_pago: "No encontramos el m\u00e9todo de pago reci\u00e9n registrado."
-    };
-    lead = porques[err] || "Algo fall\u00f3 al activar la membres\u00eda y preferimos dec\u00edrtelo a dejarte creyendo que qued\u00f3.";
+     webhook minutos despues. La pantalla del dinero no puede adelantarse.
+     Lo unico que la deja decir «activa» es la FILA: si la persona recarga la
+     pagina despues de que el webhook confirmo, leerla en presente seria
+     mentirle al reves. */
+  if (activa) {
+    titulo = T.tActiva; lead = T.lActiva; nota = T.nActiva;
+  } else if (verif) {
+    titulo = T.tVerif; lead = T.lVerif(tarjeta); nota = T.nVerif;
+  } else if (sub1) {
+    /* El nivel va en la frase solo si NO hay resumen: con el, ya se lee en su
+       fila y repetirlo arriba era decir lo mismo dos veces. */
+    titulo = T.tProc; lead = T.lProc(fila ? "" : nivelTxt, tarjeta); nota = T.nProc;
+  } else if (sub0) {
+    titulo = T.tFallo;
+    lead = Object.hasOwn(T.porques, err) ? T.porques[err] : T.porqueOtro;
     /* `en_proceso`: ya hay un primer cobro de ese correo esperando respuesta.
        Se dice sin confirmar que ese correo tenga membresia —lo teclea
        cualquiera— y sobre todo sin decir «no se te cobro nada», que aqui
        podria no ser cierto. */
-    extra = err === "en_proceso"
-      ? '  <p class="mu">Si ya lo intentaste hace un momento, espera el correo de confirmaci\u00f3n antes de volver a intentarlo, para no cobrarte dos veces.</p>\n'
-      : '  <p class="mu">No se te cobr\u00f3 nada por la membres\u00eda. Si quieres, int\u00e9ntalo de nuevo desde membres\u00edas; y si vuelve a fallar, escr\u00edbenos y lo miramos nosotros.</p>\n';
-    if (err === "en_proceso") lead = "No pudimos arrancar esta membres\u00eda ahora.";
+    if (err === "en_proceso") { lead = T.lEnProceso; nota = T.nEnProceso; }
+    else nota = T.nFallo;
   } else {
-    titulo = "M\u00e9todo de pago registrado";
-    lead = "Tu m\u00e9todo de pago qued\u00f3 guardado" + (tarjeta ? " (" + tarjeta + ")" : "") + "."
-         + (url.searchParams.get("r") === "1" ? " Tu membres\u00eda usar\u00e1 esta tarjeta desde el pr\u00f3ximo cobro." : "");
-    extra = '  <p class="mu">Puedes retirarlo cuando quieras desde tu membres\u00eda. Guardamos la marca y los cuatro \u00faltimos d\u00edgitos para que reconozcas cu\u00e1l registraste; el n\u00famero de tu tarjeta no lo tenemos, y su fecha de vencimiento tampoco.</p>\n';
+    titulo = T.tTarjeta; lead = T.lTarjeta(tarjeta, reatada); nota = T.nTarjeta;
   }
 
+  /* EL ENLACE AL OTRO IDIOMA se arma con los valores YA LIMPIOS de arriba, no
+     copiando la query: lo que llego crudo no se vuelve a escribir en la
+     pagina. El token viaja porque sin el la otra version no tendria resumen
+     ni enlace a la membresia; es el mismo que ya esta en esta URL. */
+  const qOtro = new URLSearchParams();
+  if (url.searchParams.get("ok") === "1") qOtro.set("ok", "1");
+  if (t4) qOtro.set("t4", t4);
+  if (marca) qOtro.set("m", marca);
+  if (sub1 || sub0) qOtro.set("sub", sub1 ? "1" : "0");
+  if (nivelObj && !fila) qOtro.set("n", nivelObj.id);
+  if (tokOk) qOtro.set("t", tok);
+  if (verif) qOtro.set("v", "1");
+  if (reatada) qOtro.set("r", "1");
+  if (sub0 && err) qOtro.set("e", err);
+  qOtro.set("lang", T.otroLang);
+  const otro = "/pago/listo?" + qOtro.toString();
+
+  /* LA FILA del resumen es la de /pago/metodo (`.rec-item`): la persona acaba
+     de leer ese mismo ledger antes de poner la tarjeta, y aqui lo reconoce. */
+  const filaDl = (k, v) => '      <div class="rec-item"><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>\n';
+  /* EL RESUMEN, solo con la fila: sin ella no hay nada verificado que resumir
+     (tarjeta sin membresia, o una membresia que no arranco). */
+  const resumen = fila && sub1
+    ? '  <section class="pm-resumen" aria-labelledby="pl-res-t">\n'
+      + '    <div>\n'
+      + '      <span class="ey" id="pl-res-t">' + esc(T.resEy) + '</span>\n'
+      + '      <b class="pm-cifra">' + esc(fmtPesos(fila.monto_centavos)) + '</b>\n'
+      + '      <span class="pm-cifra-u">' + esc(T.alMes) + '</span>\n'
+      + '    </div>\n'
+      + '    <dl class="pm-dl">\n'
+      + filaDl(T.nivel, nivelTxt)
+      + filaDl(T.programa, nombreDestinoMb(c.programa || null, en))
+      + filaDl(T.primero, activa ? T.primeroOk : (verif ? T.primeroVerif : T.primeroProc))
+      /* Contado desde que NACIO la membresia y no desde hoy: quien recarga esta
+         pagina dias despues tiene que leer la misma fecha que el primer dia. */
+      + filaDl(T.proximo, T.proximoV(fechaLargaIdioma(proximoCobroISO(fila.creada_en), en)))
+      + '    </dl>\n'
+      + '  </section>\n'
+    : '';
+
+  /* «MI APORTE» VA SIEMPRE, junto al enlace a la membresia o en su lugar: es
+     la seccion del sitio donde vive todo lo de quien ya dono —rastrear la guia,
+     recuperar el enlace de la membresia, pedir el certificado— y es a donde
+     tiene que poder volver sin buscarla. */
+  const volver = "/#membresias";
+  const acciones = enlaceBaja
+    ? '<a class="btn btn-g" href="' + esc(enlaceBaja) + '">' + esc(T.verMembresia) + '</a>\n'
+      + '    <a class="card-link" href="/#mi-aporte">' + esc(T.miAporte) + '</a>\n'
+      + '    <a class="card-link" href="' + volver + '">' + esc(T.volver) + '</a>\n'
+    : '<a class="btn btn-g" href="' + volver + '">' + esc(T.volver) + '</a>\n'
+      + '    <a class="card-link" href="/membresia' + (en ? "?lang=en" : "") + '">' + esc(T.buscar) + '</a>\n'
+      + '    <a class="card-link" href="/#mi-aporte">' + esc(T.miAporte) + '</a>\n';
+
   return '<!doctype html>\n'
-+ '<html lang="es">\n<head>\n<meta charset="utf-8">\n'
++ '<html lang="' + T.htmlLang + '"' + (c.tema === "dark" ? ' data-theme="dark"' : '') + '>\n<head>\n<meta charset="utf-8">\n'
++ '<meta name="theme-color" content="' + (c.tema === "dark" ? "#0F1613" : "#1F5C38") + '">\n'
 + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-+ '<title>' + esc(titulo.replace(/<[^>]*>/g, "")) + ' \u00b7 Give&amp;Grow International</title>\n'
++ '<title>' + esc(titulo) + ' · Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
 + HOJA_CSS + '\n</head>\n<body>\n'
-+ '<main class="wrap" style="padding-top:40px;padding-bottom:48px;max-width:640px">\n'
-+ '  <h1>' + titulo + '</h1>\n'
-+ '  <p class="lead">' + lead + '</p>\n'
-+ extra
-+ '  <p style="margin-top:28px">'
-+ (enlaceBaja
-    ? '<a class="btn btn-g" href="' + esc(enlaceBaja) + '">Ver mi membres\u00eda</a> '
-      + '<a class="card-link" href="/#membresias" style="margin-left:14px">Volver a membres\u00edas</a>'
-    : '<a class="btn btn-g" href="/#membresias">Volver a membres\u00edas</a> '
-      + '<a class="card-link" href="/membresia" style="margin-left:14px">Buscar mi membres\u00eda</a>')
-+ '</p>\n'
++ '<main class="wrap pm">\n'
++ '  <div class="pm-top">\n'
++ '    <a class="card-link" href="' + volver + '">&larr; ' + esc(T.volver) + '</a>\n'
++ '    <a class="card-link" href="' + esc(otro) + '" hreflang="' + T.otroLang + '" lang="' + T.otroLang + '">' + esc(T.otroIdioma) + '</a>\n'
++ '  </div>\n'
++ '  <h1 class="pm-t">' + esc(titulo) + '</h1>\n'
++ '  <p class="lead">' + esc(lead) + '</p>\n'
++ resumen
++ '  <p class="pm-nota">' + esc(nota) + '</p>\n'
++ '  <div class="pm-acciones">\n    ' + acciones + '  </div>\n'
++ '  <p class="pm-pie">' + esc(T.pie) + '</p>\n'
 + '</main>\n</body>\n</html>';
 }
 
@@ -23271,11 +23497,7 @@ export default {
        que identificarlo todavia— sino que el token que llega ya viene de Wompi
        y que la llave privada solo vive aqui. */
     if (ruta === "/pago/metodo")       return await rutaMetodoPago(env, url, request);
-    if (ruta === "/pago/listo")        return new Response(paginaPagoListo(url), {
-      headers: { "content-type": "text/html; charset=utf-8",
-                 "content-security-policy": cspPagina({}),
-                 "cache-control": "private, no-store",
-                 "x-robots-tag": "noindex, nofollow" } });
+    if (ruta === "/pago/listo")        return await rutaPagoListo(env, url, request);
     if (ruta === "/api/pago/fuente")   return await apiCrearFuentePago(request, env, url);
     if (ruta === "/api/pago/suscribir") return await apiSuscribir(request, env, url);
 
