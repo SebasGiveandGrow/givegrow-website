@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "bd0139b8";
+const STYLES_V = "fe113c7b";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -15721,14 +15721,28 @@ async function adminFichaArchivo(env, clave) {
 async function adminSuscripciones(env) {
   const r = await env.DB.prepare(
     "SELECT s.id, s.estado, s.nivel, s.monto_centavos, s.moneda, s.cobros, s.creada_en, " +
-    "s.ultimo_cobro_en, s.cancelada_en, d.nombre, d.email, " +
+    "s.ultimo_cobro_en, s.cancelada_en, s.destino, d.nombre, d.email, " +
     "CAST(julianday('now') - julianday(s.creada_en) AS INTEGER) AS dias, " +
     "(SELECT COUNT(*) FROM aportes a WHERE a.suscripcion = s.id) AS aportes " +
     "FROM suscripciones s LEFT JOIN donantes d ON d.id = s.donante_id " +
     "ORDER BY CASE WHEN s.estado = 'aprobacion_pendiente' THEN 0 ELSE 1 END, s.creada_en DESC " +
     "LIMIT 200"
   ).all();
-  return json({ suscripciones: r.results || [] });
+  /* EL PROGRAMA SALE YA ARMADO del servidor y el panel solo lo imprime: la
+     lista cerrada vive aqui (`destinosMembresia`) y copiarla en el JS del panel
+     seria tener dos que un dia dicen cosas distintas. Un id que ya no esta en
+     `partners.json` se marca, porque sus cobros estan cayendo al fondo general
+     y eso lo tiene que ver una persona. */
+  const filas = [];
+  for (const s of (r.results || [])) {
+    let destino_nombre = null;
+    if (s.destino) {
+      const d = await destinoMembresia(env, s.destino);
+      destino_nombre = d ? nombreDestinoMb(d, false) : s.destino + " (ya no está en partners.json)";
+    }
+    filas.push(Object.assign({}, s, { destino_nombre }));
+  }
+  return json({ suscripciones: filas });
 }
 
 async function adminPaypalSueltos(env) {
@@ -17000,8 +17014,8 @@ tiene a dónde ir: eso hay que repararlo.</p>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Creada</th><th scope="col">Estado</th><th scope="col">Nivel</th>
-<th scope="col">Monto</th><th scope="col">Cobros</th><th scope="col">Miembro</th>
-</tr></thead><tbody id="sus-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+<th scope="col">Monto</th><th scope="col">Programa</th><th scope="col">Cobros</th><th scope="col">Miembro</th>
+</tr></thead><tbody id="sus-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 </div>
@@ -19694,7 +19708,7 @@ function cargarSuscripciones(){
   pedirJSON("/api/admin/suscripciones", "sus-filas").then(function(d){
     var tb = document.getElementById("sus-filas"); if (!tb) return;
     var l = d.suscripciones || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguna todavia.</td></tr>'; return; }
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Ninguna todavia.</td></tr>'; return; }
     tb.innerHTML = l.map(function(s){
       var pend = s.estado === "aprobacion_pendiente";
       var estado = esc(s.estado || "—");
@@ -19713,6 +19727,9 @@ function cargarSuscripciones(){
         "<td>" + estado + "</td>" +
         "<td>" + esc(s.nivel || "—") + "</td>" +
         "<td>" + monto + "</td>" +
+        /* El nombre llega armado del servidor (adminSuscripciones); sin
+           destino es el fondo general, igual que en el libro de aportes. */
+        "<td>" + esc(s.destino_nombre || "Fondo general") + "</td>" +
         "<td>" + (s.cobros || 0) + (s.aportes ? "<br><small>" + s.aportes + " aporte(s)</small>" : "") + "</td>" +
         "<td>" + quien + "</td>" +
       "</tr>";
@@ -20643,71 +20660,214 @@ async function wompiInfoComercio(env) {
   };
 }
 
+/* LOS TEXTOS DE /pago/metodo, en los dos idiomas (30 sep 2026).
+   Hasta hoy la pagina solo hablaba espanol, y era la UNICA del recorrido de
+   membresia que no se podia leer en ingles: quien venia del SPA en ingles caia
+   aqui, en la pantalla de la tarjeta, sin entender las dos casillas que tiene
+   que aceptar. Se sigue el patron de `paginaMembresia`: un diccionario por
+   idioma, elegido por `?lang=`, y `esc()` en todo lo que se pinta. */
+const TXT_METODO = Object.freeze({
+  es: {
+    htmlLang: "es",
+    tituloPag: "Registra tu método de pago",
+    volver: "Volver a membresías",
+    otroIdioma: "English", otroLang: "en",
+    h1: "Registra tu método de pago",
+    leadMonto: "Es el último paso para activar tu membresía. Registras tu tarjeta una sola vez y el aporte se cobra solo cada mes, sin que tengas que volver a entrar.",
+    leadSin: "Registra una tarjeta nueva. Si ya tienes una membresía activa con el mismo correo, el próximo cobro saldrá de esta tarjeta.",
+    resEy: "Tu membresía",
+    alMes: "COP al mes",
+    nivel: "Nivel", programa: "Programa", primero: "Primer cobro", proximo: "Próximo cobro",
+    primeroV: "Hoy, al registrar tu tarjeta",
+    proximoV: (f) => "Hacia el " + f + ", y luego cada mes",
+    cambiar: "Cambiar el monto o el programa",
+    p1t: "Tu correo y tus autorizaciones",
+    p1p: "Ahí te llegan el recibo de cada aporte y el enlace propio de tu membresía.",
+    correo: "Tu correo", correoPh: "tucorreo@ejemplo.com",
+    privacidad: (a) => "He leído y acepto la " + a + "política de privacidad de Wompi</a>.",
+    datos: (a) => "Autorizo el " + a + "tratamiento de mis datos personales</a> (Ley 1581 de 2012).",
+    cert: "Quiero certificado de donación por mis aportes",
+    certH: "Opcional. Sirve para el descuento tributario en Colombia (Art. 257 ET). Te pediremos el documento y la ciudad antes de emitirlo, y lo firman el Representante Legal y la Revisora Fiscal.",
+    p2t: "Tu tarjeta, en la ventana de Wompi",
+    p2p: "Pulsa el botón y escribe los datos de tu tarjeta en la ventana segura de Wompi, la pasarela de Bancolombia.",
+    p3tMonto: "Primer cobro y confirmación",
+    p3pMonto: "Al terminar cobramos el primer mes. La membresía queda activa cuando la pasarela lo confirma, y te escribimos con tu número de guía y el enlace a tu membresía.",
+    p3tSin: "Confirmación",
+    p3pSin: "Al terminar te mostramos la marca y los cuatro últimos dígitos de la tarjeta que quedó registrada.",
+    segT: "Así protegemos tu tarjeta",
+    segP1: "Wompi recibe los datos de tu tarjeta dentro de su propia ventana y los convierte en un token: ese token es lo único que llega a nosotros. Give&Grow no ve, no recibe y no guarda el número de tu tarjeta; conservamos la marca y los cuatro últimos dígitos para que reconozcas cuál registraste.",
+    segP2: "Puedes terminar tu membresía cuando quieras: al activarla te llega por correo un enlace propio desde el que la terminas y retiramos tu tarjeta, sin escribirle a nadie.",
+    pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2",
+    sandbox: "Ambiente de pruebas de Wompi: no se cobra dinero real."
+  },
+  en: {
+    htmlLang: "en",
+    tituloPag: "Register your payment method",
+    volver: "Back to memberships",
+    otroIdioma: "Español", otroLang: "es",
+    h1: "Register your payment method",
+    leadMonto: "This is the last step to start your membership. You register your card once and the gift is charged automatically every month, with no need to come back.",
+    leadSin: "Register a new card. If you already have an active membership with the same email, the next charge will come from this card.",
+    resEy: "Your membership",
+    alMes: "COP a month",
+    nivel: "Level", programa: "Programme", primero: "First charge", proximo: "Next charge",
+    primeroV: "Today, when you register your card",
+    proximoV: (f) => "Around " + f + ", and then every month",
+    cambiar: "Change the amount or the programme",
+    p1t: "Your email and your consent",
+    p1p: "That is where you receive the receipt for every gift and your membership's own link.",
+    correo: "Your email", correoPh: "you@example.com",
+    privacidad: (a) => "I have read and accept " + a + "Wompi's privacy policy</a>.",
+    datos: (a) => "I authorise the " + a + "processing of my personal data</a> (Colombian Law 1581 of 2012).",
+    cert: "I want a donation certificate for my gifts",
+    certH: "Optional. It is used for the tax deduction in Colombia (Art. 257 of the Tax Code). We will ask for your ID and city before issuing it, and it is signed by the Legal Representative and the Statutory Auditor.",
+    p2t: "Your card, in Wompi's window",
+    p2p: "Press the button and type your card details in the secure window of Wompi, Bancolombia's payment gateway.",
+    p3tMonto: "First charge and confirmation",
+    p3pMonto: "When you finish we charge the first month. The membership becomes active once the gateway confirms it, and we email you your tracking number and the link to your membership.",
+    p3tSin: "Confirmation",
+    p3pSin: "When you finish we show you the brand and the last four digits of the card you registered.",
+    segT: "How we protect your card",
+    segP1: "Wompi receives your card details inside its own window and turns them into a token: that token is the only thing that reaches us. Give&Grow does not see, receive or store your card number; we keep the brand and the last four digits so you can tell which card you registered.",
+    segP2: "You can end your membership whenever you want: once it is active we email you its own link, from which you end it and we withdraw your card, with no need to write to anyone.",
+    pie: "Fundación Give&Grow International · Colombian nonprofit · NIT 901.948.930-2",
+    sandbox: "Wompi test environment: no real money is charged."
+  }
+});
+
+const MESES_EN_LARGO = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+
+/* EL PROXIMO COBRO, dicho como fecha y no como «en un mes». El cobro mensual
+   entra cuando `ultimo_cobro_en` cumple un mes (`cobrarSuscripcionesDelMes`),
+   y la tarea corre una vez al dia: por eso la pagina dice «hacia el», no
+   «el». El desborde de fin de mes —un 31 que cae en marzo— se deja igual que
+   lo normaliza SQLite, para que la pagina y el cobro digan la misma fecha. */
+function proximoCobroISO() {
+  const hoy = enColombia();
+  const d = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() + 1, hoy.getUTCDate()));
+  return d.toISOString().slice(0, 10);
+}
+function fechaLargaIdioma(iso, en) {
+  if (!en) return fechaLargaISO(iso);
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return "";
+  return MESES_EN_LARGO[Number(m[2]) - 1] + " " + Number(m[3]) + ", " + m[1];
+}
+
+/* El candado del aviso de seguridad. Trazo y no relleno, con `currentColor`,
+   como los iconos de las tarjetas del sitio: sin emoji y sin imagen externa
+   (la CSP de esta pagina no admite mas origen de imagenes que el propio). */
+const SVG_CANDADO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+  + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>'
+  + '<path d="M12 14.5v2.5"/></svg>';
+
 function paginaMetodoPago(cfg) {
   const amb = cfg.amb, info = cfg.info;
-  const aviso = cfg.aviso ? '<p class="mu" style="color:var(--err)">' + esc(cfg.aviso) + '</p>' : "";
+  const en = cfg.lang === "en";
+  const T = en ? TXT_METODO.en : TXT_METODO.es;
+  const aviso = cfg.aviso ? '  <p class="pm-aviso" role="alert">' + esc(cfg.aviso) + '</p>\n' : "";
+  /* El enlace al otro idioma conserva lo elegido. Se arma con los valores YA
+     validados (monto en rango, destino de la lista cerrada): lo que llego
+     crudo en la URL no se vuelve a escribir en la pagina. */
+  const qOtro = new URLSearchParams();
+  if (cfg.monto) qOtro.set("monto", String(cfg.monto));
+  if (cfg.destino) qOtro.set("destino", cfg.destino.id);
+  if (T.otroLang === "en") qOtro.set("lang", "en");
+  const otro = "/pago/metodo" + (qOtro.toString() ? "?" + qOtro.toString() : "");
+  const abre = (href) => '<a href="' + esc(href) + '" target="_blank" rel="noopener">';
+
+  /* LA FILA del resumen reusa `.rec-item`, el mismo par etiqueta/valor del
+     recibo de ejemplo del SPA: lo que se firma se lee como un documento. */
+  const fila = (k, v) => '      <div class="rec-item"><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>\n';
+
   return '<!doctype html>\n'
-+ '<html lang="es">\n'
++ '<html lang="' + T.htmlLang + '"' + (cfg.tema === "dark" ? ' data-theme="dark"' : '') + '>\n'
 + '<head>\n'
 + '<meta charset="utf-8">\n'
++ '<meta name="theme-color" content="' + (cfg.tema === "dark" ? "#0F1613" : "#1F5C38") + '">\n'
 + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-+ '<title>Registrar metodo de pago · Give&amp;Grow International</title>\n'
++ '<title>' + esc(T.tituloPag) + ' · Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
 + HOJA_CSS + '\n'
 + '</head>\n'
 + '<body>\n'
-+ '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
-+ '  <p><a class="card-link" href="/#membresias">&larr; Volver a membresías</a></p>\n'
-+ '  <h1>Registra tu método de pago</h1>\n'
-+ '  <p class="lead">Con esto podemos cobrar tu membresía cada mes sin que tengas que entrar otra vez.</p>\n'
-/* «Puedes retirarlo cuando quieras» se quedó corto: era cierto y no decía
-   cómo, y durante unas horas el cómo fue «escríbenos». Ahora se nombra el
-   mecanismo, porque una promesa sin mecanismo se parece demasiado a una
-   promesa sin cumplir. */
-+ '  <p class="mu">Puedes retirarlo cuando quieras: al activar tu membresía te llega por correo un enlace propio desde el que puedes terminarla y retirar tu tarjeta, sin escribirle a nadie.</p>\n'
-+ '  <p class="mu">Los datos de tu tarjeta los recibe <b>Wompi</b> directamente, dentro de su propia ventana. Give&amp;Grow no los ve, no los recibe y no los guarda: solo guardamos los cuatro últimos dígitos para que reconozcas cuál registraste.</p>\n'
++ '<main class="wrap pm">\n'
++ '  <div class="pm-top">\n'
++ '    <a class="card-link" href="/#membresias">&larr; ' + esc(T.volver) + '</a>\n'
++ '    <a class="card-link" href="' + esc(otro) + '" hreflang="' + T.otroLang + '" lang="' + T.otroLang + '">' + esc(T.otroIdioma) + '</a>\n'
++ '  </div>\n'
++ '  <h1 class="pm-t">' + esc(T.h1) + '</h1>\n'
++ '  <p class="lead">' + esc(cfg.monto ? T.leadMonto : T.leadSin) + '</p>\n'
 + aviso
+/* EL RESUMEN VA ANTES DEL FORMULARIO: es lo que la persona esta a punto de
+   autorizar, y tiene que poder leerlo entero sin haber escrito nada. Solo
+   con monto: sin el, esta pagina es la de cambiar de tarjeta y no hay
+   membresia nueva que resumir. */
++ (cfg.monto
+    ? '  <section class="pm-resumen" aria-labelledby="pm-res-t">\n'
+      + '    <div>\n'
+      + '      <span class="ey" id="pm-res-t">' + esc(T.resEy) + '</span>\n'
+      + '      <b class="pm-cifra">' + esc(fmtPesos(cfg.monto * 100)) + '</b>\n'
+      + '      <span class="pm-cifra-u">' + esc(T.alMes) + '</span>\n'
+      + '    </div>\n'
+      + '    <dl class="pm-dl">\n'
+      + fila(T.nivel, cfg.nivel)
+      + fila(T.programa, nombreDestinoMb(cfg.destino, en))
+      + fila(T.primero, T.primeroV)
+      + fila(T.proximo, T.proximoV(fechaLargaIdioma(proximoCobroISO(), en)))
+      + '    </dl>\n'
+      + '    <p class="pm-cambiar"><a class="card-link" href="/#membresias">' + esc(T.cambiar) + '</a></p>\n'
+      + '  </section>\n'
+    : '')
 /* `.ally-form` + `.field` Y NO `.et`, que no existe. La primera version de esta
    pagina invento esa clase: el navegador la ignoro en silencio y el campo de
    correo quedo del ancho por defecto —unos 170px— pegado a su etiqueta, sin
    relleno, sin estado de foco y con fondo blanco en modo noche. Salio asi a
    produccion. Estas dos clases son las que usa el resto del sitio para lo
    mismo y traen las cuatro cosas. */
-+ (cfg.monto
-    ? '  <div class="card" style="margin-top:22px;padding:18px 20px;display:flex;flex-direction:column;gap:4px">\n'
-      + '    <span class="et">Tu membres\u00eda</span>\n'
-      + '    <b style="font-size:var(--fs-h3)">' + esc(fmtPesos(cfg.monto * 100)) + ' al mes</b>\n'
-      + '    <span class="mu">Nivel ' + esc(cfg.nivel) + ' \u00b7 se cobra hoy y luego cada mes</span>\n'
-      + '  </div>\n'
-    : '')
-+ '  <form method="POST" action="/api/pago/fuente" class="card ally-form" style="margin-top:22px;padding:20px">\n'
++ '  <form method="POST" action="/api/pago/fuente" class="card ally-form pm-form">\n'
 + (cfg.monto ? '    <input type="hidden" name="monto" value="' + esc(String(cfg.monto)) + '">\n' : '')
-+ '    <div class="field">\n'
-+ '      <label for="fp-email">Tu correo</label>\n'
-+ '      <input id="fp-email" name="email" type="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com">\n'
-+ '    </div>\n'
-+ '\n'
-+ '    <label style="display:flex;gap:10px;align-items:flex-start;margin-top:18px">\n'
-+ '      <input type="checkbox" name="acepta_privacidad" value="1" required style="margin-top:4px">\n'
-+ '      <span>He leído y acepto la <a href="' + esc(info.privacidad.enlace) + '" target="_blank" rel="noopener">política de privacidad de Wompi</a>.</span>\n'
-+ '    </label>\n'
-+ '    <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px">\n'
-+ '      <input type="checkbox" name="acepta_datos" value="1" required style="margin-top:4px">\n'
-+ '      <span>Autorizo el <a href="' + esc(info.datos.enlace) + '" target="_blank" rel="noopener">tratamiento de mis datos personales</a> (Ley 1581).</span>\n'
-+ '    </label>\n'
+/* El programa viaja con el formulario y `crearSuscripcion` lo valida otra
+   vez: entre esta pagina y el envio, lo que hay en el HTML lo puede cambiar
+   cualquiera con las herramientas del navegador. */
++ (cfg.monto && cfg.destino ? '    <input type="hidden" name="destino" value="' + esc(cfg.destino.id) + '">\n' : '')
+/* `idioma` ya lo leia `apiCrearFuentePago` y nadie lo mandaba, asi que toda
+   membresia nacia en espanol y sus correos tambien. */
++ '    <input type="hidden" name="idioma" value="' + (en ? "en" : "es") + '">\n'
++ '    <div class="pm-paso">\n'
++ '      <span class="pm-n" aria-hidden="true">1</span>\n'
++ '      <h2 class="pm-paso-t">' + esc(T.p1t) + '</h2>\n'
++ '      <p class="pm-paso-p">' + esc(T.p1p) + '</p>\n'
++ '      <div class="pm-campos">\n'
++ '        <div class="field">\n'
++ '          <label for="fp-email">' + esc(T.correo) + '</label>\n'
++ '          <input id="fp-email" name="email" type="email" required autocomplete="email" placeholder="' + esc(T.correoPh) + '">\n'
++ '        </div>\n'
+/* Las DOS casillas de Wompi van separadas y con su enlace: son dos contratos
+   distintos y la persona tiene que ver y aceptar cada uno. `.ally-check` es la
+   casilla con marco del resto de formularios del sitio. */
++ '        <label class="ally-check"><input type="checkbox" name="acepta_privacidad" value="1" required>'
++ '<span><b>' + T.privacidad(abre(info.privacidad.enlace)) + '</b></span></label>\n'
++ '        <label class="ally-check"><input type="checkbox" name="acepta_datos" value="1" required>'
++ '<span><b>' + T.datos(abre(info.datos.enlace)) + '</b></span></label>\n'
 /* LA CASILLA DEL CERTIFICADO, que en la membresia con tarjeta no existia
    (auditoria del 28 sep 2026): el deseo de certificado no llegaba a ningun
    aporte. Opcional, y solo con monto: sin membresia no hay aporte que
    certificar. El documento y la ciudad los pide una persona antes de emitir. */
 + (cfg.monto
-    ? '    <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px">\n'
-      + '      <input type="checkbox" name="certificado" value="1" style="margin-top:4px">\n'
-      + '      <span>Quiero certificado de donaci\u00f3n por mis aportes (sirve para el descuento tributario en Colombia). Te pediremos el documento y la ciudad antes de emitirlo.</span>\n'
-      + '    </label>\n'
+    ? '        <label class="ally-check"><input type="checkbox" name="certificado" value="1">'
+      + '<span><b>' + esc(T.cert) + '</b><small>' + esc(T.certH) + '</small></span></label>\n'
     : '')
-+ '\n'
-+ '\n'
++ '      </div>\n'
++ '    </div>\n'
++ '    <div class="pm-paso pm-paso-tarjeta">\n'
++ '      <span class="pm-n" aria-hidden="true">2</span>\n'
++ '      <h2 class="pm-paso-t">' + esc(T.p2t) + '</h2>\n'
++ '      <p class="pm-paso-p">' + esc(T.p2p) + '</p>\n'
++ '    </div>\n'
 + '    <!-- HIJO DIRECTO DEL <form>, y no es estilo: el widget busca el\n'
 + '         formulario en su elemento PADRE. Envuelto en un <div> falla con\n'
 + '         «El atributo method del <form> debe ser POST» aunque el form lo\n'
@@ -20716,18 +20876,43 @@ function paginaMetodoPago(cfg) {
 + '      data-render="button"\n'
 + '      data-widget-operation="tokenize"\n'
 + '      data-public-key="' + esc(cfg.pub) + '"></script>\n'
++ '    <div class="pm-paso pm-paso-sig">\n'
++ '      <span class="pm-n" aria-hidden="true">3</span>\n'
++ '      <h2 class="pm-paso-t">' + esc(cfg.monto ? T.p3tMonto : T.p3tSin) + '</h2>\n'
++ '      <p class="pm-paso-p">' + esc(cfg.monto ? T.p3pMonto : T.p3pSin) + '</p>\n'
++ '    </div>\n'
 + '  </form>\n'
-+ '  <p class="mu" style="margin-top:22px;font-size:var(--fs-13)">Ambiente: ' + esc(amb.modo) + '</p>\n'
++ '  <section class="pm-seguro" aria-labelledby="pm-seg-t">\n'
++ '    ' + SVG_CANDADO + '\n'
++ '    <h2 id="pm-seg-t">' + esc(T.segT) + '</h2>\n'
++ '    <p>' + esc(T.segP1) + '</p>\n'
+/* «Puedes retirarlo cuando quieras» se quedó corto: era cierto y no decía
+   cómo, y durante unas horas el cómo fue «escríbenos». Ahora se nombra el
+   mecanismo, porque una promesa sin mecanismo se parece demasiado a una
+   promesa sin cumplir. */
++ '    <p>' + esc(T.segP2) + '</p>\n'
++ '  </section>\n'
+/* El ambiente se dice SOLO si es el de pruebas. «Ambiente: produccion» al pie
+   de la pagina de la tarjeta no le decia nada a un donante; «no se cobra dinero
+   real» si, y es justo lo que alguien probando tiene que poder ver. */
++ '  <p class="pm-pie">' + esc(T.pie) + (amb.modo === "sandbox" ? ' · ' + esc(T.sandbox) : '') + '</p>\n'
 + '</main>\n'
 + '</body>\n'
 + '</html>';
 }
 
-async function rutaMetodoPago(env, url) {
+async function rutaMetodoPago(env, url, request) {
+  /* El idioma se decide PRIMERO, para que hasta los dos errores de abajo
+     salgan en el de la persona. `?lang=en` es el mismo mecanismo de
+     /membresia; cualquier otro valor es espanol. */
+  const lang = url.searchParams.get("lang") === "en" ? "en" : "es";
+  const en = lang === "en";
   const pub = env.WOMPI_PUBLIC_KEY;
-  if (!pub) return new Response("Pasarela no configurada", { status: 503 });
+  if (!pub) return new Response(en ? "Payment gateway not configured" : "Pasarela no configurada", { status: 503 });
   const info = await wompiInfoComercio(env);
-  if (!info) return new Response("No se pudo preparar el formulario. Intenta en unos minutos.", { status: 503 });
+  if (!info) return new Response(en
+    ? "We could not prepare the form. Please try again in a few minutes."
+    : "No se pudo preparar el formulario. Intenta en unos minutos.", { status: 503 });
   const amb = ambienteWompi(pub);
   /* EL MONTO VIENE DE LA PANTALLA DE MEMBRESIAS y se valida aqui, no se
      confia. Lo que llega por la URL lo escribe cualquiera; si esta fuera de
@@ -20736,12 +20921,17 @@ async function rutaMetodoPago(env, url) {
   const mTxt = String(url.searchParams.get("monto") || "").replace(/[^0-9]/g, "");
   const mNum = mTxt ? Number(mTxt) : 0;
   const monto = (Number.isInteger(mNum) && mNum >= MONTO_MIN && mNum <= MONTO_MAX) ? mNum : 0;
-  const html = paginaMetodoPago({ amb, info, pub, monto,
-    nivel: monto ? nivelPorMensual(monto).es : "",
+  /* EL PROGRAMA, por el mismo camino y con la misma desconfianza: solo se
+     pinta —y solo viaja en el formulario— si esta en la lista cerrada. Uno
+     desconocido no es un error que mostrar: es el fondo general. */
+  const destino = monto ? await destinoMembresia(env, url.searchParams.get("destino")) : null;
+  const codigoAviso = String(url.searchParams.get("aviso") || "");
+  const html = paginaMetodoPago({ amb, info, pub, monto, destino, lang,
+    tema: temaPorReloj(request),
+    nivel: monto ? (en ? nivelPorMensual(monto).en : nivelPorMensual(monto).es) : "",
     /* hasOwn y no AVISOS_METODO[k] a secas: «?aviso=constructor» devolvería
        la función de Object.prototype. */
-    aviso: Object.hasOwn(AVISOS_METODO, String(url.searchParams.get("aviso") || ""))
-      ? AVISOS_METODO[url.searchParams.get("aviso")] : "" });
+    aviso: Object.hasOwn(AVISOS_METODO, codigoAviso) ? AVISOS_METODO[codigoAviso][lang] : "" });
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -20750,7 +20940,8 @@ async function rutaMetodoPago(env, url) {
          para el widget —su script y su iframe— porque es el precio de no
          alojar nosotros los campos de la tarjeta. Por eso esta pagina la sirve
          el Worker y no es una seccion del SPA: para que la excepcion no se
-         contagie al resto. */
+         contagie al resto. El rediseno del 30 sep 2026 no le anade un solo
+         origen: el candado es SVG en linea y los estilos salen de /styles.css. */
       "content-security-policy": cspPagina({
         script: "'self' " + ambienteWompi(pub).widget,
         frame:  ambienteWompi(pub).widget,
@@ -20847,15 +21038,40 @@ async function wompiCobrar(env, sub) {
   const guia = reintento ? String(reciente.guia) : await siguienteGuia(env, anioCO());
 
   if (!reintento) {
+    /* EL DESTINO VIAJA de la suscripcion a cada aporte (migrations/0035), igual
+       que el certificado. Se escribe lo MISMO que escribe Donar para ese
+       programa —`dirigida`, el id de la fundacion, el nombre del programa—
+       para que el rastreo y las actas de entrega lo traten igual.
+
+       SI EL PROGRAMA YA NO ESTA en `partners.json` —la aliada salio de la red,
+       o el archivo no se pudo leer— el aporte va al fondo general y QUEDA UN
+       INCIDENTE. No se inventa un destino con el id guardado: `destino_id`
+       tiene que ser el de una fundacion, o el enlace con las actas diria «no
+       hay entregas para este destino», que es una afirmacion falsa. Y no se
+       deja de cobrar: la persona se inscribio para aportar, y decidir que hacer
+       con su eleccion es de una persona, no de este bucle. */
+    let dest = null;
+    if (sub.destino) {
+      dest = await destinoMembresia(env, sub.destino);
+      if (!dest) {
+        console.error("membresia con destino que ya no existe", sub.id, sub.destino);
+        await anotarIncidente(env, "membresia-destino", "",
+          "el programa " + String(sub.destino).slice(0, 60) + " de la suscripcion " + sub.id +
+          " no esta en partners.json: el cobro se registro al fondo general");
+      }
+    }
+    const enIngles = String(sub.idioma || "es") === "en";
     /* `quiere_certificado` VIAJA de la suscripcion a cada aporte, como ya lo
        hacia PayPal. Sin esto la casilla de la membresia no llegaba a ningun
        aporte y el panel nunca contaba un certificado por emitir de un miembro
        (auditoria del 28 sep 2026). */
     await env.DB.prepare(
-      "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, frecuencia, " +
+      "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, frecuencia, " +
       "idioma, token, proveedor, suscripcion, donante_id, quiere_certificado) " +
-      "VALUES (?, 'intencion', ?, ?, 'fondo', ?, ?, ?, 'wompi', ?, ?, ?)"
-    ).bind(guia, centavos, moneda, String(sub.frecuencia || "mensual"),
+      "VALUES (?, 'intencion', ?, ?, ?, ?, ?, ?, ?, ?, 'wompi', ?, ?, ?)"
+    ).bind(guia, centavos, moneda, dest ? "dirigida" : "fondo",
+           dest ? dest.destino_id : null, dest ? (enIngles ? dest.en : dest.es) : null,
+           String(sub.frecuencia || "mensual"),
            String(sub.idioma || "es"), tokenNuevo(), sub.id, sub.donante_id || null,
            sub.quiere_certificado ? 1 : 0).run();
   }
@@ -21006,7 +21222,7 @@ async function cobrarSuscripcionesDelMes(env) {
     "AND (ultimo_cobro_en IS NULL OR ultimo_cobro_en <= datetime('now','-1 month') " +
     "     OR (reintento_en IS NOT NULL AND reintento_en <= datetime('now')))";
   const { results } = await env.DB.prepare(
-    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id, quiere_certificado, reintento_en " +
+    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id, quiere_certificado, reintento_en, destino " +
     "FROM suscripciones WHERE " + TOCA + " ORDER BY ultimo_cobro_en ASC LIMIT ?"
   ).bind(COBROS_POR_EJECUCION).all();
 
@@ -21103,7 +21319,7 @@ async function cobrarSuscripcionesDelMes(env) {
      atiende el guardian de certificados, no esto. */
 async function membresiaTrasCobro(env, fila, nuevo) {
   const sub = await env.DB.prepare(
-    "SELECT s.id, s.estado, s.token, s.nivel, s.monto_centavos, s.idioma, d.email, d.nombre " +
+    "SELECT s.id, s.estado, s.token, s.nivel, s.monto_centavos, s.idioma, s.destino, d.email, d.nombre " +
     "FROM suscripciones s LEFT JOIN donantes d ON d.id = s.donante_id WHERE s.id = ?"
   ).bind(fila.suscripcion).first();
   if (!sub) return;
@@ -21205,6 +21421,90 @@ async function correoCobroRechazado(env, sub, guia, o) {
   });
 }
 
+/* A QUE PROGRAMA VA UNA MEMBRESIA (migrations/0035).
+   ==========================================================================
+
+   LA LISTA CERRADA sale del mismo sitio que el selector de Donar: los
+   programas (`impactUnits`) de las fundaciones de `partners.json`, mas Mira
+   Mi Casa. Lo que llega por la URL o por el formulario lo escribe cualquiera,
+   asi que solo se acepta un id que este en esta lista; cualquier otra cosa
+   —un id viejo, uno inventado, «constructor»— es el fondo general, que es lo
+   que la persona habria tenido sin elegir.
+
+   SIN LA BRIGADA, a proposito: es una campana de aporte UNICO (la calculadora
+   no deja marcarla mensual) y una membresia seria cobrar cada mes por una
+   emergencia que termina. Mira Mi Casa si entra: reparar viviendas no tiene
+   fecha de cierre.
+
+   `destino_id` es lo que Donar escribe en el aporte para ese mismo programa:
+   el id de la fundacion, o «miramicasa-reparacion». Es la llave con la que las
+   actas de entrega encuentran a sus aportantes (`entregas.destino_id`), asi
+   que tiene que ser la misma y no una parecida.
+
+   `partners.json` se lee por el binding ASSETS, como en `almaContextoRed`, y se
+   guarda unos minutos en el isolate: el cobro del mes pasa por aqui una vez
+   por suscripcion y no tiene por que pedir el mismo archivo veinte veces. */
+const DESTINO_MMC_MEMBRESIA = Object.freeze({
+  id: "miramicasa-reparacion", destino_id: "miramicasa-reparacion",
+  es: "Mira Mi Casa · reparación de viviendas", en: "Mira Mi Casa · home repairs", fundacion: ""
+});
+const DESTINOS_MB_TTL_MS = 600000;
+let DESTINOS_MB_CACHE = null;   // { en: ms, mapa: Map, completo: bool }
+
+async function destinosMembresia(env) {
+  if (DESTINOS_MB_CACHE && Date.now() - DESTINOS_MB_CACHE.en < DESTINOS_MB_TTL_MS) return DESTINOS_MB_CACHE;
+  const mapa = new Map([[DESTINO_MMC_MEMBRESIA.id, DESTINO_MMC_MEMBRESIA]]);
+  let completo = false;
+  try {
+    const r = env.ASSETS ? await env.ASSETS.fetch(new URL("/data/partners.json", ORIGIN)) : null;
+    if (r && r.ok) {
+      const data = await r.json();
+      const partners = Array.isArray(data && data.partners) ? data.partners : [];
+      for (const p of partners) {
+        /* El mismo filtro que `buildProjectSelect` en app.js: fundacion con al
+           menos un programa. Si divergieran, el sitio ofreceria un destino que
+           el servidor rechaza —o al reves— sin que nada lo avise. */
+        if (!p || p.type !== "foundation" || !Array.isArray(p.impactUnits)) continue;
+        for (const u of p.impactUnits) {
+          if (!u || typeof u.id !== "string" || !/^[a-z0-9][a-z0-9-]{1,59}$/.test(u.id)) continue;
+          mapa.set(u.id, Object.freeze({
+            id: u.id, destino_id: String(p.id || "").slice(0, 60),
+            /* Lo mismo que lee la persona en el <option>: el nombre del
+               programa si lo tiene, o la unidad en su idioma. */
+            es: String(u.project || u.es || u.id).slice(0, 120),
+            en: String(u.project || u.en || u.es || u.id).slice(0, 120),
+            fundacion: String(p.name || "").slice(0, 120)
+          }));
+        }
+      }
+      completo = true;
+    }
+  } catch (e) { console.error("destinos de membresia", e && e.message); }
+  /* Solo se guarda una lista COMPLETA. Si `partners.json` fallo, la respuesta
+     de hoy es «solo Mira Mi Casa», y guardarla diez minutos convertiria un
+     tropiezo pasajero en diez minutos de membresias al fondo general. */
+  const res = { en: Date.now(), mapa, completo };
+  if (completo) DESTINOS_MB_CACHE = res;
+  return res;
+}
+
+/* El programa de un id, o null = fondo general. `hasOwn` no hace falta: es un
+   Map, y «constructor» no es una llave que tenga. */
+async function destinoMembresia(env, valor) {
+  const id = String(valor == null ? "" : valor).trim().toLowerCase().slice(0, 60);
+  if (!id || id === "general") return null;
+  const { mapa } = await destinosMembresia(env);
+  return mapa.get(id) || null;
+}
+
+/* Como la lee una persona: «Fundación Niños del Futuro · Borboletas». La
+   fundacion va delante porque el credito del programa es suyo. */
+function nombreDestinoMb(d, en) {
+  if (!d) return en ? "Where it's needed most (general fund)" : "Donde más se necesite (fondo general)";
+  const prog = en ? d.en : d.es;
+  return d.fundacion ? d.fundacion + " · " + prog : prog;
+}
+
 /* EL NUCLEO DE HACERSE MIEMBRO, fuera de cualquier ruta.
    ==========================================================================
 
@@ -21243,7 +21543,7 @@ async function crearSuscripcion(env, o) {
   /* UNA SUSCRIPCION ACTIVA POR CORREO. Sin esto, dos envios del formulario
      —o dos pestanas— dejan a la persona pagando dos veces al mes. */
   const ya = await env.DB.prepare(
-    "SELECT s.id, s.token, s.nivel, s.monto_centavos, s.idioma, d.nombre FROM suscripciones s " +
+    "SELECT s.id, s.token, s.nivel, s.monto_centavos, s.idioma, s.destino, d.nombre FROM suscripciones s " +
     "JOIN donantes d ON d.id = s.donante_id " +
     "WHERE s.proveedor = 'wompi' AND s.estado = 'activa' AND LOWER(d.email) = ? LIMIT 1"
   ).bind(email).first();
@@ -21260,6 +21560,10 @@ async function crearSuscripcion(env, o) {
 
   const nivel = nivelPorMensual(Math.round(monto));
   const idioma = o.idioma === "en" ? "en" : "es";
+  /* EL PROGRAMA, validado contra la lista cerrada. Un id que no esta en ella
+     se guarda como NULL —fondo general— y no como texto libre: esta columna la
+     lee `wompiCobrar` cada mes para decidir a donde va la plata. */
+  const destino = await destinoMembresia(env, o.destino);
 
   /* UNA EN CAMINO TAMBIEN CUENTA. Desde el 28 sep 2026 la membresia nace
      `pendiente` hasta que el webhook confirma el primer cobro, y el freno de
@@ -21290,13 +21594,13 @@ async function crearSuscripcion(env, o) {
   const tokenBaja = tokenNuevo();
   await env.DB.prepare(
     "INSERT INTO suscripciones (id, proveedor, estado, nivel, monto_centavos, moneda, frecuencia, " +
-    "donante_id, idioma, quiere_certificado, consent_muro, fuente_id, token) " +
-    "VALUES (?, 'wompi', 'pendiente', ?, ?, 'COP', 'mensual', ?, ?, ?, ?, ?, ?)"
+    "donante_id, idioma, quiere_certificado, consent_muro, fuente_id, token, destino) " +
+    "VALUES (?, 'wompi', 'pendiente', ?, ?, 'COP', 'mensual', ?, ?, ?, ?, ?, ?, ?)"
   ).bind(subId, nivel.id, Math.round(monto) * 100, donante, idioma,
          o.certificado ? 1 : 0, ["nombre","anonimo","no"].includes(o.muro) ? o.muro : "no",
-         fuente.id, tokenBaja).run();
+         fuente.id, tokenBaja, destino ? destino.id : null).run();
   const sub = await env.DB.prepare(
-    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id, quiere_certificado " +
+    "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id, quiere_certificado, destino " +
     "FROM suscripciones WHERE id = ?"
   ).bind(subId).first();
 
@@ -21383,16 +21687,25 @@ async function apiCrearFuentePago(request, env, url) {
      correo mal escrito la mandaba de vuelta al formulario habiendo perdido la
      membresia que ya habia elegido, y a elegirla otra vez. */
   const montoTxt = String(f.get("monto") || "").replace(/[^0-9]/g, "");
+  /* Y POR LO MISMO, el programa y el idioma. Un correo mal escrito no puede
+     devolver a la persona al formulario en espanol y con su membresia apuntada
+     al fondo general cuando habia elegido otra cosa. Aqui solo se RECORTAN: la
+     validacion de verdad la hacen `rutaMetodoPago` al pintar y
+     `crearSuscripcion` al guardar, las dos contra la lista cerrada. */
+  const vuelta = {
+    destino: String(f.get("destino") || "").replace(/[^a-z0-9-]/gi, "").slice(0, 60),
+    lang: f.get("idioma") === "en" ? "en" : "es"
+  };
 
   const email = String(f.get("email") || "").trim().slice(0, 200);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return volverAlFormulario(url, "correo", montoTxt);
+    return volverAlFormulario(url, "correo", montoTxt, vuelta);
   }
   /* Las DOS casillas, y por separado. Son dos contratos distintos —politica de
      privacidad y Ley 1581— y Wompi exige un token para cada uno. Una sola
      casilla de «acepto todo» no seria aceptacion explicita de ninguno. */
   if (!f.get("acepta_privacidad") || !f.get("acepta_datos")) {
-    return volverAlFormulario(url, "aceptar", montoTxt);
+    return volverAlFormulario(url, "aceptar", montoTxt, vuelta);
   }
 
   /* EL NOMBRE DEL CAMPO DEL TOKEN NO ESTA DOCUMENTADO. La guia de Wompi dice
@@ -21410,11 +21723,11 @@ async function apiCrearFuentePago(request, env, url) {
     /* Se registran los NOMBRES de los campos recibidos, nunca sus valores: por
        aqui pasa un token de pago y no tiene por que quedar en un log. */
     console.error("fuente de pago sin token; campos recibidos:", [...f.keys()].join(","));
-    return volverAlFormulario(url, "sin_metodo", montoTxt);
+    return volverAlFormulario(url, "sin_metodo", montoTxt, vuelta);
   }
 
   const info = await wompiInfoComercio(env);
-  if (!info) return volverAlFormulario(url, "terminos", montoTxt);
+  if (!info) return volverAlFormulario(url, "terminos", montoTxt, vuelta);
 
   const amb = ambienteWompi(pub);
   let creada;
@@ -21435,11 +21748,11 @@ async function apiCrearFuentePago(request, env, url) {
       /* El motivo de Wompi si se registra —es lo unico que permite entender un
          rechazo—, pero nunca el cuerpo que enviamos. */
       console.error("payment_sources", r.status, JSON.stringify(creada && creada.error || {}).slice(0, 300));
-      return volverAlFormulario(url, "rechazado", montoTxt);
+      return volverAlFormulario(url, "rechazado", montoTxt, vuelta);
     }
   } catch (e) {
     console.error("payment_sources red", e && e.message);
-    return volverAlFormulario(url, "pasarela", montoTxt);
+    return volverAlFormulario(url, "pasarela", montoTxt, vuelta);
   }
 
   const d = (creada && creada.data) || {};
@@ -21479,10 +21792,13 @@ async function apiCrearFuentePago(request, env, url) {
     const sus = await crearSuscripcion(env, {
       email, monto: Number(montoTxt),
       nombre: String(f.get("nombre") || "").slice(0, 120),
-      idioma: f.get("idioma") === "en" ? "en" : "es",
+      idioma: vuelta.lang,
       /* La casilla existe en /pago/metodo desde el 28 sep 2026. `crearSuscripcion`
          ya sabia guardarla; nadie se la pasaba. */
-      certificado: !!f.get("certificado")
+      certificado: !!f.get("certificado"),
+      /* El programa elegido en Membresias (o en la calculadora de Donar).
+         `crearSuscripcion` lo valida otra vez: esto lo escribe el navegador. */
+      destino: vuelta.destino
     });
     if (sus.ok) {
       q.set("sub", "1");
@@ -21537,24 +21853,32 @@ async function apiCrearFuentePago(request, env, url) {
    escríbenos al 300…». Es la página donde la gente pone su tarjeta, y la más
    rentable de suplantar. Ahora el enlace solo puede elegir entre estos
    mensajes; un código desconocido no pinta nada. */
+/* Y EN LOS DOS IDIOMAS desde el 30 sep 2026: el codigo sigue siendo lo unico
+   que viaja, y la pagina elige el texto segun su `?lang=`. */
 const AVISOS_METODO = Object.freeze({
-  formulario: "No se pudo leer el formulario.",
-  correo: "Revisa tu correo: no parece valido.",
-  aceptar: "Hay que aceptar los dos documentos para continuar.",
-  sin_metodo: "No recibimos el metodo de pago. Intenta de nuevo.",
-  terminos: "No pudimos confirmar los terminos con la pasarela. Intenta en unos minutos.",
-  rechazado: "La pasarela no acepto el metodo de pago. Revisa los datos e intenta de nuevo.",
-  pasarela: "No pudimos contactar la pasarela. Intenta en unos minutos."
+  formulario: { es: "No se pudo leer el formulario.", en: "We could not read the form." },
+  correo: { es: "Revisa tu correo: no parece válido.", en: "Check your email: it does not look valid." },
+  aceptar: { es: "Hay que aceptar los dos documentos para continuar.", en: "You need to accept both documents to continue." },
+  sin_metodo: { es: "No recibimos el método de pago. Intenta de nuevo.", en: "We did not receive the payment method. Please try again." },
+  terminos: { es: "No pudimos confirmar los términos con la pasarela. Intenta en unos minutos.",
+              en: "We could not confirm the terms with the payment gateway. Please try again in a few minutes." },
+  rechazado: { es: "La pasarela no aceptó el método de pago. Revisa los datos e intenta de nuevo.",
+               en: "The payment gateway did not accept the payment method. Check the details and try again." },
+  pasarela: { es: "No pudimos contactar la pasarela. Intenta en unos minutos.",
+              en: "We could not reach the payment gateway. Please try again in a few minutes." }
 });
 
 /* Se vuelve al formulario con el motivo a la vista. Un 303 y no un JSON porque
    quien esta al otro lado es un navegador que acaba de enviar un formulario:
    devolverle `{"error":...}` lo dejaria mirando texto crudo. */
-function volverAlFormulario(url, motivo, monto) {
+function volverAlFormulario(url, motivo, monto, extra) {
   const q = new URLSearchParams({ aviso: motivo });
   /* El monto elegido vuelve con la persona. Sin esto, un error de validacion
      la devolvia al formulario habiendo perdido su membresia a medio elegir. */
   if (monto) q.set("monto", String(monto));
+  const x = extra || {};
+  if (x.destino) q.set("destino", String(x.destino));
+  if (x.lang === "en") q.set("lang", "en");
   return Response.redirect(new URL("/pago/metodo?" + q.toString(), url.origin).toString(), 303);
 }
 
@@ -21722,7 +22046,7 @@ function paginaMembresia(m, lang, estado, tema) {
     volver: "Back to memberships", titulo: "Your membership",
     activa: "Active", cancelada: "Cancelled", suspendida: "Suspended",
     fallida: "Not started", otra: "Under review", pendiente: "Confirming the first charge",
-    nivel: "Level", monto: "Monthly", desde: "Member since",
+    nivel: "Level", monto: "Monthly", programa: "Programme", desde: "Member since",
     ultimo: "Last charge", metodo: "Payment method", ninguno: "None yet",
     cabeza: "This is everything we have on your membership, and the button to end it.",
     bajaT: "End my membership",
@@ -21738,7 +22062,7 @@ function paginaMembresia(m, lang, estado, tema) {
     volver: "Volver a membresías", titulo: "Tu membresía",
     activa: "Activa", cancelada: "Cancelada", suspendida: "Suspendida",
     fallida: "No llegó a empezar", otra: "En revisión", pendiente: "Confirmando el primer cobro",
-    nivel: "Nivel", monto: "Mensual", desde: "Miembro desde",
+    nivel: "Nivel", monto: "Mensual", programa: "Programa", desde: "Miembro desde",
     ultimo: "Último cobro", metodo: "Método de pago", ninguno: "Todavía ninguno",
     cabeza: "Esto es todo lo que tenemos de tu membresía, y el botón para terminarla.",
     bajaT: "Terminar mi membresía",
@@ -21794,6 +22118,7 @@ function paginaMembresia(m, lang, estado, tema) {
   fila(en ? "Status" : "Estado", nombreEstado);
   fila(T.nivel, en ? nivel.en : nivel.es);
   fila(T.monto, fmtPesos(m.monto_centavos) + " COP");
+  fila(T.programa, nombreDestinoMb(m.programa || null, en));
   fila(T.desde, String(m.creada_en || "").slice(0, 10));
   fila(T.ultimo, m.ultimo_cobro_en ? String(m.ultimo_cobro_en).slice(0, 10) : "—");
   fila(T.metodo, metodo);
@@ -21832,7 +22157,7 @@ async function rutaMembresia(env, token, url, request) {
 
   const m = await env.DB.prepare(
     "SELECT s.id, s.token, s.estado, s.nivel, s.monto_centavos, s.creada_en, s.ultimo_cobro_en, " +
-    "s.idioma, f.marca, f.ultimos_cuatro " +
+    "s.idioma, s.destino, f.marca, f.ultimos_cuatro " +
     "FROM suscripciones s LEFT JOIN fuentes_pago f ON f.id = s.fuente_id " +
     "WHERE s.token = ?"
   ).bind(token).first();
@@ -21845,6 +22170,9 @@ async function rutaMembresia(env, token, url, request) {
   const lang = q === "en" || q === "es" ? q : (m.idioma === "en" ? "en" : "es");
   const estado = url.searchParams.get("baja") === "1" ? "hecho"
                : url.searchParams.get("baja") === "0" ? "error" : "";
+  /* El programa se resuelve aqui, que es async, y llega ya armado a la
+     pagina. `paginaMembresia` sigue siendo una funcion pura de sus datos. */
+  m.programa = m.destino ? await destinoMembresia(env, m.destino) : null;
 
   return new Response(paginaMembresia(m, lang, estado, temaPorReloj(request)), {
     headers: {
@@ -21999,7 +22327,7 @@ async function apiBajaEnlace(request, env, url) {
 
   if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     const sub = await env.DB.prepare(
-      "SELECT s.token, s.nivel, s.monto_centavos, s.idioma, d.nombre " +
+      "SELECT s.token, s.nivel, s.monto_centavos, s.idioma, s.destino, d.nombre " +
       "FROM suscripciones s JOIN donantes d ON d.id = s.donante_id " +
       "WHERE s.proveedor = 'wompi' AND s.estado = 'activa' AND s.token IS NOT NULL " +
       "AND LOWER(d.email) = ? ORDER BY s.creada_en DESC LIMIT 1"
@@ -22017,6 +22345,11 @@ async function correoEnlaceMembresia(env, sub, email, lang) {
   const en = lang === "en";
   const enlace = ORIGIN + "/membresia/" + sub.token + (en ? "?lang=en" : "");
   const nivel = nivelDe(sub.nivel);
+  /* EL PROGRAMA, en el correo que confirma la membresia: es el unico papel que
+     la persona conserva de lo que eligio. Se resuelve contra la lista cerrada
+     y no se pinta el id crudo; uno que ya no existe se dice fondo general,
+     que es a donde van a ir sus cobros (ver `wompiCobrar`). */
+  const programa = nombreDestinoMb(sub.destino ? await destinoMembresia(env, sub.destino) : null, en);
   return await enviarCorreo(env, {
     para: email,
     etiqueta: "membresia_enlace",
@@ -22032,8 +22365,8 @@ async function correoEnlaceMembresia(env, sub, email, lang) {
         "Guarda este correo: el enlace sirve mientras tu membresía siga viva."
       ],
       filas: en
-        ? [["Level", nivel.en], ["Monthly", fmtPesos(sub.monto_centavos) + " COP"]]
-        : [["Nivel", nivel.es], ["Mensual", fmtPesos(sub.monto_centavos) + " COP"]],
+        ? [["Level", nivel.en], ["Monthly", fmtPesos(sub.monto_centavos) + " COP"], ["Programme", programa]]
+        : [["Nivel", nivel.es], ["Mensual", fmtPesos(sub.monto_centavos) + " COP"], ["Programa", programa]],
       boton: { url: enlace, texto: en ? "Open my membership" : "Abrir mi membresía" },
       cierre: en
         ? "If you did not ask for this email, you can ignore it: nothing changed and nobody can act on your membership without this link."
@@ -22852,11 +23185,16 @@ export default {
        familia abre su caso.
 
        Solo en los hosts de Mira Mi Casa: el sitio de la fundación es `www.` a
-       propósito y su `ORIGIN` lo dice. */
+       propósito y su `ORIGIN` lo dice.
+
+       301 y no 302 (30 sep 2026): la cicatriz de arriba es la de una RUTA que
+       todavía puede moverse; esto es el HOST, y la decisión de que el ápex es
+       el canónico ya está tomada. Con 302 el buscador sigue tratando las dos
+       puertas como distintas, que es justo lo que este bloque quiere evitar. */
     if (/^www\./i.test(url.hostname) && HOST_MMC.test(url.hostname)) {
       const sinWww = new URL(url.toString());
       sinWww.hostname = url.hostname.replace(/^www\./i, "");
-      return Response.redirect(sinWww.toString(), 302);
+      return Response.redirect(sinWww.toString(), 301);
     }
 
     /* El manifiesto de Mira Mi Casa. Ver `MMC_MANIFIESTO` arriba para el motivo.
@@ -22932,7 +23270,7 @@ export default {
        las abre un donante sin sesion. Su proteccion no es Access —no hay con
        que identificarlo todavia— sino que el token que llega ya viene de Wompi
        y que la llave privada solo vive aqui. */
-    if (ruta === "/pago/metodo")       return await rutaMetodoPago(env, url);
+    if (ruta === "/pago/metodo")       return await rutaMetodoPago(env, url, request);
     if (ruta === "/pago/listo")        return new Response(paginaPagoListo(url), {
       headers: { "content-type": "text/html; charset=utf-8",
                  "content-security-policy": cspPagina({}),
