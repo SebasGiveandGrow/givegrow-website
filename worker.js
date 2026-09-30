@@ -40,6 +40,20 @@ import { recibo, certificado, informeTriage, inspeccionPDF,
 
 const ORIGIN = "https://www.thegiveandgrowproject.org";
 
+/* LA VERSIÓN DE styles.css QUE ENLAZAN LAS PÁGINAS DEL WORKER (auditoría 28 sep
+   2026). `_headers` sirve /styles.css con «immutable» durante un año, y el panel,
+   la firma, el carnet, la ficha, /pago y /membresia la enlazaban SIN `?v=`: un
+   navegador que ya la tuviera guardada no volvía a pedirla nunca, así que un
+   arreglo de CSS podía no llegarle jamás. `index.html` no tenía el problema
+   porque lleva su hash desde siempre.
+
+   Es el MISMO hash de `index.html` (md5 de styles.css, 8 caracteres) y el gate
+   lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
+   `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
+   porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
+const STYLES_V = "10c32dfc";
+const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
+
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
    no como un cambio de `ORIGIN` a propósito: `ORIGIN` lo usan el recibo, el
    carnet y las tarjetas de compartir, que son de la FUNDACIÓN. Tocarlo mandaría
@@ -11003,7 +11017,7 @@ function paginaFirma() {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Firma de certificados · Give&Grow</title>
-<link rel="stylesheet" href="/styles.css">
+${HOJA_CSS}
 <style>
   .wrap{max-width:820px;margin:0 auto;padding:28px 20px 80px}
   input,select,textarea{font-size:16px}
@@ -11157,7 +11171,7 @@ function paginaCarnet(c) {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Carnet de miembro · ${esc(c.codigo)} · Give&Grow</title>
-<link rel="stylesheet" href="/styles.css">
+${HOJA_CSS}
 </head><body style="background:#0E2118;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
 <main class="carnet">
   <div class="carnet-top">
@@ -15376,13 +15390,14 @@ function paginaAdmin() {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Panel · Give&Grow</title>
-<link rel="stylesheet" href="/styles.css">
+${HOJA_CSS}
 <style>
 /* ---- Portada de decisiones ----
-   VA AQUÍ Y NO EN styles.css, y es deliberado. El panel enlaza /styles.css SIN
-   versión, y esa URL se sirve «Cache-Control: immutable» durante un año: un
-   cambio de CSS para el panel puede no llegarle nunca al navegador que ya la
-   tiene guardada. Esta página, en cambio, se sirve «no-store», así que lo que
+   VA AQUÍ Y NO EN styles.css, y es deliberado. El panel enlazaba /styles.css
+   SIN versión, y esa URL se sirve «Cache-Control: immutable» durante un año: un
+   cambio de CSS para el panel podía no llegarle nunca al navegador que ya la
+   tenía guardada. Desde el 28 sep 2026 lleva ?v= (ver STYLES_V), pero la
+   razón de fondo sigue: esta página se sirve «no-store», así que lo que
    viaja aquí llega siempre. De paso, son bytes que no paga cada visitante del
    sitio público por una pantalla que nunca va a abrir.
 
@@ -19283,7 +19298,7 @@ function paginaMetodoPago(cfg) {
 + '<title>Registrar metodo de pago · Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-+ '<link rel="stylesheet" href="/styles.css">\n'
++ HOJA_CSS + '\n'
 + '</head>\n'
 + '<body>\n'
 + '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
@@ -19975,7 +19990,7 @@ function paginaPagoListo(url) {
 + '<title>' + esc(titulo.replace(/<[^>]*>/g, "")) + ' \u00b7 Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-+ '<link rel="stylesheet" href="/styles.css">\n</head>\n<body>\n'
++ HOJA_CSS + '\n</head>\n<body>\n'
 + '<main class="wrap" style="padding-top:40px;padding-bottom:48px;max-width:640px">\n'
 + '  <h1>' + titulo + '</h1>\n'
 + '  <p class="lead">' + lead + '</p>\n'
@@ -20063,7 +20078,7 @@ function cascaraBaja(titulo, cuerpo, lang, tema) {
 + '<title>' + esc(titulo) + ' · Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-+ '<link rel="stylesheet" href="/styles.css">\n</head>\n<body>\n'
++ HOJA_CSS + '\n</head>\n<body>\n'
 + '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
 + cuerpo
 + '</main>\n</body>\n</html>';
@@ -20492,7 +20507,7 @@ function sharePage(p, lang) {
 <link rel="alternate" hreflang="en" href="${esc(urlEn)}">
 <link rel="alternate" hreflang="x-default" href="${esc(urlEs)}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/styles.css">
+${HOJA_CSS}
 </head>
 <body>
 <main class="wrap" style="padding-top:34px;padding-bottom:48px">
@@ -20878,6 +20893,16 @@ function marcarMarca(respuesta, host) {
     .on('img[src^="/img/jornadas/hero"]', { element(e) {
       e.setAttribute("loading", "lazy");
       e.removeAttribute("fetchpriority");
+    } })
+    /* Y AL REVÉS CON LA FOTO DE LA PORTADA DE MIRA MI CASA (auditoría 28 sep
+       2026). En `index.html` ahora va `loading="lazy"`: en el ápex esa página
+       está oculta y, con `fetchpriority="high"`, competía con el hero de la
+       fundación por el ancho de banda de la primera carga sin mostrarse nunca.
+       Aquí es lo contrario: `#proyecto` es la ruta por defecto del subdominio y
+       esta foto es su LCP, así que recupera la carga inmediata y la prioridad. */
+    .on("figure.mmc-portada-foto img", { element(e) {
+      e.removeAttribute("loading");
+      e.setAttribute("fetchpriority", "high");
     } })
     .transform(respuesta);
 }
@@ -21829,6 +21854,30 @@ export default {
             "form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
         }
       });
+    }
+
+    /* LAS DOS RUTAS CON PATH DE LA SPA (auditoría 28 sep 2026).
+       ========================================================================
+       Hasta hoy `not_found_handling` era «single-page-application»: CUALQUIER
+       dirección que no fuera un archivo devolvía la portada con un 200. Un
+       enlace roto, una imagen mal escrita, `/lo-que-sea`: todo «existía», y
+       Google indexaba copias de la portada bajo nombres inventados (el «soft
+       404» que marca Search Console). Ahora es «404-page» y lo que no existe
+       responde 404 con `404.html`.
+
+       Pero la SPA vive de dos rutas con PATH que no son archivos y que antes
+       salían gratis del comodín:
+         · `/gracias` — a donde Wompi y PayPal devuelven al donante (ver
+           `redirect-url` y `return_url` más arriba). app.js la lee de
+           `location.pathname`.
+         · `/caso/CV-…` — el enlace de seguimiento de cada familia en Mira Mi
+           Casa, que ya estaba en `run_worker_first` por `marcarCaso`.
+       Sin esto, el donante que acaba de pagar aterrizaría en un 404. Por eso
+       las dos se sirven AQUÍ con el `index.html` de la raíz, y `/gracias` entra
+       en `run_worker_first` el mismo día. Cualquier ruta con path nueva en la
+       SPA tiene que añadirse a las dos listas. */
+    if (ruta === "/gracias" || ruta === "/gracias/" || ruta.startsWith("/caso/")) {
+      return env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
     }
 
     return env.ASSETS.fetch(request);
