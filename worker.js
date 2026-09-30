@@ -20854,10 +20854,38 @@ function marcarPruebas(respuesta, host) {
 
    Va en el UNICO sitio por donde salen todas, y no en cada ruta: asi la proxima
    ruta que alguien escriba nace protegida en vez de olvidarse. */
-function sinOlfato(respuesta) {
-  if (respuesta.headers.get("x-content-type-options")) return respuesta;
+/* Y LAS OTRAS TRES CABECERAS QUE `_headers` DA A LOS ASSETS (28 sep 2026).
+   La auditoría previa al lanzamiento encontró que /pago/*, /membresia/*,
+   /carnet/* y /ficha/* —páginas que genera el Worker, dos de ellas con token en
+   la URL y una donde se pone la tarjeta— salían sin HSTS, sin Referrer-Policy
+   y sin Permissions-Policy: el mismo hueco de arriba, con otras tres cabeceras.
+   Va en el mismo sitio y por la misma razón.
+
+   SOLO SE PONE LA QUE FALTA. Varias rutas ya llevan su propia
+   `referrer-policy` o su CSP a la medida; esas mandan, y esta envoltura no
+   las pisa nunca.
+
+   LA EXCEPCIÓN DE PERMISOS ES /triaje/inspeccion: la herramienta de terreno
+   pide la ubicación del teléfono (navigator.geolocation) y es la razón de
+   ser de su formulario. Ahí va `geolocation=(self)`, y `camera=(self)` por
+   prudencia con la foto de la visita. En el resto, nada: el formulario de la
+   familia usa un input de archivo con `capture`, que abre la cámara del
+   sistema y no pasa por esta política — el sitio estático ya sirve
+   `camera=()` en `_headers` y las familias suben fotos igual. */
+const PERMISOS_WORKER = "geolocation=(), microphone=(), camera=()";
+const PERMISOS_TERRENO = "geolocation=(self), microphone=(), camera=(self)";
+
+function sinOlfato(respuesta, ruta) {
+  const faltan = {
+    "x-content-type-options": "nosniff",
+    "strict-transport-security": "max-age=31536000; includeSubDomains",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": String(ruta || "").startsWith("/triaje/inspeccion") ? PERMISOS_TERRENO : PERMISOS_WORKER
+  };
+  const nombres = Object.keys(faltan).filter((k) => !respuesta.headers.has(k));
+  if (!nombres.length) return respuesta;
   const r = new Response(respuesta.body, respuesta);
-  r.headers.set("x-content-type-options", "nosniff");
+  for (const k of nombres) r.headers.set(k, faltan[k]);
   return r;
 }
 
@@ -21144,6 +21172,29 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const ruta = url.pathname;
+    /* HTTP → HTTPS, COMO RED DE ÚLTIMO RECURSO (28 sep 2026).
+       La auditoría previa al lanzamiento encontró que los dominios de
+       producción respondían 200 por http:// plano: la página de la tarjeta, el
+       rastreo con su guía y la página de la familia con su token en la URL,
+       todo legible y alterable en el camino. El arreglo de verdad es «Always
+       Use HTTPS» en el panel de Cloudflare, que actúa antes de todo; esto solo
+       cubre lo que llega al Worker. Los assets que el runtime sirve sin
+       pasar por aquí (lo que no está en `run_worker_first` de wrangler.toml)
+       quedan fuera de esta red.
+       Misma ruta y query. Local y *.localhost se quedan en http: ahí
+       no hay certificado y `wrangler dev` sirve así. */
+    if (url.protocol === "http:" &&
+        !/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(url.hostname) && !/\.localhost$/i.test(url.hostname)) {
+      const segura = new URL(request.url);
+      segura.protocol = "https:";
+      /* Un POST por http (un webhook mal configurado) recibe 308, que conserva
+         el método y el cuerpo; con 301 el cliente lo repetiría como GET. */
+      const lectura = request.method === "GET" || request.method === "HEAD";
+      return new Response(null, {
+        status: lectura ? 301 : 308,
+        headers: { "location": segura.toString(), "cache-control": "public, max-age=3600" }
+      });
+    }
     /* LA RED VA AQUÍ Y NO EN CADA RAMA. Había un try/catch que cubría
        `/api/…` y otro que cubría el panel, pero SIETE rutas se resuelven antes
        de llegar a ellos —`/api/trm`, las tres de PayPal, `/api/alma` y las dos
@@ -21158,11 +21209,11 @@ export default {
       const esPruebas = /\.workers\.dev$/i.test(url.hostname);
       if (esPruebas) {
         /* Se responde a través del marcador para no repetirlo en cada rama. */
-        return sinOlfato(marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
+        return sinOlfato(marcarCaso(marcarPruebas(await this.ruteo(request, env, url, ruta), url.hostname), ruta), ruta);
       }
       /* Igual que arriba: se envuelve la respuesta entera en vez de tocar cada
          rama. Fuera del subdominio devuelve exactamente lo que recibió. */
-      return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
+      return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta), ruta);
     } catch (e) {
       console.error("sin_capturar", ruta, e && e.message);
       return json({ error: "error_interno" }, 500);
