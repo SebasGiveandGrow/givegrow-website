@@ -219,6 +219,10 @@ nav.sol{background:var(--nav-bg);-webkit-backdrop-filter:blur(12px);backdrop-fil
 
 /* ===== BUTTONS ===== */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:999px;font-weight:700;font-size:var(--fs-15);transition:transform .15s var(--ease),box-shadow .15s,background .15s;cursor:pointer}
+/* Un botón con `hidden` se esconde de verdad: `.btn` fija display y le ganaba al
+   atributo. Lo usan «Mandármelo por WhatsApp» y «Reintentar ahora» de Mira Mi
+   Casa, que solo aparecen cuando la subida de fotos lo permite (28 sep 2026). */
+.btn[hidden]{display:none}
 .btn:hover{transform:translateY(-2px)}
 .btn-g{background:var(--g);color:var(--on-dark);box-shadow:0 4px 14px rgba(31,92,56,.28)}
 .btn-g:hover{background:var(--gm)}
@@ -518,6 +522,10 @@ body.alma-lock .alma-fab,body.alma-lock .wa{display:none}
   flex:1;min-width:0;background:var(--bg);border:1px solid var(--bd);color:var(--ink);
   border-radius:var(--r);padding:11px 13px;font-size:var(--fs-15);
 }
+/* A 16px en el teléfono (auditoría 28 sep 2026): con 15, iOS Safari hacía zoom al
+   enfocar la caja de ALMA y el panel quedaba desencuadrado. En escritorio sigue a
+   15, donde no hay zoom y el panel es más estrecho. */
+@media (max-width:640px){#alma-input{font-size:var(--fs-16)}}
 #alma-input::placeholder{color:var(--mu)}
 #alma-input:focus{outline:2px solid var(--acc);outline-offset:-1px}
 .alma-send{
@@ -1195,14 +1203,32 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
 /* Píldora, como el resto de chips del sitio (.tag, .bc-level). */
 .alma-chip{padding:7px 12px;border:1px solid var(--bd);border-radius:999px;background:transparent;font-size:var(--fs-13);font-weight:500;color:var(--ink-soft);cursor:pointer;text-align:left;transition:color .15s,border-color .15s}
 .alma-chip:hover{color:var(--ink);border-color:var(--ink-soft)}
+/* El «Reintentar» de ALMA va debajo del aviso de fallo, dentro de la burbuja. */
+.alma-retry{margin-top:10px}
+/* OBJETIVOS TÁCTILES DE 44px (auditoría 28 sep 2026, WCAG 2.5.5 y la guía de
+   iOS). Estos controles medían 26–34px de alto: el ES/EN, la moneda y los montos
+   rápidos de la calculadora, «Copiar» la cuenta, los chips y la X de ALMA y el
+   «no tengo guía» del rastreo. En un teléfono se fallaba el dedo y se tocaba el
+   vecino. Solo con puntero grueso: con ratón el tamaño de escritorio no cambia.
+   La X de ALMA amplía su zona de toque con un ::after invisible, para que
+   el círculo de 30px siga viéndose igual en la cabecera del panel. */
+@media (pointer:coarse){
+  .lang button,.cur-toggle button,.qbtn,.copy,.alma-chip,.track-noguide{min-height:44px}
+  .qbtn,.copy{min-width:44px}
+  .alma-x{position:relative}
+  .alma-x::after{content:"";position:absolute;inset:-7px;border-radius:50%}
+}
 
 /* ===== flotantes en móvil: ALMA y WhatsApp no deben chocar ni tapar contenido ===== */
 @media(max-width:768px){
   /* Los dos círculos bajan a 52px y se separan a lados opuestos: apilados en la
      misma esquina taparían contenido en una pantalla de teléfono. */
-  .wa{bottom:18px;right:18px;width:52px;height:52px}
+  /* + env(safe-area-inset-bottom) (auditoría 28 sep 2026): el viewport lleva
+     `viewport-fit=cover`, así que en un iPhone sin botón los 18px se medían
+     desde el borde físico y el círculo quedaba encima de la barra de inicio. */
+  .wa{bottom:calc(18px + env(safe-area-inset-bottom));right:18px;width:52px;height:52px}
   .wa svg{width:25px;height:25px}
-  .alma-fab{bottom:18px;left:18px;right:auto;width:52px;height:52px;
+  .alma-fab{bottom:calc(18px + env(safe-area-inset-bottom));left:18px;right:auto;width:52px;height:52px;
             transition:transform .18s var(--ease),box-shadow .18s var(--ease),background .18s,opacity .2s var(--ease)}
   /* En la primera pantalla de la portada, este círculo caía encima de
      «Conocer el HUB SOCIAL» (medido a 375 × 812). Se aparta solo mientras el
@@ -1212,6 +1238,10 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
   .alma-fab svg{width:23px;height:23px}
   /* Sin etiqueta: en táctil no hay hover que la dispare y estorbaría. */
   .wa span,.alma-fab span{display:none}
+  /* El pie reserva el alto de los círculos (18 + 52 + aire = 88px): al llegar al
+     final, la última línea —NIT y derechos— quedaba debajo de ALMA y
+     de WhatsApp y no había más scroll para destaparla. */
+  footer{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
 }
 
 /* ============ Rastrea tu donación ============ */
@@ -1318,7 +1348,9 @@ html[data-theme="dark"] .track-badge-recibida{color:var(--brote)}
 .track-timeline::before{content:"";position:absolute;top:9px;left:8%;right:8%;height:2px;background:var(--bd);z-index:0}
 .tl-step{display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;z-index:1;flex:1}
 .tl-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--bd);background:var(--surface);transition:all .3s}
-.tl-step.done .tl-dot{background:var(--g);border-color:var(--g)}
+/* --acc y no --g (auditoría 28 sep 2026): de noche el punto «hecho» en --g
+   quedaba casi invisible sobre la tarjeta oscura (<3:1). De día valen igual. */
+.tl-step.done .tl-dot{background:var(--acc);border-color:var(--acc)}
 .tl-step.current .tl-dot{background:var(--brote);border-color:var(--g);box-shadow:0 0 0 4px var(--gl)}
 .tl-label{font-size:var(--fs-13);color:var(--mu);text-align:center;font-weight:600}
 .tl-step.done .tl-label,.tl-step.current .tl-label{color:var(--ink)}
@@ -1366,6 +1398,18 @@ html[data-theme="dark"] .track-cta :is(h3:not(:where(.h-comp4)),:where(.h-comp3)
 .ally-form input:focus{outline:none;border-color:var(--acc)}
 .ally-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:var(--fs-16);font-family:inherit;background:var(--surface);color:var(--ink);resize:vertical;min-height:96px;box-sizing:border-box}
 .ally-form textarea:focus{outline:none;border-color:var(--acc)}
+/* EL ANILLO DE FOCO VUELVE A LOS CAMPOS (auditoría 28 sep 2026). Las tres reglas
+   `:focus{outline:none}` de .field, .ally-form y .track-search pesan más que el
+   `input:focus-visible` global, así que se lo comían: quien navega con teclado
+   solo veía cambiar el borde de 1px de tono, y de día ese cambio es de verde a
+   casi el mismo verde. Se deja el borde y se suma un anillo de 2px con --acc,
+   que se aclara de noche. Va DESPUÉS de esas reglas y con la misma especificidad
+   a propósito. El radio se repite porque la regla global lo baja a 6px; las
+   casillas llevan el anillo pero no ese radio, que en 18px las volvería un círculo. */
+.field input:focus-visible,.ally-form input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.field input:not([type=checkbox]):not([type=radio]):focus-visible,.field textarea:focus-visible,.field select:focus-visible,
+.ally-form input:not([type=checkbox]):not([type=radio]):focus-visible,.ally-form textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:10px}
+.track-search input:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:12px}
 .ally-mods{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 /* LAS DOS REGLAS QUE EVITAN QUE EL SITIO SE ARRASTRE DE LADO EN UN TELEFONO
    PEQUEÑO. Las dos son la misma historia contada de dos maneras.
@@ -1675,7 +1719,10 @@ html[data-theme="dark"] .rep-note{border-left-color:var(--acc)}
 
 /* documento legal (#privacidad): lectura cómoda, tono institucional, día/noche */
 .legal-doc{max-width:72ch;margin-top:24px}
-.legal-doc h3{font-family:"Inter",sans-serif;font-size:var(--fs-17);font-weight:700;color:var(--ink);margin:30px 0 8px;letter-spacing:-.01em}
+/* h2 y no h3 (auditoría 28 sep 2026): la política cuelga del h1 de #privacidad y
+   un h3 directo dejaba un hueco en el esquema que lee el lector de pantalla. El
+   aspecto no cambia: el nivel lo fija el documento, la apariencia esta regla. */
+.legal-doc h2{font-family:"Inter",sans-serif;line-height:var(--lh-tight);font-size:var(--fs-17);font-weight:700;color:var(--ink);margin:30px 0 8px;letter-spacing:-.01em}
 .legal-doc p{color:var(--ink-soft);line-height:1.65;margin:0 0 12px}
 .legal-doc ul{margin:0 0 14px;padding-left:20px;color:var(--ink-soft);line-height:1.6}
 .legal-doc li{margin:5px 0}
@@ -1810,8 +1857,11 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .of-t{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h4);
   letter-spacing:-.01em;margin:26px 0 6px;padding-top:22px;border-top:1px solid var(--bd)}
 #of{margin-top:16px;max-width:560px}
+/* 16px y no 15 (auditoría 28 sep 2026): por debajo de 16px iOS Safari hace zoom
+   al enfocar el campo, y este formulario se llena desde el teléfono. Es el mismo
+   tamaño que ya tienen los demás campos de .field. */
 #of select{width:100%;padding:11px 12px;border:1px solid var(--bd);border-radius:10px;
-  background:var(--surface);color:var(--ink);font:inherit;font-size:var(--fs-15)}
+  background:var(--surface);color:var(--ink);font:inherit;font-size:var(--fs-16)}
 
 /* Rastreo: de dónde salió el dato, y las entregas del destino. */
 .track-fuente{font-size:var(--fs-12);font-weight:700;letter-spacing:.1em;text-transform:uppercase;
@@ -1849,9 +1899,10 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 /* Reporte de transferencia */
 .rep-link{font-weight:700;color:var(--acc);border-bottom:1px solid var(--bd)}
 .rep-link:hover{border-color:var(--acc)}
+/* 16px por lo mismo que #of: con 15 iOS hacía zoom en monto, fecha y destino. */
 #rep select,#rep input[type=date],#rep input[type=number]{width:100%;padding:11px 12px;
   border:1px solid var(--bd);border-radius:10px;background:var(--surface);color:var(--ink);
-  font:inherit;font-size:var(--fs-15)}
+  font:inherit;font-size:var(--fs-16)}
 .rep-ok{margin-top:26px;padding-top:24px;border-top:2px solid var(--g);max-width:600px}
 .rep-guia{font-family:var(--font-display);font-weight:800;font-size:clamp(26px,6vw,38px);
   color:var(--acc);letter-spacing:-.02em;margin:6px 0 14px}
@@ -2340,7 +2391,8 @@ section[tabindex="-1"]:focus{ outline:none }
 /* El seleccionado se marca con BORDE y FONDO, no solo con color: un solo
    canal deja fuera a quien no distingue el verde. */
 .mb-monto.is-on{border-color:var(--g);background:var(--gl)}
-.mb-monto.is-on span{color:var(--g)}
+/* --acc: con --g el nombre del nivel elegido quedaba a 1,78:1 de noche (28 sep 2026). */
+.mb-monto.is-on span{color:var(--acc)}
 .mb-otro{display:flex;flex-direction:column;gap:6px}
 .mb-otro .field{margin-bottom:0}
 /* Un botón de continuar que no puede continuar se apaga, pero NO se oculta:

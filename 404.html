@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Página no encontrada · Give&amp;Grow International</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css?v=029ef30e">
+</head>
+<body>
+<!-- EL 404 DE VERDAD (auditoría 28 sep 2026). Lo sirve la capa de assets con
+     estado 404 para cualquier dirección que no sea un archivo ni una ruta del
+     Worker — ver `not_found_handling = "404-page"` en wrangler.toml. Antes esa
+     dirección devolvía la portada con 200 («soft 404»).
+
+     SIN SCRIPTS, a propósito: la CSP de _headers solo deja correr scripts en
+     línea con su hash, y esta página no necesita ninguno. Por eso tampoco lleva
+     el conmutador de tema ni el de idioma: va en los dos idiomas a la vez.
+
+     NEUTRA ENTRE MARCAS: también la ve quien entra por miramicasa.org (el
+     Worker no corre aquí y no puede ponerle la marca), así que el botón lleva a
+     `/`, que en cada dominio es su propia portada. El `?v=` de styles.css es el
+     mismo de index.html y el check #23 del gate lo vigila. -->
+<main class="e404-sec">
+  <div class="wrap e404-wrap">
+    <div class="e404-code" aria-hidden="true">404</div>
+    <h1 class="e404-title">Esta página no existe</h1>
+    <p class="e404-lead">El enlace que seguiste no lleva a ninguna página de este sitio. Puede que esté mal escrito o que la página haya cambiado de lugar.</p>
+    <p class="e404-lead" lang="en">This page does not exist. The link you followed may be mistyped, or the page may have moved.</p>
+    <div class="e404-actions">
+      <a class="btn btn-g" href="/">Ir al inicio · Home</a>
+    </div>
+  </div>
+</main>
+</body>
+</html>

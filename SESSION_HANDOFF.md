@@ -1300,8 +1300,8 @@ código— y la pista fue que el papel decía más casas que la base.
    se haya tocado «Preparar para trabajar sin señal», que pide almacenamiento
    persistente. En Android/Chrome la regla es por presión de espacio y no por
    calendario, así que ahí probablemente sobrevivan. **Puede que ya no estén.**
-   Al 31 de agosto no había cómo contactarla; sus datos, por si sirven:
-   `camilapavia95@gmail.com` · 3134019808 · Medellín.
+   Al 31 de agosto no había cómo contactarla; su contacto está en el registro
+   privado de voluntarios, no aquí (retirado del repo público el 28 sep 2026).
 3. **~~La carga del respaldo contra la base real NO se ha ejercido~~ — HECHO
    (29 ago, PR #172).** Probado de punta a punta contra una base real, incluido
    cargar el mismo archivo dos veces. Ver su sección arriba.
@@ -2506,7 +2506,8 @@ responde 200. No es un defecto del código.
 
 **Dos correcciones sobre el documento (PR #94).** Las **cédulas de los
 firmantes**, que estaban vacías y hacían que el PDF saliera con dos nombres y
-ninguna identificación (C.C. 1.007.420.930 y C.C. 1.040.745.501). Y el numeral
+ninguna identificación (las cédulas se retiraron de este archivo el 28 sep 2026:
+el repo es público). Y el numeral
 II.5 **citaba el art. 771-2**, que trata de la factura como soporte de costos y
 no viene al caso: la norma que exige que una donación en dinero pase por el
 sistema financiero es el **numeral 1 del art. 125-2 ET**. Fue el único error de
@@ -3408,9 +3409,10 @@ Datos tomados del formulario ANTERIOR "Aplicación al Hub Social (respuestas)"
 - **Fundación Conciencia formación para la paz** (NIT 900229688-6). ESAL CONSTITUIDA
   (2008), Cámara de Comercio VIGENTE y RUT — estándar legal más fuerte que NDF
   ("en proceso de constitución").
-- Rep. legal: Lina Marcela Cardona Arango. Contacto form: proyectosconciencia@gmail.com
+- Rep. legal: en el formulario de ingreso (nombre retirado del repo público el
+  28 sep 2026). Contacto form: proyectosconciencia@gmail.com
   / fundacionconcienciaparalapaz@gmail.com. Web: fundacionconcienciaparalapaz.org.
-  IG: @fundacion_conciencia. Referida por Andrea Lopera / Sebastián.
+  IG: @fundacion_conciencia. Referida por una persona cercana al equipo.
 - Territorio: comedores en Nueva Jerusalén (Medellín) + Valencia y La Apartada (Córdoba).
 - 2 unidades de impacto (calculadora): ración de almuerzo COP 3.200; mercado familiar
   mensual COP 150.000 (ambas "de facturas reales" según el form). La 3ª unidad del form
