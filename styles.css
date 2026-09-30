@@ -2533,3 +2533,11 @@ section[tabindex="-1"]:focus{ outline:none }
 .pm-seguro h2{margin:0;font-family:"Inter",sans-serif;font-size:var(--fs-15);font-weight:700;letter-spacing:0;color:var(--ink)}
 .pm-seguro p{grid-column:2;margin:4px 0 0;font-size:var(--fs-14);color:var(--mu);line-height:1.5}
 .pm-pie{margin-top:30px;font-size:var(--fs-13);color:var(--mu)}
+/* /pago/listo, la página que sigue (30 sep 2026): la misma hoja, el mismo
+   resumen, y dos piezas propias. La nota va en gris y sin caja porque es la
+   letra pequeña de lo que dice el titular, no un aviso. Las acciones se parten
+   en filas en el móvil en vez de apretarse: el botón primero y a lo ancho. */
+.pm-nota{margin:18px 0 0;font-size:var(--fs-15);color:var(--mu);line-height:1.55;max-width:62ch}
+.pm-acciones{margin-top:28px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px}
+.pm-acciones .card-link{margin-top:0}
+@media(max-width:520px){.pm-acciones .btn{flex:1 1 100%;justify-content:center;text-align:center}}
