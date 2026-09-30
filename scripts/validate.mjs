@@ -1958,4 +1958,31 @@ try {
   }
 } catch (e) { err("no se pudo revisar la sucesión de firmantes: " + e.message); }
 
+/* CHECK #23 · LAS PÁGINAS DEL WORKER ENLAZAN LA HOJA DE HOY (auditoría 28 sep 2026).
+   `_headers` sirve /styles.css «immutable» un año. index.html lleva su `?v=` y
+   ci.yml lo vigila; las páginas que arma worker.js —panel, firma, carnet, ficha,
+   /pago, /membresia— la enlazaban SIN versión, así que un navegador que ya la
+   tuviera no volvía a pedirla nunca. Ahora usan STYLES_V, y este check exige dos
+   cosas: que STYLES_V sea el md5 real de styles.css (8 caracteres, el mismo
+   corte que index.html), y que no vuelva a aparecer un enlace sin versión.
+   Desde el mismo día mira también 404.html, que enlaza la hoja igual. */
+try {
+  const { createHash } = await import("node:crypto");
+  const real = createHash("md5").update(readFileSync("styles.css")).digest("hex").slice(0, 8);
+  const wk = readFileSync("worker.js", "utf8");
+  const decl = (wk.match(/const STYLES_V = "([0-9a-f]{8})";/) || [])[1];
+  const sueltos = (wk.match(/href="\/styles\.css"/g) || []).length;
+  const enIndex = (readFileSync("index.html", "utf8").match(/styles\.css\?v=([0-9a-f]+)/) || [])[1];
+  if (!decl) err("check #23: no encontré `const STYLES_V = \"…\";` en worker.js");
+  else if (decl !== real) err("check #23: STYLES_V de worker.js es " + decl + " pero md5(styles.css) empieza por " + real +
+                              " · actualízalo junto con el `?v=` de index.html, o las páginas del Worker se quedan con la hoja vieja un año");
+  else if (enIndex && enIndex !== real) err("check #23: el `?v=` de styles.css en index.html (" + enIndex + ") no es md5(styles.css) " + real);
+  /* 404.html es estático y nadie le reescribe nada: si su `?v=` se queda viejo,
+     la página de error sale con la hoja de hace un año. */
+  else if (existsSync("404.html") && (readFileSync("404.html", "utf8").match(/styles\.css\?v=([0-9a-f]+)/) || [])[1] !== real)
+    err("check #23: 404.html no enlaza styles.css?v=" + real + " · actualízalo junto con index.html");
+  else if (sueltos) err("check #23: worker.js enlaza /styles.css sin versión " + sueltos + " vez/veces · usa HOJA_CSS");
+  else ok("las páginas del Worker y 404.html enlazan styles.css?v=" + real + ", el mismo de index.html");
+} catch (e) { err("check #23: no se pudo comparar la versión de styles.css: " + e.message); }
+
 process.exit(fail);
