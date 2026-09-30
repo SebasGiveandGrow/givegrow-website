@@ -953,7 +953,25 @@ async function avisoSinBuzon(env, etiqueta) {
 const CORREO_TOPE_DIA = 95;
 const CORREO_RESERVA_PERSONAS = 25;
 
-async function cupoDeCorreo(env, para) {
+/* UNA SEGUNDA RESERVA, DENTRO DE LA DE PERSONAS (auditoria del 28 sep 2026).
+   La primera protege a quien esta fuera de la organizacion frente a los avisos
+   internos. Pero entre personas tambien hay orden: el acuse de una inscripcion
+   se puede reenviar a mano manana; el RECIBO de quien acaba de donar, el
+   certificado y el ENLACE DEL CASO de una familia no. El enlace del caso es la
+   unica forma de volver a su caso —si la pantalla se cierra y el correo no
+   salio, se pierde—, y el recibo es lo que el donante guarda.
+
+   Aqui SI va una lista de etiquetas, aunque arriba se descarto para el corte
+   interno/persona: la lista es CORTA y el error es benigno. Si manana nace una
+   etiqueta que deberia estar y no esta, esa etiqueta se comporta como hoy —
+   persona normal—, no se queda sin correo.
+
+   Escalones con el tope en 95: internos hasta 70, personas hasta 80, y estas
+   tres hasta 95. */
+const CORREO_RESERVA_PRIORITARIAS = 15;
+const CORREO_PRIORITARIAS = ["aporte-aprobado", "certificado", "caso-creado"];
+
+async function cupoDeCorreo(env, para, etiqueta) {
   if (!env.DB) return { hay: true };
   const buzones = [env.CORREO_AVISOS, env.CORREO_MMC, env.CORREO_ALIANZAS].filter(Boolean);
   const interno = buzones.includes(para);
@@ -975,6 +993,10 @@ async function cupoDeCorreo(env, para) {
   if (interno && hoy >= CORREO_TOPE_DIA - CORREO_RESERVA_PERSONAS) {
     return { hay: false, hoy, motivo: "reserva_para_personas" };
   }
+  if (!interno && !CORREO_PRIORITARIAS.includes(etiqueta) &&
+      hoy >= CORREO_TOPE_DIA - CORREO_RESERVA_PRIORITARIAS) {
+    return { hay: false, hoy, motivo: "reserva_para_recibos_y_casos" };
+  }
   return { hay: true, hoy };
 }
 
@@ -995,7 +1017,7 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
 
   /* EL PRESUPUESTO SE MIRA AQUI: despues de la simulacion —sin llave no se
      consume cupo de nada— y antes de gastar una llamada a Resend. */
-  const cupo = await cupoDeCorreo(env, para);
+  const cupo = await cupoDeCorreo(env, para, etiqueta);
   if (!cupo.hay) {
     console.warn("sin cupo de correo", etiqueta || "", cupo.motivo, "hoy:", cupo.hoy);
     await anotarCorreo(env, { ...base, resultado: "sin_cupo",
@@ -1047,6 +1069,340 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
   } finally {
     if (reloj) clearTimeout(reloj);
   }
+}
+
+/* ========================================================================
+   OPERACION: LATIDOS, INCIDENTES, TOPE POR IP Y LA ALERTA DIARIA
+   ========================================================================
+   Auditoria de operacion del 28 sep 2026. EL PATRON QUE CIERRA es el mismo que
+   este archivo lleva meses nombrando —«apariencia de normalidad y nada
+   avisando»— pero en la capa de abajo: el Worker respondia 500 y escribia en
+   consola; el cron hacia sus tres trabajos y cada uno terminaba en un
+   `console.log`. Si un trabajo reventaba, o el cron dejaba de correr, o faltaba
+   un secreto, lo unico que quedaba era una linea en un log que nadie abre.
+
+   Lo que se anota aqui NO lleva datos personales: ver migrations/0032. */
+const TRABAJOS_CRON = ["aviso-septimo-dia", "cobro-mensual", "resumen-diario", "alerta-operacion"];
+/* 26 y no 24: el cron corre una vez al dia a las 14:00 UTC, y Cloudflare no
+   garantiza el minuto. Dos horas de holgura evitan una alarma por un retraso. */
+const LATIDO_TOPE_HORAS = 26;
+
+/* Lo que el sitio espera tener configurado. SOLO LOS NOMBRES viajan al panel:
+   el valor nunca sale de aqui, ni siquiera su largo. */
+const CONFIG_ESPERADA = [
+  "RESEND_API_KEY", "WOMPI_PRIVATE_KEY", "WOMPI_INTEGRITY_SECRET", "WOMPI_EVENTS_SECRET",
+  "PAYPAL_CLIENT_ID", "PAYPAL_SECRET", "PAYPAL_IPN_CORREO", "ANTHROPIC_API_KEY",
+  "ACCESS_EVAL_JWK", "FIRMA_RL_EMAIL", "FIRMA_RF_EMAIL"
+];
+function configuracionPresente(env) {
+  const o = {};
+  for (const k of CONFIG_ESPERADA) o[k] = !!String((env && env[k]) || "").trim();
+  return o;
+}
+
+/* La ruta SIN query —ahi viajan los tokens de caso, recibo y membresia— y con
+   cualquier tira larga tachada, que es la forma de los tokens que van en la
+   ruta misma (/ficha/<token>, /carnet/<token>, /membresia/<token>). */
+function rutaSinSecretos(ruta) {
+  return String(ruta || "").split("?")[0].replace(/[A-Za-z0-9_-]{24,}/g, ":token").slice(0, 200);
+}
+/* El mensaje de una excepcion casi nunca lleva datos, pero «casi» no alcanza
+   bajo Ley 1581: se tachan correos y tiras de siete o mas digitos (telefonos,
+   documentos) antes de guardarlo. */
+function mensajeSinDatos(e) {
+  const m = e && typeof e === "object" ? (e.message || String(e)) : String(e == null ? "sin mensaje" : e);
+  return m.replace(/[^\s@<>"']+@[^\s@<>"']+/g, "(correo)").replace(/\d{7,}/g, "(numero)").slice(0, 300);
+}
+
+/* TECHO POR ISOLATE: un ataque que produzca miles de 500 no puede convertirse
+   en miles de escrituras a D1. Treinta por minuto sobran para ver el patron. */
+const INCIDENTES_GOLPES = new Map();
+async function anotarIncidente(env, origen, ruta, e) {
+  if (!env || !env.DB) return;
+  if (limitadoPorIP(INCIDENTES_GOLPES, "todos", 60000, 30)) return;
+  try {
+    await env.DB.prepare("INSERT INTO incidentes (origen, ruta, mensaje) VALUES (?, ?, ?)")
+      .bind(String(origen || "?").slice(0, 60), rutaSinSecretos(ruta), mensajeSinDatos(e)).run();
+  } catch (x) {
+    /* Ni el registro del incidente puede tumbar la respuesta. Si falla es casi
+       siempre que la 0032 no esta aplicada, y eso lo dice la Salud. */
+    console.error("incidente sin anotar", origen, x && x.message);
+  }
+}
+
+async function anotarLatido(env, trabajo, ok, detalle) {
+  if (!env || !env.DB) return;
+  try {
+    await env.DB.prepare("INSERT INTO latidos (trabajo, ok, detalle) VALUES (?, ?, ?)")
+      .bind(trabajo, ok ? 1 : 0, String(detalle == null ? "" : detalle).slice(0, 300)).run();
+  } catch (x) { console.error("latido sin anotar", trabajo, x && x.message); }
+}
+
+/* Cada trabajo del cron en su propio try —como ya estaban— y ahora con rastro:
+   un latido si termino, un latido en 0 y un incidente si lanzo. */
+async function correrTrabajo(env, trabajo, fn) {
+  try {
+    const r = await fn(env);
+    const txt = JSON.stringify(r);
+    console.log(trabajo, txt);
+    await anotarLatido(env, trabajo, true, txt);
+    return r;
+  } catch (e) {
+    console.error(trabajo, e && e.message);
+    await anotarLatido(env, trabajo, false, mensajeSinDatos(e));
+    await anotarIncidente(env, "cron:" + trabajo, "", e);
+    return null;
+  }
+}
+
+const horasDesde = (t) => t ? (Date.now() - Date.parse(String(t).replace(" ", "T") + "Z")) / 3600000 : null;
+
+/* Lo que ve el bloque «Operacion» de la Salud y lo que decide la alerta. Cada
+   consulta en su propio try: si la 0032 falta, lo demas se sigue viendo y
+   `error` dice que falta. */
+async function estadoOperacion(env) {
+  const configuracion = configuracionPresente(env);
+  const out = {
+    trabajos: [], incidentes: { ultimas24h: 0, recientes: [] },
+    configuracion, faltan: CONFIG_ESPERADA.filter((k) => !configuracion[k]),
+    correo24h: { fallidos: 0, sin_cupo_personas: 0, sin_cupo_por_etiqueta: [] },
+    firmas_invalidas_24h: { wompi: 0, paypal: 0 },
+    error: null
+  };
+  try {
+    const { results } = await env.DB.prepare(
+      "SELECT trabajo, MAX(en) AS ultimo, MAX(CASE WHEN ok = 1 THEN en END) AS ultimo_ok " +
+      "FROM latidos GROUP BY trabajo"
+    ).all();
+    const por = new Map((results || []).map((r) => [r.trabajo, r]));
+    for (const t of TRABAJOS_CRON) {
+      const r = por.get(t) || {};
+      const u = r.ultimo ? await env.DB.prepare(
+        "SELECT ok, detalle FROM latidos WHERE trabajo = ? ORDER BY id DESC LIMIT 1"
+      ).bind(t).first() : null;
+      const h = horasDesde(r.ultimo_ok);
+      out.trabajos.push({
+        trabajo: t, ultimo: r.ultimo || null, ultimo_ok: r.ultimo_ok || null,
+        ok: u ? !!u.ok : null, detalle: u ? u.detalle : null,
+        horas_desde_ok: h == null ? null : Math.round(h * 10) / 10,
+        vencido: h == null || h > LATIDO_TOPE_HORAS
+      });
+    }
+    const n = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM incidentes WHERE en >= datetime('now','-1 day')"
+    ).first();
+    out.incidentes.ultimas24h = (n && Number(n.n)) || 0;
+    const rec = await env.DB.prepare(
+      "SELECT en, origen, ruta, mensaje FROM incidentes WHERE en >= datetime('now','-7 days') " +
+      "ORDER BY id DESC LIMIT 10"
+    ).all();
+    out.incidentes.recientes = rec.results || [];
+  } catch (e) {
+    out.error = "No se pudieron leer latidos ni incidentes (¿falta aplicar migrations/0032?): " + mensajeSinDatos(e);
+  }
+
+  /* `sin_cupo` A PERSONAS, de las ultimas 24 horas. NO SE REINTENTAN SOLOS y no
+     es descuido: la 0009 decidio no guardar el CUERPO del correo (Ley 1581,
+     minimizacion), asi que no hay con que reenviarlo. Lo que si se puede es que
+     se VEAN el mismo dia, con su etiqueta y su guia para reenviarlos a mano. La
+     excepcion es `caso-espera`, que se reintenta solo al dia siguiente porque su
+     idempotencia solo cuenta 'enviado' y 'simulado'. */
+  try {
+    const buzones = [env.CORREO_AVISOS, env.CORREO_MMC, env.CORREO_ALIANZAS].filter(Boolean);
+    const fuera = buzones.length ? " AND para NOT IN (" + buzones.map(() => "?").join(",") + ")" : "";
+    const f = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM correos WHERE resultado = 'fallo' AND intento_en >= datetime('now','-1 day')"
+    ).first();
+    out.correo24h.fallidos = (f && Number(f.n)) || 0;
+    const sc = await env.DB.prepare(
+      "SELECT etiqueta, COUNT(*) AS n FROM correos WHERE resultado = 'sin_cupo' " +
+      "AND intento_en >= datetime('now','-1 day')" + fuera + " GROUP BY etiqueta ORDER BY n DESC"
+    ).bind(...buzones).all();
+    out.correo24h.sin_cupo_por_etiqueta = sc.results || [];
+    out.correo24h.sin_cupo_personas = out.correo24h.sin_cupo_por_etiqueta.reduce((t, r) => t + Number(r.n || 0), 0);
+  } catch (e) { console.error("operacion correo", e && e.message); }
+
+  /* Firmas invalidas de las ultimas 24 h y no las de siempre: el total historico
+     de la Salud no baja nunca, y una alerta que suena todos los dias por lo mismo
+     se aprende a ignorar en una semana. */
+  try {
+    const w = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM eventos_wompi WHERE firma_valida = 0 AND recibido_en >= datetime('now','-1 day')"
+    ).first();
+    out.firmas_invalidas_24h.wompi = (w && Number(w.n)) || 0;
+  } catch (e) { console.error("operacion firmas wompi", e && e.message); }
+  try {
+    const p = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM eventos_paypal WHERE firma_valida = 0 AND recibido_en >= datetime('now','-1 day')"
+    ).first();
+    out.firmas_invalidas_24h.paypal = (p && Number(p.n)) || 0;
+  } catch (e) { console.error("operacion firmas paypal", e && e.message); }
+  return out;
+}
+
+/* Que esta mal HOY, en frases. Lo usa la alerta; el panel pinta lo mismo en
+   su bloque. Vacio = no se manda nada. */
+function hallazgosOperacion(salud) {
+  const h = [];
+  const op = (salud && salud.operacion) || {};
+  if (op.error) h.push(["Registro de operación", op.error]);
+  const inc = op.incidentes || {};
+  if (inc.ultimas24h > 0) {
+    const u = (inc.recientes || [])[0] || {};
+    h.push(["Errores del sitio en 24 h", inc.ultimas24h + " · el último: " + (u.origen || "?") +
+      (u.ruta ? " " + u.ruta : "") + " — " + (u.mensaje || "")]);
+  }
+  for (const t of op.trabajos || []) {
+    /* La propia alerta se salta: esta corriendo ahora y su latido se escribe
+       despues de esta lectura. */
+    if (t.trabajo === "alerta-operacion" || !t.vencido) continue;
+    h.push(["Tarea programada sin éxito en " + LATIDO_TOPE_HORAS + " h", t.trabajo + " · último éxito: " +
+      (t.ultimo_ok || "nunca") + (t.ok === false ? " · el último intento falló: " + (t.detalle || "") : "")]);
+  }
+  if (salud && salud.webhooks && salud.webhooks.sin_evidencia_de_cobro) {
+    h.push(["Cobro sin evidencia", "Hay intenciones de aporte y ningún evento de Wompi recibido nunca"]);
+  }
+  const pp = ((salud && salud.cola) || []).find((c) => c.clave === "paypal_sin_casa");
+  if (pp && pp.n > 0) h.push(["Eventos de PayPal sin casa", pp.n + " · plata o firma que no cuadra; bandeja en el panel"]);
+  const f = op.firmas_invalidas_24h || {};
+  if (f.wompi || f.paypal) h.push(["Firmas inválidas en 24 h", "Wompi " + (f.wompi || 0) + " · PayPal " + (f.paypal || 0)]);
+  const co = op.correo24h || {};
+  if (co.fallidos) h.push(["Correos que fallaron en 24 h", String(co.fallidos) + " · se reenvían a mano desde el panel"]);
+  if (co.sin_cupo_personas) {
+    h.push(["Correos a PERSONAS sin cupo en 24 h", co.sin_cupo_personas + " (" +
+      (co.sin_cupo_por_etiqueta || []).map((r) => r.etiqueta + " " + r.n).join(", ") +
+      ") · no se reintentan solos: el cuerpo no se guarda. Reenviar a mano"]);
+  }
+  if ((op.faltan || []).length) h.push(["Configuración que falta", op.faltan.join(", ")]);
+  return h;
+}
+
+/* LA ALERTA DIARIA DE OPERACION. Aparte del resumen de colas vencidas porque
+   habla de otra cosa —del sitio, no de personas esperando— y porque cada una
+   se deduplica por su etiqueta: si las dos compartieran correo, la primera que
+   saliera callaria a la otra hasta manana.
+
+   MISMA REGLA QUE EL RESUMEN: solo cuando algo esta mal, y una vez al dia. Va
+   al buzon de alianzas (Sebas), que es quien opera el Worker. */
+async function alertaOperacion(env) {
+  /* LIMPIEZA, aqui porque es el unico trabajo que ya lee estas tablas. Noventa
+     dias de latidos e incidentes bastan para ver un patron; los topes por IP
+     solo sirven el dia en curso. */
+  try {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM latidos WHERE en < datetime('now','-90 days')"),
+      env.DB.prepare("DELETE FROM incidentes WHERE en < datetime('now','-90 days')"),
+      env.DB.prepare("DELETE FROM topes_ip WHERE dia < date('now','-2 days')")
+    ]);
+  } catch (e) { console.error("limpieza operacion", e && e.message); }
+
+  const para = correoAlianzas(env);
+  if (!para) return { saltado: "sin_buzon" };
+  const ya = await env.DB.prepare(
+    "SELECT 1 AS s FROM correos WHERE etiqueta = 'alerta-operacion' " +
+    "AND resultado IN ('enviado','simulado') AND intento_en >= date('now') LIMIT 1"
+  ).first();
+  if (ya) return { saltado: "ya_salio_hoy" };
+
+  const salud = await (await adminSalud(env)).json();
+  const filas = hallazgosOperacion(salud);
+  if (!filas.length) return { saltado: "todo_en_orden" };
+
+  const titulo = filas.length === 1 ? "Una cosa del sitio necesita atención"
+    : filas.length + " cosas del sitio necesitan atención";
+  const parrafos = [
+    "Este correo solo sale cuando algo está mal, y una vez al día. Qué significa cada línea y qué hacer está en ops/runbook-incidentes.md.",
+    "El detalle —últimos incidentes, la última corrida de cada tarea y qué secretos faltan— está en el panel, en «Salud del ecosistema», bloque «Operación»."
+  ];
+  const r = await enviarCorreo(env, {
+    para,
+    asunto: "Operación · " + titulo,
+    texto: [titulo, "", ...parrafos, "", ...filas.map(([k, v]) => k + ": " + v), "",
+            "https://thegiveandgrowproject.org/admin#sec-salud"].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas,
+      boton: { url: "https://thegiveandgrowproject.org/admin#sec-salud", texto: "Abrir la Salud" } }),
+    etiqueta: "alerta-operacion"
+  });
+  return { enviado: !!(r && r.ok), hallazgos: filas.length };
+}
+
+/* TOPE DIARIO POR IP EN LAS PUERTAS PUBLICAS QUE ESCRIBEN A CUALQUIERA.
+   /api/caso, /api/inscripcion, /api/transferencia y /api/pago/baja-enlace
+   mandan correo a una direccion que escribe un desconocido. Sus frenos de hoy
+   son por correo o por telefono —quien los rota pasa— y los de memoria viven
+   por isolate. Quien los rota se lleva el CUPO DE RESEND, y con el el recibo de
+   un donante.
+
+   D1 Y NO EL BINDING DE RATE LIMITING, que era lo mas simple: ese binding solo
+   admite ventanas de 10 o 60 segundos, y lo que hay que acotar es el DIA — el
+   cupo de Resend es diario. Un UPSERT por peticion cuesta una escritura.
+
+   HOLGADO POR EL CGNAT: en Colombia muchas casas salen por la misma IP, y en
+   una brigada un voluntario puede registrar casos de varias familias desde su
+   telefono. De ahi los numeros, y de ahi que en /api/caso el tope NO rechace:
+   el caso se guarda igual y solo se omite el correo a la direccion escrita.
+
+   LA IP NO SE GUARDA: se guarda sha256(dia + IP), que no se puede cruzar entre
+   dias, y la fila se borra a los dos dias. Si la cuenta falla, se deja pasar:
+   el tope es una red, no una puerta — igual que el cupo de correo. */
+const TOPE_IP_DIA = { caso: 40, inscripcion: 20, transferencia: 20, "baja-enlace": 10 };
+async function pasaTopeIP(env, request, puerta) {
+  const tope = TOPE_IP_DIA[puerta];
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  if (!tope || !ip || !env.DB) return true;
+  const dia = new Date().toISOString().slice(0, 10);
+  try {
+    const huella = (await sha256Hex(dia + "|" + ip)).slice(0, 32);
+    const r = await env.DB.prepare(
+      "INSERT INTO topes_ip (huella, puerta, dia, n) VALUES (?, ?, ?, 1) " +
+      "ON CONFLICT(huella, puerta, dia) DO UPDATE SET n = n + 1 RETURNING n"
+    ).bind(huella, puerta, dia).first();
+    const n = (r && Number(r.n)) || 0;
+    /* Un incidente la PRIMERA vez que una IP cruza el tope ese dia, no en cada
+       golpe: basta para que la alerta lo diga, y no llena la tabla. */
+    if (n === tope + 1) {
+      await anotarIncidente(env, "tope-ip", "/" + puerta,
+        "una IP paso de " + tope + " envios hoy en la puerta " + puerta);
+    }
+    return n <= tope;
+  } catch (e) {
+    console.error("tope ip", puerta, e && e.message);
+    return true;
+  }
+}
+
+/* GET /api/ping — ¿esta vivo, y QUE version corre?
+   Lo lee el deploy despues de `wrangler deploy` para confirmar que el codigo
+   nuevo es el que responde —antes, un deploy «verde» no probaba nada sobre lo
+   que servia el borde—, y lo lee el vigilante horario de GitHub.
+
+   `version` es el id de version de Workers que da el binding
+   CF_VERSION_METADATA; es el mismo que imprime `wrangler deploy`.
+   `cron_al_dia` dice si las tareas diarias tuvieron exito en las ultimas 26 h
+   (null si todavia no hay latidos): es lo unico que puede avisar de que el cron
+   ENTERO dejo de correr, porque la alerta diaria corre dentro de el.
+
+   PUBLICO y sin un dato de nadie. `no-store` lo pone json(). */
+async function apiPing(env) {
+  const vm = env.CF_VERSION_METADATA || null;
+  const version = vm && vm.id ? String(vm.id) : null;
+  if (!env.DB) return json({ ok: false, version, error: "base_no_configurada" }, 503);
+  try { await env.DB.prepare("SELECT 1 AS uno").first(); }
+  catch (e) { return json({ ok: false, version, error: "base_no_responde" }, 503); }
+  let cronAlDia = null;
+  try {
+    const { results } = await env.DB.prepare(
+      "SELECT trabajo, MAX(en) AS u FROM latidos WHERE ok = 1 GROUP BY trabajo"
+    ).all();
+    if (results && results.length) {
+      const por = new Map(results.map((r) => [r.trabajo, r.u]));
+      cronAlDia = TRABAJOS_CRON.every((t) => {
+        const h = horasDesde(por.get(t));
+        return h != null && h <= LATIDO_TOPE_HORAS;
+      });
+    }
+  } catch (e) { /* sin la 0032 no hay latidos: se queda en null */ }
+  return json({ ok: true, version, desplegado: (vm && vm.timestamp) || null, cron_al_dia: cronAlDia });
 }
 
 function fmtPesos(centavos) {
@@ -1503,6 +1859,13 @@ async function apiInscripcion(request, env, url) {
   /* Honeypot: si el campo trampa viene lleno es un bot. Se responde ok para no
      enseñarle qué lo delató, y no se guarda nada. */
   if (c.web2) return json({ ok: true });
+
+  /* Tope diario por IP (ver pasaTopeIP): las seis puertas pasan por aqui. */
+  if (!(await pasaTopeIP(env, request, "inscripcion"))) {
+    return json({ error: "demasiados_envios_hoy",
+                  ayuda: "Hoy ya recibimos muchas inscripciones desde esta conexión. Inténtalo mañana, " +
+                         "o escríbenos si es urgente." }, 429);
+  }
 
   /* Los otros CUATRO tipos entran por el mismo endpoint y a la misma tabla:
      comparten el honeypot, el consentimiento de Ley 1581 y el patrón de correo.
@@ -2576,7 +2939,11 @@ async function adminSalud(env) {
       nada_salio: (co.total || 0) > 0 && (co.enviados || 0) === 0
     },
     cola,
-    abandonadas: { n: ab.n || 0, centavos: ab.centavos || 0 }
+    abandonadas: { n: ab.n || 0, centavos: ab.centavos || 0 },
+    /* Latidos del cron, incidentes y configuracion (28 sep 2026). La misma
+       lectura que decide la alerta diaria: panel y correo no pueden decir
+       cosas distintas. */
+    operacion: await estadoOperacion(env)
   });
 }
 
@@ -3462,6 +3829,12 @@ async function apiReportarTransferencia(request, env, url) {
   /* Honeypot: éxito aparente y cero registro, igual que en los otros formularios. */
   if (c.web2) return json({ ok: true, guia: null });
 
+  if (!(await pasaTopeIP(env, request, "transferencia"))) {
+    return json({ error: "demasiados_envios_hoy",
+                  ayuda: "Hoy ya recibimos muchos reportes desde esta conexión. Inténtalo mañana; " +
+                         "si ya enviaste el tuyo, busca tu número de guía en el correo que te llegó." }, 429);
+  }
+
   const monto = c.monto;
   if (typeof monto !== "number" || !Number.isInteger(monto) || monto < MONTO_MIN || monto > MONTO_MAX) {
     return json({ error: "monto_invalido", min: MONTO_MIN, max: MONTO_MAX }, 400);
@@ -3894,7 +4267,10 @@ async function apiCasoCrear(request, env) {
      caso ya está creado y la pantalla le enseña el enlace igual. Nunca al revés.
 
      Solo si dejó correo, que es opcional DE VERDAD y así se queda. */
-  if (email) {
+  /* EL TOPE POR IP AQUI NO RECHAZA: el caso ya esta guardado y la pantalla
+     le muestra el enlace. Lo unico que se omite, pasado el tope del dia, es
+     el correo a la direccion escrita — que es lo que un abuso vendria a gastar. */
+  if (email && await pasaTopeIP(env, request, "caso")) {
     try { await correoCasoCreado(env, { numero, token, nombre, sector, email }); }
     catch (e) { console.error("correo familia caso", numero, e && e.message); }
   }
@@ -17025,6 +17401,52 @@ function cargarSalud(){
     h += pasoEmbudo("sin cupo del dia", co.sin_cupo, co.sin_cupo ? "mandar a mano" : "");
     h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">El correo nunca tumba un cobro: si Resend falla, el aporte queda igual y el fallo se anota aquí. Por eso hay que mirarlo — nadie se va a quejar de un acuse que no sabe que existía.</p>';
 
+    /* 3c · Operación (auditoría del 28 sep 2026): la última corrida de cada
+       tarea del cron, los incidentes y qué secretos faltan. Es lo mismo que
+       decide la alerta diaria, leído del mismo objeto. */
+    var op = d.operacion || {};
+    h += '<h3 style="font-size:15px;margin:0 0 8px">Operación</h3>';
+    if (op.error){
+      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px"><strong>Sin registro de operación.</strong> ' + esc(op.error) + '</p>';
+    }
+    var faltan = op.faltan || [];
+    if (faltan.length){
+      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px"><strong>Falta configuración:</strong> ' +
+        esc(faltan.join(", ")) + '. Se pone con <code>npx wrangler secret put NOMBRE</code>; aquí solo se ve el nombre, nunca el valor.</p>';
+    }
+    var co24 = op.correo24h || {};
+    if (co24.sin_cupo_personas){
+      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px"><strong>' +
+        esc(String(co24.sin_cupo_personas)) + ' correo(s) a personas no salieron por cupo en las últimas 24 h</strong> (' +
+        esc((co24.sin_cupo_por_etiqueta || []).map(function(r){ return r.etiqueta + " " + r.n; }).join(", ")) +
+        '). No se reintentan solos: el cuerpo del correo no se guarda, a propósito (Ley 1581). Hay que reenviarlos a mano; «caso-espera» sí se reintenta mañana.</p>';
+    }
+    var tr = op.trabajos || [];
+    if (tr.length){
+      h += '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Tarea diaria</th><th scope="col">Última corrida</th><th scope="col">Último éxito</th><th scope="col">Resultado</th></tr></thead><tbody>';
+      h += tr.map(function(t){
+        var mal = t.vencido && t.trabajo !== "alerta-operacion";
+        return "<tr><td><strong>" + esc(t.trabajo) + "</strong></td>" +
+          "<td>" + esc(t.ultimo ? String(t.ultimo).slice(0,16) : "nunca") + "</td>" +
+          "<td>" + (mal ? '<strong style="color:#A84D00">' : "") + esc(t.ultimo_ok ? String(t.ultimo_ok).slice(0,16) : "nunca") + (mal ? "</strong>" : "") + "</td>" +
+          "<td><small>" + esc(t.ok === false ? "falló: " + (t.detalle || "") : (t.detalle || "—")) + "</small></td></tr>";
+      }).join("");
+      h += '</tbody></table></div>';
+    }
+    var inc = op.incidentes || {};
+    var rec = inc.recientes || [];
+    h += '<p class="mu" style="font-size:13.5px;margin:10px 0 6px">' +
+      (inc.ultimas24h ? "<strong>" + esc(String(inc.ultimas24h)) + "</strong> incidente(s) en las últimas 24 h." : "Ningún incidente en las últimas 24 h.") + '</p>';
+    if (rec.length){
+      h += '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Cuándo (UTC)</th><th scope="col">Dónde</th><th scope="col">Qué</th></tr></thead><tbody>';
+      h += rec.map(function(x){
+        return "<tr><td>" + esc(String(x.en || "").slice(0,16)) + "</td><td>" + esc(x.origen || "") + (x.ruta ? " <small>" + esc(x.ruta) + "</small>" : "") +
+          "</td><td><small>" + esc(x.mensaje || "") + "</small></td></tr>";
+      }).join("");
+      h += '</tbody></table></div>';
+    }
+    h += '<p class="mu" style="font-size:12.5px;margin:6px 0 20px">Si algo de este bloque está mal, a las 9 de la mañana llega un correo «Operación ·» al buzón de alianzas. Qué hacer con cada cosa: <code>ops/runbook-incidentes.md</code>.</p>';
+
     /* 4 · Lo que espera a una persona. */
     h += '<h3 style="font-size:15px;margin:0 0 8px">Esperando a una persona</h3>';
     var cola = d.cola || [];
@@ -19471,9 +19893,18 @@ async function wompiCobrar(env, sub) {
   const firma = await sha256Hex(guia + centavos + moneda + sec);
 
   let j;
+  /* SIN TOPE, un Wompi que no contesta deja colgado el cron entero: los
+     cobros van uno detras de otro y detras de ellos el resumen y la alerta.
+     15 s sobran para una transaccion que normalmente vuelve en uno. Un corte
+     entra por el `catch` de abajo como cualquier falta de respuesta —la fila
+     queda en `intencion` y el reintento usa la MISMA guia—, asi que el
+     comportamiento no cambia: solo deja de esperar para siempre (28 sep 2026). */
+  const corteWompi = new AbortController();
+  const relojWompi = setTimeout(() => corteWompi.abort(), 15000);
   try {
     const r = await fetch(amb.api + "/transactions", {
       method: "POST",
+      signal: corteWompi.signal,
       headers: { "content-type": "application/json", "authorization": "Bearer " + prv },
       body: JSON.stringify({
         amount_in_cents: centavos,
@@ -19535,7 +19966,12 @@ async function wompiCobrar(env, sub) {
        Si la transaccion si se creo al otro lado, el webhook la encontrara por
        la referencia y la pondra al dia. */
     await env.DB.prepare("UPDATE aportes SET wompi_estado = 'sin_respuesta' WHERE guia = ?").bind(guia).run();
+    const cortado = e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")));
+    await anotarIncidente(env, "wompi", "/transactions",
+      (cortado ? "sin respuesta de Wompi en 15 s" : "cobro sin respuesta: " + mensajeSinDatos(e)) + " · guia " + guia);
     return { ok: false, motivo: "sin_respuesta", guia };
+  } finally {
+    clearTimeout(relojWompi);
   }
 
   const tx = (j && j.data) || {};
@@ -19584,7 +20020,14 @@ async function wompiCobrar(env, sub) {
 const COBROS_POR_EJECUCION = 20;
 
 async function cobrarSuscripcionesDelMes(env) {
-  if (!env.DB || !env.WOMPI_PRIVATE_KEY) return { ok: true, motivo: "sin_pasarela", cobrados: 0 };
+  if (!env.DB || !env.WOMPI_PRIVATE_KEY) {
+    /* Sin la llave privada el cobro mensual NO cobra a nadie, y hasta hoy eso
+       era un `ok: true` en el log. Ahora es un incidente, y la alerta lo dice
+       (auditoria del 28 sep 2026). */
+    if (env.DB) await anotarIncidente(env, "cobro-mensual", "",
+      "sin_pasarela: falta WOMPI_PRIVATE_KEY, no se cobro ninguna membresia");
+    return { ok: true, motivo: "sin_pasarela", cobrados: 0 };
+  }
 
   const { results } = await env.DB.prepare(
     "SELECT id, monto_centavos, moneda, frecuencia, idioma, donante_id, fuente_id " +
@@ -20318,7 +20761,7 @@ async function apiBajaEnlace(request, env, url) {
      El tope es por IP y en Colombia el CGNAT comparte IP entre muchas casas,
      asi que se deja holgado: quien de verdad lo necesite pide UNO. */
   const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
-  if (bajaLimitada(ip)) {
+  if (bajaLimitada(ip) || !(await pasaTopeIP(env, request, "baja-enlace"))) {
     /* Se responde la MISMA pantalla de siempre. Decir «vas muy rapido» ya seria
        una senal distinta segun el correo, que es justo lo que no queremos. */
     return respuestaPedirEnlace(lang, true, request);
@@ -20871,30 +21314,16 @@ export default {
      Va envuelta en su propio try: si esto falla, no puede tumbar nada más —no
      hay nada más en el `scheduled`, pero lo habrá. */
   async scheduled(evento, env, ctx) {
+    /* Cada trabajo en su propio try, como siempre: que un fallo cobrando no
+       impida el aviso a las familias, ni al reves. `correrTrabajo` añade el
+       rastro (auditoria del 28 sep 2026): un latido por trabajo y un incidente
+       si lanza. La ALERTA va la ultima porque lee los latidos de los otros
+       tres, y un aviso interno no puede ir antes de familias y cobros. */
     ctx.waitUntil((async () => {
-      try {
-        const r = await avisarEsperaSeptimoDia(env);
-        console.log("aviso septimo dia", JSON.stringify(r));
-      } catch (e) {
-        console.error("aviso septimo dia", e && e.message);
-      }
-      /* En su propio try: que un fallo cobrando no impida el aviso a las
-         familias, ni al reves. Son dos trabajos sin relacion que comparten
-         disparador. */
-      try {
-        const c = await cobrarSuscripcionesDelMes(env);
-        console.log("cobro mensual", JSON.stringify(c));
-      } catch (e) {
-        console.error("cobro mensual", e && e.message);
-      }
-      /* El ultimo y en su propio try: es un aviso interno, y nada de lo de
-         arriba —familias, cobros— puede depender de que salga. */
-      try {
-        const rd = await resumenDiarioEquipo(env);
-        console.log("resumen diario", JSON.stringify(rd));
-      } catch (e) {
-        console.error("resumen diario", e && e.message);
-      }
+      await correrTrabajo(env, "aviso-septimo-dia", avisarEsperaSeptimoDia);
+      await correrTrabajo(env, "cobro-mensual", cobrarSuscripcionesDelMes);
+      await correrTrabajo(env, "resumen-diario", resumenDiarioEquipo);
+      await correrTrabajo(env, "alerta-operacion", alertaOperacion);
     })());
   },
 
@@ -20922,11 +21351,18 @@ export default {
       return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta));
     } catch (e) {
       console.error("sin_capturar", ruta, e && e.message);
+      /* Y AHORA QUEDA ESCRITO: un 500 que solo vive en la consola no lo ve
+         nadie. La alerta diaria cuenta estas filas. */
+      await anotarIncidente(env, "fetch", ruta, e);
       return json({ error: "error_interno" }, 500);
     }
   },
 
   async ruteo(request, env, url, ruta) {
+
+    /* El pulso, antes que nada y fuera del bloque `/api/`: ese bloque responde
+       503 sin base, y el ping tiene que poder decir «sin base» con su version. */
+    if (ruta === "/api/ping") return await apiPing(env);
 
     /* `/f/<id>` en espanol y `/f/<id>/en` en ingles. DOS URLs y no un parametro
        ni la cabecera Accept-Language: Google rastrea desde Estados Unidos, asi
@@ -21728,6 +22164,7 @@ export default {
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
         console.error("admin", ruta, e && e.message);
+        await anotarIncidente(env, "admin", ruta, e);
         return json({ error: "error_interno" }, 500);
       }
     }
@@ -21766,6 +22203,7 @@ export default {
       } catch (e) {
         /* Nunca se filtra el detalle interno al cliente. */
         console.error("api", ruta, e && e.message);
+        await anotarIncidente(env, "api", ruta, e);
         return json({ error: "error_interno" }, 500);
       }
     }

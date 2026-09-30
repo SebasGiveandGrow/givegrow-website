@@ -60,6 +60,23 @@ run_worker_first = ["/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/a
 [triggers]
 crons = ["0 14 * * *"]
 
+# ---------------------------------------------------------------------------
+# REGISTROS Y VERSION (auditoría de operación del 28 sep 2026)
+# ---------------------------------------------------------------------------
+# Sin esto los `console.error` del Worker solo existían mientras alguien tuviera
+# abierto `wrangler tail`: un 500 de madrugada no dejaba rastro en ninguna parte.
+# Con `observability` Cloudflare los guarda y se consultan en el panel del
+# Worker → Observability → Logs. Lo hereda el entorno de pruebas.
+[observability]
+enabled = true
+
+# El id de la versión desplegada, para /api/ping. Es el mismo que imprime
+# `wrangler deploy` («Current Version ID»), y es lo que deploy.yml compara para
+# saber que el código nuevo es el que de verdad responde. Los bindings NO se
+# heredan: el sandbox lleva su propia copia al final del archivo.
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
 # Base PRIVADA (Ley 1581): donantes, aportes, inscripciones y consentimientos.
 # Nunca se sirve al navegador. Los datos públicos de la red siguen en
 # data/partners.json. Esquema en migrations/0001_inicial.sql.
@@ -247,3 +264,8 @@ PAYPAL_PLAN_SEMILLA = "P-9BG09831XA1085144NKMMLNA"
 PAYPAL_PLAN_RETONO = "P-7398672717248935BNKMMLNI"
 PAYPAL_PLAN_ARBOL = "P-8T600504SC255541ENKMMLNQ"
 PAYPAL_PLAN_BOSQUE = "P-0W178534CC254241JNKMMLNY"
+
+# Mismo binding que producción, para que /api/ping del sandbox también diga
+# qué versión corre (los bindings no se heredan entre entornos).
+[env.sandbox.version_metadata]
+binding = "CF_VERSION_METADATA"
