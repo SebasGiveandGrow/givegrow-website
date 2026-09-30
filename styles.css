@@ -219,6 +219,10 @@ nav.sol{background:var(--nav-bg);-webkit-backdrop-filter:blur(12px);backdrop-fil
 
 /* ===== BUTTONS ===== */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:999px;font-weight:700;font-size:var(--fs-15);transition:transform .15s var(--ease),box-shadow .15s,background .15s;cursor:pointer}
+/* Un botón con `hidden` se esconde de verdad: `.btn` fija display y le ganaba al
+   atributo. Lo usan «Mandármelo por WhatsApp» y «Reintentar ahora» de Mira Mi
+   Casa, que solo aparecen cuando la subida de fotos lo permite (28 sep 2026). */
+.btn[hidden]{display:none}
 .btn:hover{transform:translateY(-2px)}
 .btn-g{background:var(--g);color:var(--on-dark);box-shadow:0 4px 14px rgba(31,92,56,.28)}
 .btn-g:hover{background:var(--gm)}
@@ -1192,7 +1196,7 @@ main.page:focus{outline:none}
    que son oscuras en los dos temas. */
 a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus-visible{
   outline:3px solid var(--acc);outline-offset:2px;border-radius:6px}
-:is(.band,.hero,footer,.home-hub,.carnet,.brig-aviso) :focus-visible{outline-color:var(--brote)}
+:is(.band,.hero,footer,.home-hub,.carnet) :focus-visible{outline-color:var(--brote)}
 .btn:focus-visible,.btn-g:focus-visible,.btn-o:focus-visible{outline-offset:3px}
 .theme-toggle:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
 .nlink:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -1787,27 +1791,13 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 /* ===========================================================================
    BRIGADA DE ATENCIÓN A EMERGENCIA — página de campaña (agosto 2026)
    ===========================================================================
-   Campaña, no sección permanente: cuando cierre, esta hoja se retira o se
-   convierte en el registro de lo que ocurrió. Por eso vive al final del
+   Campaña, no sección permanente: cerró, y desde el 29 sep 2026 la página es
+   el registro de lo que ocurrió. Se retiraron las reglas del aviso de portada,
+   del contador, de las cuatro formas de ayudar, de manos y contactos, de los
+   acopios y de las columnas de meta/zona por sector: ya no hay HTML que las use. Por eso vive al final del
    archivo y reutiliza los componentes que ya existen (.rec-ledger, .card,
    .rec-cap) en vez de inventar un lenguaje nuevo para algo temporal.
    =========================================================================== */
-
-/* Aviso de portada. Una sola línea sobre el hero: es una emergencia y tiene que
-   encontrarse, pero no puede convertir la home en un cartel. */
-/* TIRA FINA, NO PRIMERA PANTALLA. Era lo primero que veía un visitante nuevo:
-   un bloque de 12px de alto con borde de 2px, antes del titular. Es información
-   con fecha —el sismo del 10 de agosto— y la portada no; quien llega por
-   primera vez necesita saber qué es Give&Grow antes que qué pasó en agosto.
-   Se queda, se ve, y deja de competir con el titular. */
-.brig-aviso{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:2px 10px;
-  padding:7px 20px;background:var(--gd);color:var(--on-dark);font-size:var(--fs-13);line-height:1.35;
-  border-bottom:1px solid var(--brote);transition:background .15s}
-.brig-aviso:hover{background:var(--g)}
-.brig-aviso strong{font-weight:800}
-.brig-aviso span{color:var(--on-dark-2)}
-.brig-aviso span::after{content:" →";color:var(--brote);font-weight:700}
-@media(min-width:760px){.brig-aviso{padding:7px 24px}}
 
 .brig-nota{font-size:var(--fs-14);line-height:1.6;max-width:64ch;margin-top:16px}
 
@@ -1820,32 +1810,13 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .brig-cifra{font-family:var(--font-display);font-weight:700;
   font-size:clamp(28px,5.2vw,44px);line-height:1.06;letter-spacing:-.015em;margin:6px 0 0}
 .brig-est-p{font-size:var(--fs-15);line-height:1.6;max-width:62ch;margin:12px 0 0;color:var(--ink-soft)}
-.brig-nec-cap{margin-top:24px;padding-top:18px;border-top:1px solid var(--bd)}
-.brig-nec4{display:grid;gap:16px 26px;margin-top:12px;
-  grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr))}
-.brig-n b{display:block;font-size:var(--fs-15);font-weight:700;letter-spacing:.01em}
-.brig-n small{display:block;margin-top:4px;font-size:var(--fs-14);line-height:1.55;color:var(--mu)}
-
-/* Manos y contactos: dos bloques hermanos, reglas finas, sin tarjetas. */
-.brig-mc{display:grid;gap:26px;margin-top:26px;
-  grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}
-.brig-mc-b{padding-top:18px;border-top:2px solid var(--g)}
-.brig-mc-b :is(h4,:where(.h-comp4)){font-size:var(--fs-h4);margin:0 0 10px}
-.brig-mc-b p{font-size:var(--fs-15);line-height:1.65;max-width:56ch;margin:0 0 16px}
 
 /* Ledger de sectores: misma gramática que la tabla de transparencia. */
 .brig-sec{margin-top:26px}
-.brig-sec .sec-fila{display:grid;grid-template-columns:1fr auto auto;gap:8px 18px;
+.brig-sec .sec-fila{display:grid;grid-template-columns:1fr;gap:8px 18px;
   align-items:baseline;padding:14px 0;border-bottom:1px solid var(--bd)}
 .brig-sec .sec-ciudad{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h4);
   letter-spacing:-.01em}
-.brig-sec .sec-meta{font-size:var(--fs-15);font-weight:700;font-variant-numeric:tabular-nums}
-/* Ámbar solo donde falta un dato — no como color de alarma. */
-.brig-sec .sec-estado{font-size:var(--fs-13);font-weight:600;color:var(--amber)}
-@media(max-width:620px){
-  .brig-sec .sec-fila{grid-template-columns:1fr auto}
-  .brig-sec .sec-estado{grid-column:1/-1}
-}
 
 /* Categorías. El numeral cuelga y la razón va en Fraunces: es la voz humana
    dentro de un documento de logística, y por eso cambia de familia. */
@@ -1868,19 +1839,6 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .brig-via-v a:hover{border-color:var(--acc);color:var(--acc)}
 .brig-via-p{font-size:var(--fs-15);line-height:1.6;color:var(--ink-soft);max-width:62ch;margin-bottom:14px}
 
-/* Un acopio: nombre, dirección y cómo llegar. Sin tarjeta — regla fina a la
-   izquierda, que es la gramática del resto de la página. La dirección va en
-   display porque es el dato que alguien va a copiar o a leer en voz alta a un
-   taxista, no un párrafo. */
-.brig-acopio{padding:12px 0 12px 16px;border-left:2px solid var(--g);margin:14px 0}
-.brig-acopio-n{font-size:var(--fs-13);font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-  color:var(--mu);margin:0 0 4px}
-.brig-acopio-d{font-family:var(--font-display);font-weight:700;font-size:var(--fs-17);line-height:1.3;
-  letter-spacing:-.005em;margin:0 0 6px}
-.brig-acopio-c{font-size:var(--fs-14);font-weight:600;margin:0}
-.brig-acopio-c a{color:var(--acc);border-bottom:1px solid var(--bd)}
-.brig-acopio-c a:hover{border-color:var(--acc)}
-.brig-acopio-aviso{margin-top:14px}
 .brig-cert{margin-top:26px}
 
 /* Reglas. Lo que NO se hace genera más confianza que cualquier promesa. */
@@ -2028,7 +1986,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 
   /* TINTA INVISIBLE — el fallo que casi se escapó.
      Varias superficies del sitio son oscuras y pintan su texto en blanco:
-     `.band`, `.calc`, `.hero`, `.brig-aviso`, los contadores. Al forzar el papel
+     `.band`, `.calc`, `.hero`, los contadores. Al forzar el papel
      a blanco, ese texto quedaba blanco sobre blanco: la sección «Gobernanza y
      control» de Transparencia se imprimía VACÍA, sin el nombre de la Revisora
      Fiscal, en un documento cuyo propósito es probar quién responde.
@@ -2039,7 +1997,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
      una por una, que es como se quedan tres sueltas. */
   .band, .band *, .calc, .calc *, .hero, .hero *, .home-hub, .home-hub *,
   .foto-banner, .foto-banner *, .stats, .stats *,
-  .brig-aviso, .brig-aviso *, .live-stat, .live-stat *, .carnet, .carnet *,
+  .live-stat, .live-stat *, .carnet, .carnet *,
   .pay-now-t, .pay-now-p, .pay-now-msg, .pay-now-rec, .gal-cap, .track-ev-ic {
     color:#111 !important; background:transparent !important;
     text-shadow:none !important; box-shadow:none !important;

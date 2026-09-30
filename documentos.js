@@ -999,7 +999,22 @@ export async function informeTriage(c, hoyISO) {
   h.texto(ETIQUETA_CLAS[c.clasificacion] || String(c.clasificacion || "-"), {
     tam: 15, fuente: f.negrita, color: VERDE, interlinea: 19, despues: 6
   });
-  h.texto(EXPLICA_CLAS[c.clasificacion] || "", { tam: 9.5, color: GRIS, interlinea: 13.5, despues: 16 });
+  h.texto(EXPLICA_CLAS[c.clasificacion] || "", { tam: 9.5, color: GRIS, interlinea: 13.5, despues: 6 });
+  /* NO AGENDA NADA (auditoría del 28 sep 2026). «Visita urgente» impreso en
+     grande se leía como una cita. La plataforma no agenda ni promete visitas: el
+     papel lo dice debajo de la prioridad, que es donde nace la confusión. Y con
+     prioridad alta dice a quién acudir, porque quien sí puede actuar sobre la
+     casa es el municipio (Ley 1523 de 2012). */
+  if (c.clasificacion !== "inevaluable") {
+    h.texto("Esta prioridad no agenda una visita ni la promete: dice qué tan pronto convendría que alguien fuera.",
+      { tam: 9.5, fuente: f.negrita, color: TINTA, interlinea: 13.5, despues: 6 });
+  }
+  if (c.clasificacion === "urgente") {
+    h.texto("Informa a tu alcaldía o al consejo municipal de gestión del riesgo. Si las cosas empeoran " +
+      "—la grieta crece, algo cruje, hay olor a gas— sal de la casa y llama al 123.",
+      { tam: 9.5, color: TINTA, interlinea: 13.5, despues: 6 });
+  }
+  h.salto(10);
 
   /* La firma es del INGENIERO, no de la Fundación: es él quien responde por el
      criterio técnico. La Fundación aparece como quien organiza, en el pie. */
@@ -1053,10 +1068,12 @@ export async function informeTriage(c, hoyISO) {
   return pdf.save();
 }
 
+/* «Prioridad de visita», no «Visita urgente»: ver `TRIAJE_ET` en worker.js,
+   que es la misma etiqueta en el correo (auditoría del 28 sep 2026). */
 const ETIQUETA_CLAS = {
-  urgente:     "Visita urgente",
-  programada:  "Visita programada",
-  no_requiere: "No requiere visita por ahora",
+  urgente:     "Prioridad alta",
+  programada:  "Prioridad media",
+  no_requiere: "No prioritaria por ahora",
   inevaluable: "No se pudo evaluar con el material enviado"
 };
 
@@ -1067,8 +1084,10 @@ const EXPLICA_CLAS = {
                "situación que obligue a atenderla de inmediato.",
   no_requiere: "Con lo que muestran las fotografías, el ingeniero no ve necesaria una visita " +
                "por ahora. Si aparecen grietas nuevas o crecen las existentes, vuelve a escribirnos.",
-  inevaluable: "Las fotografías enviadas no permiten formarse un criterio. Abajo se indica qué " +
-               "hace falta para poder evaluar."
+  /* «Arriba» y no «Abajo» (auditoría del 28 sep 2026): lo que falta se imprime
+     en la sección II, antes de esta. */
+  inevaluable: "Las fotografías enviadas no permiten formarse un criterio. Arriba, en el concepto, " +
+               "se indica qué hace falta para poder evaluar."
 };
 
 /* ===========================================================================

@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "15b4ac0d";
+const STYLES_V = "9c80cbf4";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -985,7 +985,25 @@ async function avisoSinBuzon(env, etiqueta) {
 const CORREO_TOPE_DIA = 95;
 const CORREO_RESERVA_PERSONAS = 25;
 
-async function cupoDeCorreo(env, para) {
+/* UNA SEGUNDA RESERVA, DENTRO DE LA DE PERSONAS (auditoria del 28 sep 2026).
+   La primera protege a quien esta fuera de la organizacion frente a los avisos
+   internos. Pero entre personas tambien hay orden: el acuse de una inscripcion
+   se puede reenviar a mano manana; el RECIBO de quien acaba de donar, el
+   certificado y el ENLACE DEL CASO de una familia no. El enlace del caso es la
+   unica forma de volver a su caso —si la pantalla se cierra y el correo no
+   salio, se pierde—, y el recibo es lo que el donante guarda.
+
+   Aqui SI va una lista de etiquetas, aunque arriba se descarto para el corte
+   interno/persona: la lista es CORTA y el error es benigno. Si manana nace una
+   etiqueta que deberia estar y no esta, esa etiqueta se comporta como hoy —
+   persona normal—, no se queda sin correo.
+
+   Escalones con el tope en 95: internos hasta 70, personas hasta 80, y estas
+   tres hasta 95. */
+const CORREO_RESERVA_PRIORITARIAS = 15;
+const CORREO_PRIORITARIAS = ["aporte-aprobado", "certificado", "caso-creado"];
+
+async function cupoDeCorreo(env, para, etiqueta) {
   if (!env.DB) return { hay: true };
   const buzones = [env.CORREO_AVISOS, env.CORREO_MMC, env.CORREO_ALIANZAS].filter(Boolean);
   const interno = buzones.includes(para);
@@ -1006,6 +1024,10 @@ async function cupoDeCorreo(env, para) {
   if (hoy >= CORREO_TOPE_DIA) return { hay: false, hoy, motivo: "tope_diario" };
   if (interno && hoy >= CORREO_TOPE_DIA - CORREO_RESERVA_PERSONAS) {
     return { hay: false, hoy, motivo: "reserva_para_personas" };
+  }
+  if (!interno && !CORREO_PRIORITARIAS.includes(etiqueta) &&
+      hoy >= CORREO_TOPE_DIA - CORREO_RESERVA_PRIORITARIAS) {
+    return { hay: false, hoy, motivo: "reserva_para_recibos_y_casos" };
   }
   return { hay: true, hoy };
 }
@@ -1057,7 +1079,7 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
 
   /* EL PRESUPUESTO SE MIRA AQUI: despues de la simulacion —sin llave no se
      consume cupo de nada— y antes de gastar una llamada a Resend. */
-  const cupo = await cupoDeCorreo(env, para);
+  const cupo = await cupoDeCorreo(env, para, etiqueta);
   if (!cupo.hay) {
     console.warn("sin cupo de correo", etiqueta || "", cupo.motivo, "hoy:", cupo.hoy);
     await anotarCorreo(env, { ...base, resultado: "sin_cupo",
@@ -1110,6 +1132,340 @@ async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos
   } finally {
     if (reloj) clearTimeout(reloj);
   }
+}
+
+/* ========================================================================
+   OPERACION: LATIDOS, INCIDENTES, TOPE POR IP Y LA ALERTA DIARIA
+   ========================================================================
+   Auditoria de operacion del 28 sep 2026. EL PATRON QUE CIERRA es el mismo que
+   este archivo lleva meses nombrando —«apariencia de normalidad y nada
+   avisando»— pero en la capa de abajo: el Worker respondia 500 y escribia en
+   consola; el cron hacia sus tres trabajos y cada uno terminaba en un
+   `console.log`. Si un trabajo reventaba, o el cron dejaba de correr, o faltaba
+   un secreto, lo unico que quedaba era una linea en un log que nadie abre.
+
+   Lo que se anota aqui NO lleva datos personales: ver migrations/0032. */
+const TRABAJOS_CRON = ["aviso-septimo-dia", "cobro-mensual", "resumen-diario", "alerta-operacion"];
+/* 26 y no 24: el cron corre una vez al dia a las 14:00 UTC, y Cloudflare no
+   garantiza el minuto. Dos horas de holgura evitan una alarma por un retraso. */
+const LATIDO_TOPE_HORAS = 26;
+
+/* Lo que el sitio espera tener configurado. SOLO LOS NOMBRES viajan al panel:
+   el valor nunca sale de aqui, ni siquiera su largo. */
+const CONFIG_ESPERADA = [
+  "RESEND_API_KEY", "WOMPI_PRIVATE_KEY", "WOMPI_INTEGRITY_SECRET", "WOMPI_EVENTS_SECRET",
+  "PAYPAL_CLIENT_ID", "PAYPAL_SECRET", "PAYPAL_IPN_CORREO", "ANTHROPIC_API_KEY",
+  "ACCESS_EVAL_JWK", "FIRMA_RL_EMAIL", "FIRMA_RF_EMAIL"
+];
+function configuracionPresente(env) {
+  const o = {};
+  for (const k of CONFIG_ESPERADA) o[k] = !!String((env && env[k]) || "").trim();
+  return o;
+}
+
+/* La ruta SIN query —ahi viajan los tokens de caso, recibo y membresia— y con
+   cualquier tira larga tachada, que es la forma de los tokens que van en la
+   ruta misma (/ficha/<token>, /carnet/<token>, /membresia/<token>). */
+function rutaSinSecretos(ruta) {
+  return String(ruta || "").split("?")[0].replace(/[A-Za-z0-9_-]{24,}/g, ":token").slice(0, 200);
+}
+/* El mensaje de una excepcion casi nunca lleva datos, pero «casi» no alcanza
+   bajo Ley 1581: se tachan correos y tiras de siete o mas digitos (telefonos,
+   documentos) antes de guardarlo. */
+function mensajeSinDatos(e) {
+  const m = e && typeof e === "object" ? (e.message || String(e)) : String(e == null ? "sin mensaje" : e);
+  return m.replace(/[^\s@<>"']+@[^\s@<>"']+/g, "(correo)").replace(/\d{7,}/g, "(numero)").slice(0, 300);
+}
+
+/* TECHO POR ISOLATE: un ataque que produzca miles de 500 no puede convertirse
+   en miles de escrituras a D1. Treinta por minuto sobran para ver el patron. */
+const INCIDENTES_GOLPES = new Map();
+async function anotarIncidente(env, origen, ruta, e) {
+  if (!env || !env.DB) return;
+  if (limitadoPorIP(INCIDENTES_GOLPES, "todos", 60000, 30)) return;
+  try {
+    await env.DB.prepare("INSERT INTO incidentes (origen, ruta, mensaje) VALUES (?, ?, ?)")
+      .bind(String(origen || "?").slice(0, 60), rutaSinSecretos(ruta), mensajeSinDatos(e)).run();
+  } catch (x) {
+    /* Ni el registro del incidente puede tumbar la respuesta. Si falla es casi
+       siempre que la 0032 no esta aplicada, y eso lo dice la Salud. */
+    console.error("incidente sin anotar", origen, x && x.message);
+  }
+}
+
+async function anotarLatido(env, trabajo, ok, detalle) {
+  if (!env || !env.DB) return;
+  try {
+    await env.DB.prepare("INSERT INTO latidos (trabajo, ok, detalle) VALUES (?, ?, ?)")
+      .bind(trabajo, ok ? 1 : 0, String(detalle == null ? "" : detalle).slice(0, 300)).run();
+  } catch (x) { console.error("latido sin anotar", trabajo, x && x.message); }
+}
+
+/* Cada trabajo del cron en su propio try —como ya estaban— y ahora con rastro:
+   un latido si termino, un latido en 0 y un incidente si lanzo. */
+async function correrTrabajo(env, trabajo, fn) {
+  try {
+    const r = await fn(env);
+    const txt = JSON.stringify(r);
+    console.log(trabajo, txt);
+    await anotarLatido(env, trabajo, true, txt);
+    return r;
+  } catch (e) {
+    console.error(trabajo, e && e.message);
+    await anotarLatido(env, trabajo, false, mensajeSinDatos(e));
+    await anotarIncidente(env, "cron:" + trabajo, "", e);
+    return null;
+  }
+}
+
+const horasDesde = (t) => t ? (Date.now() - Date.parse(String(t).replace(" ", "T") + "Z")) / 3600000 : null;
+
+/* Lo que ve el bloque «Operacion» de la Salud y lo que decide la alerta. Cada
+   consulta en su propio try: si la 0032 falta, lo demas se sigue viendo y
+   `error` dice que falta. */
+async function estadoOperacion(env) {
+  const configuracion = configuracionPresente(env);
+  const out = {
+    trabajos: [], incidentes: { ultimas24h: 0, recientes: [] },
+    configuracion, faltan: CONFIG_ESPERADA.filter((k) => !configuracion[k]),
+    correo24h: { fallidos: 0, sin_cupo_personas: 0, sin_cupo_por_etiqueta: [] },
+    firmas_invalidas_24h: { wompi: 0, paypal: 0 },
+    error: null
+  };
+  try {
+    const { results } = await env.DB.prepare(
+      "SELECT trabajo, MAX(en) AS ultimo, MAX(CASE WHEN ok = 1 THEN en END) AS ultimo_ok " +
+      "FROM latidos GROUP BY trabajo"
+    ).all();
+    const por = new Map((results || []).map((r) => [r.trabajo, r]));
+    for (const t of TRABAJOS_CRON) {
+      const r = por.get(t) || {};
+      const u = r.ultimo ? await env.DB.prepare(
+        "SELECT ok, detalle FROM latidos WHERE trabajo = ? ORDER BY id DESC LIMIT 1"
+      ).bind(t).first() : null;
+      const h = horasDesde(r.ultimo_ok);
+      out.trabajos.push({
+        trabajo: t, ultimo: r.ultimo || null, ultimo_ok: r.ultimo_ok || null,
+        ok: u ? !!u.ok : null, detalle: u ? u.detalle : null,
+        horas_desde_ok: h == null ? null : Math.round(h * 10) / 10,
+        vencido: h == null || h > LATIDO_TOPE_HORAS
+      });
+    }
+    const n = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM incidentes WHERE en >= datetime('now','-1 day')"
+    ).first();
+    out.incidentes.ultimas24h = (n && Number(n.n)) || 0;
+    const rec = await env.DB.prepare(
+      "SELECT en, origen, ruta, mensaje FROM incidentes WHERE en >= datetime('now','-7 days') " +
+      "ORDER BY id DESC LIMIT 10"
+    ).all();
+    out.incidentes.recientes = rec.results || [];
+  } catch (e) {
+    out.error = "No se pudieron leer latidos ni incidentes (¿falta aplicar migrations/0032?): " + mensajeSinDatos(e);
+  }
+
+  /* `sin_cupo` A PERSONAS, de las ultimas 24 horas. NO SE REINTENTAN SOLOS y no
+     es descuido: la 0009 decidio no guardar el CUERPO del correo (Ley 1581,
+     minimizacion), asi que no hay con que reenviarlo. Lo que si se puede es que
+     se VEAN el mismo dia, con su etiqueta y su guia para reenviarlos a mano. La
+     excepcion es `caso-espera`, que se reintenta solo al dia siguiente porque su
+     idempotencia solo cuenta 'enviado' y 'simulado'. */
+  try {
+    const buzones = [env.CORREO_AVISOS, env.CORREO_MMC, env.CORREO_ALIANZAS].filter(Boolean);
+    const fuera = buzones.length ? " AND para NOT IN (" + buzones.map(() => "?").join(",") + ")" : "";
+    const f = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM correos WHERE resultado = 'fallo' AND intento_en >= datetime('now','-1 day')"
+    ).first();
+    out.correo24h.fallidos = (f && Number(f.n)) || 0;
+    const sc = await env.DB.prepare(
+      "SELECT etiqueta, COUNT(*) AS n FROM correos WHERE resultado = 'sin_cupo' " +
+      "AND intento_en >= datetime('now','-1 day')" + fuera + " GROUP BY etiqueta ORDER BY n DESC"
+    ).bind(...buzones).all();
+    out.correo24h.sin_cupo_por_etiqueta = sc.results || [];
+    out.correo24h.sin_cupo_personas = out.correo24h.sin_cupo_por_etiqueta.reduce((t, r) => t + Number(r.n || 0), 0);
+  } catch (e) { console.error("operacion correo", e && e.message); }
+
+  /* Firmas invalidas de las ultimas 24 h y no las de siempre: el total historico
+     de la Salud no baja nunca, y una alerta que suena todos los dias por lo mismo
+     se aprende a ignorar en una semana. */
+  try {
+    const w = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM eventos_wompi WHERE firma_valida = 0 AND recibido_en >= datetime('now','-1 day')"
+    ).first();
+    out.firmas_invalidas_24h.wompi = (w && Number(w.n)) || 0;
+  } catch (e) { console.error("operacion firmas wompi", e && e.message); }
+  try {
+    const p = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM eventos_paypal WHERE firma_valida = 0 AND recibido_en >= datetime('now','-1 day')"
+    ).first();
+    out.firmas_invalidas_24h.paypal = (p && Number(p.n)) || 0;
+  } catch (e) { console.error("operacion firmas paypal", e && e.message); }
+  return out;
+}
+
+/* Que esta mal HOY, en frases. Lo usa la alerta; el panel pinta lo mismo en
+   su bloque. Vacio = no se manda nada. */
+function hallazgosOperacion(salud) {
+  const h = [];
+  const op = (salud && salud.operacion) || {};
+  if (op.error) h.push(["Registro de operación", op.error]);
+  const inc = op.incidentes || {};
+  if (inc.ultimas24h > 0) {
+    const u = (inc.recientes || [])[0] || {};
+    h.push(["Errores del sitio en 24 h", inc.ultimas24h + " · el último: " + (u.origen || "?") +
+      (u.ruta ? " " + u.ruta : "") + " — " + (u.mensaje || "")]);
+  }
+  for (const t of op.trabajos || []) {
+    /* La propia alerta se salta: esta corriendo ahora y su latido se escribe
+       despues de esta lectura. */
+    if (t.trabajo === "alerta-operacion" || !t.vencido) continue;
+    h.push(["Tarea programada sin éxito en " + LATIDO_TOPE_HORAS + " h", t.trabajo + " · último éxito: " +
+      (t.ultimo_ok || "nunca") + (t.ok === false ? " · el último intento falló: " + (t.detalle || "") : "")]);
+  }
+  if (salud && salud.webhooks && salud.webhooks.sin_evidencia_de_cobro) {
+    h.push(["Cobro sin evidencia", "Hay intenciones de aporte y ningún evento de Wompi recibido nunca"]);
+  }
+  const pp = ((salud && salud.cola) || []).find((c) => c.clave === "paypal_sin_casa");
+  if (pp && pp.n > 0) h.push(["Eventos de PayPal sin casa", pp.n + " · plata o firma que no cuadra; bandeja en el panel"]);
+  const f = op.firmas_invalidas_24h || {};
+  if (f.wompi || f.paypal) h.push(["Firmas inválidas en 24 h", "Wompi " + (f.wompi || 0) + " · PayPal " + (f.paypal || 0)]);
+  const co = op.correo24h || {};
+  if (co.fallidos) h.push(["Correos que fallaron en 24 h", String(co.fallidos) + " · se reenvían a mano desde el panel"]);
+  if (co.sin_cupo_personas) {
+    h.push(["Correos a PERSONAS sin cupo en 24 h", co.sin_cupo_personas + " (" +
+      (co.sin_cupo_por_etiqueta || []).map((r) => r.etiqueta + " " + r.n).join(", ") +
+      ") · no se reintentan solos: el cuerpo no se guarda. Reenviar a mano"]);
+  }
+  if ((op.faltan || []).length) h.push(["Configuración que falta", op.faltan.join(", ")]);
+  return h;
+}
+
+/* LA ALERTA DIARIA DE OPERACION. Aparte del resumen de colas vencidas porque
+   habla de otra cosa —del sitio, no de personas esperando— y porque cada una
+   se deduplica por su etiqueta: si las dos compartieran correo, la primera que
+   saliera callaria a la otra hasta manana.
+
+   MISMA REGLA QUE EL RESUMEN: solo cuando algo esta mal, y una vez al dia. Va
+   al buzon de alianzas (Sebas), que es quien opera el Worker. */
+async function alertaOperacion(env) {
+  /* LIMPIEZA, aqui porque es el unico trabajo que ya lee estas tablas. Noventa
+     dias de latidos e incidentes bastan para ver un patron; los topes por IP
+     solo sirven el dia en curso. */
+  try {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM latidos WHERE en < datetime('now','-90 days')"),
+      env.DB.prepare("DELETE FROM incidentes WHERE en < datetime('now','-90 days')"),
+      env.DB.prepare("DELETE FROM topes_ip WHERE dia < date('now','-2 days')")
+    ]);
+  } catch (e) { console.error("limpieza operacion", e && e.message); }
+
+  const para = correoAlianzas(env);
+  if (!para) return { saltado: "sin_buzon" };
+  const ya = await env.DB.prepare(
+    "SELECT 1 AS s FROM correos WHERE etiqueta = 'alerta-operacion' " +
+    "AND resultado IN ('enviado','simulado') AND intento_en >= date('now') LIMIT 1"
+  ).first();
+  if (ya) return { saltado: "ya_salio_hoy" };
+
+  const salud = await (await adminSalud(env)).json();
+  const filas = hallazgosOperacion(salud);
+  if (!filas.length) return { saltado: "todo_en_orden" };
+
+  const titulo = filas.length === 1 ? "Una cosa del sitio necesita atención"
+    : filas.length + " cosas del sitio necesitan atención";
+  const parrafos = [
+    "Este correo solo sale cuando algo está mal, y una vez al día. Qué significa cada línea y qué hacer está en ops/runbook-incidentes.md.",
+    "El detalle —últimos incidentes, la última corrida de cada tarea y qué secretos faltan— está en el panel, en «Salud del ecosistema», bloque «Operación»."
+  ];
+  const r = await enviarCorreo(env, {
+    para,
+    asunto: "Operación · " + titulo,
+    texto: [titulo, "", ...parrafos, "", ...filas.map(([k, v]) => k + ": " + v), "",
+            "https://thegiveandgrowproject.org/admin#sec-salud"].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas,
+      boton: { url: "https://thegiveandgrowproject.org/admin#sec-salud", texto: "Abrir la Salud" } }),
+    etiqueta: "alerta-operacion"
+  });
+  return { enviado: !!(r && r.ok), hallazgos: filas.length };
+}
+
+/* TOPE DIARIO POR IP EN LAS PUERTAS PUBLICAS QUE ESCRIBEN A CUALQUIERA.
+   /api/caso, /api/inscripcion, /api/transferencia y /api/pago/baja-enlace
+   mandan correo a una direccion que escribe un desconocido. Sus frenos de hoy
+   son por correo o por telefono —quien los rota pasa— y los de memoria viven
+   por isolate. Quien los rota se lleva el CUPO DE RESEND, y con el el recibo de
+   un donante.
+
+   D1 Y NO EL BINDING DE RATE LIMITING, que era lo mas simple: ese binding solo
+   admite ventanas de 10 o 60 segundos, y lo que hay que acotar es el DIA — el
+   cupo de Resend es diario. Un UPSERT por peticion cuesta una escritura.
+
+   HOLGADO POR EL CGNAT: en Colombia muchas casas salen por la misma IP, y en
+   una brigada un voluntario puede registrar casos de varias familias desde su
+   telefono. De ahi los numeros, y de ahi que en /api/caso el tope NO rechace:
+   el caso se guarda igual y solo se omite el correo a la direccion escrita.
+
+   LA IP NO SE GUARDA: se guarda sha256(dia + IP), que no se puede cruzar entre
+   dias, y la fila se borra a los dos dias. Si la cuenta falla, se deja pasar:
+   el tope es una red, no una puerta — igual que el cupo de correo. */
+const TOPE_IP_DIA = { caso: 40, inscripcion: 20, transferencia: 20, "baja-enlace": 10 };
+async function pasaTopeIP(env, request, puerta) {
+  const tope = TOPE_IP_DIA[puerta];
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  if (!tope || !ip || !env.DB) return true;
+  const dia = new Date().toISOString().slice(0, 10);
+  try {
+    const huella = (await sha256Hex(dia + "|" + ip)).slice(0, 32);
+    const r = await env.DB.prepare(
+      "INSERT INTO topes_ip (huella, puerta, dia, n) VALUES (?, ?, ?, 1) " +
+      "ON CONFLICT(huella, puerta, dia) DO UPDATE SET n = n + 1 RETURNING n"
+    ).bind(huella, puerta, dia).first();
+    const n = (r && Number(r.n)) || 0;
+    /* Un incidente la PRIMERA vez que una IP cruza el tope ese dia, no en cada
+       golpe: basta para que la alerta lo diga, y no llena la tabla. */
+    if (n === tope + 1) {
+      await anotarIncidente(env, "tope-ip", "/" + puerta,
+        "una IP paso de " + tope + " envios hoy en la puerta " + puerta);
+    }
+    return n <= tope;
+  } catch (e) {
+    console.error("tope ip", puerta, e && e.message);
+    return true;
+  }
+}
+
+/* GET /api/ping — ¿esta vivo, y QUE version corre?
+   Lo lee el deploy despues de `wrangler deploy` para confirmar que el codigo
+   nuevo es el que responde —antes, un deploy «verde» no probaba nada sobre lo
+   que servia el borde—, y lo lee el vigilante horario de GitHub.
+
+   `version` es el id de version de Workers que da el binding
+   CF_VERSION_METADATA; es el mismo que imprime `wrangler deploy`.
+   `cron_al_dia` dice si las tareas diarias tuvieron exito en las ultimas 26 h
+   (null si todavia no hay latidos): es lo unico que puede avisar de que el cron
+   ENTERO dejo de correr, porque la alerta diaria corre dentro de el.
+
+   PUBLICO y sin un dato de nadie. `no-store` lo pone json(). */
+async function apiPing(env) {
+  const vm = env.CF_VERSION_METADATA || null;
+  const version = vm && vm.id ? String(vm.id) : null;
+  if (!env.DB) return json({ ok: false, version, error: "base_no_configurada" }, 503);
+  try { await env.DB.prepare("SELECT 1 AS uno").first(); }
+  catch (e) { return json({ ok: false, version, error: "base_no_responde" }, 503); }
+  let cronAlDia = null;
+  try {
+    const { results } = await env.DB.prepare(
+      "SELECT trabajo, MAX(en) AS u FROM latidos WHERE ok = 1 GROUP BY trabajo"
+    ).all();
+    if (results && results.length) {
+      const por = new Map(results.map((r) => [r.trabajo, r.u]));
+      cronAlDia = TRABAJOS_CRON.every((t) => {
+        const h = horasDesde(por.get(t));
+        return h != null && h <= LATIDO_TOPE_HORAS;
+      });
+    }
+  } catch (e) { /* sin la 0032 no hay latidos: se queda en null */ }
+  return json({ ok: true, version, desplegado: (vm && vm.timestamp) || null, cron_al_dia: cronAlDia });
 }
 
 function fmtPesos(centavos) {
@@ -1649,6 +2005,13 @@ async function apiInscripcion(request, env, url) {
   /* Honeypot: si el campo trampa viene lleno es un bot. Se responde ok para no
      enseñarle qué lo delató, y no se guarda nada. */
   if (c.web2) return json({ ok: true });
+
+  /* Tope diario por IP (ver pasaTopeIP): las seis puertas pasan por aqui. */
+  if (!(await pasaTopeIP(env, request, "inscripcion"))) {
+    return json({ error: "demasiados_envios_hoy",
+                  ayuda: "Hoy ya recibimos muchas inscripciones desde esta conexión. Inténtalo mañana, " +
+                         "o escríbenos si es urgente." }, 429);
+  }
 
   /* Los otros CUATRO tipos entran por el mismo endpoint y a la misma tabla:
      comparten el honeypot, el consentimiento de Ley 1581 y el patrón de correo.
@@ -2473,11 +2836,17 @@ async function adminSalud(env) {
      Es justo lo que este panel existe para impedir, y ahora importa más que
      nunca: la brigada visita cinco territorios y todavía no hay ingenieros
      aprobados. */
+  /* PLAZO DE DOS DÍAS (auditoría del 28 sep 2026). Sin plazo esta cola no
+     entraba nunca al resumen diario, así que unas fotos que nadie abría solo
+     las veía quien entrara al panel. Dos días es lo que una familia con la casa
+     agrietada puede esperar sin empezar a pensar que nadie va a mirar.
+
+     «Sin abrir» es `SIN_ABRIR`, la misma definición que la familia lee en su
+     enlace y que decide el aviso a los ingenieros: si cada sitio contara otra
+     cosa, el número de la familia y el del panel no cuadrarían. */
   await enCola("casos_sin_evaluar",
-    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
-    "WHERE estado IN ('recibido','en_revision') " +
-    "AND NOT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = casos.numero)",
-    "Pantalla /triaje · una familia mandó fotos de su casa y nadie las ha abierto", 20, "/triaje");
+    "SELECT COUNT(*) AS n, MIN(c.creado_en) AS masViejo FROM casos c WHERE " + SIN_ABRIR,
+    "Pantalla /triaje · una familia mandó fotos de su casa y nadie las ha abierto", 20, "/triaje", 2);
   /* LAS QUE EL AVISO AUTOMÁTICO NO ALCANZA. A los siete días el Worker le
      escribe a la familia que sigue esperando —ver `avisarEsperaSeptimoDia`—,
      pero solo puede escribirle a quien dejó correo, y el correo es opcional DE
@@ -2547,10 +2916,16 @@ async function adminSalud(env) {
     "Pantalla «Firma» · un certificado ya firmado perdió su respaldo: el pago se cayó después. Decide si se anula", 11, "/firma");
   /* La peor de las cinco, y por eso va con su propio texto: el sistema dijo
      «vayan ya» y nadie fue. Que exista esta fila es media razón de esta tanda. */
+  /* PLAZO DE UN DÍA, contado desde que un ingeniero lo marcó urgente y no desde
+     que la familia lo mandó (auditoría del 28 sep 2026). Con la fecha del caso,
+     uno que esperó cinco días en la fila nacía vencido el mismo día en que por
+     fin alguien lo miró, y la alarma perdía el dato que la hace útil: cuánto
+     lleva el sistema diciendo «vayan ya». */
   await enCola("urgentes_sin_visitar",
-    "SELECT COUNT(*) AS n, MIN(creado_en) AS masViejo FROM casos " +
-    "WHERE clasificacion = 'urgente' AND estado NOT IN ('visitado','cerrado','descartado')",
-    "Pantalla /ruta · un ingeniero dijo que era urgente y todavía no ha ido nadie", 10, "/admin/ruta");
+    "SELECT COUNT(*) AS n, MIN(COALESCE((SELECT MIN(e.creado_en) FROM evaluaciones e " +
+    "WHERE e.caso = c.numero AND e.clasificacion = 'urgente'), c.creado_en)) AS masViejo FROM casos c " +
+    "WHERE c.clasificacion = 'urgente' AND c.estado NOT IN ('visitado','cerrado','descartado')",
+    "Pantalla /ruta · un ingeniero dijo que era urgente y todavía no ha ido nadie", 10, "/admin/ruta", 1);
   /* ESTA COLA NO SE LIMPIABA CUANDO LAS FOTOS LLEGABAN. Contaba cualquier caso en
      `en_revision` que hubiera recibido un «no puedo evaluar» alguna vez, y subir
      material solo toca `actualizado_en`: así que una familia que respondía seguía
@@ -2722,7 +3097,11 @@ async function adminSalud(env) {
       nada_salio: (co.total || 0) > 0 && (co.enviados || 0) === 0
     },
     cola,
-    abandonadas: { n: ab.n || 0, centavos: ab.centavos || 0 }
+    abandonadas: { n: ab.n || 0, centavos: ab.centavos || 0 },
+    /* Latidos del cron, incidentes y configuracion (28 sep 2026). La misma
+       lectura que decide la alerta diaria: panel y correo no pueden decir
+       cosas distintas. */
+    operacion: await estadoOperacion(env)
   });
 }
 
@@ -3746,6 +4125,12 @@ async function apiReportarTransferencia(request, env, url) {
   /* Honeypot: éxito aparente y cero registro, igual que en los otros formularios. */
   if (c.web2) return json({ ok: true, guia: null });
 
+  if (!(await pasaTopeIP(env, request, "transferencia"))) {
+    return json({ error: "demasiados_envios_hoy",
+                  ayuda: "Hoy ya recibimos muchos reportes desde esta conexión. Inténtalo mañana; " +
+                         "si ya enviaste el tuyo, busca tu número de guía en el correo que te llegó." }, 429);
+  }
+
   const monto = c.monto;
   if (typeof monto !== "number" || !Number.isInteger(monto) || monto < MONTO_MIN || monto > MONTO_MAX) {
     return json({ error: "monto_invalido", min: MONTO_MIN, max: MONTO_MAX }, 400);
@@ -4332,7 +4717,10 @@ async function apiCasoCrear(request, env) {
      caso ya está creado y la pantalla le enseña el enlace igual. Nunca al revés.
 
      Solo si dejó correo, que es opcional DE VERDAD y así se queda. */
-  if (email) {
+  /* EL TOPE POR IP AQUI NO RECHAZA: el caso ya esta guardado y la pantalla
+     le muestra el enlace. Lo unico que se omite, pasado el tope del dia, es
+     el correo a la direccion escrita — que es lo que un abuso vendria a gastar. */
+  if (email && await pasaTopeIP(env, request, "caso")) {
     try { await correoCasoCreado(env, { numero, token, nombre, sector, email }); }
     catch (e) { console.error("correo familia caso", numero, e && e.message); }
   }
@@ -4441,7 +4829,13 @@ async function apiCasoEstado(env, numero, token) {
     "SELECT numero, token, estado, clasificacion, sector, creado_en FROM casos WHERE numero = ?"
   ).bind(numero).first();
   if (!c || !c.token || !igualesSeguro(c.token, String(token || ""))) return json({ error: "no_autorizado" }, 403);
-  const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
+  /* SOLO LO QUE MANDÓ LA FAMILIA (auditoría del 28 sep 2026). Contaba también
+     las fotos que sube el equipo en la visita, así que «Fotos que enviaste» y el
+     conteo del informe decían un número que la familia no reconocía. Misma
+     regla que `cupoFamilia`, que ya las separaba. */
+  const m = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ? AND COALESCE(categoria,'') <> ?"
+  ).bind(numero, CATEGORIA_VISITA).first();
 
   /* Lo que el ingeniero dijo, para que la familia lo lea en su página y no solo
      en un correo que pudo no llegarle — el correo es opcional de verdad, así
@@ -4485,9 +4879,11 @@ async function apiCasoEstado(env, numero, token) {
      marca prohíbe. Se dan los dos hechos verificables que sí existen: los días
      que lleva y cuántos casos siguen sin abrir. El segundo explica el primero
      mejor que cualquier disculpa. */
+  /* `SIN_ABRIR`: la misma cuenta que el correo del séptimo día y el panel
+     (auditoría del 28 sep 2026). Esta ya excluía lo evaluado, pero contaba los
+     casos que un ingeniero tiene tomados — y esos ya los está mirando alguien. */
   const espera = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM casos WHERE estado IN ('recibido','en_revision') " +
-    "AND NOT EXISTS (SELECT 1 FROM evaluaciones e WHERE e.caso = casos.numero)"
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_ABRIR
   ).first();
 
   return json({
@@ -4522,8 +4918,37 @@ async function apiCasoEstado(env, numero, token) {
        `tope_medios` se queda por si un navegador conserva un app.js viejo: con él
        vuelve al comportamiento anterior en vez de romperse. */
     cupo: { usados: cupo.usados, tope: cupo.tope, queda: cupo.queda, pedidas: cupo.pedidas },
-    tope_medios: MAX_MEDIOS
+    tope_medios: MAX_MEDIOS,
+    /* SI SE DESCARTÓ POR DUPLICADO, CUÁL ES EL QUE SIGUE (auditoría del 28 sep
+       2026). La página de un caso descartado decía lo mismo que la de uno
+       cerrado, y la familia que envió dos veces leía que «su caso» estaba
+       terminado sin saber que el otro seguía vivo. Solo el NÚMERO, nunca el
+       enlace ni el motivo que escribió el equipo. */
+    duplicado_de: c.estado === "descartado" ? await casoQueSigue(env, numero) : null
   });
+}
+
+/* El número de caso que el equipo citó al descartar este, si existe. Sale del
+   motivo que `adminMoverCaso` deja en la auditoría —«duplicado de CV-…»—: no hay
+   columna para esto y una migración para un dato que ya está escrito no se
+   justifica. Se comprueba que el citado exista y siga abierto; si no, nada. */
+async function casoQueSigue(env, numero) {
+  try {
+    const a = await env.DB.prepare(
+      "SELECT detalle FROM consentimientos WHERE tipo = 'auditoria' AND detalle LIKE ? " +
+      "ORDER BY id DESC LIMIT 1"
+    ).bind("caso " + numero + " % -> descartado%").first();
+    const citados = (String((a && a.detalle) || "").match(/CV-\d{4}-\d{6}/g) || [])
+      .filter((n) => n !== numero);
+    if (!citados.length) return null;
+    const otro = await env.DB.prepare(
+      "SELECT numero FROM casos WHERE numero = ? AND estado NOT IN ('cerrado','descartado')"
+    ).bind(citados[0]).first();
+    return otro ? otro.numero : null;
+  } catch (e) {
+    console.error("caso que sigue", numero, e && e.message);
+    return null;
+  }
 }
 
 /* El correo que la familia recibe al crear su caso: su número y su enlace.
@@ -4627,8 +5052,15 @@ async function familiasQueEsperan(env, dias) {
      nada. Eso es una decision de comunicacion, no un arreglo tecnico, y no se
      toma desde aqui. */
   const r = await env.DB.prepare(
+    /* `pide_material`: el siguiente paso es de la FAMILIA (auditoría del 28 sep
+       2026). Un ingeniero ya miró y pidió algo que no ha llegado; decirle «tu
+       caso sigue en la fila» es falso y además la deja esperando algo que solo
+       ella puede destrabar. A esas se les recuerda qué fotos faltan. */
     "SELECT c.numero, c.token, c.contacto_email, c.contacto_nombre, c.sector, c.creado_en, " +
-    "CAST(julianday('now') - julianday(c.creado_en) AS INTEGER) AS dias " +
+    "CAST(julianday('now') - julianday(c.creado_en) AS INTEGER) AS dias, " +
+    "(CASE WHEN " + PIDIERON_MATERIAL + " AND NOT " + RESPONDIO_TRAS_PEDIDO + " THEN 1 ELSE 0 END) AS pide_material, " +
+    "(SELECT e3.falta FROM evaluaciones e3 WHERE e3.caso = c.numero AND e3.clasificacion = 'inevaluable' " +
+    " ORDER BY e3.creado_en DESC, e3.id DESC LIMIT 1) AS falta " +
     "FROM casos c WHERE " + SIN_REVISAR + " " +
     "AND julianday('now') - julianday(c.creado_en) >= ? " +
     "AND julianday('now') - julianday(c.creado_en) < ? " +
@@ -4652,52 +5084,88 @@ async function familiasQueEsperan(env, dias) {
 
    Una vez al dia (UTC, como el cupo de Resend): si ya salio hoy no se repite,
    aunque el cron corra dos veces. Va al buzon de alianzas, que es quien atiende
-   estas colas, y cuenta como interno para el presupuesto de correo: si el dia
+   estas colas —lo de casas, al de Mira Mi Casa: ver `COLAS_PLAZO_MMC`—, y cuenta como interno para el presupuesto de correo: si el dia
    viene justo, gana el recibo de un donante, que es lo correcto. */
 const NOMBRE_COLA_PLAZO = {
   fundaciones_sin_respuesta: "Fundaciones que aplicaron y esperan respuesta",
   empresas_sin_respuesta: "Empresas que pidieron alianza y esperan respuesta",
   ofrecimientos_sin_respuesta: "Ofrecimientos en especie sin responder",
   apadrinamientos_sin_respuesta: "Quieren apadrinar y esperan respuesta",
-  voluntarios_sin_respuesta: "Voluntarios sin responder"
+  voluntarios_sin_respuesta: "Voluntarios sin responder",
+  urgentes_sin_visitar: "Casos urgentes que nadie ha visitado",
+  casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto"
 };
+/* LAS COLAS DE MIRA MI CASA VAN A SU PROPIO BUZÓN (auditoría del 28 sep 2026).
+   Hasta hoy ninguna cola de casos tenía plazo, así que ninguna llegaba nunca a
+   este resumen: un urgente sin visitar esperaba a que alguien abriera el panel.
+   Ahora tienen plazo, y su aviso va a `correoMMC` —quien atiende la ruta y el
+   triaje— y no al de alianzas, que es quien contesta a fundaciones y empresas.
+   Mezclarlos haría que cada buzón leyera avisos que no le tocan y dejara de
+   abrirlos. Cada uno se deduplica por su propia etiqueta. */
+const COLAS_PLAZO_MMC = ["urgentes_sin_visitar", "casos_sin_evaluar"];
 async function resumenDiarioEquipo(env) {
-  const para = correoAlianzas(env);
-  if (!para) return { saltado: "sin_buzon" };
-  const ya = await env.DB.prepare(
-    "SELECT 1 AS s FROM correos WHERE etiqueta = 'resumen-diario' " +
-    "AND resultado IN ('enviado','simulado') AND intento_en >= date('now') LIMIT 1"
-  ).first();
-  if (ya) return { saltado: "ya_salio_hoy" };
-
   const salud = await (await adminSalud(env)).json();
   const cola = (salud && salud.cola) || [];
   const vencidas = cola.filter(c => c.n > 0 && c.vencida);
   if (!vencidas.length) return { saltado: "nada_vencido" };
+  const deMMC = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) >= 0);
+  const deAlianzas = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) < 0);
   const otras = cola.filter(c => c.n > 0 && !c.vencida).length;
+  const out = {};
+  if (deAlianzas.length) {
+    out.alianzas = await enviarResumenVencidas(env, {
+      para: correoAlianzas(env), etiqueta: "resumen-diario", vencidas: deAlianzas,
+      titulo: (n) => n === 1
+        ? "Una persona espera una respuesta que ya pasó su plazo"
+        : n + " personas esperan una respuesta que ya pasó su plazo",
+      parrafos: [
+        "A cada una el acuse le prometió que una persona le escribe. Desde el panel, en «Quién quiere entrar», el filtro «Sin responder» las ordena de la más vieja a la más nueva, y cada fila trae un borrador de respuesta.",
+        otras ? "Además hay " + otras + (otras === 1 ? " cola" : " colas") + " con trabajo pendiente que todavía no pasa su plazo: están en «Hoy»." : ""
+      ],
+      boton: { url: "https://thegiveandgrowproject.org/admin#hoy", texto: "Abrir el panel" }
+    });
+  }
+  if (deMMC.length) {
+    out.mmc = await enviarResumenVencidas(env, {
+      para: correoMMC(env), etiqueta: "resumen-diario-mmc", vencidas: deMMC,
+      titulo: (n) => n === 1
+        ? "Una casa de Mira Mi Casa pasó su plazo"
+        : n + " casas de Mira Mi Casa pasaron su plazo",
+      parrafos: [
+        "Un urgente sin visitar vence al día; unas fotos que ningún ingeniero ha abierto, a los dos días. Cada fila de abajo es una familia que espera.",
+        "Los urgentes se atienden desde la ruta de visitas. Si hay riesgo para la vida, lo que corresponde es avisar a la alcaldía o al consejo municipal de gestión del riesgo, y al 123. Las fotos sin abrir se destraban escribiendo a los ingenieros verificados o abriéndolas desde /triaje."
+      ],
+      boton: { url: "https://thegiveandgrowproject.org/admin/ruta", texto: "Abrir la ruta de visitas" }
+    });
+  }
+  return out;
+}
 
-  const total = vencidas.reduce((t, c) => t + c.n, 0);
-  const titulo = total === 1
-    ? "Una persona espera una respuesta que ya pasó su plazo"
-    : total + " personas esperan una respuesta que ya pasó su plazo";
-  const filas = vencidas.map(c => [
+/* Un resumen, a un buzón, una vez al día (UTC, como el cupo de Resend): si ya
+   salió hoy con esa etiqueta no se repite, aunque el cron corra dos veces. */
+async function enviarResumenVencidas(env, x) {
+  if (!x.para) return { saltado: "sin_buzon" };
+  const ya = await env.DB.prepare(
+    "SELECT 1 AS s FROM correos WHERE etiqueta = ? " +
+    "AND resultado IN ('enviado','simulado') AND intento_en >= date('now') LIMIT 1"
+  ).bind(x.etiqueta).first();
+  if (ya) return { saltado: "ya_salio_hoy" };
+  const total = x.vencidas.reduce((t, c) => t + c.n, 0);
+  const titulo = x.titulo(total);
+  const filas = x.vencidas.map(c => [
     NOMBRE_COLA_PLAZO[c.clave] || c.clave,
     c.n + " · la más vieja hace " + c.dias + " días (plazo " + c.plazo + ")"
   ]);
-  const parrafos = [
-    "A cada una el acuse le prometió que una persona le escribe. Desde el panel, en «Quién quiere entrar», el filtro «Sin responder» las ordena de la más vieja a la más nueva, y cada fila trae un borrador de respuesta.",
-    otras ? "Además hay " + otras + (otras === 1 ? " cola" : " colas") + " con trabajo pendiente que todavía no pasa su plazo: están en «Hoy»." : ""
-  ].filter(Boolean);
+  const parrafos = x.parrafos.filter(Boolean);
   const r = await enviarCorreo(env, {
-    para,
+    para: x.para,
     asunto: "Panel · " + titulo,
     texto: [titulo, "", ...parrafos, "", ...filas.map(([k, v]) => k + ": " + v), "",
-            "https://thegiveandgrowproject.org/admin#hoy"].join("\n"),
-    html: plantillaCorreo({ titulo, parrafos, filas,
-      boton: { url: "https://thegiveandgrowproject.org/admin#hoy", texto: "Abrir el panel" } }),
-    etiqueta: "resumen-diario"
+            x.boton.url].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, boton: x.boton }),
+    etiqueta: x.etiqueta
   });
-  return { enviado: !!(r && r.ok), vencidas: vencidas.length, personas: total };
+  return { enviado: !!(r && r.ok), vencidas: x.vencidas.length, personas: total };
 }
 
 async function avisarEsperaSeptimoDia(env) {
@@ -4705,9 +5173,11 @@ async function avisarEsperaSeptimoDia(env) {
   if (!casos.length) return { ok: true, revisados: 0, enviados: 0 };
 
   /* Cuántos hay sin abrir POR DELANTE. Es el mismo número que la familia ve en
-     su enlace, así que el correo y la página no pueden contradecirse. */
+     su enlace, así que el correo y la página no pueden contradecirse — por eso
+     los dos usan `SIN_ABRIR` (antes este contaba con `SIN_REVISAR` y la página
+     con otra condición, y no cuadraban). */
   const fila = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_REVISAR
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_ABRIR
   ).first();
   const sinAbrir = (fila && Number(fila.n)) || 0;
 
@@ -4738,11 +5208,27 @@ async function avisarEsperaSeptimoDia(env) {
        configurada, y reintentar eso cada dia no manda nada y llena la tabla.
        De esa situacion informa `adminSalud`, que cuenta los 'simulado' aparte
        precisamente porque en produccion significan que nadie recibio nada. */
-    const ya = await env.DB.prepare(
+    /* SE RECLAMA ANTES DE ENVIAR, en una sola sentencia (auditoría del 28 sep
+       2026). Antes era «¿ya salió? → enviar»: dos ejecuciones del cron a la vez
+       —un reintento de Cloudflare, o alguien disparándolo a mano mientras
+       corría— pasaban las dos la pregunta antes de que ninguna anotara nada, y
+       la familia recibía dos veces el mismo aviso. Es la carrera que ya se
+       midió en los frenos anti-duplicado.
+
+       Ahora la pregunta y la reserva son el mismo INSERT ... WHERE NOT EXISTS:
+       solo una ejecución cambia una fila. La reserva es transitoria —se borra
+       en cuanto `enviarCorreo` deja su propia fila `enviado`/`fallo`— y caduca
+       a los 30 minutos, para que un Worker que muera entre reservar y enviar no
+       deje a esa familia bloqueada para siempre. */
+    const reserva = await env.DB.prepare(
+      "INSERT INTO correos (etiqueta, para, guia, resultado) " +
+      "SELECT 'caso-espera', ?, ?, 'reservado' WHERE NOT EXISTS (" +
       "SELECT 1 FROM correos WHERE etiqueta = 'caso-espera' AND guia = ? " +
-      "AND resultado IN ('enviado','simulado') LIMIT 1"
-    ).bind(c.numero).first();
-    if (ya) continue;
+      "AND (resultado IN ('enviado','simulado') OR " +
+      "(resultado = 'reservado' AND intento_en > datetime('now','-30 minutes'))))"
+    ).bind(c.contacto_email, c.numero, c.numero).run();
+    if (!reserva.meta || !reserva.meta.changes) continue;
+    const idReserva = reserva.meta.last_row_id;
 
     try {
       /* SE MIRA EL RESULTADO. `enviarCorreo` NO lanza cuando Resend responde
@@ -4755,6 +5241,12 @@ async function avisarEsperaSeptimoDia(env) {
     } catch (e) {
       fallidos++;
       console.error("aviso espera", c.numero, e && e.message);
+    } finally {
+      /* La reserva ya cumplió: lo que queda escrito es la fila real del envío. */
+      try {
+        await env.DB.prepare("DELETE FROM correos WHERE id = ? AND resultado = 'reservado'")
+          .bind(idReserva).run();
+      } catch (e) { console.error("soltar reserva aviso espera", c.numero, e && e.message); }
     }
   }
 
@@ -4766,6 +5258,7 @@ async function avisarEsperaSeptimoDia(env) {
 
 async function correoCasoEspera(env, x) {
   const enlace = ORIGIN_MMC + "/caso/" + x.numero + "?t=" + x.token;
+  if (x.pide_material) return correoCasoEsperaFotos(env, x, enlace);
   const titulo = "Tu caso sigue en la fila: " + x.numero;
   const parrafos = [
     "Te escribimos porque llevas " + x.dias + " días esperando y no queremos que " +
@@ -4793,6 +5286,33 @@ async function correoCasoEspera(env, x) {
     html: plantillaCorreo({
       titulo, parrafos, filas,
       boton: { url: enlace, texto: "Abrir mi caso" },
+      cierre: "Este es el único recordatorio automático que te mandamos. No te vamos a escribir cada semana."
+    }),
+    etiqueta: "caso-espera", guia: x.numero
+  });
+}
+
+/* EL MISMO AVISO, CUANDO EL SIGUIENTE PASO ES DE LA FAMILIA (auditoría del 28
+   sep 2026). Un ingeniero ya miró su caso y pidió algo que no ha llegado: «sigue
+   en la fila» sería mentira, y la dejaría esperando algo que solo ella puede
+   destrabar. Misma etiqueta `caso-espera`, así que sigue siendo UN solo aviso. */
+async function correoCasoEsperaFotos(env, x, enlace) {
+  const titulo = "Nos faltan unas fotos de tu casa: " + x.numero;
+  const parrafos = [
+    "Te escribimos porque un ingeniero voluntario ya miró tu caso, pero con las fotos que llegaron no pudo darte un concepto. Mientras no lleguen las que faltan, tu caso no puede avanzar.",
+    "Esto es lo que pidió: " + (x.falta || "más fotografías de los daños."),
+    "Las subes desde tu enlace, el mismo de siempre. No hace falta empezar de nuevo.",
+    "No entres a la casa si ves muros caídos, techos hundidos o columnas partidas: ninguna foto vale un accidente. Y si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— llama al 123 y a tu alcaldía."
+  ];
+  const filas = [["Tu caso", x.numero], ["Sector", x.sector || "—"], ["Días desde que lo enviaste", String(x.dias)]];
+  return enviarCorreo(env, {
+    para: x.contacto_email,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", "Tu enlace: " + enlace, "",
+            filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, filas,
+      boton: { url: enlace, texto: "Agregar las fotos que faltan" },
       cierre: "Este es el único recordatorio automático que te mandamos. No te vamos a escribir cada semana."
     }),
     etiqueta: "caso-espera", guia: x.numero
@@ -4827,8 +5347,12 @@ async function correoCasoEspera(env, x) {
    le escribe, para que sepa que no va a recibir uno por cada caso.
    ============================================================================ */
 async function avisarIngenierosFilaDespierta(env, x) {
+  /* `SIN_ABRIR` y no `SIN_REVISAR` (auditoría del 28 sep 2026): un caso que
+     espera fotos de la familia, o que otro ingeniero ya tomó, no es trabajo
+     esperando a un ingeniero, y contarlo callaba este aviso justo cuando la
+     fila de verdad pasaba de vacía a tener algo. */
   const fila = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_REVISAR
+    "SELECT COUNT(*) AS n FROM casos c WHERE " + SIN_ABRIR
   ).first();
   /* Exactamente 1 = el que se acaba de crear es el único esperando. Si hay más,
      alguien ya tenía trabajo pendiente y este correo no aporta. */
@@ -5322,7 +5846,11 @@ function abrir(numero){
       var src = "/api/triage/medio/" + m[j].id;
       h += "<a href='" + src + "' target='_blank' rel='noopener'>";
       h += m[j].clase === "video"
-         ? "<video src='" + src + "' style='width:100%;height:130px;object-fit:cover' muted></video>"
+         /* preload='none' (auditoría del 28 sep 2026): sin él, abrir la ficha
+            bajaba enteros los videos de la familia —hasta 60 MB cada uno— antes
+            de que nadie pulsara reproducir, y el ingeniero revisa desde un
+            teléfono con datos. El enlace de alrededor abre el video completo. */
+         ? "<video src='" + src + "' preload='none' style='width:100%;height:130px;object-fit:cover;background:#1A1D21' muted></video>"
          : "<img src='" + src + "' alt='' loading='lazy'>";
       h += "<small>" + esc(m[j].categoria || m[j].clase) + "</small></a>";
     }
@@ -5347,10 +5875,16 @@ function abrir(numero){
       pintarFicha(h).scrollIntoView({ block: "start" });
       return;
     }
-    h += "<label for='t-clas'>Tu clasificación</label><select id='t-clas'>"
-      +  "<option value='urgente'>Visita urgente</option>"
-      +  "<option value='programada'>Visita programada</option>"
-      +  "<option value='no_requiere'>No requiere visita</option>"
+    /* SIN VALOR POR DEFECTO (auditoría del 28 sep 2026). El desplegable abría
+       en «Visita urgente», así que quien guardaba sin tocarlo firmaba un
+       urgente que no había decidido — y sobre un urgente se mueve una brigada y
+       ahora sale un correo al equipo. La primera opción está vacía y el envío
+       se para si sigue ahí; el servidor rechaza igual una clasificación vacía. */
+    h += "<label for='t-clas'>Tu clasificación</label><select id='t-clas' required>"
+      +  "<option value='' selected>Elige una clasificación…</option>"
+      +  "<option value='urgente'>Prioridad de visita alta (urgente)</option>"
+      +  "<option value='programada'>Prioridad de visita media (programada)</option>"
+      +  "<option value='no_requiere'>Visita no prioritaria</option>"
       +  "<option value='inevaluable'>No puedo evaluar con esto</option></select>"
       /* NO SE PREGUNTAN si el registro ya los tiene verificados. El número de
          matrícula es largo y se pedía de memoria en cada caso; así fue como un
@@ -5410,6 +5944,13 @@ var ENVIANDO = false;
 function enviar(){
   var msg = el("t-msg");
   if (ENVIANDO) return;
+  var clas = el("t-clas");
+  if (!clas || !clas.value){
+    msg.textContent = "Elige una clasificación antes de guardar.";
+    msg.style.color = "#8C2F1E";
+    if (clas) clas.focus();
+    return;
+  }
   ENVIANDO = true;
   var soltar = function(){
     ENVIANDO = false;
@@ -5575,6 +6116,27 @@ async function firmanteVerificado(env, email) {
    `TERRENO_URGE`, y por la misma razón. */
 const SIN_REVISAR = "c.estado IN ('recibido','en_revision')";
 
+/* LO QUE PARECE MÁS GRAVE, PRIMERO (auditoría del 28 sep 2026).
+   El sitio le dice a la familia «no es orden de llegada: se mira primero lo
+   que parece más grave», y la fila del ingeniero era `ORDER BY creado_en ASC`:
+   orden de llegada puro. Una promesa publicada sin una función detrás.
+
+   Antes de que un ingeniero mire, lo único que se sabe es lo que la familia
+   contestó, así que el orden sale de ahí y de nada inventado:
+     1. hubo heridos — la señal más fuerte de que la casa falló de verdad;
+     2. vive gente ahí ahora — el riesgo es para alguien que duerme adentro;
+     3. muros de adobe o bahareque — los que peor responden a un sismo;
+     4. hay fotos de la familia — sin fotos no hay nada que evaluar todavía;
+     5. y a igualdad, el que más lleva esperando.
+   Es una función porque cada consulta tiene su forma de saber si hay fotos: la
+   bandeja ya calcula `medios` y la ruta no. */
+const ORDEN_GRAVEDAD = (hayFotos) =>
+  "COALESCE(c.heridos,0) DESC, COALESCE(c.habitada,0) DESC, " +
+  "(CASE WHEN c.material IN ('adobe','bahareque') THEN 1 ELSE 0 END) DESC, " +
+  "(" + hayFotos + ") DESC, c.creado_en ASC";
+const HAY_FOTOS_FAMILIA =
+  "EXISTS (SELECT 1 FROM caso_medios mo WHERE mo.caso = c.numero AND COALESCE(mo.categoria,'') <> 'visita')";
+
 const CONFIRMAR = () =>
   "((c.clasificacion = 'urgente' AND " + FIRMES + " = 1) OR " + DISCREPA + " OR " + SIN_RESPALDO + ")" +
   /* Y NO LO TERMINADO. La pestaña enseñaba casos cerrados y descartados, así que
@@ -5660,6 +6222,21 @@ const TOMA_MAX = 10;
    caso esta libre aunque la columna siga escrita. */
 const TOMA_VIGENTE =
   "(c.tomado_por IS NOT NULL AND c.tomado_en > datetime('now','-" + TOMA_HORAS + " hours'))";
+/* «SIN ABRIR», en un solo sitio (auditoría del 28 sep 2026). `SIN_REVISAR` es
+   la pestaña del ingeniero y cuenta de más para esta pregunta: incluye los
+   casos donde el siguiente paso es de la FAMILIA —se le pidió material— y los
+   que un ingeniero ya tiene tomados. Así el aviso «la fila despertó» se callaba
+   porque había un caso esperando fotos, el correo del séptimo día le decía «tu
+   caso sigue en la fila» a quien en realidad le tocaba mandar fotos, y el
+   «casos sin abrir» de la familia contaba casos que alguien ya estaba mirando.
+
+   Sin abrir = en fila, sin NINGUNA evaluación (ni siquiera un «no puedo
+   evaluar», que es lo que convierte el siguiente paso en de la familia) y sin
+   una toma vigente. */
+const SIN_ABRIR =
+  "c.estado IN ('recibido','en_revision') " +
+  "AND NOT EXISTS (SELECT 1 FROM evaluaciones e0 WHERE e0.caso = c.numero) " +
+  "AND NOT " + TOMA_VIGENTE;
 /* Lo que otro tiene tomado ahora mismo. `?` es el correo de quien mira. */
 const TOMADO_POR_OTRO = "(" + TOMA_VIGENTE + " AND c.tomado_por <> ?)";
 /* QUÉ CUENTA COMO SEÑAL DE TERRENO QUE NO ESPERA, en un solo sitio.
@@ -5745,7 +6322,7 @@ async function triageCasos(env, url, email) {
     DISCREPA + " AS discrepa, " + FIRMES + " AS firmes, " + SIN_RESPALDO + " AS sin_respaldo, " +
     "c.tomado_por, c.tomado_en " +
     "FROM casos c " + filtro + oculto +
-    " ORDER BY c.creado_en ASC LIMIT " + TOPE_COLA + " OFFSET " + desde
+    " ORDER BY " + ORDEN_GRAVEDAD(HAY_FOTOS_FAMILIA) + " LIMIT " + TOPE_COLA + " OFFSET " + desde
   ).bind(...args).all();
 
   /* EL TOTAL, con el MISMO filtro que la lista. Sin esto la cola termina en el
@@ -5884,7 +6461,8 @@ async function triageEvaluar(request, env, numero, email) {
   if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
 
   const caso = await env.DB.prepare(
-    "SELECT numero, estado, contacto_email, token, sector FROM casos WHERE numero = ?"
+    "SELECT numero, estado, clasificacion, contacto_email, token, sector, material, " +
+    "habitada, heridos FROM casos WHERE numero = ?"
   ).bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
 
@@ -5914,7 +6492,11 @@ async function triageEvaluar(request, env, numero, email) {
 
   const clasificacion = String(c.clasificacion || "");
   if (!CLASIFICACIONES.includes(clasificacion)) {
-    return json({ error: "clasificacion_invalida", permitidas: CLASIFICACIONES }, 422);
+    /* Vacía o inventada, se rechaza igual (auditoría del 28 sep 2026): desde
+       que el desplegable no trae valor por defecto, una clasificación vacía es
+       «no decidió», y eso no se puede guardar como si fuera un veredicto. */
+    return json({ error: "clasificacion_invalida", permitidas: CLASIFICACIONES,
+                  ayuda: "Elige una clasificación antes de guardar." }, 422);
   }
   /* LA FIRMA SALE DEL REGISTRO, NO DEL FORMULARIO. Ver `firmanteVerificado`:
      lo que se teclea solo se usa si no hay inscripción verificada para ese
@@ -6052,6 +6634,30 @@ async function triageEvaluar(request, env, numero, email) {
     }
   } catch (e) { console.error("correo caso clasificado", numero, e && e.message); }
 
+  /* EL URGENTE LE LLEGA AL EQUIPO EN EL ACTO (auditoría del 28 sep 2026).
+     Hasta hoy marcar un caso `urgente` no avisaba a NADIE: el caso entraba a la
+     cola `urgentes_sin_visitar` y esperaba a que alguien abriera el panel. Y el
+     urgente es justo lo único que no puede esperar a que alguien se acuerde —
+     el comentario de esa cola lo dice: «el sistema dijo "vayan ya" y nadie
+     fue».
+
+     Solo en la TRANSICIÓN a urgente, no en cada evaluación de un caso que ya lo
+     era: el segundo ingeniero que confirma no trae noticia nueva, y un buzón
+     que recibe el mismo aviso dos veces aprende a ignorarlo. Sale con o sin
+     respaldo de matrícula y con o sin discrepancia: esas dos cosas deciden qué
+     se le dice a la FAMILIA; al equipo le basta con que alguien con criterio
+     vio señales graves. Va después de todo lo escrito y en su propio try, por
+     la misma regla dura de siempre: un correo no tumba una evaluación. */
+  if (veredicto.clasificacion === "urgente" && caso.clasificacion !== "urgente") {
+    try {
+      await correoCasoUrgente(env, {
+        numero, sector: caso.sector, material: caso.material,
+        habitada: caso.habitada, heridos: caso.heridos,
+        ing: nombre, conRespaldo, discrepa: veredicto.discrepa
+      });
+    } catch (e) { console.error("aviso urgente", numero, e && e.message); }
+  }
+
   return json({ ok: true, numero, estado: nuevoEstado,
                 clasificacion: nuevoEstado === "clasificado" ? veredicto.clasificacion : null,
                 discrepa: veredicto.discrepa, con_respaldo: conRespaldo });
@@ -6121,23 +6727,35 @@ self.addEventListener("fetch", (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== "GET") return;
   if (u.pathname !== "/triaje/inspeccion" && u.pathname !== "/triaje/inspeccion.js") return;
-  e.respondWith(
-    fetch(e.request).then((r) => {
-      /* Detrás de Access, una sesión expirada devuelve el HTML del login. Eso NO
-         se guarda en caché: sustituiría el formulario por una pantalla de
-         entrada, justo cuando no hay señal para volver a entrar. */
-      const ct = r.headers.get("content-type") || "";
-      const esLogin = r.redirected || (u.pathname.endsWith(".js") && !ct.includes("javascript"));
-      if (r.ok && !esLogin) {
-        const copia = r.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copia));
-      }
-      return r;
-    }).catch(() => caches.match(e.request).then((c) => c || new Response(
-      "Sin señal y sin copia guardada. Abre esta pantalla una vez con internet antes de salir.",
-      { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } }
-    )))
+  /* RED CON RELOJ (auditoría del 28 sep 2026). Era «red primero» sin tope: con
+     una barra de señal la petición no falla, se queda colgada, y el formulario
+     no abría nunca aunque estuviera guardado — el peor caso posible para una
+     pantalla hecha para las veredas. Ahora la red tiene 3,5 s; si no contesta,
+     sale la copia guardada y la respuesta de red, si llega después, igual
+     refresca la caché para la próxima vez. */
+  const red = fetch(e.request).then((r) => {
+    /* Detrás de Access, una sesión expirada devuelve el HTML del login. Eso NO
+       se guarda en caché: sustituiría el formulario por una pantalla de
+       entrada, justo cuando no hay señal para volver a entrar. */
+    const ct = r.headers.get("content-type") || "";
+    const esLogin = r.redirected || (u.pathname.endsWith(".js") && !ct.includes("javascript"));
+    if (r.ok && !esLogin) {
+      const copia = r.clone();
+      caches.open(CACHE).then((c) => c.put(e.request, copia));
+    }
+    return r;
+  });
+  const sinCopia = () => new Response(
+    "Sin señal y sin copia guardada. Abre esta pantalla una vez con internet antes de salir.",
+    { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } }
   );
+  const reloj = new Promise((res) => setTimeout(res, 3500)).then(() =>
+    caches.match(e.request).then((c) => c || red));
+  e.respondWith(
+    Promise.race([red, reloj])
+      .catch(() => caches.match(e.request).then((c) => c || sinCopia()))
+  );
+  e.waitUntil(red.catch(() => null));
 });
 `;
 }
@@ -8541,13 +9159,55 @@ async function correoDiscrepancia(env, x) {
   });
 }
 
+/* EL AVISO DEL URGENTE, al buzón de Mira Mi Casa (auditoría del 28 sep 2026).
+   Sin nombre, teléfono ni dirección de la familia, a propósito: ya están en el
+   panel, detrás de Access, y un correo se reenvía. Lo que tiene que lograr es
+   que alguien abra la ruta hoy, y para eso bastan el número, el sector y lo que
+   la familia contó que hace grave el caso. */
+async function correoCasoUrgente(env, x) {
+  const para = correoMMC(env);
+  if (!para) return avisoSinBuzon(env, "caso-urgente");
+  const si = (v) => (v ? "Sí" : "No");
+  const filas = [
+    ["Caso", x.numero],
+    ["Sector", x.sector || "—"],
+    ["Muros", x.material || "no dijo"],
+    ["Vive gente ahí ahora", si(x.habitada)],
+    ["Hubo heridos", si(x.heridos)],
+    ["Lo marcó", (x.ing || "un ingeniero") + (x.conRespaldo ? "" : " · matrícula SIN verificar")]
+  ];
+  const parrafos = [
+    "Un ingeniero acaba de marcar este caso como prioridad de visita ALTA. Entra a la cola «Urgentes sin visitar» y vence en un día: si mañana nadie ha ido, sale en el resumen diario.",
+    x.conRespaldo ? null : "La matrícula de quien lo marcó todavía no está verificada, así que a la familia no se le ha escrito: verifícala o pide una segunda opinión desde «Piden confirmación».",
+    x.discrepa ? "Hay otra opinión distinta sobre este caso. El caso se queda con la más grave mientras se resuelve." : null,
+    "Recuerda lo que la plataforma NO hace: no declara habitabilidad ni promete la visita a la familia. Si hay riesgo para la vida, lo que corresponde es avisar a la alcaldía o al consejo municipal de gestión del riesgo (Ley 1523 de 2012), y al 123."
+  ].filter(Boolean);
+  return enviarCorreo(env, {
+    para,
+    asunto: "URGENTE · " + x.numero + (x.sector ? " · " + x.sector : ""),
+    texto: [...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "",
+            "https://thegiveandgrowproject.org/admin/ruta"].join("\n"),
+    html: plantillaCorreo({
+      titulo: "Caso urgente: " + x.numero,
+      parrafos, filas,
+      boton: { url: "https://thegiveandgrowproject.org/admin/ruta", texto: "Abrir la ruta de visitas" }
+    }),
+    etiqueta: "caso-urgente", guia: x.numero
+  });
+}
+
 /* El aviso va en español y no bilingüe: esta plataforma atiende a familias en
    Colombia y el caso no guarda idioma. Si algún día hace falta, se añade el
    campo, no se adivina. */
+/* «PRIORIDAD DE VISITA», no «Visita urgente» (auditoría del 28 sep 2026).
+   Leído por una familia, «Visita urgente» es una promesa: alguien viene, y
+   pronto. La plataforma no agenda visitas ni las promete; lo que el ingeniero
+   dice es cuánta prioridad tendría ir. La etiqueta dice eso y nada más, y el
+   correo añade que no se agendó nada. */
 const TRIAJE_ET = {
-  urgente: "Visita urgente",
-  programada: "Visita programada",
-  no_requiere: "No requiere visita por ahora",
+  urgente: "Prioridad de visita: alta",
+  programada: "Prioridad de visita: media",
+  no_requiere: "Prioridad de visita: no prioritaria",
   inevaluable: "No se pudo evaluar con las fotos enviadas"
 };
 
@@ -8568,6 +9228,12 @@ async function correoCasoClasificado(env, x) {
     "Un ingeniero voluntario revisó las fotos de tu casa y ya hay un concepto.",
     x.recomendacion ? "Qué hacer, y con qué reparar: " + x.recomendacion : null,
     "Esto no reemplaza una visita ni la declaratoria de tu municipio: es un concepto hecho a distancia, sobre las fotos que enviaste.",
+    "La prioridad de visita que ves abajo NO agenda una visita: dice qué tan pronto convendría que alguien fuera, no que alguien vaya a ir.",
+    /* Con prioridad alta, a quién acudir: la plataforma no va a ir por su
+       cuenta, y quien sí puede actuar sobre la casa es el municipio (Ley 1523). */
+    x.clasificacion === "urgente"
+      ? "Como la prioridad es alta, informa a tu alcaldía o al consejo municipal de gestión del riesgo de tu municipio. Y si las cosas empeoran —la grieta crece, algo cruje, hay olor a gas— sal de la casa y llama al 123."
+      : null,
     "Buscaremos gestionar ayuda para todas las casas que podamos, y no podemos comprometerla casa por casa."
   ].filter(Boolean);
 
@@ -8621,7 +9287,13 @@ async function apiCasoInforme(env, numero, token) {
           ayuda: "Todavía ningún ingeniero ha revisado este caso." }, 409);
   }
 
-  const m = await env.DB.prepare("SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ?").bind(numero).first();
+  /* SOLO LO QUE MANDÓ LA FAMILIA (auditoría del 28 sep 2026). Contaba también
+     las fotos que sube el equipo en la visita, así que «Fotos que enviaste» y el
+     conteo del informe decían un número que la familia no reconocía. Misma
+     regla que `cupoFamilia`, que ya las separaba. */
+  const m = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM caso_medios WHERE caso = ? AND COALESCE(categoria,'') <> ?"
+  ).bind(numero, CATEGORIA_VISITA).first();
   const hoy = fechaCO();
   const bytes = await informeTriage({
     numero: c.numero, sector: c.sector, material: c.material, pisos: c.pisos,
@@ -8690,7 +9362,10 @@ async function adminCasos(env) {
     /* Urgentes primero, y dentro de cada grupo el más viejo antes: en una
        emergencia el orden es la gravedad y luego la espera, nunca la novedad. */
     "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
-    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT " + TOPE_COLA
+    "WHEN 'no_requiere' THEN 3 ELSE 2 END, " +
+    /* Y dentro de cada clasificación, lo que la familia contó que es grave
+       (auditoría del 28 sep 2026) — misma clave que la fila del ingeniero. */
+    ORDEN_GRAVEDAD(HAY_FOTOS_FAMILIA) + " LIMIT " + TOPE_COLA
   ).all();
 
   /* POSIBLE DUPLICADO, y se calcula AQUÍ y no en SQL.
@@ -8864,7 +9539,7 @@ async function adminMoverCaso(request, env, numero, quien) {
   if (!regla) return json({ error: "estado_no_permitido", permitidos: Object.keys(CASO_DESTINOS) }, 400);
 
   const caso = await env.DB.prepare(
-    "SELECT numero, estado, tomado_por FROM casos WHERE numero = ?"
+    "SELECT numero, estado, tomado_por, token, contacto_email FROM casos WHERE numero = ?"
   ).bind(numero).first();
   if (!caso) return json({ error: "no_encontrado" }, 404);
   if (caso.estado === nuevo) return json({ error: "sin_cambio", estado: caso.estado }, 409);
@@ -8925,8 +9600,70 @@ async function adminMoverCaso(request, env, numero, quien) {
             desaparecer un caso de su lista y el registro no dice por qué. */
          (suelta && caso.tomado_por ? " · se soltó de " + caso.tomado_por : "")).run();
 
+  /* LA FAMILIA SE ENTERA DE QUE SU CASO TERMINÓ (auditoría del 28 sep 2026).
+     Hasta hoy cerrar o descartar no le decía nada a nadie de fuera: la familia
+     que había dejado correo seguía esperando un concepto que ya no iba a
+     llegar, o leía en su enlace que estaba «cerrado» sin que nadie se lo
+     hubiera contado. Solo si dejó correo —es opcional DE VERDAD— y después de
+     escribir, en su propio try: el correo no puede deshacer el movimiento. Va
+     SIN el motivo, que es una nota del equipo y puede nombrar a otras
+     personas; si es un duplicado, sí va el número del caso que sigue. */
+  if (suelta && caso.contacto_email) {
+    try {
+      await correoCasoTerminado(env, {
+        numero, token: caso.token, email: caso.contacto_email, estado: nuevo,
+        sigue: nuevo === "descartado" ? await casoQueSigue(env, numero) : null
+      });
+    } catch (e) { console.error("correo caso terminado", numero, e && e.message); }
+  }
+
   return json({ ok: true, numero, estado: nuevo, anterior: caso.estado,
                 soltado_de: suelta ? (caso.tomado_por || null) : null });
+}
+
+/* El aviso de cierre, en los DOS idiomas y en ese orden. `casos` no guarda
+   idioma y el resto de correos a familias van solo en castellano por eso mismo
+   —«se añade el campo, no se adivina»—; aquí, que es una mala noticia posible,
+   se ponen las dos versiones completas en vez de adivinar. Sobrio a propósito:
+   no es un veredicto sobre la casa y no puede sonar a uno. */
+async function correoCasoTerminado(env, x) {
+  const enlace = ORIGIN_MMC + "/caso/" + x.numero + "?t=" + x.token;
+  const cerrado = x.estado === "cerrado";
+  const titulo = (cerrado ? "Tu caso quedó cerrado: " : "Tu caso no siguió adelante: ") + x.numero;
+  const es = cerrado ? [
+    "El equipo de Mira Mi Casa cerró tu caso " + x.numero + ". Cerrarlo no es un concepto sobre tu casa ni dice si se puede habitar: significa que desde aquí no hay un paso más que dar con él.",
+    "Si ya tenías un concepto, sigue en tu enlace y lo puedes descargar cuando quieras.",
+    "Si algo cambió en tu casa, escríbenos por WhatsApp con tu número de caso: el equipo revisa si corresponde reabrirlo."
+  ] : [
+    "El equipo de Mira Mi Casa no siguió adelante con el caso " + x.numero + ".",
+    x.sigue
+      ? "Tenemos otro caso tuyo, el " + x.sigue + ", y ese es el que sigue abierto: ahí aparece el concepto cuando esté. Si tienes su enlace, ábrelo ahí."
+      : "Si crees que es un error, escríbenos por WhatsApp con tu número de caso y lo revisamos."
+  ];
+  es.push("Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— llama al 123 y avisa a tu alcaldía o al consejo municipal de gestión del riesgo.");
+  const en = cerrado ? [
+    "The Mira Mi Casa team closed your case " + x.numero + ". Closing it is not an opinion on your home and does not say whether it can be lived in: it means there is no further step to take with it from here.",
+    "If you already had an opinion, it is still on your link and you can download it any time.",
+    "If something changed in your home, write to us on WhatsApp with your case number: the team will check whether it should be reopened."
+  ] : [
+    "The Mira Mi Casa team did not continue with case " + x.numero + ".",
+    x.sigue
+      ? "We have another case of yours, " + x.sigue + ", and that is the one still open: the opinion will appear there when it is ready."
+      : "If you think this is a mistake, write to us on WhatsApp with your case number and we will look into it."
+  ];
+  en.push("If the danger is happening NOW —a wall about to fall, a smell of gas, someone trapped— call 123 and tell your municipality or its disaster risk council.");
+  const parrafos = [...es, "— English —", ...en];
+  return enviarCorreo(env, {
+    para: x.email,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", "Tu enlace / Your link: " + enlace].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, filas: [["Tu caso · Your case", x.numero]],
+      boton: { url: enlace, texto: "Abrir mi caso · Open my case" },
+      cierre: "Este mensaje es automático. · This is an automatic message."
+    }),
+    etiqueta: "caso-terminado", guia: x.numero
+  });
 }
 
 /* POST /api/admin/inspeccion/<numero>/atendida — cerrar una señal de terreno.
@@ -9076,7 +9813,10 @@ async function adminRuta(env, url) {
        se hunde: sigue en la lista porque falta cerrarlo, pero no es una parada. */
     "CASE WHEN c.estado = 'visitado' THEN 1 ELSE 0 END, " +
     "CASE c.clasificacion WHEN 'urgente' THEN 0 WHEN 'programada' THEN 1 " +
-    "WHEN 'no_requiere' THEN 3 ELSE 2 END, c.creado_en ASC LIMIT " + TOPE_RUTA
+    "WHEN 'no_requiere' THEN 3 ELSE 2 END, " +
+    /* Entre dos urgentes, primero donde hubo heridos o vive gente (auditoría
+       del 28 sep 2026): misma clave que la fila del ingeniero. */
+    ORDEN_GRAVEDAD(HAY_FOTOS_FAMILIA) + " LIMIT " + TOPE_RUTA
   );
   const r = await (sector ? q.bind(sector) : q).all();
 
@@ -10322,40 +11062,40 @@ async function paypalCobro(env, suscripcionId, recurso) {
 
 const ALMA_SYS = `Eres ALMA (Asistente de Labor Misional y Alianzas), la IA de Fundación Give&Grow International. Respondes de forma clara, cálida y concisa. Máximo 3 párrafos por respuesta. No uses listas extensas. Responde en el idioma del usuario.
 
-GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Fundada el 19 de mayo de 2025 en Medellín. Fundador: Juan Sebastián Navarro Osorio, casi 4 años de trabajo en zonas de difícil acceso (La Guajira, Sierra Nevada, Medellín). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
+GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Constituida por documento privado el 11 de abril de 2025 y registrada en la Cámara de Comercio de Medellín el 19 de mayo de 2025; la calificación en el Régimen Tributario Especial la da la DIAN. 2025 fue el año de constitución, sin operación: la Fundación empezó a operar en 2026. Fundador: Juan Sebastián Navarro Osorio, con casi 4 años de trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín ANTES de constituir la Fundación; ese trabajo es suyo, no de la Fundación, y así hay que decirlo. GOBIERNO: el máximo órgano de dirección es el que definen los estatutos, hoy el fundador; hay Representante Legal y Revisora Fiscal, y NO hay junta directiva. ESTADOS FINANCIEROS 2025: publicados en #transparencia, firmados por el Representante Legal y la Revisora Fiscal (un año de constitución, sin operación). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
 
 MISIÓN: Conectar generosidad con necesidad de forma estratégica y con trazabilidad completa. No reemplazamos fundaciones, las amplificamos.
 
-IMPACTOS Y ALMA: ImpactOS es el sistema operativo de Give&Grow (la plataforma digital del ecosistema). ALMA es su interfaz inteligente. Give&Grow es el ecosistema completo. ALMA es a Give&Grow lo que Siri es al iPhone.
+IMPACTOS Y ALMA: ImpactOS es el sistema operativo de Give&Grow (la plataforma digital del ecosistema). ALMA es su interfaz inteligente. Give&Grow es el ecosistema completo. ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción.
 
-HUB SOCIAL: Centro operativo en Medellín. 5 rutas: R1 Alianzas con Fundaciones, R2 Gestión de Donaciones, R3 Social Grow, R4 Impact Journey, R5 Conexión Laboral. Proceso operativo: visita de contexto, onboarding, gestión de necesidades y entrega con acta, cuyas fotos quedan publicadas en el rastreo del aporte.
+HUB SOCIAL: Centro operativo en Medellín. 5 rutas: R1 Alianzas con Fundaciones, R2 Gestión de Donaciones, R3 Social Grow, R4 Impact Journey, R5 Conexión Laboral. Proceso operativo: visita de contexto, onboarding, gestión de necesidades y entrega con acta. El donante recibe recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en su rastreo cuando la fundación entrega, no antes.
 
-CÓMO ENTRA UNA FUNDACIÓN, cinco pasos y en este orden: 1 aplica en el sitio, 2 revisamos y verificamos su trabajo, 3 visita de contexto en su territorio, 4 convenio de cooperación, 5 vinculación al Hub. Aplicar NO es entrar, y hay que decirlo así. El cuestionario largo —logo, fotos, unidad de impacto con su costo documentado y las autorizaciones de imagen— llega DESPUÉS de la visita, no antes: pedirlo antes sería pedirle documentación a alguien con quien todavía no se ha hablado. Nada se cobra, nunca, en ninguna dirección.
+CÓMO ENTRA UNA FUNDACIÓN, cinco pasos y en este orden: 1 aplica en el sitio, 2 revisamos y verificamos su trabajo, 3 visita de contexto en su territorio, 4 convenio de cooperación, 5 vinculación al HUB SOCIAL. Aplicar NO es entrar, y hay que decirlo así. El cuestionario largo —logo, fotos, unidad de impacto con su costo documentado y las autorizaciones de imagen— llega DESPUÉS de la visita, no antes: pedirlo antes sería pedirle documentación a alguien con quien todavía no se ha hablado. Nada se cobra, nunca, en ninguna dirección.
 
 DONACIONES: Transferencia a Bancolombia Cuenta de Ahorros 31000009221 (NIT 901.948.930-2). Mejor aún: que la reporte en el sitio (#reportar), porque así recibe su número de guía al instante y sube ahí mismo el comprobante. Una persona la contrasta contra el extracto y entonces le llega el RECIBO.
 
-DOS COSAS QUE NO DEBES PROMETER, porque el sitio dejó de prometerlas a propósito. NO existe reporte fotográfico mensual: no hay nada que lo envíe, y prometerlo fue un error que ya se corrigió. Lo que sí ocurre es que el acta de entrega y sus fotos quedan publicadas en el rastreo del aporte. Y el CERTIFICADO tributario NO es automático ni sale en 24h: es una declaración bajo la gravedad de juramento que firman el Representante Legal y la Revisora Fiscal, la emite una persona, solo si el donante lo pidió, y para emitirlo hacen falta su documento y su ciudad. El recibo sí es automático; el certificado es otra cosa. No los confundas.
+DOS COSAS QUE NO DEBES PROMETER, porque el sitio dejó de prometerlas a propósito. NO existe reporte fotográfico mensual: no hay nada que lo envíe, y prometerlo fue un error que ya se corrigió. Lo que sí ocurre es que, cuando la fundación entrega, el acta firmada y sus fotos aparecen en el rastreo del aporte. Y el CERTIFICADO tributario NO es automático ni sale en 24h: es una declaración bajo la gravedad de juramento que firman el Representante Legal y la Revisora Fiscal, la emite una persona, solo si el donante lo pidió, y para emitirlo hacen falta su documento y su ciudad. El recibo sí es automático; el certificado es otra cosa. No los confundas.
 
-BENEFICIO TRIBUTARIO: 25% de descuento sobre el impuesto de renta a cargo (Art. 257 ET), en los términos y límites que contempla la ley. Ejemplo: 4.000.000 COP donados = hasta 1.000.000 COP menos de impuesto, según la situación tributaria del donante. APLICA SOLO EN COLOMBIA: es un descuento del impuesto de renta colombiano, así que a quien no declara renta en Colombia no le sirve. Si preguntan desde el exterior, dilo de frente en vez de ofrecerles el 25%.
+BENEFICIO TRIBUTARIO: la donación PUEDE dar derecho a un descuento en renta equivalente al 25% DEL VALOR DONADO (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de la situación tributaria de cada donante y requiere el certificado de donación. No digas «25% del impuesto»: es el 25% de lo donado. Ejemplo: 4.000.000 COP donados pueden significar hasta 1.000.000 COP menos de impuesto. El beneficio es de las DONACIONES: el voluntariado corporativo o una alianza sin donación no dan certificado. APLICA SOLO EN COLOMBIA: es un descuento del impuesto de renta colombiano, así que a quien no declara renta en Colombia no le sirve. Si preguntan desde el exterior, dilo de frente en vez de ofrecerles el 25%.
 
-MEMBRESÍAS: Semilla, Retoño, Árbol y Bosque (niveles crecientes de aporte mensual), Temporal (donación única) y Honor (por invitación).
+MEMBRESÍAS: Semilla, Retoño, Árbol y Bosque (niveles crecientes de aporte mensual), Temporal (donación única) y Honor (por invitación). Lo que existe HOY: recibo y número de guía con cada aporte, carnet digital, certificado de donación si se pide y beneficios del Programa de Gratitud desde Retoño. Boletín, reconocimiento público, certificados personalizados, eventos, reportes periódicos y reuniones están EN PREPARACIÓN: no los ofrezcas como disponibles.
 
-DESDE EL EXTERIOR, en dólares y por PayPal. Es la puerta de quien no está en Colombia: sin PSE ni Nequi, esos no le sirven. Hay DOS caminos y no son lo mismo:
+DESDE EL EXTERIOR, en dólares y por PayPal. Es la puerta de quien no está en Colombia. Hay DOS caminos y no son lo mismo:
 · Aporte ÚNICO: el botón de donaciones de PayPal, con el monto que la persona escriba. Ahí mismo puede sumar la comisión para que a la fundación le llegue completo. Por ese camino su aporte NO lleva número de guía nuestro —PayPal no permite pasarle una referencia por donante a un botón alojado— así que el comprobante se lo manda PayPal, no nosotros.
 · MEMBRESÍA mensual: el formulario de «Membresía en dólares» del sitio. Esa sí queda registrada con guía y recibo, el monto es libre desde US$5, y se cancela desde la propia cuenta de PayPal sin escribirnos.
 La comisión internacional se lleva cerca del 10%: si el aporte es grande, es más eficiente una transferencia y conviene decirlo. Y el descuento del Art. 257 NO le sirve a quien no declara renta en Colombia.
 
 PROGRAMA DE GRATITUD: beneficios que comercios aliados dan a los miembros activos. Las cinco categorias para las que esta construido el programa son gastronomia, moda, belleza, bienestar y odontologia, pero ESO ES LA TAXONOMIA, NO LO QUE HAY: no enumeres categorias como si cada una tuviera comercios. Los comercios de verdad te llegan mas abajo en datos en vivo, y son los unicos sobre los que puedes afirmar algo. Hoy son muy pocos; decirlo asi es mas util que insinuar una red.
 
-RSE EMPRESARIAL: 3 puertas cumplibles hoy: Padrinazgo de Impacto (presupuesto traducido a unidades reales con certificado y reporte), Impact Journey (voluntariado corporativo en doble vía, Ruta 4) y Alianza a medida (co-creación de programas). El aporte se define a la medida de cada empresa; invita a escribir para una propuesta personalizada.
+RSE EMPRESARIAL: 3 puertas cumplibles hoy: Padrinazgo de Impacto (presupuesto traducido a unidades reales con certificado y reporte), Impact Journey (voluntariado corporativo en doble vía) y Alianza a medida (co-creación de programas). El aporte se define a la medida de cada empresa; invita a escribir para una propuesta personalizada.
 
 POBLACIONES OBJETIVO: la misión busca impactar todo tipo de población vulnerable a través de las fundaciones del HUB. Las que hoy guían el objeto social: niñez en riesgo, comunidades indígenas, comunidades campesinas, personas en situación de calle, adultos mayores, animales en maltrato, personas en rehabilitación, personas privadas de la libertad. La cobertura real crece con cada aliada verificada.
 
-EMERGENCIA ABIERTA — SISMO DEL 10 DE AGOSTO DE 2026. Magnitud 7,4, epicentro cerca de San José del Palmar (Chocó), 103 km de profundidad, según el Servicio Geológico Colombiano. Desastre nacional declarado. NO des cifras de víctimas: en las primeras horas las fuentes iban de 132 a más de 240 y no repetimos números que no podemos verificar. Remite a las fuentes oficiales.
+SISMO DEL 10 DE AGOSTO DE 2026 (la brigada ya terminó). Magnitud 7,4, epicentro cerca de San José del Palmar (Chocó), 103 km de profundidad, según el Servicio Geológico Colombiano. Desastre nacional declarado. NO des cifras de víctimas: en las primeras horas las fuentes iban de 132 a más de 240 y no repetimos números que no podemos verificar. Remite a las fuentes oficiales.
 
-LA BRIGADA YA SALIO Y TERMINO: fue del 24 al 28 de agosto de 2026, cinco territorios en cinco dias (Cali, Pereira, Manizales, Armenia y Choco), con las fundaciones de cada territorio. HABLA DE ELLA EN PASADO. Es un error grave decir que esta en terreno o que se necesitan cosas para ella: quien pregunte hoy no puede sumarse a algo que ya paso.
+LA BRIGADA YA SALIO Y TERMINO: salio el 20 de agosto de 2026 hacia la zona afectada, con las fundaciones de cada territorio. No des fecha de cierre: no esta documentada. HABLA DE ELLA EN PASADO. NO afirmes cuantas familias recibieron ayuda ni en cuantos territorios se entrego: las actas firmadas se publican en el rastreo cuando esten revisadas, y hasta entonces no hay cifra que dar. Es un error grave decir que esta en terreno o que se necesitan cosas para ella: quien pregunte hoy no puede sumarse a algo que ya paso.
 
-SI ALGUIEN QUIERE AYUDAR HOY, lo que esta activo es MIRA MI CASA, no la brigada. Sus tres puertas: una familia publica su casa, un ingeniero voluntario la diagnostica, y alguien apadrina la reparacion (materiales, mano de obra, transporte o dinero). Manda a la puerta que corresponda segun quien te habla.
+SI ALGUIEN QUIERE AYUDAR HOY, lo que esta activo es MIRA MI CASA, no la brigada. Sus tres puertas: una familia reporta su casa, un ingeniero voluntario da un concepto, y alguien apadrina la reparacion (materiales, mano de obra, transporte o dinero). Manda a la puerta que corresponda segun quien te habla.
 
 Y AL HABLAR DE APADRINAR, DOS COSAS SIN EXCEPCION, porque son la condicion del proyecto y estan escritas en la pagina: APADRINAR NO RESERVA UNA CASA CONCRETA —quien decide que viviendas se atienden son los conceptos escritos de los ingenieros, no quien aporta— y NO SE COBRA NADA EN LINEA: el formulario registra el ofrecimiento y despues una persona del equipo escribe para acordar los detalles. Nunca digas «apadrina una casa concreta» ni nada que suene a elegirla; se dice «aportar a la reparacion de viviendas». Es el mismo limite que el punto 4 de abajo, repetido aqui a proposito: al describir las tres puertas es facil prometer justo eso sin darse cuenta.
 
@@ -10378,7 +11118,7 @@ LOS LÍMITES DE MIRA MI CASA, Y ESTOS NO SE NEGOCIAN NI SE SUAVIZAN:
 
 INGENIEROS: quien quiera ser voluntario se postula en la página "Ingenieros voluntarios" con su matrícula del COPNIA. La verificacion la hace una persona contra el registro publico del COPNIA, asi que no es inmediata; pero en cuanto la matricula queda verificada el acceso se abre solo, sin que nadie tenga que habilitarlo a mano. Puede ser correo de universidad, de empresa o particular.
 
-Más de 25 fundaciones preaprobadas en la red de espera; la vinculación formal se confirma una a una con verificación. Hoy el muro muestra las aliadas ya verificadas.`;
+Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. Cada una entra una a una, con verificación y convenio. No hables de fundaciones «preaprobadas» ni de una red de espera: no hay respaldo para esa cifra.`;
 
 /* La red viva sale de partners.json, que es un ASSET de este mismo Worker: se
    lee por el binding y no saliendo a internet a buscar nuestro propio archivo.
@@ -10670,8 +11410,10 @@ async function apiAlma(request, env, url) {
    exactamente cuando pasa de vacía a tener algo. */
 async function apiFilaTriaje(env) {
   const f = await env.DB.prepare(
+    /* `SIN_ABRIR`, la misma que decide el aviso de «la fila despertó»: el
+       comentario de arriba promete que los dos van juntos. */
     "SELECT COUNT(*) AS esperando, MIN(c.creado_en) AS mas_viejo " +
-    "FROM casos c WHERE " + SIN_REVISAR
+    "FROM casos c WHERE " + SIN_ABRIR
   ).first();
 
   const esperando = (f && Number(f.esperando)) || 0;
@@ -11863,11 +12605,11 @@ async function correoApadrinamiento(env, a) {
       parrafos: en ? [
         "Someone from the team will write to you to agree on the details. Nothing is charged from this form.",
         "One thing so there is no misunderstanding: sponsoring does not reserve a particular home. Which homes are attended is decided with the engineers' written opinions, because the need has an order and a photograph is not that order.",
-        "What you do get back is evidence: every delivery we make is published with its record."
+        "What you do get back is evidence: a receipt and tracking number once a payment clears; the signed handover record and its photos appear in the tracking page when the delivery is made."
       ] : [
         "Alguien del equipo te va a escribir para acordar los detalles. Desde este formulario no se cobra nada.",
         "Una cosa para que no haya malentendido: apadrinar no reserva una casa concreta. Qué casas se atienden se decide con los conceptos escritos de los ingenieros, porque la necesidad tiene un orden y una fotografía no es ese orden.",
-        "Lo que sí vuelve es evidencia: cada entrega que hacemos se publica con su acta."
+        "Lo que sí vuelve es evidencia: recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo cuando se entrega."
       ],
       filas: [
         [en ? "What you offer" : "Qué ofreces", (ETIQUETA_APORTE[en ? "en" : "es"][a.aporte] || a.aporte)],
@@ -12076,10 +12818,11 @@ async function apiAliado(env, c) {
   if (c.modGratitud && !benBeneficio) return json({ error: "beneficio_requerido" }, 400);
   if (c.modServicios && !servDetalle) return json({ error: "servicio_requerido" }, 400);
 
-  /* Las tres autorizaciones son la condición para guardar. La de datos es Ley
-     1581; la de marca y la de licitud son lo que permite publicar la alianza y
-     lo que la fundación necesita declarar recibido. Sin ellas no se guarda. */
-  if (!c.autMarca || !c.autDatos || !c.autLicitud) {
+  /* Datos (Ley 1581) y licitud son la condición para guardar. LA DE MARCA ES
+     OPCIONAL desde el 29 sep 2026: una empresa puede aportar sin que la
+     mostremos, y exigirla dejaba fuera a quien quiere dar en silencio. Se guarda
+     tal como vino, y sin ella no se publica ni el nombre ni el logo. */
+  if (!c.autDatos || !c.autLicitud) {
     return json({ error: "autorizacion_requerida" }, 400);
   }
 
@@ -12112,7 +12855,7 @@ async function apiAliado(env, c) {
     benCondiciones: limpio(c.benCondiciones, 300),
     benRedime: limpio(c.benRedime, 200),
     servDetalle,
-    autMarca: true, autDatos: true, autLicitud: true,
+    autMarca: !!c.autMarca, autDatos: true, autLicitud: true,
     idioma: c.idioma === "en" ? "en" : "es"
   };
 
@@ -12142,7 +12885,7 @@ async function apiAliado(env, c) {
   }
 
   await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "empresa",
-    "ally.a.marca + ally.a.datos + ally.a.licitud");
+    (datos.autMarca ? "ally.a.marca + " : "") + "ally.a.datos + ally.a.licitud");
 
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
 }
@@ -12212,7 +12955,8 @@ async function correoAvisoAliado(env, a) {
     ["Qué aporta", a.aporta || "(no dice)"],
     ["Web", a.web || "—"],
     ["Instagram", a.instagram || "—"],
-    ["Modalidades", (a.modalidades || []).map(k => ETIQUETA_MOD.es[k] || k).join(", ")]
+    ["Modalidades", (a.modalidades || []).map(k => ETIQUETA_MOD.es[k] || k).join(", ")],
+    ["Uso de marca", a.autMarca ? "Autorizado" : "NO autorizado — aporte anónimo: no publicar nombre ni logo"]
   ];
   if (a.benBeneficio) {
     filas.push(["Beneficio ofrecido", a.benBeneficio]);
@@ -17561,6 +18305,52 @@ function cargarSalud(){
     h += pasoEmbudo("sin cupo del dia", co.sin_cupo, co.sin_cupo ? "mandar a mano" : "");
     h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">El correo nunca tumba un cobro: si Resend falla, el aporte queda igual y el fallo se anota aquí. Por eso hay que mirarlo — nadie se va a quejar de un acuse que no sabe que existía.</p>';
 
+    /* 3c · Operación (auditoría del 28 sep 2026): la última corrida de cada
+       tarea del cron, los incidentes y qué secretos faltan. Es lo mismo que
+       decide la alerta diaria, leído del mismo objeto. */
+    var op = d.operacion || {};
+    h += '<h3 style="font-size:15px;margin:0 0 8px">Operación</h3>';
+    if (op.error){
+      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px"><strong>Sin registro de operación.</strong> ' + esc(op.error) + '</p>';
+    }
+    var faltan = op.faltan || [];
+    if (faltan.length){
+      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px"><strong>Falta configuración:</strong> ' +
+        esc(faltan.join(", ")) + '. Se pone con <code>npx wrangler secret put NOMBRE</code>; aquí solo se ve el nombre, nunca el valor.</p>';
+    }
+    var co24 = op.correo24h || {};
+    if (co24.sin_cupo_personas){
+      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px"><strong>' +
+        esc(String(co24.sin_cupo_personas)) + ' correo(s) a personas no salieron por cupo en las últimas 24 h</strong> (' +
+        esc((co24.sin_cupo_por_etiqueta || []).map(function(r){ return r.etiqueta + " " + r.n; }).join(", ")) +
+        '). No se reintentan solos: el cuerpo del correo no se guarda, a propósito (Ley 1581). Hay que reenviarlos a mano; «caso-espera» sí se reintenta mañana.</p>';
+    }
+    var tr = op.trabajos || [];
+    if (tr.length){
+      h += '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Tarea diaria</th><th scope="col">Última corrida</th><th scope="col">Último éxito</th><th scope="col">Resultado</th></tr></thead><tbody>';
+      h += tr.map(function(t){
+        var mal = t.vencido && t.trabajo !== "alerta-operacion";
+        return "<tr><td><strong>" + esc(t.trabajo) + "</strong></td>" +
+          "<td>" + esc(t.ultimo ? String(t.ultimo).slice(0,16) : "nunca") + "</td>" +
+          "<td>" + (mal ? '<strong style="color:#A84D00">' : "") + esc(t.ultimo_ok ? String(t.ultimo_ok).slice(0,16) : "nunca") + (mal ? "</strong>" : "") + "</td>" +
+          "<td><small>" + esc(t.ok === false ? "falló: " + (t.detalle || "") : (t.detalle || "—")) + "</small></td></tr>";
+      }).join("");
+      h += '</tbody></table></div>';
+    }
+    var inc = op.incidentes || {};
+    var rec = inc.recientes || [];
+    h += '<p class="mu" style="font-size:13.5px;margin:10px 0 6px">' +
+      (inc.ultimas24h ? "<strong>" + esc(String(inc.ultimas24h)) + "</strong> incidente(s) en las últimas 24 h." : "Ningún incidente en las últimas 24 h.") + '</p>';
+    if (rec.length){
+      h += '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Cuándo (UTC)</th><th scope="col">Dónde</th><th scope="col">Qué</th></tr></thead><tbody>';
+      h += rec.map(function(x){
+        return "<tr><td>" + esc(String(x.en || "").slice(0,16)) + "</td><td>" + esc(x.origen || "") + (x.ruta ? " <small>" + esc(x.ruta) + "</small>" : "") +
+          "</td><td><small>" + esc(x.mensaje || "") + "</small></td></tr>";
+      }).join("");
+      h += '</tbody></table></div>';
+    }
+    h += '<p class="mu" style="font-size:12.5px;margin:6px 0 20px">Si algo de este bloque está mal, a las 9 de la mañana llega un correo «Operación ·» al buzón de alianzas. Qué hacer con cada cosa: <code>ops/runbook-incidentes.md</code>.</p>';
+
     /* 4 · Lo que espera a una persona. */
     h += '<h3 style="font-size:15px;margin:0 0 8px">Esperando a una persona</h3>';
     var cola = d.cola || [];
@@ -20073,9 +20863,18 @@ async function wompiCobrar(env, sub) {
   const firma = await sha256Hex(guia + centavos + moneda + sec);
 
   let j;
+  /* SIN TOPE, un Wompi que no contesta deja colgado el cron entero: los
+     cobros van uno detras de otro y detras de ellos el resumen y la alerta.
+     15 s sobran para una transaccion que normalmente vuelve en uno. Un corte
+     entra por el `catch` de abajo como cualquier falta de respuesta —la fila
+     queda en `intencion` y el reintento usa la MISMA guia—, asi que el
+     comportamiento no cambia: solo deja de esperar para siempre (28 sep 2026). */
+  const corteWompi = new AbortController();
+  const relojWompi = setTimeout(() => corteWompi.abort(), 15000);
   try {
     const r = await fetch(amb.api + "/transactions", {
       method: "POST",
+      signal: corteWompi.signal,
       headers: { "content-type": "application/json", "authorization": "Bearer " + prv },
       body: JSON.stringify({
         amount_in_cents: centavos,
@@ -20137,7 +20936,12 @@ async function wompiCobrar(env, sub) {
        Si la transaccion si se creo al otro lado, el webhook la encontrara por
        la referencia y la pondra al dia. */
     await env.DB.prepare("UPDATE aportes SET wompi_estado = 'sin_respuesta' WHERE guia = ?").bind(guia).run();
+    const cortado = e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")));
+    await anotarIncidente(env, "wompi", "/transactions",
+      (cortado ? "sin respuesta de Wompi en 15 s" : "cobro sin respuesta: " + mensajeSinDatos(e)) + " · guia " + guia);
     return { ok: false, motivo: "sin_respuesta", guia };
+  } finally {
+    clearTimeout(relojWompi);
   }
 
   const tx = (j && j.data) || {};
@@ -20186,7 +20990,14 @@ async function wompiCobrar(env, sub) {
 const COBROS_POR_EJECUCION = 20;
 
 async function cobrarSuscripcionesDelMes(env) {
-  if (!env.DB || !env.WOMPI_PRIVATE_KEY) return { ok: true, motivo: "sin_pasarela", cobrados: 0 };
+  if (!env.DB || !env.WOMPI_PRIVATE_KEY) {
+    /* Sin la llave privada el cobro mensual NO cobra a nadie, y hasta hoy eso
+       era un `ok: true` en el log. Ahora es un incidente, y la alerta lo dice
+       (auditoria del 28 sep 2026). */
+    if (env.DB) await anotarIncidente(env, "cobro-mensual", "",
+      "sin_pasarela: falta WOMPI_PRIVATE_KEY, no se cobro ninguna membresia");
+    return { ok: true, motivo: "sin_pasarela", cobrados: 0 };
+  }
 
   /* LE TOCA A QUIEN LLEVA UN MES SIN COBRO, O A QUIEN TIENE UN REINTENTO
      VENCIDO: un cobro de este mes que la pasarela rechazo y que se repite una
@@ -21180,7 +21991,7 @@ async function apiBajaEnlace(request, env, url) {
      El tope es por IP y en Colombia el CGNAT comparte IP entre muchas casas,
      asi que se deja holgado: quien de verdad lo necesite pide UNO. */
   const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
-  if (bajaLimitada(ip)) {
+  if (bajaLimitada(ip) || !(await pasaTopeIP(env, request, "baja-enlace"))) {
     /* Se responde la MISMA pantalla de siempre. Decir «vas muy rapido» ya seria
        una senal distinta segun el correo, que es justo lo que no queremos. */
     return respuestaPedirEnlace(lang, true, request);
@@ -21771,30 +22582,16 @@ export default {
      Va envuelta en su propio try: si esto falla, no puede tumbar nada más —no
      hay nada más en el `scheduled`, pero lo habrá. */
   async scheduled(evento, env, ctx) {
+    /* Cada trabajo en su propio try, como siempre: que un fallo cobrando no
+       impida el aviso a las familias, ni al reves. `correrTrabajo` añade el
+       rastro (auditoria del 28 sep 2026): un latido por trabajo y un incidente
+       si lanza. La ALERTA va la ultima porque lee los latidos de los otros
+       tres, y un aviso interno no puede ir antes de familias y cobros. */
     ctx.waitUntil((async () => {
-      try {
-        const r = await avisarEsperaSeptimoDia(env);
-        console.log("aviso septimo dia", JSON.stringify(r));
-      } catch (e) {
-        console.error("aviso septimo dia", e && e.message);
-      }
-      /* En su propio try: que un fallo cobrando no impida el aviso a las
-         familias, ni al reves. Son dos trabajos sin relacion que comparten
-         disparador. */
-      try {
-        const c = await cobrarSuscripcionesDelMes(env);
-        console.log("cobro mensual", JSON.stringify(c));
-      } catch (e) {
-        console.error("cobro mensual", e && e.message);
-      }
-      /* El ultimo y en su propio try: es un aviso interno, y nada de lo de
-         arriba —familias, cobros— puede depender de que salga. */
-      try {
-        const rd = await resumenDiarioEquipo(env);
-        console.log("resumen diario", JSON.stringify(rd));
-      } catch (e) {
-        console.error("resumen diario", e && e.message);
-      }
+      await correrTrabajo(env, "aviso-septimo-dia", avisarEsperaSeptimoDia);
+      await correrTrabajo(env, "cobro-mensual", cobrarSuscripcionesDelMes);
+      await correrTrabajo(env, "resumen-diario", resumenDiarioEquipo);
+      await correrTrabajo(env, "alerta-operacion", alertaOperacion);
     })());
   },
 
@@ -21845,11 +22642,18 @@ export default {
       return sinOlfato(marcarCaso(marcarMarca(await this.ruteo(request, env, url, ruta), url.hostname), ruta), ruta);
     } catch (e) {
       console.error("sin_capturar", ruta, e && e.message);
+      /* Y AHORA QUEDA ESCRITO: un 500 que solo vive en la consola no lo ve
+         nadie. La alerta diaria cuenta estas filas. */
+      await anotarIncidente(env, "fetch", ruta, e);
       return json({ error: "error_interno" }, 500);
     }
   },
 
   async ruteo(request, env, url, ruta) {
+
+    /* El pulso, antes que nada y fuera del bloque `/api/`: ese bloque responde
+       503 sin base, y el ping tiene que poder decir «sin base» con su version. */
+    if (ruta === "/api/ping") return await apiPing(env);
 
     /* `/f/<id>` en espanol y `/f/<id>/en` en ingles. DOS URLs y no un parametro
        ni la cabecera Accept-Language: Google rastrea desde Estados Unidos, asi
@@ -22651,6 +23455,7 @@ export default {
         return json({ error: "no_encontrado" }, 404);
       } catch (e) {
         console.error("admin", ruta, e && e.message);
+        await anotarIncidente(env, "admin", ruta, e);
         return json({ error: "error_interno" }, 500);
       }
     }
@@ -22689,6 +23494,7 @@ export default {
       } catch (e) {
         /* Nunca se filtra el detalle interno al cliente. */
         console.error("api", ruta, e && e.message);
+        await anotarIncidente(env, "api", ruta, e);
         return json({ error: "error_interno" }, 500);
       }
     }
