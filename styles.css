@@ -548,7 +548,18 @@ html[data-theme="dark"] .alma-send{background:var(--acc);color:#0F1613}
 /* ===== forms ===== */
 .field{margin-bottom:16px}
 .field label{display:block;font-size:var(--fs-13);font-weight:700;margin-bottom:6px}
-.field input,.field textarea,.field select{width:100%;padding:11px 14px;border:1px solid var(--bd);border-radius:10px;font-family:inherit;font-size:var(--fs-16)}
+.field input,.field textarea,.field select{width:100%;padding:11px 14px;border:1px solid var(--bd);border-radius:10px;font-family:inherit;font-size:var(--fs-16);background-color:var(--surface);color:var(--ink)}
+/* EL FONDO Y LA TINTA VAN AQUÍ, NO SOLO EN EL SELECT (30 sep 2026). Esta regla
+   nunca los declaraba, así que input y textarea se quedaban con los del
+   navegador: blanco con tinta negra, también de noche. Se veía en Contacto y en
+   la caja de la guía de «Mi aporte» —un rectángulo blanco sobre la página
+   oscura—. `.track-search` y `.ally-form` ya lo hacían bien; esto los alcanza.
+   El placeholder va en --mu, que de noche da 6.4:1 sobre --surface (5.7:1 de día); y
+   `color-scheme` le pide al navegador que pinte oscuros sus propios controles
+   (calendario de fecha, flechas de número, autocompletar). */
+.field :is(input,textarea)::placeholder{color:var(--mu);opacity:1}
+html[data-theme="dark"] .field :is(input,textarea,select){color-scheme:dark}
+html[data-theme="dark"] .field :is(input,textarea):-webkit-autofill{-webkit-text-fill-color:var(--ink);box-shadow:0 0 0 1000px var(--surface) inset;caret-color:var(--ink)}
 /* select del form: mismo fondo/tinta que los inputs (día y noche) + flecha propia */
 .field select{background-color:var(--surface);color:var(--ink);appearance:none;-webkit-appearance:none;padding-right:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 /* --acc Y NO --g. Son el MISMO color de dia, token por token; de noche --acc
