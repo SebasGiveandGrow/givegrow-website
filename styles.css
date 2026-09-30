@@ -219,6 +219,10 @@ nav.sol{background:var(--nav-bg);-webkit-backdrop-filter:blur(12px);backdrop-fil
 
 /* ===== BUTTONS ===== */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:999px;font-weight:700;font-size:var(--fs-15);transition:transform .15s var(--ease),box-shadow .15s,background .15s;cursor:pointer}
+/* Un botón con `hidden` se esconde de verdad: `.btn` fija display y le ganaba al
+   atributo. Lo usan «Mandármelo por WhatsApp» y «Reintentar ahora» de Mira Mi
+   Casa, que solo aparecen cuando la subida de fotos lo permite (28 sep 2026). */
+.btn[hidden]{display:none}
 .btn:hover{transform:translateY(-2px)}
 .btn-g{background:var(--g);color:var(--on-dark);box-shadow:0 4px 14px rgba(31,92,56,.28)}
 .btn-g:hover{background:var(--gm)}
