@@ -32,7 +32,7 @@
          que nadie ha visto suspender no se ha probado — y el que pasa en verde
          no se vuelve a mirar nunca. De ahí venían los siete.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { esDict, decodeHtml, eachTextNode, eachAttrNode } from "./i18n-html.mjs";
 
@@ -1984,5 +1984,160 @@ try {
   else if (sueltos) err("check #23: worker.js enlaza /styles.css sin versión " + sueltos + " vez/veces · usa HOJA_CSS");
   else ok("las páginas del Worker y 404.html enlazan styles.css?v=" + real + ", el mismo de index.html");
 } catch (e) { err("check #23: no se pudo comparar la versión de styles.css: " + e.message); }
+
+/* ── check #24 · NINGUNA FOTO PUBLICADA LLEVA EXIF NI XMP ──────────────────
+   La auditoría previa al lanzamiento (28 sep 2026) encontró DIEZ fotos de
+   `img/jornadas/` y `img/vivienda/` con el bloque GPS del iPhone intacto: la
+   latitud y longitud de casas de familias damnificadas, servidas a cualquiera
+   que descargara la imagen. Una de ellas traía además, en su XMP, las regiones
+   de las caras que había detectado el teléfono. Nadie lo vio porque el sitio
+   las muestra bien: el metadato no se nota hasta que alguien lo busca.
+
+   Se limpiaron sin re-codificar (se quitan los segmentos APP1/APP13/COM del
+   JPEG y los chunks eXIf/iTXt/tEXt/zTXt/tIME del PNG; los píxeles quedan byte
+   a byte). Este check existe por la foto SIGUIENTE: basta exportar otra del
+   carrete sin pasarla por el limpiador para reabrir el hueco.
+
+   No distingue «EXIF con GPS» de «EXIF sin GPS» a propósito: el bloque entero
+   sobra en la web (la orientación de todas las fotos del repo es 1, y el
+   navegador no necesita nada más de él), y un check que mira solo una etiqueta
+   es el que deja pasar la fecha, el modelo del teléfono o el número de serie.
+
+   PARA LIMPIAR una foto nueva, sin perder calidad:
+     jpegtran -copy icc -optimize -outfile limpia.jpg foto.jpg
+   (`-copy icc` conserva el perfil de color y tira EXIF, XMP y comentarios.) Si
+   la foto dependía de la orientación EXIF (≠ 1), gírala antes: sin ese dato
+   saldría acostada. HEIC no se admite: el navegador no lo muestra y siempre
+   trae EXIF; conviértela a JPG o WebP. En PNG y WebP basta con quitar los
+   chunks eXIf/iTXt (PNG) o EXIF/XMP (WebP): no tocan los píxeles. */
+try {
+  const archivos = [];
+  const recorrer = (d) => {
+    for (const n of readdirSync(d)) {
+      const r = d + "/" + n;
+      if (statSync(r).isDirectory()) recorrer(r); else archivos.push(r);
+    }
+  };
+  recorrer("img");
+  const hallazgos = (b, ext) => {
+    const h = [];
+    if (ext === "heic" || ext === "heif") return ["formato HEIC"];
+    if ((ext === "jpg" || ext === "jpeg") && b[0] === 0xff && b[1] === 0xd8) {
+      let i = 2;
+      while (i < b.length - 4) {
+        if (b[i] !== 0xff) break;
+        const m = b[i + 1];
+        if (m === 0xff) { i++; continue; }
+        if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+        if (m === 0xda || m === 0xd9) break;          /* empieza el scan: ya no hay metadatos */
+        const L = b.readUInt16BE(i + 2);
+        const cab = b.toString("latin1", i + 4, i + 4 + 30);
+        if (m === 0xe1 && cab.startsWith("Exif\0")) {
+          /* 0x8825 es el puntero al IFD de GPS; se busca en los dos órdenes de bytes
+             solo para que el mensaje diga la gravedad — falla igual sin él. */
+          const seg = b.subarray(i + 4, i + 2 + L);
+          const gps = seg.includes(Buffer.from([0x88, 0x25])) || seg.includes(Buffer.from([0x25, 0x88]));
+          h.push("EXIF" + (gps ? " (con GPS)" : ""));
+        } else if (m === 0xe1 && cab.startsWith("http://ns.adobe.com/xap")) h.push("XMP");
+        else if (m === 0xed) h.push("APP13 Photoshop/IPTC");
+        i += 2 + L;
+      }
+    } else if (ext === "png" && b.toString("latin1", 1, 4) === "PNG") {
+      let i = 8;
+      while (i + 8 <= b.length) {
+        const L = b.readUInt32BE(i), t = b.toString("latin1", i + 4, i + 8);
+        if (t === "eXIf") h.push("EXIF");
+        if (t === "iTXt" && b.toString("latin1", i + 8, i + 25).startsWith("XML:com.adobe.xmp")) h.push("XMP");
+        if (t === "IEND") break;
+        i += 12 + L;
+      }
+    } else if (ext === "webp" && b.toString("latin1", 8, 12) === "WEBP") {
+      let i = 12;
+      while (i + 8 <= b.length) {
+        const t = b.toString("latin1", i, i + 4), L = b.readUInt32LE(i + 4);
+        if (t === "EXIF") h.push("EXIF");
+        if (t === "XMP ") h.push("XMP");
+        i += 8 + L + (L & 1);
+      }
+    }
+    return h;
+  };
+  let sucias = 0, vistas = 0;
+  for (const r of archivos) {
+    const ext = r.toLowerCase().split(".").pop();
+    if (!["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(ext)) continue;
+    vistas++;
+    const h = hallazgos(readFileSync(r), ext);
+    if (h.length) {
+      sucias++;
+      err("check #24: " + r + " lleva " + [...new Set(h)].join(", ") + ". Límpiala antes de publicarla" +
+          (ext === "jpg" || ext === "jpeg" ? " (jpegtran -copy icc" : " (quita sus chunks de metadatos") +
+          "; ver el comentario del check #24 en validate.mjs)");
+    }
+  }
+  if (!vistas) err("check #24: no encontré ninguna imagen en img/ — el recorrido se rompió");
+  else if (!sucias) ok("metadatos: las " + vistas + " imágenes de img/ van sin EXIF ni XMP");
+} catch (e) { err("no se pudieron revisar los metadatos de img/: " + e.message); }
+
+/* ── check #25 · TODA FOTO DE PERSONAS TIENE SU ENTRADA EN EL REGISTRO ──────
+   `ops/consentimientos-medios.json` dice, en su regla, que ningún medio con
+   rostros identificables se publica sin entrada. Hasta el 29 sep 2026 eso lo
+   sostenía la memoria de quien subía la foto, y la auditoría previa al
+   lanzamiento encontró lo que suele encontrar una regla sin guardián: cinco
+   fotos de la galería general —cuatro con niñas y niños— y las de la brigada,
+   el héroe y el banner, publicadas sin entrada; y cuatro entradas apuntando a
+   un héroe que ya no existía. Las autorizaciones sí existían (en papel, en el
+   archivo de la fundación); lo que faltaba era que el registro lo dijera.
+
+   Mira dos direcciones:
+     1 · cada imagen de img/jornadas/ (con sus variantes m/ y thumb/) y cada
+         img/benef_* e img/campo_* tiene entrada. Las variantes se reconocen por
+         el nombre raíz: «hero_futbol_1400.webp» y «thumb/hero_futbol_800.webp»
+         son la misma foto.
+     2 · cada archivo que una entrada publicada nombra existe. Una entrada que
+         apunta a nada no protege nada y hace creer que el registro está al día.
+   Las entradas con `publicado: false` (videos de la Sierra) se saltan la 2.
+
+   NO mira las galerías de aliadas fuera de img/jornadas/ ni los logos: esas
+   van por `consent` en data/partners.json y las vigila el check #22. */
+try {
+  const reg = JSON.parse(readFileSync("ops/consentimientos-medios.json", "utf8"));
+  const raiz = (n) => {
+    /* Solo sufijos de ANCHO (3 o 4 cifras) y «_movil»: con «_\d+» a secas,
+       «benef_01» y «campo_04» quedaban en «benef» y «campo», y una
+       «campo_99» nueva pasaba cubierta por la entrada de otra foto. */
+    let r = n.split("/").pop().replace(/\.[a-z0-9]+$/i, "");
+    for (let k = 0; k < 3; k++) r = r.replace(/_(\d{3,4}|movil)$/i, "");
+    return r;
+  };
+  const cubiertas = new Set(), fallos = [];
+  for (const j of reg.jornadas || []) {
+    for (const a of j.archivos || []) {
+      cubiertas.add(raiz(a));
+      if (j.publicado !== false && !existsSync("img/jornadas/" + a) && !existsSync("img/" + a)) {
+        fallos.push("la entrada «" + j.id + "» nombra " + a + ", que no existe: quítalo o muévelo a «retirados»");
+      }
+    }
+  }
+  const fotos = [];
+  const recorrer = (d) => {
+    for (const n of readdirSync(d)) {
+      const r = d + "/" + n;
+      if (statSync(r).isDirectory()) recorrer(r);
+      else if (/\.(jpe?g|png|webp|heic)$/i.test(n)) fotos.push(r);
+    }
+  };
+  recorrer("img/jornadas");
+  for (const n of readdirSync("img")) if (/^(benef|campo)_.*\.(jpe?g|png|webp)$/i.test(n)) fotos.push("img/" + n);
+  for (const f of fotos) {
+    if (!cubiertas.has(raiz(f))) {
+      fallos.push(f + " no tiene entrada en el registro. Si retrata personas, añade su jornada con la " +
+                  "fuente de la autorización (sin nombres); si no, añádela igual y dilo en la descripción");
+    }
+  }
+  if (fallos.length) err("check #25 · " + fallos.length + " problema(s) en ops/consentimientos-medios.json:\n        " + fallos.join("\n        "));
+  else if (!fotos.length) err("check #25: no encontré ninguna foto en img/jornadas/ — el recorrido se rompió");
+  else ok("consentimientos: las " + fotos.length + " fotos de img/jornadas/ y la galería general tienen entrada");
+} catch (e) { err("no se pudo revisar el registro de consentimientos: " + e.message); }
 
 process.exit(fail);
