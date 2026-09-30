@@ -195,12 +195,22 @@ html_handling = "auto-trailing-slash"
 # camino rápido.
 run_worker_first = true
 
+# SIN CRON. Los [triggers] del nivel superior se HEREDAN en los entornos, y el
+# comentario de arriba que decía que el sandbox no la lleva era cierto solo
+# porque el sandbox se desplegó antes de que existiera el cron (auditoría del
+# 28 sep 2026). Una tarea que manda correo sola no corre sobre casos de ensayo.
+[env.sandbox.triggers]
+crons = []
+
+# BUCKET PROPIO desde el 28 sep 2026. Antes era el mismo de producción, y las
+# llaves de las inspecciones son fijas (inspecciones/<IV-numero>/inspeccion.pdf,
+# firma-*.png) con numeración que en el sandbox también arranca en 000001: la
+# primera inspección firmada de pruebas pisaba el PDF y las firmas REALES de
+# producción. `preview_bucket_name` solo aplica a `wrangler dev`, no separaba nada.
 [[env.sandbox.r2_buckets]]
 binding = "MEDIA"
-bucket_name = "givegrow-media"
-# Prefijo aparte dentro del mismo bucket: las pruebas no ensucian la evidencia
-# real y tampoco obligan a mantener dos buckets.
-preview_bucket_name = "givegrow-media"
+bucket_name = "givegrow-media-sandbox"
+preview_bucket_name = "givegrow-media-sandbox"
 
 [[env.sandbox.d1_databases]]
 binding = "DB"

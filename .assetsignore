@@ -58,3 +58,19 @@ scripts
 # `/caso/<n>` es ruta del Worker (`run_worker_first`), no un archivo.
 casos
 inspecciones
+
+# SECRETOS LOCALES Y MATERIAL INTERNO (auditoría del 28 sep 2026).
+# El sandbox se desplegaba desde el portátil, donde `.dev.vars` existe (está en
+# .gitignore, no en el repo), y https://givegrow-website-sandbox…/.dev.vars
+# servía el archivo real: llaves de PRUEBA de Wompi y de PayPal sandbox, pero
+# llaves. Producción no lo sirvía porque CI despliega desde un checkout limpio;
+# un `wrangler deploy` desde el portátil sí lo habría publicado.
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+# Las migraciones se servían como /migrations/0001_inicial.sql.
+migrations
+# Respaldos de terreno (llevan datos personales) si alguno cae en la raíz.
+respaldo-*
+node_modules
