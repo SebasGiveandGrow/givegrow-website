@@ -2450,8 +2450,14 @@ var I18N_LOADING = null;
       un segundo intento lo resuelve sin molestar a nadie.
    2) Si insiste, se dice. Que es la regla de esta casa: «no existe» y «no pude
       preguntar» no son lo mismo. */
+/* `no-cache` y NO `force-cache` (30 sep 2026). `force-cache` le dice al
+   navegador que use cualquier copia guardada SIN preguntar, así que ignoraba el
+   `no-cache, must-revalidate` que `_headers` pone a este archivo: un visitante
+   que volvía en inglés seguía con el diccionario viejo y cada texto nuevo le
+   salía en español. `no-cache` sí pregunta, y si el archivo no cambió el
+   servidor responde 304 sin cuerpo: cuesta una ida y vuelta, no una descarga. */
 function pedirIngles(){
-  return fetch("/i18n/en.json", { cache: "force-cache" })
+  return fetch("/i18n/en.json", { cache: "no-cache" })
     .then(function(r){ if(!r.ok) throw 0; return r.json(); });
 }
 function ensureLang(next){
