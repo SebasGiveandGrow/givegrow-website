@@ -1,0 +1,94 @@
+name: Deploy sandbox (pruebas)
+
+# EL ENTORNO DE PRUEBAS SE DESPLIEGA DESDE AQUÍ, NUNCA DESDE UNA LAPTOP
+# (auditoría de operación del 28 sep 2026). Un `wrangler deploy --env sandbox`
+# desde una máquina sube lo que haya en SU carpeta: archivos sin commitear,
+# un `.dev.vars` con secretos (el PR #524 cerró justamente eso en
+# .assetsignore) o una rama a medio hacer. Desde aquí sale un checkout limpio
+# del ref elegido, con el mismo Node y el mismo wrangler que producción.
+#
+# Solo a mano: Actions → «Deploy sandbox (pruebas)» → Run workflow, eligiendo
+# la rama. Sirve para probar un PR en el sandbox antes de fusionarlo.
+#
+# A diferencia de producción, aquí las migraciones pendientes SE APLICAN solas:
+# la base del sandbox tiene datos de ensayo y el orden correcto —migración
+# antes que código— es el mismo que en producción, así que el flujo lo cumple
+# en vez de pedirlo.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-sandbox
+  cancel-in-progress: false
+
+jobs:
+  sandbox:
+    runs-on: ubuntu-latest
+    name: Deploy sandbox
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Gate del proyecto
+        run: node scripts/validate.mjs
+
+      - name: Dependencias (incluye wrangler fijo)
+        run: |
+          npm ci
+          npx wrangler --version
+
+      # Mismo criterio que deploy.yml para DETECTAR pendientes (un NNNN_x.sql
+      # en la salida solo sale de la tabla «Migrations to be applied»), y aquí
+      # además se aplican. Si alguna de las 0022–0027 —las que se registran
+      # solas— estuviera pendiente en el sandbox, `apply` choca con el UNIQUE
+      # de d1_migrations y el job se para: eso se arregla a mano, no se fuerza.
+      - name: Migraciones pendientes del sandbox, aplicadas antes del código
+        run: |
+          set -uo pipefail
+          SALIDA=$(npx wrangler d1 migrations list givegrow-privado-sandbox --remote --env sandbox 2>&1)
+          echo "$SALIDA"
+          if echo "$SALIDA" | grep -qE '[0-9]{4}_[A-Za-z0-9_]+\.sql'; then
+            npx wrangler d1 migrations apply givegrow-privado-sandbox --remote --env sandbox
+          else
+            echo "Base del sandbox al día."
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy --env sandbox
+        id: deploy
+        run: |
+          set -o pipefail
+          npx wrangler deploy --env sandbox 2>&1 | tee /tmp/deploy.log
+          VID="$(grep -oE 'Current Version ID: [0-9a-f-]{36}' /tmp/deploy.log | awk '{print $4}' | tail -1)"
+          URL="$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/deploy.log | head -1)"
+          echo "version=$VID" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: El sandbox responde con la versión nueva
+        run: |
+          set -uo pipefail
+          ESPERADA="${{ steps.deploy.outputs.version }}"
+          URL="${{ steps.deploy.outputs.url }}"
+          if [ -z "$ESPERADA" ] || [ -z "$URL" ]; then
+            echo "::error::No encontré la versión o la URL del sandbox en la salida de wrangler."; exit 1
+          fi
+          for i in $(seq 1 12); do
+            R="$(curl -fsS -m 10 "$URL/api/ping" || true)"
+            V="$(printf '%s' "$R" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log(j.ok===true?String(j.version):"no_ok")}catch{console.log("ilegible")}})')"
+            echo "intento $i: $V"
+            if [ "$V" = "$ESPERADA" ]; then echo "Sandbox sirve $ESPERADA en $URL"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::el sandbox no devolvió la versión $ESPERADA (última respuesta: $R)"
+          exit 1

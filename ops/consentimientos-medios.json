@@ -1,8 +1,8 @@
 {
-  "_doc": "Registro de consentimientos de medios publicados — Fundación Give&Grow International (Ley 1581 de 2012). Este registro NO contiene nombres de las personas retratadas por tratarse de un repositorio público; la documentación de soporte (autorizaciones de padres/acudientes y avales comunitarios) reposa en el archivo físico y digital privado de la fundación bajo custodia del representante legal.",
+  "_doc": "Registro de consentimientos de medios publicados — Fundación Give&Grow International (Ley 1581 de 2012). Este registro NO contiene nombres de las personas retratadas por tratarse de un repositorio público; la documentación de soporte (autorizaciones de padres/acudientes y avales comunitarios) reposa en el archivo físico y digital privado de la fundación bajo custodia del representante legal. `archivos` nombra el archivo de img/jornadas/ o de img/ (benef_*, campo_*); sus variantes (m/, thumb/, sufijos _800, _1400, _movil…) quedan cubiertas por el mismo nombre raíz. `menores: true` marca las entradas con niñas o niños identificables. `publicado: false` = consentimiento registrado de un medio que aún no está en el sitio. El check #25 de scripts/validate.mjs falla si una imagen de img/jornadas/ o una benef_*/campo_* no tiene entrada aquí, o si una entrada publicada nombra un archivo que ya no existe.",
   "responsable_custodia": "Representante legal — Fundación Give&Grow International",
   "contacto_habeas_data": "sebas@thegiveandgrowproject.org",
-  "ultima_actualizacion": "2026-07-08",
+  "ultima_actualizacion": "2026-09-29",
   "jornadas": [
     {
       "id": "mayores-2023-05",
@@ -16,11 +16,16 @@
       "descripcion": "Jornada con comunidades wayuu, Alta Guajira (entregas de alimentos, leche y juguetes)",
       "fecha": "2025-01-23/28",
       "consentimiento": "confirmado por representante legal — autorizaciones de la jornada en archivo de la fundación",
+      "menores": true,
       "archivos": [
-        "guajira_nina_naranja.webp", "hero_nina_naranja_800.webp", "hero_nina_naranja_1400.webp", "hero_nina_naranja_2000.webp", "hero_nina_naranja_1400.jpg",
+        "guajira_nina_naranja.webp",
         "guajira_abuela.webp", "guajira_retrato_azul.webp", "guajira_futbol.webp",
         "guajira_sonrisa.webp", "guajira_hermanas.webp", "guajira_panoleta.webp",
-        "guajira_atardecer.webp", "guajira_bebe.webp", "guajira_territorio.webp", "guajira_jornada.webp"
+        "guajira_atardecer.webp", "guajira_bebe.webp", "guajira_territorio.webp", "guajira_jornada.webp",
+        "guajira_territorio_banda_800.webp", "guajira_territorio_banda_1400.webp",
+        "hero_futbol_800.webp", "hero_futbol_1400.webp", "hero_futbol_2000.webp",
+        "banner_atardecer_800.webp", "banner_atardecer_1200.webp", "banner_atardecer_2000.webp", "banner_atardecer_movil.webp",
+        "origen_abuela.webp"
       ]
     },
     {
@@ -28,7 +33,52 @@
       "descripcion": "Jornada en la Sierra Nevada de Santa Marta (videos; aún no publicados en el sitio)",
       "fecha": "2025-09-01/03",
       "consentimiento": "confirmado por representante legal — pendiente publicar",
+      "publicado": false,
       "archivos": ["sierra_sendero", "sierra_aula", "sierra_cancha", "sierra_escuela"]
+    },
+    {
+      "id": "ndf-baile",
+      "descripcion": "Galería del Proyecto de Baile de una fundación aliada (perfil en el mapa de la red)",
+      "fecha": "2026-07",
+      "consentimiento": "registrado en data/partners.json, aliada ndf (consent.photos = true); la protección de imagen de menores figura allí como pendiente",
+      "archivos": ["baile_flow_escenario.webp", "baile_presentacion.webp", "baile_grupo_estudio.webp", "baile_retrato.webp"]
+    },
+    {
+      "id": "brigada-terremoto-2026-08",
+      "descripcion": "Brigada tras el sismo del Eje Cafetero (daños en edificaciones y equipo en terreno)",
+      "fecha": "2026-08",
+      "consentimiento": "confirmado por representante legal — autorización para publicar el conjunto de la brigada; en la de Manizales se recortó fuera del cuadro a un menor que no estaba cubierto (ver el comentario de GALLERY en app.js)",
+      "menores": false,
+      "archivos": [
+        "brigada_aguila_apuntalado.jpg", "brigada_aguila_apuntalado_1200.webp",
+        "brigada_aguila_bodega.jpg", "brigada_aguila_escombros.jpg",
+        "brigada_ansermanuevo_vivienda.jpg", "brigada_ansermanuevo_vivienda_1600.webp",
+        "brigada_manizales_revision.jpg",
+        "brigada_marsella_equipo.jpg", "brigada_marsella_equipo_1200.webp"
+      ]
+    },
+    {
+      "id": "galeria-terreno-menores",
+      "descripcion": "Fotos de terreno de la galería general con niñas y niños identificables",
+      "fecha": null,
+      "consentimiento": "autorización escrita en archivo físico de la Fundación (confirmado por Sebas el 29 sep 2026)",
+      "menores": true,
+      "archivos": ["benef_01.jpg", "benef_03.jpg", "campo_01.jpg", "campo_04.jpg"]
+    },
+    {
+      "id": "galeria-terreno-adultos",
+      "descripcion": "Foto de terreno de la galería general con adultos mayores identificables",
+      "fecha": null,
+      "consentimiento": "autorización escrita en archivo físico de la Fundación (confirmado por Sebas el 29 sep 2026)",
+      "menores": false,
+      "archivos": ["benef_02.jpg"]
+    }
+  ],
+  "retirados": [
+    {
+      "archivos": ["hero_nina_naranja_800.webp", "hero_nina_naranja_1400.webp", "hero_nina_naranja_2000.webp", "hero_nina_naranja_1400.jpg"],
+      "fecha": "2026-09-29",
+      "motivo": "ya no existen en el repositorio (el héroe pasó a hero_futbol_*); se sacan del registro activo para que la lista diga lo que de verdad se publica"
     }
   ],
   "regla": "Ningún medio con rostros identificables se publica sin entrada en este registro. Al retirar un consentimiento, el medio se elimina del sitio y del repositorio en el siguiente deploy."
