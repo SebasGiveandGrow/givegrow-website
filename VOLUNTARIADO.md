@@ -17,8 +17,10 @@ Give&Grow no busca voluntarios para tener manos gratis. Busca dos cosas al mismo
 
 Las dos, no una. Un voluntariado que solo sensibiliza usa a la comunidad como escenografía. Uno
 que solo transfiere capacidad desaprovecha a la persona que vino. **La primera línea de este
-programa es Impact Journey (Ruta 4)**, diseñada con MIRA para que ambas cosas ocurran en la misma
-jornada.
+programa es Impact Journey (Ruta 4)**, diseñada con MIRA para que ambas cosas ocurran, y en doble
+vía: en la **ida**, el equipo de la empresa va a la fundación; en la **vuelta**, que es el corazón
+del método, la comunidad de la fundación va a la empresa a conocer la vida de quienes trabajan ahí,
+sus funciones y el camino para llegar a esos cargos (ver [MIRA §4](METODOLOGIA_MIRA.md)).
 
 ---
 
@@ -64,7 +66,7 @@ en el formulario porque es lo que dispara el protocolo de cuidado.
 
 | Puerta | Para quién | Nivel en el formulario |
 |---|---|---|
-| **Impact Journey** · voluntariado en doble vía | Empresas y sus equipos (formulario de alianza, «Voluntariado corporativo») | — |
+| **Impact Journey** · voluntariado en doble vía (ida a la fundación, vuelta a la empresa) | Empresas y sus equipos (formulario de alianza, «Voluntariado corporativo») | — |
 | **En terreno** | Personas, con las fundaciones del HUB | `hub` |
 | **Administrativo** | Personas, en la sede de Give&Grow | `estructura` |
 | **Técnico** · Mira Mi Casa | Ingenieros con matrícula del COPNIA | (su propio formulario) |
@@ -131,6 +133,26 @@ nivel — incluido quien solo lleva su celular. No depende del oficio ni de si l
 entregable ES la imagen de una persona**. Ahí el consentimiento deja de ser un trámite y se vuelve
 el oficio. Y separándolo del nivel se cubre también el caso simple: un voluntario del nivel HUB con
 el celular en la mano.
+
+---
+
+## 3.2 Protocolo de la vuelta (la comunidad en la empresa)
+
+La vuelta lleva a niñas, niños, jóvenes y familias a un lugar que no conocen, así que el cuidado
+cambia de lado: ahora el anfitrión es la empresa y quien cuida sigue siendo la fundación.
+
+1. **La fundación decide quién va y acompaña** a su gente durante toda la visita. Nadie de la
+   comunidad está a solas con personal de la empresa.
+2. **Los menores van con la autorización firmada de su acudiente**, igual que en cualquier
+   actividad (Ley 1581 art. 7 y Ley 1098).
+3. **La empresa designa a una persona que recibe** y a quienes van a contar su trabajo, y pasa por
+   la sesión de Marco: qué esperar, cómo hablar de su oficio sin condescendencia, qué no preguntar.
+4. **La visita es para conocer, no para posar:** recorrido por las áreas, conversaciones con
+   personas de distintos cargos y algo que el visitante haga con sus manos.
+5. **El protocolo de imagen aplica igual:** las fotos de la comunidad las autorizan la fundación y
+   las familias, no la empresa.
+6. **Transporte, alimentación y seguridad del recorrido** se acuerdan por escrito (Parte A de la
+   plantilla de acuerdos).
 
 ---
 
@@ -205,7 +227,8 @@ Estos aportes entran por el nivel **"con Give&Grow"**. Si la persona además qui
 - El reporte de lo que la jornada dejó.
 
 **La empresa aliada**
-- Jornada diseñada y acompañada, con protocolo.
+- Jornada diseñada y acompañada, con protocolo, en las dos vías: su equipo va a la fundación y
+  la fundación viene a la empresa.
 - **Reporte de impacto de la jornada** (ver [MEDICION.md](MEDICION.md)), redactado en clave de
   **contribución**, no de atribución.
 - Reconocimiento como empresa aliada en la red.
