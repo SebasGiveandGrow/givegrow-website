@@ -2675,6 +2675,20 @@ async function adminSalud(env) {
     "WHERE tipo = 'voluntario' AND estado = 'aceptada' AND COALESCE(json_extract(datos, '$.listo'), 0) <> 1 " +
     "AND actualizada_en < datetime('now','-14 days')",
     "Bandeja «Quién quiere entrar» · aceptados cuya lista de pasos lleva dos semanas quieta", 89, "#sec-entrar");
+  /* JORNADAS REALIZADAS SIN CERRAR (0036). Cerrar es lo que emite el
+     certificado de cada voluntario y abre las encuestas; una jornada que se
+     queda en «realizada» deja a todos sin las dos cosas, y nada lo decia.
+
+     Cuenta desde la FECHA DE LA JORNADA (medianoche de Colombia, que en UTC son
+     las 05:00), no desde el clic: la espera empieza el dia en que la gente fue.
+     SIETE DIAS de plazo: lo que falta para cerrar es la cifra de beneficiarios
+     que manda la fundacion y las horas de cada quien, y una semana le da tiempo
+     a la fundacion sin que el agradecimiento llegue cuando ya nadie se acuerda
+     de la jornada — ni la encuesta, que pierde respuestas con cada dia. */
+  await enCola("jornadas_sin_cerrar",
+    "SELECT COUNT(*) AS n, MIN(fecha || ' 05:00:00') AS masViejo FROM jornadas WHERE estado = 'realizada'",
+    "Módulo «Voluntariado» · ciérrala con los beneficiarios que reportó la fundación: así salen los certificados y las encuestas",
+    80, "#sec-jornadas", 7);
   /* Y DESPUES DE «nueva». Mover una fundacion a «en revision» la sacaba de toda
      cola para siempre, y lo mismo aceptada sin visita o visitada sin
      cuestionario: el proceso de cinco pasos se podia quedar parado en
@@ -5094,6 +5108,7 @@ const NOMBRE_COLA_PLAZO = {
   ofrecimientos_sin_respuesta: "Ofrecimientos en especie sin responder",
   apadrinamientos_sin_respuesta: "Quieren apadrinar y esperan respuesta",
   voluntarios_sin_respuesta: "Voluntarios sin responder",
+  jornadas_sin_cerrar: "Jornadas realizadas sin cerrar (sin certificados ni encuestas)",
   urgentes_sin_visitar: "Casos urgentes que nadie ha visitado",
   casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto"
 };
@@ -5111,7 +5126,11 @@ async function resumenDiarioEquipo(env) {
   const vencidas = cola.filter(c => c.n > 0 && c.vencida);
   if (!vencidas.length) return { saltado: "nada_vencido" };
   const deMMC = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) >= 0);
-  const deAlianzas = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) < 0);
+  /* Las jornadas van al mismo buzon de alianzas pero en SU correo: el de arriba
+     cuenta «personas que esperan una respuesta», y una jornada sin cerrar no es
+     eso. Mezclarlas haria que el titulo mintiera. */
+  const deJornadas = vencidas.filter(c => c.clave === "jornadas_sin_cerrar");
+  const deAlianzas = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) < 0 && c.clave !== "jornadas_sin_cerrar");
   const otras = cola.filter(c => c.n > 0 && !c.vencida).length;
   const out = {};
   if (deAlianzas.length) {
@@ -5138,6 +5157,19 @@ async function resumenDiarioEquipo(env) {
         "Los urgentes se atienden desde la ruta de visitas. Si hay riesgo para la vida, lo que corresponde es avisar a la alcaldía o al consejo municipal de gestión del riesgo, y al 123. Las fotos sin abrir se destraban escribiendo a los ingenieros verificados o abriéndolas desde /triaje."
       ],
       boton: { url: "https://thegiveandgrowproject.org/admin/ruta", texto: "Abrir la ruta de visitas" }
+    });
+  }
+  if (deJornadas.length) {
+    out.jornadas = await enviarResumenVencidas(env, {
+      para: correoAlianzas(env), etiqueta: "resumen-diario-jornadas", vencidas: deJornadas,
+      titulo: (n) => n === 1
+        ? "Una jornada de voluntariado lleva más de una semana sin cerrar"
+        : n + " jornadas de voluntariado llevan más de una semana sin cerrar",
+      parrafos: [
+        "Mientras no se cierre, sus voluntarios no reciben el certificado con sus horas ni la encuesta, y la empresa no recibe la suya.",
+        "Para cerrarla hacen falta las horas de cada persona y los beneficiarios que reportó la fundación. Se cierra desde el panel, en «Voluntariado»."
+      ],
+      boton: { url: "https://thegiveandgrowproject.org/admin#vol/sec-jornadas", texto: "Abrir las jornadas" }
     });
   }
   return out;
@@ -15616,10 +15648,40 @@ async function adminBorrarInscripcion(request, env, id, quien) {
    decision, con la regla de MEDICION.md («reportadas», contribucion y no
    atribucion) y con la fundacion de por medio. */
 const PUERTAS_JORNADA = ["impact-journey", "terreno", "administrativo", "tecnico", "emergencia"];
-/* Las dos que pisan territorio por definicion. Tecnico (Mira Mi Casa) tiene su
-   propia induccion y la de emergencia no da tiempo a una sesion aparte: si
-   Sebas decide que tambien la exigen, se añaden aqui y nada mas cambia. */
-const PUERTAS_CON_MARCO = ["impact-journey", "terreno"];
+/* Las que pisan territorio. «emergencia» entro el 30 sep 2026 (decision de
+   Sebas): una brigada tambien pisa el territorio, y es justo cuando hay menos
+   tiempo para preparar a la gente cuando mas falta el Marco. «tecnico» (Mira
+   Mi Casa) NO: el triaje se hace a distancia, sobre fotos. */
+const PUERTAS_CON_MARCO = ["impact-journey", "terreno", "emergencia"];
+/* LA VERIFICACION DE CADA PERSONA, antes de anotarla (decision de Sebas, 30 sep
+   2026). En estas dos puertas nadie entra a la lista de una jornada sin haber
+   pasado los pasos de VOLUNTARIADO.md §3: identidad, antecedentes, acuerdo y
+   protocolo firmados, visto bueno de la fundacion y, si es menor, la
+   autorizacion del acudiente. Antes el panel solo avisaba «le faltan pasos».
+
+   SE EXIGEN LOS PASOS DE TERRENO aunque la persona se inscribiera como
+   «administrativa»: lo que dispara el protocolo de cuidado es pisar el
+   territorio, no el nivel con el que llego (§2). Con el nivel de su
+   inscripcion, a alguien de sede le bastaba el acuerdo para ir a terreno.
+
+   EL MARCO DE LA PERSONA NO SE EXIGE AL ANOTARLA, y no es una rebaja: la sesion
+   de Marco se hace con el grupo de la jornada, asi que pedirla antes de armar
+   la lista seria pedir algo que todavia no puede haber ocurrido. Lo cubre el
+   Marco de la jornada, que el servidor ya exige para marcarla realizada.
+
+   Y A MANO NO SE ANOTA A NADIE en estas puertas: sin inscripcion no hay pasos
+   que mirar. Quien venga con una empresa se inscribe por el formulario de
+   voluntariado como cualquiera (es publico y no pide nada que un empleado no
+   tenga); la solicitud de alianza es de la empresa, no de su equipo. */
+const PUERTAS_CON_VERIFICACION = ["impact-journey", "terreno"];
+function pasosQueFaltan(x) {
+  const pasos = (x && x.pasos) || {};
+  return pasosRequeridos(Object.assign({}, x, { nivel: "hub" }))
+    .filter((k) => k !== "marco" && !pasos[k]);
+}
+const PASO_NOMBRE = { identidad: "identidad verificada", antecedentes: "antecedentes revisados",
+  acuerdo: "acuerdo y protocolo firmados", fundacion: "visto bueno de la fundación",
+  acudiente: "autorización del acudiente" };
 const FORMATOS_JORNADA = ["presencial", "virtual", "remoto", "hibrido"];
 const ESTADOS_JORNADA = ["planeada", "confirmada", "realizada", "cerrada", "cancelada"];
 /* Que estado puede seguir a cual. «cerrada» no esta en ninguna lista: a ella
@@ -15935,12 +15997,17 @@ async function adminJornada(env, id) {
     let x = {};
     try { x = JSON.parse(v.datos || "{}") || {}; } catch (e) { /* nada */ }
     return { id: v.id, nombre: v.nombre, estado: v.estado, nivel: x.nivel || null, listo: !!x.listo,
-             menor: x.mayor_edad === false };
+             menor: x.mayor_edad === false,
+             /* Lo que le falta PARA ESTA JORNADA, con la misma regla que aplica
+                el servidor al anotar: el panel no la recalcula. */
+             faltan: PUERTAS_CON_VERIFICACION.includes(j.puerta) ? pasosQueFaltan(x).map((k) => PASO_NOMBRE[k] || k) : [] };
   });
   const correoEmpresa = await correoEmpresaJornada(env, j);
   return json({
     jornada: Object.assign({}, j, { anfitriona_nombre: nombreAnfitriona(red, j.anfitriona),
-      requiere_marco: PUERTAS_CON_MARCO.includes(j.puerta), siguientes: PASOS_JORNADA[j.estado] || [] }),
+      requiere_marco: PUERTAS_CON_MARCO.includes(j.puerta),
+      requiere_verificacion: PUERTAS_CON_VERIFICACION.includes(j.puerta),
+      siguientes: PASOS_JORNADA[j.estado] || [] }),
     participaciones,
     encuestas_actor: (act || []).map((e) => Object.assign({}, e, {
       enlace: ORIGIN + "/encuesta/" + e.token,
@@ -15972,6 +16039,25 @@ async function adminEditarJornada(request, env, id, quien) {
   if (j.estado === "realizada" && PUERTAS_CON_MARCO.includes(v.campos.puerta) && !j.marco_en) {
     return json({ error: "sin_marco", campo: "puerta",
       ayuda: "Esa puerta exige la sesión de Marco y esta jornada ya está realizada sin ella." }, 409);
+  }
+  /* Y la otra puerta trasera: anotar gente en una puerta sin verificacion y
+     despues cambiarla a terreno o Impact Journey. Se revisa a quien ya esta. */
+  if (PUERTAS_CON_VERIFICACION.includes(v.campos.puerta) && !PUERTAS_CON_VERIFICACION.includes(j.puerta)) {
+    const { results: ya } = await env.DB.prepare(
+      "SELECT p.nombre, p.inscripcion, i.datos FROM participaciones p LEFT JOIN inscripciones i ON i.id = p.inscripcion WHERE p.jornada = ?"
+    ).bind(id).all();
+    const sinVerificar = (ya || []).filter((p) => {
+      if (!p.inscripcion || !p.datos) return true;
+      let x = {};
+      try { x = JSON.parse(p.datos) || {}; } catch (e) { return true; }
+      return pasosQueFaltan(x).length > 0;
+    });
+    if (sinVerificar.length) {
+      return json({ error: "verificacion_incompleta", campo: "puerta",
+        ayuda: "No se puede pasar a esta puerta: " + sinVerificar.length + (sinVerificar.length === 1 ? " persona anotada no tiene" : " personas anotadas no tienen") +
+               " su verificación completa o se anotaron a mano (" + sinVerificar.slice(0, 5).map((p) => p.nombre).join(", ") +
+               (sinVerificar.length > 5 ? "…" : "") + "). Quítalas o complétala primero." }, 409);
+    }
   }
   await env.DB.prepare(
     "UPDATE jornadas SET " + CAMPOS_JORNADA.map((k) => k + " = ?").join(", ") +
@@ -16060,6 +16146,15 @@ async function adminAnotarParticipante(request, env, id, quien) {
     if (v.estado === "archivada") return json({ error: "archivada", ayuda: "Está archivada: reábrela antes de anotarla." }, 409);
     let x = {};
     try { x = JSON.parse(v.datos || "{}") || {}; } catch (e) { /* nada */ }
+    if (PUERTAS_CON_VERIFICACION.includes(j.puerta)) {
+      const faltan = pasosQueFaltan(x);
+      if (faltan.length) {
+        const nombres = faltan.map((k) => PASO_NOMBRE[k] || k);
+        return json({ error: "verificacion_incompleta", faltan: nombres,
+          ayuda: "No se puede anotar en una jornada de " + (j.puerta === "terreno" ? "terreno" : "Impact Journey") +
+                 ": le falta " + nombres.join(", ") + ". Márcalo en su fila de «Quién quiere entrar» (Red) y vuelve a intentarlo." }, 409);
+      }
+    }
     const acu = x.acudiente || {};
     /* El contacto del acudiente es texto libre en el formulario (correo o
        telefono). Solo se toma si ES un correo: no se adivina. */
@@ -16072,6 +16167,12 @@ async function adminAnotarParticipante(request, env, id, quien) {
       acudiente_email: x.mayor_edad === false ? acuCorreo : null
     };
   } else {
+    if (PUERTAS_CON_VERIFICACION.includes(j.puerta)) {
+      return json({ error: "requiere_inscripcion",
+        ayuda: "En una jornada de " + (j.puerta === "terreno" ? "terreno" : "Impact Journey") +
+               " no se anota a nadie a mano: cada persona —también el equipo de una empresa— se inscribe primero " +
+               "por el formulario de voluntariado del sitio y pasa su verificación. Después se anota desde la lista." }, 409);
+    }
     const nombre = limpiar(c.nombre, 120);
     const email = limpiar(c.email, 200).toLowerCase();
     const celular = telefonoContacto(c.celular);
@@ -18053,7 +18154,7 @@ textarea { font-size: 16px }
   <button type="button" class="mod-tab" data-mod-ir="dinero">Dinero<span class="mod-n" id="n-dinero"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="mmc">Mira Mi Casa<span class="mod-n" id="n-mmc"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="red">Red<span class="mod-n" id="n-red"></span></button>
-  <button type="button" class="mod-tab" data-mod-ir="vol">Voluntariado</button>
+  <button type="button" class="mod-tab" data-mod-ir="vol">Voluntariado<span class="mod-n" id="n-vol"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="entregas">Entregas<span class="mod-n" id="n-entregas"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="conta">Contabilidad<span class="mod-n" id="n-conta"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="salud">Salud<span class="mod-n" id="n-salud"></span></button>
@@ -18137,9 +18238,13 @@ declaró, no uno comprobado.</p>
 <h2 id="sec-jornadas" class="h-sec" style="margin:8px 0 6px;font-size:26px">Jornadas de voluntariado</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">De la ficha de convocatoria al
 cierre. <strong>Sin sesión de Marco no hay jornada en terreno:</strong> el panel no deja marcar como
-realizada una jornada de Impact Journey o En terreno sin ella. <strong>Cerrar es el registro:</strong>
-las horas quedan fijas, la fundación reporta a cuántas personas llegó, sale un certificado de
-voluntariado por cada persona con horas y nacen las encuestas. Después de cerrar ya no se edita.</p>
+realizada una jornada de Impact Journey, En terreno o De emergencia sin ella. En Impact Journey y En
+terreno, además, <strong>solo se anota a quien tiene su verificación completa</strong> (Red → «Quién
+quiere entrar»), y nadie a mano. <strong>Cerrar es el registro:</strong> las horas quedan fijas, la
+fundación reporta a cuántas personas llegó, sale un certificado de voluntariado por cada persona con
+horas y nacen las encuestas. <strong>Una jornada cerrada no se reabre:</strong> si algo quedó mal, se
+crea otra jornada con los datos buenos y la cerrada se deja como está, porque sus certificados ya
+dicen lo que dicen.</p>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:18px">Los indicadores cuentan solo lo
 que ocurrió —jornadas realizadas y personas con horas— y los beneficiarios son <strong>los que reporta
 la fundación</strong>, no los que contamos nosotros. A un menor de edad <strong>nunca</strong> se le
@@ -19230,7 +19335,8 @@ var COLA_ES = {
   actas_sin_donante: "Actas que no le aparecen a nadie",
   concepto_sin_avisar: "Conceptos escritos y sin avisar",
   certificados_en_revision: "Certificados que perdieron respaldo",
-  correos_sin_cupo: "Avisos que no salieron por cupo"
+  correos_sin_cupo: "Avisos que no salieron por cupo",
+  jornadas_sin_cerrar: "Jornadas realizadas sin cerrar"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -19424,7 +19530,9 @@ var COLA_MOD = {
   actas_sin_donante: "entregas",
   concepto_sin_avisar: "mmc",
   certificados_en_revision: "dinero",
-  correos_sin_cupo: "salud"
+  correos_sin_cupo: "salud",
+  /* Su «Ir» lleva a #sec-jornadas, que vive en el modulo de voluntariado. */
+  jornadas_sin_cerrar: "vol"
 };
 
 /* El numero en la pestana es lo que convierte esto en una consola: sin el hay
@@ -19442,7 +19550,7 @@ function pintarContadores(pend){
   Object.keys(por).forEach(function(m){ total += por[m]; });
   por.hoy = total;
   if (Object.keys(urge).length) urge.hoy = true;
-  ["hoy", "dinero", "mmc", "red", "entregas", "salud"].forEach(function(m){
+  ["hoy", "dinero", "mmc", "red", "vol", "entregas", "salud"].forEach(function(m){
     var n = document.getElementById("n-" + m);
     if (!n) return;
     n.textContent = por[m] ? String(por[m]) : "";
@@ -22032,7 +22140,8 @@ function pintarJornada(d){
   if (j.estado === "realizada"){
     var sede = !j.anfitriona || j.anfitriona === "sede";
     h += '<div class="vol-cierre eg-form" style="max-width:none;padding-top:12px"><p style="margin:0"><strong>Cerrar la jornada.</strong> ' +
-      "Fija las horas, emite un certificado por cada persona con horas y crea las encuestas. Después ya no se edita.</p>" +
+      "Fija las horas, emite un certificado por cada persona con horas y crea las encuestas. Después ya no se edita ni se reabre: " +
+      "si luego aparece un error, se crea otra jornada con los datos buenos.</p>" +
       '<div class="eg-par"><div><label for="j-bd">Beneficiarios directos</label><input id="j-bd" inputmode="numeric"></div>' +
       '<div><label for="j-bi">Beneficiarios indirectos</label><input id="j-bi" inputmode="numeric"></div></div>' +
       '<p class="mu" style="font-size:12.5px;margin:4px 0 0">Los que <strong>reporta la fundación</strong>, no los que contamos nosotros. ' +
@@ -22058,15 +22167,34 @@ function pintarJornada(d){
       ps.map(function(p){ return filaParticipante(p, abierta); }).join("") + "</tbody></table></div>"
     : '<p class="mu">Nadie anotado todavía.</p>';
   if (abierta){
-    var vols = (d.voluntarios || []).map(function(v){
-      return [v.id, v.nombre + " · " + (NIVEL_ES[v.nivel] || v.nivel || "sin nivel") + (v.listo ? " · lista" : " · le faltan pasos") + (v.menor ? " · menor" : "")];
+    /* En terreno e Impact Journey la lista se parte en dos: a quien se puede
+       anotar, y a quien le falta algo, con lo que le falta. El servidor
+       bloquea igual; esto es para que nadie tenga que descubrirlo con un error. */
+    var todos = d.voluntarios || [];
+    var listos = todos.filter(function(v){ return !(v.faltan && v.faltan.length); });
+    var faltos = todos.filter(function(v){ return v.faltan && v.faltan.length; });
+    var vols = listos.map(function(v){
+      return [v.id, v.nombre + " · " + (NIVEL_ES[v.nivel] || v.nivel || "sin nivel") + (v.menor ? " · menor" : "")];
     });
     h += '<div class="eg-form" style="max-width:none">' +
       '<div class="eg-par"><div><label for="jp-vol">Anotar a un voluntario inscrito</label><select id="jp-vol">' +
-        opcionesJ(vols, "", vols.length ? "Elige…" : "No hay voluntarios sin anotar") + "</select></div>" +
-      '<button type="button" class="btn" data-panotar="' + j.id + '">Anotar</button></div>' +
-      (j.requiere_marco ? '<p class="mu" style="font-size:12.5px;margin:4px 0 0">«Le faltan pasos» es la lista de Red (identidad, antecedentes, acuerdo, visto bueno de la fundación, Marco): para ir a terreno conviene tenerla completa.</p>' : "") +
-      '<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600;font-size:13.5px">O alguien que no se inscribió por el sitio</summary>' +
+        opcionesJ(vols, "", vols.length ? "Elige…" : (j.requiere_verificacion ? "Nadie con la verificación completa" : "No hay voluntarios sin anotar")) + "</select></div>" +
+      '<button type="button" class="btn" data-panotar="' + j.id + '">Anotar</button></div>';
+    if (j.requiere_verificacion){
+      h += '<p class="mu" style="font-size:12.5px;margin:6px 0 0">En esta puerta solo se anota a quien tiene su verificación completa. ' +
+        "El Marco no hace falta todavía: es la sesión de esta jornada, y se marca arriba.</p>";
+      if (faltos.length){
+        h += '<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;font-size:13.5px">' + faltos.length +
+          (faltos.length === 1 ? " voluntario no se puede anotar todavía" : " voluntarios no se pueden anotar todavía") + "</summary>" +
+          '<ul style="margin:8px 0 0 18px;padding:0;font-size:13.5px">' + faltos.map(function(v){
+            return "<li><strong>" + esc(v.nombre) + "</strong>: le falta " + esc(v.faltan.join(", ")) + "</li>";
+          }).join("") + '</ul><p class="mu" style="font-size:12.5px;margin:6px 0 0">Se completa en Red → «Quién quiere entrar», en su fila.</p></details>';
+      }
+      h += '<p class="mu" style="font-size:12.5px;margin:10px 0 0">Aquí no se anota a nadie a mano, tampoco al equipo de una empresa: ' +
+        "cada persona se inscribe por el formulario de voluntariado del sitio y pasa su verificación.</p>" +
+        '<p class="msg" id="jp-msg"></p></div>';
+    } else {
+    h += '<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600;font-size:13.5px">O alguien que no se inscribió por el sitio</summary>' +
       '<div class="eg-par"><div><label for="jp-nombre">Nombre, como debe salir en el certificado</label><input id="jp-nombre" autocomplete="off"></div>' +
       '<div><label for="jp-email">Correo</label><input id="jp-email" type="email" autocomplete="off"></div></div>' +
       '<div class="eg-par"><div><label for="jp-celular">Celular</label><input id="jp-celular" type="tel" autocomplete="off"></div>' +
@@ -22076,6 +22204,7 @@ function pintarJornada(d){
       '<div><label for="jp-aemail">Correo del acudiente (si es menor)</label><input id="jp-aemail" type="email" autocomplete="off"></div></div>' +
       '<p><button type="button" class="btn" data-panotarmano="' + j.id + '" style="margin-top:10px">Anotarla</button></p></details>' +
       '<p class="msg" id="jp-msg"></p></div>';
+    }
   }
   h += "</div>";
 
