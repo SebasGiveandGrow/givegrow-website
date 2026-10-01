@@ -94,9 +94,32 @@ la interrupción.
 
 ---
 
-## 4. La doble vía
+## 4. La doble vía: ida y vuelta
 
-En un **Impact Journey** ocurren **dos ampliaciones simultáneas en direcciones opuestas**:
+> **Precisado por Sebas el 30 sep 2026. Es lo más importante del concepto.** La doble vía no son
+> solo dos aprendizajes dentro de la misma jornada. Son **dos encuentros en direcciones opuestas**:
+
+| | **La ida** | **La vuelta** — el corazón del método |
+|---|---|---|
+| **Quién va** | El equipo de la empresa | Niñas, niños, jóvenes y familias de la fundación |
+| **A dónde** | A la fundación del HUB, en su territorio | A la empresa |
+| **Qué conoce** | Una realidad que no veía | Cómo es la vida de quienes trabajan ahí, qué hace cada área, qué estudió cada persona y qué camino recorrió hasta su cargo |
+| **Qué se amplía** | Su mirada sobre la comunidad | Lo que cree posible para sí: ver que ese trabajo existe y cómo se alcanza |
+| **Quién acompaña** | El equipo de la fundación (anfitriona) | La fundación, que va con su gente; la empresa designa quién recibe |
+
+La vuelta es la que da sentido al objetivo técnico: para alguien que nunca ha entrado a una
+oficina, una planta o un laboratorio, **ver el trabajo por dentro es la experiencia significativa**
+que amplía su campo perceptual. Una ida sin vuelta es el voluntariado de siempre: la empresa
+visita y se va.
+
+**Antecedente:** el fundador ya hizo la vuelta antes de crear Give&Grow, a título personal y con
+esta misma metodología. Se puede decir así; **nunca «Give&Grow ya la hizo»**.
+
+**Cuidado en la vuelta:** se aplican el protocolo de cuidado y el de imagen (VOLUNTARIADO.md
+§3.2). Los menores van siempre con la fundación y con la autorización de su acudiente.
+
+En **cada uno de los dos encuentros** ocurren **dos ampliaciones simultáneas en direcciones
+opuestas**, una en quien llega y otra en quien recibe:
 
 ```
         MISMA EXPERIENCIA · CUATRO FASES · DOS CAMPOS QUE SE AMPLÍAN
@@ -139,7 +162,7 @@ MIRA es el **motor pedagógico**; no reemplaza ni la infraestructura ni la plata
 ```
 
 **Rutas donde MIRA opera hoy:**
-- **R4 · Impact Journey** — ruta principal. Doble vía completa (voluntario + participante).
+- **R4 · Impact Journey** — ruta principal. Doble vía completa: la ida (la empresa va a la fundación) y la vuelta (la comunidad va a la empresa), cada una con sus cuatro fases.
 - **R3 · Social Grow** — formación y capacidades. Chefs del Futuro (NDF) es el caso vivo.
 
 **Regla:** ninguna intervención se diseña como "entrega de suministros" o "taller técnico" a secas.
