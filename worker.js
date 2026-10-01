@@ -32,7 +32,7 @@
 */
 
 import { qrSvg } from './qr.js';
-import { recibo, certificado, informeTriage, inspeccionPDF,
+import { recibo, certificado, certificadoVoluntariado, informeTriage, inspeccionPDF,
          INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT,
          INSPECCION_AYUDA, INSPECCION_ANCHOS, INSPECCION_GLOSARIO,
          INSPECCION_LIMITES, INSPECCION_REGLA_VISTA, INSPECCION_RECOMENDA,
@@ -1408,7 +1408,9 @@ async function alertaOperacion(env) {
    LA IP NO SE GUARDA: se guarda sha256(dia + IP), que no se puede cruzar entre
    dias, y la fila se borra a los dos dias. Si la cuenta falla, se deja pasar:
    el tope es una red, no una puerta — igual que el cupo de correo. */
-const TOPE_IP_DIA = { caso: 40, inscripcion: 20, transferencia: 20, "baja-enlace": 10 };
+/* `encuesta` (0036): una brigada que responde desde el mismo wifi cabe de
+   sobra en 40; un script que rellena encuestas, no. */
+const TOPE_IP_DIA = { caso: 40, inscripcion: 20, transferencia: 20, "baja-enlace": 10, encuesta: 40 };
 async function pasaTopeIP(env, request, puerta) {
   const tope = TOPE_IP_DIA[puerta];
   const ip = request.headers.get("CF-Connecting-IP") || "";
@@ -15539,6 +15541,23 @@ async function adminBorrarInscripcion(request, env, id, quien) {
     pasos.push(env.DB.prepare("DELETE FROM consentimientos WHERE LOWER(sujeto) = ?").bind(correo));
     pasos.push(env.DB.prepare("DELETE FROM correos WHERE LOWER(para) = ? AND guia IS NULL").bind(correo));
   }
+  /* Y LO QUE DEJO EN LAS JORNADAS (0036). Su participacion NO se borra: sus
+     horas son parte de un agregado —«horas de voluntariado efectivas»— que ya
+     se pudo haber reportado a una empresa, y quitarlas cambiaria una cifra
+     publicada. Lo que se borra es QUIEN: nombre, correo, celular y acudiente,
+     tambien dentro del certificado congelado. La huella de ese certificado
+     deja de cuadrar, y es lo correcto: la persona pidio que ese papel ya no la
+     nombre. El orden importa: el certificado primero, mientras la participacion
+     todavia apunta a la inscripcion. Si la empresa es la que se suprime, la
+     jornada pierde el enlace y conserva el nombre de la empresa, que no es un
+     dato personal. */
+  pasos.push(env.DB.prepare(
+    "UPDATE reconocimientos SET datos = json_set(datos, '$.nombre', '(suprimido)') " +
+    "WHERE participacion IN (SELECT id FROM participaciones WHERE inscripcion = ?)").bind(id));
+  pasos.push(env.DB.prepare(
+    "UPDATE participaciones SET inscripcion = NULL, nombre = '(suprimido)', email = NULL, celular = NULL, " +
+    "acudiente_nombre = NULL, acudiente_email = NULL WHERE inscripcion = ?").bind(id));
+  pasos.push(env.DB.prepare("UPDATE jornadas SET empresa_inscripcion = NULL WHERE empresa_inscripcion = ?").bind(id));
   pasos.push(env.DB.prepare("DELETE FROM inscripciones WHERE id = ?").bind(id));
   await env.DB.batch(pasos);
 
@@ -15570,6 +15589,1063 @@ async function adminBorrarInscripcion(request, env, id, quien) {
   return json({ ok: true, id, suprimida: true,
                 ...(archivosPendientes ? { aviso: "archivos_pendientes",
                   ayuda: "Se borro de la base, pero los archivos del cuestionario (fichas/" + id + "/) no se pudieron borrar de R2. Hay que borrarlos a mano." } : {}) });
+}
+
+/* ========================================================================
+   JORNADAS DE VOLUNTARIADO — la parte operativa (migrations/0036)
+   ========================================================================
+   QUE CIERRA. El pitch del Social Fest le dice a una empresa que la jornada
+   «deja registro, igual que una donacion», que cada voluntario recibe un
+   certificado con sus horas efectivas y que se mide con los indicadores de
+   siempre del voluntariado corporativo. Hasta hoy el panel sabia quien se
+   inscribio y si ya hizo su Marco, y nada mas: no habia donde decir que hubo
+   una jornada. Esto es ese registro, de la ficha de convocatoria al cierre.
+
+   EL RECORRIDO, que es el de VOLUNTARIADO.md §9 visto desde el panel:
+     planeada → confirmada → realizada → cerrada        (o cancelada)
+   · «realizada» exige la sesion de Marco cuando la puerta pisa territorio
+     (Impact Journey y En terreno): §4, «sin sesion de Marco no hay jornada».
+     Lo hace cumplir el servidor, no el boton.
+   · «cerrada» es el momento del registro: las horas quedan fijas, la
+     fundacion reporta a cuantas personas llego, se emiten los certificados
+     con su numero y nacen los enlaces de la encuesta. Despues de cerrar no se
+     edita: lo que dice un certificado ya emitido no puede cambiar debajo de el.
+
+   LO QUE NO HACE, a proposito: no publica nada en el sitio. Las cifras de aqui
+   son para el reporte de la jornada y para el panel; publicarlas es otra
+   decision, con la regla de MEDICION.md («reportadas», contribucion y no
+   atribucion) y con la fundacion de por medio. */
+const PUERTAS_JORNADA = ["impact-journey", "terreno", "administrativo", "tecnico", "emergencia"];
+/* Las dos que pisan territorio por definicion. Tecnico (Mira Mi Casa) tiene su
+   propia induccion y la de emergencia no da tiempo a una sesion aparte: si
+   Sebas decide que tambien la exigen, se añaden aqui y nada mas cambia. */
+const PUERTAS_CON_MARCO = ["impact-journey", "terreno"];
+const FORMATOS_JORNADA = ["presencial", "virtual", "remoto", "hibrido"];
+const ESTADOS_JORNADA = ["planeada", "confirmada", "realizada", "cerrada", "cancelada"];
+/* Que estado puede seguir a cual. «cerrada» no esta en ninguna lista: a ella
+   solo se llega por /cerrar, que pide los beneficiarios y emite. Y de ella no
+   se sale, por lo dicho arriba. */
+const PASOS_JORNADA = {
+  planeada:   ["confirmada", "cancelada"],
+  confirmada: ["planeada", "realizada", "cancelada"],
+  realizada:  ["confirmada"],
+  cancelada:  ["planeada"],
+  cerrada:    []
+};
+const JORNADA_ABIERTA = ["planeada", "confirmada", "realizada"];
+const RE_CORREO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+/* CUANTOS CORREOS POR CLIC. Cada uno arma un PDF y llama a Resend, y el cupo
+   diario es de 95 para todo el sitio (ver CORREO_TOPE_DIA). Ocho por clic deja
+   la peticion corta y hace visible el gasto: un equipo de treinta son cuatro
+   clics, no un barrido que se come el cupo del dia sin que nadie lo vea. */
+const RECONOCIMIENTOS_POR_LLAMADA = 8;
+
+/* Las fundaciones de la red, para validar la anfitriona y mostrar su nombre.
+   Misma lectura que `destinosMembresia`, con el mismo cuidado: solo se guarda
+   una lista que llego completa. */
+let FUNDACIONES_RED = null;
+async function fundacionesRed(env) {
+  if (FUNDACIONES_RED && Date.now() - FUNDACIONES_RED.en < 600000) return FUNDACIONES_RED;
+  const mapa = new Map();
+  let completo = false;
+  try {
+    const r = env.ASSETS ? await env.ASSETS.fetch(new URL("/data/partners.json", ORIGIN)) : null;
+    if (r && r.ok) {
+      const d = await r.json();
+      for (const p of (Array.isArray(d && d.partners) ? d.partners : [])) {
+        if (!p || p.type !== "foundation" || typeof p.id !== "string") continue;
+        mapa.set(p.id, String(p.name || p.id).slice(0, 160));
+      }
+      completo = true;
+    }
+  } catch (e) { console.error("fundaciones de la red", e && e.message); }
+  const res = { en: Date.now(), mapa, completo };
+  if (completo) FUNDACIONES_RED = res;
+  return res;
+}
+function nombreAnfitriona(red, id) {
+  if (!id) return "";
+  if (id === "sede") return "Sede de Give&Grow International";
+  return red.mapa.get(id) || id;
+}
+
+function fechaValidaISO(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + "T00:00:00Z");
+  return !isNaN(d) && d.toISOString().slice(0, 10) === s;
+}
+/* Un entero opcional: vacio es null, y lo que no es un entero en rango es un
+   error que se dice, no un cero que se cuela. */
+function enteroOpcional(v, max) {
+  if (v === null || v === undefined || String(v).trim() === "") return { ok: true, valor: null };
+  const n = Number(String(v).trim());
+  if (!Number.isInteger(n) || n < 0 || n > max) return { ok: false };
+  return { ok: true, valor: n };
+}
+function horarioDe(j) {
+  if (j.hora_inicio && j.hora_fin) return j.hora_inicio + " – " + j.hora_fin;
+  return j.hora_inicio || "";
+}
+
+/* LA FICHA, VALIDADA EN EL SERVIDOR. El panel la manda entera en cada
+   guardado —crear y editar son el mismo formulario— y aqui se revisa campo por
+   campo. Un error dice CUAL campo, para que el panel lo pueda señalar. */
+function jornadaValidar(c, red) {
+  const mal = (campo, ayuda) => ({ ok: false, campo, ayuda });
+  const o = {};
+  o.nombre = limpiar(c.nombre, 160);
+  if (!o.nombre) return mal("nombre", "La jornada necesita un nombre.");
+  o.descripcion = limpiar(c.descripcion, 1500) || null;
+  o.rol = limpiar(c.rol, 800) || null;
+  o.requisitos = limpiar(c.requisitos, 800) || null;
+  o.fecha = limpiar(c.fecha, 10) || null;
+  if (o.fecha && !fechaValidaISO(o.fecha)) return mal("fecha", "La fecha va como AAAA-MM-DD.");
+  o.hora_inicio = limpiar(c.hora_inicio, 5) || null;
+  o.hora_fin = limpiar(c.hora_fin, 5) || null;
+  if (o.hora_inicio && !RE_HORA.test(o.hora_inicio)) return mal("hora_inicio", "La hora va como HH:MM, de 00:00 a 23:59.");
+  if (o.hora_fin && !RE_HORA.test(o.hora_fin)) return mal("hora_fin", "La hora va como HH:MM, de 00:00 a 23:59.");
+  if (o.hora_inicio && o.hora_fin && o.hora_fin <= o.hora_inicio) return mal("hora_fin", "La hora de cierre tiene que ser después de la de inicio.");
+  o.lugar = limpiar(c.lugar, 200) || null;
+  o.formato = FORMATOS_JORNADA.includes(c.formato) ? c.formato : null;
+  if (!o.formato) return mal("formato", "El formato es presencial, virtual, remoto o híbrido.");
+  const mn = enteroOpcional(c.cupo_min, 10000), mx = enteroOpcional(c.cupo_max, 10000);
+  if (!mn.ok) return mal("cupo_min", "El cupo mínimo es un número entero.");
+  if (!mx.ok) return mal("cupo_max", "El cupo máximo es un número entero.");
+  if (mn.valor !== null && mx.valor !== null && mn.valor > mx.valor) return mal("cupo_max", "El cupo máximo no puede ser menor que el mínimo.");
+  o.cupo_min = mn.valor; o.cupo_max = mx.valor;
+  const anf = limpiar(c.anfitriona, 60);
+  if (!anf) o.anfitriona = null;
+  else if (anf === "sede") o.anfitriona = "sede";
+  /* Con la lista completa, solo vale un id que exista. Si partners.json no
+     llego, se acepta un id con forma de slug: no se puede comprobar, y negarse
+     a guardar una jornada por un tropiezo de lectura es peor. */
+  else if (red.completo ? red.mapa.has(anf) : /^[a-z0-9][a-z0-9-]{1,59}$/.test(anf)) o.anfitriona = anf;
+  else return mal("anfitriona", "Esa fundación no está en la red (data/partners.json).");
+  o.empresa = limpiar(c.empresa, 160) || null;
+  const ei = enteroOpcional(c.empresa_inscripcion, 1e9);
+  if (!ei.ok) return mal("empresa_inscripcion", "La alianza enlazada no es válida.");
+  o.empresa_inscripcion = ei.valor;
+  o.empresa_email = limpiar(c.empresa_email, 200).toLowerCase() || null;
+  if (o.empresa_email && !RE_CORREO.test(o.empresa_email)) return mal("empresa_email", "El correo de la empresa no parece un correo.");
+  o.fundacion_email = limpiar(c.fundacion_email, 200).toLowerCase() || null;
+  if (o.fundacion_email && !RE_CORREO.test(o.fundacion_email)) return mal("fundacion_email", "El correo de la fundación no parece un correo.");
+  o.coordinador = limpiar(c.coordinador, 120) || null;
+  o.puerta = PUERTAS_JORNADA.includes(c.puerta) ? c.puerta : null;
+  if (!o.puerta) return mal("puerta", "Elige la puerta: Impact Journey, En terreno, Administrativo, Técnico o De emergencia.");
+  o.costos = limpiar(c.costos, 800) || null;
+  return { ok: true, campos: o };
+}
+const CAMPOS_JORNADA = ["nombre", "descripcion", "rol", "requisitos", "fecha", "hora_inicio", "hora_fin", "lugar",
+  "formato", "cupo_min", "cupo_max", "anfitriona", "empresa", "empresa_inscripcion", "empresa_email",
+  "fundacion_email", "coordinador", "puerta", "costos"];
+
+/* Si se enlaza una alianza, que exista y que sea de una empresa. */
+async function alianzaValida(env, id) {
+  if (id === null) return true;
+  const f = await env.DB.prepare("SELECT tipo FROM inscripciones WHERE id = ?").bind(id).first();
+  return !!(f && f.tipo === "empresa");
+}
+
+async function siguienteReconocimiento(env, anio) {
+  const { results } = await env.DB.prepare(
+    "INSERT INTO numerador_voluntariado (anio, ultimo) VALUES (?, 1) " +
+    "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1 RETURNING ultimo"
+  ).bind(anio).all();
+  const n = results && results[0] ? results[0].ultimo : null;
+  if (!n) throw new Error("numerador de voluntariado no devolvió consecutivo");
+  return "VC-" + anio + "-" + String(n).padStart(6, "0");
+}
+
+async function auditarJornada(env, quien, detalle) {
+  try {
+    await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+      .bind(quien || "?", String(detalle).slice(0, 600)).run();
+  } catch (e) { console.error("auditoria jornada", e && e.message); }
+}
+
+/* LOS INDICADORES, con los nombres del voluntariado corporativo de siempre.
+   Una sola funcion para el panel entero y para una jornada, para que el
+   resumen de una jornada y el total no puedan contar distinto.
+
+   SOLO CUENTA LO QUE OCURRIO: jornadas realizadas o cerradas, y
+   participaciones con horas. Quien se anoto y no llego no suma como
+   participacion — un «inscritos» inflado es justo la cifra que un gerente de
+   sostenibilidad desarma.
+
+   «Voluntarios unicos» reconoce a la persona por su inscripcion si la tiene,
+   si no por su correo, y en ultimo caso por su nombre. Los BENEFICIARIOS salen
+   solo de jornadas cerradas, que es donde la fundacion los reporto. */
+async function indicadoresVoluntariado(env, jornadaId) {
+  const filtro = jornadaId ? " AND j.id = ?" : "";
+  const arg = jornadaId ? [jornadaId] : [];
+  const p = await env.DB.prepare(
+    "SELECT COUNT(*) AS participaciones, " +
+    "COUNT(DISTINCT CASE WHEN p.inscripcion IS NOT NULL THEN 'i' || p.inscripcion " +
+    "  WHEN COALESCE(p.email, '') <> '' THEN 'e' || LOWER(p.email) ELSE 'n' || LOWER(p.nombre) END) AS voluntarios, " +
+    "COALESCE(SUM(p.horas), 0) AS horas, " +
+    "COALESCE(SUM(CASE WHEN p.pro_bono = 1 THEN p.horas ELSE 0 END), 0) AS horas_pro_bono " +
+    "FROM participaciones p JOIN jornadas j ON j.id = p.jornada " +
+    "WHERE j.estado IN ('realizada', 'cerrada') AND p.horas > 0" + filtro
+  ).bind(...arg).first();
+  const j = await env.DB.prepare(
+    "SELECT COUNT(*) AS jornadas, " +
+    "COUNT(DISTINCT CASE WHEN j.empresa_inscripcion IS NOT NULL THEN 'i' || j.empresa_inscripcion " +
+    "  WHEN TRIM(COALESCE(j.empresa, '')) <> '' THEN 'n' || LOWER(TRIM(j.empresa)) END) AS empresas, " +
+    "SUM(CASE WHEN j.estado = 'cerrada' THEN j.beneficiarios_directos END) AS directos, " +
+    "SUM(CASE WHEN j.estado = 'cerrada' THEN j.beneficiarios_indirectos END) AS indirectos " +
+    "FROM jornadas j WHERE j.estado IN ('realizada', 'cerrada')" + filtro
+  ).bind(...arg).first();
+  const { results: sat } = await env.DB.prepare(
+    "SELECT e.actor, COUNT(*) AS n, AVG(e.satisfaccion) AS media FROM encuestas e " +
+    "JOIN jornadas j ON j.id = e.jornada WHERE e.respondida_en IS NOT NULL AND e.satisfaccion IS NOT NULL" + filtro +
+    " GROUP BY e.actor"
+  ).bind(...arg).all();
+  let nSat = 0, suma = 0;
+  const porActor = {};
+  for (const s of sat || []) {
+    nSat += s.n; suma += s.media * s.n;
+    porActor[s.actor] = { respuestas: s.n, media: Math.round(s.media * 10) / 10 };
+  }
+  return {
+    voluntarios_unicos: (p && p.voluntarios) || 0,
+    horas: Math.round(((p && p.horas) || 0) * 100) / 100,
+    horas_pro_bono: Math.round(((p && p.horas_pro_bono) || 0) * 100) / 100,
+    participaciones: (p && p.participaciones) || 0,
+    jornadas_realizadas: (j && j.jornadas) || 0,
+    empresas: (j && j.empresas) || 0,
+    /* null y no 0 cuando no hay ninguna cifra reportada: «sin reporte» no es
+       «llego a cero personas». */
+    beneficiarios_directos: j && j.directos !== null ? j.directos : null,
+    beneficiarios_indirectos: j && j.indirectos !== null ? j.indirectos : null,
+    satisfaccion: nSat ? Math.round((suma / nSat) * 10) / 10 : null,
+    satisfaccion_respuestas: nSat,
+    satisfaccion_por_actor: porActor
+  };
+}
+
+/* GET y POST /api/admin/jornadas — la lista, y crear. */
+async function adminJornadas(request, env, quien) {
+  const red = await fundacionesRed(env);
+  if (request.method === "POST") {
+    let c;
+    try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+    if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+    const v = jornadaValidar(c, red);
+    if (!v.ok) return json({ error: "campo_invalido", campo: v.campo, ayuda: v.ayuda }, 400);
+    if (!(await alianzaValida(env, v.campos.empresa_inscripcion))) {
+      return json({ error: "campo_invalido", campo: "empresa_inscripcion", ayuda: "Esa alianza no existe o no es de una empresa." }, 400);
+    }
+    const cols = CAMPOS_JORNADA;
+    const r = await env.DB.prepare(
+      "INSERT INTO jornadas (" + cols.join(", ") + ", estado, creada_por) VALUES (" + cols.map(() => "?").join(", ") + ", 'planeada', ?)"
+    ).bind(...cols.map((k) => v.campos[k]), quien || "?").run();
+    const id = r.meta ? r.meta.last_row_id : null;
+    await auditarJornada(env, quien, "jornada " + id + " creada · " + v.campos.nombre);
+    return json({ ok: true, id });
+  }
+  if (request.method !== "GET") return json({ error: "metodo_no_permitido" }, 405);
+
+  const { results } = await env.DB.prepare(
+    "SELECT j.id, j.nombre, j.fecha, j.hora_inicio, j.hora_fin, j.puerta, j.formato, j.anfitriona, j.empresa, " +
+    "j.estado, j.cupo_min, j.cupo_max, j.coordinador, j.marco_en, " +
+    "(SELECT COUNT(*) FROM participaciones p WHERE p.jornada = j.id) AS anotados, " +
+    "(SELECT COALESCE(SUM(p.horas), 0) FROM participaciones p WHERE p.jornada = j.id) AS horas " +
+    "FROM jornadas j ORDER BY CASE j.estado WHEN 'cancelada' THEN 2 WHEN 'cerrada' THEN 1 ELSE 0 END, " +
+    "COALESCE(j.fecha, '9999-12-31') DESC, j.id DESC LIMIT 300"
+  ).all();
+  const { results: emp } = await env.DB.prepare(
+    "SELECT id, nombre, email FROM inscripciones WHERE tipo = 'empresa' AND estado <> 'archivada' ORDER BY id DESC LIMIT 200"
+  ).all();
+  return json({
+    jornadas: (results || []).map((j) => Object.assign({}, j, { anfitriona_nombre: nombreAnfitriona(red, j.anfitriona) })),
+    indicadores: await indicadoresVoluntariado(env, null),
+    fundaciones: [...red.mapa].map(([id, nombre]) => ({ id, nombre })),
+    fundaciones_completas: red.completo,
+    empresas: (emp || []).map((e) => ({ id: e.id, nombre: e.nombre, con_correo: !!e.email }))
+  });
+}
+
+/* A quien se le manda el certificado de una participacion, o por que no.
+   AL MENOR NUNCA: si es menor, solo a su acudiente y solo si hay un correo de
+   acudiente registrado. Si la edad no se sabe, a nadie — y se dice. */
+function destinoReconocimiento(p) {
+  if (p.menor === 1) {
+    if (p.acudiente_email && RE_CORREO.test(p.acudiente_email)) return { para: p.acudiente_email, a: "acudiente" };
+    return { motivo: "Es menor de edad y su registro no trae un correo de su acudiente. Al menor no se le escribe: entrégale el certificado a su acudiente." };
+  }
+  if (p.menor !== 0) return { motivo: "Su edad no está confirmada. Márcala en la fila: a un menor no se le escribe." };
+  if (p.email && RE_CORREO.test(p.email)) return { para: p.email, a: "participante" };
+  return { motivo: "No tiene un correo válido: descarga el PDF y entrégaselo." };
+}
+
+async function jornadaPorId(env, id) {
+  return env.DB.prepare("SELECT * FROM jornadas WHERE id = ?").bind(id).first();
+}
+async function correoEmpresaJornada(env, j) {
+  if (j.empresa_email) return j.empresa_email;
+  if (j.empresa_inscripcion) {
+    const f = await env.DB.prepare("SELECT email FROM inscripciones WHERE id = ? AND tipo = 'empresa'").bind(j.empresa_inscripcion).first();
+    if (f && f.email && RE_CORREO.test(f.email)) return String(f.email).toLowerCase();
+  }
+  return null;
+}
+
+/* GET /api/admin/jornada/<id> — la ficha entera, con quien fue, sus
+   certificados, las encuestas y lo que respondieron. */
+async function adminJornada(env, id) {
+  const j = await jornadaPorId(env, id);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  const red = await fundacionesRed(env);
+  const { results: ps } = await env.DB.prepare(
+    "SELECT p.*, r.numero, r.enviado_en, r.enviado_a, e.token AS encuesta, e.respondida_en AS encuesta_respondida " +
+    "FROM participaciones p LEFT JOIN reconocimientos r ON r.participacion = p.id " +
+    "LEFT JOIN encuestas e ON e.participacion = p.id WHERE p.jornada = ? ORDER BY p.nombre COLLATE NOCASE, p.id"
+  ).bind(id).all();
+  const participaciones = (ps || []).map((p) => {
+    const d = destinoReconocimiento(p);
+    const conHoras = p.horas > 0;
+    return Object.assign({}, p, {
+      envio_a: d.para && conHoras ? d.a : null,
+      envio_motivo: !conHoras && p.horas !== null ? "Sin horas efectivas: no lleva certificado."
+                  : (d.para ? null : d.motivo)
+    });
+  });
+  const { results: act } = await env.DB.prepare(
+    "SELECT token, actor, respondida_en, enviada_en FROM encuestas WHERE jornada = ? AND participacion IS NULL"
+  ).bind(id).all();
+  /* LAS RESPUESTAS SIN NOMBRE. La consolidacion es por actor, y la de los
+     voluntarios es anonima a proposito: MEDICION.md §4 dice que la reflexion
+     del voluntario es «insumo cualitativo, anonimo». El panel no cruza una
+     respuesta con quien la dio, aunque la base podria. */
+  const { results: rs } = await env.DB.prepare(
+    "SELECT actor, satisfaccion, respuestas, respondida_en FROM encuestas WHERE jornada = ? AND respondida_en IS NOT NULL ORDER BY respondida_en"
+  ).bind(id).all();
+  const respuestas = (rs || []).map((x) => {
+    let r = {};
+    try { r = JSON.parse(x.respuestas || "{}") || {}; } catch (e) { /* nada */ }
+    return { actor: x.actor, satisfaccion: x.satisfaccion, respondida_en: x.respondida_en, r };
+  });
+  const enlazados = new Set(participaciones.filter((p) => p.inscripcion).map((p) => p.inscripcion));
+  const { results: vs } = await env.DB.prepare(
+    "SELECT id, nombre, estado, datos FROM inscripciones WHERE tipo = 'voluntario' AND estado <> 'archivada' " +
+    "ORDER BY nombre COLLATE NOCASE LIMIT 500"
+  ).all();
+  const voluntarios = (vs || []).filter((v) => !enlazados.has(v.id)).map((v) => {
+    let x = {};
+    try { x = JSON.parse(v.datos || "{}") || {}; } catch (e) { /* nada */ }
+    return { id: v.id, nombre: v.nombre, estado: v.estado, nivel: x.nivel || null, listo: !!x.listo,
+             menor: x.mayor_edad === false };
+  });
+  const correoEmpresa = await correoEmpresaJornada(env, j);
+  return json({
+    jornada: Object.assign({}, j, { anfitriona_nombre: nombreAnfitriona(red, j.anfitriona),
+      requiere_marco: PUERTAS_CON_MARCO.includes(j.puerta), siguientes: PASOS_JORNADA[j.estado] || [] }),
+    participaciones,
+    encuestas_actor: (act || []).map((e) => Object.assign({}, e, {
+      enlace: ORIGIN + "/encuesta/" + e.token,
+      correo: e.actor === "empresa" ? correoEmpresa : (j.fundacion_email || null)
+    })),
+    respuestas,
+    resumen: await indicadoresVoluntariado(env, id),
+    voluntarios
+  });
+}
+
+/* POST /api/admin/jornada/<id> — editar la ficha. Abierta, si; cerrada o
+   cancelada, no: lo cerrado ya emitio certificados con estos datos. */
+async function adminEditarJornada(request, env, id, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const j = await jornadaPorId(env, id);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  if (!JORNADA_ABIERTA.includes(j.estado)) return json({ error: "jornada_cerrada",
+    ayuda: "Una jornada " + j.estado + " ya no se edita." }, 409);
+  const v = jornadaValidar(c, await fundacionesRed(env));
+  if (!v.ok) return json({ error: "campo_invalido", campo: v.campo, ayuda: v.ayuda }, 400);
+  if (!(await alianzaValida(env, v.campos.empresa_inscripcion))) {
+    return json({ error: "campo_invalido", campo: "empresa_inscripcion", ayuda: "Esa alianza no existe o no es de una empresa." }, 400);
+  }
+  /* Cambiar la puerta de una jornada ya realizada a una que exige Marco, sin
+     Marco, la dejaria en un estado que el servidor nunca habria permitido. */
+  if (j.estado === "realizada" && PUERTAS_CON_MARCO.includes(v.campos.puerta) && !j.marco_en) {
+    return json({ error: "sin_marco", campo: "puerta",
+      ayuda: "Esa puerta exige la sesión de Marco y esta jornada ya está realizada sin ella." }, 409);
+  }
+  await env.DB.prepare(
+    "UPDATE jornadas SET " + CAMPOS_JORNADA.map((k) => k + " = ?").join(", ") +
+    ", actualizada_en = datetime('now') WHERE id = ? AND estado IN ('planeada', 'confirmada', 'realizada')"
+  ).bind(...CAMPOS_JORNADA.map((k) => v.campos[k]), id).run();
+  await auditarJornada(env, quien, "jornada " + id + " editada");
+  return json({ ok: true, id });
+}
+
+/* POST /api/admin/jornada/<id>/estado  { estado } */
+async function adminEstadoJornada(request, env, id, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const nuevo = String(c.estado || "");
+  const j = await jornadaPorId(env, id);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  if (nuevo === "cerrada") return json({ error: "usa_cerrar",
+    ayuda: "Cerrar pide los beneficiarios que reporta la fundación: usa «Cerrar la jornada»." }, 400);
+  if (!ESTADOS_JORNADA.includes(nuevo) || !(PASOS_JORNADA[j.estado] || []).includes(nuevo)) {
+    return json({ error: "paso_no_permitido", desde: j.estado, permitidos: PASOS_JORNADA[j.estado] || [],
+      ayuda: "Desde «" + j.estado + "» no se pasa a «" + nuevo + "»." }, 409);
+  }
+  if (nuevo === "realizada") {
+    /* VOLUNTARIADO.md §4, hecho regla: sin Marco no hay jornada en terreno. */
+    if (PUERTAS_CON_MARCO.includes(j.puerta) && !j.marco_en) {
+      return json({ error: "sin_marco",
+        ayuda: "Sin sesión de Marco no hay jornada en terreno (VOLUNTARIADO.md §4). Marca el Marco cuando se haya hecho y vuelve a intentarlo." }, 409);
+    }
+    if (!j.fecha) return json({ error: "sin_fecha", ayuda: "Ponle fecha a la jornada antes de marcarla realizada." }, 409);
+    if (j.fecha > fechaCO()) return json({ error: "fecha_futura",
+      ayuda: "La jornada es el " + j.fecha + ": todavía no ha pasado." }, 409);
+  }
+  /* Condicionado al estado que se leyo: dos clics a la vez no encadenan dos
+     pasos que nadie pidio. */
+  const r = await env.DB.prepare(
+    "UPDATE jornadas SET estado = ?, actualizada_en = datetime('now') WHERE id = ? AND estado = ?"
+  ).bind(nuevo, id, j.estado).run();
+  if (!(r.meta && r.meta.changes)) return json({ error: "cambio_en_curso", ayuda: "Alguien la movió a la vez. Recarga." }, 409);
+  await auditarJornada(env, quien, "jornada " + id + " · " + j.estado + " → " + nuevo);
+  return json({ ok: true, id, estado: nuevo });
+}
+
+/* POST /api/admin/jornada/<id>/marco  { hecho } */
+async function adminMarcoJornada(request, env, id, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const j = await jornadaPorId(env, id);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  if (!JORNADA_ABIERTA.includes(j.estado)) return json({ error: "jornada_cerrada", ayuda: "La jornada ya no está abierta." }, 409);
+  if (!c.hecho && j.estado === "realizada" && PUERTAS_CON_MARCO.includes(j.puerta)) {
+    return json({ error: "sin_marco", ayuda: "Ya está realizada: desmarcar el Marco la dejaría como una jornada en terreno sin Marco. Devuélvela a «confirmada» primero." }, 409);
+  }
+  if (c.hecho) {
+    await env.DB.prepare("UPDATE jornadas SET marco_en = datetime('now'), marco_por = ?, actualizada_en = datetime('now') WHERE id = ?")
+      .bind(quien || "?", id).run();
+  } else {
+    await env.DB.prepare("UPDATE jornadas SET marco_en = NULL, marco_por = NULL, actualizada_en = datetime('now') WHERE id = ?").bind(id).run();
+  }
+  await auditarJornada(env, quien, "jornada " + id + " · Marco " + (c.hecho ? "marcado" : "desmarcado"));
+  return json({ ok: true, id, marco: !!c.hecho });
+}
+
+/* POST /api/admin/jornada/<id>/participante
+   { inscripcion }  o  { nombre, email, celular, idioma, menor, acudiente_nombre, acudiente_email } */
+async function adminAnotarParticipante(request, env, id, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const j = await jornadaPorId(env, id);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  if (!JORNADA_ABIERTA.includes(j.estado)) return json({ error: "jornada_cerrada", ayuda: "La jornada ya no está abierta." }, 409);
+  if (j.cupo_max !== null) {
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM participaciones WHERE jornada = ?").bind(id).first();
+    if (n && n.n >= j.cupo_max) return json({ error: "cupo_lleno",
+      ayuda: "La jornada tiene cupo para " + j.cupo_max + " y ya está lleno. Si de verdad caben más, sube el cupo máximo en la ficha." }, 409);
+  }
+
+  let fila;
+  if (c.inscripcion !== undefined && c.inscripcion !== null && c.inscripcion !== "") {
+    const insId = Number(c.inscripcion);
+    if (!Number.isInteger(insId) || insId <= 0) return json({ error: "inscripcion_invalida" }, 400);
+    const v = await env.DB.prepare("SELECT id, tipo, estado, nombre, email, telefono, datos FROM inscripciones WHERE id = ?").bind(insId).first();
+    if (!v || v.tipo !== "voluntario") return json({ error: "no_es_voluntario", ayuda: "Esa inscripción no es de un voluntario." }, 400);
+    if (v.estado === "archivada") return json({ error: "archivada", ayuda: "Está archivada: reábrela antes de anotarla." }, 409);
+    let x = {};
+    try { x = JSON.parse(v.datos || "{}") || {}; } catch (e) { /* nada */ }
+    const acu = x.acudiente || {};
+    /* El contacto del acudiente es texto libre en el formulario (correo o
+       telefono). Solo se toma si ES un correo: no se adivina. */
+    const acuCorreo = RE_CORREO.test(String(acu.contacto || "").trim()) ? String(acu.contacto).trim().toLowerCase() : null;
+    fila = {
+      inscripcion: v.id, nombre: v.nombre || "(sin nombre)", email: v.email || null, celular: v.telefono || null,
+      idioma: x.idioma === "en" ? "en" : "es",
+      menor: x.mayor_edad === false ? 1 : x.mayor_edad === true ? 0 : null,
+      acudiente_nombre: x.mayor_edad === false ? (limpiar(acu.nombre, 120) || null) : null,
+      acudiente_email: x.mayor_edad === false ? acuCorreo : null
+    };
+  } else {
+    const nombre = limpiar(c.nombre, 120);
+    const email = limpiar(c.email, 200).toLowerCase();
+    const celular = telefonoContacto(c.celular);
+    if (!nombre) return json({ error: "nombre_requerido", campo: "nombre", ayuda: "Escribe el nombre como debe salir en el certificado." }, 400);
+    if (!RE_CORREO.test(email)) return json({ error: "email_invalido", campo: "email", ayuda: "El correo no parece un correo." }, 400);
+    if (!celular) return json({ error: "telefono_requerido", campo: "celular", ayuda: AYUDA_TEL }, 400);
+    if (c.menor !== true && c.menor !== false) return json({ error: "edad_requerida", campo: "menor",
+      ayuda: "Di si es mayor o menor de edad: a un menor no se le escribe." }, 400);
+    const acuCorreo = limpiar(c.acudiente_email, 200).toLowerCase();
+    if (c.menor && acuCorreo && !RE_CORREO.test(acuCorreo)) return json({ error: "email_invalido", campo: "acudiente_email",
+      ayuda: "El correo del acudiente no parece un correo." }, 400);
+    const ya = await env.DB.prepare("SELECT 1 AS s FROM participaciones WHERE jornada = ? AND LOWER(email) = ?").bind(id, email).first();
+    if (ya) return json({ error: "ya_anotado", ayuda: "Ya hay alguien con ese correo en esta jornada." }, 409);
+    fila = {
+      inscripcion: null, nombre, email, celular,
+      idioma: c.idioma === "en" ? "en" : "es",
+      menor: c.menor ? 1 : 0,
+      acudiente_nombre: c.menor ? (limpiar(c.acudiente_nombre, 120) || null) : null,
+      acudiente_email: c.menor ? (acuCorreo || null) : null
+    };
+  }
+  let r;
+  try {
+    r = await env.DB.prepare(
+      "INSERT INTO participaciones (jornada, inscripcion, nombre, email, celular, idioma, menor, acudiente_nombre, acudiente_email, creada_por) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, fila.inscripcion, fila.nombre, fila.email, fila.celular, fila.idioma, fila.menor,
+           fila.acudiente_nombre, fila.acudiente_email, quien || "?").run();
+  } catch (e) {
+    if (/UNIQUE/i.test(String(e && e.message))) return json({ error: "ya_anotado", ayuda: "Esa persona ya está anotada en esta jornada." }, 409);
+    throw e;
+  }
+  const pid = r.meta ? r.meta.last_row_id : null;
+  await auditarJornada(env, quien, "jornada " + id + " · participación " + pid + " anotada" + (fila.inscripcion ? " (voluntario " + fila.inscripcion + ")" : " (a mano)"));
+  return json({ ok: true, id: pid });
+}
+
+/* POST /api/admin/participacion/<id>  { horas, pro_bono, menor }
+   DELETE /api/admin/participacion/<id> */
+async function adminParticipacion(request, env, pid, quien) {
+  const p = await env.DB.prepare(
+    "SELECT p.id, p.jornada, j.estado FROM participaciones p JOIN jornadas j ON j.id = p.jornada WHERE p.id = ?"
+  ).bind(pid).first();
+  if (!p) return json({ error: "no_encontrada" }, 404);
+  if (!JORNADA_ABIERTA.includes(p.estado)) return json({ error: "jornada_cerrada",
+    ayuda: "La jornada está " + p.estado + ": sus horas ya no cambian." }, 409);
+  if (request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM participaciones WHERE id = ?").bind(pid).run();
+    await auditarJornada(env, quien, "jornada " + p.jornada + " · participación " + pid + " quitada");
+    return json({ ok: true, id: pid, quitada: true });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const sets = [], args = [];
+  if (c.horas !== undefined) {
+    const t = String(c.horas == null ? "" : c.horas).trim().replace(",", ".");
+    let h = null;
+    if (t !== "") {
+      h = Number(t);
+      /* 200 como techo: una jornada de varios dias cabe; un 2000 tecleado de
+         mas, no. Al cuarto de hora, que es la precision con la que alguien
+         recuerda cuanto estuvo. */
+      if (!isFinite(h) || h < 0 || h > 200) return json({ error: "horas_invalidas", campo: "horas",
+        ayuda: "Las horas van de 0 a 200 (0 = no asistió)." }, 400);
+      h = Math.round(h * 4) / 4;
+    }
+    sets.push("horas = ?"); args.push(h);
+  }
+  if (c.pro_bono !== undefined) { sets.push("pro_bono = ?"); args.push(c.pro_bono ? 1 : 0); }
+  if (c.menor !== undefined) {
+    const m = c.menor === true ? 1 : c.menor === false ? 0 : null;
+    sets.push("menor = ?"); args.push(m);
+  }
+  if (!sets.length) return json({ error: "nada_que_cambiar" }, 400);
+  await env.DB.prepare("UPDATE participaciones SET " + sets.join(", ") + " WHERE id = ?").bind(...args, pid).run();
+  return json({ ok: true, id: pid });
+}
+
+/* EMITIR LO QUE EL CIERRE PROMETE: el certificado de cada quien con horas y
+   los enlaces de la encuesta. IDEMPOTENTE —lo que ya existe no se toca— porque
+   lo llaman el cierre y, como reparacion, el envio: si el cierre se corto a
+   mitad, el siguiente clic completa lo que falto en vez de dejar a alguien sin
+   certificado. */
+async function asegurarCierre(env, j) {
+  const red = await fundacionesRed(env);
+  const anf = j.anfitriona && j.anfitriona !== "sede" ? nombreAnfitriona(red, j.anfitriona) : "";
+  const { results: ps } = await env.DB.prepare(
+    "SELECT p.*, r.participacion AS ya FROM participaciones p LEFT JOIN reconocimientos r ON r.participacion = p.id WHERE p.jornada = ?"
+  ).bind(j.id).all();
+  const hoy = new Date().toISOString();
+  const pasos = [];
+  for (const p of ps || []) {
+    if (!(p.horas > 0)) continue;
+    if (!p.ya) {
+      const numero = await siguienteReconocimiento(env, anioCO(hoy));
+      /* Lo que el certificado DICE, congelado. Sin el lugar a proposito: puede
+         ser la direccion de una fundacion, y esas no se escriben en ningun
+         papel que salga de aqui (CLAUDE.md, coordenadas a nivel de zona). */
+      const datos = JSON.stringify({
+        numero, idioma: p.idioma === "en" ? "en" : "es", nombre: p.nombre,
+        jornada: j.nombre, fecha: j.fecha, horario: horarioDe(j),
+        anfitriona: anf, empresa: j.empresa || "", horas: Number(p.horas), pro_bono: !!p.pro_bono,
+        emitido_en: fechaCO(hoy)
+      });
+      pasos.push(env.DB.prepare(
+        "INSERT OR IGNORE INTO reconocimientos (participacion, jornada, numero, datos, huella) VALUES (?, ?, ?, ?, ?)"
+      ).bind(p.id, j.id, numero, datos, await huellaDe(datos)));
+    }
+    pasos.push(env.DB.prepare(
+      "INSERT OR IGNORE INTO encuestas (token, jornada, actor, participacion, idioma) VALUES (?, ?, 'voluntario', ?, ?)"
+    ).bind(tokenNuevo(), j.id, p.id, p.idioma === "en" ? "en" : "es"));
+  }
+  if (j.empresa || j.empresa_inscripcion) {
+    pasos.push(env.DB.prepare(
+      "INSERT OR IGNORE INTO encuestas (token, jornada, actor, idioma) VALUES (?, ?, 'empresa', 'es')"
+    ).bind(tokenNuevo(), j.id));
+  }
+  if (j.anfitriona && j.anfitriona !== "sede") {
+    pasos.push(env.DB.prepare(
+      "INSERT OR IGNORE INTO encuestas (token, jornada, actor, idioma) VALUES (?, ?, 'fundacion', 'es')"
+    ).bind(tokenNuevo(), j.id));
+  }
+  if (pasos.length) await env.DB.batch(pasos);
+}
+
+/* POST /api/admin/jornada/<id>/cerrar
+   { beneficiarios_directos, beneficiarios_indirectos, beneficiarios_nota } */
+async function adminCerrarJornada(request, env, id, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const j = await jornadaPorId(env, id);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  if (j.estado !== "realizada") return json({ error: "no_realizada",
+    ayuda: "Solo se cierra una jornada realizada. Esta está «" + j.estado + "»." }, 409);
+
+  const conFundacion = j.anfitriona && j.anfitriona !== "sede";
+  const bd = enteroOpcional(c.beneficiarios_directos, 10000000);
+  const bi = enteroOpcional(c.beneficiarios_indirectos, 10000000);
+  if (!bd.ok || !bi.ok) return json({ error: "beneficiarios_invalidos", ayuda: "Los beneficiarios son números enteros." }, 400);
+  /* Con fundacion anfitriona, la cifra es obligatoria: es lo que ella reporta y
+     lo que el reporte a la empresa necesita. Cero es una respuesta valida;
+     vacio no. En la sede de Give&Grow puede no haber beneficiarios directos. */
+  if (conFundacion && (bd.valor === null || bi.valor === null)) {
+    return json({ error: "beneficiarios_requeridos",
+      ayuda: "Escribe los beneficiarios directos e indirectos que reportó la fundación (pueden ser 0)." }, 400);
+  }
+  const { results: ps } = await env.DB.prepare("SELECT nombre, horas FROM participaciones WHERE jornada = ?").bind(id).all();
+  const sinHoras = (ps || []).filter((p) => p.horas === null || p.horas === undefined);
+  if (sinHoras.length) return json({ error: "faltan_horas",
+    ayuda: "Faltan las horas de " + sinHoras.length + (sinHoras.length === 1 ? " persona" : " personas") +
+           " (" + sinHoras.slice(0, 5).map((p) => p.nombre).join(", ") + (sinHoras.length > 5 ? "…" : "") +
+           "). Si alguien no fue, ponle 0." }, 409);
+  if (!(ps || []).some((p) => p.horas > 0)) return json({ error: "sin_participantes",
+    ayuda: "Nadie tiene horas en esta jornada. Si no ocurrió, devuélvela a confirmada y cancélala." }, 409);
+
+  /* EL ESTADO PRIMERO, condicionado: es el cerrojo. Dos cierres a la vez no
+     emiten dos tandas; el segundo encuentra la jornada ya cerrada. */
+  const r = await env.DB.prepare(
+    "UPDATE jornadas SET estado = 'cerrada', cerrada_en = datetime('now'), cerrada_por = ?, " +
+    "beneficiarios_directos = ?, beneficiarios_indirectos = ?, beneficiarios_nota = ?, actualizada_en = datetime('now') " +
+    "WHERE id = ? AND estado = 'realizada'"
+  ).bind(quien || "?", bd.valor, bi.valor, limpiar(c.beneficiarios_nota, 400) || null, id).run();
+  if (!(r.meta && r.meta.changes)) return json({ error: "cambio_en_curso", ayuda: "Alguien la cerró a la vez. Recarga." }, 409);
+  try {
+    await asegurarCierre(env, j);
+  } catch (e) {
+    /* Si la emision falla, la jornada vuelve a «realizada»: cerrada y sin
+       certificados es el peor estado posible, porque nada pediria repararla. */
+    console.error("cierre de jornada", id, e && e.message);
+    await env.DB.prepare("UPDATE jornadas SET estado = 'realizada', cerrada_en = NULL, cerrada_por = NULL WHERE id = ?").bind(id).run();
+    throw e;
+  }
+  await auditarJornada(env, quien, "jornada " + id + " CERRADA · beneficiarios reportados " + bd.valor + " / " + bi.valor);
+  return json({ ok: true, id, estado: "cerrada" });
+}
+
+/* El correo de agradecimiento, con el certificado y el enlace de la encuesta.
+   En el idioma de la persona; si va al acudiente, se le dice por que le
+   escribimos a el y no al menor. */
+async function correoReconocimiento(env, p, datos, huella, token, aAcudiente) {
+  const en = datos.idioma === "en";
+  const encuesta = token ? ORIGIN + "/encuesta/" + token + (en ? "?lang=en" : "") : null;
+  const conQuien = datos.anfitriona ? (en ? ", with " : ", con ") + datos.anfitriona : "";
+  const fecha = fechaLargaIdioma(datos.fecha, en);
+  const horasTxt = en ? String(datos.horas) : String(datos.horas).replace(".", ",");
+  let titulo, parrafos;
+  if (aAcudiente) {
+    const saludo = p.acudiente_nombre ? (en ? "Hello, " : "Hola, ") + p.acudiente_nombre + "." : (en ? "Hello." : "Hola.");
+    titulo = en ? "The volunteer certificate of " + datos.nombre : "El certificado de voluntariado de " + datos.nombre;
+    parrafos = en ? [
+      saludo + " " + datos.nombre + " took part in the activity «" + datos.jornada + "» on " + fecha + conQuien + ". Thank you for making it possible.",
+      "We are writing to you and not to " + datos.nombre + " because they are under 18. Attached is their volunteer certificate, with their effective hours.",
+      ...(encuesta ? ["If you would like to tell us how it went, you can answer this short survey together. It asks for no personal data."] : [])
+    ] : [
+      saludo + " " + datos.nombre + " participó en la jornada «" + datos.jornada + "» del " + fecha + conQuien + ". Gracias por hacerlo posible.",
+      "Te escribimos a ti y no a " + datos.nombre + " porque es menor de edad. Adjuntamos su certificado de voluntariado, con sus horas efectivas.",
+      ...(encuesta ? ["Si quieren contarnos cómo le fue, pueden responder juntos esta encuesta corta. No pide ningún dato personal."] : [])
+    ];
+  } else {
+    titulo = en ? "Thank you for your time" : "Gracias por tu tiempo";
+    parrafos = en ? [
+      "Thank you for being part of «" + datos.jornada + "» on " + fecha + conQuien + ". Attached is your volunteer certificate, with your effective hours.",
+      ...(datos.anfitriona ? ["The work on the ground belongs to " + datos.anfitriona + ": your time contributed to it."] : []),
+      ...(encuesta ? ["It would help us a lot to know how it went for you. It is five short questions, it asks for no personal data, and the link is yours alone."] : [])
+    ] : [
+      "Gracias por haber estado en «" + datos.jornada + "» el " + fecha + conQuien + ". Adjuntamos tu certificado de voluntariado, con tus horas efectivas.",
+      ...(datos.anfitriona ? ["El trabajo en territorio es de " + datos.anfitriona + ": tu tiempo contribuyó a él."] : []),
+      ...(encuesta ? ["Nos ayudaría mucho saber cómo te fue. Son cinco preguntas cortas, no te pedimos ningún dato y el enlace es solo tuyo."] : [])
+    ];
+  }
+  const filas = en ? [
+    ["Certificate", datos.numero], ["Activity", datos.jornada], ["Date", fecha], ["Effective hours", horasTxt]
+  ] : [
+    ["Certificado", datos.numero], ["Jornada", datos.jornada], ["Fecha", fecha], ["Horas efectivas", horasTxt]
+  ];
+  const boton = encuesta ? { url: encuesta, texto: en ? "Answer the survey" : "Responder la encuesta" } : null;
+  const bytes = await certificadoVoluntariado(Object.assign({}, datos, { huella }));
+  return enviarCorreo(env, {
+    para: aAcudiente ? p.acudiente_email : p.email,
+    asunto: titulo + " · " + datos.numero,
+    texto: [titulo, "", ...parrafos, ...(encuesta ? ["", encuesta] : []), "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, boton }),
+    etiqueta: "reconocimiento-voluntariado",
+    responderA: correoAlianzas(env),
+    adjuntos: [{ filename: datos.numero + ".pdf", content: bytesABase64(bytes) }]
+  });
+}
+
+/* POST /api/admin/jornada/<id>/reconocer  { participacion? }
+   Manda el agradecimiento con el certificado a quien falte (o a una persona).
+   NO DUPLICA: cada certificado se reserva antes de enviarse (`enviado_en`),
+   como `enviarCertificadoFirmado`, y lo que ya salio no vuelve a salir. */
+async function adminReconocerJornada(request, env, id, quien) {
+  let c = {};
+  try { c = await request.json(); } catch { /* cuerpo opcional */ }
+  if (!esObjeto(c)) c = {};
+  const j = await jornadaPorId(env, id);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  if (j.estado !== "cerrada") return json({ error: "no_cerrada", ayuda: "El agradecimiento sale cuando la jornada está cerrada." }, 409);
+  await asegurarCierre(env, j);
+  const una = c.participacion ? Number(c.participacion) : null;
+  const { results } = await env.DB.prepare(
+    "SELECT p.*, r.numero, r.datos, r.huella, r.enviado_en, e.token FROM participaciones p " +
+    "JOIN reconocimientos r ON r.participacion = p.id LEFT JOIN encuestas e ON e.participacion = p.id " +
+    "WHERE p.jornada = ?" + (una ? " AND p.id = ?" : "") + " ORDER BY p.id"
+  ).bind(...(una ? [id, una] : [id])).all();
+  const enviados = [], omitidos = [], fallidos = [];
+  let quedan = 0;
+  for (const p of results || []) {
+    if (p.enviado_en) continue;
+    const d = destinoReconocimiento(p);
+    if (!d.para) { omitidos.push({ id: p.id, nombre: p.nombre, motivo: d.motivo }); continue; }
+    if (enviados.length + fallidos.length >= RECONOCIMIENTOS_POR_LLAMADA) { quedan++; continue; }
+    const res = await env.DB.prepare(
+      "UPDATE reconocimientos SET enviado_en = datetime('now'), enviado_a = 'enviando' WHERE participacion = ? AND enviado_en IS NULL"
+    ).bind(p.id).run();
+    if (!(res.meta && res.meta.changes)) continue;
+    let ok = false;
+    try {
+      const datos = JSON.parse(p.datos);
+      const envio = await correoReconocimiento(env, p, datos, p.huella, p.token, d.a === "acudiente");
+      ok = !!(envio && envio.ok);
+    } catch (e) { console.error("reconocimiento", p.id, e && e.message); }
+    if (ok) {
+      await env.DB.prepare("UPDATE reconocimientos SET enviado_a = ?, enviado_por = ? WHERE participacion = ?")
+        .bind(d.para, quien || "?", p.id).run();
+      enviados.push({ id: p.id, nombre: p.nombre, a: d.a });
+    } else {
+      await env.DB.prepare("UPDATE reconocimientos SET enviado_en = NULL, enviado_a = NULL WHERE participacion = ? AND enviado_a = 'enviando'")
+        .bind(p.id).run();
+      fallidos.push({ id: p.id, nombre: p.nombre });
+    }
+  }
+  if (enviados.length || fallidos.length) {
+    await auditarJornada(env, quien, "jornada " + id + " · agradecimiento enviado a " + enviados.length +
+      (fallidos.length ? " · " + fallidos.length + " no salieron" : "") + (omitidos.length ? " · " + omitidos.length + " omitidos" : ""));
+  }
+  return json({ ok: true, id, enviados, omitidos, fallidos, quedan,
+    ...(fallidos.length ? { ayuda: "Algunos no salieron: mira la cola de correos en Salud y vuelve a intentarlo." } : {}) });
+}
+
+/* POST /api/admin/jornada/<id>/encuesta  { actor: empresa | fundacion }
+   El enlace de la empresa o de la fundacion, por correo. Una sola vez: el
+   enlace sigue en el panel para copiarlo si hay que reenviarlo a mano. */
+async function adminEnviarEncuestaActor(request, env, id, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const actor = c.actor === "empresa" ? "empresa" : c.actor === "fundacion" ? "fundacion" : null;
+  if (!actor) return json({ error: "actor_invalido" }, 400);
+  const j = await jornadaPorId(env, id);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  if (j.estado !== "cerrada") return json({ error: "no_cerrada", ayuda: "La encuesta nace al cerrar la jornada." }, 409);
+  const e = await env.DB.prepare("SELECT token, enviada_en FROM encuestas WHERE jornada = ? AND actor = ? AND participacion IS NULL")
+    .bind(id, actor).first();
+  if (!e) return json({ error: "sin_encuesta", ayuda: "Esta jornada no tiene encuesta para " + actor + "." }, 404);
+  if (e.enviada_en) return json({ error: "ya_enviada", ayuda: "Ya salió por correo. El enlace está en el panel para reenviarlo a mano." }, 409);
+  const para = actor === "empresa" ? await correoEmpresaJornada(env, j) : j.fundacion_email;
+  if (!para) return json({ error: "sin_correo", ayuda: "No hay correo de " + (actor === "empresa" ? "la empresa" : "la fundación") +
+    ": ponlo en la ficha o copia el enlace y mándalo tú." }, 409);
+  const r = await env.DB.prepare("UPDATE encuestas SET enviada_en = datetime('now') WHERE token = ? AND enviada_en IS NULL").bind(e.token).run();
+  if (!(r.meta && r.meta.changes)) return json({ error: "ya_enviada" }, 409);
+  const red = await fundacionesRed(env);
+  const enlace = ORIGIN + "/encuesta/" + e.token;
+  const titulo = "¿Cómo les fue en la jornada?";
+  const parrafos = actor === "empresa" ? [
+    "Gracias por la jornada «" + j.nombre + "» del " + fechaLargaISO(j.fecha) +
+      (j.anfitriona && j.anfitriona !== "sede" ? ", con " + nombreAnfitriona(red, j.anfitriona) : "") + ".",
+    "Para el reporte de la jornada nos sirve mucho la mirada de la empresa: son seis preguntas cortas y no piden ningún dato personal."
+  ] : [
+    "Gracias por recibir la jornada «" + j.nombre + "» del " + fechaLargaISO(j.fecha) + ".",
+    "La fundación tiene la última palabra sobre cada jornada, y por eso su evaluación es la que más pesa: son seis preguntas cortas, sin datos personales."
+  ];
+  const envio = await enviarCorreo(env, {
+    para, asunto: titulo + " · " + j.nombre,
+    texto: [titulo, "", ...parrafos, "", enlace].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, boton: { url: enlace, texto: "Responder la encuesta" } }),
+    etiqueta: "encuesta-jornada", responderA: correoAlianzas(env)
+  });
+  if (!(envio && envio.ok)) {
+    await env.DB.prepare("UPDATE encuestas SET enviada_en = NULL WHERE token = ?").bind(e.token).run();
+    return json({ error: "no_salio", ayuda: "No salió: mira la cola de correos en Salud." }, 502);
+  }
+  await auditarJornada(env, quien, "jornada " + id + " · encuesta de " + actor + " enviada");
+  return json({ ok: true, enviado: true });
+}
+
+/* GET /api/admin/reconocimiento/<VC-…>.pdf — el certificado tal como se emitio. */
+async function adminReconocimientoPdf(env, numero) {
+  const r = await env.DB.prepare("SELECT datos, huella FROM reconocimientos WHERE numero = ?").bind(numero).first();
+  if (!r) return json({ error: "no_encontrado" }, 404);
+  let d = {};
+  try { d = JSON.parse(r.datos) || {}; } catch (e) { return json({ error: "datos_ilegibles" }, 500); }
+  const bytes = await certificadoVoluntariado(Object.assign({}, d, { huella: r.huella }));
+  return new Response(bytes, {
+    headers: {
+      "content-type": "application/pdf",
+      "content-disposition": 'inline; filename="' + numero + '.pdf"',
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
+
+/* ========================================================================
+   /encuesta/<token> — la encuesta de satisfaccion, publica tras su enlace
+   ========================================================================
+   Sin un solo script, como /membresia: una pagina que lee un estado y envia un
+   formulario no necesita JavaScript, y la CSP se lo niega entero. El tema de
+   dia o de noche sale del reloj del visitante (`temaPorReloj`).
+
+   NO PIDE DATOS PERSONALES. Quien responde ya esta identificado por el enlace,
+   y la respuesta se lee en el panel por actor, no por nombre. Las preguntas son
+   las mismas cinco o seis para todos los de un actor, para poder agregarlas. */
+const ENCUESTA_TOPE_TEXTO = 1000;
+const ENCUESTA_GOLPES = new Map();
+function encuestaLimitada(ip) {
+  return limitadoPorIP(ENCUESTA_GOLPES, ip, 300000, 30);
+}
+const OPCIONES_ENCUESTA = {
+  volveria: ["si", "tal_vez", "no"],
+  expectativas: ["si", "en_parte", "no"],
+  util: ["si", "en_parte", "no"]
+};
+const PREGUNTAS_ENCUESTA = {
+  voluntario: ["satisfaccion", "aprendio", "no_funciono", "volveria", "sugerencia"],
+  empresa:    ["satisfaccion", "expectativas", "aprendio", "no_funciono", "volveria", "sugerencia"],
+  fundacion:  ["satisfaccion", "util", "aprendio", "no_funciono", "volveria", "sugerencia"]
+};
+function textosEncuesta(actor, en) {
+  const T = en ? {
+    titulo: "How did it go?", ey: "Give&Grow International · Survey",
+    intro: actor === "voluntario" ? "Your view of the activity, in a few short questions."
+         : actor === "empresa" ? "Your company's view of the activity, in a few short questions."
+         : "Your foundation's view of the activity, in a few short questions. The foundation has the last word on every activity, so this one weighs the most.",
+    privado: "We do not ask for your name or any personal data, and this link is yours alone. You can answer only once.",
+    satisfaccion: actor === "voluntario" ? "Overall, how satisfied are you with the activity?" : "Overall, how satisfied are you with the activity?",
+    escalaBaja: "Not at all", escalaAlta: "Very",
+    aprendio: actor === "voluntario" ? "What did you learn, or what changed in the way you see things?"
+            : actor === "empresa" ? "What changed in the team after the activity?" : "What did the activity leave the foundation?",
+    no_funciono: "What did not work, or what would you change?",
+    volveria: actor === "voluntario" ? "Would you take part again?" : actor === "empresa" ? "Would you do another activity with us?" : "Would you host an activity like this again?",
+    expectativas: "Did the activity meet the company's expectations?",
+    util: "Did the activity leave something useful for the foundation?",
+    sugerencia: "Any suggestion for next time?",
+    op: { si: "Yes", tal_vez: "Maybe", no: "No", en_parte: "Partly" },
+    opcional: "Optional", enviar: "Send my answers",
+    gracias: "Thank you. We received your answers.",
+    graciasP: "They go into the activity's report, together with those of the other people who took part.",
+    ya: "This survey was already answered", yaP: "Each link takes one answer, and this one already has it. Thank you.",
+    falta: "Please choose how satisfied you are (1 to 5): it is the only required question.",
+    error: "We could not save your answers. Please try again in a moment.",
+    otro: "Leer en español", pie: "Fundación Give&Grow International · Colombian non-profit · NIT 901.948.930-2",
+    con: "with", inactivo: "This link is not active", inactivoP: "Check that you copied the whole link. If it still does not work, reply to the email you received it in."
+  } : {
+    titulo: "¿Cómo te fue?", ey: "Give&Grow International · Encuesta",
+    intro: actor === "voluntario" ? "Tu mirada de la jornada, en unas pocas preguntas cortas."
+         : actor === "empresa" ? "La mirada de la empresa sobre la jornada, en unas pocas preguntas cortas."
+         : "La mirada de la fundación sobre la jornada, en unas pocas preguntas cortas. La fundación tiene la última palabra sobre cada jornada: por eso esta es la que más pesa.",
+    privado: "No te pedimos tu nombre ni ningún dato personal, y este enlace es solo tuyo. Se puede responder una sola vez.",
+    satisfaccion: actor === "voluntario" ? "En general, ¿qué tan satisfecho o satisfecha quedaste con la jornada?" : "En general, ¿qué tan satisfechos quedaron con la jornada?",
+    escalaBaja: "Nada", escalaAlta: "Mucho",
+    aprendio: actor === "voluntario" ? "¿Qué aprendiste, o qué cambió en tu forma de ver las cosas?"
+            : actor === "empresa" ? "¿Qué cambió en el equipo después de la jornada?" : "¿Qué dejó la jornada en la fundación?",
+    no_funciono: "¿Qué no funcionó o qué cambiarías?",
+    volveria: actor === "voluntario" ? "¿Volverías a participar?" : actor === "empresa" ? "¿Volverían a hacer una jornada con nosotros?" : "¿Volverían a recibir una jornada así?",
+    expectativas: "¿La jornada cumplió las expectativas de la empresa?",
+    util: "¿La jornada dejó algo útil para la fundación?",
+    sugerencia: "¿Alguna sugerencia para la próxima?",
+    op: { si: "Sí", tal_vez: "Tal vez", no: "No", en_parte: "En parte" },
+    opcional: "Opcional", enviar: "Enviar mis respuestas",
+    gracias: "Gracias. Recibimos tus respuestas.",
+    graciasP: "Van al reporte de la jornada, junto con las de las demás personas que participaron.",
+    ya: "Esta encuesta ya fue respondida", yaP: "Cada enlace recibe una sola respuesta, y este ya la tiene. Gracias.",
+    falta: "Elige qué tan satisfecho quedaste (de 1 a 5): es la única pregunta obligatoria.",
+    error: "No pudimos guardar tus respuestas. Inténtalo de nuevo en un momento.",
+    otro: "Read in English", pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2",
+    con: "con", inactivo: "Este enlace no está activo", inactivoP: "Revisa que copiaste el enlace completo. Si sigue sin funcionar, responde el correo en el que te llegó."
+  };
+  return T;
+}
+/* Los radios con aspecto de boton, con los tokens del sitio: de noche --acc se
+   aclara solo, y el texto encima va en --bg para que el contraste se sostenga
+   en los dos temas. Nada de tokens nuevos. */
+const ESTILO_ENCUESTA = ""
+  + ".enc-form{padding:22px 20px;max-width:none}"
+  + ".enc-form fieldset{border:0;margin:0 0 24px;padding:0;min-width:0}"
+  + ".enc-form legend{font-weight:600;font-size:var(--fs-15);color:var(--ink);margin-bottom:10px;padding:0}"
+  + ".enc-ops{display:flex;flex-wrap:wrap;gap:8px}"
+  + ".enc-op{position:relative;display:inline-flex}"
+  + ".enc-op input{position:absolute;opacity:0;width:1px;height:1px;margin:0}"
+  + ".enc-op span{display:inline-flex;align-items:center;justify-content:center;min-width:48px;min-height:44px;"
+  +   "padding:0 14px;border:1.5px solid var(--bd);border-radius:10px;background:var(--surface);color:var(--ink);"
+  +   "font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer}"
+  + ".enc-op input:checked+span{background:var(--acc);border-color:var(--acc);color:var(--bg)}"
+  + ".enc-op input:focus-visible+span{outline:2px solid var(--acc);outline-offset:2px}"
+  + ".enc-escala{display:flex;justify-content:space-between;max-width:296px;margin-top:6px;font-size:var(--fs-13);color:var(--mu)}"
+  + ".enc-form .field{margin:0 0 20px}"
+  + ".enc-form .field small{font-weight:400;color:var(--mu)}"
+  + ".enc-aviso{border-left:3px solid var(--err);padding:9px 13px;margin:18px 0 0;background:var(--surface)}";
+
+function paginaEncuesta(e, j, anfitriona, lang, estado, tema, token) {
+  const en = lang === "en";
+  const T = textosEncuesta(e.actor, en);
+  const otra = "/encuesta/" + token + (en ? "" : "?lang=en");
+  const fecha = j.fecha ? fechaLargaIdioma(j.fecha, en) : "";
+  let cuerpo = ""
+    + '  <span class="ey">' + esc(T.ey) + '</span>\n'
+    + '  <h1>' + esc(T.titulo) + '</h1>\n'
+    + '  <p class="lead">«' + esc(j.nombre) + '»' + (fecha ? ' · ' + esc(fecha) : '')
+    + (anfitriona ? ' · ' + esc(T.con) + ' ' + esc(anfitriona) : '') + '</p>\n';
+
+  if (estado === "hecho" && e.respondida_en) {
+    cuerpo += '  <section class="card" style="margin-top:22px;padding:20px">\n'
+      + '    <h2 style="margin-top:0">' + esc(T.gracias) + '</h2>\n'
+      + '    <p class="mu">' + esc(T.graciasP) + '</p>\n  </section>\n';
+  } else if (e.respondida_en) {
+    cuerpo += '  <section class="card" style="margin-top:22px;padding:20px">\n'
+      + '    <h2 style="margin-top:0">' + esc(T.ya) + '</h2>\n'
+      + '    <p class="mu">' + esc(T.yaP) + '</p>\n  </section>\n';
+  } else {
+    cuerpo += '  <p>' + esc(T.intro) + '</p>\n'
+      + '  <p class="mu">' + esc(T.privado) + '</p>\n';
+    if (estado === "falta") cuerpo += '  <p class="enc-aviso" role="alert">' + esc(T.falta) + '</p>\n';
+    if (estado === "error") cuerpo += '  <p class="enc-aviso" role="alert">' + esc(T.error) + '</p>\n';
+    let f = '  <form method="POST" action="/encuesta/' + esc(token) + '" class="card ally-form enc-form" style="margin-top:22px">\n';
+    for (const q of PREGUNTAS_ENCUESTA[e.actor] || []) {
+      if (q === "satisfaccion") {
+        f += '    <fieldset>\n      <legend>' + esc(T.satisfaccion) + '</legend>\n      <div class="enc-ops">\n';
+        for (let n = 1; n <= 5; n++) {
+          f += '        <label class="enc-op"><input type="radio" name="satisfaccion" value="' + n + '"' + (n === 1 ? ' required' : '') + '><span>' + n + '</span></label>\n';
+        }
+        f += '      </div>\n      <div class="enc-escala" aria-hidden="true"><span>1 · ' + esc(T.escalaBaja) + '</span><span>5 · ' + esc(T.escalaAlta) + '</span></div>\n    </fieldset>\n';
+      } else if (OPCIONES_ENCUESTA[q]) {
+        f += '    <fieldset>\n      <legend>' + esc(T[q]) + ' <small class="mu">(' + esc(T.opcional) + ')</small></legend>\n      <div class="enc-ops">\n';
+        for (const o of OPCIONES_ENCUESTA[q]) {
+          f += '        <label class="enc-op"><input type="radio" name="' + q + '" value="' + o + '"><span>' + esc(T.op[o]) + '</span></label>\n';
+        }
+        f += '      </div>\n    </fieldset>\n';
+      } else {
+        f += '    <div class="field">\n      <label for="enc-' + q + '">' + esc(T[q]) + ' <small>(' + esc(T.opcional) + ')</small></label>\n'
+          + '      <textarea id="enc-' + q + '" name="' + q + '" rows="3" maxlength="' + ENCUESTA_TOPE_TEXTO + '"></textarea>\n    </div>\n';
+      }
+    }
+    f += '    <input type="hidden" name="lang" value="' + (en ? "en" : "es") + '">\n'
+      + '    <p style="margin-top:6px"><button class="btn btn-g" type="submit">' + esc(T.enviar) + '</button></p>\n  </form>\n';
+    cuerpo += f;
+  }
+  cuerpo += '  <p style="margin-top:22px"><a class="card-link" href="' + esc(otra) + '" lang="' + (en ? "es" : "en") + '">' + esc(T.otro) + '</a></p>\n'
+    + '  <p class="mu" style="margin-top:18px;font-size:var(--fs-13)">' + esc(T.pie) + '</p>\n';
+  return cascaraBaja(T.titulo, cuerpo, lang, tema, ESTILO_ENCUESTA);
+}
+
+function respuestaEncuestaHTML(html, status) {
+  return new Response(html, {
+    status: status || 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "referrer-policy": "no-referrer",
+      /* La URL ES la credencial: sin cache compartida y sin indexar. */
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow",
+      "content-security-policy": cspPagina({ script: "'none'", form: "'self'" })
+    }
+  });
+}
+
+/* GET y POST /encuesta/<token> */
+async function rutaEncuesta(request, env, token, url) {
+  if (!env.DB) return new Response("No disponible", { status: 503 });
+  const q = url.searchParams.get("lang");
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  /* El limite va tambien en el GET: el token tiene 128 bits y no se adivina,
+     pero un barrido de enlaces no tiene por que salir gratis. */
+  if (ip && encuestaLimitada(ip)) {
+    return new Response("Demasiadas solicitudes. Intenta en unos minutos. / Too many requests, try again in a few minutes.", {
+      status: 429, headers: { "content-type": "text/plain; charset=utf-8", "retry-after": "300", "cache-control": "no-store" }
+    });
+  }
+  const tema = temaPorReloj(request);
+  const tok = String(token || "");
+  const e = /^[a-f0-9]{32}$/.test(tok)
+    ? await env.DB.prepare("SELECT token, jornada, actor, idioma, respondida_en FROM encuestas WHERE token = ?").bind(tok).first()
+    : null;
+  if (!e) {
+    const en = q === "en";
+    const T = textosEncuesta("voluntario", en);
+    return respuestaEncuestaHTML(cascaraBaja(T.inactivo,
+      '  <h1>' + esc(T.inactivo) + '</h1>\n  <p class="lead">' + esc(T.inactivoP) + '</p>\n', en ? "en" : "es", tema), 404);
+  }
+  const lang = q === "en" || q === "es" ? q : (e.idioma === "en" ? "en" : "es");
+  const j = await env.DB.prepare("SELECT nombre, fecha, anfitriona FROM jornadas WHERE id = ?").bind(e.jornada).first();
+  const red = await fundacionesRed(env);
+  const anf = j && j.anfitriona && j.anfitriona !== "sede" ? nombreAnfitriona(red, j.anfitriona) : "";
+
+  if (request.method === "POST") {
+    /* Un formulario de OTRO sitio no responde por nadie. El navegador manda
+       `Origin` en un POST; si llega y no es el nuestro, no se guarda. */
+    const origen = request.headers.get("origin");
+    if (origen && origen !== url.origin) return new Response("Origen no permitido", { status: 403 });
+    if (!(await pasaTopeIP(env, request, "encuesta"))) {
+      return new Response("Demasiadas respuestas hoy desde esta conexión. / Too many answers today from this connection.", {
+        status: 429, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" }
+      });
+    }
+    let f;
+    try { f = await request.formData(); } catch { return new Response("Formulario inválido", { status: 400 }); }
+    const langF = f.get("lang") === "en" ? "en" : f.get("lang") === "es" ? "es" : lang;
+    /* Al mismo origen de la peticion y no a ORIGIN: asi la encuesta tambien
+       se puede responder en el entorno de pruebas y en local. */
+    const volver = (estado) => Response.redirect(url.origin + "/encuesta/" + tok + "?lang=" + langF + (estado ? "&r=" + estado : ""), 303);
+    if (e.respondida_en) return volver("");
+    const sat = Number(f.get("satisfaccion"));
+    if (!Number.isInteger(sat) || sat < 1 || sat > 5) return volver("falta");
+    const r = {};
+    for (const k of PREGUNTAS_ENCUESTA[e.actor] || []) {
+      if (k === "satisfaccion") continue;
+      const v = limpiar(f.get(k), ENCUESTA_TOPE_TEXTO);
+      if (OPCIONES_ENCUESTA[k]) { if (OPCIONES_ENCUESTA[k].includes(v)) r[k] = v; }
+      else if (v) r[k] = v;
+    }
+    /* UNA RESPUESTA POR ENLACE, garantizada por la base y no por la pagina:
+       el UPDATE solo escribe si sigue sin responder. */
+    const w = await env.DB.prepare(
+      "UPDATE encuestas SET satisfaccion = ?, respuestas = ?, respondida_en = datetime('now') WHERE token = ? AND respondida_en IS NULL"
+    ).bind(sat, JSON.stringify(r), tok).run();
+    return volver(w.meta && w.meta.changes ? "hecho" : "");
+  }
+  if (request.method !== "GET" && request.method !== "HEAD") return new Response("Método no permitido", { status: 405 });
+  const estado = ["hecho", "falta", "error"].includes(url.searchParams.get("r")) ? url.searchParams.get("r") : "";
+  return respuestaEncuestaHTML(paginaEncuesta(e, j || { nombre: "", fecha: null }, anf, lang, estado, tema, tok));
 }
 
 /* ========================================================================
@@ -16903,6 +17979,44 @@ textarea { font-size: 16px }
 .dec-ir:hover{border-color:var(--acc)}
 .dec-sinir{color:var(--mu);font-weight:400;border-style:dashed}
 .dec-sinir:hover{border-color:var(--bd)}
+/* ---- JORNADAS DE VOLUNTARIADO ----
+   Los indicadores son un ledger de fichas separadas por una regla de 1px, no
+   tarjetas con sombra: es la gramatica de la tabla de transparencia. La ficha
+   abierta lleva el filete de acento a la izquierda, como la portada de
+   decisiones. Todo con los tokens que ya existen. */
+/* Las reglas las pone cada ficha (derecha y abajo) y el margen negativo las
+   esconde bajo el borde del contenedor: asi la ultima fila, si queda corta,
+   no deja un hueco gris como dejaria el truco del «gap» sobre fondo de regla. */
+.vol-ind{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));background:var(--surface);
+  border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:0 0 22px}
+.vol-ind>div{padding:12px 14px;min-width:0;border-right:1px solid var(--bd);border-bottom:1px solid var(--bd);margin:0 -1px -1px 0}
+.vol-ind b.vol-nd{font-size:var(--fs-15);color:var(--mu);font-weight:600;padding-top:5px}
+.vol-ind b{display:block;font-size:var(--fs-h3);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.2}
+.vol-ind small{display:block;font-size:var(--fs-12);color:var(--mu);margin-top:3px;line-height:1.35}
+.vol-ind-t{font-size:var(--fs-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin:0 0 8px}
+.vol-caja{margin-bottom:22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
+.vol-caja>summary,.vol-bloque>summary{cursor:pointer;font-weight:700;font-size:var(--fs-14)}
+.vol-det{border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:10px;padding:18px 20px;background:var(--surface)}
+.vol-cab{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.vol-bloque{border-top:1px solid var(--bd);padding:14px 0 4px;margin-top:14px}
+.vol-bloque h4{font-size:var(--fs-15);margin:0 0 8px}
+.vol-ficha{display:grid;grid-template-columns:13rem 1fr;gap:6px 14px;font-size:var(--fs-14);margin:12px 0 0}
+.vol-ficha dt{color:var(--mu)}
+.vol-ficha dd{margin:0;white-space:pre-line;min-width:0;overflow-wrap:anywhere}
+@media(max-width:560px){ .vol-ficha{grid-template-columns:1fr;gap:2px} .vol-ficha dd{margin-bottom:8px} }
+/* Los campos de esta zona van sobre --bg y no sobre blanco suelto: dentro de
+   la ficha (que es --surface) un campo del mismo papel no se distinguiria. */
+.eg-form textarea{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:8px;font:inherit;
+  font-size:var(--fs-16);background:var(--bg);color:var(--ink);resize:vertical}
+.vol-horas{width:5.5rem;padding:6px 8px;border:1px solid var(--bd);border-radius:6px;font:inherit;background:var(--bg);color:var(--ink)}
+.vol-motivo{color:var(--amber)}
+.vol-enlace{width:100%;max-width:520px;padding:7px 10px;border:1px solid var(--bd);border-radius:6px;font:inherit;
+  font-size:var(--fs-14);background:var(--bg);color:var(--ink)}
+.vol-cierre{border:1px dashed var(--bd);border-radius:10px;padding:12px 14px;margin-top:12px}
+.vol-res{margin:10px 0 18px}
+.vol-res h5{font-size:var(--fs-14);margin:0 0 4px}
+.vol-res h6{font-size:var(--fs-11);letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin:12px 0 4px}
+.vol-res ul{margin:0 0 0 18px;padding:0;font-size:var(--fs-14);line-height:1.5}
 @media (max-width:640px){
   /* En móvil la rejilla de cuatro columnas aplasta el texto: se apila, y el
      conteo queda junto a la antigüedad, que es como se leería en voz alta. */
@@ -16939,6 +18053,7 @@ textarea { font-size: 16px }
   <button type="button" class="mod-tab" data-mod-ir="dinero">Dinero<span class="mod-n" id="n-dinero"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="mmc">Mira Mi Casa<span class="mod-n" id="n-mmc"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="red">Red<span class="mod-n" id="n-red"></span></button>
+  <button type="button" class="mod-tab" data-mod-ir="vol">Voluntariado</button>
   <button type="button" class="mod-tab" data-mod-ir="entregas">Entregas<span class="mod-n" id="n-entregas"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="conta">Contabilidad<span class="mod-n" id="n-conta"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="salud">Salud<span class="mod-n" id="n-salud"></span></button>
@@ -17018,8 +18133,34 @@ declaró, no uno comprobado.</p>
 </table></div>
 
 </div>
+<div class="mod" data-mod="vol" hidden>
+<h2 id="sec-jornadas" class="h-sec" style="margin:8px 0 6px;font-size:26px">Jornadas de voluntariado</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">De la ficha de convocatoria al
+cierre. <strong>Sin sesión de Marco no hay jornada en terreno:</strong> el panel no deja marcar como
+realizada una jornada de Impact Journey o En terreno sin ella. <strong>Cerrar es el registro:</strong>
+las horas quedan fijas, la fundación reporta a cuántas personas llegó, sale un certificado de
+voluntariado por cada persona con horas y nacen las encuestas. Después de cerrar ya no se edita.</p>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:18px">Los indicadores cuentan solo lo
+que ocurrió —jornadas realizadas y personas con horas— y los beneficiarios son <strong>los que reporta
+la fundación</strong>, no los que contamos nosotros. A un menor de edad <strong>nunca</strong> se le
+escribe: su certificado va a su acudiente si hay un correo registrado, y si no, se entrega en mano.
+Nada de esto se cobra.</p>
+<div id="vol-ind"></div>
+<details id="j-nueva" class="vol-caja">
+  <summary>Nueva jornada</summary>
+  <div id="j-form-nueva" class="eg-form"><p class="mu">Se arma al cargar la lista.</p></div>
+</details>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Jornada</th><th scope="col">Fecha</th><th scope="col">Puerta</th><th scope="col">Anfitriona</th>
+<th scope="col">Personas</th><th scope="col">Horas</th><th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="j-filas"><tr><td colspan="8" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
+</table></div>
+<div id="j-dlg" style="display:none;margin-top:24px"></div>
+</div>
+
 <div class="mod" data-mod="mmc" hidden>
-<h2 id="sec-casas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Casas por revisar</h2>
+<h2 id="sec-casas"class="h-sec" style="margin:48px 0 6px;font-size:26px">Casas por revisar</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Triaje estructural. Los
 ingenieros clasifican sin ver de quién es la casa ni dónde queda; <strong>aquí sí están el contacto
 y la dirección</strong>, que es lo que permite ir a visitar. Ordenadas por urgencia y, dentro de
@@ -20604,6 +21745,513 @@ document.addEventListener("click", function(ev){
   }
 });
 
+/* ---------------- jornadas de voluntariado (migrations/0036) ----------------
+   La lista, la ficha abierta y sus acciones. Las REGLAS viven en el servidor
+   —el Marco, el cierre, a quien se le escribe—; aqui solo se pinta lo que el
+   servidor dice y se le pregunta. Por eso «envio_motivo» llega ya escrito: el
+   panel no decide si a alguien se le puede mandar un correo. */
+var J_LISTAS = { fundaciones: [], empresas: [], completas: true };
+var J_ABIERTA = null;
+var J_FORM_NUEVA = false;
+var PUERTA_ES = { "impact-journey":"Impact Journey", terreno:"En terreno", administrativo:"Administrativo",
+  tecnico:"Técnico · Mira Mi Casa", emergencia:"De emergencia" };
+var FORMATO_ES = { presencial:"Presencial", virtual:"Virtual", remoto:"Remoto", hibrido:"Híbrido" };
+var ESTADO_J_ES = { planeada:"Planeada", confirmada:"Confirmada", realizada:"Realizada", cerrada:"Cerrada", cancelada:"Cancelada" };
+var PASO_J_ES = { confirmada:"Confirmar", planeada:"Volver a planeada", realizada:"Marcar realizada", cancelada:"Cancelar" };
+var OP_ES = { si:"Sí", tal_vez:"Tal vez", no:"No", en_parte:"En parte" };
+var ACTOR_ES = { voluntario:"Voluntarios", empresa:"Empresa", fundacion:"Fundación anfitriona" };
+var CAMPOS_J = ["nombre", "descripcion", "rol", "requisitos", "puerta", "formato", "fecha", "hora_inicio", "hora_fin",
+  "lugar", "cupo_min", "cupo_max", "anfitriona", "empresa", "empresa_inscripcion", "empresa_email",
+  "fundacion_email", "coordinador", "costos"];
+
+function numCO(n){ return n === null || n === undefined ? "—" : Number(n).toLocaleString("es-CO"); }
+function horarioJ(j){ return j.hora_inicio && j.hora_fin ? j.hora_inicio + "–" + j.hora_fin : (j.hora_inicio || ""); }
+
+/* Los indicadores del voluntariado corporativo, en el mismo orden siempre: el
+   total del panel y el resumen de una jornada se leen igual. «Sin reporte» y
+   «sin respuestas» no son cero, y no se escriben como cero. */
+function pintarIndicadores(id, x, titulo, deUna){
+  var el = document.getElementById(id); if (!el) return;
+  var t = [
+    [numCO(x.voluntarios_unicos), "voluntarios únicos"],
+    [numCO(x.horas), "horas efectivas"],
+    [numCO(x.horas_pro_bono), "horas pro bono (profesionales)"],
+    [numCO(x.participaciones), "participaciones"]
+  ];
+  if (!deUna){
+    t.push([numCO(x.jornadas_realizadas), "jornadas realizadas"]);
+    t.push([numCO(x.empresas), "empresas que participaron"]);
+  }
+  t.push([x.beneficiarios_directos === null || x.beneficiarios_directos === undefined ? "sin reporte" : numCO(x.beneficiarios_directos),
+          "beneficiarios directos · reportados por la fundación"]);
+  t.push([x.beneficiarios_indirectos === null || x.beneficiarios_indirectos === undefined ? "sin reporte" : numCO(x.beneficiarios_indirectos),
+          "beneficiarios indirectos · reportados por la fundación"]);
+  t.push([x.satisfaccion === null || x.satisfaccion === undefined ? "sin respuestas" : String(x.satisfaccion).replace(".", ",") + " / 5",
+          "satisfacción promedio · " + numCO(x.satisfaccion_respuestas || 0) + " respuestas"]);
+  el.innerHTML = (titulo ? '<p class="vol-ind-t">' + esc(titulo) + "</p>" : "") + '<div class="vol-ind">' + t.map(function(c){
+    /* Una palabra no es una cifra: «sin reporte» va en tamaño de texto. */
+    var nd = c[0] === "sin reporte" || c[0] === "sin respuestas";
+    return "<div><b" + (nd ? ' class="vol-nd"' : "") + ">" + esc(c[0]) + "</b><small>" + esc(c[1]) + "</small></div>";
+  }).join("") + "</div>";
+}
+
+function opcionesJ(lista, actual, vacio){
+  var a = String(actual === null || actual === undefined ? "" : actual);
+  return (vacio !== null ? '<option value="">' + esc(vacio) + "</option>" : "") + lista.map(function(o){
+    return '<option value="' + esc(o[0]) + '"' + (a === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>";
+  }).join("");
+}
+function campoJ(p, k, etiqueta, j, tipo, extra){
+  var v = j && j[k] !== null && j[k] !== undefined ? j[k] : "";
+  if (tipo === "area") return '<label for="' + p + k + '">' + esc(etiqueta) + '</label><textarea id="' + p + k + '" rows="3">' + esc(v) + "</textarea>";
+  return '<label for="' + p + k + '">' + esc(etiqueta) + '</label><input id="' + p + k + '" type="' + (tipo || "text") + '" value="' + esc(v) + '"' + (extra || "") + ' autocomplete="off">';
+}
+/* LA FICHA DE CONVOCATORIA. Un solo formulario para crear y para editar, con
+   prefijo en los ids para que los dos puedan estar en la pagina a la vez. */
+function formJornada(p, j){
+  var fund = J_LISTAS.fundaciones.map(function(f){ return [f.id, f.nombre]; });
+  fund.push(["sede", "Sede de Give&Grow (sin fundación anfitriona)"]);
+  var emp = J_LISTAS.empresas.map(function(e){ return [e.id, e.nombre + (e.con_correo ? "" : " (sin correo)")]; });
+  var puertas = Object.keys(PUERTA_ES).map(function(k){ return [k, PUERTA_ES[k]]; });
+  var formatos = Object.keys(FORMATO_ES).map(function(k){ return [k, FORMATO_ES[k]]; });
+  return campoJ(p, "nombre", "Nombre de la jornada", j) +
+    campoJ(p, "descripcion", "Descripción", j, "area") +
+    campoJ(p, "rol", "Rol de los voluntarios", j, "area") +
+    campoJ(p, "requisitos", "Qué se necesita para participar", j, "area") +
+    '<div class="eg-par"><div><label for="' + p + 'puerta">Puerta</label><select id="' + p + 'puerta">' +
+      opcionesJ(puertas, j && j.puerta, "Elige…") + "</select></div>" +
+    '<div><label for="' + p + 'formato">Formato</label><select id="' + p + 'formato">' +
+      opcionesJ(formatos, (j && j.formato) || "presencial", null) + "</select></div></div>" +
+    '<div class="eg-par"><div>' + campoJ(p, "fecha", "Fecha", j, "date") + "</div>" +
+    '<div class="eg-par"><div>' + campoJ(p, "hora_inicio", "Desde", j, "time") + "</div><div>" +
+      campoJ(p, "hora_fin", "Hasta", j, "time") + "</div></div></div>" +
+    campoJ(p, "lugar", "Lugar (de uso interno: no sale en el certificado)", j) +
+    '<div class="eg-par"><div>' + campoJ(p, "cupo_min", "Cupo mínimo", j, "text", ' inputmode="numeric"') + "</div><div>" +
+      campoJ(p, "cupo_max", "Cupo máximo", j, "text", ' inputmode="numeric"') + "</div></div>" +
+    '<label for="' + p + 'anfitriona">Fundación anfitriona</label><select id="' + p + 'anfitriona">' +
+      opcionesJ(fund, j && j.anfitriona, "Sin definir todavía") + "</select>" +
+    (J_LISTAS.completas ? "" : '<p class="mu" style="font-size:12.5px;margin:4px 0 0;color:#A84D00">No se pudo leer la lista de la red: la anfitriona no se puede comprobar ahora.</p>') +
+    '<div class="eg-par"><div>' + campoJ(p, "empresa", "Empresa o grupo aliado (opcional)", j) + "</div>" +
+    '<div><label for="' + p + 'empresa_inscripcion">Su solicitud de alianza (opcional)</label><select id="' + p + 'empresa_inscripcion">' +
+      opcionesJ(emp, j && j.empresa_inscripcion, "Ninguna") + "</select></div></div>" +
+    '<div class="eg-par"><div>' + campoJ(p, "empresa_email", "Correo de la empresa para su encuesta (opcional)", j, "email") + "</div><div>" +
+      campoJ(p, "fundacion_email", "Correo de la fundación para su encuesta (opcional)", j, "email") + "</div></div>" +
+    campoJ(p, "coordinador", "Coordinador voluntario responsable", j) +
+    campoJ(p, "costos", "Materiales y costos acordados con la empresa (opcional)", j, "area") +
+    '<p class="mu" style="font-size:12.5px;margin:6px 0 0">Nada de esto se cobra como tarifa. Si la jornada necesita ' +
+    "materiales, se acuerdan con la empresa y aquí queda escrito lo acordado.</p>";
+}
+function leerJornada(p){
+  var o = {};
+  CAMPOS_J.forEach(function(k){ var e = document.getElementById(p + k); o[k] = e ? e.value.trim() : ""; });
+  return o;
+}
+function pintarFormNueva(){
+  var c = document.getElementById("j-form-nueva"); if (!c) return;
+  if (J_FORM_NUEVA) return;
+  J_FORM_NUEVA = true;
+  c.innerHTML = formJornada("jn-", null) +
+    '<p><button class="btn" type="button" id="j-crear" style="margin-top:12px">Crear la jornada</button></p><p class="msg" id="jn-msg"></p>';
+}
+/* El campo que el servidor rechazo, señalado: el mensaje dice el porque y el
+   foco lleva a donde hay que corregir. */
+function marcarCampoJ(p, campo){
+  if (!campo) return;
+  var e = document.getElementById(p + campo);
+  if (e){ e.focus(); e.scrollIntoView({ block: "center" }); }
+}
+function guardarJornada(p, id, boton, msg){
+  boton.disabled = true;
+  fetch(id ? "/api/admin/jornada/" + encodeURIComponent(id) : "/api/admin/jornadas", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(leerJornada(p))
+  }).then(conEstado).then(function(r){
+    boton.disabled = false;
+    if (r.http >= 300 || (r.d && r.d.error)){
+      egMsg(msg, (r.d && (r.d.ayuda || r.d.error)) || "No se pudo.", false);
+      marcarCampoJ(p, r.d && r.d.campo);
+      return;
+    }
+    egMsg(msg, id ? "Guardado." : "Jornada creada.", true);
+    if (!id){
+      var n = document.getElementById("j-nueva"); if (n) n.open = false;
+      J_FORM_NUEVA = false;
+    }
+    cargarJornadas();
+    abrirJornada(id || r.d.id);
+  }).catch(function(){ boton.disabled = false; egMsg(msg, "No se pudo. Revisa la conexión.", false); });
+}
+
+function cargarJornadas(){
+  pedirJSON("/api/admin/jornadas", "j-filas").then(function(d){
+    J_LISTAS.fundaciones = d.fundaciones || [];
+    J_LISTAS.empresas = d.empresas || [];
+    J_LISTAS.completas = d.fundaciones_completas !== false;
+    pintarIndicadores("vol-ind", d.indicadores || {}, "Indicadores de voluntariado · todo el panel", false);
+    pintarFormNueva();
+    var tb = document.getElementById("j-filas"); if (!tb) return;
+    var l = d.jornadas || [];
+    if (!l.length){
+      tb.innerHTML = '<tr><td colspan="8">Todavía no hay jornadas. La primera se crea arriba, en «Nueva jornada».</td></tr>';
+      return;
+    }
+    tb.innerHTML = l.map(function(j){
+      var cupo = j.cupo_max ? " de " + j.cupo_max : "";
+      return "<tr>" +
+        "<td>" + esc(j.nombre) + (j.empresa ? "<br><small>" + esc(j.empresa) + "</small>" : "") + "</td>" +
+        "<td>" + esc(j.fecha || "sin fecha") + (horarioJ(j) ? "<br><small>" + esc(horarioJ(j)) + "</small>" : "") + "</td>" +
+        "<td>" + esc(PUERTA_ES[j.puerta] || j.puerta) + "<br><small>" + esc(FORMATO_ES[j.formato] || j.formato) + "</small></td>" +
+        "<td>" + esc(j.anfitriona_nombre || "sin definir") + "</td>" +
+        "<td>" + esc(String(j.anotados) + cupo) + "</td>" +
+        "<td>" + esc(numCO(j.horas)) + "</td>" +
+        "<td>" + esc(ESTADO_J_ES[j.estado] || j.estado) +
+          (j.marco_en ? "<br><small>Marco hecho</small>" : "") + "</td>" +
+        '<td><button class="copy" type="button" data-jabrir="' + j.id + '">Abrir</button></td>' +
+      "</tr>";
+    }).join("");
+  });
+}
+
+function abrirJornada(id){
+  J_ABIERTA = id;
+  var dlg = document.getElementById("j-dlg"); if (!dlg) return;
+  dlg.style.display = "block";
+  pedirJSON("/api/admin/jornada/" + encodeURIComponent(id), "j-dlg").then(function(d){ pintarJornada(d); });
+}
+
+function fichaLectura(j){
+  var f = [
+    ["Descripción", j.descripcion], ["Rol de los voluntarios", j.rol], ["Qué se necesita", j.requisitos],
+    ["Formato", FORMATO_ES[j.formato] || j.formato], ["Lugar", j.lugar],
+    ["Cupos", (j.cupo_min !== null ? "mínimo " + j.cupo_min : "") + (j.cupo_min !== null && j.cupo_max !== null ? " · " : "") + (j.cupo_max !== null ? "máximo " + j.cupo_max : "")],
+    ["Empresa o grupo", j.empresa], ["Materiales y costos acordados", j.costos]
+  ].filter(function(x){ return x[1]; });
+  if (!f.length) return "";
+  return '<dl class="vol-ficha">' + f.map(function(x){ return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") + "</dl>";
+}
+
+function filaParticipante(p, abierta){
+  var edad = p.menor === 1 ? "Menor de edad" : p.menor === 0 ? "Mayor de edad" : "Sin confirmar";
+  var tdEdad = abierta
+    ? '<select data-pmenor="' + p.id + '" aria-label="Edad de ' + esc(p.nombre) + '">' +
+        opcionesJ([["", "Sin confirmar"], ["no", "Mayor de edad"], ["si", "Menor de edad"]], p.menor === 1 ? "si" : p.menor === 0 ? "no" : "", null) + "</select>"
+    : esc(edad);
+  if (p.menor === 1) tdEdad += "<br><small>Acudiente: " + esc(p.acudiente_nombre || "sin nombre") + " · " + esc(p.acudiente_email || "sin correo") + "</small>";
+  var tdHoras = abierta
+    ? '<input class="vol-horas" data-phoras="' + p.id + '" value="' + esc(p.horas === null ? "" : p.horas) + '" inputmode="decimal" aria-label="Horas de ' + esc(p.nombre) + '">'
+    : esc(p.horas === null ? "—" : String(p.horas).replace(".", ","));
+  var tdPro = abierta
+    ? '<input type="checkbox" data-pprobono="' + p.id + '"' + (p.pro_bono ? " checked" : "") + ' aria-label="Horas profesionales de ' + esc(p.nombre) + '">'
+    : (p.pro_bono ? "Sí" : "No");
+  var cert;
+  if (p.numero){
+    cert = '<a href="/api/admin/reconocimiento/' + esc(p.numero) + '.pdf" target="_blank" rel="noopener">' + esc(p.numero) + "</a>";
+    if (p.enviado_en && p.enviado_a && p.enviado_a !== "enviando") cert += "<br><small>Enviado el " + esc(enCO(p.enviado_en, 10)) + " a " + esc(p.enviado_a) + "</small>";
+    else if (p.envio_motivo) cert += '<br><small class="vol-motivo">' + esc(p.envio_motivo) + "</small>";
+    else cert += '<br><button class="copy" type="button" data-jreconocer="' + p.jornada + '" data-jpart="' + p.id + '">Enviar' + (p.envio_a === "acudiente" ? " al acudiente" : "") + "</button>";
+  } else if (abierta){
+    cert = '<small class="mu">Sale al cerrar</small>' + (p.envio_motivo ? '<br><small class="vol-motivo">' + esc(p.envio_motivo) + "</small>" : "");
+  } else {
+    cert = '<small class="vol-motivo">' + esc(p.envio_motivo || "Sin certificado") + "</small>";
+  }
+  var enc = p.encuesta ? (p.encuesta_respondida ? "Respondió" : "Sin responder") : "—";
+  return "<tr>" +
+    "<td>" + esc(p.nombre) + (p.inscripcion ? "<br><small>inscrita · #" + esc(p.inscripcion) + "</small>" : "<br><small>anotada a mano</small>") + "</td>" +
+    "<td>" + esc(p.email || "sin correo") + (p.celular ? "<br><small>" + esc(p.celular) + "</small>" : "") + "<br><small>" + (p.idioma === "en" ? "inglés" : "español") + "</small></td>" +
+    "<td>" + tdHoras + "</td><td>" + tdPro + "</td><td>" + tdEdad + "</td>" +
+    "<td>" + cert + "</td><td>" + esc(enc) + "</td>" +
+    "<td>" + (abierta ? '<button class="copy" type="button" data-pquitar="' + p.id + '">Quitar</button>' : "—") + "</td>" +
+  "</tr>";
+}
+
+/* LA CONSOLIDACION CUALITATIVA: por actor, sin nombres. Fortalezas es lo que
+   cada quien dice que aprendio o que dejo la jornada; debilidades, lo que no
+   funciono; sugerencias, lo que propone. No se resume ni se interpreta: se
+   lista, porque resumir es decidir que importa y eso lo hace quien lee. */
+function pintarResultadosJ(rs){
+  if (!rs.length) return '<p class="mu">Todavía nadie ha respondido.</p>';
+  var por = {};
+  rs.forEach(function(x){ (por[x.actor] = por[x.actor] || []).push(x); });
+  return ["voluntario", "empresa", "fundacion"].filter(function(a){ return por[a]; }).map(function(a){
+    var l = por[a], suma = 0;
+    l.forEach(function(x){ suma += Number(x.satisfaccion || 0); });
+    var cuenta = function(k){
+      var c = {};
+      l.forEach(function(x){ var v = x.r && x.r[k]; if (v) c[v] = (c[v] || 0) + 1; });
+      return Object.keys(c).map(function(v){ return (OP_ES[v] || v) + " " + c[v]; }).join(", ");
+    };
+    var lista = function(k){
+      var t = l.map(function(x){ return x.r && x.r[k]; }).filter(Boolean);
+      return t.length ? "<ul>" + t.map(function(s){ return "<li>" + esc(s) + "</li>"; }).join("") + "</ul>"
+                      : '<p class="mu" style="font-size:13px;margin:0">Nadie escribió aquí.</p>';
+    };
+    var cifras = [];
+    if (a === "empresa") cifras.push("¿Cumplió expectativas? " + (cuenta("expectativas") || "—"));
+    if (a === "fundacion") cifras.push("¿Dejó algo útil? " + (cuenta("util") || "—"));
+    cifras.push("¿Volvería? " + (cuenta("volveria") || "—"));
+    return '<div class="vol-res"><h5>' + esc(ACTOR_ES[a] || a) + " · " + l.length + (l.length === 1 ? " respuesta" : " respuestas") +
+      " · satisfacción " + esc(String(Math.round(suma / l.length * 10) / 10).replace(".", ",")) + " / 5</h5>" +
+      '<p class="mu" style="font-size:13px;margin:0">' + esc(cifras.join(" · ")) + "</p>" +
+      "<h6>Fortalezas</h6>" + lista("aprendio") + "<h6>Debilidades</h6>" + lista("no_funciono") +
+      "<h6>Sugerencias</h6>" + lista("sugerencia") + "</div>";
+  }).join("");
+}
+
+function pintarJornada(d){
+  var dlg = document.getElementById("j-dlg"); if (!dlg) return;
+  var j = d.jornada;
+  var abierta = ["planeada", "confirmada", "realizada"].indexOf(j.estado) >= 0;
+  var cerrada = j.estado === "cerrada";
+  var ps = d.participaciones || [];
+  var h = '<div class="vol-det">';
+  h += '<div class="vol-cab"><div><span class="ey" style="margin-bottom:4px">' + esc(PUERTA_ES[j.puerta] || j.puerta) + " · " +
+       esc(ESTADO_J_ES[j.estado] || j.estado) + "</span>" +
+       '<h3 style="margin:0;font-size:22px">' + esc(j.nombre) + "</h3>" +
+       '<p class="mu" style="margin:4px 0 0;font-size:13.5px">' +
+       esc([j.fecha || "sin fecha", horarioJ(j), j.anfitriona_nombre || "sin anfitriona",
+            j.coordinador ? "coordina " + j.coordinador : "sin coordinador"].filter(Boolean).join(" · ")) + "</p></div>" +
+       '<button class="tab" type="button" data-jocultar="1">Ocultar</button></div>';
+  h += fichaLectura(j);
+
+  /* El Marco */
+  h += '<div class="vol-bloque"><h4>Marco</h4>';
+  h += j.marco_en
+    ? "<p>✓ Sesión de Marco hecha el " + esc(enCO(j.marco_en, 10)) + (j.marco_por ? " · " + esc(j.marco_por) : "") + "</p>"
+    : '<p class="mu" style="font-size:13.5px">' + (j.requiere_marco
+        ? "<strong>Obligatoria para esta puerta.</strong> Sin Marco el panel no deja marcarla realizada."
+        : "No es obligatoria para esta puerta, pero se puede anotar.") + "</p>";
+  if (abierta) h += '<label class="eg-check"><input type="checkbox" data-jmarco="' + j.id + '"' + (j.marco_en ? " checked" : "") + "> Marco realizado</label>";
+  h += "</div>";
+
+  /* El estado */
+  h += '<div class="vol-bloque"><h4>Estado: ' + esc(ESTADO_J_ES[j.estado] || j.estado) +
+       (j.cerrada_en ? " el " + esc(enCO(j.cerrada_en, 10)) : "") + "</h4><p>";
+  (j.siguientes || []).forEach(function(s){
+    h += '<button class="copy" type="button" data-jest="' + esc(s) + '" data-jid="' + j.id + '">' + esc(PASO_J_ES[s] || s) + "</button> ";
+  });
+  h += '</p><p class="msg" id="j-est-msg"></p>';
+  if (j.estado === "realizada"){
+    var sede = !j.anfitriona || j.anfitriona === "sede";
+    h += '<div class="vol-cierre eg-form" style="max-width:none;padding-top:12px"><p style="margin:0"><strong>Cerrar la jornada.</strong> ' +
+      "Fija las horas, emite un certificado por cada persona con horas y crea las encuestas. Después ya no se edita.</p>" +
+      '<div class="eg-par"><div><label for="j-bd">Beneficiarios directos</label><input id="j-bd" inputmode="numeric"></div>' +
+      '<div><label for="j-bi">Beneficiarios indirectos</label><input id="j-bi" inputmode="numeric"></div></div>' +
+      '<p class="mu" style="font-size:12.5px;margin:4px 0 0">Los que <strong>reporta la fundación</strong>, no los que contamos nosotros. ' +
+      (sede ? "Sin fundación anfitriona pueden quedar vacíos." : "Pueden ser 0, no vacíos.") + "</p>" +
+      '<label for="j-bn">De dónde sale la cifra (opcional)</label><input id="j-bn" autocomplete="off" placeholder="Lista de asistencia de la fundación">' +
+      '<p><button class="btn" type="button" data-jcerrar="' + j.id + '" style="margin-top:10px">Cerrar la jornada</button></p></div>';
+  }
+  if (cerrada){
+    h += '<p class="mu" style="font-size:13.5px">Beneficiarios reportados por la fundación: ' +
+      esc(j.beneficiarios_directos === null ? "sin reporte" : numCO(j.beneficiarios_directos)) + " directos · " +
+      esc(j.beneficiarios_indirectos === null ? "sin reporte" : numCO(j.beneficiarios_indirectos)) + " indirectos" +
+      (j.beneficiarios_nota ? " · " + esc(j.beneficiarios_nota) : "") + "</p>";
+  }
+  h += "</div>";
+
+  /* Quien fue */
+  h += '<div class="vol-bloque"><h4>Quién fue · ' + ps.length + (j.cupo_max ? " de " + j.cupo_max + " cupos" : "") +
+       (j.cupo_min ? " (mínimo " + j.cupo_min + ")" : "") + "</h4>";
+  h += ps.length
+    ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Persona</th><th scope="col">Contacto</th>' +
+      '<th scope="col">Horas efectivas</th><th scope="col">Pro bono</th><th scope="col">Edad</th><th scope="col">Certificado</th>' +
+      '<th scope="col">Encuesta</th><th scope="col">Acción</th></tr></thead><tbody>' +
+      ps.map(function(p){ return filaParticipante(p, abierta); }).join("") + "</tbody></table></div>"
+    : '<p class="mu">Nadie anotado todavía.</p>';
+  if (abierta){
+    var vols = (d.voluntarios || []).map(function(v){
+      return [v.id, v.nombre + " · " + (NIVEL_ES[v.nivel] || v.nivel || "sin nivel") + (v.listo ? " · lista" : " · le faltan pasos") + (v.menor ? " · menor" : "")];
+    });
+    h += '<div class="eg-form" style="max-width:none">' +
+      '<div class="eg-par"><div><label for="jp-vol">Anotar a un voluntario inscrito</label><select id="jp-vol">' +
+        opcionesJ(vols, "", vols.length ? "Elige…" : "No hay voluntarios sin anotar") + "</select></div>" +
+      '<button type="button" class="btn" data-panotar="' + j.id + '">Anotar</button></div>' +
+      (j.requiere_marco ? '<p class="mu" style="font-size:12.5px;margin:4px 0 0">«Le faltan pasos» es la lista de Red (identidad, antecedentes, acuerdo, visto bueno de la fundación, Marco): para ir a terreno conviene tenerla completa.</p>' : "") +
+      '<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600;font-size:13.5px">O alguien que no se inscribió por el sitio</summary>' +
+      '<div class="eg-par"><div><label for="jp-nombre">Nombre, como debe salir en el certificado</label><input id="jp-nombre" autocomplete="off"></div>' +
+      '<div><label for="jp-email">Correo</label><input id="jp-email" type="email" autocomplete="off"></div></div>' +
+      '<div class="eg-par"><div><label for="jp-celular">Celular</label><input id="jp-celular" type="tel" autocomplete="off"></div>' +
+      '<div><label for="jp-idioma">Idioma de sus correos</label><select id="jp-idioma"><option value="es">Español</option><option value="en">Inglés</option></select></div></div>' +
+      '<label for="jp-menor">Edad</label><select id="jp-menor"><option value="">Elige…</option><option value="no">Mayor de edad</option><option value="si">Menor de edad</option></select>' +
+      '<div class="eg-par"><div><label for="jp-anom">Acudiente (si es menor)</label><input id="jp-anom" autocomplete="off"></div>' +
+      '<div><label for="jp-aemail">Correo del acudiente (si es menor)</label><input id="jp-aemail" type="email" autocomplete="off"></div></div>' +
+      '<p><button type="button" class="btn" data-panotarmano="' + j.id + '" style="margin-top:10px">Anotarla</button></p></details>' +
+      '<p class="msg" id="jp-msg"></p></div>';
+  }
+  h += "</div>";
+
+  /* Reconocimiento y encuestas, solo al cerrar */
+  if (cerrada){
+    var pend = ps.filter(function(p){ return p.numero && !p.enviado_en && !p.envio_motivo; }).length;
+    var omit = ps.filter(function(p){ return p.numero && !p.enviado_en && p.envio_motivo; }).length;
+    h += '<div class="vol-bloque"><h4>Agradecimiento y certificado</h4>' +
+      '<p class="mu" style="font-size:13.5px">Un correo por persona, en su idioma, con su certificado y el enlace de su encuesta. ' +
+      "Sale una sola vez: lo ya enviado no se repite. " + pend + " por enviar" + (omit ? " · " + omit + " que no se pueden enviar (el motivo está en su fila)" : "") + ".</p>" +
+      (pend ? '<p><button class="btn" type="button" data-jreconocer="' + j.id + '">Enviar a quien falte (' + pend + ")</button></p>" : "") +
+      '<p class="msg" id="jr-msg"></p></div>';
+    h += '<div class="vol-bloque"><h4>Encuestas de la empresa y la fundación</h4>';
+    var acts = d.encuestas_actor || [];
+    if (!acts.length) h += '<p class="mu" style="font-size:13.5px">Esta jornada no tiene empresa ni fundación anfitriona: solo responden los voluntarios.</p>';
+    acts.forEach(function(e){
+      h += '<p style="margin:10px 0 4px"><strong>' + esc(ACTOR_ES[e.actor] || e.actor) + "</strong> · " +
+        (e.respondida_en ? "respondió el " + esc(enCO(e.respondida_en, 10)) : "sin responder") +
+        (e.enviada_en ? " · enlace enviado el " + esc(enCO(e.enviada_en, 10)) : "") + "</p>" +
+        '<input class="vol-enlace" readonly value="' + esc(e.enlace) + '" aria-label="Enlace de la encuesta de ' + esc(ACTOR_ES[e.actor] || e.actor) + '"> ' +
+        '<button class="copy" type="button" data-jcopiar="' + esc(e.enlace) + '">Copiar</button>' +
+        (!e.respondida_en && !e.enviada_en && e.correo
+          ? ' <button class="copy" type="button" data-jencuesta="' + esc(e.actor) + '" data-jid="' + j.id + '">Enviar a ' + esc(e.correo) + "</button>"
+          : (!e.correo && !e.respondida_en ? ' <small class="mu">Sin correo: copia el enlace y mándalo tú.</small>' : ""));
+    });
+    h += '<p class="msg" id="je-enc-msg"></p></div>';
+  }
+
+  /* Resumen y resultados */
+  h += '<div class="vol-bloque"><div id="j-resumen"></div></div>';
+  if (cerrada) h += '<div class="vol-bloque"><h4>Lo que respondieron</h4>' + pintarResultadosJ(d.respuestas || []) + "</div>";
+
+  /* La ficha editable, al final: es lo que menos se toca una vez creada. */
+  if (abierta){
+    h += '<details class="vol-bloque"><summary>Editar la ficha de convocatoria</summary><div class="eg-form">' + formJornada("je-", j) +
+      '<p><button class="btn" type="button" data-jguardar="' + j.id + '" style="margin-top:12px">Guardar cambios</button></p>' +
+      '<p class="msg" id="je-msg"></p></div></details>';
+  }
+  h += "</div>";
+  dlg.innerHTML = h;
+  pintarIndicadores("j-resumen", d.resumen || {}, "Resumen de esta jornada", true);
+}
+
+/* Los POST de la ficha abierta: todos devuelven JSON y todos refrescan la
+   ficha y la lista, que es donde se ve el efecto. */
+function postJ(url, cuerpo, msg, boton, despues){
+  if (boton) boton.disabled = true;
+  return fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo || {}) })
+    .then(conEstado).then(function(r){
+      if (boton) boton.disabled = false;
+      if (r.http >= 300 || (r.d && r.d.error)){
+        if (msg && document.getElementById(msg)) egMsg(msg, (r.d && (r.d.ayuda || r.d.error)) || "No se pudo.", false);
+        else alert((r.d && (r.d.ayuda || r.d.error)) || "No se pudo.");
+        return null;
+      }
+      if (despues) despues(r.d);
+      return r.d;
+    }).catch(function(){
+      if (boton) boton.disabled = false;
+      alert("No se pudo. Revisa la conexión.");
+      return null;
+    });
+}
+function refrescarJ(){ cargarJornadas(); if (J_ABIERTA) abrirJornada(J_ABIERTA); }
+
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if ((b = e.target.closest("[data-jabrir]"))){
+    abrirJornada(b.getAttribute("data-jabrir"));
+    var dl = document.getElementById("j-dlg"); if (dl) dl.scrollIntoView({ block: "start" });
+    return;
+  }
+  if ((b = e.target.closest("[data-jocultar]"))){
+    var dg = document.getElementById("j-dlg"); if (dg){ dg.style.display = "none"; dg.innerHTML = ""; }
+    J_ABIERTA = null; return;
+  }
+  if (e.target.id === "j-crear"){ guardarJornada("jn-", null, e.target, "jn-msg"); return; }
+  if ((b = e.target.closest("[data-jguardar]"))){ guardarJornada("je-", b.getAttribute("data-jguardar"), b, "je-msg"); return; }
+  if ((b = e.target.closest("[data-jest]"))){
+    var est = b.getAttribute("data-jest");
+    if (est === "cancelada" && !confirm("¿Cancelar la jornada? Se puede volver a planear después.")) return;
+    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-jid")) + "/estado", { estado: est }, "j-est-msg", b, refrescarJ);
+    return;
+  }
+  if ((b = e.target.closest("[data-jcerrar]"))){
+    if (!confirm("¿Cerrar la jornada? Las horas quedan fijas, se emiten los certificados y ya no se puede editar.")) return;
+    var vj = function(id){ var x = document.getElementById(id); return x ? x.value.trim() : ""; };
+    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-jcerrar")) + "/cerrar", {
+      beneficiarios_directos: vj("j-bd"), beneficiarios_indirectos: vj("j-bi"), beneficiarios_nota: vj("j-bn")
+    }, "j-est-msg", b, refrescarJ);
+    return;
+  }
+  if ((b = e.target.closest("[data-panotar]"))){
+    var sel = document.getElementById("jp-vol");
+    if (!sel || !sel.value){ egMsg("jp-msg", "Elige a alguien de la lista.", false); return; }
+    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-panotar")) + "/participante",
+      { inscripcion: sel.value }, "jp-msg", b, refrescarJ);
+    return;
+  }
+  if ((b = e.target.closest("[data-panotarmano]"))){
+    var v = function(id){ var x = document.getElementById(id); return x ? x.value.trim() : ""; };
+    var m = v("jp-menor");
+    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-panotarmano")) + "/participante", {
+      nombre: v("jp-nombre"), email: v("jp-email"), celular: v("jp-celular"), idioma: v("jp-idioma"),
+      menor: m === "si" ? true : m === "no" ? false : null,
+      acudiente_nombre: v("jp-anom"), acudiente_email: v("jp-aemail")
+    }, "jp-msg", b, refrescarJ);
+    return;
+  }
+  if ((b = e.target.closest("[data-pquitar]"))){
+    if (!confirm("¿Quitar a esta persona de la jornada?")) return;
+    b.disabled = true;
+    fetch("/api/admin/participacion/" + encodeURIComponent(b.getAttribute("data-pquitar")), { method: "DELETE" })
+      .then(conEstado).then(function(r){ if (fallo(r.http, r.d)){ b.disabled = false; return; } refrescarJ(); })
+      .catch(function(){ b.disabled = false; alert("No se pudo. Revisa la conexión."); });
+    return;
+  }
+  if ((b = e.target.closest("[data-jreconocer]"))){
+    var una = b.getAttribute("data-jpart");
+    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-jreconocer")) + "/reconocer",
+      una ? { participacion: Number(una) } : {}, "jr-msg", b, function(d){
+        var txt = (d.enviados || []).length + " enviados";
+        if ((d.fallidos || []).length) txt += " · " + d.fallidos.length + " no salieron (mira Salud)";
+        if (d.quedan) txt += " · quedan " + d.quedan + ": vuelve a pulsar para seguir";
+        alert(txt + ".");
+        refrescarJ();
+      });
+    return;
+  }
+  if ((b = e.target.closest("[data-jencuesta]"))){
+    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-jid")) + "/encuesta",
+      { actor: b.getAttribute("data-jencuesta") }, "je-enc-msg", b, refrescarJ);
+    return;
+  }
+  if ((b = e.target.closest("[data-jcopiar]"))){
+    var enlace = b.getAttribute("data-jcopiar");
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(enlace).then(function(){ b.textContent = "Copiado"; }, function(){ window.prompt("Copia el enlace:", enlace); });
+    } else { window.prompt("Copia el enlace:", enlace); }
+    return;
+  }
+});
+
+/* Lo que cambia sin boton: el Marco, las horas, el pro bono y la edad. Las
+   horas y el pro bono NO repintan la ficha —se pierde el foco al pasar al
+   siguiente campo con Tab—; el Marco y la edad si, porque cambian lo que el
+   servidor permite. */
+document.addEventListener("change", function(e){
+  if (!e.target.closest) return;
+  var t;
+  if ((t = e.target.closest("[data-jmarco]"))){
+    if (!t.checked && !confirm("¿Desmarcar el Marco?")){ t.checked = true; return; }
+    postJ("/api/admin/jornada/" + encodeURIComponent(t.getAttribute("data-jmarco")) + "/marco", { hecho: t.checked }, null, t, refrescarJ)
+      .then(function(d){ if (!d) t.checked = !t.checked; });
+    return;
+  }
+  if ((t = e.target.closest("[data-phoras]"))){
+    postJ("/api/admin/participacion/" + encodeURIComponent(t.getAttribute("data-phoras")), { horas: t.value }, "jp-msg", null, function(){
+      t.style.borderColor = "#1F5C38"; egMsg("jp-msg", "Horas guardadas.", true); cargarJornadas();
+    }).then(function(d){ if (!d) t.style.borderColor = "#8C2F1E"; });
+    return;
+  }
+  if ((t = e.target.closest("[data-pprobono]"))){
+    postJ("/api/admin/participacion/" + encodeURIComponent(t.getAttribute("data-pprobono")), { pro_bono: t.checked }, "jp-msg", null, function(){
+      egMsg("jp-msg", "Guardado.", true); cargarJornadas();
+    }).then(function(d){ if (!d) t.checked = !t.checked; });
+    return;
+  }
+  if ((t = e.target.closest("[data-pmenor]"))){
+    var m = t.value;
+    postJ("/api/admin/participacion/" + encodeURIComponent(t.getAttribute("data-pmenor")),
+      { menor: m === "si" ? true : m === "no" ? false : null }, "jp-msg", null, refrescarJ);
+  }
+});
+
 var BANDEJAS = {
   "filas": cargarAportes,
   "t-filas": cargarReportadas,
@@ -20617,7 +22265,8 @@ var BANDEJAS = {
   "pps-filas": cargarPaypalSueltos,
   "e-filas": cargarEntregas,
   "eg-filas": cargarEgresos,
-  "pr-filas": cargarProveedores
+  "pr-filas": cargarProveedores,
+  "j-filas": cargarJornadas
 };
 
 /* «pedir» sale de «armarBandejas» para que tambien pueda llamarlo el cambio de
@@ -22336,7 +23985,11 @@ function temaPorReloj(request) {
   return hora >= 6 && hora < 18 ? "light" : "dark";
 }
 
-function cascaraBaja(titulo, cuerpo, lang, tema) {
+/* `estilo` es opcional: CSS propio de una pantalla, con los tokens del sitio.
+   Va en una etiqueta style del head, que la CSP de estas paginas admite
+   ('unsafe-inline' en style-src) y que no obliga a tocar styles.css ni su
+   version. Lo usa la encuesta de las jornadas. */
+function cascaraBaja(titulo, cuerpo, lang, tema, estilo) {
   return '<!doctype html>\n'
 + '<html lang="' + (lang === "en" ? "en" : "es") + '"' + (tema === "dark" ? ' data-theme="dark"' : '') + '>\n<head>\n<meta charset="utf-8">\n'
 + '<meta name="theme-color" content="' + (tema === "dark" ? "#0F1613" : "#1F5C38") + '">\n'
@@ -22344,7 +23997,7 @@ function cascaraBaja(titulo, cuerpo, lang, tema) {
 + '<title>' + esc(titulo) + ' · Give&amp;Grow International</title>\n'
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-+ HOJA_CSS + '\n</head>\n<body>\n'
++ HOJA_CSS + '\n' + (estilo ? '<style>' + estilo + '</style>\n' : '') + '</head>\n<body>\n'
 + '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
 + cuerpo
 + '</main>\n</body>\n</html>';
@@ -24086,6 +25739,30 @@ export default {
         if (ma) return await adminAvisarIngeniero(request, env, Number(ma[1]), sesion.email);
         const mpv = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/paso$/);
         if (mpv) return await adminPasoVoluntario(request, env, Number(mpv[1]), sesion.email);
+        /* Jornadas de voluntariado (0036). Todas detras del mismo guardian, y
+           las que escriben con el chequeo de Origin de arriba. */
+        if (ruta === "/api/admin/jornadas") return await adminJornadas(request, env, sesion.email);
+        const mjo = ruta.match(/^\/api\/admin\/jornada\/(\d{1,9})$/);
+        if (mjo) {
+          if (request.method === "POST") return await adminEditarJornada(request, env, Number(mjo[1]), sesion.email);
+          if (request.method !== "GET") return json({ error: "metodo_no_permitido" }, 405);
+          return await adminJornada(env, Number(mjo[1]));
+        }
+        const mja = ruta.match(/^\/api\/admin\/jornada\/(\d{1,9})\/(estado|marco|participante|cerrar|reconocer|encuesta)$/);
+        if (mja) {
+          if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+          const jid = Number(mja[1]);
+          if (mja[2] === "estado")       return await adminEstadoJornada(request, env, jid, sesion.email);
+          if (mja[2] === "marco")        return await adminMarcoJornada(request, env, jid, sesion.email);
+          if (mja[2] === "participante") return await adminAnotarParticipante(request, env, jid, sesion.email);
+          if (mja[2] === "cerrar")       return await adminCerrarJornada(request, env, jid, sesion.email);
+          if (mja[2] === "reconocer")    return await adminReconocerJornada(request, env, jid, sesion.email);
+          return await adminEnviarEncuestaActor(request, env, jid, sesion.email);
+        }
+        const mpa = ruta.match(/^\/api\/admin\/participacion\/(\d{1,9})$/);
+        if (mpa) return await adminParticipacion(request, env, Number(mpa[1]), sesion.email);
+        const mrp = ruta.match(/^\/api\/admin\/reconocimiento\/(VC-\d{4}-\d{6})\.pdf$/i);
+        if (mrp) return await adminReconocimientoPdf(env, mrp[1].toUpperCase());
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
         const mec = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/caso$/i);
         if (mec) return await adminEntregaCaso(request, env, mec[1].toUpperCase(), sesion.email);
@@ -24179,6 +25856,23 @@ export default {
             "form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
         }
       });
+    }
+
+    /* LA ENCUESTA DE UNA JORNADA (0036). Publica: al otro lado hay un
+       voluntario, una empresa o una fundacion sin sesion, y su credencial es
+       el token de 128 bits del enlace. Va antes del comodin y su ruta esta en
+       `run_worker_first`, por la misma razon que la ficha. Atrapa cualquier
+       /encuesta/… y valida dentro, para que un enlace mal copiado diga «este
+       enlace no esta activo» y no devuelva la portada. */
+    const enc = ruta.match(/^\/encuesta\/(.*)$/);
+    if (enc) {
+      try {
+        return await rutaEncuesta(request, env, enc[1], url);
+      } catch (e) {
+        console.error("encuesta", e && e.message);
+        await anotarIncidente(env, "api", "/encuesta", e);
+        return new Response("No disponible", { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
+      }
     }
 
     /* LAS DOS RUTAS CON PATH DE LA SPA (auditoría 28 sep 2026).

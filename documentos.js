@@ -1640,3 +1640,138 @@ function firmas(h, f, firmaRL, firmaRF) {
   }
   h.y = yLinea - 86;
 }
+
+/* ===========================================================================
+   CERTIFICADO DE VOLUNTARIADO — las horas efectivas de una jornada
+   ===========================================================================
+   Lo que VOLUNTARIADO.md §7 le promete al voluntario: «certificado de
+   voluntariado con las horas efectivas». Nace al cerrar una jornada en /admin
+   (ver migrations/0036) y viaja en el correo de agradecimiento.
+
+   NO ES UN CERTIFICADO DE DONACION, y el documento lo dice con su forma: no
+   hay juramento, ni articulado, ni Revisora Fiscal, ni una palabra de
+   beneficios. Certifica tiempo, no dinero. Por eso tampoco comparte una sola
+   linea con `certificado()`: si algun dia alguien copia de ahi «para que se
+   vea igual de serio», esta constancia empezaria a prometer lo que no es.
+
+   BILINGUE POR PERSONA. A diferencia del certificado tributario —que es un
+   documento colombiano y se queda en español a proposito—, este se lo lleva un
+   voluntario que puede no leer español, y no tiene texto juridico que
+   traducir mal.
+
+   LO QUE IMPRIME ES LO CONGELADO al cerrar la jornada (`reconocimientos.datos`)
+   y su huella: el PDF se redibuja en cada descarga, el JSON no. Es la misma
+   regla del certificado de donacion, y por la misma razon.
+
+   LA FIRMA es la del Representante Legal en ejercicio en la fecha de emision
+   (`enEjercicio`), impresa con «Expedido electronicamente», no «Firmado»: nadie
+   pulsa un boton de firma por cada voluntario, y el documento no dice que
+   alguien hizo algo que no hizo.
+   =========================================================================== */
+const TV = {
+  es: {
+    titulo: "CERTIFICADO DE VOLUNTARIADO", asunto: "Certificado de voluntariado",
+    abre: (ent) => "La " + ent.nombre + ", entidad sin ánimo de lucro identificada con NIT " + ent.nit +
+      " y domicilio en " + ent.ciudad + ", hace constar que",
+    sigue: "participó como voluntaria o voluntario en la jornada que se detalla, con las horas efectivas que se indican:",
+    jornada: "Jornada", fecha: "Fecha", horario: "Horario", lugar: "Lugar",
+    anfitriona: "Fundación anfitriona", sede: "Sede de " + ENTIDAD.nombreCorto,
+    empresa: "Empresa o grupo aliado", horas: "Horas efectivas",
+    horasTxt: (h) => String(h).replace(".", ",") + (Number(h) === 1 ? " hora" : " horas"),
+    pro: " (aporte profesional)",
+    credito: (anf) => anf
+      ? "El trabajo en territorio es de " + anf + ", anfitriona de la jornada. Este voluntariado contribuyó a él."
+      : "Este voluntariado contribuyó al trabajo de la red de fundaciones aliadas de " + ENTIDAD.nombreCorto + ".",
+    gracias: "Gracias por el tiempo y el trabajo que donaste.",
+    horasNota: "Las horas efectivas son las que registró la coordinación de la jornada.",
+    cargo: "Representante Legal",
+    expedido: (f) => "Expedido electrónicamente el " + f,
+    huella: (h) => "Huella " + h + " · Ley 527 de 1999",
+    pie: "Certificado de voluntariado "
+  },
+  en: {
+    titulo: "VOLUNTEER CERTIFICATE", asunto: "Volunteer certificate",
+    abre: (ent) => ent.nombreCorto + ", a Colombian non-profit organisation with tax ID (NIT) " + ent.nit +
+      ", based in " + ent.ciudad + ", hereby states that",
+    sigue: "took part as a volunteer in the activity detailed below, for the effective hours shown:",
+    jornada: "Activity", fecha: "Date", horario: "Time", lugar: "Place",
+    anfitriona: "Host foundation", sede: ENTIDAD.nombreCorto + " office",
+    empresa: "Partner company or group", horas: "Effective hours",
+    horasTxt: (h) => String(h) + (Number(h) === 1 ? " hour" : " hours"),
+    pro: " (professional, pro bono)",
+    credito: (anf) => anf
+      ? "The work on the ground belongs to " + anf + ", which hosted the activity. This volunteering contributed to it."
+      : "This volunteering contributed to the work of the " + ENTIDAD.nombreCorto + " network of partner foundations.",
+    gracias: "Thank you for the time and work you gave.",
+    horasNota: "Effective hours are those recorded by the activity's coordination team.",
+    cargo: "Legal Representative",
+    expedido: (f) => "Issued electronically on " + f,
+    huella: (h) => "Fingerprint " + h + " · Colombian Law 527 of 1999",
+    pie: "Volunteer certificate "
+  }
+};
+const MESES_EN = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+function fechaDoc(iso, en) {
+  const p = partesFecha(iso);
+  if (!p) return "";
+  return en ? MESES_EN[p.mes - 1] + " " + p.dia + ", " + p.anio : fechaLarga(iso);
+}
+
+export async function certificadoVoluntariado(c) {
+  const en = c.idioma === "en";
+  const t = en ? TV.en : TV.es;
+  const { pdf, hoja: h, f } = await abrir(t.asunto + " " + c.numero, t.asunto);
+
+  membrete(h);
+
+  h.texto(t.titulo, { tam: 16, fuente: f.negrita, color: TINTA, centrado: true, interlinea: 20, despues: 4 });
+  h.texto("No. " + c.numero, { tam: 12, fuente: f.negrita, color: VERDE, centrado: true, interlinea: 16, despues: 10 });
+  h.texto(ENTIDAD.ciudad + ", " + fechaDoc(c.emitido_en, en), {
+    tam: 9.5, color: GRIS, centrado: true, despues: 26
+  });
+
+  h.texto(t.abre(ENTIDAD), { tam: 10.5, interlinea: 15.5, despues: 16 });
+  /* El nombre es la cifra monumental de este papel: es lo unico que la persona
+     va a buscar con la vista, y lo que enseña cuando lo muestra. */
+  h.texto(c.nombre || "-", { tam: 22, fuente: f.negrita, color: VERDE, centrado: true, interlinea: 26, despues: 16 });
+  h.texto(t.sigue, { tam: 10.5, interlinea: 15.5, despues: 18 });
+
+  h.regla({ despues: 6 });
+  h.fila(t.jornada, c.jornada || "-");
+  h.fila(t.fecha, fechaDoc(c.fecha, en) || "-");
+  if (c.horario) h.fila(t.horario, c.horario);
+  if (c.lugar) h.fila(t.lugar, c.lugar);
+  h.fila(t.anfitriona, c.anfitriona || t.sede);
+  if (c.empresa) h.fila(t.empresa, c.empresa);
+  h.fila(t.horas, t.horasTxt(c.horas) + (c.pro_bono ? t.pro : ""));
+  h.salto(18);
+
+  h.texto(t.credito(c.anfitriona || ""), { tam: 10, color: SUAVE, interlinea: 14.5, despues: 8 });
+  h.texto(t.gracias, { tam: 10, fuente: f.negrita, color: TINTA, interlinea: 14.5, despues: 8 });
+  h.texto(t.horasNota, { tam: 8.5, color: GRIS, interlinea: 12, despues: 30 });
+
+  /* Una sola firma, la del Representante Legal en ejercicio en la fecha de
+     emision. Mismo trazo que el bloque de firmas del certificado tributario. */
+  h.reservar(96);
+  const rl = enEjercicio(ENTIDAD.repLegal, c.emitido_en);
+  const yLinea = h.y - 30;
+  const anchoCol = (ANCHO - 40) / 2;
+  h.p.drawLine({ start: { x: MG.izq, y: yLinea }, end: { x: MG.izq + anchoCol, y: yLinea }, thickness: 0.75, color: TINTA });
+  let y = yLinea - 14;
+  h.p.drawText(winansi(rl.nombre), { x: MG.izq, y, size: 10, font: f.negrita, color: TINTA });
+  y -= 13;
+  h.p.drawText(winansi(t.cargo), { x: MG.izq, y, size: 9, font: f.normal, color: GRIS });
+  y -= 12;
+  h.p.drawText(winansi(t.expedido(fechaDoc(c.emitido_en, en))), { x: MG.izq, y, size: 8, font: f.normal, color: GRIS });
+  if (c.huella) {
+    y -= 10;
+    h.p.drawText(winansi(t.huella(String(c.huella).slice(0, 16))), { x: MG.izq, y, size: 7.5, font: f.normal, color: GRIS });
+  }
+  h.y = yLinea - 70;
+
+  /* Solo el numero en el pie: con «Certificado de voluntariado …» delante, en
+     español se montaba sobre el nombre de la entidad (medido en el PDF). */
+  h.cerrarPie(c.numero);
+  return pdf.save();
+}
