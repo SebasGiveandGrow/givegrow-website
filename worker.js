@@ -1157,6 +1157,9 @@ const CONFIG_ESPERADA = [
   "PAYPAL_CLIENT_ID", "PAYPAL_SECRET", "PAYPAL_IPN_CORREO", "ANTHROPIC_API_KEY",
   "ACCESS_EVAL_JWK", "FIRMA_RL_EMAIL", "FIRMA_RF_EMAIL"
 ];
+/* Lo que puede faltar sin que sea una falla: encenderlo es una decisión, no un
+   arreglo. El panel lo muestra igual; la alerta diaria no lo cuenta. */
+const CONFIG_OPCIONAL = ["FIRMA_RL_EMAIL", "FIRMA_RF_EMAIL"];
 function configuracionPresente(env) {
   const o = {};
   for (const k of CONFIG_ESPERADA) o[k] = !!String((env && env[k]) || "").trim();
@@ -1336,7 +1339,16 @@ function hallazgosOperacion(salud) {
       (co.sin_cupo_por_etiqueta || []).map((r) => r.etiqueta + " " + r.n).join(", ") +
       ") · no se reintentan solos: el cuerpo no se guarda. Reenviar a mano"]);
   }
-  if ((op.faltan || []).length) h.push(["Configuración que falta", op.faltan.join(", ")]);
+  /* LA FIRMA NO ES UNA FALLA (1 oct 2026). `FIRMA_RL_EMAIL` y `FIRMA_RF_EMAIL`
+     encienden el flujo de firma de certificados; sin ellas los certificados
+     siguen saliendo como antes, y dejarlas sin cargar es una decisión: la RF se
+     carga solo cuando la Revisora confirme que entra a /firma
+     (ops/firma-certificados.md). Mientras tanto la alerta llegaba TODOS los días
+     por algo que nadie tiene que arreglar, y una alarma que suena a diario
+     enseña a no leerla. Se sacan del correo; el panel las sigue mostrando en
+     «Operación» y en la tarjeta de la firma. */
+  const faltanQueAlertan = (op.faltan || []).filter((k) => !CONFIG_OPCIONAL.includes(k));
+  if (faltanQueAlertan.length) h.push(["Configuración que falta", faltanQueAlertan.join(", ")]);
   return h;
 }
 
