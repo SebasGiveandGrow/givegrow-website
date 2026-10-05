@@ -13379,9 +13379,15 @@ async function correoFundacionAceptada(env, f) {
   const lista = {
     titulo: en ? "For the agreement (step 4) you will need:" : "Para el convenio (paso 4) vas a necesitar:",
     items: docsConvenio(variante).map(d => textoDoc(d, variante, en)),
-    nota: en
-      ? "Do not send them yet: we ask for them in step 4. We tell you now so they do not catch you by surprise. And do not request the certificate of existence yet — it must be no older than 30 days on the day we sign."
-      : "No nos los mandes todavía: te los pedimos en el paso 4. Te lo contamos ahora para que no te tome por sorpresa. Y el certificado de existencia no lo saques aún: debe tener máximo 30 días el día de la firma."
+    /* La advertencia del certificado solo existe en la versión registrada: la
+       de proyectos sin registro no pide certificado. */
+    nota: (en
+      ? "Do not send them yet: we ask for them in step 4. We tell you now so they do not catch you by surprise."
+      : "No nos los mandes todavía: te los pedimos en el paso 4. Te lo contamos ahora para que no te tome por sorpresa.") +
+      (variante === "registradas"
+        ? (en ? " And do not request the certificate of existence yet — it must be no older than 30 days on the day we sign."
+              : " Y el certificado de existencia no lo saques aún: debe tener máximo 30 días el día de la firma.")
+        : "")
   };
 
   return enviarCorreo(env, {
@@ -15574,25 +15580,50 @@ function varianteConvenio(x) {
    y aqui solo consta que llegaron, cuando y quien lo anoto. Tampoco el numero
    de la cedula: basta con saber que se recibio. */
 const DOCS_CONVENIO = [
+  /* «Registradas»: Anexo 1 del convenio «Fundaciones Aliadas Registradas». */
   { id: "certificado", variantes: ["registradas"], na: [],
     es: "Certificado de existencia y representación legal (de máximo 30 días al firmar)",
     en: "Certificate of existence and legal representation (no older than 30 days at signing)" },
-  { id: "rut", variantes: ["registradas", "no_registradas"], na: ["no_registradas"],
-    es: "RUT", en: "RUT (tax registry)" },
-  { id: "cedula", variantes: ["registradas", "no_registradas"], na: [],
-    es: "Cédula del representante legal", esNR: "Cédula de quien responde por el proyecto",
-    en: "ID of the legal representative", enNR: "ID of the person responsible for the project" },
+  { id: "rut", variantes: ["registradas"], na: [],
+    es: "RUT actualizado", en: "Updated RUT (tax registry)" },
+  { id: "cedula", variantes: ["registradas"], na: [],
+    es: "Copia del documento de identidad del representante legal",
+    en: "Copy of the legal representative's ID" },
   { id: "estatutos", variantes: ["registradas"], na: [],
-    es: "Estatutos", en: "Bylaws" },
-  { id: "rte", variantes: ["registradas", "no_registradas"], na: ["registradas", "no_registradas"],
+    es: "Estatutos vigentes (o documento que acredite su objeto social)",
+    en: "Current bylaws (or a document proving its purpose)" },
+  { id: "rte", variantes: ["registradas"], na: ["registradas"],
     es: "Constancia de Régimen Tributario Especial (si aplica)", en: "Special Tax Regime (RTE) record (if applicable)" },
-  { id: "bancaria", variantes: ["registradas", "no_registradas"], na: ["registradas", "no_registradas"],
-    es: "Certificación bancaria (si va a recibir dinero)", en: "Bank certificate (if you will receive money)" },
-  { id: "laft", variantes: ["registradas", "no_registradas"], na: [],
-    es: "Formulario de conocimiento del aliado y origen lícito de fondos (LA/FT)",
-    en: "Partner due-diligence and lawful origin of funds form (AML/CFT)" },
+  { id: "bancaria", variantes: ["registradas"], na: ["registradas"],
+    es: "Certificación bancaria (si aplica para donaciones en dinero)", en: "Bank certificate (if applicable, for money donations)" },
+  { id: "laft", variantes: ["registradas"], na: [],
+    es: "Formulario de conocimiento del aliado y declaración de origen lícito de fondos (LA/FT)",
+    en: "Partner due-diligence form and lawful origin of funds declaration (AML/CFT)" },
+
+  /* «No registradas»: Anexo 1 del convenio «Proyectos Sociales No Registrados»
+     (debida diligencia reforzada). Quien firma es el RESPONSABLE —una o dos
+     personas naturales—, no un representante legal; y no hay certificado, RUT
+     ni estatutos, así que la regla de los 30 días no le aplica. Ninguno de sus
+     siete documentos es «si aplica». */
+  { id: "cedula_resp", variantes: ["no_registradas"], na: [],
+    es: "Copia del documento de identidad de cada responsable",
+    en: "Copy of the ID of each person responsible" },
+  { id: "descripcion", variantes: ["no_registradas"], na: [],
+    es: "Descripción del proyecto: trayectoria, población atendida y territorio donde opera",
+    en: "Project description: track record, population served and territory" },
+  { id: "aval", variantes: ["no_registradas"], na: [],
+    es: "Referencia o aval de un tercero confiable (líder comunitario, JAC, entidad religiosa, institución educativa u organización formal)",
+    en: "Reference or endorsement from a trusted third party (community leader, JAC, religious body, school or formal organisation)" },
+  { id: "evidencia", variantes: ["no_registradas"], na: [],
+    es: "Evidencia verificable del trabajo realizado (fotografías, registros, testimonios)",
+    en: "Verifiable evidence of the work done (photos, records, testimonies)" },
+  { id: "origen", variantes: ["no_registradas"], na: [],
+    es: "Declaración de origen lícito de los recursos (prevención LA/FT)",
+    en: "Declaration of lawful origin of resources (AML/CFT)" },
+
+  /* Comunes a las dos versiones. */
   { id: "datos", variantes: ["registradas", "no_registradas"], na: [],
-    es: "Autorización de tratamiento de datos, firmada", en: "Signed personal data processing authorisation" },
+    es: "Autorización de tratamiento de datos personales, firmada", en: "Signed personal data processing authorisation" },
   { id: "conflictos", variantes: ["registradas", "no_registradas"], na: [],
     es: "Declaración de inexistencia de conflictos de interés", en: "Declaration of no conflicts of interest" }
 ];

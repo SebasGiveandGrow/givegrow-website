@@ -801,7 +801,7 @@
   "fund.s3.t": "Context visit",
   "fund.s3.p": "We meet on the ground to understand your operation and your real needs.",
   "fund.s4.t": "Cooperation agreement",
-  "fund.s4.p": "We formalize the alliance with a clear, free agreement, signed electronically. We ask for basic documents —RUT, certificate of existence, the legal representative's ID— and a few declarations on data and origin of funds. If you are not registered, there is a version for unregistered social projects.",
+  "fund.s4.p": "We formalize the alliance with a clear, free agreement, signed electronically. If the foundation is registered, we ask for its basic documents —certificate of existence, RUT, bylaws and the legal representative's ID. If it is an unregistered social project, there is a version of its own: the ID of the person responsible, a project description, a third-party endorsement and evidence of the work. In both, a few declarations on data, origin of funds and conflicts of interest.",
   "fund.s5.t": "You join the Social Hub",
   "fund.s5.p": "Your foundation enters the network and can start receiving donations, tools and support. Its profile is published once you authorise it. In return, every delivery is documented with its record and every semester you send us a report.",
   "fund.free.t": "No cost. No opaque intermediaries.",

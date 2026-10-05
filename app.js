@@ -2008,7 +2008,7 @@ var I18N = {
     "fund.s3.t":"Visita de contexto",
     "fund.s3.p":"Nos conocemos en territorio para entender tu operación y tus necesidades reales.",
     "fund.s4.t":"Convenio de cooperación",
-    "fund.s4.p":"Formalizamos la alianza con un convenio claro y gratuito, que se firma electrónicamente. Te pedimos documentos básicos —RUT, certificado de existencia, cédula del representante legal— y unas declaraciones de datos y origen de fondos. Si tu proyecto no está registrado, hay una versión para proyectos sociales sin registro.",
+    "fund.s4.p":"Formalizamos la alianza con un convenio claro y gratuito, que se firma electrónicamente. Si la fundación está registrada, te pedimos sus documentos básicos —certificado de existencia, RUT, estatutos y cédula del representante legal—. Si es un proyecto social sin registro, hay una versión propia: cédula de quien responde, una descripción del proyecto, el aval de un tercero y evidencia del trabajo. En las dos, unas declaraciones de datos, origen de fondos y conflictos de interés.",
     "fund.s5.t":"Vinculación al HUB SOCIAL",
     "fund.s5.p":"Tu fundación entra a la red y puede empezar a recibir donaciones, herramientas y acompañamiento. Su perfil se publica cuando lo autorizas. A cambio, cada entrega se documenta con su acta y cada semestre nos mandas un informe.",
     "fund.free.t":"Sin costo. Sin intermediarios opacos.",
