@@ -2642,7 +2642,19 @@ async function adminSalud(env) {
      viejo de la cola antes de que la espera sea un incumplimiento. Pasado el
      plazo la cola sale `vencida`, sube al principio de la portada y entra en el
      resumen diario por correo. Sin plazo, la cola se comporta como siempre. */
+  /* `sql` puede ser tambien un resultado YA CONTADO —{ n, vencida, cuando }—
+     para la cola que no sale de una consulta: los vencimientos viven en una
+     constante del codigo y su urgencia es lo que FALTA, no lo que lleva
+     esperando. `cuando` es el texto que el panel pone en vez de la antiguedad. */
   const enCola = async (clave, sql, comoSeArregla, orden, destino, plazo) => {
+    if (typeof sql !== "string") {
+      cola.push({
+        clave, n: sql.n || 0, dias: null, cuando: sql.cuando || null,
+        arreglo: comoSeArregla, orden: orden, destino: destino || null,
+        plazo: null, vencida: !!sql.vencida
+      });
+      return;
+    }
     const r = await uno(sql);
     const dias = r.n ? Math.floor((Date.now() - Date.parse((r.masViejo || "").replace(" ", "T") + "Z")) / 86400000) : null;
     cola.push({
@@ -3058,6 +3070,23 @@ async function adminSalud(env) {
     "WHERE atendida_en IS NULL AND (" + TERRENO_URGE + ")",
     "Alguien ya fue a la casa y dijo que corre · panel, «Inspecciones en terreno» · se cierra con «Ya la atendimos» y qué se hizo",
     10, "#sec-inspecciones");
+
+  /* VENCIMIENTOS TRIBUTARIOS Y LEGALES (0037). Entra lo que no se ha marcado y
+     está vencido o a 14 días o menos. Sale «vencida» —arriba de la portada y en
+     el correo diario a contabilidad— con lo mismo que decide ese correo: algo
+     vencido o a tres días o menos. Orden 15: detrás de las casas con peligro
+     (una familia que corre va primero), delante de todo lo demás, porque una
+     sanción no espera a que se desocupe nadie. */
+  const porVencer = await vencimientosPorAtender(env);
+  const encima = porVencer.filter((x) => x.vencida || x.dias <= OBLIGACIONES_DIAS_CORREO);
+  await enCola("vencimientos_por_atender",
+    { n: porVencer.length, vencida: encima.length > 0, cuando: porVencer.length ? cuandoVence(porVencer[0]) : null },
+    "Contabilidad › Vencimientos · " + (porVencer.length
+      ? porVencer.slice(0, 3).map((x) => x.corto + ", " + x.periodo + ": " + cuandoVence(x)).join("; ") +
+        (porVencer.length > 3 ? "; y " + (porVencer.length - 3) + " más" : "") +
+        " · se marca «Hecho» o «No aplicó este periodo»"
+      : "nada a 14 días"),
+    15, "#sec-vencimientos");
 
   /* Intenciones abandonadas: más de 48 h en `intencion` y sin transacción de
      Wompi. No se tocan solas —borrar el registro de alguien que quizá vuelva a
@@ -5099,6 +5128,360 @@ async function familiasQueEsperan(env, dias) {
   return r.results || [];
 }
 
+/* EL CALENDARIO DE OBLIGACIONES — lo que la Fundación tiene que presentar,
+   pagar o reportar, y cuándo.
+   ============================================================================
+   POR QUÉ EXISTE. El 22 de septiembre de 2026 la Alcaldía de Medellín notificó
+   que la Fundación nunca presentó la declaración de ICA del año gravable 2025.
+   No era descuido de una persona: el ICA no estaba en NINGUNA lista. Lo que no
+   está escrito en un sitio que avise, no se presenta. Esta constante es esa
+   lista, y el módulo «Contabilidad» del panel y el resumen diario la leen.
+
+   POR QUÉ ES CÓDIGO Y NO UNA TABLA. Las fechas las fija un decreto o una
+   resolución UNA VEZ AL AÑO (el calendario de la DIAN, la resolución de
+   Hacienda de Medellín). Cambiarlas es un acto raro y delicado: una fecha mal
+   copiada es una sanción. Como constante, cada cambio es un PR revisado, con
+   diff y con fuente, y el gate lo valida; como filas en D1 sería un formulario
+   que cualquiera con sesión edita sin dejar rastro de por qué. Lo que SÍ es
+   dato vivo —que un vencimiento concreto se atendió— va en la tabla
+   `obligaciones_cumplidas` (migración 0037).
+
+   CADA DICIEMBRE alguien tiene que cotejar las fechas del año siguiente contra
+   los calendarios publicados (DIAN, Medellín, Gobernación) y escribirlas aquí.
+   Esa revisión es, ella misma, una obligación más de la lista
+   («revision-calendario»): si no se hace, aparece en «Hoy» como cualquier otra.
+   La documentación, con fuentes y con lo que NO aplica, está en
+   `ops/obligaciones.md`.
+
+   CÓMO SE LEE CADA ENTRADA:
+   · `clave`        fija para siempre: es lo que guarda la tabla. No se renombra.
+   · `corto`        el nombre que cabe en una fila del correo y de «Hoy».
+   · `condicion`    cuándo aplica. «Solo si hubo retenciones» no se resuelve
+                    sola: el periodo en que no aplicó se marca «No aplicó».
+   · `porConfirmar` la fecha no está publicada todavía (se calculó con la regla
+                    o con la del año anterior). Ver también
+                    `DIAN_PUBLICADO_HASTA`.
+   · `vencimientos` cada fecha (AAAA-MM-DD, día civil de Colombia) con la
+                    etiqueta del periodo que cubre. Un vencimiento puede llevar
+                    `vencidaDesde` (la fecha legal ya pasó y lo que queda es una
+                    fecha objetivo nuestra) y `limite` (la fecha a partir de la
+                    cual sale más caro).
+
+   UVT 2026 = $52.374 (Res. DIAN 238 de 2025). NIT 901.948.930-2: último
+   dígito 0, dos últimos 30 — de ahí salen las fechas de la DIAN. */
+const OBLIGACIONES = [
+  { clave: "ica-2025", corto: "ICA 2025 (extemporánea)", entidad: "Alcaldía de Medellín",
+    titulo: "Declaración de Industria y Comercio del año gravable 2025, extemporánea",
+    condicion: "Aplica. Venció el 17 abr 2026 y no se presentó (oficio de Hacienda del 22 sep 2026). Sanción mínima 10 UVT (art. 346 Acuerdo 93 de 2023) = $523.740 con la UVT 2026: presentarla antes del 31 dic 2026, porque en 2027 se liquida con la UVT nueva.",
+    fuente: "https://www.medellin.gov.co/es/wp-content/uploads/2024/01/ACUERDO-093-2023-GACETA.pdf",
+    porConfirmar: false,
+    vencimientos: [
+      { fecha: "2026-10-09", periodo: "año gravable 2025", vencidaDesde: "2026-04-17", limite: "2026-12-31" }
+    ] },
+  { clave: "retencion-350", corto: "Retención en la fuente (350)", entidad: "DIAN",
+    titulo: "Declaración mensual de retención en la fuente, formulario 350",
+    condicion: "Solo si ese mes se practicaron retenciones (art. 606 par. ET). Si se presenta, sin el pago total es ineficaz (art. 580-1 ET).",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/decreto_2229_2023.htm",
+    porConfirmar: false,
+    vencimientos: [
+      { fecha: "2026-10-23", periodo: "septiembre 2026" },
+      { fecha: "2026-11-25", periodo: "octubre 2026" },
+      { fecha: "2026-12-23", periodo: "noviembre 2026" },
+      { fecha: "2027-01-26", periodo: "diciembre 2026" },
+      { fecha: "2027-02-22", periodo: "enero 2027" },
+      { fecha: "2027-03-23", periodo: "febrero 2027" },
+      { fecha: "2027-04-22", periodo: "marzo 2027" },
+      { fecha: "2027-05-25", periodo: "abril 2027" },
+      { fecha: "2027-06-23", periodo: "mayo 2027" },
+      { fecha: "2027-07-26", periodo: "junio 2027" },
+      { fecha: "2027-08-24", periodo: "julio 2027" },
+      { fecha: "2027-09-22", periodo: "agosto 2027" },
+      { fecha: "2027-10-25", periodo: "septiembre 2027" },
+      { fecha: "2027-11-24", periodo: "octubre 2027" },
+      { fecha: "2027-12-23", periodo: "noviembre 2027" },
+      { fecha: "2028-01-25", periodo: "diciembre 2027" }
+    ] },
+  { clave: "rub", corto: "Beneficiarios finales (RUB)", entidad: "DIAN",
+    titulo: "Actualización del Registro Único de Beneficiarios Finales",
+    condicion: "Solo si en el trimestre cambió algún beneficiario final (Res. DIAN 164 de 2021, art. 11).",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/resolucion_dian_0164_2021.htm",
+    porConfirmar: false,
+    vencimientos: [
+      { fecha: "2026-11-03", periodo: "cambios de jul–sep 2026" },
+      { fecha: "2027-02-01", periodo: "cambios de oct–dic 2026" },
+      { fecha: "2027-05-03", periodo: "cambios de ene–mar 2027" },
+      { fecha: "2027-08-02", periodo: "cambios de abr–jun 2027" },
+      { fecha: "2027-11-02", periodo: "cambios de jul–sep 2027" }
+    ] },
+  { clave: "cert-donacion", corto: "Certificados de donación", entidad: "DIAN",
+    titulo: "Certificados de donación a los donantes del año anterior (art. 1.2.1.4.3 DUR 1625 de 2016)",
+    condicion: "Aplica. El plazo legal es el 31 de enero; en 2027 cae domingo y se toma el viernes anterior.",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/decreto_2150_2017.htm",
+    porConfirmar: false,
+    vencimientos: [{ fecha: "2027-01-29", periodo: "donaciones de 2026" }] },
+  { clave: "asamblea", corto: "Reunión del máximo órgano", entidad: "Fundación",
+    titulo: "Reunión ordinaria del máximo órgano: estados financieros, destinación de excedentes (art. 1.2.1.5.1.27 DUR), presupuesto e informe de gestión",
+    condicion: "Aplica. Es el límite; el acta es la que se carga luego en la actualización del RTE.",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/decreto_2150_2017.htm",
+    porConfirmar: false,
+    vencimientos: [{ fecha: "2027-03-31", periodo: "ejercicio 2026" }] },
+  { clave: "camara", corto: "Renovación en Cámara de Comercio", entidad: "Cámara de Comercio de Medellín",
+    titulo: "Renovación anual de la inscripción de la entidad sin ánimo de lucro (Ley 1727 de 2014)",
+    condicion: "Aplica.",
+    fuente: "http://www.secretariasenado.gov.co/senado/basedoc/ley_1727_2014.html",
+    porConfirmar: false,
+    vencimientos: [{ fecha: "2027-03-31", periodo: "año 2027" }] },
+  { clave: "cert-retencion", corto: "Certificados de retención", entidad: "DIAN",
+    titulo: "Certificados de retención en la fuente a los proveedores (art. 381 ET)",
+    condicion: "Solo si en el año se practicaron retenciones.",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/decreto_2229_2023.htm",
+    porConfirmar: false,
+    vencimientos: [{ fecha: "2027-03-31", periodo: "retenciones de 2026" }] },
+  { clave: "ica-anual", corto: "ICA 2026", entidad: "Alcaldía de Medellín",
+    titulo: "Declaración anual de Industria y Comercio",
+    condicion: "Aplica: se declara, y la actividad de beneficencia va como no sujeta (art. 51 num. 7 Acuerdo 93 de 2023). Fecha tomada del calendario 2026 (17 abr): confirmar con la resolución de Medellín para 2027.",
+    fuente: "https://www.medellin.gov.co/es/wp-content/uploads/2025/12/RESOLUCION-202550100057-DE-2025-CALENDARIO-TRIBUTARIO-2026.pdf",
+    porConfirmar: true,
+    vencimientos: [{ fecha: "2027-04-16", periodo: "año gravable 2026" }] },
+  { clave: "gobernacion", corto: "Reporte anual a la Gobernación", entidad: "Gobernación de Antioquia",
+    titulo: "Reporte anual de documentación a la entidad de inspección y vigilancia (Circular K)",
+    condicion: "Aplica. La circular de 2025 decía «antes del 30 de abril»: confirmar con la de 2027.",
+    fuente: "https://www.antioquia.gov.co/images/PDF2/Circulares/2025/02/202590000038.pdf",
+    porConfirmar: true,
+    vencimientos: [{ fecha: "2027-04-30", periodo: "ejercicio 2026" }] },
+  { clave: "exogena", corto: "Exógena (formato 1001)", entidad: "DIAN",
+    titulo: "Información exógena nacional, formato 1001 (pagos y retenciones)",
+    condicion: "Aplica como agente de retención. Confirmar con el contador si se reporta en un año sin retenciones.",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/resolucion_dian_0227_2025.htm",
+    porConfirmar: false,
+    vencimientos: [{ fecha: "2027-05-21", periodo: "año gravable 2026" }] },
+  { clave: "renta", corto: "Renta RTE (110) y 1.ª cuota", entidad: "DIAN",
+    titulo: "Declaración de renta del Régimen Tributario Especial (formulario 110) y primera cuota",
+    condicion: "Aplica. El mismo día, la declaración de activos en el exterior si superan 2.000 UVT (p. ej. saldo en PayPal).",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/decreto_2229_2023.htm",
+    porConfirmar: false,
+    vencimientos: [{ fecha: "2027-05-25", periodo: "año gravable 2026" }] },
+  { clave: "rte-actualizacion", corto: "Actualización anual del RTE", entidad: "DIAN",
+    titulo: "Actualización anual del registro web del Régimen Tributario Especial (art. 364-5 ET)",
+    condicion: "Aplica. Sin ella la Fundación sale del Régimen Tributario Especial.",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/decreto_2150_2017.htm",
+    porConfirmar: false,
+    vencimientos: [{ fecha: "2027-06-30", periodo: "año 2027" }] },
+  { clave: "renta-cuota2", corto: "Renta, 2.ª cuota", entidad: "DIAN",
+    titulo: "Segunda cuota del impuesto de renta",
+    condicion: "Solo si la declaración de renta deja impuesto a cargo.",
+    fuente: "https://normograma.dian.gov.co/dian/compilacion/docs/decreto_2229_2023.htm",
+    porConfirmar: false,
+    vencimientos: [{ fecha: "2027-07-26", periodo: "año gravable 2026" }] },
+  /* LA QUE MANTIENE VIVAS A LAS DEMÁS. Si en diciembre nadie escribe las fechas
+     del año siguiente, la lista se queda vacía en silencio a partir de enero —
+     que es exactamente cómo se perdió el ICA—. Por eso la revisión es una fila
+     más, con su fecha, y entra a «Hoy» como cualquier otra. */
+  { clave: "revision-calendario", corto: "Actualizar el calendario tributario", entidad: "Fundación",
+    titulo: "Actualizar en el panel el calendario tributario del año siguiente",
+    condicion: "Aplica. Cotejar cada fecha con el calendario de la DIAN, la resolución de Hacienda de Medellín y la circular de la Gobernación; escribirlas en OBLIGACIONES (worker.js) y en ops/obligaciones.md, y subir DIAN_PUBLICADO_HASTA. Es un PR.",
+    fuente: "https://github.com/SebasGiveandGrow/givegrow-website/blob/main/ops/obligaciones.md",
+    porConfirmar: false,
+    vencimientos: [
+      { fecha: "2026-12-01", periodo: "calendario 2027" },
+      { fecha: "2027-12-01", periodo: "calendario 2028" }
+    ] }
+];
+
+/* HASTA DÓNDE ESTÁ PUBLICADO EL CALENDARIO DE LA DIAN. Toda fecha de la DIAN
+   posterior a esta se CALCULÓ con la regla del Decreto 2229 de 2023 («a partir
+   de 2024 y siguientes») y no se ha cotejado contra un calendario publicado:
+   sale con la marca «por confirmar». Se sube en la revisión de diciembre. */
+const DIAN_PUBLICADO_HASTA = "2026-12-31";
+/* Cuánto antes entra un vencimiento a «Hoy», y cuándo pasa además al correo.
+   Catorce días en el panel dan tiempo de pedirle al contador lo que haga falta;
+   tres en el correo es la última llamada. Un correo que llega cada día con
+   cosas a dos semanas se aprende a ignorar. */
+const OBLIGACIONES_DIAS_COLA = 14;
+const OBLIGACIONES_DIAS_CORREO = 3;
+const OBLIGACION_ESTADOS = ["hecho", "no_aplica"];
+
+function diasHasta(desde, hasta) {
+  return Math.round((Date.parse(hasta + "T00:00:00Z") - Date.parse(desde + "T00:00:00Z")) / 86400000);
+}
+
+/* Cada vencimiento con su estado, en orden de fecha. `hoy` es el día civil de
+   Colombia: una declaración vence a medianoche de aquí, no de Greenwich.
+
+   SI LA TABLA NO EXISTE TODAVÍA (código desplegado antes que la 0037) no se
+   cae: todo sale como pendiente y `sin_tabla` lo dice. Esto lo lee también
+   `adminSalud`, que es la portada del panel, y la portada no puede romperse
+   por una bandeja. */
+async function vencimientosConEstado(env, hoy) {
+  hoy = hoy || fechaCO();
+  const marcas = new Map();
+  let sinTabla = false;
+  try {
+    const r = await env.DB.prepare(
+      "SELECT clave, fecha_vencimiento, estado, nota, marcado_en, marcado_por FROM obligaciones_cumplidas"
+    ).all();
+    for (const m of (r.results || [])) marcas.set(m.clave + "|" + m.fecha_vencimiento, m);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+    sinTabla = true;
+  }
+  const items = [];
+  for (const ob of OBLIGACIONES) {
+    for (const v of ob.vencimientos) {
+      const dias = diasHasta(hoy, v.fecha);
+      const m = marcas.get(ob.clave + "|" + v.fecha) || null;
+      items.push({
+        clave: ob.clave, corto: ob.corto, entidad: ob.entidad, titulo: ob.titulo,
+        condicion: ob.condicion, fuente: ob.fuente,
+        fecha: v.fecha, periodo: v.periodo,
+        limite: v.limite || null, vencida_desde: v.vencidaDesde || null,
+        por_confirmar: !!(ob.porConfirmar || (ob.entidad === "DIAN" && v.fecha > DIAN_PUBLICADO_HASTA)),
+        dias,
+        /* Vencida es «la fecha ya pasó», o que la fecha LEGAL ya pasó aunque la
+           nuestra no: el ICA 2025 está vencido desde abril, y el 9 de octubre es
+           solo la fecha en que nos propusimos presentarlo. */
+        vencida: dias < 0 || !!(v.vencidaDesde && v.vencidaDesde < hoy),
+        marca: m ? { estado: m.estado, nota: m.nota || "", marcado_en: m.marcado_en, marcado_por: m.marcado_por || "" } : null
+      });
+      items[items.length - 1].cuando = cuandoVence(items[items.length - 1]);
+    }
+  }
+  items.sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0);
+  return { hoy, items, sinTabla };
+}
+
+/* Lo que espera a una persona: sin marcar, y vencido o a 14 días o menos. Lo
+   vencido primero; entre iguales, el de fecha más cercana. */
+async function vencimientosPorAtender(env, hoy) {
+  const { items } = await vencimientosConEstado(env, hoy);
+  return items
+    .filter((x) => !x.marca && (x.vencida || x.dias <= OBLIGACIONES_DIAS_COLA))
+    .sort((a, b) => (b.vencida ? 1 : 0) - (a.vencida ? 1 : 0) || (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+}
+
+/* «vence en 4 días», «vencida». Lo usan la cola de «Hoy» y el correo, así que
+   los dos dicen lo mismo con las mismas palabras. */
+function cuandoVence(x) {
+  if (x.vencida) {
+    return x.vencida_desde && x.dias >= 0
+      ? "vencida (objetivo en " + x.dias + (x.dias === 1 ? " día)" : " días)")
+      : "vencida hace " + (-x.dias) + (x.dias === -1 ? " día" : " días");
+  }
+  if (x.dias === 0) return "vence hoy";
+  if (x.dias === 1) return "vence mañana";
+  return "vence en " + x.dias + " días";
+}
+
+/* GET y POST /api/admin/obligaciones.
+
+   GET devuelve el calendario ENTERO (unas treinta filas) y el panel filtra los
+   próximos 120 días o el año: son pocas, y alternar la vista no debería costar
+   otra petición.
+
+   POST marca UN vencimiento: { clave, fecha, estado: 'hecho'|'no_aplica', nota }.
+   La clave tiene que existir en OBLIGACIONES y la fecha tiene que ser UNO DE SUS
+   vencimientos: no se puede marcar una fecha que el calendario no tiene, porque
+   esa marca no la vería nadie y daría por cumplida una obligación imaginaria.
+   Es IDEMPOTENTE: repetir la misma marca responde ok sin escribir otra fila; una
+   marca DISTINTA sobre un vencimiento ya marcado se rechaza con lo que ya dice,
+   para que nadie pise sin querer la nota de otro. `estado: 'pendiente'` la
+   deshace, porque marcar por error tiene que poder corregirse; queda auditado. */
+async function adminObligaciones(request, env, quien) {
+  if (request.method === "GET") {
+    const r = await vencimientosConEstado(env);
+    return json({
+      hoy: r.hoy, items: r.items, sin_tabla: r.sinTabla,
+      dias_cola: OBLIGACIONES_DIAS_COLA, dias_correo: OBLIGACIONES_DIAS_CORREO,
+      dian_publicado_hasta: DIAN_PUBLICADO_HASTA
+    });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+
+  const clave = String(c.clave == null ? "" : c.clave);
+  const fecha = String(c.fecha == null ? "" : c.fecha);
+  const estado = String(c.estado == null ? "" : c.estado);
+  const ob = OBLIGACIONES.find((o) => o.clave === clave);
+  if (!ob) return json({ error: "clave_desconocida", ayuda: "Esa obligación no está en el calendario." }, 422);
+  if (!ob.vencimientos.some((v) => v.fecha === fecha)) {
+    return json({ error: "fecha_desconocida", ayuda: "Esa fecha no es uno de los vencimientos de «" + ob.corto + "»." }, 422);
+  }
+  if (estado !== "pendiente" && OBLIGACION_ESTADOS.indexOf(estado) < 0) {
+    return json({ error: "estado_invalido", ayuda: "El estado es «hecho» o «no_aplica»." }, 422);
+  }
+  const nota = String(c.nota == null ? "" : c.nota).trim().slice(0, 500);
+
+  try {
+    if (estado === "pendiente") {
+      const borrada = await env.DB.prepare(
+        "DELETE FROM obligaciones_cumplidas WHERE clave = ? AND fecha_vencimiento = ?"
+      ).bind(clave, fecha).run();
+      if (borrada.meta && borrada.meta.changes) {
+        await env.DB.prepare(
+          "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+        ).bind(quien || "?", "obligacion " + clave + " " + fecha + " vuelve a pendiente").run();
+      }
+      return json({ ok: true, clave, fecha, estado: "pendiente" });
+    }
+
+    /* Una sola sentencia: dos clics seguidos (o dos personas a la vez) no
+       pueden dejar dos filas, y el UNIQUE de la 0037 es quien lo garantiza. */
+    const ins = await env.DB.prepare(
+      "INSERT INTO obligaciones_cumplidas (clave, fecha_vencimiento, estado, nota, marcado_por) " +
+      "VALUES (?, ?, ?, ?, ?) ON CONFLICT (clave, fecha_vencimiento) DO NOTHING"
+    ).bind(clave, fecha, estado, nota || null, quien || "?").run();
+    if (!(ins.meta && ins.meta.changes)) {
+      const ya = await env.DB.prepare(
+        "SELECT estado, nota, marcado_en, marcado_por FROM obligaciones_cumplidas WHERE clave = ? AND fecha_vencimiento = ?"
+      ).bind(clave, fecha).first();
+      if (ya && ya.estado === estado) return json({ ok: true, clave, fecha, estado, ya_estaba: true });
+      return json({ error: "ya_marcada", marca: ya || null,
+                    ayuda: "Ese vencimiento ya está marcado como «" + (ya && ya.estado === "hecho" ? "hecho" : "no aplicó") +
+                           "». Si fue un error, deshazlo primero." }, 409);
+    }
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(quien || "?", "obligacion " + clave + " " + fecha + " · " + estado + (nota ? " · " + nota : "")).run();
+    return json({ ok: true, clave, fecha, estado });
+  } catch (e) {
+    if (/no such table/i.test(String(e && e.message))) {
+      return json({ error: "falta_migracion",
+                    ayuda: "Falta aplicar la migración 0037 (obligaciones_cumplidas) en la base." }, 503);
+    }
+    throw e;
+  }
+}
+
+/* El correo de vencimientos: a CONTABILIDAD (`CORREO_AVISOS`), que es el buzón
+   de los asuntos de plata y de papeles —no al de alianzas—, y solo con lo que
+   ya está encima: vencido o a tres días o menos. Una vez al día, con su propia
+   etiqueta, por la misma deduplicación que los otros resúmenes. */
+async function resumenObligaciones(env) {
+  const urgentes = (await vencimientosPorAtender(env))
+    .filter((x) => x.vencida || x.dias <= OBLIGACIONES_DIAS_CORREO);
+  if (!urgentes.length) return { saltado: "nada_encima" };
+  const filas = urgentes.map((x) => [
+    x.corto + " · " + x.entidad + " · " + x.periodo,
+    cuandoVence(x) + " · " + x.fecha +
+      (x.limite ? " (límite " + x.limite + ")" : "") +
+      (x.por_confirmar ? " · fecha por confirmar" : "")
+  ]);
+  return await enviarResumenVencidas(env, {
+    para: env.CORREO_AVISOS, etiqueta: "resumen-diario-obligaciones",
+    vencidas: urgentes.map(() => ({ n: 1 })), filas,
+    titulo: (n) => n === 1
+      ? "Un vencimiento tributario o legal está encima o ya pasó"
+      : n + " vencimientos tributarios o legales están encima o ya pasaron",
+    parrafos: [
+      "Cada fila es una obligación de la Fundación con su fecha. Las que dicen «solo si…» no siempre aplican: si este periodo no aplicó —un mes sin retenciones, un trimestre sin cambios—, márcalo así en el panel y deja de salir aquí.",
+      "Marcar no presenta nada: solo deja constancia de que alguien se ocupó. El ICA 2025 se perdió porque no estaba en ninguna lista; esta es la lista."
+    ],
+    boton: { url: "https://thegiveandgrowproject.org/admin#conta/sec-vencimientos", texto: "Abrir los vencimientos" }
+  });
+}
+
 /* EL RESUMEN DIARIO AL EQUIPO — solo cuando algo paso su plazo.
    ============================================================================
    Una bandeja que hay que acordarse de abrir no es una alarma: este archivo lo
@@ -5122,7 +5505,8 @@ const NOMBRE_COLA_PLAZO = {
   voluntarios_sin_respuesta: "Voluntarios sin responder",
   jornadas_sin_cerrar: "Jornadas realizadas sin cerrar (sin certificados ni encuestas)",
   urgentes_sin_visitar: "Casos urgentes que nadie ha visitado",
-  casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto"
+  casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto",
+  vencimientos_por_atender: "Vencimientos tributarios y legales sin atender"
 };
 /* LAS COLAS DE MIRA MI CASA VAN A SU PROPIO BUZÓN (auditoría del 28 sep 2026).
    Hasta hoy ninguna cola de casos tenía plazo, así que ninguna llegaba nunca a
@@ -5135,8 +5519,14 @@ const COLAS_PLAZO_MMC = ["urgentes_sin_visitar", "casos_sin_evaluar"];
 async function resumenDiarioEquipo(env) {
   const salud = await (await adminSalud(env)).json();
   const cola = (salud && salud.cola) || [];
-  const vencidas = cola.filter(c => c.n > 0 && c.vencida);
-  if (!vencidas.length) return { saltado: "nada_vencido" };
+  /* LOS VENCIMIENTOS VAN APARTE, a contabilidad y con su propio correo
+     (`resumenObligaciones`): su fila no es «la mas vieja hace N dias» sino
+     «vence en N dias», y quien los atiende no es quien contesta a fundaciones.
+     Se sacan de aqui para que no caigan TAMBIEN en el correo de alianzas. */
+  const out = {};
+  out.obligaciones = await resumenObligaciones(env);
+  const vencidas = cola.filter(c => c.n > 0 && c.vencida && c.clave !== "vencimientos_por_atender");
+  if (!vencidas.length) return { saltado: "nada_vencido", obligaciones: out.obligaciones };
   const deMMC = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) >= 0);
   /* Las jornadas van al mismo buzon de alianzas pero en SU correo: el de arriba
      cuenta «personas que esperan una respuesta», y una jornada sin cerrar no es
@@ -5144,7 +5534,6 @@ async function resumenDiarioEquipo(env) {
   const deJornadas = vencidas.filter(c => c.clave === "jornadas_sin_cerrar");
   const deAlianzas = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) < 0 && c.clave !== "jornadas_sin_cerrar");
   const otras = cola.filter(c => c.n > 0 && !c.vencida).length;
-  const out = {};
   if (deAlianzas.length) {
     out.alianzas = await enviarResumenVencidas(env, {
       para: correoAlianzas(env), etiqueta: "resumen-diario", vencidas: deAlianzas,
@@ -5198,7 +5587,8 @@ async function enviarResumenVencidas(env, x) {
   if (ya) return { saltado: "ya_salio_hoy" };
   const total = x.vencidas.reduce((t, c) => t + c.n, 0);
   const titulo = x.titulo(total);
-  const filas = x.vencidas.map(c => [
+  /* `filas` ya armadas, para el resumen que no es de colas (vencimientos). */
+  const filas = x.filas || x.vencidas.map(c => [
     NOMBRE_COLA_PLAZO[c.clave] || c.clave,
     c.n + " · la más vieja hace " + c.dias + " días (plazo " + c.plazo + ")"
   ]);
@@ -18092,6 +18482,20 @@ textarea { font-size: 16px }
 .dec-ir:hover{border-color:var(--acc)}
 .dec-sinir{color:var(--mu);font-weight:400;border-style:dashed}
 .dec-sinir:hover{border-color:var(--bd)}
+/* ---- VENCIMIENTOS ----
+   El estado se lee por FORMA y texto, no solo por color: triangulo y filete
+   para lo vencido, circulo lleno para lo que esta a 14 dias, vacio para lo
+   lejano, visto para lo hecho, raya para lo que no aplico. */
+.ob-vencida td:first-child{border-left:3px solid var(--err)}
+.ob-vencida .ob-est{color:var(--err);font-weight:700}
+.ob-cerca .ob-est{color:var(--amber);font-weight:600}
+.ob-lejos .ob-est,.ob-hecha .ob-est{color:var(--mu)}
+.ob-hecha td{color:var(--mu)}
+.ob-chip{display:inline-block;font-size:var(--fs-11);letter-spacing:.04em;text-transform:uppercase;
+  border:1px dashed var(--amber);color:var(--amber);border-radius:999px;padding:1px 8px;margin-left:6px;white-space:nowrap}
+.ob-nota{width:100%;min-width:9rem;max-width:16rem;padding:5px 8px;margin:0 0 6px;border:1px solid var(--bd);
+  border-radius:6px;font:inherit;font-size:var(--fs-13);background:var(--bg);color:var(--ink)}
+.ob-acc{display:flex;flex-wrap:wrap;gap:6px}
 /* ---- JORNADAS DE VOLUNTARIADO ----
    Los indicadores son un ledger de fichas separadas por una regla de 1px, no
    tarjetas con sombra: es la gramatica de la tabla de transparencia. La ficha
@@ -18462,7 +18866,30 @@ y la entidad, no una persona atendida. Una entrega no se puede publicar sin al m
 </div>
 
 <div class="mod" data-mod="conta" hidden>
-<h2 id="sec-egresos" class="h-sec" style="margin:8px 0 6px;font-size:26px">Egresos</h2>
+<!-- VENCIMIENTOS. Va PRIMERO en Contabilidad: el 22 sep 2026 la Alcaldia de
+     Medellin aviso que el ICA 2025 nunca se declaro, y no estaba en ninguna
+     lista. Las fechas viven en OBLIGACIONES (worker.js) y se revisan cada
+     diciembre; aqui solo se marca que alguien se ocupo. -->
+<h2 id="sec-vencimientos" class="h-sec" style="margin:8px 0 6px;font-size:26px">Vencimientos</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que la Fundación tiene que presentar,
+pagar o reportar, con su fecha. <strong>Marcar no presenta nada:</strong> solo deja constancia de que alguien se
+ocupó. Las que dicen «solo si…» se marcan <strong>«No aplicó este periodo»</strong> cuando no aplicaron — un mes sin
+retenciones también hay que cerrarlo. «Por confirmar» es una fecha calculada con la regla, no publicada todavía.
+Lo vencido y lo que vence en 14 días sale en «Hoy»; lo vencido o a 3 días, además, en el correo diario a contabilidad.</p>
+<div class="eg-acciones">
+  <label class="eg-check"><input type="checkbox" id="ob-todo"> Ver todo el calendario, no solo los próximos 120 días</label>
+</div>
+<div class="med-tw"><table class="med-tbl" id="ob-tabla">
+<thead><tr>
+<th scope="col">Fecha</th><th scope="col">Entidad</th><th scope="col">Obligación</th>
+<th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="ob-filas"><tr><td colspan="5" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
+</table></div>
+<p class="msg" id="ob-msg"></p>
+<p class="mu" style="font-size:12.5px;margin:6px 0 0;max-width:70ch">Qué aplica, qué no y de dónde sale cada fecha:
+<code>ops/obligaciones.md</code>. Una fecha nueva o corregida es un PR, no un clic.</p>
+
+<h2 id="sec-egresos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Egresos</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Cada peso que sale, con su papel y su clasificación.
 <strong>Esto no es el libro oficial</strong> — los libros, la declaración y la exógena son de tu contador y llevan
 responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde vive el soporte.</p>
@@ -19338,6 +19765,7 @@ var COLA_ES = {
   casos_respondieron: "Familias que ya mandaron sus fotos",
   visitadas_sin_materiales: "Visitadas y todavía sin materiales",
   terreno_sin_atender: "Inspecciones de terreno sin atender",
+  vencimientos_por_atender: "Vencimientos tributarios y legales",
   /* LAS TRES MAS NUEVAS, y llegaron sin nombre. Son justo las que se añadieron
      para hacer visible lo que fallaba callado —el concepto escrito que la
      familia no sabe, el certificado que perdio su respaldo, el aviso que no
@@ -19544,7 +19972,10 @@ var COLA_MOD = {
   certificados_en_revision: "dinero",
   correos_sin_cupo: "salud",
   /* Su «Ir» lleva a #sec-jornadas, que vive en el modulo de voluntariado. */
-  jornadas_sin_cerrar: "vol"
+  jornadas_sin_cerrar: "vol",
+  /* «#sec-vencimientos» vive en Contabilidad. Es la primera cola de ese
+     modulo, por eso «conta» entra tambien en la lista de pintarContadores. */
+  vencimientos_por_atender: "conta"
 };
 
 /* El numero en la pestana es lo que convierte esto en una consola: sin el hay
@@ -19556,13 +19987,15 @@ function pintarContadores(pend){
     var m = COLA_MOD[c.clave];
     if (!m) return;
     por[m] = (por[m] || 0) + c.n;
-    if (c.dias !== null && c.dias >= 3) urge[m] = true;
+    /* «vencida» tambien enciende: la cola de vencimientos no tiene antiguedad
+       (su urgencia es lo que falta, no lo que lleva esperando). */
+    if (c.vencida || (c.dias !== null && c.dias >= 3)) urge[m] = true;
   });
   var total = 0;
   Object.keys(por).forEach(function(m){ total += por[m]; });
   por.hoy = total;
   if (Object.keys(urge).length) urge.hoy = true;
-  ["hoy", "dinero", "mmc", "red", "vol", "entregas", "salud"].forEach(function(m){
+  ["hoy", "dinero", "mmc", "red", "vol", "entregas", "conta", "salud"].forEach(function(m){
     var n = document.getElementById("n-" + m);
     if (!n) return;
     n.textContent = por[m] ? String(por[m]) : "";
@@ -19616,7 +20049,7 @@ function pintarDecisiones(d){
          cola tiene plazo, manda el plazo: vencida es otra cosa que «vieja». */
       var viejo = c.dias !== null && c.dias >= 3;
       return '<li class="dec-fila' + (c.vencida ? " dec-vencida" : viejo ? " dec-viejo" : "") + '">'
-        + '<span class="dec-cuando">' + esc(antiguedad(c.dias))
+        + '<span class="dec-cuando">' + esc(c.cuando || antiguedad(c.dias))
         + (c.plazo != null ? '<small>' + (c.vencida ? "plazo vencido · " : "plazo ") + esc(String(c.plazo)) + (c.plazo === 1 ? " día" : " días") + '</small>' : "")
         + '</span>'
         + '<span class="dec-n">' + esc(String(c.n)) + '</span>'
@@ -19751,8 +20184,8 @@ function cargarSalud(){
     } else {
       h += '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Qué</th><th scope="col">Cuántos</th><th scope="col">El más viejo</th><th scope="col">Dónde se resuelve</th></tr></thead><tbody>';
       h += pend.map(function(c){
-        var viejo = antiguedad(c.dias);
-        var urgente = c.dias !== null && c.dias >= 3;
+        var viejo = c.cuando || antiguedad(c.dias);
+        var urgente = c.vencida || (c.dias !== null && c.dias >= 3);
         return "<tr><td><strong>" + esc(COLA_ES[c.clave] || c.clave) + "</strong></td>" +
           "<td>" + c.n + "</td>" +
           "<td>" + (urgente ? '<strong style="color:#A84D00">' + esc(viejo) + "</strong>" : esc(viejo)) + "</td>" +
@@ -22393,6 +22826,92 @@ document.addEventListener("change", function(e){
   }
 });
 
+/* ---------------- vencimientos (0037) ----------------
+   El calendario llega ENTERO (unas treinta filas) y aqui se filtra: por defecto
+   lo vencido sin marcar y lo de los proximos 120 dias (mas lo de hace un mes,
+   para ver lo que se acaba de marcar); con la casilla, todo. Alternar no pide
+   nada al servidor.
+
+   Los botones llevan el INDICE de la fila y no la clave: la clave y la fecha
+   salen de OB_FILAS, que es exactamente lo que se pinto, y el servidor vuelve a
+   comprobar que las dos existen. El texto «vence en N dias» tambien viene del
+   servidor (cuandoVence), para que la tabla, «Hoy» y el correo digan lo mismo. */
+var OB = null;
+var OB_FILAS = [];
+var MESES_CORTOS = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+function fechaCorta(f){
+  var p = String(f || "").split("-");
+  if (p.length !== 3) return String(f || "");
+  return Number(p[2]) + " " + MESES_CORTOS[Number(p[1]) - 1] + " " + p[0];
+}
+function cargarVencimientos(){
+  pedirJSON("/api/admin/obligaciones", "ob-filas").then(function(d){
+    OB = d;
+    pintarVencimientos();
+    if (d.sin_tabla) egMsg("ob-msg", "Falta aplicar la migración 0037: el calendario se ve, pero las marcas no se pueden guardar todavía.", false);
+  });
+}
+function pintarVencimientos(){
+  var tb = document.getElementById("ob-filas"); if (!tb || !OB) return;
+  var todo = document.getElementById("ob-todo");
+  var verTodo = !!(todo && todo.checked);
+  OB_FILAS = (OB.items || []).filter(function(x){
+    if (verTodo) return true;
+    if (!x.marca && x.vencida) return true;
+    return x.dias >= -30 && x.dias <= 120;
+  });
+  if (!OB_FILAS.length){
+    tb.innerHTML = '<tr><td colspan="5" class="mu">Nada en los próximos 120 días. La casilla de arriba muestra el año entero.</td></tr>';
+    return;
+  }
+  tb.innerHTML = OB_FILAS.map(function(x, i){
+    var cls, est;
+    if (x.marca){ cls = "ob-hecha"; est = x.marca.estado === "hecho" ? "✓ Hecho" : "– No aplicó"; }
+    else if (x.vencida){ cls = "ob-vencida"; est = "▲ " + x.cuando; }
+    else if (x.dias <= OB.dias_cola){ cls = "ob-cerca"; est = "● " + x.cuando; }
+    else { cls = "ob-lejos"; est = "○ " + x.cuando; }
+    var fecha = '<strong>' + esc(fechaCorta(x.fecha)) + '</strong>'
+      + (x.vencida_desde ? '<br><small>venció el ' + esc(fechaCorta(x.vencida_desde)) + '; esta es la fecha objetivo</small>' : '')
+      + (x.limite ? '<br><small>límite práctico ' + esc(fechaCorta(x.limite)) + '</small>' : '');
+    var que = '<strong>' + esc(x.titulo) + '</strong>'
+      + (x.por_confirmar ? '<span class="ob-chip">por confirmar</span>' : '')
+      + '<br><small>' + esc(x.periodo) + ' · ' + esc(x.condicion)
+      + ' · <a href="' + esc(x.fuente) + '" target="_blank" rel="noopener">fuente</a></small>';
+    var estado = '<span class="ob-est">' + esc(est) + '</span>'
+      + (x.marca
+          ? '<br><small>' + esc(enCO(x.marca.marcado_en, 10)) + (x.marca.marcado_por ? ' · ' + esc(x.marca.marcado_por) : '')
+            + (x.marca.nota ? '<br>' + esc(x.marca.nota) : '') + '</small>'
+          : '');
+    var acc = x.marca
+      ? '<button type="button" class="copy" data-obdeshacer="' + i + '">Deshacer</button>'
+      : '<input class="ob-nota" id="ob-nota-' + i + '" maxlength="500" autocomplete="off" placeholder="Nota (opcional)" aria-label="Nota para ' + esc(x.corto + ' · ' + x.periodo) + '">'
+        + '<span class="ob-acc"><button type="button" class="copy" data-obhecho="' + i + '">Hecho</button>'
+        + '<button type="button" class="copy" data-obna="' + i + '">No aplicó este periodo</button></span>';
+    return '<tr class="' + cls + '"><td>' + fecha + '</td><td>' + esc(x.entidad) + '</td><td>' + que
+      + '</td><td>' + estado + '</td><td>' + acc + '</td></tr>';
+  }).join("");
+}
+function marcarObligacion(i, estado, boton){
+  var x = OB_FILAS[i]; if (!x) return;
+  if (estado === "pendiente" && !confirm("¿Volver a dejar pendiente «" + x.corto + " · " + x.periodo + "»?")) return;
+  var n = document.getElementById("ob-nota-" + i);
+  postJ("/api/admin/obligaciones", { clave: x.clave, fecha: x.fecha, estado: estado, nota: n ? n.value : "" }, "ob-msg", boton, function(){
+    egMsg("ob-msg", (estado === "pendiente" ? "Vuelve a estar pendiente: " : "Guardado: ") + x.corto + " · " + x.periodo + ".", true);
+    /* La portada tambien: la cola de «Hoy» y su insignia salen de /salud. */
+    cargarVencimientos(); cargarSalud();
+  });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if ((b = e.target.closest("[data-obhecho]"))){ marcarObligacion(Number(b.getAttribute("data-obhecho")), "hecho", b); return; }
+  if ((b = e.target.closest("[data-obna]"))){ marcarObligacion(Number(b.getAttribute("data-obna")), "no_aplica", b); return; }
+  if ((b = e.target.closest("[data-obdeshacer]"))){ marcarObligacion(Number(b.getAttribute("data-obdeshacer")), "pendiente", b); }
+});
+document.addEventListener("change", function(e){
+  if (e.target && e.target.id === "ob-todo") pintarVencimientos();
+});
+
 var BANDEJAS = {
   "filas": cargarAportes,
   "t-filas": cargarReportadas,
@@ -22407,6 +22926,7 @@ var BANDEJAS = {
   "e-filas": cargarEntregas,
   "eg-filas": cargarEgresos,
   "pr-filas": cargarProveedores,
+  "ob-filas": cargarVencimientos,
   "j-filas": cargarJornadas
 };
 
@@ -25843,6 +26363,9 @@ export default {
            método, como ya hacen otras del panel. */
         if (ruta === "/api/admin/egresos")      return await adminEgresos(request, env, url, sesion.email);
         if (ruta === "/api/admin/proveedores")  return await adminProveedores(request, env);
+        /* Vencimientos (0037): GET el calendario, POST marcar uno. El POST pasa
+           por el chequeo de Origin de arriba como todos los que escriben. */
+        if (ruta === "/api/admin/obligaciones") return await adminObligaciones(request, env, sesion.email);
         /* El soporte de un egreso: subirlo y volver a verlo. Con el número en la
            ruta y su forma exacta, como el aporte y el acta. */
         const egs = ruta.match(/^\/api\/admin\/egreso\/(EG-\d{4}-\d{6})\/soporte$/i);
