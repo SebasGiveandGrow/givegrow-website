@@ -1775,3 +1775,82 @@ export async function certificadoVoluntariado(c) {
   h.cerrarPie(c.numero);
   return pdf.save();
 }
+
+/* ===========================================================================
+   COMPROBANTE DE FIRMA ELECTRÓNICA — convenio del HUB (paso 4)
+   ===========================================================================
+   Uno por documento firmado en /convenio/<token>: el formulario A, el B, el C
+   o la aceptación del convenio (D). Lo recibe quien firmó, por correo, y queda
+   en /admin.
+
+   ES LA FOTOGRAFÍA DE LO FIRMADO, no un resumen: lleva el texto que se le
+   mostró, cada respuesta tal como quedó y los datos de la firma (Ley 527 de
+   1999 y Decreto 2364 de 2012): quién, con qué documento y en qué calidad,
+   cuándo en UTC, a qué correo llegó el código de un solo uso y la huella
+   SHA-256 del contenido. Con esa huella cualquiera puede comprobar después que
+   el JSON guardado en la base es exactamente lo que se firmó.
+
+   `c` llega ARMADO desde worker.js (`comprobanteDeFirma`): aquí no se decide
+   nada, solo se dibuja. Así el PDF no puede decir algo distinto de lo que se
+   guardó. */
+export async function comprobanteFirmaConvenio(c) {
+  const { pdf, hoja: h, f } = await abrir("Comprobante de firma " + c.referencia, c.titulo);
+
+  membrete(h);
+  h.cintillo("Comprobante de firma electrónica", { tam: 7.5, despues: 10 });
+  h.texto(c.titulo, { tam: 17, fuente: f.negrita, color: TINTA, interlinea: 21, despues: 6 });
+  h.texto(c.referencia, { tam: 11, fuente: f.negrita, color: VERDE, interlinea: 15, despues: 14 });
+
+  h.regla({ despues: 6 });
+  h.fila("Organización", c.fundacion || "-");
+  h.fila("Versión del convenio", c.variante || "-");
+  h.fila("Firmado (UTC)", c.firmado_en || "-");
+  h.fila("Firmado (hora de Colombia)", c.firmado_co || "-");
+  h.salto(12);
+
+  for (const p of (c.intro || [])) {
+    h.texto(p, { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 6 });
+  }
+
+  if ((c.respuestas || []).length) {
+    h.salto(8);
+    h.cintillo("Lo que se declaró", { tam: 7.5, despues: 10 });
+    for (const r of c.respuestas) {
+      /* La pregunta y el arranque de su respuesta no se separan de página. */
+      h.reservar(36);
+      h.texto((r.num ? r.num + "  " : "") + r.pregunta,
+        { tam: 8.8, fuente: f.negrita, color: TINTA, interlinea: 12.5, despues: 1 });
+      const resp = Array.isArray(r.respuesta)
+        ? (r.respuesta.length ? r.respuesta.map((x) => "[X] " + x).join("\n") : "(ninguna)")
+        : (r.respuesta === "" || r.respuesta == null ? "(sin respuesta)" : String(r.respuesta));
+      h.texto(resp, { tam: 9, color: SUAVE, interlinea: 13, despues: 7 });
+    }
+  }
+
+  h.salto(10);
+  /* El bloque de la firma no se parte entre dos hojas: medido, quedaba el
+     firmante al pie de una y su documento y su huella en la siguiente. */
+  h.reservar(230);
+  h.cintillo("Firma electrónica", { tam: 7.5, despues: 10 });
+  h.regla({ despues: 6 });
+  h.fila("Firmante", c.firmante.nombre);
+  h.fila("Documento", c.firmante.doc_tipo + " " + c.firmante.doc_num);
+  h.fila("Calidad", c.firmante.calidad);
+  h.fila("Código de un solo uso enviado a", c.correo || "-");
+  if (c.texto_sha256) h.fila("Huella del PDF del convenio", c.texto_sha256.slice(0, 32) + "...", { fuerte: false });
+  h.fila("Huella de la conexión", String(c.ip_huella || "-").slice(0, 16), { fuerte: false });
+  h.salto(8);
+  h.texto("Huella SHA-256 del contenido firmado:", { tam: 8.5, color: GRIS, despues: 1 });
+  h.texto(c.sha256, { tam: 8.5, fuente: f.negrita, color: TINTA, despues: 4 });
+  if (c.user_agent) {
+    h.texto("Navegador: " + String(c.user_agent).slice(0, 220), { tam: 7.5, color: GRIS, interlinea: 10.5, despues: 10 });
+  }
+
+  h.texto(c.nota_legal, { tam: 8.5, color: GRIS, interlinea: 12, despues: 8 });
+  h.regla({ despues: 12 });
+  h.texto(ENTIDAD.nombreCorto, { tam: 9, fuente: f.negrita, color: TINTA, despues: 2 });
+  h.texto("NIT " + ENTIDAD.nit + "  ·  " + ENTIDAD.domicilio, { tam: 8.5, color: GRIS, interlinea: 12 });
+
+  h.cerrarPie(c.referencia);
+  return pdf.save();
+}
