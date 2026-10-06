@@ -1489,9 +1489,17 @@ function fmtPesos(centavos) {
 
 /* Envoltura sobria, sin imágenes ni columnas: un correo institucional que se lee
    igual en cualquier cliente y no se rompe si se bloquean las imágenes. */
-function plantillaCorreo({ titulo, parrafos, filas, cierre, boton }) {
+/* `lista` (opcional) es una lista con su titulo, para lo que de verdad es una
+   lista —los documentos del convenio—: en parrafos sueltos se leia como prosa. */
+function plantillaCorreo({ titulo, parrafos, filas, cierre, boton, lista }) {
   const p = (parrafos || []).map((x) =>
-    `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3A3F45">${esc(x)}</p>`).join("");
+    `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3A3F45">${esc(x)}</p>`).join("") +
+    (lista && lista.items && lista.items.length
+      ? `<p style="margin:4px 0 6px;font-size:15px;line-height:1.6;color:#1A1D21;font-weight:700">${esc(lista.titulo || "")}</p>` +
+        `<ul style="margin:0 0 14px;padding-left:20px">` +
+        lista.items.map((x) => `<li style="margin:0 0 6px;font-size:14px;line-height:1.55;color:#3A3F45">${esc(x)}</li>`).join("") +
+        `</ul>` + (lista.nota ? `<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#5C636F">${esc(lista.nota)}</p>` : "")
+      : "");
   const f = (filas || []).map(([k, v]) =>
     `<tr><td style="padding:9px 0;border-bottom:1px solid #DAD3C3;font-size:14px;color:#5C636F">${esc(k)}</td>` +
     `<td style="padding:9px 0;border-bottom:1px solid #DAD3C3;font-size:14px;font-weight:600;color:#1A1D21;text-align:right">${esc(v)}</td></tr>`
@@ -2725,6 +2733,16 @@ async function adminSalud(env) {
     "(i.estado = 'aceptada' AND i.actualizada_en < datetime('now','-14 days')) OR " +
     "(i.estado = 'visitada' AND COALESCE(f.estado, '') <> 'enviada' AND i.actualizada_en < datetime('now','-21 days')))",
     "Bandeja «Quién quiere entrar» · en revisión +7 días, aceptada sin visita +14, o visitada sin cuestionario +21", 27, "#sec-entrar");
+  /* EL CONVENIO, CON PLAZO. Reunir el Anexo 1 y firmar es trabajo de las dos
+     partes, y cada fundacion en «convenio» es algo que mover: por eso cuenta
+     desde el primer dia y no solo cuando ya se paso. TREINTA DIAS, que es lo
+     que vale el certificado de existencia: un convenio que lleva mas que eso
+     probablemente necesita pedirlo otra vez. Cuenta desde que entro al paso
+     (`convenio.desde`), no desde el ultimo documento marcado. */
+  await enCola("convenios_en_curso",
+    "SELECT COUNT(*) AS n, MIN(COALESCE(json_extract(datos, '$.convenio.desde'), actualizada_en)) AS masViejo " +
+    "FROM inscripciones WHERE tipo = 'fundacion' AND estado = 'convenio'",
+    "Bandeja «Quién quiere entrar» · documentos del Anexo 1 y firma; pasados 30 días, el certificado de existencia ya no vale", 28, "#sec-entrar", 30);
   await enCola("transferencias_sin_verificar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
     "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado", 60, "#sec-transferencias");
@@ -5504,6 +5522,7 @@ const NOMBRE_COLA_PLAZO = {
   apadrinamientos_sin_respuesta: "Quieren apadrinar y esperan respuesta",
   voluntarios_sin_respuesta: "Voluntarios sin responder",
   jornadas_sin_cerrar: "Jornadas realizadas sin cerrar (sin certificados ni encuestas)",
+  convenios_en_curso: "Fundaciones en convenio hace más de 30 días",
   urgentes_sin_visitar: "Casos urgentes que nadie ha visitado",
   casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto",
   vencimientos_por_atender: "Vencimientos tributarios y legales sin atender"
@@ -13561,7 +13580,27 @@ async function correoAvisoAliado(env, a) {
    perfil— sigue intacta, y este formulario ni siquiera pregunta eso.
    ======================================================================== */
 
+/* LA PREGUNTA ES «¿ESTA CONSTITUIDA LEGALMENTE?» y sus valores siguen siendo
+   los de cuando se llamaba «personeria juridica»: `nit` = Si, `tramite` = En
+   tramite, `base` = No. No se renombran porque las aplicaciones que ya entraron
+   los tienen guardados en `datos`. Ademas de describir a la organizacion, dice
+   que version del convenio aplica en el paso 4: ver `varianteConvenio`. */
 const PERSONERIAS = ["nit", "tramite", "base"];
+
+/* NIT colombiano: el numero, un guion y el digito de verificacion de la DIAN
+   (pesos 3, 7, 13… de derecha a izquierda, modulo 11). Devuelve el NIT sin
+   puntos ni espacios si cuadra, o "" si no. La misma cuenta vive en `nitValido`
+   de app.js para avisar antes de enviar; esta es la que decide. */
+function nitNormal(v) {
+  const m = /^(\d{6,10})-(\d)$/.exec(String(v || "").replace(/[\s.]/g, ""));
+  if (!m) return "";
+  const pesos = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
+  const d = m[1].split("").reverse();
+  let suma = 0;
+  for (let i = 0; i < d.length; i++) suma += Number(d[i]) * pesos[i];
+  const r = suma % 11;
+  return Number(m[2]) === (r > 1 ? 11 - r : r) ? m[1] + "-" + m[2] : "";
+}
 const POBLACIONES_FUND = [
   "ninos", "adolescentes", "jovenes", "madres", "mayores",
   "familias", "migrante", "discapacidad", "otra"
@@ -13589,6 +13628,13 @@ async function apiFundacion(env, c) {
 
   const personeria = PERSONERIAS.includes(c.personeria) ? c.personeria : null;
   if (!personeria) return json({ error: "personeria_requerida", opciones: PERSONERIAS }, 400);
+  /* EL NIT, OPCIONAL y solo con «Sí». Se guarda normalizado (sin puntos) y
+     solo si su digito de verificacion cuadra: un NIT con un digito cambiado
+     tiene la forma correcta y es de OTRA entidad, y es el que despues se copia
+     al convenio. Con «En tramite» o «No» se descarta aunque llegue escrito. */
+  const nitCrudo = personeria === "nit" ? limpio(c.nit, 20) : "";
+  const nit = nitCrudo ? nitNormal(nitCrudo) : "";
+  if (nitCrudo && !nit) return json({ error: "nit_invalido" }, 400);
 
   const poblacion = Array.isArray(c.poblacion)
     ? c.poblacion.filter(p => POBLACIONES_FUND.includes(p)) : [];
@@ -13606,6 +13652,7 @@ async function apiFundacion(env, c) {
     cargo: limpio(c.cargo, 120),
     anio: limpio(c.anio, 8),
     personeria,
+    nit,
     zona,
     historia,
     mision,
@@ -13712,13 +13759,115 @@ async function correoFundacionAceptada(env, f) {
     ? [["Foundation", f.nombre], ["Step just closed", "2 · Review"], ["Next step", "3 · Context visit"]]
     : [["Fundación", f.nombre], ["Paso que se cierra", "2 · Revisamos"], ["Paso siguiente", "3 · Visita de contexto"]];
 
+  /* LO QUE VA A PEDIR EL PASO 4, dicho ya. Reunir un certificado, unos
+     estatutos y una certificacion bancaria toma semanas, y descubrirlo cuando
+     el convenio esta listo para firmar es lo que lo frena. Pero el certificado
+     de existencia NO se pide aun: vale 30 dias el dia de la firma, y sacarlo hoy
+     es sacarlo dos veces. Si no se sabe la version (una aplicacion vieja sin la
+     pregunta), va la lista de la registrada, que es la mas larga. */
+  const variante = varianteConvenio(f) || "registradas";
+  const lista = {
+    titulo: en ? "For the agreement (step 4) you will need:" : "Para el convenio (paso 4) vas a necesitar:",
+    items: docsConvenio(variante).map(d => textoDoc(d, variante, en)),
+    /* La advertencia del certificado solo existe en la versión registrada: la
+       de proyectos sin registro no pide certificado. */
+    nota: (en
+      ? "Do not send them yet: we ask for them in step 4. We tell you now so they do not catch you by surprise."
+      : "No nos los mandes todavía: te los pedimos en el paso 4. Te lo contamos ahora para que no te tome por sorpresa.") +
+      (variante === "registradas"
+        ? (en ? " And do not request the certificate of existence yet — it must be no older than 30 days on the day we sign."
+              : " Y el certificado de existencia no lo saques aún: debe tener máximo 30 días el día de la firma.")
+        : "")
+  };
+
   return enviarCorreo(env, {
     para: f.email,
     asunto: en ? "Your application to the HUB SOCIAL: review passed"
                : "Tu aplicación al HUB SOCIAL: pasaste la revisión",
-    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
-    html: plantillaCorreo({ titulo, parrafos, filas }),
+    texto: [titulo, "", ...parrafos, "", lista.titulo, ...lista.items.map(x => "· " + x), lista.nota, "",
+            filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, lista }),
     etiqueta: "fundacion-aceptada"
+  });
+}
+
+/* PASO 4: EL CONVENIO. Sale al pulsar «Iniciar convenio», una sola vez.
+   ============================================================================
+   Dice tres cosas que la fundacion necesita para moverse sola: que version del
+   convenio le aplica y por que, la lista exacta de documentos —la misma del
+   panel, de `DOCS_CONVENIO`—, y como se firma: electronicamente, que en
+   Colombia tiene la misma validez que en papel (Ley 527 de 1999). Los papeles
+   se mandan respondiendo a este correo, que va al buzon de alianzas.
+
+   SOLO EN ESPAÑOL: las fundaciones del HUB son colombianas y el convenio esta
+   en español; un correo en ingles sobre un documento en español no ayuda. */
+async function correoFundacionConvenio(env, f) {
+  const variante = f.variante || "registradas";
+  const titulo = "Empezamos el convenio de cooperación.";
+  const parrafos = [
+    "Ya recibimos tu cuestionario del HUB. Con eso queda cerrado lo anterior y empieza el paso 4 de cinco: el convenio de cooperación, que formaliza la alianza. Es gratuito, como todo lo demás.",
+    variante === "registradas"
+      ? "Te aplica la versión para Fundaciones Aliadas Registradas, porque nos contaste que la fundación está constituida legalmente."
+      : "Te aplica la versión para Proyectos Sociales No Registrados, porque nos contaste que todavía no tienen registro en Cámara de Comercio. Si el registro sale antes de firmar, avísanos y usamos la versión para fundaciones registradas.",
+    "Give&Grow te envía el convenio para firma electrónica, que tiene la misma validez que una firma en papel (Ley 527 de 1999). No hay que imprimir ni desplazarse."
+  ];
+  const lista = {
+    titulo: "Los documentos que necesitamos (Anexo 1 del convenio):",
+    items: docsConvenio(variante).map(d => textoDoc(d, variante, false)),
+    nota: "Mándalos respondiendo a este correo. Los que dicen «si aplica» pueden no aplicarte: cuéntanos y los marcamos así." +
+      (variante === "registradas"
+        ? " El certificado de existencia pídelo de último: tiene que tener máximo 30 días el día de la firma."
+        : "")
+  };
+  return enviarCorreo(env, {
+    para: f.email,
+    asunto: "Paso 4 del HUB SOCIAL: el convenio de cooperación",
+    texto: [titulo, "", ...parrafos, "", lista.titulo, ...lista.items.map(x => "· " + x), lista.nota].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, lista,
+      filas: [["Fundación", f.nombre], ["Paso en curso", "4 · Convenio de cooperación"],
+              ["Versión del convenio", NOMBRE_VARIANTE[variante]]]
+    }),
+    etiqueta: "fundacion-convenio"
+  });
+}
+
+/* PASO 5: LA BIENVENIDA. Sale al marcarla vinculada, una sola vez.
+   ============================================================================
+   «Ya estas en la red» y nada mas seria la promesa vacia que este sitio evita.
+   Dice lo que pasa de verdad:
+   · EL PERFIL PUBLICO no sale solo: se publica cuando estan los datos del
+     cuestionario y la autorizacion del nombre (regla 1: sin `consent.name` no
+     hay perfil). Por eso «cuando», y no «ya».
+   · LO QUE LE TOCA REPORTAR, que es la otra mitad del convenio: el reporte de
+     accion inmediata —el acta de recepcion o de entrega— por cada donacion, y
+     el informe semestral. Decirlo el primer dia es mas honesto que recordarlo
+     el dia que falta.
+   · A quien escribir. */
+async function correoFundacionVinculada(env, f) {
+  const titulo = "Bienvenida al HUB SOCIAL.";
+  const parrafos = [
+    "El convenio quedó firmado por las dos partes y tu fundación ya está vinculada al HUB SOCIAL. Con esto se cierran los cinco pasos.",
+    "Tu perfil público se publica cuando tengamos listos los datos del cuestionario y tu autorización para mostrar el nombre y las imágenes.",
+    "Desde ahora puedes recibir donaciones, herramientas y acompañamiento a través de la red. No prometemos montos ni fechas: llegan cuando hay donantes y empresas que eligen apoyar tu trabajo."
+  ];
+  const lista = {
+    titulo: "Lo que te toca reportar, como dice el convenio:",
+    items: [
+      "Por cada donación que recibas o entregues, un reporte de acción inmediata: el acta de recepción o de entrega, con su evidencia. Es lo que le permite a cada donante seguir su aporte hasta el final.",
+      "Cada semestre, un informe de lo que se hizo con lo recibido."
+    ],
+    nota: "Cualquier duda, responde a este correo: le llega a la persona de Give&Grow que acompaña a las fundaciones."
+  };
+  return enviarCorreo(env, {
+    para: f.email,
+    asunto: "Bienvenida al HUB SOCIAL · Give&Grow",
+    texto: [titulo, "", ...parrafos, "", lista.titulo, ...lista.items.map(x => "· " + x), lista.nota].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, lista,
+      filas: [["Fundación", f.nombre], ["Paso que se cierra", "5 · Vinculación al HUB SOCIAL"]]
+    }),
+    etiqueta: "fundacion-vinculada"
   });
 }
 
@@ -14596,7 +14745,7 @@ const ETIQUETA_POB = {
   migrante:"Población migrante", discapacidad:"Personas con discapacidad", otra:"Otra"
 };
 const ETIQUETA_PERS = {
-  nit: "Sí, con NIT", tramite: "En trámite", base: "Proyecto comunitario de base"
+  nit: "Constituida (Cámara de Comercio)", tramite: "Constitución en trámite", base: "Proyecto social sin registro"
 };
 
 /* Al buzón de alianzas: ver la nota de `correoAvisoAliado`. */
@@ -14610,7 +14759,8 @@ async function correoAvisoFundacion(env, f) {
     ["Lidera", f.lider + (f.cargo ? " · " + f.cargo : "")],
     ["Correo", f.email],
     ["Teléfono", f.telefono || "(no dejó)"],
-    ["Personería", ETIQUETA_PERS[f.personeria] || f.personeria],
+    ["Constituida", (ETIQUETA_PERS[f.personeria] || f.personeria) + (f.nit ? " · NIT " + f.nit : "")],
+    ["Convenio que aplica", NOMBRE_VARIANTE[varianteConvenio(f)] || "por definir"],
     ["Desde", f.anio || "(no dice)"],
     ["Territorio", f.zona],
     ["Ciudad", f.ciudad || "(no dice)"],
@@ -15467,6 +15617,15 @@ async function adminInscripciones(env, url) {
     "AND COALESCE(json_extract(datos, '$.matricula_verificada'), 0) <> 1"
   ).first();
 
+  /* EL CONVENIO DE CADA FUNDACION, ya calculado: version que aplica, lista del
+     Anexo 1 y si se puede vincular. Lo pinta el panel; lo decide esta cuenta. */
+  for (const i of (r.results || [])) {
+    if (i.tipo !== "fundacion") continue;
+    let x = {};
+    try { x = JSON.parse(i.datos || "{}") || {}; } catch (e) { /* nada */ }
+    i.convenio = resumenConvenio(x);
+  }
+
   return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0,
                 tope: TOPE_COLA, desde, tipo,
                 pendiente: soloSinVerificar ? "matricula" : soloSinResponder ? "respuesta" : "",
@@ -15745,8 +15904,268 @@ async function adminEntregaCaso(request, env, entrega, quien) {
    cinco pasos y la visita de contexto es el TERCERO: pedirle logo, fotos y
    costos a una fundacion antes de conocerse es pedirle documentacion a alguien
    con quien todavia no se ha hablado. Lo dice la cabecera del propio
-   cuestionario, y por eso el estado existe. */
-const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "visitada", "archivada"];
+   cuestionario, y por eso el estado existe.
+
+   LOS PASOS 4 Y 5 (oct 2026). Hasta aqui el sistema llegaba al paso 3 y de ahi
+   en adelante el proceso vivia en la cabeza de Sebas: ni estado, ni lista de
+   documentos, ni un correo. Con la primera fundacion nueva a punto de aplicar,
+   eso dejaba el convenio —el paso con mas papeles— sin rastro. Dos estados:
+   · `convenio`  documentos y firma en curso (paso 4).
+   · `vinculada` en la red (paso 5).
+   Sin migracion: lo que cada uno necesita guardar —la lista de documentos,
+   quien firmo, cuando entro— va en `datos`, como ya van los pasos de un
+   voluntario y la matricula de un ingeniero. */
+const ESTADOS_INSCRIPCION = ["nueva", "en_revision", "aceptada", "visitada", "convenio", "vinculada", "archivada"];
+
+/* DE DONDE SE PUEDE LLEGAR A CADA ESTADO. Hasta hoy el servidor aceptaba
+   cualquier estado desde cualquier otro, y lo unico que impedia saltarse la
+   visita era que el panel no pintara el boton. Con dos pasos nuevos que
+   dependen de papeles firmados, «el panel no lo ofrece» deja de bastar: una
+   peticion a mano —o un boton viejo en una pestaña abierta— podia vincular a una
+   fundacion sin convenio. Ahora la cadena la hace cumplir el servidor.
+   · Archivar se puede desde cualquier estado vivo: cerrar no es avanzar, y
+     quien se retira se retira en el paso en que este.
+   · Reabrir lleva a «en revision», como siempre: lo ya hecho (la ficha, la
+     lista del convenio) se conserva y no se vuelve a pedir. */
+const DESDE_INSCRIPCION = {
+  nueva: [],
+  en_revision: ["nueva", "archivada"],
+  aceptada: ["en_revision"],
+  visitada: ["aceptada"],
+  convenio: ["visitada"],
+  vinculada: ["convenio"],
+  archivada: ["nueva", "en_revision", "aceptada", "visitada", "convenio", "vinculada"]
+};
+/* Visita, convenio y vinculacion son el proceso de cinco pasos, que solo tienen
+   las fundaciones. A un voluntario no se le «vincula» con convenio. */
+const ESTADOS_SOLO_FUNDACION = ["visitada", "convenio", "vinculada"];
+
+/* EL CONVENIO TIENE DOS VERSIONES y la decide una pregunta del formulario
+   publico («¿esta constituida legalmente?»): la de Fundaciones Aliadas
+   Registradas, para una ESAL con Camara de Comercio, y la de Proyectos Sociales
+   No Registrados. «En tramite» firma la segunda mientras no tenga registro; si
+   lo consigue antes de firmar, se cambia en el panel (`variante`). */
+const VARIANTES_CONVENIO = ["registradas", "no_registradas"];
+const NOMBRE_VARIANTE = {
+  registradas: "Fundaciones Aliadas Registradas",
+  no_registradas: "Proyectos Sociales No Registrados"
+};
+function varianteConvenio(x) {
+  const c = x && x.convenio;
+  if (c && VARIANTES_CONVENIO.includes(c.variante)) return c.variante;
+  if (!x) return null;
+  if (x.personeria === "nit") return "registradas";
+  if (x.personeria === "tramite" || x.personeria === "base") return "no_registradas";
+  return null;
+}
+
+/* EL ANEXO 1 DEL CONVENIO, en una sola lista. De aqui salen la lista del panel,
+   lo que exige el servidor antes de dejar vincular, y los correos que se los
+   piden a la fundacion: si algun dia cambia el anexo, se cambia aqui y en el
+   Google Doc del convenio, y en ningun otro sitio.
+   · `variantes`: en cuales se pide. Certificado y estatutos solo existen para
+     una entidad registrada.
+   · `na`: en cuales se puede marcar «no aplica» — los «si aplica» del anexo.
+   NO SE GUARDA NINGUN DOCUMENTO NI NINGUN NUMERO: los papeles viven en el Drive
+   y aqui solo consta que llegaron, cuando y quien lo anoto. Tampoco el numero
+   de la cedula: basta con saber que se recibio. */
+const DOCS_CONVENIO = [
+  /* «Registradas»: Anexo 1 del convenio «Fundaciones Aliadas Registradas». */
+  { id: "certificado", variantes: ["registradas"], na: [],
+    es: "Certificado de existencia y representación legal (de máximo 30 días al firmar)",
+    en: "Certificate of existence and legal representation (no older than 30 days at signing)" },
+  { id: "rut", variantes: ["registradas"], na: [],
+    es: "RUT actualizado", en: "Updated RUT (tax registry)" },
+  { id: "cedula", variantes: ["registradas"], na: [],
+    es: "Copia del documento de identidad del representante legal",
+    en: "Copy of the legal representative's ID" },
+  { id: "estatutos", variantes: ["registradas"], na: [],
+    es: "Estatutos vigentes (o documento que acredite su objeto social)",
+    en: "Current bylaws (or a document proving its purpose)" },
+  { id: "rte", variantes: ["registradas"], na: ["registradas"],
+    es: "Constancia de Régimen Tributario Especial (si aplica)", en: "Special Tax Regime (RTE) record (if applicable)" },
+  { id: "bancaria", variantes: ["registradas"], na: ["registradas"],
+    es: "Certificación bancaria (si aplica para donaciones en dinero)", en: "Bank certificate (if applicable, for money donations)" },
+  { id: "laft", variantes: ["registradas"], na: [],
+    es: "Formulario de conocimiento del aliado y declaración de origen lícito de fondos (LA/FT)",
+    en: "Partner due-diligence form and lawful origin of funds declaration (AML/CFT)" },
+
+  /* «No registradas»: Anexo 1 del convenio «Proyectos Sociales No Registrados»
+     (debida diligencia reforzada). Quien firma es el RESPONSABLE —una o dos
+     personas naturales—, no un representante legal; y no hay certificado, RUT
+     ni estatutos, así que la regla de los 30 días no le aplica. Ninguno de sus
+     siete documentos es «si aplica». */
+  { id: "cedula_resp", variantes: ["no_registradas"], na: [],
+    es: "Copia del documento de identidad de cada responsable",
+    en: "Copy of the ID of each person responsible" },
+  { id: "descripcion", variantes: ["no_registradas"], na: [],
+    es: "Descripción del proyecto: trayectoria, población atendida y territorio donde opera",
+    en: "Project description: track record, population served and territory" },
+  { id: "aval", variantes: ["no_registradas"], na: [],
+    es: "Referencia o aval de un tercero confiable (líder comunitario, JAC, entidad religiosa, institución educativa u organización formal)",
+    en: "Reference or endorsement from a trusted third party (community leader, JAC, religious body, school or formal organisation)" },
+  { id: "evidencia", variantes: ["no_registradas"], na: [],
+    es: "Evidencia verificable del trabajo realizado (fotografías, registros, testimonios)",
+    en: "Verifiable evidence of the work done (photos, records, testimonies)" },
+  { id: "origen", variantes: ["no_registradas"], na: [],
+    es: "Declaración de origen lícito de los recursos (prevención LA/FT)",
+    en: "Declaration of lawful origin of resources (AML/CFT)" },
+
+  /* Comunes a las dos versiones. */
+  { id: "datos", variantes: ["registradas", "no_registradas"], na: [],
+    es: "Autorización de tratamiento de datos personales, firmada", en: "Signed personal data processing authorisation" },
+  { id: "conflictos", variantes: ["registradas", "no_registradas"], na: [],
+    es: "Declaración de inexistencia de conflictos de interés", en: "Declaration of no conflicts of interest" }
+];
+function docsConvenio(variante) {
+  return DOCS_CONVENIO.filter(d => d.variantes.includes(variante));
+}
+function textoDoc(d, variante, en) {
+  if (variante === "no_registradas" && (en ? d.enNR : d.esNR)) return en ? d.enNR : d.esNR;
+  return en ? d.en : d.es;
+}
+/* El certificado vale 30 dias el dia de la firma. Lo que se anota es cuando
+   LLEGO, y la expedicion es anterior a eso: si llego hace mas de 30 dias, ya
+   esta vencido seguro. */
+const DIAS_CERTIFICADO = 30;
+function diasDesdeUTC(v) {
+  const t = Date.parse(String(v || "").replace(" ", "T") + (/[Zz]$/.test(String(v || "")) ? "" : "Z"));
+  return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400000);
+}
+
+/* Como va el convenio, calculado AQUI y no en el panel: el panel solo lo pinta
+   (la regla de `adminJS` no admite valores del Worker), y es la misma cuenta la
+   que deja o no vincular. */
+function resumenConvenio(x) {
+  const variante = varianteConvenio(x);
+  const c = (x && x.convenio) || {};
+  const hechos = c.docs || {};
+  const notas = c.notas || {};
+  const lista = variante ? docsConvenio(variante) : [];
+  const items = lista.map(d => {
+    const h = hechos[d.id] || null;
+    const valido = !!h && (h.estado === "recibido" || (h.estado === "no_aplica" && d.na.includes(variante)));
+    return { id: d.id, texto: textoDoc(d, variante, false), na: d.na.includes(variante),
+             estado: valido ? h.estado : null, en: valido ? h.en : null, por: valido ? h.por : null,
+             nota: notas[d.id] || "" };
+  });
+  const faltan = items.filter(i => !i.estado).length;
+  const cert = items.find(i => i.id === "certificado" && i.estado === "recibido");
+  const diasCert = cert ? diasDesdeUTC(cert.en) : null;
+  return {
+    variante, nombre_variante: variante ? NOMBRE_VARIANTE[variante] : null,
+    desde: c.desde || null, items, faltan,
+    documentos_completos: !!variante && faltan === 0,
+    /* Solo cuenta ANTES de firmar: despues, el certificado ya cumplio su papel. */
+    certificado_vencido: !c.firmado && diasCert != null && diasCert > DIAS_CERTIFICADO,
+    firmado: c.firmado || null,
+    completo: !!variante && faltan === 0 && !!c.firmado
+  };
+}
+
+/* POST /api/admin/inscripcion/<id>/convenio — la lista del paso 4.
+   Cuatro cosas, una por peticion:
+     { doc, marca: "recibido" | "no_aplica" | "" }   marcar o desmarcar
+     { doc, nota }                                   nota o enlace al Drive
+     { doc: "firmado", marca: "recibido" | "" }      convenio firmado por ambas partes
+     { variante: "registradas" | "no_registradas" }
+   Solo mientras la fundacion esta en «convenio»: antes no hay convenio que
+   llenar, y despues de vincularla la lista ya es historia.
+
+   json_set en la base, como los pasos de un voluntario: dos clics seguidos en
+   documentos distintos no se pisan. */
+async function adminConvenioFundacion(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+
+  const f = await env.DB.prepare("SELECT id, tipo, estado, datos FROM inscripciones WHERE id = ?").bind(id).first();
+  if (!f) return json({ error: "no_encontrada" }, 404);
+  if (f.tipo !== "fundacion") return json({ error: "no_es_fundacion" }, 400);
+  if (f.estado !== "convenio") return json({ error: "no_esta_en_convenio",
+    ayuda: "La lista del convenio solo se llena mientras la fundación está en «Convenio»." }, 409);
+  let x = {};
+  try { x = JSON.parse(f.datos || "{}") || {}; } catch (e) { /* nada */ }
+  const antes = resumenConvenio(x);
+  const firmado = !!antes.firmado;
+  let detalle;
+
+  if (c.variante !== undefined) {
+    const v = String(c.variante || "");
+    if (!VARIANTES_CONVENIO.includes(v)) return json({ error: "variante_no_valida", permitidas: VARIANTES_CONVENIO }, 400);
+    if (firmado) return json({ error: "ya_firmado",
+      ayuda: "El convenio ya está firmado en esa versión. Desmarca la firma antes de cambiarla." }, 409);
+    await env.DB.prepare(
+      "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.convenio.variante', ?), actualizada_en = datetime('now') WHERE id = ?"
+    ).bind(v, id).run();
+    detalle = "versión del convenio: " + NOMBRE_VARIANTE[v];
+  } else if (c.doc === "firmado") {
+    if (c.marca) {
+      if (!antes.documentos_completos) return json({ error: "faltan_documentos",
+        ayuda: "Faltan " + antes.faltan + " documento(s) del Anexo 1. La firma va después de tenerlos todos." }, 409);
+      if (antes.certificado_vencido) return json({ error: "certificado_vencido",
+        ayuda: "El certificado de existencia llegó hace más de " + DIAS_CERTIFICADO + " días, así que ya no vale para firmar. Pide uno nuevo y vuelve a marcarlo cuando llegue." }, 409);
+      await env.DB.prepare(
+        "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.convenio.firmado', json_object('en', datetime('now'), 'por', ?)), " +
+        "actualizada_en = datetime('now') WHERE id = ?"
+      ).bind(quien || "?", id).run();
+      detalle = "convenio FIRMADO por ambas partes";
+    } else {
+      await env.DB.prepare(
+        "UPDATE inscripciones SET datos = json_remove(COALESCE(datos, '{}'), '$.convenio.firmado'), actualizada_en = datetime('now') WHERE id = ?"
+      ).bind(id).run();
+      detalle = "firma del convenio desmarcada";
+    }
+  } else {
+    const v = antes.variante;
+    if (!v) return json({ error: "sin_variante",
+      ayuda: "No se sabe qué versión del convenio aplica. Elígela primero." }, 409);
+    const d = docsConvenio(v).find(k => k.id === c.doc);
+    if (!d) return json({ error: "documento_no_valido", permitidos: docsConvenio(v).map(k => k.id) }, 400);
+
+    if (c.nota !== undefined) {
+      const nota = limpiar(c.nota, 300);
+      /* NI UN NUMERO DE DOCUMENTO. La nota es para «en el Drive, carpeta X» o el
+         enlace; si trae seis cifras seguidas fuera de un enlace, lo mas
+         probable es una cedula o un numero de cuenta, y eso no se guarda aqui. */
+      const sinEnlaces = nota.replace(/https?:\/\/\S+/gi, " ").replace(/[\s.\-]/g, "");
+      if (/\d{6,}/.test(sinEnlaces)) return json({ error: "nota_con_numero",
+        ayuda: "La nota parece traer un número de documento o de cuenta. No lo guardes aquí: basta con que conste que se recibió, y el papel vive en el Drive." }, 400);
+      await env.DB.prepare(nota
+        ? "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.convenio.notas.' || ?, ?), actualizada_en = datetime('now') WHERE id = ?"
+        : "UPDATE inscripciones SET datos = json_remove(COALESCE(datos, '{}'), '$.convenio.notas.' || ?), actualizada_en = datetime('now') WHERE id = ?"
+      ).bind(...(nota ? [d.id, nota, id] : [d.id, id])).run();
+      detalle = "nota en «" + d.es + "»";
+    } else {
+      const marca = String(c.marca || "");
+      if (marca && marca !== "recibido" && marca !== "no_aplica") return json({ error: "marca_no_valida" }, 400);
+      if (marca === "no_aplica" && !d.na.includes(v)) return json({ error: "no_aplica_no_permitido",
+        ayuda: "Este documento se pide siempre en esta versión del convenio." }, 400);
+      if (firmado) return json({ error: "ya_firmado",
+        ayuda: "El convenio ya está firmado. Desmarca la firma antes de tocar los documentos." }, 409);
+      if (marca) {
+        await env.DB.prepare(
+          "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.convenio.docs.' || ?, json_object('estado', ?, 'en', datetime('now'), 'por', ?)), " +
+          "actualizada_en = datetime('now') WHERE id = ?"
+        ).bind(d.id, marca, quien || "?", id).run();
+      } else {
+        await env.DB.prepare(
+          "UPDATE inscripciones SET datos = json_remove(COALESCE(datos, '{}'), '$.convenio.docs.' || ?), actualizada_en = datetime('now') WHERE id = ?"
+        ).bind(d.id, id).run();
+      }
+      detalle = "«" + d.es + "» " + (marca === "recibido" ? "recibido" : marca === "no_aplica" ? "no aplica" : "desmarcado");
+    }
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "inscripción " + id + " · convenio · " + detalle).run();
+  const g = await env.DB.prepare("SELECT datos FROM inscripciones WHERE id = ?").bind(id).first();
+  let y = {};
+  try { y = JSON.parse((g && g.datos) || "{}") || {}; } catch (e) { /* nada */ }
+  return json({ ok: true, id, convenio: resumenConvenio(y) });
+}
 
 /* LA LISTA DE UN VOLUNTARIO, antes de su primera jornada.
    ============================================================================
@@ -15838,6 +16257,37 @@ async function adminMoverInscripcion(request, env, id, quien) {
     ayuda: "Esa inscripcion ya no existe. Recarga la bandeja: puede que alguien la haya suprimido."
   }, 404);
 
+  /* LA CADENA LA HACE CUMPLIR EL SERVIDOR (ver `DESDE_INSCRIPCION`). Pedir el
+     estado en el que ya esta no es un error —es un doble clic— y no hace nada:
+     ni mueve la fecha ni repite un correo. */
+  if (nuevo === f.estado) return json({ ok: true, id, estado: nuevo, aviso: null, sin_cambio: true });
+  if (ESTADOS_SOLO_FUNDACION.includes(nuevo) && f.tipo !== "fundacion") {
+    return json({ error: "estado_solo_fundaciones",
+      ayuda: "Visita, convenio y vinculación son el proceso de las fundaciones. Esta inscripción es de otro tipo." }, 400);
+  }
+  if (!(DESDE_INSCRIPCION[nuevo] || []).includes(f.estado)) {
+    return json({ error: "salto_no_permitido", desde: f.estado, hacia: nuevo,
+      ayuda: "No se puede pasar de «" + f.estado + "» a «" + nuevo + "»: los pasos van en orden. Recarga la bandeja por si alguien la movió." }, 409);
+  }
+  let xMov = {};
+  try { xMov = JSON.parse(f.datos || "{}") || {}; } catch (e) { /* nada */ }
+  /* PASO 4 SOLO CON EL CUESTIONARIO ENVIADO: el convenio se arma con lo que la
+     fundacion respondio ahi (y su Seccion 7 es la autorizacion firmada). */
+  if (nuevo === "convenio") {
+    const fi = await env.DB.prepare("SELECT estado FROM fichas_fundacion WHERE inscripcion = ?").bind(id).first();
+    if (!fi || fi.estado !== "enviada") return json({ error: "ficha_sin_enviar",
+      ayuda: "El convenio empieza cuando la fundación envía su cuestionario del HUB. Todavía no lo ha enviado." }, 409);
+  }
+  /* PASO 5 SOLO CON LA LISTA COMPLETA Y LA FIRMA. Es lo que el panel muestra,
+     comprobado otra vez aqui con la misma cuenta. */
+  if (nuevo === "vinculada") {
+    const rc = resumenConvenio(xMov);
+    if (!rc.completo) return json({ error: "convenio_incompleto",
+      ayuda: !rc.documentos_completos
+        ? "Faltan " + rc.faltan + " documento(s) del Anexo 1 en la lista del convenio."
+        : "Falta marcar «Convenio firmado por ambas partes»." }, 409);
+  }
+
   await env.DB.prepare(
     "UPDATE inscripciones SET estado = ?, actualizada_en = datetime('now') WHERE id = ?"
   ).bind(nuevo, id).run();
@@ -15891,7 +16341,8 @@ async function adminMoverInscripcion(request, env, id, quien) {
   if (nuevo === "aceptada" && f.estado !== "aceptada" && f.tipo === "fundacion" && f.email &&
       !xAcep.aceptacion_enviada) {
     const x = xAcep;
-    const datos = { nombre: f.nombre || "", email: f.email, zona: x.zona || "", idioma: x.idioma === "en" ? "en" : "es" };
+    const datos = { nombre: f.nombre || "", email: f.email, zona: x.zona || "", idioma: x.idioma === "en" ? "en" : "es",
+                    personeria: x.personeria || "" };
     try {
       const r = await correoFundacionAceptada(env, datos);
       await correoVisitaPendiente(env, datos);
@@ -15904,6 +16355,50 @@ async function adminMoverInscripcion(request, env, id, quien) {
     } catch (e) {
       console.error("correo aceptacion fundacion", id, e && e.message);
       aviso = "correo_fallo";
+    }
+  }
+
+  /* AL ENTRAR AL CONVENIO. `desde` se reescribe cada vez que entra —es de donde
+     cuenta la cola de «Hoy»: una que se archivo y se reabrio no puede salir
+     vencida el primer dia—; la lista y sus notas se conservan. El correo sale
+     UNA vez: la marca `correo_en` es la que manda, como `aceptacion_enviada`. */
+  if (nuevo === "convenio") {
+    await env.DB.prepare(
+      "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.convenio.desde', datetime('now')) WHERE id = ?"
+    ).bind(id).run();
+    const yaAvisado = xMov.convenio && xMov.convenio.correo_en;
+    if (f.email && !yaAvisado) {
+      try {
+        const r = await correoFundacionConvenio(env, { nombre: f.nombre || "", email: f.email,
+                                                       variante: varianteConvenio(xMov) });
+        aviso = r && r.ok ? "correo_enviado" : "correo_fallo";
+        if (r && r.ok) await env.DB.prepare(
+          "UPDATE inscripciones SET datos = json_set(datos, '$.convenio.correo_en', datetime('now')) WHERE id = ?"
+        ).bind(id).run();
+      } catch (e) {
+        console.error("correo convenio fundacion", id, e && e.message);
+        aviso = "correo_fallo";
+      }
+    }
+  }
+
+  /* AL VINCULAR: la fecha y quien, y la bienvenida —una vez, aunque se
+     archive y se vuelva a vincular—. */
+  if (nuevo === "vinculada") {
+    await env.DB.prepare(
+      "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.vinculada', json_object('en', datetime('now'), 'por', ?)) WHERE id = ?"
+    ).bind(quien || "?", id).run();
+    if (f.email && !xMov.bienvenida_enviada) {
+      try {
+        const r = await correoFundacionVinculada(env, { nombre: f.nombre || "", email: f.email });
+        aviso = r && r.ok ? "correo_enviado" : "correo_fallo";
+        if (r && r.ok) await env.DB.prepare(
+          "UPDATE inscripciones SET datos = json_set(datos, '$.bienvenida_enviada', datetime('now')) WHERE id = ?"
+        ).bind(id).run();
+      } catch (e) {
+        console.error("correo bienvenida fundacion", id, e && e.message);
+        aviso = "correo_fallo";
+      }
     }
   }
 
@@ -19341,6 +19836,40 @@ document.addEventListener("click", function(e){
   }).catch(function(){ b.disabled = false; });
 });
 
+/* La lista del convenio. Desmarcar pide confirmar, como los pasos de un
+   voluntario; la nota se pide con prompt y el servidor rechaza la que traiga
+   un numero de documento. */
+document.addEventListener("click", function(e){
+  var t = e.target.closest ? e.target.closest("[data-cdoc],[data-cnota],[data-cvar]") : null;
+  if (!t) return;
+  var id, cuerpo;
+  if (t.hasAttribute("data-cvar")) {
+    id = t.getAttribute("data-cvar");
+    if (!confirm("¿Cambiar la versión del convenio? La lista de documentos cambia con ella.")) return;
+    cuerpo = { variante: t.getAttribute("data-v") };
+  } else if (t.hasAttribute("data-cnota")) {
+    id = t.getAttribute("data-cnota");
+    var n = window.prompt("Nota o enlace al Drive para este documento.\\n"
+      + "Sin números de documento ni de cuenta: solo dónde está o qué falta.\\n"
+      + "Vacío = borrar la nota.", t.getAttribute("data-nota") || "");
+    if (n === null) return;
+    cuerpo = { doc: t.getAttribute("data-doc"), nota: n };
+  } else {
+    id = t.getAttribute("data-cdoc");
+    var marca = t.getAttribute("data-marca") || "";
+    if (!marca && !confirm("¿Desmarcar? Queda en la auditoría igual.")) return;
+    cuerpo = { doc: t.getAttribute("data-doc"), marca: marca };
+  }
+  t.disabled = true;
+  fetch("/api/admin/inscripcion/" + encodeURIComponent(id) + "/convenio", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify(cuerpo)
+  }).then(conEstado).then(function(res){
+    if (fallo(res.http, res.d)){ t.disabled = false; return; }
+    cargarInscripciones(); cargarSalud();
+  }).catch(function(){ t.disabled = false; });
+});
+
 /* LA FRANJA DE CERTIFICADOS, arriba de la lista. Dice en que mundo esta la
    firma, que papel tiene quien mira y cuanto hay en cada tramo. Los ceros se
    dicen: «0 por emitir» es la respuesta a «no veo certificados». */
@@ -19741,6 +20270,7 @@ var COLA_ES = {
   apadrinamientos_sin_respuesta: "Quieren apadrinar y esperan respuesta",
   voluntarios_sin_respuesta: "Voluntarios sin responder",
   fundaciones_detenidas: "Fundaciones detenidas a mitad del proceso",
+  convenios_en_curso: "Fundaciones en convenio (documentos y firma)",
   voluntarios_detenidos: "Voluntarios aceptados que no avanzan",
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
@@ -19928,6 +20458,7 @@ var COLA_MOD = {
   apadrinamientos_sin_respuesta: "red",
   voluntarios_sin_respuesta: "red",
   fundaciones_detenidas: "red",
+  convenios_en_curso: "red",
   voluntarios_detenidos: "red",
   transferencias_sin_verificar: "dinero",
   certificados_por_emitir: "dinero",
@@ -20249,6 +20780,54 @@ function listaVoluntario(i, x){
   }).join("");
   return h + "</div>";
 }
+/* ---- el convenio de una fundacion (paso 4) ----
+   La lista del Anexo 1 llega YA ARMADA del servidor (i.convenio, de
+   DOCS_CONVENIO): este panel no tiene su propia copia de que documentos se
+   piden, porque dos copias terminan diciendo cosas distintas. */
+var PERS_ES = { nit: "Constituida (Cámara de Comercio)", tramite: "Constitución en trámite",
+                base: "Proyecto social sin registro" };
+/* Una nota que es un enlace se abre; cualquier otra cosa es texto. Mismo
+   criterio que la web de quien aplica: solo http(s). */
+function notaConv(n){
+  if (/^https?:\\/\\/\\S+$/i.test(n)) return '<a href="' + esc(n) + '" target="_blank" rel="noopener">enlace</a>';
+  return esc(n);
+}
+function listaConvenio(i){
+  var c = i.convenio;
+  if (!c) return "";
+  if (i.estado === "vinculada" && c.firmado) {
+    return '<div class="vpasos"><small>Convenio firmado el ' + esc(enCO(c.firmado.en, 10))
+      + (c.nombre_variante ? " · " + esc(c.nombre_variante) : "") + "</small></div>";
+  }
+  if (i.estado !== "convenio") return "";
+  var f = c.firmado;
+  var h = '<div class="vpasos"><small><strong>Convenio · '
+    + (c.nombre_variante ? esc(c.nombre_variante) : "versión por definir") + "</strong>"
+    + (f ? "" : ' <button class="copy" data-cvar="' + i.id + '" data-v="'
+        + (c.variante === "registradas" ? "no_registradas" : "registradas") + '">cambiar versión</button>')
+    + "<br>" + (!c.variante ? "Elige la versión para ver la lista."
+        : c.documentos_completos ? "Anexo 1 completo." : "Anexo 1: faltan " + c.faltan + " de " + c.items.length + ".")
+    + "</small>";
+  if (c.certificado_vencido) h += '<br><small style="color:var(--err);font-weight:700">El certificado llegó hace más de 30 días: pide uno nuevo antes de firmar.</small>';
+  h += (c.items || []).map(function(d){
+    var hecho = d.estado ? (d.estado === "no_aplica" ? "no aplica" : "recibido") + " " + esc(enCO(d.en, 10)) : "";
+    var b = '<div style="margin-top:2px"><button class="copy" data-cdoc="' + i.id + '" data-doc="' + esc(d.id) + '" data-marca="' + (d.estado ? "" : "recibido") + '"'
+      + (d.estado ? ' title="Lo anotó ' + esc(d.por || "?") + '"' : "") + (f ? " disabled" : "") + ">"
+      + (d.estado ? (d.estado === "no_aplica" ? "– " : "✓ ") : "○ ") + esc(d.texto)
+      + (hecho ? ' <span class="mu">· ' + hecho + "</span>" : "") + "</button>";
+    if (d.na && !d.estado && !f) b += ' <button class="copy" data-cdoc="' + i.id + '" data-doc="' + esc(d.id) + '" data-marca="no_aplica">no aplica</button>';
+    b += ' <button class="copy" data-cnota="' + i.id + '" data-doc="' + esc(d.id) + '" data-nota="' + esc(d.nota) + '">' + (d.nota ? "editar nota" : "+ nota") + "</button>";
+    if (d.nota) b += ' <small>' + notaConv(d.nota) + "</small>";
+    return b + "</div>";
+  }).join("");
+  if (c.variante) {
+    h += '<div style="margin-top:8px"><button class="copy" data-cdoc="' + i.id + '" data-doc="firmado" data-marca="' + (f ? "" : "recibido") + '"'
+      + (!f && !c.documentos_completos ? ' disabled title="Primero el Anexo 1 completo"' : "") + ">"
+      + (f ? "✓ " : "○ ") + "<strong>Convenio firmado por ambas partes</strong>"
+      + (f ? ' <span class="mu">· ' + esc(enCO(f.en, 10)) + "</span>" : "") + "</button></div>";
+  }
+  return h + "</div>";
+}
 var ESP_ING = { estructural:"Ing. estructural", civil:"Ing. civil", geotecnia:"Geotecnia",
   arquitectura:"Arquitectura", otra:"Otra especialidad" };
 
@@ -20294,9 +20873,16 @@ function resumenInscripcion(tipo, x, i){
   if (tipo === "fundacion"){
     var menor = ["cuenta: " + esc(x.conteo || "no dice")];
     if (x.programa) menor.push("programa: " + esc(x.programa));
+    /* Si esta constituida decide que version del convenio firma (paso 4), asi
+       que se ve desde el primer dia, con el NIT si lo dio. La version la
+       calcula el servidor. */
+    var cv = i && i.convenio;
+    var legal = esc(PERS_ES[x.personeria] || "constitución: no dice") + (x.nit ? " · NIT " + esc(x.nit) : "")
+      + (cv && cv.nombre_variante ? " · convenio: " + esc(cv.nombre_variante) : "");
     return esc(x.atiende || "?") + " — " +
       (x.poblacion || []).map(function(k){ return esc(POB_ES[k] || k); }).join(", ") +
-      "<br><small>" + menor.join(" · ") + "</small>";
+      "<br><small>" + menor.join(" · ") + "</small>" +
+      "<br><small>" + legal + "</small>" + (i ? listaConvenio(i) : "");
   }
   var m = (x.modalidades || []).map(function(k){ return esc(MOD_ES[k] || k); }).join(", ");
   var extra = [];
@@ -20340,7 +20926,8 @@ var ETIQ_INSC = { voluntario:"Voluntarios", fundacion:"Fundaciones", empresa:"Em
 /* LOS PLAZOS DE LA BANDEJA, los mismos de las colas de «Hoy» (adminSalud). */
 var PLAZO_INSC = { fundacion: 2, empresa: 2, apadrinamiento: 3, voluntario: 5 };
 var ESTADO_INSC_ES = { nueva: "Nueva", en_revision: "En revisión", aceptada: "Aceptada",
-                       visitada: "Visitada", archivada: "Archivada" };
+                       visitada: "Visitada", convenio: "Convenio", vinculada: "Vinculada",
+                       archivada: "Archivada" };
 function diasDesde(v){
   if (!v) return null;
   var t = Date.parse(String(v).trim().replace(" ", "T") + (/[Zz]$/.test(v) ? "" : "Z"));
@@ -20477,11 +21064,25 @@ function cargarInscripciones(){
          su proceso de cinco pasos. Ofrecerle «Visita hecha» a un voluntario
          seria inventarle un paso que no existe. */
       var esFund = i.tipo === "fundacion";
+      /* LOS PASOS 4 Y 5 SIGUEN LA MISMA REGLA: el primario aparece solo cuando
+         avanzar ya es verdad. «Iniciar convenio» pide el cuestionario ENVIADO;
+         «Marcar vinculada», la lista del Anexo 1 completa y la firma. Mientras
+         tanto no hay boton sino lo que falta, dicho en palabras. El servidor
+         comprueba lo mismo: esconder el boton no es la cerradura. */
+      var conv = i.convenio || {};
+      var fichaEnviada = i.ficha_estado === "enviada";
       var siguiente = i.estado === "nueva" ? ["en_revision","En revisión"]
                     : i.estado === "en_revision" ? ["aceptada","Aceptar"]
-                    : (i.estado === "aceptada" && esFund) ? ["visitada","Visita hecha"] : null;
+                    : (i.estado === "aceptada" && esFund) ? ["visitada","Visita hecha"]
+                    : (i.estado === "visitada" && esFund && fichaEnviada) ? ["convenio","Iniciar convenio"]
+                    : (i.estado === "convenio" && esFund && conv.completo) ? ["vinculada","Marcar vinculada"] : null;
+      var espera = (siguiente || !esFund) ? ""
+                 : i.estado === "visitada" ? "Esperando su cuestionario"
+                 : i.estado === "convenio" ? (conv.documentos_completos ? "Falta marcar la firma" : "Faltan documentos del Anexo 1")
+                 : "";
       var cerrar = i.estado === "archivada" ? ["en_revision","Reabrir"]
-                 : (i.estado === "aceptada" || i.estado === "visitada") ? ["archivada","Archivar"] : null;
+                 : (i.estado === "aceptada" || i.estado === "visitada" || i.estado === "convenio" || i.estado === "vinculada")
+                   ? ["archivada","Archivar"] : null;
       /* El enlace del cuestionario se muestra para poder reenviarlo a mano si el
          correo no llego: el token ya existe y esconderlo no lo hace mas secreto. */
       var ficha = (i.estado === "visitada" && i.token)
@@ -20489,6 +21090,11 @@ function cargarInscripciones(){
           (i.ficha_estado
             ? ' · <button class="copy" data-verficha="' + i.id + '">ver respuestas (' + esc(i.ficha_estado) + ")</button>"
             : " · sin abrir") + "</small>"
+        /* Despues de la visita el enlace ya no abre (la ficha enviada no se
+           reescribe), pero las respuestas siguen haciendo falta: de ahi sale el
+           objeto de partners.json, que es justo lo que se arma al vincular. */
+        : ((i.estado === "convenio" || i.estado === "vinculada") && i.ficha_estado)
+        ? '<br><small><button class="copy" data-verficha="' + i.id + '">ver respuestas (' + esc(i.ficha_estado) + ")</button></small>"
         : "";
       /* La web la escribe quien aplica, así que solo se vuelve enlace si es
          http(s). Una URL con esquema javascript: escapada sigue ejecutándose al
@@ -20510,7 +21116,8 @@ function cargarInscripciones(){
           (i.tipo === "ingeniero" ? "" : borradorRespuesta(i, x)) + "</td>" +
         "<td>" + esc(enCO(i.creada_en, 10)) + fechaConPlazo(i) + "</td>" +
         "<td>" + esc(ESTADO_INSC_ES[i.estado] || i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
-        "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") +
+        "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>'
+                  : espera ? '<small class="mu">' + espera + "</small>" : "—") +
           (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") +
           ficha +
           (cerrar ? '<br><small><button class="copy" data-ins="' + i.id + '" data-e="' + cerrar[0] + '">' + cerrar[1] + '</button></small>' : "") +
@@ -26403,6 +27010,8 @@ export default {
         if (ma) return await adminAvisarIngeniero(request, env, Number(ma[1]), sesion.email);
         const mpv = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/paso$/);
         if (mpv) return await adminPasoVoluntario(request, env, Number(mpv[1]), sesion.email);
+        const mcv = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/convenio$/);
+        if (mcv) return await adminConvenioFundacion(request, env, Number(mcv[1]), sesion.email);
         /* Jornadas de voluntariado (0036). Todas detras del mismo guardian, y
            las que escriben con el chequeo de Origin de arriba. */
         if (ruta === "/api/admin/jornadas") return await adminJornadas(request, env, sesion.email);

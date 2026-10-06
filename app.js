@@ -1157,11 +1157,14 @@ var I18N = {
     "ff.cargo":"Su cargo (opcional)",
     "ff.cargo.ph":"Directora y fundadora, representante legal…",
     "ff.anio":"¿Desde qué año trabaja? (opcional)",
-    "ff.pers.lbl":"¿Tiene personería jurídica?",
-    "ff.pers.help":"Cualquier respuesta sirve para aplicar. Esto no define si entra: define cómo describimos a la organización si algún día publicamos su perfil.",
-    "ff.pers.nit":"Sí, con NIT",
+    "ff.pers.lbl":"¿La fundación está constituida legalmente (registrada en Cámara de Comercio)?",
+    "ff.pers.help":"Cualquier respuesta sirve para aplicar. Esto no define si entra: define qué versión del convenio de cooperación aplica en el paso 4 y cómo describimos a la organización si algún día publicamos su perfil.",
+    "ff.pers.nit":"Sí",
     "ff.pers.tramite":"En trámite",
-    "ff.pers.base":"No — es un proyecto comunitario de base",
+    "ff.pers.base":"No — es un proyecto social sin registro",
+    "ff.nit":"NIT de la fundación (opcional)",
+    "ff.nit.ph":"900123456-8",
+    "ff.nit.help":"Como aparece en el RUT, con el dígito de verificación después del guion.",
     "ff.zona":"Barrio o sector y ciudad donde trabaja",
     "ff.zona.ph":"Ej. La Honda, Manrique, Medellín",
     "ff.zona.help":"El sector, no la dirección exacta. En el mapa de la red el pin va a nivel de barrio, nunca a la puerta.",
@@ -1212,7 +1215,8 @@ var I18N = {
     "ff.err.nombre":"Nos falta el nombre de la fundación.",
     "ff.err.email":"Revisa el correo: parece que tiene algo raro.",
     "ff.err.lider":"Cuéntanos quién lidera la fundación.",
-    "ff.err.pers":"Elige una opción de personería jurídica. Cualquiera sirve.",
+    "ff.err.pers":"Dinos si la fundación está registrada en Cámara de Comercio. Cualquier respuesta sirve.",
+    "ff.err.nit":"Ese NIT no cuadra. Escríbelo como en el RUT, con el guion y el dígito de verificación (ej. 900123456-8). Si no lo tienes a mano, déjalo vacío.",
     "ff.err.zona":"Dinos el barrio o sector y la ciudad donde trabaja.",
     "ff.err.historia":"Cuéntanos la historia de la fundación, aunque sea en pocas líneas.",
     "ff.err.mision":"Nos falta la misión.",
@@ -2004,9 +2008,9 @@ var I18N = {
     "fund.s3.t":"Visita de contexto",
     "fund.s3.p":"Nos conocemos en territorio para entender tu operación y tus necesidades reales.",
     "fund.s4.t":"Convenio de cooperación",
-    "fund.s4.p":"Formalizamos la alianza con un convenio claro — gratuito y transparente.",
+    "fund.s4.p":"Formalizamos la alianza con un convenio claro y gratuito, que se firma electrónicamente. Si la fundación está registrada, te pedimos sus documentos básicos —certificado de existencia, RUT, estatutos y cédula del representante legal—. Si es un proyecto social sin registro, hay una versión propia: cédula de quien responde, una descripción del proyecto, el aval de un tercero y evidencia del trabajo. En las dos, unas declaraciones de datos, origen de fondos y conflictos de interés.",
     "fund.s5.t":"Vinculación al HUB SOCIAL",
-    "fund.s5.p":"Tu fundación entra a la red y empieza a recibir donaciones, herramientas y acompañamiento.",
+    "fund.s5.p":"Tu fundación entra a la red y puede empezar a recibir donaciones, herramientas y acompañamiento. Su perfil se publica cuando lo autorizas. A cambio, cada entrega se documenta con su acta y cada semestre nos mandas un informe.",
     "fund.free.t":"Sin costo. Sin intermediarios opacos.",
     "fund.free.p":"Vincularte al HUB SOCIAL es y será siempre gratuito. Solo te pedimos una cosa a cambio: trazabilidad, que cada apoyo llegue documentado a quien lo necesita.",
     "ndf.chip.sector":"Niñez y adolescencia",
@@ -3972,7 +3976,7 @@ var ACT_FNS = {
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
   donarBrigada:donarBrigada, allySubmit:allySubmit, allySector:allySector,
   irAPagar:irAPagar, payCert:payCert, volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit, apSubmit:apSubmit, apQuien:apQuien,
-  fundSubmit:fundSubmit, fundOtra:fundOtra, irAFormFund:irAFormFund,
+  fundSubmit:fundSubmit, fundOtra:fundOtra, fundPers:fundPers, irAFormFund:irAFormFund,
   ingSubmit:ingSubmit, ingEsp:ingEsp,
   /* Sin estas dos, el boton de la membresia internacional no hacia NADA: la
      delegacion solo invoca funciones de esta lista, a proposito y sin eval.
@@ -6981,6 +6985,10 @@ function fundSubmit(ev){
   if (!telOk(val("ff-tel"))) return allyMal(note, "ff-tel", "form.err.tel");
   if (!val("ff-lider")) return allyMal(note, "ff-lider", "ff.err.lider");
   if (!pers) return allyMal(note, document.querySelector('input[name="ff-pers"]'), "ff.err.pers");
+  /* El NIT solo cuenta si dijo «Sí»: si cambió de opinión después de escribirlo,
+     la casilla se esconde y lo escrito no viaja. */
+  var nit = pers.value === "nit" ? val("ff-nit") : "";
+  if (nit && !nitValido(nit)) return allyMal(note, "ff-nit", "ff.err.nit");
   if (!val("ff-zona")) return allyMal(note, "ff-zona", "ff.err.zona");
   if (!val("ff-historia")) return allyMal(note, "ff-historia", "ff.err.historia");
   if (!val("ff-mision")) return allyMal(note, "ff-mision", "ff.err.mision");
@@ -6999,7 +7007,7 @@ function fundSubmit(ev){
       tipo: "fundacion",
       nombre: val("ff-nombre"), sigla: val("ff-sigla"),
       lider: val("ff-lider"), cargo: val("ff-cargo"), anio: val("ff-anio"),
-      personeria: pers.value, zona: val("ff-zona"), ciudad: val("ff-ciudad"),
+      personeria: pers.value, nit: nit, zona: val("ff-zona"), ciudad: val("ff-ciudad"),
       email: val("ff-email"), telefono: val("ff-tel"),
       historia: val("ff-historia"), mision: val("ff-mision"),
       poblacion: pob, poblacion_otra: val("ff-pob-otra"),
@@ -7011,7 +7019,7 @@ function fundSubmit(ev){
     })
   }).then(formRespuesta)
     .then(function(){
-      document.getElementById("ff").reset(); fundPobOtra();
+      document.getElementById("ff").reset(); fundPobOtra(); fundPersVer();
       btn.disabled = false;
       allyMsg(note, t("ff.ok"), true);
     })
@@ -7043,6 +7051,29 @@ function fundPobOtra(){
 }
 function fundOtra(){ setTimeout(fundPobOtra, 0); }
 
+/* El NIT aparece solo con «Sí». A una fundación en trámite o a un proyecto sin
+   registro pedírselo sería pedirle algo que no tiene. */
+function fundPersVer(){
+  var p = document.querySelector('input[name="ff-pers"]:checked');
+  var box = document.getElementById("ff-nit-box");
+  if (box) box.style.display = (p && p.value === "nit") ? "" : "none";
+}
+function fundPers(){ setTimeout(fundPersVer, 0); }
+
+/* EL NIT SE COMPRUEBA CON SU DÍGITO DE VERIFICACIÓN, el mismo cálculo de la
+   DIAN que hace `nitValido` en el servidor (quien de verdad decide). Un NIT con
+   un dígito cambiado tiene la forma correcta y es de otra entidad: con el
+   dígito se atrapa justo ese error, que es el que no se ve a ojo. */
+function nitValido(v){
+  var m = /^(\d{6,10})-(\d)$/.exec(String(v || "").replace(/[\s.]/g, ""));
+  if (!m) return false;
+  var pesos = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
+  var d = m[1].split("").reverse(), suma = 0;
+  for (var i = 0; i < d.length; i++) suma += Number(d[i]) * pesos[i];
+  var r = suma % 11;
+  return Number(m[2]) === (r > 1 ? 11 - r : r);
+}
+
 /* ---------- lo que responde el servidor, dicho en palabras ----------
    Antes, CUALQUIER respuesta que no fuera 200 decía «no pudimos enviar, intenta
    de nuevo». Para el tope de envíos (429) eso es exactamente el consejo
@@ -7067,6 +7098,7 @@ var FF_ERRS = {
   email_invalido: ["#ff-email", "ff.err.email"],
   lider_requerido: ["#ff-lider", "ff.err.lider"],
   personeria_requerida: ['input[name="ff-pers"]', "ff.err.pers"],
+  nit_invalido: ["#ff-nit", "ff.err.nit"],
   zona_requerida: ["#ff-zona", "ff.err.zona"],
   historia_requerida: ["#ff-historia", "ff.err.historia"],
   mision_requerida: ["#ff-mision", "ff.err.mision"],

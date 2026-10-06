@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=45bb713a" defer></script>
+<script src="/app.js?v=e0dc6648" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -547,8 +547,8 @@
         <div class="step"><div class="step-n">1</div><div><h3 data-i18n="fund.s1.t">Aplicas</h3><p data-i18n="fund.s1.p">Completas el formulario con la información de tu fundación. Toma 10–15 minutos.</p></div></div>
         <div class="step"><div class="step-n">2</div><div><h3 data-i18n="fund.s2.t">Revisamos</h3><p data-i18n="fund.s2.p">Estudiamos tu información y verificamos tu trabajo en campo.</p></div></div>
         <div class="step"><div class="step-n">3</div><div><h3 data-i18n="fund.s3.t">Visita de contexto</h3><p data-i18n="fund.s3.p">Nos conocemos en territorio para entender tu operación y tus necesidades reales.</p></div></div>
-        <div class="step"><div class="step-n">4</div><div><h3 data-i18n="fund.s4.t">Convenio de cooperación</h3><p data-i18n="fund.s4.p">Formalizamos la alianza con un convenio claro — gratuito y transparente.</p></div></div>
-        <div class="step"><div class="step-n">5</div><div><h3 data-i18n="fund.s5.t">Vinculación al HUB SOCIAL</h3><p data-i18n="fund.s5.p">Tu fundación entra a la red y empieza a recibir donaciones, herramientas y acompañamiento.</p></div></div>
+        <div class="step"><div class="step-n">4</div><div><h3 data-i18n="fund.s4.t">Convenio de cooperación</h3><p data-i18n="fund.s4.p">Formalizamos la alianza con un convenio claro y gratuito, que se firma electrónicamente. Si la fundación está registrada, te pedimos sus documentos básicos —certificado de existencia, RUT, estatutos y cédula del representante legal—. Si es un proyecto social sin registro, hay una versión propia: cédula de quien responde, una descripción del proyecto, el aval de un tercero y evidencia del trabajo. En las dos, unas declaraciones de datos, origen de fondos y conflictos de interés.</p></div></div>
+        <div class="step"><div class="step-n">5</div><div><h3 data-i18n="fund.s5.t">Vinculación al HUB SOCIAL</h3><p data-i18n="fund.s5.p">Tu fundación entra a la red y puede empezar a recibir donaciones, herramientas y acompañamiento. Su perfil se publica cuando lo autorizas. A cambio, cada entrega se documenta con su acta y cada semestre nos mandas un informe.</p></div></div>
       </div>
     </div>
   </section>
@@ -603,11 +603,15 @@
         </div>
 
         <fieldset class="vf-set">
-          <legend data-i18n="ff.pers.lbl">¿Tiene personería jurídica?</legend>
-          <p class="vf-help" data-i18n="ff.pers.help">Cualquier respuesta sirve para aplicar. Esto no define si entra: define cómo describimos a la organización si algún día publicamos su perfil.</p>
-          <label class="ally-check"><input type="radio" name="ff-pers" value="nit"><span data-i18n="ff.pers.nit">Sí, con NIT</span></label>
-          <label class="ally-check"><input type="radio" name="ff-pers" value="tramite"><span data-i18n="ff.pers.tramite">En trámite</span></label>
-          <label class="ally-check"><input type="radio" name="ff-pers" value="base"><span data-i18n="ff.pers.base">No — es un proyecto comunitario de base</span></label>
+          <legend data-i18n="ff.pers.lbl">¿La fundación está constituida legalmente (registrada en Cámara de Comercio)?</legend>
+          <p class="vf-help" data-i18n="ff.pers.help">Cualquier respuesta sirve para aplicar. Esto no define si entra: define qué versión del convenio de cooperación aplica en el paso 4 y cómo describimos a la organización si algún día publicamos su perfil.</p>
+          <label class="ally-check" data-act="fundPers()"><input type="radio" name="ff-pers" value="nit"><span data-i18n="ff.pers.nit">Sí</span></label>
+          <label class="ally-check" data-act="fundPers()"><input type="radio" name="ff-pers" value="base"><span data-i18n="ff.pers.base">No — es un proyecto social sin registro</span></label>
+          <label class="ally-check" data-act="fundPers()"><input type="radio" name="ff-pers" value="tramite"><span data-i18n="ff.pers.tramite">En trámite</span></label>
+          <div class="field" id="ff-nit-box" style="display:none;margin-top:12px">
+            <label for="ff-nit" data-i18n="ff.nit">NIT de la fundación (opcional)</label>
+            <input type="text" id="ff-nit" maxlength="20" autocomplete="off" data-i18n="ff.nit.ph" data-i18n-attr="placeholder" placeholder="900123456-8">
+            <small class="vf-help" data-i18n="ff.nit.help">Como aparece en el RUT, con el dígito de verificación después del guion.</small></div>
         </fieldset>
 
         <h3 class="ally-sec" data-i18n="ff.s.hist">Qué hace y por qué</h3>
