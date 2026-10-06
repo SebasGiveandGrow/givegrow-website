@@ -17115,7 +17115,9 @@ async function correoCodigoConvenio(env, ctx, F, codigo, sha) {
   ];
   return enviarCorreo(env, {
     para: ctx.email,
-    asunto: "Código para firmar: " + codigo,
+    /* El codigo NO va en el asunto: el asunto queda escrito en `correos`, y un
+       codigo legible ahi dejaria de ser algo que solo tiene quien lee el correo. */
+    asunto: "Tu código para firmar el convenio del HUB SOCIAL",
     texto: [titulo, "", ...parrafos, "", "Huella de lo que vas a firmar: " + sha.slice(0, 16)].join("\n"),
     html: plantillaCorreo({ titulo, parrafos, filas: [["Documento", CONVENIO_FORMULARIOS[F].titulo],
       ["Huella de lo que vas a firmar", sha.slice(0, 16)]] }),
@@ -17369,7 +17371,7 @@ function paginaConvenio(ctx, nonce) {
   const v = ctx.variante;
   const campoHTML = (c) => {
     const base = "c-" + c.f + "-" + c.id;
-    const req = (c.req || c.todas) && !c.si ? ' <span class="req" aria-hidden="true">*</span>' : "";
+    const req = c.req || c.todas ? ' <span class="req" aria-hidden="true">*</span>' : "";
     const ayuda = c.ayuda ? '<small class="ayuda">' + esc(c.ayuda) + "</small>" : "";
     const grupo = c.tipo === "casillas" || (c.tipo === "opcion" && c.ops.length <= 3);
     const cab = '<div class="num">' + esc(c.f + " · " + c.num) + "</div>" +
@@ -17673,7 +17675,7 @@ function bloquear(F, firmado){
   if (ok && firmado){
     ok.hidden = false;
     ok.innerHTML = "<strong>Firmado</strong> por " + esc(firmado.nombre) + " (" + esc(firmado.calidad) + ") el " + esc(enCO(firmado.en)) +
-      ". Huella: <code>" + esc(firmado.huella) + "</code>. Te enviamos el comprobante en PDF; ya no se puede cambiar.";
+      " · huella <code>" + esc(firmado.huella) + "</code>. Te enviamos el comprobante en PDF; ya no se puede cambiar.";
   }
 }
 
@@ -17825,21 +17827,19 @@ function firmar(F, b){
 }
 
 var MAX = 10 * 1024 * 1024;
-function subir(doc, archivo, nota){
-  if (archivo.size > MAX){
-    nota.className = "subenota mal"; nota.textContent = "«" + archivo.name + "» pasa de 10 MB. Comprímelo o tómale una foto.";
-    return Promise.resolve(false);
-  }
+/* Devuelve "" si subio, o la razon si no. Con varios archivos a la vez, cada
+   uno dice lo suyo con su nombre: un «subido» del ultimo no puede tapar que el
+   primero se rechazo. */
+function subir(doc, archivo){
+  if (archivo.size > MAX) return Promise.resolve("pasa de 10 MB. Comprímelo o tómale una foto.");
   return post("/archivo/" + doc, archivo, archivo.type || "application/octet-stream").then(function(res){
     var j = res.j || {};
-    if (j.ok){ nota.className = "subenota ok"; nota.textContent = "Subido."; return true; }
-    nota.className = "subenota mal";
-    nota.textContent = j.error === "archivo_muy_grande" ? "Ese archivo pasa de 10 MB."
-      : j.error === "archivo_no_coincide" ? (j.ayuda || "Ese archivo no es un PDF, JPG o PNG.")
-      : j.error === "tope_alcanzado" ? "Ya subiste el máximo para este documento."
-      : (j.ayuda || "No se pudo subir. Intenta de nuevo.");
-    return false;
-  }).catch(function(){ nota.className = "subenota mal"; nota.textContent = "No se pudo subir. Revisa tu conexión."; return false; });
+    if (j.ok) return "";
+    return j.error === "archivo_muy_grande" ? "pasa de 10 MB."
+      : j.error === "archivo_no_coincide" ? "no es un PDF, JPG o PNG de verdad. Expórtalo de nuevo o tómale una foto."
+      : j.error === "tope_alcanzado" ? "ya subiste el máximo para este documento."
+      : (j.ayuda || "no se pudo subir. Intenta de nuevo.");
+  }).catch(function(){ return "no se pudo subir. Revisa tu conexión."; });
 }
 
 document.addEventListener("change", function(ev){
@@ -17851,8 +17851,15 @@ document.addEventListener("change", function(ev){
     var lista = [].slice.call(t.files || []);
     if (!lista.length) return;
     nota.className = "subenota"; nota.textContent = "Subiendo…";
-    lista.reduce(function(c, f){ return c.then(function(){ return subir(doc, f, nota); }); }, Promise.resolve())
-      .then(function(){ t.value = ""; return cargar(false); });
+    var malos = [], bien = 0;
+    lista.reduce(function(c, f){
+      return c.then(function(){ return subir(doc, f).then(function(m){ if (m) malos.push("«" + f.name + "» " + m); else bien++; }); });
+    }, Promise.resolve()).then(function(){
+      nota.className = "subenota " + (malos.length ? "mal" : "ok");
+      nota.textContent = (bien ? (bien === 1 ? "1 archivo subido. " : bien + " archivos subidos. ") : "") + malos.join(" ");
+      t.value = "";
+      return cargar(false);
+    });
     return;
   }
   var form = t.closest ? t.closest("form[data-form]") : null;

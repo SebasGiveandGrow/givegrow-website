@@ -1828,6 +1828,9 @@ export async function comprobanteFirmaConvenio(c) {
   }
 
   h.salto(10);
+  /* El bloque de la firma no se parte entre dos hojas: medido, quedaba el
+     firmante al pie de una y su documento y su huella en la siguiente. */
+  h.reservar(230);
   h.cintillo("Firma electrónica", { tam: 7.5, despues: 10 });
   h.regla({ despues: 6 });
   h.fila("Firmante", c.firmante.nombre);
