@@ -1001,7 +1001,10 @@ const CORREO_RESERVA_PERSONAS = 25;
    Escalones con el tope en 95: internos hasta 70, personas hasta 80, y estas
    tres hasta 95. */
 const CORREO_RESERVA_PRIORITARIAS = 15;
-const CORREO_PRIORITARIAS = ["aporte-aprobado", "certificado", "caso-creado"];
+/* El codigo para firmar el convenio (0038) entra con ellas: vale 15 minutos, y
+   quedarse sin el porque el cupo se lo comieron otros correos deja a alguien a
+   mitad de una firma. Son pocos por naturaleza (uno por documento firmado). */
+const CORREO_PRIORITARIAS = ["aporte-aprobado", "certificado", "caso-creado", "fundacion-convenio-codigo"];
 
 async function cupoDeCorreo(env, para, etiqueta) {
   if (!env.DB) return { hay: true };
