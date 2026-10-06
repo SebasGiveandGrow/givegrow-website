@@ -178,7 +178,7 @@ const workerSrc = readFileSync("worker.js", "utf8");
    invertidas dentro de la plantilla y saltos de linea sin escapar—. Al escribir
    `fichaJS` pise la primera otra vez, en un comentario; el gate la caza SOLO si
    la funcion esta en esta lista. */
-for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"], ["rutaJS()", "rutaJS"], ["inspeccionJS()", "inspeccionJS"], ["inspeccionSW()", "inspeccionSW"], ["fichaJS()", "fichaJS"]]) {
+for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"], ["rutaJS()", "rutaJS"], ["inspeccionJS()", "inspeccionJS"], ["inspeccionSW()", "inspeccionSW"], ["fichaJS()", "fichaJS"], ["convenioJS()", "convenioJS"]]) {
   try {
     const i = workerSrc.indexOf("function " + fn + "()");
     if (i === -1) throw new Error("no se encontró " + nombre);
@@ -912,9 +912,9 @@ if (tagsOk) ok("balance de tags (" + tagsVistas + " etiquetas vigiladas)");
    añadir una decima sin registrarla SUSPENDE. */
 const PLANTILLAS = [
   "plantillaCorreo", "paginaTriage", "inspeccionHTML", "paginaFirma",
-  "paginaCarnet", "paginaFicha", "paginaRuta", "paginaAdmin", "sharePage",
+  "paginaCarnet", "paginaFicha", "paginaConvenio", "paginaRuta", "paginaAdmin", "sharePage",
   /* Vive DENTRO de la plantilla de adminJS: es el popup que abre el panel. */
-  "verFicha"
+  "verFicha", "verConvenio"
 ];
 try {
   /* `<!doctype` dentro de comillas invertidas, recorriendo con estado. */
@@ -1442,6 +1442,8 @@ try {
        FIRMA, que es la mas nueva del sistema y donde un `data-*` que nadie lee
        significa un boton que no firma y no avisa. */
     { nombre: "ficha", html: plantilla("paginaFicha"), js: plantilla("fichaJS") },
+    /* El convenio en linea (0038): la pantalla donde se firma. */
+    { nombre: "convenio", html: plantilla("paginaConvenio"), js: plantilla("convenioJS") },
     { nombre: "firma", html: plantilla("paginaFirma"), js: plantilla("firmaJS") }
   ];
 
