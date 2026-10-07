@@ -52,7 +52,9 @@ html_handling = "auto-trailing-slash"
 # herramienta no dejo, con razon.
 # `/encuesta/*` (la encuesta de las jornadas de voluntariado, migracion 0036)
 # entra el mismo dia que la pagina, por la misma leccion de `/pago/*`.
-run_worker_first = ["/", "/gracias", "/gracias/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest", "/pago/*", "/membresia", "/membresia/*", "/encuesta/*", "/convenio/*"]
+# `/socialfest` (el QR impreso de Social Fest 2026) entra igual, el mismo dia
+# que su redireccion: con y sin barra, y con la mayuscula de la diapositiva.
+run_worker_first = ["/", "/gracias", "/gracias/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest", "/pago/*", "/membresia", "/membresia/*", "/encuesta/*", "/convenio/*", "/socialfest", "/socialfest/", "/SocialFest"]
 
 # ---------------------------------------------------------------------------
 # LA ÚNICA TAREA PROGRAMADA DEL WORKER, y la primera que tiene.

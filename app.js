@@ -2030,6 +2030,58 @@ var I18N = {
     "ficha.gal.next":"Fotografía siguiente",
     "ficha.share":"Compartir ficha",
     "ficha.share.copied":"Enlace copiado",
+    /* Social Fest 2026 (#socialfest): la página del QR. */
+    "sf.ey":"Social Fest 2026 · Ruta N, Medellín",
+    "sf.t":"Aquí nadie viene a mirar.",
+    "sf.lead":"Somos Give&Grow, una fundación de Medellín que une a empresas, personas y fundaciones de base para que cada apoyo llegue a quien lo necesita y quede documentado.",
+    "sf.p.emp.k":"Soy empresa",
+    "sf.p.emp.d":"Un piloto de Impact Journey con tu equipo: ida y vuelta, sin costo.",
+    "sf.p.red.k":"Soy fundación o profesional",
+    "sf.p.red.d":"Suma tu fundación al HUB SOCIAL o dona horas de tu oficio.",
+    "sf.emp.ey":"Para empresas · Impact Journey",
+    "sf.emp.t":"Voluntariado en doble vía.",
+    "sf.emp.lead":"Te proponemos un piloto con tu equipo, con la ida y la vuelta. Ya hicimos jornadas con donantes individuales; con un equipo de empresa sería de las primeras, y la participación no tiene costo.",
+    "sf.ida.k":"La ida",
+    "sf.ida.t":"Tu equipo va a una fundación del HUB SOCIAL",
+    "sf.ida.p":"Trabaja junto a su comunidad, en su territorio, en una jornada que la fundación define con nosotros.",
+    "sf.vuelta.k":"La vuelta · el corazón",
+    "sf.vuelta.t":"Esa comunidad viene a tu empresa",
+    "sf.vuelta.p":"Los niños, niñas, jóvenes y familias de la fundación ven cómo se trabaja ahí: qué hace cada área, qué estudió cada persona y qué camino lleva a cada cargo.",
+    "sf.pone.t":"Qué pone tu empresa",
+    "sf.pone.1":"El tiempo de tu equipo, para la ida.",
+    "sf.pone.2":"Las puertas abiertas, para la vuelta: personas de distintas áreas dispuestas a contar su camino.",
+    "sf.pone.3":"La logística que acordemos juntos.",
+    "sf.f.t":"Déjanos tus datos y te escribimos",
+    "sf.f.razon":"Empresa",
+    "sf.f.nombre":"Tu nombre",
+    "sf.f.cargo":"Tu cargo (opcional)",
+    "sf.f.correo":"Correo",
+    "sf.f.tel":"Celular o WhatsApp",
+    "sf.f.int":"¿Qué les interesa? (opcional)",
+    "sf.f.int.journey":"Impact Journey (piloto)",
+    "sf.f.int.alianza":"Alianza",
+    "sf.f.int.donacion":"Donación",
+    "sf.datos":"Autorizo el tratamiento de estos datos para que Give&Grow me contacte sobre Impact Journey, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.",
+    "sf.f.submit":"Enviar mis datos",
+    "sf.f.legal":"Enviar esto no te compromete a nada: es el comienzo de una conversación.",
+    "sf.f.sending":"Enviando…",
+    "sf.f.ok":"Listo. Te llegó un correo con lo que sigue — nos vemos en el pasillo.",
+    "sf.err.razon":"Nos falta el nombre de la empresa.",
+    "sf.err.nombre":"Nos falta tu nombre.",
+    "sf.err.email":"Revisa el correo: parece que tiene algo raro.",
+    "sf.err.datos":"Para enviar, marca la autorización de datos.",
+    "sf.err.send":"No pudimos enviar tus datos. Inténtalo de nuevo en un momento.",
+    "sf.red.ey":"Para fundaciones y profesionales",
+    "sf.red.t":"La evidencia no se construye sola.",
+    "sf.red.lead":"Si vienes del taller «Si no quedó documentado, no ocurrió», estas son las dos formas de seguir.",
+    "sf.red.f.tag":"Fundaciones",
+    "sf.red.f.t":"Tu fundación en el HUB SOCIAL",
+    "sf.red.f.p":"Aplicar es gratis y es solo texto. Después vienen la revisión, una visita de contexto y, si encajamos, el convenio de cooperación.",
+    "sf.red.f.btn":"Aplicar al HUB SOCIAL",
+    "sf.red.p.tag":"Profesionales",
+    "sf.red.p.t":"Tus horas profesionales",
+    "sf.red.p.p":"Derecho, contabilidad, diseño, desarrollo, comunicación o formación: tu oficio, desde la sede, sostiene la red que hace posible todo lo demás.",
+    "sf.red.p.btn":"Ofrecer mis horas",
   }
 };
 
@@ -2073,6 +2125,7 @@ var ROUTE_META = {
   "mi-aporte":{t:{es:"Mi aporte · Give&Grow International",en:"My giving · Give&Grow International"},d:{es:"Lo de quien ya donó, en un solo lugar: rastrea tu donación con su número de guía, recibe el enlace a tu membresía y entérate de cómo se pide el certificado de donación.",en:"Everything for people who have already given, in one place: track your donation with its tracking number, get the link to your membership and find out how to request your donation certificate."}},
   gracias:{t:{es:"Gracias por tu aporte · Give&Grow International",en:"Thank you for your gift · Give&Grow International"},d:{es:"Recibimos tu aporte y lo estamos confirmando. Guarda tu número de guía: con él puedes seguirlo hasta la entrega.",en:"We received your gift and we are confirming it. Keep your tracking number: it lets you follow the gift through to delivery."}},
   aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
+  socialfest:{t:{es:"Social Fest 2026 · Give&Grow International",en:"Social Fest 2026 · Give&Grow International"},d:{es:"Impact Journey para empresas —voluntariado en doble vía, piloto sin costo— y el HUB SOCIAL para fundaciones y profesionales. Give&Grow en Social Fest 2026, Ruta N, Medellín.",en:"Impact Journey for companies —two-way volunteering, a free pilot— and the HUB SOCIAL for foundations and professionals. Give&Grow at Social Fest 2026, Ruta N, Medellín."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
 };
 function mmcTitulo(){
@@ -3986,6 +4039,7 @@ var ACT_FNS = {
   mcEnviar:mcEnviar,
   irAVoluntariadoBrigada:irAVoluntariadoBrigada,
   volEdad:volEdad, volIrForm:volIrForm, irAAliadosVoluntariado:irAAliadosVoluntariado,
+  sfIr:sfIr, sfFund:sfFund, sfPro:sfPro, sfSubmit:sfSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
@@ -4063,6 +4117,7 @@ function go(id, fromPop){
   renderJourney(id);
   if (id==="impacto") initGallery();
   if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); }
+  if (id==="socialfest") marcarOrigenEvento("socialfest-2026");
   if (id==="transparencia") pintarFechaImpresion();
   if (id==="caso" && MC.caso) mcPinta();
   if (id==="casas") bcPinta();
@@ -6941,6 +6996,8 @@ function allySubmit(ev){
     /* El honeypot viaja también al servidor, que descarta si `web2` llega
        lleno: el atajo de arriba solo cubre a quien ejecuta este script. */
     web2: val("ally-website2"),
+    /* Si la pestaña pasó por la página de un evento (Social Fest). */
+    origen: origenEvento(),
     tipo:"empresa", idioma: lang === "en" ? "en" : "es"
   };
   btn.disabled = true;
@@ -7014,6 +7071,8 @@ function fundSubmit(ev){
       atiende: val("ff-atiende"), conteo: val("ff-conteo"),
       programa: val("ff-prog"), programa_desc: val("ff-prog-desc"), evidencia: val("ff-evid"),
       web: val("ff-web"), instagram: val("ff-instagram"),
+      /* Si la pestaña pasó por la página de un evento (Social Fest). */
+      origen: origenEvento(),
       autoriza_datos: true, declara_veraz: true,
       idioma: lang === "en" ? "en" : "es"
     })
@@ -7413,6 +7472,88 @@ function volIrForm(nivel){
   if (primero) setTimeout(function(){ primero.focus({ preventScroll: true }); }, suave ? 500 : 0);
 }
 
+/* ---------- SOCIAL FEST 2026 (#socialfest) ----------
+   EL ORIGEN VIAJA EN LA PESTAÑA. Quien escanea el QR aterriza aquí, y de aquí
+   puede seguir a #fundaciones o a #voluntariado, que son formularios de todo el
+   año. Para que esas inscripciones lleguen al panel marcadas como del evento,
+   pasar por esta página deja el origen en `sessionStorage`: dura lo que dura la
+   pestaña —el rato del evento— y no se queda en el teléfono para siempre como
+   lo haría `localStorage`. Si el navegador no deja guardar (modo privado
+   estricto), se recuerda en memoria mientras la página siga abierta.
+   La PUERTA no se guarda: la decide el servidor según el formulario que llega,
+   que es lo que de verdad dice por dónde entró la persona. */
+var ORIGEN_EVENTO = "";
+function marcarOrigenEvento(o){
+  ORIGEN_EVENTO = o;
+  try { sessionStorage.setItem("gg-origen", o); } catch (e) { /* queda en memoria */ }
+}
+function origenEvento(){
+  try { return sessionStorage.getItem("gg-origen") || ORIGEN_EVENTO || ""; }
+  catch (e) { return ORIGEN_EVENTO || ""; }
+}
+/* Las dos puertas bajan a su bloque. No son anclas `#sf-empresa`: el hash se
+   resolvería como ruta y daría 404 (la misma razón de irAFormFund). */
+function sfIr(cual){
+  var s = document.getElementById(cual === "empresa" ? "sf-empresa" : "sf-red");
+  if (!s) return;
+  var suave = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  s.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+  if (cual === "empresa"){
+    var p = document.getElementById("sf-razon");
+    if (p) setTimeout(function(){ p.focus({ preventScroll: true }); }, suave ? 500 : 0);
+  }
+}
+function sfFund(){ irAFormFund(); }
+/* Las horas profesionales son la puerta «Administrativo» de #voluntariado. */
+function sfPro(){ volIrForm("estructura"); }
+
+var SF_ERRS = {
+  razon_requerida: ["#sf-razon", "sf.err.razon"],
+  contacto_requerido: ["#sf-nombre", "sf.err.nombre"],
+  telefono_requerido: ["#sf-tel", "form.err.tel"],
+  email_invalido: ["#sf-correo", "sf.err.email"],
+  autorizacion_requerida: ["#sf-datos", "sf.err.datos"]
+};
+/* El formulario CORTO de empresa: cinco datos y el interés. Entra por
+   /api/inscripcion como `empresa` con `formato: "evento"` — ver apiLeadEmpresa
+   en worker.js. El origen va siempre: este formulario solo existe en la
+   página del evento. */
+function sfSubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("sf-note");
+  var btn = document.getElementById("sf-btn");
+  var val = function(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
+
+  if (val("sf-web2")){ document.getElementById("sf").reset(); return allyMsg(note, t("sf.f.ok"), true); }
+  if (!val("sf-razon")) return allyMal(note, "sf-razon", "sf.err.razon");
+  if (!val("sf-nombre")) return allyMal(note, "sf-nombre", "sf.err.nombre");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("sf-correo"))) return allyMal(note, "sf-correo", "sf.err.email");
+  if (!telOk(val("sf-tel"))) return allyMal(note, "sf-tel", "form.err.tel");
+  if (!chk("sf-datos")) return allyMal(note, "sf-datos", "sf.err.datos");
+
+  var interes = [].slice.call(document.querySelectorAll('input[name="sf-int"]:checked'))
+    .map(function(e){ return e.value; });
+  btn.disabled = true;
+  allyMsg(note, t("sf.f.sending"), true);
+  fetch("/api/inscripcion", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tipo: "empresa", formato: "evento",
+      origen: origenEvento() || "socialfest-2026",
+      razon: val("sf-razon"), contacto: val("sf-nombre"), cargo: val("sf-cargo"),
+      correo: val("sf-correo"), telefono: val("sf-tel"),
+      interes: interes, autDatos: true,
+      web2: val("sf-web2"),
+      idioma: lang === "en" ? "en" : "es"
+    })
+  }).then(formRespuesta)
+    .then(function(){ document.getElementById("sf").reset(); btn.disabled = false; allyMsg(note, t("sf.f.ok"), true); })
+    .catch(function(err){ btn.disabled = false; formFallo(note, err, SF_ERRS, "sf.err.send"); });
+  return false;
+}
+
 /* Impact Journey es voluntariado de EMPRESA: su puerta es el formulario de
    alianza, con «Voluntariado corporativo» ya marcado. */
 function irAAliadosVoluntariado(){
@@ -7473,7 +7614,8 @@ function volSubmit(ev){
       acudiente_contacto: menor ? val("vf-acu-contacto") : "",
       acudiente_modo: menor && acuModo ? acuModo.value : "",
       acudiente_sabe: menor ? chk("vf-acu-sabe") : false,
-      origen: VOL_ORIGEN || "",
+      /* La brigada manda sobre el evento: es la urgencia de la que viene. */
+      origen: VOL_ORIGEN || origenEvento(),
       autoriza_datos: true,
       web2: val("vf-web2"),
       idioma: (typeof lang !== "undefined" && lang === "en") ? "en" : "es"

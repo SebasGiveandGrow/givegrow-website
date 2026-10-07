@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "983f8f8e";
+const STYLES_V = "b8b70cf6";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -2023,6 +2023,29 @@ function telefonoContacto(v) {
 }
 const AYUDA_TEL = "Déjanos un celular o WhatsApp: es por donde te escribimos más rápido.";
 
+/* LOS EVENTOS DE LOS QUE PUEDE VENIR UNA INSCRIPCIÓN, con su nombre legible.
+   ----------------------------------------------------------------------------
+   Nació con Social Fest 2026 (Ruta N, 14–15 oct): un QR en un pasillo lleva a
+   `/socialfest`, y de ahí la persona puede acabar en cualquiera de tres
+   formularios —el corto de empresa, el de fundaciones o el de voluntariado—.
+   Sin una marca común, después del evento no habría forma de saber qué salió
+   de él, que es lo único que dice si valió la pena ir.
+
+   LISTA CERRADA A PROPÓSITO. El navegador manda el origen (lo guarda en la
+   pestaña al pasar por la página del evento), y un campo libre que llega de un
+   formulario público es un campo que cualquiera llena con lo que quiera. Aquí
+   solo cuenta lo que esté escrito en esta lista; lo demás se descarta.
+
+   VA EN EL JSON DE `datos`, como `origen` y `puerta`, sin migración: es lo
+   mismo que ya hacía `origen` en el voluntariado para la brigada. La PUERTA la
+   pone el servidor según el formulario que llegó —empresa, fundacion,
+   profesional—, no el navegador. */
+const ORIGENES_EVENTO = { "socialfest-2026": "Social Fest 2026" };
+function origenEvento(c, puerta) {
+  const o = String((c && c.origen) || "").trim();
+  return ORIGENES_EVENTO[o] ? { origen: o, puerta } : {};
+}
+
 async function apiInscripcion(request, env, url) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
 
@@ -2098,7 +2121,10 @@ async function apiInscripcion(request, env, url) {
   if (c.tipo === "especie")   return await apiOfrecimiento(env, c);
   if (c.tipo === "ingeniero") return await apiIngeniero(env, c);
   if (c.tipo === "apadrinamiento") return await apiApadrinamiento(env, c);
-  if (c.tipo === "empresa")   return await apiAliado(env, c);
+  /* La empresa que llega por el QR de un evento entra por la MISMA puerta y a
+     la misma tabla, pero con el formulario corto: cinco datos en un pasillo, no
+     las doce casillas del de alianza. Ver `apiLeadEmpresa`. */
+  if (c.tipo === "empresa")   return c.formato === "evento" ? await apiLeadEmpresa(env, c) : await apiAliado(env, c);
   if (c.tipo === "fundacion") return await apiFundacion(env, c);
 
   const tipo = c.tipo === "voluntario" ? "voluntario" : null;
@@ -2156,6 +2182,11 @@ async function apiInscripcion(request, env, url) {
        la brigada llega indistinguible de quien se apunta al programa de todo el
        año, y son dos conversaciones distintas con dos urgencias distintas. */
     origen: limpio(c.origen, 60),
+    /* Si el origen es un EVENTO (Social Fest), se anota además por qué puerta
+       del evento entró. La decide el servidor y no el navegador: quien llega a
+       este formulario desde el evento ofreció sus horas, así que es la puerta
+       «profesional», venga de donde venga el clic. */
+    ...(ORIGENES_EVENTO[String(c.origen || "").trim()] ? { puerta: "profesional" } : {}),
     idioma: c.idioma === "en" ? "en" : "es"
   };
 
@@ -2242,7 +2273,9 @@ async function correoAvisoInscripcion(env, v) {
     ["Nombre", v.nombre],
     ["Correo", v.email],
     ["Teléfono", v.telefono || "(no dejó)"],
-    ...(v.origen ? [["Viene de", "la campaña " + v.origen + " — responder con esa urgencia"]] : []),
+    ...(v.origen ? [["Viene de", ORIGENES_EVENTO[v.origen]
+      ? ORIGENES_EVENTO[v.origen] + " — ofreció horas profesionales desde la página del evento"
+      : "la campaña " + v.origen + " — responder con esa urgencia"]] : []),
     ["Nivel", nivel],
     ["Oficio", v.oficio],
     ["Disponibilidad", v.disponibilidad || "(no dijo)"],
@@ -13456,6 +13489,9 @@ async function apiAliado(env, c) {
     benRedime: limpio(c.benRedime, 200),
     servDetalle,
     autMarca: !!c.autMarca, autDatos: true, autLicitud: true,
+    /* La empresa que pasó por la página de un evento y prefirió el formulario
+       completo sigue contando como del evento. */
+    ...origenEvento(c, "empresa"),
     idioma: c.idioma === "en" ? "en" : "es"
   };
 
@@ -13556,7 +13592,8 @@ async function correoAvisoAliado(env, a) {
     ["Web", a.web || "—"],
     ["Instagram", a.instagram || "—"],
     ["Modalidades", (a.modalidades || []).map(k => ETIQUETA_MOD.es[k] || k).join(", ")],
-    ["Uso de marca", a.autMarca ? "Autorizado" : "NO autorizado — aporte anónimo: no publicar nombre ni logo"]
+    ["Uso de marca", a.autMarca ? "Autorizado" : "NO autorizado — aporte anónimo: no publicar nombre ni logo"],
+    ...(a.origen ? [["Viene de", (ORIGENES_EVENTO[a.origen] || a.origen) + " — pasó por la página del evento"]] : [])
   ];
   if (a.benBeneficio) {
     filas.push(["Beneficio ofrecido", a.benBeneficio]);
@@ -13580,6 +13617,156 @@ async function correoAvisoAliado(env, a) {
       ].filter(Boolean),
       filas,
       cierre: "Está en el panel, en solicitudes por revisar. El Convenio Marco lo envías tú."
+    }),
+    etiqueta: "aviso-aliado"
+  });
+}
+
+/* ========================================================================
+   La empresa que llega por el QR de un evento  ·  tipo "empresa", formato "evento"
+   ========================================================================
+   Nació para Social Fest 2026 (Ruta N, 14–15 oct). Allá Give&Grow le propone
+   a las empresas un PILOTO de Impact Journey —ida a una fundación del HUB y
+   vuelta de esa comunidad a la empresa—, y quien se interesa lo hace con el
+   teléfono en la mano, de pie en un pasillo. El formulario de alianza pide
+   doce cosas (NIT, representante, modalidades, licitud…) que nadie va a
+   escribir ahí, y que tampoco hacen falta para lo único que sigue: una
+   conversación.
+
+   Así que este es el formulario CORTO: empresa, nombre, cargo, correo,
+   celular, y qué les interesa. MISMA TABLA y MISMO TIPO que la alianza, a
+   propósito: en el panel cae en la bandeja de empresas, con su plazo de dos
+   días, y si la conversación avanza los datos del convenio se piden después,
+   igual que la cédula y la dirección desde el 29 sep 2026.
+
+   QUÉ NO PIDE, Y POR QUÉ: la declaración de licitud de los recursos va con
+   un aporte, y aquí todavía no hay ninguno; la autorización de marca va con
+   publicar, y de aquí no se publica nada. Lo que sí es condición para
+   guardar es la de datos: Ley 1581, igual que en todas las puertas. */
+
+const INTERESES_LEAD = ["journey", "alianza", "donacion"];
+const ETIQUETA_INTERES = {
+  es: { journey: "Impact Journey (piloto)", alianza: "Alianza", donacion: "Donación" },
+  en: { journey: "Impact Journey (pilot)", alianza: "Partnership", donacion: "Donation" }
+};
+
+async function apiLeadEmpresa(env, c) {
+  const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const razon    = limpio(c.razon, 160);
+  const contacto = limpio(c.contacto, 120);
+  const email    = limpio(c.correo, 200);
+
+  if (!razon) return json({ error: "razon_requerida" }, 400);
+  if (!contacto) return json({ error: "contacto_requerido" }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  if (!c.autDatos) return json({ error: "autorizacion_requerida" }, 400);
+
+  const interes = Array.isArray(c.interes)
+    ? INTERESES_LEAD.filter(k => c.interes.includes(k)) : [];
+
+  const datos = {
+    formato: "evento",
+    contacto,
+    cargo: limpio(c.cargo, 120),
+    interes,
+    /* Sin modalidades: las seis casillas de la alianza son una decisión que la
+       empresa no ha tomado todavía. Se deja la lista vacía para que el panel y
+       la traducción a `partners.json` no confundan un interés con una
+       modalidad elegida. */
+    modalidades: [],
+    autMarca: false, autDatos: true,
+    ...origenEvento(c, "empresa"),
+    idioma: c.idioma === "en" ? "en" : "es"
+  };
+
+  const ins = await env.DB.prepare(
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
+    "VALUES ('empresa', 'nueva', ?, ?, ?, NULL, ?)"
+  ).bind(razon, email, limpio(c.telefono, 40) || null, JSON.stringify(datos)).run();
+
+  /* El correo no puede tumbar el registro: misma regla que en todas las puertas. */
+  try {
+    await correoLeadEmpresa(env, { razon, email, ...datos });
+    await correoAvisoLeadEmpresa(env, { razon, email, telefono: limpio(c.telefono, 40), ...datos });
+  } catch (e) {
+    console.error("correo lead empresa", e && e.message);
+  }
+
+  await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "empresa", "sf.datos");
+
+  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+}
+
+/* Acuse a la empresa del evento. TRES COSAS Y NINGUNA PROMESA DE MÁS:
+   · que la conversación sigue, y en qué consiste (conocer al equipo y qué
+     áreas podrían abrir sus puertas en la vuelta);
+   · qué pone la empresa —tiempo, puertas abiertas, la logística que se
+     acuerde— y que participar no se cobra;
+   · y que esto NO es un compromiso: ni de ellos ni nuestro.
+   No dice que Give&Grow ya hizo un Impact Journey con un equipo de empresa,
+   porque no lo ha hecho: las jornadas hasta hoy fueron con donantes
+   individuales, y el piloto es justamente eso, el primero. */
+async function correoLeadEmpresa(env, a) {
+  const en = a.idioma === "en";
+  const mapa = ETIQUETA_INTERES[en ? "en" : "es"];
+  const titulo = en ? "Thank you for stopping by. See you in the hallway."
+                    : "Gracias por acercarte. Nos vemos en el pasillo.";
+  const parrafos = en ? [
+    "We got your details from the Social Fest page. Someone from Give&Grow will write to you in the coming days — a person, not an autoresponder — for a short conversation: getting to know your team and which areas of your company could open their doors.",
+    "With that we design the pilot together. The outbound leg: your team goes to a HUB SOCIAL foundation and works alongside its community. The return leg, which is the heart of it: the foundation's children, young people and families visit your company to see how people work there, what each area does, what they studied and the path to each role.",
+    "Taking part is free. What your company provides is the team's time, open doors and the logistics we agree on.",
+    "Sending this does not commit you to anything. If it is not the moment, it is fine to tell us."
+  ] : [
+    "Recibimos tus datos desde la página de Social Fest. Alguien de Give&Grow te escribe en los próximos días —una persona, no un autorespondedor— para una conversación corta: conocer a tu equipo y qué áreas de tu empresa podrían abrir sus puertas.",
+    "Con eso diseñamos juntos el piloto. La ida: tu equipo va a una fundación del HUB SOCIAL y trabaja junto a su comunidad. La vuelta, que es el corazón: los niños, niñas, jóvenes y familias de esa fundación visitan tu empresa para ver cómo se trabaja ahí, qué hace cada área, qué estudió cada persona y qué camino lleva a cada cargo.",
+    "Participar no tiene costo. Lo que pone tu empresa es el tiempo del equipo, las puertas abiertas y la logística que acordemos.",
+    "Enviar esto no te compromete a nada. Si no es el momento, también está bien decírnoslo."
+  ];
+  const filas = [
+    [en ? "Company" : "Empresa", a.razon],
+    [en ? "Contact" : "Contacto", a.contacto + (a.cargo ? " · " + a.cargo : "")]
+  ];
+  if ((a.interes || []).length) {
+    filas.push([en ? "Interested in" : "Les interesa", a.interes.map(k => mapa[k] || k).join(", ")]);
+  }
+  const boton = { url: ORIGIN + "/#voluntariado",
+                  texto: en ? "See the volunteering programme" : "Ver el programa de voluntariado" };
+
+  return enviarCorreo(env, {
+    para: a.email,
+    asunto: en ? "Impact Journey · Give&Grow at Social Fest" : "Impact Journey · Give&Grow en Social Fest",
+    texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n"), "",
+            boton.texto + ": " + boton.url].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, boton }),
+    /* El prefijo `solicitud-aliado` hace que la respuesta vaya al buzón de
+       alianzas (ver `buzonDeRespuesta`): es la misma conversación. */
+    etiqueta: "solicitud-aliado-evento"
+  });
+}
+
+/* Aviso interno: corto como el formulario. Lo que hace falta para escribirle
+   hoy, y el recordatorio de que el NIT y lo demás se piden después. */
+async function correoAvisoLeadEmpresa(env, a) {
+  const para = correoAlianzas(env);
+  if (!para) return avisoSinBuzon(env, "aviso-aliado");
+  const filas = [
+    ["Empresa", a.razon],
+    ["Contacto", a.contacto + (a.cargo ? " · " + a.cargo : "")],
+    ["Correo", a.email],
+    ["Teléfono", a.telefono || "(no dejó)"],
+    ["Les interesa", (a.interes || []).map(k => ETIQUETA_INTERES.es[k] || k).join(", ") || "(no marcó)"],
+    ["Viene de", (ORIGENES_EVENTO[a.origen] || a.origen || "evento") + " — formulario corto"]
+  ];
+  return enviarCorreo(env, {
+    para,
+    asunto: "Empresa desde Social Fest: " + a.razon,
+    texto: filas.map(([k, v]) => k + ": " + v).join("\n"),
+    html: plantillaCorreo({
+      titulo: "Empresa desde Social Fest: " + a.razon,
+      parrafos: ["Dejó sus datos en la página del evento. Ya recibió el acuse con la ida y la vuelta explicadas y un enlace a #voluntariado.",
+                 "Es un primer contacto: no hay NIT, ni representante, ni modalidades. Eso se pide si la conversación avanza."],
+      filas,
+      cierre: "Está en el panel, en Red → Quién quiere entrar, con la marca «Social Fest»."
     }),
     etiqueta: "aviso-aliado"
   });
@@ -13697,6 +13884,8 @@ async function apiFundacion(env, c) {
     evidencia: limpio(c.evidencia, 900),
     web: limpio(c.web, 200),
     instagram: limpio(c.instagram, 120),
+    /* Si llegó desde la página de un evento (ver ORIGENES_EVENTO). */
+    ...origenEvento(c, "fundacion"),
     idioma: c.idioma === "en" ? "en" : "es"
   };
 
@@ -14810,7 +14999,8 @@ async function correoAvisoFundacion(env, f) {
     ["Programa", f.programa || "(no dice)"],
     ["Evidencia declarada", f.evidencia || "(no dice)"],
     ["Web", f.web || "—"],
-    ["Instagram", f.instagram || "—"]
+    ["Instagram", f.instagram || "—"],
+    ...(f.origen ? [["Viene de", (ORIGENES_EVENTO[f.origen] || f.origen) + " — pasó por la página del evento"]] : [])
   ];
   return enviarCorreo(env, {
     para,
@@ -15670,7 +15860,22 @@ async function adminInscripciones(env, url) {
     i.convenio = resumenConvenio(x, enLinea && enConv.includes(i.id) ? (enLinea[i.id] || {}) : null);
   }
 
+  /* LO QUE SALIÓ DE CADA EVENTO, por puerta. Se cuenta sobre la tabla entera
+     y no sobre la página que se ve, y sin mirar el estado: lo que se quiere
+     saber es cuánta gente llegó desde el evento, también la ya archivada. */
+  const ev = await env.DB.prepare(
+    "SELECT json_extract(datos, '$.origen') AS origen, json_extract(datos, '$.puerta') AS puerta, " +
+    "COUNT(*) AS n FROM inscripciones WHERE json_extract(datos, '$.origen') IN ('" +
+    Object.keys(ORIGENES_EVENTO).join("','") + "') GROUP BY origen, puerta"
+  ).all();
+  const eventos = {};
+  for (const f of (ev.results || [])) {
+    const e = eventos[f.origen] || (eventos[f.origen] = { nombre: ORIGENES_EVENTO[f.origen], empresa: 0, fundacion: 0, profesional: 0 });
+    if (f.puerta in e) e[f.puerta] += f.n;
+  }
+
   return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0,
+                eventos,
                 tope: TOPE_COLA, desde, tipo,
                 pendiente: soloSinVerificar ? "matricula" : soloSinResponder ? "respuesta" : "",
                 sinVerificar: (pend && pend.n) || 0 });
@@ -21072,6 +21277,9 @@ tocar nada en el dashboard de Cloudflare. Ojo con la diferencia, porque no es la
 <strong>«Seguimos» no le da acceso; «Marcar verificada» sí.</strong> Y archivarlo se lo quita, sin
 tener que acordarse de desmarcar nada. Mientras no esté verificada, su matrícula es un dato que él
 declaró, no uno comprobado.</p>
+<!-- Lo que salió de un evento (Social Fest 2026), por puerta. Lo rellena
+     pintarEventosInsc; vacío si ningún evento tiene inscripciones. -->
+<p id="i-eventos" class="mu" style="font-size:13px;margin:10px 0 0"></p>
 <div id="i-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0"></div>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
@@ -22991,6 +23199,16 @@ function verConvenio(id){
     });
   });
 }
+/* LOS EVENTOS, con el nombre corto del chip. Es el espejo de
+   ORIGENES_EVENTO en el servidor: un origen que no esté aquí no lleva chip. */
+var ORIGEN_ES = { "socialfest-2026": "Social Fest" };
+var PUERTA_EVENTO_ES = { empresa: "empresa", fundacion: "fundación", profesional: "profesional" };
+var INTERES_ES = { journey: "Impact Journey (piloto)", alianza: "Alianza", donacion: "Donación" };
+function chipOrigen(x){
+  if (!x || !ORIGEN_ES[x.origen]) return "";
+  return '<br><span class="tag" title="Llegó desde la página del evento' +
+    (x.puerta ? " · puerta " + esc(PUERTA_EVENTO_ES[x.puerta] || x.puerta) : "") + '">' + esc(ORIGEN_ES[x.origen]) + "</span>";
+}
 var ESP_ING = { estructural:"Ing. estructural", civil:"Ing. civil", geotecnia:"Geotecnia",
   arquitectura:"Arquitectura", otra:"Otra especialidad" };
 
@@ -23003,7 +23221,9 @@ function resumenInscripcion(tipo, x, i){
     var p = [esc(x.oficio || "?") + " · " + esc(NIVEL_ES[x.nivel] || x.nivel || "?")];
     if (x.protocolo_cuidado) p.push("<strong>protocolo de cuidado</strong>");
     if (x.protocolo_imagen) p.push("<strong>protocolo de imagen</strong>");
-    if (x.origen) p.push('<strong style="color:#A84D00">' + esc(x.origen) + "</strong>");
+    /* El de un evento ya lleva su chip en la columna de tipo; aquí solo la
+       campaña (la brigada), que pide otra urgencia. */
+    if (x.origen && !ORIGEN_ES[x.origen]) p.push('<strong style="color:#A84D00">' + esc(x.origen) + "</strong>");
     /* Un menor se ve a la primera, con su acudiente: es a quien hay que pedirle
        la autorizacion escrita antes de cualquier actividad. */
     var menor = x.mayor_edad === false && x.acudiente
@@ -23046,6 +23266,13 @@ function resumenInscripcion(tipo, x, i){
       (x.poblacion || []).map(function(k){ return esc(POB_ES[k] || k); }).join(", ") +
       "<br><small>" + menor.join(" · ") + "</small>" +
       "<br><small>" + legal + "</small>" + (i ? listaConvenio(i) : "");
+  }
+  /* La empresa del formulario corto de un evento no eligió modalidades:
+     dijo qué le interesa. Se muestra eso, y que el resto falta a propósito. */
+  if (x.formato === "evento"){
+    var int = (x.interes || []).map(function(k){ return esc(INTERES_ES[k] || k); }).join(", ");
+    return (int ? "Le interesa: " + int : "No marcó interés") +
+      "<br><small>primer contacto en el evento · sin NIT ni modalidades todavía</small>";
   }
   var m = (x.modalidades || []).map(function(k){ return esc(MOD_ES[k] || k); }).join(", ");
   var extra = [];
@@ -23111,6 +23338,14 @@ function borradorRespuesta(i, x){
     cuerpo = en
       ? "Thank you for applying to the HUB SOCIAL with " + i.nombre + ". We read your application and would like to get to know you better. Do you have 20 minutes this week for a call?"
       : "Gracias por aplicar al HUB SOCIAL con " + i.nombre + ". Leímos su aplicación y queremos conocerlos mejor. ¿Tienen 20 minutos esta semana para una llamada?";
+  } else if (i.tipo === "empresa" && x.formato === "evento"){
+    /* La del pasillo no pidió alianza todavía: dejó sus datos para hablar del
+       piloto. Responderle con «tu solicitud» y el Convenio Marco sería
+       contestarle a otra persona. */
+    asunto = "Impact Journey · Give&Grow";
+    cuerpo = en
+      ? "Thank you for stopping by Give&Grow at Social Fest. We would like to tell you how the Impact Journey pilot could work with your team: the outbound leg to a HUB SOCIAL foundation and the return leg to your company. Do you have 20 minutes this week for a call?"
+      : "Gracias por acercarte a Give&Grow en Social Fest. Queremos contarte cómo sería el piloto de Impact Journey con tu equipo: la ida a una fundación del HUB SOCIAL y la vuelta a tu empresa. ¿Tienes 20 minutos esta semana para una llamada?";
   } else if (i.tipo === "empresa"){
     asunto = en ? "Your alliance request · Give&Grow" : "Tu solicitud de alianza · Give&Grow";
     cuerpo = en
@@ -23147,7 +23382,24 @@ function fechaConPlazo(i){
     + (vencida ? " · plazo " + PLAZO_INSC[i.tipo] + " vencido" : "") + "</small>";
 }
 
+/* «Social Fest: N empresas · N fundaciones · N profesionales». El número
+   sale del servidor sobre la tabla entera, no de la página que se ve. El cero
+   se escribe: que todavía no haya llegado nadie también es el dato. */
+function pintarEventosInsc(d){
+  var p = document.getElementById("i-eventos"); if (!p) return;
+  var ev = d.eventos || {}, partes = [];
+  var pl = function(n, uno, varios){ return n + " " + (n === 1 ? uno : varios); };
+  for (var k in ev) if (ev.hasOwnProperty(k)){
+    var e = ev[k];
+    partes.push("<strong>" + esc(ORIGEN_ES[k] || e.nombre || k) + ":</strong> " +
+      pl(e.empresa, "empresa", "empresas") + " · " + pl(e.fundacion, "fundación", "fundaciones") +
+      " · " + pl(e.profesional, "profesional", "profesionales"));
+  }
+  p.innerHTML = partes.join("<br>");
+}
+
 function pintarFiltrosInsc(d){
+  pintarEventosInsc(d);
   var c = document.getElementById("i-filtros"); if (!c) return;
   var b = function(tipo, pend, texto, extra){
     var on = (INSC_TIPO === tipo && INSC_PEND === pend);
@@ -23269,10 +23521,10 @@ function cargarInscripciones(){
       if (x.instagram) enlaces.push(esc(x.instagram));
       var det = esFund ? detalleConvenio(i) : "";
       return "<tr" + (det ? ' class="con-det"' : "") + ">" +
-        "<td>" + esc(TIPO_ES[i.tipo] || i.tipo) + "</td>" +
+        "<td>" + esc(TIPO_ES[i.tipo] || i.tipo) + chipOrigen(x) + "</td>" +
         "<td><strong>" + esc(i.nombre||"") + "</strong>" +
           (x.lider ? "<br><small>" + esc(x.lider) + (x.cargo ? " · " + esc(x.cargo) : "") + "</small>" : "") +
-          (x.contacto ? "<br><small>" + esc(x.contacto) + "</small>" : "") + "</td>" +
+          (x.contacto ? "<br><small>" + esc(x.contacto) + (x.cargo && !x.lider ? " · " + esc(x.cargo) : "") + "</small>" : "") + "</td>" +
         "<td>" + resumenInscripcion(i.tipo, x, i) + "</td>" +
         "<td>" + esc(i.email||"") + (i.telefono ? "<br><small>" + esc(i.telefono) + "</small>" : "") +
           (i.ciudad ? "<br><small>" + esc(i.ciudad) + "</small>" : "") +
@@ -28601,6 +28853,29 @@ export default {
           "cache-control": "public, max-age=3600"
         }
       });
+    }
+
+    /* EL ENLACE DEL QR DE SOCIAL FEST (Ruta N, 14–15 oct 2026). El QR impreso
+       dice `/socialfest` y no `/#socialfest` por dos razones: un `#` en un
+       enlace dictado o escrito a mano se pierde, y la almohadilla no la ve el
+       Worker, así que no habría forma de cambiar el destino después de
+       imprimir. Con una ruta propia, el papel queda fijo y el destino se puede
+       mover aquí.
+
+       Se compara en minúsculas porque la gente lo teclea como lo leyó en una
+       diapositiva —«SocialFest»—, y conserva la query por si algún día se
+       reparte con `?utm_…`.
+
+       302 y no 301, por la cicatriz que este archivo ya tiene escrita: una ruta
+       que todavía puede moverse no se declara permanente. Y en Mira Mi Casa no
+       existe esta página: se manda al dominio de la fundación.
+
+       TIENE QUE ESTAR EN `run_worker_first` de wrangler.toml (las dos formas,
+       con y sin barra final): sin eso la capa de assets responde 404 y este
+       bloque no llega a correr — la misma lección de `/casa`. */
+    if (/^\/socialfest\/?$/i.test(ruta)) {
+      const base = HOST_MMC.test(url.hostname) ? ORIGIN : url.origin;
+      return Response.redirect(base + "/" + url.search + "#socialfest", 302);
     }
 
     if (ruta === "/casa" || ruta === "/micasa" || ruta === "/mimicasa") {

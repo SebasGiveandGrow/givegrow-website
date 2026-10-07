@@ -2541,3 +2541,32 @@ section[tabindex="-1"]:focus{ outline:none }
 .pm-acciones{margin-top:28px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px}
 .pm-acciones .card-link{margin-top:0}
 @media(max-width:520px){.pm-acciones .btn{flex:1 1 100%;justify-content:center;text-align:center}}
+
+/* ===== SOCIAL FEST 2026 (#socialfest) =====
+   La página del QR. Se lee con el teléfono, de pie y con prisa: el elemento
+   firma son LAS DOS PUERTAS, grandes, a lo ancho en el móvil y lado a lado
+   desde 720 px. Papel sobre papel, sin vidrio (no hay foto detrás) y sin
+   tokens nuevos: el filo izquierdo es el mismo gesto de `.vol-ij`, en `--acc`
+   porque se aclara de noche y `--g` no. */
+.sf-hero{padding-top:40px}
+.sf-hero .h-sec{max-width:14ch}
+.sf-puertas{display:grid;gap:12px;margin-top:26px}
+@media(min-width:720px){.sf-puertas{grid-template-columns:1fr 1fr;gap:16px}}
+.sf-puerta{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:center;width:100%;text-align:left;padding:18px 20px;border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:var(--r);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;transition:border-color .2s var(--ease)}
+.sf-puerta:hover{border-color:var(--acc)}
+.sf-puerta:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+.sf-puerta-k{font-family:var(--font-display);font-size:var(--fs-h4);font-weight:600;line-height:1.25;color:var(--acc)}
+.sf-puerta-d{grid-column:1;font-size:var(--fs-15);line-height:1.45;color:var(--mu)}
+.sf-puerta-f{grid-column:2;grid-row:1 / span 2;font-size:var(--fs-h4);color:var(--acc)}
+.sf-vias{display:grid;gap:14px;margin-top:26px}
+@media(min-width:720px){.sf-vias{grid-template-columns:1fr 1fr;gap:18px}}
+.sf-via{padding:20px 0 4px;border-top:1px solid var(--bd)}
+.sf-via-vuelta{border-top:3px solid var(--acc)}
+.sf-via-k{display:block;font-size:var(--fs-eyebrow);font-weight:800;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--acc);margin-bottom:8px}
+.sf-via h3{font-size:var(--fs-h4);margin-bottom:6px}
+.sf-via p{color:var(--mu);line-height:1.55}
+.sf-sub{font-size:var(--fs-h4);margin:30px 0 10px}
+.sf-lista{margin:0;padding-left:20px;color:var(--ink-soft);line-height:1.6;max-width:62ch}
+.sf-lista li{margin-bottom:6px}
+.sf-btn{margin-top:14px}
+@media(prefers-reduced-motion:reduce){.sf-puerta{transition:none}}
