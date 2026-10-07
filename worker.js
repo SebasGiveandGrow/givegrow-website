@@ -16394,7 +16394,7 @@ const CONVENIO_CAMPOS = [
   { f: "A", sec: "2. Qué hacen", id: "poblacion", num: "2.2", tipo: "texto", req: true, max: 300,
     lbl: "Población que atienden", pre: "poblacion" },
   { f: "A", sec: "2. Qué hacen", id: "personas_anio", num: "2.3", tipo: "numero", req: true, min: 1, max: 10000000,
-    lbl: "Número aproximado de personas que atienden al año" },
+    lbl: "Número aproximado de personas que atienden al año", pre: "personas" },
   { f: "A", sec: "2. Qué hacen", id: "lugares", num: "2.4", tipo: "texto", req: true, max: 300,
     lbl: "Municipios o barrios donde trabajan", pre: "zona" },
 
@@ -16505,7 +16505,12 @@ function convenioValido(form, variante, datos, final) {
     }
     const v = d[c.id];
     if (c.tipo === "casillas") {
-      const marcadas = Array.isArray(v) ? c.ops.filter(o => v.includes(o)) : [];
+      let marcadas = Array.isArray(v) ? c.ops.filter(o => v.includes(o)) : [];
+      /* «No tengo nada que declarar» ES declarar las cinco: la pantalla lo
+         dice («se marcan todas») y aqui se cumple aunque el navegador no las
+         haya marcado. Al reves no: con «Declaro lo siguiente» cuenta solo lo
+         que la persona marco. */
+      if (c.todasSi && condicionConvenio(c.todasSi, limpio)) marcadas = c.ops.slice();
       const todas = c.todas || (c.todasSi && condicionConvenio(c.todasSi, limpio));
       if (final && c.req && !marcadas.length) errores.push(c.num);
       else if (final && todas && marcadas.length !== c.ops.length) errores.push(c.num);
@@ -16611,8 +16616,18 @@ function prellenadoConvenio(ctx) {
   return {
     nombre: ctx.nombre || "", nit: x.nit || "", direccion: (ctx.ficha && ctx.ficha.direccion) || "",
     ciudad: ctx.ciudad || "", lider: x.lider || "", email: ctx.email || "", telefono: ctx.telefono || "",
-    zona: x.zona || "", anio: x.anio || "", mision: x.mision || "", poblacion: pob
+    zona: x.zona || "", anio: x.anio || "", mision: x.mision || "", poblacion: pob,
+    personas: personasDeAtiende(x.atiende)
   };
+}
+/* «¿A cuántas personas atiende?» es texto libre en la inscripcion («unas
+   1.200», «≈ 300 personas»); el 2.3 del formulario A pide un numero. Se toma
+   la PRIMERA cifra que aparezca, leida como numeroCO. Es una sugerencia: la
+   casilla queda a la vista para corregirla, y sin cifra no se prellena nada. */
+function personasDeAtiende(t) {
+  const m = /\d[\d.,]*/.exec(String(t || ""));
+  const n = m ? numeroCO(m[0].replace(/[.,]$/, "")) : null;
+  return n && n >= 1 && n <= 10000000 ? String(n) : "";
 }
 
 /* La fundacion detras de un token, SOLO mientras esta en «convenio». Antes no
@@ -16821,7 +16836,7 @@ async function convenioEstado(env, ctx) {
     correo: correoEnmascarado(ctx.email), cerrado: convenioCerrado(ctx),
     texto: ctx.texto ? { en: ctx.texto.en, huella: String(ctx.texto.sha || "").slice(0, 16) } : null,
     campos: CONVENIO_CAMPOS.filter(c => !c.v || c.v === ctx.variante)
-      .map(c => ({ f: c.f, id: c.id, tipo: c.tipo, num: c.num, si: c.si || null })),
+      .map(c => ({ f: c.f, id: c.id, tipo: c.tipo, num: c.num, si: c.si || null, todasSi: c.todasSi || null })),
     formularios,
     anexo: anexoParaFundacion(ctx, rc),
     subidas: docs.map(d => ({ doc: d.id, texto: textoDoc(d, ctx.variante, false), tope: CONVENIO_SUBIDAS[d.id].tope })),
@@ -17647,6 +17662,13 @@ function cumple(si, d){
 function condiciones(F){
   var d = leer(F);
   campos(F).forEach(function(c){
+    /* «No tengo nada que declarar» marca las cinco declaraciones del B, como
+       dice su ayuda, y las mantiene marcadas mientras siga elegida: es lo que
+       el servidor firma de todos modos. Con «Declaro lo siguiente» no se
+       desmarca nada: la persona quita las que no sean ciertas. */
+    if (c.todasSi && c.tipo === "casillas" && cumple(c.todasSi, d)){
+      [].slice.call(document.querySelectorAll('[data-ck="' + F + "-" + c.id + '"]')).forEach(function(e){ e.checked = true; });
+    }
     if (!c.si) return;
     var w = $("w-c-" + F + "-" + c.id);
     if (w) w.hidden = !cumple(c.si, d);
