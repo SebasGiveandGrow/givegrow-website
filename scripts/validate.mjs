@@ -913,6 +913,7 @@ if (tagsOk) ok("balance de tags (" + tagsVistas + " etiquetas vigiladas)");
 const PLANTILLAS = [
   "plantillaCorreo", "paginaTriage", "inspeccionHTML", "paginaFirma",
   "paginaCarnet", "paginaFicha", "paginaConvenio", "paginaRuta", "paginaAdmin", "sharePage",
+  "paginaSocialfest",
   /* Vive DENTRO de la plantilla de adminJS: es el popup que abre el panel. */
   "verFicha", "verConvenio"
 ];
@@ -1733,6 +1734,34 @@ try {
     if (huerfanos.length) {
       err("check #21 · la CSP autoriza " + huerfanos.length + " hash(es) que no son de ningún script de index.html: " +
           huerfanos.map((h) => h.slice(0, 12) + "…").join(", ") + " · es un permiso para código que ya no existe; quítalo");
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     CHECK #21b · las rutas que el <head> muestra antes de app.js existen
+
+     El script en línea del tema también lee el hash: si es una página
+     conocida, esconde la portada y muestra esa página ANTES de que corra
+     app.js (lo pidió Social Fest: el QR lleva a /#socialfest y la gente veía la
+     portada). Si un nombre de esa lista no tuviera su <main id="page-…">, la
+     portada quedaría oculta y no se vería NADA hasta app.js — una pantalla en
+     blanco justo en el teléfono con mala señal. Por eso cada nombre se
+     comprueba aquí, y la portada (`inicio`) no puede estar en la lista.
+     ------------------------------------------------------------------ */
+  {
+    const html = readFileSync("index.html", "utf8");
+    const m = /var R=" ([a-z0-9 -]+) ";/.exec(html);
+    if (!m) {
+      err("check #21b: no encontré la lista de rutas (var R=\" … \") en el script del <head> de index.html");
+    } else {
+      const rutas = m[1].trim().split(/\s+/);
+      const faltan = rutas.filter((r) => r === "inicio" || !html.includes('<main id="page-' + r + '"'));
+      if (faltan.length) {
+        err("check #21b · rutas del <head> sin su <main id=\"page-…\"> (o la portada metida en la lista): " + faltan.join(", ") +
+            " · con el hash de una de ellas la página quedaría en blanco hasta que corra app.js");
+      } else {
+        ok("las " + rutas.length + " rutas que el <head> muestra antes de app.js tienen su página");
+      }
     }
   }
 

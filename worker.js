@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "4f61f4e5";
+const STYLES_V = "dd2aee83";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -13701,7 +13701,8 @@ async function apiLeadEmpresa(env, c) {
    · que la conversación sigue, y en qué consiste (conocer al equipo y qué
      áreas podrían abrir sus puertas en la vuelta);
    · qué pone la empresa —tiempo, puertas abiertas, la logística que se
-     acuerde— y que participar no se cobra;
+     acuerde— y que no hay cuota de participación (no «sin costo»: el
+     transporte y los refrigerios cuestan, y se acuerdan);
    · y que esto NO es un compromiso: ni de ellos ni nuestro.
    No dice que Give&Grow ya hizo un Impact Journey con un equipo de empresa,
    porque no lo ha hecho: las jornadas hasta hoy fueron con donantes
@@ -13714,12 +13715,12 @@ async function correoLeadEmpresa(env, a) {
   const parrafos = en ? [
     "We got your details from the Social Fest page. Someone from Give&Grow will write to you in the coming days — a person, not an autoresponder — for a short conversation: getting to know your team and which areas of your company could open their doors.",
     "With that we design the pilot together. The outbound leg: your team goes to a HUB SOCIAL foundation and works alongside its community. The return leg, which is the heart of it: the foundation's children, young people and families visit your company to see how people work there, what each area does, what they studied and the path to each role.",
-    "Taking part is free. What your company provides is the team's time, open doors and the logistics we agree on.",
+    "There is no participation fee. What your company provides is the team's time and open doors; the logistics (transport, refreshments) we agree on together.",
     "Sending this does not commit you to anything. If it is not the moment, it is fine to tell us."
   ] : [
     "Recibimos tus datos desde la página de Social Fest. Alguien de Give&Grow te escribe en los próximos días —una persona, no un autorespondedor— para una conversación corta: conocer a tu equipo y qué áreas de tu empresa podrían abrir sus puertas.",
     "Con eso diseñamos juntos el piloto. La ida: tu equipo va a una fundación del HUB SOCIAL y trabaja junto a su comunidad. La vuelta, que es el corazón: los niños, niñas, jóvenes y familias de esa fundación visitan tu empresa para ver cómo se trabaja ahí, qué hace cada área, qué estudió cada persona y qué camino lleva a cada cargo.",
-    "Participar no tiene costo. Lo que pone tu empresa es el tiempo del equipo, las puertas abiertas y la logística que acordemos.",
+    "No hay cuota de participación. Lo que pone tu empresa es el tiempo del equipo y las puertas abiertas; la logística (transporte, refrigerios) la acordamos juntos.",
     "Enviar esto no te compromete a nada. Si no es el momento, también está bien decírnoslo."
   ];
   const filas = [
@@ -28183,6 +28184,72 @@ ${HOJA_CSS}
 </html>`;
 }
 
+/* LA TARJETA DE /socialfest (Social Fest 2026, Ruta N, 14–15 oct).
+   ==========================================================================
+   Hasta el 7 oct 2026 esta ruta era un 302 sin cuerpo a `/#socialfest`. Para
+   la persona que escanea el QR daba igual, pero el enlace también se comparte
+   por WhatsApp, y el rastreador de la vista previa NO ve la almohadilla: sigue
+   el 302 hasta `/` y pinta la tarjeta de la portada. Quien recibía el enlace
+   veía «Give&Grow International · Dar para crecer…», no Social Fest.
+
+   Ahora responde un 200 con sus propios metadatos OG y un refresco a la SPA,
+   el mismo patrón de `/f/<id>`: metadatos, un refresco y un enlace visible por
+   si el refresco no corre. Sin un solo script, así que la CSP es la negación
+   entera. `og:url` apunta a ESTA ruta y no a `/#socialfest`: el rastreador de
+   Facebook/WhatsApp vuelve a raspar el og:url si difiere, y en `/` encontraría
+   otra vez la tarjeta de la portada.
+
+   La query se conserva en el destino (`?utm_…` si algún día se reparte así).
+   Va escapada con `esc` porque entra a un atributo; `url.search` ya viene
+   codificado por el parser de URL, así que no hay comillas crudas que temer,
+   pero no se confía en eso. */
+function paginaSocialfest(url) {
+  const destino = "/" + url.search + "#socialfest";
+  const titulo = "Give&Grow en Social Fest 2026 \u00b7 Ruta N, Medell\u00edn";
+  const desc = "Impact Journey para empresas: voluntariado en doble v\u00eda, con la ida y la vuelta. Y para fundaciones y profesionales, el HUB SOCIAL. D\u00e9janos tus datos y te escribimos.";
+  const img = ORIGIN + "/img/og.jpg";
+  const canon = ORIGIN + "/socialfest";
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="0;url=${esc(destino)}">
+<title>${esc(titulo)}</title>
+<meta name="description" content="${esc(desc)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Give&amp;Grow International">
+<meta property="og:title" content="${esc(titulo)}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:url" content="${esc(canon)}">
+<meta property="og:image" content="${esc(img)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Give&amp;Grow International en Social Fest 2026">
+<meta property="og:locale" content="es_CO">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(titulo)}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${esc(img)}">
+<link rel="canonical" href="${esc(canon)}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1F5C38">
+<style>
+:root{--bg:#F3EFE6;--ink:#191813;--acc:#1F5C38}
+body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+main{max-width:34rem;margin:0 auto;padding:48px 16px}
+a{color:var(--acc);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<p>Give&amp;Grow International \u00b7 Social Fest 2026</p>
+<p><a href="${esc(destino)}">Abrir la p\u00e1gina de Social Fest</a></p>
+</main>
+</body>
+</html>`;
+}
+
 async function rutaCompartir(env, url, id, lang) {
   try {
     const r = await env.ASSETS.fetch(new URL("/data/partners.json", url.origin));
@@ -28562,9 +28629,13 @@ function marcarMarca(respuesta, host) {
        Mira Mi Casa tiene su propia imagen de portada, la precargaría desde su
        propia carpeta y esta regla NO se la llevaría por delante.
 
-       ⚠️ EL ÁPEX NO SE TOCA. Allí la imagen sigue precargada y con
-       `fetchpriority="high"`, que es lo correcto para su LCP. Añadirle `lazy` al
-       archivo compartido habría empeorado la portada de la fundación. */
+       DESDE EL 7 OCT 2026 el preload ya no está en el HTML: lo crea el script
+       en línea del <head> solo cuando la portada es lo que se va a ver, y ese
+       script no hace nada en Mira Mi Casa. Y el `<img>` del archivo ya trae
+       `lazy` (con `fetchpriority="high"`): quien entra por `/#socialfest` tiene
+       la portada oculta y no debe bajarla. En la portada del ápex el preload
+       sigue arrancando la descarga desde el <head>, así que el `lazy` no la
+       retrasa. Estas dos reglas quedan como red: no cuestan nada. */
     .on('link[rel="preload"][href^="/img/jornadas/"]', { element(e) { e.remove(); } })
     .on('img[src^="/img/jornadas/hero"]', { element(e) {
       e.setAttribute("loading", "lazy");
@@ -28906,16 +28977,33 @@ export default {
        diapositiva —«SocialFest»—, y conserva la query por si algún día se
        reparte con `?utm_…`.
 
-       302 y no 301, por la cicatriz que este archivo ya tiene escrita: una ruta
-       que todavía puede moverse no se declara permanente. Y en Mira Mi Casa no
-       existe esta página: se manda al dominio de la fundación.
+       Nunca un 301, por la cicatriz que este archivo ya tiene escrita: una ruta
+       que todavía puede moverse no se declara permanente. Desde el 7 oct 2026
+       ni siquiera es un 302: es un 200 con su propia tarjeta OG y un refresco
+       (ver `paginaSocialfest`), para que el enlace compartido por WhatsApp no
+       pinte la tarjeta de la portada.
 
        TIENE QUE ESTAR EN `run_worker_first` de wrangler.toml (las dos formas,
        con y sin barra final): sin eso la capa de assets responde 404 y este
        bloque no llega a correr — la misma lección de `/casa`. */
     if (/^\/socialfest\/?$/i.test(ruta)) {
-      const base = HOST_MMC.test(url.hostname) ? ORIGIN : url.origin;
-      return Response.redirect(base + "/" + url.search + "#socialfest", 302);
+      /* En Mira Mi Casa no existe esta página: se manda al dominio de la
+         fundación, y ese salto sí es un 302 (otro origen). En el sitio de la
+         fundación, la tarjeta propia: ver `paginaSocialfest`. */
+      if (HOST_MMC.test(url.hostname)) {
+        return Response.redirect(ORIGIN + "/socialfest" + url.search, 302);
+      }
+      return new Response(paginaSocialfest(url), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "referrer-policy": "strict-origin-when-cross-origin",
+          "x-content-type-options": "nosniff",
+          /* Corta: si el destino del QR se mueve después de imprimir, el
+             cambio tiene que llegar en minutos, no en días. */
+          "cache-control": "public, max-age=300",
+          "content-security-policy": cspPagina({ script: "'none'" })
+        }
+      });
     }
 
     if (ruta === "/casa" || ruta === "/micasa" || ruta === "/mimicasa") {
