@@ -389,6 +389,7 @@ var I18N = {
     "nav.estandares":"Marco de actuación",
     "nav.d.estandares":"Bajo qué normas trabajamos, y qué no afirmamos",
     "nav.g.emergencia":"Emergencia",
+    "nav.g.red":"Red",
     "nav.brigada":"Brigada del sismo, agosto 2026",
     "nav.d.brigada":"El informe: qué se llevó y cómo se entregó",
     "nav.d.vivienda":"Sube fotos y recibe un concepto: si hay señales para no permanecer y con qué reparar",
@@ -980,6 +981,10 @@ var I18N = {
     "emp.ey":"RSE empresarial",
     "emp.t":"Tu empresa, con propósito y trazabilidad.",
     "emp.lead":"Tres formas de aliarte, todas con reporte verificable. Las donaciones, además, dan derecho a certificado.",
+    "emp.piloto.ey":"Impact Journey · piloto",
+    "emp.piloto.t":"Te proponemos un piloto, con la ida y la vuelta.",
+    "emp.piloto.p":"Tu equipo va a una fundación del HUB SOCIAL, y después esa comunidad visita tu empresa para ver cómo se trabaja ahí. Ya hicimos jornadas con donantes individuales; con un equipo de empresa todavía no, y por eso es un piloto: lo diseñamos juntos.",
+    "emp.piloto.btn":"Proponer el piloto",
     "emp.aliadas.ey":"Red de empresas aliadas",
     "emp.aliadas.t":"Empresas que crecen dando",
     "emp.aliadas.lead":"Cada alianza entra con convenio firmado. Aquí verás las empresas que ya suman al impacto — con trazabilidad y reconocimiento.",
@@ -2048,12 +2053,12 @@ var I18N = {
     "sf.t":"Aquí nadie viene a mirar.",
     "sf.lead":"Somos Give&Grow, una fundación de Medellín que une a empresas, personas y fundaciones de base para que cada apoyo llegue a quien lo necesita y quede documentado.",
     "sf.p.emp.k":"Soy empresa",
-    "sf.p.emp.d":"Un piloto de Impact Journey con tu equipo: ida y vuelta, sin costo.",
+    "sf.p.emp.d":"Un piloto de Impact Journey con tu equipo, ida y vuelta, sin cuota de participación.",
     "sf.p.red.k":"Soy fundación o profesional",
     "sf.p.red.d":"Suma tu fundación al HUB SOCIAL o dona horas de tu oficio.",
     "sf.emp.ey":"Para empresas · Impact Journey",
     "sf.emp.t":"Voluntariado en doble vía.",
-    "sf.emp.lead":"Te proponemos un piloto con tu equipo, con la ida y la vuelta. Ya hicimos jornadas con donantes individuales; con un equipo de empresa sería de las primeras, y la participación no tiene costo.",
+    "sf.emp.lead":"Te proponemos un piloto con tu equipo, con la ida y la vuelta. Ya hicimos jornadas con donantes individuales; con un equipo de empresa sería de las primeras. No hay cuota de participación; la logística (transporte, refrigerios) la acordamos juntos.",
     "sf.ida.k":"La ida",
     "sf.ida.t":"Tu equipo va a una fundación del HUB SOCIAL",
     "sf.ida.p":"Trabaja junto a su comunidad, en su territorio, en una jornada que la fundación define con nosotros.",
@@ -2063,7 +2068,7 @@ var I18N = {
     "sf.pone.t":"Qué pone tu empresa",
     "sf.pone.1":"El tiempo de tu equipo, para la ida.",
     "sf.pone.2":"Las puertas abiertas, para la vuelta: personas de distintas áreas dispuestas a contar su camino.",
-    "sf.pone.3":"La logística que acordemos juntos.",
+    "sf.pone.3":"La logística —transporte, refrigerios—, que acordamos juntos.",
     "sf.f.t":"Déjanos tus datos y te escribimos",
     "sf.f.razon":"Empresa",
     "sf.f.nombre":"Tu nombre",
@@ -2138,7 +2143,7 @@ var ROUTE_META = {
   "mi-aporte":{t:{es:"Mi aporte · Give&Grow International",en:"My giving · Give&Grow International"},d:{es:"Lo de quien ya donó, en un solo lugar: rastrea tu donación con su número de guía, recibe el enlace a tu membresía y entérate de cómo se pide el certificado de donación.",en:"Everything for people who have already given, in one place: track your donation with its tracking number, get the link to your membership and find out how to request your donation certificate."}},
   gracias:{t:{es:"Gracias por tu aporte · Give&Grow International",en:"Thank you for your gift · Give&Grow International"},d:{es:"Recibimos tu aporte y lo estamos confirmando. Guarda tu número de guía: con él puedes seguirlo hasta la entrega.",en:"We received your gift and we are confirming it. Keep your tracking number: it lets you follow the gift through to delivery."}},
   aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
-  socialfest:{t:{es:"Social Fest 2026 · Give&Grow International",en:"Social Fest 2026 · Give&Grow International"},d:{es:"Impact Journey para empresas —voluntariado en doble vía, piloto sin costo— y el HUB SOCIAL para fundaciones y profesionales. Give&Grow en Social Fest 2026, Ruta N, Medellín.",en:"Impact Journey for companies —two-way volunteering, a free pilot— and the HUB SOCIAL for foundations and professionals. Give&Grow at Social Fest 2026, Ruta N, Medellín."}},
+  socialfest:{t:{es:"Social Fest 2026 · Give&Grow International",en:"Social Fest 2026 · Give&Grow International"},d:{es:"Impact Journey para empresas —voluntariado en doble vía, piloto sin cuota de participación— y el HUB SOCIAL para fundaciones y profesionales. Give&Grow en Social Fest 2026, Ruta N, Medellín.",en:"Impact Journey for companies —two-way volunteering, a pilot with no participation fee— and the HUB SOCIAL for foundations and professionals. Give&Grow at Social Fest 2026, Ruta N, Medellín."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
 };
 function mmcTitulo(){
@@ -4136,6 +4141,9 @@ function go(id, fromPop){
   if (!target){ id = "e404"; target = ensureE404(); }
   if (!target){ id = "inicio"; target = document.getElementById("page-inicio"); }
   target.classList.add("active");
+  /* La marca que puso el script en línea del <head> para no pintar la portada
+     antes de tiempo (ver index.html). Desde aquí manda `.active`. */
+  document.documentElement.removeAttribute("data-ruta");
   currentRoute = id;
   if (location.hash !== "#"+id) history[fromPop ? "replaceState" : "pushState"](null,"","#"+id);
   applyRouteMeta(id);
@@ -6639,7 +6647,7 @@ function renderJourney(id){
     + '<div class="j-track" aria-hidden="true">' + segs + '</div>'
     + '<div class="j-links">';
   if (prev) html += '<a class="j-prev" href="#'+prev+'">&larr; <span data-i18n="'+JOURNEY_KEYS[prev]+'"></span></a>';
-  if (next) html += '<a class="j-next" href="#'+next+'"><span data-i18n="journey.next">Siguiente</span>: <span data-i18n="'+JOURNEY_KEYS[next]+'"></span> &rarr;</a>';
+  if (next) html += '<a class="j-next" href="#'+next+'"><span><span data-i18n="journey.next">Siguiente</span>: <span data-i18n="'+JOURNEY_KEYS[next]+'"></span></span> &rarr;</a>';
   else html += '<span class="j-done" data-i18n="journey.done">Recorrido completo.</span>';
   html += '</div></div>';
   bar.innerHTML = html;
