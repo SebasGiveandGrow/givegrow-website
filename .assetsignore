@@ -8,6 +8,7 @@
 # arriesgaría que deje de procesarse, y con él se iría la CSP.
 #
 # Se sirve, a propósito: index.html, 404.html, app.js, styles.css, favicon.svg,
+# favicon.ico, apple-touch-icon.png,
 # manifest.webmanifest, robots.txt, sitemap.xml, img/, vendor/, docs/, data/,
 # i18n/ y .well-known/.
 
