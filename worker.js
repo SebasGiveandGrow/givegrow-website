@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "b8b70cf6";
+const STYLES_V = "4f61f4e5";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -26141,7 +26141,14 @@ const TXT_METODO = Object.freeze({
     segP1: "Wompi recibe los datos de tu tarjeta dentro de su propia ventana y los convierte en un token: ese token es lo único que llega a nosotros. Give&Grow no ve, no recibe y no guarda el número de tu tarjeta; conservamos la marca y los cuatro últimos dígitos para que reconozcas cuál registraste.",
     segP2: "Puedes terminar tu membresía cuando quieras: al activarla te llega por correo un enlace propio desde el que la terminas y retiramos tu tarjeta, sin escribirle a nadie.",
     pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2",
-    sandbox: "Ambiente de pruebas de Wompi: no se cobra dinero real."
+    sandbox: "Ambiente de pruebas de Wompi: no se cobra dinero real.",
+    franjaEy: "Verifica antes de pagar",
+    franja: [
+      { k: "Entidad", v: "ESAL · NIT 901.948.930-2 · vigilada por la Gobernación de Antioquia.", a: "Consultar en el RUES" },
+      { k: "Régimen Tributario Especial", v: "Si declaras renta en Colombia, tu aporte puede servir para el descuento del Art. 257 ET, con certificado firmado.", a: "Cuándo aplica el descuento" },
+      { k: "Trazabilidad", v: "Cada cobro mensual lleva su número de guía, y con él lo rastreas.", a: "Rastrear una guía" },
+      { k: "Cuentas", v: "Estados financieros 2025, publicados y firmados.", a: "Ver los estados financieros (PDF)" }
+    ]
   },
   en: {
     htmlLang: "en",
@@ -26174,9 +26181,29 @@ const TXT_METODO = Object.freeze({
     segP1: "Wompi receives your card details inside its own window and turns them into a token: that token is the only thing that reaches us. Give&Grow does not see, receive or store your card number; we keep the brand and the last four digits so you can tell which card you registered.",
     segP2: "You can end your membership whenever you want: once it is active we email you its own link, from which you end it and we withdraw your card, with no need to write to anyone.",
     pie: "Fundación Give&Grow International · Colombian nonprofit · NIT 901.948.930-2",
-    sandbox: "Wompi test environment: no real money is charged."
+    sandbox: "Wompi test environment: no real money is charged.",
+    franjaEy: "Check before you pay",
+    franja: [
+      { k: "Organisation", v: "Colombian nonprofit (ESAL) · NIT 901.948.930-2 · overseen by the Antioquia Department Government.", a: "Look up in RUES" },
+      { k: "Special Tax Regime", v: "If you file income tax in Colombia, your gift may qualify for the Art. 257 tax credit, with a signed certificate.", a: "When the credit applies" },
+      { k: "Traceability", v: "Every monthly charge carries its own tracking number, and you can follow it.", a: "Track a gift" },
+      { k: "Accounts", v: "2025 financial statements, published and signed.", a: "View the financial statements (PDF)" }
+    ]
   }
 });
+
+/* LA FRANJA DE CONFIANZA de /pago/metodo: la version compacta de la del SPA
+   (<template id="tpl-franja"> en index.html), con el texto ajustado a la
+   membresia —«cada cobro mensual»—. Los enlaces no dependen del idioma y van
+   aqui, en el mismo orden que `TXT_METODO.*.franja`. Todos abren en otra
+   pestaña: quien esta a mitad del formulario no pierde lo que escribio.
+   Si cambia un hecho, cambia en los dos sitios. */
+const FRANJA_ENLACES = Object.freeze([
+  "https://www.rues.org.co",
+  "/#faq",
+  "/#rastrea",
+  "/docs/estados-financieros-2025.pdf"
+]);
 
 const MESES_EN_LARGO = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
@@ -26328,6 +26355,19 @@ function paginaMetodoPago(cfg) {
 + '      <p class="pm-paso-p">' + esc(cfg.monto ? T.p3pMonto : T.p3pSin) + '</p>\n'
 + '    </div>\n'
 + '  </form>\n'
+/* La franja va justo despues del formulario: es la letra pequeña del paso que
+   se acaba de leer, no un paso mas. Solo con monto, que es cuando hay una
+   membresia nueva que decidir; cambiar de tarjeta no la necesita. */
++ (cfg.monto
+    ? '  <div class="franja">\n'
+      + '    <p class="franja-ey">' + esc(T.franjaEy) + '</p>\n'
+      + '    <ul class="franja-l">\n'
+      + T.franja.map((x, i) => '      <li><span class="franja-k">' + esc(x.k) + '</span>'
+          + '<span class="franja-v">' + esc(x.v) + '</span>'
+          + '<a class="franja-a" href="' + esc(FRANJA_ENLACES[i]) + '" target="_blank" rel="noopener">' + esc(x.a) + '</a></li>\n').join("")
+      + '    </ul>\n'
+      + '  </div>\n'
+    : '')
 + '  <section class="pm-seguro" aria-labelledby="pm-seg-t">\n'
 + '    ' + SVG_CANDADO + '\n'
 + '    <h2 id="pm-seg-t">' + esc(T.segT) + '</h2>\n'

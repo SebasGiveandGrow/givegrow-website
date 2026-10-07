@@ -2484,6 +2484,36 @@ section[tabindex="-1"]:focus{ outline:none }
 .mb-ir{align-self:flex-start}
 @media(max-width:520px){.mb-ir{align-self:stretch;justify-content:center;text-align:center}}
 
+/* ---------- Franja de confianza (7 oct 2026) ----------
+   Cuatro hechos verificables junto al botón de pagar: Donar, Hazte miembro y
+   /pago/metodo. Es la nota al pie de un informe anual, no un sello de app: rótulo
+   en versalitas, filete fino y celdas de libro (el mismo idioma que `.libro`, a
+   escala de letra pequeña). Sin cajas, sin iconos y sin color propio: así no le
+   disputa la mirada al botón. Dos columnas que pasan a lista en el móvil. */
+.franja{margin-top:24px}
+.franja-ey{margin:0 0 8px;font-size:var(--fs-eyebrow);font-weight:700;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--mu)}
+.franja-l{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;border-top:1px solid var(--bd)}
+.franja-l li{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:11px 0 12px;border-bottom:1px solid var(--bd);font-size:var(--fs-13);line-height:1.45}
+.franja-l li[hidden]{display:none}
+.franja-k{font-size:var(--fs-12);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+.franja-v{color:var(--mu)}
+.franja-a{margin-top:2px;color:var(--acc);font-weight:600;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+.franja-a:hover{text-decoration-thickness:2px}
+@media(max-width:560px){.franja-l{grid-template-columns:1fr}}
+/* En la hoja de Hazte miembro la columna ya separa sus piezas con `gap`. */
+.mb-elige .franja{margin-top:0}
+/* En /pago/metodo la franja ya cierra con su filete: el del aviso de seguridad
+   que la sigue sobraría, y dos rayas seguidas se leen como un error. */
+.pm .franja{margin-top:30px}
+.pm .franja + .pm-seguro{border-top:0}
+/* Sobre el panel de pago de Donar, que es oscuro en los DOS temas: la escala
+   --on-dark y el verde --brote, como el resto de ese bloque. */
+.pay-now .franja-ey{color:var(--on-dark-3)}
+.pay-now .franja-l,.pay-now .franja-l li{border-color:var(--on-dark-line)}
+.pay-now .franja-k{color:var(--on-dark-2)}
+.pay-now .franja-v{color:var(--on-dark-3)}
+.pay-now .franja-a{color:var(--brote)}
+
 /* ---------- /pago/metodo: registrar la tarjeta (30 sep 2026) ----------
    Página del WORKER, no del SPA: se sirve con su propia CSP para que el widget
    de Wompi —su script y su iframe— no contagie al resto del sitio. Solo usa

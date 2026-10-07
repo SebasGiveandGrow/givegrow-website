@@ -882,6 +882,19 @@ var I18N = {
     "donar.conf.2":"Régimen Tributario Especial",
     "donar.conf.3":"Certificado firmado, si lo pides",
     "donar.conf.4":"Rastreo con número de guía",
+    "franja.ey":"Verifica antes de pagar",
+    "franja.1.k":"Entidad",
+    "franja.1.v":"ESAL · NIT 901.948.930-2 · vigilada por la Gobernación de Antioquia.",
+    "franja.1.a":"Consultar en el RUES",
+    "franja.2.k":"Régimen Tributario Especial",
+    "franja.2.v":"Si declaras renta en Colombia, tu aporte puede servir para el descuento del Art. 257 ET, con el certificado que firman el Representante Legal y la Revisora Fiscal.",
+    "franja.2.a":"Cuándo aplica el descuento",
+    "franja.3.k":"Trazabilidad",
+    "franja.3.v":"Cada aporte lleva su número de guía, y con él lo rastreas.",
+    "franja.3.a":"Rastrear una guía",
+    "franja.4.k":"Cuentas",
+    "franja.4.v":"Estados financieros 2025, publicados y firmados.",
+    "franja.4.a":"Ver los estados financieros (PDF)",
     "track.foto.alt":"Equipo de la brigada frente a una vivienda en Marsella, agosto de 2026",
     "track.ej.ey":"Antes de buscar",
     "track.ej.t":"Así se ve un aporte de principio a fin",
@@ -4083,6 +4096,18 @@ function ensureE404(){
   }
   return el;
 }
+/* LA FRANJA DE CONFIANZA se escribe una vez, en <template id="tpl-franja">, y
+   aquí se copia en cada <div data-franja> (Donar y Hazte miembro). Corre al
+   arrancar, ANTES del primer applyLang: así el recorrido de los data-i18n ya
+   alcanza las copias y cambian de idioma solas, sin repintar nada. */
+function montarFranjas(){
+  var tpl = document.getElementById("tpl-franja");
+  if (!tpl || !tpl.content) return;
+  var slots = document.querySelectorAll("[data-franja]");
+  for (var i=0;i<slots.length;i++){
+    if (!slots[i].firstElementChild) slots[i].appendChild(tpl.content.cloneNode(true));
+  }
+}
 function go(id, fromPop){
   /* En el subdominio de Mira Mi Casa solo existen sus rutas; el resto se manda
      al dominio de la fundación en vez de mostrar un 404. */
@@ -4703,6 +4728,16 @@ function payRecNote(){
      Mensual tampoco aqui: /pago/metodo tiene la suya. */
   var pc = document.getElementById("pay-cert");
   if (pc) pc.style.display = (PAGO_VIA === "paypal" || calc.freq === "m") ? "none" : "";
+  /* La franja de Donar dice solo lo que es cierto para ESTE pago. Con PayPal no
+     hay certificado ni descuento (la minuta certifica pesos), y el aporte ÚNICO
+     por PayPal sale por su botón alojado, que no lleva número de guía nuestro.
+     La entidad y los estados financieros valen para todos. */
+  var fr = document.querySelector("#page-donar .franja");
+  if (fr){
+    var rte = fr.querySelector(".franja-rte"), gu = fr.querySelector(".franja-guia");
+    if (rte) rte.hidden = (PAGO_VIA === "paypal");
+    if (gu) gu.hidden = (PAGO_VIA === "paypal" && calc.freq === "u");
+  }
   var n = document.getElementById("pay-rec-note");
   if (!n) return;
   if (calc.freq === "u" || PAGO_VIA === "paypal"){ n.style.display = "none"; n.textContent = ""; return; }
@@ -6376,6 +6411,7 @@ function almaReintentar(burbuja, text){
 
 /* ---------- init ---------- */
 function init(){
+  montarFranjas();
   // language
   setLang("es");
   // routing from hash

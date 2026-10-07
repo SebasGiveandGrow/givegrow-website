@@ -37,7 +37,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=b8b70cf6">
+<link rel="stylesheet" href="/styles.css?v=4f61f4e5">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=c006c875" defer></script>
+<script src="/app.js?v=80632533" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1692,6 +1692,8 @@
           <p class="pay-now-rec" id="pay-rec-note" style="display:none"></p>
           <button type="button" class="btn btn-g pay-now-btn" id="pay-go" data-act="irAPagar()" data-i18n="pay.now.btn">Continuar al pago</button>
           <p class="pay-now-msg" id="pay-msg" role="status" aria-live="polite" style="display:none"></p>
+          <!-- La franja de confianza: su marcado vive UNA vez, en <template id="tpl-franja">. -->
+          <div class="franja" data-franja></div>
         </div>
       </div>
     </div>
@@ -2400,6 +2402,7 @@
           </div>
           <a class="btn btn-g mb-ir" id="mb-ir" href="/pago/metodo?monto=50000" data-i18n="membres.cta.btn">Continuar a registrar tu tarjeta</a>
           <p class="mb-ayuda" data-i18n="membres.cta.calc2">¿Quieres ver antes tu beneficio tributario? Usa el calculador.</p>
+          <div class="franja" data-franja></div>
         </div>
       </div>
     </div>
@@ -2751,6 +2754,24 @@
     </div>
   </section>
 </main>
+
+<!-- LA FRANJA DE CONFIANZA (7 oct 2026): cuatro hechos verificables, cada uno con
+     su enlace, en el punto de decisión de Donar y de Hazte miembro. Va en un
+     <template> para que el marcado exista UNA sola vez: montarFranjas() en app.js
+     lo copia en cada <div data-franja>. Es letra pequeña de informe anual a
+     propósito —sin sellos, sin candados, sin cajas— para no competir con el botón.
+     Solo hechos que se pueden comprobar: si uno deja de serlo, se quita aquí.
+     /pago/metodo (Worker) tiene su versión compacta en TXT_METODO de worker.js:
+     si cambia una, cambiar la otra. -->
+<template id="tpl-franja">
+  <p class="franja-ey" data-i18n="franja.ey">Verifica antes de pagar</p>
+  <ul class="franja-l">
+    <li><span class="franja-k" data-i18n="franja.1.k">Entidad</span><span class="franja-v" data-i18n="franja.1.v">ESAL · NIT 901.948.930-2 · vigilada por la Gobernación de Antioquia.</span><a class="franja-a" href="https://www.rues.org.co" target="_blank" rel="noopener" data-i18n="franja.1.a">Consultar en el RUES</a></li>
+    <li class="franja-rte"><span class="franja-k" data-i18n="franja.2.k">Régimen Tributario Especial</span><span class="franja-v" data-i18n="franja.2.v">Si declaras renta en Colombia, tu aporte puede servir para el descuento del Art. 257 ET, con el certificado que firman el Representante Legal y la Revisora Fiscal.</span><a class="franja-a" href="#faq" data-i18n="franja.2.a">Cuándo aplica el descuento</a></li>
+    <li class="franja-guia"><span class="franja-k" data-i18n="franja.3.k">Trazabilidad</span><span class="franja-v" data-i18n="franja.3.v">Cada aporte lleva su número de guía, y con él lo rastreas.</span><a class="franja-a" href="#rastrea" data-i18n="franja.3.a">Rastrear una guía</a></li>
+    <li><span class="franja-k" data-i18n="franja.4.k">Cuentas</span><span class="franja-v" data-i18n="franja.4.v">Estados financieros 2025, publicados y firmados.</span><a class="franja-a" href="/docs/estados-financieros-2025.pdf" target="_blank" rel="noopener" data-i18n="franja.4.a">Ver los estados financieros (PDF)</a></li>
+  </ul>
+</template>
 
 <!-- El 404 vive en un <template>: inerte hasta que la ruta lo pide. Así no aparece en el
      HTML publicado, donde era la primera página del documento y se lo llevaban crawlers,
