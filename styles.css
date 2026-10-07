@@ -1057,6 +1057,9 @@ html[data-theme="dark"] .alma-fab:hover{background:var(--acc-2);border-color:var
 /* Anatomía de un registro: ledger sobrio (elemento firma de la página) */
 .rec-ledger{margin-top:20px;padding:22px 24px;background:var(--surface-2);border:1px solid var(--bd);border-radius:var(--rl)}
 .rec-cap{font-size:var(--fs-12);font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--mu);margin:0 0 10px}
+/* En #donar sube a 13 px (auditoría 7 oct 2026): ahí rotula el paso de pago y
+   «Más allá del dinero», y a 12 px en versalitas se leía como nota al pie. */
+#page-donar .rec-cap{font-size:var(--fs-13)}
 .rec-list{margin:0 0 22px}
 .rec-list:last-of-type{margin-bottom:12px}
 .rec-item{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--bd)}
@@ -1107,7 +1110,7 @@ html[data-theme="dark"] .prog-logo{background:#000}
 }
 
 /* nota legal pequeña bajo el beneficio tributario */
-.calc-legal{font-size:var(--fs-11);line-height:1.5;color:var(--on-dark-4);margin:2px 0 8px;max-width:52ch}
+.calc-legal{font-size:var(--fs-13);line-height:1.5;color:var(--on-dark-4);margin:2px 0 8px;max-width:52ch}
 /* `.mu` es el gris apagado del fondo PAPEL, y `.calc` es oscuro en los DOS
    temas. Un `.mu` que caiga aquí dentro queda en 2,28:1 —medido— cuando el
    mínimo es 4,5. Le pasaba a la nota de equivalencia de impacto, visible, de
@@ -1259,13 +1262,21 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
      desde el borde físico y el círculo quedaba encima de la barra de inicio. */
   .wa{bottom:calc(18px + env(safe-area-inset-bottom));right:18px;width:52px;height:52px}
   .wa svg{width:25px;height:25px}
-  .alma-fab{bottom:calc(18px + env(safe-area-inset-bottom));left:18px;right:auto;width:52px;height:52px;
-            transition:transform .18s var(--ease),box-shadow .18s var(--ease),background .18s,opacity .2s var(--ease)}
+  .alma-fab{bottom:calc(18px + env(safe-area-inset-bottom));left:18px;right:auto;width:52px;height:52px}
   /* En la primera pantalla de la portada, este círculo caía encima de
      «Conocer el HUB SOCIAL» (medido a 375 × 812). Se aparta solo mientras el
      hero está a la vista —lo marca initFabHero en app.js— y vuelve en cuanto
      se hace scroll. A la derecha, WhatsApp no toca ningún botón del hero. */
   body.hero-vista .alma-fab{opacity:0;pointer-events:none;transform:translateY(8px)}
+  /* Y los dos se apartan de los formularios (auditoría 7 oct 2026): tapaban
+     casillas como «Alianza» en #socialfest. initFabForms en app.js marca
+     `fab-form` cuando un formulario pasa por la franja de abajo y `fab-foco`
+     mientras un campo tiene el foco. `visibility` acompaña a la opacidad para
+     que el botón invisible tampoco reciba el tabulador; con la transición, se
+     oculta al terminar el fundido y aparece al empezar. */
+  .wa,.alma-fab{transition:transform .18s var(--ease),box-shadow .18s var(--ease),background .18s,opacity .2s var(--ease),visibility .2s}
+  body.fab-form .wa,body.fab-form .alma-fab,
+  body.fab-foco .wa,body.fab-foco .alma-fab{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px)}
   .alma-fab svg{width:23px;height:23px}
   /* Sin etiqueta: en táctil no hay hover que la dispare y estorbaría. */
   .wa span,.alma-fab span{display:none}
@@ -1273,6 +1284,15 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
      final, la última línea —NIT y derechos— quedaba debajo de ALMA y
      de WhatsApp y no había más scroll para destaparla. */
   footer{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+}
+/* Con movimiento reducido se apartan sin fundido ni desplazamiento. Va aparte
+   porque la transición de arriba, dentro del bloque móvil, le ganaba a la regla
+   general de `prefers-reduced-motion` que está más arriba. */
+@media(max-width:768px) and (prefers-reduced-motion:reduce){
+  .wa,.alma-fab{transition:none}
+  body.hero-vista .alma-fab,
+  body.fab-form .wa,body.fab-form .alma-fab,
+  body.fab-foco .wa,body.fab-foco .alma-fab{transform:none}
 }
 
 /* ============ Rastrea tu donación ============ */
@@ -1422,7 +1442,9 @@ html[data-theme="dark"] .track-cta :is(h3:not(:where(.h-comp4)),:where(.h-comp3)
 .ally-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .ally-wide{grid-column:1 / -1}
 .ally-form .field{display:flex;flex-direction:column;gap:6px}
-.ally-form label{font-size:var(--fs-13);font-weight:600;color:var(--ink-soft)}
+/* 14 px y no 13 (auditoría 7 oct 2026): en #socialfest, #fundaciones y #aliados
+   el rótulo de cada campo quedaba más chico que la ayuda que lo acompaña. */
+.ally-form label{font-size:var(--fs-14);font-weight:600;color:var(--ink-soft)}
 /* `url` estaba fuera de la lista y el campo "Sitio web" quedaba con el borde de
    1px del estilo genérico, medio punto más fino que sus vecinos. */
 .ally-form input[type=text],.ally-form input[type=email],.ally-form input[type=tel],.ally-form input[type=url]{padding:11px 13px;border:1.5px solid var(--bd);border-radius:10px;font-size:var(--fs-16);background:var(--surface);color:var(--ink)}
@@ -1633,7 +1655,7 @@ html[data-theme="dark"] .mira-hv{color:#e6a44e}
    Reusa .ally-form, .field y .ally-check. Solo añade el grupo de niveles y sus
    dos textos de apoyo. */
 .vf-set{border:0;padding:0;margin:6px 0 18px}
-.vf-set legend{font-size:var(--fs-13);font-weight:700;color:var(--ink-soft);padding:0;margin-bottom:6px}
+.vf-set legend{font-size:var(--fs-14);font-weight:700;color:var(--ink-soft);padding:0;margin-bottom:6px}
 .vf-help{margin:0 0 12px;font-size:var(--fs-14);line-height:1.55;color:var(--mu);max-width:64ch}
 /* Contador de caracteres (app.js, contarCaracteres): aparece al 60 % del tope.
    Ámbar y no rojo al llegar: no es un error, es un aviso de que no cabe más. */
