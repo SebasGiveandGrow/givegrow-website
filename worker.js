@@ -20763,6 +20763,67 @@ textarea { font-size: 16px }
 /* La lista de pasos de un voluntario, dentro de su fila. */
 .vpasos{margin-top:8px;line-height:1.9}
 .vpasos .copy{font-size:var(--fs-12)}
+/* ---- EL CONVENIO EN LA BANDEJA (ver detalleConvenio) ----
+   En la celda, un resumen de tres lineas; debajo, una fila a todo el ancho que
+   se abre. Sin pildoras nuevas: las fichas A-D son texto con filete, y la lista
+   del Anexo 1 son casillas sobre reglas finas, como el resto del panel. */
+.conv-res{margin-top:8px;line-height:1.5}
+.conv-fs{display:inline-flex;flex-wrap:wrap;gap:4px;margin:4px 0 0;vertical-align:middle}
+.conv-f{font-size:var(--fs-11);font-weight:700;letter-spacing:.04em;padding:1px 6px;border:1px solid var(--bd);
+  border-radius:4px;color:var(--mu);background:var(--surface);white-space:nowrap}
+.conv-f.ok{border-color:var(--g);color:var(--g)}
+.conv-f.medio{border-style:dashed;color:var(--ink)}
+.conv-mal{color:var(--err);font-weight:700}
+.conv-res .conv-mal{display:block;font-size:var(--fs-12)}
+.med-tbl tr.con-det td{border-bottom:0;padding-bottom:6px}
+.med-tbl tr.conv-tr td{padding:0 0 14px}
+/* Dentro de la tabla que se desplaza en el telefono, la ficha se queda quieta
+   a la izquierda y del ancho de la ventana: si no, mediria lo que la tabla
+   (560px minimo) y habria que arrastrarla de lado para leerla. */
+.conv-det{position:sticky;left:0;max-width:calc(100vw - 48px);border:1px solid var(--bd);
+  border-left:3px solid var(--acc);border-radius:10px;background:var(--surface)}
+.conv-det>summary{cursor:pointer;padding:10px 14px;font-size:var(--fs-14);line-height:1.5}
+.conv-det[open]>summary{border-bottom:1px solid var(--bd)}
+.conv-cuerpo{padding:12px 16px 16px}
+.conv-cab{margin:0 0 14px;font-size:var(--fs-14)}
+.conv-alerta{border-left:3px solid var(--err);padding:6px 10px;margin:0 0 12px;font-size:var(--fs-13);
+  color:var(--err);font-weight:600;background:var(--bg)}
+.conv-cols{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+@media(min-width:900px){ .conv-cols{grid-template-columns:minmax(0,1.7fr) minmax(240px,1fr);gap:28px} }
+.conv-lado{display:grid;gap:18px;align-content:start}
+.conv-sec h4{font-size:var(--fs-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--mu);margin:0 0 6px}
+.conv-p{margin:0 0 6px;font-size:var(--fs-13);line-height:1.5}
+.conv-p a{color:var(--acc);text-decoration:underline;text-underline-offset:2px}
+.conv-anexo{list-style:none;margin:0;padding:0;display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));column-gap:20px}
+.conv-anexo.conv-uno{grid-template-columns:minmax(0,1fr)}
+.conv-doc{border-top:1px solid var(--bd);padding:7px 0 6px;min-width:0}
+.conv-chk{appearance:none;background:none;border:0;padding:2px 0;margin:0;cursor:pointer;width:100%;
+  display:flex;gap:9px;align-items:flex-start;text-align:left;font:inherit;font-size:var(--fs-13);
+  line-height:1.4;color:var(--ink)}
+.conv-chk:disabled{cursor:default}
+.conv-chk:disabled .conv-txt{color:var(--mu)}
+.conv-chk:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:3px}
+.conv-box{flex:0 0 16px;height:16px;margin-top:1px;border:1.5px solid var(--mu);border-radius:3px;
+  display:inline-flex;align-items:center;justify-content:center;font-size:var(--fs-11);font-weight:700;line-height:1;
+  background:var(--bg)}
+.conv-doc.hecho .conv-box{background:var(--g);border-color:var(--g);color:var(--on-dark)}
+.conv-doc.revisar .conv-box{border-color:var(--amber);color:var(--amber)}
+.conv-chk:not(:disabled):hover .conv-box{border-color:var(--acc)}
+.conv-meta{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;padding-left:25px;font-size:var(--fs-12);color:var(--mu)}
+.conv-meta small{font-size:var(--fs-12)}
+.conv-doc.revisar .conv-meta small{color:var(--amber);font-weight:600}
+.conv-mini{display:inline-flex;gap:10px}
+.conv-link{appearance:none;background:none;border:0;padding:0;cursor:pointer;font:inherit;
+  font-size:var(--fs-12);font-weight:600;color:var(--acc);text-decoration:underline;text-underline-offset:2px}
+.conv-acc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.conv-acc .copy{font-size:var(--fs-12);padding:5px 10px;border:0;cursor:pointer}
+.conv-subir{display:inline-flex;align-items:center;cursor:pointer}
+@media (pointer:coarse){
+  .conv-link{min-height:36px;display:inline-flex;align-items:center}
+  .conv-chk{min-height:40px}
+}
 .carga-fallo{border-left:3px solid var(--amber);padding:9px 13px;margin:0;
   font-size:var(--fs-14);background:var(--amberl)}
 .dec-lista{list-style:none;margin:0;padding:0}
@@ -20870,7 +20931,11 @@ textarea { font-size: 16px }
      y mezclaba tres cosas que se usan distinto — bandejas que esperan una
      decision, libros de lo que ya paso, y el estado de la maquina.
      Se agrupan por LO QUE ESTAS HACIENDO, no por tipo de dato. -->
-<nav class="mod-barra" aria-label="Modulos del panel">
+<!-- Un <div> con role y no un <nav>: la hoja del sitio fija TODO <nav> arriba de
+     la ventana (position:fixed, z-index 200, sin fondo), que es la barra del
+     sitio publico. Aqui eso dejaba las pestañas flotando sobre lo que pasaba
+     por debajo —los filtros de la bandeja se pintaban encima de ellas—. -->
+<div class="mod-barra" role="navigation" aria-label="Modulos del panel">
   <button type="button" class="mod-tab on" data-mod-ir="hoy">Hoy<span class="mod-n" id="n-hoy"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="dinero">Dinero<span class="mod-n" id="n-dinero"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="mmc">Mira Mi Casa<span class="mod-n" id="n-mmc"></span></button>
@@ -20879,7 +20944,7 @@ textarea { font-size: 16px }
   <button type="button" class="mod-tab" data-mod-ir="entregas">Entregas<span class="mod-n" id="n-entregas"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="conta">Contabilidad<span class="mod-n" id="n-conta"></span></button>
   <button type="button" class="mod-tab" data-mod-ir="salud">Salud<span class="mod-n" id="n-salud"></span></button>
-</nav>
+</div>
 
 <div class="mod" data-mod="hoy"><div id="decisiones"></div></div>
 
@@ -22602,6 +22667,32 @@ function notaConv(n){
   if (/^https?:\\/\\/\\S+$/i.test(n)) return '<a href="' + esc(n) + '" target="_blank" rel="noopener">enlace</a>';
   return esc(n);
 }
+/* EL CONVENIO EN LA BANDEJA VA EN DOS PISOS (6 oct 2026). Todo el convenio —
+   version, enlace, formularios, texto, los nueve documentos del Anexo 1 y la
+   firma— vivia dentro de la celda «Lo que hay que saber», que mide unos 170px
+   a 1000px de ancho: salia una columna de un metro de alto con un boton de
+   ancho completo por documento. Sebas lo probo en produccion y «el panel no se
+   ve bien».
+
+   Ahora la celda solo RESUME (version, cuanto falta del Anexo 1 y como va cada
+   formulario A-D) y el convenio completo se abre en una fila propia, debajo de
+   la de la inscripcion y a todo el ancho de la tabla. La lista del Anexo 1 es
+   una rejilla de casillas, no una torre de botones. */
+function fichasFormularios(c){
+  var fs = (c.en_linea && c.en_linea.formularios) || {};
+  return '<span class="conv-fs">' + ["A", "B", "C", "D"].map(function(F){
+    var x = fs[F];
+    var firmado = x && x.estado === "firmado";
+    return '<span class="conv-f' + (firmado ? " ok" : x ? " medio" : "") + '" title="Formulario ' + F + ": "
+      + (firmado ? "firmado" : x ? "en borrador" : "sin empezar") + '">' + F + (firmado ? " ✓" : x ? " …" : " —") + "</span>";
+  }).join("") + "</span>";
+}
+function faltaAnexo(c){
+  return !c.variante ? "Elige la versión para ver la lista"
+    : c.documentos_completos ? "Anexo 1 completo"
+    : "Anexo 1: faltan " + c.faltan + " de " + c.items.length;
+}
+/* El resumen, en la celda. */
 function listaConvenio(i){
   var c = i.convenio;
   if (!c) return "";
@@ -22610,71 +22701,112 @@ function listaConvenio(i){
       + (c.nombre_variante ? " · " + esc(c.nombre_variante) : "") + "</small></div>";
   }
   if (i.estado !== "convenio") return "";
-  var f = c.firmado;
-  var h = '<div class="vpasos"><small><strong>Convenio · '
-    + (c.nombre_variante ? esc(c.nombre_variante) : "versión por definir") + "</strong>"
-    + (f ? "" : ' <button class="copy" data-cvar="' + i.id + '" data-v="'
-        + (c.variante === "registradas" ? "no_registradas" : "registradas") + '">cambiar versión</button>')
-    + "<br>" + (!c.variante ? "Elige la versión para ver la lista."
-        : c.documentos_completos ? "Anexo 1 completo." : "Anexo 1: faltan " + c.faltan + " de " + c.items.length + ".")
-    + "</small>";
-  if (c.certificado_vencido) h += '<br><small style="color:var(--err);font-weight:700">El certificado llegó hace más de 30 días: pide uno nuevo antes de firmar.</small>';
-  h += enLineaConvenio(i, c);
-  h += (c.items || []).map(function(d){
-    /* Lo que hizo la fundacion en linea cierra la casilla igual que una marca,
-       pero se dice distinto: «subido» es un archivo que nadie ha mirado. El
-       boton, sobre una casilla cerrada en linea, MARCA (revisado), no desmarca. */
-    var hecho = d.estado ? (ESTADO_ANEXO[d.estado] || d.estado) + " " + esc(enCO(d.en, 10)) : "";
-    var b = '<div style="margin-top:2px"><button class="copy" data-cdoc="' + i.id + '" data-doc="' + esc(d.id) + '" data-marca="' + (d.manual ? "" : "recibido") + '"'
-      + (d.estado ? ' title="' + (d.manual ? "Lo anotó " : "Lo hizo ") + esc(d.por || "?") + '"' : "") + (f ? " disabled" : "") + ">"
-      + (d.estado ? (d.estado === "no_aplica" ? "– " : d.estado === "subido" ? "↑ " : "✓ ") : "○ ") + esc(d.texto)
-      + (hecho ? ' <span class="mu">· ' + hecho + "</span>" : "")
-      + (d.rechazados ? ' <span style="color:var(--err)">· ' + d.rechazados + " rechazado(s)</span>" : "") + "</button>";
-    if (d.na && !d.estado && !f) b += ' <button class="copy" data-cdoc="' + i.id + '" data-doc="' + esc(d.id) + '" data-marca="no_aplica">no aplica</button>';
-    b += ' <button class="copy" data-cnota="' + i.id + '" data-doc="' + esc(d.id) + '" data-nota="' + esc(d.nota) + '">' + (d.nota ? "editar nota" : "+ nota") + "</button>";
-    if (d.nota) b += ' <small>' + notaConv(d.nota) + "</small>";
-    return b + "</div>";
-  }).join("");
-  if (c.variante) {
-    h += '<div style="margin-top:8px"><button class="copy" data-cdoc="' + i.id + '" data-doc="firmado" data-marca="' + (f ? "" : "recibido") + '"'
-      + (!f && !c.documentos_completos ? ' disabled title="Primero el Anexo 1 completo"' : "") + ">"
-      + (f ? "✓ " : "○ ") + "<strong>Convenio firmado por ambas partes</strong>"
-      + (f ? ' <span class="mu">· ' + esc(enCO(f.en, 10)) + "</span>" : "") + "</button>";
-    /* La aceptacion de la fundacion se ve AQUI, junto a la firma de las dos
-       partes, que sigue siendo de Give&Grow: la contraparte la pone una persona. */
-    var acepto = c.en_linea && c.en_linea.fundacion_acepto;
-    if (c.en_linea) h += '<br><small class="mu">' + (acepto
-      ? "La fundación aceptó el convenio en línea el " + esc(enCO(acepto, 16)) + "."
-      : "La fundación todavía no acepta el convenio en línea (D).") + "</small>";
-    h += "</div>";
-  }
-  return h + "</div>";
+  return '<div class="conv-res"><small><strong>Convenio · '
+    + (c.nombre_variante ? esc(c.nombre_variante) : "versión por definir") + "</strong><br>"
+    + esc(faltaAnexo(c)) + (c.firmado ? " · firmado" : "") + "</small>"
+    + (c.en_linea ? fichasFormularios(c) : "")
+    + (c.certificado_vencido ? '<small class="conv-mal">Certificado de más de 30 días</small>' : "")
+    + "</div>";
 }
 var ESTADO_ANEXO = { recibido: "recibido", no_aplica: "no aplica", firmado_en_linea: "firmado en línea",
                      subido: "subido por la fundación, sin revisar" };
-/* EL CONVENIO EN LINEA (0038): el enlace, el texto del convenio que hay que
-   subir para que la fundacion pueda aceptarlo, y como va cada formulario. Todo
-   llega armado del servidor en i.convenio.en_linea. */
-function enLineaConvenio(i, c){
+/* Que fichas estan abiertas, para que sigan abiertas cuando la tabla se
+   vuelve a pintar despues de marcar un documento. Solo vive en esta pestaña. */
+var CONV_ABIERTO = {};
+document.addEventListener("toggle", function(e){
+  var d = e.target;
+  if (d && d.getAttribute && d.hasAttribute("data-cdet")) CONV_ABIERTO[d.getAttribute("data-cdet")] = d.open;
+}, true);
+
+/* La fila de detalle, debajo de la de la inscripcion. Vacia si no hay convenio
+   en curso. */
+function detalleConvenio(i){
+  var c = i.convenio;
+  if (!c || i.estado !== "convenio") return "";
+  var f = c.firmado;
+  var abierto = CONV_ABIERTO[i.id];
+  var h = '<tr class="conv-tr"><td colspan="7"><details class="conv-det" data-cdet="' + i.id + '"' + (abierto ? " open" : "") + ">"
+    + '<summary><strong>Convenio de ' + esc(i.nombre || "") + "</strong>"
+    + ' <span class="mu">· documentos del Anexo 1, formularios en línea, texto y firma</span></summary>';
+  h += '<div class="conv-cuerpo">';
+
+  /* Version: lo primero, porque de ella sale la lista. */
+  h += '<p class="conv-cab">Versión: <strong>' + (c.nombre_variante ? esc(c.nombre_variante) : "por definir") + "</strong>"
+    + (f ? "" : ' <button type="button" class="conv-link" data-cvar="' + i.id + '" data-v="'
+        + (c.variante === "registradas" ? "no_registradas" : "registradas") + '">cambiar versión</button>') + "</p>";
+  if (c.certificado_vencido) h += '<p class="conv-alerta">El certificado llegó hace más de 30 días: pide uno nuevo antes de firmar.</p>';
+
+  h += '<div class="conv-cols">';
+  /* Izquierda: el Anexo 1, que es donde se trabaja. */
+  h += '<div class="conv-sec"><h4>' + esc(faltaAnexo(c)) + "</h4>";
+  if ((c.items || []).length) {
+    h += '<ul class="conv-anexo">' + c.items.map(function(d){
+      /* Lo que hizo la fundacion en linea cierra la casilla igual que una marca,
+         pero se dice distinto: «subido» es un archivo que nadie ha mirado. La
+         casilla, sobre algo cerrado en linea, MARCA (revisado), no desmarca. */
+      var hecho = d.estado ? (ESTADO_ANEXO[d.estado] || d.estado) + " " + esc(enCO(d.en, 10)) : "";
+      var marca = d.estado === "no_aplica" ? "–" : d.estado === "subido" ? "↑" : d.estado ? "✓" : "";
+      var clase = d.estado === "subido" ? " revisar" : d.estado ? " hecho" : "";
+      var s = '<li class="conv-doc' + clase + '">'
+        + '<button type="button" class="conv-chk" data-cdoc="' + i.id + '" data-doc="' + esc(d.id) + '" data-marca="' + (d.manual ? "" : "recibido") + '"'
+        + ' aria-pressed="' + (d.manual ? "true" : "false") + '"'
+        + (d.estado ? ' title="' + (d.manual ? "Lo anotó " : "Lo hizo ") + esc(d.por || "?") + '"' : "") + (f ? " disabled" : "") + ">"
+        + '<span class="conv-box" aria-hidden="true">' + marca + "</span>"
+        + '<span class="conv-txt">' + esc(d.texto) + "</span></button>";
+      var meta = [];
+      if (hecho) meta.push(hecho);
+      if (d.rechazados) meta.push('<span class="conv-mal">' + d.rechazados + " rechazado(s)</span>");
+      if (d.nota) meta.push(notaConv(d.nota));
+      var acc = "";
+      if (d.na && !d.estado && !f) acc += '<button type="button" class="conv-link" data-cdoc="' + i.id + '" data-doc="' + esc(d.id) + '" data-marca="no_aplica">no aplica</button>';
+      acc += '<button type="button" class="conv-link" data-cnota="' + i.id + '" data-doc="' + esc(d.id) + '" data-nota="' + esc(d.nota) + '">' + (d.nota ? "editar nota" : "+ nota") + "</button>";
+      s += '<div class="conv-meta">' + (meta.length ? "<small>" + meta.join(" · ") + "</small>" : "") + '<span class="conv-mini">' + acc + "</span></div>";
+      return s + "</li>";
+    }).join("") + "</ul>";
+  } else {
+    h += '<p class="mu conv-p">Elige la versión del convenio para ver qué documentos se piden.</p>';
+  }
+  h += "</div>";
+
+  /* Derecha: lo que pasa en linea y la firma. */
+  h += '<div class="conv-lado">';
   var el = c.en_linea;
-  if (!el) return "";
-  var fs = el.formularios || {};
-  var est = ["A", "B", "C", "D"].map(function(F){
-    var x = fs[F];
-    return F + (x && x.estado === "firmado" ? " ✓" : x ? " borrador" : " —");
-  }).join(" · ");
-  return '<br><small><strong>En línea:</strong> '
-    + (el.token ? '<a href="/convenio/' + esc(el.token) + '" target="_blank" rel="noopener">enlace</a> · ' : "sin enlace todavía · ")
-    + '<button class="copy" data-cenlace="' + i.id + '">' + (el.token ? "reenviar enlace" : "crear y enviar enlace") + "</button>"
-    + " · " + esc(est)
-    + ' · <button class="copy" data-cver="' + i.id + '">ver respuestas y archivos</button>'
-    + "<br>Texto del convenio: " + (el.texto
-        ? "subido " + esc(enCO(el.texto.en, 10)) + ' · <a href="/api/admin/inscripcion/' + i.id + '/convenio-texto.pdf" target="_blank" rel="noopener">ver</a>'
-        : '<strong style="color:#A84D00">falta subirlo</strong> (sin él la fundación no puede aceptar)')
-    + (el.fundacion_acepto ? ""
-        : ' · <label class="copy" style="cursor:pointer">' + (el.texto ? "reemplazar" : "subir PDF")
-          + ' <input type="file" accept="application/pdf" data-ctexto="' + i.id + '" style="display:none"></label>')
-    + "</small>";
+  if (el) {
+    h += '<div class="conv-sec"><h4>En línea</h4>'
+      + '<p class="conv-p">Formularios ' + fichasFormularios(c) + "</p>"
+      + '<p class="conv-p">Texto del convenio: ' + (el.texto
+          ? "subido " + esc(enCO(el.texto.en, 10)) + ' · <a href="/api/admin/inscripcion/' + i.id + '/convenio-texto.pdf" target="_blank" rel="noopener">ver</a>'
+          : '<strong class="conv-mal">falta subirlo</strong> <span class="mu">(sin él la fundación no puede aceptar)</span>') + "</p>"
+      + '<p class="conv-p">' + (el.token
+          ? '<a href="/convenio/' + esc(el.token) + '" target="_blank" rel="noopener">Abrir el enlace de la fundación</a>'
+          : '<span class="mu">Sin enlace todavía.</span>') + "</p>"
+      + '<div class="conv-acc">'
+      + '<button type="button" class="copy" data-cver="' + i.id + '">Ver respuestas y archivos</button>'
+      + '<button type="button" class="copy" data-cenlace="' + i.id + '">' + (el.token ? "Reenviar enlace" : "Crear y enviar enlace") + "</button>"
+      + (el.fundacion_acepto ? ""
+          : '<label class="copy conv-subir">' + (el.texto ? "Reemplazar texto (PDF)" : "Subir texto (PDF)")
+            + '<input type="file" accept="application/pdf" data-ctexto="' + i.id + '" hidden></label>')
+      + "</div></div>";
+  }
+  if (c.variante) {
+    var acepto = el && el.fundacion_acepto;
+    h += '<div class="conv-sec"><h4>Firma</h4><ul class="conv-anexo conv-uno"><li class="conv-doc' + (f ? " hecho" : "") + '">'
+      + '<button type="button" class="conv-chk" data-cdoc="' + i.id + '" data-doc="firmado" data-marca="' + (f ? "" : "recibido") + '"'
+      + ' aria-pressed="' + (f ? "true" : "false") + '"'
+      + (!f && !c.documentos_completos ? ' disabled title="Primero el Anexo 1 completo"' : "") + ">"
+      + '<span class="conv-box" aria-hidden="true">' + (f ? "✓" : "") + "</span>"
+      + '<span class="conv-txt"><strong>Convenio firmado por ambas partes</strong></span></button>'
+      + '<div class="conv-meta"><small>' + (f ? esc(enCO(f.en, 10))
+          : !c.documentos_completos ? "Se marca con el Anexo 1 completo." : "Lo marca Give&amp;Grow al firmar su parte.") + "</small></div></li></ul>"
+      /* La aceptacion de la fundacion se ve AQUI, junto a la firma de las dos
+         partes, que sigue siendo de Give&Grow: la contraparte la pone una persona. */
+      + (el ? '<p class="conv-p mu">' + (acepto
+          ? "La fundación aceptó el convenio en línea el " + esc(enCO(acepto, 16)) + "."
+          : "La fundación todavía no acepta el convenio en línea (D).") + "</p>" : "")
+      + "</div>";
+  }
+  h += "</div></div></div></details></td></tr>";
+  return h;
 }
 
 /* Los botones del convenio en linea. Reenviar el enlace pide confirmar: sale
@@ -22708,6 +22840,24 @@ document.addEventListener("change", function(e){
     cargarInscripciones();
   }).catch(function(){ inp.disabled = false; alert("No se pudo subir: revisa la conexión."); });
 });
+
+/* LA HOJA DE LAS DOS VENTANAS APARTE (respuestas del cuestionario y del
+   convenio). Era una por ventana y ya no se parecian: la de la ficha llevaba
+   sus colores escritos a mano. Una sola, con tokens — el trinquete #11 del
+   gate cuenta los literales del Worker—. */
+var VENTANA_CSS = "<style>:root{--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--sf:#FBF8F1;--acc:#1F5C38;" +
+  "--fs-s:13px;--fs-xs:12px;--fs-h1:20px;--fs-h2:16px}" +
+  "body{font:15px/1.5 system-ui;margin:24px;color:var(--ink);background:var(--bg)}" +
+  "table{border-collapse:collapse;width:100%;background:var(--sf);margin:6px 0 14px}" +
+  "td{border-bottom:1px solid var(--bd);padding:6px 9px;vertical-align:top}" +
+  "td:first-child{width:190px;color:var(--mu);font-size:var(--fs-s)}table.r td:first-child{width:44px}" +
+  "table.r td:nth-child(2){width:42%;font-weight:600}h1{font-size:var(--fs-h1);margin:0 0 2px}" +
+  "h2,h3{font-size:var(--fs-h2);margin:22px 0 4px}.mu{color:var(--mu);font-weight:400}p.sub{color:var(--mu);font-size:var(--fs-s);margin:0 0 16px}" +
+  "ul{margin:8px 0 20px 18px}a{color:var(--acc)}code{font-size:var(--fs-xs);word-break:break-all}" +
+  "button{font:inherit;font-size:var(--fs-s);font-weight:600;padding:5px 12px;border:1px solid var(--bd);border-radius:6px;" +
+  "background:var(--sf);color:var(--acc);cursor:pointer}button:disabled{color:var(--mu);cursor:default}" +
+  "textarea{width:100%;height:300px;font:13px/1.45 ui-monospace,monospace;border:1px solid var(--bd);border-radius:8px;" +
+  "padding:10px;background:var(--sf);color:var(--ink)}</style>";
 
 /* Todo lo del convenio en linea de una fundacion, en una ventana aparte, como
    la ficha: respuestas, evidencia de cada firma, comprobantes y archivos. */
@@ -22745,15 +22895,7 @@ function verConvenio(id){
     }).join("");
     w.document.write(
       "<!doctype html><meta charset=utf-8><title>Convenio · " + esc(d.nombre) + "</title>" +
-      /* Con tokens: el trinquete #11 del gate cuenta los literales del Worker. */
-      "<style>:root{--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--sf:#FBF8F1;" +
-      "--fs-s:13px;--fs-xs:12px;--fs-h1:20px;--fs-h2:16px}" +
-      "body{font:15px/1.5 system-ui;margin:24px;color:var(--ink);background:var(--bg)}" +
-      "table{border-collapse:collapse;width:100%;background:var(--sf);margin:6px 0 14px}" +
-      "td{border-bottom:1px solid var(--bd);padding:6px 9px;vertical-align:top}" +
-      "td:first-child{width:190px;color:var(--mu);font-size:var(--fs-s)}table.r td:first-child{width:44px}" +
-      "table.r td:nth-child(2){width:42%;font-weight:600}h1{font-size:var(--fs-h1);margin:0 0 2px}" +
-      "h2{font-size:var(--fs-h2);margin:22px 0 4px}.mu{color:var(--mu);font-weight:400}code{font-size:var(--fs-xs);word-break:break-all}</style>" +
+      VENTANA_CSS +
       "<h1>" + esc(d.nombre) + "</h1>" +
       '<p class="mu">' + esc(d.variante || "versión por definir") + " · " + esc(d.estado) + " · " + esc(d.email || "") +
       (d.enlace ? ' · <a href="' + esc(d.enlace) + '" target="_blank" rel="noopener">enlace de la fundación</a>' : "") + "</p>" +
@@ -22833,7 +22975,7 @@ function resumenInscripcion(tipo, x, i){
        calcula el servidor. */
     var cv = i && i.convenio;
     var legal = esc(PERS_ES[x.personeria] || "constitución: no dice") + (x.nit ? " · NIT " + esc(x.nit) : "")
-      + (cv && cv.nombre_variante ? " · convenio: " + esc(cv.nombre_variante) : "");
+      + (cv && cv.nombre_variante && i.estado !== "convenio" ? " · convenio: " + esc(cv.nombre_variante) : "");
     return esc(x.atiende || "?") + " — " +
       (x.poblacion || []).map(function(k){ return esc(POB_ES[k] || k); }).join(", ") +
       "<br><small>" + menor.join(" · ") + "</small>" +
@@ -23059,7 +23201,8 @@ function cargarInscripciones(){
         enlaces.push('<a href="' + esc(x.web) + '" target="_blank" rel="noopener">web</a>');
       } else if (x.web) { enlaces.push(esc(x.web)); }
       if (x.instagram) enlaces.push(esc(x.instagram));
-      return "<tr>" +
+      var det = esFund ? detalleConvenio(i) : "";
+      return "<tr" + (det ? ' class="con-det"' : "") + ">" +
         "<td>" + esc(TIPO_ES[i.tipo] || i.tipo) + "</td>" +
         "<td><strong>" + esc(i.nombre||"") + "</strong>" +
           (x.lider ? "<br><small>" + esc(x.lider) + (x.cargo ? " · " + esc(x.cargo) : "") + "</small>" : "") +
@@ -23079,7 +23222,7 @@ function cargarInscripciones(){
           /* La supresion va SIEMPRE, en cualquier estado: quien pide que le
              borren sus datos no tiene por que haber llegado a «aceptada». */
           '<br><small><button class="copy" data-insborrar="' + i.id + '">Suprimir</button></small>' + "</td>" +
-      "</tr>";
+      "</tr>" + det;
     }).join("");
   });
 }
@@ -24014,7 +24157,7 @@ function verFicha(id){
     if (!w){ alert("El navegador bloqueo la ventana."); return; }
     var filas = (d.respuestas||[]).map(function(r){
       return "<tr><td>" + esc(r.num) + "</td><td>" + esc(r.lbl) + "</td><td>" +
-             (r.valor ? esc(r.valor) : '<em style="color:#5C636F">sin responder</em>') + "</td></tr>";
+             (r.valor ? esc(r.valor) : '<em class="mu">sin responder</em>') + "</td></tr>";
     }).join("");
     /* El boton del objeto va DENTRO de la ventana de la ficha, no en la fila:
        solo tiene sentido con las respuestas delante. */
@@ -24026,18 +24169,13 @@ function verFicha(id){
     }).join("");
     w.document.write(
       "<!doctype html><meta charset=utf-8><title>Ficha · " + esc(d.nombre) + "</title>" +
-      "<style>body{font:15px/1.5 system-ui;margin:24px;color:#191813;background:#F3EFE6}" +
-      "table{border-collapse:collapse;width:100%;background:#FBF8F1}" +
-      "td{border-bottom:1px solid #DAD3C3;padding:7px 9px;vertical-align:top}" +
-      "td:first-child{width:52px;color:#5C636F;font-size:13px}" +
-      "td:nth-child(2){width:38%;font-weight:600}h1{font-size:20px;margin:0 0 2px}" +
-      "p.sub{color:#5C636F;font-size:13px;margin:0 0 16px}ul{margin:8px 0 20px 18px}</style>" +
+      VENTANA_CSS +
       "<h1>" + esc(d.nombre) + "</h1>" +
       '<p class="sub">' + esc(d.estado) + (d.enviada_en ? " · enviada " + esc(enCO(d.enviada_en)) : "") +
       " · " + esc(d.email || "") + "</p>" +
       (arch ? "<h3>Archivos</h3><ul>" + arch + "</ul>" : "<p><em>Sin archivos subidos.</em></p>") +
       objeto +
-      "<table>" + filas + "</table>");
+      '<table class="r">' + filas + "</table>");
     w.document.close();
 
     /* Se arma A PETICION y no al abrir: quien viene a leer las respuestas no
@@ -24061,8 +24199,7 @@ function verFicha(id){
         caja.innerHTML =
           "<p class='sub'>Pégalo en <code>data/partners.json</code> dentro de <code>partners[]</code>, " +
           "y <strong>después</strong> completa lo de abajo. Corre <code>node scripts/validate.mjs</code> antes de commitear.</p>" +
-          "<textarea readonly style='width:100%;height:300px;font:13px/1.45 ui-monospace,monospace;" +
-          "border:1px solid #DAD3C3;border-radius:8px;padding:10px;background:#FBF8F1'>" +
+          "<textarea readonly>" +
           esc(JSON.stringify(o.objeto, null, 2)) + "</textarea>" +
           "<h3 style='margin-top:18px'>Falta completar a mano (" + (o.pendientes||[]).length + ")</h3><ul>" +
           (o.pendientes||[]).map(function(x){ return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
