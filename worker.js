@@ -2749,6 +2749,26 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(COALESCE(json_extract(datos, '$.convenio.desde'), actualizada_en)) AS masViejo " +
     "FROM inscripciones WHERE tipo = 'fundacion' AND estado = 'convenio'",
     "Bandeja «Quién quiere entrar» · documentos del Anexo 1 y firma; pasados 30 días, el certificado de existencia ya no vale", 28, "#sec-entrar", 30);
+  /* LA FUNDACION YA FIRMO Y FALTAMOS NOSOTROS. Aceptar el convenio (el
+     formulario D, firmado con codigo en /convenio) es lo ultimo que le toca a
+     la fundacion; desde ahi la pelota es de Give&Grow: revisar lo que falte
+     del Anexo 1 y marcar «firmado por ambas partes». Dentro de
+     `convenios_en_curso` esto no se distinguia de una fundacion que aun no ha
+     subido nada, y su plazo de 30 dias es el del certificado, no el nuestro.
+     CINCO DIAS desde la firma de D: una semana habil para revisar y firmar,
+     que es lo que la pagina le dice («Give&Grow lo firma cuando revise los
+     documentos»), y holgura de sobra antes de que el certificado de
+     existencia —30 dias— venza y haya que pedirlo otra vez.
+     Sin la 0038 no hay tabla de formularios: la cola simplemente no sale. */
+  try {
+    await enCola("convenios_por_firmar",
+      "SELECT COUNT(*) AS n, MIN(f.firmado_en) AS masViejo FROM inscripciones i " +
+      "JOIN convenio_formularios f ON f.inscripcion = i.id AND f.formulario = 'D' AND f.estado = 'firmado' " +
+      "WHERE i.tipo = 'fundacion' AND i.estado = 'convenio' AND json_extract(i.datos, '$.convenio.firmado') IS NULL",
+      "Bandeja «Quién quiere entrar» · la fundación ya aceptó el convenio: revisa el Anexo 1 y marca «firmado por ambas partes»", 24, "#sec-entrar", 5);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   await enCola("transferencias_sin_verificar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
     "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado", 60, "#sec-transferencias");
@@ -5529,6 +5549,7 @@ const NOMBRE_COLA_PLAZO = {
   voluntarios_sin_respuesta: "Voluntarios sin responder",
   jornadas_sin_cerrar: "Jornadas realizadas sin cerrar (sin certificados ni encuestas)",
   convenios_en_curso: "Fundaciones en convenio hace más de 30 días",
+  convenios_por_firmar: "Convenio aceptado por la fundación, falta la firma de Give&Grow",
   urgentes_sin_visitar: "Casos urgentes que nadie ha visitado",
   casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto",
   vencimientos_por_atender: "Vencimientos tributarios y legales sin atender"
@@ -5567,6 +5588,8 @@ async function resumenDiarioEquipo(env) {
         : n + " personas esperan una respuesta que ya pasó su plazo",
       parrafos: [
         "A cada una el acuse le prometió que una persona le escribe. Desde el panel, en «Quién quiere entrar», el filtro «Sin responder» las ordena de la más vieja a la más nueva, y cada fila trae un borrador de respuesta.",
+        deAlianzas.some(c => c.clave === "convenios_por_firmar")
+          ? "Las de «convenio aceptado» ya firmaron su parte en línea: falta que Give&Grow revise el Anexo 1 y marque «firmado por ambas partes» en su fila de «Quién quiere entrar»." : "",
         otras ? "Además hay " + otras + (otras === 1 ? " cola" : " colas") + " con trabajo pendiente que todavía no pasa su plazo: están en «Hoy»." : ""
       ],
       boton: { url: "https://thegiveandgrowproject.org/admin#hoy", texto: "Abrir el panel" }
@@ -16841,7 +16864,7 @@ async function convenioEstado(env, ctx) {
     anexo: anexoParaFundacion(ctx, rc),
     subidas: docs.map(d => ({ doc: d.id, texto: textoDoc(d, ctx.variante, false), tope: CONVENIO_SUBIDAS[d.id].tope })),
     archivos: (arch.results || []).map(a => ({ id: a.id, doc: a.doc, tipo: a.tipo, bytes: a.bytes,
-      en: a.subido_en, estado: a.estado, motivo: a.motivo || "" }))
+      en: a.subido_en, estado: a.estado, motivo: a.motivo || "", revisado: archivoRevisado(x, a) }))
   });
 }
 
@@ -17108,14 +17131,42 @@ async function convenioSubir(request, env, ctx, doc) {
   return json({ ok: true, archivo: { id: r.id, doc, tipo, bytes: bytes.length, en: r.subido_en, estado: "subido" } });
 }
 
+/* UN ARCHIVO REVISADO YA NO LO QUITA LA FUNDACION. Cuando Give&Grow marca
+   en el panel un documento del Anexo 1 como «recibido», lo hace mirando los
+   archivos que habia EN ESE MOMENTO: si la fundacion pudiera borrarlos despues,
+   la casilla quedaria marcada sobre un papel que ya no existe, y nada lo diria.
+   Revisado = el documento esta marcado «recibido», el archivo sigue vigente (no
+   rechazado) y se subio ANTES de la marca o en ese mismo segundo. Lo que llegue
+   despues no lo vio nadie: se puede quitar, y no desmarca nada. Un archivo
+   rechazado tampoco esta revisado en este sentido: se quita y se reemplaza
+   como siempre. Desmarcar el documento en el panel lo vuelve a soltar.
+   Las dos fechas son UTC «AAAA-MM-DD HH:MM:SS» (datetime('now')), asi que se
+   comparan como texto. */
+function archivoRevisado(x, a) {
+  const h = x && x.convenio && x.convenio.docs && x.convenio.docs[a.doc];
+  return !!h && h.estado === "recibido" && !!h.en && a.estado === "subido" &&
+         !!a.subido_en && String(a.subido_en) <= String(h.en);
+}
+/* La misma regla, en SQL y dentro del DELETE: si Give&Grow marca el documento
+   mientras la fundacion pulsa «quitar», no hay lectura previa que adelantar. */
+const SQL_ARCHIVO_REVISADO =
+  "EXISTS (SELECT 1 FROM inscripciones i WHERE i.id = convenio_archivos.inscripcion " +
+  "AND convenio_archivos.estado = 'subido' " +
+  "AND json_extract(i.datos, '$.convenio.docs.' || convenio_archivos.doc || '.estado') = 'recibido' " +
+  "AND convenio_archivos.subido_en <= json_extract(i.datos, '$.convenio.docs.' || convenio_archivos.doc || '.en'))";
+const AYUDA_ARCHIVO_REVISADO = "Give&Grow ya revisó este archivo, así que no se puede quitar desde aquí. Si necesitas cambiarlo, escríbenos y lo resolvemos contigo.";
+
 /* POST …/archivo/<n>/quitar — la fundacion se equivoco de archivo. Solo los
-   suyos y mientras el convenio no este firmado por las dos partes. */
+   suyos, mientras el convenio no este firmado por las dos partes, y nunca uno
+   que Give&Grow ya reviso (ver `archivoRevisado`). */
 async function convenioQuitar(env, ctx, n) {
   if (!Number.isInteger(n)) return json({ error: "archivo_no_valido" }, 400);
   if (convenioCerrado(ctx)) return json({ error: "convenio_cerrado" }, 409);
-  const a = await env.DB.prepare("SELECT id, clave FROM convenio_archivos WHERE id = ? AND inscripcion = ?").bind(n, ctx.id).first();
+  const a = await env.DB.prepare("SELECT id, clave, doc, estado, subido_en FROM convenio_archivos WHERE id = ? AND inscripcion = ?").bind(n, ctx.id).first();
   if (!a) return json({ error: "no_encontrado" }, 404);
-  await env.DB.prepare("DELETE FROM convenio_archivos WHERE id = ?").bind(a.id).run();
+  if (archivoRevisado(ctx.x, a)) return json({ error: "archivo_revisado", ayuda: AYUDA_ARCHIVO_REVISADO }, 409);
+  const b = await env.DB.prepare("DELETE FROM convenio_archivos WHERE id = ? AND NOT " + SQL_ARCHIVO_REVISADO).bind(a.id).run();
+  if (!b.meta || !b.meta.changes) return json({ error: "archivo_revisado", ayuda: AYUDA_ARCHIVO_REVISADO }, 409);
   if (env.MEDIA) {
     try { await env.MEDIA.delete(a.clave); } catch (e) { console.error("quitar archivo convenio", a.id, e && e.message); }
   }
@@ -17239,7 +17290,10 @@ async function adminConvenioEnLinea(env, id) {
           user_agent: r.user_agent, comprobante: !!r.comprobante_clave } : null,
         respuestas: c ? c.respuestas : (borrador ? camposConvenio(F, variante).map(k => ({ num: k.num, pregunta: k.lbl, respuesta: borrador[k.id] == null ? "" : borrador[k.id] })) : []) };
     }),
-    archivos: (arc.results || []).map(a => ({ ...a, documento: nombreDoc(a.doc) }))
+    archivos: (arc.results || []).map(a => ({ ...a, documento: nombreDoc(a.doc), revisado: archivoRevisado(x, a),
+      /* Llego despues de marcar el documento: nadie lo ha mirado todavia. */
+      despues: a.estado === "subido" && !archivoRevisado(x, a) && !!(x.convenio && x.convenio.docs && x.convenio.docs[a.doc] &&
+               x.convenio.docs[a.doc].estado === "recibido") }))
   });
 }
 
@@ -17552,6 +17606,7 @@ function paginaConvenio(ctx, nonce) {
   .archivos{list-style:none;margin:4px 0 8px;font-size:14px}
   .archivos li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0}
   .archivos li.rech{color:var(--err)}
+  .archivos li small{display:block;color:var(--mu);font-size:13px}
   .subida input[type=file]{font:inherit;font-size:14px;max-width:100%}
   .subenota{display:block;color:var(--mu);font-size:13px;margin-top:5px}
   .subenota.ok{color:var(--g);font-weight:600}
@@ -17724,8 +17779,9 @@ function pintarArchivos(){
       var tipo = a.tipo === "application/pdf" ? "PDF" : a.tipo === "image/png" ? "PNG" : "JPG";
       return '<li class="' + (a.estado === "rechazado" ? "rech" : "") + '"><span>' +
         (a.estado === "rechazado" ? "&#10007; " : "&#10003; ") + "Archivo " + (n + 1) + " · " + tipo + " · " + peso(a.bytes) + " · " + esc(enCO(a.en)) +
-        (a.estado === "rechazado" ? " · <strong>no sirve: " + esc(a.motivo) + "</strong>" : "") + "</span>" +
-        (EST.cerrado ? "" : '<button type="button" class="mini" data-quitar="' + a.id + '">quitar</button>') + "</li>";
+        (a.estado === "rechazado" ? " · <strong>no sirve: " + esc(a.motivo) + "</strong>" : "") +
+        (a.revisado && !EST.cerrado ? "<small>Give&amp;Grow ya lo revisó; si necesitas cambiarlo, escríbenos.</small>" : "") + "</span>" +
+        (EST.cerrado || a.revisado ? "" : '<button type="button" class="mini" data-quitar="' + a.id + '">quitar</button>') + "</li>";
     }).join("");
     var inp = $("f-" + s.doc);
     var vivos = l.filter(function(a){ return a.estado === "subido"; }).length;
@@ -17908,7 +17964,12 @@ document.addEventListener("click", function(ev){
   if (q){
     if (!confirm("¿Quitar este archivo?")) return;
     b.disabled = true;
-    post("/archivo/" + q + "/quitar", {}).then(function(){ return cargar(false); });
+    post("/archivo/" + q + "/quitar", {}).then(function(res){
+      /* Si Give&Grow lo reviso mientras tanto, el servidor no lo quita: se dice
+         por que y se repinta, que ya sale sin el boton. */
+      if (!(res.j && res.j.ok)) alert((res.j && res.j.ayuda) || "No se pudo quitar el archivo.");
+      return cargar(false);
+    });
   }
 });
 
@@ -22146,6 +22207,7 @@ var COLA_ES = {
   voluntarios_sin_respuesta: "Voluntarios sin responder",
   fundaciones_detenidas: "Fundaciones detenidas a mitad del proceso",
   convenios_en_curso: "Fundaciones en convenio (documentos y firma)",
+  convenios_por_firmar: "Convenio aceptado por la fundación, falta la firma de Give&Grow",
   voluntarios_detenidos: "Voluntarios aceptados que no avanzan",
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
@@ -22334,6 +22396,7 @@ var COLA_MOD = {
   voluntarios_sin_respuesta: "red",
   fundaciones_detenidas: "red",
   convenios_en_curso: "red",
+  convenios_por_firmar: "red",
   voluntarios_detenidos: "red",
   transferencias_sin_verificar: "dinero",
   certificados_por_emitir: "dinero",
@@ -22888,7 +22951,10 @@ function verConvenio(id){
     var arch = (d.archivos || []).map(function(a){
       return "<tr><td>" + esc(a.documento) + "</td><td>" + esc(a.tipo) + " · " + Math.round(a.bytes / 1024) + " KB<br><small>" +
         esc(enCO(a.subido_en, 16)) + " · sha256 " + esc(String(a.sha256).slice(0, 12)) + "</small></td><td>" +
-        (a.estado === "rechazado" ? '<strong style="color:#8C2F1E">rechazado</strong>: ' + esc(a.motivo || "") : "vigente") +
+        (a.estado === "rechazado" ? '<strong style="color:#8C2F1E">rechazado</strong>: ' + esc(a.motivo || "")
+          : a.revisado ? "vigente · revisado<br><small>la fundación ya no puede quitarlo</small>"
+          : a.despues ? "vigente · <strong>llegó después de marcar el documento</strong><br><small>nadie lo ha revisado; la fundación aún puede quitarlo</small>"
+          : "vigente") +
         '</td><td><a href="/api/admin/convenio-archivo/' + a.id + '">descargar</a> · ' +
         '<button class="rech" data-arch="' + a.id + '" data-est="' + esc(a.estado) + '">' +
         (a.estado === "rechazado" ? "aceptar de nuevo" : "rechazar") + "</button></td></tr>";
