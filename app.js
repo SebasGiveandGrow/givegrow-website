@@ -972,7 +972,7 @@ var I18N = {
     "hub.form.link":"Conocer la fundación",
 
     "hub.r4.t":"R4 - Impact Journey",
-    "hub.r4.p":"Voluntariado en doble vía: los equipos aliados van al territorio con comunidades reales, y las comunidades van a las empresas a conocer cómo se trabaja y cómo se llega ahí. Con reporte de impacto. Ya hicimos las primeras jornadas con donantes y aliados; ahora abrimos el formato a equipos de empresa.",
+    "hub.r4.p":"Voluntariado en doble vía: los equipos aliados van al territorio con comunidades reales, y las comunidades van a las empresas a conocer cómo se trabaja y cómo se llega ahí. Con reporte de impacto. Ya hicimos las primeras jornadas con donantes individuales; ahora abrimos el formato a equipos de empresa.",
     "hub.r5.t":"R5 - Conexión Laboral",
     "hub.r5.p":"Puente hacia el empleo para poblaciones vulnerables. Fase futura. Ejemplo: acompañamiento de 12 a 18 meses a una persona saliendo de reclusión, conectada con formación (R3) y con las empresas aliadas de la red.",
     "hub.pob.t":"Las poblaciones que queremos alcanzar",
@@ -1008,7 +1008,7 @@ var I18N = {
     "emp.p1.t":"Padrinazgo de Impacto",
     "emp.p1.p":"Defines un presupuesto y, con la Calculadora de Impacto, lo traduces en unidades reales y verificables. Recibes certificado de donación y reporte de impacto con evidencia.",
     "emp.p2.t":"Impact Journey",
-    "emp.p2.p":"Voluntariado corporativo en doble vía: tu equipo va a conocer la realidad de una comunidad del HUB SOCIAL, y esa comunidad viene a tu empresa a conocer la vida de quienes trabajan en ella y cómo se llega hasta ahí. Ya hicimos las primeras jornadas con donantes y aliados; ahora estamos abriendo el formato a equipos de empresa — escríbenos para diseñar la primera.",
+    "emp.p2.p":"Voluntariado corporativo en doble vía: tu equipo va a conocer la realidad de una comunidad del HUB SOCIAL, y esa comunidad viene a tu empresa a conocer la vida de quienes trabajan en ella y cómo se llega hasta ahí. Ya hicimos las primeras jornadas con donantes individuales; ahora estamos abriendo el formato a equipos de empresa — escríbenos para diseñar la primera.",
     "emp.p3.t":"Alianza a medida",
     "emp.p3.p":"Un canal abierto para co-crear juntos programas, campañas o formas de cooperación ajustadas a la realidad de tu empresa.",
     "nav.voluntariado":"Voluntariado e Impact Journey",
@@ -1129,7 +1129,7 @@ var I18N = {
     "vol.port.note":"Así está diseñado el modelo. Cada experiencia se abre cuando hay una fundación aliada verificada para esa población — y la red crece una alianza a la vez.",
     "vol.hoy.ey":"Dónde estamos hoy",
     "vol.hoy.t":"Contado sin adornos",
-    "vol.hoy.p":"Ya hicimos las primeras jornadas con donantes y aliados. Con equipos de empresa estamos abriendo Impact Journey: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.",
+    "vol.hoy.p":"Ya hicimos las primeras jornadas con donantes individuales. Con equipos de empresa estamos abriendo Impact Journey: si tu equipo quiere ser el primero, conversemos. Nada de esto se cobra.",
     "vol.cta":"Quiero participar",
     "vf.ey":"Sumarte",
     "vf.t":"Cuéntanos quién eres",
@@ -1869,7 +1869,7 @@ var I18N = {
     "brig.ey":"Brigada de atención a emergencia",
     "brig.t":"Terremoto del 10 de agosto. La brigada salió el 20 de agosto de 2026.",
     "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 20 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo: las actas firmadas de las entregas se publican en el rastreo cuando estén listas. Lo que sigue abierto es Mira Mi Casa.",
-    "brig.est.rango":"Desde el 20 de agosto de 2026",
+    "brig.est.rango":"Agosto de 2026",
     "brig.est.despues":"La brigada terminó.",
     "brig.est.p":"Las actas firmadas de las entregas se publican aquí y en el rastreo cuando estén revisadas, no antes. Lo que sigue abierto es Mira Mi Casa.",
     "brig.hechos.cap":"El sismo",
@@ -2015,7 +2015,7 @@ var I18N = {
     "origen.ms3.t":"19 mayo 2025 · Registro en Cámara",
     "origen.ms3.p":"Constituida por documento privado el 11 de abril de 2025, queda inscrita ante la Cámara de Comercio de Medellín el 19 de mayo. La calificación en el Régimen Tributario Especial la otorga la DIAN. 2025 es el año de constitución, sin operación: la Fundación empieza a operar en 2026.",
     "origen.ms4.t":"2026 · Primera aliada e Impact Journey",
-    "origen.ms4.p":"Sumamos la primera fundación aliada y activamos Impact Journey. ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción.",
+    "origen.ms4.p":"Sumamos la primera fundación aliada y abrimos Impact Journey a empresas. ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción.",
     "origen.cta.btn":"Ver el HUB SOCIAL",
     "fund.proc.ey":"El proceso",
     "fund.proc.t":"De la aplicación a la vinculación.",
@@ -2201,6 +2201,14 @@ function applyRouteMeta(id){
   var ti = m.t[lang]||m.t.es, de = m.d[lang]||m.d.es;
   document.title = ti;
   setMetaTag("name","description",de);
+  // la vista 404 del SPA se sirve con 200 (fallback SPA): no indexarla
+  setMetaTag("name","robots", id==="e404" ? "noindex, follow" : "index, follow");
+  /* EN MIRA MI CASA LA TARJETA PARA COMPARTIR ES LA DEL WORKER, NO LA DE AQUÍ
+     (auditoría 7 oct 2026). El HTMLRewriter del subdominio ya dejó og:url,
+     og:image, og:title y los de twitter apuntando a Mira Mi Casa; esta función
+     los pisaba con la URL del ápex y la imagen de la fundación en cuanto cargaba
+     el JS. La pestaña sí cambia por ruta (mmcTitulo); la tarjeta, no. */
+  if (MARCA_MMC) return;
   setMetaTag("property","og:title",ti);
   setMetaTag("property","og:description",de);
   setMetaTag("property","og:url",ORIGIN_FUND+"/#"+id);
@@ -2209,8 +2217,6 @@ function applyRouteMeta(id){
   setMetaTag("name","twitter:image", OG_IMG_DEFAULT);
   setMetaTag("name","twitter:title",ti);
   setMetaTag("name","twitter:description",de);
-  // la vista 404 del SPA se sirve con 200 (fallback SPA): no indexarla
-  setMetaTag("name","robots", id==="e404" ? "noindex, follow" : "index, follow");
 }
 function applyFichaMeta(p){
   var pr = p.profile || {};
@@ -4243,7 +4249,14 @@ function initReveal(){
   if (!revObserver){
     revObserver = new IntersectionObserver(function(entries){
       entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("in"); revObserver.unobserve(e.target);} });
-    },{threshold:0.12});
+    /* threshold 0 + margen inferior del 8% (auditoría 7 oct 2026). Con
+       threshold:0.12 un bloque alto esperaba a que se viera el 12% de SU alto:
+       la calculadora de #donar mide ~1.630 px en móvil, así que no aparecía
+       hasta tener ~195 px en pantalla y dejaba una franja vacía bajo la
+       cabecera a 375 × 812. Ahora todo se revela cuando su borde superior
+       cruza el 92% de la ventana — para un bloque corriente es casi el mismo
+       momento de antes; para uno alto deja de depender de su tamaño. */
+    },{threshold:0, rootMargin:"0px 0px -8% 0px"});
   }
   document.querySelectorAll(".page.active .rv:not(.in)").forEach(function(el){ revObserver.observe(el); });
 }
@@ -5597,6 +5610,43 @@ function initFabHero(){
     document.body.classList.toggle("hero-vista", !!(e.isIntersecting && e.intersectionRatio > 0.35 && enPortada));
   }, { threshold: [0, 0.35, 0.6] }).observe(hero);
 }
+/* LOS FLOTANTES SE APARTAN DE LOS FORMULARIOS EN MÓVIL (auditoría 7 oct 2026).
+   A 375 px, ALMA (abajo a la izquierda) y WhatsApp (abajo a la derecha) caían
+   encima de controles: la casilla «Alianza» del formulario de #socialfest no se
+   podía tocar sin hacer scroll de más. Dos señales, y ninguna esconde nada en
+   escritorio (el CSS solo actúa por debajo de 768 px):
+     · `fab-form`: un formulario ocupa la franja de abajo de la pantalla, la
+       misma que ocupan los círculos (el 15% inferior). Se mira solo esa franja y
+       no «el formulario está a la vista» para que mientras se lee el texto de
+       arriba los botones sigan ahí.
+     · `fab-foco`: hay un campo con el foco — con el teclado abierto la franja
+       de abajo es lo único que queda, y el campo suele estar ahí.
+   Las páginas ocultas no cruzan la franja (display:none), así que navegar entre
+   rutas limpia la marca sola. */
+var FAB_FORMS = "form.ally-form, #page-contacto .field, #page-donar .calc";
+function initFabForms(){
+  var dentro = [];
+  if ("IntersectionObserver" in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        var i = dentro.indexOf(e.target);
+        if (e.isIntersecting && i < 0) dentro.push(e.target);
+        else if (!e.isIntersecting && i > -1) dentro.splice(i, 1);
+      });
+      document.body.classList.toggle("fab-form", dentro.length > 0);
+    }, { rootMargin: "-85% 0px 0px 0px" });
+    document.querySelectorAll(FAB_FORMS).forEach(function(el){ io.observe(el); });
+  }
+  function campo(el){
+    return el && el.matches && el.matches("input, select, textarea") && !el.closest("#alma-panel");
+  }
+  document.addEventListener("focusin", function(e){
+    if (campo(e.target)) document.body.classList.add("fab-foco");
+  });
+  document.addEventListener("focusout", function(e){
+    if (campo(e.target) && !campo(e.relatedTarget)) document.body.classList.remove("fab-foco");
+  });
+}
 function initIconDraw(){
   var shapes = document.querySelectorAll(".ic-svg path, .ic-svg circle, .ic-svg rect, .ic-svg line, .ic-svg polyline, .ic-svg polygon");
   for (var i=0;i<shapes.length;i++) shapes[i].setAttribute("pathLength","1");
@@ -6544,6 +6594,7 @@ trmCarga();
 if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
 initFabHero();
+initFabForms();
 
 /* ---------- tema día/noche: automático + preferencia manual ----------
    EL AUTOMÁTICO SIGUE AL DISPOSITIVO (decisión de Sebas, 25 sep 2026). Antes
