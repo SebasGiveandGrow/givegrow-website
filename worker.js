@@ -1428,7 +1428,12 @@ async function alertaOperacion(env) {
 const TOPE_IP_DIA = { caso: 40, inscripcion: 20, transferencia: 20, "baja-enlace": 10, encuesta: 40,
   /* El convenio en linea (0038): el borrador se autoguarda, de ahi el numero
      alto; los codigos y las firmas, en cambio, son pocos por naturaleza. */
-  convenio: 1500, "convenio-archivo": 150, "convenio-codigo": 40, "convenio-firma": 60 };
+  convenio: 1500, "convenio-archivo": 150, "convenio-codigo": 40, "convenio-firma": 60,
+  /* /verificar (0039): un comercio comprueba unos pocos carnets al dia, y
+     un centro comercial detras de un mismo NAT, unas decenas. Barrer los 31^8
+     codigos pide cientos de miles. Aqui no se manda correo: el tope existe
+     solo contra el barrido. */
+  verificar: 300 };
 async function pasaTopeIP(env, request, puerta) {
   const tope = TOPE_IP_DIA[puerta];
   const ip = request.headers.get("CF-Connecting-IP") || "";
@@ -12802,20 +12807,118 @@ async function carnetTrasAporte(env, aporte, donanteId, nivelForzado) {
 
   const codigo = await siguienteMiembro(env, anioCO());
   const token = tokenNuevo();
+  /* El carnet nace con su código de verificación (0039): el QR que el comercio
+     escanea tiene que existir desde el primer día, no desde la primera visita. */
   await env.DB.prepare(
-    "INSERT INTO miembros (codigo, token, donante_id, nivel, desde, vigente_hasta) " +
-    "VALUES (?,?,?,?,date('now'),?)"
-  ).bind(codigo, token, donanteId, nivel.id, hasta).run();
+    "INSERT INTO miembros (codigo, token, donante_id, nivel, desde, vigente_hasta, verif) " +
+    "VALUES (?,?,?,?,date('now'),?,?)"
+  ).bind(codigo, token, donanteId, nivel.id, hasta, verifNuevo()).run();
   return { codigo, token, nivel: nivel.id, vigente_hasta: hasta, nuevo: true };
+}
+
+/* ========================================================================
+   LA VERIFICACIÓN DEL CARNET POR EL COMERCIO (migración 0039)
+   ========================================================================
+   El carnet lo muestra el miembro en SU celular, y una captura o una copia
+   del diseño se ven igual. Por eso el carnet lleva un código y un QR que el
+   comercio consulta con SU celular en /verificar: la respuesta sale del sitio
+   de la fundación y no de la pantalla que le enseñan.
+
+   El código no es el token (esa es la llave del miembro) ni el MB-… (que es
+   consecutivo). Es aleatorio, de un alfabeto sin 0/O ni 1/I/L para que se
+   pueda dictar y leer sin dudas. */
+const VERIF_ALFABETO = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";   // 31 símbolos
+
+/* Rechazo en vez de módulo: 256 no es múltiplo de 31, y con `% 31` los
+   primeros símbolos saldrían un poco más que los demás. Se descartan los bytes
+   de 248 en adelante (31 × 8). */
+function verifNuevo() {
+  let s = "";
+  while (s.length < 8) {
+    const b = new Uint8Array(16);
+    crypto.getRandomValues(b);
+    for (const x of b) {
+      if (x < 248 && s.length < 8) s += VERIF_ALFABETO[x % 31];
+    }
+  }
+  return s;
+}
+
+/* «K7Q3M9XA» → «K7Q3-M9XA». El guion es solo para leerlo: se guarda sin él. */
+function verifFormato(v) {
+  const t = String(v || "");
+  return t.length === 8 ? t.slice(0, 4) + "-" + t.slice(4) : t;
+}
+
+/* Lo que escribe el comercio, con o sin guion, en minúsculas o con espacios.
+   Devuelve "" si no puede ser un código: un símbolo fuera del alfabeto no se
+   «corrige» adivinando, porque adivinar es responder por otro carnet. */
+function verifNormal(entrada) {
+  const t = String(entrada || "").toUpperCase().replace(/[\s-]+/g, "");
+  if (t.length !== 8) return "";
+  for (const ch of t) if (!VERIF_ALFABETO.includes(ch)) return "";
+  return t;
+}
+
+/* El código de un carnet, creándolo si la fila no lo tiene. `WHERE verif IS
+   NULL` hace que dos visitas a la vez no se pisen: gana la primera y la otra
+   lee el que quedó. Un choque con el índice único (improbable, pero posible)
+   se reintenta con otro código. */
+async function verifDeMiembro(env, codigo, actual) {
+  if (actual) return actual;
+  for (let i = 0; i < 4; i++) {
+    try {
+      await env.DB.prepare("UPDATE miembros SET verif = ? WHERE codigo = ? AND verif IS NULL")
+        .bind(verifNuevo(), codigo).run();
+    } catch (e) {
+      console.error("verif", codigo, e && e.message);
+      continue;
+    }
+    const r = await env.DB.prepare("SELECT verif FROM miembros WHERE codigo = ?").bind(codigo).first();
+    if (r && r.verif) return r.verif;
+  }
+  return null;
+}
+
+/* «Sebastián Navarro Gómez» → «Sebastián N.» Nombre de pila completo y la
+   inicial del PRIMER apellido: lo justo para cotejar con la cédula, que
+   separa nombres y apellidos, y no lo bastante para saber quién es.
+   Sin saber dónde acaba el nombre y empieza el apellido se supone lo más
+   común en Colombia: con cuatro palabras o más, el primer apellido es la
+   penúltima; con tres, la segunda (nombre + dos apellidos). Las partículas
+   («de», «del», «la»…) no cuentan como palabra. */
+const PARTICULAS_NOMBRE = new Set(["de", "del", "la", "las", "los", "y", "da", "di", "van", "von"]);
+function nombreEnmascarado(nombre) {
+  const p = String(nombre || "").trim().split(/\s+/).filter((x) => x && !PARTICULAS_NOMBRE.has(x.toLowerCase()));
+  if (!p.length) return "";
+  const may = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+  const pila = may(p[0]);
+  if (p.length === 1) return pila;
+  const ap = p.length >= 4 ? p[p.length - 2] : p[1];
+  return pila + " " + ap.charAt(0).toUpperCase() + ".";
+}
+
+/* «2026-10-07 14:32» en hora de Colombia: la hora a la que el SERVIDOR
+   respondió. En una captura vieja, esa hora es lo que la delata. */
+function consultadoCO() { return selloCO().slice(0, 16); }
+
+/* ?lang= manda; sin él, el idioma del navegador de quien abre la página. Aquí
+   sí vale la cabecera —al revés que en /f/<id>—: estas páginas no se indexan,
+   y quien las abre es un cajero, no Google. */
+function idiomaPagina(url, request) {
+  const q = url && url.searchParams.get("lang");
+  if (q === "en" || q === "es") return q;
+  const al = String((request && request.headers.get("accept-language")) || "").trim().toLowerCase();
+  return al.startsWith("en") ? "en" : "es";
 }
 
 /* GET /carnet/<token> — la tarjeta. Página propia servida por el Worker, no la
    SPA: tiene que abrir rápido en el celular de quien atiende una caja, sin
    depender de que cargue una aplicación entera. */
-async function rutaCarnet(env, token) {
+async function rutaCarnet(env, token, url, request) {
   if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return new Response("No encontrado", { status: 404 });
   const m = await env.DB.prepare(
-    "SELECT m.codigo, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, d.nombre " +
+    "SELECT m.codigo, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, d.nombre " +
     "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.token = ?"
   ).bind(token).first();
   if (!m) return new Response("No encontrado", { status: 404 });
@@ -12826,10 +12929,19 @@ async function rutaCarnet(env, token) {
   const hoy = fechaCO();
   const vigente = !m.revocado_en && m.vigente_hasta >= hoy;
   const n = nivelDe(m.nivel);
+  const lang = idiomaPagina(url, request);
+  /* Un carnet anterior a la 0039 que se quedó sin código lo recibe aquí, en
+     su primera visita. Si fallara, el carnet se pinta igual sin QR: el
+     miembro no puede quedarse sin carnet por esto. */
+  let verif = null;
+  try { verif = await verifDeMiembro(env, m.codigo, m.verif); }
+  catch (e) { console.error("carnet verif", m.codigo, e && e.message); }
 
   return new Response(paginaCarnet({
-    nombre: m.nombre || "Miembro", codigo: m.codigo, nivel: n.es,
-    desde: m.desde, hasta: m.vigente_hasta, vigente
+    nombre: m.nombre || (lang === "en" ? "Member" : "Miembro"), codigo: m.codigo,
+    nivel: lang === "en" ? n.en : n.es,
+    desde: m.desde, hasta: m.vigente_hasta, vigente, verif,
+    consultado: consultadoCO(), lang
   }), {
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -12841,6 +12953,167 @@ async function rutaCarnet(env, token) {
       "content-security-policy": cspPagina({ script: "'none'" })
     }
   });
+}
+
+/* GET /verificar y /verificar/<código> — lo que consulta el COMERCIO.
+   Pública, sin un solo script, sin caché y sin indexar.
+
+   UN CÓDIGO DESCONOCIDO Y UNO MAL ESCRITO RESPONDEN LO MISMO, y los dos pasan
+   por la base: la página no debe enseñar a distinguir «ese formato no existe»
+   de «ese carnet no existe». Y UN CARNET REVOCADO dice «No vigente» igual que
+   uno vencido, nunca el motivo: eso es asunto entre la fundación y la persona,
+   no del cajero. */
+const VERIFICAR_GOLPES = new Map();
+async function rutaVerificar(env, url, request, crudo) {
+  const lang = idiomaPagina(url, request);
+  const tema = temaPorReloj(request);
+  const entrada = String(crudo != null ? crudo : (url.searchParams.get("c") || "")).trim().slice(0, 20);
+  const respuesta = (html, status) => new Response(html, {
+    status,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "referrer-policy": "no-referrer",
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow",
+      /* `form: 'self'` porque la página lleva el formulario GET que vuelve
+         aquí mismo; con el 'none' por defecto el navegador no lo enviaría. */
+      "content-security-policy": cspPagina({ script: "'none'", form: "'self'" })
+    }
+  });
+
+  /* Sin código: solo el formulario. No cuenta para el tope. */
+  if (!entrada) return respuesta(paginaVerificar({ lang, tema, entrada: "" }), 200);
+
+  /* EL TOPE, antes de tocar la base. Dos redes: una ráfaga corta en memoria
+     (30 en 5 minutos, por isolate) y el tope diario en D1, que es el que no se
+     esquiva repartiendo golpes entre isolates. Un comercio consulta unos pocos
+     carnets al día; quien barre códigos necesita cientos de miles. */
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  if ((ip && limitadoPorIP(VERIFICAR_GOLPES, ip, 300000, 30)) || !(await pasaTopeIP(env, request, "verificar"))) {
+    return respuesta(paginaVerificar({ lang, tema, entrada, limitado: true }), 429);
+  }
+
+  const v = verifNormal(entrada);
+  const m = await env.DB.prepare(
+    "SELECT m.nivel, m.desde, m.vigente_hasta, m.revocado_en, d.nombre " +
+    "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.verif = ?"
+  ).bind(v || "-").first();
+
+  if (!m) return respuesta(paginaVerificar({ lang, tema, entrada, noEncontrado: true }), 404);
+
+  const n = nivelDe(m.nivel);
+  return respuesta(paginaVerificar({
+    lang, tema, entrada: verifFormato(v),
+    resultado: {
+      vigente: !m.revocado_en && m.vigente_hasta >= fechaCO(),
+      nivel: lang === "en" ? n.en : n.es,
+      nombre: nombreEnmascarado(m.nombre),
+      desde: m.desde, hasta: m.vigente_hasta,
+      consultado: consultadoCO()
+    }
+  }), 200);
+}
+
+function paginaVerificar(o) {
+  const en = o.lang === "en";
+  const T = en ? {
+    titulo: "Check a member card", ey: "Gratitude Programme · for partner businesses",
+    lead: "Type the code printed under the QR on the member's card, or scan that QR with your own phone. The answer comes from the foundation's site, not from the screen you are being shown.",
+    label: "Verification code", boton: "Check",
+    vig: "Valid", novig: "Not valid",
+    vigP: "This membership is active today.",
+    novigP: "This card does not give access to benefits today.",
+    nivel: "Level", nombre: "Name", desde: "Member since", hasta: "Valid until", cons: "Checked",
+    hora: "Colombia time",
+    cotejar: "Ask for an ID document and check that the name matches. The card is personal and not transferable.",
+    nf: "We could not find that code.",
+    nfP: "Check that it was typed correctly: eight characters, with or without the dash. If it still does not show up, the card cannot be confirmed — do not apply the benefit; the member can write to us.",
+    lim: "Too many checks from this connection.",
+    limP: "Wait a few minutes and try again.",
+    otra: "Check another code", otro: "Español", otroLang: "es",
+    pie: "Fundación Give&Grow International · Colombian nonprofit · NIT 901.948.930-2"
+  } : {
+    titulo: "Verificar un carnet", ey: "Programa de Gratitud · para comercios aliados",
+    lead: "Escribe el código que aparece bajo el QR del carnet del miembro, o escanea ese QR con tu propio celular. La respuesta sale del sitio de la fundación, no de la pantalla que te muestran.",
+    label: "Código de verificación", boton: "Verificar",
+    vig: "Vigente", novig: "No vigente",
+    vigP: "Esta membresía está activa hoy.",
+    novigP: "Este carnet no da acceso a beneficios hoy.",
+    nivel: "Nivel", nombre: "Nombre", desde: "Miembro desde", hasta: "Vigente hasta", cons: "Consultado",
+    hora: "hora de Colombia",
+    cotejar: "Pide un documento de identidad y compara el nombre. El carnet es personal e intransferible.",
+    nf: "No encontramos ese código.",
+    nfP: "Revisa que esté bien escrito: ocho caracteres, con o sin guion. Si aun así no aparece, el carnet no se puede confirmar: no apliques el beneficio, y el miembro puede escribirnos.",
+    lim: "Demasiadas consultas desde esta conexión.",
+    limP: "Espera unos minutos y vuelve a intentarlo.",
+    otra: "Verificar otro código", otro: "English", otroLang: "en",
+    pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2"
+  };
+  const qLang = en ? "?lang=en" : "";
+  const otroHref = "/verificar" + (o.resultado ? "/" + encodeURIComponent(o.entrada) : "") + "?lang=" + T.otroLang;
+
+  const formulario = ''
+    + '  <form class="vf-form" method="GET" action="/verificar">\n'
+    + (en ? '    <input type="hidden" name="lang" value="en">\n' : '')
+    + '    <label for="vf-c">' + esc(T.label) + '</label>\n'
+    + '    <div class="vf-fila">\n'
+    + '      <input id="vf-c" name="c" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="K7Q3-M9XA" value="' + esc(o.entrada || "") + '">\n'
+    + '      <button class="btn btn-g" type="submit">' + esc(T.boton) + '</button>\n'
+    + '    </div>\n'
+    + '  </form>\n';
+
+  let cuerpo = ''
+    + '  <p class="vf-top"><span class="ey">' + esc(T.ey) + '</span>'
+    + '<a class="card-link" href="' + esc(otroHref) + '" hreflang="' + T.otroLang + '" lang="' + T.otroLang + '">' + esc(T.otro) + '</a></p>\n'
+    + '  <h1>' + esc(T.titulo) + '</h1>\n';
+
+  if (o.resultado) {
+    const r = o.resultado;
+    const fila = (k, v) => '      <div><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>\n';
+    cuerpo += ''
+      + '  <section class="vf-res ' + (r.vigente ? "vf-si" : "vf-no") + '">\n'
+      + '    <p class="vf-estado">' + esc(r.vigente ? T.vig : T.novig) + '</p>\n'
+      + '    <p class="vf-estado-p">' + esc(r.vigente ? T.vigP : T.novigP) + '</p>\n'
+      + '    <dl class="vf-dl">\n'
+      + fila(T.nombre, r.nombre || "—")
+      + fila(T.nivel, r.nivel)
+      + fila(T.desde, r.desde)
+      + fila(T.hasta, r.hasta)
+      + '    </dl>\n'
+      + '    <p class="vf-cons">' + esc(T.cons) + ': <b>' + esc(r.consultado) + '</b> (' + esc(T.hora) + ') · ' + esc(o.entrada) + '</p>\n'
+      + '  </section>\n'
+      + (r.vigente ? '  <p class="vf-cotejar">' + esc(T.cotejar) + '</p>\n' : '')
+      + '  <p style="margin-top:22px"><a class="card-link" href="/verificar' + qLang + '">' + esc(T.otra) + '</a></p>\n';
+  } else {
+    cuerpo += '  <p class="lead">' + esc(T.lead) + '</p>\n';
+    if (o.noEncontrado || o.limitado) {
+      cuerpo += '  <section class="vf-res vf-nada">\n'
+        + '    <p class="vf-estado-p"><b>' + esc(o.limitado ? T.lim : T.nf) + '</b> ' + esc(o.limitado ? T.limP : T.nfP) + '</p>\n'
+        + '  </section>\n';
+    }
+    cuerpo += formulario;
+  }
+  cuerpo += '  <p class="mu" style="margin-top:34px;font-size:var(--fs-13)">' + esc(T.pie) + '</p>\n';
+
+  /* Los tokens del sitio y ninguno nuevo: `--acc` para vigente y `--err` para
+     no vigente, porque los dos se aclaran de noche. `--g` NO: se queda verde
+     oscuro sobre la superficie oscura y el «Vigente» no se leería. */
+  const estilo = ''
+    + '.vf-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}'
+    + '.vf-form{margin-top:22px}.vf-form label{display:block;font-weight:600;margin-bottom:8px}'
+    + '.vf-fila{display:flex;gap:10px;flex-wrap:wrap}'
+    + '.vf-fila input{flex:1 1 200px;min-width:0;font-size:var(--fs-h4);font-family:ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;'
+    + 'padding:12px 14px;border:1px solid var(--bd);border-radius:10px;background:var(--surface);color:var(--ink)}'
+    + '.vf-res{margin-top:22px;padding:22px 22px 18px;border:1px solid var(--bd);border-left-width:6px;border-radius:12px;background:var(--surface)}'
+    + '.vf-si{border-left-color:var(--acc)}.vf-no{border-left-color:var(--err)}'
+    + '.vf-estado{font-family:var(--font-display);font-weight:800;font-size:clamp(34px,10vw,48px);line-height:1;margin:0 0 8px}'
+    + '.vf-si .vf-estado{color:var(--acc)}.vf-no .vf-estado{color:var(--err)}'
+    + '.vf-estado-p{margin:0 0 6px}'
+    + '.vf-dl{margin:14px 0 0}.vf-dl>div{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-top:1px solid var(--bd)}'
+    + '.vf-dl dt{color:var(--mu)}.vf-dl dd{margin:0;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}'
+    + '.vf-cons{margin:12px 0 0;font-size:var(--fs-13);color:var(--mu);font-variant-numeric:tabular-nums}'
+    + '.vf-cotejar{margin-top:16px;font-weight:600}';
+  return cascaraBaja(T.titulo, cuerpo, o.lang, o.tema, estilo);
 }
 
 /* ========================================================================
@@ -13007,30 +13280,85 @@ cargar();
 `;
 
 function paginaCarnet(c) {
-  const estado = c.vigente ? "Vigente" : "No vigente";
+  const en = c.lang === "en";
+  const T = en ? {
+    vig: "Valid", novig: "Not valid", carnet: "Card", desde: "Member since", hasta: "Valid until",
+    titulo: "Member card",
+    qr: "Business: scan with YOUR phone to check",
+    codigo: "Code", cons: "Checked", hora: "Colombia time",
+    pie: "Gratitude Programme · Show this screen at partner businesses. Its status is read at the moment it opens, and the business can confirm it on its own at thegiveandgrowproject.org/verificar.",
+    otro: "Español", otroLang: "es"
+  } : {
+    vig: "Vigente", novig: "No vigente", carnet: "Carnet", desde: "Miembro desde", hasta: "Vigente hasta",
+    titulo: "Carnet de miembro",
+    qr: "Comercio: escanea con TU celular para comprobar",
+    codigo: "Código", cons: "Consultado", hora: "hora de Colombia",
+    pie: "Programa de Gratitud · Presenta esta pantalla en los comercios aliados. El estado se consulta en el momento, y el comercio puede comprobarlo por su cuenta en thegiveandgrowproject.org/verificar.",
+    otro: "English", otroLang: "en"
+  };
+  const estado = c.vigente ? T.vig : T.novig;
   const color = c.vigente ? "#9CCBA9" : "#E8A24C";   // --brote: el verde claro de marca sobre --ink-deep
+
+  /* EL QR LLEVA AL CÓDIGO DE VERIFICACIÓN, NUNCA AL TOKEN. El token abre esta
+     página con el nombre completo: un QR que lo llevara le daría la llave del
+     carnet a cada cajero que lo escanea. */
+  let bloqueQR = "";
+  if (c.verif) {
+    let svg = "";
+    try {
+      svg = qrSvg(ORIGIN + "/verificar/" + verifFormato(c.verif), { alt: en ? "QR code to check this card" : "Código QR para verificar este carnet" });
+    } catch (e) { console.error("carnet qr", e && e.message); }
+    bloqueQR = '  <div class="cv-qr">\n'
+      + (svg ? '    <div class="cv-qr-img">' + svg + '</div>\n' : '')
+      + '    <div class="cv-qr-txt">\n'
+      + '      <p class="cv-qr-l">' + esc(T.qr) + '</p>\n'
+      + '      <p class="cv-qr-c"><span>' + esc(T.codigo) + '</span> ' + esc(verifFormato(c.verif)) + '</p>\n'
+      + '    </div>\n'
+      + '  </div>\n';
+  }
+
+  /* EL PUNTO QUE LATE es solo una pista visual de que la página está viva; la
+     prueba de verdad es la hora del servidor al lado y, sobre todo, el QR que
+     el comercio abre en su propio celular. Con «reducir movimiento», quieto. */
+  const estilo = '<style>'
+    + '.cv-qr{display:flex;gap:16px;align-items:center;margin:4px 0 20px;padding:14px;border:1px solid var(--on-dark-line);border-radius:12px}'
+    + '.cv-qr-img{flex:0 0 112px;width:112px;height:112px;border-radius:8px;overflow:hidden}'
+    + '.cv-qr-img svg{display:block;width:100%;height:100%}'
+    + '.cv-qr-l{font-size:var(--fs-13);line-height:1.4;margin:0 0 8px;font-weight:700}'
+    + '.cv-qr-c{font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-h4);font-weight:700;letter-spacing:.1em;margin:0}'
+    + '.cv-qr-c span{display:block;font-family:inherit;font-size:var(--fs-11);letter-spacing:.06em;font-weight:400;color:var(--on-dark-4);text-transform:uppercase}'
+    + '.cv-cons{display:flex;align-items:center;gap:8px;font-size:var(--fs-12);color:var(--on-dark-4);margin:0 0 14px;font-variant-numeric:tabular-nums}'
+    + '.cv-cons b{color:var(--on-dark);font-weight:700}'
+    + '.cv-pulso{flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:' + color + ';animation:cv-late 2s ease-in-out infinite}'
+    + '@keyframes cv-late{0%,100%{opacity:1}50%{opacity:.25}}'
+    + '@media (prefers-reduced-motion: reduce){.cv-pulso{animation:none}}'
+    + '.cv-lang{margin-left:auto;font-size:var(--fs-12);color:var(--on-dark-4)}'
+    + '</style>';
+
   return `<!doctype html>
-<html lang="es"><head>
+<html lang="${en ? "en" : "es"}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Carnet de miembro · ${esc(c.codigo)} · Give&Grow</title>
+<title>${esc(T.titulo)} · ${esc(c.codigo)} · Give&Grow</title>
 ${HOJA_CSS}
+${estilo}
 </head><body style="background:#0E2118;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
 <main class="carnet">
   <div class="carnet-top">
     <span class="carnet-amp">&amp;</span>
     <span class="carnet-marca">Fundación<br>Give&amp;Grow</span>
+    <a class="cv-lang" href="?lang=${T.otroLang}" hreflang="${T.otroLang}" lang="${T.otroLang}">${esc(T.otro)}</a>
   </div>
   <p class="carnet-nivel">${esc(c.nivel)}</p>
   <h1 class="carnet-nombre">${esc(c.nombre)}</h1>
   <dl class="carnet-datos">
-    <div><dt>Carnet</dt><dd>${esc(c.codigo)}</dd></div>
-    <div><dt>Miembro desde</dt><dd>${esc(c.desde)}</dd></div>
-    <div><dt>Vigente hasta</dt><dd>${esc(c.hasta)}</dd></div>
+    <div><dt>${esc(T.carnet)}</dt><dd>${esc(c.codigo)}</dd></div>
+    <div><dt>${esc(T.desde)}</dt><dd>${esc(c.desde)}</dd></div>
+    <div><dt>${esc(T.hasta)}</dt><dd>${esc(c.hasta)}</dd></div>
   </dl>
-  <p class="carnet-estado" style="color:${color};border-color:${color}">${estado}</p>
-  <p class="carnet-pie">Programa de Gratitud · Presenta esta pantalla en los comercios aliados.
-  El estado se consulta en el momento: esta página no sirve como captura.</p>
+  <p class="carnet-estado" style="color:${color};border-color:${color}">${esc(estado)}</p>
+  <p class="cv-cons"><span class="cv-pulso" aria-hidden="true"></span><span>${esc(T.cons)}: <b>${esc(c.consultado)}</b> (${esc(T.hora)})</span></p>
+${bloqueQR}  <p class="carnet-pie">${esc(T.pie)}</p>
   <p class="carnet-nit">NIT 901.948.930-2 · thegiveandgrowproject.org</p>
 </main>
 </body></html>`;
@@ -13040,11 +13368,23 @@ ${HOJA_CSS}
 
 async function adminMiembros(env) {
   const r = await env.DB.prepare(
-    "SELECT m.codigo, m.token, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, " +
+    "SELECT m.codigo, m.token, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, " +
     "d.nombre, d.email FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
     "ORDER BY m.creado_en DESC LIMIT 200"
   ).all();
-  return json({ miembros: r.results || [] });
+  const filas = r.results || [];
+  /* El código de verificación es lo que el equipo le dicta a un comercio que
+     llama a preguntar, así que tiene que estar aquí aunque la fila sea
+     anterior a la 0039 y nadie haya abierto todavía ese carnet. */
+  for (const f of filas) {
+    if (!f.verif) {
+      try { f.verif = await verifDeMiembro(env, f.codigo, null); }
+      catch (e) { console.error("admin verif", f.codigo, e && e.message); }
+    }
+    f.verif_fmt = f.verif ? verifFormato(f.verif) : null;
+    f.estado = f.revocado_en ? "revocado" : (f.vigente_hasta >= fechaCO() ? "vigente" : "vencido");
+  }
+  return json({ miembros: filas });
 }
 
 /* Y SE PUEDE DESHACER, con `revocar: false` y su motivo.
@@ -13088,16 +13428,16 @@ async function adminRevocarMiembro(request, env, codigo, quien) {
 async function correoCarnet(env, email, nombre, carnet, idioma) {
   if (!email) return { ok: true, sinCorreo: true };
   const en = idioma === "en";
-  const url = ORIGIN + "/carnet/" + carnet.token;
+  const url = ORIGIN + "/carnet/" + carnet.token + (en ? "?lang=en" : "");
   const n = nivelDe(carnet.nivel);
   const titulo = en ? "Your member card" : "Tu carnet de miembro";
   const parrafos = en ? [
     "Your membership is active. This is your card: open the link and show that screen at partner businesses.",
-    "It is a live page, not an image — it states whether it is valid at the moment it is opened, so nobody has to take your word for it.",
+    "It is a live page, not an image: it states whether it is valid at the moment it is opened. And the business does not have to take the screen's word for it either — it scans the QR on your card with its own phone, or types the code at thegiveandgrowproject.org/verificar.",
     "It renews on its own with each contribution. If you stop giving, it simply expires."
   ] : [
     "Tu membresía quedó activa. Este es tu carnet: abre el enlace y muestra esa pantalla en los comercios aliados.",
-    "Es una página viva, no una imagen: dice si está vigente en el momento en que se abre, así nadie tiene que creerte de palabra.",
+    "Es una página viva, no una imagen: dice si está vigente en el momento en que se abre. Y el comercio tampoco tiene que creerle a la pantalla: escanea el QR de tu carnet con su propio celular, o escribe el código en thegiveandgrowproject.org/verificar.",
     "Se renueva solo con cada aporte. Si dejas de aportar, simplemente vence."
   ];
   const filas = en
@@ -21438,6 +21778,21 @@ tiene a dónde ir: eso hay que repararlo.</p>
 
 </div>
 <div class="mod" data-mod="dinero" hidden>
+<h2 id="sec-miembros" class="h-sec" style="margin:48px 0 6px;font-size:26px">Carnets de miembro</h2>
+<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Los carnets emitidos, los más
+nuevos primero. La columna <strong>Verificación</strong> es el código que va bajo el QR del carnet: con
+él un comercio aliado comprueba en <code>/verificar</code> si la membresía está vigente, sin ver más que
+el nombre de pila y la inicial del apellido. Si un comercio llama a preguntar, es ese código el que se
+busca aquí. <strong>El enlace del carnet no se comparte</strong>: es la credencial del miembro.</p>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Carnet</th><th scope="col">Verificación</th><th scope="col">Miembro</th>
+<th scope="col">Nivel</th><th scope="col">Vigente hasta</th><th scope="col">Estado</th>
+</tr></thead><tbody id="mb-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</table></div>
+
+</div>
+<div class="mod" data-mod="dinero" hidden>
 <h2 id="sec-ipn" class="h-sec" style="margin:48px 0 6px;font-size:26px">Donaciones por el botón de PayPal</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que entró por el
 <strong>botón de donaciones</strong>, único o mensual. A un botón alojado PayPal no acepta que se le
@@ -24565,6 +24920,29 @@ function cargarSuscripciones(){
   });
 }
 
+/* ---------------- carnets de miembro ---------------- */
+function cargarMiembros(){
+  pedirJSON("/api/admin/miembros", "mb-filas").then(function(d){
+    var tb = document.getElementById("mb-filas"); if (!tb) return;
+    var l = d.miembros || [];
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguno todavia.</td></tr>'; return; }
+    tb.innerHTML = l.map(function(m){
+      /* El estado lo calcula el servidor con el dia colombiano, el mismo que
+         usa /verificar: aqui no se recalcula con el reloj del navegador. */
+      var estado = m.estado === "vigente" ? "vigente"
+        : m.estado === "revocado" ? "<strong>revocado</strong>" : "vencido";
+      return "<tr>" +
+        "<td>" + esc(m.codigo) + "<br><small>desde " + esc(m.desde || "—") + "</small></td>" +
+        "<td><code>" + esc(m.verif_fmt || "—") + "</code></td>" +
+        "<td>" + esc(m.nombre || "—") + (m.email ? "<br><small>" + esc(m.email) + "</small>" : "") + "</td>" +
+        "<td>" + esc(m.nivel || "—") + "</td>" +
+        "<td>" + esc(m.vigente_hasta || "—") + "</td>" +
+        "<td>" + estado + "</td>" +
+      "</tr>";
+    }).join("");
+  });
+}
+
 /* ---------------- eventos de PayPal sin casa ---------------- */
 function cargarPaypalSueltos(){
   pedirJSON("/api/admin/paypal-sueltos", "pps-filas").then(function(d){
@@ -25939,6 +26317,7 @@ var BANDEJAS = {
   "o-filas": cargarOfrecimientos,
   "p-filas": cargarSueltos,
   "sus-filas": cargarSuscripciones,
+  "mb-filas": cargarMiembros,
   "ipn-filas": cargarIpn,
   "pps-filas": cargarPaypalSueltos,
   "e-filas": cargarEntregas,
@@ -27030,7 +27409,7 @@ async function crearSuscripcion(env, o) {
   /* UNA SUSCRIPCION ACTIVA POR CORREO. Sin esto, dos envios del formulario
      —o dos pestanas— dejan a la persona pagando dos veces al mes. */
   const ya = await env.DB.prepare(
-    "SELECT s.id, s.token, s.nivel, s.monto_centavos, s.idioma, s.destino, d.nombre FROM suscripciones s " +
+    "SELECT s.id, s.token, s.nivel, s.monto_centavos, s.idioma, s.destino, s.donante_id, d.nombre FROM suscripciones s " +
     "JOIN donantes d ON d.id = s.donante_id " +
     "WHERE s.proveedor = 'wompi' AND s.estado = 'activa' AND LOWER(d.email) = ? LIMIT 1"
   ).bind(email).first();
@@ -28009,7 +28388,7 @@ async function apiBajaEnlace(request, env, url) {
 
   if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     const sub = await env.DB.prepare(
-      "SELECT s.token, s.nivel, s.monto_centavos, s.idioma, s.destino, d.nombre " +
+      "SELECT s.token, s.nivel, s.monto_centavos, s.idioma, s.destino, s.donante_id, d.nombre " +
       "FROM suscripciones s JOIN donantes d ON d.id = s.donante_id " +
       "WHERE s.proveedor = 'wompi' AND s.estado = 'activa' AND s.token IS NOT NULL " +
       "AND LOWER(d.email) = ? ORDER BY s.creada_en DESC LIMIT 1"
@@ -28032,11 +28411,27 @@ async function correoEnlaceMembresia(env, sub, email, lang) {
      y no se pinta el id crudo; uno que ya no existe se dice fondo general,
      que es a donde van a ir sus cobros (ver `wompiCobrar`). */
   const programa = nombreDestinoMb(sub.destino ? await destinoMembresia(env, sub.destino) : null, en);
+  /* Y EL CARNET, que hasta ahora solo llegaba una vez —en el correo del primer
+     cobro— y no se podía volver a pedir. Quien lo perdía no tenía cómo
+     enseñarlo en un comercio aliado. Va en este mismo correo porque la
+     credencial es la misma: el correo de la inscripción. */
+  let carnet = null;
+  if (sub.donante_id) {
+    try {
+      const m = await env.DB.prepare("SELECT token FROM miembros WHERE donante_id = ?").bind(sub.donante_id).first();
+      if (m && m.token) carnet = ORIGIN + "/carnet/" + m.token + (en ? "?lang=en" : "");
+    } catch (e) { console.error("enlace carnet", e && e.message); }
+  }
+  const filasBase = en
+    ? [["Level", nivel.en], ["Monthly", fmtPesos(sub.monto_centavos) + " COP"], ["Programme", programa]]
+    : [["Nivel", nivel.es], ["Mensual", fmtPesos(sub.monto_centavos) + " COP"], ["Programa", programa]];
+  if (carnet) filasBase.push([en ? "Your member card" : "Tu carnet", carnet]);
   return await enviarCorreo(env, {
     para: email,
     etiqueta: "membresia_enlace",
     asunto: en ? "Your membership link" : "El enlace a tu membresía",
-    texto: (en ? "Open your membership here: " : "Abre tu membresía aquí: ") + enlace,
+    texto: (en ? "Open your membership here: " : "Abre tu membresía aquí: ") + enlace +
+      (carnet ? "\n" + (en ? "Your member card: " : "Tu carnet: ") + carnet : ""),
     html: plantillaCorreo({
       titulo: en ? "Your membership" : "Tu membresía",
       parrafos: en ? [
@@ -28046,9 +28441,7 @@ async function correoEnlaceMembresia(env, sub, email, lang) {
         "Este es el enlace a tu membresía. Desde ahí puedes ver qué te cobramos y terminarla cuando quieras, sin escribirle a nadie.",
         "Guarda este correo: el enlace sirve mientras tu membresía siga viva."
       ],
-      filas: en
-        ? [["Level", nivel.en], ["Monthly", fmtPesos(sub.monto_centavos) + " COP"], ["Programme", programa]]
-        : [["Nivel", nivel.es], ["Mensual", fmtPesos(sub.monto_centavos) + " COP"], ["Programa", programa]],
+      filas: filasBase,
       boton: { url: enlace, texto: en ? "Open my membership" : "Abrir mi membresía" },
       cierre: en
         ? "If you did not ask for this email, you can ignore it: nothing changed and nobody can act on your membership without this link."
@@ -28753,8 +29146,22 @@ export default {
     const car = ruta.match(/^\/carnet\/([a-f0-9]{32})\/?$/i);
     if (car) {
       if (!env.DB) return json({ error: "base_no_configurada" }, 503);
-      try { return await rutaCarnet(env, car[1].toLowerCase()); }
+      try { return await rutaCarnet(env, car[1].toLowerCase(), url, request); }
       catch (e) { console.error("carnet", e && e.message); return json({ error: "error_interno" }, 500); }
+    }
+
+    /* La verificación del carnet por el COMERCIO (0039). Pública: quien la
+       abre es un cajero sin sesión, y lo que responde está pensado para eso
+       —nombre enmascarado, sin motivo de revocación, con tope por IP—. */
+    const ver = ruta.match(/^\/verificar(?:\/([^/]{0,40}))?\/?$/);
+    if (ver) {
+      if (!env.DB) return new Response("No disponible", { status: 503 });
+      try {
+        let crudo = null;
+        if (ver[1]) { try { crudo = decodeURIComponent(ver[1]); } catch { crudo = ver[1]; } }
+        return await rutaVerificar(env, url, request, crudo);
+      }
+      catch (e) { console.error("verificar", e && e.message); return json({ error: "error_interno" }, 500); }
     }
 
     /* Fotos de las actas y las jornadas. Fuera de /api/ a propósito: son
