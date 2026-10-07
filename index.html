@@ -4,11 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <link rel="canonical" href="https://www.thegiveandgrowproject.org">
-<!-- `100vw` en el preload y en el <source> del hero, y los dos IGUALES (auditoría 28 sep 2026):
-     el hero es de borde a borde, y los anchos fijos que había (`1400px`, `2000px`) no decían el
-     ancho real del hueco: una tableta de 1024 px pedía la de una pantalla de 1400. Si el preload
-     y el <source> difieren, el navegador baja la imagen dos veces. -->
-<link rel="preload" as="image" href="/img/jornadas/hero_futbol_1400.webp" imagesrcset="/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w" imagesizes="100vw" type="image/webp" fetchpriority="high">
 <title>Give&Grow International - Dar para crecer, crecer para dar más</title>
 <meta name="robots" content="index, follow">
 <meta name="description" content="Fundación Give&Grow International - NIT 901.948.930-2 - ESAL - Régimen Tributario Especial - Colombia. Conectamos generosidad con necesidad, con trazabilidad completa.">
@@ -34,10 +29,12 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/img/icon/gg-180.png">
 <script>/* tema antes del primer render: la preferencia guardada; si no hay, la del dispositivo; y la hora (día 6–18h) solo si el dispositivo no dice nada. La misma cuenta que themeResolve en app.js */
 (function(){var t="light";try{var s=localStorage.getItem("gg-theme");if(s==="light"||s==="dark"){t=s}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches){t="light"}else{var h=new Date().getHours();t=(h>=6&&h<18)?"light":"dark"}}catch(e){}document.documentElement.setAttribute("data-theme",t);if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",document.documentElement.getAttribute("data-marca")==="mmc"?"#07131F":"#0F1613")}})();
+/* LA RUTA ANTES DEL PRIMER RENDER (Social Fest, 7 oct 2026). Quien llega a /#socialfest por el QR veía la portada hasta que corría app.js, y bajaba su foto (262 KB a DPR 3) sin verla. Si el hash es una página conocida, se marca data-ruta y una regla esconde la portada y muestra esa página; go() en app.js quita la marca. La lista la vigila el check #21b: cada nombre tiene que ser una <main id="page-…"> de index.html, si no, la portada se queda y no hay pantalla en blanco. El preload del hero solo se pide cuando la portada es lo que se va a ver: `100vw` aquí y en el <source>, IGUALES, o se baja dos veces. */
+(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=5589e788">
+<link rel="stylesheet" href="/styles.css?v=da69df5a">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -45,7 +42,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=ff6440b4" defer></script>
+<script src="/app.js?v=15563c62" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -147,6 +144,18 @@
 <p id="lang-fallo" class="lang-fallo" role="status" aria-live="polite" style="display:none"
    data-i18n="lang.fallo">Couldn't load English — check your connection · No se pudo cargar el inglés — revisa tu conexión</p>
 <div class="nav-mobile" id="nav-mobile">
+  <!-- EL IDIOMA, QUE EN EL TELÉFONO NO CABE ARRIBA. `applyLang` lleva tiempo
+       marcando `dlang-es` y `dlang-en` —el conmutador del cajón estaba previsto
+       en el código y nunca se escribió aquí—, así que esto no inventa un
+       mecanismo: le pone el cuerpo al que ya había. Ver la nota de `.lang` en
+       styles.css para por qué la barra lo suelta por debajo de 460 px.
+       ARRIBA DEL TODO desde el 7 oct 2026: al final quedaba tras treinta
+       enlaces, y quien llega en inglés por el QR de Social Fest no lo encontraba. -->
+  <span class="mnav-g" data-i18n="nav.idioma">Idioma</span>
+  <div class="lang lang-cajon">
+    <button id="dlang-es" class="on" aria-pressed="true" data-act="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
+    <button id="dlang-en" aria-pressed="false" data-act="setLang('en')" aria-label="Switch language to English">EN</button>
+  </div>
   <a class="mmc-nav" href="#proyecto" data-i18n="mmc.nav.que">Qué es esto</a>
   <a class="mmc-nav" href="#vivienda" data-i18n="mmc.nav.casa">Revisa tu casa</a>
   <a class="mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
@@ -157,6 +166,9 @@
   <a href="https://miramicasa.org/#vivienda" data-i18n="cv.t">Revisa tu casa</a>
   <a href="https://miramicasa.org/#ingenieros" data-i18n="ing.ey">Ingenieros voluntarios</a>
   <a href="https://miramicasa.org/#casas" data-i18n="nav.casas">Casas revisadas</a>
+  <!-- Grupo propio: sin esta etiqueta, HUB SOCIAL y Fundaciones se leían como
+       parte de «Emergencia». En la barra de escritorio son enlaces sueltos. -->
+  <span class="mnav-g" data-i18n="nav.g.red">Red</span>
   <a href="#hub" data-i18n="nav.hub">HUB SOCIAL</a>
   <a href="#fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
   <span class="mnav-g" data-i18n="nav.empresas">Empresas</span>
@@ -178,16 +190,6 @@
   <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
   <a href="#faq" data-i18n="nav.faq">FAQ</a>
   <a href="#contacto" data-i18n="nav.contacto">Contacto</a>
-  <!-- EL IDIOMA, QUE EN EL TELÉFONO NO CABE ARRIBA. `applyLang` lleva tiempo
-       marcando `dlang-es` y `dlang-en` —el conmutador del cajón estaba previsto
-       en el código y nunca se escribió aquí—, así que esto no inventa un
-       mecanismo: le pone el cuerpo al que ya había. Ver la nota de `.lang` en
-       styles.css para por qué la barra lo suelta por debajo de 460 px. -->
-  <span class="mnav-g" data-i18n="nav.idioma">Idioma</span>
-  <div class="lang lang-cajon">
-    <button id="dlang-es" class="on" aria-pressed="true" data-act="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
-    <button id="dlang-en" aria-pressed="false" data-act="setLang('en')" aria-label="Switch language to English">EN</button>
-  </div>
 </div>
 
 <!-- ============ INICIO ============ -->
@@ -195,7 +197,7 @@
   <section class="hero">
     <div class="hero-bg"><picture>
       <source type="image/webp" srcset="/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w" sizes="100vw">
-      <img src="/img/jornadas/hero_futbol_1400.webp" alt="Padre e hijo juegan con un balón entregado en jornada, en su comunidad wayuu de la Alta Guajira" fetchpriority="high" decoding="async" data-i18n="hero.imgalt" data-i18n-attr="alt">
+      <img src="/img/jornadas/hero_futbol_1400.webp" alt="Padre e hijo juegan con un balón entregado en jornada, en su comunidad wayuu de la Alta Guajira" fetchpriority="high" loading="lazy" decoding="async" data-i18n="hero.imgalt" data-i18n-attr="alt">
     </picture></div>
     <div class="wrap">
       <p class="hero-eyebrow" data-i18n="hero.eyebrow">Colombia · ESAL · NIT 901.948.930-2</p>
@@ -459,19 +461,22 @@
       <p class="lead rv d1" data-i18n="emp.lead">Tres formas de aliarte, todas con reporte verificable. Las donaciones, además, dan derecho a certificado.</p>
     </div>
   </section>
-  <section id="empresas-aliadas-sec">
+  <!-- El piloto va justo después del encabezado (Social Fest, 7 oct 2026): antes
+       el segundo bloque era el estado vacío de «empresas aliadas», y lo primero que
+       leía una empresa era que todavía no hay ninguna. Honesto, sin decir que ya
+       hicimos un Impact Journey con una empresa: no lo hemos hecho. -->
+  <section class="cream" id="empresas-piloto">
     <div class="wrap">
-      <span class="ey rv" data-i18n="emp.aliadas.ey">Red de empresas aliadas</span>
-      <h2 class="h-sec rv" data-i18n="emp.aliadas.t">Empresas que crecen dando</h2>
-      <p class="lead rv d1" data-i18n="emp.aliadas.lead">Cada alianza entra con convenio firmado. Aquí verás las empresas que ya suman al impacto — con trazabilidad y reconocimiento.</p>
-      <div id="empresas-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
-      <div id="empresas-empty" class="grat-empty rv d2" style="display:none">
-        <p data-i18n="emp.aliadas.empty">Estamos sumando las primeras empresas aliadas. Muy pronto verás aquí quiénes ya crecen dando — con evidencia, no promesas.</p>
-        <a class="btn btn-g" href="#aliados" data-i18n="emp.aliadas.cta">Quiero aliar mi empresa</a>
+      <span class="ey rv" data-i18n="emp.piloto.ey">Impact Journey · piloto</span>
+      <h2 class="h-sec rv" data-i18n="emp.piloto.t">Te proponemos un piloto, con la ida y la vuelta.</h2>
+      <p class="lead rv d1" data-i18n="emp.piloto.p">Tu equipo va a una fundación del HUB SOCIAL, y después esa comunidad visita tu empresa para ver cómo se trabaja ahí. Ya hicimos jornadas con donantes individuales; con un equipo de empresa todavía no, y por eso es un piloto: lo diseñamos juntos.</p>
+      <div class="rv d2" style="margin-top:22px;display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center">
+        <a class="btn btn-g" href="#socialfest" data-i18n="emp.piloto.btn">Proponer el piloto</a>
+        <a class="card-link" href="#voluntariado" style="margin-top:0"><span data-i18n="vol.link">Ver el programa de voluntariado</span> <span aria-hidden="true">&rarr;</span></a>
       </div>
     </div>
   </section>
-  <section class="cream">
+  <section>
     <div class="wrap">
       <span class="ey rv" data-i18n="emp.why.ey">Por qué aliarte</span>
       <h2 class="h-sec rv" data-i18n="emp.why.t">RSE que se ve, se mide y se siente.</h2>
@@ -483,7 +488,7 @@
       </div>
     </div>
   </section>
-  <section>
+  <section class="cream">
     <div class="wrap">
       <span class="ey rv" data-i18n="emp.levels.ey">Tres formas de aliarte</span>
       <h2 class="h-sec rv" data-i18n="emp.levels.t">Elige el nivel de tu alianza.</h2>
@@ -491,6 +496,20 @@
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/></svg></div><h3 data-i18n="emp.p1.t">Padrinazgo de Impacto</h3><p data-i18n="emp.p1.p">Defines un presupuesto y, con la Calculadora de Impacto, lo traduces en unidades reales y verificables. Recibes certificado de donación y reporte de impacto con evidencia.</p></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="emp.p2.t">Impact Journey</h3><p data-i18n="emp.p2.p">Voluntariado corporativo en doble vía: tu equipo va a conocer la realidad de una comunidad del HUB SOCIAL, y esa comunidad viene a tu empresa a conocer la vida de quienes trabajan en ella y cómo se llega hasta ahí. Ya hicimos las primeras jornadas con donantes individuales; ahora estamos abriendo el formato a equipos de empresa — escríbenos para diseñar la primera.</p><p style="margin-top:10px"><a class="card-link" href="#voluntariado"><span data-i18n="vol.link">Ver el programa de voluntariado</span> <span aria-hidden="true">&rarr;</span></a></p></div>
         <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M8 6h8M7.6 7.8 10.8 16M16.4 7.8 13.2 16"/></svg></div><h3 data-i18n="emp.p3.t">Alianza a medida</h3><p data-i18n="emp.p3.p">Un canal abierto para co-crear juntos programas, campañas o formas de cooperación ajustadas a la realidad de tu empresa.</p></div>
+      </div>
+    </div>
+  </section>
+  <!-- Debajo de las formas de aliarse, no arriba: mientras la red está vacía,
+       este bloque es una invitación, no una vitrina. -->
+  <section id="empresas-aliadas-sec">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="emp.aliadas.ey">Red de empresas aliadas</span>
+      <h2 class="h-sec rv" data-i18n="emp.aliadas.t">Empresas que crecen dando</h2>
+      <p class="lead rv d1" data-i18n="emp.aliadas.lead">Cada alianza entra con convenio firmado. Aquí verás las empresas que ya suman al impacto — con trazabilidad y reconocimiento.</p>
+      <div id="empresas-grid" class="grid g3 rv d2" style="margin-top:30px"></div>
+      <div id="empresas-empty" class="grat-empty rv d2" style="display:none">
+        <p data-i18n="emp.aliadas.empty">Estamos sumando las primeras empresas aliadas. Muy pronto verás aquí quiénes ya crecen dando — con evidencia, no promesas.</p>
+        <a class="btn btn-g" href="#aliados" data-i18n="emp.aliadas.cta">Quiero aliar mi empresa</a>
       </div>
     </div>
   </section>
@@ -1153,7 +1172,7 @@
       <div class="sf-puertas">
         <button type="button" class="sf-puerta" data-act="sfIr('empresa')">
           <span class="sf-puerta-k" data-i18n="sf.p.emp.k">Soy empresa</span>
-          <span class="sf-puerta-d" data-i18n="sf.p.emp.d">Un piloto de Impact Journey con tu equipo: ida y vuelta, sin costo.</span>
+          <span class="sf-puerta-d" data-i18n="sf.p.emp.d">Un piloto de Impact Journey con tu equipo, ida y vuelta, sin cuota de participación.</span>
           <span class="sf-puerta-f" aria-hidden="true">&darr;</span>
         </button>
         <button type="button" class="sf-puerta" data-act="sfIr('red')">
@@ -1169,7 +1188,7 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="sf.emp.ey">Para empresas · Impact Journey</span>
       <h2 class="h-sec rv" data-i18n="sf.emp.t">Voluntariado en doble vía.</h2>
-      <p class="lead rv d1" data-i18n="sf.emp.lead">Te proponemos un piloto con tu equipo, con la ida y la vuelta. Ya hicimos jornadas con donantes individuales; con un equipo de empresa sería de las primeras, y la participación no tiene costo.</p>
+      <p class="lead rv d1" data-i18n="sf.emp.lead">Te proponemos un piloto con tu equipo, con la ida y la vuelta. Ya hicimos jornadas con donantes individuales; con un equipo de empresa sería de las primeras. No hay cuota de participación; la logística (transporte, refrigerios) la acordamos juntos.</p>
       <div class="sf-vias rv d2">
         <div class="sf-via">
           <span class="sf-via-k" data-i18n="sf.ida.k">La ida</span>
@@ -1186,7 +1205,7 @@
       <ul class="sf-lista rv">
         <li data-i18n="sf.pone.1">El tiempo de tu equipo, para la ida.</li>
         <li data-i18n="sf.pone.2">Las puertas abiertas, para la vuelta: personas de distintas áreas dispuestas a contar su camino.</li>
-        <li data-i18n="sf.pone.3">La logística que acordemos juntos.</li>
+        <li data-i18n="sf.pone.3">La logística —transporte, refrigerios—, que acordamos juntos.</li>
       </ul>
 
       <form id="sf" class="ally-form" data-submit="sfSubmit(event)">
