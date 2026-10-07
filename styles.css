@@ -1218,7 +1218,7 @@ main.page:focus{outline:none}
    que son oscuras en los dos temas. */
 a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible,[tabindex]:focus-visible{
   outline:3px solid var(--acc);outline-offset:2px;border-radius:6px}
-:is(.band,.hero,footer,.home-hub,.carnet) :focus-visible{outline-color:var(--brote)}
+:is(.band,.hero,footer,.home-hub) :focus-visible{outline-color:var(--brote)}
 .btn:focus-visible,.btn-g:focus-visible,.btn-o:focus-visible{outline-offset:3px}
 .theme-toggle:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
 .nlink:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -1932,30 +1932,17 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .track-ev-box .mu{font-size:var(--fs-15);line-height:1.6;max-width:64ch}
 .track-ev-box .ev-lista{margin-top:8px}
 
-/* ---- carnet de miembro ----
-   Página propia, no una sección del sitio: se abre en el celular de quien
-   atiende una caja y tiene que leerse de un vistazo, en una mano y con prisa.
-   Por eso vive sobre el panel oscuro y el estado es lo más grande después del
-   nombre. */
-.carnet{max-width:400px;width:100%;background:var(--ink-deep);color:var(--on-dark);
-  border-radius:18px;padding:30px 28px 24px;border:1px solid var(--on-dark-fill-2)}
-.carnet-top{display:flex;align-items:baseline;gap:10px;margin-bottom:26px}
-.carnet-amp{font-family:var(--font-display);font-weight:800;font-size:30px;color:var(--brote);line-height:1}
-.carnet-marca{font-weight:800;text-transform:uppercase;letter-spacing:.14em;font-size:10px;
-  color:var(--on-dark-3);line-height:1.4}
-.carnet-nivel{font-family:var(--font-display);font-weight:700;font-size:var(--fs-13);letter-spacing:.14em;
-  text-transform:uppercase;color:var(--brote);margin-bottom:6px}
-.carnet-nombre{font-family:var(--font-display);font-weight:800;font-size:clamp(24px,7vw,32px);
-  line-height:1.08;letter-spacing:-.02em;color:var(--on-dark);margin-bottom:24px;text-wrap:balance}
-.carnet-datos{display:flex;flex-direction:column;gap:0;margin-bottom:22px}
-.carnet-datos > div{display:flex;justify-content:space-between;gap:14px;padding:10px 0;
-  border-bottom:1px solid var(--on-dark-fill-2)}
-.carnet-datos dt{font-size:var(--fs-13);color:var(--on-dark-4)}
-.carnet-datos dd{font-size:var(--fs-14);font-weight:700;font-variant-numeric:tabular-nums}
-.carnet-estado{display:inline-block;font-family:var(--font-display);font-weight:700;font-size:var(--fs-15);
-  letter-spacing:.04em;padding:9px 20px;border:2px solid;border-radius:999px;margin-bottom:20px}
-.carnet-pie{font-size:var(--fs-12);line-height:1.5;color:var(--on-dark-4)}
-.carnet-nit{font-size:var(--fs-11);letter-spacing:.06em;color:var(--on-dark-4);margin-top:16px}
+/* ---- la puerta a /verificar (7 oct 2026) ----
+   Una línea discreta para el COMERCIO en Gratitud, Membresías, el rastreo y el
+   pie: escribe el código o escanea el QR. Es un enlace normal a una página del
+   Worker (/verificar), no una ruta de la SPA: carga entera, sin script.
+   El carnet ya no vive aquí: su tarjeta la pinta el Worker con su propio CSS
+   (`CARNET_CSS`), y las reglas `.carnet*` que había se fueron con el diseño
+   viejo. */
+.verif-door{margin-top:26px;padding-top:14px;border-top:1px solid var(--bd);font-size:var(--fs-14);
+  line-height:1.5;color:var(--mu);max-width:68ch;display:flex;flex-wrap:wrap;align-items:center;gap:0 12px}
+.verif-door .card-link{margin-top:0}
+.band .verif-door{color:var(--on-dark-3);border-top-color:var(--on-dark-line)}
 
 /* Reporte de transferencia */
 .rep-link{font-weight:700;color:var(--acc);border-bottom:1px solid var(--bd)}
@@ -2038,7 +2025,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
      una por una, que es como se quedan tres sueltas. */
   .band, .band *, .calc, .calc *, .hero, .hero *, .home-hub, .home-hub *,
   .foto-banner, .foto-banner *, .stats, .stats *,
-  .live-stat, .live-stat *, .carnet, .carnet *,
+  .live-stat, .live-stat *,
   .pay-now-t, .pay-now-p, .pay-now-msg, .pay-now-rec, .gal-cap, .track-ev-ic {
     color:#111 !important; background:transparent !important;
     text-shadow:none !important; box-shadow:none !important;

@@ -24,6 +24,7 @@
    =========================================================================== */
 
 import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
+import { qrMatriz } from "./qr.js";
 
 /* --- identidad de la entidad. Un solo lugar: si cambia el domicilio o la
        Revisora Fiscal, se cambia aquí y cambia en los dos documentos. --- */
@@ -605,7 +606,125 @@ const METODOS = {
   TRANSFERENCIA: "Transferencia bancaria"
 };
 
-export async function recibo(a, hoyISO) {
+/* ===========================================================================
+   EL CARNET EN EL RECIBO (7 oct 2026)
+   ===========================================================================
+   Solo cuando el aporte es un cobro de membresía que creó o renovó un carnet:
+   quien decide eso es `carnetDeAporte` en worker.js, que trae aquí los datos ya
+   resueltos —textos en su idioma, tinte, código—. Este archivo no sabe de
+   niveles ni de quién es miembro: dibuja lo que le dan.
+
+   Es la misma tarjeta de la página /carnet/<token> en proporciones ID-1 (85,6 ×
+   54 mm = 242,6 × 153 pt), en color plano —un PDF de oficina no necesita el
+   degradado— y con Helvetica, como el resto del documento. A su lado, el QR
+   que lleva a /verificar/<código>: el mismo de la pantalla, nunca el token. El
+   enlace al carnet NO va impreso: este recibo se reenvía —al contador, a quien
+   pide el certificado— y el token del carnet es la llave del miembro.
+   =========================================================================== */
+function hexRgb(h) {
+  const x = String(h || "#1F5C38").replace("#", "");
+  return rgb(parseInt(x.slice(0, 2), 16) / 255, parseInt(x.slice(2, 4), 16) / 255, parseInt(x.slice(4, 6), 16) / 255);
+}
+function rectRedondo(w, hh, r) {
+  return "M" + r + " 0H" + (w - r) + "A" + r + " " + r + " 0 0 1 " + w + " " + r
+    + "V" + (hh - r) + "A" + r + " " + r + " 0 0 1 " + (w - r) + " " + hh
+    + "H" + r + "A" + r + " " + r + " 0 0 1 0 " + (hh - r)
+    + "V" + r + "A" + r + " " + r + " 0 0 1 " + r + " 0Z";
+}
+function conTracking(p, txt, x, y, tam, fuente, color, paso, opacity) {
+  let xx = x;
+  for (const ch of winansi(txt)) {
+    p.drawText(ch, { x: xx, y, size: tam, font: fuente, color, opacity });
+    xx += fuente.widthOfTextAtSize(ch, tam) + paso;
+  }
+  return xx - x;
+}
+
+async function dibujarCarnet(pdf, h, f, c) {
+  const W = 242.6, H = 153, R = 11, QR = 112, GAP = 22;
+  const blanco = rgb(1, 1, 1);
+  const mono = await pdf.embedFont(StandardFonts.CourierBold);
+
+  h.reservar(H + 46);
+  h.cintillo(c.titulo, { tam: 7.5, despues: 12 });
+  const p = h.p;
+  const x0 = MG.izq, yTop = h.y;
+
+  /* el anverso */
+  p.drawSvgPath(rectRedondo(W, H, R), { x: x0, y: yTop, color: hexRgb(c.tinte[0]) });
+  p.drawText("&", { x: x0 + W - 92, y: yTop - H - 26, size: 150, font: f.negrita, color: blanco, opacity: 0.06 });
+  const pad = 15;
+  p.drawText("&", { x: x0 + pad, y: yTop - pad - 17, size: 21, font: f.negrita, color: rgb(0.612, 0.796, 0.663) });
+  conTracking(p, "FUNDACIÓN", x0 + pad + 19, yTop - pad - 7, 5.6, f.negrita, blanco, 0.9, 0.8);
+  conTracking(p, "GIVE&GROW", x0 + pad + 19, yTop - pad - 14.5, 5.6, f.negrita, blanco, 0.9, 0.8);
+
+  const chipColor = c.vigente ? rgb(0.725, 0.871, 0.765) : rgb(0.941, 0.71, 0.4);
+  const chipT = winansi(c.estado);
+  const chipW = f.negrita.widthOfTextAtSize(chipT, 8) + 18;
+  p.drawSvgPath(rectRedondo(chipW, 16, 8), { x: x0 + W - pad - chipW, y: yTop - pad + 2, borderColor: chipColor, borderWidth: 1.1, color: hexRgb(c.tinte[1]) });
+  p.drawText(chipT, { x: x0 + W - pad - chipW + 9, y: yTop - pad - 9.5, size: 8, font: f.negrita, color: chipColor });
+
+  conTracking(p, String(c.nivelTxt).toUpperCase(), x0 + pad, yTop - 78, 6.4, f.negrita, blanco, 1.1, 0.85);
+  let tn = 15;
+  const nombre = winansi(c.nombre);
+  while (tn > 9 && f.negrita.widthOfTextAtSize(nombre, tn) > W - pad * 2) tn -= 0.5;
+  let nom = nombre;
+  while (nom.length > 1 && f.negrita.widthOfTextAtSize(nom, tn) > W - pad * 2) nom = nom.slice(0, -1);
+  p.drawText(nom, { x: x0 + pad, y: yTop - 97, size: tn, font: f.negrita, color: blanco });
+
+  const yEt = yTop - H + pad + 13, yVal = yTop - H + pad + 1;
+  conTracking(p, String(c.etNumero).toUpperCase(), x0 + pad, yEt, 5.2, f.normal, blanco, 0.8, 0.7);
+  p.drawText(winansi(c.numero), { x: x0 + pad, y: yVal, size: 8.6, font: mono, color: blanco });
+  const x2 = x0 + pad + mono.widthOfTextAtSize(winansi(c.numero), 8.6) + 16;
+  conTracking(p, String(c.etHasta).toUpperCase(), x2, yEt, 5.2, f.normal, blanco, 0.8, 0.7);
+  p.drawText(winansi(c.hasta), { x: x2, y: yVal, size: 8.6, font: mono, color: blanco });
+  for (let i = 0; i < 4; i++) {
+    p.drawRectangle({ x: x0 + W - pad - 4 * 13 + i * 13 + 3, y: yVal + 2, width: 10, height: 2.6, color: blanco, opacity: i <= c.indice ? 0.9 : 0.25 });
+  }
+
+  /* el reverso, al lado: QR, código y la hora a la que se generó */
+  const xq = x0 + W + GAP;
+  if (c.qr) {
+    const { lado, modulos } = qrMatriz(c.qr);
+    const borde = 3, total = lado + borde * 2, esc = QR / total;
+    p.drawRectangle({ x: xq, y: yTop - QR, width: QR, height: QR, color: blanco, borderColor: LINEA, borderWidth: 0.6 });
+    let d = "";
+    for (let i = 0; i < lado; i++) {
+      let j = 0;
+      while (j < lado) {
+        if (!modulos[i][j]) { j++; continue; }
+        let n = 1;
+        while (j + n < lado && modulos[i][j + n]) n++;
+        d += "M" + (j + borde) + " " + (i + borde) + "h" + n + "v1h-" + n + "z";
+        j += n;
+      }
+    }
+    p.drawSvgPath(d, { x: xq, y: yTop, scale: esc, color: TINTA });
+  }
+  const xt = c.qr ? xq + QR + 14 : xq;
+  const anchoT = MG.izq + ANCHO - xt;
+  let yt = yTop - 4;
+  const parrafo = (txt, tam, fuente, color, inter) => {
+    for (const l of h.lineas(winansi(txt), fuente, tam, anchoT)) {
+      p.drawText(l, { x: xt, y: yt - tam, size: tam, font: fuente, color });
+      yt -= inter;
+    }
+  };
+  parrafo(c.etQr, 7.6, f.negrita, TINTA, 10.5);
+  yt -= 6;
+  conTracking(p, String(c.etCodigo).toUpperCase(), xt, yt - 6, 5.6, f.negrita, GRIS, 0.8);
+  yt -= 10;
+  if (c.verif) { p.drawText(winansi(c.verif), { x: xt, y: yt - 13, size: 13, font: mono, color: TINTA }); yt -= 20; }
+  yt -= 4;
+  parrafo(c.consultado, 7.4, f.normal, GRIS, 10);
+  yt -= 4;
+  parrafo(c.nota, 7.4, f.normal, GRIS, 10);
+
+  h.y = Math.min(yTop - H, yt) - 18;
+}
+
+/* `carnet` (opcional): ver `dibujarCarnet`. */
+export async function recibo(a, hoyISO, carnet) {
   const en = a.idioma === "en";
   const t = en ? T.en : T.es;
   const { pdf, hoja: h, f } = await abrir(t.titulo + " " + a.guia, t.asunto);
@@ -648,6 +767,13 @@ export async function recibo(a, hoyISO) {
   const esCampana = String(a.destino_id || "").startsWith("brigada-");
   h.texto(esCampana ? t.rastreoBrigada : t.rastreo,
     { tam: 9.5, color: SUAVE, interlinea: 14, despues: 18 });
+
+  /* Una campaña propia nunca da carnet (0006): la guarda va aquí también, por
+     si algún día alguien llama a esto sin pasar por `carnetDeAporte`. */
+  if (carnet && !esCampana) {
+    h.regla({ despues: 14 });
+    await dibujarCarnet(pdf, h, f, carnet);
+  }
 
   h.regla({ despues: 12 });
   h.texto(ENTIDAD.nombreCorto, { tam: 9, fuente: f.negrita, color: TINTA, despues: 2 });
