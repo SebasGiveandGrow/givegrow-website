@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "da69df5a";
+const STYLES_V = "e68dad3e";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -1501,8 +1501,12 @@ function fmtPesos(centavos) {
 /* Envoltura sobria, sin imágenes ni columnas: un correo institucional que se lee
    igual en cualquier cliente y no se rompe si se bloquean las imágenes. */
 /* `lista` (opcional) es una lista con su titulo, para lo que de verdad es una
-   lista —los documentos del convenio—: en parrafos sueltos se leia como prosa. */
-function plantillaCorreo({ titulo, parrafos, filas, cierre, boton, lista }) {
+   lista —los documentos del convenio—: en parrafos sueltos se leia como prosa.
+   `bloque` (opcional) es HTML YA ARMADO por el propio Worker —hoy, la tarjeta
+   del carnet de `carnetCorreoHTML`—, nunca texto que venga de nadie: no se
+   escapa, así que todo lo variable que lleve tiene que haber pasado por `esc`
+   al armarlo. */
+function plantillaCorreo({ titulo, parrafos, filas, cierre, boton, lista, bloque }) {
   const p = (parrafos || []).map((x) =>
     `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3A3F45">${esc(x)}</p>`).join("") +
     (lista && lista.items && lista.items.length
@@ -1522,6 +1526,7 @@ function plantillaCorreo({ titulo, parrafos, filas, cierre, boton, lista }) {
 <h1 style="margin:0 0 16px;font-size:22px;line-height:1.25;color:#1A1D21">${esc(titulo)}</h1>
 ${p}
 ${f ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:18px 0">${f}</table>` : ""}
+${bloque || ""}
 ${boton ? `<p style="margin:20px 0 0"><a href="${esc(boton.url)}" style="display:inline-block;background:#1F5C38;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:999px">${esc(boton.texto)}</a></p>` : ""}
 ${cierre ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.55;color:#5C636F">${esc(cierre)}</p>` : ""}
 <p style="margin:22px 0 0;font-size:12px;color:#5C636F">Fundación Give&amp;Grow International · NIT 901.948.930-2 · Medellín, Colombia<!--contacto--></p>
@@ -1531,7 +1536,11 @@ ${cierre ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.55;color:#5C6
 /* Confirmación al donante: lo único que de verdad necesita conservar es su
    número de guía, así que el correo existe sobre todo para dárselo por escrito.
    Antes de esto, quien cerraba la página de gracias lo perdía. */
-async function correoAporteAprobado(env, aporte, email, nombre) {
+/* `carnet` (opcional, de `carnetDeAporte`): si el aporte es un cobro de
+   membresía que creó o renovó un carnet, el correo lo enseña —la tarjeta, con
+   el nombre completo, porque este correo es del propio miembro— y lleva el
+   enlace para abrirlo. Un aporte único o uno a la brigada nunca lo traen. */
+async function correoAporteAprobado(env, aporte, email, nombre, carnet) {
   if (!email) return { ok: true, sinCorreo: true };
   const en = aporte.idioma === "en";
   const guia = aporte.guia;
@@ -1579,13 +1588,34 @@ async function correoAporteAprobado(env, aporte, email, nombre) {
 
   const texto = [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")];
   if (urlRecibo) texto.push("", (en ? "Your receipt: " : "Tu recibo: ") + urlRecibo);
+
+  /* LA TARJETA, debajo de los datos del cobro y antes del recibo. El botón
+     principal sigue siendo el recibo —es lo que este correo existe para
+     dar—; el carnet va como enlace propio bajo su tarjeta. */
+  let bloque = "";
+  if (carnet && carnet.url) {
+    const cl = Object.assign({}, carnet, { lang: en ? "en" : "es" });
+    const nota = carnetSinGratitud(carnet.nivelId)
+      ? (en ? "Your member card. It proves your Seed membership; Gratitude Programme benefits at partner businesses start at the Sprout level."
+            : "Tu carnet de miembro. Acredita tu membresía Semilla; los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño.")
+      : carnet.nuevo
+        ? (en ? "Your member card is active. Show it at partner businesses: they check it on their own phone."
+              : "Tu carnet de miembro ya está activo. Muéstralo en los comercios aliados: ellos lo comprueban desde su propio celular.")
+        : (en ? "Your member card, renewed with this payment. Show it at partner businesses: they check it on their own phone."
+              : "Tu carnet de miembro, renovado con este cobro. Muéstralo en los comercios aliados: ellos lo comprueban desde su propio celular.");
+    bloque = '<p style="margin:22px 0 0;font-size:14px;line-height:1.55;color:#3A3F45">' + esc(nota) + '</p>'
+      + carnetCorreoHTML(cl)
+      + '<p style="margin:8px 0 0"><a href="' + esc(carnet.url) + '" style="font-size:14px;font-weight:700;color:#1F5C38">'
+      + esc(en ? "Open my card" : "Abrir mi carnet") + ' &rarr;</a></p>';
+    texto.push("", (en ? "Your member card: " : "Tu carnet: ") + carnet.url);
+  }
   texto.push("", cierre);
 
   return enviarCorreo(env, {
     para: email,
     asunto,
     texto: texto.join("\n"),
-    html: plantillaCorreo({ titulo, parrafos, filas, cierre, boton }),
+    html: plantillaCorreo({ titulo, parrafos, filas, cierre, boton, bloque }),
     etiqueta: "aporte-aprobado", guia: aporte.guia
   });
 }
@@ -1768,11 +1798,19 @@ async function aplicarEstado(env, guia, tx, estado) {
         quiere_certificado: fila.quiere_certificado,
         token: fila.token
       };
-      await correoAporteAprobado(env, datos, d && d.email, d && d.nombre);
+      /* La membresía se crea o se renueva aquí, con el pago ya confirmado, y
+         ANTES del correo del aporte: así ese correo ya puede enseñar la
+         tarjeta renovada. Va en su propio try: si el carnet fallara, el
+         recibo del cobro tiene que salir igual. */
+      let carnet = null, tarjeta = null;
+      try {
+        carnet = await carnetTrasAporte(env, Object.assign({}, datos, { destino_id: fila.destino_id }), donanteId);
+        if (carnet) tarjeta = await carnetDeAporte(env, datos, donanteId, fila.idioma);
+        if (tarjeta) tarjeta.nuevo = !!carnet.nuevo;
+      } catch (e) { console.error("carnet tras aprobar", guia, e && e.message); }
+      await correoAporteAprobado(env, datos, d && d.email, d && d.nombre, tarjeta);
       await correoAvisoInterno(env, datos, d && d.email, d && d.nombre);
-      /* La membresía se crea o se renueva aquí, con el pago ya confirmado.
-         Solo se avisa la primera vez: una renovación no necesita anunciarse. */
-      const carnet = await carnetTrasAporte(env, Object.assign({}, datos, { destino_id: fila.destino_id }), donanteId);
+      /* Solo se avisa la primera vez: una renovación no necesita anunciarse. */
       if (carnet && carnet.nuevo) await correoCarnet(env, d && d.email, d && d.nombre, carnet, fila.idioma);
     } catch (e) {
       console.error("correo tras aprobar", guia, e && e.message);
@@ -1886,7 +1924,7 @@ async function apiRecibo(env, guia, token) {
 
   const a = await env.DB.prepare(
     "SELECT guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, frecuencia, " +
-    "nota, idioma, metodo_pago, creada_en, aprobada_en, token, fecha_pago FROM aportes WHERE guia = ?"
+    "nota, idioma, metodo_pago, creada_en, aprobada_en, token, fecha_pago, donante_id, confirmacion FROM aportes WHERE guia = ?"
   ).bind(g).first();
 
   /* Mismo 403 exista o no la guía: distinguirlos convertiría este endpoint en un
@@ -1918,11 +1956,19 @@ async function apiRecibo(env, guia, token) {
      Se convierte AQUÍ, en el borde de presentación, y no dentro de
      `documentos.js`, que recibe fechas ISO y no sabe de husos. Con guarda: sin
      ella `fechaCO(null)` devuelve HOY, que es peor que no imprimir nada. */
+  /* EL CARNET, si este cobro es de una membresía (ver `carnetDeAporte`). Un
+     fallo aquí deja el recibo sin tarjeta, nunca sin recibo. */
+  let tarjeta = null;
+  try {
+    const t = await carnetDeAporte(env, a, a.donante_id, a.idioma);
+    if (t) tarjeta = carnetParaDocumento(t);
+  } catch (e) { console.error("recibo carnet", g, e && e.message); }
+
   const bytes = await recibo({
     ...a,
     aprobada_en: a.aprobada_en ? fechaCO(a.aprobada_en) : null,
     creada_en: a.creada_en ? fechaCO(a.creada_en) : null
-  }, selloCO());
+  }, selloCO(), tarjeta);
   return new Response(bytes, {
     headers: {
       "content-type": "application/pdf",
@@ -11643,6 +11689,35 @@ async function paypalCobro(env, suscripcionId, recurso) {
     "actualizada_en = datetime('now') WHERE id = ?"
   ).bind(suscripcionId).run();
 
+  /* EL CARNET VA PRIMERO, y el recibo después: así el correo del cobro ya puede
+     enseñar la tarjeta renovada. Antes salía al revés.
+
+     `carnetTrasAporte` solo se llamaba desde el camino de Wompi, asi que un
+     miembro internacional pagaba todos los meses y nunca recibia su carnet —
+     mientras la pagina de membresias se lo promete a todos: «tu carnet digital
+     de miembro, que se renueva con cada aporte».
+
+     Se le pasa el nivel QUE YA DECIDIO la suscripcion en dolares. Recalcularlo
+     aqui con `nivelPorMensual` leeria 35 dolares como 35 pesos.
+
+     Va en try aparte: un carnet que falla no puede tumbar el registro de un
+     cobro que YA ocurrio, ni dejarlo sin recibo. */
+  const d = sub.donante_id
+    ? await env.DB.prepare("SELECT nombre, email FROM donantes WHERE id = ?").bind(sub.donante_id).first().catch(() => null)
+    : null;
+  let carnet = null, tarjeta = null;
+  try {
+    carnet = await carnetTrasAporte(
+      env,
+      { frecuencia: "mensual", monto_centavos: centavos, destino_id: destinoId },
+      sub.donante_id, sub.nivel
+    );
+    if (carnet) {
+      tarjeta = await carnetDeAporte(env, { frecuencia: "mensual", destino_id: destinoId }, sub.donante_id, sub.idioma);
+      if (tarjeta) tarjeta.nuevo = !!carnet.nuevo;
+    }
+  } catch (e) { console.error("carnet tras cobro paypal", guia, e && e.message); }
+
   /* Y AHORA SI, EL RECIBO. Quien apoya desde el exterior recibe lo mismo que
      quien paga por Wompi: su recibo con la guia, cada mes. Antes no salia
      ninguno, y no por un fallo de envio sino porque no habia a quien mandarlo.
@@ -11651,14 +11726,11 @@ async function paypalCobro(env, suscripcionId, recurso) {
      cobro que YA ocurrio. Si falla queda en el log y el aporte existe igual, que
      es el orden correcto de prioridades cuando ya hay dinero de por medio. */
   try {
-    const d = sub.donante_id
-      ? await env.DB.prepare("SELECT nombre, email FROM donantes WHERE id = ?").bind(sub.donante_id).first()
-      : null;
     if (d && d.email) {
       await correoAporteAprobado(env, {
         guia, monto_centavos: centavos, moneda, idioma: sub.idioma,
         modo, destino_id: destinoId, frecuencia: "mensual", token
-      }, d.email, d.nombre);
+      }, d.email, d.nombre, tarjeta);
     } else {
       /* Se DICE que no se mando y por que. Una membresia sin correo enlazado es
          reparable, pero solo si alguien se entera. */
@@ -11666,17 +11738,7 @@ async function paypalCobro(env, suscripcionId, recurso) {
     }
   } catch (e) { console.error("correo tras cobro paypal", guia, e && e.message); }
 
-  /* Y EL CARNET, que tampoco salia. `carnetTrasAporte` solo se llamaba desde el
-     camino de Wompi, asi que un miembro internacional pagaba todos los meses y
-     nunca recibia su carnet — mientras la pagina de membresias se lo promete a
-     todos: «tu carnet digital de miembro, que se renueva con cada aporte».
-
-     Se le pasa el nivel QUE YA DECIDIO la suscripcion en dolares. Recalcularlo
-     aqui con `nivelPorMensual` leeria 35 dolares como 35 pesos. */
   try {
-    const d = sub.donante_id
-      ? await env.DB.prepare("SELECT nombre, email FROM donantes WHERE id = ?").bind(sub.donante_id).first()
-      : null;
     /* EL AVISO INTERNO, la tercera pieza que le faltaba a este camino. Sin el,
        la fundacion no se entera de que hay un miembro nuevo cobrando cada mes
        salvo que alguien abra el panel. El de Wompi lleva anios mandandolo. */
@@ -11684,16 +11746,10 @@ async function paypalCobro(env, suscripcionId, recurso) {
       guia, monto_centavos: centavos, moneda,
       modo, destino_id: destinoId, frecuencia: "mensual"
     }, d && d.email, d && d.nombre);
-
-    const carnet = await carnetTrasAporte(
-      env,
-      { frecuencia: "mensual", monto_centavos: centavos, destino_id: destinoId },
-      sub.donante_id, sub.nivel
-    );
     if (carnet && carnet.nuevo && d && d.email) {
       await correoCarnet(env, d.email, d.nombre, carnet, sub.idioma);
     }
-  } catch (e) { console.error("carnet tras cobro paypal", guia, e && e.message); }
+  } catch (e) { console.error("aviso y carnet tras cobro paypal", guia, e && e.message); }
 
   return "aporte " + guia;
 }
@@ -12939,9 +12995,9 @@ async function rutaCarnet(env, token, url, request) {
 
   return new Response(paginaCarnet({
     nombre: m.nombre || (lang === "en" ? "Member" : "Miembro"), codigo: m.codigo,
-    nivel: lang === "en" ? n.en : n.es,
+    nivel: lang === "en" ? n.en : n.es, nivelId: n.id,
     desde: m.desde, hasta: m.vigente_hasta, vigente, verif,
-    consultado: consultadoCO(), lang
+    consultado: consultadoCO(), lang, tema: temaPorReloj(request)
   }), {
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -13006,7 +13062,7 @@ async function rutaVerificar(env, url, request, crudo) {
     lang, tema, entrada: verifFormato(v),
     resultado: {
       vigente: !m.revocado_en && m.vigente_hasta >= fechaCO(),
-      nivel: lang === "en" ? n.en : n.es,
+      nivel: lang === "en" ? n.en : n.es, nivelId: n.id, verif: v,
       nombre: nombreEnmascarado(m.nombre),
       desde: m.desde, hasta: m.vigente_hasta,
       consultado: consultadoCO()
@@ -13026,6 +13082,8 @@ function paginaVerificar(o) {
     nivel: "Level", nombre: "Name", desde: "Member since", hasta: "Valid until", cons: "Checked",
     hora: "Colombia time",
     cotejar: "Ask for an ID document and check that the name matches. The card is personal and not transferable.",
+    semilla: "Seed level: the membership is real, but Gratitude Programme benefits start at the Sprout level.",
+    cotejarSemilla: "At this level the partner-business benefit does not apply. If you want to confirm the name, ask for an ID document.",
     nf: "We could not find that code.",
     nfP: "Check that it was typed correctly: eight characters, with or without the dash. If it still does not show up, the card cannot be confirmed — do not apply the benefit; the member can write to us.",
     lim: "Too many checks from this connection.",
@@ -13042,6 +13100,8 @@ function paginaVerificar(o) {
     nivel: "Nivel", nombre: "Nombre", desde: "Miembro desde", hasta: "Vigente hasta", cons: "Consultado",
     hora: "hora de Colombia",
     cotejar: "Pide un documento de identidad y compara el nombre. El carnet es personal e intransferible.",
+    semilla: "Nivel Semilla: la membresía es real, pero los beneficios del Programa de Gratitud empiezan en el nivel Retoño.",
+    cotejarSemilla: "A este nivel no aplica el beneficio del comercio aliado. Si quieres confirmar el nombre, pide un documento de identidad.",
     nf: "No encontramos ese código.",
     nfP: "Revisa que esté bien escrito: ocho caracteres, con o sin guion. Si aun así no aparece, el carnet no se puede confirmar: no apliques el beneficio, y el miembro puede escribirnos.",
     lim: "Demasiadas consultas desde esta conexión.",
@@ -13069,20 +13129,24 @@ function paginaVerificar(o) {
 
   if (o.resultado) {
     const r = o.resultado;
-    const fila = (k, v) => '      <div><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>\n';
+    /* LA MISMA TARJETA QUE ENSEÑA EL MIEMBRO, con su nombre enmascarado y el
+       código de verificación en lugar del número MB-…: el cajero coteja lo que
+       ve en su celular con lo que le muestran, y se parecen porque las dos
+       salen de `carnetTarjetaHTML`. Arriba, en grande, la respuesta. */
     cuerpo += ''
       + '  <section class="vf-res ' + (r.vigente ? "vf-si" : "vf-no") + '">\n'
       + '    <p class="vf-estado">' + esc(r.vigente ? T.vig : T.novig) + '</p>\n'
       + '    <p class="vf-estado-p">' + esc(r.vigente ? T.vigP : T.novigP) + '</p>\n'
-      + '    <dl class="vf-dl">\n'
-      + fila(T.nombre, r.nombre || "—")
-      + fila(T.nivel, r.nivel)
-      + fila(T.desde, r.desde)
-      + fila(T.hasta, r.hasta)
-      + '    </dl>\n'
-      + '    <p class="vf-cons">' + esc(T.cons) + ': <b>' + esc(r.consultado) + '</b> (' + esc(T.hora) + ') · ' + esc(o.entrada) + '</p>\n'
+      + (carnetSinGratitud(r.nivelId) ? '    <p class="vf-estado-p vf-semilla">' + esc(T.semilla) + '</p>\n' : '')
       + '  </section>\n'
-      + (r.vigente ? '  <p class="vf-cotejar">' + esc(T.cotejar) + '</p>\n' : '')
+      + '  <div class="vf-tarjeta">\n'
+      + carnetTarjetaHTML({
+          lang: o.lang, modo: "verificar", nombre: r.nombre, nivel: r.nivel, nivelId: r.nivelId,
+          verif: r.verif, desde: r.desde, hasta: r.hasta, vigente: r.vigente, consultado: r.consultado
+        })
+      + '  </div>\n'
+      + (r.vigente && !carnetSinGratitud(r.nivelId) ? '  <p class="vf-cotejar">' + esc(T.cotejar) + '</p>\n' : '')
+      + (r.vigente && carnetSinGratitud(r.nivelId) ? '  <p class="vf-cotejar">' + esc(T.cotejarSemilla) + '</p>\n' : '')
       + '  <p style="margin-top:22px"><a class="card-link" href="/verificar' + qLang + '">' + esc(T.otra) + '</a></p>\n';
   } else {
     cuerpo += '  <p class="lead">' + esc(T.lead) + '</p>\n';
@@ -13109,11 +13173,10 @@ function paginaVerificar(o) {
     + '.vf-estado{font-family:var(--font-display);font-weight:800;font-size:clamp(34px,10vw,48px);line-height:1;margin:0 0 8px}'
     + '.vf-si .vf-estado{color:var(--acc)}.vf-no .vf-estado{color:var(--err)}'
     + '.vf-estado-p{margin:0 0 6px}'
-    + '.vf-dl{margin:14px 0 0}.vf-dl>div{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-top:1px solid var(--bd)}'
-    + '.vf-dl dt{color:var(--mu)}.vf-dl dd{margin:0;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}'
-    + '.vf-cons{margin:12px 0 0;font-size:var(--fs-13);color:var(--mu);font-variant-numeric:tabular-nums}'
+    + '.vf-semilla{margin-top:10px;font-weight:600}'
+    + '.vf-tarjeta{margin-top:18px}'
     + '.vf-cotejar{margin-top:16px;font-weight:600}';
-  return cascaraBaja(T.titulo, cuerpo, o.lang, o.tema, estilo);
+  return cascaraBaja(T.titulo, cuerpo, o.lang, o.tema, (o.resultado ? CARNET_CSS : '') + estilo);
 }
 
 /* ========================================================================
@@ -13279,89 +13342,339 @@ document.addEventListener("click", function(ev){
 cargar();
 `;
 
-function paginaCarnet(c) {
-  const en = c.lang === "en";
-  const T = en ? {
-    vig: "Valid", novig: "Not valid", carnet: "Card", desde: "Member since", hasta: "Valid until",
-    titulo: "Member card",
-    qr: "Business: scan with YOUR phone to check",
-    codigo: "Code", cons: "Checked", hora: "Colombia time",
-    pie: "Gratitude Programme · Show this screen at partner businesses. Its status is read at the moment it opens, and the business can confirm it on its own at thegiveandgrowproject.org/verificar.",
-    otro: "Español", otroLang: "es"
-  } : {
-    vig: "Vigente", novig: "No vigente", carnet: "Carnet", desde: "Miembro desde", hasta: "Vigente hasta",
-    titulo: "Carnet de miembro",
-    qr: "Comercio: escanea con TU celular para comprobar",
-    codigo: "Código", cons: "Consultado", hora: "hora de Colombia",
-    pie: "Programa de Gratitud · Presenta esta pantalla en los comercios aliados. El estado se consulta en el momento, y el comercio puede comprobarlo por su cuenta en thegiveandgrowproject.org/verificar.",
-    otro: "English", otroLang: "en"
-  };
-  const estado = c.vigente ? T.vig : T.novig;
-  const color = c.vigente ? "#9CCBA9" : "#E8A24C";   // --brote: el verde claro de marca sobre --ink-deep
+/* ========================================================================
+   EL CARNET COMO TARJETA (7 oct 2026)
+   ========================================================================
+   Hasta hoy era un panel oscuro con una lista de datos: se leía como una
+   pantalla del sitio, no como un carnet, y en la caja eso cuenta —el cajero
+   reconoce una tarjeta antes de leerla—.
 
-  /* EL QR LLEVA AL CÓDIGO DE VERIFICACIÓN, NUNCA AL TOKEN. El token abre esta
-     página con el nombre completo: un QR que lo llevara le daría la llave del
-     carnet a cada cajero que lo escanea. */
-  let bloqueQR = "";
-  if (c.verif) {
+   UNA SOLA FUNCIÓN LA PINTA (`carnetTarjetaHTML`) y la usan las dos páginas que
+   la muestran: el carnet del miembro (/carnet/<token>) y la respuesta al
+   comercio (/verificar/<código>). Si cada una tuviera su copia, la que ve el
+   cajero en su celular y la que le enseña el miembro dejarían de parecerse, y
+   «se ven iguales» es justamente lo que el comercio coteja. El recibo en PDF
+   la dibuja con pdf-lib (`dibujarCarnet`, documentos.js) a partir de
+   `carnetParaDocumento`, y el correo con `carnetCorreoHTML`: los dos con los mismos datos y el mismo tinte.
+
+   · EL ANVERSO tiene las proporciones de una tarjeta física (ID-1, 85,6 × 54
+     mm ≈ 1,586:1): la marca, el nivel, el nombre, un número, la vigencia y el
+     estado vivo. Los tamaños van en `cqw` —relativos al ancho de la tarjeta, no
+     de la pantalla— para que la composición sea la misma en un celular y en un
+     escritorio.
+   · EL REVERSO va debajo y es papel: el QR que el comercio escanea con SU
+     celular, el código para teclear y la hora a la que respondió el servidor.
+     El QR no baja de 150 px: con menos, una cámara de gama baja tarda en
+     enfocarlo sobre una pantalla con brillo.
+   · EL TINTE POR NIVEL sale del verde de marca y de la tinta oscura, sin
+     colores nuevos: Semilla gris verdoso apagado, Retoño el verde medio, Árbol
+     el verde institucional, Bosque la tinta más honda. Y como el tono solo no
+     basta —ni le sirve a quien no distingue bien los verdes—, la tarjeta lleva
+     además la escala de cuatro marcas.
+   · UN CARNET NO VIGENTE pierde el tinte y queda gris, con el estado en ámbar:
+     el cajero lo nota sin leer.
+   · EN /verificar EL NÚMERO MB-… NO SALE: es consecutivo, y en su lugar va el
+     código de verificación, que es lo que el cajero escribió. El nombre llega
+     ya enmascarado. Ni ahí ni en ningún otro sitio la tarjeta lleva el token.
+
+   Sin un solo script (las dos páginas niegan la capacidad entera) y con el
+   día/noche del sitio: la tarjeta tiene su color propio, como una de
+   plástico, y lo que cambia es el papel de alrededor. */
+const CARNET_TINTE = {
+  semilla: ["#3B4D42", "#1E2B23"],
+  retono:  ["#2E7D4F", "#17432B"],
+  arbol:   ["#1F5C38", "#0E2118"],
+  bosque:  ["#123322", "#060F0A"],
+  apagado: ["#454B47", "#1F2321"]
+};
+function carnetTinte(nivelId, vigente) {
+  return vigente ? (CARNET_TINTE[nivelId] || CARNET_TINTE.semilla) : CARNET_TINTE.apagado;
+}
+function carnetIndiceNivel(nivelId) { return Math.max(0, NIVELES_MB.findIndex((x) => x.id === nivelId)); }
+
+/* LO QUE PROMETE EL CARNET DEPENDE DEL NIVEL. Los beneficios del Programa de
+   Gratitud empiezan en Retoño (`grat.lead`, `membres.ben.1.p`), y el pie decía
+   «Presenta esta pantalla en los comercios aliados» a todos: a un Semilla le
+   prometía en la caja algo que el programa no le da. Semilla recibe un carnet
+   que ACREDITA su membresía, y se le dice desde qué nivel empiezan los
+   beneficios en vez de dejar que lo descubra frente al comercio. Lo usan el
+   carnet, sus correos, el recibo y /verificar. */
+function carnetSinGratitud(nivelId) { return (nivelId || "semilla") === "semilla"; }
+
+const CARNET_CSS = ''
+  + '.cv-par{display:grid;gap:14px;width:100%;max-width:440px}'
+  /* el anverso */
+  + '.cv-card{position:relative;overflow:hidden;container-type:inline-size;aspect-ratio:1.586/1;width:100%;'
+  + 'border-radius:4.2cqw;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.18),0 10px 28px -14px rgba(0,0,0,.45);'
+  + 'border:1px solid rgba(255,255,255,.08);-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+  + 'html[data-theme="dark"] .cv-card{border-color:rgba(255,255,255,.16)}'
+  + Object.keys(CARNET_TINTE).map((k) =>
+      '.cv-t-' + k + '{background:linear-gradient(135deg,' + CARNET_TINTE[k][0] + ' 0%,' + CARNET_TINTE[k][1] + ' 100%)}').join('')
+  + '.cv-in{position:relative;z-index:1;height:100%;box-sizing:border-box;padding:5.6cqw 6cqw 5.2cqw;display:grid;grid-template-rows:auto 1fr auto;gap:2cqw}'
+  + '.cv-fondo{position:absolute;right:-6cqw;bottom:-30cqw;font-family:var(--font-display);font-weight:800;font-size:78cqw;line-height:1;'
+  + 'color:rgba(255,255,255,.055);pointer-events:none;user-select:none}'
+  + '.cv-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:3cqw}'
+  + '.cv-marca{display:flex;align-items:center;gap:2.2cqw}'
+  + '.cv-amp{font-family:var(--font-display);font-weight:800;font-size:8.4cqw;line-height:1;color:#9CCBA9}'
+  + '.cv-marca-t{font-weight:800;text-transform:uppercase;letter-spacing:.14em;font-size:max(9px,2.6cqw);line-height:1.35;color:rgba(255,255,255,.78)}'
+  + '.cv-chip{display:inline-flex;align-items:center;gap:1.8cqw;white-space:nowrap;font-family:var(--font-display);font-weight:700;'
+  + 'font-size:max(12px,3.6cqw);letter-spacing:.03em;padding:1.6cqw 3.2cqw;border-radius:999px;background:rgba(0,0,0,.32);border:1.5px solid}'
+  + '.cv-si{color:#B9DEC3;border-color:rgba(185,222,195,.7)}.cv-no{color:#F0B566;border-color:rgba(240,181,102,.75)}'
+  /* EL PUNTO QUE LATE es solo una pista de que la página está viva; la prueba
+     de verdad es la hora del servidor y, sobre todo, el QR que el comercio abre
+     en su propio celular. Con «reducir movimiento», quieto. */
+  + '.cv-pulso{flex:0 0 auto;width:max(7px,2cqw);height:max(7px,2cqw);border-radius:50%;background:currentColor;animation:cv-late 2s ease-in-out infinite}'
+  + '@keyframes cv-late{0%,100%{opacity:1}50%{opacity:.25}}'
+  + '@media (prefers-reduced-motion: reduce){.cv-pulso{animation:none}}'
+  + '.cv-medio{align-self:end}'
+  + '.cv-nivel{font-weight:700;font-size:max(10px,2.9cqw);letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.82);margin:0 0 1.2cqw}'
+  + '.cv-nombre{font-family:var(--font-display);font-weight:700;font-size:clamp(17px,6.4cqw,30px);line-height:1.12;letter-spacing:-.015em;margin:0;color:#fff;'
+  + 'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance}'
+  + '.cv-base{display:flex;justify-content:space-between;align-items:flex-end;gap:3cqw}'
+  + '.cv-datos{display:flex;gap:6cqw;margin:0}'
+  + '.cv-datos dt{font-size:max(9px,2.5cqw);letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.66);margin:0 0 .6cqw}'
+  + '.cv-datos dd{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:max(12px,3.7cqw);letter-spacing:.04em;font-variant-numeric:tabular-nums}'
+  + '.cv-escala{display:flex;gap:1.2cqw;padding-bottom:1cqw}'
+  + '.cv-escala i{display:block;width:4.2cqw;height:1.1cqw;min-height:3px;border-radius:1px;background:rgba(255,255,255,.22)}'
+  + '.cv-escala i.on{background:rgba(255,255,255,.9)}'
+  /* el reverso, en papel */
+  + '.cv-rev{background:var(--surface);border:1px solid var(--bd);border-radius:14px;padding:16px}'
+  + '.cv-qr{display:flex;flex-wrap:wrap;gap:16px;align-items:center}'
+  + '.cv-qr-img{flex:0 0 152px;width:152px;height:152px;border-radius:6px;overflow:hidden;border:1px solid var(--bd)}'
+  + '.cv-qr-img svg{display:block;width:100%;height:100%}'
+  + '.cv-qr-txt{flex:1 1 120px;min-width:0}'
+  + '.cv-qr-l{font-size:var(--fs-14);line-height:1.4;margin:0 0 10px;font-weight:700}'
+  + '.cv-qr-c{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:clamp(17px,5vw,23px);font-weight:700;letter-spacing:.06em;white-space:nowrap;margin:0;color:var(--ink)}'
+  + '.cv-qr-c span{display:block;white-space:normal;font-family:Inter,system-ui,sans-serif;font-size:var(--fs-11);letter-spacing:.08em;font-weight:600;color:var(--mu);text-transform:uppercase;margin-bottom:4px}'
+  + '.cv-cons{display:flex;align-items:center;gap:8px;font-size:var(--fs-13);color:var(--mu);margin:14px 0 0;padding-top:12px;border-top:1px solid var(--bd);font-variant-numeric:tabular-nums}'
+  + '.cv-cons b{color:var(--ink);font-weight:700}'
+  + '.cv-cons .cv-pulso{width:7px;height:7px;color:var(--acc)}'
+  + '.cv-desde{font-size:var(--fs-13);color:var(--mu);margin:6px 0 0}.cv-desde b{color:var(--ink);font-variant-numeric:tabular-nums}'
+  + '@media print{.cv-par{max-width:86mm}.cv-card{box-shadow:none}.cv-pulso{animation:none}'
+  + '.cv-rev{border-color:#999;background:#fff}.cv-qr-c,.cv-cons b,.cv-desde b{color:#111}}';
+
+/* `c`: { lang, modo ("carnet" | "verificar"), nombre, nivel, nivelId, codigo,
+   verif, desde, hasta, vigente, consultado }. En modo "verificar" el número de
+   la tarjeta es el código de verificación y `codigo` no se usa. */
+function carnetTarjetaHTML(c) {
+  const en = c.lang === "en";
+  const verificar = c.modo === "verificar";
+  const T = en ? {
+    vig: "Valid", novig: "Not valid", carnet: "Card no.", verif: "Check code", desde: "Member since",
+    hasta: "Valid until", miembro: "Member",
+    qr: verificar ? "This QR and this code open this same check." : "Business: scan with YOUR phone to check",
+    codigo: "Verification code", cons: "Checked", hora: "Colombia time",
+    escala: "Level %n of 4", personal: "Personal and not transferable."
+  } : {
+    vig: "Vigente", novig: "No vigente", carnet: "Carnet", verif: "Verificación", desde: "Miembro desde",
+    hasta: "Vigente hasta", miembro: "Miembro",
+    qr: verificar ? "Este QR y este código abren esta misma consulta." : "Comercio: escanea con TU celular para comprobar",
+    codigo: "Código de verificación", cons: "Consultado", hora: "hora de Colombia",
+    escala: "Nivel %n de 4", personal: "Personal e intransferible."
+  };
+  const idx = carnetIndiceNivel(c.nivelId);
+  const tinte = c.vigente ? (CARNET_TINTE[c.nivelId] ? c.nivelId : "semilla") : "apagado";
+  const vf = c.verif ? verifFormato(c.verif) : "";
+  const marcas = NIVELES_MB.map((_, i) => '<i' + (i <= idx ? ' class="on"' : '') + '></i>').join("");
+
+  /* EL QR LLEVA AL CÓDIGO DE VERIFICACIÓN, NUNCA AL TOKEN. El token abre el
+     carnet con el nombre completo: un QR que lo llevara le daría la llave a
+     cada cajero que lo escanea. */
+  let qr = "";
+  if (vf) {
     let svg = "";
     try {
-      svg = qrSvg(ORIGIN + "/verificar/" + verifFormato(c.verif), { alt: en ? "QR code to check this card" : "Código QR para verificar este carnet" });
+      svg = qrSvg(ORIGIN + "/verificar/" + vf, { alt: en ? "QR code to check this card" : "Código QR para verificar este carnet" });
     } catch (e) { console.error("carnet qr", e && e.message); }
-    bloqueQR = '  <div class="cv-qr">\n'
-      + (svg ? '    <div class="cv-qr-img">' + svg + '</div>\n' : '')
-      + '    <div class="cv-qr-txt">\n'
-      + '      <p class="cv-qr-l">' + esc(T.qr) + '</p>\n'
-      + '      <p class="cv-qr-c"><span>' + esc(T.codigo) + '</span> ' + esc(verifFormato(c.verif)) + '</p>\n'
-      + '    </div>\n'
-      + '  </div>\n';
+    qr = ''
+      + '    <div class="cv-qr">\n'
+      + (svg ? '      <div class="cv-qr-img">' + svg + '</div>\n' : '')
+      + '      <div class="cv-qr-txt">\n'
+      + '        <p class="cv-qr-l">' + esc(T.qr) + '</p>\n'
+      + '        <p class="cv-qr-c"><span>' + esc(T.codigo) + '</span>' + esc(vf) + '</p>\n'
+      + '      </div>\n'
+      + '    </div>\n';
   }
+  const numero = verificar ? [T.verif, vf] : [T.carnet, c.codigo];
 
-  /* EL PUNTO QUE LATE es solo una pista visual de que la página está viva; la
-     prueba de verdad es la hora del servidor al lado y, sobre todo, el QR que
-     el comercio abre en su propio celular. Con «reducir movimiento», quieto. */
-  const estilo = '<style>'
-    + '.cv-qr{display:flex;gap:16px;align-items:center;margin:4px 0 20px;padding:14px;border:1px solid var(--on-dark-line);border-radius:12px}'
-    + '.cv-qr-img{flex:0 0 112px;width:112px;height:112px;border-radius:8px;overflow:hidden}'
-    + '.cv-qr-img svg{display:block;width:100%;height:100%}'
-    + '.cv-qr-l{font-size:var(--fs-13);line-height:1.4;margin:0 0 8px;font-weight:700}'
-    + '.cv-qr-c{font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-h4);font-weight:700;letter-spacing:.1em;margin:0}'
-    + '.cv-qr-c span{display:block;font-family:inherit;font-size:var(--fs-11);letter-spacing:.06em;font-weight:400;color:var(--on-dark-4);text-transform:uppercase}'
-    + '.cv-cons{display:flex;align-items:center;gap:8px;font-size:var(--fs-12);color:var(--on-dark-4);margin:0 0 14px;font-variant-numeric:tabular-nums}'
-    + '.cv-cons b{color:var(--on-dark);font-weight:700}'
-    + '.cv-pulso{flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:' + color + ';animation:cv-late 2s ease-in-out infinite}'
-    + '@keyframes cv-late{0%,100%{opacity:1}50%{opacity:.25}}'
-    + '@media (prefers-reduced-motion: reduce){.cv-pulso{animation:none}}'
-    + '.cv-lang{margin-left:auto;font-size:var(--fs-12);color:var(--on-dark-4)}'
-    + '</style>';
+  return '<div class="cv-par">\n'
+    + '  <article class="cv-card cv-t-' + tinte + '" aria-labelledby="cv-nombre">\n'
+    + '    <span class="cv-fondo" aria-hidden="true">&amp;</span>\n'
+    + '    <div class="cv-in">\n'
+    + '      <div class="cv-cab">\n'
+    + '        <span class="cv-marca"><span class="cv-amp" aria-hidden="true">&amp;</span><span class="cv-marca-t">Fundación<br>Give&amp;Grow</span></span>\n'
+    + '        <span class="cv-chip ' + (c.vigente ? "cv-si" : "cv-no") + '"><span class="cv-pulso" aria-hidden="true"></span>' + esc(c.vigente ? T.vig : T.novig) + '</span>\n'
+    + '      </div>\n'
+    + '      <div class="cv-medio">\n'
+    + '        <p class="cv-nivel">' + esc(T.miembro) + ' · ' + esc(c.nivel) + '</p>\n'
+    + '        <' + (verificar ? 'p' : 'h1') + ' class="cv-nombre" id="cv-nombre">' + esc(c.nombre || "—") + '</' + (verificar ? 'p' : 'h1') + '>\n'
+    + '      </div>\n'
+    + '      <div class="cv-base">\n'
+    + '        <dl class="cv-datos">\n'
+    + '          <div><dt>' + esc(numero[0]) + '</dt><dd>' + esc(numero[1] || "—") + '</dd></div>\n'
+    + '          <div><dt>' + esc(T.hasta) + '</dt><dd>' + esc(c.hasta) + '</dd></div>\n'
+    + '        </dl>\n'
+    + '        <span class="cv-escala" role="img" aria-label="' + esc(T.escala.replace("%n", String(idx + 1))) + '">' + marcas + '</span>\n'
+    + '      </div>\n'
+    + '    </div>\n'
+    + '  </article>\n'
+    + '  <section class="cv-rev">\n'
+    + qr
+    + '    <p class="cv-cons"><span class="cv-pulso" aria-hidden="true"></span><span>' + esc(T.cons) + ': <b>' + esc(c.consultado) + '</b> (' + esc(T.hora) + ')</span></p>\n'
+    + '    <p class="cv-desde">' + esc(T.desde) + ': <b>' + esc(c.desde) + '</b> · ' + esc(T.personal) + '</p>\n'
+    + '  </section>\n'
+    + '</div>\n';
+}
 
+/* La misma tarjeta para el CORREO, donde no hay CSS de verdad: tablas, color
+   plano (Outlook no pinta degradados) y sin QR. Un SVG no se ve en Gmail y una
+   imagen `data:` la bloquean casi todos los clientes; el QR vive en la página
+   del carnet, a un toque del botón. Lo que sí va es el código de
+   verificación, que el comercio puede teclear. */
+function carnetCorreoHTML(c) {
+  const en = c.lang === "en";
+  const tinte = carnetTinte(c.nivelId, c.vigente);
+  const idx = carnetIndiceNivel(c.nivelId);
+  const T = en
+    ? { vig: "Valid", novig: "Not valid", miembro: "Member", carnet: "Card no.", hasta: "Valid until", codigo: "Verification code" }
+    : { vig: "Vigente", novig: "No vigente", miembro: "Miembro", carnet: "Carnet", hasta: "Vigente hasta", codigo: "Código de verificación" };
+  const marcas = NIVELES_MB.map((_, i) =>
+    '<span style="display:inline-block;width:14px;height:3px;margin-left:4px;background:' + (i <= idx ? '#FFFFFF' : '#6B7A70') + '"></span>').join("");
+  const chip = c.vigente ? "#B9DEC3" : "#F0B566";
+  const celda = (k, v) => '<td style="padding:0 14px 0 0;vertical-align:bottom;white-space:nowrap">'
+    + '<div style="font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#C9D3CC">' + esc(k) + '</div>'
+    + '<div style="font-family:Menlo,Consolas,monospace;font-size:12px;font-weight:700;color:#FFFFFF;margin-top:2px;white-space:nowrap">' + esc(v) + '</div></td>';
+  return '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:360px;margin:18px 0 6px;border-collapse:separate">'
+    + '<tr><td bgcolor="' + tinte[0] + '" style="background:' + tinte[0] + ';background-image:linear-gradient(135deg,' + tinte[0] + ',' + tinte[1] + ');border-radius:14px;padding:18px 20px 16px;color:#FFFFFF">'
+    + '<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>'
+    + '<td style="font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#DCE6DF"><span style="font-size:20px;color:#9CCBA9;letter-spacing:0">&amp;</span>&nbsp; Fundación Give&amp;Grow</td>'
+    + '<td align="right" style="white-space:nowrap"><span style="display:inline-block;font-size:12px;font-weight:700;color:' + chip + ';border:1.5px solid ' + chip + ';border-radius:999px;padding:3px 10px">' + esc(c.vigente ? T.vig : T.novig) + '</span></td>'
+    + '</tr></table>'
+    + '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:26px"><tr>'
+    + '<td style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#DCE6DF">' + esc(T.miembro) + ' · ' + esc(c.nivel) + '</td>'
+    + '<td align="right" style="white-space:nowrap">' + marcas + '</td></tr></table>'
+    + '<div style="font-size:21px;line-height:1.2;font-weight:700;color:#FFFFFF;margin:4px 0 18px">' + esc(c.nombre || "") + '</div>'
+    + '<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>'
+    + celda(T.carnet, c.codigo) + celda(T.hasta, c.hasta)
+    + '</tr></table>'
+    + '</td></tr>'
+    + (c.verif ? '<tr><td style="padding:10px 2px 0;font-size:13px;color:#5C636F">' + esc(T.codigo) + ': '
+      + '<b style="font-family:Menlo,Consolas,monospace;color:#1A1D21;letter-spacing:1px">' + esc(verifFormato(c.verif)) + '</b></td></tr>' : '')
+    + '</table>';
+}
+
+/* Lo que necesitan el correo y el recibo para pintar la tarjeta de un aporte.
+   SOLO para un aporte RECURRENTE que no sea de una campaña propia —las mismas
+   dos condiciones con las que `carnetTrasAporte` crea o renueva el carnet—: un
+   aporte único o uno a la brigada no dan membresía (0006), y su recibo no
+   puede enseñar una. Devuelve null si no hay carnet. */
+async function carnetDeAporte(env, aporte, donanteId, lang) {
+  if (!donanteId) return null;
+  if (aporte.frecuencia !== "mensual" && aporte.frecuencia !== "anual") return null;
+  if (String(aporte.destino_id || "").startsWith("brigada-")) return null;
+  /* Una transferencia confirmada a mano no pasa por `carnetTrasAporte`: no
+     creó ni renovó nada, así que su recibo no enseña carnet aunque la persona
+     tenga uno por otro camino. */
+  if (aporte.confirmacion === "manual" || aporte.metodo_pago === "TRANSFERENCIA") return null;
+  const m = await env.DB.prepare(
+    "SELECT m.codigo, m.token, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, d.nombre " +
+    "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.donante_id = ?"
+  ).bind(donanteId).first();
+  if (!m) return null;
+  let verif = m.verif;
+  try { verif = await verifDeMiembro(env, m.codigo, m.verif); } catch (e) { console.error("carnet aporte verif", e && e.message); }
+  const n = nivelDe(m.nivel);
+  const en = lang === "en";
+  return {
+    lang: en ? "en" : "es",
+    nombre: m.nombre || (en ? "Member" : "Miembro"), codigo: m.codigo, token: m.token,
+    nivelId: n.id, nivel: en ? n.en : n.es,
+    desde: m.desde, hasta: m.vigente_hasta, verif,
+    vigente: !m.revocado_en && m.vigente_hasta >= fechaCO(),
+    consultado: consultadoCO(),
+    url: ORIGIN + "/carnet/" + m.token + (en ? "?lang=en" : "")
+  };
+}
+
+/* Los datos del carnet ya traducidos para `dibujarCarnet` (documentos.js), que
+   no sabe de niveles ni de idiomas. Sin token: el recibo se reenvía. */
+function carnetParaDocumento(t) {
+  const en = t.lang === "en";
+  return {
+    titulo: en ? "Your member card" : "Tu carnet de miembro",
+    estado: t.vigente ? (en ? "VALID" : "VIGENTE") : (en ? "NOT VALID" : "NO VIGENTE"),
+    vigente: t.vigente,
+    tinte: carnetTinte(t.nivelId, t.vigente),
+    indice: carnetIndiceNivel(t.nivelId),
+    nivelTxt: (en ? "Member · " : "Miembro · ") + t.nivel,
+    nombre: t.nombre,
+    etNumero: en ? "Card no." : "Carnet", numero: t.codigo,
+    etHasta: en ? "Valid until" : "Vigente hasta", hasta: t.hasta,
+    qr: t.verif ? ORIGIN + "/verificar/" + verifFormato(t.verif) : null,
+    verif: t.verif ? verifFormato(t.verif) : "",
+    etQr: en ? "Business: scan with YOUR phone to check" : "Comercio: escanea con TU celular para comprobar",
+    etCodigo: en ? "Verification code" : "Código de verificación",
+    consultado: (en ? "Status as of " : "Estado al ") + t.consultado + (en ? " (Colombia time). The live status is at the QR." : " (hora de Colombia). El estado vivo está en el QR."),
+    nota: carnetSinGratitud(t.nivelId)
+      ? (en ? "Seed membership. Gratitude Programme benefits at partner businesses start at the Sprout level."
+            : "Membresía Semilla. Los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño.")
+      : (en ? "Open your live card from the link in your confirmation email." : "Abre tu carnet vivo desde el enlace del correo de confirmación.")
+  };
+}
+
+function paginaCarnet(c) {
+  const en = c.lang === "en";
+  const semilla = carnetSinGratitud(c.nivelId);
+  const T = en ? {
+    titulo: "Member card",
+    pie: semilla
+      ? "This card proves your Seed membership. Gratitude Programme benefits at partner businesses start at the Sprout level. Its status is read at the moment it opens, and anyone can confirm it at thegiveandgrowproject.org/verificar."
+      : "Gratitude Programme · Show this screen at partner businesses. Its status is read at the moment it opens, and the business can confirm it on its own at thegiveandgrowproject.org/verificar.",
+    otro: "Español", otroLang: "es"
+  } : {
+    titulo: "Carnet de miembro",
+    pie: semilla
+      ? "Este carnet acredita tu membresía Semilla. Los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño. El estado se consulta en el momento, y cualquiera puede comprobarlo en thegiveandgrowproject.org/verificar."
+      : "Programa de Gratitud · Presenta esta pantalla en los comercios aliados. El estado se consulta en el momento, y el comercio puede comprobarlo por su cuenta en thegiveandgrowproject.org/verificar.",
+    otro: "English", otroLang: "en"
+  };
+  const oscuro = c.tema === "dark";
+
+  /* En pantallas anchas el reverso va AL LADO, como quien pone la tarjeta y su
+     respaldo sobre la mesa. */
+  const estilo = CARNET_CSS
+    + 'body.cv-body{background:var(--bg);color:var(--ink);min-height:100vh;margin:0;padding:20px 16px 40px;display:flex;justify-content:center}'
+    + '.cv{width:100%;max-width:440px;display:grid;gap:14px;align-content:start}'
+    + '.cv-barra{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0}'
+    + '.cv-barra .ey{margin:0}.cv-barra .card-link{min-height:44px;margin:0}'
+    + '.cv-pie{font-size:var(--fs-13);line-height:1.55;color:var(--mu);margin:2px 0 0}'
+    + '.cv-nit{font-size:var(--fs-11);letter-spacing:.06em;color:var(--mu);margin:0}'
+    + '@media (min-width:880px){body.cv-body{align-items:center;padding:40px 32px}.cv{max-width:900px}'
+    + '.cv .cv-par{max-width:none;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;align-items:center}}'
+    + '@media print{body.cv-body{background:#fff;color:#111;padding:0;display:block}.cv-barra .card-link{display:none}'
+    + '.cv .cv-par{grid-template-columns:none}.cv-pie,.cv-nit{color:#333;max-width:120mm}}';
+
+  /* Plantilla literal a propósito: así el check #8b del gate le cuenta las
+     etiquetas. La tarjeta (`carnetTarjetaHTML`) va interpolada. */
   return `<!doctype html>
-<html lang="${en ? "en" : "es"}"><head>
+<html lang="${en ? "en" : "es"}"${oscuro ? ' data-theme="dark"' : ""}>
+<head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>${esc(T.titulo)} · ${esc(c.codigo)} · Give&Grow</title>
+<meta name="theme-color" content="${oscuro ? "#0F1613" : "#1F5C38"}">
+<title>${esc(T.titulo)} · ${esc(c.codigo)} · Give&amp;Grow</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${HOJA_CSS}
-${estilo}
-</head><body style="background:#0E2118;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
-<main class="carnet">
-  <div class="carnet-top">
-    <span class="carnet-amp">&amp;</span>
-    <span class="carnet-marca">Fundación<br>Give&amp;Grow</span>
-    <a class="cv-lang" href="?lang=${T.otroLang}" hreflang="${T.otroLang}" lang="${T.otroLang}">${esc(T.otro)}</a>
-  </div>
-  <p class="carnet-nivel">${esc(c.nivel)}</p>
-  <h1 class="carnet-nombre">${esc(c.nombre)}</h1>
-  <dl class="carnet-datos">
-    <div><dt>${esc(T.carnet)}</dt><dd>${esc(c.codigo)}</dd></div>
-    <div><dt>${esc(T.desde)}</dt><dd>${esc(c.desde)}</dd></div>
-    <div><dt>${esc(T.hasta)}</dt><dd>${esc(c.hasta)}</dd></div>
-  </dl>
-  <p class="carnet-estado" style="color:${color};border-color:${color}">${esc(estado)}</p>
-  <p class="cv-cons"><span class="cv-pulso" aria-hidden="true"></span><span>${esc(T.cons)}: <b>${esc(c.consultado)}</b> (${esc(T.hora)})</span></p>
-${bloqueQR}  <p class="carnet-pie">${esc(T.pie)}</p>
-  <p class="carnet-nit">NIT 901.948.930-2 · thegiveandgrowproject.org</p>
+<style>${estilo}</style>
+</head>
+<body class="cv-body">
+<main class="cv">
+  <p class="cv-barra"><span class="ey">${esc(T.titulo)}</span><a class="card-link" href="?lang=${T.otroLang}" hreflang="${T.otroLang}" lang="${T.otroLang}">${esc(T.otro)}</a></p>
+${carnetTarjetaHTML(Object.assign({}, c, { modo: "carnet" }))}  <p class="cv-pie">${esc(T.pie)}</p>
+  <p class="cv-nit">Fundación Give&amp;Grow International · NIT 901.948.930-2 · thegiveandgrowproject.org</p>
 </main>
-</body></html>`;
+</body>
+</html>`;
 }
 
 /* ---- panel ---- */
@@ -13431,7 +13744,18 @@ async function correoCarnet(env, email, nombre, carnet, idioma) {
   const url = ORIGIN + "/carnet/" + carnet.token + (en ? "?lang=en" : "");
   const n = nivelDe(carnet.nivel);
   const titulo = en ? "Your member card" : "Tu carnet de miembro";
-  const parrafos = en ? [
+  /* Semilla no tiene beneficios del Programa de Gratitud (empiezan en Retoño):
+     su correo no lo manda a enseñar la pantalla en la caja de un comercio. */
+  const semilla = carnetSinGratitud(n.id);
+  const parrafos = semilla ? (en ? [
+    "Your membership is active. This is your card: a page that proves your Seed membership. Gratitude Programme benefits at partner businesses start at the Sprout level.",
+    "It is a live page, not an image: it states whether it is valid at the moment it is opened, and anyone can confirm it by scanning its QR or typing its code at thegiveandgrowproject.org/verificar.",
+    "It renews on its own with each contribution. If you stop giving, it simply expires."
+  ] : [
+    "Tu membresía quedó activa. Este es tu carnet: una página que acredita tu membresía Semilla. Los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño.",
+    "Es una página viva, no una imagen: dice si está vigente en el momento en que se abre, y cualquiera puede comprobarla escaneando su QR o escribiendo su código en thegiveandgrowproject.org/verificar.",
+    "Se renueva solo con cada aporte. Si dejas de aportar, simplemente vence."
+  ]) : en ? [
     "Your membership is active. This is your card: open the link and show that screen at partner businesses.",
     "It is a live page, not an image: it states whether it is valid at the moment it is opened. And the business does not have to take the screen's word for it either — it scans the QR on your card with its own phone, or types the code at thegiveandgrowproject.org/verificar.",
     "It renews on its own with each contribution. If you stop giving, it simply expires."
@@ -28320,7 +28644,7 @@ function paginaPedirEnlace(lang, enviado, tema) {
     campo: "Your email", boton: "Send me the link",
     hecho: "If there is an active membership with that email, the link is on its way. Check your inbox and your spam folder.",
     nota: "We never say whether an email is registered here — that would let anyone use this page to find out who is a member.",
-    paypal: "If you became a member through PayPal, your subscription is cancelled from your own PayPal account: we cannot stop it from here, and we would rather say so than let you believe otherwise.",
+    paypal: "If you became a member through PayPal, we send you the link to your member card. The subscription itself is cancelled from your own PayPal account: we cannot stop it from here, and we would rather say so than let you believe otherwise.",
     volver: "Back to memberships"
   } : {
     titulo: "Encuentra tu membresía",
@@ -28328,7 +28652,7 @@ function paginaPedirEnlace(lang, enviado, tema) {
     campo: "Tu correo", boton: "Envíame el enlace",
     hecho: "Si hay una membresía activa con ese correo, el enlace va en camino. Revisa tu bandeja y la carpeta de spam.",
     nota: "Aquí nunca decimos si un correo está registrado o no — eso convertiría esta página en una forma de averiguar quién es miembro.",
-    paypal: "Si te hiciste miembro por PayPal, esa suscripción se cancela desde tu propia cuenta de PayPal: desde aquí no podemos detenerla, y preferimos decírtelo a que te quedes creyendo que sí.",
+    paypal: "Si te hiciste miembro por PayPal, te enviamos el enlace a tu carnet. La suscripción en sí se cancela desde tu propia cuenta de PayPal: desde aquí no podemos detenerla, y preferimos decírtelo a que te quedes creyendo que sí.",
     volver: "Volver a membresías"
   };
 
@@ -28394,6 +28718,21 @@ async function apiBajaEnlace(request, env, url) {
       "AND LOWER(d.email) = ? ORDER BY s.creada_en DESC LIMIT 1"
     ).bind(email).first();
     if (sub) await correoEnlaceMembresia(env, sub, email, lang);
+    /* Y LOS MIEMBROS DE PAYPAL, que hasta el 7 oct 2026 no recibían nada aquí:
+       la consulta de arriba es solo de Wompi, porque su suscripción no tiene
+       página propia que enlazar (se cancela desde la cuenta de PayPal). Pero el
+       carnet sí es nuestro, y quien lo perdía no tenía cómo volver a pedirlo.
+       Se manda solo el carnet, y SOLO desde aquí adentro: hacia afuera la
+       respuesta es la misma pantalla, haya o no haya miembro. */
+    else {
+      const pp = await env.DB.prepare(
+        "SELECT s.nivel AS nivel_pp, s.monto_centavos, s.idioma, m.token, m.codigo, m.nivel, m.vigente_hasta, m.revocado_en, d.nombre " +
+        "FROM suscripciones s JOIN donantes d ON d.id = s.donante_id JOIN miembros m ON m.donante_id = s.donante_id " +
+        "WHERE s.proveedor = 'paypal' AND s.estado = 'activa' AND m.token IS NOT NULL " +
+        "AND LOWER(d.email) = ? ORDER BY s.creada_en DESC LIMIT 1"
+      ).bind(email).first();
+      if (pp) await correoEnlaceCarnetPaypal(env, pp, email, lang);
+    }
   }
 
   /* SIEMPRE la misma respuesta, haya suscripcion o no, sea el correo valido o
@@ -28446,6 +28785,45 @@ async function correoEnlaceMembresia(env, sub, email, lang) {
       cierre: en
         ? "If you did not ask for this email, you can ignore it: nothing changed and nobody can act on your membership without this link."
         : "Si no pediste este correo, puedes ignorarlo: no cambió nada y nadie puede actuar sobre tu membresía sin este enlace."
+    }),
+    msTope: 8000
+  });
+}
+
+/* El correo de quien es miembro por PayPal y pide su enlace. Lleva el carnet y
+   nada más: su suscripción no tiene página nuestra —se gestiona desde su
+   cuenta de PayPal— y decírselo aquí evita que busque un botón que no existe. */
+async function correoEnlaceCarnetPaypal(env, m, email, lang) {
+  const en = lang === "en";
+  const carnet = ORIGIN + "/carnet/" + m.token + (en ? "?lang=en" : "");
+  const n = nivelDe(m.nivel);
+  const semilla = carnetSinGratitud(n.id);
+  const filas = en
+    ? [["Card", m.codigo], ["Level", n.en], ["Valid until", m.vigente_hasta], ["Monthly", "US$" + (Number(m.monto_centavos || 0) / 100).toFixed(2) + " · PayPal"]]
+    : [["Carnet", m.codigo], ["Nivel", n.es], ["Vigente hasta", m.vigente_hasta], ["Mensual", "US$" + (Number(m.monto_centavos || 0) / 100).toFixed(2) + " · PayPal"]];
+  return await enviarCorreo(env, {
+    para: email,
+    etiqueta: "carnet_enlace",
+    asunto: en ? "Your member card link" : "El enlace a tu carnet",
+    texto: (en ? "Your member card: " : "Tu carnet: ") + carnet,
+    html: plantillaCorreo({
+      titulo: en ? "Your member card" : "Tu carnet de miembro",
+      parrafos: en ? [
+        semilla
+          ? "Here is the link to your member card. It proves your Seed membership; Gratitude Programme benefits at partner businesses start at the Sprout level."
+          : "Here is the link to your member card. Show that screen at partner businesses: they check it on their own phone.",
+        "Your membership is through PayPal, so the subscription itself is managed from your own PayPal account: that is where you change or cancel it."
+      ] : [
+        semilla
+          ? "Este es el enlace a tu carnet de miembro. Acredita tu membresía Semilla; los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño."
+          : "Este es el enlace a tu carnet de miembro. Muestra esa pantalla en los comercios aliados: ellos lo comprueban desde su propio celular.",
+        "Tu membresía es por PayPal, así que la suscripción se gestiona desde tu propia cuenta de PayPal: ahí la cambias o la cancelas."
+      ],
+      filas,
+      boton: { url: carnet, texto: en ? "Open my card" : "Abrir mi carnet" },
+      cierre: en
+        ? "If you did not ask for this email, you can ignore it: nothing changed."
+        : "Si no pediste este correo, puedes ignorarlo: no cambió nada."
     }),
     msTope: 8000
   });
