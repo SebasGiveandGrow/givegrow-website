@@ -37,7 +37,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=983f8f8e">
+<link rel="stylesheet" href="/styles.css?v=b8b70cf6">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -45,7 +45,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=e0dc6648" defer></script>
+<script src="/app.js?v=b6cedb94" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1129,6 +1129,120 @@
       <h2 class="h-comp3 rv" data-i18n="med.unlock.t" style="margin-bottom:14px">El segundo peldaño no necesita presupuesto</h2>
       <p class="lead rv d1" data-i18n="med.unlock.p" style="margin-left:auto;margin-right:auto">Necesita un profesional. Un psicólogo voluntario podría validar los instrumentos de observación y definir hasta dónde se puede afirmar sin sobre-interpretar. El programa de voluntariado ya tiene el canal para recibirlo, sin pisar territorio si no quiere.</p>
       <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="#voluntariado" data-i18n="med.unlock.cta">Aportar mi profesión</a></div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ SOCIAL FEST 2026 (página de evento) ============
+     Destino del QR impreso (`/socialfest` → aquí). Se lee DE PIE, en un
+     pasillo de Ruta N, con el teléfono: por eso arriba va una sola frase de
+     quiénes somos y las dos puertas, y nada más. No está en el menú a
+     propósito: es una página de evento, como la de la brigada.
+     Pasar por aquí deja el origen «socialfest-2026» guardado en la pestaña
+     (ver `marcarOrigenEvento` en app.js): la fundación que sigue a #fundaciones
+     o el profesional que sigue a #voluntariado llegan marcados al panel.
+     HONESTIDAD: Give&Grow todavía NO ha hecho un Impact Journey con un equipo de
+     empresa (sí con donantes individuales), y la vuelta la hizo el fundador antes
+     de que existiera la fundación. Esta página no dice lo contrario. -->
+<main id="page-socialfest" class="page">
+  <section class="sf-hero">
+    <div class="wrap">
+      <span class="ey" data-i18n="sf.ey">Social Fest 2026 · Ruta N, Medellín</span>
+      <h1 class="h-sec" data-i18n="sf.t">Aquí nadie viene a mirar.</h1>
+      <p class="lead" data-i18n="sf.lead">Somos Give&amp;Grow, una fundación de Medellín que une a empresas, personas y fundaciones de base para que cada apoyo llegue a quien lo necesita y quede documentado.</p>
+      <div class="sf-puertas">
+        <button type="button" class="sf-puerta" data-act="sfIr('empresa')">
+          <span class="sf-puerta-k" data-i18n="sf.p.emp.k">Soy empresa</span>
+          <span class="sf-puerta-d" data-i18n="sf.p.emp.d">Un piloto de Impact Journey con tu equipo: ida y vuelta, sin costo.</span>
+          <span class="sf-puerta-f" aria-hidden="true">&darr;</span>
+        </button>
+        <button type="button" class="sf-puerta" data-act="sfIr('red')">
+          <span class="sf-puerta-k" data-i18n="sf.p.red.k">Soy fundación o profesional</span>
+          <span class="sf-puerta-d" data-i18n="sf.p.red.d">Suma tu fundación al HUB SOCIAL o dona horas de tu oficio.</span>
+          <span class="sf-puerta-f" aria-hidden="true">&darr;</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="cream" id="sf-empresa">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="sf.emp.ey">Para empresas · Impact Journey</span>
+      <h2 class="h-sec rv" data-i18n="sf.emp.t">Voluntariado en doble vía.</h2>
+      <p class="lead rv d1" data-i18n="sf.emp.lead">Te proponemos un piloto con tu equipo, con las dos piernas. Ya hicimos jornadas con donantes individuales; con un equipo de empresa sería de las primeras, y la participación no tiene costo.</p>
+      <div class="sf-vias rv d2">
+        <div class="sf-via">
+          <span class="sf-via-k" data-i18n="sf.ida.k">La ida</span>
+          <h3 class="h-comp4" data-i18n="sf.ida.t">Tu equipo va a una fundación del HUB SOCIAL</h3>
+          <p data-i18n="sf.ida.p">Trabaja junto a su comunidad, en su territorio, en una jornada que la fundación define con nosotros.</p>
+        </div>
+        <div class="sf-via sf-via-vuelta">
+          <span class="sf-via-k" data-i18n="sf.vuelta.k">La vuelta · el corazón</span>
+          <h3 class="h-comp4" data-i18n="sf.vuelta.t">Esa comunidad viene a tu empresa</h3>
+          <p data-i18n="sf.vuelta.p">Los niños, niñas, jóvenes y familias de la fundación ven cómo se trabaja ahí: qué hace cada área, qué estudió cada persona y qué camino lleva a cada cargo.</p>
+        </div>
+      </div>
+      <h3 class="sf-sub rv" data-i18n="sf.pone.t">Qué pone tu empresa</h3>
+      <ul class="sf-lista rv">
+        <li data-i18n="sf.pone.1">El tiempo de tu equipo, para la ida.</li>
+        <li data-i18n="sf.pone.2">Las puertas abiertas, para la vuelta: personas de distintas áreas dispuestas a contar su camino.</li>
+        <li data-i18n="sf.pone.3">La logística que acordemos juntos.</li>
+      </ul>
+
+      <form id="sf" class="ally-form" data-submit="sfSubmit(event)">
+        <h3 class="ally-sec" data-i18n="sf.f.t">Déjanos tus datos y te escribimos</h3>
+        <div class="ally-grid">
+          <div class="field ally-wide"><label for="sf-razon" data-i18n="sf.f.razon">Empresa</label>
+            <input type="text" id="sf-razon" maxlength="160" autocomplete="organization" required></div>
+          <div class="field"><label for="sf-nombre" data-i18n="sf.f.nombre">Tu nombre</label>
+            <input type="text" id="sf-nombre" maxlength="120" autocomplete="name" required></div>
+          <div class="field"><label for="sf-cargo" data-i18n="sf.f.cargo">Tu cargo (opcional)</label>
+            <input type="text" id="sf-cargo" maxlength="120" autocomplete="organization-title"></div>
+          <div class="field"><label for="sf-correo" data-i18n="sf.f.correo">Correo</label>
+            <input type="email" id="sf-correo" maxlength="200" autocomplete="email" required></div>
+          <div class="field"><label for="sf-tel" data-i18n="sf.f.tel">Celular o WhatsApp</label>
+            <input type="tel" id="sf-tel" maxlength="40" autocomplete="tel" required></div>
+        </div>
+        <fieldset class="vf-set">
+          <legend data-i18n="sf.f.int">¿Qué les interesa? (opcional)</legend>
+          <div class="ally-mods">
+            <label class="ally-check"><input type="checkbox" name="sf-int" value="journey" checked><span data-i18n="sf.f.int.journey">Impact Journey (piloto)</span></label>
+            <label class="ally-check"><input type="checkbox" name="sf-int" value="alianza"><span data-i18n="sf.f.int.alianza">Alianza</span></label>
+            <label class="ally-check"><input type="checkbox" name="sf-int" value="donacion"><span data-i18n="sf.f.int.donacion">Donación</span></label>
+          </div>
+        </fieldset>
+        <div class="ally-auts">
+          <label class="ally-check"><input type="checkbox" id="sf-datos" required><span data-i18n="sf.datos">Autorizo el tratamiento de estos datos para que Give&amp;Grow me contacte sobre Impact Journey, conforme a la Ley 1581 de 2012 y a su Política de Privacidad.</span></label>
+          <a class="ally-policy-link" href="#privacidad" target="_blank" rel="noopener" data-i18n="ally.a.datos.link">Ver Política de Privacidad</a>
+        </div>
+        <!-- Trampa para bots: invisible y sin etiqueta. Si llega llena, no se guarda. -->
+        <input type="text" id="sf-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+        <button type="submit" class="btn btn-g ally-submit" id="sf-btn" data-i18n="sf.f.submit">Enviar mis datos</button>
+        <p id="sf-note" class="ally-msg" role="status" aria-live="polite" style="display:none"></p>
+        <p class="ally-legal" data-i18n="sf.f.legal">Enviar esto no te compromete a nada: es el comienzo de una conversación.</p>
+      </form>
+    </div>
+  </section>
+
+  <section id="sf-red">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="sf.red.ey">Para fundaciones y profesionales</span>
+      <h2 class="h-sec rv" data-i18n="sf.red.t">La evidencia no se construye sola.</h2>
+      <p class="lead rv d1" data-i18n="sf.red.lead">Si vienes del taller «Si no quedó documentado, no ocurrió», estas son las dos formas de seguir.</p>
+      <div class="grid g2 rv d2" style="margin-top:28px">
+        <div class="card">
+          <span class="tag" data-i18n="sf.red.f.tag">Fundaciones</span>
+          <h3 data-i18n="sf.red.f.t">Tu fundación en el HUB SOCIAL</h3>
+          <p data-i18n="sf.red.f.p">Aplicar es gratis y es solo texto. Después vienen la revisión, una visita de contexto y, si encajamos, el convenio de cooperación.</p>
+          <a class="btn btn-g sf-btn" href="#fundaciones" data-act="sfFund()" data-i18n="sf.red.f.btn">Aplicar al HUB SOCIAL</a>
+        </div>
+        <div class="card">
+          <span class="tag" data-i18n="sf.red.p.tag">Profesionales</span>
+          <h3 data-i18n="sf.red.p.t">Tus horas profesionales</h3>
+          <p data-i18n="sf.red.p.p">Derecho, contabilidad, diseño, desarrollo, comunicación o formación: tu oficio, desde la sede, sostiene la red que hace posible todo lo demás.</p>
+          <a class="btn btn-g sf-btn" href="#voluntariado" data-act="sfPro()" data-i18n="sf.red.p.btn">Ofrecer mis horas</a>
+        </div>
+      </div>
     </div>
   </section>
 </main>
