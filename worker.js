@@ -2749,6 +2749,26 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(COALESCE(json_extract(datos, '$.convenio.desde'), actualizada_en)) AS masViejo " +
     "FROM inscripciones WHERE tipo = 'fundacion' AND estado = 'convenio'",
     "Bandeja «Quién quiere entrar» · documentos del Anexo 1 y firma; pasados 30 días, el certificado de existencia ya no vale", 28, "#sec-entrar", 30);
+  /* LA FUNDACION YA FIRMO Y FALTAMOS NOSOTROS. Aceptar el convenio (el
+     formulario D, firmado con codigo en /convenio) es lo ultimo que le toca a
+     la fundacion; desde ahi la pelota es de Give&Grow: revisar lo que falte
+     del Anexo 1 y marcar «firmado por ambas partes». Dentro de
+     `convenios_en_curso` esto no se distinguia de una fundacion que aun no ha
+     subido nada, y su plazo de 30 dias es el del certificado, no el nuestro.
+     CINCO DIAS desde la firma de D: una semana habil para revisar y firmar,
+     que es lo que la pagina le dice («Give&Grow lo firma cuando revise los
+     documentos»), y holgura de sobra antes de que el certificado de
+     existencia —30 dias— venza y haya que pedirlo otra vez.
+     Sin la 0038 no hay tabla de formularios: la cola simplemente no sale. */
+  try {
+    await enCola("convenios_por_firmar",
+      "SELECT COUNT(*) AS n, MIN(f.firmado_en) AS masViejo FROM inscripciones i " +
+      "JOIN convenio_formularios f ON f.inscripcion = i.id AND f.formulario = 'D' AND f.estado = 'firmado' " +
+      "WHERE i.tipo = 'fundacion' AND i.estado = 'convenio' AND json_extract(i.datos, '$.convenio.firmado') IS NULL",
+      "Bandeja «Quién quiere entrar» · la fundación ya aceptó el convenio: revisa el Anexo 1 y marca «firmado por ambas partes»", 24, "#sec-entrar", 5);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   await enCola("transferencias_sin_verificar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
     "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado", 60, "#sec-transferencias");
@@ -5529,6 +5549,7 @@ const NOMBRE_COLA_PLAZO = {
   voluntarios_sin_respuesta: "Voluntarios sin responder",
   jornadas_sin_cerrar: "Jornadas realizadas sin cerrar (sin certificados ni encuestas)",
   convenios_en_curso: "Fundaciones en convenio hace más de 30 días",
+  convenios_por_firmar: "Convenio aceptado por la fundación, falta la firma de Give&Grow",
   urgentes_sin_visitar: "Casos urgentes que nadie ha visitado",
   casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto",
   vencimientos_por_atender: "Vencimientos tributarios y legales sin atender"
@@ -5567,6 +5588,8 @@ async function resumenDiarioEquipo(env) {
         : n + " personas esperan una respuesta que ya pasó su plazo",
       parrafos: [
         "A cada una el acuse le prometió que una persona le escribe. Desde el panel, en «Quién quiere entrar», el filtro «Sin responder» las ordena de la más vieja a la más nueva, y cada fila trae un borrador de respuesta.",
+        deAlianzas.some(c => c.clave === "convenios_por_firmar")
+          ? "Las de «convenio aceptado» ya firmaron su parte en línea: falta que Give&Grow revise el Anexo 1 y marque «firmado por ambas partes» en su fila de «Quién quiere entrar»." : "",
         otras ? "Además hay " + otras + (otras === 1 ? " cola" : " colas") + " con trabajo pendiente que todavía no pasa su plazo: están en «Hoy»." : ""
       ],
       boton: { url: "https://thegiveandgrowproject.org/admin#hoy", texto: "Abrir el panel" }
@@ -22184,6 +22207,7 @@ var COLA_ES = {
   voluntarios_sin_respuesta: "Voluntarios sin responder",
   fundaciones_detenidas: "Fundaciones detenidas a mitad del proceso",
   convenios_en_curso: "Fundaciones en convenio (documentos y firma)",
+  convenios_por_firmar: "Convenio aceptado por la fundación, falta la firma de Give&Grow",
   voluntarios_detenidos: "Voluntarios aceptados que no avanzan",
   transferencias_sin_verificar: "Transferencias sin verificar",
   certificados_por_emitir: "Certificados por emitir",
@@ -22372,6 +22396,7 @@ var COLA_MOD = {
   voluntarios_sin_respuesta: "red",
   fundaciones_detenidas: "red",
   convenios_en_curso: "red",
+  convenios_por_firmar: "red",
   voluntarios_detenidos: "red",
   transferencias_sin_verificar: "dinero",
   certificados_por_emitir: "dinero",
