@@ -2040,7 +2040,7 @@ var I18N = {
     "sf.p.red.d":"Suma tu fundación al HUB SOCIAL o dona horas de tu oficio.",
     "sf.emp.ey":"Para empresas · Impact Journey",
     "sf.emp.t":"Voluntariado en doble vía.",
-    "sf.emp.lead":"Te proponemos un piloto con tu equipo, con las dos piernas. Ya hicimos jornadas con donantes individuales; con un equipo de empresa sería de las primeras, y la participación no tiene costo.",
+    "sf.emp.lead":"Te proponemos un piloto con tu equipo, con la ida y la vuelta. Ya hicimos jornadas con donantes individuales; con un equipo de empresa sería de las primeras, y la participación no tiene costo.",
     "sf.ida.k":"La ida",
     "sf.ida.t":"Tu equipo va a una fundación del HUB SOCIAL",
     "sf.ida.p":"Trabaja junto a su comunidad, en su territorio, en una jornada que la fundación define con nosotros.",

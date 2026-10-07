@@ -23136,12 +23136,12 @@ function verConvenio(id){
 /* LOS EVENTOS, con el nombre corto del chip. Es el espejo de
    ORIGENES_EVENTO en el servidor: un origen que no esté aquí no lleva chip. */
 var ORIGEN_ES = { "socialfest-2026": "Social Fest" };
-var PUERTA_ES = { empresa: "empresa", fundacion: "fundación", profesional: "profesional" };
+var PUERTA_EVENTO_ES = { empresa: "empresa", fundacion: "fundación", profesional: "profesional" };
 var INTERES_ES = { journey: "Impact Journey (piloto)", alianza: "Alianza", donacion: "Donación" };
 function chipOrigen(x){
   if (!x || !ORIGEN_ES[x.origen]) return "";
   return '<br><span class="tag" title="Llegó desde la página del evento' +
-    (x.puerta ? " · puerta " + esc(PUERTA_ES[x.puerta] || x.puerta) : "") + '">' + esc(ORIGEN_ES[x.origen]) + "</span>";
+    (x.puerta ? " · puerta " + esc(PUERTA_EVENTO_ES[x.puerta] || x.puerta) : "") + '">' + esc(ORIGEN_ES[x.origen]) + "</span>";
 }
 var ESP_ING = { estructural:"Ing. estructural", civil:"Ing. civil", geotecnia:"Geotecnia",
   arquitectura:"Arquitectura", otra:"Otra especialidad" };
