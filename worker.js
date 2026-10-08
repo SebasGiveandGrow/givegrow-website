@@ -2643,8 +2643,10 @@ const CERT_POR_EMITIR =
 
 async function adminResumen(env) {
   const porEstado = await env.DB.prepare(
-    "SELECT estado, COUNT(*) AS n, COALESCE(SUM(monto_centavos),0) AS centavos " +
-    "FROM aportes GROUP BY estado"
+    /* POR MONEDA (Fase 2): sin ella, la cifra de «pagados» sumaba centavos de
+       dólar de PayPal con centavos de peso. */
+    "SELECT estado, moneda, COUNT(*) AS n, COALESCE(SUM(monto_centavos),0) AS centavos " +
+    "FROM aportes GROUP BY estado, moneda"
   ).all();
   const cert = await env.DB.prepare("SELECT COUNT(*) AS n " + CERT_POR_EMITIR).first();
   const recurrentes = await env.DB.prepare(
@@ -3446,19 +3448,116 @@ async function conteoCertificados(env) {
   return r || {};
 }
 
+/* ========================================================================
+   FINANZAS (Fase 2 del panel, oct 2026)
+   ========================================================================
+   Tres preguntas que la lista de aportes no sabía contestar: ¿por dónde entró
+   el dinero?, ¿de qué tipo es? y ¿de qué fecha es? Cada una se responde con UNA
+   expresión SQL, y la usan la lista, sus totales, el CSV y el Resumen. Si un
+   día cambia la regla (un medio nuevo, por ejemplo), cambia aquí y las cuatro
+   pantallas siguen diciendo lo mismo.
+
+   «CONFIRMADO» es lo único que se suma como dinero: lo que la pasarela aprobó
+   o lo que una persona confirmó contra el extracto. Un intento sin pagar o una
+   transferencia reportada y sin verificar se cuentan, nunca se suman. */
+const APORTE_CONFIRMADO = "a.estado IN ('aprobada','en_distribucion','entregada')";
+const MEDIO_APORTE =
+  "(CASE WHEN a.proveedor = 'paypal' THEN 'paypal' " +
+  "WHEN a.metodo_pago = 'TRANSFERENCIA' OR a.confirmacion = 'manual' THEN 'transferencia' " +
+  "WHEN a.metodo_pago = 'CARD' THEN 'wompi_tarjeta' " +
+  "WHEN a.metodo_pago = 'BANCOLOMBIA_TRANSFER' THEN 'wompi_bancolombia' " +
+  "WHEN a.metodo_pago IS NOT NULL OR a.wompi_transaction_id IS NOT NULL OR a.proveedor = 'wompi' THEN 'wompi_otro' " +
+  "ELSE 'sin_medio' END)";
+/* Membresía = atada a una suscripción (cobro automático, Wompi o PayPal).
+   Un aporte mensual o anual sin suscripción también da carnet
+   (`carnetTrasAporte`), pero lo paga la persona cada vez. */
+const TIPO_APORTE =
+  "(CASE WHEN a.suscripcion IS NOT NULL THEN 'membresia' " +
+  "WHEN a.frecuencia IN ('mensual','anual') THEN 'mensual' ELSE 'unico' END)";
+/* LA FECHA DEL DINERO, en día colombiano: la del extracto si la escribió una
+   persona (`fecha_pago`, la misma que decide el año gravable del
+   certificado), si no la de la aprobación, y si no hubo pago, la de cuando se
+   abrió. Las marcas de D1 son UTC: por eso el «-5 hours». */
+const FECHA_APORTE = "COALESCE(a.fecha_pago, date(a.aprobada_en, '-5 hours'), date(a.creada_en, '-5 hours'))";
+const ESTADOS_APORTE = ["intencion", "pendiente", "error", "aprobada", "en_distribucion", "entregada",
+  "rechazada", "reportada", "anulada"];
+/* Los nombres de persona viajan desde aquí al panel (`etiquetas`): la tabla,
+   los filtros, el Resumen y el CSV dicen lo mismo porque leen lo mismo. */
+const ETIQ_FINANZAS = Object.freeze({
+  medio: { wompi_tarjeta: "Wompi · tarjeta", wompi_bancolombia: "Wompi · transferencia Bancolombia",
+           wompi_otro: "Wompi · otro medio", paypal: "PayPal", transferencia: "Transferencia directa",
+           sin_medio: "Sin pago todavía" },
+  tipo: { unico: "Único", mensual: "Mensual o anual", membresia: "Membresía (cobro automático)" },
+  estado: { intencion: "Intento sin pagar", pendiente: "Pendiente en la pasarela", error: "Error de la pasarela",
+            aprobada: "Pagado", en_distribucion: "En distribución", entregada: "Entregado", rechazada: "Rechazado",
+            reportada: "Transferencia por verificar", anulada: "Anulado" },
+  categoria: { compras: "Compras", servicios: "Servicios", honorarios: "Honorarios", arrendamientos: "Arrendamientos",
+               transporte: "Transporte", no_aplica: "Sin retención (otros)" }
+});
+const ORDEN_APORTES = {
+  fecha: FECHA_APORTE, creada: "a.creada_en", monto: "a.monto_centavos", guia: "a.guia", estado: "a.estado",
+  donante: "d.nombre COLLATE NOCASE", medio: MEDIO_APORTE, tipo: TIPO_APORTE,
+  destino: "COALESCE(a.proyecto, a.destino_id, '')"
+};
+const RE_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+/* Los filtros de la lista, del CSV y de sus totales, en un solo sitio. Todo
+   valor del usuario va por `?`, nunca pegado al SQL. */
+function filtroAportes(sp) {
+  const w = [], args = [];
+  const est = String(sp.get("estado") || "");
+  if (est === "confirmados") w.push(APORTE_CONFIRMADO);
+  else if (est === "sin_pagar") w.push("a.estado IN ('intencion','pendiente','error')");
+  else if (ESTADOS_APORTE.includes(est)) { w.push("a.estado = ?"); args.push(est); }
+  const medio = String(sp.get("medio") || "");
+  if (ETIQ_FINANZAS.medio[medio]) { w.push(MEDIO_APORTE + " = ?"); args.push(medio); }
+  const tipo = String(sp.get("tipo") || "");
+  if (ETIQ_FINANZAS.tipo[tipo]) { w.push(TIPO_APORTE + " = ?"); args.push(tipo); }
+  const dest = limpiar(sp.get("destino"), 80);
+  if (dest === "fondo") w.push("a.destino_id IS NULL");
+  else if (dest) { w.push("a.destino_id = ? COLLATE NOCASE"); args.push(dest); }
+  const moneda = String(sp.get("moneda") || "").toUpperCase();
+  if (/^[A-Z]{3}$/.test(moneda)) { w.push("a.moneda = ?"); args.push(moneda); }
+  const desde = limpiar(sp.get("desde"), 10), hasta = limpiar(sp.get("hasta"), 10);
+  if (RE_FECHA.test(desde)) { w.push(FECHA_APORTE + " >= ?"); args.push(desde); }
+  if (RE_FECHA.test(hasta)) { w.push(FECHA_APORTE + " <= ?"); args.push(hasta); }
+  const q = limpiar(sp.get("q"), 80);
+  if (q) {
+    const p = "%" + q.replace(/[\\%_]/g, (c) => "\\" + c) + "%";
+    w.push("(a.guia LIKE ? ESCAPE '\\' OR d.nombre LIKE ? ESCAPE '\\' OR d.email LIKE ? ESCAPE '\\' " +
+           "OR a.referencia_pago LIKE ? ESCAPE '\\' OR d.telefono LIKE ? ESCAPE '\\' OR a.proyecto LIKE ? ESCAPE '\\')");
+    args.push(p, p, p, p, p, p);
+  }
+  return { where: w.length ? " WHERE " + w.join(" AND ") : "", args };
+}
+
+/* GET /api/admin/aportes — ahora con filtros, orden y páginas EN EL SERVIDOR.
+   Es la única tabla de Finanzas que crece sin techo (cada intento de pago es
+   una fila), así que traerla entera al navegador para filtrar ahí dejaría de
+   funcionar justo cuando más se use. Las demás bandejas de Finanzas tienen
+   cientos de filas como mucho y se filtran en el panel.
+   Parámetros: q, estado (o «confirmados» / «sin_pagar»), medio, tipo, destino
+   («fondo» = fondo general), moneda, desde, hasta (AAAA-MM-DD, fecha del
+   dinero), orden, dir, pagina, por (25/50/100), meta=1 (opciones de filtro).
+   Sigue aceptando `guia` y `limite`, que usan «Hoy» y el certificado. */
 async function adminAportes(env, url, quien) {
-  const estado = url.searchParams.get("estado");
-  const limite = entero(url.searchParams.get("limite"), 50, 1, 200);
+  const sp = url.searchParams;
+  const por = entero(sp.get("por") || sp.get("limite"), 50, 1, 200);
+  const pagina = entero(sp.get("pagina"), 1, 1, PAGINA_MAX);
   /* `?guia=` trae UNA fila con la misma forma que la lista: es lo que abre el
      cajón de «Emitir certificado» desde «Hoy», donde la fila puede no estar
-     entre las cien más recientes. */
-  const guia = /^GG-\d{4}-\d{6}$/i.test(url.searchParams.get("guia") || "") ? url.searchParams.get("guia").toUpperCase() : "";
-  const filtro = guia || estado;
-  const where = guia ? " WHERE a.guia = ?" : estado ? " WHERE a.estado = ?" : "";
+     entre las de la página abierta. */
+  const guia = /^GG-\d{4}-\d{6}$/i.test(sp.get("guia") || "") ? sp.get("guia").toUpperCase() : "";
+  const f = guia ? { where: " WHERE a.guia = ?", args: [guia] } : filtroAportes(sp);
+  const ord = ORDEN_APORTES[sp.get("orden")] || ORDEN_APORTES.fecha;
+  const dir = sp.get("dir") === "asc" ? "ASC" : "DESC";
   const sql =
-    "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.frecuencia, " +
+    "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.proyecto, a.frecuencia, " +
     "a.quiere_certificado, a.consent_muro, a.idioma, a.nota, a.metodo_pago, a.creada_en, " +
-    "a.aprobada_en, a.entregada_en, d.nombre AS donante, d.email AS correo, d.telefono AS telefono, " +
+    "a.aprobada_en, a.entregada_en, a.fecha_pago, a.referencia_pago, a.comprobante, a.confirmacion, " +
+    "a.confirmado_por, a.confirmado_en, a.suscripcion, a.proveedor, a.wompi_transaction_id, " +
+    MEDIO_APORTE + " AS medio, " + TIPO_APORTE + " AS tipo, " + FECHA_APORTE + " AS fecha, " +
+    "d.nombre AS donante, d.email AS correo, d.telefono AS telefono, " +
     "d.doc_tipo AS doc_tipo, d.doc_numero AS doc_numero, d.ciudad AS ciudad, a.token, " +
     "a.identidad_pasarela, a.certificado_datos, " +
     /* El certificado vigente viaja con la fila para que el panel sepa, sin una
@@ -3483,10 +3582,9 @@ async function adminAportes(env, url, quien) {
        sabemos por qué. */
     "(SELECT co.resultado FROM correos co WHERE co.guia = a.guia AND co.etiqueta = 'aporte-aprobado' " +
     "ORDER BY co.id DESC LIMIT 1) AS recibo_correo " +
-    "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + where +
-    " ORDER BY a.creada_en DESC LIMIT " + limite;
-  const q = filtro ? env.DB.prepare(sql).bind(filtro) : env.DB.prepare(sql);
-  const r = await q.all();
+    "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + f.where +
+    " ORDER BY " + ord + " " + dir + ", a.creada_en " + dir + " LIMIT ? OFFSET ?";
+  const r = await env.DB.prepare(sql).bind(...f.args, por, (pagina - 1) * por).all();
   /* Lo que el formulario de emision propone, ya resuelto aqui con la misma
      regla que usara la emision. Los dos JSON crudos no viajan al panel. */
   for (const f of (r.results || [])) {
@@ -3502,15 +3600,185 @@ async function adminAportes(env, url, quien) {
      `limite` mas recientes y hasta hoy callaba el resto: el aporte 101 —justo
      el mas viejo, el que mas lleva esperando su certificado— no existia para
      nadie. Mismo patron que `filaTope` en las otras bandejas. */
-  const cuenta = "SELECT COUNT(*) AS n FROM aportes a" + where;
-  const tot = await (estado ? env.DB.prepare(cuenta).bind(estado) : env.DB.prepare(cuenta)).first();
+  const desde = " FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + f.where;
+  const tot = await env.DB.prepare(
+    "SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN a.estado = 'reportada' THEN 1 ELSE 0 END),0) AS rep_n, " +
+    "COALESCE(SUM(CASE WHEN a.estado = 'reportada' THEN a.monto_centavos ELSE 0 END),0) AS rep_c" + desde
+  ).bind(...f.args).first();
+  /* LOS TOTALES SON DEL FILTRO ENTERO, no de la página, y POR MONEDA: hasta
+     esta fase la cifra de arriba sumaba centavos de dólar con centavos de peso
+     (una membresía de US$25 contaba como $25). Solo lo confirmado. */
+  const conf = await env.DB.prepare(
+    "SELECT a.moneda AS moneda, COUNT(*) AS n, COALESCE(SUM(a.monto_centavos),0) AS centavos" + desde +
+    (f.where ? " AND " : " WHERE ") + APORTE_CONFIRMADO + " GROUP BY a.moneda ORDER BY centavos DESC"
+  ).bind(...f.args).all();
+  let opciones = null;
+  if (sp.get("meta") === "1") {
+    const ds = await env.DB.prepare(
+      "SELECT COALESCE(destino_id, '') AS id, MAX(proyecto) AS nombre, COUNT(*) AS n FROM aportes " +
+      "GROUP BY COALESCE(destino_id, '') ORDER BY n DESC LIMIT 60"
+    ).all();
+    const ms = await env.DB.prepare("SELECT DISTINCT moneda FROM aportes ORDER BY moneda").all();
+    opciones = { destinos: ds.results || [], monedas: (ms.results || []).map((x) => x.moneda) };
+  }
   return json({ aportes: r.results || [], firma_activa: firmaConfigurada(env),
                 /* Que casilla puede firmar quien mira el panel: «rl», «rf» o null.
                    Es lo mismo que `/firma` le dice a su pantalla. */
                 firmante: quienFirma(env, quien),
                 firma_falta: firmaFaltantes(env),
                 certs: await conteoCertificados(env),
-                total: (tot && tot.n) || 0, tope: limite });
+                total: (tot && tot.n) || 0, tope: por, por, pagina,
+                totales: { confirmados: conf.results || [], reportadas: { n: (tot && tot.rep_n) || 0, centavos: (tot && tot.rep_c) || 0 } },
+                etiquetas: ETIQ_FINANZAS, opciones });
+}
+
+/* GET /api/admin/aportes.csv — la lista con LOS MISMOS filtros de la tabla.
+   Mismo formato que el de egresos (punto y coma, BOM, fórmulas neutralizadas
+   por `csvCampo`): lo abre Excel en español en columnas. Los pesos van en
+   pesos enteros; los dólares con coma decimal, que es como Excel en español
+   los lee como número. La columna «Confirmado» separa el dinero de lo que no
+   lo es: un intento sin pagar viaja en el archivo si el filtro lo incluye,
+   pero nunca dice «sí». */
+async function adminAportesCSV(env, url) {
+  const sp = url.searchParams;
+  const f = filtroAportes(sp);
+  const r = await env.DB.prepare(
+    "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.destino_id, a.proyecto, a.quiere_certificado, " +
+    "a.referencia_pago, a.wompi_transaction_id, a.creada_en, a.confirmado_por, " +
+    MEDIO_APORTE + " AS medio, " + TIPO_APORTE + " AS tipo, " + FECHA_APORTE + " AS fecha, " +
+    "(" + APORTE_CONFIRMADO + ") AS confirmado, " +
+    "d.nombre AS donante, d.email AS correo, d.doc_tipo, d.doc_numero, d.ciudad, " +
+    "(SELECT c.numero FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL) AS certificado " +
+    "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + f.where +
+    " ORDER BY " + FECHA_APORTE + ", a.guia LIMIT 20000"
+  ).bind(...f.args).all();
+  const monto = (c, mon) => mon === "COP" ? String(Math.round((c || 0) / 100))
+    : ((c || 0) / 100).toFixed(2).replace(".", ",");
+  const E = ETIQ_FINANZAS;
+  const cab = ["Guia", "Fecha del dinero", "Estado", "Confirmado", "Medio", "Tipo", "Destino", "Moneda", "Monto",
+    "Donante", "Correo", "Tipo documento", "Documento", "Ciudad", "Pide certificado", "Certificado",
+    "Referencia bancaria", "Transaccion Wompi", "Abierto el", "Confirmado por"];
+  const filas = (r.results || []).map((a) => [
+    a.guia, a.fecha || "", E.estado[a.estado] || a.estado, a.confirmado ? "si" : "no",
+    E.medio[a.medio] || a.medio, E.tipo[a.tipo] || a.tipo,
+    a.destino_id ? (a.proyecto || a.destino_id) : "Fondo general", a.moneda, monto(a.monto_centavos, a.moneda),
+    a.donante || "", a.correo || "", a.doc_tipo || "", a.doc_numero || "", a.ciudad || "",
+    a.quiere_certificado ? "si" : "no", a.certificado || "", a.referencia_pago || "", a.wompi_transaction_id || "",
+    a.creada_en ? selloCO(a.creada_en) : "", a.confirmado_por || ""
+  ]);
+  const texto = "﻿" + [cab].concat(filas).map((x) => x.map(csvCampo).join(";")).join("\r\n") + "\r\n";
+  const d1 = limpiar(sp.get("desde"), 10), d2 = limpiar(sp.get("hasta"), 10);
+  const nombre = "aportes" + (RE_FECHA.test(d1) ? "-desde-" + d1 : "") + (RE_FECHA.test(d2) ? "-hasta-" + d2 : "") + ".csv";
+  return new Response(texto, {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": 'attachment; filename="' + nombre + '"',
+      "cache-control": "private, no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
+/* GET /api/admin/finanzas?anio=2026&mes=10 — Finanzas › Resumen.
+   `mes` 0 (o ausente con anio) = el año entero. Cifras OPERATIVAS del panel:
+   salen de las mismas tablas que las bandejas y de las mismas reglas de
+   arriba, no de un libro contable. El panel lo dice en una línea. */
+async function adminFinanzas(env, url) {
+  const sp = url.searchParams;
+  const hoy = fechaCO();
+  const anioHoy = Number(hoy.slice(0, 4));
+  const anio = entero(sp.get("anio"), anioHoy, 2024, anioHoy + 1);
+  const mes = entero(sp.get("mes"), sp.get("anio") ? 0 : Number(hoy.slice(5, 7)), 0, 12);
+  const p2 = (n) => String(n).padStart(2, "0");
+  const ultimo = mes ? new Date(Date.UTC(anio, mes, 0)).getUTCDate() : 31;
+  const desde = anio + "-" + (mes ? p2(mes) : "01") + "-01";
+  const hasta = anio + "-" + (mes ? p2(mes) : "12") + "-" + p2(ultimo);
+  const EN = FECHA_APORTE + " BETWEEN ? AND ?";
+  const CONF = " FROM aportes a WHERE " + APORTE_CONFIRMADO + " AND " + EN;
+  const todas = async (sql, ...b) => ((await env.DB.prepare(sql).bind(...b).all()).results || []);
+  const una = async (sql, ...b) => (await env.DB.prepare(sql).bind(...b).first()) || {};
+  /* Las tablas que llegaron con migraciones más nuevas pueden faltar en una
+     base vieja: su bloque dice «sin datos» y el resto se pinta igual. */
+  const quizas = async (f, porDefecto) => { try { return await f(); } catch (e) { return porDefecto; } };
+
+  const ingresos = {
+    total: await todas("SELECT a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS centavos" + CONF +
+                       " GROUP BY a.moneda ORDER BY centavos DESC", desde, hasta),
+    por_medio: await todas("SELECT " + MEDIO_APORTE + " AS clave, a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS centavos" + CONF +
+                           " GROUP BY 1, 2 ORDER BY centavos DESC", desde, hasta),
+    por_tipo: await todas("SELECT " + TIPO_APORTE + " AS clave, a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS centavos" + CONF +
+                          " GROUP BY 1, 2 ORDER BY centavos DESC", desde, hasta),
+    por_destino: await todas("SELECT COALESCE(a.destino_id, '') AS clave, MAX(a.proyecto) AS nombre, a.moneda AS moneda, COUNT(*) AS n, " +
+                             "SUM(a.monto_centavos) AS centavos" + CONF + " GROUP BY 1, 3 ORDER BY centavos DESC LIMIT 40", desde, hasta)
+  };
+  /* Lo que entró sin guía y por eso NO está arriba: cobros del enlace directo
+     de Wompi y donaciones del botón de PayPal. Es dinero confirmado, pero sin
+     registro no tiene recibo ni certificado: se enseña aparte. */
+  const sinGuia = {
+    wompi: await quizas(() => todas(
+      "SELECT COALESCE(json_extract(e.cuerpo, '$.data.transaction.currency'), 'COP') AS moneda, COUNT(*) AS n, " +
+      "COALESCE(SUM(json_extract(e.cuerpo, '$.data.transaction.amount_in_cents')), 0) AS centavos " +
+      "FROM eventos_wompi e LEFT JOIN aportes a ON a.guia = e.guia " +
+      "WHERE e.firma_valida = 1 AND e.estado = 'APPROVED' AND a.guia IS NULL AND date(e.recibido_en, '-5 hours') BETWEEN ? AND ? " +
+      "GROUP BY 1", desde, hasta), []),
+    paypal: await quizas(() => todas(
+      "SELECT moneda, COUNT(*) AS n, COALESCE(SUM(monto_centavos), 0) AS centavos FROM eventos_ipn " +
+      "WHERE resultado = 'por_registrar' AND estado = 'Completed' AND date(recibido_en, '-5 hours') BETWEEN ? AND ? GROUP BY moneda",
+      desde, hasta), [])
+  };
+  const reportadas = await una("SELECT COUNT(*) AS n, COALESCE(SUM(a.monto_centavos), 0) AS centavos FROM aportes a " +
+                               "WHERE a.estado = 'reportada' AND " + EN, desde, hasta);
+  const don = await una("SELECT COUNT(DISTINCT a.donante_id) AS n, SUM(CASE WHEN a.donante_id IS NULL THEN 1 ELSE 0 END) AS sin" + CONF,
+                        desde, hasta);
+  const nuevos = await una("SELECT COUNT(*) AS n FROM (SELECT a.donante_id, MIN(" + FECHA_APORTE + ") AS f FROM aportes a " +
+                           "WHERE " + APORTE_CONFIRMADO + " AND a.donante_id IS NOT NULL GROUP BY a.donante_id) WHERE f BETWEEN ? AND ?",
+                           desde, hasta);
+  const miembros = await quizas(() => una(
+    "SELECT COALESCE(SUM(CASE WHEN nivel <> ? THEN 1 ELSE 0 END), 0) AS pagados, " +
+    "COALESCE(SUM(CASE WHEN nivel = ? THEN 1 ELSE 0 END), 0) AS honor FROM miembros WHERE desde BETWEEN ? AND ?",
+    NIVEL_HONOR, NIVEL_HONOR, desde, hasta), null);
+  const certs = await una(
+    "SELECT (SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND date(emitido_en, '-5 hours') BETWEEN ?1 AND ?2) AS emitidos, " +
+    "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NOT NULL AND date(anulado_en, '-5 hours') BETWEEN ?1 AND ?2) AS anulados, " +
+    /* La MISMA condición que «Hoy» (CERT_POR_EMITIR), acotada a los aportes
+       del periodo; y la de hoy sin acotar, que es la que espera trabajo. */
+    "(SELECT COUNT(*) " + CERT_POR_EMITIR + " AND " + FECHA_APORTE + " BETWEEN ?1 AND ?2) AS por_emitir_periodo, " +
+    "(SELECT COUNT(*) " + CERT_POR_EMITIR + ") AS por_emitir_hoy", desde, hasta);
+  const EG = " FROM egresos e WHERE e.anulado_en IS NULL AND e.fecha BETWEEN ? AND ?";
+  const egresos = {
+    total: await una("SELECT COUNT(*) AS n, COALESCE(SUM(e.total_centavos), 0) AS centavos, " +
+                     "COALESCE(SUM(e.retefuente_centavos + e.reteica_centavos), 0) AS retenido, " +
+                     "COALESCE(SUM(e.neto_centavos), 0) AS neto, " +
+                     "COALESCE(SUM(CASE WHEN e.meritoria = 1 THEN e.total_centavos ELSE 0 END), 0) AS meritoria, " +
+                     "COALESCE(SUM(CASE WHEN e.soporte = 'sin_soporte' THEN 1 ELSE 0 END), 0) AS sin_papel" + EG, desde, hasta),
+    por_categoria: await todas("SELECT COALESCE(e.concepto_ret, 'no_aplica') AS clave, COUNT(*) AS n, SUM(e.total_centavos) AS centavos" + EG +
+                               " GROUP BY 1 ORDER BY centavos DESC", desde, hasta),
+    por_centro: await todas("SELECT COALESCE(e.centro, '') AS clave, COUNT(*) AS n, SUM(e.total_centavos) AS centavos" + EG +
+                            " GROUP BY 1 ORDER BY centavos DESC LIMIT 30", desde, hasta)
+  };
+  /* Mes a mes del año elegido: ingresos confirmados (por moneda) y egresos. */
+  const serieIng = await todas("SELECT substr(" + FECHA_APORTE + ", 1, 7) AS m, a.moneda AS moneda, SUM(a.monto_centavos) AS centavos " +
+                               "FROM aportes a WHERE " + APORTE_CONFIRMADO + " AND " + EN + " GROUP BY 1, 2",
+                               anio + "-01-01", anio + "-12-31");
+  const serieEg = await todas("SELECT substr(e.fecha, 1, 7) AS m, SUM(e.total_centavos) AS centavos FROM egresos e " +
+                              "WHERE e.anulado_en IS NULL AND e.fecha BETWEEN ? AND ? GROUP BY 1", anio + "-01-01", anio + "-12-31");
+  const meses = [];
+  for (let m = 1; m <= 12; m++) {
+    const k = anio + "-" + p2(m);
+    const ing = {};
+    serieIng.filter((x) => x.m === k).forEach((x) => { ing[x.moneda] = x.centavos || 0; });
+    const eg = serieEg.find((x) => x.m === k);
+    meses.push({ mes: k, ingresos: ing, egresos: (eg && eg.centavos) || 0, futuro: k > hoy.slice(0, 7) });
+  }
+  const primero = await una("SELECT MIN(" + FECHA_APORTE + ") AS f FROM aportes a WHERE " + APORTE_CONFIRMADO);
+  const anioMin = Math.min(anio, primero.f ? Number(String(primero.f).slice(0, 4)) : anioHoy);
+  return json({
+    periodo: { anio, mes, desde, hasta, hoy },
+    anios: Array.from({ length: anioHoy - anioMin + 1 }, (_, i) => anioHoy - i),
+    ingresos, sin_guia: sinGuia, reportadas,
+    donantes: { n: don.n || 0, nuevos: nuevos.n || 0, sin_ficha: don.sin || 0 },
+    miembros, certificados: certs, egresos, serie: meses, etiquetas: ETIQ_FINANZAS
+  });
 }
 
 /* Solo se permiten los dos pasos que ocurren en terreno. Los estados de pago los
@@ -6902,6 +7170,9 @@ const DISCREPA = "((SELECT COUNT(DISTINCT e.clasificacion) FROM evaluaciones e "
    justo en colas donde la antigüedad es el dato que decide. Un ofrecimiento de
    hace tres meses que nadie atendió es exactamente lo que desaparece primero. */
 const TOPE_BANDEJA = 100;
+/* El libro de egresos y la lista de proveedores se filtran y se suman en el
+   panel (Fase 2): llegan enteros hasta este techo, que es años de operación. */
+const TOPE_LIBRO = 2000;
 const TOPE_RUTA = 300;
 
 /* El tope de las listas de casos. Existe como constante y no como número
@@ -16500,10 +16771,11 @@ async function adminProveedores(request, env) {
     "p.email, p.telefono, p.ciudad, " +
     "(SELECT COUNT(*) FROM egresos e WHERE e.proveedor_id = p.id AND e.anulado_en IS NULL) AS egresos, " +
     "(SELECT COALESCE(SUM(e.total_centavos), 0) FROM egresos e WHERE e.proveedor_id = p.id AND e.anulado_en IS NULL) AS total_centavos " +
-    "FROM proveedores p ORDER BY p.nombre LIMIT " + TOPE_BANDEJA
+    "FROM proveedores p ORDER BY p.nombre LIMIT " + TOPE_LIBRO
   ).all();
   const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM proveedores").first();
-  return json({ proveedores: r.results || [], total: (tot && tot.n) || 0, tope: TOPE_BANDEJA });
+  return json({ proveedores: r.results || [], total: (tot && tot.n) || 0, tope: TOPE_LIBRO,
+                categorias: ETIQ_FINANZAS.categoria });
 }
 
 async function adminProveedorCrear(request, env) {
@@ -16772,14 +17044,18 @@ async function adminEgresos(request, env, url, quien) {
   if (request.method === "POST") return await adminEgresoCrear(request, env, quien);
   const soloSinPapel = url && url.searchParams.get("sin_soporte") === "1";
   const r = await env.DB.prepare(
-    "SELECT e.numero, e.fecha, e.concepto, e.total_centavos, e.retefuente_centavos, " +
-    "e.reteica_centavos, e.neto_centavos, e.concepto_ret, e.soporte, e.soporte_numero, " +
-    "e.meritoria, e.centro, e.entrega, e.medio_pago, e.anulado_en, e.anulado_motivo, " +
+    "SELECT e.numero, e.fecha, e.concepto, e.base_centavos, e.iva_centavos, e.total_centavos, e.retefuente_centavos, " +
+    "e.reteica_centavos, e.neto_centavos, e.concepto_ret, e.soporte, e.soporte_numero, e.soporte_cufe, " +
+    "e.meritoria, e.centro, e.entrega, e.medio_pago, e.nota, e.creado_por, e.creado_en, " +
+    "e.anulado_en, e.anulado_motivo, e.anulado_por, e.proveedor_id, " +
     "(e.soporte_key IS NOT NULL) AS tiene_archivo, " +
     "p.nombre AS proveedor, p.tipo_doc, p.documento " +
     "FROM egresos e LEFT JOIN proveedores p ON p.id = e.proveedor_id " +
     (soloSinPapel ? "WHERE e.soporte = 'sin_soporte' AND e.anulado_en IS NULL " : "") +
-    "ORDER BY e.fecha DESC, e.numero DESC LIMIT " + TOPE_BANDEJA
+    /* TOPE_LIBRO y no TOPE_BANDEJA (Fase 2): la tabla del panel filtra, ordena
+       y suma en el navegador, así que tiene que tener el libro entero; cien
+       filas son tres meses de una brigada. */
+    "ORDER BY e.fecha DESC, e.numero DESC LIMIT " + TOPE_LIBRO
   ).all();
   /* Los totales van sobre TODO lo vigente y no sobre la página: un total que
      solo suma lo que cupo en pantalla es un total que miente. */
@@ -16807,7 +17083,7 @@ async function adminEgresos(request, env, url, quien) {
   ).all();
 
   return json({
-    egresos: r.results || [], tope: TOPE_BANDEJA,
+    egresos: r.results || [], tope: TOPE_LIBRO,
     centros: (cen.results || []).map((x) => x.c).filter(Boolean),
     total: (sum && sum.n) || 0,
     suma_centavos: (sum && sum.total) || 0,
@@ -19851,6 +20127,111 @@ async function adminPrevia(request, env, sesion) {
       await correoFundacionConvenio(envP, { nombre: g.f.nombre || "", email: g.f.email, variante: varianteConvenio(g.x),
         url: ORIGIN + "/convenio/" + (token || "(enlace que se crea al confirmar)") });
     } else nota = "La fundación no dejó correo.";
+
+  /* ---- LAS CINCO QUE FALTABAN (Fase 2 del panel) ---- */
+  } else if (accion === "conciliar") {
+    /* Conciliar llama a `aplicarEstado`, que con un pago aprobado manda el
+       recibo al donante y el aviso interno. La vista previa NO le pregunta a
+       Wompi —eso lo hace el clic, con la llave privada—: enseña lo que sale SI
+       Wompi confirma que la transacción es de esta guía y está aprobada. */
+    const guia = String(c.guia || "").toUpperCase();
+    const a = await env.DB.prepare(
+      "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.idioma, a.modo, a.destino_id, a.frecuencia, " +
+      "a.quiere_certificado, a.token, a.aprobada_en, d.nombre AS nombre, d.email AS email " +
+      "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?"
+    ).bind(guia).first();
+    if (!a) return json({ error: "no_encontrada" }, 404);
+    if (["aprobada", "en_distribucion", "entregada"].includes(a.estado) || a.aprobada_en) {
+      nota = "Este aporte ya está confirmado: conciliarlo no envía nada.";
+    } else {
+      const datos = { guia: a.guia, monto_centavos: a.monto_centavos, moneda: a.moneda, idioma: a.idioma, modo: a.modo,
+                      destino_id: a.destino_id, frecuencia: a.frecuencia, quiere_certificado: a.quiere_certificado, token: a.token };
+      await correoAporteAprobado(envP, datos, a.email || "(el correo que Wompi tenga del pagador)", a.nombre);
+      await correoAvisoInterno(envP, datos, a.email, a.nombre);
+      nota = "Solo sale si Wompi confirma que esa transacción es de " + guia + " y está APROBADA. Si dice otra cosa " +
+             "(pendiente, rechazada, de otra guía), no se envía nada." +
+             (a.email ? "" : " Este aporte todavía no tiene donante: el recibo va al correo con que se pagó en Wompi.") +
+             (a.frecuencia !== "unico" ? " Si es la primera cuota de una membresía, sale además el correo del carnet." : "");
+    }
+  } else if (accion === "honor") {
+    /* Lo mismo que hará `adminEmitirHonor`, sin escribir: si la persona ya
+       tiene carnet, la distinción se le AÑADE (mismo enlace); si no, nace uno. */
+    const email = limpiar(c.email, 200).toLowerCase();
+    const nombre = limpiar(c.nombre, 200).replace(/\s+/g, " ");
+    const dist = distincionDe(String(c.distincion || ""));
+    if (nombre.length < 3 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !dist) {
+      return json({ error: "datos_incompletos", ayuda: "Escribe el nombre completo, un correo válido y elige la distinción para ver el correo." }, 400);
+    }
+    const forma = FORMAS_DISTINCION.includes(c.forma) ? c.forma : "n";
+    const meses = Math.min(24, Math.max(1, Math.round(Number(c.meses) || 12)));
+    const hasta = dist.permanente ? null : sumarMeses(fechaCO(), meses);
+    const d = await env.DB.prepare("SELECT id, doc_numero FROM donantes WHERE LOWER(email) = ? ORDER BY id LIMIT 1").bind(email).first();
+    const m = d ? await env.DB.prepare("SELECT codigo, distincion, revocado_en FROM miembros WHERE donante_id = ?").bind(d.id).first() : null;
+    if (m && m.revocado_en) nota = "Esa persona tiene el carnet " + m.codigo + " REVOCADO: no se puede emitir hasta reactivarlo.";
+    else if (m && m.distincion) nota = "El carnet " + m.codigo + " ya lleva una distinción: hay que quitarla primero.";
+    else {
+      await correoCarnetHonor(envP, email, nombre, {
+        codigo: m ? m.codigo : "MB-" + anioCO() + "-(número al emitir)", token: "(enlace-personal-del-carnet)",
+        distincion: dist.id, forma, hasta, contexto: limpiar(c.contexto, 60), conDoc: !!limpiar(c.doc_numero, 40) || !!(d && d.doc_numero),
+        agregada: !!m
+      }, c.idioma === "en" ? "en" : "es");
+      if (m) nota = "Ya tiene el carnet " + m.codigo + ": la distinción se añade a ese carnet (mismo enlace y mismo QR).";
+    }
+  } else if (accion === "convenio-texto") {
+    /* Subir el texto le avisa a la fundación SOLO la primera vez (ver
+       `adminConvenioTexto`): reemplazar un PDF con una errata no la molesta. */
+    const g = await fundacionEnConvenio(env, Number(c.id));
+    if (g.error) return g.error;
+    let enl = null;
+    try {
+      enl = await env.DB.prepare("SELECT token, texto_clave FROM convenio_enlaces WHERE inscripcion = ?").bind(Number(c.id)).first();
+    } catch (e) { /* sin la 0038 */ }
+    if (enl && enl.texto_clave) nota = "Ya había un texto subido: reemplazarlo no le escribe a la fundación.";
+    else if (!g.f.email) nota = "La fundación no dejó correo: se sube y no se le avisa.";
+    else await correoTextoConvenio(envP, { nombre: g.f.nombre || "", email: g.f.email },
+      ORIGIN + "/convenio/" + ((enl && enl.token) || "(enlace que se crea al subir)"));
+  } else if (accion === "reconocer") {
+    /* La misma selección que `adminReconocerJornada`: lo ya enviado no se
+       repite, al menor nunca se le escribe, y van de a RECONOCIMIENTOS_POR_LLAMADA. */
+    const id = Number(c.id);
+    const j = await jornadaPorId(env, id);
+    if (!j) return json({ error: "no_encontrada" }, 404);
+    const una = c.participacion ? Number(c.participacion) : null;
+    const { results } = await env.DB.prepare(
+      "SELECT p.*, r.numero, r.datos, r.huella, r.enviado_en, e.token FROM participaciones p " +
+      "JOIN reconocimientos r ON r.participacion = p.id LEFT JOIN encuestas e ON e.participacion = p.id " +
+      "WHERE p.jornada = ?" + (una ? " AND p.id = ?" : "") + " ORDER BY p.id"
+    ).bind(...(una ? [id, una] : [id])).all();
+    const omitidos = [];
+    let van = 0, quedan = 0;
+    for (const p of results || []) {
+      if (p.enviado_en) continue;
+      const dst = destinoReconocimiento(p);
+      if (!dst.para) { omitidos.push(p.nombre); continue; }
+      if (van >= RECONOCIMIENTOS_POR_LLAMADA) { quedan++; continue; }
+      let datos = {};
+      try { datos = JSON.parse(p.datos); } catch (e) { continue; }
+      await correoReconocimiento(envP, p, datos, p.huella, p.token, dst.a === "acudiente");
+      van++;
+    }
+    const partes = [];
+    if (omitidos.length) partes.push("No se le escribe a " + omitidos.length + " (" + omitidos.slice(0, 4).join(", ") +
+      (omitidos.length > 4 ? "…" : "") + "): menores sin correo de acudiente, edad sin confirmar o sin correo. El motivo está en su fila.");
+    if (quedan) partes.push("Salen de a " + RECONOCIMIENTOS_POR_LLAMADA + ": después de estos quedan " + quedan + ", que se envían con otro clic.");
+    if (!van && !omitidos.length) partes.push("No queda nadie por enviar en esta jornada.");
+    nota = partes.join(" ") || null;
+  } else if (accion === "encuesta") {
+    const id = Number(c.id);
+    const actor = c.actor === "empresa" ? "empresa" : c.actor === "fundacion" ? "fundacion" : null;
+    const j = await jornadaPorId(env, id);
+    if (!j || !actor) return json({ error: "no_encontrada" }, 404);
+    const e = await env.DB.prepare("SELECT token, enviada_en FROM encuestas WHERE jornada = ? AND actor = ? AND participacion IS NULL")
+      .bind(id, actor).first();
+    const para = actor === "empresa" ? await correoEmpresaJornada(env, j) : j.fundacion_email;
+    if (!e) nota = "Esta jornada no tiene encuesta para " + (actor === "empresa" ? "la empresa" : "la fundación") + ".";
+    else if (e.enviada_en) nota = "Ya salió por correo: no se repite.";
+    else if (!para) nota = "No hay correo de " + (actor === "empresa" ? "la empresa" : "la fundación") + ".";
+    else await correoEncuestaActor(envP, j, actor, para, ORIGIN + "/encuesta/" + e.token, await fundacionesRed(env));
   } else {
     return json({ error: "accion_no_valida" }, 400);
   }
@@ -20994,7 +21375,10 @@ async function correoReconocimiento(env, p, datos, huella, token, aAcudiente) {
     ["Certificado", datos.numero], ["Jornada", datos.jornada], ["Fecha", fecha], ["Horas efectivas", horasTxt]
   ];
   const boton = encuesta ? { url: encuesta, texto: en ? "Answer the survey" : "Responder la encuesta" } : null;
-  const bytes = await certificadoVoluntariado(Object.assign({}, datos, { huella }));
+  /* En la vista previa del panel no se arma el PDF: se enseña la carta y el
+     nombre del adjunto, como hace `correoCertificado`. */
+  const previa = !!(env && Array.isArray(env.__previa));
+  const bytes = previa ? null : await certificadoVoluntariado(Object.assign({}, datos, { huella }));
   return enviarCorreo(env, {
     para: aAcudiente ? p.acudiente_email : p.email,
     asunto: titulo + " · " + datos.numero,
@@ -21002,7 +21386,7 @@ async function correoReconocimiento(env, p, datos, huella, token, aAcudiente) {
     html: plantillaCorreo({ titulo, parrafos, filas, boton }),
     etiqueta: "reconocimiento-voluntariado",
     responderA: correoAlianzas(env),
-    adjuntos: [{ filename: datos.numero + ".pdf", content: bytesABase64(bytes) }]
+    adjuntos: [{ filename: datos.numero + ".pdf", content: bytes ? bytesABase64(bytes) : "" }]
   });
 }
 
@@ -21059,6 +21443,27 @@ async function adminReconocerJornada(request, env, id, quien) {
     ...(fallidos.length ? { ayuda: "Algunos no salieron: mira la cola de correos en Salud y vuelve a intentarlo." } : {}) });
 }
 
+/* El correo con el enlace de la encuesta de la empresa o de la fundación.
+   Función aparte (Fase 2 del panel) para que la vista previa de /admin lo arme
+   con la MISMA plantilla que el envío (ver `adminPrevia`). */
+async function correoEncuestaActor(env, j, actor, para, enlace, red) {
+  const titulo = "¿Cómo les fue en la jornada?";
+  const parrafos = actor === "empresa" ? [
+    "Gracias por la jornada «" + j.nombre + "» del " + fechaLargaISO(j.fecha) +
+      (j.anfitriona && j.anfitriona !== "sede" ? ", con " + nombreAnfitriona(red, j.anfitriona) : "") + ".",
+    "Para el reporte de la jornada nos sirve mucho la mirada de la empresa: son seis preguntas cortas y no piden ningún dato personal."
+  ] : [
+    "Gracias por recibir la jornada «" + j.nombre + "» del " + fechaLargaISO(j.fecha) + ".",
+    "La fundación tiene la última palabra sobre cada jornada, y por eso su evaluación es la que más pesa: son seis preguntas cortas, sin datos personales."
+  ];
+  return enviarCorreo(env, {
+    para, asunto: titulo + " · " + j.nombre,
+    texto: [titulo, "", ...parrafos, "", enlace].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, boton: { url: enlace, texto: "Responder la encuesta" } }),
+    etiqueta: "encuesta-jornada", responderA: correoAlianzas(env)
+  });
+}
+
 /* POST /api/admin/jornada/<id>/encuesta  { actor: empresa | fundacion }
    El enlace de la empresa o de la fundacion, por correo. Una sola vez: el
    enlace sigue en el panel para copiarlo si hay que reenviarlo a mano. */
@@ -21081,22 +21486,7 @@ async function adminEnviarEncuestaActor(request, env, id, quien) {
   const r = await env.DB.prepare("UPDATE encuestas SET enviada_en = datetime('now') WHERE token = ? AND enviada_en IS NULL").bind(e.token).run();
   if (!(r.meta && r.meta.changes)) return json({ error: "ya_enviada" }, 409);
   const red = await fundacionesRed(env);
-  const enlace = ORIGIN + "/encuesta/" + e.token;
-  const titulo = "¿Cómo les fue en la jornada?";
-  const parrafos = actor === "empresa" ? [
-    "Gracias por la jornada «" + j.nombre + "» del " + fechaLargaISO(j.fecha) +
-      (j.anfitriona && j.anfitriona !== "sede" ? ", con " + nombreAnfitriona(red, j.anfitriona) : "") + ".",
-    "Para el reporte de la jornada nos sirve mucho la mirada de la empresa: son seis preguntas cortas y no piden ningún dato personal."
-  ] : [
-    "Gracias por recibir la jornada «" + j.nombre + "» del " + fechaLargaISO(j.fecha) + ".",
-    "La fundación tiene la última palabra sobre cada jornada, y por eso su evaluación es la que más pesa: son seis preguntas cortas, sin datos personales."
-  ];
-  const envio = await enviarCorreo(env, {
-    para, asunto: titulo + " · " + j.nombre,
-    texto: [titulo, "", ...parrafos, "", enlace].join("\n"),
-    html: plantillaCorreo({ titulo, parrafos, boton: { url: enlace, texto: "Responder la encuesta" } }),
-    etiqueta: "encuesta-jornada", responderA: correoAlianzas(env)
-  });
+  const envio = await correoEncuestaActor(env, j, actor, para, ORIGIN + "/encuesta/" + e.token, red);
   if (!(envio && envio.ok)) {
     await env.DB.prepare("UPDATE encuestas SET enviada_en = NULL WHERE token = ?").bind(e.token).run();
     return json({ error: "no_salio", ayuda: "No salió: mira la cola de correos en Salud." }, 502);
@@ -22906,6 +23296,91 @@ textarea { font-size: 16px }
 .vol-res h6{font-size:var(--fs-11);letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin:12px 0 4px}
 .vol-res ul{margin:0 0 0 18px;padding:0;font-size:var(--fs-14);line-height:1.5}
 
+/* ==== LA TABLA DE FINANZAS (Fase 2 del panel, oct 2026) ====
+   Una sola pieza para todas las tablas de Finanzas (tablaArmar en adminJS).
+   Gramática de ledger: papel, reglas de 1 px, cifras a la derecha en
+   tabulares. La caja tiene su propio scroll para que la cabecera se quede
+   arriba y la fila de totales abajo mientras se recorre la lista; en el
+   teléfono la tabla se desliza de lado dentro de la caja. */
+.tb{margin:0 0 30px}
+.tb-barra{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;margin:0 0 10px}
+.tb-barra label,.fin-barra label{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-12);font-weight:600;color:var(--mu);margin:0}
+.tb-barra input,.tb-barra select,.fin-barra select{height:38px;padding:5px 9px;border:1px solid var(--bd);border-radius:7px;font:inherit;background:var(--surface);color:var(--ink);min-width:0;max-width:13rem}
+.tb-barra .tb-q input{width:15rem}
+.tb-barra input[type=date]{width:10.5rem}
+.tb-sep{flex:1 1 auto}
+.tb-aviso{border-left:3px solid var(--amber);padding:7px 12px;margin:0 0 10px;font-size:var(--fs-13);background:var(--amberl)}
+.tb-aviso:empty{display:none}
+.tb-caja{border:1px solid var(--bd);border-radius:10px;background:var(--surface);overflow:auto;max-height:calc(100vh - 150px)}
+.tb-t{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--fs-14);line-height:1.4}
+.tb-t th{position:sticky;top:0;z-index:2;background:var(--surface);text-align:left;font-size:var(--fs-11);font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--mu);padding:0;border-bottom:1px solid var(--bd);white-space:nowrap}
+.tb-t th>span,.tb-t th>button{display:block;padding:10px 12px}
+.tb-t th>button{appearance:none;border:0;background:none;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;
+  cursor:pointer;width:100%;text-align:inherit}
+.tb-t th>button:hover{color:var(--ink)}
+.tb-t th>button:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+.tb-t th[aria-sort=ascending]>button::after{content:" ↑";color:var(--g)}
+.tb-t th[aria-sort=descending]>button::after{content:" ↓";color:var(--g)}
+.tb-t th[aria-sort]{color:var(--ink)}
+.tb-t td{padding:9px 12px;border-bottom:1px solid var(--bds);vertical-align:top}
+.tb-t .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tb-t .nw{white-space:nowrap}
+.tb-t .pn-b1{padding:4px 10px;font-size:var(--fs-12);border-radius:7px}
+#fin-resumen .vol-ind b{white-space:nowrap}
+.tb-t td small{display:block;font-size:var(--fs-12);color:var(--mu);margin-top:1px}
+.tb-t tbody tr[data-tb-fila]{cursor:pointer}
+.tb-t tbody tr[data-tb-fila]:hover td{background:var(--bg)}
+.tb-t tbody tr[data-tb-fila]:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+.tb-t tbody tr.tb-gris td{color:var(--mu)}
+.tb-t tfoot td{position:sticky;bottom:0;z-index:1;background:var(--gl);color:var(--gd);font-weight:700;border-top:1px solid var(--bd);border-bottom:0}
+.tb-t .tb-conf{color:var(--g);font-weight:600}
+.tb-t .tb-mal{color:var(--err);font-weight:600}
+.tb-t .copy{font-size:var(--fs-12);padding:3px 9px}
+.tb-vacio{padding:34px 20px;text-align:center;cursor:default}
+.tb-vacio b{display:block;font-size:var(--fs-16);margin:0 0 4px;color:var(--ink)}
+.tb-vacio span{display:block;font-size:var(--fs-14);color:var(--mu);max-width:56ch;margin:0 auto 10px}
+.tb-pie{display:flex;justify-content:space-between;align-items:center;gap:8px 14px;flex-wrap:wrap;margin-top:8px;font-size:var(--fs-13);color:var(--mu)}
+.tb-pie .tb-nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tb-pie select{padding:4px 6px;border:1px solid var(--bd);border-radius:6px;font:inherit;background:var(--surface);color:var(--ink)}
+.tb-nota{flex:1 1 100%;margin:0;font-size:var(--fs-12)}
+.tb-nota:empty{display:none}
+/* Las tablas pequeñas del cajón y del Resumen. */
+.pn-tabla{width:100%;border-collapse:collapse;font-size:var(--fs-13);margin:0 0 14px}
+.pn-tabla th{text-align:left;font-size:var(--fs-11);letter-spacing:.08em;text-transform:uppercase;color:var(--mu);padding:6px 8px;border-bottom:1px solid var(--bd)}
+.pn-tabla td{padding:6px 8px;border-bottom:1px solid var(--bds);vertical-align:top}
+.pn-tabla .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pn-tabla tfoot td{font-weight:700;border-top:1px solid var(--bd);border-bottom:0}
+.pn-acciones{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+
+/* ==== FINANZAS › RESUMEN ==== */
+.fin-barra{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;margin:0 0 8px}
+.fin-quieta{margin:0 0 18px;font-size:var(--fs-12);color:var(--mu)}
+.fin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:18px 26px;margin:0 0 8px}
+.fin-bloque{min-width:0}
+.fin-bloque h3,.fin-graf h3{margin:0 0 2px;font-family:"Inter",sans-serif;font-size:var(--fs-15);font-weight:700;letter-spacing:0}
+.fin-fuente{margin:0 0 8px;font-size:var(--fs-12);color:var(--mu)}
+.fin-graf{border:1px solid var(--bd);border-radius:10px;background:var(--surface);padding:16px 18px 10px;margin:8px 0 22px;position:relative}
+.fin-ley{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 4px;font-size:var(--fs-12);color:var(--ink-soft)}
+.fin-ley i{display:inline-block;width:18px;height:0;border-top:2px solid var(--gm);vertical-align:middle;margin-right:6px}
+.fin-ley i.eg{border-top:2px dashed var(--amber)}
+.fin-graf svg{display:block;width:100%;height:auto;overflow:visible}
+.fin-graf .eje{stroke:var(--bds);stroke-width:1}
+.fin-graf .eje0{stroke:var(--bd);stroke-width:1}
+.fin-graf text{font-family:"Inter",sans-serif;font-size:var(--fs-11);fill:var(--mu)}
+.fin-graf text.lbl{font-size:var(--fs-12);font-weight:600;fill:var(--ink-soft)}
+.fin-graf .l-ing{fill:none;stroke:var(--gm);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.fin-graf .l-eg{fill:none;stroke:var(--amber);stroke-width:2;stroke-dasharray:6 4;stroke-linejoin:round;stroke-linecap:round}
+.fin-graf .p-ing{fill:var(--gm);stroke:var(--surface);stroke-width:2}
+.fin-graf .p-eg{fill:var(--amber);stroke:var(--surface);stroke-width:2}
+.fin-graf .guia{stroke:var(--mu);stroke-width:1;stroke-dasharray:2 3}
+.fin-tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--on-dark);border-radius:7px;padding:7px 10px;
+  font-size:var(--fs-12);line-height:1.45;white-space:nowrap;transform:translate(-50%,-100%);margin-top:-8px}
+.fin-tip[hidden]{display:none}
+.fin-graf details{margin-top:6px}
+.fin-graf summary{cursor:pointer;font-size:var(--fs-13);font-weight:600;color:var(--acc)}
+.fin-linea{margin:0 0 10px;font-size:var(--fs-14)}
+
 /* ---- ESCRITORIO PRIMERO; EL TELÉFONO NO SE ROMPE ----
    Por debajo de 900 px la barra lateral sale de la rejilla y se abre con
    «Menú», encima del contenido. */
@@ -22927,6 +23402,13 @@ textarea { font-size: 16px }
   .hoy-it{grid-template-columns:minmax(0,1fr)}
   .hoy-it-d{justify-content:flex-start}
 }
+@media (max-width:700px){
+  .tb-barra label{flex:1 1 44%}
+  .tb-barra .tb-q{flex:1 1 100%}
+  .tb-barra .tb-q input,.tb-barra input[type=date],.tb-barra select{width:100%;max-width:none}
+  .tb-sep{display:none}
+  .tb-caja{max-height:75vh}
+}
 @media (prefers-reduced-motion:reduce){ .pn-lado{transition:none} }
 </style>
 </head><body class="pn-body">
@@ -22945,6 +23427,7 @@ textarea { font-size: 16px }
 </div>
 <div class="pn-grupo">
   <p class="pn-gt">Finanzas</p>
+  <a class="pn-it" href="#finanzas/resumen" data-pn-ir="finanzas/resumen">Resumen<span class="pn-n" data-pn-n="finanzas/resumen"></span></a>
   <a class="pn-it" href="#finanzas/aportes" data-pn-ir="finanzas/aportes">Aportes<span class="pn-n" data-pn-n="finanzas/aportes"></span></a>
   <a class="pn-it" href="#finanzas/transferencias" data-pn-ir="finanzas/transferencias">Transferencias<span class="pn-n" data-pn-n="finanzas/transferencias"></span></a>
   <a class="pn-it" href="#finanzas/pagos" data-pn-ir="finanzas/pagos">Pagos sin aporte<span class="pn-n" data-pn-n="finanzas/pagos"></span></a>
@@ -23019,31 +23502,38 @@ textarea { font-size: 16px }
 </section>
 
 <!-- ============================ FINANZAS ============================ -->
-<!-- Aportes. Vivía sin encabezado propio, colgando de «Salud del ecosistema»,
-     que es de donde venía que los avisos de un aporte mandaran a mirar la salud
-     del sitio. -->
+<!-- FASE 2 DEL PANEL (oct 2026). Cada tabla de Finanzas es la MISMA pieza
+     (tablaArmar en adminJS): buscador, filtros, columnas que ordenan, páginas,
+     cabecera fija, fila de totales y un vacío dicho con palabras. Aquí solo va
+     su contenedor; la tabla la arma el panel al abrir la sección. -->
+
+<!-- Resumen: la primera entrada de Finanzas. Cifras de operación, no estados
+     financieros, y cada una dice de dónde sale. -->
+<section class="pn-vista" data-vista="finanzas/resumen" id="sec-resumen" hidden>
+<div class="fin-barra">
+  <label>Año<select id="fin-anio" aria-label="Año"></select></label>
+  <label>Mes<select id="fin-mes" aria-label="Mes"></select></label>
+  <span class="tb-sep"></span>
+  <button type="button" class="pn-b2" id="fin-ver-aportes">Ver estos aportes</button>
+  <button type="button" class="pn-b2" id="fin-csv-aportes">Descargar ingresos (CSV)</button>
+  <button type="button" class="pn-b2" id="fin-csv-egresos">Descargar egresos (CSV)</button>
+</div>
+<p class="fin-quieta">Cifras operativas del panel, para el día a día: no son estados financieros. Los estados financieros son los que firman el Representante Legal y la Revisora Fiscal.</p>
+<div id="fin-resumen" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<!-- Aportes. La tabla pide al servidor solo la página que se ve: es la única
+     de Finanzas que crece sin techo. -->
 <section class="pn-vista" data-vista="finanzas/aportes" id="sec-aportes" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p>Un aporte queda <strong>pagado</strong> cuando la pasarela confirma el cobro, o cuando alguien confirma una transferencia contra el extracto. Desde aquí no se puede marcar un pago a mano: así el rastreo que ve el donante significa algo.</p>
 <p>El <strong>recibo</strong> sale solo al confirmarse el pago. El <strong>certificado</strong> no: lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, así que se emite desde aquí, revisando los datos del donante.</p>
-<p>Lo único que se marca a mano es lo que pasa en terreno: «A distribución» y «Entregado». Un <strong>intento sin pagar</strong> es alguien que abrió el pago y no lo terminó: no es dinero y no se suma.</p>
+<p>Lo único que se marca a mano es lo que pasa en terreno: «A distribución» y «Entregado». Un <strong>intento sin pagar</strong> es alguien que abrió el pago y no lo terminó: no es dinero y no se suma. La <strong>fecha</strong> es la del dinero: la del extracto en una transferencia, la de la aprobación en la pasarela, y la de cuando se abrió si nunca se pagó. Los pesos y los dólares se suman por separado: no se convierten.</p>
+<p><strong>Tipo:</strong> «Membresía» es un aporte atado a un cobro automático (Wompi o PayPal); «Mensual o anual» es un aporte recurrente que la persona paga cada vez. Toca una fila para ver todo el aporte.</p>
 </div></details>
 <div id="resumen" class="vol-ind" aria-label="Cifras de los aportes"></div>
 <div id="cert-estado" class="cert-estado" aria-live="polite"></div>
-<div class="pay-tabs" role="group" aria-label="Filtrar por estado" style="margin-bottom:6px">
-  <button type="button" class="pay-tab on" data-estado="">Todos</button>
-  <button type="button" class="pay-tab" data-estado="aprobada">Pagados</button>
-  <button type="button" class="pay-tab" data-estado="en_distribucion">En distribución</button>
-  <button type="button" class="pay-tab" data-estado="entregada">Entregados</button>
-  <button type="button" class="pay-tab" data-estado="intencion">Intentos sin pagar</button>
-</div>
-<div class="med-tw"><table class="med-tbl" id="tabla">
-<thead><tr>
-<th scope="col">Guía</th><th scope="col">Estado</th><th scope="col">Monto</th>
-<th scope="col">Destino</th><th scope="col">Donante</th><th scope="col">Recibo</th>
-<th scope="col">Certificado</th><th scope="col">Creada</th><th scope="col">Acción</th>
-</tr></thead><tbody id="filas"><tr><td colspan="9" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-aportes" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="finanzas/transferencias" id="sec-transferencias" hidden>
@@ -23051,13 +23541,7 @@ textarea { font-size: 16px }
 <p>Que alguien diga que transfirió <strong>no es dinero en el banco</strong>: compáralo con el extracto antes de confirmar. Hasta que lo confirmes no hay recibo ni certificado, y el donante ya sabe que es así.</p>
 <p>Al confirmar se piden el número del comprobante, la fecha y el monto <strong>que aparecen en el extracto</strong>: son los que van en el recibo y en el certificado, y la fecha decide el año gravable. Confirmar le envía su recibo al donante; antes verás el correo que sale.</p>
 </div></details>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Guía</th><th scope="col">Monto</th><th scope="col">Destino</th>
-<th scope="col">Donante</th><th scope="col">Ref.</th><th scope="col">Comprobante</th>
-<th scope="col">Cert.</th><th scope="col">Acción</th>
-</tr></thead><tbody id="t-filas"><tr><td colspan="8" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-transferencias" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="finanzas/pagos" id="sec-pagos" hidden>
@@ -23065,12 +23549,7 @@ textarea { font-size: 16px }
 <p>Son pagos aprobados que entraron por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el sitio. Cobraron a la misma cuenta, pero sin guía no tienen recibo ni certificado: si alguno pide certificado, hay que crearle el registro a mano.</p>
 <p>Si la lista está vacía, todo lo cobrado está trazado.</p>
 </div></details>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Referencia</th><th scope="col">Monto</th><th scope="col">Método</th>
-<th scope="col">Donante</th><th scope="col">Recibido</th>
-</tr></thead><tbody id="p-filas"><tr><td colspan="5" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-pagos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="finanzas/membresias" id="sec-sus" hidden>
@@ -23080,91 +23559,15 @@ textarea { font-size: 16px }
 <p>«Por aprobar» es una membresía que la persona no terminó de aprobar en la pantalla de PayPal. No se activa sola: si lleva días y ningún cobro, es un abandono y no un miembro.</p>
 <p><strong>Sin correo</strong> quiere decir que el recibo mensual no tiene a dónde ir: hay que repararlo.</p>
 </div></details>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Creada</th><th scope="col">Estado</th><th scope="col">Nivel</th>
-<th scope="col">Monto</th><th scope="col">Programa</th><th scope="col">Cobros</th><th scope="col">Miembro</th>
-</tr></thead><tbody id="sus-filas"><tr><td colspan="7" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-suscripciones" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 
-<h2 class="pn-h2" id="sec-miembros">Carnets de miembro</h2>
-<p class="pn-sub">Los carnets emitidos, los más nuevos primero.</p>
+<h2 class="pn-h2" id="sec-miembros">Carnets de miembro y de honor</h2>
+<p class="pn-sub">Los carnets emitidos, los más nuevos primero. Los de honor van aquí mismo: no son dinero, pero viven con las membresías.</p>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p>La columna <strong>Verificación</strong> es el código que va bajo el QR del carnet. Con él —o con la cédula del miembro, si la registró— un comercio aliado comprueba en /verificar si la membresía está vigente, viendo solo el nombre de pila y la inicial del apellido. Si un comercio llama a preguntar, es ese código el que se busca aquí.</p>
-<p><strong>El enlace del carnet no se comparte</strong>: es la credencial del miembro.</p>
+<p>Un <strong>carnet de honor</strong> lo otorga la fundación por invitación («Emitir carnet de honor», arriba). Las distinciones de rol se renuevan y se quitan desde la ficha del carnet: toca su fila. <strong>El enlace del carnet no se comparte</strong>: es la credencial del miembro.</p>
 </div></details>
-
-<details id="hn-nuevo" class="pn-caja">
-  <summary>Emitir carnet de honor</summary>
-  <div class="eg-form">
-    <p class="mu" style="font-size:var(--fs-13);margin:8px 0 4px;max-width:66ch">Un carnet de honor lo otorga la fundación
-    <strong>por invitación</strong> y da acceso a los beneficios del Programa de Gratitud mientras esté vigente.
-    <strong>Una persona, un carnet:</strong> si el correo ya es de alguien con carnet, la distinción se añade a ese
-    mismo carnet —mismo enlace, mismo QR—. Fundador/a y Pionero/a son permanentes; las demás valen por el tiempo que
-    elijas y se renuevan desde la tabla. <strong>Junta de Asesores</strong> es un grupo honorario y asesor, sin
-    funciones de dirección: la fundación no tiene junta directiva. Al emitirlo se le envía el carnet por correo.</p>
-
-    <div class="eg-par">
-      <div><label for="hn-nombre">Nombre completo</label><input id="hn-nombre" autocomplete="off"></div>
-      <div><label for="hn-email">Correo</label><input id="hn-email" type="email" autocomplete="off"></div>
-    </div>
-
-    <div class="eg-par">
-      <div><label for="hn-dist">Distinción</label><select id="hn-dist">
-        <option value="">Elige…</option>
-        <option value="fundador">Fundador/a · permanente</option>
-        <option value="pionero">Pionero/a · permanente</option>
-        <option value="coordinador_voluntario">Coordinador/a voluntario/a</option>
-        <option value="aliado_red">Aliado/a de la red</option>
-        <option value="embajador">Embajador/a</option>
-        <option value="junta_asesores">Junta de Asesores (asesora, sin funciones de dirección)</option>
-      </select></div>
-      <div id="hn-meses-caja"><label for="hn-meses">Vigencia de la distinción</label><select id="hn-meses">
-        <option value="12" selected>12 meses</option><option value="6">6 meses</option><option value="24">24 meses</option>
-      </select></div>
-    </div>
-
-    <div class="eg-par">
-      <div><label for="hn-forma">Forma del título</label><select id="hn-forma">
-        <option value="n" selected>Neutra · Fundador/a</option>
-        <option value="m">Masculina · Fundador</option>
-        <option value="f">Femenina · Fundadora</option>
-      </select></div>
-      <div></div>
-    </div>
-    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Cómo se lee la distinción en su carnet, correo y recibo. «Junta de Asesores» es igual en las tres; en inglés siempre es neutra.</p>
-
-    <label for="hn-ctx">Contexto <span style="font-weight:400">(opcional, una línea: «Fundación X», «Brigada Sismo 2026»)</span></label>
-    <input id="hn-ctx" maxlength="60" autocomplete="off">
-
-    <div class="eg-par">
-      <div><label for="hn-dt">Tipo de documento <span style="font-weight:400">(opcional)</span></label><select id="hn-dt">
-        <option value="CC">Cédula de ciudadanía</option><option value="CE">Cédula de extranjería</option>
-        <option value="PP">Pasaporte</option><option value="PPT">PPT</option><option value="TI">Tarjeta de identidad</option>
-      </select></div>
-      <div><label for="hn-dn">Número de documento <span style="font-weight:400">(opcional)</span></label><input id="hn-dn" inputmode="numeric" autocomplete="off"></div>
-    </div>
-    <label class="eg-check" style="display:flex;gap:10px;align-items:flex-start;font-weight:400;color:var(--ink)"><input type="checkbox" id="hn-aut" style="flex:0 0 auto;width:18px;height:18px;padding:0;margin:2px 0 0"> La persona autorizó que la fundación guarde su número de documento para que un comercio aliado pueda verificar su carnet con él en /verificar.</label>
-    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Obligatorio si escribes un documento. Sin documento el carnet se verifica igual, por su código.</p>
-
-    <div class="eg-par">
-      <div><label for="hn-idioma">Idioma del correo</label><select id="hn-idioma">
-        <option value="es">Español</option><option value="en">English</option>
-      </select></div>
-      <div></div>
-    </div>
-
-    <p style="margin-top:14px"><button type="button" class="btn btn-g" id="hn-emitir">Emitir y enviar el carnet</button></p>
-    <p class="msg" id="hn-msg"></p>
-  </div>
-</details>
-
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Carnet</th><th scope="col">Verificación</th><th scope="col">Miembro</th>
-<th scope="col">Nivel</th><th scope="col">Distinción</th><th scope="col">Vigente hasta</th><th scope="col">Estado</th>
-</tr></thead><tbody id="mb-filas"><tr><td colspan="7" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-miembros" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <!-- VENCIMIENTOS. El 22 sep 2026 la Alcaldía de Medellín avisó que el ICA 2025
@@ -23192,132 +23595,17 @@ textarea { font-size: 16px }
 <section class="pn-vista" data-vista="finanzas/egresos" id="sec-egresos" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p><strong>Esto no es el libro oficial:</strong> los libros, la declaración y la exógena son del contador y llevan responsabilidad legal. Esto es la fuente de la que él trabaja, y el lugar donde vive cada soporte.</p>
-<p>El archivo para el contador sale separado por punto y coma y con las columnas que pide la exógena, así que Excel en español lo abre en columnas. Las fechas acotan la descarga, no la tabla.</p>
+<p>El archivo para el contador sale separado por punto y coma y con las columnas que pide la exógena, así que Excel en español lo abre en columnas. Lo acotan las fechas «Desde» y «Hasta» de la tabla. La <strong>categoría</strong> es el concepto de retención que se eligió al registrar el egreso.</p>
 </div></details>
-
 <div id="eg-resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:18px"></div>
-
-<details id="eg-nuevo" class="pn-caja">
-  <summary>Registrar un egreso</summary>
-  <div class="eg-form">
-    <div class="eg-xml">
-      <label for="eg-arch" style="margin-top:0">Arrastra la factura electrónica</label>
-      <input id="eg-arch" type="file" accept=".xml,application/xml,text/xml,.pdf,application/pdf">
-      <p class="mu" style="font-size:var(--fs-13);margin:6px 0 0">El XML de la DIAN trae todo esto escrito, así que
-      no hay que teclearlo. Se lee <strong>en tu navegador</strong>: el archivo no sale de aquí hasta que
-      registres el egreso. También vale un PDF, pero ese solo se guarda — no se puede leer.</p>
-      <p class="msg" id="eg-xmsg"></p>
-    </div>
-
-    <label for="eg-prov">Proveedor</label>
-    <div class="eg-par">
-      <select id="eg-prov"><option value="">Cargando…</option></select>
-      <button type="button" class="tab" id="eg-prov-nuevo">Nuevo proveedor</button>
-    </div>
-
-    <div id="eg-prov-caja" hidden style="border-left:2px solid var(--g);padding:10px 0 10px 14px;margin:10px 0">
-      <label for="eg-pn">Nombre o razón social</label>
-      <input id="eg-pn" autocomplete="off">
-      <div class="eg-par">
-        <select id="eg-pt"><option value="NIT">NIT</option><option value="CC">Cédula</option><option value="CE">C. extranjería</option><option value="NINGUNO">Sin documento</option></select>
-        <input id="eg-pd" placeholder="Número de documento" autocomplete="off">
-      </div>
-      <label class="eg-check"><input type="checkbox" id="eg-pf" checked> Está obligado a facturar</label>
-      <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Si no lo está —la tienda de la vereda—, desmárcalo:
-      es lo que dice que ese egreso necesita <strong>documento soporte</strong> y no una factura suya.</p>
-      <button type="button" class="btn" id="eg-pg">Guardar proveedor</button>
-      <p class="msg" id="eg-pmsg"></p>
-    </div>
-
-    <div class="eg-par">
-      <div><label for="eg-fecha">Fecha</label><input id="eg-fecha" type="date"></div>
-      <div><label for="eg-medio">Medio de pago</label><select id="eg-medio">
-        <option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option>
-        <option value="tarjeta">Tarjeta</option><option value="otro">Otro</option></select></div>
-    </div>
-
-    <label for="eg-concepto">Qué se compró</label>
-    <input id="eg-concepto" autocomplete="off" placeholder="Cemento y arena para la brigada">
-
-    <div class="eg-par">
-      <div><label for="eg-base">Base</label><input id="eg-base" inputmode="numeric" placeholder="500000"></div>
-      <div><label for="eg-iva">IVA</label><input id="eg-iva" inputmode="numeric" placeholder="95000"></div>
-    </div>
-    <p class="mu" style="font-size:var(--fs-13);margin:0 0 10px">En pesos, sin centavos. El IVA se guarda para poder
-    informarlo: la fundación <strong>no es responsable de IVA</strong>, así que es mayor valor del costo y no se descuenta.</p>
-
-    <div class="eg-par">
-      <div><label for="eg-cret">Concepto de retención</label><select id="eg-cret">
-        <option value="no_aplica">No aplica</option><option value="compras">Compras</option>
-        <option value="servicios">Servicios</option><option value="honorarios">Honorarios</option>
-        <option value="arrendamientos">Arrendamientos</option><option value="transporte">Transporte</option></select></div>
-      <div><label for="eg-rf">Retefuente practicada</label><input id="eg-rf" inputmode="numeric" placeholder="0"></div>
-    </div>
-    <p class="mu" style="font-size:var(--fs-13);margin:0 0 10px">Lo que retuviste <strong>de verdad</strong>, no lo que
-    debería ser. Las tarifas y las bases mínimas cambian cada año y las confirma tu contador; aquí se guarda
-    lo aplicado. El concepto sí hace falta siempre: de él salen la exógena y el certificado anual del proveedor.</p>
-
-    <div id="eg-cuentas" class="eg-cuentas"></div>
-
-    <label for="eg-soporte">El papel</label>
-    <select id="eg-soporte">
-      <option value="factura_electronica">Factura electrónica</option>
-      <option value="factura_manual">Factura en papel</option>
-      <option value="documento_soporte">Documento soporte (a no obligado a facturar)</option>
-      <option value="sin_soporte">Sin soporte todavía</option>
-    </select>
-    <div class="eg-par" id="eg-papel">
-      <input id="eg-snum" placeholder="Número del documento" autocomplete="off">
-      <input id="eg-cufe" placeholder="CUFE (si es electrónica)" autocomplete="off">
-    </div>
-
-    <div class="eg-par">
-      <div><label for="eg-centro">Centro de costo</label>
-        <input id="eg-centro" list="eg-centros" autocomplete="off" placeholder="ndf, brigada-chocó, estructura">
-        <datalist id="eg-centros"></datalist></div>
-      <div><label for="eg-entrega">Acta que pagó (opcional)</label><input id="eg-entrega" autocomplete="off" placeholder="AE-2026-000001"></div>
-    </div>
-
-    <label class="eg-check"><input type="checkbox" id="eg-mer" checked> Es egreso de la actividad meritoria</label>
-    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 12px">De esto cuelga el Régimen Tributario Especial. Se pregunta
-    ahora y no al cerrar el año, que es cuando ya no se acuerda nadie.</p>
-
-    <label for="eg-nota">Nota interna (opcional)</label>
-    <input id="eg-nota" autocomplete="off">
-
-    <p><button type="button" class="btn btn-g" id="eg-guardar" style="margin-top:12px">Registrar egreso</button></p>
-    <p class="msg" id="eg-msg"></p>
-  </div>
-</details>
-
-<div class="eg-acciones">
-  <label class="eg-check"><input type="checkbox" id="eg-solo-sin"> Ver solo los que no tienen papel</label>
-  <span class="eg-sep"></span>
-  <label for="eg-d1">Desde</label><input id="eg-d1" type="date">
-  <label for="eg-d2">Hasta</label><input id="eg-d2" type="date">
-  <button type="button" class="tab" id="eg-csv">Descargar para el contador</button>
-</div>
-
-<div class="med-tw"><table class="med-tbl" id="eg-tabla">
-<thead><tr>
-<th scope="col">Número</th><th scope="col">Fecha</th><th scope="col">Proveedor</th>
-<th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Retenido</th>
-<th scope="col">Papel</th><th scope="col">Centro</th><th scope="col">Acta</th>
-<th scope="col">Acción</th>
-</tr></thead><tbody id="eg-filas"><tr><td colspan="10" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-egresos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="finanzas/proveedores" id="sec-proveedores" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p>Van aparte porque un proveedor se repite y sus datos se corrigen, y porque el <strong>certificado anual de retención</strong> se expide por proveedor, no por factura. Un proveedor nuevo se crea desde «Registrar un egreso».</p>
 </div></details>
-<div class="med-tw"><table class="med-tbl" id="pr-tabla">
-<thead><tr>
-<th scope="col">Nombre</th><th scope="col">Documento</th><th scope="col">Factura</th>
-<th scope="col">Egresos</th><th scope="col">Total pagado</th>
-</tr></thead><tbody id="pr-filas"><tr><td colspan="5" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-proveedores" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="finanzas/paypal" id="sec-ipn" hidden>
@@ -23325,14 +23613,9 @@ textarea { font-size: 16px }
 <p class="pn-sub">Lo que entró por el botón de donaciones, único o mensual. No tienen guía.</p>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p>Al botón de PayPal no se le puede pasar una referencia por donante, así que <strong>estas donaciones no tienen guía</strong>: si alguien pide certificado o quiere rastrear su aporte, hay que crearle el registro a mano. Las membresías creadas desde el sitio no salen aquí: esas ya tienen su suscripción y su recibo.</p>
-<p><strong>Verificado</strong> quiere decir que PayPal confirmó el aviso y que la cuenta que recibió es la nuestra; si dice otra cosa, es el motivo por el que no pasó y no hay que darlo por cobrado.</p>
+<p><strong>Verificado</strong> quiere decir que PayPal confirmó el aviso y que la cuenta que recibió es la nuestra; si dice otra cosa, es el motivo por el que no pasó y no hay que darlo por cobrado. Los montos van en la moneda que cobró PayPal: no se convierten.</p>
 </div></details>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Recibido</th><th scope="col">Tipo</th><th scope="col">Monto</th>
-<th scope="col">Donante</th><th scope="col">Destino</th><th scope="col">Verificado</th>
-</tr></thead><tbody id="ipn-filas"><tr><td colspan="6" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-ipn" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 
 <h2 class="pn-h2" id="sec-pps">Avisos de PayPal sin registro</h2>
 <p class="pn-sub">Avisos de PayPal que no encontraron a qué membresía o aporte pertenecen. Si la lista está vacía, todo tiene dónde ir.</p>
@@ -23340,12 +23623,7 @@ textarea { font-size: 16px }
 <p>Caen aquí tres cosas. <strong>Pago sin suscripción</strong>: entró dinero con firma válida que no corresponde a ninguna membresía; puede ser una donación del botón y hay que registrarla a mano. <strong>Firma inválida</strong>: el aviso se guardó y no se procesó; puede ser una suplantación, pero la primera vez fue un ajuste mal puesto, así que conviene mirarlo antes de asumir lo peor.</p>
 <p><strong>Se quedó a medias</strong>: la firma era buena y el proceso falló, así que ese cobro puede no estar en el libro. PayPal reintenta durante días: una fila recién aparecida suele resolverse sola; una que lleve días ahí, no.</p>
 </div></details>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Recibido</th><th scope="col">Evento</th><th scope="col">Monto</th>
-<th scope="col">Donante</th><th scope="col">Qué pasa</th>
-</tr></thead><tbody id="pps-filas"><tr><td colspan="5" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-pps" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <!-- ============================ ALIANZAS ============================ -->
@@ -23499,6 +23777,158 @@ sabes que está mal.</p>
 <!-- EL CAJÓN y sus avisos. Un solo cajón para todo el panel: detalle de un
      caso, formularios y la confirmación de lo que envía un correo o destruye
      algo. Lo maneja «cajon» en adminJS. -->
+<!-- LOS FORMULARIOS QUE SE ABREN EN EL CAJÓN (Fase 2). Viven aquí, ocultos, y
+     «cajonForma» los mueve al cajón y los devuelve al cerrarlo: así conservan
+     sus ids y todo lo que ya los maneja. -->
+<div id="pn-formas" hidden>
+<div id="eg-nuevo" class="eg-form" data-forma="1">
+    <div class="eg-xml">
+      <label for="eg-arch" style="margin-top:0">Arrastra la factura electrónica</label>
+      <input id="eg-arch" type="file" accept=".xml,application/xml,text/xml,.pdf,application/pdf">
+      <p class="mu" style="font-size:var(--fs-13);margin:6px 0 0">El XML de la DIAN trae todo esto escrito, así que
+      no hay que teclearlo. Se lee <strong>en tu navegador</strong>: el archivo no sale de aquí hasta que
+      registres el egreso. También vale un PDF, pero ese solo se guarda — no se puede leer.</p>
+      <p class="msg" id="eg-xmsg"></p>
+    </div>
+
+    <label for="eg-prov">Proveedor</label>
+    <div class="eg-par">
+      <select id="eg-prov"><option value="">Cargando…</option></select>
+      <button type="button" class="tab" id="eg-prov-nuevo">Nuevo proveedor</button>
+    </div>
+
+    <div id="eg-prov-caja" hidden style="border-left:2px solid var(--g);padding:10px 0 10px 14px;margin:10px 0">
+      <label for="eg-pn">Nombre o razón social</label>
+      <input id="eg-pn" autocomplete="off">
+      <div class="eg-par">
+        <select id="eg-pt"><option value="NIT">NIT</option><option value="CC">Cédula</option><option value="CE">C. extranjería</option><option value="NINGUNO">Sin documento</option></select>
+        <input id="eg-pd" placeholder="Número de documento" autocomplete="off">
+      </div>
+      <label class="eg-check"><input type="checkbox" id="eg-pf" checked> Está obligado a facturar</label>
+      <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Si no lo está —la tienda de la vereda—, desmárcalo:
+      es lo que dice que ese egreso necesita <strong>documento soporte</strong> y no una factura suya.</p>
+      <button type="button" class="btn" id="eg-pg">Guardar proveedor</button>
+      <p class="msg" id="eg-pmsg"></p>
+    </div>
+
+    <div class="eg-par">
+      <div><label for="eg-fecha">Fecha</label><input id="eg-fecha" type="date"></div>
+      <div><label for="eg-medio">Medio de pago</label><select id="eg-medio">
+        <option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option>
+        <option value="tarjeta">Tarjeta</option><option value="otro">Otro</option></select></div>
+    </div>
+
+    <label for="eg-concepto">Qué se compró</label>
+    <input id="eg-concepto" autocomplete="off" placeholder="Cemento y arena para la brigada">
+
+    <div class="eg-par">
+      <div><label for="eg-base">Base</label><input id="eg-base" inputmode="numeric" placeholder="500000"></div>
+      <div><label for="eg-iva">IVA</label><input id="eg-iva" inputmode="numeric" placeholder="95000"></div>
+    </div>
+    <p class="mu" style="font-size:var(--fs-13);margin:0 0 10px">En pesos, sin centavos. El IVA se guarda para poder
+    informarlo: la fundación <strong>no es responsable de IVA</strong>, así que es mayor valor del costo y no se descuenta.</p>
+
+    <div class="eg-par">
+      <div><label for="eg-cret">Concepto de retención</label><select id="eg-cret">
+        <option value="no_aplica">No aplica</option><option value="compras">Compras</option>
+        <option value="servicios">Servicios</option><option value="honorarios">Honorarios</option>
+        <option value="arrendamientos">Arrendamientos</option><option value="transporte">Transporte</option></select></div>
+      <div><label for="eg-rf">Retefuente practicada</label><input id="eg-rf" inputmode="numeric" placeholder="0"></div>
+    </div>
+    <p class="mu" style="font-size:var(--fs-13);margin:0 0 10px">Lo que retuviste <strong>de verdad</strong>, no lo que
+    debería ser. Las tarifas y las bases mínimas cambian cada año y las confirma tu contador; aquí se guarda
+    lo aplicado. El concepto sí hace falta siempre: de él salen la exógena y el certificado anual del proveedor.</p>
+
+    <div id="eg-cuentas" class="eg-cuentas"></div>
+
+    <label for="eg-soporte">El papel</label>
+    <select id="eg-soporte">
+      <option value="factura_electronica">Factura electrónica</option>
+      <option value="factura_manual">Factura en papel</option>
+      <option value="documento_soporte">Documento soporte (a no obligado a facturar)</option>
+      <option value="sin_soporte">Sin soporte todavía</option>
+    </select>
+    <div class="eg-par" id="eg-papel">
+      <input id="eg-snum" placeholder="Número del documento" autocomplete="off">
+      <input id="eg-cufe" placeholder="CUFE (si es electrónica)" autocomplete="off">
+    </div>
+
+    <div class="eg-par">
+      <div><label for="eg-centro">Centro de costo</label>
+        <input id="eg-centro" list="eg-centros" autocomplete="off" placeholder="ndf, brigada-chocó, estructura">
+        <datalist id="eg-centros"></datalist></div>
+      <div><label for="eg-entrega">Acta que pagó (opcional)</label><input id="eg-entrega" autocomplete="off" placeholder="AE-2026-000001"></div>
+    </div>
+
+    <label class="eg-check"><input type="checkbox" id="eg-mer" checked> Es egreso de la actividad meritoria</label>
+    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 12px">De esto cuelga el Régimen Tributario Especial. Se pregunta
+    ahora y no al cerrar el año, que es cuando ya no se acuerda nadie.</p>
+
+    <label for="eg-nota">Nota interna (opcional)</label>
+    <input id="eg-nota" autocomplete="off">
+
+  </div>
+<div id="hn-nuevo" class="eg-form" data-forma="1">
+    <p class="mu" style="font-size:var(--fs-13);margin:8px 0 4px;max-width:66ch">Un carnet de honor lo otorga la fundación
+    <strong>por invitación</strong> y da acceso a los beneficios del Programa de Gratitud mientras esté vigente.
+    <strong>Una persona, un carnet:</strong> si el correo ya es de alguien con carnet, la distinción se añade a ese
+    mismo carnet —mismo enlace, mismo QR—. Fundador/a y Pionero/a son permanentes; las demás valen por el tiempo que
+    elijas y se renuevan desde la tabla. <strong>Junta de Asesores</strong> es un grupo honorario y asesor, sin
+    funciones de dirección: la fundación no tiene junta directiva. Al emitirlo se le envía el carnet por correo.</p>
+
+    <div class="eg-par">
+      <div><label for="hn-nombre">Nombre completo</label><input id="hn-nombre" autocomplete="off"></div>
+      <div><label for="hn-email">Correo</label><input id="hn-email" type="email" autocomplete="off"></div>
+    </div>
+
+    <div class="eg-par">
+      <div><label for="hn-dist">Distinción</label><select id="hn-dist">
+        <option value="">Elige…</option>
+        <option value="fundador">Fundador/a · permanente</option>
+        <option value="pionero">Pionero/a · permanente</option>
+        <option value="coordinador_voluntario">Coordinador/a voluntario/a</option>
+        <option value="aliado_red">Aliado/a de la red</option>
+        <option value="embajador">Embajador/a</option>
+        <option value="junta_asesores">Junta de Asesores (asesora, sin funciones de dirección)</option>
+      </select></div>
+      <div id="hn-meses-caja"><label for="hn-meses">Vigencia de la distinción</label><select id="hn-meses">
+        <option value="12" selected>12 meses</option><option value="6">6 meses</option><option value="24">24 meses</option>
+      </select></div>
+    </div>
+
+    <div class="eg-par">
+      <div><label for="hn-forma">Forma del título</label><select id="hn-forma">
+        <option value="n" selected>Neutra · Fundador/a</option>
+        <option value="m">Masculina · Fundador</option>
+        <option value="f">Femenina · Fundadora</option>
+      </select></div>
+      <div></div>
+    </div>
+    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Cómo se lee la distinción en su carnet, correo y recibo. «Junta de Asesores» es igual en las tres; en inglés siempre es neutra.</p>
+
+    <label for="hn-ctx">Contexto <span style="font-weight:400">(opcional, una línea: «Fundación X», «Brigada Sismo 2026»)</span></label>
+    <input id="hn-ctx" maxlength="60" autocomplete="off">
+
+    <div class="eg-par">
+      <div><label for="hn-dt">Tipo de documento <span style="font-weight:400">(opcional)</span></label><select id="hn-dt">
+        <option value="CC">Cédula de ciudadanía</option><option value="CE">Cédula de extranjería</option>
+        <option value="PP">Pasaporte</option><option value="PPT">PPT</option><option value="TI">Tarjeta de identidad</option>
+      </select></div>
+      <div><label for="hn-dn">Número de documento <span style="font-weight:400">(opcional)</span></label><input id="hn-dn" inputmode="numeric" autocomplete="off"></div>
+    </div>
+    <label class="eg-check" style="display:flex;gap:10px;align-items:flex-start;font-weight:400;color:var(--ink)"><input type="checkbox" id="hn-aut" style="flex:0 0 auto;width:18px;height:18px;padding:0;margin:2px 0 0"> La persona autorizó que la fundación guarde su número de documento para que un comercio aliado pueda verificar su carnet con él en /verificar.</label>
+    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Obligatorio si escribes un documento. Sin documento el carnet se verifica igual, por su código.</p>
+
+    <div class="eg-par">
+      <div><label for="hn-idioma">Idioma del correo</label><select id="hn-idioma">
+        <option value="es">Español</option><option value="en">English</option>
+      </select></div>
+      <div></div>
+    </div>
+
+    <p class="pn-h3">Lo que se envía</p><div id="hn-previa"><p class="mu">Completa nombre, correo y distinción para ver el correo.</p></div>
+  </div>
+</div>
 <div class="pn-velo" id="pn-velo" hidden></div>
 <aside class="pn-cajon" id="pn-cajon" role="dialog" aria-modal="true" aria-labelledby="pn-cajon-t" hidden>
   <header class="pn-cajon-cab">
@@ -23515,7 +23945,6 @@ sabes que está mal.</p>
 
 function adminJS() {
   return `"use strict";
-var FILTRO = "";
 var FILAS = {};
 function pesos(c){ return "$" + Math.round((c||0)/100).toLocaleString("es-CO"); }
 
@@ -23556,6 +23985,7 @@ var CAJON = { abierto: false, volver: null };
 function cajonAbrir(o){
   var c = document.getElementById("pn-cajon"), v = document.getElementById("pn-velo");
   if (!c) return;
+  formaDevolver();
   if (!CAJON.abierto) CAJON.volver = document.activeElement;
   c.classList.toggle("ancho", !!o.ancho);
   c.classList.toggle("peligro", !!o.peligro);
@@ -23569,7 +23999,7 @@ function cajonAbrir(o){
   var foco = o.foco ? document.getElementById(o.foco) : null;
   (foco || document.getElementById("pn-cajon-t")).focus();
 }
-function cajonCuerpo(html){ var b = document.getElementById("pn-cajon-cuerpo"); if (b) b.innerHTML = html; }
+function cajonCuerpo(html){ formaDevolver(); var b = document.getElementById("pn-cajon-cuerpo"); if (b) b.innerHTML = html; }
 function cajonPie(html){ var p = document.getElementById("pn-cajon-pie"); if (p) p.innerHTML = html || ""; }
 function cajonCerrar(){
   var c = document.getElementById("pn-cajon"); if (!c || c.hidden) return;
@@ -23767,7 +24197,7 @@ function falloCarga(donde, http, d){
   } else {
     el.innerHTML = '<p class="carga-fallo">' + aviso + '</p>';
   }
-  if (typeof PEDIDAS === "object") delete PEDIDAS[donde];
+  if (typeof PEDIDAS === "object"){ delete PEDIDAS[donde]; delete PEDIDAS[String(donde).replace(/-cuerpo$/, "")]; }
 }
 /* HORA DE COLOMBIA. El panel leia estas marcas tal como las guarda D1, que es
    UTC, asi que TODO el registro operativo iba corrido cinco horas: un caso
@@ -23815,20 +24245,33 @@ var ESTADO_APORTE_ES = { intencion: "Intento sin pagar", pendiente: "Pendiente e
   reportada: "Transferencia por verificar", anulada: "Anulado" };
 function pintarResumen(d){
   var box = document.getElementById("resumen"); if (!box) return;
-  var por = {};
-  (d.por_estado || []).forEach(function(x){ por[x.estado] = x; });
+  /* POR MONEDA (Fase 2): hasta aquí se sumaban los centavos de dólar de PayPal
+     como si fueran pesos. Los pesos son la cifra; los dólares van aparte. */
+  var por = {}, usd = { n: 0, c: 0 };
+  (d.por_estado || []).forEach(function(x){
+    var m = String(x.moneda || "COP").toUpperCase();
+    if (m !== "COP"){
+      if (APROBADOS.indexOf(x.estado) >= 0){ usd.n += Number(x.n || 0); usd.c += Number(x.centavos || 0); usd.m = m; }
+      por[x.estado] = por[x.estado] || { n: 0, centavos: 0 }; por[x.estado].n += Number(x.n || 0);
+      return;
+    }
+    por[x.estado] = por[x.estado] || { n: 0, centavos: 0 };
+    por[x.estado].n += Number(x.n || 0); por[x.estado].centavos += Number(x.centavos || 0);
+  });
   var n = function(k){ return Number((por[k] || {}).n || 0); };
   var c = function(k){ return Number((por[k] || {}).centavos || 0); };
-  var pagN = n("aprobada") + n("en_distribucion") + n("entregada");
+  var pagN = n("aprobada") + n("en_distribucion") + n("entregada") - usd.n;
   var pagC = c("aprobada") + c("en_distribucion") + c("entregada");
   var celdas = [
-    [pesos(pagC), pagN + (pagN === 1 ? " aporte pagado" : " aportes pagados") + " · el dinero está en la cuenta"],
+    [pesos(pagC), pagN + (pagN === 1 ? " aporte pagado en pesos" : " aportes pagados en pesos") + " · el dinero está en la cuenta"]];
+  if (usd.n) celdas.push([dinero(usd.c, usd.m), usd.n + (usd.n === 1 ? " aporte pagado" : " aportes pagados") + " en " + usd.m + " · sin convertir"]);
+  celdas = celdas.concat([
     [String(n("reportada")), "transferencias por verificar · " + pesos(c("reportada")) + " según el donante"],
     [String(Number(d.certificados_pendientes || 0)), "certificados por emitir"],
     [String(n("entregada")), "entregados"],
     [String(n("intencion")), "intentos sin pagar · no es dinero"],
     [String(n("rechazada")), "rechazados"]
-  ];
+  ]);
   box.innerHTML = celdas.map(function(x){ return "<div><b>" + esc(x[0]) + "</b><small>" + esc(x[1]) + "</small></div>"; }).join("");
 }
 
@@ -23914,34 +24357,6 @@ function celDonante(tel){
   if (dig.length === 10 && dig.charAt(0) === "3") dig = "57" + dig;
   return "<br><small>" + esc(tel) + (dig.length >= 11 && dig.length <= 15
     ? ' · <a href="https://wa.me/' + dig + '" target="_blank" rel="noopener">WhatsApp</a>' : "") + "</small>";
-}
-function pintarFilas(l){
-  var tb = document.getElementById("filas");
-  if (!l.length){ tb.innerHTML = '<tr><td colspan="9">Nada con ese filtro.</td></tr>'; return; }
-  FILAS = {};
-  tb.innerHTML = l.map(function(a){
-    FILAS[a.guia] = a;
-    var recibo = (APROBADOS.indexOf(a.estado) >= 0 && a.token)
-      ? '<a href="/api/recibo/' + esc(a.guia) + '.pdf?t=' + esc(a.token) + '" target="_blank" rel="noopener">PDF</a>' : "—";
-    /* Que el PDF exista no significa que al donante le haya llegado. Debajo del
-       enlace va lo que pasó con SU correo: sin esto, «no me llegó el recibo» no
-       tenía respuesta desde el panel. */
-    if (a.recibo_correo === "enviado")       recibo += '<br><small>correo enviado</small>';
-    else if (a.recibo_correo === "fallo")    recibo += '<br><small style="color:#A84D00"><strong>correo falló</strong></small>';
-    else if (a.recibo_correo === "simulado") recibo += '<br><small style="color:#A84D00"><strong>no se envió</strong></small>';
-    else if (APROBADOS.indexOf(a.estado) >= 0) recibo += '<br><small>correo sin registro</small>';
-    return "<tr>" +
-      "<td>" + esc(a.guia) + "</td>" +
-      "<td>" + esc(ESTADO_APORTE_ES[a.estado] || a.estado) + "</td>" +
-      "<td>" + pesos(a.monto_centavos) + "</td>" +
-      "<td>" + esc(a.modo === "dirigida" ? (a.destino_id||"?") : "Fondo general") + "</td>" +
-      "<td>" + esc(a.donante || "—") + (a.correo ? "<br><small>" + esc(a.correo) + "</small>" : "") + celDonante(a.telefono) + "</td>" +
-      "<td>" + recibo + "</td>" +
-      "<td>" + celdaCert(a) + "</td>" +
-      "<td>" + esc(enCO(a.creada_en, 16)) + "</td>" +
-      "<td>" + accion(a) + "</td>" +
-    "</tr>";
-  }).join("");
 }
 
 /* ---- revisión previa a emitir -------------------------------------------
@@ -24036,15 +24451,25 @@ document.addEventListener("click", function(e){
   var b = e.target.closest ? e.target.closest("[data-vpaso]") : null;
   if (!b) return;
   var hecho = b.getAttribute("data-hecho") === "1";
-  if (!hecho && !confirm("¿Desmarcar «" + (PASO_ES[b.getAttribute("data-paso")] || "") + "»?")) return;
-  b.disabled = true;
-  fetch("/api/admin/inscripcion/" + encodeURIComponent(b.getAttribute("data-vpaso")) + "/paso", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ paso: b.getAttribute("data-paso"), hecho: hecho })
-  }).then(conEstado).then(function(res){
-    if (fallo(res.http, res.d)){ b.disabled = false; return; }
-    cargarInscripciones(); cargarSalud();
-  }).catch(function(){ b.disabled = false; });
+  var id = b.getAttribute("data-vpaso"), paso = b.getAttribute("data-paso");
+  var mandar = function(){
+    return postPanel("/api/admin/inscripcion/" + encodeURIComponent(id) + "/paso", { paso: paso, hecho: hecho }).then(function(d){
+      if (!d) return false;
+      cargarInscripciones(); cargarSalud();
+      return true;
+    });
+  };
+  if (hecho){
+    b.disabled = true;
+    mandar().then(function(ok){ if (!ok){ b.disabled = false; avisoError("No se pudo marcar el paso. Recarga e inténtalo otra vez."); } });
+    return;
+  }
+  /* Desmarcar deshace algo que alguien anotó: se pregunta en el cajón (antes,
+     window.confirm), y queda en la auditoría igual. */
+  confirmarSimple({ ey: "Voluntariado", titulo: "Desmarcar «" + (PASO_ES[paso] || paso) + "»",
+    detalle: "<p>El paso vuelve a quedar pendiente en la lista de esta persona" + (b.title ? " (" + esc(b.title.toLowerCase()) + ")" : "") +
+      ". Si con él estaba lista para su primera jornada, deja de estarlo. Queda en la auditoría con tu correo.</p>",
+    boton: "Desmarcar", hacer: mandar });
 });
 
 /* La lista del convenio. Desmarcar pide confirmar, como los pasos de un
@@ -24053,32 +24478,40 @@ document.addEventListener("click", function(e){
 document.addEventListener("click", function(e){
   var t = e.target.closest ? e.target.closest("[data-cdoc],[data-cnota],[data-cvar]") : null;
   if (!t) return;
-  var id, cuerpo;
+  var mandar = function(id, cuerpo){
+    return postPanel("/api/admin/inscripcion/" + encodeURIComponent(id) + "/convenio", cuerpo).then(function(d){
+      if (!d) return false;
+      cargarInscripciones(); cargarSalud();
+      return true;
+    });
+  };
+  /* Lo que era window.confirm y window.prompt, en el cajón. */
   if (t.hasAttribute("data-cvar")) {
-    id = t.getAttribute("data-cvar");
-    if (!confirm("¿Cambiar la versión del convenio? La lista de documentos cambia con ella.")) return;
-    cuerpo = { variante: t.getAttribute("data-v") };
-  } else if (t.hasAttribute("data-cnota")) {
-    id = t.getAttribute("data-cnota");
-    var n = window.prompt("Nota o enlace al Drive para este documento.\\n"
-      + "Sin números de documento ni de cuenta: solo dónde está o qué falta.\\n"
-      + "Vacío = borrar la nota.", t.getAttribute("data-nota") || "");
-    if (n === null) return;
-    cuerpo = { doc: t.getAttribute("data-doc"), nota: n };
-  } else {
-    id = t.getAttribute("data-cdoc");
-    var marca = t.getAttribute("data-marca") || "";
-    if (!marca && !confirm("¿Desmarcar? Queda en la auditoría igual.")) return;
-    cuerpo = { doc: t.getAttribute("data-doc"), marca: marca };
+    var idv = t.getAttribute("data-cvar"), v = t.getAttribute("data-v");
+    confirmarSimple({ ey: "Convenio", titulo: "Cambiar la versión del convenio",
+      detalle: "<p>Pasa a la versión <strong>" + (v === "registradas" ? "para fundaciones registradas" : "para fundaciones no registradas") +
+        "</strong>. La lista de documentos del Anexo 1 cambia con ella; lo que ya está marcado se conserva donde coincida.</p>",
+      boton: "Cambiar la versión", hacer: function(){ return mandar(idv, { variante: v }); } });
+    return;
   }
-  t.disabled = true;
-  fetch("/api/admin/inscripcion/" + encodeURIComponent(id) + "/convenio", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify(cuerpo)
-  }).then(conEstado).then(function(res){
-    if (fallo(res.http, res.d)){ t.disabled = false; return; }
-    cargarInscripciones(); cargarSalud();
-  }).catch(function(){ t.disabled = false; });
+  if (t.hasAttribute("data-cnota")) {
+    var idn = t.getAttribute("data-cnota"), doc = t.getAttribute("data-doc");
+    pedirTexto({ ey: "Convenio · nota de un documento", titulo: t.getAttribute("data-nota") ? "Editar la nota" : "Añadir una nota",
+      etiqueta: "Nota o enlace al Drive", valor: t.getAttribute("data-nota") || "", area: false,
+      ayuda: "Sin números de documento ni de cuenta: solo dónde está o qué falta. Vacía, borra la nota.",
+      boton: "Guardar la nota", hacer: function(texto){ return mandar(idn, { doc: doc, nota: texto }); } });
+    return;
+  }
+  var idd = t.getAttribute("data-cdoc"), marca = t.getAttribute("data-marca") || "";
+  var cuerpoDoc = { doc: t.getAttribute("data-doc"), marca: marca };
+  if (marca){
+    t.disabled = true;
+    mandar(idd, cuerpoDoc).then(function(ok){ if (!ok){ t.disabled = false; avisoError("No se pudo marcar. Recarga e inténtalo otra vez."); } });
+    return;
+  }
+  confirmarSimple({ ey: "Convenio", titulo: "Desmarcar «" + ((t.querySelector(".conv-txt") || {}).textContent || "el documento") + "»",
+    detalle: "<p>El documento vuelve a contar como pendiente en el Anexo 1. Queda en la auditoría igual.</p>",
+    boton: "Desmarcar", hacer: function(){ return mandar(idd, cuerpoDoc); } });
 });
 
 /* LA FRANJA DE CERTIFICADOS, arriba de la lista. Dice en que mundo esta la
@@ -24218,16 +24651,6 @@ var FIRMA_ACTIVA = false;
    servidor, que es quien lo vuelve a comprobar al firmar. */
 var FIRMANTE = null;
 var PAPEL_ES = { rl: "Representante Legal", rf: "Revisora Fiscal" };
-function cargarAportes(){
-  pedirJSON("/api/admin/aportes?limite=100" + (FILTRO ? "&estado=" + encodeURIComponent(FILTRO) : ""), "filas")
-    .then(function(d){
-      FIRMA_ACTIVA = !!d.firma_activa; FIRMANTE = d.firmante || null; pintarFilas(d.aportes || []);
-      pintarEstadoCert(d);
-      var tb = document.getElementById("filas");
-      if (tb && (d.aportes || []).length) tb.insertAdjacentHTML("afterbegin", filaTope(d, 9, "aportes",
-        "Van los más recientes primero, así que lo que falta es lo MÁS VIEJO. Filtra por estado arriba."));
-    });
-}
 
 document.addEventListener("click", function(e){
   var fi = e.target.closest("[data-ifil]");
@@ -24236,11 +24659,6 @@ document.addEventListener("click", function(e){
   if (ip){ inscPagina(ip.getAttribute("data-ipag")); return; }
   var np = e.target.closest("[data-inspag]");
   if (np){ inspPagina(np.getAttribute("data-inspag")); return; }
-  var t = e.target.closest("[data-estado]");
-  if (t){
-    document.querySelectorAll(".pay-tab").forEach(function(b){ b.classList.remove("on"); });
-    t.classList.add("on"); FILTRO = t.getAttribute("data-estado"); cargarAportes(); return;
-  }
   var c = e.target.closest("[data-cert]");
   if (c){ abrirCert(c.getAttribute("data-cert")); return; }
 
@@ -24345,69 +24763,27 @@ document.addEventListener("click", function(e){
        el aviso nuevo de «no hay acta para esto» se habría perdido igual. */
     }).then(function(r){ return r.json(); })
       .then(function(d){
-        if (d && d.error) avisar("No se pudo: " + (d.ayuda || d.error));
-        else if (d && d.aviso) avisar(d.aviso);
+        if (d && d.error){ avisoError("No se pudo: " + (d.ayuda || d.error)); b.disabled = false; return; }
+        /* Desde el cajón del aporte, el cajón se cierra: lo que se ve detrás
+           ya es el estado nuevo. */
+        if (CAJON.abierto) cajonCerrar();
+        if (d && d.aviso) avisar(d.aviso, { tono: "error" });
+        else avisar(b.getAttribute("data-guia") + (b.getAttribute("data-a") === "entregada" ? " quedó entregado." : " pasó a distribución."));
         cargarResumen(); cargarAportes(); cargarSalud();
       })
       .catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
   }
 
-  /* Conciliar contra la API de Wompi. Se pide el número de transacción y no se
-     busca por referencia a propósito: el número lo trae el correo de «Pago
-     exitoso» y el panel de Wompi, y obligar a copiarlo es lo que permite que el
-     Worker verifique que la transacción es de ESTA guía antes de tocar nada. */
+  /* Conciliar contra la API de Wompi: en el cajón, con el número de
+     transacción y el recibo que saldría a la vista (antes, window.prompt). */
   var cn = e.target.closest("[data-conc]");
-  if (cn){
-    var g3 = cn.getAttribute("data-conc");
-    var tx = window.prompt("Conciliar " + g3 + " contra la API de Wompi.\\n\\nNúmero de transacción (lo trae el correo de «Pago exitoso» y el panel de Wompi):");
-    if (!tx) return;
-    cn.disabled = true; cn.textContent = "…";
-    fetch("/api/admin/aporte/" + encodeURIComponent(g3) + "/conciliar", {
-      method: "POST", headers: {"content-type":"application/json"},
-      body: JSON.stringify({ transaccion: tx })
-    }).then(function(r){ return r.json(); }).then(function(d){
-      if (d.ayuda) avisar(d.ayuda);
-      else if (d.error) avisar("No se pudo conciliar: " + d.error);
-      else avisar("Wompi dice: " + d.wompi_estado + ". El aporte quedó en «" + (d.aporte && d.aporte.estado) + "».");
-      cargarResumen(); cargarAportes(); cargarSalud();
-    }).catch(function(){ cn.disabled = false; cn.textContent = "Reintentar"; });
-  }
+  if (cn){ abrirConciliar(cn.getAttribute("data-conc")); return; }
 });
 
 /* ---------------- transferencias por verificar ---------------- */
 /* Lo que reporto cada donante, para PROPONERLO al confirmar: la fecha y el
    monto se comparan contra el extracto, no se teclean de memoria. */
 var REPORTADAS = {};
-function cargarReportadas(){
-  pedirJSON("/api/admin/reportadas", "t-filas").then(function(d){
-    var tb = document.getElementById("t-filas"); if (!tb) return;
-    var l = d.reportadas || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="8">Ninguna esperando verificación.</td></tr>'; return; }
-    /* Esta va ASC: lo que el tope esconde es lo mas RECIENTE, no lo mas viejo. */
-    REPORTADAS = {};
-    tb.innerHTML = filaTope(d, 8, "transferencias",
-      "Van de la mas antigua a la mas nueva, asi que lo que falta es lo que acaba de llegar.")
-      + l.map(function(a){
-      REPORTADAS[a.guia] = a;
-      return "<tr>" +
-        "<td>" + esc(a.guia) + "<br><small>" + esc(enCO(a.creada_en, 16)) +
-          (a.fecha_pago ? "<br>dice que transfirió el " + esc(a.fecha_pago) : "") +
-          (a.dias >= 3 ? '<br><strong style="color:#A84D00">esperando ' + a.dias + " dia(s)</strong>" : "") +
-        "</small></td>" +
-        "<td>" + pesos(a.monto_centavos) + "</td>" +
-        "<td>" + esc(a.modo === "dirigida" ? (a.proyecto || a.destino_id || "?") : "Fondo general") + "</td>" +
-        "<td>" + esc(a.nombre || "—") + (a.email ? "<br><small>" + esc(a.email) + "</small>" : "") + celDonante(a.telefono) + "</td>" +
-        "<td>" + esc(a.referencia_pago || "—") + "</td>" +
-        "<td>" + (a.comprobante
-          ? '<a href="/api/admin/comprobante/' + esc(a.guia) + '" target="_blank" rel="noopener">ver</a>'
-          : '<strong style="color:#A84D00">sin subir</strong>') + "</td>" +
-        "<td>" + (a.quiere_certificado ? "sí" : "—") + "</td>" +
-        '<td><button class="btn btn-g" data-conf="' + esc(a.guia) + '">Confirmar…</button> ' +
-        '<button class="copy pn-peligro" data-desc="' + esc(a.guia) + '">Descartar…</button></td>' +
-      "</tr>";
-    }).join("");
-  });
-}
 
 /* CONFIRMAR UNA TRANSFERENCIA, EN EL CAJÓN (Fase 1 del panel). Eran tres
    window.prompt seguidos —comprobante, fecha, monto— y otros dos si el
@@ -24670,8 +25046,10 @@ document.addEventListener("submit", function(e){
 var VISTAS = {
   "hoy": { area: "Inicio", titulo: "Hoy",
     linea: "Lo que espera a una persona, de lo más grave a lo que puede esperar a la semana." },
+  "finanzas/resumen": { area: "Finanzas", titulo: "Resumen",
+    linea: "Lo que entró y lo que salió en el mes o en el año, y de dónde sale cada cifra." },
   "finanzas/aportes": { area: "Finanzas", titulo: "Aportes",
-    linea: "Todo lo que ha entrado, con su recibo y su certificado." },
+    linea: "Todo lo que ha entrado, con su recibo y su certificado. Toca una fila para verlo entero." },
   "finanzas/transferencias": { area: "Finanzas", titulo: "Transferencias por verificar",
     linea: "Quien dice que transfirió. Se confirma contra el extracto del banco y entonces sale su recibo." },
   "finanzas/pagos": { area: "Finanzas", titulo: "Pagos sin aporte",
@@ -24714,7 +25092,7 @@ var FILTRO_VISTA = {
   "personas/ingenieros": { tipo: "ingeniero", origen: "" }
 };
 /* Las direcciones de las pestañas de antes. */
-var VIEJAS = { dinero: "finanzas/aportes", conta: "finanzas/vencimientos", mmc: "mmc/casas", red: "alianzas/red",
+var VIEJAS = { finanzas: "finanzas/resumen", dinero: "finanzas/aportes", conta: "finanzas/vencimientos", mmc: "mmc/casas", red: "alianzas/red",
                vol: "personas/voluntariado", salud: "sistema/salud" };
 var VISTA = null;
 
@@ -24759,7 +25137,7 @@ function mostrar(ruta){
   VISTA = vista;
   pintarCabecera();
   filtrarInscripciones(vista, ruta.filtro);
-  sec.querySelectorAll("tbody[id]").forEach(function(t){ pedir(t.id); });
+  sec.querySelectorAll("tbody[id],[data-bandeja]").forEach(function(t){ pedir(t.id); });
   cerrarMenu();
   document.title = VISTAS[vista].titulo + " · Panel · Give&Grow";
   if (ruta.ancla && document.getElementById(ruta.ancla) && document.getElementById(ruta.ancla) !== sec){
@@ -24800,6 +25178,8 @@ document.addEventListener("click", function(e){
   /* La acción principal de una cabecera abre su formulario y lo trae a la vista. */
   var ab = e.target.closest("[data-pn-abre]");
   if (ab){
+    /* Los de Finanzas (egreso, carnet de honor) se abren en el cajón. */
+    if (abrirForma(ab.getAttribute("data-pn-abre"))) return;
     var d = document.getElementById(ab.getAttribute("data-pn-abre"));
     if (d){ d.open = true; d.scrollIntoView({ block: "start" }); var f = d.querySelector("input,select,textarea"); if (f) f.focus({ preventScroll: true }); }
   }
@@ -25402,16 +25782,26 @@ document.addEventListener("click", function(e){
 document.addEventListener("change", function(e){
   var inp = e.target.closest ? e.target.closest("[data-ctexto]") : null;
   if (!inp || !inp.files || !inp.files[0]) return;
-  var f = inp.files[0];
-  inp.disabled = true;
-  fetch("/api/admin/inscripcion/" + encodeURIComponent(inp.getAttribute("data-ctexto")) + "/convenio-texto", {
-    method: "POST", headers: { "content-type": "application/pdf" }, body: f
-  }).then(conEstado).then(function(res){
-    inp.disabled = false; inp.value = "";
-    if (fallo(res.http, res.d)) return;
-    if (res.d.aviso === "correo_fallo") avisar("Subido, pero el aviso a la fundación no salió. Revisa la cola de correos.");
-    cargarInscripciones();
-  }).catch(function(){ inp.disabled = false; avisar("No se pudo subir: revisa la conexión."); });
+  var f = inp.files[0], idt = inp.getAttribute("data-ctexto");
+  inp.value = "";
+  /* Subir el texto le escribe a la fundación la primera vez: se enseña el
+     correo antes (Fase 2 del panel). */
+  confirmarConCorreo({ previa: { accion: "convenio-texto", id: Number(idt) }, ey: "Convenio",
+    titulo: "Subir el texto del convenio",
+    intro: "<p>Archivo: <strong>" + esc(f.name) + "</strong> (" + Math.round(f.size / 1024) + " KB). Es el texto que la fundación lee y acepta en su enlace: " +
+      "una vez lo acepte, ya no se puede reemplazar.</p>",
+    boton: "Subir el texto", botonCorreo: "Subir y avisar a la fundación",
+    hacer: function(){
+      return fetch("/api/admin/inscripcion/" + encodeURIComponent(idt) + "/convenio-texto", {
+        method: "POST", headers: { "content-type": "application/pdf" }, body: f
+      }).then(conEstado).then(function(res){
+        if (res.http >= 300 || (res.d && res.d.error)){ errorEnCajon((res.d && (res.d.ayuda || res.d.error)) || "No se pudo subir."); return false; }
+        if (res.d.aviso === "correo_fallo") avisoError("Subido, pero el aviso a la fundación no salió. Revisa la cola de correos en Salud.");
+        else avisar("Texto del convenio subido" + (res.d.aviso === "correo_enviado" ? ". Se le avisó a la fundación." : "."));
+        cargarInscripciones();
+        return true;
+      }).catch(function(){ errorEnCajon("No se pudo subir: revisa la conexión."); return false; });
+    } });
 });
 
 /* LA HOJA DE LAS DOS VENTANAS APARTE (respuestas del cuestionario y del
@@ -25432,75 +25822,75 @@ var VENTANA_CSS = "<style>:root{--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3
   "textarea{width:100%;height:300px;font:13px/1.45 ui-monospace,monospace;border:1px solid var(--bd);border-radius:8px;" +
   "padding:10px;background:var(--sf);color:var(--ink)}</style>";
 
-/* Todo lo del convenio en linea de una fundacion, en una ventana aparte, como
-   la ficha: respuestas, evidencia de cada firma, comprobantes y archivos. */
+/* Todo lo del convenio en línea de una fundación: respuestas, evidencia de
+   cada firma, comprobantes y archivos. EN EL CAJÓN ANCHO desde la Fase 2:
+   antes era una ventana aparte, y rechazar un archivo se pedía con un
+   window.prompt dentro de ella. */
 function verConvenio(id){
+  cajonAbrir({ ancho: true, ey: "Convenio en línea", titulo: "Cargando…", cuerpo: '<p class="mu">Cargando…</p>',
+    pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
   fetch("/api/admin/inscripcion/" + encodeURIComponent(id) + "/convenio-en-linea").then(conEstado).then(function(res){
-    if (fallo(res.http, res.d)) return;
+    if (res.http >= 300 || !res.d || res.d.error){ cajonCuerpo('<p class="pn-error">' + esc((res.d && (res.d.ayuda || res.d.error)) || "No se pudo cargar.") + "</p>"); return; }
     var d = res.d;
-    var w = window.open("", "_blank");
-    if (!w){ avisar("El navegador bloqueo la ventana."); return; }
-    var fila = function(k, v){ return "<tr><td>" + esc(k) + "</td><td>" + v + "</td></tr>"; };
-    var resp = function(r){
-      var v = Array.isArray(r.respuesta) ? r.respuesta.map(function(x){ return "☑ " + esc(x); }).join("<br>") : esc(r.respuesta);
-      return "<tr><td>" + esc(r.num) + "</td><td>" + esc(r.pregunta) + "</td><td>" + (v || '<em class="mu">sin respuesta</em>') + "</td></tr>";
-    };
     var forms = (d.formularios || []).map(function(f){
       var g = f.firma;
-      return "<h2>" + esc(f.formulario) + " · " + esc(f.titulo) + ' <span class="mu">· ' +
-        (g ? "firmado" : f.estado === "borrador" ? "borrador" : "sin empezar") + "</span></h2>" +
-        (g ? "<table>" +
-          fila("Firmante", esc(g.nombre)) + fila("Documento", esc(g.doc_tipo + " " + g.doc_num)) +
-          fila("Calidad", esc(g.calidad)) + fila("Código verificado en", esc(g.correo)) +
-          fila("Firmado (UTC)", esc(g.en)) + fila("Huella SHA-256", "<code>" + esc(g.sha256) + "</code>") +
-          fila("Huella de la IP", "<code>" + esc(g.ip_huella) + "</code>") + fila("Navegador", esc(g.user_agent)) +
-          fila("Comprobante", '<a href="/api/admin/inscripcion/' + encodeURIComponent(d.id) + "/convenio-" + esc(f.formulario) + '.pdf" target="_blank" rel="noopener">PDF</a>') +
-          "</table>" : "") +
-        ((f.respuestas || []).length ? '<table class="r">' + f.respuestas.map(resp).join("") + "</table>" : "");
+      return '<p class="pn-h3">' + esc(f.formulario) + " · " + esc(f.titulo) + " · " +
+        (g ? "firmado" : f.estado === "borrador" ? "borrador" : "sin empezar") + "</p>" +
+        (g ? ficha([["Firmante", esc(g.nombre)], ["Documento", esc(g.doc_tipo + " " + g.doc_num)], ["Calidad", esc(g.calidad)],
+          ["Código verificado en", esc(g.correo)], ["Firmado (UTC)", esc(g.en)], ["Huella SHA-256", "<code>" + esc(g.sha256) + "</code>"],
+          ["Huella de la IP", "<code>" + esc(g.ip_huella) + "</code>"], ["Navegador", esc(g.user_agent)],
+          ["Comprobante", '<a href="/api/admin/inscripcion/' + encodeURIComponent(d.id) + "/convenio-" + esc(f.formulario) + '.pdf" target="_blank" rel="noopener">PDF</a>']]) : "") +
+        ((f.respuestas || []).length ? '<table class="pn-tabla"><tbody>' + f.respuestas.map(function(r){
+          var v = Array.isArray(r.respuesta) ? r.respuesta.map(function(x){ return "☑ " + esc(x); }).join("<br>") : esc(r.respuesta);
+          return "<tr><td>" + esc(r.num) + "</td><td><strong>" + esc(r.pregunta) + "</strong></td><td>" + (v || '<em class="mu">sin respuesta</em>') + "</td></tr>";
+        }).join("") + "</tbody></table>" : "");
     }).join("");
     var arch = (d.archivos || []).map(function(a){
-      return "<tr><td>" + esc(a.documento) + "</td><td>" + esc(a.tipo) + " · " + Math.round(a.bytes / 1024) + " KB<br><small>" +
+      return "<tr><td>" + esc(a.documento) + "</td><td>" + esc(a.tipo) + " · " + Math.round(a.bytes / 1024) + " KB<small>" +
         esc(enCO(a.subido_en, 16)) + " · sha256 " + esc(String(a.sha256).slice(0, 12)) + "</small></td><td>" +
-        (a.estado === "rechazado" ? '<strong style="color:#8C2F1E">rechazado</strong>: ' + esc(a.motivo || "")
-          : a.revisado ? "vigente · revisado<br><small>la fundación ya no puede quitarlo</small>"
-          : a.despues ? "vigente · <strong>llegó después de marcar el documento</strong><br><small>nadie lo ha revisado; la fundación aún puede quitarlo</small>"
+        (a.estado === "rechazado" ? '<span class="conv-mal">rechazado</span>: ' + esc(a.motivo || "")
+          : a.revisado ? "vigente · revisado<small>la fundación ya no puede quitarlo</small>"
+          : a.despues ? "vigente · <strong>llegó después de marcar el documento</strong><small>nadie lo ha revisado; la fundación aún puede quitarlo</small>"
           : "vigente") +
         '</td><td><a href="/api/admin/convenio-archivo/' + a.id + '">descargar</a> · ' +
-        '<button class="rech" data-arch="' + a.id + '" data-est="' + esc(a.estado) + '">' +
-        (a.estado === "rechazado" ? "aceptar de nuevo" : "rechazar") + "</button></td></tr>";
+        '<button type="button" class="conv-link" data-crech="' + a.id + '" data-cid="' + esc(String(d.id)) + '" data-est="' + esc(a.estado) + '" data-doc="' + esc(a.documento) + '">' +
+        (a.estado === "rechazado" ? "aceptar de nuevo" : "rechazar…") + "</button></td></tr>";
     }).join("");
-    w.document.write(
-      "<!doctype html><meta charset=utf-8><title>Convenio · " + esc(d.nombre) + "</title>" +
-      VENTANA_CSS +
-      "<h1>" + esc(d.nombre) + "</h1>" +
-      '<p class="mu">' + esc(d.variante || "versión por definir") + " · " + esc(d.estado) + " · " + esc(d.email || "") +
-      (d.enlace ? ' · <a href="' + esc(d.enlace) + '" target="_blank" rel="noopener">enlace de la fundación</a>' : "") + "</p>" +
+    document.getElementById("pn-cajon-t").textContent = "Convenio · " + (d.nombre || "");
+    cajonCuerpo('<p class="mu">' + esc(d.variante || "versión por definir") + " · " + esc(d.estado) + " · " + esc(d.email || "") +
+        (d.enlace ? ' · <a href="' + esc(d.enlace) + '" target="_blank" rel="noopener">enlace de la fundación</a>' : "") + "</p>" +
       "<p>" + (d.texto ? "Texto del convenio subido " + esc(enCO(d.texto.en, 16)) + " por " + esc(d.texto.por || "?") +
         " · sha256 <code>" + esc(d.texto.sha256) + "</code>" : "<strong>Falta subir el texto del convenio.</strong>") + "</p>" +
-      forms +
-      "<h2>Archivos del Anexo 1</h2>" +
-      (arch ? "<table>" + arch + "</table>" : '<p class="mu">Sin archivos subidos.</p>'));
-    w.document.close();
-    [].slice.call(w.document.querySelectorAll(".rech")).forEach(function(b){
-      b.addEventListener("click", function(){
-        var rechazar = b.getAttribute("data-est") !== "rechazado";
-        var motivo = "";
-        if (rechazar){
-          motivo = w.prompt("¿Por qué no sirve? La fundación lo ve tal cual (ej.: «ilegible», «vencido»).", "");
-          if (!motivo) return;
-        }
-        b.disabled = true;
-        fetch("/api/admin/convenio-archivo/" + b.getAttribute("data-arch") + "/rechazar", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ motivo: motivo })
-        }).then(conEstado).then(function(r){
-          if (fallo(r.http, r.d)){ b.disabled = false; return; }
-          b.textContent = rechazar ? "rechazado ✓" : "aceptado ✓";
-          cargarInscripciones();
-        }).catch(function(){ b.disabled = false; });
-      });
-    });
-  });
+      forms + '<p class="pn-h3">Archivos del Anexo 1</p>' +
+      (arch ? '<table class="pn-tabla"><tbody>' + arch + "</tbody></table>" : '<p class="mu">Sin archivos subidos.</p>'));
+  }).catch(function(){ cajonCuerpo('<p class="pn-error">No se pudo cargar: revisa la conexión.</p>'); });
 }
+/* Rechazar un archivo del Anexo 1 (la fundación ve el motivo tal cual), o
+   aceptarlo de nuevo. Los dos vuelven a la ficha del convenio. */
+document.addEventListener("click", function(e){
+  var b = e.target && e.target.closest ? e.target.closest("[data-crech]") : null; if (!b) return;
+  var arch = b.getAttribute("data-crech"), idc = b.getAttribute("data-cid"), doc = b.getAttribute("data-doc") || "el archivo";
+  var volver = function(){ verConvenio(idc); };
+  var mandar = function(motivo){
+    return postPanel("/api/admin/convenio-archivo/" + encodeURIComponent(arch) + "/rechazar", { motivo: motivo }).then(function(d){
+      if (!d) return false;
+      avisar(motivo ? "Archivo rechazado: la fundación ve el motivo." : "Archivo aceptado de nuevo.");
+      cargarInscripciones();
+      return true;
+    });
+  };
+  if (b.getAttribute("data-est") === "rechazado"){
+    confirmarSimple({ ey: "Convenio · Anexo 1", titulo: "Aceptar de nuevo «" + doc + "»",
+      detalle: "<p>El archivo vuelve a contar para el Anexo 1 y la fundación deja de ver el motivo del rechazo.</p>",
+      boton: "Aceptar de nuevo", volver: volver, hacer: function(){ return mandar(""); } });
+  } else {
+    pedirTexto({ ey: "Convenio · Anexo 1", titulo: "Rechazar «" + doc + "»",
+      detalle: "<p>Deja de contar en el Anexo 1. Se puede aceptar de nuevo después.</p>",
+      etiqueta: "¿Por qué no sirve?", area: false, obligatorio: true, faltaTexto: "Escribe el motivo: la fundación lo necesita para corregirlo.",
+      ayuda: "La fundación lo ve tal cual (por ejemplo: «ilegible», «vencido»).", boton: "Rechazar el archivo", volver: volver,
+      hacer: function(t){ return mandar(t); } });
+  }
+});
 /* LOS EVENTOS, con el nombre corto del chip. Es el espejo de
    ORIGENES_EVENTO en el servidor: un origen que no esté aquí no lleva chip. */
 var ORIGEN_ES = { "socialfest-2026": "Social Fest" };
@@ -26441,10 +26831,11 @@ function abrirAtender(num){
 }
 function reabrirInspeccion(num){
   return postPanel("/api/admin/inspeccion/" + encodeURIComponent(num) + "/atendida", { atendida: false }).then(function(d){
-    if (!d) return;
+    if (!d) return false;
     avisar(num + " vuelve a la cola de señales sin atender.");
     if (PEDIDAS["ins-filas"]) cargarInspecciones();
     cargarSalud();
+    return true;
   });
 }
 document.addEventListener("change", function(e){
@@ -26539,17 +26930,18 @@ document.addEventListener("click", function(e){
   var av = e.target.closest("[data-avisado]");
   if (av){
     var numA = av.getAttribute("data-avisado");
-    if (!window.confirm("Registrar que ya le contaste a la familia de " + numA +
-        " el concepto de su casa.\\n\\nQueda en el registro con tu nombre, y el caso" +
-        " sale de la alerta. Solo si de verdad ya lo hiciste.")) return;
-    av.disabled = true; av.textContent = "\u2026";
-    fetch("/api/admin/caso/" + encodeURIComponent(numA) + "/avisado", {
-      method: "POST", headers: {"content-type":"application/json"},
-      body: JSON.stringify({ canal: "whatsapp" })
-    }).then(function(r){ return r.json(); }).then(function(d){
-      if (d && d.error) avisar("No se registro: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
-      cargarCasos(); cargarSalud();
-    }).catch(function(){ av.disabled = false; av.textContent = "Ya le avise"; });
+    confirmarSimple({ ey: "Mira Mi Casa", titulo: "Ya le contaste a la familia de " + numA,
+      detalle: "<p>Registra que el concepto de su casa ya se le contó a la familia por otro canal (casi siempre WhatsApp). " +
+        "No le envía nada a nadie.</p><p><strong>Solo si de verdad ya lo hiciste:</strong> queda en el registro con tu nombre y el caso sale de la alerta.</p>",
+      boton: "Sí, ya se lo conté",
+      hacer: function(){
+        return postPanel("/api/admin/caso/" + encodeURIComponent(numA) + "/avisado", { canal: "whatsapp" }).then(function(d){
+          if (!d) return false;
+          avisar(numA + ": quedó registrado que la familia ya lo sabe.");
+          cargarCasos(); cargarSalud();
+          return true;
+        });
+      } });
     return;
   }
 
@@ -26596,18 +26988,9 @@ document.addEventListener("click", function(e){
   var ir = e.target.closest("[data-insp-reabrir]");
   if (ir){
     var numr = ir.getAttribute("data-insp-reabrir");
-    if (!confirm("¿Reabrir " + numr + "? Vuelve a la cola de señales de terreno sin atender.")) return;
-    ir.disabled = true; ir.textContent = "Reabriendo…";
-    fetch("/api/admin/inspeccion/" + encodeURIComponent(numr) + "/atendida",
-      { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ atendida: false }) })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if (d.ok) { cargarInspecciones(); cargarSalud(); return; }
-        ir.disabled = false; ir.textContent = "Reabrir";
-        avisar(d.ayuda || d.error || "No se pudo reabrir.");
-      })
-      .catch(function(){ ir.disabled = false; ir.textContent = "Reabrir"; });
+    confirmarSimple({ ey: "Inspección en terreno", titulo: "Reabrir " + numr,
+      detalle: "<p>Vuelve a la cola de señales de terreno sin atender, y a «Hoy». Queda en la auditoría con tu correo. La nota de quien la cerró se conserva.</p>",
+      boton: "Reabrir", hacer: function(){ return reabrirInspeccion(numr); } });
     return;
   }
 
@@ -26637,16 +27020,18 @@ document.addEventListener("click", function(e){
   var de = e.target.closest("[data-desatar]");
   if (de){
     var ent2 = de.getAttribute("data-desatar"), c2 = de.getAttribute("data-caso");
-    if (!confirm("¿Quitar " + c2 + " de la entrega " + ent2 + "? Vuelve a contar como casa sin materiales.")) return;
-    de.disabled = true;
-    fetch("/api/admin/entrega/" + encodeURIComponent(ent2) + "/caso", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ caso: c2, quitar: true })
-    }).then(function(r){ return r.json(); }).then(function(d){
-      if (d.ok){ cargarEntregas(); cargarSalud(); return; }
-      de.disabled = false;
-      avisar(d.ayuda || d.error || "No se pudo quitar.");
-    }).catch(function(){ de.disabled = false; });
+    confirmarSimple({ ey: "Acta " + ent2, titulo: "Quitar " + c2 + " de la entrega",
+      detalle: "<p>La casa <strong>" + esc(c2) + "</strong> deja de figurar como cubierta por el acta " + esc(ent2) +
+        " y vuelve a contar como casa sin materiales. Se puede volver a atar. Queda en la auditoría.</p>",
+      boton: "Quitar la casa",
+      hacer: function(){
+        return postPanel("/api/admin/entrega/" + encodeURIComponent(ent2) + "/caso", { caso: c2, quitar: true }).then(function(d){
+          if (!d) return false;
+          avisar(c2 + " ya no está atada a " + ent2 + ".");
+          cargarEntregas(); cargarSalud();
+          return true;
+        });
+      } });
     return;
   }
 
@@ -26798,55 +27183,8 @@ function moverInscripcion(id, estado, b, op){
 }
 
 /* ---------------- pagos sin aporte ---------------- */
-function cargarSueltos(){
-  pedirJSON("/api/admin/pagos-sueltos", "p-filas").then(function(d){
-    var tb = document.getElementById("p-filas"); if (!tb) return;
-    var l = d.pagos || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="5">Ninguno: todo lo cobrado tiene su aporte.</td></tr>'; return; }
-    tb.innerHTML = filaTope(d, 5, "pagos", "Lo que no se ve es lo MAS VIEJO de la cola, que es justo lo que llevaba mas tiempo esperando.") + l.map(function(p){
-      return "<tr>" +
-        "<td>" + esc(p.referencia || p.transaction_id) + "</td>" +
-        "<td>" + (p.monto_centavos ? pesos(p.monto_centavos) : "—") + "</td>" +
-        "<td>" + esc(p.metodo || "—") + "</td>" +
-        "<td>" + esc(p.nombre || "—") + (p.correo ? "<br><small>" + esc(p.correo) + "</small>" : "") + "</td>" +
-        "<td>" + esc(enCO(p.recibido_en, 16)) + "</td>" +
-      "</tr>";
-    }).join("");
-  });
-}
 
 /* ---------------- donaciones por el boton de PayPal (IPN) ---------------- */
-function cargarIpn(){
-  pedirJSON("/api/admin/ipn", "ipn-filas").then(function(d){
-    var tb = document.getElementById("ipn-filas"); if (!tb) return;
-    var l = d.ipn || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguna todavia. Si el boton ya recibio donaciones y esto sigue vacio, el notify_url no esta puesto.</td></tr>'; return; }
-    tb.innerHTML = filaTope(d, 6, "avisos", "Lo que no se ve es lo MAS VIEJO de la cola, que es justo lo que llevaba mas tiempo esperando.") + l.map(function(e){
-      /* El monto viene en la moneda que cobro PayPal, casi siempre USD, asi que
-         NO se formatea con pesos(): eso mentiria sobre la moneda. */
-      var monto = e.monto_centavos != null
-        ? ((e.monto_centavos/100).toFixed(2) + " " + esc(e.moneda || ""))
-        : "—";
-      var comision = e.comision_centavos != null
-        ? "<br><small>comision " + (e.comision_centavos/100).toFixed(2) + "</small>"
-        : "";
-      /* Una prueba esta verificada, pero decir solo «Si» la haria indistinguible
-         de una donacion real en la unica columna que se mira de reojo. */
-      var sello = e.resultado === "prueba" ? "Prueba, no es plata"
-        : e.verificado
-        ? (e.resultado === "por_registrar" ? "Si, por registrar" : "Si")
-        : ("No: " + esc(e.resultado || "sin verificar"));
-      return "<tr>" +
-        "<td>" + esc(enCO(e.recibido_en, 16)) + "</td>" +
-        "<td>" + esc(e.txn_type || e.estado || "—") + (e.recurrente ? "<br><small>mensual</small>" : "") + "</td>" +
-        "<td>" + monto + comision + "</td>" +
-        "<td>" + esc(e.nombre || "—") + (e.correo ? "<br><small>" + esc(e.correo) + "</small>" : "") + "</td>" +
-        "<td>" + esc(e.destino || "—") + "</td>" +
-        "<td>" + sello + "</td>" +
-      "</tr>";
-    }).join("");
-  });
-}
 
 /* Las respuestas del cuestionario, en una ventana aparte. Se pintan aqui y no
    en la fila porque son veintiseis: meterlas en la tabla la volveria ilegible
@@ -26914,78 +27252,8 @@ function verFicha(id){
 }
 
 /* ---------------- membresias internacionales ---------------- */
-var ESTADO_SUS_ES = { aprobacion_pendiente: "Por aprobar", activa: "Activa", suspendida: "Suspendida",
-  cancelada: "Cancelada", expirada: "Vencida" };
-function cargarSuscripciones(){
-  pedirJSON("/api/admin/suscripciones", "sus-filas").then(function(d){
-    var tb = document.getElementById("sus-filas"); if (!tb) return;
-    var l = d.suscripciones || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Ninguna todavia.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(s){
-      var pend = s.estado === "aprobacion_pendiente";
-      var estado = esc(ESTADO_SUS_ES[s.estado] || s.estado || "—");
-      /* La EDAD solo se muestra en las pendientes: en una activa el dato no dice
-         nada, y en una pendiente lo dice todo. */
-      if (pend) estado += "<br><small>hace " + (s.dias || 0) + " dia(s)" +
-        (!s.cobros && s.dias > 2 ? " · parece abandono" : "") + "</small>";
-      var monto = s.monto_centavos != null
-        ? ((s.monto_centavos/100).toFixed(2) + " " + esc(s.moneda || ""))
-        : "—";
-      var quien = s.email
-        ? esc(s.nombre || "—") + "<br><small>" + esc(s.email) + "</small>"
-        : "<strong>sin correo</strong>";
-      return "<tr>" +
-        "<td>" + esc(enCO(s.creada_en, 16)) + "</td>" +
-        "<td>" + estado + "</td>" +
-        "<td>" + esc(s.nivel || "—") + "</td>" +
-        "<td>" + monto + "</td>" +
-        /* El nombre llega armado del servidor (adminSuscripciones); sin
-           destino es el fondo general, igual que en el libro de aportes. */
-        "<td>" + esc(s.destino_nombre || "Fondo general") + "</td>" +
-        "<td>" + (s.cobros || 0) + (s.aportes ? "<br><small>" + s.aportes + " aporte(s)</small>" : "") + "</td>" +
-        "<td>" + quien + "</td>" +
-      "</tr>";
-    }).join("");
-  });
-}
 
 /* ---------------- carnets de miembro ---------------- */
-function cargarMiembros(){
-  pedirJSON("/api/admin/miembros", "mb-filas").then(function(d){
-    var tb = document.getElementById("mb-filas"); if (!tb) return;
-    var l = d.miembros || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Ninguno todavia.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(m){
-      /* El estado lo calcula el servidor con el dia colombiano y la misma regla
-         que /carnet y /verificar (estadoCarnet): aqui no se recalcula. */
-      var estado = m.estado === "vigente" ? "vigente"
-        : m.estado === "revocado" ? "<strong>revocado</strong>" : "vencido";
-      /* La distincion, con su vigencia y sus dos acciones. Renovar solo en las
-         de rol: una permanente no vence. */
-      var dist = "—";
-      if (m.distincion_txt){
-        dist = esc(m.distincion_txt) +
-          " <small>(" + (m.distincion_forma === "m" ? "masculina" : m.distincion_forma === "f" ? "femenina" : "neutra") + ")</small>" +
-          (m.distincion_contexto ? "<br><small>" + esc(m.distincion_contexto) + "</small>" : "") +
-          "<br><small>" + (m.distincion_permanente ? "permanente"
-            : (m.distincion_vigente ? "hasta " : "<strong>vencida</strong> el ") + esc(m.distincion_hasta || "—")) + "</small>" +
-          '<br><span style="display:inline-flex;gap:6px;flex-wrap:wrap;margin-top:6px">' +
-          (m.distincion_permanente ? "" : '<button type="button" class="tab" data-hnrenovar="' + esc(m.codigo) + '">Renovar 12 meses</button>') +
-          '<button type="button" class="tab pn-peligro" data-hnquitar="' + esc(m.codigo) + '" data-nombre="' + esc(m.nombre || "") + '" data-dist="' + esc(m.distincion_txt || "") + '">Quitar…</button></span>';
-      }
-      return "<tr>" +
-        "<td>" + esc(m.codigo) + "<br><small>desde " + esc(m.desde || "—") + "</small></td>" +
-        "<td><code>" + esc(m.verif_fmt || "—") + "</code></td>" +
-        "<td>" + esc(m.nombre || "—") + (m.email ? "<br><small>" + esc(m.email) + "</small>" : "") + "</td>" +
-        "<td>" + (m.solo_honor ? "<small>solo de honor</small>" : esc(m.nivel || "—") +
-          (m.distincion_txt ? "<br><small>pagado hasta " + esc(m.vigente_hasta || "—") + "</small>" : "")) + "</td>" +
-        "<td>" + dist + "</td>" +
-        "<td>" + esc(m.hasta_efectivo || "—") + "</td>" +
-        "<td>" + estado + "</td>" +
-      "</tr>";
-    }).join("");
-  });
-}
 
 /* ---------------- carnet de honor (0040) ---------------- */
 function hnValor(id){ var el = document.getElementById(id); return el ? el.value.trim() : ""; }
@@ -26995,67 +27263,27 @@ function hnMesesVisible(){
   var caja = document.getElementById("hn-meses-caja");
   if (caja) caja.style.display = (d === "fundador" || d === "pionero") ? "none" : "";
 }
-function hnEmitir(b){
-  var msg = document.getElementById("hn-msg");
-  var doc = hnValor("hn-dn");
-  var aut = document.getElementById("hn-aut");
-  if (doc && !(aut && aut.checked)){
-    msg.textContent = "Para guardar el documento hace falta marcar que la persona lo autorizó. Si no, deja el documento vacío.";
-    msg.style.color = "#8C2F1E";
-    return;
-  }
-  b.disabled = true; msg.textContent = "Emitiendo…"; msg.style.color = "var(--mu)";
-  fetch("/api/admin/miembros/honor", {
-    method: "POST", headers: {"content-type":"application/json"},
-    body: JSON.stringify({
-      nombre: hnValor("hn-nombre"), email: hnValor("hn-email"),
-      distincion: hnValor("hn-dist"), forma: hnValor("hn-forma") || "n", contexto: hnValor("hn-ctx"),
-      meses: Number(hnValor("hn-meses") || 12),
-      doc_tipo: doc ? hnValor("hn-dt") : "", doc_numero: doc,
-      autoriza: !!(aut && aut.checked), idioma: hnValor("hn-idioma") || "es"
-    })
-  }).then(conEstado).then(function(res){
-    b.disabled = false;
-    if (res.http !== 200 || !res.d || res.d.error){
-      msg.textContent = (res.d && (res.d.ayuda || res.d.error)) || "No se pudo.";
-      msg.style.color = "#8C2F1E";
-      return;
-    }
-    var r = res.d;
-    /* QUE PASO, dicho: carnet nuevo o distincion anadida a uno que ya habia,
-       y si el correo salio. */
-    var t = r.accion === "creado"
-      ? "Carnet de honor " + r.codigo + " creado con la distinción " + r.distincion + "."
-      : "La persona ya tenía el carnet " + r.codigo + ": se le añadió la distinción " + r.distincion + " (mismo enlace y mismo QR).";
-    t += r.permanente ? " Permanente." : " Vigente hasta " + r.hasta + ".";
-    t += r.correo === "enviado" ? " El correo salió."
-      : r.correo === "simulado" ? " Correo SIMULADO (sin llave de envío)."
-      : " El correo NO salió: avísale a la persona por otro medio.";
-    if (r.doc_distinto) t += " OJO: el documento escrito no coincide con el que ya tenía guardado; se dejó el guardado.";
-    msg.textContent = t;
-    msg.style.color = r.correo === "fallo" || r.doc_distinto ? "#A84D00" : "#1F5C38";
-    ["hn-nombre","hn-email","hn-ctx","hn-dn"].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ""; });
-    if (aut) aut.checked = false;
-    cargarMiembros();
-  }).catch(function(){ b.disabled = false; msg.textContent = "No se pudo. Revisa la conexión."; msg.style.color = "#8C2F1E"; });
-}
-function hnDistincion(codigo, cuerpo, b, texto){
-  b.disabled = true; b.textContent = "…";
-  fetch("/api/admin/miembro/" + encodeURIComponent(codigo) + "/distincion", {
-    method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify(cuerpo)
-  }).then(conEstado).then(function(res){
-    if (fallo(res.http, res.d)){ b.disabled = false; b.textContent = texto; return; }
-    cargarMiembros();
-  }).catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
-}
 document.addEventListener("click", function(e){
   if (!e.target.closest) return;
   var b;
-  if (e.target.id === "hn-emitir"){ hnEmitir(e.target); return; }
+  if (e.target.id === "hn-ok"){ hnEmitir(e.target); return; }
   if ((b = e.target.closest("[data-hnrenovar]"))){
     var cr = b.getAttribute("data-hnrenovar");
-    if (!window.confirm("¿Renovar 12 meses la distinción del carnet " + cr + "?")) return;
-    hnDistincion(cr, { accion: "renovar", meses: 12 }, b, "Renovar 12 meses");
+    /* Renovar se puede volver a hacer y no destruye nada: confirmación
+       normal, no en rojo. Antes era un window.confirm. */
+    confirmarSimple({ ey: "Carnet " + cr, titulo: "Renovar 12 meses la distinción",
+      detalle: "<p>La distinción <strong>«" + esc(b.getAttribute("data-dist") || "") + "»</strong> de " + esc(b.getAttribute("data-nombre") || "esta persona") +
+        " gana 12 meses de vigencia" + (b.getAttribute("data-hasta") ? " (hoy vence el " + esc(b.getAttribute("data-hasta")) + ")" : "") +
+        ". El carnet, su enlace y su QR siguen siendo los mismos. No se le envía ningún correo.</p>",
+      boton: "Renovar 12 meses",
+      hacer: function(){
+        return postPanel("/api/admin/miembro/" + encodeURIComponent(cr) + "/distincion", { accion: "renovar", meses: 12 }).then(function(d){
+          if (!d) return false;
+          avisar("Distinción del carnet " + cr + " renovada" + (d.hasta ? " hasta el " + d.hasta : "") + ".");
+          cargarMiembros();
+          return true;
+        });
+      } });
     return;
   }
   if ((b = e.target.closest("[data-hnquitar]"))){
@@ -27075,47 +27303,8 @@ document.addEventListener("click", function(e){
       } });
   }
 });
-document.addEventListener("change", function(e){
-  if (e.target && e.target.id === "hn-dist") hnMesesVisible();
-});
 
 /* ---------------- eventos de PayPal sin casa ---------------- */
-function cargarPaypalSueltos(){
-  pedirJSON("/api/admin/paypal-sueltos", "pps-filas").then(function(d){
-    var tb = document.getElementById("pps-filas"); if (!tb) return;
-    var l = d.eventos || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="5">Ninguno: todo lo que llego de PayPal tiene donde ir.</td></tr>'; return; }
-    tb.innerHTML = l.map(function(e){
-      /* El monto llega como texto desde PayPal y se muestra tal cual con su
-         moneda. Convertirlo a pesos aqui seria inventar una tasa. */
-      var monto = e.monto ? (esc(e.monto) + " " + esc(e.moneda || "")) : "—";
-      var que = !e.firma_valida
-        ? (e.resultado === "verificacion_indeterminada"
-            ? "No se pudo comprobar la firma: se le pidio a PayPal que reintente"
-            : "Firma invalida: NO se proceso")
-        /* SE QUEDO A MEDIAS. Firma buena y sin procesar: el cobro puede no estar
-           en el libro. Se enseña el motivo tal como lo dejo el manejador, que es
-           lo unico que dice por que fallo. */
-        : !e.procesado
-        ? ("Se quedo a medias: llego con firma buena y no se proceso"
-           + (e.resultado ? " · " + esc(String(e.resultado).slice(0, 90)) : ""))
-        : e.resultado === "sin_regla"
-        ? "Evento sin regla: llego y nadie lo atiende"
-        : e.resultado === "reversa_sin_aporte"
-        ? "REVERSA sin aporte: le devolvieron plata a algo que no esta en el libro"
-        : e.resultado === "donacion_sin_guia"
-        ? "Donacion del boton: sin guia, hay que registrarla a mano"
-        : "Pago sin suscripcion: registrar a mano";
-      return "<tr>" +
-        "<td>" + esc(enCO(e.recibido_en, 16)) + "</td>" +
-        "<td>" + esc(e.tipo || "—") + "<br><small>" + esc(e.evento_id || "") + "</small></td>" +
-        "<td>" + monto + "</td>" +
-        "<td>" + esc(e.correo || "—") + "</td>" +
-        "<td>" + que + "</td>" +
-      "</tr>";
-    }).join("");
-  });
-}
 
 /* ---------------- entregas ---------------- */
 var E_CAMPOS = [
@@ -27224,8 +27413,10 @@ document.addEventListener("change", function(e){
     method: "POST", headers: { "content-type": tipo }, body: f
   }).then(conEstado).then(function(r){
     if (fallo(r.http, r.d)){ inp.disabled = false; inp.value = ""; return; }
+    if (CAJON.abierto) cajonCerrar();
+    avisar(num + ": soporte guardado.");
     cargarEgresos();
-  }).catch(function(){ inp.disabled = false; avisar("No se pudo subir: revisa la conexión."); });
+  }).catch(function(){ inp.disabled = false; avisoError("No se pudo subir: revisa la conexión."); });
 });
 
 document.addEventListener("change", function(e){
@@ -27242,26 +27433,43 @@ document.addEventListener("change", function(e){
      /evidencia: «IMG_4821» no describe nada, y «casa_de_Maria_calle_12» dice
      justo lo que el acta promete no decir. Auditoria del 28 sep 2026.
      Cancelar no sube nada; dejarlo vacio sube la foto sin descripcion. */
-  var alt = window.prompt("Describe la foto en una frase corta. Sale como texto alternativo en la " +
-    "página pública de evidencia: sin nombres de personas ni direcciones.\\n\\nPuedes dejarlo vacío.", "");
-  if (alt === null) return;
-  /* El cuerpo va crudo con su content-type: sin multipart no hay que parsear
-     nada en el Worker, y el nombre del archivo lo pone el servidor. */
-  fotoSinMetadatos(f).then(function(limpia){
-    return fetch("/api/admin/entrega/" + encodeURIComponent(inp.getAttribute("data-foto")) + "/foto?alt=" +
-          encodeURIComponent(String(alt).trim()), {
-      method: "POST", headers: {"content-type": "image/jpeg"}, body: limpia
-    });
-  }, function(){
-    throw new Error("lienzo");
-  }).then(function(r){ return r.json(); })
-    .then(function(d){ if (d.error) avisar("No se pudo subir: " + (d.ayuda || d.error)); cargarEntregas(); })
-    .catch(function(x){
-      avisar(String(x && x.message) === "lienzo"
-        ? "Este navegador no pudo leer la foto (¿HEIC?). Expórtala como JPG y vuelve a subirla."
-        : "No se pudo subir la foto.");
-    });
+  abrirFotoActa(inp.getAttribute("data-foto"), f);
 });
+
+/* La foto y su texto alternativo, en el cajón (antes, window.prompt): se ve
+   la foto que se va a publicar mientras se describe. Cancelar no sube nada;
+   dejarlo vacío sube la foto sin descripción. */
+var FOTO_URL = null;
+function abrirFotoActa(numero, f){
+  if (FOTO_URL){ try { URL.revokeObjectURL(FOTO_URL); } catch (x) {} }
+  FOTO_URL = URL.createObjectURL(f);
+  cajonAbrir({ ey: "Acta " + numero, titulo: "Subir una foto",
+    cuerpo: '<p><img src="' + FOTO_URL + '" alt="" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid var(--bd)"></p>' +
+      pnCampo("fa-alt", "Describe la foto en una frase corta", "", { ayuda: "Sale como texto alternativo en la página pública de evidencia: sin nombres de personas ni direcciones. Puede quedar vacío." }) +
+      '<p class="mu" style="font-size:var(--fs-13)">Antes de salir del navegador se le quitan los metadatos (la ubicación del teléfono incluida).</p>' +
+      '<p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="fa-ok">Subir la foto</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>',
+    foco: "fa-alt" });
+  document.getElementById("fa-ok").addEventListener("click", function(){
+    var b = this, alt = pnValor("fa-alt");
+    b.disabled = true; b.textContent = "Subiendo…";
+    /* El cuerpo va crudo con su content-type: sin multipart no hay que parsear
+       nada en el Worker, y el nombre del archivo lo pone el servidor. */
+    fotoSinMetadatos(f).then(function(limpia){
+      return fetch("/api/admin/entrega/" + encodeURIComponent(numero) + "/foto?alt=" + encodeURIComponent(alt), {
+        method: "POST", headers: {"content-type": "image/jpeg"}, body: limpia
+      });
+    }, function(){ throw new Error("lienzo"); }).then(conEstado).then(function(r){
+      if (r.http >= 300 || (r.d && r.d.error)){ b.disabled = false; b.textContent = "Subir la foto"; errorEnCajon("No se pudo subir: " + ((r.d && (r.d.ayuda || r.d.error)) || r.http)); return; }
+      cajonCerrar(); avisar("Foto subida al acta " + numero + "."); cargarEntregas();
+    }).catch(function(x){
+      b.disabled = false; b.textContent = "Subir la foto";
+      errorEnCajon(String(x && x.message) === "lienzo"
+        ? "Este navegador no pudo leer la foto (¿HEIC?). Expórtala como JPG y vuelve a subirla."
+        : "No se pudo subir la foto: revisa la conexión.");
+    });
+  });
+}
 
 /* LA FOTO DE EVIDENCIA PASA POR UN LIENZO ANTES DE SALIR DEL NAVEGADOR.
    Estas fotos se publican en /evidencia, y la foto cruda de un telefono trae
@@ -27524,107 +27732,8 @@ function egCuentas(){
     : "";
 }
 
-function cargarProveedores(){
-  fetch("/api/admin/proveedores").then(conEstado).then(function(res){
-    if (res.http !== 200) throw 0;
-    var d = res.d;
-    var l = d.proveedores || [];
-    var sel = document.getElementById("eg-prov");
-    if (sel){
-      sel.innerHTML = '<option value="">Elige un proveedor…</option>'
-        + l.map(function(p){
-            return '<option value="' + esc(String(p.id)) + '">' + esc(p.nombre)
-              + (p.documento ? " · " + esc(p.tipo_doc) + " " + esc(p.documento) : " · sin documento")
-              + "</option>";
-          }).join("");
-    }
-    var tb = document.getElementById("pr-filas"); if (!tb) return;
-    tb.innerHTML = l.length
-      ? l.map(function(p){
-          return "<tr><td>" + esc(p.nombre) + "</td>"
-            + "<td>" + (p.documento ? esc(p.tipo_doc) + " " + esc(p.documento) + (p.dv ? "-" + esc(p.dv) : "") : '<span class="mu">sin documento</span>') + "</td>"
-            + "<td>" + (p.factura ? "sí" : '<b>no</b> · necesita documento soporte') + "</td>"
-            + "<td>" + esc(String(p.egresos)) + "</td>"
-            + "<td>" + esc(deCentavos(p.total_centavos)) + "</td></tr>";
-        }).join("")
-      : '<tr><td colspan="5" class="mu">Todavía no hay proveedores.</td></tr>';
-  }).catch(function(){
-    var tb = document.getElementById("pr-filas");
-    if (tb) tb.innerHTML = '<tr><td colspan="5" class="mu">No se pudieron cargar.</td></tr>';
-  });
-}
 
-var SOPORTE_ES = {
-  factura_electronica: "Factura electrónica",
-  factura_manual: "Factura en papel",
-  documento_soporte: "Documento soporte",
-  sin_soporte: "sin papel"
-};
 
-function cargarEgresos(){
-  var solo = document.getElementById("eg-solo-sin");
-  fetch("/api/admin/egresos" + (solo && solo.checked ? "?sin_soporte=1" : "")).then(conEstado).then(function(res){
-    if (res.http !== 200) throw 0;
-    var d = res.d;
-    var r = document.getElementById("eg-resumen");
-    if (r){
-      r.innerHTML = pasoEmbudo("egresos", d.total, "registrados")
-        + pasoEmbudo("salido", deCentavos(d.suma_centavos), "suma de lo vigente")
-        + pasoEmbudo("retenido", deCentavos(d.retenido_centavos), "pendiente de declarar")
-        + pasoEmbudo("meritoria", deCentavos(d.meritoria_centavos), "lo que sostiene el RTE")
-        + (d.sin_papel ? pasoEmbudo("sin papel", d.sin_papel, "les falta soporte") : "");
-    }
-    /* «datalist» SUGIERE, no obliga: una brigada nueva se escribe y ya, y a
-       partir de ahí aparece sola para las siguientes. Un desplegable cerrado
-       habría hecho falta mantenerlo a mano el día que arranca una. */
-    var dl = document.getElementById("eg-centros");
-    if (dl) dl.innerHTML = ((d.centros || []).concat(["estructura"]))
-      .filter(function(c, i, a){ return a.indexOf(c) === i; })
-      .map(function(c){ return '<option value="' + esc(c) + '"></option>'; }).join("");
-
-    var tb = document.getElementById("eg-filas"); if (!tb) return;
-    var l = d.egresos || [];
-    tb.innerHTML = l.length
-      ? l.map(function(e){
-          var ret = (e.retefuente_centavos || 0) + (e.reteica_centavos || 0);
-          return '<tr' + (e.anulado_en ? ' style="opacity:.5"' : "") + "><td>" + esc(e.numero) + "</td>"
-            + "<td>" + esc(e.fecha) + "</td>"
-            + "<td>" + esc(e.proveedor || "?") + "</td>"
-            + "<td>" + esc(e.concepto) + (e.meritoria ? "" : ' <b class="mu">no meritoria</b>') + "</td>"
-            + "<td>" + esc(deCentavos(e.total_centavos)) + "</td>"
-            + "<td>" + (ret ? esc(deCentavos(ret)) + ' <small class="mu">' + esc(e.concepto_ret || "") + "</small>" : '<span class="mu">—</span>') + "</td>"
-            + "<td>" + (e.soporte === "sin_soporte"
-                ? '<b style="color:#A84D00">sin papel</b>'
-                : esc(SOPORTE_ES[e.soporte] || e.soporte) + (e.soporte_numero ? " " + esc(e.soporte_numero) : "")
-                  /* El archivo se abre desde la fila: un soporte que hay que ir a
-                     buscar a otro sitio es un soporte que no se mira. */
-                  + (e.tiene_archivo
-                      ? ' <a href="/api/admin/egreso/' + esc(e.numero) + '/soporte.ver" target="_blank" rel="noopener">ver</a>'
-                      /* Sin archivo, se puede subir DESDE LA FILA. El aviso de
-                         «el archivo no subio» decia «reintenta desde la fila» y
-                         la fila no tenia como: un papel que llega tarde, o una
-                         subida que fallo, no se podia adjuntar nunca. */
-                      : ' <span class="mu">sin archivo</span>'
-                        + (e.anulado_en ? "" : ' <label class="copy" style="cursor:pointer">subir'
-                          + '<input type="file" accept=".pdf,.xml,application/pdf,application/xml,text/xml" data-eg-soporte="'
-                          + esc(e.numero) + '" style="display:none"></label>'))) + "</td>"
-            + "<td>" + esc(e.centro || "—") + "</td>"
-            + "<td>" + (e.entrega ? esc(e.entrega) : '<span class="mu">—</span>') + "</td>"
-            /* El motivo de la anulación se enseña EN la fila. Un renglón tachado
-               sin explicación obliga a ir a buscarla a otro sitio, que es donde
-               nadie va. */
-            + "<td>" + (e.anulado_en
-                ? '<span class="mu">anulado' + (e.anulado_motivo ? " · " + esc(e.anulado_motivo) : "") + "</span>"
-                : '<button type="button" class="tab pn-peligro" data-eg-anular="' + esc(e.numero) + '">Anular…</button>') + "</td></tr>";
-        }).join("")
-      : '<tr><td colspan="10" class="mu">' + (solo && solo.checked
-          ? "Ninguno sin papel. Eso es lo que se quiere."
-          : "Todavía no hay egresos registrados.") + "</td></tr>";
-  }).catch(function(){
-    var tb = document.getElementById("eg-filas");
-    if (tb) tb.innerHTML = '<tr><td colspan="10" class="mu">No se pudieron cargar.</td></tr>';
-  });
-}
 
 function egMsg(id, txt, bien){
   var m = document.getElementById(id); if (!m) return;
@@ -27641,7 +27750,6 @@ document.addEventListener("input", function(ev){
 var EG_ARCHIVO = null;
 
 document.addEventListener("change", function(ev){
-  if (ev.target.id === "eg-solo-sin"){ cargarEgresos(); return; }
   if (ev.target.id !== "eg-arch") return;
   var f = ev.target.files && ev.target.files[0];
   EG_ARCHIVO = f || null;
@@ -27746,7 +27854,8 @@ document.addEventListener("click", function(ev){
     return;
   }
   if (ev.target.id === "eg-csv"){
-    var d1 = val("eg-d1"), d2 = val("eg-d2");
+    /* Las fechas «Desde» y «Hasta» de la tabla acotan el archivo. */
+    var d1 = TB_EGRESOS.f.desde || "", d2 = TB_EGRESOS.f.hasta || "";
     var q = [];
     if (d1) q.push("desde=" + encodeURIComponent(d1));
     if (d2) q.push("hasta=" + encodeURIComponent(d2));
@@ -27776,8 +27885,8 @@ document.addEventListener("click", function(ev){
     return;
   }
   if (ev.target.id === "eg-guardar"){
-    var g = ev.target; g.disabled = true;
-    egMsg("eg-msg", "Guardando…", true);
+    var g = ev.target; g.disabled = true; g.textContent = "Registrando…";
+    errorEnCajon("");
     var base = aCentavos(val("eg-base")), iva = aCentavos(val("eg-iva"));
     var rf = aCentavos(val("eg-rf"));
     fetch("/api/admin/egresos", {
@@ -27794,10 +27903,13 @@ document.addEventListener("click", function(ev){
       })
     }).then(conEstado)
       .then(function(res){
-        g.disabled = false;
-        if (res.http !== 200){ egMsg("eg-msg", (res.d && (res.d.ayuda || res.d.error)) || "No se pudo.", false); return; }
+        g.disabled = false; g.textContent = "Registrar egreso";
+        if (res.http !== 200){ errorEnCajon((res.d && (res.d.ayuda || res.d.error)) || "No se pudo."); return; }
         var num = res.d.numero;
-        egMsg("eg-msg", "Registrado como " + num + ".", true);
+        /* Registrado: el cajón se cierra y el aviso dice el número. Si el
+           archivo falla después, el egreso queda igual y otro aviso lo dice. */
+        cajonCerrar();
+        avisar("Registrado como " + num + (EG_ARCHIVO ? ". Subiendo su archivo…" : "."));
         /* El archivo va DESPUES, ya con numero. Si falla, el egreso queda igual
            —que es lo que importa— y se dice que falta el papel, en vez de perder
            los catorce campos por un archivo que no subio. */
@@ -27808,14 +27920,14 @@ document.addEventListener("click", function(ev){
             method: "POST", headers: { "content-type": tipo }, body: f
           }).then(conEstado).then(function(r2){
             if (r2.http !== 200){
-              egMsg("eg-msg", "Registrado como " + num + ", pero el archivo no subió: "
-                + ((r2.d && (r2.d.ayuda || r2.d.error)) || "reintenta desde la fila."), false);
+              avisoError("Registrado como " + num + ", pero el archivo no subió: "
+                + ((r2.d && (r2.d.ayuda || r2.d.error)) || "súbelo desde su ficha (toca la fila)."));
               return;
             }
-            egMsg("eg-msg", "Registrado como " + num + ", con su archivo guardado.", true);
+            avisar(num + ": archivo guardado.");
             cargarEgresos();
           }).catch(function(){
-            egMsg("eg-msg", "Registrado como " + num + ", pero el archivo no subió.", false);
+            avisoError("Registrado como " + num + ", pero el archivo no subió: súbelo desde su ficha.");
           });
           EG_ARCHIVO = null;
           var inp = document.getElementById("eg-arch"); if (inp) inp.value = "";
@@ -27826,7 +27938,7 @@ document.addEventListener("click", function(ev){
         egCuentas();
         cargarEgresos();
         cargarProveedores();
-      }).catch(function(){ g.disabled = false; egMsg("eg-msg", "No se pudo. Revisa la conexión.", false); });
+      }).catch(function(){ g.disabled = false; g.textContent = "Registrar egreso"; errorEnCajon("No se pudo. Revisa la conexión."); });
   }
 });
 
@@ -28265,17 +28377,40 @@ document.addEventListener("click", function(e){
   if (e.target.id === "j-crear"){ guardarJornada("jn-", null, e.target, "jn-msg"); return; }
   if ((b = e.target.closest("[data-jguardar]"))){ guardarJornada("je-", b.getAttribute("data-jguardar"), b, "je-msg"); return; }
   if ((b = e.target.closest("[data-jest]"))){
-    var est = b.getAttribute("data-jest");
-    if (est === "cancelada" && !confirm("¿Cancelar la jornada? Se puede volver a planear después.")) return;
-    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-jid")) + "/estado", { estado: est }, "j-est-msg", b, refrescarJ);
+    var est = b.getAttribute("data-jest"), jidE = b.getAttribute("data-jid");
+    if (est === "cancelada"){
+      confirmarSimple({ ey: "Voluntariado", titulo: "Cancelar la jornada",
+        detalle: "<p>La jornada queda cancelada: no se anota a nadie más ni se cierra. Se puede volver a planear después. No se le escribe a nadie.</p>",
+        boton: "Cancelar la jornada",
+        hacer: function(){
+          return postPanel("/api/admin/jornada/" + encodeURIComponent(jidE) + "/estado", { estado: est }).then(function(d){
+            if (!d) return false; avisar("Jornada cancelada."); refrescarJ(); return true;
+          });
+        } });
+      return;
+    }
+    postJ("/api/admin/jornada/" + encodeURIComponent(jidE) + "/estado", { estado: est }, "j-est-msg", b, refrescarJ);
     return;
   }
   if ((b = e.target.closest("[data-jcerrar]"))){
-    if (!confirm("¿Cerrar la jornada? Las horas quedan fijas, se emiten los certificados y ya no se puede editar.")) return;
     var vj = function(id){ var x = document.getElementById(id); return x ? x.value.trim() : ""; };
-    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-jcerrar")) + "/cerrar", {
-      beneficiarios_directos: vj("j-bd"), beneficiarios_indirectos: vj("j-bi"), beneficiarios_nota: vj("j-bn")
-    }, "j-est-msg", b, refrescarJ);
+    var cuerpoC = { beneficiarios_directos: vj("j-bd"), beneficiarios_indirectos: vj("j-bi"), beneficiarios_nota: vj("j-bn") };
+    var jidC = b.getAttribute("data-jcerrar");
+    /* Cerrar no se deshace: va en rojo y dice qué queda fijo (antes,
+       window.confirm). */
+    confirmarPeligro({ ey: "No se puede deshacer", titulo: "Cerrar la jornada",
+      detalle: "<p>Las horas quedan fijas, sale un certificado de voluntariado por cada persona con horas y nacen las encuestas. " +
+        "<strong>Una jornada cerrada no se reabre ni se edita</strong>: si algo queda mal, se crea otra con los datos buenos.</p>" +
+        ficha([["Beneficiarios directos", esc(cuerpoC.beneficiarios_directos || "sin reporte")],
+               ["Beneficiarios indirectos", esc(cuerpoC.beneficiarios_indirectos || "sin reporte")],
+               ["De dónde sale la cifra", esc(cuerpoC.beneficiarios_nota || "")]]) +
+        '<p class="mu" style="font-size:var(--fs-13)">Cerrar no le escribe a nadie: el agradecimiento con el certificado se envía después, y antes verás el correo.</p>',
+      boton: "Cerrar la jornada",
+      hacer: function(){
+        return postPanel("/api/admin/jornada/" + encodeURIComponent(jidC) + "/cerrar", cuerpoC).then(function(d){
+          if (!d) return false; avisar("Jornada cerrada. Ya se pueden enviar los certificados."); refrescarJ(); return true;
+        });
+      } });
     return;
   }
   if ((b = e.target.closest("[data-panotar]"))){
@@ -28296,35 +28431,55 @@ document.addEventListener("click", function(e){
     return;
   }
   if ((b = e.target.closest("[data-pquitar]"))){
-    if (!confirm("¿Quitar a esta persona de la jornada?")) return;
-    b.disabled = true;
-    fetch("/api/admin/participacion/" + encodeURIComponent(b.getAttribute("data-pquitar")), { method: "DELETE" })
-      .then(conEstado).then(function(r){ if (fallo(r.http, r.d)){ b.disabled = false; return; } refrescarJ(); })
-      .catch(function(){ b.disabled = false; avisar("No se pudo. Revisa la conexión."); });
+    var pid = b.getAttribute("data-pquitar");
+    var filaP = b.closest("tr"), quien = filaP && filaP.cells[0] ? filaP.cells[0].textContent.split("inscrita")[0].split("anotada")[0] : "esta persona";
+    confirmarSimple({ ey: "Voluntariado", titulo: "Quitar a " + quien + " de la jornada",
+      detalle: "<p>Sale de la lista de esta jornada, con sus horas. Se puede volver a anotar mientras la jornada siga abierta. No se le escribe.</p>",
+      boton: "Quitar de la jornada",
+      hacer: function(){
+        return postPanel("/api/admin/participacion/" + encodeURIComponent(pid), {}, "DELETE").then(function(d){
+          if (!d) return false; avisar(quien + " ya no está en la jornada."); refrescarJ(); return true;
+        });
+      } });
     return;
   }
   if ((b = e.target.closest("[data-jreconocer]"))){
-    var una = b.getAttribute("data-jpart");
-    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-jreconocer")) + "/reconocer",
-      una ? { participacion: Number(una) } : {}, "jr-msg", b, function(d){
-        var txt = (d.enviados || []).length + " enviados";
-        if ((d.fallidos || []).length) txt += " · " + d.fallidos.length + " no salieron (mira Salud)";
-        if (d.quedan) txt += " · quedan " + d.quedan + ": vuelve a pulsar para seguir";
-        avisar(txt + ".");
-        refrescarJ();
-      });
+    var una = b.getAttribute("data-jpart"), jidR = b.getAttribute("data-jreconocer");
+    var cuerpoR = una ? { participacion: Number(una) } : {};
+    /* El agradecimiento con el certificado, con cada correo a la vista antes
+       de salir (Fase 2 del panel). */
+    confirmarConCorreo({ origen: b, previa: Object.assign({ accion: "reconocer", id: Number(jidR) }, cuerpoR),
+      ey: "Voluntariado", titulo: una ? "Enviar su certificado" : "Enviar el agradecimiento y los certificados",
+      intro: "<p>Un correo por persona, en su idioma, con su certificado de voluntariado y el enlace de su encuesta. Lo ya enviado no se repite.</p>",
+      botonCorreo: "Enviar", boton: "Listo",
+      hacer: function(){
+        return postPanel("/api/admin/jornada/" + encodeURIComponent(jidR) + "/reconocer", cuerpoR).then(function(d){
+          if (!d) return false;
+          var txt = (d.enviados || []).length + " enviados";
+          if ((d.fallidos || []).length) txt += " · " + d.fallidos.length + " no salieron (mira Salud)";
+          if (d.quedan) txt += " · quedan " + d.quedan + ": vuelve a pulsar para seguir";
+          avisar(txt + ".", { tono: (d.fallidos || []).length ? "error" : "" });
+          refrescarJ();
+          return true;
+        });
+      } });
     return;
   }
   if ((b = e.target.closest("[data-jencuesta]"))){
-    postJ("/api/admin/jornada/" + encodeURIComponent(b.getAttribute("data-jid")) + "/encuesta",
-      { actor: b.getAttribute("data-jencuesta") }, "je-enc-msg", b, refrescarJ);
+    var actor = b.getAttribute("data-jencuesta"), jidQ = b.getAttribute("data-jid");
+    confirmarConCorreo({ origen: b, previa: { accion: "encuesta", id: Number(jidQ), actor: actor },
+      ey: "Voluntariado", titulo: "Enviar la encuesta a " + (actor === "empresa" ? "la empresa" : "la fundación"),
+      intro: "<p>Sale una sola vez. El enlace sigue en la ficha para reenviarlo a mano si hace falta.</p>",
+      botonCorreo: "Enviar la encuesta",
+      hacer: function(){
+        return postPanel("/api/admin/jornada/" + encodeURIComponent(jidQ) + "/encuesta", { actor: actor }).then(function(d){
+          if (!d) return false; avisar("Encuesta enviada."); refrescarJ(); return true;
+        });
+      } });
     return;
   }
   if ((b = e.target.closest("[data-jcopiar]"))){
-    var enlace = b.getAttribute("data-jcopiar");
-    if (navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(enlace).then(function(){ b.textContent = "Copiado"; }, function(){ window.prompt("Copia el enlace:", enlace); });
-    } else { window.prompt("Copia el enlace:", enlace); }
+    copiarEnlace(b.getAttribute("data-jcopiar"), b);
     return;
   }
 });
@@ -28337,9 +28492,23 @@ document.addEventListener("change", function(e){
   if (!e.target.closest) return;
   var t;
   if ((t = e.target.closest("[data-jmarco]"))){
-    if (!t.checked && !confirm("¿Desmarcar el Marco?")){ t.checked = true; return; }
-    postJ("/api/admin/jornada/" + encodeURIComponent(t.getAttribute("data-jmarco")) + "/marco", { hecho: t.checked }, null, t, refrescarJ)
-      .then(function(d){ if (!d) t.checked = !t.checked; });
+    var jidM = t.getAttribute("data-jmarco");
+    if (!t.checked){
+      /* Desmarcar se pregunta en el cajón; la casilla no cambia hasta que se
+         confirma. */
+      t.checked = true;
+      confirmarSimple({ ey: "Voluntariado", titulo: "Desmarcar la sesión de Marco",
+        detalle: "<p>La jornada vuelve a figurar sin Marco. En las puertas que lo exigen, no se podrá marcar realizada hasta volver a marcarlo.</p>",
+        boton: "Desmarcar el Marco",
+        hacer: function(){
+          return postPanel("/api/admin/jornada/" + encodeURIComponent(jidM) + "/marco", { hecho: false }).then(function(d){
+            if (!d) return false; refrescarJ(); return true;
+          });
+        } });
+      return;
+    }
+    postJ("/api/admin/jornada/" + encodeURIComponent(jidM) + "/marco", { hecho: true }, null, t, refrescarJ)
+      .then(function(d){ if (!d) t.checked = false; });
     return;
   }
   if ((t = e.target.closest("[data-phoras]"))){
@@ -28426,9 +28595,16 @@ function pintarVencimientos(){
       + '</td><td>' + estado + '</td><td>' + acc + '</td></tr>';
   }).join("");
 }
-function marcarObligacion(i, estado, boton){
+function marcarObligacion(i, estado, boton, confirmado){
   var x = OB_FILAS[i]; if (!x) return;
-  if (estado === "pendiente" && !confirm("¿Volver a dejar pendiente «" + x.corto + " · " + x.periodo + "»?")) return;
+  if (estado === "pendiente" && !confirmado){
+    confirmarSimple({ ey: "Vencimientos", titulo: "Volver a dejar pendiente «" + x.corto + " · " + x.periodo + "»",
+      detalle: "<p>Se borra la marca" + (x.marca && x.marca.marcado_por ? " que dejó " + esc(x.marca.marcado_por) : "") +
+        " y vuelve a contar en «Hoy» si está vencida o cerca. No presenta ni deshace nada ante la entidad.</p>",
+      boton: "Dejar pendiente",
+      hacer: function(){ marcarObligacion(i, estado, null, true); return true; } });
+    return;
+  }
   var n = document.getElementById("ob-nota-" + i);
   postJ("/api/admin/obligaciones", { clave: x.clave, fecha: x.fecha, estado: estado, nota: n ? n.value : "" }, "ob-msg", boton, function(){
     egMsg("ob-msg", (estado === "pendiente" ? "Vuelve a estar pendiente: " : "Guardado: ") + x.corto + " · " + x.periodo + ".", true);
@@ -28447,21 +28623,1287 @@ document.addEventListener("change", function(e){
   if (e.target && e.target.id === "ob-todo") pintarVencimientos();
 });
 
+/* ==== LA TABLA DE FINANZAS (Fase 2 del panel, oct 2026) ====
+   Una sola pieza para todas las tablas de Finanzas: buscador, filtros,
+   columnas que ordenan, páginas de 25/50/100, cabecera fija, fila de totales,
+   un vacío dicho con palabras y la fila que abre el cajón con todo el detalle.
+
+   DOS MODOS. Aportes es la única tabla que crece sin techo (cada intento de
+   pago es una fila): filtra, ordena y pagina EN EL SERVIDOR, y sus totales son
+   del filtro entero, no de la página. Las demás llegan enteras —son cientos de
+   filas como mucho, y el servidor dice si se cortó— y se filtran aquí, sin
+   volver a preguntar.
+
+   Los totales NUNCA suman como dinero lo que no lo es: cada tabla decide qué
+   suma, y lo dice debajo en una línea. */
+var TABLAS = {};
+var TB_RELOJ = {};
+/* Los nombres de persona de medios, tipos y categorías llegan del servidor
+   (ETIQ_FINANZAS): la tabla, los filtros, el Resumen y el CSV dicen lo mismo. */
+var FIN_ETIQ = { medio: {}, tipo: {}, estado: {}, categoria: {} };
+function tablaNueva(cfg){
+  var t = { cfg: cfg, todas: null, vista: [], filas: [], total: 0, pagina: 1, por: cfg.por || 25,
+            orden: cfg.orden || "", dir: cfg.dir || "desc", q: "", f: {}, seq: 0, resp: null, opc: null, armada: false };
+  (cfg.filtros || []).forEach(function(x){ t.f[x.k] = x.def || ""; });
+  TABLAS[cfg.id] = t;
+  return t;
+}
+function sinTildes(s){ return String(s == null ? "" : s).normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase(); }
+function opcionesDe(mapa){ return Object.keys(mapa || {}).map(function(k){ return [k, mapa[k]]; }); }
+/* Dinero con su moneda. Un dólar no se escribe con pesos(): eso mentiría
+   sobre la moneda. */
+function dinero(c, moneda){
+  moneda = String(moneda || "COP").toUpperCase();
+  if (moneda === "COP") return pesos(c);
+  return (moneda === "USD" ? "US$" : moneda + " ") +
+    (Number(c || 0) / 100).toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+/* Suma por moneda: [{ moneda, centavos, n }], pesos primero. */
+function sumaPorMoneda(filas, monto, moneda){
+  var por = {};
+  filas.forEach(function(r){
+    var m = String(moneda(r) || "COP").toUpperCase();
+    por[m] = por[m] || { moneda: m, centavos: 0, n: 0 };
+    por[m].centavos += Number(monto(r) || 0); por[m].n++;
+  });
+  return Object.keys(por).sort(function(a, b){ return a === "COP" ? -1 : b === "COP" ? 1 : a < b ? -1 : 1; })
+    .map(function(k){ return por[k]; });
+}
+function dineroLista(l){ return l.length ? l.map(function(x){ return dinero(x.centavos, x.moneda); }).join("<br>") : "$0"; }
+function tablaFiltrada(t){
+  if (t.q) return true;
+  return (t.cfg.filtros || []).some(function(x){ return (t.f[x.k] || "") !== (x.def || ""); });
+}
+function tablaFiltroHTML(t, x){
+  var v = t.f[x.k] || "", id = t.cfg.id + "-f-" + x.k;
+  if (x.tipo === "fecha"){
+    return '<label for="' + id + '">' + esc(x.t) + '<input type="date" id="' + id + '" data-tb-f="' + t.cfg.id +
+      '" data-k="' + esc(x.k) + '" value="' + esc(v) + '"></label>';
+  }
+  var ops = (typeof x.opciones === "function" ? x.opciones(t) : x.opciones) || [];
+  if (v && !ops.some(function(o){ return String(o[0]) === String(v); })) ops = ops.concat([[v, v]]);
+  return '<label for="' + id + '">' + esc(x.t) + '<select id="' + id + '" data-tb-f="' + t.cfg.id + '" data-k="' + esc(x.k) + '">' +
+    (x.sinTodos ? "" : '<option value="">' + esc(x.todos || "Todos") + "</option>") +
+    ops.map(function(o){
+      return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(v) ? " selected" : "") + ">" + esc(o[1]) + "</option>";
+    }).join("") + "</select></label>";
+}
+function tablaArmar(t, caja){
+  if (!caja) return;
+  var c = t.cfg;
+  caja.innerHTML = '<div class="tb-barra" id="' + c.id + '-barra"></div><p class="tb-aviso" id="' + c.id + '-aviso"></p>' +
+    '<div class="tb-caja"><table class="tb-t"' + (c.titulo ? ' aria-label="' + esc(c.titulo) + '"' : "") + ">" +
+    '<thead id="' + c.id + '-cab"></thead><tbody id="' + c.id + '-cuerpo"><tr><td class="mu" colspan="' + c.columnas.length +
+    '">Pidiendo la lista…</td></tr></tbody><tfoot id="' + c.id + '-tot"></tfoot></table></div>' +
+    '<div class="tb-pie" id="' + c.id + '-pie"></div>';
+  t.armada = true;
+  tablaBarra(t);
+}
+/* La barra se repinta entera solo cuando cambian sus opciones (o al limpiar):
+   repintarla en cada tecla le quitaría el foco al buscador. */
+function tablaBarra(t){
+  var c = t.cfg, b = document.getElementById(c.id + "-barra"); if (!b) return;
+  b.innerHTML = (c.buscar ? '<label class="tb-q" for="' + c.id + '-q">Buscar<input type="search" id="' + c.id + '-q" data-tb-q="' + c.id +
+      '" value="' + esc(t.q) + '" placeholder="' + esc(c.buscar) + '" autocomplete="off" spellcheck="false"></label>' : "") +
+    (c.filtros || []).map(function(x){ return tablaFiltroHTML(t, x); }).join("") +
+    '<button type="button" class="pn-b2" data-tb-limpiar="' + c.id + '"' + (tablaFiltrada(t) ? "" : " hidden") + ">Limpiar filtros</button>" +
+    '<span class="tb-sep"></span>' + (c.extra ? c.extra(t) : "");
+}
+function tablaCargar(t, filas){ t.todas = filas || []; tablaRefrescar(t); }
+function tablaRefrescar(t){
+  if (!t.armada) return;
+  if (t.cfg.servidor){ tablaPedirServidor(t); return; }
+  if (!t.todas) return;
+  tablaFiltrarCliente(t);
+  tablaPintar(t);
+}
+function tablaFiltrarCliente(t){
+  var c = t.cfg, q = sinTildes(t.q).trim();
+  var l = t.todas.filter(function(r){
+    if (q && sinTildes(c.texto ? c.texto(r) : "").indexOf(q) < 0) return false;
+    for (var i = 0; i < (c.filtros || []).length; i++){
+      var x = c.filtros[i], v = t.f[x.k];
+      if (!v) continue;
+      if (x.tipo === "fecha"){
+        var d = String(x.fecha(r) || "").slice(0, 10);
+        if (!d || (x.k === "hasta" ? d > v : d < v)) return false;
+        continue;
+      }
+      if (x.prueba ? !x.prueba(r, v) : String(x.valor(r)) !== String(v)) return false;
+    }
+    return true;
+  });
+  var col = c.columnas.filter(function(k){ return k.k === t.orden; })[0];
+  if (col && col.valor){
+    var s = t.dir === "asc" ? 1 : -1;
+    l.sort(function(a, b){
+      var x = col.valor(a), y = col.valor(b);
+      var xv = x == null || x === "", yv = y == null || y === "";
+      if (xv || yv) return xv === yv ? 0 : xv ? 1 : -1;   /* lo vacío, siempre al final */
+      if (typeof x === "number" && typeof y === "number") return (x - y) * s;
+      return String(x).localeCompare(String(y), "es", { numeric: true, sensitivity: "base" }) * s;
+    });
+  }
+  t.vista = l; t.total = l.length;
+  var max = Math.max(1, Math.ceil(l.length / t.por));
+  if (t.pagina > max) t.pagina = max;
+  t.filas = l.slice((t.pagina - 1) * t.por, t.pagina * t.por);
+}
+function tablaParams(t, conPagina){
+  var p = [];
+  if (t.q) p.push("q=" + encodeURIComponent(t.q));
+  Object.keys(t.f).forEach(function(k){ if (t.f[k]) p.push(encodeURIComponent(k) + "=" + encodeURIComponent(t.f[k])); });
+  if (conPagina){
+    if (t.orden) p.push("orden=" + encodeURIComponent(t.orden) + "&dir=" + t.dir);
+    p.push("pagina=" + t.pagina + "&por=" + t.por);
+  }
+  return p.join("&");
+}
+function tablaPedirServidor(t){
+  var c = t.cfg, seq = ++t.seq;
+  var cuerpo = document.getElementById(c.id + "-cuerpo");
+  if (cuerpo) cuerpo.style.opacity = ".55";
+  fetch(c.url + "?" + tablaParams(t, true) + (t.opc ? "" : "&meta=1")).then(conEstado).then(function(r){
+    if (seq !== t.seq) return;
+    if (cuerpo) cuerpo.style.opacity = "";
+    if (r.http !== 200 || !r.d || r.d.error){ falloCarga(c.id + "-cuerpo", r.http, r.d); return; }
+    var primera = !t.opc;
+    t.resp = r.d; t.total = Number(r.d.total || 0);
+    if (r.d.opciones) t.opc = r.d.opciones;
+    t.filas = c.filasDe(r.d);
+    if (c.alRecibir) c.alRecibir(r.d);
+    /* Si un filtro dejó la página más allá del final, se vuelve a la última. */
+    var max = Math.max(1, Math.ceil(t.total / t.por));
+    if (t.pagina > max){ t.pagina = max; tablaPedirServidor(t); return; }
+    if (primera) tablaBarra(t);
+    tablaPintar(t);
+  }).catch(function(){
+    if (seq !== t.seq) return;
+    if (cuerpo) cuerpo.style.opacity = "";
+    falloCarga(c.id + "-cuerpo", 0, null);
+  });
+}
+function tablaPintar(t){
+  var c = t.cfg;
+  var cab = document.getElementById(c.id + "-cab"), cuerpo = document.getElementById(c.id + "-cuerpo");
+  var tot = document.getElementById(c.id + "-tot"), pie = document.getElementById(c.id + "-pie");
+  if (!cuerpo || !cab) return;
+  cab.innerHTML = "<tr>" + c.columnas.map(function(k){
+    var sort = t.orden === k.k ? (t.dir === "asc" ? "ascending" : "descending") : "";
+    var dentro = k.orden === false ? "<span>" + esc(k.t) + "</span>"
+      : '<button type="button" data-tb-orden="' + c.id + '" data-k="' + esc(k.k) + '">' + esc(k.t) + "</button>";
+    return '<th scope="col"' + (k.num ? ' class="num"' : "") + (sort ? ' aria-sort="' + sort + '"' : "") + ">" + dentro + "</th>";
+  }).join("") + "</tr>";
+  if (!t.filas.length){
+    var nada = c.servidor ? (!t.total && !tablaFiltrada(t)) : !(t.todas || []).length;
+    var v = nada ? c.vacio : { titulo: "Nada con estos filtros.", texto: "Prueba con otro rango de fechas o quita algún filtro.", limpiar: true };
+    cuerpo.innerHTML = '<tr><td class="tb-vacio" colspan="' + c.columnas.length + '"><b>' + esc(v.titulo) + "</b><span>" + esc(v.texto || "") +
+      "</span>" + (v.limpiar ? '<button type="button" class="pn-b2" data-tb-limpiar="' + c.id + '">Limpiar filtros</button>' : "") + "</td></tr>";
+  } else {
+    cuerpo.innerHTML = t.filas.map(function(r, i){
+      var cls = c.claseFila ? c.claseFila(r) : "";
+      return '<tr data-tb-fila="' + c.id + '" data-i="' + i + '" tabindex="0"' + (cls ? ' class="' + esc(cls) + '"' : "") +
+        ' aria-label="' + esc(c.etiquetaFila ? c.etiquetaFila(r) : "Abrir el detalle") + '">' +
+        c.columnas.map(function(k){ return "<td" + (k.num ? ' class="num"' : k.nw ? ' class="nw"' : "") + ">" + k.celda(r) + "</td>"; }).join("") + "</tr>";
+    }).join("");
+  }
+  /* LOS TOTALES, del filtro entero. La etiqueta ocupa las columnas que hay
+     antes de la primera cifra, para que el número quede bajo su columna. */
+  var tt = t.filas.length && c.totales ? c.totales(t) : null;
+  if (tot){
+    if (!tt){ tot.innerHTML = ""; }
+    else {
+      var primera = -1;
+      c.columnas.forEach(function(k, i){ if (primera < 0 && tt.celdas && tt.celdas[k.k] != null) primera = i; });
+      if (primera < 1) primera = 1;
+      tot.innerHTML = "<tr>" + '<td colspan="' + primera + '">' + esc(tt.etiqueta || "Total") + "</td>" +
+        c.columnas.slice(primera).map(function(k){
+          return tt.celdas && tt.celdas[k.k] != null ? '<td class="num">' + tt.celdas[k.k] + "</td>" : "<td></td>";
+        }).join("") + "</tr>";
+    }
+  }
+  var paginas = Math.max(1, Math.ceil(t.total / t.por));
+  var ini = t.total ? (t.pagina - 1) * t.por + 1 : 0, fin = Math.min(t.total, t.pagina * t.por);
+  if (pie) pie.innerHTML = "<span>" + (t.total ? "Mostrando " + ini + "–" + fin + " de " + numCO(t.total) : "Sin filas") + "</span>" +
+    '<span class="tb-nav">' + (paginas > 1
+      ? '<button type="button" class="pn-b2" data-tb-pag="' + c.id + '" data-p="' + (t.pagina - 1) + '"' + (t.pagina <= 1 ? " disabled" : "") + ">Anterior</button>" +
+        "<span>Página " + t.pagina + " de " + paginas + "</span>" +
+        '<button type="button" class="pn-b2" data-tb-pag="' + c.id + '" data-p="' + (t.pagina + 1) + '"' + (t.pagina >= paginas ? " disabled" : "") + ">Siguiente</button>"
+      : "") +
+    '<label>Filas por página <select data-tb-por="' + c.id + '" aria-label="Filas por página">' + [25, 50, 100].map(function(n){
+      return '<option value="' + n + '"' + (n === t.por ? " selected" : "") + ">" + n + "</option>";
+    }).join("") + "</select></label></span>" +
+    '<p class="tb-nota">' + (c.nota ? c.nota(t) : "") + "</p>";
+  var av = document.getElementById(c.id + "-aviso");
+  if (av) av.innerHTML = c.aviso ? c.aviso(t) : "";
+  var lim = document.querySelector("#" + c.id + "-barra [data-tb-limpiar]");
+  if (lim) lim.hidden = !tablaFiltrada(t);
+}
+function tablaAbrirFila(fila){
+  var t = TABLAS[fila.getAttribute("data-tb-fila")]; if (!t) return;
+  var r = t.filas[Number(fila.getAttribute("data-i"))];
+  if (r && t.cfg.abrir) t.cfg.abrir(r);
+}
+document.addEventListener("input", function(e){
+  var q = e.target && e.target.closest ? e.target.closest("[data-tb-q]") : null; if (!q) return;
+  var t = TABLAS[q.getAttribute("data-tb-q")]; if (!t) return;
+  clearTimeout(TB_RELOJ[t.cfg.id]);
+  TB_RELOJ[t.cfg.id] = setTimeout(function(){ t.q = q.value.trim(); t.pagina = 1; tablaRefrescar(t); }, t.cfg.servidor ? 300 : 120);
+});
+document.addEventListener("change", function(e){
+  if (!e.target || !e.target.closest) return;
+  var f = e.target.closest("[data-tb-f]");
+  if (f){
+    var t = TABLAS[f.getAttribute("data-tb-f")]; if (!t) return;
+    t.f[f.getAttribute("data-k")] = f.value; t.pagina = 1; tablaRefrescar(t); return;
+  }
+  var p = e.target.closest("[data-tb-por]");
+  if (p){ var t2 = TABLAS[p.getAttribute("data-tb-por")]; if (!t2) return; t2.por = Number(p.value) || 25; t2.pagina = 1; tablaRefrescar(t2); }
+});
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var o = e.target.closest("[data-tb-orden]");
+  if (o){
+    var t = TABLAS[o.getAttribute("data-tb-orden")]; if (!t) return;
+    var k = o.getAttribute("data-k");
+    if (t.orden === k) t.dir = t.dir === "asc" ? "desc" : "asc";
+    else {
+      var col = t.cfg.columnas.filter(function(x){ return x.k === k; })[0];
+      t.orden = k; t.dir = (col && col.dir) || (col && col.num ? "desc" : "asc");
+    }
+    t.pagina = 1; tablaRefrescar(t); return;
+  }
+  var pg = e.target.closest("[data-tb-pag]");
+  if (pg){
+    var t2 = TABLAS[pg.getAttribute("data-tb-pag")]; if (!t2) return;
+    t2.pagina = Math.max(1, Number(pg.getAttribute("data-p")) || 1); tablaRefrescar(t2);
+    var caja = document.getElementById(t2.cfg.id); var sc = caja && caja.querySelector(".tb-caja"); if (sc) sc.scrollTop = 0;
+    return;
+  }
+  var lim = e.target.closest("[data-tb-limpiar]");
+  if (lim){
+    var t3 = TABLAS[lim.getAttribute("data-tb-limpiar")]; if (!t3) return;
+    t3.q = ""; (t3.cfg.filtros || []).forEach(function(x){ t3.f[x.k] = x.def || ""; }); t3.pagina = 1;
+    tablaBarra(t3); tablaRefrescar(t3); return;
+  }
+  /* La fila abre el detalle, salvo que el clic fuera en algo que ya hace
+     otra cosa (un botón, un enlace, una casilla). */
+  var fila = e.target.closest("tr[data-tb-fila]");
+  if (fila && !e.target.closest("a,button,input,select,label,textarea,summary")) tablaAbrirFila(fila);
+});
+document.addEventListener("keydown", function(e){
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var fila = e.target && e.target.matches && e.target.matches("tr[data-tb-fila]") ? e.target : null;
+  if (!fila) return;
+  e.preventDefault(); tablaAbrirFila(fila);
+});
+
+/* Piezas de la ficha del cajón. */
+function ficha(pares){
+  return '<dl class="pn-ficha">' + pares.filter(function(p){ return p && p[1] != null && p[1] !== ""; }).map(function(p){
+    return "<dt>" + esc(p[0]) + "</dt><dd>" + p[1] + "</dd>";
+  }).join("") + "</dl>";
+}
+function celdaPersona(nombre, correo){ return esc(nombre || "—") + (correo ? "<small>" + esc(correo) + "</small>" : ""); }
+
+/* ==== CONFIRMAR Y PEDIR UN TEXTO, EN EL CAJÓN (Fase 2) ====
+   Lo que quedaba en window.confirm y window.prompt. confirmarSimple es para lo
+   que se puede volver a hacer (desmarcar, reabrir, renovar); lo que destruye
+   sigue yendo por confirmarPeligro, en rojo. «volver» regresa a la ficha
+   desde la que se abrió. */
+function confirmarSimple(op){
+  cajonAbrir({ ey: op.ey || "Antes de confirmar", titulo: op.titulo,
+    cuerpo: (op.detalle || "") + '<p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="pn-ok">' + esc(op.boton || "Confirmar") + "</button>" +
+      '<button type="button" class="pn-b2" id="pn-cancelar">Cancelar</button>', foco: "pn-ok" });
+  document.getElementById("pn-cancelar").addEventListener("click", function(){ if (op.volver) op.volver(); else cajonCerrar(); });
+  document.getElementById("pn-ok").addEventListener("click", function(){
+    var ok = this; ok.disabled = true; errorEnCajon("");
+    Promise.resolve(op.hacer(ok)).then(function(cerrar){
+      if (cerrar){ if (op.volver) op.volver(); else cajonCerrar(); } else ok.disabled = false;
+    });
+  });
+}
+function pedirTexto(op){
+  cajonAbrir({ ey: op.ey || "Escribe", titulo: op.titulo,
+    cuerpo: (op.detalle || "") + pnCampo("pn-texto", op.etiqueta, op.valor || "", { area: op.area !== false, ayuda: op.ayuda, filas: 3 }) +
+      '<p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="pn-ok">' + esc(op.boton || "Guardar") + "</button>" +
+      '<button type="button" class="pn-b2" id="pn-cancelar">Cancelar</button>', foco: "pn-texto" });
+  document.getElementById("pn-cancelar").addEventListener("click", function(){ if (op.volver) op.volver(); else cajonCerrar(); });
+  document.getElementById("pn-ok").addEventListener("click", function(){
+    var v = pnValor("pn-texto");
+    if (op.obligatorio && !v){ pnMarcar("pn-texto", op.faltaTexto || "Escríbelo: sin esto no se hace."); document.getElementById("pn-texto").focus(); return; }
+    var ok = this; ok.disabled = true; errorEnCajon("");
+    Promise.resolve(op.hacer(v, ok)).then(function(cerrar){
+      if (cerrar){ if (op.volver) op.volver(); else cajonCerrar(); } else ok.disabled = false;
+    });
+  });
+}
+/* Copiar un enlace; si el navegador no deja, el enlace en el cajón, ya
+   seleccionado, en vez de un window.prompt. */
+function copiarEnlace(enlace, boton){
+  var aMano = function(){
+    cajonAbrir({ ey: "Copiar el enlace", titulo: "Cópialo a mano",
+      cuerpo: '<p>El navegador no dejó copiarlo solo. Está seleccionado: cópialo con Ctrl+C (o Cmd+C en Mac).</p>' +
+        pnCampo("pn-enlace", "Enlace", enlace, { extra: " readonly" }),
+      pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Listo</button>', foco: "pn-enlace" });
+    var i = document.getElementById("pn-enlace"); if (i) i.select();
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(enlace).then(function(){ if (boton) boton.textContent = "Copiado"; avisar("Enlace copiado."); }, aMano);
+  } else aMano();
+}
+
+/* LOS FORMULARIOS QUE SE ABREN EN EL CAJÓN. Viven ocultos en #pn-formas y se
+   MUEVEN al cajón (no se copian): conservan sus ids y todo el código que ya
+   los maneja. Al cerrar el cajón vuelven a su sitio. */
+var FORMA = null;
+function formaDevolver(){
+  if (!FORMA) return;
+  var dep = document.getElementById("pn-formas");
+  if (dep) dep.appendChild(FORMA);
+  FORMA = null;
+}
+function cajonForma(o){
+  var n = document.getElementById(o.forma); if (!n) return;
+  cajonAbrir({ ey: o.ey, titulo: o.titulo, cuerpo: "", pie: o.pie, ancho: o.ancho });
+  var cuerpo = document.getElementById("pn-cajon-cuerpo");
+  cuerpo.appendChild(n); FORMA = n;
+  var err = document.createElement("p"); err.className = "pn-error"; err.id = "pn-err"; cuerpo.appendChild(err);
+  var f = n.querySelector("input:not([type=file]),select,textarea"); if (f) f.focus();
+}
+function abrirForma(id){
+  var n = document.getElementById(id);
+  if (!n || !n.hasAttribute("data-forma")) return false;
+  if (id === "eg-nuevo"){
+    cajonForma({ forma: "eg-nuevo", ey: "Egresos", titulo: "Registrar un egreso", ancho: true,
+      pie: '<button type="button" class="pn-b1" id="eg-guardar">Registrar egreso</button>' +
+           '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+    cargarProveedores();
+    return true;
+  }
+  if (id === "hn-nuevo"){
+    cajonForma({ forma: "hn-nuevo", ey: "Membresías y carnets", titulo: "Emitir carnet de honor",
+      pie: '<button type="button" class="pn-b1" id="hn-ok" disabled>Emitir y enviar el carnet</button>' +
+           '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+    hnMesesVisible(); previaHonor();
+    return true;
+  }
+  return false;
+}
+
+/* ==== FINANZAS: LAS TABLAS (Fase 2) ==== */
+function destinoAporte(a){ return a.destino_id ? (a.proyecto || a.destino_id) : "Fondo general"; }
+function confirmadoAporte(a){ return APROBADOS.indexOf(a.estado) >= 0; }
+function estadoAporteHTML(a){
+  var t = esc(ESTADO_APORTE_ES[a.estado] || a.estado);
+  if (confirmadoAporte(a)) return '<span class="tb-conf">' + t + "</span>";
+  if (["rechazada", "error", "anulada"].indexOf(a.estado) >= 0) return '<span class="tb-mal">' + t + "</span>";
+  return '<span class="mu">' + t + "</span>";
+}
+/* Lo que no es dinero se ve distinto y lo dice: un intento sin pagar no está
+   en la cuenta, y una transferencia reportada solo la afirma el donante. */
+function montoAporteHTML(a){
+  var m = dinero(a.monto_centavos, a.moneda);
+  if (confirmadoAporte(a)) return m;
+  if (a.estado === "reportada") return m + "<small>según el donante</small>";
+  return '<span class="mu">' + m + "</span><small>no es dinero</small>";
+}
+/* Que el PDF exista no significa que al donante le haya llegado: debajo del
+   enlace va lo que pasó con SU correo. */
+function reciboAporte(a){
+  var r = (confirmadoAporte(a) && a.token)
+    ? '<a href="/api/recibo/' + esc(a.guia) + '.pdf?t=' + esc(a.token) + '" target="_blank" rel="noopener">Ver el recibo (PDF)</a>' : "Sin recibo: el pago no está confirmado.";
+  if (a.recibo_correo === "enviado") r += "<small>el correo salió</small>";
+  else if (a.recibo_correo === "fallo") r += '<small class="tb-mal">el correo falló: mira la cola de correos en Salud</small>';
+  else if (a.recibo_correo === "simulado") r += '<small class="tb-mal">no se envió (correo simulado)</small>';
+  else if (confirmadoAporte(a)) r += "<small>sin registro de correo</small>";
+  return r;
+}
+var CONFIRMACION_ES = { wompi: "La pasarela (aviso de Wompi)", manual: "Una persona, contra el extracto", conciliada: "Wompi, consultado a mano desde el panel" };
+var TB_APORTES = tablaNueva({ id: "tb-aportes", titulo: "Aportes", servidor: true, url: "/api/admin/aportes",
+  orden: "fecha", dir: "desc", por: 25,
+  buscar: "Guía, nombre, correo, teléfono o referencia",
+  filtros: [
+    { k: "estado", t: "Estado", opciones: [["confirmados", "Pagados (confirmados)"], ["aprobada", "Pagado"], ["en_distribucion", "En distribución"],
+      ["entregada", "Entregado"], ["reportada", "Transferencia por verificar"], ["sin_pagar", "Sin pagar (intentos y pendientes)"],
+      ["rechazada", "Rechazado"], ["anulada", "Anulado"]] },
+    { k: "medio", t: "Medio", opciones: function(){ return opcionesDe(FIN_ETIQ.medio); } },
+    { k: "tipo", t: "Tipo", opciones: function(){ return opcionesDe(FIN_ETIQ.tipo); } },
+    { k: "destino", t: "Destino o programa", opciones: function(t){
+      return ((t.opc && t.opc.destinos) || []).map(function(d){ return [d.id || "fondo", d.id ? (d.nombre || d.id) : "Fondo general"]; }); } },
+    { k: "moneda", t: "Moneda", opciones: function(t){ return ((t.opc && t.opc.monedas) || []).map(function(m){ return [m, m]; }); } },
+    { k: "desde", t: "Desde", tipo: "fecha" },
+    { k: "hasta", t: "Hasta", tipo: "fecha" }
+  ],
+  columnas: [
+    { k: "guia", t: "Guía", nw: true, celda: function(a){ return "<strong>" + esc(a.guia) + "</strong><small>" + esc(FIN_ETIQ.tipo[a.tipo] || a.tipo || "") + "</small>"; } },
+    { k: "fecha", t: "Fecha", dir: "desc", nw: true, celda: function(a){
+      return esc(a.fecha || "") + (!confirmadoAporte(a) && a.estado !== "reportada" ? "<small>se abrió</small>" : ""); } },
+    { k: "donante", t: "Donante", celda: function(a){ return celdaPersona(a.donante, a.correo); } },
+    { k: "medio", t: "Medio", celda: function(a){ return esc(FIN_ETIQ.medio[a.medio] || a.medio || ""); } },
+    { k: "destino", t: "Destino", celda: function(a){ return esc(destinoAporte(a)); } },
+    { k: "estado", t: "Estado", celda: estadoAporteHTML },
+    { k: "monto", t: "Monto", num: true, celda: montoAporteHTML },
+    { k: "cert", t: "Certificado", orden: false, celda: function(a){ return celdaCert(a); } },
+    { k: "acc", t: "Acción", orden: false, celda: function(a){ return accion(a) || ""; } }
+  ],
+  etiquetaFila: function(a){ return "Abrir el aporte " + a.guia; },
+  filasDe: function(d){ return d.aportes || []; },
+  alRecibir: function(d){
+    FIRMA_ACTIVA = !!d.firma_activa; FIRMANTE = d.firmante || null;
+    if (d.etiquetas) FIN_ETIQ = d.etiquetas;
+    (d.aportes || []).forEach(function(a){ FILAS[a.guia] = a; });
+    pintarEstadoCert(d);
+  },
+  totales: function(t){
+    var c = (t.resp && t.resp.totales && t.resp.totales.confirmados) || [], n = 0;
+    c.forEach(function(x){ n += Number(x.n || 0); });
+    return { etiqueta: "Confirmado en todo el filtro · " + numCO(n) + (n === 1 ? " pago" : " pagos"), celdas: { monto: dineroLista(c) } };
+  },
+  nota: function(t){
+    var r = t.resp && t.resp.totales && t.resp.totales.reportadas;
+    return "El total suma solo pagos confirmados, en todo el filtro y no solo en esta página; pesos y dólares por separado, sin convertir." +
+      (r && r.n ? " " + r.n + (r.n === 1 ? " transferencia por verificar" : " transferencias por verificar") + " (" + pesos(r.centavos) +
+        " según el donante) no se suman." : "") + " Un intento sin pagar nunca se suma.";
+  },
+  extra: function(){ return '<button type="button" class="pn-b2" id="ap-csv" title="Con los mismos filtros de la tabla">Descargar CSV</button>'; },
+  vacio: { titulo: "Todavía no ha entrado ningún aporte.", texto: "Cuando alguien abra el pago en el sitio o reporte una transferencia, aparece aquí." },
+  abrir: function(a){ abrirAporte(a); }
+});
+function cargarAportes(){
+  var caja = document.getElementById("tb-aportes");
+  if (!TB_APORTES.armada) tablaArmar(TB_APORTES, caja);
+  tablaRefrescar(TB_APORTES);
+}
+/* EL APORTE ENTERO, en el cajón: lo que antes había que deducir de nueve
+   columnas, y lo que no cabía en ninguna. */
+function abrirAporte(a){
+  FILAS[a.guia] = a;
+  var conf = confirmadoAporte(a);
+  var tel = a.telefono ? celDonante(a.telefono).replace("<br><small>", "").replace("</small>", "") : "";
+  var h = ficha([
+      ["Estado", estadoAporteHTML(a) + (conf ? " · el dinero está confirmado" : a.estado === "reportada" ? " · falta confirmarla contra el extracto" : "")],
+      ["Monto", montoAporteHTML(a)],
+      ["Fecha del dinero", esc(a.fecha || "—")],
+      ["Medio", esc(FIN_ETIQ.medio[a.medio] || a.medio || "") + (a.metodo_pago && a.medio === "wompi_otro" ? " (" + esc(a.metodo_pago) + ")" : "")],
+      ["Tipo", esc(FIN_ETIQ.tipo[a.tipo] || a.tipo || "") + (a.suscripcion ? "<small>suscripción " + esc(a.suscripcion) + "</small>" : "")],
+      ["Destino", esc(destinoAporte(a))],
+      ["Se abrió", esc(enCO(a.creada_en, 16))],
+      ["Aprobado", a.aprobada_en ? esc(enCO(a.aprobada_en, 16)) : ""],
+      ["Entregado", a.entregada_en ? esc(enCO(a.entregada_en, 16)) : ""],
+      ["Quién dio la certeza", a.confirmacion ? esc(CONFIRMACION_ES[a.confirmacion] || a.confirmacion) +
+        (a.confirmado_por ? "<small>" + esc(a.confirmado_por) + (a.confirmado_en ? " · " + esc(enCO(a.confirmado_en, 16)) : "") + "</small>" : "") : ""],
+      ["Referencia bancaria", a.referencia_pago ? esc(a.referencia_pago) : ""],
+      ["Transacción Wompi", a.wompi_transaction_id ? "<code>" + esc(a.wompi_transaction_id) + "</code>" : ""],
+      ["Comprobante", a.comprobante ? '<a href="/api/admin/comprobante/' + esc(a.guia) + '" target="_blank" rel="noopener">Ver el comprobante</a>' : ""],
+      ["Nota del donante", a.nota ? esc(a.nota) : ""]
+    ]) +
+    '<p class="pn-h3">Donante</p>' + ficha([
+      ["Nombre", esc(a.donante || "—")], ["Correo", a.correo ? esc(a.correo) : "sin correo"],
+      ["Teléfono", tel], ["Documento", a.doc_numero ? esc((a.doc_tipo || "") + " " + a.doc_numero) : ""],
+      ["Domicilio", a.ciudad ? esc(a.ciudad) : ""], ["Pidió certificado", a.quiere_certificado ? "sí, al donar" : "no"]
+    ]) +
+    '<p class="pn-h3">Recibo y certificado</p>' + ficha([["Recibo", reciboAporte(a)], ["Certificado", celdaCert(a)]]) +
+    '<p><a class="pn-b2" href="/?g=' + encodeURIComponent(a.guia) + '#rastrea" target="_blank" rel="noopener">Ver el rastreo que ve el donante</a></p>';
+  var acc = accion(a);
+  cajonAbrir({ ey: "Aporte", titulo: a.guia + " · " + dinero(a.monto_centavos, a.moneda), cuerpo: h,
+    pie: (acc ? acc.replace('class="copy"', 'class="pn-b1"') : "") + '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+}
+document.addEventListener("click", function(e){
+  if (e.target && e.target.id === "ap-csv"){
+    /* Una navegación y no un fetch, como el de egresos: el navegador ya sabe
+       guardar un archivo con Content-Disposition. */
+    var q = tablaParams(TB_APORTES, false);
+    location.href = "/api/admin/aportes.csv" + (q ? "?" + q : "");
+  }
+});
+
+/* ---- Conciliar con Wompi, en el cajón ----
+   Se pide el número de transacción y no se busca por referencia a propósito:
+   el número lo trae el correo de «Pago exitoso» y el panel de Wompi, y
+   obligar a copiarlo es lo que permite que el Worker verifique que la
+   transacción es de ESTA guía antes de tocar nada. Antes era un
+   window.prompt, sin ver el recibo que podía salir. */
+function abrirConciliar(guia){
+  var a = FILAS[guia] || { guia: guia };
+  cajonAbrir({ ey: "Conciliar con Wompi", titulo: "Conciliar " + guia,
+    cuerpo: ficha([["Aporte", esc(guia)], ["Monto", a.monto_centavos != null ? dinero(a.monto_centavos, a.moneda) : ""],
+                   ["Estado aquí", a.estado ? esc(ESTADO_APORTE_ES[a.estado] || a.estado) : ""], ["Donante", a.donante ? celdaPersona(a.donante, a.correo) : ""]]) +
+      '<p>Es el rescate de un pago que ocurrió y cuyo aviso no llegó. El panel le pregunta a Wompi por esa transacción y, si es de esta guía y está aprobada, el aporte queda pagado por el mismo camino que un aviso normal.</p>' +
+      pnCampo("cz-tx", "Número de transacción de Wompi", "", { ayuda: "Lo trae el correo de «Pago exitoso» y el panel de Wompi. Se copia completo, con los guiones." }) +
+      '<p class="pn-h3">Lo que se envía</p><div id="cz-previa"><p class="mu">Mirando qué correo saldría…</p></div><p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="cz-ok" data-cz="' + esc(guia) + '" disabled>Conciliar</button>' +
+         '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>', foco: "cz-tx" });
+  pedirPrevia({ accion: "conciliar", guia: guia }).then(function(r){
+    var box = document.getElementById("cz-previa"); if (!box) return;
+    box.innerHTML = htmlCorreos(r);
+    var b = document.getElementById("cz-ok"); if (b){ b.disabled = false; b.textContent = hayCorreos(r) ? "Conciliar (y enviar si está aprobada)" : "Conciliar"; }
+  }).catch(function(){
+    var box = document.getElementById("cz-previa");
+    if (box) box.innerHTML = '<p class="pn-error">No se pudo armar la vista previa del recibo. Sin ella no se concilia: recarga e inténtalo otra vez.</p>';
+  });
+}
+document.addEventListener("click", function(e){
+  var b = e.target && e.target.closest ? e.target.closest("[data-cz]") : null; if (!b) return;
+  var guia = b.getAttribute("data-cz"), tx = pnValor("cz-tx");
+  if (!tx){ pnMarcar("cz-tx", "Pega el número de transacción."); document.getElementById("cz-tx").focus(); return; }
+  pnMarcar("cz-tx", ""); b.disabled = true; b.textContent = "Preguntándole a Wompi…";
+  postPanel("/api/admin/aporte/" + encodeURIComponent(guia) + "/conciliar", { transaccion: tx }).then(function(d){
+    b.disabled = false; b.textContent = "Conciliar";
+    if (!d) return;
+    cajonCerrar();
+    var est = d.aporte && d.aporte.estado;
+    avisar("Wompi dice: " + d.wompi_estado + ". " + guia + " quedó en «" + (ESTADO_APORTE_ES[est] || est) + "»." +
+      (est === "aprobada" ? " Se le envió su recibo al donante." : ""), { tono: est === "aprobada" ? "" : "error" });
+    cargarResumen(); cargarAportes(); cargarSalud();
+  });
+});
+
+/* ---- Transferencias por verificar ---- */
+var TB_TRANSF = tablaNueva({ id: "tb-transferencias", titulo: "Transferencias por verificar", orden: "creada", dir: "asc",
+  buscar: "Guía, nombre, correo o referencia",
+  texto: function(a){ return [a.guia, a.nombre, a.email, a.telefono, a.referencia_pago, a.proyecto, a.destino_id].join(" "); },
+  filtros: [
+    { k: "cert", t: "Certificado", opciones: [["si", "Lo pide"], ["no", "No lo pide"]], prueba: function(a, v){ return (a.quiere_certificado ? "si" : "no") === v; } },
+    { k: "comp", t: "Comprobante", opciones: [["si", "Subido"], ["no", "Sin subir"]], prueba: function(a, v){ return (a.comprobante ? "si" : "no") === v; } },
+    { k: "desde", t: "Reportada desde", tipo: "fecha", fecha: function(a){ return enCO(a.creada_en, 10); } },
+    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: function(a){ return enCO(a.creada_en, 10); } }
+  ],
+  columnas: [
+    { k: "guia", t: "Guía", nw: true, valor: function(a){ return a.guia; }, celda: function(a){
+      return "<strong>" + esc(a.guia) + "</strong>" + (a.dias >= 3 ? '<small class="tb-mal">esperando ' + a.dias + " días</small>" : "<small>" + esc(antiguedad(a.dias)) + "</small>"); } },
+    { k: "creada", t: "Reportada", valor: function(a){ return a.creada_en; }, celda: function(a){
+      return esc(enCO(a.creada_en, 16)) + (a.fecha_pago ? "<small>dice que transfirió el " + esc(a.fecha_pago) + "</small>" : ""); } },
+    { k: "donante", t: "Donante", valor: function(a){ return a.nombre; }, celda: function(a){ return celdaPersona(a.nombre, a.email); } },
+    { k: "destino", t: "Destino", valor: function(a){ return a.modo === "dirigida" ? (a.proyecto || a.destino_id) : "Fondo general"; },
+      celda: function(a){ return esc(a.modo === "dirigida" ? (a.proyecto || a.destino_id || "?") : "Fondo general"); } },
+    { k: "ref", t: "Referencia", valor: function(a){ return a.referencia_pago; }, celda: function(a){ return esc(a.referencia_pago || "—"); } },
+    { k: "comp", t: "Comprobante", orden: false, celda: function(a){ return a.comprobante
+      ? '<a href="/api/admin/comprobante/' + esc(a.guia) + '" target="_blank" rel="noopener">ver</a>' : '<span class="tb-mal">sin subir</span>'; } },
+    { k: "cert", t: "Cert.", valor: function(a){ return a.quiere_certificado ? 1 : 0; }, celda: function(a){ return a.quiere_certificado ? "lo pide" : "—"; } },
+    { k: "monto", t: "Según el donante", num: true, valor: function(a){ return Number(a.monto_centavos || 0); }, celda: function(a){ return pesos(a.monto_centavos); } },
+    { k: "acc", t: "Acción", orden: false, celda: function(a){
+      return '<button type="button" class="pn-b1" data-conf="' + esc(a.guia) + '">Confirmar…</button> ' +
+        '<button type="button" class="copy pn-peligro" data-desc="' + esc(a.guia) + '">Descartar…</button>'; } }
+  ],
+  totales: function(t){
+    var s = 0; t.vista.forEach(function(a){ s += Number(a.monto_centavos || 0); });
+    return { etiqueta: "Reportado en el filtro · " + t.vista.length + (t.vista.length === 1 ? " transferencia" : " transferencias"), celdas: { monto: pesos(s) } };
+  },
+  nota: function(){ return "Lo reportado no es dinero confirmado: no entra en ninguna cifra de ingresos hasta que se confirma contra el extracto."; },
+  aviso: function(t){ var d = t.resp; return d && d.total > (d.reportadas || []).length
+    ? "<strong>Faltan " + (d.total - d.reportadas.length) + " por mostrar</strong> · se enseñan las " + d.reportadas.length + " más antiguas: lo que falta es lo que acaba de llegar." : ""; },
+  vacio: { titulo: "Ninguna transferencia esperando verificación.", texto: "Cuando alguien reporte que transfirió, aparece aquí para confirmarla contra el extracto." },
+  etiquetaFila: function(a){ return "Confirmar " + a.guia; },
+  abrir: function(a){ abrirConfirmarTransferencia(a.guia); }
+});
+function cargarReportadas(){
+  var caja = document.getElementById("tb-transferencias");
+  if (!TB_TRANSF.armada) tablaArmar(TB_TRANSF, caja);
+  pedirJSON("/api/admin/reportadas", "tb-transferencias-cuerpo").then(function(d){
+    REPORTADAS = {};
+    (d.reportadas || []).forEach(function(a){ REPORTADAS[a.guia] = a; });
+    TB_TRANSF.resp = d;
+    tablaCargar(TB_TRANSF, d.reportadas || []);
+  });
+}
+
+/* ---- Pagos sin aporte (enlace directo de Wompi) ---- */
+var TB_PAGOS = tablaNueva({ id: "tb-pagos", titulo: "Pagos sin aporte", orden: "recibido", dir: "desc",
+  buscar: "Referencia, nombre o correo",
+  texto: function(p){ return [p.referencia, p.transaction_id, p.nombre, p.correo, p.metodo].join(" "); },
+  filtros: [
+    { k: "metodo", t: "Método", opciones: function(t){ return distintos(t.todas, function(p){ return p.metodo; }); }, valor: function(p){ return p.metodo || ""; } },
+    { k: "desde", t: "Desde", tipo: "fecha", fecha: function(p){ return enCO(p.recibido_en, 10); } },
+    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: function(p){ return enCO(p.recibido_en, 10); } }
+  ],
+  columnas: [
+    { k: "recibido", t: "Recibido", valor: function(p){ return p.recibido_en; }, celda: function(p){ return esc(enCO(p.recibido_en, 16)); } },
+    { k: "ref", t: "Referencia", valor: function(p){ return p.referencia || p.transaction_id; }, celda: function(p){ return esc(p.referencia || p.transaction_id); } },
+    { k: "metodo", t: "Método", valor: function(p){ return p.metodo; }, celda: function(p){ return esc(p.metodo || "—"); } },
+    { k: "donante", t: "Pagador", valor: function(p){ return p.nombre; }, celda: function(p){ return celdaPersona(p.nombre, p.correo); } },
+    { k: "monto", t: "Monto", num: true, valor: function(p){ return Number(p.monto_centavos || 0); },
+      celda: function(p){ return p.monto_centavos ? dinero(p.monto_centavos, p.moneda) : "—"; } }
+  ],
+  totales: function(t){ var l = sumaPorMoneda(t.vista, function(p){ return p.monto_centavos; }, function(p){ return p.moneda; });
+    return { etiqueta: "Cobrado en el filtro · " + t.vista.length + " pagos", celdas: { monto: dineroLista(l) } }; },
+  nota: function(){ return "Son cobros aprobados por Wompi: es dinero confirmado, pero sin guía no está en las cifras de Aportes."; },
+  vacio: { titulo: "Ninguno: todo lo cobrado tiene su aporte.", texto: "Si alguien paga por el enlace directo de Wompi (el QR), aparece aquí." },
+  abrir: function(p){
+    cajonAbrir({ ey: "Pago sin aporte", titulo: (p.referencia || p.transaction_id) + " · " + (p.monto_centavos ? dinero(p.monto_centavos, p.moneda) : ""),
+      cuerpo: ficha([["Recibido", esc(enCO(p.recibido_en, 16))], ["Referencia", esc(p.referencia || "—")],
+        ["Transacción Wompi", "<code>" + esc(p.transaction_id) + "</code>"], ["Método", esc(p.metodo || "—")],
+        ["Pagador", celdaPersona(p.nombre, p.correo)], ["Monto", p.monto_centavos ? dinero(p.monto_centavos, p.moneda) : "—"]]) +
+        '<p class="pn-nota">Entró por el <strong>enlace directo de Wompi</strong> y no por el sitio, así que no tiene guía, ni recibo, ni certificado. ' +
+        "Si esta persona pide certificado, hay que crearle el registro a mano: no se puede desde este panel.</p>",
+      pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+  }
+});
+function distintos(l, f){
+  var v = {}; (l || []).forEach(function(r){ var x = f(r); if (x) v[x] = 1; });
+  return Object.keys(v).sort().map(function(x){ return [x, x]; });
+}
+function cargarSueltos(){
+  var caja = document.getElementById("tb-pagos");
+  if (!TB_PAGOS.armada) tablaArmar(TB_PAGOS, caja);
+  pedirJSON("/api/admin/pagos-sueltos", "tb-pagos-cuerpo").then(function(d){
+    TB_PAGOS.resp = d; TB_PAGOS.todas = d.pagos || []; tablaBarra(TB_PAGOS); tablaRefrescar(TB_PAGOS);
+  });
+}
+
+/* ---- Membresías (suscripciones de PayPal) ---- */
+var ESTADO_SUS_ES = { aprobacion_pendiente: "Por aprobar", activa: "Activa", suspendida: "Suspendida",
+  cancelada: "Cancelada", expirada: "Vencida" };
+var TB_SUS = tablaNueva({ id: "tb-suscripciones", titulo: "Membresías internacionales", orden: "", dir: "desc",
+  buscar: "Nombre, correo o nivel",
+  texto: function(s){ return [s.id, s.nombre, s.email, s.nivel, s.destino_nombre].join(" "); },
+  filtros: [
+    { k: "estado", t: "Estado", opciones: opcionesDe(ESTADO_SUS_ES), valor: function(s){ return s.estado; } },
+    { k: "nivel", t: "Nivel", opciones: function(t){ return distintos(t.todas, function(s){ return s.nivel; }); }, valor: function(s){ return s.nivel || ""; } }
+  ],
+  columnas: [
+    { k: "creada", t: "Creada", valor: function(s){ return s.creada_en; }, celda: function(s){ return esc(enCO(s.creada_en, 10)); } },
+    { k: "miembro", t: "Miembro", valor: function(s){ return s.nombre; }, celda: function(s){
+      return s.email ? celdaPersona(s.nombre, s.email) : '<span class="tb-mal">sin correo</span>'; } },
+    { k: "estado", t: "Estado", valor: function(s){ return s.estado; }, celda: function(s){
+      var t = esc(ESTADO_SUS_ES[s.estado] || s.estado || "—");
+      if (s.estado === "aprobacion_pendiente") t += "<small>hace " + (s.dias || 0) + " días" + (!s.cobros && s.dias > 2 ? " · parece abandono" : "") + "</small>";
+      return t; } },
+    { k: "nivel", t: "Nivel", valor: function(s){ return s.nivel; }, celda: function(s){ return esc(s.nivel || "—"); } },
+    { k: "programa", t: "Programa", valor: function(s){ return s.destino_nombre || ""; }, celda: function(s){ return esc(s.destino_nombre || "Fondo general"); } },
+    { k: "cobros", t: "Cobros", num: true, valor: function(s){ return Number(s.cobros || 0); }, celda: function(s){ return String(s.cobros || 0); } },
+    { k: "monto", t: "Al mes", num: true, valor: function(s){ return Number(s.monto_centavos || 0); },
+      celda: function(s){ return s.monto_centavos != null ? dinero(s.monto_centavos, s.moneda) : "—"; } }
+  ],
+  totales: function(t){
+    var act = t.vista.filter(function(s){ return s.estado === "activa"; });
+    return { etiqueta: "Activas en el filtro · " + act.length + " · lo que suman en un mes",
+             celdas: { monto: dineroLista(sumaPorMoneda(act, function(s){ return s.monto_centavos; }, function(s){ return s.moneda; })) } };
+  },
+  nota: function(){ return "La suma es de las membresías activas: lo que se cobraría en un mes si todas se cobran. No es lo que entró; eso está en Aportes y en el Resumen."; },
+  vacio: { titulo: "Ninguna membresía todavía.", texto: "Cuando alguien se haga miembro en dólares por PayPal, su membresía aparece aquí." },
+  abrir: function(s){
+    cajonAbrir({ ey: "Membresía internacional", titulo: (s.nombre || s.email || s.id),
+      cuerpo: ficha([["Suscripción", "<code>" + esc(s.id) + "</code>"], ["Estado", esc(ESTADO_SUS_ES[s.estado] || s.estado)],
+        ["Nivel", esc(s.nivel || "—")], ["Monto", s.monto_centavos != null ? dinero(s.monto_centavos, s.moneda) + " al mes" : "—"],
+        ["Programa", esc(s.destino_nombre || "Fondo general")], ["Cobros", String(s.cobros || 0) + (s.aportes ? " · " + s.aportes + " aporte(s) en el libro" : "")],
+        ["Último cobro", s.ultimo_cobro_en ? esc(enCO(s.ultimo_cobro_en, 16)) : "ninguno"], ["Creada", esc(enCO(s.creada_en, 16))],
+        ["Cancelada", s.cancelada_en ? esc(enCO(s.cancelada_en, 16)) : ""], ["Miembro", s.email ? celdaPersona(s.nombre, s.email) : '<span class="tb-mal">sin correo: el recibo mensual no tiene a dónde ir</span>']]) +
+        (s.estado === "aprobacion_pendiente" ? '<p class="pn-nota">«Por aprobar» es una membresía que la persona no terminó de aprobar en PayPal. No se activa sola: si lleva días y ningún cobro, es un abandono.</p>' : ""),
+      pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+  }
+});
+function cargarSuscripciones(){
+  var caja = document.getElementById("tb-suscripciones");
+  if (!TB_SUS.armada) tablaArmar(TB_SUS, caja);
+  pedirJSON("/api/admin/suscripciones", "tb-suscripciones-cuerpo").then(function(d){
+    TB_SUS.todas = d.suscripciones || []; tablaBarra(TB_SUS); tablaRefrescar(TB_SUS);
+  });
+}
+
+/* ---- Carnets de miembro y de honor ---- */
+var ESTADO_CARNET_ES = { vigente: "Vigente", vencido: "Vencido", revocado: "Revocado" };
+var TB_MIEMBROS = tablaNueva({ id: "tb-miembros", titulo: "Carnets", orden: "", dir: "desc",
+  buscar: "Carnet, código de verificación, nombre o correo",
+  texto: function(m){ return [m.codigo, m.verif_fmt, m.verif, m.nombre, m.email, m.distincion_txt, m.distincion_contexto].join(" "); },
+  filtros: [
+    { k: "estado", t: "Estado", opciones: opcionesDe(ESTADO_CARNET_ES), valor: function(m){ return m.estado; } },
+    { k: "clase", t: "Clase", opciones: [["pagado", "Membresía pagada"], ["honor", "Solo de honor"], ["distincion", "Con distinción"]],
+      prueba: function(m, v){ return v === "pagado" ? !m.solo_honor : v === "honor" ? !!m.solo_honor : !!m.distincion_txt; } }
+  ],
+  columnas: [
+    { k: "codigo", t: "Carnet", nw: true, valor: function(m){ return m.codigo; }, celda: function(m){ return "<strong>" + esc(m.codigo) + "</strong><small>desde " + esc(m.desde || "—") + "</small>"; } },
+    { k: "miembro", t: "Miembro", valor: function(m){ return m.nombre; }, celda: function(m){ return celdaPersona(m.nombre, m.email); } },
+    { k: "nivel", t: "Nivel", valor: function(m){ return m.solo_honor ? "" : m.nivel; }, celda: function(m){
+      return m.solo_honor ? '<span class="mu">solo de honor</span>' : esc(m.nivel || "—") + (m.distincion_txt ? "<small>pagado hasta " + esc(m.vigente_hasta || "—") + "</small>" : ""); } },
+    { k: "dist", t: "Distinción", valor: function(m){ return m.distincion_txt || ""; }, celda: function(m){
+      if (!m.distincion_txt) return '<span class="mu">—</span>';
+      return esc(m.distincion_txt) + "<small>" + (m.distincion_permanente ? "permanente"
+        : (m.distincion_vigente ? "hasta " : '<span class="tb-mal">vencida</span> el ') + esc(m.distincion_hasta || "—")) + "</small>"; } },
+    { k: "verif", t: "Verificación", valor: function(m){ return m.verif_fmt; }, celda: function(m){ return "<code>" + esc(m.verif_fmt || "—") + "</code>"; } },
+    { k: "hasta", t: "Vigente hasta", valor: function(m){ return m.hasta_efectivo; }, celda: function(m){ return esc(m.hasta_efectivo || "—"); } },
+    { k: "estado", t: "Estado", valor: function(m){ return m.estado; }, celda: function(m){
+      return m.estado === "vigente" ? '<span class="tb-conf">vigente</span>' : m.estado === "revocado" ? '<span class="tb-mal">revocado</span>' : '<span class="mu">vencido</span>'; } }
+  ],
+  nota: function(t){
+    var v = 0, h = 0; t.vista.forEach(function(m){ if (m.estado === "vigente") v++; if (m.solo_honor) h++; });
+    return v + " vigentes y " + h + " solo de honor en el filtro. Un carnet no es dinero: aquí no se suma nada.";
+  },
+  vacio: { titulo: "Ningún carnet todavía.", texto: "Los carnets nacen con la primera cuota de una membresía o con «Emitir carnet de honor»." },
+  etiquetaFila: function(m){ return "Abrir el carnet " + m.codigo; },
+  abrir: function(m){ abrirCarnet(m); }
+});
+function cargarMiembros(){
+  var caja = document.getElementById("tb-miembros");
+  if (!TB_MIEMBROS.armada) tablaArmar(TB_MIEMBROS, caja);
+  pedirJSON("/api/admin/miembros", "tb-miembros-cuerpo").then(function(d){ tablaCargar(TB_MIEMBROS, d.miembros || []); });
+}
+function abrirCarnet(m){
+  var acc = "";
+  if (m.distincion_txt){
+    if (!m.distincion_permanente) acc += '<button type="button" class="pn-b1" data-hnrenovar="' + esc(m.codigo) + '" data-nombre="' + esc(m.nombre || "") +
+      '" data-dist="' + esc(m.distincion_txt) + '" data-hasta="' + esc(m.distincion_hasta || "") + '">Renovar 12 meses…</button>';
+    acc += '<button type="button" class="pn-b2 pn-peligro" data-hnquitar="' + esc(m.codigo) + '" data-nombre="' + esc(m.nombre || "") +
+      '" data-dist="' + esc(m.distincion_txt) + '">Quitar la distinción…</button>';
+  }
+  cajonAbrir({ ey: m.solo_honor ? "Carnet de honor" : "Carnet de miembro", titulo: m.codigo + " · " + (m.nombre || ""),
+    cuerpo: ficha([
+      ["Estado", esc(ESTADO_CARNET_ES[m.estado] || m.estado)], ["Miembro", celdaPersona(m.nombre, m.email)],
+      ["Nivel", m.solo_honor ? "solo de honor (nunca pagó)" : esc(m.nivel || "—")],
+      ["Pagado hasta", m.solo_honor ? "" : esc(m.vigente_hasta || "—")],
+      ["Distinción", m.distincion_txt ? esc(m.distincion_txt) + " <small>(" + (m.distincion_forma === "m" ? "forma masculina" : m.distincion_forma === "f" ? "forma femenina" : "forma neutra") + ")</small>" : "ninguna"],
+      ["Contexto", m.distincion_contexto ? esc(m.distincion_contexto) : ""],
+      ["Vigencia de la distinción", m.distincion_txt ? (m.distincion_permanente ? "permanente" : (m.distincion_vigente ? "hasta " : "vencida el ") + esc(m.distincion_hasta || "—")) : ""],
+      ["Otorgada por", m.distincion_por ? esc(m.distincion_por) : ""],
+      ["Vigente hasta", esc(m.hasta_efectivo || "—") + "<small>la fecha más lejana entre lo pagado y la distinción</small>"],
+      ["Código de verificación", "<code>" + esc(m.verif_fmt || "—") + "</code><small>el que se le dicta a un comercio que llama</small>"],
+      ["Desde", esc(m.desde || "—")]]) +
+      '<p class="mu" style="font-size:var(--fs-13)">El enlace del carnet no se muestra aquí: es la credencial del miembro.</p>' +
+      (acc ? '<div class="pn-acciones">' + acc + "</div>" : ""),
+    pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+}
+
+/* ---- Carnet de honor, en el cajón y con su correo a la vista ---- */
+var HN_SEQ = 0, HN_RELOJ = null;
+function hnDatos(){
+  var doc = hnValor("hn-dn"), aut = document.getElementById("hn-aut");
+  return { nombre: hnValor("hn-nombre"), email: hnValor("hn-email"), distincion: hnValor("hn-dist"), forma: hnValor("hn-forma") || "n",
+           contexto: hnValor("hn-ctx"), meses: Number(hnValor("hn-meses") || 12), doc_tipo: doc ? hnValor("hn-dt") : "", doc_numero: doc,
+           autoriza: !!(aut && aut.checked), idioma: hnValor("hn-idioma") || "es" };
+}
+function previaHonor(){
+  var box = document.getElementById("hn-previa"), b = document.getElementById("hn-ok");
+  if (!box) return;
+  var d = hnDatos(), mia = ++HN_SEQ;
+  if (d.nombre.length < 3 || d.email.indexOf("@") < 1 || !d.distincion){
+    box.innerHTML = '<p class="mu">Completa nombre, correo y distinción para ver el correo.</p>';
+    if (b) b.disabled = true;
+    return;
+  }
+  if (b) b.disabled = true;
+  box.innerHTML = '<p class="mu">Mirando qué correo saldría…</p>';
+  var cuerpo = Object.assign({ accion: "honor" }, d);
+  pedirPrevia(cuerpo).then(function(r){
+    if (mia !== HN_SEQ) return;
+    box.innerHTML = htmlCorreos(r);
+    if (b) b.disabled = !hayCorreos(r);
+  }).catch(function(x){
+    if (mia !== HN_SEQ) return;
+    box.innerHTML = '<p class="pn-error">' + esc((x && x.message) || "No se pudo armar la vista previa.") + "</p>";
+  });
+}
+document.addEventListener("input", function(e){
+  if (!e.target || !/^hn-/.test(e.target.id || "")) return;
+  clearTimeout(HN_RELOJ); HN_RELOJ = setTimeout(previaHonor, 450);
+});
+document.addEventListener("change", function(e){
+  if (!e.target || !/^hn-/.test(e.target.id || "")) return;
+  if (e.target.id === "hn-dist") hnMesesVisible();
+  clearTimeout(HN_RELOJ); previaHonor();
+});
+function hnEmitir(b){
+  var d = hnDatos();
+  if (d.doc_numero && !d.autoriza){
+    errorEnCajon("Para guardar el documento hace falta marcar que la persona lo autorizó. Si no, deja el documento vacío.");
+    return;
+  }
+  b.disabled = true; b.textContent = "Emitiendo…"; errorEnCajon("");
+  postPanel("/api/admin/miembros/honor", d).then(function(r){
+    b.textContent = "Emitir y enviar el carnet";
+    if (!r){ b.disabled = false; return; }
+    /* QUÉ PASÓ, dicho: carnet nuevo o distinción añadida a uno que ya había,
+       y si el correo salió. */
+    var t = r.accion === "creado"
+      ? "Carnet de honor " + r.codigo + " creado con la distinción " + r.distincion + "."
+      : "La persona ya tenía el carnet " + r.codigo + ": se le añadió la distinción " + r.distincion + " (mismo enlace y mismo QR).";
+    t += r.permanente ? " Permanente." : " Vigente hasta " + r.hasta + ".";
+    t += r.correo === "enviado" ? " El correo salió."
+      : r.correo === "simulado" ? " Correo SIMULADO (sin llave de envío)."
+      : " El correo NO salió: avísale a la persona por otro medio.";
+    if (r.doc_distinto) t += " OJO: el documento escrito no coincide con el que ya tenía guardado; se dejó el guardado.";
+    ["hn-nombre", "hn-email", "hn-ctx", "hn-dn"].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ""; });
+    var aut = document.getElementById("hn-aut"); if (aut) aut.checked = false;
+    cajonCerrar();
+    avisar(t, { tono: r.correo === "fallo" || r.doc_distinto ? "error" : "", ms: 12000 });
+    cargarMiembros();
+  });
+}
+
+/* ---- Egresos: el libro ---- */
+var SOPORTE_ES = {
+  factura_electronica: "Factura electrónica",
+  factura_manual: "Factura en papel",
+  documento_soporte: "Documento soporte",
+  sin_soporte: "sin papel"
+};
+var MEDIO_PAGO_ES = { transferencia: "Transferencia", efectivo: "Efectivo", tarjeta: "Tarjeta", otro: "Otro" };
+function categoriaEg(e){ return (FIN_ETIQ.categoria || {})[e.concepto_ret || "no_aplica"] || e.concepto_ret || "—"; }
+function retenidoEg(e){ return Number(e.retefuente_centavos || 0) + Number(e.reteica_centavos || 0); }
+var TB_EGRESOS = tablaNueva({ id: "tb-egresos", titulo: "Egresos", orden: "fecha", dir: "desc",
+  buscar: "Número, proveedor, concepto o documento",
+  texto: function(e){ return [e.numero, e.proveedor, e.documento, e.concepto, e.centro, e.entrega, e.soporte_numero].join(" "); },
+  filtros: [
+    { k: "estado", t: "Estado", def: "vigentes", sinTodos: true, opciones: [["vigentes", "Vigentes"], ["anulados", "Anulados"], ["todos", "Todos"]],
+      prueba: function(e, v){ return v === "todos" ? true : v === "anulados" ? !!e.anulado_en : !e.anulado_en; } },
+    { k: "cat", t: "Categoría", opciones: function(){ return opcionesDe(FIN_ETIQ.categoria); }, valor: function(e){ return e.concepto_ret || "no_aplica"; } },
+    { k: "centro", t: "Centro de costo", opciones: function(t){ return distintos(t.todas, function(e){ return e.centro; }); }, valor: function(e){ return e.centro || ""; } },
+    { k: "papel", t: "Soporte", opciones: [["con", "Con papel"], ["sin", "Sin papel"], ["sin_archivo", "Sin archivo guardado"]],
+      prueba: function(e, v){ return v === "con" ? e.soporte !== "sin_soporte" : v === "sin" ? e.soporte === "sin_soporte" : !e.tiene_archivo; } },
+    { k: "meritoria", t: "Meritoria", opciones: [["si", "Sí"], ["no", "No"]], prueba: function(e, v){ return (e.meritoria ? "si" : "no") === v; } },
+    { k: "medio", t: "Medio de pago", opciones: opcionesDe(MEDIO_PAGO_ES), valor: function(e){ return e.medio_pago || ""; } },
+    { k: "desde", t: "Desde", tipo: "fecha", fecha: function(e){ return e.fecha; } },
+    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: function(e){ return e.fecha; } }
+  ],
+  columnas: [
+    { k: "numero", t: "Número", nw: true, valor: function(e){ return e.numero; }, celda: function(e){
+      return "<strong>" + esc(e.numero) + "</strong>" + (e.anulado_en ? "<small>anulado</small>" : ""); } },
+    { k: "fecha", t: "Fecha", dir: "desc", nw: true, valor: function(e){ return e.fecha; }, celda: function(e){ return esc(e.fecha); } },
+    { k: "proveedor", t: "Proveedor", valor: function(e){ return e.proveedor; }, celda: function(e){
+      return esc(e.proveedor || "?") + (e.documento ? "<small>" + esc(e.tipo_doc || "") + " " + esc(e.documento) + "</small>" : ""); } },
+    { k: "concepto", t: "Concepto", valor: function(e){ return e.concepto; }, celda: function(e){
+      return esc(e.concepto) + (e.meritoria ? "" : "<small>no meritoria</small>"); } },
+    { k: "cat", t: "Categoría", valor: categoriaEg, celda: function(e){ return esc(categoriaEg(e)); } },
+    { k: "centro", t: "Centro", valor: function(e){ return e.centro; }, celda: function(e){ return esc(e.centro || "—"); } },
+    { k: "papel", t: "Soporte", valor: function(e){ return e.soporte; }, celda: function(e){
+      return e.soporte === "sin_soporte" ? '<span class="tb-mal">sin papel</span>'
+        : esc(SOPORTE_ES[e.soporte] || e.soporte) + (e.tiene_archivo ? "" : "<small>sin archivo guardado</small>"); } },
+    { k: "total", t: "Total", num: true, valor: function(e){ return Number(e.total_centavos || 0); }, celda: function(e){ return esc(deCentavos(e.total_centavos)); } },
+    { k: "ret", t: "Retenido", num: true, valor: retenidoEg, celda: function(e){ var r = retenidoEg(e); return r ? esc(deCentavos(r)) : '<span class="mu">—</span>'; } }
+  ],
+  claseFila: function(e){ return e.anulado_en ? "tb-gris" : ""; },
+  totales: function(t){
+    var v = t.vista.filter(function(e){ return !e.anulado_en; }), tot = 0, ret = 0;
+    v.forEach(function(e){ tot += Number(e.total_centavos || 0); ret += retenidoEg(e); });
+    return { etiqueta: "Vigentes en el filtro · " + v.length + (v.length === 1 ? " egreso" : " egresos"),
+             celdas: { total: esc(deCentavos(tot)), ret: esc(deCentavos(ret)) } };
+  },
+  nota: function(){ return "Los anulados se ven en gris y nunca se suman. El archivo para el contador lleva el libro entero entre las fechas Desde y Hasta (los anulados, marcados), no solo lo filtrado aquí."; },
+  extra: function(){ return '<button type="button" class="pn-b2" id="eg-csv">Descargar para el contador</button>'; },
+  aviso: function(t){ var d = t.resp; return d && d.total > (d.egresos || []).length
+    ? "<strong>Faltan " + (d.total - d.egresos.length) + " egresos por mostrar</strong> · el libro tiene más filas de las que el panel trae: usa el archivo para el contador." : ""; },
+  vacio: { titulo: "Todavía no hay egresos registrados.", texto: "Cada peso que sale se registra con «Registrar un egreso», arriba, con su soporte." },
+  etiquetaFila: function(e){ return "Abrir el egreso " + e.numero; },
+  abrir: function(e){ abrirEgreso(e); }
+});
+function cargarEgresos(){
+  var caja = document.getElementById("tb-egresos");
+  if (!TB_EGRESOS.armada) tablaArmar(TB_EGRESOS, caja);
+  pedirJSON("/api/admin/egresos", "tb-egresos-cuerpo").then(function(d){
+    if (d.categorias) FIN_ETIQ.categoria = d.categorias;
+    var r = document.getElementById("eg-resumen");
+    if (r){
+      r.innerHTML = pasoEmbudo("egresos", d.total, "vigentes en el libro")
+        + pasoEmbudo("salido", deCentavos(d.suma_centavos), "suma de lo vigente")
+        + pasoEmbudo("retenido", deCentavos(d.retenido_centavos), "pendiente de declarar")
+        + pasoEmbudo("meritoria", deCentavos(d.meritoria_centavos), "lo que sostiene el RTE")
+        + (d.sin_papel ? pasoEmbudo("sin papel", d.sin_papel, "les falta soporte") : "");
+    }
+    /* «datalist» SUGIERE, no obliga: una brigada nueva se escribe y ya, y a
+       partir de ahí aparece sola para las siguientes. */
+    var dl = document.getElementById("eg-centros");
+    if (dl) dl.innerHTML = ((d.centros || []).concat(["estructura"]))
+      .filter(function(c, i, a){ return a.indexOf(c) === i; })
+      .map(function(c){ return '<option value="' + esc(c) + '"></option>'; }).join("");
+    TB_EGRESOS.resp = d; TB_EGRESOS.todas = d.egresos || [];
+    tablaBarra(TB_EGRESOS); tablaRefrescar(TB_EGRESOS);
+  });
+}
+function abrirEgreso(e){
+  var ret = retenidoEg(e);
+  var soporte = e.soporte === "sin_soporte" ? '<span class="tb-mal">sin papel todavía</span>'
+    : esc(SOPORTE_ES[e.soporte] || e.soporte) + (e.soporte_numero ? " " + esc(e.soporte_numero) : "") + (e.soporte_cufe ? "<small>CUFE " + esc(e.soporte_cufe) + "</small>" : "");
+  var archivo = e.tiene_archivo
+    ? '<a href="/api/admin/egreso/' + esc(e.numero) + '/soporte.ver" target="_blank" rel="noopener">Ver el archivo guardado</a>'
+    : (e.anulado_en ? '<span class="mu">sin archivo</span>'
+      : '<span class="mu">sin archivo</span> <label class="copy" style="cursor:pointer">Subir PDF o XML<input type="file" accept=".pdf,.xml,application/pdf,application/xml,text/xml" data-eg-soporte="' +
+        esc(e.numero) + '" style="display:none"></label>');
+  cajonAbrir({ ey: e.anulado_en ? "Egreso anulado" : "Egreso", titulo: e.numero + " · " + deCentavos(e.total_centavos),
+    cuerpo: (e.anulado_en ? '<p class="pn-nota"><strong>Anulado</strong> el ' + esc(enCO(e.anulado_en, 16)) + (e.anulado_por ? " por " + esc(e.anulado_por) : "") +
+        (e.anulado_motivo ? ": «" + esc(e.anulado_motivo) + "»" : "") + ". No cuenta en el libro, en la exógena ni en lo meritorio.</p>" : "") +
+      ficha([["Fecha", esc(e.fecha)], ["Proveedor", esc(e.proveedor || "?") + (e.documento ? "<small>" + esc(e.tipo_doc || "") + " " + esc(e.documento) + "</small>" : "")],
+        ["Concepto", esc(e.concepto)], ["Categoría", esc(categoriaEg(e)) + "<small>concepto de retención</small>"],
+        ["Base", esc(deCentavos(e.base_centavos))], ["IVA", esc(deCentavos(e.iva_centavos))], ["Total", "<strong>" + esc(deCentavos(e.total_centavos)) + "</strong>"],
+        ["Retenido", ret ? esc(deCentavos(ret)) : "nada"], ["Salió de la cuenta", esc(deCentavos(e.neto_centavos))],
+        ["Medio de pago", esc(MEDIO_PAGO_ES[e.medio_pago] || e.medio_pago || "—")],
+        ["Actividad meritoria", e.meritoria ? "sí" : "no"], ["Centro de costo", esc(e.centro || "—")],
+        ["Acta que pagó", e.entrega ? esc(e.entrega) : ""], ["Soporte", soporte], ["Archivo", archivo],
+        ["Nota interna", e.nota ? esc(e.nota) : ""], ["Registrado", (e.creado_por ? esc(e.creado_por) : "") + (e.creado_en ? " · " + esc(enCO(e.creado_en, 16)) : "")]]),
+    pie: (e.anulado_en ? "" : '<button type="button" class="pn-b2 pn-peligro" data-eg-anular="' + esc(e.numero) + '">Anular el egreso…</button>') +
+      '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+}
+
+/* ---- Proveedores ---- */
+var TB_PROV = tablaNueva({ id: "tb-proveedores", titulo: "Proveedores", orden: "nombre", dir: "asc",
+  buscar: "Nombre o documento",
+  texto: function(p){ return [p.nombre, p.documento, p.email, p.ciudad].join(" "); },
+  filtros: [
+    { k: "factura", t: "Factura", opciones: [["si", "Obligado a facturar"], ["no", "No factura (documento soporte)"]], prueba: function(p, v){ return (p.factura ? "si" : "no") === v; } },
+    { k: "doc", t: "Documento", opciones: [["si", "Con documento"], ["no", "Sin documento"]], prueba: function(p, v){ return (p.documento ? "si" : "no") === v; } }
+  ],
+  columnas: [
+    { k: "nombre", t: "Nombre", valor: function(p){ return p.nombre; }, celda: function(p){ return "<strong>" + esc(p.nombre) + "</strong>" + (p.ciudad ? "<small>" + esc(p.ciudad) + "</small>" : ""); } },
+    { k: "doc", t: "Documento", valor: function(p){ return p.documento; }, celda: function(p){
+      return p.documento ? esc(p.tipo_doc) + " " + esc(p.documento) + (p.dv ? "-" + esc(p.dv) : "") : '<span class="mu">sin documento</span>'; } },
+    { k: "factura", t: "Factura", valor: function(p){ return p.factura ? 1 : 0; }, celda: function(p){ return p.factura ? "sí" : "<b>no</b><small>necesita documento soporte</small>"; } },
+    { k: "egresos", t: "Egresos", num: true, valor: function(p){ return Number(p.egresos || 0); }, celda: function(p){ return esc(String(p.egresos || 0)); } },
+    { k: "total", t: "Total pagado", num: true, valor: function(p){ return Number(p.total_centavos || 0); }, celda: function(p){ return esc(deCentavos(p.total_centavos)); } }
+  ],
+  totales: function(t){
+    var n = 0, s = 0; t.vista.forEach(function(p){ n += Number(p.egresos || 0); s += Number(p.total_centavos || 0); });
+    return { etiqueta: t.vista.length + " proveedores en el filtro", celdas: { egresos: numCO(n), total: esc(deCentavos(s)) } };
+  },
+  nota: function(){ return "Egresos y total cuentan solo lo vigente: un egreso anulado no se suma."; },
+  vacio: { titulo: "Todavía no hay proveedores.", texto: "Un proveedor se crea desde «Registrar un egreso», en Egresos." },
+  abrir: function(p){
+    cajonAbrir({ ey: "Proveedor", titulo: p.nombre,
+      cuerpo: ficha([["Documento", p.documento ? esc(p.tipo_doc) + " " + esc(p.documento) + (p.dv ? "-" + esc(p.dv) : "") : "sin documento"],
+        ["Persona", p.natural_ ? "natural" : "jurídica"], ["Factura", p.factura ? "está obligado a facturar" : "no factura: sus egresos van con documento soporte"],
+        ["Correo", p.email ? esc(p.email) : ""], ["Teléfono", p.telefono ? esc(p.telefono) : ""], ["Ciudad", p.ciudad ? esc(p.ciudad) : ""],
+        ["Egresos vigentes", esc(String(p.egresos || 0))], ["Total pagado", esc(deCentavos(p.total_centavos))]]) +
+        '<p class="mu" style="font-size:var(--fs-13)">El certificado anual de retención se expide por proveedor, con lo que dice el libro.</p>',
+      pie: '<button type="button" class="pn-b1" data-prov-egresos="' + esc(p.nombre) + '">Ver sus egresos</button>' +
+        '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+  }
+});
+document.addEventListener("click", function(e){
+  var b = e.target && e.target.closest ? e.target.closest("[data-prov-egresos]") : null; if (!b) return;
+  TB_EGRESOS.q = b.getAttribute("data-prov-egresos"); TB_EGRESOS.f.estado = "todos"; TB_EGRESOS.pagina = 1;
+  cajonCerrar();
+  if (TB_EGRESOS.armada){ tablaBarra(TB_EGRESOS); tablaRefrescar(TB_EGRESOS); }
+  location.hash = "finanzas/egresos";
+});
+function cargarProveedores(){
+  var caja = document.getElementById("tb-proveedores");
+  if (!TB_PROV.armada) tablaArmar(TB_PROV, caja);
+  fetch("/api/admin/proveedores").then(conEstado).then(function(res){
+    if (res.http !== 200 || !res.d || res.d.error){ falloCarga("tb-proveedores-cuerpo", res.http, res.d); return; }
+    var l = res.d.proveedores || [];
+    if (res.d.categorias) FIN_ETIQ.categoria = res.d.categorias;
+    /* El desplegable del formulario de egresos sale de la misma lista. */
+    var sel = document.getElementById("eg-prov");
+    if (sel){
+      var antes = sel.value;
+      sel.innerHTML = '<option value="">Elige un proveedor…</option>' + l.map(function(p){
+        return '<option value="' + esc(String(p.id)) + '">' + esc(p.nombre) +
+          (p.documento ? " · " + esc(p.tipo_doc) + " " + esc(p.documento) : " · sin documento") + "</option>";
+      }).join("");
+      if (antes) sel.value = antes;
+    }
+    TB_PROV.resp = res.d;
+    tablaCargar(TB_PROV, l);
+  }).catch(function(){ falloCarga("tb-proveedores-cuerpo", 0, null); });
+}
+
+/* ---- PayPal: el botón de donaciones (IPN) ---- */
+function selloIpn(e){
+  return e.resultado === "prueba" ? "Prueba, no es dinero"
+    : e.verificado ? (e.resultado === "por_registrar" ? "Sí, por registrar" : "Sí")
+    : "No: " + (e.resultado || "sin verificar");
+}
+function ipnCuenta(e){ return !!e.verificado && e.resultado !== "prueba"; }
+var TB_IPN = tablaNueva({ id: "tb-ipn", titulo: "Donaciones por el botón de PayPal", orden: "recibido", dir: "desc",
+  buscar: "Nombre, correo o destino",
+  texto: function(e){ return [e.nombre, e.correo, e.destino, e.txn_type, e.clave].join(" "); },
+  filtros: [
+    { k: "tipo", t: "Tipo", opciones: [["unico", "Único"], ["mensual", "Mensual"]], prueba: function(e, v){ return (e.recurrente ? "mensual" : "unico") === v; } },
+    { k: "verif", t: "Verificado", opciones: [["si", "Sí (cuenta como dinero)"], ["no", "No verificado"], ["prueba", "Prueba"]],
+      prueba: function(e, v){ return v === "prueba" ? e.resultado === "prueba" : v === "si" ? ipnCuenta(e) : !e.verificado; } },
+    { k: "desde", t: "Desde", tipo: "fecha", fecha: function(e){ return enCO(e.recibido_en, 10); } },
+    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: function(e){ return enCO(e.recibido_en, 10); } }
+  ],
+  columnas: [
+    { k: "recibido", t: "Recibido", valor: function(e){ return e.recibido_en; }, celda: function(e){ return esc(enCO(e.recibido_en, 16)); } },
+    { k: "tipo", t: "Tipo", valor: function(e){ return e.txn_type || e.estado; }, celda: function(e){ return esc(e.txn_type || e.estado || "—") + (e.recurrente ? "<small>mensual</small>" : ""); } },
+    { k: "donante", t: "Donante", valor: function(e){ return e.nombre; }, celda: function(e){ return celdaPersona(e.nombre, e.correo); } },
+    { k: "destino", t: "Destino", valor: function(e){ return e.destino; }, celda: function(e){ return esc(e.destino || "—"); } },
+    { k: "verif", t: "Verificado", valor: selloIpn, celda: function(e){ var s = esc(selloIpn(e)); return ipnCuenta(e) ? '<span class="tb-conf">' + s + "</span>" : '<span class="tb-mal">' + s + "</span>"; } },
+    { k: "monto", t: "Monto", num: true, valor: function(e){ return Number(e.monto_centavos || 0); }, celda: function(e){
+      return e.monto_centavos != null ? dinero(e.monto_centavos, e.moneda) + (e.comision_centavos != null ? "<small>comisión " + dinero(e.comision_centavos, e.moneda) + "</small>" : "") : "—"; } }
+  ],
+  totales: function(t){
+    var l = sumaPorMoneda(t.vista.filter(ipnCuenta), function(e){ return e.monto_centavos; }, function(e){ return e.moneda; });
+    return { etiqueta: "Verificado en el filtro (sin pruebas)", celdas: { monto: dineroLista(l) } };
+  },
+  nota: function(){ return "Solo suma lo que PayPal verificó y no es una prueba. Va en la moneda que cobró PayPal: no se convierte a pesos."; },
+  aviso: function(t){ var d = t.resp; return d && d.total > (d.ipn || []).length
+    ? "<strong>Faltan " + (d.total - d.ipn.length) + " avisos por mostrar</strong> · se enseñan los " + d.ipn.length + " más recientes." : ""; },
+  vacio: { titulo: "Ninguna todavía.", texto: "Si el botón ya recibió donaciones y esto sigue vacío, el notify_url no está puesto en PayPal." },
+  abrir: function(e){
+    cajonAbrir({ ey: "Botón de PayPal", titulo: (e.nombre || e.correo || e.clave) + " · " + (e.monto_centavos != null ? dinero(e.monto_centavos, e.moneda) : ""),
+      cuerpo: ficha([["Recibido", esc(enCO(e.recibido_en, 16))], ["Tipo", esc(e.txn_type || e.estado || "—") + (e.recurrente ? " · mensual" : "")],
+        ["Estado del pago", esc(e.estado || "—")], ["Monto", e.monto_centavos != null ? dinero(e.monto_centavos, e.moneda) : "—"],
+        ["Comisión de PayPal", e.comision_centavos != null ? dinero(e.comision_centavos, e.moneda) : ""], ["Donante", celdaPersona(e.nombre, e.correo)],
+        ["Destino", esc(e.destino || "—")], ["Nota", e.nota ? esc(e.nota) : ""], ["Verificado", esc(selloIpn(e))], ["Clave", "<code>" + esc(e.clave) + "</code>"]]) +
+        '<p class="pn-nota">Sin guía: si esta persona pide certificado o quiere rastrear su aporte, hay que crearle el registro a mano.</p>',
+      pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+  }
+});
+function cargarIpn(){
+  var caja = document.getElementById("tb-ipn");
+  if (!TB_IPN.armada) tablaArmar(TB_IPN, caja);
+  pedirJSON("/api/admin/ipn", "tb-ipn-cuerpo").then(function(d){ TB_IPN.resp = d; tablaCargar(TB_IPN, d.ipn || []); });
+}
+
+/* ---- PayPal: avisos sin registro ---- */
+function quePasaPps(e){
+  if (!e.firma_valida) return e.resultado === "verificacion_indeterminada" ? ["firma", "No se pudo comprobar la firma: se le pidió a PayPal que reintente"] : ["firma", "Firma inválida: NO se procesó"];
+  if (!e.procesado) return ["medias", "Se quedó a medias: llegó con firma buena y no se procesó" + (e.resultado ? " · " + String(e.resultado).slice(0, 90) : "")];
+  if (e.resultado === "sin_regla") return ["regla", "Evento sin regla: llegó y nadie lo atiende"];
+  if (e.resultado === "reversa_sin_aporte") return ["reversa", "REVERSA sin aporte: le devolvieron dinero a algo que no está en el libro"];
+  if (e.resultado === "donacion_sin_guia") return ["donacion", "Donación del botón: sin guía, hay que registrarla a mano"];
+  return ["pago", "Pago sin suscripción: registrar a mano"];
+}
+var TB_PPS = tablaNueva({ id: "tb-pps", titulo: "Avisos de PayPal sin registro", orden: "recibido", dir: "desc",
+  buscar: "Correo, evento o tipo",
+  texto: function(e){ return [e.correo, e.evento_id, e.tipo, e.suscripcion, e.resultado].join(" "); },
+  filtros: [
+    { k: "que", t: "Qué pasa", opciones: [["firma", "Firma inválida o sin comprobar"], ["medias", "Se quedó a medias"], ["regla", "Evento sin regla"],
+      ["reversa", "Reversa sin aporte"], ["donacion", "Donación sin guía"], ["pago", "Pago sin suscripción"]], valor: function(e){ return quePasaPps(e)[0]; } }
+  ],
+  columnas: [
+    { k: "recibido", t: "Recibido", valor: function(e){ return e.recibido_en; }, celda: function(e){ return esc(enCO(e.recibido_en, 16)); } },
+    { k: "evento", t: "Evento", valor: function(e){ return e.tipo; }, celda: function(e){ return esc(e.tipo || "—") + "<small>" + esc(e.evento_id || "") + "</small>"; } },
+    { k: "correo", t: "Correo", valor: function(e){ return e.correo; }, celda: function(e){ return esc(e.correo || "—"); } },
+    { k: "que", t: "Qué pasa", valor: function(e){ return quePasaPps(e)[1]; }, celda: function(e){ return esc(quePasaPps(e)[1]); } },
+    { k: "monto", t: "Monto", num: true, valor: function(e){ return Number(e.monto || 0); }, celda: function(e){ return e.monto ? esc(e.monto) + " " + esc(e.moneda || "") : "—"; } }
+  ],
+  nota: function(){ return "Montos tal como los manda PayPal, en su moneda. No se suman: ninguno de estos avisos está confirmado en el libro."; },
+  vacio: { titulo: "Ninguno: todo lo que llegó de PayPal tiene dónde ir.", texto: "Si PayPal avisa de algo que no encuentra su membresía o su aporte, aparece aquí." },
+  abrir: function(e){
+    cajonAbrir({ ey: "Aviso de PayPal", titulo: e.tipo || e.evento_id,
+      cuerpo: ficha([["Recibido", esc(enCO(e.recibido_en, 16))], ["Evento", "<code>" + esc(e.evento_id || "") + "</code>"], ["Tipo", esc(e.tipo || "—")],
+        ["Suscripción", e.suscripcion ? "<code>" + esc(e.suscripcion) + "</code>" : ""], ["Monto", e.monto ? esc(e.monto) + " " + esc(e.moneda || "") : "—"],
+        ["Correo", esc(e.correo || "—")], ["Firma", e.firma_valida ? "válida" : "inválida o sin comprobar"], ["Procesado", e.procesado ? "sí" : "no"],
+        ["Qué pasa", esc(quePasaPps(e)[1])]]),
+      pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+  }
+});
+function cargarPaypalSueltos(){
+  var caja = document.getElementById("tb-pps");
+  if (!TB_PPS.armada) tablaArmar(TB_PPS, caja);
+  pedirJSON("/api/admin/paypal-sueltos", "tb-pps-cuerpo").then(function(d){ tablaCargar(TB_PPS, d.eventos || []); });
+}
+
+/* ==== FINANZAS › RESUMEN (Fase 2) ====
+   El mes o el año, de un vistazo y con la fuente de cada cifra. Todo sale de
+   /api/admin/finanzas, que usa las mismas reglas que la tabla de aportes: lo
+   confirmado se suma, lo demás se cuenta aparte, y los dólares no se
+   convierten. */
+var FIN = { anio: 0, mes: -1, d: null };
+var MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function cargarFinanzas(){
+  var caja = document.getElementById("fin-resumen"); if (!caja) return;
+  if (FIN.d) caja.style.opacity = ".55";
+  pedirJSON("/api/admin/finanzas" + (FIN.anio ? "?anio=" + FIN.anio + "&mes=" + FIN.mes : ""), "fin-resumen").then(function(d){
+    caja.style.opacity = "";
+    FIN.d = d; FIN.anio = d.periodo.anio; FIN.mes = d.periodo.mes;
+    if (d.etiquetas) FIN_ETIQ = d.etiquetas;
+    pintarSelectoresFin(d); pintarFinanzas(d);
+  });
+}
+function pintarSelectoresFin(d){
+  var a = document.getElementById("fin-anio"), m = document.getElementById("fin-mes");
+  if (a) a.innerHTML = (d.anios || [d.periodo.anio]).map(function(x){ return '<option value="' + x + '"' + (x === d.periodo.anio ? " selected" : "") + ">" + x + "</option>"; }).join("");
+  if (m) m.innerHTML = '<option value="0"' + (d.periodo.mes ? "" : " selected") + ">Todo el año</option>" + MESES_LARGOS.map(function(n, i){
+    var k = d.periodo.anio + "-" + String(i + 1).padStart(2, "0");
+    return '<option value="' + (i + 1) + '"' + (d.periodo.mes === i + 1 ? " selected" : "") + (k > d.periodo.hoy.slice(0, 7) ? " disabled" : "") + ">" +
+      n.charAt(0).toUpperCase() + n.slice(1) + "</option>";
+  }).join("");
+}
+document.addEventListener("change", function(e){
+  if (!e.target) return;
+  if (e.target.id === "fin-anio"){ FIN.anio = Number(e.target.value); if (FIN.mes && FIN.d && FIN.anio !== FIN.d.periodo.anio) FIN.mes = 0; cargarFinanzas(); }
+  if (e.target.id === "fin-mes"){ FIN.mes = Number(e.target.value); cargarFinanzas(); }
+});
+document.addEventListener("click", function(e){
+  if (!e.target || !FIN.d) return;
+  var p = FIN.d.periodo;
+  if (e.target.id === "fin-csv-aportes") location.href = "/api/admin/aportes.csv?estado=confirmados&desde=" + p.desde + "&hasta=" + p.hasta;
+  if (e.target.id === "fin-csv-egresos") location.href = "/api/admin/egresos.csv?desde=" + p.desde + "&hasta=" + p.hasta;
+  if (e.target.id === "fin-ver-aportes"){
+    TB_APORTES.q = ""; Object.keys(TB_APORTES.f).forEach(function(k){ TB_APORTES.f[k] = ""; });
+    TB_APORTES.f.estado = "confirmados"; TB_APORTES.f.desde = p.desde; TB_APORTES.f.hasta = p.hasta; TB_APORTES.pagina = 1;
+    if (TB_APORTES.armada){ tablaBarra(TB_APORTES); tablaRefrescar(TB_APORTES); }
+    location.hash = "finanzas/aportes";
+  }
+});
+function sumaMon(l, mon){ var s = { c: 0, n: 0 }; (l || []).forEach(function(x){ if (x.moneda === mon){ s.c += Number(x.centavos || 0); s.n += Number(x.n || 0); } }); return s; }
+/* Una tabla de desglose: concepto, cuántos, cuánto y qué parte de los pesos. */
+function bloqueFin(titulo, fuente, filas, totalCop, etiq){
+  var cuerpo = filas.length ? filas.map(function(x){
+    var cop = !x.moneda || x.moneda === "COP";
+    var pct = cop && totalCop ? Math.round(Number(x.centavos || 0) * 1000 / totalCop) / 10 : null;
+    return "<tr><td>" + esc(etiq(x)) + (x.moneda && x.moneda !== "COP" ? " <small class=\\"mu\\">(" + esc(x.moneda) + ")</small>" : "") + "</td>" +
+      '<td class="num">' + numCO(x.n) + '</td><td class="num">' + dinero(x.centavos, x.moneda || "COP") + "</td>" +
+      '<td class="num">' + (pct == null ? "—" : String(pct).replace(".", ",") + " %") + "</td></tr>";
+  }).join("") : '<tr><td colspan="4" class="mu">Nada en este periodo.</td></tr>';
+  return '<div class="fin-bloque"><h3>' + esc(titulo) + '</h3><p class="fin-fuente">' + esc(fuente) + "</p>" +
+    '<table class="pn-tabla"><thead><tr><th scope="col">Concepto</th><th scope="col" class="num">Cuántos</th><th scope="col" class="num">Monto</th>' +
+    '<th scope="col" class="num">De los pesos</th></tr></thead><tbody>' + cuerpo + "</tbody></table></div>";
+}
+function pintarFinanzas(d){
+  var caja = document.getElementById("fin-resumen"); if (!caja) return;
+  var p = d.periodo, E = FIN_ETIQ;
+  var nom = p.mes ? MESES_LARGOS[p.mes - 1] + " de " + p.anio : "todo " + p.anio;
+  var ing = d.ingresos, cop = sumaMon(ing.total, "COP");
+  var otras = (ing.total || []).filter(function(x){ return x.moneda !== "COP"; });
+  var eg = d.egresos.total || {}, neto = cop.c - Number(eg.centavos || 0);
+  var mb = d.miembros, ce = d.certificados || {};
+  var cel = [[pesos(cop.c), "ingresos confirmados en pesos · " + numCO(cop.n) + (cop.n === 1 ? " pago" : " pagos") + " · solo pagos confirmados (aportes)"]];
+  otras.forEach(function(x){ cel.push([dinero(x.centavos, x.moneda), "en " + x.moneda + " · " + numCO(x.n) + " pagos confirmados · PayPal, sin convertir"]); });
+  cel.push([pesos(eg.centavos), "egresos · " + numCO(eg.n || 0) + " vigentes en el libro de egresos"]);
+  cel.push([(neto < 0 ? "−" : "") + pesos(Math.abs(neto)), "neto en pesos · ingresos confirmados en pesos menos egresos"]);
+  cel.push([numCO(d.donantes.n), "donantes con pago confirmado · " + numCO(d.donantes.nuevos) + " nuevos (su primer pago)"]);
+  cel.push(mb ? [numCO(mb.pagados), "membresías nuevas · carnets que empezaron · " + numCO(mb.honor) + " de honor"] : ["sin datos", "membresías nuevas"]);
+  cel.push([numCO(ce.emitidos || 0), "certificados emitidos · " + numCO(ce.por_emitir_periodo || 0) + " por emitir de este periodo · " + numCO(ce.por_emitir_hoy || 0) + " por emitir hoy en total"]);
+  var h = '<p class="vol-ind-t">' + esc(nom.charAt(0).toUpperCase() + nom.slice(1)) + " · del " + esc(p.desde) + " al " + esc(p.hasta) + "</p>" +
+    '<div class="vol-ind">' + cel.map(function(c){ return "<div><b" + (c[0] === "sin datos" ? ' class="vol-nd"' : "") + ">" + esc(c[0]) + "</b><small>" + esc(c[1]) + "</small></div>"; }).join("") + "</div>";
+  /* Lo que entró pero no está en las cifras de arriba, dicho aparte. */
+  var aparte = [];
+  if (d.reportadas && d.reportadas.n) aparte.push("<strong>" + d.reportadas.n + (d.reportadas.n === 1 ? " transferencia reportada" : " transferencias reportadas") +
+    "</strong> en el periodo por " + pesos(d.reportadas.centavos) + ' según el donante siguen sin verificar: no se suman hasta confirmarlas en <a href="#finanzas/transferencias">Transferencias</a>.');
+  var sw = d.sin_guia || {};
+  (sw.wompi || []).forEach(function(x){ if (x.n) aparte.push("<strong>" + x.n + (x.n === 1 ? " pago" : " pagos") + " de Wompi sin aporte</strong> por " + dinero(x.centavos, x.moneda) +
+    ': cobrados por el enlace directo, sin guía. No están arriba: ver <a href="#finanzas/pagos">Pagos sin aporte</a>.'); });
+  (sw.paypal || []).forEach(function(x){ if (x.n) aparte.push("<strong>" + x.n + (x.n === 1 ? " donación" : " donaciones") + " del botón de PayPal</strong> por " + dinero(x.centavos, x.moneda) +
+    ': verificadas y sin guía. No están arriba: ver <a href="#finanzas/paypal">PayPal</a>.'); });
+  if (d.donantes.sin_ficha) aparte.push(d.donantes.sin_ficha + " pago(s) confirmado(s) del periodo no tienen ficha de donante: suman como dinero, no como donantes.");
+  if (aparte.length) h += aparte.map(function(x){ return '<p class="fin-linea">' + x + "</p>"; }).join("");
+  var fuenteIng = "Aportes con pago confirmado (pasarela o extracto), por la fecha del dinero. Solo pagos confirmados.";
+  var fuenteEg = "Libro de egresos, por la fecha del egreso. Sin los anulados.";
+  h += graficaFin(d);
+  h += '<div class="fin-grid">' +
+    bloqueFin("Ingresos por medio", fuenteIng, ing.por_medio || [], cop.c, function(x){ return E.medio[x.clave] || x.clave; }) +
+    bloqueFin("Ingresos por destino o programa", fuenteIng, ing.por_destino || [], cop.c, function(x){ return x.clave ? (x.nombre || x.clave) : "Fondo general"; }) +
+    bloqueFin("Ingresos por tipo", fuenteIng + " «Membresía» es la que tiene cobro automático.", ing.por_tipo || [], cop.c, function(x){ return E.tipo[x.clave] || x.clave; }) +
+    bloqueFin("Egresos por categoría", fuenteEg + " La categoría es el concepto de retención.", (d.egresos.por_categoria || []), Number(eg.centavos || 0),
+      function(x){ return (E.categoria || {})[x.clave] || x.clave; }) +
+    bloqueFin("Egresos por centro de costo", fuenteEg, (d.egresos.por_centro || []), Number(eg.centavos || 0), function(x){ return x.clave || "Sin centro"; }) +
+    '<div class="fin-bloque"><h3>Retenciones y lo meritorio</h3><p class="fin-fuente">' + esc(fuenteEg) + "</p>" + ficha([
+      ["Retenido", pesos(eg.retenido)], ["Salió de la cuenta", pesos(eg.neto)], ["Actividad meritoria", pesos(eg.meritoria)],
+      ["Sin papel", numCO(eg.sin_papel || 0) + (eg.sin_papel ? ' · <a href="#finanzas/egresos">completar</a>' : "")]]) + "</div>" +
+    "</div>";
+  caja.innerHTML = h;
+  armarGraficaFin(d);
+}
+/* MES A MES: dos líneas, ingresos confirmados en pesos y egresos, en un solo
+   eje (los dos son pesos). Los dólares no se dibujan: no hay tasa, y
+   dibujarlos en el mismo eje sería inventarla; van en la tabla de abajo.
+   La de egresos va punteada y las dos llevan su nombre al final: el color no
+   es lo único que las distingue. */
+function cifraCorta(c){
+  var v = Math.round(Number(c || 0) / 100), a = Math.abs(v);
+  if (a >= 1000000) return "$" + (v / 1000000).toLocaleString("es-CO", { maximumFractionDigits: 1 }) + " M";
+  if (a >= 1000) return "$" + Math.round(v / 1000).toLocaleString("es-CO") + " mil";
+  return "$" + v.toLocaleString("es-CO");
+}
+function techoBonito(v){
+  if (v <= 0) return 100000000;
+  var p = Math.pow(10, Math.floor(Math.log10(v))), n = v / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+}
+var FIN_G = { W: 1000, H: 280, L: 64, R: 84, T: 16, B: 28 };
+function graficaFin(d){
+  var s = d.serie || [], G = FIN_G;
+  var max = 0;
+  s.forEach(function(m){ if (!m.futuro){ max = Math.max(max, Number(m.ingresos.COP || 0), Number(m.egresos || 0)); } });
+  var techo = techoBonito(max), ancho = G.W - G.L - G.R, alto = G.H - G.T - G.B;
+  var x = function(i){ return G.L + (ancho * i) / 11; }, y = function(c){ return G.T + alto - (alto * Number(c || 0)) / techo; };
+  var h = '<div class="fin-graf" id="fin-graf"><h3>Mes a mes · ' + d.periodo.anio + "</h3>" +
+    '<p class="fin-fuente">Ingresos confirmados en pesos y egresos vigentes, por mes. Los dólares no se dibujan (no se convierten): están en la tabla de abajo.</p>' +
+    '<div class="fin-ley"><span><i></i>Ingresos confirmados</span><span><i class="eg"></i>Egresos</span></div>' +
+    '<svg viewBox="0 0 ' + G.W + " " + G.H + '" role="img" aria-label="Ingresos confirmados y egresos por mes de ' + d.periodo.anio + '; las cifras están en la tabla de abajo">';
+  for (var k = 0; k <= 4; k++){
+    var v = (techo * k) / 4, yy = y(v);
+    h += '<line class="' + (k ? "eje" : "eje0") + '" x1="' + G.L + '" x2="' + (G.W - G.R) + '" y1="' + yy + '" y2="' + yy + '"></line>' +
+      '<text x="' + (G.L - 8) + '" y="' + (yy + 4) + '" text-anchor="end">' + esc(cifraCorta(v)) + "</text>";
+  }
+  if (d.periodo.mes){
+    var i0 = d.periodo.mes - 1, wb = ancho / 11;
+    h += '<rect x="' + Math.max(G.L, x(i0) - wb / 2) + '" y="' + G.T + '" width="' + (Math.min(G.W - G.R, x(i0) + wb / 2) - Math.max(G.L, x(i0) - wb / 2)) +
+      '" height="' + alto + '" fill="var(--gl)"></rect>';
+  }
+  s.forEach(function(m, i){
+    h += '<text x="' + x(i) + '" y="' + (G.H - 8) + '" text-anchor="middle">' + MESES_CORTOS[i] + "</text>";
+  });
+  var vivos = s.map(function(m, i){ return { m: m, i: i }; }).filter(function(o){ return !o.m.futuro; });
+  var linea = function(f){ return vivos.map(function(o, j){ return (j ? "L" : "M") + x(o.i).toFixed(1) + " " + y(f(o.m)).toFixed(1); }).join(" "); };
+  if (vivos.length){
+    h += '<path class="l-eg" d="' + linea(function(m){ return m.egresos; }) + '"></path>' +
+      '<path class="l-ing" d="' + linea(function(m){ return m.ingresos.COP || 0; }) + '"></path>';
+    var u = vivos[vivos.length - 1], yi = y(u.m.ingresos.COP || 0), ye = y(u.m.egresos);
+    if (Math.abs(yi - ye) < 14){ if (yi <= ye){ yi -= 7; ye += 7; } else { yi += 7; ye -= 7; } }
+    h += '<circle class="p-eg" cx="' + x(u.i) + '" cy="' + y(u.m.egresos) + '" r="4"></circle>' +
+      '<circle class="p-ing" cx="' + x(u.i) + '" cy="' + y(u.m.ingresos.COP || 0) + '" r="4"></circle>' +
+      '<text class="lbl" x="' + (x(u.i) + 9) + '" y="' + (yi + 4) + '">Ingresos</text>' +
+      '<text class="lbl" x="' + (x(u.i) + 9) + '" y="' + (ye + 4) + '">Egresos</text>';
+  }
+  h += '<g id="fin-hover" style="display:none"><line class="guia" id="fin-hl" x1="0" x2="0" y1="' + G.T + '" y2="' + (G.T + alto) + '"></line>' +
+    '<circle class="p-eg" id="fin-he" r="4.5" cx="0" cy="0"></circle><circle class="p-ing" id="fin-hi" r="4.5" cx="0" cy="0"></circle></g>' +
+    '<rect id="fin-zona" x="' + G.L + '" y="' + G.T + '" width="' + ancho + '" height="' + alto + '" fill="transparent"></rect></svg>' +
+    '<div class="fin-tip" id="fin-tip" hidden></div>';
+  /* La vista de tabla: las mismas cifras, para leerlas o copiarlas. */
+  var usd = s.some(function(m){ return Object.keys(m.ingresos).some(function(k){ return k !== "COP"; }); });
+  h += "<details><summary>Ver las cifras mes a mes</summary><table class=\\"pn-tabla\\" style=\\"margin-top:8px\\"><thead><tr><th scope=\\"col\\">Mes</th>" +
+    '<th scope="col" class="num">Ingresos (pesos)</th>' + (usd ? '<th scope="col" class="num">Ingresos (dólares)</th>' : "") +
+    '<th scope="col" class="num">Egresos</th><th scope="col" class="num">Neto en pesos</th></tr></thead><tbody>' +
+    s.map(function(m, i){
+      if (m.futuro) return "";
+      var n = Number(m.ingresos.COP || 0) - Number(m.egresos || 0);
+      return "<tr><td>" + MESES_LARGOS[i] + '</td><td class="num">' + pesos(m.ingresos.COP || 0) + "</td>" +
+        (usd ? '<td class="num">' + (m.ingresos.USD ? dinero(m.ingresos.USD, "USD") : "—") + "</td>" : "") +
+        '<td class="num">' + pesos(m.egresos) + '</td><td class="num">' + (n < 0 ? "−" : "") + pesos(Math.abs(n)) + "</td></tr>";
+    }).join("") + "</tbody></table></details></div>";
+  return h;
+}
+/* El paso del ratón: guía vertical, los dos puntos del mes y sus cifras. */
+function armarGraficaFin(d){
+  var z = document.getElementById("fin-zona"), svg = z && z.ownerSVGElement; if (!svg) return;
+  var s = d.serie || [], G = FIN_G, ancho = G.W - G.L - G.R, alto = G.H - G.T - G.B;
+  var max = 0; s.forEach(function(m){ if (!m.futuro) max = Math.max(max, Number(m.ingresos.COP || 0), Number(m.egresos || 0)); });
+  var techo = techoBonito(max), y = function(c){ return G.T + alto - (alto * Number(c || 0)) / techo; };
+  var tip = document.getElementById("fin-tip"), g = document.getElementById("fin-hover"), caja = document.getElementById("fin-graf");
+  function mover(ev){
+    var r = svg.getBoundingClientRect(), esc2 = G.W / r.width;
+    var px = (ev.clientX - r.left) * esc2;
+    var i = Math.max(0, Math.min(11, Math.round(((px - G.L) / ancho) * 11)));
+    var m = s[i]; if (!m || m.futuro){ salir(); return; }
+    var xx = G.L + (ancho * i) / 11;
+    g.style.display = "";
+    document.getElementById("fin-hl").setAttribute("x1", xx); document.getElementById("fin-hl").setAttribute("x2", xx);
+    var hi = document.getElementById("fin-hi"), he = document.getElementById("fin-he");
+    hi.setAttribute("cx", xx); hi.setAttribute("cy", y(m.ingresos.COP || 0)); he.setAttribute("cx", xx); he.setAttribute("cy", y(m.egresos));
+    var otras = Object.keys(m.ingresos).filter(function(k){ return k !== "COP"; });
+    tip.innerHTML = "<strong>" + esc(MESES_LARGOS[i].charAt(0).toUpperCase() + MESES_LARGOS[i].slice(1) + " " + d.periodo.anio) + "</strong><br>" +
+      "Ingresos " + esc(pesos(m.ingresos.COP || 0)) + otras.map(function(k){ return " · " + esc(dinero(m.ingresos[k], k)); }).join("") + "<br>Egresos " + esc(pesos(m.egresos));
+    var cr = caja.getBoundingClientRect();
+    tip.style.left = (r.left - cr.left + xx / esc2) + "px";
+    tip.style.top = (r.top - cr.top + Math.min(y(m.ingresos.COP || 0), y(m.egresos)) / esc2) + "px";
+    tip.hidden = false;
+  }
+  function salir(){ g.style.display = "none"; tip.hidden = true; }
+  z.addEventListener("mousemove", mover);
+  z.addEventListener("mouseleave", salir);
+}
+
 var BANDEJAS = {
-  "filas": cargarAportes,
-  "t-filas": cargarReportadas,
+  "fin-resumen": cargarFinanzas,
+  "tb-aportes": cargarAportes,
+  "tb-transferencias": cargarReportadas,
   "i-filas": cargarInscripciones,
   "cs-filas": cargarCasos,
   "ins-filas": cargarInspecciones,
   "o-filas": cargarOfrecimientos,
-  "p-filas": cargarSueltos,
-  "sus-filas": cargarSuscripciones,
-  "mb-filas": cargarMiembros,
-  "ipn-filas": cargarIpn,
-  "pps-filas": cargarPaypalSueltos,
+  "tb-pagos": cargarSueltos,
+  "tb-suscripciones": cargarSuscripciones,
+  "tb-miembros": cargarMiembros,
+  "tb-ipn": cargarIpn,
+  "tb-pps": cargarPaypalSueltos,
   "e-filas": cargarEntregas,
-  "eg-filas": cargarEgresos,
-  "pr-filas": cargarProveedores,
+  "tb-egresos": cargarEgresos,
+  "tb-proveedores": cargarProveedores,
   "ob-filas": cargarVencimientos,
   "j-filas": cargarJornadas
 };
@@ -28517,6 +29959,8 @@ function armarBandejas(){
        un elemento que no existe es como no pedirlo nunca. */
     if (!el) { pedir(id); return; }
     var caja = el.closest(".med-tw") || el;
+    /* Un contenedor oculto (una sección cerrada) no tiene caja: lo pide
+       «mostrar» al abrir su sección. */
     deQuien.set(caja, id);
     obs.observe(caja);
   });
@@ -32136,7 +33580,11 @@ export default {
         const cfi = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})$/i);
         if (cfi) return await adminCasoFicha(env, cfi[1].toUpperCase());
         if (ruta === "/api/admin/aportes")  return await adminAportes(env, url, sesion.email);
-        const mv = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
+        /* Fase 2 del panel: la misma lista en CSV, con los mismos filtros, y las
+           cifras de Finanzas › Resumen. Las dos solo leen. */
+        if (ruta === "/api/admin/aportes.csv") return await adminAportesCSV(env, url);
+        if (ruta === "/api/admin/finanzas") return await adminFinanzas(env, url);
+        const mv =ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/estado$/);
         if (mv) return await adminMoverEstado(request, env, mv[1].toUpperCase(), sesion.email);
         const cw = ruta.match(/^\/api\/admin\/aporte\/([A-Za-z0-9-]+)\/conciliar$/);
         if (cw) return await adminConciliarWompi(request, env, cw[1].toUpperCase(), sesion.email);

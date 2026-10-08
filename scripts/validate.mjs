@@ -914,8 +914,10 @@ const PLANTILLAS = [
   "plantillaCorreo", "paginaTriage", "inspeccionHTML", "paginaFirma",
   "paginaCarnet", "paginaFicha", "paginaConvenio", "paginaRuta", "paginaAdmin", "sharePage",
   "paginaSocialfest",
-  /* Vive DENTRO de la plantilla de adminJS: es el popup que abre el panel. */
-  "verFicha", "verConvenio"
+  /* Vive DENTRO de la plantilla de adminJS: es el popup que abre el panel.
+     `verConvenio` salió de aquí en la Fase 2 del panel: ya no arma una
+     página en una ventana aparte, pinta el cajón. */
+  "verFicha"
 ];
 try {
   /* `<!doctype` dentro de comillas invertidas, recorriendo con estado. */
