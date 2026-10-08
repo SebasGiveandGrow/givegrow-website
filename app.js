@@ -1261,7 +1261,7 @@ var I18N = {
     "fund.btn":"Quiero aplicar",
     "grat.ey":"Programa de Gratitud",
     "grat.t":"Quien da, también recibe.",
-    "grat.lead":"Una red de empresas aliadas que ofrecen beneficios voluntarios a los miembros activos, desde el nivel Retoño.",
+    "grat.lead":"Una red de empresas aliadas que ofrecen beneficios voluntarios a los miembros activos, desde el nivel Retoño, y para los miembros de honor.",
     "imp.ey":"Impacto",
     "imp.t":"Evidencia, no promesas.",
     "imp.tab.gal":"Galería",
@@ -1551,7 +1551,7 @@ var I18N = {
     "faq.q1":"¿Cómo hago una donación?",
     "faq.a1":"En la calculadora eliges tu monto y continúas al pago: pagas con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía para seguir tu aporte. Si prefieres transferir, la cuenta de ahorros Bancolombia es la 31000009221 a nombre de Fundación Give&Grow International (NIT 901.948.930-2); repórtala después en el sitio: recibes tu número de guía al instante y subes ahí mismo el comprobante. Es mejor que mandarlo por correo, porque así tu aporte queda registrado y rastreable desde el primer minuto.",
     "faq.q2":"¿Qué es el Programa de Gratitud?",
-    "faq.a2":"Es un programa de beneficios: comercios aliados dan descuentos a los miembros activos, desde el nivel Retoño, y ganan visibilidad como negocios con propósito. La red está empezando, así que preferimos decirlo: los comercios que ya dan beneficio son los que aparecen en la página del programa, y son los únicos. Está construido para cinco categorías —gastronomía, moda, belleza, bienestar y odontología— y se van sumando de a uno. Para recibir el beneficio muestras tu carnet digital, y el comercio comprueba que esté vigente escaneando su QR con su propio celular o escribiendo el código o tu número de cédula en thegiveandgrowproject.org/verificar.",
+    "faq.a2":"Es un programa de beneficios: comercios aliados dan descuentos a los miembros activos, desde el nivel Retoño, y a los miembros de honor, y ganan visibilidad como negocios con propósito. La red está empezando, así que preferimos decirlo: los comercios que ya dan beneficio son los que aparecen en la página del programa, y son los únicos. Está construido para cinco categorías —gastronomía, moda, belleza, bienestar y odontología— y se van sumando de a uno. Para recibir el beneficio muestras tu carnet digital, y el comercio comprueba que esté vigente escaneando su QR con su propio celular o escribiendo el código o tu número de cédula en thegiveandgrowproject.org/verificar.",
     "faq.q3":"¿Cómo funciona el beneficio tributario?",
     "faq.a3":"Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación. Si donas en dinero, el aporte debe pasar por el sistema financiero. Por ejemplo, $4.000.000 COP donados pueden significar hasta $1.000.000 COP menos en tu impuesto. No somos asesores tributarios: confírmalo con tu contador.",
     "faq.q4":"¿Puedo ser voluntario?",
@@ -1749,7 +1749,7 @@ var I18N = {
     "membres.ben.ey":"Lo que recibes",
     "membres.ben.t":"Beneficios que crecen contigo.",
     "membres.ben.1.t":"Programa de Gratitud",
-    "membres.ben.1.p":"Beneficios que empresas aliadas ofrecen de forma voluntaria, en gratitud por el impacto. Disponible desde el nivel Retoño; estamos sumando aliados.",
+    "membres.ben.1.p":"Beneficios que empresas aliadas ofrecen de forma voluntaria, en gratitud por el impacto. Disponible desde el nivel Retoño, y para los miembros de honor; estamos sumando aliados.",
     "membres.ben.2.t":"Certificado y carnet",
     "membres.ben.2.p":"Tu certificado de donación para el beneficio tributario en Colombia y tu carnet digital de miembro, que se renueva con cada aporte.",
     "membres.ben.3.t":"Reportes de impacto",
@@ -1803,7 +1803,7 @@ var I18N = {
     "grat.you.ey":"Para todos",
     "grat.you.t":"Dos caras de la misma gratitud.",
     "grat.you.mem.t":"Si eres miembro",
-    "grat.you.mem.p":"Con tu carnet digital accedes a beneficios en comercios aliados, desde el nivel Retoño. El comercio lo comprueba por su cuenta, desde su propio celular.",
+    "grat.you.mem.p":"Con tu carnet digital accedes a beneficios en comercios aliados, desde el nivel Retoño, y para los miembros de honor. El comercio lo comprueba por su cuenta, desde su propio celular.",
     "grat.you.biz.t":"Si eres comercio",
     "grat.you.biz.p":"Sumas tu negocio sin costo, ganas visibilidad como marca con propósito y llegas a una comunidad que valora a quien da.",
     "grat.cats.ey":"Categorías",
@@ -5809,7 +5809,7 @@ function renderEmpresas(){
 // por ser documento largo). Adaptado del doc legal v1.0: cookies = realidad del sitio
 // (Cloudflare sin cookies), sin citar % tributario para no reabrir la inconsistencia.
 var PRIVACY = {
-  es: `<p class="legal-meta">Versión 1.1 · Vigente desde el 8 de octubre de 2026 · Conforme a la Ley 1581 de 2012 (Colombia), su Decreto 1377 de 2013 y el Reglamento General de Protección de Datos (GDPR, Unión Europea).</p>
+  es: `<p class="legal-meta">Versión 1.2 · Vigente desde el 8 de octubre de 2026 · Conforme a la Ley 1581 de 2012 (Colombia), su Decreto 1377 de 2013 y el Reglamento General de Protección de Datos (GDPR, Unión Europea).</p>
 <h2>1. Responsable del tratamiento</h2>
 <ul>
 <li><strong>Razón social:</strong> Fundación Give&amp;Grow International</li>
@@ -5827,7 +5827,8 @@ var PRIVACY = {
 <li><strong>Voluntarios:</strong> datos de identificación y profesionales — para verificar idoneidad y asignarte a los programas.</li>
 <li><strong>Beneficiarios de programas:</strong> datos entregados por las fundaciones aliadas para ejecutar y documentar el impacto. Los datos de niñas, niños y adolescentes reciben protección reforzada y solo se tratan con autorización de su representante legal.</li>
 </ul>
-<p><strong>Membresías y carnet de miembro.</strong> Tu carnet digital se puede comprobar en <code>thegiveandgrowproject.org/verificar</code>. Mientras tu membresía esté vigente, un comercio aliado del Programa de Gratitud puede confirmarla escribiendo el código de verificación de tu carnet o el número de documento que registraste al pagar o al pedir tu certificado. La respuesta muestra solo tu nombre de pila y la inicial de tu apellido, tu nivel y la vigencia; nunca tu documento ni tus datos de contacto. Cuando la membresía deja de estar vigente, tu número de documento ya no devuelve ningún resultado; solo el código de tu propio carnet sigue indicando que no está vigente. El número consultado no viaja en la dirección de la página ni aparece en la respuesta.</p>
+<p><strong>Membresías y carnet de miembro.</strong> Tu carnet digital se puede comprobar en <code>thegiveandgrowproject.org/verificar</code>. Mientras tu membresía esté vigente, un comercio aliado del Programa de Gratitud puede confirmarla escribiendo el código de verificación de tu carnet o el número de documento que registraste al pagar o al pedir tu certificado. La respuesta muestra solo tu nombre de pila y la inicial de tu apellido, tu nivel o tu distinción y la vigencia; nunca tu documento ni tus datos de contacto. Cuando la membresía deja de estar vigente, tu número de documento ya no devuelve ningún resultado; solo el código de tu propio carnet sigue indicando que no está vigente. El número consultado no viaja en la dirección de la página ni aparece en la respuesta.</p>
+<p><strong>Carnets de miembro de honor.</strong> La fundación también emite, <strong>por invitación</strong>, carnets de miembro de honor a personas que reconoce con una distinción (por ejemplo, fundador/a, pionero/a, coordinador/a voluntario/a, aliado/a de la red, embajador/a o integrante de la Junta de Asesores, un grupo honorario y asesor sin funciones de dirección). Para emitirlo guardamos tu nombre, tu correo, la distinción y su vigencia y, <strong>solo si nos autorizas expresamente</strong>, tu tipo y número de documento; esa autorización queda registrada. Usamos esos datos para emitir y enviarte el carnet y para que se pueda verificar, con las mismas reglas de arriba: por su código siempre, y por tu número de documento solo si lo autorizaste y mientras el carnet esté vigente. Puedes pedir en cualquier momento que retiremos tu documento o tu carnet.</p>
 <h2>3. Base legal</h2>
 <p>Tratamos tus datos con tu <strong>autorización previa, expresa e informada</strong>, que recogemos por formulario físico o digital (con registro de fecha). Puedes revocarla en cualquier momento. Para titulares en la Unión Europea aplicamos las bases del Artículo 6 del GDPR (consentimiento, ejecución de un contrato, obligación legal o interés legítimo, según el caso).</p>
 <h2>4. Tus derechos</h2>
@@ -5851,9 +5852,10 @@ var PRIVACY = {
 <h2>9. Cookies y analítica</h2>
 <p>Este sitio <strong>no usa cookies de rastreo ni de marketing, ni píxeles de terceros.</strong> Para entender el uso del sitio empleamos <strong>Cloudflare Web Analytics, que no instala cookies ni identifica a las personas.</strong> Solo guardamos tu <strong>preferencia de tema (claro u oscuro)</strong> en tu navegador, y en una cookie técnica (<code>gg-tema</code>) que solo sirve para que las páginas sin JavaScript —como el carnet o el verificador— se muestren en el tema que elegiste. No te identifica, no es de seguimiento y no se usa para nada más.</p>
 <h2>10. Vigencia y cambios</h2>
-<p>Esta política (Versión 1.1) rige desde el 8 de octubre de 2026 y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>
-<p><strong>Cambios frente a la Versión 1.0:</strong> se añadió cómo un comercio aliado puede confirmar una membresía vigente con el código del carnet o el número de documento (sección 2), y se declaró la cookie técnica que guarda la preferencia de tema (sección 9).</p>`,
-  en: `<p class="legal-meta">Version 1.1 · Effective October 8, 2026 · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
+<p>Esta política (Versión 1.2) rige desde el 8 de octubre de 2026 y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>
+<p><strong>Cambios frente a la Versión 1.1:</strong> se añadieron los carnets de miembro de honor, que la fundación emite por invitación: qué datos guardamos para emitirlos (nombre, correo y, solo con tu autorización, tu documento) y cómo se verifican (sección 2).</p>
+<p><strong>Cambios de la Versión 1.1 frente a la 1.0:</strong> se añadió cómo un comercio aliado puede confirmar una membresía vigente con el código del carnet o el número de documento (sección 2), y se declaró la cookie técnica que guarda la preferencia de tema (sección 9).</p>`,
+  en: `<p class="legal-meta">Version 1.2 · Effective October 8, 2026 · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
 <h2>1. Data controller</h2>
 <ul>
 <li><strong>Legal name:</strong> Fundación Give&amp;Grow International</li>
@@ -5871,7 +5873,8 @@ var PRIVACY = {
 <li><strong>Volunteers:</strong> identification and professional data — to verify suitability and assign you to programs.</li>
 <li><strong>Program beneficiaries:</strong> data provided by partner foundations to deliver and document impact. Data of children and adolescents receives reinforced protection and is processed only with their legal guardian's authorization.</li>
 </ul>
-<p><strong>Memberships and member card.</strong> Your digital card can be checked at <code>thegiveandgrowproject.org/verificar</code>. While your membership is active, a Gratitude Programme partner business can confirm it by typing your card's verification code or the ID number you gave when paying or when asking for your certificate. The answer shows only your first name and the initial of your surname, your level and its validity; never your ID number or your contact details. Once the membership is no longer active, your ID number returns no result; only your own card's code still shows that it is not valid. The number checked does not travel in the page address and does not appear in the answer.</p>
+<p><strong>Memberships and member card.</strong> Your digital card can be checked at <code>thegiveandgrowproject.org/verificar</code>. While your membership is active, a Gratitude Programme partner business can confirm it by typing your card's verification code or the ID number you gave when paying or when asking for your certificate. The answer shows only your first name and the initial of your surname, your level or your distinction and its validity; never your ID number or your contact details. Once the membership is no longer active, your ID number returns no result; only your own card's code still shows that it is not valid. The number checked does not travel in the page address and does not appear in the answer.</p>
+<p><strong>Honorary member cards.</strong> The foundation also issues, <strong>by invitation</strong>, honorary member cards to people it recognises with a distinction (for example founder, pioneer, volunteer coordinator, network ally, ambassador, or member of the Advisory Board, an honorary advisory group with no governing role). To issue one we keep your name, your email, the distinction and its validity and, <strong>only if you expressly authorise it</strong>, your ID type and number; that authorisation is recorded. We use this data to issue and send you the card and so that it can be checked, under the same rules as above: always by its code, and by your ID number only if you authorised it and while the card is valid. You can ask us at any time to remove your ID number or your card.</p>
 <h2>3. Legal basis</h2>
 <p>We process your data with your <strong>prior, express and informed authorization</strong>, collected through a physical or digital form (with a timestamp). You may revoke it at any time. For data subjects in the European Union we rely on the bases in Article 6 of the GDPR (consent, performance of a contract, legal obligation or legitimate interest, as applicable).</p>
 <h2>4. Your rights</h2>
@@ -5895,8 +5898,9 @@ var PRIVACY = {
 <h2>9. Cookies and analytics</h2>
 <p>This site <strong>uses no tracking or marketing cookies, and no third-party pixels.</strong> To understand site usage we use <strong>Cloudflare Web Analytics, which sets no cookies and does not identify individuals.</strong> We only store your <strong>theme preference (light or dark)</strong> in your browser, and in a technical cookie (<code>gg-tema</code>) whose only purpose is to show pages that run without JavaScript —such as the member card or the verifier— in the theme you chose. It does not identify you, is not used for tracking and serves no other purpose.</p>
 <h2>10. Term and changes</h2>
-<p>This policy (Version 1.1) is effective as of October 8, 2026 and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>
-<p><strong>Changes from Version 1.0:</strong> we added how a partner business can confirm an active membership with the card's code or the member's ID number (section 2), and we disclosed the technical cookie that stores the theme preference (section 9).</p>`
+<p>This policy (Version 1.2) is effective as of October 8, 2026 and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>
+<p><strong>Changes from Version 1.1:</strong> we added honorary member cards, which the foundation issues by invitation: what data we keep to issue them (name, email and, only with your authorisation, your ID number) and how they are checked (section 2).</p>
+<p><strong>Changes in Version 1.1 from 1.0:</strong> we added how a partner business can confirm an active membership with the card's code or the member's ID number (section 2), and we disclosed the technical cookie that stores the theme preference (section 9).</p>`
 };
 function renderPrivacy(){
   var el = document.getElementById("privacy-body"); if (!el) return;
