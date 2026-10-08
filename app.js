@@ -2054,7 +2054,7 @@ var I18N = {
     "ficha.share.copied":"Enlace copiado",
     /* Social Fest 2026 (#socialfest): la página del QR. */
     "sf.ey":"Social Fest 2026 · Ruta N, Medellín",
-    "sf.t":"Aquí nadie viene a mirar.",
+    "sf.t":"Una alianza, muchas realidades.",
     "sf.lead":"Somos Give&Grow, una fundación de Medellín que une a empresas, personas y fundaciones de base para que cada apoyo llegue a quien lo necesita y quede documentado.",
     "sf.p.emp.k":"Soy empresa",
     "sf.p.emp.d":"Un piloto de Impact Journey con tu equipo, ida y vuelta, sin cuota de participación.",
