@@ -5809,7 +5809,7 @@ function renderEmpresas(){
 // por ser documento largo). Adaptado del doc legal v1.0: cookies = realidad del sitio
 // (Cloudflare sin cookies), sin citar % tributario para no reabrir la inconsistencia.
 var PRIVACY = {
-  es: `<p class="legal-meta">Versión 1.0 · Vigente desde su publicación · Conforme a la Ley 1581 de 2012 (Colombia), su Decreto 1377 de 2013 y el Reglamento General de Protección de Datos (GDPR, Unión Europea).</p>
+  es: `<p class="legal-meta">Versión 1.1 · Vigente desde el 8 de octubre de 2026 · Conforme a la Ley 1581 de 2012 (Colombia), su Decreto 1377 de 2013 y el Reglamento General de Protección de Datos (GDPR, Unión Europea).</p>
 <h2>1. Responsable del tratamiento</h2>
 <ul>
 <li><strong>Razón social:</strong> Fundación Give&amp;Grow International</li>
@@ -5851,8 +5851,9 @@ var PRIVACY = {
 <h2>9. Cookies y analítica</h2>
 <p>Este sitio <strong>no usa cookies de rastreo ni de marketing, ni píxeles de terceros.</strong> Para entender el uso del sitio empleamos <strong>Cloudflare Web Analytics, que no instala cookies ni identifica a las personas.</strong> Solo guardamos tu <strong>preferencia de tema (claro u oscuro)</strong> en tu navegador, y en una cookie técnica (<code>gg-tema</code>) que solo sirve para que las páginas sin JavaScript —como el carnet o el verificador— se muestren en el tema que elegiste. No te identifica, no es de seguimiento y no se usa para nada más.</p>
 <h2>10. Vigencia y cambios</h2>
-<p>Esta política (Versión 1.0) rige desde su publicación y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>`,
-  en: `<p class="legal-meta">Version 1.0 · Effective upon publication · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
+<p>Esta política (Versión 1.1) rige desde el 8 de octubre de 2026 y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>
+<p><strong>Cambios frente a la Versión 1.0:</strong> se añadió cómo un comercio aliado puede confirmar una membresía vigente con el código del carnet o el número de documento (sección 2), y se declaró la cookie técnica que guarda la preferencia de tema (sección 9).</p>`,
+  en: `<p class="legal-meta">Version 1.1 · Effective October 8, 2026 · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
 <h2>1. Data controller</h2>
 <ul>
 <li><strong>Legal name:</strong> Fundación Give&amp;Grow International</li>
@@ -5894,7 +5895,8 @@ var PRIVACY = {
 <h2>9. Cookies and analytics</h2>
 <p>This site <strong>uses no tracking or marketing cookies, and no third-party pixels.</strong> To understand site usage we use <strong>Cloudflare Web Analytics, which sets no cookies and does not identify individuals.</strong> We only store your <strong>theme preference (light or dark)</strong> in your browser, and in a technical cookie (<code>gg-tema</code>) whose only purpose is to show pages that run without JavaScript —such as the member card or the verifier— in the theme you chose. It does not identify you, is not used for tracking and serves no other purpose.</p>
 <h2>10. Term and changes</h2>
-<p>This policy (Version 1.0) is effective upon publication and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>`
+<p>This policy (Version 1.1) is effective as of October 8, 2026 and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>
+<p><strong>Changes from Version 1.0:</strong> we added how a partner business can confirm an active membership with the card's code or the member's ID number (section 2), and we disclosed the technical cookie that stores the theme preference (section 9).</p>`
 };
 function renderPrivacy(){
   var el = document.getElementById("privacy-body"); if (!el) return;
