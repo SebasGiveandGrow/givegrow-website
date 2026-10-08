@@ -652,6 +652,13 @@ async function dibujarCarnet(pdf, h, f, c) {
 
   /* el anverso */
   p.drawSvgPath(rectRedondo(W, H, R), { x: x0, y: yTop, color: hexRgb(c.tinte[0]) });
+  /* LA DE HONOR (0040): el filo interior en el acento arena, como en la
+     página. `c.honor` lo decide worker.js (`carnetParaDocumento`). */
+  const hon = c.honor || null;
+  const acento = hon ? hexRgb(hon.acento) : null;
+  if (hon) {
+    p.drawSvgPath(rectRedondo(W - 12, H - 12, R - 4), { x: x0 + 6, y: yTop - 6, borderColor: acento, borderWidth: 0.6, borderOpacity: 0.5 });
+  }
   p.drawText("&", { x: x0 + W - 92, y: yTop - H - 26, size: 150, font: f.negrita, color: blanco, opacity: 0.06 });
   const pad = 15;
   p.drawText("&", { x: x0 + pad, y: yTop - pad - 17, size: 21, font: f.negrita, color: rgb(0.612, 0.796, 0.663) });
@@ -664,13 +671,33 @@ async function dibujarCarnet(pdf, h, f, c) {
   p.drawSvgPath(rectRedondo(chipW, 16, 8), { x: x0 + W - pad - chipW, y: yTop - pad + 2, borderColor: chipColor, borderWidth: 1.1, color: hexRgb(c.tinte[1]) });
   p.drawText(chipT, { x: x0 + W - pad - chipW + 9, y: yTop - pad - 9.5, size: 8, font: f.negrita, color: chipColor });
 
-  conTracking(p, String(c.nivelTxt).toUpperCase(), x0 + pad, yTop - 78, 6.4, f.negrita, blanco, 1.1, 0.85);
-  let tn = 15;
-  const nombre = winansi(c.nombre);
-  while (tn > 9 && f.negrita.widthOfTextAtSize(nombre, tn) > W - pad * 2) tn -= 0.5;
-  let nom = nombre;
-  while (nom.length > 1 && f.negrita.widthOfTextAtSize(nom, tn) > W - pad * 2) nom = nom.slice(0, -1);
-  p.drawText(nom, { x: x0 + pad, y: yTop - 97, size: tn, font: f.negrita, color: blanco });
+  /* Lo que cabe en un ancho: se achica hasta `min` y, si aun así no cabe, se
+     corta. Un nombre largo no se sale de la tarjeta. */
+  const ajustar = (txt, max, min, fuente) => {
+    let t = max;
+    const s = winansi(txt);
+    while (t > min && fuente.widthOfTextAtSize(s, t) > W - pad * 2) t -= 0.5;
+    let x = s;
+    while (x.length > 1 && fuente.widthOfTextAtSize(x, t) > W - pad * 2) x = x.slice(0, -1);
+    return [x, t];
+  };
+  let yNombre = yTop - 97, tnMax = 15;
+  if (hon) {
+    conTracking(p, String(c.nivelTxt).toUpperCase(), x0 + pad, yTop - 56, 6.4, f.negrita, acento, 1.1, 1);
+    if (hon.distincion) {
+      const [dt, dtam] = ajustar(hon.distincion, 12, 8, f.negrita);
+      p.drawText(dt, { x: x0 + pad, y: yTop - 71, size: dtam, font: f.negrita, color: acento });
+    }
+    if (hon.contexto) {
+      const [ct, ctam] = ajustar(hon.contexto, 7, 6, f.normal);
+      p.drawText(ct, { x: x0 + pad, y: yTop - 82, size: ctam, font: f.normal, color: blanco, opacity: 0.8 });
+    }
+    yNombre = yTop - 101; tnMax = 13;
+  } else {
+    conTracking(p, String(c.nivelTxt).toUpperCase(), x0 + pad, yTop - 78, 6.4, f.negrita, blanco, 1.1, 0.85);
+  }
+  const [nom, tn] = ajustar(c.nombre, tnMax, 9, f.negrita);
+  p.drawText(nom, { x: x0 + pad, y: yNombre, size: tn, font: f.negrita, color: blanco });
 
   const yEt = yTop - H + pad + 13, yVal = yTop - H + pad + 1;
   conTracking(p, String(c.etNumero).toUpperCase(), x0 + pad, yEt, 5.2, f.normal, blanco, 0.8, 0.7);
@@ -678,8 +705,17 @@ async function dibujarCarnet(pdf, h, f, c) {
   const x2 = x0 + pad + mono.widthOfTextAtSize(winansi(c.numero), 8.6) + 16;
   conTracking(p, String(c.etHasta).toUpperCase(), x2, yEt, 5.2, f.normal, blanco, 0.8, 0.7);
   p.drawText(winansi(c.hasta), { x: x2, y: yVal, size: 8.6, font: mono, color: blanco });
-  for (let i = 0; i < 4; i++) {
-    p.drawRectangle({ x: x0 + W - pad - 4 * 13 + i * 13 + 3, y: yVal + 2, width: 10, height: 2.6, color: blanco, opacity: i <= c.indice ? 0.9 : 0.25 });
+  if (hon) {
+    /* En la de honor, el nivel pagado en pequeño en lugar de la escala. */
+    if (hon.nivel) {
+      const tx = String(hon.nivel).toUpperCase();
+      const ancho = tx.length * 0.7 + f.normal.widthOfTextAtSize(winansi(tx), 5.2);
+      conTracking(p, tx, x0 + W - pad - ancho, yVal + 1, 5.2, f.normal, blanco, 0.7, 0.75);
+    }
+  } else {
+    for (let i = 0; i < 4; i++) {
+      p.drawRectangle({ x: x0 + W - pad - 4 * 13 + i * 13 + 3, y: yVal + 2, width: 10, height: 2.6, color: blanco, opacity: i <= c.indice ? 0.9 : 0.25 });
+    }
   }
 
   /* el reverso, al lado: QR, código y la hora a la que se generó */
