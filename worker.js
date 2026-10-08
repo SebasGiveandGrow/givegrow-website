@@ -937,6 +937,12 @@ async function anotarCorreo(env, fila) {
    como problema llenaria la tabla de ruido. Solo los once que dependen de la
    configuracion. */
 async function avisoSinBuzon(env, etiqueta) {
+  /* En la vista previa no se escribe nada: se dice que ese aviso no tendría a
+     dónde ir, que es lo que la persona necesita saber antes de confirmar. */
+  if (env && Array.isArray(env.__previa)) {
+    env.__previa.push({ para: "", asunto: "", texto: "", etiqueta: etiqueta || "", sin_buzon: true, adjuntos: [] });
+    return { ok: true, sinDestino: true };
+  }
   try {
     await env.DB.prepare(
       "INSERT INTO correos (etiqueta, para, asunto, resultado, error) VALUES (?, ?, ?, 'sin_destino', ?)"
@@ -1055,6 +1061,17 @@ function buzonDeRespuesta(env, etiqueta) {
 }
 
 async function enviarCorreo(env, { para, asunto, texto, html, etiqueta, adjuntos, guia, msTope, responderA }) {
+  /* LA VISTA PREVIA DEL PANEL (Fase 1 del panel, oct 2026). Antes de un clic
+     que escribe a alguien de fuera, el panel enseña a quién, con qué asunto y
+     qué dice. Para no mantener una segunda copia de cada plantilla, la vista
+     previa llama a las MISMAS funciones `correo*` con un `env` que lleva
+     `__previa`: aquí se recoge el correo y se devuelve sin enviarlo, sin
+     anotarlo y sin gastar cupo. Ver `adminPrevia`. */
+  if (env && Array.isArray(env.__previa)) {
+    env.__previa.push({ para: para || "", asunto: asunto || "", texto: texto || "", etiqueta: etiqueta || "",
+                        adjuntos: (adjuntos || []).map((a) => a && a.filename).filter(Boolean) });
+    return { ok: true, previa: true };
+  }
   const llave = env.RESEND_API_KEY;
   const desde = env.CORREO_DESDE || CORREO_DESDE_DEF;
   const base = { etiqueta, para, asunto, guia };
@@ -2611,14 +2628,25 @@ async function apiGracias(env, url) {
    detrás de Access, y así el JS del panel no vive en el bundle público.
    ======================================================================== */
 
+/* «CERTIFICADOS POR EMITIR» ES UN SOLO NÚMERO (Fase 1 del panel, oct 2026).
+   La auditoría del panel encontró tres cifras distintas para lo mismo en la
+   misma pantalla —14 en la ficha de la cabecera, 16 en la franja de Aportes y
+   15 en «Hoy»— porque salían de tres consultas: la cabecera contaba solo
+   `aprobada` y no miraba si ya había certificado. Desde aquí las tres leen esta
+   condición: «Hoy» y las insignias por la cola `certificados_por_emitir`, la
+   franja de Aportes por `conteoCertificados`, y este resumen igual. Cambiar la
+   regla es cambiar esta línea. */
+const CERT_POR_EMITIR =
+  "FROM aportes a WHERE a.quiere_certificado = 1 " +
+  "AND a.estado IN ('aprobada','en_distribucion','entregada') AND NOT EXISTS " +
+  "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)";
+
 async function adminResumen(env) {
   const porEstado = await env.DB.prepare(
     "SELECT estado, COUNT(*) AS n, COALESCE(SUM(monto_centavos),0) AS centavos " +
     "FROM aportes GROUP BY estado"
   ).all();
-  const cert = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM aportes WHERE quiere_certificado = 1 AND estado = 'aprobada'"
-  ).first();
+  const cert = await env.DB.prepare("SELECT COUNT(*) AS n " + CERT_POR_EMITIR).first();
   const recurrentes = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM aportes WHERE frecuencia <> 'unico' AND estado = 'aprobada'"
   ).first();
@@ -2685,7 +2713,94 @@ const PAYPAL_SIN_CASA =
   " OR (e.tipo IN ('PAYMENT.SALE.COMPLETED','PAYMENT.CAPTURE.COMPLETED') AND s.id IS NULL) " +
   " OR e.resultado IN ('sin_regla','reversa_sin_aporte','donacion_sin_guia'))";
 
-async function adminSalud(env) {
+/* «HOY» COMO BANDEJA DE ENTRADA (Fase 1 del panel, oct 2026).
+   ----------------------------------------------------------------------------
+   Cada cola trae, además de su número, sus CINCO filas más viejas: quien abre
+   «Hoy» ve a quién se espera —nombre, monto, desde cuándo— y puede actuar ahí
+   mismo, en vez de un «Ir» que lo soltaba a cinco mil píxeles de distancia.
+
+   LAS FILAS SALEN DE LA MISMA CONSULTA QUE EL NÚMERO. No hay una segunda
+   condición escrita a mano que pueda divergir: `itemsDeCola` toma el `FROM …
+   WHERE …` de la consulta que cuenta y le cambia solo lo que se selecciona.
+   Aquí se escribe únicamente QUÉ columnas enseñar de cada cola, con cuatro
+   nombres fijos que el panel sabe pintar: `id` (lo que identifica la fila y
+   lleva la acción), `titulo` (quién), `detalle` (lo que hay que saber) y
+   `monto` (centavos, si es dinero). La antigüedad es la misma expresión que
+   decide «la más vieja hace N días».
+
+   Una cola sin entrada aquí sale sin filas, con su número y su «Ver todo»: no
+   todas tienen algo que mirar fila por fila (los correos sin buzón, por
+   ejemplo, son un ajuste de configuración). */
+const NOMBRE_DONANTE_SQL = "(SELECT d.nombre FROM donantes d WHERE d.id = donante_id)";
+const ITEMS_COLA = {
+  fundaciones_sin_respuesta: "id AS id, nombre AS titulo, COALESCE(ciudad, '') AS detalle",
+  empresas_sin_respuesta: "id AS id, nombre AS titulo, COALESCE(ciudad, '') AS detalle",
+  ofrecimientos_sin_respuesta: "id AS id, nombre AS titulo, COALESCE(json_extract(datos, '$.detalle'), json_extract(datos, '$.categoria'), '') AS detalle",
+  apadrinamientos_sin_respuesta: "id AS id, nombre AS titulo, COALESCE(ciudad, '') AS detalle",
+  voluntarios_sin_respuesta: "id AS id, nombre AS titulo, COALESCE(json_extract(datos, '$.oficio'), '') AS detalle",
+  voluntarios_detenidos: "id AS id, nombre AS titulo, COALESCE(json_extract(datos, '$.oficio'), '') AS detalle",
+  jornadas_sin_cerrar: "id AS id, nombre AS titulo, fecha AS detalle",
+  fundaciones_detenidas: "i.id AS id, i.nombre AS titulo, i.estado AS detalle",
+  convenios_en_curso: "id AS id, nombre AS titulo, COALESCE(ciudad, '') AS detalle",
+  convenios_por_firmar: "i.id AS id, i.nombre AS titulo, COALESCE(i.ciudad, '') AS detalle",
+  transferencias_sin_verificar: "guia AS id, " + NOMBRE_DONANTE_SQL + " AS titulo, " +
+    "COALESCE(referencia_pago, '') AS detalle, monto_centavos AS monto",
+  certificados_por_emitir: "a.guia AS id, (SELECT d.nombre FROM donantes d WHERE d.id = a.donante_id) AS titulo, " +
+    "'' AS detalle, a.monto_centavos AS monto",
+  certificados_sin_firmar: "numero AS id, json_extract(datos, '$.donante_nombre') AS titulo, " +
+    "guia AS detalle, json_extract(datos, '$.monto_centavos') AS monto",
+  certificados_en_revision: "numero AS id, json_extract(datos, '$.donante_nombre') AS titulo, " +
+    "guia AS detalle, json_extract(datos, '$.monto_centavos') AS monto",
+  ipn_por_registrar: "id AS id, COALESCE(txn_type, estado) AS titulo, COALESCE(moneda, '') AS detalle",
+  suscripciones_sin_aprobar: "id AS id, " + NOMBRE_DONANTE_SQL + " AS titulo, COALESCE(nivel, '') AS detalle",
+  paypal_sin_casa: "e.evento_id AS id, e.tipo AS titulo, COALESCE(e.resultado, '') AS detalle",
+  correos_fallidos: "id AS id, etiqueta AS titulo, para AS detalle",
+  correos_sin_cupo: "id AS id, etiqueta AS titulo, para AS detalle",
+  entregas_en_borrador: "numero AS id, COALESCE(sector, '') AS titulo, fecha AS detalle",
+  entregadas_sin_acta: "a.guia AS id, (SELECT d.nombre FROM donantes d WHERE d.id = a.donante_id) AS titulo, " +
+    "COALESCE(a.destino_id, 'Fondo general') AS detalle, a.monto_centavos AS monto",
+  actas_sin_donante: "g.numero AS id, COALESCE(g.sector, '') AS titulo, g.destino_id AS detalle",
+  casos_sin_evaluar: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
+  espera_sin_correo: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
+  concepto_sin_avisar: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
+  urgentes_sin_visitar: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
+  casos_esperando_fotos: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
+  casos_respondieron: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
+  ingenieros_sin_verificar: "id AS id, nombre AS titulo, COALESCE(json_extract(datos, '$.matricula'), 'sin matrícula') AS detalle",
+  conceptos_sin_respaldo: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
+  visitadas_sin_materiales: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
+  terreno_sin_atender: "numero AS id, COALESCE(propietario, caso, numero) AS titulo, " +
+    "municipio || COALESCE(' · casa ' || casa_no, '') AS detalle"
+};
+const ITEMS_POR_COLA = 5;
+/* `SELECT COUNT(*) AS n, MIN(<t>) AS masViejo <FROM … WHERE …>` → las filas.
+   Si una consulta no tiene esa forma, la cola sale sin filas y no se rompe
+   nada: el número sigue siendo el de siempre. */
+function itemsDeCola(sql, campos) {
+  const m = String(sql).match(/^SELECT COUNT\(\*\) AS n, MIN\(([\s\S]*)\) AS masViejo (FROM [\s\S]*)$/);
+  if (!m || !campos) return null;
+  return "SELECT " + campos + ", " + m[1] + " AS t " + m[2] + " ORDER BY t ASC LIMIT " + ITEMS_POR_COLA;
+}
+
+/* LAS TRES FRANJAS DE «HOY»: urgente, hoy y esta semana.
+   Lo que la portada hacía antes era poner primero TODO lo vencido, pesara lo
+   que pesara: una fundación con el plazo de respuesta pasado salía por encima
+   de «Inspecciones de terreno sin atender», que es una casa donde un ingeniero
+   dijo que corre. Ahora el orden es la franja, y dentro de la franja, el PESO
+   (`orden`) primero y la fecha después.
+   · Urgente: lo de peso 15 o menos —familias en riesgo, documentos jurados sin
+     respaldo, vencimientos legales— y toda promesa a alguien de fuera que ya
+     pasó su plazo.
+   · Hoy: lo que destraba a esas personas o al dinero (peso hasta 60).
+   · Esta semana: papeles y oficina, que no se rompen por esperar unos días. */
+function bandaDeCola(c) {
+  if (c.vencida || (c.orden != null && c.orden <= 15)) return "urgente";
+  if (c.orden != null && c.orden <= 60) return "hoy";
+  return "semana";
+}
+
+async function adminSalud(env, opciones) {
+  const conItems = !!(opciones && opciones.items);
   const uno = async (sql) => (await env.DB.prepare(sql).first()) || {};
 
   /* Embudo. Se mide sobre `aportes` y no sobre los eventos de Wompi porque el
@@ -2746,23 +2861,36 @@ async function adminSalud(env) {
      esperando. `cuando` es el texto que el panel pone en vez de la antiguedad. */
   const enCola = async (clave, sql, comoSeArregla, orden, destino, plazo) => {
     if (typeof sql !== "string") {
-      cola.push({
+      const c = {
         clave, n: sql.n || 0, dias: null, cuando: sql.cuando || null,
         arreglo: comoSeArregla, orden: orden, destino: destino || null,
         plazo: null, vencida: !!sql.vencida
-      });
+      };
+      c.banda = bandaDeCola(c);
+      if (conItems && c.n && sql.items) c.items = sql.items;
+      cola.push(c);
       return;
     }
     const r = await uno(sql);
     const dias = r.n ? Math.floor((Date.now() - Date.parse((r.masViejo || "").replace(" ", "T") + "Z")) / 86400000) : null;
-    cola.push({
+    const c = {
       clave, n: r.n || 0,
       dias,
       arreglo: comoSeArregla,
       orden: orden, destino: destino || null,
       plazo: plazo == null ? null : plazo,
       vencida: plazo != null && dias != null && dias > plazo
-    });
+    };
+    c.banda = bandaDeCola(c);
+    /* Las filas solo se piden para el panel y solo si hay algo: el resumen
+       diario por correo llama a esta misma función y no las necesita. Si la
+       consulta de filas falla, la cola sale igual con su número. */
+    const qi = conItems && c.n ? itemsDeCola(sql, ITEMS_COLA[clave]) : null;
+    if (qi) {
+      try { c.items = ((await env.DB.prepare(qi).all()).results || []); }
+      catch (e) { console.error("filas de la cola", clave, e && e.message); }
+    }
+    cola.push(c);
   };
   /* Sin los ingenieros: tienen su propia cola, con su propio «cómo se arregla»
      —buscar la matrícula en el COPNIA—, y contarlos dos veces inflaba el panel
@@ -2857,9 +2985,7 @@ async function adminSalud(env) {
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
     "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado", 60, "#sec-transferencias");
   await enCola("certificados_por_emitir",
-    "SELECT COUNT(*) AS n, MIN(aprobada_en) AS masViejo FROM aportes a WHERE a.quiere_certificado = 1 " +
-    "AND a." + PAGADA + " AND NOT EXISTS " +
-    "(SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)",
+    "SELECT COUNT(*) AS n, MIN(a.aprobada_en) AS masViejo " + CERT_POR_EMITIR,
     "Lista de aportes · los firma la Revisora Fiscal, no el sistema", 70, "#sec-aportes");
   /* EMITIDO NO ES FIRMADO, y esta cola nació con la pantalla de firma: sin ella,
      un certificado podía quedarse esperando una firma para siempre y nada lo
@@ -3208,7 +3334,13 @@ async function adminSalud(env) {
   const porVencer = await vencimientosPorAtender(env);
   const encima = porVencer.filter((x) => x.vencida || x.dias <= OBLIGACIONES_DIAS_CORREO);
   await enCola("vencimientos_por_atender",
-    { n: porVencer.length, vencida: encima.length > 0, cuando: porVencer.length ? cuandoVence(porVencer[0]) : null },
+    { n: porVencer.length, vencida: encima.length > 0, cuando: porVencer.length ? cuandoVence(porVencer[0]) : null,
+      /* Sus filas: la obligación y cuándo vence. `clave` y `fecha` son lo que
+         pide el botón «Hecho» de «Hoy», igual que el de la tabla. */
+      items: porVencer.slice(0, ITEMS_POR_COLA).map((x) => ({
+        id: x.clave + "|" + x.fecha, titulo: x.titulo, detalle: x.periodo + " · " + x.entidad,
+        cuando: cuandoVence(x), clave: x.clave, fecha: x.fecha, corto: x.corto, periodo: x.periodo
+      })) },
     "Contabilidad › Vencimientos · " + (porVencer.length
       ? porVencer.slice(0, 3).map((x) => x.corto + ", " + x.periodo + ": " + cuandoVence(x)).join("; ") +
         (porVencer.length > 3 ? "; y " + (porVencer.length - 3) + " más" : "") +
@@ -3297,8 +3429,8 @@ async function conteoCertificados(env) {
   const PAGADA = "estado IN ('aprobada','en_distribucion','entregada')";
   const r = await env.DB.prepare(
     "SELECT " +
-    "(SELECT COUNT(*) FROM aportes a WHERE a.quiere_certificado = 1 AND a." + PAGADA + " AND NOT EXISTS " +
-    " (SELECT 1 FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)) AS por_emitir, " +
+    /* La MISMA condición que «Hoy» y las insignias: ver CERT_POR_EMITIR. */
+    "(SELECT COUNT(*) " + CERT_POR_EMITIR + ") AS por_emitir, " +
     "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND revision_en IS NULL AND enviado_en IS NULL AND firma_rl_en IS NULL) AS sin_rl, " +
     "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND revision_en IS NULL AND enviado_en IS NULL AND firma_rf_en IS NULL) AS sin_rf, " +
     "(SELECT COUNT(*) FROM certificados WHERE anulado_en IS NULL AND revision_en IS NULL AND enviado_en IS NULL " +
@@ -3317,7 +3449,12 @@ async function conteoCertificados(env) {
 async function adminAportes(env, url, quien) {
   const estado = url.searchParams.get("estado");
   const limite = entero(url.searchParams.get("limite"), 50, 1, 200);
-  const where = estado ? " WHERE a.estado = ?" : "";
+  /* `?guia=` trae UNA fila con la misma forma que la lista: es lo que abre el
+     cajón de «Emitir certificado» desde «Hoy», donde la fila puede no estar
+     entre las cien más recientes. */
+  const guia = /^GG-\d{4}-\d{6}$/i.test(url.searchParams.get("guia") || "") ? url.searchParams.get("guia").toUpperCase() : "";
+  const filtro = guia || estado;
+  const where = guia ? " WHERE a.guia = ?" : estado ? " WHERE a.estado = ?" : "";
   const sql =
     "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.modo, a.destino_id, a.frecuencia, " +
     "a.quiere_certificado, a.consent_muro, a.idioma, a.nota, a.metodo_pago, a.creada_en, " +
@@ -3348,7 +3485,7 @@ async function adminAportes(env, url, quien) {
     "ORDER BY co.id DESC LIMIT 1) AS recibo_correo " +
     "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id" + where +
     " ORDER BY a.creada_en DESC LIMIT " + limite;
-  const q = estado ? env.DB.prepare(sql).bind(estado) : env.DB.prepare(sql);
+  const q = filtro ? env.DB.prepare(sql).bind(filtro) : env.DB.prepare(sql);
   const r = await q.all();
   /* Lo que el formulario de emision propone, ya resuelto aqui con la misma
      regla que usara la emision. Los dos JSON crudos no viajan al panel. */
@@ -4247,14 +4384,17 @@ async function correoCertificado(env, datos, email) {
     ["Valor", fmtPesos(datos.monto_centavos) + " COP"],
     ["Fecha de la donación", fechaLargaISO(datos.fecha_donacion)]
   ];
-  const bytes = await certificado(datos, datos.emitido_en);
+  /* En la vista previa no se arma el PDF: solo se enseña la carta y el nombre
+     del adjunto. Armarlo costaría lo mismo que emitirlo y no se mira. */
+  const previa = !!(env && Array.isArray(env.__previa));
+  const bytes = previa ? null : await certificado(datos, datos.emitido_en);
   return enviarCorreo(env, {
     para: email,
     asunto: titulo + " · " + datos.numero,
     texto: [titulo, "", ...parrafos, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
     html: plantillaCorreo({ titulo, parrafos, filas }),
     etiqueta: "certificado", guia: datos.guia,
-    adjuntos: [{ filename: datos.numero + ".pdf", content: bytesABase64(bytes) }]
+    adjuntos: [{ filename: datos.numero + ".pdf", content: bytes ? bytesABase64(bytes) : "" }]
   });
 }
 
@@ -17134,6 +17274,11 @@ async function adminInscripciones(env, url) {
     cond.push("i.estado = 'nueva'");
     cond.push("i.tipo <> 'ingeniero'");
   }
+  /* `?origen=`: lo que llegó desde un evento (la entrada «Social Fest» del
+     panel). Solo los orígenes registrados en ORIGENES_EVENTO. */
+  const origen = url && Object.prototype.hasOwnProperty.call(ORIGENES_EVENTO, url.searchParams.get("origen") || "")
+    ? url.searchParams.get("origen") : "";
+  if (origen) { cond.push("json_extract(i.datos, '$.origen') = ?"); args.push(origen); }
   const donde = " WHERE " + cond.join(" AND ");
 
   const r = await env.DB.prepare(
@@ -17188,7 +17333,7 @@ async function adminInscripciones(env, url) {
 
   return json({ inscripciones: r.results || [], total: (tot && tot.n) || 0,
                 eventos,
-                tope: TOPE_COLA, desde, tipo,
+                tope: TOPE_COLA, desde, tipo, origen,
                 pendiente: soloSinVerificar ? "matricula" : soloSinResponder ? "respuesta" : "",
                 sinVerificar: (pend && pend.n) || 0 });
 }
@@ -19564,6 +19709,181 @@ async function adminPasoVoluntario(request, env, id, quien) {
   return json({ ok: true, id, pasos, listo });
 }
 
+/* POST /api/admin/previa — LO QUE SE VA A ENVIAR, ANTES DE ENVIARLO.
+   ============================================================================
+   La auditoría del panel (oct 2026) encontró que cambiar el estado de una
+   fundación —Aceptar, Visita hecha, Iniciar convenio— le mandaba un correo sin
+   decirlo: el botón se veía igual que uno que solo mueve una fila. Lo mismo
+   confirmar una transferencia, que le manda el recibo al donante.
+
+   Desde aquí el panel pregunta primero QUÉ correos saldrían, a quién, con qué
+   asunto y qué dicen, y solo después de un «Confirmar y enviar» hace el clic de
+   verdad.
+
+   NO HAY PLANTILLAS COPIADAS: se llaman las mismas funciones `correo*` que usa
+   la acción, con un `env` que lleva `__previa` (ver `enviarCorreo`). Y las
+   condiciones de cuándo sale cada correo son las mismas (`correosAlMover`).
+   ESTA RUTA NO ESCRIBE NADA: ni crea el enlace del cuestionario ni el del
+   convenio —esos se crean al confirmar, y la vista previa lo dice—, ni anota
+   correos, ni gasta cupo. Solo llama a funciones `correo*`, nunca a las
+   `admin*` que las rodean, porque esas escriben al volver con «ok». */
+async function adminPrevia(request, env, sesion) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const envP = Object.create(env);
+  envP.__previa = [];
+  const accion = String(c.accion || "");
+  let nota = null;
+  const parse = (t) => { try { return JSON.parse(t || "{}") || {}; } catch (e) { return {}; } };
+
+  if (accion === "inscripcion") {
+    const id = Number(c.id);
+    const f = await env.DB.prepare(
+      "SELECT id, tipo, estado, nombre, email, datos, token FROM inscripciones WHERE id = ?"
+    ).bind(id).first();
+    if (!f) return json({ error: "no_encontrada" }, 404);
+    const x = parse(f.datos);
+    const nuevo = String(c.estado || "");
+    const manda = correosAlMover(f, nuevo, x);
+    const datos = { nombre: f.nombre || "", email: f.email, zona: x.zona || "",
+                    idioma: x.idioma === "en" ? "en" : "es", personeria: x.personeria || "" };
+    if (manda.includes("ficha")) {
+      await correoFichaFundacion(envP, { nombre: datos.nombre, email: f.email, idioma: datos.idioma,
+                                         token: f.token || "(enlace que se crea al confirmar)" });
+    }
+    if (manda.includes("aceptada")) {
+      await correoFundacionAceptada(envP, datos);
+      await correoVisitaPendiente(envP, datos);
+    }
+    if (manda.includes("convenio")) {
+      let token = null;
+      try {
+        const t = await env.DB.prepare("SELECT token FROM convenio_enlaces WHERE inscripcion = ?").bind(id).first();
+        token = t && t.token;
+      } catch (e) { /* sin la 0038 no hay enlaces: sale el correo sin enlace */ }
+      await correoFundacionConvenio(envP, { nombre: datos.nombre, email: f.email, variante: varianteConvenio(x),
+                                            url: ORIGIN + "/convenio/" + (token || "(enlace que se crea al confirmar)") });
+    }
+    if (manda.includes("vinculada")) await correoFundacionVinculada(envP, { nombre: datos.nombre, email: f.email });
+    if (!f.email && f.tipo === "fundacion") nota = "Esta postulación no dejó correo: no se le escribe nada.";
+  } else if (accion === "transferencia") {
+    const guia = String(c.guia || "").toUpperCase();
+    const a = await env.DB.prepare(
+      "SELECT a.guia, a.estado, a.monto_centavos, a.modo, a.destino_id, a.frecuencia, a.idioma, a.token, " +
+      "d.nombre AS nombre, d.email AS email FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?"
+    ).bind(guia).first();
+    if (!a) return json({ error: "no_encontrada" }, 404);
+    /* El monto que se va a confirmar, si ya se escribió: es el que va en el
+       recibo. Sin él, el que reportó el donante. */
+    const monto = Number(String(c.monto == null ? "" : c.monto).replace(/[^0-9]/g, "")) || Math.round(Number(a.monto_centavos) / 100);
+    await correoAporteAprobado(envP, { guia: a.guia, monto_centavos: monto * 100, idioma: a.idioma, modo: a.modo,
+      destino_id: a.destino_id, frecuencia: a.frecuencia, token: a.token }, a.email, a.nombre);
+    if (!a.email) nota = "El donante no dejó correo: el recibo queda en el panel y no se le envía.";
+  } else if (accion === "certificado") {
+    const guia = String(c.guia || "").toUpperCase();
+    const a = await env.DB.prepare(
+      "SELECT a.guia, a.monto_centavos, a.aprobada_en, a.fecha_pago, d.email AS email " +
+      "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?"
+    ).bind(guia).first();
+    if (!a) return json({ error: "no_encontrada" }, 404);
+    if (firmaConfigurada(env)) {
+      nota = "Al emitirlo no sale nada: se envía al donante cuando lo firmen el Representante Legal y la Revisora Fiscal.";
+    } else if (!a.email) {
+      nota = "El donante no tiene correo registrado: se emite y no se envía.";
+    } else {
+      const fecha = a.fecha_pago && /^\d{4}-\d{2}-\d{2}$/.test(a.fecha_pago) ? a.fecha_pago : (a.aprobada_en ? fechaCO(a.aprobada_en) : "");
+      await correoCertificado(envP, { numero: "CD-" + (fecha ? fecha.slice(0, 4) : anioCO()) + "-(número al emitir)",
+        guia: a.guia, monto_centavos: a.monto_centavos, fecha_donacion: fecha }, a.email);
+    }
+  } else if (accion === "certificado-enviar" || accion === "firmar") {
+    const numero = String(c.numero || "").toUpperCase();
+    const k = await env.DB.prepare(
+      "SELECT numero, guia, datos, firma_rl_en, firma_rf_en, enviado_en FROM certificados WHERE numero = ?"
+    ).bind(numero).first();
+    if (!k) return json({ error: "no_encontrado" }, 404);
+    const d = parse(k.datos);
+    const don = await env.DB.prepare("SELECT d.email AS email FROM donantes d JOIN aportes a ON a.donante_id = d.id WHERE a.guia = ?")
+      .bind(k.guia).first();
+    let sale = !k.enviado_en;
+    if (accion === "firmar") {
+      /* Con tu firma sale solo si la otra ya está: es lo que hace `firmaFirmar`. */
+      const papel = quienFirma(env, sesion && sesion.email);
+      const otra = papel === "rl" ? k.firma_rf_en : papel === "rf" ? k.firma_rl_en : null;
+      sale = sale && !!otra;
+      if (!otra) nota = "Con tu firma todavía no sale: falta la de " + (papel === "rl" ? "la Revisora Fiscal" : "el Representante Legal") + ".";
+    }
+    if (sale && don && don.email) await correoCertificado(envP, d, don.email);
+    else if (sale) nota = "El donante no tiene correo registrado: no se le envía.";
+  } else if (accion === "matricula" || accion === "avisar") {
+    const id = Number(c.id);
+    const f = await env.DB.prepare("SELECT id, tipo, nombre, email, datos FROM inscripciones WHERE id = ?").bind(id).first();
+    if (!f) return json({ error: "no_encontrada" }, 404);
+    const x = parse(f.datos);
+    await correoIngenieroVerificado(envP, { email: f.email, nombre: f.nombre, matricula: x.matricula, idioma: x.idioma });
+    if (!f.email) nota = "No dejó correo: no se le avisa.";
+  } else if (accion === "caso") {
+    /* Cerrar o descartar un caso le avisa a la familia, si dejó correo (ver
+       `adminMoverCaso`). El caso que sigue se lee del motivo que se va a
+       escribir, igual que lo leerá `casoQueSigue` después de guardarlo. */
+    const numero = String(c.numero || "").toUpperCase();
+    const nuevo = String(c.estado || "");
+    const k = await env.DB.prepare("SELECT numero, token, contacto_email FROM casos WHERE numero = ?").bind(numero).first();
+    if (!k) return json({ error: "no_encontrado" }, 404);
+    if ((nuevo === "cerrado" || nuevo === "descartado") && k.contacto_email) {
+      const citado = (String(c.motivo || "").match(/CV-\d{4}-\d{6}/gi) || [])
+        .map((x) => x.toUpperCase()).filter((x) => x !== numero)[0] || null;
+      await correoCasoTerminado(envP, { numero, token: k.token, email: k.contacto_email, estado: nuevo,
+                                        sigue: nuevo === "descartado" ? citado : null });
+    } else if (nuevo === "cerrado" || nuevo === "descartado") {
+      nota = "La familia no dejó correo: no se le avisa por aquí. Si hace falta, escríbele por WhatsApp desde su ficha.";
+    }
+  } else if (accion === "convenio-enlace") {
+    const g = await fundacionEnConvenio(env, Number(c.id));
+    if (g.error) return g.error;
+    let token = null;
+    try {
+      const t = await env.DB.prepare("SELECT token FROM convenio_enlaces WHERE inscripcion = ?").bind(Number(c.id)).first();
+      token = t && t.token;
+    } catch (e) { /* nada */ }
+    if (g.f.email) {
+      await correoFundacionConvenio(envP, { nombre: g.f.nombre || "", email: g.f.email, variante: varianteConvenio(g.x),
+        url: ORIGIN + "/convenio/" + (token || "(enlace que se crea al confirmar)") });
+    } else nota = "La fundación no dejó correo.";
+  } else {
+    return json({ error: "accion_no_valida" }, 400);
+  }
+
+  /* Lo que viaja al panel: destinatario, asunto, la carta en texto plano y los
+     adjuntos por nombre. Un aviso interno sin buzón sale marcado como tal. */
+  const correos = envP.__previa.map((m) => ({
+    para: m.para, asunto: m.asunto, etiqueta: m.etiqueta, adjuntos: m.adjuntos || [],
+    texto: String(m.texto || "").slice(0, 6000), sin_buzon: !!m.sin_buzon,
+    interno: [env.CORREO_AVISOS, env.CORREO_MMC, env.CORREO_ALIANZAS].filter(Boolean).includes(m.para)
+  }));
+  return json({ ok: true, correos, nota });
+}
+
+/* QUÉ CORREOS DISPARA MOVER UNA INSCRIPCIÓN. Una sola lista para el movimiento
+   y para la vista previa del panel (`adminPrevia`): si la regla viviera en dos
+   sitios, el panel podría anunciar «no se envía nada» y el clic mandar un
+   correo, que es justo lo que la vista previa existe para impedir.
+   · «ficha»: al marcar la visita, el enlace del cuestionario.
+   · «aceptada»: al aceptar por primera vez (la marca `aceptacion_enviada`
+     evita repetirlo tras archivar y reabrir), y con él el aviso interno de la
+     visita pendiente.
+   · «convenio» y «vinculada»: una sola vez cada uno, por su marca. */
+function correosAlMover(f, nuevo, x) {
+  const out = [];
+  if (!f.email) return out;
+  if (nuevo === "visitada" && f.estado !== "visitada" && f.tipo === "fundacion") out.push("ficha");
+  if (nuevo === "aceptada" && f.estado !== "aceptada" && f.tipo === "fundacion" && !(x && x.aceptacion_enviada)) out.push("aceptada");
+  if (nuevo === "convenio" && !(x && x.convenio && x.convenio.correo_en)) out.push("convenio");
+  if (nuevo === "vinculada" && !(x && x.bienvenida_enviada)) out.push("vinculada");
+  return out;
+}
+
 async function adminMoverInscripcion(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -19646,7 +19966,8 @@ async function adminMoverInscripcion(request, env, id, quien) {
 
      El token se genera UNA vez y se reusa: marcar la visita dos veces no debe
      invalidar el enlace que la fundacion ya tiene abierto en una pestaña. */
-  if (nuevo === "visitada" && f.estado !== "visitada" && f.tipo === "fundacion" && f.email) {
+  const manda = correosAlMover(f, nuevo, xMov);
+  if (manda.includes("ficha")) {
     let token = f.token;
     if (!token) {
       token = tokenNuevo();
@@ -19669,11 +19990,8 @@ async function adminMoverInscripcion(request, env, id, quien) {
   /* «Solo si NO estaba ya aceptada» no bastaba: aceptada → archivada →
      reabierta → aceptada volvia a mandar el mismo correo. Se deja la marca
      `aceptacion_enviada` en `datos` cuando sale, y es esa la que manda. */
-  let xAcep = {};
-  try { xAcep = JSON.parse(f.datos || "{}"); } catch (e) { /* nada */ }
-  if (nuevo === "aceptada" && f.estado !== "aceptada" && f.tipo === "fundacion" && f.email &&
-      !xAcep.aceptacion_enviada) {
-    const x = xAcep;
+  if (manda.includes("aceptada")) {
+    const x = xMov;
     const datos = { nombre: f.nombre || "", email: f.email, zona: x.zona || "", idioma: x.idioma === "en" ? "en" : "es",
                     personeria: x.personeria || "" };
     try {
@@ -19699,8 +20017,7 @@ async function adminMoverInscripcion(request, env, id, quien) {
     await env.DB.prepare(
       "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.convenio.desde', datetime('now')) WHERE id = ?"
     ).bind(id).run();
-    const yaAvisado = xMov.convenio && xMov.convenio.correo_en;
-    if (f.email && !yaAvisado) {
+    if (manda.includes("convenio")) {
       /* EL ENLACE ANTES DEL CORREO: el correo lo lleva. Si la 0038 no esta
          aplicada, sale el correo de siempre, sin enlace — el panel tiene
          «Enviar enlace» para cuando este. */
@@ -19727,7 +20044,7 @@ async function adminMoverInscripcion(request, env, id, quien) {
     await env.DB.prepare(
       "UPDATE inscripciones SET datos = json_set(COALESCE(datos, '{}'), '$.vinculada', json_object('en', datetime('now'), 'por', ?)) WHERE id = ?"
     ).bind(quien || "?", id).run();
-    if (f.email && !xMov.bienvenida_enviada) {
+    if (manda.includes("vinculada")) {
       try {
         const r = await correoFundacionVinculada(env, { nombre: f.nombre || "", email: f.email });
         aviso = r && r.ok ? "correo_enviado" : "correo_fallo";
@@ -22208,134 +22525,274 @@ function paginaAdmin() {
 <title>Panel · Give&Grow</title>
 ${HOJA_CSS}
 <style>
-/* ---- Portada de decisiones ----
-   VA AQUÍ Y NO EN styles.css, y es deliberado. El panel enlazaba /styles.css
-   SIN versión, y esa URL se sirve «Cache-Control: immutable» durante un año: un
-   cambio de CSS para el panel podía no llegarle nunca al navegador que ya la
-   tenía guardada. Desde el 28 sep 2026 lleva ?v= (ver STYLES_V), pero la
-   razón de fondo sigue: esta página se sirve «no-store», así que lo que
-   viaja aquí llega siempre. De paso, son bytes que no paga cada visitante del
-   sitio público por una pantalla que nunca va a abrir.
+/* ---- EL PANEL ES SIEMPRE DE DÍA ----
+   Esta página no pone data-theme, así que lee los tokens de día de styles.css.
+   VA AQUÍ Y NO EN styles.css, y es deliberado: esta página se sirve
+   «no-store», así que lo que viaja aquí llega siempre, y son bytes que no paga
+   cada visitante del sitio público por una pantalla que nunca va a abrir. */
 
-   La jerarquía va al revés de una tabla porque esto es para ACTUAR: primero
-   desde cuándo espera, después cuántos, y el «cómo se arregla» debajo del
-   nombre. El único acento es el ámbar de lo que lleva tres días o más, para que
-   ese ámbar signifique algo cuando aparezca. */
 /* ---- 16px EN TODO LO QUE SE ESCRIBE ----
    Por debajo de 16px, iOS Safari hace zoom al enfocar un campo de escritura: la
-   pantalla salta y hay que pellizcar para volver, en cada campo. El panel estaba
-   entero a 13 y 14 — el buscador, el formulario de entregas, el de importar — y
-   ahora ademas estrena el formulario de egresos, que es el que mas campos tiene
-   y el que se va a llenar desde un telefono en una vereda.
-
-   Es la misma correccion del PR #372 para la pantalla del triaje, donde el
-   propio archivo ya tenia dos de sus tres hojas de formulario en 16 y solo una
-   se habia quedado atras. Aqui se habian quedado todas. */
+   pantalla salta y hay que pellizcar para volver, en cada campo. Es la misma
+   corrección del PR #372 para la pantalla del triaje. */
 input:not([type=checkbox]):not([type=radio]),
 select,
 textarea { font-size: 16px }
 
-/* La barra de acciones del libro: filtro, rango y descarga en una sola linea,
-   que se parte sola en el telefono. */
+/* ==== EL ARMAZÓN (Fase 1 del panel, oct 2026) ====
+   El panel eran ocho pestañas bajo una cabecera —título, seis cifras
+   históricas y el buscador— que se comía 560 de 900 px en cada pestaña, y cada
+   pestaña era una sola página de miles de píxeles con todas sus secciones
+   apiladas. Ahora: una barra lateral fija agrupada por área, una barra
+   superior delgada con el buscador, y UNA sección a la vista, con su propia
+   cabecera y su propia dirección (#finanzas/aportes) para poder guardarla y
+   volver con el botón de atrás.
+
+   Gramática de siempre: papel, reglas finas de 1 px, filete de color a la
+   izquierda para lo que pide atención. Sin sombras, sin píldoras de color. */
+.pn-body{overflow-x:hidden}
+.pn-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.pn-saltar{position:absolute;left:-999px;top:8px;z-index:400;background:var(--surface);color:var(--acc);padding:8px 12px;border:1px solid var(--bd);border-radius:6px;font-size:var(--fs-14)}
+.pn-saltar:focus{left:8px}
+.pn-app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+
+/* La barra lateral. Un <div> con role y no un <nav>: la hoja del sitio fija
+   TODO <nav> arriba de la ventana (es la barra del sitio público). */
+.pn-lado{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);
+  border-right:1px solid var(--bd);padding:18px 0 28px}
+.pn-marca{display:block;padding:0 22px 16px;margin:0 0 6px;border-bottom:1px solid var(--bds);text-decoration:none}
+.pn-marca b{display:block;font-family:var(--font-display);font-weight:700;font-size:var(--fs-16);color:var(--g);letter-spacing:-.01em}
+.pn-marca span{display:block;font-size:var(--fs-12);color:var(--mu);margin-top:2px}
+.pn-grupo{padding:10px 0 2px}
+.pn-gt{margin:0;padding:0 22px 5px;font-size:var(--fs-11);font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mu)}
+.pn-it{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 22px 6px 20px;
+  border-left:2px solid transparent;font-size:var(--fs-14);color:var(--ink-soft);text-decoration:none;line-height:1.35}
+.pn-it:hover{color:var(--ink);background:var(--bg)}
+.pn-it.on{border-left-color:var(--g);color:var(--g);font-weight:600;background:var(--bg)}
+.pn-it:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+.pn-it.fuera{font-size:var(--fs-13);color:var(--mu)}
+/* El contador solo aparece cuando hay algo esperando: un cero dibujado es ruido. */
+.pn-n{font-size:var(--fs-11);font-weight:700;min-width:22px;text-align:center;padding:1px 7px;border-radius:999px;
+  background:var(--gl);color:var(--gd);font-variant-numeric:tabular-nums;line-height:1.5}
+.pn-n:empty{display:none}
+.pn-n.urge{background:var(--amberl);color:var(--err)}
+
+.pn-cuerpo{min-width:0;display:flex;flex-direction:column}
+.pn-barra{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px;padding:10px 40px;
+  background:var(--bg);border-bottom:1px solid var(--bd);min-height:58px}
+#buscador{display:flex;gap:8px;align-items:center;flex:1 1 auto;max-width:560px;margin:0}
+#buscador input{flex:1 1 auto;min-width:0;padding:8px 12px;border:1px solid var(--bd);border-radius:7px;
+  font:inherit;font-size:var(--fs-16);background:var(--surface);color:var(--ink)}
+.pn-quien{margin:0 0 0 auto;font-size:var(--fs-13);color:var(--mu);white-space:nowrap}
+.pn-barra .pn-menu.copy{display:none}
+.pn-cont{padding:28px 40px 96px;max-width:1240px;width:100%}
+.pn-cont:focus{outline:none}
+#busca-res:empty{display:none}
+#busca-res{margin:0 0 26px}
+
+/* La cabecera de cada sección: de qué área es, cómo se llama, para qué sirve
+   en una línea, y su acción principal a la derecha. */
+.pn-cab{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:24px;align-items:end;
+  padding:0 0 16px;margin:0 0 22px;border-bottom:1px solid var(--bd)}
+.pn-cab-ey{grid-column:1 / -1;margin:0 0 4px;font-size:var(--fs-12);font-weight:700;letter-spacing:var(--tr-eyebrow);
+  text-transform:uppercase;color:var(--acc)}
+.pn-cab h1{grid-column:1;margin:0;font-size:var(--fs-h3);line-height:var(--lh-heading);letter-spacing:var(--tr-heading)}
+.pn-cab h1:focus{outline:none}
+.pn-cab-linea{grid-column:1;margin:6px 0 0;font-size:var(--fs-15);color:var(--ink-soft);max-width:72ch}
+.pn-cab-meta{grid-column:1;margin:6px 0 0;font-size:var(--fs-13);color:var(--mu)}
+.pn-cab-meta:empty{display:none}
+.pn-cab-meta b{color:var(--ink);font-variant-numeric:tabular-nums}
+.pn-cab-meta .urge{color:var(--err);font-weight:600}
+.pn-cab-acc{grid-column:2;grid-row:2 / span 3;align-self:end;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pn-cab-acc:empty{display:none}
+
+.pn-vista{padding:0}
+.pn-vista[hidden]{display:none}
+.pn-h2{font-family:"Inter",sans-serif;font-size:var(--fs-17);font-weight:700;letter-spacing:0;line-height:1.3;margin:40px 0 4px}
+.pn-sub{margin:0 0 12px;font-size:var(--fs-14);color:var(--mu);max-width:72ch}
+.pn-vista .med-tw{margin-top:12px}
+.pn-vista [id^="sec-"]{scroll-margin-top:76px}
+
+/* «Cómo funciona»: lo que antes eran párrafos de 600 palabras encima de cada
+   tabla. Cerrado por defecto; quien ya lo sabe no lo vuelve a leer. */
+.pn-como{margin:0 0 16px;max-width:78ch}
+.pn-como>summary{cursor:pointer;display:inline-block;list-style:none;font-size:var(--fs-13);font-weight:600;color:var(--acc)}
+.pn-como>summary::-webkit-details-marker{display:none}
+.pn-como>summary::before{content:"+ "}
+.pn-como[open]>summary::before{content:"– "}
+.pn-como>div{border-left:2px solid var(--bd);padding:2px 0 2px 14px;margin-top:8px}
+.pn-como p{margin:0 0 8px;font-size:var(--fs-14);line-height:1.55;color:var(--ink-soft)}
+.pn-como p:last-child{margin-bottom:0}
+
+/* ---- LOS BOTONES: tres y nada más ----
+   Primario (relleno verde): la acción que se viene a hacer. Secundario (filete):
+   todo lo demás. Peligro (filete rojo): lo que destruye o no se deshace —
+   Suprimir, Anular, Descartar, Quitar—. Antes «Suprimir» se veía exactamente
+   igual que «Aceptar». Las clases viejas del panel (.copy, .tab, .btn) se
+   alinean aquí a estas tres, sin reescribir cada botón. */
+.pn-app .copy,.pn-app .tab,.pn-cajon .copy,.pn-b2{appearance:none;display:inline-flex;align-items:center;gap:6px;
+  padding:5px 11px;border:1px solid var(--bd);border-radius:7px;background:var(--surface);color:var(--acc);
+  font:inherit;font-size:var(--fs-13);font-weight:600;line-height:1.35;cursor:pointer;text-decoration:none;white-space:nowrap}
+.pn-app .copy:hover,.pn-app .tab:hover,.pn-cajon .copy:hover,.pn-b2:hover{border-color:var(--acc)}
+.pn-app .btn,.pn-cajon .btn,.pn-b1{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:8px;
+  font:inherit;font-size:var(--fs-14);font-weight:700;box-shadow:none;transform:none;cursor:pointer;text-decoration:none;line-height:1.3}
+.pn-app .btn:hover,.pn-cajon .btn:hover{transform:none}
+.pn-app .btn-g,.pn-cajon .btn-g,.pn-b1{background:var(--g);color:var(--on-dark);border:1px solid var(--g);box-shadow:none}
+.pn-app .btn-g:hover,.pn-cajon .btn-g:hover,.pn-b1:hover{background:var(--gm);border-color:var(--gm)}
+.pn-app .btn-w,.pn-cajon .btn-w{background:var(--surface);color:var(--ink);border:1px solid var(--bd)}
+.pn-app .btn:not(.btn-g):not(.btn-w),.pn-cajon .btn:not(.btn-g):not(.btn-w){background:var(--surface);color:var(--acc);border:1px solid var(--bd)}
+.pn-app .pn-peligro,.pn-cajon .pn-peligro{color:var(--err);border-color:var(--err);background:var(--surface)}
+.pn-app .pn-peligro:hover,.pn-cajon .pn-peligro:hover{background:var(--amberl);border-color:var(--err)}
+.pn-cajon .pn-b1.pn-peligro{background:var(--err);color:var(--on-dark);border-color:var(--err)}
+.pn-cajon .pn-b1.pn-peligro:hover{background:var(--err);opacity:.92}
+.pn-app button:disabled,.pn-cajon button:disabled{opacity:.55;cursor:default}
+.pn-app .copy:focus-visible,.pn-app .btn:focus-visible,.pn-cajon button:focus-visible,.pn-b1:focus-visible,.pn-b2:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* ---- «HOY», LA BANDEJA DE ENTRADA ----
+   Tres franjas por gravedad. Cada cola es una carta con sus filas más viejas y
+   la acción ahí mismo; el filete de la izquierda dice la franja (rojo de error
+   para lo urgente, ámbar para hoy, regla para la semana) y se lee también por
+   el título de la franja, no solo por el color. */
+.hoy-alarma{border-left:3px solid var(--amber);padding:9px 13px;margin:0 0 14px;font-size:var(--fs-14);background:var(--amberl)}
+/* <section> y no <footer> en las cartas: la hoja del sitio pinta todo
+   <section> con 72px de aire y todo <footer> en verde tinta (el pie público). */
+.hoy-banda{margin:0 0 32px;padding:0}
+.hoy-bcab{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:0 0 12px;padding:0 0 8px;border-bottom:1px solid var(--bd)}
+.hoy-bcab h2{margin:0;font-family:"Inter",sans-serif;font-size:var(--fs-13);font-weight:700;letter-spacing:.14em;text-transform:uppercase;line-height:1.3}
+.hoy-urgente .hoy-bcab h2{color:var(--err)}
+.hoy-hoy .hoy-bcab h2{color:var(--amber)}
+.hoy-semana .hoy-bcab h2{color:var(--ink-soft)}
+.hoy-bcab span{font-size:var(--fs-13);color:var(--mu)}
+.hoy-cartas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:14px}
+.hoy-carta{display:flex;flex-direction:column;min-width:0;border:1px solid var(--bd);border-left:3px solid var(--bd);
+  border-radius:10px;background:var(--surface);padding:14px 16px 12px}
+.hoy-urgente .hoy-carta{border-left-color:var(--err)}
+.hoy-hoy .hoy-carta{border-left-color:var(--amber)}
+.hoy-ccab{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.hoy-ccab h3{margin:0;font-size:var(--fs-15);font-weight:700;line-height:1.3;letter-spacing:0}
+.hoy-cn{font-size:var(--fs-17);font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.hoy-cuando{margin:2px 0 8px;font-size:var(--fs-13);color:var(--mu)}
+.hoy-cuando.vencida{color:var(--err);font-weight:600}
+.hoy-items{list-style:none;margin:0;padding:0}
+.hoy-it{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:8px 0;border-top:1px solid var(--bds)}
+.hoy-it-q{min-width:0}
+.hoy-it-q strong{display:block;font-size:var(--fs-14);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hoy-it-q small{display:block;font-size:var(--fs-12);color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hoy-it-d{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.hoy-it-t{font-size:var(--fs-12);color:var(--mu);white-space:nowrap;font-variant-numeric:tabular-nums;margin-right:4px}
+.hoy-it .pn-b1,.hoy-it .pn-b2{padding:5px 11px;font-size:var(--fs-13);border-radius:7px}
+.hoy-mas{margin:4px 0 0;font-size:var(--fs-12);color:var(--mu)}
+.hoy-cpie{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:auto;padding-top:10px;border-top:1px solid var(--bds)}
+.hoy-cpie small{font-size:var(--fs-12);color:var(--mu);min-width:0}
+.hoy-todo{font-size:var(--fs-13);font-weight:600;color:var(--acc);white-space:nowrap;text-decoration:none}
+.hoy-todo:hover{text-decoration:underline;text-underline-offset:2px}
+.hoy-nada{margin:0;padding:12px 16px;border:1px dashed var(--bd);border-radius:10px;font-size:var(--fs-14);color:var(--mu)}
+
+/* ---- EL CAJÓN ----
+   Detalle y formularios se abren aquí, al lado de lo que se estaba mirando, y
+   no en un window.prompt ni en una caja pintada mil píxeles más abajo («Emitir
+   certificado» se abría debajo de la tabla y parecía que no pasaba nada). */
+.pn-velo{position:fixed;inset:0;z-index:300;background:var(--ink);opacity:.24}
+.pn-velo[hidden]{display:none}
+.pn-cajon{position:fixed;top:0;right:0;bottom:0;z-index:310;width:min(560px,100vw);background:var(--surface);
+  border-left:1px solid var(--bd);display:flex;flex-direction:column}
+.pn-cajon.ancho{width:min(820px,100vw)}
+.pn-cajon[hidden]{display:none}
+.pn-cajon-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:18px 24px 14px;border-bottom:1px solid var(--bd)}
+.pn-cajon.peligro .pn-cajon-cab{box-shadow:inset 0 3px 0 var(--err)}
+.pn-cajon-ey{margin:0 0 2px;font-size:var(--fs-12);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mu)}
+.pn-cajon.peligro .pn-cajon-ey{color:var(--err)}
+.pn-cajon-cab h2{margin:0;font-family:"Inter",sans-serif;font-size:var(--fs-h4);font-weight:700;letter-spacing:0;line-height:1.3}
+.pn-cajon-cab h2:focus{outline:none}
+.pn-cajon-cuerpo{flex:1 1 auto;overflow-y:auto;padding:18px 24px 28px;font-size:var(--fs-14)}
+.pn-cajon-pie{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 24px;border-top:1px solid var(--bd);background:var(--bg)}
+.pn-cajon-pie:empty{display:none}
+.pn-cajon-pie .pn-pie-nota{flex:1 1 100%;margin:0;font-size:var(--fs-12);color:var(--mu)}
+.pn-campo{display:block;margin:0 0 14px}
+.pn-campo>span{display:block;font-size:var(--fs-13);font-weight:600;color:var(--ink);margin:0 0 4px}
+.pn-campo input:not([type=checkbox]),.pn-campo select,.pn-campo textarea{display:block;width:100%;padding:9px 11px;border:1px solid var(--bd);
+  border-radius:8px;font:inherit;font-size:var(--fs-16);background:var(--bg);color:var(--ink)}
+.pn-campo textarea{resize:vertical;min-height:90px}
+.pn-campo small{display:block;margin-top:4px;font-size:var(--fs-12);color:var(--mu)}
+.pn-campo.mal input,.pn-campo.mal textarea{border-color:var(--err)}
+.pn-campo.mal small{color:var(--err)}
+.pn-campo .pn-err{color:var(--err)}
+.pn-campo .pn-err:empty{display:none}
+.pn-casilla{display:flex;gap:9px;align-items:flex-start;margin:0 0 12px;font-size:var(--fs-14)}
+.pn-casilla input{flex:0 0 auto;margin-top:3px}
+.pn-par{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.pn-ficha{display:grid;grid-template-columns:10rem minmax(0,1fr);gap:6px 14px;margin:0 0 18px;font-size:var(--fs-14)}
+.pn-ficha dt{color:var(--mu)}
+.pn-ficha dd{margin:0;overflow-wrap:anywhere}
+.pn-error{border-left:3px solid var(--err);padding:8px 12px;margin:0 0 14px;font-size:var(--fs-14);color:var(--err);background:var(--bg)}
+.pn-error:empty{display:none}
+.pn-nota{border-left:3px solid var(--amber);padding:8px 12px;margin:0 0 14px;font-size:var(--fs-14);background:var(--amberl)}
+.pn-bien{border-left:3px solid var(--g);padding:8px 12px;margin:0 0 14px;font-size:var(--fs-14);background:var(--bg)}
+.pn-h3{font-size:var(--fs-12);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);margin:20px 0 8px}
+/* Lo que se va a enviar: destinatario y asunto arriba, la carta debajo. */
+.pn-correo{border:1px solid var(--bd);border-radius:10px;margin:0 0 14px;background:var(--bg)}
+.pn-correo-cab{padding:10px 14px;border-bottom:1px solid var(--bd);font-size:var(--fs-14);line-height:1.5}
+.pn-correo-cab small{display:block;font-size:var(--fs-12);color:var(--mu)}
+.pn-correo pre{margin:0;padding:12px 14px;max-height:260px;overflow:auto;white-space:pre-wrap;font:inherit;font-size:var(--fs-13);line-height:1.55;color:var(--ink-soft)}
+
+/* ---- LOS AVISOS «Hecho · Deshacer» ----
+   Abajo al centro, uno encima de otro, y se van solos. Deshacer solo aparece
+   cuando existe la acción contraria de verdad. */
+/* Abajo a la IZQUIERDA y no al centro: el cajón se abre a la derecha, y un
+   aviso centrado tapaba sus botones. */
+.pn-avisos{position:fixed;left:16px;bottom:18px;z-index:400;display:flex;flex-direction:column;gap:8px;
+  align-items:stretch;width:min(480px,calc(100vw - 32px));pointer-events:none}
+.pn-aviso{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:9px;background:var(--ink);color:var(--on-dark);
+  font-size:var(--fs-14);line-height:1.45;white-space:pre-line;pointer-events:auto}
+.pn-aviso.error{background:var(--err)}
+.pn-aviso span{flex:1 1 auto;min-width:0}
+.pn-aviso button{appearance:none;background:none;border:0;color:var(--on-dark);font:inherit;font-size:var(--fs-13);font-weight:700;
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:2px 4px;white-space:nowrap}
+
+/* La barra de acciones del libro de egresos: filtro, rango y descarga. */
 .eg-acciones{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 8px}
-.eg-acciones label{font-size:12.5px;font-weight:700;color:var(--mu);margin:0}
+.eg-acciones label{font-size:var(--fs-13);font-weight:700;color:var(--mu);margin:0}
 .eg-acciones input[type=date]{padding:7px 10px;border:1px solid var(--bd);border-radius:7px;
-  font:inherit;font-size:16px;background:#fff;color:var(--ink)}
+  font:inherit;font-size:var(--fs-16);background:var(--surface);color:var(--ink)}
 .eg-acciones .eg-check{margin:0}
 .eg-sep{flex:1 1 auto}
 @media(max-width:560px){ .eg-sep{display:none} .eg-acciones{gap:8px 10px} }
 
-/* El bloque de la factura va ARRIBA del todo del formulario, y no al final
-   junto al resto del papel, porque es el atajo: si hay XML, lo primero que
-   haces es soltarlo y lo demas se rellena solo. Ponerlo abajo seria pedirte que
-   teclees catorce campos y descubras al final que no hacia falta. */
-.eg-xml{border:1px dashed var(--bd);border-radius:10px;padding:14px 16px;margin:0 0 6px;
-        background:var(--surface)}
-.eg-xml input[type=file]{width:100%;font-size:16px;padding:8px 0;border:0;background:none}
+/* El bloque de la factura va ARRIBA del formulario porque es el atajo: si hay
+   XML, lo primero es soltarlo y lo demás se rellena solo. */
+.eg-xml{border:1px dashed var(--bd);border-radius:10px;padding:14px 16px;margin:0 0 6px;background:var(--surface)}
+.eg-xml input[type=file]{width:100%;font-size:var(--fs-16);padding:8px 0;border:0;background:none}
 
-/* ---- EL FORMULARIO DE EGRESOS ----
-   Una columna, etiquetas encima y pares que se parten en el telefono. Nada de
-   rejilla elaborada: son catorce campos que se llenan de arriba abajo. */
+/* El formulario de egresos: una columna, etiquetas encima, pares que se parten
+   en el teléfono. */
 .eg-form{max-width:640px;padding-top:14px}
-.eg-form label{display:block;font-size:12.5px;font-weight:700;color:var(--mu);margin:12px 0 4px}
+.eg-form label{display:block;font-size:var(--fs-13);font-weight:700;color:var(--mu);margin:12px 0 4px}
 .eg-form input,.eg-form select{width:100%;padding:10px 12px;border:1px solid var(--bd);
-  border-radius:8px;font:inherit;font-size:16px;background:#fff;color:var(--ink)}
+  border-radius:8px;font:inherit;font-size:var(--fs-16);background:var(--bg);color:var(--ink)}
 .eg-par{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;margin-top:4px}
 .eg-par>div{min-width:0}
 .eg-par>button{align-self:end;white-space:nowrap}
 @media(max-width:560px){ .eg-par{grid-template-columns:1fr} }
-.eg-check{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;
-  color:var(--ink);margin:14px 0 0}
+.eg-check{display:flex;align-items:center;gap:8px;font-size:var(--fs-14);font-weight:600;color:var(--ink);margin:14px 0 0}
 .eg-check input{width:auto}
-/* Las cuentas en vivo: la misma gramatica de fichas que el resumen de arriba. */
-.eg-cuentas{display:flex;flex-wrap:wrap;gap:8px 18px;margin:10px 0 4px;font-size:13.5px;color:var(--mu)}
+.eg-cuentas{display:flex;flex-wrap:wrap;gap:8px 18px;margin:10px 0 4px;font-size:var(--fs-14);color:var(--mu)}
 .eg-cuentas:empty{display:none}
 .eg-cuentas b{color:var(--ink);font-variant-numeric:tabular-nums}
+.pn-caja{margin:0 0 22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px;background:var(--surface)}
+.pn-caja>summary{cursor:pointer;font-weight:700;font-size:var(--fs-14)}
 
-/* ---- LA BARRA DE MODULOS ----
-   Vocabulario editorial y no de pestanas de aplicacion: versalita ancha sobre
-   una regla fina, y el modulo abierto marcado por un trazo verde APOYADO en esa
-   regla. Es el mismo gesto de los cintillos del sistema.
-
-   Y a proposito NO son pildoras: las pildoras ya significan otra cosa en esta
-   pantalla —filtrar el estado de un aporte, en «.pay-tab»—, y repetir la forma
-   para la navegacion de primer nivel haria que las dos dejaran de significar
-   nada. Un solo elemento firma, y aqui el firma es el trazo. */
-.mod-barra{display:flex;gap:0;flex-wrap:wrap;align-items:flex-end;
-           border-bottom:1px solid var(--bd);margin:0 0 30px}
-.mod-tab{appearance:none;background:none;border:0;cursor:pointer;
-         padding:10px 18px 11px;margin-bottom:-1px;
-         font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-         color:var(--mu);border-bottom:2px solid transparent;
-         display:inline-flex;align-items:center;gap:8px}
-.mod-tab:hover{color:var(--ink)}
-.mod-tab.on{color:var(--g);border-bottom-color:var(--g)}
-/* El contador solo aparece cuando hay algo esperando: un cero dibujado es ruido
-   que te hace mirar seis veces para descubrir que no habia nada. */
-.mod-n{font-size:11px;font-weight:700;letter-spacing:0;
-       background:var(--gl);color:var(--gd);border-radius:999px;padding:2px 7px;min-width:20px;text-align:center}
-.mod-n:empty{display:none}
-.mod-n.urge{background:#F6E7DF;color:#8C2F1E}
-@media(max-width:560px){
-  /* «max-width:100%» y «min-width:0» no son adorno: sin ellos la barra se hace
-     tan ancha como sus seis pestañas y EMPUJA la página, que era justo lo que se
-     queria evitar. El desplazamiento tiene que ocurrir DENTRO de la barra. */
-  .mod-barra{gap:0;overflow-x:auto;flex-wrap:nowrap;max-width:100%;min-width:0;
-             -webkit-overflow-scrolling:touch}
-  .mod-tab{padding:10px 13px 11px;white-space:nowrap;flex:0 0 auto}
-}
-/* La primera seccion de un modulo no necesita el aire que la separaba de la
-   anterior, porque ahora no hay anterior. */
-.mod>.h-sec:first-child{margin-top:8px}
-/* El foco a un encabezado lo pone el codigo cuando pulsas «Ir», nunca el Tab:
-   el anillo alrededor de un titulo no senalaria nada accionable. Misma regla
-   que la ficha del triaje. */
-.mod .h-sec:focus{outline:none}
-
-/* El buscador: una casilla, arriba de todo. Ancho de sobra porque lo que se
-   pega dentro es un consecutivo largo y verlo entero evita el error de teclear
-   uno y buscar otro. */
-#buscador{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
-#buscador label{font-size:var(--fs-13);font-weight:600;color:var(--mu)}
-#buscador input{flex:1 1 22rem;min-width:0;padding:9px 12px;border:1px solid var(--bd);
-  border-radius:7px;font:inherit;font-size:16px;background:var(--surface);color:inherit}
-#busca-res{margin:0 0 22px}
-.bus-fila{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:baseline;
-  padding:10px 0;border-top:1px solid var(--bd)}
+/* El buscador: resultados en reglas finas. */
+.bus-fila{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:baseline;padding:10px 0;border-top:1px solid var(--bd)}
 .bus-fila:first-child{border-top:0}
 .bus-q{font-size:var(--fs-15);font-weight:600}
 .bus-q small{display:block;font-weight:400;color:var(--mu);font-size:var(--fs-13);margin-top:2px}
 .bus-nada{font-size:var(--fs-14);color:var(--mu);margin:0}
+.bus-caja{border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:10px;padding:12px 18px;background:var(--surface)}
 @media (max-width:640px){ .bus-fila{grid-template-columns:1fr} }
-.dec-caja{border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:10px;
-  padding:18px 20px;margin:0 0 30px;background:var(--surface)}
-.dec-t{font-size:var(--fs-h4);margin:0 0 14px;letter-spacing:.01em}
-.dec-alarma{border-left:3px solid var(--amber);padding:9px 13px;margin:0 0 12px;
-  font-size:var(--fs-14);background:var(--amberl)}
-/* Una lista que no llego (pedirJSON). Mismo lenguaje que la alarma: no es un
-   vacio, es algo que hay que mirar. */
+
 /* Franja de estado de los certificados, arriba de la lista de aportes. */
 .cert-estado{border-left:3px solid var(--g);padding:10px 14px;margin:0 0 16px;background:var(--surface);font-size:var(--fs-14);max-width:80ch}
+.cert-estado:empty{display:none}
 .cert-estado p{margin:0}
 .cert-estado p+p{margin-top:4px;font-size:var(--fs-13)}
 /* La lista de pasos de un voluntario, dentro de su fila. */
@@ -22343,8 +22800,7 @@ textarea { font-size: 16px }
 .vpasos .copy{font-size:var(--fs-12)}
 /* ---- EL CONVENIO EN LA BANDEJA (ver detalleConvenio) ----
    En la celda, un resumen de tres lineas; debajo, una fila a todo el ancho que
-   se abre. Sin pildoras nuevas: las fichas A-D son texto con filete, y la lista
-   del Anexo 1 son casillas sobre reglas finas, como el resto del panel. */
+   se abre. */
 .conv-res{margin-top:8px;line-height:1.5}
 .conv-fs{display:inline-flex;flex-wrap:wrap;gap:4px;margin:4px 0 0;vertical-align:middle}
 .conv-f{font-size:var(--fs-11);font-weight:700;letter-spacing:.04em;padding:1px 6px;border:1px solid var(--bd);
@@ -22355,9 +22811,6 @@ textarea { font-size: 16px }
 .conv-res .conv-mal{display:block;font-size:var(--fs-12)}
 .med-tbl tr.con-det td{border-bottom:0;padding-bottom:6px}
 .med-tbl tr.conv-tr td{padding:0 0 14px}
-/* Dentro de la tabla que se desplaza en el telefono, la ficha se queda quieta
-   a la izquierda y del ancho de la ventana: si no, mediria lo que la tabla
-   (560px minimo) y habria que arrastrarla de lado para leerla. */
 .conv-det{position:sticky;left:0;max-width:calc(100vw - 48px);border:1px solid var(--bd);
   border-left:3px solid var(--acc);border-radius:10px;background:var(--surface)}
 .conv-det>summary{cursor:pointer;padding:10px 14px;font-size:var(--fs-14);line-height:1.5}
@@ -22396,40 +22849,20 @@ textarea { font-size: 16px }
 .conv-link{appearance:none;background:none;border:0;padding:0;cursor:pointer;font:inherit;
   font-size:var(--fs-12);font-weight:600;color:var(--acc);text-decoration:underline;text-underline-offset:2px}
 .conv-acc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.conv-acc .copy{font-size:var(--fs-12);padding:5px 10px;border:0;cursor:pointer}
 .conv-subir{display:inline-flex;align-items:center;cursor:pointer}
 @media (pointer:coarse){
   .conv-link{min-height:36px;display:inline-flex;align-items:center}
   .conv-chk{min-height:40px}
 }
-.carga-fallo{border-left:3px solid var(--amber);padding:9px 13px;margin:0;
-  font-size:var(--fs-14);background:var(--amberl)}
-.dec-lista{list-style:none;margin:0;padding:0}
-.dec-fila{display:grid;grid-template-columns:9.5rem 3rem 1fr auto;gap:14px;align-items:baseline;
-  padding:11px 0;border-top:1px solid var(--bd)}
-.dec-fila:first-child{border-top:0}
-.dec-cuando{font-size:var(--fs-13);color:var(--mu);font-variant-numeric:tabular-nums}
-.dec-viejo .dec-cuando{color:var(--amber);font-weight:600}
-/* Plazo vencido: una promesa a alguien de fuera que ya no se cumplio. Rojo de
-   error (--err, definido en los dos temas) y un filete, para que se lea sin
-   depender solo del color. */
-.dec-cuando small{display:block;font-size:var(--fs-12);font-weight:400;color:var(--mu)}
-.dec-vencida{border-left:3px solid var(--err);padding-left:10px}
-.dec-vencida .dec-cuando{color:var(--err);font-weight:700}
-.dec-vencida .dec-cuando small{color:var(--err)}
-.dec-n{font-size:var(--fs-17);font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
-.dec-que{display:block;min-width:0}
-.dec-que strong{display:block;font-size:var(--fs-15);font-weight:600}
-.dec-que small{display:block;color:var(--mu);font-size:var(--fs-13);margin-top:2px}
+/* Una lista que no llegó (pedirJSON): no es un vacío, es algo que mirar. */
+.carga-fallo{border-left:3px solid var(--amber);padding:9px 13px;margin:0;font-size:var(--fs-14);background:var(--amberl)}
 .dec-ir{white-space:nowrap;font-size:var(--fs-13);font-weight:600;text-decoration:none;
   border:1px solid var(--bd);border-radius:6px;padding:5px 11px;color:var(--acc)}
 .dec-ir:hover{border-color:var(--acc)}
 .dec-sinir{color:var(--mu);font-weight:400;border-style:dashed}
 .dec-sinir:hover{border-color:var(--bd)}
 /* ---- VENCIMIENTOS ----
-   El estado se lee por FORMA y texto, no solo por color: triangulo y filete
-   para lo vencido, circulo lleno para lo que esta a 14 dias, vacio para lo
-   lejano, visto para lo hecho, raya para lo que no aplico. */
+   El estado se lee por FORMA y texto, no solo por color. */
 .ob-vencida td:first-child{border-left:3px solid var(--err)}
 .ob-vencida .ob-est{color:var(--err);font-weight:700}
 .ob-cerca .ob-est{color:var(--amber);font-weight:600}
@@ -22440,14 +22873,10 @@ textarea { font-size: 16px }
 .ob-nota{width:100%;min-width:9rem;max-width:16rem;padding:5px 8px;margin:0 0 6px;border:1px solid var(--bd);
   border-radius:6px;font:inherit;font-size:var(--fs-13);background:var(--bg);color:var(--ink)}
 .ob-acc{display:flex;flex-wrap:wrap;gap:6px}
-/* ---- JORNADAS DE VOLUNTARIADO ----
-   Los indicadores son un ledger de fichas separadas por una regla de 1px, no
-   tarjetas con sombra: es la gramatica de la tabla de transparencia. La ficha
-   abierta lleva el filete de acento a la izquierda, como la portada de
-   decisiones. Todo con los tokens que ya existen. */
-/* Las reglas las pone cada ficha (derecha y abajo) y el margen negativo las
-   esconde bajo el borde del contenedor: asi la ultima fila, si queda corta,
-   no deja un hueco gris como dejaria el truco del «gap» sobre fondo de regla. */
+/* ---- LAS CIFRAS DE UNA SECCIÓN: el ledger de Voluntariado ----
+   Fichas separadas por una regla de 1px, no tarjetas con sombra. Es el patrón
+   que la auditoría señaló como el mejor del panel, y ahora lo usan también los
+   aportes. */
 .vol-ind{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));background:var(--surface);
   border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:0 0 22px}
 .vol-ind>div{padding:12px 14px;min-width:0;border-right:1px solid var(--bd);border-bottom:1px solid var(--bd);margin:0 -1px -1px 0}
@@ -22465,8 +22894,6 @@ textarea { font-size: 16px }
 .vol-ficha dt{color:var(--mu)}
 .vol-ficha dd{margin:0;white-space:pre-line;min-width:0;overflow-wrap:anywhere}
 @media(max-width:560px){ .vol-ficha{grid-template-columns:1fr;gap:2px} .vol-ficha dd{margin-bottom:8px} }
-/* Los campos de esta zona van sobre --bg y no sobre blanco suelto: dentro de
-   la ficha (que es --surface) un campo del mismo papel no se distinguiria. */
 .eg-form textarea{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:8px;font:inherit;
   font-size:var(--fs-16);background:var(--bg);color:var(--ink);resize:vertical}
 .vol-horas{width:5.5rem;padding:6px 8px;border:1px solid var(--bd);border-radius:6px;font:inherit;background:var(--bg);color:var(--ink)}
@@ -22478,293 +22905,204 @@ textarea { font-size: 16px }
 .vol-res h5{font-size:var(--fs-14);margin:0 0 4px}
 .vol-res h6{font-size:var(--fs-11);letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin:12px 0 4px}
 .vol-res ul{margin:0 0 0 18px;padding:0;font-size:var(--fs-14);line-height:1.5}
-@media (max-width:640px){
-  /* En móvil la rejilla de cuatro columnas aplasta el texto: se apila, y el
-     conteo queda junto a la antigüedad, que es como se leería en voz alta. */
-  .dec-fila{grid-template-columns:auto 1fr;gap:4px 12px}
-  .dec-que,.dec-ir{grid-column:1 / -1}
-  .dec-n{text-align:left}
-  .dec-ir{justify-self:start;margin-top:6px}
+
+/* ---- ESCRITORIO PRIMERO; EL TELÉFONO NO SE ROMPE ----
+   Por debajo de 900 px la barra lateral sale de la rejilla y se abre con
+   «Menú», encima del contenido. */
+@media (max-width:900px){
+  .pn-app{grid-template-columns:minmax(0,1fr)}
+  .pn-lado{position:fixed;left:0;top:0;bottom:0;height:auto;width:min(300px,86vw);z-index:320;
+    transform:translateX(-102%);transition:transform .2s var(--ease)}
+  .pn-lado.abierto{transform:none}
+  .pn-barra .pn-menu.copy{display:inline-flex}
+  .pn-barra{padding:10px 16px;gap:10px}
+  .pn-quien{display:none}
+  #buscador button{display:none}
+  .pn-cont{padding:20px 16px 72px}
+  .pn-cab{grid-template-columns:minmax(0,1fr)}
+  .pn-cab-acc{grid-column:1;grid-row:auto;justify-content:flex-start;margin-top:12px}
+  .pn-par{grid-template-columns:1fr}
+  .pn-ficha{grid-template-columns:1fr;gap:0 0}
+  .pn-ficha dd{margin-bottom:8px}
+  .hoy-it{grid-template-columns:minmax(0,1fr)}
+  .hoy-it-d{justify-content:flex-start}
 }
+@media (prefers-reduced-motion:reduce){ .pn-lado{transition:none} }
 </style>
-</head><body>
-<main class="page active"><section><div class="wrap">
-<span class="ey">Interno</span>
-<h1 class="h-sec" style="margin-bottom:6px">Panel</h1>
-<p class="lead" id="quien" style="margin-bottom:26px">Cargando…</p>
+</head><body class="pn-body">
+<a class="pn-saltar" href="#pn-contenido">Saltar al contenido</a>
+<div class="pn-app">
 
-<div id="resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:26px"></div>
+<!-- LA BARRA LATERAL. Cada entrada es un enlace a una dirección (#area/seccion):
+     se puede guardar, abrir en otra pestaña y volver con «atrás». El número de
+     cada entrada sale de la MISMA respuesta que pinta «Hoy». -->
+<aside class="pn-lado" id="pn-lado">
+<a class="pn-marca" href="#hoy"><b>Give&amp;Grow</b><span>Panel interno</span></a>
+<div role="navigation" aria-label="Secciones del panel">
+<div class="pn-grupo">
+  <p class="pn-gt">Inicio</p>
+  <a class="pn-it" href="#hoy" data-pn-ir="hoy">Hoy<span class="pn-n" data-pn-n="hoy"></span></a>
+</div>
+<div class="pn-grupo">
+  <p class="pn-gt">Finanzas</p>
+  <a class="pn-it" href="#finanzas/aportes" data-pn-ir="finanzas/aportes">Aportes<span class="pn-n" data-pn-n="finanzas/aportes"></span></a>
+  <a class="pn-it" href="#finanzas/transferencias" data-pn-ir="finanzas/transferencias">Transferencias<span class="pn-n" data-pn-n="finanzas/transferencias"></span></a>
+  <a class="pn-it" href="#finanzas/pagos" data-pn-ir="finanzas/pagos">Pagos sin aporte<span class="pn-n" data-pn-n="finanzas/pagos"></span></a>
+  <a class="pn-it" href="#finanzas/membresias" data-pn-ir="finanzas/membresias">Membresías y carnets<span class="pn-n" data-pn-n="finanzas/membresias"></span></a>
+  <a class="pn-it" href="#finanzas/vencimientos" data-pn-ir="finanzas/vencimientos">Vencimientos<span class="pn-n" data-pn-n="finanzas/vencimientos"></span></a>
+  <a class="pn-it" href="#finanzas/egresos" data-pn-ir="finanzas/egresos">Egresos<span class="pn-n" data-pn-n="finanzas/egresos"></span></a>
+  <a class="pn-it" href="#finanzas/proveedores" data-pn-ir="finanzas/proveedores">Proveedores<span class="pn-n" data-pn-n="finanzas/proveedores"></span></a>
+  <a class="pn-it" href="#finanzas/paypal" data-pn-ir="finanzas/paypal">PayPal<span class="pn-n" data-pn-n="finanzas/paypal"></span></a>
+</div>
+<div class="pn-grupo">
+  <p class="pn-gt">Alianzas</p>
+  <a class="pn-it" href="#alianzas/red" data-pn-ir="alianzas/red">Red<span class="pn-n" data-pn-n="alianzas/red"></span></a>
+  <a class="pn-it" href="#alianzas/ofrecimientos" data-pn-ir="alianzas/ofrecimientos">Ofrecimientos en especie<span class="pn-n" data-pn-n="alianzas/ofrecimientos"></span></a>
+  <a class="pn-it" href="#alianzas/socialfest" data-pn-ir="alianzas/socialfest">Social Fest<span class="pn-n" data-pn-n="alianzas/socialfest"></span></a>
+</div>
+<div class="pn-grupo">
+  <p class="pn-gt">Personas</p>
+  <a class="pn-it" href="#personas/voluntariado" data-pn-ir="personas/voluntariado">Voluntariado<span class="pn-n" data-pn-n="personas/voluntariado"></span></a>
+  <a class="pn-it" href="#personas/ingenieros" data-pn-ir="personas/ingenieros">Ingenieros<span class="pn-n" data-pn-n="personas/ingenieros"></span></a>
+</div>
+<div class="pn-grupo">
+  <p class="pn-gt">Mira Mi Casa</p>
+  <a class="pn-it" href="#mmc/casas" data-pn-ir="mmc/casas">Casas<span class="pn-n" data-pn-n="mmc/casas"></span></a>
+  <a class="pn-it" href="#mmc/inspecciones" data-pn-ir="mmc/inspecciones">Inspecciones en terreno<span class="pn-n" data-pn-n="mmc/inspecciones"></span></a>
+</div>
+<div class="pn-grupo">
+  <p class="pn-gt">Entregas</p>
+  <a class="pn-it" href="#entregas" data-pn-ir="entregas">Actas de entrega<span class="pn-n" data-pn-n="entregas"></span></a>
+</div>
+<div class="pn-grupo">
+  <p class="pn-gt">Sistema</p>
+  <a class="pn-it" href="#sistema/salud" data-pn-ir="sistema/salud">Salud<span class="pn-n" data-pn-n="sistema/salud"></span></a>
+</div>
+<!-- Las otras pantallas internas, que viven fuera de este panel. -->
+<div class="pn-grupo">
+  <p class="pn-gt">Otras pantallas</p>
+  <a class="pn-it fuera" href="/triaje">Triaje de casas</a>
+  <a class="pn-it fuera" href="/admin/ruta">Ruta de visitas</a>
+  <a class="pn-it fuera" href="/firma">Firma de certificados</a>
+</div>
+</div>
+</aside>
 
-<form id="buscador">
-  <label for="q">Buscar</label>
-  <input id="q" type="search" autocomplete="off" spellcheck="false"
-         placeholder="CV-2026-000012, GG-2026-000004, IV-2026-000001 o un teléfono">
-  <button type="submit" class="copy">Buscar</button>
-</form>
+<div class="pn-cuerpo">
+<header class="pn-barra">
+  <button type="button" class="copy pn-menu" id="pn-menu" aria-controls="pn-lado" aria-expanded="false">Menú</button>
+  <!-- El buscador: una casilla, arriba de todo. Busca al enviar, no al teclear
+       (una búsqueda por teléfono son tres escaneos de tabla). -->
+  <form id="buscador" role="search">
+    <label for="q" class="pn-oculto">Buscar</label>
+    <input id="q" type="search" autocomplete="off" spellcheck="false"
+           placeholder="Buscar un número (GG-, CV-, IV-, CD-…) o un teléfono">
+    <button type="submit" class="copy">Buscar</button>
+  </form>
+  <p class="pn-quien" id="quien">Cargando…</p>
+</header>
+
+<main class="pn-cont" id="pn-contenido" tabindex="-1">
 <div id="busca-res"></div>
+<!-- La cabecera de la sección abierta. La escribe el panel con lo que dice
+     VISTAS (adminJS): área, título, una línea de propósito y su acción. -->
+<header class="pn-cab" id="pn-cab">
+  <p class="pn-cab-ey" id="pn-cab-ey">Inicio</p>
+  <h1 id="pn-cab-t" tabindex="-1">Hoy</h1>
+  <p class="pn-cab-linea" id="pn-cab-linea"></p>
+  <p class="pn-cab-meta" id="pn-cab-meta" aria-live="polite"></p>
+  <div class="pn-cab-acc" id="pn-cab-acc"></div>
+</header>
 
+<section class="pn-vista" data-vista="hoy" aria-labelledby="pn-cab-t">
+<div id="decisiones"><p class="mu">Cargando…</p></div>
+</section>
 
-<!-- LA BARRA DE MODULOS. El panel era una sola pagina con once secciones
-     apiladas: cada visita las recorria todas para llegar a la que ibas a mirar,
-     y mezclaba tres cosas que se usan distinto — bandejas que esperan una
-     decision, libros de lo que ya paso, y el estado de la maquina.
-     Se agrupan por LO QUE ESTAS HACIENDO, no por tipo de dato. -->
-<!-- Un <div> con role y no un <nav>: la hoja del sitio fija TODO <nav> arriba de
-     la ventana (position:fixed, z-index 200, sin fondo), que es la barra del
-     sitio publico. Aqui eso dejaba las pestañas flotando sobre lo que pasaba
-     por debajo —los filtros de la bandeja se pintaban encima de ellas—. -->
-<div class="mod-barra" role="navigation" aria-label="Modulos del panel">
-  <button type="button" class="mod-tab on" data-mod-ir="hoy">Hoy<span class="mod-n" id="n-hoy"></span></button>
-  <button type="button" class="mod-tab" data-mod-ir="dinero">Dinero<span class="mod-n" id="n-dinero"></span></button>
-  <button type="button" class="mod-tab" data-mod-ir="mmc">Mira Mi Casa<span class="mod-n" id="n-mmc"></span></button>
-  <button type="button" class="mod-tab" data-mod-ir="red">Red<span class="mod-n" id="n-red"></span></button>
-  <button type="button" class="mod-tab" data-mod-ir="vol">Voluntariado<span class="mod-n" id="n-vol"></span></button>
-  <button type="button" class="mod-tab" data-mod-ir="entregas">Entregas<span class="mod-n" id="n-entregas"></span></button>
-  <button type="button" class="mod-tab" data-mod-ir="conta">Contabilidad<span class="mod-n" id="n-conta"></span></button>
-  <button type="button" class="mod-tab" data-mod-ir="salud">Salud<span class="mod-n" id="n-salud"></span></button>
-</div>
-
-<div class="mod" data-mod="hoy"><div id="decisiones"></div></div>
-
-<div class="mod" data-mod="salud" hidden>
-<h2 id="sec-salud" class="h-sec" style="margin:8px 0 6px;font-size:26px">Salud del ecosistema</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que las listas de abajo
-no dicen: dónde se cae la donación, si el cobro está dando señales de vida, y qué lleva días
-esperando a que una persona haga algo. <strong>El cero se muestra como cero</strong> — que algo no
-haya pasado todavía es información, no un hueco que tapar. Y no hay porcentajes sin denominador:
-donde falta el dato dice «sin datos», no «0 %».</p>
-<div id="salud"><p class="mu">Cargando…</p></div>
-
-</div>
-
-<div class="mod" data-mod="dinero" hidden>
-<h2 id="sec-aportes" class="h-sec" style="margin:8px 0 6px;font-size:26px">Aportes</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">El libro de todo lo que ha entrado. Vivia sin encabezado propio, colgando de «Salud del ecosistema», que es de donde venia que los avisos de un aporte te mandaran a mirar la salud del sitio.</p>
+<!-- ============================ FINANZAS ============================ -->
+<!-- Aportes. Vivía sin encabezado propio, colgando de «Salud del ecosistema»,
+     que es de donde venía que los avisos de un aporte mandaran a mirar la salud
+     del sitio. -->
+<section class="pn-vista" data-vista="finanzas/aportes" id="sec-aportes" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Un aporte queda <strong>pagado</strong> cuando la pasarela confirma el cobro, o cuando alguien confirma una transferencia contra el extracto. Desde aquí no se puede marcar un pago a mano: así el rastreo que ve el donante significa algo.</p>
+<p>El <strong>recibo</strong> sale solo al confirmarse el pago. El <strong>certificado</strong> no: lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, así que se emite desde aquí, revisando los datos del donante.</p>
+<p>Lo único que se marca a mano es lo que pasa en terreno: «A distribución» y «Entregado». Un <strong>intento sin pagar</strong> es alguien que abrió el pago y no lo terminó: no es dinero y no se suma.</p>
+</div></details>
+<div id="resumen" class="vol-ind" aria-label="Cifras de los aportes"></div>
 <div id="cert-estado" class="cert-estado" aria-live="polite"></div>
-<div class="pay-tabs" role="group" aria-label="Filtrar por estado" style="margin-bottom:18px">
+<div class="pay-tabs" role="group" aria-label="Filtrar por estado" style="margin-bottom:6px">
   <button type="button" class="pay-tab on" data-estado="">Todos</button>
-  <button type="button" class="pay-tab" data-estado="aprobada">Aprobados</button>
-  <button type="button" class="pay-tab" data-estado="intencion">Sin pagar</button>
+  <button type="button" class="pay-tab" data-estado="aprobada">Pagados</button>
   <button type="button" class="pay-tab" data-estado="en_distribucion">En distribución</button>
   <button type="button" class="pay-tab" data-estado="entregada">Entregados</button>
+  <button type="button" class="pay-tab" data-estado="intencion">Intentos sin pagar</button>
 </div>
-
 <div class="med-tw"><table class="med-tbl" id="tabla">
 <thead><tr>
 <th scope="col">Guía</th><th scope="col">Estado</th><th scope="col">Monto</th>
 <th scope="col">Destino</th><th scope="col">Donante</th><th scope="col">Recibo</th>
 <th scope="col">Certificado</th><th scope="col">Creada</th><th scope="col">Acción</th>
-</tr></thead><tbody id="filas"><tr><td colspan="9" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</tr></thead><tbody id="filas"><tr><td colspan="9" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
+</section>
 
-<div id="dlg" style="display:none;margin-top:24px"></div>
-
-</div>
-<div class="mod" data-mod="dinero" hidden>
-<h2 id="sec-transferencias" class="h-sec" style="margin:48px 0 6px;font-size:26px">Transferencias por verificar</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Alguien dice que transfirió.
-<strong>Eso no es dinero en el banco:</strong> contrasta contra el extracto antes de confirmar. Hasta
-que lo hagas no hay recibo ni certificado, y el donante ya sabe que es así. Al confirmar se pide el
-número del comprobante porque <strong>es el que cita el certificado</strong>.</p>
+<section class="pn-vista" data-vista="finanzas/transferencias" id="sec-transferencias" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Que alguien diga que transfirió <strong>no es dinero en el banco</strong>: compáralo con el extracto antes de confirmar. Hasta que lo confirmes no hay recibo ni certificado, y el donante ya sabe que es así.</p>
+<p>Al confirmar se piden el número del comprobante, la fecha y el monto <strong>que aparecen en el extracto</strong>: son los que van en el recibo y en el certificado, y la fecha decide el año gravable. Confirmar le envía su recibo al donante; antes verás el correo que sale.</p>
+</div></details>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Guía</th><th scope="col">Monto</th><th scope="col">Destino</th>
 <th scope="col">Donante</th><th scope="col">Ref.</th><th scope="col">Comprobante</th>
 <th scope="col">Cert.</th><th scope="col">Acción</th>
-</tr></thead><tbody id="t-filas"><tr><td colspan="8" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</tr></thead><tbody id="t-filas"><tr><td colspan="8" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
+</section>
 
-</div>
-<div class="mod" data-mod="red" hidden>
-<h2 id="sec-entrar" class="h-sec" style="margin:48px 0 6px;font-size:26px">Quién quiere entrar</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Voluntarios, fundaciones que
-aplican al HUB, empresas que piden alianza e ingenieros que se postulan al triaje. <strong>Ninguna de
-estas cuatro cosas es un alta:</strong> la fundación entra con el convenio de cooperación después de
-la visita de contexto, y la empresa con la firma del Convenio Marco. Aceptar aquí significa
-«seguimos», no «ya está publicado».</p>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px"><strong>Con un ingeniero hay
-un paso que sigue siendo humano:</strong> buscar su matrícula en el registro público del COPNIA. El
-resto ya lo hace este panel — al pulsar «Marcar verificada», Access le abre el triaje solo, sin
-tocar nada en el dashboard de Cloudflare. Ojo con la diferencia, porque no es la misma cosa:
-<strong>«Seguimos» no le da acceso; «Marcar verificada» sí.</strong> Y archivarlo se lo quita, sin
-tener que acordarse de desmarcar nada. Mientras no esté verificada, su matrícula es un dato que él
-declaró, no uno comprobado.</p>
-<!-- Lo que salió de un evento (Social Fest 2026), por puerta. Lo rellena
-     pintarEventosInsc; vacío si ningún evento tiene inscripciones. -->
-<p id="i-eventos" class="mu" style="font-size:13px;margin:10px 0 0"></p>
-<div id="i-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0"></div>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Tipo</th><th scope="col">Quién</th><th scope="col">Lo que hay que saber</th>
-<th scope="col">Contacto</th><th scope="col">Fecha</th><th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="i-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
-</table></div>
-
-</div>
-<div class="mod" data-mod="vol" hidden>
-<h2 id="sec-jornadas" class="h-sec" style="margin:8px 0 6px;font-size:26px">Jornadas de voluntariado</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">De la ficha de convocatoria al
-cierre. <strong>Sin sesión de Marco no hay jornada en terreno:</strong> el panel no deja marcar como
-realizada una jornada de Impact Journey, En terreno o De emergencia sin ella. En Impact Journey y En
-terreno, además, <strong>solo se anota a quien tiene su verificación completa</strong> (Red → «Quién
-quiere entrar»), y nadie a mano. <strong>Cerrar es el registro:</strong> las horas quedan fijas, la
-fundación reporta a cuántas personas llegó, sale un certificado de voluntariado por cada persona con
-horas y nacen las encuestas. <strong>Una jornada cerrada no se reabre:</strong> si algo quedó mal, se
-crea otra jornada con los datos buenos y la cerrada se deja como está, porque sus certificados ya
-dicen lo que dicen.</p>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:18px">Los indicadores cuentan solo lo
-que ocurrió —jornadas realizadas y personas con horas— y los beneficiarios son <strong>los que reporta
-la fundación</strong>, no los que contamos nosotros. A un menor de edad <strong>nunca</strong> se le
-escribe: su certificado va a su acudiente si hay un correo registrado, y si no, se entrega en mano.
-Nada de esto se cobra.</p>
-<div id="vol-ind"></div>
-<details id="j-nueva" class="vol-caja">
-  <summary>Nueva jornada</summary>
-  <div id="j-form-nueva" class="eg-form"><p class="mu">Se arma al cargar la lista.</p></div>
-</details>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Jornada</th><th scope="col">Fecha</th><th scope="col">Puerta</th><th scope="col">Anfitriona</th>
-<th scope="col">Personas</th><th scope="col">Horas</th><th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="j-filas"><tr><td colspan="8" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
-</table></div>
-<div id="j-dlg" style="display:none;margin-top:24px"></div>
-</div>
-
-<div class="mod" data-mod="mmc" hidden>
-<h2 id="sec-casas"class="h-sec" style="margin:48px 0 6px;font-size:26px">Casas por revisar</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Triaje estructural. Los
-ingenieros clasifican sin ver de quién es la casa ni dónde queda; <strong>aquí sí están el contacto
-y la dirección</strong>, que es lo que permite ir a visitar. Ordenadas por urgencia y, dentro de
-cada grupo, por antigüedad; lo cerrado se hunde al fondo.</p>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Si dos casos comparten
-teléfono aparece el aviso <strong>«mismo teléfono que…»</strong>. Casi siempre es la misma familia
-que envió dos veces porque no estaba segura: <strong>revísalos antes de salir</strong>, o se va dos
-veces a la misma puerta. A veces son dos casas de verdad —un arriendo, un familiar— y entonces no
-hay nada que hacer.</p>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Cerrar y descartar
-<strong>piden motivo, y no es un trámite</strong>: un caso que se va de la lista sin decir por qué
-es indistinguible de uno perdido, y del otro lado hay una familia que mandó fotos de su casa. Queda
-en el registro con tu correo y la fecha. <strong>Descartar no borra nada</strong> —es para
-duplicados y pruebas— y todo se puede reabrir.</p>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Caso</th><th scope="col">Prioridad</th><th scope="col">Dónde</th>
-<th scope="col">Contacto</th><th scope="col">La casa</th><th scope="col">Estado</th>
-<th scope="col">Acción</th>
-</tr></thead><tbody id="cs-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
-</table></div>
-<div id="cs-dlg" style="display:none;margin-top:20px"></div>
-
-</div>
-<div class="mod" data-mod="mmc" hidden>
-<h2 id="sec-inspecciones" class="h-sec" style="margin:48px 0 6px;font-size:26px">Inspecciones en terreno</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">La visita en persona, que es
-<strong>otra cosa</strong> que el triaje: el triaje mira fotos a distancia y ordena la fila; esto lo
-llena un ingeniero parado en la casa, con el habitante delante. Se llena <strong>sin internet</strong>
-y puede llegar días después, así que la fecha de la visita y la de recepción son distintas a
-propósito.</p>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Ordenadas poniendo primero las
-que <strong>requieren revisión especializada</strong>, que son las que hay que mirar hoy. La columna
-<strong>RE / Obs</strong> dice cuántos elementos se marcaron de cada tipo — para saber a cuál entrar
-sin abrir todos los PDF.</p>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Si dice <strong>«sin firma»</strong>
-NO significa que no autorizara: significa que no pudo firmar, y al lado está el motivo que el
-ingeniero escribió. Un espacio en blanco no distingue esas dos cosas, por eso el motivo es
-obligatorio. Y el <strong>PDF está congelado</strong>: es el documento que esa persona firmó y no se
-regenera nunca.</p>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Inspección</th><th scope="col">Familia</th><th scope="col">Dónde</th><th scope="col">Visita</th>
-<th scope="col">Quién observó</th><th scope="col">RE / Obs</th><th scope="col">Firma del habitante</th>
-<th scope="col">Documento</th>
-</tr></thead><tbody id="ins-filas"><tr><td colspan="8" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
-</table></div>
-
-<div style="margin-top:18px;border:1px solid var(--bd);border-radius:8px;padding:15px">
-<h3 style="margin:0 0 6px;font-size:17px">Cargar el respaldo de un teléfono</h3>
-<p class="mu" style="font-size:13px;max-width:70ch;margin:0 0 9px">La salida de emergencia. Si el
-formulario de un ingeniero no logra enviar, él baja un archivo desde su teléfono y se carga aquí.
-Pasa por las <strong>mismas validaciones</strong> que el envío normal, así que lo que el formulario
-habría rechazado se rechaza también, y <strong>cargar dos veces el mismo archivo no duplica nada</strong>.</p>
-<p class="mu" style="font-size:13px;max-width:70ch;margin:0 0 9px">Las que vengan <strong>a medias</strong>
-saldrán rechazadas diciendo qué les falta. Esas hay que terminarlas en el teléfono o pasarlas del
-papel: aceptarlas incompletas metería en la base un documento sin firma.</p>
-<p class="mu" style="font-size:13px;max-width:70ch;margin:0 0 12px"><strong>El correo importa.</strong>
-Es de quién responde por lo que el documento dice, y decide si esa persona la verá en «Las que ya
-enviaste». Al elegir el archivo se rellena con el que el respaldo trae — cámbialo solo si sabes que
-está mal.</p>
-<label for="imp-correo" style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">Correo del ingeniero</label>
-<input id="imp-correo" type="email" autocomplete="off" placeholder="ingeniera@ejemplo.com"
- style="width:100%;max-width:340px;padding:8px 10px;border:1px solid var(--bd);border-radius:5px;font:inherit;font-size:14px">
-<div style="margin-top:10px"><input id="imp-arch" type="file" accept="application/json,.json" style="font-size:13px"></div>
-<div id="imp-de" class="mu" style="font-size:13px;margin-top:8px"></div>
-<button class="copy" id="b-imp" style="margin-top:10px">Cargar el respaldo</button>
-<div id="imp-res" style="margin-top:12px"></div>
-</div>
-
-</div>
-<div class="mod" data-mod="red" hidden>
-<h2 id="sec-ofrecimientos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Ofrecimientos en especie</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que llega por el formulario
-de la brigada. <strong>El acuse les pidió NO comprar todavía</strong>, así que conviene responder
-antes de que lo hagan: el inventario cambia todos los días.</p>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Qué</th><th scope="col">Cantidad</th><th scope="col">Cuándo</th>
-<th scope="col">Quién</th><th scope="col">Ciudad</th><th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="o-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
-</table></div>
-
-</div>
-<div class="mod" data-mod="dinero" hidden>
-<h2 id="sec-pagos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Pagos sin aporte</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Pagos aprobados que entraron
-por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el checkout del sitio.
-Cobraron a la misma cuenta, pero no tienen guía, ni recibo, ni certificado emitible: si alguno pide
-certificado, hay que crearle el registro a mano. Si esta lista está vacía, todo lo cobrado está
-trazado.</p>
+<section class="pn-vista" data-vista="finanzas/pagos" id="sec-pagos" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Son pagos aprobados que entraron por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el sitio. Cobraron a la misma cuenta, pero sin guía no tienen recibo ni certificado: si alguno pide certificado, hay que crearle el registro a mano.</p>
+<p>Si la lista está vacía, todo lo cobrado está trazado.</p>
+</div></details>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Referencia</th><th scope="col">Monto</th><th scope="col">Método</th>
 <th scope="col">Donante</th><th scope="col">Recibido</th>
-</tr></thead><tbody id="p-filas"><tr><td colspan="5" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</tr></thead><tbody id="p-filas"><tr><td colspan="5" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
+</section>
 
-</div>
-<div class="mod" data-mod="dinero" hidden>
-<h2 id="sec-sus" class="h-sec" style="margin:48px 0 6px;font-size:26px">Membresías internacionales</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Las suscripciones en dólares por
-PayPal. <strong>Las pendientes salen primero</strong> porque son las únicas que piden algo: una que la
-persona no llegó a aprobar en PayPal se queda pendiente para siempre —el evento que la activaría nunca
-llega— así que se muestra su edad y quien mire decide. Con muchos días y cero cobros, es un abandono en
-la pantalla de PayPal y no un miembro. <strong>Sin correo</strong> significa que el recibo mensual no
-tiene a dónde ir: eso hay que repararlo.</p>
+<section class="pn-vista" data-vista="finanzas/membresias" id="sec-sus" hidden>
+<h2 class="pn-h2" style="margin-top:0">Membresías internacionales</h2>
+<p class="pn-sub">Las membresías mensuales en dólares por PayPal. Las que están por aprobar salen primero.</p>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>«Por aprobar» es una membresía que la persona no terminó de aprobar en la pantalla de PayPal. No se activa sola: si lleva días y ningún cobro, es un abandono y no un miembro.</p>
+<p><strong>Sin correo</strong> quiere decir que el recibo mensual no tiene a dónde ir: hay que repararlo.</p>
+</div></details>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Creada</th><th scope="col">Estado</th><th scope="col">Nivel</th>
 <th scope="col">Monto</th><th scope="col">Programa</th><th scope="col">Cobros</th><th scope="col">Miembro</th>
-</tr></thead><tbody id="sus-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</tr></thead><tbody id="sus-filas"><tr><td colspan="7" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
 
-</div>
-<div class="mod" data-mod="dinero" hidden>
-<h2 id="sec-miembros" class="h-sec" style="margin:48px 0 6px;font-size:26px">Carnets de miembro</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Los carnets emitidos, los más
-nuevos primero. La columna <strong>Verificación</strong> es el código que va bajo el QR del carnet: con
-él (o con la cédula del miembro, si la registró al pagar) un comercio aliado comprueba en <code>/verificar</code>
-si la membresía está vigente, sin ver más que el nombre de pila y la inicial del apellido. Si un comercio llama a preguntar, es ese código el que se
-busca aquí. <strong>El enlace del carnet no se comparte</strong>: es la credencial del miembro.</p>
+<h2 class="pn-h2" id="sec-miembros">Carnets de miembro</h2>
+<p class="pn-sub">Los carnets emitidos, los más nuevos primero.</p>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>La columna <strong>Verificación</strong> es el código que va bajo el QR del carnet. Con él —o con la cédula del miembro, si la registró— un comercio aliado comprueba en /verificar si la membresía está vigente, viendo solo el nombre de pila y la inicial del apellido. Si un comercio llama a preguntar, es ese código el que se busca aquí.</p>
+<p><strong>El enlace del carnet no se comparte</strong>: es la credencial del miembro.</p>
+</div></details>
 
-<details id="hn-nuevo" style="margin-bottom:22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px">
-  <summary style="cursor:pointer;font-weight:700;font-size:14px">Emitir carnet de honor</summary>
+<details id="hn-nuevo" class="pn-caja">
+  <summary>Emitir carnet de honor</summary>
   <div class="eg-form">
-    <p class="mu" style="font-size:12.5px;margin:8px 0 4px;max-width:66ch">Un carnet de honor lo otorga la fundación
+    <p class="mu" style="font-size:var(--fs-13);margin:8px 0 4px;max-width:66ch">Un carnet de honor lo otorga la fundación
     <strong>por invitación</strong> y da acceso a los beneficios del Programa de Gratitud mientras esté vigente.
-    <strong>Una persona, un carnet:</strong> si el correo ya es de alguien con carnet (aunque sea pagado), la
-    distinción se le añade a ese mismo carnet —mismo enlace, mismo QR— y no se crea otro. Fundador/a y Pionero/a
-    son permanentes; las demás valen por el tiempo que elijas y se renuevan desde la tabla.
-    <strong>Junta de Asesores</strong> es un grupo honorario y asesor, sin funciones de dirección: la fundación no tiene junta directiva.</p>
+    <strong>Una persona, un carnet:</strong> si el correo ya es de alguien con carnet, la distinción se añade a ese
+    mismo carnet —mismo enlace, mismo QR—. Fundador/a y Pionero/a son permanentes; las demás valen por el tiempo que
+    elijas y se renuevan desde la tabla. <strong>Junta de Asesores</strong> es un grupo honorario y asesor, sin
+    funciones de dirección: la fundación no tiene junta directiva. Al emitirlo se le envía el carnet por correo.</p>
 
     <div class="eg-par">
       <div><label for="hn-nombre">Nombre completo</label><input id="hn-nombre" autocomplete="off"></div>
@@ -22794,7 +23132,7 @@ busca aquí. <strong>El enlace del carnet no se comparte</strong>: es la credenc
       </select></div>
       <div></div>
     </div>
-    <p class="mu" style="font-size:12.5px;margin:4px 0 10px">Cómo se lee la distinción en SU carnet, correo y recibo. «Junta de Asesores» es igual en las tres; en inglés siempre es neutra.</p>
+    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Cómo se lee la distinción en su carnet, correo y recibo. «Junta de Asesores» es igual en las tres; en inglés siempre es neutra.</p>
 
     <label for="hn-ctx">Contexto <span style="font-weight:400">(opcional, una línea: «Fundación X», «Brigada Sismo 2026»)</span></label>
     <input id="hn-ctx" maxlength="60" autocomplete="off">
@@ -22807,7 +23145,7 @@ busca aquí. <strong>El enlace del carnet no se comparte</strong>: es la credenc
       <div><label for="hn-dn">Número de documento <span style="font-weight:400">(opcional)</span></label><input id="hn-dn" inputmode="numeric" autocomplete="off"></div>
     </div>
     <label class="eg-check" style="display:flex;gap:10px;align-items:flex-start;font-weight:400;color:var(--ink)"><input type="checkbox" id="hn-aut" style="flex:0 0 auto;width:18px;height:18px;padding:0;margin:2px 0 0"> La persona autorizó que la fundación guarde su número de documento para que un comercio aliado pueda verificar su carnet con él en /verificar.</label>
-    <p class="mu" style="font-size:12.5px;margin:4px 0 10px">Obligatorio si escribes un documento. Sin documento el carnet se verifica igual, por su código.</p>
+    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Obligatorio si escribes un documento. Sin documento el carnet se verifica igual, por su código.</p>
 
     <div class="eg-par">
       <div><label for="hn-idioma">Idioma del correo</label><select id="hn-idioma">
@@ -22825,89 +23163,20 @@ busca aquí. <strong>El enlace del carnet no se comparte</strong>: es la credenc
 <thead><tr>
 <th scope="col">Carnet</th><th scope="col">Verificación</th><th scope="col">Miembro</th>
 <th scope="col">Nivel</th><th scope="col">Distinción</th><th scope="col">Vigente hasta</th><th scope="col">Estado</th>
-</tr></thead><tbody id="mb-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+</tr></thead><tbody id="mb-filas"><tr><td colspan="7" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
+</section>
 
-</div>
-<div class="mod" data-mod="dinero" hidden>
-<h2 id="sec-ipn" class="h-sec" style="margin:48px 0 6px;font-size:26px">Donaciones por el botón de PayPal</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que entró por el
-<strong>botón de donaciones</strong>, único o mensual. A un botón alojado PayPal no acepta que se le
-pase una referencia por donante, así que <strong>estas donaciones no tienen guía</strong>: si alguien
-pide certificado o quiere rastrear su aporte, hay que crearle el registro a mano. Las membresías
-creadas desde el sitio no salen aquí — esas ya tienen su suscripción y su recibo.
-<strong>Verificado</strong> significa que PayPal confirmó el mensaje y que la cuenta que recibió es
-la nuestra; si dice otra cosa, es el motivo por el que no pasó y no hay que darlo por cobrado.</p>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Recibido</th><th scope="col">Tipo</th><th scope="col">Monto</th>
-<th scope="col">Donante</th><th scope="col">Destino</th><th scope="col">Verificado</th>
-</tr></thead><tbody id="ipn-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
-</table></div>
-
-</div>
-<div class="mod" data-mod="dinero" hidden>
-<h2 id="sec-pps" class="h-sec" style="margin:48px 0 6px;font-size:26px">Eventos de PayPal sin casa</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">La hermana de «Pagos sin aporte»,
-para PayPal. Tres cosas distintas caen aquí. <strong>Pago sin suscripción</strong>: entró plata con firma
-válida que no corresponde a ninguna membresía — pudo ser una donación del botón llegando por webhook en
-vez de por IPN, y hay que registrarla a mano. <strong>Firma inválida</strong>: el evento se guardó y
-<strong>no</strong> se procesó; puede ser una suplantación, pero la primera vez que pasó la causa fue una
-variable mal puesta, así que conviene mirarlo antes de asumir lo peor. <strong>Se quedó a medias</strong>:
-la firma era buena y el proceso falló, así que ese cobro puede no estar en el libro — PayPal reintenta
-durante días, de modo que una fila recién aparecida suele resolverse sola; una que lleve días ahí, no.
-Si esta lista está vacía, todo lo que llegó de PayPal tiene dónde ir.</p>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Recibido</th><th scope="col">Evento</th><th scope="col">Monto</th>
-<th scope="col">Donante</th><th scope="col">Qué pasa</th>
-</tr></thead><tbody id="pps-filas"><tr><td colspan="5" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
-</table></div>
-
-</div>
-<div class="mod" data-mod="entregas" hidden>
-<h2 id="sec-entregas" class="h-sec" style="margin:48px 0 6px;font-size:26px">Entregas</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:18px">El documento legal es el
-acta EN PAPEL que firma quien recibe. Aquí se registra su transcripción y se sube su foto.
-<strong>Nunca se publican nombres de personas beneficiarias</strong> — en «recibido por» va el rol
-y la entidad, no una persona atendida. Una entrega no se puede publicar sin al menos una foto.</p>
-
-<div class="card" style="max-width:640px;text-align:left;margin-bottom:20px">
-  <h3 style="margin-bottom:12px">Registrar una entrega</h3>
-  <div id="e-campos"></div>
-  <p id="e-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>
-  <button class="btn btn-g" id="e-crear">Registrar</button>
-</div>
-
-<!-- eco-stack: en pantalla angosta esta tabla deja de ser tabla y se apila.
-     Es la única del panel que se usa EN TERRENO, desde un celular, después de
-     una entrega — y era la que peor se comportaba: 633px de contenido en una
-     ventana de 327, con «+foto», «Publicar» y «Anular» fuera de pantalla y de
-     26px de alto. La clase va solo aquí y no en med-tbl porque esa tabla
-     también la usa la página pública de medición. -->
-<div class="med-tw"><table class="med-tbl eco-stack">
-<thead><tr>
-<th scope="col">Acta</th><th scope="col">Fecha</th><th scope="col">Sector</th>
-<th scope="col">Aliada</th><th scope="col">Recibido por</th><th scope="col">Familias</th><th scope="col">Fotos</th>
-<th scope="col">Casas</th><th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="e-filas"><tr><td colspan="10" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
-</table></div>
-
-<p class="mu" style="margin-top:18px;font-size:13px;max-width:70ch">Los estados de pago los mueve el webhook de Wompi, nunca este panel. Aquí solo se marca lo que ocurre en terreno: distribución y entrega.</p>
-<p class="mu" style="margin-top:8px;font-size:13px;max-width:70ch">El <strong>recibo</strong> lo emite el sistema al confirmarse el pago. El <strong>certificado</strong> no: lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento, así que sale de aquí, revisado, y nunca solo.</p>
-</div>
-
-<div class="mod" data-mod="conta" hidden>
-<!-- VENCIMIENTOS. Va PRIMERO en Contabilidad: el 22 sep 2026 la Alcaldia de
-     Medellin aviso que el ICA 2025 nunca se declaro, y no estaba en ninguna
-     lista. Las fechas viven en OBLIGACIONES (worker.js) y se revisan cada
-     diciembre; aqui solo se marca que alguien se ocupo. -->
-<h2 id="sec-vencimientos" class="h-sec" style="margin:8px 0 6px;font-size:26px">Vencimientos</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Lo que la Fundación tiene que presentar,
-pagar o reportar, con su fecha. <strong>Marcar no presenta nada:</strong> solo deja constancia de que alguien se
-ocupó. Las que dicen «solo si…» se marcan <strong>«No aplicó este periodo»</strong> cuando no aplicaron — un mes sin
-retenciones también hay que cerrarlo. «Por confirmar» es una fecha calculada con la regla, no publicada todavía.
-Lo vencido y lo que vence en 14 días sale en «Hoy»; lo vencido o a 3 días, además, en el correo diario a contabilidad.</p>
+<!-- VENCIMIENTOS. El 22 sep 2026 la Alcaldía de Medellín avisó que el ICA 2025
+     nunca se declaró, y no estaba en ninguna lista. Las fechas viven en
+     OBLIGACIONES (worker.js) y se revisan cada diciembre; aquí solo se marca
+     que alguien se ocupó. Una fecha nueva o corregida es un PR, no un clic. -->
+<section class="pn-vista" data-vista="finanzas/vencimientos" id="sec-vencimientos" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p><strong>Marcar no presenta nada:</strong> solo deja constancia de que alguien se ocupó. Las que dicen «solo si…» se marcan «No aplicó este periodo» cuando no aplicaron: un mes sin retenciones también se cierra.</p>
+<p>«Por confirmar» es una fecha calculada con la regla y todavía no publicada. Lo vencido y lo que vence en 14 días sale en «Hoy»; lo vencido o a tres días llega además en el correo diario a contabilidad.</p>
+<p>Qué aplica, qué no y de dónde sale cada fecha está en ops/obligaciones.md. Una fecha nueva o corregida se cambia en el sistema, no desde esta pantalla.</p>
+</div></details>
 <div class="eg-acciones">
   <label class="eg-check"><input type="checkbox" id="ob-todo"> Ver todo el calendario, no solo los próximos 120 días</label>
 </div>
@@ -22915,26 +23184,26 @@ Lo vencido y lo que vence en 14 días sale en «Hoy»; lo vencido o a 3 días, a
 <thead><tr>
 <th scope="col">Fecha</th><th scope="col">Entidad</th><th scope="col">Obligación</th>
 <th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="ob-filas"><tr><td colspan="5" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
+</tr></thead><tbody id="ob-filas"><tr><td colspan="5" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
 <p class="msg" id="ob-msg"></p>
-<p class="mu" style="font-size:12.5px;margin:6px 0 0;max-width:70ch">Qué aplica, qué no y de dónde sale cada fecha:
-<code>ops/obligaciones.md</code>. Una fecha nueva o corregida es un PR, no un clic.</p>
+</section>
 
-<h2 id="sec-egresos" class="h-sec" style="margin:48px 0 6px;font-size:26px">Egresos</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Cada peso que sale, con su papel y su clasificación.
-<strong>Esto no es el libro oficial</strong> — los libros, la declaración y la exógena son de tu contador y llevan
-responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde vive el soporte.</p>
+<section class="pn-vista" data-vista="finanzas/egresos" id="sec-egresos" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p><strong>Esto no es el libro oficial:</strong> los libros, la declaración y la exógena son del contador y llevan responsabilidad legal. Esto es la fuente de la que él trabaja, y el lugar donde vive cada soporte.</p>
+<p>El archivo para el contador sale separado por punto y coma y con las columnas que pide la exógena, así que Excel en español lo abre en columnas. Las fechas acotan la descarga, no la tabla.</p>
+</div></details>
 
 <div id="eg-resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:18px"></div>
 
-<details id="eg-nuevo" style="margin-bottom:22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px">
-  <summary style="cursor:pointer;font-weight:700;font-size:14px">Registrar un egreso</summary>
+<details id="eg-nuevo" class="pn-caja">
+  <summary>Registrar un egreso</summary>
   <div class="eg-form">
     <div class="eg-xml">
       <label for="eg-arch" style="margin-top:0">Arrastra la factura electrónica</label>
       <input id="eg-arch" type="file" accept=".xml,application/xml,text/xml,.pdf,application/pdf">
-      <p class="mu" style="font-size:12.5px;margin:6px 0 0">El XML de la DIAN trae todo esto escrito, así que
+      <p class="mu" style="font-size:var(--fs-13);margin:6px 0 0">El XML de la DIAN trae todo esto escrito, así que
       no hay que teclearlo. Se lee <strong>en tu navegador</strong>: el archivo no sale de aquí hasta que
       registres el egreso. También vale un PDF, pero ese solo se guarda — no se puede leer.</p>
       <p class="msg" id="eg-xmsg"></p>
@@ -22954,7 +23223,7 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
         <input id="eg-pd" placeholder="Número de documento" autocomplete="off">
       </div>
       <label class="eg-check"><input type="checkbox" id="eg-pf" checked> Está obligado a facturar</label>
-      <p class="mu" style="font-size:12.5px;margin:4px 0 10px">Si no lo está —la tienda de la vereda—, desmárcalo:
+      <p class="mu" style="font-size:var(--fs-13);margin:4px 0 10px">Si no lo está —la tienda de la vereda—, desmárcalo:
       es lo que dice que ese egreso necesita <strong>documento soporte</strong> y no una factura suya.</p>
       <button type="button" class="btn" id="eg-pg">Guardar proveedor</button>
       <p class="msg" id="eg-pmsg"></p>
@@ -22974,7 +23243,7 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
       <div><label for="eg-base">Base</label><input id="eg-base" inputmode="numeric" placeholder="500000"></div>
       <div><label for="eg-iva">IVA</label><input id="eg-iva" inputmode="numeric" placeholder="95000"></div>
     </div>
-    <p class="mu" style="font-size:12.5px;margin:0 0 10px">En pesos, sin centavos. El IVA se guarda para poder
+    <p class="mu" style="font-size:var(--fs-13);margin:0 0 10px">En pesos, sin centavos. El IVA se guarda para poder
     informarlo: la fundación <strong>no es responsable de IVA</strong>, así que es mayor valor del costo y no se descuenta.</p>
 
     <div class="eg-par">
@@ -22984,8 +23253,8 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
         <option value="arrendamientos">Arrendamientos</option><option value="transporte">Transporte</option></select></div>
       <div><label for="eg-rf">Retefuente practicada</label><input id="eg-rf" inputmode="numeric" placeholder="0"></div>
     </div>
-    <p class="mu" style="font-size:12.5px;margin:0 0 10px">Lo que retuviste <strong>de verdad</strong>, no lo que
-    debería ser. Las tarifas y las bases mínimas en UVT cambian cada año y las confirma tu contador; aquí se guarda
+    <p class="mu" style="font-size:var(--fs-13);margin:0 0 10px">Lo que retuviste <strong>de verdad</strong>, no lo que
+    debería ser. Las tarifas y las bases mínimas cambian cada año y las confirma tu contador; aquí se guarda
     lo aplicado. El concepto sí hace falta siempre: de él salen la exógena y el certificado anual del proveedor.</p>
 
     <div id="eg-cuentas" class="eg-cuentas"></div>
@@ -23010,13 +23279,13 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
     </div>
 
     <label class="eg-check"><input type="checkbox" id="eg-mer" checked> Es egreso de la actividad meritoria</label>
-    <p class="mu" style="font-size:12.5px;margin:4px 0 12px">De esto cuelga el Régimen Tributario Especial. Se pregunta
+    <p class="mu" style="font-size:var(--fs-13);margin:4px 0 12px">De esto cuelga el Régimen Tributario Especial. Se pregunta
     ahora y no al cerrar el año, que es cuando ya no se acuerda nadie.</p>
 
     <label for="eg-nota">Nota interna (opcional)</label>
     <input id="eg-nota" autocomplete="off">
 
-    <p><button type="button" class="btn" id="eg-guardar" style="margin-top:12px">Registrar egreso</button></p>
+    <p><button type="button" class="btn btn-g" id="eg-guardar" style="margin-top:12px">Registrar egreso</button></p>
     <p class="msg" id="eg-msg"></p>
   </div>
 </details>
@@ -23028,9 +23297,6 @@ responsabilidad legal. Esto es la fuente de la que él trabaja, y el sitio donde
   <label for="eg-d2">Hasta</label><input id="eg-d2" type="date">
   <button type="button" class="tab" id="eg-csv">Descargar para el contador</button>
 </div>
-<p class="mu" style="font-size:12.5px;margin:0 0 14px">El archivo sale con punto y coma y con las columnas que
-pide la exógena, así que Excel en español lo abre en columnas y no en una sola. Las fechas acotan la descarga,
-no la tabla.</p>
 
 <div class="med-tw"><table class="med-tbl" id="eg-tabla">
 <thead><tr>
@@ -23038,22 +23304,211 @@ no la tabla.</p>
 <th scope="col">Concepto</th><th scope="col">Total</th><th scope="col">Retenido</th>
 <th scope="col">Papel</th><th scope="col">Centro</th><th scope="col">Acta</th>
 <th scope="col">Acción</th>
-</tr></thead><tbody id="eg-filas"><tr><td colspan="10" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
+</tr></thead><tbody id="eg-filas"><tr><td colspan="10" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
+</section>
 
-<h2 id="sec-proveedores" class="h-sec" style="margin:48px 0 6px;font-size:26px">Proveedores</h2>
-<p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">A quién se le paga. Van aparte porque un proveedor
-se repite y sus datos se corrigen — y porque el <strong>certificado anual de retención</strong> se expide por proveedor,
-no por factura.</p>
+<section class="pn-vista" data-vista="finanzas/proveedores" id="sec-proveedores" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Van aparte porque un proveedor se repite y sus datos se corrigen, y porque el <strong>certificado anual de retención</strong> se expide por proveedor, no por factura. Un proveedor nuevo se crea desde «Registrar un egreso».</p>
+</div></details>
 <div class="med-tw"><table class="med-tbl" id="pr-tabla">
 <thead><tr>
 <th scope="col">Nombre</th><th scope="col">Documento</th><th scope="col">Factura</th>
 <th scope="col">Egresos</th><th scope="col">Total pagado</th>
-</tr></thead><tbody id="pr-filas"><tr><td colspan="5" class="mu">Se pide al abrir el módulo.</td></tr></tbody>
+</tr></thead><tbody id="pr-filas"><tr><td colspan="5" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
+</section>
+
+<section class="pn-vista" data-vista="finanzas/paypal" id="sec-ipn" hidden>
+<h2 class="pn-h2" style="margin-top:0">Donaciones por el botón de PayPal</h2>
+<p class="pn-sub">Lo que entró por el botón de donaciones, único o mensual. No tienen guía.</p>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Al botón de PayPal no se le puede pasar una referencia por donante, así que <strong>estas donaciones no tienen guía</strong>: si alguien pide certificado o quiere rastrear su aporte, hay que crearle el registro a mano. Las membresías creadas desde el sitio no salen aquí: esas ya tienen su suscripción y su recibo.</p>
+<p><strong>Verificado</strong> quiere decir que PayPal confirmó el aviso y que la cuenta que recibió es la nuestra; si dice otra cosa, es el motivo por el que no pasó y no hay que darlo por cobrado.</p>
+</div></details>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Recibido</th><th scope="col">Tipo</th><th scope="col">Monto</th>
+<th scope="col">Donante</th><th scope="col">Destino</th><th scope="col">Verificado</th>
+</tr></thead><tbody id="ipn-filas"><tr><td colspan="6" class="mu">Se pide al abrir la sección.</td></tr></tbody>
+</table></div>
+
+<h2 class="pn-h2" id="sec-pps">Avisos de PayPal sin registro</h2>
+<p class="pn-sub">Avisos de PayPal que no encontraron a qué membresía o aporte pertenecen. Si la lista está vacía, todo tiene dónde ir.</p>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Caen aquí tres cosas. <strong>Pago sin suscripción</strong>: entró dinero con firma válida que no corresponde a ninguna membresía; puede ser una donación del botón y hay que registrarla a mano. <strong>Firma inválida</strong>: el aviso se guardó y no se procesó; puede ser una suplantación, pero la primera vez fue un ajuste mal puesto, así que conviene mirarlo antes de asumir lo peor.</p>
+<p><strong>Se quedó a medias</strong>: la firma era buena y el proceso falló, así que ese cobro puede no estar en el libro. PayPal reintenta durante días: una fila recién aparecida suele resolverse sola; una que lleve días ahí, no.</p>
+</div></details>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Recibido</th><th scope="col">Evento</th><th scope="col">Monto</th>
+<th scope="col">Donante</th><th scope="col">Qué pasa</th>
+</tr></thead><tbody id="pps-filas"><tr><td colspan="5" class="mu">Se pide al abrir la sección.</td></tr></tbody>
+</table></div>
+</section>
+
+<!-- ============================ ALIANZAS ============================ -->
+<!-- Una misma bandeja sirve a tres entradas: Red (todo), Social Fest (lo que
+     llegó desde el evento) e Ingenieros (las postulaciones al triaje). Cambia
+     el filtro, no la tabla: así una fila no puede verse distinta según por
+     dónde se entró. -->
+<section class="pn-vista" data-vista="alianzas/red" data-alias="alianzas/socialfest personas/ingenieros" id="sec-entrar" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p><strong>Ninguna de estas solicitudes es un alta.</strong> La fundación entra con el convenio de cooperación después de la visita de contexto, y la empresa con la firma del Convenio Marco. Aceptar quiere decir «seguimos», no «ya está publicado».</p>
+<p>Algunos pasos le escriben a la fundación: Aceptar, Visita hecha, Iniciar convenio y Marcar vinculada. Antes de confirmar verás el correo que sale, a quién y qué dice.</p>
+<p><strong>Con un ingeniero hay un paso que sigue siendo humano:</strong> buscar su matrícula en el registro público del COPNIA. «Marcar verificada» le abre el triaje y le avisa por correo; «En revisión» o «Aceptar» no le dan acceso. Archivarlo se lo quita. Mientras no esté verificada, su matrícula es un dato que él declaró, no uno comprobado.</p>
+<p><strong>Suprimir</strong> borra los datos de la persona para siempre. Es para cuando alguien pide que lo borremos (Ley 1581); para cerrar una solicitud, usa Archivar.</p>
+</div></details>
+<!-- Lo que salió de un evento (Social Fest 2026), por puerta. Lo rellena
+     pintarEventosInsc; vacío si ningún evento tiene inscripciones. -->
+<p id="i-eventos" class="mu" style="font-size:var(--fs-13);margin:0"></p>
+<div id="i-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0"></div>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Tipo</th><th scope="col">Quién</th><th scope="col">Lo que hay que saber</th>
+<th scope="col">Contacto</th><th scope="col">Fecha</th><th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="i-filas"><tr><td colspan="7" class="mu">Se pide al abrir la sección.</td></tr></tbody>
+</table></div>
+</section>
+
+<section class="pn-vista" data-vista="alianzas/ofrecimientos" id="sec-ofrecimientos" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>El acuse les pidió <strong>no comprar todavía</strong>, así que conviene responder antes de que lo hagan: el inventario cambia todos los días.</p>
+</div></details>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Qué</th><th scope="col">Cantidad</th><th scope="col">Cuándo</th>
+<th scope="col">Quién</th><th scope="col">Ciudad</th><th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="o-filas"><tr><td colspan="7" class="mu">Se pide al abrir la sección.</td></tr></tbody>
+</table></div>
+</section>
+
+<!-- ============================ PERSONAS ============================ -->
+<section class="pn-vista" data-vista="personas/voluntariado" id="sec-jornadas" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p><strong>Sin sesión de Marco no hay jornada en terreno:</strong> el panel no deja marcar como realizada una jornada de Impact Journey, En terreno o De emergencia sin ella. En Impact Journey y En terreno, además, <strong>solo se anota a quien tiene su verificación completa</strong> (en Red), y nadie a mano.</p>
+<p><strong>Cerrar es el registro:</strong> las horas quedan fijas, la fundación reporta a cuántas personas llegó, sale un certificado de voluntariado por cada persona con horas y nacen las encuestas. <strong>Una jornada cerrada no se reabre:</strong> si algo quedó mal, se crea otra con los datos buenos, porque sus certificados ya dicen lo que dicen.</p>
+<p>Los indicadores cuentan solo lo que ocurrió —jornadas realizadas y personas con horas— y los beneficiarios son <strong>los que reporta la fundación</strong>. A un menor de edad <strong>nunca</strong> se le escribe: su certificado va a su acudiente si hay un correo registrado, y si no, se entrega en mano. Nada de esto se cobra.</p>
+</div></details>
+<div id="vol-ind"></div>
+<details id="j-nueva" class="vol-caja">
+  <summary>Nueva jornada</summary>
+  <div id="j-form-nueva" class="eg-form"><p class="mu">Se arma al cargar la lista.</p></div>
+</details>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Jornada</th><th scope="col">Fecha</th><th scope="col">Puerta</th><th scope="col">Anfitriona</th>
+<th scope="col">Personas</th><th scope="col">Horas</th><th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="j-filas"><tr><td colspan="8" class="mu">Se pide al abrir la sección.</td></tr></tbody>
+</table></div>
+<div id="j-dlg" style="display:none;margin-top:24px"></div>
+</section>
+
+<!-- ========================== MIRA MI CASA ========================== -->
+<section class="pn-vista" data-vista="mmc/casas" id="sec-casas" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Los ingenieros clasifican sin ver de quién es la casa ni dónde queda; <strong>aquí sí están el contacto y la dirección</strong>, que es lo que permite ir a visitar. Van ordenadas por urgencia y, dentro de cada grupo, por antigüedad; lo cerrado se hunde al fondo.</p>
+<p>Si dos casos comparten teléfono aparece <strong>«mismo teléfono que…»</strong>. Casi siempre es la misma familia que envió dos veces: revísalos antes de salir, o se va dos veces a la misma puerta.</p>
+<p>Cerrar y descartar <strong>piden motivo</strong>: un caso que se va de la lista sin decir por qué es indistinguible de uno perdido. Descartar no borra nada —es para duplicados y pruebas— y todo se puede reabrir.</p>
+</div></details>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Caso</th><th scope="col">Prioridad</th><th scope="col">Dónde</th>
+<th scope="col">Contacto</th><th scope="col">La casa</th><th scope="col">Estado</th>
+<th scope="col">Acción</th>
+</tr></thead><tbody id="cs-filas"><tr><td colspan="7" class="mu">Se pide al abrir la sección.</td></tr></tbody>
+</table></div>
+</section>
+
+<section class="pn-vista" data-vista="mmc/inspecciones" id="sec-inspecciones" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>La visita en persona es <strong>otra cosa</strong> que el triaje: el triaje mira fotos a distancia; esto lo llena un ingeniero en la casa, con el habitante delante. Se llena sin internet y puede llegar días después, por eso la fecha de la visita y la de recepción son distintas.</p>
+<p>Salen primero las que <strong>requieren revisión especializada</strong>. La columna RE / Obs dice cuántos elementos se marcaron de cada tipo, para saber a cuál entrar sin abrir todos los documentos.</p>
+<p><strong>«Sin firma»</strong> no significa que no autorizara: significa que no pudo firmar, y al lado está el motivo. El documento está congelado: es el que esa persona firmó y no se regenera nunca.</p>
+</div></details>
+<div class="med-tw"><table class="med-tbl">
+<thead><tr>
+<th scope="col">Inspección</th><th scope="col">Familia</th><th scope="col">Dónde</th><th scope="col">Visita</th>
+<th scope="col">Quién observó</th><th scope="col">RE / Obs</th><th scope="col">Firma del habitante</th>
+<th scope="col">Documento</th>
+</tr></thead><tbody id="ins-filas"><tr><td colspan="8" class="mu">Se pide al abrir la sección.</td></tr></tbody>
+</table></div>
+
+<details class="pn-caja" style="margin-top:22px">
+<summary>Cargar el respaldo de un teléfono</summary>
+<p class="mu" style="font-size:var(--fs-13);max-width:70ch;margin:10px 0 9px">La salida de emergencia: si el formulario de un
+ingeniero no logra enviar, él baja un archivo desde su teléfono y se carga aquí. Pasa por las <strong>mismas
+validaciones</strong> que el envío normal, y <strong>cargar dos veces el mismo archivo no duplica nada</strong>. Las que
+vengan a medias salen rechazadas diciendo qué les falta.</p>
+<p class="mu" style="font-size:var(--fs-13);max-width:70ch;margin:0 0 12px"><strong>El correo importa:</strong> es de quién
+responde por lo que el documento dice. Al elegir el archivo se rellena con el que el respaldo trae; cámbialo solo si
+sabes que está mal.</p>
+<label for="imp-correo" style="display:block;font-size:var(--fs-13);font-weight:600;margin-bottom:4px">Correo del ingeniero</label>
+<input id="imp-correo" type="email" autocomplete="off" placeholder="ingeniera@ejemplo.com"
+ style="width:100%;max-width:340px;padding:8px 10px;border:1px solid var(--bd);border-radius:5px;font:inherit">
+<div style="margin-top:10px"><input id="imp-arch" type="file" accept="application/json,.json" style="font-size:var(--fs-13)"></div>
+<div id="imp-de" class="mu" style="font-size:var(--fs-13);margin-top:8px"></div>
+<button class="copy" id="b-imp" style="margin-top:10px">Cargar el respaldo</button>
+<div id="imp-res" style="margin-top:12px"></div>
+</details>
+</section>
+
+<!-- ============================ ENTREGAS ============================ -->
+<section class="pn-vista" data-vista="entregas" id="sec-entregas" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>El documento legal es el <strong>acta en papel</strong> que firma quien recibe. Aquí se registra su transcripción y se sube su foto.</p>
+<p><strong>Nunca se publican nombres de personas beneficiarias</strong>: en «recibido por» va el rol y la entidad, no una persona atendida. Una entrega no se puede publicar sin al menos una foto. Anular no se deshace: el número queda gastado y con su motivo.</p>
+</div></details>
+
+<details class="pn-caja" id="e-form">
+  <summary>Registrar una entrega</summary>
+  <div style="max-width:640px;margin-top:12px">
+  <div id="e-campos"></div>
+  <p id="e-error" class="mu" style="color:var(--err);font-size:var(--fs-13);display:none"></p>
+  <button class="btn btn-g" id="e-crear">Registrar</button>
+  </div>
+</details>
+
+<!-- eco-stack: en pantalla angosta esta tabla deja de ser tabla y se apila.
+     Es la única del panel que se usa EN TERRENO, desde un celular, después de
+     una entrega. La clase va solo aquí y no en med-tbl porque esa tabla
+     también la usa la página pública de medición. -->
+<div class="med-tw"><table class="med-tbl eco-stack">
+<thead><tr>
+<th scope="col">Acta</th><th scope="col">Fecha</th><th scope="col">Sector</th>
+<th scope="col">Aliada</th><th scope="col">Recibido por</th><th scope="col">Familias</th><th scope="col">Fotos</th>
+<th scope="col">Casas</th><th scope="col">Estado</th><th scope="col">Acción</th>
+</tr></thead><tbody id="e-filas"><tr><td colspan="10" class="mu">Se pide al abrir la sección.</td></tr></tbody>
+</table></div>
+</section>
+
+<!-- ============================ SISTEMA ============================ -->
+<section class="pn-vista" data-vista="sistema/salud" id="sec-salud" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p><strong>El cero se muestra como cero</strong>: que algo no haya pasado todavía también es un dato. Y no hay porcentajes sin denominador: donde falta el dato dice «sin datos», no «0 %».</p>
+<p>Si algo de «Operación» está mal, a las 9 de la mañana llega un correo «Operación ·» al buzón de alianzas. Qué hacer con cada cosa está en ops/runbook-incidentes.md.</p>
+</div></details>
+<div id="salud"><p class="mu">Cargando…</p></div>
+</section>
+
+</main>
+</div>
 </div>
 
-</div></section></main>
+<!-- EL CAJÓN y sus avisos. Un solo cajón para todo el panel: detalle de un
+     caso, formularios y la confirmación de lo que envía un correo o destruye
+     algo. Lo maneja «cajon» en adminJS. -->
+<div class="pn-velo" id="pn-velo" hidden></div>
+<aside class="pn-cajon" id="pn-cajon" role="dialog" aria-modal="true" aria-labelledby="pn-cajon-t" hidden>
+  <header class="pn-cajon-cab">
+    <div><p class="pn-cajon-ey" id="pn-cajon-ey"></p><h2 id="pn-cajon-t" tabindex="-1"></h2></div>
+    <button type="button" class="copy" data-pn-cerrar="1">Cerrar</button>
+  </header>
+  <div class="pn-cajon-cuerpo" id="pn-cajon-cuerpo"></div>
+  <div class="pn-cajon-pie" id="pn-cajon-pie"></div>
+</aside>
+<div class="pn-avisos" id="pn-avisos" aria-live="polite"></div>
 <script src="/admin/app.js"></script>
 </body></html>`;
 }
@@ -23080,11 +23535,194 @@ function pesos(c){ return "$" + Math.round((c||0)/100).toLocaleString("es-CO"); 
    El «catch» de cada sitio sigue siendo suyo: esto mira la respuesta, no la red. */
 function fallo(http, d){
   if (http >= 200 && http < 300 && !(d && d.error)) return false;
-  alert((d && (d.ayuda || d.error)) || "No se pudo. Intenta otra vez.");
+  avisoError((d && (d.ayuda || d.error)) || "No se pudo. Intenta otra vez.");
   return true;
 }
 /* Los cuatro sitios repiten el mismo gesto: leer estado y cuerpo a la vez. */
 function conEstado(r){ return r.json().then(function(d){ return { http: r.status, d: d }; }); }
+
+/* ==== EL CAJÓN, LOS AVISOS Y LA VISTA PREVIA (Fase 1 del panel, oct 2026) ====
+   Tres piezas que usa todo el panel:
+   · cajonAbrir/cajonCerrar: el panel lateral donde se abren el detalle y los
+     formularios. Reemplaza a window.prompt y a las cajas que se pintaban mil
+     píxeles más abajo de la tabla.
+   · avisar: «Hecho · Deshacer» abajo al centro. Deshacer solo cuando existe la
+     acción contraria de verdad. Reemplaza a window.alert.
+   · confirmarConCorreo / confirmarPeligro: antes de lo que le escribe a alguien
+     de fuera se enseña el correo (lo arma el servidor con las mismas
+     plantillas, ver adminPrevia), y antes de lo que destruye se dice qué se
+     destruye, con un botón rojo. */
+var CAJON = { abierto: false, volver: null };
+function cajonAbrir(o){
+  var c = document.getElementById("pn-cajon"), v = document.getElementById("pn-velo");
+  if (!c) return;
+  if (!CAJON.abierto) CAJON.volver = document.activeElement;
+  c.classList.toggle("ancho", !!o.ancho);
+  c.classList.toggle("peligro", !!o.peligro);
+  document.getElementById("pn-cajon-ey").textContent = o.ey || "";
+  document.getElementById("pn-cajon-t").textContent = o.titulo || "";
+  cajonCuerpo(o.cuerpo || "");
+  cajonPie(o.pie || "");
+  c.hidden = false; v.hidden = false; CAJON.abierto = true;
+  document.body.style.overflow = "hidden";
+  document.getElementById("pn-cajon-cuerpo").scrollTop = 0;
+  var foco = o.foco ? document.getElementById(o.foco) : null;
+  (foco || document.getElementById("pn-cajon-t")).focus();
+}
+function cajonCuerpo(html){ var b = document.getElementById("pn-cajon-cuerpo"); if (b) b.innerHTML = html; }
+function cajonPie(html){ var p = document.getElementById("pn-cajon-pie"); if (p) p.innerHTML = html || ""; }
+function cajonCerrar(){
+  var c = document.getElementById("pn-cajon"); if (!c || c.hidden) return;
+  c.hidden = true; document.getElementById("pn-velo").hidden = true; CAJON.abierto = false;
+  document.body.style.overflow = "";
+  cajonCuerpo(""); cajonPie("");
+  CASO_ABIERTO = null;
+  if (CAJON.volver && CAJON.volver.focus && document.contains(CAJON.volver)) CAJON.volver.focus();
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  if (e.target.closest("[data-pn-cerrar]") || e.target.id === "pn-velo") cajonCerrar();
+});
+document.addEventListener("keydown", function(e){
+  if (!CAJON.abierto) return;
+  if (e.key === "Escape"){ cajonCerrar(); return; }
+  /* El foco no se escapa del cajón con Tab mientras está abierto. */
+  if (e.key !== "Tab") return;
+  var c = document.getElementById("pn-cajon");
+  var f = c.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])');
+  if (!f.length) return;
+  var pri = f[0], ult = f[f.length - 1];
+  if (!c.contains(document.activeElement)){ e.preventDefault(); pri.focus(); }
+  else if (e.shiftKey && document.activeElement === pri){ e.preventDefault(); ult.focus(); }
+  else if (!e.shiftKey && document.activeElement === ult){ e.preventDefault(); pri.focus(); }
+});
+
+var AVISO_N = 0, AVISOS = {};
+function avisar(texto, op){
+  op = op || {};
+  var caja = document.getElementById("pn-avisos"); if (!caja) return;
+  var id = "pn-av-" + (++AVISO_N);
+  var d = document.createElement("div");
+  d.className = "pn-aviso" + (op.tono === "error" ? " error" : "");
+  d.id = id;
+  d.setAttribute("role", op.tono === "error" ? "alert" : "status");
+  d.innerHTML = "<span></span>" + (op.deshacer ? '<button type="button" data-pn-deshacer="' + id + '">Deshacer</button>' : "") +
+    '<button type="button" data-pn-quitar="' + id + '">Cerrar</button>';
+  d.firstChild.textContent = String(texto == null ? "" : texto);
+  caja.appendChild(d);
+  AVISOS[id] = op.deshacer || null;
+  setTimeout(function(){ quitarAviso(id); }, op.ms || (op.tono === "error" ? 15000 : op.deshacer ? 10000 : 6500));
+}
+function avisoError(t){ avisar(t, { tono: "error" }); }
+function quitarAviso(id){ var d = document.getElementById(id); if (d) d.parentNode.removeChild(d); delete AVISOS[id]; }
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var q = e.target.closest("[data-pn-quitar]");
+  if (q){ quitarAviso(q.getAttribute("data-pn-quitar")); return; }
+  var u = e.target.closest("[data-pn-deshacer]");
+  if (u){ var id = u.getAttribute("data-pn-deshacer"); var f = AVISOS[id]; quitarAviso(id); if (f) f(); }
+});
+
+/* Un campo de formulario del cajón, con su ayuda y su línea de error. */
+function pnCampo(id, etiqueta, valor, op){
+  op = op || {};
+  var v = valor == null ? "" : valor;
+  return '<label class="pn-campo" id="' + id + '-c"><span>' + esc(etiqueta) + "</span>" +
+    (op.area
+      ? '<textarea id="' + id + '" rows="' + (op.filas || 3) + '">' + esc(v) + "</textarea>"
+      : '<input id="' + id + '" type="' + (op.tipo || "text") + '" value="' + esc(v) + '"' + (op.extra || "") + ' autocomplete="off">') +
+    (op.ayuda ? "<small>" + esc(op.ayuda) + "</small>" : "") +
+    '<small id="' + id + '-e" class="pn-err"></small></label>';
+}
+function pnMarcar(id, mensaje){
+  var c = document.getElementById(id + "-c"), e = document.getElementById(id + "-e");
+  if (c) c.classList.toggle("mal", !!mensaje);
+  if (e) e.textContent = mensaje || "";
+}
+function pnValor(id){ var e = document.getElementById(id); return e ? String(e.value || "").trim() : ""; }
+function errorEnCajon(t){ var e = document.getElementById("pn-err"); if (e) e.textContent = t || ""; else if (t) avisoError(t); }
+
+/* LA VISTA PREVIA DE LOS CORREOS. */
+function pedirPrevia(cuerpo){
+  return fetch("/api/admin/previa", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+    .then(conEstado).then(function(r){
+      if (r.http !== 200 || !r.d || r.d.error) throw new Error((r.d && (r.d.ayuda || r.d.error)) || "HTTP " + r.http);
+      return r.d;
+    });
+}
+function hayCorreos(r){ return ((r && r.correos) || []).some(function(m){ return !m.sin_buzon; }); }
+function htmlCorreos(r){
+  var l = (r && r.correos) || [];
+  var h = "";
+  if (r && r.nota) h += '<p class="pn-nota">' + esc(r.nota) + "</p>";
+  if (!l.length){ return h + (r && r.nota ? "" : '<p class="pn-bien">No se envía ningún correo.</p>'); }
+  return h + l.map(function(m){
+    if (m.sin_buzon) return '<p class="pn-nota">Un aviso interno al equipo no tiene buzón configurado: no saldrá.</p>';
+    return '<div class="pn-correo"><div class="pn-correo-cab">Se enviará este correo a <strong>' + esc(m.para) + "</strong>" +
+      (m.interno ? " (aviso interno del equipo)" : "") +
+      "<small>Asunto: «" + esc(m.asunto) + "»" + (m.adjuntos && m.adjuntos.length ? " · adjunto: " + esc(m.adjuntos.join(", ")) : "") +
+      "</small></div><pre>" + esc(m.texto) + "</pre></div>";
+  }).join("");
+}
+/* confirmarConCorreo({ previa, titulo, ey, intro, boton, botonCorreo, origen, directoSinCorreo, hacer(boton) })
+   Pregunta primero qué correos saldrían. Si no sale ninguno y la acción lo
+   permite, la hace sin más (con su aviso). Si sale alguno, abre el cajón con
+   cada correo —a quién, asunto y texto— y solo actúa con «Confirmar y enviar».
+   «hacer» devuelve una promesa: true cierra el cajón, false lo deja abierto. */
+function confirmarConCorreo(op){
+  var b = op.origen;
+  if (b) b.disabled = true;
+  pedirPrevia(op.previa).then(function(r){
+    if (b) b.disabled = false;
+    if (op.directoSinCorreo && !hayCorreos(r) && !r.nota){ op.hacer(b); return; }
+    cajonAbrir({ ey: op.ey || "Antes de confirmar", titulo: op.titulo,
+      cuerpo: (op.intro || "") + '<p class="pn-h3">Lo que se envía</p>' + htmlCorreos(r) + '<p class="pn-error" id="pn-err"></p>' });
+    var manda = hayCorreos(r);
+    cajonPie('<button type="button" class="pn-b1" id="pn-ok">' + esc(manda ? (op.botonCorreo || "Confirmar y enviar") : (op.boton || "Confirmar")) + "</button>" +
+      '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>');
+    document.getElementById("pn-ok").addEventListener("click", function(){
+      var ok = this; ok.disabled = true; errorEnCajon("");
+      Promise.resolve(op.hacer(ok)).then(function(cerrar){ if (cerrar) cajonCerrar(); else ok.disabled = false; });
+    });
+  }).catch(function(x){
+    if (b) b.disabled = false;
+    /* Sin vista previa no se manda a ciegas: es justo lo que esto evita. */
+    avisoError("No se pudo saber qué correos saldrían (" + (x && x.message) + "). No se hizo nada: recarga e inténtalo otra vez.");
+  });
+}
+/* confirmarPeligro({ titulo, detalle, motivo, etiquetaMotivo, ayudaMotivo, boton, volver, hacer(motivo, boton) })
+   Lo que destruye o no se deshace: cajón con filete rojo, lo que se va a
+   destruir dicho por su nombre, el motivo cuando el servidor lo exige y un
+   botón rojo. «volver» (opcional) es a dónde regresa «Cancelar», por ejemplo a
+   la ficha del caso desde la que se quiso quitar una foto. */
+function confirmarPeligro(op){
+  cajonAbrir({ peligro: true, ey: op.ey || "No se puede deshacer", titulo: op.titulo,
+    cuerpo: (op.detalle || "") +
+      (op.motivo ? pnCampo("pn-motivo", op.etiquetaMotivo || "Motivo", "", { area: true, ayuda: op.ayudaMotivo || "Queda escrito en la auditoría, con tu correo." }) : "") +
+      (op.extra || "") + '<p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1 pn-peligro" id="pn-ok">' + esc(op.boton) + "</button>" +
+      '<button type="button" class="pn-b2" id="pn-cancelar">Cancelar</button>',
+    foco: op.motivo ? "pn-motivo" : null });
+  document.getElementById("pn-cancelar").addEventListener("click", function(){ if (op.volver) op.volver(); else cajonCerrar(); });
+  document.getElementById("pn-ok").addEventListener("click", function(){
+    var m = op.motivo ? pnValor("pn-motivo") : "";
+    if (op.motivo && !m){ pnMarcar("pn-motivo", "Escribe el motivo: sin él no se hace."); document.getElementById("pn-motivo").focus(); return; }
+    var ok = this; ok.disabled = true; errorEnCajon("");
+    Promise.resolve(op.hacer(m, ok)).then(function(cerrar){
+      if (cerrar){ if (op.volver) op.volver(); else cajonCerrar(); } else ok.disabled = false;
+    });
+  });
+}
+/* Un POST que devuelve JSON: true si salió bien; si no, dice por qué en el
+   cajón (o en un aviso) y devuelve false. */
+function postPanel(url, cuerpo, metodo){
+  return fetch(url, { method: metodo || "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo || {}) })
+    .then(conEstado).then(function(r){
+      if (r.http >= 200 && r.http < 300 && !(r.d && r.d.error)) return r.d || {};
+      errorEnCajon((r.d && (r.d.ayuda || r.d.error)) || "No se pudo (HTTP " + r.http + ").");
+      return null;
+    }).catch(function(){ errorEnCajon("No se pudo: revisa la conexión."); return null; });
+}
 
 /* UNA LISTA QUE NO LLEGA NO ESTA VACIA. Hasta el 28 sep 2026 cada bandeja hacia
    «fetch().then(r.json())» sin mirar el estado: si /api/admin/salud respondia
@@ -23166,18 +23804,32 @@ function esc(s){
   });
 }
 
+/* LAS CIFRAS DE LOS APORTES, en el ledger de Voluntariado. Antes eran seis
+   fichas en la cabecera de TODAS las pestañas, con el estado crudo
+   («intencion: 8 · $1.730.000») y sumando como dinero lo que nadie pagó. Ahora
+   viven solo aquí, con nombre de persona, y un intento sin pagar se cuenta pero
+   NUNCA se suma: no es dinero. «Certificados por emitir» sale de la misma
+   condición que «Hoy» y las insignias (CERT_POR_EMITIR en el servidor). */
+var ESTADO_APORTE_ES = { intencion: "Intento sin pagar", pendiente: "Pendiente en la pasarela", error: "Error de la pasarela",
+  aprobada: "Pagado", en_distribucion: "En distribución", entregada: "Entregado", rechazada: "Rechazado",
+  reportada: "Transferencia por verificar", anulada: "Anulado" };
 function pintarResumen(d){
-  var box = document.getElementById("resumen");
-  var chips = [];
-  (d.por_estado||[]).forEach(function(x){
-    chips.push('<span class="eco-chip">' + esc(x.estado) + ': ' + x.n + ' · ' + pesos(x.centavos) + '</span>');
-  });
-  if (d.certificados_pendientes) chips.push('<span class="eco-chip">certificados por emitir: ' + d.certificados_pendientes + '</span>');
-  if (d.esperando_recurrencia) chips.push('<span class="eco-chip">esperan débito automático: ' + d.esperando_recurrencia + '</span>');
-  /* Las inscripciones nuevas ya NO van aqui: «Hoy» las cuenta por tipo y con
-     su plazo, y dos numeros distintos para lo mismo en la misma pantalla
-     obligaban a adivinar cual creer (el de aqui sumaba ingenieros y especie). */
-  box.innerHTML = chips.join("") || '<span class="eco-chip">sin datos todavía</span>';
+  var box = document.getElementById("resumen"); if (!box) return;
+  var por = {};
+  (d.por_estado || []).forEach(function(x){ por[x.estado] = x; });
+  var n = function(k){ return Number((por[k] || {}).n || 0); };
+  var c = function(k){ return Number((por[k] || {}).centavos || 0); };
+  var pagN = n("aprobada") + n("en_distribucion") + n("entregada");
+  var pagC = c("aprobada") + c("en_distribucion") + c("entregada");
+  var celdas = [
+    [pesos(pagC), pagN + (pagN === 1 ? " aporte pagado" : " aportes pagados") + " · el dinero está en la cuenta"],
+    [String(n("reportada")), "transferencias por verificar · " + pesos(c("reportada")) + " según el donante"],
+    [String(Number(d.certificados_pendientes || 0)), "certificados por emitir"],
+    [String(n("entregada")), "entregados"],
+    [String(n("intencion")), "intentos sin pagar · no es dinero"],
+    [String(n("rechazada")), "rechazados"]
+  ];
+  box.innerHTML = celdas.map(function(x){ return "<div><b>" + esc(x[0]) + "</b><small>" + esc(x[1]) + "</small></div>"; }).join("");
 }
 
 function accion(a){
@@ -23200,7 +23852,7 @@ var APROBADOS = ["aprobada", "en_distribucion", "entregada"];
 function celdaCert(a){
   if (a.certificado){
     var enlace = '<a href="/api/admin/certificado/' + esc(a.certificado) + '.pdf" target="_blank" rel="noopener">' + esc(a.certificado) + '</a>';
-    var anular = '<br><button class="copy" data-anular="' + esc(a.certificado) + '">Anular&hellip;</button>';
+    var anular = '<br><button class="copy pn-peligro" data-anular="' + esc(a.certificado) + '">Anular&hellip;</button>';
     /* Un certificado en revisión perdió su respaldo: el pago se cayó después de
        emitirlo. Tiene que gritar en la lista, no esconderse tras un número que
        se ve igual que los sanos. VA PRIMERO: un certificado puede estar sin
@@ -23280,7 +23932,7 @@ function pintarFilas(l){
     else if (APROBADOS.indexOf(a.estado) >= 0) recibo += '<br><small>correo sin registro</small>';
     return "<tr>" +
       "<td>" + esc(a.guia) + "</td>" +
-      "<td>" + esc(a.estado) + "</td>" +
+      "<td>" + esc(ESTADO_APORTE_ES[a.estado] || a.estado) + "</td>" +
       "<td>" + pesos(a.monto_centavos) + "</td>" +
       "<td>" + esc(a.modo === "dirigida" ? (a.destino_id||"?") : "Fondo general") + "</td>" +
       "<td>" + esc(a.donante || "—") + (a.correo ? "<br><small>" + esc(a.correo) + "</small>" : "") + celDonante(a.telefono) + "</td>" +
@@ -23296,54 +23948,78 @@ function pintarFilas(l){
    Wompi no entrega domicilio y a veces tampoco documento, y el certificado
    identifica al donante ante la DIAN. Este formulario es donde una persona
    completa y confirma esos datos: no es un trámite, es la revisión que el
-   documento exige. Lo que se corrija aquí se guarda también en el donante. */
+   documento exige. Lo que se corrija aquí se guarda también en el donante.
+
+   SE ABRE EN EL CAJÓN (Fase 1 del panel). Antes se pintaba debajo de la tabla,
+   a mil píxeles del botón, sin mover la pantalla: parecía que no pasaba nada.
+   Y se abre igual desde «Hoy», donde la fila puede no estar entre las cien que
+   carga la tabla: por eso se pide sola con ?guia=. */
 function abrirCert(guia){
-  var a = FILAS[guia] || {};
-  var caja = document.getElementById("dlg");
-  caja.innerHTML =
-    '<div class="card" style="max-width:520px;margin:0 auto;text-align:left">' +
-      '<h3 style="margin-bottom:4px">Emitir certificado</h3>' +
-      '<p class="mu" style="font-size:13px;margin-bottom:16px">Aporte ' + esc(guia) + ' · ' + pesos(a.monto_centavos) +
-        '. Firman el Representante Legal y la Revisora Fiscal: revisa los datos antes de emitir.</p>' +
-      (a.quiere_certificado ? "" :
-        '<p style="font-size:13px;margin:-8px 0 16px;border-left:3px solid var(--amber);padding-left:10px">' +
-        '<strong>Al donar no pidió certificado.</strong> Emítelo si te lo pidió después. Necesita su documento de identidad: ' +
-        'si no lo tienes, pídeselo antes de emitir.</p>') +
-      /* LO QUE PROPONE EL SERVIDOR (cert_pre), con la misma regla con la que
-         emitira: lo que el donante pidio al donar, la identidad de la pasarela
-         para este pago y, sin ella, la ficha. Y EL TIPO DE DOCUMENTO se elige:
-         antes no habia campo y todo lo que no era NIT salia «C.C.» en el papel. */
-      campo("c-nombre", "Nombre o razón social", (a.cert_pre || {}).nombre || a.donante) +
-      selectorDoc((a.cert_pre || {}).doc_tipo || a.doc_tipo || "CC") +
-      campo("c-doc", "Número de documento", (a.cert_pre || {}).doc_numero || a.doc_numero) +
-      campo("c-ciudad", "Domicilio del donante", (a.cert_pre || {}).ciudad || a.ciudad) +
-      /* Solo aparece si el emisor se aparta de lo que validó Wompi. Pedirlo
-         siempre lo convertiría en un campo que se rellena en automático. */
-      '<div id="c-div" style="display:none;border-left:3px solid #A84D00;padding-left:12px;margin:12px 0">' +
-        '<p style="font-size:13px;margin-bottom:8px"><strong>Cambiaste la identidad que validó la pasarela.</strong> ' +
-        'El descuento tributario le corresponde a quien donó: explica por qué.</p>' +
-        campo("c-motivo", "Motivo del cambio", "") +
-      '</div>' +
-      '<label style="display:flex;gap:8px;align-items:center;margin:14px 0;font-size:14px">' +
-        '<input type="checkbox" id="c-enviar"' + (a.correo ? " checked" : " disabled") + '> ' +
-        (a.correo ? "Enviarlo a " + esc(a.correo) : "Sin correo del donante: solo se emite") +
-      '</label>' +
-      /* Con el flujo de firma encendido, quien emite y firma puede hacer las dos
-         cosas de una vez. Queda marcada: si lo revisaste para emitirlo, lo
-         revisaste para firmarlo. Se puede desmarcar. */
-      (FIRMA_ACTIVA && FIRMANTE
-        ? '<label style="display:flex;gap:8px;align-items:center;margin:0 0 14px;font-size:14px">' +
-            '<input type="checkbox" id="c-firmar" checked> Firmarlo yo ahora como ' + esc(PAPEL_ES[FIRMANTE]) +
-          '</label>'
-        : "") +
-      '<p id="c-error" class="mu" style="color:#c0392b;font-size:13px;display:none"></p>' +
-      '<div style="display:flex;gap:10px;margin-top:8px">' +
-        '<button class="btn btn-g" id="c-ok" data-emitir="' + esc(guia) + '">Emitir</button>' +
-        '<button class="btn btn-w" id="c-no">Cancelar</button>' +
-      '</div>' +
-    '</div>';
-  caja.style.display = "block";
+  if (FILAS[guia]){ pintarCert(guia, FILAS[guia]); return; }
+  cajonAbrir({ ey: "Certificado de donación", titulo: "Emitir certificado · " + guia, cuerpo: '<p class="mu">Cargando el aporte…</p>' });
+  fetch("/api/admin/aportes?guia=" + encodeURIComponent(guia)).then(conEstado).then(function(r){
+    var f = r.d && r.d.aportes && r.d.aportes[0];
+    if (r.http !== 200 || !f){ cajonCuerpo('<p class="pn-error">No se pudo cargar ' + esc(guia) + ".</p>"); return; }
+    FIRMA_ACTIVA = !!r.d.firma_activa; FIRMANTE = r.d.firmante || null;
+    FILAS[guia] = f;
+    pintarCert(guia, f);
+  }).catch(function(){ cajonCuerpo('<p class="pn-error">No se pudo cargar: revisa la conexión.</p>'); });
 }
+function pintarCert(guia, a){
+  var pre = a.cert_pre || {};
+  var cuerpo =
+    '<dl class="pn-ficha"><dt>Aporte</dt><dd>' + esc(guia) + "</dd><dt>Monto</dt><dd>" + pesos(a.monto_centavos) +
+    "</dd><dt>Donante</dt><dd>" + esc(a.donante || "—") + (a.correo ? "<br><small>" + esc(a.correo) + "</small>" : "") + "</dd></dl>" +
+    '<p class="mu" style="margin:0 0 14px">Lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento: revisa los datos antes de emitir.</p>' +
+    (a.quiere_certificado ? "" :
+      '<p class="pn-nota"><strong>Al donar no pidió certificado.</strong> Emítelo si te lo pidió después. Necesita su documento de identidad: si no lo tienes, pídeselo antes de emitir.</p>') +
+    /* LO QUE PROPONE EL SERVIDOR (cert_pre), con la misma regla con la que
+       emitirá: lo que el donante pidió al donar, la identidad de la pasarela
+       para este pago y, sin ella, la ficha. */
+    pnCampo("c-nombre", "Nombre o razón social", pre.nombre || a.donante) +
+    selectorDoc(pre.doc_tipo || a.doc_tipo || "CC") +
+    pnCampo("c-doc", "Número de documento", pre.doc_numero || a.doc_numero) +
+    pnCampo("c-ciudad", "Domicilio del donante", pre.ciudad || a.ciudad) +
+    /* Solo aparece si el emisor se aparta de lo que validó la pasarela. */
+    '<div id="c-div" hidden><p class="pn-nota"><strong>Cambiaste la identidad que validó la pasarela.</strong> ' +
+      "El descuento tributario le corresponde a quien donó: explica por qué.</p>" + pnCampo("c-motivo", "Motivo del cambio", "") + "</div>" +
+    '<label class="pn-casilla"><input type="checkbox" id="c-enviar"' + (a.correo ? " checked" : " disabled") + "> <span>" +
+      (a.correo ? "Enviarlo a " + esc(a.correo) : "Sin correo del donante: solo se emite") + "</span></label>" +
+    /* Con el flujo de firma encendido, quien emite y firma puede hacer las dos
+       cosas de una vez. Queda marcada: si lo revisaste para emitirlo, lo
+       revisaste para firmarlo. */
+    (FIRMA_ACTIVA && FIRMANTE
+      ? '<label class="pn-casilla"><input type="checkbox" id="c-firmar" checked> <span>Firmarlo yo ahora como ' + esc(PAPEL_ES[FIRMANTE]) + "</span></label>"
+      : "") +
+    '<p class="pn-h3">Lo que se envía</p><div id="c-previa"><p class="mu">Mirando qué correo saldría…</p></div>' +
+    '<p class="pn-error" id="pn-err"></p>';
+  cajonAbrir({ ey: "Certificado de donación", titulo: "Emitir certificado · " + guia, cuerpo: cuerpo, foco: "c-nombre",
+    pie: '<button type="button" class="pn-b1" id="c-ok" data-emitir="' + esc(guia) + '" disabled>Emitir</button>' +
+         '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+  previaCert(guia);
+}
+/* El correo que saldría al emitir, si se marcó «Enviarlo». Con la firma
+   encendida no sale nada al emitir, y la vista previa lo dice. */
+function previaCert(guia){
+  var box = document.getElementById("c-previa"); if (!box) return;
+  var env = document.getElementById("c-enviar");
+  var b = document.getElementById("c-ok");
+  if (!(env && env.checked && !env.disabled)){
+    box.innerHTML = '<p class="pn-bien">No se envía ningún correo: solo se emite.</p>';
+    if (b){ b.disabled = false; b.textContent = "Emitir"; }
+    return;
+  }
+  if (b) b.disabled = true;
+  pedirPrevia({ accion: "certificado", guia: guia }).then(function(r){
+    box.innerHTML = htmlCorreos(r);
+    if (b){ b.disabled = false; b.textContent = hayCorreos(r) ? "Emitir y enviar" : "Emitir"; }
+  }).catch(function(){
+    box.innerHTML = '<p class="pn-error">No se pudo armar la vista previa del correo. Desmarca «Enviarlo» para emitir sin enviar, o recarga.</p>';
+  });
+}
+document.addEventListener("change", function(e){
+  if (e.target && e.target.id === "c-enviar"){ var b = document.getElementById("c-ok"); if (b) previaCert(b.getAttribute("data-emitir")); }
+});
 var TIPOS_DOC_ES = [["CC","Cédula de ciudadanía"],["CE","Cédula de extranjería"],["NIT","NIT"],
   ["PP","Pasaporte"],["TI","Tarjeta de identidad"],["PEP","Permiso especial de permanencia"],
   ["PPT","Permiso por protección temporal"],["DNI","Documento extranjero (DNI)"]];
@@ -23352,9 +24028,7 @@ function selectorDoc(actual){
   var ops = TIPOS_DOC_ES.map(function(x){
     return '<option value="' + x[0] + '"' + (x[0] === actual ? " selected" : "") + ">" + esc(x[1]) + "</option>";
   }).join("") + (hay ? "" : '<option value="' + esc(actual) + '" selected>' + esc(actual) + "</option>");
-  return '<label style="display:block;margin-bottom:10px;font-size:13px;font-weight:600">Tipo de documento' +
-    '<select id="c-doctipo" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--bd);border-radius:10px;font:inherit;font-weight:400;background:var(--surface);color:var(--ink)">' +
-    ops + "</select></label>";
+  return '<label class="pn-campo"><span>Tipo de documento</span><select id="c-doctipo">' + ops + "</select></label>";
 }
 /* Un paso de la lista de un voluntario. Desmarcar pide confirmar: deshace
    algo que alguien anoto, y queda en la auditoria igual. */
@@ -23418,10 +24092,10 @@ function pintarEstadoCert(d){
     ? "<strong>Firma de certificados encendida.</strong> " + (papel
         ? "Firmas como " + esc(papel) + ", aquí mismo en cada fila."
         : "Tu correo no es el de ninguno de los dos firmantes: puedes emitir, no firmar.")
-    : "<strong>Firma de certificados apagada.</strong> Falta " + esc((d.firma_falta || []).join(" y ") || "configurar") +
+    : "<strong>Firma de certificados apagada.</strong> Falta " + esc((d.firma_falta || []).map(function(k){ return CONFIG_ES[k] || k; }).join(" y ") || "configurarla") +
       ": al emitir, el certificado sale con los dos nombres impresos y sin firmas registradas. " + (papel
         ? "Cuando se encienda, firmarás como " + esc(papel) + " desde aquí."
-        : (((d.firma_falta || []).indexOf("FIRMA_RL_EMAIL") < 0)
+        : (((d.firma_falta || []).indexOf("FIRMA_RL_EMAIL") < 0) /* el del RL ya está */
             ? "Ojo: tu correo no coincide con el del Representante Legal ni con el de la Revisora Fiscal configurados."
             : ""));
   var n = function(x){ return Number(x || 0); };
@@ -23436,7 +24110,7 @@ function pintarEstadoCert(d){
   box.innerHTML = "<p>" + linea1 + "</p>" + '<p class="mu">' + esc(partes.join(" · ")) + ".</p>" +
     (n(c.reportadas_piden)
       ? '<p><strong>' + esc(String(n(c.reportadas_piden))) + (n(c.reportadas_piden) === 1 ? " transferencia pide certificado y sigue" : " transferencias piden certificado y siguen") +
-        ' sin verificar.</strong> Confírmalas contra el extracto en <a href="#sec-transferencias">Transferencias</a>: sin eso no hay recibo ni certificado.</p>'
+        ' sin verificar.</strong> Confírmalas contra el extracto en <a href="#finanzas/transferencias">Transferencias</a>: sin eso no hay recibo ni certificado.</p>'
       : "");
 }
 
@@ -23451,31 +24125,42 @@ document.addEventListener("click", function(e){
   if (bf){
     var num = bf.getAttribute("data-cfirmar");
     /* LO QUE SE FIRMA SE DICE. El certificado dice «bajo la gravedad de
-       juramento»: la confirmacion no es un tramite, es la ultima vez que alguien
-       mira el documento antes de que lleve tu nombre. */
-    if (!confirm("Vas a firmar " + num + " como " + PAPEL_ES[FIRMANTE] + ".\\n\\nTu firma queda registrada con la huella del documento, y el certificado la presenta bajo la gravedad de juramento. ¿Revisaste el PDF?")) return;
-    bf.disabled = true; bf.textContent = "Firmando…";
-    firmarCert(num).then(function(f){
-      if (!f || !f.ok){ bf.disabled = false; bf.textContent = "Firmar…"; alert("No quedó firmado: " + ((f && (f.ayuda || f.error)) || "sin respuesta")); return; }
-      alert(f.completo
-        ? (f.enviado ? "Firmado. Con las dos firmas, salió a " + (f.correo || "el donante") + "."
-                     : "Firmado por los dos, pero el correo no salió: usa «Reenviar al donante».")
-        : "Firmado. Sale al donante cuando firme " + (FIRMANTE === "rl" ? "la Revisora Fiscal" : "el Representante Legal") + ".");
-      cargarAportes(); cargarSalud();
-    });
+       juramento»: la confirmación no es un trámite, es la última vez que alguien
+       mira el documento antes de que lleve tu nombre. Y si con esta firma quedan
+       las dos, el certificado sale al donante: la vista previa lo enseña. */
+    confirmarConCorreo({ origen: bf, previa: { accion: "firmar", numero: num },
+      ey: "Firma del certificado", titulo: "Firmar " + num + " como " + PAPEL_ES[FIRMANTE],
+      intro: "<p>Tu firma queda registrada con la huella del documento, y el certificado la presenta bajo la gravedad de juramento. " +
+        '<a href="/api/admin/certificado/' + esc(num) + '.pdf" target="_blank" rel="noopener">Revisa el PDF</a> antes de firmar.</p>',
+      boton: "Firmar", botonCorreo: "Firmar y enviar al donante",
+      hacer: function(){
+        return firmarCert(num).then(function(f){
+          if (!f || !f.ok){ errorEnCajon("No quedó firmado: " + ((f && (f.ayuda || f.error)) || "sin respuesta")); return false; }
+          avisar(f.completo
+            ? (f.enviado ? "Firmado. Con las dos firmas, salió a " + (f.correo || "el donante") + "."
+                         : "Firmado por los dos, pero el correo no salió: usa «Reenviar al donante».")
+            : "Firmado. Sale al donante cuando firme " + (FIRMANTE === "rl" ? "la Revisora Fiscal" : "el Representante Legal") + ".",
+            { tono: f.completo && !f.enviado ? "error" : "" });
+          cargarAportes(); cargarSalud();
+          return true;
+        });
+      } });
     return;
   }
   var be = e.target.closest ? e.target.closest("[data-cenviar]") : null;
   if (be){
     var n2 = be.getAttribute("data-cenviar");
-    if (!confirm("¿Enviar " + n2 + " al donante ahora?")) return;
-    be.disabled = true; be.textContent = "Enviando…";
-    fetch("/api/admin/certificado/" + encodeURIComponent(n2) + "/enviar", { method: "POST" })
-      .then(conEstado).then(function(res){
-        if (fallo(res.http, res.d)){ be.disabled = false; be.textContent = "Reintentar"; return; }
-        alert(res.d.enviado ? "Salió a " + (res.d.correo || "el donante") + "." : (res.d.ayuda || "No salió."));
-        cargarAportes(); cargarSalud();
-      }).catch(function(){ be.disabled = false; be.textContent = "Reintentar"; });
+    confirmarConCorreo({ origen: be, previa: { accion: "certificado-enviar", numero: n2 },
+      ey: "Certificado de donación", titulo: "Enviar " + n2 + " al donante", botonCorreo: "Enviar",
+      hacer: function(){
+        return postPanel("/api/admin/certificado/" + encodeURIComponent(n2) + "/enviar", {}).then(function(d){
+          if (!d) return false;
+          if (d.enviado) avisar("Salió a " + (d.correo || "el donante") + ".");
+          else avisoError(d.ayuda || "No salió.");
+          cargarAportes(); cargarSalud();
+          return true;
+        });
+      } });
   }
 });
 
@@ -23495,37 +24180,29 @@ function campoLargo(id, etiqueta, valor){
     esc(valor || "") + '</textarea></label>';
 }
 function cerrarCert(hecho){
-  var caja = document.getElementById("dlg");
-  if (!hecho){ caja.style.display = "none"; caja.innerHTML = ""; return; }
+  if (!hecho){ cajonCerrar(); return; }
   var pdf = "/api/admin/certificado/" + encodeURIComponent(hecho.numero) + ".pdf";
-  /* Tres desenlaces y ninguno se parece: espera firma, salio al donante, o se
-     emitio y no salia a nadie porque no hay correo. */
-  var linea, tono;
+  /* Tres desenlaces y ninguno se parece: espera firma, salió al donante, o se
+     emitió y no salió a nadie porque no hay correo. */
+  var linea, clase;
   if (hecho.espera_firma){
-    linea = hecho.ayuda || "Emitido. Sale al donante cuando lo firmen los dos.";
-    tono = "#b7791f";
+    linea = hecho.ayuda || "Emitido. Sale al donante cuando lo firmen los dos."; clase = "pn-nota";
   } else if (hecho.enviado){
-    linea = "Emitido y enviado a " + esc(hecho.correo || "");
-    tono = "var(--ok)";
+    linea = "Emitido y enviado a " + (hecho.correo || ""); clase = "pn-bien";
   } else if (hecho.sin_pedir){
-    linea = "Emitido. No se envió porque no marcaste «Enviarlo»: descárgalo o envíalo tú.";
-    tono = "#b7791f";
+    linea = hecho.ayuda || "Emitido. No se envió porque no marcaste «Enviarlo»: descárgalo o envíalo tú."; clase = "pn-nota";
   } else {
     linea = hecho.correo
-      ? "Emitido. NO se envio: el correo no salio, mira la cola de correos."
-      : "Emitido. No se envio porque el donante no tiene correo registrado.";
-    tono = hecho.correo ? "#c0392b" : "#b7791f";
+      ? "Emitido. NO se envió: el correo no salió, mira la cola de correos en Salud."
+      : "Emitido. No se envió porque el donante no tiene correo registrado.";
+    clase = hecho.correo ? "pn-error" : "pn-nota";
   }
-  caja.innerHTML =
-    '<div class="card" style="max-width:520px;margin:0 auto;text-align:left">' +
-      '<h3 style="margin-bottom:4px">' + esc(hecho.numero) + '</h3>' +
-      '<p style="font-size:14px;margin-bottom:16px;color:' + tono + '">' + esc(linea) + '</p>' +
-      '<div style="display:flex;gap:10px">' +
-        '<a class="btn btn-w" href="' + pdf + '" target="_blank" rel="noopener">Ver el documento</a>' +
-        '<button class="btn btn-g" id="c-no">Cerrar</button>' +
-      '</div>' +
-    '</div>';
-  caja.style.display = "block";
+  if (!CAJON.abierto) cajonAbrir({ ey: "Certificado de donación", titulo: hecho.numero });
+  document.getElementById("pn-cajon-t").textContent = "Certificado " + hecho.numero;
+  cajonCuerpo('<p class="' + clase + '">' + esc(linea) + "</p>" +
+    '<p><a class="pn-b2" href="' + pdf + '" target="_blank" rel="noopener">Ver el documento</a></p>');
+  cajonPie('<button type="button" class="pn-b1" data-pn-cerrar="1">Listo</button>');
+  avisar("Certificado " + hecho.numero + " emitido.", { tono: clase === "pn-error" ? "error" : "" });
 }
 
 /* Partida en dos porque tienen urgencias distintas: el resumen son las cifras
@@ -23572,25 +24249,25 @@ document.addEventListener("click", function(e){
   var an = e.target.closest("[data-anular]");
   if (an){
     var num = an.getAttribute("data-anular");
-    var motivo = window.prompt("Anular " + num + ". ¿Motivo? Queda impreso en el certificado.");
-    if (!motivo) return;
-    an.disabled = true; an.textContent = "…";
-    fetch("/api/admin/certificado/" + encodeURIComponent(num) + "/anular", {
-      method: "POST", headers: {"content-type":"application/json"},
-      body: JSON.stringify({ motivo: motivo })
-    }).then(conEstado).then(function(res){
-      if (fallo(res.http, res.d)){ an.disabled = false; an.textContent = "Anular"; return; }
-      cargarResumen(); cargarAportes(); cargarSalud();
-    }).catch(function(){ an.disabled = false; an.textContent = "Reintentar"; });
+    confirmarPeligro({ titulo: "Anular el certificado " + num,
+      detalle: "<p>Se anula el certificado <strong>" + esc(num) + "</strong>. El número no se reutiliza: queda gastado, y el PDF " +
+        "sale con el sello de anulado y este motivo impreso. No se puede deshacer; si hace falta, se emite uno nuevo.</p>",
+      motivo: true, etiquetaMotivo: "¿Por qué se anula?", ayudaMotivo: "Queda impreso en el certificado.",
+      boton: "Anular el certificado",
+      hacer: function(motivo){
+        return postPanel("/api/admin/certificado/" + encodeURIComponent(num) + "/anular", { motivo: motivo }).then(function(d){
+          if (!d) return false;
+          avisar("Certificado " + num + " anulado.");
+          cargarResumen(); cargarAportes(); cargarSalud();
+          return true;
+        });
+      } });
     return;
   }
 
-  if (e.target.id === "c-no"){ cerrarCert(); return; }
-
   var ok = e.target.closest("[data-emitir]");
   if (ok){
-    var err = document.getElementById("c-error");
-    err.style.display = "none";
+    errorEnCajon("");
     ok.disabled = true; ok.textContent = "Emitiendo…";
     var env = document.getElementById("c-enviar");
     fetch("/api/admin/certificado/" + encodeURIComponent(ok.getAttribute("data-emitir")), {
@@ -23609,15 +24286,15 @@ document.addEventListener("click", function(e){
           /* El error se muestra en el formulario y NO se cierra: quien emite
              tiene que ver qué faltó, no adivinarlo tras un diálogo que se fue. */
           if (res.d.error === "divergencia_sin_motivo"){
-            document.getElementById("c-div").style.display = "block";
-            err.textContent = "Cambiaste " + res.d.divergencia.map(function(x){ return x.campo; }).join(", ") +
-              " respecto de lo que validó la pasarela. Escribe el motivo y vuelve a emitir.";
+            document.getElementById("c-div").hidden = false;
+            errorEnCajon("Cambiaste " + res.d.divergencia.map(function(x){ return x.campo; }).join(", ") +
+              " respecto de lo que validó la pasarela. Escribe el motivo y vuelve a emitir.");
+            var cm = document.getElementById("c-motivo"); if (cm) cm.focus();
           } else {
-            err.textContent = res.d.faltan
+            errorEnCajon(res.d.faltan
               ? "Faltan datos obligatorios: " + res.d.faltan.join(", ") + "."
-              : ("No se pudo emitir (" + (res.d.error || res.http) + ").");
+              : (res.d.ayuda || ("No se pudo emitir (" + (res.d.error || res.http) + ").")));
           }
-          err.style.display = "block";
           ok.disabled = false; ok.textContent = "Emitir";
           return;
         }
@@ -23668,8 +24345,8 @@ document.addEventListener("click", function(e){
        el aviso nuevo de «no hay acta para esto» se habría perdido igual. */
     }).then(function(r){ return r.json(); })
       .then(function(d){
-        if (d && d.error) alert("No se pudo: " + (d.ayuda || d.error));
-        else if (d && d.aviso) alert(d.aviso);
+        if (d && d.error) avisar("No se pudo: " + (d.ayuda || d.error));
+        else if (d && d.aviso) avisar(d.aviso);
         cargarResumen(); cargarAportes(); cargarSalud();
       })
       .catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
@@ -23689,9 +24366,9 @@ document.addEventListener("click", function(e){
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ transaccion: tx })
     }).then(function(r){ return r.json(); }).then(function(d){
-      if (d.ayuda) alert(d.ayuda);
-      else if (d.error) alert("No se pudo conciliar: " + d.error);
-      else alert("Wompi dice: " + d.wompi_estado + ". El aporte quedó en «" + (d.aporte && d.aporte.estado) + "».");
+      if (d.ayuda) avisar(d.ayuda);
+      else if (d.error) avisar("No se pudo conciliar: " + d.error);
+      else avisar("Wompi dice: " + d.wompi_estado + ". El aporte quedó en «" + (d.aporte && d.aporte.estado) + "».");
       cargarResumen(); cargarAportes(); cargarSalud();
     }).catch(function(){ cn.disabled = false; cn.textContent = "Reintentar"; });
   }
@@ -23725,73 +24402,144 @@ function cargarReportadas(){
           ? '<a href="/api/admin/comprobante/' + esc(a.guia) + '" target="_blank" rel="noopener">ver</a>'
           : '<strong style="color:#A84D00">sin subir</strong>') + "</td>" +
         "<td>" + (a.quiere_certificado ? "sí" : "—") + "</td>" +
-        '<td><button class="copy" data-conf="' + esc(a.guia) + '">Confirmar…</button> ' +
-        '<button class="copy" data-desc="' + esc(a.guia) + '">Descartar</button></td>' +
+        '<td><button class="btn btn-g" data-conf="' + esc(a.guia) + '">Confirmar…</button> ' +
+        '<button class="copy pn-peligro" data-desc="' + esc(a.guia) + '">Descartar…</button></td>' +
       "</tr>";
     }).join("");
   });
 }
 
+/* CONFIRMAR UNA TRANSFERENCIA, EN EL CAJÓN (Fase 1 del panel). Eran tres
+   window.prompt seguidos —comprobante, fecha, monto— y otros dos si el
+   servidor preguntaba algo, sin ver lo que había reportado el donante ni el
+   correo que sale al confirmar. Ahora es un formulario con lo reportado al
+   lado, la fecha y el monto validados antes de enviar, y el recibo que le
+   llega al donante a la vista antes de confirmar. */
+function abrirConfirmarTransferencia(g){
+  if (REPORTADAS[g]){ pintarConfirmar(g, REPORTADAS[g]); return; }
+  cajonAbrir({ ey: "Transferencia por verificar", titulo: "Confirmar " + g, cuerpo: '<p class="mu">Cargando…</p>' });
+  fetch("/api/admin/reportadas").then(conEstado).then(function(r){
+    ((r.d && r.d.reportadas) || []).forEach(function(a){ REPORTADAS[a.guia] = a; });
+    if (REPORTADAS[g]) pintarConfirmar(g, REPORTADAS[g]);
+    else cajonCuerpo('<p class="pn-error">' + esc(g) + " ya no está esperando verificación: puede que alguien la haya confirmado o descartado.</p>");
+  }).catch(function(){ cajonCuerpo('<p class="pn-error">No se pudo cargar: revisa la conexión.</p>'); });
+}
+function hoyCO(){ return new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10); }
+function pintarConfirmar(g, a){
+  var montoRep = a.monto_centavos ? String(Math.round(a.monto_centavos / 100)) : "";
+  var cuerpo =
+    '<dl class="pn-ficha"><dt>Guía</dt><dd>' + esc(g) + "</dd>" +
+    "<dt>Donante</dt><dd>" + esc(a.nombre || "—") + (a.email ? "<br><small>" + esc(a.email) + "</small>" : "") + "</dd>" +
+    "<dt>Dice que transfirió</dt><dd>" + pesos(a.monto_centavos) + (a.fecha_pago ? " · el " + esc(a.fecha_pago) : "") + "</dd>" +
+    "<dt>Referencia que dio</dt><dd>" + esc(a.referencia_pago || "—") + "</dd>" +
+    "<dt>Comprobante</dt><dd>" + (a.comprobante
+      ? '<a href="/api/admin/comprobante/' + esc(g) + '" target="_blank" rel="noopener">Ver el comprobante</a>'
+      : '<span style="color:var(--err)">no lo subió</span>') + "</dd>" +
+    "<dt>Certificado</dt><dd>" + (a.quiere_certificado ? "lo pide" : "no lo pide") + "</dd></dl>" +
+    '<p class="pn-h3">Lo que dice el extracto del banco</p>' +
+    pnCampo("t-ref", "Número del comprobante bancario", "", { ayuda: "Lo cita el certificado: no puede ser un número inventado." }) +
+    '<div class="pn-par">' +
+      pnCampo("t-fecha", "Fecha del movimiento", a.fecha_pago || "", { tipo: "date", extra: ' max="' + hoyCO() + '"',
+        ayuda: "Va en el recibo y en el certificado; decide el año gravable." }) +
+      pnCampo("t-monto", "Monto que entró, en pesos", montoRep, { extra: ' inputmode="numeric"', ayuda: "Sin puntos. El donante reportó " + pesos(a.monto_centavos) + "." }) +
+    "</div>" +
+    '<div id="t-mdiv" hidden>' + pnCampo("t-mmot", "Por qué difiere del monto reportado", "", { area: true, ayuda: "El aporte queda con lo que entró, que es lo único que se puede certificar." }) + "</div>" +
+    '<div id="t-rdiv" hidden>' + pnCampo("t-rmot", "Por qué son dos depósitos distintos", "", { area: true }) + "</div>" +
+    '<p class="pn-h3">Lo que se envía al confirmar</p><div id="t-previa"><p class="mu">Mirando qué correo saldría…</p></div>' +
+    '<p class="pn-error" id="pn-err"></p>';
+  cajonAbrir({ ey: "Transferencia por verificar", titulo: "Confirmar " + g + " contra el extracto", cuerpo: cuerpo, foco: "t-ref",
+    pie: '<button type="button" class="pn-b1" id="t-ok" data-tconf="' + esc(g) + '" disabled>Confirmar</button>' +
+         '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' +
+         '<p class="pn-pie-nota">Hasta que confirmes no hay recibo ni certificado. Confirmar no se deshace.</p>' });
+  previaTransfer(g);
+}
+function soloDigitos(v){ return String(v || "").replace(/[^0-9]/g, ""); }
+function previaTransfer(g){
+  var box = document.getElementById("t-previa"); if (!box) return;
+  var b = document.getElementById("t-ok");
+  pedirPrevia({ accion: "transferencia", guia: g, monto: soloDigitos(pnValor("t-monto")) }).then(function(r){
+    box.innerHTML = htmlCorreos(r);
+    if (b){ b.disabled = false; b.textContent = hayCorreos(r) ? "Confirmar y enviar el recibo" : "Confirmar"; }
+  }).catch(function(){
+    box.innerHTML = '<p class="pn-error">No se pudo armar la vista previa del recibo. Recarga e inténtalo otra vez.</p>';
+    if (b) b.disabled = true;
+  });
+}
+document.addEventListener("change", function(e){
+  if (e.target && e.target.id === "t-monto"){ var b = document.getElementById("t-ok"); if (b) previaTransfer(b.getAttribute("data-tconf")); }
+});
+/* Lo que se puede comprobar antes de mandar, se comprueba aquí: el servidor
+   lo vuelve a exigir, esto solo ahorra el viaje y dice dónde está el error. */
+function enviarConfirmacion(g, b){
+  var a = REPORTADAS[g] || {};
+  var ref = pnValor("t-ref"), fecha = pnValor("t-fecha"), monto = soloDigitos(pnValor("t-monto"));
+  var montoRep = a.monto_centavos ? String(Math.round(a.monto_centavos / 100)) : "";
+  var bien = true;
+  pnMarcar("t-ref", ref ? "" : "Escribe el número del comprobante.");
+  if (!ref) bien = false;
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(fecha)){ pnMarcar("t-fecha", "Elige la fecha del movimiento."); bien = false; }
+  else if (fecha > hoyCO()){ pnMarcar("t-fecha", "Un movimiento del extracto no puede ser de una fecha futura."); bien = false; }
+  else pnMarcar("t-fecha", "");
+  if (!monto || Number(monto) < 1){ pnMarcar("t-monto", "Escribe el monto que entró, en pesos."); bien = false; }
+  else pnMarcar("t-monto", "");
+  var difiere = monto && montoRep && monto !== montoRep;
+  document.getElementById("t-mdiv").hidden = !difiere;
+  if (difiere && !pnValor("t-mmot")){ pnMarcar("t-mmot", "El monto no coincide con el reportado: di por qué."); bien = false; }
+  if (!bien){ errorEnCajon("Revisa los campos marcados."); return; }
+  errorEnCajon("");
+  b.disabled = true; b.textContent = "Confirmando…";
+  fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ referencia: ref, referencia_repetida_motivo: pnValor("t-rmot"),
+                           fecha: fecha, monto: monto, monto_motivo: pnValor("t-mmot") })
+  }).then(conEstado).then(function(res){
+    b.disabled = false; b.textContent = "Confirmar y enviar el recibo";
+    /* Si la referencia ya confirmó otra guía, o el monto no cuadra, el
+       servidor pregunta: se pide el motivo en el mismo cajón. */
+    if (res.http === 409 && res.d && res.d.error === "referencia_repetida"){
+      document.getElementById("t-rdiv").hidden = false;
+      pnMarcar("t-rmot", res.d.ayuda || "Esa referencia ya confirmó otra guía.");
+      document.getElementById("t-rmot").focus(); return;
+    }
+    if (res.http === 409 && res.d && res.d.error === "monto_distinto"){
+      document.getElementById("t-mdiv").hidden = false;
+      pnMarcar("t-mmot", res.d.ayuda || "El monto no coincide con el reportado.");
+      document.getElementById("t-mmot").focus(); return;
+    }
+    if (res.http < 200 || res.http >= 300 || (res.d && res.d.error)){
+      errorEnCajon((res.d && (res.d.ayuda || res.d.error)) || "No se pudo confirmar."); return;
+    }
+    cajonCerrar();
+    delete REPORTADAS[g];
+    avisar("Transferencia " + g + " confirmada" + (a.email ? ". Recibo enviado a " + a.email + "." : "."));
+    cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
+  }).catch(function(){ b.disabled = false; errorEnCajon("No se pudo: revisa la conexión."); });
+}
+
 document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var tk = e.target.closest("[data-tconf]");
+  if (tk){ enviarConfirmacion(tk.getAttribute("data-tconf"), tk); return; }
   var cf = e.target.closest("[data-conf]");
-  if (cf){
-    var g = cf.getAttribute("data-conf");
-    /* \\n y no \n: esto vive dentro del template literal de adminJS(), así que un
-       \n se interpolaría aquí y el admin.js emitido quedaría con un salto de
-       línea real dentro de una cadena entre comillas — sin cerrar. */
-    var ref = window.prompt("Confirmar " + g + " contra el extracto.\\n\\nNúmero del comprobante bancario (lo cita el certificado):");
-    if (!ref) return;
-    /* LA FECHA Y EL MONTO DEL EXTRACTO (auditoria del 28 sep 2026). Se
-       proponen los que reporto el donante; quien confirma los cambia si el
-       extracto dice otra cosa. Van al certificado tal cual. */
-    var rep = REPORTADAS[g] || {};
-    var fechaExt = window.prompt("Fecha del movimiento en el extracto (AAAA-MM-DD).\\n\\nEs la fecha que va en el recibo y en el certificado, y la que decide el año gravable. El donante reportó: " + (rep.fecha_pago || "(sin fecha)"), rep.fecha_pago || "");
-    if (!fechaExt) return;
-    var montoRep = rep.monto_centavos ? String(Math.round(rep.monto_centavos / 100)) : "";
-    var montoExt = window.prompt("Monto que ENTRÓ según el extracto, en pesos y sin puntos.\\n\\nEl donante reportó: " + (montoRep || "?"), montoRep);
-    if (!montoExt) return;
-    cf.disabled = true; cf.textContent = "…";
-    /* Si la referencia ya confirmo otra guia, el servidor pregunta (409) y aqui
-       se le pregunta a la persona: solo con un motivo escrito se confirma. Lo
-       mismo si el monto no coincide con el reportado. */
-    var porQueRef = "", porQueMonto = "";
-    var confirmar = function(){
-      fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
-        method:"POST", headers:{"content-type":"application/json"},
-        body: JSON.stringify({ referencia: ref, referencia_repetida_motivo: porQueRef,
-                               fecha: fechaExt.trim(), monto: montoExt, monto_motivo: porQueMonto })
-      }).then(conEstado)
-        .then(function(res){
-          if (res.http === 409 && res.d && res.d.error === "referencia_repetida"){
-            var m = window.prompt(res.d.ayuda + "\\n\\n¿Por qué son dos depósitos distintos? (vacío = no confirmar)");
-            if (m){ porQueRef = m; return confirmar(); }
-            cf.disabled = false; cf.textContent = "Confirmar"; return;
-          }
-          if (res.http === 409 && res.d && res.d.error === "monto_distinto"){
-            var mm = window.prompt(res.d.ayuda + "\\n\\n¿Por qué difieren? (vacío = no confirmar)");
-            if (mm){ porQueMonto = mm; return confirmar(); }
-            cf.disabled = false; cf.textContent = "Confirmar"; return;
-          }
-          if (fallo(res.http, res.d)){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); return; }
-          cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
-        })
-        .catch(function(){ cf.disabled = false; cf.textContent = "Confirmar"; cargarReportadas(); });
-    };
-    confirmar();
-    return;
-  }
+  if (cf){ abrirConfirmarTransferencia(cf.getAttribute("data-conf")); return; }
   var ds = e.target.closest("[data-desc]");
   if (ds){
     var g2 = ds.getAttribute("data-desc");
-    var motivo = window.prompt("Descartar " + g2 + ". ¿Motivo? Queda en la auditoría.");
-    if (!motivo) return;
-    ds.disabled = true; ds.textContent = "…";
-    fetch("/api/admin/transferencia/" + encodeURIComponent(g2) + "/confirmar", {
-      method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ descartar:true, motivo: motivo })
-    }).then(conEstado).then(function(res){
-      if (fallo(res.http, res.d)){ ds.disabled = false; ds.textContent = "Descartar"; cargarReportadas(); return; }
-      cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
-    }).catch(function(){ ds.disabled = false; ds.textContent = "Descartar"; cargarReportadas(); });
+    var r2 = REPORTADAS[g2] || {};
+    confirmarPeligro({ titulo: "Descartar la transferencia " + g2,
+      detalle: "<p>Se descarta lo que reportó <strong>" + esc(r2.nombre || "el donante") + "</strong> (" + pesos(r2.monto_centavos) +
+        "): queda como rechazada y no habrá recibo ni certificado. Úsalo cuando el dinero no aparece en el extracto. No se deshace.</p>",
+      motivo: true, etiquetaMotivo: "¿Por qué se descarta?",
+      ayudaMotivo: "Por ejemplo: «no aparece en el extracto del 25 al 28 de septiembre». Queda en la auditoría.",
+      boton: "Descartar la transferencia",
+      hacer: function(motivo){
+        return postPanel("/api/admin/transferencia/" + encodeURIComponent(g2) + "/confirmar", { descartar: true, motivo: motivo }).then(function(d){
+          if (!d) return false;
+          avisar("Transferencia " + g2 + " descartada.");
+          cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
+          return true;
+        });
+      } });
   }
 });
 
@@ -23826,7 +24574,7 @@ var COLA_ES = {
      —«visitadas_sin_materiales»—. Se pintaban, si: el respaldo es
      «COLA_ES[clave] || clave». Pero un nombre de variable no le dice a nadie que
      hacer, y esa es toda la razon de ser de esta lista. */
-  paypal_sin_casa: "Eventos de PayPal sin casa",
+  paypal_sin_casa: "Avisos de PayPal sin registro",
   ipn_por_registrar: "Donaciones del botón, sin registrar",
   suscripciones_sin_aprobar: "Membresías que quedaron a medias",
   correos_sin_buzon: "Avisos internos sin buzón a donde ir",
@@ -23880,12 +24628,12 @@ function pintarBusqueda(d){
       + (d.tipo === "telefono" ? ": ningún caso, aporte ni postulación con ese teléfono." : ".") + '</p>';
     return;
   }
-  caja.innerHTML = '<div class="dec-caja">' + l.map(function(x){
+  caja.innerHTML = '<div class="bus-caja">' + l.map(function(x){
     return '<div class="bus-fila"><span class="bus-q">' + esc(x.clase) + " " + esc(x.numero)
       + "<small>"
       + [x.nombre, x.sector, x.estado, x.cuando].filter(Boolean).map(esc).join(" · ")
       + "</small></span>"
-      + (x.destino ? '<a class="dec-ir" href="' + esc(x.destino) + '">Ir</a>'
+      + (x.destino ? '<a class="dec-ir" href="' + esc(x.destino) + '">Abrir</a>'
                    : '<span class="dec-ir dec-sinir">sin bandeja</span>')
       + "</div>";
   }).join("") + "</div>";
@@ -23908,240 +24656,399 @@ document.addEventListener("submit", function(e){
   if (e.target && e.target.id === "buscador"){ e.preventDefault(); buscar(); }
 });
 
-/* LA PORTADA DE DECISIONES. Lo primero del panel deja de ser una tabla y pasa a
-   ser lo que hay que hacer hoy.
+/* ==== LAS SECCIONES Y SUS DIRECCIONES (Fase 1 del panel, oct 2026) ====
+   Antes: ocho pestañas, cada una una página larga con todas sus secciones
+   apiladas, y un «Ir» que bajaba cinco mil píxeles y dejaba la sección a media
+   pantalla. Ahora cada sección vive sola, con su dirección (#finanzas/aportes):
+   se guarda en marcadores, se abre en otra pestaña y el botón de atrás vuelve
+   a la anterior.
 
-   No calcula nada nuevo: /api/admin/salud ya devolvía las diez colas con su
-   conteo, su antigüedad y su «cómo se arregla». Lo que faltaba era ponerlo
-   arriba — el dato estaba a seis pantallazos de scroll, debajo del embudo y de
-   las señales de Wompi, que son para entender y no para actuar.
-
-   ORDEN POR URGENCIA, NO POR CANTIDAD: lo trae el endpoint en «orden», decidido
-   junto a cada consulta. Y dentro de cada fila la ANTIGÜEDAD SE LEE ANTES QUE
-   EL CONTEO, que es la regla que ya gobierna la tabla de abajo: de una cola no
-   importa cuántos hay, importa desde cuándo esperan. */
-/* ---- LOS MODULOS ----
-
-   Que seccion vive en que modulo NO se escribe aqui: se lee del DOM, subiendo
-   desde la seccion hasta su envoltorio. Asi mover una seccion de modulo es
-   mover una linea de HTML, y esta funcion no se entera — que es justo lo que
-   hace falta cuando lo que se espera es que el panel siga creciendo. */
-function moduloDe(id){
-  var el = document.getElementById(id);
-  var caja = el && el.closest ? el.closest("[data-mod]") : null;
-  return caja ? caja.getAttribute("data-mod") : null;
-}
-
-function irAModulo(nombre, seccion){
-  var hay = false;
-  document.querySelectorAll("[data-mod]").forEach(function(caja){
-    var suyo = caja.getAttribute("data-mod") === nombre;
-    caja.hidden = !suyo;
-    if (suyo) hay = true;
-  });
-  if (!hay) return false;
-  document.querySelectorAll("[data-mod-ir]").forEach(function(b){
-    b.classList.toggle("on", b.getAttribute("data-mod-ir") === nombre);
-  });
-  pedirDeModulo(nombre);
-  /* El modulo abierto va en la URL: recargar cae donde estabas, y un enlace a
-     una seccion concreta se puede pegar en un chat y abre lo que debe. */
-  var hash = "#" + nombre + (seccion ? "/" + seccion : "");
-  if (location.hash !== hash) history.replaceState(null, "", hash);
-  if (seccion){
-    var s = document.getElementById(seccion);
-    /* El foco va con la vista, igual que en la ficha del triaje: quien usa
-       teclado se quedaba en el boton «Ir» con el modulo entero por delante. */
-    if (s){ s.scrollIntoView({ block: "start" }); s.setAttribute("tabindex", "-1"); s.focus(); }
-  } else {
-    window.scrollTo(0, 0);
-  }
-  return true;
-}
-
-function abrirDesdeURL(){
-  var h = (location.hash || "").replace(/^#/, "");
-  if (!h) return irAModulo("hoy");
-  var partes = h.split("/");
-  /* Dos formas: «#dinero» y «#dinero/sec-aportes». Y ademas la de antes,
-     «#sec-aportes» a secas, que es la que llevan los enlaces ya escritos. */
-  if (partes[0].indexOf("sec-") === 0){
-    var m = moduloDe(partes[0]);
-    return m ? irAModulo(m, partes[0]) : irAModulo("hoy");
-  }
-  return irAModulo(partes[0], partes[1] || null) || irAModulo("hoy");
-}
-
-document.addEventListener("click", function(ev){
-  var t = ev.target.closest ? ev.target.closest("[data-mod-ir]") : null;
-  if (t){ ev.preventDefault(); irAModulo(t.getAttribute("data-mod-ir")); return; }
-  /* Los «Ir» de la portada son enlaces a #sec-… y el navegador no salta a algo
-     oculto. Se atienden aqui: primero se abre el modulo, despues se baja. */
-  var a = ev.target.closest ? ev.target.closest('a[href^="#sec-"]') : null;
-  if (a){
-    var id = a.getAttribute("href").slice(1);
-    var m = moduloDe(id);
-    if (m){ ev.preventDefault(); irAModulo(m, id); }
-  }
-});
-window.addEventListener("hashchange", abrirDesdeURL);
-
-/* De que modulo es cada cola de «Lo que hay que hacer hoy». Es lo unico que se
-   escribe a mano, porque una cola no es un elemento del DOM del que se pueda
-   deducir donde vive. */
-var COLA_MOD = {
-  fundaciones_sin_respuesta: "red",
-  empresas_sin_respuesta: "red",
-  ofrecimientos_sin_respuesta: "red",
-  apadrinamientos_sin_respuesta: "red",
-  voluntarios_sin_respuesta: "red",
-  fundaciones_detenidas: "red",
-  convenios_en_curso: "red",
-  convenios_por_firmar: "red",
-  voluntarios_detenidos: "red",
-  transferencias_sin_verificar: "dinero",
-  certificados_por_emitir: "dinero",
-  certificados_sin_firmar: "dinero",
-  correos_fallidos: "salud",
-  entregas_en_borrador: "entregas",
-  casos_sin_evaluar: "mmc",
-  espera_sin_correo: "mmc",
-  urgentes_sin_visitar: "mmc",
-  casos_esperando_fotos: "mmc",
-  /* «red» y no «mmc»: el «Ir» de las dos lleva a #sec-entrar, que vive en Red.
-     Con «mmc» la insignia de Mira Mi Casa contaba algo que no estaba ahi y la
-     de Red, a donde de verdad se iba, decia cero. */
-  ingenieros_sin_verificar: "red",
-  conceptos_sin_respaldo: "red",
-  /* Y SUS MODULOS, que es lo que de verdad faltaba: «pintarContadores» hace
-     «if (!m) return;», asi que una cola sin entrada aqui no suma en ninguna
-     insignia — tampoco en la de «hoy», que es el total. Siete de diecisiete no
-     se contaban.
-     El modulo NO se elige a ojo: sale de la seccion a la que apunta el
-     «destino» de cada cola, para que la pestaña que se enciende sea la misma a
-     la que lleva el boton «Ir». */
-  paypal_sin_casa: "dinero",
-  ipn_por_registrar: "dinero",
-  suscripciones_sin_aprobar: "dinero",
-  correos_sin_buzon: "salud",
-  casos_respondieron: "mmc",
-  terreno_sin_atender: "mmc",
-  visitadas_sin_materiales: "entregas",
-  /* Y AQUI ESTABA EL FALLO CALLADO DE VERDAD: sin modulo, «pintarContadores»
-     hace «if (!m) return;» y la cola no suma en ninguna insignia. Las tres
-     colas mas nuevas no se contaban en ningun sitio, tampoco en el total de
-     «hoy» — o sea que el panel podia decir que no habia nada pendiente con un
-     certificado sin respaldo esperando.
-     El modulo sale del destino, como dice la regla de arriba: «#sec-casas» es
-     mmc, «/firma» lo atiende el modulo de dinero —igual que
-     "certificados_sin_firmar", que apunta al mismo sitio— y una cola sin
-     pantalla va a salud, como las otras dos de correos. */
-  entregadas_sin_acta: "entregas",
-  actas_sin_donante: "entregas",
-  concepto_sin_avisar: "mmc",
-  certificados_en_revision: "dinero",
-  correos_sin_cupo: "salud",
-  /* Su «Ir» lleva a #sec-jornadas, que vive en el modulo de voluntariado. */
-  jornadas_sin_cerrar: "vol",
-  /* «#sec-vencimientos» vive en Contabilidad. Es la primera cola de ese
-     modulo, por eso «conta» entra tambien en la lista de pintarContadores. */
-  vencimientos_por_atender: "conta"
+   QUÉ SECCIÓN ES CADA COSA no se escribe dos veces: el HTML dice en qué
+   sección vive cada tabla (data-vista), y aquí solo va lo que se pinta en la
+   cabecera. Las direcciones viejas (#dinero, #conta/sec-vencimientos,
+   #sec-aportes…) siguen funcionando: las llevan correos ya enviados. */
+var VISTAS = {
+  "hoy": { area: "Inicio", titulo: "Hoy",
+    linea: "Lo que espera a una persona, de lo más grave a lo que puede esperar a la semana." },
+  "finanzas/aportes": { area: "Finanzas", titulo: "Aportes",
+    linea: "Todo lo que ha entrado, con su recibo y su certificado." },
+  "finanzas/transferencias": { area: "Finanzas", titulo: "Transferencias por verificar",
+    linea: "Quien dice que transfirió. Se confirma contra el extracto del banco y entonces sale su recibo." },
+  "finanzas/pagos": { area: "Finanzas", titulo: "Pagos sin aporte",
+    linea: "Cobros aprobados que entraron por el enlace directo de Wompi y no tienen guía." },
+  "finanzas/membresias": { area: "Finanzas", titulo: "Membresías y carnets",
+    linea: "Las membresías mensuales en dólares por PayPal y los carnets de miembro emitidos.",
+    accion: ["Emitir carnet de honor", "hn-nuevo"] },
+  "finanzas/vencimientos": { area: "Finanzas", titulo: "Vencimientos",
+    linea: "Lo que la Fundación tiene que presentar, pagar o reportar, con su fecha." },
+  "finanzas/egresos": { area: "Finanzas", titulo: "Egresos",
+    linea: "Cada peso que sale, con su soporte y su clasificación.", accion: ["Registrar un egreso", "eg-nuevo"] },
+  "finanzas/proveedores": { area: "Finanzas", titulo: "Proveedores",
+    linea: "A quién se le paga, con su documento y lo que se le ha pagado." },
+  "finanzas/paypal": { area: "Finanzas", titulo: "PayPal",
+    linea: "Lo que entró por el botón de donaciones y los avisos de PayPal que no encontraron su registro." },
+  "alianzas/red": { area: "Alianzas", titulo: "Red",
+    linea: "Fundaciones, empresas, voluntarios y padrinos que quieren entrar a la red." },
+  "alianzas/ofrecimientos": { area: "Alianzas", titulo: "Ofrecimientos en especie",
+    linea: "Lo que llega por el formulario de la brigada para donar en especie." },
+  "alianzas/socialfest": { area: "Alianzas", titulo: "Social Fest",
+    linea: "Empresas, fundaciones y profesionales que llegaron desde Social Fest 2026." },
+  "personas/voluntariado": { area: "Personas", titulo: "Voluntariado",
+    linea: "Jornadas de voluntariado, de la convocatoria al cierre.", accion: ["Nueva jornada", "j-nueva"] },
+  "personas/ingenieros": { area: "Personas", titulo: "Ingenieros",
+    linea: "Quienes se postulan al triaje de casas, y la verificación de su matrícula en el COPNIA." },
+  "mmc/casas": { area: "Mira Mi Casa", titulo: "Casas",
+    linea: "Los casos de vivienda, con su contacto y su dirección para ir a visitar." },
+  "mmc/inspecciones": { area: "Mira Mi Casa", titulo: "Inspecciones en terreno",
+    linea: "Las visitas en persona de los ingenieros, con el documento que firmó el habitante." },
+  "entregas": { area: "Entregas", titulo: "Actas de entrega",
+    linea: "Se registra la transcripción del acta, se suben sus fotos y se publica.", accion: ["Registrar una entrega", "e-form"] },
+  "sistema/salud": { area: "Sistema", titulo: "Salud",
+    linea: "Dónde se cae la donación, si el cobro y el correo dan señales de vida, y la operación diaria." }
 };
+/* Las secciones que COMPARTEN la bandeja de inscripciones, y el filtro que
+   cada una le pone. */
+var FILTRO_VISTA = {
+  "alianzas/red": { tipo: "", origen: "" },
+  "alianzas/socialfest": { tipo: "", origen: "socialfest-2026" },
+  "personas/ingenieros": { tipo: "ingeniero", origen: "" }
+};
+/* Las direcciones de las pestañas de antes. */
+var VIEJAS = { dinero: "finanzas/aportes", conta: "finanzas/vencimientos", mmc: "mmc/casas", red: "alianzas/red",
+               vol: "personas/voluntariado", salud: "sistema/salud" };
+var VISTA = null;
 
-/* El numero en la pestana es lo que convierte esto en una consola: sin el hay
-   que entrar a los seis modulos para saber si hay algo. Sale de /api/admin/salud,
-   que ya se pide al abrir — ni un endpoint mas, ni una peticion mas. */
-function pintarContadores(pend){
-  var por = {}, urge = {};
-  (pend || []).forEach(function(c){
-    var m = COLA_MOD[c.clave];
-    if (!m) return;
-    por[m] = (por[m] || 0) + c.n;
-    /* «vencida» tambien enciende: la cola de vencimientos no tiene antiguedad
-       (su urgencia es lo que falta, no lo que lleva esperando). */
-    if (c.vencida || (c.dias !== null && c.dias >= 3)) urge[m] = true;
+function vistaDeElemento(id){
+  var el = document.getElementById(id);
+  var c = el && el.closest ? el.closest("[data-vista]") : null;
+  return c ? c.getAttribute("data-vista") : null;
+}
+function rutaDeHash(h){
+  h = String(h || "").replace(/^#/, "");
+  if (!h) return { vista: "hoy" };
+  var partes = h.split("/");
+  var sec = partes.filter(function(p){ return p.indexOf("sec-") === 0; })[0];
+  if (sec){ var v = vistaDeElemento(sec); if (v) return { vista: v, ancla: sec, vieja: true }; }
+  var dos = partes.slice(0, 2).join("/");
+  if (VISTAS[dos]) return { vista: dos, filtro: partes[2] || "" };
+  if (VISTAS[partes[0]]) return { vista: partes[0], filtro: partes[1] || "" };
+  if (VIEJAS[partes[0]]) return { vista: VIEJAS[partes[0]], vieja: true };
+  return { vista: "hoy", vieja: true };
+}
+function seccionDe(vista){
+  var l = document.querySelectorAll("[data-vista]");
+  for (var i = 0; i < l.length; i++){
+    var al = (l[i].getAttribute("data-alias") || "").split(" ");
+    if (l[i].getAttribute("data-vista") === vista || al.indexOf(vista) >= 0) return l[i];
+  }
+  return null;
+}
+function mostrar(ruta){
+  var vista = ruta.vista, sec = seccionDe(vista);
+  if (!sec || !VISTAS[vista]){ vista = "hoy"; sec = seccionDe("hoy"); }
+  /* La dirección vieja se cambia por la nueva sin dejar un paso más en el
+     historial: así «atrás» no vuelve a una dirección que solo redirige. */
+  if (ruta.vieja) history.replaceState(null, "", "#" + vista);
+  document.querySelectorAll(".pn-vista").forEach(function(s){ s.hidden = s !== sec; });
+  document.querySelectorAll("[data-pn-ir]").forEach(function(a){
+    var on = a.getAttribute("data-pn-ir") === vista;
+    a.classList.toggle("on", on);
+    if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
-  var total = 0;
-  Object.keys(por).forEach(function(m){ total += por[m]; });
-  por.hoy = total;
-  if (Object.keys(urge).length) urge.hoy = true;
-  ["hoy", "dinero", "mmc", "red", "vol", "entregas", "conta", "salud"].forEach(function(m){
-    var n = document.getElementById("n-" + m);
-    if (!n) return;
-    n.textContent = por[m] ? String(por[m]) : "";
-    n.classList.toggle("urge", !!urge[m]);
-  });
+  var cambio = VISTA !== vista;
+  VISTA = vista;
+  pintarCabecera();
+  filtrarInscripciones(vista, ruta.filtro);
+  sec.querySelectorAll("tbody[id]").forEach(function(t){ pedir(t.id); });
+  cerrarMenu();
+  document.title = VISTAS[vista].titulo + " · Panel · Give&Grow";
+  if (ruta.ancla && document.getElementById(ruta.ancla) && document.getElementById(ruta.ancla) !== sec){
+    document.getElementById(ruta.ancla).scrollIntoView({ block: "start" });
+  } else if (cambio) window.scrollTo(0, 0);
+  if (cambio){ var t = document.getElementById("pn-cab-t"); if (t && t.focus) t.focus({ preventScroll: true }); }
+}
+window.addEventListener("hashchange", function(){ if (CAJON.abierto) cajonCerrar(); mostrar(rutaDeHash(location.hash)); });
+function abrirDesdeURL(){ mostrar(rutaDeHash(location.hash)); }
+
+/* El filtro de la bandeja compartida. Solo se vuelve a pedir si cambió y la
+   tabla ya se había pedido; si no, la pide «mostrar» con el filtro nuevo. */
+function filtrarInscripciones(vista, f){
+  var base = FILTRO_VISTA[vista];
+  if (!base) return;
+  var pend = (f === "respuesta" || f === "matricula") ? f : "";
+  var tipo = pend === "matricula" ? "" : base.tipo;
+  if (INSC_TIPO === tipo && INSC_ORIGEN === base.origen && INSC_PEND === pend) return;
+  INSC_TIPO = tipo; INSC_ORIGEN = base.origen; INSC_PEND = pend; INSC_DESDE = 0;
+  if (PEDIDAS["i-filas"]) cargarInscripciones();
 }
 
-function pintarDecisiones(d){
-  var caja = document.getElementById("decisiones"); if (!caja) return;
-  var h = "";
-
-  /* Las alarmas van ARRIBA de todo y no son una cola: significan que el sitio
-     le está prometiendo algo a alguien que no se está cumpliendo ahora mismo. */
-  var alarmas = [];
-  if (d.webhooks && d.webhooks.sin_evidencia_de_cobro){
-    alarmas.push("El cobro no está probado en producción: cero eventos de Wompi en toda la historia de la base.");
-  }
-  if (d.correo && d.correo.nada_salio){
-    alarmas.push("Ningún correo ha salido de verdad. Quien donó, se ofreció o aplicó no recibió nada.");
-  }
-
-  /* LO VENCIDO PRIMERO. Una cola que ya paso su plazo es una promesa rota a
-     alguien de fuera, y va arriba sin importar su orden de siempre; entre
-     vencidas, y entre las demas, manda el orden de siempre. */
-  var pend = (d.cola || []).filter(function(c){ return c.n > 0; })
-    .sort(function(a,b){
-      return (b.vencida ? 1 : 0) - (a.vencida ? 1 : 0) || (a.orden || 999) - (b.orden || 999);
-    });
-  /* Los contadores salen de la MISMA lista ya filtrada que pinta la portada:
-     si algun dia cambia la regla de que cuenta como pendiente, cambia en un
-     solo sitio y la barra no se queda diciendo otra cosa. */
-  pintarContadores(pend);
-
-  if (!alarmas.length && !pend.length){
-    caja.innerHTML = '<div class="dec-caja"><h2 class="dec-t">Nada esperando</h2>'
-      + '<p class="mu" style="margin:0;font-size:13.5px">Las ' + esc(String((d.cola || []).length)) + ' colas están en cero. '
-      + 'Lo de abajo es para entender el sistema, no para actuar sobre él.</p></div>';
+/* La barra lateral en el teléfono. */
+function cerrarMenu(){
+  var l = document.getElementById("pn-lado"), b = document.getElementById("pn-menu");
+  if (l) l.classList.remove("abierto");
+  if (b) b.setAttribute("aria-expanded", "false");
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  if (e.target.closest("#pn-menu")){
+    var l = document.getElementById("pn-lado");
+    var abre = !l.classList.contains("abierto");
+    l.classList.toggle("abierto", abre);
+    e.target.closest("#pn-menu").setAttribute("aria-expanded", abre ? "true" : "false");
     return;
   }
-
-  h += '<div class="dec-caja"><h2 class="dec-t">Lo que hay que hacer hoy</h2>';
-
-  for (var i = 0; i < alarmas.length; i++){
-    h += '<p class="dec-alarma">' + esc(alarmas[i]) + '</p>';
+  /* La acción principal de una cabecera abre su formulario y lo trae a la vista. */
+  var ab = e.target.closest("[data-pn-abre]");
+  if (ab){
+    var d = document.getElementById(ab.getAttribute("data-pn-abre"));
+    if (d){ d.open = true; d.scrollIntoView({ block: "start" }); var f = d.querySelector("input,select,textarea"); if (f) f.focus({ preventScroll: true }); }
   }
+});
 
-  if (pend.length){
-    h += '<ul class="dec-lista">';
-    h += pend.map(function(c){
-      /* El mismo umbral que la tabla de abajo: tres días o más se marca. Si la
-         cola tiene plazo, manda el plazo: vencida es otra cosa que «vieja». */
-      var viejo = c.dias !== null && c.dias >= 3;
-      return '<li class="dec-fila' + (c.vencida ? " dec-vencida" : viejo ? " dec-viejo" : "") + '">'
-        + '<span class="dec-cuando">' + esc(c.cuando || antiguedad(c.dias))
-        + (c.plazo != null ? '<small>' + (c.vencida ? "plazo vencido · " : "plazo ") + esc(String(c.plazo)) + (c.plazo === 1 ? " día" : " días") + '</small>' : "")
-        + '</span>'
-        + '<span class="dec-n">' + esc(String(c.n)) + '</span>'
-        + '<span class="dec-que"><strong>' + esc(COLA_ES[c.clave] || c.clave) + '</strong>'
-        + '<small>' + esc(c.arreglo) + '</small></span>'
-        + (c.destino
-            ? '<a class="dec-ir" href="' + esc(c.destino) + '">Ir</a>'
-            : '<span class="dec-ir dec-sinir">sin pantalla</span>')
-        + '</li>';
-    }).join("");
-    h += '</ul>';
+/* De qué sección es cada cola de «Hoy»: a dónde lleva su «Ver todo» y en qué
+   entrada de la barra lateral suma. Es lo único que se escribe a mano, porque
+   una cola no es un elemento del DOM. El check #18 del gate exige que toda
+   cola tenga entrada aquí y en COLA_ES. */
+var COLA_MOD = {
+  fundaciones_sin_respuesta: "alianzas/red",
+  empresas_sin_respuesta: "alianzas/red",
+  ofrecimientos_sin_respuesta: "alianzas/ofrecimientos",
+  apadrinamientos_sin_respuesta: "alianzas/red",
+  voluntarios_sin_respuesta: "alianzas/red",
+  fundaciones_detenidas: "alianzas/red",
+  convenios_en_curso: "alianzas/red",
+  convenios_por_firmar: "alianzas/red",
+  voluntarios_detenidos: "alianzas/red",
+  transferencias_sin_verificar: "finanzas/transferencias",
+  certificados_por_emitir: "finanzas/aportes",
+  certificados_sin_firmar: "finanzas/aportes",
+  correos_fallidos: "sistema/salud",
+  entregas_en_borrador: "entregas",
+  casos_sin_evaluar: "mmc/casas",
+  espera_sin_correo: "mmc/casas",
+  urgentes_sin_visitar: "mmc/casas",
+  casos_esperando_fotos: "mmc/casas",
+  ingenieros_sin_verificar: "personas/ingenieros",
+  conceptos_sin_respaldo: "personas/ingenieros",
+  paypal_sin_casa: "finanzas/paypal",
+  ipn_por_registrar: "finanzas/paypal",
+  suscripciones_sin_aprobar: "finanzas/membresias",
+  correos_sin_buzon: "sistema/salud",
+  casos_respondieron: "mmc/casas",
+  terreno_sin_atender: "mmc/inspecciones",
+  visitadas_sin_materiales: "entregas",
+  entregadas_sin_acta: "entregas",
+  actas_sin_donante: "entregas",
+  concepto_sin_avisar: "mmc/casas",
+  certificados_en_revision: "finanzas/aportes",
+  correos_sin_cupo: "sistema/salud",
+  jornadas_sin_cerrar: "personas/voluntariado",
+  vencimientos_por_atender: "finanzas/vencimientos"
+};
+/* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
+   vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
+var COLA_FILTRO = { fundaciones_sin_respuesta: "respuesta", empresas_sin_respuesta: "respuesta",
+  apadrinamientos_sin_respuesta: "respuesta", voluntarios_sin_respuesta: "respuesta", ingenieros_sin_verificar: "matricula" };
+var DESTINO_ES = { "/triaje": "Abrir el triaje", "/admin/ruta": "Abrir la ruta de visitas", "/firma": "Abrir la firma" };
+
+/* LAS INSIGNIAS salen de la MISMA lista que pinta «Hoy»: si un día cambia la
+   regla de qué cuenta como pendiente, cambia en un solo sitio y la barra no se
+   queda diciendo otra cosa. En rojo, la entrada que tiene algo urgente. */
+function pintarInsignias(pend){
+  var por = {}, urge = {}, total = 0, urgeTodo = false;
+  pend.forEach(function(c){
+    var v = COLA_MOD[c.clave]; if (!v) return;
+    por[v] = (por[v] || 0) + c.n; total += c.n;
+    if (c.banda === "urgente"){ urge[v] = true; urgeTodo = true; }
+  });
+  por.hoy = total; urge.hoy = urgeTodo;
+  document.querySelectorAll("[data-pn-n]").forEach(function(n){
+    var v = n.getAttribute("data-pn-n");
+    n.textContent = por[v] ? String(por[v]) : "";
+    n.classList.toggle("urge", !!urge[v]);
+    n.title = por[v] ? por[v] + (por[v] === 1 ? " pendiente" : " pendientes") + (urge[v] ? ", algo urgente" : "") : "";
+  });
+}
+
+/* LA CABECERA de la sección abierta: área, título, una línea, lo que espera
+   en esa sección (de la misma respuesta que «Hoy») y su acción principal. */
+var HOY = null;
+function pintarCabecera(){
+  var v = VISTAS[VISTA] || VISTAS.hoy;
+  document.getElementById("pn-cab-ey").textContent = v.area;
+  document.getElementById("pn-cab-t").textContent = v.titulo;
+  document.getElementById("pn-cab-linea").textContent = v.linea;
+  document.getElementById("pn-cab-acc").innerHTML = v.accion
+    ? '<button type="button" class="pn-b1" data-pn-abre="' + esc(v.accion[1]) + '">' + esc(v.accion[0]) + "</button>" : "";
+  var meta = document.getElementById("pn-cab-meta");
+  if (!HOY){ meta.innerHTML = ""; return; }
+  var pend = (HOY.cola || []).filter(function(c){ return c.n > 0; });
+  if (VISTA === "hoy"){
+    var tot = 0; pend.forEach(function(c){ tot += c.n; });
+    meta.innerHTML = pend.length
+      ? "<b>" + tot + "</b> " + (tot === 1 ? "pendiente" : "pendientes") + " en " + pend.length + (pend.length === 1 ? " cola" : " colas") +
+        " · corte " + esc(enCO(HOY.corte, 16).slice(11)) + " (hora de Colombia)"
+      : "Nada pendiente en ninguna cola.";
+    return;
   }
+  meta.innerHTML = pend.filter(function(c){ return COLA_MOD[c.clave] === VISTA; }).map(function(c){
+    var urg = c.banda === "urgente";
+    return '<span class="' + (urg ? "urge" : "") + '"><b>' + c.n + "</b> " + esc((COLA_ES[c.clave] || c.clave).toLowerCase()) +
+      (c.dias != null ? " · la más vieja " + esc(antiguedad(c.dias)) : c.cuando ? " · " + esc(c.cuando) : "") + "</span>";
+  }).join(" &middot; ");
+}
 
-  h += '</div>';
+/* ==== «HOY», LA BANDEJA DE ENTRADA ====
+   Tres franjas por gravedad, que decide el servidor (bandaDeCola): Urgente,
+   Hoy y Esta semana. Dentro de cada una manda el PESO de la cola y después la
+   fecha: antes lo vencido subía primero pesara lo que pesara, y una respuesta
+   atrasada a una fundación quedaba por encima de una casa donde un ingeniero
+   dijo que corre.
+
+   Cada cola es una carta con sus filas más viejas y la acción ahí mismo
+   cuando el panel ya sabe hacerla (confirmar una transferencia, emitir un
+   certificado, abrir un caso, marcar un vencimiento); si no, «Ver todo» lleva
+   a su sección. Las alarmas van arriba de todo y no son una cola: dicen que el
+   sitio le promete algo a alguien que no se está cumpliendo. */
+var BANDAS = [
+  ["urgente", "Urgente", "Personas en riesgo, documentos sin respaldo y promesas que ya pasaron su plazo."],
+  ["hoy", "Hoy", "Lo que destraba a una persona o al dinero."],
+  ["semana", "Esta semana", "Papeles y oficina: no se rompen por esperar unos días."]
+];
+function restanteCola(c){
+  if (c.plazo != null && c.dias != null) return c.plazo - c.dias;
+  if (c.dias != null) return -c.dias;
+  return 0;
+}
+function ordenCola(a, b){ return (a.orden || 999) - (b.orden || 999) || restanteCola(a) - restanteCola(b); }
+/* El «cómo se arregla» sin el nombre de la bandeja delante: en la carta ya se
+   sabe dónde está, y «Ver todo» lleva allí. */
+function textoArreglo(c){
+  if (c.clave === "vencimientos_por_atender") return "Se marca «Hecho» o «No aplicó este periodo». Marcar no presenta nada.";
+  var t = String(c.arreglo || "");
+  var m = t.match(/^(Bandeja|Lista|Pantalla|Panel|Módulo|Contabilidad)[^·]*· *(.*)$/);
+  if (m) t = m[2];
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function accionesItem(clave, it){
+  var id = esc(String(it.id == null ? "" : it.id));
+  var nombre = esc(String(it.titulo || it.id || ""));
+  if (clave === "transferencias_sin_verificar")
+    return '<button type="button" class="pn-b1" data-hoy="conf" data-id="' + id + '">Confirmar…</button>';
+  if (clave === "certificados_por_emitir")
+    return '<button type="button" class="pn-b1" data-hoy="cert" data-id="' + id + '">Emitir…</button>';
+  if (clave === "certificados_sin_firmar" || clave === "certificados_en_revision")
+    return '<a class="pn-b2" href="/api/admin/certificado/' + id + '.pdf" target="_blank" rel="noopener">Ver PDF</a>';
+  if (["fundaciones_sin_respuesta", "empresas_sin_respuesta", "apadrinamientos_sin_respuesta", "voluntarios_sin_respuesta"].indexOf(clave) >= 0)
+    return '<button type="button" class="pn-b2" data-hoy="revision" data-id="' + id + '" data-nombre="' + nombre + '">Pasar a revisión</button>';
+  if (clave === "ofrecimientos_sin_respuesta")
+    return '<button type="button" class="pn-b2" data-hoy="revision" data-id="' + id + '" data-nombre="' + nombre + '">Contactado</button>';
+  if (["casos_sin_evaluar", "espera_sin_correo", "concepto_sin_avisar", "urgentes_sin_visitar", "casos_esperando_fotos",
+       "casos_respondieron", "conceptos_sin_respaldo", "visitadas_sin_materiales"].indexOf(clave) >= 0)
+    return '<button type="button" class="pn-b2" data-hoy="caso" data-id="' + id + '">Abrir caso</button>';
+  if (clave === "terreno_sin_atender")
+    return '<a class="pn-b2" href="/api/triage/inspeccion/' + id + '.pdf" target="_blank" rel="noopener">PDF</a>' +
+      '<button type="button" class="pn-b1" data-hoy="atender" data-id="' + id + '">Ya la atendimos…</button>';
+  if (clave === "vencimientos_por_atender")
+    return '<button type="button" class="pn-b1" data-hoy="ob" data-oest="hecho" data-oclave="' + esc(it.clave) + '" data-ofecha="' + esc(it.fecha) +
+      '" data-nombre="' + esc((it.corto || it.titulo) + " · " + (it.periodo || "")) + '">Hecho</button>' +
+      '<button type="button" class="pn-b2" data-hoy="ob" data-oest="no_aplica" data-oclave="' + esc(it.clave) + '" data-ofecha="' + esc(it.fecha) +
+      '" data-nombre="' + esc((it.corto || it.titulo) + " · " + (it.periodo || "")) + '">No aplicó</button>';
+  if (clave === "jornadas_sin_cerrar")
+    return '<button type="button" class="pn-b2" data-hoy="jornada" data-id="' + id + '">Abrir jornada</button>';
+  return "";
+}
+function cartaCola(c){
+  var vista = COLA_MOD[c.clave];
+  var cuando = c.cuando || (c.dias === 0 ? "la más vieja llegó hoy" : c.dias != null ? "la más vieja " + antiguedad(c.dias) : "");
+  var plazo = c.plazo != null
+    ? (c.vencida ? " · plazo de " : " · plazo ") + c.plazo + (c.plazo === 1 ? " día" : " días") + (c.vencida ? " vencido" : "") : "";
+  var items = c.items || [];
+  var lis = items.map(function(it){
+    var det = [];
+    /* El número de la fila solo si dice algo (GG-…, CV-…); un id interno no. */
+    if (it.titulo && String(it.titulo) !== String(it.id) && !/^[0-9]+$/.test(String(it.id))) det.push(String(it.id));
+    if (it.detalle) det.push(String(it.detalle));
+    if (it.monto != null && it.monto !== "") det.push(pesos(it.monto));
+    var t = it.cuando || (it.t ? antiguedad(diasDesde(it.t)) : "");
+    return '<li class="hoy-it"><div class="hoy-it-q"><strong>' + esc(it.titulo || it.id) + "</strong>" +
+      (det.length ? "<small>" + esc(det.join(" · ")) + "</small>" : "") + "</div>" +
+      '<div class="hoy-it-d">' + (t ? '<span class="hoy-it-t">' + esc(t) + "</span>" : "") + accionesItem(c.clave, it) + "</div></li>";
+  }).join("");
+  var enlaces = (vista ? '<a class="hoy-todo" href="#' + vista + (COLA_FILTRO[c.clave] ? "/" + COLA_FILTRO[c.clave] : "") + '">Ver todo (' + c.n + ")</a>" : "") +
+    (c.destino && c.destino.charAt(0) === "/" ? ' &nbsp;<a class="hoy-todo" href="' + esc(c.destino) + '">' + esc(DESTINO_ES[c.destino] || "Abrir") + "</a>" : "");
+  return '<article class="hoy-carta"><header class="hoy-ccab"><h3>' + esc(COLA_ES[c.clave] || c.clave) + "</h3>" +
+    '<span class="hoy-cn" aria-label="' + c.n + ' pendientes">' + c.n + "</span></header>" +
+    (cuando || plazo ? '<p class="hoy-cuando' + (c.vencida ? " vencida" : "") + '">' + esc(cuando + plazo) + "</p>" : "") +
+    (lis ? '<ul class="hoy-items">' + lis + "</ul>" : "") +
+    (c.n > items.length && items.length ? '<p class="hoy-mas">y ' + (c.n - items.length) + " más</p>" : "") +
+    '<div class="hoy-cpie"><small>' + esc(textoArreglo(c)) + "</small><span>" + enlaces + "</span></div></article>";
+}
+function pintarHoy(d){
+  HOY = d;
+  var pend = (d.cola || []).filter(function(c){ return c.n > 0; });
+  pintarInsignias(pend);
+  pintarCabecera();
+  var caja = document.getElementById("decisiones"); if (!caja) return;
+  var h = "";
+  if (d.webhooks && d.webhooks.sin_evidencia_de_cobro)
+    h += '<p class="hoy-alarma"><strong>El cobro no está probado en producción:</strong> no ha llegado ni un aviso de Wompi en toda la historia de la base.</p>';
+  if (d.correo && d.correo.nada_salio)
+    h += '<p class="hoy-alarma"><strong>Ningún correo ha salido de verdad.</strong> Quien donó, se ofreció o aplicó no recibió nada.</p>';
+  BANDAS.forEach(function(b){
+    var l = pend.filter(function(c){ return (c.banda || "semana") === b[0]; }).sort(ordenCola);
+    var n = 0; l.forEach(function(c){ n += c.n; });
+    h += '<section class="hoy-banda hoy-' + b[0] + '" aria-labelledby="hb-' + b[0] + '">' +
+      '<header class="hoy-bcab"><h2 id="hb-' + b[0] + '">' + esc(b[1]) + "</h2><span>" +
+      (l.length ? n + (n === 1 ? " pendiente" : " pendientes") + " · " : "") + esc(b[2]) + "</span></header>" +
+      (l.length ? '<div class="hoy-cartas">' + l.map(cartaCola).join("") + "</div>" : '<p class="hoy-nada">Nada pendiente.</p>') +
+      "</section>";
+  });
   caja.innerHTML = h;
 }
 
+/* Las acciones de las cartas de «Hoy». Usan las mismas rutas de siempre. */
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b = e.target.closest("[data-hoy]");
+  if (!b) return;
+  var que = b.getAttribute("data-hoy"), id = b.getAttribute("data-id");
+  if (que === "conf"){ abrirConfirmarTransferencia(id); return; }
+  if (que === "cert"){ abrirCert(id); return; }
+  if (que === "caso"){ abrirCaso(id); return; }
+  if (que === "atender"){ abrirAtender(id); return; }
+  if (que === "revision"){ moverInscripcion(Number(id), "en_revision", b, { de: "nueva", nombre: b.getAttribute("data-nombre") }); return; }
+  if (que === "jornada"){ location.hash = "personas/voluntariado"; abrirJornada(id); return; }
+  if (que === "ob"){
+    var clave = b.getAttribute("data-oclave"), fecha = b.getAttribute("data-ofecha"), est = b.getAttribute("data-oest");
+    var nom = b.getAttribute("data-nombre");
+    b.disabled = true;
+    postPanel("/api/admin/obligaciones", { clave: clave, fecha: fecha, estado: est, nota: "" }).then(function(d){
+      b.disabled = false;
+      if (!d) return;
+      avisar("«" + nom + "» " + (est === "hecho" ? "marcado como hecho." : "marcado como «no aplicó»."), { deshacer: function(){
+        postPanel("/api/admin/obligaciones", { clave: clave, fecha: fecha, estado: "pendiente", nota: "" }).then(function(d2){
+          if (d2){ avisar("«" + nom + "» vuelve a estar pendiente."); cargarSalud(); if (PEDIDAS["ob-filas"]) cargarVencimientos(); }
+        });
+      } });
+      cargarSalud(); if (PEDIDAS["ob-filas"]) cargarVencimientos();
+    });
+  }
+});
+
+/* Los nombres de la operación, dichos para una persona. */
+var TRABAJO_ES = { "aviso-septimo-dia": "Aviso del séptimo día a las familias", "cobro-mensual": "Cobro mensual de membresías",
+  "resumen-diario": "Resumen diario al equipo", "alerta-operacion": "Alerta de operación" };
+var CONFIG_ES = { RESEND_API_KEY: "la llave del servicio de correo", WOMPI_PRIVATE_KEY: "la llave privada de Wompi",
+  WOMPI_INTEGRITY_SECRET: "el secreto de integridad de Wompi", WOMPI_EVENTS_SECRET: "el secreto de eventos de Wompi",
+  PAYPAL_CLIENT_ID: "el cliente de PayPal", PAYPAL_SECRET: "el secreto de PayPal", PAYPAL_IPN_CORREO: "la cuenta de PayPal del botón",
+  ANTHROPIC_API_KEY: "la llave del asistente", ACCESS_EVAL_JWK: "la llave del acceso de ingenieros",
+  FIRMA_RL_EMAIL: "el correo del Representante Legal", FIRMA_RF_EMAIL: "el correo de la Revisora Fiscal" };
 function cargarSalud(){
-  pedirJSON("/api/admin/salud", ["decisiones", "salud"]).then(function(d){
-    /* Se pinta con los MISMOS datos y sin una petición más: la portada y esta
-       sección salen del mismo /api/admin/salud. */
-    pintarDecisiones(d);
+  pedirJSON("/api/admin/salud?items=1", ["decisiones", "salud"]).then(function(d){
+    /* Se pinta con los MISMOS datos y sin una petición más: «Hoy», las
+       insignias, las cabeceras y esta sección salen del mismo /api/admin/salud. */
+    pintarHoy(d);
     var box = document.getElementById("salud"); if (!box) return;
     var h = "";
 
@@ -24175,7 +25082,7 @@ function cargarSalud(){
     h += pasoEmbudo("eventos recibidos", w.recibidos, w.ultimo ? "último " + String(w.ultimo).slice(0,16) : "nunca");
     h += pasoEmbudo("con firma inválida", w.firma_invalida, w.firma_invalida ? "revisar YA" : "");
     h += pasoEmbudo("sin procesar", w.sin_procesar);
-    h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">Una firma inválida es o alguien golpeando el endpoint, o que volvió el bug del <code>timestamp</code>. «Sin procesar» con firma buena es un aporte que se quedó a medias.</p>';
+    h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">Una firma inválida es alguien probando la dirección de cobro o un ajuste mal puesto: hay que mirarlo. «Sin procesar» con firma buena es un aporte que se quedó a medias.</p>';
 
     /* 3b · Correo. La alarma va primero por la misma razón que la de Wompi: si
        nada salió, el sitio lleva prometiendo acuses que nadie recibió. */
@@ -24185,7 +25092,7 @@ function cargarSalud(){
       h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px">' +
         '<strong>Ningún correo ha salido de verdad.</strong> Hay ' + esc(String(co.total)) +
         ' anotados y ' + esc(String(co.simulados)) + ' quedaron en «simulado», que es lo que hace el sistema ' +
-        'cuando falta la llave de Resend: se registra y no se envía. Quien donó, se ofreció o aplicó ' +
+        'cuando falta la llave del servicio de correo: se registra y no se envía. Quien donó, se ofreció o aplicó ' +
         'no recibió nada.</p>';
     }
     h += '<div class="eco-row" style="justify-content:flex-start;margin-bottom:6px">';
@@ -24209,8 +25116,8 @@ function cargarSalud(){
     }
     var faltan = op.faltan || [];
     if (faltan.length){
-      h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px"><strong>Falta configuración:</strong> ' +
-        esc(faltan.join(", ")) + '. Se pone con <code>npx wrangler secret put NOMBRE</code>; aquí solo se ve el nombre, nunca el valor.</p>';
+      h += '<p class="pn-nota"><strong>Falta configurar en Cloudflare:</strong> ' +
+        esc(faltan.map(function(k){ return CONFIG_ES[k] || k; }).join(", ")) + '. Aquí solo se ve qué falta, nunca el valor.</p>';
     }
     var co24 = op.correo24h || {};
     if (co24.sin_cupo_personas){
@@ -24224,7 +25131,7 @@ function cargarSalud(){
       h += '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Tarea diaria</th><th scope="col">Última corrida</th><th scope="col">Último éxito</th><th scope="col">Resultado</th></tr></thead><tbody>';
       h += tr.map(function(t){
         var mal = t.vencido && t.trabajo !== "alerta-operacion";
-        return "<tr><td><strong>" + esc(t.trabajo) + "</strong></td>" +
+        return "<tr><td><strong>" + esc(TRABAJO_ES[t.trabajo] || t.trabajo) + "</strong></td>" +
           "<td>" + esc(t.ultimo ? String(t.ultimo).slice(0,16) : "nunca") + "</td>" +
           "<td>" + (mal ? '<strong style="color:#A84D00">' : "") + esc(t.ultimo_ok ? String(t.ultimo_ok).slice(0,16) : "nunca") + (mal ? "</strong>" : "") + "</td>" +
           "<td><small>" + esc(t.ok === false ? "falló: " + (t.detalle || "") : (t.detalle || "—")) + "</small></td></tr>";
@@ -24473,22 +25380,24 @@ function detalleConvenio(i){
   return h;
 }
 
-/* Los botones del convenio en linea. Reenviar el enlace pide confirmar: sale
-   un correo a la fundacion. */
+/* Los botones del convenio en linea. Reenviar el enlace le escribe a la
+   fundación: se enseña el correo antes. */
 document.addEventListener("click", function(e){
   var t = e.target.closest ? e.target.closest("[data-cenlace],[data-cver]") : null;
   if (!t) return;
   if (t.hasAttribute("data-cver")) { verConvenio(t.getAttribute("data-cver")); return; }
-  if (!confirm("¿Mandarle a la fundación el correo del convenio con su enlace?")) return;
-  t.disabled = true;
-  fetch("/api/admin/inscripcion/" + encodeURIComponent(t.getAttribute("data-cenlace")) + "/convenio-enlace", {
-    method: "POST", headers: { "content-type": "application/json" }, body: "{}"
-  }).then(conEstado).then(function(res){
-    t.disabled = false;
-    if (fallo(res.http, res.d)) return;
-    alert(res.d.aviso === "correo_enviado" ? "Correo enviado." : "El enlace existe, pero el correo no salió. Revisa la cola de correos.");
-    cargarInscripciones();
-  }).catch(function(){ t.disabled = false; });
+  var idc = t.getAttribute("data-cenlace");
+  confirmarConCorreo({ origen: t, previa: { accion: "convenio-enlace", id: Number(idc) },
+    ey: "Convenio", titulo: "Mandarle a la fundación el enlace del convenio", botonCorreo: "Enviar el enlace",
+    hacer: function(){
+      return postPanel("/api/admin/inscripcion/" + encodeURIComponent(idc) + "/convenio-enlace", {}).then(function(d){
+        if (!d) return false;
+        if (d.aviso === "correo_enviado") avisar("Correo enviado.");
+        else avisoError("El enlace existe, pero el correo no salió. Revisa la cola de correos en Salud.");
+        cargarInscripciones();
+        return true;
+      });
+    } });
 });
 document.addEventListener("change", function(e){
   var inp = e.target.closest ? e.target.closest("[data-ctexto]") : null;
@@ -24500,9 +25409,9 @@ document.addEventListener("change", function(e){
   }).then(conEstado).then(function(res){
     inp.disabled = false; inp.value = "";
     if (fallo(res.http, res.d)) return;
-    if (res.d.aviso === "correo_fallo") alert("Subido, pero el aviso a la fundación no salió. Revisa la cola de correos.");
+    if (res.d.aviso === "correo_fallo") avisar("Subido, pero el aviso a la fundación no salió. Revisa la cola de correos.");
     cargarInscripciones();
-  }).catch(function(){ inp.disabled = false; alert("No se pudo subir: revisa la conexión."); });
+  }).catch(function(){ inp.disabled = false; avisar("No se pudo subir: revisa la conexión."); });
 });
 
 /* LA HOJA DE LAS DOS VENTANAS APARTE (respuestas del cuestionario y del
@@ -24530,7 +25439,7 @@ function verConvenio(id){
     if (fallo(res.http, res.d)) return;
     var d = res.d;
     var w = window.open("", "_blank");
-    if (!w){ alert("El navegador bloqueo la ventana."); return; }
+    if (!w){ avisar("El navegador bloqueo la ventana."); return; }
     var fila = function(k, v){ return "<tr><td>" + esc(k) + "</td><td>" + v + "</td></tr>"; };
     var resp = function(r){
       var v = Array.isArray(r.respuesta) ? r.respuesta.map(function(x){ return "☑ " + esc(x); }).join("<br>") : esc(r.respuesta);
@@ -24823,7 +25732,7 @@ function paginaInsc(d){
 }
 
 /* El filtro vivo de la bandeja. Vacio = todo, como antes. */
-var INSC_TIPO = "", INSC_PEND = "", INSC_DESDE = 0;
+var INSC_TIPO = "", INSC_PEND = "", INSC_DESDE = 0, INSC_ORIGEN = "";
 
 function inscFiltro(tipo, pend){
   INSC_TIPO = tipo || ""; INSC_PEND = pend || ""; INSC_DESDE = 0;
@@ -24834,7 +25743,8 @@ function inscPagina(d){ INSC_DESDE = Number(d) || 0; cargarInscripciones(); }
 function cargarInscripciones(){
   var q = "?desde=" + INSC_DESDE
         + (INSC_TIPO ? "&tipo=" + encodeURIComponent(INSC_TIPO) : "")
-        + (INSC_PEND ? "&pendiente=" + encodeURIComponent(INSC_PEND) : "");
+        + (INSC_PEND ? "&pendiente=" + encodeURIComponent(INSC_PEND) : "")
+        + (INSC_ORIGEN ? "&origen=" + encodeURIComponent(INSC_ORIGEN) : "");
   pedirJSON("/api/admin/inscripciones" + q, "i-filas").then(function(d){
     var tb = document.getElementById("i-filas"); if (!tb) return;
     var l = d.inscripciones || [];
@@ -24925,14 +25835,14 @@ function cargarInscripciones(){
           (i.tipo === "ingeniero" ? "" : borradorRespuesta(i, x)) + "</td>" +
         "<td>" + esc(enCO(i.creada_en, 10)) + fechaConPlazo(i) + "</td>" +
         "<td>" + esc(ESTADO_INSC_ES[i.estado] || i.estado) + (i.tipo === "ingeniero" ? "<br>" + selloMatricula(x) : "") + "</td>" +
-        "<td>" + (siguiente ? '<button class="copy" data-ins="' + i.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>'
+        "<td>" + (siguiente ? '<button class="btn btn-g" data-ins="' + i.id + '" data-e="' + siguiente[0] + '" data-de="' + esc(i.estado) + '" data-nombre="' + esc(i.nombre || "") + '">' + siguiente[1] + '</button>'
                   : espera ? '<small class="mu">' + espera + "</small>" : "—") +
           (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") +
           ficha +
-          (cerrar ? '<br><small><button class="copy" data-ins="' + i.id + '" data-e="' + cerrar[0] + '">' + cerrar[1] + '</button></small>' : "") +
+          (cerrar ? '<br><small><button class="copy" data-ins="' + i.id + '" data-e="' + cerrar[0] + '" data-de="' + esc(i.estado) + '" data-nombre="' + esc(i.nombre || "") + '">' + cerrar[1] + '</button></small>' : "") +
           /* La supresion va SIEMPRE, en cualquier estado: quien pide que le
              borren sus datos no tiene por que haber llegado a «aceptada». */
-          '<br><small><button class="copy" data-insborrar="' + i.id + '">Suprimir</button></small>' + "</td>" +
+          '<br><small><button class="copy pn-peligro" data-insborrar="' + i.id + '" data-nombre="' + esc(i.nombre || "") + '" data-tipo="' + esc(TIPO_ES[i.tipo] || i.tipo) + '">Suprimir…</button></small>' + "</td>" +
       "</tr>" + det;
     }).join("");
   });
@@ -25018,9 +25928,10 @@ function casilla(id, etiqueta, marcada){
 }
 
 function abrirCaso(numero){
-  var caja = document.getElementById("cs-dlg");
-  caja.style.display = "block";
-  caja.innerHTML = '<p class="mu">Abriendo ' + esc(numero) + '…</p>';
+  /* LA FICHA SE ABRE EN EL CAJÓN, ancho, al lado de la lista: antes se
+     pintaba debajo de la tabla y había que ir a buscarla. */
+  cajonAbrir({ ancho: true, ey: "Caso de Mira Mi Casa", titulo: numero, cuerpo: '<p class="mu">Abriendo ' + esc(numero) + "…</p>" });
+  var caja = document.getElementById("pn-cajon-cuerpo");
   fetch("/api/admin/caso/" + encodeURIComponent(numero)).then(function(r){ return r.json(); }).then(function(d){
     if (d.error){ caja.innerHTML = '<p class="mu">No se pudo abrir: ' + esc(d.error) + "</p>"; return; }
     CASO_ABIERTO = numero;
@@ -25061,7 +25972,7 @@ function abrirCaso(numero){
           'style="width:100%;height:120px;object-fit:cover;border-radius:8px;display:block"></a>';
       return '<div style="width:160px">' + cuerpo +
         '<small style="display:block;margin:6px 0 4px">' + esc(CAT_MED[m.categoria] || m.categoria || "sin categoría") + "</small>" +
-        '<button class="copy" data-medio="' + m.id + '">Quitar…</button></div>';
+        '<button class="copy pn-peligro" data-medio="' + m.id + '">Quitar…</button></div>';
     }).join("");
     if (!fotos) fotos = '<p class="mu" style="font-size:13px">Este caso no tiene fotos. Un ingeniero no va a poder evaluarlo.</p>';
 
@@ -25130,8 +26041,7 @@ function abrirCaso(numero){
     }
 
     caja.innerHTML =
-      '<div class="card" style="max-width:760px;text-align:left">' +
-        '<h3 style="margin-bottom:4px">' + esc(numero) + "</h3>" +
+      "<div>" +
         '<p class="mu" style="font-size:13px;margin-bottom:16px">Corrige lo que la familia escribió mal — un teléfono ' +
         'con un dígito de menos o una dirección a medias es la diferencia entre encontrar la casa y no encontrarla. ' +
         '<strong>Los cambios quedan en el historial</strong> con tu correo, y se guarda qué campos tocaste, nunca los valores.</p>' +
@@ -25223,10 +26133,7 @@ function abrirCaso(numero){
   });
 }
 
-function cerrarCaso(){
-  var caja = document.getElementById("cs-dlg");
-  caja.style.display = "none"; caja.innerHTML = ""; CASO_ABIERTO = null;
-}
+function cerrarCaso(){ cajonCerrar(); }
 
 function guardarCaso(numero){
   var v = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
@@ -25486,6 +26393,89 @@ function cargarInspecciones(){
   });
 }
 
+/* El estado de un ofrecimiento, dicho como lo vive quien lo atiende. */
+var ESTADO_OFR_ES = { nueva: "Sin responder", en_revision: "Contactado", aceptada: "Recibido", archivada: "Archivado" };
+/* MOVER UN CASO. Devuelve una promesa con true si quedó. */
+function moverCaso(num, dest, motivo){
+  return postPanel("/api/admin/caso/" + encodeURIComponent(num) + "/estado", { estado: dest, motivo: motivo }).then(function(d){
+    if (!d) return false;
+    var reabre = dest === "cerrado" || dest === "descartado";
+    avisar(num + (dest === "cerrado" ? " quedó cerrado." : dest === "descartado" ? " quedó descartado." : dest === "visitado" ? " quedó como visitada." : " vuelve a estar en revisión."),
+      reabre ? { deshacer: function(){ moverCaso(num, "en_revision", ""); } } : {});
+    if (PEDIDAS["cs-filas"]) cargarCasos();
+    cargarSalud();
+    return true;
+  });
+}
+function abrirMoverCaso(num, dest){
+  var cerrar = dest === "cerrado";
+  cajonAbrir({ ey: "Caso de Mira Mi Casa", titulo: (cerrar ? "Cerrar " : "Descartar ") + num,
+    cuerpo: "<p>" + (cerrar
+        ? "El caso sale de la lista de pendientes. Se puede reabrir."
+        : "Descartar es para duplicados y pruebas: no borra nada y se puede reabrir.") + "</p>" +
+      pnCampo("cm-mot", "¿Qué pasó con el caso?", "", { area: true,
+        ayuda: "Queda en el registro con tu correo: es lo que va a leer quien pregunte mañana." + (cerrar ? "" : " Si es un duplicado, escribe el número del caso que sigue (CV-…).") }) +
+      '<p class="pn-h3">Lo que se envía</p><div id="cm-previa"><p class="mu">Mirando qué correo saldría…</p></div>' +
+      '<p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="cm-ok" data-cmover="' + esc(num) + '" data-cdest="' + esc(dest) + '">' + (cerrar ? "Cerrar el caso" : "Descartar el caso") + "</button>" +
+      '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>', foco: "cm-mot" });
+  previaCaso(num, dest);
+}
+function previaCaso(num, dest){
+  var box = document.getElementById("cm-previa"); if (!box) return;
+  pedirPrevia({ accion: "caso", numero: num, estado: dest, motivo: pnValor("cm-mot") }).then(function(r){
+    box.innerHTML = htmlCorreos(r);
+    var b = document.getElementById("cm-ok");
+    if (b && hayCorreos(r)) b.textContent = (dest === "cerrado" ? "Cerrar" : "Descartar") + " y avisar a la familia";
+  }).catch(function(){ box.innerHTML = '<p class="pn-error">No se pudo armar la vista previa del aviso a la familia.</p>'; });
+}
+/* «Ya la atendimos», en el cajón. */
+function abrirAtender(num){
+  cajonAbrir({ ey: "Inspección en terreno", titulo: "Ya atendimos " + num,
+    cuerpo: '<p>Registra que el equipo ya respondió a la señal del ingeniero. <strong>No cambia su concepto</strong> ni declara nada sobre la casa.</p>' +
+      '<p><a href="/api/triage/inspeccion/' + esc(num) + '.pdf" target="_blank" rel="noopener">Ver el documento de la visita</a></p>' +
+      pnCampo("at-nota", "¿Qué se hizo con esta casa?", "", { area: true, ayuda: "Lo va a leer alguien dentro de un mes preguntando qué pasó." }) +
+      '<p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="at-ok" data-atender="' + esc(num) + '">Guardar</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>',
+    foco: "at-nota" });
+}
+function reabrirInspeccion(num){
+  return postPanel("/api/admin/inspeccion/" + encodeURIComponent(num) + "/atendida", { atendida: false }).then(function(d){
+    if (!d) return;
+    avisar(num + " vuelve a la cola de señales sin atender.");
+    if (PEDIDAS["ins-filas"]) cargarInspecciones();
+    cargarSalud();
+  });
+}
+document.addEventListener("change", function(e){
+  if (e.target && e.target.id === "cm-mot"){ var b = document.getElementById("cm-ok"); if (b) previaCaso(b.getAttribute("data-cmover"), b.getAttribute("data-cdest")); }
+});
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b = e.target.closest("[data-cmover]");
+  if (b){
+    var mot = pnValor("cm-mot");
+    if (!mot){ pnMarcar("cm-mot", "Escribe qué pasó: sin motivo no se cierra."); return; }
+    b.disabled = true;
+    moverCaso(b.getAttribute("data-cmover"), b.getAttribute("data-cdest"), mot).then(function(ok){ b.disabled = false; if (ok) cajonCerrar(); });
+    return;
+  }
+  var at = e.target.closest("[data-atender]");
+  if (at){
+    var num = at.getAttribute("data-atender"), nota = pnValor("at-nota");
+    if (!nota){ pnMarcar("at-nota", "Hace falta decir qué se hizo. Sin eso la fila se cierra y no queda rastro."); return; }
+    at.disabled = true;
+    postPanel("/api/admin/inspeccion/" + encodeURIComponent(num) + "/atendida", { nota: nota }).then(function(d){
+      at.disabled = false;
+      if (!d) return;
+      cajonCerrar();
+      avisar(num + " quedó como atendida.", { deshacer: function(){ reabrirInspeccion(num); } });
+      if (PEDIDAS["ins-filas"]) cargarInspecciones();
+      cargarSalud();
+    });
+  }
+});
+
 function cargarOfrecimientos(){
   pedirJSON("/api/admin/ofrecimientos", "o-filas").then(function(d){
     var tb = document.getElementById("o-filas"); if (!tb) return;
@@ -25503,8 +26493,8 @@ function cargarOfrecimientos(){
         "<td>" + esc(o.nombre||"") + "<br><small>" + esc(o.email||"") + (o.telefono ? " · " + esc(o.telefono) : "") +
           (x.quien === "empresa" ? " · empresa" : "") + "</small></td>" +
         "<td>" + esc(o.ciudad || "—") + "</td>" +
-        "<td>" + esc(o.estado) + "</td>" +
-        "<td>" + (siguiente ? '<button class="copy" data-ins="' + o.id + '" data-e="' + siguiente[0] + '">' + siguiente[1] + '</button>' : "—") + "</td>" +
+        "<td>" + esc(ESTADO_OFR_ES[o.estado] || ESTADO_INSC_ES[o.estado] || o.estado) + "</td>" +
+        "<td>" + (siguiente ? '<button class="copy" data-ins="' + o.id + '" data-e="' + siguiente[0] + '" data-de="' + esc(o.estado) + '" data-nombre="' + esc(o.nombre || "") + '">' + siguiente[1] + '</button>' : "—") + "</td>" +
       "</tr>";
     }).join("");
   });
@@ -25522,22 +26512,22 @@ document.addEventListener("click", function(e){
   if (gu){ guardarCaso(gu.getAttribute("data-guardar")); return; }
 
   /* Borrar una foto es lo único de este panel que NO se puede deshacer: el
-     objeto se va del bucket. Por eso pide motivo y lo dice antes. */
+     objeto se va del bucket. Por eso pide motivo y lo dice antes, en rojo. */
   var bm = e.target.closest("[data-medio]");
   if (bm && CASO_ABIERTO){
-    var razon = window.prompt("Quitar esta foto de " + CASO_ABIERTO +
-      ".\\n\\nSe borra de verdad, también del almacenamiento, y no se puede deshacer." +
-      "\\n\\n¿Por qué se quita? (por ejemplo: salen personas)");
-    if (!razon) return;
-    bm.disabled = true; bm.textContent = "…";
-    fetch("/api/admin/caso/" + encodeURIComponent(CASO_ABIERTO) + "/medio/" +
-          encodeURIComponent(bm.getAttribute("data-medio")) + "/borrar", {
-      method: "POST", headers: {"content-type":"application/json"},
-      body: JSON.stringify({ motivo: razon })
-    }).then(function(r){ return r.json(); }).then(function(d){
-      if (d && d.error) window.alert("No se quitó: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
-      abrirCaso(CASO_ABIERTO); cargarCasos();
-    }).catch(function(){ abrirCaso(CASO_ABIERTO); });
+    var numF = CASO_ABIERTO, med = bm.getAttribute("data-medio");
+    confirmarPeligro({ titulo: "Quitar una foto de " + numF,
+      detalle: "<p>La foto se borra <strong>de verdad</strong>, también del almacenamiento, y no se puede recuperar. Es lo que cumple la promesa de que el caso no sale con personas dentro.</p>",
+      motivo: true, etiquetaMotivo: "¿Por qué se quita?", ayudaMotivo: "Por ejemplo: «salen personas». Queda en el historial del caso.",
+      boton: "Borrar la foto", volver: function(){ abrirCaso(numF); },
+      hacer: function(razon){
+        return postPanel("/api/admin/caso/" + encodeURIComponent(numF) + "/medio/" + encodeURIComponent(med) + "/borrar", { motivo: razon }).then(function(d){
+          if (!d) return false;
+          avisar("Foto borrada de " + numF + ".");
+          if (PEDIDAS["cs-filas"]) cargarCasos();
+          return true;
+        });
+      } });
     return;
   }
 
@@ -25557,35 +26547,24 @@ document.addEventListener("click", function(e){
       method: "POST", headers: {"content-type":"application/json"},
       body: JSON.stringify({ canal: "whatsapp" })
     }).then(function(r){ return r.json(); }).then(function(d){
-      if (d && d.error) window.alert("No se registro: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
+      if (d && d.error) avisar("No se registro: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
       cargarCasos(); cargarSalud();
     }).catch(function(){ av.disabled = false; av.textContent = "Ya le avise"; });
     return;
   }
 
-  /* CON data-ce, no solo data-caso. El boton «quitar» de una entrega tambien
+  /* CON data-ce, no solo data-caso. El botón «quitar» de una entrega también
      lleva data-caso —es la casa que suelta—, y como este bloque va antes, se
-     quedaba con el clic: mandaba {estado:null} a mover el caso, el servidor
-     respondia estado_no_permitido y la casa nunca se soltaba (28 sep 2026). */
+     quedaba con el clic (28 sep 2026). */
   var cs = e.target.closest("[data-caso][data-ce]");
   if (cs){
     var num = cs.getAttribute("data-caso");
     var dest = cs.getAttribute("data-ce");
-    var motivo = "";
-    if (dest === "cerrado" || dest === "descartado"){
-      /* \\n y no \n: esto vive dentro del template literal de adminJS(). */
-      motivo = window.prompt((dest === "cerrado" ? "Cerrar " : "Descartar ") + num +
-        ".\\n\\n¿Qué pasó con el caso? Queda en el registro y es lo que va a leer quien pregunte mañana:");
-      if (!motivo) return;
-    }
-    cs.disabled = true; cs.textContent = "…";
-    fetch("/api/admin/caso/" + encodeURIComponent(num) + "/estado", {
-      method: "POST", headers: {"content-type":"application/json"},
-      body: JSON.stringify({ estado: dest, motivo: motivo })
-    }).then(function(r){ return r.json(); }).then(function(d){
-      if (d && d.error) window.alert("No se movió: " + d.error + (d.ayuda ? "\\n\\n" + d.ayuda : ""));
-      cargarCasos(); cargarSalud();
-    }).catch(function(){ cargarCasos(); });
+    /* Cerrar y descartar piden motivo y le avisan a la familia si dejó correo:
+       van al cajón con el correo a la vista. Lo demás se hace directo. */
+    if (dest === "cerrado" || dest === "descartado"){ abrirMoverCaso(num, dest); return; }
+    cs.disabled = true;
+    moverCaso(num, dest, "").then(function(){ cs.disabled = false; });
     return;
   }
   /* Copiar la matrícula: es el paso que evita teclear mal un número de siete
@@ -25600,35 +26579,17 @@ document.addEventListener("click", function(e){
       .then(function(d){
         if (d.ok) { cargarInspecciones(); return; }
         ip.disabled = false; ip.textContent = d.ayuda ? "No se pudo" : "No se pudo";
-        alert(d.ayuda || d.error || "No se pudo emitir el documento.");
+        avisar(d.ayuda || d.error || "No se pudo emitir el documento.");
       })
       .catch(function(){ ip.disabled = false; ip.textContent = "No se pudo"; });
     return;
   }
 
   /* «Ya la atendimos». La nota se PIDE y no se puede saltar: el servidor la
-     exige, y aquí se pregunta antes para no gastar un viaje. Lo que importa no
-     es cerrar la fila, es que en un mes se pueda leer qué se hizo con la casa. */
+     exige. Lo que importa no es cerrar la fila, es que en un mes se pueda leer
+     qué se hizo con la casa. Se abre en el cajón, también desde «Hoy». */
   var ia = e.target.closest("[data-insp-at]");
-  if (ia){
-    var num = ia.getAttribute("data-insp-at");
-    var nota = prompt("¿Qué se hizo con esta casa? (" + num + ")\\n\\nLo va a leer alguien dentro de un mes preguntando qué pasó.");
-    if (nota === null) return;
-    nota = nota.trim();
-    if (!nota) { alert("Hace falta decir qué se hizo. Sin eso la fila se cierra y no queda rastro."); return; }
-    ia.disabled = true; ia.textContent = "Guardando…";
-    fetch("/api/admin/inspeccion/" + encodeURIComponent(num) + "/atendida",
-      { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ nota: nota }) })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if (d.ok) { cargarInspecciones(); cargarSalud(); return; }
-        ia.disabled = false; ia.textContent = "Ya la atendimos";
-        alert(d.ayuda || d.error || "No se pudo guardar.");
-      })
-      .catch(function(){ ia.disabled = false; ia.textContent = "Ya la atendimos"; });
-    return;
-  }
+  if (ia){ abrirAtender(ia.getAttribute("data-insp-at")); return; }
 
   /* Reabrir. Volver a poner una casa en la cola de peligro es una decisión, así
      que se confirma y queda en auditoría del lado del servidor. */
@@ -25644,7 +26605,7 @@ document.addEventListener("click", function(e){
       .then(function(d){
         if (d.ok) { cargarInspecciones(); cargarSalud(); return; }
         ir.disabled = false; ir.textContent = "Reabrir";
-        alert(d.ayuda || d.error || "No se pudo reabrir.");
+        avisar(d.ayuda || d.error || "No se pudo reabrir.");
       })
       .catch(function(){ ir.disabled = false; ir.textContent = "Reabrir"; });
     return;
@@ -25658,7 +26619,7 @@ document.addEventListener("click", function(e){
     var ent = at.getAttribute("data-atar");
     var caja = document.querySelector('.ecaso[data-para="' + ent + '"]');
     var num = caja ? caja.value.trim().toUpperCase() : "";
-    if (!num){ alert("Escribe el número del caso, con la forma CV-2026-000001."); return; }
+    if (!num){ avisar("Escribe el número del caso, con la forma CV-2026-000001."); return; }
     at.disabled = true; at.textContent = "…";
     fetch("/api/admin/entrega/" + encodeURIComponent(ent) + "/caso", {
       method: "POST", headers: { "content-type": "application/json" },
@@ -25666,7 +26627,7 @@ document.addEventListener("click", function(e){
     }).then(function(r){ return r.json(); }).then(function(d){
       at.disabled = false; at.textContent = "atar";
       if (d.ok){ if (caja) caja.value = ""; cargarEntregas(); cargarSalud(); return; }
-      alert(d.ayuda || d.error || "No se pudo atar.");
+      avisar(d.ayuda || d.error || "No se pudo atar.");
     }).catch(function(){ at.disabled = false; at.textContent = "atar"; });
     return;
   }
@@ -25684,7 +26645,7 @@ document.addEventListener("click", function(e){
     }).then(function(r){ return r.json(); }).then(function(d){
       if (d.ok){ cargarEntregas(); cargarSalud(); return; }
       de.disabled = false;
-      alert(d.ayuda || d.error || "No se pudo quitar.");
+      avisar(d.ayuda || d.error || "No se pudo quitar.");
     }).catch(function(){ de.disabled = false; });
     return;
   }
@@ -25713,99 +26674,128 @@ document.addEventListener("click", function(e){
 
   var mv = e.target.closest("[data-mver]");
   if (mv) {
+    var idm = mv.getAttribute("data-mver");
     var quiere = mv.getAttribute("data-v") === "1";
-    /* El aviso por correo se anuncia en la confirmación: desde el 31 ago este
-       botón le ESCRIBE a la persona, y quien lo pulsa tiene que saberlo antes. */
-    if (quiere && !confirm("¿Viste su matrícula vigente en el registro del COPNIA?\\n\\nCon esto sus conceptos empiezan a salir solos a las familias, y se le manda un correo diciéndole que ya puede entrar.")) return;
-    mv.disabled = true;
-    fetch("/api/admin/inscripcion/" + encodeURIComponent(mv.getAttribute("data-mver")) + "/matricula", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ verificada: quiere })
-    }).then(function(r){ return r.json(); }).then(function(d){
-      /* SI EL AVISO NO SALIÓ, SE DICE. La verificación sí quedó guardada —eso es
-         lo que abre la puerta— pero la persona sigue sin saberlo, y eso hay que
-         verlo aquí y no en la cola de correos. */
-      /* Y si el SERVIDOR dijo que no, tambien: antes se recargaba la tabla y el
-         error se perdia, como si la verificacion hubiera quedado. */
-      if (d && d.error){ alert("No quedó verificada: " + (d.ayuda || d.error)); cargarInscripciones(); return; }
-      if (d && d.aviso === "fallo") alert("Quedó verificada, pero el correo de aviso NO salió. Usa «Avisarle que ya puede entrar» en su fila, o revisa la cola de correos fallidos.");
-      if (d && d.aviso === "simulado") alert("Quedó verificada. El correo quedó como SIMULADO: falta configurar RESEND_API_KEY, así que la persona no recibió nada.");
-      cargarInscripciones(); cargarSalud();
-    }).catch(function(){ mv.disabled = false; mv.textContent = "No se pudo"; });
+    if (quiere){
+      /* Verificar le ESCRIBE a la persona (desde el 31 ago): se enseña el correo. */
+      confirmarConCorreo({ origen: mv, previa: { accion: "matricula", id: Number(idm) },
+        ey: "Matrícula del COPNIA", titulo: "Marcar verificada la matrícula",
+        intro: "<p><strong>¿Viste su matrícula vigente en el registro del COPNIA?</strong> Con esto entra al triaje y sus conceptos empiezan a salir solos a las familias.</p>",
+        botonCorreo: "Marcar verificada y avisarle",
+        hacer: function(){ return verificarMatricula(idm, true); } });
+    } else {
+      confirmarPeligro({ ey: "Quita un acceso", titulo: "Quitar la verificación de la matrícula",
+        detalle: "<p>Pierde el acceso al triaje y sus conceptos dejan de salir solos a las familias. Se puede volver a verificar después. No se le avisa: esa conversación la tiene una persona.</p>",
+        boton: "Quitar la verificación",
+        hacer: function(){ return verificarMatricula(idm, false); } });
+    }
     return;
   }
 
-  /* Reenviar el aviso de acceso. Sin confirmación: es un correo informativo y
-     repetido no hace daño — el daño era que no llegara nunca. */
+  /* Reenviar el aviso de acceso: le escribe a la persona, así que se enseña. */
   var av = e.target.closest("[data-mavisar]");
   if (av) {
-    av.disabled = true; av.textContent = "Enviando…";
-    fetch("/api/admin/inscripcion/" + encodeURIComponent(av.getAttribute("data-mavisar")) + "/avisar",
-      { method: "POST" })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if (d && d.ok) {
-          av.textContent = d.simulado ? "Simulado (falta la llave)" : "Avisado";
-          return;
-        }
-        av.disabled = false; av.textContent = "Avisarle que ya puede entrar";
-        alert(d && (d.ayuda || d.error) ? (d.ayuda || d.error) : "No se pudo enviar.");
-      })
-      .catch(function(){ av.disabled = false; av.textContent = "No se pudo"; });
+    var ida = av.getAttribute("data-mavisar");
+    confirmarConCorreo({ origen: av, previa: { accion: "avisar", id: Number(ida) },
+      ey: "Matrícula del COPNIA", titulo: "Avisarle que ya puede entrar", botonCorreo: "Enviar el aviso",
+      hacer: function(){
+        return postPanel("/api/admin/inscripcion/" + encodeURIComponent(ida) + "/avisar", {}).then(function(d){
+          if (!d) return false;
+          avisar(d.simulado ? "El aviso quedó como simulado: falta la llave del servicio de correo." : "Aviso enviado.");
+          return true;
+        });
+      } });
     return;
   }
 
-  /* Va DELANTE del manejador de estado y sale por su cuenta: son dos botones
-     en la misma celda y el de suprimir no debe caer nunca en la rama que solo
-     mueve el estado.
-
-     Pide el motivo con prompt, como ya hacen anular un certificado y conciliar
-     un pago en este mismo panel. Y avisa de las tres cosas que importan: que no
-     se puede deshacer, que tambien se van los consentimientos, y que la linea de
-     auditoria NO conserva el nombre ni el correo. */
   var vf = e.target.closest("[data-verficha]");
   if (vf) { verFicha(vf.getAttribute("data-verficha")); return; }
 
+  /* SUPRIMIR: lo único de esta bandeja que destruye. Va en rojo, dice qué se
+     borra —la fila y sus consentimientos—, que no se puede deshacer, y que la
+     línea de auditoría NO conserva el nombre ni el correo. */
   var ib = e.target.closest("[data-insborrar]");
   if (ib) {
     var idIns = ib.getAttribute("data-insborrar");
-    var mot = window.prompt("SUPRIMIR la inscripcion " + idIns + ".\\n\\n"
-      + "Se borra la fila y sus consentimientos. NO se puede deshacer.\\n"
-      + "Queda una linea de auditoria con quien, cuando y este motivo, sin el nombre ni el correo.\\n\\n"
-      + "Motivo:");
-    if (!mot) return;
-    ib.disabled = true; ib.textContent = "...";
-    fetch("/api/admin/inscripcion/" + encodeURIComponent(idIns), {
-      method: "DELETE", headers: {"content-type":"application/json"},
-      body: JSON.stringify({ motivo: mot })
-    }).then(function(r){ return r.json(); }).then(function(d){
-      if (d && d.error) { alert("No se pudo suprimir: " + (d.ayuda || d.error)); }
-      else if (d && d.aviso) { alert(d.ayuda || d.aviso); }
-      cargarInscripciones(); cargarSalud();
-    }).catch(function(){ cargarInscripciones(); });
+    confirmarPeligro({ titulo: "Suprimir los datos de «" + (ib.getAttribute("data-nombre") || "#" + idIns) + "»",
+      detalle: "<p>Se borran para siempre la inscripción #" + esc(idIns) + " (" + esc(ib.getAttribute("data-tipo") || "") +
+        ") y sus consentimientos: nombre, correo, teléfono y todo lo que escribió. <strong>No se puede deshacer.</strong></p>" +
+        "<p>Es para cuando la persona pide que borremos sus datos (Ley 1581). Para cerrar una solicitud, usa «Archivar».</p>" +
+        '<p class="mu">Queda una línea de auditoría con quién, cuándo y el motivo, sin el nombre ni el correo.</p>',
+      motivo: true, etiquetaMotivo: "Motivo", boton: "Suprimir para siempre",
+      hacer: function(mot){
+        return postPanel("/api/admin/inscripcion/" + encodeURIComponent(idIns), { motivo: mot }, "DELETE").then(function(d){
+          if (!d) return false;
+          avisar(d.aviso ? (d.ayuda || d.aviso) : "Datos suprimidos.");
+          cargarInscripciones(); cargarSalud();
+          return true;
+        });
+      } });
     return;
   }
 
   var b = e.target.closest("[data-ins]");
   if (!b) return;
-  b.disabled = true; b.textContent = "…";
-  fetch("/api/admin/inscripcion/" + encodeURIComponent(b.getAttribute("data-ins")) + "/estado", {
-    method: "POST", headers: {"content-type":"application/json"},
-    body: JSON.stringify({ estado: b.getAttribute("data-e") })
-  }).then(conEstado).then(function(res){
-    if (fallo(res.http, res.d)){ b.disabled = false; b.textContent = "Reintentar"; cargarInscripciones(); return; }
-    /* La bandeja de inscripciones y la portada TAMBIEN: sin esto la fila se
-       quedaba con su estado viejo y el boton en «…», y «Hoy» seguia contando
-       la solicitud que acababas de atender. */
-    cargarInscripciones(); cargarSalud();
-    cargarOfrecimientos(); cargarReportadas(); cargarResumen(); cargarAportes();
-    /* El estado ya se movio; lo que puede faltar es el correo que el acuse le
-       prometio a la fundacion. Callarlo es dejarla esperando sin saberlo. */
-    if (res.d && res.d.aviso === "correo_fallo"){
-      alert("El estado quedó en «" + (res.d.estado || "") + "», pero el correo a la fundación NO salió. Escríbele tú, o mira la cola de correos en Salud.");
-    }
-  }).catch(function(){ cargarOfrecimientos(); cargarInscripciones(); });
+  moverInscripcion(Number(b.getAttribute("data-ins")), b.getAttribute("data-e"), b,
+    { de: b.getAttribute("data-de"), nombre: b.getAttribute("data-nombre"), etiqueta: b.textContent });
 });
+
+function verificarMatricula(id, quiere){
+  return postPanel("/api/admin/inscripcion/" + encodeURIComponent(id) + "/matricula", { verificada: quiere }).then(function(d){
+    if (!d) return false;
+    /* SI EL AVISO NO SALIÓ, SE DICE: la verificación sí quedó guardada —eso es
+       lo que abre la puerta— pero la persona sigue sin saberlo. */
+    if (d.aviso === "fallo") avisoError("Quedó verificada, pero el correo de aviso NO salió. Usa «Avisarle que ya puede entrar» en su fila.");
+    else if (d.aviso === "simulado") avisar("Quedó verificada. El correo quedó como simulado: falta la llave del servicio de correo, así que la persona no recibió nada.");
+    else avisar(quiere ? "Matrícula verificada. Se le avisó por correo." : "Verificación retirada.");
+    cargarInscripciones(); cargarSalud();
+    return true;
+  });
+}
+
+/* MOVER UNA INSCRIPCIÓN DE ESTADO. Varios pasos le escriben a la fundación
+   (Aceptar, Visita hecha, Iniciar convenio, Marcar vinculada) y hasta la Fase 1
+   lo hacían sin decirlo. Ahora se pregunta primero al servidor qué correos
+   saldrían: si sale alguno, el cajón lo enseña y pide confirmar; si no, se hace
+   directamente y queda un aviso. Deshacer solo donde existe el paso contrario:
+   archivar desde «En revisión» se deshace reabriendo, y al revés. */
+function moverInscripcion(id, estado, b, op){
+  op = op || {};
+  var nombre = op.nombre || ("#" + id);
+  var etiqueta = String(op.etiqueta || ESTADO_INSC_ES[estado] || estado).replace(/…$/, "");
+  confirmarConCorreo({ origen: b, directoSinCorreo: true, previa: { accion: "inscripcion", id: id, estado: estado },
+    ey: "Red", titulo: etiqueta + " · " + nombre,
+    intro: "<p>«" + esc(nombre) + "» pasa a <strong>" + esc(ESTADO_INSC_ES[estado] || estado) + "</strong>.</p>",
+    hacer: function(boton){
+      if (boton) boton.disabled = true;
+      return fetch("/api/admin/inscripcion/" + encodeURIComponent(id) + "/estado", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ estado: estado })
+      }).then(conEstado).then(function(res){
+        if (boton) boton.disabled = false;
+        if (res.http < 200 || res.http >= 300 || (res.d && res.d.error)){
+          var t = (res.d && (res.d.ayuda || res.d.error)) || "No se pudo.";
+          if (CAJON.abierto) errorEnCajon(t); else avisoError(t);
+          cargarInscripciones();
+          return false;
+        }
+        var inverso = (estado === "archivada" && op.de === "en_revision") ? "en_revision"
+                    : (estado === "en_revision" && op.de === "archivada") ? "archivada" : null;
+        var txt = "«" + nombre + "» pasó a «" + (ESTADO_INSC_ES[estado] || estado) + "»." +
+          (res.d && res.d.aviso === "correo_enviado" ? " Correo enviado." : "");
+        if (res.d && res.d.aviso === "correo_fallo"){
+          avisoError("«" + nombre + "» quedó en «" + (ESTADO_INSC_ES[estado] || estado) + "», pero el correo a la fundación NO salió. Escríbele tú, o mira la cola de correos en Salud.");
+        } else {
+          avisar(txt, inverso ? { deshacer: function(){ moverInscripcion(id, inverso, null, { de: estado, nombre: op.nombre }); } } : {});
+        }
+        /* La bandeja y «Hoy» TAMBIÉN: si no, «Hoy» seguía contando la solicitud
+           que acababas de atender. */
+        if (PEDIDAS["i-filas"]) cargarInscripciones();
+        if (PEDIDAS["o-filas"]) cargarOfrecimientos();
+        cargarSalud();
+        return true;
+      }).catch(function(){ if (boton) boton.disabled = false; errorEnCajon("No se pudo: revisa la conexión."); return false; });
+    } });
+}
 
 /* ---------------- pagos sin aporte ---------------- */
 function cargarSueltos(){
@@ -25863,9 +26853,9 @@ function cargarIpn(){
    justo cuando hay algo que leer. */
 function verFicha(id){
   fetch("/api/admin/ficha/" + id).then(function(r){ return r.json(); }).then(function(d){
-    if (!d || !d.ok){ alert("No se pudo cargar la ficha."); return; }
+    if (!d || !d.ok){ avisar("No se pudo cargar la ficha."); return; }
     var w = window.open("", "_blank");
-    if (!w){ alert("El navegador bloqueo la ventana."); return; }
+    if (!w){ avisar("El navegador bloqueo la ventana."); return; }
     var filas = (d.respuestas||[]).map(function(r){
       return "<tr><td>" + esc(r.num) + "</td><td>" + esc(r.lbl) + "</td><td>" +
              (r.valor ? esc(r.valor) : '<em class="mu">sin responder</em>') + "</td></tr>";
@@ -25924,6 +26914,8 @@ function verFicha(id){
 }
 
 /* ---------------- membresias internacionales ---------------- */
+var ESTADO_SUS_ES = { aprobacion_pendiente: "Por aprobar", activa: "Activa", suspendida: "Suspendida",
+  cancelada: "Cancelada", expirada: "Vencida" };
 function cargarSuscripciones(){
   pedirJSON("/api/admin/suscripciones", "sus-filas").then(function(d){
     var tb = document.getElementById("sus-filas"); if (!tb) return;
@@ -25931,7 +26923,7 @@ function cargarSuscripciones(){
     if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Ninguna todavia.</td></tr>'; return; }
     tb.innerHTML = l.map(function(s){
       var pend = s.estado === "aprobacion_pendiente";
-      var estado = esc(s.estado || "—");
+      var estado = esc(ESTADO_SUS_ES[s.estado] || s.estado || "—");
       /* La EDAD solo se muestra en las pendientes: en una activa el dato no dice
          nada, y en una pendiente lo dice todo. */
       if (pend) estado += "<br><small>hace " + (s.dias || 0) + " dia(s)" +
@@ -25979,7 +26971,7 @@ function cargarMiembros(){
             : (m.distincion_vigente ? "hasta " : "<strong>vencida</strong> el ") + esc(m.distincion_hasta || "—")) + "</small>" +
           '<br><span style="display:inline-flex;gap:6px;flex-wrap:wrap;margin-top:6px">' +
           (m.distincion_permanente ? "" : '<button type="button" class="tab" data-hnrenovar="' + esc(m.codigo) + '">Renovar 12 meses</button>') +
-          '<button type="button" class="tab" data-hnquitar="' + esc(m.codigo) + '">Quitar</button></span>';
+          '<button type="button" class="tab pn-peligro" data-hnquitar="' + esc(m.codigo) + '" data-nombre="' + esc(m.nombre || "") + '" data-dist="' + esc(m.distincion_txt || "") + '">Quitar…</button></span>';
       }
       return "<tr>" +
         "<td>" + esc(m.codigo) + "<br><small>desde " + esc(m.desde || "—") + "</small></td>" +
@@ -26068,10 +27060,19 @@ document.addEventListener("click", function(e){
   }
   if ((b = e.target.closest("[data-hnquitar]"))){
     var cq = b.getAttribute("data-hnquitar");
-    /* Como revocar: exige motivo y queda en la auditoria. */
-    var motivo = window.prompt("Quitar la distinción del carnet " + cq + ". Motivo (queda en la auditoría):");
-    if (!motivo) return;
-    hnDistincion(cq, { accion: "quitar", motivo: motivo }, b, "Quitar");
+    /* Como revocar: exige motivo y queda en la auditoría. */
+    confirmarPeligro({ ey: "Quita una distinción", titulo: "Quitar «" + (b.getAttribute("data-dist") || "la distinción") + "» del carnet " + cq,
+      detalle: "<p>" + esc(b.getAttribute("data-nombre") || "La persona") + " deja de tener esta distinción en su carnet y pierde los beneficios que le daba. " +
+        "El carnet sigue existiendo. Para devolvérsela hay que emitirla otra vez.</p>",
+      motivo: true, boton: "Quitar la distinción",
+      hacer: function(motivo){
+        return postPanel("/api/admin/miembro/" + encodeURIComponent(cq) + "/distincion", { accion: "quitar", motivo: motivo }).then(function(d){
+          if (!d) return false;
+          avisar("Distinción quitada del carnet " + cq + ".");
+          cargarMiembros();
+          return true;
+        });
+      } });
   }
 });
 document.addEventListener("change", function(e){
@@ -26201,7 +27202,7 @@ function pintarEntregas(l, sobre){
       '<td data-label="Acción">' + (nula ? "—" :
         '<button class="copy toca" data-pub="' + esc(e.numero) + '" data-v="' + (pub ? "0" : "1") + '">' +
         (pub ? "Despublicar" : "Publicar") + "</button>" +
-        ' <button class="copy toca" data-anu="' + esc(e.numero) + '">Anular</button>') + "</td>" +
+        ' <button class="copy toca pn-peligro" data-anu="' + esc(e.numero) + '">Anular…</button>') + "</td>" +
     "</tr>";
   }).join("");
 }
@@ -26224,7 +27225,7 @@ document.addEventListener("change", function(e){
   }).then(conEstado).then(function(r){
     if (fallo(r.http, r.d)){ inp.disabled = false; inp.value = ""; return; }
     cargarEgresos();
-  }).catch(function(){ inp.disabled = false; alert("No se pudo subir: revisa la conexión."); });
+  }).catch(function(){ inp.disabled = false; avisar("No se pudo subir: revisa la conexión."); });
 });
 
 document.addEventListener("change", function(e){
@@ -26254,9 +27255,9 @@ document.addEventListener("change", function(e){
   }, function(){
     throw new Error("lienzo");
   }).then(function(r){ return r.json(); })
-    .then(function(d){ if (d.error) alert("No se pudo subir: " + (d.ayuda || d.error)); cargarEntregas(); })
+    .then(function(d){ if (d.error) avisar("No se pudo subir: " + (d.ayuda || d.error)); cargarEntregas(); })
     .catch(function(x){
-      alert(String(x && x.message) === "lienzo"
+      avisar(String(x && x.message) === "lienzo"
         ? "Este navegador no pudo leer la foto (¿HEIC?). Expórtala como JPG y vuelve a subirla."
         : "No se pudo subir la foto.");
     });
@@ -26334,26 +27335,29 @@ document.addEventListener("click", function(e){
     }).then(function(r){ return r.json(); })
       .then(function(d){
         /* Un error sin «ayuda» (no_encontrada, por ejemplo) se callaba. */
-        if (d.ayuda) alert(d.ayuda); else if (d.error) alert("No se pudo: " + d.error); else if (d.aviso) alert(d.aviso);
+        if (d.ayuda) avisar(d.ayuda); else if (d.error) avisar("No se pudo: " + d.error); else if (d.aviso) avisar(d.aviso);
         cargarEntregas(); cargarSalud(); })
       .catch(function(){ cargarEntregas(); });
   }
 
-  /* Anular pide motivo y avisa que no se deshace. Dos frenos y no uno porque el
-     botón vive al lado de «Despublicar», que sí es reversible. */
+  /* Anular pide motivo y avisa que no se deshace, en rojo: el botón vive al
+     lado de «Despublicar», que sí es reversible. */
   var an = e.target.closest("[data-anu]");
   if (an){
     var num = an.getAttribute("data-anu");
-    var motivo = window.prompt("Anular " + num + " — no se puede deshacer.\\n\\n¿Por qué se anula? (queda escrito y explica el hueco en el consecutivo)");
-    if (!motivo) return;
-    an.disabled = true; an.textContent = "…";
-    fetch("/api/admin/entrega/" + encodeURIComponent(num) + "/anular", {
-      method: "POST", headers: {"content-type":"application/json"},
-      body: JSON.stringify({ motivo: motivo })
-    }).then(function(r){ return r.json(); })
-      .then(function(d){ if (d.ayuda) alert(d.ayuda); else if (d.error) alert("No se pudo anular: " + d.error);
-        cargarEntregas(); cargarSalud(); })
-      .catch(function(){ cargarEntregas(); });
+    confirmarPeligro({ titulo: "Anular el acta " + num,
+      detalle: "<p>El acta <strong>" + esc(num) + "</strong> queda anulada: se deja de publicar, no se le suben fotos y su número queda gastado. " +
+        "No se puede deshacer; si hace falta, se registra otra.</p>",
+      motivo: true, etiquetaMotivo: "¿Por qué se anula?", ayudaMotivo: "Queda escrito y explica el hueco en el consecutivo.",
+      boton: "Anular el acta",
+      hacer: function(motivo){
+        return postPanel("/api/admin/entrega/" + encodeURIComponent(num) + "/anular", { motivo: motivo }).then(function(d){
+          if (!d) return false;
+          avisar(d.ayuda || ("Acta " + num + " anulada."));
+          cargarEntregas(); cargarSalud();
+          return true;
+        });
+      } });
   }
 });
 
@@ -26363,8 +27367,8 @@ pintarCampos();
    siempre. Estuvo tapado mientras el archivo entero no compilaba. */
 
 fetch("/api/admin/quien").then(function(r){ return r.json(); })
-  .then(function(d){ document.getElementById("quien").textContent = "Sesión de " + (d.email || "?") + "."; })
-  .catch(function(){});
+  .then(function(d){ document.getElementById("quien").textContent = d.email || "Sesión sin correo"; })
+  .catch(function(){ document.getElementById("quien").textContent = ""; });
 /* ---- LAS BANDEJAS SE PIDEN CUANDO SE VAN A VER ----
 
    Antes el panel disparaba ONCE peticiones al abrirlo y pintaba ocho tablas que
@@ -26611,7 +27615,7 @@ function cargarEgresos(){
                nadie va. */
             + "<td>" + (e.anulado_en
                 ? '<span class="mu">anulado' + (e.anulado_motivo ? " · " + esc(e.anulado_motivo) : "") + "</span>"
-                : '<button type="button" class="tab" data-eg-anular="' + esc(e.numero) + '">Anular</button>') + "</td></tr>";
+                : '<button type="button" class="tab pn-peligro" data-eg-anular="' + esc(e.numero) + '">Anular…</button>') + "</td></tr>";
         }).join("")
       : '<tr><td colspan="10" class="mu">' + (solo && solo.checked
           ? "Ninguno sin papel. Eso es lo que se quiere."
@@ -26755,23 +27759,20 @@ document.addEventListener("click", function(ev){
   var an = ev.target.closest ? ev.target.closest("[data-eg-anular]") : null;
   if (an){
     var num = an.getAttribute("data-eg-anular");
-    /* Se pide el motivo ANTES de tocar nada, y sin motivo no se llama al
-       servidor: es el unico boton de esta pantalla que retira una fila del
-       libro, y lo que explica el hueco es justo esa frase. */
-    var motivo = prompt("¿Por qué se anula " + num + "?\\n\\nEsto no lo borra: queda tachado, con tu motivo y tu nombre.");
-    if (motivo === null) return;
-    motivo = String(motivo).trim();
-    if (!motivo){ alert("Sin motivo no se anula."); return; }
-    an.disabled = true;
-    fetch("/api/admin/egreso/" + encodeURIComponent(num) + "/anular", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ motivo: motivo })
-    }).then(conEstado).then(function(res){
-      an.disabled = false;
-      if (fallo(res.http, res.d)) return;
-      cargarEgresos();
-      cargarProveedores();
-    }).catch(function(){ an.disabled = false; alert("No se pudo. Revisa la conexión."); });
+    /* Sin motivo no se llama al servidor: es el único botón de esta pantalla
+       que retira una fila del libro, y lo que explica el hueco es esa frase. */
+    confirmarPeligro({ titulo: "Anular el egreso " + num,
+      detalle: "<p>El egreso <strong>" + esc(num) + "</strong> deja de contar en el libro, en la exógena y en lo meritorio. " +
+        "No se borra: queda tachado, con tu motivo y tu nombre. No se puede deshacer.</p>",
+      motivo: true, etiquetaMotivo: "¿Por qué se anula?", boton: "Anular el egreso",
+      hacer: function(motivo){
+        return postPanel("/api/admin/egreso/" + encodeURIComponent(num) + "/anular", { motivo: motivo }).then(function(d){
+          if (!d) return false;
+          avisar("Egreso " + num + " anulado.");
+          cargarEgresos(); cargarProveedores();
+          return true;
+        });
+      } });
     return;
   }
   if (ev.target.id === "eg-guardar"){
@@ -26999,7 +28000,11 @@ function abrirJornada(id){
   J_ABIERTA = id;
   var dlg = document.getElementById("j-dlg"); if (!dlg) return;
   dlg.style.display = "block";
-  pedirJSON("/api/admin/jornada/" + encodeURIComponent(id), "j-dlg").then(function(d){ pintarJornada(d); });
+  pedirJSON("/api/admin/jornada/" + encodeURIComponent(id), "j-dlg").then(function(d){
+    pintarJornada(d);
+    /* El detalle queda debajo de la tabla: se lleva la vista hasta él. */
+    dlg.scrollIntoView({ block: "start" });
+  });
 }
 
 function fichaLectura(j){
@@ -27233,14 +28238,14 @@ function postJ(url, cuerpo, msg, boton, despues){
       if (boton) boton.disabled = false;
       if (r.http >= 300 || (r.d && r.d.error)){
         if (msg && document.getElementById(msg)) egMsg(msg, (r.d && (r.d.ayuda || r.d.error)) || "No se pudo.", false);
-        else alert((r.d && (r.d.ayuda || r.d.error)) || "No se pudo.");
+        else avisar((r.d && (r.d.ayuda || r.d.error)) || "No se pudo.");
         return null;
       }
       if (despues) despues(r.d);
       return r.d;
     }).catch(function(){
       if (boton) boton.disabled = false;
-      alert("No se pudo. Revisa la conexión.");
+      avisar("No se pudo. Revisa la conexión.");
       return null;
     });
 }
@@ -27251,7 +28256,6 @@ document.addEventListener("click", function(e){
   var b;
   if ((b = e.target.closest("[data-jabrir]"))){
     abrirJornada(b.getAttribute("data-jabrir"));
-    var dl = document.getElementById("j-dlg"); if (dl) dl.scrollIntoView({ block: "start" });
     return;
   }
   if ((b = e.target.closest("[data-jocultar]"))){
@@ -27296,7 +28300,7 @@ document.addEventListener("click", function(e){
     b.disabled = true;
     fetch("/api/admin/participacion/" + encodeURIComponent(b.getAttribute("data-pquitar")), { method: "DELETE" })
       .then(conEstado).then(function(r){ if (fallo(r.http, r.d)){ b.disabled = false; return; } refrescarJ(); })
-      .catch(function(){ b.disabled = false; alert("No se pudo. Revisa la conexión."); });
+      .catch(function(){ b.disabled = false; avisar("No se pudo. Revisa la conexión."); });
     return;
   }
   if ((b = e.target.closest("[data-jreconocer]"))){
@@ -27306,7 +28310,7 @@ document.addEventListener("click", function(e){
         var txt = (d.enviados || []).length + " enviados";
         if ((d.fallidos || []).length) txt += " · " + d.fallidos.length + " no salieron (mira Salud)";
         if (d.quedan) txt += " · quedan " + d.quedan + ": vuelve a pulsar para seguir";
-        alert(txt + ".");
+        avisar(txt + ".");
         refrescarJ();
       });
     return;
@@ -27479,10 +28483,6 @@ function pedir(id){
    bandejas del modulo que se abre — como maximo seis, y son las del trabajo que
    acabas de decir que vas a hacer. El observador se queda igual, para lo que
    quede por debajo del pliegue dentro del modulo. */
-function pedirDeModulo(nombre){
-  document.querySelectorAll('[data-mod="' + nombre + '"] tbody[id]').forEach(function(t){ pedir(t.id); });
-}
-
 function armarBandejas(){
 
   /* Sin IntersectionObserver se piden todas, o sea como estaba antes. Una carga
@@ -31090,7 +32090,11 @@ export default {
         const tm = ruta.match(/^\/api\/triage\/medio\/(\d+)$/);
         if (tm) return await triageMedio(env, Number(tm[1]));
         if (ruta === "/api/admin/resumen")  return await adminResumen(env);
-        if (ruta === "/api/admin/salud")    return await adminSalud(env);
+        /* `?items=1`: con las filas de cada cola, para «Hoy». Sin el parámetro
+           responde como siempre (lo usa también el resumen diario). */
+        if (ruta === "/api/admin/salud")    return await adminSalud(env, { items: url.searchParams.get("items") === "1" });
+        /* La vista previa de los correos que dispara una acción. No escribe nada. */
+        if (ruta === "/api/admin/previa")   return await adminPrevia(request, env, sesion);
         if (ruta === "/api/admin/casos")    return await adminCasos(env);
         if (ruta === "/api/admin/ruta")     return await adminRuta(env, url);
         /* `/admin/ruta` y no `/ruta`, y la razón es de Access, no de estética.
