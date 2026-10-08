@@ -5846,7 +5846,7 @@ var PRIVACY = {
 <h2>8. Seguridad de la información</h2>
 <p>Protegemos tus datos con cifrado en tránsito, control de acceso por roles, registros de auditoría y protocolos de gestión de incidentes. Ningún sistema es infalible, pero aplicamos estándares reconocidos para reducir el riesgo.</p>
 <h2>9. Cookies y analítica</h2>
-<p>Este sitio <strong>no usa cookies de rastreo ni de marketing, ni píxeles de terceros.</strong> Para entender el uso del sitio empleamos <strong>Cloudflare Web Analytics, que no instala cookies ni identifica a las personas.</strong> Solo guardamos tu <strong>preferencia de tema (claro u oscuro)</strong> localmente en tu navegador; no es una cookie de seguimiento ni se envía a ningún servidor.</p>
+<p>Este sitio <strong>no usa cookies de rastreo ni de marketing, ni píxeles de terceros.</strong> Para entender el uso del sitio empleamos <strong>Cloudflare Web Analytics, que no instala cookies ni identifica a las personas.</strong> Solo guardamos tu <strong>preferencia de tema (claro u oscuro)</strong> en tu navegador, y en una cookie técnica (<code>gg-tema</code>) que solo sirve para que las páginas sin JavaScript —como el carnet o el verificador— se muestren en el tema que elegiste. No te identifica, no es de seguimiento y no se usa para nada más.</p>
 <h2>10. Vigencia y cambios</h2>
 <p>Esta política (Versión 1.0) rige desde su publicación y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>`,
   en: `<p class="legal-meta">Version 1.0 · Effective upon publication · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
@@ -5888,7 +5888,7 @@ var PRIVACY = {
 <h2>8. Information security</h2>
 <p>We protect your data with encryption in transit, role-based access control, audit logs and incident-management protocols. No system is infallible, but we apply recognized standards to reduce risk.</p>
 <h2>9. Cookies and analytics</h2>
-<p>This site <strong>uses no tracking or marketing cookies, and no third-party pixels.</strong> To understand site usage we use <strong>Cloudflare Web Analytics, which sets no cookies and does not identify individuals.</strong> We only store your <strong>theme preference (light or dark)</strong> locally in your browser; it is not a tracking cookie and is not sent to any server.</p>
+<p>This site <strong>uses no tracking or marketing cookies, and no third-party pixels.</strong> To understand site usage we use <strong>Cloudflare Web Analytics, which sets no cookies and does not identify individuals.</strong> We only store your <strong>theme preference (light or dark)</strong> in your browser, and in a technical cookie (<code>gg-tema</code>) whose only purpose is to show pages that run without JavaScript —such as the member card or the verifier— in the theme you chose. It does not identify you, is not used for tracking and serves no other purpose.</p>
 <h2>10. Term and changes</h2>
 <p>This policy (Version 1.0) is effective upon publication and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>`
 };
