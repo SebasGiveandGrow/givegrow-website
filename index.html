@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=1c4c372e">
+<link rel="stylesheet" href="/styles.css?v=3a871ec1">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -42,7 +42,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=0e20012b" defer></script>
+<script src="/app.js?v=ec113763" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -133,7 +133,7 @@
         <button id="lang-es" class="on" aria-pressed="true" data-act="setLang('es')" aria-label="Cambiar idioma a español">ES</button>
         <button id="lang-en" aria-pressed="false" data-act="setLang('en')" aria-label="Switch language to English">EN</button>
       </div>
-      <button class="burger" aria-label="Menú" data-i18n="nav.menu.aria" data-i18n-attr="aria-label" aria-expanded="false" data-act="toggleDrawer()">&#9776;</button>
+      <button class="burger" aria-label="Menú" data-i18n="nav.menu.aria" data-i18n-attr="aria-label" aria-expanded="false" aria-controls="nav-mobile" data-act="toggleDrawer()"><svg class="bg-lineas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg><svg class="bg-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
     </div>
   </div>
 </nav>
@@ -203,13 +203,13 @@
       <p class="hero-eyebrow" data-i18n="hero.eyebrow">Colombia · ESAL · NIT 901.948.930-2</p>
       <h1 data-i18n="hero.title">Una alianza, muchas realidades.</h1>
       <p class="hero-lead" data-i18n="hero.lead">Conectamos generosidad con necesidad. No reemplazamos a las fundaciones de base: las amplificamos. Y aquí, quien da también crece.</p>
-      <p class="hero-impact rv d1" id="hero-impact" hidden></p>
-      <div class="hero-cta rv d2">
+      <p class="hero-impact entra d1" id="hero-impact" hidden></p>
+      <div class="hero-cta entra d2">
         <a class="btn btn-g" href="#donar" data-i18n="hero.cta.donar">Donar</a>
         <a class="btn btn-w" href="#hub" data-i18n="hero.cta.hub">Conocer el HUB SOCIAL</a>
       </div>
-      <a class="hero-tour rv d3" href="#origen"><span data-i18n="hero.tour">¿Primera vez aquí? Haz el recorrido completo</span> &rarr;</a>
-      <aside class="hero-cred vidrio rv d3" aria-labelledby="hero-cred-t">
+      <a class="hero-tour entra d3" href="#origen"><span data-i18n="hero.tour">¿Primera vez aquí? Haz el recorrido completo</span> &rarr;</a>
+      <aside class="hero-cred vidrio entra d3" aria-labelledby="hero-cred-t">
         <span class="ey" data-i18n="hero.cred.ey">Entidad verificable</span>
         <b id="hero-cred-t" data-i18n="hero.cred.t">Fundación Give&amp;Grow International</b>
         <dl>
@@ -1629,7 +1629,7 @@
           <select id="calc-project" class="calc-select" data-change="setProject(this.value)"></select>
         </div>
         <div class="calc-amount"><div id="calc-display">$200.000</div></div>
-        <input id="calc-manual" type="text" inputmode="numeric" enterkeyhint="done" placeholder="0" data-input="onManual(this.value)" data-i18n="calc.manual.aria" data-i18n-attr="aria-label" aria-label="Escribe el monto de tu donación">
+        <input id="calc-manual" type="text" inputmode="numeric" enterkeyhint="done" placeholder="Escribe el monto de tu donación" data-input="onManual(this.value)" data-i18n="calc.manual.aria" data-i18n-attr="aria-label,placeholder" aria-label="Escribe el monto de tu donación">
         <div id="calc-rate"></div>
         <input id="calc-slider" type="range" min="0" max="100" value="50" data-input="onSlider(this.value)" data-i18n="calc.slider.aria" data-i18n-attr="aria-label" aria-label="Ajusta el monto de tu donación">
         <div class="calc-hints"><span>$5.000</span><span>$20.000.000</span></div>
@@ -1664,7 +1664,7 @@
           <p class="mu" id="calc-impact-note" style="display:none;font-size:13px;margin-top:10px" data-i18n="calc.impact.note">Equivalencia aproximada, según datos de las fundaciones del HUB SOCIAL.</p>
           <div class="calc-note">
             <label for="calc-msg" data-i18n="calc.note.lbl">Deja un mensaje o dedicatoria (opcional)</label>
-            <textarea id="calc-msg" rows="2" maxlength="280" data-input="onNote(this.value)" data-i18n="calc.note.ph" data-i18n-attr="placeholder" placeholder="Tu mensaje viajará con tu donación y aparecerá en tu recibo."></textarea>
+            <textarea id="calc-msg" rows="3" maxlength="280" data-input="onNote(this.value)" data-i18n="calc.note.ph" data-i18n-attr="placeholder" placeholder="Tu mensaje viajará con tu donación y aparecerá en tu recibo."></textarea>
             <span class="calc-note-count"><span id="calc-msg-count">0</span>/280</span>
           </div>
         </div>
@@ -2856,23 +2856,23 @@
   <section class="mmc-portada">
     <div class="wrap mmc-portada-in">
       <div>
-        <span class="ey rv" data-i18n="mmc.p.hero.ey">Tras el sismo del 10 de agosto</span>
-        <h1 class="h-sec rv" data-i18n="mmc.p.t">Tu casa, revisada por un ingeniero.</h1>
-        <p class="lead rv d1" data-i18n="mmc.p.lead">Sin costo y desde tu teléfono. Subes fotos y un ingeniero voluntario con matrícula te escribe si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar y con qué materiales conviene reparar.</p>
+        <span class="ey entra" data-i18n="mmc.p.hero.ey">Tras el sismo del 10 de agosto</span>
+        <h1 class="h-sec entra" data-i18n="mmc.p.t">Tu casa, revisada por un ingeniero.</h1>
+        <p class="lead entra d1" data-i18n="mmc.p.lead">Sin costo y desde tu teléfono. Subes fotos y un ingeniero voluntario con matrícula te escribe si hay señales para no permanecer en la casa o en una parte de ella, qué precauciones tomar y con qué materiales conviene reparar.</p>
         <!-- QUIEN VUELVE NO VIENE A ELEGIR PUERTA. Ver `mmcMiCaso` en app.js:
              el enlace del caso es la única llave de la familia y no había
              ninguna forma de recuperarlo. Va ANTES de los tres botones porque
              quien teclea el dominio y ya reportó viene a UNA cosa. Oculta
              mientras no haya nada guardado. -->
         <div class="mmc-mio" data-mi-caso hidden></div>
-        <div class="mmc-botones rv d2">
+        <div class="mmc-botones entra d2">
           <a class="btn btn-g" href="#vivienda" data-i18n="mmc.p.b1.t">Revisa tu casa</a>
           <a class="btn btn-o" href="#ingenieros" data-i18n="mmc.p.b2.t">Soy ingeniero</a>
           <a class="btn btn-o" href="#apadrinar" data-i18n="mmc.p.b3.t">Quiero apadrinar</a>
         </div>
-        <p class="mu rv d3" style="margin-top:16px;font-size:var(--fs-14)" data-i18n="mmc.p.b.pie">Las tres puertas del proyecto. Si no sabes cuál es la tuya, empieza por la primera.</p>
+        <p class="mu entra d3" style="margin-top:16px;font-size:var(--fs-14)" data-i18n="mmc.p.b.pie">Las tres puertas del proyecto. Si no sabes cuál es la tuya, empieza por la primera.</p>
       </div>
-      <figure class="mmc-portada-foto rv d1">
+      <figure class="mmc-portada-foto entra d1">
         <picture>
           <source type="image/webp" srcset="/img/jornadas/m/brigada_ansermanuevo_vivienda.webp 800w, /img/jornadas/brigada_ansermanuevo_vivienda_1600.webp 1600w" sizes="(max-width:860px) calc(100vw - 48px), 480px">
           <img src="/img/jornadas/brigada_ansermanuevo_vivienda.jpg" alt="Vivienda de dos plantas visitada por la brigada en Ansermanuevo, con el segundo piso en ladrillo a la vista" data-i18n="mmc.p.hero.alt" data-i18n-attr="alt" width="1600" height="1200" loading="lazy" decoding="async">

@@ -103,7 +103,9 @@
   --lh-body:1.6;
   --tr-display:-.03em;
   --tr-heading:-.02em;
-  --tr-eyebrow:.14em;
+  /* .16em desde el pulido visual (7 oct 2026): a 12 px y en versalitas, .14
+     apretaba las letras; y 12 px es el suelo de toda ceja (antes había de 11). */
+  --tr-eyebrow:.16em;
   /* tokens semánticos de tema (día por defecto) — Etapa v5: papel institucional */
   --bg:#F3EFE6;--surface:#FBF8F1;--surface-2:var(--cream);
   --ink:#191813;--ink-soft:#47443B;
@@ -164,6 +166,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:14px 0;padding-top:c
 nav.sol{background:var(--nav-bg);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 1px 0 var(--bd)}
 .nav-in{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .nlogo{font-family:var(--font-display);font-size:var(--fs-16);font-weight:800;color:var(--ink);letter-spacing:-.01em}
+/* El logotipo de la barra también es un objetivo táctil: 44 px de alto. */
+nav .nlogo{display:inline-flex;align-items:center;min-height:44px}
 .nlogo em{font-style:normal;color:var(--gm)}
 .nlinks{display:flex;align-items:center;gap:6px}
 .nlink{position:relative;padding:8px 11px;border-radius:8px;font-size:var(--fs-14);font-weight:600;color:var(--ink);white-space:nowrap;transition:background .15s,color .15s}
@@ -218,7 +222,14 @@ nav.sol{background:var(--nav-bg);-webkit-backdrop-filter:blur(12px);backdrop-fil
 .lang-fallo{position:fixed;left:0;right:0;z-index:199;margin:0;
   padding:10px 24px;background:var(--surface);color:var(--mu);
   font-size:var(--fs-13);line-height:1.45;text-align:center;border-bottom:1px solid var(--bd)}
-.burger{display:none;width:40px;height:40px;border-radius:8px;font-size:22px;color:var(--ink)}
+/* UN BOTÓN CON DOS ESTADOS, no un carácter (pulido visual, 7 oct 2026). El «☰»
+   era texto: dependía de la fuente, medía 40 × 40 y no cambiaba al abrir el
+   cajón. Ahora son dos iconos de línea y el CSS muestra el que corresponde a
+   `aria-expanded`, que toggleDrawer ya mantenía: abierto, se ve la X que cierra. */
+.burger{display:none;width:44px;height:44px;border-radius:8px;color:var(--ink)}
+.burger svg{width:24px;height:24px}
+.burger .bg-x,.burger[aria-expanded="true"] .bg-lineas{display:none}
+.burger[aria-expanded="true"] .bg-x{display:block}
 
 /* ===== BUTTONS ===== */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:999px;font-weight:700;font-size:var(--fs-15);transition:transform .15s var(--ease),box-shadow .15s,background .15s;cursor:pointer}
@@ -255,6 +266,18 @@ section{padding:72px 0}
 .rv{opacity:0;transform:translateY(22px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
 .rv.in{opacity:1;transform:none}
 .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
+/* LO QUE SE VE AL ABRIR NO DEPENDE DE app.js (pulido visual, 7 oct 2026).
+   `.rv` arranca en opacidad 0 y solo aparece cuando app.js lo observa: en un
+   teléfono lento, la cifra del hero y los dos botones —Donar entre ellos—
+   estuvieron invisibles 2–3 s, y la portada de Mira Mi Casa no tenía ni
+   titular. Lo de la primera pantalla lleva `.entra`: se pinta visible desde el
+   primer cuadro y el movimiento solo lo acompaña, sin pasar nunca por
+   invisible. Sin movimiento, se queda quieto. */
+@media (prefers-reduced-motion:no-preference){
+  .entra{animation:entra .6s var(--ease) both}
+  .entra.d1{animation-delay:.08s}.entra.d2{animation-delay:.16s}.entra.d3{animation-delay:.24s}
+}
+@keyframes entra{from{transform:translateY(10px)}to{transform:none}}
 
 /* ===== HERO ===== */
 .hero{position:relative;min-height:92vh;display:flex;align-items:center;color:var(--on-dark);overflow:hidden}
@@ -365,20 +388,33 @@ section{padding:72px 0}
 
 /* ===== CALCULATOR ===== */
 .calc{background:var(--ink-deep);color:var(--on-dark);border-radius:16px;padding:32px;max-width:560px;margin:0 auto}
-.calc-tabs{display:flex;gap:8px;margin-bottom:22px}
-.calc-tab{flex:1;padding:10px;border-radius:10px;background:var(--on-dark-fill-2);color:var(--on-dark-3);font-weight:700;font-size:var(--fs-14)}
-.calc-tab.on{background:var(--gm);color:var(--on-dark)}
-.cur-toggle{display:flex;justify-content:center;gap:6px;margin-bottom:14px}
-.cur-toggle button{padding:5px 16px;border-radius:999px;border:1px solid var(--on-dark-line);color:var(--on-dark-3);font-size:var(--fs-13);font-weight:700}
-.cur-toggle button.on{background:var(--on-dark);color:var(--ink-deep)}
+/* UN SOLO CONTROL SEGMENTADO (pulido visual, 7 oct 2026). Persona/Empresa eran
+   rectángulos rellenos de verde; moneda, frecuencia y pasarela, píldoras
+   blancas sueltas de 30 px. Cuatro preguntas del mismo tipo —elige una de dos
+   o tres— con dos dibujos distintos. Ahora las cuatro son el mismo carril con
+   el mismo segmento claro para lo elegido, a 44 px de alto. El panel es oscuro
+   en los dos temas, así que todo sale de la escala --on-dark. */
+.calc-tabs,.cur-toggle{display:flex;gap:4px;padding:3px;margin-bottom:18px;
+  border:1px solid var(--on-dark-line);border-radius:999px;background:var(--on-dark-fill-2)}
+.calc-tabs{margin-bottom:22px}
+.calc-tab,.cur-toggle button{flex:1 1 0;min-width:0;min-height:44px;padding:6px 12px;
+  border:0;border-radius:999px;background:transparent;color:var(--on-dark-3);
+  font-weight:700;font-size:var(--fs-14);transition:background .15s,color .15s}
+.calc-tab:hover:not(.on),.cur-toggle button:hover:not(.on){color:var(--on-dark)}
+.calc-tab.on,.cur-toggle button.on{background:var(--on-dark);color:var(--ink-deep)}
 .calc-amount{text-align:center;margin-bottom:6px}
 #calc-display{font-family:var(--font-display);font-size:clamp(22px,7vw,42px);font-weight:800;color:var(--on-dark);letter-spacing:-.01em;line-height:1.05;white-space:nowrap}
 #calc-manual{width:100%;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-fill);color:var(--on-dark);border-radius:10px;padding:10px;text-align:center;font-size:var(--fs-16);margin:6px 0 4px}
+/* Vacío hasta que se escribe: el «0» de ejemplo se leía como un monto, debajo
+   de los $200.000 de la cifra grande. Ahora el ejemplo dice qué va ahí. */
+#calc-manual::placeholder{color:var(--on-dark-4);font-size:var(--fs-14)}
 #calc-rate{font-size:var(--fs-12);color:var(--on-dark-4);text-align:center;margin-bottom:16px;min-height:16px}
 input[type=range]{width:100%;accent-color:var(--brote);margin:8px 0 4px}
 .calc-hints{display:flex;justify-content:space-between;font-size:var(--fs-11);color:var(--on-dark-4);margin-bottom:16px}
-.calc-quick{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:20px}
-.qbtn{padding:5px 12px;border-radius:16px;border:1px solid var(--on-dark-line);color:var(--on-dark-2);font-size:var(--fs-12);font-weight:700}
+/* Seis montos en rejilla de 3 × 2: con flex se partían en 4 + 2 y la segunda
+   fila quedaba huérfana en el centro. */
+.calc-quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px}
+.qbtn{min-height:44px;padding:6px 12px;border-radius:999px;border:1px solid var(--on-dark-line);color:var(--on-dark-2);font-size:var(--fs-14);font-weight:700}
 .qbtn:hover{border-color:var(--brote);color:var(--brote)}
 .calc-out{background:var(--on-dark-fill-2);border-radius:14px;padding:18px;display:grid;gap:10px}
 .calc-row{display:flex;justify-content:space-between;font-size:var(--fs-14)}
@@ -390,7 +426,7 @@ input[type=range]{width:100%;accent-color:var(--brote);margin:8px 0 4px}
 
 /* ===== PAYMENTS ===== */
 .pay-tabs{display:flex;gap:8px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
-.pay-tab{padding:10px 20px;border-radius:999px;border:1px solid var(--bd);font-weight:700;font-size:var(--fs-14);color:var(--ink)}
+.pay-tab{min-height:44px;padding:10px 20px;border-radius:999px;border:1px solid var(--bd);font-weight:700;font-size:var(--fs-14);color:var(--ink)}
 .pay-tab.on{background:var(--g);color:var(--on-dark);border-color:var(--g)}
 .pay-panel{display:none;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:26px;max-width:520px;margin:0 auto}
 .pay-panel.on{display:block}
@@ -459,7 +495,8 @@ input[type=range]{width:100%;accent-color:var(--brote);margin:8px 0 4px}
 .map-legend{background:var(--surface);border:1px solid var(--bd);border-radius:10px;padding:8px 12px;font-size:var(--fs-12);display:flex;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .map-legend span{display:flex;align-items:center;gap:5px;color:var(--mu);white-space:nowrap}
 .gg-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
-.faq-cta{display:inline-block;margin:0 0 20px;font-weight:700;font-size:var(--fs-14);color:var(--acc)}
+/* 44 px de alto (medía 22): el margen de abajo baja lo que crece la caja. */
+.faq-cta{display:inline-flex;align-items:center;min-height:44px;margin:-11px 0 9px;font-weight:700;font-size:var(--fs-14);color:var(--acc)}
 #blog-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 
 /* ===== FAQ ===== */
@@ -762,12 +799,25 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 .routes>.card:not(:last-child)::after{content:"";position:absolute;top:50%;right:-20px;width:20px;height:2px;background:var(--bd)}
 .hero-impact{display:inline-block;line-height:1.5;margin:-16px 0 30px;padding:8px 16px;border-radius:999px;background:var(--on-dark-fill);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:var(--fs-14);color:var(--on-dark-2);border:1px solid var(--on-dark-line)}
 .hero-impact b{color:var(--brote);font-weight:700}
+/* Vacía hasta que app.js la llena: sin esto, `display` le ganaba a `hidden` y,
+   ya sin el `.rv` que la volvía invisible, se veía una barra de vidrio vacía. */
+.hero-impact[hidden]{display:none}
 /* ES UNA FRASE. Con inline-flex, cada trozo de texto y cada <b> era un ítem
    flexible: en escritorio cabían en una línea, pero a 375 px se partían en
    cuatro columnas estrechas de dos y tres renglones. Como texto corrido se
    envuelve solo; en angosto la píldora pasa a esquina de tarjeta, porque una
    cápsula de 999px con tres renglones dentro parece un error. */
 @media(max-width:600px){.hero-impact{display:block;border-radius:var(--r);padding:10px 14px}}
+/* EL NIÑO NO VA DEBAJO DEL TEXTO (pulido visual, 7 oct 2026). En el teléfono la
+   foto se recorta por los lados y el niño quedaba en el centro, justo debajo de
+   la píldora de la cifra y del botón Donar: el texto le tapaba la cara. Se
+   corre la foto para dejarlo en la columna derecha, y la píldora deja libre esa
+   columna con la misma medida que ya usa el enlace del recorrido para no chocar
+   con WhatsApp. El padre queda a la izquierda, detrás del velo y los botones. */
+@media(max-width:600px){
+  .hero-bg img{object-position:25% center}
+  .hero-impact{max-width:calc(100% - 64px)}
+}
 
 /* ===== VIDRIO =====================================================
    «Lo que se mira a través es vidrio. Lo que se firma es papel.»
@@ -802,7 +852,7 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 .hero .wrap{position:relative}
 .hero-cred{position:absolute;z-index:1;right:24px;bottom:0;
   width:300px;padding:18px 20px 16px;display:none}
-.hero-cred .ey{display:block;font-size:var(--fs-11);font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--brote)}
+.hero-cred .ey{display:block;font-size:var(--fs-eyebrow);font-weight:700;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--brote)}
 .hero-cred b{display:block;margin-top:8px;font-family:var(--font-display);font-weight:600;font-size:var(--fs-16);line-height:1.25;letter-spacing:-.01em}
 .hero-cred dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:12px 0 0;font-size:var(--fs-13)}
 .hero-cred dt{color:var(--on-dark-3)}
@@ -815,10 +865,11 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
    Give&Grow y no se mezcla con esa marca. */
 html[data-marca="mmc"] .hero-cred{display:none}
 @media (prefers-reduced-motion:reduce){.card:hover .ic-svg *{animation:none}.stats .stat:hover{transform:none}}
-.btn-nav{background:var(--g);color:var(--on-dark);padding:9px 20px;border-radius:999px;font-weight:700;font-size:var(--fs-14);white-space:nowrap;transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
+/* 44 px de alto (pulido visual, 7 oct 2026): medía 37, por debajo del objetivo táctil. */
+.btn-nav{display:inline-flex;align-items:center;min-height:44px;background:var(--g);color:var(--on-dark);padding:9px 20px;border-radius:999px;font-weight:700;font-size:var(--fs-14);white-space:nowrap;transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
 .btn-nav:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(31,92,56,.35)}
 @media (max-width:600px){.btn-nav{padding:8px 14px;font-size:var(--fs-13)}}
-.mnav-g{display:block;font-size:var(--fs-11);letter-spacing:1.2px;text-transform:uppercase;color:var(--acc);font-weight:800;margin:16px 0 4px}
+.mnav-g{display:block;font-size:var(--fs-eyebrow);letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--acc);font-weight:800;margin:16px 0 4px}
 .nav-mobile > .mnav-g:first-child{margin-top:4px}
 .pcard{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:16px 18px;transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
 .pcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(31,92,56,.12)}
@@ -991,7 +1042,7 @@ html[data-theme="dark"]{
   --fab-shadow-hover:0 2px 6px rgba(0,0,0,.55), 0 14px 32px rgba(0,0,0,.55);
 }
 html[data-theme="dark"] .hero-bg img{filter:brightness(.8)}
-html[data-theme="dark"] .cur-toggle button.on{color:#0E2118}
+html[data-theme="dark"] .cur-toggle button.on,html[data-theme="dark"] .calc-tab.on{color:#0E2118}
 
 /* Transición suave al cambiar de tema (respetando reduced-motion global) */
 html.theming, html.theming body, html.theming nav, html.theming .card,
@@ -1001,31 +1052,58 @@ html.theming .band, html.theming section, html.theming .nav-mobile{
 }
 
 /* ---------- Toggle día/noche: automático (como el dispositivo), claro, oscuro ---------- */
-.theme-toggle{display:inline-flex;align-items:center;gap:7px;border:none;background:none;cursor:pointer;padding:4px 2px;color:var(--ink)}
-.tt-track{position:relative;width:46px;height:24px;border-radius:999px;background:var(--bg2,rgba(0,0,0,.08));border:1px solid var(--bd);display:flex;align-items:center;transition:background .3s}
-.tt-track svg{width:14px;height:14px;position:absolute;top:50%;transform:translateY(-50%);transition:opacity .3s;pointer-events:none}
-.tt-sun{left:6px;color:#E8A33D;opacity:1}
-.tt-moon{right:6px;color:#6FB08D;opacity:.35}
-.tt-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--on-dark);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .3s cubic-bezier(.4,0,.2,1)}
-.theme-toggle[data-mode="auto"] .tt-knob::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--acc)}
+/* LEGIBLE EN LOS DOS TEMAS (pulido visual, 7 oct 2026). De día era una perilla
+   blanca sobre un riel al 8 % de negro encima del papel: 1,1:1, casi invisible,
+   y el sol iba en un ámbar suelto que no es de la paleta. Ahora el riel
+   lleva un filo de tinta (--mu: 5,3:1 sobre el papel de día y 7,3:1 sobre el
+   de noche), la perilla es el verde de la casa (--acc, que se aclara de noche)
+   y el icono del tema vigente va DENTRO de la perilla, en el color del fondo;
+   el otro espera en --mu. El botón mide 44 × 44 aunque el riel siga siendo
+   pequeño: el objetivo táctil es el botón, no el dibujo. */
+.theme-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:none;background:none;cursor:pointer;padding:0 2px;color:var(--ink)}
+.tt-track{position:relative;width:48px;height:26px;border-radius:999px;background:transparent;border:1.5px solid var(--mu);display:flex;align-items:center;transition:border-color .3s}
+.tt-track svg{width:13px;height:13px;position:absolute;z-index:1;top:50%;transform:translateY(-50%);transition:color .3s;pointer-events:none;color:var(--mu)}
+.tt-track .tt-sun{left:5px;color:var(--bg)}
+.tt-track .tt-moon{right:5px}
+.tt-knob{position:absolute;top:1.5px;left:1.5px;width:20px;height:20px;border-radius:50%;background:var(--acc);transition:transform .3s cubic-bezier(.4,0,.2,1)}
 /* estado oscuro: perilla a la derecha, luna activa */
-html[data-theme="dark"] .tt-track{background:rgba(255,255,255,.12)}
 html[data-theme="dark"] .tt-knob{transform:translateX(22px)}
-html[data-theme="dark"] .tt-sun{opacity:.35}
-html[data-theme="dark"] .tt-moon{opacity:1}
-/* modo auto: un borde de acento sutil (y el punto en la perilla, arriba) */
+html[data-theme="dark"] .tt-track .tt-sun{color:var(--mu)}
+html[data-theme="dark"] .tt-track .tt-moon{color:var(--bg)}
+/* modo auto: el filo del riel en el verde de la casa (--acc también pasa 3:1
+   sobre los dos papeles), que es lo que lo distingue de una elección fija */
 .theme-toggle[data-mode="auto"] .tt-track{border-color:var(--acc)}
 
 /* ---------- Foto-banner editorial (pausa fotográfica) ---------- */
 .foto-banner{position:relative;padding:0;min-height:56vh;display:flex;align-items:flex-end;overflow:hidden}
 .foto-banner picture,.foto-banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.foto-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,33,24,0) 38%,rgba(14,33,24,.72) 100%)}
+.foto-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(var(--hero-velo),0) 38%,rgba(var(--hero-velo),.72) 100%)}
 .fb-in{position:relative;z-index:1;padding:0 24px 46px;max-width:var(--maxw);margin:0 auto;width:100%}
-.fb-ey{display:block;font-size:var(--fs-12);font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--brote);margin-bottom:10px}
-.fb-quote{font-family:"Fraunces",serif;font-style:italic;font-weight:450;font-size:clamp(26px,4.2vw,44px);line-height:1.15;color:var(--on-dark);max-width:18ch;margin:0 0 14px;letter-spacing:-.01em}
-.fb-link{display:inline-flex;align-items:center;gap:8px;color:var(--on-dark-2);font-weight:700;font-size:var(--fs-15);border-bottom:1.5px solid var(--on-dark-4);padding-bottom:2px;transition:border-color .15s,color .15s}
+.fb-ey{display:block;font-size:var(--fs-12);font-weight:800;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--brote);margin-bottom:10px}
+.fb-quote{font-family:"Fraunces",serif;font-style:italic;font-weight:450;font-size:clamp(26px,4.2vw,44px);line-height:1.15;color:var(--on-dark);max-width:18ch;margin:0 0 6px;letter-spacing:-.01em}
+/* 44 px de alto (objetivo táctil) con el subrayado pegado al texto: el aire
+   va arriba, y el margen de la cita bajó lo mismo para que nada se mueva. */
+.fb-link{display:inline-flex;align-items:flex-end;gap:8px;min-height:44px;color:var(--on-dark-2);font-weight:700;font-size:var(--fs-15);border-bottom:1.5px solid var(--on-dark-4);padding-bottom:2px;transition:border-color .15s,color .15s}
 .fb-link:hover{color:var(--brote);border-color:var(--brote)}
 @media(max-width:640px){.foto-banner{min-height:68vh}.fb-in{padding-bottom:38px}}
+/* EL TEXTO NO CRUZA LA CARA DE LA NIÑA (pulido visual, 7 oct 2026). Desde la
+   tableta, la ceja corría de lado a lado sobre su boca y la cita le caía en la
+   barbilla. El texto se queda en el tercio izquierdo, que en la foto son
+   espaldas y camisetas, con la ceja partida en dos renglones; la foto se corre
+   para dejar su cara a la derecha cuando el recorte es por los lados (tableta)
+   y sube cuando es por arriba y abajo (escritorio), para que el pelo a
+   contraluz —lo más claro de la foto— no quede detrás de la ceja;
+   y un velo lateral, con el mismo verde del hero, sostiene el contraste sobre
+   la camiseta blanca del niño de la izquierda. En el teléfono la foto es otra,
+   vertical, y su cara ya queda por encima del texto. */
+@media(min-width:641px){
+  .foto-banner img{object-position:15% 100%}
+  .foto-banner::after{background:
+    linear-gradient(90deg,rgba(var(--hero-velo),.74) 0%,rgba(var(--hero-velo),0) 60%),
+    linear-gradient(180deg,rgba(var(--hero-velo),0) 38%,rgba(var(--hero-velo),.72) 100%)}
+  .fb-ey{max-width:min(100%,19rem)}
+  .fb-quote{max-width:14ch}
+}
 
 /* ---------- disparador de ALMA ----------
    Rectangular, 2px de radio, borde de 1px. Sin píldora, sin sombra difusa,
@@ -1036,7 +1114,7 @@ html[data-theme="dark"] .alma-fab:hover{background:var(--acc-2);border-color:var
 /* ---------- barra de recorrido (0 a 100) ---------- */
 /* El Recorrido — riel de progreso sutil de la guía de 12 paradas (v5) */
 .journey{margin-top:40px;border-top:1px solid var(--bd);padding:15px 0 2px;display:flex;flex-direction:column;gap:8px}
-.j-meta{font-size:var(--fs-11);font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mu)}
+.j-meta{font-size:var(--fs-eyebrow);font-weight:800;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--mu)}
 .j-meta b{color:var(--acc)}
 .j-track{display:flex;gap:4px}
 .j-seg{flex:1;height:2px;border-radius:2px;background:var(--bd);transition:background .35s var(--ease)}
@@ -1064,7 +1142,7 @@ html[data-theme="dark"] .alma-fab:hover{background:var(--acc-2);border-color:var
 .os-use p{margin:0 0 6px;max-width:62ch;font-size:var(--fs-15)}
 /* Anatomía de un registro: ledger sobrio (elemento firma de la página) */
 .rec-ledger{margin-top:20px;padding:22px 24px;background:var(--surface-2);border:1px solid var(--bd);border-radius:var(--rl)}
-.rec-cap{font-size:var(--fs-12);font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--mu);margin:0 0 10px}
+.rec-cap{font-size:var(--fs-eyebrow);font-weight:700;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--mu);margin:0 0 10px}
 /* En #donar sube a 13 px (auditoría 7 oct 2026): ahí rotula el paso de pago y
    «Más allá del dinero», y a 12 px en versalitas se leía como nota al pie. */
 #page-donar .rec-cap{font-size:var(--fs-13)}
@@ -1094,7 +1172,7 @@ html[data-theme="dark"] .prog-logo{background:#000}
 /* ---------- calculadora: selector de destino y nota ---------- */
 .calc-dest{margin:2px 0 12px}
 .calc-dest-lbl,.calc-cap{display:block;font-size:var(--fs-13);font-weight:700;color:var(--on-dark-2);margin-bottom:6px;letter-spacing:.2px}
-.calc-select{width:100%;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);color:var(--on-dark);border-radius:10px;padding:11px 12px;font-size:var(--fs-15);font-weight:600;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.calc-select{width:100%;min-height:44px;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);color:var(--on-dark);border-radius:10px;padding:11px 12px;font-size:var(--fs-15);font-weight:600;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .calc-select:focus{outline:none;border-color:var(--on-dark-4)}
 /* Blanco literal a propósito en optgroup/option: la lista desplegable la pinta el
    sistema operativo y no todos los navegadores resuelven var() ahí dentro. */
@@ -1102,8 +1180,11 @@ html[data-theme="dark"] .prog-logo{background:#000}
 .calc-select option{color:#0E2118;background:#fff;font-weight:500}
 .calc-note{margin-top:16px;text-align:left}
 .calc-note label{display:block;font-size:var(--fs-13);font-weight:700;color:var(--on-dark-2);margin-bottom:6px}
-.calc-note textarea{width:100%;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);color:var(--on-dark);border-radius:10px;padding:10px 12px;font-size:var(--fs-14);font-family:inherit;resize:vertical;box-sizing:border-box}
-.calc-note textarea::placeholder{color:var(--on-dark-4)}
+/* Alto para tres renglones: con dos, el texto de ejemplo se cortaba a 375 px.
+   Y el ejemplo nunca más grande que su etiqueta (13 px): en el teléfono el
+   campo sube a 16 px para que iOS no haga zoom, y el ejemplo se quedaba en 16. */
+.calc-note textarea{width:100%;min-height:88px;background:var(--on-dark-fill-2);border:1px solid var(--on-dark-line);color:var(--on-dark);border-radius:10px;padding:10px 12px;font-size:var(--fs-14);line-height:1.45;font-family:inherit;resize:vertical;box-sizing:border-box}
+.calc-note textarea::placeholder{color:var(--on-dark-4);font-size:var(--fs-13)}
 .calc-note textarea:focus{outline:none;border-color:var(--on-dark-4)}
 .calc-note-count{display:block;text-align:right;font-size:var(--fs-11);color:var(--on-dark-4);margin-top:4px}
 /* SAFARI EN iOS HACE ZOOM al enfocar un campo con letra menor de 16px, y lo hace
@@ -1283,8 +1364,14 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
      que el botón invisible tampoco reciba el tabulador; con la transición, se
      oculta al terminar el fundido y aparece al empezar. */
   .wa,.alma-fab{transition:transform .18s var(--ease),box-shadow .18s var(--ease),background .18s,opacity .2s var(--ease),visibility .2s}
+  /* Y se apartan mientras se baja (pulido visual, 7 oct 2026): leyendo hacia
+     abajo, los dos círculos tapaban la última línea de lo que se tenía delante
+     —«Generosidad que crece» en la portada, «Ver el programa de voluntariado»
+     en #empresas—. initFabScroll en app.js marca `fab-scroll` al bajar y la
+     quita al subir o al quedarse quieto: el atajo vuelve justo cuando se busca. */
   body.fab-form .wa,body.fab-form .alma-fab,
-  body.fab-foco .wa,body.fab-foco .alma-fab{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px)}
+  body.fab-foco .wa,body.fab-foco .alma-fab,
+  body.fab-scroll .wa,body.fab-scroll .alma-fab{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px)}
   .alma-fab svg{width:23px;height:23px}
   /* Sin etiqueta: en táctil no hay hover que la dispare y estorbaría. */
   .wa span,.alma-fab span{display:none}
@@ -1292,6 +1379,12 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
      final, la última línea —NIT y derechos— quedaba debajo de ALMA y
      de WhatsApp y no había más scroll para destaparla. */
   footer{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+  /* Lo mismo al final de cada página: su último bloque reserva el alto de los
+     círculos para que la última línea quede libre en reposo. Va en el bloque y
+     no en el <main>: con el relleno en el <main> asomaba una franja de papel
+     entre una banda oscura final (#gratitud, #empresas) y el pie, que también
+     es oscuro. */
+  main.page > :last-child{padding-bottom:max(72px, calc(88px + env(safe-area-inset-bottom)))}
 }
 /* Con movimiento reducido se apartan sin fundido ni desplazamiento. Va aparte
    porque la transición de arriba, dentro del bloque móvil, le ganaba a la regla
@@ -1300,7 +1393,8 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
   .wa,.alma-fab{transition:none}
   body.hero-vista .alma-fab,
   body.fab-form .wa,body.fab-form .alma-fab,
-  body.fab-foco .wa,body.fab-foco .alma-fab{transform:none}
+  body.fab-foco .wa,body.fab-foco .alma-fab,
+  body.fab-scroll .wa,body.fab-scroll .alma-fab{transform:none}
 }
 
 /* ============ Rastrea tu donación ============ */
@@ -1532,6 +1626,13 @@ html[data-theme="dark"] input[type=checkbox]::before{background:var(--ink-deep)}
 @media(prefers-reduced-motion:reduce){input[type=checkbox],input[type=checkbox]::before{transition:none}}
 
 .ally-check input{margin-top:2px}
+/* LOS RADIOS, AL TAMAÑO DE LAS CASILLAS (pulido visual, 7 oct 2026). Medían
+   13 px —el tamaño del sistema— junto a casillas de 19. Lo que se toca es la
+   etiqueta entera, que ya pasa de 44 px de alto con su relleno; el círculo
+   solo tiene que verse. */
+.ally-check{min-height:44px}
+.ally-check input[type=radio]{width:19px;height:19px;flex:none;accent-color:var(--g)}
+html[data-theme="dark"] .ally-check input[type=radio]{accent-color:var(--acc)}
 /* MISMO CASO QUE «.track-search»: este span es item flex y conserva
    «min-width:auto», asi que su suelo es el ancho de su contenido mas largo
    sin partir — que aqui es el correo de privacidad—. A 320 px el span media
@@ -1578,7 +1679,7 @@ html[data-theme="dark"] .grat-card-head h3 a:hover{color:var(--brote)}
    línea punteada que separa el beneficio de sus condiciones. */
 .benefit-coupon{position:relative;border:1.5px solid var(--bd);border-radius:var(--rl);background:var(--surface);overflow:hidden}
 .bc-main{padding:24px 24px 20px}
-.bc-eyebrow{display:block;font-size:var(--fs-12);font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--acc);margin-bottom:12px}
+.bc-eyebrow{display:block;font-size:var(--fs-eyebrow);font-weight:800;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--acc);margin-bottom:12px}
 .bc-benefit{font-family:var(--font-display,inherit);font-size:var(--fs-h4);line-height:1.25;font-weight:600;color:var(--ink);margin:0}
 .bc-level{display:inline-flex;align-items:center;gap:8px;margin-top:18px;padding:7px 15px;border-radius:999px;background:var(--gl);color:var(--acc);font-size:var(--fs-13);font-weight:700}
 .bc-level::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
@@ -1640,7 +1741,7 @@ html[data-theme="dark"] .mira-sig-l{color:var(--brote)}
 .mira-flow{margin-top:26px;border-top:1px solid var(--bd)}
 .mira-head,.mira-row{display:grid;grid-template-columns:1fr auto 1fr;gap:10px 18px;border-bottom:1px solid var(--bd)}
 .mira-head{padding:10px 0}
-.mira-head span{font-size:var(--fs-11);font-weight:700;letter-spacing:1.1px;text-transform:uppercase}
+.mira-head span{font-size:var(--fs-eyebrow);font-weight:700;letter-spacing:var(--tr-eyebrow);text-transform:uppercase}
 .mira-hv{text-align:right;color:var(--amber)}
 .mira-hp{color:var(--acc)}
 .mira-row{padding:16px 0;align-items:center}
@@ -2289,7 +2390,7 @@ html[data-marca="mmc"] #page-proyecto > section[id]{ scroll-margin-top:84px }
 .mmc-indice{ position:static; top:auto; left:auto; right:auto; z-index:auto;
   margin:0; padding:20px 0 26px; border-top:1.5px solid var(--bd);
   display:flex; flex-wrap:wrap; gap:8px; align-items:center; max-width:52ch }
-.mmc-indice-t{ flex-basis:100%; font-size:var(--fs-11); letter-spacing:.13em;
+.mmc-indice-t{ flex-basis:100%; font-size:var(--fs-eyebrow); letter-spacing:var(--tr-eyebrow);
   text-transform:uppercase; font-weight:700; color:var(--mu); margin-bottom:2px }
 /* 44 px de alto mínimo: es un objetivo táctil, y medido daba 38. */
 .mmc-indice button{ font:inherit; font-size:var(--fs-13); font-weight:600;
@@ -2309,7 +2410,7 @@ section[tabindex="-1"]:focus{ outline:none }
    hay— y manda la frase. */
 .mmc-fila{ margin:26px 0 0; padding:18px 0 0; border-top:1.5px solid var(--bd);
   max-width:46ch }
-.mmc-fila-et{ display:block; font-size:var(--fs-11); letter-spacing:.13em;
+.mmc-fila-et{ display:block; font-size:var(--fs-eyebrow); letter-spacing:var(--tr-eyebrow);
   text-transform:uppercase; font-weight:700; color:var(--acc) }
 .mmc-fila-n{ margin:6px 0 0; font-family:var(--font-display); font-size:2.6rem;
   font-weight:700; line-height:1; letter-spacing:-.02em;
@@ -2328,7 +2429,7 @@ section[tabindex="-1"]:focus{ outline:none }
 .mmc-mio{ margin:0 0 22px; padding:16px 18px; border-radius:3px;
   border:1.5px solid var(--acc); background:var(--gl); max-width:46ch }
 .mmc-mio[hidden]{ display:none }
-.mmc-mio-et{ display:block; font-size:var(--fs-11); letter-spacing:.13em;
+.mmc-mio-et{ display:block; font-size:var(--fs-eyebrow); letter-spacing:var(--tr-eyebrow);
   text-transform:uppercase; font-weight:700; color:var(--acc) }
 .mmc-mio-num{ margin:4px 0 0; font-family:var(--font-display);
   font-size:var(--fs-17); font-weight:700; letter-spacing:-.01em;
@@ -2521,7 +2622,10 @@ section[tabindex="-1"]:focus{ outline:none }
 .franja-l li[hidden]{display:none}
 .franja-k{font-size:var(--fs-12);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
 .franja-v{color:var(--mu)}
-.franja-a{margin-top:2px;color:var(--acc);font-weight:600;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+/* 44 px de alto sin mover la franja (medía 19): la caja crece y los márgenes
+   negativos se comen ese aire, arriba sobre el texto y abajo sobre el relleno
+   de la celda. */
+.franja-a{display:inline-flex;align-items:center;min-height:44px;margin:-10px 0 -12px;color:var(--acc);font-weight:600;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
 .franja-a:hover{text-decoration-thickness:2px}
 @media(max-width:560px){.franja-l{grid-template-columns:1fr}}
 /* En la hoja de Hazte miembro la columna ya separa sus piezas con `gap`. */
