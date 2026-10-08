@@ -939,7 +939,7 @@ var I18N = {
     "ma.mem.tarjeta":"¿Cambiaste de tarjeta? Actualízala →",
     "ma.mem.paypal":"Si te hiciste miembro por PayPal, con el mismo correo te enviamos el enlace a tu carnet. La suscripción se gestiona desde tu propia cuenta de PayPal: desde aquí no podemos detenerla.",
     "verif.door.t":"¿Atiendes un comercio aliado?",
-    "verif.door.p":"Comprueba que el carnet de un miembro esté vigente: escribe su código o escanea su QR con tu propio celular.",
+    "verif.door.p":"Comprueba que el carnet de un miembro esté vigente: escribe su código o su número de cédula, o escanea su QR con tu propio celular.",
     "verif.door.a":"Verificar un carnet de membresía",
     "verif.door.href":"/verificar",
     "foot.verificar":"Verificar un carnet",
@@ -1551,7 +1551,7 @@ var I18N = {
     "faq.q1":"¿Cómo hago una donación?",
     "faq.a1":"En la calculadora eliges tu monto y continúas al pago: pagas con tarjeta o con el Botón Bancolombia a través de Wompi, la pasarela de Bancolombia, y vuelves con tu número de guía para seguir tu aporte. Si prefieres transferir, la cuenta de ahorros Bancolombia es la 31000009221 a nombre de Fundación Give&Grow International (NIT 901.948.930-2); repórtala después en el sitio: recibes tu número de guía al instante y subes ahí mismo el comprobante. Es mejor que mandarlo por correo, porque así tu aporte queda registrado y rastreable desde el primer minuto.",
     "faq.q2":"¿Qué es el Programa de Gratitud?",
-    "faq.a2":"Es un programa de beneficios: comercios aliados dan descuentos a los miembros activos, desde el nivel Retoño, y ganan visibilidad como negocios con propósito. La red está empezando, así que preferimos decirlo: los comercios que ya dan beneficio son los que aparecen en la página del programa, y son los únicos. Está construido para cinco categorías —gastronomía, moda, belleza, bienestar y odontología— y se van sumando de a uno. Para recibir el beneficio muestras tu carnet digital, y el comercio comprueba que esté vigente escaneando su QR con su propio celular o escribiendo el código en thegiveandgrowproject.org/verificar.",
+    "faq.a2":"Es un programa de beneficios: comercios aliados dan descuentos a los miembros activos, desde el nivel Retoño, y ganan visibilidad como negocios con propósito. La red está empezando, así que preferimos decirlo: los comercios que ya dan beneficio son los que aparecen en la página del programa, y son los únicos. Está construido para cinco categorías —gastronomía, moda, belleza, bienestar y odontología— y se van sumando de a uno. Para recibir el beneficio muestras tu carnet digital, y el comercio comprueba que esté vigente escaneando su QR con su propio celular o escribiendo el código o tu número de cédula en thegiveandgrowproject.org/verificar.",
     "faq.q3":"¿Cómo funciona el beneficio tributario?",
     "faq.a3":"Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación. Si donas en dinero, el aporte debe pasar por el sistema financiero. Por ejemplo, $4.000.000 COP donados pueden significar hasta $1.000.000 COP menos en tu impuesto. No somos asesores tributarios: confírmalo con tu contador.",
     "faq.q4":"¿Puedo ser voluntario?",
@@ -1759,6 +1759,7 @@ var I18N = {
     "membres.cta.t":"Hazte miembro.",
     "membres.cta.otro":"O escribe otro monto mensual, en pesos",
     "membres.cta.calc2":"¿Quieres ver antes tu beneficio tributario? Usa el calculador.",
+    "membres.cta.verif":"Mientras tu membresía esté vigente, un comercio aliado puede comprobarla en thegiveandgrowproject.org/verificar escribiendo su código o tu número de cédula, si lo registraste al pagar. Solo ve tu nombre de pila, la inicial de tu apellido, tu nivel y si está vigente.",
     "membres.cta.nivel":"Nivel {n} · {m} al mes",
     "membres.cta.rango":"El aporte mensual va de {min} a {max}.",
     "membres.cta.p":"Eliges cuánto y a qué programa, registras tu método de pago una sola vez y el aporte se cobra solo cada mes. Puedes terminarlo cuando quieras desde tu propia membresía.",
@@ -1819,7 +1820,7 @@ var I18N = {
     "grat.s2.t":"Recibe tu carnet",
     "grat.s2.p":"Te llega tu carnet digital: una página que dice si tu membresía está vigente en el momento en que se abre, con un QR y un código de verificación.",
     "grat.s3.t":"Presenta y disfruta",
-    "grat.s3.p":"Muéstralo en los comercios aliados. El comercio no tiene que creerle a tu pantalla: escanea el QR con su propio celular, o escribe el código en thegiveandgrowproject.org/verificar, y le pide un documento para comparar el nombre.",
+    "grat.s3.p":"Muéstralo en los comercios aliados. El comercio no tiene que creerle a tu pantalla: escanea el QR con su propio celular, o escribe el código o tu número de cédula en thegiveandgrowproject.org/verificar, y le pide un documento para comparar el nombre.",
     "grat.cta.t":"Empieza a recibir.",
     "grat.cta.mem":"Quiero ser miembro",
     "grat.cta.biz":"Quiero ser comercio aliado",
@@ -5826,6 +5827,7 @@ var PRIVACY = {
 <li><strong>Voluntarios:</strong> datos de identificación y profesionales — para verificar idoneidad y asignarte a los programas.</li>
 <li><strong>Beneficiarios de programas:</strong> datos entregados por las fundaciones aliadas para ejecutar y documentar el impacto. Los datos de niñas, niños y adolescentes reciben protección reforzada y solo se tratan con autorización de su representante legal.</li>
 </ul>
+<p><strong>Membresías y carnet de miembro.</strong> Tu carnet digital se puede comprobar en <code>thegiveandgrowproject.org/verificar</code>. Mientras tu membresía esté vigente, un comercio aliado del Programa de Gratitud puede confirmarla escribiendo el código de verificación de tu carnet o el número de documento que registraste al pagar o al pedir tu certificado. La respuesta muestra solo tu nombre de pila y la inicial de tu apellido, tu nivel y la vigencia; nunca tu documento ni tus datos de contacto. Cuando la membresía deja de estar vigente, tu número de documento ya no devuelve ningún resultado; solo el código de tu propio carnet sigue indicando que no está vigente. El número consultado no viaja en la dirección de la página ni aparece en la respuesta.</p>
 <h2>3. Base legal</h2>
 <p>Tratamos tus datos con tu <strong>autorización previa, expresa e informada</strong>, que recogemos por formulario físico o digital (con registro de fecha). Puedes revocarla en cualquier momento. Para titulares en la Unión Europea aplicamos las bases del Artículo 6 del GDPR (consentimiento, ejecución de un contrato, obligación legal o interés legítimo, según el caso).</p>
 <h2>4. Tus derechos</h2>
@@ -5868,6 +5870,7 @@ var PRIVACY = {
 <li><strong>Volunteers:</strong> identification and professional data — to verify suitability and assign you to programs.</li>
 <li><strong>Program beneficiaries:</strong> data provided by partner foundations to deliver and document impact. Data of children and adolescents receives reinforced protection and is processed only with their legal guardian's authorization.</li>
 </ul>
+<p><strong>Memberships and member card.</strong> Your digital card can be checked at <code>thegiveandgrowproject.org/verificar</code>. While your membership is active, a Gratitude Programme partner business can confirm it by typing your card's verification code or the ID number you gave when paying or when asking for your certificate. The answer shows only your first name and the initial of your surname, your level and its validity; never your ID number or your contact details. Once the membership is no longer active, your ID number returns no result; only your own card's code still shows that it is not valid. The number checked does not travel in the page address and does not appear in the answer.</p>
 <h2>3. Legal basis</h2>
 <p>We process your data with your <strong>prior, express and informed authorization</strong>, collected through a physical or digital form (with a timestamp). You may revoke it at any time. For data subjects in the European Union we rely on the bases in Article 6 of the GDPR (consent, performance of a contract, legal obligation or legitimate interest, as applicable).</p>
 <h2>4. Your rights</h2>
