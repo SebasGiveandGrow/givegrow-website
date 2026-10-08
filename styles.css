@@ -1933,16 +1933,23 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .track-ev-box .ev-lista{margin-top:8px}
 
 /* ---- la puerta a /verificar (7 oct 2026) ----
-   Una línea discreta para el COMERCIO en Gratitud, Membresías, el rastreo y el
-   pie: escribe el código o escanea el QR. Es un enlace normal a una página del
+   Un bloque para el COMERCIO en Gratitud, Membresías y el rastreo (en el pie
+   sigue siendo un enlace): título corto, una línea y un botón de contorno.
+   Contorno y no relleno a propósito: no compite con Donar ni con Hazte
+   miembro, pero se lee como botón. Es un enlace normal a una página del
    Worker (/verificar), no una ruta de la SPA: carga entera, sin script.
    El carnet ya no vive aquí: su tarjeta la pinta el Worker con su propio CSS
    (`CARNET_CSS`), y las reglas `.carnet*` que había se fueron con el diseño
    viejo. */
-.verif-door{margin-top:26px;padding-top:14px;border-top:1px solid var(--bd);font-size:var(--fs-14);
-  line-height:1.5;color:var(--mu);max-width:68ch;display:flex;flex-wrap:wrap;align-items:center;gap:0 12px}
-.verif-door .card-link{margin-top:0}
-.band .verif-door{color:var(--on-dark-3);border-top-color:var(--on-dark-line)}
+.verif-door{margin-top:32px;padding-top:20px;border-top:1px solid var(--bd);display:flex;flex-wrap:wrap;
+  align-items:center;justify-content:space-between;gap:14px 28px}
+.verif-door-txt{flex:1 1 320px;max-width:62ch}
+.verif-door h3{font-size:var(--fs-17);margin:0 0 4px}
+.verif-door p{margin:0;font-size:var(--fs-15);line-height:1.5;color:var(--mu)}
+.verif-door-btn{flex:0 0 auto;min-height:44px;justify-content:center;text-align:center}
+.band .verif-door{border-top-color:var(--on-dark-line)}
+.band .verif-door p{color:var(--on-dark-3)}
+@media(max-width:520px){.verif-door-btn{flex:1 1 100%}}
 
 /* Reporte de transferencia */
 .rep-link{font-weight:700;color:var(--acc);border-bottom:1px solid var(--bd)}
