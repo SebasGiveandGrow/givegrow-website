@@ -3820,7 +3820,8 @@ const ESTADOS_MANUALES = ["en_distribucion", "entregada"];
    ======================================================================== */
 async function adminConciliarWompi(request, env, guia, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
-  if (!env.WOMPI_PRIVATE_KEY) return json({ error: "wompi_no_configurado" }, 503);
+  if (!env.WOMPI_PRIVATE_KEY) return json({ error: "wompi_no_configurado",
+    ayuda: "Falta la llave privada de Wompi en Cloudflare: sin ella el panel no le puede preguntar a Wompi. No se tocó nada." }, 503);
 
   let c = {};
   try { c = await request.json(); } catch { /* se valida abajo */ }
@@ -23114,6 +23115,7 @@ textarea { font-size: 16px }
 .pn-ficha{display:grid;grid-template-columns:10rem minmax(0,1fr);gap:6px 14px;margin:0 0 18px;font-size:var(--fs-14)}
 .pn-ficha dt{color:var(--mu)}
 .pn-ficha dd{margin:0;overflow-wrap:anywhere}
+.pn-ficha dd small{display:block;font-size:var(--fs-12);color:var(--mu);margin-top:1px}
 .pn-error{border-left:3px solid var(--err);padding:8px 12px;margin:0 0 14px;font-size:var(--fs-14);color:var(--err);background:var(--bg)}
 .pn-error:empty{display:none}
 .pn-nota{border-left:3px solid var(--amber);padding:8px 12px;margin:0 0 14px;font-size:var(--fs-14);background:var(--amberl)}
@@ -23360,7 +23362,9 @@ textarea { font-size: 16px }
 .fin-bloque{min-width:0}
 .fin-bloque h3,.fin-graf h3{margin:0 0 2px;font-family:"Inter",sans-serif;font-size:var(--fs-15);font-weight:700;letter-spacing:0}
 .fin-fuente{margin:0 0 8px;font-size:var(--fs-12);color:var(--mu)}
-.fin-graf{border:1px solid var(--bd);border-radius:10px;background:var(--surface);padding:16px 18px 10px;margin:8px 0 22px;position:relative}
+.fin-graf{border:1px solid var(--bd);border-radius:10px;background:var(--surface);padding:16px 18px 10px;margin:8px 0 22px;position:relative;overflow:hidden}
+.fin-svg{overflow-x:auto}
+.fin-svg svg{min-width:620px}
 .fin-ley{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 4px;font-size:var(--fs-12);color:var(--ink-soft)}
 .fin-ley i{display:inline-block;width:18px;height:0;border-top:2px solid var(--gm);vertical-align:middle;margin-right:6px}
 .fin-ley i.eg{border-top:2px dashed var(--amber)}
@@ -23873,7 +23877,7 @@ sabes que está mal.</p>
     <strong>por invitación</strong> y da acceso a los beneficios del Programa de Gratitud mientras esté vigente.
     <strong>Una persona, un carnet:</strong> si el correo ya es de alguien con carnet, la distinción se añade a ese
     mismo carnet —mismo enlace, mismo QR—. Fundador/a y Pionero/a son permanentes; las demás valen por el tiempo que
-    elijas y se renuevan desde la tabla. <strong>Junta de Asesores</strong> es un grupo honorario y asesor, sin
+    elijas y se renuevan desde la ficha del carnet. <strong>Junta de Asesores</strong> es un grupo honorario y asesor, sin
     funciones de dirección: la fundación no tiene junta directiva. Al emitirlo se le envía el carnet por correo.</p>
 
     <div class="eg-par">
@@ -25055,7 +25059,7 @@ var VISTAS = {
   "finanzas/pagos": { area: "Finanzas", titulo: "Pagos sin aporte",
     linea: "Cobros aprobados que entraron por el enlace directo de Wompi y no tienen guía." },
   "finanzas/membresias": { area: "Finanzas", titulo: "Membresías y carnets",
-    linea: "Las membresías mensuales en dólares por PayPal y los carnets de miembro emitidos.",
+    linea: "Las membresías mensuales en dólares por PayPal y los carnets, también los de honor.",
     accion: ["Emitir carnet de honor", "hn-nuevo"] },
   "finanzas/vencimientos": { area: "Finanzas", titulo: "Vencimientos",
     linea: "Lo que la Fundación tiene que presentar, pagar o reportar, con su fecha." },
@@ -29814,7 +29818,7 @@ function graficaFin(d){
   var h = '<div class="fin-graf" id="fin-graf"><h3>Mes a mes · ' + d.periodo.anio + "</h3>" +
     '<p class="fin-fuente">Ingresos confirmados en pesos y egresos vigentes, por mes. Los dólares no se dibujan (no se convierten): están en la tabla de abajo.</p>' +
     '<div class="fin-ley"><span><i></i>Ingresos confirmados</span><span><i class="eg"></i>Egresos</span></div>' +
-    '<svg viewBox="0 0 ' + G.W + " " + G.H + '" role="img" aria-label="Ingresos confirmados y egresos por mes de ' + d.periodo.anio + '; las cifras están en la tabla de abajo">';
+    '<div class="fin-svg"><svg viewBox="0 0 ' + G.W + " " + G.H + '" role="img" aria-label="Ingresos confirmados y egresos por mes de ' + d.periodo.anio + '; las cifras están en la tabla de abajo">';
   for (var k = 0; k <= 4; k++){
     var v = (techo * k) / 4, yy = y(v);
     h += '<line class="' + (k ? "eje" : "eje0") + '" x1="' + G.L + '" x2="' + (G.W - G.R) + '" y1="' + yy + '" y2="' + yy + '"></line>' +
@@ -29842,7 +29846,7 @@ function graficaFin(d){
   }
   h += '<g id="fin-hover" style="display:none"><line class="guia" id="fin-hl" x1="0" x2="0" y1="' + G.T + '" y2="' + (G.T + alto) + '"></line>' +
     '<circle class="p-eg" id="fin-he" r="4.5" cx="0" cy="0"></circle><circle class="p-ing" id="fin-hi" r="4.5" cx="0" cy="0"></circle></g>' +
-    '<rect id="fin-zona" x="' + G.L + '" y="' + G.T + '" width="' + ancho + '" height="' + alto + '" fill="transparent"></rect></svg>' +
+    '<rect id="fin-zona" x="' + G.L + '" y="' + G.T + '" width="' + ancho + '" height="' + alto + '" fill="transparent"></rect></svg></div>' +
     '<div class="fin-tip" id="fin-tip" hidden></div>';
   /* La vista de tabla: las mismas cifras, para leerlas o copiarlas. */
   var usd = s.some(function(m){ return Object.keys(m.ingresos).some(function(k){ return k !== "COP"; }); });

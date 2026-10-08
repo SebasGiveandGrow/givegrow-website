@@ -254,10 +254,11 @@ botón de atrás. En el teléfono la barra lateral se abre con «Menú».
 | área | entrada (dirección) | qué hay dentro |
 |---|---|---|
 | Inicio | Hoy (`#hoy`) | La bandeja de entrada: todas las colas, en tres franjas |
-| Finanzas | Aportes (`#finanzas/aportes`) | Cifras de los aportes, franja de certificados y la lista |
+| Finanzas | Resumen (`#finanzas/resumen`) | El mes o el año: ingresos confirmados por medio, destino y tipo; egresos por categoría y centro; neto; donantes, membresías y certificados; mes a mes |
+| | Aportes (`#finanzas/aportes`) | Cifras de los aportes, franja de certificados y la lista |
 | | Transferencias (`#finanzas/transferencias`) | Lo reportado por transferencia, para confirmar contra el extracto |
 | | Pagos sin aporte (`#finanzas/pagos`) | Cobros de Wompi sin guía |
-| | Membresías y carnets (`#finanzas/membresias`) | Membresías de PayPal · carnets · carnet de honor |
+| | Membresías y carnets (`#finanzas/membresias`) | Membresías de PayPal · carnets (también los de honor) · «Emitir carnet de honor» |
 | | Vencimientos (`#finanzas/vencimientos`) | Obligaciones tributarias y legales |
 | | Egresos (`#finanzas/egresos`) | Registrar egresos, soportes y la descarga para el contador |
 | | Proveedores (`#finanzas/proveedores`) | A quién se le paga |
@@ -301,8 +302,52 @@ mismas plantillas** sin enviarlos ni anotarlos, y el cajón enseña a quién, co
 qué asunto y qué dice. Cubre: mover una fundación (Aceptar, Visita hecha,
 Iniciar convenio, Marcar vinculada), confirmar una transferencia (el recibo),
 emitir y enviar un certificado, firmarlo cuando con esa firma sale, verificar
-una matrícula y reenviar su aviso, reenviar el enlace del convenio, y cerrar o
-descartar un caso. Si la vista previa falla, no se confirma.
+una matrícula y reenviar su aviso, reenviar el enlace del convenio, cerrar o
+descartar un caso y, desde la Fase 2, conciliar con Wompi, emitir un carnet de
+honor, subir el texto del convenio, el agradecimiento de una jornada y sus
+encuestas. Si la vista previa falla, no se confirma.
+
+**Fase 2 (oct 2026): Finanzas completa.**
+
+- **Una sola tabla para todo Finanzas** (`tablaArmar` en `adminJS`): buscador,
+  filtros, columnas que ordenan, páginas de 25/50/100, cabecera fija, fila de
+  totales, un vacío dicho con palabras, y la fila abre el cajón con el detalle
+  entero. **Aportes filtra, ordena y pagina en el servidor** (es la única que
+  crece sin techo: cada intento de pago es una fila) y sus totales son del filtro
+  entero; las demás llegan enteras y se filtran en el navegador (egresos y
+  proveedores hasta `TOPE_LIBRO` = 2000 filas; las bandejas, `TOPE_BANDEJA`, y la
+  tabla avisa si se cortó).
+- **Las tres reglas viven en una expresión SQL cada una**, en `worker.js`, y las
+  usan la lista, sus totales, el CSV y el Resumen: `MEDIO_APORTE` (Wompi tarjeta,
+  Wompi transferencia Bancolombia, Wompi otro, PayPal, transferencia directa),
+  `TIPO_APORTE` (único; mensual o anual; membresía = atada a una suscripción con
+  cobro automático) y `FECHA_APORTE` (la fecha del dinero en día colombiano: la
+  del extracto, si no la de la aprobación, si no la de apertura). Los nombres de
+  persona salen de `ETIQ_FINANZAS`.
+- **Solo se suma lo confirmado** (`APORTE_CONFIRMADO`). Un intento sin pagar o
+  una transferencia reportada se cuentan, nunca se suman. **Pesos y dólares van
+  por separado y no se convierten**: hasta esta fase la cifra de «pagados» sumaba
+  los centavos de dólar de PayPal como si fueran pesos.
+- **Resumen** (`GET /api/admin/finanzas?anio=&mes=`, `mes=0` = el año): cada cifra
+  dice de dónde sale. Lo que entró sin guía (pagos de Wompi sin aporte, el botón
+  de PayPal) y las transferencias sin verificar se dicen aparte, no se mezclan.
+  Son **cifras operativas, no estados financieros**, y la pantalla lo dice.
+- **CSV de aportes** (`GET /api/admin/aportes.csv`) con los mismos filtros de la
+  tabla, en el mismo formato que el de egresos (punto y coma, BOM, fórmulas
+  neutralizadas). La columna «Confirmado» separa el dinero de lo que no lo es.
+- **Formularios en el cajón**: «Registrar un egreso» y «Emitir carnet de honor»
+  viven ocultos en `#pn-formas` y `cajonForma` los mueve al cajón (conservan sus
+  ids); al cerrar vuelven.
+- **Ya no queda ningún `prompt`/`confirm`/`alert` en el panel.** Lo reversible se
+  confirma con `confirmarSimple`, lo que pide un texto con `pedirTexto`, lo que
+  destruye con `confirmarPeligro`; copiar un enlace que el navegador no deja
+  copiar lo enseña seleccionado en el cajón. La ficha del convenio en línea pasó
+  de una ventana aparte al cajón ancho.
+- **Cinco vistas previas más** en `/api/admin/previa`: `conciliar` (el recibo y
+  el aviso interno que salen si Wompi confirma), `honor`, `convenio-texto` (solo
+  la primera subida avisa), `reconocer` (agradecimiento y certificado de
+  voluntariado) y `encuesta` (empresa o fundación). El correo de la encuesta salió
+  a `correoEncuestaActor` para que la vista previa use la misma plantilla.
 
 **Lo que destruye va en rojo.** Suprimir, Anular (certificado, acta, egreso),
 Descartar una transferencia, quitar una foto o una distinción: botón rojo y un
