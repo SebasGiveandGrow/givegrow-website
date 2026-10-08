@@ -12790,16 +12790,36 @@ function nivelDe(id) { return NIVELES_MB.find((x) => x.id === id) || NIVELES_MB[
    LA JUNTA DE ASESORES es un grupo honorario y ASESOR, sin funciones de
    dirección: la fundación no tiene junta directiva (CLAUDE.md, «Gobierno»).
    Donde se nombre, se dice así. */
+/* LA FORMA DEL TÍTULO (0041). En una tarjeta personal «Fundador/a» se lee
+   raro: el carnet es de UNA persona. Quien emite elige, por carnet, la forma
+   masculina (m), femenina (f) o la neutra «/a» (n, y NULL = n). `es` es la
+   neutra y sigue siendo la que usa el panel para nombrar la distinción en
+   general. El inglés ya es neutro. */
 const DISTINCIONES = [
-  { id: "fundador",               es: "Fundador/a",                 en: "Founder",               permanente: true },
-  { id: "pionero",                es: "Pionero/a",                  en: "Pioneer",               permanente: true },
-  { id: "coordinador_voluntario", es: "Coordinador/a voluntario/a", en: "Volunteer coordinator", permanente: false },
-  { id: "aliado_red",             es: "Aliado/a de la red",         en: "Network ally",          permanente: false },
-  { id: "embajador",              es: "Embajador/a",                en: "Ambassador",            permanente: false },
-  { id: "junta_asesores",         es: "Junta de Asesores",          en: "Advisory Board",        permanente: false,
+  { id: "fundador",               es: "Fundador/a",                 m: "Fundador",               f: "Fundadora",
+    en: "Founder",               permanente: true },
+  { id: "pionero",                es: "Pionero/a",                  m: "Pionero",                f: "Pionera",
+    en: "Pioneer",               permanente: true },
+  { id: "coordinador_voluntario", es: "Coordinador/a voluntario/a", m: "Coordinador voluntario", f: "Coordinadora voluntaria",
+    en: "Volunteer coordinator", permanente: false },
+  { id: "aliado_red",             es: "Aliado/a de la red",         m: "Aliado de la red",       f: "Aliada de la red",
+    en: "Network ally",          permanente: false },
+  { id: "embajador",              es: "Embajador/a",                m: "Embajador",              f: "Embajadora",
+    en: "Ambassador",            permanente: false },
+  { id: "junta_asesores",         es: "Junta de Asesores",          m: "Junta de Asesores",      f: "Junta de Asesores",
+    en: "Advisory Board",        permanente: false,
     nota: { es: "Grupo honorario y asesor, sin funciones de dirección.", en: "An honorary advisory group, with no governing role." } }
 ];
 function distincionDe(id) { return DISTINCIONES.find((x) => x.id === id) || null; }
+const FORMAS_DISTINCION = ["m", "f", "n"];
+/* El nombre de la distinción tal como va en ESE carnet: el único sitio que
+   elige la forma, para que la tarjeta, el correo, el PDF y /verificar digan
+   lo mismo. */
+function etiquetaDistincion(d, forma, lang) {
+  if (!d) return "";
+  if (lang === "en") return d.en;
+  return forma === "m" ? d.m : forma === "f" ? d.f : d.es;
+}
 /* El valor de `miembros.nivel` de quien solo tiene carnet de honor: no es
    ninguno de los cuatro niveles pagados (ver la 0040). */
 const NIVEL_HONOR = "honor";
@@ -12847,7 +12867,7 @@ function sqlCarnetVigente(alias, hoy) {
 /* Las columnas que `estadoCarnet` necesita, para no olvidar ninguna en un
    SELECT: sin `distincion_hasta`, una distinción de rol se leería permanente. */
 const COLS_CARNET = "m.codigo, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, " +
-  "m.distincion, m.distincion_contexto, m.distincion_desde, m.distincion_hasta";
+  "m.distincion, m.distincion_contexto, m.distincion_desde, m.distincion_hasta, m.distincion_forma";
 
 async function siguienteMiembro(env, anio) {
   const { results } = await env.DB.prepare(
@@ -13665,7 +13685,7 @@ function datosTarjeta(m, est, lang) {
     nivelId: pagado ? pagado.id : NIVEL_HONOR,
     nivel: pagado && (est.pagado || !honor) ? (en ? pagado.en : pagado.es) : "",
     honor, honorVigente: est.honor,
-    distincion: d ? (en ? d.en : d.es) : "", distincionId: d ? d.id : "",
+    distincion: etiquetaDistincion(d, m.distincion_forma, lang), distincionId: d ? d.id : "",
     distincionNota: d && d.nota ? (en ? d.nota.en : d.nota.es) : ""
   };
 }
@@ -14058,7 +14078,7 @@ async function adminMiembros(env) {
     f.hasta_efectivo = est.permanente ? "permanente" : est.hasta;
     f.solo_honor = !esNivelPagado(f.nivel);
     const d = est.distincion;
-    f.distincion_txt = d ? d.es : null;
+    f.distincion_txt = d ? etiquetaDistincion(d, f.distincion_forma, "es") : null;
     f.distincion_permanente = !!(d && !f.distincion_hasta);
     f.distincion_vigente = est.honor;
     /* El token no sale al panel: no lo usa, y es la credencial del miembro. */
@@ -14142,6 +14162,7 @@ async function adminEmitirHonor(request, env, quien) {
   const nombre = limpiar(c.nombre, 200).replace(/\s+/g, " ");
   const email = limpiar(c.email, 200).toLowerCase();
   const dist = distincionDe(String(c.distincion || ""));
+  const forma = FORMAS_DISTINCION.includes(c.forma) ? c.forma : "n";
   const contexto = limpiar(c.contexto, 60).replace(/\s+/g, " ");
   const docNum = limpiar(c.doc_numero, 40);
   const docTipo = limpiar(c.doc_tipo, 10).toUpperCase();
@@ -14211,8 +14232,8 @@ async function adminEmitirHonor(request, env, quien) {
     codigo = m.codigo; token = m.token; accion = "agregada";
     await env.DB.prepare(
       "UPDATE miembros SET distincion = ?, distincion_contexto = ?, distincion_desde = ?, distincion_hasta = ?, " +
-      "distincion_por = ?, actualizado_en = datetime('now') WHERE codigo = ?"
-    ).bind(dist.id, contexto || null, hoy, hasta, quien || "?", codigo).run();
+      "distincion_por = ?, distincion_forma = ?, actualizado_en = datetime('now') WHERE codigo = ?"
+    ).bind(dist.id, contexto || null, hoy, hasta, quien || "?", forma, codigo).run();
   } else {
     codigo = await siguienteMiembro(env, anioCO());
     token = tokenNuevo();
@@ -14221,10 +14242,10 @@ async function adminEmitirHonor(request, env, quien) {
        la distinción, y eso lo decide `estadoCarnet`. */
     await env.DB.prepare(
       "INSERT INTO miembros (codigo, token, donante_id, nivel, desde, vigente_hasta, verif, " +
-      "distincion, distincion_contexto, distincion_desde, distincion_hasta, distincion_por) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+      "distincion, distincion_contexto, distincion_desde, distincion_hasta, distincion_por, distincion_forma) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
     ).bind(codigo, token, d.id, NIVEL_HONOR, hoy, hoy, verifNuevo(),
-           dist.id, contexto || null, hoy, hasta, quien || "?").run();
+           dist.id, contexto || null, hoy, hasta, quien || "?", forma).run();
   }
 
   await env.DB.prepare(
@@ -14242,7 +14263,7 @@ async function adminEmitirHonor(request, env, quien) {
   let correo = "no_enviado";
   try {
     const r = await correoCarnetHonor(env, email, nombre, {
-      codigo, token, distincion: dist.id, hasta, contexto, conDoc: !!docNum || !!(d.doc_numero), agregada: accion === "agregada"
+      codigo, token, distincion: dist.id, forma, hasta, contexto, conDoc: !!docNum || !!(d.doc_numero), agregada: accion === "agregada"
     }, idioma);
     correo = r && r.ok ? (r.simulado ? "simulado" : "enviado") : "fallo";
   } catch (e) {
@@ -14250,7 +14271,7 @@ async function adminEmitirHonor(request, env, quien) {
     correo = "fallo";
   }
 
-  return json({ ok: true, accion, codigo, distincion: dist.es, hasta, permanente: !hasta,
+  return json({ ok: true, accion, codigo, distincion: etiquetaDistincion(dist, forma, "es"), forma, hasta, permanente: !hasta,
                 donante_nuevo: donanteNuevo, doc_guardado: docGuardado, doc_distinto: docDistinto, correo });
 }
 
@@ -14296,7 +14317,7 @@ async function adminDistincionMiembro(request, env, codigo, quien) {
     if (!motivo) return json({ error: "motivo_requerido", ayuda: "Quitar una distinción exige un motivo." }, 400);
     await env.DB.prepare(
       "UPDATE miembros SET distincion = NULL, distincion_contexto = NULL, distincion_desde = NULL, " +
-      "distincion_hasta = NULL, distincion_por = NULL, actualizado_en = datetime('now') WHERE codigo = ?"
+      "distincion_hasta = NULL, distincion_por = NULL, distincion_forma = NULL, actualizado_en = datetime('now') WHERE codigo = ?"
     ).bind(codigo).run();
     await env.DB.prepare(
       "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
@@ -14317,7 +14338,7 @@ async function correoCarnetHonor(env, email, nombre, carnet, idioma) {
   const en = idioma === "en";
   const url = ORIGIN + "/carnet/" + carnet.token + (en ? "?lang=en" : "");
   const dist = distincionDe(carnet.distincion);
-  const etDist = dist ? (en ? dist.en : dist.es) : "";
+  const etDist = etiquetaDistincion(dist, carnet.forma, en ? "en" : "es");
   const titulo = en ? "Your honorary member card" : "Tu carnet de miembro de honor";
   const cedula = carnet.conDoc ? (en ? " or your ID number" : " o tu número de cédula") : "";
   const parrafos = en ? [
@@ -22765,6 +22786,16 @@ busca aquí. <strong>El enlace del carnet no se comparte</strong>: es la credenc
       </select></div>
     </div>
 
+    <div class="eg-par">
+      <div><label for="hn-forma">Forma del título</label><select id="hn-forma">
+        <option value="n" selected>Neutra · Fundador/a</option>
+        <option value="m">Masculina · Fundador</option>
+        <option value="f">Femenina · Fundadora</option>
+      </select></div>
+      <div></div>
+    </div>
+    <p class="mu" style="font-size:12.5px;margin:4px 0 10px">Cómo se lee la distinción en SU carnet, correo y recibo. «Junta de Asesores» es igual en las tres; en inglés siempre es neutra.</p>
+
     <label for="hn-ctx">Contexto <span style="font-weight:400">(opcional, una línea: «Fundación X», «Brigada Sismo 2026»)</span></label>
     <input id="hn-ctx" maxlength="60" autocomplete="off">
 
@@ -25942,6 +25973,7 @@ function cargarMiembros(){
       var dist = "—";
       if (m.distincion_txt){
         dist = esc(m.distincion_txt) +
+          " <small>(" + (m.distincion_forma === "m" ? "masculina" : m.distincion_forma === "f" ? "femenina" : "neutra") + ")</small>" +
           (m.distincion_contexto ? "<br><small>" + esc(m.distincion_contexto) + "</small>" : "") +
           "<br><small>" + (m.distincion_permanente ? "permanente"
             : (m.distincion_vigente ? "hasta " : "<strong>vencida</strong> el ") + esc(m.distincion_hasta || "—")) + "</small>" +
@@ -25985,7 +26017,7 @@ function hnEmitir(b){
     method: "POST", headers: {"content-type":"application/json"},
     body: JSON.stringify({
       nombre: hnValor("hn-nombre"), email: hnValor("hn-email"),
-      distincion: hnValor("hn-dist"), contexto: hnValor("hn-ctx"),
+      distincion: hnValor("hn-dist"), forma: hnValor("hn-forma") || "n", contexto: hnValor("hn-ctx"),
       meses: Number(hnValor("hn-meses") || 12),
       doc_tipo: doc ? hnValor("hn-dt") : "", doc_numero: doc,
       autoriza: !!(aut && aut.checked), idioma: hnValor("hn-idioma") || "es"
@@ -29541,13 +29573,13 @@ async function apiBajaEnlace(request, env, url) {
          vencido o revocado no se reenvía—, y hacia afuera, la misma pantalla. */
       else {
         const hn = await env.DB.prepare(
-          "SELECT m.token, m.codigo, m.distincion, m.distincion_hasta, m.distincion_contexto, d.doc_numero " +
+          "SELECT m.token, m.codigo, m.distincion, m.distincion_hasta, m.distincion_contexto, m.distincion_forma, d.doc_numero " +
           "FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
           "WHERE m.distincion IS NOT NULL AND LOWER(d.email) = ? AND " + sqlCarnetVigente("m") + " LIMIT 1"
         ).bind(email, fechaCO(), fechaCO()).first();
         if (hn) {
           await correoCarnetHonor(env, email, null, {
-            codigo: hn.codigo, token: hn.token, distincion: hn.distincion, hasta: hn.distincion_hasta,
+            codigo: hn.codigo, token: hn.token, distincion: hn.distincion, forma: hn.distincion_forma, hasta: hn.distincion_hasta,
             contexto: hn.distincion_contexto || "", conDoc: !!hn.doc_numero, agregada: true, reenvio: true
           }, lang);
         }
