@@ -13135,9 +13135,15 @@ async function cuerpoCorto(request, max) {
    de ningún miembro, y uno de un donante sin carnet responden la misma página
    con el mismo 404, y los tres pasan por la base, como en el código.
 
-   VARIOS CARNETS CON EL MISMO NÚMERO (dos correos de la misma persona, o un
-   número mal escrito en Wompi): gana el vigente y, entre iguales, el más
-   reciente. Un miembro de PayPal puede no tener documento: a ese solo se le
+   SOLO CARNETS VIGENTES. Por código, un carnet vencido o revocado dice «No
+   vigente»: el código lo lleva el propio carnet del miembro. Por cédula NO: la
+   política promete revelar la membresía solo mientras está activa, y una
+   cédula no puede delatar a quien ya no es miembro. Un carnet no vigente
+   responde el mismo «No encontramos…» que un número desconocido, por la misma
+   consulta (el filtro va en el WHERE, no en una segunda ida a la base).
+
+   VARIOS CARNETS VIGENTES CON EL MISMO NÚMERO (dos correos de la misma
+   persona, o un número mal escrito en Wompi): gana el más reciente. Un miembro de PayPal puede no tener documento: a ese solo se le
    encuentra por su código, y la página no lo distingue de «no existe». */
 async function rutaVerificarDoc(env, url, request) {
   const lang = idiomaPagina(url, request);
@@ -13164,7 +13170,8 @@ async function rutaVerificarDoc(env, url, request) {
     "FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
     "WHERE d.doc_numero IS NOT NULL AND " +
     "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(d.doc_numero, '.', ''), ' ', ''), '-', ''), char(9), ''), char(160), '') = ? " +
-    "ORDER BY (m.revocado_en IS NULL AND m.vigente_hasta >= ?) DESC, m.vigente_hasta DESC, m.desde DESC, m.creado_en DESC " +
+    "AND m.revocado_en IS NULL AND m.vigente_hasta >= ? " +
+    "ORDER BY m.vigente_hasta DESC, m.desde DESC, m.creado_en DESC " +
     "LIMIT 1"
   ).bind(doc || "-", fechaCO()).first();
 
@@ -26997,7 +27004,7 @@ const TXT_METODO = Object.freeze({
     datos: (a) => "Autorizo el " + a + "tratamiento de mis datos personales</a> (Ley 1581 de 2012).",
     cert: "Quiero certificado de donación por mis aportes",
     certH: "Opcional. Sirve para el descuento tributario en Colombia (Art. 257 ET). Te pediremos el documento y la ciudad antes de emitirlo, y lo firman el Representante Legal y la Revisora Fiscal.",
-    verifAviso: "Para que un comercio aliado compruebe tu carnet: en thegiveandgrowproject.org/verificar puede escribir su código o tu número de documento, si lo registraste al pagar o al pedir tu certificado. Solo ve tu nombre de pila, la inicial de tu apellido, tu nivel y si está vigente; nunca tu documento ni tus datos de contacto.",
+    verifAviso: "Mientras tu membresía esté vigente, un comercio aliado puede comprobarla en thegiveandgrowproject.org/verificar escribiendo su código o tu número de documento, si lo registraste al pagar o al pedir tu certificado. Solo ve tu nombre de pila, la inicial de tu apellido, tu nivel y si está vigente; nunca tu documento ni tus datos de contacto.",
     p2t: "Tu tarjeta, en la ventana de Wompi",
     p2p: "Pulsa el botón y escribe los datos de tu tarjeta en la ventana segura de Wompi, la pasarela de Bancolombia.",
     p3tMonto: "Primer cobro y confirmación",
@@ -27038,7 +27045,7 @@ const TXT_METODO = Object.freeze({
     datos: (a) => "I authorise the " + a + "processing of my personal data</a> (Colombian Law 1581 of 2012).",
     cert: "I want a donation certificate for my gifts",
     certH: "Optional. It is used for the tax deduction in Colombia (Art. 257 of the Tax Code). We will ask for your ID and city before issuing it, and it is signed by the Legal Representative and the Statutory Auditor.",
-    verifAviso: "So that a partner business can check your card: at thegiveandgrowproject.org/verificar it can type the card's code or your ID number, if you gave it when paying or when asking for your certificate. It only sees your first name, the initial of your surname, your level and whether it is valid; never your ID number or your contact details.",
+    verifAviso: "While your membership is active, a partner business can confirm it at thegiveandgrowproject.org/verificar by typing the card's code or your ID number, if you gave it when paying or when asking for your certificate. It only sees your first name, the initial of your surname, your level and whether it is valid; never your ID number or your contact details.",
     p2t: "Your card, in Wompi's window",
     p2p: "Press the button and type your card details in the secure window of Wompi, Bancolombia's payment gateway.",
     p3tMonto: "First charge and confirmation",

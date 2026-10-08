@@ -1897,7 +1897,7 @@
   "vis.lema": "Give to grow, grow to give more.",
   "membres.cta.otro": "Or write another monthly amount, in Colombian pesos",
   "membres.cta.calc2": "Want to see your tax benefit first? Use the calculator.",
-  "membres.cta.verif": "So that a partner business can check your card, at thegiveandgrowproject.org/verificar it can type the card's code or your ID number, if you gave it when paying. It only sees your first name, the initial of your surname, your level and whether it is valid.",
+  "membres.cta.verif": "While your membership is active, a partner business can confirm it at thegiveandgrowproject.org/verificar by typing the card's code or your ID number, if you gave it when paying. It only sees your first name, the initial of your surname, your level and whether it is valid.",
   "membres.cta.nivel": "{n} level · {m} a month",
   "membres.cta.rango": "The monthly gift goes from {min} to {max}.",
   "mmc.donar.opcion": "Mira Mi Casa · home repairs",
