@@ -1132,8 +1132,8 @@ const TECHO_FUENTES = 21;
 
    Es el mismo hueco que tenia el medidor de contraste hasta el PR #415: miraba
    styles.css y no lo que el Worker pinta. */
-const TECHO_COLORES_WK = 27;
-const TECHO_FUENTES_WK = 80;
+const TECHO_COLORES_WK = 23;   // 27 → 23 el 8 oct 2026: la Fase 1 del panel pasó sus estilos a tokens
+const TECHO_FUENTES_WK = 70;   // 80 → 70 el mismo día
 try {
   const css = readFileSync("styles.css", "utf8");
   /* Los bloques que DEFINEN tokens son justo donde los literales deben estar.

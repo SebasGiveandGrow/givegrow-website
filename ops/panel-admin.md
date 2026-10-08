@@ -241,28 +241,74 @@ falsificar.
 
 ## Qué hace el panel
 
-> Esta sección describía un panel de tres líneas —«resumen, tabla de aportes y
-> dos acciones»— que dejó de existir hace meses. Reescrita el 14 sep 2026 contra
-> el código, no de memoria.
+> Reescrita el 8 oct 2026 con la Fase 1 del panel (barra lateral, «Hoy» como
+> bandeja de entrada, cajón lateral y vista previa de correos). La versión
+> anterior describía siete pestañas que ya no existen.
 
-El panel está partido en **siete pestañas**, y cada una agrupa sus pantallas:
+**El armazón.** Una barra lateral fija, agrupada por área, y una barra superior
+delgada con el buscador y la sesión. Se ve **una sección a la vez**, con su
+cabecera —área, título, una línea de para qué sirve, lo que espera en ella y su
+acción principal— y su propia dirección, que se puede guardar y que respeta el
+botón de atrás. En el teléfono la barra lateral se abre con «Menú».
 
-| pestaña | qué hay dentro |
-|---|---|
-| **Hoy** | «Lo que hay que hacer hoy»: las colas pendientes, ordenadas por prioridad y con los días que llevan esperando. Es la portada. |
-| **Dinero** | Aportes · Transferencias por verificar · Pagos sin aporte · Membresías internacionales · Donaciones por el botón de PayPal · Eventos de PayPal sin casa |
-| **Mira Mi Casa** | Casas por revisar · Inspecciones en terreno |
-| **Red** | Quién quiere entrar · Ofrecimientos en especie |
-| **Entregas** | Entregas, con sus fotos y su publicación |
-| **Contabilidad** | Egresos · Proveedores |
-| **Salud** | Salud del ecosistema: dónde se cae la donación y qué lleva días esperando |
+| área | entrada (dirección) | qué hay dentro |
+|---|---|---|
+| Inicio | Hoy (`#hoy`) | La bandeja de entrada: todas las colas, en tres franjas |
+| Finanzas | Aportes (`#finanzas/aportes`) | Cifras de los aportes, franja de certificados y la lista |
+| | Transferencias (`#finanzas/transferencias`) | Lo reportado por transferencia, para confirmar contra el extracto |
+| | Pagos sin aporte (`#finanzas/pagos`) | Cobros de Wompi sin guía |
+| | Membresías y carnets (`#finanzas/membresias`) | Membresías de PayPal · carnets · carnet de honor |
+| | Vencimientos (`#finanzas/vencimientos`) | Obligaciones tributarias y legales |
+| | Egresos (`#finanzas/egresos`) | Registrar egresos, soportes y la descarga para el contador |
+| | Proveedores (`#finanzas/proveedores`) | A quién se le paga |
+| | PayPal (`#finanzas/paypal`) | Donaciones del botón · avisos de PayPal sin registro |
+| Alianzas | Red (`#alianzas/red`) | Quién quiere entrar: fundaciones, empresas, voluntarios, padrinos |
+| | Ofrecimientos en especie (`#alianzas/ofrecimientos`) | Lo que llega por el formulario de la brigada |
+| | Social Fest (`#alianzas/socialfest`) | La misma bandeja de Red, filtrada por lo que llegó del evento |
+| Personas | Voluntariado (`#personas/voluntariado`) | Jornadas, de la convocatoria al cierre |
+| | Ingenieros (`#personas/ingenieros`) | La bandeja de Red filtrada a ingenieros y su matrícula |
+| Mira Mi Casa | Casas (`#mmc/casas`) · Inspecciones (`#mmc/inspecciones`) | Casos de vivienda · visitas en terreno y el respaldo de un teléfono |
+| Entregas | Actas de entrega (`#entregas`) | Registrar, subir fotos, publicar |
+| Sistema | Salud (`#sistema/salud`) | Embudo, señales de Wompi y del correo, operación del cron |
 
-**Las colas son diecisiete** y se calculan en `/api/admin/salud`. Cada una trae
-su conteo, desde cuándo espera la más vieja, cómo se arregla y a qué pantalla
-lleva. La insignia de cada pestaña suma las suyas.
+Las direcciones viejas (`#dinero`, `#conta/sec-vencimientos`, `#sec-aportes`…)
+siguen abriendo su sección: las llevan correos ya enviados.
 
-**Las bandejas son trece** y se cargan solas al abrir su módulo o al asomar por
-pantalla, nunca todas de golpe.
+**«Hoy».** Las colas salen de `/api/admin/salud?items=1`. Cada una trae su
+conteo, desde cuándo espera la más vieja, cómo se arregla, su **franja**
+(`bandaDeCola`: Urgente, Hoy o Esta semana) y sus **cinco filas más viejas**,
+que salen de la misma consulta que el número (`itemsDeCola` + `ITEMS_COLA`).
+Dentro de cada franja manda el **peso** de la cola y después la fecha: ya no
+sube primero todo lo vencido pesara lo que pesara. Donde el panel ya sabe
+hacerlo, la acción está en la fila: confirmar una transferencia, emitir un
+certificado, abrir un caso, «Ya la atendimos», marcar un vencimiento. Las
+insignias de la barra lateral salen de esa misma respuesta (`COLA_MOD` dice de
+qué sección es cada cola). El resumen diario por correo sigue igual: llama a
+`adminSalud` sin filas.
+
+**Un solo número.** «Certificados por emitir» sale de `CERT_POR_EMITIR` en
+`worker.js`, que usan «Hoy», la franja de Aportes y el resumen. Antes eran tres
+consultas y tres cifras.
+
+**El cajón y los avisos.** Detalle y formularios se abren en un cajón lateral,
+no en `window.prompt`. Al terminar sale un aviso «Hecho», con «Deshacer» solo
+donde existe la acción contraria (vencimientos, «Ya la atendimos», cerrar o
+descartar un caso, archivar y reabrir).
+
+**Antes de un correo, el correo.** Toda acción que le escribe a alguien de
+fuera pregunta primero a `/api/admin/previa`, que arma los correos con **las
+mismas plantillas** sin enviarlos ni anotarlos, y el cajón enseña a quién, con
+qué asunto y qué dice. Cubre: mover una fundación (Aceptar, Visita hecha,
+Iniciar convenio, Marcar vinculada), confirmar una transferencia (el recibo),
+emitir y enviar un certificado, firmarlo cuando con esa firma sale, verificar
+una matrícula y reenviar su aviso, reenviar el enlace del convenio, y cerrar o
+descartar un caso. Si la vista previa falla, no se confirma.
+
+**Lo que destruye va en rojo.** Suprimir, Anular (certificado, acta, egreso),
+Descartar una transferencia, quitar una foto o una distinción: botón rojo y un
+cajón que dice qué se destruye y pide el motivo cuando el servidor lo exige.
+
+Las bandejas se cargan al abrir su sección, nunca todas de golpe.
 
 **Lo que el panel NO puede hacer, a propósito:** mover estados de pago. Los
 únicos que admite a mano son `en_distribucion` y `entregada` —está escrito en
@@ -270,11 +316,6 @@ pantalla, nunca todas de golpe.
 solo lo hace el webhook de la pasarela. Si el panel pudiera hacerlo, la
 trazabilidad dejaría de significar algo, que es justo lo que el sitio le promete
 al donante.
-
-**Lo que el panel NO puede hacer, a propósito:** mover estados de pago. Eso lo
-hace únicamente el webhook de Wompi. Si el panel pudiera marcar un aporte como
-"aprobada" a mano, la trazabilidad dejaría de significar algo — y es justo lo que
-el sitio le promete al donante.
 
 Cada cambio manual deja rastro de quién lo hizo, en la tabla `consentimientos`
 con tipo `auditoria`. Hoy el panel es de una sola persona; el día que sean dos,
