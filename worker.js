@@ -1595,7 +1595,7 @@ async function correoAporteAprobado(env, aporte, email, nombre, carnet) {
   let bloque = "";
   if (carnet && carnet.url) {
     const cl = Object.assign({}, carnet, { lang: en ? "en" : "es" });
-    const nota = carnetSinGratitud(carnet.nivelId)
+    const nota = carnetSinGratitud(carnet.nivelId, carnet.honorVigente)
       ? (en ? "Your member card. It proves your Seed membership; Gratitude Programme benefits at partner businesses start at the Sprout level."
             : "Tu carnet de miembro. Acredita tu membresía Semilla; los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño.")
       : carnet.nuevo
@@ -12774,6 +12774,101 @@ function nivelPorMensual(cop) {
 }
 function nivelDe(id) { return NIVELES_MB.find((x) => x.id === id) || NIVELES_MB[0]; }
 
+/* ========================================================================
+   EL CARNET DE HONOR (migración 0040, decisión del fundador, 8 oct 2026)
+   ========================================================================
+   Una DISTINCIÓN que la fundación otorga por invitación, de un catálogo
+   cerrado: un campo libre acabaría con «Fundador», «fundador» y «Fundadora»
+   siendo tres cosas. Se guarda el id y se pinta siempre con la misma forma
+   «/a» —la persona no tiene que declarar su género para recibirla—.
+
+   `permanente`: fundador y pionero no vencen (lo que se reconoce ya ocurrió).
+   Las demás son de ROL —se reconoce algo que la persona está haciendo— y
+   valen 12 meses renovables desde el panel: cuando el rol termina, la
+   distinción se apaga sola sin que nadie tenga que acordarse de quitarla.
+
+   LA JUNTA DE ASESORES es un grupo honorario y ASESOR, sin funciones de
+   dirección: la fundación no tiene junta directiva (CLAUDE.md, «Gobierno»).
+   Donde se nombre, se dice así. */
+/* LA FORMA DEL TÍTULO (0041). En una tarjeta personal «Fundador/a» se lee
+   raro: el carnet es de UNA persona. Quien emite elige, por carnet, la forma
+   masculina (m), femenina (f) o la neutra «/a» (n, y NULL = n). `es` es la
+   neutra y sigue siendo la que usa el panel para nombrar la distinción en
+   general. El inglés ya es neutro. */
+const DISTINCIONES = [
+  { id: "fundador",               es: "Fundador/a",                 m: "Fundador",               f: "Fundadora",
+    en: "Founder",               permanente: true },
+  { id: "pionero",                es: "Pionero/a",                  m: "Pionero",                f: "Pionera",
+    en: "Pioneer",               permanente: true },
+  { id: "coordinador_voluntario", es: "Coordinador/a voluntario/a", m: "Coordinador voluntario", f: "Coordinadora voluntaria",
+    en: "Volunteer coordinator", permanente: false },
+  { id: "aliado_red",             es: "Aliado/a de la red",         m: "Aliado de la red",       f: "Aliada de la red",
+    en: "Network ally",          permanente: false },
+  { id: "embajador",              es: "Embajador/a",                m: "Embajador",              f: "Embajadora",
+    en: "Ambassador",            permanente: false },
+  { id: "junta_asesores",         es: "Junta de Asesores",          m: "Junta de Asesores",      f: "Junta de Asesores",
+    en: "Advisory Board",        permanente: false,
+    nota: { es: "Grupo honorario y asesor, sin funciones de dirección.", en: "An honorary advisory group, with no governing role." } }
+];
+function distincionDe(id) { return DISTINCIONES.find((x) => x.id === id) || null; }
+const FORMAS_DISTINCION = ["m", "f", "n"];
+/* El nombre de la distinción tal como va en ESE carnet: el único sitio que
+   elige la forma, para que la tarjeta, el correo, el PDF y /verificar digan
+   lo mismo. */
+function etiquetaDistincion(d, forma, lang) {
+  if (!d) return "";
+  if (lang === "en") return d.en;
+  return forma === "m" ? d.m : forma === "f" ? d.f : d.es;
+}
+/* El valor de `miembros.nivel` de quien solo tiene carnet de honor: no es
+   ninguno de los cuatro niveles pagados (ver la 0040). */
+const NIVEL_HONOR = "honor";
+function esNivelPagado(id) { return NIVELES_MB.some((x) => x.id === id); }
+
+/* ¿VALE ESTE CARNET HOY? El ÚNICO sitio que lo decide. Antes la cuenta
+   `!revocado_en && vigente_hasta >= hoy` estaba copiada en seis lugares; con
+   la distinción esa cuenta ya no basta, y una copia que se quedara vieja
+   negaría en la caja de un comercio un carnet que en /carnet dice «Vigente».
+
+   `m`: fila de `miembros` (nivel, vigente_hasta, revocado_en y las columnas
+   distincion*). Devuelve, además del sí o no, lo que necesitan las pantallas:
+   · `pagado`  — la membresía pagada sigue viva;
+   · `honor`   — la distinción sigue viva;
+   · `hasta`   — la fecha hasta la que vale (la más lejana de las dos), o null
+                 si vale sin fecha porque la distinción es permanente. */
+function estadoCarnet(m, hoy) {
+  const h = hoy || fechaCO();
+  const revocado = !!(m && m.revocado_en);
+  const pagado = !!m && esNivelPagado(m.nivel) && String(m.vigente_hasta || "") >= h;
+  const d = m && m.distincion ? distincionDe(m.distincion) : null;
+  const honor = !!d && (!m.distincion_hasta || m.distincion_hasta >= h);
+  const permanente = honor && !m.distincion_hasta;
+  let hasta = null;
+  if (!permanente) {
+    const a = esNivelPagado(m && m.nivel) ? String(m.vigente_hasta || "") : "";
+    const b = d ? String(m.distincion_hasta || "") : "";
+    hasta = (a > b ? a : b) || (m && m.vigente_hasta) || null;
+  }
+  return { vigente: !revocado && (pagado || honor), revocado, pagado, honor, permanente, hasta, distincion: d };
+}
+
+/* La misma regla para un WHERE, donde no se puede llamar a `estadoCarnet`
+   (la consulta por cédula filtra en la base para no delatar a quien ya no es
+   miembro). `hoy` es la expresión con la que se compara: "?" si se va a
+   enlazar —y entonces se enlaza DOS veces—, o una expresión SQL. Si cambia
+   `estadoCarnet`, cambia esto. */
+function sqlCarnetVigente(alias, hoy) {
+  const a = alias ? alias + "." : "";
+  const h = hoy || "?";
+  return "(" + a + "revocado_en IS NULL AND ((" + a + "nivel <> '" + NIVEL_HONOR + "' AND " + a + "vigente_hasta >= " + h + ") OR " +
+    "(" + a + "distincion IS NOT NULL AND (" + a + "distincion_hasta IS NULL OR " + a + "distincion_hasta >= " + h + "))))";
+}
+
+/* Las columnas que `estadoCarnet` necesita, para no olvidar ninguna en un
+   SELECT: sin `distincion_hasta`, una distinción de rol se leería permanente. */
+const COLS_CARNET = "m.codigo, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, " +
+  "m.distincion, m.distincion_contexto, m.distincion_desde, m.distincion_hasta, m.distincion_forma";
+
 async function siguienteMiembro(env, anio) {
   const { results } = await env.DB.prepare(
     "INSERT INTO numerador_miembro (anio, ultimo) VALUES (?, 1) " +
@@ -12974,7 +13069,7 @@ function idiomaPagina(url, request) {
 async function rutaCarnet(env, token, url, request) {
   if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return new Response("No encontrado", { status: 404 });
   const m = await env.DB.prepare(
-    "SELECT m.codigo, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, d.nombre " +
+    "SELECT " + COLS_CARNET + ", d.nombre " +
     "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.token = ?"
   ).bind(token).first();
   if (!m) return new Response("No encontrado", { status: 404 });
@@ -12982,9 +13077,7 @@ async function rutaCarnet(env, token, url, request) {
   /* EL DIA COLOMBIANO. Con el reloj en UTC, un carnet que vence HOY se veia
      «No vigente» desde las 7 de la tarde: cinco horas en las que su dueño abre
      su enlace y lee que ya no vale, siendo mentira. */
-  const hoy = fechaCO();
-  const vigente = !m.revocado_en && m.vigente_hasta >= hoy;
-  const n = nivelDe(m.nivel);
+  const est = estadoCarnet(m, fechaCO());
   const lang = idiomaPagina(url, request);
   /* Un carnet anterior a la 0039 que se quedó sin código lo recibe aquí, en
      su primera visita. Si fallara, el carnet se pinta igual sin QR: el
@@ -12993,12 +13086,11 @@ async function rutaCarnet(env, token, url, request) {
   try { verif = await verifDeMiembro(env, m.codigo, m.verif); }
   catch (e) { console.error("carnet verif", m.codigo, e && e.message); }
 
-  return new Response(paginaCarnet({
-    nombre: m.nombre || (lang === "en" ? "Member" : "Miembro"), codigo: m.codigo,
-    nivel: lang === "en" ? n.en : n.es, nivelId: n.id,
-    desde: m.desde, hasta: m.vigente_hasta, vigente, verif,
+  return new Response(paginaCarnet(Object.assign(datosTarjeta(m, est, lang), {
+    nombre: m.nombre || (lang === "en" ? "Member" : "Miembro"), codigo: m.codigo, verif,
+    contexto: m.distincion_contexto || "",
     consultado: consultadoCO(), lang, tema: temaPorReloj(request)
-  }), {
+  })), {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "referrer-policy": "strict-origin-when-cross-origin",
@@ -13054,15 +13146,15 @@ async function verificarLimitado(env, request) {
 
 /* La fila de un carnet → lo que pinta la página. Una sola función para las dos
    consultas: el resultado por cédula es EXACTAMENTE el mismo que por código. */
+/* SIN el contexto de la distinción («Fundación X»): esta respuesta es la
+   mínima que deja cotejar, y el contexto no le sirve al cajero para decidir.
+   La distinción sí va, porque es la razón por la que el beneficio aplica. */
 function resultadoVerificar(m, verif, lang) {
-  const n = nivelDe(m.nivel);
-  return {
-    vigente: !m.revocado_en && m.vigente_hasta >= fechaCO(),
-    nivel: lang === "en" ? n.en : n.es, nivelId: n.id, verif,
+  return Object.assign(datosTarjeta(m, estadoCarnet(m, fechaCO()), lang), {
+    verif,
     nombre: nombreEnmascarado(m.nombre),
-    desde: m.desde, hasta: m.vigente_hasta,
     consultado: consultadoCO()
-  };
+  });
 }
 
 async function rutaVerificar(env, url, request, crudo) {
@@ -13079,7 +13171,7 @@ async function rutaVerificar(env, url, request, crudo) {
 
   const v = verifNormal(entrada);
   const m = await env.DB.prepare(
-    "SELECT m.nivel, m.desde, m.vigente_hasta, m.revocado_en, d.nombre " +
+    "SELECT " + COLS_CARNET + ", d.nombre " +
     "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.verif = ?"
   ).bind(v || "-").first();
 
@@ -13166,14 +13258,16 @@ async function rutaVerificarDoc(env, url, request) {
      puede venir con puntos o espacios. La tabla es pequeña; el REPLACE no usa
      índice y no hace falta. */
   const m = await env.DB.prepare(
-    "SELECT m.codigo, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, d.nombre " +
+    "SELECT " + COLS_CARNET + ", d.nombre " +
     "FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
     "WHERE d.doc_numero IS NOT NULL AND " +
     "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(d.doc_numero, '.', ''), ' ', ''), '-', ''), char(9), ''), char(160), '') = ? " +
-    "AND m.revocado_en IS NULL AND m.vigente_hasta >= ? " +
+    /* La misma regla que `estadoCarnet`: un carnet de honor vigente también se
+       encuentra por cédula (la persona lo autorizó al recibirlo). */
+    "AND " + sqlCarnetVigente("m") + " " +
     "ORDER BY m.vigente_hasta DESC, m.desde DESC, m.creado_en DESC " +
     "LIMIT 1"
-  ).bind(doc || "-", fechaCO()).first();
+  ).bind(doc || "-", fechaCO(), fechaCO()).first();
 
   if (!m) return respuestaVerificar(paginaVerificar({ lang, tema, entrada: "", noEncontrado: true }), 404);
 
@@ -13209,6 +13303,7 @@ function paginaVerificar(o) {
     cotejar: "Ask for an ID document and check that the name matches. The card is personal and not transferable.",
     semilla: "Seed level: the membership is real, but Gratitude Programme benefits start at the Sprout level.",
     cotejarSemilla: "At this level the partner-business benefit does not apply. If you want to confirm the name, ask for an ID document.",
+    honor: "Honorary member: the Gratitude Programme benefit applies.",
     nf: "We could not find a card with that code or ID number.",
     nfP: "Check that it was typed correctly: the code has eight characters, with or without the dash; the ID number, digits only. If it still does not show up, the card cannot be confirmed — do not apply the benefit; the member can write to us.",
     lim: "Too many checks from this connection.",
@@ -13231,6 +13326,7 @@ function paginaVerificar(o) {
     cotejar: "Pide un documento de identidad y compara el nombre. El carnet es personal e intransferible.",
     semilla: "Nivel Semilla: la membresía es real, pero los beneficios del Programa de Gratitud empiezan en el nivel Retoño.",
     cotejarSemilla: "A este nivel no aplica el beneficio del comercio aliado. Si quieres confirmar el nombre, pide un documento de identidad.",
+    honor: "Miembro de honor: el beneficio del Programa de Gratitud aplica.",
     nf: "No encontramos un carnet con ese código o documento.",
     nfP: "Revisa que esté bien escrito: el código tiene ocho caracteres, con o sin guion; la cédula, solo números. Si aun así no aparece, el carnet no se puede confirmar: no apliques el beneficio, y el miembro puede escribirnos.",
     lim: "Demasiadas consultas desde esta conexión.",
@@ -13292,16 +13388,16 @@ function paginaVerificar(o) {
       + '  <section class="vf-res ' + (r.vigente ? "vf-si" : "vf-no") + '">\n'
       + '    <p class="vf-estado">' + esc(r.vigente ? T.vig : T.novig) + '</p>\n'
       + '    <p class="vf-estado-p">' + esc(r.vigente ? T.vigP : T.novigP) + '</p>\n'
-      + (carnetSinGratitud(r.nivelId) ? '    <p class="vf-estado-p vf-semilla">' + esc(T.semilla) + '</p>\n' : '')
+      /* Un miembro de honor VIGENTE tiene el beneficio aunque su nivel pagado
+         sea Semilla, y se le dice al cajero en vez de dejar que lo deduzca. */
+      + (r.vigente && r.honorVigente ? '    <p class="vf-estado-p vf-semilla">' + esc(T.honor) + '</p>\n'
+        : carnetSinGratitud(r.nivelId, r.honorVigente) ? '    <p class="vf-estado-p vf-semilla">' + esc(T.semilla) + '</p>\n' : '')
       + '  </section>\n'
       + '  <div class="vf-tarjeta">\n'
-      + carnetTarjetaHTML({
-          lang: o.lang, modo: "verificar", nombre: r.nombre, nivel: r.nivel, nivelId: r.nivelId,
-          verif: r.verif, desde: r.desde, hasta: r.hasta, vigente: r.vigente, consultado: r.consultado
-        })
+      + carnetTarjetaHTML(Object.assign({}, r, { lang: o.lang, modo: "verificar" }))
       + '  </div>\n'
-      + (r.vigente && !carnetSinGratitud(r.nivelId) ? '  <p class="vf-cotejar">' + esc(T.cotejar) + '</p>\n' : '')
-      + (r.vigente && carnetSinGratitud(r.nivelId) ? '  <p class="vf-cotejar">' + esc(T.cotejarSemilla) + '</p>\n' : '')
+      + (r.vigente && !carnetSinGratitud(r.nivelId, r.honorVigente) ? '  <p class="vf-cotejar">' + esc(T.cotejar) + '</p>\n' : '')
+      + (r.vigente && carnetSinGratitud(r.nivelId, r.honorVigente) ? '  <p class="vf-cotejar">' + esc(T.cotejarSemilla) + '</p>\n' : '')
       + '  <p style="margin-top:22px"><a class="card-link" href="/verificar' + qLang + '">' + esc(T.otra) + '</a></p>\n';
   } else {
     cuerpo += '  <p class="lead">' + esc(T.lead) + '</p>\n';
@@ -13549,15 +13645,49 @@ cargar();
    Sin un solo script (las dos páginas niegan la capacidad entera) y con el
    día/noche del sitio: la tarjeta tiene su color propio, como una de
    plástico, y lo que cambia es el papel de alrededor. */
+/* EL CARNET DE HONOR (0040) va en TINTA, más honda y menos verde que
+   Bosque, con un solo acento cálido: el arena de papel (`CARNET_ARENA`), en
+   un filo interior fino y en el nombre de la distinción. Sin dorado ni brillo:
+   la distinción se reconoce por la composición —«Miembro de honor» arriba, la
+   distinción en grande— y no por un efecto. Y el arena NO es el ámbar del
+   «No vigente», para que el cajero no lea una distinción como una alarma. */
 const CARNET_TINTE = {
   semilla: ["#3B4D42", "#1E2B23"],
   retono:  ["#2E7D4F", "#17432B"],
   arbol:   ["#1F5C38", "#0E2118"],
   bosque:  ["#123322", "#060F0A"],
+  honor:   ["#18221C", "#0A110D"],
   apagado: ["#454B47", "#1F2321"]
 };
-function carnetTinte(nivelId, vigente) {
-  return vigente ? (CARNET_TINTE[nivelId] || CARNET_TINTE.semilla) : CARNET_TINTE.apagado;
+const CARNET_ARENA = "#D8C9A6";
+function carnetTinte(nivelId, vigente, honor) {
+  if (!vigente) return CARNET_TINTE.apagado;
+  if (honor) return CARNET_TINTE.honor;
+  return CARNET_TINTE[nivelId] || CARNET_TINTE.semilla;
+}
+
+/* Lo que toda tarjeta necesita saber de una fila, ya decidido por
+   `estadoCarnet`: la pinten /carnet, /verificar, el correo o el recibo, el
+   nivel, la distinción y la vigencia salen de aquí y no de una cuenta propia.
+
+   · `honor`: la tarjeta se pinta de honor. Lo es si la distinción sigue viva,
+     o si la persona SOLO tiene carnet de honor (aunque se haya vencido: así
+     su carnet dice «No vigente» con lo que era, en vez de fingir un nivel).
+   · `nivel`: el nivel pagado, y solo si la membresía pagada sigue viva; en una
+     tarjeta de honor va en pequeño. */
+function datosTarjeta(m, est, lang) {
+  const en = lang === "en";
+  const pagado = esNivelPagado(m.nivel) ? nivelDe(m.nivel) : null;
+  const d = est.distincion && (est.honor || !pagado) ? est.distincion : null;
+  const honor = !!d || !pagado;
+  return {
+    vigente: est.vigente, desde: m.desde, hasta: est.hasta, permanente: est.permanente,
+    nivelId: pagado ? pagado.id : NIVEL_HONOR,
+    nivel: pagado && (est.pagado || !honor) ? (en ? pagado.en : pagado.es) : "",
+    honor, honorVigente: est.honor,
+    distincion: etiquetaDistincion(d, m.distincion_forma, lang), distincionId: d ? d.id : "",
+    distincionNota: d && d.nota ? (en ? d.nota.en : d.nota.es) : ""
+  };
 }
 function carnetIndiceNivel(nivelId) { return Math.max(0, NIVELES_MB.findIndex((x) => x.id === nivelId)); }
 
@@ -13568,7 +13698,14 @@ function carnetIndiceNivel(nivelId) { return Math.max(0, NIVELES_MB.findIndex((x
    que ACREDITA su membresía, y se le dice desde qué nivel empiezan los
    beneficios en vez de dejar que lo descubra frente al comercio. Lo usan el
    carnet, sus correos, el recibo y /verificar. */
-function carnetSinGratitud(nivelId) { return (nivelId || "semilla") === "semilla"; }
+/* Y UN MIEMBRO DE HONOR SÍ TIENE el beneficio, sea cual sea su nivel
+   pagado (decisión del fundador, 8 oct 2026: esas personas hacen posibles los
+   beneficios y la fundación). Por eso el segundo argumento: la distinción
+   VIVA, no el solo hecho de tenerla anotada. */
+function carnetSinGratitud(nivelId, honorVigente) {
+  if (honorVigente) return false;
+  return (nivelId || "semilla") === "semilla";
+}
 
 const CARNET_CSS = ''
   + '.cv-par{display:grid;gap:14px;width:100%;max-width:440px}'
@@ -13606,6 +13743,17 @@ const CARNET_CSS = ''
   + '.cv-escala{display:flex;gap:1.2cqw;padding-bottom:1cqw}'
   + '.cv-escala i{display:block;width:4.2cqw;height:1.1cqw;min-height:3px;border-radius:1px;background:rgba(255,255,255,.22)}'
   + '.cv-escala i.on{background:rgba(255,255,255,.9)}'
+  /* la tarjeta de honor: un filo interior en arena y la distinción en grande */
+  + '.cv-honor::after{content:"";position:absolute;inset:2.2cqw;border:1px solid ' + CARNET_ARENA + ';opacity:.42;border-radius:2.8cqw;pointer-events:none}'
+  + '.cv-t-apagado.cv-honor::after{opacity:.2}'
+  + '.cv-honor .cv-nivel{color:' + CARNET_ARENA + ';margin:0 0 .8cqw}'
+  + '.cv-dist{font-family:var(--font-display);font-weight:600;font-size:max(14px,4.6cqw);line-height:1.15;letter-spacing:-.005em;color:' + CARNET_ARENA + ';margin:0 0 .6cqw}'
+  + '.cv-t-apagado .cv-dist,.cv-t-apagado.cv-honor .cv-nivel{color:rgba(255,255,255,.72)}'
+  + '.cv-ctx{font-size:max(10px,2.7cqw);line-height:1.3;color:rgba(255,255,255,.74);margin:0 0 1.6cqw;'
+  + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  + '.cv-honor .cv-nombre{font-size:clamp(16px,5.6cqw,26px)}'
+  + '.cv-hon-ey{display:flex;justify-content:space-between;align-items:baseline;gap:3cqw}'
+  + '.cv-nivpeq{font-size:max(9px,2.5cqw);font-weight:600;letter-spacing:.12em;color:rgba(255,255,255,.7);white-space:nowrap}'
   /* el reverso, en papel */
   + '.cv-rev{background:var(--surface);border:1px solid var(--bd);border-radius:14px;padding:16px}'
   + '.cv-qr{display:flex;flex-wrap:wrap;gap:16px;align-items:center}'
@@ -13630,19 +13778,22 @@ function carnetTarjetaHTML(c) {
   const verificar = c.modo === "verificar";
   const T = en ? {
     vig: "Valid", novig: "Not valid", carnet: "Card no.", verif: "Check code", desde: "Member since",
-    hasta: "Valid until", miembro: "Member",
+    hasta: "Valid until", miembro: "Member", honor: "Honorary member",
+    vigencia: "Validity", permanente: "Permanent", nivelPeq: "%s level",
     qr: verificar ? "This QR and this code open this same check." : "Business: scan with YOUR phone to check",
     codigo: "Verification code", cons: "Checked", hora: "Colombia time",
     escala: "Level %n of 4", personal: "Personal and not transferable."
   } : {
     vig: "Vigente", novig: "No vigente", carnet: "Carnet", verif: "Verificación", desde: "Miembro desde",
-    hasta: "Vigente hasta", miembro: "Miembro",
+    hasta: "Vigente hasta", miembro: "Miembro", honor: "Miembro de honor",
+    vigencia: "Vigencia", permanente: "Permanente", nivelPeq: "Nivel %s",
     qr: verificar ? "Este QR y este código abren esta misma consulta." : "Comercio: escanea con TU celular para comprobar",
     codigo: "Código de verificación", cons: "Consultado", hora: "hora de Colombia",
     escala: "Nivel %n de 4", personal: "Personal e intransferible."
   };
+  const honor = !!c.honor;
   const idx = carnetIndiceNivel(c.nivelId);
-  const tinte = c.vigente ? (CARNET_TINTE[c.nivelId] ? c.nivelId : "semilla") : "apagado";
+  const tinte = !c.vigente ? "apagado" : honor ? "honor" : (CARNET_TINTE[c.nivelId] ? c.nivelId : "semilla");
   const vf = c.verif ? verifFormato(c.verif) : "";
   const marcas = NIVELES_MB.map((_, i) => '<i' + (i <= idx ? ' class="on"' : '') + '></i>').join("");
 
@@ -13665,9 +13816,27 @@ function carnetTarjetaHTML(c) {
       + '    </div>\n';
   }
   const numero = verificar ? [T.verif, vf] : [T.carnet, c.codigo];
+  /* La vigencia de una distinción permanente no tiene fecha: se dice. */
+  const vence = c.permanente ? [T.vigencia, T.permanente] : [T.hasta, c.hasta || "—"];
+  const nombreTag = verificar ? 'p' : 'h1';
+
+  /* EN LA DE HONOR, arriba «Miembro de honor» —y a su derecha, en pequeño,
+     el nivel pagado si la persona además paga una membresía viva—, la
+     distinción en grande y, si la hay, la línea de contexto (que /verificar no
+     recibe). Sin la escala de cuatro marcas: abajo, en un celular de 375 px,
+     el nivel junto a «Permanente» partía el número del carnet en dos líneas. */
+  const medio = honor
+    ? '        <p class="cv-nivel cv-hon-ey"><span>' + esc(T.honor) + '</span>'
+      + (c.nivel ? '<span class="cv-nivpeq">' + esc(T.nivelPeq.replace("%s", c.nivel)) + '</span>' : '') + '</p>\n'
+      + (c.distincion ? '        <p class="cv-dist"' + (c.distincionNota ? ' title="' + esc(c.distincionNota) + '"' : '') + '>' + esc(c.distincion) + '</p>\n' : '')
+      + (c.contexto && !verificar ? '        <p class="cv-ctx">' + esc(c.contexto) + '</p>\n' : '')
+    : '        <p class="cv-nivel">' + esc(T.miembro) + ' · ' + esc(c.nivel) + '</p>\n';
+  const derecha = honor
+    ? ''
+    : '        <span class="cv-escala" role="img" aria-label="' + esc(T.escala.replace("%n", String(idx + 1))) + '">' + marcas + '</span>\n';
 
   return '<div class="cv-par">\n'
-    + '  <article class="cv-card cv-t-' + tinte + '" aria-labelledby="cv-nombre">\n'
+    + '  <article class="cv-card cv-t-' + tinte + (honor ? ' cv-honor' : '') + '" aria-labelledby="cv-nombre">\n'
     + '    <span class="cv-fondo" aria-hidden="true">&amp;</span>\n'
     + '    <div class="cv-in">\n'
     + '      <div class="cv-cab">\n'
@@ -13675,15 +13844,15 @@ function carnetTarjetaHTML(c) {
     + '        <span class="cv-chip ' + (c.vigente ? "cv-si" : "cv-no") + '"><span class="cv-pulso" aria-hidden="true"></span>' + esc(c.vigente ? T.vig : T.novig) + '</span>\n'
     + '      </div>\n'
     + '      <div class="cv-medio">\n'
-    + '        <p class="cv-nivel">' + esc(T.miembro) + ' · ' + esc(c.nivel) + '</p>\n'
-    + '        <' + (verificar ? 'p' : 'h1') + ' class="cv-nombre" id="cv-nombre">' + esc(c.nombre || "—") + '</' + (verificar ? 'p' : 'h1') + '>\n'
+    + medio
+    + '        <' + nombreTag + ' class="cv-nombre" id="cv-nombre">' + esc(c.nombre || "—") + '</' + nombreTag + '>\n'
     + '      </div>\n'
     + '      <div class="cv-base">\n'
     + '        <dl class="cv-datos">\n'
     + '          <div><dt>' + esc(numero[0]) + '</dt><dd>' + esc(numero[1] || "—") + '</dd></div>\n'
-    + '          <div><dt>' + esc(T.hasta) + '</dt><dd>' + esc(c.hasta) + '</dd></div>\n'
+    + '          <div><dt>' + esc(vence[0]) + '</dt><dd>' + esc(vence[1]) + '</dd></div>\n'
     + '        </dl>\n'
-    + '        <span class="cv-escala" role="img" aria-label="' + esc(T.escala.replace("%n", String(idx + 1))) + '">' + marcas + '</span>\n'
+    + derecha
     + '      </div>\n'
     + '    </div>\n'
     + '  </article>\n'
@@ -13702,29 +13871,47 @@ function carnetTarjetaHTML(c) {
    verificación, que el comercio puede teclear. */
 function carnetCorreoHTML(c) {
   const en = c.lang === "en";
-  const tinte = carnetTinte(c.nivelId, c.vigente);
+  const honor = !!c.honor;
+  const tinte = carnetTinte(c.nivelId, c.vigente, honor);
   const idx = carnetIndiceNivel(c.nivelId);
   const T = en
-    ? { vig: "Valid", novig: "Not valid", miembro: "Member", carnet: "Card no.", hasta: "Valid until", codigo: "Verification code" }
-    : { vig: "Vigente", novig: "No vigente", miembro: "Miembro", carnet: "Carnet", hasta: "Vigente hasta", codigo: "Código de verificación" };
-  const marcas = NIVELES_MB.map((_, i) =>
-    '<span style="display:inline-block;width:14px;height:3px;margin-left:4px;background:' + (i <= idx ? '#FFFFFF' : '#6B7A70') + '"></span>').join("");
+    ? { vig: "Valid", novig: "Not valid", miembro: "Member", carnet: "Card no.", hasta: "Valid until", codigo: "Verification code",
+        honor: "Honorary member", vigencia: "Validity", permanente: "Permanent", nivelPeq: "%s level" }
+    : { vig: "Vigente", novig: "No vigente", miembro: "Miembro", carnet: "Carnet", hasta: "Vigente hasta", codigo: "Código de verificación",
+        honor: "Miembro de honor", vigencia: "Vigencia", permanente: "Permanente", nivelPeq: "Nivel %s" };
+  /* En la de honor, el nivel pagado (si lo hay) en texto pequeño en vez de
+     las cuatro marcas, como en la tarjeta de la página. */
+  const marcas = honor
+    ? (c.nivel ? '<span style="font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#C9D3CC">' + esc(T.nivelPeq.replace("%s", c.nivel)) + '</span>' : '')
+    : NIVELES_MB.map((_, i) =>
+      '<span style="display:inline-block;width:14px;height:3px;margin-left:4px;background:' + (i <= idx ? '#FFFFFF' : '#6B7A70') + '"></span>').join("");
+  const arena = c.vigente ? CARNET_ARENA : "#DCE6DF";
+  const ey = honor
+    ? '<td style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:' + arena + '">' + esc(T.honor) + '</td>'
+    : '<td style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#DCE6DF">' + esc(T.miembro) + ' · ' + esc(c.nivel) + '</td>';
+  const dist = honor && c.distincion
+    ? '<div style="font-size:16px;line-height:1.25;font-weight:700;color:' + arena + ';margin:6px 0 0">' + esc(c.distincion) + '</div>'
+      + (c.contexto ? '<div style="font-size:12px;line-height:1.35;color:#C9D3CC;margin:2px 0 0">' + esc(c.contexto) + '</div>' : '')
+    : '';
+  const vence = c.permanente ? [T.vigencia, T.permanente] : [T.hasta, c.hasta || "—"];
   const chip = c.vigente ? "#B9DEC3" : "#F0B566";
   const celda = (k, v) => '<td style="padding:0 14px 0 0;vertical-align:bottom;white-space:nowrap">'
     + '<div style="font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#C9D3CC">' + esc(k) + '</div>'
     + '<div style="font-family:Menlo,Consolas,monospace;font-size:12px;font-weight:700;color:#FFFFFF;margin-top:2px;white-space:nowrap">' + esc(v) + '</div></td>';
   return '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:360px;margin:18px 0 6px;border-collapse:separate">'
-    + '<tr><td bgcolor="' + tinte[0] + '" style="background:' + tinte[0] + ';background-image:linear-gradient(135deg,' + tinte[0] + ',' + tinte[1] + ');border-radius:14px;padding:18px 20px 16px;color:#FFFFFF">'
+    + '<tr><td bgcolor="' + tinte[0] + '" style="background:' + tinte[0] + ';background-image:linear-gradient(135deg,' + tinte[0] + ',' + tinte[1] + ');border-radius:14px;padding:18px 20px 16px;color:#FFFFFF'
+    + (honor ? ';border:1px solid #5E594B' : '') + '">'
     + '<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>'
     + '<td style="font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#DCE6DF"><span style="font-size:20px;color:#9CCBA9;letter-spacing:0">&amp;</span>&nbsp; Fundación Give&amp;Grow</td>'
     + '<td align="right" style="white-space:nowrap"><span style="display:inline-block;font-size:12px;font-weight:700;color:' + chip + ';border:1.5px solid ' + chip + ';border-radius:999px;padding:3px 10px">' + esc(c.vigente ? T.vig : T.novig) + '</span></td>'
     + '</tr></table>'
     + '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:26px"><tr>'
-    + '<td style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#DCE6DF">' + esc(T.miembro) + ' · ' + esc(c.nivel) + '</td>'
+    + ey
     + '<td align="right" style="white-space:nowrap">' + marcas + '</td></tr></table>'
-    + '<div style="font-size:21px;line-height:1.2;font-weight:700;color:#FFFFFF;margin:4px 0 18px">' + esc(c.nombre || "") + '</div>'
+    + dist
+    + '<div style="font-size:21px;line-height:1.2;font-weight:700;color:#FFFFFF;margin:' + (dist ? '10px' : '4px') + ' 0 18px">' + esc(c.nombre || "") + '</div>'
     + '<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>'
-    + celda(T.carnet, c.codigo) + celda(T.hasta, c.hasta)
+    + celda(T.carnet, c.codigo) + celda(vence[0], vence[1])
     + '</tr></table>'
     + '</td></tr>'
     + (c.verif ? '<tr><td style="padding:10px 2px 0;font-size:13px;color:#5C636F">' + esc(T.codigo) + ': '
@@ -13746,23 +13933,23 @@ async function carnetDeAporte(env, aporte, donanteId, lang) {
      tenga uno por otro camino. */
   if (aporte.confirmacion === "manual" || aporte.metodo_pago === "TRANSFERENCIA") return null;
   const m = await env.DB.prepare(
-    "SELECT m.codigo, m.token, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, d.nombre " +
+    "SELECT " + COLS_CARNET + ", m.token, d.nombre " +
     "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.donante_id = ?"
   ).bind(donanteId).first();
   if (!m) return null;
   let verif = m.verif;
   try { verif = await verifDeMiembro(env, m.codigo, m.verif); } catch (e) { console.error("carnet aporte verif", e && e.message); }
-  const n = nivelDe(m.nivel);
   const en = lang === "en";
-  return {
+  /* Quien paga y ADEMÁS tiene una distinción viva recibe en su recibo la
+     tarjeta de honor, con su nivel en pequeño: es la misma que ve en /carnet. */
+  return Object.assign(datosTarjeta(m, estadoCarnet(m, fechaCO()), en ? "en" : "es"), {
     lang: en ? "en" : "es",
     nombre: m.nombre || (en ? "Member" : "Miembro"), codigo: m.codigo, token: m.token,
-    nivelId: n.id, nivel: en ? n.en : n.es,
-    desde: m.desde, hasta: m.vigente_hasta, verif,
-    vigente: !m.revocado_en && m.vigente_hasta >= fechaCO(),
+    contexto: m.distincion_contexto || "",
+    verif,
     consultado: consultadoCO(),
     url: ORIGIN + "/carnet/" + m.token + (en ? "?lang=en" : "")
-  };
+  });
 }
 
 /* Los datos del carnet ya traducidos para `dibujarCarnet` (documentos.js), que
@@ -13770,21 +13957,33 @@ async function carnetDeAporte(env, aporte, donanteId, lang) {
 function carnetParaDocumento(t) {
   const en = t.lang === "en";
   return {
-    titulo: en ? "Your member card" : "Tu carnet de miembro",
+    titulo: t.honor ? (en ? "Your honorary member card" : "Tu carnet de miembro de honor") : (en ? "Your member card" : "Tu carnet de miembro"),
     estado: t.vigente ? (en ? "VALID" : "VIGENTE") : (en ? "NOT VALID" : "NO VIGENTE"),
     vigente: t.vigente,
-    tinte: carnetTinte(t.nivelId, t.vigente),
+    tinte: carnetTinte(t.nivelId, t.vigente, t.honor),
     indice: carnetIndiceNivel(t.nivelId),
-    nivelTxt: (en ? "Member · " : "Miembro · ") + t.nivel,
+    nivelTxt: t.honor ? (en ? "Honorary member" : "Miembro de honor") : (en ? "Member · " : "Miembro · ") + t.nivel,
+    /* La tarjeta de honor (0040): el acento arena, la distinción, el contexto
+       y el nivel pagado en pequeño en lugar de la escala. */
+    honor: t.honor ? {
+      acento: t.vigente ? CARNET_ARENA : "#C9D3CC",
+      distincion: t.distincion || "",
+      contexto: t.contexto || "",
+      nivel: t.nivel ? (en ? t.nivel + " level" : "Nivel " + t.nivel) : ""
+    } : null,
     nombre: t.nombre,
     etNumero: en ? "Card no." : "Carnet", numero: t.codigo,
-    etHasta: en ? "Valid until" : "Vigente hasta", hasta: t.hasta,
+    etHasta: t.permanente ? (en ? "Validity" : "Vigencia") : (en ? "Valid until" : "Vigente hasta"),
+    hasta: t.permanente ? (en ? "Permanent" : "Permanente") : (t.hasta || "-"),
     qr: t.verif ? ORIGIN + "/verificar/" + verifFormato(t.verif) : null,
     verif: t.verif ? verifFormato(t.verif) : "",
     etQr: en ? "Business: scan with YOUR phone to check" : "Comercio: escanea con TU celular para comprobar",
     etCodigo: en ? "Verification code" : "Código de verificación",
     consultado: (en ? "Status as of " : "Estado al ") + t.consultado + (en ? " (Colombia time). The live status is at the QR." : " (hora de Colombia). El estado vivo está en el QR."),
-    nota: carnetSinGratitud(t.nivelId)
+    nota: t.honorVigente
+      ? (en ? "Honorary member: Gratitude Programme benefits at partner businesses apply. Open your live card from the link in your email."
+            : "Miembro de honor: aplican los beneficios del Programa de Gratitud en comercios aliados. Abre tu carnet vivo desde el enlace de tu correo.")
+      : carnetSinGratitud(t.nivelId)
       ? (en ? "Seed membership. Gratitude Programme benefits at partner businesses start at the Sprout level."
             : "Membresía Semilla. Los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño.")
       : (en ? "Open your live card from the link in your confirmation email." : "Abre tu carnet vivo desde el enlace del correo de confirmación.")
@@ -13793,16 +13992,22 @@ function carnetParaDocumento(t) {
 
 function paginaCarnet(c) {
   const en = c.lang === "en";
-  const semilla = carnetSinGratitud(c.nivelId);
+  const semilla = carnetSinGratitud(c.nivelId, c.honorVigente);
   const T = en ? {
-    titulo: "Member card",
-    pie: semilla
+    titulo: c.honor ? "Honorary member card" : "Member card",
+    pie: c.honor
+      ? "Honorary member card, issued by the foundation by invitation. It gives access to Gratitude Programme benefits at partner businesses while it is valid. Its status is read at the moment it opens, and the business can confirm it on its own at thegiveandgrowproject.org/verificar with its code or your ID number."
+        + (c.distincionNota ? " " + c.distincionNota : "")
+      : semilla
       ? "This card proves your Seed membership. Gratitude Programme benefits at partner businesses start at the Sprout level. Its status is read at the moment it opens, and anyone can confirm it at thegiveandgrowproject.org/verificar with its code or your ID number."
       : "Gratitude Programme · Show this screen at partner businesses. Its status is read at the moment it opens, and the business can confirm it on its own at thegiveandgrowproject.org/verificar with its code or your ID number.",
     otro: "Español", otroLang: "es"
   } : {
-    titulo: "Carnet de miembro",
-    pie: semilla
+    titulo: c.honor ? "Carnet de miembro de honor" : "Carnet de miembro",
+    pie: c.honor
+      ? "Carnet de miembro de honor, emitido por la fundación por invitación. Mientras esté vigente da acceso a los beneficios del Programa de Gratitud en comercios aliados. El estado se consulta en el momento, y el comercio puede comprobarlo por su cuenta en thegiveandgrowproject.org/verificar con su código o tu número de cédula."
+        + (c.distincionNota ? " " + c.distincionNota : "")
+      : semilla
       ? "Este carnet acredita tu membresía Semilla. Los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño. El estado se consulta en el momento, y cualquiera puede comprobarlo en thegiveandgrowproject.org/verificar con su código o tu número de cédula."
       : "Programa de Gratitud · Presenta esta pantalla en los comercios aliados. El estado se consulta en el momento, y el comercio puede comprobarlo por su cuenta en thegiveandgrowproject.org/verificar con su código o tu número de cédula.",
     otro: "English", otroLang: "en"
@@ -13850,10 +14055,11 @@ ${carnetTarjetaHTML(Object.assign({}, c, { modo: "carnet" }))}  <p class="cv-pie
 
 async function adminMiembros(env) {
   const r = await env.DB.prepare(
-    "SELECT m.codigo, m.token, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, " +
+    "SELECT " + COLS_CARNET + ", m.token, m.distincion_por, " +
     "d.nombre, d.email FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
     "ORDER BY m.creado_en DESC LIMIT 200"
   ).all();
+  const hoy = fechaCO();
   const filas = r.results || [];
   /* El código de verificación es lo que el equipo le dicta a un comercio que
      llama a preguntar, así que tiene que estar aquí aunque la fila sea
@@ -13864,9 +14070,21 @@ async function adminMiembros(env) {
       catch (e) { console.error("admin verif", f.codigo, e && e.message); }
     }
     f.verif_fmt = f.verif ? verifFormato(f.verif) : null;
-    f.estado = f.revocado_en ? "revocado" : (f.vigente_hasta >= fechaCO() ? "vigente" : "vencido");
+    /* El estado, de `estadoCarnet` como en /carnet y /verificar. «Vigente
+       hasta» es la fecha EFECTIVA (la más lejana entre la pagada y la de la
+       distinción), y la pagada sola va aparte para quien paga. */
+    const est = estadoCarnet(f, hoy);
+    f.estado = est.revocado ? "revocado" : (est.vigente ? "vigente" : "vencido");
+    f.hasta_efectivo = est.permanente ? "permanente" : est.hasta;
+    f.solo_honor = !esNivelPagado(f.nivel);
+    const d = est.distincion;
+    f.distincion_txt = d ? etiquetaDistincion(d, f.distincion_forma, "es") : null;
+    f.distincion_permanente = !!(d && !f.distincion_hasta);
+    f.distincion_vigente = est.honor;
+    /* El token no sale al panel: no lo usa, y es la credencial del miembro. */
+    delete f.token;
   }
-  return json({ miembros: filas });
+  return json({ miembros: filas, distinciones: DISTINCIONES.map((x) => ({ id: x.id, es: x.es, permanente: x.permanente })) });
 }
 
 /* Y SE PUEDE DESHACER, con `revocar: false` y su motivo.
@@ -13903,6 +14121,263 @@ async function adminRevocarMiembro(request, env, codigo, quien) {
     "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
   ).bind(quien || "?", "carnet " + codigo + (quitar ? " REACTIVADO: " : " revocado: ") + motivo).run();
   return json({ ok: true, codigo, revocado: !quitar });
+}
+
+/* ---- el carnet de honor desde el panel (0040) ---- */
+
+/* «2026-10-08» + 12 meses → «2027-10-08». Un 31 que no existe en el mes de
+   llegada cae al último día de ese mes, no al día 1 del siguiente: una
+   distinción de rol no se alarga sola un día. */
+function sumarMeses(fechaISO, meses) {
+  const [a, m, d] = String(fechaISO).split("-").map(Number);
+  const total = (m - 1) + meses;
+  const anio = a + Math.floor(total / 12), mes = (total % 12 + 12) % 12;
+  const ultimo = new Date(Date.UTC(anio, mes + 1, 0)).getUTCDate();
+  return anio + "-" + String(mes + 1).padStart(2, "0") + "-" + String(Math.min(d, ultimo)).padStart(2, "0");
+}
+
+/* POST /api/admin/miembros/honor — emitir un carnet de honor.
+
+   UNA PERSONA, UN CARNET. Si el correo ya es de un donante con carnet (el del
+   fundador, pagado desde el primer día), la distinción se le AÑADE a ese
+   carnet: mismo enlace, mismo QR, misma respuesta en /verificar. Solo si no
+   tenía ninguno se le abre uno, con nivel 'honor'. La respuesta dice cuál de
+   las dos cosas pasó, porque quien emite tiene que saber si mandó un carnet
+   nuevo o si cambió uno que la persona ya enseñaba en la caja.
+
+   LA FICHA DEL DONANTE NO SE PISA. Si el correo ya existía, el nombre y el
+   documento que están se quedan —los dejó la pasarela, y corregirlos es otro
+   acto del panel, con motivo—; solo se llena lo que estaba vacío, y si el
+   documento escrito aquí no coincide con el guardado, se avisa en vez de
+   cambiarlo.
+
+   EL DOCUMENTO, SOLO CON AUTORIZACIÓN. Es lo que permite que un comercio
+   encuentre el carnet por cédula; la persona tiene que haberlo autorizado, y
+   esa autorización queda en `consentimientos` con quién la registró. */
+async function adminEmitirHonor(request, env, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* se valida abajo */ }
+  if (!esObjeto(c)) c = {};
+  const nombre = limpiar(c.nombre, 200).replace(/\s+/g, " ");
+  const email = limpiar(c.email, 200).toLowerCase();
+  const dist = distincionDe(String(c.distincion || ""));
+  const forma = FORMAS_DISTINCION.includes(c.forma) ? c.forma : "n";
+  const contexto = limpiar(c.contexto, 60).replace(/\s+/g, " ");
+  const docNum = limpiar(c.doc_numero, 40);
+  const docTipo = limpiar(c.doc_tipo, 10).toUpperCase();
+  const idioma = c.idioma === "en" ? "en" : "es";
+  const meses = Math.min(24, Math.max(1, Math.round(Number(c.meses) || 12)));
+
+  if (nombre.length < 3) return json({ error: "nombre_requerido", ayuda: "Escribe el nombre completo de la persona." }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido", ayuda: "El correo no parece válido." }, 400);
+  if (!dist) return json({ error: "distincion_invalida", ayuda: "Elige una distinción de la lista." }, 400);
+  if (docNum) {
+    if (!TIPOS_DOC.includes(docTipo) || !/^[0-9A-Za-z][0-9A-Za-z.\- ]{2,24}$/.test(docNum)) {
+      return json({ error: "documento_invalido", ayuda: "Revisa el tipo y el número de documento, o déjalo vacío." }, 400);
+    }
+    if (c.autoriza !== true) {
+      return json({ error: "documento_sin_autorizacion",
+        ayuda: "Para guardar el documento hace falta marcar que la persona lo autorizó. Si no lo autorizó, deja el documento vacío: el carnet se verifica igual por su código." }, 400);
+    }
+  }
+
+  const hoy = fechaCO();
+  const hasta = dist.permanente ? null : sumarMeses(hoy, meses);
+
+  let d = await env.DB.prepare(
+    "SELECT id, nombre, doc_numero FROM donantes WHERE LOWER(email) = ? ORDER BY id LIMIT 1"
+  ).bind(email).first();
+  let donanteNuevo = false, docGuardado = false, docDistinto = false;
+  if (!d) {
+    d = await env.DB.prepare(
+      "INSERT INTO donantes (email, nombre, doc_tipo, doc_numero) VALUES (?,?,?,?) RETURNING id"
+    ).bind(email, nombre, docNum ? docTipo : null, docNum || null).first();
+    donanteNuevo = true;
+    docGuardado = !!docNum;
+  } else {
+    if (!String(d.nombre || "").trim()) {
+      await env.DB.prepare("UPDATE donantes SET nombre = ?, actualizado_en = datetime('now') WHERE id = ?").bind(nombre, d.id).run();
+    }
+    if (docNum) {
+      if (!String(d.doc_numero || "").trim()) {
+        await env.DB.prepare(
+          "UPDATE donantes SET doc_tipo = ?, doc_numero = ?, actualizado_en = datetime('now') WHERE id = ?"
+        ).bind(docTipo, docNum, d.id).run();
+        docGuardado = true;
+      } else if (docNormal(d.doc_numero) !== docNormal(docNum)) {
+        docDistinto = true;
+      }
+    }
+  }
+
+  const m = await env.DB.prepare(
+    "SELECT codigo, token, nivel, distincion, revocado_en FROM miembros WHERE donante_id = ?"
+  ).bind(d.id).first();
+  /* Un carnet revocado no se «arregla» con una distinción: la revocación fue
+     una decisión con motivo, y se deshace con su propio botón y su propio
+     motivo, no de lado. */
+  if (m && m.revocado_en) {
+    return json({ error: "carnet_revocado", codigo: m.codigo,
+      ayuda: "Esa persona tiene el carnet " + m.codigo + " REVOCADO. Si la revocación ya no aplica, reactívalo primero (con su motivo) y vuelve a emitir." }, 409);
+  }
+  if (m && m.distincion) {
+    const ya = distincionDe(m.distincion);
+    return json({ error: "ya_tiene_distincion", codigo: m.codigo,
+      ayuda: "El carnet " + m.codigo + " ya lleva la distinción «" + (ya ? ya.es : m.distincion) + "». Para cambiarla, quítala primero (con su motivo)." }, 409);
+  }
+
+  let codigo, token, accion;
+  if (m) {
+    codigo = m.codigo; token = m.token; accion = "agregada";
+    await env.DB.prepare(
+      "UPDATE miembros SET distincion = ?, distincion_contexto = ?, distincion_desde = ?, distincion_hasta = ?, " +
+      "distincion_por = ?, distincion_forma = ?, actualizado_en = datetime('now') WHERE codigo = ?"
+    ).bind(dist.id, contexto || null, hoy, hasta, quien || "?", forma, codigo).run();
+  } else {
+    codigo = await siguienteMiembro(env, anioCO());
+    token = tokenNuevo();
+    accion = "creado";
+    /* `vigente_hasta` = hoy: nunca pagó (ver la 0040). Lo que la hace valer es
+       la distinción, y eso lo decide `estadoCarnet`. */
+    await env.DB.prepare(
+      "INSERT INTO miembros (codigo, token, donante_id, nivel, desde, vigente_hasta, verif, " +
+      "distincion, distincion_contexto, distincion_desde, distincion_hasta, distincion_por, distincion_forma) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    ).bind(codigo, token, d.id, NIVEL_HONOR, hoy, hoy, verifNuevo(),
+           dist.id, contexto || null, hoy, hasta, quien || "?", forma).run();
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "carnet " + codigo + " distinción " + dist.id + " OTORGADA" +
+         (accion === "creado" ? " (carnet de honor nuevo)" : " (añadida al carnet existente)") +
+         " · " + (hasta ? "hasta " + hasta : "permanente") + (contexto ? " · " + contexto : "")).run();
+  if (docGuardado) {
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'datos', ?)"
+    ).bind(email, "Autorizó guardar su documento para que un comercio aliado verifique su carnet de honor " + codigo +
+           " en /verificar · registrado en el panel por " + (quien || "?")).run();
+  }
+
+  let correo = "no_enviado";
+  try {
+    const r = await correoCarnetHonor(env, email, nombre, {
+      codigo, token, distincion: dist.id, forma, hasta, contexto, conDoc: !!docNum || !!(d.doc_numero), agregada: accion === "agregada"
+    }, idioma);
+    correo = r && r.ok ? (r.simulado ? "simulado" : "enviado") : "fallo";
+  } catch (e) {
+    console.error("correo carnet honor", codigo, e && e.message);
+    correo = "fallo";
+  }
+
+  return json({ ok: true, accion, codigo, distincion: etiquetaDistincion(dist, forma, "es"), forma, hasta, permanente: !hasta,
+                donante_nuevo: donanteNuevo, doc_guardado: docGuardado, doc_distinto: docDistinto, correo });
+}
+
+/* POST /api/admin/miembro/<MB-…>/distincion — renovar (+N meses) o quitar.
+
+   QUITAR exige motivo y queda en `consentimientos`, como la revocación: es una
+   decisión de la que alguien responde. Las columnas se vacían; lo que era
+   queda escrito en esa fila de auditoría. Al carnet de quien además paga no le
+   pasa nada más: sigue valiendo por su membresía. Al de quien solo era de
+   honor lo deja «No vigente».
+
+   RENOVAR solo tiene sentido en una de rol: una permanente no vence. Cuenta
+   desde su vencimiento si todavía no llegó (renovar antes no hace perder
+   días) y desde hoy si ya pasó. */
+async function adminDistincionMiembro(request, env, codigo, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* se valida abajo */ }
+  if (!esObjeto(c)) c = {};
+  const m = await env.DB.prepare(
+    "SELECT codigo, distincion, distincion_hasta, distincion_contexto FROM miembros WHERE codigo = ?"
+  ).bind(codigo).first();
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  if (!m.distincion) return json({ error: "sin_distincion", ayuda: "Ese carnet no tiene distinción." }, 409);
+
+  if (c.accion === "renovar") {
+    if (!m.distincion_hasta) return json({ error: "es_permanente", ayuda: "Esa distinción es permanente: no vence ni se renueva." }, 409);
+    const meses = Math.min(24, Math.max(1, Math.round(Number(c.meses) || 12)));
+    const hoy = fechaCO();
+    const base = m.distincion_hasta > hoy ? m.distincion_hasta : hoy;
+    const hasta = sumarMeses(base, meses);
+    await env.DB.prepare(
+      "UPDATE miembros SET distincion_hasta = ?, actualizado_en = datetime('now') WHERE codigo = ?"
+    ).bind(hasta, codigo).run();
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(quien || "?", "carnet " + codigo + " distinción " + m.distincion + " RENOVADA hasta " + hasta + " (antes " + m.distincion_hasta + ")").run();
+    return json({ ok: true, codigo, accion: "renovada", hasta });
+  }
+
+  if (c.accion === "quitar") {
+    const motivo = limpiar(c.motivo, 280);
+    if (!motivo) return json({ error: "motivo_requerido", ayuda: "Quitar una distinción exige un motivo." }, 400);
+    await env.DB.prepare(
+      "UPDATE miembros SET distincion = NULL, distincion_contexto = NULL, distincion_desde = NULL, " +
+      "distincion_hasta = NULL, distincion_por = NULL, distincion_forma = NULL, actualizado_en = datetime('now') WHERE codigo = ?"
+    ).bind(codigo).run();
+    await env.DB.prepare(
+      "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+    ).bind(quien || "?", "carnet " + codigo + " distinción " + m.distincion + " QUITADA" +
+           (m.distincion_contexto ? " (" + m.distincion_contexto + ")" : "") +
+           " · era " + (m.distincion_hasta ? "hasta " + m.distincion_hasta : "permanente") + ": " + motivo).run();
+    return json({ ok: true, codigo, accion: "quitada" });
+  }
+
+  return json({ error: "accion_invalida" }, 400);
+}
+
+/* El correo del carnet de honor, en el idioma que eligió quien lo emite. Sale
+   en los dos casos —carnet nuevo o distinción añadida a uno que ya había—,
+   porque en los dos la persona tiene algo nuevo que enseñar. */
+async function correoCarnetHonor(env, email, nombre, carnet, idioma) {
+  if (!email) return { ok: true, sinCorreo: true };
+  const en = idioma === "en";
+  const url = ORIGIN + "/carnet/" + carnet.token + (en ? "?lang=en" : "");
+  const dist = distincionDe(carnet.distincion);
+  const etDist = etiquetaDistincion(dist, carnet.forma, en ? "en" : "es");
+  const titulo = en ? "Your honorary member card" : "Tu carnet de miembro de honor";
+  const cedula = carnet.conDoc ? (en ? " or your ID number" : " o tu número de cédula") : "";
+  const parrafos = en ? [
+    carnet.reenvio
+      ? "Here is the link to your honorary member card, with the distinction «" + etDist + "»."
+      : carnet.agregada
+      ? "Fundación Give&Grow has recognised you as an honorary member, with the distinction «" + etDist + "». It has been added to the member card you already have: same link, same code."
+      : "Fundación Give&Grow has recognised you as an honorary member, with the distinction «" + etDist + "». This is your card.",
+    "While it is valid, it gives you access to Gratitude Programme benefits at partner businesses. It is a live page, not an image: it states whether it is valid at the moment it is opened, and the business confirms it on its own by scanning its QR or typing its code" + cedula + " at thegiveandgrowproject.org/verificar.",
+    carnet.hasta
+      ? "This distinction is valid until " + carnet.hasta + ", and the foundation renews it while you remain in that role."
+      : "This distinction is permanent.",
+    ...(dist && dist.nota ? [dist.nota.en] : []),
+    "The link is personal: please do not share it."
+  ] : [
+    carnet.reenvio
+      ? "Este es el enlace a tu carnet de miembro de honor, con la distinción «" + etDist + "»."
+      : carnet.agregada
+      ? "La Fundación Give&Grow te reconoce como miembro de honor, con la distinción «" + etDist + "». Quedó anotada en el carnet que ya tienes: es el mismo enlace y el mismo código."
+      : "La Fundación Give&Grow te reconoce como miembro de honor, con la distinción «" + etDist + "». Este es tu carnet.",
+    "Mientras esté vigente, te da acceso a los beneficios del Programa de Gratitud en los comercios aliados. Es una página viva, no una imagen: dice si está vigente en el momento en que se abre, y el comercio lo comprueba por su cuenta escaneando su QR o escribiendo su código" + cedula + " en thegiveandgrowproject.org/verificar.",
+    carnet.hasta
+      ? "Esta distinción tiene vigencia hasta el " + carnet.hasta + ", y la fundación la renueva mientras sigas en ese rol."
+      : "Esta distinción es permanente.",
+    ...(dist && dist.nota ? [dist.nota.es] : []),
+    "El enlace es personal: no lo compartas."
+  ];
+  const filas = en
+    ? [["Card", carnet.codigo], ["Distinction", etDist], ...(carnet.contexto ? [["Context", carnet.contexto]] : []),
+       ["Validity", carnet.hasta ? "until " + carnet.hasta : "permanent"]]
+    : [["Carnet", carnet.codigo], ["Distinción", etDist], ...(carnet.contexto ? [["Contexto", carnet.contexto]] : []),
+       ["Vigencia", carnet.hasta ? "hasta el " + carnet.hasta : "permanente"]];
+  return enviarCorreo(env, {
+    para: email, asunto: titulo + " · " + carnet.codigo,
+    texto: [titulo, "", ...parrafos, "", url, "", filas.map(([k, v]) => k + ": " + v).join("\n")].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, boton: { url, texto: en ? "Open my card" : "Abrir mi carnet" } }),
+    etiqueta: carnet.reenvio ? "carnet_enlace" : "carnet_honor",
+    msTope: carnet.reenvio ? 8000 : undefined
+  });
 }
 
 /* Correo con el enlace del carnet. Solo la PRIMERA vez: una renovación no
@@ -16483,10 +16958,13 @@ const BUSCA_NUMERO = {
      que uno vigente. Los miembros no tienen bandeja propia, así que el buscador
      es LA superficie donde el equipo mira un carnet: si ahí no se ve la
      revocación, no se ve en ningún sitio. */
-  MB: { sql: "SELECT codigo AS numero, creado_en AS cuando, nivel AS sector, " +
+  /* Y con la distinción (0040): la regla es la de `estadoCarnet`, escrita
+     una sola vez en `sqlCarnetVigente`. */
+  MB: { sql: "SELECT codigo AS numero, creado_en AS cuando, " +
+             "CASE WHEN distincion IS NULL THEN nivel WHEN nivel = 'honor' THEN 'honor: ' || distincion ELSE nivel || ' · honor: ' || distincion END AS sector, " +
              "CASE WHEN revocado_en IS NOT NULL THEN 'revocado' " +
-             "WHEN vigente_hasta < date('now','-5 hours') THEN 'vencido' " +
-             "ELSE 'vigente' END AS estado FROM miembros WHERE codigo = ?",
+             "WHEN " + sqlCarnetVigente("", "date('now','-5 hours')") + " THEN 'vigente' " +
+             "ELSE 'vencido' END AS estado FROM miembros WHERE codigo = ?",
         clase: "Membresía", destino: null }
 };
 
@@ -22277,11 +22755,77 @@ nuevos primero. La columna <strong>Verificación</strong> es el código que va b
 él (o con la cédula del miembro, si la registró al pagar) un comercio aliado comprueba en <code>/verificar</code>
 si la membresía está vigente, sin ver más que el nombre de pila y la inicial del apellido. Si un comercio llama a preguntar, es ese código el que se
 busca aquí. <strong>El enlace del carnet no se comparte</strong>: es la credencial del miembro.</p>
+
+<details id="hn-nuevo" style="margin-bottom:22px;border:1px solid var(--bd);border-radius:10px;padding:14px 16px">
+  <summary style="cursor:pointer;font-weight:700;font-size:14px">Emitir carnet de honor</summary>
+  <div class="eg-form">
+    <p class="mu" style="font-size:12.5px;margin:8px 0 4px;max-width:66ch">Un carnet de honor lo otorga la fundación
+    <strong>por invitación</strong> y da acceso a los beneficios del Programa de Gratitud mientras esté vigente.
+    <strong>Una persona, un carnet:</strong> si el correo ya es de alguien con carnet (aunque sea pagado), la
+    distinción se le añade a ese mismo carnet —mismo enlace, mismo QR— y no se crea otro. Fundador/a y Pionero/a
+    son permanentes; las demás valen por el tiempo que elijas y se renuevan desde la tabla.
+    <strong>Junta de Asesores</strong> es un grupo honorario y asesor, sin funciones de dirección: la fundación no tiene junta directiva.</p>
+
+    <div class="eg-par">
+      <div><label for="hn-nombre">Nombre completo</label><input id="hn-nombre" autocomplete="off"></div>
+      <div><label for="hn-email">Correo</label><input id="hn-email" type="email" autocomplete="off"></div>
+    </div>
+
+    <div class="eg-par">
+      <div><label for="hn-dist">Distinción</label><select id="hn-dist">
+        <option value="">Elige…</option>
+        <option value="fundador">Fundador/a · permanente</option>
+        <option value="pionero">Pionero/a · permanente</option>
+        <option value="coordinador_voluntario">Coordinador/a voluntario/a</option>
+        <option value="aliado_red">Aliado/a de la red</option>
+        <option value="embajador">Embajador/a</option>
+        <option value="junta_asesores">Junta de Asesores (asesora, sin funciones de dirección)</option>
+      </select></div>
+      <div id="hn-meses-caja"><label for="hn-meses">Vigencia de la distinción</label><select id="hn-meses">
+        <option value="12" selected>12 meses</option><option value="6">6 meses</option><option value="24">24 meses</option>
+      </select></div>
+    </div>
+
+    <div class="eg-par">
+      <div><label for="hn-forma">Forma del título</label><select id="hn-forma">
+        <option value="n" selected>Neutra · Fundador/a</option>
+        <option value="m">Masculina · Fundador</option>
+        <option value="f">Femenina · Fundadora</option>
+      </select></div>
+      <div></div>
+    </div>
+    <p class="mu" style="font-size:12.5px;margin:4px 0 10px">Cómo se lee la distinción en SU carnet, correo y recibo. «Junta de Asesores» es igual en las tres; en inglés siempre es neutra.</p>
+
+    <label for="hn-ctx">Contexto <span style="font-weight:400">(opcional, una línea: «Fundación X», «Brigada Sismo 2026»)</span></label>
+    <input id="hn-ctx" maxlength="60" autocomplete="off">
+
+    <div class="eg-par">
+      <div><label for="hn-dt">Tipo de documento <span style="font-weight:400">(opcional)</span></label><select id="hn-dt">
+        <option value="CC">Cédula de ciudadanía</option><option value="CE">Cédula de extranjería</option>
+        <option value="PP">Pasaporte</option><option value="PPT">PPT</option><option value="TI">Tarjeta de identidad</option>
+      </select></div>
+      <div><label for="hn-dn">Número de documento <span style="font-weight:400">(opcional)</span></label><input id="hn-dn" inputmode="numeric" autocomplete="off"></div>
+    </div>
+    <label class="eg-check" style="display:flex;gap:10px;align-items:flex-start;font-weight:400;color:var(--ink)"><input type="checkbox" id="hn-aut" style="flex:0 0 auto;width:18px;height:18px;padding:0;margin:2px 0 0"> La persona autorizó que la fundación guarde su número de documento para que un comercio aliado pueda verificar su carnet con él en /verificar.</label>
+    <p class="mu" style="font-size:12.5px;margin:4px 0 10px">Obligatorio si escribes un documento. Sin documento el carnet se verifica igual, por su código.</p>
+
+    <div class="eg-par">
+      <div><label for="hn-idioma">Idioma del correo</label><select id="hn-idioma">
+        <option value="es">Español</option><option value="en">English</option>
+      </select></div>
+      <div></div>
+    </div>
+
+    <p style="margin-top:14px"><button type="button" class="btn btn-g" id="hn-emitir">Emitir y enviar el carnet</button></p>
+    <p class="msg" id="hn-msg"></p>
+  </div>
+</details>
+
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
 <th scope="col">Carnet</th><th scope="col">Verificación</th><th scope="col">Miembro</th>
-<th scope="col">Nivel</th><th scope="col">Vigente hasta</th><th scope="col">Estado</th>
-</tr></thead><tbody id="mb-filas"><tr><td colspan="6" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
+<th scope="col">Nivel</th><th scope="col">Distinción</th><th scope="col">Vigente hasta</th><th scope="col">Estado</th>
+</tr></thead><tbody id="mb-filas"><tr><td colspan="7" class="mu">Se pide al bajar hasta aquí.</td></tr></tbody>
 </table></div>
 
 </div>
@@ -25418,23 +25962,121 @@ function cargarMiembros(){
   pedirJSON("/api/admin/miembros", "mb-filas").then(function(d){
     var tb = document.getElementById("mb-filas"); if (!tb) return;
     var l = d.miembros || [];
-    if (!l.length){ tb.innerHTML = '<tr><td colspan="6">Ninguno todavia.</td></tr>'; return; }
+    if (!l.length){ tb.innerHTML = '<tr><td colspan="7">Ninguno todavia.</td></tr>'; return; }
     tb.innerHTML = l.map(function(m){
-      /* El estado lo calcula el servidor con el dia colombiano, el mismo que
-         usa /verificar: aqui no se recalcula con el reloj del navegador. */
+      /* El estado lo calcula el servidor con el dia colombiano y la misma regla
+         que /carnet y /verificar (estadoCarnet): aqui no se recalcula. */
       var estado = m.estado === "vigente" ? "vigente"
         : m.estado === "revocado" ? "<strong>revocado</strong>" : "vencido";
+      /* La distincion, con su vigencia y sus dos acciones. Renovar solo en las
+         de rol: una permanente no vence. */
+      var dist = "—";
+      if (m.distincion_txt){
+        dist = esc(m.distincion_txt) +
+          " <small>(" + (m.distincion_forma === "m" ? "masculina" : m.distincion_forma === "f" ? "femenina" : "neutra") + ")</small>" +
+          (m.distincion_contexto ? "<br><small>" + esc(m.distincion_contexto) + "</small>" : "") +
+          "<br><small>" + (m.distincion_permanente ? "permanente"
+            : (m.distincion_vigente ? "hasta " : "<strong>vencida</strong> el ") + esc(m.distincion_hasta || "—")) + "</small>" +
+          '<br><span style="display:inline-flex;gap:6px;flex-wrap:wrap;margin-top:6px">' +
+          (m.distincion_permanente ? "" : '<button type="button" class="tab" data-hnrenovar="' + esc(m.codigo) + '">Renovar 12 meses</button>') +
+          '<button type="button" class="tab" data-hnquitar="' + esc(m.codigo) + '">Quitar</button></span>';
+      }
       return "<tr>" +
         "<td>" + esc(m.codigo) + "<br><small>desde " + esc(m.desde || "—") + "</small></td>" +
         "<td><code>" + esc(m.verif_fmt || "—") + "</code></td>" +
         "<td>" + esc(m.nombre || "—") + (m.email ? "<br><small>" + esc(m.email) + "</small>" : "") + "</td>" +
-        "<td>" + esc(m.nivel || "—") + "</td>" +
-        "<td>" + esc(m.vigente_hasta || "—") + "</td>" +
+        "<td>" + (m.solo_honor ? "<small>solo de honor</small>" : esc(m.nivel || "—") +
+          (m.distincion_txt ? "<br><small>pagado hasta " + esc(m.vigente_hasta || "—") + "</small>" : "")) + "</td>" +
+        "<td>" + dist + "</td>" +
+        "<td>" + esc(m.hasta_efectivo || "—") + "</td>" +
         "<td>" + estado + "</td>" +
       "</tr>";
     }).join("");
   });
 }
+
+/* ---------------- carnet de honor (0040) ---------------- */
+function hnValor(id){ var el = document.getElementById(id); return el ? el.value.trim() : ""; }
+function hnMesesVisible(){
+  /* La vigencia solo aplica a las distinciones de rol. */
+  var d = hnValor("hn-dist");
+  var caja = document.getElementById("hn-meses-caja");
+  if (caja) caja.style.display = (d === "fundador" || d === "pionero") ? "none" : "";
+}
+function hnEmitir(b){
+  var msg = document.getElementById("hn-msg");
+  var doc = hnValor("hn-dn");
+  var aut = document.getElementById("hn-aut");
+  if (doc && !(aut && aut.checked)){
+    msg.textContent = "Para guardar el documento hace falta marcar que la persona lo autorizó. Si no, deja el documento vacío.";
+    msg.style.color = "#8C2F1E";
+    return;
+  }
+  b.disabled = true; msg.textContent = "Emitiendo…"; msg.style.color = "var(--mu)";
+  fetch("/api/admin/miembros/honor", {
+    method: "POST", headers: {"content-type":"application/json"},
+    body: JSON.stringify({
+      nombre: hnValor("hn-nombre"), email: hnValor("hn-email"),
+      distincion: hnValor("hn-dist"), forma: hnValor("hn-forma") || "n", contexto: hnValor("hn-ctx"),
+      meses: Number(hnValor("hn-meses") || 12),
+      doc_tipo: doc ? hnValor("hn-dt") : "", doc_numero: doc,
+      autoriza: !!(aut && aut.checked), idioma: hnValor("hn-idioma") || "es"
+    })
+  }).then(conEstado).then(function(res){
+    b.disabled = false;
+    if (res.http !== 200 || !res.d || res.d.error){
+      msg.textContent = (res.d && (res.d.ayuda || res.d.error)) || "No se pudo.";
+      msg.style.color = "#8C2F1E";
+      return;
+    }
+    var r = res.d;
+    /* QUE PASO, dicho: carnet nuevo o distincion anadida a uno que ya habia,
+       y si el correo salio. */
+    var t = r.accion === "creado"
+      ? "Carnet de honor " + r.codigo + " creado con la distinción " + r.distincion + "."
+      : "La persona ya tenía el carnet " + r.codigo + ": se le añadió la distinción " + r.distincion + " (mismo enlace y mismo QR).";
+    t += r.permanente ? " Permanente." : " Vigente hasta " + r.hasta + ".";
+    t += r.correo === "enviado" ? " El correo salió."
+      : r.correo === "simulado" ? " Correo SIMULADO (sin llave de envío)."
+      : " El correo NO salió: avísale a la persona por otro medio.";
+    if (r.doc_distinto) t += " OJO: el documento escrito no coincide con el que ya tenía guardado; se dejó el guardado.";
+    msg.textContent = t;
+    msg.style.color = r.correo === "fallo" || r.doc_distinto ? "#A84D00" : "#1F5C38";
+    ["hn-nombre","hn-email","hn-ctx","hn-dn"].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ""; });
+    if (aut) aut.checked = false;
+    cargarMiembros();
+  }).catch(function(){ b.disabled = false; msg.textContent = "No se pudo. Revisa la conexión."; msg.style.color = "#8C2F1E"; });
+}
+function hnDistincion(codigo, cuerpo, b, texto){
+  b.disabled = true; b.textContent = "…";
+  fetch("/api/admin/miembro/" + encodeURIComponent(codigo) + "/distincion", {
+    method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify(cuerpo)
+  }).then(conEstado).then(function(res){
+    if (fallo(res.http, res.d)){ b.disabled = false; b.textContent = texto; return; }
+    cargarMiembros();
+  }).catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if (e.target.id === "hn-emitir"){ hnEmitir(e.target); return; }
+  if ((b = e.target.closest("[data-hnrenovar]"))){
+    var cr = b.getAttribute("data-hnrenovar");
+    if (!window.confirm("¿Renovar 12 meses la distinción del carnet " + cr + "?")) return;
+    hnDistincion(cr, { accion: "renovar", meses: 12 }, b, "Renovar 12 meses");
+    return;
+  }
+  if ((b = e.target.closest("[data-hnquitar]"))){
+    var cq = b.getAttribute("data-hnquitar");
+    /* Como revocar: exige motivo y queda en la auditoria. */
+    var motivo = window.prompt("Quitar la distinción del carnet " + cq + ". Motivo (queda en la auditoría):");
+    if (!motivo) return;
+    hnDistincion(cq, { accion: "quitar", motivo: motivo }, b, "Quitar");
+  }
+});
+document.addEventListener("change", function(e){
+  if (e.target && e.target.id === "hn-dist") hnMesesVisible();
+});
 
 /* ---------------- eventos de PayPal sin casa ---------------- */
 function cargarPaypalSueltos(){
@@ -28919,12 +29561,29 @@ async function apiBajaEnlace(request, env, url) {
        respuesta es la misma pantalla, haya o no haya miembro. */
     else {
       const pp = await env.DB.prepare(
-        "SELECT s.nivel AS nivel_pp, s.monto_centavos, s.idioma, m.token, m.codigo, m.nivel, m.vigente_hasta, m.revocado_en, d.nombre " +
+        "SELECT s.nivel AS nivel_pp, s.monto_centavos, s.idioma, m.token, m.codigo, m.nivel, m.vigente_hasta, m.revocado_en, " +
+        "m.distincion, m.distincion_hasta, d.nombre " +
         "FROM suscripciones s JOIN donantes d ON d.id = s.donante_id JOIN miembros m ON m.donante_id = s.donante_id " +
         "WHERE s.proveedor = 'paypal' AND s.estado = 'activa' AND m.token IS NOT NULL " +
         "AND LOWER(d.email) = ? ORDER BY s.creada_en DESC LIMIT 1"
       ).bind(email).first();
       if (pp) await correoEnlaceCarnetPaypal(env, pp, email, lang);
+      /* Y LOS MIEMBROS DE HONOR (0040), que no tienen suscripción de ningún
+         lado: su carnet lo emitió la fundación. Solo si sigue vigente —uno
+         vencido o revocado no se reenvía—, y hacia afuera, la misma pantalla. */
+      else {
+        const hn = await env.DB.prepare(
+          "SELECT m.token, m.codigo, m.distincion, m.distincion_hasta, m.distincion_contexto, m.distincion_forma, d.doc_numero " +
+          "FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
+          "WHERE m.distincion IS NOT NULL AND LOWER(d.email) = ? AND " + sqlCarnetVigente("m") + " LIMIT 1"
+        ).bind(email, fechaCO(), fechaCO()).first();
+        if (hn) {
+          await correoCarnetHonor(env, email, null, {
+            codigo: hn.codigo, token: hn.token, distincion: hn.distincion, forma: hn.distincion_forma, hasta: hn.distincion_hasta,
+            contexto: hn.distincion_contexto || "", conDoc: !!hn.doc_numero, agregada: true, reenvio: true
+          }, lang);
+        }
+      }
     }
   }
 
@@ -28990,7 +29649,9 @@ async function correoEnlaceCarnetPaypal(env, m, email, lang) {
   const en = lang === "en";
   const carnet = ORIGIN + "/carnet/" + m.token + (en ? "?lang=en" : "");
   const n = nivelDe(m.nivel);
-  const semilla = carnetSinGratitud(n.id);
+  /* Un miembro de PayPal Semilla que además tiene una distinción viva SÍ tiene
+     el beneficio: no se le dice lo contrario. */
+  const semilla = carnetSinGratitud(n.id, !!m.distincion && (!m.distincion_hasta || m.distincion_hasta >= fechaCO()));
   const filas = en
     ? [["Card", m.codigo], ["Level", n.en], ["Valid until", m.vigente_hasta], ["Monthly", "US$" + (Number(m.monto_centavos || 0) / 100).toFixed(2) + " · PayPal"]]
     : [["Carnet", m.codigo], ["Nivel", n.es], ["Vigente hasta", m.vigente_hasta], ["Mensual", "US$" + (Number(m.monto_centavos || 0) / 100).toFixed(2) + " · PayPal"]];
@@ -30532,6 +31193,7 @@ export default {
         const mia = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/atendida$/);
         if (mia) return await adminInspeccionAtendida(request, env, mia[1], sesion.email);
         if (ruta === "/api/admin/miembros") return await adminMiembros(env);
+        if (ruta === "/api/admin/miembros/honor") return await adminEmitirHonor(request, env, sesion.email);
         if (ruta === "/api/admin/reportadas") return await adminReportadas(env);
         const rc = ruta.match(/^\/api\/admin\/comprobante\/(GG-\d{4}-\d{6})$/i);
         if (rc) return await adminComprobante(env, rc[1].toUpperCase());
@@ -30539,6 +31201,8 @@ export default {
         if (rt) return await adminConfirmarTransferencia(request, env, rt[1].toUpperCase(), sesion.email);
         const mr = ruta.match(/^\/api\/admin\/miembro\/(MB-\d{4}-\d{6})\/revocar$/i);
         if (mr) return await adminRevocarMiembro(request, env, mr[1].toUpperCase(), sesion.email);
+        const mdi = ruta.match(/^\/api\/admin\/miembro\/(MB-\d{4}-\d{6})\/distincion$/i);
+        if (mdi) return await adminDistincionMiembro(request, env, mdi[1].toUpperCase(), sesion.email);
         const mi = ruta.match(/^\/api\/admin\/inscripcion\/(\d+)\/estado$/);
         if (mi) return await adminMoverInscripcion(request, env, Number(mi[1]), sesion.email);
         /* Sin sufijo y con DELETE: la supresion actua sobre la inscripcion
