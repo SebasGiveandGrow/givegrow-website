@@ -140,6 +140,20 @@ h3,h4{font-family:"Inter",sans-serif;line-height:var(--lh-tight);letter-spacing:
   letter-spacing:var(--tr-heading);font-weight:700}
 .h-comp3{font-size:1.17em}
 .h-comp4{font-size:1em}
+/* UN SOLO SISTEMA DE TITULARES (oct 2026). Transparencia, Donar, Brigada y Mi
+   aporte abrían sus secciones con un h2 Inter de ~20px mientras el resto del
+   sitio las abre con `.h-sec` (Unbounded, --fs-h2): ahora esas aperturas son
+   `.h-sec` en el HTML. Lo que queda aquí son los subtítulos DENTRO de una
+   sección (tarjetas, pasos, cajas), que caían en cinco tamaños casi iguales
+   (17 / 18,15 / 19 / 19,89 / 22px): se asientan en uno solo de la escala. */
+:is(#page-transparencia,#page-donar,#page-brigada,#page-mi-aporte) :is(.h-comp3,.h-comp4){
+  font-family:"Inter",sans-serif;font-size:var(--fs-h4)}
+/* En estas páginas el h1 también es `.h-sec`, y los h2 de sección van seguidos
+   (cinco en Transparencia, siete en Brigada, con titulares de hasta 90
+   caracteres): a --fs-h2 empataban con el h1 y la página se volvía una pila de
+   titulares de portada. Bajan UN peldaño de la escala, a --fs-h3, y siguen en
+   Unbounded: la misma voz de marca, con jerarquía h1 > h2 > subtítulo. */
+:is(#page-transparencia,#page-donar,#page-brigada) h2.h-sec{font-size:var(--fs-h3);max-width:30ch;margin-bottom:14px}
 /* Y las reglas de componente lo alcanzan con `:is(h3:not(:where(.h-comp4)),:where(.h-comp3))`, que NO
    es lo mismo que `:is(h3,.h-comp3)`. La segunda forma sube la especificidad de
    (0,1,1) a (0,2,0) y le gana a reglas que antes mandaban: se midió, y movía el
