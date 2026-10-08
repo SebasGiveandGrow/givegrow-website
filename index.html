@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=64d99601">
+<link rel="stylesheet" href="/styles.css?v=3a871ec1">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -42,7 +42,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=55abebff" defer></script>
+<script src="/app.js?v=ec113763" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -760,7 +760,7 @@
         <div class="step"><div class="step-n">2</div><div><h3 data-i18n="grat.s2.t">Recibe tu carnet</h3><p data-i18n="grat.s2.p">Te llega tu carnet digital: una página que dice si tu membresía está vigente en el momento en que se abre, con un QR y un código de verificación.</p></div></div>
         <div class="step"><div class="step-n">3</div><div><h3 data-i18n="grat.s3.t">Presenta y disfruta</h3><p data-i18n="grat.s3.p">Muéstralo en los comercios aliados. El comercio no tiene que creerle a tu pantalla: escanea el QR con su propio celular, o escribe el código en thegiveandgrowproject.org/verificar, y le pide un documento para comparar el nombre.</p></div></div>
       </div>
-      <p class="verif-door rv d2"><span data-i18n="verif.door.p">¿Atiendes un comercio aliado? Comprueba el carnet de un miembro: escribe su código o escanea su QR con tu propio celular.</span> <a class="card-link" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet →</span></a></p>
+      <div class="verif-door rv d2"><div class="verif-door-txt"><h3 data-i18n="verif.door.t">¿Atiendes un comercio aliado?</h3><p data-i18n="verif.door.p">Comprueba que el carnet de un miembro esté vigente: escribe su código o escanea su QR con tu propio celular.</p></div><a class="btn btn-o verif-door-btn" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet de membresía</span></a></div>
     </div>
   </section>
   <section class="band">
@@ -2132,7 +2132,7 @@
         </ol>
         <p class="rastro-nota" data-i18n="track.ej.cert">Si pediste certificado de donación, se emite aparte: lo firman el Representante Legal y la Revisora Fiscal, y te lo enviamos cuando esté firmado.</p>
       </div>
-      <p class="verif-door"><span data-i18n="verif.door.p">¿Atiendes un comercio aliado? Comprueba el carnet de un miembro: escribe su código o escanea su QR con tu propio celular.</span> <a class="card-link" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet →</span></a></p>
+      <div class="verif-door"><div class="verif-door-txt"><h3 data-i18n="verif.door.t">¿Atiendes un comercio aliado?</h3><p data-i18n="verif.door.p">Comprueba que el carnet de un miembro esté vigente: escribe su código o escanea su QR con tu propio celular.</p></div><a class="btn btn-o verif-door-btn" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet de membresía</span></a></div>
     </div>
   </section>
 </main>
@@ -2365,7 +2365,7 @@
         <div class="card card-d"><span class="tag soon" data-i18n="membres.prep">En preparación</span><h3 data-i18n="membres.ben.3.t">Reportes de impacto</h3><p data-i18n="membres.ben.3.p">Te contamos a dónde llegó tu aporte, con evidencia: cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Los reportes periódicos de impacto están en preparación.</p></div>
         <div class="card card-d"><h3 data-i18n="membres.ben.4.t">Trazabilidad total</h3><p data-i18n="membres.ben.4.p">Cada donación tiene destino y número de guía; el acta y sus fotos se suman a tu rastreo cuando la fundación entrega. Sin promesas: evidencia.</p></div>
       </div>
-      <p class="verif-door rv d2"><span data-i18n="verif.door.p">¿Atiendes un comercio aliado? Comprueba el carnet de un miembro: escribe su código o escanea su QR con tu propio celular.</span> <a class="card-link" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet →</span></a></p>
+      <div class="verif-door rv d2"><div class="verif-door-txt"><h3 data-i18n="verif.door.t">¿Atiendes un comercio aliado?</h3><p data-i18n="verif.door.p">Comprueba que el carnet de un miembro esté vigente: escribe su código o escanea su QR con tu propio celular.</p></div><a class="btn btn-o verif-door-btn" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet de membresía</span></a></div>
     </div>
   </section>
   <!-- HAZTE MIEMBRO (30 sep 2026). Era una caja centrada con cuatro montos y un
