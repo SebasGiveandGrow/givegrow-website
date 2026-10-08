@@ -5651,6 +5651,27 @@ function initFabForms(){
     if (campo(e.target) && !campo(e.relatedTarget)) document.body.classList.remove("fab-foco");
   });
 }
+/* LOS FLOTANTES SE APARTAN AL BAJAR (pulido visual, 7 oct 2026). Leyendo hacia
+   abajo en el teléfono, ALMA y WhatsApp tapaban la última línea de lo que se
+   estaba leyendo. Al bajar se marca `fab-scroll` y el CSS los esconde por
+   debajo de 768 px con el mismo fundido que `fab-form`; al subir —que es cuando
+   se busca un atajo— o al quedarse quieto un momento, vuelven. Los primeros
+   120 px no cuentan: arriba del todo no hay nada que tapar todavía. */
+function initFabScroll(){
+  var ultimo = window.pageYOffset || 0, quieto = null, pendiente = false;
+  function mirar(){
+    pendiente = false;
+    var y = window.pageYOffset || 0, d = y - ultimo;
+    if (Math.abs(d) < 6) return;
+    document.body.classList.toggle("fab-scroll", d > 0 && y > 120);
+    ultimo = y;
+    clearTimeout(quieto);
+    quieto = setTimeout(function(){ document.body.classList.remove("fab-scroll"); }, 1500);
+  }
+  window.addEventListener("scroll", function(){
+    if (!pendiente){ pendiente = true; requestAnimationFrame(mirar); }
+  }, { passive: true });
+}
 function initIconDraw(){
   var shapes = document.querySelectorAll(".ic-svg path, .ic-svg circle, .ic-svg rect, .ic-svg line, .ic-svg polyline, .ic-svg polygon");
   for (var i=0;i<shapes.length;i++) shapes[i].setAttribute("pathLength","1");
@@ -6599,6 +6620,7 @@ if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
 initFabHero();
 initFabForms();
+initFabScroll();
 
 /* ---------- tema día/noche: automático + preferencia manual ----------
    EL AUTOMÁTICO SIGUE AL DISPOSITIVO (decisión de Sebas, 25 sep 2026). Antes
@@ -6629,6 +6651,12 @@ function themeApply(mode, anim){
     setTimeout(function(){ root.classList.remove("theming"); }, 380);
   }
   root.setAttribute("data-theme", res);
+  /* Las páginas que sirve el Worker sin un solo script (/verificar, el carnet,
+     la membresía…) no pueden leer localStorage ni preguntarle al sistema. Se
+     les deja el tema que se está pintando AQUÍ en una cookie, y `temaGuardado`
+     en worker.js la lee: quien ve el sitio en oscuro abre /verificar en oscuro.
+     Solo «light» o «dark»; nada que identifique a nadie. */
+  try { document.cookie = "gg-tema=" + res + "; Path=/; Max-Age=31536000; SameSite=Lax" + (location.protocol === "https:" ? "; Secure" : ""); } catch(e){}
   ggMapTiles();
   /* EL COLOR DE LA BARRA ES DE CADA MARCA. Esto escribía siempre los de
      Give&Grow, así que en miramicasa.org pisaba el azul que pone el Worker

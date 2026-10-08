@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "e68dad3e";
+const STYLES_V = "64d99601";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -13089,6 +13089,7 @@ function paginaVerificar(o) {
     lim: "Too many checks from this connection.",
     limP: "Wait a few minutes and try again.",
     otra: "Check another code", otro: "Español", otroLang: "es",
+    volver: "Gratitude Programme", inicio: "Give&Grow home",
     pie: "Fundación Give&Grow International · Colombian nonprofit · NIT 901.948.930-2"
   } : {
     titulo: "Verificar un carnet", ey: "Programa de Gratitud · para comercios aliados",
@@ -13107,9 +13108,20 @@ function paginaVerificar(o) {
     lim: "Demasiadas consultas desde esta conexión.",
     limP: "Espera unos minutos y vuelve a intentarlo.",
     otra: "Verificar otro código", otro: "English", otroLang: "en",
+    volver: "Programa de Gratitud", inicio: "Inicio de Give&Grow",
     pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2"
   };
   const qLang = en ? "?lang=en" : "";
+  /* LA BARRA DE ARRIBA (pulido visual, 7 oct 2026). La página no tenía ni
+     logotipo ni salida: quien llegaba por el QR veía un formulario suelto en el
+     tercio de arriba de la pantalla, sin saber de quién era ni cómo volver. El
+     logotipo es el de la barra del sitio y lleva a la portada; la vuelta, al
+     Programa de Gratitud, que es desde donde se llega aquí. */
+  const cabecera = ''
+    + '<header class="vf-cab"><div class="wrap vf-cab-in">'
+    + '<a class="nlogo" href="/" aria-label="' + esc(T.inicio) + '">Give<em>&amp;</em>Grow</a>'
+    + '<a class="vf-volver" href="/#gratitud"><span aria-hidden="true">&larr;</span> ' + esc(T.volver) + '</a>'
+    + '</div></header>\n';
   const otroHref = "/verificar" + (o.resultado ? "/" + encodeURIComponent(o.entrada) : "") + "?lang=" + T.otroLang;
 
   const formulario = ''
@@ -13157,7 +13169,7 @@ function paginaVerificar(o) {
     }
     cuerpo += formulario;
   }
-  cuerpo += '  <p class="mu" style="margin-top:34px;font-size:var(--fs-13)">' + esc(T.pie) + '</p>\n';
+  cuerpo += '  <p class="mu vf-pie">' + esc(T.pie) + '</p>\n';
 
   /* Los tokens del sitio y ninguno nuevo: `--acc` para vigente y `--err` para
      no vigente, porque los dos se aclaran de noche. `--g` NO: se queda verde
@@ -13175,8 +13187,19 @@ function paginaVerificar(o) {
     + '.vf-estado-p{margin:0 0 6px}'
     + '.vf-semilla{margin-top:10px;font-weight:600}'
     + '.vf-tarjeta{margin-top:18px}'
-    + '.vf-cotejar{margin-top:16px;font-weight:600}';
-  return cascaraBaja(T.titulo, cuerpo, o.lang, o.tema, (o.resultado ? CARNET_CSS : '') + estilo);
+    + '.vf-cotejar{margin-top:16px;font-weight:600}'
+    /* La página ocupa la pantalla entera: barra arriba, consulta, y el pie con
+       el NIT abajo del todo en vez de flotar a media pantalla. */
+    + 'body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}'
+    + 'body>main{flex:1 0 auto;width:100%;display:flex;flex-direction:column}'
+    + '.vf-pie{margin-top:auto;padding-top:34px;font-size:var(--fs-13)}'
+    + 'body>main>h1{margin-bottom:14px}'
+    + '.vf-cab{background:var(--nav-bg);border-bottom:1px solid var(--bd)}'
+    + '.vf-cab-in{max-width:640px;min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}'
+    + '.vf-cab .nlogo{display:inline-flex;align-items:center;min-height:44px}'
+    + '.vf-volver{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:var(--fs-14);font-weight:600;color:var(--acc)}'
+    + '.vf-volver:hover{text-decoration:underline;text-underline-offset:3px}';
+  return cascaraBaja(T.titulo, cuerpo, o.lang, o.tema, (o.resultado ? CARNET_CSS : '') + estilo, cabecera);
 }
 
 /* ========================================================================
@@ -28393,8 +28416,22 @@ function bajaLimitada(ip) {
 
    `hourCycle: "h23"` y no `hour12: false`: con el segundo, la medianoche sale
    como «24» en algunas versiones de ICU y la comparacion de abajo la tomaria
-   por la tarde. */
+   por la tarde.
+
+   PERO PRIMERO, LO QUE LA PERSONA YA VE EN EL SITIO (pulido visual, 7 oct
+   2026). El reloj adivinaba: quien tiene el sitio en oscuro —por su teléfono o
+   porque lo eligió en el botón— abría /verificar o su carnet en claro a
+   mediodía. app.js deja ahora el tema que está pintando en la cookie `gg-tema`
+   (solo «light» o «dark», nada más), y aquí manda esa cookie. Sin ella —un
+   cajero que escanea un QR sin haber entrado nunca al sitio— sigue el reloj. */
+function temaGuardado(request) {
+  const c = String((request && request.headers.get("cookie")) || "");
+  const m = c.match(/(?:^|;\s*)gg-tema=(light|dark)(?:;|$)/);
+  return m ? m[1] : null;
+}
 function temaPorReloj(request) {
+  const guardado = temaGuardado(request);
+  if (guardado) return guardado;
   let zona = "America/Bogota";
   try {
     const z = request && request.cf && request.cf.timezone;
@@ -28411,7 +28448,9 @@ function temaPorReloj(request) {
    Va en una etiqueta style del head, que la CSP de estas paginas admite
    ('unsafe-inline' en style-src) y que no obliga a tocar styles.css ni su
    version. Lo usa la encuesta de las jornadas. */
-function cascaraBaja(titulo, cuerpo, lang, tema, estilo) {
+/* `cabecera` es opcional: HTML que va ANTES del <main>, a todo lo ancho. Lo usa
+   /verificar para su barra con el logotipo y la vuelta al sitio. */
+function cascaraBaja(titulo, cuerpo, lang, tema, estilo, cabecera) {
   return '<!doctype html>\n'
 + '<html lang="' + (lang === "en" ? "en" : "es") + '"' + (tema === "dark" ? ' data-theme="dark"' : '') + '>\n<head>\n<meta charset="utf-8">\n'
 + '<meta name="theme-color" content="' + (tema === "dark" ? "#0F1613" : "#1F5C38") + '">\n'
@@ -28420,6 +28459,7 @@ function cascaraBaja(titulo, cuerpo, lang, tema, estilo) {
 + '<meta name="robots" content="noindex, nofollow">\n'
 + '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
 + HOJA_CSS + '\n' + (estilo ? '<style>' + estilo + '</style>\n' : '') + '</head>\n<body>\n'
++ (cabecera || '')
 + '<main class="wrap" style="padding-top:34px;padding-bottom:48px;max-width:640px">\n'
 + cuerpo
 + '</main>\n</body>\n</html>';
