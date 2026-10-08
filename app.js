@@ -1563,8 +1563,19 @@ var I18N = {
     "grat.biz.ey":"Comercios aliados",
     "grat.biz.t":"Los comercios que van entrando",
     "grat.biz.lead":"El programa se arma comercio a comercio. Cada ficha dice qué ofrece ese negocio y bajo qué condiciones, y los beneficios se publican a medida que cada comercio los confirma.",
-    "grat.biz.empty":"Todavía no hay comercios con convenio firmado. Cada comercio aparece aquí cuando firma su convenio, con su beneficio y sus condiciones.",
-    "grat.biz.cta":"¿Tienes un negocio? Alíate",
+    "grat.biz.empty":"Todavía no hay comercios con convenio firmado. El primero aparecerá aquí, con su beneficio y sus condiciones, el día que firme.",
+    "grat.biz.cta":"Postular mi comercio",
+    "grat.alta.t":"Cómo entra un comercio",
+    "grat.alta.s1.t":"Postula",
+    "grat.alta.s1.p":"Llenas el formulario de aliados con «Programa de Gratitud» marcado y propones el beneficio: qué ofreces, desde qué nivel y cómo se redime.",
+    "grat.alta.s2.t":"Firma el convenio",
+    "grat.alta.s2.p":"Revisamos la propuesta y te enviamos el Convenio Marco de Alianza para firmar. Sin costo y sin exclusividad.",
+    "grat.alta.s3.t":"Beneficio publicado",
+    "grat.alta.s3.p":"Tu ficha aparece en esta página con el beneficio y sus condiciones exactas, y los miembros pueden empezar a usarlo.",
+    "grat.alta.crit.t":"Qué le pedimos",
+    "grat.alta.c1":"Un beneficio concreto para los miembros, con sus condiciones por escrito: lo que se publica es lo que se cumple.",
+    "grat.alta.c2":"Comprobar el carnet antes de aplicarlo, escaneando su QR o escribiendo el código en thegiveandgrowproject.org/verificar.",
+    "grat.alta.c3":"De preferencia, un negocio de gastronomía, moda, belleza, bienestar u odontología: las cinco categorías que priorizamos.",
     "grat.card.nivel":"Desde nivel",
     "grat.card.redime":"Cómo redimir",
     "grat.card.cond":"Condiciones",
@@ -1695,21 +1706,15 @@ var I18N = {
     "membres.t4.t":"Bosque",
     "membres.t4.p":"El nivel más alto: tu generosidad multiplica toda la red.",
     "membres.t1.price":"$20.000","membres.t1.priceu":"/ mes · o US$5 por PayPal","membres.t1.b0":"Recibo y número de guía con cada aporte, y carnet digital",
-    "membres.t1.b1":"Boletín de impacto con historias reales",
     "membres.t1.b2":"Certificado de donación si lo pides (Art. 257 ET, solo Colombia)",
-    "membres.t1.b3":"Reconocimiento en web y redes",
     "membres.t2.price":"$50.000","membres.t2.priceu":"/ mes · o US$15 por PayPal","membres.t2.more":"Todo lo de Semilla, y además:",
     "membres.t2.b1":"Acceso al Programa de Gratitud",
-    "membres.t2.b2":"Certificado de agradecimiento personalizado",
-    "membres.t2.b3":"Contenido especial de voluntariado e impacto",
-    "membres.t3.price":"$120.000","membres.t3.priceu":"/ mes · o US$35 por PayPal","membres.t3.more":"Todo lo de Retoño, y además:",
-    "membres.t3.b1":"Invitación a eventos y sesiones en vivo",
-    "membres.t3.b2":"Acceso prioritario a Impact Journey",
-    "membres.t3.b3":"Certificado de impacto personalizado",
-    "membres.t4.price":"$250.000+","membres.t4.priceu":"/ mes · o US$75+ por PayPal","membres.t4.more":"Todo lo de Árbol, y además:",
-    "membres.t4.b1":"Reportes de impacto detallados",
-    "membres.t4.b2":"Reunión con el fundador",
-    "membres.t4.b3":"Membresía honorífica y liderazgo en la comunidad",
+    "membres.t3.price":"$120.000","membres.t3.priceu":"/ mes · o US$35 por PayPal","membres.t3.more":"Todo lo de Retoño.",
+    "membres.t4.price":"$250.000+","membres.t4.priceu":"/ mes · o US$75+ por PayPal","membres.t4.more":"Todo lo de Árbol.",
+    "membres.t1.soon":"Boletín de impacto con historias reales y reconocimiento en web y redes.",
+    "membres.t2.soon":"Certificado de agradecimiento personalizado y contenido especial de voluntariado e impacto.",
+    "membres.t3.soon":"Invitación a eventos y sesiones en vivo, acceso prioritario a Impact Journey y certificado de impacto personalizado.",
+    "membres.t4.soon":"Reportes de impacto detallados, reunión con el fundador y membresía honorífica con liderazgo en la comunidad.",
     "membres.cancel":"Puedes terminar tu membresía cuando quieras desde tu propia membresía: al activarla te llega por correo un enlace propio, y desde ahí la cancelas y retiramos tu método de pago en un clic. No hay que escribirle a nadie ni hay penalidades; el certificado tributario cubre lo donado hasta la fecha. Si perdiste el enlace, lo recuperas con tu correo.",
     "mi.ey":"Desde el exterior",
     "mi.t":"Membresía en dólares, por PayPal",
@@ -1752,7 +1757,7 @@ var I18N = {
     "membres.ben.1.p":"Beneficios que empresas aliadas ofrecen de forma voluntaria, en gratitud por el impacto. Disponible desde el nivel Retoño, y para los miembros de honor; estamos sumando aliados.",
     "membres.ben.2.t":"Certificado y carnet",
     "membres.ben.2.p":"Tu certificado de donación para el beneficio tributario en Colombia y tu carnet digital de miembro, que se renueva con cada aporte.",
-    "membres.ben.3.t":"Reportes de impacto",
+    "membres.ben.3.t":"El acta de cada entrega",
     "membres.ben.3.p":"Te contamos a dónde llegó tu aporte, con evidencia: cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Los reportes periódicos de impacto están en preparación.",
     "membres.ben.4.t":"Trazabilidad total",
     "membres.ben.4.p":"Cada donación tiene destino y número de guía; el acta y sus fotos se suman a tu rastreo cuando la fundación entrega. Sin promesas: evidencia.",
@@ -1832,7 +1837,6 @@ var I18N = {
     "imp.pr3.t":"Acta por entrega",
     "imp.pr3.p":"Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo de quien aportó a ese destino cuando la fundación entrega.",
     "imp.ev.ey":"La evidencia",
-    "imp.ev.t":"Compruébalo tú mismo.",
     "imp.soon.t":"Estamos documentando las primeras historias.",
     "imp.soon.p":"A medida que el HUB SOCIAL crece, este espacio se llenará de historias reales del terreno — sin inventar nada. Síguenos para no perdértelas.",
     "start.ey":"¿Por dónde empiezo?",
@@ -4068,7 +4072,7 @@ var ACT_FNS = {
   setPagoVia:setPagoVia,
   mcEnviar:mcEnviar,
   irAVoluntariadoBrigada:irAVoluntariadoBrigada,
-  volEdad:volEdad, volIrForm:volIrForm, irAAliadosVoluntariado:irAAliadosVoluntariado,
+  volEdad:volEdad, volIrForm:volIrForm, irAAliadosVoluntariado:irAAliadosVoluntariado, irAAliadosGratitud:irAAliadosGratitud,
   sfIr:sfIr, sfFund:sfFund, sfPro:sfPro, sfSubmit:sfSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
@@ -7697,6 +7701,17 @@ function irAAliadosVoluntariado(){
   if (currentRoute !== "aliados") go("aliados");
   var c = document.getElementById("mod-voluntariado");
   if (c) c.checked = true;
+  var f = document.getElementById("ally-form");
+  if (f) f.scrollIntoView({ block: "start" });
+}
+
+/* El mismo atajo para el comercio que llega desde #gratitud: entra al
+   formulario con «Programa de Gratitud» ya marcado y su ficha de beneficio
+   abierta, que es lo único que ese comercio viene a llenar. */
+function irAAliadosGratitud(){
+  if (currentRoute !== "aliados") go("aliados");
+  var c = document.getElementById("mod-gratitud");
+  if (c && !c.checked){ c.checked = true; allyToggleGrat(); }
   var f = document.getElementById("ally-form");
   if (f) f.scrollIntoView({ block: "start" });
 }

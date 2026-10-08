@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=477df1c1">
+<link rel="stylesheet" href="/styles.css?v=6b17fbbf">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -42,7 +42,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=d23a7920" defer></script>
+<script src="/app.js?v=4d733287" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -317,13 +317,19 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="start.ey">¿Por dónde empiezo?</span>
       <h2 class="h-sec rv" data-i18n="start.t">Hay un camino para ti.</h2>
-      <div class="grid g3 rv d1" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z"/></svg></div><h3 data-i18n="start.don.t">Soy donante</h3><p data-i18n="start.don.p">Elige un monto, pide tu certificado si declaras renta en Colombia y sigue tu aporte con su número de guía.</p><a class="card-link" href="#donar" data-i18n="start.don.btn">Quiero donar →</a></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M10 8h4M10 12h4M10 16h4"/></svg></div><h3 data-i18n="start.emp.t">Soy empresa</h3><p data-i18n="start.emp.p">Convierte tu RSE en impacto medible y trazable, con beneficios tributarios.</p><a class="card-link" href="#empresas" data-i18n="start.emp.btn">Aliar mi empresa →</a></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="start.fund.t">Soy fundación</h3><p data-i18n="start.fund.p">Súmate al HUB SOCIAL y recibe donaciones y herramientas, sin costo.</p><a class="card-link" href="#fundaciones" data-i18n="start.fund.btn">Aplicar al HUB SOCIAL →</a></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18 9l-4.2 1.3L12 15l-1.8-4.7L6 9l4.2-1.3z"/><path d="M19 14l.8 1.9L22 17l-2.2.7L19 20l-.8-2.3L16 17l2.2-1.1z"/></svg></div><h3 data-i18n="start.vol.t">Quiero dar mi tiempo</h3><p data-i18n="start.vol.p">Voluntariado por oficio y jornadas en territorio con las comunidades.</p><a class="card-link" href="#voluntariado" data-i18n="start.vol.btn">Ver voluntariado →</a></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div><h3 data-i18n="start.com.t">Tengo un comercio</h3><p data-i18n="start.com.p">Aporta un beneficio a la red sin girar dinero, y recibe visibilidad.</p><a class="card-link" href="#gratitud" data-i18n="start.com.btn">Programa de Gratitud →</a></div>
-        <div class="card card-mmc"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg></div><h3 data-i18n="start.mmc.t">Mira Mi Casa</h3><p data-i18n="start.mmc.p">Reporta tu casa tras el sismo y recibe un concepto técnico, gratis.</p><a class="card-link" href="https://miramicasa.org" data-i18n="start.mmc.btn">Revisar mi casa →</a></div>
+      <!-- LOS SEIS CAMINOS, EN LISTA Y NO EN TARJETAS (8 oct 2026). Eran seis
+           tarjetas con icono en caja redondeada, título, texto y flecha: el
+           patrón que más se lee como plantilla. Ahora son asientos de un índice
+           —quién eres, en una línea qué te toca, y a dónde ir—, con la regla
+           fuerte arriba y una fina entre filas, el mismo idioma del libro de
+           Transparencia. -->
+      <div class="caminos rv d1">
+        <div class="camino"><h3 class="camino-t" data-i18n="start.don.t">Soy donante</h3><p data-i18n="start.don.p">Elige un monto, pide tu certificado si declaras renta en Colombia y sigue tu aporte con su número de guía.</p><a class="card-link" href="#donar" data-i18n="start.don.btn">Quiero donar →</a></div>
+        <div class="camino"><h3 class="camino-t" data-i18n="start.emp.t">Soy empresa</h3><p data-i18n="start.emp.p">Convierte tu RSE en impacto medible y trazable, con beneficios tributarios.</p><a class="card-link" href="#empresas" data-i18n="start.emp.btn">Aliar mi empresa →</a></div>
+        <div class="camino"><h3 class="camino-t" data-i18n="start.fund.t">Soy fundación</h3><p data-i18n="start.fund.p">Súmate al HUB SOCIAL y recibe donaciones y herramientas, sin costo.</p><a class="card-link" href="#fundaciones" data-i18n="start.fund.btn">Aplicar al HUB SOCIAL →</a></div>
+        <div class="camino"><h3 class="camino-t" data-i18n="start.vol.t">Quiero dar mi tiempo</h3><p data-i18n="start.vol.p">Voluntariado por oficio y jornadas en territorio con las comunidades.</p><a class="card-link" href="#voluntariado" data-i18n="start.vol.btn">Ver voluntariado →</a></div>
+        <div class="camino"><h3 class="camino-t" data-i18n="start.com.t">Tengo un comercio</h3><p data-i18n="start.com.p">Aporta un beneficio a la red sin girar dinero, y recibe visibilidad.</p><a class="card-link" href="#gratitud" data-i18n="start.com.btn">Programa de Gratitud →</a></div>
+        <div class="camino camino-mmc"><h3 class="camino-t" data-i18n="start.mmc.t">Mira Mi Casa</h3><p data-i18n="start.mmc.p">Reporta tu casa tras el sismo y recibe un concepto técnico, gratis.</p><a class="card-link" href="https://miramicasa.org" data-i18n="start.mmc.btn">Revisar mi casa →</a></div>
       </div>
     </div>
   </section>
@@ -480,11 +486,14 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="emp.why.ey">Por qué aliarte</span>
       <h2 class="h-sec rv" data-i18n="emp.why.t">RSE que se ve, se mide y se siente.</h2>
-      <div class="grid g4 rv d1" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM8 7h8M8 11h8M8 15h5"/></svg></div><h3 data-i18n="emp.why.1.t">Beneficio tributario</h3><p data-i18n="emp.why.1.p">Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg></div><h3 data-i18n="emp.why.2.t">Trazabilidad real</h3><p data-i18n="emp.why.2.p">Cada aporte con destino, acta y reporte verificable. Evidencia, no promesas.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18 9l-4.2 1.3L12 15l-1.8-4.7L6 9l4.2-1.3z"/><path d="M19 14l.8 1.9L22 17l-2.2.7L19 20l-.8-2.3L16 17l2.2-1.1z"/></svg></div><h3 data-i18n="emp.why.3.t">Marca con propósito</h3><p data-i18n="emp.why.3.p">Reconocimiento como empresa aliada y visibilidad ante una comunidad que valora el propósito.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3 data-i18n="emp.why.4.t">Impact Journey</h3><p data-i18n="emp.why.4.p">Un día en campo para tu equipo, con comunidades reales. RSE que se vive.</p></div>
+      <!-- Cuatro razones, no cuatro productos: van en reglas finas (8 oct 2026),
+           como los caminos de la portada. Los tres niveles de abajo siguen en
+           tarjetas porque esos sí se eligen. -->
+      <div class="caminos rv d1">
+        <div class="camino camino-sin"><h3 class="camino-t" data-i18n="emp.why.1.t">Beneficio tributario</h3><p data-i18n="emp.why.1.p">Tu donación puede darte derecho a un descuento en renta equivalente al 25% del valor donado (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de tu situación tributaria y requiere el certificado de donación.</p></div>
+        <div class="camino camino-sin"><h3 class="camino-t" data-i18n="emp.why.2.t">Trazabilidad real</h3><p data-i18n="emp.why.2.p">Cada aporte con destino, acta y reporte verificable. Evidencia, no promesas.</p></div>
+        <div class="camino camino-sin"><h3 class="camino-t" data-i18n="emp.why.3.t">Marca con propósito</h3><p data-i18n="emp.why.3.p">Reconocimiento como empresa aliada y visibilidad ante una comunidad que valora el propósito.</p></div>
+        <div class="camino camino-sin"><h3 class="camino-t" data-i18n="emp.why.4.t">Impact Journey</h3><p data-i18n="emp.why.4.p">Un día en campo para tu equipo, con comunidades reales. RSE que se vive.</p></div>
       </div>
     </div>
   </section>
@@ -745,9 +754,33 @@
       <h2 class="h-sec rv" data-i18n="grat.biz.t">Los comercios que van entrando</h2>
       <p class="lead rv d1" data-i18n="grat.biz.lead">El programa se arma comercio a comercio. Cada ficha dice qué ofrece ese negocio y bajo qué condiciones, y los beneficios se publican a medida que cada comercio los confirma.</p>
       <div id="grat-grid" class="grat-grid rv d2"></div>
-      <div id="grat-empty" class="grat-empty rv d2" style="display:none">
-        <p data-i18n="grat.biz.empty">Todavía no hay comercios con convenio firmado. Cada comercio aparece aquí cuando firma su convenio, con su beneficio y sus condiciones.</p>
-        <a class="btn btn-g" href="#aliados" data-i18n="grat.biz.cta">¿Tienes un negocio? Alíate</a>
+      <!-- SIN COMERCIOS TODAVÍA (8 oct 2026). Era una caja punteada con una sola
+           frase —«todavía no hay…»— como protagonista de la sección. Ahora el
+           hecho sigue dicho, en una línea, y lo que ocupa el espacio es lo útil
+           para quien llega: cómo entra un comercio y qué le pedimos. Con el
+           primer comercio en `status: "activa"` este bloque se oculta y se
+           pinta la rejilla (renderGratitudComercios). -->
+      <div id="grat-empty" class="grat-alta rv d2" style="display:none">
+        <p class="grat-alta-nota" data-i18n="grat.biz.empty">Todavía no hay comercios con convenio firmado. El primero aparecerá aquí, con su beneficio y sus condiciones, el día que firme.</p>
+        <div class="grat-alta-cols">
+          <div>
+            <h3 class="grat-alta-h" data-i18n="grat.alta.t">Cómo entra un comercio</h3>
+            <ol class="grat-alta-pasos">
+              <li><b data-i18n="grat.alta.s1.t">Postula</b><span data-i18n="grat.alta.s1.p">Llenas el formulario de aliados con «Programa de Gratitud» marcado y propones el beneficio: qué ofreces, desde qué nivel y cómo se redime.</span></li>
+              <li><b data-i18n="grat.alta.s2.t">Firma el convenio</b><span data-i18n="grat.alta.s2.p">Revisamos la propuesta y te enviamos el Convenio Marco de Alianza para firmar. Sin costo y sin exclusividad.</span></li>
+              <li><b data-i18n="grat.alta.s3.t">Beneficio publicado</b><span data-i18n="grat.alta.s3.p">Tu ficha aparece en esta página con el beneficio y sus condiciones exactas, y los miembros pueden empezar a usarlo.</span></li>
+            </ol>
+          </div>
+          <div>
+            <h3 class="grat-alta-h" data-i18n="grat.alta.crit.t">Qué le pedimos</h3>
+            <ul class="grat-alta-crit">
+              <li data-i18n="grat.alta.c1">Un beneficio concreto para los miembros, con sus condiciones por escrito: lo que se publica es lo que se cumple.</li>
+              <li data-i18n="grat.alta.c2">Comprobar el carnet antes de aplicarlo, escaneando su QR o escribiendo el código en thegiveandgrowproject.org/verificar.</li>
+              <li data-i18n="grat.alta.c3">De preferencia, un negocio de gastronomía, moda, belleza, bienestar u odontología: las cinco categorías que priorizamos.</li>
+            </ul>
+            <a class="btn btn-g" href="#aliados" data-act="irAAliadosGratitud()" data-i18n="grat.biz.cta">Postular mi comercio</a>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -781,18 +814,7 @@
       <span class="ey rv" data-i18n="imp.ey">Impacto</span>
       <h1 class="h-sec rv" data-i18n="imp.t">Evidencia, no promesas.</h1>
       <p class="lead rv d1" data-i18n="imp.lead">Somos una fundación joven y transparente: en lugar de cifras infladas, te mostramos lo que sí podemos probar — el trabajo en campo, las rutas donde operamos y cómo documentamos cada entrega.</p>
-      <div class="grid g3 rv d2" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></svg></div><h2 data-i18n="imp.pr1.t" class="h-comp3">Fotografías reales</h2><p data-i18n="imp.pr1.p">Cada imagen es real: la de 2026, de la Fundación en terreno; la anterior a abril de 2025, del trabajo de campo del fundador antes de constituirla. Sin bancos de fotos ni montajes.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div><h2 data-i18n="imp.pr2.t" class="h-comp3">Rutas en territorio</h2><p data-i18n="imp.pr2.p">El fundador trabajó casi cuatro años en La Guajira, la Sierra Nevada y las comunas de Medellín; hoy la red opera en Medellín.</p></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM8 7h8M8 11h8M8 15h5"/></svg></div><h2 data-i18n="imp.pr3.t" class="h-comp3">Acta por entrega</h2><p data-i18n="imp.pr3.p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo de quien aportó a ese destino cuando la fundación entrega.</p></div>
-      </div>
-    </div>
-  </section>
-  <section class="cream">
-    <div class="wrap">
-      <span class="ey rv" data-i18n="imp.ev.ey">La evidencia</span>
-      <h2 class="h-sec rv" data-i18n="imp.ev.t">Compruébalo tú mismo.</h2>
-      <div class="acc-tabs rv d1">
+      <div class="acc-tabs imp-tabs rv d2">
         <button id="acctab-gal" class="acc-tab on" data-act="accTab('gal')" data-i18n="imp.tab.gal">Galería</button>
         <button id="acctab-map" class="acc-tab" data-act="accTab('map')" data-i18n="imp.tab.map">Mapa</button>
         <button id="acctab-blog" class="acc-tab" data-act="accTab('blog')" data-i18n="imp.tab.blog">Historias</button>
@@ -802,8 +824,19 @@
       <div id="acc-blog" class="acc-panel"><div id="blog-grid"></div></div>
     </div>
   </section>
+  <!-- #IMPACTO ABRE CON LA EVIDENCIA (8 oct 2026). Antes: titular, tres
+       tarjetas con icono y, una sección más abajo, «Compruébalo tú mismo» con
+       la galería. Ahora las fotos —con su pie y su fecha— van justo después de
+       la entradilla, que es lo que la promete, y los tres principios bajan a
+       una lista de reglas finas que explica cómo se documenta. -->
   <section class="cream">
     <div class="wrap">
+      <span class="ey rv" data-i18n="imp.ev.ey">La evidencia</span>
+      <div class="caminos rv d1">
+        <div class="camino camino-sin"><h2 class="camino-t h-comp3" data-i18n="imp.pr1.t">Fotografías reales</h2><p data-i18n="imp.pr1.p">Cada imagen es real: la de 2026, de la Fundación en terreno; la anterior a abril de 2025, del trabajo de campo del fundador antes de constituirla. Sin bancos de fotos ni montajes.</p></div>
+        <div class="camino camino-sin"><h2 class="camino-t h-comp3" data-i18n="imp.pr2.t">Rutas en territorio</h2><p data-i18n="imp.pr2.p">El fundador trabajó casi cuatro años en La Guajira, la Sierra Nevada y las comunas de Medellín; hoy la red opera en Medellín.</p></div>
+        <div class="camino camino-sin"><h2 class="camino-t h-comp3" data-i18n="imp.pr3.t">Acta por entrega</h2><p data-i18n="imp.pr3.p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en el rastreo de quien aportó a ese destino cuando la fundación entrega.</p></div>
+      </div>
       <p class="rv"><a class="card-link" href="#hub"><span data-i18n="net.hub">Conoce una por una a las fundaciones que forman la red</span> <span aria-hidden="true">&rarr;</span></a></p>
       <div class="cta-box rv">
         <h2 data-i18n="imp.cta.t" class="h-comp3">La evidencia crece contigo.</h2>
@@ -2331,17 +2364,19 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="membres.tiers.ey">Tu recorrido</span>
       <h2 class="h-sec rv" data-i18n="membres.tiers.t">De semilla a bosque.</h2>
-      <!-- «EN PREPARACIÓN» marca cada beneficio que todavía no tiene cómo
-           entregarse: no hay boletín, ni reconocimiento publicado, ni eventos, ni
-           reportes periódicos, ni certificados personalizados. Lo que sí existe
-           hoy va sin marca: recibo y número de guía, carnet, certificado de
-           donación si se pide y Gratitud desde Retoño. Decisión de Sebas, 29 sep
-           2026. Cuando uno exista, se le quita la marca, no antes. -->
+      <!-- LO QUE EXISTE HOY va en la lista de cada nivel; lo que todavía no tiene
+           cómo entregarse va junto, en UNA línea «En preparación» al pie del
+           nivel (boletín, reconocimiento publicado, certificados personalizados,
+           eventos, reportes periódicos, reunión). Hasta el 8 oct 2026 era una
+           marca por beneficio —once en la página—, y justo donde se decide pagar
+           se leía como un borrador. Árbol y Bosque hoy no suman nada que ya
+           exista: por eso su «Todo lo de…» termina en punto, sin lista. Decisión
+           de Sebas, 29 sep y 8 oct 2026. Cuando uno exista, sube a la lista. -->
       <div class="grid g4 rv d1" style="margin-top:28px">
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c-.6-3-3.2-4.6-6.3-4 .3 3 2.6 4.8 6.3 4z"/></svg></div><h3 data-i18n="membres.t1.t">Semilla</h3><div class="tier-price"><b data-i18n="membres.t1.price">$20.000</b><span data-i18n="membres.t1.priceu">/ mes · o US$5 por PayPal</span></div><p data-i18n="membres.t1.p">El primer paso: empiezas a sembrar impacto cada mes.</p><ul class="tier-ben"><li data-i18n="membres.t1.b0">Recibo y número de guía con cada aporte, y carnet digital</li><li><span data-i18n="membres.t1.b1">Boletín de impacto con historias reales</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li data-i18n="membres.t1.b2">Certificado de donación si lo pides (Art. 257 ET, solo Colombia)</li><li><span data-i18n="membres.t1.b3">Reconocimiento en web y redes</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li></ul></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 15c-.6-2.6-3-4-6-3.4.3 2.7 2.6 4.2 6 3.4z"/><path d="M12 13c.6-2.6 3-4 6-3.4-.3 2.7-2.6 4.2-6 3.4z"/></svg></div><h3 data-i18n="membres.t2.t">Retoño</h3><div class="tier-price"><b data-i18n="membres.t2.price">$50.000</b><span data-i18n="membres.t2.priceu">/ mes · o US$15 por PayPal</span></div><p data-i18n="membres.t2.p">Tu aporte crece y sostiene programas con más alcance.</p><p class="tier-more" data-i18n="membres.t2.more">Todo lo de Semilla, y además:</p><ul class="tier-ben"><li data-i18n="membres.t2.b1">Acceso al Programa de Gratitud</li><li><span data-i18n="membres.t2.b2">Certificado de agradecimiento personalizado</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t2.b3">Contenido especial de voluntariado e impacto</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li></ul></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><circle cx="12" cy="9.5" r="6"/></svg></div><h3 data-i18n="membres.t3.t">Árbol</h3><div class="tier-price"><b data-i18n="membres.t3.price">$120.000</b><span data-i18n="membres.t3.priceu">/ mes · o US$35 por PayPal</span></div><p data-i18n="membres.t3.p">Un compromiso firme que sostiene proyectos completos.</p><p class="tier-more" data-i18n="membres.t3.more">Todo lo de Retoño, y además:</p><ul class="tier-ben"><li><span data-i18n="membres.t3.b1">Invitación a eventos y sesiones en vivo</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t3.b2">Acceso prioritario a Impact Journey</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t3.b3">Certificado de impacto personalizado</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li></ul></div>
-        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 22v-3M17 22v-3M12 22v-4"/><circle cx="7" cy="13" r="4"/><circle cx="17" cy="13" r="4"/><circle cx="12" cy="9" r="4.5"/></svg></div><h3 data-i18n="membres.t4.t">Bosque</h3><div class="tier-price"><b data-i18n="membres.t4.price">$250.000+</b><span data-i18n="membres.t4.priceu">/ mes · o US$75+ por PayPal</span></div><p data-i18n="membres.t4.p">El nivel más alto: tu generosidad multiplica toda la red.</p><p class="tier-more" data-i18n="membres.t4.more">Todo lo de Árbol, y además:</p><ul class="tier-ben"><li><span data-i18n="membres.t4.b1">Reportes de impacto detallados</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t4.b2">Reunión con el fundador</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li><li><span data-i18n="membres.t4.b3">Membresía honorífica y liderazgo en la comunidad</span> <span class="tag soon" data-i18n="membres.prep">En preparación</span></li></ul></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c-.6-3-3.2-4.6-6.3-4 .3 3 2.6 4.8 6.3 4z"/></svg></div><h3 data-i18n="membres.t1.t">Semilla</h3><div class="tier-price"><b data-i18n="membres.t1.price">$20.000</b><span data-i18n="membres.t1.priceu">/ mes · o US$5 por PayPal</span></div><p data-i18n="membres.t1.p">El primer paso: empiezas a sembrar impacto cada mes.</p><ul class="tier-ben"><li data-i18n="membres.t1.b0">Recibo y número de guía con cada aporte, y carnet digital</li><li data-i18n="membres.t1.b2">Certificado de donación si lo pides (Art. 257 ET, solo Colombia)</li></ul><p class="tier-soon"><b data-i18n="membres.prep">En preparación</b> <span data-i18n="membres.t1.soon">Boletín de impacto con historias reales y reconocimiento en web y redes.</span></p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-9"/><path d="M12 15c-.6-2.6-3-4-6-3.4.3 2.7 2.6 4.2 6 3.4z"/><path d="M12 13c.6-2.6 3-4 6-3.4-.3 2.7-2.6 4.2-6 3.4z"/></svg></div><h3 data-i18n="membres.t2.t">Retoño</h3><div class="tier-price"><b data-i18n="membres.t2.price">$50.000</b><span data-i18n="membres.t2.priceu">/ mes · o US$15 por PayPal</span></div><p data-i18n="membres.t2.p">Tu aporte crece y sostiene programas con más alcance.</p><p class="tier-more" data-i18n="membres.t2.more">Todo lo de Semilla, y además:</p><ul class="tier-ben"><li data-i18n="membres.t2.b1">Acceso al Programa de Gratitud</li></ul><p class="tier-soon"><b data-i18n="membres.prep">En preparación</b> <span data-i18n="membres.t2.soon">Certificado de agradecimiento personalizado y contenido especial de voluntariado e impacto.</span></p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><circle cx="12" cy="9.5" r="6"/></svg></div><h3 data-i18n="membres.t3.t">Árbol</h3><div class="tier-price"><b data-i18n="membres.t3.price">$120.000</b><span data-i18n="membres.t3.priceu">/ mes · o US$35 por PayPal</span></div><p data-i18n="membres.t3.p">Un compromiso firme que sostiene proyectos completos.</p><p class="tier-more" data-i18n="membres.t3.more">Todo lo de Retoño.</p><p class="tier-soon"><b data-i18n="membres.prep">En preparación</b> <span data-i18n="membres.t3.soon">Invitación a eventos y sesiones en vivo, acceso prioritario a Impact Journey y certificado de impacto personalizado.</span></p></div>
+        <div class="card"><div class="ic"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 22v-3M17 22v-3M12 22v-4"/><circle cx="7" cy="13" r="4"/><circle cx="17" cy="13" r="4"/><circle cx="12" cy="9" r="4.5"/></svg></div><h3 data-i18n="membres.t4.t">Bosque</h3><div class="tier-price"><b data-i18n="membres.t4.price">$250.000+</b><span data-i18n="membres.t4.priceu">/ mes · o US$75+ por PayPal</span></div><p data-i18n="membres.t4.p">El nivel más alto: tu generosidad multiplica toda la red.</p><p class="tier-more" data-i18n="membres.t4.more">Todo lo de Árbol.</p><p class="tier-soon"><b data-i18n="membres.prep">En preparación</b> <span data-i18n="membres.t4.soon">Reportes de impacto detallados, reunión con el fundador y membresía honorífica con liderazgo en la comunidad.</span></p></div>
       </div>
     </div>
   </section>
@@ -2362,7 +2397,7 @@
       <div class="grid g2 rv d1" style="margin-top:22px">
         <div class="card card-d"><h3 data-i18n="membres.ben.1.t">Programa de Gratitud</h3><p data-i18n="membres.ben.1.p">Beneficios que empresas aliadas ofrecen de forma voluntaria, en gratitud por el impacto. Disponible desde el nivel Retoño, y para los miembros de honor; estamos sumando aliados.</p></div>
         <div class="card card-d"><h3 data-i18n="membres.ben.2.t">Certificado y carnet</h3><p data-i18n="membres.ben.2.p">Tu certificado de donación para el beneficio tributario en Colombia y tu carnet digital de miembro, que se renueva con cada aporte.</p></div>
-        <div class="card card-d"><span class="tag soon" data-i18n="membres.prep">En preparación</span><h3 data-i18n="membres.ben.3.t">Reportes de impacto</h3><p data-i18n="membres.ben.3.p">Te contamos a dónde llegó tu aporte, con evidencia: cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Los reportes periódicos de impacto están en preparación.</p></div>
+        <div class="card card-d"><h3 data-i18n="membres.ben.3.t">El acta de cada entrega</h3><p data-i18n="membres.ben.3.p">Te contamos a dónde llegó tu aporte, con evidencia: cuando la fundación entrega, el acta firmada y sus fotos aparecen en tu rastreo. Los reportes periódicos de impacto están en preparación.</p></div>
         <div class="card card-d"><h3 data-i18n="membres.ben.4.t">Trazabilidad total</h3><p data-i18n="membres.ben.4.p">Cada donación tiene destino y número de guía; el acta y sus fotos se suman a tu rastreo cuando la fundación entrega. Sin promesas: evidencia.</p></div>
       </div>
       <div class="verif-door rv d2"><div class="verif-door-txt"><h3 data-i18n="verif.door.t">¿Atiendes un comercio aliado?</h3><p data-i18n="verif.door.p">Comprueba que el carnet de un miembro esté vigente: escribe su código o su número de cédula, o escanea su QR con tu propio celular.</p></div><a class="btn btn-o verif-door-btn" href="/verificar" data-i18n="verif.door.href" data-i18n-attr="href"><span data-i18n="verif.door.a">Verificar un carnet de membresía</span></a></div>
