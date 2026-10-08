@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "f322c52a";
+const STYLES_V = "6b17fbbf";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -11756,7 +11756,7 @@ async function paypalCobro(env, suscripcionId, recurso) {
 
 const ALMA_SYS = `Eres ALMA (Asistente de Labor Misional y Alianzas), la IA de Fundación Give&Grow International. Respondes de forma clara, cálida y concisa. Máximo 3 párrafos por respuesta. No uses listas extensas. Responde en el idioma del usuario.
 
-GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Constituida por documento privado el 11 de abril de 2025 y registrada en la Cámara de Comercio de Medellín el 19 de mayo de 2025; la calificación en el Régimen Tributario Especial la da la DIAN. 2025 fue el año de constitución, sin operación: la Fundación empezó a operar en 2026. Fundador: Juan Sebastián Navarro Osorio, con casi 4 años de trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín ANTES de constituir la Fundación; ese trabajo es suyo, no de la Fundación, y así hay que decirlo. GOBIERNO: el máximo órgano de dirección es el que definen los estatutos, hoy el fundador; hay Representante Legal y Revisora Fiscal, y NO hay junta directiva. ESTADOS FINANCIEROS 2025: publicados en #transparencia, firmados por el Representante Legal y la Revisora Fiscal (un año de constitución, sin operación). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: sebas@thegiveandgrowproject.org / +57 315 330 5028.
+GIVE&GROW: Fundación colombiana ESAL (NIT 901.948.930-2, RTE Código 04 DIAN). Constituida por documento privado el 11 de abril de 2025 y registrada en la Cámara de Comercio de Medellín el 19 de mayo de 2025; la calificación en el Régimen Tributario Especial la da la DIAN. 2025 fue el año de constitución, sin operación: la Fundación empezó a operar en 2026. Fundador: Juan Sebastián Navarro Osorio, con casi 4 años de trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín ANTES de constituir la Fundación; ese trabajo es suyo, no de la Fundación, y así hay que decirlo. GOBIERNO: el máximo órgano de dirección es el que definen los estatutos, hoy el fundador; hay Representante Legal y Revisora Fiscal, y NO hay junta directiva. ESTADOS FINANCIEROS 2025: publicados en #transparencia, firmados por el Representante Legal y la Revisora Fiscal (un año de constitución, sin operación). Tagline: "Dar para crecer, crecer para dar más". Web: www.thegiveandgrowproject.org. Contacto: contacto@thegiveandgrowproject.org / +57 315 330 5028.
 
 MISIÓN: Conectar generosidad con necesidad de forma estratégica y con trazabilidad completa. No reemplazamos fundaciones, las amplificamos.
 

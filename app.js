@@ -536,7 +536,7 @@ var I18N = {
     "ally.err.mod":"Marca al menos una forma de apoyar.",
     "ally.err.ben":"Cuéntanos qué beneficio ofreces para el Programa de Gratitud.",
     "ally.err.serv":"Describe el servicio que ofreces a la población vulnerable.",
-    "ally.err.send":"No pudimos enviar tu solicitud. Vuelve a intentarlo en un momento, o escríbenos a sebas@thegiveandgrowproject.org.",
+    "ally.err.send":"No pudimos enviar tu solicitud. Vuelve a intentarlo en un momento, o escríbenos a contacto@thegiveandgrowproject.org.",
     "ally.err.razon":"Nos falta la razón social o el nombre del emprendimiento.",
     "ally.err.email":"Revisa el correo: parece que tiene algo raro.",
     "form.err.muchas":"Ya recibimos varios envíos desde este correo hace un momento. Si ya mandaste el tuyo, no hace falta repetirlo: te escribimos a ese correo. Si no, espera unos minutos y vuelve a intentarlo.",
@@ -1166,7 +1166,7 @@ var I18N = {
     "vf.err.nivel":"Elige cómo quieres participar.",
     "vf.err.oficio":"Cuéntanos tu oficio o área.",
     "vf.err.datos":"Necesitamos tu autorización para guardar tus datos y poder escribirte.",
-    "vf.err.send":"No pudimos enviar tus datos. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
+    "vf.err.send":"No pudimos enviar tus datos. Vuelve a intentarlo, o escríbenos a contacto@thegiveandgrowproject.org.",
     "vf.nada":"Nada de esto se cobra, en ninguna dirección.",
     "vf.origen.brig":"Vienes de la página de la brigada del terremoto, que ya terminó. Te marcamos «Administrativo»; puedes cambiarlo si prefieres otro nivel.",
     "ff.ey":"Aplicar al HUB SOCIAL",
@@ -1247,7 +1247,7 @@ var I18N = {
     "ff.err.atiende":"Dinos a cuántas personas llega, aunque sea aproximado.",
     "ff.err.datos":"Necesitamos la autorización de datos para poder escribirte.",
     "ff.err.veraz":"Necesitamos la declaración de veracidad para recibir la aplicación.",
-    "ff.err.send":"No pudimos enviar la aplicación. Vuelve a intentarlo, o escríbenos a sebas@thegiveandgrowproject.org.",
+    "ff.err.send":"No pudimos enviar la aplicación. Vuelve a intentarlo, o escríbenos a contacto@thegiveandgrowproject.org.",
     "vol.link":"Ver el programa de voluntariado",
     "fund.ey":"Para fundaciones",
     "fund.t":"Aplica al HUB SOCIAL.",
@@ -5231,7 +5231,7 @@ function formSend(){
   if(!telOk(tel)){ show(t("form.err.tel"), false); var ct=document.getElementById("cf-tel"); if (ct) ct.focus(); return; }
   var subject=encodeURIComponent((es?"Contacto web — ":"Web contact — ")+(n||e));
   var body=encodeURIComponent((es?"Nombre: ":"Name: ")+n+"\n"+(es?"Correo: ":"Email: ")+e+"\n"+(es?"Celular: ":"Mobile: ")+tel+"\n\n"+m);
-  window.location.href="mailto:sebas@thegiveandgrowproject.org?subject="+subject+"&body="+body;
+  window.location.href="mailto:contacto@thegiveandgrowproject.org?subject="+subject+"&body="+body;
   show(es?"Abrimos tu app de correo con el mensaje listo para enviar.":"We opened your email app with the message ready to send.", true);
 }
 
