@@ -13018,35 +13018,63 @@ async function rutaCarnet(env, token, url, request) {
    por la base: la página no debe enseñar a distinguir «ese formato no existe»
    de «ese carnet no existe». Y UN CARNET REVOCADO dice «No vigente» igual que
    uno vencido, nunca el motivo: eso es asunto entre la fundación y la persona,
-   no del cajero. */
+   no del cajero.
+
+   POST /verificar — LA MISMA CONSULTA POR NÚMERO DE CÉDULA (oct 2026, pedido
+   del fundador). Va por POST y no por GET a propósito: una cédula en la URL
+   queda en el historial del celular del cajero, en los logs y en el Referer.
+   Ver `rutaVerificarDoc`. */
 const VERIFICAR_GOLPES = new Map();
-async function rutaVerificar(env, url, request, crudo) {
-  const lang = idiomaPagina(url, request);
-  const tema = temaPorReloj(request);
-  const entrada = String(crudo != null ? crudo : (url.searchParams.get("c") || "")).trim().slice(0, 20);
-  const respuesta = (html, status) => new Response(html, {
+function respuestaVerificar(html, status) {
+  return new Response(html, {
     status,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "referrer-policy": "no-referrer",
       "cache-control": "private, no-store",
       "x-robots-tag": "noindex, nofollow",
-      /* `form: 'self'` porque la página lleva el formulario GET que vuelve
-         aquí mismo; con el 'none' por defecto el navegador no lo enviaría. */
+      /* `form: 'self'` porque la página lleva los dos formularios (GET del
+         código, POST de la cédula) que vuelven aquí mismo; con el 'none' por
+         defecto el navegador no los enviaría. */
       "content-security-policy": cspPagina({ script: "'none'", form: "'self'" })
     }
   });
+}
+
+/* EL TOPE, antes de tocar la base, y EL MISMO para el código y la cédula: los
+   dos comparten contadores, así que repartir golpes entre las dos puertas no
+   da más intentos. Dos redes: una ráfaga corta en memoria (30 en 5 minutos,
+   por isolate) y el tope diario en D1, que es el que no se esquiva repartiendo
+   golpes entre isolates. Un comercio consulta unos pocos carnets al día; quien
+   barre códigos o cédulas necesita cientos de miles. */
+async function verificarLimitado(env, request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  return (ip && limitadoPorIP(VERIFICAR_GOLPES, ip, 300000, 30)) || !(await pasaTopeIP(env, request, "verificar"));
+}
+
+/* La fila de un carnet → lo que pinta la página. Una sola función para las dos
+   consultas: el resultado por cédula es EXACTAMENTE el mismo que por código. */
+function resultadoVerificar(m, verif, lang) {
+  const n = nivelDe(m.nivel);
+  return {
+    vigente: !m.revocado_en && m.vigente_hasta >= fechaCO(),
+    nivel: lang === "en" ? n.en : n.es, nivelId: n.id, verif,
+    nombre: nombreEnmascarado(m.nombre),
+    desde: m.desde, hasta: m.vigente_hasta,
+    consultado: consultadoCO()
+  };
+}
+
+async function rutaVerificar(env, url, request, crudo) {
+  const lang = idiomaPagina(url, request);
+  const tema = temaPorReloj(request);
+  const entrada = String(crudo != null ? crudo : (url.searchParams.get("c") || "")).trim().slice(0, 20);
 
   /* Sin código: solo el formulario. No cuenta para el tope. */
-  if (!entrada) return respuesta(paginaVerificar({ lang, tema, entrada: "" }), 200);
+  if (!entrada) return respuestaVerificar(paginaVerificar({ lang, tema, entrada: "" }), 200);
 
-  /* EL TOPE, antes de tocar la base. Dos redes: una ráfaga corta en memoria
-     (30 en 5 minutos, por isolate) y el tope diario en D1, que es el que no se
-     esquiva repartiendo golpes entre isolates. Un comercio consulta unos pocos
-     carnets al día; quien barre códigos necesita cientos de miles. */
-  const ip = request.headers.get("CF-Connecting-IP") || "";
-  if ((ip && limitadoPorIP(VERIFICAR_GOLPES, ip, 300000, 30)) || !(await pasaTopeIP(env, request, "verificar"))) {
-    return respuesta(paginaVerificar({ lang, tema, entrada, limitado: true }), 429);
+  if (await verificarLimitado(env, request)) {
+    return respuestaVerificar(paginaVerificar({ lang, tema, entrada, limitado: true }), 429);
   }
 
   const v = verifNormal(entrada);
@@ -13055,18 +13083,105 @@ async function rutaVerificar(env, url, request, crudo) {
     "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.verif = ?"
   ).bind(v || "-").first();
 
-  if (!m) return respuesta(paginaVerificar({ lang, tema, entrada, noEncontrado: true }), 404);
+  if (!m) return respuestaVerificar(paginaVerificar({ lang, tema, entrada, noEncontrado: true }), 404);
 
-  const n = nivelDe(m.nivel);
-  return respuesta(paginaVerificar({
-    lang, tema, entrada: verifFormato(v),
-    resultado: {
-      vigente: !m.revocado_en && m.vigente_hasta >= fechaCO(),
-      nivel: lang === "en" ? n.en : n.es, nivelId: n.id, verif: v,
-      nombre: nombreEnmascarado(m.nombre),
-      desde: m.desde, hasta: m.vigente_hasta,
-      consultado: consultadoCO()
-    }
+  return respuestaVerificar(paginaVerificar({
+    lang, tema, entrada: verifFormato(v), resultado: resultadoVerificar(m, v, lang)
+  }), 200);
+}
+
+/* «1.000.000.001», «1000 000 001», «1-000-000-001» → «1000000001». Solo se
+   quitan puntos, espacios y guiones; cualquier otra cosa (letras, comas) hace
+   que no sea una cédula y se responde lo mismo que a una que no existe. Entre
+   5 y 15 dígitos: fuera de eso no hay documento colombiano posible. */
+function docNormal(entrada) {
+  const t = String(entrada || "").replace(/[\s.-]+/g, "");
+  return /^[0-9]{5,15}$/.test(t) ? t : "";
+}
+
+/* El cuerpo de un formulario de un solo campo cabe de sobra en 1 KB. Se lee
+   por trozos y se corta al pasarse, porque `content-length` lo escribe el
+   cliente y un cuerpo sin él (chunked) no lo trae. */
+const VERIFICAR_MAX_CUERPO = 1024;
+async function cuerpoCorto(request, max) {
+  const largo = Number(request.headers.get("content-length") || 0);
+  if (largo > max) return null;
+  if (!request.body) return "";
+  const lector = request.body.getReader();
+  const trozos = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await lector.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) { try { await lector.cancel(); } catch {} return null; }
+    trozos.push(value);
+  }
+  const todo = new Uint8Array(total);
+  let i = 0;
+  for (const t of trozos) { todo.set(t, i); i += t.byteLength; }
+  return new TextDecoder().decode(todo);
+}
+
+/* POST /verificar con `doc=<número>` — la consulta por cédula.
+
+   LA CÉDULA NO SE QUEDA EN NINGÚN LADO. No viaja en la URL (es POST y la
+   respuesta se pinta aquí mismo, 200, sin redirigir a una dirección que la
+   lleve), no vuelve en el HTML (ni en el campo del formulario, ni «terminada
+   en…»), no se escribe en el log, y el tope por IP guarda un hash del IP, no
+   lo consultado.
+
+   EL MISMO NO ENCONTRADO QUE UN CÓDIGO MALO. Un número absurdo, uno que no es
+   de ningún miembro, y uno de un donante sin carnet responden la misma página
+   con el mismo 404, y los tres pasan por la base, como en el código.
+
+   VARIOS CARNETS CON EL MISMO NÚMERO (dos correos de la misma persona, o un
+   número mal escrito en Wompi): gana el vigente y, entre iguales, el más
+   reciente. Un miembro de PayPal puede no tener documento: a ese solo se le
+   encuentra por su código, y la página no lo distingue de «no existe». */
+async function rutaVerificarDoc(env, url, request) {
+  const lang = idiomaPagina(url, request);
+  const tema = temaPorReloj(request);
+
+  const texto = await cuerpoCorto(request, VERIFICAR_MAX_CUERPO);
+  if (texto === null) return respuestaVerificar(paginaVerificar({ lang, tema, entrada: "", noEncontrado: true }), 413);
+  let crudo = "";
+  try { crudo = String(new URLSearchParams(texto).get("doc") || "").trim().slice(0, 40); } catch { crudo = ""; }
+
+  /* Formulario vacío: la página, sin contar para el tope (igual que el GET). */
+  if (!crudo) return respuestaVerificar(paginaVerificar({ lang, tema, entrada: "" }), 200);
+
+  if (await verificarLimitado(env, request)) {
+    return respuestaVerificar(paginaVerificar({ lang, tema, entrada: "", limitado: true }), 429);
+  }
+
+  const doc = docNormal(crudo);
+  /* La comparación se hace normalizada en los DOS lados: lo que guardó Wompi
+     puede venir con puntos o espacios. La tabla es pequeña; el REPLACE no usa
+     índice y no hace falta. */
+  const m = await env.DB.prepare(
+    "SELECT m.codigo, m.nivel, m.desde, m.vigente_hasta, m.revocado_en, m.verif, d.nombre " +
+    "FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
+    "WHERE d.doc_numero IS NOT NULL AND " +
+    "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(d.doc_numero, '.', ''), ' ', ''), '-', ''), char(9), ''), char(160), '') = ? " +
+    "ORDER BY (m.revocado_en IS NULL AND m.vigente_hasta >= ?) DESC, m.vigente_hasta DESC, m.desde DESC, m.creado_en DESC " +
+    "LIMIT 1"
+  ).bind(doc || "-", fechaCO()).first();
+
+  if (!m) return respuestaVerificar(paginaVerificar({ lang, tema, entrada: "", noEncontrado: true }), 404);
+
+  /* Un carnet anterior a la 0039 sin código lo recibe aquí, como en su primera
+     visita a /carnet. Si fallara, la tarjeta sale sin QR: la respuesta (vigente
+     o no) no depende del código. */
+  let verif = null;
+  try { verif = await verifDeMiembro(env, m.codigo, m.verif); }
+  catch (e) { console.error("verificar doc verif", m.codigo, e && e.message); }
+
+  /* `entrada` es el CÓDIGO del carnet, nunca la cédula: es lo que usan el
+     enlace de idioma y el QR, y con él la consulta se puede repetir sin que
+     el número vuelva a viajar. */
+  return respuestaVerificar(paginaVerificar({
+    lang, tema, entrada: verif ? verifFormato(verif) : "", resultado: resultadoVerificar(m, verif, lang)
   }), 200);
 }
 
@@ -13074,8 +13189,11 @@ function paginaVerificar(o) {
   const en = o.lang === "en";
   const T = en ? {
     titulo: "Check a member card", ey: "Gratitude Programme · for partner businesses",
-    lead: "Type the code printed under the QR on the member's card, or scan that QR with your own phone. The answer comes from the foundation's site, not from the screen you are being shown.",
-    label: "Verification code", boton: "Check",
+    lead: "Type the code printed under the QR on the member's card or the member's ID number, or scan that QR with your own phone. The answer comes from the foundation's site, not from the screen you are being shown.",
+    label: "Card code", boton: "Check",
+    o: "or",
+    labelDoc: "ID number (cédula)",
+    ayudaDoc: "The ID number the member used to pay for the membership, with or without dots. It does not travel in the page address and it does not appear in the answer.",
     vig: "Valid", novig: "Not valid",
     vigP: "This membership is active today.",
     novigP: "This card does not give access to benefits today.",
@@ -13084,17 +13202,20 @@ function paginaVerificar(o) {
     cotejar: "Ask for an ID document and check that the name matches. The card is personal and not transferable.",
     semilla: "Seed level: the membership is real, but Gratitude Programme benefits start at the Sprout level.",
     cotejarSemilla: "At this level the partner-business benefit does not apply. If you want to confirm the name, ask for an ID document.",
-    nf: "We could not find that code.",
-    nfP: "Check that it was typed correctly: eight characters, with or without the dash. If it still does not show up, the card cannot be confirmed — do not apply the benefit; the member can write to us.",
+    nf: "We could not find a card with that code or ID number.",
+    nfP: "Check that it was typed correctly: the code has eight characters, with or without the dash; the ID number, digits only. If it still does not show up, the card cannot be confirmed — do not apply the benefit; the member can write to us.",
     lim: "Too many checks from this connection.",
     limP: "Wait a few minutes and try again.",
-    otra: "Check another code", otro: "Español", otroLang: "es",
+    otra: "Check another card", otro: "Español", otroLang: "es",
     volver: "Gratitude Programme", inicio: "Give&Grow home",
     pie: "Fundación Give&Grow International · Colombian nonprofit · NIT 901.948.930-2"
   } : {
     titulo: "Verificar un carnet", ey: "Programa de Gratitud · para comercios aliados",
-    lead: "Escribe el código que aparece bajo el QR del carnet del miembro, o escanea ese QR con tu propio celular. La respuesta sale del sitio de la fundación, no de la pantalla que te muestran.",
-    label: "Código de verificación", boton: "Verificar",
+    lead: "Escribe el código que aparece bajo el QR del carnet del miembro o su número de cédula, o escanea ese QR con tu propio celular. La respuesta sale del sitio de la fundación, no de la pantalla que te muestran.",
+    label: "Código del carnet", boton: "Verificar",
+    o: "o",
+    labelDoc: "Número de cédula",
+    ayudaDoc: "La cédula con la que el miembro pagó su membresía, con o sin puntos. No viaja en la dirección de la página ni aparece en la respuesta.",
     vig: "Vigente", novig: "No vigente",
     vigP: "Esta membresía está activa hoy.",
     novigP: "Este carnet no da acceso a beneficios hoy.",
@@ -13103,11 +13224,11 @@ function paginaVerificar(o) {
     cotejar: "Pide un documento de identidad y compara el nombre. El carnet es personal e intransferible.",
     semilla: "Nivel Semilla: la membresía es real, pero los beneficios del Programa de Gratitud empiezan en el nivel Retoño.",
     cotejarSemilla: "A este nivel no aplica el beneficio del comercio aliado. Si quieres confirmar el nombre, pide un documento de identidad.",
-    nf: "No encontramos ese código.",
-    nfP: "Revisa que esté bien escrito: ocho caracteres, con o sin guion. Si aun así no aparece, el carnet no se puede confirmar: no apliques el beneficio, y el miembro puede escribirnos.",
+    nf: "No encontramos un carnet con ese código o documento.",
+    nfP: "Revisa que esté bien escrito: el código tiene ocho caracteres, con o sin guion; la cédula, solo números. Si aun así no aparece, el carnet no se puede confirmar: no apliques el beneficio, y el miembro puede escribirnos.",
     lim: "Demasiadas consultas desde esta conexión.",
     limP: "Espera unos minutos y vuelve a intentarlo.",
-    otra: "Verificar otro código", otro: "English", otroLang: "en",
+    otra: "Verificar otro carnet", otro: "English", otroLang: "en",
     volver: "Programa de Gratitud", inicio: "Inicio de Give&Grow",
     pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2"
   };
@@ -13122,7 +13243,9 @@ function paginaVerificar(o) {
     + '<a class="nlogo" href="/" aria-label="' + esc(T.inicio) + '">Give<em>&amp;</em>Grow</a>'
     + '<a class="vf-volver" href="/#gratitud"><span aria-hidden="true">&larr;</span> ' + esc(T.volver) + '</a>'
     + '</div></header>\n';
-  const otroHref = "/verificar" + (o.resultado ? "/" + encodeURIComponent(o.entrada) : "") + "?lang=" + T.otroLang;
+  /* Tras una consulta por cédula, `entrada` es el código del carnet (nunca la
+     cédula), así que este enlace no la lleva. */
+  const otroHref = "/verificar" + (o.resultado && o.entrada ? "/" + encodeURIComponent(o.entrada) : "") + "?lang=" + T.otroLang;
 
   const formulario = ''
     + '  <form class="vf-form" method="GET" action="/verificar">\n'
@@ -13132,6 +13255,19 @@ function paginaVerificar(o) {
     + '      <input id="vf-c" name="c" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="K7Q3-M9XA" value="' + esc(o.entrada || "") + '">\n'
     + '      <button class="btn btn-g" type="submit">' + esc(T.boton) + '</button>\n'
     + '    </div>\n'
+    + '  </form>\n'
+    /* LA CÉDULA, EN SU PROPIO FORMULARIO Y POR POST: así no termina en la URL.
+       Sin `value`: la página nunca devuelve el número que se escribió, ni
+       siquiera para corregirlo. `autocomplete="off"` para que el celular del
+       cajero no lo guarde ni lo sugiera al siguiente cliente. */
+    + '  <p class="vf-o" aria-hidden="true"><span>' + esc(T.o) + '</span></p>\n'
+    + '  <form class="vf-form vf-form-doc" method="POST" action="/verificar' + qLang + '">\n'
+    + '    <label for="vf-d">' + esc(T.labelDoc) + '</label>\n'
+    + '    <div class="vf-fila">\n'
+    + '      <input id="vf-d" name="doc" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="20" aria-describedby="vf-d-ayuda">\n'
+    + '      <button class="btn btn-g" type="submit">' + esc(T.boton) + '</button>\n'
+    + '    </div>\n'
+    + '    <p class="mu vf-ayuda" id="vf-d-ayuda">' + esc(T.ayudaDoc) + '</p>\n'
     + '  </form>\n';
 
   let cuerpo = ''
@@ -13177,6 +13313,9 @@ function paginaVerificar(o) {
   const estilo = ''
     + '.vf-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}'
     + '.vf-form{margin-top:22px}.vf-form label{display:block;font-weight:600;margin-bottom:8px}'
+    + '.vf-form-doc{margin-top:0}.vf-ayuda{margin:8px 0 0;font-size:var(--fs-14)}'
+    + '.vf-o{display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:var(--mu);font-size:var(--fs-14)}'
+    + '.vf-o::before,.vf-o::after{content:"";flex:1;border-top:1px solid var(--bd)}'
     + '.vf-fila{display:flex;gap:10px;flex-wrap:wrap}'
     + '.vf-fila input{flex:1 1 200px;min-width:0;font-size:var(--fs-h4);font-family:ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;'
     + 'padding:12px 14px;border:1px solid var(--bd);border-radius:10px;background:var(--surface);color:var(--ink)}'
@@ -13651,14 +13790,14 @@ function paginaCarnet(c) {
   const T = en ? {
     titulo: "Member card",
     pie: semilla
-      ? "This card proves your Seed membership. Gratitude Programme benefits at partner businesses start at the Sprout level. Its status is read at the moment it opens, and anyone can confirm it at thegiveandgrowproject.org/verificar."
-      : "Gratitude Programme · Show this screen at partner businesses. Its status is read at the moment it opens, and the business can confirm it on its own at thegiveandgrowproject.org/verificar.",
+      ? "This card proves your Seed membership. Gratitude Programme benefits at partner businesses start at the Sprout level. Its status is read at the moment it opens, and anyone can confirm it at thegiveandgrowproject.org/verificar with its code or your ID number."
+      : "Gratitude Programme · Show this screen at partner businesses. Its status is read at the moment it opens, and the business can confirm it on its own at thegiveandgrowproject.org/verificar with its code or your ID number.",
     otro: "Español", otroLang: "es"
   } : {
     titulo: "Carnet de miembro",
     pie: semilla
-      ? "Este carnet acredita tu membresía Semilla. Los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño. El estado se consulta en el momento, y cualquiera puede comprobarlo en thegiveandgrowproject.org/verificar."
-      : "Programa de Gratitud · Presenta esta pantalla en los comercios aliados. El estado se consulta en el momento, y el comercio puede comprobarlo por su cuenta en thegiveandgrowproject.org/verificar.",
+      ? "Este carnet acredita tu membresía Semilla. Los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño. El estado se consulta en el momento, y cualquiera puede comprobarlo en thegiveandgrowproject.org/verificar con su código o tu número de cédula."
+      : "Programa de Gratitud · Presenta esta pantalla en los comercios aliados. El estado se consulta en el momento, y el comercio puede comprobarlo por su cuenta en thegiveandgrowproject.org/verificar con su código o tu número de cédula.",
     otro: "English", otroLang: "en"
   };
   const oscuro = c.tema === "dark";
@@ -13772,19 +13911,19 @@ async function correoCarnet(env, email, nombre, carnet, idioma) {
   const semilla = carnetSinGratitud(n.id);
   const parrafos = semilla ? (en ? [
     "Your membership is active. This is your card: a page that proves your Seed membership. Gratitude Programme benefits at partner businesses start at the Sprout level.",
-    "It is a live page, not an image: it states whether it is valid at the moment it is opened, and anyone can confirm it by scanning its QR or typing its code at thegiveandgrowproject.org/verificar.",
+    "It is a live page, not an image: it states whether it is valid at the moment it is opened, and anyone can confirm it by scanning its QR or typing its code or your ID number at thegiveandgrowproject.org/verificar.",
     "It renews on its own with each contribution. If you stop giving, it simply expires."
   ] : [
     "Tu membresía quedó activa. Este es tu carnet: una página que acredita tu membresía Semilla. Los beneficios del Programa de Gratitud en comercios aliados empiezan en el nivel Retoño.",
-    "Es una página viva, no una imagen: dice si está vigente en el momento en que se abre, y cualquiera puede comprobarla escaneando su QR o escribiendo su código en thegiveandgrowproject.org/verificar.",
+    "Es una página viva, no una imagen: dice si está vigente en el momento en que se abre, y cualquiera puede comprobarla escaneando su QR o escribiendo su código o tu número de cédula en thegiveandgrowproject.org/verificar.",
     "Se renueva solo con cada aporte. Si dejas de aportar, simplemente vence."
   ]) : en ? [
     "Your membership is active. This is your card: open the link and show that screen at partner businesses.",
-    "It is a live page, not an image: it states whether it is valid at the moment it is opened. And the business does not have to take the screen's word for it either — it scans the QR on your card with its own phone, or types the code at thegiveandgrowproject.org/verificar.",
+    "It is a live page, not an image: it states whether it is valid at the moment it is opened. And the business does not have to take the screen's word for it either — it scans the QR on your card with its own phone, or types the code or your ID number at thegiveandgrowproject.org/verificar.",
     "It renews on its own with each contribution. If you stop giving, it simply expires."
   ] : [
     "Tu membresía quedó activa. Este es tu carnet: abre el enlace y muestra esa pantalla en los comercios aliados.",
-    "Es una página viva, no una imagen: dice si está vigente en el momento en que se abre. Y el comercio tampoco tiene que creerle a la pantalla: escanea el QR de tu carnet con su propio celular, o escribe el código en thegiveandgrowproject.org/verificar.",
+    "Es una página viva, no una imagen: dice si está vigente en el momento en que se abre. Y el comercio tampoco tiene que creerle a la pantalla: escanea el QR de tu carnet con su propio celular, o escribe el código o tu número de cédula en thegiveandgrowproject.org/verificar.",
     "Se renueva solo con cada aporte. Si dejas de aportar, simplemente vence."
   ];
   const filas = en
@@ -22128,8 +22267,8 @@ tiene a dónde ir: eso hay que repararlo.</p>
 <h2 id="sec-miembros" class="h-sec" style="margin:48px 0 6px;font-size:26px">Carnets de miembro</h2>
 <p class="mu" style="font-size:13px;max-width:70ch;margin-bottom:14px">Los carnets emitidos, los más
 nuevos primero. La columna <strong>Verificación</strong> es el código que va bajo el QR del carnet: con
-él un comercio aliado comprueba en <code>/verificar</code> si la membresía está vigente, sin ver más que
-el nombre de pila y la inicial del apellido. Si un comercio llama a preguntar, es ese código el que se
+él (o con la cédula del miembro, si la registró al pagar) un comercio aliado comprueba en <code>/verificar</code>
+si la membresía está vigente, sin ver más que el nombre de pila y la inicial del apellido. Si un comercio llama a preguntar, es ese código el que se
 busca aquí. <strong>El enlace del carnet no se comparte</strong>: es la credencial del miembro.</p>
 <div class="med-tw"><table class="med-tbl">
 <thead><tr>
@@ -26858,6 +26997,7 @@ const TXT_METODO = Object.freeze({
     datos: (a) => "Autorizo el " + a + "tratamiento de mis datos personales</a> (Ley 1581 de 2012).",
     cert: "Quiero certificado de donación por mis aportes",
     certH: "Opcional. Sirve para el descuento tributario en Colombia (Art. 257 ET). Te pediremos el documento y la ciudad antes de emitirlo, y lo firman el Representante Legal y la Revisora Fiscal.",
+    verifAviso: "Para que un comercio aliado compruebe tu carnet: en thegiveandgrowproject.org/verificar puede escribir su código o tu número de documento, si lo registraste al pagar o al pedir tu certificado. Solo ve tu nombre de pila, la inicial de tu apellido, tu nivel y si está vigente; nunca tu documento ni tus datos de contacto.",
     p2t: "Tu tarjeta, en la ventana de Wompi",
     p2p: "Pulsa el botón y escribe los datos de tu tarjeta en la ventana segura de Wompi, la pasarela de Bancolombia.",
     p3tMonto: "Primer cobro y confirmación",
@@ -26898,6 +27038,7 @@ const TXT_METODO = Object.freeze({
     datos: (a) => "I authorise the " + a + "processing of my personal data</a> (Colombian Law 1581 of 2012).",
     cert: "I want a donation certificate for my gifts",
     certH: "Optional. It is used for the tax deduction in Colombia (Art. 257 of the Tax Code). We will ask for your ID and city before issuing it, and it is signed by the Legal Representative and the Statutory Auditor.",
+    verifAviso: "So that a partner business can check your card: at thegiveandgrowproject.org/verificar it can type the card's code or your ID number, if you gave it when paying or when asking for your certificate. It only sees your first name, the initial of your surname, your level and whether it is valid; never your ID number or your contact details.",
     p2t: "Your card, in Wompi's window",
     p2p: "Press the button and type your card details in the secure window of Wompi, Bancolombia's payment gateway.",
     p3tMonto: "First charge and confirmation",
@@ -27061,6 +27202,11 @@ function paginaMetodoPago(cfg) {
     ? '        <label class="ally-check"><input type="checkbox" name="certificado" value="1">'
       + '<span><b>' + esc(T.cert) + '</b><small>' + esc(T.certH) + '</small></span></label>\n'
     : '')
+/* EL AVISO DE LA CONSULTA POR CÉDULA (oct 2026), ANTES de pagar: el número de
+   documento que pide Wompi también sirve para que un comercio confirme el
+   carnet en /verificar, y eso se dice aquí y no después. Solo al hacerse
+   miembro (con monto); cambiar de tarjeta no es entrar. */
++ (cfg.monto ? '        <p class="pm-paso-p">' + esc(T.verifAviso) + '</p>\n' : '')
 + '      </div>\n'
 + '    </div>\n'
 + '    <div class="pm-paso pm-paso-tarjeta">\n'
@@ -29575,6 +29721,8 @@ export default {
     if (ver) {
       if (!env.DB) return new Response("No disponible", { status: 503 });
       try {
+        /* La cédula llega por POST y solo a /verificar a secas: nunca en la ruta. */
+        if (request.method === "POST" && !ver[1]) return await rutaVerificarDoc(env, url, request);
         let crudo = null;
         if (ver[1]) { try { crudo = decodeURIComponent(ver[1]); } catch { crudo = ver[1]; } }
         return await rutaVerificar(env, url, request, crudo);
