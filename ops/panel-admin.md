@@ -254,6 +254,7 @@ botón de atrás. En el teléfono la barra lateral se abre con «Menú».
 | área | entrada (dirección) | qué hay dentro |
 |---|---|---|
 | Inicio | Hoy (`#hoy`) | La bandeja de entrada: todas las colas, en tres franjas |
+| | Tareas (`#tareas`) | Lo que hay que hacer, con o sin alguien; «Esta semana» y la tabla (Fase 5) |
 | Finanzas | Resumen (`#finanzas/resumen`) | El mes o el año: ingresos confirmados por medio, destino y tipo; egresos por categoría y centro; neto; donantes, membresías y certificados; mes a mes |
 | | Banco (`#finanzas/banco`) | El extracto de Bancolombia importado: movimientos e importaciones · «Importar un extracto» |
 | | Conciliar (`#finanzas/conciliar`) | Cada movimiento del extracto con lo que lo explica, con sugerencias |
@@ -273,6 +274,8 @@ botón de atrás. En el teléfono la barra lateral se abre con «Menú».
 | | Ingenieros (`#personas/ingenieros`) | La bandeja de Red filtrada a ingenieros y su matrícula |
 | Mira Mi Casa | Casas (`#mmc/casas`) · Inspecciones (`#mmc/inspecciones`) | Casos de vivienda · visitas en terreno y el respaldo de un teléfono |
 | Entregas | Actas de entrega (`#entregas`) | Registrar, subir fotos, publicar |
+| Legal y documentos | Documentos (`#legal/documentos`) | El archivo de la fundación con su vencimiento, los huecos de lo que siempre tiene que haber y los convenios firmados en línea (Fase 5) |
+| Reportes | `#reportes/donaciones`, `donantes`, `voluntariado`, `mmc`, `banco` | Cinco informes anuales: pantalla, CSV e impresión (Fase 5) |
 | Sistema | Salud (`#sistema/salud`) | Embudo, señales de Wompi y del correo, operación del cron |
 | | Correos (`#sistema/correos`) | Todo lo que el sitio intentó mandar · «Reenviar» lo que no salió (Fase 4) |
 
@@ -598,6 +601,119 @@ documento del donante; carnet por donante). **Se aplica antes de que el código
 llegue a producción**, con `migrations apply`. Si el código llegara antes, el
 panel no se cae: la ficha y la lista funcionan sin notas ni uniones (y lo
 dicen), y las colas de correos cuentan como antes.
+
+## Tareas, documentos y reportes (Fase 5, oct 2026)
+
+**Decisiones del fundador que esto respeta (8 oct 2026):** opera la fundación
+solo, en el escritorio, y quiere que el panel sea la plataforma administrativa
+entera; el panel no escribe correos a mano. Las tablas viven en
+`migrations/0044_tareas_documentos.sql`.
+
+### Tareas
+
+**«+ Tarea»** en la barra de arriba, desde cualquier sección, o **«Crear
+tarea»** desde lo que la origina: la ficha de un contacto, un aporte, un caso,
+un movimiento del banco, un vencimiento (Vencimientos) o un documento. Cada
+tarea lleva título, detalle, fecha límite, prioridad (alta o normal), área
+(Finanzas, Alianzas, Personas, Mira Mi Casa, Legal, Otro), su vínculo si lo
+tiene, y si **se repite** (cada mes o cada año). Al marcar «Hecha» una que se
+repite nace la siguiente con el mismo día del mes (una del 31 va al 30 de
+noviembre y vuelve al 31 de diciembre: `dia_ancla`); «Deshacer» la quita si
+nadie la ha tocado, y si ya se tocó, se queda y lo dice. Marcar dos veces no
+crea dos. No se borran: se cancelan y se reabren.
+
+La sección arriba tiene **«Esta semana»** (vencidas · hoy · próximos 7 días) y
+debajo la tabla compartida (estado, cuándo, área, prioridad, tareas o próximos
+pasos de fichas). **Los próximos pasos de las fichas salen aquí también**, con
+su «Hecho» y su «Posponer…» de siempre, pero siguen siendo filas de
+`seguimientos`: se anotan en la ficha.
+
+**Por qué una tabla nueva y no `seguimientos`:** un seguimiento es el registro de
+algo que ya pasó (su fecha no puede ser de mañana) con un próximo paso colgado;
+una tarea es algo por hacer. Juntarlas obligaba a un ALTER por columna, y
+SQLite no admite ALTER … IF NOT EXISTS.
+
+**En «Hoy»:** la cola **«Tareas para hoy y vencidas»** (`tareas_pendientes`,
+plazo cero como los seguimientos): el día de la fecha en «Hoy», vencida en
+Urgente, con «Hecha», «Posponer…» y «Abrir». Son dos colas de dos tablas
+(`seguimientos_pendientes` y `tareas_pendientes`): nada se cuenta dos veces.
+Vencidas, van en su propio correo diario (`resumen-diario-tareas`) al buzón de
+alianzas. Una tarea sin fecha no entra a «Hoy».
+
+### Documentos
+
+El archivo de la fundación: estatutos, RUT, certificado de existencia y
+representación legal (Cámara de Comercio), actas, estados financieros, informe
+de gestión, registro web del RTE, convenios, pólizas, contratos, políticas, lo
+presentado ante la DIAN u otra entidad, y otros. Cada uno con título, año que
+cubre, entidad, **fecha de expedición y de vencimiento**, nota y la casilla
+«Se puede enseñar», que **es solo una nota: no publica nada**.
+
+**El archivo** (PDF, JPG o PNG, hasta 10 MB) se comprueba **por sus bytes**
+(`tipoPorBytes`, lo mismo que el Anexo 1 del convenio): un ejecutable o una
+página HTML con la extensión cambiada se rechaza, y un tipo declarado distinto
+de lo que dicen los bytes también. Se guarda en R2 (`MEDIA`) con una clave de
+128 bits bajo `documentos/`, sin ninguna ruta pública que la sirva, y se
+descarga solo desde `/api/admin/documento/<n>/archivo` (Access; como adjunto,
+`nosniff`, `no-store`). Queda su huella SHA-256 y la subida va a la auditoría.
+**Un archivo no se reemplaza**: la versión nueva se registra como otro
+documento y la anterior queda «reemplazada» (para los tipos de los que vale
+uno: estatutos, RUT, Cámara, y los que van por año).
+
+**Estados:** vigente, por vencer (30 días o menos), vencido, sin fecha,
+reemplazado, no aplica, anulado. **Lo que siempre tiene que haber** sale arriba
+como huecos (`documentosEsperados`): estatutos, RUT y certificado de la Cámara;
+y cada año desde 2026, el acta de la reunión ordinaria, los estados financieros
+y el informe de gestión del ejercicio anterior (31 de marzo) y la actualización
+del RTE (30 de junio). Un hueco se llena registrando ese tipo de ese año, o con
+**«No aplica»** y su motivo.
+
+**En «Hoy»:** «Documentos vencidos» (Urgente; correo diario a contabilidad,
+`resumen-diario-documentos`), «Documentos por vencer» y «Documentos que
+faltan» (Esta semana). **El certificado de la Cámara no avisa**: vale 30 días
+para licitaciones y se pide cuando hace falta; volverlo alarma sería una alarma
+permanente. Su renovación anual sigue en Vencimientos.
+
+**Convenios firmados en línea:** se listan abajo desde `convenio_formularios`
+(formulario D firmado), con su PDF y «Ver el convenio». No se copian.
+
+**Vencimientos:** una obligación marcada «Hecho» tiene **«Adjuntar lo
+presentado…»** (abre un documento de tipo «Declaración o reporte presentado»
+ya atado a ese vencimiento) y su fila enseña lo que se adjuntó. Las que siguen
+pendientes tienen «Crear tarea».
+
+### Reportes
+
+Cinco informes por año (selector de año), cada uno en pantalla, **«Descargar
+(CSV)»** (mismo formato que los otros: punto y coma, BOM, fórmulas
+neutralizadas) e **«Imprimir»** (la hoja de impresión quita barras y botones y
+pone el encabezado de la fundación). Todos dicen **«Cifras operativas del
+panel, no estados financieros. Solo pagos confirmados. Pesos y dólares por
+separado, sin convertir.»** Una sola función (`datosReporte`) arma lo que se
+ve y lo que se descarga.
+
+| reporte | qué trae |
+|---|---|
+| Donaciones del año | Ingresos confirmados mes a mes, por medio, por destino y por tipo; donantes y donantes nuevos; aparte, lo que entró sin guía y lo reportado sin verificar |
+| Donantes del año | Una fila por donante (documento, correo, ciudad, pagos y totales en pesos y dólares) y el estado de su certificado: no lo pidió, pedido sin emitir, emitido falta firma o envío, emitido y enviado. Es para el contador y la exógena: lleva datos personales |
+| Voluntariado | Jornadas del año con personas, horas anotadas y beneficiarios que reporta la fundación; mes a mes. Solo cuentan las realizadas o cerradas |
+| Mira Mi Casa | Casos recibidos, atendidos (primer concepto de un ingeniero), visitas y cerrados o descartados (por la auditoría del cambio de estado), mes a mes |
+| Banco y panel | Abonos y cargos del extracto junto a ingresos confirmados en pesos y egresos netos, la diferencia desarmada como en el Resumen (`resumenBanco`) y mes a mes |
+
+### Pulido de las fases anteriores
+
+- «Registrar una entrega» y «Nueva jornada» se abren en el cajón.
+- La lista de jornadas usa la tabla compartida (buscador, estado, puerta, fechas, totales). La de entregas **no**: es la única que se usa en terreno desde un teléfono y se apila (`eco-stack`); la tabla compartida no se apila.
+- **El CSV de egresos lleva todos los filtros de la tabla y el buscador.** Sin filtro de estado (el enlace del Resumen) sigue siendo el libro entero.
+- **Conciliar › «Aceptar todas las de confianza alta…»**: enseña la lista entera, acepta cada una por la misma ruta que su fila y un solo «Deshacer» las devuelve todas. Las transferencias reportadas no entran: confirmarlas le escribe al donante.
+
+### La migración 0044
+
+Dos tablas con `IF NOT EXISTS` y ningún ALTER: `tareas` y `documentos`. **Se
+aplica antes de que el código llegue a producción**, con `migrations apply`.
+Si el código llegara antes, el panel no se cae: Tareas enseña los próximos
+pasos de las fichas y avisa que falta la migración, Documentos enseña los
+huecos y los convenios, y las colas nuevas de «Hoy» no salen.
 
 ## Cerrar una señal de terreno (desde el 31 ago 2026)
 

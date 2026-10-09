@@ -19488,7 +19488,11 @@ async function adminTarea(request, env, id, quien) {
         : json({ error: "no_pendiente", ayuda: "Esa tarea está cancelada: reábrela primero." }, 409);
     }
     let siguiente = null;
-    if (t.recurrencia !== "ninguna" && t.fecha_limite) {
+    /* Si ya nació la siguiente (se marcó, se reabrió y la siguiente se quedó
+       porque alguien la tocó), no nace otra: serían dos iguales. */
+    const ya = t.siguiente_id ? await env.DB.prepare("SELECT id, fecha_limite FROM tareas WHERE id = ?").bind(t.siguiente_id).first() : null;
+    if (ya) siguiente = { id: ya.id, fecha_limite: ya.fecha_limite, ya_existia: true };
+    else if (t.recurrencia !== "ninguna" && t.fecha_limite) {
       const f = t.recurrencia === "anual" ? siguienteRepeticion(t.fecha_limite, 12, t.dia_ancla) : siguienteRepeticion(t.fecha_limite, 1, t.dia_ancla);
       const r = await env.DB.prepare(
         "INSERT INTO tareas (titulo, detalle, fecha_limite, prioridad, area, recurrencia, dia_ancla, ref_tipo, ref_id, ref_nombre, origen_id, creado_por) " +
@@ -19644,6 +19648,11 @@ async function leerDocumentos(env) {
    · por vencer: a 30 días o menos → Esta semana;
    · faltan: un documento esperado que ya debería estar, o le faltan 30 días
      → Esta semana. */
+/* «31 de marzo de 2026»: la fecha como la dice una persona, en «Hoy». */
+function fechaDicha(f) {
+  const p = String(f || "").split("-");
+  return p.length === 3 ? Number(p[2]) + " de " + MESES_ES[Number(p[1]) - 1] + " de " + p[0] : String(f || "");
+}
 async function colasDocumentos(env) {
   const docs = await leerDocumentos(env);
   if (!docs) return null;
@@ -19661,9 +19670,9 @@ async function colasDocumentos(env) {
     vencidos: { n: vencidos.length, vencida: vencidos.length > 0, cuando: vencidos.length ? fila(vencidos[0]).cuando : null,
                 items: vencidos.slice(0, ITEMS_POR_COLA).map(fila) },
     porVencer: { n: porVencer.length, cuando: porVencer.length ? fila(porVencer[0]).cuando : null, items: porVencer.slice(0, ITEMS_POR_COLA).map(fila) },
-    faltan: { n: faltan.length, cuando: faltan.length ? (faltan[0].para ? "para el " + faltan[0].para : "debería estar ya") : null,
+    faltan: { n: faltan.length, cuando: faltan.length ? (faltan[0].para ? (faltan[0].dias < 0 ? "debía estar el " : "para el ") + fechaDicha(faltan[0].para) : "debería estar ya") : null,
               items: faltan.slice(0, ITEMS_POR_COLA).map((e) => ({ id: e.clave, titulo: "Falta: " + e.titulo.charAt(0).toLowerCase() + e.titulo.slice(1),
-                detalle: (DOC_TIPOS[e.tipo] || {}).nombre || e.tipo, cuando: e.para ? (e.dias < 0 ? "debía estar el " + e.para : "para el " + e.para) : "debería estar ya",
+                detalle: (DOC_TIPOS[e.tipo] || {}).nombre || e.tipo, cuando: e.para ? (e.dias < 0 ? "debía estar el " + fechaDicha(e.para) : "para el " + fechaDicha(e.para)) : "debería estar ya",
                 tipo: e.tipo, periodo: e.periodo || "" })) }
   };
 }
@@ -26835,9 +26844,12 @@ textarea { font-size: 16px }
 .ta-grupo h3{display:flex;justify-content:space-between;gap:8px;margin:0 0 4px;font-family:"Inter",sans-serif;font-size:var(--fs-14);font-weight:700;letter-spacing:0}
 .ta-grupo h3 span{font-variant-numeric:tabular-nums;color:var(--mu)}
 .ta-grupo ul{list-style:none;margin:0;padding:0}
-.ta-grupo li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 0;border-top:1px solid var(--bds)}
-.ta-grupo li small{display:block;font-size:var(--fs-12);color:var(--mu)}
-.ta-grupo li .ct-link{text-align:left}
+.ta-grupo li{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:9px 0;border-top:1px solid var(--bds)}
+.ta-grupo li small{display:block;font-size:var(--fs-12);color:var(--mu);margin-top:2px}
+.ta-grupo li>div:last-child{display:flex;gap:6px;flex-wrap:wrap}
+.ta-grupo .ta-t{appearance:none;border:0;background:none;padding:0;font:inherit;font-size:var(--fs-14);font-weight:600;color:var(--ink);text-align:left;cursor:pointer;line-height:1.35}
+.ta-grupo .ta-t:hover{color:var(--g);text-decoration:underline}
+.ta-grupo .ta-t:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .ta-grupo .pn-b1,.ta-grupo .pn-b2{padding:4px 10px;font-size:var(--fs-12);border-radius:7px}
 .ta-grupo .hoy-nada{margin:6px 0 10px}
 .ta-alta{color:var(--err);font-weight:700}
@@ -35100,7 +35112,6 @@ var TB_TAREAS = tablaNueva({ id: "tb-tareas", titulo: "Tareas", orden: "fecha", 
   claseFila: function(r){ return r.estado !== "pendiente" ? "tb-gris" : ""; },
   nota: function(){ return "La fila abre la tarea para editarla. Un próximo paso de una ficha se edita en su ficha. Las tareas no se borran: se cancelan."; },
   aviso: function(){ return TA.d && TA.d.cortada ? "<strong>La lista se cortó</strong> · hay más tareas de las que el panel trae: filtra o busca." : ""; },
-  extra: function(){ return '<button type="button" class="pn-b1" data-tarea-nueva="1">Nueva tarea</button>'; },
   vacio: { titulo: "No hay tareas todavía.", texto: "Anota la primera con «+ Tarea», arriba, desde cualquier sección." },
   etiquetaFila: function(r){ return "Abrir la tarea " + r.titulo; },
   abrir: function(r){ if (r.origen === "ficha") abrirContacto(r.ref_id); else abrirTarea(r.t); }
@@ -35135,12 +35146,12 @@ function pintarSemanaTareas(filas, d){
   ];
   caja.innerHTML = '<h2 class="pn-h2" style="margin-top:0">Esta semana</h2><div class="ta-sem">' + grupos.map(function(g){
     var l = g[2];
-    return '<section class="ta-grupo ' + g[0] + '" aria-label="' + esc(g[1]) + '"><h3>' + esc(g[1]) + "<span>" + l.length + "</span></h3>" +
+    return '<div class="ta-grupo ' + g[0] + '" role="group" aria-label="' + esc(g[1]) + '"><h3>' + esc(g[1]) + "<span>" + l.length + "</span></h3>" +
       (l.length ? "<ul>" + l.slice(0, 8).map(function(r){
-        return '<li><div><button type="button" class="ct-link" data-ta-abrir="' + esc(r.k) + '">' + esc(r.titulo) + "</button><small>" +
+        return '<li><div><button type="button" class="ta-t" data-ta-abrir="' + esc(r.k) + '">' + esc(r.titulo) + "</button><small>" +
           esc([g[0] === "hoy" ? "" : fechaCorta(r.fecha) + " · " + cuandoTarea(r, hoy), TA_AREAS[r.area], r.origen === "ficha" ? "próximo paso de " + r.ref_nombre : r.ref_nombre].filter(Boolean).join(" · ")) +
           (r.prioridad === "alta" ? ' · <span class="ta-alta">prioridad alta</span>' : "") + "</small></div><div>" + botonesTarea(r) + "</div></li>";
-      }).join("") + "</ul>" + (l.length > 8 ? '<p class="hoy-mas">y ' + (l.length - 8) + " más en la tabla</p>" : "") : '<p class="hoy-nada">' + esc(g[3]) + "</p>") + "</section>";
+      }).join("") + "</ul>" + (l.length > 8 ? '<p class="hoy-mas">y ' + (l.length - 8) + " más en la tabla</p>" : "") : '<p class="hoy-nada">' + esc(g[3]) + "</p>") + "</div>";
   }).join("") + "</div>";
   TA.pend = filas;
 }
@@ -35382,7 +35393,6 @@ var TB_DOCS = tablaNueva({ id: "tb-docs", titulo: "Documentos", orden: "vence", 
   ],
   claseFila: function(x){ return x.estado === "anulado" || x.estado === "reemplazado" ? "tb-gris" : ""; },
   nota: function(){ return "La fila abre el documento: su archivo, sus fechas y su historia. Los archivos son privados: solo se descargan desde aquí."; },
-  extra: function(){ return '<button type="button" class="pn-b1" data-doc-nuevo="1">Registrar un documento</button>'; },
   vacio: { titulo: "Todavía no hay documentos registrados.", texto: "Empieza por los huecos de arriba: estatutos, RUT y el certificado de la Cámara." },
   etiquetaFila: function(x){ return "Abrir el documento " + x.titulo; },
   abrir: function(x){ abrirDocumento(x); }
@@ -35468,7 +35478,7 @@ function abrirDocumento(x, aviso){
   h += '<p class="pn-h3">El archivo</p>';
   if (x.tiene_archivo){
     h += '<p><a class="pn-b1" href="/api/admin/documento/' + x.id + '/archivo">Descargar</a></p>' + ficha([
-      ["Formato", esc(x.archivo_tipo || "") + " · " + tamano(x.archivo_bytes)],
+      ["Formato", (x.archivo_tipo === "application/pdf" ? "PDF" : x.archivo_tipo === "image/png" ? "PNG" : "JPG") + " · " + tamano(x.archivo_bytes)],
       ["Subido", esc(enCO(x.archivo_en, 16)) + (x.archivo_por ? "<small>" + esc(x.archivo_por) + "</small>" : "")],
       ["Huella SHA-256", "<code>" + esc(String(x.archivo_sha256 || "").slice(0, 16)) + "…</code><small>Si alguien cambia el archivo, la huella cambia.</small>"]]);
   } else if (x.no_aplica || x.anulado_en){
@@ -35610,7 +35620,6 @@ function documentoNoAplica(tipo, periodo, titulo){
 document.addEventListener("click", function(e){
   if (!e.target.closest) return;
   var b;
-  if ((b = e.target.closest("[data-doc-nuevo]"))){ formDocumento(null, {}); return; }
   if ((b = e.target.closest("[data-doc-falta]"))){
     formDocumento(null, { tipo: b.getAttribute("data-doc-falta"), periodo: b.getAttribute("data-periodo"), titulo: b.getAttribute("data-titulo") });
     return;
@@ -35682,7 +35691,7 @@ function pintarReporte(d){
   }
   (d.secciones || []).forEach(function(s){
     var num = function(k){ return k.tipo !== "texto"; };
-    h += '<section class="rp-sec"><h3>' + esc(s.titulo) + '</h3><p class="fin-fuente">' + esc(s.fuente || "") + "</p>" +
+    h += '<div class="rp-sec"><h3>' + esc(s.titulo) + '</h3><p class="fin-fuente">' + esc(s.fuente || "") + "</p>" +
       '<div class="rp-tw"><table class="pn-tabla"><thead><tr>' + s.columnas.map(function(k){
         return '<th scope="col"' + (num(k) ? ' class="num"' : "") + ">" + esc(k.t) + "</th>"; }).join("") + "</tr></thead><tbody>" +
       (s.filas.length ? s.filas.map(function(f){
@@ -35691,7 +35700,7 @@ function pintarReporte(d){
       (s.total && s.filas.length ? "<tfoot><tr>" + s.columnas.map(function(k){
         var v = s.total[k.k];
         return "<td" + (num(k) ? ' class="num"' : "") + ">" + (v == null ? "" : rpValor(v, k.tipo)) + "</td>"; }).join("") + "</tr></tfoot>" : "") +
-      "</table></div></section>";
+      "</table></div></div>";
   });
   caja.innerHTML = h;
 }
