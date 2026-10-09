@@ -4006,7 +4006,7 @@ function mapeoSugerido(nombres) {
   if (deb >= 0 && cre >= 0) { m.debito = deb; m.credito = cre; }
   else pon("valor", busca(/VALOR|IMPORTE|MONTO|MOVIMIENTO|CANTIDAD/));
   pon("descripcion", busca(/DESCRIP|CONCEPTO|DETALLE|TRANSACCION|NARRATIVA|MOTIVO/));
-  pon("referencia", busca(/REFERENCIA|DOCUMENTO|COMPROBANTE|^DOC/));
+  pon("referencia", busca(/REFERENCIA|DOCUMENTO|COMPROBANTE|^DOC|DCTO/));
   pon("oficina", busca(/OFICINA|SUCURSAL|CANAL/));
   return m;
 }
@@ -4161,7 +4161,10 @@ async function adminBancoLeer(request, env, quien) {
      más viejo; la posición que se guarda es la cronológica, para que «el
      último saldo del mes» sea el último de verdad. */
   const desc = buenas.length > 1 && buenas[0].fecha > buenas[buenas.length - 1].fecha;
-  const crono = desc ? buenas.slice().reverse() : buenas.slice();
+  /* Y un renglón suelto fuera de orden (alguno trae al final un movimiento
+     del día anterior) se reubica: el orden estable por fecha conserva el del
+     archivo dentro de cada día. */
+  const crono = (desc ? buenas.slice().reverse() : buenas.slice()).sort((x, y) => (x.fecha < y.fecha ? -1 : x.fecha > y.fecha ? 1 : 0));
   /* El saldo, renglón a renglón: si la columna de saldo viene y el valor no
      la explica, casi siempre es el signo al revés o el débito y el crédito
      cruzados. Se dice antes de guardar, que es cuando se arregla barato. */
@@ -4427,6 +4430,31 @@ function sugerirParaMovimientos(movs, pools) {
   const wompiPool = pools.aportes.filter((a) => a.moneda === "COP" && /^wompi/.test(a.medio)).concat(pools.wompi.filter((w) => w.moneda === "COP"));
   const paypalPool = pools.aportes.filter((a) => a.moneda !== "COP" && a.medio === "paypal").concat(pools.ipn);
   const transfer = pools.aportes.filter((a) => a.moneda === "COP" && a.medio === "transferencia").concat(pools.sinGuia.filter((p) => p.moneda === "COP"));
+  /* LOS CARGOS SE REPARTEN DE UNA VEZ, por puntos y no por orden de fecha:
+     cinco egresos de $1.000.000 en cinco días seguidos, y un pago a la DIAN
+     del mismo monto en otra cuenta, se le quitaban el egreso al cargo del día
+     siguiente, que era el suyo. Primero se asignan las parejas más claras. */
+  const paresEgreso = {}, asignado = {}, todasLasParejas = [];
+  for (const m of orden) {
+    if (m.valor_centavos >= 0) continue;
+    const ab = -m.valor_centavos, texto = m.descripcion + " " + (m.referencia || "");
+    paresEgreso[m.id] = pools.egresos.filter((e) => (e.monto_centavos === ab || e.total_centavos === ab) &&
+                                                    Math.abs(diasEntre(m.fecha, e.fecha)) <= 5)
+      .map((e) => {
+        const nom = pistaNombre(texto, e.nombre), d = diasEntre(m.fecha, e.fecha);
+        const par = { m, e, puntos: 100 - 4 * Math.abs(d) + (nom.length ? 20 : 0) + (e.monto_centavos === ab ? 5 : 0),
+                 por: [e.monto_centavos === ab ? "lo que salió de la cuenta (neto) es el mismo" : "el total es el mismo (sin retenciones)",
+                       d === 0 ? "el mismo día" : Math.abs(d) + (Math.abs(d) === 1 ? " día " : " días ") + (d > 0 ? "después" : "antes")]
+                   .concat(nom.length ? ["«" + nom.join(" ") + "» aparece en la descripción"] : []) };
+        todasLasParejas.push(par);
+        return par;
+      }).sort((x, y) => y.puntos - x.puntos);
+  }
+  const egresoTomado = new Set();
+  todasLasParejas.sort((x, y) => y.puntos - x.puntos).forEach((p) => {
+    if (asignado[p.m.id] || egresoTomado.has(p.e)) return;
+    asignado[p.m.id] = p.e; egresoTomado.add(p.e);
+  });
   for (const m of orden) {
     const s = [];
     const V = m.valor_centavos, texto = m.descripcion + " " + (m.referencia || ""), nt = normalTexto(texto);
@@ -4489,7 +4517,11 @@ function sugerirParaMovimientos(movs, pools) {
             if (com < 0 || com > bruto * 0.08) continue;
             const est = comisionWompiEstimada(grupo.map((w) => w.monto_centavos));
             const err = Math.abs(com - est);
-            if (!mejor || err < mejor.err) mejor = { grupo, bruto, com, est, err, desde: dias[i], hasta: dias[j] };
+            /* A igual error, gana el grupo más cercano al abono: dos pagos de
+               $200.000 de días distintos dan la misma cuenta, y Wompi consigna
+               lo más reciente. */
+            const cerca = mejor && err === mejor.err && (dias[j] > mejor.hasta || (dias[j] === mejor.hasta && dias[i] > mejor.desde));
+            if (!mejor || err < mejor.err || cerca) mejor = { grupo, bruto, com, est, err, desde: dias[i], hasta: dias[j] };
           }
         }
         const dice = /WOMPI|PASARELA|BOLD|PAYU/.test(nt);
@@ -4506,17 +4538,9 @@ function sugerirParaMovimientos(movs, pools) {
       if (RE_TRASLADO.test(nt)) s.push({ tipo: "ignorar", motivo: "traslado", items: [], confianza: "media", explicacion: "La descripción dice traslado" });
     } else {
       const ab = -V;
-      const ec = pools.egresos.filter((e) => !usados.has(clave(e)) && (e.monto_centavos === ab || e.total_centavos === ab) &&
-                                            Math.abs(diasEntre(m.fecha, e.fecha)) <= 5)
-        .map((e) => {
-          const nom = pistaNombre(texto, e.nombre), d = diasEntre(m.fecha, e.fecha);
-          return { e, puntos: 100 - 4 * Math.abs(d) + (nom.length ? 20 : 0) + (e.monto_centavos === ab ? 5 : 0),
-                   por: [e.monto_centavos === ab ? "lo que salió de la cuenta (neto) es el mismo" : "el total es el mismo (sin retenciones)",
-                         d === 0 ? "el mismo día" : Math.abs(d) + (Math.abs(d) === 1 ? " día " : " días ") + (d > 0 ? "después" : "antes")]
-                     .concat(nom.length ? ["«" + nom.join(" ") + "» aparece en la descripción"] : []) };
-        }).sort((x, y) => y.puntos - x.puntos);
-      if (ec.length) {
-        const b = ec[0];
+      const ec = paresEgreso[m.id] || [];
+      const b = ec.length ? ec.find((x) => x.e === asignado[m.id]) : null;
+      if (b) {
         s.push({ tipo: "egreso", items: [itemSugerido(b.e)], diferencia_centavos: b.e.monto_centavos === ab ? 0 : ab - b.e.monto_centavos,
                  confianza: ec.length === 1 && b.e.monto_centavos === ab ? "alta" : "media",
                  explicacion: b.por.join(", ") + (ec.length > 1 ? " · hay " + ec.length + " egresos con ese monto" : "") });
@@ -24576,6 +24600,7 @@ textarea { font-size: 16px }
 /* ==== BANCO Y CONCILIACIÓN (Fase 3) ====
    Abonos en verde y cargos en tinta: el signo va escrito («+», «−»), así
    que el color nunca es lo único que los distingue. */
+.tb-barra [hidden]{display:none}
 .bk-mas{color:var(--g);font-weight:600}
 .bk-menos{color:var(--ink)}
 .bk-err{color:var(--err);font-weight:600}
