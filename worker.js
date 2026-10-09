@@ -2776,8 +2776,9 @@ const ITEMS_COLA = {
   /* Un lote del extracto entra entero de una vez: todos tienen la misma hora
      de importación, así que el desempate es la fecha del banco (`luego`) y
      salen primero los movimientos más viejos de verdad. */
-  banco_sin_conciliar: { campos: "id AS id, descripcion AS titulo, fecha || COALESCE(' · ' || referencia, '') AS detalle, " +
-    "valor_centavos AS monto", luego: "fecha ASC, id ASC" }
+  banco_sin_conciliar: { campos: "id AS id, descripcion AS titulo, " +
+    "(CASE WHEN valor_centavos < 0 THEN 'cargo · ' ELSE 'abono · ' END) || fecha || COALESCE(' · ' || referencia, '') AS detalle, " +
+    "ABS(valor_centavos) AS monto", luego: "fecha ASC, id ASC" }
 };
 const ITEMS_POR_COLA = 5;
 /* `SELECT COUNT(*) AS n, MIN(<t>) AS masViejo <FROM … WHERE …>` → las filas.
@@ -31825,11 +31826,14 @@ var T_BANCO = [];
 function usarMovTransfer(m){
   T_MOV = m;
   var set = function(id, v){ var e = document.getElementById(id); if (e) e.value = v; };
-  set("t-ref", m.referencia || String(m.descripcion || "").slice(0, 60));
+  /* La referencia va al certificado: se copia solo si el extracto la trae.
+     La descripción del banco no es un número de comprobante. */
+  set("t-ref", m.referencia || "");
   set("t-fecha", m.fecha);
   set("t-monto", String(Math.round(m.valor_centavos / 100)));
   var p = document.getElementById("t-banco-elegido");
   if (p) p.innerHTML = "<strong>Se enlazará con el movimiento del " + esc(m.fecha) + " (" + pesos(m.valor_centavos) + ")</strong> y quedará conciliado al confirmar. " +
+    (m.referencia ? "" : "El extracto no trae referencia para este movimiento: escribe abajo el número del comprobante. ") +
     '<button type="button" class="copy" data-tbanco="0">No enlazar</button>';
   document.querySelectorAll("[data-tbanco]").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-tbanco") === String(m.id)); });
   var b = document.getElementById("t-ok"); if (b) previaTransfer(b.getAttribute("data-tconf"));
