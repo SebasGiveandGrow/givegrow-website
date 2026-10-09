@@ -886,7 +886,7 @@ async function anotarAutorizacion(env, id, tipo, claves, prefijo) {
 async function anotarCorreo(env, fila) {
   if (!env.DB) return;
   try {
-    await env.DB.prepare(
+    const r = await env.DB.prepare(
       "INSERT INTO correos (etiqueta, para, asunto, guia, resultado, proveedor_id, error) " +
       "VALUES (?,?,?,?,?,?,?)"
     ).bind(
@@ -896,6 +896,9 @@ async function anotarCorreo(env, fila) {
       fila.resultado, fila.proveedor_id || null,
       fila.error ? String(fila.error).slice(0, 300) : null
     ).run();
+    /* Un reenvío desde el panel (Sistema › Correos) necesita saber qué fila
+       escribió, para enlazarla con la que no salió: ver `adminReenviarCorreo`. */
+    if (env.__reenvio && r && r.meta) env.__reenvio.ids.push(r.meta.last_row_id);
   } catch (e) {
     console.error("no se pudo anotar el correo", fila.etiqueta, e && e.message);
   }
@@ -2756,8 +2759,12 @@ const ITEMS_COLA = {
   ipn_por_registrar: "id AS id, COALESCE(txn_type, estado) AS titulo, COALESCE(moneda, '') AS detalle",
   suscripciones_sin_aprobar: "id AS id, " + NOMBRE_DONANTE_SQL + " AS titulo, COALESCE(nivel, '') AS detalle",
   paypal_sin_casa: "e.evento_id AS id, e.tipo AS titulo, COALESCE(e.resultado, '') AS detalle",
-  correos_fallidos: "id AS id, etiqueta AS titulo, para AS detalle",
-  correos_sin_cupo: "id AS id, etiqueta AS titulo, para AS detalle",
+  correos_fallidos: "c.id AS id, c.etiqueta AS titulo, c.para AS detalle",
+  correos_sin_cupo: "c.id AS id, c.etiqueta AS titulo, c.para AS detalle",
+  /* El próximo paso que alguien se anotó en una ficha (Fase 4). `clave` es la
+     ficha, para abrirla desde la fila. */
+  seguimientos_pendientes: "id AS id, COALESCE(contacto_nombre, contacto, 'Sin contacto') AS titulo, " +
+    "COALESCE(proximo, '') AS detalle, contacto AS clave, proximo_fecha AS fecha",
   entregas_en_borrador: "numero AS id, COALESCE(sector, '') AS titulo, fecha AS detalle",
   entregadas_sin_acta: "a.guia AS id, (SELECT d.nombre FROM donantes d WHERE d.id = a.donante_id) AS titulo, " +
     "COALESCE(a.destino_id, 'Fondo general') AS detalle, a.monto_centavos AS monto",
@@ -3056,9 +3063,14 @@ async function adminSalud(env, opciones) {
     "WHERE estado = 'aprobacion_pendiente' AND cobros = 0 " +
     "AND julianday('now') - julianday(creada_en) > 2",
     "Bandeja «Membresías internacionales» · quedaron a medias en PayPal y ya no se van a activar solas", 85, "#sec-sus");
+  /* SISTEMA › CORREOS (Fase 4) es su pantalla: ahí se reenvía —con la vista
+     previa— o se marca «resuelto a mano». Lo resuelto (0043) deja de contar;
+     sin la 0043 la cola cuenta como antes. */
+  const conResueltos = await existeTabla(env, "correos_resueltos");
+  const sinResolver = conResueltos ? " AND NOT EXISTS (SELECT 1 FROM correos_resueltos r WHERE r.correo_id = c.id)" : "";
   await enCola("correos_fallidos",
-    "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'fallo'",
-    "Reenviar a mano y revisar Resend · a esa persona el sitio le prometió un correo que no salió", 95, null);
+    "SELECT COUNT(*) AS n, MIN(c.intento_en) AS masViejo FROM correos c WHERE c.resultado = 'fallo'" + sinResolver,
+    "Sistema › Correos · reenvíalo desde el panel (con vista previa) o márcalo resuelto si le escribiste por Gmail o WhatsApp", 95, "#sec-correos");
   /* APARTE DE `fallo`, y no por prolijidad: el remedio es otro.
 
      Un `fallo` es un correo que Resend rechazó — se reenvía a mano y se mira el
@@ -3087,11 +3099,28 @@ async function adminSalud(env, opciones) {
      ni el panel de salud. O sea que la escasez pasó de ser aleatoria a ser
      invisible, que es peor. */
   await enCola("correos_sin_cupo",
-    "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'sin_cupo'",
-    "El presupuesto diario de correo se agotó y estos avisos no salieron · mándalos a mano, y si se repite, el plan de Resend se quedó corto", 20, null);
+    "SELECT COUNT(*) AS n, MIN(c.intento_en) AS masViejo FROM correos c WHERE c.resultado = 'sin_cupo'" + sinResolver,
+    "Sistema › Correos · el presupuesto diario se agotó y estos no salieron: reenvíalos desde el panel, y si se repite, el plan de Resend se quedó corto", 20, "#sec-correos");
   await enCola("correos_sin_buzon",
-    "SELECT COUNT(*) AS n, MIN(intento_en) AS masViejo FROM correos WHERE resultado = 'sin_destino'",
-    "Poner CORREO_MMC o CORREO_AVISOS en la configuración del Worker · mientras estén vacíos ningún aviso interno sale", 15, null);
+    "SELECT COUNT(*) AS n, MIN(c.intento_en) AS masViejo FROM correos c WHERE c.resultado = 'sin_destino'" + sinResolver,
+    "Poner CORREO_MMC o CORREO_AVISOS en la configuración del Worker · mientras estén vacíos ningún aviso interno sale", 15, "#sec-correos");
+
+  /* LOS PRÓXIMOS PASOS DE LAS FICHAS (Fase 4, 0043). Lo que alguien se anotó
+     hacer con una persona u organización —«llamarla el jueves», «mandarle el
+     convenio»— el día que toca. PLAZO CERO: el día de la fecha sale en «Hoy»;
+     pasado ese día está vencido, sube a Urgente y entra al correo diario,
+     porque casi siempre es algo que se le prometió a alguien de fuera. Cuenta
+     desde la fecha del próximo paso (medianoche de Colombia), no desde que se
+     escribió la nota. Sin la 0043 no hay tabla y no sale. */
+  try {
+    await enCola("seguimientos_pendientes",
+      "SELECT COUNT(*) AS n, MIN(proximo_fecha || ' 05:00:00') AS masViejo FROM seguimientos " +
+      "WHERE proximo_fecha IS NOT NULL AND proximo_hecho_en IS NULL AND anulado_en IS NULL " +
+      "AND proximo_fecha <= date('now', '-5 hours')",
+      "Contactos · lo que te anotaste hacer con alguien: hazlo y márcalo «Hecho», o posponlo con fecha nueva", 45, "#sec-contactos", 0);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
     "WHERE publicada_en IS NULL AND anulada_en IS NULL",
@@ -7198,7 +7227,8 @@ const NOMBRE_COLA_PLAZO = {
   casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto",
   vencimientos_por_atender: "Vencimientos tributarios y legales sin atender",
   banco_sin_conciliar: "Movimientos del extracto sin conciliar",
-  extracto_por_importar: "Extracto del banco del mes pasado sin importar"
+  extracto_por_importar: "Extracto del banco del mes pasado sin importar",
+  seguimientos_pendientes: "Próximos pasos con alguien que ya pasaron su fecha"
 };
 /* LAS COLAS DE MIRA MI CASA VAN A SU PROPIO BUZÓN (auditoría del 28 sep 2026).
    Hasta hoy ninguna cola de casos tenía plazo, así que ninguna llegaba nunca a
@@ -18533,113 +18563,1203 @@ function base64ABytes(t) {
   } catch { return null; }
 }
 
-/* GET /api/admin/buscar?q= — UNA casilla en vez de ocho tablas.
+/* ========================================================================
+   FASE 4 DEL PANEL (oct 2026): BÚSQUEDA, CONTACTOS Y CORREOS
+   ========================================================================
 
-   El panel tiene ocho bandejas y hasta ahora había que saber en cuál mirar: con
-   un número en la mano —el que llegó por correo, el que dictó una familia por
-   teléfono— tocaba adivinar si era de aportes, de casas o de inspecciones.
+   Tres decisiones del fundador mandan sobre todo lo de abajo:
+   · Nadie más opera el panel: no hay roles, ni «asignado a», ni permisos.
+   · NO se escriben correos a mano desde el panel. El contacto con la gente
+     sigue por WhatsApp y Gmail; el panel solo DEJA REGISTRO de que pasó
+     (`seguimientos`) y reenvía lo que el sistema ya mandaba y no salió.
+   · Nada de esto se ve fuera de /admin: todas las rutas viven bajo
+     /api/admin/, detrás de Access, y las notas no salen en ninguna pantalla
+     pública ni en ningún correo.
 
-   NO ES UNA BÚSQUEDA DE TEXTO LIBRE, y es deliberado. Los consecutivos de este
-   proyecto llevan su prefijo (GG, CV, IV, CD, AE, MB), así que el propio dato
-   dice en qué tabla vive: se hace UNA consulta a la tabla correcta en vez de
-   siete a todas. Y un buscador difuso sobre nombres y notas sería un escaneo de
-   todo el panel para responder casi siempre lo mismo que el prefijo ya sabía.
+   LA FICHA DE CONTACTO no es una tabla nueva de personas: se arma cada vez
+   con lo que la base ya sabe (donantes, inscripciones de la red,
+   participaciones en jornadas), y por eso no se puede desfasar de ellas. */
 
-   Lo que sí acepta además del número es un TELÉFONO, porque es lo único que una
-   familia sabe de memoria cuando llama. */
-const BUSCA_NUMERO = {
-  GG: { sql: "SELECT a.guia AS numero, a.estado, a.creada_en AS cuando, d.nombre " +
-             "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?",
-        clase: "Aporte", destino: "#sec-salud" },
-  CV: { sql: "SELECT numero, estado, creado_en AS cuando, contacto_nombre AS nombre, sector " +
-             "FROM casos WHERE numero = ?",
-        clase: "Caso de vivienda", destino: "#sec-casas" },
-  IV: { sql: "SELECT numero, familia AS nombre, municipio AS sector, recibido_en AS cuando, " +
-             "CASE WHEN requiere_esp = 1 THEN 'requiere revisión especializada' ELSE 'recibida' END AS estado " +
-             "FROM inspecciones WHERE numero = ?",
-        clase: "Inspección en terreno", destino: "#sec-inspecciones" },
-  CD: { sql: "SELECT numero, guia AS sector, emitido_en AS cuando, " +
-             "CASE WHEN anulado_en IS NULL THEN 'vigente' ELSE 'anulado' END AS estado " +
-             "FROM certificados WHERE numero = ?",
-        clase: "Certificado", destino: "#sec-salud" },
-  AE: { sql: "SELECT numero, creada_en AS cuando, " +
-             "CASE WHEN anulada_en IS NOT NULL THEN 'anulada' " +
-             "WHEN publicada_en IS NULL THEN 'en borrador' ELSE 'publicada' END AS estado " +
-             "FROM entregas WHERE numero = ?",
-        clase: "Acta de entrega", destino: "#sec-entregas" },
-  /* Los miembros no tienen bandeja propia en este panel, así que el resultado
-     sale sin enlace en vez de mandar a una pantalla que no los enseña. */
-  /* EL ESTADO, no el nivel. Esta fila devolvía `nivel AS estado`, así que un
-     carnet revocado se buscaba por su código y salía «retono» — el mismo texto
-     que uno vigente. Los miembros no tienen bandeja propia, así que el buscador
-     es LA superficie donde el equipo mira un carnet: si ahí no se ve la
-     revocación, no se ve en ningún sitio. */
-  /* Y con la distinción (0040): la regla es la de `estadoCarnet`, escrita
-     una sola vez en `sqlCarnetVigente`. */
-  MB: { sql: "SELECT codigo AS numero, creado_en AS cuando, " +
-             "CASE WHEN distincion IS NULL THEN nivel WHEN nivel = 'honor' THEN 'honor: ' || distincion ELSE nivel || ' · honor: ' || distincion END AS sector, " +
-             "CASE WHEN revocado_en IS NOT NULL THEN 'revocado' " +
-             "WHEN " + sqlCarnetVigente("", "date('now','-5 hours')") + " THEN 'vigente' " +
-             "ELSE 'vencido' END AS estado FROM miembros WHERE codigo = ?",
-        clase: "Membresía", destino: null }
-};
+/* ---- Texto buscable: sin tildes y en minúsculas, en los dos lados ----
+   SQLite no tiene una función para quitar tildes, y LOWER() solo baja las
+   letras ASCII. La columna se normaliza con REPLACE encadenados (después de
+   LOWER, así que hay que cubrir también las mayúsculas acentuadas) y la
+   consulta con `normalize("NFD")`. «José», «JOSÉ» y «jose» son lo mismo. */
+const TILDES_SQL = [["á", "a"], ["é", "e"], ["í", "i"], ["ó", "o"], ["ú", "u"], ["ü", "u"], ["ñ", "n"],
+  ["Á", "a"], ["É", "e"], ["Í", "i"], ["Ó", "o"], ["Ú", "u"], ["Ü", "u"], ["Ñ", "n"]];
+function sqlBuscable(col) {
+  let s = "LOWER(COALESCE(" + col + ", ''))";
+  for (const [de, a] of TILDES_SQL) s = "REPLACE(" + s + ", '" + de + "', '" + a + "')";
+  return s;
+}
+function buscable(t) {
+  return String(t == null ? "" : t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
+/* Un patrón de LIKE con los comodines del propio texto escapados: alguien que
+   busca «50%» no quiere «todo lo que empiece por 50». Va con ESCAPE '\'. */
+function patronLike(q, inicio) {
+  const t = String(q).replace(/[\\%_]/g, (c) => "\\" + c);
+  return (inicio ? "" : "%") + t + "%";
+}
+const LIKE_ESC = " ESCAPE '\\'";
+/* Solo los dígitos de un documento o un teléfono, en SQL. */
+const DOC_DIGITOS = (col) => "REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(" + col + ", ''), '.', ''), '-', ''), ' ', ''), ',', '')";
+
+/* ---- LA CLAVE DE UN CONTACTO ----
+   Cada registro que nombra a alguien (un donante, una inscripción, una
+   participación) se reduce a UNA clave, en este orden:
+     1 · el correo en minúsculas — dos registros con el mismo correo son la
+         misma ficha, porque es literalmente la misma dirección;
+     2 · si no hay correo, `tel:<dígitos>`;
+     3 · si tampoco, `doc:<dígitos>`.
+   Un mismo documento o teléfono bajo DOS correos distintos NO se une solo: es
+   un «posible duplicado» y lo decide una persona (`contactos_vinculos`). El
+   panel nunca une por su cuenta: dos hermanos comparten teléfono, y una
+   fundación y su representante, a veces, correo. */
+function correoClave(e) {
+  const t = String(e || "").trim().toLowerCase();
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t) && t.length <= 200 ? t : "";
+}
+function telClave(t) {
+  let d = String(t || "").replace(/\D/g, "");
+  if (d.length > 10 && d.startsWith("57")) d = d.slice(2);
+  return d.length >= 7 && d.length <= 15 ? d : "";
+}
+function docClave(d) {
+  const x = String(d || "").replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+  return x.length >= 5 && x.length <= 20 ? x : "";
+}
+function claveContacto(r) {
+  const e = correoClave(r.email);
+  if (e) return e;
+  const t = telClave(r.tel);
+  if (t) return "tel:" + t;
+  const d = docClave(r.doc);
+  if (d) return "doc:" + d;
+  return "";
+}
+function claveValida(k) {
+  const s = String(k || "");
+  return !!(correoClave(s) || /^tel:\d{7,15}$/.test(s) || /^doc:[0-9A-Z]{5,20}$/.test(s));
+}
+/* El nombre solo sirve de pista si tiene al menos dos palabras: «Ana» no dice
+   nada; «Ana María Gómez» dos veces, sí. */
+function nombreClave(n) {
+  const t = buscable(n).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  return t.split(" ").length >= 2 ? t : "";
+}
+/* Día colombiano de una marca de la base: las fechas que ya son un día
+   (AAAA-MM-DD, las escribe una persona) no se corren cinco horas. */
+function diaCO(v) {
+  const s = String(v || "");
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return fechaCO(s);
+}
+
+/* Las etiquetas de una ficha. Las mismas que filtran la lista. */
+const ETIQUETAS_CONTACTO = Object.freeze({
+  donante: "Donante", miembro: "Miembro", honor: "Honor", fundacion: "Fundación", empresa: "Empresa",
+  voluntario: "Voluntario", ingeniero: "Ingeniero", padrino: "Padrino", especie: "Ofrece en especie",
+  socialfest: "Social Fest", sin_pago: "Intento sin pagar"
+});
+const ETIQUETA_DE_TIPO = { fundacion: "fundacion", empresa: "empresa", voluntario: "voluntario",
+  ingeniero: "ingeniero", apadrinamiento: "padrino", especie: "especie" };
+const TIPOS_SEGUIMIENTO = ["nota", "llamada", "whatsapp", "correo", "reunion", "otro"];
+
+/* ¿Existe la tabla? Para lo que vive en la 0043: si el código llega antes que
+   la migración, el panel sigue funcionando sin esa parte en vez de caerse. */
+async function existeTabla(env, nombre) {
+  try {
+    const r = await env.DB.prepare("SELECT 1 AS si FROM sqlite_master WHERE type = 'table' AND name = ?").bind(nombre).first();
+    return !!r;
+  } catch (e) { return false; }
+}
+
+/* Unión de claves: por las decisiones «Unir» y por los vínculos que la base ya
+   tiene escritos (una participación que se anotó desde una inscripción). La
+   raíz es la clave menor, así la ficha tiene siempre la misma dirección. */
+function unionClaves() {
+  const padre = new Map();
+  const raiz = (k) => {
+    let r = k;
+    while (padre.has(r) && padre.get(r) !== r) r = padre.get(r);
+    let x = k;
+    while (padre.has(x) && padre.get(x) !== r) { const s = padre.get(x); padre.set(x, r); x = s; }
+    return r;
+  };
+  const unir = (a, b) => {
+    if (!a || !b) return;
+    const ra = raiz(a), rb = raiz(b);
+    if (ra === rb) return;
+    if (ra < rb) padre.set(rb, ra); else padre.set(ra, rb);
+  };
+  return { raiz, unir };
+}
+
+/* Lo que se lee de `contactos_vinculos`. Sin la 0043, nada: no hay uniones ni
+   descartes y el panel sugiere igual. */
+async function vinculosContactos(env) {
+  try {
+    const r = await env.DB.prepare("SELECT a, b, decision, motivo, por, en FROM contactos_vinculos").all();
+    return r.results || [];
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+    return [];
+  }
+}
+
+/* EL ÍNDICE DE CONTACTOS: todos los registros que nombran a alguien, unidos
+   por su clave. Lo usan la lista, la ficha y los duplicados, así que los tres
+   dicen lo mismo. Son cuatro consultas sobre tablas de cientos de filas. */
+async function indiceContactos(env) {
+  const fuentes = [];
+  const don = await env.DB.prepare(
+    "SELECT d.id, d.email, d.nombre, d.doc_tipo, d.doc_numero, d.telefono, d.creado_en, " +
+    "SUM(CASE WHEN " + APORTE_CONFIRMADO + " THEN 1 ELSE 0 END) AS confirmados, " +
+    "MAX(COALESCE(a.aprobada_en, a.creada_en)) AS ultimo_aporte " +
+    "FROM donantes d LEFT JOIN aportes a ON a.donante_id = d.id GROUP BY d.id"
+  ).all();
+  const carnets = {};
+  for (const m of ((await env.DB.prepare(
+    "SELECT donante_id, nivel, distincion, revocado_en FROM miembros").all()).results || [])) {
+    const c = carnets[m.donante_id] || (carnets[m.donante_id] = { miembro: false, honor: false });
+    if (!m.revocado_en && m.nivel !== "honor") c.miembro = true;
+    if (!m.revocado_en && m.distincion) c.honor = true;
+  }
+  const subs = {};
+  try {
+    for (const s of ((await env.DB.prepare(
+      "SELECT donante_id FROM suscripciones WHERE estado = 'activa' AND donante_id IS NOT NULL").all()).results || [])) subs[s.donante_id] = true;
+  } catch (e) { /* sin suscripciones, nada */ }
+  for (const d of don.results || []) {
+    const et = [];
+    if (Number(d.confirmados) > 0) et.push("donante");
+    const c = carnets[d.id] || {};
+    if (c.miembro || subs[d.id]) et.push("miembro");
+    if (c.honor) et.push("honor");
+    if (!et.length) et.push("sin_pago");
+    fuentes.push({ fuente: "donante", id: d.id, email: d.email, tel: d.telefono,
+      doc: d.doc_numero, nombre: d.nombre, org: String(d.doc_tipo || "").toUpperCase() === "NIT",
+      etiquetas: et, fecha: d.ultimo_aporte || d.creado_en });
+  }
+  const ins = await env.DB.prepare(
+    "SELECT id, tipo, estado, nombre, email, telefono, creada_en, actualizada_en, " +
+    "json_extract(datos, '$.nit') AS nit, json_extract(datos, '$.origen') AS origen, " +
+    "json_extract(datos, '$.puerta') AS puerta FROM inscripciones"
+  ).all();
+  const claveIns = {};
+  for (const i of ins.results || []) {
+    const org = i.tipo === "fundacion" || i.tipo === "empresa";
+    const et = [];
+    if (ETIQUETA_DE_TIPO[i.tipo]) et.push(ETIQUETA_DE_TIPO[i.tipo]);
+    if (i.origen === "socialfest-2026") et.push("socialfest");
+    const f = { fuente: "inscripcion", id: i.id, tipo: i.tipo, estado: i.estado, email: i.email, tel: i.telefono,
+      doc: org ? i.nit : null, nombre: i.nombre, org, etiquetas: et, fecha: i.actualizada_en || i.creada_en,
+      origen: i.origen || null, puerta: i.puerta || null };
+    fuentes.push(f);
+    claveIns[i.id] = claveContacto(f);
+  }
+  const par = await env.DB.prepare(
+    "SELECT p.id, p.nombre, p.email, p.celular, p.inscripcion, j.fecha FROM participaciones p " +
+    "JOIN jornadas j ON j.id = p.jornada"
+  ).all();
+  for (const p of par.results || []) {
+    fuentes.push({ fuente: "participacion", id: p.id, email: p.email, tel: p.celular, doc: null,
+      nombre: p.nombre, org: false, etiquetas: ["voluntario"], fecha: p.fecha, inscripcion: p.inscripcion });
+  }
+
+  const vinc = await vinculosContactos(env);
+  const u = unionClaves();
+  for (const f of fuentes) {
+    f.clave = claveContacto(f);
+    if (f.fuente === "participacion" && f.inscripcion && claveIns[f.inscripcion]) {
+      if (!f.clave) f.clave = claveIns[f.inscripcion];
+      else u.unir(f.clave, claveIns[f.inscripcion]);
+    }
+  }
+  for (const v of vinc) if (v.decision === "unir") u.unir(v.a, v.b);
+
+  const porRaiz = new Map();
+  for (const f of fuentes) {
+    if (!f.clave) continue;
+    const r = u.raiz(f.clave);
+    let c = porRaiz.get(r);
+    if (!c) {
+      c = { clave: r, claves: new Set(), nombres: [], emails: new Set(), tels: new Set(), docs: new Set(),
+            nomClaves: new Set(), etiquetas: new Set(), org: false, orgNombre: "", ultima: "",
+            donantes: [], inscripciones: [], participaciones: [], sf: null };
+      porRaiz.set(r, c);
+    }
+    c.claves.add(f.clave);
+    const e = correoClave(f.email); if (e) c.emails.add(e);
+    const t = telClave(f.tel); if (t) c.tels.add(t);
+    const d = docClave(f.doc); if (d) c.docs.add(d);
+    if (f.nombre) {
+      c.nombres.push({ n: String(f.nombre).trim(), f: String(f.fecha || "") });
+      const nk = nombreClave(f.nombre); if (nk) c.nomClaves.add(nk);
+    }
+    f.etiquetas.forEach((x) => c.etiquetas.add(x));
+    if (f.org) { c.org = true; if (!c.orgNombre && f.fuente === "inscripcion" && f.nombre) c.orgNombre = String(f.nombre).trim(); }
+    const dia = diaCO(f.fecha);
+    if (dia > c.ultima) c.ultima = dia;
+    if (f.fuente === "donante") c.donantes.push(f.id);
+    if (f.fuente === "inscripcion") {
+      c.inscripciones.push(f.id);
+      if (f.origen === "socialfest-2026" && (!c.sf || f.id > c.sf.id)) c.sf = { id: f.id, puerta: f.puerta, estado: f.estado, tipo: f.tipo };
+    }
+    if (f.fuente === "participacion") c.participaciones.push(f.id);
+  }
+  /* Quien ya pagó deja de ser «intento sin pagar» aunque otro registro suyo lo
+     sea. */
+  for (const c of porRaiz.values()) {
+    if (c.etiquetas.has("donante") || c.etiquetas.has("miembro") || c.etiquetas.has("honor")) c.etiquetas.delete("sin_pago");
+    c.nombres.sort((a, b) => (a.f < b.f ? 1 : a.f > b.f ? -1 : 0));
+    c.nombre = c.orgNombre || (c.nombres[0] && c.nombres[0].n) || [...c.emails][0] || c.clave;
+  }
+  /* Las claves que no tienen ningún registro detrás también tienen raíz: una
+     nota sobre una clave unida después tiene que caer en la misma ficha. */
+  const porClave = new Map();
+  for (const c of porRaiz.values()) for (const k of c.claves) porClave.set(k, c);
+  for (const v of vinc) {
+    if (v.decision !== "unir") continue;
+    for (const k of [v.a, v.b]) if (!porClave.has(k) && porRaiz.has(u.raiz(k))) {
+      const c = porRaiz.get(u.raiz(k)); c.claves.add(k); porClave.set(k, c);
+    }
+  }
+  return { lista: [...porRaiz.values()], porClave, vinculos: vinc, raiz: u.raiz };
+}
+
+/* LOS POSIBLES DUPLICADOS: dos fichas que comparten documento, teléfono o
+   nombre completo. Lo que una persona ya dijo que «no son la misma» no se
+   vuelve a sugerir. Devuelve, por ficha, las otras y por qué. */
+function duplicadosContactos(idx) {
+  const distintos = new Set();
+  for (const v of idx.vinculos) if (v.decision === "distintos") { distintos.add(v.a + "|" + v.b); distintos.add(v.b + "|" + v.a); }
+  const mapas = { documento: new Map(), telefono: new Map(), nombre: new Map() };
+  const meter = (m, k, c) => { if (!m.has(k)) m.set(k, new Set()); m.get(k).add(c); };
+  for (const c of idx.lista) {
+    c.docs.forEach((d) => meter(mapas.documento, d, c));
+    c.tels.forEach((t) => meter(mapas.telefono, t, c));
+    c.nomClaves.forEach((n) => meter(mapas.nombre, n, c));
+  }
+  const decidido = (a, b) => {
+    for (const x of a.claves) for (const y of b.claves) if (distintos.has(x + "|" + y)) return true;
+    return false;
+  };
+  const out = new Map();
+  for (const [motivo, m] of Object.entries(mapas)) {
+    for (const [valor, grupo] of m) {
+      if (grupo.size < 2) continue;
+      const l = [...grupo];
+      for (const a of l) for (const b of l) {
+        if (a === b || decidido(a, b)) continue;
+        const lista = out.get(a.clave) || (out.set(a.clave, new Map()), out.get(a.clave));
+        const it = lista.get(b.clave) || { contacto: b, motivos: [] };
+        if (!it.motivos.some((x) => x.motivo === motivo)) it.motivos.push({ motivo, valor });
+        lista.set(b.clave, it);
+      }
+    }
+  }
+  return out;
+}
+
+/* Lo abierto de cada ficha: el próximo paso más cercano y la última nota. */
+async function seguimientosPorContacto(env) {
+  const out = {};
+  try {
+    const r = await env.DB.prepare(
+      "SELECT contacto, MAX(fecha) AS ultima, " +
+      "MIN(CASE WHEN proximo_fecha IS NOT NULL AND proximo_hecho_en IS NULL THEN proximo_fecha END) AS prox, " +
+      "SUM(CASE WHEN proximo_fecha IS NOT NULL AND proximo_hecho_en IS NULL THEN 1 ELSE 0 END) AS abiertos " +
+      "FROM seguimientos WHERE anulado_en IS NULL AND contacto IS NOT NULL GROUP BY contacto"
+    ).all();
+    for (const f of r.results || []) out[f.contacto] = f;
+    const tx = await env.DB.prepare(
+      "SELECT contacto, proximo, proximo_fecha FROM seguimientos WHERE anulado_en IS NULL AND proximo_fecha IS NOT NULL " +
+      "AND proximo_hecho_en IS NULL ORDER BY proximo_fecha ASC, id ASC"
+    ).all();
+    for (const f of tx.results || []) {
+      const o = out[f.contacto];
+      if (o && o.prox === f.proximo_fecha && !o.prox_texto) o.prox_texto = f.proximo;
+    }
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  return out;
+}
+
+function filaContacto(c, dups, seg) {
+  let ultima = c.ultima, prox = null, abiertos = 0;
+  for (const k of c.claves) {
+    const s = seg[k];
+    if (!s) continue;
+    if (s.ultima && s.ultima > ultima) ultima = s.ultima;
+    if (s.prox && (!prox || s.prox < prox.fecha)) prox = { fecha: s.prox, texto: s.prox_texto || "" };
+    abiertos += Number(s.abiertos || 0);
+  }
+  const d = dups.get(c.clave);
+  return {
+    clave: c.clave, nombre: c.nombre, org: c.org,
+    otros_nombres: [...new Set(c.nombres.map((x) => x.n))].filter((n) => n !== c.nombre).slice(0, 3),
+    etiquetas: [...c.etiquetas], email: [...c.emails][0] || "", emails: c.emails.size,
+    tel: [...c.tels][0] || "", ultima, prox, abiertos, dup: d ? d.size : 0,
+    unidas: c.claves.size, sf: c.sf
+  };
+}
+
+/* GET /api/admin/contactos — la lista entera. Son cientos de filas: llega
+   completa y la tabla del panel filtra y ordena sin volver a preguntar. */
+async function adminContactos(env) {
+  const idx = await indiceContactos(env);
+  const dups = duplicadosContactos(idx);
+  const seg = await seguimientosPorContacto(env);
+  const filas = idx.lista.map((c) => filaContacto(c, dups, seg));
+  filas.sort((a, b) => (a.ultima < b.ultima ? 1 : a.ultima > b.ultima ? -1 : 0));
+  return json({ contactos: filas, total: filas.length, etiquetas: ETIQUETAS_CONTACTO,
+                origenes: ORIGENES_EVENTO, hoy: fechaCO(), con_vinculos: await existeTabla(env, "contactos_vinculos"),
+                con_seguimientos: await existeTabla(env, "seguimientos") });
+}
+
+/* Tantos «?» como valores, para un IN (…). */
+const huecos = (a) => [...a].map(() => "?").join(",");
+
+/* GET /api/admin/contacto?k=<clave> — LA FICHA: todo lo que la base sabe de
+   una persona u organización, en un solo sitio. Cualquiera de sus claves la
+   abre (la de un registro unido también). */
+async function adminContacto(env, url) {
+  const k = String(url.searchParams.get("k") || "").trim();
+  const clave = correoClave(k) || k;
+  if (!claveValida(clave)) return json({ error: "clave_invalida" }, 400);
+  const idx = await indiceContactos(env);
+  const c = idx.porClave.get(clave);
+  if (!c) return json({ error: "no_encontrado", ayuda: "No hay ningún donante, inscripción ni participación con esa clave." }, 404);
+  const dups = duplicadosContactos(idx);
+  const parse = (t) => { try { return JSON.parse(t || "{}") || {}; } catch (e) { return {}; } };
+
+  /* Donaciones. Se listan todas (también los intentos), pero los totales por
+     año son SOLO dinero confirmado, y por moneda: pesos y dólares no se suman. */
+  let aportes = [];
+  if (c.donantes.length) {
+    aportes = (await env.DB.prepare(
+      "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, " + FECHA_APORTE + " AS fecha, a.frecuencia, " +
+      "a.destino_id, a.proyecto, a.suscripcion, " + MEDIO_APORTE + " AS medio, a.quiere_certificado, a.wompi_transaction_id, " +
+      "CASE WHEN " + APORTE_CONFIRMADO + " THEN 1 ELSE 0 END AS confirmado " +
+      "FROM aportes a WHERE a.donante_id IN (" + huecos(c.donantes) + ") ORDER BY fecha DESC, a.guia DESC"
+    ).bind(...c.donantes).all()).results || [];
+  }
+  const porAnio = {};
+  for (const a of aportes) {
+    if (!a.confirmado) continue;
+    const anio = String(a.fecha || "").slice(0, 4) || "?";
+    const m = String(a.moneda || "COP").toUpperCase();
+    const k2 = anio + "|" + m;
+    const x = porAnio[k2] || (porAnio[k2] = { anio, moneda: m, centavos: 0, n: 0 });
+    x.centavos += Number(a.monto_centavos || 0); x.n++;
+  }
+  const totales = Object.values(porAnio).sort((a, b) => (a.anio < b.anio ? 1 : a.anio > b.anio ? -1 : a.moneda === "COP" ? -1 : 1));
+  const guias = aportes.map((a) => a.guia);
+
+  let certificados = [];
+  if (guias.length) {
+    certificados = (await env.DB.prepare(
+      "SELECT numero, guia, emitido_en, enviado_en, anulado_en, firma_rl_en, firma_rf_en FROM certificados " +
+      "WHERE guia IN (" + huecos(guias) + ") ORDER BY emitido_en DESC"
+    ).bind(...guias).all()).results || [];
+  }
+  let carnets = [], suscripciones = [];
+  if (c.donantes.length) {
+    carnets = (await env.DB.prepare(
+      "SELECT codigo, nivel, desde, vigente_hasta, revocado_en, distincion, distincion_hasta, distincion_contexto, " +
+      "CASE WHEN revocado_en IS NOT NULL THEN 'revocado' WHEN " + sqlCarnetVigente("", "date('now','-5 hours')") +
+      " THEN 'vigente' ELSE 'vencido' END AS estado FROM miembros WHERE donante_id IN (" + huecos(c.donantes) + ")"
+    ).bind(...c.donantes).all()).results || [];
+    try {
+      suscripciones = (await env.DB.prepare(
+        "SELECT id, estado, nivel, monto_centavos, moneda, cobros, ultimo_cobro_en, creada_en FROM suscripciones " +
+        "WHERE donante_id IN (" + huecos(c.donantes) + ") ORDER BY creada_en DESC"
+      ).bind(...c.donantes).all()).results || [];
+    } catch (e) { /* nada */ }
+  }
+  let identidad = [];
+  if (c.donantes.length) {
+    identidad = (await env.DB.prepare(
+      "SELECT id, email, nombre, doc_tipo, doc_numero, telefono, ciudad, creado_en FROM donantes WHERE id IN (" + huecos(c.donantes) + ")"
+    ).bind(...c.donantes).all()).results || [];
+  }
+
+  /* La red: cada inscripción con su estado, su origen (Social Fest) y, si es
+     una fundación, el estado de su convenio. */
+  let red = [];
+  if (c.inscripciones.length) {
+    const filas = (await env.DB.prepare(
+      "SELECT id, tipo, estado, nombre, email, telefono, ciudad, datos, creada_en, actualizada_en FROM inscripciones " +
+      "WHERE id IN (" + huecos(c.inscripciones) + ") ORDER BY creada_en DESC"
+    ).bind(...c.inscripciones).all()).results || [];
+    const enConv = filas.filter((i) => i.tipo === "fundacion" && (i.estado === "convenio" || i.estado === "vinculada")).map((i) => i.id);
+    let enLinea = null;
+    try { enLinea = await convenioEnLinea(env, enConv); } catch (e) { enLinea = null; }
+    red = filas.map((i) => {
+      const x = parse(i.datos);
+      let conv = null;
+      if (i.tipo === "fundacion" && ["convenio", "vinculada"].includes(i.estado)) {
+        const r = resumenConvenio(x, enLinea && enConv.includes(i.id) ? (enLinea[i.id] || {}) : null);
+        conv = { variante: r.nombre_variante, faltan: r.faltan, firmado: r.firmado, completo: r.completo,
+                 certificado_vencido: r.certificado_vencido, fundacion_acepto: r.en_linea && r.en_linea.fundacion_acepto };
+      }
+      return { id: i.id, tipo: i.tipo, estado: i.estado, nombre: i.nombre, email: i.email, telefono: i.telefono,
+               ciudad: i.ciudad, creada_en: i.creada_en, actualizada_en: i.actualizada_en,
+               origen: x.origen || null, origen_nombre: x.origen ? (ORIGENES_EVENTO[x.origen] || x.origen) : null, puerta: x.puerta || null,
+               nit: x.nit || null, contacto: x.contacto || x.lider || x.representante || null, cargo: x.cargo || null,
+               matricula: i.tipo === "ingeniero" ? (x.matricula || null) : null,
+               matricula_verificada: i.tipo === "ingeniero" ? x.matricula_verificada === 1 : null,
+               oficio: x.oficio || null, interes: Array.isArray(x.interes) ? x.interes : null, convenio: conv };
+    });
+  }
+
+  let voluntariado = [];
+  if (c.participaciones.length) {
+    voluntariado = (await env.DB.prepare(
+      "SELECT p.id, p.horas, p.pro_bono, j.id AS jornada, j.nombre, j.fecha, j.estado, j.puerta, j.lugar, r.numero AS reconocimiento " +
+      "FROM participaciones p JOIN jornadas j ON j.id = p.jornada LEFT JOIN reconocimientos r ON r.participacion = p.id " +
+      "WHERE p.id IN (" + huecos(c.participaciones) + ") ORDER BY j.fecha DESC"
+    ).bind(...c.participaciones).all()).results || [];
+  }
+
+  const emails = [...c.emails];
+  let correos = [];
+  if (emails.length) {
+    const conRes = await existeTabla(env, "correos_resueltos");
+    correos = (await env.DB.prepare(
+      "SELECT c.id, c.etiqueta, c.asunto, c.para, c.guia, c.resultado, c.intento_en" +
+      (conRes ? ", r.como AS resuelto" : ", NULL AS resuelto") + " FROM correos c" +
+      (conRes ? " LEFT JOIN correos_resueltos r ON r.correo_id = c.id" : "") +
+      " WHERE LOWER(c.para) IN (" + huecos(emails) + ") ORDER BY c.intento_en DESC, c.id DESC LIMIT 60"
+    ).bind(...emails).all()).results || [];
+  }
+
+  /* El banco: los movimientos del extracto conciliados con sus aportes. */
+  let banco = [];
+  if (guias.length) {
+    try {
+      banco = (await env.DB.prepare(
+        "SELECT m.id, m.fecha, m.descripcion, m.valor_centavos, m.estado, k.ref AS guia, k.monto_centavos AS parte " +
+        "FROM conciliaciones k JOIN movimientos_banco m ON m.id = k.movimiento_id " +
+        "WHERE k.tipo = 'aporte' AND k.ref IN (" + huecos(guias) + ") ORDER BY m.fecha DESC"
+      ).bind(...guias).all()).results || [];
+    } catch (e) {
+      if (!/no such table/i.test(String(e && e.message))) throw e;
+    }
+  }
+
+  let seguimientos = [];
+  const claves = [...c.claves];
+  try {
+    seguimientos = (await env.DB.prepare(
+      "SELECT id, contacto, tipo, fecha, resumen, proximo, proximo_fecha, proximo_hecho_en, proximo_hecho_por, pospuesto, " +
+      "creado_por, creado_en FROM seguimientos WHERE anulado_en IS NULL AND contacto IN (" + huecos(claves) + ") " +
+      "ORDER BY fecha DESC, id DESC"
+    ).bind(...claves).all()).results || [];
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+
+  const d = dups.get(c.clave);
+  const duplicados = d ? [...d.values()].map((x) => ({
+    clave: x.contacto.clave, nombre: x.contacto.nombre, etiquetas: [...x.contacto.etiquetas],
+    email: [...x.contacto.emails][0] || "", tel: [...x.contacto.tels][0] || "", motivos: x.motivos
+  })) : [];
+  const unidas = idx.vinculos.filter((v) => v.decision === "unir" && c.claves.has(v.a) && c.claves.has(v.b));
+
+  return json({
+    clave: c.clave, claves, nombre: c.nombre, org: c.org,
+    nombres: [...new Set(c.nombres.map((x) => x.n))],
+    emails, telefonos: [...c.tels], documentos: [...c.docs],
+    etiquetas: [...c.etiquetas], etiquetas_es: ETIQUETAS_CONTACTO, ultima: c.ultima, sf: c.sf,
+    identidad, aportes, totales, certificados, carnets, suscripciones, red, voluntariado, correos, banco,
+    seguimientos, duplicados, unidas, hoy: fechaCO(),
+    con_seguimientos: await existeTabla(env, "seguimientos"),
+    con_vinculos: await existeTabla(env, "contactos_vinculos")
+  });
+}
+
+/* POST /api/admin/contacto/vinculo { a, b, decision: "unir" | "distintos", motivo }
+   y { a, b, quitar: true } para deshacer. La decisión es entre dos CLAVES; el
+   par se guarda en orden para que no se repita al revés. Queda en la
+   auditoría, porque unir dos fichas cambia lo que el panel dice de alguien. */
+async function adminVinculoContacto(request, env, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  let a = correoClave(c.a) || String(c.a || ""), b = correoClave(c.b) || String(c.b || "");
+  if (!claveValida(a) || !claveValida(b) || a === b) return json({ error: "claves_invalidas" }, 400);
+  if (a > b) { const t = a; a = b; b = t; }
+  if (!(await existeTabla(env, "contactos_vinculos"))) {
+    return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0043 en la base: sin ella no se guarda la decisión." }, 409);
+  }
+  if (c.quitar) {
+    await env.DB.prepare("DELETE FROM contactos_vinculos WHERE a = ? AND b = ?").bind(a, b).run();
+  } else {
+    const decision = c.decision === "unir" ? "unir" : c.decision === "distintos" ? "distintos" : null;
+    if (!decision) return json({ error: "decision_invalida" }, 400);
+    const motivo = ["documento", "telefono", "nombre", "manual"].includes(c.motivo) ? c.motivo : null;
+    await env.DB.prepare(
+      "INSERT INTO contactos_vinculos (a, b, decision, motivo, por) VALUES (?, ?, ?, ?, ?) " +
+      "ON CONFLICT (a, b) DO UPDATE SET decision = excluded.decision, motivo = excluded.motivo, por = excluded.por, en = datetime('now')"
+    ).bind(a, b, decision, motivo, quien || null).run();
+  }
+  try {
+    await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+      .bind("contacto " + a, (c.quitar ? "vinculo QUITADO" : "vinculo " + c.decision) + " con " + b + " por " + (quien || "?")).run();
+  } catch (e) { console.error("auditoria vinculo", e && e.message); }
+  return json({ ok: true, a, b });
+}
+
+/* ---- SEGUIMIENTOS: notas y registro de contacto ----
+   POST /api/admin/seguimientos { contacto, nombre, tipo, fecha, resumen, proximo, proximo_fecha }
+   Una nota interna, o «hablé con esta persona» (llamada, WhatsApp, un correo
+   que se mandó desde Gmail, una reunión), con un próximo paso opcional. El
+   próximo paso con fecha es lo que sale en «Hoy» el día que toca. */
+function fechaISOValida(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s || ""))) return false;
+  const d = new Date(s + "T00:00:00Z");
+  return !isNaN(d) && d.toISOString().slice(0, 10) === s;
+}
+async function adminCrearSeguimiento(request, env, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "seguimientos"))) {
+    return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0043 en la base: sin ella no se guardan notas." }, 409);
+  }
+  const contacto = correoClave(c.contacto) || String(c.contacto || "");
+  if (!claveValida(contacto)) return json({ error: "contacto_invalido" }, 400);
+  const tipo = TIPOS_SEGUIMIENTO.includes(c.tipo) ? c.tipo : null;
+  if (!tipo) return json({ error: "tipo_invalido", ayuda: "Elige qué fue: nota, llamada, WhatsApp, correo desde Gmail, reunión u otro." }, 400);
+  const hoy = fechaCO();
+  const fecha = c.fecha ? String(c.fecha) : hoy;
+  if (!fechaISOValida(fecha)) return json({ error: "fecha_invalida", campo: "fecha", ayuda: "La fecha no es válida." }, 400);
+  if (fecha > hoy) return json({ error: "fecha_futura", campo: "fecha", ayuda: "Lo que pasó no puede tener fecha de mañana: para eso está el próximo paso." }, 400);
+  const resumen = limpiar(c.resumen, 1500);
+  if (!resumen) return json({ error: "resumen_requerido", campo: "resumen", ayuda: "Escribe qué pasó o qué se habló." }, 400);
+  const proximo = limpiar(c.proximo, 300) || null;
+  const pf = c.proximo_fecha ? String(c.proximo_fecha) : null;
+  if (pf && !fechaISOValida(pf)) return json({ error: "fecha_invalida", campo: "proximo_fecha", ayuda: "La fecha del próximo paso no es válida." }, 400);
+  if (pf && !proximo) return json({ error: "proximo_requerido", campo: "proximo", ayuda: "Escribe cuál es el próximo paso: la fecha sola no le dice nada a nadie dentro de un mes." }, 400);
+  const nombre = limpiar(c.nombre, 160) || null;
+  const r = await env.DB.prepare(
+    "INSERT INTO seguimientos (contacto, contacto_nombre, tipo, fecha, resumen, proximo, proximo_fecha, creado_por) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(contacto, nombre, tipo, fecha, resumen, proximo, pf, quien || null).run();
+  return json({ ok: true, id: r.meta && r.meta.last_row_id });
+}
+
+/* POST /api/admin/seguimiento/<id> { accion }
+   · hecho / reabrir — el próximo paso se hizo (o no);
+   · posponer { fecha } — fecha nueva, y se cuenta cuántas veces se movió;
+   · fecha { fecha } — poner una fecha sin contarlo (el «Deshacer» de posponer);
+   · anular / restaurar — una nota escrita por error no se borra: se anula. */
+async function adminSeguimiento(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const s = await env.DB.prepare("SELECT id, proximo_fecha, proximo_hecho_en, anulado_en FROM seguimientos WHERE id = ?").bind(id).first();
+  if (!s) return json({ error: "no_encontrado" }, 404);
+  const accion = String(c.accion || "");
+  if (accion === "hecho") {
+    if (!s.proximo_fecha) return json({ error: "sin_proximo", ayuda: "Esta nota no tiene próximo paso." }, 409);
+    await env.DB.prepare("UPDATE seguimientos SET proximo_hecho_en = datetime('now'), proximo_hecho_por = ?, actualizado_en = datetime('now') WHERE id = ?")
+      .bind(quien || null, id).run();
+  } else if (accion === "reabrir") {
+    await env.DB.prepare("UPDATE seguimientos SET proximo_hecho_en = NULL, proximo_hecho_por = NULL, actualizado_en = datetime('now') WHERE id = ?")
+      .bind(id).run();
+  } else if (accion === "posponer" || accion === "fecha") {
+    const f = String(c.fecha || "");
+    if (!fechaISOValida(f)) return json({ error: "fecha_invalida", ayuda: "Elige una fecha válida." }, 400);
+    if (accion === "posponer" && f < fechaCO()) return json({ error: "fecha_pasada", ayuda: "Posponer es a hoy o a una fecha que todavía no llega." }, 400);
+    if (!s.proximo_fecha) return json({ error: "sin_proximo", ayuda: "Esta nota no tiene próximo paso." }, 409);
+    await env.DB.prepare(
+      "UPDATE seguimientos SET proximo_fecha = ?, proximo_hecho_en = NULL, proximo_hecho_por = NULL, " +
+      "pospuesto = pospuesto + ?, actualizado_en = datetime('now') WHERE id = ?"
+    ).bind(f, accion === "posponer" ? 1 : 0, id).run();
+  } else if (accion === "anular") {
+    await env.DB.prepare("UPDATE seguimientos SET anulado_en = datetime('now'), anulado_por = ? WHERE id = ?").bind(quien || null, id).run();
+  } else if (accion === "restaurar") {
+    await env.DB.prepare("UPDATE seguimientos SET anulado_en = NULL, anulado_por = NULL WHERE id = ?").bind(id).run();
+  } else {
+    return json({ error: "accion_invalida" }, 400);
+  }
+  return json({ ok: true, id, antes: s.proximo_fecha });
+}
+
+/* GET /api/admin/buscar?q= — EL BUSCADOR DE LA BARRA (Fase 4 del panel).
+
+   Antes entendía dos cosas —un número completo con su prefijo, o un teléfono—
+   y mandaba un aporte a la sección Salud, donde no se ve ningún aporte. Ahora
+   busca mientras se escribe, por nombre, correo, teléfono, documento o NIT,
+   por cualquier número del sistema (GG-, MB-, CV-, IV-, CD-, también a medias)
+   y por el código de verificación de un carnet, y devuelve los resultados en
+   grupos: Personas, Organizaciones, Aportes, Carnets, Casos, Inscripciones y
+   Movimientos del banco. Cada resultado dice qué abrir —la ficha, el cajón del
+   aporte, el del carnet, el del caso— y el panel lo abre.
+
+   EN EL SERVIDOR, con LIKE sobre lo normalizado: sin tildes y en minúsculas en
+   los dos lados (`sqlBuscable` / `buscable`), así que «Jose» encuentra a
+   «José». Cada grupo es UNA consulta con tope: son tablas de cientos de filas,
+   y un escaneo con tope es barato; lo que no se hace es una consulta por fila.
+
+   NUNCA SALE DE /admin: la ruta vive bajo /api/admin/, detrás de Access, como
+   todo lo que lee datos personales. */
+const BUSCA_TOPE = 6;
+const BUSCA_GRUPOS = ["Personas", "Organizaciones", "Aportes", "Carnets", "Casos", "Inscripciones", "Movimientos del banco"];
+const TIPO_INSC_ES = { voluntario: "Voluntario", fundacion: "Fundación", empresa: "Empresa", ingeniero: "Ingeniero",
+  apadrinamiento: "Padrino", especie: "Ofrecimiento en especie" };
 
 async function adminBuscar(env, url) {
-  const q = String(url.searchParams.get("q") || "").trim().slice(0, 60);
-  if (q.length < 3) return json({ q, tipo: "corto", resultados: [] });
-
-  const num = q.toUpperCase().replace(/\s+/g, "");
-  const m = /^(GG|CV|IV|CD|AE|MB)-(\d{4})-(\d{6})$/.exec(num);
-  if (m) {
-    const cfg = BUSCA_NUMERO[m[1]];
-    const f = await env.DB.prepare(cfg.sql).bind(num).first();
-    return json({ q, tipo: "numero", resultados: f ? [{
-      clase: cfg.clase, numero: f.numero, estado: f.estado || null,
-      nombre: f.nombre || null, sector: f.sector || null,
-      cuando: f.cuando ? selloCO(f.cuando).slice(0, 16) : null,
-      destino: cfg.destino
-    }] : [] });
-  }
-
+  const q = String(url.searchParams.get("q") || "").trim().slice(0, 80);
+  if (q.length < 2) return json({ q, tipo: "corto", grupos: [] });
+  const norm = buscable(q);
+  const pat = patronLike(norm);
   const digitos = q.replace(/\D/g, "");
-  if (digitos.length >= 7) {
-    /* SE NORMALIZA LA COLUMNA, así que esto es UN escaneo por tabla y el índice
-       de teléfono no entra. Es aceptable —lineal, tres tablas, con tope— y es
-       muy distinto de lo que ya mordió esta pantalla: allí la normalización
-       vivía en una subconsulta correlacionada y se ejecutaba UNA VEZ POR FILA,
-       o sea cuadrática. Un escaneo no es el problema; un escaneo por fila sí. */
-    const filas = [];
-    const casos = await env.DB.prepare(
-      "SELECT numero, estado, sector, contacto_nombre AS nombre, creado_en AS cuando FROM casos " +
-      "WHERE " + TEL_DIGITOS("contacto_tel") + " = ? ORDER BY creado_en DESC LIMIT 20"
-    ).bind(digitos).all();
-    for (const f of casos.results || []) {
-      filas.push({ clase: "Caso de vivienda", numero: f.numero, estado: f.estado,
-                   nombre: f.nombre, sector: f.sector,
-                   cuando: f.cuando ? selloCO(f.cuando).slice(0, 16) : "", destino: "#sec-casas" });
+  /* Un número del sistema, entero o a medias: «GG-2026-0000», «gg 2026 12». */
+  const numero = q.toUpperCase().replace(/\s+/g, "-").replace(/-+/g, "-");
+  const prefijo = (/^(GG|CV|IV|CD|AE|MB|EG|VC)(-|\d|$)/.exec(numero) || [])[1] || "";
+  const patNum = prefijo ? patronLike(numero.replace(/^([A-Z]{2})(\d)/, "$1-$2"), true) : null;
+  const esCorreo = q.includes("@");
+  const conTexto = norm.length >= 3 && !prefijo;
+  const tel = digitos.length >= 7 ? patronLike(digitos.length > 10 && digitos.startsWith("57") ? digitos.slice(2) : digitos) : null;
+  const doc = digitos.length >= 5 && digitos.length === q.replace(/[\s.,-]/g, "").length ? patronLike(digitos) : null;
+
+  const grupos = {};
+  const poner = (g, it) => { (grupos[g] = grupos[g] || []).push(it); };
+  const cuando = (v) => (v ? selloCO(v).slice(0, 10) : "");
+
+  /* ---- Personas y organizaciones: donantes, inscripciones y participaciones,
+     reducidos a su ficha. Las uniones decididas a mano se respetan aquí. ---- */
+  if (conTexto || tel || doc) {
+    const condPersona = (nombre, correo, telefono, documento) => {
+      const c = [], a = [];
+      if (conTexto) { c.push(sqlBuscable(nombre) + " LIKE ?" + LIKE_ESC); a.push(pat); }
+      if (conTexto || esCorreo) { c.push("LOWER(COALESCE(" + correo + ", '')) LIKE ?" + LIKE_ESC); a.push(patronLike(q.toLowerCase())); }
+      if (tel && telefono) { c.push(TEL_DIGITOS("COALESCE(" + telefono + ", '')") + " LIKE ?" + LIKE_ESC); a.push(tel); }
+      if (doc && documento) { c.push(DOC_DIGITOS(documento) + " LIKE ?" + LIKE_ESC); a.push(doc); }
+      return { donde: c.length ? "(" + c.join(" OR ") + ")" : "0", args: a };
+    };
+    const hits = [];
+    const d1 = condPersona("nombre", "email", "telefono", "doc_numero");
+    for (const d of ((await env.DB.prepare(
+      "SELECT id, email, nombre, doc_tipo, doc_numero, telefono, creado_en FROM donantes WHERE " + d1.donde + " LIMIT 30"
+    ).bind(...d1.args).all()).results || [])) {
+      hits.push({ email: d.email, tel: d.telefono, doc: d.doc_numero, nombre: d.nombre,
+                  org: String(d.doc_tipo || "").toUpperCase() === "NIT", detalle: "Donante" });
     }
-    const aportes = await env.DB.prepare(
-      "SELECT a.guia AS numero, a.estado, a.creada_en AS cuando, d.nombre FROM aportes a " +
-      "JOIN donantes d ON d.id = a.donante_id " +
-      "WHERE " + TEL_DIGITOS("d.telefono") + " = ? ORDER BY a.creada_en DESC LIMIT 20"
-    ).bind(digitos).all();
-    for (const f of aportes.results || []) {
-      filas.push({ clase: "Aporte", numero: f.numero, estado: f.estado, nombre: f.nombre,
-                   sector: null, cuando: f.cuando ? selloCO(f.cuando).slice(0, 16) : "", destino: "#sec-salud" });
+    const d2 = condPersona("nombre", "email", "telefono", "json_extract(datos, '$.nit')");
+    if (conTexto) { d2.donde = d2.donde.replace(/\)$/, " OR " + sqlBuscable("json_extract(datos, '$.contacto')") + " LIKE ?" + LIKE_ESC + ")"); d2.args.push(pat); }
+    const insHits = (await env.DB.prepare(
+      "SELECT id, tipo, estado, nombre, email, telefono, json_extract(datos, '$.nit') AS nit, " +
+      "json_extract(datos, '$.origen') AS origen, json_extract(datos, '$.puerta') AS puerta, creada_en FROM inscripciones " +
+      "WHERE " + d2.donde + " ORDER BY creada_en DESC LIMIT 30"
+    ).bind(...d2.args).all()).results || [];
+    for (const i of insHits) {
+      const org = i.tipo === "fundacion" || i.tipo === "empresa";
+      hits.push({ email: i.email, tel: i.telefono, doc: org ? i.nit : null, nombre: i.nombre, org,
+                  detalle: TIPO_INSC_ES[i.tipo] || i.tipo });
     }
-    const insc = await env.DB.prepare(
-      "SELECT id, tipo, estado, nombre, creada_en AS cuando FROM inscripciones " +
-      "WHERE " + TEL_DIGITOS("telefono") + " = ? ORDER BY creada_en DESC LIMIT 20"
-    ).bind(digitos).all();
-    for (const f of insc.results || []) {
-      filas.push({ clase: "Quién quiere entrar (" + f.tipo + ")", numero: "#" + f.id,
-                   estado: f.estado, nombre: f.nombre, sector: null,
-                   cuando: f.cuando ? selloCO(f.cuando).slice(0, 16) : "", destino: "#sec-entrar" });
+    const d3 = condPersona("p.nombre", "p.email", "p.celular", null);
+    for (const p of ((await env.DB.prepare(
+      "SELECT p.id, p.nombre, p.email, p.celular, i.email AS ins_email FROM participaciones p " +
+      "LEFT JOIN inscripciones i ON i.id = p.inscripcion WHERE " + d3.donde + " LIMIT 30"
+    ).bind(...d3.args).all()).results || [])) {
+      hits.push({ email: p.email || p.ins_email, tel: p.celular, doc: null, nombre: p.nombre, org: false, detalle: "Voluntario en jornadas" });
     }
-    return json({ q, tipo: "telefono", resultados: filas });
+    const u = unionClaves();
+    for (const v of await vinculosContactos(env)) if (v.decision === "unir") u.unir(v.a, v.b);
+    const fichas = new Map();
+    for (const h of hits) {
+      const k = claveContacto(h);
+      if (!k) continue;
+      const r = u.raiz(k);
+      const f = fichas.get(r) || { clave: r, nombre: "", org: false, detalles: new Set(), email: "", tel: "" };
+      if (h.org && !f.org) { f.org = true; f.nombre = h.nombre || f.nombre; }
+      if (!f.nombre && h.nombre) f.nombre = h.nombre;
+      if (!f.email && h.email) f.email = String(h.email).toLowerCase();
+      if (!f.tel && h.tel) f.tel = h.tel;
+      f.detalles.add(h.detalle);
+      fichas.set(r, f);
+    }
+    for (const f of fichas.values()) {
+      poner(f.org ? "Organizaciones" : "Personas", { titulo: f.nombre || f.email || f.clave,
+        detalle: [...f.detalles].join(" · ") + (f.email ? " · " + f.email : f.tel ? " · " + f.tel : ""),
+        abrir: { tipo: "contacto", id: f.clave } });
+    }
+    for (const i of insHits.slice(0, BUSCA_TOPE)) {
+      const k = claveContacto({ email: i.email, tel: i.telefono, doc: i.nit });
+      poner("Inscripciones", { titulo: i.nombre || "(sin nombre)",
+        detalle: [TIPO_INSC_ES[i.tipo] || i.tipo, i.estado, i.origen ? (ORIGENES_EVENTO[i.origen] || i.origen) + (i.puerta ? " · " + i.puerta : "") : "",
+                  cuando(i.creada_en)].filter(Boolean).join(" · "),
+        abrir: k ? { tipo: "contacto", id: u.raiz(k), inscripcion: i.id } : { tipo: "red", id: i.id } });
+    }
   }
 
-  return json({ q, tipo: "no_reconocido", resultados: [] });
+  /* ---- Aportes: por guía (también a medias), referencia de pago,
+     transacción de Wompi y número de certificado. ---- */
+  {
+    const c = [], a = [];
+    if (prefijo === "GG") { c.push("a.guia LIKE ?" + LIKE_ESC); a.push(patNum); }
+    if (prefijo === "CD") { c.push("a.guia IN (SELECT guia FROM certificados WHERE numero LIKE ?" + LIKE_ESC + ")"); a.push(patNum); }
+    if (!prefijo && q.length >= 4) {
+      c.push("LOWER(COALESCE(a.referencia_pago, '')) LIKE ?" + LIKE_ESC); a.push(patronLike(q.toLowerCase()));
+      c.push("LOWER(COALESCE(a.wompi_transaction_id, '')) LIKE ?" + LIKE_ESC); a.push(patronLike(q.toLowerCase()));
+    }
+    if (c.length) {
+      for (const f of ((await env.DB.prepare(
+        "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, " + FECHA_APORTE + " AS fecha, d.nombre, " +
+        "(SELECT k.numero FROM certificados k WHERE k.guia = a.guia AND k.anulado_en IS NULL ORDER BY k.emitido_en DESC LIMIT 1) AS cert " +
+        "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE " + c.join(" OR ") +
+        " ORDER BY a.creada_en DESC LIMIT " + BUSCA_TOPE
+      ).bind(...a).all()).results || [])) {
+        poner("Aportes", { titulo: f.guia + " · " + (f.nombre || "sin donante"),
+          detalle: [ESTADO_APORTE_BUSCA[f.estado] || f.estado, montoBusca(f.monto_centavos, f.moneda), f.fecha, f.cert ? "certificado " + f.cert : ""]
+            .filter(Boolean).join(" · "), abrir: { tipo: "aporte", id: f.guia } });
+      }
+    }
+  }
+
+  /* ---- Carnets: por código, por el código de verificación que se le dicta a
+     un comercio, y por el nombre o el correo de quien lo tiene. ---- */
+  {
+    const c = [], a = [];
+    if (prefijo === "MB") { c.push("m.codigo LIKE ?" + LIKE_ESC); a.push(patNum); }
+    const v = verifNormal(q);
+    if (v) { c.push("m.verif = ?"); a.push(v); }
+    if (conTexto) {
+      c.push(sqlBuscable("d.nombre") + " LIKE ?" + LIKE_ESC); a.push(pat);
+      c.push("LOWER(d.email) LIKE ?" + LIKE_ESC); a.push(patronLike(q.toLowerCase()));
+    }
+    if (c.length) {
+      for (const m of ((await env.DB.prepare(
+        "SELECT m.codigo, m.nivel, m.distincion, d.nombre, " +
+        "CASE WHEN m.revocado_en IS NOT NULL THEN 'revocado' WHEN " + sqlCarnetVigente("m", "date('now','-5 hours')") +
+        " THEN 'vigente' ELSE 'vencido' END AS estado FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE " +
+        c.join(" OR ") + " ORDER BY m.creado_en DESC LIMIT " + BUSCA_TOPE
+      ).bind(...a).all()).results || [])) {
+        poner("Carnets", { titulo: m.codigo + " · " + (m.nombre || ""),
+          detalle: [m.nivel === "honor" ? "solo de honor" : m.nivel, m.distincion ? "distinción: " + m.distincion : "", m.estado,
+                    v ? "código de verificación" : ""].filter(Boolean).join(" · "),
+          abrir: { tipo: "carnet", id: m.codigo } });
+      }
+    }
+  }
+
+  /* ---- Casos de Mira Mi Casa e inspecciones en terreno. ---- */
+  {
+    const c = [], a = [];
+    if (prefijo === "CV") { c.push("numero LIKE ?" + LIKE_ESC); a.push(patNum); }
+    if (conTexto) {
+      c.push(sqlBuscable("contacto_nombre") + " LIKE ?" + LIKE_ESC); a.push(pat);
+      c.push("LOWER(COALESCE(contacto_email, '')) LIKE ?" + LIKE_ESC); a.push(patronLike(q.toLowerCase()));
+    }
+    if (tel) { c.push(TEL_DIGITOS("contacto_tel") + " LIKE ?" + LIKE_ESC); a.push(tel); }
+    if (c.length) {
+      for (const f of ((await env.DB.prepare(
+        "SELECT numero, estado, sector, contacto_nombre, creado_en FROM casos WHERE " + c.join(" OR ") +
+        " ORDER BY creado_en DESC LIMIT " + BUSCA_TOPE
+      ).bind(...a).all()).results || [])) {
+        poner("Casos", { titulo: f.numero + " · " + (f.contacto_nombre || ""),
+          detalle: ["Caso de vivienda", f.estado, f.sector, cuando(f.creado_en)].filter(Boolean).join(" · "),
+          abrir: { tipo: "caso", id: f.numero } });
+      }
+    }
+    const c2 = [], a2 = [];
+    if (prefijo === "IV") { c2.push("numero LIKE ?" + LIKE_ESC); a2.push(patNum); }
+    if (conTexto) {
+      c2.push(sqlBuscable("propietario") + " LIKE ?" + LIKE_ESC); a2.push(pat);
+      c2.push(sqlBuscable("familia") + " LIKE ?" + LIKE_ESC); a2.push(pat);
+    }
+    if (c2.length) {
+      for (const f of ((await env.DB.prepare(
+        "SELECT numero, caso, municipio, casa_no, COALESCE(familia, propietario) AS nombre, fecha_visita, requiere_esp FROM inspecciones " +
+        "WHERE " + c2.join(" OR ") + " ORDER BY recibido_en DESC LIMIT " + BUSCA_TOPE
+      ).bind(...a2).all()).results || [])) {
+        poner("Casos", { titulo: f.numero + (f.nombre ? " · " + f.nombre : ""),
+          detalle: ["Inspección en terreno", f.municipio, f.casa_no ? "casa " + f.casa_no : "", f.fecha_visita,
+                    f.requiere_esp ? "requiere revisión especializada" : ""].filter(Boolean).join(" · "),
+          abrir: { tipo: "inspeccion", id: f.numero, caso: f.caso || null } });
+      }
+    }
+  }
+
+  /* ---- Movimientos del extracto: por descripción, referencia o el valor
+     exacto en pesos («150000»). Sin la 0042 no hay tabla y no sale. ---- */
+  try {
+    const c = [], a = [];
+    if (conTexto) { c.push(sqlBuscable("descripcion") + " LIKE ?" + LIKE_ESC); a.push(pat); }
+    if (!prefijo && q.length >= 4) { c.push("LOWER(COALESCE(referencia, '')) LIKE ?" + LIKE_ESC); a.push(patronLike(q.toLowerCase())); }
+    const soloNumero = /^\$?\s*[\d.,]+$/.test(q) && digitos.length >= 3 && digitos.length <= 11;
+    if (soloNumero) {
+      const pesos = Number(q.replace(/[^\d,]/g, "").replace(/,\d{1,2}$/, "").replace(/,/g, ""));
+      if (pesos > 0) { c.push("ABS(valor_centavos) = ?"); a.push(pesos * 100); }
+    }
+    if (c.length) {
+      for (const m of ((await env.DB.prepare(
+        "SELECT id, fecha, descripcion, valor_centavos, estado FROM movimientos_banco WHERE " + c.join(" OR ") +
+        " ORDER BY fecha DESC, id DESC LIMIT " + BUSCA_TOPE
+      ).bind(...a).all()).results || [])) {
+        poner("Movimientos del banco", { titulo: m.descripcion || "(sin descripción)",
+          detalle: [m.fecha, (m.valor_centavos < 0 ? "cargo " : "abono ") + montoBusca(Math.abs(m.valor_centavos), "COP"),
+                    m.estado === "sin_conciliar" ? "sin conciliar" : m.estado].join(" · "),
+          abrir: { tipo: "movimiento", id: m.id } });
+      }
+    }
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+
+  const salida = BUSCA_GRUPOS.filter((g) => grupos[g] && grupos[g].length)
+    .map((g) => ({ grupo: g, items: grupos[g].slice(0, BUSCA_TOPE), mas: Math.max(0, grupos[g].length - BUSCA_TOPE) }));
+  return json({ q, tipo: "texto", grupos: salida });
+}
+const ESTADO_APORTE_BUSCA = { intencion: "intento sin pagar", pendiente: "pendiente", error: "error", aprobada: "pagado",
+  en_distribucion: "en distribución", entregada: "entregado", rechazada: "rechazado", reportada: "transferencia por verificar", anulada: "anulado" };
+function montoBusca(c, moneda) {
+  return String(moneda || "COP").toUpperCase() === "USD"
+    ? "US$" + (Number(c || 0) / 100).toFixed(2) : fmtPesos(c);
+}
+
+/* ========================================================================
+   SISTEMA › CORREOS (Fase 4 del panel, oct 2026)
+   ========================================================================
+   La tabla `correos` (0009) anota cada intento: a quién, con qué asunto, qué
+   pasó. Hasta hoy no tenía pantalla —«Correos que no salieron» decía «sin
+   bandeja»— y reenviar era ir a Resend o escribir a mano.
+
+   EL CUERPO NO SE GUARDA, a propósito (Ley 1581), y eso no cambia. Para
+   reenviar, el panel VUELVE A ARMAR el correo con la misma plantilla y los
+   datos de hoy, que es lo que hace `REENVIOS`: una entrada por etiqueta, que
+   llama a la misma función `correo*` que lo mandó la primera vez. Antes de
+   enviar se enseña con la vista previa de la Fase 1 (`adminPrevia`, acción
+   «reenviar»), y solo sale si va a la MISMA dirección que el original.
+
+   Lo que no se puede volver a armar —avisos internos, resúmenes del día, o
+   correos que dependen de un momento que ya pasó— no se reenvía: se marca
+   «resuelto a mano» con una nota (le escribiste por Gmail o WhatsApp). */
+
+/* REENVIOS[etiqueta](env, fila) arma el correo con `env` (que en la vista
+   previa lo recoge sin enviar y en el reenvío lo envía). Devuelve null si lo
+   armó, o un texto que dice por qué no se puede. */
+async function aporteParaCorreo(env, guia) {
+  if (!guia) return null;
+  return env.DB.prepare(
+    "SELECT a.guia, a.estado, a.monto_centavos, a.moneda, a.idioma, a.modo, a.destino_id, a.frecuencia, " +
+    "a.quiere_certificado, a.token, a.fecha_pago, a.aprobada_en, d.nombre AS nombre, d.email AS email " +
+    "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?"
+  ).bind(guia).first();
+}
+async function inscripcionParaCorreo(env, para, tipos) {
+  const f = await env.DB.prepare(
+    "SELECT id, tipo, estado, nombre, email, telefono, ciudad, datos, token FROM inscripciones " +
+    "WHERE LOWER(email) = ? AND tipo IN ('" + tipos.join("','") + "') ORDER BY creada_en DESC LIMIT 1"
+  ).bind(String(para || "").toLowerCase()).first();
+  if (!f) return null;
+  let x = {};
+  try { x = JSON.parse(f.datos || "{}") || {}; } catch (e) { x = {}; }
+  return { f, x };
+}
+const acuseDeInscripcion = (tipos, fn) => async (env, fila) => {
+  const r = await inscripcionParaCorreo(env, fila.para, tipos);
+  if (!r) return "Ya no hay una inscripción con ese correo (pudo suprimirse).";
+  await fn(env, { ...r.x, nombre: r.f.nombre, razon: r.f.nombre, email: r.f.email, ciudad: r.f.ciudad });
+  return null;
+};
+const REENVIOS = {
+  "aporte-aprobado": async (env, fila) => {
+    const a = await aporteParaCorreo(env, fila.guia);
+    if (!a) return "El aporte " + (fila.guia || "") + " ya no existe.";
+    if (!["aprobada", "en_distribucion", "entregada"].includes(a.estado)) return "El aporte ya no está confirmado: no hay recibo que mandar.";
+    await correoAporteAprobado(env, { guia: a.guia, monto_centavos: a.monto_centavos, moneda: a.moneda, idioma: a.idioma, modo: a.modo,
+      destino_id: a.destino_id, frecuencia: a.frecuencia, token: a.token }, a.email, a.nombre);
+    return null;
+  },
+  "transferencia-reportada": async (env, fila) => {
+    const a = await aporteParaCorreo(env, fila.guia);
+    if (!a) return "El aporte " + (fila.guia || "") + " ya no existe.";
+    if (a.estado !== "reportada") return "La transferencia ya no está «por verificar»: este acuse ya no dice la verdad.";
+    await correoTransferenciaReportada(env, { guia: a.guia, email: a.email, idioma: a.idioma,
+      monto: Math.round(Number(a.monto_centavos || 0) / 100), fecha: a.fecha_pago || "" });
+    return null;
+  },
+  "certificado": async (env, fila) => {
+    const k = await env.DB.prepare(
+      "SELECT numero, datos FROM certificados WHERE guia = ? AND anulado_en IS NULL ORDER BY emitido_en DESC LIMIT 1"
+    ).bind(fila.guia || "").first();
+    if (!k) return "No hay un certificado vigente para " + (fila.guia || "ese aporte") + ".";
+    let d = {};
+    try { d = JSON.parse(k.datos || "{}"); } catch (e) { return "El certificado guardado no se puede leer."; }
+    await correoCertificado(env, d, fila.para);
+    return null;
+  },
+  "carnet": async (env, fila) => {
+    const m = await env.DB.prepare(
+      "SELECT m.*, d.nombre AS d_nombre, d.email AS d_email FROM miembros m JOIN donantes d ON d.id = m.donante_id " +
+      "WHERE LOWER(d.email) = ? AND m.revocado_en IS NULL ORDER BY m.creado_en DESC LIMIT 1"
+    ).bind(String(fila.para || "").toLowerCase()).first();
+    if (!m) return "Esa persona ya no tiene un carnet activo.";
+    await correoCarnet(env, m.d_email, m.d_nombre, m, "es");
+    return null;
+  },
+  "ingeniero-verificado": async (env, fila) => {
+    const r = await inscripcionParaCorreo(env, fila.para, ["ingeniero"]);
+    if (!r) return "Ya no hay una postulación de ingeniero con ese correo.";
+    if (r.x.matricula_verificada !== 1) return "Su matrícula ya no figura como verificada: este aviso ya no es cierto.";
+    await correoIngenieroVerificado(env, { email: r.f.email, nombre: r.f.nombre, matricula: r.x.matricula, idioma: r.x.idioma });
+    return null;
+  },
+  "fundacion-aceptada": async (env, fila) => {
+    const r = await inscripcionParaCorreo(env, fila.para, ["fundacion"]);
+    if (!r) return "Ya no hay una fundación con ese correo.";
+    await correoFundacionAceptada(env, { nombre: r.f.nombre || "", email: r.f.email, zona: r.x.zona || "",
+      idioma: r.x.idioma === "en" ? "en" : "es", personeria: r.x.personeria || "" });
+    return null;
+  },
+  "fundacion-convenio": async (env, fila) => {
+    const r = await inscripcionParaCorreo(env, fila.para, ["fundacion"]);
+    if (!r) return "Ya no hay una fundación con ese correo.";
+    if (r.f.estado !== "convenio") return "La fundación ya no está en el paso del convenio.";
+    let t = null;
+    try { t = await env.DB.prepare("SELECT token FROM convenio_enlaces WHERE inscripcion = ?").bind(r.f.id).first(); } catch (e) { /* sin la 0038 */ }
+    if (!t || !t.token) return "La fundación todavía no tiene enlace del convenio: se crea desde su fila en Red.";
+    await correoFundacionConvenio(env, { nombre: r.f.nombre || "", email: r.f.email, variante: varianteConvenio(r.x),
+      url: ORIGIN + "/convenio/" + t.token });
+    return null;
+  },
+  "fundacion-vinculada": async (env, fila) => {
+    const r = await inscripcionParaCorreo(env, fila.para, ["fundacion"]);
+    if (!r) return "Ya no hay una fundación con ese correo.";
+    if (r.f.estado !== "vinculada") return "La fundación ya no figura como vinculada.";
+    await correoFundacionVinculada(env, { nombre: r.f.nombre || "", email: r.f.email });
+    return null;
+  },
+  "ficha-fundacion": async (env, fila) => {
+    const r = await inscripcionParaCorreo(env, fila.para, ["fundacion"]);
+    if (!r) return "Ya no hay una fundación con ese correo.";
+    if (!r.f.token) return "La fundación no tiene enlace del cuestionario.";
+    await correoFichaFundacion(env, { nombre: r.f.nombre || "", email: r.f.email, idioma: r.x.idioma === "en" ? "en" : "es", token: r.f.token });
+    return null;
+  },
+  "fundacion-convenio-texto": async (env, fila) => {
+    const r = await inscripcionParaCorreo(env, fila.para, ["fundacion"]);
+    if (!r) return "Ya no hay una fundación con ese correo.";
+    let t = null;
+    try { t = await env.DB.prepare("SELECT token, texto_clave FROM convenio_enlaces WHERE inscripcion = ?").bind(r.f.id).first(); } catch (e) { /* nada */ }
+    if (!t || !t.texto_clave) return "No hay texto del convenio subido.";
+    await correoTextoConvenio(env, { nombre: r.f.nombre || "", email: r.f.email }, ORIGIN + "/convenio/" + t.token);
+    return null;
+  },
+  "caso-creado": async (env, fila) => {
+    const k = await env.DB.prepare("SELECT numero, token, contacto_nombre, sector, contacto_email FROM casos WHERE numero = ?")
+      .bind(fila.guia || "").first();
+    if (!k) return "El caso " + (fila.guia || "") + " ya no existe.";
+    if (!k.contacto_email || k.contacto_email.toLowerCase() !== String(fila.para || "").toLowerCase()) return "El caso ya no tiene ese correo.";
+    await correoCasoCreado(env, { numero: k.numero, token: k.token, nombre: k.contacto_nombre, sector: k.sector, email: k.contacto_email });
+    return null;
+  },
+  /* Los acuses de los formularios: se arman con lo que la persona escribió,
+     que vive en la inscripción. */
+  "inscripcion-voluntario": acuseDeInscripcion(["voluntario"], (env, v) => correoInscripcionVoluntario(env, v)),
+  "postulacion-ingeniero": acuseDeInscripcion(["ingeniero"], (env, v) => correoIngeniero(env, v)),
+  "aplicacion-fundacion": acuseDeInscripcion(["fundacion"], (env, v) => correoFundacion(env, v)),
+  "solicitud-aliado": acuseDeInscripcion(["empresa"], (env, v) => correoAliado(env, v)),
+  "solicitud-aliado-evento": acuseDeInscripcion(["empresa"], (env, v) => correoLeadEmpresa(env, v)),
+  "apadrinamiento": acuseDeInscripcion(["apadrinamiento"], (env, v) => correoApadrinamiento(env, v)),
+  "ofrecimiento-especie": acuseDeInscripcion(["especie"], (env, v) => correoOfrecimiento(env, v))
+};
+/* Por qué no se reenvía lo que no está arriba, para decírselo a quien mira. */
+function porQueNoSeReenvia(fila, env) {
+  const internos = [env.CORREO_AVISOS, env.CORREO_MMC, env.CORREO_ALIANZAS].filter(Boolean);
+  if (fila.resultado === "sin_destino") return "No había buzón configurado: reenviarlo no arregla nada. Hay que poner CORREO_AVISOS o CORREO_MMC en la configuración del Worker.";
+  if (internos.includes(fila.para) || /^(aviso-|resumen-diario|alerta-)/.test(fila.etiqueta || "")) {
+    return "Es un aviso interno del equipo: lo que decía ya está en el panel. Márcalo resuelto.";
+  }
+  return "Este tipo de correo («" + (fila.etiqueta || "?") + "») no se puede volver a armar desde aquí: depende de un momento que ya pasó. Si hace falta, escríbele desde Gmail o por WhatsApp y márcalo «resuelto a mano».";
+}
+
+/* Arma el correo de `fila` con `env` y comprueba lo que salió: uno solo y a la
+   misma dirección. Devuelve { correos, no }. */
+async function regenerarCorreo(env, envDestino, fila) {
+  const fn = REENVIOS[fila.etiqueta];
+  if (!fn) return { no: porQueNoSeReenvia(fila, env) };
+  const envP = Object.create(env);
+  envP.__previa = [];
+  const motivo = await fn(envP, fila);
+  if (motivo) return { no: motivo };
+  const salen = envP.__previa.filter((m) => !m.sin_buzon);
+  if (salen.length !== 1) return { no: "Al volver a armarlo salen " + salen.length + " correos y no uno: no se reenvía desde aquí." };
+  if (String(salen[0].para || "").toLowerCase() !== String(fila.para || "").toLowerCase()) {
+    return { no: "Hoy ese correo iría a " + (salen[0].para || "nadie") + " y no a " + fila.para + " (el dato cambió). No se reenvía desde aquí: revisa la ficha y escríbele a mano." };
+  }
+  if (!envDestino) return { correos: envP.__previa };
+  await fn(envDestino, fila);
+  return { correos: envP.__previa };
+}
+
+const RESULTADOS_CORREO = ["enviado", "fallo", "simulado", "sin_cupo", "sin_destino"];
+const CORREO_RESULTADO_ES = { enviado: "Enviado", fallo: "Falló", simulado: "Simulado (no salió)", sin_cupo: "Sin cupo del día",
+  sin_destino: "Sin buzón configurado" };
+const CORREO_ORDEN = { fecha: "c.intento_en", para: "LOWER(c.para)", etiqueta: "c.etiqueta", resultado: "c.resultado" };
+
+/* GET /api/admin/correos — la tabla, filtrada y paginada EN EL SERVIDOR: es la
+   tabla que más crece del sistema (cada aviso es una fila). */
+async function adminCorreos(env, url) {
+  const p = url.searchParams;
+  const conRes = await existeTabla(env, "correos_resueltos");
+  const cond = [], args = [];
+  const estado = String(p.get("estado") || "");
+  if (RESULTADOS_CORREO.includes(estado)) { cond.push("c.resultado = ?"); args.push(estado); }
+  else if (estado === "por_atender") {
+    cond.push("c.resultado IN ('fallo','sin_cupo')");
+    if (conRes) cond.push("r.correo_id IS NULL");
+  } else if (estado === "resueltos" && conRes) cond.push("r.correo_id IS NOT NULL");
+  const etiqueta = limpiar(p.get("etiqueta"), 60);
+  if (etiqueta) { cond.push("c.etiqueta = ?"); args.push(etiqueta); }
+  const q = limpiar(p.get("q"), 120).toLowerCase();
+  if (q) {
+    cond.push("(LOWER(c.para) LIKE ?" + LIKE_ESC + " OR LOWER(COALESCE(c.asunto, '')) LIKE ?" + LIKE_ESC +
+              " OR LOWER(COALESCE(c.guia, '')) LIKE ?" + LIKE_ESC + ")");
+    const pt = patronLike(q); args.push(pt, pt, pt);
+  }
+  const desde = p.get("desde"), hasta = p.get("hasta");
+  if (fechaISOValida(desde)) { cond.push("date(c.intento_en, '-5 hours') >= ?"); args.push(desde); }
+  if (fechaISOValida(hasta)) { cond.push("date(c.intento_en, '-5 hours') <= ?"); args.push(hasta); }
+  const join = conRes ? " LEFT JOIN correos_resueltos r ON r.correo_id = c.id" : "";
+  const donde = cond.length ? " WHERE " + cond.join(" AND ") : "";
+  const orden = CORREO_ORDEN[p.get("orden")] || "c.intento_en";
+  const dir = p.get("dir") === "asc" ? "ASC" : "DESC";
+  const por = [25, 50, 100].includes(Number(p.get("por"))) ? Number(p.get("por")) : 25;
+  const pagina = Math.max(1, Math.min(10000, Number(p.get("pagina")) || 1));
+  const filas = (await env.DB.prepare(
+    "SELECT c.id, c.etiqueta, c.para, c.asunto, c.guia, c.resultado, c.proveedor_id, c.error, c.intento_en" +
+    (conRes ? ", r.como AS resuelto, r.en AS resuelto_en, r.reenvio_id" : ", NULL AS resuelto, NULL AS resuelto_en, NULL AS reenvio_id") +
+    " FROM correos c" + join + donde + " ORDER BY " + orden + " " + dir + ", c.id " + dir +
+    " LIMIT " + por + " OFFSET " + (pagina - 1) * por
+  ).bind(...args).all()).results || [];
+  const tot = await env.DB.prepare("SELECT COUNT(*) AS n FROM correos c" + join + donde).bind(...args).first();
+  const out = { correos: filas.map((f) => ({ ...f, reenviable: !!REENVIOS[f.etiqueta] })), total: (tot && tot.n) || 0,
+                resultados: CORREO_RESULTADO_ES, con_resueltos: conRes };
+  if (p.get("meta") === "1") {
+    out.opciones = {
+      etiquetas: ((await env.DB.prepare("SELECT etiqueta, COUNT(*) AS n FROM correos GROUP BY etiqueta ORDER BY etiqueta").all()).results || [])
+        .map((r) => r.etiqueta)
+    };
+  }
+  return json(out);
+}
+
+/* GET /api/admin/correo/<id> — el detalle, con el correo vuelto a armar (como
+   saldría hoy) si se puede, y a qué ficha pertenece. */
+async function adminCorreo(env, id) {
+  const conRes = await existeTabla(env, "correos_resueltos");
+  const f = await env.DB.prepare(
+    "SELECT c.id, c.etiqueta, c.para, c.asunto, c.guia, c.resultado, c.proveedor_id, c.error, c.intento_en" +
+    (conRes ? ", r.como AS resuelto, r.en AS resuelto_en, r.por AS resuelto_por, r.nota AS resuelto_nota, r.reenvio_id" : "") +
+    " FROM correos c" + (conRes ? " LEFT JOIN correos_resueltos r ON r.correo_id = c.id" : "") + " WHERE c.id = ?"
+  ).bind(id).first();
+  if (!f) return json({ error: "no_encontrado" }, 404);
+  let reenvioDe = null, reenvio = null;
+  if (conRes) {
+    const o = await env.DB.prepare("SELECT correo_id FROM correos_resueltos WHERE reenvio_id = ?").bind(id).first();
+    reenvioDe = o ? o.correo_id : null;
+    if (f.reenvio_id) reenvio = await env.DB.prepare("SELECT id, resultado, intento_en FROM correos WHERE id = ?").bind(f.reenvio_id).first();
+  }
+  let previa = null, no = null;
+  try {
+    const r = await regenerarCorreo(env, null, f);
+    if (r.no) no = r.no; else previa = r.correos.map((m) => ({ para: m.para, asunto: m.asunto, texto: String(m.texto || "").slice(0, 6000), adjuntos: m.adjuntos || [] }));
+  } catch (e) {
+    no = "No se pudo volver a armar: " + (e && e.message);
+  }
+  /* La ficha: solo si esa dirección es de alguien que la base conoce. */
+  let contacto = null;
+  const e = correoClave(f.para);
+  if (e) {
+    const hay = await env.DB.prepare(
+      "SELECT 1 AS si FROM donantes WHERE LOWER(email) = ?1 UNION ALL SELECT 1 FROM inscripciones WHERE LOWER(email) = ?1 " +
+      "UNION ALL SELECT 1 FROM participaciones WHERE LOWER(email) = ?1 LIMIT 1"
+    ).bind(e).first();
+    if (hay) contacto = e;
+  }
+  const atender = ["fallo", "sin_cupo"].includes(f.resultado) && !f.resuelto;
+  return json({ correo: f, previa, no, reenviable: atender && !!previa, atender, contacto, reenvio_de: reenvioDe, reenvio,
+                con_resueltos: conRes, resultado_es: CORREO_RESULTADO_ES });
+}
+
+/* POST /api/admin/correo/<id>/reenviar — vuelve a armar el correo y lo envía
+   por `enviarCorreo`, que lo anota como cualquier otro (y gasta cupo). La fila
+   nueva queda enlazada a la vieja en `correos_resueltos`, salga como salga: si
+   el reenvío también falla, en la cola queda UNO, el nuevo. */
+async function adminReenviarCorreo(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!(await existeTabla(env, "correos_resueltos"))) {
+    return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0043 en la base: sin ella el reenvío no queda enlazado." }, 409);
+  }
+  const f = await env.DB.prepare(
+    "SELECT c.*, r.como AS resuelto FROM correos c LEFT JOIN correos_resueltos r ON r.correo_id = c.id WHERE c.id = ?"
+  ).bind(id).first();
+  if (!f) return json({ error: "no_encontrado" }, 404);
+  if (!["fallo", "sin_cupo"].includes(f.resultado)) return json({ error: "no_fallo", ayuda: "Solo se reenvía un correo que no salió." }, 409);
+  if (f.resuelto) return json({ error: "ya_resuelto", ayuda: "Este correo ya se atendió." }, 409);
+  /* Se reserva ANTES de enviar: dos clics seguidos no mandan dos correos. */
+  try {
+    await env.DB.prepare("INSERT INTO correos_resueltos (correo_id, como, por) VALUES (?, 'reenviado', ?)").bind(id, quien || null).run();
+  } catch (e) {
+    return json({ error: "ya_resuelto", ayuda: "Este correo ya se está reenviando." }, 409);
+  }
+  const envR = Object.create(env);
+  envR.__reenvio = { ids: [] };
+  let r;
+  try {
+    r = await regenerarCorreo(env, envR, f);
+  } catch (e) {
+    r = { no: "Falló al armarlo: " + (e && e.message) };
+  }
+  const nuevo = envR.__reenvio.ids[0] || null;
+  if (r.no || !nuevo) {
+    await env.DB.prepare("DELETE FROM correos_resueltos WHERE correo_id = ? AND reenvio_id IS NULL").bind(id).run();
+    return json({ error: "no_reenviable", ayuda: r.no || "No quedó registro del envío: no se marcó como reenviado." }, 409);
+  }
+  await env.DB.prepare("UPDATE correos_resueltos SET reenvio_id = ? WHERE correo_id = ?").bind(nuevo, id).run();
+  const n = await env.DB.prepare("SELECT id, resultado, error FROM correos WHERE id = ?").bind(nuevo).first();
+  return json({ ok: true, nuevo: n });
+}
+
+/* POST /api/admin/correo/<id>/resuelto { nota } — se atendió por fuera (Gmail,
+   WhatsApp, o era un aviso interno que ya se vio en el panel). { deshacer: true }
+   lo devuelve a la cola, salvo que haya sido un reenvío. */
+async function adminCorreoResuelto(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "correos_resueltos"))) {
+    return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0043 en la base." }, 409);
+  }
+  const f = await env.DB.prepare("SELECT id, resultado FROM correos WHERE id = ?").bind(id).first();
+  if (!f) return json({ error: "no_encontrado" }, 404);
+  if (c.deshacer) {
+    await env.DB.prepare("DELETE FROM correos_resueltos WHERE correo_id = ? AND como = 'a_mano'").bind(id).run();
+    return json({ ok: true });
+  }
+  if (!["fallo", "sin_cupo", "sin_destino"].includes(f.resultado)) return json({ error: "no_fallo", ayuda: "Este correo salió: no hay nada que resolver." }, 409);
+  const nota = limpiar(c.nota, 500);
+  if (!nota) return json({ error: "nota_requerida", ayuda: "Escribe cómo se resolvió: «le escribí por WhatsApp el 9 de octubre»." }, 400);
+  try {
+    await env.DB.prepare("INSERT INTO correos_resueltos (correo_id, como, nota, por) VALUES (?, 'a_mano', ?, ?)").bind(id, nota, quien || null).run();
+  } catch (e) {
+    return json({ error: "ya_resuelto", ayuda: "Este correo ya se atendió." }, 409);
+  }
+  return json({ ok: true });
 }
 
 /* GET /api/admin/inspecciones — lo que la brigada necesita ver de un vistazo.
@@ -21432,6 +22552,16 @@ async function adminPrevia(request, env, sesion) {
     else if (e.enviada_en) nota = "Ya salió por correo: no se repite.";
     else if (!para) nota = "No hay correo de " + (actor === "empresa" ? "la empresa" : "la fundación") + ".";
     else await correoEncuestaActor(envP, j, actor, para, ORIGIN + "/encuesta/" + e.token, await fundacionesRed(env));
+  } else if (accion === "reenviar") {
+    /* Sistema › Correos (Fase 4): el correo que no salió, vuelto a armar con
+       la misma plantilla y los datos de hoy. Es lo mismo que hará
+       `adminReenviarCorreo`, que además comprueba que vaya a la misma dirección. */
+    const f = await env.DB.prepare("SELECT * FROM correos WHERE id = ?").bind(Number(c.id) || 0).first();
+    if (!f) return json({ error: "no_encontrado" }, 404);
+    const r = await regenerarCorreo(env, null, f);
+    if (r.no) return json({ error: "no_reenviable", ayuda: r.no }, 409);
+    for (const m of r.correos) envP.__previa.push(m);
+    nota = "Se arma otra vez con la plantilla y los datos de hoy: el original no se guardó (Ley 1581). Sale a la misma dirección que el original y gasta cupo del día como cualquier correo.";
   } else {
     return json({ error: "accion_no_valida" }, 400);
   }
@@ -24395,6 +25525,75 @@ textarea { font-size: 16px }
 .bus-caja{border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:10px;padding:12px 18px;background:var(--surface)}
 @media (max-width:640px){ .bus-fila{grid-template-columns:1fr} }
 
+/* ---- EL BUSCADOR DE LA BARRA (Fase 4) ----
+   Los resultados se abren debajo de la casilla, por grupos, sin mover la
+   página. Reglas finas y un filete a la izquierda en la fila elegida: la
+   misma gramática que el resto del panel, sin sombras de aplicación. */
+#buscador{position:relative}
+.bus-atajo{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:inherit;font-size:var(--fs-12);color:var(--mu);
+  border:1px solid var(--bd);border-radius:4px;padding:0 6px;line-height:1.5;background:var(--bg);pointer-events:none}
+#q:focus+.bus-atajo{display:none}
+.bus-pop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60;max-height:min(70vh,560px);overflow-y:auto;
+  background:var(--surface);border:1px solid var(--bd);border-top:2px solid var(--acc);border-radius:10px;padding:6px 0}
+.bus-pop[hidden]{display:none}
+.bus-g{padding:4px 0 6px}
+.bus-g+.bus-g{border-top:1px solid var(--bds)}
+.bus-gt{margin:0;padding:6px 16px 4px;font-size:var(--fs-11);font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mu)}
+.bus-it{padding:7px 16px 7px 14px;border-left:2px solid transparent;cursor:pointer}
+.bus-it strong{display:block;font-size:var(--fs-14);font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bus-it small{display:block;font-size:var(--fs-12);color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bus-it:hover,.bus-it.on{background:var(--bg);border-left-color:var(--acc)}
+.bus-mas{margin:0;padding:2px 16px 4px;font-size:var(--fs-12);color:var(--mu)}
+.bus-pop .bus-nada{padding:10px 16px}
+
+/* ---- LA FICHA DE CONTACTO (Fase 4) ---- */
+.ct-chip{display:inline-block;font-size:var(--fs-11);font-weight:700;letter-spacing:.03em;padding:1px 7px;margin:0 2px 2px 0;
+  border:1px solid var(--bd);border-radius:4px;color:var(--ink-soft);background:var(--surface);white-space:nowrap}
+.ct-chip.sf{border-color:var(--acc);color:var(--acc)}
+.ct-chip.mu{border-style:dashed;color:var(--mu)}
+.ct-dup{font-size:var(--fs-12);font-weight:600;color:var(--amber);white-space:nowrap}
+.ct-hoy{color:var(--amber);font-weight:600}
+.ct-cab{margin:0 0 12px}
+.ct-ayuda{margin:0 0 10px;font-size:var(--fs-13);color:var(--mu);max-width:70ch}
+.ct-sub{margin:14px 0 4px;font-size:var(--fs-13);font-weight:700;color:var(--ink)}
+.ct-acc{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ct-rapido{margin:0 0 14px}
+.ct-link{appearance:none;background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--acc);cursor:pointer;text-align:left;
+  text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:2px}
+.ct-link:hover{text-decoration-color:var(--acc)}
+.ct-anular{appearance:none;background:none;border:0;padding:0 2px;margin-left:auto;font:inherit;font-size:var(--fs-12);color:var(--mu);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.ct-lista{list-style:none;margin:0 0 6px;padding:0}
+.ct-lista li{padding:7px 0;border-top:1px solid var(--bds);font-size:var(--fs-14)}
+.ct-lista li:first-child{border-top:0}
+.ct-lista small{display:block;font-size:var(--fs-12);color:var(--mu);margin-top:1px}
+.ct-lista .ct-resalta{border-left:3px solid var(--acc);padding-left:10px;background:var(--bg)}
+.ct-dupf{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:start;padding:10px 12px;margin:0 0 8px;
+  border:1px solid var(--bd);border-left:3px solid var(--amber);border-radius:8px;background:var(--bg)}
+.ct-dupf small{display:block;font-size:var(--fs-12);color:var(--mu)}
+.ct-dupf .ct-cab{margin:4px 0 0}
+.ct-prox{list-style:none;margin:0 0 12px;padding:0}
+.ct-prox li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:9px 12px;margin:0 0 6px;
+  border:1px solid var(--bd);border-left:3px solid var(--g);border-radius:8px}
+.ct-prox li.hoy{border-left-color:var(--amber)}
+.ct-prox li.venc{border-left-color:var(--err)}
+.ct-prox li.venc small{color:var(--err)}
+.ct-prox small{display:block;font-size:var(--fs-12);color:var(--mu)}
+.ct-nueva{margin:0 0 14px;border:1px solid var(--bd);border-radius:10px;background:var(--bg)}
+.ct-nueva>summary{cursor:pointer;padding:10px 14px;font-size:var(--fs-14);font-weight:700;color:var(--acc)}
+.ct-nueva>div{padding:4px 14px 14px}
+.ct-nueva select{display:block;width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:var(--fs-16);background:var(--surface);color:var(--ink)}
+.ct-linea{list-style:none;margin:0;padding:0 0 0 14px;border-left:1px solid var(--bd)}
+.ct-linea li{position:relative;padding:4px 0 12px}
+.ct-linea li::before{content:"";position:absolute;left:-18px;top:11px;width:7px;height:7px;border-radius:50%;background:var(--bd)}
+.ct-lcab{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:var(--fs-13)}
+.ct-lcab small{color:var(--mu);font-size:var(--fs-12)}
+.ct-linea p{margin:3px 0 0;font-size:var(--fs-14);white-space:pre-line;overflow-wrap:anywhere}
+.ct-linea .ct-lprox{font-size:var(--fs-13);color:var(--ink-soft)}
+.ct-tot{border-collapse:collapse;margin:0 0 4px;font-size:var(--fs-14);min-width:260px}
+.ct-tot th,.ct-tot td{padding:5px 12px 5px 0;border-bottom:1px solid var(--bds);text-align:left}
+.ct-tot th{font-size:var(--fs-12);color:var(--mu);font-weight:600}
+.ct-tot .num{text-align:right;font-variant-numeric:tabular-nums}
+
 /* Franja de estado de los certificados, arriba de la lista de aportes. */
 .cert-estado{border-left:3px solid var(--g);padding:10px 14px;margin:0 0 16px;background:var(--surface);font-size:var(--fs-14);max-width:80ch}
 .cert-estado:empty{display:none}
@@ -24651,7 +25850,9 @@ textarea { font-size: 16px }
   .pn-barra .pn-menu.copy{display:inline-flex}
   .pn-barra{padding:10px 16px;gap:10px}
   .pn-quien{display:none}
-  #buscador button{display:none}
+  .bus-atajo{display:none}
+  .bus-pop{position:fixed;left:8px;right:8px;top:62px;max-height:calc(100vh - 80px)}
+  .ct-dupf,.ct-prox li{grid-template-columns:minmax(0,1fr)}
   .pn-cont{padding:20px 16px 72px}
   .pn-cab{grid-template-columns:minmax(0,1fr)}
   .pn-cab-acc{grid-column:1;grid-row:auto;justify-content:flex-start;margin-top:12px}
@@ -24705,7 +25906,8 @@ textarea { font-size: 16px }
   <a class="pn-it" href="#alianzas/socialfest" data-pn-ir="alianzas/socialfest">Social Fest<span class="pn-n" data-pn-n="alianzas/socialfest"></span></a>
 </div>
 <div class="pn-grupo">
-  <p class="pn-gt">Personas</p>
+  <p class="pn-gt">Personas y organizaciones</p>
+  <a class="pn-it" href="#personas/contactos" data-pn-ir="personas/contactos">Contactos<span class="pn-n" data-pn-n="personas/contactos"></span></a>
   <a class="pn-it" href="#personas/voluntariado" data-pn-ir="personas/voluntariado">Voluntariado<span class="pn-n" data-pn-n="personas/voluntariado"></span></a>
   <a class="pn-it" href="#personas/ingenieros" data-pn-ir="personas/ingenieros">Ingenieros<span class="pn-n" data-pn-n="personas/ingenieros"></span></a>
 </div>
@@ -24721,6 +25923,7 @@ textarea { font-size: 16px }
 <div class="pn-grupo">
   <p class="pn-gt">Sistema</p>
   <a class="pn-it" href="#sistema/salud" data-pn-ir="sistema/salud">Salud<span class="pn-n" data-pn-n="sistema/salud"></span></a>
+  <a class="pn-it" href="#sistema/correos" data-pn-ir="sistema/correos">Correos<span class="pn-n" data-pn-n="sistema/correos"></span></a>
 </div>
 <!-- Las otras pantallas internas, que viven fuera de este panel. -->
 <div class="pn-grupo">
@@ -24735,19 +25938,20 @@ textarea { font-size: 16px }
 <div class="pn-cuerpo">
 <header class="pn-barra">
   <button type="button" class="copy pn-menu" id="pn-menu" aria-controls="pn-lado" aria-expanded="false">Menú</button>
-  <!-- El buscador: una casilla, arriba de todo. Busca al enviar, no al teclear
-       (una búsqueda por teléfono son tres escaneos de tabla). -->
+  <!-- El buscador (Fase 4): busca mientras se escribe, en el servidor y sin
+       tildes, y abre cada resultado en su cajón. «/» o Ctrl/Cmd+K lo enfocan. -->
   <form id="buscador" role="search">
-    <label for="q" class="pn-oculto">Buscar</label>
-    <input id="q" type="search" autocomplete="off" spellcheck="false"
-           placeholder="Buscar un número (GG-, CV-, IV-, CD-…) o un teléfono">
-    <button type="submit" class="copy">Buscar</button>
+    <label for="q" class="pn-oculto">Buscar en el panel</label>
+    <input id="q" type="search" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false"
+           aria-controls="busca-res" aria-autocomplete="list"
+           placeholder="Buscar persona, correo, teléfono, documento o número (GG-, MB-, CV-…)">
+    <kbd class="bus-atajo" aria-hidden="true">/</kbd>
+    <div id="busca-res" class="bus-pop" role="listbox" aria-label="Resultados de la búsqueda" hidden></div>
   </form>
   <p class="pn-quien" id="quien">Cargando…</p>
 </header>
 
 <main class="pn-cont" id="pn-contenido" tabindex="-1">
-<div id="busca-res"></div>
 <!-- La cabecera de la sección abierta. La escribe el panel con lo que dice
      VISTAS (adminJS): área, título, una línea de propósito y su acción. -->
 <header class="pn-cab" id="pn-cab">
@@ -24916,7 +26120,7 @@ textarea { font-size: 16px }
      llegó desde el evento) e Ingenieros (las postulaciones al triaje). Cambia
      el filtro, no la tabla: así una fila no puede verse distinta según por
      dónde se entró. -->
-<section class="pn-vista" data-vista="alianzas/red" data-alias="alianzas/socialfest personas/ingenieros" id="sec-entrar" hidden>
+<section class="pn-vista" data-vista="alianzas/red" data-alias="personas/ingenieros" id="sec-entrar" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p><strong>Ninguna de estas solicitudes es un alta.</strong> La fundación entra con el convenio de cooperación después de la visita de contexto, y la empresa con la firma del Convenio Marco. Aceptar quiere decir «seguimos», no «ya está publicado».</p>
 <p>Algunos pasos le escriben a la fundación: Aceptar, Visita hecha, Iniciar convenio y Marcar vinculada. Antes de confirmar verás el correo que sale, a quién y qué dice.</p>
@@ -24935,6 +26139,16 @@ textarea { font-size: 16px }
 </table></div>
 </section>
 
+<!-- SOCIAL FEST (Fase 4): ya no es la bandeja de Red filtrada sino la lista de
+     contactos que llegaron del evento, con su puerta, su estado en la red y su
+     próximo paso: el seguimiento después del evento vive en cada ficha. -->
+<section class="pn-vista" data-vista="alianzas/socialfest" id="sec-socialfest" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Cada fila es alguien que llegó por la página del evento —empresa, fundación o profesional— con su <strong>ficha</strong>. Ábrela para anotar la conversación (llamada, WhatsApp, correo desde Gmail, reunión) y el <strong>próximo paso con fecha</strong>: ese día sale en «Hoy». Aceptar o mover su solicitud sigue siendo en Red.</p>
+</div></details>
+<div id="tb-socialfest" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
 <section class="pn-vista" data-vista="alianzas/ofrecimientos" id="sec-ofrecimientos" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p>El acuse les pidió <strong>no comprar todavía</strong>, así que conviene responder antes de que lo hagan: el inventario cambia todos los días.</p>
@@ -24948,6 +26162,18 @@ textarea { font-size: 16px }
 </section>
 
 <!-- ============================ PERSONAS ============================ -->
+<!-- ===================== PERSONAS Y ORGANIZACIONES ===================== -->
+<!-- FASE 4 (oct 2026). La lista de contactos y su ficha se arman con lo que la
+     base ya sabe: no es una tabla aparte que se pueda desfasar. -->
+<section class="pn-vista" data-vista="personas/contactos" id="sec-contactos" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p><strong>Una ficha por persona u organización</strong>, armada con lo que ya está en la base: lo que donó (los totales por año suman solo dinero confirmado), su carnet, sus certificados, sus solicitudes en la red y el convenio, las jornadas en que estuvo, si llegó por Social Fest, los correos que le mandó el sistema y los movimientos del banco que explican sus aportes.</p>
+<p><strong>Qué es «la misma» ficha.</strong> Todo lo que tiene el mismo correo es la misma ficha. Lo que solo comparte documento, teléfono o nombre completo sale como <strong>posible duplicado</strong>, y lo decides tú en la ficha: «Unir» o «No son la misma». El panel nunca une solo, y la decisión se puede deshacer.</p>
+<p><strong>Notas y contacto.</strong> En cada ficha se anota una nota o un contacto —llamada, WhatsApp, correo desde Gmail, reunión— con un próximo paso opcional. El próximo paso con fecha sale en «Hoy» ese día, y vencido sube a Urgente. Todo es interno: el panel no le escribe a nadie, y las notas no salen en ninguna pantalla pública.</p>
+</div></details>
+<div id="tb-contactos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
 <section class="pn-vista" data-vista="personas/voluntariado" id="sec-jornadas" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p><strong>Sin sesión de Marco no hay jornada en terreno:</strong> el panel no deja marcar como realizada una jornada de Impact Journey, En terreno o De emergencia sin ella. En Impact Journey y En terreno, además, <strong>solo se anota a quien tiene su verificación completa</strong> (en Red), y nadie a mano.</p>
@@ -25053,6 +26279,17 @@ sabes que está mal.</p>
 <p>Si algo de «Operación» está mal, a las 9 de la mañana llega un correo «Operación ·» al buzón de alianzas. Qué hacer con cada cosa está en ops/runbook-incidentes.md.</p>
 </div></details>
 <div id="salud"><p class="mu">Cargando…</p></div>
+</section>
+
+<!-- SISTEMA › CORREOS (Fase 4). La tabla «correos», que hasta aquí no tenía
+     pantalla: lo que no salió se reenvía (con la vista previa) o se marca
+     resuelto a mano. -->
+<section class="pn-vista" data-vista="sistema/correos" id="sec-correos" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p><strong>Cada correo que el sitio intenta mandar queda anotado</strong>: a quién, con qué asunto y qué pasó. «Enviado» es que Resend lo aceptó; «Falló», que respondió con un error; «Sin cupo», que se agotó el presupuesto del día; «Simulado», que falta la llave del servicio y no salió nada. Los rebotes no se registran: Resend no le avisa al sitio.</p>
+<p><strong>El cuerpo no se guarda</strong> (Ley 1581). Para reenviar, el panel arma el correo otra vez con su plantilla y los datos de hoy, te lo enseña, y solo sale si va a la misma dirección. Lo que no se puede volver a armar —avisos internos, resúmenes— se marca <strong>resuelto a mano</strong>, con una nota de cómo se resolvió.</p>
+</div></details>
+<div id="tb-correos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 </main>
@@ -25285,11 +26522,18 @@ function cajonAbrir(o){
   (foco || document.getElementById("pn-cajon-t")).focus();
 }
 function cajonCuerpo(html){ formaDevolver(); var b = document.getElementById("pn-cajon-cuerpo"); if (b) b.innerHTML = html; }
-function cajonPie(html){ var p = document.getElementById("pn-cajon-pie"); if (p) p.innerHTML = html || ""; }
+function cajonPie(html){
+  var p = document.getElementById("pn-cajon-pie"); if (!p) return;
+  html = html || "";
+  /* Lo que se abrió desde una ficha de contacto vuelve a ella (Fase 4). */
+  if (CT_VOLVER && CT_FICHA && html.indexOf("data-ct-volver") < 0) html = '<button type="button" class="pn-b2" data-ct-volver="1">Volver a la ficha</button>' + html;
+  p.innerHTML = html;
+}
 function cajonCerrar(){
   var c = document.getElementById("pn-cajon"); if (!c || c.hidden) return;
   c.hidden = true; document.getElementById("pn-velo").hidden = true; CAJON.abierto = false;
   document.body.style.overflow = "";
+  CT_VOLVER = false; CT_FICHA = null;
   cajonCuerpo(""); cajonPie("");
   CASO_ABIERTO = null;
   if (CAJON.volver && CAJON.volver.focus && document.contains(CAJON.volver)) CAJON.volver.focus();
@@ -26257,7 +27501,8 @@ var COLA_ES = {
   correos_sin_cupo: "Avisos que no salieron por cupo",
   jornadas_sin_cerrar: "Jornadas realizadas sin cerrar",
   banco_sin_conciliar: "Movimientos del banco sin conciliar",
-  extracto_por_importar: "Importar el extracto del mes"
+  extracto_por_importar: "Importar el extracto del mes",
+  seguimientos_pendientes: "Seguimientos para hoy y vencidos"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -26274,52 +27519,8 @@ function antiguedad(d){
   return "hace " + d + " días";
 }
 
-/* EL BUSCADOR. Busca AL ENVIAR y no al teclear, a propósito: una búsqueda por
-   teléfono son tres escaneos de tabla, y dispararlos en cada pulsación es como
-   se construye una pantalla lenta sin darse cuenta. Además un consecutivo se
-   pega entero de una vez, así que teclear no es la forma en que este campo se
-   usa de verdad. */
-function pintarBusqueda(d){
-  var caja = document.getElementById("busca-res"); if (!caja) return;
-  if (d.tipo === "corto"){ caja.innerHTML = ""; return; }
-  if (d.tipo === "no_reconocido"){
-    caja.innerHTML = '<p class="bus-nada">No reconozco «' + esc(d.q) + '». '
-      + 'Se busca por número completo —CV, GG, IV, CD, AE o MB— o por un teléfono.</p>';
-    return;
-  }
-  var l = d.resultados || [];
-  if (!l.length){
-    caja.innerHTML = '<p class="bus-nada">Nada con «' + esc(d.q) + '»'
-      + (d.tipo === "telefono" ? ": ningún caso, aporte ni postulación con ese teléfono." : ".") + '</p>';
-    return;
-  }
-  caja.innerHTML = '<div class="bus-caja">' + l.map(function(x){
-    return '<div class="bus-fila"><span class="bus-q">' + esc(x.clase) + " " + esc(x.numero)
-      + "<small>"
-      + [x.nombre, x.sector, x.estado, x.cuando].filter(Boolean).map(esc).join(" · ")
-      + "</small></span>"
-      + (x.destino ? '<a class="dec-ir" href="' + esc(x.destino) + '">Abrir</a>'
-                   : '<span class="dec-ir dec-sinir">sin bandeja</span>')
-      + "</div>";
-  }).join("") + "</div>";
-}
-
-function buscar(){
-  var q = (document.getElementById("q") || {}).value || "";
-  var caja = document.getElementById("busca-res");
-  if (!q.trim()){ caja.innerHTML = ""; return; }
-  caja.innerHTML = '<p class="bus-nada">Buscando…</p>';
-  fetch("/api/admin/buscar?q=" + encodeURIComponent(q.trim()))
-    .then(function(r){ return r.json(); })
-    .then(pintarBusqueda)
-    .catch(function(){
-      caja.innerHTML = '<p class="bus-nada">No se pudo buscar. Revisa la conexión.</p>';
-    });
-}
-
-document.addEventListener("submit", function(e){
-  if (e.target && e.target.id === "buscador"){ e.preventDefault(); buscar(); }
-});
+/* EL BUSCADOR de la barra vive con la Fase 4 (más abajo): busca mientras se
+   escribe, en el servidor y sin tildes, y abre cada resultado en su cajón. */
 
 /* ==== LAS SECCIONES Y SUS DIRECCIONES (Fase 1 del panel, oct 2026) ====
    Antes: ocho pestañas, cada una una página larga con todas sus secciones
@@ -26363,10 +27564,12 @@ var VISTAS = {
   "alianzas/ofrecimientos": { area: "Alianzas", titulo: "Ofrecimientos en especie",
     linea: "Lo que llega por el formulario de la brigada para donar en especie." },
   "alianzas/socialfest": { area: "Alianzas", titulo: "Social Fest",
-    linea: "Empresas, fundaciones y profesionales que llegaron desde Social Fest 2026." },
-  "personas/voluntariado": { area: "Personas", titulo: "Voluntariado",
+    linea: "Empresas, fundaciones y profesionales que llegaron desde Social Fest 2026, cada uno con su ficha, sus notas y su próximo paso." },
+  "personas/contactos": { area: "Personas y organizaciones", titulo: "Contactos",
+    linea: "Cada persona y organización que la base conoce, con todo lo suyo en una ficha: donaciones, carnet, red, voluntariado, correos y notas." },
+  "personas/voluntariado": { area: "Personas y organizaciones", titulo: "Voluntariado",
     linea: "Jornadas de voluntariado, de la convocatoria al cierre.", accion: ["Nueva jornada", "j-nueva"] },
-  "personas/ingenieros": { area: "Personas", titulo: "Ingenieros",
+  "personas/ingenieros": { area: "Personas y organizaciones", titulo: "Ingenieros",
     linea: "Quienes se postulan al triaje de casas, y la verificación de su matrícula en el COPNIA." },
   "mmc/casas": { area: "Mira Mi Casa", titulo: "Casas",
     linea: "Los casos de vivienda, con su contacto y su dirección para ir a visitar." },
@@ -26375,13 +27578,14 @@ var VISTAS = {
   "entregas": { area: "Entregas", titulo: "Actas de entrega",
     linea: "Se registra la transcripción del acta, se suben sus fotos y se publica.", accion: ["Registrar una entrega", "e-form"] },
   "sistema/salud": { area: "Sistema", titulo: "Salud",
-    linea: "Dónde se cae la donación, si el cobro y el correo dan señales de vida, y la operación diaria." }
+    linea: "Dónde se cae la donación, si el cobro y el correo dan señales de vida, y la operación diaria." },
+  "sistema/correos": { area: "Sistema", titulo: "Correos",
+    linea: "Todo lo que el sitio intentó mandar, con lo que pasó. Lo que no salió se reenvía desde aquí, con la vista previa primero." }
 };
 /* Las secciones que COMPARTEN la bandeja de inscripciones, y el filtro que
    cada una le pone. */
 var FILTRO_VISTA = {
   "alianzas/red": { tipo: "", origen: "" },
-  "alianzas/socialfest": { tipo: "", origen: "socialfest-2026" },
   "personas/ingenieros": { tipo: "ingeniero", origen: "" }
 };
 /* Las direcciones de las pestañas de antes. */
@@ -26430,6 +27634,7 @@ function mostrar(ruta){
   VISTA = vista;
   pintarCabecera();
   filtrarInscripciones(vista, ruta.filtro);
+  filtrarFase4(vista, ruta.filtro);
   sec.querySelectorAll("tbody[id],[data-bandeja]").forEach(function(t){ pedir(t.id); });
   cerrarMenu();
   document.title = VISTAS[vista].titulo + " · Panel · Give&Grow";
@@ -26451,6 +27656,27 @@ function filtrarInscripciones(vista, f){
   if (INSC_TIPO === tipo && INSC_ORIGEN === base.origen && INSC_PEND === pend) return;
   INSC_TIPO = tipo; INSC_ORIGEN = base.origen; INSC_PEND = pend; INSC_DESDE = 0;
   if (PEDIDAS["i-filas"]) cargarInscripciones();
+}
+
+/* Fase 4: «#personas/contactos/<clave>» abre esa ficha; «#sistema/correos/por_atender»
+   y «#personas/contactos/vencidos» llegan con el filtro puesto (son los «Ver
+   todo» de sus colas en «Hoy»). */
+function filtrarFase4(vista, f){
+  if (!f) return;
+  if (vista === "sistema/correos"){
+    TB_CORREOS.f.estado = f === "sin_destino" ? "sin_destino" : "por_atender"; TB_CORREOS.pagina = 1;
+    if (TB_CORREOS.armada){ tablaBarra(TB_CORREOS); tablaRefrescar(TB_CORREOS); }
+    return;
+  }
+  if (vista === "personas/contactos"){
+    if (f === "vencidos"){
+      TB_CONTACTOS.f.seg = "vencidos"; TB_CONTACTOS.pagina = 1;
+      if (TB_CONTACTOS.armada && TB_CONTACTOS.todas){ tablaBarra(TB_CONTACTOS); tablaRefrescar(TB_CONTACTOS); }
+      return;
+    }
+    var k = ""; try { k = decodeURIComponent(f); } catch (e) { k = f; }
+    abrirContacto(k);
+  }
 }
 
 /* La barra lateral en el teléfono. */
@@ -26495,7 +27721,7 @@ var COLA_MOD = {
   transferencias_sin_verificar: "finanzas/transferencias",
   certificados_por_emitir: "finanzas/aportes",
   certificados_sin_firmar: "finanzas/aportes",
-  correos_fallidos: "sistema/salud",
+  correos_fallidos: "sistema/correos",
   entregas_en_borrador: "entregas",
   casos_sin_evaluar: "mmc/casas",
   espera_sin_correo: "mmc/casas",
@@ -26506,7 +27732,7 @@ var COLA_MOD = {
   paypal_sin_casa: "finanzas/paypal",
   ipn_por_registrar: "finanzas/paypal",
   suscripciones_sin_aprobar: "finanzas/membresias",
-  correos_sin_buzon: "sistema/salud",
+  correos_sin_buzon: "sistema/correos",
   casos_respondieron: "mmc/casas",
   terreno_sin_atender: "mmc/inspecciones",
   visitadas_sin_materiales: "entregas",
@@ -26514,16 +27740,18 @@ var COLA_MOD = {
   actas_sin_donante: "entregas",
   concepto_sin_avisar: "mmc/casas",
   certificados_en_revision: "finanzas/aportes",
-  correos_sin_cupo: "sistema/salud",
+  correos_sin_cupo: "sistema/correos",
   jornadas_sin_cerrar: "personas/voluntariado",
   vencimientos_por_atender: "finanzas/vencimientos",
   banco_sin_conciliar: "finanzas/conciliar",
-  extracto_por_importar: "finanzas/banco"
+  extracto_por_importar: "finanzas/banco",
+  seguimientos_pendientes: "personas/contactos"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
 var COLA_FILTRO = { fundaciones_sin_respuesta: "respuesta", empresas_sin_respuesta: "respuesta",
-  apadrinamientos_sin_respuesta: "respuesta", voluntarios_sin_respuesta: "respuesta", ingenieros_sin_verificar: "matricula" };
+  apadrinamientos_sin_respuesta: "respuesta", voluntarios_sin_respuesta: "respuesta", ingenieros_sin_verificar: "matricula",
+  correos_fallidos: "por_atender", correos_sin_cupo: "por_atender", correos_sin_buzon: "sin_destino", seguimientos_pendientes: "vencidos" };
 var DESTINO_ES = { "/triaje": "Abrir el triaje", "/admin/ruta": "Abrir la ruta de visitas", "/firma": "Abrir la firma" };
 
 /* LAS INSIGNIAS salen de la MISMA lista que pinta «Hoy»: si un día cambia la
@@ -26635,6 +27863,13 @@ function accionesItem(clave, it){
     return '<button type="button" class="pn-b1" data-hoy="banco" data-id="' + id + '">Conciliar…</button>';
   if (clave === "extracto_por_importar")
     return '<button type="button" class="pn-b1" data-hoy="importar" data-id="' + id + '">Importar…</button>';
+  if (clave === "correos_fallidos" || clave === "correos_sin_cupo")
+    return '<button type="button" class="pn-b1" data-hoy="reenviar" data-id="' + id + '">Reenviar…</button>' +
+      '<button type="button" class="pn-b2" data-hoy="correo" data-id="' + id + '">Ver</button>';
+  if (clave === "seguimientos_pendientes")
+    return '<button type="button" class="pn-b1" data-hoy="seg-hecho" data-id="' + id + '" data-nombre="' + esc(it.detalle || "") + '">Hecho</button>' +
+      '<button type="button" class="pn-b2" data-hoy="seg-posponer" data-id="' + id + '" data-fecha="' + esc(it.fecha || "") + '" data-nombre="' + esc(it.detalle || "") + '">Posponer…</button>' +
+      (it.clave ? '<button type="button" class="pn-b2" data-hoy="ficha" data-clave="' + esc(it.clave) + '">Ficha</button>' : "");
   return "";
 }
 function cartaCola(c){
@@ -31888,7 +33123,703 @@ function bloqueBanco(b, nom){
   return h;
 }
 
+/* ==== FASE 4 DEL PANEL: CONTACTOS, SEGUIMIENTOS Y CORREOS (oct 2026) ====
+   · Contactos: la lista de personas y organizaciones que la base conoce, y la
+     FICHA de cada una en el cajón ancho: donaciones (con totales por año, solo
+     lo confirmado), carnet, certificados, la red, el voluntariado, Social Fest,
+     los correos que se le mandaron, el banco, y las notas.
+   · Seguimientos: notas internas y registro de contacto (llamada, WhatsApp,
+     correo desde Gmail, reunión) con un próximo paso que sale en «Hoy».
+     El panel NO escribe correos a nadie: «Abrir en Gmail» y «WhatsApp» abren
+     TU correo o tu WhatsApp, y aquí solo queda el registro de que pasó.
+   · Correos: la tabla de todo lo que el sistema mandó, con «Reenviar» para lo
+     que no salió (vista previa primero) y «Resuelto a mano». */
+var TIPO_SEG_ES = { nota: "Nota", llamada: "Llamada", whatsapp: "WhatsApp", correo: "Correo desde Gmail", reunion: "Reunión", otro: "Otro" };
+var PUERTA_ES = { empresa: "Empresa", fundacion: "Fundación", profesional: "Profesional" };
+var ESTADO_INSC_ES = { nueva: "Nueva, sin responder", en_revision: "En revisión", aceptada: "Aceptada", visitada: "Visitada",
+  convenio: "En convenio", vinculada: "Vinculada", archivada: "Archivada", rechazada: "Rechazada" };
+var CT_ETIQ = { donante: "Donante", miembro: "Miembro", honor: "Honor", fundacion: "Fundación", empresa: "Empresa",
+  voluntario: "Voluntario", ingeniero: "Ingeniero", padrino: "Padrino", especie: "Ofrece en especie", socialfest: "Social Fest",
+  sin_pago: "Intento sin pagar" };
+var CT_DATOS = null, CT_FICHA = null;
+
+function chipsEtiquetas(l){
+  return (l || []).map(function(e){ return '<span class="ct-chip' + (e === "socialfest" ? " sf" : e === "sin_pago" ? " mu" : "") + '">' + esc(CT_ETIQ[e] || e) + "</span>"; }).join(" ");
+}
+function proximoHTML(p, hoy){
+  if (!p) return '<span class="mu">—</span>';
+  var venc = p.fecha < (hoy || hoyCO()), es = p.fecha === (hoy || hoyCO());
+  return '<span class="' + (venc ? "tb-mal" : es ? "ct-hoy" : "") + '">' + esc(fechaCorta(p.fecha)) + (venc ? " · vencido" : es ? " · hoy" : "") +
+    "</span>" + (p.texto ? "<small>" + esc(p.texto) + "</small>" : "");
+}
+function textoContacto(c){ return [c.nombre, (c.otros_nombres || []).join(" "), c.email, c.tel, (c.etiquetas || []).map(function(e){ return CT_ETIQ[e] || e; }).join(" ")].join(" "); }
+function filtroSeguimiento(c, v){
+  if (v === "con") return !!c.prox;
+  if (v === "vencidos") return !!c.prox && c.prox.fecha <= hoyCO();
+  if (v === "sin") return !c.prox;
+  return true;
+}
+
+var TB_CONTACTOS = tablaNueva({ id: "tb-contactos", titulo: "Contactos", orden: "ultima", dir: "desc",
+  buscar: "Nombre, correo, teléfono o etiqueta",
+  texto: textoContacto,
+  filtros: [
+    { k: "etiqueta", t: "Tipo", opciones: function(){ return opcionesDe(CT_ETIQ); }, prueba: function(c, v){ return (c.etiquetas || []).indexOf(v) >= 0; } },
+    { k: "clase", t: "Persona u organización", opciones: [["persona", "Personas"], ["org", "Organizaciones"]],
+      prueba: function(c, v){ return v === "org" ? !!c.org : !c.org; } },
+    { k: "seg", t: "Próximo paso", opciones: [["con", "Con próximo paso"], ["vencidos", "Para hoy o vencidos"], ["sin", "Sin próximo paso"]], prueba: filtroSeguimiento },
+    { k: "dup", t: "Duplicados", opciones: [["si", "Con posibles duplicados"]], prueba: function(c){ return c.dup > 0; } }
+  ],
+  columnas: [
+    { k: "nombre", t: "Nombre", valor: function(c){ return c.nombre; }, celda: function(c){
+      return "<strong>" + esc(c.nombre) + "</strong><small>" + esc(c.email || c.tel || "") +
+        (c.emails > 1 ? " · " + c.emails + " correos" : "") + "</small>"; } },
+    { k: "clase", t: "Es", valor: function(c){ return c.org ? "organización" : "persona"; }, celda: function(c){ return c.org ? "Organización" : "Persona"; } },
+    { k: "etiquetas", t: "Relación", orden: false, celda: function(c){ return chipsEtiquetas(c.etiquetas); } },
+    { k: "ultima", t: "Último movimiento", dir: "desc", nw: true, valor: function(c){ return c.ultima; }, celda: function(c){ return esc(c.ultima ? fechaCorta(c.ultima) : "—"); } },
+    { k: "prox", t: "Próximo paso", valor: function(c){ return c.prox ? c.prox.fecha : ""; }, celda: function(c){ return proximoHTML(c.prox); } },
+    { k: "dup", t: "", orden: false, celda: function(c){ return c.dup ? '<span class="ct-dup">posible duplicado</span>' : ""; } }
+  ],
+  nota: function(t){
+    var o = 0; t.vista.forEach(function(c){ if (c.org) o++; });
+    return numCO(t.vista.length - o) + " personas y " + numCO(o) + " organizaciones en el filtro. Una ficha junta todo lo que tiene el mismo correo; lo que solo comparte documento, teléfono o nombre sale como «posible duplicado» y lo decides tú.";
+  },
+  vacio: { titulo: "Todavía no hay contactos.", texto: "Cada donante, inscripción de la red y voluntario de una jornada aparece aquí con su ficha." },
+  etiquetaFila: function(c){ return "Abrir la ficha de " + c.nombre; },
+  abrir: function(c){ abrirContacto(c.clave); }
+});
+var TB_SF = tablaNueva({ id: "tb-socialfest", titulo: "Social Fest", orden: "ultima", dir: "desc",
+  buscar: "Nombre, correo o teléfono",
+  texto: textoContacto,
+  filtros: [
+    { k: "puerta", t: "Puerta", opciones: opcionesDe(PUERTA_ES), prueba: function(c, v){ return c.sf && c.sf.puerta === v; } },
+    { k: "estado", t: "Estado en la red", opciones: opcionesDe(ESTADO_INSC_ES), prueba: function(c, v){ return c.sf && c.sf.estado === v; } },
+    { k: "seg", t: "Próximo paso", opciones: [["con", "Con próximo paso"], ["vencidos", "Para hoy o vencidos"], ["sin", "Sin próximo paso"]], prueba: filtroSeguimiento }
+  ],
+  columnas: [
+    { k: "nombre", t: "Quién", valor: function(c){ return c.nombre; }, celda: function(c){
+      return "<strong>" + esc(c.nombre) + "</strong><small>" + esc(c.email || c.tel || "") + "</small>"; } },
+    { k: "puerta", t: "Puerta", valor: function(c){ return c.sf ? c.sf.puerta : ""; }, celda: function(c){ return esc(c.sf ? (PUERTA_ES[c.sf.puerta] || c.sf.puerta || "—") : "—"); } },
+    { k: "estado", t: "En la red", valor: function(c){ return c.sf ? c.sf.estado : ""; }, celda: function(c){
+      return c.sf ? esc(ESTADO_INSC_ES[c.sf.estado] || c.sf.estado) : "—"; } },
+    { k: "etiquetas", t: "Relación", orden: false, celda: function(c){ return chipsEtiquetas((c.etiquetas || []).filter(function(e){ return e !== "socialfest"; })); } },
+    { k: "ultima", t: "Último movimiento", dir: "desc", nw: true, valor: function(c){ return c.ultima; }, celda: function(c){ return esc(c.ultima ? fechaCorta(c.ultima) : "—"); } },
+    { k: "prox", t: "Próximo paso", valor: function(c){ return c.prox ? c.prox.fecha : ""; }, celda: function(c){ return proximoHTML(c.prox); } }
+  ],
+  nota: function(t){
+    var sin = 0; t.vista.forEach(function(c){ if (!c.prox) sin++; });
+    return sin ? sin + (sin === 1 ? " no tiene" : " no tienen") + " próximo paso anotado: el seguimiento después del evento vive en su ficha." : "Todos tienen un próximo paso anotado.";
+  },
+  aviso: function(t){
+    var p = { empresa: 0, fundacion: 0, profesional: 0 };
+    (t.todas || []).forEach(function(c){ if (c.sf && p[c.sf.puerta] != null) p[c.sf.puerta]++; });
+    return "<strong>Social Fest 2026</strong> · " + p.empresa + (p.empresa === 1 ? " empresa · " : " empresas · ") + p.fundacion +
+      (p.fundacion === 1 ? " fundación · " : " fundaciones · ") + p.profesional + (p.profesional === 1 ? " profesional" : " profesionales") +
+      ' · <a href="#alianzas/red">ver sus solicitudes en Red</a>';
+  },
+  vacio: { titulo: "Nadie llegó todavía desde Social Fest.", texto: "Lo que entre por la página del evento (empresas, fundaciones, profesionales) aparece aquí con su ficha." },
+  etiquetaFila: function(c){ return "Abrir la ficha de " + c.nombre; },
+  abrir: function(c){ abrirContacto(c.clave); }
+});
+function pedirContactos(){
+  return pedirJSON("/api/admin/contactos", ["tb-contactos-cuerpo", "tb-socialfest-cuerpo"]).then(function(d){
+    CT_DATOS = d;
+    if (d.etiquetas) CT_ETIQ = d.etiquetas;
+    if (TB_CONTACTOS.armada){ TB_CONTACTOS.todas = d.contactos || []; tablaBarra(TB_CONTACTOS); tablaRefrescar(TB_CONTACTOS); }
+    if (TB_SF.armada){ TB_SF.todas = (d.contactos || []).filter(function(c){ return (c.etiquetas || []).indexOf("socialfest") >= 0; }); tablaRefrescar(TB_SF); }
+    return d;
+  });
+}
+function cargarContactos(){
+  if (!TB_CONTACTOS.armada) tablaArmar(TB_CONTACTOS, document.getElementById("tb-contactos"));
+  return pedirContactos();
+}
+function cargarSocialFest(){
+  if (!TB_SF.armada) tablaArmar(TB_SF, document.getElementById("tb-socialfest"));
+  return pedirContactos();
+}
+/* Después de escribir algo en una ficha: la lista y «Hoy» dicen lo nuevo. */
+function refrescarContactos(){
+  if (TB_CONTACTOS.armada || TB_SF.armada) pedirContactos();
+  cargarSalud();
+}
+
+/* ---- LA FICHA ---- */
+function abrirContacto(clave, op){
+  op = op || {};
+  CT_FICHA = { clave: clave, resaltar: op.inscripcion || null };
+  cajonAbrir({ ancho: true, ey: "Contacto", titulo: "Cargando la ficha…", cuerpo: '<p class="mu">Juntando lo que la base sabe…</p>' });
+  fetch("/api/admin/contacto?k=" + encodeURIComponent(clave)).then(conEstado).then(function(r){
+    if (!CAJON.abierto || !CT_FICHA || CT_FICHA.clave !== clave) return;
+    if (r.http !== 200 || !r.d || r.d.error){
+      document.getElementById("pn-cajon-t").textContent = "Ficha no encontrada";
+      cajonCuerpo('<p class="pn-error">' + esc((r.d && (r.d.ayuda || r.d.error)) || "No se pudo cargar (HTTP " + r.http + ").") + "</p>");
+      return;
+    }
+    CT_FICHA.d = r.d;
+    pintarContacto(r.d);
+  }).catch(function(){ cajonCuerpo('<p class="pn-error">No se pudo cargar: revisa la conexión.</p>'); });
+}
+function recargarFicha(){ if (CT_FICHA && CAJON.abierto) abrirContacto(CT_FICHA.clave, { inscripcion: CT_FICHA.resaltar }); }
+function enlacesContacto(d){
+  var l = [];
+  (d.emails || []).forEach(function(e){ l.push('<a href="mailto:' + esc(e) + '">' + esc(e) + "</a>"); });
+  return l.join("<br>");
+}
+function telsContacto(d){
+  return (d.telefonos || []).map(function(t){
+    var w = t.length === 10 && t.charAt(0) === "3" ? "57" + t : t;
+    return esc(t) + (w.length >= 11 && w.length <= 15 ? ' · <a href="https://wa.me/' + esc(w) + '" target="_blank" rel="noopener">WhatsApp</a>' : "");
+  }).join("<br>");
+}
+function seccionFicha(titulo, cuerpo, n){ return '<p class="pn-h3">' + esc(titulo) + (n != null ? " · " + n : "") + "</p>" + cuerpo; }
+function pintarContacto(d){
+  var hoy = d.hoy || hoyCO();
+  document.getElementById("pn-cajon-ey").textContent = d.org ? "Organización" : "Persona";
+  document.getElementById("pn-cajon-t").textContent = d.nombre;
+  var h = '<div class="ct-cab">' + chipsEtiquetas(d.etiquetas) + "</div>";
+  h += ficha([
+    ["Correo", enlacesContacto(d) + ((d.emails || []).length ? "<small>Se abre en tu correo: el panel no le escribe a nadie.</small>" : "")],
+    ["Teléfono", telsContacto(d)],
+    ["Documento", (d.documentos || []).map(esc).join("<br>")],
+    ["También aparece como", (d.nombres || []).filter(function(n){ return n !== d.nombre; }).map(esc).join("<br>")],
+    ["Social Fest", d.sf ? esc((PUERTA_ES[d.sf.puerta] || d.sf.puerta || "sin puerta") + " · " + (ESTADO_INSC_ES[d.sf.estado] || d.sf.estado)) : ""],
+    ["Último movimiento", esc(d.ultima ? fechaCorta(d.ultima) : "—")]
+  ]);
+
+  /* Duplicados primero: si esta ficha es la mitad de otra, todo lo de abajo
+     está incompleto hasta que se decida. */
+  if ((d.duplicados || []).length){
+    h += seccionFicha("Posibles duplicados", '<p class="ct-ayuda">Comparten algo con esta ficha. El panel no une solo: dos hermanos comparten teléfono. Decide tú; la decisión queda guardada y no se vuelve a preguntar.</p>' +
+      d.duplicados.map(function(x){
+        var m = x.motivos.map(function(y){ return { documento: "mismo documento", telefono: "mismo teléfono", nombre: "mismo nombre" }[y.motivo] + " (" + y.valor + ")"; }).join(" · ");
+        return '<div class="ct-dupf"><div><strong>' + esc(x.nombre) + "</strong><small>" + esc([x.email, x.tel].filter(Boolean).join(" · ")) + "</small><small>" + esc(m) + "</small>" +
+          '<div class="ct-cab">' + chipsEtiquetas(x.etiquetas) + '</div></div><div class="ct-acc">' +
+          '<button type="button" class="pn-b1" data-ct-unir="' + esc(x.clave) + '" data-motivo="' + esc(x.motivos[0].motivo) + '" data-nombre="' + esc(x.nombre) + '">Unir</button>' +
+          '<button type="button" class="pn-b2" data-ct-distintos="' + esc(x.clave) + '" data-motivo="' + esc(x.motivos[0].motivo) + '" data-nombre="' + esc(x.nombre) + '">No son la misma</button>' +
+          '<button type="button" class="pn-b2" data-ct-abrir="' + esc(x.clave) + '">Ver su ficha</button></div></div>';
+      }).join(""));
+  }
+
+  /* Seguimientos: lo pendiente arriba, el formulario, y el registro. */
+  var segs = d.seguimientos || [];
+  var abiertos = segs.filter(function(s){ return s.proximo_fecha && !s.proximo_hecho_en; }).sort(function(a, b){ return a.proximo_fecha < b.proximo_fecha ? -1 : 1; });
+  var hs = "";
+  if (!d.con_seguimientos) hs += '<p class="pn-nota">Falta aplicar la migración 0043: hasta entonces no se pueden guardar notas.</p>';
+  if (abiertos.length){
+    hs += '<ul class="ct-prox">' + abiertos.map(function(s){
+      var venc = s.proximo_fecha < hoy;
+      return '<li class="' + (venc ? "venc" : s.proximo_fecha === hoy ? "hoy" : "") + '"><div><strong>' + esc(s.proximo) + "</strong><small>" +
+        esc(fechaCorta(s.proximo_fecha)) + (venc ? " · vencido" : s.proximo_fecha === hoy ? " · hoy" : "") + (s.pospuesto ? " · pospuesto " + s.pospuesto + (s.pospuesto === 1 ? " vez" : " veces") : "") +
+        '</small></div><div class="ct-acc"><button type="button" class="pn-b1" data-seg-hecho="' + s.id + '" data-nombre="' + esc(s.proximo) + '">Hecho</button>' +
+        '<button type="button" class="pn-b2" data-seg-posponer="' + s.id + '" data-fecha="' + esc(s.proximo_fecha) + '" data-nombre="' + esc(s.proximo) + '">Posponer…</button></div></li>';
+    }).join("") + "</ul>";
+  }
+  if (d.con_seguimientos){
+    hs += '<details class="ct-nueva"' + (segs.length ? "" : " open") + '><summary>Anotar una nota o un contacto</summary><div>' +
+      '<div class="pn-par"><label class="pn-campo"><span>Qué fue</span><select id="sg-tipo">' +
+      Object.keys(TIPO_SEG_ES).map(function(k){ return '<option value="' + k + '">' + esc(TIPO_SEG_ES[k]) + "</option>"; }).join("") + "</select></label>" +
+      pnCampo("sg-fecha", "Cuándo", hoy, { tipo: "date", extra: ' max="' + esc(hoy) + '"' }) + "</div>" +
+      pnCampo("sg-resumen", "Qué pasó o qué se habló", "", { area: true, filas: 3, ayuda: "Interno: no lo ve nadie fuera del panel." }) +
+      '<div class="pn-par">' + pnCampo("sg-prox", "Próximo paso (opcional)", "", { ayuda: "«Mandarle el Convenio Marco», «llamarla el jueves»." }) +
+      pnCampo("sg-proxf", "Para cuándo", "", { tipo: "date", extra: ' min="' + esc(hoy) + '"', ayuda: "Con fecha, ese día sale en «Hoy»." }) + "</div>" +
+      '<p class="pn-error" id="sg-err"></p><button type="button" class="pn-b1" id="sg-guardar">Guardar</button></div></details>';
+  }
+  if (segs.length){
+    hs += '<ol class="ct-linea">' + segs.map(function(s){
+      return '<li><div class="ct-lcab"><b>' + esc(TIPO_SEG_ES[s.tipo] || s.tipo) + "</b> · " + esc(fechaCorta(s.fecha)) +
+        '<small>' + esc(s.creado_por || "") + '</small><button type="button" class="ct-anular" data-seg-anular="' + s.id + '" title="Anular esta nota">Anular</button></div>' +
+        '<p>' + esc(s.resumen) + "</p>" +
+        (s.proximo ? '<p class="ct-lprox">Próximo paso: ' + esc(s.proximo) + (s.proximo_fecha ? " · " + esc(fechaCorta(s.proximo_fecha)) : "") +
+          (s.proximo_hecho_en ? ' · <span class="tb-conf">hecho ' + esc(enCO(s.proximo_hecho_en, 10)) + '</span> <button type="button" class="ct-anular" data-seg-reabrir="' + s.id + '">Reabrir</button>' : "") + "</p>" : "") +
+        "</li>";
+    }).join("") + "</ol>";
+  } else if (d.con_seguimientos) hs += '<p class="mu">Sin notas todavía.</p>';
+  h += seccionFicha("Notas y contacto", hs, segs.length || null);
+
+  /* El dinero: solo lo confirmado suma. */
+  var ap = d.aportes || [];
+  if (ap.length || (d.carnets || []).length || (d.suscripciones || []).length){
+    var hd = "";
+    if ((d.totales || []).length){
+      hd += '<table class="ct-tot"><thead><tr><th scope="col">Año</th><th scope="col" class="num">Pagos</th><th scope="col" class="num">Confirmado</th></tr></thead><tbody>' +
+        d.totales.map(function(t){ return "<tr><td>" + esc(t.anio) + '</td><td class="num">' + t.n + '</td><td class="num">' + dinero(t.centavos, t.moneda) + "</td></tr>"; }).join("") +
+        '</tbody></table><p class="ct-ayuda">Solo dinero confirmado; pesos y dólares por separado, sin convertir.</p>';
+    } else if (ap.length) hd += '<p class="ct-ayuda">Ningún aporte confirmado todavía: lo de abajo son intentos o transferencias por verificar, y no suman.</p>';
+    if (ap.length){
+      hd += '<ul class="ct-lista">' + ap.map(function(a){
+        return '<li><button type="button" class="ct-link" data-ct-aporte="' + esc(a.guia) + '">' + esc(a.guia) + "</button> · " + esc(a.fecha || "") +
+          " · " + (a.confirmado ? dinero(a.monto_centavos, a.moneda) : '<span class="mu">' + dinero(a.monto_centavos, a.moneda) + "</span>") +
+          '<small>' + esc((ESTADO_APORTE_ES[a.estado] || a.estado) + " · " + (FIN_ETIQ.medio[a.medio] || a.medio || "") +
+          (a.frecuencia && a.frecuencia !== "unico" ? " · " + a.frecuencia : "") + (a.destino_id ? " · " + (a.proyecto || a.destino_id) : " · Fondo general")) + "</small></li>";
+      }).join("") + "</ul>";
+    }
+    if ((d.carnets || []).length){
+      hd += '<p class="ct-sub">Carnet</p><ul class="ct-lista">' + d.carnets.map(function(m){
+        return '<li><button type="button" class="ct-link" data-ct-carnet="' + esc(m.codigo) + '">' + esc(m.codigo) + "</button> · " +
+          esc(m.nivel === "honor" ? "solo de honor" : m.nivel) + " · " + '<span class="' + (m.estado === "vigente" ? "tb-conf" : m.estado === "revocado" ? "tb-mal" : "mu") + '">' + esc(m.estado) + "</span>" +
+          "<small>" + esc([m.desde ? "desde " + m.desde : "", m.distincion ? "distinción: " + m.distincion + (m.distincion_hasta ? " hasta " + m.distincion_hasta : " (permanente)") : "",
+            m.distincion_contexto || ""].filter(Boolean).join(" · ")) + "</small></li>";
+      }).join("") + "</ul>";
+    }
+    if ((d.suscripciones || []).length){
+      hd += '<p class="ct-sub">Membresía internacional (PayPal)</p><ul class="ct-lista">' + d.suscripciones.map(function(s){
+        return "<li>" + esc(s.nivel || "membresía") + " · " + dinero(s.monto_centavos, s.moneda) + " al mes · " + esc(s.estado) + "<small>" + s.cobros + " cobro(s)</small></li>";
+      }).join("") + "</ul>";
+    }
+    if ((d.certificados || []).length){
+      hd += '<p class="ct-sub">Certificados de donación</p><ul class="ct-lista">' + d.certificados.map(function(k){
+        var est = k.anulado_en ? '<span class="tb-mal">anulado</span>' : !k.firma_rl_en || !k.firma_rf_en ? '<span class="mu">esperando firma</span>' : k.enviado_en ? '<span class="tb-conf">enviado</span>' : "firmado";
+        return '<li><a href="/api/admin/certificado/' + esc(k.numero) + '.pdf" target="_blank" rel="noopener">' + esc(k.numero) + "</a> · " + est + "<small>del aporte " + esc(k.guia) + " · emitido " + esc(enCO(k.emitido_en, 10)) + "</small></li>";
+      }).join("") + "</ul>";
+    }
+    h += seccionFicha("Donaciones", hd, ap.length || null);
+  }
+
+  if ((d.red || []).length){
+    h += seccionFicha("En la red", '<ul class="ct-lista">' + d.red.map(function(i){
+      var c = i.convenio;
+      var conv = c ? (c.completo ? '<span class="tb-conf">convenio firmado por ambas partes</span>' : c.firmado ? "convenio firmado" :
+        "convenio en curso · " + (c.faltan ? c.faltan + " documento(s) por recibir" : "documentos completos") + (c.fundacion_acepto ? " · la fundación ya aceptó" : "") +
+        (c.certificado_vencido ? ' · <span class="tb-mal">certificado de existencia vencido</span>' : "")) : "";
+      return '<li class="' + (CT_FICHA && CT_FICHA.resaltar === i.id ? "ct-resalta" : "") + '"><strong>' + esc(TIPO_ES[i.tipo] || i.tipo) + "</strong> · " + esc(i.nombre || "") +
+        " · " + esc(ESTADO_INSC_ES[i.estado] || i.estado) +
+        "<small>" + esc(["entró " + enCO(i.creada_en, 10), i.origen_nombre ? "desde " + i.origen_nombre + (i.puerta ? " (" + (PUERTA_ES[i.puerta] || i.puerta) + ")" : "") : "",
+          i.nit ? "NIT " + i.nit : "", i.contacto ? "contacto: " + i.contacto + (i.cargo ? ", " + i.cargo : "") : "",
+          i.matricula ? "matrícula " + i.matricula + (i.matricula_verificada ? " (verificada)" : " (sin verificar)") : "", i.oficio || ""].filter(Boolean).join(" · ")) + "</small>" +
+        (conv ? "<small>" + conv + "</small>" : "") +
+        '<small><a href="#' + (i.tipo === "ingeniero" ? "personas/ingenieros" : "alianzas/red") + '">Ver en ' + (i.tipo === "ingeniero" ? "Ingenieros" : "Red") + "</a>" +
+        (c ? ' · <button type="button" class="ct-link" data-ct-convenio="' + i.id + '">Ver el convenio</button>' : "") + "</small></li>";
+    }).join("") + "</ul>", d.red.length);
+  }
+  if ((d.voluntariado || []).length){
+    var horas = 0; d.voluntariado.forEach(function(p){ horas += Number(p.horas || 0); });
+    h += seccionFicha("Voluntariado", '<p class="ct-ayuda">' + d.voluntariado.length + (d.voluntariado.length === 1 ? " jornada" : " jornadas") +
+      (horas ? " · " + numCO(horas) + " horas anotadas" : "") + '</p><ul class="ct-lista">' + d.voluntariado.map(function(p){
+      return '<li><button type="button" class="ct-link" data-ct-jornada="' + p.jornada + '">' + esc(p.nombre) + "</button> · " + esc(p.fecha || "sin fecha") +
+        "<small>" + esc([p.estado, p.horas != null ? p.horas + " h" : "horas sin anotar", p.pro_bono ? "pro bono" : "", p.reconocimiento ? "certificado " + p.reconocimiento : ""].filter(Boolean).join(" · ")) + "</small></li>";
+    }).join("") + "</ul>");
+  }
+  if ((d.correos || []).length){
+    h += seccionFicha("Correos que le mandó el sistema", '<ul class="ct-lista">' + d.correos.map(function(c){
+      var mal = (c.resultado === "fallo" || c.resultado === "sin_cupo") && !c.resuelto;
+      return '<li><button type="button" class="ct-link" data-ct-correo="' + c.id + '">' + esc(c.asunto || c.etiqueta) + "</button>" +
+        '<small><span class="' + (mal ? "tb-mal" : c.resultado === "enviado" ? "" : "mu") + '">' + esc(CORREO_RES_ES[c.resultado] || c.resultado) +
+        (c.resuelto ? " · " + (c.resuelto === "reenviado" ? "reenviado" : "resuelto a mano") : "") + "</span> · " + esc(enCO(c.intento_en, 16)) + " · " + esc(c.etiqueta) + "</small></li>";
+    }).join("") + "</ul>", d.correos.length);
+  }
+  if ((d.banco || []).length){
+    h += seccionFicha("En el extracto del banco", '<ul class="ct-lista">' + d.banco.map(function(m){
+      return '<li><button type="button" class="ct-link" data-ct-mov="' + m.id + '">' + esc(m.descripcion || "Movimiento") + "</button> · " + esc(m.fecha) +
+        "<small>" + pesos(Math.abs(m.valor_centavos)) + (m.valor_centavos < 0 ? " cargo" : " abono") + " · de él, " + pesos(Math.abs(m.parte)) + " explican " + esc(m.guia) + "</small></li>";
+    }).join("") + "</ul>");
+  }
+  if ((d.unidas || []).length){
+    h += seccionFicha("Fichas unidas a mano", '<ul class="ct-lista">' + d.unidas.map(function(v){
+      return "<li>" + esc(v.a) + " + " + esc(v.b) + '<small>unidas ' + esc(enCO(v.en, 10)) + (v.por ? " por " + esc(v.por) : "") +
+        ' · <button type="button" class="ct-link" data-ct-separar="' + esc(v.a) + '" data-b="' + esc(v.b) + '">Separar</button></small></li>';
+    }).join("") + "</ul>");
+  }
+  if (!ap.length && !(d.red || []).length && !(d.voluntariado || []).length && !(d.correos || []).length){
+    h += '<p class="mu">Fuera de esto, la base no tiene nada más de esta ficha.</p>';
+  }
+  cajonCuerpo(h);
+  CT_VOLVER = false;
+  cajonPie('<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' +
+    '<p class="pn-pie-nota">Todo lo de esta ficha es interno. Las notas no salen en ninguna pantalla pública ni en ningún correo.</p>');
+  if (CT_FICHA && CT_FICHA.resaltar){ var r = document.querySelector("#pn-cajon .ct-resalta"); if (r) r.scrollIntoView({ block: "center" }); }
+}
+/* Lo que se abre DESDE la ficha (un aporte, un carnet, un correo, un
+   movimiento) lleva «Volver a la ficha» en el pie, para no perderla: lo pone
+   «cajonPie» mientras CT_VOLVER esté encendido, y se apaga al cerrar. */
+var CT_VOLVER = false;
+function desdeFicha(){ CT_VOLVER = !!(CT_FICHA && CAJON.abierto); }
+function guardarSeguimiento(b){
+  var d = CT_FICHA && CT_FICHA.d; if (!d) return;
+  var cuerpo = { contacto: d.clave, nombre: d.nombre, tipo: pnValor("sg-tipo"), fecha: pnValor("sg-fecha"), resumen: pnValor("sg-resumen"),
+                 proximo: pnValor("sg-prox"), proximo_fecha: pnValor("sg-proxf") };
+  ["sg-fecha", "sg-resumen", "sg-prox", "sg-proxf"].forEach(function(x){ pnMarcar(x, ""); });
+  var e = document.getElementById("sg-err"); if (e) e.textContent = "";
+  if (!cuerpo.resumen){ pnMarcar("sg-resumen", "Escribe qué pasó o qué se habló."); document.getElementById("sg-resumen").focus(); return; }
+  if (cuerpo.proximo_fecha && !cuerpo.proximo){ pnMarcar("sg-prox", "¿Cuál es el próximo paso? La fecha sola no dice nada."); document.getElementById("sg-prox").focus(); return; }
+  b.disabled = true;
+  fetch("/api/admin/seguimientos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+    .then(conEstado).then(function(r){
+      b.disabled = false;
+      if (r.http !== 200 || !r.d || r.d.error){
+        var campo = { fecha: "sg-fecha", resumen: "sg-resumen", proximo: "sg-prox", proximo_fecha: "sg-proxf" }[r.d && r.d.campo];
+        if (campo) pnMarcar(campo, r.d.ayuda || r.d.error); else if (e) e.textContent = (r.d && (r.d.ayuda || r.d.error)) || "No se pudo guardar.";
+        return;
+      }
+      avisar(cuerpo.proximo_fecha ? "Guardado. El próximo paso sale en «Hoy» el " + fechaCorta(cuerpo.proximo_fecha) + "." : "Guardado en la ficha.");
+      recargarFicha(); refrescarContactos();
+    }).catch(function(){ b.disabled = false; if (e) e.textContent = "No se pudo: revisa la conexión."; });
+}
+function accionSeguimiento(id, cuerpo){
+  return fetch("/api/admin/seguimiento/" + id, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+    .then(conEstado).then(function(r){
+      if (r.http !== 200 || !r.d || r.d.error){ avisoError((r.d && (r.d.ayuda || r.d.error)) || "No se pudo (HTTP " + r.http + ")."); return null; }
+      return r.d;
+    }).catch(function(){ avisoError("No se pudo: revisa la conexión."); return null; });
+}
+function segHecho(id, nombre, b){
+  if (b) b.disabled = true;
+  accionSeguimiento(id, { accion: "hecho" }).then(function(d){
+    if (b) b.disabled = false;
+    if (!d) return;
+    avisar("«" + nombre + "» hecho.", { deshacer: function(){
+      accionSeguimiento(id, { accion: "reabrir" }).then(function(d2){ if (d2){ avisar("«" + nombre + "» vuelve a estar pendiente."); recargarFicha(); refrescarContactos(); } });
+    } });
+    recargarFicha(); refrescarContactos();
+  });
+}
+function sumarDias(f, n){ var d = new Date(f + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function proximoLunes(f){ var d = new Date(f + "T12:00:00Z"); var n = (8 - d.getUTCDay()) % 7 || 7; return sumarDias(f, n); }
+function segPosponer(id, nombre, antes, desdeFicha){
+  var hoy = hoyCO();
+  var ops = [["Mañana", sumarDias(hoy, 1)], ["En 3 días", sumarDias(hoy, 3)], ["El próximo lunes", proximoLunes(hoy)], ["En una semana", sumarDias(hoy, 7)]];
+  cajonAbrir({ ey: "Posponer el próximo paso", titulo: nombre,
+    cuerpo: '<p>Estaba para el <strong>' + esc(fechaCorta(antes)) + "</strong>. ¿Para cuándo lo dejas?</p>" +
+      '<div class="ct-acc ct-rapido">' + ops.map(function(o){ return '<button type="button" class="pn-b2" data-pos-f="' + o[1] + '">' + esc(o[0]) + " · " + esc(fechaCorta(o[1])) + "</button>"; }).join("") + "</div>" +
+      pnCampo("pos-fecha", "Otra fecha", "", { tipo: "date", extra: ' min="' + esc(hoy) + '"' }) + '<p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="pos-ok">Posponer</button><button type="button" class="pn-b2" id="pos-no">Cancelar</button>' });
+  var hacer = function(f){
+    if (!f){ pnMarcar("pos-fecha", "Elige una fecha."); return; }
+    accionSeguimiento(id, { accion: "posponer", fecha: f }).then(function(d){
+      if (!d) return;
+      avisar("«" + nombre + "» pasa al " + fechaCorta(f) + ".", { deshacer: function(){
+        accionSeguimiento(id, { accion: "fecha", fecha: antes }).then(function(d2){ if (d2){ avisar("«" + nombre + "» vuelve al " + fechaCorta(antes) + "."); if (desdeFicha) recargarFicha(); refrescarContactos(); } });
+      } });
+      if (desdeFicha) recargarFicha(); else cajonCerrar();
+      refrescarContactos();
+    });
+  };
+  document.getElementById("pos-ok").addEventListener("click", function(){ hacer(pnValor("pos-fecha")); });
+  document.getElementById("pos-no").addEventListener("click", function(){ if (desdeFicha) recargarFicha(); else cajonCerrar(); });
+  document.querySelectorAll("[data-pos-f]").forEach(function(x){ x.addEventListener("click", function(){ hacer(x.getAttribute("data-pos-f")); }); });
+}
+function vinculo(a, b, decision, motivo, nombre){
+  return postPanel("/api/admin/contacto/vinculo", { a: a, b: b, decision: decision, motivo: motivo }).then(function(d){
+    if (!d) return;
+    avisar(decision === "unir" ? "Unidas: «" + nombre + "» es ahora parte de esta ficha." : "Anotado: no son la misma. No se vuelve a sugerir.", { deshacer: function(){
+      postPanel("/api/admin/contacto/vinculo", { a: a, b: b, quitar: true }).then(function(d2){ if (d2){ avisar("Decisión deshecha."); recargarFicha(); refrescarContactos(); } });
+    } });
+    recargarFicha(); refrescarContactos();
+  });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if ((b = e.target.closest("#sg-guardar"))){ guardarSeguimiento(b); return; }
+  if ((b = e.target.closest("[data-seg-hecho]"))){ segHecho(Number(b.getAttribute("data-seg-hecho")), b.getAttribute("data-nombre"), b); return; }
+  if ((b = e.target.closest("[data-seg-posponer]"))){ segPosponer(Number(b.getAttribute("data-seg-posponer")), b.getAttribute("data-nombre"), b.getAttribute("data-fecha"), true); return; }
+  if ((b = e.target.closest("[data-seg-reabrir]"))){
+    accionSeguimiento(Number(b.getAttribute("data-seg-reabrir")), { accion: "reabrir" }).then(function(d){ if (d){ avisar("Vuelve a estar pendiente."); recargarFicha(); refrescarContactos(); } });
+    return;
+  }
+  if ((b = e.target.closest("[data-seg-anular]"))){
+    var ids = Number(b.getAttribute("data-seg-anular"));
+    accionSeguimiento(ids, { accion: "anular" }).then(function(d){
+      if (!d) return;
+      avisar("Nota anulada.", { deshacer: function(){ accionSeguimiento(ids, { accion: "restaurar" }).then(function(d2){ if (d2){ avisar("Nota restaurada."); recargarFicha(); refrescarContactos(); } }); } });
+      recargarFicha(); refrescarContactos();
+    });
+    return;
+  }
+  if ((b = e.target.closest("[data-ct-unir]"))){ vinculo(CT_FICHA.d.clave, b.getAttribute("data-ct-unir"), "unir", b.getAttribute("data-motivo"), b.getAttribute("data-nombre")); return; }
+  if ((b = e.target.closest("[data-ct-distintos]"))){ vinculo(CT_FICHA.d.clave, b.getAttribute("data-ct-distintos"), "distintos", b.getAttribute("data-motivo"), b.getAttribute("data-nombre")); return; }
+  if ((b = e.target.closest("[data-ct-separar]"))){
+    var a1 = b.getAttribute("data-ct-separar"), b1 = b.getAttribute("data-b");
+    confirmarSimple({ ey: "Contactos", titulo: "Separar las dos fichas",
+      detalle: "<p>" + esc(a1) + " y " + esc(b1) + " vuelven a ser fichas aparte, y el panel volverá a sugerirlas como posible duplicado.</p>",
+      boton: "Separar", volver: recargarFicha,
+      hacer: function(){ return postPanel("/api/admin/contacto/vinculo", { a: a1, b: b1, quitar: true }).then(function(d){ if (d){ avisar("Fichas separadas."); refrescarContactos(); } return !!d; }); } });
+    return;
+  }
+  if ((b = e.target.closest("[data-ct-abrir]"))){ abrirContacto(b.getAttribute("data-ct-abrir")); return; }
+  if ((b = e.target.closest("[data-ct-volver]"))){ recargarFicha(); return; }
+  if ((b = e.target.closest("[data-ct-aporte]"))){ desdeFicha(); abrirAportePorGuia(b.getAttribute("data-ct-aporte")); return; }
+  if ((b = e.target.closest("[data-ct-carnet]"))){ desdeFicha(); abrirCarnetPorCodigo(b.getAttribute("data-ct-carnet")); return; }
+  if ((b = e.target.closest("[data-ct-correo]"))){ desdeFicha(); abrirCorreo(Number(b.getAttribute("data-ct-correo"))); return; }
+  if ((b = e.target.closest("[data-ct-mov]"))){ desdeFicha(); abrirMovimiento(Number(b.getAttribute("data-ct-mov"))); return; }
+  if ((b = e.target.closest("[data-ct-convenio]"))){ desdeFicha(); verConvenio(Number(b.getAttribute("data-ct-convenio"))); return; }
+  if ((b = e.target.closest("[data-ct-jornada]"))){ cajonCerrar(); location.hash = "personas/voluntariado"; abrirJornada(Number(b.getAttribute("data-ct-jornada"))); return; }
+});
+
+/* Abrir un aporte o un carnet que no está en la tabla abierta: se pide su
+   fila con la misma forma que la lista y se abre el mismo cajón. */
+function abrirAportePorGuia(guia){
+  fetch("/api/admin/aportes?guia=" + encodeURIComponent(guia) + "&meta=1").then(conEstado).then(function(r){
+    var a = r.d && r.d.aportes && r.d.aportes[0];
+    if (r.http !== 200 || !a){ avisoError("No se pudo abrir " + guia + "."); return; }
+    if (r.d.etiquetas) FIN_ETIQ = r.d.etiquetas;
+    FIRMA_ACTIVA = !!r.d.firma_activa; FIRMANTE = r.d.firmante || null;
+    abrirAporte(a);
+  }).catch(function(){ avisoError("No se pudo abrir " + guia + ": revisa la conexión."); });
+}
+function abrirCarnetPorCodigo(codigo){
+  pedirJSON("/api/admin/miembros", "pn-avisos").then(function(d){
+    var m = (d.miembros || []).filter(function(x){ return x.codigo === codigo; })[0];
+    if (!m){ avisoError("No encontré el carnet " + codigo + "."); return; }
+    abrirCarnet(m);
+  });
+}
+
+/* ---- SISTEMA › CORREOS ---- */
+var CORREO_RES_ES = { enviado: "Enviado", fallo: "Falló", simulado: "Simulado (no salió)", sin_cupo: "Sin cupo del día", sin_destino: "Sin buzón configurado" };
+function estadoCorreoHTML(c){
+  var t = esc(CORREO_RES_ES[c.resultado] || c.resultado);
+  if (c.resuelto) return '<span class="mu">' + t + "</span><small>" + (c.resuelto === "reenviado" ? "reenviado" : "resuelto a mano") + "</small>";
+  if (c.resultado === "fallo" || c.resultado === "sin_cupo" || c.resultado === "sin_destino") return '<span class="tb-mal">' + t + "</span>";
+  if (c.resultado === "enviado") return '<span class="tb-conf">' + t + "</span>";
+  return '<span class="mu">' + t + "</span>";
+}
+var TB_CORREOS = tablaNueva({ id: "tb-correos", titulo: "Correos", servidor: true, url: "/api/admin/correos", orden: "fecha", dir: "desc", por: 25,
+  buscar: "Destinatario, asunto o guía",
+  filtros: [
+    { k: "estado", t: "Estado", opciones: [["por_atender", "Por atender (falló o sin cupo)"], ["enviado", "Enviado"], ["fallo", "Falló"],
+      ["simulado", "Simulado (no salió)"], ["sin_cupo", "Sin cupo del día"], ["sin_destino", "Sin buzón configurado"], ["resueltos", "Ya atendidos"]] },
+    { k: "etiqueta", t: "Tipo", opciones: function(t){ return ((t.opc && t.opc.etiquetas) || []).map(function(x){ return [x, x]; }); } },
+    { k: "desde", t: "Desde", tipo: "fecha" },
+    { k: "hasta", t: "Hasta", tipo: "fecha" }
+  ],
+  columnas: [
+    { k: "fecha", t: "Cuándo", dir: "desc", nw: true, celda: function(c){ return esc(enCO(c.intento_en, 16)); } },
+    { k: "para", t: "Para", celda: function(c){ return esc(c.para) + (c.guia ? "<small>" + esc(c.guia) + "</small>" : ""); } },
+    { k: "etiqueta", t: "Qué", celda: function(c){ return esc(c.asunto || "(sin asunto)") + "<small>" + esc(c.etiqueta) + "</small>"; } },
+    { k: "resultado", t: "Estado", celda: estadoCorreoHTML },
+    { k: "acc", t: "", orden: false, celda: function(c){
+      return (c.resultado === "fallo" || c.resultado === "sin_cupo") && !c.resuelto && c.reenviable
+        ? '<button type="button" class="pn-b1" data-co-reenviar="' + c.id + '">Reenviar…</button>' : ""; } }
+  ],
+  etiquetaFila: function(c){ return "Abrir el correo a " + c.para; },
+  filasDe: function(d){ return d.correos || []; },
+  nota: function(t){ return "El cuerpo de los correos no se guarda (Ley 1581): al abrir uno se vuelve a armar con la plantilla y los datos de hoy. Los rebotes no se registran: Resend no le avisa al sitio."; },
+  vacio: { titulo: "Ningún correo registrado.", texto: "Cada correo que el sitio intenta mandar —recibos, acuses, avisos— queda anotado aquí." },
+  abrir: function(c){ abrirCorreo(c.id); }
+});
+function cargarCorreos(){
+  if (!TB_CORREOS.armada) tablaArmar(TB_CORREOS, document.getElementById("tb-correos"));
+  tablaRefrescar(TB_CORREOS);
+}
+function abrirCorreo(id, op){
+  op = op || {};
+  cajonAbrir({ ey: "Correo", titulo: "Cargando…", cuerpo: '<p class="mu">Leyendo el registro…</p>' });
+  fetch("/api/admin/correo/" + id).then(conEstado).then(function(r){
+    if (r.http !== 200 || !r.d || r.d.error){ cajonCuerpo('<p class="pn-error">' + esc((r.d && (r.d.ayuda || r.d.error)) || "No se pudo cargar.") + "</p>"); return; }
+    var d = r.d, c = d.correo;
+    document.getElementById("pn-cajon-t").textContent = (c.asunto || c.etiqueta);
+    var h = ficha([
+      ["Estado", estadoCorreoHTML(c)],
+      ["Para", esc(c.para) + (d.contacto ? ' · <button type="button" class="ct-link" data-ct-abrir="' + esc(d.contacto) + '">Abrir la ficha</button>' : "")],
+      ["Tipo", "<code>" + esc(c.etiqueta) + "</code>"],
+      ["Guía o caso", c.guia ? esc(c.guia) : ""],
+      ["Cuándo", esc(enCO(c.intento_en, 16))],
+      ["Error", c.error ? esc(c.error) : ""],
+      ["Id en Resend", c.proveedor_id ? "<code>" + esc(c.proveedor_id) + "</code>" : ""],
+      ["Atendido", c.resuelto ? esc(c.resuelto === "reenviado" ? "Reenviado desde el panel" : "Resuelto a mano") +
+        "<small>" + esc([c.resuelto_por, c.resuelto_en ? enCO(c.resuelto_en, 16) : "", c.resuelto_nota].filter(Boolean).join(" · ")) + "</small>" : ""],
+      ["El reenvío", d.reenvio ? '<button type="button" class="ct-link" data-co-abrir="' + d.reenvio.id + '">correo #' + d.reenvio.id + "</button> · " + esc(CORREO_RES_ES[d.reenvio.resultado] || d.reenvio.resultado) : ""],
+      ["Reenvío de", d.reenvio_de ? '<button type="button" class="ct-link" data-co-abrir="' + d.reenvio_de + '">correo #' + d.reenvio_de + "</button>" : ""]
+    ]);
+    if (c.resultado === "simulado") h += '<p class="pn-nota">«Simulado» quiere decir que no salió: falta la llave del servicio de correo y el sistema solo lo anotó.</p>';
+    h += '<p class="pn-h3">' + (d.previa ? "Cómo saldría hoy" : "El contenido") + "</p>";
+    if (d.previa) h += '<p class="ct-ayuda">El original no se guardó (Ley 1581). Esto es el mismo correo vuelto a armar con su plantilla y los datos de hoy.</p>' + htmlCorreos({ correos: d.previa });
+    else h += '<p class="pn-nota">' + esc(d.no || "No se puede volver a armar.") + "</p>";
+    cajonCuerpo(h);
+    var pie = "";
+    if (d.reenviable) pie += '<button type="button" class="pn-b1" data-co-reenviar="' + c.id + '">Reenviar…</button>';
+    if (d.atender && d.con_resueltos) pie += '<button type="button" class="pn-b2" data-co-amano="' + c.id + '">Marcar resuelto a mano…</button>';
+    if (c.resuelto === "a_mano") pie += '<button type="button" class="pn-b2" data-co-deshacer="' + c.id + '">Volver a la cola</button>';
+    cajonPie(pie + '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>');
+    if (op.reenviar){
+      if (d.reenviable) reenviarCorreo(c.id, null);
+      else if (d.atender) errorCorreo(d.no);
+    }
+  }).catch(function(){ cajonCuerpo('<p class="pn-error">No se pudo cargar: revisa la conexión.</p>'); });
+}
+function errorCorreo(t){ if (t) avisar("No se puede reenviar desde aquí: " + t, { tono: "error" }); }
+function refrescarCorreos(){ if (TB_CORREOS.armada) tablaRefrescar(TB_CORREOS); cargarSalud(); }
+function reenviarCorreo(id, b){
+  confirmarConCorreo({ origen: b, previa: { accion: "reenviar", id: id }, ey: "Sistema › Correos", titulo: "Reenviar el correo",
+    intro: "<p>Sale otra vez, armado con la plantilla y los datos de hoy. Queda enlazado al que no salió, que deja de contar en «Hoy».</p>",
+    botonCorreo: "Reenviar",
+    hacer: function(){
+      return postPanel("/api/admin/correo/" + id + "/reenviar", {}).then(function(d){
+        if (!d) return false;
+        var res = d.nuevo && d.nuevo.resultado;
+        avisar(res === "enviado" ? "Reenviado: el correo salió." : res === "simulado" ? "Reenviado, pero quedó «simulado»: falta la llave del servicio de correo." :
+          "Se intentó de nuevo y quedó «" + (CORREO_RES_ES[res] || res) + "». Sigue en la cola.", { tono: res === "enviado" || res === "simulado" ? "" : "error" });
+        refrescarCorreos(); if (CT_FICHA) refrescarContactos();
+        return true;
+      });
+    } });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if ((b = e.target.closest("[data-co-reenviar]"))){ reenviarCorreo(Number(b.getAttribute("data-co-reenviar")), b); return; }
+  if ((b = e.target.closest("[data-co-abrir]"))){ abrirCorreo(Number(b.getAttribute("data-co-abrir"))); return; }
+  if ((b = e.target.closest("[data-co-amano]"))){
+    var ida = Number(b.getAttribute("data-co-amano"));
+    pedirTexto({ ey: "Sistema › Correos", titulo: "Resuelto a mano", etiqueta: "Cómo se resolvió",
+      ayuda: "«Le escribí por WhatsApp el 9 de octubre», «era un aviso interno, ya lo vi en el panel». Queda con tu correo.",
+      obligatorio: true, boton: "Marcar resuelto", volver: function(){ abrirCorreo(ida); },
+      hacer: function(nota){
+        return postPanel("/api/admin/correo/" + ida + "/resuelto", { nota: nota }).then(function(d){
+          if (!d) return false;
+          avisar("Marcado como resuelto a mano.", { deshacer: function(){
+            postPanel("/api/admin/correo/" + ida + "/resuelto", { deshacer: true }).then(function(d2){ if (d2){ avisar("Vuelve a la cola."); refrescarCorreos(); } });
+          } });
+          refrescarCorreos();
+          return true;
+        });
+      } });
+    return;
+  }
+  if ((b = e.target.closest("[data-co-deshacer]"))){
+    var idd = Number(b.getAttribute("data-co-deshacer"));
+    postPanel("/api/admin/correo/" + idd + "/resuelto", { deshacer: true }).then(function(d){ if (d){ avisar("Vuelve a la cola."); refrescarCorreos(); abrirCorreo(idd); } });
+  }
+});
+
+/* ==== EL BUSCADOR DE LA BARRA (Fase 4) ====
+   Busca mientras se escribe (con una pausa de un cuarto de segundo), en el
+   servidor y sin tildes, y enseña los resultados por grupos debajo de la
+   casilla. Flechas para moverse, Enter para abrir, Esc para cerrar. «/» o
+   Ctrl/Cmd+K llevan a la casilla desde cualquier parte del panel. */
+var BUS = { seq: 0, reloj: null, items: [], activo: -1, q: "" };
+function busCaja(){ return document.getElementById("busca-res"); }
+function busCerrar(){
+  var c = busCaja(); if (c){ c.hidden = true; c.innerHTML = ""; }
+  BUS.items = []; BUS.activo = -1;
+  var q = document.getElementById("q"); if (q){ q.setAttribute("aria-expanded", "false"); q.removeAttribute("aria-activedescendant"); }
+}
+function busPintar(d){
+  var c = busCaja(); if (!c) return;
+  var q = document.getElementById("q");
+  BUS.items = []; BUS.activo = -1;
+  var h = "";
+  if (d.tipo === "corto"){ busCerrar(); return; }
+  (d.grupos || []).forEach(function(g){
+    h += '<div class="bus-g" role="group" aria-label="' + esc(g.grupo) + '"><p class="bus-gt">' + esc(g.grupo) + "</p>";
+    g.items.forEach(function(it){
+      var i = BUS.items.length; BUS.items.push(it);
+      h += '<div class="bus-it" role="option" id="bus-o-' + i + '" data-bus-i="' + i + '" aria-selected="false"><strong>' + esc(it.titulo) + "</strong>" +
+        (it.detalle ? "<small>" + esc(it.detalle) + "</small>" : "") + "</div>";
+    });
+    if (g.mas) h += '<p class="bus-mas">y ' + g.mas + " más: escribe un poco más para afinar</p>";
+    h += "</div>";
+  });
+  if (!BUS.items.length) h = '<p class="bus-nada">Nada con «' + esc(d.q) + '». Se busca por nombre, correo, teléfono, documento o NIT, y por cualquier número (GG-, MB-, CV-, IV-, CD-) o código de verificación.</p>';
+  c.innerHTML = h; c.hidden = false;
+  if (q) q.setAttribute("aria-expanded", "true");
+  if (BUS.items.length) busMarcar(0);
+}
+function busMarcar(i){
+  if (!BUS.items.length) return;
+  BUS.activo = (i + BUS.items.length) % BUS.items.length;
+  document.querySelectorAll("#busca-res .bus-it").forEach(function(x){
+    var on = Number(x.getAttribute("data-bus-i")) === BUS.activo;
+    x.classList.toggle("on", on); x.setAttribute("aria-selected", on ? "true" : "false");
+    if (on) x.scrollIntoView({ block: "nearest" });
+  });
+  var q = document.getElementById("q"); if (q) q.setAttribute("aria-activedescendant", "bus-o-" + BUS.activo);
+}
+function busAbrir(it){
+  if (!it) return;
+  var a = it.abrir || {};
+  busCerrar();
+  var q = document.getElementById("q"); if (q) q.blur();
+  if (a.tipo === "contacto") abrirContacto(a.id, { inscripcion: a.inscripcion });
+  else if (a.tipo === "aporte") abrirAportePorGuia(a.id);
+  else if (a.tipo === "carnet") abrirCarnetPorCodigo(a.id);
+  else if (a.tipo === "caso") abrirCaso(a.id);
+  else if (a.tipo === "movimiento") abrirMovimiento(a.id);
+  else if (a.tipo === "inspeccion"){
+    cajonAbrir({ ey: "Inspección en terreno", titulo: it.titulo, cuerpo: "<p>" + esc(it.detalle || "") + "</p>" +
+      '<p><a class="pn-b2" href="/api/triage/inspeccion/' + esc(a.id) + '.pdf" target="_blank" rel="noopener">Ver el PDF</a> ' +
+      (a.caso ? '<button type="button" class="pn-b2" data-bus-caso="' + esc(a.caso) + '">Abrir el caso ' + esc(a.caso) + "</button> " : "") +
+      '<a class="pn-b2" href="#mmc/inspecciones">Ir a Inspecciones</a></p>',
+      pie: '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+  } else if (a.tipo === "red") location.hash = "alianzas/red";
+}
+function busPedir(){
+  var q = (document.getElementById("q") || {}).value || "";
+  q = q.trim();
+  if (q === BUS.q && BUS.items.length) return;
+  BUS.q = q;
+  if (q.length < 2){ busCerrar(); return; }
+  var seq = ++BUS.seq;
+  fetch("/api/admin/buscar?q=" + encodeURIComponent(q)).then(conEstado).then(function(r){
+    if (seq !== BUS.seq) return;
+    if (r.http !== 200 || !r.d || r.d.error){
+      var c = busCaja(); if (c){ c.innerHTML = '<p class="bus-nada">No se pudo buscar (HTTP ' + r.http + "). Si llevas rato con el panel abierto, recarga la página.</p>"; c.hidden = false; }
+      return;
+    }
+    busPintar(r.d);
+  }).catch(function(){
+    if (seq !== BUS.seq) return;
+    var c = busCaja(); if (c){ c.innerHTML = '<p class="bus-nada">No se pudo buscar. Revisa la conexión.</p>'; c.hidden = false; }
+  });
+}
+document.addEventListener("input", function(e){
+  if (!e.target || e.target.id !== "q") return;
+  clearTimeout(BUS.reloj);
+  BUS.reloj = setTimeout(busPedir, 250);
+});
+document.addEventListener("focusin", function(e){
+  if (e.target && e.target.id === "q" && e.target.value.trim().length >= 2 && !BUS.items.length){ BUS.q = ""; busPedir(); }
+});
+document.addEventListener("keydown", function(e){
+  var enQ = e.target && e.target.id === "q";
+  if (enQ){
+    if (e.key === "ArrowDown"){ e.preventDefault(); busMarcar(BUS.activo + 1); return; }
+    if (e.key === "ArrowUp"){ e.preventDefault(); busMarcar(BUS.activo - 1); return; }
+    if (e.key === "Escape"){ if (BUS.items.length || !busCaja().hidden){ e.preventDefault(); busCerrar(); } else e.target.blur(); return; }
+    if (e.key === "Enter"){
+      e.preventDefault();
+      if (BUS.activo >= 0) busAbrir(BUS.items[BUS.activo]);
+      else { clearTimeout(BUS.reloj); BUS.q = ""; busPedir(); }
+      return;
+    }
+    return;
+  }
+  if (CAJON.abierto) return;
+  var t = e.target, escribe = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""));
+  if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)){ e.preventDefault(); var q1 = document.getElementById("q"); q1.focus(); q1.select(); return; }
+  if (e.key === "/" && !escribe && !e.metaKey && !e.ctrlKey && !e.altKey){ e.preventDefault(); var q2 = document.getElementById("q"); q2.focus(); q2.select(); }
+});
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var it = e.target.closest("[data-bus-i]");
+  if (it){ busAbrir(BUS.items[Number(it.getAttribute("data-bus-i"))]); return; }
+  var cs = e.target.closest("[data-bus-caso]");
+  if (cs){ abrirCaso(cs.getAttribute("data-bus-caso")); return; }
+  if (!e.target.closest("#buscador") && !e.target.closest("#busca-res")){ var c = busCaja(); if (c && !c.hidden) busCerrar(); }
+});
+document.addEventListener("submit", function(e){
+  if (e.target && e.target.id === "buscador"){ e.preventDefault(); if (BUS.activo >= 0) busAbrir(BUS.items[BUS.activo]); else { BUS.q = ""; busPedir(); } }
+});
+
+/* Las acciones de «Hoy» de esta fase: reenviar un correo que no salió, y el
+   próximo paso de una ficha (Hecho, Posponer, abrir la ficha). */
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b = e.target.closest("[data-hoy]");
+  if (!b) return;
+  var que = b.getAttribute("data-hoy"), id = Number(b.getAttribute("data-id"));
+  if (que === "reenviar"){ abrirCorreo(id, { reenviar: true }); return; }
+  if (que === "correo"){ abrirCorreo(id); return; }
+  if (que === "seg-hecho"){ segHecho(id, b.getAttribute("data-nombre"), b); return; }
+  if (que === "seg-posponer"){ segPosponer(id, b.getAttribute("data-nombre"), b.getAttribute("data-fecha"), false); return; }
+  if (que === "ficha"){ abrirContacto(b.getAttribute("data-clave")); }
+});
+
 var BANDEJAS = {
+  "tb-contactos": cargarContactos,
+  "tb-socialfest": cargarSocialFest,
+  "tb-correos": cargarCorreos,
   "fin-resumen": cargarFinanzas,
   "tb-movs": cargarBanco,
   "tb-conc": cargarConciliar,
@@ -35658,6 +37589,21 @@ export default {
         if (ruta === "/api/admin/egresos.csv") return await adminEgresosCSV(env, url);
         if (ruta === "/api/admin/inscripciones") return await adminInscripciones(env, url);
         if (ruta === "/api/admin/buscar")   return await adminBuscar(env, url);
+        /* Fase 4: contactos, seguimientos y correos. */
+        if (ruta === "/api/admin/contactos") return await adminContactos(env);
+        if (ruta === "/api/admin/contacto")  return await adminContacto(env, url);
+        if (ruta === "/api/admin/contacto/vinculo") return await adminVinculoContacto(request, env, sesion.email);
+        if (ruta === "/api/admin/seguimientos") return await adminCrearSeguimiento(request, env, sesion.email);
+        const msg = ruta.match(/^\/api\/admin\/seguimiento\/(\d{1,9})$/);
+        if (msg) return await adminSeguimiento(request, env, Number(msg[1]), sesion.email);
+        if (ruta === "/api/admin/correos")   return await adminCorreos(env, url);
+        const mco = ruta.match(/^\/api\/admin\/correo\/(\d{1,9})(?:\/(reenviar|resuelto))?$/);
+        if (mco) {
+          if (!mco[2]) return await adminCorreo(env, Number(mco[1]));
+          return mco[2] === "reenviar"
+            ? await adminReenviarCorreo(request, env, Number(mco[1]), sesion.email)
+            : await adminCorreoResuelto(request, env, Number(mco[1]), sesion.email);
+        }
         if (ruta === "/api/admin/inspecciones/importar") return await adminInspeccionesImportar(request, env, sesion.email);
         if (ruta === "/api/admin/inspecciones") return await adminInspecciones(env, url);
         const mip = ruta.match(/^\/api\/admin\/inspeccion\/(IV-\d{4}-\d{6})\/pdf$/);
