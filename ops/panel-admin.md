@@ -267,12 +267,14 @@ botón de atrás. En el teléfono la barra lateral se abre con «Menú».
 | | PayPal (`#finanzas/paypal`) | Donaciones del botón · avisos de PayPal sin registro |
 | Alianzas | Red (`#alianzas/red`) | Quién quiere entrar: fundaciones, empresas, voluntarios, padrinos |
 | | Ofrecimientos en especie (`#alianzas/ofrecimientos`) | Lo que llega por el formulario de la brigada |
-| | Social Fest (`#alianzas/socialfest`) | La misma bandeja de Red, filtrada por lo que llegó del evento |
-| Personas | Voluntariado (`#personas/voluntariado`) | Jornadas, de la convocatoria al cierre |
+| | Social Fest (`#alianzas/socialfest`) | Los contactos que llegaron del evento, con su puerta, su estado en Red y su próximo paso (Fase 4) |
+| Personas y organizaciones | Contactos (`#personas/contactos`) | Cada persona u organización con su ficha: dinero, carnet, red, voluntariado, correos, banco y notas (Fase 4) |
+| | Voluntariado (`#personas/voluntariado`) | Jornadas, de la convocatoria al cierre |
 | | Ingenieros (`#personas/ingenieros`) | La bandeja de Red filtrada a ingenieros y su matrícula |
 | Mira Mi Casa | Casas (`#mmc/casas`) · Inspecciones (`#mmc/inspecciones`) | Casos de vivienda · visitas en terreno y el respaldo de un teléfono |
 | Entregas | Actas de entrega (`#entregas`) | Registrar, subir fotos, publicar |
 | Sistema | Salud (`#sistema/salud`) | Embudo, señales de Wompi y del correo, operación del cron |
+| | Correos (`#sistema/correos`) | Todo lo que el sitio intentó mandar · «Reenviar» lo que no salió (Fase 4) |
 
 Las direcciones viejas (`#dinero`, `#conta/sec-vencimientos`, `#sec-aportes`…)
 siguen abriendo su sección: las llevan correos ya enviados.
@@ -475,6 +477,127 @@ hay extracto importado para el periodo, lo dice en vez de enseñar ceros.
 cada mes hasta que haya un extracto que cubra el mes anterior; desde el 15 pasa
 a Urgente). Vencidas, las dos van en un correo diario propio a
 `CORREO_AVISOS` (contabilidad), no al de alianzas: `COLAS_PLAZO_BANCO`.
+
+## Búsqueda, contactos y correos (Fase 4, oct 2026)
+
+**Decisiones del fundador que esto respeta (8 oct 2026):** nadie más opera el
+panel (no hay roles); el contacto con la gente sigue por **WhatsApp y Gmail**, y
+el panel **no escribe correos a mano**: solo deja registro de que hubo contacto
+y reenvía lo que el sistema ya mandaba y no salió. Las tablas nuevas viven en
+`migrations/0043_contactos_seguimientos.sql`.
+
+### El buscador de la barra
+
+Busca **mientras se escribe** (pausa de un cuarto de segundo) y abre los
+resultados debajo de la casilla, por grupos: Personas, Organizaciones, Aportes,
+Carnets, Casos, Inscripciones y Movimientos del banco. **«/»** o
+**Ctrl/Cmd+K** llevan a la casilla; flechas para elegir, Enter para abrir, Esc
+para cerrar. Cada resultado abre lo suyo: la ficha de contacto, el cajón del
+aporte, del carnet, del caso, del movimiento.
+
+Encuentra por nombre, correo, teléfono (con o sin +57, espacios o guiones),
+documento o NIT, por cualquier número del sistema **también a medias**
+(`GG-2026-0009` encuentra `GG-2026-000901`), por el **código de verificación**
+de un carnet (con o sin guion), por el número de certificado (abre su aporte),
+por el valor exacto de un movimiento del extracto (`150000`) y por el nombre de
+una fundación o empresa. **Sin tildes y sin mayúsculas**: «jose» encuentra a
+«José», «nandu» a «Ñandú». Se hace en el servidor (`adminBuscar`), con LIKE
+sobre lo normalizado (`sqlBuscable`), y la ruta vive bajo `/api/admin/`: nada
+de esto sale de detrás de Access.
+
+Antes solo entendía un número completo o un teléfono, y mandaba los aportes a
+la sección Salud, donde no se ve ningún aporte.
+
+### Contactos y la ficha
+
+**No hay una tabla de personas.** La lista y la ficha se arman cada vez con lo
+que la base ya tiene —donantes, inscripciones de la red, participaciones en
+jornadas— (`indiceContactos`), así que no se pueden desfasar de ellas. Las
+familias de Mira Mi Casa no entran: se buscan por el buscador y viven en Casas.
+
+**Qué es la misma ficha.** Cada registro se reduce a una clave: el **correo**
+en minúsculas; si no hay correo, `tel:<dígitos>`; si tampoco, `doc:<dígitos>`.
+Todo lo que tiene el mismo correo es la misma ficha. Lo que solo comparte
+**documento, teléfono o nombre completo** sale como **posible duplicado**, con
+el motivo, y se decide en la ficha: **Unir** o **No son la misma**. **El panel
+nunca une solo** (dos hermanos comparten teléfono). La decisión se guarda en
+`contactos_vinculos`, se puede deshacer («Separar», o «Deshacer» en el aviso) y
+queda en la auditoría.
+
+**La ficha** (cajón ancho): correos y teléfonos con «Abrir en tu correo» y
+WhatsApp —se abren en TU correo, el panel no le escribe a nadie—, documento,
+otros nombres, Social Fest (puerta y estado), los próximos pasos y las notas,
+**donaciones con totales por año que suman solo dinero confirmado** (pesos y
+dólares por separado, sin convertir), carnet, membresía de PayPal,
+certificados, sus solicitudes en la red (con el estado del convenio de una
+fundación), las jornadas en que estuvo, los correos que le mandó el sistema y
+los movimientos del extracto conciliados con sus aportes. Lo que se abre desde
+la ficha (un aporte, un carnet, un correo) trae «Volver a la ficha».
+
+**La lista** usa la tabla compartida: buscador, filtro por relación (donante,
+miembro, honor, fundación, empresa, voluntario, ingeniero, padrino, Social
+Fest…), persona u organización, próximo paso y «con posibles duplicados»;
+ordenada por el último movimiento. Una dirección como
+`#personas/contactos/<correo>` abre esa ficha.
+
+### Notas y registro de contacto
+
+En cada ficha, **«Anotar una nota o un contacto»**: qué fue (nota, llamada,
+WhatsApp, correo desde Gmail, reunión, otro), cuándo, qué pasó, y un **próximo
+paso** opcional con fecha. Todo es interno y no sale en ninguna pantalla
+pública ni en ningún correo. Una nota escrita por error se **anula**, no se
+borra.
+
+**El próximo paso con fecha sale en «Hoy»** en la cola **«Seguimientos para hoy
+y vencidos»** (`seguimientos_pendientes`, plazo cero): el día de la fecha va en
+su franja; pasado ese día está vencido, sube a Urgente y entra al correo diario
+del buzón de alianzas. Desde la fila: **Hecho** (con Deshacer), **Posponer…**
+(mañana, en 3 días, el próximo lunes, en una semana u otra fecha; también con
+Deshacer) y **Ficha**.
+
+La tabla `seguimientos` está pensada para que la Fase 5 (tareas) la extienda:
+admite una nota sin contacto y tiene `ref_tipo`/`ref_id` para pegarla a una
+inscripción, un aporte o una jornada.
+
+### Sistema › Correos
+
+La tabla `correos` con la tabla compartida, filtrada y paginada en el servidor:
+estado (enviado, falló, simulado, sin cupo, sin buzón, **por atender** y **ya
+atendidos**), tipo, fechas y buscador por destinatario, asunto o guía. Los
+**rebotes no se registran**: Resend no le avisa al sitio, y la pantalla lo dice.
+
+**El cuerpo de los correos sigue sin guardarse** (Ley 1581). Al abrir uno, el
+panel lo **vuelve a armar** con su plantilla y los datos de hoy (`REENVIOS` en
+`worker.js`, una entrada por etiqueta que llama a la misma función `correo*`) y
+lo enseña. **«Reenviar…»** (solo lo que falló o no tuvo cupo) pasa por la vista
+previa de la Fase 1 y solo sale si va **a la misma dirección** que el original
+y si al armarlo sale exactamente un correo. El envío se anota como cualquier
+otro (y gasta cupo), y queda enlazado al original en `correos_resueltos`: el
+original deja de contar en «Hoy», y si el reenvío también falla, en la cola
+queda uno, el nuevo. Dos clics seguidos no mandan dos correos.
+
+Se pueden volver a armar: el recibo (`aporte-aprobado`), el acuse de una
+transferencia reportada, el certificado, el carnet, el aviso de matrícula
+verificada, los correos de una fundación (aceptada, convenio, vinculada,
+cuestionario, texto del convenio), el enlace del caso de una familia y los
+acuses de los formularios (voluntario, ingeniero, fundación, empresa, lead de
+Social Fest, padrino, especie). **Lo demás** —avisos internos, resúmenes del día,
+correos que dependen de un momento que ya pasó— se marca **«Resuelto a mano»**
+con una nota de cómo se resolvió (le escribiste por Gmail o WhatsApp); también
+se deshace.
+
+Las colas de correos de «Hoy» (`correos_fallidos`, `correos_sin_cupo`,
+`correos_sin_buzon`) llevan aquí, con **«Reenviar…»** y **«Ver»** en cada fila.
+
+### La migración 0043
+
+Tres tablas con `IF NOT EXISTS` y ningún ALTER: `contactos_vinculos`,
+`seguimientos`, `correos_resueltos`, y los índices que la búsqueda y la ficha
+usan (correo en minúsculas en `correos`, `donantes` y `participaciones`;
+documento del donante; carnet por donante). **Se aplica antes de que el código
+llegue a producción**, con `migrations apply`. Si el código llegara antes, el
+panel no se cae: la ficha y la lista funcionan sin notas ni uniones (y lo
+dicen), y las colas de correos cuentan como antes.
 
 ## Cerrar una señal de terreno (desde el 31 ago 2026)
 
