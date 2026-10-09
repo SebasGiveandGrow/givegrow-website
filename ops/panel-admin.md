@@ -255,9 +255,11 @@ botón de atrás. En el teléfono la barra lateral se abre con «Menú».
 |---|---|---|
 | Inicio | Hoy (`#hoy`) | La bandeja de entrada: todas las colas, en tres franjas |
 | Finanzas | Resumen (`#finanzas/resumen`) | El mes o el año: ingresos confirmados por medio, destino y tipo; egresos por categoría y centro; neto; donantes, membresías y certificados; mes a mes |
+| | Banco (`#finanzas/banco`) | El extracto de Bancolombia importado: movimientos e importaciones · «Importar un extracto» |
+| | Conciliar (`#finanzas/conciliar`) | Cada movimiento del extracto con lo que lo explica, con sugerencias |
 | | Aportes (`#finanzas/aportes`) | Cifras de los aportes, franja de certificados y la lista |
 | | Transferencias (`#finanzas/transferencias`) | Lo reportado por transferencia, para confirmar contra el extracto |
-| | Pagos sin aporte (`#finanzas/pagos`) | Cobros de Wompi sin guía |
+| | Pagos sin aporte (`#finanzas/pagos`) | Cobros de Wompi sin guía y pagos sin guía registrados desde el extracto |
 | | Membresías y carnets (`#finanzas/membresias`) | Membresías de PayPal · carnets (también los de honor) · «Emitir carnet de honor» |
 | | Vencimientos (`#finanzas/vencimientos`) | Obligaciones tributarias y legales |
 | | Egresos (`#finanzas/egresos`) | Registrar egresos, soportes y la descarga para el contador |
@@ -365,6 +367,114 @@ al donante.
 Cada cambio manual deja rastro de quién lo hizo, en la tabla `consentimientos`
 con tipo `auditoria`. Hoy el panel es de una sola persona; el día que sean dos,
 «quién marcó esta entrega» es la primera pregunta.
+
+## Conciliar con el banco (Fase 3, oct 2026)
+
+**Decisión del fundador (8 oct 2026): el extracto de Bancolombia es la cifra
+que manda.** Lo que dicen Wompi, PayPal o el donante se compara con él, no al
+revés. Para eso hay dos entradas nuevas en Finanzas, debajo de Resumen:
+**Banco** (`#finanzas/banco`) y **Conciliar** (`#finanzas/conciliar`). Las
+tablas viven en `migrations/0042_conciliacion_bancaria.sql`.
+
+### 1 · Descargar el extracto de Bancolombia
+
+> **Verifica estos pasos en tu Sucursal Virtual: el menú exacto puede ser
+> distinto.** Están escritos de memoria de cómo suele verse, no copiados de la
+> pantalla, y la interfaz de un banco cambia sin avisar.
+
+1. Entra a la **Sucursal Virtual Empresas** (o Personas, según la cuenta) de
+   Bancolombia.
+2. Busca la cuenta de ahorros de la Fundación → **Movimientos** (a veces
+   «Consultas → Movimientos de cuenta» o «Extractos»).
+3. Elige el **periodo**: el mes entero (del 1 al último día).
+4. **Descargar / Exportar** en **CSV** o «Texto». Si solo ofrece «Excel», sirve
+   también: casi siempre es una tabla HTML con extensión `.xls`, y el panel la
+   lee. Un `.xlsx` de verdad no: ábrelo en Excel y usa *Guardar como → CSV UTF-8*.
+5. No edites el archivo antes de importarlo (Excel cambia fechas y números al
+   guardarlo). Si tuviste que abrirlo, guárdalo como CSV.
+
+### 2 · Importar
+
+*Banco → Importar un extracto.* Pon un **nombre** para la cuenta («Bancolombia
+ahorros»), **nunca su número**: el panel rechaza un nombre con seis dígitos
+seguidos. Elige el archivo. Nada se guarda todavía:
+
+- El panel detecta el separador (punto y coma, coma, tabulador o tabla HTML) y
+  la codificación (UTF-8 o Latin-1), salta las líneas de encabezado del banco y
+  **propone qué columna es qué** por sus títulos. Revísalas: fecha, descripción,
+  referencia, oficina (opcional), el valor —una columna con signo, o débito y
+  crédito por separado— y el saldo (opcional). Formato de fecha día/mes/año o
+  mes/día/año; «Invertir el signo» si los cargos vienen positivos.
+- Entiende los números como los escribe un banco colombiano: `1.234.567,89`,
+  `-50.000`, `$ 1,234,567.89`, `(12.500)`, `50000.00`. Fechas `dd/mm/aaaa`,
+  `aaaa-mm-dd` y `aaaammdd`.
+- Enseña **«N nuevos · M ya estaban · K con error»**, los primeros renglones
+  como van a quedar, los que tienen error (no se guardan) y si **el saldo
+  cuadra renglón a renglón** con el valor. Si no cuadra, casi siempre es el
+  signo al revés o débito y crédito cruzados: se arregla aquí, antes de guardar.
+- Pide el **periodo que cubre el extracto** (propone el mes). Con él el Resumen
+  sabe qué meses puede comparar con el banco, y se apaga el recordatorio.
+- **Recuerda la elección por cuenta**: el mes siguiente, el mismo formato entra
+  con las columnas ya puestas.
+
+**Volver a importar no duplica.** Cada movimiento tiene una huella (cuenta,
+fecha, valor, descripción normalizada, referencia, saldo y cuántas veces se
+repite ese mismo renglón ese día). Un archivo que se solapa con el anterior
+solo agrega lo nuevo. **Deshacer una importación** (columnas cruzadas, la cuenta
+equivocada): desde su fila en «Importaciones», mientras nada de ella se haya
+conciliado; si ya, primero se deshacen esas conciliaciones.
+
+### 3 · Conciliar
+
+*Conciliar* enseña los movimientos sin explicar, del más viejo al más nuevo,
+con lo que **sugiere el servidor**:
+
+| movimiento | se explica con | regla |
+|---|---|---|
+| abono | una transferencia directa confirmada | el mismo monto al peso, a ±3 días; suma si el nombre o la referencia aparecen en la descripción |
+| abono | una transferencia **reportada** sin verificar | igual; aceptar abre «Confirmar transferencia» con el movimiento ya elegido y el recibo a la vista |
+| abono | un **lote de Wompi** | los pagos aprobados de uno o varios días seguidos antes del abono; la diferencia es la comisión, y gana el grupo cuya comisión más se parece a la tarifa publicada (2,65 % + $700, más IVA) |
+| abono que dice PAYPAL | los pagos de PayPal (en dólares) desde el último retiro | el banco da los pesos: esa cifra se reparte entre los pagos por sus dólares y es la cifra de PayPal en pesos, sin TRM inventada |
+| cargo | un **egreso** | lo que salió de la cuenta (el neto, o el total si el banco pagó sin retenciones), a ±5 días; los cargos se reparten de una vez, por puntos |
+| abono o cargo | **dejar fuera** | 4 por mil, cuota de manejo e IVA, rendimientos, traslados entre cuentas propias |
+
+«Aceptar» guarda enseguida y sale un aviso con **Deshacer**. Abrir un
+movimiento deja además:
+
+- **Conciliar a mano:** buscar aportes, pagos sin aporte, donaciones del botón
+  de PayPal o egresos, elegir varios, ver la diferencia que queda y asignarla a
+  **Comisión de la pasarela** o **Ajuste** (con nota). Lo elegido más la
+  diferencia tiene que ser exactamente el valor del movimiento, o no se guarda.
+- **Dejarlo fuera** con su motivo (con «Otro motivo», la nota es obligatoria).
+- **Registrar como pago sin guía** (solo abonos): un dinero que nadie reportó.
+  Queda en «Pagos sin aporte» con quien pagó si se sabe, por dónde entró y su
+  destino. **No crea un aporte, no envía ningún correo y no emite
+  certificado.** Si quien pagó aparece y lo pide, eso sigue siendo a mano.
+- **Deshacer**, desde el movimiento: vuelve a «sin conciliar» y, si de él salió
+  un pago sin guía, ese registro se anula.
+
+**Confirmar una transferencia** (Transferencias o «Hoy») busca en el extracto
+importado un abono sin conciliar por el mismo monto a ±7 días. Si lo hay, «Usar
+este» llena la fecha, el monto y la referencia con lo del extracto y lo deja
+conciliado al confirmar. Si no, dice **«Aún no aparece en el extracto
+importado»** y hasta dónde llega lo importado: no bloquea, porque el extracto
+puede no estar importado todavía.
+
+### 4 · Lo que se ve en el Resumen y en «Hoy»
+
+**Resumen** añade, para el mes o el año, **«Según el banco»** (abonos, cargos y
+saldo final del extracto) junto a **«Según el panel»** (aportes confirmados en
+pesos y egresos netos), y desarma la diferencia: sin conciliar, dejados fuera,
+comisiones, ajustes, lo que entró sin guía, PayPal en pesos y «otras
+diferencias» (fechas de corte: un pago del 30 que Wompi consigna el 1). Si no
+hay extracto importado para el periodo, lo dice en vez de enseñar ceros.
+
+**«Hoy»** tiene dos colas nuevas: **Movimientos del banco sin conciliar**
+(franja Hoy; plazo de 7 días desde que se importaron; cada fila con su
+«Conciliar…») e **Importar el extracto del mes** (Esta semana, del día 3 de
+cada mes hasta que haya un extracto que cubra el mes anterior; desde el 15 pasa
+a Urgente). Vencidas, las dos van en un correo diario propio a
+`CORREO_AVISOS` (contabilidad), no al de alianzas: `COLAS_PLAZO_BANCO`.
 
 ## Cerrar una señal de terreno (desde el 31 ago 2026)
 

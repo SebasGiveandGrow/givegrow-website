@@ -2772,7 +2772,13 @@ const ITEMS_COLA = {
   conceptos_sin_respaldo: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
   visitadas_sin_materiales: "numero AS id, contacto_nombre AS titulo, sector AS detalle",
   terreno_sin_atender: "numero AS id, COALESCE(propietario, caso, numero) AS titulo, " +
-    "municipio || COALESCE(' · casa ' || casa_no, '') AS detalle"
+    "municipio || COALESCE(' · casa ' || casa_no, '') AS detalle",
+  /* Un lote del extracto entra entero de una vez: todos tienen la misma hora
+     de importación, así que el desempate es la fecha del banco (`luego`) y
+     salen primero los movimientos más viejos de verdad. */
+  banco_sin_conciliar: { campos: "id AS id, descripcion AS titulo, " +
+    "(CASE WHEN valor_centavos < 0 THEN 'cargo · ' ELSE 'abono · ' END) || fecha || COALESCE(' · ' || referencia, '') AS detalle, " +
+    "ABS(valor_centavos) AS monto", luego: "fecha ASC, id ASC" }
 };
 const ITEMS_POR_COLA = 5;
 /* `SELECT COUNT(*) AS n, MIN(<t>) AS masViejo <FROM … WHERE …>` → las filas.
@@ -2781,7 +2787,10 @@ const ITEMS_POR_COLA = 5;
 function itemsDeCola(sql, campos) {
   const m = String(sql).match(/^SELECT COUNT\(\*\) AS n, MIN\(([\s\S]*)\) AS masViejo (FROM [\s\S]*)$/);
   if (!m || !campos) return null;
-  return "SELECT " + campos + ", " + m[1] + " AS t " + m[2] + " ORDER BY t ASC LIMIT " + ITEMS_POR_COLA;
+  /* `campos` puede traer un desempate: { campos, luego }. */
+  const c = typeof campos === "string" ? { campos } : campos;
+  return "SELECT " + c.campos + ", " + m[1] + " AS t " + m[2] + " ORDER BY t ASC" + (c.luego ? ", " + c.luego : "") +
+    " LIMIT " + ITEMS_POR_COLA;
 }
 
 /* LAS TRES FRANJAS DE «HOY»: urgente, hoy y esta semana.
@@ -2986,6 +2995,25 @@ async function adminSalud(env, opciones) {
   await enCola("transferencias_sin_verificar",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM aportes WHERE estado = 'reportada'",
     "Bandeja «Transferencias» · sin verificar no hay recibo ni certificado", 60, "#sec-transferencias");
+  /* EL EXTRACTO DEL BANCO (Fase 3, 0042). Dos colas:
+     · lo importado que nadie ha explicado. Cuenta desde que se IMPORTÓ, no
+       desde la fecha del banco: importar el extracto de septiembre el 3 de
+       octubre no puede nacer vencido. Siete días de plazo, porque mientras un
+       abono no se concilia, el Resumen no sabe si cuadra.
+     · el recordatorio de importar el del mes anterior, del día 3 en adelante,
+       hasta que haya uno que lo cubra. Es papel de oficina («Esta semana»);
+       pasado el 15 ya no lo es, sube a Urgente y entra al correo diario.
+     Las dos van al correo de contabilidad, no al de alianzas: ver
+     `COLAS_PLAZO_BANCO`. Sin la 0042 no hay tablas y no salen. */
+  try {
+    await enCola("banco_sin_conciliar",
+      "SELECT COUNT(*) AS n, MIN(importado_en) AS masViejo FROM movimientos_banco WHERE estado = 'sin_conciliar'",
+      "Finanzas › Conciliar · cada renglón del extracto se explica con un aporte, un egreso, una comisión o un motivo", 58, "#sec-conciliar", 7);
+    await enCola("extracto_por_importar", await colaExtractoPorImportar(env),
+      "Finanzas › Banco · descarga el extracto del mes en la Sucursal Virtual de Bancolombia e impórtalo", 75, "#sec-banco");
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   await enCola("certificados_por_emitir",
     "SELECT COUNT(*) AS n, MIN(a.aprobada_en) AS masViejo " + CERT_POR_EMITIR,
     "Lista de aportes · los firma la Revisora Fiscal, no el sistema", 70, "#sec-aportes");
@@ -3724,7 +3752,11 @@ async function adminFinanzas(env, url) {
     paypal: await quizas(() => todas(
       "SELECT moneda, COUNT(*) AS n, COALESCE(SUM(monto_centavos), 0) AS centavos FROM eventos_ipn " +
       "WHERE resultado = 'por_registrar' AND estado = 'Completed' AND date(recibido_en, '-5 hours') BETWEEN ? AND ? GROUP BY moneda",
-      desde, hasta), [])
+      desde, hasta), []),
+    /* Lo que una persona registró desde el extracto como pago sin guía (0042). */
+    banco: await quizas(() => todas(
+      "SELECT moneda, COUNT(*) AS n, COALESCE(SUM(monto_centavos), 0) AS centavos FROM pagos_sin_guia " +
+      "WHERE anulado_en IS NULL AND fecha BETWEEN ? AND ? GROUP BY moneda", desde, hasta), [])
   };
   const reportadas = await una("SELECT COUNT(*) AS n, COALESCE(SUM(a.monto_centavos), 0) AS centavos FROM aportes a " +
                                "WHERE a.estado = 'reportada' AND " + EN, desde, hasta);
@@ -3756,6 +3788,10 @@ async function adminFinanzas(env, url) {
     por_centro: await todas("SELECT COALESCE(e.centro, '') AS clave, COUNT(*) AS n, SUM(e.total_centavos) AS centavos" + EG +
                             " GROUP BY 1 ORDER BY centavos DESC LIMIT 30", desde, hasta)
   };
+  /* EL BANCO, que es la cifra que manda (Fase 3, 0042). Sin extracto
+     importado para el periodo, lo dice en vez de enseñar ceros. */
+  const copConf = (ingresos.total.find((x) => x.moneda === "COP") || {}).centavos || 0;
+  const banco = await quizas(() => resumenBanco(env, desde, hasta, Number(copConf), Number(egresos.total.neto || 0)), null);
   /* Mes a mes del año elegido: ingresos confirmados (por moneda) y egresos. */
   const serieIng = await todas("SELECT substr(" + FECHA_APORTE + ", 1, 7) AS m, a.moneda AS moneda, SUM(a.monto_centavos) AS centavos " +
                                "FROM aportes a WHERE " + APORTE_CONFIRMADO + " AND " + EN + " GROUP BY 1, 2",
@@ -3777,8 +3813,1123 @@ async function adminFinanzas(env, url) {
     anios: Array.from({ length: anioHoy - anioMin + 1 }, (_, i) => anioHoy - i),
     ingresos, sin_guia: sinGuia, reportadas,
     donantes: { n: don.n || 0, nuevos: nuevos.n || 0, sin_ficha: don.sin || 0 },
-    miembros, certificados: certs, egresos, serie: meses, etiquetas: ETIQ_FINANZAS
+    miembros, certificados: certs, egresos, banco, serie: meses, etiquetas: ETIQ_FINANZAS
   });
+}
+
+/* ========================================================================
+   CONCILIACIÓN BANCARIA (Fase 3 del panel, oct 2026)
+   ========================================================================
+   Decisión del fundador del 8 oct 2026: **el extracto de Bancolombia es la
+   cifra que manda.** El panel sabía lo que decían Wompi, PayPal y los
+   donantes; desde aquí sabe también lo que dice el banco, y cada renglón del
+   extracto queda explicado por un aporte, un egreso, una comisión o un motivo
+   escrito. Las tablas y su porqué: migrations/0042_conciliacion_bancaria.sql.
+
+   EL FORMATO DEL ARCHIVO NO ESTÁ CONFIRMADO, y eso decide la forma del
+   importador: no hay un lector de «el CSV de Bancolombia», hay uno de
+   cualquier tabla —punto y coma, coma, tabulador o la tabla HTML que algunos
+   bancos llaman «Excel»—, en el que una persona dice qué columna es qué, ve
+   el resultado antes de guardar, y el panel recuerda su elección por cuenta.
+   Todo el análisis vive aquí, en el servidor: el navegador solo decodifica los
+   bytes (UTF-8 o Latin-1) y pinta lo que esto responde. Así la regla de cómo
+   se lee un número colombiano está escrita una sola vez. */
+const BANCO_MAX_TEXTO = 3 * 1024 * 1024;
+const BANCO_MAX_FILAS = 6000;
+/* Los motivos para dejar un movimiento fuera sin un aporte ni un egreso. Son
+   los que el extracto trae todos los meses y no son de ningún donante. */
+const MOTIVOS_IGNORAR = Object.freeze({
+  gmf: "GMF · 4 por mil",
+  gasto_bancario: "Gasto bancario (cuota de manejo, comisión, IVA)",
+  rendimientos: "Rendimientos o intereses",
+  traslado: "Traslado entre cuentas propias",
+  otro: "Otro motivo"
+});
+const MEDIOS_SIN_GUIA = Object.freeze({
+  transferencia: "Transferencia", consignacion: "Consignación", wompi_qr: "Wompi · enlace directo o QR",
+  paypal: "PayPal", otro: "Otro"
+});
+const TIPOS_ENLACE_ES = Object.freeze({
+  aporte: "Aporte", egreso: "Egreso", wompi: "Pago de Wompi sin aporte", ipn: "Donación del botón de PayPal",
+  pago_sin_guia: "Pago sin guía", comision: "Comisión de la pasarela", ajuste: "Ajuste"
+});
+const CAMPOS_EXTRACTO = ["fecha", "descripcion", "referencia", "oficina", "valor", "debito", "credito", "saldo"];
+const SEPARADORES_EXTRACTO = [";", ",", "\t", "|"];
+
+/* Mayúsculas, sin tildes y sin signos: es la forma en que se compara una
+   descripción del banco con un nombre, y la que entra en la huella. */
+function normalTexto(s) {
+  return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+}
+
+/* Una línea de CSV con comillas: un campo entre comillas puede llevar el
+   separador y hasta saltos de línea, y una comilla doble dentro es una. */
+function partirCSV(texto, sep) {
+  const filas = [];
+  let fila = [], campo = "", dentro = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (dentro) {
+      if (c === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else dentro = false; }
+      else campo += c;
+    } else if (c === '"' && campo.trim() === "") { dentro = true; campo = ""; }
+    else if (c === sep) { fila.push(campo); campo = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && texto[i + 1] === "\n") i++;
+      fila.push(campo); filas.push(fila); fila = []; campo = "";
+      if (filas.length > BANCO_MAX_FILAS + 60) break;
+    } else campo += c;
+  }
+  if (campo !== "" || fila.length) { fila.push(campo); filas.push(fila); }
+  return filas.map((f) => f.map((x) => x.trim()));
+}
+/* El separador es el que deja MÁS renglones con el mismo número de columnas
+   (y más de una). Contar apariciones de «;» no sirve: una descripción con
+   comas o un monto «1,234,567.89» entre comillas engañan a ese conteo. */
+function delimitadorDe(texto) {
+  const lineas = texto.split(/\r?\n/).filter((l) => l.trim()).slice(0, 60);
+  let mejor = ";", puntos = -1;
+  for (const s of SEPARADORES_EXTRACTO) {
+    const frec = {};
+    for (const l of lineas) { const n = partirCSV(l, s)[0].length; if (n > 1) frec[n] = (frec[n] || 0) + 1; }
+    const top = Object.entries(frec).sort((a, b) => b[1] - a[1] || Number(b[0]) - Number(a[0]))[0];
+    const p = top ? top[1] * 100 + Number(top[0]) : 0;
+    if (p > puntos) { puntos = p; mejor = s; }
+  }
+  return mejor;
+}
+const ENTIDADES_HTML = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", aacute: "á", eacute: "é",
+  iacute: "í", oacute: "ó", uacute: "ú", ntilde: "ñ", Aacute: "Á", Eacute: "É", Iacute: "Í", Oacute: "Ó",
+  Uacute: "Ú", Ntilde: "Ñ", uuml: "ü", Uuml: "Ü" };
+/* «Exportar a Excel» en varios bancos entrega una TABLA HTML con extensión
+   .xls. Se lee aquí sin librerías: filas <tr>, celdas <td>/<th>. Un .xlsx de
+   verdad (un zip) no llega hasta aquí: el panel pide guardarlo como CSV. */
+function filasDeHTML(t) {
+  const deco = (s) => s.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e) => {
+    if (e[0] === "#") { const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10); return n ? String.fromCodePoint(n) : ""; }
+    return ENTIDADES_HTML[e] != null ? ENTIDADES_HTML[e] : m;
+  });
+  return (t.match(/<tr[\s\S]*?<\/tr>/gi) || []).slice(0, BANCO_MAX_FILAS + 60).map((tr) =>
+    (tr.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || []).map((td) => deco(td.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim()));
+}
+
+/* UN NÚMERO COMO LO ESCRIBE UN BANCO COLOMBIANO, en centavos con signo.
+   «1.234.567,89», «-50.000», «$ 1,234,567.89», «(12.500)», «50000.00».
+   La regla del separador decimal: si hay punto Y coma, el último es el
+   decimal; si hay uno solo, es decimal cuando le siguen una o dos cifras
+   («50000.00», «0,5») y de miles cuando le siguen tres o se repite
+   («50.000», «1.234.567»). Un peso colombiano casi nunca lleva tres
+   decimales, así que la ambigüedad de «1.234» se resuelve a mil
+   doscientos treinta y cuatro, que es lo que significa en un extracto. */
+function centavosExtracto(crudo) {
+  let s = String(crudo == null ? "" : crudo).trim();
+  if (!s) return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+  s = s.replace(/COP|\$|\s| /gi, "");
+  if (s[0] === "-") { neg = !neg; s = s.slice(1); }
+  else if (s[0] === "+") s = s.slice(1);
+  if (s.endsWith("-")) { neg = !neg; s = s.slice(0, -1); }
+  if (!/^[0-9.,]+$/.test(s) || !/[0-9]/.test(s)) return null;
+  const ult = Math.max(s.lastIndexOf("."), s.lastIndexOf(","));
+  let entera = s, dec = "";
+  if (ult >= 0) {
+    const tras = s.slice(ult + 1);
+    const ambos = s.includes(".") && s.includes(",");
+    const repetido = s.split(s[ult]).length > 2;
+    if (ambos || (!repetido && tras.length !== 3)) { entera = s.slice(0, ult); dec = tras; }
+  }
+  entera = entera.replace(/[.,]/g, "");
+  if (!/^\d*$/.test(entera) || !/^\d*$/.test(dec)) return null;
+  let c = Number(entera || "0") * 100 + Number((dec + "00").slice(0, 2));
+  if (dec.length > 2 && Number(dec[2]) >= 5) c += 1;
+  if (!Number.isSafeInteger(c)) return null;
+  return neg ? -c : c;
+}
+/* Una fecha del extracto, a AAAA-MM-DD. Día/mes/año es lo colombiano; si el
+   archivo trae mes/día (alguna exportación en inglés), `formato` = "mdy".
+   La hora, si viene pegada, se descarta: el extracto es por día. */
+function fechaExtracto(crudo, formato) {
+  const s = String(crudo == null ? "" : crudo).trim().replace(/[ T]\d{1,2}:\d{2}(:\d{2})?.*$/, "");
+  let a, m, d, x;
+  if ((x = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/))) { a = +x[1]; m = +x[2]; d = +x[3]; }
+  else if ((x = s.match(/^(\d{4})(\d{2})(\d{2})$/))) { a = +x[1]; m = +x[2]; d = +x[3]; }
+  else if ((x = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})$/))) {
+    a = +x[3]; if (a < 100) a += 2000;
+    if (formato === "mdy") { m = +x[1]; d = +x[2]; } else { d = +x[1]; m = +x[2]; }
+  } else return null;
+  if (a < 2000 || a > 2100) return null;
+  const iso = a + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+  const t = new Date(iso + "T00:00:00Z");
+  if (isNaN(t) || t.toISOString().slice(0, 10) !== iso) return null;
+  return iso;
+}
+/* ¿Día/mes o mes/día? Si alguna fecha tiene un primer número mayor que 12, es
+   día/mes; si alguna tiene el SEGUNDO mayor que 12 y nunca el primero, es
+   mes/día. Sin pistas, lo colombiano. */
+function formatoFechas(valores) {
+  let dmy = false, mdy = false;
+  for (const v of valores) {
+    const x = String(v || "").trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.]\d{2,4}/);
+    if (!x) continue;
+    if (+x[1] > 12) dmy = true; else if (+x[2] > 12) mdy = true;
+  }
+  return mdy && !dmy ? "mdy" : "dmy";
+}
+/* La fila de títulos: la primera que tiene el ancho de la tabla, tres celdas
+   o más, ninguna fecha y pocos números. Si antes aparece una fila con fecha,
+   el archivo no tiene títulos. Los extractos suelen traer arriba el nombre del
+   titular y el periodo: esas líneas tienen otro ancho y se saltan solas. */
+function filaDeTitulos(filas) {
+  const anchos = {};
+  filas.slice(0, 300).forEach((f) => { if (f.filter(Boolean).length >= 3) anchos[f.length] = (anchos[f.length] || 0) + 1; });
+  const ancho = Number((Object.entries(anchos).sort((a, b) => b[1] - a[1])[0] || [0])[0]);
+  for (let i = 0; i < Math.min(filas.length, 30); i++) {
+    const llenas = filas[i].filter(Boolean);
+    if (filas[i].length !== ancho || llenas.length < 3) continue;
+    if (llenas.some((c) => fechaExtracto(c, "dmy"))) return -1;
+    if (llenas.filter((c) => centavosExtracto(c) != null).length <= llenas.length / 3) return i;
+  }
+  return -1;
+}
+/* Qué columna es qué, por el nombre del título. Es solo la propuesta: la
+   persona la corrige en el panel y su corrección se recuerda. */
+function mapeoSugerido(nombres) {
+  const n = nombres.map(normalTexto), m = {};
+  const usada = (i) => Object.values(m).includes(i);
+  const busca = (re) => n.findIndex((x, i) => re.test(x) && !usada(i));
+  const pon = (k, i) => { if (i >= 0) m[k] = i; };
+  pon("fecha", busca(/FECHA/));
+  pon("saldo", busca(/SALDO/));
+  const deb = busca(/DEBITO|CARGO|RETIRO|EGRESO|SALIDA/);
+  const cre = n.findIndex((x, i) => /CREDITO|ABONO|DEPOSITO|INGRESO|ENTRADA/.test(x) && !usada(i) && i !== deb);
+  if (deb >= 0 && cre >= 0) { m.debito = deb; m.credito = cre; }
+  else pon("valor", busca(/VALOR|IMPORTE|MONTO|MOVIMIENTO|CANTIDAD/));
+  pon("descripcion", busca(/DESCRIP|CONCEPTO|DETALLE|TRANSACCION|NARRATIVA|MOTIVO/));
+  pon("referencia", busca(/REFERENCIA|DOCUMENTO|COMPROBANTE|^DOC|DCTO/));
+  pon("oficina", busca(/OFICINA|SUCURSAL|CANAL/));
+  return m;
+}
+/* El mapeo recordado se guarda por NOMBRE de columna (con su posición de
+   respaldo): si el mes que viene el banco agrega una columna al principio, el
+   nombre sigue encontrando la suya. Si algún nombre ya no está, no se usa. */
+function mapeoRecordado(guardado, nombres) {
+  if (!guardado || !guardado.columnas) return null;
+  const n = nombres.map(normalTexto), m = {};
+  for (const [k, nombre] of Object.entries(guardado.columnas)) {
+    if (!CAMPOS_EXTRACTO.includes(k)) continue;
+    const i = n.indexOf(normalTexto(nombre));
+    if (i < 0) return null;
+    m[k] = i;
+  }
+  return Object.keys(m).length ? m : null;
+}
+function mapeoValido(crudo, ancho) {
+  if (!esObjeto(crudo)) return null;
+  const m = {};
+  for (const k of CAMPOS_EXTRACTO) {
+    const v = crudo[k];
+    if (v === "" || v == null) continue;
+    const i = Number(v);
+    if (Number.isInteger(i) && i >= 0 && i < ancho) m[k] = i;
+  }
+  if (m.valor != null) { delete m.debito; delete m.credito; }
+  return m;
+}
+function faltasMapeo(m) {
+  const f = [];
+  if (m.fecha == null) f.push("la fecha");
+  if (m.valor == null && (m.debito == null || m.credito == null)) f.push("el valor (o las columnas de débito y crédito)");
+  return f;
+}
+/* LA HUELLA DE UN MOVIMIENTO, para no duplicar al volver a importar.
+   Entra todo lo que lo distingue —cuenta, fecha, valor, descripción
+   normalizada, referencia y saldo— y, al final, cuántas veces antes apareció
+   ESE MISMO renglón en el mismo archivo. Lo último es lo que separa dos
+   cobros idénticos del 4 por mil el mismo día en un extracto sin saldo: sin
+   ese número serían una sola huella y el segundo se perdería. Como el conteo
+   es dentro del día, un archivo que se solapa con el anterior produce las
+   mismas huellas para los días que comparten. */
+async function huellaMovimiento(base) {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(base));
+  return [...new Uint8Array(h)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+function diasEntre(a, b) { return Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 86400000); }
+function fechaMasDias(f, n) { const d = new Date(f + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function ultimoDiaMes(f) { const d = new Date(Date.UTC(+f.slice(0, 4), +f.slice(5, 7), 0)); return d.toISOString().slice(0, 10); }
+
+/* El archivo entero, leído con un mapeo: columnas, muestra cruda y renglones
+   ya convertidos, con su error dicho en palabras si no se entienden. */
+function leerExtracto(texto, op) {
+  const t = String(texto || "").replace(/^﻿/, "");
+  const html = /<table[\s>]/i.test(t);
+  const sep = html ? null : (SEPARADORES_EXTRACTO.includes(op.delimitador) ? op.delimitador : delimitadorDe(t));
+  const crudas = (html ? filasDeHTML(t) : partirCSV(t, sep)).filter((f) => f.some((c) => c !== ""));
+  const titulos = Number.isInteger(op.fila_titulos) && op.fila_titulos >= -1 && op.fila_titulos < Math.min(crudas.length, 30)
+    ? op.fila_titulos : filaDeTitulos(crudas);
+  const datos = crudas.slice(titulos + 1);
+  const ancho = Math.max(0, ...crudas.slice(0, 400).map((f) => f.length));
+  const nombres = [];
+  for (let i = 0; i < ancho; i++) nombres.push(titulos >= 0 && crudas[titulos][i] ? crudas[titulos][i] : "Columna " + (i + 1));
+  let origen = "tuyo";
+  let mapeo = mapeoValido(op.mapeo, ancho);
+  if (!mapeo || !Object.keys(mapeo).length) {
+    mapeo = mapeoRecordado(op.recordado, nombres);
+    origen = mapeo ? "recordado" : "sugerido";
+    if (!mapeo) mapeo = mapeoSugerido(nombres);
+  }
+  const celda = (f, k) => (mapeo[k] != null ? String(f[mapeo[k]] == null ? "" : f[mapeo[k]]).trim() : "");
+  const formato = op.formato_fecha === "mdy" || op.formato_fecha === "dmy" ? op.formato_fecha
+    : (origen === "recordado" && op.recordado && (op.recordado.formato_fecha === "mdy" || op.recordado.formato_fecha === "dmy")
+      ? op.recordado.formato_fecha : formatoFechas(datos.slice(0, 400).map((f) => celda(f, "fecha"))));
+  const invertir = op.invertir === true || (op.invertir == null && origen === "recordado" && op.recordado && op.recordado.invertir === true);
+  const manana = fechaMasDias(fechaCO(), 1);
+  const filas = [];
+  let omitidas = 0;
+  datos.slice(0, BANCO_MAX_FILAS).forEach((f, k) => {
+    const linea = titulos + 2 + k;
+    const cf = celda(f, "fecha"), desc = celda(f, "descripcion");
+    const cv = celda(f, "valor"), cd = celda(f, "debito"), cc = celda(f, "credito");
+    if (!cf && !cv && !cd && !cc) { omitidas++; return; }
+    const fecha = fechaExtracto(cf, formato);
+    /* Las líneas de «saldo anterior» o «total» no son movimientos. */
+    if (!fecha && /SALDO|TOTAL|RESUMEN/.test(normalTexto(cf + " " + desc))) { omitidas++; return; }
+    let valor;
+    if (mapeo.valor != null) valor = centavosExtracto(cv);
+    else {
+      const d = cd ? centavosExtracto(cd) : 0, c = cc ? centavosExtracto(cc) : 0;
+      valor = d == null || c == null ? null : Math.abs(c) - Math.abs(d);
+    }
+    if (valor != null && invertir) valor = -valor;
+    const cs = celda(f, "saldo");
+    const saldo = cs ? centavosExtracto(cs) : null;
+    let error = "";
+    if (!fecha) error = "La fecha no se entiende: «" + cf.slice(0, 30) + "»";
+    else if (fecha > manana) error = "La fecha " + fecha + " es futura";
+    else if (fecha < "2020-01-01") error = "La fecha " + fecha + " es anterior a 2020";
+    else if (valor == null) error = "El valor no se entiende: «" + (mapeo.valor != null ? cv : cd + " / " + cc).slice(0, 30) + "»";
+    else if (cs && saldo == null) error = "El saldo no se entiende: «" + cs.slice(0, 30) + "»";
+    if (!error && valor === 0) { omitidas++; return; }
+    filas.push({ linea, fecha, descripcion: desc.slice(0, 300), referencia: celda(f, "referencia").slice(0, 120) || null,
+                 oficina: celda(f, "oficina").slice(0, 80) || null, valor_centavos: valor, saldo_centavos: saldo, error });
+  });
+  return { html, delimitador: sep, columnas: nombres, fila_titulos: titulos, formato_fecha: formato, invertir,
+           muestra: datos.slice(0, 6), crudas_n: datos.length, mapeo, origen, filas, omitidas,
+           cortado: datos.length > BANCO_MAX_FILAS };
+}
+
+/* POST /api/admin/banco/leer  { texto, archivo, cuenta, mapeo?, fila_titulos?,
+   formato_fecha?, invertir?, periodo_desde?, periodo_hasta?, confirmar? }
+   Sin `confirmar` NO escribe nada: devuelve la lectura y «N nuevos · M ya
+   estaban · K con error». Con `confirmar` guarda el lote y sus movimientos. */
+async function adminBancoLeer(request, env, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const texto = typeof c.texto === "string" ? c.texto : "";
+  if (!texto.trim()) return json({ error: "archivo_vacio", ayuda: "El archivo llegó vacío." }, 400);
+  if (texto.length > BANCO_MAX_TEXTO) return json({ error: "archivo_grande",
+    ayuda: "El archivo pasa de 3 MB. Exporta un periodo más corto (un mes es lo normal)." }, 413);
+  const cuenta = limpiar(c.cuenta, 60) || "Bancolombia";
+  /* EL NOMBRE, NUNCA EL NÚMERO. La cuenta se llama «Bancolombia ahorros»; su
+     número no lo necesita ninguna pantalla y es lo que no debe quedar escrito
+     en la base, ni en un respaldo, ni en una captura. */
+  if (/\d{6,}/.test(cuenta.replace(/[\s.-]/g, ""))) {
+    return json({ error: "cuenta_con_numero",
+      ayuda: "Ponle a la cuenta un nombre, no su número: por ejemplo «Bancolombia ahorros»." }, 400);
+  }
+  const archivo = limpiar(c.archivo, 120);
+  const prev = await env.DB.prepare(
+    "SELECT mapeo FROM lotes_banco WHERE cuenta = ? COLLATE NOCASE AND deshecho_en IS NULL AND mapeo IS NOT NULL ORDER BY id DESC LIMIT 1"
+  ).bind(cuenta).first();
+  let recordado = null;
+  try { recordado = prev && prev.mapeo ? JSON.parse(prev.mapeo) : null; } catch (e) { recordado = null; }
+  const filaT = c.fila_titulos === "" || c.fila_titulos == null ? null : Number(c.fila_titulos);
+  const r = leerExtracto(texto, {
+    mapeo: c.mapeo, fila_titulos: Number.isInteger(filaT) ? filaT : null, recordado,
+    formato_fecha: c.formato_fecha, invertir: typeof c.invertir === "boolean" ? c.invertir : null,
+    delimitador: c.delimitador
+  });
+  if (!r.columnas.length) return json({ error: "sin_tabla",
+    ayuda: "No encontré una tabla en el archivo. ¿Es el extracto en CSV (o en «Excel» exportado por el banco)?" }, 422);
+  const faltan = faltasMapeo(r.mapeo);
+  const buenas = faltan.length ? [] : r.filas.filter((f) => !f.error);
+  const malas = faltan.length ? [] : r.filas.filter((f) => f.error);
+
+  /* Orden cronológico. Bancolombia (y casi todos) exportan del más nuevo al
+     más viejo; la posición que se guarda es la cronológica, para que «el
+     último saldo del mes» sea el último de verdad. */
+  const desc = buenas.length > 1 && buenas[0].fecha > buenas[buenas.length - 1].fecha;
+  /* Y un renglón suelto fuera de orden (alguno trae al final un movimiento
+     del día anterior) se reubica: el orden estable por fecha conserva el del
+     archivo dentro de cada día. */
+  const crono = (desc ? buenas.slice().reverse() : buenas.slice()).sort((x, y) => (x.fecha < y.fecha ? -1 : x.fecha > y.fecha ? 1 : 0));
+  /* El saldo, renglón a renglón: si la columna de saldo viene y el valor no
+     la explica, casi siempre es el signo al revés o el débito y el crédito
+     cruzados. Se dice antes de guardar, que es cuando se arregla barato. */
+  let saldoMal = 0, saldoRevés = 0, saldoPares = 0;
+  for (let i = 1; i < crono.length; i++) {
+    const a = crono[i - 1], b = crono[i];
+    if (a.saldo_centavos == null || b.saldo_centavos == null) continue;
+    saldoPares++;
+    const dif = b.saldo_centavos - a.saldo_centavos;
+    if (dif !== b.valor_centavos) { saldoMal++; if (dif === -b.valor_centavos) saldoRevés++; }
+  }
+  const veces = {};
+  for (let i = 0; i < crono.length; i++) {
+    const f = crono[i];
+    f.posicion = i + 1;
+    const base = [cuenta.toLowerCase(), f.fecha, f.valor_centavos, normalTexto(f.descripcion), normalTexto(f.referencia || ""),
+                  f.saldo_centavos == null ? "" : f.saldo_centavos].join("|");
+    veces[base] = (veces[base] || 0) + 1;
+    f.hash = await huellaMovimiento(base + "|" + veces[base]);
+  }
+  const ya = new Set();
+  for (let i = 0; i < crono.length; i += 80) {
+    const trozo = crono.slice(i, i + 80);
+    const q = await env.DB.prepare("SELECT hash FROM movimientos_banco WHERE hash IN (" + trozo.map(() => "?").join(",") + ")")
+      .bind(...trozo.map((f) => f.hash)).all();
+    (q.results || []).forEach((x) => ya.add(x.hash));
+  }
+  crono.forEach((f) => { f.ya = ya.has(f.hash); });
+  const nuevos = crono.filter((f) => !f.ya);
+  const primera = crono.length ? crono[0].fecha : null, ultima = crono.length ? crono[crono.length - 1].fecha : null;
+  const hoy = fechaCO();
+  const periodo = primera ? {
+    desde: primera.slice(0, 8) + "01",
+    hasta: ultima.slice(0, 7) < hoy.slice(0, 7) ? ultimoDiaMes(ultima) : ultima
+  } : { desde: null, hasta: null };
+  const conSaldo = crono.filter((f) => f.saldo_centavos != null);
+  const saldoFinal = conSaldo.length ? conSaldo[conSaldo.length - 1].saldo_centavos : null;
+  const sumas = { creditos: 0, debitos: 0, n_creditos: 0, n_debitos: 0 };
+  crono.forEach((f) => { if (f.valor_centavos > 0) { sumas.creditos += f.valor_centavos; sumas.n_creditos++; } else { sumas.debitos += f.valor_centavos; sumas.n_debitos++; } });
+  const mapeoGuardar = {
+    columnas: Object.fromEntries(Object.entries(r.mapeo).map(([k, i]) => [k, r.columnas[i]])),
+    indices: r.mapeo, fila_titulos: r.fila_titulos, formato_fecha: r.formato_fecha, invertir: r.invertir,
+    delimitador: r.delimitador, html: r.html
+  };
+
+  if (!c.confirmar) {
+    const vista = (faltan.length ? r.filas : r.filas.slice(0, 400)).slice(0, 25).map((f) => ({
+      linea: f.linea, fecha: f.fecha, descripcion: f.descripcion, referencia: f.referencia, valor_centavos: f.valor_centavos,
+      saldo_centavos: f.saldo_centavos, error: f.error, ya: f.hash ? ya.has(f.hash) : false }));
+    return json({
+      columnas: r.columnas, muestra: r.muestra, fila_titulos: r.fila_titulos, delimitador: r.delimitador, html: r.html,
+      mapeo: r.mapeo, origen: r.origen, recordado: !!recordado, formato_fecha: r.formato_fecha, invertir: r.invertir,
+      faltan, vista,
+      errores: malas.slice(0, 40).map((f) => ({ linea: f.linea, error: f.error })),
+      conteo: { filas: r.filas.length, nuevos: nuevos.length, repetidos: crono.length - nuevos.length, errores: malas.length,
+                omitidas: r.omitidas, cortado: r.cortado },
+      rango: { primera, ultima }, periodo, saldo_final: saldoFinal, sumas,
+      saldo: { pares: saldoPares, no_cuadran: saldoMal, al_reves: saldoRevés }
+    });
+  }
+
+  if (faltan.length) return json({ error: "mapeo_incompleto", ayuda: "Falta decir qué columna es " + faltan.join(" y ") + "." }, 422);
+  if (!crono.length) return json({ error: "sin_movimientos", ayuda: "Con esta lectura no queda ningún movimiento que guardar." }, 422);
+  const pd = limpiar(c.periodo_desde, 10) || periodo.desde, ph = limpiar(c.periodo_hasta, 10) || periodo.hasta;
+  if (!RE_FECHA.test(pd) || !RE_FECHA.test(ph) || pd > ph) {
+    return json({ error: "periodo_invalido", ayuda: "El periodo del extracto tiene que ser dos fechas, la primera antes que la segunda." }, 422);
+  }
+  if (pd > primera || ph < ultima) {
+    return json({ error: "periodo_corto", ayuda: "El periodo que escribiste (" + pd + " a " + ph + ") deja fuera movimientos del archivo, que van del " +
+      primera + " al " + ultima + ". Amplíalo." }, 422);
+  }
+  if (!nuevos.length) {
+    return json({ ok: true, lote_id: null, nuevos: 0, repetidos: crono.length, errores: malas.length,
+                  ayuda: "Todos los movimientos de este archivo ya estaban importados. No se guardó nada." });
+  }
+  const lote = await env.DB.prepare(
+    "INSERT INTO lotes_banco (cuenta, archivo, mapeo, periodo_desde, periodo_hasta, primera_fecha, ultima_fecha, filas, nuevos, " +
+    "repetidos, errores, saldo_final_centavos, importado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+  ).bind(cuenta, archivo || null, JSON.stringify(mapeoGuardar), pd, ph, primera, ultima, r.filas.length, 0,
+         crono.length - nuevos.length, malas.length, saldoFinal, quien || "?").run();
+  const loteId = lote.meta && lote.meta.last_row_id;
+  let insertados = 0;
+  for (let i = 0; i < nuevos.length; i += 40) {
+    const res = await env.DB.batch(nuevos.slice(i, i + 40).map((f) => env.DB.prepare(
+      "INSERT OR IGNORE INTO movimientos_banco (cuenta, fecha, descripcion, referencia, oficina, valor_centavos, saldo_centavos, hash, lote_id, posicion) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?)"
+    ).bind(cuenta, f.fecha, f.descripcion, f.referencia, f.oficina, f.valor_centavos, f.saldo_centavos, f.hash, loteId, f.posicion)));
+    res.forEach((x) => { insertados += (x.meta && x.meta.changes) || 0; });
+  }
+  await env.DB.prepare("UPDATE lotes_banco SET nuevos = ?, repetidos = ? WHERE id = ?")
+    .bind(insertados, crono.length - insertados, loteId).run();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "extracto importado · lote " + loteId + " · " + cuenta + " · " + pd + " a " + ph + " · " +
+          insertados + " nuevos, " + (crono.length - insertados) + " ya estaban, " + malas.length + " con error" +
+          (archivo ? " · " + archivo : "")).run();
+  return json({ ok: true, lote_id: loteId, nuevos: insertados, repetidos: crono.length - insertados, errores: malas.length });
+}
+
+/* POST /api/admin/banco/lote/<id>/deshacer — quitar una importación mal hecha
+   (columnas cruzadas, la cuenta equivocada). Solo mientras NADA de ese lote se
+   haya conciliado ni ignorado: después ya hay decisiones encima, y se deshacen
+   una por una. */
+async function adminBancoDeshacerLote(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const l = await env.DB.prepare("SELECT id, cuenta, deshecho_en FROM lotes_banco WHERE id = ?").bind(id).first();
+  if (!l) return json({ error: "no_encontrado" }, 404);
+  if (l.deshecho_en) return json({ error: "ya_deshecho", ayuda: "Esa importación ya se había deshecho." }, 409);
+  const tocados = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM movimientos_banco WHERE lote_id = ? AND estado <> 'sin_conciliar'").bind(id).first();
+  if (tocados && tocados.n) return json({ error: "lote_con_conciliaciones",
+    ayuda: tocados.n + (tocados.n === 1 ? " movimiento" : " movimientos") + " de esta importación ya se concilió o se ignoró. " +
+           "Deshaz esas decisiones primero (desde cada movimiento) y vuelve a intentarlo." }, 409);
+  const borr = await env.DB.prepare("DELETE FROM movimientos_banco WHERE lote_id = ? AND estado = 'sin_conciliar'").bind(id).run();
+  await env.DB.prepare("UPDATE lotes_banco SET deshecho_en = datetime('now'), deshecho_por = ? WHERE id = ?").bind(quien || "?", id).run();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "extracto DESHECHO · lote " + id + " · " + l.cuenta + " · " + ((borr.meta && borr.meta.changes) || 0) + " movimientos quitados").run();
+  return json({ ok: true, quitados: (borr.meta && borr.meta.changes) || 0 });
+}
+
+/* Lo que explica cada movimiento, en una línea para la tabla. */
+async function enlacesDe(env, ids) {
+  const por = {};
+  for (let i = 0; i < ids.length; i += 90) {
+    const t = ids.slice(i, i + 90);
+    if (!t.length) continue;
+    const q = await env.DB.prepare(
+      "SELECT movimiento_id, tipo, ref, monto_centavos, moneda_origen, monto_origen_centavos, nota FROM conciliaciones " +
+      "WHERE movimiento_id IN (" + t.map(() => "?").join(",") + ") ORDER BY id"
+    ).bind(...t).all();
+    (q.results || []).forEach((x) => { (por[x.movimiento_id] = por[x.movimiento_id] || []).push(x); });
+  }
+  return por;
+}
+
+/* GET /api/admin/banco — la sección «Banco»: lo importado y los movimientos. */
+async function adminBanco(env) {
+  const lotes = await env.DB.prepare(
+    "SELECT l.*, (SELECT COUNT(*) FROM movimientos_banco m WHERE m.lote_id = l.id AND m.estado <> 'sin_conciliar') AS resueltos " +
+    "FROM lotes_banco l ORDER BY l.id DESC LIMIT 200"
+  ).all();
+  const movs = await env.DB.prepare(
+    "SELECT id, cuenta, fecha, descripcion, referencia, oficina, valor_centavos, saldo_centavos, lote_id, posicion, " +
+    "importado_en, estado, motivo, nota, resuelto_por, resuelto_en FROM movimientos_banco " +
+    "ORDER BY fecha DESC, lote_id DESC, posicion DESC LIMIT " + TOPE_LIBRO
+  ).all();
+  const tot = await env.DB.prepare(
+    "SELECT COUNT(*) AS n, SUM(CASE WHEN estado = 'sin_conciliar' THEN 1 ELSE 0 END) AS sin, " +
+    "MIN(fecha) AS primera, MAX(fecha) AS ultima FROM movimientos_banco").first();
+  const l = movs.results || [];
+  const en = await enlacesDe(env, l.map((m) => m.id));
+  l.forEach((m) => { m.enlaces = en[m.id] || []; });
+  const cob = await env.DB.prepare(
+    "SELECT cuenta, MIN(periodo_desde) AS desde, MAX(periodo_hasta) AS hasta, COUNT(*) AS lotes FROM lotes_banco " +
+    "WHERE deshecho_en IS NULL GROUP BY cuenta ORDER BY cuenta").all();
+  return json({ lotes: (lotes.results || []).map((x) => { delete x.mapeo; return x; }), movimientos: l,
+                total: (tot && tot.n) || 0, sin_conciliar: (tot && tot.sin) || 0, tope: TOPE_LIBRO,
+                cobertura: cob.results || [], etiquetas: { motivos: MOTIVOS_IGNORAR, medios: MEDIOS_SIN_GUIA, enlaces: TIPOS_ENLACE_ES } });
+}
+
+/* ==== LAS SUGERENCIAS ====
+   Cada movimiento sin conciliar se compara con lo que el panel ya sabe, en el
+   SERVIDOR y con reglas escritas aquí:
+
+   · un abono ↔ una transferencia directa: el mismo monto al peso, a tres días
+     o menos, y suma si el apellido o la referencia aparecen en la descripción.
+     Si la transferencia todavía está «reportada», la sugerencia es confirmarla
+     (con su recibo a la vista, como siempre);
+   · un abono ↔ un lote de Wompi: la suma de los pagos aprobados de uno o
+     varios días seguidos ANTES del abono, menos la comisión. La comisión que
+     se espera es la tarifa publicada de Wompi —2,65 % + $700 más IVA por
+     transacción—, y gana el grupo cuya diferencia más se le parece;
+   · un abono que dice PAYPAL ↔ lo que entró por PayPal (en dólares) desde el
+     último retiro. El banco da los pesos: esa es la cifra, sin TRM inventada;
+   · un cargo ↔ un egreso por lo que salió de la cuenta (el neto), a cinco días;
+   · y los de todos los meses —4 por mil, cuota de manejo, rendimientos,
+     traslados— se proponen para ignorar con su motivo.
+
+   Una sugerencia no hace nada: una persona la acepta, y se puede deshacer. */
+const WOMPI_TARIFA = { pct: 0.0265, fijo: 70000, iva: 0.19 };
+function comisionWompiEstimada(montos) {
+  return montos.reduce((t, m) => t + Math.round((Math.round(m * WOMPI_TARIFA.pct) + WOMPI_TARIFA.fijo) * (1 + WOMPI_TARIFA.iva)), 0);
+}
+const RE_GMF = /\b(GMF|4 ?X ?1000|4 POR MIL|GRAVAMEN)\b/;
+const RE_GASTO = /\b(CUOTA (DE )?MANEJO|COMISION|COMIS|IVA COM|CARGO FIJO|COBRO SERVICIO)\b/;
+const RE_REND = /\b(RENDIMIENTO|RENDIMIENTOS|INTERES|INTERESES|ABONO INTERES)\b/;
+const RE_TRASLADO = /\b(TRASLADO|TRASL|ENTRE CUENTAS|CTA PROPIA|CUENTAS PROPIAS)\b/;
+
+async function poolsConciliacion(env, desde, hasta) {
+  const todas = async (sql, ...b) => ((await env.DB.prepare(sql).bind(...b).all()).results || []);
+  const ligados = new Set((await todas("SELECT tipo, ref FROM conciliaciones WHERE ref IS NOT NULL")).map((x) => x.tipo + "|" + x.ref));
+  const libre = (tipo, ref) => !ligados.has(tipo + "|" + ref);
+  const aportes = (await todas(
+    "SELECT a.guia, a.monto_centavos, a.moneda, " + MEDIO_APORTE + " AS medio, " + FECHA_APORTE + " AS fecha, " +
+    "a.referencia_pago, d.nombre FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id " +
+    "WHERE " + APORTE_CONFIRMADO + " AND " + FECHA_APORTE + " BETWEEN ? AND ?", desde, hasta))
+    .filter((a) => libre("aporte", a.guia))
+    .map((a) => ({ tipo: "aporte", ref: a.guia, titulo: a.nombre || "Sin nombre", fecha: a.fecha, monto_centavos: a.monto_centavos,
+                   moneda: a.moneda, medio: a.medio, referencia: a.referencia_pago, nombre: a.nombre }));
+  const reportadas = (await todas(
+    "SELECT a.guia, a.monto_centavos, COALESCE(a.fecha_pago, date(a.creada_en, '-5 hours')) AS fecha, a.referencia_pago, d.nombre " +
+    "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.estado = 'reportada'"))
+    .map((a) => ({ tipo: "reportada", ref: a.guia, titulo: a.nombre || "Sin nombre", fecha: a.fecha, monto_centavos: a.monto_centavos,
+                   moneda: "COP", referencia: a.referencia_pago, nombre: a.nombre }));
+  let wompi = [];
+  try {
+    wompi = (await todas(
+      "SELECT e.transaction_id, date(e.recibido_en, '-5 hours') AS fecha, e.cuerpo FROM eventos_wompi e " +
+      "LEFT JOIN aportes a ON a.guia = e.guia WHERE e.firma_valida = 1 AND e.estado = 'APPROVED' AND a.guia IS NULL " +
+      "AND date(e.recibido_en, '-5 hours') BETWEEN ? AND ?", desde, hasta))
+      .filter((e) => libre("wompi", e.transaction_id)).map((e) => {
+        let tx = {}; try { tx = (JSON.parse(e.cuerpo || "{}").data || {}).transaction || {}; } catch (x) { /* nada */ }
+        const nombre = (tx.customer_data && tx.customer_data.full_name) || null;
+        return { tipo: "wompi", ref: e.transaction_id, titulo: nombre || "Pago sin aporte", fecha: e.fecha,
+                 monto_centavos: Number(tx.amount_in_cents) || 0, moneda: tx.currency || "COP", medio: "wompi_otro", nombre };
+      }).filter((e) => e.monto_centavos > 0);
+  } catch (e) { wompi = []; }
+  let ipn = [];
+  try {
+    ipn = (await todas(
+      "SELECT clave, monto_centavos, moneda, date(recibido_en, '-5 hours') AS fecha, cuerpo FROM eventos_ipn " +
+      "WHERE resultado = 'por_registrar' AND estado = 'Completed' AND date(recibido_en, '-5 hours') BETWEEN ? AND ?", desde, hasta))
+      .filter((e) => libre("ipn", e.clave)).map((e) => {
+        let p = new URLSearchParams(""); try { p = new URLSearchParams(e.cuerpo || ""); } catch (x) { /* nada */ }
+        const nombre = [p.get("first_name"), p.get("last_name")].filter(Boolean).join(" ") || null;
+        return { tipo: "ipn", ref: e.clave, titulo: nombre || "Donación del botón", fecha: e.fecha, monto_centavos: e.monto_centavos,
+                 moneda: e.moneda || "USD", medio: "paypal", nombre };
+      });
+  } catch (e) { ipn = []; }
+  let sinGuia = [];
+  try {
+    sinGuia = (await todas("SELECT id, fecha, monto_centavos, moneda, nombre, medio FROM pagos_sin_guia WHERE anulado_en IS NULL AND fecha BETWEEN ? AND ?", desde, hasta))
+      .filter((p) => libre("pago_sin_guia", String(p.id)))
+      .map((p) => ({ tipo: "pago_sin_guia", ref: String(p.id), titulo: p.nombre || "Pago sin guía", fecha: p.fecha,
+                     monto_centavos: p.monto_centavos, moneda: p.moneda, medio: p.medio, nombre: p.nombre }));
+  } catch (e) { sinGuia = []; }
+  const egresos = (await todas(
+    "SELECT e.numero, e.fecha, e.concepto, e.neto_centavos, e.total_centavos, e.medio_pago, p.nombre FROM egresos e " +
+    "LEFT JOIN proveedores p ON p.id = e.proveedor_id WHERE e.anulado_en IS NULL AND e.fecha BETWEEN ? AND ?", desde, hasta))
+    .filter((e) => libre("egreso", e.numero))
+    .map((e) => ({ tipo: "egreso", ref: e.numero, titulo: (e.nombre || "Sin proveedor") + " · " + (e.concepto || ""), fecha: e.fecha,
+                   monto_centavos: e.neto_centavos, total_centavos: e.total_centavos, moneda: "COP", medio: e.medio_pago, nombre: e.nombre }));
+  return { aportes, reportadas, wompi, ipn, sinGuia, egresos };
+}
+/* ¿Aparece el nombre o la referencia en lo que escribió el banco? Palabras de
+   cuatro letras o más, para que «DE» o «LA» no cuenten como pista. */
+function pistaNombre(texto, nombre) {
+  const t = " " + normalTexto(texto) + " ";
+  const pal = normalTexto(nombre).split(" ").filter((p) => p.length >= 4);
+  return pal.filter((p) => t.includes(" " + p + " "));
+}
+function pistaReferencia(texto, ref) {
+  const r = normalTexto(ref).replace(/ /g, "");
+  return r.length >= 4 && normalTexto(texto).replace(/ /g, "").includes(r);
+}
+function itemSugerido(i) {
+  return { tipo: i.tipo, ref: i.ref, titulo: i.titulo, fecha: i.fecha, monto_centavos: i.monto_centavos, moneda: i.moneda || "COP", medio: i.medio || null };
+}
+function sugerirParaMovimientos(movs, pools) {
+  const usados = new Set();
+  const clave = (i) => i.tipo + "|" + i.ref;
+  const out = {};
+  const orden = movs.slice().sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.id - b.id));
+  const wompiPool = pools.aportes.filter((a) => a.moneda === "COP" && /^wompi/.test(a.medio)).concat(pools.wompi.filter((w) => w.moneda === "COP"));
+  const paypalPool = pools.aportes.filter((a) => a.moneda !== "COP" && a.medio === "paypal").concat(pools.ipn);
+  const transfer = pools.aportes.filter((a) => a.moneda === "COP" && a.medio === "transferencia").concat(pools.sinGuia.filter((p) => p.moneda === "COP"));
+  /* LOS CARGOS SE REPARTEN DE UNA VEZ, por puntos y no por orden de fecha:
+     cinco egresos de $1.000.000 en cinco días seguidos, y un pago a la DIAN
+     del mismo monto en otra cuenta, se le quitaban el egreso al cargo del día
+     siguiente, que era el suyo. Primero se asignan las parejas más claras. */
+  const paresEgreso = {}, asignado = {}, todasLasParejas = [];
+  for (const m of orden) {
+    if (m.valor_centavos >= 0) continue;
+    const ab = -m.valor_centavos, texto = m.descripcion + " " + (m.referencia || "");
+    paresEgreso[m.id] = pools.egresos.filter((e) => (e.monto_centavos === ab || e.total_centavos === ab) &&
+                                                    Math.abs(diasEntre(m.fecha, e.fecha)) <= 5)
+      .map((e) => {
+        const nom = pistaNombre(texto, e.nombre), d = diasEntre(m.fecha, e.fecha);
+        const par = { m, e, puntos: 100 - 4 * Math.abs(d) + (nom.length ? 20 : 0) + (e.monto_centavos === ab ? 5 : 0),
+                 por: [e.monto_centavos === ab ? "lo que salió de la cuenta (neto) es el mismo" : "el total es el mismo (sin retenciones)",
+                       d === 0 ? "el mismo día" : Math.abs(d) + (Math.abs(d) === 1 ? " día " : " días ") + (d > 0 ? "después" : "antes")]
+                   .concat(nom.length ? ["«" + nom.join(" ") + "» aparece en la descripción"] : []) };
+        todasLasParejas.push(par);
+        return par;
+      }).sort((x, y) => y.puntos - x.puntos);
+  }
+  const egresoTomado = new Set();
+  todasLasParejas.sort((x, y) => y.puntos - x.puntos).forEach((p) => {
+    if (asignado[p.m.id] || egresoTomado.has(p.e)) return;
+    asignado[p.m.id] = p.e; egresoTomado.add(p.e);
+  });
+  for (const m of orden) {
+    const s = [];
+    const V = m.valor_centavos, texto = m.descripcion + " " + (m.referencia || ""), nt = normalTexto(texto);
+    if (V > 0) {
+      const porTransfer = (lista, tipo) => lista.filter((a) => !usados.has(clave(a)) && a.monto_centavos === V && Math.abs(diasEntre(m.fecha, a.fecha)) <= 3)
+        .map((a) => {
+          const nom = pistaNombre(texto, a.nombre), ref = a.referencia && pistaReferencia(texto, a.referencia);
+          const d = diasEntre(m.fecha, a.fecha);
+          return { a, puntos: 100 - 5 * Math.abs(d) + (nom.length ? 20 : 0) + (ref ? 30 : 0),
+                   por: ["el mismo monto", d === 0 ? "el mismo día" : Math.abs(d) + (Math.abs(d) === 1 ? " día " : " días ") + (d > 0 ? "después" : "antes")]
+                     .concat(nom.length ? ["«" + nom.join(" ") + "» aparece en la descripción"] : [])
+                     .concat(ref ? ["la referencia " + a.referencia + " aparece en el extracto"] : []) };
+        }).sort((x, y) => y.puntos - x.puntos);
+      if (!/WOMPI|PAYPAL/.test(nt)) {
+        const tc = porTransfer(transfer, "transferencia");
+        if (tc.length) {
+          const b = tc[0];
+          s.push({ tipo: b.a.tipo === "pago_sin_guia" ? "sin_guia" : "transferencia", items: [itemSugerido(b.a)], diferencia_centavos: 0,
+                   confianza: b.puntos >= 110 || tc.length === 1 ? "alta" : "media",
+                   explicacion: b.por.join(", ") + (tc.length > 1 ? " · hay " + tc.length + " candidatas con ese monto" : "") });
+          usados.add(clave(b.a));
+        }
+        const rc = porTransfer(pools.reportadas, "reportada");
+        if (rc.length) {
+          const b = rc[0];
+          s.push({ tipo: "reportada", items: [itemSugerido(b.a)], diferencia_centavos: 0, confianza: b.puntos >= 110 || rc.length === 1 ? "alta" : "media",
+                   explicacion: "Reportada por el donante y sin verificar · " + b.por.join(", ") + ". Confirmarla le envía su recibo." });
+          if (!s.length || s[0].tipo !== "transferencia") usados.add(clave(b.a));
+        }
+      }
+      if (/PAYPAL/.test(nt)) {
+        let cand = paypalPool.filter((p) => !usados.has(clave(p)) && p.fecha <= m.fecha && p.fecha >= fechaMasDias(m.fecha, -45))
+          .sort((x, y) => (x.fecha < y.fecha ? -1 : 1));
+        let tasa = 0;
+        while (cand.length) {
+          const usd = cand.reduce((t, p) => t + p.monto_centavos, 0);
+          tasa = usd ? V / usd : 0;
+          if (tasa >= 2500 && tasa <= 6000) break;
+          if (tasa < 2500) cand = cand.slice(1); else break;
+        }
+        if (cand.length && tasa >= 2500 && tasa <= 6000) {
+          const usd = cand.reduce((t, p) => t + p.monto_centavos, 0);
+          s.push({ tipo: "paypal", items: cand.map(itemSugerido), diferencia_centavos: 0, confianza: "media", usd_centavos: usd,
+                   tasa: Math.round(tasa * 100) / 100,
+                   explicacion: cand.length + (cand.length === 1 ? " pago" : " pagos") + " de PayPal por US$" + (usd / 100).toFixed(2) +
+                     " desde el último retiro · el banco da " + fmtPesos(V) + ": " + Math.round(tasa).toLocaleString("es-CO") +
+                     " pesos por dólar, neto de comisiones y cambio" });
+          cand.forEach((p) => usados.add(clave(p)));
+        }
+      }
+      if (!s.length && !/PAYPAL/.test(nt)) {
+        const cand = wompiPool.filter((w) => !usados.has(clave(w)) && w.fecha < m.fecha && w.fecha >= fechaMasDias(m.fecha, -10));
+        const dias = [...new Set(cand.map((w) => w.fecha))].sort();
+        let mejor = null;
+        for (let i = 0; i < dias.length; i++) {
+          for (let j = i; j < dias.length && diasEntre(dias[j], dias[i]) <= 5; j++) {
+            const grupo = cand.filter((w) => w.fecha >= dias[i] && w.fecha <= dias[j]);
+            const bruto = grupo.reduce((t, w) => t + w.monto_centavos, 0);
+            const com = bruto - V;
+            if (com < 0 || com > bruto * 0.08) continue;
+            const est = comisionWompiEstimada(grupo.map((w) => w.monto_centavos));
+            const err = Math.abs(com - est);
+            /* A igual error, gana el grupo más cercano al abono: dos pagos de
+               $200.000 de días distintos dan la misma cuenta, y Wompi consigna
+               lo más reciente. */
+            const cerca = mejor && err === mejor.err && (dias[j] > mejor.hasta || (dias[j] === mejor.hasta && dias[i] > mejor.desde));
+            if (!mejor || err < mejor.err || cerca) mejor = { grupo, bruto, com, est, err, desde: dias[i], hasta: dias[j] };
+          }
+        }
+        const dice = /WOMPI|PASARELA|BOLD|PAYU/.test(nt);
+        if (mejor && (mejor.err <= Math.max(mejor.est * 0.25, 300000) || dice)) {
+          s.push({ tipo: "wompi", items: mejor.grupo.map(itemSugerido), diferencia_centavos: mejor.com, comision_estimada: mejor.est,
+                   confianza: mejor.err <= Math.max(mejor.est * 0.02, 10000) ? "alta" : "media",
+                   explicacion: mejor.grupo.length + (mejor.grupo.length === 1 ? " pago" : " pagos") + " de Wompi " +
+                     (mejor.desde === mejor.hasta ? "del " + mejor.desde : "del " + mejor.desde + " al " + mejor.hasta) +
+                     " por " + fmtPesos(mejor.bruto) + " · comisión " + fmtPesos(mejor.com) + " (la tarifa da " + fmtPesos(mejor.est) + ")" });
+          mejor.grupo.forEach((w) => usados.add(clave(w)));
+        }
+      }
+      if (RE_REND.test(nt)) s.push({ tipo: "ignorar", motivo: "rendimientos", items: [], confianza: "alta", explicacion: "La descripción dice rendimientos o intereses" });
+      if (RE_TRASLADO.test(nt)) s.push({ tipo: "ignorar", motivo: "traslado", items: [], confianza: "media", explicacion: "La descripción dice traslado" });
+    } else {
+      const ab = -V;
+      const ec = paresEgreso[m.id] || [];
+      const b = ec.length ? ec.find((x) => x.e === asignado[m.id]) : null;
+      if (b) {
+        s.push({ tipo: "egreso", items: [itemSugerido(b.e)], diferencia_centavos: b.e.monto_centavos === ab ? 0 : ab - b.e.monto_centavos,
+                 confianza: ec.length === 1 && b.e.monto_centavos === ab ? "alta" : "media",
+                 explicacion: b.por.join(", ") + (ec.length > 1 ? " · hay " + ec.length + " egresos con ese monto" : "") });
+        usados.add(clave(b.e));
+      }
+      if (RE_GMF.test(nt)) s.push({ tipo: "ignorar", motivo: "gmf", items: [], confianza: "alta", explicacion: "La descripción dice 4 por mil (GMF)" });
+      else if (RE_GASTO.test(nt)) s.push({ tipo: "ignorar", motivo: "gasto_bancario", items: [], confianza: "alta", explicacion: "La descripción dice cuota de manejo, comisión o IVA del banco" });
+      if (RE_TRASLADO.test(nt)) s.push({ tipo: "ignorar", motivo: "traslado", items: [], confianza: "media", explicacion: "La descripción dice traslado" });
+    }
+    out[m.id] = s;
+  }
+  return out;
+}
+async function sugerenciasPendientes(env) {
+  const movs = (await env.DB.prepare(
+    "SELECT id, cuenta, fecha, descripcion, referencia, oficina, valor_centavos, saldo_centavos, lote_id, posicion, importado_en " +
+    "FROM movimientos_banco WHERE estado = 'sin_conciliar' ORDER BY fecha, lote_id, posicion LIMIT " + TOPE_LIBRO
+  ).all()).results || [];
+  if (!movs.length) return { movs, sug: {} };
+  const pools = await poolsConciliacion(env, fechaMasDias(movs[0].fecha, -50), fechaMasDias(movs[movs.length - 1].fecha, 10));
+  return { movs, sug: sugerirParaMovimientos(movs, pools) };
+}
+
+/* GET /api/admin/banco/conciliar — los movimientos sin conciliar, con sus
+   sugerencias, del más viejo al más nuevo. */
+async function adminBancoConciliar(env) {
+  const { movs, sug } = await sugerenciasPendientes(env);
+  movs.forEach((m) => { m.sugerencias = sug[m.id] || []; });
+  return json({ movimientos: movs, total: movs.length, tope: TOPE_LIBRO,
+                etiquetas: { motivos: MOTIVOS_IGNORAR, medios: MEDIOS_SIN_GUIA, enlaces: TIPOS_ENLACE_ES } });
+}
+
+/* El título humano de lo enlazado, para el cajón. */
+async function tituloEnlace(env, e) {
+  try {
+    if (e.tipo === "aporte") {
+      const a = await env.DB.prepare("SELECT a.guia, a.monto_centavos, a.moneda, d.nombre FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE a.guia = ?").bind(e.ref).first();
+      return a ? (a.nombre || "Sin nombre") : "";
+    }
+    if (e.tipo === "egreso") {
+      const g = await env.DB.prepare("SELECT e.concepto, p.nombre FROM egresos e LEFT JOIN proveedores p ON p.id = e.proveedor_id WHERE e.numero = ?").bind(e.ref).first();
+      return g ? (g.nombre || "") + " · " + (g.concepto || "") : "";
+    }
+    if (e.tipo === "pago_sin_guia") {
+      const p = await env.DB.prepare("SELECT nombre, medio FROM pagos_sin_guia WHERE id = ?").bind(Number(e.ref)).first();
+      return p ? (p.nombre || "Sin nombre") + " · " + (MEDIOS_SIN_GUIA[p.medio] || p.medio) : "";
+    }
+  } catch (x) { /* el título es un adorno: si falla, va sin él */ }
+  return "";
+}
+async function movimientoFila(env, id) {
+  return await env.DB.prepare(
+    "SELECT id, cuenta, fecha, descripcion, referencia, oficina, valor_centavos, saldo_centavos, lote_id, posicion, importado_en, " +
+    "estado, motivo, nota, resuelto_por, resuelto_en FROM movimientos_banco WHERE id = ?").bind(id).first();
+}
+/* GET /api/admin/banco/movimiento/<id> — el cajón de un movimiento. */
+async function adminBancoMovimiento(env, id) {
+  const m = await movimientoFila(env, id);
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  const en = (await enlacesDe(env, [id]))[id] || [];
+  for (const e of en) e.titulo = await tituloEnlace(env, e);
+  let sugerencias = [];
+  if (m.estado === "sin_conciliar") sugerencias = (await sugerenciasPendientes(env)).sug[id] || [];
+  const lote = await env.DB.prepare("SELECT id, archivo, importado_en, importado_por FROM lotes_banco WHERE id = ?").bind(m.lote_id).first();
+  return json({ movimiento: m, enlaces: en, sugerencias, lote,
+                etiquetas: { motivos: MOTIVOS_IGNORAR, medios: MEDIOS_SIN_GUIA, enlaces: TIPOS_ENLACE_ES } });
+}
+
+/* GET /api/admin/banco/buscar?mov=<id>&q= — para conciliar a mano: lo que
+   puede explicar ESE movimiento (abonos: aportes, pagos sin aporte, botón de
+   PayPal, pagos sin guía; cargos: egresos) y que nadie haya enlazado aún. Sin
+   texto, a 45 días; con texto, cualquier fecha. */
+async function adminBancoBuscar(env, url) {
+  const id = entero(url.searchParams.get("mov"), 0, 0, PAGINA_MAX);
+  const m = id ? await movimientoFila(env, id) : null;
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  const q = normalTexto(limpiar(url.searchParams.get("q"), 60));
+  const desde = q ? "2000-01-01" : fechaMasDias(m.fecha, -45), hasta = q ? "2100-12-31" : fechaMasDias(m.fecha, 15);
+  const p = await poolsConciliacion(env, desde, hasta);
+  let l = m.valor_centavos > 0 ? p.aportes.concat(p.wompi, p.ipn, p.sinGuia) : p.egresos;
+  if (q) l = l.filter((i) => normalTexto([i.ref, i.titulo, i.referencia, i.fecha, Math.round(i.monto_centavos / 100)].join(" ")).includes(q));
+  const ab = Math.abs(m.valor_centavos);
+  l.sort((a, b) => (a.monto_centavos === ab ? 0 : 1) - (b.monto_centavos === ab ? 0 : 1) ||
+                   Math.abs(diasEntre(m.fecha, a.fecha)) - Math.abs(diasEntre(m.fecha, b.fecha)));
+  return json({ items: l.slice(0, 60).map((i) => ({ ...itemSugerido(i), total_centavos: i.total_centavos || null })), total: l.length });
+}
+
+/* Lo que cuesta de verdad cada cosa que se enlaza, leído de su tabla: el panel
+   manda qué enlazar, nunca cuánto vale. */
+async function itemParaEnlazar(env, tipo, ref) {
+  if (tipo === "aporte") {
+    const a = await env.DB.prepare("SELECT guia, monto_centavos, moneda, estado FROM aportes WHERE guia = ?").bind(ref).first();
+    if (!a) return { error: "El aporte " + ref + " no existe." };
+    if (!["aprobada", "en_distribucion", "entregada"].includes(a.estado)) {
+      return { error: "El aporte " + ref + " no está confirmado (está «" + a.estado + "»). Si es una transferencia reportada, confírmala: así sale su recibo." };
+    }
+    return { monto: a.monto_centavos, moneda: a.moneda || "COP", signo: 1 };
+  }
+  if (tipo === "egreso") {
+    const e = await env.DB.prepare("SELECT numero, neto_centavos, anulado_en FROM egresos WHERE numero = ?").bind(ref).first();
+    if (!e) return { error: "El egreso " + ref + " no existe." };
+    if (e.anulado_en) return { error: "El egreso " + ref + " está anulado." };
+    return { monto: e.neto_centavos, moneda: "COP", signo: -1 };
+  }
+  if (tipo === "wompi") {
+    const e = await env.DB.prepare(
+      "SELECT e.cuerpo FROM eventos_wompi e LEFT JOIN aportes a ON a.guia = e.guia WHERE e.transaction_id = ? " +
+      "AND e.firma_valida = 1 AND e.estado = 'APPROVED' AND a.guia IS NULL LIMIT 1").bind(ref).first();
+    if (!e) return { error: "Ese pago de Wompi no está entre los pagos sin aporte." };
+    let tx = {}; try { tx = (JSON.parse(e.cuerpo || "{}").data || {}).transaction || {}; } catch (x) { /* nada */ }
+    return { monto: Number(tx.amount_in_cents) || 0, moneda: tx.currency || "COP", signo: 1 };
+  }
+  if (tipo === "ipn") {
+    const e = await env.DB.prepare("SELECT monto_centavos, moneda FROM eventos_ipn WHERE clave = ?").bind(ref).first();
+    if (!e) return { error: "Esa donación de PayPal no existe." };
+    return { monto: e.monto_centavos || 0, moneda: e.moneda || "USD", signo: 1 };
+  }
+  if (tipo === "pago_sin_guia") {
+    const e = await env.DB.prepare("SELECT monto_centavos, moneda, anulado_en FROM pagos_sin_guia WHERE id = ?").bind(Number(ref)).first();
+    if (!e || e.anulado_en) return { error: "Ese pago sin guía no existe o está anulado." };
+    return { monto: e.monto_centavos, moneda: e.moneda || "COP", signo: 1 };
+  }
+  return { error: "No sé enlazar «" + tipo + "»." };
+}
+
+/* POST /api/admin/banco/movimiento/<id>/conciliar
+   { items: [{tipo, ref}], diferencia: "comision"|"ajuste", nota }
+   LA SUMA CUADRA AL PESO O NO SE GUARDA: lo enlazado más la diferencia
+   asignada es exactamente el valor del movimiento. Lo que va en dólares
+   (PayPal) se reparte lo que queda del abono en pesos, en proporción a sus
+   dólares: esa es la cifra en pesos que el Resumen usa para PayPal. */
+async function adminBancoConciliarMov(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c) || !Array.isArray(c.items)) return json({ error: "json_invalido" }, 400);
+  const m = await movimientoFila(env, id);
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  if (m.estado !== "sin_conciliar") return json({ error: "ya_resuelto", ayuda: "Este movimiento ya está " + m.estado + ". Recarga." }, 409);
+  const V = m.valor_centavos, signo = V > 0 ? 1 : -1;
+  const vistos = new Set(), items = [];
+  for (const x of c.items.slice(0, 200)) {
+    if (!esObjeto(x)) continue;
+    const tipo = String(x.tipo || ""), ref = limpiar(x.ref, 80);
+    if (!ref || vistos.has(tipo + "|" + ref)) continue;
+    vistos.add(tipo + "|" + ref);
+    const it = await itemParaEnlazar(env, tipo, ref);
+    if (it.error) return json({ error: "item_invalido", ayuda: it.error }, 409);
+    if (it.signo !== signo) return json({ error: "signo_cruzado",
+      ayuda: signo > 0 ? "Este movimiento es un abono: se explica con lo que entró, no con un egreso."
+                       : "Este movimiento es un cargo: se explica con un egreso, no con lo que entró." }, 409);
+    const otro = await env.DB.prepare("SELECT movimiento_id FROM conciliaciones WHERE tipo = ? AND ref = ? LIMIT 1").bind(tipo, ref).first();
+    if (otro) return json({ error: "ya_enlazado",
+      ayuda: ref + " ya explica el movimiento #" + otro.movimiento_id + " del extracto. Deshaz esa conciliación si fue un error." }, 409);
+    items.push({ tipo, ref, ...it });
+  }
+  if (!items.length) return json({ error: "sin_items", ayuda: "Elige al menos un aporte o egreso. Si no lo explica ninguno, ignóralo con su motivo o regístralo como pago sin guía." }, 400);
+  const filas = [];
+  let suma = 0;
+  items.filter((i) => i.moneda === "COP").forEach((i) => { const v = signo * i.monto; filas.push({ tipo: i.tipo, ref: i.ref, monto: v }); suma += v; });
+  const usd = items.filter((i) => i.moneda !== "COP");
+  if (usd.length) {
+    const resto = V - suma, totalOrigen = usd.reduce((t, i) => t + i.monto, 0);
+    if (signo < 0 || resto <= 0 || !totalOrigen) return json({ error: "sin_pesos_para_dolares",
+      ayuda: "Lo que va en dólares se valora con lo que dio el banco en pesos, y aquí no queda nada para repartir. Quita aportes en pesos o revisa el movimiento." }, 409);
+    let repartido = 0;
+    usd.forEach((i, k) => {
+      const v = k === usd.length - 1 ? resto - repartido : Math.round(resto * i.monto / totalOrigen);
+      repartido += v;
+      filas.push({ tipo: i.tipo, ref: i.ref, monto: v, moneda_origen: i.moneda, monto_origen: i.monto,
+                   nota: "En pesos según el banco: " + Math.round(resto / (totalOrigen / 100)).toLocaleString("es-CO") + " por dólar" });
+    });
+    suma += repartido;
+  }
+  const dif = V - suma;
+  const nota = limpiar(c.nota, 280);
+  if (dif !== 0) {
+    const tipoDif = String(c.diferencia || "");
+    if (tipoDif !== "comision" && tipoDif !== "ajuste") {
+      return json({ error: "diferencia_sin_asignar", diferencia_centavos: dif,
+        ayuda: "Lo elegido no suma el valor del movimiento: faltan " + fmtPesos(Math.abs(dif)) +
+               (dif < 0 ? " (lo elegido suma más)" : "") + ". Asígnalo a «Comisión de la pasarela» o a «Ajuste» con una nota." }, 409);
+    }
+    if (tipoDif === "ajuste" && !nota) return json({ error: "nota_requerida", ayuda: "Un ajuste lleva siempre una nota que diga por qué." }, 400);
+    filas.push({ tipo: tipoDif, ref: null, monto: dif, nota: nota || null });
+  }
+  const hecho = await env.DB.prepare(
+    "UPDATE movimientos_banco SET estado = 'conciliado', nota = ?, resuelto_por = ?, resuelto_en = datetime('now') WHERE id = ? AND estado = 'sin_conciliar'"
+  ).bind(nota || null, quien || "?", id).run();
+  if (!hecho.meta || !hecho.meta.changes) return json({ error: "ya_resuelto", ayuda: "Alguien lo resolvió mientras mirabas. Recarga." }, 409);
+  await env.DB.batch(filas.map((f) => env.DB.prepare(
+    "INSERT INTO conciliaciones (movimiento_id, tipo, ref, monto_centavos, moneda_origen, monto_origen_centavos, nota, creado_por) VALUES (?,?,?,?,?,?,?,?)"
+  ).bind(id, f.tipo, f.ref, f.monto, f.moneda_origen || null, f.monto_origen == null ? null : f.monto_origen, f.nota || null, quien || "?")));
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)").bind(quien || "?",
+    "movimiento del banco #" + id + " CONCILIADO (" + m.fecha + " · " + fmtPesos(V) + ") con " +
+    filas.map((f) => f.tipo + (f.ref ? " " + f.ref : "") + " " + fmtPesos(f.monto)).join(", ")).run();
+  return json({ ok: true, enlaces: filas.length, diferencia_centavos: dif });
+}
+
+/* POST /api/admin/banco/movimiento/<id>/ignorar { motivo, nota } */
+async function adminBancoIgnorar(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* se valida abajo */ }
+  if (!esObjeto(c)) c = {};
+  const motivo = String(c.motivo || "");
+  if (!MOTIVOS_IGNORAR[motivo]) return json({ error: "motivo_invalido", ayuda: "Elige por qué se deja fuera." }, 400);
+  const nota = limpiar(c.nota, 280);
+  if (motivo === "otro" && !nota) return json({ error: "nota_requerida", ayuda: "Con «Otro motivo», escribe cuál." }, 400);
+  const r = await env.DB.prepare(
+    "UPDATE movimientos_banco SET estado = 'ignorado', motivo = ?, nota = ?, resuelto_por = ?, resuelto_en = datetime('now') " +
+    "WHERE id = ? AND estado = 'sin_conciliar'").bind(motivo, nota || null, quien || "?", id).run();
+  if (!r.meta || !r.meta.changes) return json({ error: "ya_resuelto", ayuda: "Ese movimiento ya no está sin conciliar. Recarga." }, 409);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "movimiento del banco #" + id + " IGNORADO · " + MOTIVOS_IGNORAR[motivo] + (nota ? " · " + nota : "")).run();
+  return json({ ok: true });
+}
+
+/* POST /api/admin/banco/movimiento/<id>/deshacer — vuelve a «sin conciliar».
+   Si de él salió un pago sin guía, ese registro se anula con el motivo: el
+   pago no existía antes de este movimiento y no tiene por qué quedarse. */
+async function adminBancoDeshacer(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const m = await movimientoFila(env, id);
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  if (m.estado === "sin_conciliar") return json({ error: "nada_que_deshacer", ayuda: "Ese movimiento ya está sin conciliar." }, 409);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM conciliaciones WHERE movimiento_id = ?").bind(id),
+    env.DB.prepare("UPDATE pagos_sin_guia SET anulado_en = datetime('now'), anulado_por = ?, anulado_motivo = ? " +
+                   "WHERE movimiento_id = ? AND anulado_en IS NULL").bind(quien || "?", "Se deshizo la conciliación del movimiento #" + id, id),
+    env.DB.prepare("UPDATE movimientos_banco SET estado = 'sin_conciliar', motivo = NULL, nota = NULL, resuelto_por = NULL, resuelto_en = NULL WHERE id = ?").bind(id)
+  ]);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "movimiento del banco #" + id + " vuelve a sin conciliar (estaba " + m.estado + (m.motivo ? " · " + m.motivo : "") + ")").run();
+  return json({ ok: true });
+}
+
+/* POST /api/admin/banco/movimiento/<id>/pago-sin-guia { nombre, medio, destino_id, proyecto, nota }
+   «REGISTRAR UN PAGO QUE LLEGÓ SIN GUÍA» (pendiente desde la Fase 2): un abono
+   que ningún aporte explica. Queda en «Pagos sin aporte» junto a los cobros de
+   Wompi sin guía, y su dinero cuenta en el Resumen como «sin guía».
+   A PROPÓSITO NO HACE NADA MÁS: no crea un aporte (no quema un número de
+   guía), no le escribe a nadie y no emite certificado. Si quien pagó aparece y
+   lo pide, eso sigue siendo un paso a mano y revisado. */
+async function adminBancoPagoSinGuia(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* se valida abajo */ }
+  if (!esObjeto(c)) c = {};
+  const m = await movimientoFila(env, id);
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  if (m.valor_centavos <= 0) return json({ error: "no_es_abono", ayuda: "Solo un abono puede ser un pago que entró." }, 409);
+  if (m.estado !== "sin_conciliar") return json({ error: "ya_resuelto", ayuda: "Ese movimiento ya está " + m.estado + ". Recarga." }, 409);
+  const medio = String(c.medio || "");
+  if (!MEDIOS_SIN_GUIA[medio]) return json({ error: "medio_invalido", ayuda: "Elige por dónde entró." }, 400);
+  const nombre = limpiar(c.nombre, 120), destino = limpiar(c.destino_id, 80), proyecto = limpiar(c.proyecto, 120), nota = limpiar(c.nota, 280);
+  const hecho = await env.DB.prepare(
+    "UPDATE movimientos_banco SET estado = 'conciliado', nota = ?, resuelto_por = ?, resuelto_en = datetime('now') WHERE id = ? AND estado = 'sin_conciliar'"
+  ).bind(nota || null, quien || "?", id).run();
+  if (!hecho.meta || !hecho.meta.changes) return json({ error: "ya_resuelto", ayuda: "Alguien lo resolvió mientras mirabas. Recarga." }, 409);
+  const p = await env.DB.prepare(
+    "INSERT INTO pagos_sin_guia (fecha, monto_centavos, moneda, medio, nombre, destino_id, proyecto, nota, movimiento_id, creado_por) " +
+    "VALUES (?, ?, 'COP', ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(m.fecha, m.valor_centavos, medio, nombre || null, destino || null, proyecto || null, nota || null, id, quien || "?").run();
+  const pid = p.meta && p.meta.last_row_id;
+  await env.DB.prepare(
+    "INSERT INTO conciliaciones (movimiento_id, tipo, ref, monto_centavos, creado_por) VALUES (?, 'pago_sin_guia', ?, ?, ?)"
+  ).bind(id, String(pid), m.valor_centavos, quien || "?").run();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "pago sin guía #" + pid + " registrado desde el movimiento del banco #" + id + " · " + m.fecha + " · " +
+          fmtPesos(m.valor_centavos) + " · " + MEDIOS_SIN_GUIA[medio] + (nombre ? " · " + nombre : "") + " · sin correo ni certificado").run();
+  return json({ ok: true, pago_sin_guia: pid });
+}
+
+/* GET /api/admin/banco/candidatos?guia=GG-… — para «Confirmar transferencia»:
+   abonos del extracto sin conciliar por EL MISMO MONTO que reportó el donante,
+   a una semana de la fecha que dio. Y si no hay, cuánto cubre el extracto
+   importado: «no aparece» y «todavía no se ha importado ese día» son dos
+   respuestas distintas, y la segunda no es motivo para descartar a nadie. */
+async function adminBancoCandidatos(env, url) {
+  const g = String(url.searchParams.get("guia") || "").toUpperCase();
+  if (!/^GG-\d{4}-\d{6}$/.test(g)) return json({ error: "guia_invalida" }, 400);
+  const a = await env.DB.prepare(
+    "SELECT guia, monto_centavos, COALESCE(fecha_pago, date(creada_en, '-5 hours')) AS fecha, referencia_pago FROM aportes WHERE guia = ?").bind(g).first();
+  if (!a) return json({ error: "no_encontrada" }, 404);
+  let movs = [], cob = null;
+  try {
+    movs = ((await env.DB.prepare(
+      "SELECT id, cuenta, fecha, descripcion, referencia, valor_centavos FROM movimientos_banco WHERE estado = 'sin_conciliar' " +
+      "AND valor_centavos = ? AND fecha BETWEEN ? AND ? ORDER BY ABS(julianday(fecha) - julianday(?)) LIMIT 5"
+    ).bind(a.monto_centavos, fechaMasDias(a.fecha, -7), fechaMasDias(a.fecha, 7), a.fecha).all()).results || []);
+    cob = await env.DB.prepare("SELECT MIN(periodo_desde) AS desde, MAX(periodo_hasta) AS hasta FROM lotes_banco WHERE deshecho_en IS NULL").first();
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  return json({ guia: g, fecha: a.fecha, movimientos: movs,
+                cobertura: cob && cob.hasta ? { desde: cob.desde, hasta: cob.hasta, cubre: cob.hasta >= a.fecha } : null });
+}
+
+/* «SEGÚN EL BANCO» PARA EL RESUMEN. La cifra del extracto es la de
+   referencia: el panel se le compara a ella, no al revés. La diferencia se
+   desarma en lo que la explica —sin conciliar, ignorados, comisiones,
+   ajustes, lo que entró sin guía, PayPal en pesos— y lo que queda se dice
+   como lo que es: fechas de corte (un pago del 30 que Wompi consigna el 1),
+   efectivo, o algo que falta conciliar en otro mes. */
+async function resumenBanco(env, desde, hasta, ingresosCop, egresosNeto) {
+  const una = async (sql, ...b) => (await env.DB.prepare(sql).bind(...b).first()) || {};
+  const todas = async (sql, ...b) => ((await env.DB.prepare(sql).bind(...b).all()).results || []);
+  const lotes = await todas(
+    "SELECT cuenta, MIN(periodo_desde) AS desde, MAX(periodo_hasta) AS hasta, COUNT(*) AS n FROM lotes_banco " +
+    "WHERE deshecho_en IS NULL AND periodo_desde <= ? AND periodo_hasta >= ? GROUP BY cuenta", hasta, desde);
+  if (!lotes.length) {
+    const ult = await una("SELECT MAX(periodo_hasta) AS hasta, MIN(periodo_desde) AS desde FROM lotes_banco WHERE deshecho_en IS NULL");
+    return { sin_extracto: true, importado: ult.hasta ? { desde: ult.desde, hasta: ult.hasta } : null };
+  }
+  const completo = lotes.every((l) => l.desde <= desde && l.hasta >= hasta);
+  const m = await una(
+    "SELECT COUNT(*) AS n, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos > 0 THEN valor_centavos END), 0) AS creditos, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos > 0 THEN 1 END), 0) AS n_creditos, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos < 0 THEN -valor_centavos END), 0) AS debitos, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos < 0 THEN 1 END), 0) AS n_debitos, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos > 0 AND estado = 'sin_conciliar' THEN valor_centavos END), 0) AS cred_sin, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos > 0 AND estado = 'sin_conciliar' THEN 1 END), 0) AS n_cred_sin, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos > 0 AND estado = 'ignorado' THEN valor_centavos END), 0) AS cred_ign, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos < 0 AND estado = 'sin_conciliar' THEN -valor_centavos END), 0) AS deb_sin, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos < 0 AND estado = 'sin_conciliar' THEN 1 END), 0) AS n_deb_sin, " +
+    "COALESCE(SUM(CASE WHEN valor_centavos < 0 AND estado = 'ignorado' THEN -valor_centavos END), 0) AS deb_ign " +
+    "FROM movimientos_banco WHERE fecha BETWEEN ? AND ?", desde, hasta);
+  const ign = await todas(
+    "SELECT motivo, SUM(CASE WHEN valor_centavos > 0 THEN 1 ELSE -1 END) AS signo, COUNT(*) AS n, SUM(ABS(valor_centavos)) AS centavos " +
+    "FROM movimientos_banco WHERE estado = 'ignorado' AND fecha BETWEEN ? AND ? GROUP BY motivo, valor_centavos > 0 ORDER BY centavos DESC", desde, hasta);
+  const en = await todas(
+    "SELECT c.tipo, c.moneda_origen, (m.valor_centavos > 0) AS credito, COUNT(*) AS n, SUM(c.monto_centavos) AS centavos, " +
+    "SUM(c.monto_origen_centavos) AS origen FROM conciliaciones c JOIN movimientos_banco m ON m.id = c.movimiento_id " +
+    "WHERE m.fecha BETWEEN ? AND ? GROUP BY c.tipo, c.moneda_origen, m.valor_centavos > 0", desde, hasta);
+  const suma = (f) => en.filter(f).reduce((t, x) => t + Number(x.centavos || 0), 0);
+  const comisiones = suma((x) => x.tipo === "comision");                       /* negativo: la pasarela se quedó con eso */
+  const ajustesCred = suma((x) => x.tipo === "ajuste" && x.credito);
+  const ajustesDeb = -suma((x) => x.tipo === "ajuste" && !x.credito);
+  const sinGuia = suma((x) => ["wompi", "ipn", "pago_sin_guia"].includes(x.tipo) && !x.moneda_origen);
+  const paypalCop = suma((x) => x.moneda_origen === "USD");
+  const paypalUsd = en.filter((x) => x.moneda_origen === "USD").reduce((t, x) => t + Number(x.origen || 0), 0);
+  const saldos = await todas(
+    "SELECT cuenta, saldo_centavos, fecha FROM movimientos_banco m WHERE fecha BETWEEN ? AND ? AND saldo_centavos IS NOT NULL " +
+    "AND NOT EXISTS (SELECT 1 FROM movimientos_banco o WHERE o.cuenta = m.cuenta AND o.saldo_centavos IS NOT NULL AND o.fecha BETWEEN ? AND ? " +
+    "AND (o.fecha > m.fecha OR (o.fecha = m.fecha AND (o.lote_id > m.lote_id OR (o.lote_id = m.lote_id AND o.posicion > m.posicion)))))",
+    desde, hasta, desde, hasta);
+  const credExplica = Number(m.cred_sin) + Number(m.cred_ign) + comisiones + ajustesCred + sinGuia + paypalCop;
+  const debExplica = Number(m.deb_sin) + Number(m.deb_ign) + ajustesDeb;
+  return {
+    sin_extracto: false, completo, cobertura: lotes,
+    creditos: { centavos: m.creditos, n: m.n_creditos }, debitos: { centavos: m.debitos, n: m.n_debitos },
+    saldos, n: m.n,
+    panel: { ingresos: ingresosCop, egresos: egresosNeto },
+    entradas: {
+      diferencia: Number(m.creditos) - ingresosCop,
+      sin_conciliar: { centavos: m.cred_sin, n: m.n_cred_sin }, ignorados: m.cred_ign, comisiones, ajustes: ajustesCred,
+      sin_guia: sinGuia, paypal: { cop: paypalCop, usd: paypalUsd },
+      otras: Number(m.creditos) - ingresosCop - credExplica
+    },
+    salidas: {
+      diferencia: Number(m.debitos) - egresosNeto,
+      sin_conciliar: { centavos: m.deb_sin, n: m.n_deb_sin }, ignorados: m.deb_ign, ajustes: ajustesDeb,
+      otras: Number(m.debitos) - egresosNeto - debExplica
+    },
+    ignorados_por_motivo: ign.map((x) => ({ motivo: x.motivo, nombre: MOTIVOS_IGNORAR[x.motivo] || x.motivo, credito: x.signo > 0, n: x.n, centavos: x.centavos }))
+  };
+}
+
+/* LAS DOS COLAS DEL BANCO EN «HOY». Sin la 0042 no existen las tablas: las
+   colas no salen y el resto de «Hoy» se pinta igual. */
+async function colaExtractoPorImportar(env) {
+  const hoy = fechaCO();
+  const dia = Number(hoy.slice(8, 10));
+  const finMesPasado = fechaMasDias(hoy.slice(0, 8) + "01", -1);
+  const nombreMes = MESES_ES[Number(finMesPasado.slice(5, 7)) - 1];
+  if (dia < 3) return { n: 0 };
+  const hay = await env.DB.prepare(
+    "SELECT MAX(periodo_hasta) AS hasta FROM lotes_banco WHERE deshecho_en IS NULL").first();
+  if (hay && hay.hasta && hay.hasta >= finMesPasado) return { n: 0 };
+  return {
+    n: 1, vencida: dia >= 15,
+    cuando: "desde el 3 de " + MESES_ES[Number(hoy.slice(5, 7)) - 1] + (dia >= 15 ? " · pasó el día 15" : ""),
+    items: [{ id: finMesPasado.slice(0, 7), titulo: "Importar el extracto de " + nombreMes,
+              detalle: hay && hay.hasta ? "el último importado llega hasta el " + hay.hasta : "todavía no se ha importado ninguno",
+              cuando: "desde el día 3" }]
+  };
 }
 
 /* Solo se permiten los dos pasos que ocurren en terreno. Los estados de pago los
@@ -6045,7 +7196,9 @@ const NOMBRE_COLA_PLAZO = {
   convenios_por_firmar: "Convenio aceptado por la fundación, falta la firma de Give&Grow",
   urgentes_sin_visitar: "Casos urgentes que nadie ha visitado",
   casos_sin_evaluar: "Casas cuyas fotos ningún ingeniero ha abierto",
-  vencimientos_por_atender: "Vencimientos tributarios y legales sin atender"
+  vencimientos_por_atender: "Vencimientos tributarios y legales sin atender",
+  banco_sin_conciliar: "Movimientos del extracto sin conciliar",
+  extracto_por_importar: "Extracto del banco del mes pasado sin importar"
 };
 /* LAS COLAS DE MIRA MI CASA VAN A SU PROPIO BUZÓN (auditoría del 28 sep 2026).
    Hasta hoy ninguna cola de casos tenía plazo, así que ninguna llegaba nunca a
@@ -6055,6 +7208,10 @@ const NOMBRE_COLA_PLAZO = {
    Mezclarlos haría que cada buzón leyera avisos que no le tocan y dejara de
    abrirlos. Cada uno se deduplica por su propia etiqueta. */
 const COLAS_PLAZO_MMC = ["urgentes_sin_visitar", "casos_sin_evaluar"];
+/* LAS DEL BANCO VAN A CONTABILIDAD (`CORREO_AVISOS`), igual que los
+   vencimientos: quien concilia el extracto no es quien le contesta a una
+   fundación (Fase 3, oct 2026). */
+const COLAS_PLAZO_BANCO = ["banco_sin_conciliar", "extracto_por_importar"];
 async function resumenDiarioEquipo(env) {
   const salud = await (await adminSalud(env)).json();
   const cola = (salud && salud.cola) || [];
@@ -6067,11 +7224,13 @@ async function resumenDiarioEquipo(env) {
   const vencidas = cola.filter(c => c.n > 0 && c.vencida && c.clave !== "vencimientos_por_atender");
   if (!vencidas.length) return { saltado: "nada_vencido", obligaciones: out.obligaciones };
   const deMMC = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) >= 0);
+  const deBanco = vencidas.filter(c => COLAS_PLAZO_BANCO.indexOf(c.clave) >= 0);
   /* Las jornadas van al mismo buzon de alianzas pero en SU correo: el de arriba
      cuenta «personas que esperan una respuesta», y una jornada sin cerrar no es
      eso. Mezclarlas haria que el titulo mintiera. */
   const deJornadas = vencidas.filter(c => c.clave === "jornadas_sin_cerrar");
-  const deAlianzas = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) < 0 && c.clave !== "jornadas_sin_cerrar");
+  const deAlianzas = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) < 0 && COLAS_PLAZO_BANCO.indexOf(c.clave) < 0 &&
+    c.clave !== "jornadas_sin_cerrar");
   const otras = cola.filter(c => c.n > 0 && !c.vencida).length;
   if (deAlianzas.length) {
     out.alianzas = await enviarResumenVencidas(env, {
@@ -6099,6 +7258,20 @@ async function resumenDiarioEquipo(env) {
         "Los urgentes se atienden desde la ruta de visitas. Si hay riesgo para la vida, lo que corresponde es avisar a la alcaldía o al consejo municipal de gestión del riesgo, y al 123. Las fotos sin abrir se destraban escribiendo a los ingenieros verificados o abriéndolas desde /triaje."
       ],
       boton: { url: "https://thegiveandgrowproject.org/admin/ruta", texto: "Abrir la ruta de visitas" }
+    });
+  }
+  if (deBanco.length) {
+    out.banco = await enviarResumenVencidas(env, {
+      para: env.CORREO_AVISOS, etiqueta: "resumen-diario-banco", vencidas: deBanco,
+      titulo: () => "El extracto del banco espera en el panel",
+      parrafos: [
+        "El extracto de Bancolombia es la cifra que manda: mientras un movimiento no se concilia, el Resumen no puede decir si lo del panel cuadra con lo que llegó a la cuenta.",
+        "Se concilia desde el panel, en Finanzas › Conciliar: cada abono con sus aportes (Wompi y PayPal consignan en lotes, netos de comisión), cada cargo con su egreso, y lo demás —4 por mil, cuota de manejo, traslados— se deja fuera con su motivo."
+      ],
+      filas: deBanco.map(c => [NOMBRE_COLA_PLAZO[c.clave] || c.clave,
+        c.clave === "extracto_por_importar" ? (c.cuando || "pendiente")
+          : c.n + " · lo más viejo se importó hace " + c.dias + " días (plazo " + c.plazo + ")"]),
+      boton: { url: "https://thegiveandgrowproject.org/admin#finanzas/conciliar", texto: "Abrir la conciliación" }
     });
   }
   if (deJornadas.length) {
@@ -13070,6 +14243,21 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
     }, 409);
   }
 
+  /* CON EL RENGLÓN DEL EXTRACTO, si ya está importado (Fase 3, 0042). El
+     panel lo propone y la persona lo elige; aquí se comprueba que sea un abono
+     sin conciliar por EXACTAMENTE lo que se confirma. Si no se manda, se
+     confirma igual que siempre: el extracto puede no estar importado todavía. */
+  const movId = Number(c.movimiento_id) || 0;
+  let mov = null;
+  if (movId) {
+    mov = await env.DB.prepare("SELECT id, valor_centavos, estado, fecha FROM movimientos_banco WHERE id = ?").bind(movId).first();
+    if (!mov) return json({ error: "movimiento_no_existe", ayuda: "Ese movimiento del extracto ya no existe. Recarga." }, 409);
+    if (mov.estado !== "sin_conciliar") return json({ error: "movimiento_resuelto",
+      ayuda: "Ese movimiento del extracto ya está " + mov.estado + ": no puede confirmar esta transferencia. Elige otro o confirma sin enlazar." }, 409);
+    if (mov.valor_centavos !== montoExt * 100) return json({ error: "movimiento_otro_monto",
+      ayuda: "El movimiento del extracto es de " + fmtPesos(mov.valor_centavos) + " y estás confirmando " + fmtPesos(montoExt * 100) + ". Tienen que ser iguales." }, 409);
+  }
+
   const hecho = await env.DB.prepare(
     /* «reportada» vuelve al WHERE. El `if (a.estado !== "reportada")` de arriba
        se hizo sobre una lectura anterior, y entre las dos cabe otra petición
@@ -13097,7 +14285,18 @@ async function adminConfirmarTransferencia(request, env, guia, quien) {
          " · monto " + fmtPesos(montoExt * 100) +
          (montoExt !== montoReportado
            ? " · DIFIERE del reportado " + fmtPesos(montoReportado * 100) + ": " + porQueMonto : "") +
-         (gemela ? " · REPITE la ref de " + gemela.guia + ": " + porQueRepite : "")).run();
+         (gemela ? " · REPITE la ref de " + gemela.guia + ": " + porQueRepite : "") +
+         (mov ? " · enlazada al movimiento del banco #" + mov.id : "")).run();
+  if (mov) {
+    const ya = await env.DB.prepare(
+      "UPDATE movimientos_banco SET estado = 'conciliado', resuelto_por = ?, resuelto_en = datetime('now') WHERE id = ? AND estado = 'sin_conciliar'"
+    ).bind(quien || "?", mov.id).run();
+    if (ya.meta && ya.meta.changes) {
+      await env.DB.prepare(
+        "INSERT INTO conciliaciones (movimiento_id, tipo, ref, monto_centavos, creado_por) VALUES (?, 'aporte', ?, ?, ?)"
+      ).bind(mov.id, guia, montoExt * 100, quien || "?").run();
+    }
+  }
 
   /* Ahora sí hay dinero: el donante recibe lo mismo que quien paga por la
      pasarela — su recibo con la guía. */
@@ -22135,7 +23334,21 @@ async function adminPagosSueltos(env) {
       nombre: (tx.customer_data && tx.customer_data.full_name) || null
     };
   });
-  return json({ pagos: filas });
+  /* LOS QUE REGISTRÓ UNA PERSONA desde el extracto (Fase 3, 0042): un abono
+     del banco que ningún aporte explicaba. Son el mismo concepto —dinero que
+     entró sin guía— y por eso viven en la misma bandeja, con su origen. */
+  let registrados = [];
+  try {
+    registrados = ((await env.DB.prepare(
+      "SELECT p.id, p.fecha, p.monto_centavos, p.moneda, p.medio, p.nombre, p.destino_id, p.proyecto, p.nota, p.movimiento_id, " +
+      "p.creado_por, p.creado_en, m.descripcion AS mov_descripcion, m.referencia AS mov_referencia, m.cuenta AS mov_cuenta " +
+      "FROM pagos_sin_guia p LEFT JOIN movimientos_banco m ON m.id = p.movimiento_id WHERE p.anulado_en IS NULL " +
+      "ORDER BY p.fecha DESC LIMIT " + TOPE_BANDEJA
+    ).all()).results || []);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  return json({ pagos: filas, registrados, medios: MEDIOS_SIN_GUIA });
 }
 
 /* ========================================================================
@@ -23385,6 +24598,48 @@ textarea { font-size: 16px }
 .fin-graf summary{cursor:pointer;font-size:var(--fs-13);font-weight:600;color:var(--acc)}
 .fin-linea{margin:0 0 10px;font-size:var(--fs-14)}
 
+/* ==== BANCO Y CONCILIACIÓN (Fase 3) ====
+   Abonos en verde y cargos en tinta: el signo va escrito («+», «−»), así
+   que el color nunca es lo único que los distingue. */
+.tb-barra [hidden]{display:none}
+.bk-mas{color:var(--g);font-weight:600}
+.bk-menos{color:var(--ink)}
+.bk-err{color:var(--err);font-weight:600}
+.bk-mapa{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:0 14px;align-items:end}
+.bk-mapa .pn-campo select{width:100%}
+.bk-casilla{display:flex;gap:8px;align-items:center;font-size:var(--fs-13);margin:0 0 14px;grid-column:1/-1}
+.bk-crudo{margin:0 0 14px;font-size:var(--fs-13)}
+.bk-crudo summary{cursor:pointer;font-weight:600;color:var(--acc)}
+.bk-crudo-t{overflow-x:auto;margin-top:8px;border:1px solid var(--bds);border-radius:8px}
+.bk-crudo-t .pn-tabla{margin:0;white-space:nowrap}
+.bk-cuenta{font-size:var(--fs-15);margin:0 0 8px}
+.bk-cuenta b{font-weight:700}
+.bk-linea{font-size:var(--fs-13);margin:0 0 12px;color:var(--ink-soft)}
+.bk-ayuda{font-size:var(--fs-12);color:var(--mu);margin:-6px 0 12px}
+.bk-vista td small{display:block;font-size:var(--fs-12);color:var(--mu)}
+.bk-vista tr.bk-fila-mal td{background:var(--amberl)}
+.bk-errores{margin:0 0 14px;padding-left:18px;font-size:var(--fs-13);color:var(--err)}
+.bk-sug{border:1px solid var(--bd);border-radius:10px;background:var(--surface);padding:12px 14px;margin:0 0 12px}
+.bk-sug-cab{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin:0 0 4px}
+.bk-sug p{margin:0 0 8px;font-size:var(--fs-13);color:var(--ink-soft)}
+.bk-sug .pn-tabla{margin:0 0 10px}
+.bk-sug .pn-tabla td small{display:block;font-size:var(--fs-11);color:var(--mu)}
+.bk-sug [data-tbanco].on{border-color:var(--g);color:var(--g);font-weight:700}
+.bk-conf{display:inline-block;font-size:var(--fs-11);font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:999px;
+  background:var(--amberl);color:var(--amber);white-space:nowrap}
+.bk-conf.alta{background:var(--gl);color:var(--gd)}
+.bk-res-l .pn-tabla td small,#bk-sel .pn-tabla td small{display:block;font-size:var(--fs-11);color:var(--mu)}
+.bk-cmp{border:1px solid var(--bd);border-left:3px solid var(--g);border-radius:10px;background:var(--surface);padding:16px 18px 6px;margin:0 0 20px}
+.bk-cmp h3{margin:0 0 10px;font-family:"Inter",sans-serif;font-size:var(--fs-15);font-weight:700}
+.bk-cmp h3 small{font-size:var(--fs-11);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--g);margin-left:8px}
+.bk-cmp-vacio{border-left-color:var(--amber)}
+.bk-cmp-vacio p{margin:0 0 10px;font-size:var(--fs-14)}
+.bk-cmp-t td small{display:block;font-size:var(--fs-12);color:var(--mu);font-weight:400}
+.bk-cmp-t td{font-size:var(--fs-14)}
+.bk-sub{margin:0 0 4px;font-size:var(--fs-12);font-weight:700;color:var(--mu)}
+.bk-cmp .pn-tabla td small{font-size:var(--fs-11);color:var(--mu)}
+.bk-cmp tr.bk-otras td{color:var(--ink-soft);font-style:italic}
+
 /* ---- ESCRITORIO PRIMERO; EL TELÉFONO NO SE ROMPE ----
    Por debajo de 900 px la barra lateral sale de la rejilla y se abre con
    «Menú», encima del contenido. */
@@ -23432,6 +24687,8 @@ textarea { font-size: 16px }
 <div class="pn-grupo">
   <p class="pn-gt">Finanzas</p>
   <a class="pn-it" href="#finanzas/resumen" data-pn-ir="finanzas/resumen">Resumen<span class="pn-n" data-pn-n="finanzas/resumen"></span></a>
+  <a class="pn-it" href="#finanzas/banco" data-pn-ir="finanzas/banco">Banco<span class="pn-n" data-pn-n="finanzas/banco"></span></a>
+  <a class="pn-it" href="#finanzas/conciliar" data-pn-ir="finanzas/conciliar">Conciliar<span class="pn-n" data-pn-n="finanzas/conciliar"></span></a>
   <a class="pn-it" href="#finanzas/aportes" data-pn-ir="finanzas/aportes">Aportes<span class="pn-n" data-pn-n="finanzas/aportes"></span></a>
   <a class="pn-it" href="#finanzas/transferencias" data-pn-ir="finanzas/transferencias">Transferencias<span class="pn-n" data-pn-n="finanzas/transferencias"></span></a>
   <a class="pn-it" href="#finanzas/pagos" data-pn-ir="finanzas/pagos">Pagos sin aporte<span class="pn-n" data-pn-n="finanzas/pagos"></span></a>
@@ -23526,6 +24783,30 @@ textarea { font-size: 16px }
 <div id="fin-resumen" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
+<!-- Banco y Conciliar (Fase 3, oct 2026): el extracto de Bancolombia es la
+     cifra que manda. Las dos tablas son la misma pieza de siempre. -->
+<section class="pn-vista" data-vista="finanzas/banco" id="sec-banco" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>El <strong>extracto de Bancolombia es la cifra que manda</strong>: lo que dice la pasarela o el donante se compara con él, no al revés. Se descarga de la Sucursal Virtual en CSV y se importa aquí con «Importar un extracto».</p>
+<p>La primera vez el panel pregunta qué columna es qué (fecha, descripción, referencia, valor —o débito y crédito— y saldo), enseña cómo queda cada movimiento y si el saldo cuadra, y no guarda nada hasta que lo confirmes. Recuerda esa elección para la próxima vez, por cuenta.</p>
+<p>Volver a importar el mismo archivo, o uno que se solapa con el anterior, <strong>no duplica nada</strong>: cada movimiento tiene su huella. Una importación mal hecha se deshace desde su fila en «Importaciones», mientras nada de ella se haya conciliado.</p>
+</div></details>
+<div id="bk-cob" class="cert-estado" aria-live="polite"></div>
+<div id="tb-movs" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+<h2 class="pn-h2">Importaciones</h2>
+<div id="tb-lotes" class="tb"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<section class="pn-vista" data-vista="finanzas/conciliar" id="sec-conciliar" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Cada movimiento del extracto se explica con algo: un abono con sus aportes, un cargo con su egreso, y lo que no es de nadie —el 4 por mil, la cuota de manejo, los rendimientos, un traslado— se deja fuera con su motivo.</p>
+<p><strong>Wompi y PayPal consignan en lotes</strong>, netos de comisión: un abono de Wompi cubre los pagos de uno o varios días y la diferencia es la comisión. El de PayPal cubre pagos en dólares y el banco da los pesos: esa es la cifra en pesos de PayPal, sin tasa inventada.</p>
+<p>El panel sugiere; una persona acepta. Una transferencia reportada se confirma en su cajón de siempre, con el recibo a la vista. Un abono que nada explica se puede registrar como <strong>pago sin guía</strong>: no crea un aporte, no envía correos ni emite certificado. Todo se deshace.</p>
+</div></details>
+<div id="bk-conc-res" class="cert-estado" aria-live="polite"></div>
+<div id="tb-conc" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
 <!-- Aportes. La tabla pide al servidor solo la página que se ve: es la única
      de Finanzas que crece sin techo. -->
 <section class="pn-vista" data-vista="finanzas/aportes" id="sec-aportes" hidden>
@@ -23550,7 +24831,7 @@ textarea { font-size: 16px }
 
 <section class="pn-vista" data-vista="finanzas/pagos" id="sec-pagos" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
-<p>Son pagos aprobados que entraron por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el sitio. Cobraron a la misma cuenta, pero sin guía no tienen recibo ni certificado: si alguno pide certificado, hay que crearle el registro a mano.</p>
+<p>Son pagos aprobados que entraron por el <strong>enlace directo de Wompi</strong> (el QR de la brigada) y no por el sitio, y los <strong>abonos del extracto</strong> que alguien registró como pago sin guía desde «Conciliar». Es dinero que entró, pero sin guía no tiene recibo ni certificado: si alguien lo pide, hay que crearle el registro a mano.</p>
 <p>Si la lista está vacía, todo lo cobrado está trazado.</p>
 </div></details>
 <div id="tb-pagos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
@@ -24795,17 +26076,17 @@ var REPORTADAS = {};
    correo que sale al confirmar. Ahora es un formulario con lo reportado al
    lado, la fecha y el monto validados antes de enviar, y el recibo que le
    llega al donante a la vista antes de confirmar. */
-function abrirConfirmarTransferencia(g){
-  if (REPORTADAS[g]){ pintarConfirmar(g, REPORTADAS[g]); return; }
+function abrirConfirmarTransferencia(g, op){
+  if (REPORTADAS[g]){ pintarConfirmar(g, REPORTADAS[g], op); return; }
   cajonAbrir({ ey: "Transferencia por verificar", titulo: "Confirmar " + g, cuerpo: '<p class="mu">Cargando…</p>' });
   fetch("/api/admin/reportadas").then(conEstado).then(function(r){
     ((r.d && r.d.reportadas) || []).forEach(function(a){ REPORTADAS[a.guia] = a; });
-    if (REPORTADAS[g]) pintarConfirmar(g, REPORTADAS[g]);
+    if (REPORTADAS[g]) pintarConfirmar(g, REPORTADAS[g], op);
     else cajonCuerpo('<p class="pn-error">' + esc(g) + " ya no está esperando verificación: puede que alguien la haya confirmado o descartado.</p>");
   }).catch(function(){ cajonCuerpo('<p class="pn-error">No se pudo cargar: revisa la conexión.</p>'); });
 }
 function hoyCO(){ return new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10); }
-function pintarConfirmar(g, a){
+function pintarConfirmar(g, a, op){
   var montoRep = a.monto_centavos ? String(Math.round(a.monto_centavos / 100)) : "";
   var cuerpo =
     '<dl class="pn-ficha"><dt>Guía</dt><dd>' + esc(g) + "</dd>" +
@@ -24816,7 +26097,7 @@ function pintarConfirmar(g, a){
       ? '<a href="/api/admin/comprobante/' + esc(g) + '" target="_blank" rel="noopener">Ver el comprobante</a>'
       : '<span style="color:var(--err)">no lo subió</span>') + "</dd>" +
     "<dt>Certificado</dt><dd>" + (a.quiere_certificado ? "lo pide" : "no lo pide") + "</dd></dl>" +
-    '<p class="pn-h3">Lo que dice el extracto del banco</p>' +
+    '<p class="pn-h3">Lo que dice el extracto del banco</p><div id="t-banco"><p class="mu">Buscando en el extracto importado…</p></div>' +
     pnCampo("t-ref", "Número del comprobante bancario", "", { ayuda: "Lo cita el certificado: no puede ser un número inventado." }) +
     '<div class="pn-par">' +
       pnCampo("t-fecha", "Fecha del movimiento", a.fecha_pago || "", { tipo: "date", extra: ' max="' + hoyCO() + '"',
@@ -24832,6 +26113,7 @@ function pintarConfirmar(g, a){
          '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' +
          '<p class="pn-pie-nota">Hasta que confirmes no hay recibo ni certificado. Confirmar no se deshace.</p>' });
   previaTransfer(g);
+  bancoParaTransfer(g, op && op.mov);
 }
 function soloDigitos(v){ return String(v || "").replace(/[^0-9]/g, ""); }
 function previaTransfer(g){
@@ -24871,7 +26153,7 @@ function enviarConfirmacion(g, b){
   fetch("/api/admin/transferencia/" + encodeURIComponent(g) + "/confirmar", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ referencia: ref, referencia_repetida_motivo: pnValor("t-rmot"),
-                           fecha: fecha, monto: monto, monto_motivo: pnValor("t-mmot") })
+                           fecha: fecha, monto: monto, monto_motivo: pnValor("t-mmot"), movimiento_id: T_MOV ? T_MOV.id : 0 })
   }).then(conEstado).then(function(res){
     b.disabled = false; b.textContent = "Confirmar y enviar el recibo";
     /* Si la referencia ya confirmó otra guía, o el monto no cuadra, el
@@ -24891,8 +26173,9 @@ function enviarConfirmacion(g, b){
     }
     cajonCerrar();
     delete REPORTADAS[g];
-    avisar("Transferencia " + g + " confirmada" + (a.email ? ". Recibo enviado a " + a.email + "." : "."));
-    cargarReportadas(); cargarResumen(); cargarAportes(); cargarSalud();
+    avisar("Transferencia " + g + " confirmada" + (T_MOV ? " y conciliada con el extracto" : "") + (a.email ? ". Recibo enviado a " + a.email + "." : "."));
+    T_MOV = null;
+    cargarReportadas(); cargarResumen(); cargarAportes(); recargarBanco();
   }).catch(function(){ b.disabled = false; errorEnCajon("No se pudo: revisa la conexión."); });
 }
 
@@ -24972,7 +26255,9 @@ var COLA_ES = {
   concepto_sin_avisar: "Conceptos escritos y sin avisar",
   certificados_en_revision: "Certificados que perdieron respaldo",
   correos_sin_cupo: "Avisos que no salieron por cupo",
-  jornadas_sin_cerrar: "Jornadas realizadas sin cerrar"
+  jornadas_sin_cerrar: "Jornadas realizadas sin cerrar",
+  banco_sin_conciliar: "Movimientos del banco sin conciliar",
+  extracto_por_importar: "Importar el extracto del mes"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -25052,12 +26337,16 @@ var VISTAS = {
     linea: "Lo que espera a una persona, de lo más grave a lo que puede esperar a la semana." },
   "finanzas/resumen": { area: "Finanzas", titulo: "Resumen",
     linea: "Lo que entró y lo que salió en el mes o en el año, y de dónde sale cada cifra." },
+  "finanzas/banco": { area: "Finanzas", titulo: "Banco",
+    linea: "El extracto de Bancolombia, que es la cifra que manda: lo importado y cada movimiento.", accion: ["Importar un extracto", "bk-importar"] },
+  "finanzas/conciliar": { area: "Finanzas", titulo: "Conciliar con el banco",
+    linea: "Cada movimiento del extracto con lo que lo explica: aportes, egresos, comisiones o un motivo." },
   "finanzas/aportes": { area: "Finanzas", titulo: "Aportes",
     linea: "Todo lo que ha entrado, con su recibo y su certificado. Toca una fila para verlo entero." },
   "finanzas/transferencias": { area: "Finanzas", titulo: "Transferencias por verificar",
     linea: "Quien dice que transfirió. Se confirma contra el extracto del banco y entonces sale su recibo." },
   "finanzas/pagos": { area: "Finanzas", titulo: "Pagos sin aporte",
-    linea: "Cobros aprobados que entraron por el enlace directo de Wompi y no tienen guía." },
+    linea: "Dinero que entró sin guía: cobros del enlace directo de Wompi y abonos del extracto registrados a mano." },
   "finanzas/membresias": { area: "Finanzas", titulo: "Membresías y carnets",
     linea: "Las membresías mensuales en dólares por PayPal y los carnets, también los de honor.",
     accion: ["Emitir carnet de honor", "hn-nuevo"] },
@@ -25227,7 +26516,9 @@ var COLA_MOD = {
   certificados_en_revision: "finanzas/aportes",
   correos_sin_cupo: "sistema/salud",
   jornadas_sin_cerrar: "personas/voluntariado",
-  vencimientos_por_atender: "finanzas/vencimientos"
+  vencimientos_por_atender: "finanzas/vencimientos",
+  banco_sin_conciliar: "finanzas/conciliar",
+  extracto_por_importar: "finanzas/banco"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -25310,7 +26601,7 @@ function ordenCola(a, b){ return (a.orden || 999) - (b.orden || 999) || restante
 function textoArreglo(c){
   if (c.clave === "vencimientos_por_atender") return "Se marca «Hecho» o «No aplicó este periodo». Marcar no presenta nada.";
   var t = String(c.arreglo || "");
-  var m = t.match(/^(Bandeja|Lista|Pantalla|Panel|Módulo|Contabilidad)[^·]*· *(.*)$/);
+  var m = t.match(/^(Bandeja|Lista|Pantalla|Panel|Módulo|Contabilidad|Finanzas)[^·]*· *(.*)$/);
   if (m) t = m[2];
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
@@ -25340,6 +26631,10 @@ function accionesItem(clave, it){
       '" data-nombre="' + esc((it.corto || it.titulo) + " · " + (it.periodo || "")) + '">No aplicó</button>';
   if (clave === "jornadas_sin_cerrar")
     return '<button type="button" class="pn-b2" data-hoy="jornada" data-id="' + id + '">Abrir jornada</button>';
+  if (clave === "banco_sin_conciliar")
+    return '<button type="button" class="pn-b1" data-hoy="banco" data-id="' + id + '">Conciliar…</button>';
+  if (clave === "extracto_por_importar")
+    return '<button type="button" class="pn-b1" data-hoy="importar" data-id="' + id + '">Importar…</button>';
   return "";
 }
 function cartaCola(c){
@@ -25403,6 +26698,8 @@ document.addEventListener("click", function(e){
   if (que === "atender"){ abrirAtender(id); return; }
   if (que === "revision"){ moverInscripcion(Number(id), "en_revision", b, { de: "nueva", nombre: b.getAttribute("data-nombre") }); return; }
   if (que === "jornada"){ location.hash = "personas/voluntariado"; abrirJornada(id); return; }
+  if (que === "banco"){ abrirMovimiento(id); return; }
+  if (que === "importar"){ location.hash = "finanzas/banco"; abrirImportar(); return; }
   if (que === "ob"){
     var clave = b.getAttribute("data-oclave"), fecha = b.getAttribute("data-ofecha"), est = b.getAttribute("data-oest");
     var nom = b.getAttribute("data-nombre");
@@ -28978,6 +30275,7 @@ function cajonForma(o){
   var f = n.querySelector("input:not([type=file]),select,textarea"); if (f) f.focus();
 }
 function abrirForma(id){
+  if (id === "bk-importar"){ abrirImportar(); return true; }
   var n = document.getElementById(id);
   if (!n || !n.hasAttribute("data-forma")) return false;
   if (id === "eg-nuevo"){
@@ -29214,28 +30512,46 @@ function cargarReportadas(){
   });
 }
 
-/* ---- Pagos sin aporte (enlace directo de Wompi) ---- */
+/* ---- Pagos sin aporte: el enlace directo de Wompi y lo registrado desde el banco ---- */
+var ORIGEN_PAGO_ES = { wompi: "Wompi · enlace directo", banco: "Registrado desde el extracto" };
+function fechaPago(p){ return p.origen === "banco" ? p.fecha : enCO(p.recibido_en, 10); }
 var TB_PAGOS = tablaNueva({ id: "tb-pagos", titulo: "Pagos sin aporte", orden: "recibido", dir: "desc",
   buscar: "Referencia, nombre o correo",
-  texto: function(p){ return [p.referencia, p.transaction_id, p.nombre, p.correo, p.metodo].join(" "); },
+  texto: function(p){ return [p.referencia, p.transaction_id, p.nombre, p.correo, p.metodo, p.nota, p.mov_descripcion].join(" "); },
   filtros: [
-    { k: "metodo", t: "Método", opciones: function(t){ return distintos(t.todas, function(p){ return p.metodo; }); }, valor: function(p){ return p.metodo || ""; } },
-    { k: "desde", t: "Desde", tipo: "fecha", fecha: function(p){ return enCO(p.recibido_en, 10); } },
-    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: function(p){ return enCO(p.recibido_en, 10); } }
+    { k: "origen", t: "Origen", opciones: opcionesDe(ORIGEN_PAGO_ES), valor: function(p){ return p.origen; } },
+    { k: "metodo", t: "Medio", opciones: function(t){ return distintos(t.todas, function(p){ return p.metodo; }); }, valor: function(p){ return p.metodo || ""; } },
+    { k: "desde", t: "Desde", tipo: "fecha", fecha: fechaPago },
+    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: fechaPago }
   ],
   columnas: [
-    { k: "recibido", t: "Recibido", valor: function(p){ return p.recibido_en; }, celda: function(p){ return esc(enCO(p.recibido_en, 16)); } },
-    { k: "ref", t: "Referencia", valor: function(p){ return p.referencia || p.transaction_id; }, celda: function(p){ return esc(p.referencia || p.transaction_id); } },
-    { k: "metodo", t: "Método", valor: function(p){ return p.metodo; }, celda: function(p){ return esc(p.metodo || "—"); } },
+    { k: "recibido", t: "Fecha", valor: function(p){ return p.origen === "banco" ? p.fecha + " 99" : enCO(p.recibido_en, 16); },
+      celda: function(p){ return esc(p.origen === "banco" ? p.fecha : enCO(p.recibido_en, 16)); } },
+    { k: "origen", t: "Origen", valor: function(p){ return p.origen; }, celda: function(p){ return esc(ORIGEN_PAGO_ES[p.origen] || p.origen); } },
+    { k: "ref", t: "Referencia", valor: function(p){ return p.referencia || p.transaction_id; }, celda: function(p){
+      return p.origen === "banco" ? "Pago sin guía #" + esc(p.id) + "<small>" + esc(p.mov_descripcion || "") + "</small>" : esc(p.referencia || p.transaction_id); } },
+    { k: "metodo", t: "Medio", valor: function(p){ return p.metodo; }, celda: function(p){ return esc(p.metodo || "—"); } },
     { k: "donante", t: "Pagador", valor: function(p){ return p.nombre; }, celda: function(p){ return celdaPersona(p.nombre, p.correo); } },
     { k: "monto", t: "Monto", num: true, valor: function(p){ return Number(p.monto_centavos || 0); },
       celda: function(p){ return p.monto_centavos ? dinero(p.monto_centavos, p.moneda) : "—"; } }
   ],
   totales: function(t){ var l = sumaPorMoneda(t.vista, function(p){ return p.monto_centavos; }, function(p){ return p.moneda; });
-    return { etiqueta: "Cobrado en el filtro · " + t.vista.length + " pagos", celdas: { monto: dineroLista(l) } }; },
-  nota: function(){ return "Son cobros aprobados por Wompi: es dinero confirmado, pero sin guía no está en las cifras de Aportes."; },
-  vacio: { titulo: "Ninguno: todo lo cobrado tiene su aporte.", texto: "Si alguien paga por el enlace directo de Wompi (el QR), aparece aquí." },
+    return { etiqueta: "Entró en el filtro · " + t.vista.length + " pagos", celdas: { monto: dineroLista(l) } }; },
+  nota: function(){ return "Es dinero que entró (Wompi lo aprobó, o está en el extracto), pero sin guía no está en las cifras de Aportes: el Resumen lo dice aparte."; },
+  vacio: { titulo: "Ninguno: todo lo que entró tiene su aporte.", texto: "Si alguien paga por el enlace directo de Wompi (el QR), o un abono del extracto se registra como pago sin guía, aparece aquí." },
   abrir: function(p){
+    if (p.origen === "banco"){
+      cajonAbrir({ ey: "Pago sin guía", titulo: "Pago sin guía #" + p.id + " · " + dinero(p.monto_centavos, p.moneda),
+        cuerpo: ficha([["Fecha del extracto", esc(p.fecha)], ["Monto", dinero(p.monto_centavos, p.moneda)], ["Por dónde entró", esc(p.metodo || "—")],
+          ["Quién pagó", esc(p.nombre || "no se sabe")], ["Destino", esc(p.proyecto || p.destino_id || "Fondo general")], ["Nota", esc(p.nota || "")],
+          ["En el extracto", esc((p.mov_descripcion || "") + (p.mov_referencia ? " · ref. " + p.mov_referencia : "")) + "<small>" + esc(p.mov_cuenta || "") + "</small>"],
+          ["Registrado", esc(enCO(p.creado_en, 16)) + "<small>" + esc(p.creado_por || "") + "</small>"]]) +
+          '<p class="pn-nota">Se registró desde un abono del extracto que ningún aporte explicaba. No tiene guía, ni recibo, ni certificado, y no se le escribió a nadie. ' +
+          "Si quien pagó aparece y pide certificado, hay que crearle el registro a mano, revisado.</p>",
+        pie: (p.movimiento_id ? '<button type="button" class="pn-b2" data-bk-abrir="' + esc(p.movimiento_id) + '">Ver el movimiento del extracto</button>' : "") +
+          '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+      return;
+    }
     cajonAbrir({ ey: "Pago sin aporte", titulo: (p.referencia || p.transaction_id) + " · " + (p.monto_centavos ? dinero(p.monto_centavos, p.moneda) : ""),
       cuerpo: ficha([["Recibido", esc(enCO(p.recibido_en, 16))], ["Referencia", esc(p.referencia || "—")],
         ["Transacción Wompi", "<code>" + esc(p.transaction_id) + "</code>"], ["Método", esc(p.metodo || "—")],
@@ -29253,7 +30569,14 @@ function cargarSueltos(){
   var caja = document.getElementById("tb-pagos");
   if (!TB_PAGOS.armada) tablaArmar(TB_PAGOS, caja);
   pedirJSON("/api/admin/pagos-sueltos", "tb-pagos-cuerpo").then(function(d){
-    TB_PAGOS.resp = d; TB_PAGOS.todas = d.pagos || []; tablaBarra(TB_PAGOS); tablaRefrescar(TB_PAGOS);
+    var med = d.medios || {};
+    TB_PAGOS.resp = d;
+    TB_PAGOS.todas = (d.pagos || []).map(function(p){ p.origen = "wompi"; return p; }).concat((d.registrados || []).map(function(p){
+      return { origen: "banco", id: p.id, fecha: p.fecha, monto_centavos: p.monto_centavos, moneda: p.moneda, metodo: med[p.medio] || p.medio,
+               nombre: p.nombre, destino_id: p.destino_id, proyecto: p.proyecto, nota: p.nota, movimiento_id: p.movimiento_id,
+               mov_descripcion: p.mov_descripcion, mov_referencia: p.mov_referencia, mov_cuenta: p.mov_cuenta, creado_por: p.creado_por, creado_en: p.creado_en };
+    }));
+    tablaBarra(TB_PAGOS); tablaRefrescar(TB_PAGOS);
   });
 }
 
@@ -29771,9 +31094,12 @@ function pintarFinanzas(d){
   var sw = d.sin_guia || {};
   (sw.wompi || []).forEach(function(x){ if (x.n) aparte.push("<strong>" + x.n + (x.n === 1 ? " pago" : " pagos") + " de Wompi sin aporte</strong> por " + dinero(x.centavos, x.moneda) +
     ': cobrados por el enlace directo, sin guía. No están arriba: ver <a href="#finanzas/pagos">Pagos sin aporte</a>.'); });
+  (sw.banco || []).forEach(function(x){ if (x.n) aparte.push("<strong>" + x.n + (x.n === 1 ? " pago sin guía registrado" : " pagos sin guía registrados") + "</strong> desde el extracto por " + dinero(x.centavos, x.moneda) +
+    ': entraron al banco sin que nadie los reportara. No están arriba: ver <a href="#finanzas/pagos">Pagos sin aporte</a>.'); });
   (sw.paypal || []).forEach(function(x){ if (x.n) aparte.push("<strong>" + x.n + (x.n === 1 ? " donación" : " donaciones") + " del botón de PayPal</strong> por " + dinero(x.centavos, x.moneda) +
     ': verificadas y sin guía. No están arriba: ver <a href="#finanzas/paypal">PayPal</a>.'); });
   if (d.donantes.sin_ficha) aparte.push(d.donantes.sin_ficha + " pago(s) confirmado(s) del periodo no tienen ficha de donante: suman como dinero, no como donantes.");
+  h += bloqueBanco(d.banco, nom);
   if (aparte.length) h += aparte.map(function(x){ return '<p class="fin-linea">' + x + "</p>"; }).join("");
   var fuenteIng = "Aportes con pago confirmado (pasarela o extracto), por la fecha del dinero. Solo pagos confirmados.";
   var fuenteEg = "Libro de egresos, por la fecha del egreso. Sin los anulados.";
@@ -29892,8 +31218,680 @@ function armarGraficaFin(d){
   z.addEventListener("mouseleave", salir);
 }
 
+
+/* ==== BANCO Y CONCILIACIÓN (Fase 3 del panel, oct 2026) ====
+   El extracto de Bancolombia es la cifra que manda (decisión del fundador, 8
+   oct 2026). Tres piezas: «Banco» importa el extracto y enseña sus
+   movimientos; «Conciliar» enseña los que nadie ha explicado, con lo que el
+   servidor sugiere; y el cajón de un movimiento, donde se acepta, se concilia
+   a mano, se ignora con su motivo o se registra como pago sin guía. Todo lo
+   que se decide aquí se deshace. */
+var BANCO = { d: null, conc: null, destinos: null, etiq: { motivos: {}, medios: {}, enlaces: {} } };
+var ESTADO_MOV_ES = { sin_conciliar: "Sin conciliar", conciliado: "Conciliado", ignorado: "Ignorado" };
+var SUG_ES = { transferencia: "Transferencia directa", reportada: "Transferencia reportada, sin verificar", sin_guia: "Pago sin guía ya registrado",
+  wompi: "Lote de Wompi", paypal: "Retiro de PayPal", egreso: "Egreso", ignorar: "Dejar fuera" };
+function valorBanco(c){ var v = Number(c || 0); return (v < 0 ? "−" : "+") + pesos(Math.abs(v)); }
+function signoClase(c){ return Number(c || 0) < 0 ? "bk-menos" : "bk-mas"; }
+function etiqBanco(d){ if (d && d.etiquetas) BANCO.etiq = d.etiquetas; }
+function resumenEnlaces(m){
+  if (m.estado === "ignorado") return (BANCO.etiq.motivos[m.motivo] || m.motivo || "ignorado") + (m.nota ? " · " + m.nota : "");
+  var l = m.enlaces || [];
+  if (!l.length) return "";
+  var refs = l.filter(function(e){ return e.ref && e.tipo !== "comision" && e.tipo !== "ajuste"; });
+  var com = l.filter(function(e){ return e.tipo === "comision"; }).reduce(function(t, e){ return t + Number(e.monto_centavos || 0); }, 0);
+  var aj = l.filter(function(e){ return e.tipo === "ajuste"; }).reduce(function(t, e){ return t + Number(e.monto_centavos || 0); }, 0);
+  var t = refs.length ? (refs[0].tipo === "pago_sin_guia" ? "Pago sin guía #" + refs[0].ref : refs[0].ref) + (refs.length > 1 ? " y " + (refs.length - 1) + " más" : "") : "";
+  if (com) t += (t ? " · " : "") + "comisión " + pesos(Math.abs(com));
+  if (aj) t += (t ? " · " : "") + "ajuste " + pesos(Math.abs(aj));
+  return t;
+}
+function recargarBanco(){
+  if (PEDIDAS["tb-movs"]) cargarBanco();
+  if (PEDIDAS["tb-conc"]) cargarConciliar();
+  if (PEDIDAS["tb-pagos"]) cargarSueltos();
+  if (FIN.d) cargarFinanzas();
+  cargarSalud();
+}
+
+/* ---- Banco: los movimientos y las importaciones ---- */
+var TB_MOVS = tablaNueva({ id: "tb-movs", titulo: "Movimientos del extracto", orden: "fecha", dir: "desc",
+  buscar: "Descripción, referencia o monto",
+  texto: function(m){ return [m.descripcion, m.referencia, m.oficina, m.cuenta, m.fecha, Math.round(Math.abs(m.valor_centavos) / 100), resumenEnlaces(m)].join(" "); },
+  filtros: [
+    { k: "estado", t: "Estado", opciones: opcionesDe(ESTADO_MOV_ES), valor: function(m){ return m.estado; } },
+    { k: "signo", t: "Tipo", opciones: [["credito", "Abonos (entra)"], ["debito", "Cargos (sale)"]], valor: function(m){ return m.valor_centavos > 0 ? "credito" : "debito"; } },
+    { k: "cuenta", t: "Cuenta", opciones: function(t){ return distintos(t.todas, function(m){ return m.cuenta; }); }, valor: function(m){ return m.cuenta; } },
+    { k: "desde", t: "Desde", tipo: "fecha", fecha: function(m){ return m.fecha; } },
+    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: function(m){ return m.fecha; } }
+  ],
+  columnas: [
+    { k: "fecha", t: "Fecha", nw: true, valor: function(m){ return m.fecha + String(1000000 + Number(m.posicion || 0)); }, celda: function(m){ return esc(m.fecha); } },
+    { k: "desc", t: "Descripción", valor: function(m){ return m.descripcion; }, celda: function(m){
+      return esc(m.descripcion || "—") + "<small>" + esc([m.referencia ? "ref. " + m.referencia : "", m.oficina, m.cuenta].filter(Boolean).join(" · ")) + "</small>"; } },
+    { k: "estado", t: "Estado", valor: function(m){ return m.estado; }, celda: function(m){
+      var r = resumenEnlaces(m);
+      return '<span class="' + (m.estado === "sin_conciliar" ? "tb-mal" : m.estado === "conciliado" ? "tb-conf" : "") + '">' + esc(ESTADO_MOV_ES[m.estado] || m.estado) + "</span>" +
+        (r ? "<small>" + esc(r) + "</small>" : ""); } },
+    { k: "valor", t: "Valor", num: true, valor: function(m){ return Number(m.valor_centavos); }, celda: function(m){
+      return '<span class="' + signoClase(m.valor_centavos) + '">' + esc(valorBanco(m.valor_centavos)) + "</span>"; } },
+    { k: "saldo", t: "Saldo", num: true, valor: function(m){ return m.saldo_centavos == null ? null : Number(m.saldo_centavos); },
+      celda: function(m){ return m.saldo_centavos == null ? "—" : pesos(m.saldo_centavos); } }
+  ],
+  totales: function(t){
+    var ab = 0, ca = 0, na = 0, nc = 0;
+    t.vista.forEach(function(m){ if (m.valor_centavos > 0){ ab += Number(m.valor_centavos); na++; } else { ca += Number(m.valor_centavos); nc++; } });
+    return { etiqueta: "En el filtro · " + na + " abonos y " + nc + " cargos", celdas: { valor: '<span class="bk-mas">+' + pesos(ab) + "</span><br>" + '<span class="bk-menos">−' + pesos(Math.abs(ca)) + "</span>" } };
+  },
+  nota: function(){ return "Las cifras son las del extracto: abonos en verde, cargos en negro. Toca un movimiento para ver qué lo explica o para conciliarlo."; },
+  aviso: function(t){ var d = t.resp; return d && d.total > (d.movimientos || []).length
+    ? "<strong>Se muestran los " + d.movimientos.length + " más recientes de " + numCO(d.total) + ".</strong> Acota por fechas para ver los anteriores." : ""; },
+  vacio: { titulo: "Todavía no hay extracto importado.", texto: "Descarga el extracto de la Sucursal Virtual de Bancolombia en CSV e impórtalo con «Importar un extracto»." },
+  etiquetaFila: function(m){ return "Abrir el movimiento del " + m.fecha; },
+  abrir: function(m){ abrirMovimiento(m.id); }
+});
+var TB_LOTES = tablaNueva({ id: "tb-lotes", titulo: "Importaciones", orden: "importado", dir: "desc",
+  texto: function(l){ return [l.archivo, l.cuenta, l.importado_por].join(" "); },
+  columnas: [
+    { k: "importado", t: "Importado", nw: true, valor: function(l){ return l.importado_en; }, celda: function(l){
+      return esc(enCO(l.importado_en, 16)) + "<small>" + esc(l.importado_por || "") + "</small>"; } },
+    { k: "archivo", t: "Archivo", valor: function(l){ return l.archivo; }, celda: function(l){
+      return esc(l.archivo || "—") + "<small>" + esc(l.cuenta) + (l.deshecho_en ? " · deshecha" : "") + "</small>"; } },
+    { k: "periodo", t: "Periodo del extracto", valor: function(l){ return l.periodo_desde; }, celda: function(l){
+      return esc(l.periodo_desde + " a " + l.periodo_hasta) + "<small>movimientos del " + esc(l.primera_fecha || "") + " al " + esc(l.ultima_fecha || "") + "</small>"; } },
+    { k: "nuevos", t: "Nuevos", num: true, valor: function(l){ return Number(l.nuevos); }, celda: function(l){ return numCO(l.nuevos); } },
+    { k: "repetidos", t: "Ya estaban", num: true, valor: function(l){ return Number(l.repetidos); }, celda: function(l){ return numCO(l.repetidos); } },
+    { k: "errores", t: "Con error", num: true, valor: function(l){ return Number(l.errores); }, celda: function(l){
+      return l.errores ? '<span class="tb-mal">' + numCO(l.errores) + "</span>" : "0"; } },
+    { k: "saldo", t: "Saldo final", num: true, valor: function(l){ return l.saldo_final_centavos == null ? null : Number(l.saldo_final_centavos); },
+      celda: function(l){ return l.saldo_final_centavos == null ? "—" : pesos(l.saldo_final_centavos); } }
+  ],
+  claseFila: function(l){ return l.deshecho_en ? "tb-gris" : ""; },
+  vacio: { titulo: "Ninguna importación todavía.", texto: "Cada archivo que importes queda aquí, con lo que trajo y lo que ya estaba." },
+  abrir: function(l){ abrirLote(l); }
+});
+function cargarBanco(){
+  var caja = document.getElementById("tb-movs");
+  if (!TB_MOVS.armada) tablaArmar(TB_MOVS, caja);
+  if (!TB_LOTES.armada) tablaArmar(TB_LOTES, document.getElementById("tb-lotes"));
+  pedirJSON("/api/admin/banco", "tb-movs-cuerpo").then(function(d){
+    BANCO.d = d; etiqBanco(d);
+    TB_MOVS.resp = d; TB_MOVS.todas = d.movimientos || []; tablaBarra(TB_MOVS); tablaRefrescar(TB_MOVS);
+    tablaCargar(TB_LOTES, d.lotes || []);
+    var cob = document.getElementById("bk-cob");
+    if (cob) cob.innerHTML = (d.cobertura || []).length
+      ? "<p><strong>Importado:</strong> " + d.cobertura.map(function(c){ return esc(c.cuenta) + " del " + esc(c.desde) + " al " + esc(c.hasta); }).join(" · ") +
+        " · " + numCO(d.total) + " movimientos" + (d.sin_conciliar ? ' · <a href="#finanzas/conciliar">' + numCO(d.sin_conciliar) + " sin conciliar</a>" : " · todos conciliados") + "</p>"
+      : "<p>Todavía no se ha importado ningún extracto. El Resumen no puede compararse con el banco hasta que haya uno.</p>";
+  });
+}
+function abrirLote(l){
+  var puede = !l.deshecho_en && !Number(l.resueltos || 0);
+  cajonAbrir({ ey: "Importación del extracto", titulo: (l.archivo || "Lote " + l.id),
+    cuerpo: ficha([["Cuenta", esc(l.cuenta)], ["Periodo", esc(l.periodo_desde + " a " + l.periodo_hasta)],
+      ["Movimientos", esc("del " + (l.primera_fecha || "") + " al " + (l.ultima_fecha || ""))],
+      ["Renglones", numCO(l.filas) + " leídos · " + numCO(l.nuevos) + " nuevos · " + numCO(l.repetidos) + " ya estaban · " + numCO(l.errores) + " con error"],
+      ["Saldo final", l.saldo_final_centavos == null ? "sin columna de saldo" : pesos(l.saldo_final_centavos)],
+      ["Importado", esc(enCO(l.importado_en, 16)) + "<small>" + esc(l.importado_por || "") + "</small>"],
+      ["Deshecho", l.deshecho_en ? esc(enCO(l.deshecho_en, 16)) + "<small>" + esc(l.deshecho_por || "") + "</small>" : ""]]) +
+      (l.deshecho_en ? "" : puede
+        ? '<p class="pn-nota">Si las columnas se leyeron mal o es la cuenta equivocada, deshazla y vuelve a importar el archivo.</p>'
+        : '<p class="pn-nota">' + numCO(l.resueltos) + " de sus movimientos ya se conciliaron o ignoraron: para deshacerla, primero deshaz esas decisiones desde cada movimiento.</p>"),
+    pie: (puede ? '<button type="button" class="pn-b1 pn-peligro" data-bk-lote="' + esc(l.id) + '">Deshacer esta importación…</button>' : "") +
+      '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+}
+
+/* ---- Importar: archivo, columnas, vista previa ---- */
+var IMP = null;
+function abrirImportar(){
+  var cuentas = ((BANCO.d && BANCO.d.cobertura) || []).map(function(c){ return c.cuenta; });
+  IMP = { cuenta: cuentas[0] || "Bancolombia ahorros", seq: 0 };
+  cajonAbrir({ ancho: true, ey: "Banco", titulo: "Importar un extracto",
+    cuerpo: '<p class="mu">El CSV que descargas de la Sucursal Virtual de Bancolombia. Nada se guarda hasta que pulses «Importar»: antes verás qué columna es qué y cómo queda cada movimiento.</p>' +
+      pnCampo("bi-cuenta", "Cuenta", IMP.cuenta, { extra: ' list="bi-cuentas"', ayuda: "Un nombre para la cuenta, no su número: por ejemplo «Bancolombia ahorros». El panel recuerda las columnas de cada cuenta." }) +
+      '<datalist id="bi-cuentas">' + cuentas.map(function(c){ return '<option value="' + esc(c) + '">'; }).join("") + "</datalist>" +
+      '<label class="pn-campo"><span>Archivo del extracto</span><input type="file" id="bi-archivo" accept=".csv,.txt,.tsv,.xls,.htm,.html,text/csv">' +
+      "<small>CSV con punto y coma, coma o tabulador, o el «Excel» que exporta el banco. Si es un .xlsx, ábrelo en Excel y guárdalo como CSV.</small></label>" +
+      '<div id="bi-paso2"></div><p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="bi-ok" disabled>Importar</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' +
+      '<p class="pn-pie-nota" id="bi-pie">Elige el archivo.</p>', foco: "bi-archivo" });
+}
+function leerArchivoBanco(f){
+  if (!f || !IMP) return;
+  errorEnCajon("");
+  if (f.size > 3 * 1024 * 1024){ errorEnCajon("El archivo pasa de 3 MB. Exporta un periodo más corto: un mes es lo normal."); return; }
+  f.arrayBuffer().then(function(buf){
+    var b = new Uint8Array(buf);
+    if (b[0] === 0x50 && b[1] === 0x4B){ errorEnCajon("Es un libro de Excel (.xlsx). Ábrelo en Excel, usa «Guardar como» → «CSV UTF-8» y sube ese archivo."); return; }
+    if (b[0] === 0xD0 && b[1] === 0xCF){ errorEnCajon("Es un Excel antiguo (.xls). Ábrelo en Excel, usa «Guardar como» → «CSV UTF-8» y sube ese archivo."); return; }
+    var texto, enc = "UTF-8";
+    try { texto = new TextDecoder("utf-8", { fatal: true }).decode(b); }
+    catch (x){ texto = new TextDecoder("windows-1252").decode(b); enc = "Latin-1 (Windows)"; }
+    IMP.texto = texto; IMP.archivo = f.name; IMP.enc = enc;
+    IMP.mapeo = null; IMP.fila = null; IMP.formato = ""; IMP.invertir = null; IMP.desde = ""; IMP.hasta = ""; IMP.modo = null;
+    releerBanco(true);
+  });
+}
+function recogerMapeo(){
+  if (!IMP || !IMP.resp) return;
+  var v = function(id){ var e = document.getElementById(id); return e ? e.value : ""; };
+  var m = {};
+  ["fecha", "descripcion", "referencia", "oficina", "saldo"].forEach(function(k){ if (v("bi-m-" + k) !== "") m[k] = Number(v("bi-m-" + k)); });
+  if (v("bi-modo") === "dos"){
+    if (v("bi-m-debito") !== "") m.debito = Number(v("bi-m-debito"));
+    if (v("bi-m-credito") !== "") m.credito = Number(v("bi-m-credito"));
+  } else if (v("bi-m-valor") !== "") m.valor = Number(v("bi-m-valor"));
+  IMP.mapeo = m;
+  IMP.fila = v("bi-fila") === "" ? null : Number(v("bi-fila"));
+  IMP.formato = v("bi-formato");
+  var inv = document.getElementById("bi-inv"); IMP.invertir = inv ? inv.checked : null;
+  IMP.desde = v("bi-desde"); IMP.hasta = v("bi-hasta");
+}
+function cuerpoLeer(confirmar){
+  return { texto: IMP.texto, archivo: IMP.archivo, cuenta: pnValor("bi-cuenta") || IMP.cuenta, mapeo: IMP.mapeo, fila_titulos: IMP.fila,
+           formato_fecha: IMP.formato, invertir: IMP.invertir, periodo_desde: IMP.desde, periodo_hasta: IMP.hasta, confirmar: !!confirmar };
+}
+function releerBanco(primera){
+  if (!IMP || !IMP.texto) return;
+  if (!primera) recogerMapeo();
+  var seq = ++IMP.seq, box = document.getElementById("bi-paso2"), ok = document.getElementById("bi-ok");
+  if (box) box.style.opacity = ".55";
+  if (ok) ok.disabled = true;
+  fetch("/api/admin/banco/leer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpoLeer(false)) })
+    .then(conEstado).then(function(r){
+      if (!IMP || seq !== IMP.seq) return;
+      if (box) box.style.opacity = "";
+      if (r.http !== 200 || !r.d || r.d.error){ errorEnCajon((r.d && (r.d.ayuda || r.d.error)) || "No se pudo leer el archivo (HTTP " + r.http + ")."); return; }
+      errorEnCajon("");
+      IMP.resp = r.d; IMP.mapeo = r.d.mapeo; IMP.fila = r.d.fila_titulos; IMP.formato = r.d.formato_fecha; IMP.invertir = r.d.invertir;
+      if (!IMP.desde && r.d.periodo){ IMP.desde = r.d.periodo.desde || ""; IMP.hasta = r.d.periodo.hasta || ""; }
+      pintarLecturaBanco(r.d);
+    }).catch(function(){ if (box) box.style.opacity = ""; errorEnCajon("No se pudo leer el archivo: revisa la conexión."); });
+}
+function pintarLecturaBanco(d){
+  var box = document.getElementById("bi-paso2"); if (!box) return;
+  var m = d.mapeo || {};
+  var dos = IMP.modo ? IMP.modo === "dos" : m.valor == null && (m.debito != null || m.credito != null);
+  var sel = function(k, etiqueta, opcional){
+    return '<label class="pn-campo"><span>' + esc(etiqueta) + '</span><select id="bi-m-' + k + '" data-bi="1"><option value="">' + (opcional ? "— no tiene —" : "— elige —") + "</option>" +
+      d.columnas.map(function(n, i){ return '<option value="' + i + '"' + (m[k] === i ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("") + "</select></label>";
+  };
+  var origen = d.origen === "recordado" ? "Usé las columnas que elegiste la última vez para esta cuenta."
+    : d.origen === "sugerido" ? (d.recordado ? "Este archivo no trae las mismas columnas que la última vez: propuse unas por sus títulos. Revísalas."
+                                              : "Propuse las columnas por sus títulos. Revísalas: la próxima vez esta cuenta las recordará.")
+    : "Con las columnas que elegiste.";
+  var h = '<p class="pn-bien">«' + esc(IMP.archivo) + "» · leído como " + esc(IMP.enc) + " · " +
+    (d.html ? "tabla HTML (el «Excel» del banco)" : "separado por «" + (d.delimitador === "\\t" ? "tabulador" : esc(d.delimitador)) + "»") + "<br>" + esc(origen) + "</p>";
+  h += '<p class="pn-h3">Qué columna es qué</p><div class="bk-mapa">' + sel("fecha", "Fecha") + sel("descripcion", "Descripción", true) +
+    sel("referencia", "Referencia o documento", true) + sel("oficina", "Oficina o canal", true) +
+    '<label class="pn-campo"><span>El valor viene en</span><select id="bi-modo" data-bi="1"><option value="uno"' + (dos ? "" : " selected") + ">Una columna, con signo</option>" +
+    '<option value="dos"' + (dos ? " selected" : "") + ">Dos columnas: débito y crédito</option></select></label>" +
+    (dos ? sel("debito", "Débito (sale)") + sel("credito", "Crédito (entra)") : sel("valor", "Valor")) + sel("saldo", "Saldo", true) +
+    '<label class="pn-campo"><span>Los títulos están en</span><select id="bi-fila" data-bi="1"><option value="-1"' + (d.fila_titulos === -1 ? " selected" : "") + ">No hay fila de títulos</option>" +
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function(i){ return '<option value="' + i + '"' + (d.fila_titulos === i ? " selected" : "") + ">La fila " + (i + 1) + "</option>"; }).join("") + "</select></label>" +
+    '<label class="pn-campo"><span>Las fechas son</span><select id="bi-formato" data-bi="1"><option value="dmy"' + (d.formato_fecha === "dmy" ? " selected" : "") + ">día/mes/año (31/12/2026)</option>" +
+    '<option value="mdy"' + (d.formato_fecha === "mdy" ? " selected" : "") + ">mes/día/año (12/31/2026)</option></select></label>" +
+    '<label class="bk-casilla"><input type="checkbox" id="bi-inv" data-bi="1"' + (d.invertir ? " checked" : "") + "> Invertir el signo (si los cargos salen positivos)</label></div>";
+  if (d.faltan && d.faltan.length) h += '<p class="pn-nota">Falta decir qué columna es ' + esc(d.faltan.join(" y ")) + ".</p>";
+  h += '<details class="bk-crudo"><summary>Así viene el archivo (primeras filas después de los títulos)</summary><div class="bk-crudo-t"><table class="pn-tabla"><thead><tr>' +
+    d.columnas.map(function(n){ return "<th>" + esc(n) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+    (d.muestra || []).map(function(f){ return "<tr>" + d.columnas.map(function(n, i){ return "<td>" + esc(String(f[i] == null ? "" : f[i]).slice(0, 60)) + "</td>"; }).join("") + "</tr>"; }).join("") +
+    "</tbody></table></div></details>";
+  if (!(d.faltan && d.faltan.length)){
+    var c = d.conteo || {};
+    h += '<p class="pn-h3">Lo que se va a guardar</p><p class="bk-cuenta"><b>' + numCO(c.nuevos) + (c.nuevos === 1 ? " nuevo" : " nuevos") + "</b> · " +
+      numCO(c.repetidos) + " ya estaban · " + '<span class="' + (c.errores ? "bk-err" : "") + '">' + numCO(c.errores) + " con error</span>" +
+      (c.omitidas ? " · " + numCO(c.omitidas) + " renglones sin movimiento (vacíos o de saldo)" : "") + "</p>";
+    if (c.cortado) h += '<p class="pn-nota">El archivo trae más de 6.000 renglones: solo se leen los primeros. Exporta un periodo más corto.</p>';
+    var s = d.sumas || {};
+    h += '<p class="bk-linea">Del ' + esc((d.rango && d.rango.primera) || "—") + " al " + esc((d.rango && d.rango.ultima) || "—") + " · " +
+      '<span class="bk-mas">abonos +' + pesos(s.creditos) + "</span> (" + numCO(s.n_creditos) + ") · " +
+      '<span class="bk-menos">cargos −' + pesos(Math.abs(s.debitos || 0)) + "</span> (" + numCO(s.n_debitos) + ")" +
+      (d.saldo_final != null ? " · saldo final " + pesos(d.saldo_final) : "") + "</p>";
+    var sd = d.saldo || {};
+    if (sd.pares){
+      if (!sd.no_cuadran) h += '<p class="pn-bien">El saldo cuadra renglón a renglón con el valor (' + numCO(sd.pares) + " de " + numCO(sd.pares) + ").</p>";
+      else h += '<p class="pn-nota">En ' + numCO(sd.no_cuadran) + " de " + numCO(sd.pares) + " renglones el saldo no cuadra con el valor." +
+        (sd.al_reves * 2 > sd.no_cuadran ? " Casi siempre es el signo al revés: prueba «Invertir el signo» o cruza débito y crédito." : " Revisa qué columna es el valor y cuál el saldo.") + "</p>";
+    }
+    h += '<div class="pn-par">' + pnCampo("bi-desde", "El extracto cubre desde", IMP.desde || "", { tipo: "date", extra: ' data-bi="1"' }) +
+      pnCampo("bi-hasta", "hasta", IMP.hasta || "", { tipo: "date", extra: ' data-bi="1"' }) + "</div>" +
+      '<p class="bk-ayuda">El periodo que dice el extracto, no solo el de sus movimientos: con él el Resumen sabe qué meses puede comparar con el banco, y se apaga el recordatorio del mes.</p>';
+    h += '<table class="pn-tabla bk-vista"><thead><tr><th>Fila</th><th>Fecha</th><th>Descripción</th><th class="num">Valor</th><th class="num">Saldo</th><th></th></tr></thead><tbody>' +
+      (d.vista || []).map(function(f){
+        return "<tr" + (f.error ? ' class="bk-fila-mal"' : "") + "><td>" + f.linea + "</td><td>" + esc(f.fecha || "—") + "</td><td>" + esc(f.descripcion || "") +
+          (f.referencia ? "<small>ref. " + esc(f.referencia) + "</small>" : "") + "</td>" +
+          '<td class="num">' + (f.valor_centavos == null ? "—" : '<span class="' + signoClase(f.valor_centavos) + '">' + esc(valorBanco(f.valor_centavos)) + "</span>") + "</td>" +
+          '<td class="num">' + (f.saldo_centavos == null ? "—" : pesos(f.saldo_centavos)) + "</td><td>" +
+          (f.error ? '<span class="bk-err">' + esc(f.error) + "</span>" : f.ya ? '<span class="mu">ya estaba</span>' : '<span class="bk-mas">nuevo</span>') + "</td></tr>";
+      }).join("") + "</tbody></table>" +
+      (c.filas > (d.vista || []).length ? '<p class="bk-ayuda">Se enseñan los primeros ' + (d.vista || []).length + " de " + numCO(c.filas) + ".</p>" : "");
+    if ((d.errores || []).length) h += '<p class="pn-h3">Renglones con error (no se guardan)</p><ul class="bk-errores">' +
+      d.errores.map(function(e){ return "<li>Fila " + e.linea + ": " + esc(e.error) + "</li>"; }).join("") + "</ul>";
+  }
+  box.innerHTML = h;
+  var ok = document.getElementById("bi-ok"), pie = document.getElementById("bi-pie");
+  var n = (d.conteo && d.conteo.nuevos) || 0, listo = !(d.faltan && d.faltan.length) && n > 0;
+  if (ok){ ok.disabled = !listo; ok.textContent = listo ? "Importar " + numCO(n) + (n === 1 ? " movimiento" : " movimientos") : "Importar"; }
+  if (pie) pie.textContent = d.faltan && d.faltan.length ? "Elige las columnas que faltan." : !n ? "Nada nuevo: todo lo de este archivo ya está importado." : "Los que ya estaban no se duplican.";
+}
+function importarBanco(b){
+  if (!IMP || !IMP.resp) return;
+  recogerMapeo();
+  b.disabled = true; b.textContent = "Importando…"; errorEnCajon("");
+  fetch("/api/admin/banco/leer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpoLeer(true)) })
+    .then(conEstado).then(function(r){
+      if (r.http !== 200 || !r.d || r.d.error){ b.disabled = false; b.textContent = "Importar"; errorEnCajon((r.d && (r.d.ayuda || r.d.error)) || "No se pudo importar."); return; }
+      cajonCerrar(); IMP = null;
+      avisar(r.d.nuevos ? "Importados " + numCO(r.d.nuevos) + (r.d.nuevos === 1 ? " movimiento" : " movimientos") + (r.d.repetidos ? " · " + numCO(r.d.repetidos) + " ya estaban" : "") + "." : (r.d.ayuda || "Nada nuevo."));
+      recargarBanco();
+    }).catch(function(){ b.disabled = false; b.textContent = "Importar"; errorEnCajon("No se pudo: revisa la conexión."); });
+}
+document.addEventListener("change", function(e){
+  if (!e.target || !e.target.closest) return;
+  if (e.target.id === "bi-archivo"){ leerArchivoBanco(e.target.files && e.target.files[0]); return; }
+  if (e.target.id === "bi-cuenta" && IMP && IMP.texto){ IMP.mapeo = null; IMP.fila = null; IMP.formato = ""; IMP.invertir = null; IMP.modo = null; releerBanco(true); return; }
+  if (e.target.closest("[data-bi]") && IMP && IMP.resp){
+    /* Cambiar de una columna a dos (o al revés): se vuelve a leer y el panel
+       pide las columnas que falten. */
+    if (e.target.id === "bi-modo") IMP.modo = e.target.value;
+    releerBanco(false);
+  }
+});
+
+/* ---- Conciliar: lo que falta explicar, con sus sugerencias ---- */
+function mejorSugerencia(m){ return (m.sugerencias || [])[0] || null; }
+function textoSugerencia(s){
+  if (!s) return "";
+  if (s.tipo === "ignorar") return "Dejar fuera · " + (BANCO.etiq.motivos[s.motivo] || s.motivo);
+  var it = s.items || [];
+  return (SUG_ES[s.tipo] || s.tipo) + " · " + (it.length === 1 ? it[0].ref + " · " + (it[0].titulo || "") : it.length + " pagos") +
+    (s.diferencia_centavos ? " · comisión " + pesos(s.diferencia_centavos) : "");
+}
+var TB_CONC = tablaNueva({ id: "tb-conc", titulo: "Movimientos sin conciliar", orden: "fecha", dir: "asc",
+  buscar: "Descripción, referencia o monto",
+  texto: function(m){ return [m.descripcion, m.referencia, m.cuenta, m.fecha, Math.round(Math.abs(m.valor_centavos) / 100), textoSugerencia(mejorSugerencia(m))].join(" "); },
+  filtros: [
+    { k: "signo", t: "Tipo", opciones: [["credito", "Abonos (entra)"], ["debito", "Cargos (sale)"]], valor: function(m){ return m.valor_centavos > 0 ? "credito" : "debito"; } },
+    { k: "sug", t: "Sugerencia", opciones: [["si", "Con sugerencia"], ["alta", "Sugerencia de confianza alta"], ["no", "Sin sugerencia"]],
+      prueba: function(m, v){ var s = mejorSugerencia(m); return v === "no" ? !s : v === "alta" ? !!(s && s.confianza === "alta") : !!s; } },
+    { k: "desde", t: "Desde", tipo: "fecha", fecha: function(m){ return m.fecha; } },
+    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: function(m){ return m.fecha; } }
+  ],
+  columnas: [
+    { k: "fecha", t: "Fecha", nw: true, valor: function(m){ return m.fecha + String(1000000 + Number(m.posicion || 0)); }, celda: function(m){ return esc(m.fecha); } },
+    { k: "desc", t: "Descripción", valor: function(m){ return m.descripcion; }, celda: function(m){
+      return esc(m.descripcion || "—") + "<small>" + esc([m.referencia ? "ref. " + m.referencia : "", m.cuenta].filter(Boolean).join(" · ")) + "</small>"; } },
+    { k: "valor", t: "Valor", num: true, valor: function(m){ return Number(m.valor_centavos); }, celda: function(m){
+      return '<span class="' + signoClase(m.valor_centavos) + '">' + esc(valorBanco(m.valor_centavos)) + "</span>"; } },
+    { k: "sug", t: "Lo que sugiere el panel", orden: false, celda: function(m){
+      var s = mejorSugerencia(m);
+      if (!s) return '<span class="mu">Nada lo explica solo · ábrelo para conciliarlo a mano</span>';
+      return '<span class="bk-conf ' + (s.confianza === "alta" ? "alta" : "") + '">' + (s.confianza === "alta" ? "confianza alta" : "revisar") + "</span> " +
+        esc(textoSugerencia(s)) + "<small>" + esc(s.explicacion || "") + "</small>"; } },
+    { k: "acc", t: "", orden: false, celda: function(m){
+      var s = mejorSugerencia(m);
+      return (s ? '<button type="button" class="pn-b1" data-bk-aceptar="' + esc(m.id) + '">' + (s.tipo === "reportada" ? "Confirmar…" : "Aceptar") + "</button> " : "") +
+        '<button type="button" class="pn-b2" data-bk-abrir="' + esc(m.id) + '">Abrir</button>'; } }
+  ],
+  totales: function(t){
+    var ab = 0, ca = 0;
+    t.vista.forEach(function(m){ if (m.valor_centavos > 0) ab += Number(m.valor_centavos); else ca += Number(m.valor_centavos); });
+    return { etiqueta: "Sin conciliar en el filtro · " + t.vista.length, celdas: { valor: '<span class="bk-mas">+' + pesos(ab) + '</span><br><span class="bk-menos">−' + pesos(Math.abs(ca)) + "</span>" } };
+  },
+  nota: function(){ return "Aceptar guarda la conciliación enseguida y se puede deshacer desde el aviso o desde el movimiento. Una transferencia reportada se confirma en su cajón, con el recibo a la vista."; },
+  vacio: { titulo: "Todo lo importado está conciliado.", texto: "Cuando importes el siguiente extracto, lo que falte por explicar aparece aquí." },
+  etiquetaFila: function(m){ return "Conciliar el movimiento del " + m.fecha; },
+  abrir: function(m){ abrirMovimiento(m.id); }
+});
+function cargarConciliar(){
+  var caja = document.getElementById("tb-conc");
+  if (!TB_CONC.armada) tablaArmar(TB_CONC, caja);
+  pedirJSON("/api/admin/banco/conciliar", "tb-conc-cuerpo").then(function(d){
+    BANCO.conc = d; etiqBanco(d);
+    TB_CONC.resp = d; tablaCargar(TB_CONC, d.movimientos || []);
+    var con = (d.movimientos || []).filter(function(m){ return mejorSugerencia(m); });
+    var alta = con.filter(function(m){ return mejorSugerencia(m).confianza === "alta"; });
+    var r = document.getElementById("bk-conc-res");
+    if (r) r.innerHTML = (d.movimientos || []).length
+      ? "<p><strong>" + numCO(d.movimientos.length) + " sin conciliar</strong> · " + numCO(con.length) + " con sugerencia (" + numCO(alta.length) + " de confianza alta) · " +
+        numCO(d.movimientos.length - con.length) + " para mirar a mano.</p>" : "";
+  });
+}
+function movDeLista(id){
+  var l = ((BANCO.conc && BANCO.conc.movimientos) || []).filter(function(m){ return String(m.id) === String(id); });
+  return l[0] || null;
+}
+/* Aceptar una sugerencia. La transferencia reportada NO se acepta aquí: se
+   abre su cajón de siempre, con el movimiento ya elegido y el recibo a la
+   vista, porque confirmarla le escribe al donante. */
+function aceptarSugerencia(m, s, b){
+  if (!s) return;
+  if (s.tipo === "reportada"){ abrirConfirmarTransferencia(s.items[0].ref, { mov: m.id }); return; }
+  if (b) b.disabled = true;
+  var p = s.tipo === "ignorar"
+    ? postPanel("/api/admin/banco/movimiento/" + m.id + "/ignorar", { motivo: s.motivo, nota: "" })
+    : postPanel("/api/admin/banco/movimiento/" + m.id + "/conciliar", {
+        items: (s.items || []).map(function(i){ return { tipo: i.tipo, ref: i.ref }; }),
+        diferencia: s.diferencia_centavos ? (s.tipo === "wompi" ? "comision" : "ajuste") : "",
+        nota: s.diferencia_centavos ? (s.tipo === "wompi" ? "Comisión de Wompi" : "Retenciones: el banco pagó el total del egreso") : "" });
+  return p.then(function(d){
+    if (b) b.disabled = false;
+    if (!d) return false;
+    avisar((s.tipo === "ignorar" ? "Dejado fuera · " : "Conciliado · ") + m.fecha + " · " + valorBanco(m.valor_centavos), { deshacer: function(){ deshacerMovimiento(m.id); } });
+    cajonCerrar();
+    recargarBanco();
+    return true;
+  });
+}
+function deshacerMovimiento(id){
+  postPanel("/api/admin/banco/movimiento/" + id + "/deshacer", {}).then(function(d){
+    if (d){ avisar("El movimiento vuelve a estar sin conciliar."); recargarBanco(); }
+  });
+}
+
+/* ---- El cajón de un movimiento ---- */
+var MOV = null;
+function abrirMovimiento(id){
+  cajonAbrir({ ancho: true, ey: "Movimiento del extracto", titulo: "Cargando…", cuerpo: '<p class="mu">Cargando…</p>' });
+  fetch("/api/admin/banco/movimiento/" + encodeURIComponent(id)).then(conEstado).then(function(r){
+    if (r.http !== 200 || !r.d || r.d.error){ cajonCuerpo('<p class="pn-error">' + esc((r.d && (r.d.ayuda || r.d.error)) || "No se pudo cargar.") + "</p>"); return; }
+    etiqBanco(r.d);
+    MOV = { d: r.d, sel: [], res: [] };
+    pintarMovimiento();
+  }).catch(function(){ cajonCuerpo('<p class="pn-error">No se pudo cargar: revisa la conexión.</p>'); });
+}
+function filaItem(i, boton){
+  return "<tr><td><strong>" + esc(i.ref) + "</strong><small>" + esc(BANCO.etiq.enlaces[i.tipo] || i.tipo) + "</small></td><td>" + esc(i.titulo || "") +
+    "</td><td class=\\"nw\\">" + esc(i.fecha || "") + '</td><td class="num">' + dinero(i.monto_centavos, i.moneda) + "</td>" + (boton != null ? "<td>" + boton + "</td>" : "") + "</tr>";
+}
+function pintarMovimiento(){
+  var d = MOV.d, m = d.movimiento, cred = m.valor_centavos > 0, E = BANCO.etiq;
+  document.getElementById("pn-cajon-t").textContent = (cred ? "Abono de " : "Cargo de ") + pesos(Math.abs(m.valor_centavos)) + " · " + m.fecha;
+  var h = ficha([["Descripción", esc(m.descripcion || "—")], ["Referencia", esc(m.referencia || "")], ["Oficina o canal", esc(m.oficina || "")],
+    ["Valor", '<span class="' + signoClase(m.valor_centavos) + '">' + esc(valorBanco(m.valor_centavos)) + "</span>"],
+    ["Saldo", m.saldo_centavos == null ? "" : pesos(m.saldo_centavos)], ["Cuenta", esc(m.cuenta)],
+    ["Importado", esc(enCO(m.importado_en, 16)) + (d.lote ? "<small>" + esc((d.lote.archivo || "lote " + d.lote.id) + " · " + (d.lote.importado_por || "")) + "</small>" : "")],
+    ["Estado", esc(ESTADO_MOV_ES[m.estado] || m.estado) + (m.resuelto_por ? "<small>" + esc(m.resuelto_por + " · " + enCO(m.resuelto_en, 16)) + "</small>" : "")]]);
+  var pie = '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  if (m.estado === "conciliado"){
+    h += '<p class="pn-h3">Lo explica</p><table class="pn-tabla"><thead><tr><th>Qué</th><th>Detalle</th><th class="num">En pesos</th></tr></thead><tbody>' +
+      d.enlaces.map(function(e){
+        return "<tr><td><strong>" + esc(e.ref ? (e.tipo === "pago_sin_guia" ? "Pago sin guía #" + e.ref : e.ref) : (E.enlaces[e.tipo] || e.tipo)) + "</strong><small>" + esc(E.enlaces[e.tipo] || e.tipo) + "</small></td>" +
+          "<td>" + esc(e.titulo || "") + (e.moneda_origen ? "<small>" + esc(dinero(e.monto_origen_centavos, e.moneda_origen) + " · " + (e.nota || "")) + "</small>" : e.nota ? "<small>" + esc(e.nota) + "</small>" : "") + "</td>" +
+          '<td class="num">' + esc(valorBanco(e.monto_centavos)) + "</td></tr>";
+      }).join("") + "</tbody></table>" + (m.nota ? '<p class="pn-nota">' + esc(m.nota) + "</p>" : "");
+    pie = '<button type="button" class="pn-b2" data-bk-deshacer="' + esc(m.id) + '">Deshacer la conciliación</button>' + pie;
+  } else if (m.estado === "ignorado"){
+    h += '<p class="pn-nota">Dejado fuera · <strong>' + esc(E.motivos[m.motivo] || m.motivo) + "</strong>" + (m.nota ? " · " + esc(m.nota) : "") + "</p>";
+    pie = '<button type="button" class="pn-b2" data-bk-deshacer="' + esc(m.id) + '">Deshacer</button>' + pie;
+  } else {
+    var sug = d.sugerencias || [];
+    h += '<p class="pn-h3">Lo que sugiere el panel</p>' + (sug.length ? sug.map(function(s, i){
+      return '<div class="bk-sug"><div class="bk-sug-cab"><strong>' + esc(SUG_ES[s.tipo] || s.tipo) + (s.tipo === "ignorar" ? " · " + esc(E.motivos[s.motivo] || s.motivo) : "") + "</strong>" +
+        '<span class="bk-conf ' + (s.confianza === "alta" ? "alta" : "") + '">' + (s.confianza === "alta" ? "confianza alta" : "revisar") + "</span></div>" +
+        "<p>" + esc(s.explicacion || "") + "</p>" +
+        ((s.items || []).length ? '<table class="pn-tabla"><tbody>' + s.items.map(function(it){ return filaItem(it); }).join("") + "</tbody>" +
+          (s.diferencia_centavos ? '<tfoot><tr><td colspan="3">' + (s.tipo === "wompi" ? "Comisión de la pasarela" : "Diferencia") + '</td><td class="num">−' + pesos(s.diferencia_centavos) + "</td></tr></tfoot>" : "") +
+          "</table>" : "") +
+        '<button type="button" class="pn-b1" data-bk-sug="' + i + '">' + (s.tipo === "reportada" ? "Confirmar la transferencia…" : s.tipo === "ignorar" ? "Dejar fuera" : "Aceptar") + "</button></div>";
+    }).join("") : '<p class="mu">El panel no encontró nada que lo explique solo. Concílialo a mano, déjalo fuera con su motivo' + (cred ? " o regístralo como pago sin guía" : "") + ".</p>");
+    h += '<p class="pn-h3">Conciliar a mano</p>' +
+      '<label class="pn-campo"><span>Buscar ' + (cred ? "aportes, pagos sin aporte o donaciones de PayPal" : "egresos") + '</span><input type="search" id="bk-q" data-bk-q="1" autocomplete="off" placeholder="Guía, nombre, monto o fecha">' +
+      "<small>Sin escribir nada salen los de seis semanas alrededor, primero los del mismo monto.</small></label>" +
+      '<div id="bk-res" class="bk-res-l"><p class="mu">Buscando…</p></div><div id="bk-sel"></div>';
+    h += '<p class="pn-h3">Dejarlo fuera</p><p class="bk-ayuda">Para lo que no es de ningún donante ni de ningún egreso. Queda con su motivo y se puede deshacer.</p><div class="pn-acciones">' +
+      Object.keys(E.motivos).map(function(k){ return '<button type="button" class="pn-b2" data-bk-ign="' + esc(k) + '">' + esc(E.motivos[k]) + "</button>"; }).join("") + "</div>" +
+      pnCampo("bk-inota", "Nota (obligatoria con «Otro motivo»)", "", {});
+    if (cred){
+      h += '<p class="pn-h3">Registrar como pago sin guía</p><p class="pn-nota">Para un abono que ningún aporte explica: alguien consignó o transfirió sin reportarlo. ' +
+        "Queda en «Pagos sin aporte» y cuenta como dinero que entró sin guía. <strong>No se crea un aporte, no se envía ningún correo y no se emite certificado</strong>: si la persona aparece y lo pide, eso sigue siendo a mano.</p>" +
+        '<div class="pn-par">' + pnCampo("ps-nombre", "Quién pagó, si se sabe", "", {}) +
+        '<label class="pn-campo"><span>Por dónde entró</span><select id="ps-medio">' + Object.keys(E.medios).map(function(k){ return '<option value="' + esc(k) + '">' + esc(E.medios[k]) + "</option>"; }).join("") + "</select></label></div>" +
+        '<label class="pn-campo"><span>Destino</span><select id="ps-destino"><option value="">Fondo general</option></select><small>Si quien pagó dijo para qué era.</small></label>' +
+        pnCampo("ps-nota", "Nota", "", { area: true, filas: 2 }) +
+        '<button type="button" class="pn-b2" id="ps-ok">Registrar el pago sin guía</button>';
+    }
+    h += '<p class="pn-error" id="pn-err"></p>';
+  }
+  cajonCuerpo(h);
+  cajonPie(pie);
+  if (m.estado === "sin_conciliar"){ buscarParaMovimiento(""); if (cred) llenarDestinos(); }
+}
+function llenarDestinos(){
+  var pinta = function(){
+    var s = document.getElementById("ps-destino"); if (!s) return;
+    s.innerHTML = '<option value="">Fondo general</option>' + (BANCO.destinos || []).filter(function(x){ return x.id; }).map(function(x){
+      return '<option value="' + esc(x.id) + '" data-nombre="' + esc(x.nombre || x.id) + '">' + esc(x.nombre || x.id) + "</option>"; }).join("");
+  };
+  if (BANCO.destinos){ pinta(); return; }
+  fetch("/api/admin/aportes?meta=1&por=1").then(conEstado).then(function(r){
+    BANCO.destinos = (r.d && r.d.opciones && r.d.opciones.destinos) || []; pinta();
+  }).catch(function(){});
+}
+var BK_RELOJ = null;
+function buscarParaMovimiento(q){
+  if (!MOV) return;
+  var id = MOV.d.movimiento.id, seq = MOV.bseq = (MOV.bseq || 0) + 1;
+  fetch("/api/admin/banco/buscar?mov=" + id + "&q=" + encodeURIComponent(q || "")).then(conEstado).then(function(r){
+    if (!MOV || seq !== MOV.bseq) return;
+    MOV.res = (r.d && r.d.items) || [];
+    pintarBusqueda(r.d && r.d.total);
+  }).catch(function(){ var b = document.getElementById("bk-res"); if (b) b.innerHTML = '<p class="pn-error">No se pudo buscar.</p>'; });
+}
+function enSel(i){ return MOV.sel.some(function(x){ return x.tipo === i.tipo && x.ref === i.ref; }); }
+function pintarBusqueda(total){
+  var b = document.getElementById("bk-res"); if (!b) return;
+  var l = MOV.res.filter(function(i){ return !enSel(i); });
+  b.innerHTML = l.length ? '<table class="pn-tabla"><tbody>' + l.slice(0, 12).map(function(i){
+    return filaItem(i, '<button type="button" class="pn-b2" data-bk-add="' + esc(i.tipo + "|" + i.ref) + '">Añadir</button>');
+  }).join("") + "</tbody></table>" + (total > 12 ? '<p class="bk-ayuda">' + numCO(total) + " en total: escribe para acotar.</p>" : "")
+    : '<p class="mu">Nada que no esté ya conciliado. Prueba con otro nombre, la guía o el monto.</p>';
+  pintarSeleccion();
+}
+function pintarSeleccion(){
+  var b = document.getElementById("bk-sel"); if (!b || !MOV) return;
+  var m = MOV.d.movimiento, V = Math.abs(Number(m.valor_centavos));
+  if (!MOV.sel.length){ b.innerHTML = ""; return; }
+  var cop = 0, usd = [];
+  MOV.sel.forEach(function(i){ if ((i.moneda || "COP") === "COP") cop += Number(i.monto_centavos || 0); else usd.push(i); });
+  var dif = usd.length ? 0 : V - cop;
+  var prev = document.getElementById("bk-dtipo"), prevT = prev ? prev.value : "comision", prevN = pnValor("bk-dnota");
+  b.innerHTML = '<p class="pn-h3">Elegido</p><table class="pn-tabla"><tbody>' + MOV.sel.map(function(i){
+      return filaItem(i, '<button type="button" class="copy" data-bk-quitar="' + esc(i.tipo + "|" + i.ref) + '">Quitar</button>'); }).join("") + "</tbody></table>" +
+    '<p class="bk-cuenta">Movimiento ' + pesos(V) + " · elegido " + pesos(cop) + (usd.length ? " + " + usd.length + " en dólares (se valoran con lo que queda del abono: " + pesos(Math.max(0, V - cop)) + ")" : "") +
+    " · <b>" + (dif === 0 ? "cuadra" : dif > 0 ? "faltan " + pesos(dif) : "sobran " + pesos(-dif)) + "</b></p>" +
+    (dif !== 0 ? '<div class="pn-par"><label class="pn-campo"><span>La diferencia es</span><select id="bk-dtipo">' +
+      '<option value="comision"' + (prevT === "comision" ? " selected" : "") + ">Comisión de la pasarela</option>" +
+      '<option value="ajuste"' + (prevT === "ajuste" ? " selected" : "") + ">Ajuste (con nota)</option></select></label>" +
+      pnCampo("bk-dnota", "Nota", prevN, { ayuda: "Obligatoria si es un ajuste." }) + "</div>" : "") +
+    '<button type="button" class="pn-b1" id="bk-man">Conciliar con lo elegido</button>';
+}
+function conciliarAMano(b){
+  var m = MOV.d.movimiento;
+  var t = document.getElementById("bk-dtipo"), nota = pnValor("bk-dnota");
+  if (t && t.value === "ajuste" && !nota){ pnMarcar("bk-dnota", "Un ajuste lleva una nota que diga por qué."); return; }
+  b.disabled = true;
+  postPanel("/api/admin/banco/movimiento/" + m.id + "/conciliar", { items: MOV.sel.map(function(i){ return { tipo: i.tipo, ref: i.ref }; }),
+    diferencia: t ? t.value : "", nota: nota }).then(function(d){
+    b.disabled = false;
+    if (!d) return;
+    avisar("Conciliado · " + m.fecha + " · " + valorBanco(m.valor_centavos), { deshacer: function(){ deshacerMovimiento(m.id); } });
+    cajonCerrar(); recargarBanco();
+  });
+}
+function ignorarMovimiento(motivo, b){
+  var m = MOV.d.movimiento, nota = pnValor("bk-inota");
+  if (motivo === "otro" && !nota){ pnMarcar("bk-inota", "Con «Otro motivo», escribe cuál."); document.getElementById("bk-inota").focus(); return; }
+  b.disabled = true;
+  postPanel("/api/admin/banco/movimiento/" + m.id + "/ignorar", { motivo: motivo, nota: nota }).then(function(d){
+    b.disabled = false;
+    if (!d) return;
+    avisar("Dejado fuera · " + (BANCO.etiq.motivos[motivo] || motivo), { deshacer: function(){ deshacerMovimiento(m.id); } });
+    cajonCerrar(); recargarBanco();
+  });
+}
+function registrarSinGuia(b){
+  var m = MOV.d.movimiento, s = document.getElementById("ps-destino"), op = s && s.options[s.selectedIndex];
+  b.disabled = true;
+  postPanel("/api/admin/banco/movimiento/" + m.id + "/pago-sin-guia", { nombre: pnValor("ps-nombre"), medio: pnValor("ps-medio"),
+    destino_id: s ? s.value : "", proyecto: op && op.value ? op.getAttribute("data-nombre") : "", nota: pnValor("ps-nota") }).then(function(d){
+    b.disabled = false;
+    if (!d) return;
+    avisar("Pago sin guía registrado (" + pesos(m.valor_centavos) + "). No se envió ningún correo.", { deshacer: function(){ deshacerMovimiento(m.id); } });
+    cajonCerrar(); recargarBanco();
+  });
+}
+document.addEventListener("input", function(e){
+  if (!e.target || !e.target.closest || !e.target.closest("[data-bk-q]")) return;
+  var v = e.target.value;
+  clearTimeout(BK_RELOJ); BK_RELOJ = setTimeout(function(){ buscarParaMovimiento(v.trim()); }, 250);
+});
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var x;
+  if ((x = e.target.closest("[data-bk-aceptar]"))){
+    var m = movDeLista(x.getAttribute("data-bk-aceptar")); if (m) aceptarSugerencia(m, mejorSugerencia(m), x); return;
+  }
+  if ((x = e.target.closest("[data-bk-abrir]"))){ abrirMovimiento(x.getAttribute("data-bk-abrir")); return; }
+  if ((x = e.target.closest("[data-bk-sug]")) && MOV){
+    var s = (MOV.d.sugerencias || [])[Number(x.getAttribute("data-bk-sug"))];
+    aceptarSugerencia(MOV.d.movimiento, s, x); return;
+  }
+  if ((x = e.target.closest("[data-bk-add]")) && MOV){
+    var k = x.getAttribute("data-bk-add");
+    var it = MOV.res.filter(function(i){ return i.tipo + "|" + i.ref === k; })[0];
+    if (it && !enSel(it)) MOV.sel.push(it);
+    pintarBusqueda(); return;
+  }
+  if ((x = e.target.closest("[data-bk-quitar]")) && MOV){
+    var k2 = x.getAttribute("data-bk-quitar");
+    MOV.sel = MOV.sel.filter(function(i){ return i.tipo + "|" + i.ref !== k2; });
+    pintarBusqueda(); return;
+  }
+  if ((x = e.target.closest("[data-bk-ign]")) && MOV){ ignorarMovimiento(x.getAttribute("data-bk-ign"), x); return; }
+  if ((x = e.target.closest("[data-bk-deshacer]"))){
+    var id = x.getAttribute("data-bk-deshacer");
+    confirmarSimple({ titulo: "Volver a «sin conciliar»", detalle: "<p>Se quitan los enlaces de este movimiento y vuelve a la lista de «Conciliar». Si de él salió un pago sin guía, ese registro se anula.</p>",
+      boton: "Deshacer", hacer: function(){
+        return postPanel("/api/admin/banco/movimiento/" + id + "/deshacer", {}).then(function(d){
+          if (!d) return false; avisar("El movimiento vuelve a estar sin conciliar."); recargarBanco(); return true; });
+      } });
+    return;
+  }
+  if ((x = e.target.closest("[data-bk-lote]"))){
+    var lid = x.getAttribute("data-bk-lote");
+    confirmarPeligro({ titulo: "Deshacer la importación", boton: "Deshacer la importación",
+      detalle: "<p>Se quitan del panel todos los movimientos que trajo este archivo. Úsalo cuando las columnas se leyeron mal o es la cuenta equivocada, y vuelve a importarlo.</p>",
+      hacer: function(){
+        return postPanel("/api/admin/banco/lote/" + lid + "/deshacer", {}).then(function(d){
+          if (!d) return false; avisar("Importación deshecha · " + numCO(d.quitados) + " movimientos quitados."); recargarBanco(); return true; });
+      } });
+    return;
+  }
+  if (e.target.id === "bk-man" && MOV){ conciliarAMano(e.target); return; }
+  if (e.target.id === "ps-ok" && MOV){ registrarSinGuia(e.target); return; }
+  if (e.target.id === "bi-ok"){ importarBanco(e.target); return; }
+});
+
+/* ---- Confirmar una transferencia: el renglón del extracto ----
+   Si ya está importado, se ve y se enlaza en el mismo paso; si no, se dice
+   «aún no aparece en el extracto importado» y se confirma igual: el extracto
+   puede no estar importado todavía. */
+var T_MOV = null;
+function bancoParaTransfer(g, movPedido){
+  T_MOV = null;
+  var box = document.getElementById("t-banco"); if (!box) return;
+  fetch("/api/admin/banco/candidatos?guia=" + encodeURIComponent(g)).then(conEstado).then(function(r){
+    if (!document.getElementById("t-banco")) return;
+    if (r.http !== 200 || !r.d || r.d.error){ box.innerHTML = ""; return; }
+    var l = r.d.movimientos || [], cob = r.d.cobertura;
+    if (!l.length){
+      box.innerHTML = '<p class="pn-nota"><strong>Aún no aparece en el extracto importado.</strong> ' +
+        (cob ? "Lo importado llega hasta el " + esc(cob.hasta) + (cob.cubre ? ": búscalo en el extracto antes de confirmar." : ", así que todavía no cubre la fecha que reportó el donante.")
+             : "Todavía no se ha importado ningún extracto.") + " No hace falta para confirmar.</p>";
+      return;
+    }
+    T_BANCO = l;
+    box.innerHTML = '<div class="bk-sug"><div class="bk-sug-cab"><strong>En el extracto importado</strong></div>' +
+      '<table class="pn-tabla"><tbody>' + l.map(function(m){
+        return "<tr><td class=\\"nw\\">" + esc(m.fecha) + "</td><td>" + esc(m.descripcion || "") + (m.referencia ? "<small>ref. " + esc(m.referencia) + "</small>" : "") + "</td>" +
+          '<td class="num">' + pesos(m.valor_centavos) + '</td><td><button type="button" class="pn-b2" data-tbanco="' + esc(m.id) + '">Usar este</button></td></tr>';
+      }).join("") + "</tbody></table><p class=\\"bk-ayuda\\" id=\\"t-banco-elegido\\">Elige el movimiento: llena la fecha, el monto y la referencia con lo del extracto y lo deja conciliado al confirmar.</p></div>";
+    var pedido = movPedido && l.filter(function(m){ return String(m.id) === String(movPedido); })[0];
+    if (pedido) usarMovTransfer(pedido);
+    else if (l.length === 1) usarMovTransfer(l[0]);
+  }).catch(function(){ box.innerHTML = ""; });
+}
+var T_BANCO = [];
+function usarMovTransfer(m){
+  T_MOV = m;
+  var set = function(id, v){ var e = document.getElementById(id); if (e) e.value = v; };
+  /* La referencia va al certificado: se copia solo si el extracto la trae.
+     La descripción del banco no es un número de comprobante. */
+  set("t-ref", m.referencia || "");
+  set("t-fecha", m.fecha);
+  set("t-monto", String(Math.round(m.valor_centavos / 100)));
+  var p = document.getElementById("t-banco-elegido");
+  if (p) p.innerHTML = "<strong>Se enlazará con el movimiento del " + esc(m.fecha) + " (" + pesos(m.valor_centavos) + ")</strong> y quedará conciliado al confirmar. " +
+    (m.referencia ? "" : "El extracto no trae referencia para este movimiento: escribe abajo el número del comprobante. ") +
+    '<button type="button" class="copy" data-tbanco="0">No enlazar</button>';
+  document.querySelectorAll("[data-tbanco]").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-tbanco") === String(m.id)); });
+  var b = document.getElementById("t-ok"); if (b) previaTransfer(b.getAttribute("data-tconf"));
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b = e.target.closest("[data-tbanco]"); if (!b) return;
+  var id = b.getAttribute("data-tbanco");
+  if (id === "0"){ T_MOV = null; var p = document.getElementById("t-banco-elegido"); if (p) p.textContent = "No se enlazará con el extracto."; return; }
+  var m = T_BANCO.filter(function(x){ return String(x.id) === id; })[0];
+  if (m) usarMovTransfer(m);
+});
+
+/* ---- Resumen: según el banco y según el panel ---- */
+function bloqueBanco(b, nom){
+  if (!b) return "";
+  if (b.sin_extracto){
+    return '<div class="bk-cmp bk-cmp-vacio"><h3>Según el banco</h3><p>No hay extracto importado para ' + esc(nom) + ". " +
+      (b.importado ? "Lo importado va del " + esc(b.importado.desde) + " al " + esc(b.importado.hasta) + "." : "Todavía no se ha importado ninguno.") +
+      ' Sin extracto, estas cifras son solo las del panel. <a href="#finanzas/banco">Importar el extracto</a></p></div>';
+  }
+  var dif = function(c){ c = Number(c || 0); return (c < 0 ? "−" : c > 0 ? "+" : "") + pesos(Math.abs(c)); };
+  var fila = function(t, c, op){ op = op || {}; return Number(c || 0) || op.siempre ? "<tr" + (op.cls ? ' class="' + op.cls + '"' : "") + "><td>" + t + '</td><td class="num">' + dif(c) + "</td></tr>" : ""; };
+  var en = b.entradas, sa = b.salidas;
+  var saldo = (b.saldos || []).map(function(s){ return pesos(s.saldo_centavos) + (b.saldos.length > 1 ? " (" + esc(s.cuenta) + ")" : "") + " al " + esc(s.fecha); }).join(" · ");
+  var h = '<div class="bk-cmp"><h3>Según el banco <small>la cifra de referencia</small></h3>' +
+    (b.completo ? "" : '<p class="pn-nota">El extracto importado no cubre todo el periodo: va ' + b.cobertura.map(function(c){ return "del " + esc(c.desde) + " al " + esc(c.hasta) + " (" + esc(c.cuenta) + ")"; }).join(", ") + ".</p>") +
+    '<table class="pn-tabla bk-cmp-t"><thead><tr><th></th><th class="num">Según el banco</th><th class="num">Según el panel</th><th class="num">Diferencia</th></tr></thead><tbody>' +
+    "<tr><td><strong>Entradas</strong><small>abonos del extracto · aportes confirmados en pesos</small></td>" +
+      '<td class="num"><strong>' + pesos(b.creditos.centavos) + "</strong><small>" + numCO(b.creditos.n) + " abonos</small></td>" +
+      '<td class="num">' + pesos(b.panel.ingresos) + '</td><td class="num">' + dif(en.diferencia) + "</td></tr>" +
+    "<tr><td><strong>Salidas</strong><small>cargos del extracto · egresos (lo que salió de la cuenta)</small></td>" +
+      '<td class="num"><strong>' + pesos(b.debitos.centavos) + "</strong><small>" + numCO(b.debitos.n) + " cargos</small></td>" +
+      '<td class="num">' + pesos(b.panel.egresos) + '</td><td class="num">' + dif(sa.diferencia) + "</td></tr>" +
+    "</tbody></table>" + (saldo ? '<p class="bk-linea">Saldo final según el extracto: <strong>' + saldo + "</strong></p>" : "") +
+    '<div class="fin-grid"><div><p class="bk-sub">De dónde sale la diferencia de las entradas</p><table class="pn-tabla"><tbody>' +
+      fila("Abonos sin conciliar" + (en.sin_conciliar.n ? " (" + numCO(en.sin_conciliar.n) + ")" : ""), en.sin_conciliar.centavos) +
+      fila("Dejados fuera (rendimientos, traslados…)", en.ignorados) +
+      fila("Comisiones de las pasarelas", en.comisiones) +
+      fila("Ajustes", en.ajustes) +
+      fila("Entró sin guía y está conciliado", en.sin_guia) +
+      fila("PayPal en pesos, según el banco" + (en.paypal.usd ? " <small>" + esc(dinero(en.paypal.usd, "USD")) + " a " + Math.round(en.paypal.cop / (en.paypal.usd / 100) / 100).toLocaleString("es-CO") + " pesos por dólar</small>" : ""), en.paypal.cop) +
+      fila("Otras diferencias <small>fechas de corte (un pago del 30 que la pasarela consigna el 1), aportes aún sin conciliar de este u otro mes</small>", en.otras, { siempre: true, cls: "bk-otras" }) +
+    '</tbody></table></div><div><p class="bk-sub">De dónde sale la diferencia de las salidas</p><table class="pn-tabla"><tbody>' +
+      fila("Cargos sin conciliar" + (sa.sin_conciliar.n ? " (" + numCO(sa.sin_conciliar.n) + ")" : ""), sa.sin_conciliar.centavos) +
+      (b.ignorados_por_motivo || []).filter(function(x){ return !x.credito; }).map(function(x){ return fila("Dejados fuera · " + esc(x.nombre) + " (" + numCO(x.n) + ")", x.centavos); }).join("") +
+      fila("Ajustes", sa.ajustes) +
+      fila("Otras diferencias <small>egresos en efectivo o con tarjeta, o pagados en otro mes</small>", sa.otras, { siempre: true, cls: "bk-otras" }) +
+    "</tbody></table></div></div>" +
+    ((en.sin_conciliar.n || sa.sin_conciliar.n) ? '<p class="bk-linea"><a href="#finanzas/conciliar">Conciliar lo que falta (' + numCO(Number(en.sin_conciliar.n) + Number(sa.sin_conciliar.n)) + ")</a></p>" : "") +
+    "</div>";
+  return h;
+}
+
 var BANDEJAS = {
   "fin-resumen": cargarFinanzas,
+  "tb-movs": cargarBanco,
+  "tb-conc": cargarConciliar,
   "tb-aportes": cargarAportes,
   "tb-transferencias": cargarReportadas,
   "i-filas": cargarInscripciones,
@@ -33614,6 +35612,24 @@ export default {
         /* Entregas (Fase 6). El borrador y sus fotos viven tras Access hasta que
            alguien las publica: en terreno se registra rápido y se revisa después. */
         if (ruta === "/api/admin/pagos-sueltos") return await adminPagosSueltos(env);
+        /* Conciliación bancaria (Fase 3, 0042). Los POST pasan por el chequeo
+           de Origin de arriba como todos los que escriben. */
+        if (ruta === "/api/admin/banco")            return await adminBanco(env);
+        if (ruta === "/api/admin/banco/leer")       return await adminBancoLeer(request, env, sesion.email);
+        if (ruta === "/api/admin/banco/conciliar")  return await adminBancoConciliar(env);
+        if (ruta === "/api/admin/banco/buscar")     return await adminBancoBuscar(env, url);
+        if (ruta === "/api/admin/banco/candidatos") return await adminBancoCandidatos(env, url);
+        const bl = ruta.match(/^\/api\/admin\/banco\/lote\/(\d{1,9})\/deshacer$/);
+        if (bl) return await adminBancoDeshacerLote(request, env, Number(bl[1]), sesion.email);
+        const bm = ruta.match(/^\/api\/admin\/banco\/movimiento\/(\d{1,9})(?:\/(conciliar|ignorar|deshacer|pago-sin-guia))?$/);
+        if (bm) {
+          const mid = Number(bm[1]);
+          if (!bm[2]) return await adminBancoMovimiento(env, mid);
+          if (bm[2] === "conciliar") return await adminBancoConciliarMov(request, env, mid, sesion.email);
+          if (bm[2] === "ignorar")   return await adminBancoIgnorar(request, env, mid, sesion.email);
+          if (bm[2] === "deshacer")  return await adminBancoDeshacer(request, env, mid, sesion.email);
+          return await adminBancoPagoSinGuia(request, env, mid, sesion.email);
+        }
         if (ruta === "/api/admin/ipn")           return await adminIpn(env);
         if (ruta === "/api/admin/paypal-sueltos") return await adminPaypalSueltos(env);
         if (ruta === "/api/admin/suscripciones") return await adminSuscripciones(env);
