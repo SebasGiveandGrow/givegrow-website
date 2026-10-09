@@ -2765,6 +2765,12 @@ const ITEMS_COLA = {
      ficha, para abrirla desde la fila. */
   seguimientos_pendientes: "id AS id, COALESCE(contacto_nombre, contacto, 'Sin contacto') AS titulo, " +
     "COALESCE(proximo, '') AS detalle, contacto AS clave, proximo_fecha AS fecha",
+  /* Las tareas (Fase 5, 0044): primero la fecha más vieja; a igual fecha, la
+     de prioridad alta. `fecha` es lo que pide «Posponer…» para su Deshacer. */
+  tareas_pendientes: { campos: "id AS id, titulo AS titulo, " +
+    "TRIM(CASE prioridad WHEN 'alta' THEN 'prioridad alta' ELSE '' END || COALESCE(' · ' || ref_nombre, ''), ' ·') AS detalle, " +
+    "fecha_limite AS fecha, prioridad AS prioridad, ref_tipo AS ref_tipo, ref_id AS ref_id",
+    luego: "CASE prioridad WHEN 'alta' THEN 0 ELSE 1 END, id" },
   entregas_en_borrador: "numero AS id, COALESCE(sector, '') AS titulo, fecha AS detalle",
   entregadas_sin_acta: "a.guia AS id, (SELECT d.nombre FROM donantes d WHERE d.id = a.donante_id) AS titulo, " +
     "COALESCE(a.destino_id, 'Fondo general') AS detalle, a.monto_centavos AS monto",
@@ -3120,6 +3126,31 @@ async function adminSalud(env, opciones) {
       "Contactos · lo que te anotaste hacer con alguien: hazlo y márcalo «Hecho», o posponlo con fecha nueva", 45, "#sec-contactos", 0);
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  /* LAS TAREAS (Fase 5, 0044). La misma regla que los próximos pasos de las
+     fichas, y en otra tabla, así que nada se cuenta dos veces: PLAZO CERO, el
+     día de la fecha límite en su franja; pasado ese día, vencida, a Urgente y
+     al correo diario. Una tarea sin fecha no entra a «Hoy»: vive en Tareas. */
+  try {
+    await enCola("tareas_pendientes",
+      "SELECT COUNT(*) AS n, MIN(fecha_limite || ' 05:00:00') AS masViejo FROM tareas " +
+      "WHERE estado = 'pendiente' AND fecha_limite IS NOT NULL AND fecha_limite <= date('now', '-5 hours')",
+      "Tareas · lo que tenías para hoy o ya pasó su fecha: hazlo y márcalo «Hecha», o posponlo con fecha nueva", 44, "#sec-tareas", 0);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  /* LOS DOCUMENTOS DE LA FUNDACIÓN (Fase 5, 0044). Tres colas que arma
+     `colasDocumentos` —los huecos salen del código, no de una consulta—:
+     vencido (Urgente), por vencer a 30 días y lo que falta (Esta semana). El
+     certificado de la Cámara no avisa: ver DOC_TIPOS. Sin la 0044 no salen. */
+  const cd = await colasDocumentos(env);
+  if (cd) {
+    await enCola("documentos_vencidos", cd.vencidos,
+      "Legal y documentos › Documentos · registra el documento vigente (el vencido queda reemplazado) o corrige su fecha", 15, "#sec-documentos");
+    await enCola("documentos_por_vencer", cd.porVencer,
+      "Legal y documentos › Documentos · renuévalo antes de que venza: el nuevo reemplaza al viejo", 86, "#sec-documentos");
+    await enCola("documentos_faltantes", cd.faltan,
+      "Legal y documentos › Documentos · súbelo, o márcalo «No aplica» con el motivo", 87, "#sec-documentos");
   }
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
@@ -7106,6 +7137,20 @@ function cuandoVence(x) {
 async function adminObligaciones(request, env, quien) {
   if (request.method === "GET") {
     const r = await vencimientosConEstado(env);
+    /* Lo que se presentó (Fase 5, 0044): el documento atado a cada
+       vencimiento, si alguien lo subió. Sin la 0044, nada. */
+    try {
+      const docs = (await env.DB.prepare(
+        "SELECT id, titulo, ob_clave, ob_fecha, (archivo_clave IS NOT NULL) AS tiene_archivo FROM documentos " +
+        "WHERE ob_clave IS NOT NULL AND anulado_en IS NULL ORDER BY id"
+      ).all()).results || [];
+      for (const x of r.items) {
+        const l = docs.filter((d) => d.ob_clave === x.clave && d.ob_fecha === x.fecha);
+        if (l.length) x.documentos = l.map((d) => ({ id: d.id, titulo: d.titulo, tiene_archivo: d.tiene_archivo ? 1 : 0 }));
+      }
+    } catch (e) {
+      if (!/no such table/i.test(String(e && e.message))) throw e;
+    }
     return json({
       hoy: r.hoy, items: r.items, sin_tabla: r.sinTabla,
       dias_cola: OBLIGACIONES_DIAS_COLA, dias_correo: OBLIGACIONES_DIAS_CORREO,
@@ -7228,7 +7273,8 @@ const NOMBRE_COLA_PLAZO = {
   vencimientos_por_atender: "Vencimientos tributarios y legales sin atender",
   banco_sin_conciliar: "Movimientos del extracto sin conciliar",
   extracto_por_importar: "Extracto del banco del mes pasado sin importar",
-  seguimientos_pendientes: "Próximos pasos con alguien que ya pasaron su fecha"
+  seguimientos_pendientes: "Próximos pasos con alguien que ya pasaron su fecha",
+  tareas_pendientes: "Tareas que ya pasaron su fecha"
 };
 /* LAS COLAS DE MIRA MI CASA VAN A SU PROPIO BUZÓN (auditoría del 28 sep 2026).
    Hasta hoy ninguna cola de casos tenía plazo, así que ninguna llegaba nunca a
@@ -7259,8 +7305,14 @@ async function resumenDiarioEquipo(env) {
      cuenta «personas que esperan una respuesta», y una jornada sin cerrar no es
      eso. Mezclarlas haria que el titulo mintiera. */
   const deJornadas = vencidas.filter(c => c.clave === "jornadas_sin_cerrar");
+  /* Las tareas y los documentos (Fase 5) tampoco son «una persona que espera
+     respuesta»: cada uno en su correo, para que el título no mienta. Las
+     tareas al buzón de alianzas, que es el del fundador; un documento vencido
+     a contabilidad, que es el de los papeles. */
+  const deTareas = vencidas.filter(c => c.clave === "tareas_pendientes");
+  const deDocs = vencidas.filter(c => c.clave === "documentos_vencidos");
   const deAlianzas = vencidas.filter(c => COLAS_PLAZO_MMC.indexOf(c.clave) < 0 && COLAS_PLAZO_BANCO.indexOf(c.clave) < 0 &&
-    c.clave !== "jornadas_sin_cerrar");
+    c.clave !== "jornadas_sin_cerrar" && c.clave !== "tareas_pendientes" && c.clave !== "documentos_vencidos");
   const otras = cola.filter(c => c.n > 0 && !c.vencida).length;
   if (deAlianzas.length) {
     out.alianzas = await enviarResumenVencidas(env, {
@@ -7302,6 +7354,29 @@ async function resumenDiarioEquipo(env) {
         c.clave === "extracto_por_importar" ? (c.cuando || "pendiente")
           : c.n + " · lo más viejo se importó hace " + c.dias + " días (plazo " + c.plazo + ")"]),
       boton: { url: "https://thegiveandgrowproject.org/admin#finanzas/conciliar", texto: "Abrir la conciliación" }
+    });
+  }
+  if (deTareas.length) {
+    out.tareas = await enviarResumenVencidas(env, {
+      para: correoAlianzas(env), etiqueta: "resumen-diario-tareas", vencidas: deTareas,
+      titulo: (n) => n === 1 ? "Una tarea pasó su fecha" : n + " tareas pasaron su fecha",
+      parrafos: [
+        "Son las que te anotaste en el panel con fecha límite. Desde «Hoy» o desde Tareas se marcan «Hecha» o se posponen con fecha nueva; las que se repiten crean la siguiente al marcarse."
+      ],
+      filas: deTareas.map(c => [NOMBRE_COLA_PLAZO[c.clave] || c.clave,
+        c.n + " · la más atrasada era para hace " + c.dias + (c.dias === 1 ? " día" : " días")]),
+      boton: { url: "https://thegiveandgrowproject.org/admin#tareas", texto: "Abrir las tareas" }
+    });
+  }
+  if (deDocs.length) {
+    out.documentos = await enviarResumenVencidas(env, {
+      para: env.CORREO_AVISOS, etiqueta: "resumen-diario-documentos", vencidas: deDocs,
+      titulo: (n) => n === 1 ? "Un documento de la fundación está vencido" : n + " documentos de la fundación están vencidos",
+      parrafos: [
+        "Pólizas, contratos, el registro del RTE o cualquier documento con fecha de vencimiento que se registró en el panel. Se arregla registrando el vigente (el vencido queda reemplazado) o corrigiendo la fecha."
+      ],
+      filas: deDocs.map(c => ["Documentos vencidos", c.n + " · el primero " + (c.cuando || "venció")]),
+      boton: { url: "https://thegiveandgrowproject.org/admin#legal/documentos", texto: "Abrir los documentos" }
     });
   }
   if (deJornadas.length) {
@@ -18138,6 +18213,34 @@ async function adminEgresosCSV(env, url) {
   const args = [];
   if (/^\d{4}-\d{2}-\d{2}$/.test(desde)) { cond.push("e.fecha >= ?"); args.push(desde); }
   if (/^\d{4}-\d{2}-\d{2}$/.test(hasta)) { cond.push("e.fecha <= ?"); args.push(hasta); }
+  /* LOS MISMOS FILTROS DE LA TABLA (Fase 5). Antes el archivo llevaba el libro
+     entero entre dos fechas, filtrara lo que filtrara la pantalla: «Descargar»
+     con «Sin papel» puesto bajaba también los que sí tenían papel. Ahora lleva
+     lo que se ve. Sin `estado` (el enlace del Resumen) sigue siendo el libro
+     entero, con los anulados marcados, como siempre. */
+  const sp = url ? url.searchParams : new URLSearchParams();
+  const est = sp.get("estado");
+  if (est === "vigentes") cond.push("e.anulado_en IS NULL");
+  else if (est === "anulados") cond.push("e.anulado_en IS NOT NULL");
+  const cat = limpiar(sp.get("cat"), 40);
+  if (cat) { cond.push("COALESCE(e.concepto_ret, 'no_aplica') = ?"); args.push(cat); }
+  const centro = limpiar(sp.get("centro"), 80);
+  if (centro) { cond.push("COALESCE(e.centro, '') = ?"); args.push(centro); }
+  const papel = sp.get("papel");
+  if (papel === "con") cond.push("e.soporte <> 'sin_soporte'");
+  else if (papel === "sin") cond.push("e.soporte = 'sin_soporte'");
+  else if (papel === "sin_archivo") cond.push("e.soporte_key IS NULL");
+  const mer = sp.get("meritoria");
+  if (mer === "si") cond.push("e.meritoria = 1"); else if (mer === "no") cond.push("COALESCE(e.meritoria, 0) = 0");
+  const medio = limpiar(sp.get("medio"), 40);
+  if (medio) { cond.push("COALESCE(e.medio_pago, '') = ?"); args.push(medio); }
+  /* El buscador, sin tildes ni mayúsculas, sobre lo mismo que mira la tabla. */
+  const qb = buscable(limpiar(sp.get("q"), 100));
+  if (qb) {
+    cond.push(sqlBuscable("e.numero || ' ' || COALESCE(p.nombre, '') || ' ' || COALESCE(p.documento, '') || ' ' || COALESCE(e.concepto, '') || ' ' || " +
+      "COALESCE(e.centro, '') || ' ' || COALESCE(e.entrega, '') || ' ' || COALESCE(e.soporte_numero, '')") + " LIKE ? ESCAPE '\\'");
+    args.push(patronLike(qb));
+  }
 
   const sql =
     "SELECT e.numero, e.fecha, e.concepto, e.concepto_ret, e.base_centavos, e.iva_centavos, " +
@@ -19074,6 +19177,19 @@ async function adminContacto(env, url) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
 
+  /* Las tareas pegadas a esta ficha (Fase 5, 0044): las pendientes y las
+     últimas hechas. Sin la 0044 la ficha sale igual, sin ellas. */
+  let tareas = [];
+  try {
+    tareas = (await env.DB.prepare(
+      "SELECT id, titulo, fecha_limite, prioridad, area, estado, recurrencia, hecha_en FROM tareas " +
+      "WHERE ref_tipo = 'contacto' AND ref_id IN (" + huecos(claves) + ") AND estado <> 'cancelada' " +
+      "ORDER BY (estado = 'pendiente') DESC, COALESCE(fecha_limite, '9999-12-31'), id DESC LIMIT 30"
+    ).bind(...claves).all()).results || [];
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+
   const d = dups.get(c.clave);
   const duplicados = d ? [...d.values()].map((x) => ({
     clave: x.contacto.clave, nombre: x.contacto.nombre, etiquetas: [...x.contacto.etiquetas],
@@ -19087,7 +19203,7 @@ async function adminContacto(env, url) {
     emails, telefonos: [...c.tels], documentos: [...c.docs],
     etiquetas: [...c.etiquetas], etiquetas_es: ETIQUETAS_CONTACTO, etiquetas_finanzas: ETIQ_FINANZAS, ultima: c.ultima, sf: c.sf,
     identidad, aportes, totales, certificados, carnets, suscripciones, red, voluntariado, correos, banco,
-    seguimientos, duplicados, unidas, hoy: fechaCO(),
+    seguimientos, tareas, duplicados, unidas, hoy: fechaCO(),
     con_seguimientos: await existeTabla(env, "seguimientos"),
     con_vinculos: await existeTabla(env, "contactos_vinculos")
   });
@@ -19203,6 +19319,832 @@ async function adminSeguimiento(request, env, id, quien) {
     return json({ error: "accion_invalida" }, 400);
   }
   return json({ ok: true, id, antes: s.proximo_fecha });
+}
+
+/* ========================================================================
+   FASE 5 DEL PANEL (oct 2026): TAREAS, DOCUMENTOS Y REPORTES
+   ========================================================================
+   El fundador opera la fundación solo y quiere que el panel sea la
+   plataforma administrativa entera. Tres piezas, las tres tras Access:
+
+   · TAREAS — lo que hay que hacer, sea o no con alguien, con prioridad, área,
+     fecha y repetición, pegado si se quiere a una ficha, un aporte, un caso,
+     un vencimiento, un movimiento del banco o un documento. Las que vencen
+     hoy o ya pasaron son la cola `tareas_pendientes` de «Hoy».
+   · DOCUMENTOS — el archivo de la fundación con su vencimiento, y los
+     documentos que SIEMPRE tiene que haber dichos como huecos («Falta: acta
+     de asamblea 2026»). El archivo vive en R2, privado.
+   · REPORTES — cinco informes anuales armados con lo que la base ya tiene, en
+     pantalla, en CSV y para imprimir. Cifras OPERATIVAS, no estados
+     financieros, y solo pagos confirmados.
+
+   Las tablas y su porqué: migrations/0044_tareas_documentos.sql. */
+
+/* ---- TAREAS ---- */
+const TAREA_AREAS = Object.freeze({ finanzas: "Finanzas", alianzas: "Alianzas", personas: "Personas", mmc: "Mira Mi Casa", legal: "Legal", otro: "Otro" });
+const TAREA_REFS = Object.freeze({ contacto: "Ficha de contacto", aporte: "Aporte", caso: "Caso de Mira Mi Casa", obligacion: "Vencimiento",
+  movimiento: "Movimiento del banco", documento: "Documento" });
+const TAREA_RECURRENCIAS = Object.freeze({ ninguna: "No se repite", mensual: "Cada mes", anual: "Cada año" });
+const TAREAS_TOPE = 2000;
+
+/* AAAA-MM-DD + n meses, con el día de `ancla`: si ese día no existe en el mes
+   (31 de febrero) va el último, y el mes siguiente vuelve al 31. */
+function siguienteRepeticion(f, n, ancla) {
+  const [a, m, d] = String(f).split("-").map(Number);
+  const total = a * 12 + (m - 1) + n;
+  const na = Math.floor(total / 12), nm = (total % 12) + 1;
+  const ult = new Date(Date.UTC(na, nm, 0)).getUTCDate();
+  return na + "-" + String(nm).padStart(2, "0") + "-" + String(Math.min(ancla || d, ult)).padStart(2, "0");
+}
+
+/* El vínculo, comprobado: que tenga la forma de lo que dice ser, y si es un
+   vencimiento, que sea uno del calendario. Devuelve { ref_tipo, ref_id } o
+   { error }. Vacío = sin vínculo. */
+function refTarea(c) {
+  const tipo = c.ref_tipo ? String(c.ref_tipo) : "";
+  const id = limpiar(c.ref_id, 200);
+  if (!tipo && !id) return { ref_tipo: null, ref_id: null };
+  if (!TAREA_REFS[tipo] || !id) return { error: "vinculo_invalido", ayuda: "El vínculo de la tarea no es válido." };
+  const ok = tipo === "contacto" ? claveValida(correoClave(id) || id)
+    : tipo === "aporte" ? /^GG-\d{4}-\d{6}$/i.test(id)
+    : tipo === "caso" ? /^CV-\d{4}-\d{6}$/i.test(id)
+    : tipo === "movimiento" || tipo === "documento" ? /^\d{1,9}$/.test(id)
+    : (() => { const p = id.split("|"); const ob = OBLIGACIONES.find((o) => o.clave === p[0]);
+               return !!ob && ob.vencimientos.some((v) => v.fecha === p[1]); })();
+  if (!ok) return { error: "vinculo_invalido", ayuda: "El vínculo de la tarea no tiene la forma de un " + TAREA_REFS[tipo].toLowerCase() + "." };
+  return { ref_tipo: tipo, ref_id: tipo === "contacto" ? (correoClave(id) || id) : tipo === "aporte" || tipo === "caso" ? id.toUpperCase() : id };
+}
+
+/* Los campos de una tarea, leídos y validados. `campo` dice cuál falló para
+   que el panel lo señale. */
+function leerTarea(c) {
+  const titulo = limpiar(c.titulo, 200);
+  if (!titulo) return { error: "titulo_requerido", campo: "titulo", ayuda: "Escribe qué hay que hacer." };
+  const fecha = c.fecha_limite ? String(c.fecha_limite) : null;
+  if (fecha && !fechaISOValida(fecha)) return { error: "fecha_invalida", campo: "fecha_limite", ayuda: "La fecha límite no es válida." };
+  const prioridad = c.prioridad === "alta" ? "alta" : "normal";
+  const area = TAREA_AREAS[c.area] ? String(c.area) : "otro";
+  const recurrencia = TAREA_RECURRENCIAS[c.recurrencia] ? String(c.recurrencia) : "ninguna";
+  if (recurrencia !== "ninguna" && !fecha) {
+    return { error: "recurrencia_sin_fecha", campo: "fecha_limite", ayuda: "Una tarea que se repite necesita su fecha: de ella sale la siguiente." };
+  }
+  const ref = refTarea(c);
+  if (ref.error) return { error: ref.error, campo: "ref", ayuda: ref.ayuda };
+  return {
+    titulo, detalle: limpiar(c.detalle, 2000) || null, fecha_limite: fecha, prioridad, area, recurrencia,
+    dia_ancla: recurrencia !== "ninguna" ? Number(fecha.slice(8, 10)) : null,
+    ref_tipo: ref.ref_tipo, ref_id: ref.ref_id, ref_nombre: ref.ref_tipo ? (limpiar(c.ref_nombre, 160) || null) : null
+  };
+}
+
+/* GET  /api/admin/tareas — todas (hasta TAREAS_TOPE), los próximos pasos de las
+        fichas que siguen abiertos, y los vencimientos a los que se puede pegar.
+   POST /api/admin/tareas — una tarea nueva. */
+async function adminTareas(request, env, quien) {
+  if (request.method === "POST") return await adminCrearTarea(request, env, quien);
+  if (request.method !== "GET") return json({ error: "metodo_no_permitido" }, 405);
+  const hoy = fechaCO();
+  const conTabla = await existeTabla(env, "tareas");
+  let tareas = [];
+  if (conTabla) {
+    tareas = (await env.DB.prepare(
+      "SELECT * FROM tareas ORDER BY (estado = 'pendiente') DESC, COALESCE(fecha_limite, '9999-12-31'), " +
+      "CASE prioridad WHEN 'alta' THEN 0 ELSE 1 END, id DESC LIMIT ?"
+    ).bind(TAREAS_TOPE + 1).all()).results || [];
+  }
+  let proximos = [];
+  if (await existeTabla(env, "seguimientos")) {
+    proximos = (await env.DB.prepare(
+      "SELECT id, contacto, contacto_nombre, proximo, proximo_fecha, pospuesto, creado_en FROM seguimientos " +
+      "WHERE proximo_fecha IS NOT NULL AND proximo_hecho_en IS NULL AND anulado_en IS NULL ORDER BY proximo_fecha LIMIT 500"
+    ).all()).results || [];
+  }
+  /* Los vencimientos a los que una tarea se puede pegar: los que siguen sin
+     marcar, de dos meses atrás a un año adelante. */
+  const { items } = await vencimientosConEstado(env, hoy);
+  const obligaciones = items.filter((x) => !x.marca && x.dias >= -60 && x.dias <= 400)
+    .map((x) => ({ id: x.clave + "|" + x.fecha, nombre: x.corto + " · " + x.periodo + " · " + x.fecha }));
+  return json({
+    hoy, con_tabla: conTabla, cortada: tareas.length > TAREAS_TOPE, tareas: tareas.slice(0, TAREAS_TOPE), proximos,
+    obligaciones, areas: TAREA_AREAS, refs: TAREA_REFS, recurrencias: TAREA_RECURRENCIAS
+  });
+}
+
+async function adminCrearTarea(request, env, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "tareas"))) {
+    return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0044 en la base: sin ella no se guardan tareas." }, 409);
+  }
+  const t = leerTarea(c);
+  if (t.error) return json(t, 400);
+  const r = await env.DB.prepare(
+    "INSERT INTO tareas (titulo, detalle, fecha_limite, prioridad, area, recurrencia, dia_ancla, ref_tipo, ref_id, ref_nombre, creado_por) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(t.titulo, t.detalle, t.fecha_limite, t.prioridad, t.area, t.recurrencia, t.dia_ancla, t.ref_tipo, t.ref_id, t.ref_nombre,
+         quien || null).first();
+  return json({ ok: true, id: r && r.id });
+}
+
+/* POST /api/admin/tarea/<id> { accion }
+   · editar {campos}      — lo mismo que al crearla;
+   · hecha                — y si se repite, nace la siguiente (una sola vez: el
+                            UPDATE condicional es el que decide, así que dos
+                            clics seguidos no crean dos);
+   · reabrir              — vuelve a pendiente; la siguiente que creó se quita
+                            si nadie la ha tocado (el «Deshacer» de «Hecha»);
+   · cancelar {nota}      — no se borra: se cancela, y se puede reabrir;
+   · posponer {fecha}     — a hoy o a una fecha que no ha llegado; cuenta;
+   · fecha {fecha}        — poner una fecha sin contarlo (el «Deshacer»). */
+async function adminTarea(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "tareas"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0044." }, 409);
+  const t = await env.DB.prepare("SELECT * FROM tareas WHERE id = ?").bind(id).first();
+  if (!t) return json({ error: "no_encontrada" }, 404);
+  const accion = String(c.accion || "");
+  const hoy = fechaCO();
+
+  if (accion === "editar") {
+    const n = leerTarea(Object.assign({}, c));
+    if (n.error) return json(n, 400);
+    await env.DB.prepare(
+      "UPDATE tareas SET titulo = ?, detalle = ?, fecha_limite = ?, prioridad = ?, area = ?, recurrencia = ?, dia_ancla = ?, " +
+      "ref_tipo = ?, ref_id = ?, ref_nombre = ?, actualizado_en = datetime('now') WHERE id = ?"
+    ).bind(n.titulo, n.detalle, n.fecha_limite, n.prioridad, n.area, n.recurrencia, n.dia_ancla, n.ref_tipo, n.ref_id, n.ref_nombre, id).run();
+    return json({ ok: true, id });
+  }
+
+  if (accion === "hecha") {
+    const u = await env.DB.prepare(
+      "UPDATE tareas SET estado = 'hecha', hecha_en = datetime('now'), hecha_por = ?, actualizado_en = datetime('now') " +
+      "WHERE id = ? AND estado = 'pendiente'"
+    ).bind(quien || null, id).run();
+    if (!(u.meta && u.meta.changes)) {
+      return t.estado === "hecha" ? json({ ok: true, id, ya_estaba: true })
+        : json({ error: "no_pendiente", ayuda: "Esa tarea está cancelada: reábrela primero." }, 409);
+    }
+    let siguiente = null;
+    if (t.recurrencia !== "ninguna" && t.fecha_limite) {
+      const f = t.recurrencia === "anual" ? siguienteRepeticion(t.fecha_limite, 12, t.dia_ancla) : siguienteRepeticion(t.fecha_limite, 1, t.dia_ancla);
+      const r = await env.DB.prepare(
+        "INSERT INTO tareas (titulo, detalle, fecha_limite, prioridad, area, recurrencia, dia_ancla, ref_tipo, ref_id, ref_nombre, origen_id, creado_por) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+      ).bind(t.titulo, t.detalle, f, t.prioridad, t.area, t.recurrencia, t.dia_ancla, t.ref_tipo, t.ref_id, t.ref_nombre, id,
+             "repeticion:" + (quien || "?")).first();
+      await env.DB.prepare("UPDATE tareas SET siguiente_id = ? WHERE id = ?").bind(r.id, id).run();
+      siguiente = { id: r.id, fecha_limite: f };
+    }
+    return json({ ok: true, id, siguiente });
+  }
+
+  if (accion === "reabrir") {
+    await env.DB.prepare(
+      "UPDATE tareas SET estado = 'pendiente', hecha_en = NULL, hecha_por = NULL, cancelada_en = NULL, cancelada_por = NULL, " +
+      "cancelada_nota = NULL, actualizado_en = datetime('now') WHERE id = ?"
+    ).bind(id).run();
+    let quitada = false;
+    if (t.siguiente_id) {
+      /* Solo si sigue como nació: pendiente y sin que nadie la haya editado,
+         pospuesto o marcado. Una que ya se tocó es trabajo de alguien. */
+      const b = await env.DB.prepare(
+        "DELETE FROM tareas WHERE id = ? AND origen_id = ? AND estado = 'pendiente' AND actualizado_en IS NULL AND pospuesta = 0"
+      ).bind(t.siguiente_id, id).run();
+      quitada = !!(b.meta && b.meta.changes);
+      if (quitada) await env.DB.prepare("UPDATE tareas SET siguiente_id = NULL WHERE id = ?").bind(id).run();
+    }
+    return json({ ok: true, id, siguiente_quitada: quitada, siguiente_quedo: !!t.siguiente_id && !quitada });
+  }
+
+  if (accion === "cancelar") {
+    if (t.estado !== "pendiente") return json({ error: "no_pendiente", ayuda: "Solo se cancela una tarea pendiente." }, 409);
+    await env.DB.prepare(
+      "UPDATE tareas SET estado = 'cancelada', cancelada_en = datetime('now'), cancelada_por = ?, cancelada_nota = ?, " +
+      "actualizado_en = datetime('now') WHERE id = ?"
+    ).bind(quien || null, limpiar(c.nota, 300) || null, id).run();
+    return json({ ok: true, id });
+  }
+
+  if (accion === "posponer" || accion === "fecha") {
+    const f = String(c.fecha || "");
+    if (!fechaISOValida(f)) return json({ error: "fecha_invalida", ayuda: "Elige una fecha válida." }, 400);
+    if (accion === "posponer" && f < hoy) return json({ error: "fecha_pasada", ayuda: "Posponer es a hoy o a una fecha que todavía no llega." }, 400);
+    if (t.estado !== "pendiente") return json({ error: "no_pendiente", ayuda: "Solo se pospone una tarea pendiente." }, 409);
+    await env.DB.prepare(
+      "UPDATE tareas SET fecha_limite = ?, pospuesta = pospuesta + ?, actualizado_en = datetime('now') WHERE id = ?"
+    ).bind(f, accion === "posponer" ? 1 : 0, id).run();
+    return json({ ok: true, id, antes: t.fecha_limite });
+  }
+  return json({ error: "accion_invalida" }, 400);
+}
+
+/* ---- DOCUMENTOS ---- */
+/* `unico`: solo vale el más reciente (el RUT de hoy reemplaza al de ayer).
+   `porAnio`: uno por periodo. `avisa: false`: su vencimiento NO entra a «Hoy»
+   — el certificado de la Cámara vale 30 días para licitaciones y se pide
+   cuando hace falta; volverlo alarma sería una alarma permanente. */
+const DOC_TIPOS = Object.freeze({
+  estatutos: { nombre: "Estatutos", unico: true },
+  rut: { nombre: "RUT", unico: true, ayuda: "Se actualiza cuando cambia algo (responsabilidades, dirección, representante). No vence." },
+  camara: { nombre: "Certificado de existencia y representación legal (Cámara de Comercio)", unico: true, vigenciaDias: 30, avisa: false,
+            ayuda: "Para licitaciones y convenios suele pedirse con menos de 30 días de expedido. Su vencimiento se ve aquí y no entra a «Hoy»: pídelo cuando lo necesites. La renovación anual de la inscripción está en Vencimientos." },
+  acta: { nombre: "Acta de asamblea o del máximo órgano", porAnio: true, ayuda: "El periodo es el año de la reunión: la de 2026 aprueba el ejercicio 2025." },
+  estados_financieros: { nombre: "Estados financieros", porAnio: true, ayuda: "El periodo es el ejercicio que cubren." },
+  informe_gestion: { nombre: "Informe de gestión", porAnio: true, ayuda: "El periodo es el ejercicio que cubre." },
+  rte: { nombre: "Registro web del RTE (DIAN)", porAnio: true, ayuda: "La actualización anual del Régimen Tributario Especial, a más tardar el 30 de junio. El periodo es el año de la actualización." },
+  convenio: { nombre: "Convenio firmado" },
+  poliza: { nombre: "Póliza" },
+  contrato: { nombre: "Contrato" },
+  politica: { nombre: "Política interna" },
+  presentacion: { nombre: "Declaración o reporte presentado", ayuda: "Lo que se presentó ante la DIAN, la Alcaldía o la Gobernación: la renta 110, la exógena, el ICA…" },
+  otro: { nombre: "Otro" }
+});
+const DOC_ESTADOS = Object.freeze({ vigente: "Vigente", por_vencer: "Por vencer", vencido: "Vencido", sin_fecha: "Sin fecha de vencimiento",
+  reemplazado: "Reemplazado por uno más nuevo", no_aplica: "No aplica", anulado: "Anulado" });
+const DOC_DIAS_AVISO = 30;
+const DOC_MAX_ARCHIVO = 10 * 1024 * 1024;
+/* El primer ejercicio de la fundación (año de constitución, sin operación:
+   docs/estados-financieros-2025.pdf). De ahí en adelante se esperan, cada año,
+   el acta de la reunión ordinaria, los estados financieros y el informe de
+   gestión del ejercicio anterior —límite 31 de marzo, la obligación
+   «asamblea»— y la actualización del RTE —30 de junio, «rte-actualizacion»—. */
+const FUNDACION_PRIMER_EJERCICIO = 2025;
+
+/* LOS QUE SIEMPRE TIENE QUE HABER. No son filas: los dice el código, y una fila
+   del mismo tipo (y del mismo periodo, si va por año) los llena. `para` es la
+   fecha en que ya debería existir; sin `para`, debería existir ya. Se enseñan
+   los que ya tocan y los que tocan en los próximos 120 días. */
+function documentosEsperados(hoy) {
+  const anio = Number(hoy.slice(0, 4));
+  const out = [
+    { clave: "estatutos", tipo: "estatutos", periodo: null, titulo: "Estatutos vigentes", para: null },
+    { clave: "rut", tipo: "rut", periodo: null, titulo: "RUT actualizado", para: null },
+    { clave: "camara", tipo: "camara", periodo: null, titulo: "Certificado de existencia y representación legal", para: null }
+  ];
+  for (let y = FUNDACION_PRIMER_EJERCICIO + 1; y <= anio + 1; y++) {
+    out.push({ clave: "acta-" + y, tipo: "acta", periodo: String(y), titulo: "Acta de asamblea " + y + " (aprueba el ejercicio " + (y - 1) + ")", para: y + "-03-31" });
+    out.push({ clave: "estados_financieros-" + (y - 1), tipo: "estados_financieros", periodo: String(y - 1), titulo: "Estados financieros " + (y - 1), para: y + "-03-31" });
+    out.push({ clave: "informe_gestion-" + (y - 1), tipo: "informe_gestion", periodo: String(y - 1), titulo: "Informe de gestión " + (y - 1), para: y + "-03-31" });
+    out.push({ clave: "rte-" + y, tipo: "rte", periodo: String(y), titulo: "Actualización del registro web del RTE " + y, para: y + "-06-30" });
+  }
+  return out.filter((e) => !e.para || diasHasta(hoy, e.para) <= 120);
+}
+
+/* El estado de cada documento y de cada hueco, en un solo sitio: lo usan la
+   pantalla y las tres colas de «Hoy», así que las dos dicen lo mismo. */
+function estadosDocumentos(docs, hoy) {
+  const vivos = docs.filter((d) => !d.anulado_en);
+  /* Reemplazado: hay otro vivo del mismo tipo (y periodo, si va por año) más
+     nuevo. Solo para los tipos de los que vale uno. */
+  const mas = (a, b) => (String(a.fecha_expedicion || a.creado_en) > String(b.fecha_expedicion || b.creado_en)) ||
+    (String(a.fecha_expedicion || a.creado_en) === String(b.fecha_expedicion || b.creado_en) && a.id > b.id);
+  for (const d of docs) {
+    const t = DOC_TIPOS[d.tipo] || {};
+    let est;
+    if (d.anulado_en) est = "anulado";
+    else if (d.no_aplica) est = "no_aplica";
+    else if ((t.unico || t.porAnio) && vivos.some((o) => o.id !== d.id && o.tipo === d.tipo && !o.no_aplica &&
+             (!t.porAnio || String(o.periodo || "") === String(d.periodo || "")) && mas(o, d))) est = "reemplazado";
+    else if (!d.fecha_vencimiento) est = "sin_fecha";
+    else if (d.fecha_vencimiento < hoy) est = "vencido";
+    else if (diasHasta(hoy, d.fecha_vencimiento) <= DOC_DIAS_AVISO) est = "por_vencer";
+    else est = "vigente";
+    d.estado = est;
+    d.dias = d.fecha_vencimiento ? diasHasta(hoy, d.fecha_vencimiento) : null;
+    d.avisa = t.avisa !== false;
+  }
+  const esperados = documentosEsperados(hoy).map((e) => {
+    const lleno = vivos.filter((d) => d.tipo === e.tipo && (e.periodo == null || String(d.periodo || "") === e.periodo))
+      .sort((a, b) => (mas(a, b) ? -1 : 1))[0] || null;
+    const dias = e.para ? diasHasta(hoy, e.para) : null;
+    return Object.assign({}, e, {
+      documento_id: lleno ? lleno.id : null,
+      estado: lleno ? (lleno.no_aplica ? "no_aplica" : "lleno") : (dias == null || dias < 0 ? "falta" : "pendiente"),
+      dias, toca: !lleno && (dias == null || dias <= DOC_DIAS_AVISO)
+    });
+  });
+  return { docs, esperados };
+}
+
+async function leerDocumentos(env) {
+  if (!(await existeTabla(env, "documentos"))) return null;
+  return (await env.DB.prepare(
+    "SELECT id, tipo, titulo, periodo, entidad, fecha_expedicion, fecha_vencimiento, publico, no_aplica, nota, ob_clave, ob_fecha, " +
+    "archivo_tipo, archivo_bytes, archivo_sha256, archivo_en, archivo_por, (archivo_clave IS NOT NULL) AS tiene_archivo, " +
+    "creado_por, creado_en, actualizado_en, anulado_en, anulado_por, anulado_motivo FROM documentos ORDER BY id DESC LIMIT 2000"
+  ).all()).results || [];
+}
+
+/* LAS TRES COLAS DE «HOY». Las arma JavaScript y no una consulta, porque los
+   huecos salen del código: van con la forma YA CONTADA de `enCola`.
+   · vencidos: un documento que avisa, vivo y con la fecha pasada → Urgente;
+   · por vencer: a 30 días o menos → Esta semana;
+   · faltan: un documento esperado que ya debería estar, o le faltan 30 días
+     → Esta semana. */
+async function colasDocumentos(env) {
+  const docs = await leerDocumentos(env);
+  if (!docs) return null;
+  const hoy = fechaCO();
+  const { esperados } = estadosDocumentos(docs, hoy);
+  const avisan = docs.filter((d) => d.avisa);
+  const vencidos = avisan.filter((d) => d.estado === "vencido").sort((a, b) => (a.fecha_vencimiento < b.fecha_vencimiento ? -1 : 1));
+  const porVencer = avisan.filter((d) => d.estado === "por_vencer").sort((a, b) => (a.fecha_vencimiento < b.fecha_vencimiento ? -1 : 1));
+  const faltan = esperados.filter((e) => e.toca);
+  const nombre = (d) => (DOC_TIPOS[d.tipo] || {}).nombre || d.tipo;
+  const fila = (d) => ({ id: d.id, titulo: d.titulo, detalle: nombre(d) + (d.entidad ? " · " + d.entidad : ""),
+    cuando: d.dias < 0 ? "venció hace " + (-d.dias) + (d.dias === -1 ? " día" : " días") : d.dias === 0 ? "vence hoy" : "vence en " + d.dias + (d.dias === 1 ? " día" : " días"),
+    tiene_archivo: d.tiene_archivo ? 1 : 0 });
+  return {
+    vencidos: { n: vencidos.length, vencida: vencidos.length > 0, cuando: vencidos.length ? fila(vencidos[0]).cuando : null,
+                items: vencidos.slice(0, ITEMS_POR_COLA).map(fila) },
+    porVencer: { n: porVencer.length, cuando: porVencer.length ? fila(porVencer[0]).cuando : null, items: porVencer.slice(0, ITEMS_POR_COLA).map(fila) },
+    faltan: { n: faltan.length, cuando: faltan.length ? (faltan[0].para ? "para el " + faltan[0].para : "debería estar ya") : null,
+              items: faltan.slice(0, ITEMS_POR_COLA).map((e) => ({ id: e.clave, titulo: "Falta: " + e.titulo.charAt(0).toLowerCase() + e.titulo.slice(1),
+                detalle: (DOC_TIPOS[e.tipo] || {}).nombre || e.tipo, cuando: e.para ? (e.dias < 0 ? "debía estar el " + e.para : "para el " + e.para) : "debería estar ya",
+                tipo: e.tipo, periodo: e.periodo || "" })) }
+  };
+}
+
+/* GET  /api/admin/documentos — el registro, los huecos y los convenios firmados
+        en línea (solo lectura: viven en la 0038, no se copian).
+   POST /api/admin/documentos — un documento nuevo (sin archivo: el archivo va
+        después, crudo, a …/archivo). */
+async function adminDocumentos(request, env, quien) {
+  if (request.method === "POST") return await adminCrearDocumento(request, env, quien);
+  if (request.method !== "GET") return json({ error: "metodo_no_permitido" }, 405);
+  const hoy = fechaCO();
+  const docs = await leerDocumentos(env);
+  const r = estadosDocumentos(docs || [], hoy);
+  let convenios = [];
+  try {
+    convenios = (await env.DB.prepare(
+      "SELECT f.inscripcion, f.firmado_en, i.nombre, i.ciudad, json_extract(i.datos, '$.convenio.firmado.en') AS ambas_en " +
+      "FROM convenio_formularios f JOIN inscripciones i ON i.id = f.inscripcion " +
+      "WHERE f.formulario = 'D' AND f.estado = 'firmado' ORDER BY f.firmado_en DESC LIMIT 300"
+    ).all()).results || [];
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  const ob = await vencimientosConEstado(env, hoy);
+  return json({
+    hoy, con_tabla: !!docs, documentos: r.docs, esperados: r.esperados, convenios,
+    tipos: DOC_TIPOS, estados: DOC_ESTADOS, dias_aviso: DOC_DIAS_AVISO,
+    obligaciones: ob.items.filter((x) => x.dias >= -400 && x.dias <= 400)
+      .map((x) => ({ id: x.clave + "|" + x.fecha, nombre: x.corto + " · " + x.periodo + " · " + x.fecha, marca: x.marca ? x.marca.estado : null }))
+  });
+}
+
+function leerDocumento(c) {
+  const tipo = DOC_TIPOS[c.tipo] ? String(c.tipo) : "";
+  if (!tipo) return { error: "tipo_invalido", campo: "tipo", ayuda: "Elige qué documento es." };
+  const titulo = limpiar(c.titulo, 200) || DOC_TIPOS[tipo].nombre;
+  const periodo = c.periodo ? String(c.periodo).trim() : null;
+  if (periodo && !/^\d{4}$/.test(periodo)) return { error: "periodo_invalido", campo: "periodo", ayuda: "El periodo es un año: 2026." };
+  if (DOC_TIPOS[tipo].porAnio && !periodo) return { error: "periodo_requerido", campo: "periodo", ayuda: "Este documento va por año: escribe de qué año es." };
+  const fe = c.fecha_expedicion ? String(c.fecha_expedicion) : null;
+  const fv = c.fecha_vencimiento ? String(c.fecha_vencimiento) : null;
+  if (fe && !fechaISOValida(fe)) return { error: "fecha_invalida", campo: "fecha_expedicion", ayuda: "La fecha de expedición no es válida." };
+  if (fv && !fechaISOValida(fv)) return { error: "fecha_invalida", campo: "fecha_vencimiento", ayuda: "La fecha de vencimiento no es válida." };
+  if (fe && fe > fechaCO()) return { error: "fecha_futura", campo: "fecha_expedicion", ayuda: "La fecha de expedición no puede ser de mañana." };
+  if (fe && fv && fv < fe) return { error: "vence_antes", campo: "fecha_vencimiento", ayuda: "Vence antes de expedirse: revisa las dos fechas." };
+  let obClave = null, obFecha = null;
+  if (c.obligacion) {
+    const p = String(c.obligacion).split("|");
+    const ob = OBLIGACIONES.find((o) => o.clave === p[0]);
+    if (!ob || !ob.vencimientos.some((v) => v.fecha === p[1])) return { error: "obligacion_invalida", campo: "obligacion", ayuda: "Ese vencimiento no está en el calendario." };
+    obClave = p[0]; obFecha = p[1];
+  }
+  return {
+    tipo, titulo, periodo, entidad: limpiar(c.entidad, 160) || null, fecha_expedicion: fe, fecha_vencimiento: fv,
+    publico: c.publico ? 1 : 0, no_aplica: c.no_aplica ? 1 : 0, nota: limpiar(c.nota, 1500) || null, ob_clave: obClave, ob_fecha: obFecha
+  };
+}
+
+async function adminCrearDocumento(request, env, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "documentos"))) {
+    return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0044 en la base: sin ella no se guardan documentos." }, 409);
+  }
+  const d = leerDocumento(c);
+  if (d.error) return json(d, 400);
+  if (d.no_aplica && !d.nota) return json({ error: "nota_requerida", campo: "nota", ayuda: "Di por qué no aplica: dentro de un año nadie se acordará." }, 400);
+  const r = await env.DB.prepare(
+    "INSERT INTO documentos (tipo, titulo, periodo, entidad, fecha_expedicion, fecha_vencimiento, publico, no_aplica, nota, ob_clave, ob_fecha, creado_por) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(d.tipo, d.titulo, d.periodo, d.entidad, d.fecha_expedicion, d.fecha_vencimiento, d.publico, d.no_aplica, d.nota,
+         d.ob_clave, d.ob_fecha, quien || null).first();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "documento " + r.id + " · registrado · " + d.tipo + (d.periodo ? " " + d.periodo : "") + (d.no_aplica ? " · no aplica" : "")).run();
+  return json({ ok: true, id: r.id });
+}
+
+/* POST /api/admin/documento/<id> { accion: editar | anular {motivo} | restaurar } */
+async function adminDocumento(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "documentos"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0044." }, 409);
+  const doc = await env.DB.prepare("SELECT id, anulado_en FROM documentos WHERE id = ?").bind(id).first();
+  if (!doc) return json({ error: "no_encontrado" }, 404);
+  const accion = String(c.accion || "");
+  if (accion === "editar") {
+    if (doc.anulado_en) return json({ error: "anulado", ayuda: "Un documento anulado no se edita: restáuralo primero." }, 409);
+    const d = leerDocumento(c);
+    if (d.error) return json(d, 400);
+    await env.DB.prepare(
+      "UPDATE documentos SET tipo = ?, titulo = ?, periodo = ?, entidad = ?, fecha_expedicion = ?, fecha_vencimiento = ?, publico = ?, " +
+      "nota = ?, ob_clave = ?, ob_fecha = ?, actualizado_en = datetime('now') WHERE id = ?"
+    ).bind(d.tipo, d.titulo, d.periodo, d.entidad, d.fecha_expedicion, d.fecha_vencimiento, d.publico, d.nota, d.ob_clave, d.ob_fecha, id).run();
+    return json({ ok: true, id });
+  }
+  if (accion === "anular") {
+    const motivo = limpiar(c.motivo, 300);
+    if (!motivo) return json({ error: "motivo_requerido", ayuda: "Escribe por qué se anula." }, 400);
+    await env.DB.prepare("UPDATE documentos SET anulado_en = datetime('now'), anulado_por = ?, anulado_motivo = ? WHERE id = ? AND anulado_en IS NULL")
+      .bind(quien || null, motivo, id).run();
+    await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+      .bind(quien || "?", "documento " + id + " · anulado · " + motivo).run();
+    return json({ ok: true, id });
+  }
+  if (accion === "restaurar") {
+    await env.DB.prepare("UPDATE documentos SET anulado_en = NULL, anulado_por = NULL, anulado_motivo = NULL WHERE id = ?").bind(id).run();
+    await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+      .bind(quien || "?", "documento " + id + " · restaurado").run();
+    return json({ ok: true, id });
+  }
+  return json({ error: "accion_invalida" }, 400);
+}
+
+/* POST /api/admin/documento/<id>/archivo — el archivo, crudo en el cuerpo.
+   LOS BYTES MANDAN, como en el Anexo 1 del convenio: un .pdf que por dentro
+   no empieza por «%PDF-» no es un PDF, y si el navegador anuncia un tipo y los
+   bytes dicen otro, alguien renombró el archivo. Un HTML o un ejecutable con
+   la extensión cambiada no pasa. Se guarda PRIVADO, con 128 bits en la clave,
+   y no se reemplaza en silencio: un documento ya con archivo responde 409.
+   GET  …/archivo — la descarga, solo tras Access, como adjunto y con nosniff. */
+async function adminDocumentoArchivo(request, env, id, quien) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  if (!(await existeTabla(env, "documentos"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0044." }, 409);
+  if (request.method === "GET") {
+    const a = await env.DB.prepare("SELECT tipo, titulo, archivo_clave, archivo_tipo FROM documentos WHERE id = ?").bind(id).first();
+    if (!a || !a.archivo_clave) return json({ error: "no_encontrado" }, 404);
+    const obj = await env.MEDIA.get(a.archivo_clave);
+    if (!obj) return json({ error: "no_encontrado" }, 404);
+    const base = String(a.titulo || a.tipo).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "documento";
+    return new Response(obj.body, { headers: {
+      "content-type": a.archivo_tipo || "application/octet-stream", "x-content-type-options": "nosniff",
+      "content-disposition": 'attachment; filename="' + base + "-" + id + "." + (CONVENIO_TIPOS_ARCHIVO[a.archivo_tipo] || "bin") + '"',
+      "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const doc = await env.DB.prepare("SELECT id, archivo_clave, anulado_en, no_aplica FROM documentos WHERE id = ?").bind(id).first();
+  if (!doc) return json({ error: "no_encontrado" }, 404);
+  if (doc.anulado_en) return json({ error: "anulado", ayuda: "Ese documento está anulado." }, 409);
+  if (doc.archivo_clave) {
+    return json({ error: "ya_tiene_archivo", ayuda: "Ese documento ya tiene su archivo. Un archivo no se reemplaza: registra la versión nueva como otro documento (la vieja queda «reemplazada»), o anula este." }, 409);
+  }
+  const largo = Number(request.headers.get("content-length") || 0);
+  if (largo > DOC_MAX_ARCHIVO) return json({ error: "archivo_muy_grande", max_mb: 10, ayuda: "El archivo pasa de 10 MB." }, 413);
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio", ayuda: "El archivo está vacío." }, 400);
+  if (bytes.length > DOC_MAX_ARCHIVO) return json({ error: "archivo_muy_grande", max_mb: 10, ayuda: "El archivo pasa de 10 MB." }, 413);
+  const tipo = tipoPorBytes(bytes);
+  const dice = String(request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  if (!tipo || (CONVENIO_TIPOS_ARCHIVO[dice] && dice !== tipo)) {
+    return json({ error: "archivo_no_coincide",
+      ayuda: "Ese archivo no es un PDF, JPG o PNG de verdad (se miran sus bytes, no su nombre). Expórtalo de nuevo o escanéalo." }, 415);
+  }
+  const clave = "documentos/" + id + "/" + tokenNuevo() + "." + CONVENIO_TIPOS_ARCHIVO[tipo];
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+  const huella = await sha256Bytes(bytes);
+  const u = await env.DB.prepare(
+    "UPDATE documentos SET archivo_clave = ?, archivo_tipo = ?, archivo_bytes = ?, archivo_sha256 = ?, archivo_en = datetime('now'), " +
+    "archivo_por = ?, actualizado_en = datetime('now') WHERE id = ? AND archivo_clave IS NULL"
+  ).bind(clave, tipo, bytes.length, huella, quien || null, id).run();
+  if (!(u.meta && u.meta.changes)) {
+    await env.MEDIA.delete(clave);
+    return json({ error: "ya_tiene_archivo", ayuda: "Ese documento ya tiene su archivo." }, 409);
+  }
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "documento " + id + " · archivo " + CONVENIO_TIPOS_ARCHIVO[tipo] + " guardado · sha256 " + huella.slice(0, 16)).run();
+  return json({ ok: true, id, tipo, bytes: bytes.length, sha256: huella });
+}
+
+/* ---- REPORTES ---- */
+/* Cinco informes anuales, con UNA función que arma los datos y dos que los
+   sirven: en JSON para la pantalla y la impresión, y en CSV. Así lo que se ve
+   y lo que se descarga no se pueden desfasar.
+
+   La forma: `cifras` (lo grande, arriba) y `secciones`, cada una una tabla
+   con sus columnas tipadas — 'texto', 'n', 'cop' (centavos de peso), 'usd'
+   (centavos de dólar). PESOS Y DÓLARES VAN EN COLUMNAS DISTINTAS Y NUNCA SE
+   CONVIERTEN. Todo dinero es «solo pagos confirmados» (APORTE_CONFIRMADO) por
+   la fecha del dinero (FECHA_APORTE), las mismas reglas de Finanzas. */
+const REPORTES = Object.freeze({
+  donaciones: "Informe anual de donaciones",
+  donantes: "Donantes del año",
+  voluntariado: "Voluntariado del año",
+  mmc: "Mira Mi Casa: casos del año",
+  banco: "Banco y panel: conciliación del año"
+});
+const AVISO_REPORTE = "Cifras operativas del panel, no estados financieros. Solo pagos confirmados. Pesos y dólares por separado, sin convertir.";
+
+async function datosReporte(env, tipo, anio) {
+  const desde = anio + "-01-01", hasta = anio + "-12-31";
+  const todas = async (sql, ...b) => ((await env.DB.prepare(sql).bind(...b).all()).results || []);
+  const una = async (sql, ...b) => (await env.DB.prepare(sql).bind(...b).first()) || {};
+  const quizas = async (f, porDefecto) => { try { return await f(); } catch (e) { return porDefecto; } };
+  const EN = FECHA_APORTE + " BETWEEN ? AND ?";
+  const CONF = " FROM aportes a WHERE " + APORTE_CONFIRMADO + " AND " + EN;
+  const meses = Array.from({ length: 12 }, (_, i) => anio + "-" + String(i + 1).padStart(2, "0"));
+  const nomMes = (m) => { const n = MESES_ES[Number(m.slice(5, 7)) - 1]; return n.charAt(0).toUpperCase() + n.slice(1); };
+  const pivote = (filas) => {
+    /* [{clave, moneda, n, centavos}] → [{clave, n_cop, cop, n_usd, usd}] */
+    const por = new Map();
+    for (const x of filas) {
+      const k = x.clave == null ? "" : String(x.clave);
+      const o = por.get(k) || { clave: k, nombre: x.nombre || null, n_cop: 0, cop: 0, n_usd: 0, usd: 0, n_otra: 0 };
+      if (x.moneda === "COP") { o.n_cop += Number(x.n || 0); o.cop += Number(x.centavos || 0); }
+      else if (x.moneda === "USD") { o.n_usd += Number(x.n || 0); o.usd += Number(x.centavos || 0); }
+      else o.n_otra += Number(x.n || 0);
+      if (x.nombre) o.nombre = x.nombre;
+      por.set(k, o);
+    }
+    return [...por.values()].sort((a, b) => b.cop - a.cop || b.usd - a.usd);
+  };
+  const colsDinero = [{ k: "n_cop", t: "Pagos en pesos", tipo: "n" }, { k: "cop", t: "Pesos", tipo: "cop" },
+                      { k: "n_usd", t: "Pagos en dólares", tipo: "n" }, { k: "usd", t: "Dólares", tipo: "usd" }];
+  const totalDe = (filas, ks) => { const t = {}; ks.forEach((k) => { t[k] = filas.reduce((s, x) => s + Number(x[k] || 0), 0); }); return t; };
+  const R = { tipo, titulo: REPORTES[tipo], anio, desde, hasta, aviso: AVISO_REPORTE, notas: [], cifras: [], secciones: [] };
+
+  if (tipo === "donaciones" || tipo === "donantes") {
+    const tot = pivote(await todas("SELECT 'total' AS clave, a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS centavos" + CONF + " GROUP BY a.moneda", desde, hasta))[0] ||
+      { n_cop: 0, cop: 0, n_usd: 0, usd: 0 };
+    const don = await una("SELECT COUNT(DISTINCT a.donante_id) AS n, SUM(CASE WHEN a.donante_id IS NULL THEN 1 ELSE 0 END) AS sin" + CONF, desde, hasta);
+    const nuevos = await una("SELECT COUNT(*) AS n FROM (SELECT a.donante_id, MIN(" + FECHA_APORTE + ") AS f FROM aportes a " +
+      "WHERE " + APORTE_CONFIRMADO + " AND a.donante_id IS NOT NULL GROUP BY a.donante_id) WHERE f BETWEEN ? AND ?", desde, hasta);
+    R.cifras.push({ etiqueta: "Ingresos confirmados en pesos", tipo: "cop", valor: tot.cop, nota: tot.n_cop + (tot.n_cop === 1 ? " pago" : " pagos") });
+    R.cifras.push({ etiqueta: "Ingresos confirmados en dólares (PayPal, sin convertir)", tipo: "usd", valor: tot.usd, nota: tot.n_usd + (tot.n_usd === 1 ? " pago" : " pagos") });
+    R.cifras.push({ etiqueta: "Donantes con pago confirmado", tipo: "n", valor: don.n || 0, nota: "fichas distintas con al menos un pago confirmado en el año" });
+    R.cifras.push({ etiqueta: "Pagos confirmados sin ficha de donante", tipo: "n", valor: don.sin || 0, nota: "suman como dinero, no como donantes" });
+    R.cifras.push({ etiqueta: "Donantes nuevos", tipo: "n", valor: nuevos.n || 0, nota: "su primer pago confirmado, de toda la historia, fue este año" });
+  }
+
+  if (tipo === "donaciones") {
+    const porMes = await todas("SELECT substr(" + FECHA_APORTE + ", 1, 7) AS clave, a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS centavos" + CONF + " GROUP BY 1, 2", desde, hasta);
+    const donMes = await todas("SELECT substr(" + FECHA_APORTE + ", 1, 7) AS m, COUNT(DISTINCT a.donante_id) AS n" + CONF + " GROUP BY 1", desde, hasta);
+    const pm = pivote(porMes);
+    const filasMes = meses.map((m) => {
+      const x = pm.find((y) => y.clave === m) || { n_cop: 0, cop: 0, n_usd: 0, usd: 0 };
+      const d = donMes.find((y) => y.m === m);
+      return { mes: nomMes(m), n_cop: x.n_cop, cop: x.cop, n_usd: x.n_usd, usd: x.usd, donantes: d ? d.n : 0 };
+    });
+    R.secciones.push({ titulo: "Mes a mes", fuente: "Aportes con pago confirmado, por la fecha del dinero (la del extracto, si no la de la aprobación).",
+      columnas: [{ k: "mes", t: "Mes", tipo: "texto" }].concat(colsDinero, [{ k: "donantes", t: "Donantes del mes", tipo: "n" }]),
+      filas: filasMes, total: Object.assign({ mes: "Año" }, totalDe(filasMes, ["n_cop", "cop", "n_usd", "usd"]), { donantes: null }) });
+    const medio = pivote(await todas("SELECT " + MEDIO_APORTE + " AS clave, a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS centavos" + CONF + " GROUP BY 1, 2", desde, hasta))
+      .map((x) => Object.assign(x, { concepto: ETIQ_FINANZAS.medio[x.clave] || x.clave }));
+    R.secciones.push({ titulo: "Por medio de pago", fuente: "Wompi, PayPal y transferencia directa, por la regla MEDIO_APORTE de Finanzas.",
+      columnas: [{ k: "concepto", t: "Medio", tipo: "texto" }].concat(colsDinero), filas: medio, total: Object.assign({ concepto: "Total" }, totalDe(medio, ["n_cop", "cop", "n_usd", "usd"])) });
+    const destino = pivote(await todas("SELECT COALESCE(a.destino_id, '') AS clave, MAX(a.proyecto) AS nombre, a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS centavos" + CONF + " GROUP BY 1, 3", desde, hasta))
+      .map((x) => Object.assign(x, { concepto: x.clave ? (x.nombre || x.clave) : "Fondo general" }));
+    R.secciones.push({ titulo: "Por destino o programa", fuente: "De más a menos pesos. Las primeras filas son los destinos principales del año.",
+      columnas: [{ k: "concepto", t: "Destino", tipo: "texto" }].concat(colsDinero), filas: destino, total: Object.assign({ concepto: "Total" }, totalDe(destino, ["n_cop", "cop", "n_usd", "usd"])) });
+    const tipoA = pivote(await todas("SELECT " + TIPO_APORTE + " AS clave, a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS centavos" + CONF + " GROUP BY 1, 2", desde, hasta))
+      .map((x) => Object.assign(x, { concepto: ETIQ_FINANZAS.tipo[x.clave] || x.clave }));
+    R.secciones.push({ titulo: "Por tipo de aporte", fuente: "«Membresía» es la que tiene cobro automático.",
+      columnas: [{ k: "concepto", t: "Tipo", tipo: "texto" }].concat(colsDinero), filas: tipoA, total: Object.assign({ concepto: "Total" }, totalDe(tipoA, ["n_cop", "cop", "n_usd", "usd"])) });
+    /* Lo que entró y NO está arriba, dicho aparte: dinero sin guía y
+       transferencias que el donante reportó y nadie ha verificado. */
+    const aparte = [];
+    const sumar = (l, concepto) => l.forEach((x) => aparte.push({ concepto, moneda: x.moneda, n: x.n, centavos: x.centavos }));
+    sumar(await quizas(() => todas("SELECT COALESCE(json_extract(e.cuerpo, '$.data.transaction.currency'), 'COP') AS moneda, COUNT(*) AS n, " +
+      "COALESCE(SUM(json_extract(e.cuerpo, '$.data.transaction.amount_in_cents')), 0) AS centavos FROM eventos_wompi e LEFT JOIN aportes a ON a.guia = e.guia " +
+      "WHERE e.firma_valida = 1 AND e.estado = 'APPROVED' AND a.guia IS NULL AND date(e.recibido_en, '-5 hours') BETWEEN ? AND ? GROUP BY 1", desde, hasta), []),
+      "Pagos de Wompi sin aporte (enlace directo)");
+    sumar(await quizas(() => todas("SELECT moneda, COUNT(*) AS n, COALESCE(SUM(monto_centavos), 0) AS centavos FROM eventos_ipn " +
+      "WHERE resultado = 'por_registrar' AND estado = 'Completed' AND date(recibido_en, '-5 hours') BETWEEN ? AND ? GROUP BY moneda", desde, hasta), []),
+      "Donaciones del botón de PayPal sin registrar");
+    sumar(await quizas(() => todas("SELECT moneda, COUNT(*) AS n, COALESCE(SUM(monto_centavos), 0) AS centavos FROM pagos_sin_guia " +
+      "WHERE anulado_en IS NULL AND fecha BETWEEN ? AND ? GROUP BY moneda", desde, hasta), []),
+      "Pagos sin guía registrados desde el extracto");
+    sumar(await todas("SELECT a.moneda AS moneda, COUNT(*) AS n, COALESCE(SUM(a.monto_centavos), 0) AS centavos FROM aportes a " +
+      "WHERE a.estado = 'reportada' AND " + EN + " GROUP BY a.moneda", desde, hasta), "Transferencias reportadas sin verificar (no son dinero confirmado)");
+    const ap = pivote(aparte.map((x) => ({ clave: x.concepto, moneda: x.moneda, n: x.n, centavos: x.centavos }))).map((x) => Object.assign(x, { concepto: x.clave }));
+    R.secciones.push({ titulo: "Lo que entró y no está arriba", fuente: "No se suma a las cifras de arriba: sin guía no hay recibo ni certificado, y lo reportado no está verificado.",
+      columnas: [{ k: "concepto", t: "Qué", tipo: "texto" }].concat(colsDinero), filas: ap });
+  }
+
+  if (tipo === "donantes") {
+    const filas = await todas(
+      "SELECT a.donante_id AS id, d.nombre, d.doc_tipo, d.doc_numero, d.email, d.ciudad, " +
+      "SUM(CASE WHEN a.moneda = 'COP' THEN 1 ELSE 0 END) AS n_cop, SUM(CASE WHEN a.moneda = 'COP' THEN a.monto_centavos ELSE 0 END) AS cop, " +
+      "SUM(CASE WHEN a.moneda = 'USD' THEN 1 ELSE 0 END) AS n_usd, SUM(CASE WHEN a.moneda = 'USD' THEN a.monto_centavos ELSE 0 END) AS usd, " +
+      "SUM(CASE WHEN a.quiere_certificado = 1 THEN 1 ELSE 0 END) AS piden, " +
+      "SUM((SELECT COUNT(*) FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL)) AS emitidos, " +
+      "SUM((SELECT COUNT(*) FROM certificados c WHERE c.guia = a.guia AND c.anulado_en IS NULL AND c.firma_rl_en IS NOT NULL " +
+      "AND c.firma_rf_en IS NOT NULL AND c.enviado_en IS NOT NULL)) AS enviados " +
+      "FROM aportes a LEFT JOIN donantes d ON d.id = a.donante_id WHERE " + APORTE_CONFIRMADO + " AND " + EN +
+      " GROUP BY a.donante_id ORDER BY (a.donante_id IS NULL), cop DESC, usd DESC, d.nombre COLLATE NOCASE", desde, hasta);
+    const out = filas.map((x) => ({
+      nombre: x.id == null ? "Sin ficha de donante" : (x.nombre || "(sin nombre)"),
+      documento: x.doc_numero ? ((x.doc_tipo || "") + " " + x.doc_numero).trim() : "", correo: x.email || "", ciudad: x.ciudad || "",
+      n_cop: x.n_cop, cop: x.cop, n_usd: x.n_usd, usd: x.usd,
+      certificado: x.id == null ? "" : !x.piden ? (x.emitidos ? "no lo pidió al donar · emitido" : "no lo pidió al donar")
+        : x.enviados >= x.piden ? "pedido · emitido y enviado"
+        : x.emitidos >= x.piden ? "pedido · emitido, falta firma o envío"
+        : x.emitidos ? "pedido · emitido en parte (" + x.emitidos + " de " + x.piden + ")" : "pedido · SIN EMITIR",
+      piden: x.piden, emitidos: x.emitidos
+    }));
+    const piden = out.filter((x) => x.piden > 0).length;
+    const sinEmitir = out.filter((x) => x.piden > 0 && x.emitidos < x.piden).length;
+    R.cifras.push({ etiqueta: "Donantes que pidieron certificado", tipo: "n", valor: piden, nota: sinEmitir + " con algún certificado sin emitir" });
+    R.notas.push("Para el contador y para el flujo de la exógena y los certificados de donación: una fila por donante con pago confirmado en el año. El certificado se emite por aporte; aquí se resume si cada donante lo pidió y si ya lo tiene.");
+    R.notas.push("El documento y el correo son datos personales (Ley 1581): este archivo no se comparte fuera del contador.");
+    R.secciones.push({ titulo: "Una fila por donante", fuente: "Aportes con pago confirmado en el año, por la fecha del dinero, sumados por ficha de donante.",
+      columnas: [{ k: "nombre", t: "Donante", tipo: "texto" }, { k: "documento", t: "Documento", tipo: "texto" }, { k: "correo", t: "Correo", tipo: "texto" },
+        { k: "ciudad", t: "Ciudad", tipo: "texto" }].concat(colsDinero, [{ k: "certificado", t: "Certificado de donación", tipo: "texto" }]),
+      filas: out, total: Object.assign({ nombre: out.length + (out.length === 1 ? " fila" : " filas") }, totalDe(out, ["n_cop", "cop", "n_usd", "usd"])) });
+  }
+
+  if (tipo === "voluntariado") {
+    const js = await quizas(() => todas(
+      "SELECT j.id, j.nombre, j.fecha, j.puerta, j.estado, j.beneficiarios_directos AS bd, j.beneficiarios_indirectos AS bi, " +
+      "(SELECT COUNT(*) FROM participaciones p WHERE p.jornada = j.id) AS personas, " +
+      "(SELECT COUNT(*) FROM participaciones p WHERE p.jornada = j.id AND p.horas IS NOT NULL) AS con_horas, " +
+      "(SELECT COALESCE(SUM(p.horas), 0) FROM participaciones p WHERE p.jornada = j.id) AS horas " +
+      "FROM jornadas j WHERE j.fecha BETWEEN ? AND ? ORDER BY j.fecha, j.id", desde, hasta), []);
+    const ESTJ = { planeada: "Planeada", confirmada: "Confirmada", realizada: "Realizada", cerrada: "Cerrada", cancelada: "Cancelada" };
+    const ocurridas = js.filter((j) => j.estado === "realizada" || j.estado === "cerrada");
+    const unicas = await quizas(() => una(
+      "SELECT COUNT(DISTINCT COALESCE(NULLIF(lower(trim(p.email)), ''), 'n:' || lower(trim(p.nombre)))) AS n FROM participaciones p " +
+      "JOIN jornadas j ON j.id = p.jornada WHERE j.fecha BETWEEN ? AND ? AND j.estado IN ('realizada','cerrada')", desde, hasta), {});
+    const suma = (l, k) => l.reduce((s, x) => s + Number(x[k] || 0), 0);
+    R.cifras.push({ etiqueta: "Jornadas realizadas o cerradas", tipo: "n", valor: ocurridas.length, nota: js.length + " en el año, " + js.filter((j) => j.estado === "cancelada").length + " canceladas" });
+    R.cifras.push({ etiqueta: "Participaciones", tipo: "n", valor: suma(ocurridas, "personas"), nota: (unicas.n || 0) + " personas distintas (por correo, o por nombre si no hay)" });
+    R.cifras.push({ etiqueta: "Horas anotadas", tipo: "n", valor: suma(ocurridas, "horas"), nota: suma(ocurridas, "con_horas") + " participaciones con horas anotadas" });
+    R.cifras.push({ etiqueta: "Beneficiarios directos que reportan las fundaciones", tipo: "n", valor: suma(ocurridas, "bd"), nota: "reportados por la fundación anfitriona, no medidos por nosotros" });
+    R.notas.push("Solo cuentan las jornadas realizadas o cerradas; las demás se listan con su estado. Las horas son las anotadas: una participación sin horas no suma.");
+    const filasJ = js.map((j) => ({ nombre: j.nombre, fecha: j.fecha, estado: ESTJ[j.estado] || j.estado, personas: j.personas,
+      con_horas: j.con_horas, horas: j.horas, bd: j.bd, bi: j.bi }));
+    R.secciones.push({ titulo: "Jornadas", fuente: "Tabla de jornadas, por su fecha.",
+      columnas: [{ k: "nombre", t: "Jornada", tipo: "texto" }, { k: "fecha", t: "Fecha", tipo: "texto" }, { k: "estado", t: "Estado", tipo: "texto" },
+        { k: "personas", t: "Personas", tipo: "n" }, { k: "con_horas", t: "Con horas", tipo: "n" }, { k: "horas", t: "Horas", tipo: "n" },
+        { k: "bd", t: "Beneficiarios directos (reportados)", tipo: "n" }, { k: "bi", t: "Indirectos (reportados)", tipo: "n" }],
+      filas: filasJ });
+    const filasM = meses.map((m) => {
+      const l = ocurridas.filter((j) => String(j.fecha).slice(0, 7) === m);
+      return { mes: nomMes(m), jornadas: l.length, personas: suma(l, "personas"), horas: suma(l, "horas") };
+    });
+    R.secciones.push({ titulo: "Mes a mes", fuente: "Solo jornadas realizadas o cerradas.",
+      columnas: [{ k: "mes", t: "Mes", tipo: "texto" }, { k: "jornadas", t: "Jornadas", tipo: "n" }, { k: "personas", t: "Participaciones", tipo: "n" }, { k: "horas", t: "Horas", tipo: "n" }],
+      filas: filasM, total: Object.assign({ mes: "Año" }, totalDe(filasM, ["jornadas", "personas", "horas"])) });
+  }
+
+  if (tipo === "mmc") {
+    const MES_CO = (col) => "substr(datetime(" + col + ", '-5 hours'), 1, 7)";
+    const recibidos = await todas("SELECT " + MES_CO("creado_en") + " AS m, COUNT(*) AS n FROM casos WHERE date(creado_en, '-5 hours') BETWEEN ? AND ? GROUP BY 1", desde, hasta);
+    /* «Atendido» = recibió su primer concepto de un ingeniero (no un «no puedo
+       evaluar»): es el momento en que la familia tiene una respuesta. */
+    const concepto = await todas("SELECT " + MES_CO("p") + " AS m, COUNT(*) AS n FROM (SELECT caso, MIN(creado_en) AS p FROM evaluaciones " +
+      "WHERE clasificacion <> 'inevaluable' GROUP BY caso) WHERE date(p, '-5 hours') BETWEEN ? AND ? GROUP BY 1", desde, hasta);
+    const visitas = await quizas(() => todas("SELECT substr(fecha_visita, 1, 7) AS m, COUNT(*) AS n FROM inspecciones WHERE fecha_visita BETWEEN ? AND ? GROUP BY 1", desde, hasta), []);
+    /* Cerrados y descartados, por la auditoría del cambio de estado (0027): la
+       fila del caso solo sabe cómo está HOY, no cuándo se cerró. */
+    const cierre = (destino) => todas("SELECT " + MES_CO("otorgado_en") + " AS m, COUNT(DISTINCT substr(detalle, 6, 14)) AS n FROM consentimientos " +
+      "WHERE tipo = 'auditoria' AND detalle LIKE 'caso CV-% -> " + destino + "%' AND date(otorgado_en, '-5 hours') BETWEEN ? AND ? GROUP BY 1", desde, hasta);
+    const cerrados = await cierre("cerrado"), descartados = await cierre("descartado");
+    const de = (l, m) => { const x = l.find((y) => y.m === m); return x ? x.n : 0; };
+    const filasM = meses.map((m) => ({ mes: nomMes(m), recibidos: de(recibidos, m), concepto: de(concepto, m), visitas: de(visitas, m),
+      cerrados: de(cerrados, m), descartados: de(descartados, m) }));
+    const t = totalDe(filasM, ["recibidos", "concepto", "visitas", "cerrados", "descartados"]);
+    const abiertos = await una("SELECT COUNT(*) AS n FROM casos WHERE date(creado_en, '-5 hours') BETWEEN ? AND ? AND estado NOT IN ('cerrado','descartado')", desde, hasta);
+    const porClas = await todas("SELECT COALESCE(clasificacion, 'sin concepto') AS c, COUNT(*) AS n FROM casos WHERE date(creado_en, '-5 hours') BETWEEN ? AND ? GROUP BY 1 ORDER BY n DESC", desde, hasta);
+    R.cifras.push({ etiqueta: "Casos recibidos", tipo: "n", valor: t.recibidos, nota: (abiertos.n || 0) + " de ellos siguen abiertos hoy" });
+    R.cifras.push({ etiqueta: "Atendidos (primer concepto de un ingeniero)", tipo: "n", valor: t.concepto, nota: "por el mes del concepto, aunque el caso sea de otro año" });
+    R.cifras.push({ etiqueta: "Visitas en terreno", tipo: "n", valor: t.visitas, nota: "inspecciones por la fecha de la visita" });
+    R.cifras.push({ etiqueta: "Cerrados", tipo: "n", valor: t.cerrados, nota: t.descartados + " descartados (duplicados y pruebas)" });
+    R.notas.push("Cerrar y descartar se cuentan por el mes en que se hizo, según la auditoría de cada caso. Un caso reabierto y vuelto a cerrar cuenta en cada mes en que se cerró.");
+    R.secciones.push({ titulo: "Mes a mes", fuente: "Recibidos por su fecha de llegada; atendidos por el primer concepto; cerrados por la auditoría.",
+      columnas: [{ k: "mes", t: "Mes", tipo: "texto" }, { k: "recibidos", t: "Recibidos", tipo: "n" }, { k: "concepto", t: "Atendidos", tipo: "n" },
+        { k: "visitas", t: "Visitas", tipo: "n" }, { k: "cerrados", t: "Cerrados", tipo: "n" }, { k: "descartados", t: "Descartados", tipo: "n" }],
+      filas: filasM, total: Object.assign({ mes: "Año" }, t) });
+    const CLAS = { urgente: "Urgente", programada: "Programada", no_requiere: "No requiere intervención", inevaluable: "No se pudo evaluar" };
+    R.secciones.push({ titulo: "Los recibidos del año, por su concepto de hoy", fuente: "La clasificación vigente de cada caso.",
+      columnas: [{ k: "c", t: "Concepto", tipo: "texto" }, { k: "n", t: "Casos", tipo: "n" }],
+      filas: porClas.map((x) => ({ c: CLAS[x.c] || x.c, n: x.n })) });
+  }
+
+  if (tipo === "banco") {
+    const cop = await una("SELECT COALESCE(SUM(a.monto_centavos), 0) AS c" + CONF + " AND a.moneda = 'COP'", desde, hasta);
+    const eg = await una("SELECT COALESCE(SUM(e.neto_centavos), 0) AS c FROM egresos e WHERE e.anulado_en IS NULL AND e.fecha BETWEEN ? AND ?", desde, hasta);
+    const b = await quizas(() => resumenBanco(env, desde, hasta, Number(cop.c || 0), Number(eg.c || 0)), null);
+    if (!b || b.sin_extracto) {
+      R.cifras.push({ etiqueta: "Extracto importado", tipo: "texto", valor: "Ninguno para " + anio,
+        nota: b && b.importado ? "lo importado va del " + b.importado.desde + " al " + b.importado.hasta : "todavía no se ha importado ningún extracto" });
+      R.notas.push("Sin extracto del banco no hay con qué comparar: el banco es la cifra que manda. Se importa en Finanzas › Banco.");
+    } else {
+      R.cifras.push({ etiqueta: "Abonos según el banco", tipo: "cop", valor: b.creditos.centavos, nota: b.creditos.n + " movimientos" });
+      R.cifras.push({ etiqueta: "Ingresos confirmados en pesos según el panel", tipo: "cop", valor: b.panel.ingresos, nota: "aportes confirmados en pesos" });
+      R.cifras.push({ etiqueta: "Cargos según el banco", tipo: "cop", valor: b.debitos.centavos, nota: b.debitos.n + " movimientos" });
+      R.cifras.push({ etiqueta: "Egresos netos según el panel", tipo: "cop", valor: b.panel.egresos, nota: "lo que salió de la cuenta, del libro de egresos" });
+      if (!b.completo) R.notas.push("El extracto importado no cubre el año entero: " + b.cobertura.map((l) => l.cuenta + " del " + l.desde + " al " + l.hasta).join("; ") + ".");
+      const E = b.entradas, S = b.salidas;
+      R.secciones.push({ titulo: "De dónde sale la diferencia de los abonos", fuente: "Abonos del banco menos ingresos confirmados en pesos del panel, desarmados.",
+        columnas: [{ k: "concepto", t: "Concepto", tipo: "texto" }, { k: "cop", t: "Pesos", tipo: "cop" }, { k: "usd", t: "Dólares", tipo: "usd" }],
+        filas: [
+          { concepto: "Diferencia (banco − panel)", cop: E.diferencia },
+          { concepto: "Abonos sin conciliar (" + E.sin_conciliar.n + ")", cop: E.sin_conciliar.centavos },
+          { concepto: "Abonos dejados fuera (rendimientos, traslados…)", cop: E.ignorados },
+          { concepto: "Comisiones de la pasarela (lo que el banco no recibió)", cop: E.comisiones },
+          { concepto: "Ajustes", cop: E.ajustes },
+          { concepto: "Entró sin guía (Wompi, PayPal, pagos sin guía)", cop: E.sin_guia },
+          { concepto: "PayPal en pesos según el banco", cop: E.paypal.cop, usd: E.paypal.usd },
+          { concepto: "Otras diferencias (fechas de corte)", cop: E.otras }
+        ] });
+      R.secciones.push({ titulo: "De dónde sale la diferencia de los cargos", fuente: "Cargos del banco menos egresos netos del panel, desarmados.",
+        columnas: [{ k: "concepto", t: "Concepto", tipo: "texto" }, { k: "cop", t: "Pesos", tipo: "cop" }],
+        filas: [
+          { concepto: "Diferencia (banco − panel)", cop: S.diferencia },
+          { concepto: "Cargos sin conciliar (" + S.sin_conciliar.n + ")", cop: S.sin_conciliar.centavos },
+          { concepto: "Cargos dejados fuera (4 por mil, cuota de manejo…)", cop: S.ignorados },
+          { concepto: "Ajustes", cop: S.ajustes },
+          { concepto: "Otras diferencias (fechas de corte)", cop: S.otras }
+        ] });
+    }
+    const bm = await quizas(() => todas("SELECT substr(fecha, 1, 7) AS m, " +
+      "COALESCE(SUM(CASE WHEN valor_centavos > 0 THEN valor_centavos END), 0) AS abonos, " +
+      "COALESCE(SUM(CASE WHEN valor_centavos < 0 THEN -valor_centavos END), 0) AS cargos, " +
+      "COALESCE(SUM(CASE WHEN estado = 'sin_conciliar' THEN 1 END), 0) AS sin_conc, COUNT(*) AS n " +
+      "FROM movimientos_banco WHERE fecha BETWEEN ? AND ? GROUP BY 1", desde, hasta), []);
+    const im = await todas("SELECT substr(" + FECHA_APORTE + ", 1, 7) AS m, SUM(a.monto_centavos) AS c" + CONF + " AND a.moneda = 'COP' GROUP BY 1", desde, hasta);
+    const emv = await todas("SELECT substr(e.fecha, 1, 7) AS m, SUM(e.neto_centavos) AS c FROM egresos e WHERE e.anulado_en IS NULL AND e.fecha BETWEEN ? AND ? GROUP BY 1", desde, hasta);
+    const de = (l, m, k) => { const x = l.find((y) => y.m === m); return x ? Number(x[k] || 0) : 0; };
+    const filasM = meses.map((m) => {
+      const ab = de(bm, m, "abonos"), ing = de(im, m, "c"), ca = de(bm, m, "cargos"), egm = de(emv, m, "c");
+      return { mes: nomMes(m), abonos: ab, ingresos: ing, dif_in: ab - ing, cargos: ca, egresos: egm, dif_eg: ca - egm, movs: de(bm, m, "n"), sin_conc: de(bm, m, "sin_conc") };
+    });
+    R.secciones.push({ titulo: "Mes a mes", fuente: "Banco: movimientos del extracto importado. Panel: aportes confirmados en pesos y egresos netos. Un mes sin extracto sale en cero del lado del banco.",
+      columnas: [{ k: "mes", t: "Mes", tipo: "texto" }, { k: "abonos", t: "Abonos (banco)", tipo: "cop" }, { k: "ingresos", t: "Ingresos (panel)", tipo: "cop" },
+        { k: "dif_in", t: "Diferencia", tipo: "cop" }, { k: "cargos", t: "Cargos (banco)", tipo: "cop" }, { k: "egresos", t: "Egresos netos (panel)", tipo: "cop" },
+        { k: "dif_eg", t: "Diferencia", tipo: "cop" }, { k: "movs", t: "Movimientos", tipo: "n" }, { k: "sin_conc", t: "Sin conciliar", tipo: "n" }],
+      filas: filasM, total: Object.assign({ mes: "Año" }, totalDe(filasM, ["abonos", "ingresos", "dif_in", "cargos", "egresos", "dif_eg", "movs", "sin_conc"])) });
+  }
+  return R;
+}
+
+/* Los años que tienen sentido: del primer dato de la base al de hoy. */
+async function aniosReporte(env) {
+  const hoy = Number(fechaCO().slice(0, 4));
+  const p = await env.DB.prepare("SELECT MIN(" + FECHA_APORTE + ") AS f FROM aportes a").first();
+  const desde = Math.max(2024, Math.min(hoy, p && p.f ? Number(String(p.f).slice(0, 4)) : hoy, FUNDACION_PRIMER_EJERCICIO));
+  return Array.from({ length: hoy - desde + 1 }, (_, i) => hoy - i);
+}
+
+/* GET /api/admin/reporte?tipo=&anio= — JSON para la pantalla y la impresión.
+   GET /api/admin/reporte.csv?tipo=&anio= — el mismo informe, en el formato de
+   los otros CSV del panel (punto y coma, BOM, fórmulas neutralizadas). */
+async function adminReporte(env, url, csv) {
+  const tipo = String(url.searchParams.get("tipo") || "");
+  if (!REPORTES[tipo]) return json({ error: "reporte_desconocido", ayuda: "Ese reporte no existe." }, 400);
+  const anios = await aniosReporte(env);
+  const anio = entero(url.searchParams.get("anio"), anios[0], anios[anios.length - 1], anios[0]);
+  const R = await datosReporte(env, tipo, anio);
+  R.generado = selloCO(new Date().toISOString());
+  if (!csv) return json(Object.assign(R, { anios, reportes: REPORTES }));
+  const valorCSV = (v, t) => v == null || v === "" ? "" : t === "cop" ? String(Math.round(Number(v) / 100))
+    : t === "usd" ? (Number(v) / 100).toFixed(2).replace(".", ",") : String(v);
+  const filas = [
+    ["Fundación Give&Grow International · NIT 901.948.930-2"],
+    [R.titulo + " · " + anio + " (del " + R.desde + " al " + R.hasta + ")"],
+    [R.aviso],
+    ["Generado el " + R.generado + " (hora de Colombia) desde el panel interno"]
+  ];
+  R.notas.forEach((n) => filas.push([n]));
+  filas.push([]);
+  if (R.cifras.length) {
+    filas.push(["Cifra", "Valor", "Moneda", "Nota"]);
+    R.cifras.forEach((c) => filas.push([c.etiqueta, valorCSV(c.valor, c.tipo), c.tipo === "cop" ? "COP" : c.tipo === "usd" ? "USD" : "", c.nota || ""]));
+    filas.push([]);
+  }
+  for (const s of R.secciones) {
+    filas.push([s.titulo]);
+    filas.push(s.columnas.map((k) => k.t + (k.tipo === "cop" ? " (COP)" : k.tipo === "usd" ? " (USD)" : "")));
+    s.filas.forEach((f) => filas.push(s.columnas.map((k) => valorCSV(f[k.k], k.tipo))));
+    if (s.total) filas.push(s.columnas.map((k) => valorCSV(s.total[k.k], k.tipo)));
+    filas.push([]);
+  }
+  const texto = "﻿" + filas.map((x) => x.map(csvCampo).join(";")).join("\r\n") + "\r\n";
+  return new Response(texto, { headers: {
+    "content-type": "text/csv; charset=utf-8",
+    "content-disposition": 'attachment; filename="reporte-' + tipo + "-" + anio + '.csv"',
+    "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
 }
 
 /* GET /api/admin/buscar?q= — EL BUSCADOR DE LA BARRA (Fase 4 del panel).
@@ -25880,6 +26822,57 @@ textarea { font-size: 16px }
   .tb-sep{display:none}
   .tb-caja{max-height:75vh}
 }
+/* ==== FASE 5: TAREAS, DOCUMENTOS Y REPORTES (oct 2026) ====
+   La misma gramática: papel, reglas finas, filete de color a la izquierda para
+   lo que pide atención. «Esta semana» son tres columnas —vencidas, hoy, lo que
+   queda de la semana— con el filete rojo, ámbar y verde de siempre. */
+.pn-barra .pn-mas{flex:0 0 auto;padding:6px 12px;font-size:var(--fs-13);white-space:nowrap}
+.ta-sem{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0 0 24px}
+.ta-grupo{min-width:0;border:1px solid var(--bd);border-left:3px solid var(--bd);border-radius:10px;background:var(--surface);padding:12px 14px 6px}
+.ta-grupo.venc{border-left-color:var(--err)}
+.ta-grupo.hoy{border-left-color:var(--amber)}
+.ta-grupo.sem{border-left-color:var(--g)}
+.ta-grupo h3{display:flex;justify-content:space-between;gap:8px;margin:0 0 4px;font-family:"Inter",sans-serif;font-size:var(--fs-14);font-weight:700;letter-spacing:0}
+.ta-grupo h3 span{font-variant-numeric:tabular-nums;color:var(--mu)}
+.ta-grupo ul{list-style:none;margin:0;padding:0}
+.ta-grupo li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 0;border-top:1px solid var(--bds)}
+.ta-grupo li small{display:block;font-size:var(--fs-12);color:var(--mu)}
+.ta-grupo li .ct-link{text-align:left}
+.ta-grupo .pn-b1,.ta-grupo .pn-b2{padding:4px 10px;font-size:var(--fs-12);border-radius:7px}
+.ta-grupo .hoy-nada{margin:6px 0 10px}
+.ta-alta{color:var(--err);font-weight:700}
+.ta-vinc{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px;font-size:var(--fs-14)}
+.doc-est{font-weight:600}
+.doc-est.vencido{color:var(--err)}
+.doc-est.por_vencer{color:var(--amber)}
+.doc-est.vigente{color:var(--g)}
+.doc-est.reemplazado,.doc-est.anulado,.doc-est.no_aplica{color:var(--mu);font-weight:400}
+.rp-cab{margin:0 0 6px;font-size:var(--fs-13);color:var(--mu)}
+.rp-cab b{color:var(--ink)}
+.rp-aviso{margin:0 0 16px;padding:8px 12px;border-left:3px solid var(--g);background:var(--gl);font-size:var(--fs-14);color:var(--gd)}
+.rp-sec{margin:0 0 26px;min-width:0}
+.rp-sec h3{margin:0 0 2px;font-family:"Inter",sans-serif;font-size:var(--fs-15);font-weight:700;letter-spacing:0}
+.rp-tw{overflow-x:auto}
+.rp-tw .pn-tabla{min-width:520px}
+.rp-tw tfoot td{font-weight:700;border-top:1px solid var(--bd)}
+@media (max-width:900px){
+  .ta-sem{grid-template-columns:minmax(0,1fr)}
+  .pn-barra .pn-mas{padding:6px 10px}
+}
+/* EL PAPEL. Un reporte se imprime sin la barra lateral, sin la barra de arriba
+   y sin botones, con su encabezado de fundación (solo-impresion, que la hoja
+   del sitio ya enciende en papel). */
+@media print{
+  .pn-lado,.pn-barra,.pn-cab-acc,.pn-cab-meta,.pn-cab-linea,.rp-barra,.pn-avisos,.pn-cajon,.pn-velo,.pn-saltar,.pn-como{display:none !important}
+  .pn-app{display:block !important}
+  .pn-cont{padding:0 !important;max-width:none !important}
+  .pn-cab{display:block !important;margin:0 0 6pt !important;padding:0 !important;border:0 !important}
+  .rp-sec,.vol-ind{break-inside:avoid;page-break-inside:avoid}
+  .rp-tw{overflow:visible}
+  .rp-tw .pn-tabla{min-width:0;width:100%;font-size:8.5pt}
+  .pn-tabla tr{break-inside:avoid}
+  .rp-aviso{background:transparent !important;color:var(--ink) !important}
+}
 @media (prefers-reduced-motion:reduce){ .pn-lado{transition:none} }
 </style>
 </head><body class="pn-body">
@@ -25895,6 +26888,7 @@ textarea { font-size: 16px }
 <div class="pn-grupo">
   <p class="pn-gt">Inicio</p>
   <a class="pn-it" href="#hoy" data-pn-ir="hoy">Hoy<span class="pn-n" data-pn-n="hoy"></span></a>
+  <a class="pn-it" href="#tareas" data-pn-ir="tareas">Tareas<span class="pn-n" data-pn-n="tareas"></span></a>
 </div>
 <div class="pn-grupo">
   <p class="pn-gt">Finanzas</p>
@@ -25932,6 +26926,20 @@ textarea { font-size: 16px }
   <a class="pn-it" href="#entregas" data-pn-ir="entregas">Actas de entrega<span class="pn-n" data-pn-n="entregas"></span></a>
 </div>
 <div class="pn-grupo">
+  <p class="pn-gt">Legal y documentos</p>
+  <a class="pn-it" href="#legal/documentos" data-pn-ir="legal/documentos">Documentos<span class="pn-n" data-pn-n="legal/documentos"></span></a>
+</div>
+<!-- Fase 5: informes anuales con lo que la base ya tiene. Cifras operativas,
+     no estados financieros; cada uno en pantalla, en CSV y para imprimir. -->
+<div class="pn-grupo">
+  <p class="pn-gt">Reportes</p>
+  <a class="pn-it" href="#reportes/donaciones" data-pn-ir="reportes/donaciones">Donaciones del año</a>
+  <a class="pn-it" href="#reportes/donantes" data-pn-ir="reportes/donantes">Donantes del año</a>
+  <a class="pn-it" href="#reportes/voluntariado" data-pn-ir="reportes/voluntariado">Voluntariado</a>
+  <a class="pn-it" href="#reportes/mmc" data-pn-ir="reportes/mmc">Mira Mi Casa</a>
+  <a class="pn-it" href="#reportes/banco" data-pn-ir="reportes/banco">Banco y panel</a>
+</div>
+<div class="pn-grupo">
   <p class="pn-gt">Sistema</p>
   <a class="pn-it" href="#sistema/salud" data-pn-ir="sistema/salud">Salud<span class="pn-n" data-pn-n="sistema/salud"></span></a>
   <a class="pn-it" href="#sistema/correos" data-pn-ir="sistema/correos">Correos<span class="pn-n" data-pn-n="sistema/correos"></span></a>
@@ -25959,6 +26967,8 @@ textarea { font-size: 16px }
     <kbd class="bus-atajo" aria-hidden="true">/</kbd>
     <div id="busca-res" class="bus-pop" role="listbox" aria-label="Resultados de la búsqueda" hidden></div>
   </form>
+  <!-- Fase 5: una tarea desde cualquier sección, sin salir de lo que se hace. -->
+  <button type="button" class="pn-b2 pn-mas" id="pn-tarea" title="Anotar una tarea">+ Tarea</button>
   <p class="pn-quien" id="quien">Cargando…</p>
 </header>
 
@@ -25975,6 +26985,19 @@ textarea { font-size: 16px }
 
 <section class="pn-vista" data-vista="hoy" aria-labelledby="pn-cab-t">
 <div id="decisiones"><p class="mu">Cargando…</p></div>
+</section>
+
+<!-- TAREAS (Fase 5, 0044). Lo que hay que hacer, sea o no con alguien. Los
+     próximos pasos de las fichas salen aquí también, con su «Hecho» de
+     siempre: son otra tabla, y «Hoy» los cuenta en su propia cola. -->
+<section class="pn-vista" data-vista="tareas" id="sec-tareas" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Una tarea es <strong>algo por hacer</strong>, con o sin alguien: «pedir el certificado de la Cámara», «revisar la póliza», «llamar a la fundación». Lleva su fecha límite, su prioridad, su área y, si quieres, un vínculo con una ficha, un aporte, un caso, un vencimiento, un movimiento del banco o un documento. Se crea con «+ Tarea», arriba, desde cualquier sección, o con «Crear tarea» desde lo que la origina.</p>
+<p>El día de su fecha sale en «Hoy»; pasado ese día está vencida y sube a Urgente. <strong>Las que se repiten</strong> (cada mes o cada año) crean la siguiente al marcarse «Hecha», con el mismo día; deshacer el «Hecha» la quita si nadie la ha tocado. Una tarea no se borra: se cancela, y se puede reabrir.</p>
+<p>Los <strong>próximos pasos de las fichas</strong> de contacto también salen aquí, marcados así, porque también son trabajo con fecha. Se siguen anotando en la ficha.</p>
+</div></details>
+<div id="ta-semana" aria-live="polite"></div>
+<div id="tb-tareas" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <!-- ============================ FINANZAS ============================ -->
@@ -26095,7 +27118,7 @@ textarea { font-size: 16px }
 <section class="pn-vista" data-vista="finanzas/egresos" id="sec-egresos" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p><strong>Esto no es el libro oficial:</strong> los libros, la declaración y la exógena son del contador y llevan responsabilidad legal. Esto es la fuente de la que él trabaja, y el lugar donde vive cada soporte.</p>
-<p>El archivo para el contador sale separado por punto y coma y con las columnas que pide la exógena, así que Excel en español lo abre en columnas. Lo acotan las fechas «Desde» y «Hasta» de la tabla. La <strong>categoría</strong> es el concepto de retención que se eligió al registrar el egreso.</p>
+<p>El archivo para el contador sale separado por punto y coma y con las columnas que pide la exógena, así que Excel en español lo abre en columnas. Lleva lo que se ve: lo acotan todos los filtros de la tabla y el buscador. La <strong>categoría</strong> es el concepto de retención que se eligió al registrar el egreso.</p>
 </div></details>
 <div id="eg-resumen" class="eco-row" style="justify-content:flex-start;margin-bottom:18px"></div>
 <div id="tb-egresos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
@@ -26192,16 +27215,7 @@ textarea { font-size: 16px }
 <p>Los indicadores cuentan solo lo que ocurrió —jornadas realizadas y personas con horas— y los beneficiarios son <strong>los que reporta la fundación</strong>. A un menor de edad <strong>nunca</strong> se le escribe: su certificado va a su acudiente si hay un correo registrado, y si no, se entrega en mano. Nada de esto se cobra.</p>
 </div></details>
 <div id="vol-ind"></div>
-<details id="j-nueva" class="vol-caja">
-  <summary>Nueva jornada</summary>
-  <div id="j-form-nueva" class="eg-form"><p class="mu">Se arma al cargar la lista.</p></div>
-</details>
-<div class="med-tw"><table class="med-tbl">
-<thead><tr>
-<th scope="col">Jornada</th><th scope="col">Fecha</th><th scope="col">Puerta</th><th scope="col">Anfitriona</th>
-<th scope="col">Personas</th><th scope="col">Horas</th><th scope="col">Estado</th><th scope="col">Acción</th>
-</tr></thead><tbody id="j-filas"><tr><td colspan="8" class="mu">Se pide al abrir la sección.</td></tr></tbody>
-</table></div>
+<div id="tb-jornadas" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 <div id="j-dlg" style="display:none;margin-top:24px"></div>
 </section>
 
@@ -26261,14 +27275,6 @@ sabes que está mal.</p>
 <p><strong>Nunca se publican nombres de personas beneficiarias</strong>: en «recibido por» va el rol y la entidad, no una persona atendida. Una entrega no se puede publicar sin al menos una foto. Anular no se deshace: el número queda gastado y con su motivo.</p>
 </div></details>
 
-<details class="pn-caja" id="e-form">
-  <summary>Registrar una entrega</summary>
-  <div style="max-width:640px;margin-top:12px">
-  <div id="e-campos"></div>
-  <p id="e-error" class="mu" style="color:var(--err);font-size:var(--fs-13);display:none"></p>
-  <button class="btn btn-g" id="e-crear">Registrar</button>
-  </div>
-</details>
 
 <!-- eco-stack: en pantalla angosta esta tabla deja de ser tabla y se apila.
      Es la única del panel que se usa EN TERRENO, desde un celular, después de
@@ -26281,6 +27287,36 @@ sabes que está mal.</p>
 <th scope="col">Casas</th><th scope="col">Estado</th><th scope="col">Acción</th>
 </tr></thead><tbody id="e-filas"><tr><td colspan="10" class="mu">Se pide al abrir la sección.</td></tr></tbody>
 </table></div>
+</section>
+
+<!-- ======================= LEGAL Y DOCUMENTOS ======================= -->
+<!-- Fase 5 (0044). El archivo de la fundación con su vencimiento, y los
+     documentos que siempre tiene que haber dichos como huecos. Los archivos
+     son privados: solo se descargan desde aquí, tras Access. -->
+<section class="pn-vista" data-vista="legal/documentos" id="sec-documentos" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Cada documento de la fundación —estatutos, RUT, certificado de la Cámara de Comercio, actas, estados financieros, informe de gestión, registro del RTE, pólizas, contratos, políticas, lo presentado ante la DIAN— con su <strong>fecha de expedición y de vencimiento</strong>. Lo que vence en 30 días sale en «Hoy» (Esta semana); lo vencido, en Urgente. El certificado de la Cámara no se vuelve alarma: vale 30 días para licitaciones y se pide cuando hace falta.</p>
+<p><strong>Lo que siempre tiene que haber</strong> sale arriba como hueco («Falta: acta de asamblea 2026») hasta que se registra el documento de ese tipo y ese año, o se marca «No aplica» con su motivo. Un documento nuevo del mismo tipo deja al anterior como <strong>reemplazado</strong>: nada se pisa.</p>
+<p>El archivo (PDF, JPG o PNG, hasta 10 MB) se comprueba por sus bytes, no por su nombre, se guarda <strong>privado</strong> y solo se descarga desde aquí. La casilla «Público» es solo una nota de que se puede enseñar: <strong>no publica nada</strong>. Los convenios firmados en línea se ven abajo tal como están en Red, sin copiarlos.</p>
+</div></details>
+<div id="doc-esperados"></div>
+<div id="tb-docs" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+<h2 class="pn-h2">Convenios firmados en línea</h2>
+<p class="pn-sub">Los que las fundaciones firmaron en /convenio. Viven en Red: aquí solo se enlazan, no se copian.</p>
+<div id="doc-convenios"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<!-- ============================ REPORTES ============================ -->
+<!-- Fase 5. Una sola sección para los cinco informes: cada dirección
+     (#reportes/donaciones…) es un alias de ésta y pinta el suyo. -->
+<section class="pn-vista" data-vista="reportes/donaciones" data-alias="reportes/donantes reportes/voluntariado reportes/mmc reportes/banco" id="sec-reportes" hidden>
+<div class="fin-barra rp-barra">
+  <label>Año<select id="rp-anio" aria-label="Año del reporte"></select></label>
+  <span class="tb-sep"></span>
+  <button type="button" class="pn-b2" id="rp-csv">Descargar (CSV)</button>
+  <button type="button" class="pn-b2" id="rp-imprimir">Imprimir</button>
+</div>
+<div id="rp-caja"><p class="mu">Elige un reporte.</p></div>
 </section>
 
 <!-- ============================ SISTEMA ============================ -->
@@ -26314,6 +27350,15 @@ sabes que está mal.</p>
      «cajonForma» los mueve al cajón y los devuelve al cerrarlo: así conservan
      sus ids y todo lo que ya los maneja. -->
 <div id="pn-formas" hidden>
+<!-- Fase 5: «Registrar una entrega» y «Nueva jornada» también se abren en el
+     cajón, como el egreso y el carnet de honor. -->
+<div id="e-nueva" class="eg-form" data-forma="1">
+  <div id="e-campos"></div>
+  <p id="e-error" class="mu" style="color:var(--err);font-size:var(--fs-13);display:none"></p>
+</div>
+<div id="j-nueva" class="eg-form" data-forma="1">
+  <div id="j-form-nueva"><p class="mu">Se arma al cargar la lista de jornadas.</p></div>
+</div>
 <div id="eg-nuevo" class="eg-form" data-forma="1">
     <div class="eg-xml">
       <label for="eg-arch" style="margin-top:0">Arrastra la factura electrónica</label>
@@ -27513,7 +28558,11 @@ var COLA_ES = {
   jornadas_sin_cerrar: "Jornadas realizadas sin cerrar",
   banco_sin_conciliar: "Movimientos del banco sin conciliar",
   extracto_por_importar: "Importar el extracto del mes",
-  seguimientos_pendientes: "Seguimientos para hoy y vencidos"
+  seguimientos_pendientes: "Seguimientos para hoy y vencidos",
+  tareas_pendientes: "Tareas para hoy y vencidas",
+  documentos_vencidos: "Documentos vencidos",
+  documentos_por_vencer: "Documentos por vencer",
+  documentos_faltantes: "Documentos que faltan"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -27547,6 +28596,22 @@ function antiguedad(d){
 var VISTAS = {
   "hoy": { area: "Inicio", titulo: "Hoy",
     linea: "Lo que espera a una persona, de lo más grave a lo que puede esperar a la semana." },
+  "tareas": { area: "Inicio", titulo: "Tareas",
+    linea: "Lo que hay que hacer, con o sin alguien: con fecha, prioridad y área. Lo de hoy y lo vencido también sale en «Hoy».",
+    accion: ["Nueva tarea", "ta-nueva"] },
+  "legal/documentos": { area: "Legal y documentos", titulo: "Documentos",
+    linea: "El archivo de la fundación con su vencimiento, y lo que siempre tiene que haber. Los archivos son privados.",
+    accion: ["Registrar un documento", "doc-nuevo"] },
+  "reportes/donaciones": { area: "Reportes", titulo: "Informe anual de donaciones",
+    linea: "Ingresos confirmados del año por mes, medio y destino, y cuántos donantes. Para leer, descargar o imprimir." },
+  "reportes/donantes": { area: "Reportes", titulo: "Donantes del año",
+    linea: "Una fila por donante con sus totales y su certificado: para el contador, la exógena y los certificados de donación." },
+  "reportes/voluntariado": { area: "Reportes", titulo: "Voluntariado del año",
+    linea: "Jornadas, participantes y horas anotadas, y los beneficiarios que reportan las fundaciones." },
+  "reportes/mmc": { area: "Reportes", titulo: "Mira Mi Casa: casos del año",
+    linea: "Casos recibidos, atendidos, visitados y cerrados, mes a mes." },
+  "reportes/banco": { area: "Reportes", titulo: "Banco y panel",
+    linea: "Lo que dice el extracto del banco junto a lo que dice el panel, mes a mes, y de dónde sale la diferencia." },
   "finanzas/resumen": { area: "Finanzas", titulo: "Resumen",
     linea: "Lo que entró y lo que salió en el mes o en el año, y de dónde sale cada cifra." },
   "finanzas/banco": { area: "Finanzas", titulo: "Banco",
@@ -27587,7 +28652,7 @@ var VISTAS = {
   "mmc/inspecciones": { area: "Mira Mi Casa", titulo: "Inspecciones en terreno",
     linea: "Las visitas en persona de los ingenieros, con el documento que firmó el habitante." },
   "entregas": { area: "Entregas", titulo: "Actas de entrega",
-    linea: "Se registra la transcripción del acta, se suben sus fotos y se publica.", accion: ["Registrar una entrega", "e-form"] },
+    linea: "Se registra la transcripción del acta, se suben sus fotos y se publica.", accion: ["Registrar una entrega", "e-nueva"] },
   "sistema/salud": { area: "Sistema", titulo: "Salud",
     linea: "Dónde se cae la donación, si el cobro y el correo dan señales de vida, y la operación diaria." },
   "sistema/correos": { area: "Sistema", titulo: "Correos",
@@ -27646,7 +28711,10 @@ function mostrar(ruta){
   pintarCabecera();
   filtrarInscripciones(vista, ruta.filtro);
   filtrarFase4(vista, ruta.filtro);
+  filtrarFase5(vista, ruta.filtro);
   sec.querySelectorAll("tbody[id],[data-bandeja]").forEach(function(t){ pedir(t.id); });
+  /* Los cinco reportes comparten la sección: cada dirección pinta el suyo. */
+  if (vista.indexOf("reportes/") === 0) pedirReporte();
   cerrarMenu();
   document.title = VISTAS[vista].titulo + " · Panel · Give&Grow";
   if (ruta.ancla && document.getElementById(ruta.ancla) && document.getElementById(ruta.ancla) !== sec){
@@ -27688,6 +28756,18 @@ function filtrarFase4(vista, f){
     var k = ""; try { k = decodeURIComponent(f); } catch (e) { k = f; }
     abrirContacto(k);
   }
+}
+
+/* Fase 5: los «Ver todo» de «Hoy» llegan con el filtro puesto. */
+function filtrarFase5(vista, f){
+  if (!f) return;
+  var t = vista === "tareas" ? TB_TAREAS : vista === "legal/documentos" ? TB_DOCS : null;
+  if (!t) return;
+  if (vista === "tareas" && f === "vencidas"){ t.f.estado = "pendiente"; t.f.cuando = "vencidas"; }
+  else if (vista === "legal/documentos" && f === "atencion") t.f.estado = "atencion";
+  else return;
+  t.pagina = 1;
+  if (t.armada && t.todas){ tablaBarra(t); tablaRefrescar(t); }
 }
 
 /* La barra lateral en el teléfono. */
@@ -27756,13 +28836,18 @@ var COLA_MOD = {
   vencimientos_por_atender: "finanzas/vencimientos",
   banco_sin_conciliar: "finanzas/conciliar",
   extracto_por_importar: "finanzas/banco",
-  seguimientos_pendientes: "personas/contactos"
+  seguimientos_pendientes: "personas/contactos",
+  tareas_pendientes: "tareas",
+  documentos_vencidos: "legal/documentos",
+  documentos_por_vencer: "legal/documentos",
+  documentos_faltantes: "legal/documentos"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
 var COLA_FILTRO = { fundaciones_sin_respuesta: "respuesta", empresas_sin_respuesta: "respuesta",
   apadrinamientos_sin_respuesta: "respuesta", voluntarios_sin_respuesta: "respuesta", ingenieros_sin_verificar: "matricula",
-  correos_fallidos: "por_atender", correos_sin_cupo: "por_atender", correos_sin_buzon: "sin_destino", seguimientos_pendientes: "vencidos" };
+  correos_fallidos: "por_atender", correos_sin_cupo: "por_atender", correos_sin_buzon: "sin_destino", seguimientos_pendientes: "vencidos" ,
+  tareas_pendientes: "vencidas", documentos_vencidos: "atencion", documentos_por_vencer: "atencion" };
 var DESTINO_ES = { "/triaje": "Abrir el triaje", "/admin/ruta": "Abrir la ruta de visitas", "/firma": "Abrir la firma" };
 
 /* LAS INSIGNIAS salen de la MISMA lista que pinta «Hoy»: si un día cambia la
@@ -27877,6 +28962,15 @@ function accionesItem(clave, it){
   if (clave === "correos_fallidos" || clave === "correos_sin_cupo")
     return '<button type="button" class="pn-b1" data-hoy="reenviar" data-id="' + id + '">Reenviar…</button>' +
       '<button type="button" class="pn-b2" data-hoy="correo" data-id="' + id + '">Ver</button>';
+  if (clave === "tareas_pendientes")
+    return '<button type="button" class="pn-b1" data-hoy="tarea-hecha" data-id="' + id + '" data-nombre="' + nombre + '">Hecha</button>' +
+      '<button type="button" class="pn-b2" data-hoy="tarea-posponer" data-id="' + id + '" data-fecha="' + esc(it.fecha || "") + '" data-nombre="' + nombre + '">Posponer…</button>' +
+      '<button type="button" class="pn-b2" data-hoy="tarea-abrir" data-id="' + id + '">Abrir</button>';
+  if (clave === "documentos_vencidos" || clave === "documentos_por_vencer")
+    return '<button type="button" class="pn-b2" data-hoy="doc-abrir" data-id="' + id + '">Abrir</button>';
+  if (clave === "documentos_faltantes")
+    return '<button type="button" class="pn-b1" data-hoy="doc-falta" data-tipo="' + esc(it.tipo || "") + '" data-periodo="' + esc(it.periodo || "") +
+      '" data-nombre="' + esc(String(it.titulo || "").replace(/^Falta: /, "")) + '">Registrar…</button>';
   if (clave === "seguimientos_pendientes")
     return '<button type="button" class="pn-b1" data-hoy="seg-hecho" data-id="' + id + '" data-nombre="' + esc(it.detalle || "") + '">Hecho</button>' +
       '<button type="button" class="pn-b2" data-hoy="seg-posponer" data-id="' + id + '" data-fecha="' + esc(it.fecha || "") + '" data-nombre="' + esc(it.detalle || "") + '">Posponer…</button>' +
@@ -29040,6 +30134,8 @@ function abrirCaso(numero){
         '<div style="display:flex;gap:10px;margin:8px 0 22px">' +
           '<button class="btn btn-g" id="f-ok" data-guardar="' + esc(numero) + '">Guardar</button>' +
           '<button class="btn btn-w" id="f-no">Cerrar</button>' +
+          '<button class="btn btn-w" type="button" data-tarea-nueva="caso" data-ref="' + esc(numero) + '" data-ref-nombre="' + esc(numero + (c.sector ? " · " + c.sector : "")) +
+          '" data-area="mmc">Crear tarea</button>' +
         "</div>" +
 
         '<h4 style="margin-bottom:4px">Fotos</h4>' +
@@ -30081,7 +31177,11 @@ document.addEventListener("click", function(e){
           err.style.color = "#b7791f";
           err.style.display = "block";
         }
-        pintarCampos(); cargarEntregas();
+        /* Fase 5: el formulario vive en el cajón. Si el servidor dejó un aviso,
+           el cajón se queda abierto para leerlo; si no, se cierra con su aviso. */
+        if (!(res.d && res.d.aviso) && CAJON.abierto) cajonCerrar();
+        avisar("Acta " + ((res.d && res.d.numero) || "") + " registrada como borrador.");
+        pintarCampos(); cargarEntregas(); cargarSalud();
       })
       .catch(function(){ b.disabled = false; b.textContent = "Reintentar"; });
     return;
@@ -30407,15 +31507,13 @@ document.addEventListener("click", function(ev){
     return;
   }
   if (ev.target.id === "eg-csv"){
-    /* Las fechas «Desde» y «Hasta» de la tabla acotan el archivo. */
-    var d1 = TB_EGRESOS.f.desde || "", d2 = TB_EGRESOS.f.hasta || "";
-    var q = [];
-    if (d1) q.push("desde=" + encodeURIComponent(d1));
-    if (d2) q.push("hasta=" + encodeURIComponent(d2));
+    /* TODOS los filtros de la tabla, y el buscador, acotan el archivo (Fase 5):
+       lo que se descarga es lo que se ve. */
+    var q = tablaParams(TB_EGRESOS, false);
     /* Una navegacion y no un fetch: el navegador ya sabe guardar un archivo que
        viene con Content-Disposition, y montar un blob a mano solo anadiria una
        copia en memoria y una URL que hay que acordarse de revocar. */
-    location.href = "/api/admin/egresos.csv" + (q.length ? "?" + q.join("&") : "");
+    location.href = "/api/admin/egresos.csv" + (q ? "?" + q : "");
     return;
   }
   var an = ev.target.closest ? ev.target.closest("[data-eg-anular]") : null;
@@ -30600,8 +31698,8 @@ function pintarFormNueva(){
   var c = document.getElementById("j-form-nueva"); if (!c) return;
   if (J_FORM_NUEVA) return;
   J_FORM_NUEVA = true;
-  c.innerHTML = formJornada("jn-", null) +
-    '<p><button class="btn" type="button" id="j-crear" style="margin-top:12px">Crear la jornada</button></p><p class="msg" id="jn-msg"></p>';
+  /* El botón «Crear la jornada» va en el pie del cajón (Fase 5). */
+  c.innerHTML = formJornada("jn-", null) + '<p class="msg" id="jn-msg"></p>';
 }
 /* El campo que el servidor rechazo, señalado: el mensaje dice el porque y el
    foco lleva a donde hay que corregir. */
@@ -30623,7 +31721,8 @@ function guardarJornada(p, id, boton, msg){
     }
     egMsg(msg, id ? "Guardado." : "Jornada creada.", true);
     if (!id){
-      var n = document.getElementById("j-nueva"); if (n) n.open = false;
+      if (CAJON.abierto) cajonCerrar();
+      avisar("Jornada creada.");
       J_FORM_NUEVA = false;
     }
     cargarJornadas();
@@ -30631,33 +31730,54 @@ function guardarJornada(p, id, boton, msg){
   }).catch(function(){ boton.disabled = false; egMsg(msg, "No se pudo. Revisa la conexión.", false); });
 }
 
+/* LA LISTA DE JORNADAS, en la tabla compartida (Fase 5): buscador, filtros
+   por estado y puerta, columnas que ordenan, y la fila abre la jornada. */
+/* La configuración se escribe aquí y la tabla se crea al cargarla: «TABLAS»
+   se declara más abajo en el archivo y todavía no existe a esta altura. */
+var TB_JORNADAS = null;
+var CFG_JORNADAS = { id: "tb-jornadas", titulo: "Jornadas", orden: "fecha", dir: "desc",
+  buscar: "Jornada, empresa o anfitriona",
+  texto: function(j){ return [j.nombre, j.empresa, j.anfitriona_nombre, j.fecha, PUERTA_ES[j.puerta]].join(" "); },
+  filtros: [
+    { k: "estado", t: "Estado", opciones: function(){ return opcionesDe(ESTADO_J_ES); }, valor: function(j){ return j.estado; } },
+    { k: "puerta", t: "Puerta", opciones: function(t){ return distintos(t.todas, function(j){ return j.puerta; }).map(function(o){ return [o[0], PUERTA_ES[o[0]] || o[1]]; }); },
+      valor: function(j){ return j.puerta || ""; } },
+    { k: "desde", t: "Desde", tipo: "fecha", fecha: function(j){ return j.fecha; } },
+    { k: "hasta", t: "Hasta", tipo: "fecha", fecha: function(j){ return j.fecha; } }
+  ],
+  columnas: [
+    { k: "nombre", t: "Jornada", valor: function(j){ return j.nombre; }, celda: function(j){ return "<strong>" + esc(j.nombre) + "</strong>" + (j.empresa ? "<small>" + esc(j.empresa) + "</small>" : ""); } },
+    { k: "fecha", t: "Fecha", nw: true, dir: "desc", valor: function(j){ return j.fecha || ""; }, celda: function(j){
+      return esc(j.fecha || "sin fecha") + (horarioJ(j) ? "<small>" + esc(horarioJ(j)) + "</small>" : ""); } },
+    { k: "puerta", t: "Puerta", valor: function(j){ return PUERTA_ES[j.puerta] || j.puerta; }, celda: function(j){
+      return esc(PUERTA_ES[j.puerta] || j.puerta) + "<small>" + esc(FORMATO_ES[j.formato] || j.formato) + "</small>"; } },
+    { k: "anf", t: "Anfitriona", valor: function(j){ return j.anfitriona_nombre || ""; }, celda: function(j){ return esc(j.anfitriona_nombre || "sin definir"); } },
+    { k: "personas", t: "Personas", num: true, valor: function(j){ return Number(j.anotados || 0); }, celda: function(j){ return esc(String(j.anotados) + (j.cupo_max ? " de " + j.cupo_max : "")); } },
+    { k: "horas", t: "Horas", num: true, valor: function(j){ return Number(j.horas || 0); }, celda: function(j){ return esc(numCO(j.horas)); } },
+    { k: "estado", t: "Estado", valor: function(j){ return j.estado; }, celda: function(j){
+      return esc(ESTADO_J_ES[j.estado] || j.estado) + (j.marco_en ? "<small>Marco hecho</small>" : ""); } }
+  ],
+  claseFila: function(j){ return j.estado === "cancelada" ? "tb-gris" : ""; },
+  totales: function(t){
+    var p = 0, h = 0; t.vista.forEach(function(j){ if (j.estado !== "cancelada"){ p += Number(j.anotados || 0); h += Number(j.horas || 0); } });
+    return { etiqueta: "Sin canceladas, en el filtro", celdas: { personas: numCO(p), horas: numCO(h) } };
+  },
+  nota: function(){ return "La fila abre la jornada debajo de la tabla: su ficha, sus personas, el cierre y las encuestas."; },
+  vacio: { titulo: "Todavía no hay jornadas.", texto: "La primera se crea con «Nueva jornada», arriba." },
+  etiquetaFila: function(j){ return "Abrir la jornada " + j.nombre; },
+  abrir: function(j){ abrirJornada(j.id); }
+};
 function cargarJornadas(){
-  pedirJSON("/api/admin/jornadas", "j-filas").then(function(d){
+  if (!TB_JORNADAS) TB_JORNADAS = tablaNueva(CFG_JORNADAS);
+  if (!TB_JORNADAS.armada) tablaArmar(TB_JORNADAS, document.getElementById("tb-jornadas"));
+  pedirJSON("/api/admin/jornadas", "tb-jornadas-cuerpo").then(function(d){
     J_LISTAS.fundaciones = d.fundaciones || [];
     J_LISTAS.empresas = d.empresas || [];
     J_LISTAS.completas = d.fundaciones_completas !== false;
-    pintarIndicadores("vol-ind", d.indicadores || {}, "Indicadores de voluntariado · todo el panel", false);
+    if (document.getElementById("vol-ind")) pintarIndicadores("vol-ind", d.indicadores || {}, "Indicadores de voluntariado · todo el panel", false);
     pintarFormNueva();
-    var tb = document.getElementById("j-filas"); if (!tb) return;
-    var l = d.jornadas || [];
-    if (!l.length){
-      tb.innerHTML = '<tr><td colspan="8">Todavía no hay jornadas. La primera se crea arriba, en «Nueva jornada».</td></tr>';
-      return;
-    }
-    tb.innerHTML = l.map(function(j){
-      var cupo = j.cupo_max ? " de " + j.cupo_max : "";
-      return "<tr>" +
-        "<td>" + esc(j.nombre) + (j.empresa ? "<br><small>" + esc(j.empresa) + "</small>" : "") + "</td>" +
-        "<td>" + esc(j.fecha || "sin fecha") + (horarioJ(j) ? "<br><small>" + esc(horarioJ(j)) + "</small>" : "") + "</td>" +
-        "<td>" + esc(PUERTA_ES[j.puerta] || j.puerta) + "<br><small>" + esc(FORMATO_ES[j.formato] || j.formato) + "</small></td>" +
-        "<td>" + esc(j.anfitriona_nombre || "sin definir") + "</td>" +
-        "<td>" + esc(String(j.anotados) + cupo) + "</td>" +
-        "<td>" + esc(numCO(j.horas)) + "</td>" +
-        "<td>" + esc(ESTADO_J_ES[j.estado] || j.estado) +
-          (j.marco_en ? "<br><small>Marco hecho</small>" : "") + "</td>" +
-        '<td><button class="copy" type="button" data-jabrir="' + j.id + '">Abrir</button></td>' +
-      "</tr>";
-    }).join("");
+    tablaCargar(TB_JORNADAS, d.jornadas || []);
+    tablaBarra(TB_JORNADAS);
   });
 }
 
@@ -31139,11 +32259,20 @@ function pintarVencimientos(){
           ? '<br><small>' + esc(enCO(x.marca.marcado_en, 10)) + (x.marca.marcado_por ? ' · ' + esc(x.marca.marcado_por) : '')
             + (x.marca.nota ? '<br>' + esc(x.marca.nota) : '') + '</small>'
           : '');
+    /* Fase 5: lo que se presentó, atado al vencimiento (un PDF de la renta
+       110), y una tarea para lo que hay que preparar antes. */
+    var docs = (x.documentos || []).map(function(d){
+      return d.tiene_archivo ? '<a href="/api/admin/documento/' + d.id + '/archivo">' + esc(d.titulo) + "</a>"
+        : '<button type="button" class="ct-link" data-doc-ver="' + d.id + '">' + esc(d.titulo) + " (sin archivo)</button>";
+    }).join("<br>");
     var acc = x.marca
       ? '<button type="button" class="copy" data-obdeshacer="' + i + '">Deshacer</button>'
+        + (x.marca.estado === "hecho" ? ' <button type="button" class="copy" data-obdoc="' + i + '">Adjuntar lo presentado…</button>' : "")
       : '<input class="ob-nota" id="ob-nota-' + i + '" maxlength="500" autocomplete="off" placeholder="Nota (opcional)" aria-label="Nota para ' + esc(x.corto + ' · ' + x.periodo) + '">'
         + '<span class="ob-acc"><button type="button" class="copy" data-obhecho="' + i + '">Hecho</button>'
-        + '<button type="button" class="copy" data-obna="' + i + '">No aplicó este periodo</button></span>';
+        + '<button type="button" class="copy" data-obna="' + i + '">No aplicó este periodo</button>'
+        + '<button type="button" class="copy" data-tarea-nueva="obligacion" data-ref="' + esc(x.clave + "|" + x.fecha) + '" data-ref-nombre="' + esc(x.corto + " · " + x.periodo) + '" data-area="legal">Crear tarea</button></span>';
+    if (docs) acc = '<small>Presentado: ' + docs + "</small><br>" + acc;
     return '<tr class="' + cls + '"><td>' + fecha + '</td><td>' + esc(x.entidad) + '</td><td>' + que
       + '</td><td>' + estado + '</td><td>' + acc + '</td></tr>';
   }).join("");
@@ -31170,7 +32299,12 @@ document.addEventListener("click", function(e){
   var b;
   if ((b = e.target.closest("[data-obhecho]"))){ marcarObligacion(Number(b.getAttribute("data-obhecho")), "hecho", b); return; }
   if ((b = e.target.closest("[data-obna]"))){ marcarObligacion(Number(b.getAttribute("data-obna")), "no_aplica", b); return; }
-  if ((b = e.target.closest("[data-obdeshacer]"))){ marcarObligacion(Number(b.getAttribute("data-obdeshacer")), "pendiente", b); }
+  if ((b = e.target.closest("[data-obdeshacer]"))){ marcarObligacion(Number(b.getAttribute("data-obdeshacer")), "pendiente", b); return; }
+  if ((b = e.target.closest("[data-obdoc]"))){
+    var x = OB_FILAS[Number(b.getAttribute("data-obdoc"))]; if (!x) return;
+    formDocumento(null, { tipo: "presentacion", obligacion: x.clave + "|" + x.fecha, titulo: x.corto + " · " + x.periodo, entidad: x.entidad,
+      periodo: (String(x.periodo).match(/[0-9]{4}/) || [""])[0] });
+  }
 });
 document.addEventListener("change", function(e){
   if (e.target && e.target.id === "ob-todo") pintarVencimientos();
@@ -31528,6 +32662,8 @@ function cajonForma(o){
 }
 function abrirForma(id){
   if (id === "bk-importar"){ abrirImportar(); return true; }
+  if (id === "ta-nueva"){ abrirTarea(null, {}); return true; }
+  if (id === "doc-nuevo"){ formDocumento(null, {}); return true; }
   var n = document.getElementById(id);
   if (!n || !n.hasAttribute("data-forma")) return false;
   if (id === "eg-nuevo"){
@@ -31535,6 +32671,19 @@ function abrirForma(id){
       pie: '<button type="button" class="pn-b1" id="eg-guardar">Registrar egreso</button>' +
            '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
     cargarProveedores();
+    return true;
+  }
+  if (id === "e-nueva"){
+    cajonForma({ forma: "e-nueva", ey: "Entregas", titulo: "Registrar una entrega",
+      pie: '<button type="button" class="pn-b1" id="e-crear">Registrar</button>' +
+           '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+    return true;
+  }
+  if (id === "j-nueva"){
+    pintarFormNueva();
+    cajonForma({ forma: "j-nueva", ey: "Voluntariado", titulo: "Nueva jornada", ancho: true,
+      pie: '<button type="button" class="pn-b1" id="j-crear">Crear la jornada</button>' +
+           '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
     return true;
   }
   if (id === "hn-nuevo"){
@@ -31663,7 +32812,10 @@ function abrirAporte(a){
     '<p><a class="pn-b2" href="/?g=' + encodeURIComponent(a.guia) + '#rastrea" target="_blank" rel="noopener">Ver el rastreo que ve el donante</a></p>';
   var acc = accion(a);
   cajonAbrir({ ey: "Aporte", titulo: a.guia + " · " + dinero(a.monto_centavos, a.moneda), cuerpo: h,
-    pie: (acc ? acc.replace('class="copy"', 'class="pn-b1"') : "") + '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+    pie: (acc ? acc.replace('class="copy"', 'class="pn-b1"') : "") +
+      '<button type="button" class="pn-b2" data-tarea-nueva="aporte" data-ref="' + esc(a.guia) + '" data-ref-nombre="' + esc(a.guia + (a.donante ? " · " + a.donante : "")) +
+      '" data-area="finanzas">Crear tarea</button>' +
+      '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
 }
 document.addEventListener("click", function(e){
   if (e.target && e.target.id === "ap-csv"){
@@ -32058,7 +33210,7 @@ var TB_EGRESOS = tablaNueva({ id: "tb-egresos", titulo: "Egresos", orden: "fecha
     return { etiqueta: "Vigentes en el filtro · " + v.length + (v.length === 1 ? " egreso" : " egresos"),
              celdas: { total: esc(deCentavos(tot)), ret: esc(deCentavos(ret)) } };
   },
-  nota: function(){ return "Los anulados se ven en gris y nunca se suman. El archivo para el contador lleva el libro entero entre las fechas Desde y Hasta (los anulados, marcados), no solo lo filtrado aquí."; },
+  nota: function(){ return "Los anulados se ven en gris y nunca se suman. El archivo para el contador lleva lo que se ve con estos filtros y el buscador; con «Estado: Todos», los anulados van marcados."; },
   extra: function(){ return '<button type="button" class="pn-b2" id="eg-csv">Descargar para el contador</button>'; },
   aviso: function(t){ var d = t.resp; return d && d.total > (d.egresos || []).length
     ? "<strong>Faltan " + (d.total - d.egresos.length) + " egresos por mostrar</strong> · el libro tiene más filas de las que el panel trae: usa el archivo para el contador." : ""; },
@@ -32791,6 +33943,9 @@ var TB_CONC = tablaNueva({ id: "tb-conc", titulo: "Movimientos sin conciliar", o
     return { etiqueta: "Sin conciliar en el filtro · " + t.vista.length, celdas: { valor: '<span class="bk-mas">+' + pesos(ab) + '</span><br><span class="bk-menos">−' + pesos(Math.abs(ca)) + "</span>" } };
   },
   nota: function(){ return "Aceptar guarda la conciliación enseguida y se puede deshacer desde el aviso o desde el movimiento. Una transferencia reportada se confirma en su cajón, con el recibo a la vista."; },
+  /* Fase 5: todas las de confianza alta de una vez, con la lista antes y un
+     solo «Deshacer» después. */
+  extra: function(){ return '<button type="button" class="pn-b1" id="bk-altas">Aceptar todas las de confianza alta…</button>'; },
   vacio: { titulo: "Todo lo importado está conciliado.", texto: "Cuando importes el siguiente extracto, lo que falte por explicar aparece aquí." },
   etiquetaFila: function(m){ return "Conciliar el movimiento del " + m.fecha; },
   abrir: function(m){ abrirMovimiento(m.id); }
@@ -32864,7 +34019,9 @@ function pintarMovimiento(){
     ["Saldo", m.saldo_centavos == null ? "" : pesos(m.saldo_centavos)], ["Cuenta", esc(m.cuenta)],
     ["Importado", esc(enCO(m.importado_en, 16)) + (d.lote ? "<small>" + esc((d.lote.archivo || "lote " + d.lote.id) + " · " + (d.lote.importado_por || "")) + "</small>" : "")],
     ["Estado", esc(ESTADO_MOV_ES[m.estado] || m.estado) + (m.resuelto_por ? "<small>" + esc(m.resuelto_por + " · " + enCO(m.resuelto_en, 16)) + "</small>" : "")]]);
-  var pie = '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  var pie = '<button type="button" class="pn-b2" data-tarea-nueva="movimiento" data-ref="' + esc(m.id) + '" data-ref-nombre="' +
+    esc((cred ? "Abono de " : "Cargo de ") + pesos(Math.abs(m.valor_centavos)) + " · " + m.fecha) + '" data-area="finanzas">Crear tarea</button>' +
+    '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
   if (m.estado === "conciliado"){
     h += '<p class="pn-h3">Lo explica</p><table class="pn-tabla"><thead><tr><th>Qué</th><th>Detalle</th><th class="num">En pesos</th></tr></thead><tbody>' +
       d.enlaces.map(function(e){
@@ -33258,6 +34415,8 @@ function cargarSocialFest(){
 /* Después de escribir algo en una ficha: la lista y «Hoy» dicen lo nuevo. */
 function refrescarContactos(){
   if (TB_CONTACTOS.armada || TB_SF.armada) pedirContactos();
+  /* Los próximos pasos salen también en Tareas (Fase 5). */
+  if (PEDIDAS["tb-tareas"]) cargarTareas();
   cargarSalud();
 }
 
@@ -33355,6 +34514,18 @@ function pintarContacto(d){
   } else if (d.con_seguimientos) hs += '<p class="mu">Sin notas todavía.</p>';
   h += seccionFicha("Notas y contacto", hs, segs.length || null);
 
+  /* Las tareas pegadas a esta ficha (Fase 5): las pendientes con su «Hecha». */
+  var tas = d.tareas || [];
+  if (tas.length){
+    h += seccionFicha("Tareas", '<ul class="ct-prox">' + tas.map(function(t){
+      var venc = t.estado === "pendiente" && t.fecha_limite && t.fecha_limite < hoy;
+      return '<li class="' + (t.estado !== "pendiente" ? "" : venc ? "venc" : t.fecha_limite === hoy ? "hoy" : "") + '"><div><strong>' + esc(t.titulo) + "</strong><small>" +
+        esc([t.fecha_limite ? fechaCorta(t.fecha_limite) + (venc ? " · vencida" : "") : "sin fecha", t.prioridad === "alta" ? "prioridad alta" : "",
+          t.estado === "hecha" ? "hecha " + enCO(t.hecha_en, 10) : ""].filter(Boolean).join(" · ")) + '</small></div><div class="ct-acc">' +
+        (t.estado === "pendiente" ? '<button type="button" class="pn-b1" data-ta-hecha="' + t.id + '" data-nombre="' + esc(t.titulo) + '">Hecha</button>' : "") + "</div></li>";
+    }).join("") + "</ul>", tas.filter(function(t){ return t.estado === "pendiente"; }).length || null);
+  }
+
   /* El dinero: solo lo confirmado suma. */
   var ap = d.aportes || [];
   if (ap.length || (d.carnets || []).length || (d.suscripciones || []).length){
@@ -33443,7 +34614,9 @@ function pintarContacto(d){
   }
   cajonCuerpo(h);
   CT_VOLVER = false;
-  cajonPie('<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' +
+  cajonPie('<button type="button" class="pn-b2" data-tarea-nueva="contacto" data-ref="' + esc(d.clave) + '" data-ref-nombre="' + esc(d.nombre) +
+    '" data-area="' + (d.org ? "alianzas" : "personas") + '">Crear tarea</button>' +
+    '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' +
     '<p class="pn-pie-nota">Todo lo de esta ficha es interno. Las notas no salen en ninguna pantalla pública ni en ningún correo.</p>');
   if (CT_FICHA && CT_FICHA.resaltar){ var r = document.querySelector("#pn-cajon .ct-resalta"); if (r) r.scrollIntoView({ block: "center" }); }
 }
@@ -33831,10 +35004,767 @@ document.addEventListener("click", function(e){
   if (que === "correo"){ abrirCorreo(id); return; }
   if (que === "seg-hecho"){ segHecho(id, b.getAttribute("data-nombre"), b); return; }
   if (que === "seg-posponer"){ segPosponer(id, b.getAttribute("data-nombre"), b.getAttribute("data-fecha"), false); return; }
-  if (que === "ficha"){ abrirContacto(b.getAttribute("data-clave")); }
+  if (que === "ficha"){ abrirContacto(b.getAttribute("data-clave")); return; }
+  /* Fase 5: tareas y documentos. */
+  if (que === "tarea-hecha"){ tareaHecha(Number(id), b.getAttribute("data-nombre"), b); return; }
+  if (que === "tarea-posponer"){ tareaPosponer(Number(id), b.getAttribute("data-nombre"), b.getAttribute("data-fecha")); return; }
+  if (que === "tarea-abrir"){ abrirTareaPorId(id); return; }
+  if (que === "doc-abrir"){ abrirDocumentoPorId(id); return; }
+  if (que === "doc-falta"){
+    var nom = b.getAttribute("data-nombre");
+    formDocumento(null, { tipo: b.getAttribute("data-tipo"), periodo: b.getAttribute("data-periodo"), titulo: nom.charAt(0).toUpperCase() + nom.slice(1) });
+  }
+});
+
+/* ==== FASE 5 DEL PANEL (oct 2026): TAREAS, DOCUMENTOS Y REPORTES ====
+   Las tres piezas nuevas usan lo de siempre: la tabla compartida, el cajón,
+   los avisos con «Deshacer» y «Hoy». */
+
+/* ---- TAREAS ---- */
+var TA = { d: null, pend: [] };
+var TA_AREAS = { finanzas: "Finanzas", alianzas: "Alianzas", personas: "Personas", mmc: "Mira Mi Casa", legal: "Legal", otro: "Otro" };
+var TA_REFS = { contacto: "Ficha", aporte: "Aporte", caso: "Caso", obligacion: "Vencimiento", movimiento: "Movimiento del banco", documento: "Documento" };
+var TA_REC = { ninguna: "No se repite", mensual: "Cada mes", anual: "Cada año" };
+var TA_EST = { pendiente: "Pendiente", hecha: "Hecha", cancelada: "Cancelada" };
+
+/* Una fila de la tabla: una tarea, o el próximo paso de una ficha (otra
+   tabla, la de seguimientos), con la misma forma. */
+function filaTarea(t){
+  return { k: "t" + t.id, origen: "tarea", id: t.id, titulo: t.titulo, detalle: t.detalle || "", fecha: t.fecha_limite || "",
+    prioridad: t.prioridad, area: t.area, estado: t.estado, recurrencia: t.recurrencia, ref_tipo: t.ref_tipo || "", ref_id: t.ref_id || "",
+    ref_nombre: t.ref_nombre || "", pospuesta: t.pospuesta || 0, t: t };
+}
+function filaProximo(s){
+  return { k: "s" + s.id, origen: "ficha", id: s.id, titulo: s.proximo, detalle: "", fecha: s.proximo_fecha || "", prioridad: "normal",
+    area: "personas", estado: "pendiente", recurrencia: "ninguna", ref_tipo: "contacto", ref_id: s.contacto || "",
+    ref_nombre: s.contacto_nombre || s.contacto || "", pospuesta: s.pospuesto || 0, s: s };
+}
+function cuandoTarea(r, hoy){
+  if (!r.fecha) return "sin fecha";
+  if (r.estado !== "pendiente") return fechaCorta(r.fecha);
+  var n = Math.round((Date.parse(r.fecha + "T12:00:00Z") - Date.parse(hoy + "T12:00:00Z")) / 86400000);
+  if (n < 0) return "vencida hace " + (-n) + (n === -1 ? " día" : " días");
+  if (n === 0) return "hoy";
+  if (n === 1) return "mañana";
+  return "en " + n + " días";
+}
+function refTareaHTML(r){
+  if (!r.ref_tipo) return "";
+  return '<button type="button" class="ct-link" data-ta-ir="' + esc(r.ref_tipo) + '" data-ref="' + esc(r.ref_id) + '">' +
+    esc((TA_REFS[r.ref_tipo] || r.ref_tipo) + (r.ref_nombre ? " · " + r.ref_nombre : "")) + "</button>";
+}
+function botonesTarea(r){
+  if (r.origen === "ficha"){
+    return '<button type="button" class="pn-b1" data-ta-seg-hecho="' + r.id + '" data-nombre="' + esc(r.titulo) + '">Hecho</button> ' +
+      '<button type="button" class="pn-b2" data-ta-seg-posponer="' + r.id + '" data-fecha="' + esc(r.fecha) + '" data-nombre="' + esc(r.titulo) + '">Posponer…</button>';
+  }
+  if (r.estado !== "pendiente") return '<button type="button" class="pn-b2" data-ta-reabrir="' + r.id + '" data-nombre="' + esc(r.titulo) + '">Reabrir</button>';
+  return '<button type="button" class="pn-b1" data-ta-hecha="' + r.id + '" data-nombre="' + esc(r.titulo) + '">Hecha</button> ' +
+    '<button type="button" class="pn-b2" data-ta-posponer="' + r.id + '" data-fecha="' + esc(r.fecha) + '" data-nombre="' + esc(r.titulo) + '">Posponer…</button>';
+}
+var TB_TAREAS = tablaNueva({ id: "tb-tareas", titulo: "Tareas", orden: "fecha", dir: "asc",
+  buscar: "Tarea, detalle o vínculo",
+  texto: function(r){ return [r.titulo, r.detalle, r.ref_nombre, r.ref_id, TA_AREAS[r.area]].join(" "); },
+  filtros: [
+    { k: "estado", t: "Estado", def: "pendiente", sinTodos: true, opciones: [["pendiente", "Pendientes"], ["hecha", "Hechas"], ["cancelada", "Canceladas"], ["todas", "Todas"]],
+      prueba: function(r, v){ return v === "todas" || r.estado === v; } },
+    { k: "cuando", t: "Cuándo", opciones: [["vencidas", "Vencidas"], ["hoy", "Hoy"], ["semana", "Próximos 7 días"], ["sin", "Sin fecha"]],
+      prueba: function(r, v){
+        var hoy = (TA.d && TA.d.hoy) || hoyCO();
+        if (v === "sin") return !r.fecha;
+        if (!r.fecha) return false;
+        if (v === "vencidas") return r.fecha < hoy;
+        if (v === "hoy") return r.fecha === hoy;
+        return r.fecha >= hoy && r.fecha <= sumarDias(hoy, 7);
+      } },
+    { k: "area", t: "Área", opciones: opcionesDe(TA_AREAS), valor: function(r){ return r.area; } },
+    { k: "prioridad", t: "Prioridad", opciones: [["alta", "Alta"], ["normal", "Normal"]], valor: function(r){ return r.prioridad; } },
+    { k: "origen", t: "Qué", opciones: [["tarea", "Tareas"], ["ficha", "Próximos pasos de fichas"]], valor: function(r){ return r.origen; } }
+  ],
+  columnas: [
+    { k: "fecha", t: "Fecha límite", nw: true, valor: function(r){ return r.fecha || ""; }, celda: function(r){
+      var hoy = (TA.d && TA.d.hoy) || hoyCO();
+      var venc = r.estado === "pendiente" && r.fecha && r.fecha < hoy;
+      return r.fecha ? esc(fechaCorta(r.fecha)) + "<small" + (venc ? ' class="tb-mal"' : "") + ">" + esc(cuandoTarea(r, hoy)) + "</small>" : '<span class="mu">sin fecha</span>'; } },
+    { k: "titulo", t: "Tarea", valor: function(r){ return r.titulo; }, celda: function(r){
+      return "<strong>" + esc(r.titulo) + "</strong>" + (r.origen === "ficha" ? "<small>próximo paso de una ficha</small>" : r.detalle ? "<small>" + esc(r.detalle.slice(0, 140)) + "</small>" : ""); } },
+    { k: "area", t: "Área", valor: function(r){ return TA_AREAS[r.area] || r.area; }, celda: function(r){ return esc(TA_AREAS[r.area] || r.area); } },
+    { k: "prioridad", t: "Prioridad", valor: function(r){ return r.prioridad === "alta" ? 0 : 1; }, dir: "asc", celda: function(r){
+      return r.prioridad === "alta" ? '<span class="tb-mal">alta</span>' : '<span class="mu">normal</span>'; } },
+    { k: "ref", t: "Vínculo", orden: false, celda: function(r){ return refTareaHTML(r) || '<span class="mu">—</span>'; } },
+    { k: "estado", t: "Estado", valor: function(r){ return r.estado; }, celda: function(r){
+      return esc(TA_EST[r.estado] || r.estado) + (r.recurrencia && r.recurrencia !== "ninguna" ? "<small>" + esc(TA_REC[r.recurrencia]) + "</small>" : "") +
+        (r.pospuesta ? "<small>pospuesta " + r.pospuesta + (r.pospuesta === 1 ? " vez" : " veces") + "</small>" : ""); } },
+    { k: "acc", t: "", orden: false, celda: botonesTarea }
+  ],
+  claseFila: function(r){ return r.estado !== "pendiente" ? "tb-gris" : ""; },
+  nota: function(){ return "La fila abre la tarea para editarla. Un próximo paso de una ficha se edita en su ficha. Las tareas no se borran: se cancelan."; },
+  aviso: function(){ return TA.d && TA.d.cortada ? "<strong>La lista se cortó</strong> · hay más tareas de las que el panel trae: filtra o busca." : ""; },
+  extra: function(){ return '<button type="button" class="pn-b1" data-tarea-nueva="1">Nueva tarea</button>'; },
+  vacio: { titulo: "No hay tareas todavía.", texto: "Anota la primera con «+ Tarea», arriba, desde cualquier sección." },
+  etiquetaFila: function(r){ return "Abrir la tarea " + r.titulo; },
+  abrir: function(r){ if (r.origen === "ficha") abrirContacto(r.ref_id); else abrirTarea(r.t); }
+});
+function cargarTareas(){
+  var caja = document.getElementById("tb-tareas");
+  if (!TB_TAREAS.armada) tablaArmar(TB_TAREAS, caja);
+  return pedirJSON("/api/admin/tareas", "tb-tareas-cuerpo").then(function(d){
+    TA.d = d;
+    var filas = (d.tareas || []).map(filaTarea).concat((d.proximos || []).map(filaProximo));
+    tablaCargar(TB_TAREAS, filas);
+    pintarSemanaTareas(filas, d);
+    if (!d.con_tabla){
+      var av = document.getElementById("tb-tareas-aviso");
+      if (av) av.innerHTML = "<strong>Falta aplicar la migración 0044</strong> · se ven los próximos pasos de las fichas, pero no se pueden guardar tareas.";
+    }
+    return d;
+  });
+}
+/* «ESTA SEMANA»: tres columnas —vencidas, hoy y los próximos siete días— con
+   lo pendiente de las dos tablas. Es la vista para planear la semana; la
+   tabla de abajo es para buscar. */
+function pintarSemanaTareas(filas, d){
+  var caja = document.getElementById("ta-semana"); if (!caja) return;
+  var hoy = d.hoy || hoyCO(), fin = sumarDias(hoy, 7);
+  var pend = filas.filter(function(r){ return r.estado === "pendiente" && r.fecha; });
+  var orden = function(a, b){ return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : (a.prioridad === "alta" ? -1 : 0) - (b.prioridad === "alta" ? -1 : 0); };
+  var grupos = [
+    ["venc", "Vencidas", pend.filter(function(r){ return r.fecha < hoy; }).sort(orden), "Nada vencido."],
+    ["hoy", "Hoy", pend.filter(function(r){ return r.fecha === hoy; }).sort(orden), "Nada para hoy."],
+    ["sem", "Próximos 7 días", pend.filter(function(r){ return r.fecha > hoy && r.fecha <= fin; }).sort(orden), "Nada en los próximos siete días."]
+  ];
+  caja.innerHTML = '<h2 class="pn-h2" style="margin-top:0">Esta semana</h2><div class="ta-sem">' + grupos.map(function(g){
+    var l = g[2];
+    return '<section class="ta-grupo ' + g[0] + '" aria-label="' + esc(g[1]) + '"><h3>' + esc(g[1]) + "<span>" + l.length + "</span></h3>" +
+      (l.length ? "<ul>" + l.slice(0, 8).map(function(r){
+        return '<li><div><button type="button" class="ct-link" data-ta-abrir="' + esc(r.k) + '">' + esc(r.titulo) + "</button><small>" +
+          esc([g[0] === "hoy" ? "" : fechaCorta(r.fecha) + " · " + cuandoTarea(r, hoy), TA_AREAS[r.area], r.origen === "ficha" ? "próximo paso de " + r.ref_nombre : r.ref_nombre].filter(Boolean).join(" · ")) +
+          (r.prioridad === "alta" ? ' · <span class="ta-alta">prioridad alta</span>' : "") + "</small></div><div>" + botonesTarea(r) + "</div></li>";
+      }).join("") + "</ul>" + (l.length > 8 ? '<p class="hoy-mas">y ' + (l.length - 8) + " más en la tabla</p>" : "") : '<p class="hoy-nada">' + esc(g[3]) + "</p>") + "</section>";
+  }).join("") + "</div>";
+  TA.pend = filas;
+}
+function opcionesHTML(mapa, actual){
+  return Object.keys(mapa).map(function(k){ return '<option value="' + esc(k) + '"' + (k === actual ? " selected" : "") + ">" + esc(mapa[k]) + "</option>"; }).join("");
+}
+function selectCampo(id, etiqueta, opciones, ayuda){
+  return '<label class="pn-campo" id="' + id + '-c"><span>' + esc(etiqueta) + '</span><select id="' + id + '">' + opciones + "</select>" +
+    (ayuda ? "<small>" + esc(ayuda) + "</small>" : "") + '<small id="' + id + '-e" class="pn-err"></small></label>';
+}
+/* El formulario de una tarea, nueva o existente, en el cajón. «pre» trae el
+   vínculo cuando se crea desde una ficha, un aporte, un caso, un movimiento,
+   un vencimiento o un documento. */
+function abrirTarea(t, pre){
+  pre = pre || {};
+  var nueva = !t;
+  t = t || {};
+  var ref = { tipo: t.ref_tipo || pre.ref_tipo || "", id: t.ref_id || pre.ref_id || "", nombre: t.ref_nombre || pre.ref_nombre || "" };
+  var asegurar = TA.d ? Promise.resolve(TA.d) : fetch("/api/admin/tareas").then(conEstado).then(function(r){ if (r.http === 200 && r.d && !r.d.error) TA.d = r.d; return TA.d; }).catch(function(){ return null; });
+  asegurar.then(function(d){
+    var obs = (d && d.obligaciones) || [];
+    var info = nueva ? "" : ficha([
+      ["Estado", esc(TA_EST[t.estado] || t.estado) + (t.hecha_en ? "<small>hecha " + esc(enCO(t.hecha_en, 16)) + (t.hecha_por ? " · " + esc(t.hecha_por) : "") + "</small>" : "") +
+        (t.cancelada_en ? "<small>cancelada " + esc(enCO(t.cancelada_en, 16)) + (t.cancelada_nota ? " · " + esc(t.cancelada_nota) : "") + "</small>" : "")],
+      ["Creada", esc(enCO(t.creado_en, 16)) + (t.creado_por ? "<small>" + esc(String(t.creado_por).replace("repeticion:", "repetición de una tarea anterior · ")) + "</small>" : "")],
+      ["Pospuesta", t.pospuesta ? t.pospuesta + (t.pospuesta === 1 ? " vez" : " veces") : ""]
+    ]);
+    var vinc;
+    if (ref.tipo && ref.tipo !== "obligacion"){
+      vinc = '<div class="ta-vinc" id="ta-vinc"><span>Vinculada con: ' + refTareaHTML({ ref_tipo: ref.tipo, ref_id: ref.id, ref_nombre: ref.nombre }) + "</span>" +
+        '<label class="eg-check"><input type="checkbox" id="ta-sinref"> Quitar el vínculo</label></div>';
+    } else {
+      vinc = selectCampo("ta-ob", "Vincular con un vencimiento (opcional)", '<option value="">Ninguno</option>' + obs.map(function(o){
+        return '<option value="' + esc(o.id) + '"' + (ref.tipo === "obligacion" && ref.id === o.id ? " selected" : "") + ">" + esc(o.nombre) + "</option>"; }).join(""),
+        "Para tareas como «pedir al contador el formulario 350»: el vencimiento se abre desde la tarea.");
+    }
+    var hoy = (d && d.hoy) || hoyCO();
+    var h = info + pnCampo("ta-titulo", "Qué hay que hacer", t.titulo || pre.titulo || "", { ayuda: "En una línea: «Pedir el certificado de la Cámara para la licitación»." }) +
+      pnCampo("ta-detalle", "Detalle (opcional)", t.detalle || "", { area: true, filas: 3 }) +
+      '<div class="pn-par">' + pnCampo("ta-fecha", "Fecha límite", t.fecha_limite || pre.fecha || "", { tipo: "date", ayuda: "Con fecha, ese día sale en «Hoy»." }) +
+      selectCampo("ta-prioridad", "Prioridad", opcionesHTML({ normal: "Normal", alta: "Alta" }, t.prioridad || "normal")) + "</div>" +
+      '<div class="pn-par">' + selectCampo("ta-area", "Área", opcionesHTML(TA_AREAS, t.area || pre.area || "otro")) +
+      selectCampo("ta-rec", "Se repite", opcionesHTML(TA_REC, t.recurrencia || "ninguna"), "Al marcarla «Hecha» nace la siguiente, el mismo día del mes.") + "</div>" +
+      vinc + '<p class="pn-error" id="pn-err"></p>';
+    var pie = '<button type="button" class="pn-b1" id="ta-guardar">' + (nueva ? "Guardar la tarea" : "Guardar cambios") + "</button>";
+    if (!nueva && t.estado === "pendiente"){
+      pie += '<button type="button" class="pn-b2" data-ta-hecha="' + t.id + '" data-nombre="' + esc(t.titulo) + '">Hecha</button>' +
+        '<button type="button" class="pn-b2" id="ta-cancelar">Cancelar la tarea…</button>';
+    } else if (!nueva){
+      pie += '<button type="button" class="pn-b2" data-ta-reabrir="' + t.id + '" data-nombre="' + esc(t.titulo) + '">Reabrir</button>';
+    }
+    pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+    cajonAbrir({ ey: nueva ? "Nueva tarea" : "Tarea", titulo: nueva ? "Anotar una tarea" : t.titulo, cuerpo: h, pie: pie, foco: "ta-titulo" });
+    if (nueva && !pre.fecha){ var f = document.getElementById("ta-fecha"); if (f) f.setAttribute("min", hoy); }
+    document.getElementById("ta-guardar").addEventListener("click", function(){ guardarTarea(nueva ? null : t, ref, this); });
+    var cb = document.getElementById("ta-cancelar");
+    if (cb) cb.addEventListener("click", function(){ cancelarTarea(t); });
+  });
+}
+function guardarTarea(t, ref, b){
+  ["ta-titulo", "ta-fecha"].forEach(function(x){ pnMarcar(x, ""); });
+  errorEnCajon("");
+  var cuerpo = { titulo: pnValor("ta-titulo"), detalle: pnValor("ta-detalle"), fecha_limite: pnValor("ta-fecha"),
+                 prioridad: pnValor("ta-prioridad"), area: pnValor("ta-area"), recurrencia: pnValor("ta-rec") };
+  var sin = document.getElementById("ta-sinref");
+  if (document.getElementById("ta-ob")){
+    var ob = pnValor("ta-ob");
+    if (ob){ cuerpo.ref_tipo = "obligacion"; cuerpo.ref_id = ob; var o = document.getElementById("ta-ob"); cuerpo.ref_nombre = o.options[o.selectedIndex].text; }
+  } else if (ref.tipo && !(sin && sin.checked)){
+    cuerpo.ref_tipo = ref.tipo; cuerpo.ref_id = ref.id; cuerpo.ref_nombre = ref.nombre;
+  }
+  if (!cuerpo.titulo){ pnMarcar("ta-titulo", "Escribe qué hay que hacer."); document.getElementById("ta-titulo").focus(); return; }
+  if (cuerpo.recurrencia !== "ninguna" && !cuerpo.fecha_limite){ pnMarcar("ta-fecha", "Una tarea que se repite necesita su fecha."); document.getElementById("ta-fecha").focus(); return; }
+  if (t) cuerpo.accion = "editar";
+  b.disabled = true;
+  fetch(t ? "/api/admin/tarea/" + t.id : "/api/admin/tareas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+    .then(conEstado).then(function(r){
+      b.disabled = false;
+      if (r.http !== 200 || !r.d || r.d.error){
+        var campo = { titulo: "ta-titulo", fecha_limite: "ta-fecha" }[r.d && r.d.campo];
+        if (campo) pnMarcar(campo, r.d.ayuda || r.d.error); else errorEnCajon((r.d && (r.d.ayuda || r.d.error)) || "No se pudo guardar.");
+        return;
+      }
+      avisar(t ? "Tarea guardada." : (cuerpo.fecha_limite ? "Tarea anotada para el " + fechaCorta(cuerpo.fecha_limite) + "." : "Tarea anotada, sin fecha."));
+      if (CT_FICHA && CT_VOLVER){ CT_VOLVER = false; recargarFicha(); } else cajonCerrar();
+      refrescarTareas();
+    }).catch(function(){ b.disabled = false; errorEnCajon("No se pudo: revisa la conexión."); });
+}
+function refrescarTareas(){
+  if (PEDIDAS["tb-tareas"]) cargarTareas();
+  cargarSalud();
+}
+function accionTarea(id, cuerpo){
+  return fetch("/api/admin/tarea/" + id, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+    .then(conEstado).then(function(r){
+      if (r.http !== 200 || !r.d || r.d.error){ avisoError((r.d && (r.d.ayuda || r.d.error)) || "No se pudo (HTTP " + r.http + ")."); return null; }
+      return r.d;
+    }).catch(function(){ avisoError("No se pudo: revisa la conexión."); return null; });
+}
+function tareaHecha(id, nombre, b){
+  if (b) b.disabled = true;
+  accionTarea(id, { accion: "hecha" }).then(function(d){
+    if (b) b.disabled = false;
+    if (!d) return;
+    if (CAJON.abierto && document.getElementById("ta-guardar")) cajonCerrar();
+    avisar("«" + nombre + "» hecha." + (d.siguiente ? " Se repite: la siguiente queda para el " + fechaCorta(d.siguiente.fecha_limite) + "." : ""), { deshacer: function(){
+      accionTarea(id, { accion: "reabrir" }).then(function(d2){
+        if (!d2) return;
+        avisar("«" + nombre + "» vuelve a estar pendiente." + (d2.siguiente_quitada ? " La siguiente se quitó." : d2.siguiente_quedo ? " La siguiente ya se había tocado y se quedó." : ""));
+        refrescarTareas(); recargarFicha();
+      });
+    } });
+    refrescarTareas(); recargarFicha();
+  });
+}
+function tareaReabrir(id, nombre){
+  accionTarea(id, { accion: "reabrir" }).then(function(d){
+    if (!d) return;
+    if (CAJON.abierto && document.getElementById("ta-guardar")) cajonCerrar();
+    avisar("«" + nombre + "» vuelve a estar pendiente.");
+    refrescarTareas(); recargarFicha();
+  });
+}
+function cancelarTarea(t){
+  pedirTexto({ ey: "Tarea", titulo: "Cancelar «" + t.titulo + "»", etiqueta: "Por qué (opcional)", obligatorio: false, boton: "Cancelar la tarea",
+    detalle: "<p>No se borra: queda en la lista como cancelada y se puede reabrir.</p>",
+    hacer: function(v){
+      return accionTarea(t.id, { accion: "cancelar", nota: v }).then(function(d){
+        if (!d) return false;
+        avisar("«" + t.titulo + "» cancelada.", { deshacer: function(){ tareaReabrir(t.id, t.titulo); } });
+        refrescarTareas();
+        return true;
+      });
+    } });
+}
+function tareaPosponer(id, nombre, antes){
+  var hoy = hoyCO();
+  var ops = [["Mañana", sumarDias(hoy, 1)], ["En 3 días", sumarDias(hoy, 3)], ["El próximo lunes", proximoLunes(hoy)], ["En una semana", sumarDias(hoy, 7)]];
+  cajonAbrir({ ey: "Posponer la tarea", titulo: nombre,
+    cuerpo: (antes ? "<p>Estaba para el <strong>" + esc(fechaCorta(antes)) + "</strong>. ¿Para cuándo la dejas?</p>" : "<p>¿Para cuándo la dejas?</p>") +
+      '<div class="ct-acc ct-rapido">' + ops.map(function(o){ return '<button type="button" class="pn-b2" data-tapos-f="' + o[1] + '">' + esc(o[0]) + " · " + esc(fechaCorta(o[1])) + "</button>"; }).join("") + "</div>" +
+      pnCampo("tapos-fecha", "Otra fecha", "", { tipo: "date", extra: ' min="' + esc(hoy) + '"' }) + '<p class="pn-error" id="pn-err"></p>',
+    pie: '<button type="button" class="pn-b1" id="tapos-ok">Posponer</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+  var hacer = function(f){
+    if (!f){ pnMarcar("tapos-fecha", "Elige una fecha."); return; }
+    accionTarea(id, { accion: "posponer", fecha: f }).then(function(d){
+      if (!d) return;
+      avisar("«" + nombre + "» pasa al " + fechaCorta(f) + ".", { deshacer: function(){
+        if (!antes) return;
+        accionTarea(id, { accion: "fecha", fecha: antes }).then(function(d2){ if (d2){ avisar("«" + nombre + "» vuelve al " + fechaCorta(antes) + "."); refrescarTareas(); } });
+      } });
+      cajonCerrar(); refrescarTareas();
+    });
+  };
+  document.getElementById("tapos-ok").addEventListener("click", function(){ hacer(pnValor("tapos-fecha")); });
+  document.querySelectorAll("[data-tapos-f]").forEach(function(x){ x.addEventListener("click", function(){ hacer(x.getAttribute("data-tapos-f")); }); });
+}
+/* Abrir una tarea por su número (desde «Hoy»): la lista entera ya trae todo. */
+function abrirTareaPorId(id){
+  var ir = function(d){
+    var t = ((d && d.tareas) || []).filter(function(x){ return String(x.id) === String(id); })[0];
+    if (t) abrirTarea(t); else avisoError("No encontré esa tarea: recarga el panel.");
+  };
+  fetch("/api/admin/tareas").then(conEstado).then(function(r){ if (r.http === 200 && r.d && !r.d.error){ TA.d = r.d; ir(r.d); } else avisoError("No se pudo cargar la tarea."); })
+    .catch(function(){ avisoError("No se pudo: revisa la conexión."); });
+}
+/* A donde lleva el vínculo de una tarea. */
+function irVinculo(tipo, id){
+  if (tipo === "contacto"){ abrirContacto(id); return; }
+  if (tipo === "aporte"){ abrirAportePorGuia(id); return; }
+  if (tipo === "caso"){ abrirCaso(id); return; }
+  if (tipo === "movimiento"){ abrirMovimiento(id); return; }
+  if (tipo === "documento"){ abrirDocumentoPorId(id); return; }
+  if (tipo === "obligacion"){ if (CAJON.abierto) cajonCerrar(); location.hash = "finanzas/vencimientos"; }
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if ((b = e.target.closest("#pn-tarea"))){ abrirTarea(null, {}); return; }
+  if ((b = e.target.closest("[data-tarea-nueva]"))){
+    var tipo = b.getAttribute("data-tarea-nueva");
+    desdeFicha();
+    abrirTarea(null, tipo === "1" ? {} : { ref_tipo: tipo, ref_id: b.getAttribute("data-ref") || "", ref_nombre: b.getAttribute("data-ref-nombre") || "",
+      area: b.getAttribute("data-area") || "otro" });
+    return;
+  }
+  if ((b = e.target.closest("[data-ta-hecha]"))){ tareaHecha(Number(b.getAttribute("data-ta-hecha")), b.getAttribute("data-nombre"), b); return; }
+  if ((b = e.target.closest("[data-ta-reabrir]"))){ tareaReabrir(Number(b.getAttribute("data-ta-reabrir")), b.getAttribute("data-nombre")); return; }
+  if ((b = e.target.closest("[data-ta-posponer]"))){ tareaPosponer(Number(b.getAttribute("data-ta-posponer")), b.getAttribute("data-nombre"), b.getAttribute("data-fecha")); return; }
+  if ((b = e.target.closest("[data-ta-seg-hecho]"))){ segHecho(Number(b.getAttribute("data-ta-seg-hecho")), b.getAttribute("data-nombre"), b); return; }
+  if ((b = e.target.closest("[data-ta-seg-posponer]"))){ segPosponer(Number(b.getAttribute("data-ta-seg-posponer")), b.getAttribute("data-nombre"), b.getAttribute("data-fecha"), false); return; }
+  if ((b = e.target.closest("[data-ta-ir]"))){ desdeFicha(); irVinculo(b.getAttribute("data-ta-ir"), b.getAttribute("data-ref")); return; }
+  if ((b = e.target.closest("[data-ta-abrir]"))){
+    var k = b.getAttribute("data-ta-abrir");
+    var r = (TA.pend || []).filter(function(x){ return x.k === k; })[0];
+    if (r){ if (r.origen === "ficha") abrirContacto(r.ref_id); else abrirTarea(r.t); }
+  }
+});
+
+/* ---- DOCUMENTOS ---- */
+var DOC = { d: null };
+var DOC_ESTADO_CORTO = { vigente: "vigente", por_vencer: "por vencer", vencido: "vencido", sin_fecha: "sin fecha", reemplazado: "reemplazado", no_aplica: "no aplica", anulado: "anulado" };
+function nombreTipoDoc(t){ return ((DOC.d && DOC.d.tipos && DOC.d.tipos[t]) || {}).nombre || t; }
+function tamano(b){ b = Number(b || 0); return b >= 1048576 ? (Math.round(b / 104857.6) / 10).toLocaleString("es-CO") + " MB" : Math.max(1, Math.round(b / 1024)) + " KB"; }
+function venceDoc(x){
+  if (!x.fecha_vencimiento) return '<span class="mu">sin fecha</span>';
+  var d = x.dias;
+  return esc(fechaCorta(x.fecha_vencimiento)) + "<small>" + esc(d < 0 ? "venció hace " + (-d) + (d === -1 ? " día" : " días") : d === 0 ? "vence hoy" : "en " + d + (d === 1 ? " día" : " días")) + "</small>";
+}
+var TB_DOCS = tablaNueva({ id: "tb-docs", titulo: "Documentos", orden: "vence", dir: "asc",
+  buscar: "Título, entidad, tipo o año",
+  texto: function(x){ return [x.titulo, x.entidad, nombreTipoDoc(x.tipo), x.periodo, x.nota].join(" "); },
+  filtros: [
+    { k: "estado", t: "Estado", def: "actuales", sinTodos: true,
+      opciones: [["actuales", "Actuales"], ["atencion", "Vencidos o por vencer"], ["reemplazados", "Reemplazados"], ["anulados", "Anulados"], ["todos", "Todos"]],
+      prueba: function(x, v){
+        if (v === "todos") return true;
+        if (v === "anulados") return x.estado === "anulado";
+        if (v === "reemplazados") return x.estado === "reemplazado";
+        if (v === "atencion") return x.estado === "vencido" || x.estado === "por_vencer";
+        return x.estado !== "anulado" && x.estado !== "reemplazado";
+      } },
+    { k: "tipo", t: "Tipo", opciones: function(){ var o = []; var t = (DOC.d && DOC.d.tipos) || {}; Object.keys(t).forEach(function(k){ o.push([k, t[k].nombre]); }); return o; },
+      valor: function(x){ return x.tipo; } },
+    { k: "archivo", t: "Archivo", opciones: [["si", "Con archivo"], ["no", "Sin archivo"]], prueba: function(x, v){ return (x.tiene_archivo ? "si" : "no") === v; } }
+  ],
+  columnas: [
+    { k: "titulo", t: "Documento", valor: function(x){ return x.titulo; }, celda: function(x){
+      return "<strong>" + esc(x.titulo) + "</strong><small>" + esc(nombreTipoDoc(x.tipo) + (x.periodo ? " · " + x.periodo : "")) + (x.publico ? " · se puede enseñar" : "") + "</small>"; } },
+    { k: "entidad", t: "Entidad", valor: function(x){ return x.entidad || ""; }, celda: function(x){ return esc(x.entidad || "—"); } },
+    { k: "exp", t: "Expedición", nw: true, valor: function(x){ return x.fecha_expedicion || ""; }, celda: function(x){ return x.fecha_expedicion ? esc(fechaCorta(x.fecha_expedicion)) : '<span class="mu">—</span>'; } },
+    { k: "vence", t: "Vence", nw: true, valor: function(x){ return x.fecha_vencimiento || ""; }, celda: venceDoc },
+    { k: "estado", t: "Estado", valor: function(x){ return x.estado; }, celda: function(x){
+      return '<span class="doc-est ' + esc(x.estado) + '">' + esc(DOC_ESTADO_CORTO[x.estado] || x.estado) + "</span>" + (x.estado === "vencido" && !x.avisa ? "<small>no avisa en «Hoy»</small>" : ""); } },
+    { k: "archivo", t: "Archivo", orden: false, celda: function(x){
+      if (x.no_aplica) return '<span class="mu">—</span>';
+      return x.tiene_archivo ? '<a href="/api/admin/documento/' + x.id + '/archivo">Descargar</a><small>' + esc((x.archivo_tipo === "application/pdf" ? "PDF" : x.archivo_tipo === "image/png" ? "PNG" : "JPG") + " · " + tamano(x.archivo_bytes)) + "</small>"
+        : '<span class="tb-mal">sin archivo</span>'; } }
+  ],
+  claseFila: function(x){ return x.estado === "anulado" || x.estado === "reemplazado" ? "tb-gris" : ""; },
+  nota: function(){ return "La fila abre el documento: su archivo, sus fechas y su historia. Los archivos son privados: solo se descargan desde aquí."; },
+  extra: function(){ return '<button type="button" class="pn-b1" data-doc-nuevo="1">Registrar un documento</button>'; },
+  vacio: { titulo: "Todavía no hay documentos registrados.", texto: "Empieza por los huecos de arriba: estatutos, RUT y el certificado de la Cámara." },
+  etiquetaFila: function(x){ return "Abrir el documento " + x.titulo; },
+  abrir: function(x){ abrirDocumento(x); }
+});
+function cargarDocumentos(){
+  var caja = document.getElementById("tb-docs");
+  if (!TB_DOCS.armada) tablaArmar(TB_DOCS, caja);
+  return pedirJSON("/api/admin/documentos", "tb-docs-cuerpo").then(function(d){
+    DOC.d = d;
+    tablaBarra(TB_DOCS);
+    tablaCargar(TB_DOCS, d.documentos || []);
+    pintarEsperados(d); pintarConveniosDoc(d);
+    if (!d.con_tabla){
+      var av = document.getElementById("tb-docs-aviso");
+      if (av) av.innerHTML = "<strong>Falta aplicar la migración 0044</strong> · se ven los huecos y los convenios, pero no se pueden guardar documentos.";
+    }
+    return d;
+  });
+}
+function refrescarDocumentos(){ if (PEDIDAS["tb-docs"]) cargarDocumentos(); cargarSalud(); }
+/* LO QUE SIEMPRE TIENE QUE HABER: un hueco por documento esperado, con su
+   estado. Rojo lo que falta y ya debía estar; ámbar lo que toca en 30 días. */
+function pintarEsperados(d){
+  var caja = document.getElementById("doc-esperados"); if (!caja) return;
+  var l = d.esperados || [];
+  var faltan = l.filter(function(e){ return e.estado === "falta"; }).length;
+  caja.innerHTML = '<h2 class="pn-h2" style="margin-top:0">Lo que siempre tiene que haber</h2><p class="pn-sub">' +
+    (faltan ? faltan + (faltan === 1 ? " documento falta" : " documentos faltan") + ". " : "Nada falta. ") +
+    "Se llenan registrando un documento de ese tipo (y de ese año), o con «No aplica».</p>" +
+    '<ul class="ct-prox">' + l.map(function(e){
+      var cls = e.estado === "falta" ? "venc" : e.estado === "pendiente" && e.toca ? "hoy" : "";
+      var doc = e.documento_id ? (d.documentos || []).filter(function(x){ return x.id === e.documento_id; })[0] : null;
+      var que = e.estado === "lleno" ? "Registrado: " + (doc ? doc.titulo + " · " + (DOC_ESTADO_CORTO[doc.estado] || doc.estado) + (doc.tiene_archivo ? "" : " · sin archivo") : "")
+        : e.estado === "no_aplica" ? "No aplica" + (doc && doc.nota ? ": " + doc.nota : "")
+        : e.estado === "falta" ? (e.para ? "Falta · debía estar el " + fechaCorta(e.para) : "Falta")
+        : "Para el " + fechaCorta(e.para);
+      var acc = e.documento_id
+        ? '<button type="button" class="pn-b2" data-doc-ver="' + e.documento_id + '">Ver</button>'
+        : '<button type="button" class="pn-b1" data-doc-falta="' + esc(e.tipo) + '" data-periodo="' + esc(e.periodo || "") + '" data-titulo="' + esc(e.titulo) + '">Registrar…</button>' +
+          '<button type="button" class="pn-b2" data-doc-noaplica="' + esc(e.tipo) + '" data-periodo="' + esc(e.periodo || "") + '" data-titulo="' + esc(e.titulo) + '">No aplica…</button>';
+      return '<li class="' + cls + '"><div><strong>' + esc(e.titulo) + "</strong><small>" + esc(que) + '</small></div><div class="ct-acc">' + acc + "</div></li>";
+    }).join("") + "</ul>";
+}
+function pintarConveniosDoc(d){
+  var caja = document.getElementById("doc-convenios"); if (!caja) return;
+  var l = d.convenios || [];
+  if (!l.length){ caja.innerHTML = '<p class="mu">Ninguna fundación ha firmado su convenio en línea todavía.</p>'; return; }
+  caja.innerHTML = '<div class="rp-tw"><table class="pn-tabla"><thead><tr><th scope="col">Fundación</th><th scope="col">Firmó la fundación</th>' +
+    '<th scope="col">Firmado por ambas partes</th><th scope="col">Comprobante</th><th scope="col"></th></tr></thead><tbody>' + l.map(function(c){
+      return "<tr><td><strong>" + esc(c.nombre || "Inscripción " + c.inscripcion) + "</strong>" + (c.ciudad ? "<small>" + esc(c.ciudad) + "</small>" : "") + "</td>" +
+        "<td>" + esc(enCO(c.firmado_en, 10)) + "</td><td>" + (c.ambas_en ? esc(enCO(c.ambas_en, 10)) : '<span class="mu">falta la firma de Give&amp;Grow</span>') + "</td>" +
+        '<td><a href="/api/admin/inscripcion/' + c.inscripcion + '/convenio-D.pdf" target="_blank" rel="noopener">PDF firmado</a></td>' +
+        '<td><button type="button" class="pn-b2" data-ct-convenio="' + c.inscripcion + '">Ver el convenio</button></td></tr>';
+    }).join("") + "</tbody></table></div>";
+}
+function asegurarDocs(){
+  if (DOC.d) return Promise.resolve(DOC.d);
+  return fetch("/api/admin/documentos").then(conEstado).then(function(r){ if (r.http === 200 && r.d && !r.d.error) DOC.d = r.d; return DOC.d; }).catch(function(){ return null; });
+}
+function abrirDocumentoPorId(id, aviso){
+  fetch("/api/admin/documentos").then(conEstado).then(function(r){
+    if (r.http !== 200 || !r.d || r.d.error){ avisoError("No se pudo cargar el documento."); return; }
+    DOC.d = r.d;
+    var x = (r.d.documentos || []).filter(function(y){ return String(y.id) === String(id); })[0];
+    if (x) abrirDocumento(x, aviso); else avisoError("No encontré ese documento.");
+  }).catch(function(){ avisoError("No se pudo: revisa la conexión."); });
+}
+function abrirDocumento(x, aviso){
+  var ob = x.ob_clave ? ((DOC.d && DOC.d.obligaciones) || []).filter(function(o){ return o.id === x.ob_clave + "|" + x.ob_fecha; })[0] : null;
+  var h = (aviso ? '<p class="pn-error">' + esc(aviso) + "</p>" : "") + ficha([
+    ["Tipo", esc(nombreTipoDoc(x.tipo)) + (x.periodo ? " · " + esc(x.periodo) : "")],
+    ["Estado", '<span class="doc-est ' + esc(x.estado) + '">' + esc((DOC.d && DOC.d.estados && DOC.d.estados[x.estado]) || x.estado) + "</span>" +
+      (x.estado === "vencido" && !x.avisa ? "<small>Este tipo no avisa en «Hoy».</small>" : "")],
+    ["Entidad", esc(x.entidad || "")],
+    ["Expedición", x.fecha_expedicion ? esc(fechaCorta(x.fecha_expedicion)) : ""],
+    ["Vence", x.fecha_vencimiento ? venceDoc(x) : "sin fecha de vencimiento"],
+    ["Respalda", ob ? esc(ob.nombre) + '<small><a href="#finanzas/vencimientos">Ver en Vencimientos</a></small>' : x.ob_clave ? esc(x.ob_clave + " · " + x.ob_fecha) : ""],
+    ["Público", x.publico ? "Sí, se puede enseñar (es solo una nota: no publica nada)" : ""],
+    ["Nota", x.nota ? esc(x.nota) : ""],
+    ["Registrado", esc(enCO(x.creado_en, 16)) + (x.creado_por ? "<small>" + esc(x.creado_por) + "</small>" : "")],
+    ["Anulado", x.anulado_en ? esc(enCO(x.anulado_en, 16)) + "<small>" + esc((x.anulado_motivo || "") + (x.anulado_por ? " · " + x.anulado_por : "")) + "</small>" : ""]
+  ]);
+  h += '<p class="pn-h3">El archivo</p>';
+  if (x.tiene_archivo){
+    h += '<p><a class="pn-b1" href="/api/admin/documento/' + x.id + '/archivo">Descargar</a></p>' + ficha([
+      ["Formato", esc(x.archivo_tipo || "") + " · " + tamano(x.archivo_bytes)],
+      ["Subido", esc(enCO(x.archivo_en, 16)) + (x.archivo_por ? "<small>" + esc(x.archivo_por) + "</small>" : "")],
+      ["Huella SHA-256", "<code>" + esc(String(x.archivo_sha256 || "").slice(0, 16)) + "…</code><small>Si alguien cambia el archivo, la huella cambia.</small>"]]);
+  } else if (x.no_aplica || x.anulado_en){
+    h += '<p class="mu">Sin archivo.</p>';
+  } else {
+    h += '<label class="pn-campo" id="doc-arch-c"><span>Subir el archivo (PDF, JPG o PNG, hasta 10 MB)</span>' +
+      '<input type="file" id="doc-arch" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png">' +
+      '<small>Se comprueba por sus bytes, no por su nombre, y se guarda privado. Un archivo no se reemplaza: si sale otra versión, se registra como documento nuevo.</small>' +
+      '<small id="doc-arch-e" class="pn-err"></small></label><button type="button" class="pn-b1" id="doc-subir">Subir el archivo</button>';
+  }
+  h += '<p class="pn-error" id="pn-err"></p>';
+  var pie = "";
+  if (!x.anulado_en){
+    pie += '<button type="button" class="pn-b2" data-doc-editar="' + x.id + '">Editar</button>' +
+      '<button type="button" class="pn-b2" data-tarea-nueva="documento" data-ref="' + x.id + '" data-ref-nombre="' + esc(x.titulo) + '" data-area="legal">Crear tarea</button>' +
+      '<button type="button" class="pn-b2 pn-peligro" data-doc-anular="' + x.id + '">Anular…</button>';
+  } else pie += '<button type="button" class="pn-b2" data-doc-restaurar="' + x.id + '">Restaurar</button>';
+  pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  cajonAbrir({ ey: "Documento", titulo: x.titulo, cuerpo: h, pie: pie });
+  var sb = document.getElementById("doc-subir");
+  if (sb) sb.addEventListener("click", function(){
+    var inp = document.getElementById("doc-arch"), f = inp && inp.files && inp.files[0];
+    if (!f){ pnMarcar("doc-arch", "Elige el archivo."); return; }
+    sb.disabled = true;
+    subirArchivoDoc(x.id, f).then(function(r){
+      sb.disabled = false;
+      if (!r.ok){ pnMarcar("doc-arch", r.error); return; }
+      avisar("Archivo guardado en «" + x.titulo + "».");
+      refrescarDocumentos(); abrirDocumentoPorId(x.id);
+    });
+  });
+}
+/* El archivo, crudo, con su tipo declarado: el servidor mira los bytes. */
+function subirArchivoDoc(id, f){
+  if (f.size > 10 * 1024 * 1024) return Promise.resolve({ ok: false, error: "Pasa de 10 MB: comprímelo o escanéalo con menos resolución." });
+  return fetch("/api/admin/documento/" + id + "/archivo", { method: "POST", headers: { "content-type": f.type || "application/octet-stream" }, body: f })
+    .then(conEstado).then(function(r){
+      if (r.http !== 200 || !r.d || r.d.error) return { ok: false, error: (r.d && (r.d.ayuda || r.d.error)) || "No se pudo subir (HTTP " + r.http + ")." };
+      return { ok: true, d: r.d };
+    }).catch(function(){ return { ok: false, error: "No se pudo subir: revisa la conexión." }; });
+}
+/* El formulario de un documento: nuevo (con lo que traiga «pre»: el tipo y el
+   año de un hueco, o el vencimiento que respalda) o para editar uno. */
+function formDocumento(x, pre){
+  pre = pre || {};
+  asegurarDocs().then(function(d){
+    if (!d){ avisoError("No se pudo cargar la lista de documentos."); return; }
+    var nuevo = !x; x = x || {};
+    var tipo = x.tipo || pre.tipo || "";
+    var tipos = d.tipos || {};
+    var obs = d.obligaciones || [];
+    var obActual = x.ob_clave ? x.ob_clave + "|" + x.ob_fecha : pre.obligacion || "";
+    var h = selectCampo("doc-tipo", "Qué documento es", '<option value="">Elige…</option>' + Object.keys(tipos).map(function(k){
+        return '<option value="' + esc(k) + '"' + (k === tipo ? " selected" : "") + ">" + esc(tipos[k].nombre) + "</option>"; }).join("")) +
+      '<p class="ct-ayuda" id="doc-tipo-ayuda"></p>' +
+      pnCampo("doc-titulo", "Título", x.titulo || pre.titulo || "", { ayuda: "Como lo vas a buscar: «Póliza de responsabilidad civil 2026»." }) +
+      '<div class="pn-par">' + pnCampo("doc-periodo", "Año que cubre", x.periodo || pre.periodo || "", { tipo: "number", extra: ' min="2020" max="2100" inputmode="numeric"' }) +
+      pnCampo("doc-entidad", "Entidad", x.entidad || pre.entidad || "", { ayuda: "Quien lo expide o ante quien se presenta." }) + "</div>" +
+      '<div class="pn-par">' + pnCampo("doc-fexp", "Fecha de expedición", x.fecha_expedicion || "", { tipo: "date", extra: ' max="' + esc(d.hoy) + '"' }) +
+      pnCampo("doc-fven", "Vence o se renueva", x.fecha_vencimiento || "", { tipo: "date", ayuda: "Vacío si no vence. A 30 días sale en «Hoy»." }) + "</div>" +
+      selectCampo("doc-ob", "Respalda un vencimiento (opcional)", '<option value="">Ninguno</option>' + obs.map(function(o){
+        return '<option value="' + esc(o.id) + '"' + (o.id === obActual ? " selected" : "") + ">" + esc(o.nombre + (o.marca === "hecho" ? " · hecho" : "")) + "</option>"; }).join(""),
+        "Lo que se presentó para ese vencimiento: la renta 110, la exógena…") +
+      '<label class="eg-check"><input type="checkbox" id="doc-publico"' + (x.publico ? " checked" : "") + '> Se puede enseñar (solo una nota: no publica nada)</label>' +
+      pnCampo("doc-nota", "Nota (opcional)", x.nota || "", { area: true, filas: 2 }) +
+      (nuevo ? '<label class="pn-campo" id="doc-archn-c"><span>El archivo (opcional: también se sube después)</span>' +
+        '<input type="file" id="doc-archn" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"><small>PDF, JPG o PNG, hasta 10 MB. Privado.</small>' +
+        '<small id="doc-archn-e" class="pn-err"></small></label>' : "") +
+      '<p class="pn-error" id="pn-err"></p>';
+    cajonAbrir({ ey: "Documentos", titulo: nuevo ? "Registrar un documento" : "Editar «" + x.titulo + "»", cuerpo: h,
+      pie: '<button type="button" class="pn-b1" id="doc-guardar">' + (nuevo ? "Registrar" : "Guardar cambios") + '</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>',
+      foco: tipo ? "doc-titulo" : "doc-tipo" });
+    var sel = document.getElementById("doc-tipo");
+    var ayuda = function(){
+      var t = tipos[sel.value] || {};
+      document.getElementById("doc-tipo-ayuda").textContent = t.ayuda || "";
+      var ti = document.getElementById("doc-titulo");
+      if (nuevo && !pnValor("doc-titulo") && t.nombre) ti.value = t.nombre;
+    };
+    sel.addEventListener("change", ayuda); ayuda();
+    /* El certificado de la Cámara vale 30 días: se propone el vencimiento. */
+    document.getElementById("doc-fexp").addEventListener("change", function(){
+      var t = tipos[sel.value] || {};
+      if (t.vigenciaDias && pnValor("doc-fexp") && !pnValor("doc-fven")) document.getElementById("doc-fven").value = sumarDias(pnValor("doc-fexp"), t.vigenciaDias);
+    });
+    document.getElementById("doc-guardar").addEventListener("click", function(){ guardarDocumento(nuevo ? null : x, this); });
+  });
+}
+function guardarDocumento(x, b){
+  ["doc-tipo", "doc-titulo", "doc-periodo", "doc-fexp", "doc-fven", "doc-ob"].forEach(function(k){ pnMarcar(k, ""); });
+  errorEnCajon("");
+  var cuerpo = { tipo: pnValor("doc-tipo"), titulo: pnValor("doc-titulo"), periodo: pnValor("doc-periodo"), entidad: pnValor("doc-entidad"),
+    fecha_expedicion: pnValor("doc-fexp"), fecha_vencimiento: pnValor("doc-fven"), obligacion: pnValor("doc-ob"),
+    publico: !!(document.getElementById("doc-publico") || {}).checked, nota: pnValor("doc-nota") };
+  if (!cuerpo.tipo){ pnMarcar("doc-tipo", "Elige qué documento es."); document.getElementById("doc-tipo").focus(); return; }
+  var inp = document.getElementById("doc-archn"), f = inp && inp.files && inp.files[0];
+  if (f && f.size > 10 * 1024 * 1024){ pnMarcar("doc-archn", "Pasa de 10 MB."); return; }
+  if (x) cuerpo.accion = "editar";
+  b.disabled = true;
+  fetch(x ? "/api/admin/documento/" + x.id : "/api/admin/documentos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) })
+    .then(conEstado).then(function(r){
+      if (r.http !== 200 || !r.d || r.d.error){
+        b.disabled = false;
+        var campo = { tipo: "doc-tipo", periodo: "doc-periodo", fecha_expedicion: "doc-fexp", fecha_vencimiento: "doc-fven", obligacion: "doc-ob" }[r.d && r.d.campo];
+        if (campo) pnMarcar(campo, r.d.ayuda || r.d.error); else errorEnCajon((r.d && (r.d.ayuda || r.d.error)) || "No se pudo guardar.");
+        return;
+      }
+      var id = x ? x.id : r.d.id;
+      if (!f){
+        avisar(x ? "Documento guardado." : "Documento registrado" + (x ? "." : ", sin archivo todavía."));
+        cajonCerrar(); refrescarDocumentos(); if (PEDIDAS["ob-filas"]) cargarVencimientos();
+        return;
+      }
+      subirArchivoDoc(id, f).then(function(s){
+        b.disabled = false;
+        refrescarDocumentos(); if (PEDIDAS["ob-filas"]) cargarVencimientos();
+        /* El documento quedó registrado aunque el archivo no pasara: se abre
+           su ficha con el motivo, para subir el bueno ahí mismo. */
+        if (!s.ok){ abrirDocumentoPorId(id, "El documento quedó registrado, pero el archivo no: " + s.error); return; }
+        avisar("Documento registrado con su archivo."); cajonCerrar();
+      });
+    }).catch(function(){ b.disabled = false; errorEnCajon("No se pudo: revisa la conexión."); });
+}
+function documentoNoAplica(tipo, periodo, titulo){
+  pedirTexto({ ey: "Documentos", titulo: "«" + titulo + "» no aplica", etiqueta: "Por qué no aplica", obligatorio: true, boton: "Marcar «No aplica»",
+    faltaTexto: "Di por qué: dentro de un año nadie se acordará.",
+    detalle: "<p>Cierra el hueco sin archivo y deja de salir en «Hoy». Queda registrado con tu correo y se puede anular.</p>",
+    hacer: function(v){
+      return postPanel("/api/admin/documentos", { tipo: tipo, periodo: periodo, titulo: titulo, no_aplica: true, nota: v }).then(function(d){
+        if (!d) return false;
+        avisar("«" + titulo + "» marcado como «No aplica».", { deshacer: function(){
+          postPanel("/api/admin/documento/" + d.id, { accion: "anular", motivo: "Deshecho: no era «No aplica»" }).then(function(d2){ if (d2){ avisar("El hueco vuelve a estar abierto."); refrescarDocumentos(); } });
+        } });
+        refrescarDocumentos();
+        return true;
+      });
+    } });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if ((b = e.target.closest("[data-doc-nuevo]"))){ formDocumento(null, {}); return; }
+  if ((b = e.target.closest("[data-doc-falta]"))){
+    formDocumento(null, { tipo: b.getAttribute("data-doc-falta"), periodo: b.getAttribute("data-periodo"), titulo: b.getAttribute("data-titulo") });
+    return;
+  }
+  if ((b = e.target.closest("[data-doc-noaplica]"))){ documentoNoAplica(b.getAttribute("data-doc-noaplica"), b.getAttribute("data-periodo"), b.getAttribute("data-titulo")); return; }
+  if ((b = e.target.closest("[data-doc-ver]"))){ abrirDocumentoPorId(b.getAttribute("data-doc-ver")); return; }
+  if ((b = e.target.closest("[data-doc-editar]"))){
+    var x = ((DOC.d && DOC.d.documentos) || []).filter(function(y){ return String(y.id) === b.getAttribute("data-doc-editar"); })[0];
+    if (x) formDocumento(x);
+    return;
+  }
+  if ((b = e.target.closest("[data-doc-anular]"))){
+    var id = b.getAttribute("data-doc-anular");
+    confirmarPeligro({ titulo: "Anular este documento", boton: "Anular", motivo: true, etiquetaMotivo: "Por qué se anula",
+      detalle: "<p>Deja de contar: si llenaba un hueco, el hueco vuelve a abrirse. El archivo no se borra (queda guardado y privado) y se puede restaurar.</p>",
+      volver: function(){ abrirDocumentoPorId(id); },
+      hacer: function(m){
+        return postPanel("/api/admin/documento/" + id, { accion: "anular", motivo: m }).then(function(d){
+          if (!d) return false;
+          avisar("Documento anulado.", { deshacer: function(){ postPanel("/api/admin/documento/" + id, { accion: "restaurar" }).then(function(d2){ if (d2){ avisar("Documento restaurado."); refrescarDocumentos(); } }); } });
+          refrescarDocumentos(); cajonCerrar();
+          return false;
+        });
+      } });
+    return;
+  }
+  if ((b = e.target.closest("[data-doc-restaurar]"))){
+    var ir = b.getAttribute("data-doc-restaurar");
+    postPanel("/api/admin/documento/" + ir, { accion: "restaurar" }).then(function(d){ if (d){ avisar("Documento restaurado."); refrescarDocumentos(); abrirDocumentoPorId(ir); } });
+  }
+});
+
+/* ---- REPORTES ---- */
+var RP = { anio: 0, d: null, seq: 0 };
+function rpValor(v, tipo){
+  if (v == null || v === "") return '<span class="mu">—</span>';
+  if (tipo === "cop" || tipo === "usd"){ var n = Number(v); return (n < 0 ? "−" : "") + dinero(Math.abs(n), tipo === "usd" ? "USD" : "COP"); }
+  if (tipo === "n") return numCO(Number(v));
+  return esc(v);
+}
+/* Se llama al abrir una de las cinco direcciones («mostrar») y al cambiar el
+   año. El reporte que se pinta es el de la dirección: las cinco comparten la
+   sección. */
+function pedirReporte(){
+  var tipo = String(VISTA || "").split("/")[1]; if (!tipo) return;
+  var caja = document.getElementById("rp-caja"); if (!caja) return;
+  var seq = ++RP.seq;
+  caja.style.opacity = ".55";
+  pedirJSON("/api/admin/reporte?tipo=" + encodeURIComponent(tipo) + (RP.anio ? "&anio=" + RP.anio : ""), "rp-caja").then(function(d){
+    if (seq !== RP.seq) return;
+    caja.style.opacity = "";
+    RP.d = d; RP.anio = d.anio;
+    var s = document.getElementById("rp-anio");
+    if (s) s.innerHTML = (d.anios || [d.anio]).map(function(a){ return '<option value="' + a + '"' + (a === d.anio ? " selected" : "") + ">" + a + "</option>"; }).join("");
+    pintarReporte(d);
+  });
+}
+function pintarReporte(d){
+  var caja = document.getElementById("rp-caja"); if (!caja) return;
+  var h = '<p class="solo-impresion rp-cab">Fundación Give&amp;Grow International · NIT 901.948.930-2 · informe operativo interno</p>' +
+    '<p class="rp-cab"><b>' + esc(d.titulo) + " · " + d.anio + "</b> · del " + esc(fechaCorta(d.desde)) + " al " + esc(fechaCorta(d.hasta)) +
+    " · generado el " + esc(d.generado) + " (hora de Colombia)</p>" +
+    '<p class="rp-aviso">' + esc(d.aviso) + "</p>" +
+    (d.notas || []).map(function(n){ return '<p class="fin-linea">' + esc(n) + "</p>"; }).join("");
+  if ((d.cifras || []).length){
+    h += '<div class="vol-ind">' + d.cifras.map(function(c){
+      return "<div><b>" + (c.tipo === "texto" ? esc(c.valor) : rpValor(c.valor, c.tipo)) + "</b><small>" + esc(c.etiqueta + (c.nota ? " · " + c.nota : "")) + "</small></div>";
+    }).join("") + "</div>";
+  }
+  (d.secciones || []).forEach(function(s){
+    var num = function(k){ return k.tipo !== "texto"; };
+    h += '<section class="rp-sec"><h3>' + esc(s.titulo) + '</h3><p class="fin-fuente">' + esc(s.fuente || "") + "</p>" +
+      '<div class="rp-tw"><table class="pn-tabla"><thead><tr>' + s.columnas.map(function(k){
+        return '<th scope="col"' + (num(k) ? ' class="num"' : "") + ">" + esc(k.t) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      (s.filas.length ? s.filas.map(function(f){
+        return "<tr>" + s.columnas.map(function(k){ return "<td" + (num(k) ? ' class="num"' : "") + ">" + rpValor(f[k.k], k.tipo) + "</td>"; }).join("") + "</tr>";
+      }).join("") : '<tr><td colspan="' + s.columnas.length + '" class="mu">Nada en este año.</td></tr>') + "</tbody>" +
+      (s.total && s.filas.length ? "<tfoot><tr>" + s.columnas.map(function(k){
+        var v = s.total[k.k];
+        return "<td" + (num(k) ? ' class="num"' : "") + ">" + (v == null ? "" : rpValor(v, k.tipo)) + "</td>"; }).join("") + "</tr></tfoot>" : "") +
+      "</table></div></section>";
+  });
+  caja.innerHTML = h;
+}
+document.addEventListener("change", function(e){
+  if (e.target && e.target.id === "rp-anio"){ RP.anio = Number(e.target.value); pedirReporte(); }
+});
+document.addEventListener("click", function(e){
+  if (!e.target) return;
+  if (e.target.id === "rp-csv" && RP.d){ location.href = "/api/admin/reporte.csv?tipo=" + encodeURIComponent(RP.d.tipo) + "&anio=" + RP.d.anio; return; }
+  if (e.target.id === "rp-imprimir") window.print();
+});
+
+/* ---- CONCILIAR: ACEPTAR TODAS LAS DE CONFIANZA ALTA ----
+   Lo que antes eran veinte clics iguales. Se enseña la lista entera antes de
+   aceptar, se aceptan una por una por las MISMAS rutas que el botón de cada
+   fila (así el servidor valida cada una igual), y un solo «Deshacer» las
+   devuelve todas. Las transferencias reportadas no entran: confirmarlas le
+   escribe al donante, y eso se hace en su cajón, con el recibo a la vista. */
+function cuerpoSugerencia(m, s){
+  if (s.tipo === "ignorar") return { url: "/api/admin/banco/movimiento/" + m.id + "/ignorar", cuerpo: { motivo: s.motivo, nota: "" } };
+  return { url: "/api/admin/banco/movimiento/" + m.id + "/conciliar", cuerpo: {
+    items: (s.items || []).map(function(i){ return { tipo: i.tipo, ref: i.ref }; }),
+    diferencia: s.diferencia_centavos ? (s.tipo === "wompi" ? "comision" : "ajuste") : "",
+    nota: s.diferencia_centavos ? (s.tipo === "wompi" ? "Comisión de Wompi" : "Retenciones: el banco pagó el total del egreso") : "" } };
+}
+function aceptarTodasAltas(){
+  var todas = ((BANCO.conc && BANCO.conc.movimientos) || []).filter(function(m){ var s = mejorSugerencia(m); return s && s.confianza === "alta"; });
+  var l = todas.filter(function(m){ return mejorSugerencia(m).tipo !== "reportada"; });
+  var rep = todas.length - l.length;
+  if (!l.length){ avisar(rep ? "Las de confianza alta que quedan son transferencias reportadas: se confirman una por una, con el recibo a la vista." : "No hay sugerencias de confianza alta por aceptar."); return; }
+  confirmarSimple({ ey: "Conciliar con el banco", titulo: "Aceptar " + l.length + (l.length === 1 ? " sugerencia" : " sugerencias") + " de confianza alta",
+    detalle: "<p>Cada una se guarda como si la aceptaras desde su fila. <strong>Un solo «Deshacer»</strong> las devuelve todas a «sin conciliar».</p>" +
+      (rep ? '<p class="pn-nota">' + rep + (rep === 1 ? " transferencia reportada no entra" : " transferencias reportadas no entran") + ": confirmarlas le escribe al donante, y se hace en su cajón.</p>" : "") +
+      '<div class="rp-tw"><table class="pn-tabla"><thead><tr><th scope="col">Fecha</th><th scope="col">Movimiento</th><th scope="col" class="num">Valor</th><th scope="col">Se explica con</th></tr></thead><tbody>' +
+      l.map(function(m){ var s = mejorSugerencia(m);
+        return "<tr><td>" + esc(m.fecha) + "</td><td>" + esc(m.descripcion || "—") + '</td><td class="num">' + esc(valorBanco(m.valor_centavos)) + "</td><td>" + esc(textoSugerencia(s)) + "</td></tr>"; }).join("") +
+      "</tbody></table></div>",
+    boton: "Aceptar " + (l.length === 1 ? "la sugerencia" : "las " + l.length),
+    hacer: function(){
+      var hechos = [], fallos = [];
+      var uno = function(i){
+        if (i >= l.length) return Promise.resolve();
+        var m = l[i], c = cuerpoSugerencia(m, mejorSugerencia(m));
+        return fetch(c.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(c.cuerpo) }).then(conEstado).then(function(r){
+          if (r.http >= 200 && r.http < 300 && !(r.d && r.d.error)) hechos.push(m); else fallos.push({ m: m, e: (r.d && (r.d.ayuda || r.d.error)) || "HTTP " + r.http });
+        }).catch(function(){ fallos.push({ m: m, e: "sin conexión" }); }).then(function(){ return uno(i + 1); });
+      };
+      return uno(0).then(function(){
+        cajonCerrar();
+        var ids = hechos.map(function(m){ return m.id; });
+        avisar(hechos.length + (hechos.length === 1 ? " movimiento conciliado" : " movimientos conciliados") +
+          (fallos.length ? " · " + fallos.length + " no se pudieron (" + fallos.map(function(f){ return f.m.fecha + ": " + f.e; }).join("; ") + ")" : "") + ".",
+          { ms: 20000, deshacer: ids.length ? function(){
+            var vuelven = 0;
+            var des = function(i){
+              if (i >= ids.length) return Promise.resolve();
+              return fetch("/api/admin/banco/movimiento/" + ids[i] + "/deshacer", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+                .then(conEstado).then(function(r){ if (r.http === 200 && !(r.d && r.d.error)) vuelven++; }).catch(function(){}).then(function(){ return des(i + 1); });
+            };
+            des(0).then(function(){ avisar(vuelven + " de " + ids.length + " vuelven a estar sin conciliar."); recargarBanco(); });
+          } : null });
+        recargarBanco();
+        return false;
+      });
+    } });
+}
+document.addEventListener("click", function(e){
+  if (e.target && e.target.id === "bk-altas") aceptarTodasAltas();
 });
 
 var BANDEJAS = {
+  "tb-tareas": cargarTareas,
+  "tb-docs": cargarDocumentos,
   "tb-contactos": cargarContactos,
   "tb-socialfest": cargarSocialFest,
   "tb-correos": cargarCorreos,
@@ -33856,7 +35786,7 @@ var BANDEJAS = {
   "tb-egresos": cargarEgresos,
   "tb-proveedores": cargarProveedores,
   "ob-filas": cargarVencimientos,
-  "j-filas": cargarJornadas
+  "tb-jornadas": cargarJornadas
 };
 
 /* «pedir» sale de «armarBandejas» para que tambien pueda llamarlo el cambio de
@@ -37614,6 +39544,16 @@ export default {
         if (ruta === "/api/admin/seguimientos") return await adminCrearSeguimiento(request, env, sesion.email);
         const msg = ruta.match(/^\/api\/admin\/seguimiento\/(\d{1,9})$/);
         if (msg) return await adminSeguimiento(request, env, Number(msg[1]), sesion.email);
+        /* Fase 5: tareas, documentos y reportes (0044). */
+        if (ruta === "/api/admin/tareas") return await adminTareas(request, env, sesion.email);
+        const mta = ruta.match(/^\/api\/admin\/tarea\/(\d{1,9})$/);
+        if (mta) return await adminTarea(request, env, Number(mta[1]), sesion.email);
+        if (ruta === "/api/admin/documentos") return await adminDocumentos(request, env, sesion.email);
+        const mdo = ruta.match(/^\/api\/admin\/documento\/(\d{1,9})(\/archivo)?$/);
+        if (mdo) return mdo[2] ? await adminDocumentoArchivo(request, env, Number(mdo[1]), sesion.email)
+                               : await adminDocumento(request, env, Number(mdo[1]), sesion.email);
+        if (ruta === "/api/admin/reporte") return await adminReporte(env, url, false);
+        if (ruta === "/api/admin/reporte.csv") return await adminReporte(env, url, true);
         if (ruta === "/api/admin/correos")   return await adminCorreos(env, url);
         const mco = ruta.match(/^\/api\/admin\/correo\/(\d{1,9})(?:\/(reenviar|resuelto))?$/);
         if (mco) {
