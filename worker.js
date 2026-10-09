@@ -18761,12 +18761,16 @@ async function indiceContactos(env) {
     claveIns[i.id] = claveContacto(f);
   }
   const par = await env.DB.prepare(
-    "SELECT p.id, p.nombre, p.email, p.celular, p.inscripcion, j.fecha FROM participaciones p " +
+    "SELECT p.id, p.nombre, p.email, p.celular, p.inscripcion, p.creada_en, j.fecha FROM participaciones p " +
     "JOIN jornadas j ON j.id = p.jornada"
   ).all();
+  /* Una jornada que todavía no llega no es «el último movimiento»: hasta ese
+     día cuenta cuándo se anotó a la persona. */
+  const hoy = fechaCO();
   for (const p of par.results || []) {
     fuentes.push({ fuente: "participacion", id: p.id, email: p.email, tel: p.celular, doc: null,
-      nombre: p.nombre, org: false, etiquetas: ["voluntario"], fecha: p.fecha, inscripcion: p.inscripcion });
+      nombre: p.nombre, org: false, etiquetas: ["voluntario"], fecha: p.fecha && p.fecha <= hoy ? p.fecha : p.creada_en,
+      inscripcion: p.inscripcion });
   }
 
   const vinc = await vinculosContactos(env);
@@ -18929,6 +18933,8 @@ const huecos = (a) => [...a].map(() => "?").join(",");
    abre (la de un registro unido también). */
 async function adminContacto(env, url) {
   const k = String(url.searchParams.get("k") || "").trim();
+  /* Tope de seguridad para los IN (…): D1 no admite más de 100 parámetros. */
+  const tope = (l) => l.slice(0, 90);
   const clave = correoClave(k) || k;
   if (!claveValida(clave)) return json({ error: "clave_invalida" }, 400);
   const idx = await indiceContactos(env);
@@ -18936,6 +18942,7 @@ async function adminContacto(env, url) {
   if (!c) return json({ error: "no_encontrado", ayuda: "No hay ningún donante, inscripción ni participación con esa clave." }, 404);
   const dups = duplicadosContactos(idx);
   const parse = (t) => { try { return JSON.parse(t || "{}") || {}; } catch (e) { return {}; } };
+  c.donantes = tope(c.donantes); c.inscripciones = tope(c.inscripciones); c.participaciones = tope(c.participaciones);
 
   /* Donaciones. Se listan todas (también los intentos), pero los totales por
      año son SOLO dinero confirmado, y por moneda: pesos y dólares no se suman. */
@@ -18960,12 +18967,15 @@ async function adminContacto(env, url) {
   const totales = Object.values(porAnio).sort((a, b) => (a.anio < b.anio ? 1 : a.anio > b.anio ? -1 : a.moneda === "COP" ? -1 : 1));
   const guias = aportes.map((a) => a.guia);
 
+  /* Las guías van por subconsulta y no como parámetros: D1 admite 100
+     parámetros por consulta, y un donante mensual de varios años los pasa. */
+  const susGuias = "SELECT guia FROM aportes WHERE donante_id IN (" + huecos(c.donantes) + ")";
   let certificados = [];
   if (guias.length) {
     certificados = (await env.DB.prepare(
       "SELECT numero, guia, emitido_en, enviado_en, anulado_en, firma_rl_en, firma_rf_en FROM certificados " +
-      "WHERE guia IN (" + huecos(guias) + ") ORDER BY emitido_en DESC"
-    ).bind(...guias).all()).results || [];
+      "WHERE guia IN (" + susGuias + ") ORDER BY emitido_en DESC"
+    ).bind(...c.donantes).all()).results || [];
   }
   let carnets = [], suscripciones = [];
   if (c.donantes.length) {
@@ -19026,7 +19036,7 @@ async function adminContacto(env, url) {
     ).bind(...c.participaciones).all()).results || [];
   }
 
-  const emails = [...c.emails];
+  const emails = tope([...c.emails]);
   let correos = [];
   if (emails.length) {
     const conRes = await existeTabla(env, "correos_resueltos");
@@ -19045,15 +19055,15 @@ async function adminContacto(env, url) {
       banco = (await env.DB.prepare(
         "SELECT m.id, m.fecha, m.descripcion, m.valor_centavos, m.estado, k.ref AS guia, k.monto_centavos AS parte " +
         "FROM conciliaciones k JOIN movimientos_banco m ON m.id = k.movimiento_id " +
-        "WHERE k.tipo = 'aporte' AND k.ref IN (" + huecos(guias) + ") ORDER BY m.fecha DESC"
-      ).bind(...guias).all()).results || [];
+        "WHERE k.tipo = 'aporte' AND k.ref IN (" + susGuias + ") ORDER BY m.fecha DESC"
+      ).bind(...c.donantes).all()).results || [];
     } catch (e) {
       if (!/no such table/i.test(String(e && e.message))) throw e;
     }
   }
 
   let seguimientos = [];
-  const claves = [...c.claves];
+  const claves = tope([...c.claves]);
   try {
     seguimientos = (await env.DB.prepare(
       "SELECT id, contacto, tipo, fecha, resumen, proximo, proximo_fecha, proximo_hecho_en, proximo_hecho_por, pospuesto, " +
@@ -19075,7 +19085,7 @@ async function adminContacto(env, url) {
     clave: c.clave, claves, nombre: c.nombre, org: c.org,
     nombres: [...new Set(c.nombres.map((x) => x.n))],
     emails, telefonos: [...c.tels], documentos: [...c.docs],
-    etiquetas: [...c.etiquetas], etiquetas_es: ETIQUETAS_CONTACTO, ultima: c.ultima, sf: c.sf,
+    etiquetas: [...c.etiquetas], etiquetas_es: ETIQUETAS_CONTACTO, etiquetas_finanzas: ETIQ_FINANZAS, ultima: c.ultima, sf: c.sf,
     identidad, aportes, totales, certificados, carnets, suscripciones, red, voluntariado, correos, banco,
     seguimientos, duplicados, unidas, hoy: fechaCO(),
     con_seguimientos: await existeTabla(env, "seguimientos"),
@@ -25566,6 +25576,7 @@ textarea { font-size: 16px }
 .ct-lista li{padding:7px 0;border-top:1px solid var(--bds);font-size:var(--fs-14)}
 .ct-lista li:first-child{border-top:0}
 .ct-lista small{display:block;font-size:var(--fs-12);color:var(--mu);margin-top:1px}
+.ct-lista small a,.ct-lista small .ct-link{color:var(--acc);font-weight:600}
 .ct-lista .ct-resalta{border-left:3px solid var(--acc);padding-left:10px;background:var(--bg)}
 .ct-dupf{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:start;padding:10px 12px;margin:0 0 8px;
   border:1px solid var(--bd);border-left:3px solid var(--amber);border-radius:8px;background:var(--bg)}
@@ -25944,7 +25955,7 @@ textarea { font-size: 16px }
     <label for="q" class="pn-oculto">Buscar en el panel</label>
     <input id="q" type="search" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false"
            aria-controls="busca-res" aria-autocomplete="list"
-           placeholder="Buscar persona, correo, teléfono, documento o número (GG-, MB-, CV-…)">
+           placeholder="Buscar: nombre, correo, teléfono, documento, GG-, MB-…">
     <kbd class="bus-atajo" aria-hidden="true">/</kbd>
     <div id="busca-res" class="bus-pop" role="listbox" aria-label="Resultados de la búsqueda" hidden></div>
   </form>
@@ -27877,6 +27888,12 @@ function cartaCola(c){
   var cuando = c.cuando || (c.dias === 0 ? "la más vieja llegó hoy" : c.dias != null ? "la más vieja " + antiguedad(c.dias) : "");
   var plazo = c.plazo != null
     ? (c.vencida ? " · plazo de " : " · plazo ") + c.plazo + (c.plazo === 1 ? " día" : " días") + (c.vencida ? " vencido" : "") : "";
+  /* Plazo cero (los próximos pasos de las fichas, Fase 4): la fecha ES el
+     plazo, así que se dice qué tan atrasado va el más viejo. */
+  if (c.plazo === 0){
+    cuando = c.dias === 0 ? "para hoy" : c.dias === 1 ? "el más atrasado era para ayer" : c.dias != null ? "el más atrasado lleva " + c.dias + " días vencido" : "";
+    plazo = "";
+  }
   var items = c.items || [];
   var lis = items.map(function(it){
     var det = [];
@@ -28020,7 +28037,7 @@ function cargarSalud(){
        total no coincidia con enviados+fallaron+simulados y el hueco no tenia
        nombre. */
     h += pasoEmbudo("sin cupo del dia", co.sin_cupo, co.sin_cupo ? "mandar a mano" : "");
-    h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">El correo nunca tumba un cobro: si Resend falla, el aporte queda igual y el fallo se anota aquí. Por eso hay que mirarlo — nadie se va a quejar de un acuse que no sabe que existía.</p>';
+    h += '</div><p class="mu" style="font-size:12.5px;margin:0 0 20px">El correo nunca tumba un cobro: si Resend falla, el aporte queda igual y el fallo se anota aquí. Por eso hay que mirarlo — nadie se va a quejar de un acuse que no sabe que existía. Cada correo, y el reenvío de los que no salieron, en <a href="#sistema/correos">Sistema › Correos</a>.</p>';
 
     /* 3c · Operación (auditoría del 28 sep 2026): la última corrida de cada
        tarea del cron, los incidentes y qué secretos faltan. Es lo mismo que
@@ -28040,7 +28057,7 @@ function cargarSalud(){
       h += '<p style="border-left:3px solid #A84D00;padding:10px 14px;margin:0 0 12px;font-size:14px"><strong>' +
         esc(String(co24.sin_cupo_personas)) + ' correo(s) a personas no salieron por cupo en las últimas 24 h</strong> (' +
         esc((co24.sin_cupo_por_etiqueta || []).map(function(r){ return r.etiqueta + " " + r.n; }).join(", ")) +
-        '). No se reintentan solos: el cuerpo del correo no se guarda, a propósito (Ley 1581). Hay que reenviarlos a mano; «caso-espera» sí se reintenta mañana.</p>';
+        '). No se reintentan solos: el cuerpo del correo no se guarda, a propósito (Ley 1581). Se reenvían desde <a href="#sistema/correos/por_atender">Sistema › Correos</a>, que los vuelve a armar; «caso-espera» sí se reintenta mañana.</p>';
     }
     var tr = op.trabajos || [];
     if (tr.length){
@@ -33275,6 +33292,7 @@ function telsContacto(d){
 function seccionFicha(titulo, cuerpo, n){ return '<p class="pn-h3">' + esc(titulo) + (n != null ? " · " + n : "") + "</p>" + cuerpo; }
 function pintarContacto(d){
   var hoy = d.hoy || hoyCO();
+  if (d.etiquetas_finanzas) FIN_ETIQ = d.etiquetas_finanzas;
   document.getElementById("pn-cajon-ey").textContent = d.org ? "Organización" : "Persona";
   document.getElementById("pn-cajon-t").textContent = d.nombre;
   var h = '<div class="ct-cab">' + chipsEtiquetas(d.etiquetas) + "</div>";
@@ -33295,7 +33313,7 @@ function pintarContacto(d){
         var m = x.motivos.map(function(y){ return { documento: "mismo documento", telefono: "mismo teléfono", nombre: "mismo nombre" }[y.motivo] + " (" + y.valor + ")"; }).join(" · ");
         return '<div class="ct-dupf"><div><strong>' + esc(x.nombre) + "</strong><small>" + esc([x.email, x.tel].filter(Boolean).join(" · ")) + "</small><small>" + esc(m) + "</small>" +
           '<div class="ct-cab">' + chipsEtiquetas(x.etiquetas) + '</div></div><div class="ct-acc">' +
-          '<button type="button" class="pn-b1" data-ct-unir="' + esc(x.clave) + '" data-motivo="' + esc(x.motivos[0].motivo) + '" data-nombre="' + esc(x.nombre) + '">Unir</button>' +
+          '<button type="button" class="pn-b2" data-ct-unir="' + esc(x.clave) + '" data-motivo="' + esc(x.motivos[0].motivo) + '" data-nombre="' + esc(x.nombre) + '">Unir</button>' +
           '<button type="button" class="pn-b2" data-ct-distintos="' + esc(x.clave) + '" data-motivo="' + esc(x.motivos[0].motivo) + '" data-nombre="' + esc(x.nombre) + '">No son la misma</button>' +
           '<button type="button" class="pn-b2" data-ct-abrir="' + esc(x.clave) + '">Ver su ficha</button></div></div>';
       }).join(""));
