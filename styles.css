@@ -813,9 +813,6 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
 .ic-svg path,.ic-svg circle,.ic-svg rect,.ic-svg line,.ic-svg polyline,.ic-svg polygon{stroke-dasharray:1;stroke-dashoffset:0}
 .card:hover .ic-svg *{animation:draw .8s var(--ease) both}
 @keyframes draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
-.routes{display:grid;grid-auto-flow:column;grid-auto-columns:min(80vw,320px);gap:20px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:6px 4px 20px;scrollbar-width:thin;scrollbar-color:var(--bd) transparent}
-.routes>.card{scroll-snap-align:start;position:relative}
-.routes>.card:not(:last-child)::after{content:"";position:absolute;top:50%;right:-20px;width:20px;height:2px;background:var(--bd)}
 .hero-impact{display:inline-block;line-height:1.5;margin:-16px 0 30px;padding:8px 16px;border-radius:999px;background:var(--on-dark-fill);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:var(--fs-14);color:var(--on-dark-2);border:1px solid var(--on-dark-line)}
 .hero-impact b{color:var(--brote);font-weight:700}
 /* Vacía hasta que app.js la llena: sin esto, `display` le ganaba a `hidden` y,
@@ -2781,3 +2778,87 @@ section[tabindex="-1"]:focus{ outline:none }
 .sf-lista li{margin-bottom:6px}
 .sf-btn{margin-top:14px}
 @media(prefers-reduced-motion:reduce){.sf-puerta{transition:none}}
+
+/* ===== PRE-SOCIAL FEST (12 oct 2026) ==============================
+   Portadas con foto, rutas del HUB en reglas finas, pie compacto en el
+   teléfono y la primera pantalla de /#socialfest. Ningún token nuevo. */
+
+/* PORTADA CON FOTO. La misma idea que la portada de Mira Mi Casa: el texto
+   sobre el papel y la foto al lado, a plena fuerza y sin nada encima — así no
+   hay texto sobre ningún rostro. El encuadre va por página con --foco
+   (escritorio) y --foco-m (teléfono), en el atributo style del <figure>. */
+.cab-foto{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(28px,4.5vw,64px);align-items:center}
+.cab-foto>div>.lead{margin-bottom:0}
+.foto-fig{margin:0}
+.foto-fig img{display:block;width:100%;height:auto;aspect-ratio:4/5;max-height:560px;object-fit:cover;
+  object-position:var(--foco,center);border-radius:var(--rl)}
+.foto-fig figcaption{margin-top:10px;font-size:var(--fs-14);line-height:1.45;max-width:52ch}
+/* En la Brigada la foto va dentro de la prosa, apaisada: es un informe. */
+.foto-ancha{margin:28px 0 8px}
+.foto-ancha img{aspect-ratio:16/10;max-height:none}
+@media (max-width:860px){
+  .cab-foto{grid-template-columns:1fr}
+  .foto-fig img{aspect-ratio:4/3;max-height:340px;object-position:var(--foco-m,var(--foco,center))}
+  .foto-ancha img{aspect-ratio:4/3}
+}
+
+/* PORTADA DEL HUB: titular, una línea, dos acciones y tres hechos en regla
+   fina — los mismos que la página demuestra más abajo. */
+.hub-portada{padding-bottom:clamp(36px,5vw,56px)}
+.hub-portada .h-sec{max-width:20ch}
+.hub-portada-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+.hub-portada-hechos{list-style:none;margin:34px 0 0;padding:14px 0 0;border-top:1.5px solid var(--ink);
+  display:flex;flex-wrap:wrap;gap:6px 0;font-size:var(--fs-14);font-weight:600;color:var(--ink)}
+.hub-portada-hechos li{padding-right:18px;margin-right:18px;border-right:1px solid var(--bd)}
+.hub-portada-hechos li:last-child{border-right:0;margin-right:0;padding-right:0}
+.hub-def{padding-top:0}
+@media (max-width:640px){
+  .hub-portada-hechos{flex-direction:column}
+  .hub-portada-hechos li{border-right:0;margin-right:0;padding:6px 0;border-bottom:1px solid var(--bd)}
+  .hub-portada-hechos li:last-child{border-bottom:0}
+}
+
+/* Rutas del HUB: el código una sola vez, encima del nombre. Las rutas que
+   todavía no operan (R3, R5) llevan el código en gris, como antes. */
+.ruta-cod{display:inline-block;margin-bottom:4px;font-size:var(--fs-13);font-weight:800;letter-spacing:.08em;color:var(--acc)}
+.ruta-cod.soon{color:var(--mu)}
+
+/* Encabezados h2 dentro de .caminos (Fundaciones): mismo aspecto que los h3. */
+.caminos h2.camino-t{font-family:"Inter",sans-serif;font-weight:700;letter-spacing:var(--tr-heading)}
+
+/* PIE EN EL TELÉFONO. Era una sola columna de ~17 enlaces de 44 px. Ahora cada
+   grupo reparte sus enlaces en dos columnas; correo y teléfono van a lo ancho
+   porque no caben en media columna. La línea legal sigue al final. */
+@media (max-width:640px){
+  footer{padding-top:40px}
+  .foot-grid{gap:26px;margin-bottom:24px}
+  html:not([data-marca="mmc"]) .foot-gg,
+  html[data-marca="mmc"] .mmc-foot{display:grid;grid-template-columns:1fr 1fr;column-gap:16px}
+  .foot-gg h2,.mmc-foot h2,.mmc-foot p{grid-column:1/-1;margin-bottom:4px}
+  .foot-gg a[href^="mailto:"],.foot-gg a[href^="https://wa"],
+  .mmc-foot a[href^="mailto:"],.mmc-foot a[href^="https://"]{grid-column:1/-1}
+  footer a{line-height:1.3;overflow-wrap:anywhere}
+  .foot-bottom{flex-direction:column;gap:4px}
+}
+
+/* /#SOCIALFEST, PRIMERA PANTALLA. Llegan por QR en el teléfono: el titular
+   manda y las dos puertas se leen como botones — la flecha va en un círculo
+   lleno, la señal de «toca aquí». --g no se aclara de noche: de noche el
+   círculo pasa a --acc con tinta oscura. */
+.sf-hero{padding-bottom:36px}
+.sf-hero .h-sec{font-size:clamp(2.35rem,9.5vw,4.4rem);line-height:1.02;margin-bottom:16px}
+.sf-puerta{min-height:88px}
+/* A 375×812 la segunda puerta terminaba a 7 px de los botones flotantes: se
+   recorta aire arriba para que las dos queden enteras y libres. */
+@media (max-width:640px){
+  .sf-hero{padding-top:16px}
+  .sf-hero .lead{font-size:var(--fs-17);line-height:1.5}
+  .sf-puertas{margin-top:22px}
+  .sf-puerta{padding:15px 16px 15px 18px}
+}
+.sf-puerta-k{color:var(--ink)}
+.sf-puerta-f{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;
+  background:var(--g);color:var(--on-dark);font-size:var(--fs-17);line-height:1;transition:transform .2s var(--ease)}
+html[data-theme="dark"] .sf-puerta-f{background:var(--acc);color:var(--ink-deep)}
+.sf-puerta:hover .sf-puerta-f{transform:translateY(2px)}
+@media (prefers-reduced-motion:reduce){.sf-puerta-f{transition:none}.sf-puerta:hover .sf-puerta-f{transform:none}}
