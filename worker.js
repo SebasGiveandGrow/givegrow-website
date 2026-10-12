@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "6b17fbbf";
+const STYLES_V = "7d0af73c";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -38168,14 +38168,26 @@ ${HOJA_CSS}
    Va escapada con `esc` porque entra a un atributo; `url.search` ya viene
    codificado por el parser de URL, así que no hay comillas crudas que temer,
    pero no se confía en eso. */
+/* EN INGLÉS CON `?lang=en` (auditoría preevento, 12 oct 2026). El destino ya
+   conservaba la query —la SPA abría en inglés—, pero la tarjeta misma (título,
+   descripción, `og:locale` y el enlace visible si el refresco no corre) salía
+   siempre en español. Solo la query decide, nunca Accept-Language: la
+   respuesta se cachea 5 min en el borde y no lleva `Vary`. */
 function paginaSocialfest(url) {
+  const en = url.searchParams.get("lang") === "en";
   const destino = "/" + url.search + "#socialfest";
-  const titulo = "Give&Grow en Social Fest 2026 \u00b7 Ruta N, Medell\u00edn";
-  const desc = "Impact Journey para empresas: voluntariado en doble v\u00eda, con la ida y la vuelta. Y para fundaciones y profesionales, el HUB SOCIAL. D\u00e9janos tus datos y te escribimos.";
+  const titulo = en
+    ? "Give&Grow at Social Fest 2026 \u00b7 Ruta N, Medell\u00edn"
+    : "Give&Grow en Social Fest 2026 \u00b7 Ruta N, Medell\u00edn";
+  const desc = en
+    ? "Impact Journey for companies: two-way volunteering, there and back. And for foundations and professionals, the HUB SOCIAL. Leave us your details and we'll write to you."
+    : "Impact Journey para empresas: voluntariado en doble v\u00eda, con la ida y la vuelta. Y para fundaciones y profesionales, el HUB SOCIAL. D\u00e9janos tus datos y te escribimos.";
+  const alt = en ? "Give&Grow International at Social Fest 2026" : "Give&Grow International en Social Fest 2026";
+  const abrir = en ? "Open the Social Fest page" : "Abrir la p\u00e1gina de Social Fest";
   const img = ORIGIN + "/img/og.jpg";
   const canon = ORIGIN + "/socialfest";
   return `<!doctype html>
-<html lang="es">
+<html lang="${en ? "en" : "es"}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -38190,8 +38202,8 @@ function paginaSocialfest(url) {
 <meta property="og:image" content="${esc(img)}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Give&amp;Grow International en Social Fest 2026">
-<meta property="og:locale" content="es_CO">
+<meta property="og:image:alt" content="${esc(alt)}">
+<meta property="og:locale" content="${en ? "en_US" : "es_CO"}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(titulo)}">
 <meta name="twitter:description" content="${esc(desc)}">
@@ -38209,7 +38221,7 @@ a{color:var(--acc);font-weight:600}
 <body>
 <main>
 <p>Give&amp;Grow International \u00b7 Social Fest 2026</p>
-<p><a href="${esc(destino)}">Abrir la p\u00e1gina de Social Fest</a></p>
+<p><a href="${esc(destino)}">${esc(abrir)}</a></p>
 </main>
 </body>
 </html>`;
