@@ -2862,3 +2862,9 @@ section[tabindex="-1"]:focus{ outline:none }
 html[data-theme="dark"] .sf-puerta-f{background:var(--acc);color:var(--ink-deep)}
 .sf-puerta:hover .sf-puerta-f{transform:translateY(2px)}
 @media (prefers-reduced-motion:reduce){.sf-puerta-f{transition:none}.sf-puerta:hover .sf-puerta-f{transform:none}}
+
+/* Píldora del evento sobre la foto del inicio: vidrio sobre foto, como .hero-impact. */
+.evento-pill{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;margin:0 0 18px;padding:8px 16px;border-radius:999px;background:var(--on-dark-fill);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--on-dark-line);color:var(--on-dark-2);font-size:var(--fs-14);text-decoration:none}
+.evento-pill-k{font-weight:700;color:var(--brote)}
+.evento-pill:hover,.evento-pill:focus-visible{border-color:var(--brote)}
+@media(max-width:600px){.evento-pill{font-size:var(--fs-13,13px);gap:6px;padding:8px 14px}}
