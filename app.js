@@ -1261,8 +1261,6 @@ var I18N = {
     "fund.ey":"Para fundaciones",
     "fund.t":"Aplica al HUB SOCIAL.",
     "fund.lead":"Hoy la red reúne tres fundaciones aliadas y otras en proceso de vinculación. Cada una entra una a una, con verificación y convenio.",
-    "fund.foto.alt":"Una mujer mayor con gafas de corazón, junto a una voluntaria, en un hogar de adultos mayores",
-    "fund.foto.pie":"Hogar de adultos mayores, mayo de 2023. Jornada con autorización del hogar.",
     "fund.req.t":"Qué buscamos",
     "fund.req.p":"Fundaciones y proyectos comunitarios de base, con trabajo verificable en campo y disposición a la trazabilidad. Cada una entra con verificación y convenio; algunas son proyectos comunitarios de base, y lo decimos en su ficha.",
     "fund.give.t":"Aliadas que aportan",
