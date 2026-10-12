@@ -2634,6 +2634,13 @@ function setLang(l){
         // Si una transición previa sigue activa, esta la aborta y su promesa
         // rechaza con InvalidStateError: lo absorbemos (no es un fallo real).
         if (tr && tr.finished && tr.finished.catch) tr.finished.catch(function(){});
+        /* `ready` y `updateCallbackDone` también rechazan cuando la transición
+           se aborta (pestaña oculta, o EN/ES pulsados seguidos): sin esto la
+           consola marcaba «Uncaught (in promise) InvalidStateError». El cambio
+           de idioma ocurre igual: el callback corre aunque se salte la
+           animación. Auditoría preevento, 12 oct 2026. */
+        if (tr && tr.ready && tr.ready.catch) tr.ready.catch(function(){});
+        if (tr && tr.updateCallbackDone && tr.updateCallbackDone.catch) tr.updateCallbackDone.catch(function(){});
       } catch(e){ postLang(l); }
     }
     else { postLang(l); }
@@ -2678,6 +2685,7 @@ function applyLang(l){
      hace un cambio de ruta, y es el precio de que la familia lea su caso en el
      idioma que eligió. */
   if (currentRoute === "caso" && MC.caso) mcPinta();
+  galeriaIdioma();
   /* Solo si ya hay dato: repintar sin él borraría la fila al cambiar de idioma. */
   if (FILA_DATO) filaPinta(FILA_DATO.esperando > 0 ? "hay" : "vacia", FILA_DATO);
 }
@@ -5407,6 +5415,22 @@ function initGallery(){
     g.appendChild(btn);
   });
 }
+/* LOS PIES DE FOTO SIGUEN AL IDIOMA (auditoría preevento, 12 oct 2026).
+   `initGallery` arma la rejilla UNA vez, con el idioma de ese momento, y
+   `applyLang` no la tocaba: quien abría #impacto en español y pasaba a inglés
+   se quedaba con los once pies, los alt y los aria-label en español. Se
+   reescriben en su sitio, sin rehacer las imágenes. */
+function galeriaIdioma(){
+  var g = document.getElementById("gallery");
+  if (!g || !g.dataset.done) return;
+  var items = g.querySelectorAll(".gal-item");
+  for (var i = 0; i < items.length && i < GALLERY.length; i++){
+    var cap = GALLERY[i][lang] || GALLERY[i].es;
+    items[i].setAttribute("aria-label", cap);
+    var im = items[i].querySelector("img"); if (im) im.alt = cap;
+    var c = items[i].querySelector(".gal-cap"); if (c) c.textContent = cap;
+  }
+}
 var lbTrigger = null;
 function openGalleryLightbox(i){
   lbIndex = i;
@@ -6590,6 +6614,16 @@ function init(){
   document.addEventListener("input", function(e){ var el=e.target.closest("[data-input]"); if(!el) return; runAct(el.getAttribute("data-input"), el, e); });
   document.addEventListener("change", function(e){ var el=e.target.closest("[data-change]"); if(!el) return; runAct(el.getAttribute("data-change"), el, e); });
   document.addEventListener("submit", function(e){ var el=e.target.closest("[data-submit]"); if(!el) return; e.preventDefault(); runAct(el.getAttribute("data-submit"), el, e); });
+  /* LA VALIDACIÓN LA HACE CADA MANEJADOR, NO EL NAVEGADOR (auditoría
+     preevento, 12 oct 2026). Con `required` y sin `novalidate`, el globo nativo
+     se adelantaba al evento submit: un campo vacío mostraba «Completa este
+     campo» en el idioma DEL TELÉFONO —no en el de la página— y el mensaje
+     propio, bilingüe, con `aria-invalid` y foco (`allyMal`), nunca llegaba a
+     salir. Cada manejador revisa todos sus `required` (comprobado uno por uno).
+     Se pone desde aquí y no en el HTML: sin JS no hay manejador, y entonces la
+     validación nativa es lo único que queda. `required` sigue en el marcado
+     porque es lo que anuncia el lector de pantalla. */
+  document.querySelectorAll("form[data-submit]").forEach(function(f){ f.noValidate = true; });
   document.addEventListener("keydown", function(e){ if(e.key!=="Enter") return; var el=e.target.closest("[data-enter]"); if(!el) return; runAct(el.getAttribute("data-enter"), el, e); });
   // nav scroll
   window.addEventListener("scroll", onScroll, {passive:true});

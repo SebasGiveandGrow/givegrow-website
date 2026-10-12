@@ -1353,7 +1353,7 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
    el círculo de 30px siga viéndose igual en la cabecera del panel. */
 @media (pointer:coarse){
   .lang button,.cur-toggle button,.qbtn,.copy,.alma-chip,.track-noguide{min-height:44px}
-  .qbtn,.copy{min-width:44px}
+  .qbtn,.copy,.lang button{min-width:44px}
   .alma-x{position:relative}
   .alma-x::after{content:"";position:absolute;inset:-7px;border-radius:50%}
 }
