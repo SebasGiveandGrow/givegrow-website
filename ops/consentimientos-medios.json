@@ -65,14 +65,6 @@
       "consentimiento": "autorización escrita en archivo físico de la Fundación (confirmado por Sebas el 29 sep 2026)",
       "menores": true,
       "archivos": ["benef_01.jpg", "benef_03.jpg", "campo_01.jpg", "campo_04.jpg"]
-    },
-    {
-      "id": "galeria-terreno-adultos",
-      "descripcion": "Foto de terreno de la galería general con adultos mayores identificables",
-      "fecha": null,
-      "consentimiento": "autorización escrita en archivo físico de la Fundación (confirmado por Sebas el 29 sep 2026)",
-      "menores": false,
-      "archivos": ["benef_02.jpg"]
     }
   ],
   "retirados": [
@@ -80,6 +72,11 @@
       "archivos": ["hero_nina_naranja_800.webp", "hero_nina_naranja_1400.webp", "hero_nina_naranja_2000.webp", "hero_nina_naranja_1400.jpg"],
       "fecha": "2026-09-29",
       "motivo": "ya no existen en el repositorio (el héroe pasó a hero_futbol_*); se sacan del registro activo para que la lista diga lo que de verdad se publica"
+    },
+    {
+      "archivos": ["benef_02.jpg"],
+      "fecha": "2026-10-12",
+      "motivo": "Sebas confirmó que es de otra jornada, sin fecha ni lugar registrados: el pie «Entrega documentada con acta» no se podía sostener. Sale de la galería y de la portada de Empresas, y el archivo se elimina del repositorio."
     }
   ],
   "regla": "Ningún medio con rostros identificables se publica sin entrada en este registro. Al retirar un consentimiento, el medio se elimina del sitio y del repositorio en el siguiente deploy."

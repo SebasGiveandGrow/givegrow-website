@@ -5328,7 +5328,6 @@ var GALLERY = [
   {f:"jornadas/brigada_ansermanuevo_vivienda.jpg", es:"Vivienda visitada en Ansermanuevo, agosto 2026", en:"Home visited in Ansermanuevo, August 2026"},
   {f:"jornadas/brigada_marsella_equipo.jpg", es:"Equipo en terreno, Marsella, agosto 2026", en:"Team in the field, Marsella, August 2026"},
   {f:"benef_01.jpg", es:"Comunidad acompañada en terreno", en:"Community accompanied in the field"},
-  {f:"benef_02.jpg", es:"Entrega documentada con acta", en:"Delivery documented with a record"},
   {f:"benef_03.jpg", es:"Impacto medible, personas reales", en:"Measurable impact, real people"},
   /* LAS DE LA GUAJIRA SON ANTERIORES A LA FUNDACIÓN (constituida el 11 abr 2025,
      sin operación ese año). Son trabajo de campo del fundador, y el pie lo dice:
