@@ -2848,6 +2848,14 @@ section[tabindex="-1"]:focus{ outline:none }
 .sf-hero{padding-bottom:36px}
 .sf-hero .h-sec{font-size:clamp(2.35rem,9.5vw,4.4rem);line-height:1.02;margin-bottom:16px}
 .sf-puerta{min-height:88px}
+/* A 375×812 la segunda puerta terminaba a 7 px de los botones flotantes: se
+   recorta aire arriba para que las dos queden enteras y libres. */
+@media (max-width:640px){
+  .sf-hero{padding-top:16px}
+  .sf-hero .lead{font-size:var(--fs-17);line-height:1.5}
+  .sf-puertas{margin-top:22px}
+  .sf-puerta{padding:15px 16px 15px 18px}
+}
 .sf-puerta-k{color:var(--ink)}
 .sf-puerta-f{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;
   background:var(--g);color:var(--on-dark);font-size:var(--fs-17);line-height:1;transition:transform .2s var(--ease)}
