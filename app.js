@@ -2072,6 +2072,9 @@ var I18N = {
     "ficha.share":"Compartir ficha",
     "ficha.share.copied":"Enlace copiado",
     /* Social Fest 2026 (#socialfest): la página del QR. */
+    "evt.sf.k":"Social Fest 2026",
+    "evt.sf.d":"14 y 15 de octubre · Ruta N",
+    "evt.sf.nav":"14 y 15 de octubre · Ruta N, Medellín",
     "sf.ey":"Social Fest 2026 · Ruta N, Medellín",
     "sf.t":"Una alianza, muchas realidades.",
     "sf.lead":"Somos Give&Grow, una fundación de Medellín que une a empresas, personas y fundaciones de base para que cada apoyo llegue a quien lo necesita y quede documentado.",
@@ -6545,7 +6548,21 @@ function almaReintentar(burbuja, text){
 }
 
 /* ---------- init ---------- */
+/* LO DEL EVENTO SE VA SOLO (Social Fest, 12 oct 2026). La píldora del inicio y
+   las entradas del menú llevan `data-evento-hasta` (AAAA-MM-DD, día colombiano
+   inclusive). Pasada esa fecha se quitan al cargar: nadie tiene que acordarse
+   de borrarlas y el sitio no queda anunciando un evento que ya pasó. La página
+   #socialfest sigue viva para quien llegue después por el QR. */
+function caducarEvento(){
+  var hoy;
+  try { hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date()); }
+  catch (e) { hoy = new Date().toISOString().slice(0, 10); }
+  [].slice.call(document.querySelectorAll("[data-evento-hasta]")).forEach(function(el){
+    if (hoy > el.getAttribute("data-evento-hasta")) el.parentNode.removeChild(el);
+  });
+}
 function init(){
+  caducarEvento();
   montarFranjas();
   // language
   setLang("es");
