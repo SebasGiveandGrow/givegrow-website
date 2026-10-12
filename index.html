@@ -42,7 +42,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=bc5013b8" defer></script>
+<script src="/app.js?v=89a12c43" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -491,8 +491,13 @@
 <!-- ============ EMPRESAS ============ -->
 <main id="page-empresas" class="page">
   <section>
-    <!-- Portada con foto (12 oct 2026): benef_02, adultos mayores, consentimiento
-         en ops/consentimientos-medios.json («galeria-terreno-adultos»). -->
+    <!-- Portada con foto (12 oct 2026, elegida por Sebas): entrega con apoyo de la
+         Policía Nacional en una comunidad wayuu, Alta Guajira, 28 ene 2025 —antes
+         de constituir la Fundación—. Consentimiento en
+         ops/consentimientos-medios.json («guajira-2025-01»). Recortada a vertical y
+         con el logo de Médicos Sin Fronteras del tanque pixelado: no hay relación
+         con esa organización y la foto no debe sugerirla. Va AL LADO del texto,
+         nunca debajo: hay menores en la escena. -->
     <div class="wrap cab-foto">
       <div>
       <span class="ey rv" data-i18n="emp.ey">RSE empresarial</span>
@@ -503,9 +508,12 @@
         <a class="btn btn-o" href="#contacto" data-i18n="emp.cta.btn">Quiero conversar</a>
       </div>
       </div>
-      <figure class="foto-fig rv d1" style="--foco:50% 40%;--foco-m:50% 38%">
-        <img src="/img/benef_02.jpg" alt="Adultos mayores reunidos bajo un corredor de madera durante una jornada de terreno" data-i18n="emp.foto.alt" data-i18n-attr="alt" width="675" height="900" loading="lazy" decoding="async">
-        <figcaption class="mu" data-i18n="emp.foto.pie">Jornada de terreno con adultos mayores. Archivo de la Fundación, publicada con autorización escrita.</figcaption>
+      <figure class="foto-fig rv d1" style="--foco:40% 55%;--foco-m:35% 55%">
+        <picture>
+          <source type="image/webp" srcset="/img/jornadas/m/guajira_policia_entrega.webp 800w, /img/jornadas/guajira_policia_entrega.webp 1600w" sizes="(max-width:860px) calc(100vw - 48px), 460px">
+          <img src="/img/jornadas/m/guajira_policia_entrega.webp" alt="Una camioneta de la Policía Nacional rodeada de familias wayuu mientras el equipo reparte alimentos y juguetes desde el platón" data-i18n="emp.foto.alt" data-i18n-attr="alt" width="800" height="1000" loading="lazy" decoding="async">
+        </picture>
+        <figcaption class="mu" data-i18n="emp.foto.pie">Entrega en una comunidad wayuu con apoyo de la Policía Nacional, Alta Guajira, enero de 2025. Jornada anterior a la constitución de la fundación.</figcaption>
       </figure>
     </div>
   </section>
