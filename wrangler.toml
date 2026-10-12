@@ -131,7 +131,10 @@ CORREO_MMC = "MiraMiCasa@thegiveandgrowproject.org"
 # Alianzas: la visita de contexto de una fundacion la coordina Sebas, no
 # contabilidad. Mezclarla con los avisos de aportes haria que el buzon donde se
 # revisan pagos dejara de ser una bandeja de trabajo fiable.
-CORREO_ALIANZAS = "sebas@thegiveandgrowproject.org"
+# Desde el 12 oct 2026 es contacto@ (grupo de Google que le llega a Sebas): es
+# tambien el Reply-To y el pie de los correos a empresas, fundaciones y
+# voluntarios, y el sitio ya publica contacto@ como correo de la fundacion.
+CORREO_ALIANZAS = "contacto@thegiveandgrowproject.org"
 
 # ---------------------------------------------------------------------------
 # PAYPAL — MEMBRESIAS INTERNACIONALES (PRODUCCION)
