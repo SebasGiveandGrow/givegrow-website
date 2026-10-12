@@ -16709,8 +16709,14 @@ async function apiLeadEmpresa(env, c) {
   ).bind(razon, email, limpio(c.telefono, 40) || null, JSON.stringify(datos)).run();
 
   /* El correo no puede tumbar el registro: misma regla que en todas las puertas. */
+  /* Y SE DICE SI EL ACUSE SALIÓ. La página respondía «te llegó un correo»
+     aunque el cupo diario de Resend se hubiera agotado (el envío queda
+     `sin_cupo` y sale al día siguiente). En el Social Fest, con decenas de
+     registros el mismo día, esa frase podía ser falsa para la mitad de la sala. */
+  let acuse = false;
   try {
-    await correoLeadEmpresa(env, { razon, email, ...datos });
+    const r = await correoLeadEmpresa(env, { razon, email, ...datos });
+    acuse = !!(r && r.ok);
     await correoAvisoLeadEmpresa(env, { razon, email, telefono: limpio(c.telefono, 40), ...datos });
   } catch (e) {
     console.error("correo lead empresa", e && e.message);
@@ -16718,7 +16724,7 @@ async function apiLeadEmpresa(env, c) {
 
   await anotarAutorizacion(env, ins.meta ? ins.meta.last_row_id : null, "empresa", "sf.datos");
 
-  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null });
+  return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null, acuse });
 }
 
 /* Acuse a la empresa del evento. TRES COSAS Y NINGUNA PROMESA DE MÁS:

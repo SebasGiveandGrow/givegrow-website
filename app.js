@@ -2094,6 +2094,7 @@ var I18N = {
     "sf.f.legal":"Enviar esto no te compromete a nada: es el comienzo de una conversación.",
     "sf.f.sending":"Enviando…",
     "sf.f.ok":"Listo. Te llegó un correo con lo que sigue — nos vemos en el pasillo.",
+    "sf.f.ok.sincorreo":"Listo, recibimos tus datos. El correo con lo que sigue te llega en las próximas horas — nos vemos en el pasillo.",
     "sf.err.razon":"Nos falta el nombre de la empresa.",
     "sf.err.nombre":"Nos falta tu nombre.",
     "sf.err.email":"Revisa el correo: parece que tiene algo raro.",
@@ -7690,7 +7691,8 @@ function sfSubmit(ev){
       idioma: lang === "en" ? "en" : "es"
     })
   }).then(formRespuesta)
-    .then(function(){ document.getElementById("sf").reset(); btn.disabled = false; allyMsg(note, t("sf.f.ok"), true); })
+    .then(function(r){ document.getElementById("sf").reset(); btn.disabled = false;
+      allyMsg(note, t(r && r.acuse === false ? "sf.f.ok.sincorreo" : "sf.f.ok"), true); })
     .catch(function(err){ btn.disabled = false; formFallo(note, err, SF_ERRS, "sf.err.send"); });
   return false;
 }

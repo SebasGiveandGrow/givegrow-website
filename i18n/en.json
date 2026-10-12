@@ -2034,6 +2034,7 @@
   "sf.f.legal": "Sending this commits you to nothing: it is the start of a conversation.",
   "sf.f.sending": "Sending…",
   "sf.f.ok": "Done. You have an email with what comes next — see you in the hallway.",
+  "sf.f.ok.sincorreo": "Done, we have your details. The email with what comes next will reach you in the next few hours — see you in the hallway.",
   "sf.err.razon": "We need the company name.",
   "sf.err.nombre": "We need your name.",
   "sf.err.email": "Check the email: something looks off.",
