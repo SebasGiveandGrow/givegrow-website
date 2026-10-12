@@ -34,7 +34,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=6b17fbbf">
+<link rel="stylesheet" href="/styles.css?v=7d0af73c">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -42,7 +42,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=bd4ebef8" defer></script>
+<script src="/app.js?v=337a6150" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -53,6 +53,11 @@
 </head>
 <body>
 <a class="skip-link" href="#" data-act="skipToContent()" data-i18n="a11y.skip">Saltar al contenido</a>
+<!-- SIN JAVASCRIPT NO HAY RUTAS NI FORMULARIOS (auditoría preevento, 12 oct
+     2026): la SPA se queda en la portada y quien llega por el QR de Social Fest
+     no ve ni la página del evento ni su formulario. Se le da la salida directa,
+     en los dos idiomas porque el diccionario inglés también es JS. -->
+<noscript><div style="background:#1F5C38;color:#fff;padding:14px 16px;font:16px/1.5 system-ui,sans-serif;text-align:center">Este sitio necesita JavaScript para mostrar sus páginas y formularios. Escríbenos a <a href="mailto:contacto@thegiveandgrowproject.org" style="color:#fff;font-weight:700">contacto@thegiveandgrowproject.org</a> o por WhatsApp al <a href="https://wa.me/573153305028" style="color:#fff;font-weight:700">+57 315 330 5028</a>.<br><span lang="en">This site needs JavaScript to show its pages and forms. Email us or message us on WhatsApp at the same addresses.</span></div></noscript>
 
 <!-- NAV -->
 <nav id="nav">
@@ -1204,14 +1209,14 @@
       <h1 class="h-sec" data-i18n="sf.t">Una alianza, muchas realidades.</h1>
       <p class="lead" data-i18n="sf.lead">Somos Give&amp;Grow, una fundación de Medellín que une a empresas, personas y fundaciones de base para que cada apoyo llegue a quien lo necesita y quede documentado.</p>
       <div class="sf-puertas">
-        <button type="button" class="sf-puerta" data-act="sfIr('empresa')">
-          <span class="sf-puerta-k" data-i18n="sf.p.emp.k">Soy empresa</span>
-          <span class="sf-puerta-d" data-i18n="sf.p.emp.d">Un piloto de Impact Journey con tu equipo, ida y vuelta, sin cuota de participación.</span>
+        <button type="button" class="sf-puerta" data-act="sfIr('empresa')" aria-labelledby="sf-p-emp-k" aria-describedby="sf-p-emp-d">
+          <span class="sf-puerta-k" id="sf-p-emp-k" data-i18n="sf.p.emp.k">Soy empresa</span>
+          <span class="sf-puerta-d" id="sf-p-emp-d" data-i18n="sf.p.emp.d">Un piloto de Impact Journey con tu equipo, ida y vuelta, sin cuota de participación.</span>
           <span class="sf-puerta-f" aria-hidden="true">&darr;</span>
         </button>
-        <button type="button" class="sf-puerta" data-act="sfIr('red')">
-          <span class="sf-puerta-k" data-i18n="sf.p.red.k">Soy fundación o profesional</span>
-          <span class="sf-puerta-d" data-i18n="sf.p.red.d">Suma tu fundación al HUB SOCIAL o dona horas de tu oficio.</span>
+        <button type="button" class="sf-puerta" data-act="sfIr('red')" aria-labelledby="sf-p-red-k" aria-describedby="sf-p-red-d">
+          <span class="sf-puerta-k" id="sf-p-red-k" data-i18n="sf.p.red.k">Soy fundación o profesional</span>
+          <span class="sf-puerta-d" id="sf-p-red-d" data-i18n="sf.p.red.d">Suma tu fundación al HUB SOCIAL o dona horas de tu oficio.</span>
           <span class="sf-puerta-f" aria-hidden="true">&darr;</span>
         </button>
       </div>
