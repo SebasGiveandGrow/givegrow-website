@@ -46,7 +46,10 @@ const ok  = (m) => console.log("ok     " + m);
    sino el Worker entero en producción. `--check` sobre un módulo ES no resuelve
    los imports, así que no necesita node_modules: comprueba forma, no enlaces.
    Del enlazado se encarga el `--dry-run` de wrangler en ci.yml. */
-for (const f of ["app.js", "worker.js", "documentos.js"]) {
+/* Y los archivos de js/, que app.js carga por ruta (check #27): un error de
+   sintaxis en uno de ellos deja muda una ruta entera sin tocar la portada. */
+const MODULOS_JS = existsSync("js") ? readdirSync("js").filter((f) => f.endsWith(".js")).sort().map((f) => "js/" + f) : [];
+for (const f of ["app.js", "worker.js", "documentos.js", ...MODULOS_JS]) {
   try { execSync(`node --check --input-type=module < ${f}`, { shell: "/bin/sh" }); ok(f + " sintaxis"); }
   catch (e) { err(f + " sintaxis inválida"); }
 }
@@ -419,6 +422,12 @@ for (const [i, m] of [...workerSrc.matchAll(/return `<!doctype html>/g)].entries
 }
 
 const src  = readFileSync("app.js", "utf8");
+/* EL CÓDIGO DEL SITIO YA NO ES SOLO app.js (13 oct 2026): una parte vive en
+   js/*.js y se carga por ruta. Los checks que preguntan «¿lo usa el JS?» —claves
+   de t(), clases, data-act, la galería— miran `srcJs`, que es app.js MÁS esos
+   archivos. Los que leen estructuras que solo existen en app.js (el
+   diccionario, ACT_FNS, TRACK_STEPS) siguen leyendo `src`. */
+const srcJs = [src, ...MODULOS_JS.map((f) => readFileSync(f, "utf8"))].join("\n");
 const html = readFileSync("index.html", "utf8");
 
 /* 2 · Paridad i18n: ES (app.js) vs EN (i18n/en.json) */
@@ -520,7 +529,7 @@ const TECHO_ENCABEZADOS = 0;
      EXISTA ALGUNA que empiece asi: un prefijo del que no cuelga nada tampoco
      sirve de nada. */
 try {
-  const limpio = src
+  const limpio = srcJs
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^[ \t]*\/\/[^\n]*/gm, "");
   const pedidas = [...new Set([...limpio.matchAll(/\bt\(\s*"([^"]+)"/g)].map((m) => m[1]))];
@@ -573,7 +582,7 @@ try {
    aparte es otra cosa que se desincroniza. */
 let raicesJornada = [];
 {
-  const bloque = src.slice(src.indexOf("var GALLERY = ["), src.indexOf("var lbIndex"));
+  const bloque = srcJs.slice(srcJs.indexOf("var GALLERY = ["), srcJs.indexOf("var lbIndex"));
   const rutas = [...bloque.matchAll(/\{f:"([^"]+)"/g)].map((m) => m[1]);
   /* Las de las fichas llegan con ruta absoluta (/img/jornadas/x.webp); se
      normalizan a la misma forma relativa que usa GALLERY. */
@@ -781,7 +790,7 @@ try {
     } else {
       /* Y el resto de los sitios donde está escrito. Un NIT que difiere en UN
          sitio es un NIT que alguien va a copiar del sitio equivocado. */
-      const fuentes = ["app.js", "index.html", "i18n/en.json", "documentos.js", "worker.js"];
+      const fuentes = ["app.js", ...MODULOS_JS, "index.html", "i18n/en.json", "documentos.js", "worker.js"];
       const malos = [];
       for (const f of fuentes) {
         let t = ""; try { t = readFileSync(f, "utf8"); } catch (e) { continue; }
@@ -1217,9 +1226,13 @@ try {
   if (i < 0) throw new Error("no encontré `var ACT_FNS = {` en app.js");
   const bloque = app.slice(i, app.indexOf("};", i));
   const registradas = new Set([...bloque.matchAll(/(\w+)\s*:/g)].map(m => m[1]));
+  /* Las que viven en js/*.js se registran en ACT_DIFERIDAS (nombre → archivo);
+     que cada una exista de verdad en su archivo lo comprueba el check #27. */
+  const iD = app.indexOf("var ACT_DIFERIDAS = {");
+  if (iD >= 0) for (const m of app.slice(iD, app.indexOf("};", iD)).matchAll(/(\w+)\s*:/g)) registradas.add(m[1]);
 
   const usadas = new Map();
-  for (const [nombre, txt] of [["index.html", html], ["app.js", app]]) {
+  for (const [nombre, txt] of [["index.html", html], ["app.js", app], ...MODULOS_JS.map((f) => [f, readFileSync(f, "utf8")])]) {
     for (const m of txt.matchAll(/data-(?:act|input|change|submit|enter)=\\?["']([^"']+)/g)) {
       for (const f of m[1].matchAll(/([A-Za-z_$][\w$]*)\s*\(/g)) {
         if (!usadas.has(f[1])) usadas.set(f[1], new Set());
@@ -1551,7 +1564,7 @@ try {
      Antes de este check había CUATRO desenfoques y tres iban sin prefijo.
      ------------------------------------------------------------------ */
   {
-    const fuentes = ["styles.css", "app.js", "index.html", "worker.js", "documentos.js"];
+    const fuentes = ["styles.css", "app.js", ...MODULOS_JS, "index.html", "worker.js", "documentos.js"];
     const neon = [];
     for (const f of fuentes) {
       let t = "";
@@ -1628,7 +1641,7 @@ try {
     const TECHO_CSS_MUERTO = 0;   // 9 → 0 el 25 sep 2026: limpieza del CSS muerto
 
     const html = readFileSync("index.html", "utf8");
-    const js = readFileSync("app.js", "utf8");
+    const js = srcJs;
     let worker = "";
     try { worker = readFileSync("worker.js", "utf8"); } catch { /* sin worker, sin páginas generadas */ }
     /* La política de privacidad vive en data/privacidad.json (la pintan app.js y
@@ -2244,5 +2257,56 @@ try {
     ok("inventario.json con la forma que lee app.js (" + (inv.donaciones || []).length + " donaciones)");
   }
 } catch (e) { err("check #26 · no se pudo leer data/inventario.json: " + e.message); }
+
+/* ── check #27 · EL CÓDIGO POR RUTA: cada archivo de js/ con su hash, sus rutas y sus botones ──
+   Desde el 13 oct 2026 una parte de app.js vive en js/mmc.js, js/pago.js y
+   js/impacto.js, y app.js los pide con `cargarModulo` al entrar a sus rutas.
+   Tres formas de romperlo que NO dan error en ninguna parte hasta que alguien
+   usa esa ruta, y por eso se miran aquí:
+
+   1 · EL HASH. /js/* va `immutable` un año (_headers). Si se edita js/x.js y
+       no se actualiza su md5 en MODULOS_V, los navegadores que ya lo tenían
+       siguen corriendo el viejo durante un año. Es la misma regla que el `?v=`
+       de app.js en index.html, con la misma cuenta: md5, 8 caracteres.
+   2 · UN ARCHIVO SIN ENTRADA, O UNA ENTRADA SIN ARCHIVO. Una ruta de
+       MODULOS_RUTA que apunta a un módulo inexistente pide un 404.
+   3 · UN BOTÓN DIFERIDO SIN FUNCIÓN. Lo que está en ACT_DIFERIDAS se busca en
+       `window` cuando llega su archivo: si la función se renombró, o se quedó
+       en app.js, el clic no hace nada — la misma cicatriz de miSubmit que vigila
+       el check de ACT_FNS, en su versión diferida. */
+try {
+  const { createHash } = await import("node:crypto");
+  const fallos = [];
+  const objeto = (nombre) => {
+    const i = src.indexOf("var " + nombre + " = {");
+    if (i < 0) { fallos.push("no encontré `var " + nombre + " = {` en app.js"); return {}; }
+    const cuerpo = src.slice(i + ("var " + nombre + " = ").length, src.indexOf("};", i) + 1);
+    return Object.fromEntries([...cuerpo.matchAll(/(\w+)\s*:\s*"([^"]*)"/g)].map((m) => [m[1], m[2]]));
+  };
+  const V = objeto("MODULOS_V"), RUTA = objeto("MODULOS_RUTA"), DIF = objeto("ACT_DIFERIDAS");
+  const enDisco = MODULOS_JS.map((f) => f.slice(3, -3));
+  for (const n of enDisco) {
+    const real = createHash("md5").update(readFileSync("js/" + n + ".js")).digest("hex").slice(0, 8);
+    if (!V[n]) fallos.push("js/" + n + ".js no tiene entrada en MODULOS_V");
+    else if (V[n] !== real) fallos.push("MODULOS_V." + n + " es " + V[n] + " pero md5(js/" + n + ".js) empieza por " + real +
+                                        " · actualízalo (y con él el ?v= de app.js en index.html)");
+  }
+  for (const n of Object.keys(V)) if (!enDisco.includes(n)) fallos.push("MODULOS_V nombra «" + n + "» pero no existe js/" + n + ".js");
+  for (const [r, n] of Object.entries(RUTA)) {
+    if (!V[n]) fallos.push("MODULOS_RUTA." + r + " apunta a «" + n + "», que no está en MODULOS_V");
+    if (!html.includes('id="page-' + r + '"')) fallos.push("MODULOS_RUTA nombra la ruta «" + r + "», que no tiene <main id=\"page-" + r + "\"> en index.html");
+  }
+  for (const [f, n] of Object.entries(DIF)) {
+    if (!V[n]) { fallos.push("ACT_DIFERIDAS." + f + " apunta a «" + n + "», que no está en MODULOS_V"); continue; }
+    let txt = ""; try { txt = readFileSync("js/" + n + ".js", "utf8"); } catch { continue; }
+    if (!new RegExp("^function " + f + "\\(", "m").test(txt)) fallos.push(f + "() está en ACT_DIFERIDAS como de js/" + n + ".js, pero ese archivo no la define");
+    if (new RegExp("^function " + f + "\\(", "m").test(src)) fallos.push(f + "() está en ACT_DIFERIDAS pero se define en app.js: va en ACT_FNS");
+  }
+  if (!/^\/js\/\*\n\s+Cache-Control: public, max-age=31536000, immutable/m.test(readFileSync("_headers", "utf8")))
+    fallos.push("_headers no sirve /js/* con el mismo Cache-Control que app.js (immutable, un año)");
+  if (fallos.length) err("check #27 · código por ruta: " + fallos.join(" · "));
+  else ok("código por ruta: " + enDisco.length + " archivo(s) en js/ con su md5 en MODULOS_V, " + Object.keys(RUTA).length +
+          " rutas y " + Object.keys(DIF).length + " botones diferidos que existen");
+} catch (e) { err("check #27 · no se pudo revisar el código por ruta: " + e.message); }
 
 process.exit(fail);

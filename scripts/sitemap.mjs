@@ -34,11 +34,11 @@ const MMC = "https://miramicasa.org";
 /* Cada URL con LA FUENTE que la genera. Si mañana una página nace de otro
    archivo, se cambia aquí y la fecha la pone git. */
 const PAGINAS = [
-  { loc: APEX + "/", fuentes: ["index.html", "app.js", "styles.css"], freq: "weekly", pri: "1.0" },
+  { loc: APEX + "/", fuentes: ["index.html", "app.js", "js/pago.js", "js/impacto.js", "styles.css"], freq: "weekly", pri: "1.0" },
   /* Rutas de la SPA con path propio (ver RUTAS_INDEXABLES en worker.js). */
   { loc: APEX + "/transparencia", fuentes: ["index.html", "app.js", "styles.css"], freq: "monthly", pri: "0.8" },
   { loc: APEX + "/empresas", fuentes: ["index.html", "app.js", "styles.css"], freq: "monthly", pri: "0.8" },
-  { loc: MMC + "/",  fuentes: ["index.html", "app.js", "styles.css"], freq: "weekly", pri: "0.9" }
+  { loc: MMC + "/",  fuentes: ["index.html", "app.js", "js/mmc.js", "styles.css"], freq: "weekly", pri: "0.9" }
 ];
 
 /* WORKER.JS NO ES FUENTE DE NINGUNA, y lo probe antes de decidirlo: incluyendolo
