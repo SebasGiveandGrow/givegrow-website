@@ -673,7 +673,10 @@ footer a:hover{color:var(--brote)}
 .wa:hover,.alma-fab:hover{transform:translateY(-2px);box-shadow:var(--fab-shadow-hover)}
 .wa:active,.alma-fab:active{transform:translateY(0);box-shadow:var(--fab-shadow)}
 
-.wa{bottom:24px;background:var(--wa-marca)}
+/* Icono oscuro sobre el verde de WhatsApp (auditoría para inversionistas, 12 oct
+   2026): el blanco daba 1,98:1 y WCAG 1.4.11 pide 3:1 para un control. --ink-deep
+   sobre --wa-marca da más de 8:1 y el botón se sigue reconociendo por su color. */
+.wa{bottom:24px;background:var(--wa-marca);color:var(--ink-deep)}
 .wa svg{width:28px;height:28px;fill:currentColor}
 
 .alma-fab{bottom:92px;background:var(--g)}
@@ -2760,6 +2763,7 @@ section[tabindex="-1"]:focus{ outline:none }
 .sf-hero .h-sec{max-width:14ch}
 .sf-puertas{display:grid;gap:12px;margin-top:26px}
 @media(min-width:720px){.sf-puertas{grid-template-columns:1fr 1fr;gap:16px}}
+@media(min-width:1000px){.sf-puertas{grid-template-columns:repeat(3,1fr)}}
 .sf-puerta{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:center;width:100%;text-align:left;padding:18px 20px;border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:var(--r);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;transition:border-color .2s var(--ease)}
 .sf-puerta:hover{border-color:var(--acc)}
 .sf-puerta:focus-visible{outline:2px solid var(--acc);outline-offset:3px}

@@ -1266,7 +1266,7 @@ var I18N = {
     "fund.give.t":"Aliadas que aportan",
     "fund.give.p":"Algunas fundaciones aportan servicios al HUB SOCIAL, además de recibir apoyo.",
     "fund.proto.t":"Protocolo de cumplimiento",
-    "fund.proto.p":"Faltas leves van a revisión de comité con tres oportunidades; las faltas graves, como el mal uso de recursos, terminan la alianza.",
+    "fund.proto.p":"Faltas leves van a revisión con Give&Grow, con tres oportunidades; las faltas graves, como el mal uso de recursos, terminan la alianza.",
     "fund.btn":"Quiero aplicar",
     "grat.ey":"Programa de Gratitud",
     "grat.t":"Quien da, también recibe.",
@@ -2125,6 +2125,24 @@ var I18N = {
     "sf.red.p.t":"Tus horas profesionales",
     "sf.red.p.p":"Derecho, contabilidad, diseño, desarrollo, comunicación o formación: tu oficio, desde la sede, sostiene la red que hace posible todo lo demás.",
     "sf.red.p.btn":"Ofrecer mis horas",
+    "sf.p.inv.k":"Soy financiador o inversionista",
+    "sf.p.inv.d":"Revisa quiénes somos, cómo nos gobernamos y hasta dónde podemos afirmar.",
+    "sf.inv.ey":"Para financiadores e inversionistas",
+    "sf.inv.t":"Antes de decidir, revísenos.",
+    "sf.inv.lead":"Somos una fundación joven y lo decimos. Esto es lo que se puede comprobar hoy, con documentos.",
+    "sf.inv.tr.tag":"Transparencia",
+    "sf.inv.tr.t":"Identidad legal y finanzas",
+    "sf.inv.tr.p":"NIT, matrícula, régimen tributario, Revisora Fiscal, estados financieros firmados e informe de gestión.",
+    "sf.inv.tr.btn":"Ver transparencia",
+    "sf.inv.es.tag":"Estándares",
+    "sf.inv.es.t":"Marco de actuación",
+    "sf.inv.es.p":"Los nueve compromisos de la Norma Humanitaria Esencial, con lo que opera, lo parcial y lo que aún construimos.",
+    "sf.inv.es.btn":"Ver estándares",
+    "sf.inv.me.tag":"Medición",
+    "sf.inv.me.t":"Hasta dónde podemos afirmar",
+    "sf.inv.me.p":"Contribución, no atribución: cómo medimos, qué publicamos y qué todavía no podemos probar.",
+    "sf.inv.me.btn":"Ver medición",
+    "sf.inv.docs":"¿Necesitas el RUT, el certificado de existencia u otro documento para tu debida diligencia? Escríbenos a contacto@thegiveandgrowproject.org.",
   }
 };
 
@@ -6562,7 +6580,11 @@ function init(){
   caducarEvento();
   montarFranjas();
   // language
-  setLang("es");
+  /* `?lang=en` abre el sitio en inglés (auditoría para inversionistas, 12 oct
+     2026): sin esto el inglés solo se activaba con el botón, y no había un
+     enlace que mandarle a un financiador extranjero. Cualquier otro valor
+     deja el español. */
+  setLang(new URLSearchParams(location.search).get("lang") === "en" ? "en" : "es");
   // routing from hash
   var hash = location.hash.replace("#","") || rutaPorDefecto();
   /* Wompi devuelve al donante a /gracias?id=… — una ruta con path, no con hash.
@@ -7697,7 +7719,7 @@ function origenEvento(){
 /* Las dos puertas bajan a su bloque. No son anclas `#sf-empresa`: el hash se
    resolvería como ruta y daría 404 (la misma razón de irAFormFund). */
 function sfIr(cual){
-  var s = document.getElementById(cual === "empresa" ? "sf-empresa" : "sf-red");
+  var s = document.getElementById(cual === "empresa" ? "sf-empresa" : cual === "inversion" ? "sf-inversion" : "sf-red");
   if (!s) return;
   var suave = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   s.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });

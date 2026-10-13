@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <link rel="canonical" href="https://www.thegiveandgrowproject.org">
+<!-- El inglés vive en la misma URL con ?lang=en (app.js lo lee al arrancar): así un
+     financiador extranjero recibe un enlace que abre directo en su idioma. -->
+<link rel="alternate" hreflang="es" href="https://www.thegiveandgrowproject.org/">
+<link rel="alternate" hreflang="en" href="https://www.thegiveandgrowproject.org/?lang=en">
+<link rel="alternate" hreflang="x-default" href="https://www.thegiveandgrowproject.org/">
 <title>Give&Grow International - Dar para crecer, crecer para dar más</title>
 <meta name="robots" content="index, follow">
 <meta name="description" content="Fundación Give&Grow International - NIT 901.948.930-2 - ESAL - Régimen Tributario Especial - Colombia. Conectamos generosidad con necesidad, con trazabilidad completa.">
@@ -30,11 +35,11 @@
 <script>/* tema antes del primer render: la preferencia guardada; si no hay, la del dispositivo; y la hora (día 6–18h) solo si el dispositivo no dice nada. La misma cuenta que themeResolve en app.js */
 (function(){var t="light";try{var s=localStorage.getItem("gg-theme");if(s==="light"||s==="dark"){t=s}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches){t="light"}else{var h=new Date().getHours();t=(h>=6&&h<18)?"light":"dark"}}catch(e){}document.documentElement.setAttribute("data-theme",t);if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",document.documentElement.getAttribute("data-marca")==="mmc"?"#07131F":"#0F1613")}})();
 /* LA RUTA ANTES DEL PRIMER RENDER (Social Fest, 7 oct 2026). Quien llega a /#socialfest por el QR veía la portada hasta que corría app.js, y bajaba su foto (262 KB a DPR 3) sin verla. Si el hash es una página conocida, se marca data-ruta y una regla esconde la portada y muestra esa página; go() en app.js quita la marca. La lista la vigila el check #21b: cada nombre tiene que ser una <main id="page-…"> de index.html, si no, la portada se queda y no hay pantalla en blanco. El preload del hero solo se pide cuando la portada es lo que se va a ver: `100vw` aquí y en el <source>, IGUALES, o se baja dos veces. */
-(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
+(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1100.webp 1100w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=286c86c6">
+<link rel="stylesheet" href="/styles.css?v=2431a54e">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -42,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=9c3f4515" defer></script>
+<script src="/app.js?v=a5decc73" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -203,8 +208,8 @@
 <main id="page-inicio" class="page active">
   <section class="hero">
     <div class="hero-bg"><picture>
-      <source type="image/webp" srcset="/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w" sizes="100vw">
-      <img src="/img/jornadas/hero_futbol_1400.webp" alt="Padre e hijo juegan con un balón entregado en jornada, en su comunidad wayuu de la Alta Guajira" fetchpriority="high" loading="lazy" decoding="async" data-i18n="hero.imgalt" data-i18n-attr="alt">
+      <source type="image/webp" srcset="/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1100.webp 1100w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w" sizes="100vw">
+      <img src="/img/jornadas/hero_futbol_1400.webp" alt="Padre e hijo juegan con un balón entregado en jornada, en su comunidad wayuu de la Alta Guajira" fetchpriority="high" decoding="async" data-i18n="hero.imgalt" data-i18n-attr="alt">
     </picture></div>
     <div class="wrap">
       <a class="evento-pill" href="#socialfest" data-evento-hasta="2026-10-16"><span class="evento-pill-k" data-i18n="evt.sf.k">Social Fest 2026</span> <span data-i18n="evt.sf.d">14 y 15 de octubre · Ruta N</span> <span aria-hidden="true">→</span></a>
@@ -619,7 +624,7 @@
       <div class="caminos rv d2">
         <div class="camino camino-sin"><h2 class="camino-t" data-i18n="fund.req.t">Qué buscamos</h2><p data-i18n="fund.req.p">Fundaciones y proyectos comunitarios de base, con trabajo verificable en campo y disposición a la trazabilidad. Cada una entra con verificación y convenio; algunas son proyectos comunitarios de base, y lo decimos en su ficha.</p></div>
         <div class="camino camino-sin"><h2 class="camino-t" data-i18n="fund.give.t">Aliadas que aportan</h2><p data-i18n="fund.give.p">Algunas fundaciones aportan servicios al HUB SOCIAL, además de recibir apoyo.</p></div>
-        <div class="camino camino-sin"><h2 class="camino-t" data-i18n="fund.proto.t">Protocolo de cumplimiento</h2><p data-i18n="fund.proto.p">Faltas leves van a revisión de comité con tres oportunidades; las faltas graves, como el mal uso de recursos, terminan la alianza.</p></div>
+        <div class="camino camino-sin"><h2 class="camino-t" data-i18n="fund.proto.t">Protocolo de cumplimiento</h2><p data-i18n="fund.proto.p">Faltas leves van a revisión con Give&amp;Grow, con tres oportunidades; las faltas graves, como el mal uso de recursos, terminan la alianza.</p></div>
       </div>
     </div>
   </section>
@@ -1272,6 +1277,11 @@
           <span class="sf-puerta-d" id="sf-p-red-d" data-i18n="sf.p.red.d">Suma tu fundación al HUB SOCIAL o dona horas de tu oficio.</span>
           <span class="sf-puerta-f" aria-hidden="true">&darr;</span>
         </button>
+        <button type="button" class="sf-puerta" data-act="sfIr('inversion')" aria-labelledby="sf-p-inv-k" aria-describedby="sf-p-inv-d">
+          <span class="sf-puerta-k" id="sf-p-inv-k" data-i18n="sf.p.inv.k">Soy financiador o inversionista</span>
+          <span class="sf-puerta-d" id="sf-p-inv-d" data-i18n="sf.p.inv.d">Revisa quiénes somos, cómo nos gobernamos y hasta dónde podemos afirmar.</span>
+          <span class="sf-puerta-f" aria-hidden="true">&darr;</span>
+        </button>
       </div>
     </div>
   </section>
@@ -1354,6 +1364,39 @@
           <a class="btn btn-g sf-btn" href="#voluntariado" data-act="sfPro()" data-i18n="sf.red.p.btn">Ofrecer mis horas</a>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- PARA QUIEN EVALÚA (auditoría para inversionistas, 12 oct 2026): un
+       financiador no busca un formulario, busca la debida diligencia. Esta
+       puerta lo lleva a los tres lugares que la responden, sin prometer nada
+       que esas páginas no sostengan. -->
+  <section class="cream" id="sf-inversion">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="sf.inv.ey">Para financiadores e inversionistas</span>
+      <h2 class="h-sec rv" data-i18n="sf.inv.t">Antes de decidir, revísenos.</h2>
+      <p class="lead rv d1" data-i18n="sf.inv.lead">Somos una fundación joven y lo decimos. Esto es lo que se puede comprobar hoy, con documentos.</p>
+      <div class="grid g3 rv d2" style="margin-top:28px">
+        <div class="card">
+          <span class="tag" data-i18n="sf.inv.tr.tag">Transparencia</span>
+          <h3 data-i18n="sf.inv.tr.t">Identidad legal y finanzas</h3>
+          <p data-i18n="sf.inv.tr.p">NIT, matrícula, régimen tributario, Revisora Fiscal, estados financieros firmados e informe de gestión.</p>
+          <a class="btn btn-g sf-btn" href="#transparencia" data-i18n="sf.inv.tr.btn">Ver transparencia</a>
+        </div>
+        <div class="card">
+          <span class="tag" data-i18n="sf.inv.es.tag">Estándares</span>
+          <h3 data-i18n="sf.inv.es.t">Marco de actuación</h3>
+          <p data-i18n="sf.inv.es.p">Los nueve compromisos de la Norma Humanitaria Esencial, con lo que opera, lo parcial y lo que aún construimos.</p>
+          <a class="btn btn-g sf-btn" href="#estandares" data-i18n="sf.inv.es.btn">Ver estándares</a>
+        </div>
+        <div class="card">
+          <span class="tag" data-i18n="sf.inv.me.tag">Medición</span>
+          <h3 data-i18n="sf.inv.me.t">Hasta dónde podemos afirmar</h3>
+          <p data-i18n="sf.inv.me.p">Contribución, no atribución: cómo medimos, qué publicamos y qué todavía no podemos probar.</p>
+          <a class="btn btn-g sf-btn" href="#medicion" data-i18n="sf.inv.me.btn">Ver medición</a>
+        </div>
+      </div>
+      <p class="rv d3" style="margin-top:22px" data-i18n="sf.inv.docs">¿Necesitas el RUT, el certificado de existencia u otro documento para tu debida diligencia? Escríbenos a contacto@thegiveandgrowproject.org.</p>
     </div>
   </section>
 </main>
