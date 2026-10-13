@@ -32,8 +32,10 @@
 */
 
 import { qrSvg } from './qr.js';
-/* La política de privacidad, fuente única con app.js: ver `paginaPrivacidad`. */
+/* La política de privacidad y los términos de donación, fuente única con
+   app.js: ver `paginaLegal`. */
 import PRIVACIDAD from './data/privacidad.json';
+import TERMINOS from './data/terminos.json';
 import { recibo, certificado, certificadoVoluntariado, informeTriage, inspeccionPDF, comprobanteFirmaConvenio, informeBoard,
          INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT,
          INSPECCION_AYUDA, INSPECCION_ANCHOS, INSPECCION_GLOSARIO,
@@ -53,7 +55,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "2431a54e";
+const STYLES_V = "e6555d3c";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -37406,6 +37408,8 @@ const TXT_METODO = Object.freeze({
     verifAviso: "Mientras tu membresía esté vigente, un comercio aliado puede comprobarla en thegiveandgrowproject.org/verificar escribiendo su código o tu número de documento, si lo registraste al pagar o al pedir tu certificado. Solo ve tu nombre de pila, la inicial de tu apellido, tu nivel y si está vigente; nunca tu documento ni tus datos de contacto.",
     p2t: "Tu tarjeta, en la ventana de Wompi",
     p2p: "Pulsa el botón y escribe los datos de tu tarjeta en la ventana segura de Wompi, la pasarela de Bancolombia.",
+    terminos: (a, b) => "Al registrar tu método de pago aceptas los " + a + "términos y condiciones de donación</a> de Give&amp;Grow, y el tratamiento de tus datos según nuestra " + b + "política de privacidad</a>.",
+    terminosHref: "/terminos", privacidadHref: "/privacidad",
     p3tMonto: "Primer cobro y confirmación",
     p3pMonto: "Al terminar cobramos el primer mes. La membresía queda activa cuando la pasarela lo confirma, y te escribimos con tu número de guía y el enlace a tu membresía.",
     p3tSin: "Confirmación",
@@ -37447,6 +37451,8 @@ const TXT_METODO = Object.freeze({
     verifAviso: "While your membership is active, a partner business can confirm it at thegiveandgrowproject.org/verificar by typing the card's code or your ID number, if you gave it when paying or when asking for your certificate. It only sees your first name, the initial of your surname, your level and whether it is valid; never your ID number or your contact details.",
     p2t: "Your card, in Wompi's window",
     p2p: "Press the button and type your card details in the secure window of Wompi, Bancolombia's payment gateway.",
+    terminos: (a, b) => "By registering your payment method you accept Give&amp;Grow's " + a + "donation terms and conditions</a>, and the processing of your data under our " + b + "privacy policy</a>.",
+    terminosHref: "/terms", privacidadHref: "/privacy",
     p3tMonto: "First charge and confirmation",
     p3pMonto: "When you finish we charge the first month. The membership becomes active once the gateway confirms it, and we email you your tracking number and the link to your membership.",
     p3tSin: "Confirmation",
@@ -37619,6 +37625,13 @@ function paginaMetodoPago(cfg) {
 + '      <span class="pm-n" aria-hidden="true">2</span>\n'
 + '      <h2 class="pm-paso-t">' + esc(T.p2t) + '</h2>\n'
 + '      <p class="pm-paso-p">' + esc(T.p2p) + '</p>\n'
+/* LOS TERMINOS DE LA FUNDACION, justo encima del boton de Wompi. Las dos
+   casillas del paso 1 son los contratos de WOMPI; los de Give&Grow —cobro
+   mensual, cancelacion, cobros rechazados, reembolsos— estaban solo en la
+   SPA. Va antes del boton: se lee antes de registrar la tarjeta. Enlaza a
+   /terminos y /privacidad (paginas del Worker, sin JavaScript) en otra
+   pestaña, para no perder lo ya escrito en el formulario. */
++ '      <p class="pm-paso-p">' + T.terminos(abre(T.terminosHref), abre(T.privacidadHref)) + '</p>\n'
 + '    </div>\n'
 + '    <!-- HIJO DIRECTO DEL <form>, y no es estilo: el widget busca el\n'
 + '         formulario en su elemento PADRE. Envuelto en un <div> falla con\n'
@@ -39007,11 +39020,26 @@ function temaPorReloj(request) {
    un revisor en modo lectura, sin JS, o que escribía la dirección, no la veía.
    El texto sale de data/privacidad.json, el mismo que pinta app.js: no hay
    dos copias que se puedan desincronizar. Es HTML del repositorio. */
-function paginaPrivacidad(lang, tema) {
+/* /terminos y /terms: LOS TERMINOS DE DONACION, mismo molde y mismo motivo.
+   Salen de data/terminos.json, el mismo que pinta app.js en #terminos. */
+const DOCS_LEGALES = {
+  privacidad: {
+    doc: PRIVACIDAD,
+    es: { titulo: "Política de Privacidad y Tratamiento de Datos", otroHref: "/privacy" },
+    en: { titulo: "Privacy and Data Protection Policy", otroHref: "/privacidad" }
+  },
+  terminos: {
+    doc: TERMINOS,
+    es: { titulo: "Términos y condiciones de donación", otroHref: "/terms" },
+    en: { titulo: "Donation terms and conditions", otroHref: "/terminos" }
+  }
+};
+function paginaLegal(cual, lang, tema) {
   const en = lang === "en";
-  const T = en
-    ? { titulo: "Privacy and Data Protection Policy", ey: "Legal", inicio: "Give&Grow home", volver: "Back to the site", otro: "Leer en español", otroHref: "/privacidad" }
-    : { titulo: "Política de Privacidad y Tratamiento de Datos", ey: "Legal", inicio: "Inicio de Give&Grow", volver: "Volver al sitio", otro: "Read in English", otroHref: "/privacy" };
+  const D = DOCS_LEGALES[cual] || DOCS_LEGALES.privacidad;
+  const T = Object.assign(en
+    ? { ey: "Legal", inicio: "Give&Grow home", volver: "Back to the site", otro: "Leer en español" }
+    : { ey: "Legal", inicio: "Inicio de Give&Grow", volver: "Volver al sitio", otro: "Read in English" }, en ? D.en : D.es);
   const cabecera = ''
     + '<header class="vf-cab"><div class="wrap vf-cab-in">'
     + '<a class="nlogo" href="/" aria-label="' + esc(T.inicio) + '">Give<em>&amp;</em>Grow</a>'
@@ -39021,7 +39049,7 @@ function paginaPrivacidad(lang, tema) {
     + '<span class="ey">' + esc(T.ey) + '</span>\n'
     + '<h1 class="h-sec">' + esc(T.titulo) + '</h1>\n'
     + '<p class="pv-otro"><a href="' + T.otroHref + '" hreflang="' + (en ? "es" : "en") + '">' + esc(T.otro) + '</a></p>\n'
-    + '<div class="legal-doc">' + (en ? PRIVACIDAD.en : PRIVACIDAD.es) + '</div>\n';
+    + '<div class="legal-doc">' + (en ? D.doc.en : D.doc.es) + '</div>\n';
   const estilo = ''
     + '.vf-cab{background:var(--nav-bg);border-bottom:1px solid var(--bd)}'
     + '.vf-cab-in{max-width:760px;min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}'
@@ -40478,11 +40506,13 @@ export default {
        TIENE QUE ESTAR EN `run_worker_first` de wrangler.toml (las dos formas,
        con y sin barra final): sin eso la capa de assets responde 404 y este
        bloque no llega a correr — la misma lección de `/casa`. */
-    /* La política de privacidad sin JavaScript: ver `paginaPrivacidad`. EN
-       `run_worker_first` de wrangler.toml, o la capa de assets responde 404. */
-    if (/^\/(privacidad|privacy)\/?$/i.test(ruta)) {
-      const lang = /^\/privacy/i.test(ruta) || url.searchParams.get("lang") === "en" ? "en" : "es";
-      return new Response(paginaPrivacidad(lang, temaPorReloj(request)), {
+    /* La política de privacidad y los términos de donación sin JavaScript: ver
+       `paginaLegal`. EN `run_worker_first` de wrangler.toml, o la capa de
+       assets responde 404. */
+    if (/^\/(privacidad|privacy|terminos|terms)\/?$/i.test(ruta)) {
+      const lang = /^\/(privacy|terms)/i.test(ruta) || url.searchParams.get("lang") === "en" ? "en" : "es";
+      const cual = /^\/(terminos|terms)/i.test(ruta) ? "terminos" : "privacidad";
+      return new Response(paginaLegal(cual, lang, temaPorReloj(request)), {
         headers: {
           "content-type": "text/html; charset=utf-8",
           "referrer-policy": "strict-origin-when-cross-origin",

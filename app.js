@@ -1675,6 +1675,10 @@ var I18N = {
     "priv.t":"Política de Privacidad y Tratamiento de Datos",
     "priv.lead":"Cómo protegemos y tratamos tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR — y cómo puedes ejercer tus derechos.",
     "ally.a.datos.link":"Ver Política de Privacidad",
+    "foot.terms":"Términos de donación",
+    "ter.t":"Términos y condiciones de donación",
+    "ter.lead":"Qué pasa con tu aporte desde que lo haces: quién lo recibe, cómo se cobra, qué documentos te llegan y qué hacer si algo sale mal.",
+    "ter.link":"Términos y condiciones de donación",
     "emp.cta.t":"Hablemos de tu alianza",
     "emp.cta.p":"Diseñamos el aporte a la medida de tu empresa, con beneficio tributario y reportes verificables. Cuéntanos tu objetivo y construimos la ruta juntos.",
     "emp.cta.btn":"Quiero conversar",
@@ -2177,6 +2181,7 @@ var ROUTE_META = {
   proyecto:{t:{es:"Qué es y cómo funciona · Give&Grow International",en:"What it is and how it works · Give&Grow International"},d:{es:"Un ingeniero voluntario con matrícula mira las fotos de tu casa y escribe qué hacer con ella: si hay señales para no permanecer, qué precauciones tomar y con qué reparar. Gratis y a distancia. Las tres formas de participar: reportar tu casa, dar conceptos o apadrinar una reparación.",en:"A licensed volunteer engineer looks at photos of your home and writes what to do with it: whether there are signs you should not stay, what precautions to take and what to repair with. Free and remote. The three ways to take part: report your home, give opinions or sponsor a repair."}},
   vivienda:{t:{es:"Revisa tu casa · Give&Grow International",en:"Check your home · Give&Grow International"},d:{es:"¿Tu casa se afectó por el sismo? Sube fotos y un ingeniero voluntario te da un concepto: si hay señales para no permanecer, qué precauciones tomar y con qué reparar. No reemplaza la evaluación oficial.",en:"Was your home affected by the earthquake? Upload photos and a volunteer engineer gives you an opinion: whether there are signs you should not stay, what precautions to take and what to repair with. It does not replace the official assessment."}},
   privacidad:{t:{es:"Política de Privacidad y Tratamiento de Datos · Give&Grow International",en:"Privacy & Data Protection Policy · Give&Grow International"},d:{es:"Cómo Give&Grow protege y trata tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR. Tus derechos y cómo ejercerlos.",en:"How Give&Grow protects and processes your personal data, under Colombia's Law 1581/2012 and the GDPR. Your rights and how to exercise them."}},
+  terminos:{t:{es:"Términos y condiciones de donación · Give&Grow International",en:"Donation terms and conditions · Give&Grow International"},d:{es:"Quién recibe tu donación, cómo funcionan la donación única y la membresía mensual, recibos, certificado tributario, reembolsos y qué pasa si la fundación que elegiste sale de la red.",en:"Who receives your donation, how one-off gifts and monthly memberships work, receipts, the tax certificate, refunds and what happens if the foundation you chose leaves the network."}},
   /* Estas cuatro faltaban y caían al `|| ROUTE_META.inicio`, así que se
      presentaban con el título y la descripción de la portada. No era cosmético:
      `rastrea` es la ruta a la que apunta el correo del recibo de cada donante y
@@ -2551,6 +2556,7 @@ function postLang(l){
   try { miCalcula(); } catch(e){}
   if (!MARCA_MMC){ renderHeroImpact(); renderHomeFundaciones(); renderAliadas(); renderAportantes(); renderFormacion(); renderEmpresas(); }
   renderPrivacy();
+  renderTerms();
   /* Por lo mismo que la linea de arriba: `applyLang` acaba de repintar los
      `data-i18n` y se lleva por delante el mensaje de membresia. */
   graciasFijo();
@@ -5889,6 +5895,30 @@ function renderPrivacy(){
       : "<p><a href=\"/privacidad\">Leer la política de privacidad</a></p>";
   });
 }
+/* Términos y condiciones de donación (#terminos). Mismo molde que la política:
+   el texto vive en data/terminos.json, la misma fuente que el Worker sirve en
+   /terminos y /terms con el texto en el HTML, para quien llega sin JavaScript.
+   Dicen cómo funciona HOY el sistema; las cláusulas de reembolso, de fundación
+   que sale de la red y de plazo del certificado son propuestas pendientes de
+   revisión. La frase tributaria es la del certificado (Art. 257, 25 %, límite
+   del Art. 258): no se cambia en el JSON sin cambiarla en documentos.js. */
+var TERMS = null, TERMS_CARGA = null;
+function renderTerms(){
+  var el = document.getElementById("terms-body"); if (!el) return;
+  if (TERMS){ el.innerHTML = TERMS[lang] || TERMS.es; return; }
+  if (!TERMS_CARGA){
+    TERMS_CARGA = fetch("/data/terminos.json")
+      .then(function(r){ if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then(function(j){ TERMS = j; })
+      .catch(function(){ TERMS_CARGA = null; });
+  }
+  TERMS_CARGA.then(function(){
+    if (TERMS){ renderTerms(); return; }
+    el.innerHTML = lang === "en"
+      ? "<p><a href=\"/terms\">Read the donation terms</a></p>"
+      : "<p><a href=\"/terminos\">Leer los términos de donación</a></p>";
+  });
+}
 /* ═══ LA FICHA COMO REGISTRO — fundaciones y comercios ═══════════════════
    Rediseño del 26 sep 2026, a pedido de Sebas («no se ve bien»). Lo que había:
    · las etiquetas del encabezado (zona, población, años) iban en un .eco-row,
@@ -6569,6 +6599,13 @@ function init(){
   document.addEventListener("click", function(e){
     var el = e.target.closest("[data-nav], a[href^='#']");
     if (!el || el.getAttribute("onclick") || el.hasAttribute("data-act")) return;
+    /* Un enlace con target="_blank" abre OTRA pestaña, y así debe quedar: es el
+       «Ver Política de Privacidad» junto a cada casilla de autorización y los
+       «Términos y condiciones de donación» junto al pago. Si este
+       manejador lo interceptara, navegaría en la misma pestaña y la persona
+       saldría del formulario a medio llenar — en Mira Mi Casa, con las fotos
+       todavía en memoria. */
+    if (el.getAttribute("target") === "_blank") return;
     var route = el.getAttribute("data-nav") || (el.getAttribute("href")||"").slice(1);
     if (!isSpaRoute(route)) return;   // deja pasar skip-link (#), anclas internas, etc.
     e.preventDefault();

@@ -1634,6 +1634,8 @@ try {
     /* La política de privacidad vive en data/privacidad.json (la pintan app.js y
        el Worker): sus clases —legal-meta— cuentan como usadas. */
     try { const pol = JSON.parse(readFileSync("data/privacidad.json", "utf8")); worker += "\n" + pol.es + "\n" + pol.en; } catch { /* sin política, nada que sumar */ }
+    /* Igual los términos de donación (data/terminos.json, #terminos y /terminos). */
+    try { const ter = JSON.parse(readFileSync("data/terminos.json", "utf8")); worker += "\n" + ter.es + "\n" + ter.en; } catch { /* sin términos, nada que sumar */ }
     const hoja = readFileSync("styles.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     const htmlVivo = html.replace(/<!--[\s\S]*?-->/g, "");
 

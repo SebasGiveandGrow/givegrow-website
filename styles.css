@@ -1236,6 +1236,10 @@ html[data-theme="dark"] .prog-logo{background:#000}
 .pay-now-btn:hover{background:#37955F}
 .pay-now-btn:disabled{opacity:.6;cursor:default}
 .pay-now-msg{margin:12px 0 0;font-size:var(--fs-14);color:var(--on-dark-3)}
+/* Los términos, a un paso del botón de pago: se leen ANTES de pagar, no después.
+   Panel oscuro en los dos temas, igual que el resto de .pay-now. */
+.pay-now-ter{margin:12px 0 0;font-size:var(--fs-13);line-height:1.5;color:var(--on-dark-3)}
+.pay-now-ter a{color:var(--brote);font-weight:600;text-decoration:underline}
 .pay-now-msg.err{color:#f0857a}
 /* CERTIFICADO DESDE LA CALCULADORA (28 sep 2026). Hasta hoy un donante en linea
    no tenia como pedirlo. Mismo lenguaje que `.calc-note` —el panel es oscuro en
@@ -2168,7 +2172,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
   .band, .band *, .calc, .calc *, .hero, .hero *, .home-hub, .home-hub *,
   .foto-banner, .foto-banner *, .stats, .stats *,
   .live-stat, .live-stat *,
-  .pay-now-t, .pay-now-p, .pay-now-msg, .pay-now-rec, .gal-cap, .track-ev-ic {
+  .pay-now-t, .pay-now-p, .pay-now-msg, .pay-now-rec, .pay-now-ter, .gal-cap, .track-ev-ic {
     color:#111 !important; background:transparent !important;
     text-shadow:none !important; box-shadow:none !important;
   }

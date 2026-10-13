@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=2431a54e">
+<link rel="stylesheet" href="/styles.css?v=e6555d3c">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=88fac6d4" defer></script>
+<script src="/app.js?v=0a951545" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1854,6 +1854,7 @@
           </div>
           <p class="pay-now-rec" id="pay-rec-note" style="display:none"></p>
           <button type="button" class="btn btn-g pay-now-btn" id="pay-go" data-act="irAPagar()" data-i18n="pay.now.btn">Continuar al pago</button>
+          <p class="pay-now-ter"><a href="#terminos" target="_blank" rel="noopener" data-i18n="ter.link">Términos y condiciones de donación</a></p>
           <p class="pay-now-msg" id="pay-msg" role="status" aria-live="polite" style="display:none"></p>
           <!-- La franja de confianza: su marcado vive UNA vez, en <template id="tpl-franja">. -->
           <div class="franja" data-franja></div>
@@ -2534,6 +2535,7 @@
             <li data-i18n="membres.cta.g3">Terminas cuando quieras, en un clic y sin penalidades</li>
           </ul>
           <p class="cta-note" data-i18n="membres.cancel">Puedes terminar tu membresía cuando quieras desde tu propia membresía: al activarla te llega por correo un enlace propio, y desde ahí la cancelas y retiramos tu método de pago en un clic. No hay que escribirle a nadie ni hay penalidades; el certificado tributario cubre lo donado hasta la fecha. Si perdiste el enlace, lo recuperas con tu correo.</p>
+          <a class="ally-policy-link" href="#terminos" target="_blank" rel="noopener" data-i18n="ter.link">Términos y condiciones de donación</a>
         </div>
         <div class="mb-elige">
           <fieldset class="mb-grupo">
@@ -2630,6 +2632,7 @@
         <button type="submit" class="btn btn-g" id="mif-btn" data-i18n="mi.enviar">Continuar a PayPal</button>
         <p id="mif-note" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;display:none"></p>
         <p class="mu" style="margin-top:10px;font-size:13px" data-i18n="mi.pie">PayPal te pide la aprobación y el primer cobro lo hace él. Nosotros no vemos ni guardamos los datos de tu tarjeta.</p>
+        <a class="ally-policy-link" href="#terminos" target="_blank" rel="noopener" data-i18n="ter.link">Términos y condiciones de donación</a>
       </form>
     </div>
   </section>
@@ -2932,6 +2935,20 @@
       <h1 class="h-sec rv" data-i18n="priv.t">Política de Privacidad y Tratamiento de Datos</h1>
       <p class="lead rv d1" data-i18n="priv.lead">Cómo protegemos y tratamos tus datos personales, conforme a la Ley 1581 de 2012 y el GDPR — y cómo puedes ejercer tus derechos.</p>
       <div id="privacy-body" class="legal-doc rv d2"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Términos y condiciones de donación. Mismo molde que la política: el cuerpo
+     vive en data/terminos.json y lo pinta renderTerms() desde app.js; el Worker
+     sirve el mismo texto sin JavaScript en /terminos y /terms. -->
+<main id="page-terminos" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="priv.ey">Legal</span>
+      <h1 class="h-sec rv" data-i18n="ter.t">Términos y condiciones de donación</h1>
+      <p class="lead rv d1" data-i18n="ter.lead">Qué pasa con tu aporte desde que lo haces: quién lo recibe, cómo se cobra, qué documentos te llegan y qué hacer si algo sale mal.</p>
+      <div id="terms-body" class="legal-doc rv d2"></div>
     </div>
   </section>
 </main>
@@ -3782,6 +3799,7 @@
         <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
         <a href="#medicion" data-i18n="nav.medicion">Cómo medimos</a>
         <a href="#privacidad" data-i18n="foot.privacy">Privacidad y datos</a>
+        <a href="#terminos" data-i18n="foot.terms">Términos de donación</a>
         <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a>
         <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a>
         <a href="https://wa.me/573153305028">+57 315 330 5028</a>
@@ -3823,6 +3841,7 @@
         <p class="mmc-foot-fuera" data-i18n="mmc.foot.fuera">En el sitio de la fundación, que es la entidad que responde por esto:</p>
         <a href="https://www.thegiveandgrowproject.org/#transparencia" data-i18n="nav.transp">Transparencia</a>
         <a href="https://www.thegiveandgrowproject.org/#estandares" data-i18n="nav.estandares">Marco de actuación</a>
+        <a href="https://www.thegiveandgrowproject.org/#terminos" data-i18n="foot.terms">Términos de donación</a>
       </div>
     </div>
     <div class="foot-bottom">
