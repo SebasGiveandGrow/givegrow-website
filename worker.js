@@ -34,7 +34,7 @@
 import { qrSvg } from './qr.js';
 /* La política de privacidad, fuente única con app.js: ver `paginaPrivacidad`. */
 import PRIVACIDAD from './data/privacidad.json';
-import { recibo, certificado, certificadoVoluntariado, informeTriage, inspeccionPDF, comprobanteFirmaConvenio,
+import { recibo, certificado, certificadoVoluntariado, informeTriage, inspeccionPDF, comprobanteFirmaConvenio, informeBoard,
          INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT,
          INSPECCION_AYUDA, INSPECCION_ANCHOS, INSPECCION_GLOSARIO,
          INSPECCION_LIMITES, INSPECCION_REGLA_VISTA, INSPECCION_RECOMENDA,
@@ -3153,6 +3153,17 @@ async function adminSalud(env, opciones) {
       "Legal y documentos › Documentos · renuévalo antes de que venza: el nuevo reemplaza al viejo", 86, "#sec-documentos");
     await enCola("documentos_faltantes", cd.faltan,
       "Legal y documentos › Documentos · súbelo, o márcalo «No aplica» con el motivo", 87, "#sec-documentos");
+  }
+  /* MEAL Y BOARD (0045). Dos colas ya contadas por `colasMeal`, en «Esta
+     semana» y sin plazo: medir un indicador o mandar el informe al Board no es
+     una promesa a alguien de fuera, así que no suben a Urgente ni entran al
+     correo diario. Sin la 0045 no salen. */
+  const cm = await colasMeal(env);
+  if (cm) {
+    await enCola("meal_indicadores_pendientes", cm.indicadores,
+      "MEAL y Board › Indicadores · registra la medición del periodo que cerró, con su fuente y su corte", 88, "#sec-meal");
+    await enCola("board_informe_sin_enviar", cm.informe,
+      "MEAL y Board › Board de Asesores · revisa el PDF y envíaselo a los asesores", 89, "#sec-board");
   }
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
@@ -20164,6 +20175,847 @@ async function adminReporte(env, url, csv) {
     "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
 }
 
+/* ========================================================================
+   MEAL Y BOARD DE ASESORES (0045)
+   ========================================================================
+   Dos cosas que el fundador lleva desde el panel:
+
+   · LOS INDICADORES (MEAL: monitoreo, evaluación, rendición de cuentas y
+     aprendizaje). Cada medición lleva su FUENTE y su fecha de CORTE: es la
+     regla «Evidencia, no promesas» hecha columna obligatoria. Donde la base ya
+     tiene el dato, el sistema SUGIERE el valor y dice de qué tabla sale; una
+     persona decide si lo registra. Nada se guarda solo.
+
+   · EL BOARD DE ASESORES. Asesora y recomienda; NO aprueba ni dirige. La
+     fundación no tiene junta directiva: el máximo órgano de dirección es el que
+     definen los estatutos (hoy, el fundador), con Representante Legal y
+     Revisora Fiscal. El informe trimestral y la convocatoria lo dicen así, y
+     ningún texto de este módulo puede decir «aprueba».
+
+   Ver migrations/0045_meal_board.sql. */
+
+/* EL PRIMER PERIODO QUE SE EXIGE. Antes de esta fecha no había operación que
+   medir con esta batería (el lanzamiento y la brigada son de agosto–septiembre
+   de 2026), así que un periodo que TERMINA antes no sale como «pendiente»: sería
+   una deuda inventada. El primer trimestre que se le reporta al Board es
+   2026-T3. Decisión a validar con el fundador: si cambia, cambia aquí. */
+const MEL_INICIO = "2026-07-01";
+const MEL_FRECUENCIAS = Object.freeze({ mensual: "Mensual", trimestral: "Trimestral", semestral: "Semestral", anual: "Anual", por_evento: "Por evento" });
+const MEL_TIPOS = Object.freeze({ producto: "Producto", resultado: "Resultado" });
+const MEL_LINEAS = Object.freeze({ L1: "L1", L2: "L2", L3: "L3", L4: "L4", todas: "Todas" });
+const MEL_ESTADOS = Object.freeze({ al_dia: "Al día", pendiente: "Pendiente este periodo", por_evento: "Por evento",
+  aun_no: "Sin periodo exigible todavía" });
+const MEL_FORMATO_PERIODO = Object.freeze({
+  mensual: { re: /^\d{4}-(0[1-9]|1[0-2])$/, ej: "2026-09" },
+  trimestral: { re: /^\d{4}-T[1-4]$/, ej: "2026-T3" },
+  semestral: { re: /^\d{4}-S[12]$/, ej: "2026-S2" },
+  anual: { re: /^\d{4}$/, ej: "2026" }
+});
+const MESES_CORTOS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/* EL PERIODO, en cuatro piezas que no se escriben dos veces:
+   · melPeriodoDe: el periodo (de esa frecuencia) que contiene una fecha;
+   · melRango: del primero al último día de un periodo;
+   · melAnterior: el periodo de antes;
+   · melExigible: el ÚLTIMO PERIODO CERRADO, que es el que se puede medir. El
+     trimestre en curso no se exige: no ha terminado. El 13 de octubre se le
+     pide a un indicador trimestral su 2026-T3, no su 2026-T4. */
+function melPeriodoDe(frecuencia, fecha) {
+  const y = String(fecha).slice(0, 4), m = Number(String(fecha).slice(5, 7));
+  if (frecuencia === "mensual") return y + "-" + String(m).padStart(2, "0");
+  if (frecuencia === "trimestral") return y + "-T" + Math.ceil(m / 3);
+  if (frecuencia === "semestral") return y + "-S" + (m <= 6 ? 1 : 2);
+  if (frecuencia === "anual") return y;
+  return null;
+}
+function melRango(periodo) {
+  const p = String(periodo || "");
+  const ultimo = (y, m) => new Date(Date.UTC(Number(y), m, 0)).toISOString().slice(0, 10);
+  let m;
+  if ((m = p.match(/^(\d{4})-(0[1-9]|1[0-2])$/))) return { desde: p + "-01", hasta: ultimo(m[1], Number(m[2])) };
+  if ((m = p.match(/^(\d{4})-T([1-4])$/))) {
+    const q = Number(m[2]);
+    return { desde: m[1] + "-" + String(q * 3 - 2).padStart(2, "0") + "-01", hasta: ultimo(m[1], q * 3) };
+  }
+  if ((m = p.match(/^(\d{4})-S([12])$/))) {
+    return m[2] === "1" ? { desde: m[1] + "-01-01", hasta: m[1] + "-06-30" } : { desde: m[1] + "-07-01", hasta: m[1] + "-12-31" };
+  }
+  if ((m = p.match(/^(\d{4})$/))) return { desde: m[1] + "-01-01", hasta: m[1] + "-12-31" };
+  return null;
+}
+function melDiaAntes(fecha) {
+  const d = new Date(fecha + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+function melAnterior(frecuencia, periodo) {
+  const r = melRango(periodo);
+  return r ? melPeriodoDe(frecuencia, melDiaAntes(r.desde)) : null;
+}
+function melExigible(frecuencia, hoy) {
+  if (!MEL_FORMATO_PERIODO[frecuencia]) return null;
+  const p = melAnterior(frecuencia, melPeriodoDe(frecuencia, hoy));
+  const r = melRango(p);
+  return r && r.hasta >= MEL_INICIO ? p : null;
+}
+/* «julio a septiembre de 2026»: el periodo como lo dice una persona. */
+function melPeriodoDicho(periodo) {
+  const r = melRango(periodo);
+  if (!r) return String(periodo || "");
+  const y = r.desde.slice(0, 4), a = Number(r.desde.slice(5, 7)), b = Number(r.hasta.slice(5, 7));
+  return a === b ? MESES_ES[a - 1] + " de " + y : MESES_ES[a - 1] + " a " + MESES_ES[b - 1] + " de " + y;
+}
+
+/* ¿Al día? Lo dice la medición de MAYOR periodo (del formato de su
+   frecuencia), no la última que se escribió: registrar hoy el dato de julio no
+   pone al día el de septiembre. `hoy` es un parámetro porque el informe del
+   Board lo calcula a la fecha de su corte, no a la de hoy. */
+function melEstado(ind, mediciones, hoy) {
+  if (ind.frecuencia === "por_evento") return { estado: "por_evento", exigible: null };
+  const ex = melExigible(ind.frecuencia, hoy);
+  if (!ex) return { estado: "aun_no", exigible: null, primero: melPeriodoDe(ind.frecuencia, MEL_INICIO) };
+  const f = MEL_FORMATO_PERIODO[ind.frecuencia];
+  const max = mediciones.filter((m) => !m.anulado_en && f.re.test(m.periodo)).map((m) => m.periodo).sort().pop() || null;
+  return { estado: max && max >= ex ? "al_dia" : "pendiente", exigible: ex };
+}
+/* La última medición vigente: la de corte más reciente (a igual corte, la
+   última que se escribió). */
+function melUltima(mediciones) {
+  return mediciones.filter((m) => !m.anulado_en)
+    .sort((a, b) => (a.corte < b.corte ? 1 : a.corte > b.corte ? -1 : b.id - a.id))[0] || null;
+}
+/* «45,5 %», «32 días», o lo cualitativo tal cual. */
+function melValorDicho(m, unidad) {
+  if (!m) return "";
+  const u = String(unidad || "").trim();
+  const n = m.valor == null ? "" : Number(m.valor).toLocaleString("es-CO", { maximumFractionDigits: 2 }) + (u ? (u === "%" ? " %" : " " + u) : "");
+  return [n, m.valor_texto || ""].filter(Boolean).join(" · ");
+}
+function melFechaCorta(f) {
+  const p = String(f || "").split("-");
+  return p.length === 3 ? Number(p[2]) + " " + MESES_CORTOS_ES[Number(p[1]) - 1] + " " + p[0] : String(f || "");
+}
+
+/* ---- LOS VALORES QUE EL SISTEMA SABE CALCULAR ----
+   Cada cálculo recibe el periodo (`desde`–`corte`) y devuelve
+   { valor, detalle, fuente } o { no: "por qué no" }. La consulta va escrita al
+   lado, con lo que cuenta y lo que NO cuenta: si un valor no se puede sacar con
+   honestidad de la base, no se inventa. Los que no están aquí —la escalera de
+   evidencia, las unidades de las actas, las toneladas, las viviendas, las
+   quejas— no tienen hoy una tabla que los sostenga y se miden a mano.
+
+   LOS CONTEOS SON ACUMULADOS AL CORTE (lo que hay hasta ese día, desde el
+   principio), porque las metas de 2027 son de existencias: «8 fundaciones con
+   convenio», no «8 este trimestre». Cada detalle dice además cuántos son del
+   periodo. Los porcentajes y promedios dicen su denominador. */
+const MEL_CONFIRMADO_B = "b.estado IN ('aprobada','en_distribucion','entregada')";
+const MEL_FECHA_B = FECHA_APORTE.replace(/\ba\./g, "b.");
+/* El acta que el DONANTE ve en su rastreo: publicada, no anulada y de su
+   destino (el fondo general, `destino_id` NULL, ve cualquiera). Es la misma
+   condición que la cola «entregadas_sin_acta» de «Hoy», más la fecha de corte. */
+const MEL_ACTA_DEL_APORTE = "g.publicada_en IS NOT NULL AND g.anulada_en IS NULL AND date(g.publicada_en, '-5 hours') <= ? " +
+  "AND (a.destino_id IS NULL OR g.destino_id = a.destino_id COLLATE NOCASE)";
+const MEL_CALCULOS = Object.freeze({
+  /* #1 · Fundaciones con convenio firmado.
+     SELECT COUNT(*) FROM inscripciones WHERE tipo = 'fundacion'
+       AND estado NOT IN ('archivada','rechazada')
+       AND json_extract(datos, '$.convenio.firmado.en') <= corte
+     «Firmado» = la marca «firmado por ambas partes» de Red (en línea o en
+     papel: es la misma marca). Una fundación archivada después no cuenta. Los
+     convenios que SOLO estén subidos a Documentos no se suman, para no contar
+     dos veces a la misma fundación: se dice cuántos hay, para cotejar. */
+  convenios_firmados: { nombre: "Convenios firmados por ambas partes (Red)", fuente: "inscripciones · marca «firmado por ambas partes» del convenio",
+    fn: async (env, desde, corte) => {
+      const F = "json_extract(datos, '$.convenio.firmado.en')";
+      const r = await env.DB.prepare(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN date(" + F + ", '-5 hours') >= ? THEN 1 ELSE 0 END), 0) AS en_periodo " +
+        "FROM inscripciones WHERE tipo = 'fundacion' AND estado NOT IN ('archivada','rechazada') AND " + F + " IS NOT NULL " +
+        "AND date(" + F + ", '-5 hours') <= ?"
+      ).bind(desde, corte).first();
+      let docs = null;
+      try {
+        docs = await env.DB.prepare("SELECT COUNT(*) AS n FROM documentos WHERE tipo = 'convenio' AND anulado_en IS NULL AND no_aplica = 0").first();
+      } catch (e) { /* sin la 0044 no hay archivo de documentos */ }
+      return { valor: Number(r.n || 0),
+        detalle: Number(r.n || 0) + " fundaciones con el convenio marcado «firmado por ambas partes» en Red al " + melFechaCorta(corte) +
+          " (" + Number(r.en_periodo || 0) + " en el periodo). No cuenta las archivadas." +
+          (docs ? " Documentos tiene " + Number(docs.n || 0) + " convenio(s) archivado(s): cotéjalos, no se suman para no contar dos veces." : "") };
+    } },
+  /* #4 · % de aportes con rastreo completo publicado.
+     Denominador: aportes CONFIRMADOS (aprobada, en_distribucion, entregada)
+       con fecha del dinero <= corte — las mismas reglas de Finanzas.
+     Numerador: los que están «entregada» Y tienen un acta publicada de su
+       destino al corte, que es lo que el donante ve completo en su rastreo.
+     OJO: el enlace aporte → acta es POR DESTINO (así funciona el rastreo hoy),
+     no aporte por aporte; y el estado «entregada» es el de hoy. */
+  rastreo_completo: { nombre: "Rastreo completo publicado (aportes y actas)", fuente: "aportes + entregas (actas publicadas), como lo ve el donante en el rastreo",
+    fn: async (env, desde, corte) => {
+      const r = await env.DB.prepare(
+        "SELECT COUNT(*) AS base, COALESCE(SUM(CASE WHEN a.estado = 'entregada' AND EXISTS (SELECT 1 FROM entregas g WHERE " +
+        MEL_ACTA_DEL_APORTE + ") THEN 1 ELSE 0 END), 0) AS completos FROM aportes a WHERE " + APORTE_CONFIRMADO + " AND " + FECHA_APORTE + " <= ?"
+      ).bind(corte, corte).first();
+      const base = Number(r.base || 0), c = Number(r.completos || 0);
+      if (!base) return { no: "No hay aportes confirmados al " + melFechaCorta(corte) + ": sin denominador no hay porcentaje." };
+      return { valor: Math.round((c / base) * 1000) / 10,
+        detalle: c + " de " + base + " aportes confirmados al " + melFechaCorta(corte) + " están «entregada» y con acta publicada de su destino. " +
+          "El enlace aporte → acta es por destino, como en el rastreo." };
+    } },
+  /* #5 · Días promedio entre el aporte y su acta publicada.
+     Para cada aporte «entregada» con fecha del dinero <= corte: los días hasta
+     la PRIMERA acta publicada de su destino en o después de esa fecha (y antes
+     del corte). Un acta publicada antes del aporte no es la suya. Promedio
+     simple, con cuántos aportes lo sostienen. */
+  dias_aporte_acta: { nombre: "Días del aporte a la primera acta publicada de su destino", fuente: "aportes + entregas (fecha de publicación del acta)",
+    fn: async (env, desde, corte) => {
+      const r = await env.DB.prepare(
+        "SELECT COUNT(*) AS n, AVG(julianday(p) - julianday(f)) AS dias, MIN(julianday(p) - julianday(f)) AS minimo, " +
+        "MAX(julianday(p) - julianday(f)) AS maximo FROM (SELECT " + FECHA_APORTE + " AS f, (SELECT MIN(date(g.publicada_en, '-5 hours')) " +
+        "FROM entregas g WHERE " + MEL_ACTA_DEL_APORTE + " AND date(g.publicada_en, '-5 hours') >= " + FECHA_APORTE + ") AS p " +
+        "FROM aportes a WHERE a.estado = 'entregada' AND " + FECHA_APORTE + " <= ?) WHERE p IS NOT NULL"
+      ).bind(corte, corte).first();
+      const n = Number(r.n || 0);
+      if (!n) return { no: "Ningún aporte «entregada» tiene todavía un acta publicada de su destino al " + melFechaCorta(corte) + ": no hay días que promediar." };
+      return { valor: Math.round(Number(r.dias) * 10) / 10,
+        detalle: "Promedio de " + n + " aporte(s) «entregada» con acta publicada de su destino al " + melFechaCorta(corte) +
+          " (mínimo " + Math.round(Number(r.minimo)) + ", máximo " + Math.round(Number(r.maximo)) + " días). Cuenta desde la fecha del dinero." };
+    } },
+  /* #6 · % de donantes que vuelven a aportar en 12 meses.
+     Cohorte: donantes cuyo PRIMER aporte confirmado es de hace al menos 12
+       meses al corte (si no, todavía no se sabe si vuelven).
+     Vuelven: tienen otro aporte confirmado dentro de los 12 meses siguientes
+       al primero. Una membresía cuenta: su segundo cobro es volver a aportar.
+     Con la fundación recién lanzada, la cohorte está vacía y se dice así. */
+  donantes_recurrentes: { nombre: "Donantes que vuelven a aportar en 12 meses", fuente: "aportes confirmados por donante",
+    fn: async (env, desde, corte) => {
+      const r = await env.DB.prepare(
+        "SELECT COUNT(*) AS base, COALESCE(SUM(CASE WHEN (SELECT COUNT(*) FROM aportes b WHERE b.donante_id = pa.d AND " + MEL_CONFIRMADO_B +
+        " AND " + MEL_FECHA_B + " BETWEEN pa.f AND date(pa.f, '+12 months')) >= 2 THEN 1 ELSE 0 END), 0) AS vuelven " +
+        "FROM (SELECT a.donante_id AS d, MIN(" + FECHA_APORTE + ") AS f FROM aportes a WHERE " + APORTE_CONFIRMADO +
+        " AND a.donante_id IS NOT NULL GROUP BY a.donante_id) pa WHERE pa.f <= date(?, '-12 months')"
+      ).bind(corte).first();
+      const base = Number(r.base || 0);
+      if (!base) {
+        const p = await env.DB.prepare("SELECT MIN(" + FECHA_APORTE + ") AS f FROM aportes a WHERE " + APORTE_CONFIRMADO).first();
+        return { no: "Ningún donante cumple todavía 12 meses desde su primer aporte confirmado" +
+          (p && p.f ? " (el primero es del " + melFechaCorta(p.f) + ")" : "") + ": todavía no se puede saber quién vuelve." };
+      }
+      const v = Number(r.vuelven || 0);
+      return { valor: Math.round((v / base) * 1000) / 10,
+        detalle: v + " de " + base + " donantes con su primer aporte de hace 12 meses o más (al " + melFechaCorta(corte) +
+          ") volvieron a aportar dentro de esos 12 meses. Las membresías cuentan." };
+    } },
+  /* #7 · Horas de voluntariado efectivas.
+     SUM(participaciones.horas) de jornadas realizadas o cerradas con fecha <=
+     corte. Son las horas EFECTIVAS que se anotan al cerrar cada participación;
+     una participación sin horas anotadas no suma (y se dice cuántas hay). */
+  horas_voluntariado: { nombre: "Horas efectivas anotadas en las jornadas", fuente: "jornadas + participaciones (horas efectivas)",
+    fn: async (env, desde, corte) => {
+      const r = await env.DB.prepare(
+        "SELECT COALESCE(SUM(p.horas), 0) AS h, COALESCE(SUM(CASE WHEN j.fecha >= ? THEN p.horas END), 0) AS h_periodo, " +
+        "COALESCE(SUM(CASE WHEN p.horas IS NULL THEN 1 ELSE 0 END), 0) AS sin_horas, COUNT(DISTINCT j.id) AS jornadas " +
+        "FROM participaciones p JOIN jornadas j ON j.id = p.jornada WHERE j.estado IN ('realizada','cerrada') AND j.fecha <= ?"
+      ).bind(desde, corte).first();
+      const h = Math.round(Number(r.h || 0) * 10) / 10;
+      return { valor: h,
+        detalle: h.toLocaleString("es-CO") + " horas en " + Number(r.jornadas || 0) + " jornada(s) realizada(s) o cerrada(s) al " + melFechaCorta(corte) +
+          " (" + (Math.round(Number(r.h_periodo || 0) * 10) / 10).toLocaleString("es-CO") + " en el periodo)." +
+          (Number(r.sin_horas) ? " " + r.sin_horas + " participación(es) sin horas anotadas no suman." : "") };
+    } },
+  /* #8 · Empresas con al menos una jornada de Impact Journey.
+     Empresas distintas en jornadas de la puerta «impact-journey» realizadas o
+     cerradas con fecha <= corte. Se distinguen por su inscripción en Red, o por
+     el nombre escrito si no la tiene: la misma empresa escrita de dos maneras
+     contaría dos veces, y se avisa. */
+  empresas_impact_journey: { nombre: "Empresas en jornadas de Impact Journey realizadas", fuente: "jornadas (puerta Impact Journey, realizadas o cerradas)",
+    fn: async (env, desde, corte) => {
+      const r = await env.DB.prepare(
+        "SELECT COUNT(DISTINCT CASE WHEN j.empresa_inscripcion IS NOT NULL THEN 'i' || j.empresa_inscripcion ELSE 't' || lower(trim(j.empresa)) END) AS n, " +
+        "COUNT(*) AS jornadas FROM jornadas j WHERE j.puerta = 'impact-journey' AND j.estado IN ('realizada','cerrada') AND j.fecha <= ? " +
+        "AND (j.empresa_inscripcion IS NOT NULL OR trim(COALESCE(j.empresa, '')) <> '')"
+      ).bind(corte).first();
+      return { valor: Number(r.n || 0),
+        detalle: Number(r.n || 0) + " empresa(s) en " + Number(r.jornadas || 0) + " jornada(s) de Impact Journey realizada(s) al " + melFechaCorta(corte) +
+          ". Se distinguen por su inscripción en Red o por el nombre escrito: revisa que ninguna esté escrita de dos maneras." };
+    } },
+  /* #10 · Casas con concepto técnico emitido.
+     Casos con al menos un concepto FIRME de un ingeniero (no «no se pudo
+     evaluar») escrito <= corte, sin los descartados (duplicados y pruebas). Es
+     la misma regla de «atendido» de Reportes › Mira Mi Casa. No exige la
+     matrícula verificada: se dice cuántos esperan todavía ese segundo par de
+     ojos. */
+  casas_con_concepto: { nombre: "Casos con concepto firme de un ingeniero", fuente: "casos + evaluaciones del triaje (sin «no se pudo evaluar» ni descartados)",
+    fn: async (env, desde, corte) => {
+      const r = await env.DB.prepare(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN date(p, '-5 hours') >= ? THEN 1 ELSE 0 END), 0) AS en_periodo FROM (" +
+        "SELECT e.caso, MIN(e.creado_en) AS p FROM evaluaciones e JOIN casos c ON c.numero = e.caso " +
+        "WHERE e.clasificacion <> 'inevaluable' AND c.estado <> 'descartado' GROUP BY e.caso) WHERE date(p, '-5 hours') <= ?"
+      ).bind(desde, corte).first();
+      let sin = null;
+      try {
+        sin = await env.DB.prepare("SELECT COUNT(*) AS n FROM casos c WHERE c.estado <> 'descartado' AND " + SIN_RESPALDO).first();
+      } catch (e) { /* sin la tabla de inscripciones de ingenieros no hay respaldo que mirar */ }
+      return { valor: Number(r.n || 0),
+        detalle: Number(r.n || 0) + " casas con concepto firme al " + melFechaCorta(corte) + " (" + Number(r.en_periodo || 0) + " con su primer concepto en el periodo)." +
+          (sin && Number(sin.n) ? " Hoy, " + sin.n + " de ellas tienen el concepto de un ingeniero sin matrícula verificada." : "") };
+    } }
+});
+
+/* La sugerencia de un indicador: el valor que la base sostiene para su
+   periodo exigible (o, si todavía no hay ninguno, para el periodo en curso,
+   hasta hoy). Nunca se guarda: la devuelve el GET y una persona decide. */
+async function melSugerencia(env, ind, est, hoy) {
+  const calc = ind.calculo && MEL_CALCULOS[ind.calculo];
+  if (!calc) return null;
+  const periodo = est.exigible || melPeriodoDe(ind.frecuencia, hoy) || null;
+  const r = periodo ? melRango(periodo) : null;
+  const desde = r ? r.desde : MEL_INICIO;
+  const corte = r && r.hasta < hoy ? r.hasta : hoy;
+  try {
+    const x = await calc.fn(env, desde, corte);
+    return Object.assign({ calculo: ind.calculo, nombre: calc.nombre, fuente: calc.fuente,
+      periodo: periodo || "", corte, calculado: selloCO(new Date().toISOString()) }, x);
+  } catch (e) {
+    /* Una tabla que falta (una migración sin aplicar) no tumba la pantalla. */
+    console.error("sugerencia MEAL", ind.calculo, e && e.message);
+    return { calculo: ind.calculo, nombre: calc.nombre, fuente: calc.fuente, periodo: periodo || "", corte,
+      no: "No se pudo calcular: " + (/no such table/i.test(String(e && e.message)) ? "falta una tabla en la base." : "error al consultar la base.") };
+  }
+}
+
+async function melLeer(env, conAnuladas) {
+  if (!(await existeTabla(env, "mel_indicadores"))) return null;
+  const ind = (await env.DB.prepare("SELECT * FROM mel_indicadores ORDER BY activo DESC, orden, numero, id").all()).results || [];
+  const med = (await env.DB.prepare("SELECT * FROM mel_mediciones" + (conAnuladas ? "" : " WHERE anulado_en IS NULL") +
+    " ORDER BY corte DESC, id DESC LIMIT 5000").all()).results || [];
+  return { ind, med };
+}
+
+/* GET /api/admin/meal — la batería con su última medición, su estado y la
+   sugerencia del sistema donde la hay. */
+async function adminMeal(env) {
+  const hoy = fechaCO();
+  const base = { hoy, inicio: MEL_INICIO, frecuencias: MEL_FRECUENCIAS, tipos: MEL_TIPOS, lineas: MEL_LINEAS, estados: MEL_ESTADOS,
+    calculos: Object.fromEntries(Object.entries(MEL_CALCULOS).map(([k, v]) => [k, v.nombre])),
+    formatos: Object.fromEntries(Object.entries(MEL_FORMATO_PERIODO).map(([k, v]) => [k, v.ej])) };
+  const L = await melLeer(env, false);
+  if (!L) return json(Object.assign(base, { con_tabla: false, indicadores: [] }));
+  const indicadores = [];
+  for (const i of L.ind) {
+    const meds = L.med.filter((m) => m.indicador_id === i.id);
+    const est = melEstado(i, meds, hoy);
+    const ultima = melUltima(meds);
+    const x = Object.assign({}, i, est, { n_mediciones: meds.length, ultima,
+      ultima_dicha: ultima ? melValorDicho(ultima, i.unidad) : "",
+      rango_exigible: est.exigible ? melRango(est.exigible) : null });
+    x.sugerido = i.activo ? await melSugerencia(env, i, est, hoy) : null;
+    if (x.sugerido && x.sugerido.periodo) {
+      const ya = meds.filter((m) => m.periodo === x.sugerido.periodo)[0];
+      if (ya) x.sugerido.ya_registrada = { id: ya.id, valor: melValorDicho(ya, i.unidad) };
+    }
+    indicadores.push(x);
+  }
+  return json(Object.assign(base, { con_tabla: true, indicadores,
+    pendientes: indicadores.filter((x) => x.activo && x.estado === "pendiente").length }));
+}
+
+/* GET /api/admin/meal/mediciones?indicador=<id> — la historia, anuladas
+   incluidas (marcadas): un registro anulado también es historia. */
+async function adminMealMediciones(env, url) {
+  if (!(await existeTabla(env, "mel_mediciones"))) return json({ mediciones: [], con_tabla: false });
+  const id = Number(url.searchParams.get("indicador") || 0);
+  const r = await env.DB.prepare(
+    "SELECT m.*, i.numero, i.nombre AS indicador, i.unidad FROM mel_mediciones m JOIN mel_indicadores i ON i.id = m.indicador_id" +
+    (id ? " WHERE m.indicador_id = ?" : "") + " ORDER BY m.corte DESC, m.id DESC LIMIT 2000"
+  ).bind(...(id ? [id] : [])).all();
+  return json({ con_tabla: true, mediciones: (r.results || []).map((m) => Object.assign(m, { valor_dicho: melValorDicho(m, m.unidad) })) });
+}
+
+/* GET /api/admin/meal/mediciones.csv — todas, en el formato de los otros CSV
+   del panel (punto y coma, BOM, fórmulas neutralizadas por `csvCampo`). */
+async function adminMealCSV(env) {
+  const filas = [["Fundación Give&Grow International · NIT 901.948.930-2"],
+    ["Mediciones de los indicadores MEAL · generado el " + selloCO(new Date().toISOString()) + " (hora de Colombia) desde el panel interno"],
+    ["Cada valor lleva su fuente y su fecha de corte. Las anuladas salen marcadas: también son historia."], [],
+    ["Indicador #", "Indicador", "Periodo", "Valor", "Unidad", "Valor (texto)", "Fuente", "Corte", "Origen", "Nota", "Registrado por", "Registrado (UTC)",
+     "Anulada (UTC)", "Motivo de anulación"]];
+  if (await existeTabla(env, "mel_mediciones")) {
+    const r = await env.DB.prepare(
+      "SELECT m.*, i.numero, i.nombre AS indicador, i.unidad FROM mel_mediciones m JOIN mel_indicadores i ON i.id = m.indicador_id " +
+      "ORDER BY i.numero, m.corte, m.id"
+    ).all();
+    for (const m of r.results || []) {
+      filas.push([m.numero, m.indicador, m.periodo, m.valor == null ? "" : String(m.valor).replace(".", ","), m.unidad || "", m.valor_texto || "",
+        m.fuente_detalle, m.corte, m.origen === "sugerido" ? "sugerido por el sistema, aceptado por una persona" : "manual", m.nota || "",
+        m.registrado_por || "", m.creado, m.anulado_en || "", m.anulado_motivo || ""]);
+    }
+  }
+  const texto = "﻿" + filas.map((x) => x.map(csvCampo).join(";")).join("\r\n") + "\r\n";
+  return new Response(texto, { headers: {
+    "content-type": "text/csv; charset=utf-8",
+    "content-disposition": 'attachment; filename="mediciones-meal-' + fechaCO() + '.csv"',
+    "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
+}
+
+/* POST /api/admin/meal/mediciones — una medición nueva. La fuente es
+   obligatoria y el periodo tiene la forma de la frecuencia del indicador. Un
+   periodo ya medido no se mide dos veces: se anula el anterior y se registra
+   el bueno, así la corrección queda escrita. */
+async function adminMealMedir(request, env, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "mel_mediciones"))) {
+    return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0045 en la base: sin ella no se guardan mediciones." }, 409);
+  }
+  const ind = await env.DB.prepare("SELECT * FROM mel_indicadores WHERE id = ?").bind(Number(c.indicador_id) || 0).first();
+  if (!ind) return json({ error: "indicador_invalido", campo: "indicador", ayuda: "Elige el indicador." }, 400);
+  const fmt = MEL_FORMATO_PERIODO[ind.frecuencia];
+  const periodo = limpiar(c.periodo, 40).replace(/\s+/g, " ");
+  if (!periodo) return json({ error: "periodo_requerido", campo: "periodo", ayuda: "Escribe el periodo que mide." }, 400);
+  if (fmt && !fmt.re.test(periodo)) {
+    return json({ error: "periodo_invalido", campo: "periodo", ayuda: "Este indicador es " + MEL_FRECUENCIAS[ind.frecuencia].toLowerCase() + ": el periodo se escribe así: " + fmt.ej + "." }, 400);
+  }
+  const corte = String(c.corte || "");
+  if (!fechaISOValida(corte)) return json({ error: "corte_invalido", campo: "corte", ayuda: "La fecha de corte no es válida." }, 400);
+  if (corte > fechaCO()) return json({ error: "corte_futuro", campo: "corte", ayuda: "El corte no puede ser de mañana: es hasta cuándo cuenta el dato." }, 400);
+  const r = fmt ? melRango(periodo) : null;
+  if (r && corte < r.desde) return json({ error: "corte_antes", campo: "corte", ayuda: "El corte es anterior al periodo " + periodo + " (empieza el " + r.desde + ")." }, 400);
+  const crudo = c.valor == null ? "" : String(c.valor).trim().replace(/\s/g, "").replace(",", ".");
+  let valor = null;
+  if (crudo !== "") {
+    valor = Number(crudo);
+    if (!isFinite(valor)) return json({ error: "valor_invalido", campo: "valor", ayuda: "El valor es un número (con coma o punto decimal). Lo que no sea número va en «Valor en texto»." }, 400);
+  }
+  const valorTexto = limpiar(c.valor_texto, 300) || null;
+  if (valor == null && !valorTexto) return json({ error: "valor_requerido", campo: "valor", ayuda: "Escribe el valor, o lo cualitativo en «Valor en texto»." }, 400);
+  const fuente = limpiar(c.fuente_detalle, 500);
+  if (fuente.length < 3) {
+    return json({ error: "fuente_requerida", campo: "fuente_detalle", ayuda: "Di de dónde sale: qué acta, registro o inventario. Sin fuente no hay medición." }, 400);
+  }
+  const ya = await env.DB.prepare("SELECT id FROM mel_mediciones WHERE indicador_id = ? AND periodo = ? AND anulado_en IS NULL").bind(ind.id, periodo).first();
+  if (ya) {
+    return json({ error: "periodo_ya_medido", campo: "periodo",
+      ayuda: "El periodo " + periodo + " ya tiene una medición. Si hay que corregirla, anúlala en la historia del indicador y registra la buena." }, 409);
+  }
+  const res = await env.DB.prepare(
+    "INSERT INTO mel_mediciones (indicador_id, periodo, valor, valor_texto, fuente_detalle, corte, nota, origen, registrado_por) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(ind.id, periodo, valor, valorTexto, fuente, corte, limpiar(c.nota, 1000) || null,
+         c.origen === "sugerido" ? "sugerido" : "manual", quien || null).first();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "medicion MEAL " + res.id + " · indicador #" + ind.numero + " · " + periodo + (c.origen === "sugerido" ? " · valor sugerido" : "")).run();
+  return json({ ok: true, id: res.id });
+}
+
+/* POST /api/admin/meal/medicion/<id> { accion: anular {motivo} } */
+async function adminMealMedicion(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "mel_mediciones"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0045." }, 409);
+  const m = await env.DB.prepare("SELECT id, anulado_en FROM mel_mediciones WHERE id = ?").bind(id).first();
+  if (!m) return json({ error: "no_encontrada" }, 404);
+  if (c.accion !== "anular") return json({ error: "accion_invalida" }, 400);
+  if (m.anulado_en) return json({ error: "ya_anulada", ayuda: "Esa medición ya está anulada." }, 409);
+  const motivo = limpiar(c.motivo, 300);
+  if (!motivo) return json({ error: "motivo_requerido", ayuda: "Escribe por qué se anula." }, 400);
+  await env.DB.prepare("UPDATE mel_mediciones SET anulado_en = datetime('now'), anulado_por = ?, anulado_motivo = ? WHERE id = ? AND anulado_en IS NULL")
+    .bind(quien || null, motivo, id).run();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "medicion MEAL " + id + " · anulada · " + motivo).run();
+  return json({ ok: true, id });
+}
+
+/* POST /api/admin/meal/indicador/<id> { accion: editar } — el borrador se
+   corrige desde aquí. «validado» marca que el fundador lo revisó: el informe
+   del Board dice cuántos de la batería siguen en borrador. */
+async function adminMealIndicador(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "mel_indicadores"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0045." }, 409);
+  const i = await env.DB.prepare("SELECT * FROM mel_indicadores WHERE id = ?").bind(id).first();
+  if (!i) return json({ error: "no_encontrado" }, 404);
+  const nombre = limpiar(c.nombre, 200).replace(/\s+/g, " ");
+  if (nombre.length < 3) return json({ error: "nombre_requerido", campo: "nombre", ayuda: "Escribe el nombre del indicador." }, 400);
+  if (!MEL_TIPOS[c.tipo]) return json({ error: "tipo_invalido", campo: "tipo", ayuda: "Elige producto o resultado." }, 400);
+  if (!MEL_LINEAS[c.linea]) return json({ error: "linea_invalida", campo: "linea", ayuda: "Elige la línea." }, 400);
+  if (!MEL_FRECUENCIAS[c.frecuencia]) return json({ error: "frecuencia_invalida", campo: "frecuencia", ayuda: "Elige la frecuencia." }, 400);
+  const fuente = limpiar(c.fuente, 300);
+  if (fuente.length < 3) return json({ error: "fuente_requerida", campo: "fuente", ayuda: "Di de dónde sale el dato." }, 400);
+  const calculo = c.calculo && MEL_CALCULOS[c.calculo] ? String(c.calculo) : null;
+  const numero = entero(c.numero, i.numero, 1, 999);
+  const validar = !!c.validado;
+  await env.DB.prepare(
+    "UPDATE mel_indicadores SET numero = ?, nombre = ?, tipo = ?, linea = ?, fuente = ?, frecuencia = ?, unidad = ?, linea_base = ?, meta_2027 = ?, " +
+    "calculo = ?, activo = ?, orden = ?, validado_en = " + (validar ? "COALESCE(validado_en, datetime('now'))" : "NULL") + ", validado_por = " +
+    (validar ? "COALESCE(validado_por, ?)" : "?") + ", actualizado = datetime('now') WHERE id = ?"
+  ).bind(numero, nombre, c.tipo, c.linea, fuente, c.frecuencia, limpiar(c.unidad, 40) || null, limpiar(c.linea_base, 200) || null,
+         limpiar(c.meta_2027, 200) || null, calculo, c.activo === false ? 0 : 1, numero, validar ? (quien || null) : null, id).run();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "indicador MEAL #" + numero + " · editado" + (validar && !i.validado_en ? " · validado" : !validar && i.validado_en ? " · vuelve a borrador" : "")).run();
+  return json({ ok: true, id });
+}
+
+/* ---- «HOY»: lo que el MEAL y el Board le piden al fundador ----
+   Dos colas YA CONTADAS (la forma de `enCola` para lo que no sale de una sola
+   consulta), las dos en «Esta semana» y SIN plazo: no son una promesa a
+   alguien de fuera, así que no suben a Urgente ni entran al correo diario.
+   · meal_indicadores_pendientes: los activos cuyo periodo exigible no tiene
+     medición;
+   · board_informe_sin_enviar: el informe del último trimestre cerrado que no
+     ha salido, si hay a quién mandárselo. */
+async function colasMeal(env) {
+  if (!(await existeTabla(env, "mel_indicadores"))) return null;
+  const hoy = fechaCO();
+  const L = await melLeer(env, false);
+  const pend = [];
+  for (const i of L.ind.filter((x) => x.activo)) {
+    const e = melEstado(i, L.med.filter((m) => m.indicador_id === i.id), hoy);
+    if (e.estado === "pendiente") pend.push({ id: i.id, titulo: "#" + i.numero + " · " + i.nombre,
+      detalle: MEL_FRECUENCIAS[i.frecuencia].toLowerCase(), cuando: "falta " + e.exigible });
+  }
+  const out = { indicadores: { n: pend.length, cuando: pend.length ? pend[0].cuando : null, items: pend.slice(0, ITEMS_POR_COLA) },
+    informe: { n: 0 } };
+  const tri = melExigible("trimestral", hoy);
+  if (tri) {
+    const a = await env.DB.prepare("SELECT COUNT(*) AS n FROM board_asesores WHERE activo = 1").first();
+    const e = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM board_envios WHERE tipo = 'informe_trimestral' AND periodo = ? AND estado IN ('enviado','parcial')"
+    ).bind(tri).first();
+    if (Number(a.n || 0) && !Number(e.n || 0)) {
+      out.informe = { n: 1, cuando: "trimestre " + tri, items: [{ id: tri, titulo: "Informe trimestral " + tri,
+        detalle: melPeriodoDicho(tri) + " · " + a.n + (Number(a.n) === 1 ? " asesor activo" : " asesores activos") }] };
+    }
+  }
+  return out;
+}
+
+/* ---- EL BOARD DE ASESORES ---- */
+const BOARD_TIPOS = Object.freeze({ informe_trimestral: "Informe trimestral", convocatoria: "Convocatoria a reunión", acta: "Acta de reunión" });
+const BOARD_ESTADOS = Object.freeze({ enviando: "Enviando", enviado: "Enviado", parcial: "Enviado a medias", fallido: "No salió", simulado: "Simulado (no salió)" });
+const BOARD_ASESORA = "El Board de Asesores asesora y recomienda: no aprueba ni dirige. Sus conceptos quedan como recomendaciones y las decisiones " +
+  "las toma el máximo órgano de dirección que definen los estatutos, con el Representante Legal y la Revisora Fiscal.";
+
+/* Los trimestres que se le pueden reportar: del primero exigible al último
+   cerrado, el más reciente primero. */
+function boardTrimestres(hoy) {
+  const ult = melExigible("trimestral", hoy);
+  const out = [];
+  let p = ult;
+  while (p && melRango(p).hasta >= MEL_INICIO && out.length < 24) { out.push(p); p = melAnterior("trimestral", p); }
+  return out;
+}
+
+/* GET /api/admin/board — asesores, envíos y lo que hace falta para los dos
+   formularios. */
+async function adminBoard(env) {
+  const hoy = fechaCO();
+  const base = { hoy, trimestres: boardTrimestres(hoy), tipos: BOARD_TIPOS, estados: BOARD_ESTADOS, asesora: BOARD_ASESORA };
+  if (!(await existeTabla(env, "board_asesores"))) return json(Object.assign(base, { con_tabla: false, asesores: [], envios: [] }));
+  const asesores = (await env.DB.prepare("SELECT * FROM board_asesores ORDER BY activo DESC, nombre").all()).results || [];
+  const envios = (await env.DB.prepare(
+    "SELECT id, tipo, periodo, asunto, destinatarios, enviados, fallidos, estado, datos, (archivo_clave IS NOT NULL) AS tiene_pdf, " +
+    "archivo_bytes, archivo_sha256, enviado_por, creado FROM board_envios ORDER BY id DESC LIMIT 300"
+  ).all()).results || [];
+  return json(Object.assign(base, { con_tabla: true, asesores, envios,
+    activos: asesores.filter((a) => a.activo).length }));
+}
+
+function leerAsesor(c) {
+  const nombre = limpiar(c.nombre, 160).replace(/\s+/g, " ");
+  if (nombre.length < 3) return { error: "nombre_requerido", campo: "nombre", ayuda: "Escribe el nombre completo." };
+  const correo = limpiar(c.correo, 200).toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) return { error: "correo_invalido", campo: "correo", ayuda: "El correo no es válido." };
+  const desde = c.desde ? String(c.desde) : null;
+  if (desde && !fechaISOValida(desde)) return { error: "fecha_invalida", campo: "desde", ayuda: "La fecha no es válida." };
+  return { nombre, correo, perfil: limpiar(c.perfil, 300) || null, desde };
+}
+
+/* POST /api/admin/board/asesores — un asesor nuevo. Un correo que ya está (aun
+   desactivado) no se repite: se reactiva el que había. */
+async function adminBoardNuevoAsesor(request, env, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "board_asesores"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0045 en la base." }, 409);
+  const a = leerAsesor(c);
+  if (a.error) return json(a, 400);
+  const ya = await env.DB.prepare("SELECT id, activo FROM board_asesores WHERE lower(correo) = ?").bind(a.correo).first();
+  if (ya) return json({ error: "ya_existe", campo: "correo", id: ya.id,
+    ayuda: ya.activo ? "Ese correo ya es de un asesor del Board." : "Ese correo es de un asesor desactivado: ábrelo en la lista y reactívalo." }, 409);
+  const r = await env.DB.prepare(
+    "INSERT INTO board_asesores (nombre, correo, perfil, desde, creado_por) VALUES (?, ?, ?, ?, ?) RETURNING id"
+  ).bind(a.nombre, a.correo, a.perfil, a.desde || fechaCO(), quien || null).first();
+  /* La auditoría dice QUIÉN hizo QUÉ con el número del asesor: su correo no
+     se copia a otra tabla. */
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "board asesor " + r.id + " · añadido").run();
+  return json({ ok: true, id: r.id });
+}
+
+/* POST /api/admin/board/asesor/<id> { accion: editar | desactivar {hasta} | reactivar } */
+async function adminBoardAsesor(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "board_asesores"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0045." }, 409);
+  const x = await env.DB.prepare("SELECT id, activo FROM board_asesores WHERE id = ?").bind(id).first();
+  if (!x) return json({ error: "no_encontrado" }, 404);
+  let detalle;
+  if (c.accion === "editar") {
+    const a = leerAsesor(c);
+    if (a.error) return json(a, 400);
+    const otro = await env.DB.prepare("SELECT id FROM board_asesores WHERE lower(correo) = ? AND id <> ?").bind(a.correo, id).first();
+    if (otro) return json({ error: "ya_existe", campo: "correo", ayuda: "Ese correo ya es de otro asesor." }, 409);
+    await env.DB.prepare("UPDATE board_asesores SET nombre = ?, correo = ?, perfil = ?, desde = ?, actualizado = datetime('now') WHERE id = ?")
+      .bind(a.nombre, a.correo, a.perfil, a.desde, id).run();
+    detalle = "editado";
+  } else if (c.accion === "desactivar") {
+    const hasta = c.hasta ? String(c.hasta) : fechaCO();
+    if (!fechaISOValida(hasta)) return json({ error: "fecha_invalida", ayuda: "La fecha no es válida." }, 400);
+    await env.DB.prepare("UPDATE board_asesores SET activo = 0, hasta = ?, actualizado = datetime('now') WHERE id = ?").bind(hasta, id).run();
+    detalle = "desactivado desde " + hasta;
+  } else if (c.accion === "reactivar") {
+    await env.DB.prepare("UPDATE board_asesores SET activo = 1, hasta = NULL, actualizado = datetime('now') WHERE id = ?").bind(id).run();
+    detalle = "reactivado";
+  } else return json({ error: "accion_invalida" }, 400);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "board asesor " + id + " · " + detalle).run();
+  return json({ ok: true, id });
+}
+
+/* LO QUE DICE EL INFORME TRIMESTRAL, armado aquí y solo dibujado en
+   documentos.js: así el PDF no puede decir algo distinto de la base. Cada
+   indicador con su ÚLTIMA medición al corte del trimestre (nunca una posterior)
+   y su estado a esa fecha. */
+async function datosInformeBoard(env, periodo) {
+  const r = melRango(periodo);
+  const L = await melLeer(env, false);
+  if (!L) return null;
+  const ref = new Date(Date.parse(r.hasta + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
+  const activos = L.ind.filter((i) => i.activo);
+  const indicadores = activos.map((i) => {
+    const meds = L.med.filter((m) => m.indicador_id === i.id && m.corte <= r.hasta);
+    const u = melUltima(meds);
+    const e = melEstado(i, meds, ref);
+    return {
+      numero: i.numero, nombre: i.nombre, linea: MEL_LINEAS[i.linea] || i.linea, tipo: MEL_TIPOS[i.tipo] || i.tipo,
+      frecuencia: MEL_FRECUENCIAS[i.frecuencia] || i.frecuencia, validado: !!i.validado_en,
+      valor: u ? melValorDicho(u, i.unidad) : "", periodo: u ? u.periodo : "", corte: u ? melFechaCorta(u.corte) : "",
+      fuente: u ? u.fuente_detalle : i.fuente, base: i.linea_base || "", meta: i.meta_2027 || "",
+      estado: e.estado === "pendiente" ? "Pendiente: falta " + e.exigible : MEL_ESTADOS[e.estado], con_dato: !!u
+    };
+  });
+  return {
+    periodo, periodo_dicho: melPeriodoDicho(periodo), desde: r.desde, corte: r.hasta, corte_dicho: fechaDicha(r.hasta),
+    generado: selloCO(new Date().toISOString()), referencia: "Informe al Board de Asesores " + periodo,
+    total: indicadores.length, validados: indicadores.filter((x) => x.validado).length, con_dato: indicadores.filter((x) => x.con_dato).length,
+    indicadores, sin_datos: indicadores.filter((x) => !x.con_dato).map((x) => ({ numero: x.numero, nombre: x.nombre, fuente: x.fuente })),
+    asesora: BOARD_ASESORA
+  };
+}
+
+/* GET /api/admin/board/informe.pdf?periodo=2026-T3 — la vista previa: el PDF
+   tal como saldría hoy. Se arma al vuelo y no se guarda; lo que se guarda es
+   el que SALE, al enviarlo. */
+async function adminBoardInformePdf(env, url) {
+  const periodo = String(url.searchParams.get("periodo") || "");
+  if (!/^\d{4}-T[1-4]$/.test(periodo) || !melRango(periodo)) return json({ error: "periodo_invalido", ayuda: "El periodo es un trimestre: 2026-T3." }, 400);
+  const d = await datosInformeBoard(env, periodo);
+  if (!d) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0045 en la base." }, 409);
+  const bytes = await informeBoard(d);
+  return new Response(bytes, { headers: {
+    "content-type": "application/pdf", "x-content-type-options": "nosniff",
+    "content-disposition": 'inline; filename="informe-board-' + periodo + '-vista-previa.pdf"',
+    "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
+}
+
+/* GET /api/admin/board/envio/<id>.pdf — el PDF que SALIÓ, tal cual, desde R2. */
+async function adminBoardEnvioPdf(env, id) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  if (!(await existeTabla(env, "board_envios"))) return json({ error: "falta_migracion" }, 409);
+  const e = await env.DB.prepare("SELECT periodo, archivo_clave FROM board_envios WHERE id = ?").bind(id).first();
+  if (!e || !e.archivo_clave) return json({ error: "no_encontrado" }, 404);
+  const obj = await env.MEDIA.get(e.archivo_clave);
+  if (!obj) return json({ error: "no_encontrado" }, 404);
+  return new Response(obj.body, { headers: {
+    "content-type": "application/pdf", "x-content-type-options": "nosniff",
+    "content-disposition": 'attachment; filename="informe-board-' + e.periodo + "-envio-" + id + '.pdf"',
+    "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
+}
+
+/* Lo que se escribe en el panel para la convocatoria, comprobado igual para la
+   vista previa y para el envío. */
+function leerConvocatoria(c) {
+  const fecha = String(c.fecha || "");
+  if (!fechaISOValida(fecha)) return { error: "fecha_invalida", campo: "fecha", ayuda: "Elige la fecha de la reunión." };
+  if (fecha < fechaCO()) return { error: "fecha_pasada", campo: "fecha", ayuda: "La reunión no puede ser en el pasado." };
+  const hora = limpiar(c.hora, 20);
+  if (hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) return { error: "hora_invalida", campo: "hora", ayuda: "La hora va así: 18:30." };
+  const lugar = limpiar(c.lugar, 300);
+  if (lugar.length < 3) return { error: "lugar_requerido", campo: "lugar", ayuda: "Di dónde es: la dirección o el enlace de la videollamada." };
+  const agenda = String(c.agenda == null ? "" : c.agenda).split(/\r?\n/).map((x) => limpiar(x, 300).replace(/^[-*·•\d.)\s]+/, "")).filter(Boolean).slice(0, 15);
+  if (!agenda.length) return { error: "agenda_requerida", campo: "agenda", ayuda: "Escribe la agenda: un punto por línea." };
+  return { fecha, hora, lugar, agenda, nota: limpiar(c.nota, 600) };
+}
+
+/* EL CORREO AL BOARD: uno por asesor, con su nombre, y nadie ve el correo de
+   los demás. Responder llega al buzón de alianzas, que es el del fundador. El
+   informe viaja ADJUNTO (`pdf`); en la vista previa no se arma, como el
+   certificado: solo se enseña la carta y el nombre del adjunto. */
+async function correoBoard(env, tipo, asesor, d) {
+  const saludo = "Hola, " + String(asesor.nombre || "").split(" ")[0] + ".";
+  let asunto, titulo, parrafos, filas = null, lista = null, adjuntos;
+  if (tipo === "informe_trimestral") {
+    titulo = "Informe trimestral " + d.periodo;
+    asunto = "Informe trimestral para el Board de Asesores · " + d.periodo;
+    parrafos = [
+      saludo,
+      "Adjuntamos el informe trimestral de " + d.periodo_dicho + " para el Board de Asesores, con corte al " + d.corte_dicho + ".",
+      "Cada cifra dice su fuente y su fecha de corte, y el informe dice también lo que todavía no podemos afirmar. La batería de indicadores es un borrador: " +
+        d.validados + " de " + d.total + " están validados.",
+      "Te pedimos tu concepto y tus recomendaciones. " + BOARD_ASESORA
+    ];
+    filas = [["Periodo", d.periodo_dicho], ["Corte", d.corte_dicho], ["Indicadores con dato al corte", d.con_dato + " de " + d.total]];
+    adjuntos = [{ filename: "informe-board-" + d.periodo + ".pdf", content: d.pdf ? bytesABase64(d.pdf) : "" }];
+  } else {
+    titulo = "Reunión trimestral del Board de Asesores";
+    asunto = "Convocatoria a la reunión trimestral del Board de Asesores · " + d.periodo;
+    parrafos = [
+      saludo,
+      "Te convocamos a la reunión trimestral del Board de Asesores, en la que revisaremos el periodo " + d.periodo + " (" + melPeriodoDicho(d.periodo) + ").",
+      d.nota || "",
+      BOARD_ASESORA
+    ].filter(Boolean);
+    filas = [["Fecha", fechaDicha(d.fecha)], ["Hora", d.hora ? d.hora + " (hora de Colombia)" : "por confirmar"], ["Lugar", d.lugar]];
+    lista = { titulo: "Agenda", items: d.agenda };
+  }
+  const texto = [titulo, "", ...parrafos, "", (filas || []).map(([k, v]) => k + ": " + v).join("\n")];
+  if (lista) texto.push("", lista.titulo + ":", ...lista.items.map((x, i) => (i + 1) + ". " + x));
+  return enviarCorreo(env, {
+    para: asesor.correo, asunto, texto: texto.join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, filas, lista }),
+    etiqueta: tipo === "informe_trimestral" ? "board-informe" : "board-convocatoria",
+    responderA: correoAlianzas(env), ...(adjuntos ? { adjuntos } : {})
+  });
+}
+
+/* ¿Cabe el envío entero en el cupo de hoy? Se pregunta ANTES del primer
+   correo: con cinco asesores, que salgan tres y dos no es peor que no mandar
+   ninguno, pero es más confuso. Usa el mismo umbral que `cupoDeCorreo` le pone
+   a un correo a una persona que no es recibo ni caso (la reserva para recibos y
+   casos no se toca), y `enviarCorreo` lo vuelve a mirar en cada correo. Sin
+   llave de Resend no se gasta cupo: sale simulado. */
+async function cupoParaVarios(env, n) {
+  if (!env.RESEND_API_KEY || !env.DB) return { cabe: true, quedan: null };
+  const r = await env.DB.prepare("SELECT COUNT(*) AS n FROM correos WHERE resultado = 'enviado' AND intento_en >= date('now')").first();
+  const quedan = Math.max(0, CORREO_TOPE_DIA - CORREO_RESERVA_PRIORITARIAS - Number((r && r.n) || 0));
+  return { cabe: quedan >= n, quedan };
+}
+
+async function asesoresActivos(env) {
+  return (await env.DB.prepare("SELECT id, nombre, correo FROM board_asesores WHERE activo = 1 ORDER BY nombre").all()).results || [];
+}
+
+/* Lo que pide la vista previa (accion «board» de `adminPrevia`): los mismos
+   correos, sin PDF y sin enviar. */
+async function previaBoard(env, envP, c) {
+  if (!(await existeTabla(env, "board_asesores"))) return { error: json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0045 en la base." }, 409) };
+  const tipo = String(c.tipo || "");
+  const periodo = String(c.periodo || "");
+  if (!BOARD_TIPOS[tipo] || tipo === "acta") return { error: json({ error: "tipo_invalido" }, 400) };
+  if (!/^\d{4}-T[1-4]$/.test(periodo)) return { error: json({ error: "periodo_invalido", ayuda: "El periodo es un trimestre: 2026-T3." }, 400) };
+  let d;
+  if (tipo === "informe_trimestral") d = await datosInformeBoard(env, periodo);
+  else {
+    const v = leerConvocatoria(c);
+    if (v.error) return { error: json(v, 400) };
+    d = Object.assign({ periodo }, v);
+  }
+  const ases = await asesoresActivos(env);
+  for (const a of ases) await correoBoard(envP, tipo, a, d);
+  const cupo = await cupoParaVarios(env, ases.length);
+  const partes = [];
+  if (!ases.length) partes.push("No hay asesores activos en el Board: no sale nada. Añádelos primero.");
+  else partes.push("Sale un correo a cada asesor activo (" + ases.length + "), cada uno con su nombre: nadie ve el correo de los demás. Gasta " +
+    ases.length + " del cupo diario de correo.");
+  if (!cupo.cabe) partes.push("HOY NO CABE: quedan " + cupo.quedan + " correos del cupo y hacen falta " + ases.length + ". No se enviará nada; inténtalo mañana.");
+  if (tipo === "informe_trimestral") partes.push("El PDF adjunto es el de la vista previa, armado otra vez al enviar; el que sale se guarda y se vuelve a descargar desde la historia.");
+  return { nota: partes.join(" ") };
+}
+
+/* POST /api/admin/board/enviar { tipo, periodo, …convocatoria } — manda el
+   informe o la convocatoria a los asesores activos, deja la fila en
+   `board_envios` con cuántos salieron y, si es el informe, el PDF que salió
+   guardado en R2. */
+async function adminBoardEnviar(request, env, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "board_envios"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0045 en la base." }, 409);
+  const tipo = String(c.tipo || "");
+  const periodo = String(c.periodo || "");
+  if (tipo !== "informe_trimestral" && tipo !== "convocatoria") return json({ error: "tipo_invalido" }, 400);
+  if (!/^\d{4}-T[1-4]$/.test(periodo) || !melRango(periodo)) return json({ error: "periodo_invalido", ayuda: "El periodo es un trimestre: 2026-T3." }, 400);
+  const ases = await asesoresActivos(env);
+  if (!ases.length) return json({ error: "sin_asesores", ayuda: "No hay asesores activos en el Board: añádelos primero." }, 409);
+  /* Dos clics seguidos no mandan dos veces: lo mismo, al mismo periodo, en los
+     últimos diez minutos, se frena. Un reenvío de verdad espera esos diez. Lo
+     que no salió (fallido, simulado) no frena: no le llegó a nadie. */
+  const reciente = await env.DB.prepare(
+    "SELECT id FROM board_envios WHERE tipo = ? AND periodo = ? AND creado >= datetime('now', '-10 minutes') AND estado IN ('enviando','enviado','parcial')"
+  ).bind(tipo, periodo).first();
+  if (reciente) return json({ error: "recien_enviado", ayuda: "Eso mismo salió hace menos de diez minutos (envío " + reciente.id + "). Míralo en la historia antes de repetirlo." }, 409);
+  const cupo = await cupoParaVarios(env, ases.length);
+  if (!cupo.cabe) return json({ error: "sin_cupo", ayuda: "Hoy no cabe: quedan " + cupo.quedan + " correos del cupo diario y hacen falta " + ases.length + ". No se envió nada; inténtalo mañana." }, 409);
+
+  let d, datos;
+  if (tipo === "informe_trimestral") {
+    d = await datosInformeBoard(env, periodo);
+    d.pdf = await informeBoard(d);
+    datos = { con_dato: d.con_dato, total: d.total, validados: d.validados, corte: d.corte };
+  } else {
+    const v = leerConvocatoria(c);
+    if (v.error) return json(v, 400);
+    d = Object.assign({ periodo }, v);
+    datos = v;
+  }
+  const asunto = tipo === "informe_trimestral" ? "Informe trimestral para el Board de Asesores · " + periodo
+    : "Convocatoria a la reunión trimestral del Board de Asesores · " + periodo;
+  const fila = await env.DB.prepare(
+    "INSERT INTO board_envios (tipo, periodo, asunto, destinatarios, estado, datos, enviado_por) VALUES (?, ?, ?, ?, 'enviando', ?, ?) RETURNING id"
+  ).bind(tipo, periodo, asunto, ases.length, JSON.stringify(datos), quien || null).first();
+  const id = fila.id;
+  if (d.pdf && env.MEDIA) {
+    /* PRIVADO y con 128 bits en la clave, como los documentos de la fundación:
+       solo se descarga desde /admin. Si R2 falla, el correo sale igual y la
+       fila dice que no hay copia. */
+    try {
+      const clave = "board/" + id + "/" + tokenNuevo() + ".pdf";
+      await env.MEDIA.put(clave, d.pdf, { httpMetadata: { contentType: "application/pdf" } });
+      await env.DB.prepare("UPDATE board_envios SET archivo_clave = ?, archivo_bytes = ?, archivo_sha256 = ? WHERE id = ?")
+        .bind(clave, d.pdf.length, await sha256Bytes(d.pdf), id).run();
+    } catch (e) { console.error("board: no se guardó el PDF", id, e && e.message); }
+  }
+  let enviados = 0, fallidos = 0, simulados = 0, sinCupo = 0;
+  for (const a of ases) {
+    const r = await correoBoard(env, tipo, a, d);
+    if (r && r.ok && r.simulado) simulados++;
+    else if (r && r.ok) enviados++;
+    else { fallidos++; if (r && r.sinCupo) sinCupo++; }
+  }
+  const estado = simulados === ases.length ? "simulado" : !fallidos ? "enviado" : enviados ? "parcial" : "fallido";
+  await env.DB.prepare("UPDATE board_envios SET enviados = ?, fallidos = ?, estado = ? WHERE id = ?").bind(enviados, fallidos, estado, id).run();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "board envio " + id + " · " + tipo + " " + periodo + " · " + estado + " · " + enviados + "/" + ases.length).run();
+  return json({ ok: true, id, estado, destinatarios: ases.length, enviados, fallidos, simulados, sin_cupo: sinCupo });
+}
+
 /* GET /api/admin/buscar?q= — EL BUSCADOR DE LA BARRA (Fase 4 del panel).
 
    Antes entendía dos cosas —un número completo con su prefijo, o un teléfono—
@@ -23521,6 +24373,12 @@ async function adminPrevia(request, env, sesion) {
     else if (e.enviada_en) nota = "Ya salió por correo: no se repite.";
     else if (!para) nota = "No hay correo de " + (actor === "empresa" ? "la empresa" : "la fundación") + ".";
     else await correoEncuestaActor(envP, j, actor, para, ORIGIN + "/encuesta/" + e.token, await fundacionesRed(env));
+  } else if (accion === "board") {
+    /* MEAL y Board (0045): el informe trimestral o la convocatoria, uno por
+       asesor activo, armados con la misma función que el envío. */
+    const r = await previaBoard(env, envP, c);
+    if (r.error) return r.error;
+    nota = r.nota;
   } else if (accion === "reenviar") {
     /* Sistema › Correos (Fase 4): el correo que no salió, vuelto a armar con
        la misma plantilla y los datos de hoy. Es lo mismo que hará
@@ -26867,6 +27725,11 @@ textarea { font-size: 16px }
 .doc-est.por_vencer{color:var(--amber)}
 .doc-est.vigente{color:var(--g)}
 .doc-est.reemplazado,.doc-est.anulado,.doc-est.no_aplica{color:var(--mu);font-weight:400}
+/* MEAL (0045): el estado de un indicador, con los mismos colores. */
+.mel-est{font-weight:600}
+.mel-est.pendiente{color:var(--amber)}
+.mel-est.al_dia{color:var(--g)}
+.mel-est.por_evento,.mel-est.aun_no{color:var(--mu);font-weight:400}
 .rp-cab{margin:0 0 6px;font-size:var(--fs-13);color:var(--mu)}
 .rp-cab b{color:var(--ink)}
 .rp-aviso{margin:0 0 16px;padding:8px 12px;border-left:3px solid var(--g);background:var(--gl);font-size:var(--fs-14);color:var(--gd)}
@@ -26958,6 +27821,13 @@ textarea { font-size: 16px }
   <a class="pn-it" href="#reportes/voluntariado" data-pn-ir="reportes/voluntariado">Voluntariado</a>
   <a class="pn-it" href="#reportes/mmc" data-pn-ir="reportes/mmc">Mira Mi Casa</a>
   <a class="pn-it" href="#reportes/banco" data-pn-ir="reportes/banco">Banco y panel</a>
+</div>
+<!-- MEAL y Board de Asesores (0045): los indicadores con su fuente y su
+     corte, y lo que se le manda al Board, que asesora y no dirige. -->
+<div class="pn-grupo">
+  <p class="pn-gt">MEAL y Board</p>
+  <a class="pn-it" href="#meal/indicadores" data-pn-ir="meal/indicadores">Indicadores<span class="pn-n" data-pn-n="meal/indicadores"></span></a>
+  <a class="pn-it" href="#meal/board" data-pn-ir="meal/board">Board de Asesores<span class="pn-n" data-pn-n="meal/board"></span></a>
 </div>
 <div class="pn-grupo">
   <p class="pn-gt">Sistema</p>
@@ -27337,6 +28207,37 @@ sabes que está mal.</p>
   <button type="button" class="pn-b2" id="rp-imprimir">Imprimir</button>
 </div>
 <div id="rp-caja"><p class="mu">Elige un reporte.</p></div>
+</section>
+
+<!-- ========================= MEAL Y BOARD ========================= -->
+<!-- 0045. Los indicadores con su fuente y su corte, y el Board de Asesores,
+     que asesora y recomienda: no aprueba ni dirige. -->
+<section class="pn-vista" data-vista="meal/indicadores" id="sec-meal" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Cada indicador se mide con su <strong>fuente</strong> (qué acta, registro o inventario) y su <strong>fecha de corte</strong> (hasta cuándo cuenta el dato). Sin fuente no se guarda: es «Evidencia, no promesas» hecha regla.</p>
+<p>Un periodo se exige cuando <strong>termina</strong>: en octubre se le pide a un indicador trimestral el tercer trimestre, no el cuarto. Lo que falta sale en «Hoy», en «Esta semana». El primer periodo que se exige empieza el 1 de julio de 2026.</p>
+<p>Donde la base ya tiene el dato —convenios firmados, rastreo de los aportes, horas de voluntariado, conceptos del triaje— el sistema <strong>sugiere</strong> el valor y dice de qué tabla sale. No lo guarda: lo registras tú, con el mismo formulario de siempre, y queda escrito que lo aceptaste. Un valor que la base no puede sostener no se sugiere.</p>
+<p>La batería es un <strong>borrador</strong> hasta que el fundador valide cada indicador desde «Editar el indicador». Una medición no se borra: se anula con su motivo, y se registra la buena.</p>
+</div></details>
+<div class="fin-barra"><button type="button" class="pn-b2" id="mel-csv">Descargar las mediciones (CSV)</button></div>
+<div id="tb-mel" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<section class="pn-vista" data-vista="meal/board" id="sec-board" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>El <strong>Board de Asesores</strong> asesora y recomienda: <strong>no aprueba ni dirige</strong>. La fundación no tiene junta directiva; el máximo órgano de dirección es el que definen los estatutos, con el Representante Legal y la Revisora Fiscal.</p>
+<p>Cada trimestre se le manda el <strong>informe</strong> en PDF —los indicadores al corte, con su fuente, y lo que todavía no se puede afirmar— y la <strong>convocatoria</strong> a la reunión. Los dos enseñan cada correo antes de salir, salen uno por asesor activo (nadie ve el correo de los demás) y gastan cupo del correo diario: si no cabe entero, no sale ninguno.</p>
+<p>El PDF que sale se guarda <strong>privado</strong> y se vuelve a descargar desde la historia, tal como se envió.</p>
+</div></details>
+<div id="tb-board" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+<h2 class="pn-h2">Documentos para el Board</h2>
+<p class="pn-sub">El informe del último trimestre cerrado y la convocatoria a su reunión. Primero la vista previa; después, «Enviar al Board».</p>
+<div class="fin-barra">
+  <button type="button" class="pn-b1" id="bd-informe">Informe trimestral…</button>
+  <button type="button" class="pn-b2" id="bd-convocatoria">Convocatoria a reunión…</button>
+</div>
+<h2 class="pn-h2">Lo que se le ha enviado</h2>
+<div id="tb-board-envios" class="tb"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <!-- ============================ SISTEMA ============================ -->
@@ -28582,7 +29483,9 @@ var COLA_ES = {
   tareas_pendientes: "Tareas para hoy y vencidas",
   documentos_vencidos: "Documentos vencidos",
   documentos_por_vencer: "Documentos por vencer",
-  documentos_faltantes: "Documentos que faltan"
+  documentos_faltantes: "Documentos que faltan",
+  meal_indicadores_pendientes: "Indicadores sin la medición del periodo",
+  board_informe_sin_enviar: "Informe trimestral sin enviar a los asesores"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -28632,6 +29535,12 @@ var VISTAS = {
     linea: "Casos recibidos, atendidos, visitados y cerrados, mes a mes." },
   "reportes/banco": { area: "Reportes", titulo: "Banco y panel",
     linea: "Lo que dice el extracto del banco junto a lo que dice el panel, mes a mes, y de dónde sale la diferencia." },
+  "meal/indicadores": { area: "MEAL y Board", titulo: "Indicadores",
+    linea: "Los indicadores de la fundación, cada valor con su fuente y su corte. El sistema sugiere lo que la base ya sabe; una persona lo registra.",
+    accion: ["Registrar una medición", "mel-medir"] },
+  "meal/board": { area: "MEAL y Board", titulo: "Board de Asesores",
+    linea: "Quién asesora a la fundación y lo que se le manda: el informe trimestral y la convocatoria. El Board recomienda; no aprueba ni dirige.",
+    accion: ["Añadir asesor", "bd-asesor"] },
   "finanzas/resumen": { area: "Finanzas", titulo: "Resumen",
     linea: "Lo que entró y lo que salió en el mes o en el año, y de dónde sale cada cifra." },
   "finanzas/banco": { area: "Finanzas", titulo: "Banco",
@@ -28732,6 +29641,7 @@ function mostrar(ruta){
   filtrarInscripciones(vista, ruta.filtro);
   filtrarFase4(vista, ruta.filtro);
   filtrarFase5(vista, ruta.filtro);
+  filtrarMeal(vista, ruta.filtro);
   sec.querySelectorAll("tbody[id],[data-bandeja]").forEach(function(t){ pedir(t.id); });
   /* Los cinco reportes comparten la sección: cada dirección pinta el suyo. */
   if (vista.indexOf("reportes/") === 0) pedirReporte();
@@ -28860,14 +29770,17 @@ var COLA_MOD = {
   tareas_pendientes: "tareas",
   documentos_vencidos: "legal/documentos",
   documentos_por_vencer: "legal/documentos",
-  documentos_faltantes: "legal/documentos"
+  documentos_faltantes: "legal/documentos",
+  meal_indicadores_pendientes: "meal/indicadores",
+  board_informe_sin_enviar: "meal/board"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
 var COLA_FILTRO = { fundaciones_sin_respuesta: "respuesta", empresas_sin_respuesta: "respuesta",
   apadrinamientos_sin_respuesta: "respuesta", voluntarios_sin_respuesta: "respuesta", ingenieros_sin_verificar: "matricula",
   correos_fallidos: "por_atender", correos_sin_cupo: "por_atender", correos_sin_buzon: "sin_destino", seguimientos_pendientes: "vencidos" ,
-  tareas_pendientes: "vencidas", documentos_vencidos: "atencion", documentos_por_vencer: "atencion" };
+  tareas_pendientes: "vencidas", documentos_vencidos: "atencion", documentos_por_vencer: "atencion",
+  meal_indicadores_pendientes: "pendientes" };
 var DESTINO_ES = { "/triaje": "Abrir el triaje", "/admin/ruta": "Abrir la ruta de visitas", "/firma": "Abrir la firma" };
 
 /* LAS INSIGNIAS salen de la MISMA lista que pinta «Hoy»: si un día cambia la
@@ -28991,6 +29904,10 @@ function accionesItem(clave, it){
   if (clave === "documentos_faltantes")
     return '<button type="button" class="pn-b1" data-hoy="doc-falta" data-tipo="' + esc(it.tipo || "") + '" data-periodo="' + esc(it.periodo || "") +
       '" data-nombre="' + esc(String(it.titulo || "").replace(/^Falta: /, "")) + '">Registrar…</button>';
+  if (clave === "meal_indicadores_pendientes")
+    return '<button type="button" class="pn-b1" data-hoy="mel-medir" data-id="' + id + '">Registrar…</button>';
+  if (clave === "board_informe_sin_enviar")
+    return '<button type="button" class="pn-b1" data-hoy="bd-informe" data-id="' + id + '">Preparar…</button>';
   if (clave === "seguimientos_pendientes")
     return '<button type="button" class="pn-b1" data-hoy="seg-hecho" data-id="' + id + '" data-nombre="' + esc(it.detalle || "") + '">Hecho</button>' +
       '<button type="button" class="pn-b2" data-hoy="seg-posponer" data-id="' + id + '" data-fecha="' + esc(it.fecha || "") + '" data-nombre="' + esc(it.detalle || "") + '">Posponer…</button>' +
@@ -29066,6 +29983,11 @@ document.addEventListener("click", function(e){
   if (que === "jornada"){ location.hash = "personas/voluntariado"; abrirJornada(id); return; }
   if (que === "banco"){ abrirMovimiento(id); return; }
   if (que === "importar"){ location.hash = "finanzas/banco"; abrirImportar(); return; }
+  if (que === "mel-medir"){
+    asegurarMeal().then(function(){ var mi = melPorId(id); if (mi) formMedicion(mi, {}); else avisoError("No encontré ese indicador."); });
+    return;
+  }
+  if (que === "bd-informe"){ abrirInformeBoard(id); return; }
   if (que === "ob"){
     var clave = b.getAttribute("data-oclave"), fecha = b.getAttribute("data-ofecha"), est = b.getAttribute("data-oest");
     var nom = b.getAttribute("data-nombre");
@@ -32684,6 +33606,8 @@ function abrirForma(id){
   if (id === "bk-importar"){ abrirImportar(); return true; }
   if (id === "ta-nueva"){ abrirTarea(null, {}); return true; }
   if (id === "doc-nuevo"){ formDocumento(null, {}); return true; }
+  if (id === "mel-medir"){ formMedicion(null, {}); return true; }
+  if (id === "bd-asesor"){ formAsesor(null); return true; }
   var n = document.getElementById(id);
   if (!n || !n.hasAttribute("data-forma")) return false;
   if (id === "eg-nuevo"){
@@ -35660,6 +36584,495 @@ document.addEventListener("click", function(e){
   }
 });
 
+/* ---- MEAL Y BOARD DE ASESORES (0045) ----
+   Los indicadores con su última medición, su estado y lo que el sistema
+   sugiere; el Board, sus asesores y lo que se le ha mandado. EL SISTEMA
+   SUGIERE Y UNA PERSONA REGISTRA: ningún valor se guarda sin un clic, y el
+   formulario de la sugerencia es el mismo de siempre, con la fuente a la vista.
+   El Board asesora y recomienda; no aprueba ni dirige. */
+var MEL = { d: null };
+var MEL_EST_CORTO = { al_dia: "al día", pendiente: "pendiente este periodo", por_evento: "por evento", aun_no: "sin periodo exigible aún" };
+function melNum(v, u){
+  if (v == null || v === "") return "";
+  u = String(u || "");
+  return Number(v).toLocaleString("es-CO", { maximumFractionDigits: 2 }) + (u ? (u === "%" ? " %" : " " + u) : "");
+}
+function melPorId(id){ return ((MEL.d && MEL.d.indicadores) || []).filter(function(x){ return String(x.id) === String(id); })[0] || null; }
+function melEtiq(mapa, k){ return ((MEL.d && MEL.d[mapa]) || {})[k] || k || ""; }
+function melUltimoHTML(x){
+  if (!x.ultima) return '<span class="mu">sin medición</span>';
+  return "<strong>" + esc(x.ultima_dicha) + "</strong><small>" + esc(x.ultima.periodo + " · corte " + fechaCorta(x.ultima.corte)) + "</small>" +
+    "<small>" + esc(x.ultima.fuente_detalle) + "</small>";
+}
+function melEstadoHTML(x){
+  var s = x.sugerido;
+  return '<span class="mel-est ' + esc(x.estado) + '">' + esc(MEL_EST_CORTO[x.estado] || x.estado) + "</span>" +
+    (x.estado === "pendiente" ? "<small>falta " + esc(x.exigible) + "</small>" : x.estado === "aun_no" && x.primero ? "<small>el primero: " + esc(x.primero) + "</small>" : "") +
+    (s && s.valor != null && !s.no && !s.ya_registrada ? "<small>sugerido: " + esc(melNum(s.valor, x.unidad)) + "</small>" : "");
+}
+var TB_MEL = tablaNueva({ id: "tb-mel", titulo: "Indicadores", orden: "numero", dir: "asc",
+  buscar: "Nombre, fuente o línea",
+  texto: function(x){ return [x.numero, x.nombre, x.fuente, x.linea, x.unidad, x.meta_2027].join(" "); },
+  filtros: [
+    { k: "estado", t: "Estado", opciones: [["pendiente", "Pendiente este periodo"], ["al_dia", "Al día"], ["por_evento", "Por evento"], ["aun_no", "Sin periodo exigible aún"]],
+      valor: function(x){ return x.estado; } },
+    { k: "linea", t: "Línea", opciones: function(){ return opcionesDe((MEL.d && MEL.d.lineas) || {}); }, valor: function(x){ return x.linea; } },
+    { k: "activo", t: "Activos", def: "si", sinTodos: true, opciones: [["si", "Activos"], ["no", "Desactivados"], ["todos", "Todos"]],
+      prueba: function(x, v){ return v === "todos" || (v === "si" ? !!x.activo : !x.activo); } }
+  ],
+  columnas: [
+    { k: "numero", t: "#", num: true, dir: "asc", valor: function(x){ return Number(x.numero); }, celda: function(x){ return "<strong>" + esc(x.numero) + "</strong>"; } },
+    { k: "nombre", t: "Indicador", valor: function(x){ return x.nombre; }, celda: function(x){
+      return "<strong>" + esc(x.nombre) + "</strong><small>" + esc(melEtiq("tipos", x.tipo) + (x.unidad ? " · " + x.unidad : "") + " · " +
+        (x.validado_en ? "validado" : "borrador") + (x.calculo ? " · el sistema sugiere" : "")) + "</small>"; } },
+    { k: "linea", t: "Línea", valor: function(x){ return x.linea; }, celda: function(x){ return esc(melEtiq("lineas", x.linea)); } },
+    { k: "frecuencia", t: "Frecuencia", valor: function(x){ return x.frecuencia; }, celda: function(x){ return esc(melEtiq("frecuencias", x.frecuencia)); } },
+    { k: "ultimo", t: "Último valor", orden: false, celda: melUltimoHTML },
+    { k: "base", t: "Línea base", orden: false, celda: function(x){ return esc(x.linea_base || "—"); } },
+    { k: "meta", t: "Meta 2027", orden: false, celda: function(x){ return esc(x.meta_2027 || "—"); } },
+    { k: "estado", t: "Estado", valor: function(x){ return x.estado; }, celda: melEstadoHTML }
+  ],
+  claseFila: function(x){ return x.activo ? "" : "tb-gris"; },
+  aviso: function(){
+    if (!MEL.d) return "";
+    if (!MEL.d.con_tabla) return "<strong>Falta aplicar la migración 0045</strong> · sin ella no hay indicadores ni mediciones.";
+    var l = (MEL.d.indicadores || []).filter(function(x){ return x.activo; });
+    var v = l.filter(function(x){ return x.validado_en; }).length;
+    return v < l.length ? "<strong>Batería en borrador</strong> · " + v + " de " + l.length + " indicadores validados. Se validan desde «Editar el indicador»." : "";
+  },
+  nota: function(){ return "Cada valor lleva su fuente y su corte. Un periodo se exige cuando termina: el trimestre en curso no está pendiente. La fila abre el indicador con su historia."; },
+  vacio: { titulo: "No hay indicadores.", texto: "La migración 0045 siembra los doce del borrador." },
+  etiquetaFila: function(x){ return "Abrir el indicador " + x.numero; },
+  abrir: function(x){ abrirIndicador(x); }
+});
+function cargarMeal(){
+  var caja = document.getElementById("tb-mel");
+  if (!TB_MEL.armada) tablaArmar(TB_MEL, caja);
+  return pedirJSON("/api/admin/meal", "tb-mel-cuerpo").then(function(d){
+    MEL.d = d;
+    tablaBarra(TB_MEL);
+    tablaCargar(TB_MEL, d.indicadores || []);
+    return d;
+  });
+}
+function refrescarMeal(){ MEL.d = null; if (PEDIDAS["tb-mel"]) cargarMeal(); cargarSalud(); }
+function asegurarMeal(){
+  if (MEL.d) return Promise.resolve(MEL.d);
+  return fetch("/api/admin/meal").then(conEstado).then(function(r){ if (r.http === 200 && r.d && !r.d.error) MEL.d = r.d; return MEL.d; })
+    .catch(function(){ return null; });
+}
+/* «Ver todo» desde «Hoy» llega con el filtro de pendientes puesto. */
+function filtrarMeal(vista, f){
+  if (vista !== "meal/indicadores" || f !== "pendientes") return;
+  TB_MEL.f.estado = "pendiente"; TB_MEL.f.activo = "si"; TB_MEL.pagina = 1;
+  if (TB_MEL.armada && TB_MEL.todas){ tablaBarra(TB_MEL); tablaRefrescar(TB_MEL); }
+}
+/* La sugerencia, dicha con su fuente. Si el sistema no la puede sostener, dice
+   por qué en vez de poner un número. */
+function sugerenciaHTML(x){
+  var s = x.sugerido;
+  if (!x.activo) return "";
+  if (!s) return '<p class="pn-nota">El sistema no lo calcula: la base no tiene hoy este dato. Se registra a mano, con su fuente.</p>';
+  if (s.no) return '<p class="pn-nota"><strong>El sistema no sugiere un valor.</strong> ' + esc(s.no) + "</p>";
+  return '<div class="pn-bien"><p style="margin:0 0 6px"><strong>Sugerido por el sistema: ' + esc(melNum(s.valor, x.unidad)) + "</strong> para " +
+    esc(s.periodo || "hoy") + " · corte " + esc(fechaCorta(s.corte)) + "</p>" +
+    '<p class="ct-ayuda" style="margin:0 0 4px">' + esc(s.detalle || "") + "</p>" +
+    '<p class="ct-ayuda" style="margin:0 0 8px">Fuente: ' + esc(s.fuente) + " · calculado el " + esc(s.calculado) + " (hora de Colombia). No se guarda solo.</p>" +
+    (s.ya_registrada ? '<p class="ct-ayuda" style="margin:0">Ese periodo ya tiene una medición registrada: ' + esc(s.ya_registrada.valor) + ".</p>"
+      : '<button type="button" class="pn-b1" data-mel-sugerido="' + x.id + '">Registrar este valor…</button>') + "</div>";
+}
+function abrirIndicador(x){
+  fetch("/api/admin/meal/mediciones?indicador=" + encodeURIComponent(x.id)).then(conEstado).then(function(r){
+    pintarIndicador(x, r.http === 200 && r.d && !r.d.error ? (r.d.mediciones || []) : null);
+  }).catch(function(){ pintarIndicador(x, null); });
+}
+function pintarIndicador(x, l){
+  var h = ficha([
+    ["Indicador", "#" + esc(x.numero) + " · " + esc(x.nombre)],
+    ["Tipo y línea", esc(melEtiq("tipos", x.tipo) + " · " + melEtiq("lineas", x.linea))],
+    ["Fuente prevista", esc(x.fuente)],
+    ["Frecuencia", esc(melEtiq("frecuencias", x.frecuencia)) + (x.exigible ? "<small>periodo exigible: " + esc(x.exigible) + "</small>" : "")],
+    ["Unidad", esc(x.unidad || "")],
+    ["Línea base", esc(x.linea_base || "")],
+    ["Meta 2027", esc(x.meta_2027 || "")],
+    ["Estado", melEstadoHTML(x)],
+    ["Cálculo del sistema", x.calculo ? esc(melEtiq("calculos", x.calculo)) : "ninguno: se mide a mano"],
+    ["Validado", x.validado_en ? esc(enCO(x.validado_en, 10)) + (x.validado_por ? "<small>" + esc(x.validado_por) + "</small>" : "") : "No: es borrador"],
+    ["Activo", x.activo ? "" : "No: no entra al informe ni a «Hoy»"]
+  ]) + sugerenciaHTML(x) + '<p class="pn-h3">Historia</p>';
+  if (l === null) h += '<p class="carga-fallo">No se pudo cargar la historia. Recarga e inténtalo otra vez.</p>';
+  else if (!l.length) h += '<p class="mu">Todavía no hay mediciones.</p>';
+  else h += '<ul class="ct-prox">' + l.map(function(m){
+    var anul = !!m.anulado_en;
+    return "<li><div><strong>" + esc(m.periodo + " · " + (m.valor_dicho || "")) + (anul ? " · anulada" : "") + "</strong>" +
+      "<small>" + esc("Corte " + fechaCorta(m.corte) + " · " + m.fuente_detalle) + "</small>" +
+      "<small>" + esc((m.origen === "sugerido" ? "Sugerido por el sistema, registrado por " : "Registrado por ") + (m.registrado_por || "?") + " el " + enCO(m.creado, 16) +
+        (m.nota ? " · " + m.nota : "") + (anul ? " · anulada: " + (m.anulado_motivo || "") : "")) + "</small></div>" +
+      '<div class="ct-acc">' + (anul ? "" : '<button type="button" class="pn-b2 pn-peligro" data-mel-anular="' + m.id + '" data-ind="' + x.id + '">Anular…</button>') + "</div></li>";
+  }).join("") + "</ul>";
+  h += '<p class="pn-error" id="pn-err"></p>';
+  cajonAbrir({ ey: "MEAL · indicador", titulo: "#" + x.numero + " · " + x.nombre, cuerpo: h, ancho: true,
+    pie: (x.activo ? '<button type="button" class="pn-b1" data-mel-medir="' + x.id + '">Registrar una medición</button>' : "") +
+      '<button type="button" class="pn-b2" data-mel-editar="' + x.id + '">Editar el indicador</button>' +
+      '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+}
+/* Registrar una medición: de un indicador ya elegido, o de cualquiera (la
+   acción de la cabecera). Con «pre.sugerido» llega lleno con el valor del
+   sistema, que la persona revisa antes del clic. */
+function formMedicion(x, pre){
+  pre = pre || {};
+  asegurarMeal().then(function(d){
+    if (!d){ avisoError("No se pudo cargar la lista de indicadores."); return; }
+    if (!d.con_tabla){ avisoError("Falta aplicar la migración 0045: sin ella no se guardan mediciones."); return; }
+    var lista = (d.indicadores || []).filter(function(i){ return i.activo; });
+    var s = pre.sugerido && !pre.sugerido.no ? pre.sugerido : null;
+    var h = selectCampo("mel-ind", "Indicador", '<option value="">Elige…</option>' + lista.map(function(i){
+        return '<option value="' + i.id + '"' + (x && x.id === i.id ? " selected" : "") + ">#" + esc(i.numero) + " · " + esc(i.nombre) + "</option>"; }).join("")) +
+      '<p class="ct-ayuda" id="mel-ind-ayuda"></p>' +
+      '<div class="pn-par">' + pnCampo("mel-periodo", "Periodo", s ? s.periodo : "", { ayuda: "El periodo que mide, en la forma de su frecuencia." }) +
+      pnCampo("mel-corte", "Fecha de corte", s ? s.corte : "", { tipo: "date", extra: ' max="' + esc(d.hoy) + '"', ayuda: "Hasta cuándo cuenta el dato." }) + "</div>" +
+      '<div class="pn-par">' + pnCampo("mel-valor", "Valor (número)", s && s.valor != null ? String(s.valor).replace(".", ",") : "", { extra: ' inputmode="decimal"', ayuda: "Con coma o punto decimal." }) +
+      pnCampo("mel-texto", "Valor en texto (opcional)", "", { ayuda: "Lo cualitativo, o lo que no cabe en un número." }) + "</div>" +
+      pnCampo("mel-fuente", "Fuente", s ? s.fuente + ". " + (s.detalle || "") : "", { area: true, filas: 3,
+        ayuda: "Obligatoria: qué acta, registro o inventario sostiene el valor." }) +
+      pnCampo("mel-nota", "Nota (opcional)", "", { area: true, filas: 2 }) +
+      (s ? '<p class="pn-bien">Valor sugerido por el sistema. Revísalo antes de registrarlo: queda escrito que lo aceptaste tú.</p>' : "") +
+      '<p class="pn-error" id="pn-err"></p>';
+    cajonAbrir({ ey: "MEAL", titulo: "Registrar una medición", cuerpo: h,
+      pie: '<button type="button" class="pn-b1" id="mel-guardar">Registrar</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>',
+      foco: x ? (s ? "mel-guardar" : "mel-valor") : "mel-ind" });
+    var sel = document.getElementById("mel-ind");
+    var ayuda = function(){
+      var i = melPorId(sel.value), a = document.getElementById("mel-ind-ayuda");
+      if (!i){ a.textContent = ""; return; }
+      var ej = (d.formatos || {})[i.frecuencia];
+      a.textContent = melEtiq("frecuencias", i.frecuencia) + (ej ? ": el periodo se escribe así: " + ej : ": el periodo es el evento, en pocas palabras") +
+        (i.unidad ? " · unidad: " + i.unidad : "") + " · fuente prevista: " + i.fuente + ".";
+      var p = document.getElementById("mel-periodo"), c = document.getElementById("mel-corte");
+      if (!s && !p.value && i.exigible){ p.value = i.exigible; if (!c.value && i.rango_exigible) c.value = i.rango_exigible.hasta; }
+      if (!c.value) c.value = d.hoy;
+    };
+    sel.addEventListener("change", ayuda); ayuda();
+    document.getElementById("mel-guardar").addEventListener("click", function(){ guardarMedicion(this, !!s); });
+  });
+}
+function guardarMedicion(b, sugerido){
+  ["mel-ind", "mel-periodo", "mel-corte", "mel-valor", "mel-fuente"].forEach(function(k){ pnMarcar(k, ""); });
+  errorEnCajon("");
+  var c = { indicador_id: Number(pnValor("mel-ind")) || 0, periodo: pnValor("mel-periodo"), corte: pnValor("mel-corte"), valor: pnValor("mel-valor"),
+    valor_texto: pnValor("mel-texto"), fuente_detalle: pnValor("mel-fuente"), nota: pnValor("mel-nota"), origen: sugerido ? "sugerido" : "manual" };
+  if (!c.indicador_id){ pnMarcar("mel-ind", "Elige el indicador."); return; }
+  if (!c.periodo){ pnMarcar("mel-periodo", "Escribe el periodo que mide."); return; }
+  if (!c.valor && !c.valor_texto){ pnMarcar("mel-valor", "Escribe el valor, o lo cualitativo en «Valor en texto»."); return; }
+  if (c.fuente_detalle.length < 3){ pnMarcar("mel-fuente", "Sin fuente no hay medición: di qué acta, registro o inventario."); document.getElementById("mel-fuente").focus(); return; }
+  b.disabled = true;
+  fetch("/api/admin/meal/mediciones", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(c) })
+    .then(conEstado).then(function(r){
+      if (r.http !== 200 || !r.d || r.d.error){
+        b.disabled = false;
+        var campo = { indicador: "mel-ind", periodo: "mel-periodo", corte: "mel-corte", valor: "mel-valor", fuente_detalle: "mel-fuente" }[r.d && r.d.campo];
+        if (campo) pnMarcar(campo, r.d.ayuda || r.d.error); else errorEnCajon((r.d && (r.d.ayuda || r.d.error)) || "No se pudo registrar (HTTP " + r.http + ").");
+        return;
+      }
+      var id = r.d.id;
+      avisar("Medición registrada.", { deshacer: function(){
+        postPanel("/api/admin/meal/medicion/" + id, { accion: "anular", motivo: "Deshecha justo después de registrarla" }).then(function(d2){
+          if (d2){ avisar("Medición anulada."); refrescarMeal(); }
+        });
+      } });
+      cajonCerrar(); refrescarMeal();
+    }).catch(function(){ b.disabled = false; errorEnCajon("No se pudo: revisa la conexión."); });
+}
+/* El borrador se corrige aquí: nombre, fuente, frecuencia, metas, el cálculo
+   del sistema que lo sugiere y la marca de «validado». */
+function formIndicador(x){
+  asegurarMeal().then(function(d){
+    if (!d){ avisoError("No se pudo cargar la lista de indicadores."); return; }
+    var calc = '<option value="">Ninguno: se mide a mano</option>' + Object.keys(d.calculos || {}).map(function(k){
+      return '<option value="' + esc(k) + '"' + (k === x.calculo ? " selected" : "") + ">" + esc(d.calculos[k]) + "</option>"; }).join("");
+    var h = '<div class="pn-par">' + pnCampo("mi-numero", "Número", String(x.numero), { tipo: "number", extra: ' min="1" max="999"' }) +
+      selectCampo("mi-tipo", "Tipo", opcionesHTML(d.tipos || {}, x.tipo)) + "</div>" +
+      pnCampo("mi-nombre", "Nombre", x.nombre) +
+      '<div class="pn-par">' + selectCampo("mi-linea", "Línea", opcionesHTML(d.lineas || {}, x.linea)) +
+      selectCampo("mi-frecuencia", "Frecuencia", opcionesHTML(d.frecuencias || {}, x.frecuencia)) + "</div>" +
+      pnCampo("mi-fuente", "Fuente prevista", x.fuente, { ayuda: "De dónde sale el dato: el acta, el registro, el inventario." }) +
+      '<div class="pn-par">' + pnCampo("mi-unidad", "Unidad", x.unidad || "", { ayuda: "%, días, horas, casas…" }) +
+      pnCampo("mi-base", "Línea base", x.linea_base || "") + "</div>" +
+      pnCampo("mi-meta", "Meta 2027", x.meta_2027 || "", { ayuda: "Con «propuesta:» delante mientras no sea un compromiso." }) +
+      selectCampo("mi-calculo", "Cálculo del sistema", calc, "Si lo hay, el panel sugiere el valor con lo que ya está en la base. Nunca lo registra solo.") +
+      '<label class="eg-check"><input type="checkbox" id="mi-validado"' + (x.validado_en ? " checked" : "") + "> Validado por el fundador (deja de ser borrador)</label>" +
+      '<label class="eg-check"><input type="checkbox" id="mi-activo"' + (x.activo ? " checked" : "") + "> Activo (entra al informe del Board y a «Hoy»)</label>" +
+      '<p class="pn-error" id="pn-err"></p>';
+    cajonAbrir({ ey: "MEAL · indicador", titulo: "Editar #" + x.numero, cuerpo: h, foco: "mi-nombre",
+      pie: '<button type="button" class="pn-b1" id="mi-guardar">Guardar</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+    document.getElementById("mi-guardar").addEventListener("click", function(){
+      var b = this;
+      ["mi-nombre", "mi-fuente"].forEach(function(k){ pnMarcar(k, ""); });
+      var c = { numero: pnValor("mi-numero"), nombre: pnValor("mi-nombre"), tipo: pnValor("mi-tipo"), linea: pnValor("mi-linea"),
+        frecuencia: pnValor("mi-frecuencia"), fuente: pnValor("mi-fuente"), unidad: pnValor("mi-unidad"), linea_base: pnValor("mi-base"),
+        meta_2027: pnValor("mi-meta"), calculo: pnValor("mi-calculo"),
+        validado: !!document.getElementById("mi-validado").checked, activo: !!document.getElementById("mi-activo").checked };
+      if (c.nombre.length < 3){ pnMarcar("mi-nombre", "Escribe el nombre del indicador."); return; }
+      if (c.fuente.length < 3){ pnMarcar("mi-fuente", "Di de dónde sale el dato."); return; }
+      b.disabled = true;
+      postPanel("/api/admin/meal/indicador/" + x.id, c).then(function(r){
+        b.disabled = false;
+        if (!r) return;
+        avisar("Indicador #" + c.numero + " guardado.");
+        cajonCerrar(); refrescarMeal();
+      });
+    });
+  });
+}
+
+/* ---- EL BOARD DE ASESORES ---- */
+var BD = { d: null };
+var BD_EST_CLASE = { enviado: "vigente", parcial: "por_vencer", fallido: "vencido", simulado: "no_aplica", enviando: "por_vencer" };
+var TB_BOARD = tablaNueva({ id: "tb-board", titulo: "Asesores del Board", orden: "nombre", dir: "asc",
+  buscar: "Nombre o perfil",
+  texto: function(x){ return [x.nombre, x.perfil].join(" "); },
+  filtros: [
+    { k: "activo", t: "Estado", def: "si", sinTodos: true, opciones: [["si", "Activos"], ["no", "Desactivados"], ["todos", "Todos"]],
+      prueba: function(x, v){ return v === "todos" || (v === "si" ? !!x.activo : !x.activo); } }
+  ],
+  columnas: [
+    { k: "nombre", t: "Asesor", valor: function(x){ return x.nombre; }, celda: function(x){ return celdaPersona(x.nombre, x.correo); } },
+    { k: "perfil", t: "Perfil", valor: function(x){ return x.perfil || ""; }, celda: function(x){ return esc(x.perfil || "—"); } },
+    { k: "desde", t: "Desde", nw: true, valor: function(x){ return x.desde || ""; }, celda: function(x){ return x.desde ? esc(fechaCorta(x.desde)) : '<span class="mu">—</span>'; } },
+    { k: "estado", t: "Estado", valor: function(x){ return x.activo ? "a" : "b"; }, celda: function(x){
+      return x.activo ? '<span class="doc-est vigente">activo</span>'
+        : '<span class="doc-est anulado">desactivado</span>' + (x.hasta ? "<small>desde el " + esc(fechaCorta(x.hasta)) + "</small>" : ""); } }
+  ],
+  claseFila: function(x){ return x.activo ? "" : "tb-gris"; },
+  aviso: function(){ return BD.d && !BD.d.con_tabla ? "<strong>Falta aplicar la migración 0045</strong> · sin ella no se guardan asesores ni envíos." : ""; },
+  nota: function(){ return "El Board asesora y recomienda; no aprueba ni dirige. El correo de cada asesor es dato personal: solo se usa para escribirle desde aquí."; },
+  vacio: { titulo: "Todavía no hay asesores registrados.", texto: "Añádelos con «Añadir asesor», arriba." },
+  etiquetaFila: function(x){ return "Abrir la ficha de " + x.nombre; },
+  abrir: function(x){ formAsesor(x); }
+});
+var TB_ENVIOS = tablaNueva({ id: "tb-board-envios", titulo: "Envíos al Board", orden: "creado", dir: "desc",
+  columnas: [
+    { k: "creado", t: "Fecha", nw: true, valor: function(x){ return x.creado; }, celda: function(x){
+      return esc(enCO(x.creado, 16)) + (x.enviado_por ? "<small>" + esc(x.enviado_por) + "</small>" : ""); } },
+    { k: "tipo", t: "Qué", valor: function(x){ return x.tipo; }, celda: function(x){
+      return "<strong>" + esc(((BD.d && BD.d.tipos) || {})[x.tipo] || x.tipo) + "</strong><small>" + esc(x.periodo) + "</small>"; } },
+    { k: "dest", t: "Le llegó a", num: true, valor: function(x){ return Number(x.enviados || 0); }, celda: function(x){
+      return esc(x.enviados + " de " + x.destinatarios) + (x.fallidos ? '<small class="tb-mal">' + esc(x.fallidos + " no salieron") + "</small>" : ""); } },
+    { k: "estado", t: "Estado", valor: function(x){ return x.estado; }, celda: function(x){
+      return '<span class="doc-est ' + esc(BD_EST_CLASE[x.estado] || "") + '">' + esc(((BD.d && BD.d.estados) || {})[x.estado] || x.estado) + "</span>"; } },
+    { k: "pdf", t: "PDF", orden: false, celda: function(x){
+      return x.tiene_pdf ? '<a href="/api/admin/board/envio/' + x.id + '.pdf">Descargar</a><small>tal como salió</small>' : '<span class="mu">—</span>'; } }
+  ],
+  vacio: { titulo: "Todavía no se le ha enviado nada al Board.", texto: "El informe trimestral y la convocatoria salen desde aquí, con la vista previa primero." },
+  etiquetaFila: function(x){ return "Ver el envío " + x.id; },
+  abrir: function(x){ abrirEnvioBoard(x); }
+});
+function cargarBoard(){
+  if (!TB_BOARD.armada) tablaArmar(TB_BOARD, document.getElementById("tb-board"));
+  if (!TB_ENVIOS.armada) tablaArmar(TB_ENVIOS, document.getElementById("tb-board-envios"));
+  return pedirJSON("/api/admin/board", "tb-board-cuerpo").then(function(d){
+    BD.d = d;
+    tablaBarra(TB_BOARD);
+    tablaCargar(TB_BOARD, d.asesores || []);
+    tablaCargar(TB_ENVIOS, d.envios || []);
+    return d;
+  });
+}
+function refrescarBoard(){ BD.d = null; if (PEDIDAS["tb-board"]) cargarBoard(); cargarSalud(); }
+function asegurarBoard(){
+  if (BD.d) return Promise.resolve(BD.d);
+  return fetch("/api/admin/board").then(conEstado).then(function(r){ if (r.http === 200 && r.d && !r.d.error) BD.d = r.d; return BD.d; })
+    .catch(function(){ return null; });
+}
+function abrirEnvioBoard(x){
+  var d = {};
+  try { d = JSON.parse(x.datos || "{}") || {}; } catch (e) { d = {}; }
+  var pares = [
+    ["Qué", esc(((BD.d && BD.d.tipos) || {})[x.tipo] || x.tipo) + " · " + esc(x.periodo)],
+    ["Asunto", esc(x.asunto)],
+    ["Le llegó a", esc(x.enviados + " de " + x.destinatarios + " asesores") + (x.fallidos ? "<small>" + esc(x.fallidos + " no salieron: míralos en Sistema › Correos") + "</small>" : "")],
+    ["Estado", esc(((BD.d && BD.d.estados) || {})[x.estado] || x.estado)],
+    ["Enviado", esc(enCO(x.creado, 16)) + (x.enviado_por ? "<small>" + esc(x.enviado_por) + "</small>" : "")]
+  ];
+  if (x.tipo === "convocatoria"){
+    pares.push(["Fecha de la reunión", esc(fechaCorta(d.fecha || "")) + (d.hora ? " · " + esc(d.hora) : "")]);
+    pares.push(["Lugar", esc(d.lugar || "")]);
+    pares.push(["Agenda", (d.agenda || []).map(function(a, i){ return esc((i + 1) + ". " + a); }).join("<br>")]);
+    if (d.nota) pares.push(["Nota", esc(d.nota)]);
+  } else {
+    pares.push(["Corte", esc(fechaCorta(d.corte || ""))]);
+    pares.push(["Indicadores con dato", esc((d.con_dato == null ? "?" : d.con_dato) + " de " + (d.total == null ? "?" : d.total))]);
+    pares.push(["Validados", esc((d.validados == null ? "?" : d.validados) + " de " + (d.total == null ? "?" : d.total))]);
+    pares.push(["Huella SHA-256", x.archivo_sha256 ? "<code>" + esc(String(x.archivo_sha256).slice(0, 16)) + "…</code><small>la del PDF que salió</small>" : "sin copia guardada"]);
+  }
+  cajonAbrir({ ey: "Board de Asesores · envío " + x.id, titulo: x.asunto, cuerpo: ficha(pares),
+    pie: (x.tiene_pdf ? '<a class="pn-b1" href="/api/admin/board/envio/' + x.id + '.pdf">Descargar el PDF</a>' : "") +
+      '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+}
+/* Un asesor nuevo, o la ficha de uno que ya está. */
+function formAsesor(x){
+  var nuevo = !x; x = x || {};
+  var h = pnCampo("ba-nombre", "Nombre completo", x.nombre || "") +
+    pnCampo("ba-correo", "Correo", x.correo || "", { tipo: "email", ayuda: "Es dato personal: solo se usa para escribirle desde aquí." }) +
+    pnCampo("ba-perfil", "Perfil (opcional)", x.perfil || "", { ayuda: "En qué asesora: finanzas sociales, ingeniería, comunicaciones…" }) +
+    pnCampo("ba-desde", "En el Board desde", x.desde || hoyCO(), { tipo: "date" }) +
+    (x.id && !x.activo ? '<p class="pn-nota">Desactivado' + (x.hasta ? " desde el " + esc(fechaCorta(x.hasta)) : "") + ": no recibe nada.</p>" : "") +
+    '<p class="ct-ayuda">El Board asesora y recomienda; no aprueba ni dirige.</p><p class="pn-error" id="pn-err"></p>';
+  var pie = '<button type="button" class="pn-b1" id="ba-guardar">' + (nuevo ? "Añadir al Board" : "Guardar cambios") + "</button>";
+  if (!nuevo) pie += x.activo ? '<button type="button" class="pn-b2" data-bd-desactivar="' + x.id + '">Desactivar…</button>'
+    : '<button type="button" class="pn-b2" data-bd-reactivar="' + x.id + '">Reactivar</button>';
+  pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>';
+  cajonAbrir({ ey: "Board de Asesores", titulo: nuevo ? "Añadir un asesor" : x.nombre, cuerpo: h, pie: pie, foco: "ba-nombre" });
+  document.getElementById("ba-guardar").addEventListener("click", function(){
+    var b = this;
+    ["ba-nombre", "ba-correo", "ba-desde"].forEach(function(k){ pnMarcar(k, ""); });
+    errorEnCajon("");
+    var c = { nombre: pnValor("ba-nombre"), correo: pnValor("ba-correo"), perfil: pnValor("ba-perfil"), desde: pnValor("ba-desde") };
+    if (c.nombre.length < 3){ pnMarcar("ba-nombre", "Escribe el nombre completo."); return; }
+    if (c.correo.indexOf("@") < 1){ pnMarcar("ba-correo", "El correo no es válido."); return; }
+    if (!nuevo) c.accion = "editar";
+    b.disabled = true;
+    fetch(nuevo ? "/api/admin/board/asesores" : "/api/admin/board/asesor/" + x.id,
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(c) })
+      .then(conEstado).then(function(r){
+        b.disabled = false;
+        if (r.http !== 200 || !r.d || r.d.error){
+          var campo = { nombre: "ba-nombre", correo: "ba-correo", desde: "ba-desde" }[r.d && r.d.campo];
+          if (campo) pnMarcar(campo, r.d.ayuda || r.d.error); else errorEnCajon((r.d && (r.d.ayuda || r.d.error)) || "No se pudo guardar (HTTP " + r.http + ").");
+          return;
+        }
+        avisar(nuevo ? "«" + c.nombre + "» quedó en el Board." : "Asesor guardado.");
+        cajonCerrar(); refrescarBoard();
+      }).catch(function(){ b.disabled = false; errorEnCajon("No se pudo: revisa la conexión."); });
+  });
+}
+function opcionesTrimestres(d, actual){
+  return (d.trimestres || []).map(function(t, i){
+    return '<option value="' + esc(t) + '"' + ((actual ? t === actual : i === 0) ? " selected" : "") + ">" + esc(t) + "</option>"; }).join("");
+}
+function boardListo(d){
+  if (!d){ avisoError("No se pudo cargar el Board."); return false; }
+  if (!d.con_tabla){ avisoError("Falta aplicar la migración 0045: sin ella no se envía nada al Board."); return false; }
+  if (!(d.trimestres || []).length){ avisoError("Todavía no ha cerrado ningún trimestre que reportar."); return false; }
+  return true;
+}
+/* EL INFORME TRIMESTRAL: elegir el trimestre, mirar el PDF, y enviarlo con la
+   vista previa del correo delante. */
+function abrirInformeBoard(periodo){
+  asegurarBoard().then(function(d){
+    if (!boardListo(d)) return;
+    var h = '<p style="margin:0 0 14px">Sale en PDF, adjunto, a cada asesor activo (' + esc(d.activos) + "). Lleva los indicadores activos con su último valor al corte del trimestre, " +
+      "su fuente, su línea base, su meta y su estado, y la lista de lo que todavía no se puede afirmar.</p>" +
+      selectCampo("bd-periodo", "Trimestre", opcionesTrimestres(d, periodo), "El corte es el último día del trimestre: ninguna medición posterior entra.") +
+      '<p><a class="pn-b2" id="bd-pdf" href="#" target="_blank" rel="noopener">Ver el PDF (vista previa)</a></p>' +
+      '<p class="pn-nota">' + esc(d.asesora) + '</p><p class="pn-error" id="pn-err"></p>';
+    cajonAbrir({ ey: "Board de Asesores", titulo: "Informe trimestral", cuerpo: h, foco: "bd-periodo",
+      pie: '<button type="button" class="pn-b1" id="bd-informe-enviar">Revisar el correo y enviar…</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+    var sel = document.getElementById("bd-periodo"), a = document.getElementById("bd-pdf");
+    var enlace = function(){ a.href = "/api/admin/board/informe.pdf?periodo=" + encodeURIComponent(sel.value); };
+    sel.addEventListener("change", enlace); enlace();
+    document.getElementById("bd-informe-enviar").addEventListener("click", function(){ enviarBoard({ tipo: "informe_trimestral", periodo: sel.value }, this); });
+  });
+}
+/* LA CONVOCATORIA: fecha, lugar y agenda, escritos aquí. */
+function abrirConvocatoria(){
+  asegurarBoard().then(function(d){
+    if (!boardListo(d)) return;
+    var agenda = ["Informe trimestral de indicadores", "Lo que todavía no podemos afirmar", "Recomendaciones del Board", "Varios"].join(String.fromCharCode(10));
+    var h = '<p style="margin:0 0 14px">Sale un correo a cada asesor activo (' + esc(d.activos) + "), con su nombre, la fecha, el lugar y la agenda.</p>" +
+      selectCampo("bc-periodo", "Trimestre que se revisa", opcionesTrimestres(d)) +
+      '<div class="pn-par">' + pnCampo("bc-fecha", "Fecha", "", { tipo: "date", extra: ' min="' + esc(d.hoy) + '"' }) +
+      pnCampo("bc-hora", "Hora (opcional)", "", { tipo: "time", ayuda: "Hora de Colombia." }) + "</div>" +
+      pnCampo("bc-lugar", "Lugar", "", { ayuda: "La dirección, o el enlace de la videollamada." }) +
+      pnCampo("bc-agenda", "Agenda", agenda, { area: true, filas: 6, ayuda: "Un punto por línea." }) +
+      pnCampo("bc-nota", "Nota (opcional)", "", { area: true, filas: 2 }) +
+      '<p class="pn-nota">' + esc(d.asesora) + '</p><p class="pn-error" id="pn-err"></p>';
+    cajonAbrir({ ey: "Board de Asesores", titulo: "Convocatoria a la reunión trimestral", cuerpo: h, foco: "bc-fecha",
+      pie: '<button type="button" class="pn-b1" id="bc-enviar">Revisar el correo y enviar…</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+    document.getElementById("bc-enviar").addEventListener("click", function(){
+      ["bc-fecha", "bc-lugar", "bc-agenda"].forEach(function(k){ pnMarcar(k, ""); });
+      var c = { tipo: "convocatoria", periodo: pnValor("bc-periodo"), fecha: pnValor("bc-fecha"), hora: pnValor("bc-hora"),
+        lugar: pnValor("bc-lugar"), agenda: pnValor("bc-agenda"), nota: pnValor("bc-nota") };
+      if (!c.fecha){ pnMarcar("bc-fecha", "Elige la fecha de la reunión."); return; }
+      if (c.lugar.length < 3){ pnMarcar("bc-lugar", "Di dónde es."); return; }
+      if (!c.agenda){ pnMarcar("bc-agenda", "Escribe la agenda: un punto por línea."); return; }
+      enviarBoard(c, this);
+    });
+  });
+}
+/* Los dos salen igual: vista previa de cada correo (adminPrevia, accion
+   «board») y solo con «Enviar al Board» se envían, respetando el cupo diario. */
+function enviarBoard(cuerpo, origen){
+  var nombre = cuerpo.tipo === "informe_trimestral" ? "El informe " + cuerpo.periodo : "La convocatoria " + cuerpo.periodo;
+  confirmarConCorreo({ previa: Object.assign({ accion: "board" }, cuerpo), origen: origen, ey: "Board de Asesores",
+    titulo: cuerpo.tipo === "informe_trimestral" ? "Enviar el informe " + cuerpo.periodo : "Enviar la convocatoria",
+    botonCorreo: "Enviar al Board", boton: "Enviar al Board",
+    hacer: function(){
+      return postPanel("/api/admin/board/enviar", cuerpo).then(function(r){
+        if (!r) return false;
+        var t = r.estado === "simulado" ? nombre + " no salió de verdad: falta la llave del servicio de correo (quedó como simulado)."
+          : r.estado === "enviado" ? nombre + " le llegó a " + r.enviados + " de " + r.destinatarios + " asesores."
+          : nombre + " le llegó a " + r.enviados + " de " + r.destinatarios + " asesores; " + r.fallidos + " no salieron" + (r.sin_cupo ? " (sin cupo)" : "") + ". Míralos en Sistema › Correos.";
+        avisar(t, { tono: r.estado === "enviado" ? "" : "error", ms: 15000 });
+        refrescarBoard();
+        return true;
+      });
+    } });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if (e.target.id === "mel-csv"){ location.href = "/api/admin/meal/mediciones.csv"; return; }
+  if (e.target.id === "bd-informe"){ abrirInformeBoard(); return; }
+  if (e.target.id === "bd-convocatoria"){ abrirConvocatoria(); return; }
+  if ((b = e.target.closest("[data-mel-medir]"))){ formMedicion(melPorId(b.getAttribute("data-mel-medir")), {}); return; }
+  if ((b = e.target.closest("[data-mel-sugerido]"))){
+    var si = melPorId(b.getAttribute("data-mel-sugerido"));
+    if (si) formMedicion(si, { sugerido: si.sugerido });
+    return;
+  }
+  if ((b = e.target.closest("[data-mel-editar]"))){ var ei = melPorId(b.getAttribute("data-mel-editar")); if (ei) formIndicador(ei); return; }
+  if ((b = e.target.closest("[data-mel-anular]"))){
+    var mid = b.getAttribute("data-mel-anular"), ind = melPorId(b.getAttribute("data-ind"));
+    confirmarPeligro({ titulo: "Anular esta medición", boton: "Anular", motivo: true, etiquetaMotivo: "Por qué se anula",
+      detalle: "<p>Deja de contar en la tabla y en el informe del Board, pero queda en la historia con tu motivo. Para corregir un valor: anúlalo y registra el bueno.</p>",
+      volver: function(){ if (ind) abrirIndicador(ind); else cajonCerrar(); },
+      hacer: function(m){
+        return postPanel("/api/admin/meal/medicion/" + mid, { accion: "anular", motivo: m }).then(function(d){
+          if (!d) return false;
+          avisar("Medición anulada."); refrescarMeal();
+          return true;
+        });
+      } });
+    return;
+  }
+  if ((b = e.target.closest("[data-bd-desactivar]"))){
+    var did = b.getAttribute("data-bd-desactivar");
+    confirmarSimple({ ey: "Board de Asesores", titulo: "Desactivar a este asesor", boton: "Desactivar",
+      detalle: "<p>Deja de recibir el informe y las convocatorias. No se borra: queda en la lista y se puede reactivar.</p>" +
+        pnCampo("bd-hasta", "En el Board hasta", hoyCO(), { tipo: "date" }),
+      hacer: function(){
+        return postPanel("/api/admin/board/asesor/" + did, { accion: "desactivar", hasta: pnValor("bd-hasta") }).then(function(d){
+          if (!d) return false;
+          avisar("Asesor desactivado.", { deshacer: function(){
+            postPanel("/api/admin/board/asesor/" + did, { accion: "reactivar" }).then(function(d2){ if (d2){ avisar("Asesor reactivado."); refrescarBoard(); } });
+          } });
+          refrescarBoard();
+          return true;
+        });
+      } });
+    return;
+  }
+  if ((b = e.target.closest("[data-bd-reactivar]"))){
+    var rid = b.getAttribute("data-bd-reactivar");
+    b.disabled = true;
+    postPanel("/api/admin/board/asesor/" + rid, { accion: "reactivar" }).then(function(d){
+      b.disabled = false;
+      if (d){ avisar("Asesor reactivado."); cajonCerrar(); refrescarBoard(); }
+    });
+  }
+});
+
 /* ---- REPORTES ---- */
 var RP = { anio: 0, d: null, seq: 0 };
 function rpValor(v, tipo){
@@ -35782,6 +37195,8 @@ document.addEventListener("click", function(e){
 var BANDEJAS = {
   "tb-tareas": cargarTareas,
   "tb-docs": cargarDocumentos,
+  "tb-mel": cargarMeal,
+  "tb-board": cargarBoard,
   "tb-contactos": cargarContactos,
   "tb-socialfest": cargarSocialFest,
   "tb-correos": cargarCorreos,
@@ -39679,6 +41094,28 @@ export default {
                                : await adminDocumento(request, env, Number(mdo[1]), sesion.email);
         if (ruta === "/api/admin/reporte") return await adminReporte(env, url, false);
         if (ruta === "/api/admin/reporte.csv") return await adminReporte(env, url, true);
+        /* MEAL y Board de Asesores (0045). Los POST pasan por el chequeo de
+           Origin de arriba como todos los que escriben. */
+        if (ruta === "/api/admin/meal") return await adminMeal(env);
+        if (ruta === "/api/admin/meal/mediciones") {
+          return request.method === "POST" ? await adminMealMedir(request, env, sesion.email) : await adminMealMediciones(env, url);
+        }
+        if (ruta === "/api/admin/meal/mediciones.csv") return await adminMealCSV(env);
+        const mme = ruta.match(/^\/api\/admin\/meal\/medicion\/(\d{1,9})$/);
+        if (mme) return await adminMealMedicion(request, env, Number(mme[1]), sesion.email);
+        const mmi = ruta.match(/^\/api\/admin\/meal\/indicador\/(\d{1,9})$/);
+        if (mmi) return await adminMealIndicador(request, env, Number(mmi[1]), sesion.email);
+        if (ruta === "/api/admin/board") return await adminBoard(env);
+        if (ruta === "/api/admin/board/asesores") {
+          if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+          return await adminBoardNuevoAsesor(request, env, sesion.email);
+        }
+        const mba = ruta.match(/^\/api\/admin\/board\/asesor\/(\d{1,9})$/);
+        if (mba) return await adminBoardAsesor(request, env, Number(mba[1]), sesion.email);
+        if (ruta === "/api/admin/board/informe.pdf") return await adminBoardInformePdf(env, url);
+        if (ruta === "/api/admin/board/enviar") return await adminBoardEnviar(request, env, sesion.email);
+        const mbe = ruta.match(/^\/api\/admin\/board\/envio\/(\d{1,9})\.pdf$/);
+        if (mbe) return await adminBoardEnvioPdf(env, Number(mbe[1]));
         if (ruta === "/api/admin/correos")   return await adminCorreos(env, url);
         const mco = ruta.match(/^\/api\/admin\/correo\/(\d{1,9})(?:\/(reenviar|resuelto))?$/);
         if (mco) {
