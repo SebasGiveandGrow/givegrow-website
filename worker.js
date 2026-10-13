@@ -51,7 +51,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "286c86c6";
+const STYLES_V = "2431a54e";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -38681,6 +38681,20 @@ export default {
       return new Response(null, {
         status: lectura ? 301 : 308,
         headers: { "location": segura.toString(), "cache-control": "public, max-age=3600" }
+      });
+    }
+    /* EL DOMINIO SIN «www» VA A «www» (auditoría para inversionistas, 12 oct
+       2026). Respondía 200 con el mismo contenido, así que el sitio vivía en dos
+       direcciones y el canonical (www) era la única pista. Solo lecturas y fuera
+       de /api/: un webhook o un formulario que haga POST al dominio sin www
+       sigue funcionando igual. Misma ruta y query. */
+    if (url.hostname === "thegiveandgrowproject.org" &&
+        (request.method === "GET" || request.method === "HEAD") && !ruta.startsWith("/api/")) {
+      const conWww = new URL(request.url);
+      conWww.hostname = "www.thegiveandgrowproject.org";
+      return new Response(null, {
+        status: 301,
+        headers: { "location": conWww.toString(), "cache-control": "public, max-age=3600" }
       });
     }
     /* LA RED VA AQUÍ Y NO EN CADA RAMA. Había un try/catch que cubría
