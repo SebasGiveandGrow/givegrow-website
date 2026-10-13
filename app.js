@@ -1892,7 +1892,7 @@ var I18N = {
     "brig.foto.pie":"El Águila, agosto de 2026. Un muro colapsado en una de las zonas que recorrió la brigada.",
     "brig.est.rango":"Del 24 al 27 de agosto de 2026",
     "brig.est.despues":"12,5 toneladas despachadas, según el inventario de carga.",
-    /* FECHA-ACTAS-PENDIENTE: «[FECHA]» en brig.lead, brig.est.p y brig.sec.nota (ES y EN)
+    /* FECHA-ACTAS-PENDIENTE: «[FECHA]» en brig.lead, brig.est.p, brig.sec.nota y calc.brigada.nota (ES y EN)
        es la fecha de publicación de las actas, todavía desconocida (13 oct 2026).
        No fusionar ni desplegar hasta reemplazarla. Las 12,5 t salen del inventario de
        carga (lo despachado), NO de la suma de actas: no escribir «entregadas con acta». */
@@ -2019,7 +2019,7 @@ var I18N = {
     "calc.brigada.unico":"Aporte único: la brigada es una operación puntual, no una membresía.",
     "calc.trm":"1 USD = {v} COP · TRM oficial del {f}",
     "calc.trm.no":"No pudimos consultar la TRM en este momento.",
-    "calc.brigada.nota":"La brigada ya terminó. Lo que se entregó se publica con su acta firmada en el rastreo cuando esté revisada.",
+    "calc.brigada.nota":"La brigada del 24 al 27 de agosto despachó 12,5 toneladas, según el inventario de carga, y seguimos entregando y acompañando. Las actas firmadas se publican en el rastreo el [FECHA].",
     "calc.dest.emergencia":"Sismo del 10 de agosto",
     "brigada.opcion":"Brigada de atención a emergencia · 5 sectores",
     "mmc.donar.opcion":"Mira Mi Casa · reparación de viviendas",
