@@ -1631,6 +1631,9 @@ try {
     const js = readFileSync("app.js", "utf8");
     let worker = "";
     try { worker = readFileSync("worker.js", "utf8"); } catch { /* sin worker, sin páginas generadas */ }
+    /* La política de privacidad vive en data/privacidad.json (la pintan app.js y
+       el Worker): sus clases —legal-meta— cuentan como usadas. */
+    try { const pol = JSON.parse(readFileSync("data/privacidad.json", "utf8")); worker += "\n" + pol.es + "\n" + pol.en; } catch { /* sin política, nada que sumar */ }
     const hoja = readFileSync("styles.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     const htmlVivo = html.replace(/<!--[\s\S]*?-->/g, "");
 

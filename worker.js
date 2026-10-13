@@ -32,6 +32,8 @@
 */
 
 import { qrSvg } from './qr.js';
+/* La política de privacidad, fuente única con app.js: ver `paginaPrivacidad`. */
+import PRIVACIDAD from './data/privacidad.json';
 import { recibo, certificado, certificadoVoluntariado, informeTriage, inspeccionPDF, comprobanteFirmaConvenio,
          INSPECCION_SECCIONES, INSPECCION_ALCANCE, INSPECCION_CONSENT,
          INSPECCION_AYUDA, INSPECCION_ANCHOS, INSPECCION_GLOSARIO,
@@ -37585,6 +37587,36 @@ function temaPorReloj(request) {
    version. Lo usa la encuesta de las jornadas. */
 /* `cabecera` es opcional: HTML que va ANTES del <main>, a todo lo ancho. Lo usa
    /verificar para su barra con el logotipo y la vuelta al sitio. */
+/* /privacidad y /privacy: LA POLÍTICA CON EL TEXTO EN EL HTML (auditoría para
+   inversionistas, 12 oct 2026). En la SPA solo existía si corría JavaScript, y
+   un revisor en modo lectura, sin JS, o que escribía la dirección, no la veía.
+   El texto sale de data/privacidad.json, el mismo que pinta app.js: no hay
+   dos copias que se puedan desincronizar. Es HTML del repositorio. */
+function paginaPrivacidad(lang, tema) {
+  const en = lang === "en";
+  const T = en
+    ? { titulo: "Privacy and Data Protection Policy", ey: "Legal", inicio: "Give&Grow home", volver: "Back to the site", otro: "Leer en español", otroHref: "/privacidad" }
+    : { titulo: "Política de Privacidad y Tratamiento de Datos", ey: "Legal", inicio: "Inicio de Give&Grow", volver: "Volver al sitio", otro: "Read in English", otroHref: "/privacy" };
+  const cabecera = ''
+    + '<header class="vf-cab"><div class="wrap vf-cab-in">'
+    + '<a class="nlogo" href="/" aria-label="' + esc(T.inicio) + '">Give<em>&amp;</em>Grow</a>'
+    + '<a class="vf-volver" href="/' + (en ? '?lang=en' : '') + '"><span aria-hidden="true">&larr;</span> ' + esc(T.volver) + '</a>'
+    + '</div></header>\n';
+  const cuerpo = ''
+    + '<span class="ey">' + esc(T.ey) + '</span>\n'
+    + '<h1 class="h-sec">' + esc(T.titulo) + '</h1>\n'
+    + '<p class="pv-otro"><a href="' + T.otroHref + '" hreflang="' + (en ? "es" : "en") + '">' + esc(T.otro) + '</a></p>\n'
+    + '<div class="legal-doc">' + (en ? PRIVACIDAD.en : PRIVACIDAD.es) + '</div>\n';
+  const estilo = ''
+    + '.vf-cab{background:var(--nav-bg);border-bottom:1px solid var(--bd)}'
+    + '.vf-cab-in{max-width:760px;min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}'
+    + '.vf-cab .nlogo{display:inline-flex;align-items:center;min-height:44px}'
+    + '.vf-volver{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:var(--fs-14);font-weight:600;color:var(--acc)}'
+    + '.pv-otro a{color:var(--acc);font-weight:600;text-decoration:underline;text-underline-offset:3px}'
+    + 'body>main{max-width:760px!important}';
+  return cascaraBaja(T.titulo, cuerpo, lang, tema, estilo, cabecera);
+}
+
 function cascaraBaja(titulo, cuerpo, lang, tema, estilo, cabecera) {
   return '<!doctype html>\n'
 + '<html lang="' + (lang === "en" ? "en" : "es") + '"' + (tema === "dark" ? ' data-theme="dark"' : '') + '>\n<head>\n<meta charset="utf-8">\n'
@@ -38993,6 +39025,20 @@ export default {
        TIENE QUE ESTAR EN `run_worker_first` de wrangler.toml (las dos formas,
        con y sin barra final): sin eso la capa de assets responde 404 y este
        bloque no llega a correr — la misma lección de `/casa`. */
+    /* La política de privacidad sin JavaScript: ver `paginaPrivacidad`. EN
+       `run_worker_first` de wrangler.toml, o la capa de assets responde 404. */
+    if (/^\/(privacidad|privacy)\/?$/i.test(ruta)) {
+      const lang = /^\/privacy/i.test(ruta) || url.searchParams.get("lang") === "en" ? "en" : "es";
+      return new Response(paginaPrivacidad(lang, temaPorReloj(request)), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "referrer-policy": "strict-origin-when-cross-origin",
+          "x-content-type-options": "nosniff",
+          "cache-control": "public, max-age=600",
+          "content-security-policy": cspPagina({ script: "'none'" })
+        }
+      });
+    }
     if (/^\/socialfest\/?$/i.test(ruta)) {
       /* En Mira Mi Casa no existe esta página: se manda al dominio de la
          fundación, y ese salto sí es un 302 (otro origen). En el sitio de la
