@@ -5,6 +5,15 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# UN DESPLIEGUE A LA VEZ, y el que llega ESPERA (auditoría del 28 sep 2026).
+# Sin esto, un merge del bot y un commit del inventario casi simultáneos corrían
+# dos `wrangler deploy` en paralelo, y ganaba el que terminara DESPUÉS — que
+# podía ser el SHA más viejo. `cancel-in-progress: false` a propósito: cancelar
+# un deploy a mitad es la ventana del #130 (main fusionado, producción atrás).
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
 jobs:
   # La automatización del inventario (Apps Script → GitHub) reescribe la marca de
   # tiempo "actualizado" cada vez que corre su disparador, incluso cuando no hay
@@ -22,6 +31,10 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     name: guard (evita despliegues sin cambios reales)
+    # Leer los runs anteriores de este mismo workflow (ver abajo).
+    permissions:
+      contents: read
+      actions: read
     outputs:
       skip: ${{ steps.check.outputs.skip }}
     steps:
@@ -41,15 +54,32 @@ jobs:
           fi
 
           AFTER="${{ github.sha }}"
-          BEFORE="${{ github.event.before }}"
-          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
-             || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            BEFORE="$(git rev-parse "${AFTER}~1" 2>/dev/null || echo "")"
-          fi
-          if [ -z "$BEFORE" ]; then
-            echo "Sin punto de comparación: se despliega por seguridad."
+
+          # SE COMPARA CONTRA LO QUE ESTÁ EN PRODUCCIÓN, no contra el commit
+          # anterior (auditoría del 28 sep 2026). Con `github.event.before`, un
+          # deploy de código que FALLABA quedaba tapado por el siguiente commit
+          # del inventario: ese commit solo cambiaba el inventario respecto de
+          # su padre, el guard saltaba, y el código fusionado no llegaba nunca
+          # — con el run en verde. Es la cicatriz que ops/en-produccion.mjs
+          # describe, y que ahí solo se detectaba; aquí ya no ocurre.
+          #
+          # «Lo que está en producción» = el headSha del último run cuyo JOB de
+          # deploy terminó en success. No el último run: un run donde el guard
+          # saltó también sale success y no desplegó nada.
+          BEFORE=""
+          for id in $(gh run list --workflow deploy.yml --branch main --status success \
+                        --limit 40 --json databaseId --jq '.[].databaseId'); do
+            C="$(gh run view "$id" --json jobs \
+                   --jq '.jobs[] | select(.name | test("Deploy to Cloudflare")) | .conclusion')"
+            if [ "$C" = "success" ]; then
+              BEFORE="$(gh run view "$id" --json headSha --jq .headSha)"; break
+            fi
+          done
+          if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "No encontré el último deploy real (o su commit no está): se despliega por seguridad."
             echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
+          echo "En producción: $BEFORE"
 
           FILES="$(git diff --name-only "$BEFORE" "$AFTER")"
           echo "Archivos cambiados:"; echo "$FILES"
@@ -75,6 +105,8 @@ jobs:
             echo "El inventario cambió de verdad: se despliega."
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy:
     needs: guard
@@ -85,14 +117,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Node FIJO y no el que traiga la imagen del runner: wrangler 4.143 pide
+      # Node >= 22, y la imagen cambia de versión sin avisar. 24 es la LTS.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
       - name: Validate site (syntax, i18n parity, structure)
         run: node scripts/validate.mjs
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Wrangler
-        run: npm install -g wrangler@latest
+      # `npm ci` instala TAMBIÉN wrangler, con la versión EXACTA de package.json
+      # (4.143.0, la que venía saliendo de `@latest` en estos logs). Antes era
+      # `npm install -g wrangler@latest`: cada deploy podía estrenar una versión
+      # de la herramienta que nadie había probado, en producción.
+      - name: Install dependencies (incluye wrangler fijo)
+        run: |
+          npm ci
+          npx wrangler --version
 
       # El 11 ago 2026 el código llegó a producción sin su migración: la 0003
       # añadía `aportes.token` y `/api/checkout` ya la escribía, así que durante
@@ -103,7 +144,7 @@ jobs:
       # remota no tiene aplicada alguna migración.
       - name: La base está migrada (si no, no se despliega)
         run: |
-          SALIDA=$(wrangler d1 migrations list givegrow-privado --remote 2>&1)
+          SALIDA=$(npx wrangler d1 migrations list givegrow-privado --remote 2>&1)
           echo "$SALIDA"
           # Se busca el nombre de un archivo de migración en la salida, en vez de
           # una frase de éxito: `migrations list` sale con código 0 tanto si hay
@@ -120,7 +161,36 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy to Cloudflare
-        run: wrangler deploy
+        id: deploy
+        run: |
+          set -o pipefail
+          npx wrangler deploy 2>&1 | tee /tmp/deploy.log
+          VID="$(grep -oE 'Current Version ID: [0-9a-f-]{36}' /tmp/deploy.log | awk '{print $4}' | tail -1)"
+          if [ -z "$VID" ]; then
+            echo "::error::wrangler deploy no imprimió «Current Version ID»: no hay con qué comprobar lo desplegado."
+            exit 1
+          fi
+          echo "version=$VID" >> "$GITHUB_OUTPUT"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # EL DEPLOY NO ESTÁ HECHO HASTA QUE PRODUCCIÓN LO DICE (28 sep 2026).
+      # `wrangler deploy` en verde prueba que Cloudflare aceptó el paquete, no
+      # que el borde lo esté sirviendo ni que el Worker arranque y llegue a D1.
+      # /api/ping hace `SELECT 1` y devuelve el id de versión del binding
+      # CF_VERSION_METADATA: si no coincide con el que acabamos de subir en
+      # dos minutos, el job falla y se ve — en vez de «verde» sin saber qué corre.
+      - name: Producción responde con la versión nueva
+        run: |
+          set -uo pipefail
+          ESPERADA="${{ steps.deploy.outputs.version }}"
+          for i in $(seq 1 12); do
+            R="$(curl -fsS -m 10 -H 'cache-control: no-cache' https://thegiveandgrowproject.org/api/ping || true)"
+            V="$(printf '%s' "$R" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log(j.ok===true?String(j.version):"no_ok")}catch{console.log("ilegible")}})')"
+            echo "intento $i: $V"
+            if [ "$V" = "$ESPERADA" ]; then echo "Producción sirve $ESPERADA y llega a la base."; exit 0; fi
+            sleep 10
+          done
+          echo "::error::/api/ping no devolvió la versión $ESPERADA en 2 minutos (última respuesta: $R). Ver ops/runbook-incidentes.md"
+          exit 1

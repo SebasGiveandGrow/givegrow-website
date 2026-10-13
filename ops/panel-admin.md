@@ -241,28 +241,126 @@ falsificar.
 
 ## Qué hace el panel
 
-> Esta sección describía un panel de tres líneas —«resumen, tabla de aportes y
-> dos acciones»— que dejó de existir hace meses. Reescrita el 14 sep 2026 contra
-> el código, no de memoria.
+> Reescrita el 8 oct 2026 con la Fase 1 del panel (barra lateral, «Hoy» como
+> bandeja de entrada, cajón lateral y vista previa de correos). La versión
+> anterior describía siete pestañas que ya no existen.
 
-El panel está partido en **siete pestañas**, y cada una agrupa sus pantallas:
+**El armazón.** Una barra lateral fija, agrupada por área, y una barra superior
+delgada con el buscador y la sesión. Se ve **una sección a la vez**, con su
+cabecera —área, título, una línea de para qué sirve, lo que espera en ella y su
+acción principal— y su propia dirección, que se puede guardar y que respeta el
+botón de atrás. En el teléfono la barra lateral se abre con «Menú».
 
-| pestaña | qué hay dentro |
-|---|---|
-| **Hoy** | «Lo que hay que hacer hoy»: las colas pendientes, ordenadas por prioridad y con los días que llevan esperando. Es la portada. |
-| **Dinero** | Aportes · Transferencias por verificar · Pagos sin aporte · Membresías internacionales · Donaciones por el botón de PayPal · Eventos de PayPal sin casa |
-| **Mira Mi Casa** | Casas por revisar · Inspecciones en terreno |
-| **Red** | Quién quiere entrar · Ofrecimientos en especie |
-| **Entregas** | Entregas, con sus fotos y su publicación |
-| **Contabilidad** | Egresos · Proveedores |
-| **Salud** | Salud del ecosistema: dónde se cae la donación y qué lleva días esperando |
+| área | entrada (dirección) | qué hay dentro |
+|---|---|---|
+| Inicio | Hoy (`#hoy`) | La bandeja de entrada: todas las colas, en tres franjas |
+| | Tareas (`#tareas`) | Lo que hay que hacer, con o sin alguien; «Esta semana» y la tabla (Fase 5) |
+| Finanzas | Resumen (`#finanzas/resumen`) | El mes o el año: ingresos confirmados por medio, destino y tipo; egresos por categoría y centro; neto; donantes, membresías y certificados; mes a mes |
+| | Banco (`#finanzas/banco`) | El extracto de Bancolombia importado: movimientos e importaciones · «Importar un extracto» |
+| | Conciliar (`#finanzas/conciliar`) | Cada movimiento del extracto con lo que lo explica, con sugerencias |
+| | Aportes (`#finanzas/aportes`) | Cifras de los aportes, franja de certificados y la lista |
+| | Transferencias (`#finanzas/transferencias`) | Lo reportado por transferencia, para confirmar contra el extracto |
+| | Pagos sin aporte (`#finanzas/pagos`) | Cobros de Wompi sin guía y pagos sin guía registrados desde el extracto |
+| | Membresías y carnets (`#finanzas/membresias`) | Membresías de PayPal · carnets (también los de honor) · «Emitir carnet de honor» |
+| | Vencimientos (`#finanzas/vencimientos`) | Obligaciones tributarias y legales |
+| | Egresos (`#finanzas/egresos`) | Registrar egresos, soportes y la descarga para el contador |
+| | Proveedores (`#finanzas/proveedores`) | A quién se le paga |
+| | PayPal (`#finanzas/paypal`) | Donaciones del botón · avisos de PayPal sin registro |
+| Alianzas | Red (`#alianzas/red`) | Quién quiere entrar: fundaciones, empresas, voluntarios, padrinos |
+| | Ofrecimientos en especie (`#alianzas/ofrecimientos`) | Lo que llega por el formulario de la brigada |
+| | Social Fest (`#alianzas/socialfest`) | Los contactos que llegaron del evento, con su puerta, su estado en Red y su próximo paso (Fase 4) |
+| Personas y organizaciones | Contactos (`#personas/contactos`) | Cada persona u organización con su ficha: dinero, carnet, red, voluntariado, correos, banco y notas (Fase 4) |
+| | Voluntariado (`#personas/voluntariado`) | Jornadas, de la convocatoria al cierre |
+| | Ingenieros (`#personas/ingenieros`) | La bandeja de Red filtrada a ingenieros y su matrícula |
+| Mira Mi Casa | Casas (`#mmc/casas`) · Inspecciones (`#mmc/inspecciones`) | Casos de vivienda · visitas en terreno y el respaldo de un teléfono |
+| Entregas | Actas de entrega (`#entregas`) | Registrar, subir fotos, publicar |
+| Legal y documentos | Documentos (`#legal/documentos`) | El archivo de la fundación con su vencimiento, los huecos de lo que siempre tiene que haber y los convenios firmados en línea (Fase 5) |
+| Reportes | `#reportes/donaciones`, `donantes`, `voluntariado`, `mmc`, `banco` | Cinco informes anuales: pantalla, CSV e impresión (Fase 5) |
+| Sistema | Salud (`#sistema/salud`) | Embudo, señales de Wompi y del correo, operación del cron |
+| | Correos (`#sistema/correos`) | Todo lo que el sitio intentó mandar · «Reenviar» lo que no salió (Fase 4) |
 
-**Las colas son diecisiete** y se calculan en `/api/admin/salud`. Cada una trae
-su conteo, desde cuándo espera la más vieja, cómo se arregla y a qué pantalla
-lleva. La insignia de cada pestaña suma las suyas.
+Las direcciones viejas (`#dinero`, `#conta/sec-vencimientos`, `#sec-aportes`…)
+siguen abriendo su sección: las llevan correos ya enviados.
 
-**Las bandejas son trece** y se cargan solas al abrir su módulo o al asomar por
-pantalla, nunca todas de golpe.
+**«Hoy».** Las colas salen de `/api/admin/salud?items=1`. Cada una trae su
+conteo, desde cuándo espera la más vieja, cómo se arregla, su **franja**
+(`bandaDeCola`: Urgente, Hoy o Esta semana) y sus **cinco filas más viejas**,
+que salen de la misma consulta que el número (`itemsDeCola` + `ITEMS_COLA`).
+Dentro de cada franja manda el **peso** de la cola y después la fecha: ya no
+sube primero todo lo vencido pesara lo que pesara. Donde el panel ya sabe
+hacerlo, la acción está en la fila: confirmar una transferencia, emitir un
+certificado, abrir un caso, «Ya la atendimos», marcar un vencimiento. Las
+insignias de la barra lateral salen de esa misma respuesta (`COLA_MOD` dice de
+qué sección es cada cola). El resumen diario por correo sigue igual: llama a
+`adminSalud` sin filas.
+
+**Un solo número.** «Certificados por emitir» sale de `CERT_POR_EMITIR` en
+`worker.js`, que usan «Hoy», la franja de Aportes y el resumen. Antes eran tres
+consultas y tres cifras.
+
+**El cajón y los avisos.** Detalle y formularios se abren en un cajón lateral,
+no en `window.prompt`. Al terminar sale un aviso «Hecho», con «Deshacer» solo
+donde existe la acción contraria (vencimientos, «Ya la atendimos», cerrar o
+descartar un caso, archivar y reabrir).
+
+**Antes de un correo, el correo.** Toda acción que le escribe a alguien de
+fuera pregunta primero a `/api/admin/previa`, que arma los correos con **las
+mismas plantillas** sin enviarlos ni anotarlos, y el cajón enseña a quién, con
+qué asunto y qué dice. Cubre: mover una fundación (Aceptar, Visita hecha,
+Iniciar convenio, Marcar vinculada), confirmar una transferencia (el recibo),
+emitir y enviar un certificado, firmarlo cuando con esa firma sale, verificar
+una matrícula y reenviar su aviso, reenviar el enlace del convenio, cerrar o
+descartar un caso y, desde la Fase 2, conciliar con Wompi, emitir un carnet de
+honor, subir el texto del convenio, el agradecimiento de una jornada y sus
+encuestas. Si la vista previa falla, no se confirma.
+
+**Fase 2 (oct 2026): Finanzas completa.**
+
+- **Una sola tabla para todo Finanzas** (`tablaArmar` en `adminJS`): buscador,
+  filtros, columnas que ordenan, páginas de 25/50/100, cabecera fija, fila de
+  totales, un vacío dicho con palabras, y la fila abre el cajón con el detalle
+  entero. **Aportes filtra, ordena y pagina en el servidor** (es la única que
+  crece sin techo: cada intento de pago es una fila) y sus totales son del filtro
+  entero; las demás llegan enteras y se filtran en el navegador (egresos y
+  proveedores hasta `TOPE_LIBRO` = 2000 filas; las bandejas, `TOPE_BANDEJA`, y la
+  tabla avisa si se cortó).
+- **Las tres reglas viven en una expresión SQL cada una**, en `worker.js`, y las
+  usan la lista, sus totales, el CSV y el Resumen: `MEDIO_APORTE` (Wompi tarjeta,
+  Wompi transferencia Bancolombia, Wompi otro, PayPal, transferencia directa),
+  `TIPO_APORTE` (único; mensual o anual; membresía = atada a una suscripción con
+  cobro automático) y `FECHA_APORTE` (la fecha del dinero en día colombiano: la
+  del extracto, si no la de la aprobación, si no la de apertura). Los nombres de
+  persona salen de `ETIQ_FINANZAS`.
+- **Solo se suma lo confirmado** (`APORTE_CONFIRMADO`). Un intento sin pagar o
+  una transferencia reportada se cuentan, nunca se suman. **Pesos y dólares van
+  por separado y no se convierten**: hasta esta fase la cifra de «pagados» sumaba
+  los centavos de dólar de PayPal como si fueran pesos.
+- **Resumen** (`GET /api/admin/finanzas?anio=&mes=`, `mes=0` = el año): cada cifra
+  dice de dónde sale. Lo que entró sin guía (pagos de Wompi sin aporte, el botón
+  de PayPal) y las transferencias sin verificar se dicen aparte, no se mezclan.
+  Son **cifras operativas, no estados financieros**, y la pantalla lo dice.
+- **CSV de aportes** (`GET /api/admin/aportes.csv`) con los mismos filtros de la
+  tabla, en el mismo formato que el de egresos (punto y coma, BOM, fórmulas
+  neutralizadas). La columna «Confirmado» separa el dinero de lo que no lo es.
+- **Formularios en el cajón**: «Registrar un egreso» y «Emitir carnet de honor»
+  viven ocultos en `#pn-formas` y `cajonForma` los mueve al cajón (conservan sus
+  ids); al cerrar vuelven.
+- **Ya no queda ningún `prompt`/`confirm`/`alert` en el panel.** Lo reversible se
+  confirma con `confirmarSimple`, lo que pide un texto con `pedirTexto`, lo que
+  destruye con `confirmarPeligro`; copiar un enlace que el navegador no deja
+  copiar lo enseña seleccionado en el cajón. La ficha del convenio en línea pasó
+  de una ventana aparte al cajón ancho.
+- **Cinco vistas previas más** en `/api/admin/previa`: `conciliar` (el recibo y
+  el aviso interno que salen si Wompi confirma), `honor`, `convenio-texto` (solo
+  la primera subida avisa), `reconocer` (agradecimiento y certificado de
+  voluntariado) y `encuesta` (empresa o fundación). El correo de la encuesta salió
+  a `correoEncuestaActor` para que la vista previa use la misma plantilla.
+
+**Lo que destruye va en rojo.** Suprimir, Anular (certificado, acta, egreso),
+Descartar una transferencia, quitar una foto o una distinción: botón rojo y un
+cajón que dice qué se destruye y pide el motivo cuando el servidor lo exige.
+
+Las bandejas se cargan al abrir su sección, nunca todas de golpe.
 
 **Lo que el panel NO puede hacer, a propósito:** mover estados de pago. Los
 únicos que admite a mano son `en_distribucion` y `entregada` —está escrito en
@@ -271,14 +369,351 @@ solo lo hace el webhook de la pasarela. Si el panel pudiera hacerlo, la
 trazabilidad dejaría de significar algo, que es justo lo que el sitio le promete
 al donante.
 
-**Lo que el panel NO puede hacer, a propósito:** mover estados de pago. Eso lo
-hace únicamente el webhook de Wompi. Si el panel pudiera marcar un aporte como
-"aprobada" a mano, la trazabilidad dejaría de significar algo — y es justo lo que
-el sitio le promete al donante.
-
 Cada cambio manual deja rastro de quién lo hizo, en la tabla `consentimientos`
 con tipo `auditoria`. Hoy el panel es de una sola persona; el día que sean dos,
 «quién marcó esta entrega» es la primera pregunta.
+
+## Conciliar con el banco (Fase 3, oct 2026)
+
+**Decisión del fundador (8 oct 2026): el extracto de Bancolombia es la cifra
+que manda.** Lo que dicen Wompi, PayPal o el donante se compara con él, no al
+revés. Para eso hay dos entradas nuevas en Finanzas, debajo de Resumen:
+**Banco** (`#finanzas/banco`) y **Conciliar** (`#finanzas/conciliar`). Las
+tablas viven en `migrations/0042_conciliacion_bancaria.sql`.
+
+### 1 · Descargar el extracto de Bancolombia
+
+> **Verifica estos pasos en tu Sucursal Virtual: el menú exacto puede ser
+> distinto.** Están escritos de memoria de cómo suele verse, no copiados de la
+> pantalla, y la interfaz de un banco cambia sin avisar.
+
+1. Entra a la **Sucursal Virtual Empresas** (o Personas, según la cuenta) de
+   Bancolombia.
+2. Busca la cuenta de ahorros de la Fundación → **Movimientos** (a veces
+   «Consultas → Movimientos de cuenta» o «Extractos»).
+3. Elige el **periodo**: el mes entero (del 1 al último día).
+4. **Descargar / Exportar** en **CSV** o «Texto». Si solo ofrece «Excel», sirve
+   también: casi siempre es una tabla HTML con extensión `.xls`, y el panel la
+   lee. Un `.xlsx` de verdad no: ábrelo en Excel y usa *Guardar como → CSV UTF-8*.
+5. No edites el archivo antes de importarlo (Excel cambia fechas y números al
+   guardarlo). Si tuviste que abrirlo, guárdalo como CSV.
+
+### 2 · Importar
+
+*Banco → Importar un extracto.* Pon un **nombre** para la cuenta («Bancolombia
+ahorros»), **nunca su número**: el panel rechaza un nombre con seis dígitos
+seguidos. Elige el archivo. Nada se guarda todavía:
+
+- El panel detecta el separador (punto y coma, coma, tabulador o tabla HTML) y
+  la codificación (UTF-8 o Latin-1), salta las líneas de encabezado del banco y
+  **propone qué columna es qué** por sus títulos. Revísalas: fecha, descripción,
+  referencia, oficina (opcional), el valor —una columna con signo, o débito y
+  crédito por separado— y el saldo (opcional). Formato de fecha día/mes/año o
+  mes/día/año; «Invertir el signo» si los cargos vienen positivos.
+- Entiende los números como los escribe un banco colombiano: `1.234.567,89`,
+  `-50.000`, `$ 1,234,567.89`, `(12.500)`, `50000.00`. Fechas `dd/mm/aaaa`,
+  `aaaa-mm-dd` y `aaaammdd`.
+- Enseña **«N nuevos · M ya estaban · K con error»**, los primeros renglones
+  como van a quedar, los que tienen error (no se guardan) y si **el saldo
+  cuadra renglón a renglón** con el valor. Si no cuadra, casi siempre es el
+  signo al revés o débito y crédito cruzados: se arregla aquí, antes de guardar.
+- Pide el **periodo que cubre el extracto** (propone el mes). Con él el Resumen
+  sabe qué meses puede comparar con el banco, y se apaga el recordatorio.
+- **Recuerda la elección por cuenta**: el mes siguiente, el mismo formato entra
+  con las columnas ya puestas.
+
+**Volver a importar no duplica.** Cada movimiento tiene una huella (cuenta,
+fecha, valor, descripción normalizada, referencia, saldo y cuántas veces se
+repite ese mismo renglón ese día). Un archivo que se solapa con el anterior
+solo agrega lo nuevo. **Deshacer una importación** (columnas cruzadas, la cuenta
+equivocada): desde su fila en «Importaciones», mientras nada de ella se haya
+conciliado; si ya, primero se deshacen esas conciliaciones.
+
+### 3 · Conciliar
+
+*Conciliar* enseña los movimientos sin explicar, del más viejo al más nuevo,
+con lo que **sugiere el servidor**:
+
+| movimiento | se explica con | regla |
+|---|---|---|
+| abono | una transferencia directa confirmada | el mismo monto al peso, a ±3 días; suma si el nombre o la referencia aparecen en la descripción |
+| abono | una transferencia **reportada** sin verificar | igual; aceptar abre «Confirmar transferencia» con el movimiento ya elegido y el recibo a la vista |
+| abono | un **lote de Wompi** | los pagos aprobados de uno o varios días seguidos antes del abono; la diferencia es la comisión, y gana el grupo cuya comisión más se parece a la tarifa publicada (2,65 % + $700, más IVA) |
+| abono que dice PAYPAL | los pagos de PayPal (en dólares) desde el último retiro | el banco da los pesos: esa cifra se reparte entre los pagos por sus dólares y es la cifra de PayPal en pesos, sin TRM inventada |
+| cargo | un **egreso** | lo que salió de la cuenta (el neto, o el total si el banco pagó sin retenciones), a ±5 días; los cargos se reparten de una vez, por puntos |
+| abono o cargo | **dejar fuera** | 4 por mil, cuota de manejo e IVA, rendimientos, traslados entre cuentas propias |
+
+«Aceptar» guarda enseguida y sale un aviso con **Deshacer**. Abrir un
+movimiento deja además:
+
+- **Conciliar a mano:** buscar aportes, pagos sin aporte, donaciones del botón
+  de PayPal o egresos, elegir varios, ver la diferencia que queda y asignarla a
+  **Comisión de la pasarela** o **Ajuste** (con nota). Lo elegido más la
+  diferencia tiene que ser exactamente el valor del movimiento, o no se guarda.
+- **Dejarlo fuera** con su motivo (con «Otro motivo», la nota es obligatoria).
+- **Registrar como pago sin guía** (solo abonos): un dinero que nadie reportó.
+  Queda en «Pagos sin aporte» con quien pagó si se sabe, por dónde entró y su
+  destino. **No crea un aporte, no envía ningún correo y no emite
+  certificado.** Si quien pagó aparece y lo pide, eso sigue siendo a mano.
+- **Deshacer**, desde el movimiento: vuelve a «sin conciliar» y, si de él salió
+  un pago sin guía, ese registro se anula.
+
+**Confirmar una transferencia** (Transferencias o «Hoy») busca en el extracto
+importado un abono sin conciliar por el mismo monto a ±7 días. Si lo hay, «Usar
+este» llena la fecha, el monto y la referencia con lo del extracto y lo deja
+conciliado al confirmar. Si no, dice **«Aún no aparece en el extracto
+importado»** y hasta dónde llega lo importado: no bloquea, porque el extracto
+puede no estar importado todavía.
+
+### 4 · Lo que se ve en el Resumen y en «Hoy»
+
+**Resumen** añade, para el mes o el año, **«Según el banco»** (abonos, cargos y
+saldo final del extracto) junto a **«Según el panel»** (aportes confirmados en
+pesos y egresos netos), y desarma la diferencia: sin conciliar, dejados fuera,
+comisiones, ajustes, lo que entró sin guía, PayPal en pesos y «otras
+diferencias» (fechas de corte: un pago del 30 que Wompi consigna el 1). Si no
+hay extracto importado para el periodo, lo dice en vez de enseñar ceros.
+
+**«Hoy»** tiene dos colas nuevas: **Movimientos del banco sin conciliar**
+(franja Hoy; plazo de 7 días desde que se importaron; cada fila con su
+«Conciliar…») e **Importar el extracto del mes** (Esta semana, del día 3 de
+cada mes hasta que haya un extracto que cubra el mes anterior; desde el 15 pasa
+a Urgente). Vencidas, las dos van en un correo diario propio a
+`CORREO_AVISOS` (contabilidad), no al de alianzas: `COLAS_PLAZO_BANCO`.
+
+## Búsqueda, contactos y correos (Fase 4, oct 2026)
+
+**Decisiones del fundador que esto respeta (8 oct 2026):** nadie más opera el
+panel (no hay roles); el contacto con la gente sigue por **WhatsApp y Gmail**, y
+el panel **no escribe correos a mano**: solo deja registro de que hubo contacto
+y reenvía lo que el sistema ya mandaba y no salió. Las tablas nuevas viven en
+`migrations/0043_contactos_seguimientos.sql`.
+
+### El buscador de la barra
+
+Busca **mientras se escribe** (pausa de un cuarto de segundo) y abre los
+resultados debajo de la casilla, por grupos: Personas, Organizaciones, Aportes,
+Carnets, Casos, Inscripciones y Movimientos del banco. **«/»** o
+**Ctrl/Cmd+K** llevan a la casilla; flechas para elegir, Enter para abrir, Esc
+para cerrar. Cada resultado abre lo suyo: la ficha de contacto, el cajón del
+aporte, del carnet, del caso, del movimiento.
+
+Encuentra por nombre, correo, teléfono (con o sin +57, espacios o guiones),
+documento o NIT, por cualquier número del sistema **también a medias**
+(`GG-2026-0009` encuentra `GG-2026-000901`), por el **código de verificación**
+de un carnet (con o sin guion), por el número de certificado (abre su aporte),
+por el valor exacto de un movimiento del extracto (`150000`) y por el nombre de
+una fundación o empresa. **Sin tildes y sin mayúsculas**: «jose» encuentra a
+«José», «nandu» a «Ñandú». Se hace en el servidor (`adminBuscar`), con LIKE
+sobre lo normalizado (`sqlBuscable`), y la ruta vive bajo `/api/admin/`: nada
+de esto sale de detrás de Access.
+
+Antes solo entendía un número completo o un teléfono, y mandaba los aportes a
+la sección Salud, donde no se ve ningún aporte.
+
+### Contactos y la ficha
+
+**No hay una tabla de personas.** La lista y la ficha se arman cada vez con lo
+que la base ya tiene —donantes, inscripciones de la red, participaciones en
+jornadas— (`indiceContactos`), así que no se pueden desfasar de ellas. Las
+familias de Mira Mi Casa no entran: se buscan por el buscador y viven en Casas.
+
+**Qué es la misma ficha.** Cada registro se reduce a una clave: el **correo**
+en minúsculas; si no hay correo, `tel:<dígitos>`; si tampoco, `doc:<dígitos>`.
+Todo lo que tiene el mismo correo es la misma ficha. Lo que solo comparte
+**documento, teléfono o nombre completo** sale como **posible duplicado**, con
+el motivo, y se decide en la ficha: **Unir** o **No son la misma**. **El panel
+nunca une solo** (dos hermanos comparten teléfono). La decisión se guarda en
+`contactos_vinculos`, se puede deshacer («Separar», o «Deshacer» en el aviso) y
+queda en la auditoría.
+
+**La ficha** (cajón ancho): correos y teléfonos con «Abrir en tu correo» y
+WhatsApp —se abren en TU correo, el panel no le escribe a nadie—, documento,
+otros nombres, Social Fest (puerta y estado), los próximos pasos y las notas,
+**donaciones con totales por año que suman solo dinero confirmado** (pesos y
+dólares por separado, sin convertir), carnet, membresía de PayPal,
+certificados, sus solicitudes en la red (con el estado del convenio de una
+fundación), las jornadas en que estuvo, los correos que le mandó el sistema y
+los movimientos del extracto conciliados con sus aportes. Lo que se abre desde
+la ficha (un aporte, un carnet, un correo) trae «Volver a la ficha».
+
+**La lista** usa la tabla compartida: buscador, filtro por relación (donante,
+miembro, honor, fundación, empresa, voluntario, ingeniero, padrino, Social
+Fest…), persona u organización, próximo paso y «con posibles duplicados»;
+ordenada por el último movimiento. Una dirección como
+`#personas/contactos/<correo>` abre esa ficha.
+
+### Notas y registro de contacto
+
+En cada ficha, **«Anotar una nota o un contacto»**: qué fue (nota, llamada,
+WhatsApp, correo desde Gmail, reunión, otro), cuándo, qué pasó, y un **próximo
+paso** opcional con fecha. Todo es interno y no sale en ninguna pantalla
+pública ni en ningún correo. Una nota escrita por error se **anula**, no se
+borra.
+
+**El próximo paso con fecha sale en «Hoy»** en la cola **«Seguimientos para hoy
+y vencidos»** (`seguimientos_pendientes`, plazo cero): el día de la fecha va en
+su franja; pasado ese día está vencido, sube a Urgente y entra al correo diario
+del buzón de alianzas. Desde la fila: **Hecho** (con Deshacer), **Posponer…**
+(mañana, en 3 días, el próximo lunes, en una semana u otra fecha; también con
+Deshacer) y **Ficha**.
+
+La tabla `seguimientos` está pensada para que la Fase 5 (tareas) la extienda:
+admite una nota sin contacto y tiene `ref_tipo`/`ref_id` para pegarla a una
+inscripción, un aporte o una jornada.
+
+### Sistema › Correos
+
+La tabla `correos` con la tabla compartida, filtrada y paginada en el servidor:
+estado (enviado, falló, simulado, sin cupo, sin buzón, **por atender** y **ya
+atendidos**), tipo, fechas y buscador por destinatario, asunto o guía. Los
+**rebotes no se registran**: Resend no le avisa al sitio, y la pantalla lo dice.
+
+**El cuerpo de los correos sigue sin guardarse** (Ley 1581). Al abrir uno, el
+panel lo **vuelve a armar** con su plantilla y los datos de hoy (`REENVIOS` en
+`worker.js`, una entrada por etiqueta que llama a la misma función `correo*`) y
+lo enseña. **«Reenviar…»** (solo lo que falló o no tuvo cupo) pasa por la vista
+previa de la Fase 1 y solo sale si va **a la misma dirección** que el original
+y si al armarlo sale exactamente un correo. El envío se anota como cualquier
+otro (y gasta cupo), y queda enlazado al original en `correos_resueltos`: el
+original deja de contar en «Hoy», y si el reenvío también falla, en la cola
+queda uno, el nuevo. Dos clics seguidos no mandan dos correos.
+
+Se pueden volver a armar: el recibo (`aporte-aprobado`), el acuse de una
+transferencia reportada, el certificado, el carnet, el aviso de matrícula
+verificada, los correos de una fundación (aceptada, convenio, vinculada,
+cuestionario, texto del convenio), el enlace del caso de una familia y los
+acuses de los formularios (voluntario, ingeniero, fundación, empresa, lead de
+Social Fest, padrino, especie). **Lo demás** —avisos internos, resúmenes del día,
+correos que dependen de un momento que ya pasó— se marca **«Resuelto a mano»**
+con una nota de cómo se resolvió (le escribiste por Gmail o WhatsApp); también
+se deshace.
+
+Las colas de correos de «Hoy» (`correos_fallidos`, `correos_sin_cupo`,
+`correos_sin_buzon`) llevan aquí, con **«Reenviar…»** y **«Ver»** en cada fila.
+
+### La migración 0043
+
+Tres tablas con `IF NOT EXISTS` y ningún ALTER: `contactos_vinculos`,
+`seguimientos`, `correos_resueltos`, y los índices que la búsqueda y la ficha
+usan (correo en minúsculas en `correos`, `donantes` y `participaciones`;
+documento del donante; carnet por donante). **Se aplica antes de que el código
+llegue a producción**, con `migrations apply`. Si el código llegara antes, el
+panel no se cae: la ficha y la lista funcionan sin notas ni uniones (y lo
+dicen), y las colas de correos cuentan como antes.
+
+## Tareas, documentos y reportes (Fase 5, oct 2026)
+
+**Decisiones del fundador que esto respeta (8 oct 2026):** opera la fundación
+solo, en el escritorio, y quiere que el panel sea la plataforma administrativa
+entera; el panel no escribe correos a mano. Las tablas viven en
+`migrations/0044_tareas_documentos.sql`.
+
+### Tareas
+
+**«+ Tarea»** en la barra de arriba, desde cualquier sección, o **«Crear
+tarea»** desde lo que la origina: la ficha de un contacto, un aporte, un caso,
+un movimiento del banco, un vencimiento (Vencimientos) o un documento. Cada
+tarea lleva título, detalle, fecha límite, prioridad (alta o normal), área
+(Finanzas, Alianzas, Personas, Mira Mi Casa, Legal, Otro), su vínculo si lo
+tiene, y si **se repite** (cada mes o cada año). Al marcar «Hecha» una que se
+repite nace la siguiente con el mismo día del mes (una del 31 va al 30 de
+noviembre y vuelve al 31 de diciembre: `dia_ancla`); «Deshacer» la quita si
+nadie la ha tocado, y si ya se tocó, se queda y lo dice. Marcar dos veces no
+crea dos. No se borran: se cancelan y se reabren.
+
+La sección arriba tiene **«Esta semana»** (vencidas · hoy · próximos 7 días) y
+debajo la tabla compartida (estado, cuándo, área, prioridad, tareas o próximos
+pasos de fichas). **Los próximos pasos de las fichas salen aquí también**, con
+su «Hecho» y su «Posponer…» de siempre, pero siguen siendo filas de
+`seguimientos`: se anotan en la ficha.
+
+**Por qué una tabla nueva y no `seguimientos`:** un seguimiento es el registro de
+algo que ya pasó (su fecha no puede ser de mañana) con un próximo paso colgado;
+una tarea es algo por hacer. Juntarlas obligaba a un ALTER por columna, y
+SQLite no admite ALTER … IF NOT EXISTS.
+
+**En «Hoy»:** la cola **«Tareas para hoy y vencidas»** (`tareas_pendientes`,
+plazo cero como los seguimientos): el día de la fecha en «Hoy», vencida en
+Urgente, con «Hecha», «Posponer…» y «Abrir». Son dos colas de dos tablas
+(`seguimientos_pendientes` y `tareas_pendientes`): nada se cuenta dos veces.
+Vencidas, van en su propio correo diario (`resumen-diario-tareas`) al buzón de
+alianzas. Una tarea sin fecha no entra a «Hoy».
+
+### Documentos
+
+El archivo de la fundación: estatutos, RUT, certificado de existencia y
+representación legal (Cámara de Comercio), actas, estados financieros, informe
+de gestión, registro web del RTE, convenios, pólizas, contratos, políticas, lo
+presentado ante la DIAN u otra entidad, y otros. Cada uno con título, año que
+cubre, entidad, **fecha de expedición y de vencimiento**, nota y la casilla
+«Se puede enseñar», que **es solo una nota: no publica nada**.
+
+**El archivo** (PDF, JPG o PNG, hasta 10 MB) se comprueba **por sus bytes**
+(`tipoPorBytes`, lo mismo que el Anexo 1 del convenio): un ejecutable o una
+página HTML con la extensión cambiada se rechaza, y un tipo declarado distinto
+de lo que dicen los bytes también. Se guarda en R2 (`MEDIA`) con una clave de
+128 bits bajo `documentos/`, sin ninguna ruta pública que la sirva, y se
+descarga solo desde `/api/admin/documento/<n>/archivo` (Access; como adjunto,
+`nosniff`, `no-store`). Queda su huella SHA-256 y la subida va a la auditoría.
+**Un archivo no se reemplaza**: la versión nueva se registra como otro
+documento y la anterior queda «reemplazada» (para los tipos de los que vale
+uno: estatutos, RUT, Cámara, y los que van por año).
+
+**Estados:** vigente, por vencer (30 días o menos), vencido, sin fecha,
+reemplazado, no aplica, anulado. **Lo que siempre tiene que haber** sale arriba
+como huecos (`documentosEsperados`): estatutos, RUT y certificado de la Cámara;
+y cada año desde 2026, el acta de la reunión ordinaria, los estados financieros
+y el informe de gestión del ejercicio anterior (31 de marzo) y la actualización
+del RTE (30 de junio). Un hueco se llena registrando ese tipo de ese año, o con
+**«No aplica»** y su motivo.
+
+**En «Hoy»:** «Documentos vencidos» (Urgente; correo diario a contabilidad,
+`resumen-diario-documentos`), «Documentos por vencer» y «Documentos que
+faltan» (Esta semana). **El certificado de la Cámara no avisa**: vale 30 días
+para licitaciones y se pide cuando hace falta; volverlo alarma sería una alarma
+permanente. Su renovación anual sigue en Vencimientos.
+
+**Convenios firmados en línea:** se listan abajo desde `convenio_formularios`
+(formulario D firmado), con su PDF y «Ver el convenio». No se copian.
+
+**Vencimientos:** una obligación marcada «Hecho» tiene **«Adjuntar lo
+presentado…»** (abre un documento de tipo «Declaración o reporte presentado»
+ya atado a ese vencimiento) y su fila enseña lo que se adjuntó. Las que siguen
+pendientes tienen «Crear tarea».
+
+### Reportes
+
+Cinco informes por año (selector de año), cada uno en pantalla, **«Descargar
+(CSV)»** (mismo formato que los otros: punto y coma, BOM, fórmulas
+neutralizadas) e **«Imprimir»** (la hoja de impresión quita barras y botones y
+pone el encabezado de la fundación). Todos dicen **«Cifras operativas del
+panel, no estados financieros. Solo pagos confirmados. Pesos y dólares por
+separado, sin convertir.»** Una sola función (`datosReporte`) arma lo que se
+ve y lo que se descarga.
+
+| reporte | qué trae |
+|---|---|
+| Donaciones del año | Ingresos confirmados mes a mes, por medio, por destino y por tipo; donantes y donantes nuevos; aparte, lo que entró sin guía y lo reportado sin verificar |
+| Donantes del año | Una fila por donante (documento, correo, ciudad, pagos y totales en pesos y dólares) y el estado de su certificado: no lo pidió, pedido sin emitir, emitido falta firma o envío, emitido y enviado. Es para el contador y la exógena: lleva datos personales |
+| Voluntariado | Jornadas del año con personas, horas anotadas y beneficiarios que reporta la fundación; mes a mes. Solo cuentan las realizadas o cerradas |
+| Mira Mi Casa | Casos recibidos, atendidos (primer concepto de un ingeniero), visitas y cerrados o descartados (por la auditoría del cambio de estado), mes a mes |
+| Banco y panel | Abonos y cargos del extracto junto a ingresos confirmados en pesos y egresos netos, la diferencia desarmada como en el Resumen (`resumenBanco`) y mes a mes |
+
+### Pulido de las fases anteriores
+
+- «Registrar una entrega» y «Nueva jornada» se abren en el cajón.
+- La lista de jornadas usa la tabla compartida (buscador, estado, puerta, fechas, totales). La de entregas **no**: es la única que se usa en terreno desde un teléfono y se apila (`eco-stack`); la tabla compartida no se apila.
+- **El CSV de egresos lleva todos los filtros de la tabla y el buscador.** Sin filtro de estado (el enlace del Resumen) sigue siendo el libro entero.
+- **Conciliar › «Aceptar todas las de confianza alta…»**: enseña la lista entera, acepta cada una por la misma ruta que su fila y un solo «Deshacer» las devuelve todas. Las transferencias reportadas no entran: confirmarlas le escribe al donante.
+
+### La migración 0044
+
+Dos tablas con `IF NOT EXISTS` y ningún ALTER: `tareas` y `documentos`. **Se
+aplica antes de que el código llegue a producción**, con `migrations apply`.
+Si el código llegara antes, el panel no se cae: Tareas enseña los próximos
+pasos de las fichas y avisa que falta la migración, Documentos enseña los
+huecos y los convenios, y las colas nuevas de «Hoy» no salen.
 
 ## Cerrar una señal de terreno (desde el 31 ago 2026)
 

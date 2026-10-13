@@ -1,0 +1,65 @@
+name: Vigilante de producción
+
+# CADA HORA, DOS PREGUNTAS (auditoría de operación del 28 sep 2026):
+#
+#   1 · ¿Está en producción todo el código de main? Es la comprobación que
+#       CLAUDE.md pide «tras cada fusión» y que dependía de que alguien se
+#       acordara. Las fusiones a mano no disparan el deploy (#499–#503, 25 sep
+#       2026) y un deploy fallido quedaba tapado por los commits del inventario.
+#   2 · ¿Responde el sitio, llega a la base y corrió el cron? /api/ping hace
+#       `SELECT 1` y dice si las tareas diarias tuvieron éxito en 26 h. Es lo
+#       único que avisa de que el cron ENTERO dejó de correr: la alerta diaria
+#       por correo corre dentro de él y con él se calla.
+#
+# FALLA EN ROJO y GitHub manda el aviso de workflow fallido. Ojo: en los
+# workflows programados ese correo le llega a quien modificó por última vez la
+# línea `cron` de este archivo.
+#
+# No despliega nada y no escribe nada: solo lee runs de Actions y hace un GET.
+on:
+  schedule:
+    # Al minuto 17 y no en punto: a las horas en punto GitHub encola miles de
+    # workflows programados y los retrasa, a veces más de una hora.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vigilante
+  cancel-in-progress: true
+
+jobs:
+  vigilar:
+    runs-on: ubuntu-latest
+    name: main en producción y sitio vivo
+    steps:
+      - name: Checkout con historia
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # 45 minutos de margen: un PR recién fusionado con su deploy en curso
+      # no es un fallo. Ver el comentario de `--margen` en el script.
+      - name: Todo el código de main está en producción
+        run: node ops/en-produccion.mjs --margen 45
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: El sitio responde, llega a la base y el cron corrió
+        run: |
+          set -uo pipefail
+          R="$(curl -fsS -m 15 https://thegiveandgrowproject.org/api/ping || true)"
+          echo "ping: $R"
+          ESTADO="$(printf '%s' "$R" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log(j.ok!==true?"caido":j.cron_al_dia===false?"cron":"bien")}catch{console.log("caido")}})')"
+          case "$ESTADO" in
+            bien) echo "Sitio vivo y cron al día (o sin latidos todavía)." ;;
+            cron) echo "::error::El sitio responde pero alguna tarea diaria no tuvo éxito en 26 h. Ver «Operación» en /admin y ops/runbook-incidentes.md"; exit 1 ;;
+            *)    echo "::error::/api/ping no respondió ok. Ver ops/runbook-incidentes.md"; exit 1 ;;
+          esac

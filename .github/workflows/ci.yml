@@ -32,6 +32,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # El mismo Node que deploy.yml, por la misma razón: wrangler 4.143 pide
+      # Node >= 22 y la imagen del runner cambia sin avisar (28 sep 2026).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
       - name: Gate del proyecto (sintaxis, i18n, estructura)
         run: node scripts/validate.mjs
 
@@ -48,7 +54,10 @@ jobs:
       - name: El Worker empaqueta (bundle + resolución de imports)
         run: |
           npm ci
-          npx wrangler@latest deploy --dry-run --outdir /tmp/gg-bundle
+          # La versión FIJA de package.json, la misma que despliega: con
+          # `wrangler@latest` el PR se probaba con una herramienta y producción
+          # salía con otra.
+          npx wrangler deploy --dry-run --outdir /tmp/gg-bundle
           echo "Tamaño del bundle:"
           du -sh /tmp/gg-bundle
 

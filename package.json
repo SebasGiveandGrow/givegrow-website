@@ -2,13 +2,16 @@
   "name": "givegrow-website",
   "private": true,
   "type": "module",
-  "description": "Sitio de Fundación Give&Grow International. La única dependencia es pdf-lib, que arma el recibo de aporte y el certificado de donación DENTRO del Worker: son documentos con datos personales y no pueden generarse en el navegador.",
+  "description": "Sitio de Fundación Give&Grow International. La única dependencia es pdf-lib, que arma el recibo de aporte y el certificado de donación DENTRO del Worker: son documentos con datos personales y no pueden generarse en el navegador. wrangler va en devDependencies con version EXACTA: CI y el deploy usan la misma, en vez de wrangler@latest.",
   "scripts": {
     "validate": "node scripts/validate.mjs",
     "dev": "wrangler dev --persist-to /tmp/gg-wrangler",
-    "deploy": "wrangler deploy"
+    "deploy": "node -e \"if(!process.env.CI){console.error('npm run deploy solo corre en GitHub Actions (auditoria 28 sep 2026): produccion sale de un checkout limpio de main, nunca de una laptop. Usa: gh workflow run \\\"Deploy Give&Grow to Cloudflare\\\" --ref main');process.exit(1)}\" && wrangler deploy"
   },
   "dependencies": {
     "pdf-lib": "1.17.1"
+  },
+  "devDependencies": {
+    "wrangler": "4.143.0"
   }
 }
