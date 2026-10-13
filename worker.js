@@ -39033,30 +39033,63 @@ function paginaPrivacidad(lang, tema) {
 }
 
 /* Las rutas de la SPA que se sirven también con path propio. Los textos son los
-   de ROUTE_META en app.js (los mismos que pone en la pestaña al navegar). */
+   de ROUTE_META en app.js (los mismos que pone en la pestaña al navegar), en
+   los dos idiomas: `en` se usa cuando la dirección lleva `?lang=en`. */
 const RUTAS_INDEXABLES = {
   transparencia: {
     t: "Transparencia · Give&Grow International",
-    d: "Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International."
+    d: "Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International.",
+    en: {
+      t: "Transparency · Give&Grow International",
+      d: "Official registration, governance, financial statements and public documents of Give&Grow International."
+    }
   },
   empresas: {
     t: "Empresas y RSE · Give&Grow International",
-    d: "Convierte la responsabilidad social de tu empresa en impacto medible y trazable, con beneficios tributarios."
+    d: "Convierte la responsabilidad social de tu empresa en impacto medible y trazable, con beneficios tributarios.",
+    en: {
+      t: "Companies & CSR · Give&Grow International",
+      d: "Turn your company's social responsibility into measurable, traceable impact, with tax benefits."
+    }
   }
 };
-function paginaIndexable(base, id) {
-  const m = RUTAS_INDEXABLES[id];
-  const url = ORIGIN + "/" + id;
+/* LA TARJETA PARA COMPARTIR EN INGLÉS (auditoría para inversionistas, 13 oct
+   2026). `?lang=en` ya abría el sitio en inglés, pero solo DESPUÉS de correr
+   app.js: WhatsApp, LinkedIn, Slack o Facebook no ejecutan JavaScript, así que
+   el enlace que se le manda a un financiador extranjero se presentaba con el
+   título y la descripción en español. Aquí se reescriben en el HTML servido.
+   Texto: ROUTE_META.inicio.en de app.js, sin cambiar una coma. */
+const PORTADA_EN = {
+  t: "Give&Grow International — Give to grow, grow to give more",
+  d: "We connect generosity with need in Colombia, with full traceability. A nonprofit foundation based in Medellín."
+};
+/* Lo que cambia en el <head> según la página y el idioma. `propia` es la URL
+   de ESTA versión: con `?lang=en` el canonical y og:url apuntan a la versión
+   inglesa y no a la española. Si apuntaran a la española, Facebook y LinkedIn
+   irían a leer la tarjeta allá (siguen og:url) y volvería el español; y Google
+   descartaría el hreflang="en", que exige que cada versión sea canónica de sí
+   misma. */
+function cabeceraPagina(m, propia, en) {
   const attr = (v) => ({ element(el) { el.setAttribute("content", v); } });
-  return new HTMLRewriter()
+  const r = new HTMLRewriter()
     .on("title", { element(el) { el.setInnerContent(m.t); } })
     .on('meta[name="description"]', attr(m.d))
     .on('meta[property="og:title"]', attr(m.t))
     .on('meta[property="og:description"]', attr(m.d))
-    .on('meta[property="og:url"]', attr(url))
+    .on('meta[property="og:url"]', attr(propia))
     .on('meta[name="twitter:title"]', attr(m.t))
     .on('meta[name="twitter:description"]', attr(m.d))
-    .on('link[rel="canonical"]', { element(el) { el.setAttribute("href", url); } })
+    .on('link[rel="canonical"]', { element(el) { el.setAttribute("href", propia); } });
+  if (!en) return r;
+  return r
+    .on("html", { element(el) { el.setAttribute("lang", "en"); } })
+    .on('meta[property="og:locale"]', attr("en_US"))
+    .on('meta[property="og:image:alt"]', attr(PORTADA_EN.t));
+}
+function paginaIndexable(base, id, en) {
+  const m = en ? RUTAS_INDEXABLES[id].en : RUTAS_INDEXABLES[id];
+  const url = ORIGIN + "/" + id;
+  return cabeceraPagina(m, en ? url + "?lang=en" : url, en)
     .on('link[rel="alternate"]', { element(el) {
       el.setAttribute("href", el.getAttribute("hreflang") === "en" ? url + "?lang=en" : url);
     } })
@@ -39068,6 +39101,12 @@ function paginaIndexable(base, id) {
       el.removeAttribute("fetchpriority"); el.setAttribute("loading", "lazy");
     } })
     .transform(base);
+}
+/* La portada con `?lang=en`. Solo el <head>: el cuerpo lo traduce app.js, como
+   siempre. Un 304 o lo que no sea HTML pasa tal cual. */
+function portadaEnIngles(base) {
+  if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
+  return cabeceraPagina(PORTADA_EN, ORIGIN + "/?lang=en", true).transform(base);
 }
 
 function cascaraBaja(titulo, cuerpo, lang, tema, estilo, cabecera) {
@@ -41380,7 +41419,12 @@ export default {
     const rIdx = ruta.match(/^\/([a-z]+)\/?$/);
     if (rIdx && RUTAS_INDEXABLES[rIdx[1]] && !HOST_MMC.test(url.hostname)) {
       const base = await env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
-      return paginaIndexable(base, rIdx[1]);
+      return paginaIndexable(base, rIdx[1], url.searchParams.get("lang") === "en");
+    }
+    /* La portada en inglés: su tarjeta para compartir (ver `PORTADA_EN`). Fuera
+       del subdominio de Mira Mi Casa, que tiene su propia tarjeta. */
+    if (ruta === "/" && url.searchParams.get("lang") === "en" && !HOST_MMC.test(url.hostname)) {
+      return portadaEnIngles(await env.ASSETS.fetch(request));
     }
     if (ruta === "/gracias" || ruta === "/gracias/" || ruta.startsWith("/caso/")) {
       return env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
