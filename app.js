@@ -1887,12 +1887,18 @@ var I18N = {
     "track.ev.p":"Tu aporte se suma al fondo de este destino. Estas son las entregas que ese fondo hizo posibles — no te atribuimos una en particular, porque el dinero se reúne y las jornadas se pagan entre varios aportes.",
     "brig.ey":"Brigada de atención a emergencia",
     "brig.t":"Terremoto del 10 de agosto. La brigada salió el 20 de agosto de 2026.",
-    "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 20 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo: las actas firmadas de las entregas se publican en el rastreo cuando estén listas. Lo que sigue abierto es Mira Mi Casa.",
+    "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 20 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo y de lo que sigue: las actas firmadas de las entregas se publican aquí y en el rastreo el [FECHA].",
     "brig.foto.alt":"Muro colapsado y escombros frente a una casa en El Águila, agosto de 2026",
     "brig.foto.pie":"El Águila, agosto de 2026. Un muro colapsado en una de las zonas que recorrió la brigada.",
-    "brig.est.rango":"Agosto de 2026",
-    "brig.est.despues":"La brigada terminó.",
-    "brig.est.p":"Las actas firmadas de las entregas se publican aquí y en el rastreo cuando estén revisadas, no antes. Lo que sigue abierto es Mira Mi Casa.",
+    "brig.est.rango":"Del 24 al 27 de agosto de 2026",
+    "brig.est.despues":"12,5 toneladas despachadas, según el inventario de carga.",
+    /* FECHA-ACTAS-PENDIENTE: «[FECHA]» en brig.lead, brig.est.p y brig.sec.nota (ES y EN)
+       es la fecha de publicación de las actas, todavía desconocida (13 oct 2026).
+       No fusionar ni desplegar hasta reemplazarla. Las 12,5 t salen del inventario de
+       carga (lo despachado), NO de la suma de actas: no escribir «entregadas con acta». */
+    "brig.est.p":"En esos días la brigada entregó ayuda humanitaria en Guática, Armenia, Cartago, Ansermanuevo y la vereda Maracaibo, en Argelia. Cuando las actas firmadas estén revisadas, la cifra pasará a ser la suma de las actas, y explicaremos cualquier diferencia. Las actas se publican aquí y en el rastreo el [FECHA].",
+    "brig.est.sigue":"Desde entonces seguimos entregando y acompañando. Empezó la reconstrucción de tres viviendas: está en curso y todavía no tiene fechas de terminación. Y está arrancando Mira Mi Casa.",
+    "brig.est.mmc":"Conoce Mira Mi Casa",
     "brig.hechos.cap":"El sismo",
     "brig.h1.k":"Magnitud",
     "brig.h1.v":"7,4",
@@ -1924,7 +1930,7 @@ var I18N = {
     "brig.plan.t":"Siete personas y cinco sectores.",
     "brig.plan.p":"La recolección se hizo en centros de acopio de empresas y amigos en Envigado. De ahí salió la carga con el equipo, por carretera, desde el 20 de agosto de 2026.",
     "brig.sec.cap":"Los cinco sectores del plan",
-    "brig.sec.nota":"Las zonas y los puntos de entrega se acordaron con los Consejos Municipales de Gestión del Riesgo y con las fundaciones de cada territorio. Lo que se entregó en cada sector, y a cuántas familias, se publica con su acta firmada cuando esté revisada: antes no lo afirmamos.",
+    "brig.sec.nota":"Las zonas y los puntos de entrega se acordaron con los Consejos Municipales de Gestión del Riesgo y con las fundaciones de cada territorio. Lo que se entregó en cada lugar, y a cuántas familias, se publica con su acta firmada el [FECHA]: antes no lo afirmamos.",
     "brig.hub.ey":"Cómo entregamos",
     "brig.hub.t":"No llegamos a repartir por nuestra cuenta.",
     "brig.hub.p":"Entregamos junto a fundaciones que ya trabajaban en cada territorio y conocían a las familias: ellas pusieron el criterio y la relación, nosotros la logística, los insumos y el registro. Es la misma modalidad del HUB SOCIAL con la que operamos todo el año, aplicada a una emergencia.",
