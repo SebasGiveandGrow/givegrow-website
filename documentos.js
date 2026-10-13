@@ -2016,3 +2016,138 @@ export async function comprobanteFirmaConvenio(c) {
   h.cerrarPie(c.referencia);
   return pdf.save();
 }
+
+/* ===========================================================================
+   INFORME TRIMESTRAL PARA EL BOARD DE ASESORES (0045)
+   ===========================================================================
+   Lo arma `datosInformeBoard` en worker.js: aquí no se decide nada, solo se
+   dibuja, como el comprobante de firma. Cuatro partes:
+
+     PORTADA      el periodo y el corte, y cómo se lee el informe.
+     LA TABLA     los indicadores activos con su último valor AL CORTE, su
+                  fuente, su línea base, su meta y su estado a esa fecha.
+     LO QUE NO    los indicadores sin dato: «Evidencia, no promesas» también es
+                  decir en voz alta lo que todavía no se puede afirmar.
+     EL PIE       el Board asesora y recomienda; no aprueba ni dirige.
+
+   Sin cifras financieras: las únicas de la fundación son las de los estados
+   financieros firmados, y este informe lo dice.
+   =========================================================================== */
+
+const AMBAR = rgb(0.62, 0.38, 0.05);
+const FONDO_CAB = rgb(0.925, 0.906, 0.859);
+
+/* Una tabla que se parte en páginas: cada fila mide lo que su celda más alta,
+   y la cabecera se repite arriba de cada página nueva. */
+function tablaPDF(h, f, cols, filas, opts = {}) {
+  const tam = opts.tam || 7.4;
+  const inter = tam * 1.32;
+  const pad = 4;
+  const lineasDe = (txt, fuente, c) => h.lineas(winansi(txt), fuente, tam, c.w - pad * 2);
+  const cabecera = () => {
+    const alto = Math.max(...cols.map((c) => lineasDe(c.t, f.negrita, c).length)) * inter + pad * 2;
+    h.reservar(alto + inter * 3 + pad * 2);
+    let x = MG.izq;
+    h.p.drawRectangle({ x: MG.izq, y: h.y - alto, width: ANCHO, height: alto, color: FONDO_CAB });
+    for (const c of cols) {
+      let y = h.y - pad;
+      for (const l of lineasDe(c.t, f.negrita, c)) {
+        h.p.drawText(l, { x: x + pad, y: y - tam, size: tam, font: f.negrita, color: TINTA });
+        y -= inter;
+      }
+      x += c.w;
+    }
+    h.y -= alto;
+  };
+  cabecera();
+  for (const fila of filas) {
+    const celdas = cols.map((c) => lineasDe(String(fila[c.k] == null || fila[c.k] === "" ? "-" : fila[c.k]), c.negrita ? f.negrita : f.normal, c));
+    const alto = Math.max(...celdas.map((ls) => ls.length)) * inter + pad * 2;
+    if (h.y - alto < MG.abajo) { h.nueva(); cabecera(); }
+    let x = MG.izq;
+    cols.forEach((c, i) => {
+      let y = h.y - pad;
+      const color = c.color ? c.color(fila) : (c.gris ? GRIS : TINTA);
+      for (const l of celdas[i]) {
+        h.p.drawText(l, { x: x + pad, y: y - tam, size: tam, font: c.negrita ? f.negrita : f.normal, color });
+        y -= inter;
+      }
+      x += c.w;
+    });
+    h.y -= alto;
+    h.p.drawLine({ start: { x: MG.izq, y: h.y }, end: { x: MG.izq + ANCHO, y: h.y }, thickness: 0.5, color: LINEA });
+  }
+  h.y -= 12;
+}
+
+export async function informeBoard(c) {
+  const { pdf, hoja: h, f } = await abrir(c.referencia, "Informe trimestral para el Board de Asesores · " + c.periodo);
+
+  /* LA PORTADA. */
+  membrete(h);
+  h.salto(70);
+  h.cintillo("Informe trimestral para el Board de Asesores", { tam: 8, despues: 14 });
+  h.texto(c.periodo, { tam: 34, fuente: f.negrita, color: VERDE, interlinea: 40, despues: 4 });
+  h.texto(c.periodo_dicho.charAt(0).toUpperCase() + c.periodo_dicho.slice(1), { tam: 15, fuente: f.negrita, color: TINTA, interlinea: 20, despues: 26 });
+  h.regla({ despues: 6 });
+  h.fila("Periodo", c.desde + " a " + c.corte);
+  h.fila("Fecha de corte", c.corte_dicho);
+  h.fila("Indicadores con dato al corte", c.con_dato + " de " + c.total);
+  h.fila("Indicadores validados", c.validados + " de " + c.total + (c.validados < c.total ? " (el resto es borrador)" : ""));
+  h.fila("Generado", c.generado + " (hora de Colombia)", { fuerte: false });
+  h.salto(18);
+  h.texto("Cómo leer este informe", { tam: 10, fuente: f.negrita, color: TINTA, despues: 4 });
+  for (const p of [
+    "Cada cifra dice de dónde sale y hasta qué fecha cuenta (su corte). Ninguna medición posterior al " + c.corte_dicho + " entra en este informe.",
+    "La batería de indicadores es un borrador en revisión: un indicador sin validar puede cambiar de nombre, de fuente o de meta. Las metas a 2027 marcadas «propuesta» no son compromisos.",
+    "El estado de cada indicador se calcula a la fecha de corte: «al día» si tiene la medición del último periodo cerrado; «pendiente» si le falta.",
+    "Este informe no contiene cifras financieras. Las únicas cifras financieras de la fundación son las de sus estados financieros firmados por el Representante Legal y la Revisora Fiscal."
+  ]) h.texto(p, { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 6 });
+  h.salto(8);
+  avisoEnCaja(h, f, c.asesora);
+
+  /* LA TABLA. */
+  h.nueva();
+  seccion(h, f, "I", "LOS INDICADORES AL " + c.corte_dicho.toUpperCase());
+  /* Los 488 pt de ancho útil, repartidos. */
+  tablaPDF(h, f, [
+    { k: "num", t: "#", w: 18, negrita: true },
+    { k: "nombre", t: "Indicador", w: 138 },
+    { k: "valor", t: "Último valor (periodo)", w: 78, negrita: true },
+    { k: "fuente", t: "Fuente y corte", w: 104, gris: true },
+    { k: "base", t: "Línea base", w: 58, gris: true },
+    { k: "meta", t: "Meta 2027", w: 44, gris: true },
+    { k: "estado", t: "Estado al corte", w: 48, color: (r) => (/^Pendiente/.test(r.estado) ? AMBAR : /^Al día/.test(r.estado) ? VERDE : GRIS) }
+  ], c.indicadores.map((x) => ({
+    num: String(x.numero),
+    nombre: x.nombre + "\n" + x.linea + " · " + x.tipo.toLowerCase() + " · " + x.frecuencia.toLowerCase() + (x.validado ? "" : " · borrador"),
+    valor: x.con_dato ? x.valor + "\n(" + x.periodo + ")" : "sin dato",
+    fuente: x.con_dato ? x.fuente + "\nCorte: " + x.corte : "Fuente prevista: " + x.fuente,
+    base: x.base, meta: x.meta, estado: x.estado
+  })));
+
+  /* LO QUE NO PODEMOS AFIRMAR TODAVÍA. */
+  seccion(h, f, "II", "LO QUE NO PODEMOS AFIRMAR TODAVÍA");
+  if (!c.sin_datos.length) {
+    h.texto("Todos los indicadores activos tienen al menos una medición al corte. Eso no los vuelve definitivos: los que siguen en borrador pueden cambiar.",
+      { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 8 });
+  } else {
+    h.texto("Estos indicadores no tienen ninguna medición registrada al " + c.corte_dicho + ". Sobre ellos el informe no afirma nada: ni avance, ni retroceso, ni cero.",
+      { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 8 });
+    for (const x of c.sin_datos) h.numeral(x.numero, x.nombre + ". Fuente prevista: " + x.fuente + ".");
+    h.salto(6);
+  }
+
+  /* EL PIE: quién decide. */
+  h.reservar(120);
+  seccion(h, f, "III", "EL PAPEL DEL BOARD");
+  h.texto(c.asesora, { tam: 9.3, color: TINTA, interlinea: 13.5, despues: 8 });
+  h.texto("La fundación no tiene junta directiva. Lo que el Board recomiende sobre este informe se registra como recomendación, con su fecha, y la decisión que se tome después es del máximo órgano de dirección.",
+    { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 12 });
+  h.regla({ despues: 12 });
+  h.texto(ENTIDAD.nombreCorto, { tam: 9, fuente: f.negrita, color: TINTA, despues: 2 });
+  h.texto("NIT " + ENTIDAD.nit + "  ·  " + ENTIDAD.domicilio, { tam: 8.5, color: GRIS, interlinea: 12 });
+
+  h.cerrarPie(c.referencia);
+  return pdf.save();
+}
