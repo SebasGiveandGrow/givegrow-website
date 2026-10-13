@@ -5865,106 +5865,29 @@ function renderEmpresas(){
     if (empty) empty.style.display = n ? "none" : "";
   });
 }
-// Política de Privacidad (#privacidad). Contenido bilingüe inyectado (no i18n key-a-key
-// por ser documento largo). Adaptado del doc legal v1.0: cookies = realidad del sitio
-// (Cloudflare sin cookies), sin citar % tributario para no reabrir la inconsistencia.
-var PRIVACY = {
-  es: `<p class="legal-meta">Versión 1.2 · Vigente desde el 8 de octubre de 2026 · Conforme a la Ley 1581 de 2012 (Colombia), su Decreto 1377 de 2013 y el Reglamento General de Protección de Datos (GDPR, Unión Europea).</p>
-<h2>1. Responsable del tratamiento</h2>
-<ul>
-<li><strong>Razón social:</strong> Fundación Give&amp;Grow International</li>
-<li><strong>NIT:</strong> 901.948.930-2</li>
-<li><strong>Domicilio:</strong> Carrera 82A #9A Sur 28, Medellín, Antioquia, Colombia</li>
-<li><strong>Correo de privacidad:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
-<li><strong>Representante Legal:</strong> Juan Sebastián Navarro Osorio</li>
-<li><strong>Autoridad de vigilancia:</strong> Superintendencia de Industria y Comercio (SIC), Colombia</li>
-</ul>
-<h2>2. Qué datos tratamos y con qué finalidad</h2>
-<p>Tratamos únicamente los datos necesarios para cumplir nuestra labor, según quién nos los entregue:</p>
-<ul>
-<li><strong>Donantes (personas y empresas):</strong> nombre o razón social, identificación, correo, teléfono, ciudad y monto o historial de aportes — para emitir tu certificado de donación con el beneficio tributario que contempla la ley, llevar la contabilidad, gestionar tu membresía y enviarte los reportes de impacto. No almacenamos datos de tarjetas de pago.</li>
-<li><strong>Empresas y comercios aliados:</strong> datos de la empresa, del representante y de contacto — para la debida diligencia, la firma del convenio y la trazabilidad de la alianza.</li>
-<li><strong>Voluntarios:</strong> datos de identificación y profesionales — para verificar idoneidad y asignarte a los programas.</li>
-<li><strong>Beneficiarios de programas:</strong> datos entregados por las fundaciones aliadas para ejecutar y documentar el impacto. Los datos de niñas, niños y adolescentes reciben protección reforzada y solo se tratan con autorización de su representante legal.</li>
-</ul>
-<p><strong>Membresías y carnet de miembro.</strong> Tu carnet digital se puede comprobar en <code>thegiveandgrowproject.org/verificar</code>. Mientras tu membresía esté vigente, un comercio aliado del Programa de Gratitud puede confirmarla escribiendo el código de verificación de tu carnet o el número de documento que registraste al pagar o al pedir tu certificado. La respuesta muestra solo tu nombre de pila y la inicial de tu apellido, tu nivel o tu distinción y la vigencia; nunca tu documento ni tus datos de contacto. Cuando la membresía deja de estar vigente, tu número de documento ya no devuelve ningún resultado; solo el código de tu propio carnet sigue indicando que no está vigente. El número consultado no viaja en la dirección de la página ni aparece en la respuesta.</p>
-<p><strong>Carnets de miembro de honor.</strong> La fundación también emite, <strong>por invitación</strong>, carnets de miembro de honor a personas que reconoce con una distinción (por ejemplo, fundador/a, pionero/a, coordinador/a voluntario/a, aliado/a de la red, embajador/a o integrante de la Junta de Asesores, un grupo honorario y asesor sin funciones de dirección). Para emitirlo guardamos tu nombre, tu correo, la distinción y su vigencia y, <strong>solo si nos autorizas expresamente</strong>, tu tipo y número de documento; esa autorización queda registrada. Usamos esos datos para emitir y enviarte el carnet y para que se pueda verificar, con las mismas reglas de arriba: por su código siempre, y por tu número de documento solo si lo autorizaste y mientras el carnet esté vigente. Puedes pedir en cualquier momento que retiremos tu documento o tu carnet.</p>
-<h2>3. Base legal</h2>
-<p>Tratamos tus datos con tu <strong>autorización previa, expresa e informada</strong>, que recogemos por formulario físico o digital (con registro de fecha). Puedes revocarla en cualquier momento. Para titulares en la Unión Europea aplicamos las bases del Artículo 6 del GDPR (consentimiento, ejecución de un contrato, obligación legal o interés legítimo, según el caso).</p>
-<h2>4. Tus derechos</h2>
-<p>Como titular de los datos puedes, en cualquier momento:</p>
-<ul>
-<li><strong>Conocer y acceder</strong> a los datos que tratamos sobre ti.</li>
-<li><strong>Rectificar</strong> datos inexactos o desactualizados.</li>
-<li><strong>Solicitar la supresión</strong> ("derecho al olvido") cuando no exista un deber legal de conservarlos.</li>
-<li><strong>Revocar la autorización</strong> que nos diste.</li>
-<li><strong>Oponerte</strong> a ciertos tratamientos y solicitar la <strong>portabilidad</strong> de tus datos.</li>
-<li><strong>Presentar una queja</strong> ante la SIC (Colombia) o la autoridad de control europea que corresponda.</li>
-</ul>
-<h2>5. Cómo ejercer tus derechos</h2>
-<p>Escríbenos a <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> con tu nombre, tu documento y la solicitud. Acusamos recibo en <strong>2 días hábiles</strong>; respondemos las consultas de acceso en <strong>10 días hábiles</strong> y los reclamos (rectificación, supresión, revocación) en <strong>15 días hábiles</strong>.</p>
-<h2>6. Conservación de los datos</h2>
-<p>Guardamos cada dato solo el tiempo necesario o el que exige la ley: los soportes de donaciones <strong>10 años</strong> (obligación tributaria y contable); los datos de beneficiarios, la duración del programa más 5 años; los de voluntarios, la vinculación más 3 años. Cumplido el plazo, se eliminan de forma segura.</p>
-<h2>7. Transferencias internacionales</h2>
-<p>Podemos compartir datos con encargados o aliados en otros países (por ejemplo, proveedores tecnológicos o fundaciones de cooperación), siempre con garantías adecuadas: cláusulas contractuales, acuerdos de encargo del tratamiento y el mínimo de datos necesarios, anonimizados cuando es posible.</p>
-<h2>8. Seguridad de la información</h2>
-<p>Protegemos tus datos con cifrado en tránsito, control de acceso por roles, registros de auditoría y protocolos de gestión de incidentes. Ningún sistema es infalible, pero aplicamos estándares reconocidos para reducir el riesgo.</p>
-<h2>9. Cookies y analítica</h2>
-<p>Este sitio <strong>no usa cookies de rastreo ni de marketing, ni píxeles de terceros.</strong> Para entender el uso del sitio empleamos <strong>Cloudflare Web Analytics, que no instala cookies ni identifica a las personas.</strong> Solo guardamos tu <strong>preferencia de tema (claro u oscuro)</strong> en tu navegador, y en una cookie técnica (<code>gg-tema</code>) que solo sirve para que las páginas sin JavaScript —como el carnet o el verificador— se muestren en el tema que elegiste. No te identifica, no es de seguimiento y no se usa para nada más.</p>
-<h2>10. Vigencia y cambios</h2>
-<p>Esta política (Versión 1.2) rige desde el 8 de octubre de 2026 y se revisa al menos una vez al año, o antes si cambian la normativa o nuestras prácticas. Publicaremos aquí cualquier actualización.</p>
-<p><strong>Cambios frente a la Versión 1.1:</strong> se añadieron los carnets de miembro de honor, que la fundación emite por invitación: qué datos guardamos para emitirlos (nombre, correo y, solo con tu autorización, tu documento) y cómo se verifican (sección 2).</p>
-<p><strong>Cambios de la Versión 1.1 frente a la 1.0:</strong> se añadió cómo un comercio aliado puede confirmar una membresía vigente con el código del carnet o el número de documento (sección 2), y se declaró la cookie técnica que guarda la preferencia de tema (sección 9).</p>`,
-  en: `<p class="legal-meta">Version 1.2 · Effective October 8, 2026 · In accordance with Colombia's Law 1581 of 2012, its Decree 1377 of 2013, and the EU General Data Protection Regulation (GDPR).</p>
-<h2>1. Data controller</h2>
-<ul>
-<li><strong>Legal name:</strong> Fundación Give&amp;Grow International</li>
-<li><strong>Tax ID (NIT):</strong> 901.948.930-2</li>
-<li><strong>Address:</strong> Carrera 82A #9A Sur 28, Medellín, Antioquia, Colombia</li>
-<li><strong>Privacy email:</strong> <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></li>
-<li><strong>Legal Representative:</strong> Juan Sebastián Navarro Osorio</li>
-<li><strong>Supervisory authority:</strong> Superintendence of Industry and Commerce (SIC), Colombia</li>
-</ul>
-<h2>2. What data we process and why</h2>
-<p>We process only the data needed to carry out our work, depending on who provides it:</p>
-<ul>
-<li><strong>Donors (individuals and companies):</strong> name or legal name, ID, email, phone, city and donation amount or history — to issue your donation certificate with the tax benefit provided by law, keep our accounting, manage your membership and send you impact reports. We do not store payment-card data.</li>
-<li><strong>Partner companies and businesses:</strong> company, representative and contact details — for due diligence, signing the agreement and alliance traceability.</li>
-<li><strong>Volunteers:</strong> identification and professional data — to verify suitability and assign you to programs.</li>
-<li><strong>Program beneficiaries:</strong> data provided by partner foundations to deliver and document impact. Data of children and adolescents receives reinforced protection and is processed only with their legal guardian's authorization.</li>
-</ul>
-<p><strong>Memberships and member card.</strong> Your digital card can be checked at <code>thegiveandgrowproject.org/verificar</code>. While your membership is active, a Gratitude Programme partner business can confirm it by typing your card's verification code or the ID number you gave when paying or when asking for your certificate. The answer shows only your first name and the initial of your surname, your level or your distinction and its validity; never your ID number or your contact details. Once the membership is no longer active, your ID number returns no result; only your own card's code still shows that it is not valid. The number checked does not travel in the page address and does not appear in the answer.</p>
-<p><strong>Honorary member cards.</strong> The foundation also issues, <strong>by invitation</strong>, honorary member cards to people it recognises with a distinction (for example founder, pioneer, volunteer coordinator, network ally, ambassador, or member of the Advisory Board, an honorary advisory group with no governing role). To issue one we keep your name, your email, the distinction and its validity and, <strong>only if you expressly authorise it</strong>, your ID type and number; that authorisation is recorded. We use this data to issue and send you the card and so that it can be checked, under the same rules as above: always by its code, and by your ID number only if you authorised it and while the card is valid. You can ask us at any time to remove your ID number or your card.</p>
-<h2>3. Legal basis</h2>
-<p>We process your data with your <strong>prior, express and informed authorization</strong>, collected through a physical or digital form (with a timestamp). You may revoke it at any time. For data subjects in the European Union we rely on the bases in Article 6 of the GDPR (consent, performance of a contract, legal obligation or legitimate interest, as applicable).</p>
-<h2>4. Your rights</h2>
-<p>As a data subject you may, at any time:</p>
-<ul>
-<li><strong>Know and access</strong> the data we process about you.</li>
-<li><strong>Rectify</strong> inaccurate or outdated data.</li>
-<li><strong>Request erasure</strong> ("right to be forgotten") where there is no legal duty to keep it.</li>
-<li><strong>Withdraw the authorization</strong> you gave us.</li>
-<li><strong>Object</strong> to certain processing and request the <strong>portability</strong> of your data.</li>
-<li><strong>File a complaint</strong> with the SIC (Colombia) or the relevant European supervisory authority.</li>
-</ul>
-<h2>5. How to exercise your rights</h2>
-<p>Write to <a href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a> with your name, ID and request. We acknowledge receipt within <strong>2 business days</strong>; we answer access requests within <strong>10 business days</strong> and claims (rectification, erasure, withdrawal) within <strong>15 business days</strong>.</p>
-<h2>6. Data retention</h2>
-<p>We keep each piece of data only as long as necessary or as required by law: donation records for <strong>10 years</strong> (tax and accounting duty); beneficiary data for the duration of the program plus 5 years; volunteer data for the engagement plus 3 years. Once the term ends, data is securely deleted.</p>
-<h2>7. International transfers</h2>
-<p>We may share data with processors or partners in other countries (for example, technology providers or cooperation foundations), always with adequate safeguards: contractual clauses, data-processing agreements and the minimum data necessary, anonymized where possible.</p>
-<h2>8. Information security</h2>
-<p>We protect your data with encryption in transit, role-based access control, audit logs and incident-management protocols. No system is infallible, but we apply recognized standards to reduce risk.</p>
-<h2>9. Cookies and analytics</h2>
-<p>This site <strong>uses no tracking or marketing cookies, and no third-party pixels.</strong> To understand site usage we use <strong>Cloudflare Web Analytics, which sets no cookies and does not identify individuals.</strong> We only store your <strong>theme preference (light or dark)</strong> in your browser, and in a technical cookie (<code>gg-tema</code>) whose only purpose is to show pages that run without JavaScript —such as the member card or the verifier— in the theme you chose. It does not identify you, is not used for tracking and serves no other purpose.</p>
-<h2>10. Term and changes</h2>
-<p>This policy (Version 1.2) is effective as of October 8, 2026 and is reviewed at least once a year, or sooner if regulations or our practices change. We will post any updates here.</p>
-<p><strong>Changes from Version 1.1:</strong> we added honorary member cards, which the foundation issues by invitation: what data we keep to issue them (name, email and, only with your authorisation, your ID number) and how they are checked (section 2).</p>
-<p><strong>Changes in Version 1.1 from 1.0:</strong> we added how a partner business can confirm an active membership with the card's code or the member's ID number (section 2), and we disclosed the technical cookie that stores the theme preference (section 9).</p>`
-};
+// Política de Privacidad (#privacidad). Documento largo y bilingüe: vive en
+// data/privacidad.json, la misma fuente que el Worker sirve en /privacidad y
+// /privacy con el texto en el HTML, para quien llega sin JavaScript (auditoría
+// para inversionistas, 12 oct 2026). Antes estaba aquí y solo existía con JS.
+// El HTML es del repositorio, no de un formulario: entra tal cual.
+var PRIVACY = null, PRIVACY_CARGA = null;
 function renderPrivacy(){
   var el = document.getElementById("privacy-body"); if (!el) return;
-  el.innerHTML = PRIVACY[lang] || PRIVACY.es;
+  if (PRIVACY){ el.innerHTML = PRIVACY[lang] || PRIVACY.es; return; }
+  if (!PRIVACY_CARGA){
+    PRIVACY_CARGA = fetch("/data/privacidad.json")
+      .then(function(r){ if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then(function(j){ PRIVACY = j; })
+      .catch(function(){ PRIVACY_CARGA = null; });
+  }
+  PRIVACY_CARGA.then(function(){
+    if (PRIVACY){ renderPrivacy(); return; }
+    /* Si el JSON no llegó, la política sigue a un clic: la página del Worker
+       la tiene en el HTML. */
+    el.innerHTML = lang === "en"
+      ? "<p><a href=\"/privacy\">Read the privacy policy</a></p>"
+      : "<p><a href=\"/privacidad\">Leer la política de privacidad</a></p>";
+  });
 }
 /* ═══ LA FICHA COMO REGISTRO — fundaciones y comercios ═══════════════════
    Rediseño del 26 sep 2026, a pedido de Sebas («no se ve bien»). Lo que había:
