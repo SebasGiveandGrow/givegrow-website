@@ -24,6 +24,7 @@
    =========================================================================== */
 
 import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
+import { qrMatriz } from "./qr.js";
 
 /* --- identidad de la entidad. Un solo lugar: si cambia el domicilio o la
        Revisora Fiscal, se cambia aquí y cambia en los dos documentos. --- */
@@ -562,6 +563,7 @@ const T = {
     cintilloGuia: "Número de guía",
     aviso: "Este documento confirma la recepción de tu aporte. No es el certificado de donación para efectos tributarios: ese se expide aparte, firmado por el Representante Legal y la Revisora Fiscal.",
     fecha: "Fecha de confirmación",
+    fechaPago: "Fecha de la transferencia",
     monto: "Monto",
     frecuencia: "Frecuencia",
     destino: "Destino",
@@ -582,6 +584,7 @@ const T = {
     cintilloGuia: "Tracking number",
     aviso: "This document confirms we received your gift. It is not the donation certificate for tax purposes: that one is issued separately, signed by the Legal Representative and the Statutory Auditor.",
     fecha: "Confirmed on",
+    fechaPago: "Transfer date",
     monto: "Amount",
     frecuencia: "Frequency",
     destino: "Destination",
@@ -599,10 +602,165 @@ const T = {
 
 const METODOS = {
   CARD: "Tarjeta", BANCOLOMBIA_TRANSFER: "Botón Bancolombia", NEQUI: "Nequi",
-  PSE: "PSE", BANCOLOMBIA_COLLECT: "Corresponsal Bancolombia"
+  PSE: "PSE", BANCOLOMBIA_COLLECT: "Corresponsal Bancolombia",
+  TRANSFERENCIA: "Transferencia bancaria"
 };
 
-export async function recibo(a, hoyISO) {
+/* ===========================================================================
+   EL CARNET EN EL RECIBO (7 oct 2026)
+   ===========================================================================
+   Solo cuando el aporte es un cobro de membresía que creó o renovó un carnet:
+   quien decide eso es `carnetDeAporte` en worker.js, que trae aquí los datos ya
+   resueltos —textos en su idioma, tinte, código—. Este archivo no sabe de
+   niveles ni de quién es miembro: dibuja lo que le dan.
+
+   Es la misma tarjeta de la página /carnet/<token> en proporciones ID-1 (85,6 ×
+   54 mm = 242,6 × 153 pt), en color plano —un PDF de oficina no necesita el
+   degradado— y con Helvetica, como el resto del documento. A su lado, el QR
+   que lleva a /verificar/<código>: el mismo de la pantalla, nunca el token. El
+   enlace al carnet NO va impreso: este recibo se reenvía —al contador, a quien
+   pide el certificado— y el token del carnet es la llave del miembro.
+   =========================================================================== */
+function hexRgb(h) {
+  const x = String(h || "#1F5C38").replace("#", "");
+  return rgb(parseInt(x.slice(0, 2), 16) / 255, parseInt(x.slice(2, 4), 16) / 255, parseInt(x.slice(4, 6), 16) / 255);
+}
+function rectRedondo(w, hh, r) {
+  return "M" + r + " 0H" + (w - r) + "A" + r + " " + r + " 0 0 1 " + w + " " + r
+    + "V" + (hh - r) + "A" + r + " " + r + " 0 0 1 " + (w - r) + " " + hh
+    + "H" + r + "A" + r + " " + r + " 0 0 1 0 " + (hh - r)
+    + "V" + r + "A" + r + " " + r + " 0 0 1 " + r + " 0Z";
+}
+function conTracking(p, txt, x, y, tam, fuente, color, paso, opacity) {
+  let xx = x;
+  for (const ch of winansi(txt)) {
+    p.drawText(ch, { x: xx, y, size: tam, font: fuente, color, opacity });
+    xx += fuente.widthOfTextAtSize(ch, tam) + paso;
+  }
+  return xx - x;
+}
+
+async function dibujarCarnet(pdf, h, f, c) {
+  const W = 242.6, H = 153, R = 11, QR = 112, GAP = 22;
+  const blanco = rgb(1, 1, 1);
+  const mono = await pdf.embedFont(StandardFonts.CourierBold);
+
+  h.reservar(H + 46);
+  h.cintillo(c.titulo, { tam: 7.5, despues: 12 });
+  const p = h.p;
+  const x0 = MG.izq, yTop = h.y;
+
+  /* el anverso */
+  p.drawSvgPath(rectRedondo(W, H, R), { x: x0, y: yTop, color: hexRgb(c.tinte[0]) });
+  /* LA DE HONOR (0040): el filo interior en el acento arena, como en la
+     página. `c.honor` lo decide worker.js (`carnetParaDocumento`). */
+  const hon = c.honor || null;
+  const acento = hon ? hexRgb(hon.acento) : null;
+  if (hon) {
+    p.drawSvgPath(rectRedondo(W - 12, H - 12, R - 4), { x: x0 + 6, y: yTop - 6, borderColor: acento, borderWidth: 0.6, borderOpacity: 0.5 });
+  }
+  p.drawText("&", { x: x0 + W - 92, y: yTop - H - 26, size: 150, font: f.negrita, color: blanco, opacity: 0.06 });
+  const pad = 15;
+  p.drawText("&", { x: x0 + pad, y: yTop - pad - 17, size: 21, font: f.negrita, color: rgb(0.612, 0.796, 0.663) });
+  conTracking(p, "FUNDACIÓN", x0 + pad + 19, yTop - pad - 7, 5.6, f.negrita, blanco, 0.9, 0.8);
+  conTracking(p, "GIVE&GROW", x0 + pad + 19, yTop - pad - 14.5, 5.6, f.negrita, blanco, 0.9, 0.8);
+
+  const chipColor = c.vigente ? rgb(0.725, 0.871, 0.765) : rgb(0.941, 0.71, 0.4);
+  const chipT = winansi(c.estado);
+  const chipW = f.negrita.widthOfTextAtSize(chipT, 8) + 18;
+  p.drawSvgPath(rectRedondo(chipW, 16, 8), { x: x0 + W - pad - chipW, y: yTop - pad + 2, borderColor: chipColor, borderWidth: 1.1, color: hexRgb(c.tinte[1]) });
+  p.drawText(chipT, { x: x0 + W - pad - chipW + 9, y: yTop - pad - 9.5, size: 8, font: f.negrita, color: chipColor });
+
+  /* Lo que cabe en un ancho: se achica hasta `min` y, si aun así no cabe, se
+     corta. Un nombre largo no se sale de la tarjeta. */
+  const ajustar = (txt, max, min, fuente) => {
+    let t = max;
+    const s = winansi(txt);
+    while (t > min && fuente.widthOfTextAtSize(s, t) > W - pad * 2) t -= 0.5;
+    let x = s;
+    while (x.length > 1 && fuente.widthOfTextAtSize(x, t) > W - pad * 2) x = x.slice(0, -1);
+    return [x, t];
+  };
+  let yNombre = yTop - 97, tnMax = 15;
+  if (hon) {
+    conTracking(p, String(c.nivelTxt).toUpperCase(), x0 + pad, yTop - 56, 6.4, f.negrita, acento, 1.1, 1);
+    if (hon.distincion) {
+      const [dt, dtam] = ajustar(hon.distincion, 12, 8, f.negrita);
+      p.drawText(dt, { x: x0 + pad, y: yTop - 71, size: dtam, font: f.negrita, color: acento });
+    }
+    if (hon.contexto) {
+      const [ct, ctam] = ajustar(hon.contexto, 7, 6, f.normal);
+      p.drawText(ct, { x: x0 + pad, y: yTop - 82, size: ctam, font: f.normal, color: blanco, opacity: 0.8 });
+    }
+    yNombre = yTop - 101; tnMax = 13;
+  } else {
+    conTracking(p, String(c.nivelTxt).toUpperCase(), x0 + pad, yTop - 78, 6.4, f.negrita, blanco, 1.1, 0.85);
+  }
+  const [nom, tn] = ajustar(c.nombre, tnMax, 9, f.negrita);
+  p.drawText(nom, { x: x0 + pad, y: yNombre, size: tn, font: f.negrita, color: blanco });
+
+  const yEt = yTop - H + pad + 13, yVal = yTop - H + pad + 1;
+  conTracking(p, String(c.etNumero).toUpperCase(), x0 + pad, yEt, 5.2, f.normal, blanco, 0.8, 0.7);
+  p.drawText(winansi(c.numero), { x: x0 + pad, y: yVal, size: 8.6, font: mono, color: blanco });
+  const x2 = x0 + pad + mono.widthOfTextAtSize(winansi(c.numero), 8.6) + 16;
+  conTracking(p, String(c.etHasta).toUpperCase(), x2, yEt, 5.2, f.normal, blanco, 0.8, 0.7);
+  p.drawText(winansi(c.hasta), { x: x2, y: yVal, size: 8.6, font: mono, color: blanco });
+  if (hon) {
+    /* En la de honor, el nivel pagado en pequeño en lugar de la escala. */
+    if (hon.nivel) {
+      const tx = String(hon.nivel).toUpperCase();
+      const ancho = tx.length * 0.7 + f.normal.widthOfTextAtSize(winansi(tx), 5.2);
+      conTracking(p, tx, x0 + W - pad - ancho, yVal + 1, 5.2, f.normal, blanco, 0.7, 0.75);
+    }
+  } else {
+    for (let i = 0; i < 4; i++) {
+      p.drawRectangle({ x: x0 + W - pad - 4 * 13 + i * 13 + 3, y: yVal + 2, width: 10, height: 2.6, color: blanco, opacity: i <= c.indice ? 0.9 : 0.25 });
+    }
+  }
+
+  /* el reverso, al lado: QR, código y la hora a la que se generó */
+  const xq = x0 + W + GAP;
+  if (c.qr) {
+    const { lado, modulos } = qrMatriz(c.qr);
+    const borde = 3, total = lado + borde * 2, esc = QR / total;
+    p.drawRectangle({ x: xq, y: yTop - QR, width: QR, height: QR, color: blanco, borderColor: LINEA, borderWidth: 0.6 });
+    let d = "";
+    for (let i = 0; i < lado; i++) {
+      let j = 0;
+      while (j < lado) {
+        if (!modulos[i][j]) { j++; continue; }
+        let n = 1;
+        while (j + n < lado && modulos[i][j + n]) n++;
+        d += "M" + (j + borde) + " " + (i + borde) + "h" + n + "v1h-" + n + "z";
+        j += n;
+      }
+    }
+    p.drawSvgPath(d, { x: xq, y: yTop, scale: esc, color: TINTA });
+  }
+  const xt = c.qr ? xq + QR + 14 : xq;
+  const anchoT = MG.izq + ANCHO - xt;
+  let yt = yTop - 4;
+  const parrafo = (txt, tam, fuente, color, inter) => {
+    for (const l of h.lineas(winansi(txt), fuente, tam, anchoT)) {
+      p.drawText(l, { x: xt, y: yt - tam, size: tam, font: fuente, color });
+      yt -= inter;
+    }
+  };
+  parrafo(c.etQr, 7.6, f.negrita, TINTA, 10.5);
+  yt -= 6;
+  conTracking(p, String(c.etCodigo).toUpperCase(), xt, yt - 6, 5.6, f.negrita, GRIS, 0.8);
+  yt -= 10;
+  if (c.verif) { p.drawText(winansi(c.verif), { x: xt, y: yt - 13, size: 13, font: mono, color: TINTA }); yt -= 20; }
+  yt -= 4;
+  parrafo(c.consultado, 7.4, f.normal, GRIS, 10);
+  yt -= 4;
+  parrafo(c.nota, 7.4, f.normal, GRIS, 10);
+
+  h.y = Math.min(yTop - H, yt) - 18;
+}
+
+/* `carnet` (opcional): ver `dibujarCarnet`. */
+export async function recibo(a, hoyISO, carnet) {
   const en = a.idioma === "en";
   const t = en ? T.en : T.es;
   const { pdf, hoja: h, f } = await abrir(t.titulo + " " + a.guia, t.asunto);
@@ -621,6 +779,10 @@ export async function recibo(a, hoyISO) {
 
   h.regla({ despues: 16 });
   h.fila(t.fecha, fechaLarga(a.aprobada_en || a.creada_en));
+  /* EL DIA DEL MOVIMIENTO, aparte del de la confirmacion. En una transferencia
+     son dos fechas distintas y la que cuenta para el donante —y la que dice su
+     certificado— es la del extracto (auditoria del 28 sep 2026). */
+  if (a.fecha_pago) h.fila(t.fechaPago, fechaLarga(a.fecha_pago));
   h.fila(t.monto, pesos(a.monto_centavos, a.moneda || "COP"));
   h.fila(t.frecuencia, t.freq[a.frecuencia] || a.frecuencia);
   h.fila(t.destino, a.modo === "dirigida" ? (a.proyecto || a.destino_id || "-") : t.fondo);
@@ -641,6 +803,13 @@ export async function recibo(a, hoyISO) {
   const esCampana = String(a.destino_id || "").startsWith("brigada-");
   h.texto(esCampana ? t.rastreoBrigada : t.rastreo,
     { tam: 9.5, color: SUAVE, interlinea: 14, despues: 18 });
+
+  /* Una campaña propia nunca da carnet (0006): la guarda va aquí también, por
+     si algún día alguien llama a esto sin pasar por `carnetDeAporte`. */
+  if (carnet && !esCampana) {
+    h.regla({ despues: 14 });
+    await dibujarCarnet(pdf, h, f, carnet);
+  }
 
   h.regla({ despues: 12 });
   h.texto(ENTIDAD.nombreCorto, { tam: 9, fuente: f.negrita, color: TINTA, despues: 2 });
@@ -992,7 +1161,22 @@ export async function informeTriage(c, hoyISO) {
   h.texto(ETIQUETA_CLAS[c.clasificacion] || String(c.clasificacion || "-"), {
     tam: 15, fuente: f.negrita, color: VERDE, interlinea: 19, despues: 6
   });
-  h.texto(EXPLICA_CLAS[c.clasificacion] || "", { tam: 9.5, color: GRIS, interlinea: 13.5, despues: 16 });
+  h.texto(EXPLICA_CLAS[c.clasificacion] || "", { tam: 9.5, color: GRIS, interlinea: 13.5, despues: 6 });
+  /* NO AGENDA NADA (auditoría del 28 sep 2026). «Visita urgente» impreso en
+     grande se leía como una cita. La plataforma no agenda ni promete visitas: el
+     papel lo dice debajo de la prioridad, que es donde nace la confusión. Y con
+     prioridad alta dice a quién acudir, porque quien sí puede actuar sobre la
+     casa es el municipio (Ley 1523 de 2012). */
+  if (c.clasificacion !== "inevaluable") {
+    h.texto("Esta prioridad no agenda una visita ni la promete: dice qué tan pronto convendría que alguien fuera.",
+      { tam: 9.5, fuente: f.negrita, color: TINTA, interlinea: 13.5, despues: 6 });
+  }
+  if (c.clasificacion === "urgente") {
+    h.texto("Informa a tu alcaldía o al consejo municipal de gestión del riesgo. Si las cosas empeoran " +
+      "—la grieta crece, algo cruje, hay olor a gas— sal de la casa y llama al 123.",
+      { tam: 9.5, color: TINTA, interlinea: 13.5, despues: 6 });
+  }
+  h.salto(10);
 
   /* La firma es del INGENIERO, no de la Fundación: es él quien responde por el
      criterio técnico. La Fundación aparece como quien organiza, en el pie. */
@@ -1046,10 +1230,12 @@ export async function informeTriage(c, hoyISO) {
   return pdf.save();
 }
 
+/* «Prioridad de visita», no «Visita urgente»: ver `TRIAJE_ET` en worker.js,
+   que es la misma etiqueta en el correo (auditoría del 28 sep 2026). */
 const ETIQUETA_CLAS = {
-  urgente:     "Visita urgente",
-  programada:  "Visita programada",
-  no_requiere: "No requiere visita por ahora",
+  urgente:     "Prioridad alta",
+  programada:  "Prioridad media",
+  no_requiere: "No prioritaria por ahora",
   inevaluable: "No se pudo evaluar con el material enviado"
 };
 
@@ -1060,8 +1246,10 @@ const EXPLICA_CLAS = {
                "situación que obligue a atenderla de inmediato.",
   no_requiere: "Con lo que muestran las fotografías, el ingeniero no ve necesaria una visita " +
                "por ahora. Si aparecen grietas nuevas o crecen las existentes, vuelve a escribirnos.",
-  inevaluable: "Las fotografías enviadas no permiten formarse un criterio. Abajo se indica qué " +
-               "hace falta para poder evaluar."
+  /* «Arriba» y no «Abajo» (auditoría del 28 sep 2026): lo que falta se imprime
+     en la sección II, antes de esta. */
+  inevaluable: "Las fotografías enviadas no permiten formarse un criterio. Arriba, en el concepto, " +
+               "se indica qué hace falta para poder evaluar."
 };
 
 /* ===========================================================================
@@ -1346,7 +1534,7 @@ export async function certificado(c, hoyISO) {
 
   seccion(h, f, "I", "IDENTIFICACIÓN DEL DONANTE");
   h.fila("Nombre o razón social", c.donante_nombre || "-");
-  h.fila((c.doc_tipo === "NIT" ? "NIT" : "C.C.") + " No.", c.doc_numero || "-");
+  h.fila(nombreDocumento(c.doc_tipo) + " No.", c.doc_numero || "-");
   h.fila("Domicilio", c.donante_ciudad || "-");
   h.salto(14);
 
@@ -1360,11 +1548,7 @@ export async function certificado(c, hoyISO) {
   h.numeral(4,
     "Valor de la donación: " + pesos(c.monto_centavos) + " (" +
     pesosEnLetras(Math.round(Number(c.monto_centavos) / 100)) + " M/cte.).");
-  h.numeral(5,
-    "Manera en que se efectuó la donación: mediante transferencia electrónica No. " +
-    (c.transaccion || "-") + " del " + fechaLarga(c.fecha_donacion) + ", realizada a través del " +
-    "sistema financiero en la " + ENTIDAD.cuenta + " de " + ENTIDAD.banco + ", en cumplimiento de " +
-    "lo previsto en el numeral 1 del artículo 125-2 del Estatuto Tributario.");
+  h.numeral(5, "Manera en que se efectuó la donación: " + maneraDePago(c) + ".");
   h.numeral(6,
     "Destinación de la donación: los recursos donados fueron incorporados al patrimonio de la " +
     "Fundación y destinados exclusivamente al desarrollo de su objeto social y de su actividad " +
@@ -1486,6 +1670,59 @@ export async function certificado(c, hoyISO) {
 /* Los motivos los escribe una persona en un campo libre, así que unos traen
    punto final y otros no. Sin normalizar, el sello salía con «aprobada.. No
    debe usarse». */
+/* EL TIPO DE DOCUMENTO CON SU NOMBRE (auditoria del 28 sep 2026). Imprimia
+   «NIT» o «C.C.» y nada mas: una cédula de extranjería o un pasaporte salian
+   como cédula de ciudadanía, en un documento que identifica al donante ante la
+   DIAN. Lo que no se reconoce no se disfraza de cédula: se nombra en genérico. */
+export const NOMBRES_DOCUMENTO = {
+  CC: "Cédula de ciudadanía", CE: "Cédula de extranjería", NIT: "NIT",
+  PP: "Pasaporte", TI: "Tarjeta de identidad", PEP: "Permiso especial de permanencia",
+  PPT: "Permiso por protección temporal", DNI: "Documento de identidad extranjero"
+};
+export function nombreDocumento(tipo) {
+  const t = String(tipo || "").toUpperCase();
+  /* Un certificado sin tipo guardado es de antes de que el panel lo pidiera, y
+     esos se emitían con «CC» por defecto: se respeta lo que ya se decía. */
+  if (!t) return NOMBRES_DOCUMENTO.CC;
+  return NOMBRES_DOCUMENTO[t] || "Documento de identificación";
+}
+
+/* EL NUMERAL 5 SEGUN COMO SE PAGO DE VERDAD (auditoria del 28 sep 2026).
+   Decia SIEMPRE «mediante transferencia electrónica … en la cuenta de ahorros
+   … de Bancolombia», tambien para un pago con tarjeta por la pasarela: una
+   afirmacion falsa bajo la gravedad de juramento. Las dos formas caben en el
+   numeral 1 del art. 125-2 ET («por medio de cheque, tarjeta de crédito o a
+   través de un intermediario financiero»); lo que cambia es la descripcion.
+
+   ⚠️ REDACCION PENDIENTE DE LA REVISORA FISCAL. El texto de la transferencia es
+   el suyo, intacto. Las variantes de pasarela son sobrias y solo describen el
+   hecho; antes de emitir el primer certificado de un pago en linea, ella tiene
+   que aprobarlas o reescribirlas aqui.
+
+   Sin `metodo_pago` en el snapshot (certificados emitidos antes de este
+   cambio) sale el texto de siempre: volver a descargar un certificado tiene que
+   devolver el mismo papel. */
+const PASARELA_FRASE = {
+  CARD: "pago con tarjeta",
+  BANCOLOMBIA_TRANSFER: "transferencia desde cuenta Bancolombia con el Botón Bancolombia",
+  PSE: "pago electrónico PSE",
+  NEQUI: "pago desde Nequi",
+  BANCOLOMBIA_COLLECT: "pago en corresponsal Bancolombia"
+};
+export function maneraDePago(c) {
+  const mp = String(c.metodo_pago || "").toUpperCase();
+  const tx = c.transaccion || "-";
+  const fecha = fechaLarga(c.fecha_donacion);
+  const cierre = ", en cumplimiento de lo previsto en el numeral 1 del artículo 125-2 del Estatuto Tributario";
+  if (!mp || mp === "TRANSFERENCIA") {
+    return "mediante transferencia electrónica No. " + tx + " del " + fecha + ", realizada a través del " +
+      "sistema financiero en la " + ENTIDAD.cuenta + " de " + ENTIDAD.banco + cierre;
+  }
+  const medio = PASARELA_FRASE[mp] || "pago electrónico";
+  return "mediante " + medio + ", procesado a través de la pasarela de pagos Wompi con la transacción No. " +
+    tx + " del " + fecha + ", por medio del sistema financiero" + cierre;
+}
+
 function motivoFrase(motivo) {
   const m = String(motivo || "").trim().replace(/[.\s]+$/, "");
   return m ? ". Motivo: " + m + "." : ".";
@@ -1564,4 +1801,353 @@ function firmas(h, f, firmaRL, firmaRF) {
     }
   }
   h.y = yLinea - 86;
+}
+
+/* ===========================================================================
+   CERTIFICADO DE VOLUNTARIADO — las horas efectivas de una jornada
+   ===========================================================================
+   Lo que VOLUNTARIADO.md §7 le promete al voluntario: «certificado de
+   voluntariado con las horas efectivas». Nace al cerrar una jornada en /admin
+   (ver migrations/0036) y viaja en el correo de agradecimiento.
+
+   NO ES UN CERTIFICADO DE DONACION, y el documento lo dice con su forma: no
+   hay juramento, ni articulado, ni Revisora Fiscal, ni una palabra de
+   beneficios. Certifica tiempo, no dinero. Por eso tampoco comparte una sola
+   linea con `certificado()`: si algun dia alguien copia de ahi «para que se
+   vea igual de serio», esta constancia empezaria a prometer lo que no es.
+
+   BILINGUE POR PERSONA. A diferencia del certificado tributario —que es un
+   documento colombiano y se queda en español a proposito—, este se lo lleva un
+   voluntario que puede no leer español, y no tiene texto juridico que
+   traducir mal.
+
+   LO QUE IMPRIME ES LO CONGELADO al cerrar la jornada (`reconocimientos.datos`)
+   y su huella: el PDF se redibuja en cada descarga, el JSON no. Es la misma
+   regla del certificado de donacion, y por la misma razon.
+
+   LA FIRMA es la del Representante Legal en ejercicio en la fecha de emision
+   (`enEjercicio`), impresa con «Expedido electronicamente», no «Firmado»: nadie
+   pulsa un boton de firma por cada voluntario, y el documento no dice que
+   alguien hizo algo que no hizo.
+   =========================================================================== */
+const TV = {
+  es: {
+    titulo: "CERTIFICADO DE VOLUNTARIADO", asunto: "Certificado de voluntariado",
+    abre: (ent) => "La " + ent.nombre + ", entidad sin ánimo de lucro identificada con NIT " + ent.nit +
+      " y domicilio en " + ent.ciudad + ", hace constar que",
+    sigue: "participó como voluntaria o voluntario en la jornada que se detalla, con las horas efectivas que se indican:",
+    jornada: "Jornada", fecha: "Fecha", horario: "Horario", lugar: "Lugar",
+    anfitriona: "Fundación anfitriona", sede: "Sede de " + ENTIDAD.nombreCorto,
+    empresa: "Empresa o grupo aliado", horas: "Horas efectivas",
+    horasTxt: (h) => String(h).replace(".", ",") + (Number(h) === 1 ? " hora" : " horas"),
+    pro: " (aporte profesional)",
+    credito: (anf) => anf
+      ? "El trabajo en territorio es de " + anf + ", anfitriona de la jornada. Este voluntariado contribuyó a él."
+      : "Este voluntariado contribuyó al trabajo de la red de fundaciones aliadas de " + ENTIDAD.nombreCorto + ".",
+    gracias: "Gracias por el tiempo y el trabajo que donaste.",
+    horasNota: "Las horas efectivas son las que registró la coordinación de la jornada.",
+    cargo: "Representante Legal",
+    expedido: (f) => "Expedido electrónicamente el " + f,
+    huella: (h) => "Huella " + h + " · Ley 527 de 1999",
+    pie: "Certificado de voluntariado "
+  },
+  en: {
+    titulo: "VOLUNTEER CERTIFICATE", asunto: "Volunteer certificate",
+    abre: (ent) => ent.nombreCorto + ", a Colombian non-profit organisation with tax ID (NIT) " + ent.nit +
+      ", based in " + ent.ciudad + ", hereby states that",
+    sigue: "took part as a volunteer in the activity detailed below, for the effective hours shown:",
+    jornada: "Activity", fecha: "Date", horario: "Time", lugar: "Place",
+    anfitriona: "Host foundation", sede: ENTIDAD.nombreCorto + " office",
+    empresa: "Partner company or group", horas: "Effective hours",
+    horasTxt: (h) => String(h) + (Number(h) === 1 ? " hour" : " hours"),
+    pro: " (professional, pro bono)",
+    credito: (anf) => anf
+      ? "The work on the ground belongs to " + anf + ", which hosted the activity. This volunteering contributed to it."
+      : "This volunteering contributed to the work of the " + ENTIDAD.nombreCorto + " network of partner foundations.",
+    gracias: "Thank you for the time and work you gave.",
+    horasNota: "Effective hours are those recorded by the activity's coordination team.",
+    cargo: "Legal Representative",
+    expedido: (f) => "Issued electronically on " + f,
+    huella: (h) => "Fingerprint " + h + " · Colombian Law 527 of 1999",
+    pie: "Volunteer certificate "
+  }
+};
+const MESES_EN = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+function fechaDoc(iso, en) {
+  const p = partesFecha(iso);
+  if (!p) return "";
+  return en ? MESES_EN[p.mes - 1] + " " + p.dia + ", " + p.anio : fechaLarga(iso);
+}
+
+export async function certificadoVoluntariado(c) {
+  const en = c.idioma === "en";
+  const t = en ? TV.en : TV.es;
+  const { pdf, hoja: h, f } = await abrir(t.asunto + " " + c.numero, t.asunto);
+
+  membrete(h);
+
+  h.texto(t.titulo, { tam: 16, fuente: f.negrita, color: TINTA, centrado: true, interlinea: 20, despues: 4 });
+  h.texto("No. " + c.numero, { tam: 12, fuente: f.negrita, color: VERDE, centrado: true, interlinea: 16, despues: 10 });
+  h.texto(ENTIDAD.ciudad + ", " + fechaDoc(c.emitido_en, en), {
+    tam: 9.5, color: GRIS, centrado: true, despues: 26
+  });
+
+  h.texto(t.abre(ENTIDAD), { tam: 10.5, interlinea: 15.5, despues: 16 });
+  /* El nombre es la cifra monumental de este papel: es lo unico que la persona
+     va a buscar con la vista, y lo que enseña cuando lo muestra. */
+  h.texto(c.nombre || "-", { tam: 22, fuente: f.negrita, color: VERDE, centrado: true, interlinea: 26, despues: 16 });
+  h.texto(t.sigue, { tam: 10.5, interlinea: 15.5, despues: 18 });
+
+  h.regla({ despues: 6 });
+  h.fila(t.jornada, c.jornada || "-");
+  h.fila(t.fecha, fechaDoc(c.fecha, en) || "-");
+  if (c.horario) h.fila(t.horario, c.horario);
+  if (c.lugar) h.fila(t.lugar, c.lugar);
+  h.fila(t.anfitriona, c.anfitriona || t.sede);
+  if (c.empresa) h.fila(t.empresa, c.empresa);
+  h.fila(t.horas, t.horasTxt(c.horas) + (c.pro_bono ? t.pro : ""));
+  h.salto(18);
+
+  h.texto(t.credito(c.anfitriona || ""), { tam: 10, color: SUAVE, interlinea: 14.5, despues: 8 });
+  h.texto(t.gracias, { tam: 10, fuente: f.negrita, color: TINTA, interlinea: 14.5, despues: 8 });
+  h.texto(t.horasNota, { tam: 8.5, color: GRIS, interlinea: 12, despues: 30 });
+
+  /* Una sola firma, la del Representante Legal en ejercicio en la fecha de
+     emision. Mismo trazo que el bloque de firmas del certificado tributario. */
+  h.reservar(96);
+  const rl = enEjercicio(ENTIDAD.repLegal, c.emitido_en);
+  const yLinea = h.y - 30;
+  const anchoCol = (ANCHO - 40) / 2;
+  h.p.drawLine({ start: { x: MG.izq, y: yLinea }, end: { x: MG.izq + anchoCol, y: yLinea }, thickness: 0.75, color: TINTA });
+  let y = yLinea - 14;
+  h.p.drawText(winansi(rl.nombre), { x: MG.izq, y, size: 10, font: f.negrita, color: TINTA });
+  y -= 13;
+  h.p.drawText(winansi(t.cargo), { x: MG.izq, y, size: 9, font: f.normal, color: GRIS });
+  y -= 12;
+  h.p.drawText(winansi(t.expedido(fechaDoc(c.emitido_en, en))), { x: MG.izq, y, size: 8, font: f.normal, color: GRIS });
+  if (c.huella) {
+    y -= 10;
+    h.p.drawText(winansi(t.huella(String(c.huella).slice(0, 16))), { x: MG.izq, y, size: 7.5, font: f.normal, color: GRIS });
+  }
+  h.y = yLinea - 70;
+
+  /* Solo el numero en el pie: con «Certificado de voluntariado …» delante, en
+     español se montaba sobre el nombre de la entidad (medido en el PDF). */
+  h.cerrarPie(c.numero);
+  return pdf.save();
+}
+
+/* ===========================================================================
+   COMPROBANTE DE FIRMA ELECTRÓNICA — convenio del HUB (paso 4)
+   ===========================================================================
+   Uno por documento firmado en /convenio/<token>: el formulario A, el B, el C
+   o la aceptación del convenio (D). Lo recibe quien firmó, por correo, y queda
+   en /admin.
+
+   ES LA FOTOGRAFÍA DE LO FIRMADO, no un resumen: lleva el texto que se le
+   mostró, cada respuesta tal como quedó y los datos de la firma (Ley 527 de
+   1999 y Decreto 2364 de 2012): quién, con qué documento y en qué calidad,
+   cuándo en UTC, a qué correo llegó el código de un solo uso y la huella
+   SHA-256 del contenido. Con esa huella cualquiera puede comprobar después que
+   el JSON guardado en la base es exactamente lo que se firmó.
+
+   `c` llega ARMADO desde worker.js (`comprobanteDeFirma`): aquí no se decide
+   nada, solo se dibuja. Así el PDF no puede decir algo distinto de lo que se
+   guardó. */
+export async function comprobanteFirmaConvenio(c) {
+  const { pdf, hoja: h, f } = await abrir("Comprobante de firma " + c.referencia, c.titulo);
+
+  membrete(h);
+  h.cintillo("Comprobante de firma electrónica", { tam: 7.5, despues: 10 });
+  h.texto(c.titulo, { tam: 17, fuente: f.negrita, color: TINTA, interlinea: 21, despues: 6 });
+  h.texto(c.referencia, { tam: 11, fuente: f.negrita, color: VERDE, interlinea: 15, despues: 14 });
+
+  h.regla({ despues: 6 });
+  h.fila("Organización", c.fundacion || "-");
+  h.fila("Versión del convenio", c.variante || "-");
+  h.fila("Firmado (UTC)", c.firmado_en || "-");
+  h.fila("Firmado (hora de Colombia)", c.firmado_co || "-");
+  h.salto(12);
+
+  for (const p of (c.intro || [])) {
+    h.texto(p, { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 6 });
+  }
+
+  if ((c.respuestas || []).length) {
+    h.salto(8);
+    h.cintillo("Lo que se declaró", { tam: 7.5, despues: 10 });
+    for (const r of c.respuestas) {
+      /* La pregunta y el arranque de su respuesta no se separan de página. */
+      h.reservar(36);
+      h.texto((r.num ? r.num + "  " : "") + r.pregunta,
+        { tam: 8.8, fuente: f.negrita, color: TINTA, interlinea: 12.5, despues: 1 });
+      const resp = Array.isArray(r.respuesta)
+        ? (r.respuesta.length ? r.respuesta.map((x) => "[X] " + x).join("\n") : "(ninguna)")
+        : (r.respuesta === "" || r.respuesta == null ? "(sin respuesta)" : String(r.respuesta));
+      h.texto(resp, { tam: 9, color: SUAVE, interlinea: 13, despues: 7 });
+    }
+  }
+
+  h.salto(10);
+  /* El bloque de la firma no se parte entre dos hojas: medido, quedaba el
+     firmante al pie de una y su documento y su huella en la siguiente. */
+  h.reservar(230);
+  h.cintillo("Firma electrónica", { tam: 7.5, despues: 10 });
+  h.regla({ despues: 6 });
+  h.fila("Firmante", c.firmante.nombre);
+  h.fila("Documento", c.firmante.doc_tipo + " " + c.firmante.doc_num);
+  h.fila("Calidad", c.firmante.calidad);
+  h.fila("Código de un solo uso enviado a", c.correo || "-");
+  if (c.texto_sha256) h.fila("Huella del PDF del convenio", c.texto_sha256.slice(0, 32) + "...", { fuerte: false });
+  h.fila("Huella de la conexión", String(c.ip_huella || "-").slice(0, 16), { fuerte: false });
+  h.salto(8);
+  h.texto("Huella SHA-256 del contenido firmado:", { tam: 8.5, color: GRIS, despues: 1 });
+  h.texto(c.sha256, { tam: 8.5, fuente: f.negrita, color: TINTA, despues: 4 });
+  if (c.user_agent) {
+    h.texto("Navegador: " + String(c.user_agent).slice(0, 220), { tam: 7.5, color: GRIS, interlinea: 10.5, despues: 10 });
+  }
+
+  h.texto(c.nota_legal, { tam: 8.5, color: GRIS, interlinea: 12, despues: 8 });
+  h.regla({ despues: 12 });
+  h.texto(ENTIDAD.nombreCorto, { tam: 9, fuente: f.negrita, color: TINTA, despues: 2 });
+  h.texto("NIT " + ENTIDAD.nit + "  ·  " + ENTIDAD.domicilio, { tam: 8.5, color: GRIS, interlinea: 12 });
+
+  h.cerrarPie(c.referencia);
+  return pdf.save();
+}
+
+/* ===========================================================================
+   INFORME TRIMESTRAL PARA EL BOARD DE ASESORES (0045)
+   ===========================================================================
+   Lo arma `datosInformeBoard` en worker.js: aquí no se decide nada, solo se
+   dibuja, como el comprobante de firma. Cuatro partes:
+
+     PORTADA      el periodo y el corte, y cómo se lee el informe.
+     LA TABLA     los indicadores activos con su último valor AL CORTE, su
+                  fuente, su línea base, su meta y su estado a esa fecha.
+     LO QUE NO    los indicadores sin dato: «Evidencia, no promesas» también es
+                  decir en voz alta lo que todavía no se puede afirmar.
+     EL PIE       el Board asesora y recomienda; no aprueba ni dirige.
+
+   Sin cifras financieras: las únicas de la fundación son las de los estados
+   financieros firmados, y este informe lo dice.
+   =========================================================================== */
+
+const AMBAR = rgb(0.62, 0.38, 0.05);
+const FONDO_CAB = rgb(0.925, 0.906, 0.859);
+
+/* Una tabla que se parte en páginas: cada fila mide lo que su celda más alta,
+   y la cabecera se repite arriba de cada página nueva. */
+function tablaPDF(h, f, cols, filas, opts = {}) {
+  const tam = opts.tam || 7.4;
+  const inter = tam * 1.32;
+  const pad = 4;
+  const lineasDe = (txt, fuente, c) => h.lineas(winansi(txt), fuente, tam, c.w - pad * 2);
+  const cabecera = () => {
+    const alto = Math.max(...cols.map((c) => lineasDe(c.t, f.negrita, c).length)) * inter + pad * 2;
+    h.reservar(alto + inter * 3 + pad * 2);
+    let x = MG.izq;
+    h.p.drawRectangle({ x: MG.izq, y: h.y - alto, width: ANCHO, height: alto, color: FONDO_CAB });
+    for (const c of cols) {
+      let y = h.y - pad;
+      for (const l of lineasDe(c.t, f.negrita, c)) {
+        h.p.drawText(l, { x: x + pad, y: y - tam, size: tam, font: f.negrita, color: TINTA });
+        y -= inter;
+      }
+      x += c.w;
+    }
+    h.y -= alto;
+  };
+  cabecera();
+  for (const fila of filas) {
+    const celdas = cols.map((c) => lineasDe(String(fila[c.k] == null || fila[c.k] === "" ? "-" : fila[c.k]), c.negrita ? f.negrita : f.normal, c));
+    const alto = Math.max(...celdas.map((ls) => ls.length)) * inter + pad * 2;
+    if (h.y - alto < MG.abajo) { h.nueva(); cabecera(); }
+    let x = MG.izq;
+    cols.forEach((c, i) => {
+      let y = h.y - pad;
+      const color = c.color ? c.color(fila) : (c.gris ? GRIS : TINTA);
+      for (const l of celdas[i]) {
+        h.p.drawText(l, { x: x + pad, y: y - tam, size: tam, font: c.negrita ? f.negrita : f.normal, color });
+        y -= inter;
+      }
+      x += c.w;
+    });
+    h.y -= alto;
+    h.p.drawLine({ start: { x: MG.izq, y: h.y }, end: { x: MG.izq + ANCHO, y: h.y }, thickness: 0.5, color: LINEA });
+  }
+  h.y -= 12;
+}
+
+export async function informeBoard(c) {
+  const { pdf, hoja: h, f } = await abrir(c.referencia, "Informe trimestral para el Board de Asesores · " + c.periodo);
+
+  /* LA PORTADA. */
+  membrete(h);
+  h.salto(70);
+  h.cintillo("Informe trimestral para el Board de Asesores", { tam: 8, despues: 14 });
+  h.texto(c.periodo, { tam: 34, fuente: f.negrita, color: VERDE, interlinea: 40, despues: 4 });
+  h.texto(c.periodo_dicho.charAt(0).toUpperCase() + c.periodo_dicho.slice(1), { tam: 15, fuente: f.negrita, color: TINTA, interlinea: 20, despues: 26 });
+  h.regla({ despues: 6 });
+  h.fila("Periodo", c.desde + " a " + c.corte);
+  h.fila("Fecha de corte", c.corte_dicho);
+  h.fila("Indicadores con dato al corte", c.con_dato + " de " + c.total);
+  h.fila("Indicadores validados", c.validados + " de " + c.total + (c.validados < c.total ? " (el resto es borrador)" : ""));
+  h.fila("Generado", c.generado + " (hora de Colombia)", { fuerte: false });
+  h.salto(18);
+  h.texto("Cómo leer este informe", { tam: 10, fuente: f.negrita, color: TINTA, despues: 4 });
+  for (const p of [
+    "Cada cifra dice de dónde sale y hasta qué fecha cuenta (su corte). Ninguna medición posterior al " + c.corte_dicho + " entra en este informe.",
+    "La batería de indicadores es un borrador en revisión: un indicador sin validar puede cambiar de nombre, de fuente o de meta. Las metas a 2027 marcadas «propuesta» no son compromisos.",
+    "El estado de cada indicador se calcula a la fecha de corte: «al día» si tiene la medición del último periodo cerrado; «pendiente» si le falta.",
+    "Este informe no contiene cifras financieras. Las únicas cifras financieras de la fundación son las de sus estados financieros firmados por el Representante Legal y la Revisora Fiscal."
+  ]) h.texto(p, { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 6 });
+  h.salto(8);
+  avisoEnCaja(h, f, c.asesora);
+
+  /* LA TABLA. */
+  h.nueva();
+  seccion(h, f, "I", "LOS INDICADORES AL " + c.corte_dicho.toUpperCase());
+  /* Los 488 pt de ancho útil, repartidos. */
+  tablaPDF(h, f, [
+    { k: "num", t: "#", w: 18, negrita: true },
+    { k: "nombre", t: "Indicador", w: 138 },
+    { k: "valor", t: "Último valor (periodo)", w: 78, negrita: true },
+    { k: "fuente", t: "Fuente y corte", w: 104, gris: true },
+    { k: "base", t: "Línea base", w: 58, gris: true },
+    { k: "meta", t: "Meta 2027", w: 44, gris: true },
+    { k: "estado", t: "Estado al corte", w: 48, color: (r) => (/^Pendiente/.test(r.estado) ? AMBAR : /^Al día/.test(r.estado) ? VERDE : GRIS) }
+  ], c.indicadores.map((x) => ({
+    num: String(x.numero),
+    nombre: x.nombre + "\n" + x.linea + " · " + x.tipo.toLowerCase() + " · " + x.frecuencia.toLowerCase() + (x.validado ? "" : " · borrador"),
+    valor: x.con_dato ? x.valor + "\n(" + x.periodo + ")" : "sin dato",
+    fuente: x.con_dato ? x.fuente + "\nCorte: " + x.corte : "Fuente prevista: " + x.fuente,
+    base: x.base, meta: x.meta, estado: x.estado
+  })));
+
+  /* LO QUE NO PODEMOS AFIRMAR TODAVÍA. */
+  seccion(h, f, "II", "LO QUE NO PODEMOS AFIRMAR TODAVÍA");
+  if (!c.sin_datos.length) {
+    h.texto("Todos los indicadores activos tienen al menos una medición al corte. Eso no los vuelve definitivos: los que siguen en borrador pueden cambiar.",
+      { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 8 });
+  } else {
+    h.texto("Estos indicadores no tienen ninguna medición registrada al " + c.corte_dicho + ". Sobre ellos el informe no afirma nada: ni avance, ni retroceso, ni cero.",
+      { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 8 });
+    for (const x of c.sin_datos) h.numeral(x.numero, x.nombre + ". Fuente prevista: " + x.fuente + ".");
+    h.salto(6);
+  }
+
+  /* EL PIE: quién decide. */
+  h.reservar(120);
+  seccion(h, f, "III", "EL PAPEL DEL BOARD");
+  h.texto(c.asesora, { tam: 9.3, color: TINTA, interlinea: 13.5, despues: 8 });
+  h.texto("La fundación no tiene junta directiva. Lo que el Board recomiende sobre este informe se registra como recomendación, con su fecha, y la decisión que se tome después es del máximo órgano de dirección.",
+    { tam: 9.3, color: SUAVE, interlinea: 13.5, despues: 12 });
+  h.regla({ despues: 12 });
+  h.texto(ENTIDAD.nombreCorto, { tam: 9, fuente: f.negrita, color: TINTA, despues: 2 });
+  h.texto("NIT " + ENTIDAD.nit + "  ·  " + ENTIDAD.domicilio, { tam: 8.5, color: GRIS, interlinea: 12 });
+
+  h.cerrarPie(c.referencia);
+  return pdf.save();
 }

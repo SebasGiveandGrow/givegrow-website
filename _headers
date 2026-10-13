@@ -5,7 +5,7 @@
   Permissions-Policy: geolocation=(), microphone=(), camera=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-Ntmsg0Iy62vxdenQGpFXDwVavqvjz25gcUsfIyNwuuM=' 'sha256-JJygVFX7NwIwsQ/L7EuGZxJM6NYRNrpdKWN1+irIQFQ=' 'sha256-Ro+85B6u5F0X297I/WXGF3rggoQ7BS71J0fKhplGGsg=' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://*.basemaps.cartocdn.com; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-qQBLQcG3neV7JsT0MKnV1KxB5gCewVRhkb4GIDkLtzU=' 'sha256-JJygVFX7NwIwsQ/L7EuGZxJM6NYRNrpdKWN1+irIQFQ=' 'sha256-Ro+85B6u5F0X297I/WXGF3rggoQ7BS71J0fKhplGGsg=' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://*.basemaps.cartocdn.com; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests
 
 /
   Cache-Control: no-cache, must-revalidate
@@ -49,6 +49,16 @@
   Cache-Control: public, max-age=86400
 
 /favicon.svg
+  Cache-Control: public, max-age=2592000
+
+# Las dos rutas que navegadores, lectores RSS e iOS piden por su cuenta aunque
+# el HTML diga otra cosa. Respondían 404 (auditoría 7 oct 2026). Son copias del
+# icono de img/icon/ (gg-192 a 16/32/48 px en el .ico; gg-180 tal cual), sin
+# metadatos. Mismo plazo que favicon.svg (30 días): si el icono cambia, tarda eso en renovarse.
+/favicon.ico
+  Cache-Control: public, max-age=2592000
+
+/apple-touch-icon.png
   Cache-Control: public, max-age=2592000
 
 /app.js

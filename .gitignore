@@ -30,3 +30,8 @@ node_modules/
 # están versionados a propósito y el sitio los enlaza. Un PDF que deba
 # publicarse va en `docs/`, no en la raíz.
 /*.pdf
+
+# Cédulas de los firmantes para imprimir en las minutas del certificado
+# (ops/minutas-certificado.js). Son datos personales y este repositorio es
+# público: viven solo en la máquina de quien genera las minutas. 28 sep 2026.
+ops/firmantes.local.json

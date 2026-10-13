@@ -1,0 +1,41 @@
+-- 0035_suscripcion_destino.sql — a qué programa va cada aporte de una membresía
+--
+-- POR QUE HACE FALTA. Donar deja elegir destino desde siempre: una fundación
+-- aliada y uno de sus programas, Mira Mi Casa, o «donde más se necesite». La
+-- membresía no: todo cobro mensual entraba a `aportes` con `modo = 'fondo'`
+-- escrito a fuego en `wompiCobrar`. Y la calculadora de Donar, cuando alguien
+-- elegía un programa y marcaba «mensual», lo mandaba a /pago/metodo con el
+-- monto y SIN el destino — o sea que la persona elegía Borboletas y terminaba
+-- con una membresía al fondo general sin que nada se lo dijera.
+--
+-- QUE GUARDA. El id del PROGRAMA, el mismo valor del <option> del selector de
+-- Donar: el id de la unidad de impacto de `partners.json` («ndf-borboletas»),
+-- o «miramicasa-reparacion». Se guarda el programa y no la fundación porque es
+-- lo que la persona eligió, y de él se deriva lo demás: en cada cobro,
+-- `wompiCobrar` lo resuelve contra `partners.json` y escribe en el aporte lo
+-- que Donar escribe para un aporte dirigido —`modo = 'dirigida'`, `destino_id`
+-- con el id de la fundación, `proyecto` con el nombre del programa—. Así el
+-- rastreo, el recibo, el certificado y el enlace con las actas de entrega
+-- funcionan igual que para un aporte de Donar, sin una segunda lógica.
+--
+-- POR QUE UNA SOLA COLUMNA y no tres (destino_id + proyecto + modo) copiadas
+-- de `aportes`. Serían una foto de `partners.json` el día de la inscripción: si
+-- la aliada cambia el nombre de su programa, la membresía seguiría escribiendo
+-- el viejo en cada recibo durante años. El programa se resuelve en cada cobro;
+-- lo único que se congela es la elección.
+--
+-- NULL = FONDO GENERAL, y es a propósito. Todas las filas que existen hoy —las
+-- de Wompi y las de PayPal— nacieron sin destino y así se quedan: eso es
+-- exactamente lo que se les cobraba. Por eso tampoco lleva DEFAULT ni NOT NULL.
+-- El valor lo valida el servidor contra una lista cerrada antes de escribirlo
+-- (`destinoMembresia` en worker.js): un id desconocido se guarda como NULL.
+--
+-- SIN `IF NOT EXISTS`: SQLite no lo admite en `ADD COLUMN`. Aplicar SOLO con
+--   npx wrangler d1 migrations apply givegrow-privado --remote
+-- (no con `d1 execute --file`, que no la registra: ver CLAUDE.md).
+-- Va ANTES de desplegar el código: `crearSuscripcion` escribe esta columna, y
+-- sin ella el INSERT falla y nadie puede hacerse miembro.
+--
+-- La 0033 está reservada y sin usar; por eso esta es la 0035.
+
+ALTER TABLE suscripciones ADD COLUMN destino TEXT;
