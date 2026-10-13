@@ -35,6 +35,9 @@ const MMC = "https://miramicasa.org";
    archivo, se cambia aquí y la fecha la pone git. */
 const PAGINAS = [
   { loc: APEX + "/", fuentes: ["index.html", "app.js", "styles.css"], freq: "weekly", pri: "1.0" },
+  /* Rutas de la SPA con path propio (ver RUTAS_INDEXABLES en worker.js). */
+  { loc: APEX + "/transparencia", fuentes: ["index.html", "app.js", "styles.css"], freq: "monthly", pri: "0.8" },
+  { loc: APEX + "/empresas", fuentes: ["index.html", "app.js", "styles.css"], freq: "monthly", pri: "0.8" },
   { loc: MMC + "/",  fuentes: ["index.html", "app.js", "styles.css"], freq: "weekly", pri: "0.9" }
 ];
 

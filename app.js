@@ -6585,6 +6585,12 @@ function init(){
      enlace que mandarle a un financiador extranjero. Cualquier otro valor
      deja el español. */
   setLang(new URLSearchParams(location.search).get("lang") === "en" ? "en" : "es");
+  /* /transparencia y /empresas son la misma SPA servida con path propio para
+     los buscadores (ver `RUTAS_INDEXABLES` en worker.js). Al llegar por ahí, la
+     dirección vuelve a la forma de siempre, /#ruta, conservando la query (el
+     ?lang=en): así los enlaces internos con # siguen funcionando igual. */
+  var rutaPath = (location.pathname.match(/^\/(transparencia|empresas)\/?$/) || [])[1];
+  if (rutaPath && !location.hash) history.replaceState(null, "", "/" + location.search + "#" + rutaPath);
   // routing from hash
   var hash = location.hash.replace("#","") || rutaPorDefecto();
   /* Wompi devuelve al donante a /gracias?id=… — una ruta con path, no con hash.

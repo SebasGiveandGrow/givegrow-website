@@ -37585,6 +37585,45 @@ function temaPorReloj(request) {
    version. Lo usa la encuesta de las jornadas. */
 /* `cabecera` es opcional: HTML que va ANTES del <main>, a todo lo ancho. Lo usa
    /verificar para su barra con el logotipo y la vuelta al sitio. */
+/* Las rutas de la SPA que se sirven también con path propio. Los textos son los
+   de ROUTE_META en app.js (los mismos que pone en la pestaña al navegar). */
+const RUTAS_INDEXABLES = {
+  transparencia: {
+    t: "Transparencia · Give&Grow International",
+    d: "Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International."
+  },
+  empresas: {
+    t: "Empresas y RSE · Give&Grow International",
+    d: "Convierte la responsabilidad social de tu empresa en impacto medible y trazable, con beneficios tributarios."
+  }
+};
+function paginaIndexable(base, id) {
+  const m = RUTAS_INDEXABLES[id];
+  const url = ORIGIN + "/" + id;
+  const attr = (v) => ({ element(el) { el.setAttribute("content", v); } });
+  const res = new HTMLRewriter()
+    .on("title", { element(el) { el.setInnerContent(m.t); } })
+    .on('meta[name="description"]', attr(m.d))
+    .on('meta[property="og:title"]', attr(m.t))
+    .on('meta[property="og:description"]', attr(m.d))
+    .on('meta[property="og:url"]', attr(url))
+    .on('meta[name="twitter:title"]', attr(m.t))
+    .on('meta[name="twitter:description"]', attr(m.d))
+    .on('link[rel="canonical"]', { element(el) { el.setAttribute("href", url); } })
+    .on('link[rel="alternate"]', { element(el) {
+      el.setAttribute("href", el.getAttribute("hreflang") === "en" ? url + "?lang=en" : url);
+    } })
+    /* La página visible es esta y no la portada. Y la foto de la portada, que
+       aquí no se ve, deja de pedirse con prioridad. */
+    .on("main#page-inicio", { element(el) { el.setAttribute("class", "page"); } })
+    .on("main#page-" + id, { element(el) { el.setAttribute("class", "page active"); } })
+    .on("main#page-inicio .hero-bg img", { element(el) {
+      el.removeAttribute("fetchpriority"); el.setAttribute("loading", "lazy");
+    } })
+    .transform(base);
+  return res;
+}
+
 function cascaraBaja(titulo, cuerpo, lang, tema, estilo, cabecera) {
   return '<!doctype html>\n'
 + '<html lang="' + (lang === "en" ? "en" : "es") + '"' + (tema === "dark" ? ' data-theme="dark"' : '') + '>\n<head>\n<meta charset="utf-8">\n'
@@ -39848,6 +39887,19 @@ export default {
        las dos se sirven AQUÍ con el `index.html` de la raíz, y `/gracias` entra
        en `run_worker_first` el mismo día. Cualquier ruta con path nueva en la
        SPA tiene que añadirse a las dos listas. */
+    /* /transparencia y /empresas: PÁGINAS QUE GOOGLE PUEDE INDEXAR (auditoría
+       para inversionistas, 12 oct 2026). La SPA vive de rutas con # y, para un
+       buscador, el sitio era una sola URL. Aquí se sirve el mismo index.html con
+       el título, la descripción, el canonical y la tarjeta de compartir de esa
+       página, y con esa página ya marcada como la visible: un buscador o un
+       lector sin JavaScript la ve sin ejecutar nada. app.js la reconoce por el
+       path (ver `init`). Ver `RUTAS_INDEXABLES`; cada una va también en
+       `run_worker_first` de wrangler.toml y en scripts/sitemap.mjs. */
+    const rIdx = ruta.match(/^\/([a-z]+)\/?$/);
+    if (rIdx && RUTAS_INDEXABLES[rIdx[1]] && !HOST_MMC.test(url.hostname)) {
+      const base = await env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
+      return paginaIndexable(base, rIdx[1]);
+    }
     if (ruta === "/gracias" || ruta === "/gracias/" || ruta.startsWith("/caso/")) {
       return env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
     }
