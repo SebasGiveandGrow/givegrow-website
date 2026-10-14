@@ -2827,6 +2827,16 @@ section[tabindex="-1"]:focus{ outline:none }
 .sf-lista{margin:0;padding-left:20px;color:var(--ink-soft);line-height:1.6;max-width:62ch}
 .sf-lista li{margin-bottom:6px}
 .sf-btn{margin-top:14px}
+.sf-hojas{list-style:none;margin:0;padding:0;border-top:1px solid var(--bd);max-width:760px}
+.sf-hojas li{border-bottom:1px solid var(--bd)}
+.sf-hojas a{display:grid;grid-template-columns:5.5rem 1fr auto;gap:4px 16px;align-items:baseline;padding:14px 2px;color:var(--ink);text-decoration:none}
+.sf-hojas a:hover .sf-hoja-t{color:var(--acc);text-decoration:underline;text-underline-offset:3px}
+.sf-hojas a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.sf-hoja-n{font-family:var(--font-display);font-weight:600;color:var(--acc)}
+.sf-hoja-t{font-weight:600;line-height:1.4}
+.sf-hoja-m{font-size:var(--fs-14);color:var(--mu);white-space:nowrap}
+@media(max-width:560px){.sf-hojas a{grid-template-columns:4.6rem 1fr}.sf-hoja-m{grid-column:2}}
+.sf-hojas-nota{margin-top:12px;color:var(--mu);font-size:var(--fs-15);line-height:1.5;max-width:62ch}
 @media(prefers-reduced-motion:reduce){.sf-puerta{transition:none}}
 
 /* ===== PRE-SOCIAL FEST (12 oct 2026) ==============================
