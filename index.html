@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=5a2ed7df">
+<link rel="stylesheet" href="/styles.css?v=ed621de3">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=b00429f8" defer></script>
+<script src="/app.js?v=04c0200c" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1363,6 +1363,49 @@
       <span class="ey rv" data-i18n="sf.red.ey">Para fundaciones y profesionales</span>
       <h2 class="h-sec rv" data-i18n="sf.red.t">La evidencia no se construye sola.</h2>
       <p class="lead rv d1" data-i18n="sf.red.lead">Si vienes del taller «Si no quedó documentado, no ocurrió», aquí están las tres hojas y las dos formas de seguir.</p>
+      <!-- ASISTENCIA DIGITAL (14 oct 2026): la misma lista de papel, para cuando no
+           alcancen los lapiceros. Solo se ve el día del taller (ventana en UTC,
+           la maneja sfHoy). Mismas preguntas y misma autorización que la hoja. -->
+      <form id="asis" class="ally-form sf-asis" data-submit="asisSubmit(event)" data-sf-desde="2026-10-14T17:00:00Z" data-sf-hasta="2026-10-15T05:00:00Z" hidden>
+        <h3 class="ally-sec" data-i18n="sf.asis.t">Registra tu asistencia al taller</h3>
+        <p class="ally-legal" style="margin:0 0 14px;text-align:left" data-i18n="sf.asis.lead">Es la misma lista que circula en papel: si ya la firmaste, no hace falta.</p>
+        <div class="ally-grid">
+          <div class="field"><label for="as-nombre" data-i18n="sf.asis.nombre">Nombre y apellido</label>
+            <input type="text" id="as-nombre" maxlength="120" autocomplete="name" required></div>
+          <div class="field"><label for="as-org" data-i18n="sf.asis.org">Organización (o «a título personal»)</label>
+            <input type="text" id="as-org" maxlength="160" autocomplete="organization"></div>
+        </div>
+        <fieldset class="vf-set">
+          <legend data-i18n="sf.asis.puerta">Vengo como</legend>
+          <div class="ally-mods">
+            <label class="ally-check"><input type="radio" name="as-puerta" value="F"><span data-i18n="sf.asis.p.f">Fundación u organización social</span></label>
+            <label class="ally-check"><input type="radio" name="as-puerta" value="E"><span data-i18n="sf.asis.p.e">Empresa</span></label>
+            <label class="ally-check"><input type="radio" name="as-puerta" value="P"><span data-i18n="sf.asis.p.p">Profesional o voluntario</span></label>
+            <label class="ally-check"><input type="radio" name="as-puerta" value="D"><span data-i18n="sf.asis.p.d">Donante o financiador</span></label>
+            <label class="ally-check"><input type="radio" name="as-puerta" value="O"><span data-i18n="sf.asis.p.o">Otro</span></label>
+          </div>
+        </fieldset>
+        <div class="ally-grid">
+          <div class="field"><label for="as-correo" data-i18n="sf.asis.correo">Correo (opcional)</label>
+            <input type="email" id="as-correo" maxlength="200" autocomplete="email"></div>
+          <div class="field"><label for="as-tel" data-i18n="sf.asis.tel">WhatsApp (opcional)</label>
+            <input type="tel" id="as-tel" maxlength="40" autocomplete="tel"></div>
+        </div>
+        <fieldset class="vf-set">
+          <legend data-i18n="sf.asis.para">Si dejas correo o WhatsApp, ¿para qué?</legend>
+          <div class="ally-mods">
+            <label class="ally-check"><input type="checkbox" id="as-hojas"><span data-i18n="sf.asis.hojas">Quiero las hojas del taller</span></label>
+            <label class="ally-check"><input type="checkbox" id="as-red"><span data-i18n="sf.asis.red">Quiero saber de la red</span></label>
+          </div>
+        </fieldset>
+        <div class="ally-auts">
+          <label class="ally-check"><input type="checkbox" id="as-aut" required><span data-i18n="sf.asis.aut">Autorizo registrar mi asistencia a este taller y soy mayor de 18 años.</span></label>
+        </div>
+        <p class="ally-legal" style="text-align:left" data-i18n="sf.asis.legal">Tu correo o WhatsApp se usa solo para lo que marcaste, conforme a la Ley 1581 de 2012 y a la Política de Privacidad de Fundación Give&amp;Grow International (NIT 901.948.930-2). Si no marcas ninguna casilla, no lo guardamos. A la organización del evento solo le reportamos cuántas personas vinieron. Para que borremos tus datos: privacidad@thegiveandgrowproject.org.</p>
+        <input type="text" id="as-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+        <button type="submit" class="btn btn-g ally-submit" id="as-btn" data-i18n="sf.asis.btn">Registrar mi asistencia</button>
+        <p id="as-note" class="ally-msg" role="status" aria-live="polite" style="display:none"></p>
+      </form>
       <!-- Las hojas del taller (14 oct 2026): el QR del taller cae aquí, así que el
            material se descarga en el mismo lugar, sin carpeta de Drive. Son
            plantillas sin datos personales; si se cambian, cambiar también el
