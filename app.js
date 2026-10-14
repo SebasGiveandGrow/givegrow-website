@@ -6515,8 +6515,17 @@ function init(){
      los buscadores (ver `RUTAS_INDEXABLES` en worker.js). Al llegar por ahí, la
      dirección vuelve a la forma de siempre, /#ruta, conservando la query (el
      ?lang=en): así los enlaces internos con # siguen funcionando igual. */
-  var rutaPath = (location.pathname.match(/^\/(transparencia|empresas)\/?$/) || [])[1];
-  if (rutaPath && !location.hash) history.replaceState(null, "", "/" + location.search + "#" + rutaPath);
+  var rutaPath = (location.pathname.match(/^\/(transparencia|empresas|socialfest)\/?$/i) || [])[1];
+  /* LAS TRES PUERTAS DE SOCIAL FEST TIENEN DIRECCIÓN (14 oct 2026). El QR del
+     taller va impreso como /socialfest#sf-red, y los correos de seguimiento
+     llevan #sf-empresa y #sf-inversion. Hasta hoy /socialfest era una página
+     intermedia que saltaba a /#socialfest y en el salto se perdía el #sf-red:
+     quien salía del taller caía arriba de la página, no en «Si vienes del
+     taller». Ahora el Worker sirve la SPA en /socialfest y aquí se baja al
+     bloque. Y /#sf-red ya no se resuelve como ruta (era un 404). */
+  var sfAncla = (location.hash.match(/^#sf-(red|empresa|inversion)$/) || [])[1];
+  if (sfAncla) history.replaceState(null, "", "/" + location.search + "#socialfest");
+  else if (rutaPath && !location.hash) history.replaceState(null, "", "/" + location.search + "#" + rutaPath.toLowerCase());
   // routing from hash
   var hash = location.hash.replace("#","") || rutaPorDefecto();
   /* Wompi devuelve al donante a /gracias?id=… — una ruta con path, no con hash.
@@ -6566,6 +6575,9 @@ function init(){
   }
   mmcMarca();
   go(hash, true);
+  /* Se baja DESPUÉS de que esté el idioma: en inglés el diccionario llega
+     después y, al traducir, la página cambia de alto y el salto quedaba corto. */
+  if (sfAncla) ensureLang(lang).then(function(){ setTimeout(function(){ sfIr(sfAncla, true); }, 450); });
   window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||rutaPorDefecto(); go(h, true); });
   // Navegación por delegación (reemplaza inline; CSP fase 1).
   // Ignora elementos que aún conservan onclick inline → migración incremental sin doble disparo.
@@ -7655,10 +7667,13 @@ function origenEvento(){
 }
 /* Las dos puertas bajan a su bloque. No son anclas `#sf-empresa`: el hash se
    resolvería como ruta y daría 404 (la misma razón de irAFormFund). */
-function sfIr(cual){
+/* `salto`: al llegar desde un enlace (el QR, un correo) se salta directo, sin
+   animar. Una animación de casi tres mil píxeles al abrir la página no ayuda a
+   nadie, y en una pestaña que carga en segundo plano el navegador ni la corre. */
+function sfIr(cual, salto){
   var s = document.getElementById(cual === "empresa" ? "sf-empresa" : cual === "inversion" ? "sf-inversion" : "sf-red");
   if (!s) return;
-  var suave = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var suave = !salto && (!window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   s.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
   if (cual === "empresa"){
     var p = document.getElementById("sf-razon");
