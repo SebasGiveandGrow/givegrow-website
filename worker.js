@@ -14190,6 +14190,24 @@ async function almaContextoRed(env, origen) {
 
    SOLO `status === "activa"`, que es la misma regla que el sitio aplica para
    mostrar un comercio en publico: sin convenio firmado no existe. */
+/* EL SOCIAL FEST, SOLO MIENTRAS DURA (14 oct 2026). Quien escanea un QR en el
+   evento le pregunta a ALMA a qué hora es el taller o dónde, y ALMA no lo
+   sabía. Se añade al system solo hasta el 16 de octubre (día colombiano) y con
+   la fecha y la hora de Bogotá, para que distinga «es hoy a las 2» de «ya
+   pasó». Después del 16 devuelve "" y ALMA vuelve a no mencionarlo. */
+function almaContextoEvento() {
+  const ahora = enColombia().toISOString();
+  const dia = ahora.slice(0, 10);
+  if (dia > "2026-10-16") return "";
+  return `
+
+SOCIAL FEST 2026 (hoy es ${dia}, ${ahora.slice(11, 16)} en Bogotá): Give&Grow participa en el Social Fest 2026, en Ruta N, Medellín, del 14 al 16 de octubre.
+- Miércoles 14 de octubre, de 2:00 a 3:30 p. m., en la Sala múltiple 3, segundo piso de Ruta N: el taller práctico «Si no quedó documentado, no ocurrió», que facilita el fundador de Give&Grow. Es para organizaciones sociales que entregan algo y necesitan poder demostrarlo; cada quien arma el mapa de su evidencia y se lleva plantillas (actas, checklist de consentimiento y el Test del Auditor). No hay que inscribirse. Si ya pasaron las 3:30 p. m. del 14, di que el taller ya ocurrió.
+- Las tres hojas del taller se descargan en #socialfest, en la sección para fundaciones y profesionales.
+- Jueves 15: Give&Grow está en la rueda de inversión y en la rueda de voluntariado. Son sesiones con cita que organiza el evento: no las ofrezcas como abiertas al público.
+- Para dejar sus datos a Give&Grow desde el evento, #socialfest tiene tres entradas: empresas (piloto de Impact Journey), fundaciones y profesionales, y financiadores.`;
+}
+
 async function almaContextoGratitud(env, origen) {
   try {
     const r = await env.ASSETS.fetch(new URL("/data/gratitud.json", origen));
@@ -14304,7 +14322,8 @@ async function apiAlma(request, env, url) {
   if (!mensajes) return json({ error: "conversacion_vacia" }, 400);
 
   const system = ALMA_SYS + (await almaContextoRed(env, url.origin))
-                              + (await almaContextoGratitud(env, url.origin));
+                              + (await almaContextoGratitud(env, url.origin))
+                              + almaContextoEvento();
 
   /* EL WORKSPACE, y por qué es condicional.
 
