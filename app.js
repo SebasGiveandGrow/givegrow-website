@@ -204,6 +204,11 @@ var I18N = {
     "med.link.os":"Ver el registro detrás de cada aporte",
     "alma.panel.sub":"Asistente de Labor Misional y Alianzas",
     "alma.close":"Cerrar ALMA",
+    "alma.intro.ey":"ALMA · la asistente de Give&Grow",
+    "alma.intro.t":"¿Quieres saber algo puntual o llegar a algún lugar?",
+    "alma.intro.p":"Pregúntale a ALMA. Responde sobre donaciones, certificados, empresas y fundaciones, y te lleva a la página que buscas.",
+    "alma.intro.b":"Preguntarle a ALMA",
+    "alma.intro.x":"Cerrar este aviso",
     "alma.note":"Respuestas generadas con inteligencia artificial. Para datos oficiales, consulta Transparencia.",
     "nav.donar":"Donar",
     "nav.empresas":"Empresas",
@@ -4119,6 +4124,7 @@ var ACT_FNS = {
   volEdad:volEdad, volIrForm:volIrForm, irAAliadosVoluntariado:irAAliadosVoluntariado, irAAliadosGratitud:irAAliadosGratitud,
   sfIr:sfIr, sfFund:sfFund, sfPro:sfPro, sfSubmit:sfSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
+  almaIntro:almaIntro, almaIr:almaIr,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
 };
@@ -6315,6 +6321,8 @@ function almaFmt(text){
   s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, function(m,l,u){ return '<a href="'+u+'" target="_blank" rel="noopener">'+l+'</a>'; });
   // bare http(s) urls
   s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, function(m,pre,u){ return pre+'<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>'; });
+  // Las páginas del sitio se vuelven botones que cierran el chat y llevan ahí.
+  s = almaEnlacesInternos(s);
   // bold
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   var lines = s.split(/\n/), out = [], i = 0;
@@ -6336,6 +6344,66 @@ function almaFmt(text){
     out.push("<p>"+para.join("<br>")+"</p>");
   }
   return out.join("");
+}
+/* LAS PÁGINAS QUE NOMBRA ALMA SE PUEDEN VISITAR (14 oct 2026). El prompt ya le
+   hacía decir «repórtala en #reportar», pero eso salía como texto: la persona
+   tenía que cerrar el chat y buscar la página. Ahora una dirección con
+   almohadilla que sea una ruta real del sitio —y también un enlace completo a
+   thegiveandgrowproject.org/#ruta— se vuelve un botón que cierra el chat y
+   lleva ahí, en esta misma pestaña. Lo que no es una ruta se queda como texto:
+   nada de enlaces a páginas inventadas. El texto ya llega escapado. */
+function almaNombreRuta(r){
+  if (r === "inicio") return lang === "en" ? "Home" : "Inicio";
+  var m = ROUTE_META[r];
+  var tt = m && m.t ? (m.t[lang] || m.t.es || "") : "";
+  return tt ? tt.split(" · ")[0] : "#" + r;
+}
+function almaBotonRuta(r){
+  return '<a href="#' + r + '" class="alma-ir" data-act="almaIr(\'' + r + '\')">' + escapeHtml(almaNombreRuta(r)) + ' &rarr;</a>';
+}
+function almaEnlacesInternos(s){
+  s = s.replace(/<a href="https?:\/\/(?:www\.)?thegiveandgrowproject\.org\/#([a-z][a-z0-9-]*)" target="_blank" rel="noopener">[^<]*<\/a>/g, function(m, r){
+    return isSpaRoute(r) ? almaBotonRuta(r) : m;
+  });
+  return s.replace(/(^|[\s(«])#([a-z][a-z0-9-]*)(?=$|[\s).,;:!?»])/g, function(m, pre, r){
+    return isSpaRoute(r) ? pre + almaBotonRuta(r) : m;
+  });
+}
+function almaIr(r){
+  almaPanel(false);
+  go(r);
+}
+/* ALMA SE PRESENTA (14 oct 2026, Social Fest). El botón decía «ALMA» y el
+   icono de destellos dice «asistente», pero nadie sabía QUÉ se le puede
+   preguntar ni que lleva a las páginas. Un aviso pequeño junto al botón lo
+   cuenta una vez: aparece a los pocos segundos de la primera visita, se va al
+   cerrarlo o al abrir ALMA, y no vuelve (se recuerda en este navegador). En el
+   teléfono se esconde con los mismos gestos que los botones flotantes: sobre
+   la portada, al bajar, sobre un formulario o con el teclado abierto. */
+var ALMA_INTRO_KEY = "gg-alma-intro", almaIntroTimer = null;
+function almaIntroVisto(){ try { return localStorage.getItem(ALMA_INTRO_KEY) === "1"; } catch (e) { return false; } }
+function almaIntroOcultar(marcar){
+  if (almaIntroTimer){ clearTimeout(almaIntroTimer); almaIntroTimer = null; }
+  if (marcar){ try { localStorage.setItem(ALMA_INTRO_KEY, "1"); } catch (e) {} }
+  var el = document.getElementById("alma-intro");
+  if (!el || el.hidden) return;
+  el.classList.remove("on");
+  el.hidden = true;
+}
+function almaIntro(abrir){
+  almaIntroOcultar(true);
+  if (abrir) almaPanel(true);
+}
+function initAlmaIntro(){
+  if (almaIntroVisto()) return;
+  almaIntroTimer = setTimeout(function(){
+    almaIntroTimer = null;
+    var el = document.getElementById("alma-intro");
+    var p = document.getElementById("alma-panel");
+    if (!el || (p && p.classList.contains("open")) || almaIntroVisto()) return;
+    el.hidden = false;
+    requestAnimationFrame(function(){ el.classList.add("on"); });
+  }, 4500);
 }
 function almaPush(role, html){
   var box = document.getElementById("alma-msgs");
@@ -6374,6 +6442,7 @@ function almaPanel(open){
   if (open){
     // Los chips se arman con la ruta desde la que se abrió: ALMA responde en contexto.
     almaFromRoute = currentRoute || "inicio";
+    almaIntroOcultar(true);
     renderAlmaChips();
     almaLastFocus = document.activeElement;
     p.classList.add("open"); if (s) s.classList.add("open");
@@ -6684,6 +6753,7 @@ if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
 initFabHero();
 initFabForms();
+initAlmaIntro();
 initFabScroll();
 
 /* ---------- tema día/noche: automático + preferencia manual ----------
