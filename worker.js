@@ -40355,74 +40355,56 @@ ${HOJA_CSS}
    el 302 hasta `/` y pinta la tarjeta de la portada. Quien recibía el enlace
    veía «Give&Grow International · Dar para crecer…», no Social Fest.
 
-   Ahora responde un 200 con sus propios metadatos OG y un refresco a la SPA,
-   el mismo patrón de `/f/<id>`: metadatos, un refresco y un enlace visible por
-   si el refresco no corre. Sin un solo script, así que la CSP es la negación
-   entera. `og:url` apunta a ESTA ruta y no a `/#socialfest`: el rastreador de
+   Del 7 al 14 oct respondió un 200 con sus propios metadatos OG y un refresco
+   a la SPA, el patrón de `/f/<id>`. Desde el 14 oct sirve la SPA misma, con
+   la cabecera reescrita (ver `paginaSocialfest`): el refresco perdía el
+   #sf-red del QR del taller. Lo que sigue valiendo: `og:url` apunta a ESTA ruta y no a `/#socialfest`: el rastreador de
    Facebook/WhatsApp vuelve a raspar el og:url si difiere, y en `/` encontraría
    otra vez la tarjeta de la portada.
 
-   La query se conserva en el destino (`?utm_…` si algún día se reparte así).
-   Va escapada con `esc` porque entra a un atributo; `url.search` ya viene
-   codificado por el parser de URL, así que no hay comillas crudas que temer,
-   pero no se confía en eso. */
+   La query se queda en la dirección (`?lang=en`, `?utm_…`): app.js la conserva
+   al pasar a /#socialfest. */
 /* EN INGLÉS CON `?lang=en` (auditoría preevento, 12 oct 2026). El destino ya
    conservaba la query —la SPA abría en inglés—, pero la tarjeta misma (título,
    descripción, `og:locale` y el enlace visible si el refresco no corre) salía
    siempre en español. Solo la query decide, nunca Accept-Language: la
    respuesta se cachea 5 min en el borde y no lleva `Vary`. */
-function paginaSocialfest(url) {
-  const en = url.searchParams.get("lang") === "en";
-  const destino = "/" + url.search + "#socialfest";
-  const titulo = en
-    ? "Give&Grow at Social Fest 2026 \u00b7 Ruta N, Medell\u00edn"
-    : "Give&Grow en Social Fest 2026 \u00b7 Ruta N, Medell\u00edn";
-  const desc = en
-    ? "Impact Journey for companies: two-way volunteering, there and back. And for foundations and professionals, the HUB SOCIAL. Leave us your details and we'll write to you."
-    : "Impact Journey para empresas: voluntariado en doble v\u00eda, con la ida y la vuelta. Y para fundaciones y profesionales, el HUB SOCIAL. D\u00e9janos tus datos y te escribimos.";
-  const alt = en ? "Give&Grow International at Social Fest 2026" : "Give&Grow International en Social Fest 2026";
-  const abrir = en ? "Open the Social Fest page" : "Abrir la p\u00e1gina de Social Fest";
-  const img = ORIGIN + "/img/og.jpg";
+/* Textos de la tarjeta de /socialfest, en los dos idiomas. Ver
+   `paginaSocialfest` justo abajo. */
+const SOCIALFEST_META = {
+  t: "Give&Grow en Social Fest 2026 \u00b7 Ruta N, Medell\u00edn",
+  d: "Impact Journey para empresas: voluntariado en doble v\u00eda, con la ida y la vuelta. Y para fundaciones y profesionales, el HUB SOCIAL. D\u00e9janos tus datos y te escribimos.",
+  alt: "Give&Grow International en Social Fest 2026",
+  en: {
+    t: "Give&Grow at Social Fest 2026 \u00b7 Ruta N, Medell\u00edn",
+    d: "Impact Journey for companies: two-way volunteering, there and back. And for foundations and professionals, the HUB SOCIAL. Leave us your details and we'll write to you.",
+    alt: "Give&Grow International at Social Fest 2026"
+  }
+};
+/* /socialfest SIRVE LA SPA (14 oct 2026, primer día del evento). Hasta hoy
+   respondía una página intermedia, con sus metadatos y un refresco a
+   `/#socialfest`; en ese refresco se perdía la almohadilla de la dirección.
+   El QR del taller va impreso como /socialfest#sf-red, y quien lo escaneaba
+   caía arriba de la página en vez de en «Si vienes del taller». Un refresco
+   no hereda el fragmento; servir la SPA aquí mismo, sí lo conserva, y app.js
+   baja al bloque (ver `init`).
+
+   La tarjeta de compartir no se pierde: es el mismo index.html con el título,
+   la descripción, el canonical y el og:url de esta página reescritos, como
+   las de `RUTAS_INDEXABLES` (no va en esa lista porque es de temporada y no
+   entra al sitemap). La CSP es la de index.html, que viaja con el asset. */
+function paginaSocialfest(base, en) {
+  if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
+  const m = en ? SOCIALFEST_META.en : SOCIALFEST_META;
   const canon = ORIGIN + "/socialfest";
-  return `<!doctype html>
-<html lang="${en ? "en" : "es"}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="0;url=${esc(destino)}">
-<title>${esc(titulo)}</title>
-<meta name="description" content="${esc(desc)}">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Give&amp;Grow International">
-<meta property="og:title" content="${esc(titulo)}">
-<meta property="og:description" content="${esc(desc)}">
-<meta property="og:url" content="${esc(canon)}">
-<meta property="og:image" content="${esc(img)}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="${esc(alt)}">
-<meta property="og:locale" content="${en ? "en_US" : "es_CO"}">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${esc(titulo)}">
-<meta name="twitter:description" content="${esc(desc)}">
-<meta name="twitter:image" content="${esc(img)}">
-<link rel="canonical" href="${esc(canon)}">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#1F5C38">
-<style>
-:root{--bg:#F3EFE6;--ink:#191813;--acc:#1F5C38}
-body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
-main{max-width:34rem;margin:0 auto;padding:48px 16px}
-a{color:var(--acc);font-weight:600}
-</style>
-</head>
-<body>
-<main>
-<p>Give&amp;Grow International \u00b7 Social Fest 2026</p>
-<p><a href="${esc(destino)}">${esc(abrir)}</a></p>
-</main>
-</body>
-</html>`;
+  return cabeceraPagina(m, en ? canon + "?lang=en" : canon, en)
+    .on('meta[property="og:image:alt"]', { element(el) { el.setAttribute("content", m.alt); } })
+    .on("main#page-inicio", { element(el) { el.setAttribute("class", "page"); } })
+    .on("main#page-socialfest", { element(el) { el.setAttribute("class", "page active"); } })
+    .on("main#page-inicio .hero-bg img", { element(el) {
+      el.removeAttribute("fetchpriority"); el.setAttribute("loading", "lazy");
+    } })
+    .transform(base);
 }
 
 async function rutaCompartir(env, url, id, lang) {
@@ -41187,10 +41169,10 @@ export default {
        reparte con `?utm_…`.
 
        Nunca un 301, por la cicatriz que este archivo ya tiene escrita: una ruta
-       que todavía puede moverse no se declara permanente. Desde el 7 oct 2026
-       ni siquiera es un 302: es un 200 con su propia tarjeta OG y un refresco
-       (ver `paginaSocialfest`), para que el enlace compartido por WhatsApp no
-       pinte la tarjeta de la portada.
+       que todavía puede moverse no se declara permanente. Desde el 14 oct 2026
+       ni siquiera es un salto: sirve la SPA con su propia tarjeta OG (ver
+       `paginaSocialfest`), para que el enlace compartido por WhatsApp no pinte
+       la tarjeta de la portada y para que el #sf-red del QR no se pierda.
 
        TIENE QUE ESTAR EN `run_worker_first` de wrangler.toml (las dos formas,
        con y sin barra final): sin eso la capa de assets responde 404 y este
@@ -41216,17 +41198,8 @@ export default {
       if (HOST_MMC.test(url.hostname)) {
         return Response.redirect(ORIGIN + "/socialfest" + url.search, 302);
       }
-      return new Response(paginaSocialfest(url), {
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-          "referrer-policy": "strict-origin-when-cross-origin",
-          "x-content-type-options": "nosniff",
-          /* Corta: si el destino del QR se mueve después de imprimir, el
-             cambio tiene que llegar en minutos, no en días. */
-          "cache-control": "public, max-age=300",
-          "content-security-policy": cspPagina({ script: "'none'" })
-        }
-      });
+      const base = await env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
+      return paginaSocialfest(base, url.searchParams.get("lang") === "en");
     }
 
     if (ruta === "/casa" || ruta === "/micasa" || ruta === "/mimicasa") {

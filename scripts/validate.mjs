@@ -913,7 +913,8 @@ if (tagsOk) ok("balance de tags (" + tagsVistas + " etiquetas vigiladas)");
 const PLANTILLAS = [
   "plantillaCorreo", "paginaTriage", "inspeccionHTML", "paginaFirma",
   "paginaCarnet", "paginaFicha", "paginaConvenio", "paginaRuta", "paginaAdmin", "sharePage",
-  "paginaSocialfest",
+  /* `paginaSocialfest` salió de aquí el 14 oct 2026: ya no arma una página,
+     reescribe la cabecera de index.html (ver worker.js). */
   /* Vive DENTRO de la plantilla de adminJS: es el popup que abre el panel.
      `verConvenio` salió de aquí en la Fase 2 del panel: ya no arma una
      página en una ventana aparte, pinta el cajón. */
