@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=ecd23f65" defer></script>
+<script src="/app.js?v=e46952c5" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1411,7 +1411,7 @@
     <div class="wrap prose">
       <span class="ey rv" data-i18n="brig.ey">Brigada de atención a emergencia</span>
       <h1 class="h-sec rv" data-i18n="brig.t">Terremoto del 10 de agosto. La brigada salió el 24 de agosto de 2026.</h1>
-      <p class="lead rv d1" data-i18n="brig.lead">Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 24 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo: las actas firmadas de las entregas se publican en el rastreo cuando estén listas. Lo que sigue abierto es Mira Mi Casa.</p>
+      <p class="lead rv d1" data-i18n="brig.lead">Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 24 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo y de lo que sigue: las actas firmadas de las entregas se publican aquí y en el rastreo cuando estén revisadas.</p>
       <!-- Foto de la brigada (12 oct 2026): sin personas. Consentimiento en
            ops/consentimientos-medios.json, «brigada-terremoto-2026-08». -->
       <figure class="foto-fig foto-ancha rv d1" style="--foco:50% 62%;--foco-m:50% 62%">
@@ -1422,16 +1422,28 @@
         <figcaption class="mu" data-i18n="brig.foto.pie">El Águila, agosto de 2026. Un muro colapsado en una de las zonas que recorrió la brigada.</figcaption>
       </figure>
 
-      <!-- LA BRIGADA TERMINÓ, y la página es su informe (29 sep 2026). Antes aquí
+      <!-- CIERRE CON CIFRA (13 oct 2026, confirmado por el fundador): entregas del 24 al
+           27 de agosto en Guática, Armenia, Cartago, Ansermanuevo y la vereda Maracaibo
+           (Argelia). Las 12,5 t son lo DESPACHADO según el inventario de carga, no la
+           suma de actas firmadas: nunca «entregadas con acta». Cuando las actas estén
+           revisadas, la cifra pasa a ser su suma y la diferencia se explica.
+           Sin fecha para las actas (Sebas, 14 oct 2026): «cuando estén revisadas»,
+           no un día que se pueda incumplir.
+           La reconstrucción de las tres viviendas va sin municipio ni fechas a propósito.
+           Lo que sigue es la nota original.
+
+           LA BRIGADA TERMINÓ, y la página es su informe (29 sep 2026). Antes aquí
            iba un contador de fases —antes, en curso, después— y cuatro formas de
            ayudar con fechas del 24 al 28 de agosto. El 29 sep Sebas había dado el 20
            de agosto como salida; el 14 oct la corrigió: salió el 24. La fecha de cierre no se afirma porque no está
            documentada. Lo único que se promete es lo verificable: las actas
            firmadas aparecen cuando estén revisadas. -->
       <div class="brig-estado rv d1">
-        <p class="rec-cap" data-i18n="brig.est.rango">Agosto de 2026</p>
-        <p class="brig-cifra" data-i18n="brig.est.despues">La brigada terminó.</p>
-        <p class="brig-est-p" data-i18n="brig.est.p">Las actas firmadas de las entregas se publican aquí y en el rastreo cuando estén revisadas, no antes. Lo que sigue abierto es Mira Mi Casa.</p>
+        <p class="rec-cap" data-i18n="brig.est.rango">Del 24 al 27 de agosto de 2026</p>
+        <p class="brig-cifra" data-i18n="brig.est.despues">12,5 toneladas despachadas, según el inventario de carga.</p>
+        <p class="brig-est-p" data-i18n="brig.est.p">En esos días la brigada entregó ayuda humanitaria en Guática, Armenia, Cartago, Ansermanuevo y la vereda Maracaibo, en Argelia. Cuando las actas firmadas estén revisadas, la cifra pasará a ser la suma de las actas, y explicaremos cualquier diferencia. Las actas se publican aquí y en el rastreo cuando estén revisadas.</p>
+        <p class="brig-est-p" data-i18n="brig.est.sigue">Desde entonces seguimos entregando y acompañando. Empezó la reconstrucción de tres viviendas: está en curso y todavía no tiene fechas de terminación. Y está arrancando Mira Mi Casa.</p>
+        <p style="margin:12px 0 0"><a class="card-link" href="https://miramicasa.org/"><span data-i18n="brig.est.mmc">Conoce Mira Mi Casa</span> <span aria-hidden="true">&rarr;</span></a></p>
       </div>
       <div class="rec-ledger rv d2">
         <p class="rec-cap" data-i18n="brig.hechos.cap">El sismo</p>
@@ -1451,7 +1463,7 @@
         <p class="rec-cap" data-i18n="brig.sec.cap">Los cinco sectores del plan</p>
         <div class="sec-fila"><span class="sec-ciudad">Cali</span></div><div class="sec-fila"><span class="sec-ciudad">Pereira</span></div><div class="sec-fila"><span class="sec-ciudad">Manizales</span></div><div class="sec-fila"><span class="sec-ciudad">Armenia</span></div><div class="sec-fila"><span class="sec-ciudad">Chocó</span></div>
       </div>
-      <p class="mu rv d2 brig-nota" data-i18n="brig.sec.nota">Las zonas y los puntos de entrega se acordaron con los Consejos Municipales de Gestión del Riesgo y con las fundaciones de cada territorio. Lo que se entregó en cada sector, y a cuántas familias, se publica con su acta firmada cuando esté revisada: antes no lo afirmamos.</p>
+      <p class="mu rv d2 brig-nota" data-i18n="brig.sec.nota">Las zonas y los puntos de entrega se acordaron con los Consejos Municipales de Gestión del Riesgo y con las fundaciones de cada territorio. Lo que se entregó en cada lugar, y a cuántas familias, se publica con su acta firmada cuando esté revisada: antes no lo afirmamos.</p>
     </div>
   </section>
 
