@@ -204,6 +204,11 @@ var I18N = {
     "med.link.os":"Ver el registro detrás de cada aporte",
     "alma.panel.sub":"Asistente de Labor Misional y Alianzas",
     "alma.close":"Cerrar ALMA",
+    "alma.intro.ey":"ALMA · la asistente de Give&Grow",
+    "alma.intro.t":"¿Quieres saber algo puntual o llegar a algún lugar?",
+    "alma.intro.p":"Pregúntale a ALMA. Responde sobre donaciones, certificados, empresas y fundaciones, y te lleva a la página que buscas.",
+    "alma.intro.b":"Preguntarle a ALMA",
+    "alma.intro.x":"Cerrar este aviso",
     "alma.note":"Respuestas generadas con inteligencia artificial. Para datos oficiales, consulta Transparencia.",
     "nav.donar":"Donar",
     "nav.empresas":"Empresas",
@@ -999,7 +1004,7 @@ var I18N = {
     "emp.piloto.btn":"Proponer el piloto",
     "emp.aliadas.ey":"Red de empresas aliadas",
     "emp.aliadas.t":"Empresas que crecen dando",
-    "emp.aliadas.lead":"Cada alianza entra con convenio firmado. Aquí verás las empresas que ya suman al impacto — con trazabilidad y reconocimiento.",
+    "emp.aliadas.lead":"Aquí verás las empresas que ya suman al impacto, cada una con lo que aporta y con su autorización para aparecer.",
     "emp.aliadas.empty":"Todavía no hay empresas con convenio firmado. La primera aparecerá aquí el día que firme, con lo que aporta y su reporte.",
     "emp.aliadas.cta":"Quiero aliar mi empresa",
     "emp.card.aporta":"Aporta",
@@ -1082,7 +1087,7 @@ var I18N = {
     "vf.edad.lbl":"¿Tienes 18 años o más?",
     "vf.edad.si":"Sí",
     "vf.edad.no":"No, soy menor de edad",
-    "vf.menor.aviso":"Vienes con tu acudiente o con su autorización firmada. La ley protege de forma especial los datos de un menor, así que antes de cualquier actividad le pedimos a tu acudiente que autorice este registro por escrito.",
+    "vf.menor.aviso":"Vienes con tu acudiente o con su autorización firmada. La ley protege de forma especial los datos de un menor: tu acudiente recibe un enlace para autorizar esta inscripción —por correo, o por WhatsApp de nuestro equipo si nos dejas su celular— y sin su autorización la borramos a los 30 días. Hasta entonces guardamos solo lo mínimo: tu celular, tu ciudad, tu disponibilidad y tu mensaje no los guardamos.",
     "vf.acu.nombre":"Nombre de tu acudiente",
     "vf.acu.contacto":"Correo o teléfono de tu acudiente",
     "vf.acu.acompana":"Vendré con mi acudiente",
@@ -1092,6 +1097,8 @@ var I18N = {
     "vf.err.acu":"Necesitamos el nombre y un contacto de tu acudiente.",
     "vf.err.acu.modo":"Dinos si vendrás con tu acudiente o con su autorización firmada.",
     "vf.err.acu.sabe":"Tu acudiente tiene que saber que te estás inscribiendo.",
+    "vf.err.acu.contacto":"Escribe el correo o el celular de tu acudiente: por ahí le llega el enlace para autorizar.",
+    "vf.err.acu.propio":"El contacto de tu acudiente no puede ser tu mismo correo o celular.",
     "rep.tel":"Celular o WhatsApp",
     "mi.tel":"Celular o WhatsApp, con el código de tu país",
     "form.err.tel":"Déjanos un celular o WhatsApp: es por donde te escribimos más rápido.",
@@ -1170,6 +1177,7 @@ var I18N = {
     "vf.submit":"Enviar mis datos",
     "vf.sending":"Enviando…",
     "vf.ok":"Listo. Te escribimos pronto al correo que dejaste, y ahí te contamos los siguientes pasos.",
+    "vf.ok.menor":"Listo. Tu acudiente va a recibir el enlace para autorizar tu inscripción; sin su autorización, la borramos a los 30 días. Te escribimos al correo que dejaste.",
     "vf.err.nombre":"Nos falta tu nombre.",
     "vf.err.email":"Revisa el correo: parece que tiene algo raro.",
     "vf.err.nivel":"Elige cómo quieres participar.",
@@ -1886,8 +1894,8 @@ var I18N = {
     "track.ev.t":"Entregas de tu destino",
     "track.ev.p":"Tu aporte se suma al fondo de este destino. Estas son las entregas que ese fondo hizo posibles — no te atribuimos una en particular, porque el dinero se reúne y las jornadas se pagan entre varios aportes.",
     "brig.ey":"Brigada de atención a emergencia",
-    "brig.t":"Terremoto del 10 de agosto. La brigada salió el 20 de agosto de 2026.",
-    "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 20 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo y de lo que sigue: las actas firmadas de las entregas se publican aquí y en el rastreo el [FECHA].",
+    "brig.t":"Terremoto del 10 de agosto. La brigada salió el 24 de agosto de 2026.",
+    "brig.lead":"Un sismo de magnitud 7,4 con epicentro en el Chocó golpeó el occidente del país. El 24 de agosto de 2026 la brigada salió hacia la zona afectada, para entregar junto a las fundaciones que ya trabajaban en cada territorio. Esta página es el informe de lo que se hizo y de lo que sigue: las actas firmadas de las entregas se publican aquí y en el rastreo el [FECHA].",
     "brig.foto.alt":"Muro colapsado y escombros frente a una casa en El Águila, agosto de 2026",
     "brig.foto.pie":"El Águila, agosto de 2026. Un muro colapsado en una de las zonas que recorrió la brigada.",
     "brig.est.rango":"Del 24 al 27 de agosto de 2026",
@@ -1928,7 +1936,7 @@ var I18N = {
     "brig.mmc.cierre":"Ninguna de las tres funciona sola: sin fotos no hay concepto, sin concepto no se sabe qué comprar, y sin materiales el concepto se queda en un papel.",
     "brig.plan.ey":"Cómo se armó",
     "brig.plan.t":"Siete personas y cinco sectores.",
-    "brig.plan.p":"La recolección se hizo en centros de acopio de empresas y amigos en Envigado. De ahí salió la carga con el equipo, por carretera, desde el 20 de agosto de 2026.",
+    "brig.plan.p":"La recolección se hizo en centros de acopio de empresas y amigos en Envigado. De ahí salió la carga con el equipo, por carretera, desde el 24 de agosto de 2026.",
     "brig.sec.cap":"Los cinco sectores del plan",
     "brig.sec.nota":"Las zonas y los puntos de entrega se acordaron con los Consejos Municipales de Gestión del Riesgo y con las fundaciones de cada territorio. Lo que se entregó en cada lugar, y a cuántas familias, se publica con su acta firmada el [FECHA]: antes no lo afirmamos.",
     "brig.hub.ey":"Cómo entregamos",
@@ -2042,7 +2050,7 @@ var I18N = {
     "origen.ms3.t":"19 mayo 2025 · Registro en Cámara",
     "origen.ms3.p":"Constituida por documento privado el 11 de abril de 2025, queda inscrita ante la Cámara de Comercio de Medellín el 19 de mayo. La calificación en el Régimen Tributario Especial la otorga la DIAN. 2025 es el año de constitución, sin operación: la Fundación empieza a operar en 2026.",
     "origen.ms4.t":"2026 · Primeras aliadas y la brigada",
-    "origen.ms4.p":"Entran al HUB SOCIAL las primeras fundaciones aliadas, cada una con verificación y convenio, y la brigada sale el 20 de agosto tras el sismo. Impact Journey se abre a empresas como piloto. ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción.",
+    "origen.ms4.p":"Entran al HUB SOCIAL las primeras fundaciones aliadas, cada una con verificación y convenio, y la brigada sale el 24 de agosto tras el sismo. Impact Journey se abre a empresas como piloto. ImpactOS ya opera en el registro, el rastreo y los certificados; otros módulos están en construcción.",
     "origen.cta.btn":"Ver el HUB SOCIAL",
     "fund.proc.ey":"El proceso",
     "fund.proc.t":"De la aplicación a la vinculación.",
@@ -2166,7 +2174,7 @@ var ROUTE_META = {
   gratitud:{t:{es:"Programa de Gratitud · Give&Grow International",en:"Gratitude Program · Give&Grow International"},d:{es:"Beneficios y reconocimientos para quienes hacen posible el impacto: donantes, aliados y empresas.",en:"Benefits and recognition for those who make impact possible: donors, allies and companies."}},
   impacto:{t:{es:"Impacto y evidencia · Give&Grow International",en:"Impact & evidence · Give&Grow International"},d:{es:"Evidencia real del trabajo en terreno: fotografías, trazabilidad y resultados de las comunidades que acompañamos.",en:"Real evidence from the field: photos, traceability and results from the communities we support."}},
   impactos:{t:{es:"ImpactOS · Give&Grow International",en:"ImpactOS · Give&Grow International"},d:{es:"Qué es ImpactOS, la plataforma del ecosistema Give&Grow, y qué módulo está operando hoy: el HUB SOCIAL.",en:"What ImpactOS is, the platform behind the Give&Grow ecosystem, and which module runs today: the HUB SOCIAL."}},
-  brigada:{t:{es:"Brigada de atención a emergencia · Give&Grow International",en:"Emergency response brigade · Give&Grow International"},d:{es:"Terremoto del 10 de agosto de 2026. Brigada de Give&Grow a Cali, Pereira, Manizales, Armenia y Chocó: qué se necesita y cómo aportar, en dinero o en especie.",en:"The 10 August 2026 earthquake. Give&Grow's brigade to Cali, Pereira, Manizales, Armenia and Chocó: what is needed and how to give, in money or in kind."}},
+  brigada:{t:{es:"Brigada de atención a emergencia · Give&Grow International",en:"Emergency response brigade · Give&Grow International"},d:{es:"Terremoto del 10 de agosto de 2026. La brigada de Give&Grow salió el 24 de agosto y entregó en Guática, Armenia, Cartago, Ansermanuevo y la vereda Maracaibo (Argelia). El informe de lo que se hizo.",en:"The 10 August 2026 earthquake. Give&Grow's brigade set out on 24 August and delivered in Guática, Armenia, Cartago, Ansermanuevo and the village of Maracaibo (Argelia). The report of what was done."}},
   reportar:{t:{es:"Reportar una transferencia · Give&Grow International",en:"Report a transfer · Give&Grow International"},d:{es:"¿Ya transferiste a la cuenta de la Fundación? Repórtalo y recibe tu número de guía para seguir tu aporte.",en:"Already transferred to the Foundation's account? Report it and get your tracking number to follow your gift."}},
   donar:{t:{es:"Donar · Give&Grow International",en:"Donate · Give&Grow International"},d:{es:"Haz tu donación a Give&Grow con trazabilidad completa y beneficio tributario. Cada aporte transforma una vida.",en:"Donate to Give&Grow with full traceability and a tax benefit. Every gift transforms a life."}},
   medicion:{t:{es:"Cómo medimos · Give&Grow International",en:"How we measure · Give&Grow International"},d:{es:"Contribución y no atribución, los tres peldaños de la medición, cómo publicamos un número y el reporte de jornada para la empresa aliada.",en:"Contribution rather than attribution, the three rungs of measurement, how we publish a figure, and the journey report for partner companies."}},
@@ -4122,6 +4130,7 @@ var ACT_FNS = {
   volEdad:volEdad, volIrForm:volIrForm, irAAliadosVoluntariado:irAAliadosVoluntariado, irAAliadosGratitud:irAAliadosGratitud,
   sfIr:sfIr, sfFund:sfFund, sfPro:sfPro, sfSubmit:sfSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
+  almaIntro:almaIntro, almaIr:almaIr,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
 };
@@ -5841,7 +5850,14 @@ function renderAportantes(){
 function renderEmpresas(){
   var el = document.getElementById("empresas-grid"); if (!el) return;
   var empty = document.getElementById("empresas-empty");
-  loadPartners().then(function(list){
+  /* TAMBIÉN LOS COMERCIOS DEL PROGRAMA DE GRATITUD (14 oct 2026, Social Fest).
+     Una empresa que ofrece un beneficio a los miembros ES una empresa aliada, y
+     la modalidad «Programa de Gratitud» ya existía para estas tarjetas. Se leen
+     de gratitud.json —su única fuente— y NO se copian a partners.json: allí el
+     mapa le pondría un segundo pin a quien ya tiene el suyo desde Gratitud. La
+     tarjeta lleva a su ficha de comercio, que es donde está su beneficio. */
+  Promise.all([loadPartners(), loadGratitud()]).then(function(res){
+    var list = res[0] || [], grat = res[1];
     var html = "", n = 0;
     for (var i=0;i<list.length;i++){
       var p = list[i]; if (p.type !== "company") continue;
@@ -5865,6 +5881,21 @@ function renderEmpresas(){
          ficha, y su web va dentro, en los enlaces. */
       html += '<a class="pcard pcard-emp" href="#empresa/'+encodeURIComponent(p.id)+'">'+inner
         + '<span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
+    }
+    var comercios = (grat && grat.comercios) || [], cats = (grat && grat.categorias) || {};
+    for (var j=0;j<comercios.length;j++){
+      var c = comercios[j]; if (c.status !== "activa") continue;
+      n++;
+      var cat = cats[c.categoria] ? (cats[c.categoria][lang]||cats[c.categoria].es||"") : "";
+      var donde = [cat, c.ciudad || ""].filter(Boolean).join(" · ");
+      var ben = c.beneficio ? (c.beneficio[lang]||c.beneficio.es||"") : "";
+      html += '<a class="pcard pcard-emp" href="#comercio/'+encodeURIComponent(c.id)+'">'
+        + ((c.logo && c.consent && c.consent.logo === true) ? '<img class="pcard-logo" src="'+escapeHtml(c.logo)+'" alt="" loading="lazy">' : '')
+        + '<span class="pcard-body"><b>'+escapeHtml(c.name)+'</b>'
+        + (donde ? '<span class="mu">'+escapeHtml(donde)+'</span>' : '')
+        + '<span class="emp-mods"><span class="emp-mod">'+escapeHtml(t("emp.mod.gratitud"))+'</span></span>'
+        + (ben ? '<span class="emp-recips"><span class="emp-recip"><i>'+escapeHtml(t("emp.card.aporta"))+'</i> '+escapeHtml(ben)+'</span></span>' : '')
+        + '</span><span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
     }
     el.innerHTML = html;
     el.style.display = n ? "" : "none";
@@ -6296,6 +6327,8 @@ function almaFmt(text){
   s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, function(m,l,u){ return '<a href="'+u+'" target="_blank" rel="noopener">'+l+'</a>'; });
   // bare http(s) urls
   s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, function(m,pre,u){ return pre+'<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>'; });
+  // Las páginas del sitio se vuelven botones que cierran el chat y llevan ahí.
+  s = almaEnlacesInternos(s);
   // bold
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   var lines = s.split(/\n/), out = [], i = 0;
@@ -6317,6 +6350,66 @@ function almaFmt(text){
     out.push("<p>"+para.join("<br>")+"</p>");
   }
   return out.join("");
+}
+/* LAS PÁGINAS QUE NOMBRA ALMA SE PUEDEN VISITAR (14 oct 2026). El prompt ya le
+   hacía decir «repórtala en #reportar», pero eso salía como texto: la persona
+   tenía que cerrar el chat y buscar la página. Ahora una dirección con
+   almohadilla que sea una ruta real del sitio —y también un enlace completo a
+   thegiveandgrowproject.org/#ruta— se vuelve un botón que cierra el chat y
+   lleva ahí, en esta misma pestaña. Lo que no es una ruta se queda como texto:
+   nada de enlaces a páginas inventadas. El texto ya llega escapado. */
+function almaNombreRuta(r){
+  if (r === "inicio") return lang === "en" ? "Home" : "Inicio";
+  var m = ROUTE_META[r];
+  var tt = m && m.t ? (m.t[lang] || m.t.es || "") : "";
+  return tt ? tt.split(" · ")[0] : "#" + r;
+}
+function almaBotonRuta(r){
+  return '<a href="#' + r + '" class="alma-ir" data-act="almaIr(\'' + r + '\')">' + escapeHtml(almaNombreRuta(r)) + ' &rarr;</a>';
+}
+function almaEnlacesInternos(s){
+  s = s.replace(/<a href="https?:\/\/(?:www\.)?thegiveandgrowproject\.org\/#([a-z][a-z0-9-]*)" target="_blank" rel="noopener">[^<]*<\/a>/g, function(m, r){
+    return isSpaRoute(r) ? almaBotonRuta(r) : m;
+  });
+  return s.replace(/(^|[\s(«])#([a-z][a-z0-9-]*)(?=$|[\s).,;:!?»])/g, function(m, pre, r){
+    return isSpaRoute(r) ? pre + almaBotonRuta(r) : m;
+  });
+}
+function almaIr(r){
+  almaPanel(false);
+  go(r);
+}
+/* ALMA SE PRESENTA (14 oct 2026, Social Fest). El botón decía «ALMA» y el
+   icono de destellos dice «asistente», pero nadie sabía QUÉ se le puede
+   preguntar ni que lleva a las páginas. Un aviso pequeño junto al botón lo
+   cuenta una vez: aparece a los pocos segundos de la primera visita, se va al
+   cerrarlo o al abrir ALMA, y no vuelve (se recuerda en este navegador). En el
+   teléfono se esconde con los mismos gestos que los botones flotantes: sobre
+   la portada, al bajar, sobre un formulario o con el teclado abierto. */
+var ALMA_INTRO_KEY = "gg-alma-intro", almaIntroTimer = null;
+function almaIntroVisto(){ try { return localStorage.getItem(ALMA_INTRO_KEY) === "1"; } catch (e) { return false; } }
+function almaIntroOcultar(marcar){
+  if (almaIntroTimer){ clearTimeout(almaIntroTimer); almaIntroTimer = null; }
+  if (marcar){ try { localStorage.setItem(ALMA_INTRO_KEY, "1"); } catch (e) {} }
+  var el = document.getElementById("alma-intro");
+  if (!el || el.hidden) return;
+  el.classList.remove("on");
+  el.hidden = true;
+}
+function almaIntro(abrir){
+  almaIntroOcultar(true);
+  if (abrir) almaPanel(true);
+}
+function initAlmaIntro(){
+  if (almaIntroVisto()) return;
+  almaIntroTimer = setTimeout(function(){
+    almaIntroTimer = null;
+    var el = document.getElementById("alma-intro");
+    var p = document.getElementById("alma-panel");
+    if (!el || (p && p.classList.contains("open")) || almaIntroVisto()) return;
+    el.hidden = false;
+    requestAnimationFrame(function(){ el.classList.add("on"); });
+  }, 4500);
 }
 function almaPush(role, html){
   var box = document.getElementById("alma-msgs");
@@ -6355,6 +6448,7 @@ function almaPanel(open){
   if (open){
     // Los chips se arman con la ruta desde la que se abrió: ALMA responde en contexto.
     almaFromRoute = currentRoute || "inicio";
+    almaIntroOcultar(true);
     renderAlmaChips();
     almaLastFocus = document.activeElement;
     p.classList.add("open"); if (s) s.classList.add("open");
@@ -6518,8 +6612,17 @@ function init(){
      los buscadores (ver `RUTAS_INDEXABLES` en worker.js). Al llegar por ahí, la
      dirección vuelve a la forma de siempre, /#ruta, conservando la query (el
      ?lang=en): así los enlaces internos con # siguen funcionando igual. */
-  var rutaPath = (location.pathname.match(/^\/(transparencia|empresas)\/?$/) || [])[1];
-  if (rutaPath && !location.hash) history.replaceState(null, "", "/" + location.search + "#" + rutaPath);
+  var rutaPath = (location.pathname.match(/^\/(transparencia|empresas|socialfest)\/?$/i) || [])[1];
+  /* LAS TRES PUERTAS DE SOCIAL FEST TIENEN DIRECCIÓN (14 oct 2026). El QR del
+     taller va impreso como /socialfest#sf-red, y los correos de seguimiento
+     llevan #sf-empresa y #sf-inversion. Hasta hoy /socialfest era una página
+     intermedia que saltaba a /#socialfest y en el salto se perdía el #sf-red:
+     quien salía del taller caía arriba de la página, no en «Si vienes del
+     taller». Ahora el Worker sirve la SPA en /socialfest y aquí se baja al
+     bloque. Y /#sf-red ya no se resuelve como ruta (era un 404). */
+  var sfAncla = (location.hash.match(/^#sf-(red|empresa|inversion)$/) || [])[1];
+  if (sfAncla) history.replaceState(null, "", "/" + location.search + "#socialfest");
+  else if (rutaPath && !location.hash) history.replaceState(null, "", "/" + location.search + "#" + rutaPath.toLowerCase());
   // routing from hash
   var hash = location.hash.replace("#","") || rutaPorDefecto();
   /* Wompi devuelve al donante a /gracias?id=… — una ruta con path, no con hash.
@@ -6569,6 +6672,9 @@ function init(){
   }
   mmcMarca();
   go(hash, true);
+  /* Se baja DESPUÉS de que esté el idioma: en inglés el diccionario llega
+     después y, al traducir, la página cambia de alto y el salto quedaba corto. */
+  if (sfAncla) ensureLang(lang).then(function(){ setTimeout(function(){ sfIr(sfAncla, true); }, 450); });
   window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||rutaPorDefecto(); go(h, true); });
   // Navegación por delegación (reemplaza inline; CSP fase 1).
   // Ignora elementos que aún conservan onclick inline → migración incremental sin doble disparo.
@@ -6653,6 +6759,7 @@ if ((navigator.language||"").indexOf("en")===0) ensureLang("en");
 initIconDraw();
 initFabHero();
 initFabForms();
+initAlmaIntro();
 initFabScroll();
 
 /* ---------- tema día/noche: automático + preferencia manual ----------
@@ -7610,7 +7717,12 @@ function volEdad(){
   setTimeout(function(){
     var e = document.querySelector('input[name="vf-edad"]:checked');
     var box = document.getElementById("vf-menor");
-    if (box) box.style.display = (e && e.value === "no") ? "" : "none";
+    var menor = e && e.value === "no";
+    if (box) box.style.display = menor ? "" : "none";
+    /* De un menor no se guarda el celular hasta que su acudiente autorice
+       (29 sep 2026): no se le puede exigir un campo que no vamos a guardar. */
+    var tel = document.getElementById("vf-tel");
+    if (tel) tel.required = !menor;
   }, 0);
 }
 
@@ -7653,10 +7765,13 @@ function origenEvento(){
 }
 /* Las dos puertas bajan a su bloque. No son anclas `#sf-empresa`: el hash se
    resolvería como ruta y daría 404 (la misma razón de irAFormFund). */
-function sfIr(cual){
+/* `salto`: al llegar desde un enlace (el QR, un correo) se salta directo, sin
+   animar. Una animación de casi tres mil píxeles al abrir la página no ayuda a
+   nadie, y en una pestaña que carga en segundo plano el navegador ni la corre. */
+function sfIr(cual, salto){
   var s = document.getElementById(cual === "empresa" ? "sf-empresa" : cual === "inversion" ? "sf-inversion" : "sf-red");
   if (!s) return;
-  var suave = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var suave = !salto && (!window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   s.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
   if (cual === "empresa"){
     var p = document.getElementById("sf-razon");
@@ -7749,15 +7864,25 @@ function volSubmit(ev){
   var nivelEl = document.querySelector('input[name="vf-nivel"]:checked');
   if (!val("vf-nombre")) return allyMal(note, "vf-nombre", "vf.err.nombre");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("vf-email"))) return allyMal(note, "vf-email", "vf.err.email");
-  if (!telOk(val("vf-tel"))) return allyMal(note, "vf-tel", "form.err.tel");
-  if (!nivelEl) return allyMal(note, document.querySelector('input[name="vf-nivel"]'), "vf.err.nivel");
   var edadEl = document.querySelector('input[name="vf-edad"]:checked');
+  var menor = !!edadEl && edadEl.value === "no";
+  if (!menor && !telOk(val("vf-tel"))) return allyMal(note, "vf-tel", "form.err.tel");
+  if (!nivelEl) return allyMal(note, document.querySelector('input[name="vf-nivel"]'), "vf.err.nivel");
   if (!edadEl) return allyMal(note, document.querySelector('input[name="vf-edad"]'), "vf.err.edad");
-  var menor = edadEl.value === "no";
   var acuModo = document.querySelector('input[name="vf-acu-modo"]:checked');
   if (menor){
     if (!val("vf-acu-nombre")) return allyMal(note, "vf-acu-nombre", "vf.err.acu");
     if (!val("vf-acu-contacto")) return allyMal(note, "vf-acu-contacto", "vf.err.acu");
+    /* Por ese contacto le llega el enlace para autorizar: tiene que ser un
+       correo o un celular, y no el del propio menor. Misma regla que el
+       servidor (contactoAcudiente en worker.js). */
+    var acuC = val("vf-acu-contacto");
+    var acuMail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(acuC);
+    if (!acuMail && !telOk(acuC)) return allyMal(note, "vf-acu-contacto", "vf.err.acu.contacto");
+    var dig = function(v){ return String(v || "").replace(/[^0-9]/g, "").slice(-10); };
+    if ((acuMail && acuC.toLowerCase() === val("vf-email").toLowerCase()) ||
+        (!acuMail && dig(val("vf-tel")) && dig(acuC) === dig(val("vf-tel"))))
+      return allyMal(note, "vf-acu-contacto", "vf.err.acu.propio");
     if (!acuModo) return allyMal(note, document.querySelector('input[name="vf-acu-modo"]'), "vf.err.acu.modo");
     if (!chk("vf-acu-sabe")) return allyMal(note, "vf-acu-sabe", "vf.err.acu.sabe");
   }
@@ -7774,12 +7899,14 @@ function volSubmit(ev){
       tipo: "voluntario",
       nombre: val("vf-nombre"),
       email: val("vf-email"),
-      telefono: val("vf-tel"),
-      ciudad: val("vf-ciudad"),
+      /* De un menor, hasta que su acudiente autorice, no sale del navegador
+         nada que no haga falta para pedirle esa autorizacion (29 sep 2026). */
+      telefono: menor ? "" : val("vf-tel"),
+      ciudad: menor ? "" : val("vf-ciudad"),
       nivel: nivelEl.value,
       oficio: val("vf-oficio"),
-      disponibilidad: val("vf-disp"),
-      mensaje: val("vf-msg"),
+      disponibilidad: menor ? "" : val("vf-disp"),
+      mensaje: menor ? "" : val("vf-msg"),
       captura: chk("vf-captura"),
       mayor_edad: !menor,
       acudiente_nombre: menor ? val("vf-acu-nombre") : "",
@@ -7800,7 +7927,7 @@ function volSubmit(ev){
       VOL_ORIGEN = null;
       var av = document.getElementById("vf-origen"); if (av) av.style.display = "none";
       btn.disabled = false;
-      allyMsg(note, t("vf.ok"), true);
+      allyMsg(note, t(menor ? "vf.ok.menor" : "vf.ok"), true);
     })
     .catch(function(err){ btn.disabled = false; formFallo(note, err, VF_ERRS, "vf.err.send"); });
   return false;
