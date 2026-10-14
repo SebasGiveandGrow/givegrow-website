@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=67282089">
+<link rel="stylesheet" href="/styles.css?v=5a2ed7df">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=312fbd7e" defer></script>
+<script src="/app.js?v=cd465db7" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1266,6 +1266,19 @@
       <span class="ey" data-i18n="sf.ey">Social Fest 2026 · Ruta N, Medellín</span>
       <h1 class="h-sec" data-i18n="sf.t">Una alianza, muchas realidades.</h1>
       <p class="lead" data-i18n="sf.lead">Somos Give&amp;Grow, una fundación de Medellín que une a empresas, personas y fundaciones de base para que cada apoyo llegue a quien lo necesita y quede documentado.</p>
+      <!-- EL EVENTO EN VIVO (14 oct 2026). Quien escanea la tarjeta o el volante en la
+           mañana no sabía que el taller era ese mismo día. Dos avisos con su ventana
+           en UTC (`data-sf-desde` / `data-sf-hasta`); sfHoy() muestra el que toca al
+           entrar a la ruta y, pasado el 16, ninguno. 20:30Z = 3:30 p. m. en Bogotá. -->
+      <div class="sf-hoy" id="sf-hoy-taller" data-sf-desde="2026-10-14T05:00:00Z" data-sf-hasta="2026-10-14T20:30:00Z" hidden>
+        <span class="sf-hoy-k" data-i18n="sf.hoy.k">Hoy · 2:00 p. m.</span>
+        <span class="sf-hoy-t" data-i18n="sf.hoy.t">Taller «Si no quedó documentado, no ocurrió» · Sala múltiple 3, segundo piso, Ruta N. Sin inscripción.</span>
+      </div>
+      <button type="button" class="sf-hoy sf-hoy-btn" id="sf-hoy-hojas" data-sf-desde="2026-10-14T20:30:00Z" data-sf-hasta="2026-10-17T05:00:00Z" data-act="sfIr('red')" hidden>
+        <span class="sf-hoy-k" data-i18n="sf.hoy2.k">¿Estuviste en el taller?</span>
+        <span class="sf-hoy-t" data-i18n="sf.hoy2.t">Aquí están las tres hojas para descargar.</span>
+        <span class="sf-hoy-f" aria-hidden="true">&darr;</span>
+      </button>
       <div class="sf-puertas">
         <button type="button" class="sf-puerta" data-act="sfIr('empresa')" aria-labelledby="sf-p-emp-k" aria-describedby="sf-p-emp-d">
           <span class="sf-puerta-k" id="sf-p-emp-k" data-i18n="sf.p.emp.k">Soy empresa</span>

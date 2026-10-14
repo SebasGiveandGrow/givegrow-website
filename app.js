@@ -2131,6 +2131,10 @@ var I18N = {
     "sf.err.send":"No pudimos enviar tus datos. Inténtalo de nuevo en un momento.",
     "sf.red.ey":"Para fundaciones y profesionales",
     "sf.red.t":"La evidencia no se construye sola.",
+    "sf.hoy.k":"Hoy · 2:00 p. m.",
+    "sf.hoy.t":"Taller «Si no quedó documentado, no ocurrió» · Sala múltiple 3, segundo piso, Ruta N. Sin inscripción.",
+    "sf.hoy2.k":"¿Estuviste en el taller?",
+    "sf.hoy2.t":"Aquí están las tres hojas para descargar.",
     "sf.red.lead":"Si vienes del taller «Si no quedó documentado, no ocurrió», aquí están las tres hojas y las dos formas de seguir.",
     "sf.hojas.t":"Las hojas del taller",
     "sf.hojas.1.n":"Hoja 1",
@@ -4235,7 +4239,7 @@ function go(id, fromPop){
   renderJourney(id);
   if (id==="impacto") initGallery();
   if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); }
-  if (id==="socialfest") marcarOrigenEvento("socialfest-2026");
+  if (id==="socialfest"){ marcarOrigenEvento("socialfest-2026"); sfHoy(); }
   if (id==="transparencia") pintarFechaImpresion();
   if (id==="caso" && MC.caso) mcPinta();
   if (id==="casas") bcPinta();
@@ -7790,6 +7794,15 @@ function sfIr(cual, salto){
     var p = document.getElementById("sf-razon");
     if (p) setTimeout(function(){ p.focus({ preventScroll: true }); }, suave ? 500 : 0);
   }
+}
+/* El aviso del día (ver el comentario en index.html): cada uno lleva su
+   ventana en UTC y se muestra solo dentro de ella, con la hora del teléfono. */
+function sfHoy(){
+  var ahora = Date.now();
+  [].slice.call(document.querySelectorAll("[data-sf-hasta]")).forEach(function(el){
+    var d = Date.parse(el.getAttribute("data-sf-desde") || "") || 0;
+    el.hidden = !(ahora >= d && ahora < Date.parse(el.getAttribute("data-sf-hasta")));
+  });
 }
 function sfFund(){ irAFormFund(); }
 /* Las horas profesionales son la puerta «Administrativo» de #voluntariado. */
