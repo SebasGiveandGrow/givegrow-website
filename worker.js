@@ -14199,10 +14199,20 @@ function almaContextoEvento() {
   const ahora = enColombia().toISOString();
   const dia = ahora.slice(0, 10);
   if (dia > "2026-10-16") return "";
+  /* El estado del taller lo decide el CÓDIGO, no el modelo. Con «si ya pasaron
+     las 3:30, di que ya ocurrió», Haiku respondió «ya ocurrió» a las 10:13 a. m.
+     del mismo día (medido en producción el 14 oct 2026). Una frase hecha no se
+     puede razonar mal. Las horas, en el reloj de Bogotá (AAAA-MM-DDTHH:MM). */
+  const reloj = ahora.slice(0, 16);
+  const estado = reloj < "2026-10-14T14:00"
+    ? (dia === "2026-10-14" ? "TODAVÍA NO HA EMPEZADO: es HOY a las 2:00 p. m. Invita a venir." : "todavía no ha ocurrido: es el miércoles 14 a las 2:00 p. m.")
+    : reloj < "2026-10-14T15:30"
+      ? "ESTÁ OCURRIENDO EN ESTE MOMENTO (de 2:00 a 3:30 p. m.): quien quiera puede llegar a la sala."
+      : "YA OCURRIÓ (fue el miércoles 14 de 2:00 a 3:30 p. m.): no invites a venir; ofrece las hojas.";
   return `
 
-SOCIAL FEST 2026 (hoy es ${dia}, ${ahora.slice(11, 16)} en Bogotá): Give&Grow participa en el Social Fest 2026, en Ruta N, Medellín, del 14 al 16 de octubre.
-- Miércoles 14 de octubre, de 2:00 a 3:30 p. m., en la Sala múltiple 3, segundo piso de Ruta N: el taller práctico «Si no quedó documentado, no ocurrió», que facilita el fundador de Give&Grow. Es para organizaciones sociales que entregan algo y necesitan poder demostrarlo; cada quien arma el mapa de su evidencia y se lleva plantillas (actas, checklist de consentimiento y el Test del Auditor). No hay que inscribirse. Si ya pasaron las 3:30 p. m. del 14, di que el taller ya ocurrió.
+SOCIAL FEST 2026: Give&Grow participa en el Social Fest 2026, en Ruta N, Medellín, del 14 al 16 de octubre.
+- El taller práctico «Si no quedó documentado, no ocurrió», que facilita el fundador de Give&Grow: miércoles 14 de octubre, de 2:00 a 3:30 p. m., en la Sala múltiple 3, segundo piso de Ruta N. ESTADO DEL TALLER AHORA MISMO: ${estado} Es para organizaciones sociales que entregan algo y necesitan poder demostrarlo; cada quien arma el mapa de su evidencia y se lleva plantillas (actas, checklist de consentimiento y el Test del Auditor). No hay que inscribirse.
 - Las tres hojas del taller se descargan en #socialfest, en la sección para fundaciones y profesionales.
 - Jueves 15: Give&Grow está en la rueda de inversión y en la rueda de voluntariado. Son sesiones con cita que organiza el evento: no las ofrezcas como abiertas al público.
 - Para dejar sus datos a Give&Grow desde el evento, #socialfest tiene tres entradas: empresas (piloto de Impact Journey), fundaciones y profesionales, y financiadores.`;
