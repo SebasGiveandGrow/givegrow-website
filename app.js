@@ -999,7 +999,7 @@ var I18N = {
     "emp.piloto.btn":"Proponer el piloto",
     "emp.aliadas.ey":"Red de empresas aliadas",
     "emp.aliadas.t":"Empresas que crecen dando",
-    "emp.aliadas.lead":"Cada alianza entra con convenio firmado. Aquí verás las empresas que ya suman al impacto — con trazabilidad y reconocimiento.",
+    "emp.aliadas.lead":"Aquí verás las empresas que ya suman al impacto, cada una con lo que aporta y con su autorización para aparecer.",
     "emp.aliadas.empty":"Todavía no hay empresas con convenio firmado. La primera aparecerá aquí el día que firme, con lo que aporta y su reporte.",
     "emp.aliadas.cta":"Quiero aliar mi empresa",
     "emp.card.aporta":"Aporta",
@@ -5838,7 +5838,14 @@ function renderAportantes(){
 function renderEmpresas(){
   var el = document.getElementById("empresas-grid"); if (!el) return;
   var empty = document.getElementById("empresas-empty");
-  loadPartners().then(function(list){
+  /* TAMBIÉN LOS COMERCIOS DEL PROGRAMA DE GRATITUD (14 oct 2026, Social Fest).
+     Una empresa que ofrece un beneficio a los miembros ES una empresa aliada, y
+     la modalidad «Programa de Gratitud» ya existía para estas tarjetas. Se leen
+     de gratitud.json —su única fuente— y NO se copian a partners.json: allí el
+     mapa le pondría un segundo pin a quien ya tiene el suyo desde Gratitud. La
+     tarjeta lleva a su ficha de comercio, que es donde está su beneficio. */
+  Promise.all([loadPartners(), loadGratitud()]).then(function(res){
+    var list = res[0] || [], grat = res[1];
     var html = "", n = 0;
     for (var i=0;i<list.length;i++){
       var p = list[i]; if (p.type !== "company") continue;
@@ -5862,6 +5869,21 @@ function renderEmpresas(){
          ficha, y su web va dentro, en los enlaces. */
       html += '<a class="pcard pcard-emp" href="#empresa/'+encodeURIComponent(p.id)+'">'+inner
         + '<span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
+    }
+    var comercios = (grat && grat.comercios) || [], cats = (grat && grat.categorias) || {};
+    for (var j=0;j<comercios.length;j++){
+      var c = comercios[j]; if (c.status !== "activa") continue;
+      n++;
+      var cat = cats[c.categoria] ? (cats[c.categoria][lang]||cats[c.categoria].es||"") : "";
+      var donde = [cat, c.ciudad || ""].filter(Boolean).join(" · ");
+      var ben = c.beneficio ? (c.beneficio[lang]||c.beneficio.es||"") : "";
+      html += '<a class="pcard pcard-emp" href="#comercio/'+encodeURIComponent(c.id)+'">'
+        + ((c.logo && c.consent && c.consent.logo === true) ? '<img class="pcard-logo" src="'+escapeHtml(c.logo)+'" alt="" loading="lazy">' : '')
+        + '<span class="pcard-body"><b>'+escapeHtml(c.name)+'</b>'
+        + (donde ? '<span class="mu">'+escapeHtml(donde)+'</span>' : '')
+        + '<span class="emp-mods"><span class="emp-mod">'+escapeHtml(t("emp.mod.gratitud"))+'</span></span>'
+        + (ben ? '<span class="emp-recips"><span class="emp-recip"><i>'+escapeHtml(t("emp.card.aporta"))+'</i> '+escapeHtml(ben)+'</span></span>' : '')
+        + '</span><span class="pcard-go" aria-hidden="true">&rarr;</span></a>';
     }
     el.innerHTML = html;
     el.style.display = n ? "" : "none";
