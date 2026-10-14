@@ -968,9 +968,13 @@ async function avisoSinBuzon(env, etiqueta) {
    EL PRESUPUESTO DIARIO DE CORREO
    ========================================================================
 
-   POR QUE EXISTE. El plan de Resend son 100 correos al dia para TODO, y
-   `pay-as-you-go` esta apagado a proposito: pasarse no cuesta dinero, cuesta
-   correos que no salen. Hasta aqui, cuando el cupo se agotaba, los envios
+   POR QUE EXISTE. Hasta octubre de 2026 el plan de Resend era el gratuito: 100
+   correos al dia para TODO, y pasarse no costaba dinero, costaba correos que no
+   salian. Desde el plan Pro (50.000 al mes, sin tope diario) el tope ya no lo
+   pone Resend sino esta red: 1.600 al dia por 31 dias son 49.600, asi que ni
+   el peor mes posible se sale de lo incluido en el plan ni genera cobro extra.
+   Sigue sirviendo para lo mismo de siempre: que un bucle o un abuso no se coma
+   el correo, y que si algun dia se llega al tope, gane quien esta fuera. Hasta aqui, cuando el cupo se agotaba, los envios
    empezaban a fallar en el orden en que llegaban — o sea, al azar— y el unico
    rastro era una fila `fallo` que nadie mira. El recibo de alguien que acababa
    de donar podia perderse para que saliera un aviso interno que el equipo ya
@@ -993,8 +997,8 @@ async function avisoSinBuzon(env, etiqueta) {
    hoy no cupo se reintenta manana en vez de darse por hecho.
 
    EL DIA ES EL DE UTC, como el de Resend. */
-const CORREO_TOPE_DIA = 95;
-const CORREO_RESERVA_PERSONAS = 25;
+const CORREO_TOPE_DIA = 1600;
+const CORREO_RESERVA_PERSONAS = 400;
 
 /* UNA SEGUNDA RESERVA, DENTRO DE LA DE PERSONAS (auditoria del 28 sep 2026).
    La primera protege a quien esta fuera de la organizacion frente a los avisos
@@ -1009,9 +1013,10 @@ const CORREO_RESERVA_PERSONAS = 25;
    etiqueta que deberia estar y no esta, esa etiqueta se comporta como hoy —
    persona normal—, no se queda sin correo.
 
-   Escalones con el tope en 95: internos hasta 70, personas hasta 80, y estas
-   tres hasta 95. */
-const CORREO_RESERVA_PRIORITARIAS = 15;
+   Escalones con el tope en 1.600, en la misma proporcion que tenian con el de
+   95 (70 / 80 / 95): internos hasta 1.200, personas hasta 1.350, y estas
+   cuatro hasta 1.600. */
+const CORREO_RESERVA_PRIORITARIAS = 250;
 /* El codigo para firmar el convenio (0038) entra con ellas: vale 15 minutos, y
    quedarse sin el porque el cupo se lo comieron otros correos deja a alguien a
    mitad de una firma. Son pocos por naturaleza (uno por documento firmado). */
@@ -7413,15 +7418,18 @@ async function correoCasoCreado(env, x) {
    lista, y desde la ficha ya hay un botón para escribirles a mano. */
 const DIAS_ESPERA_AVISO = 7;
 
-/* CUANTOS AVISOS COMO MUCHO POR EJECUCION. El plan de Resend son 100 correos
-   al dia para TODO el sistema —confirmaciones de aporte, enlaces de membresia,
-   los doce avisos internos— asi que el aviso del septimo dia no se puede quedar
-   con la cuota entera. 60 le deja 40 al resto.
+/* CUANTOS AVISOS COMO MUCHO POR EJECUCION. Se fijo cuando el plan de Resend
+   eran 100 correos al dia para TODO el sistema —confirmaciones de aporte,
+   enlaces de membresia, los doce avisos internos—: 60 le dejaba 40 al resto.
+   Con el plan Pro el tope diario es CORREO_TOPE_DIA, pero este numero NO sube:
+   lo que lo limita ahora es Cloudflare, no Resend. En el plan gratuito de
+   Workers cada ejecucion tiene 50 subpeticiones, y las de D1 cuentan.
 
    SIN ESTE TOPE, UNA JORNADA GRANDE LO REVIENTA. Medido en el banco local con
    150 familias cruzando el septimo dia el mismo dia: 150 intentos en una sola
-   ejecucion, seguidos y sin pausa. Las que pasen de 100 las rechaza Resend, y
-   antes de eso el limite de 10 por segundo. Mira Mi Casa nacio para un
+   ejecucion, seguidos y sin pausa. Con el plan gratuito de Resend, las que
+   pasaban de 100 las rechazaba; con cualquier plan, el limite de 10 por
+   segundo. Mira Mi Casa nacio para un
    terremoto: el dia que importe es justo el dia en que llegan de golpe. */
 const AVISOS_POR_EJECUCION = 60;
 
@@ -25470,7 +25478,7 @@ const JORNADA_ABIERTA = ["planeada", "confirmada", "realizada"];
 const RE_CORREO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 /* CUANTOS CORREOS POR CLIC. Cada uno arma un PDF y llama a Resend, y el cupo
-   diario es de 95 para todo el sitio (ver CORREO_TOPE_DIA). Ocho por clic deja
+   diario es uno solo para todo el sitio (ver CORREO_TOPE_DIA). Ocho por clic deja
    la peticion corta y hace visible el gasto: un equipo de treinta son cuatro
    clics, no un barrido que se come el cupo del dia sin que nadie lo vea. */
 const RECONOCIMIENTOS_POR_LLAMADA = 8;
