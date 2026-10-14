@@ -2836,6 +2836,8 @@ section[tabindex="-1"]:focus{ outline:none }
 .sf-hoy-btn:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
 .sf-hoy-f{color:var(--acc);font-size:var(--fs-h4)}
 @media(prefers-reduced-motion:reduce){.sf-hoy-btn{transition:none}}
+.sf-asis{margin:22px 0 30px;max-width:760px}
+.sf-asis[hidden]{display:none}
 .sf-hojas{list-style:none;margin:0;padding:0;border-top:1px solid var(--bd);max-width:760px}
 .sf-hojas li{border-bottom:1px solid var(--bd)}
 .sf-hojas a{display:grid;grid-template-columns:5.5rem 1fr auto;gap:4px 16px;align-items:baseline;padding:14px 2px;color:var(--ink);text-decoration:none}

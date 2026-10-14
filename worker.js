@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "5a2ed7df";
+const STYLES_V = "ed621de3";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -1452,7 +1452,12 @@ async function alertaOperacion(env) {
    el tope es una red, no una puerta — igual que el cupo de correo. */
 /* `encuesta` (0036): una brigada que responde desde el mismo wifi cabe de
    sobra en 40; un script que rellena encuestas, no. */
-const TOPE_IP_DIA = { caso: 40, inscripcion: 20, transferencia: 20, "baja-enlace": 10, encuesta: 40,
+/* EN UN EVENTO TODOS COMPARTEN IP (14 oct 2026). En el Social Fest el wifi del
+   lugar sale por una sola IP: con 20, la inscripción vigésimo primera de la sala
+   —empresa, fundación o profesional— quedaba bloqueada el resto del día. 60 sigue
+   siendo un freno para un script (el de correo, tres en diez minutos, corre
+   aparte), y la asistencia al taller, que no manda correo, tiene su propio tope. */
+const TOPE_IP_DIA = { caso: 40, inscripcion: 60, asistencia: 200, transferencia: 20, "baja-enlace": 10, encuesta: 40,
   /* El convenio en linea (0038): el borrador se autoguarda, de ahi el numero
      alto; los codigos y las firmas, en cambio, son pocos por naturaleza. */
   convenio: 1500, "convenio-archivo": 150, "convenio-codigo": 40, "convenio-firma": 60,
@@ -2136,7 +2141,7 @@ async function apiInscripcion(request, env, url) {
   if (c.web2) return json({ ok: true });
 
   /* Tope diario por IP (ver pasaTopeIP): las seis puertas pasan por aqui. */
-  if (!(await pasaTopeIP(env, request, "inscripcion"))) {
+  if (!(await pasaTopeIP(env, request, c.tipo === "asistente" ? "asistencia" : "inscripcion"))) {
     return json({ error: "demasiados_envios_hoy",
                   ayuda: "Hoy ya recibimos muchas inscripciones desde esta conexión. Inténtalo mañana, " +
                          "o escríbenos si es urgente." }, 429);
@@ -2197,6 +2202,9 @@ async function apiInscripcion(request, env, url) {
      voluntario), y no se le puede exigir un dato que no vamos a guardar. El
      contacto que si se exige es el del acudiente. */
   const menorVol = c.tipo === "voluntario" && c.mayor_edad === false;
+  /* La asistencia al taller es la otra excepción: el contacto es OPCIONAL a
+     propósito, igual que en la hoja de papel. Ver `apiAsistente`. */
+  if (c.tipo === "asistente") return await apiAsistente(env, c);
   if (!menorVol && !telefonoContacto(c.telefono)) {
     return json({ error: "telefono_requerido", ayuda: AYUDA_TEL }, 400);
   }
@@ -17353,6 +17361,49 @@ async function apiLeadEmpresa(env, c) {
   return json({ ok: true, id: ins.meta ? ins.meta.last_row_id : null, acuse });
 }
 
+/* ========================================================================
+   Asistencia al taller del Social Fest  ·  tipo = "asistente"
+   ========================================================================
+   La versión digital de la lista de asistencia de papel (14 oct 2026), para
+   cuando no alcancen los lapiceros: mismas preguntas y misma autorización.
+   · Nombre: obligatorio. Escribirlo autoriza registrar la asistencia.
+   · Correo y WhatsApp: OPCIONALES, y solo se guardan si la persona marcó para
+     qué los deja (las hojas del taller, saber de la red). Sin casilla, el
+     contacto se descarta aquí mismo: no se guarda un dato sin finalidad.
+   · Sin correo de acuse ni aviso interno: la página ya le muestra las hojas, y
+     cuarenta avisos en una hora no le sirven a nadie. Se exporta del panel.
+   · Solo mayores de 18 años, como dice la hoja. */
+const PUERTAS_ASISTENTE = ["F", "E", "P", "D", "O"];
+async function apiAsistente(env, c) {
+  const limpio = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const nombre = limpio(c.nombre, 120);
+  if (!nombre) return json({ error: "nombre_requerido" }, 400);
+  if (!c.autAsistencia || !c.mayorEdad) return json({ error: "autorizacion_requerida" }, 400);
+  const para = { hojas: !!c.hojas, red: !!c.red };
+  const conFin = para.hojas || para.red;
+  let email = conFin ? limpio(c.email, 200) : "";
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+  const tel = conFin ? limpio(c.telefono, 40) : "";
+  if (tel && !telefonoContacto(tel)) return json({ error: "telefono_invalido", ayuda: AYUDA_TEL }, 400);
+  const datos = {
+    formato: "taller",
+    evento: "taller-2026-10-14",
+    organizacion: limpio(c.organizacion, 160),
+    puerta: PUERTAS_ASISTENTE.includes(c.puerta) ? c.puerta : "O",
+    para,
+    origen: "socialfest-2026",
+    idioma: c.idioma === "en" ? "en" : "es"
+  };
+  const ins = await env.DB.prepare(
+    "INSERT INTO inscripciones (tipo, estado, nombre, email, telefono, ciudad, datos) " +
+    "VALUES ('asistente', 'nueva', ?, ?, ?, NULL, ?)"
+  ).bind(nombre, email || null, tel || null, JSON.stringify(datos)).run();
+  const id = ins.meta ? ins.meta.last_row_id : null;
+  await anotarAutorizacion(env, id, "asistente",
+    "sf.asis.aut" + (para.hojas ? " · sf.asis.hojas" : "") + (para.red ? " · sf.asis.red" : ""));
+  return json({ ok: true, id, contacto: !!(email || tel) });
+}
+
 /* Acuse a la empresa del evento. TRES COSAS Y NINGUNA PROMESA DE MÁS:
    · que la conversación sigue, y en qué consiste (conocer al equipo y qué
      áreas podrían abrir sus puertas en la vuelta);
@@ -19396,10 +19447,10 @@ function diaCO(v) {
 const ETIQUETAS_CONTACTO = Object.freeze({
   donante: "Donante", miembro: "Miembro", honor: "Honor", fundacion: "Fundación", empresa: "Empresa",
   voluntario: "Voluntario", ingeniero: "Ingeniero", padrino: "Padrino", especie: "Ofrece en especie",
-  socialfest: "Social Fest", sin_pago: "Intento sin pagar"
+  socialfest: "Social Fest", asistente: "Asistente al taller", sin_pago: "Intento sin pagar"
 });
 const ETIQUETA_DE_TIPO = { fundacion: "fundacion", empresa: "empresa", voluntario: "voluntario",
-  ingeniero: "ingeniero", apadrinamiento: "padrino", especie: "especie" };
+  ingeniero: "ingeniero", apadrinamiento: "padrino", especie: "especie", asistente: "asistente" };
 const TIPOS_SEGUIMIENTO = ["nota", "llamada", "whatsapp", "correo", "reunion", "otro"];
 
 /* ¿Existe la tabla? Para lo que vive en la 0043: si el código llega antes que
@@ -21650,7 +21701,7 @@ async function adminBoardEnviar(request, env, quien) {
 const BUSCA_TOPE = 6;
 const BUSCA_GRUPOS = ["Personas", "Organizaciones", "Aportes", "Carnets", "Casos", "Inscripciones", "Movimientos del banco"];
 const TIPO_INSC_ES = { voluntario: "Voluntario", fundacion: "Fundación", empresa: "Empresa", ingeniero: "Ingeniero",
-  apadrinamiento: "Padrino", especie: "Ofrecimiento en especie" };
+  apadrinamiento: "Padrino", especie: "Ofrecimiento en especie", asistente: "Asistente al taller" };
 
 async function adminBuscar(env, url) {
   const q = String(url.searchParams.get("q") || "").trim().slice(0, 80);

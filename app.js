@@ -2138,6 +2138,28 @@ var I18N = {
     "sf.hoy2.k":"¿Estuviste en el taller?",
     "sf.hoy2.t":"Aquí están las tres hojas para descargar.",
     "sf.red.lead":"Si vienes del taller «Si no quedó documentado, no ocurrió», aquí están las tres hojas y las dos formas de seguir.",
+    "sf.asis.t":"Registra tu asistencia al taller",
+    "sf.asis.lead":"Es la misma lista que circula en papel: si ya la firmaste, no hace falta.",
+    "sf.asis.nombre":"Nombre y apellido",
+    "sf.asis.org":"Organización (o «a título personal»)",
+    "sf.asis.puerta":"Vengo como",
+    "sf.asis.p.f":"Fundación u organización social",
+    "sf.asis.p.e":"Empresa",
+    "sf.asis.p.p":"Profesional o voluntario",
+    "sf.asis.p.d":"Donante o financiador",
+    "sf.asis.p.o":"Otro",
+    "sf.asis.correo":"Correo (opcional)",
+    "sf.asis.tel":"WhatsApp (opcional)",
+    "sf.asis.para":"Si dejas correo o WhatsApp, ¿para qué?",
+    "sf.asis.hojas":"Quiero las hojas del taller",
+    "sf.asis.red":"Quiero saber de la red",
+    "sf.asis.aut":"Autorizo registrar mi asistencia a este taller y soy mayor de 18 años.",
+    "sf.asis.legal":"Tu correo o WhatsApp se usa solo para lo que marcaste, conforme a la Ley 1581 de 2012 y a la Política de Privacidad de Fundación Give&Grow International (NIT 901.948.930-2). Si no marcas ninguna casilla, no lo guardamos. A la organización del evento solo le reportamos cuántas personas vinieron. Para que borremos tus datos: privacidad@thegiveandgrowproject.org.",
+    "sf.asis.btn":"Registrar mi asistencia",
+    "sf.asis.ok":"Listo: quedó registrada tu asistencia. Las hojas del taller están aquí abajo.",
+    "sf.asis.err.nombre":"Escribe tu nombre.",
+    "sf.asis.err.para":"Marca para qué nos dejas tu correo o WhatsApp, o déjalos en blanco.",
+    "sf.asis.err.aut":"Marca la autorización para registrar tu asistencia.",
     "sf.hojas.t":"Las hojas del taller",
     "sf.hojas.1.n":"Hoja 1",
     "sf.hojas.1.t":"Mapa de Rastro y escalera de la evidencia",
@@ -4147,7 +4169,7 @@ var ACT_FNS = {
   mcEnviar:mcEnviar,
   irAVoluntariadoBrigada:irAVoluntariadoBrigada,
   volEdad:volEdad, volIrForm:volIrForm, irAAliadosVoluntariado:irAAliadosVoluntariado, irAAliadosGratitud:irAAliadosGratitud,
-  sfIr:sfIr, sfFund:sfFund, sfPro:sfPro, sfSubmit:sfSubmit,
+  sfIr:sfIr, sfFund:sfFund, sfPro:sfPro, sfSubmit:sfSubmit, asisSubmit:asisSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
   almaIntro:almaIntro, almaIr:almaIr,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
@@ -7805,6 +7827,46 @@ function sfHoy(){
     var d = Date.parse(el.getAttribute("data-sf-desde") || "") || 0;
     el.hidden = !(ahora >= d && ahora < Date.parse(el.getAttribute("data-sf-hasta")));
   });
+}
+/* La asistencia digital al taller (ver index.html, #asis). El contacto es
+   opcional; si no marca para qué lo deja, el servidor no lo guarda, y aquí se le
+   avisa antes para que no crea que quedó. */
+var ASIS_ERRS = {
+  nombre_requerido: ["#as-nombre", "sf.asis.err.nombre"],
+  email_invalido: ["#as-correo", "sf.err.email"],
+  telefono_invalido: ["#as-tel", "form.err.tel"],
+  autorizacion_requerida: ["#as-aut", "sf.asis.err.aut"]
+};
+function asisSubmit(ev){
+  ev.preventDefault();
+  var note = document.getElementById("as-note"), btn = document.getElementById("as-btn");
+  var val = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
+  var chk = function(id){ var e = document.getElementById(id); return e ? e.checked : false; };
+  var f = document.getElementById("asis");
+  if (val("as-web2")){ f.reset(); return allyMsg(note, t("sf.asis.ok"), true); }
+  if (!val("as-nombre")) return allyMal(note, "as-nombre", "sf.asis.err.nombre");
+  var hojas = chk("as-hojas"), red = chk("as-red");
+  var correo = val("as-correo"), tel = val("as-tel");
+  if ((correo || tel) && !hojas && !red) return allyMal(note, "as-hojas", "sf.asis.err.para");
+  if (correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) return allyMal(note, "as-correo", "sf.err.email");
+  if (tel && !telOk(tel)) return allyMal(note, "as-tel", "form.err.tel");
+  if (!chk("as-aut")) return allyMal(note, "as-aut", "sf.asis.err.aut");
+  var p = document.querySelector('input[name="as-puerta"]:checked');
+  btn.disabled = true;
+  allyMsg(note, t("sf.f.sending"), true);
+  fetch("/api/inscripcion", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tipo: "asistente", nombre: val("as-nombre"), organizacion: val("as-org"),
+      puerta: p ? p.value : "O", email: correo, telefono: tel, hojas: hojas, red: red,
+      autAsistencia: true, mayorEdad: true, web2: val("as-web2"),
+      idioma: lang === "en" ? "en" : "es"
+    })
+  }).then(formRespuesta)
+    .then(function(){ f.reset(); btn.disabled = false; allyMsg(note, t("sf.asis.ok"), true); })
+    .catch(function(err){ btn.disabled = false; formFallo(note, err, ASIS_ERRS, "sf.err.send"); });
+  return false;
 }
 function sfFund(){ irAFormFund(); }
 /* Las horas profesionales son la puerta «Administrativo» de #voluntariado. */
