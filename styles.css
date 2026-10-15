@@ -522,7 +522,10 @@ input[type=range]{width:100%;accent-color:var(--brote);margin:8px 0 4px}
 .faq{max-width:760px;margin:0 auto}
 .faq-item{border-bottom:1px solid var(--bd)}
 .faq-q{width:100%;text-align:left;padding:20px 0;font-weight:700;font-size:var(--fs-17);display:flex;justify-content:space-between;align-items:center;color:var(--ink)}
-.faq-q .pm{color:var(--acc-2);font-size:24px;transition:transform .2s}
+/* `.pm` es también el contenedor de /pago/metodo (más abajo, con padding de 34/56):
+   sin anularlo aquí, cada «+» de las preguntas heredaba ese padding y cada pregunta
+   medía 159 px (roto desde el 30 sep 2026, visto el 14 oct). */
+.faq-q .pm{color:var(--acc-2);font-size:24px;transition:transform .2s;padding:0;max-width:none}
 .faq-item.open .faq-q .pm{transform:rotate(45deg)}
 .faq-a{max-height:0;overflow:hidden;transition:max-height .3s var(--ease)}
 .faq-a-in{padding:0 0 20px;color:var(--mu);font-size:var(--fs-15)}
@@ -2838,6 +2841,7 @@ section[tabindex="-1"]:focus{ outline:none }
 @media(prefers-reduced-motion:reduce){.sf-hoy-btn{transition:none}}
 .sf-asis{margin:22px 0 30px;max-width:760px}
 .sf-asis[hidden]{display:none}
+.sf-faq{margin:0 0 30px;max-width:760px}
 .sf-hojas{list-style:none;margin:0;padding:0;border-top:1px solid var(--bd);max-width:760px}
 .sf-hojas li{border-bottom:1px solid var(--bd)}
 .sf-hojas a{display:grid;grid-template-columns:5.5rem 1fr auto;gap:4px 16px;align-items:baseline;padding:14px 2px;color:var(--ink);text-decoration:none}

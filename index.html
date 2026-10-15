@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=ed621de3">
+<link rel="stylesheet" href="/styles.css?v=5927e829">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=04c0200c" defer></script>
+<script src="/app.js?v=f85860a0" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1323,6 +1323,19 @@
         <li data-i18n="sf.pone.3">La logística —transporte, refrigerios—, que acordamos juntos.</li>
       </ul>
 
+      <!-- LO QUE PREGUNTAN LAS EMPRESAS (14 oct 2026). Las respuestas son las de la hoja
+           de preguntas del pitch de la rueda de voluntariado, ya revisadas: lo que sí se
+           dice y cómo. La ficha de la Cámara resumía «ESG» y «sin costo»: aquí va lo exacto. -->
+      <h3 class="sf-sub rv" data-i18n="sf.pq.t">Lo que suelen preguntar las empresas</h3>
+      <div class="faq sf-faq rv">
+          <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="sf.pq.costo.q">¿Cuánto nos cuesta?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="sf.pq.costo.a">No hay cuota de participación ni comisión. Su empresa pone el tiempo del equipo, las puertas abiertas para la vuelta y la logística que acordemos —normalmente transporte y refrigerios—. Todo se acuerda por escrito antes: no hay costos sorpresa.</div></div></div>
+          <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="sf.pq.seguro.q">¿Es seguro para nuestro equipo?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="sf.pq.seguro.a">La ida ocurre donde la fundación trabaja todos los días, en el momento que ella define. Antes hay una sesión de preparación obligatoria —contexto, protocolo, qué esperar— y el transporte y el recorrido se acuerdan por escrito. Si la fundación dice que no es el momento, se aplaza. La cobertura de su gente (ARL o póliza) la confirma su área de seguridad y salud en el trabajo.</div></div></div>
+          <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="sf.pq.menores.q">¿Cómo se cuida a los menores de edad?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="sf.pq.menores.a">Nadie del equipo está a solas con un menor: todo ocurre a la vista del equipo de la fundación. No hay fotos ni video de menores sin la autorización escrita de su acudiente y de la fundación, y en la vuelta los menores van siempre con la fundación. Cada voluntario pasa dos verificaciones: la nuestra y la de la fundación.</div></div></div>
+          <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="sf.pq.reporte.q">¿Qué reporte recibimos?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="sf.pq.reporte.a">Un reporte de la jornada con evidencia: quiénes participaron, horas efectivas, qué se hizo y qué quedó, con acta. Lo observado va agregado y anónimo. Incluye un mapeo de referencia a ODS y GRI para su informe de sostenibilidad; no certificamos ESG ni auditamos su reporte, y no publicamos retorno social (SROI). Cada voluntario recibe certificado de sus horas.</div></div></div>
+          <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="sf.pq.tributario.q">¿Hay beneficio tributario?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="sf.pq.tributario.a">Las horas de voluntariado no son deducibles. Si además su empresa dona a la Fundación, recibe certificado de donación firmado por el Representante Legal y la Revisora Fiscal, y puede dar derecho a descontar en renta el 25 % de lo donado (art. 257 del Estatuto Tributario, con el límite del art. 258). Depende de su situación: que lo confirme su contador. Donar no es condición para el piloto.</div></div></div>
+          <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="sf.pq.directo.q">¿Por qué no hacerlo directo con una fundación?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="sf.pq.directo.a">Pueden, y es válido. Lo que ponemos nosotros es lo que a una fundación pequeña más le cuesta: diseñar la experiencia en las dos vías, preparar a su equipo, el protocolo de cuidado, la coordinación y el reporte con evidencia. La fundación lo recibe sin costo, y el crédito del trabajo sigue siendo suyo.</div></div></div>
+          <div class="faq-item"><button class="faq-q" data-act="toggleFaq(this)" aria-expanded="false"><span data-i18n="sf.pq.piloto.q">¿Ya lo han hecho con empresas?</span><span class="pm">+</span></button><div class="faq-a"><div class="faq-a-in" data-i18n="sf.pq.piloto.a">Es un piloto, y lo decimos: hemos hecho jornadas con donantes y voluntarios individuales; con un equipo de empresa, ustedes estarían entre los primeros. Por eso lo diseñamos juntos, y lo que no funcione también queda por escrito.</div></div></div>
+      </div>
       <form id="sf" class="ally-form" data-submit="sfSubmit(event)">
         <h3 class="ally-sec" data-i18n="sf.f.t">Déjanos tus datos y te escribimos</h3>
         <div class="ally-grid">
@@ -1464,7 +1477,7 @@
           <a class="btn btn-g sf-btn" href="#medicion" data-i18n="sf.inv.me.btn">Ver medición</a>
         </div>
       </div>
-      <p class="rv d3" style="margin-top:22px" data-i18n="sf.inv.docs">¿Necesitas el RUT, el certificado de existencia u otro documento para tu debida diligencia? Escríbenos a contacto@thegiveandgrowproject.org.</p>
+      <p class="rv d3" style="margin-top:22px" data-i18n="sf.inv.docs">¿Financias desde el exterior? Recibimos aportes en dólares por PayPal, a nombre de la Fundación, y reportamos en inglés. ¿Necesitas el RUT, el certificado de existencia u otro documento para tu debida diligencia? Escríbenos a contacto@thegiveandgrowproject.org y te lo enviamos.</p>
     </div>
   </section>
 </main>
