@@ -2095,6 +2095,21 @@
   "sf.asis.err.nombre": "Write your name.",
   "sf.asis.err.para": "Tick what you are leaving your email or WhatsApp for, or leave them blank.",
   "sf.asis.err.aut": "Tick the authorisation to register your attendance.",
+  "sf.pq.t": "What companies usually ask",
+  "sf.pq.costo.q": "How much does it cost us?",
+  "sf.pq.costo.a": "There is no participation fee or commission. Your company provides the team's time, open doors for the return leg and the logistics we agree on —usually transport and refreshments—. Everything is agreed in writing beforehand: no surprise costs.",
+  "sf.pq.seguro.q": "Is it safe for our team?",
+  "sf.pq.seguro.a": "The outbound leg happens where the foundation works every day, at the time it chooses. Before it there is a mandatory preparation session —context, protocol, what to expect— and transport and the route are agreed in writing. If the foundation says it is not the right moment, it is postponed. Your staff's coverage (occupational risk insurance or policy) is confirmed by your health and safety team.",
+  "sf.pq.menores.q": "How are minors protected?",
+  "sf.pq.menores.a": "No one from your team is ever alone with a minor: everything happens in sight of the foundation's staff. There are no photos or video of minors without written authorisation from their guardian and the foundation, and on the return leg minors always come with the foundation. Every volunteer goes through two checks: ours and the foundation's.",
+  "sf.pq.reporte.q": "What report do we get?",
+  "sf.pq.reporte.a": "A report of the volunteer day with evidence: who took part, effective hours, what was done and what remained, with a signed record. What was observed is aggregated and anonymous. It includes a reference mapping to the SDGs and GRI for your sustainability report; we do not certify ESG or audit your report, and we do not publish social return figures (SROI). Each volunteer receives a certificate of hours.",
+  "sf.pq.tributario.q": "Is there a tax benefit?",
+  "sf.pq.tributario.a": "Volunteer hours are not deductible. If your company also donates to the Foundation, it receives a donation certificate signed by the Legal Representative and the Statutory Auditor, which may allow a tax credit of 25% of the amount donated under Colombian law (art. 257 of the Tax Statute, within the limit of art. 258). It depends on your situation: confirm it with your accountant. Donating is not a condition for the pilot.",
+  "sf.pq.directo.q": "Why not go straight to a foundation?",
+  "sf.pq.directo.a": "You can, and it is valid. What we bring is what costs a small foundation the most: designing the experience in both directions, preparing your team, the care protocol, coordination and an evidence-based report. The foundation receives all of it at no cost, and the credit for the work stays theirs.",
+  "sf.pq.piloto.q": "Have you done this with companies?",
+  "sf.pq.piloto.a": "It is a pilot, and we say so: we have run volunteer days with individual donors and volunteers; with a company team, you would be among the first. That is why we design it together, and what does not work is written down too.",
   "sf.hojas.t": "The workshop worksheets",
   "sf.hojas.1.n": "Sheet 1",
   "sf.hojas.1.t": "Trail Map and the evidence ladder",
@@ -2132,5 +2147,5 @@
   "sf.inv.me.t": "How far our claims go",
   "sf.inv.me.p": "Contribution, not attribution: how we measure, what we publish and what we cannot prove yet.",
   "sf.inv.me.btn": "See measurement",
-  "sf.inv.docs": "Need our tax registration (RUT), certificate of existence or another document for your due diligence? Write to contacto@thegiveandgrowproject.org."
+  "sf.inv.docs": "Funding from abroad? We receive contributions in US dollars via PayPal, in the Foundation's name, and we report in English. Need our tax registration (RUT), certificate of incorporation or any other document for your due diligence? Write to contacto@thegiveandgrowproject.org and we will send it."
 }
