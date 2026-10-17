@@ -35,11 +35,11 @@
 <script>/* tema antes del primer render: la preferencia guardada; si no hay, la del dispositivo; y la hora (día 6–18h) solo si el dispositivo no dice nada. La misma cuenta que themeResolve en app.js */
 (function(){var t="light";try{var s=localStorage.getItem("gg-theme");if(s==="light"||s==="dark"){t=s}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches){t="light"}else{var h=new Date().getHours();t=(h>=6&&h<18)?"light":"dark"}}catch(e){}document.documentElement.setAttribute("data-theme",t);if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",document.documentElement.getAttribute("data-marca")==="mmc"?"#07131F":"#0F1613")}})();
 /* LA RUTA ANTES DEL PRIMER RENDER (Social Fest, 7 oct 2026). Quien llega a /#socialfest por el QR veía la portada hasta que corría app.js, y bajaba su foto (262 KB a DPR 3) sin verla. Si el hash es una página conocida, se marca data-ruta y una regla esconde la portada y muestra esa página; go() en app.js quita la marca. La lista la vigila el check #21b: cada nombre tiene que ser una <main id="page-…"> de index.html, si no, la portada se queda y no hay pantalla en blanco. El preload del hero solo se pide cuando la portada es lo que se va a ver: `100vw` aquí y en el <source>, IGUALES, o se baja dos veces. */
-(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1100.webp 1100w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
+(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion teoria-de-cambio socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1100.webp 1100w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=9ca2ee53">
+<link rel="stylesheet" href="/styles.css?v=11a3b770">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=fc8a7fcb" defer></script>
+<script src="/app.js?v=9b04bdee" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1124,6 +1124,7 @@
           </div>
           <p class="med-note mu" data-i18n="med.esc.note">El primer peldaño mide lo entregado; el tercero mediría el valor del cambio producido. No son lo mismo. La materia prima ya existe: ImpactOS registra destino, unidad, acta, entrega y reporte. Lo que falta es la capa de resultados y el rigor metodológico, no los datos.</p>
           <p style="margin-top:14px"><a class="card-link" href="#impactos"><span data-i18n="med.link.os">Ver el registro detrás de cada aporte</span> <span aria-hidden="true">&rarr;</span></a></p>
+          <p style="margin-top:6px"><a class="card-link" href="#teoria-de-cambio"><span data-i18n="med.link.toc">La teoría de cambio y sus doce indicadores</span> <span aria-hidden="true">&rarr;</span></a></p>
         </div>
 
         <div class="os-row">
@@ -1245,6 +1246,209 @@
       <h2 class="h-comp3 rv" data-i18n="med.unlock.t" style="margin-bottom:14px">Antes que presupuesto, el segundo peldaño necesita un profesional</h2>
       <p class="lead rv d1" data-i18n="med.unlock.p" style="margin-left:auto;margin-right:auto">Necesita un profesional. Un psicólogo voluntario podría validar los instrumentos de observación y definir hasta dónde se puede afirmar sin sobre-interpretar. El programa de voluntariado ya tiene el canal para recibirlo, sin pisar territorio si no quiere.</p>
       <div class="rv d2" style="margin-top:24px"><a class="btn btn-w" href="#voluntariado" data-i18n="med.unlock.cta">Aportar mi profesión</a></div>
+    </div>
+  </section>
+</main>
+
+<!-- #teoria-de-cambio (17 oct 2026): la teoría de cambio y los 12 indicadores
+     del sistema MEAL, tal como están en el doc «Teoría de cambio e indicadores»
+     (13 oct 2026), MEDICION.md y METODOLOGIA_MIRA.md. Nada que no esté ahí.
+     SIN CIFRAS a propósito: ni líneas base ni metas 2027 (son propuestas), ni
+     costos. Cada indicador dice solo si ya se mide; el número sale con fecha de
+     corte y fuente cuando exista, o no sale.
+     Reusa .os-rows, .med-tbl, .med-step-s (los tres estados), .med-note y
+     .libro; lo nuevo vive en styles.css bajo «#teoria-de-cambio».
+     Elemento firma: el «Si / Entonces / Porque». -->
+<main id="page-teoria-de-cambio" class="page">
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="toc.ey">Teoría de cambio</span>
+      <h1 class="h-sec rv" data-i18n="toc.t">Cómo esperamos que ocurra el cambio.</h1>
+      <p class="lead rv d1" data-i18n="toc.lead">Esta es la lógica que ordena nuestro trabajo: qué hacemos, qué produce, qué buscamos que cambie y con qué indicadores lo vamos a comprobar. Cada indicador dice si ya se mide o todavía no.</p>
+      <p class="toc-meta mu rv d1" data-i18n="toc.meta">Versión de octubre de 2026 · contribución, no atribución</p>
+      <dl class="toc-si rv d2">
+        <div class="toc-si-f"><dt data-i18n="toc.si.k">Si</dt><dd data-i18n="toc.si.v">verificamos fundaciones de base, canalizamos los aportes con número de guía y compartimos la infraestructura de evidencia,</dd></div>
+        <div class="toc-si-f"><dt data-i18n="toc.ent.k">Entonces</dt><dd data-i18n="toc.ent.v">la ayuda llega completa y se puede demostrar,</dd></div>
+        <div class="toc-si-f"><dt data-i18n="toc.por.k">Porque</dt><dd data-i18n="toc.por.v">el costo fijo de la credibilidad se divide en red.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="toc.prob.ey">El problema</span>
+      <h2 class="h-sec rv" data-i18n="toc.prob.t">La ayuda se pierde, o no se puede demostrar.</h2>
+      <p class="lead rv d1" data-i18n="toc.prob.p">Las fundaciones de base hacen el trabajo, pero no tienen la infraestructura que exigen los donantes —actas, consentimiento, medición, reporte—, y los donantes no tienen cómo saber qué llegó. Give&amp;Grow nace de esa brecha: una tonelada de alimento recaudada, y casi la mitad perdida porque la fundación no tenía cómo almacenarla ni repartirla.</p>
+      <p class="rv d1" style="margin-top:10px"><a class="card-link" href="#origen"><span data-i18n="toc.prob.link">Cómo empezó</span> <span aria-hidden="true">&rarr;</span></a></p>
+      <div class="med-tw rv d2">
+        <table class="med-tbl toc-tbl">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="toc.prob.h1">Quién</th>
+              <th scope="col" data-i18n="toc.prob.h2">Qué le falta hoy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td data-i18n="toc.prob.r1a">Fundaciones de base del HUB SOCIAL</td><td data-i18n="toc.prob.r1b">Infraestructura de evidencia y recursos estables. La credibilidad les cuesta lo mismo para 20 personas que para 2.000.</td></tr>
+            <tr><td data-i18n="toc.prob.r2a">Las comunidades que ellas atienden</td><td data-i18n="toc.prob.r2b">Que la ayuda llegue completa, a tiempo y con dignidad.</td></tr>
+            <tr><td data-i18n="toc.prob.r3a">Donantes y empresas</td><td data-i18n="toc.prob.r3b">Saber a dónde fue su aporte y poder reportarlo en ODS, GRI o ESG.</td></tr>
+            <tr><td data-i18n="toc.prob.r4a">Familias afectadas por emergencias</td><td data-i18n="toc.prob.r4b">Respuesta rápida y, después, un camino para reparar su casa.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="toc.cad.ey">La cadena</span>
+      <h2 class="h-sec rv" data-i18n="toc.cad.t">De lo que hacemos a lo que buscamos.</h2>
+      <p class="lead rv d1" data-i18n="toc.cad.p">Cinco actividades, cinco productos, cuatro resultados y un impacto. Las actividades y los productos dependen de nosotros; los resultados y el impacto son contribución compartida con las fundaciones aliadas, que hacen el trabajo en territorio.</p>
+      <div class="toc-chain rv d2">
+        <div class="toc-grp">
+          <p class="toc-grp-k" data-i18n="toc.cad.ctl">Depende de nosotros</p>
+          <div class="toc-cols">
+            <div class="toc-col">
+              <h3 class="toc-col-t" data-i18n="toc.cad.c1">Actividades</h3>
+              <ul class="toc-list">
+                <li data-i18n="toc.cad.a1">Verificar y vincular fundaciones al HUB SOCIAL</li>
+                <li data-i18n="toc.cad.a2">Canalizar donaciones con número de guía</li>
+                <li data-i18n="toc.cad.a3">Operar jornadas e Impact Journey</li>
+                <li data-i18n="toc.cad.a4">Responder a emergencias y operar Mira Mi Casa</li>
+                <li data-i18n="toc.cad.a5">Compartir actas, consentimiento y reporte</li>
+              </ul>
+            </div>
+            <div class="toc-col">
+              <h3 class="toc-col-t" data-i18n="toc.cad.c2">Productos</h3>
+              <ul class="toc-list">
+                <li data-i18n="toc.cad.p1">Fundaciones con convenio firmado</li>
+                <li data-i18n="toc.cad.p2">Unidades entregadas con acta firmada</li>
+                <li data-i18n="toc.cad.p3">Horas de voluntariado y capacidad transferida</li>
+                <li data-i18n="toc.cad.p4">Familias atendidas y casas con concepto técnico</li>
+                <li data-i18n="toc.cad.p5">Aportes con rastreo completo publicado</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="toc-grp is-con">
+          <p class="toc-grp-k" data-i18n="toc.cad.con">Contribución compartida</p>
+          <div class="toc-cols">
+            <div class="toc-col">
+              <h3 class="toc-col-t" data-i18n="toc.cad.c3">Resultados</h3>
+              <ul class="toc-list">
+                <li data-i18n="toc.cad.r1">Las fundaciones suben en la escalera de la evidencia</li>
+                <li data-i18n="toc.cad.r2">Menos pérdida: la ayuda llega completa y a tiempo</li>
+                <li data-i18n="toc.cad.r3">Donantes y empresas repiten y reportan</li>
+                <li data-i18n="toc.cad.r4">Las familias reparan su casa con orden y seguridad</li>
+              </ul>
+            </div>
+            <div class="toc-col is-imp">
+              <h3 class="toc-col-t" data-i18n="toc.cad.c4">Impacto</h3>
+              <p class="toc-imp" data-i18n="toc.cad.imp">Comunidades vulnerables con más bienestar, y confianza en el acto de dar.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3 class="h-comp3 toc-sub rv" data-i18n="toc.sup.t">Los supuestos</h3>
+      <p class="toc-prose rv" data-i18n="toc.sup.p">La cadena se sostiene si se cumplen cuatro condiciones. Si una falla —por ejemplo, que las fundaciones no documenten—, se rompe entre productos y resultados, y eso es lo primero que miden los indicadores.</p>
+      <ul class="vol-care rv">
+        <li data-i18n="toc.sup.1">Las fundaciones aceptan documentar.</li>
+        <li data-i18n="toc.sup.2">Los donantes valoran la trazabilidad por encima del costo.</li>
+        <li data-i18n="toc.sup.3">Hay voluntarios profesionales: ingenieros, abogados, contadores.</li>
+        <li data-i18n="toc.sup.4">El contexto de seguridad permite llegar.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="toc.ind.ey">Los indicadores</span>
+      <h2 class="h-sec rv" data-i18n="toc.ind.t">Cuatro líneas, doce indicadores.</h2>
+      <p class="lead rv d1" data-i18n="toc.ind.p">Ocho son de producto: dependen de nosotros y se pueden verificar. Cuatro son de resultado y se leen como contribución. Cada uno nombra su fuente, y ninguno publica cifra todavía: un número sale con su fecha de corte y su fuente, o no sale.</p>
+      <dl class="toc-ley rv d1">
+        <div class="toc-ley-f"><dt><span class="med-step-s is-on" data-i18n="toc.est.on">Ya se mide</span></dt><dd data-i18n="toc.est.on.d">La fuente existe y registra el dato.</dd></div>
+        <div class="toc-ley-f"><dt><span class="med-step-s is-wip" data-i18n="toc.est.wip">En parte</span></dt><dd data-i18n="toc.est.wip.d">Hay un registro provisional; falta el definitivo.</dd></div>
+        <div class="toc-ley-f"><dt><span class="med-step-s is-none" data-i18n="toc.est.no">Todavía no</span></dt><dd data-i18n="toc.est.no.d">Falta la fuente, o el tiempo para medirlo.</dd></div>
+      </dl>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l1.k">L1 · HUB SOCIAL</h3>
+          <p class="toc-ln-r" data-i18n="toc.l1.r">Las fundaciones aliadas suben al menos un peldaño en la escalera de la evidencia en 12 meses.</p>
+          <p class="toc-ln-q" data-i18n="toc.l1.q">En territorio: cada fundación, con apoyo de Give&amp;Grow.</p>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">1</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i1.n">Fundaciones con convenio de cooperación firmado y vigente</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i1.f">convenios archivados</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">2</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i2.n">Fundaciones aliadas que suben al menos un peldaño en la escalera de la evidencia</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.res">Resultado</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i2.f">autoevaluación verificada por Give&amp;Grow</span></span><span class="toc-ind-c" data-i18n="toc.f.a">Anual</span></p><p class="toc-ind-x" data-i18n="toc.i2.x">Sin línea base: hacen falta dos autoevaluaciones de cada fundación para poder comparar.</p></div><span class="med-step-s is-none toc-ind-s" data-i18n="toc.est.no">Todavía no</span></li>
+        </ul>
+      </div>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l2.k">L2 · Donaciones trazables</h3>
+          <p class="toc-ln-r" data-i18n="toc.l2.r">Cada aporte llega a su destino con acta firmada, y quien dona lo puede rastrear.</p>
+          <p class="toc-ln-q" data-i18n="toc.l2.q">En territorio: la fundación entrega; Give&amp;Grow registra y publica.</p>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">3</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i3.n">Unidades entregadas con acta firmada: platos, kits, mercados</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i3.f">actas de entrega</span></span><span class="toc-ind-c" data-i18n="toc.f.m">Mensual</span></p><p class="toc-ind-x" data-i18n="toc.i3.x">Se cuentan por tipo de unidad: nunca se suman unidades distintas.</p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">4</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i4.n">Aportes con rastreo completo publicado, del aporte al acta</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i4.f">ImpactOS</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">5</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i5.n">Días promedio entre el aporte y el acta publicada</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i5.f">ImpactOS</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p><p class="toc-ind-x" data-i18n="toc.i5.x">Sin línea base: se calcula cuando haya aportes con acta publicada.</p></div><span class="med-step-s is-none toc-ind-s" data-i18n="toc.est.no">Todavía no</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">6</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i6.n">Donantes que vuelven a aportar dentro de los 12 meses siguientes</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.res">Resultado</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i6.f">ImpactOS</span></span><span class="toc-ind-c" data-i18n="toc.f.a">Anual</span></p><p class="toc-ind-x" data-i18n="toc.i6.x">Necesita que pasen 12 meses desde el primer aporte: no habrá datos antes de 2027.</p></div><span class="med-step-s is-none toc-ind-s" data-i18n="toc.est.no">Todavía no</span></li>
+        </ul>
+      </div>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l3.k">L3 · Impact Journey y voluntariado</h3>
+          <p class="toc-ln-r" data-i18n="toc.l3.r">Empresas y profesionales aportan capacidad que la red no puede pagar sola.</p>
+          <p class="toc-ln-q" data-i18n="toc.l3.q">En territorio: los voluntarios, con la fundación anfitriona.</p>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">7</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i7.n">Horas de voluntariado efectivas, con registro de jornada</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i7.f">registro de jornada</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">8</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i8.n">Empresas con al menos una jornada de Impact Journey</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i8.f">registro de jornada</span></span><span class="toc-ind-c" data-i18n="toc.f.s">Semestral</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+        </ul>
+      </div>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l4.k">L4 · Emergencias y Mira Mi Casa</h3>
+          <p class="toc-ln-r" data-i18n="toc.l4.r">Las familias afectadas reciben ayuda rápida y reparan su casa con un concepto técnico, en orden.</p>
+          <p class="toc-ln-q" data-i18n="toc.l4.q">En territorio: brigadas, ingenieros voluntarios y aliados.</p>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">9</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i9.n">Toneladas de ayuda humanitaria entregadas con acta</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i9.f">actas de entrega e inventario de carga</span></span><span class="toc-ind-c" data-i18n="toc.f.e">Por emergencia</span></p><p class="toc-ind-x" data-i18n="toc.i9.x">Mientras las actas están en revisión, lo despachado se publica como estimado según el inventario de carga, nunca como «entregado con acta».</p></div><span class="med-step-s is-wip toc-ind-s" data-i18n="toc.est.wip">En parte</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">10</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i10.n">Casas con concepto técnico emitido en Mira Mi Casa</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i10.f">triaje de Mira Mi Casa</span></span><span class="toc-ind-c" data-i18n="toc.f.m">Mensual</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">11</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i11.n">Viviendas en reconstrucción y terminadas</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.res">Resultado</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i11.f">acta de entrega de obra</span></span><span class="toc-ind-c" data-i18n="toc.f.m">Mensual</span></p><p class="toc-ind-x" data-i18n="toc.i11.x">Dos cifras separadas: en curso y terminadas.</p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+        </ul>
+      </div>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l5.k">Todas las líneas · rendición de cuentas</h3>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">12</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i12.n">Quejas y retroalimentación respondidas a tiempo</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.res">Resultado</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i12.f">mecanismo de quejas</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p><p class="toc-ind-x" data-i18n="toc.i12.x">El mecanismo de quejas está en construcción: hasta que exista, este indicador no tiene con qué medirse.</p></div><span class="med-step-s is-none toc-ind-s" data-i18n="toc.est.no">Todavía no</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="toc.mira.ey">Lo que la cadena no cuenta todavía</span>
+      <h2 class="h-sec rv" data-i18n="toc.mira.t">El cambio en las personas.</h2>
+      <p class="rv d1" data-i18n="toc.mira.p1">Los doce indicadores cuentan lo que se entrega y lo que cambia en la red. Lo que cambia en una persona —qué cree que es capaz de hacer, si se percibe como actor o como receptor, qué metas aparecen que antes no estaban— lo observa la metodología MIRA, con un registro antes y después del proceso.</p>
+      <p class="rv d1" data-i18n="toc.mira.p2">Es observación pedagógica, no valoración clínica: no tenemos psicólogo en el equipo. No emitimos diagnósticos ni resultados individuales, y cuando quien participa es menor de edad, se necesita la autorización de su acudiente y todo reporte va agregado y anónimo.</p>
+      <p class="rv d1" data-i18n="toc.mira.p3">Tampoco publicamos ninguna razón de retorno social (SROI): no es un cálculo, es un estudio, y todavía no lo tenemos.</p>
+      <p class="toc-links rv d2"><a class="card-link" href="#medicion"><span data-i18n="toc.mira.l1">Los tres peldaños de la medición</span> <span aria-hidden="true">&rarr;</span></a><a class="card-link" href="#voluntariado"><span data-i18n="toc.mira.l2">La metodología MIRA</span> <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="toc.rev.ey">Quién lo revisa</span>
+      <h2 class="h-sec rv" data-i18n="toc.rev.t" style="margin-bottom:14px">Cómo se lee, y quién decide.</h2>
+      <dl class="libro rv d1" style="margin-top:22px">
+        <div class="libro-fila"><dt data-i18n="toc.rev.1k">Fecha de corte y fuente</dt><dd><span data-i18n="toc.rev.1v">Ninguna cifra sin papel: cada número dice hasta cuándo cuenta y qué acta, registro o inventario lo produjo.</span></dd></div>
+        <div class="libro-fila"><dt data-i18n="toc.rev.2k">Junta de Asesores</dt><dd><span data-i18n="toc.rev.2v">Cada trimestre recibe el informe de estos indicadores y emite su concepto previo y sus recomendaciones. Asesora: no aprueba ni dirige.</span></dd></div>
+        <div class="libro-fila"><dt data-i18n="toc.rev.3k">Quién decide</dt><dd><span data-i18n="toc.rev.3v">El máximo órgano de dirección que definen los estatutos (hoy, el fundador), con Representante Legal y Revisora Fiscal. La Fundación no tiene junta directiva.</span></dd></div>
+      </dl>
+      <p class="rv d2" style="margin-top:18px"><a class="card-link" href="#transparencia"><span data-i18n="toc.rev.link">Gobernanza y documentos públicos</span> <span aria-hidden="true">&rarr;</span></a></p>
     </div>
   </section>
 </main>
@@ -2280,6 +2484,7 @@
     <div class="wrap prose">
       <h2 class="h-sec rv" data-i18n="transp.trace.t">Trazabilidad de cada aporte</h2>
       <p class="rv d1" data-i18n="transp.trace.p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega. Si pides certificado de donación, se emite revisado y firmado.</p>
+      <p class="rv d2" style="margin-top:10px"><a class="card-link" href="#teoria-de-cambio"><span data-i18n="transp.toc.link">Teoría de cambio: qué medimos y qué todavía no</span> <span aria-hidden="true">&rarr;</span></a></p>
     </div>
   </section>
 
