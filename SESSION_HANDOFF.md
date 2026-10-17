@@ -27,6 +27,7 @@
 
 - **Producción al día con `main`** (último: #599, /socialfest «después del evento»).
 - **PR abiertos:**
+  - Canal de quejas (`claude/canal-quejas`, migración 0046): SIN automerge. Aplicar la 0046 desde la rama ANTES de fusionar. Punto focal y plazo quedan como parámetros vacíos hasta que Sebas los decida.
   - #584: código por ruta. Esperaba a que pasara el Social Fest; hay que ponerlo al día con `main` antes de fusionarlo.
   - #530: términos de donación. Espera revisión legal.
 - **Social Fest 2026 (14–16 oct, Ruta N) terminó.**
