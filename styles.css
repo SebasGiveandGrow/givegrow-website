@@ -2853,6 +2853,17 @@ section[tabindex="-1"]:focus{ outline:none }
 @media(max-width:560px){.sf-hojas a{grid-template-columns:4.6rem 1fr}.sf-hoja-m{grid-column:2}}
 .sf-hojas-nota{margin-top:12px;color:var(--mu);font-size:var(--fs-15);line-height:1.5;max-width:62ch}
 @media(prefers-reduced-motion:reduce){.sf-puerta{transition:none}}
+/* Resultados del taller (17 oct 2026): la gramática de .libro —regla fuerte
+   arriba, fina entre asientos, sin caja— con la cifra en Unbounded. Solo
+   --ink/--mu/--bd: se leen igual de día y de noche, sin pasar por --g. */
+.sf-res-l{margin:28px 0 0;border-top:1.5px solid var(--ink);max-width:860px}
+.sf-res-f{display:grid;grid-template-columns:minmax(9.5rem,26%) 1fr;gap:4px 24px;align-items:baseline;padding:16px 0;border-bottom:1px solid var(--bd)}
+.sf-res-l dt{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h2);line-height:1;letter-spacing:var(--tr-display);color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sf-res-de{font-size:var(--fs-15);font-weight:600;letter-spacing:0;color:var(--mu)}
+.sf-res-l dd{margin:0;font-size:var(--fs-17);line-height:1.45;color:var(--ink-soft);max-width:52ch}
+.sf-res-nota{margin-top:14px;color:var(--mu);font-size:var(--fs-13);line-height:1.5;max-width:62ch}
+.sf-res-cierre{margin-top:26px;color:var(--ink-soft);line-height:1.55;max-width:62ch}
+@media(max-width:520px){.sf-res-f{grid-template-columns:1fr;gap:6px}}
 
 /* ===== PRE-SOCIAL FEST (12 oct 2026) ==============================
    Portadas con foto, rutas del HUB en reglas finas, pie compacto en el

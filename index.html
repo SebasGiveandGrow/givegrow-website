@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=5927e829">
+<link rel="stylesheet" href="/styles.css?v=9ca2ee53">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=f85860a0" defer></script>
+<script src="/app.js?v=0180d99f" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1259,11 +1259,14 @@
      o el profesional que sigue a #voluntariado llegan marcados al panel.
      HONESTIDAD: Give&Grow todavía NO ha hecho un Impact Journey con un equipo de
      empresa (sí con donantes individuales), y la vuelta la hizo el fundador antes
-     de que existiera la fundación. Esta página no dice lo contrario. -->
+     de que existiera la fundación. Esta página no dice lo contrario.
+     DESPUÉS DEL EVENTO (17 oct 2026): el evento terminó el 16. La página queda
+     como registro —en pasado— y con lo que sigue vigente: Impact Journey, el
+     HUB SOCIAL, las hojas y la puerta de financiadores. -->
 <main id="page-socialfest" class="page">
   <section class="sf-hero">
     <div class="wrap">
-      <span class="ey" data-i18n="sf.ey">Social Fest 2026 · Ruta N, Medellín</span>
+      <span class="ey" data-i18n="sf.ey">Estuvimos en Social Fest 2026 · Ruta N, Medellín</span>
       <h1 class="h-sec" data-i18n="sf.t">Una alianza, muchas realidades.</h1>
       <p class="lead" data-i18n="sf.lead">Somos Give&amp;Grow, una fundación de Medellín que une a empresas, personas y fundaciones de base para que cada apoyo llegue a quien lo necesita y quede documentado.</p>
       <!-- EL EVENTO EN VIVO (14 oct 2026). Quien escanea la tarjeta o el volante en la
@@ -1296,6 +1299,27 @@
           <span class="sf-puerta-f" aria-hidden="true">&darr;</span>
         </button>
       </div>
+    </div>
+  </section>
+
+  <!-- RESULTADOS DEL TALLER (17 oct 2026, después del evento). Las cifras son
+       las del conteo a mano en la sala, y la nota de método lo dice: es lo que
+       reportaron los asistentes, no una evaluación externa. No añadir cifras
+       que no salgan de ese conteo. Ledger de reglas finas, sin tarjetas. -->
+  <section id="sf-resultados">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="sf.res.ey">Social Fest 2026 · Resultados del taller</span>
+      <h2 class="h-sec rv" data-i18n="sf.res.t">Si no quedó documentado, no ocurrió. Este es el registro.</h2>
+      <p class="lead rv d1" data-i18n="sf.res.lead">Lo que respondieron las personas que vinieron al taller «Si no quedó documentado, no ocurrió», el 14 de octubre de 2026 en Ruta N.</p>
+      <dl class="sf-res-l rv d2">
+        <div class="sf-res-f"><dt>14</dt><dd data-i18n="sf.res.1">personas asistieron: 13 de fundaciones de base y 1 de la Secretaría de Planeación de Medellín.</dd></div>
+        <div class="sf-res-f"><dt>12 <span class="sf-res-de" data-i18n="sf.res.de">de 14</span></dt><dd data-i18n="sf.res.2">dijeron no saber cómo medir, documentar o comunicar su impacto.</dd></div>
+        <div class="sf-res-f"><dt>5 <span class="sf-res-de" data-i18n="sf.res.de">de 14</span></dt><dd data-i18n="sf.res.3">se ven capaces de fortalecer a otras organizaciones en áreas distintas a la medición.</dd></div>
+        <div class="sf-res-f"><dt>14 <span class="sf-res-de" data-i18n="sf.res.de">de 14</span></dt><dd data-i18n="sf.res.4">pidieron saber más de la red, el HUB SOCIAL.</dd></div>
+      </dl>
+      <p class="sf-res-nota rv d2" data-i18n="sf.res.metodo">Método: conteo a mano durante el taller. Es lo que reportaron los asistentes, no una evaluación externa.</p>
+      <p class="sf-res-cierre rv d3" data-i18n="sf.res.cierre">Las hojas 2 y 3 quedaron como tarea para trabajar con cada equipo. Las tres siguen en esta página, para descargar.</p>
+      <button type="button" class="btn btn-o sf-btn rv d3" data-act="sfIr('red')" data-i18n="sf.res.btn">Ir a las hojas del taller</button>
     </div>
   </section>
 
@@ -1375,7 +1399,7 @@
     <div class="wrap">
       <span class="ey rv" data-i18n="sf.red.ey">Para fundaciones y profesionales</span>
       <h2 class="h-sec rv" data-i18n="sf.red.t">La evidencia no se construye sola.</h2>
-      <p class="lead rv d1" data-i18n="sf.red.lead">Si vienes del taller «Si no quedó documentado, no ocurrió», aquí están las tres hojas y las dos formas de seguir.</p>
+      <p class="lead rv d1" data-i18n="sf.red.lead">Si estuviste en el taller «Si no quedó documentado, no ocurrió», aquí están las tres hojas y las dos formas de seguir.</p>
       <!-- ASISTENCIA DIGITAL (14 oct 2026): la misma lista de papel, para cuando no
            alcancen los lapiceros. Solo se ve el día del taller (ventana en UTC,
            la maneja sfHoy). Mismas preguntas y misma autorización que la hoja. -->
