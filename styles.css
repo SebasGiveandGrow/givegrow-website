@@ -1511,8 +1511,19 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
 .don-panel{max-width:620px;padding:32px 32px 24px}
 .confianza{list-style:none;display:flex;flex-wrap:wrap;gap:8px 20px;margin:22px 0 0;padding:14px 0 0;
   border-top:1px solid var(--on-dark-line);font-size:var(--fs-13);color:var(--on-dark-2)}
-.confianza li{display:flex;align-items:center;gap:8px}
-.confianza li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--brote);flex:0 0 auto}
+.confianza li{display:flex;align-items:flex-start;gap:8px}
+/* El punto, a la altura de la PRIMERA línea: la del certificado se parte en dos. */
+.confianza li::before{content:"";width:5px;height:5px;margin-top:.6em;border-radius:50%;background:var(--brote);flex:0 0 auto}
+/* La misma tira fuera del vidrio (17 oct 2026), junto a los demás botones que
+   llevan a Donar: cajas finales, brigada, Mira Mi Casa y la ficha. Sobre papel
+   toma la tinta y el filete del papel. El punto va en --acc y no en --g: --acc
+   se aclara de noche y --g no, y sobre el verde nocturno se perdería. */
+.tira-papel .confianza{margin-top:18px;padding-top:12px;border-top-color:var(--bd);color:var(--mu)}
+.tira-papel .confianza li::before{background:var(--acc)}
+.cta-box .tira-papel .confianza{justify-content:center;max-width:620px;margin-left:auto;margin-right:auto}
+.mmc-donar .tira-papel{align-self:stretch}
+.mmc-donar .tira-papel .confianza{margin-top:6px}
+.ficha-apoyo .tira-papel .confianza{flex-direction:column;gap:6px;margin-top:14px}
 .don-calc{padding-top:48px}
 .rastro-cuerpo{padding-top:40px}
 .rastro-ejemplo{max-width:760px}
