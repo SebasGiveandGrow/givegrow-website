@@ -31,8 +31,8 @@
           "project": "Chefs del Futuro",
           "es": "plato de comida",
           "esPl": "platos de comida",
-          "en": "plate of food",
-          "enPl": "plates of food"
+          "en": "meal",
+          "enPl": "meals"
         },
         {
           "id": "ndf-borboletas",
@@ -153,8 +153,8 @@
         "source": "Nombre y logo ya publicados con autorización previa; galería de baile publicada con consentimiento de jornadas confirmado por el representante legal de Give&Grow (2026-07). Fecha formal del cuestionario de ingreso pendiente."
       },
       "poblacion": {
-        "es": "≈130 niñas y niños",
-        "en": "≈130 children"
+        "es": "≈130 niñas y niños, reportados por la fundación",
+        "en": "≈130 children, as reported by the foundation"
       },
       "profile": {
         "badge": {
@@ -276,8 +276,8 @@
         "source": "Formulario de aplicación al HUB (formulario anterior), 2026-07-09. Autorizó publicación de nombre, logo, descripción y enlaces. No adjuntó fotografías; galería y protección de imagen de menores pendientes."
       },
       "poblacion": {
-        "es": "≈450 niñas, niños y adolescentes",
-        "en": "≈450 children and adolescents"
+        "es": "≈450 niñas, niños y adolescentes, reportados por la fundación",
+        "en": "≈450 children and adolescents, as reported by the foundation"
       },
       "profile": {
         "badge": {
@@ -357,8 +357,8 @@
         "source": "Autorizacion escrita del Representante Legal de Fundacion Ancla Colombia, entregada a Give&Grow y en su poder (17 sep 2026). Cubre nombre, descripcion, enlaces y LOGO. NO cubre fotografias: por eso photos=false, y la galeria queda vacia. No paso por la Seccion 7 del cuestionario —el Representante Legal no pudo diligenciarlo y autorizo por escrito aparte—, asi que `fichas_fundacion` sigue vacia y esa es la via si se quiere ampliar el alcance. El archivo del logo se aloja aqui (/img/ancla_logo.png) y no se enlaza al sitio de la fundacion, que es la regla del esquema. El perfil se amplio el 17 sep 2026 con el brochure institucional 2026 que la fundacion entrego a Give&Grow; NO se uso su pagina dirigida a un donante corporativo por nombre, que es una propuesta comercial suya y no informacion publica. Rastro Ley 1581 en `consentimientos`, sujeto \"aliada ancla\"."
       },
       "poblacion": {
-        "es": "≈25.000–28.000 personas al año",
-        "en": "≈25,000–28,000 people a year"
+        "es": "≈25.000–28.000 personas al año, reportadas por la fundación",
+        "en": "≈25,000–28,000 people a year, as reported by the foundation"
       },
       "profile": {
         "badge": {

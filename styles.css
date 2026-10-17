@@ -522,7 +522,10 @@ input[type=range]{width:100%;accent-color:var(--brote);margin:8px 0 4px}
 .faq{max-width:760px;margin:0 auto}
 .faq-item{border-bottom:1px solid var(--bd)}
 .faq-q{width:100%;text-align:left;padding:20px 0;font-weight:700;font-size:var(--fs-17);display:flex;justify-content:space-between;align-items:center;color:var(--ink)}
-.faq-q .pm{color:var(--acc-2);font-size:24px;transition:transform .2s}
+/* `.pm` es también el contenedor de /pago/metodo (más abajo, con padding de 34/56):
+   sin anularlo aquí, cada «+» de las preguntas heredaba ese padding y cada pregunta
+   medía 159 px (roto desde el 30 sep 2026, visto el 14 oct). */
+.faq-q .pm{color:var(--acc-2);font-size:24px;transition:transform .2s;padding:0;max-width:none}
 .faq-item.open .faq-q .pm{transform:rotate(45deg)}
 .faq-a{max-height:0;overflow:hidden;transition:max-height .3s var(--ease)}
 .faq-a-in{padding:0 0 20px;color:var(--mu);font-size:var(--fs-15)}
@@ -542,7 +545,42 @@ input[type=range]{width:100%;accent-color:var(--brote);margin:8px 0 4px}
 .alma-panel.open{transform:translateX(0);visibility:visible}
 /* Con el panel abierto (aria-modal) la página de atrás no se desplaza. */
 body.alma-lock{overflow:hidden}
-body.alma-lock .alma-fab,body.alma-lock .wa{display:none}
+body.alma-lock .alma-fab,body.alma-lock .wa,body.alma-lock .alma-intro{display:none}
+
+/* ALMA SE PRESENTA (14 oct 2026). Un aviso de papel sobre su botón, con un
+   pico que lo señala; ver initAlmaIntro en app.js. Va encima del botón y no al
+   lado: al lado está la pastilla «ALMA». */
+.alma-intro{
+  position:fixed;right:24px;bottom:164px;z-index:401;
+  width:320px;max-width:calc(100vw - 48px);
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--bd);border-radius:14px;
+  box-shadow:var(--fab-shadow-hover);
+  padding:16px 18px;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .22s var(--ease),transform .22s var(--ease),visibility .22s;
+}
+.alma-intro.on{opacity:1;transform:none}
+.alma-intro[hidden]{display:none}
+.alma-intro::after{
+  content:"";position:absolute;right:22px;bottom:-7px;width:12px;height:12px;
+  background:var(--surface);border-right:1px solid var(--bd);border-bottom:1px solid var(--bd);
+  transform:rotate(45deg);
+}
+.alma-intro-ey{display:block;padding-right:26px;margin-bottom:6px;font:600 11px/1.3 "Inter",sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--g)}
+.alma-intro-t{margin:0 0 6px;font:600 16px/1.3 "Unbounded",sans-serif;letter-spacing:-.01em;text-wrap:balance}
+.alma-intro-p{margin:0 0 12px;font-size:14px;line-height:1.45;color:var(--ink-soft)}
+.alma-intro-b{width:100%;justify-content:center;padding:11px 18px;font-size:14px}
+.alma-intro-x{
+  position:absolute;top:6px;right:6px;width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  border:0;border-radius:8px;background:none;color:var(--mu);
+  font-size:22px;line-height:1;cursor:pointer;
+}
+.alma-intro-x:hover{color:var(--ink);background:var(--bds)}
+.alma-intro-x:focus-visible{outline:2px solid var(--g);outline-offset:2px}
+html[data-theme="dark"] .alma-intro-ey{color:var(--acc)}
+@media(prefers-reduced-motion:reduce){.alma-intro{transition:none;transform:none}}
 .alma-scrim{
   position:fixed;inset:0;z-index:599;background:rgba(14,33,24,.34);
   opacity:0;visibility:hidden;transition:opacity .28s var(--ease),visibility .28s var(--ease);
@@ -576,6 +614,12 @@ body.alma-lock .alma-fab,body.alma-lock .wa{display:none}
   border-right:2px solid var(--acc);padding-right:12px;
 }
 .amsg p{margin:0 0 8px}.amsg p:last-child{margin:0}
+/* Una página del sitio que nombra ALMA: un botón que cierra el chat y lleva
+   ahí (almaEnlacesInternos en app.js). Forma de pastilla, como los chips. */
+.amsg .alma-ir{display:inline-flex;align-items:center;gap:4px;margin:2px 0;padding:3px 11px;border:1px solid var(--g);border-radius:999px;color:var(--g);font-weight:600;text-decoration:none;white-space:nowrap}
+.amsg .alma-ir:hover{background:var(--g);color:var(--on-dark)}
+html[data-theme="dark"] .amsg .alma-ir{border-color:var(--acc);color:var(--acc)}
+html[data-theme="dark"] .amsg .alma-ir:hover{background:var(--acc);color:var(--ink-deep)}
 .alma-in{display:flex;gap:8px;padding:14px 22px;border-top:1px solid var(--bd)}
 #alma-input{
   flex:1;min-width:0;background:var(--bg);border:1px solid var(--bd);color:var(--ink);
@@ -763,7 +807,7 @@ html[data-theme="dark"] .wa span,html[data-theme="dark"] .alma-fab span{backgrou
   .nav-mobile a{padding:12px;border-radius:8px;font-weight:600}
   .nav-mobile a:hover{background:var(--gl)}
   /* con el menú abierto, ocultar flotantes para que no tapen los ítems */
-  body.menu-open .wa, body.menu-open .alma-fab{display:none!important}
+  body.menu-open .wa, body.menu-open .alma-fab, body.menu-open .alma-intro{display:none!important}
   .gallery,#blog-grid{grid-template-columns:1fr}
   .g2,.g3{grid-template-columns:repeat(2,1fr)}
   .stats{grid-template-columns:repeat(2,1fr)}
@@ -1392,6 +1436,11 @@ a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible
   body.fab-foco .wa,body.fab-foco .alma-fab,
   body.fab-scroll .wa,body.fab-scroll .alma-fab{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px)}
   .alma-fab svg{width:23px;height:23px}
+  /* El aviso de ALMA, sobre su botón (abajo a la izquierda) y del ancho de la
+     pantalla menos los márgenes; se esconde con los mismos gestos que él. */
+  .alma-intro{left:18px;right:18px;bottom:calc(82px + env(safe-area-inset-bottom));width:auto;max-width:none}
+  .alma-intro::after{left:20px;right:auto}
+  body.hero-vista .alma-intro,body.fab-form .alma-intro,body.fab-foco .alma-intro,body.fab-scroll .alma-intro{opacity:0;visibility:hidden;pointer-events:none}
   /* Sin etiqueta: en táctil no hay hover que la dispare y estorbaría. */
   .wa span,.alma-fab span{display:none}
   /* El pie reserva el alto de los círculos (18 + 52 + aire = 88px): al llegar al
@@ -2134,7 +2183,7 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
   html, body { background:#fff !important; color:#111 !important; }
 
   /* Fuera del papel: nada de esto sirve impreso y todo estorba. */
-  nav, .nav, footer, #journey-nav, .alma-fab, #alma-panel, .wa,
+  nav, .nav, footer, #journey-nav, .alma-fab, .alma-intro, #alma-panel, .wa,
   .skip-link, .drawer, .theme-toggle, .lang, .pay-tabs, .track-noguide,
   form, button, input, select, textarea { display:none !important; }
 
@@ -2781,7 +2830,40 @@ section[tabindex="-1"]:focus{ outline:none }
 .sf-lista{margin:0;padding-left:20px;color:var(--ink-soft);line-height:1.6;max-width:62ch}
 .sf-lista li{margin-bottom:6px}
 .sf-btn{margin-top:14px}
+.sf-hoy{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;width:100%;margin-top:22px;padding:14px 18px;border:1px solid var(--acc);border-radius:var(--r);background:var(--surface);color:var(--ink);font:inherit;text-align:left}
+.sf-hoy[hidden]{display:none}
+.sf-hoy-k{font-family:var(--font-display);font-weight:600;color:var(--acc)}
+.sf-hoy-t{flex:1 1 16rem;line-height:1.45}
+.sf-hoy-btn{cursor:pointer;transition:border-color .2s var(--ease)}
+.sf-hoy-btn:hover .sf-hoy-t{text-decoration:underline;text-underline-offset:3px}
+.sf-hoy-btn:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+.sf-hoy-f{color:var(--acc);font-size:var(--fs-h4)}
+@media(prefers-reduced-motion:reduce){.sf-hoy-btn{transition:none}}
+.sf-asis{margin:22px 0 30px;max-width:760px}
+.sf-asis[hidden]{display:none}
+.sf-faq{margin:0 0 30px;max-width:760px}
+.sf-hojas{list-style:none;margin:0;padding:0;border-top:1px solid var(--bd);max-width:760px}
+.sf-hojas li{border-bottom:1px solid var(--bd)}
+.sf-hojas a{display:grid;grid-template-columns:5.5rem 1fr auto;gap:4px 16px;align-items:baseline;padding:14px 2px;color:var(--ink);text-decoration:none}
+.sf-hojas a:hover .sf-hoja-t{color:var(--acc);text-decoration:underline;text-underline-offset:3px}
+.sf-hojas a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.sf-hoja-n{font-family:var(--font-display);font-weight:600;color:var(--acc)}
+.sf-hoja-t{font-weight:600;line-height:1.4}
+.sf-hoja-m{font-size:var(--fs-14);color:var(--mu);white-space:nowrap}
+@media(max-width:560px){.sf-hojas a{grid-template-columns:4.6rem 1fr}.sf-hoja-m{grid-column:2}}
+.sf-hojas-nota{margin-top:12px;color:var(--mu);font-size:var(--fs-15);line-height:1.5;max-width:62ch}
 @media(prefers-reduced-motion:reduce){.sf-puerta{transition:none}}
+/* Resultados del taller (17 oct 2026): la gramática de .libro —regla fuerte
+   arriba, fina entre asientos, sin caja— con la cifra en Unbounded. Solo
+   --ink/--mu/--bd: se leen igual de día y de noche, sin pasar por --g. */
+.sf-res-l{margin:28px 0 0;border-top:1.5px solid var(--ink);max-width:860px}
+.sf-res-f{display:grid;grid-template-columns:minmax(9.5rem,26%) 1fr;gap:4px 24px;align-items:baseline;padding:16px 0;border-bottom:1px solid var(--bd)}
+.sf-res-l dt{font-family:var(--font-display);font-weight:700;font-size:var(--fs-h2);line-height:1;letter-spacing:var(--tr-display);color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sf-res-de{font-size:var(--fs-15);font-weight:600;letter-spacing:0;color:var(--mu)}
+.sf-res-l dd{margin:0;font-size:var(--fs-17);line-height:1.45;color:var(--ink-soft);max-width:52ch}
+.sf-res-nota{margin-top:14px;color:var(--mu);font-size:var(--fs-13);line-height:1.5;max-width:62ch}
+.sf-res-cierre{margin-top:26px;color:var(--ink-soft);line-height:1.55;max-width:62ch}
+@media(max-width:520px){.sf-res-f{grid-template-columns:1fr;gap:6px}}
 
 /* ===== PRE-SOCIAL FEST (12 oct 2026) ==============================
    Portadas con foto, rutas del HUB en reglas finas, pie compacto en el

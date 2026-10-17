@@ -1,7 +1,8 @@
 # .clauderules — Give&Grow
 
 Reglas permanentes para cualquier asistente que trabaje en este repositorio.
-Léelas junto con `DESIGN_SYSTEM.md` y `SESSION_HANDOFF.md` antes de tocar código.
+Léelas junto con `DESIGN_SYSTEM.md` y `SESSION_HANDOFF.md` (corto, el estado vigente) antes de tocar código.
+La historia vieja está en `ops/historial/`: se consulta por sección, nunca entera.
 
 ## No negociable
 - **Nunca tumbar el sitio.** Verificar render antes y después de cada deploy.
