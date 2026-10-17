@@ -64,5 +64,11 @@
 /app.js
   Cache-Control: public, max-age=31536000, immutable
 
+# El código que app.js carga por ruta (js/mmc.js, js/pago.js, js/impacto.js).
+# Mismo plazo que app.js porque se piden con el mismo cache-bust: su md5 va en
+# MODULOS_V de app.js y el check #27 del gate lo exige.
+/js/*
+  Cache-Control: public, max-age=31536000, immutable
+
 /styles.css
   Cache-Control: public, max-age=31536000, immutable
