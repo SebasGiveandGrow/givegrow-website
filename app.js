@@ -2352,7 +2352,7 @@ var I18N = {
     "toc.rev.1k":"Fecha de corte y fuente",
     "toc.rev.1v":"Ninguna cifra sin papel: cada número dice hasta cuándo cuenta y qué acta, registro o inventario lo produjo.",
     "toc.rev.2k":"Junta de Asesores",
-    "toc.rev.2v":"Cada trimestre recibe el informe de estos indicadores y emite su concepto previo y sus recomendaciones. Asesora: no aprueba ni dirige.",
+    "toc.rev.2v":"Recibirá el informe trimestral de estos indicadores para emitir su concepto previo y sus recomendaciones. Asesora: no aprueba ni dirige.",
     "toc.rev.3k":"Quién decide",
     "toc.rev.3v":"El máximo órgano de dirección que definen los estatutos (hoy, el fundador), con Representante Legal y Revisora Fiscal. La Fundación no tiene junta directiva.",
     "toc.rev.link":"Gobernanza y documentos públicos",
