@@ -205,11 +205,64 @@ document.addEventListener("click", function(e){
 
 /* Mapa día/noche: los tiles siguen el tema del sitio (v5 "mapa vivo") */
 var GG_MAP=null, GG_TILE=null;
+/* Lo que el mapa escribe con `t()` —leyenda, resumen y la ventanita de cada
+   pin— no lleva `data-i18n`: sin guardarlo aquí, al cambiar de idioma se
+   quedaba en el que tenía al abrirse. Lo repinta `mapaIdioma`. */
+var GG_MAP_N=null, GG_MAP_LEYENDA=null, GG_MAP_PINES=[];
 function ggTileUrl(){
   var dark = document.documentElement.getAttribute("data-theme")==="dark";
   return "https://{s}.basemaps.cartocdn.com/"+(dark?"dark_all":"light_all")+"/{z}/{x}/{y}{r}.png";
 }
 function ggMapTiles(){ if (GG_TILE) GG_TILE.setUrl(ggTileUrl()); }
+function mapaPopup(pt){
+  var area = pt.area ? (pt.area[lang]||pt.area.es||"") : (pt.areaKey ? t(pt.areaKey) : "");
+  var html="<b>"+escapeHtml(pt.name)+"</b>"+(area?("<br>"+escapeHtml(area)):"");
+  if (pt.type==="company"){
+    if (pt.direccion) html += "<br>"+escapeHtml(pt.direccion);
+    /* Los pines de empresa traían `ficha` solo si venían de Gratitud; una
+       empresa aliada de partners.json con coordenadas enlazaba a «undefined».
+       «Ver beneficio» solo para las de Gratitud, que son las que tienen uno:
+       la ficha de una empresa aliada dice qué aporta, no un descuento. */
+    html += '<br><a href="'+escapeHtml(pt.ficha || ("#empresa/"+encodeURIComponent(pt.id)))+'">'+t(pt.ficha ? "map.biz" : "map.ficha")+"</a>";
+    if (pt.direccion) html += ' &middot; <a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(pt.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+"</a>";
+  } else if (pt.url){
+    html += '<br><a href="'+escapeHtml(pt.url)+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>";
+  }
+  return html;
+}
+/* Los tres colores salen de los tokens y no escritos a mano: así la leyenda y
+   los pines no pueden separarse, y el ámbar cambia con el modo noche igual que
+   el resto del sitio. Mismas palabras que los filtros (`map.leg.*`). */
+function mapaLeyenda(){
+  if (!GG_MAP_LEYENDA) return;
+  GG_MAP_LEYENDA.innerHTML='<span><i class="gg-dot" style="background:var(--gm)"></i>'+t("map.leg.f")+"</span>"
+             +'<span><i class="gg-dot" style="background:var(--amber)"></i>'+t("map.leg.c")+"</span>"
+             +'<span><i class="gg-dot" style="background:var(--g)"></i>'+t("map.leg.hub")+"</span>";
+}
+/* EL RESUMEN, contado de los datos reales y con la gramática de cada idioma:
+   «1 fundación aliada», nunca «fundación(es)»; un grupo en cero no se nombra
+   («reúne 0 empresas aliadas» se lee como un fallo, no como un dato), y el HUB
+   va sin número porque es uno solo por definición. Mismos sustantivos que el
+   filtro y la leyenda: «empresas aliadas», también para los comercios de
+   Gratitud, que salen en esa misma red. */
+function mapaResumen(){
+  var el = document.getElementById("map-summary");
+  if (!el || !GG_MAP_N) return;
+  var n = GG_MAP_N, partes = [];
+  var frase = function(c, k){ return c + " " + t("map.noun." + k + "." + (c === 1 ? "one" : "many")); };
+  if (n.foundation) partes.push(frase(n.foundation, "f"));
+  if (n.company) partes.push(frase(n.company, "c"));
+  if (n.hub) partes.push(t("map.noun.h"));
+  if (!partes.length){ el.textContent = ""; return; }
+  var lista = partes.length === 1 ? partes[0]
+    : partes.slice(0, -1).join(", ") + t("map.y") + partes[partes.length - 1];
+  el.textContent = t("map.sum").replace("{lista}", lista);
+}
+function mapaIdioma(){
+  mapaLeyenda();
+  mapaResumen();
+  for (var i=0;i<GG_MAP_PINES.length;i++) GG_MAP_PINES[i].mk.setPopupContent(mapaPopup(GG_MAP_PINES[i].pt));
+}
 function initMap(){
   var box = document.getElementById("map-box");
   if (!box || box.dataset.done) return;
@@ -227,19 +280,9 @@ function initMap(){
     var bounds=[];
     for (var i=0;i<list.length;i++){
       var pt=list[i];
-      var area = pt.area ? (pt.area[lang]||pt.area.es||"") : (pt.areaKey ? t(pt.areaKey) : "");
-      var html="<b>"+escapeHtml(pt.name)+"</b>"+(area?("<br>"+escapeHtml(area)):"");
-      if (pt.type==="company"){
-        if (pt.direccion) html += "<br>"+escapeHtml(pt.direccion);
-        /* Los pines de empresa traían `ficha` solo si venían de Gratitud; una
-           empresa aliada de partners.json con coordenadas enlazaba a «undefined». */
-        html += '<br><a href="'+escapeHtml(pt.ficha || ("#empresa/"+encodeURIComponent(pt.id)))+'">'+t("map.biz")+"</a>";
-        if (pt.direccion) html += ' &middot; <a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(pt.direccion+", Colombia")+'" target="_blank" rel="noopener">'+t("com.maps")+"</a>";
-      } else if (pt.url){
-        html += '<br><a href="'+escapeHtml(pt.url)+'" target="_blank" rel="noopener">'+t("map.visit")+"</a>";
-      }
       var lay = layers[pt.type] || layers.foundation;
-      L.marker([pt.lat,pt.lng],{icon:pin(pt.type)}).addTo(lay).bindPopup(html);
+      var mk = L.marker([pt.lat,pt.lng],{icon:pin(pt.type)}).addTo(lay).bindPopup(mapaPopup(pt));
+      GG_MAP_PINES.push({ mk:mk, pt:pt });
       if (counts[pt.type]!=null) counts[pt.type]++;
       bounds.push([pt.lat,pt.lng]);
     }
@@ -247,14 +290,9 @@ function initMap(){
     if (bounds.length>1) map.fitBounds(bounds,{padding:[42,42]});
     var legend=L.control({position:"bottomleft"});
     legend.onAdd=function(){
-      var d=L.DomUtil.create("div","map-legend");
-      /* Los tres colores salen de los tokens y no escritos a mano: así la
-         leyenda y los pines no pueden separarse, y el ámbar cambia con el modo
-         noche igual que el resto del sitio. */
-      d.innerHTML='<span><i class="gg-dot" style="background:var(--gm)"></i>'+t("map.leg.f")+"</span>"
-                 +'<span><i class="gg-dot" style="background:var(--amber)"></i>'+t("map.leg.c")+"</span>"
-                 +'<span><i class="gg-dot" style="background:var(--g)"></i>'+t("map.leg.hub")+"</span>";
-      return d;
+      GG_MAP_LEYENDA=L.DomUtil.create("div","map-legend");
+      mapaLeyenda();
+      return GG_MAP_LEYENDA;
     };
     legend.addTo(map);
     /* Filtros de red + resumen honesto (calculado de los datos reales) */
@@ -279,21 +317,20 @@ function initMap(){
         });
       });
     }
-    var sumEl = document.getElementById("map-summary");
-    if (sumEl){
-      var phrase = function(n, key){ return n + " " + t("map.noun." + key + "." + (n === 1 ? "one" : "many")); };
-      sumEl.textContent = t("map.sum")
-        .replace("{f}", phrase(counts.foundation, "f"))
-        .replace("{c}", phrase(counts.company, "c"))
-        .replace("{h}", phrase(counts.hub, "h"));
-    }
+    GG_MAP_N = counts;
+    mapaResumen();
   }
   function start(){
     Promise.all([loadPartners(), loadGratitud()]).then(function(res){
       var list = (res[0] || []).slice();
       var comercios = (res[1] && res[1].comercios) || [];
+      /* Una empresa puede estar en partners.json Y en Gratitud (su modalidad
+         'gratitud'): con el mismo id es la misma, y se cuenta una vez. */
+      var ya = {};
+      for (var j=0;j<list.length;j++) if (list[j].id) ya[list[j].id] = true;
       for (var i=0;i<comercios.length;i++){
         var c = comercios[i];
+        if (ya[c.id]) continue;
         if (c.status==="activa" && c.coords && typeof c.coords.lat==="number" && typeof c.coords.lng==="number"){
           list.push({ id:c.id, name:c.name, type:"company", lat:c.coords.lat, lng:c.coords.lng,
             area:{es:c.ciudad||"", en:c.ciudad||""}, ficha:"#comercio/"+c.id, direccion:c.direccion||"" });

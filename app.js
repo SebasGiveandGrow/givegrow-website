@@ -885,9 +885,9 @@ var I18N = {
     "track.btn":"Rastrear",
     "track.noguide":"No tengo mi guía",
     "donar.foto.alt":"Territorio wayuu en la Alta Guajira, con burros de carga bajo los árboles",
-    "donar.conf.1":"NIT 901.948.930-2",
+    "donar.conf.1":"ESAL · NIT 901.948.930-2",
     "donar.conf.2":"Régimen Tributario Especial",
-    "donar.conf.3":"Certificado firmado, si lo pides",
+    "donar.conf.3":"Certificado de donación si lo pides, con la firma del Representante Legal y la Revisora Fiscal",
     "donar.conf.4":"Rastreo con número de guía",
     "franja.ey":"Verifica antes de pagar",
     "franja.1.k":"Entidad",
@@ -1623,10 +1623,12 @@ var I18N = {
     "map.leg.c":"Empresas aliadas",
     "map.leg.hub":"HUB SOCIAL",
     "map.f.all":"Toda la red",
-    "map.sum":"Hoy la red reúne {f}, {c} y {h}. Crece una alianza a la vez.",
+    "map.sum":"Hoy la red reúne {lista}. Crece una alianza a la vez.",
+    "map.y":" y ",
+    "map.ficha":"Ver ficha",
     "map.noun.f.one":"fundación aliada","map.noun.f.many":"fundaciones aliadas",
     "map.noun.c.one":"empresa aliada","map.noun.c.many":"empresas aliadas",
-    "map.noun.h.one":"HUB","map.noun.h.many":"HUB",
+    "map.noun.h":"el HUB SOCIAL",
     "map.biz":"Ver beneficio",
     "com.maps":"Cómo llegar",
     "map.area.med":"Medellín · centro operativo",
@@ -2793,7 +2795,7 @@ function applyLang(l){
      js/impacto.js). Si el archivo no ha llegado, no hay nada pintado que
      traducir: lo que pinte al llegar ya sale en el idioma vigente. */
   if (moduloListo("mmc") && currentRoute === "caso" && MC.caso) mcPinta();
-  if (moduloListo("impacto")) galeriaIdioma();
+  if (moduloListo("impacto")){ galeriaIdioma(); mapaIdioma(); }
   /* Solo si ya hay dato: repintar sin él borraría la fila al cambiar de idioma. */
   if (moduloListo("mmc") && FILA_DATO) filaPinta(FILA_DATO.esperando > 0 ? "hay" : "vacia", FILA_DATO);
 }
@@ -3148,7 +3150,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "c60670f0", impacto: "59f5f70b" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "c60670f0", impacto: "59c96b4d" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto" };
@@ -3310,14 +3312,29 @@ function ensureE404(){
 /* LA FRANJA DE CONFIANZA se escribe una vez, en <template id="tpl-franja">, y
    aquí se copia en cada <div data-franja> (Donar y Hazte miembro). Corre al
    arrancar, ANTES del primer applyLang: así el recorrido de los data-i18n ya
-   alcanza las copias y cambian de idioma solas, sin repintar nada. */
+   alcanza las copias y cambian de idioma solas, sin repintar nada.
+   LA TIRA (<template id="tpl-tira">, 17 oct 2026) va por el mismo camino: es la
+   fila corta que acompaña a los botones que llevan A Donar; la franja, con sus
+   enlaces, es la del punto de pago. */
 function montarFranjas(){
-  var tpl = document.getElementById("tpl-franja");
-  if (!tpl || !tpl.content) return;
-  var slots = document.querySelectorAll("[data-franja]");
-  for (var i=0;i<slots.length;i++){
-    if (!slots[i].firstElementChild) slots[i].appendChild(tpl.content.cloneNode(true));
-  }
+  [["tpl-franja", "[data-franja]"], ["tpl-tira", "[data-tira]"]].forEach(function(par){
+    var tpl = document.getElementById(par[0]);
+    if (!tpl || !tpl.content) return;
+    var slots = document.querySelectorAll(par[1]);
+    for (var i=0;i<slots.length;i++){
+      if (!slots[i].firstElementChild) slots[i].appendChild(tpl.content.cloneNode(true));
+    }
+  });
+}
+/* La tira para lo que se pinta con `t()` y no pasa por montarFranjas (la ficha
+   de una fundación). Las claves salen de la MISMA plantilla, para que las dos
+   no puedan decir cosas distintas. */
+function tiraHtml(){
+  var tpl = document.getElementById("tpl-tira");
+  if (!tpl || !tpl.content) return "";
+  var ks = tpl.content.querySelectorAll("[data-i18n]"), li = "";
+  for (var i=0;i<ks.length;i++) li += "<li>"+escapeHtml(t(ks[i].getAttribute("data-i18n")))+"</li>";
+  return '<div class="tira-papel"><ul class="confianza">'+li+"</ul></div>";
 }
 function go(id, fromPop){
   /* En el subdominio de Mira Mi Casa solo existen sus rutas; el resto se manda
@@ -4627,7 +4644,7 @@ function renderFicha(fid){
       }).join('') + '</div><p id="fimp-out" data-fid="'+esc(p.id)+'"></p>';
     }
     lat += '<a class="ficha-cta-btn" href="#donar"'+(u ? ' data-act="donarA(\''+esc(u.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a>'
-      + '<p class="ficha-apoyo-nota">'+t("ficha.cta.p")+'</p></div>';
+      + '<p class="ficha-apoyo-nota">'+t("ficha.cta.p")+'</p>' + tiraHtml() + '</div>';
 
     html += fichaCuerpo(main, lat, "");
     el.innerHTML = html;
