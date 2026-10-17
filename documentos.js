@@ -98,6 +98,7 @@ const SUAVE = rgb(0.278, 0.267, 0.231);   // #47443B
 const GRIS  = rgb(0.361, 0.388, 0.435);   // #5C636F
 const LINEA = rgb(0.855, 0.827, 0.765);   // #DAD3C3
 const PAPEL = rgb(0.984, 0.973, 0.945);   // #FBF8F1
+const ROJO_ANULADO = rgb(0.549, 0.184, 0.118);   // #8C2F1E, el --err del sitio en día
 
 const CARTA = [612, 792];                 // carta: el tamaño de oficina en Colombia
 /* `abajo` deja aire de verdad sobre el pie: con 66 el último numeral del
@@ -640,6 +641,27 @@ function conTracking(p, txt, x, y, tam, fuente, color, paso, opacity) {
   return xx - x;
 }
 
+/* Un QR cuadrado de lado `tam`, con su margen blanco, con la esquina de arriba
+   a la izquierda en (x, yTop). Las filas de módulos negros contiguos van en un
+   solo trazo: un QR de 33×33 son cientos de cuadros y así el PDF pesa poco. */
+function dibujarQR(p, texto, x, yTop, tam) {
+  const { lado, modulos } = qrMatriz(texto);
+  const borde = 3, total = lado + borde * 2, esc = tam / total;
+  p.drawRectangle({ x, y: yTop - tam, width: tam, height: tam, color: rgb(1, 1, 1), borderColor: LINEA, borderWidth: 0.6 });
+  let d = "";
+  for (let i = 0; i < lado; i++) {
+    let j = 0;
+    while (j < lado) {
+      if (!modulos[i][j]) { j++; continue; }
+      let n = 1;
+      while (j + n < lado && modulos[i][j + n]) n++;
+      d += "M" + (j + borde) + " " + (i + borde) + "h" + n + "v1h-" + n + "z";
+      j += n;
+    }
+  }
+  p.drawSvgPath(d, { x, y: yTop, scale: esc, color: TINTA });
+}
+
 async function dibujarCarnet(pdf, h, f, c) {
   const W = 242.6, H = 153, R = 11, QR = 112, GAP = 22;
   const blanco = rgb(1, 1, 1);
@@ -720,23 +742,7 @@ async function dibujarCarnet(pdf, h, f, c) {
 
   /* el reverso, al lado: QR, código y la hora a la que se generó */
   const xq = x0 + W + GAP;
-  if (c.qr) {
-    const { lado, modulos } = qrMatriz(c.qr);
-    const borde = 3, total = lado + borde * 2, esc = QR / total;
-    p.drawRectangle({ x: xq, y: yTop - QR, width: QR, height: QR, color: blanco, borderColor: LINEA, borderWidth: 0.6 });
-    let d = "";
-    for (let i = 0; i < lado; i++) {
-      let j = 0;
-      while (j < lado) {
-        if (!modulos[i][j]) { j++; continue; }
-        let n = 1;
-        while (j + n < lado && modulos[i][j + n]) n++;
-        d += "M" + (j + borde) + " " + (i + borde) + "h" + n + "v1h-" + n + "z";
-        j += n;
-      }
-    }
-    p.drawSvgPath(d, { x: xq, y: yTop, scale: esc, color: TINTA });
-  }
+  if (c.qr) dibujarQR(p, c.qr, xq, yTop, QR);
   const xt = c.qr ? xq + QR + 14 : xq;
   const anchoT = MG.izq + ANCHO - xt;
   let yt = yTop - 4;
@@ -1807,8 +1813,9 @@ function firmas(h, f, firmaRL, firmaRF) {
    CERTIFICADO DE VOLUNTARIADO — las horas efectivas de una jornada
    ===========================================================================
    Lo que VOLUNTARIADO.md §7 le promete al voluntario: «certificado de
-   voluntariado con las horas efectivas». Nace al cerrar una jornada en /admin
-   (ver migrations/0036) y viaja en el correo de agradecimiento.
+   voluntariado con las horas efectivas». Se emite en /admin cuando la jornada
+   ya está cerrada (ver migrations/0036 y 0047) y viaja en el correo de
+   agradecimiento.
 
    NO ES UN CERTIFICADO DE DONACION, y el documento lo dice con su forma: no
    hay juramento, ni articulado, ni Revisora Fiscal, ni una palabra de
@@ -1821,9 +1828,13 @@ function firmas(h, f, firmaRL, firmaRF) {
    voluntario que puede no leer español, y no tiene texto juridico que
    traducir mal.
 
-   LO QUE IMPRIME ES LO CONGELADO al cerrar la jornada (`reconocimientos.datos`)
+   LO QUE IMPRIME ES LO CONGELADO al emitirlo (`reconocimientos.datos`)
    y su huella: el PDF se redibuja en cada descarga, el JSON no. Es la misma
    regla del certificado de donacion, y por la misma razon.
+
+   LO EMITE UNA PERSONA desde /admin, fila por fila (0047), y lleva un código
+   y un QR que abren /verificar: quien lo recibe comprueba en el sitio de la
+   fundación que existe, a nombre de quién y si sigue válido o se anuló.
 
    LA FIRMA es la del Representante Legal en ejercicio en la fecha de emision
    (`enEjercicio`), impresa con «Expedido electronicamente», no «Firmado»: nadie
@@ -1849,7 +1860,10 @@ const TV = {
     cargo: "Representante Legal",
     expedido: (f) => "Expedido electrónicamente el " + f,
     huella: (h) => "Huella " + h + " · Ley 527 de 1999",
-    pie: "Certificado de voluntariado "
+    pie: "Certificado de voluntariado ",
+    noDonacion: "Este certificado acredita tiempo de voluntariado. No es un certificado de donación y no da derecho a ningún beneficio tributario.",
+    anulado: "ANULADO · Este certificado fue anulado y no tiene validez.",
+    verifica: "Compruébalo escaneando el código QR o en " + ENTIDAD.sitio + "/verificar con este código:"
   },
   en: {
     titulo: "VOLUNTEER CERTIFICATE", asunto: "Volunteer certificate",
@@ -1869,7 +1883,10 @@ const TV = {
     cargo: "Legal Representative",
     expedido: (f) => "Issued electronically on " + f,
     huella: (h) => "Fingerprint " + h + " · Colombian Law 527 of 1999",
-    pie: "Volunteer certificate "
+    pie: "Volunteer certificate ",
+    noDonacion: "This certificate attests volunteer time. It is not a donation certificate and does not give the right to any tax benefit.",
+    anulado: "CANCELLED · This certificate has been cancelled and is not valid.",
+    verifica: "Check it by scanning the QR code or at " + ENTIDAD.sitio + "/verificar with this code:"
   }
 };
 const MESES_EN = ["January", "February", "March", "April", "May", "June",
@@ -1890,14 +1907,18 @@ export async function certificadoVoluntariado(c) {
   h.texto(t.titulo, { tam: 16, fuente: f.negrita, color: TINTA, centrado: true, interlinea: 20, despues: 4 });
   h.texto("No. " + c.numero, { tam: 12, fuente: f.negrita, color: VERDE, centrado: true, interlinea: 16, despues: 10 });
   h.texto(ENTIDAD.ciudad + ", " + fechaDoc(c.emitido_en, en), {
-    tam: 9.5, color: GRIS, centrado: true, despues: 26
+    tam: 9.5, color: GRIS, centrado: true, despues: c.anulado ? 8 : 18
   });
+  /* ANULADO arriba, donde se ve antes que el nombre: el PDF de un certificado
+     anulado se sigue pudiendo descargar desde /admin (es la historia), y no
+     puede parecer válido. */
+  if (c.anulado) h.texto(t.anulado, { tam: 11, fuente: f.negrita, color: ROJO_ANULADO, centrado: true, interlinea: 15, despues: 16 });
 
-  h.texto(t.abre(ENTIDAD), { tam: 10.5, interlinea: 15.5, despues: 16 });
+  h.texto(t.abre(ENTIDAD), { tam: 10.5, interlinea: 15, despues: 12 });
   /* El nombre es la cifra monumental de este papel: es lo unico que la persona
      va a buscar con la vista, y lo que enseña cuando lo muestra. */
-  h.texto(c.nombre || "-", { tam: 22, fuente: f.negrita, color: VERDE, centrado: true, interlinea: 26, despues: 16 });
-  h.texto(t.sigue, { tam: 10.5, interlinea: 15.5, despues: 18 });
+  h.texto(c.nombre || "-", { tam: 22, fuente: f.negrita, color: VERDE, centrado: true, interlinea: 26, despues: 12 });
+  h.texto(t.sigue, { tam: 10.5, interlinea: 15, despues: 12 });
 
   h.regla({ despues: 6 });
   h.fila(t.jornada, c.jornada || "-");
@@ -1907,15 +1928,24 @@ export async function certificadoVoluntariado(c) {
   h.fila(t.anfitriona, c.anfitriona || t.sede);
   if (c.empresa) h.fila(t.empresa, c.empresa);
   h.fila(t.horas, t.horasTxt(c.horas) + (c.pro_bono ? t.pro : ""));
-  h.salto(18);
+  h.salto(12);
 
   h.texto(t.credito(c.anfitriona || ""), { tam: 10, color: SUAVE, interlinea: 14.5, despues: 8 });
   h.texto(t.gracias, { tam: 10, fuente: f.negrita, color: TINTA, interlinea: 14.5, despues: 8 });
-  h.texto(t.horasNota, { tam: 8.5, color: GRIS, interlinea: 12, despues: 30 });
+  h.texto(t.horasNota, { tam: 8.5, color: GRIS, interlinea: 12, despues: 6 });
+  /* Lo que NO es, escrito y no solo insinuado por la forma: el papel lo puede
+     recibir un empleador o una universidad que nunca ha visto un certificado
+     de donación, y «certificado» a secas se confunde. */
+  h.texto(t.noDonacion, { tam: 8.8, fuente: f.negrita, color: SUAVE, interlinea: 12.5, despues: 8 });
 
   /* Una sola firma, la del Representante Legal en ejercicio en la fecha de
-     emision. Mismo trazo que el bloque de firmas del certificado tributario. */
-  h.reservar(96);
+     emision. Mismo trazo que el bloque de firmas del certificado tributario.
+     A su derecha, en la otra columna, el QR y el código de /verificar. */
+  /* 86 es el alto real del bloque: 30 hasta la línea y ~50 de nombre, cargo,
+     fecha y huella debajo; el QR (78) sube 34 por encima de la línea y baja
+     44, así que cabe dentro. Con más, el caso largo (nombre y jornada de dos
+     líneas, empresa, anulado) mandaba la firma sola a una segunda hoja. */
+  h.reservar(86);
   const rl = enEjercicio(ENTIDAD.repLegal, c.emitido_en);
   const yLinea = h.y - 30;
   const anchoCol = (ANCHO - 40) / 2;
@@ -1929,6 +1959,23 @@ export async function certificadoVoluntariado(c) {
   if (c.huella) {
     y -= 10;
     h.p.drawText(winansi(t.huella(String(c.huella).slice(0, 16))), { x: MG.izq, y, size: 7.5, font: f.normal, color: GRIS });
+  }
+  if (c.qr) {
+    const QR = 78;
+    const xq = MG.izq + anchoCol + 40;
+    const yq = yLinea + 34;
+    dibujarQR(h.p, c.qr, xq, yq, QR);
+    const xt = xq + QR + 10;
+    const anchoT = MG.izq + ANCHO - xt;
+    let yt = yq - 2;
+    for (const l of h.lineas(winansi(t.verifica), f.normal, 7.6, anchoT)) {
+      h.p.drawText(l, { x: xt, y: yt - 7.6, size: 7.6, font: f.normal, color: GRIS });
+      yt -= 10.5;
+    }
+    if (c.verif) {
+      const mono = await pdf.embedFont(StandardFonts.CourierBold);
+      h.p.drawText(winansi(c.verif), { x: xt, y: yt - 15, size: 13, font: mono, color: TINTA });
+    }
   }
   h.y = yLinea - 70;
 
