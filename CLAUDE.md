@@ -6,6 +6,12 @@ Deploy: GitHub Actions → Cloudflare Workers, automático al llegar a `main`.
 
 ## FLUJO DE TRABAJO OBLIGATORIO (Opción A)
 
+> **Atajo (17 oct 2026):** `node scripts/pr.mjs "Título" -m "Mensaje" --claude`
+> hace en orden el cache-bust, la hidratación, el gate, el commit, el sitemap, el
+> dry-run del Worker, el push y el PR. `node ops/verificar.mjs <ruta>` saca las
+> capturas de día, noche y celular. Guía corta: `.claude/skills/gg-pr/SKILL.md`.
+> Lo de abajo explica POR QUÉ de cada paso; no hace falta repetirlo a mano.
+
 1. **NUNCA hacer push directo a `main`.** Todo cambio va en una rama `claude/<tema>`
    (ej. `claude/v5-etapa2-tipografia`).
 2. **Flujo rutinario (auto-merge gateado):** push de la rama → abrir PR con la
@@ -226,8 +232,10 @@ Revisar SIEMPRE en modo día Y noche (toggle en el nav) antes de abrir PR.
 
 ## CONTINUIDAD
 
-- `SESSION_HANDOFF.md` = memoria histórica de decisiones (leerlo al retomar
-  trabajo grande; actualizarlo al cerrar).
+- `SESSION_HANDOFF.md` = estado vigente y decisiones abiertas, **corto (menos
+  de 8 KB)**. Leerlo al retomar; al cerrar, actualizar solo su sección «Estado».
+- `ops/historial/session-handoff-hasta-sep-2026.md` = la historia larga (225 KB).
+  Se consulta por sección con `grep -n "^## "`, **nunca entera**.
 - Estado del rediseño v5: Etapa 1 (papel/familia) en producción. Pendientes:
   tarjetas→reglas finas (piloto Transparencia/Membresías), Etapa 2 (escala
   tipográfica, cifra monumental), Etapa 3 (foto a sangre, ledger, recorrido).

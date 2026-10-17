@@ -8,8 +8,9 @@
 .dev.vars
 .dev.vars.*
 
-# Dependencias, si algún día hay
-node_modules/
+# Dependencias. Sin barra final: en los worktrees `node_modules` es un ENLACE
+# simbólico al del checkout principal, y `node_modules/` no lo atrapa.
+node_modules
 
 # Basura del sistema
 .DS_Store
@@ -35,3 +36,9 @@ node_modules/
 # (ops/minutas-certificado.js). Son datos personales y este repositorio es
 # público: viven solo en la máquina de quien genera las minutas. 28 sep 2026.
 ops/firmantes.local.json
+
+# Worktrees de los agentes de Claude Code y su configuración local de vista
+# previa. En oct 2026 había 34 copias completas del repo (2,9 GB) dentro de
+# `.claude/worktrees`: cada búsqueda en el repo las recorría todas.
+.claude/worktrees/
+.claude/launch.json
