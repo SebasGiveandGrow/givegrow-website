@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=5648cb1b">
+<link rel="stylesheet" href="/styles.css?v=9bc1e605">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=71a3268d" defer></script>
+<script src="/app.js?v=86709b69" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1283,6 +1283,7 @@
        roja con anillo dorado cuando se entrega con acta. Es un dato de la base, no un
        adorno: antes de abrir la campaña, las mil esperan apagadas. -->
   <section class="rg-portada">
+      <svg class="rg-guirnalda" viewBox="0 0 1440 56" preserveAspectRatio="xMidYMin slice" aria-hidden="true" focusable="false"><path class="rg-hilo" d="M0 4 Q80 44 160 4 Q240 44 320 4 Q400 44 480 4 Q560 44 640 4 Q720 44 800 4 Q880 44 960 4 Q1040 44 1120 4 Q1200 44 1280 4 Q1360 44 1440 4"/><rect class="rg-tapa" x="77" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="80" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="237" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-o" cx="240" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="397" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-v" cx="400" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="557" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-p" cx="560" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="717" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="720" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="877" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-o" cx="880" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1037" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-v" cx="1040" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1197" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-p" cx="1200" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1357" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="1360" cy="34" rx="6" ry="8"/></svg>
     <div class="wrap">
       <span class="ey rv" data-i18n="rg.ey">Navidad 2026</span>
       <h1 class="h-sec rg-h1 rv" data-i18n="rg.h1">Mil regalos para niñas y niños de Uribia, Medellín y Leticia.</h1>
@@ -1352,6 +1353,25 @@
           <div class="field"><label for="rg-nombre" data-i18n="rg.f.nombre">Tu nombre</label><input id="rg-nombre" autocomplete="name" maxlength="120"></div>
           <div class="field"><label for="rg-email" data-i18n="rg.f.email">Tu correo</label><input id="rg-email" type="email" autocomplete="email" maxlength="160"></div>
           <div class="field"><label for="rg-tel" data-i18n="rg.f.tel">Tu teléfono (opcional)</label><input id="rg-tel" type="tel" autocomplete="tel" maxlength="40"></div>
+          <!-- LA CARTA Y EL VIDEO (0049). Opcionales, y nada se entrega sin que
+               el equipo lo revise: son palabras de un adulto para un niño. -->
+          <fieldset class="rg-carta">
+            <legend data-i18n="rg.carta.l">Tu carta para los niños (opcional)</legend>
+            <p class="rg-ayuda" data-i18n="rg.carta.ayuda">Va impresa con cada regalo de este pedido. El equipo lee cada carta y cada video antes de entregarlos: no incluyas teléfonos, direcciones ni redes sociales.</p>
+            <div class="field"><label for="rg-carta" data-i18n="rg.carta.txt">Tu mensaje</label><textarea id="rg-carta" rows="5" maxlength="1200" data-input="rgCartaCuenta(this)"></textarea><span class="rg-cuenta-c" aria-live="polite">0 / 1200</span></div>
+            <div class="field"><label for="rg-firma" data-i18n="rg.carta.firma">Cómo firmas</label><input id="rg-firma" maxlength="80" data-i18n="rg.carta.firma.ph" data-i18n-attr="placeholder" placeholder="Por ejemplo: Familia Pérez, de Medellín"></div>
+            <div class="rg-video">
+              <p class="rg-video-t" data-i18n="rg.video.t">Un video para ellos (opcional)</p>
+              <div class="rg-video-acc">
+                <label class="btn btn-w rg-video-btn" for="rg-video-cam"><span data-i18n="rg.video.grabar">Grabar ahora</span></label>
+                <input type="file" id="rg-video-cam" class="sr-only" accept="video/*" capture="user" data-change="rgVideo(this)">
+                <label class="btn btn-w rg-video-btn" for="rg-video-arc"><span data-i18n="rg.video.subir">Subir un video</span></label>
+                <input type="file" id="rg-video-arc" class="sr-only" accept="video/mp4,video/quicktime,video/webm" data-change="rgVideo(this)">
+                <button type="button" class="rg-quitar" hidden data-act="rgVideoQuitar(this)" data-i18n="rg.video.quitar">Quitar el video</button>
+              </div>
+              <p class="rg-video-info" aria-live="polite" data-i18n="rg.video.ayuda">De 30 segundos a 1 minuto, hasta 90 MB. Lo mostramos a los niños en la entrega; nunca se publica.</p>
+            </div>
+          </fieldset>
           <div id="rg-cert-caja">
             <label class="ally-check"><input type="checkbox" id="rg-cert" data-change="rgCert()"> <span data-i18n="rg.f.cert">Quiero el certificado de donación (Colombia, Art. 257 del Estatuto Tributario)</span></label>
             <div class="rg-cert-datos" id="rg-cert-datos" hidden>
@@ -1361,6 +1381,7 @@
             </div>
           </div>
           <p class="mu rg-cert-usd" id="rg-cert-usd" hidden></p>
+          <label class="ally-check"><input type="checkbox" id="rg-noticias"> <span data-i18n="rg.f.noticias">Quiero recibir por correo lo que hicimos con los regalos, el agradecimiento y las próximas actividades en las que puedo participar.</span></label>
           <label class="ally-check"><input type="checkbox" id="rg-priv"> <span><span data-i18n="rg.f.priv">Acepto que Give&amp;Grow use mis datos para este pedido, según la</span> <a href="#privacidad" data-i18n="rg.f.priv.link">Política de Privacidad</a></span></label>
           <input type="text" id="rg-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
           <button type="submit" class="btn btn-g" id="rg-enviar" data-i18n="rg.f.enviar">Ir a pagar</button>
