@@ -13,6 +13,11 @@ var RG = {
   lista: []
 };
 var RG_PAGINA = 24;
+var RG_ANGOSTO = window.matchMedia("(max-width:820px)");
+if (RG_ANGOSTO.addEventListener) RG_ANGOSTO.addEventListener("change", function(){ if (RG.datos) rgPintaZonas(); });
+/* Ícono de regalo, line-art como todos los del sitio (DESIGN_SYSTEM.md, regla 2). */
+var RG_ICONO = '<svg class="rg-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5v8h14v-8M12 8.5v12M12 8.5c-1.6-3.6-5.5-4-5.5-1.6 0 1.6 3.2 1.6 5.5 1.6zM12 8.5c1.6-3.6 5.5-4 5.5-1.6 0 1.6-3.2 1.6-5.5 1.6z"/></svg>';
 var RG_EDADES = { "0-5": [0, 5], "6-9": [6, 9], "10-13": [10, 13], "14-17": [14, 17] };
 try { RG.lista = JSON.parse(sessionStorage.getItem("gg_rg_lista") || "[]") || []; } catch (e) { RG.lista = []; }
 
@@ -84,20 +89,31 @@ function rgPinta(){
   rgPintaLista();
 }
 
+/* Las luces: una por cada niño de la META de la zona, no por cada niño
+   cargado. Primero las entregadas, después las financiadas y al final las que
+   esperan. */
 function rgPintaZonas(){
   var d = RG.datos, caja = rgEl("rg-zonas");
   if (!caja) return;
   var borrador = !d.campana || d.campana.estado === "borrador";
+  var loc = lang === "en" ? "en-US" : "es-CO";
+  /* En el celular, 40 por fila: con 20, las mil luces apiladas ocupaban más
+     de una pantalla antes de llegar a los niños. */
+  var cols = RG_ANGOSTO.matches ? 40 : 20;
   caja.innerHTML = (d.zonas || []).map(function(z){
-    var pct = z.meta ? Math.min(100, Math.round(z.financiados * 100 / z.meta)) : 0;
+    var meta = Number(z.meta) || 0, ent = Math.min(z.entregados, meta), fin = Math.min(z.financiados, meta);
+    /* Se llena desde abajo, como un frasco: las filas se pintan al revés. */
+    var celdas = [], filas = [], luces = "";
+    for (var i = 0; i < meta; i++) celdas.push(i < ent ? '<i class="rg-l is-e"></i>' : i < fin ? '<i class="rg-l is-f"></i>' : '<i class="rg-l"></i>');
+    for (var k = 0; k < celdas.length; k += cols) filas.push(celdas.slice(k, k + cols).join(""));
+    luces = filas.reverse().join("");
     var nombre = lang === "en" ? z.nombre_en : z.nombre_es;
     return '<div class="rg-zona">' +
-      '<p class="rg-zona-n">' + rgEsc(Number(z.meta).toLocaleString(lang === "en" ? "en-US" : "es-CO")) + '</p>' +
+      '<div class="rg-luces" style="--rg-cols:' + cols + '" role="img" aria-label="' + rgEsc(nombre + ": " + t("rg.zona.aria").replace("{f}", fin).replace("{m}", meta)) + '">' + luces + '</div>' +
+      '<p class="rg-zona-n">' + rgEsc(meta.toLocaleString(loc)) + '</p>' +
       '<p class="rg-zona-t">' + rgEsc(nombre) + ' <span>' + rgEsc(z.departamento) + '</span></p>' +
-      (borrador
-        ? '<p class="rg-zona-d">' + rgEsc(t("rg.zona.prep")) + '</p>'
-        : '<div class="rg-zona-barra" role="img" aria-label="' + rgEsc(t("rg.zona.aria").replace("{f}", z.financiados).replace("{m}", z.meta)) + '"><span style="width:' + pct + '%"></span></div>' +
-          '<p class="rg-zona-d">' + rgEsc(t("rg.zona.fin").replace("{n}", z.financiados)) + ' · ' + rgEsc(t("rg.zona.ent").replace("{n}", z.entregados)) + '</p>') +
+      '<p class="rg-zona-d">' + (borrador ? rgEsc(t("rg.zona.prep"))
+        : rgEsc(t("rg.zona.fin").replace("{n}", fin.toLocaleString(loc))) + ' · ' + rgEsc(t("rg.zona.ent").replace("{n}", ent.toLocaleString(loc)))) + '</p>' +
       (z.fecha_entrega ? '<p class="rg-zona-d">' + rgEsc(t("rg.zona.fecha").replace("{f}", rgFecha(z.fecha_entrega))) + '</p>' : '') +
       '</div>';
   }).join("");
@@ -156,16 +172,17 @@ function rgTarjeta(r, recibe){
   var accion;
   if (libre && recibe) {
     accion = '<button type="button" class="btn ' + (enLista ? 'btn-g' : 'btn-o') + ' rg-add" aria-pressed="' + enLista +
-      '" data-act="rgToggle(\'' + rgEsc(r.codigo) + '\')">' + rgEsc(t(enLista ? "rg.btn.en" : "rg.btn.add")) + '</button>';
+      '" data-act="rgToggle(\'' + rgEsc(r.codigo) + '\')">' + RG_ICONO + rgEsc(t(enLista ? "rg.btn.en" : "rg.btn.add")) + '</button>';
   } else {
     accion = '<span class="tag' + (libre ? ' soon' : '') + '">' + rgEsc(t("rg.est." + (libre ? "cerrada" : r.estado))) + '</span>';
   }
   return '<article class="rg-card' + (libre ? '' : ' is-tomado') + (enLista ? ' is-en' : '') + '">' +
     '<div class="rg-foto">' + foto + '</div>' +
     '<div class="rg-cuerpo">' +
+      '<p class="rg-para">' + rgEsc(t("rg.para")) + '</p>' +
       '<p class="rg-quien"><strong>' + rgEsc(r.nombre) + '</strong>, ' + rgEsc(rgEdad(r.edad)) + '</p>' +
       '<p class="rg-donde">' + rgEsc(rgZona(r.zona)) + '</p>' +
-      '<p class="rg-deseo">' + rgEsc(rgDeseo(r)) + '</p>' +
+      '<p class="rg-deseo">' + rgEsc(t("rg.deseo").replace("{d}", rgDeseo(r))) + '</p>' +
       '<p class="rg-tipo">' + rgEsc(rgTipo(r.categoria)) + (r.talla ? ' · ' + rgEsc(t("rg.talla").replace("{t}", r.talla)) : '') + '</p>' +
       '<div class="rg-pie"><span class="rg-valor">' + rgEsc(rgValor(r)) + '</span>' + accion + '</div>' +
     '</div></article>';

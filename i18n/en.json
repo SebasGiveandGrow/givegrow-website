@@ -2160,9 +2160,9 @@
   "sf.inv.me.p": "Contribution, not attribution: how we measure, what we publish and what we cannot prove yet.",
   "sf.inv.me.btn": "See measurement",
   "sf.inv.docs": "Funding from abroad? We receive contributions in US dollars via PayPal, in the Foundation's name, and we report in English. Need our tax registration (RUT), certificate of incorporation or any other document for your due diligence? Write to contacto@thegiveandgrowproject.org and we will send it.",
-  "rg.ey": "December Gifts 2026",
+  "rg.ey": "Christmas 2026",
   "rg.h1": "A thousand gifts for children in Uribia, Medellín and Leticia.",
-  "rg.lead": "Each card is a real child, with the gift they asked for. Choose one or several, pay in Colombian pesos or US dollars, and follow each gift until it is delivered and recorded in a delivery report.",
+  "rg.lead": "This Christmas, each card is a real child with the gift they asked for. Choose who to give to, pay in Colombian pesos or US dollars, and follow your gift all the way to their hands, with a signed delivery record.",
   "rg.seg.h": "Where your gifts are",
   "rg.pronto.t": "Coming soon.",
   "rg.pronto.p": "With the written consent of each child's guardian, we are collecting the wishes of the children in all three areas. Once the lists are reviewed, you will be able to choose here who to give a gift to.",
@@ -2266,5 +2266,12 @@
   "rg.paso.entregado": "Delivered",
   "gracias.regalos": "Follow my gifts",
   "gracias.regalos.destino": "December gifts",
-  "foot.regalos": "December gifts"
+  "foot.regalos": "December gifts",
+  "rg.luces.t": "A light for every child",
+  "rg.luces.p": "Each point is a child on the list. It lights up when their gift is funded and shines when it is delivered.",
+  "rg.luz.esp": "Waiting for a gift",
+  "rg.luz.fin": "Gift funded",
+  "rg.luz.ent": "Delivered, with a record",
+  "rg.para": "For",
+  "rg.deseo": "“{d}”"
 }

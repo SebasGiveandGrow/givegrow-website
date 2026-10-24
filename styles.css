@@ -20,6 +20,16 @@
   --vidrio-filo:rgba(255,255,255,.18);
   --vidrio-luz:rgba(255,255,255,.24);
   --ink-deep:#0E2118;
+  /* LA NAVIDAD DE #regalos (oct 2026). Sebas pidió «colores muy navideños
+     pero estéticos, fondo blanco siempre, rojo, dorado y verde como detalle,
+     y plata». Solo los usa esa página. El verde es el de la casa (--g).
+     --rojo y --oro-texto son legibles sobre blanco (6,9:1 y 5,3:1); --oro y
+     --plata son de adorno: luces, cintas y bordes, nunca texto. */
+  --rojo:#A61E2D;
+  --oro:#D4A944;
+  --oro-texto:#8A6620;
+  --plata:#C9CED4;
+  --plata-suave:#F1F3F5;
   --cream:#F7F4EF;
   --mu:#5C636F;--bd:#DAD3C3;--bds:#EDE8DC;
   --amber:#A84D00;--amberl:#FEF3E0;
@@ -2152,21 +2162,61 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 /* ===========================================================================
    REGALOS DE DICIEMBRE — #regalos (oct 2026, migración 0048)
    ===========================================================================
-   Una sola firma: las tres zonas como un libro de cuentas, con la meta en
-   Unbounded y debajo lo que de verdad va financiado y entregado. Todo lo demás
-   quieto. El deseo de cada niño va en Fraunces itálica: es lo que pidió, dicho
-   con sus palabras, y es lo único de la tarjeta que no es un dato. */
+   NAVIDAD SOBRE BLANCO (pedido de Sebas, 24 oct 2026): «colores muy navideños
+   pero estéticos, fondo blanco siempre, con rojo, dorado y verde como detalle,
+   y plata». El fondo es blanco de día Y de noche: la página redefine aquí los
+   tokens de superficie y tinta con sus valores de día, así que todos los
+   componentes que reutiliza (botones, campos, chips) se pintan sobre blanco
+   sin reglas sueltas. El color va solo en los detalles: la cinta de cada
+   tarjeta, las luces, las etiquetas y los números.
+
+   Una sola firma: «Una luz por cada niño» —mil luces por zona que se
+   encienden con los datos reales—. Lo demás, quieto. */
+#page-regalos,
+html[data-theme="dark"] #page-regalos{
+  --bg:#fff;--surface:#fff;--surface-2:#fff;--cream:#fff;
+  --ink:#191813;--ink-soft:#47443B;--mu:#5C636F;
+  --bd:var(--plata);--bds:var(--plata-suave);
+  --acc:#1F5C38;--acc-2:#2E7D4F;--gl:#E8F5EC;--gd:#16402A;--gm:#2E7D4F;
+  --err:#8C2F1E;--ok:#1F5C38;
+  --shadow:0 2px 8px rgba(0,0,0,.06);--shadow-lg:0 10px 30px rgba(0,0,0,.10);
+  background:#fff;color:#191813;
+}
+#page-regalos section.cream{background:var(--surface)}
+/* De noche el menú es transparente hasta hacer scroll y su tinta es clara:
+   sobre esta página blanca desaparecía. Aquí va sólido desde el principio. */
+html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-bg);box-shadow:0 1px 0 var(--bd)}
+/* La cinta entre secciones: un filo rojo y otro dorado, como la de un regalo. */
+#page-regalos > section + section{border-top:1px solid var(--plata-suave)}
+.rg-portada{position:relative}
+.rg-portada::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;
+  background:linear-gradient(var(--rojo) 0 2px,var(--oro) 2px 4px)}
+.rg-portada .ey{color:var(--rojo)}
 .rg-h1{max-width:20ch}
-.rg-zonas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:34px;border-top:1.5px solid var(--ink)}
-.rg-zona{padding:20px 22px 18px 0;border-bottom:1px solid var(--bd)}
-.rg-zona + .rg-zona{padding-left:22px;border-left:1px solid var(--bd)}
-.rg-zona-n{font-family:var(--font-display);font-size:var(--fs-h1);line-height:1;color:var(--acc);font-variant-numeric:tabular-nums;margin:0 0 10px}
+.rg-luces-t{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:var(--fs-h3);color:var(--oro-texto);margin:44px 0 6px}
+.rg-luces-p{font-size:var(--fs-14);color:var(--mu);max-width:62ch;margin:0}
+.rg-zonas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:26px;align-items:end}
+.rg-zona{min-width:0}
+.rg-luces{display:grid;grid-template-columns:repeat(var(--rg-cols,20),minmax(0,1fr));gap:6px;margin-bottom:16px}
+.rg-l{display:block;aspect-ratio:1;border-radius:50%;background:var(--plata);transform:scale(.62)}
+.rg-l.is-f,.rg-l.is-e{transform:none}
+.rg-l.is-f{background:var(--oro);box-shadow:0 0 5px var(--oro)}
+.rg-l.is-e{background:var(--rojo);box-shadow:0 0 0 2px var(--oro)}
+@media (prefers-reduced-motion:no-preference){
+  .rg-luces .rg-l.is-f{animation:rg-titila 4.5s ease-in-out infinite}
+  .rg-luces .rg-l.is-f:nth-child(3n){animation-delay:-1.5s}
+  .rg-luces .rg-l.is-f:nth-child(5n){animation-delay:-3s}
+}
+@keyframes rg-titila{0%,100%{opacity:1}50%{opacity:.6}}
+.rg-zona-n{font-family:var(--font-display);font-size:var(--fs-h1);line-height:1;color:var(--acc);font-variant-numeric:tabular-nums;margin:0 0 8px}
 .rg-zona-t{font-weight:700;font-size:var(--fs-16);margin:0}
 .rg-zona-t span{color:var(--mu);font-weight:500}
-.rg-zona-barra{height:4px;background:var(--bds);border-radius:999px;margin:12px 0 8px;overflow:hidden}
-.rg-zona-barra span{display:block;height:100%;background:var(--acc)}
 .rg-zona-d{font-size:var(--fs-13);color:var(--mu);margin:2px 0 0;font-variant-numeric:tabular-nums}
+.rg-leyenda{list-style:none;display:flex;flex-wrap:wrap;gap:8px 22px;margin:28px 0 0;padding:16px 0 0;border-top:1px solid var(--plata-suave);font-size:var(--fs-13);color:var(--mu)}
+.rg-leyenda li{display:flex;align-items:center;gap:8px}
+.rg-leyenda .rg-l{width:10px}
 .rg-pasos{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:20px}
+.rg-pasos .step::before{background:var(--rojo);color:var(--on-dark)}
 .rg-cerrada{margin:0 0 14px}
 .rg-filtros{display:grid;gap:10px;margin:6px 0 18px}
 .rg-fgrupo{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -2176,30 +2226,45 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .rg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px}
 .rg-grid > *{min-width:0}
 .rg-vacio{grid-column:1/-1;padding:28px 0}
-.rg-card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden}
-.rg-card.is-en{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+/* La tarjeta es una etiqueta de regalo: cinta roja arriba, «Para» en rojo y el
+   deseo en Fraunces itálica, entre comillas. */
+.rg-card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--plata);border-top:3px solid var(--rojo);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+.rg-card.is-en{border-color:var(--oro);box-shadow:0 0 0 1px var(--oro),var(--shadow)}
+.rg-card.is-en{border-top-color:var(--rojo)}
 .rg-card.is-tomado .rg-foto{opacity:.7}
-.rg-foto{aspect-ratio:4/3;background:var(--surface-2);display:flex;align-items:center;justify-content:center}
-.rg-foto img{width:100%;height:100%;object-fit:cover;display:block}
-.rg-ini{font-family:var(--font-display);font-size:var(--fs-h1);color:var(--acc);opacity:.45}
+/* Sin foto, la tarjeta es un regalo envuelto: papel plata, dos cintas rojas
+   que se cruzan y la inicial en una etiqueta dorada. */
+.rg-foto{position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
+  background:
+    linear-gradient(90deg,transparent calc(50% - 2px),var(--rojo) calc(50% - 2px),var(--rojo) calc(50% + 2px),transparent calc(50% + 2px)),
+    linear-gradient(0deg,transparent calc(50% - 2px),var(--rojo) calc(50% - 2px),var(--rojo) calc(50% + 2px),transparent calc(50% + 2px)),
+    var(--plata-suave)}
+.rg-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.rg-ini{display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:var(--plata-suave);border:2px solid var(--oro);
+  font-family:"Fraunces",serif;font-style:italic;font-size:var(--fs-h3);color:var(--oro-texto)}
 .rg-cuerpo{display:flex;flex-direction:column;flex:1;padding:14px 16px 16px}
+.rg-para{font-size:var(--fs-eyebrow);font-weight:800;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--rojo);margin:0 0 2px}
 .rg-quien{font-size:var(--fs-16);margin:0}
 .rg-donde{font-size:var(--fs-13);color:var(--mu);margin:0}
 .rg-deseo{font-family:"Fraunces",serif;font-style:italic;font-size:var(--fs-17);line-height:1.35;color:var(--ink);margin:10px 0 0}
-.rg-tipo{font-size:var(--fs-12);color:var(--mu);text-transform:uppercase;letter-spacing:.04em;margin:3px 0 0}
+.rg-tipo{font-size:var(--fs-12);color:var(--oro-texto);text-transform:uppercase;letter-spacing:.04em;margin:3px 0 0}
 .rg-pie{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:14px}
 .rg-valor{font-weight:700;font-variant-numeric:tabular-nums}
 .rg-add{padding:9px 16px;font-size:var(--fs-14)}
+.rg-add.btn-o{color:var(--rojo);border-color:var(--rojo)}
+.rg-add.btn-o:hover{background:var(--plata-suave)}
+.rg-add.btn-g{background:var(--rojo);box-shadow:none}
 .rg-add:hover{transform:none}
+.rg-ic{width:17px;height:17px;flex:0 0 auto}
 .rg-mas{text-align:center;margin-top:22px}
 .rg-priv{font-size:var(--fs-13);max-width:72ch;margin-top:28px}
 .rg-pagar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;align-items:start}
-.rg-lista{list-style:none;margin:0;padding:0;border-top:1.5px solid var(--ink)}
-.rg-lista li{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--bd);font-size:var(--fs-14)}
+.rg-lista{list-style:none;margin:0;padding:0;border-top:2px solid var(--rojo)}
+.rg-lista li{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--plata-suave);font-size:var(--fs-14)}
 .rg-li-v{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
-.rg-quitar{background:none;border:0;padding:4px;margin-left:6px;color:var(--acc);font:inherit;font-size:var(--fs-13);text-decoration:underline;cursor:pointer}
+.rg-quitar{background:none;border:0;padding:4px;margin-left:6px;color:var(--rojo);font:inherit;font-size:var(--fs-13);text-decoration:underline;cursor:pointer}
 .rg-total{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--fs-17);margin-top:12px}
-.rg-total strong{font-family:var(--font-display);font-variant-numeric:tabular-nums}
+.rg-total strong{font-family:var(--font-display);font-variant-numeric:tabular-nums;color:var(--acc)}
 .rg-form{margin-top:0}
 .rg-form .ally-check{margin-bottom:10px}
 .rg-via{border:0;padding:0;margin:0 0 14px}
@@ -2209,24 +2274,25 @@ html[data-theme="dark"] .map-fchip.on{background:var(--gm);border-color:var(--gm
 .rg-msg{margin:12px 0 0;font-size:var(--fs-14)}
 .rg-usd-ok{max-width:640px}
 .rg-usd-t{font-size:var(--fs-h3);font-weight:700;margin:0 0 10px}
-.rg-ref{font-family:var(--font-display);font-size:var(--fs-h2);color:var(--acc);margin:14px 0}
+.rg-ref{font-family:var(--font-display);font-size:var(--fs-h2);color:var(--rojo);margin:14px 0}
 .rg-usd-acc{display:flex;flex-wrap:wrap;gap:12px}
-.rg-barra{position:fixed;left:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:16px;max-width:calc(100% - 110px);padding:8px 8px 8px 20px;background:var(--ink-deep);color:var(--on-dark);border:1px solid var(--on-dark-line);border-radius:999px;box-shadow:var(--shadow-lg);font-size:var(--fs-14);font-weight:600}
+.rg-barra{position:fixed;left:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:16px;max-width:calc(100% - 110px);padding:8px 8px 8px 20px;background:var(--surface);color:var(--ink);border:1px solid var(--oro);border-radius:999px;box-shadow:var(--shadow-lg);font-size:var(--fs-14);font-weight:600}
 .rg-barra[hidden]{display:none}
 #rg-barra-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rg-barra .btn{flex:0 0 auto;padding:9px 18px}
 .rg-seg-cab{max-width:560px}
 .rg-seg-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:18px}
-.rg-seg-item{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px}
-.rg-seg-nota{font-size:var(--fs-13);color:var(--amber);margin:8px 0 0}
+.rg-seg-item{background:var(--surface);border:1px solid var(--plata);border-top:3px solid var(--rojo);border-radius:var(--r);padding:16px}
+.rg-seg-nota{font-size:var(--fs-13);color:var(--rojo);margin:8px 0 0}
 .rg-linea{list-style:none;display:grid;gap:6px;margin:12px 0 0;padding:0}
 .rg-linea li{position:relative;display:flex;justify-content:space-between;gap:10px;padding-left:18px;font-size:var(--fs-13);color:var(--mu)}
-.rg-linea li::before{content:"";position:absolute;left:0;top:.45em;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--bd)}
+.rg-linea li::before{content:"";position:absolute;left:0;top:.45em;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--plata)}
 .rg-linea li.is-on{color:var(--ink);font-weight:600}
-.rg-linea li.is-on::before{background:var(--acc);border-color:var(--acc)}
+.rg-linea li.is-on::before{background:var(--oro);border-color:var(--oro)}
 @media (max-width:820px){
   .rg-zonas,.rg-pasos,.rg-pagar{grid-template-columns:1fr}
-  .rg-zona + .rg-zona{padding-left:0;border-left:0}
+  .rg-zonas{gap:30px}
+  .rg-luces{gap:3px}
   .rg-pagar{gap:24px}
   .rg-fetq{min-width:0;width:100%}
 }
