@@ -2248,6 +2248,35 @@ var I18N = {
     "rg.luz.ent":"Entregado, con acta",
     "rg.para":"Para",
     "rg.deseo":"“{d}”",
+    "rg.carta.l":"Tu carta para los niños (opcional)",
+    "rg.carta.ayuda":"Va impresa con cada regalo de este pedido. El equipo lee cada carta y cada video antes de entregarlos: no incluyas teléfonos, direcciones ni redes sociales.",
+    "rg.carta.txt":"Tu mensaje",
+    "rg.carta.firma":"Cómo firmas",
+    "rg.carta.firma.ph":"Por ejemplo: Familia Pérez, de Medellín",
+    "rg.video.t":"Un video para ellos (opcional)",
+    "rg.video.grabar":"Grabar ahora",
+    "rg.video.subir":"Subir un video",
+    "rg.video.quitar":"Quitar el video",
+    "rg.video.ayuda":"De 30 segundos a 1 minuto, hasta 90 MB. Lo mostramos a los niños en la entrega; nunca se publica.",
+    "rg.f.noticias":"Quiero recibir por correo lo que hicimos con los regalos, el agradecimiento y las próximas actividades en las que puedo participar.",
+    "rg.video.subiendo":"Subiendo tu video… {p} %",
+    "rg.video.fallo":"No pudimos subir el video. Tus regalos siguen apartados: puedes subirlo después desde el enlace de seguimiento que te llega al correo.",
+    "rg.video.tipo":"Ese archivo no es un video que podamos recibir. Usa MP4, MOV o WebM.",
+    "rg.video.pesado":"El video pesa más de 90 MB. Grábalo en 1080p en vez de 4K, o recórtalo.",
+    "rg.video.ilegible":"No pudimos leer la duración de ese video. Prueba con otro archivo.",
+    "rg.video.dur":"Ese video dura {s} segundos. Tiene que durar entre 30 segundos y 1 minuto.",
+    "rg.video.listo":"Video listo: {s} segundos, {mb} MB. Se sube al confirmar.",
+    "rg.video.cambiar":"Cambiar el video",
+    "rg.video.borrar":"Quitar el video que subí",
+    "rg.carta.seg":"Tu carta y tu video",
+    "rg.carta.e.pendiente":"El equipo la está revisando",
+    "rg.carta.e.aprobado":"Aprobada: va con tus regalos",
+    "rg.carta.e.rechazado":"No la pudimos aprobar así",
+    "rg.carta.convideo":"Con un video de {s} segundos.",
+    "rg.carta.aun":"Todavía puedes escribirles una carta o grabarles un video.",
+    "rg.carta.no":"Este pedido no tiene carta.",
+    "rg.carta.guardar":"Guardar mi carta",
+    "rg.enviando.carta":"Guardando…",
     "rg.mas":"Ver más",
     "rg.privnota":"Para proteger a los niños solo publicamos su nombre de pila, su edad, su zona y el regalo que pidieron, y su foto únicamente si su acudiente lo autorizó por escrito. Nunca publicamos apellidos, direcciones ni datos de contacto, y no hay contacto directo entre donantes y niños.",
     "rg.pagar.h":"Tu lista de regalos",
@@ -3265,7 +3294,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59f5f70b", regalos: "8c1467c2" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59f5f70b", regalos: "8f4ec3c0" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos" };
@@ -3378,7 +3407,8 @@ var ACT_DIFERIDAS = {
   irAPagar:"pago", payCert:"pago", miSubmit:"pago", miCalcula:"pago",
   closeLightbox:"impacto", lbStep:"impacto",
   rgFiltro:"regalos", rgToggle:"regalos", rgQuitar:"regalos", rgMas:"regalos", rgVia:"regalos", rgCert:"regalos",
-  rgPagar:"regalos", rgIrAPagar:"regalos"
+  rgPagar:"regalos", rgIrAPagar:"regalos", rgCartaCuenta:"regalos", rgVideo:"regalos", rgVideoQuitar:"regalos",
+  rgSegGuardar:"regalos"
 };
 function runAct(spec, el, ev){
   var m = /^(\w+)\((.*)\)$/.exec((spec||"").trim());

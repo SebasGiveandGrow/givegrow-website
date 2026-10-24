@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "17b00566";
+const STYLES_V = "9bc1e605";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -1478,7 +1478,9 @@ const TOPE_IP_DIA = { caso: 40, inscripcion: 60, asistencia: 200, transferencia:
   /* Regalos de diciembre: cada pedido gasta un consecutivo RG- y, en pesos, una
      guía. Treinta al día por IP cabe a una familia que escoge varias veces y
      frena un script. */
-  regalos: 30 };
+  regalos: 30,
+  /* La carta se puede corregir varias veces; un video pesa decenas de megas. */
+  "regalos-mensaje": 40, "regalos-video": 12 };
 async function pasaTopeIP(env, request, puerta) {
   const tope = TOPE_IP_DIA[puerta];
   const ip = request.headers.get("CF-Connecting-IP") || "";
@@ -3453,6 +3455,9 @@ async function apiRegalosPedido(request, env, url) {
     certDatos = JSON.stringify({ doc_tipo: tipo, doc_numero: num, ciudad: ciudadCert });
   }
   const muro = ["nombre", "anonimo", "no"].includes(c.muro) ? c.muro : "no";
+  const carta = limpiarCarta(c.carta);
+  const firma = limpiar(c.firma, 80);
+  const noticias = c.noticias === true;
 
   if (via === "cop" && !(env.WOMPI_PUBLIC_KEY && env.WOMPI_INTEGRITY_SECRET)) {
     return json({ error: "pasarela_no_configurada" }, 503);
@@ -3514,6 +3519,11 @@ async function apiRegalosPedido(request, env, url) {
     "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'pedido', ?, 'sistema')"
   ).bind(ref, via + " · " + codigos.join(", ")));
   await env.DB.batch(lote);
+  /* La carta y la autorización de noticias no pueden tumbar el pedido. */
+  try {
+    if (carta) await regalosGuardarCarta(env, ref, carta, firma);
+    if (noticias) await regalosGuardarNoticias(env, email, nombre, idioma, ref);
+  } catch (e) { console.error("carta o noticias", ref, e && e.message); }
 
   const seguimiento = enlaceSeguimientoRegalos(ref, token);
 
@@ -3704,8 +3714,10 @@ async function apiRegalosSeguimiento(env, ref, token) {
       acta: suyo ? (r.entrega || null) : null
     };
   });
+  const mensaje = await regalosMensajeDe(env, ref);
+  const editable = await regalosMensajeEditable(env, p);
   return json({
-    ref: p.ref, via: p.via, estado: p.estado, pago, guia: p.guia,
+    ref: p.ref, via: p.via, estado: p.estado, pago, guia: p.guia, mensaje, mensaje_editable: editable,
     total_cop: p.total_cop, total_usd: p.total_usd,
     creado_en: f(p.creado_en), pagado_en: f(p.pagado_en),
     aliada: p.via === "usd" && campana ? campana.aliada_nombre : null,
@@ -3809,6 +3821,156 @@ async function correoRegalosPedidoUSD(env, x) {
   });
 }
 
+/* LA CARTA Y EL VIDEO (migración 0049). Una carta y un video por pedido, que
+   acompañan a cada uno de sus regalos. Nada se entrega sin que una persona lo
+   revise: son palabras de un adulto para un niño. El video nunca se publica:
+   vive en R2, privado, y solo lo sirve /admin. */
+const REGALOS_CARTA_MAX = 1200;
+const REGALOS_VIDEO_MAX = 90 * 1024 * 1024;   // el tope de un cuerpo en Workers es 100 MB
+const REGALOS_VIDEO_TIPOS = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm" };
+
+async function regalosPedidoConToken(env, ref, token) {
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return null;
+  const p = await env.DB.prepare(
+    "SELECT ref, token, estado, email, nombre, idioma FROM regalo_pedidos WHERE ref = ?"
+  ).bind(ref).first();
+  if (!p || !igualesSeguro(p.token, token)) return null;
+  return p;
+}
+
+/* ¿Todavía se puede cambiar? Mientras el pedido siga vivo y ninguno de sus
+   regalos se haya entregado: después, la carta ya viajó. */
+async function regalosMensajeEditable(env, p) {
+  if (["anulado", "fallido"].includes(p.estado)) return false;
+  const e = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM regalos WHERE pedido_ref = ? AND estado = 'entregado'"
+  ).bind(p.ref).first();
+  return !(e && e.n);
+}
+
+function limpiarCarta(v) {
+  return String(v == null ? "" : v).replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, REGALOS_CARTA_MAX);
+}
+
+async function regalosGuardarCarta(env, ref, carta, firma) {
+  await env.DB.prepare(
+    "INSERT INTO regalo_mensajes (pedido_ref, carta, firma) VALUES (?, ?, ?) " +
+    "ON CONFLICT(pedido_ref) DO UPDATE SET carta = excluded.carta, firma = excluded.firma, " +
+    "estado = 'pendiente', motivo = NULL, revisado_por = NULL, revisado_en = NULL, actualizado_en = datetime('now')"
+  ).bind(ref, carta || null, firma || null).run();
+}
+
+/* La autorización para escribirle después. Si ya estaba y la había retirado,
+   volver a marcar la casilla la renueva. */
+async function regalosGuardarNoticias(env, email, nombre, idioma, ref) {
+  await env.DB.prepare(
+    "INSERT INTO regalo_noticias (email, nombre, idioma, origen_ref) VALUES (?, ?, ?, ?) " +
+    "ON CONFLICT(email) DO UPDATE SET nombre = excluded.nombre, idioma = excluded.idioma, " +
+    "consentido_en = datetime('now'), baja_en = NULL"
+  ).bind(email, nombre, idioma, ref).run();
+}
+
+/* POST /api/regalos/pedido/<RG>/mensaje?t= {carta, firma, quitar_video} */
+async function apiRegalosMensaje(request, env, ref, token) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const p = await regalosPedidoConToken(env, ref, token);
+  if (!p) return json({ error: "no_encontrado" }, 404);
+  if (!(await regalosMensajeEditable(env, p))) return json({ error: "ya_entregado" }, 409);
+  if (!(await pasaTopeIP(env, request, "regalos-mensaje"))) return json({ error: "demasiados_intentos" }, 429);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const carta = limpiarCarta(c.carta);
+  const firma = limpiar(c.firma, 80);
+  await regalosGuardarCarta(env, ref, carta, firma);
+  if (c.quitar_video) {
+    const m = await env.DB.prepare("SELECT video_key FROM regalo_mensajes WHERE pedido_ref = ?").bind(ref).first();
+    if (m && m.video_key && env.MEDIA) { try { await env.MEDIA.delete(m.video_key); } catch (e) { /* huérfano, no rompe */ } }
+    await env.DB.prepare(
+      "UPDATE regalo_mensajes SET video_key = NULL, video_tipo = NULL, video_bytes = NULL, video_seg = NULL WHERE pedido_ref = ?"
+    ).bind(ref).run();
+  }
+  await env.DB.prepare(
+    "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'carta', ?, 'donante')"
+  ).bind(ref, carta ? carta.length + " caracteres" : "sin carta").run();
+  return json({ ok: true });
+}
+
+/* PUT /api/regalos/pedido/<RG>/video?t=&seg= — el cuerpo crudo es el video.
+   Va directo a R2 sin pasar por la memoria del Worker (un minuto de video de
+   teléfono pesa decenas de megas). La duración la mide el navegador: aquí se
+   acepta con holgura y la confirma la persona que lo revisa. */
+async function apiRegalosVideo(request, env, ref, token, url) {
+  if (request.method !== "PUT" && request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const p = await regalosPedidoConToken(env, ref, token);
+  if (!p) return json({ error: "no_encontrado" }, 404);
+  if (!(await regalosMensajeEditable(env, p))) return json({ error: "ya_entregado" }, 409);
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const ext = REGALOS_VIDEO_TIPOS[tipo];
+  if (!ext) return json({ error: "tipo_no_permitido", permitidos: Object.keys(REGALOS_VIDEO_TIPOS) }, 415);
+  const largo = Number(request.headers.get("content-length") || 0);
+  if (!largo) return json({ error: "archivo_vacio" }, 400);
+  if (largo > REGALOS_VIDEO_MAX) return json({ error: "archivo_muy_grande", max_mb: 90 }, 413);
+  const seg = Math.round(Number(url.searchParams.get("seg")));
+  if (!Number.isFinite(seg) || seg < 25 || seg > 65) return json({ error: "duracion_invalida", min: 30, max: 60 }, 400);
+  if (!(await pasaTopeIP(env, request, "regalos-video"))) return json({ error: "demasiados_intentos" }, 429);
+
+  const clave = "regalos/videos/" + ref + "-" + tokenNuevo().slice(0, 8) + "." + ext;
+  await env.MEDIA.put(clave, request.body, { httpMetadata: { contentType: tipo } });
+  const previo = await env.DB.prepare("SELECT video_key FROM regalo_mensajes WHERE pedido_ref = ?").bind(ref).first();
+  await env.DB.prepare(
+    "INSERT INTO regalo_mensajes (pedido_ref, video_key, video_tipo, video_bytes, video_seg) VALUES (?, ?, ?, ?, ?) " +
+    "ON CONFLICT(pedido_ref) DO UPDATE SET video_key = excluded.video_key, video_tipo = excluded.video_tipo, " +
+    "video_bytes = excluded.video_bytes, video_seg = excluded.video_seg, estado = 'pendiente', motivo = NULL, " +
+    "revisado_por = NULL, revisado_en = NULL, actualizado_en = datetime('now')"
+  ).bind(ref, clave, tipo, largo, seg).run();
+  if (previo && previo.video_key && previo.video_key !== clave) {
+    try { await env.MEDIA.delete(previo.video_key); } catch (e) { /* huérfano, no rompe */ }
+  }
+  await env.DB.prepare(
+    "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'video', ?, 'donante')"
+  ).bind(ref, seg + " s · " + Math.round(largo / 1048576) + " MB").run();
+  return json({ ok: true });
+}
+
+/* Lo que el donante ve de su carta en el seguimiento. */
+async function regalosMensajeDe(env, ref) {
+  const m = await env.DB.prepare(
+    "SELECT carta, firma, video_key, video_seg, estado, motivo FROM regalo_mensajes WHERE pedido_ref = ?"
+  ).bind(ref).first();
+  if (!m) return null;
+  return { carta: m.carta || "", firma: m.firma || "", video: !!m.video_key, video_seg: m.video_seg || null,
+           estado: m.estado, motivo: m.estado === "rechazado" ? (m.motivo || null) : null };
+}
+
+/* Si el equipo no aprueba la carta o el video, se le dice al donante por qué
+   y cómo corregirlo. */
+async function correoRegalosMensajeRechazado(env, ref, motivo) {
+  const p = await env.DB.prepare("SELECT ref, token, email, nombre, idioma FROM regalo_pedidos WHERE ref = ?").bind(ref).first();
+  if (!p || !p.email) return;
+  const en = p.idioma === "en";
+  const enlace = enlaceSeguimientoRegalos(p.ref, p.token);
+  const titulo = (en ? "About your letter or video · " : "Sobre tu carta o tu video · ") + p.ref;
+  const parrafos = en ? [
+    "Hi " + p.nombre + ",",
+    "Our team reviews every letter and video before it reaches a child. We could not approve yours as it is:",
+    motivo,
+    "You can change it from your gift tracking page. Your gifts are not affected."
+  ] : [
+    "Hola, " + p.nombre + ":",
+    "El equipo revisa cada carta y cada video antes de que llegue a un niño. El tuyo no lo pudimos aprobar así:",
+    motivo,
+    "Lo puedes cambiar desde la página de seguimiento de tus regalos. Tus regalos siguen igual."
+  ];
+  await enviarCorreo(env, {
+    para: p.email, asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", enlace].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, boton: { url: enlace, texto: en ? "Change my letter" : "Cambiar mi carta" } }),
+    etiqueta: "regalos-carta-rechazada", guia: p.ref
+  });
+}
+
 /* ========================================================================
    /admin/regalos — la pantalla del equipo para la campaña de regalos
    ========================================================================
@@ -3880,7 +4042,25 @@ async function adminRegalos(env) {
     "FROM regalo_pedidos p LEFT JOIN regalo_pedido_items i ON i.pedido_ref = p.ref " +
     "WHERE p.campana_id = ? GROUP BY p.ref ORDER BY p.creado_en DESC LIMIT 500"
   ).bind(REGALOS_CAMPANA).all();
+  /* Las cartas y los videos, con los regalos que acompañan (el escogido o su
+     sustituto) para poder imprimir una por regalo. */
+  const mens = await env.DB.prepare(
+    "SELECT m.pedido_ref, m.carta, m.firma, m.video_key IS NOT NULL AS video, m.video_seg, m.video_bytes, m.estado, " +
+    "m.motivo, m.revisado_por, m.actualizado_en, p.nombre, p.email, p.estado AS pedido_estado, " +
+    "(SELECT group_concat(r.codigo || '|' || n.nombre_publico || '|' || r.zona_id || '|' || r.estado, ';') " +
+    " FROM regalo_pedido_items i JOIN regalos r ON r.id = COALESCE(i.sustituto_id, i.regalo_id) " +
+    " JOIN regalo_ninos n ON n.id = r.nino_id WHERE i.pedido_ref = m.pedido_ref AND r.pedido_ref = m.pedido_ref) AS regalos " +
+    "FROM regalo_mensajes m JOIN regalo_pedidos p ON p.ref = m.pedido_ref " +
+    "WHERE p.campana_id = ? ORDER BY CASE m.estado WHEN 'pendiente' THEN 0 ELSE 1 END, m.actualizado_en DESC"
+  ).bind(REGALOS_CAMPANA).all();
+  const noticias = await env.DB.prepare("SELECT COUNT(*) AS n FROM regalo_noticias WHERE baja_en IS NULL").first();
   return json({
+    mensajes: (mens.results || []).map((m) => Object.assign({}, m, {
+      video: !!m.video, actualizado_en: m.actualizado_en ? selloCO(m.actualizado_en).slice(0, 16) : null,
+      regalos: String(m.regalos || "").split(";").filter(Boolean).map((x) => {
+        const [codigo, nombre, zona, estado] = x.split("|"); return { codigo, nombre, zona, estado }; })
+    })),
+    noticias: noticias ? noticias.n : 0,
     campana, zonas, categorias: cats.results || [], ninos: ninos.results || [],
     pedidos: (pedidos.results || []).map((p) => Object.assign({}, p, {
       creado_en: p.creado_en ? selloCO(p.creado_en).slice(0, 16) : null,
@@ -4139,6 +4319,7 @@ async function adminRegalosAccion(request, env, accion, quien) {
   }
 
   if (accion === "estado") return adminRegalosMover(env, c, quien);
+  if (accion === "mensaje") return adminRegalosMensaje(env, c, quien);
   return json({ error: "no_encontrado" }, 404);
 }
 
@@ -4269,13 +4450,16 @@ async function adminRegalosMover(env, c, quien) {
 async function adminRegalosCompras(env) {
   const { results } = await env.DB.prepare(
     "SELECT r.zona_id, r.codigo, k.nombre_es AS tipo, r.deseo_es, r.talla, n.genero, n.edad, r.via, " +
-    "COALESCE(r.pedido_ref, r.financiado_por) AS origen " +
+    "COALESCE(r.pedido_ref, r.financiado_por) AS origen, " +
+    "CASE WHEN m.estado = 'aprobado' AND length(COALESCE(m.carta, '')) > 0 THEN 'si' ELSE '' END AS carta, " +
+    "CASE WHEN m.estado = 'aprobado' AND m.video_key IS NOT NULL THEN 'si' ELSE '' END AS video " +
     "FROM regalos r JOIN regalo_ninos n ON n.id = r.nino_id JOIN regalo_categorias k ON k.id = r.categoria_id " +
+    "LEFT JOIN regalo_mensajes m ON m.pedido_ref = r.pedido_ref " +
     "WHERE r.campana_id = ? AND r.estado = 'financiado' ORDER BY r.zona_id, k.orden, r.codigo"
   ).bind(REGALOS_CAMPANA).all();
   const linea = (xs) => xs.map((x) => '"' + String(x == null ? "" : x).replace(/"/g, '""') + '"').join(";");
-  const filas = [linea(["zona", "codigo", "tipo", "regalo", "talla", "genero", "edad", "via", "origen"])]
-    .concat((results || []).map((r) => linea([r.zona_id, r.codigo, r.tipo, r.deseo_es, r.talla, r.genero, r.edad, r.via, r.origen])));
+  const filas = [linea(["zona", "codigo", "tipo", "regalo", "talla", "genero", "edad", "via", "origen", "carta", "video"])]
+    .concat((results || []).map((r) => linea([r.zona_id, r.codigo, r.tipo, r.deseo_es, r.talla, r.genero, r.edad, r.via, r.origen, r.carta, r.video])));
   return new Response("﻿" + filas.join("\r\n") + "\r\n", {
     headers: {
       "content-type": "text/csv; charset=utf-8", "cache-control": "no-store",
@@ -4330,6 +4514,70 @@ async function adminRegaloArchivo(request, env, codigo, tipoArchivo, quien) {
   return json({ ok: true });
 }
 
+/* POST /api/admin/regalos/mensaje {ref, estado, motivo} — aprobar o rechazar
+   la carta y el video de un pedido. Rechazar exige decir por qué, y ese motivo
+   le llega al donante. */
+async function adminRegalosMensaje(env, c, quien) {
+  const ref = String(c.ref || "").toUpperCase();
+  if (!RE_PEDIDO_REGALO.test(ref)) return json({ error: "ref_invalida" }, 400);
+  const estado = ["aprobado", "rechazado"].includes(c.estado) ? c.estado : null;
+  if (!estado) return json({ error: "estado_invalido" }, 400);
+  const motivo = limpiar(c.motivo, 500);
+  if (estado === "rechazado" && motivo.length < 5) return json({ error: "motivo_requerido",
+    ayuda: "Di en una frase por qué no se aprueba: el donante la recibe para corregirla." }, 400);
+  const r = await env.DB.prepare(
+    "UPDATE regalo_mensajes SET estado = ?, motivo = ?, revisado_por = ?, revisado_en = datetime('now'), " +
+    "actualizado_en = datetime('now') WHERE pedido_ref = ?"
+  ).bind(estado, estado === "rechazado" ? motivo : null, quien || "?", ref).run();
+  if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+  await adminRegalosAuditar(env, quien, "carta/video de " + ref + " → " + estado + (motivo ? " · " + motivo : ""));
+  let correo = false;
+  if (estado === "rechazado") {
+    try { await correoRegalosMensajeRechazado(env, ref, motivo); correo = true; }
+    catch (e) { console.error("correo carta rechazada", ref, e && e.message); }
+  }
+  return json({ ok: true, correo });
+}
+
+/* GET /api/admin/regalos/video/<RG> — el video, solo para el equipo. Con
+   soporte de Range: sin él, el reproductor del navegador no puede adelantar. */
+async function adminRegalosVideo(request, env, ref) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const m = await env.DB.prepare("SELECT video_key, video_tipo FROM regalo_mensajes WHERE pedido_ref = ?").bind(ref).first();
+  if (!m || !m.video_key) return json({ error: "no_encontrado" }, 404);
+  const cab = { "content-type": m.video_tipo || "video/mp4", "cache-control": "private, no-store",
+                "x-robots-tag": "noindex", "accept-ranges": "bytes" };
+  const rango = /^bytes=(\d+)-(\d*)$/.exec(String(request.headers.get("range") || ""));
+  if (rango) {
+    const ini = Number(rango[1]);
+    const cabeza = await env.MEDIA.head(m.video_key);
+    if (!cabeza) return json({ error: "no_encontrado" }, 404);
+    const total = cabeza.size;
+    const fin = rango[2] ? Math.min(Number(rango[2]), total - 1) : total - 1;
+    if (ini > fin) return new Response(null, { status: 416, headers: { "content-range": "bytes */" + total } });
+    const obj = await env.MEDIA.get(m.video_key, { range: { offset: ini, length: fin - ini + 1 } });
+    return new Response(obj.body, { status: 206, headers: Object.assign(cab, {
+      "content-range": "bytes " + ini + "-" + fin + "/" + total, "content-length": String(fin - ini + 1) }) });
+  }
+  const obj = await env.MEDIA.get(m.video_key);
+  if (!obj) return json({ error: "no_encontrado" }, 404);
+  return new Response(obj.body, { headers: Object.assign(cab, { "content-length": String(obj.size) }) });
+}
+
+/* GET /api/admin/regalos/noticias.csv — quién autorizó que le escribamos. */
+async function adminRegalosNoticias(env) {
+  const { results } = await env.DB.prepare(
+    "SELECT email, nombre, idioma, origen_ref, consentido_en, baja_en FROM regalo_noticias ORDER BY consentido_en"
+  ).all();
+  const linea = (xs) => xs.map((x) => '"' + String(x == null ? "" : x).replace(/"/g, '""') + '"').join(";");
+  const filas = [linea(["email", "nombre", "idioma", "pedido", "autorizo_en", "retiro_en"])]
+    .concat((results || []).map((r) => linea([r.email, r.nombre, r.idioma, r.origen_ref,
+      r.consentido_en ? selloCO(r.consentido_en) : "", r.baja_en ? selloCO(r.baja_en) : ""])));
+  return new Response("﻿" + filas.join("\r\n") + "\r\n", { headers: {
+    "content-type": "text/csv; charset=utf-8", "cache-control": "no-store",
+    "content-disposition": 'attachment; filename="regalos-noticias.csv"' } });
+}
+
 /* ⚠ Dentro de estas dos plantillas hay que escribir \\n y \\/ : lo que se lee
    aquí no es lo que ejecuta el navegador. Se escribieron SIN barras invertidas,
    comillas invertidas ni interpolaciones, a propósito. El check #1b del gate
@@ -4346,7 +4594,7 @@ function paginaRegalosAdmin() {
   /* La misma paleta de /admin/ruta. Los colores viven SOLO en :root (el check
      #11 del gate cuenta los literales fuera de los bloques de tokens). */
   :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;
-        --amber:#A84D00;--err:#8C2F1E;--sel:#E7EFE6;--blanco:#fff}
+        --amber:#A84D00;--err:#8C2F1E;--sel:#E7EFE6;--blanco:#fff;--rojo:#A61E2D}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:1rem}
   .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 80px}
@@ -4393,6 +4641,20 @@ function paginaRegalosAdmin() {
   .errs{margin:4px 0 10px 18px;font-size:.84rem;color:var(--err)}
   .errs.aviso{color:var(--amber)}
   .tabla{overflow-x:auto}
+  .carta-adm blockquote{margin:10px 0;padding:12px 14px;border-left:3px solid var(--rojo);background:var(--bg);white-space:pre-wrap;font-size:.95rem}
+  .carta-adm video{display:block;width:100%;max-width:420px;border-radius:10px;margin:10px 0;background:var(--ink)}
+  .carta-adm .acc{margin-top:8px}
+  .solo-imprimir{display:none}
+  @media print{
+    body{background:var(--blanco)}
+    .wrap{display:none}
+    .solo-imprimir{display:block}
+    .hoja{page-break-after:always;padding:24px 8px;font-size:1.05rem;line-height:1.6}
+    .hoja h2{font-size:1.3rem;margin:0 0 4px}
+    .hoja .de{margin-top:18px;font-style:italic}
+    .hoja .pie{margin-top:28px;font-size:.8rem;color:var(--mu)}
+    .hoja p.texto{white-space:pre-wrap}
+  }
 </style>
 </head>
 <body>
@@ -4407,6 +4669,7 @@ function paginaRegalosAdmin() {
     <button role="tab" data-tab="ninos" aria-selected="true">Niños y regalos</button>
     <button role="tab" data-tab="cargar" aria-selected="false">Cargar la hoja</button>
     <button role="tab" data-tab="pedidos" aria-selected="false">Pedidos</button>
+    <button role="tab" data-tab="cartas" aria-selected="false">Cartas y videos</button>
     <button role="tab" data-tab="ajustes" aria-selected="false">Campaña y valores</button>
   </div>
 
@@ -4479,6 +4742,20 @@ function paginaRegalosAdmin() {
     </table></div>
   </section>
 
+  <section class="panel" id="p-cartas" hidden>
+    <p class="mu">Son palabras de un adulto para un niño: nada se imprime ni se muestra en la entrega sin aprobar. Si algo
+    trae teléfono, dirección, redes o no es apropiado, recházalo y di por qué: al donante le llega el motivo para corregirlo.</p>
+    <div class="filtros">
+      <label>Mostrar<select id="f-mest"><option value="pendiente">Por revisar</option><option value="aprobado">Aprobadas</option>
+        <option value="rechazado">Rechazadas</option><option value="">Todas</option></select></label>
+      <button class="b chico" id="b-imprimir">Imprimir cartas aprobadas</button>
+      <a class="b chico" href="/api/admin/regalos/noticias.csv">Correos que autorizaron noticias (CSV)</a>
+      <span class="mu" id="n-noticias"></span>
+    </div>
+    <span class="msg" id="m-cartas" role="status"></span>
+    <div id="lista-cartas"><p class="vacio">Cargando…</p></div>
+  </section>
+
   <section class="panel" id="p-ajustes" hidden>
     <div class="caja">
       <h2>Campaña <span class="pill" id="c-pill"></span></h2>
@@ -4512,6 +4789,7 @@ function paginaRegalosAdmin() {
     </div>
   </section>
 </div>
+<div id="imprimir" class="solo-imprimir"></div>
 <script src="/admin/regalos.js"></script>
 </body>
 </html>`;
@@ -4571,7 +4849,59 @@ function cargar(){
 }
 
 function pintar(){
-  pintarCampana(); pintarZonas(); pintarCategorias(); pintarNinos(); pintarPedidos();
+  pintarCampana(); pintarZonas(); pintarCategorias(); pintarNinos(); pintarPedidos(); pintarCartas();
+}
+
+/* Las cartas y los videos. FM es el filtro: por defecto, lo que falta revisar. */
+var FM = "pendiente";
+var ESTADO_CARTA = { pendiente: "Por revisar", aprobado: "Aprobada", rechazado: "Rechazada" };
+function pintarCartas(){
+  var M = (D.mensajes || []).filter(function(m){ return !FM || m.estado === FM; });
+  var pend = (D.mensajes || []).filter(function(m){ return m.estado === "pendiente"; }).length;
+  $("n-noticias").textContent = D.noticias + " correo(s) autorizaron noticias · " + pend + " carta(s) por revisar";
+  if (!M.length) { $("lista-cartas").innerHTML = "<p class='vacio'>No hay cartas en este estado.</p>"; return; }
+  $("lista-cartas").innerHTML = M.map(function(m){
+    var para = m.regalos.map(function(r){ return esc(r.nombre) + " (" + esc(r.codigo) + ")"; }).join(", ");
+    return "<article class='caja carta-adm'>" +
+      "<p><strong class='num'>" + esc(m.pedido_ref) + "</strong> · " + esc(m.nombre) + " <span class='mu'>" + esc(m.email) + "</span> " +
+        "<span class='pill p-" + (m.estado === "aprobado" ? "entregado" : m.estado === "rechazado" ? "fallido" : "pendiente") + "'>" + esc(ESTADO_CARTA[m.estado] || m.estado) + "</span></p>" +
+      "<p class='mu'>Para: " + (para || "todavía sin regalos financiados") + " · pedido " + esc(m.pedido_estado) + " · " + esc(m.actualizado_en || "") + "</p>" +
+      (m.carta ? "<blockquote>" + esc(m.carta) + (m.firma ? "<br><br>— " + esc(m.firma) : "") + "</blockquote>" : "<p class='mu'>Sin carta.</p>") +
+      (m.video ? "<video controls preload='none' src='/api/admin/regalos/video/" + esc(m.pedido_ref) + "'></video><p class='mu'>" +
+        esc(m.video_seg) + " s · " + (Math.round((m.video_bytes || 0) / 104857.6) / 10) + " MB · <a href='/api/admin/regalos/video/" + esc(m.pedido_ref) + "' download>Descargar</a></p>" : "") +
+      (m.motivo ? "<p class='avisos'>Rechazada: " + esc(m.motivo) + "</p>" : "") +
+      (m.revisado_por ? "<p class='mu'>Revisó " + esc(m.revisado_por) + "</p>" : "") +
+      "<div class='acc'>" + (m.estado !== "aprobado" ? "<button class='b chico full' data-aprobar='" + esc(m.pedido_ref) + "'>Aprobar</button>" : "") +
+        (m.estado !== "rechazado" ? "<button class='b chico' data-rechazar='" + esc(m.pedido_ref) + "'>Rechazar</button>" : "") + "</div>" +
+      "</article>";
+  }).join("");
+}
+function revisarCarta(ref, estado){
+  var porque = "";
+  if (estado === "rechazado") {
+    porque = prompt("Por qué no se aprueba la carta o el video de " + ref + " (le llega al donante):", "");
+    if (porque === null) return;
+  }
+  enviar("/api/admin/regalos/mensaje", { ref: ref, estado: estado, motivo: porque }).then(function(d){
+    aviso("m-cartas", ref + (estado === "aprobado" ? " aprobada." : " rechazada." + (d.correo ? " Se le escribió al donante." : "")));
+    return cargar();
+  }).catch(function(e){ aviso("m-cartas", motivo(e), true); });
+}
+/* Una hoja por regalo: el pedido de tres niños imprime tres cartas, una para
+   cada paquete. Solo las aprobadas, y solo para regalos ya financiados. */
+function imprimirCartas(){
+  var hojas = [];
+  (D.mensajes || []).forEach(function(m){
+    if (m.estado !== "aprobado" || !m.carta) return;
+    m.regalos.forEach(function(r){
+      hojas.push("<div class='hoja'><h2>Para " + esc(r.nombre) + "</h2><p class='mu'>" + esc(r.codigo) + " · " + esc(r.zona) + "</p>" +
+        "<p class='texto'>" + esc(m.carta) + "</p>" + (m.firma ? "<p class='de'>" + esc(m.firma) + "</p>" : "") +
+        "<p class='pie'>Fundación Give&amp;Grow International · Navidad 2026 · " + esc(m.pedido_ref) + "</p></div>");
+    });
+  });
+  if (!hojas.length) { aviso("m-cartas", "No hay cartas aprobadas con regalos financiados para imprimir.", true); return; }
+  $("imprimir").innerHTML = hojas.join("");
+  window.print();
 }
 
 function pintarCampana(){
@@ -4869,6 +5199,9 @@ document.addEventListener("click", function(ev){
     return;
   }
   if (t.id === "b-confirmar") { revisarHoja(true); return; }
+  if ((b = t.closest("[data-aprobar]"))) { revisarCarta(b.getAttribute("data-aprobar"), "aprobado"); return; }
+  if ((b = t.closest("[data-rechazar]"))) { revisarCarta(b.getAttribute("data-rechazar"), "rechazado"); return; }
+  if (t.id === "b-imprimir") { imprimirCartas(); return; }
   if (t.id === "b-paso") { aplicarPaso(); return; }
   if (t.id === "b-todos") { filtrados().forEach(function(n){ SEL[n.codigo] = true; }); pintarNinos(); return; }
   if (t.id === "b-ninguno") { SEL = {}; pintarNinos(); return; }
@@ -4896,6 +5229,7 @@ document.addEventListener("change", function(ev){
   }
   if (t.id === "f-fotos" && t.files && t.files.length) { subirLote(t.files); return; }
   if (t.id === "l-paso") { pintarExtrasPaso(); return; }
+  if (t.id === "f-mest") { FM = t.value; pintarCartas(); return; }
   if (t.id === "f-zona" || t.id === "f-estado") { F.zona = $("f-zona").value; F.estado = $("f-estado").value; pintarNinos(); }
 });
 document.addEventListener("input", function(ev){
@@ -43506,13 +43840,16 @@ export default {
         if (ruta === "/api/admin/regalos") return await adminRegalos(env);
         if (ruta === "/api/admin/regalos/plantilla.csv") return adminRegalosPlantilla();
         if (ruta === "/api/admin/regalos/compras.csv") return await adminRegalosCompras(env);
+        if (ruta === "/api/admin/regalos/noticias.csv") return await adminRegalosNoticias(env);
+        const rgv = ruta.match(/^\/api\/admin\/regalos\/video\/(RG-\d{4}-\d{6})$/i);
+        if (rgv) return await adminRegalosVideo(request, env, rgv[1].toUpperCase());
         if (ruta === "/api/admin/regalos/importar") {
           if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
           return await adminRegalosImportar(request, env, sesion.email);
         }
         const rga = ruta.match(/^\/api\/admin\/regalos\/(foto|autorizacion)\/([A-Za-z]{3}-\d{4})$/);
         if (rga) return await adminRegaloArchivo(request, env, rga[2].toUpperCase(), rga[1], sesion.email);
-        const rgx = ruta.match(/^\/api\/admin\/regalos\/(campana|zona|categoria|nino|estado|pedido-confirmar|pedido-anular)$/);
+        const rgx = ruta.match(/^\/api\/admin\/regalos\/(campana|zona|categoria|nino|estado|mensaje|pedido-confirmar|pedido-anular)$/);
         if (rgx) return await adminRegalosAccion(request, env, rgx[1], sesion.email);
         /* El número va en la ruta con su forma exacta, igual que el aporte:
            cualquier otra cosa ni siquiera entra a la función. */
@@ -43749,6 +44086,10 @@ export default {
         /* Regalos de diciembre (0048) */
         if (ruta === "/api/regalos")        return await apiRegalos(env);
         if (ruta === "/api/regalos/pedido") return await apiRegalosPedido(request, env, url);
+        const rgm = ruta.match(/^\/api\/regalos\/pedido\/(RG-\d{4}-\d{6})\/(mensaje|video)$/i);
+        if (rgm) return rgm[2].toLowerCase() === "video"
+          ? await apiRegalosVideo(request, env, rgm[1].toUpperCase(), url.searchParams.get("t"), url)
+          : await apiRegalosMensaje(request, env, rgm[1].toUpperCase(), url.searchParams.get("t"));
         const rgp = ruta.match(/^\/api\/regalos\/pedido\/(RG-\d{4}-\d{6})$/i);
         if (rgp) return await apiRegalosSeguimiento(env, rgp[1].toUpperCase(), url.searchParams.get("t"));
         const rgf = ruta.match(/^\/api\/regalos\/foto\/([A-Za-z]{3}-\d{4})$/);

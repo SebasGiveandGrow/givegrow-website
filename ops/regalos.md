@@ -48,3 +48,20 @@ y talla. Los correos al donante salen al financiarse, al despacharse y al
 entregarse: uno por pedido, nunca uno por regalo. «Comprado» no manda correo:
 con mil regalos el cupo diario de correo (1600) se guarda para lo que el
 donante espera saber.
+
+## Cartas, videos y noticias (0049)
+
+- El donante puede dejar **una carta y un video** (de 30 s a 1 min, hasta 90 MB)
+  por pedido. Se graban desde el teléfono o se suben, al pagar o después desde
+  el enlace de seguimiento, mientras ningún regalo del pedido se haya entregado.
+- **Nada se entrega sin revisar.** En `/admin/regalos › Cartas y videos` se
+  aprueba o se rechaza. Rechazar pide decir por qué: el motivo le llega al
+  donante para corregirlo. Cambiar la carta o el video la vuelve a poner en
+  «por revisar».
+- «Imprimir cartas aprobadas» saca una hoja por regalo financiado. La lista de
+  compras marca qué regalos llevan carta o video.
+- El video nunca se publica: solo lo sirve `/admin`, y el equipo lo muestra en
+  la entrega (se puede descargar desde la tarjeta).
+- **Noticias:** la casilla nace desmarcada (Ley 1581). Quien la marca queda en
+  «Correos que autorizaron noticias (CSV)». Al escribirles, cada correo tiene
+  que decir cómo retirar la autorización.

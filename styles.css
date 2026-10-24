@@ -2193,6 +2193,11 @@ html[data-theme="dark"] #page-regalos{
 #page-regalos::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--plata);opacity:.5;
   -webkit-mask:var(--rg-copos) 0 0/240px 240px repeat;mask:var(--rg-copos) 0 0/240px 240px repeat}
 #page-regalos section,#page-regalos section.cream{background:transparent}
+/* `hidden` tiene que ganar SIEMPRE en esta página: varias piezas (.ally-check,
+   .rg-cert-datos) declaran su propio display y lo pisaban. Así se veían los
+   campos del certificado sin marcar la casilla, y la opción en dólares sin
+   aliada configurada. */
+#page-regalos [hidden]{display:none!important}
 /* De noche el menú es transparente hasta hacer scroll y su tinta es clara:
    sobre esta página blanca desaparecía. Aquí va sólido desde el principio. */
 html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-bg);box-shadow:0 1px 0 var(--bd)}
@@ -2227,11 +2232,19 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 .rg-luces-p{font-size:var(--fs-14);color:var(--mu);max-width:62ch;margin:0}
 .rg-zonas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:26px;align-items:end}
 .rg-zona{min-width:0}
-.rg-luces{display:grid;grid-template-columns:repeat(var(--rg-cols,20),minmax(0,1fr));gap:6px;margin-bottom:16px}
-.rg-l{display:block;aspect-ratio:1;border-radius:50%;background:var(--plata);transform:scale(.62)}
-.rg-l.is-f,.rg-l.is-e{transform:none}
-.rg-l.is-f{background:var(--oro);box-shadow:0 0 5px var(--oro)}
-.rg-l.is-e{background:var(--rojo);box-shadow:0 0 0 2px var(--oro)}
+.rg-luces{width:var(--rg-ancho,100%);margin:0 auto 18px}
+.rg-arbol{display:block;width:100%;height:auto;overflow:visible}
+.rg-arbol .rg-l{fill:var(--plata)}
+.rg-arbol .rg-l.is-f{fill:var(--oro)}
+.rg-arbol .rg-l.is-e{fill:var(--rojo);stroke:var(--oro);stroke-width:1.2}
+.rg-astro{fill:none;stroke:var(--oro);stroke-width:1}
+.rg-astro.is-llena{fill:var(--oro)}
+.rg-tronco{fill:var(--oro-texto)}
+.rg-follaje{fill:var(--gl);stroke:var(--gl);stroke-width:6;stroke-linejoin:round}
+/* La leyenda usa las mismas tres luces, dibujadas como puntos. */
+.rg-leyenda .rg-l{display:block;width:10px;aspect-ratio:1;border-radius:50%;background:var(--plata)}
+.rg-leyenda .rg-l.is-f{background:var(--oro)}
+.rg-leyenda .rg-l.is-e{background:var(--rojo);box-shadow:0 0 0 2px var(--oro)}
 @media (prefers-reduced-motion:no-preference){
   .rg-luces .rg-l.is-f{animation:rg-titila 4.5s ease-in-out infinite}
   .rg-luces .rg-l.is-f:nth-child(3n){animation-delay:-1.5s}
@@ -2244,7 +2257,6 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 .rg-zona-d{font-size:var(--fs-13);color:var(--mu);margin:2px 0 0;font-variant-numeric:tabular-nums}
 .rg-leyenda{list-style:none;display:flex;flex-wrap:wrap;gap:8px 22px;margin:28px 0 0;padding:16px 0 0;border-top:1px solid var(--plata-suave);font-size:var(--fs-13);color:var(--mu)}
 .rg-leyenda li{display:flex;align-items:center;gap:8px}
-.rg-leyenda .rg-l{width:10px}
 .rg-pasos{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:20px}
 .rg-pasos .step::before{background:var(--rojo);color:var(--on-dark)}
 .rg-cerrada{margin:0 0 14px}
@@ -2306,6 +2318,22 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 .rg-cert-datos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 12px;margin-top:4px}
 .rg-cert-usd{font-size:var(--fs-13);margin:0 0 12px}
 .rg-msg{margin:12px 0 0;font-size:var(--fs-14)}
+.rg-carta{border:1px solid var(--plata);border-top:3px solid var(--rojo);border-radius:var(--r);padding:16px 16px 6px;margin:6px 0 16px;background:var(--surface)}
+.rg-carta legend{font-weight:700;font-size:var(--fs-14);padding:0 6px}
+.rg-ayuda{font-size:var(--fs-13);color:var(--mu);margin:0 0 12px}
+.rg-cuenta-c{display:block;text-align:right;font-size:var(--fs-12);color:var(--mu);margin-top:4px;font-variant-numeric:tabular-nums}
+.rg-video{margin:4px 0 14px}
+.rg-video-t{font-weight:700;font-size:var(--fs-14);margin:0 0 8px}
+.rg-video-acc{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.rg-video-btn{padding:9px 16px;font-size:var(--fs-14);cursor:pointer}
+.rg-video-btn:hover{transform:none}
+.rg-video-info{font-size:var(--fs-13);color:var(--mu);margin:8px 0 0}
+.rg-seg-carta{max-width:640px;margin-top:28px;padding-top:20px;border-top:1px solid var(--plata)}
+.rg-seg-estado{font-size:var(--fs-14);font-weight:700;color:var(--oro-texto);margin:6px 0 10px}
+.rg-seg-estado.is-aprobado{color:var(--acc)}
+.rg-seg-estado.is-rechazado{color:var(--rojo)}
+.rg-seg-texto{margin:0 0 10px;padding:14px 16px;border-left:3px solid var(--rojo);background:var(--plata-suave);font-family:"Fraunces",serif;font-style:italic;font-size:var(--fs-16);line-height:1.55;white-space:pre-wrap}
+.rg-seg-firma{display:block;margin-top:8px;font-style:normal;font-size:var(--fs-13);color:var(--mu)}
 .rg-usd-ok{max-width:640px}
 .rg-usd-t{font-size:var(--fs-h3);font-weight:700;margin:0 0 10px}
 .rg-ref{font-family:var(--font-display);font-size:var(--fs-h2);color:var(--rojo);margin:14px 0}
@@ -2326,7 +2354,6 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 @media (max-width:820px){
   .rg-zonas,.rg-pasos,.rg-pagar{grid-template-columns:1fr}
   .rg-zonas{gap:30px}
-  .rg-luces{gap:3px}
   .rg-pagar{gap:24px}
   .rg-fetq{min-width:0;width:100%}
 }
