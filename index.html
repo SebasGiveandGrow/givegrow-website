@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=9ca2ee53">
+<link rel="stylesheet" href="/styles.css?v=fd13ad72">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=fc8a7fcb" defer></script>
+<script src="/app.js?v=c3dd4d28" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -3961,14 +3961,13 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
   <span>ALMA</span>
 </button>
-<!-- ALMA se presenta una vez, junto a su botón (14 oct 2026). Ver initAlmaIntro
-     en app.js. Sin rol de diálogo: es un aviso, no se roba el foco. -->
+<!-- ALMA invita con preguntas de la página (17 oct 2026). Las preguntas las pinta
+     initAlmaIntro en app.js según la ruta. Sin rol de diálogo: es una sugerencia,
+     no se roba el foco ni se anuncia. -->
 <aside id="alma-intro" class="alma-intro" aria-labelledby="alma-intro-t" hidden>
-  <button type="button" class="alma-intro-x" data-act="almaIntro(false)" data-i18n="alma.intro.x" data-i18n-attr="aria-label" aria-label="Cerrar este aviso">&times;</button>
-  <span class="alma-intro-ey" data-i18n="alma.intro.ey">ALMA · la asistente de Give&amp;Grow</span>
-  <p class="alma-intro-t" id="alma-intro-t" data-i18n="alma.intro.t">¿Quieres saber algo puntual o llegar a algún lugar?</p>
-  <p class="alma-intro-p" data-i18n="alma.intro.p">Pregúntale a ALMA. Responde sobre donaciones, certificados, empresas y fundaciones, y te lleva a la página que buscas.</p>
-  <button type="button" class="btn btn-g alma-intro-b" data-act="almaIntro(true)" data-i18n="alma.intro.b">Preguntarle a ALMA</button>
+  <p class="alma-intro-t" id="alma-intro-t" data-i18n="alma.intro.t">Pregúntale a ALMA, por ejemplo:</p>
+  <ul class="alma-intro-qs" id="alma-intro-qs"></ul>
+  <button type="button" class="alma-intro-x" data-act="almaIntroCerrar()" data-i18n="alma.intro.x" data-i18n-attr="aria-label" aria-label="Cerrar las sugerencias de ALMA">&times;</button>
 </aside>
 <div id="alma-scrim" class="alma-scrim" data-act="almaPanel(false)"></div>
 <aside id="alma-panel" class="alma-panel" role="dialog" aria-modal="true" aria-labelledby="alma-panel-t">
