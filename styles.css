@@ -2240,7 +2240,7 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
     linear-gradient(0deg,transparent calc(50% - 2px),var(--rojo) calc(50% - 2px),var(--rojo) calc(50% + 2px),transparent calc(50% + 2px)),
     var(--plata-suave)}
 .rg-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.rg-ini{display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:var(--surface);border:2px solid var(--oro);
+.rg-ini{display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:var(--plata-suave);border:2px solid var(--oro);
   font-family:"Fraunces",serif;font-style:italic;font-size:var(--fs-h3);color:var(--oro-texto)}
 .rg-cuerpo{display:flex;flex-direction:column;flex:1;padding:14px 16px 16px}
 .rg-para{font-size:var(--fs-eyebrow);font-weight:800;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--rojo);margin:0 0 2px}
