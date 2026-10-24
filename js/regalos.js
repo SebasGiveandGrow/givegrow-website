@@ -13,6 +13,11 @@ var RG = {
   lista: []
 };
 var RG_PAGINA = 24;
+/* El moño del regalo envuelto (las tarjetas sin foto). */
+var RG_MONO = '<span class="rg-mono" aria-hidden="true"><svg viewBox="0 0 48 30">' +
+  '<path class="rg-cola" d="M20 15l-7 12M28 15l7 12"/>' +
+  '<path class="rg-lazo" d="M24 14C18 2 5 1 5 8.5c0 6.5 11 7.5 19 5.5zM24 14c6-12 19-13 19-5.5 0 6.5-11 7.5-19 5.5z"/>' +
+  '<circle class="rg-lazo" cx="24" cy="14" r="3.6"/></svg></span>';
 var RG_ANGOSTO = window.matchMedia("(max-width:820px)");
 if (RG_ANGOSTO.addEventListener) RG_ANGOSTO.addEventListener("change", function(){ if (RG.datos) rgPintaZonas(); });
 /* Ícono de regalo, line-art como todos los del sitio (DESIGN_SYSTEM.md, regla 2). */
@@ -168,7 +173,7 @@ function rgTarjeta(r, recibe){
   var libre = r.estado === "disponible";
   var foto = r.foto
     ? '<img src="/api/regalos/foto/' + encodeURIComponent(r.codigo) + '" alt="' + rgEsc(t("rg.foto.alt").replace("{n}", r.nombre)) + '" loading="lazy" decoding="async" width="320" height="240">'
-    : '<span class="rg-ini" aria-hidden="true">' + rgEsc(String(r.nombre || "?").charAt(0)) + '</span>';
+    : RG_MONO + '<span class="rg-ini" aria-hidden="true">' + rgEsc(String(r.nombre || "?").charAt(0)) + '</span>';
   var accion;
   if (libre && recibe) {
     accion = '<button type="button" class="btn ' + (enLista ? 'btn-g' : 'btn-o') + ' rg-add" aria-pressed="' + enLista +

@@ -2181,17 +2181,47 @@ html[data-theme="dark"] #page-regalos{
   --err:#8C2F1E;--ok:#1F5C38;
   --shadow:0 2px 8px rgba(0,0,0,.06);--shadow-lg:0 10px 30px rgba(0,0,0,.10);
   background:#fff;color:#191813;
+  /* Los dos dibujos de los detalles, como máscaras: el color lo pone el token
+     (--plata, --oro), así que el SVG solo dice la forma. */
+  --rg-copos:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240' fill='none' stroke='black' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath transform='translate(42 50)' d='M0-9V9M-7.8-4.5L7.8 4.5M-7.8 4.5L7.8-4.5M0-9l-2.4-2.4M0-9l2.4-2.4M0 9l-2.4 2.4M0 9l2.4 2.4M-7.8-4.5l-.9 3.3M-7.8-4.5l3.3-.9M7.8 4.5l.9-3.3M7.8 4.5l-3.3.9M-7.8 4.5l3.3.9M-7.8 4.5l-.9-3.3M7.8-4.5l-3.3-.9M7.8-4.5l.9 3.3'/%3E%3Cpath transform='translate(176 34) scale(.7)' d='M0-9V9M-7.8-4.5L7.8 4.5M-7.8 4.5L7.8-4.5M0-9l-2.4-2.4M0-9l2.4-2.4M0 9l-2.4 2.4M0 9l2.4 2.4M-7.8-4.5l-.9 3.3M-7.8-4.5l3.3-.9M7.8 4.5l.9-3.3M7.8 4.5l-3.3.9M-7.8 4.5l3.3.9M-7.8 4.5l-.9-3.3M7.8-4.5l-3.3-.9M7.8-4.5l.9 3.3'/%3E%3Cpath transform='translate(138 146) scale(.9)' d='M0-9V9M-7.8-4.5L7.8 4.5M-7.8 4.5L7.8-4.5M0-9l-2.4-2.4M0-9l2.4-2.4M0 9l-2.4 2.4M0 9l2.4 2.4M-7.8-4.5l-.9 3.3M-7.8-4.5l3.3-.9M7.8 4.5l.9-3.3M7.8 4.5l-3.3.9M-7.8 4.5l3.3.9M-7.8 4.5l-.9-3.3M7.8-4.5l-3.3-.9M7.8-4.5l.9 3.3'/%3E%3Cpath transform='translate(214 196) scale(.55)' d='M0-9V9M-7.8-4.5L7.8 4.5M-7.8 4.5L7.8-4.5M0-9l-2.4-2.4M0-9l2.4-2.4M0 9l-2.4 2.4M0 9l2.4 2.4M-7.8-4.5l-.9 3.3M-7.8-4.5l3.3-.9M7.8 4.5l.9-3.3M7.8 4.5l-3.3.9M-7.8 4.5l3.3.9M-7.8 4.5l-.9-3.3M7.8-4.5l-3.3-.9M7.8-4.5l.9 3.3'/%3E%3Cpath transform='translate(96 104)' fill='black' stroke='none' d='M0-7C.8-1.2 1.2-.8 7 0C1.2.8.8 1.2 0 7C-.8 1.2-1.2.8-7 0C-1.2-.8-.8-1.2 0-7Z'/%3E%3Cpath transform='translate(40 190) scale(.8)' fill='black' stroke='none' d='M0-7C.8-1.2 1.2-.8 7 0C1.2.8.8 1.2 0 7C-.8 1.2-1.2.8-7 0C-1.2-.8-.8-1.2 0-7Z'/%3E%3Cpath transform='translate(214 108) scale(.6)' fill='black' stroke='none' d='M0-7C.8-1.2 1.2-.8 7 0C1.2.8.8 1.2 0 7C-.8 1.2-1.2.8-7 0C-1.2-.8-.8-1.2 0-7Z'/%3E%3Ccircle cx='128' cy='26' r='1.6' fill='black' stroke='none'/%3E%3Ccircle cx='18' cy='120' r='1.3' fill='black' stroke='none'/%3E%3Ccircle cx='92' cy='222' r='1.5' fill='black' stroke='none'/%3E%3Ccircle cx='186' cy='150' r='1.2' fill='black' stroke='none'/%3E%3C/svg%3E");
+  --rg-estrella:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-8 -8 16 16'%3E%3Cpath fill='black' d='M0-7C.8-1.2 1.2-.8 7 0C1.2.8.8 1.2 0 7C-.8 1.2-1.2.8-7 0C-1.2-.8-.8-1.2 0-7Z'/%3E%3C/svg%3E");
 }
-#page-regalos section.cream{background:var(--surface)}
+/* EL FONDO: copos de nieve y destellos en plata, muy tenues, detrás de toda
+   la página. Las tarjetas y los campos son blancos y lo tapan: el dibujo solo
+   se asoma en los márgenes, nunca debajo de un texto que haya que leer. */
+#page-regalos{position:relative;isolation:isolate}
+#page-regalos::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--plata);opacity:.5;
+  -webkit-mask:var(--rg-copos) 0 0/240px 240px repeat;mask:var(--rg-copos) 0 0/240px 240px repeat}
+#page-regalos section,#page-regalos section.cream{background:transparent}
 /* De noche el menú es transparente hasta hacer scroll y su tinta es clara:
    sobre esta página blanca desaparecía. Aquí va sólido desde el principio. */
 html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-bg);box-shadow:0 1px 0 var(--bd)}
 /* La cinta entre secciones: un filo rojo y otro dorado, como la de un regalo. */
-#page-regalos > section + section{border-top:1px solid var(--plata-suave)}
+#page-regalos > section + section{position:relative;border-top:1px solid var(--plata)}
+/* La estrella del separador, sobre un disco blanco que la despega de la línea. */
+#page-regalos > section + section::before{content:"";position:absolute;top:-15px;left:50%;width:30px;height:30px;margin-left:-15px;border-radius:50%;background:var(--surface)}
+#page-regalos > section + section::after{content:"";position:absolute;top:-10px;left:50%;width:20px;height:20px;margin-left:-10px;background:var(--oro);
+  -webkit-mask:var(--rg-estrella) center/contain no-repeat;mask:var(--rg-estrella) center/contain no-repeat}
 .rg-portada{position:relative}
 .rg-portada::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;
   background:linear-gradient(var(--rojo) 0 2px,var(--oro) 2px 4px)}
-.rg-portada .ey{color:var(--rojo)}
+.rg-portada .ey{color:var(--rojo);display:inline-flex;align-items:center;gap:8px}
+.rg-portada .ey::before{content:"";width:12px;height:12px;background:var(--oro);
+  -webkit-mask:var(--rg-estrella) center/contain no-repeat;mask:var(--rg-estrella) center/contain no-repeat}
+/* LA GUIRNALDA: un hilo plata con bombillos en los cuatro colores, colgado
+   del borde de arriba. Titila despacio, salvo con movimiento reducido. */
+.rg-portada{padding-top:104px}
+.rg-guirnalda{position:absolute;top:0;left:0;width:100%;height:56px;pointer-events:none}
+.rg-guirnalda .rg-hilo{fill:none;stroke:var(--plata);stroke-width:1.5}
+.rg-guirnalda .rg-tapa{fill:var(--oro-texto)}
+.rg-guirnalda .is-r{fill:var(--rojo)}
+.rg-guirnalda .is-o{fill:var(--oro)}
+.rg-guirnalda .is-v{fill:var(--g)}
+.rg-guirnalda .is-p{fill:var(--plata)}
+@media (prefers-reduced-motion:no-preference){
+  .rg-guirnalda .rg-bomb:nth-of-type(2n){animation:rg-titila 3.2s ease-in-out infinite}
+  .rg-guirnalda .rg-bomb:nth-of-type(3n){animation:rg-titila 4.1s ease-in-out infinite;animation-delay:-1.4s}
+}
 .rg-h1{max-width:20ch}
 .rg-luces-t{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:var(--fs-h3);color:var(--oro-texto);margin:44px 0 6px}
 .rg-luces-p{font-size:var(--fs-14);color:var(--mu);max-width:62ch;margin:0}
@@ -2240,7 +2270,11 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
     linear-gradient(0deg,transparent calc(50% - 2px),var(--rojo) calc(50% - 2px),var(--rojo) calc(50% + 2px),transparent calc(50% + 2px)),
     var(--plata-suave)}
 .rg-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.rg-ini{display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:var(--plata-suave);border:2px solid var(--oro);
+.rg-mono{position:absolute;left:50%;top:calc(50% - 62px);width:56px;transform:translateX(-50%);z-index:1}
+.rg-mono svg{display:block;width:100%;height:auto}
+.rg-mono .rg-lazo{fill:var(--rojo)}
+.rg-mono .rg-cola{fill:none;stroke:var(--rojo);stroke-width:4;stroke-linecap:round}
+.rg-ini{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:var(--plata-suave);border:2px solid var(--oro);
   font-family:"Fraunces",serif;font-style:italic;font-size:var(--fs-h3);color:var(--oro-texto)}
 .rg-cuerpo{display:flex;flex-direction:column;flex:1;padding:14px 16px 16px}
 .rg-para{font-size:var(--fs-eyebrow);font-weight:800;letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--rojo);margin:0 0 2px}
