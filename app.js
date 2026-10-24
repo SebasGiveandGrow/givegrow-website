@@ -2226,9 +2226,9 @@ var I18N = {
     "sf.inv.me.btn":"Ver medición",
     "sf.inv.docs":"¿Financias desde el exterior? Recibimos aportes en dólares por PayPal, a nombre de la Fundación, y reportamos en inglés. ¿Necesitas el RUT, el certificado de existencia u otro documento para tu debida diligencia? Escríbenos a contacto@thegiveandgrowproject.org y te lo enviamos.",
     /* Regalos de diciembre (#regalos, migración 0048) */
-    "rg.ey":"Regalos de diciembre 2026",
+    "rg.ey":"Navidad 2026",
     "rg.h1":"Mil regalos para niñas y niños de Uribia, Medellín y Leticia.",
-    "rg.lead":"Cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge uno o varios, págalo en pesos o en dólares y sigue su recorrido hasta la entrega, que queda registrada en un acta.",
+    "rg.lead":"Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.",
     "rg.seg.h":"El recorrido de tus regalos",
     "rg.pronto.t":"Muy pronto.",
     "rg.pronto.p":"Estamos recogiendo, con la autorización escrita de cada acudiente, los deseos de los niños de las tres zonas. Cuando las listas estén revisadas, aquí vas a poder escoger a quién regalar.",
@@ -2241,6 +2241,13 @@ var I18N = {
     "rg.como.3.p":"Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.",
     "rg.lista.h":"Escoge a quién regalar",
     "rg.cerrada":"La campaña ya no recibe donaciones. Aquí puedes ver cómo avanzan los regalos.",
+    "rg.luces.t":"Una luz por cada niño",
+    "rg.luces.p":"Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.",
+    "rg.luz.esp":"Esperando su regalo",
+    "rg.luz.fin":"Regalo financiado",
+    "rg.luz.ent":"Entregado, con acta",
+    "rg.para":"Para",
+    "rg.deseo":"“{d}”",
     "rg.mas":"Ver más",
     "rg.privnota":"Para proteger a los niños solo publicamos su nombre de pila, su edad, su zona y el regalo que pidieron, y su foto únicamente si su acudiente lo autorizó por escrito. Nunca publicamos apellidos, direcciones ni datos de contacto, y no hay contacto directo entre donantes y niños.",
     "rg.pagar.h":"Tu lista de regalos",
@@ -3258,7 +3265,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59f5f70b", regalos: "1698b8eb" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59f5f70b", regalos: "75557103" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos" };

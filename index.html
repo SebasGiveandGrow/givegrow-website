@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=d2814365">
+<link rel="stylesheet" href="/styles.css?v=c1c806bd">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=a3bd7f93" defer></script>
+<script src="/app.js?v=71a3268d" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1278,14 +1278,23 @@
     <span id="rg-barra-t"></span>
     <button type="button" class="btn btn-g" data-act="rgIrAPagar()" data-i18n="rg.barra.ir">Continuar</button>
   </div>
-  <section>
+  <!-- LA FIRMA DE LA PÁGINA: una luz por cada niño de la meta, agrupadas por
+       zona. Se enciende en dorado cuando su regalo queda financiado y brilla
+       con anillo cuando se entrega con acta. Es un dato de la base, no un
+       adorno: antes de abrir la campaña, las mil esperan apagadas. -->
+  <section class="rg-noche">
     <div class="wrap">
-      <span class="ey rv" data-i18n="rg.ey">Regalos de diciembre 2026</span>
+      <span class="ey rv" data-i18n="rg.ey">Navidad 2026</span>
       <h1 class="h-sec rg-h1 rv" data-i18n="rg.h1">Mil regalos para niñas y niños de Uribia, Medellín y Leticia.</h1>
-      <p class="lead rv d1" data-i18n="rg.lead">Cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge uno o varios, págalo en pesos o en dólares y sigue su recorrido hasta la entrega, que queda registrada en un acta.</p>
-      <!-- LA FIRMA DE LA PÁGINA: las tres zonas como un libro de cuentas, con la
-           meta y lo que de verdad va financiado y entregado, leído de la base. -->
+      <p class="lead rv d1" data-i18n="rg.lead">Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.</p>
+      <h2 class="rg-luces-t rv d2" data-i18n="rg.luces.t">Una luz por cada niño</h2>
+      <p class="rg-luces-p rv d2" data-i18n="rg.luces.p">Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.</p>
       <div class="rg-zonas rv d2" id="rg-zonas" aria-live="polite"></div>
+      <ul class="rg-leyenda rv d2">
+        <li><span class="rg-l" aria-hidden="true"></span><span data-i18n="rg.luz.esp">Esperando su regalo</span></li>
+        <li><span class="rg-l is-f" aria-hidden="true"></span><span data-i18n="rg.luz.fin">Regalo financiado</span></li>
+        <li><span class="rg-l is-e" aria-hidden="true"></span><span data-i18n="rg.luz.ent">Entregado, con acta</span></li>
+      </ul>
     </div>
   </section>
 
