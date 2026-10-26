@@ -16318,12 +16318,12 @@ const ALMA_IND_TTL = 10 * 60 * 1000;
 const ALMA_IND_TTL_FALLO = 60 * 1000;
 let almaIndCache = { hasta: 0, texto: "" };
 
-async function almaContextoIndicadores(env, origen) {
+async function almaContextoIndicadores(env) {
   const ahora = Date.now();
   if (ahora < almaIndCache.hasta) return almaIndCache.texto;
   let texto = "", ttl = ALMA_IND_TTL;
   try {
-    texto = await almaArmarIndicadores(env, origen);
+    texto = await almaArmarIndicadores(env);
     /* Vacío también puede ser D1 caída (existeTabla se traga el error): se
        reintenta pronto, como un fallo. */
     if (!texto) ttl = ALMA_IND_TTL_FALLO;
@@ -16335,21 +16335,33 @@ async function almaContextoIndicadores(env, origen) {
   return texto;
 }
 
-async function almaArmarIndicadores(env, origen) {
+/* Las fuentes y notas se escriben para el panel: nombran herramientas internas
+   (/admin, Drive, la sección Red), a quien registró el dato o una «prueba
+   anulada». ALMA no debe repetir nada de eso, y una regla en el prompt no
+   alcanza con Haiku: se quita aquí. Se borran los paréntesis que nombran el
+   panel o a una persona, el prefijo «Reportado por X (fecha):» y las frases
+   enteras que hablan de herramientas o tablas. */
+const ALMA_IND_INTERNO = /\b(drive|\/admin|impactos|tabla|prueba anulada|conteo autom[aá]tico|marcado all[ií]|planilla|se anotan)\b/i;
+function almaLimpiarInterno(t) {
+  if (!t) return "";
+  return String(t)
+    .replace(/^Reportado por [^:]*:\s*/i, "")
+    .replace(/\s*\([^)]*(\/admin|Sebas|confirmado)[^)]*\)/gi, "")
+    .split(/(?<=[.;])\s+/)
+    .map((f) => f.split(/;\s*/).filter((p) => !ALMA_IND_INTERNO.test(p)).join("; "))
+    .filter((f) => f.trim() && !ALMA_IND_INTERNO.test(f))
+    .join(" ").replace(/\s{2,}/g, " ").replace(/[;,]\s*$/, "").trim();
+}
+
+async function almaArmarIndicadores(env) {
   if (!env.DB) return "";
   const L = await melLeer(env, false);
   if (!L) return "";
   const activos = L.ind.filter((i) => i.activo);
   if (!activos.length) return "";
 
-  /* ¿Existe ya la página de la teoría de cambio? La SPA la reconoce si hay un
-     `page-<ruta>` en index.html (isSpaRoute en app.js); una ruta que no existe
-     el chat la deja como texto suelto, así que solo se nombra si está. */
-  let paginas = "#medicion o #transparencia";
-  try {
-    const r = await env.ASSETS.fetch(new URL("/", origen));
-    if (r.ok && (await r.text()).includes('id="page-teoria-de-cambio"')) paginas = "#teoria-de-cambio (o #transparencia)";
-  } catch { /* sin la página nueva, se queda en #medicion */ }
+  /* La página que explica cómo se mide (#601, en producción desde el 26 oct). */
+  const paginas = "#teoria-de-cambio (o #transparencia)";
 
   const conDato = [], sinDato = [];
   for (const i of activos) {
@@ -16359,11 +16371,17 @@ async function almaArmarIndicadores(env, origen) {
     const partes = ["- #" + i.numero + " " + i.nombre + ": " + (melValorDicho(u, i.unidad) || "sin valor"),
       "periodo: " + periodo, "corte: " + fechaDicha(u.corte),
       u.origen === "sugerido" ? "CALCULADO por el sistema" : "REPORTADO (registrado a mano)",
-      "fuente: " + u.fuente_detalle];
-    if (u.nota) partes.push("nota: " + u.nota);
+      "fuente: " + (almaLimpiarInterno(u.fuente_detalle) || "registro de la Fundación")];
+    const nota = almaLimpiarInterno(u.nota);
+    if (nota) partes.push("nota: " + nota);
     conDato.push(partes.join(" · "));
   }
   const validados = activos.filter((i) => i.validado_en).length;
+  /* Lo que cambió DESPUÉS del último corte y el modelo no puede deducir: la
+     medición de quejas del T3 dice «sin mecanismo», que era cierto al 30 sep,
+     pero el canal existe desde el 26 oct (#606). */
+  const hoy = [];
+  if (await existeTabla(env, "quejas")) hoy.push("- Desde el 26 de octubre de 2026 ya existe el canal de quejas, sugerencias y felicitaciones en #quejas (también hay una vía confidencial). La medición de quejas de arriba es anterior: su primer dato con el canal será el del trimestre en curso.");
 
   return ["", "", "=== INDICADORES DE GIVE&GROW (mediciones registradas, datos en vivo) ===",
     "Son " + activos.length + " indicadores. " + (validados === activos.length ? "Todos están validados."
@@ -16372,6 +16390,7 @@ async function almaArmarIndicadores(env, origen) {
     "CON MEDICIÓN (el valor ya viene calculado: no lo cambies, solo ajusta la gramática):",
     ...conDato,
     ...(sinDato.length ? ["TODAVÍA NO SE MIDEN (no tienen ninguna medición registrada):", ...sinDato] : []),
+    ...(hoy.length ? ["CAMBIOS DESPUÉS DEL ÚLTIMO CORTE:", ...hoy] : []),
     "=== FIN DE INDICADORES ===",
     "Reglas para hablar de logros, resultados o cifras de Give&Grow:",
     "- Responde SOLO con estas cifras. Si lo que preguntan no está aquí, di que todavía no se mide o no hay dato; no lo estimes.",
@@ -16500,7 +16519,7 @@ async function apiAlma(request, env, url) {
   const system = ALMA_SYS + (await almaContextoRed(env, url.origin))
                               + (await almaContextoGratitud(env, url.origin))
                               + almaContextoEvento()
-                              + (await almaContextoIndicadores(env, url.origin));
+                              + (await almaContextoIndicadores(env));
 
   /* EL WORKSPACE, y por qué es condicional.
 
