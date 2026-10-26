@@ -1465,7 +1465,7 @@ var I18N = {
     "std.chs.c4":"4 · Comunicación y participación",
     "std.chs.c4.p":"Cada familia recibe un enlace privado donde ve en qué va su caso y puede sumar material si se lo piden. Y publicamos lo que NO va a recibir con el mismo énfasis que lo que sí: no hay letra chica al final.",
     "std.chs.c5":"5 · Quejas atendidas",
-    "std.chs.c5.p":"Hoy solo existe la ruta de protección de datos ante la Superintendencia de Industria y Comercio. El mecanismo general, con una ruta confidencial separada de la ordinaria, está redactado y pendiente de adopción por el máximo órgano de dirección que definen los estatutos, que hoy es el fundador: la Fundación todavía no tiene junta directiva.",
+    "std.chs.c5.p":"Ya existe el canal para recibir quejas, sugerencias y reportes, con una ruta confidencial separada de la ordinaria y la opción de no identificarse. Lo que sigue pendiente es la política que lo gobierna —el punto focal de salvaguarda y los plazos de respuesta—, que debe adoptar el máximo órgano de dirección que definen los estatutos, que hoy es el fundador: la Fundación todavía no tiene junta directiva.",
     "std.chs.c6":"6 · Respuesta coordinada",
     "std.chs.c6.p":"Trabajamos con fundaciones aliadas verificadas y remitimos a la autoridad municipal lo que le corresponde. Todavía no participamos en mecanismos formales de coordinación humanitaria.",
     "std.chs.c7":"7 · Aprendizaje continuo",
@@ -1474,7 +1474,79 @@ var I18N = {
     "std.chs.c8.p":"La matrícula de cada ingeniero se verifica a mano en el registro público del COPNIA. Es el único filtro del proyecto y no lo queremos automático. El código de conducta está redactado y pendiente de adopción por el máximo órgano de dirección que definen los estatutos (hoy, el fundador).",
     "std.chs.c9":"9 · Recursos bien manejados",
     "std.chs.c9.p":"Ningún voluntario recibe ni custodia dinero: todo aporte entra por pasarela o por cuenta bancaria a nombre de la Fundación, genera número de guía y su entrega se documenta con acta firmada por quien recibe. El certificado de donación lo firman el Representante Legal y la Revisora Fiscal bajo la gravedad de juramento.",
-    "std.chs.nota":"Ningún compromiso aparece aquí como cumplido si no podemos mostrar con qué. Cuatro van a medias y uno no existe todavía: decirlo es más útil, para quien nos evalúa y para nosotros, que un cuadro entero en verde que no resistiría diez minutos de comprobación.",
+    "std.chs.nota":"Ningún compromiso aparece aquí como cumplido si no podemos mostrar con qué. Cuatro van a medias y uno sigue en construcción: decirlo es más útil, para quien nos evalúa y para nosotros, que un cuadro entero en verde que no resistiría diez minutos de comprobación.",
+    "nav.quejas":"Quejas y sugerencias",
+    "qj.ey":"Quejas y sugerencias",
+    "qj.t":"Dinos qué salió mal, qué podemos mejorar o qué salió bien.",
+    "qj.lead":"Cada mensaje lo lee una persona de la fundación. Puedes escribir sin decir quién eres: al enviar recibes un código, y con él consultas aquí en qué va.",
+    "qj.ir.conf":"¿Es sobre una conducta inapropiada, un abuso o un acto de corrupción? Hay una ruta confidencial aparte",
+    "qj.cat":"¿Qué quieres contarnos?",
+    "qj.cat.queja":"Una queja",
+    "qj.cat.sug":"Una sugerencia",
+    "qj.cat.fel":"Una felicitación",
+    "qj.rel":"¿Sobre qué? (opcional)",
+    "qj.rel.no":"Prefiero no decirlo",
+    "qj.rel.mmc":"Mira Mi Casa",
+    "qj.rel.brigada":"La brigada de emergencia",
+    "qj.rel.vol":"Voluntariado",
+    "qj.rel.don":"Donaciones",
+    "qj.rel.hub":"El HUB o una fundación aliada",
+    "qj.rel.sitio":"Este sitio web",
+    "qj.rel.otro":"Otra cosa",
+    "qj.msg":"Tu mensaje",
+    "qj.msg.a":"Cuéntanos qué pasó, cuándo y dónde. No hace falta que pongas tu nombre.",
+    "qj.quiere":"Quiero que me respondan por correo o WhatsApp",
+    "qj.nombre":"Nombre (opcional)",
+    "qj.contacto":"Correo o WhatsApp",
+    "qj.datos":"Autorizo usar este contacto solo para responderme sobre este mensaje, conforme a la Política de Privacidad.",
+    "qj.btn":"Enviar",
+    "qj.ok.t":"Recibido. Tu código es",
+    "qj.ok.p":"Guárdalo: con él consultas en qué va, más abajo en esta página. Si no dejaste contacto, es la única forma de ver nuestra respuesta.",
+    "qj.sending":"Enviando…",
+    "qj.err":"No se pudo enviar. Revisa tu conexión e inténtalo de nuevo, o escríbenos por WhatsApp.",
+    "qj.err.cat":"Elige si es una queja, una sugerencia o una felicitación.",
+    "qj.err.msg":"Escribe tu mensaje (al menos unas palabras).",
+    "qj.err.contacto":"Escribe un correo o un número de WhatsApp para responderte, o desmarca la casilla para enviarlo sin contacto.",
+    "qj.err.datos":"Para guardar tu contacto necesitamos tu autorización. Si prefieres, desmarca la casilla y envíalo sin contacto.",
+    "qj.err.espera":"Hoy ya recibimos muchas solicitudes desde esta conexión. Inténtalo mañana, o escríbenos por WhatsApp.",
+    "qjc.ey":"Ruta confidencial",
+    "qjc.t":"Conductas inapropiadas, abuso o corrupción",
+    "qjc.lead":"Si alguien que actúa en nombre de Give&Grow —equipo, voluntario, ingeniero, fundación aliada o proveedor— se comportó de forma inapropiada, pidió algo a cambio de la ayuda, abusó de alguien o manejó mal los recursos, puedes contarlo aquí.",
+    "qjc.ya.t":"Si alguien está en peligro ahora",
+    "qjc.ya.123":"Emergencias: línea 123.",
+    "qjc.ya.141":"Para proteger a un niño, niña o adolescente: línea 141 del ICBF, gratuita.",
+    "qjc.ya.155":"Violencia contra las mujeres: línea 155.",
+    "qjc.pasa.t":"Qué pasa después de enviarlo",
+    "qjc.pasa.1":"Se guarda aparte de las demás solicitudes y no viaja por correo: lo lee una persona de la fundación dentro de un sistema interno.",
+    "qjc.pasa.2":"Puedes enviarlo sin decir quién eres. Si dejas un contacto, se usa solo para responderte sobre esto.",
+    "qjc.pasa.3":"Si lo que cuentas puede ser un delito, la ley colombiana obliga a ponerlo en conocimiento de las autoridades: no se resuelve solo dentro de la fundación.",
+    "qjc.pasa.4":"Recibes un código para consultar en qué va, en esta misma página.",
+    "qjc.pasa.5":"No tienes que pasar por nosotros: también puedes acudir directamente a la Fiscalía, a la Policía o al ICBF.",
+    "qjc.rel":"¿En qué actividad o programa? (opcional)",
+    "qjc.msg":"Qué pasó",
+    "qjc.msg.a":"Cuenta qué pasó, cuándo, dónde y, si lo sabes, quién lo hizo. No escribas el nombre ni ningún dato de un niño, niña o adolescente: basta con decir que había un menor de edad.",
+    "qjc.quiere":"Quiero que me contacten (si no lo marcas, el reporte es anónimo)",
+    "qjc.btn":"Enviar por la ruta confidencial",
+    "qjc.ok.p":"Guárdalo en un lugar seguro: con él consultas en qué va, aquí abajo. Gracias por contarlo.",
+    "qjq.ey":"Consultar",
+    "qjq.t":"¿Ya escribiste? Mira en qué va",
+    "qjq.codigo":"Tu código",
+    "qjq.btn":"Consultar",
+    "qjq.estado":"Estado",
+    "qjq.resp":"La respuesta de la fundación",
+    "qjq.buscando":"Buscando…",
+    "qjq.err.codigo":"El código tiene 8 letras y números, como K7Q3-M9XA.",
+    "qjq.err.no":"No encontramos ese código. Revisa que esté bien escrito.",
+    "qjq.err.espera":"Hoy ya hubo muchas consultas desde esta conexión. Inténtalo mañana.",
+    "qjq.est.recibida":"Recibida",
+    "qjq.est.en_revision":"En revisión",
+    "qjq.est.respondida":"Respondida",
+    "qjq.est.descartada":"Cerrada",
+    "qjq.f.recibida":"Recibida el",
+    "qjq.f.en_revision":"En revisión desde el",
+    "qjq.f.respondida":"Respondida el",
+    "qjq.f.cerrada":"Cerrada el",
+    "qjq.sin.resp":"La fundación registró una respuesta por el medio de contacto que dejaste.",
 
     "std.dnh.ey":"El límite que nos pusimos",
     "std.dnh.t":"Orientar, no dictaminar",
@@ -2358,6 +2430,150 @@ var I18N = {
     "toc.rev.link":"Gobernanza y documentos públicos",
     "med.link.toc":"La teoría de cambio y sus doce indicadores",
     "transp.toc.link":"Teoría de cambio: qué medimos y qué todavía no",
+    /* Regalos de diciembre (#regalos, migración 0048) */
+    "rg.ey":"Navidad 2026",
+    "rg.h1":"Mil regalos para niñas y niños de Uribia, Medellín y Leticia.",
+    "rg.lead":"Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.",
+    "rg.seg.h":"El recorrido de tus regalos",
+    "rg.pronto.t":"Muy pronto.",
+    "rg.pronto.p":"Estamos recogiendo, con la autorización escrita de cada acudiente, los deseos de los niños de las tres zonas. Cuando las listas estén revisadas, aquí vas a poder escoger a quién regalar.",
+    "rg.como.h":"Cómo funciona",
+    "rg.como.1.t":"Escoge",
+    "rg.como.1.p":"Filtra por zona, edad o tipo de regalo y agrega a tu lista los que quieras regalar.",
+    "rg.como.2.t":"Paga",
+    "rg.como.2.p":"En pesos, con Wompi, y te emitimos el certificado de donación. En dólares, a través de nuestra fundación aliada en Estados Unidos, que te emite el suyo.",
+    "rg.como.3.t":"Síguelo",
+    "rg.como.3.p":"Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.",
+    "rg.lista.h":"Escoge a quién regalar",
+    "rg.cerrada":"La campaña ya no recibe donaciones. Aquí puedes ver cómo avanzan los regalos.",
+    "rg.luces.t":"Una luz por cada niño",
+    "rg.luces.p":"Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.",
+    "rg.luz.esp":"Esperando su regalo",
+    "rg.luz.fin":"Regalo financiado",
+    "rg.luz.ent":"Entregado, con acta",
+    "rg.para":"Para",
+    "rg.deseo":"“{d}”",
+    "rg.carta.l":"Tu carta para los niños (opcional)",
+    "rg.carta.ayuda":"Va impresa con cada regalo de este pedido. El equipo lee cada carta y cada video antes de entregarlos: no incluyas teléfonos, direcciones ni redes sociales.",
+    "rg.carta.txt":"Tu mensaje",
+    "rg.carta.firma":"Cómo firmas",
+    "rg.carta.firma.ph":"Por ejemplo: Familia Pérez, de Medellín",
+    "rg.video.t":"Un video para ellos (opcional)",
+    "rg.video.grabar":"Grabar ahora",
+    "rg.video.subir":"Subir un video",
+    "rg.video.quitar":"Quitar el video",
+    "rg.video.ayuda":"De 30 segundos a 1 minuto, hasta 90 MB. Lo mostramos a los niños en la entrega; nunca se publica.",
+    "rg.f.noticias":"Quiero recibir por correo lo que hicimos con los regalos, el agradecimiento y las próximas actividades en las que puedo participar.",
+    "rg.video.subiendo":"Subiendo tu video… {p} %",
+    "rg.video.fallo":"No pudimos subir el video. Tus regalos siguen apartados: puedes subirlo después desde el enlace de seguimiento que te llega al correo.",
+    "rg.video.tipo":"Ese archivo no es un video que podamos recibir. Usa MP4, MOV o WebM.",
+    "rg.video.pesado":"El video pesa más de 90 MB. Grábalo en 1080p en vez de 4K, o recórtalo.",
+    "rg.video.ilegible":"No pudimos leer la duración de ese video. Prueba con otro archivo.",
+    "rg.video.dur":"Ese video dura {s} segundos. Tiene que durar entre 30 segundos y 1 minuto.",
+    "rg.video.listo":"Video listo: {s} segundos, {mb} MB. Se sube al confirmar.",
+    "rg.video.cambiar":"Cambiar el video",
+    "rg.video.borrar":"Quitar el video que subí",
+    "rg.carta.seg":"Tu carta y tu video",
+    "rg.carta.e.pendiente":"El equipo la está revisando",
+    "rg.carta.e.aprobado":"Aprobada: va con tus regalos",
+    "rg.carta.e.rechazado":"No la pudimos aprobar así",
+    "rg.carta.convideo":"Con un video de {s} segundos.",
+    "rg.carta.aun":"Todavía puedes escribirles una carta o grabarles un video.",
+    "rg.carta.no":"Este pedido no tiene carta.",
+    "rg.carta.guardar":"Guardar mi carta",
+    "rg.enviando.carta":"Guardando…",
+    "rg.mas":"Ver más",
+    "rg.privnota":"Para proteger a los niños solo publicamos su nombre de pila, su edad, su zona y el regalo que pidieron, y su foto únicamente si su acudiente lo autorizó por escrito. Nunca publicamos apellidos, direcciones ni datos de contacto, y no hay contacto directo entre donantes y niños.",
+    "rg.pagar.h":"Tu lista de regalos",
+    "rg.total":"Total",
+    "rg.via.l":"¿Cómo quieres pagar?",
+    "rg.via.cop":"En pesos colombianos, con Wompi",
+    "rg.via.usd":"En dólares, a través de nuestra fundación aliada en Estados Unidos",
+    "rg.f.nombre":"Tu nombre",
+    "rg.f.email":"Tu correo",
+    "rg.f.tel":"Tu teléfono (opcional)",
+    "rg.f.cert":"Quiero el certificado de donación (Colombia, Art. 257 del Estatuto Tributario)",
+    "rg.f.doctipo":"Tipo de documento",
+    "rg.f.docnum":"Número de documento",
+    "rg.f.ciudad":"Ciudad",
+    "rg.f.priv":"Acepto que Give&Grow use mis datos para este pedido, según la",
+    "rg.f.priv.link":"Política de Privacidad",
+    "rg.f.enviar":"Ir a pagar",
+    "rg.barra.ir":"Continuar",
+    "rg.anio":"{n} año",
+    "rg.anios":"{n} años",
+    "rg.todas":"Todas",
+    "rg.todos":"Todos",
+    "rg.edad.r":"{r} años",
+    "rg.genero.nina":"Niñas",
+    "rg.genero.nino":"Niños",
+    "rg.f.zona":"Zona",
+    "rg.f.tipo":"Tipo de regalo",
+    "rg.f.edad":"Edad",
+    "rg.f.genero":"Para",
+    "rg.f.estado":"Mostrar",
+    "rg.f.disp":"Los que esperan regalo",
+    "rg.f.todos":"Todos",
+    "rg.zona.prep":"Lista en preparación",
+    "rg.zona.aria":"{f} de {m} regalos financiados",
+    "rg.zona.fin":"{n} financiados",
+    "rg.zona.ent":"{n} entregados",
+    "rg.zona.fecha":"Entrega prevista: {f}",
+    "rg.cuenta":"{n} de {t} niños",
+    "rg.cargando":"Cargando…",
+    "rg.ninguno":"Ningún niño coincide con esos filtros.",
+    "rg.foto.alt":"Foto de {n}",
+    "rg.btn.add":"Regalar",
+    "rg.btn.en":"En tu lista",
+    "rg.btn.quitar":"Quitar",
+    "rg.est.cerrada":"Campaña cerrada",
+    "rg.est.apartado":"Alguien lo está pagando",
+    "rg.est.financiado":"Ya tiene quien lo regale",
+    "rg.est.comprado":"Comprado",
+    "rg.est.despachado":"En camino",
+    "rg.est.entregado":"Entregado",
+    "rg.talla":"Talla {t}",
+    "rg.barra.1":"{n} regalo · {total}",
+    "rg.barra.n":"{n} regalos · {total}",
+    "rg.cert.usd":"En dólares, el certificado para tu declaración lo emite {a} en Estados Unidos.",
+    "rg.enviando":"Apartando tus regalos…",
+    "rg.e.vacio":"Todavía no has escogido ningún regalo.",
+    "rg.e.nombre":"Escribe tu nombre.",
+    "rg.e.email":"Revisa tu correo: ahí te llega el seguimiento.",
+    "rg.e.cert":"Para el certificado hacen falta el número de documento y la ciudad.",
+    "rg.e.priv":"Para continuar, acepta el uso de tus datos para este pedido.",
+    "rg.e.nodisp":"{n} de los regalos que escogiste ya los tomó otra persona y los quitamos de tu lista. Revísala y vuelve a intentarlo.",
+    "rg.e.cerrada":"La campaña no está recibiendo donaciones en este momento.",
+    "rg.e.muchos":"Puedes escoger hasta 20 regalos por pedido.",
+    "rg.e.monto":"El total está fuera de lo que admite la pasarela de pago. Quita o agrega regalos.",
+    "rg.e.intentos":"Has iniciado varios pedidos seguidos. Espera unos minutos y vuelve a intentarlo.",
+    "rg.e.usd":"El pago en dólares todavía no está disponible.",
+    "rg.e.pasarela":"La pasarela de pago no está disponible en este momento.",
+    "rg.e.red":"No pudimos conectar. Revisa tu conexión e intenta de nuevo.",
+    "rg.usd.ok.t":"Tus regalos quedaron apartados por 72 horas.",
+    "rg.usd.ok.p":"Completa tu donación de {usd} en la página de {a} y escribe tu número de pedido, {ref}, en la nota de la donación. Te enviamos estas instrucciones a tu correo.",
+    "rg.usd.ir":"Donar con {a}",
+    "rg.seg.ir":"Ver el recorrido",
+    "rg.seg.no":"No encontramos ese pedido. Revisa el enlace de tu correo.",
+    "rg.seg.pedido":"Pedido",
+    "rg.seg.estado":"Estado",
+    "rg.seg.guia":"Guía del aporte",
+    "rg.seg.aliada":"Recibe el pago",
+    "rg.seg.acta":"acta {a}",
+    "rg.seg.sust":"Cuando llegó tu pago, el niño que escogiste ya tenía regalo. El tuyo fue para este niño de la misma zona.",
+    "rg.seg.sincupo":"Cuando llegó tu pago este regalo ya lo había tomado otro donante, y no quedaba otro niño libre en la zona. Te vamos a escribir para acordar a dónde va.",
+    "rg.pe.pendiente":"Esperando el pago",
+    "rg.pe.pagado":"Pagado",
+    "rg.pe.fallido":"El pago no pasó",
+    "rg.pe.vencido":"La reserva venció",
+    "rg.pe.anulado":"Anulado",
+    "rg.paso.financiado":"Financiado",
+    "rg.paso.comprado":"Comprado",
+    "rg.paso.despachado":"En camino",
+    "rg.paso.entregado":"Entregado",
+    "gracias.regalos":"Seguir mis regalos",
+    "gracias.regalos.destino":"Regalos de diciembre",
+    "foot.regalos":"Regalos de diciembre"
   }
 };
 
@@ -2380,6 +2596,7 @@ var ROUTE_META = {
   donar:{t:{es:"Donar · Give&Grow International",en:"Donate · Give&Grow International"},d:{es:"Haz tu donación a Give&Grow con trazabilidad completa y beneficio tributario. Cada aporte transforma una vida.",en:"Donate to Give&Grow with full traceability and a tax benefit. Every gift transforms a life."}},
   medicion:{t:{es:"Cómo medimos · Give&Grow International",en:"How we measure · Give&Grow International"},d:{es:"Contribución y no atribución, los tres peldaños de la medición, cómo publicamos un número y el reporte de jornada para la empresa aliada.",en:"Contribution rather than attribution, the three rungs of measurement, how we publish a figure, and the journey report for partner companies."}},
   "teoria-de-cambio":{t:{es:"Teoría de cambio · Give&Grow International",en:"Theory of change · Give&Grow International"},d:{es:"La teoría de cambio de Give&Grow: qué hacemos, qué buscamos que cambie, los supuestos y los doce indicadores con los que lo comprobamos, cada uno con su estado real.",en:"Give&Grow's theory of change: what we do, what we aim to change, the assumptions and the twelve indicators we use to check it, each with its real status."}},
+  quejas:{t:{es:"Quejas y sugerencias · Give&Grow International",en:"Feedback and complaints · Give&Grow International"},d:{es:"Cuéntale a Give&Grow una queja, una sugerencia o una felicitación, sin identificarte si prefieres, y consulta en qué va con tu código. Con una ruta confidencial aparte para conductas inapropiadas, abuso o corrupción.",en:"Send Give&Grow a complaint, a suggestion or a compliment, anonymously if you prefer, and check its status with your code. With a separate confidential route for misconduct, abuse or corruption."}},
   estandares:{t:{es:"Marco de actuación · Give&Grow International",en:"How we work · Give&Grow International"},d:{es:"Bajo qué normas trabaja Give&Grow: la Norma Humanitaria Esencial compromiso por compromiso, el límite legal de la Ley 1523, la protección de datos y lo que deliberadamente no afirmamos.",en:"The standards Give&Grow works to: the Core Humanitarian Standard commitment by commitment, the legal limit set by Colombia's Law 1523, data protection, and what we deliberately do not claim."}},
   transparencia:{t:{es:"Transparencia · Give&Grow International",en:"Transparency · Give&Grow International"},d:{es:"Registro oficial, gobernanza, estados financieros y documentos públicos de Fundación Give&Grow International.",en:"Official registration, governance, financial statements and public documents of Give&Grow International."}},
   contacto:{t:{es:"Contacto · Give&Grow International",en:"Contact · Give&Grow International"},d:{es:"Escríbenos para donar, aliar tu empresa o sumar tu fundación al HUB SOCIAL. Medellín, Colombia.",en:"Reach out to donate, partner your company or join your foundation to the Social Hub. Medellín, Colombia."}},
@@ -2402,6 +2619,7 @@ var ROUTE_META = {
   "mi-aporte":{t:{es:"Mi aporte · Give&Grow International",en:"My giving · Give&Grow International"},d:{es:"Lo de quien ya donó, en un solo lugar: rastrea tu donación con su número de guía, recibe el enlace a tu membresía y entérate de cómo se pide el certificado de donación.",en:"Everything for people who have already given, in one place: track your donation with its tracking number, get the link to your membership and find out how to request your donation certificate."}},
   gracias:{t:{es:"Gracias por tu aporte · Give&Grow International",en:"Thank you for your gift · Give&Grow International"},d:{es:"Recibimos tu aporte y lo estamos confirmando. Guarda tu número de guía: con él puedes seguirlo hasta la entrega.",en:"We received your gift and we are confirming it. Keep your tracking number: it lets you follow the gift through to delivery."}},
   aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
+  regalos:{t:{es:"Regalos de diciembre · Give&Grow International",en:"December Gifts · Give&Grow International"},d:{es:"Mil regalos para niñas y niños de Uribia (La Guajira), Medellín (Antioquia) y Leticia (Amazonas). Escoge uno o varios, págalo en pesos o en dólares y sigue cada regalo hasta su entrega con acta.",en:"A thousand gifts for children in Uribia (La Guajira), Medellín (Antioquia) and Leticia (Amazonas). Choose one or several, pay in pesos or US dollars, and follow each gift until it is delivered and recorded."}},
   socialfest:{t:{es:"Social Fest 2026 · Give&Grow International",en:"Social Fest 2026 · Give&Grow International"},d:{es:"Impact Journey para empresas —voluntariado en doble vía, piloto sin cuota de participación— y el HUB SOCIAL para fundaciones y profesionales. Give&Grow en Social Fest 2026, Ruta N, Medellín.",en:"Impact Journey for companies —two-way volunteering, a pilot with no participation fee— and the HUB SOCIAL for foundations and professionals. Give&Grow at Social Fest 2026, Ruta N, Medellín."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
 };
@@ -2780,6 +2998,7 @@ function postLang(l){
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("empresa/")===0) renderEmpresa(currentRoute.split("/")[1]);
   if (currentRoute==="gratitud") renderGratitudComercios();
+  if (currentRoute==="regalos" && moduloListo("regalos")){ rgPinta(); rgPintaSeg(); }
   document.querySelectorAll(".faq-a").forEach(function(a){ if(a.parentElement.classList.contains("open")) a.style.maxHeight = a.scrollHeight + "px"; });
   /* El nombre de la region sale del diccionario, asi que hay que volver a
      ponerlo cuando cambia el idioma. */
@@ -3282,10 +3501,10 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "c60670f0", impacto: "59f5f70b" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59f5f70b", regalos: "8f4ec3c0" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
-                     impacto: "impacto" };
+                     impacto: "impacto", regalos: "regalos" };
 var MODULOS_LISTOS = {};
 var MODULOS_PIDIENDO = {};
 function moduloListo(n){ return MODULOS_LISTOS[n] === true; }
@@ -3352,6 +3571,7 @@ function alEntrarRuta(id){
     else if (id === "ingenieros") filaCargar();
     /* #mif-calc lo pintaba `postLang` al arrancar; ahora, al llegar el archivo. */
     else if (id === "membresias"){ try { miCalcula(); } catch(e){} }
+    else if (id === "regalos") rgEntrar();
   });
 }
 
@@ -3362,6 +3582,7 @@ var ACT_FNS = {
   themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,
   payMethod:payMethod, accTab:accTab, setQuick:setQuick, toggleFaq:toggleFaq,
   toggleDrop:toggleDrop, almaSend:almaSend, formSend:formSend,
+  qjEnviar:qjEnviar, qjContacto:qjContacto, qjConsultar:qjConsultar,
   copyAccount:copyAccount, goComercios:goComercios, toggleDrawer:toggleDrawer, trackSearch:trackSearch,
   trackNoGuide:trackNoGuide, trackNoGuideSend:trackNoGuideSend, skipToContent:skipToContent,
   maRastrear:maRastrear,
@@ -3392,7 +3613,10 @@ var ACT_FNS = {
 var ACT_DIFERIDAS = {
   cvPaso:"mmc", cvEnviar:"mmc", cvCopiar:"mmc", cvReintentar:"mmc", mcReintentar:"mmc", mcEnviar:"mmc", bcPaso:"mmc", ingSubmit:"mmc", ingEsp:"mmc", apSubmit:"mmc", apQuien:"mmc",
   irAPagar:"pago", payCert:"pago", miSubmit:"pago", miCalcula:"pago",
-  closeLightbox:"impacto", lbStep:"impacto"
+  closeLightbox:"impacto", lbStep:"impacto",
+  rgFiltro:"regalos", rgToggle:"regalos", rgQuitar:"regalos", rgMas:"regalos", rgVia:"regalos", rgCert:"regalos",
+  rgPagar:"regalos", rgIrAPagar:"regalos", rgCartaCuenta:"regalos", rgVideo:"regalos", rgVideoQuitar:"regalos",
+  rgSegGuardar:"regalos"
 };
 function runAct(spec, el, ev){
   var m = /^(\w+)\((.*)\)$/.exec((spec||"").trim());
@@ -6569,6 +6793,111 @@ function volSubmit(ev){
       allyMsg(note, t(menor ? "vf.ok.menor" : "vf.ok"), true);
     })
     .catch(function(err){ btn.disabled = false; formFallo(note, err, VF_ERRS, "vf.err.send"); });
+  return false;
+}
+
+/* ===== CANAL DE QUEJAS (#quejas, 0046) =====
+   Dos formularios con el mismo envío: «qj» (queja, sugerencia, felicitación)
+   y «qjc» (la ruta confidencial; la categoría «conducta» la fija el servidor
+   por la ruta, no este archivo). Anónimo por defecto: el contacto solo viaja
+   si la persona marcó que quiere respuesta y autorizó usarlo. Todo lo que
+   vuelve del servidor entra al DOM con textContent, nunca como HTML. */
+function qjContacto(p){
+  var q = document.getElementById(p + "-quiere"), caja = document.getElementById(p + "-datos");
+  if (!q || !caja) return;
+  caja.hidden = !q.checked;
+  q.setAttribute("aria-expanded", q.checked ? "true" : "false");
+  if (q.checked){ var c = document.getElementById(p + "-contacto"); if (c) c.focus(); }
+}
+function qjEnviar(ev, p){
+  ev.preventDefault();
+  var conf = p === "qjc";
+  var note = document.getElementById(p + "-note"), btn = document.getElementById(p + "-btn");
+  var val = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
+  if (val(p + "-web2")){ document.getElementById(p).reset(); return false; }
+  var cat = conf ? "conducta" : "";
+  if (!conf){
+    var r = document.querySelector('input[name="qj-cat"]:checked');
+    if (!r) return allyMal(note, document.querySelector('input[name="qj-cat"]'), "qj.err.cat");
+    cat = r.value;
+  }
+  var msg = val(p + "-msg");
+  if (msg.length < 10) return allyMal(note, p + "-msg", "qj.err.msg");
+  var quiere = document.getElementById(p + "-quiere").checked;
+  var contacto = quiere ? val(p + "-contacto") : "";
+  if (quiere){
+    var esCorreo = contacto.indexOf("@") > -1;
+    if (esCorreo ? !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contacto) : !telOk(contacto)) return allyMal(note, p + "-contacto", "qj.err.contacto");
+    if (!document.getElementById(p + "-datos-ok").checked) return allyMal(note, p + "-datos-ok", "qj.err.datos");
+  }
+  btn.disabled = true;
+  allyMsg(note, t("qj.sending"), true);
+  fetch("/api/quejas", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ categoria: cat, relacionado: val(p + "-rel"), mensaje: msg, anonima: !quiere,
+      nombre: quiere ? val(p + "-nombre") : "", contacto: contacto, autoriza_datos: quiere, idioma: lang })
+  }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, d: d || {} }; }); })
+    .then(function(res){
+      btn.disabled = false;
+      var d = res.d;
+      if (!res.ok || !d.ok){
+        var k = d.error === "demasiados_envios_hoy" ? "qj.err.espera" : d.error === "mensaje_requerido" ? "qj.err.msg"
+          : d.error === "contacto_invalido" ? "qj.err.contacto" : d.error === "autorizacion_requerida" ? "qj.err.datos" : "qj.err";
+        return allyMsg(note, t(k), false);
+      }
+      document.getElementById(p).reset();
+      document.getElementById(p + "-datos").hidden = true;
+      allyMsg(note, "", true);
+      note.style.display = "none";
+      document.getElementById(p).hidden = true;
+      document.getElementById(p + "-codigo").textContent = d.codigo || "";
+      var ok = document.getElementById(p + "-ok");
+      ok.hidden = false;
+      ok.setAttribute("tabindex", "-1");
+      ok.focus();
+    })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("qj.err"), false); });
+  return false;
+}
+function qjFecha(f){
+  var d = new Date(f + "T12:00:00Z");
+  return isNaN(d) ? f : d.toLocaleDateString(lang === "en" ? "en-US" : "es-CO", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
+function qjConsultar(ev){
+  ev.preventDefault();
+  var note = document.getElementById("qjq-note"), btn = document.getElementById("qjq-btn");
+  var res = document.getElementById("qjq-res");
+  var cod = document.getElementById("qjq-codigo").value.toUpperCase().replace(/[\s-]+/g, "");
+  if (!/^[2-9A-HJKMNP-Z]{8}$/.test(cod)) return allyMal(note, "qjq-codigo", "qjq.err.codigo");
+  btn.disabled = true; res.hidden = true;
+  allyMsg(note, t("qjq.buscando"), true);
+  fetch("/api/quejas/estado", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ codigo: cod }) })
+    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, d: d || {} }; }); })
+    .then(function(x){
+      btn.disabled = false;
+      var d = x.d;
+      if (!x.ok || !d.ok){
+        var k = d.error === "no_encontrado" ? "qjq.err.no" : d.error === "codigo_invalido" ? "qjq.err.codigo"
+          : d.error === "demasiadas_consultas" ? "qjq.err.espera" : "qj.err";
+        return allyMal(note, "qjq-codigo", k);
+      }
+      allyMsg(note, "", true); note.style.display = "none";
+      document.getElementById("qjq-estado").textContent = t("qjq.est." + (d.estado === "descartada" ? "descartada" : d.estado));
+      var fechas = document.getElementById("qjq-fechas");
+      fechas.textContent = "";
+      [["recibida", d.recibida], ["en_revision", d.en_revision], ["respondida", d.respondida], ["cerrada", d.cerrada]].forEach(function(f){
+        if (!f[1]) return;
+        var li = document.createElement("li");
+        li.textContent = t("qjq.f." + f[0]) + " " + qjFecha(f[1]);
+        fechas.appendChild(li);
+      });
+      var rt = document.getElementById("qjq-resp-t"), rp = document.getElementById("qjq-resp");
+      var hay = d.estado === "respondida";
+      rt.hidden = !hay; rp.hidden = !hay;
+      rp.textContent = hay ? (d.respuesta || t("qjq.sin.resp")) : "";
+      res.hidden = false;
+    })
+    .catch(function(){ btn.disabled = false; allyMsg(note, t("qj.err"), false); });
   return false;
 }
 
