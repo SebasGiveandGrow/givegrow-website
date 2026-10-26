@@ -1972,6 +1972,65 @@ html[data-theme="dark"] .rep-note{border-left-color:var(--acc)}
   .rep-doc{padding:20px 18px}
 }
 
+/* ---------- #teoria-de-cambio (17 oct 2026) ----------
+   Sin tokens nuevos. Reusa .med-tw/.med-tbl, .med-step-s (los tres estados),
+   .vol-care y .libro. Elemento firma: el «Si / Entonces / Porque», en Fraunces;
+   Unbounded queda solo en h1/h2. La cadena separa con el filo de arriba lo que
+   depende de nosotros (raya llena) de lo que es contribución (raya discontinua). */
+.toc-meta{margin:6px 0 0;font-size:var(--fs-13)}
+.toc-si{margin:30px 0 0;border-top:1px solid var(--bd)}
+.toc-si-f{display:grid;grid-template-columns:9.5ch 1fr;gap:4px 22px;align-items:baseline;padding:16px 0;border-bottom:1px solid var(--bd)}
+.toc-si dt{font-size:var(--fs-11);font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--g)}
+.toc-si dd{margin:0;font-family:"Fraunces",serif;font-size:clamp(19px,1.2vw + .9rem,25px);line-height:1.35;color:var(--ink)}
+.toc-tbl{min-width:0}
+.toc-tbl td:first-child{width:36%}
+.toc-chain{margin-top:28px;display:grid;gap:30px}
+.toc-grp-k{margin:0 0 14px;padding-top:10px;border-top:2px solid var(--g);font-size:var(--fs-11);font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--g)}
+.toc-grp.is-con .toc-grp-k{border-top-style:dashed;border-top-color:var(--mu);color:var(--mu)}
+.toc-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+.toc-col-t{font-family:"Inter",sans-serif;font-size:var(--fs-15);font-weight:700;color:var(--ink);margin:0;padding-bottom:9px;border-bottom:1px solid var(--bd)}
+.toc-col:not(.is-imp) .toc-col-t::after{content:"\2192";content:"\2192" / "";margin-left:8px;font-weight:400;color:var(--mu)}
+.toc-list{list-style:none;margin:0;padding:0}
+.toc-list li{padding:10px 0;border-bottom:1px solid var(--bd);font-size:var(--fs-15);line-height:1.45;color:var(--ink-soft)}
+.toc-imp{margin:12px 0 0;padding:14px 16px;border-left:3px solid var(--g);background:var(--gl);border-radius:0 var(--r) var(--r) 0;font-family:"Fraunces",serif;font-size:var(--fs-17);line-height:1.45;color:var(--ink)}
+.toc-sub{margin:42px 0 8px}
+.toc-prose{max-width:70ch;color:var(--ink-soft);line-height:1.6;margin:0}
+.toc-ley{margin:22px 0 4px;display:flex;flex-wrap:wrap;gap:10px 28px}
+.toc-ley-f{display:flex;align-items:center;gap:10px}
+.toc-ley dd{margin:0;font-size:var(--fs-14);color:var(--mu)}
+.toc-ln{margin-top:36px}
+.toc-ln-hd{max-width:72ch}
+.toc-ln-k{font-family:"Inter",sans-serif;font-size:var(--fs-12);font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--g);margin:0 0 6px}
+.toc-ln-r{margin:0;max-width:64ch;font-family:"Fraunces",serif;font-size:var(--fs-17);line-height:1.45;color:var(--ink)}
+.toc-ln-q{margin:6px 0 0;font-size:var(--fs-14);color:var(--mu)}
+.toc-inds{list-style:none;margin:14px 0 0;padding:0;border-top:1px solid var(--bd)}
+.toc-ind{display:grid;grid-template-columns:2.4ch minmax(0,1fr) auto;gap:8px 18px;align-items:start;padding:16px 0;border-bottom:1px solid var(--bd)}
+.toc-ind-n{font-size:var(--fs-15);font-weight:700;color:var(--mu);font-variant-numeric:tabular-nums;line-height:1.45}
+.toc-ind-b{min-width:0}
+.toc-ind-t{margin:0;font-size:var(--fs-16);font-weight:600;color:var(--ink);line-height:1.45;max-width:62ch}
+.toc-ind-m{margin:4px 0 0;font-size:var(--fs-13);color:var(--mu);line-height:1.55}
+.toc-ind-c + .toc-ind-c::before{content:"\00B7";content:"\00B7" / "";margin:0 7px}
+.toc-ind-x{margin:6px 0 0;font-size:var(--fs-14);color:var(--ink-soft);line-height:1.5;max-width:64ch}
+.toc-ind-s{justify-self:end}
+.toc-links{display:flex;flex-wrap:wrap;gap:4px 28px;margin-top:8px}
+html[data-theme="dark"] .toc-si dt,
+html[data-theme="dark"] .toc-grp-k,
+html[data-theme="dark"] .toc-ln-k{color:var(--brote)}
+html[data-theme="dark"] .toc-grp-k{border-top-color:var(--brote)}
+html[data-theme="dark"] .toc-grp.is-con .toc-grp-k{border-top-color:var(--mu);color:var(--mu)}
+html[data-theme="dark"] .toc-imp{border-left-color:var(--brote)}
+@media(min-width:900px){
+  .toc-chain{grid-template-columns:1fr 1fr;gap:0 28px}
+}
+@media(max-width:640px){
+  .toc-si-f{grid-template-columns:1fr}
+  .toc-ind{grid-template-columns:2.4ch minmax(0,1fr)}
+  .toc-ind-s{grid-column:2;justify-self:start}
+}
+@media(max-width:560px){
+  .toc-cols{grid-template-columns:1fr;gap:24px}
+}
+
 /* documento legal (#privacidad): lectura cómoda, tono institucional, día/noche */
 .legal-doc{max-width:72ch;margin-top:24px}
 /* h2 y no h3 (auditoría 28 sep 2026): la política cuelga del h1 de #privacidad y
