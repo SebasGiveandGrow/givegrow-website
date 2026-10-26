@@ -2297,6 +2297,150 @@ var I18N = {
     "sf.inv.me.p":"Contribución, no atribución: cómo medimos, qué publicamos y qué todavía no podemos probar.",
     "sf.inv.me.btn":"Ver medición",
     "sf.inv.docs":"¿Financias desde el exterior? Recibimos aportes en dólares por PayPal, a nombre de la Fundación, y reportamos en inglés. ¿Necesitas el RUT, el certificado de existencia u otro documento para tu debida diligencia? Escríbenos a contacto@thegiveandgrowproject.org y te lo enviamos.",
+    /* Regalos de diciembre (#regalos, migración 0048) */
+    "rg.ey":"Navidad 2026",
+    "rg.h1":"Mil regalos para niñas y niños de Uribia, Medellín y Leticia.",
+    "rg.lead":"Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.",
+    "rg.seg.h":"El recorrido de tus regalos",
+    "rg.pronto.t":"Muy pronto.",
+    "rg.pronto.p":"Estamos recogiendo, con la autorización escrita de cada acudiente, los deseos de los niños de las tres zonas. Cuando las listas estén revisadas, aquí vas a poder escoger a quién regalar.",
+    "rg.como.h":"Cómo funciona",
+    "rg.como.1.t":"Escoge",
+    "rg.como.1.p":"Filtra por zona, edad o tipo de regalo y agrega a tu lista los que quieras regalar.",
+    "rg.como.2.t":"Paga",
+    "rg.como.2.p":"En pesos, con Wompi, y te emitimos el certificado de donación. En dólares, a través de nuestra fundación aliada en Estados Unidos, que te emite el suyo.",
+    "rg.como.3.t":"Síguelo",
+    "rg.como.3.p":"Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.",
+    "rg.lista.h":"Escoge a quién regalar",
+    "rg.cerrada":"La campaña ya no recibe donaciones. Aquí puedes ver cómo avanzan los regalos.",
+    "rg.luces.t":"Una luz por cada niño",
+    "rg.luces.p":"Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.",
+    "rg.luz.esp":"Esperando su regalo",
+    "rg.luz.fin":"Regalo financiado",
+    "rg.luz.ent":"Entregado, con acta",
+    "rg.para":"Para",
+    "rg.deseo":"“{d}”",
+    "rg.carta.l":"Tu carta para los niños (opcional)",
+    "rg.carta.ayuda":"Va impresa con cada regalo de este pedido. El equipo lee cada carta y cada video antes de entregarlos: no incluyas teléfonos, direcciones ni redes sociales.",
+    "rg.carta.txt":"Tu mensaje",
+    "rg.carta.firma":"Cómo firmas",
+    "rg.carta.firma.ph":"Por ejemplo: Familia Pérez, de Medellín",
+    "rg.video.t":"Un video para ellos (opcional)",
+    "rg.video.grabar":"Grabar ahora",
+    "rg.video.subir":"Subir un video",
+    "rg.video.quitar":"Quitar el video",
+    "rg.video.ayuda":"De 30 segundos a 1 minuto, hasta 90 MB. Lo mostramos a los niños en la entrega; nunca se publica.",
+    "rg.f.noticias":"Quiero recibir por correo lo que hicimos con los regalos, el agradecimiento y las próximas actividades en las que puedo participar.",
+    "rg.video.subiendo":"Subiendo tu video… {p} %",
+    "rg.video.fallo":"No pudimos subir el video. Tus regalos siguen apartados: puedes subirlo después desde el enlace de seguimiento que te llega al correo.",
+    "rg.video.tipo":"Ese archivo no es un video que podamos recibir. Usa MP4, MOV o WebM.",
+    "rg.video.pesado":"El video pesa más de 90 MB. Grábalo en 1080p en vez de 4K, o recórtalo.",
+    "rg.video.ilegible":"No pudimos leer la duración de ese video. Prueba con otro archivo.",
+    "rg.video.dur":"Ese video dura {s} segundos. Tiene que durar entre 30 segundos y 1 minuto.",
+    "rg.video.listo":"Video listo: {s} segundos, {mb} MB. Se sube al confirmar.",
+    "rg.video.cambiar":"Cambiar el video",
+    "rg.video.borrar":"Quitar el video que subí",
+    "rg.carta.seg":"Tu carta y tu video",
+    "rg.carta.e.pendiente":"El equipo la está revisando",
+    "rg.carta.e.aprobado":"Aprobada: va con tus regalos",
+    "rg.carta.e.rechazado":"No la pudimos aprobar así",
+    "rg.carta.convideo":"Con un video de {s} segundos.",
+    "rg.carta.aun":"Todavía puedes escribirles una carta o grabarles un video.",
+    "rg.carta.no":"Este pedido no tiene carta.",
+    "rg.carta.guardar":"Guardar mi carta",
+    "rg.enviando.carta":"Guardando…",
+    "rg.mas":"Ver más",
+    "rg.privnota":"Para proteger a los niños solo publicamos su nombre de pila, su edad, su zona y el regalo que pidieron, y su foto únicamente si su acudiente lo autorizó por escrito. Nunca publicamos apellidos, direcciones ni datos de contacto, y no hay contacto directo entre donantes y niños.",
+    "rg.pagar.h":"Tu lista de regalos",
+    "rg.total":"Total",
+    "rg.via.l":"¿Cómo quieres pagar?",
+    "rg.via.cop":"En pesos colombianos, con Wompi",
+    "rg.via.usd":"En dólares, a través de nuestra fundación aliada en Estados Unidos",
+    "rg.f.nombre":"Tu nombre",
+    "rg.f.email":"Tu correo",
+    "rg.f.tel":"Tu teléfono (opcional)",
+    "rg.f.cert":"Quiero el certificado de donación (Colombia, Art. 257 del Estatuto Tributario)",
+    "rg.f.doctipo":"Tipo de documento",
+    "rg.f.docnum":"Número de documento",
+    "rg.f.ciudad":"Ciudad",
+    "rg.f.priv":"Acepto que Give&Grow use mis datos para este pedido, según la",
+    "rg.f.priv.link":"Política de Privacidad",
+    "rg.f.enviar":"Ir a pagar",
+    "rg.barra.ir":"Continuar",
+    "rg.anio":"{n} año",
+    "rg.anios":"{n} años",
+    "rg.todas":"Todas",
+    "rg.todos":"Todos",
+    "rg.edad.r":"{r} años",
+    "rg.genero.nina":"Niñas",
+    "rg.genero.nino":"Niños",
+    "rg.f.zona":"Zona",
+    "rg.f.tipo":"Tipo de regalo",
+    "rg.f.edad":"Edad",
+    "rg.f.genero":"Para",
+    "rg.f.estado":"Mostrar",
+    "rg.f.disp":"Los que esperan regalo",
+    "rg.f.todos":"Todos",
+    "rg.zona.prep":"Lista en preparación",
+    "rg.zona.aria":"{f} de {m} regalos financiados",
+    "rg.zona.fin":"{n} financiados",
+    "rg.zona.ent":"{n} entregados",
+    "rg.zona.fecha":"Entrega prevista: {f}",
+    "rg.cuenta":"{n} de {t} niños",
+    "rg.cargando":"Cargando…",
+    "rg.ninguno":"Ningún niño coincide con esos filtros.",
+    "rg.foto.alt":"Foto de {n}",
+    "rg.btn.add":"Regalar",
+    "rg.btn.en":"En tu lista",
+    "rg.btn.quitar":"Quitar",
+    "rg.est.cerrada":"Campaña cerrada",
+    "rg.est.apartado":"Alguien lo está pagando",
+    "rg.est.financiado":"Ya tiene quien lo regale",
+    "rg.est.comprado":"Comprado",
+    "rg.est.despachado":"En camino",
+    "rg.est.entregado":"Entregado",
+    "rg.talla":"Talla {t}",
+    "rg.barra.1":"{n} regalo · {total}",
+    "rg.barra.n":"{n} regalos · {total}",
+    "rg.cert.usd":"En dólares, el certificado para tu declaración lo emite {a} en Estados Unidos.",
+    "rg.enviando":"Apartando tus regalos…",
+    "rg.e.vacio":"Todavía no has escogido ningún regalo.",
+    "rg.e.nombre":"Escribe tu nombre.",
+    "rg.e.email":"Revisa tu correo: ahí te llega el seguimiento.",
+    "rg.e.cert":"Para el certificado hacen falta el número de documento y la ciudad.",
+    "rg.e.priv":"Para continuar, acepta el uso de tus datos para este pedido.",
+    "rg.e.nodisp":"{n} de los regalos que escogiste ya los tomó otra persona y los quitamos de tu lista. Revísala y vuelve a intentarlo.",
+    "rg.e.cerrada":"La campaña no está recibiendo donaciones en este momento.",
+    "rg.e.muchos":"Puedes escoger hasta 20 regalos por pedido.",
+    "rg.e.monto":"El total está fuera de lo que admite la pasarela de pago. Quita o agrega regalos.",
+    "rg.e.intentos":"Has iniciado varios pedidos seguidos. Espera unos minutos y vuelve a intentarlo.",
+    "rg.e.usd":"El pago en dólares todavía no está disponible.",
+    "rg.e.pasarela":"La pasarela de pago no está disponible en este momento.",
+    "rg.e.red":"No pudimos conectar. Revisa tu conexión e intenta de nuevo.",
+    "rg.usd.ok.t":"Tus regalos quedaron apartados por 72 horas.",
+    "rg.usd.ok.p":"Completa tu donación de {usd} en la página de {a} y escribe tu número de pedido, {ref}, en la nota de la donación. Te enviamos estas instrucciones a tu correo.",
+    "rg.usd.ir":"Donar con {a}",
+    "rg.seg.ir":"Ver el recorrido",
+    "rg.seg.no":"No encontramos ese pedido. Revisa el enlace de tu correo.",
+    "rg.seg.pedido":"Pedido",
+    "rg.seg.estado":"Estado",
+    "rg.seg.guia":"Guía del aporte",
+    "rg.seg.aliada":"Recibe el pago",
+    "rg.seg.acta":"acta {a}",
+    "rg.seg.sust":"Cuando llegó tu pago, el niño que escogiste ya tenía regalo. El tuyo fue para este niño de la misma zona.",
+    "rg.seg.sincupo":"Cuando llegó tu pago este regalo ya lo había tomado otro donante, y no quedaba otro niño libre en la zona. Te vamos a escribir para acordar a dónde va.",
+    "rg.pe.pendiente":"Esperando el pago",
+    "rg.pe.pagado":"Pagado",
+    "rg.pe.fallido":"El pago no pasó",
+    "rg.pe.vencido":"La reserva venció",
+    "rg.pe.anulado":"Anulado",
+    "rg.paso.financiado":"Financiado",
+    "rg.paso.comprado":"Comprado",
+    "rg.paso.despachado":"En camino",
+    "rg.paso.entregado":"Entregado",
+    "gracias.regalos":"Seguir mis regalos",
+    "gracias.regalos.destino":"Regalos de diciembre",
+    "foot.regalos":"Regalos de diciembre"
   }
 };
 
@@ -2341,6 +2485,7 @@ var ROUTE_META = {
   "mi-aporte":{t:{es:"Mi aporte · Give&Grow International",en:"My giving · Give&Grow International"},d:{es:"Lo de quien ya donó, en un solo lugar: rastrea tu donación con su número de guía, recibe el enlace a tu membresía y entérate de cómo se pide el certificado de donación.",en:"Everything for people who have already given, in one place: track your donation with its tracking number, get the link to your membership and find out how to request your donation certificate."}},
   gracias:{t:{es:"Gracias por tu aporte · Give&Grow International",en:"Thank you for your gift · Give&Grow International"},d:{es:"Recibimos tu aporte y lo estamos confirmando. Guarda tu número de guía: con él puedes seguirlo hasta la entrega.",en:"We received your gift and we are confirming it. Keep your tracking number: it lets you follow the gift through to delivery."}},
   aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
+  regalos:{t:{es:"Regalos de diciembre · Give&Grow International",en:"December Gifts · Give&Grow International"},d:{es:"Mil regalos para niñas y niños de Uribia (La Guajira), Medellín (Antioquia) y Leticia (Amazonas). Escoge uno o varios, págalo en pesos o en dólares y sigue cada regalo hasta su entrega con acta.",en:"A thousand gifts for children in Uribia (La Guajira), Medellín (Antioquia) and Leticia (Amazonas). Choose one or several, pay in pesos or US dollars, and follow each gift until it is delivered and recorded."}},
   socialfest:{t:{es:"Social Fest 2026 · Give&Grow International",en:"Social Fest 2026 · Give&Grow International"},d:{es:"Impact Journey para empresas —voluntariado en doble vía, piloto sin cuota de participación— y el HUB SOCIAL para fundaciones y profesionales. Give&Grow en Social Fest 2026, Ruta N, Medellín.",en:"Impact Journey for companies —two-way volunteering, a pilot with no participation fee— and the HUB SOCIAL for foundations and professionals. Give&Grow at Social Fest 2026, Ruta N, Medellín."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
 };
@@ -2719,6 +2864,7 @@ function postLang(l){
   if (currentRoute.indexOf("comercio/")===0) renderComercio(currentRoute.split("/")[1]);
   if (currentRoute.indexOf("empresa/")===0) renderEmpresa(currentRoute.split("/")[1]);
   if (currentRoute==="gratitud") renderGratitudComercios();
+  if (currentRoute==="regalos" && moduloListo("regalos")){ rgPinta(); rgPintaSeg(); }
   document.querySelectorAll(".faq-a").forEach(function(a){ if(a.parentElement.classList.contains("open")) a.style.maxHeight = a.scrollHeight + "px"; });
   /* El nombre de la region sale del diccionario, asi que hay que volver a
      ponerlo cuando cambia el idioma. */
@@ -3221,10 +3367,10 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "c60670f0", impacto: "59f5f70b" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59f5f70b", regalos: "8f4ec3c0" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
-                     impacto: "impacto" };
+                     impacto: "impacto", regalos: "regalos" };
 var MODULOS_LISTOS = {};
 var MODULOS_PIDIENDO = {};
 function moduloListo(n){ return MODULOS_LISTOS[n] === true; }
@@ -3291,6 +3437,7 @@ function alEntrarRuta(id){
     else if (id === "ingenieros") filaCargar();
     /* #mif-calc lo pintaba `postLang` al arrancar; ahora, al llegar el archivo. */
     else if (id === "membresias"){ try { miCalcula(); } catch(e){} }
+    else if (id === "regalos") rgEntrar();
   });
 }
 
@@ -3332,7 +3479,10 @@ var ACT_FNS = {
 var ACT_DIFERIDAS = {
   cvPaso:"mmc", cvEnviar:"mmc", cvCopiar:"mmc", cvReintentar:"mmc", mcReintentar:"mmc", mcEnviar:"mmc", bcPaso:"mmc", ingSubmit:"mmc", ingEsp:"mmc", apSubmit:"mmc", apQuien:"mmc",
   irAPagar:"pago", payCert:"pago", miSubmit:"pago", miCalcula:"pago",
-  closeLightbox:"impacto", lbStep:"impacto"
+  closeLightbox:"impacto", lbStep:"impacto",
+  rgFiltro:"regalos", rgToggle:"regalos", rgQuitar:"regalos", rgMas:"regalos", rgVia:"regalos", rgCert:"regalos",
+  rgPagar:"regalos", rgIrAPagar:"regalos", rgCartaCuenta:"regalos", rgVideo:"regalos", rgVideoQuitar:"regalos",
+  rgSegGuardar:"regalos"
 };
 function runAct(spec, el, ev){
   var m = /^(\w+)\((.*)\)$/.exec((spec||"").trim());

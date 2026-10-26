@@ -35,11 +35,11 @@
 <script>/* tema antes del primer render: la preferencia guardada; si no hay, la del dispositivo; y la hora (día 6–18h) solo si el dispositivo no dice nada. La misma cuenta que themeResolve en app.js */
 (function(){var t="light";try{var s=localStorage.getItem("gg-theme");if(s==="light"||s==="dark"){t=s}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches){t="light"}else{var h=new Date().getHours();t=(h>=6&&h<18)?"light":"dark"}}catch(e){}document.documentElement.setAttribute("data-theme",t);if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",document.documentElement.getAttribute("data-marca")==="mmc"?"#07131F":"#0F1613")}})();
 /* LA RUTA ANTES DEL PRIMER RENDER (Social Fest, 7 oct 2026). Quien llega a /#socialfest por el QR veía la portada hasta que corría app.js, y bajaba su foto (262 KB a DPR 3) sin verla. Si el hash es una página conocida, se marca data-ruta y una regla esconde la portada y muestra esa página; go() en app.js quita la marca. La lista la vigila el check #21b: cada nombre tiene que ser una <main id="page-…"> de index.html, si no, la portada se queda y no hay pantalla en blanco. El preload del hero solo se pide cuando la portada es lo que se va a ver: `100vw` aquí y en el <source>, IGUALES, o se baja dos veces. */
-(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1100.webp 1100w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
+(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad regalos ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1100.webp 1100w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=9ca2ee53">
+<link rel="stylesheet" href="/styles.css?v=9bc1e605">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=92e511bb" defer></script>
+<script src="/app.js?v=5bf893f9" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1066,6 +1066,7 @@
       <p class="mu rv d2" id="gracias-nota" style="display:none;margin-top:16px;max-width:70ch"></p>
       <div class="cta-actions rv d2" style="justify-content:flex-start;margin-top:24px">
         <a class="btn btn-g" href="#rastrea" id="gracias-track" data-i18n="gracias.track">Rastrear mi aporte</a>
+        <a class="btn btn-o" href="#regalos" id="gracias-regalos" hidden data-i18n="gracias.regalos">Seguir mis regalos</a>
         <a class="btn btn-o" href="#inicio" data-i18n="gracias.home">Volver al inicio</a>
       </div>
       <!-- Para volver después: la membresía y el certificado viven en #mi-aporte. -->
@@ -1264,6 +1265,138 @@
      DESPUÉS DEL EVENTO (17 oct 2026): el evento terminó el 16. La página queda
      como registro —en pasado— y con lo que sigue vigente: Impact Journey, el
      HUB SOCIAL, las hojas y la puerta de financiadores. -->
+<!-- ============ REGALOS DE DICIEMBRE (0048) ============
+     La lista la pinta js/regalos.js desde /api/regalos. Mientras la campaña
+     está en borrador, la página solo dice «muy pronto»: lo decide /admin/regalos,
+     no este archivo. Datos de menores: en la tarjeta solo el nombre de pila, la
+     edad, la zona y el regalo; la foto, únicamente con autorización escrita. -->
+<main id="page-regalos" class="page">
+  <!-- La barra que acompaña mientras se escoge: cuántos y cuánto, y un atajo a pagar.
+       Va PRIMERO y no al final: es fija, y el último hijo de cada página recibe
+       el relleno inferior que deja sitio a los botones flotantes. -->
+  <div class="rg-barra" id="rg-barra" hidden>
+    <span id="rg-barra-t"></span>
+    <button type="button" class="btn btn-g" data-act="rgIrAPagar()" data-i18n="rg.barra.ir">Continuar</button>
+  </div>
+  <!-- LA FIRMA DE LA PÁGINA: una luz por cada niño de la meta, agrupadas por
+       zona. Plata mientras espera, dorada cuando su regalo queda financiado y
+       roja con anillo dorado cuando se entrega con acta. Es un dato de la base, no un
+       adorno: antes de abrir la campaña, las mil esperan apagadas. -->
+  <section class="rg-portada">
+      <svg class="rg-guirnalda" viewBox="0 0 1440 56" preserveAspectRatio="xMidYMin slice" aria-hidden="true" focusable="false"><path class="rg-hilo" d="M0 4 Q80 44 160 4 Q240 44 320 4 Q400 44 480 4 Q560 44 640 4 Q720 44 800 4 Q880 44 960 4 Q1040 44 1120 4 Q1200 44 1280 4 Q1360 44 1440 4"/><rect class="rg-tapa" x="77" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="80" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="237" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-o" cx="240" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="397" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-v" cx="400" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="557" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-p" cx="560" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="717" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="720" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="877" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-o" cx="880" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1037" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-v" cx="1040" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1197" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-p" cx="1200" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1357" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="1360" cy="34" rx="6" ry="8"/></svg>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="rg.ey">Navidad 2026</span>
+      <h1 class="h-sec rg-h1 rv" data-i18n="rg.h1">Mil regalos para niñas y niños de Uribia, Medellín y Leticia.</h1>
+      <p class="lead rv d1" data-i18n="rg.lead">Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.</p>
+      <h2 class="rg-luces-t rv d2" data-i18n="rg.luces.t">Una luz por cada niño</h2>
+      <p class="rg-luces-p rv d2" data-i18n="rg.luces.p">Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.</p>
+      <div class="rg-zonas rv d2" id="rg-zonas" aria-live="polite"></div>
+      <ul class="rg-leyenda rv d2">
+        <li><span class="rg-l" aria-hidden="true"></span><span data-i18n="rg.luz.esp">Esperando su regalo</span></li>
+        <li><span class="rg-l is-f" aria-hidden="true"></span><span data-i18n="rg.luz.fin">Regalo financiado</span></li>
+        <li><span class="rg-l is-e" aria-hidden="true"></span><span data-i18n="rg.luz.ent">Entregado, con acta</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="cream" id="rg-seguimiento" hidden>
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="rg.seg.h">El recorrido de tus regalos</h2>
+      <div id="rg-seg-cuerpo" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="rg-pronto" hidden>
+    <div class="wrap prose">
+      <h2 data-i18n="rg.pronto.t">Muy pronto.</h2>
+      <p class="lead" data-i18n="rg.pronto.p">Estamos recogiendo, con la autorización escrita de cada acudiente, los deseos de los niños de las tres zonas. Cuando las listas estén revisadas, aquí vas a poder escoger a quién regalar.</p>
+    </div>
+  </section>
+
+  <section class="cream" id="rg-como">
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="rg.como.h">Cómo funciona</h2>
+      <div class="steps rg-pasos">
+        <div class="step"><div class="step-n">1</div><div><h3 class="h-comp4" data-i18n="rg.como.1.t">Escoge</h3><p data-i18n="rg.como.1.p">Filtra por zona, edad o tipo de regalo y agrega a tu lista los que quieras regalar.</p></div></div>
+        <div class="step"><div class="step-n">2</div><div><h3 class="h-comp4" data-i18n="rg.como.2.t">Paga</h3><p data-i18n="rg.como.2.p">En pesos, con Wompi, y te emitimos el certificado de donación. En dólares, a través de nuestra fundación aliada en Estados Unidos, que te emite el suyo.</p></div></div>
+        <div class="step"><div class="step-n">3</div><div><h3 class="h-comp4" data-i18n="rg.como.3.t">Síguelo</h3><p data-i18n="rg.como.3.p">Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rg-catalogo" hidden>
+    <div class="wrap">
+      <h2 class="h-sec" data-i18n="rg.lista.h">Escoge a quién regalar</h2>
+      <p class="mu rg-cerrada" id="rg-cerrada" hidden data-i18n="rg.cerrada">La campaña ya no recibe donaciones. Aquí puedes ver cómo avanzan los regalos.</p>
+      <div class="rg-filtros" id="rg-filtros"></div>
+      <p class="rg-cuenta mu" id="rg-cuenta" aria-live="polite"></p>
+      <div class="rg-grid" id="rg-grid"></div>
+      <div class="rg-mas"><button type="button" class="btn btn-w" id="rg-mas" hidden data-act="rgMas()" data-i18n="rg.mas">Ver más</button></div>
+      <p class="rg-priv mu" data-i18n="rg.privnota">Para proteger a los niños solo publicamos su nombre de pila, su edad, su zona y el regalo que pidieron, y su foto únicamente si su acudiente lo autorizó por escrito. Nunca publicamos apellidos, direcciones ni datos de contacto, y no hay contacto directo entre donantes y niños.</p>
+    </div>
+  </section>
+
+  <section class="cream" id="rg-pagar" hidden>
+    <div class="wrap">
+      <h2 class="h-sec" data-i18n="rg.pagar.h">Tu lista de regalos</h2>
+      <div class="rg-pagar">
+        <div>
+          <ul class="rg-lista" id="rg-lista"></ul>
+          <p class="rg-total"><span data-i18n="rg.total">Total</span> <strong id="rg-total">—</strong></p>
+        </div>
+        <form id="rg-form" class="ally-form rg-form" data-submit="rgPagar(event)" novalidate>
+          <fieldset class="rg-via">
+            <legend data-i18n="rg.via.l">¿Cómo quieres pagar?</legend>
+            <label class="ally-check"><input type="radio" name="rg-via" value="cop" checked data-change="rgVia(this.value)"> <span data-i18n="rg.via.cop">En pesos colombianos, con Wompi</span></label>
+            <label class="ally-check" id="rg-via-usd"><input type="radio" name="rg-via" value="usd" data-change="rgVia(this.value)"> <span data-i18n="rg.via.usd">En dólares, a través de nuestra fundación aliada en Estados Unidos</span></label>
+          </fieldset>
+          <div class="field"><label for="rg-nombre" data-i18n="rg.f.nombre">Tu nombre</label><input id="rg-nombre" autocomplete="name" maxlength="120"></div>
+          <div class="field"><label for="rg-email" data-i18n="rg.f.email">Tu correo</label><input id="rg-email" type="email" autocomplete="email" maxlength="160"></div>
+          <div class="field"><label for="rg-tel" data-i18n="rg.f.tel">Tu teléfono (opcional)</label><input id="rg-tel" type="tel" autocomplete="tel" maxlength="40"></div>
+          <!-- LA CARTA Y EL VIDEO (0049). Opcionales, y nada se entrega sin que
+               el equipo lo revise: son palabras de un adulto para un niño. -->
+          <fieldset class="rg-carta">
+            <legend data-i18n="rg.carta.l">Tu carta para los niños (opcional)</legend>
+            <p class="rg-ayuda" data-i18n="rg.carta.ayuda">Va impresa con cada regalo de este pedido. El equipo lee cada carta y cada video antes de entregarlos: no incluyas teléfonos, direcciones ni redes sociales.</p>
+            <div class="field"><label for="rg-carta" data-i18n="rg.carta.txt">Tu mensaje</label><textarea id="rg-carta" rows="5" maxlength="1200" data-input="rgCartaCuenta(this)"></textarea><span class="rg-cuenta-c" aria-live="polite">0 / 1200</span></div>
+            <div class="field"><label for="rg-firma" data-i18n="rg.carta.firma">Cómo firmas</label><input id="rg-firma" maxlength="80" data-i18n="rg.carta.firma.ph" data-i18n-attr="placeholder" placeholder="Por ejemplo: Familia Pérez, de Medellín"></div>
+            <div class="rg-video">
+              <p class="rg-video-t" data-i18n="rg.video.t">Un video para ellos (opcional)</p>
+              <div class="rg-video-acc">
+                <label class="btn btn-w rg-video-btn" for="rg-video-cam"><span data-i18n="rg.video.grabar">Grabar ahora</span></label>
+                <input type="file" id="rg-video-cam" class="sr-only" accept="video/*" capture="user" data-change="rgVideo(this)">
+                <label class="btn btn-w rg-video-btn" for="rg-video-arc"><span data-i18n="rg.video.subir">Subir un video</span></label>
+                <input type="file" id="rg-video-arc" class="sr-only" accept="video/mp4,video/quicktime,video/webm" data-change="rgVideo(this)">
+                <button type="button" class="rg-quitar" hidden data-act="rgVideoQuitar(this)" data-i18n="rg.video.quitar">Quitar el video</button>
+              </div>
+              <p class="rg-video-info" aria-live="polite" data-i18n="rg.video.ayuda">De 30 segundos a 1 minuto, hasta 90 MB. Lo mostramos a los niños en la entrega; nunca se publica.</p>
+            </div>
+          </fieldset>
+          <div id="rg-cert-caja">
+            <label class="ally-check"><input type="checkbox" id="rg-cert" data-change="rgCert()"> <span data-i18n="rg.f.cert">Quiero el certificado de donación (Colombia, Art. 257 del Estatuto Tributario)</span></label>
+            <div class="rg-cert-datos" id="rg-cert-datos" hidden>
+              <div class="field"><label for="rg-doctipo" data-i18n="rg.f.doctipo">Tipo de documento</label><select id="rg-doctipo"><option value="CC">CC</option><option value="CE">CE</option><option value="NIT">NIT</option><option value="PP">PP</option><option value="PPT">PPT</option></select></div>
+              <div class="field"><label for="rg-docnum" data-i18n="rg.f.docnum">Número de documento</label><input id="rg-docnum" maxlength="24"></div>
+              <div class="field"><label for="rg-ciudad" data-i18n="rg.f.ciudad">Ciudad</label><input id="rg-ciudad" maxlength="120"></div>
+            </div>
+          </div>
+          <p class="mu rg-cert-usd" id="rg-cert-usd" hidden></p>
+          <label class="ally-check"><input type="checkbox" id="rg-noticias"> <span data-i18n="rg.f.noticias">Quiero recibir por correo lo que hicimos con los regalos, el agradecimiento y las próximas actividades en las que puedo participar.</span></label>
+          <label class="ally-check"><input type="checkbox" id="rg-priv"> <span><span data-i18n="rg.f.priv">Acepto que Give&amp;Grow use mis datos para este pedido, según la</span> <a href="#privacidad" data-i18n="rg.f.priv.link">Política de Privacidad</a></span></label>
+          <input type="text" id="rg-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <button type="submit" class="btn btn-g" id="rg-enviar" data-i18n="rg.f.enviar">Ir a pagar</button>
+          <p class="rg-msg" id="rg-msg" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="cream" id="rg-usd" hidden>
+    <div class="wrap"><div class="rg-usd-ok" id="rg-usd-ok" aria-live="polite"></div></div>
+  </section>
+
+</main>
+
 <main id="page-socialfest" class="page">
   <section class="sf-hero">
     <div class="wrap">
@@ -4058,6 +4191,7 @@
         <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
         <a href="#medicion" data-i18n="nav.medicion">Cómo medimos</a>
         <a href="#quejas" data-i18n="nav.quejas">Quejas y sugerencias</a>
+        <a href="#regalos" data-i18n="foot.regalos">Regalos de diciembre</a>
         <a href="#privacidad" data-i18n="foot.privacy">Privacidad y datos</a>
         <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a>
         <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a>

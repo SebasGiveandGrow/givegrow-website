@@ -33,6 +33,7 @@
 - **Social Fest 2026 (14–16 oct, Ruta N) terminó.**
   - El taller «Si no quedó documentado, no ocurrió» tuvo 14 personas; los resultados están en /socialfest.
   - Falta consolidar los contactos: hojas de papel, WhatsApp y los inscritos en línea (`inscripciones.tipo = 'asistente'`). La base consolidada vive FUERA del repo: el repo es público.
+- **Regalos de diciembre (24 oct 2026):** la base completa está en un PR (migración 0048, `/#regalos`, `/admin/regalos`). La campaña nace en borrador. Para abrirla solo faltan los datos: valores por tipo de regalo, la aliada de EE. UU., las fechas, las hojas de terreno y las fotos. Ver `ops/regalos.md`.
 - **Siguiente en el sitio:**
   - Página de teoría de cambio (sale de `MEDICION.md`; el texto lo aprueba Sebas).
   - Página de la campaña con Give to Colombia (espera sus datos).
