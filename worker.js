@@ -16396,6 +16396,8 @@ async function almaArmarIndicadores(env) {
     "- Responde SOLO con estas cifras. Si lo que preguntan no está aquí, di que todavía no se mide o no hay dato; no lo estimes.",
     "- Cita siempre el periodo o la fecha de corte, y de dónde sale el dato con palabras sencillas.",
     "- Si dice REPORTADO, dilo: «según lo reportado por la Fundación». No lo presentes como registro verificado.",
+    "- En CUALQUIER idioma: nunca llames a estas cifras «verificadas», «auditadas» ni «verified/audited» (tampoco en un título): son mediciones registradas por la Fundación y la batería está en validación. Di «registradas» o «reportadas» («recorded», «reported»).",
+    "- Cuando una medición diga «en total» o «por persona», respeta exactamente esa unidad: no la conviertas en horas por día ni en jornadas de 24 horas.",
     "- No sumes indicadores entre sí, no promedies, no extrapoles ni proyectes, y no conviertas una unidad en otra: 120 horas son 120 horas de voluntariado, NO «cientos de voluntarios»; personas, horas, toneladas y casas no se mezclan.",
     "- La nota acota el valor. Una cifra que solo está en la nota (por ejemplo, toneladas despachadas) se dice con su propia condición, nunca como si fuera el valor del indicador.",
     "- Un 0 o «sin dato» se dice tal cual, sin disculparse de más ni rellenar con promesas.",
