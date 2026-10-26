@@ -17579,11 +17579,47 @@ async function rutaVerificar(env, url, request, crudo) {
     "FROM miembros m JOIN donantes d ON d.id = m.donante_id WHERE m.verif = ?"
   ).bind(v || "-").first();
 
-  if (!m) return respuestaVerificar(paginaVerificar({ lang, tema, entrada, noEncontrado: true }), 404);
+  if (!m) {
+    /* EL MISMO CÓDIGO, OTRO PAPEL: el certificado de horas de voluntariado
+       (0047). Mismo alfabeto, mismo tope y la misma respuesta cuando no
+       existe; `verifLibre` evita que un código responda por los dos. */
+    const cert = v ? await env.DB.prepare(
+      "SELECT numero, datos, anulado_en FROM reconocimientos WHERE verif = ?"
+    ).bind(v).first() : null;
+    if (cert) {
+      return respuestaVerificar(paginaVerificar({
+        lang, tema, entrada: verifFormato(v), certificado: resultadoCertificado(cert, lang)
+      }), 200);
+    }
+    return respuestaVerificar(paginaVerificar({ lang, tema, entrada, noEncontrado: true }), 404);
+  }
 
   return respuestaVerificar(paginaVerificar({
     lang, tema, entrada: verifFormato(v), resultado: resultadoVerificar(m, v, lang)
   }), 200);
+}
+
+/* Lo que /verificar dice de un certificado de horas: SOLO LO NECESARIO para
+   cotejarlo con el papel (Ley 1581, principio de finalidad). Válido o anulado,
+   el número, el nombre ENMASCARADO como en el carnet («Ana R.»), la jornada,
+   la fecha y las horas. Ni la cédula (no existe en el certificado), ni el
+   correo, ni la fundación anfitriona, ni el MOTIVO de una anulación: eso es
+   asunto entre la fundación y la persona. Se lee de lo congelado al emitir,
+   que es lo mismo que imprime el PDF. */
+function resultadoCertificado(r, lang) {
+  let d = {};
+  try { d = JSON.parse(r.datos || "{}") || {}; } catch (e) { d = {}; }
+  const en = lang === "en";
+  const suprimido = d.nombre === "(suprimido)";
+  return {
+    valido: !r.anulado_en,
+    numero: r.numero,
+    nombre: suprimido ? (en ? "(personal data deleted at the holder's request)" : "(datos suprimidos a petición del titular)") : nombreEnmascarado(d.nombre),
+    jornada: d.jornada || "",
+    fecha: fechaLargaIdioma(d.fecha, en) || "",
+    horas: d.horas != null ? (en ? String(d.horas) : String(d.horas).replace(".", ",")) : "",
+    consultado: consultadoCO()
+  };
 }
 
 /* «1.000.000.001», «1000 000 001», «1-000-000-001» → «1000000001». Solo se
@@ -17695,7 +17731,7 @@ function paginaVerificar(o) {
   const T = en ? {
     titulo: "Check a member card", ey: "Gratitude Programme · for partner businesses",
     lead: "Type the code printed under the QR on the member's card or the member's ID number, or scan that QR with your own phone. The answer comes from the foundation's site, not from the screen you are being shown.",
-    label: "Card code", boton: "Check",
+    label: "Card or certificate code", boton: "Check",
     o: "or",
     labelDoc: "ID number (cédula)",
     ayudaDoc: "The ID number the member used to pay for the membership, with or without dots. It does not travel in the page address and it does not appear in the answer.",
@@ -17708,17 +17744,25 @@ function paginaVerificar(o) {
     semilla: "Seed level: the membership is real, but Gratitude Programme benefits start at the Sprout level.",
     cotejarSemilla: "At this level the partner-business benefit does not apply. If you want to confirm the name, ask for an ID document.",
     honor: "Honorary member: the Gratitude Programme benefit applies.",
-    nf: "We could not find a card with that code or ID number.",
+    nf: "We could not find a card or certificate with that code or ID number.",
     nfP: "Check that it was typed correctly: the code has eight characters, with or without the dash; the ID number, digits only. If it still does not show up, the card cannot be confirmed — do not apply the benefit; the member can write to us.",
     lim: "Too many checks from this connection.",
     limP: "Wait a few minutes and try again.",
     otra: "Check another card", otro: "Español", otroLang: "es",
     volver: "Gratitude Programme", inicio: "Give&Grow home",
+    cTitulo: "Check a volunteer certificate", cEy: "Volunteer certificate · effective hours",
+    cVal: "Valid", cAnu: "Cancelled",
+    cValP: "The foundation issued this certificate and it has not been cancelled.",
+    cAnuP: "The foundation cancelled this certificate. It is not valid.",
+    cNum: "Certificate no.", cNombre: "Name", cJornada: "Activity", cFecha: "Date", cHoras: "Effective hours",
+    cCotejar: "Check that the number, the activity, the date and the hours match the paper you were given. The name is shown shortened on purpose.",
+    cNo: "It attests volunteer time. It is not a donation certificate and does not give the right to any tax benefit.",
+    cOtra: "Check another code", cVolver: "Volunteering",
     pie: "Fundación Give&Grow International · Colombian nonprofit · NIT 901.948.930-2"
   } : {
     titulo: "Verificar un carnet", ey: "Programa de Gratitud · para comercios aliados",
     lead: "Escribe el código que aparece bajo el QR del carnet del miembro o su número de cédula, o escanea ese QR con tu propio celular. La respuesta sale del sitio de la fundación, no de la pantalla que te muestran.",
-    label: "Código del carnet", boton: "Verificar",
+    label: "Código del carnet o del certificado", boton: "Verificar",
     o: "o",
     labelDoc: "Número de cédula",
     ayudaDoc: "La cédula con la que el miembro pagó su membresía, con o sin puntos. No viaja en la dirección de la página ni aparece en la respuesta.",
@@ -17731,12 +17775,20 @@ function paginaVerificar(o) {
     semilla: "Nivel Semilla: la membresía es real, pero los beneficios del Programa de Gratitud empiezan en el nivel Retoño.",
     cotejarSemilla: "A este nivel no aplica el beneficio del comercio aliado. Si quieres confirmar el nombre, pide un documento de identidad.",
     honor: "Miembro de honor: el beneficio del Programa de Gratitud aplica.",
-    nf: "No encontramos un carnet con ese código o documento.",
+    nf: "No encontramos un carnet o certificado con ese código o documento.",
     nfP: "Revisa que esté bien escrito: el código tiene ocho caracteres, con o sin guion; la cédula, solo números. Si aun así no aparece, el carnet no se puede confirmar: no apliques el beneficio, y el miembro puede escribirnos.",
     lim: "Demasiadas consultas desde esta conexión.",
     limP: "Espera unos minutos y vuelve a intentarlo.",
     otra: "Verificar otro carnet", otro: "English", otroLang: "en",
     volver: "Programa de Gratitud", inicio: "Inicio de Give&Grow",
+    cTitulo: "Verificar un certificado de voluntariado", cEy: "Certificado de voluntariado · horas efectivas",
+    cVal: "Válido", cAnu: "Anulado",
+    cValP: "La fundación emitió este certificado y no lo ha anulado.",
+    cAnuP: "La fundación anuló este certificado. No tiene validez.",
+    cNum: "Certificado No.", cNombre: "Nombre", cJornada: "Jornada", cFecha: "Fecha", cHoras: "Horas efectivas",
+    cCotejar: "Comprueba que el número, la jornada, la fecha y las horas coincidan con el papel que te entregaron. El nombre se muestra abreviado a propósito.",
+    cNo: "Acredita tiempo de voluntariado. No es un certificado de donación y no da derecho a ningún beneficio tributario.",
+    cOtra: "Verificar otro código", cVolver: "Voluntariado",
     pie: "Fundación Give&Grow International · ESAL colombiana · NIT 901.948.930-2"
   };
   const qLang = en ? "?lang=en" : "";
@@ -17748,11 +17800,13 @@ function paginaVerificar(o) {
   const cabecera = ''
     + '<header class="vf-cab"><div class="wrap vf-cab-in">'
     + '<a class="nlogo" href="/" aria-label="' + esc(T.inicio) + '">Give<em>&amp;</em>Grow</a>'
-    + '<a class="vf-volver" href="/#gratitud"><span aria-hidden="true">&larr;</span> ' + esc(T.volver) + '</a>'
+    + (o.certificado
+      ? '<a class="vf-volver" href="/#voluntariado"><span aria-hidden="true">&larr;</span> ' + esc(T.cVolver) + '</a>'
+      : '<a class="vf-volver" href="/#gratitud"><span aria-hidden="true">&larr;</span> ' + esc(T.volver) + '</a>')
     + '</div></header>\n';
   /* Tras una consulta por cédula, `entrada` es el código del carnet (nunca la
      cédula), así que este enlace no la lleva. */
-  const otroHref = "/verificar" + (o.resultado && o.entrada ? "/" + encodeURIComponent(o.entrada) : "") + "?lang=" + T.otroLang;
+  const otroHref = "/verificar" + ((o.resultado || o.certificado) && o.entrada ? "/" + encodeURIComponent(o.entrada) : "") + "?lang=" + T.otroLang;
 
   const formulario = ''
     + '  <form class="vf-form" method="GET" action="/verificar">\n'
@@ -17777,12 +17831,32 @@ function paginaVerificar(o) {
     + '    <p class="mu vf-ayuda" id="vf-d-ayuda">' + esc(T.ayudaDoc) + '</p>\n'
     + '  </form>\n';
 
+  const titulo = o.certificado ? T.cTitulo : T.titulo;
   let cuerpo = ''
-    + '  <p class="vf-top"><span class="ey">' + esc(T.ey) + '</span>'
+    + '  <p class="vf-top"><span class="ey">' + esc(o.certificado ? T.cEy : T.ey) + '</span>'
     + '<a class="card-link" href="' + esc(otroHref) + '" hreflang="' + T.otroLang + '" lang="' + T.otroLang + '">' + esc(T.otro) + '</a></p>\n'
-    + '  <h1>' + esc(T.titulo) + '</h1>\n';
+    + '  <h1>' + esc(titulo) + '</h1>\n';
 
-  if (o.resultado) {
+  if (o.certificado) {
+    /* EL CERTIFICADO DE HORAS (0047): la respuesta en grande, como el carnet,
+       y debajo los cuatro datos para cotejar con el papel. Sin tarjeta: el
+       certificado es una hoja, no algo que se enseña en una caja. */
+    const c = o.certificado;
+    const fila = (k, v) => '      <div><dt>' + esc(k) + '</dt><dd>' + esc(v || "-") + '</dd></div>\n';
+    cuerpo += ''
+      + '  <section class="vf-res ' + (c.valido ? "vf-si" : "vf-no") + '">\n'
+      + '    <p class="vf-estado">' + esc(c.valido ? T.cVal : T.cAnu) + '</p>\n'
+      + '    <p class="vf-estado-p">' + esc(c.valido ? T.cValP : T.cAnuP) + '</p>\n'
+      + '    <dl class="vf-dl">\n'
+      + fila(T.cNum, c.numero) + fila(T.cNombre, c.nombre) + fila(T.cJornada, c.jornada)
+      + fila(T.cFecha, c.fecha) + fila(T.cHoras, c.horas)
+      + fila(T.cons, c.consultado + " (" + T.hora + ")")
+      + '    </dl>\n'
+      + '  </section>\n'
+      + (c.valido ? '  <p class="vf-cotejar">' + esc(T.cCotejar) + '</p>\n' : '')
+      + '  <p class="mu vf-ayuda">' + esc(T.cNo) + '</p>\n'
+      + '  <p style="margin-top:22px"><a class="card-link" href="/verificar' + qLang + '">' + esc(T.cOtra) + '</a></p>\n';
+  } else if (o.resultado) {
     const r = o.resultado;
     /* LA MISMA TARJETA QUE ENSEÑA EL MIEMBRO, con su nombre enmascarado y el
        código de verificación en lugar del número MB-…: el cajero coteja lo que
@@ -17834,6 +17908,8 @@ function paginaVerificar(o) {
     + '.vf-semilla{margin-top:10px;font-weight:600}'
     + '.vf-tarjeta{margin-top:18px}'
     + '.vf-cotejar{margin-top:16px;font-weight:600}'
+    + '.vf-dl{margin:16px 0 0;display:grid;gap:10px}.vf-dl div{display:grid;grid-template-columns:minmax(120px,38%) 1fr;gap:12px;'
+    + 'padding-top:10px;border-top:1px solid var(--bd)}.vf-dl dt{color:var(--mu);font-size:var(--fs-14)}.vf-dl dd{margin:0;font-weight:600;overflow-wrap:anywhere}'
     /* La página ocupa la pantalla entera: barra arriba, consulta, y el pie con
        el NIT abajo del todo en vez de flotar a media pantalla. */
     + 'body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}'
@@ -17845,7 +17921,7 @@ function paginaVerificar(o) {
     + '.vf-cab .nlogo{display:inline-flex;align-items:center;min-height:44px}'
     + '.vf-volver{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:var(--fs-14);font-weight:600;color:var(--acc)}'
     + '.vf-volver:hover{text-decoration:underline;text-underline-offset:3px}';
-  return cascaraBaja(T.titulo, cuerpo, o.lang, o.tema, (o.resultado ? CARNET_CSS : '') + estilo, cabecera);
+  return cascaraBaja(titulo, cuerpo, o.lang, o.tema, (o.resultado ? CARNET_CSS : '') + estilo, cabecera);
 }
 
 /* ========================================================================
@@ -27096,7 +27172,7 @@ async function adminPrevia(request, env, sesion) {
     const { results } = await env.DB.prepare(
       "SELECT p.*, r.numero, r.datos, r.huella, r.enviado_en, e.token FROM participaciones p " +
       "JOIN reconocimientos r ON r.participacion = p.id LEFT JOIN encuestas e ON e.participacion = p.id " +
-      "WHERE p.jornada = ?" + (una ? " AND p.id = ?" : "") + " ORDER BY p.id"
+      "WHERE p.jornada = ? AND r.anulado_en IS NULL" + (una ? " AND p.id = ?" : "") + " ORDER BY p.id"
     ).bind(...(una ? [id, una] : [id])).all();
     const omitidos = [];
     let van = 0, quedan = 0;
@@ -27876,15 +27952,25 @@ async function adminJornada(env, id) {
   const j = await jornadaPorId(env, id);
   if (!j) return json({ error: "no_encontrada" }, 404);
   const red = await fundacionesRed(env);
+  /* Con el certificado entero (quien lo emitio, su codigo, si se anulo) y lo
+     de la inscripcion que decide si se puede emitir (edad y acudiente). */
   const { results: ps } = await env.DB.prepare(
-    "SELECT p.*, r.numero, r.enviado_en, r.enviado_a, e.token AS encuesta, e.respondida_en AS encuesta_respondida " +
-    "FROM participaciones p LEFT JOIN reconocimientos r ON r.participacion = p.id " +
+    SQL_PARTICIPACION_CERT.replace("SELECT p.*,",
+      "SELECT p.*, r.numero, r.enviado_en, r.enviado_a, r.emitido_en, r.emitido_por, r.verif, " +
+      "r.anulado_en, r.anulado_por, r.anulado_motivo, e.token AS encuesta, e.respondida_en AS encuesta_respondida,") +
+    "LEFT JOIN reconocimientos r ON r.participacion = p.id " +
     "LEFT JOIN encuestas e ON e.participacion = p.id WHERE p.jornada = ? ORDER BY p.nombre COLLATE NOCASE, p.id"
   ).bind(id).all();
   const participaciones = (ps || []).map((p) => {
     const d = destinoReconocimiento(p);
     const conHoras = p.horas > 0;
     return Object.assign({}, p, {
+      verif: p.verif ? verifFormato(p.verif) : null,
+      ins_mayor: undefined, ins_acudiente: undefined,
+      menor_autorizado: !!p.ins_acudiente,
+      /* Por que todavia no se puede emitir, dicho en la fila. Solo cuando la
+         jornada esta cerrada y aun no hay certificado: antes, «Sale al cerrar». */
+      emitir_motivo: !p.numero && j.estado === "cerrada" ? motivoNoEmitir(p, j) : null,
       envio_a: d.para && conHoras ? d.a : null,
       envio_motivo: !conHoras && p.horas !== null ? "Sin horas efectivas: no lleva certificado."
                   : (d.para ? null : d.motivo)
@@ -28134,8 +28220,23 @@ async function adminParticipacion(request, env, pid, quien) {
     "SELECT p.id, p.jornada, j.estado FROM participaciones p JOIN jornadas j ON j.id = p.jornada WHERE p.id = ?"
   ).bind(pid).first();
   if (!p) return json({ error: "no_encontrada" }, 404);
-  if (!JORNADA_ABIERTA.includes(p.estado)) return json({ error: "jornada_cerrada",
-    ayuda: "La jornada está " + p.estado + ": sus horas ya no cambian." }, 409);
+  if (!JORNADA_ABIERTA.includes(p.estado)) {
+    /* CERRADA, las horas quedan fijas. Lo unico que se deja tocar es la EDAD
+       mientras no haya certificado: confirmarla no cambia ninguna cifra, y sin
+       ella no se puede emitir (`motivoNoEmitir`). */
+    let soloEdad = false;
+    if (p.estado === "cerrada" && request.method === "POST") {
+      try {
+        const c0 = await request.clone().json();
+        soloEdad = esObjeto(c0) && Object.keys(c0).length === 1 && c0.menor !== undefined;
+      } catch { soloEdad = false; }
+      if (soloEdad && await env.DB.prepare("SELECT 1 AS s FROM reconocimientos WHERE participacion = ?").bind(pid).first()) {
+        return json({ error: "ya_emitido", ayuda: "Ya tiene certificado: su edad no cambia. Si estaba mal, anula el certificado." }, 409);
+      }
+    }
+    if (!soloEdad) return json({ error: "jornada_cerrada",
+      ayuda: "La jornada está " + p.estado + ": sus horas ya no cambian." }, 409);
+  }
   if (request.method === "DELETE") {
     await env.DB.prepare("DELETE FROM participaciones WHERE id = ?").bind(pid).run();
     await auditarJornada(env, quien, "jornada " + p.jornada + " · participación " + pid + " quitada");
@@ -28167,39 +28268,31 @@ async function adminParticipacion(request, env, pid, quien) {
   }
   if (!sets.length) return json({ error: "nada_que_cambiar" }, 400);
   await env.DB.prepare("UPDATE participaciones SET " + sets.join(", ") + " WHERE id = ?").bind(...args, pid).run();
+  /* Con la jornada cerrada, la edad decide si se emite a nombre de un menor:
+     queda quien la confirmo. */
+  if (p.estado === "cerrada" && c.menor !== undefined) {
+    await auditarJornada(env, quien, "jornada " + p.jornada + " · participación " + pid + " · edad confirmada como " +
+      (c.menor === true ? "menor" : c.menor === false ? "mayor" : "sin confirmar") + " (jornada cerrada)");
+  }
   return json({ ok: true, id: pid });
 }
 
-/* EMITIR LO QUE EL CIERRE PROMETE: el certificado de cada quien con horas y
-   los enlaces de la encuesta. IDEMPOTENTE —lo que ya existe no se toca— porque
-   lo llaman el cierre y, como reparacion, el envio: si el cierre se corto a
-   mitad, el siguiente clic completa lo que falto en vez de dejar a alguien sin
-   certificado. */
+/* LO QUE EL CIERRE CREA: los enlaces de la encuesta (de cada quien con horas,
+   de la empresa y de la fundacion). IDEMPOTENTE —lo que ya existe no se toca—
+   porque lo llaman el cierre y, como reparacion, el envio: si el cierre se
+   corto a mitad, el siguiente clic completa lo que falto.
+
+   EL CERTIFICADO YA NO SALE AQUI (0047). Hasta el 17 oct 2026 el cierre emitia
+   uno por cada persona con horas, sin que nadie respondiera por cada papel y
+   aunque fuera a nombre de un menor sin la autorizacion de su acudiente. Ahora
+   lo emite una persona, fila por fila: ver `emitirReconocimiento`. */
 async function asegurarCierre(env, j) {
-  const red = await fundacionesRed(env);
-  const anf = j.anfitriona && j.anfitriona !== "sede" ? nombreAnfitriona(red, j.anfitriona) : "";
   const { results: ps } = await env.DB.prepare(
-    "SELECT p.*, r.participacion AS ya FROM participaciones p LEFT JOIN reconocimientos r ON r.participacion = p.id WHERE p.jornada = ?"
+    "SELECT id, horas, idioma FROM participaciones WHERE jornada = ?"
   ).bind(j.id).all();
-  const hoy = new Date().toISOString();
   const pasos = [];
   for (const p of ps || []) {
     if (!(p.horas > 0)) continue;
-    if (!p.ya) {
-      const numero = await siguienteReconocimiento(env, anioCO(hoy));
-      /* Lo que el certificado DICE, congelado. Sin el lugar a proposito: puede
-         ser la direccion de una fundacion, y esas no se escriben en ningun
-         papel que salga de aqui (CLAUDE.md, coordenadas a nivel de zona). */
-      const datos = JSON.stringify({
-        numero, idioma: p.idioma === "en" ? "en" : "es", nombre: p.nombre,
-        jornada: j.nombre, fecha: j.fecha, horario: horarioDe(j),
-        anfitriona: anf, empresa: j.empresa || "", horas: Number(p.horas), pro_bono: !!p.pro_bono,
-        emitido_en: fechaCO(hoy)
-      });
-      pasos.push(env.DB.prepare(
-        "INSERT OR IGNORE INTO reconocimientos (participacion, jornada, numero, datos, huella) VALUES (?, ?, ?, ?, ?)"
-      ).bind(p.id, j.id, numero, datos, await huellaDe(datos)));
-    }
     pasos.push(env.DB.prepare(
       "INSERT OR IGNORE INTO encuestas (token, jornada, actor, participacion, idioma) VALUES (?, ?, 'voluntario', ?, ?)"
     ).bind(tokenNuevo(), j.id, p.id, p.idioma === "en" ? "en" : "es"));
@@ -28215,6 +28308,127 @@ async function asegurarCierre(env, j) {
     ).bind(tokenNuevo(), j.id));
   }
   if (pasos.length) await env.DB.batch(pasos);
+}
+
+/* ¿Se le puede emitir el certificado a esta participacion? Devuelve el motivo
+   por el que NO, o null. Lo usan la emision (que bloquea) y la ficha del panel
+   (que lo dice en la fila antes de que nadie pulse nada).
+
+   `p` trae las columnas de `participaciones` y, si esta enlazada a una
+   inscripcion, `ins_mayor` (json `mayor_edad`) e `ins_acudiente` (el paso
+   «acudiente», marcado en papel desde el panel o por el acudiente desde su
+   enlace).
+
+   UN MENOR SOLO CON LA AUTORIZACION QUE YA MANEJA EL SISTEMA. El certificado
+   lleva su nombre, viaja por correo y se puede consultar en /verificar: es
+   tratar un dato de un menor, y la Ley 1581 (art. 7) pide para eso la
+   autorizacion de su representante. Esa autorizacion vive en la inscripcion
+   (`pasos.acudiente`); a quien se anoto a mano no se le pidio nunca, asi que
+   un menor anotado a mano no recibe certificado a su nombre. Y si la edad no
+   esta confirmada, tampoco: «no se sabe» no es «mayor». */
+function motivoNoEmitir(p, j) {
+  if (j && j.estado !== "cerrada") return "La jornada no está cerrada: las horas todavía pueden cambiar.";
+  if (!(p.horas > 0)) return "Sin horas efectivas: no lleva certificado.";
+  if (p.nombre === "(suprimido)") return "Sus datos se suprimieron (Ley 1581): no se emite a nombre de nadie.";
+  const menor = p.menor === 1 || p.ins_mayor === 0 || p.ins_mayor === false;
+  if (!menor && p.menor !== 0) return "Su edad no está confirmada: márcala en la columna «Edad» de su fila antes de emitir.";
+  if (menor) {
+    if (!p.inscripcion) return "Es menor y se anotó a mano: no hay autorización de su acudiente en el sistema. Sin ella no se emite a su nombre.";
+    if (!p.ins_acudiente) return "Es menor y su acudiente todavía no ha autorizado (paso «acudiente» de su inscripción). Sin esa autorización no se emite a su nombre.";
+  }
+  return null;
+}
+
+/* Las participaciones de una jornada con lo que hace falta para decidir si se
+   emite: su certificado (si lo hay) y, de su inscripcion, la edad y el paso
+   del acudiente. */
+const SQL_PARTICIPACION_CERT =
+  "SELECT p.*, json_extract(i.datos, '$.mayor_edad') AS ins_mayor, " +
+  "json_extract(i.datos, '$.pasos.acudiente.en') AS ins_acudiente " +
+  "FROM participaciones p LEFT JOIN inscripciones i ON i.id = p.inscripcion AND i.tipo = 'voluntario' ";
+
+/* Un codigo de /verificar que no use ya ningun carnet ni ningun certificado:
+   los dos viven en la misma pagina, y un mismo codigo no puede responder por
+   dos papeles. */
+async function verifLibre(env) {
+  for (let i = 0; i < 6; i++) {
+    const v = verifNuevo();
+    const ya = await env.DB.prepare(
+      "SELECT (SELECT 1 FROM miembros WHERE verif = ?) AS m, (SELECT 1 FROM reconocimientos WHERE verif = ?) AS r"
+    ).bind(v, v).first();
+    if (!ya || (!ya.m && !ya.r)) return v;
+  }
+  throw new Error("no se encontró un código de verificación libre");
+}
+
+/* POST /api/admin/participacion/<id>/certificado — «Emitir certificado de horas».
+   LO EMITE UNA PERSONA, una fila a la vez, y queda quien (`emitido_por`) y en
+   la auditoria. Le da numero (VC-AAAA-NNNNNN) y codigo de /verificar, y CONGELA
+   lo que dice en `datos`, con su huella: el PDF de hoy y el de dentro de un año
+   dicen lo mismo aunque la fundacion cambie de nombre en partners.json.
+   Uno por participacion (es la llave de la tabla): si sale mal, se anula. */
+async function emitirReconocimiento(env, pid, quien) {
+  const p = await env.DB.prepare(SQL_PARTICIPACION_CERT + "WHERE p.id = ?").bind(pid).first();
+  if (!p) return json({ error: "no_encontrada" }, 404);
+  const j = await jornadaPorId(env, p.jornada);
+  if (!j) return json({ error: "no_encontrada" }, 404);
+  const ya = await env.DB.prepare("SELECT numero FROM reconocimientos WHERE participacion = ?").bind(pid).first();
+  if (ya) return json({ error: "ya_emitido", numero: ya.numero,
+    ayuda: "Ya tiene el certificado " + ya.numero + ". Si salió mal, anúlalo; no se emite otro encima." }, 409);
+  const motivo = motivoNoEmitir(p, j);
+  if (motivo) return json({ error: "no_se_emite", ayuda: motivo }, 409);
+
+  const red = await fundacionesRed(env);
+  const anf = j.anfitriona && j.anfitriona !== "sede" ? nombreAnfitriona(red, j.anfitriona) : "";
+  const hoy = new Date().toISOString();
+  const numero = await siguienteReconocimiento(env, anioCO(hoy));
+  const verif = await verifLibre(env);
+  /* Lo que el certificado DICE, congelado. Sin el lugar a proposito: puede ser
+     la direccion de una fundacion, y esas no se escriben en ningun papel que
+     salga de aqui (CLAUDE.md, coordenadas a nivel de zona). El codigo de
+     verificacion va dentro: es parte de lo que el papel dice. */
+  const datos = JSON.stringify({
+    numero, verif, idioma: p.idioma === "en" ? "en" : "es", nombre: p.nombre,
+    jornada: j.nombre, fecha: j.fecha, horario: horarioDe(j),
+    anfitriona: anf, empresa: j.empresa || "", horas: Number(p.horas), pro_bono: !!p.pro_bono,
+    emitido_en: fechaCO(hoy)
+  });
+  /* El consecutivo ya se gasto: si dos personas pulsan a la vez, la segunda
+     choca con la llave (una fila por participacion) y ese numero queda como
+     hueco. Se dice en la auditoria para que el hueco tenga explicacion. */
+  const r = await env.DB.prepare(
+    "INSERT OR IGNORE INTO reconocimientos (participacion, jornada, numero, datos, huella, emitido_por, verif) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).bind(pid, j.id, numero, datos, await huellaDe(datos), quien || "?", verif).run();
+  if (!(r.meta && r.meta.changes)) {
+    await auditarJornada(env, quien, "jornada " + j.id + " · participación " + pid + " · " + numero + " NO usado: otra persona emitió a la vez");
+    return json({ error: "cambio_en_curso", ayuda: "Alguien lo emitió a la vez. Recarga." }, 409);
+  }
+  await auditarJornada(env, quien, "jornada " + j.id + " · participación " + pid + " · certificado de horas " + numero + " EMITIDO (" + String(p.horas) + " h)");
+  return json({ ok: true, numero, verif: verifFormato(verif) });
+}
+
+/* POST /api/admin/reconocimiento/<VC-…>/anular  { motivo }
+   Sin motivo no se anula: es lo que explica por que un papel que alguien tiene
+   en la mano dice «Anulado» en /verificar. El motivo se queda en /admin y en la
+   auditoria; la pagina publica no lo muestra. Condicionado a «todavia sin
+   anular» en el mismo UPDATE, por lo mismo que `adminAnularEntrega`. */
+async function adminAnularReconocimiento(request, env, numero, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c = {};
+  try { c = await request.json(); } catch { /* el motivo se valida abajo */ }
+  if (!esObjeto(c)) c = {};
+  const motivo = String(c.motivo == null ? "" : c.motivo).trim().slice(0, 300);
+  if (motivo.length < 4) return json({ error: "motivo_requerido",
+    ayuda: "Escribe por qué se anula: queda en la historia del certificado." }, 400);
+  const r0 = await env.DB.prepare("SELECT jornada, anulado_en FROM reconocimientos WHERE numero = ?").bind(numero).first();
+  if (!r0) return json({ error: "no_encontrado" }, 404);
+  if (r0.anulado_en) return json({ error: "ya_anulado", ayuda: "Ya estaba anulado." }, 409);
+  const r = await env.DB.prepare(
+    "UPDATE reconocimientos SET anulado_en = datetime('now'), anulado_por = ?, anulado_motivo = ? WHERE numero = ? AND anulado_en IS NULL"
+  ).bind(quien || "?", motivo, numero).run();
+  if (!(r.meta && r.meta.changes)) return json({ error: "ya_anulado", ayuda: "Alguien lo anuló a la vez. Recarga." }, 409);
+  await auditarJornada(env, quien, "jornada " + r0.jornada + " · certificado de horas " + numero + " ANULADO · " + motivo);
+  return json({ ok: true, numero, anulado: true });
 }
 
 /* POST /api/admin/jornada/<id>/cerrar
@@ -28303,16 +28517,19 @@ async function correoReconocimiento(env, p, datos, huella, token, aAcudiente) {
       ...(encuesta ? ["Nos ayudaría mucho saber cómo te fue. Son cinco preguntas cortas, no te pedimos ningún dato y el enlace es solo tuyo."] : [])
     ];
   }
-  const filas = en ? [
-    ["Certificate", datos.numero], ["Activity", datos.jornada], ["Date", fecha], ["Effective hours", horasTxt]
+  const vf = datos.verif ? verifFormato(datos.verif) : "";
+  const filas = (en ? [
+    ["Certificate", datos.numero], ["Activity", datos.jornada], ["Date", fecha], ["Effective hours", horasTxt],
+    ...(vf ? [["Verification code", vf + " · " + ORIGIN.replace("https://www.", "") + "/verificar"]] : [])
   ] : [
-    ["Certificado", datos.numero], ["Jornada", datos.jornada], ["Fecha", fecha], ["Horas efectivas", horasTxt]
-  ];
+    ["Certificado", datos.numero], ["Jornada", datos.jornada], ["Fecha", fecha], ["Horas efectivas", horasTxt],
+    ...(vf ? [["Código de verificación", vf + " · " + ORIGIN.replace("https://www.", "") + "/verificar"]] : [])
+  ]);
   const boton = encuesta ? { url: encuesta, texto: en ? "Answer the survey" : "Responder la encuesta" } : null;
   /* En la vista previa del panel no se arma el PDF: se enseña la carta y el
      nombre del adjunto, como hace `correoCertificado`. */
   const previa = !!(env && Array.isArray(env.__previa));
-  const bytes = previa ? null : await certificadoVoluntariado(Object.assign({}, datos, { huella }));
+  const bytes = previa ? null : await certificadoVoluntariado(datosPdfReconocimiento(datos, { huella }));
   return enviarCorreo(env, {
     para: aAcudiente ? p.acudiente_email : p.email,
     asunto: titulo + " · " + datos.numero,
@@ -28340,7 +28557,7 @@ async function adminReconocerJornada(request, env, id, quien) {
   const { results } = await env.DB.prepare(
     "SELECT p.*, r.numero, r.datos, r.huella, r.enviado_en, e.token FROM participaciones p " +
     "JOIN reconocimientos r ON r.participacion = p.id LEFT JOIN encuestas e ON e.participacion = p.id " +
-    "WHERE p.jornada = ?" + (una ? " AND p.id = ?" : "") + " ORDER BY p.id"
+    "WHERE p.jornada = ? AND r.anulado_en IS NULL" + (una ? " AND p.id = ?" : "") + " ORDER BY p.id"
   ).bind(...(una ? [id, una] : [id])).all();
   const enviados = [], omitidos = [], fallidos = [];
   let quedan = 0;
@@ -28429,13 +28646,26 @@ async function adminEnviarEncuestaActor(request, env, id, quien) {
   return json({ ok: true, enviado: true });
 }
 
+/* Lo que dibuja el PDF: lo congelado, mas lo que no se congela porque cambia
+   despues (la anulacion) o porque el certificado nacio antes de la 0047 (su
+   codigo, que la migracion le dio fuera de `datos`). */
+function datosPdfReconocimiento(d, r) {
+  const v = d.verif || r.verif || "";
+  return Object.assign({}, d, {
+    huella: r.huella,
+    verif: v ? verifFormato(v) : "",
+    qr: v ? ORIGIN + "/verificar/" + verifFormato(v) : "",
+    anulado: !!r.anulado_en
+  });
+}
+
 /* GET /api/admin/reconocimiento/<VC-…>.pdf — el certificado tal como se emitio. */
 async function adminReconocimientoPdf(env, numero) {
-  const r = await env.DB.prepare("SELECT datos, huella FROM reconocimientos WHERE numero = ?").bind(numero).first();
+  const r = await env.DB.prepare("SELECT datos, huella, verif, anulado_en FROM reconocimientos WHERE numero = ?").bind(numero).first();
   if (!r) return json({ error: "no_encontrado" }, 404);
   let d = {};
   try { d = JSON.parse(r.datos) || {}; } catch (e) { return json({ error: "datos_ilegibles" }, 500); }
-  const bytes = await certificadoVoluntariado(Object.assign({}, d, { huella: r.huella }));
+  const bytes = await certificadoVoluntariado(datosPdfReconocimiento(d, r));
   return new Response(bytes, {
     headers: {
       "content-type": "application/pdf",
@@ -35557,13 +35787,17 @@ function fichaLectura(j){
   return '<dl class="vol-ficha">' + f.map(function(x){ return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") + "</dl>";
 }
 
-function filaParticipante(p, abierta){
+function filaParticipante(p, abierta, cerrada){
   var edad = p.menor === 1 ? "Menor de edad" : p.menor === 0 ? "Mayor de edad" : "Sin confirmar";
-  var tdEdad = abierta
+  /* Cerrada y sin certificado, la edad todavia se confirma aqui: sin ella no
+     se emite. Las horas no: ya quedaron fijas. */
+  var edadEditable = abierta || (cerrada && !p.numero && p.horas > 0);
+  var tdEdad = edadEditable
     ? '<select data-pmenor="' + p.id + '" aria-label="Edad de ' + esc(p.nombre) + '">' +
         opcionesJ([["", "Sin confirmar"], ["no", "Mayor de edad"], ["si", "Menor de edad"]], p.menor === 1 ? "si" : p.menor === 0 ? "no" : "", null) + "</select>"
     : esc(edad);
-  if (p.menor === 1) tdEdad += "<br><small>Acudiente: " + esc(p.acudiente_nombre || "sin nombre") + " · " + esc(p.acudiente_email || "sin correo") + "</small>";
+  if (p.menor === 1) tdEdad += "<br><small>Acudiente: " + esc(p.acudiente_nombre || "sin nombre") + " · " + esc(p.acudiente_email || "sin correo") +
+    (p.inscripcion ? " · " + (p.menor_autorizado ? "autorizó" : "sin autorizar") : "") + "</small>";
   var tdHoras = abierta
     ? '<input class="vol-horas" data-phoras="' + p.id + '" value="' + esc(p.horas === null ? "" : p.horas) + '" inputmode="decimal" aria-label="Horas de ' + esc(p.nombre) + '">'
     : esc(p.horas === null ? "—" : String(p.horas).replace(".", ","));
@@ -35572,14 +35806,26 @@ function filaParticipante(p, abierta){
     : (p.pro_bono ? "Sí" : "No");
   var cert;
   if (p.numero){
-    cert = '<a href="/api/admin/reconocimiento/' + esc(p.numero) + '.pdf" target="_blank" rel="noopener">' + esc(p.numero) + "</a>";
-    if (p.enviado_en && p.enviado_a && p.enviado_a !== "enviando") cert += "<br><small>Enviado el " + esc(enCO(p.enviado_en, 10)) + " a " + esc(p.enviado_a) + "</small>";
-    else if (p.envio_motivo) cert += '<br><small class="vol-motivo">' + esc(p.envio_motivo) + "</small>";
-    else cert += '<br><button class="copy" type="button" data-jreconocer="' + p.jornada + '" data-jpart="' + p.id + '">Enviar' + (p.envio_a === "acudiente" ? " al acudiente" : "") + "</button>";
+    /* LA HISTORIA DEL CERTIFICADO en su celda: quien lo emitio y cuando, su
+       codigo de /verificar y, si se anulo, quien, cuando y por que. */
+    cert = '<a href="/api/admin/reconocimiento/' + esc(p.numero) + '.pdf" target="_blank" rel="noopener">' + esc(p.numero) + "</a>" +
+      (p.anulado_en ? ' <strong class="vol-motivo">Anulado</strong>' : "") +
+      "<br><small>Emitido el " + esc(enCO(p.emitido_en, 10)) + (p.emitido_por ? " por " + esc(p.emitido_por) : " al cerrar (antes de oct 2026)") +
+      (p.verif ? " · código " + esc(p.verif) : "") + "</small>";
+    if (p.anulado_en){
+      cert += '<br><small class="vol-motivo">Anulado el ' + esc(enCO(p.anulado_en, 10)) + " por " + esc(p.anulado_por || "?") + ": " + esc(p.anulado_motivo || "") + "</small>";
+    } else {
+      if (p.enviado_en && p.enviado_a && p.enviado_a !== "enviando") cert += "<br><small>Enviado el " + esc(enCO(p.enviado_en, 10)) + " a " + esc(p.enviado_a) + "</small>";
+      else if (p.envio_motivo) cert += '<br><small class="vol-motivo">' + esc(p.envio_motivo) + "</small>";
+      else cert += '<br><button class="copy" type="button" data-jreconocer="' + p.jornada + '" data-jpart="' + p.id + '">Enviar' + (p.envio_a === "acudiente" ? " al acudiente" : "") + "</button>";
+      cert += ' <button class="copy" type="button" data-ranular="' + esc(p.numero) + '">Anular</button>';
+    }
   } else if (abierta){
-    cert = '<small class="mu">Sale al cerrar</small>' + (p.envio_motivo ? '<br><small class="vol-motivo">' + esc(p.envio_motivo) + "</small>" : "");
+    cert = '<small class="mu">Se emite cuando la jornada esté cerrada</small>' + (p.envio_motivo ? '<br><small class="vol-motivo">' + esc(p.envio_motivo) + "</small>" : "");
+  } else if (cerrada && !p.emitir_motivo){
+    cert = '<button class="copy" type="button" data-pemitir="' + p.id + '">Emitir certificado de horas</button>';
   } else {
-    cert = '<small class="vol-motivo">' + esc(p.envio_motivo || "Sin certificado") + "</small>";
+    cert = '<small class="vol-motivo">' + esc(p.emitir_motivo || p.envio_motivo || "Sin certificado") + "</small>";
   }
   var enc = p.encuesta ? (p.encuesta_respondida ? "Respondió" : "Sin responder") : "—";
   return "<tr>" +
@@ -35660,7 +35906,7 @@ function pintarJornada(d){
   if (j.estado === "realizada"){
     var sede = !j.anfitriona || j.anfitriona === "sede";
     h += '<div class="vol-cierre eg-form" style="max-width:none;padding-top:12px"><p style="margin:0"><strong>Cerrar la jornada.</strong> ' +
-      "Fija las horas, emite un certificado por cada persona con horas y crea las encuestas. Después ya no se edita ni se reabre: " +
+      "Fija las horas y crea las encuestas; después, el certificado de cada persona se emite en su fila. Ya no se edita ni se reabre: " +
       "si luego aparece un error, se crea otra jornada con los datos buenos.</p>" +
       '<div class="eg-par"><div><label for="j-bd">Beneficiarios directos</label><input id="j-bd" inputmode="numeric"></div>' +
       '<div><label for="j-bi">Beneficiarios indirectos</label><input id="j-bi" inputmode="numeric"></div></div>' +
@@ -35684,7 +35930,7 @@ function pintarJornada(d){
     ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Persona</th><th scope="col">Contacto</th>' +
       '<th scope="col">Horas efectivas</th><th scope="col">Pro bono</th><th scope="col">Edad</th><th scope="col">Certificado</th>' +
       '<th scope="col">Encuesta</th><th scope="col">Acción</th></tr></thead><tbody>' +
-      ps.map(function(p){ return filaParticipante(p, abierta); }).join("") + "</tbody></table></div>"
+      ps.map(function(p){ return filaParticipante(p, abierta, cerrada); }).join("") + "</tbody></table></div>"
     : '<p class="mu">Nadie anotado todavía.</p>';
   if (abierta){
     /* En terreno e Impact Journey la lista se parte en dos: a quien se puede
@@ -35730,9 +35976,13 @@ function pintarJornada(d){
 
   /* Reconocimiento y encuestas, solo al cerrar */
   if (cerrada){
-    var pend = ps.filter(function(p){ return p.numero && !p.enviado_en && !p.envio_motivo; }).length;
-    var omit = ps.filter(function(p){ return p.numero && !p.enviado_en && p.envio_motivo; }).length;
+    var vivo = function(p){ return p.numero && !p.anulado_en; };
+    var pend = ps.filter(function(p){ return vivo(p) && !p.enviado_en && !p.envio_motivo; }).length;
+    var omit = ps.filter(function(p){ return vivo(p) && !p.enviado_en && p.envio_motivo; }).length;
+    var porEmitir = ps.filter(function(p){ return !p.numero && p.horas > 0 && !p.emitir_motivo; }).length;
     h += '<div class="vol-bloque"><h4>Agradecimiento y certificado</h4>' +
+      '<p class="mu" style="font-size:13.5px">El certificado de horas lo emite una persona, en la fila de cada quien: queda quién lo emitió. ' +
+      (porEmitir ? "<strong>" + porEmitir + (porEmitir === 1 ? " persona espera" : " personas esperan") + " su certificado.</strong> " : "") + "</p>" +
       '<p class="mu" style="font-size:13.5px">Un correo por persona, en su idioma, con su certificado y el enlace de su encuesta. ' +
       "Sale una sola vez: lo ya enviado no se repite. " + pend + " por enviar" + (omit ? " · " + omit + " que no se pueden enviar (el motivo está en su fila)" : "") + ".</p>" +
       (pend ? '<p><button class="btn" type="button" data-jreconocer="' + j.id + '">Enviar a quien falte (' + pend + ")</button></p>" : "") +
@@ -35826,7 +36076,7 @@ document.addEventListener("click", function(e){
     /* Cerrar no se deshace: va en rojo y dice qué queda fijo (antes,
        window.confirm). */
     confirmarPeligro({ ey: "No se puede deshacer", titulo: "Cerrar la jornada",
-      detalle: "<p>Las horas quedan fijas, sale un certificado de voluntariado por cada persona con horas y nacen las encuestas. " +
+      detalle: "<p>Las horas quedan fijas y nacen las encuestas. Los certificados no salen solos: después los emites tú, persona por persona. " +
         "<strong>Una jornada cerrada no se reabre ni se edita</strong>: si algo queda mal, se crea otra con los datos buenos.</p>" +
         ficha([["Beneficiarios directos", esc(cuerpoC.beneficiarios_directos || "sin reporte")],
                ["Beneficiarios indirectos", esc(cuerpoC.beneficiarios_indirectos || "sin reporte")],
@@ -35835,7 +36085,7 @@ document.addEventListener("click", function(e){
       boton: "Cerrar la jornada",
       hacer: function(){
         return postPanel("/api/admin/jornada/" + encodeURIComponent(jidC) + "/cerrar", cuerpoC).then(function(d){
-          if (!d) return false; avisar("Jornada cerrada. Ya se pueden enviar los certificados."); refrescarJ(); return true;
+          if (!d) return false; avisar("Jornada cerrada. Ya se pueden emitir los certificados."); refrescarJ(); return true;
         });
       } });
     return;
@@ -35866,6 +36116,36 @@ document.addEventListener("click", function(e){
       hacer: function(){
         return postPanel("/api/admin/participacion/" + encodeURIComponent(pid), {}, "DELETE").then(function(d){
           if (!d) return false; avisar(quien + " ya no está en la jornada."); refrescarJ(); return true;
+        });
+      } });
+    return;
+  }
+  if ((b = e.target.closest("[data-pemitir]"))){
+    var pidE = b.getAttribute("data-pemitir");
+    var filaE = b.closest("tr"), quienE = filaE && filaE.cells[0] ? filaE.cells[0].textContent.split("inscrita")[0].split("anotada")[0] : "esta persona";
+    var horasE = filaE && filaE.cells[2] ? filaE.cells[2].textContent : "";
+    confirmarSimple({ ey: "Voluntariado", titulo: "Emitir el certificado de horas de " + quienE,
+      detalle: "<p>Sale con número, código y QR de verificación, a nombre de <strong>" + esc(quienE) + "</strong> por <strong>" + esc(horasE) + " h</strong> efectivas. " +
+        "Queda escrito que lo emitiste tú. No se le envía todavía: el correo sale después, y antes lo verás.</p>" +
+        '<p class="mu" style="font-size:var(--fs-13)">Una vez emitido no se edita: si algo está mal, se anula con su motivo.</p>',
+      boton: "Emitir el certificado",
+      hacer: function(){
+        return postPanel("/api/admin/participacion/" + encodeURIComponent(pidE) + "/certificado", {}).then(function(d){
+          if (!d) return false; avisar("Certificado " + d.numero + " emitido · código " + d.verif + "."); refrescarJ(); return true;
+        });
+      } });
+    return;
+  }
+  if ((b = e.target.closest("[data-ranular]"))){
+    var numA = b.getAttribute("data-ranular");
+    confirmarPeligro({ ey: "No se puede deshacer", titulo: "Anular el certificado " + numA,
+      detalle: "<p>En /verificar pasará a decir <strong>Anulado</strong>, también para quien ya tenga el PDF. " +
+        "El motivo se queda aquí y en la auditoría, con tu correo: la página pública no lo muestra.</p>",
+      motivo: true, etiquetaMotivo: "Por qué se anula",
+      boton: "Anular el certificado",
+      hacer: function(m){
+        return postPanel("/api/admin/reconocimiento/" + encodeURIComponent(numA) + "/anular", { motivo: m }).then(function(d){
+          if (!d) return false; avisar("Certificado " + numA + " anulado."); refrescarJ(); return true;
         });
       } });
     return;
@@ -44056,8 +44336,15 @@ export default {
         }
         const mpa = ruta.match(/^\/api\/admin\/participacion\/(\d{1,9})$/);
         if (mpa) return await adminParticipacion(request, env, Number(mpa[1]), sesion.email);
+        const mpc = ruta.match(/^\/api\/admin\/participacion\/(\d{1,9})\/certificado$/);
+        if (mpc) {
+          if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+          return await emitirReconocimiento(env, Number(mpc[1]), sesion.email);
+        }
         const mrp = ruta.match(/^\/api\/admin\/reconocimiento\/(VC-\d{4}-\d{6})\.pdf$/i);
         if (mrp) return await adminReconocimientoPdf(env, mrp[1].toUpperCase());
+        const mra = ruta.match(/^\/api\/admin\/reconocimiento\/(VC-\d{4}-\d{6})\/anular$/i);
+        if (mra) return await adminAnularReconocimiento(request, env, mra[1].toUpperCase(), sesion.email);
         if (ruta === "/api/admin/entregas") return await adminEntregas(env);
         const mec = ruta.match(/^\/api\/admin\/entrega\/(AE-\d{4}-\d{6})\/caso$/i);
         if (mec) return await adminEntregaCaso(request, env, mec[1].toUpperCase(), sesion.email);
