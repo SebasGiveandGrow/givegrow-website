@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "9ca2ee53";
+const STYLES_V = "9bc1e605";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -608,6 +608,38 @@ function tokenNuevo() {
    Guarda la intención, asigna la guía, firma y devuelve la URL de Wompi.
    ======================================================================== */
 
+/* La URL del checkout de Wompi para una guía ya guardada. La comparten la
+   donación de siempre y los pedidos de regalos (que vuelven a otra pantalla:
+   `vuelta` es la ruta, con su query, a la que Wompi le añade `id`). */
+async function urlCheckoutWompi(env, url, guia, centavos, vuelta) {
+  const amb = ambienteWompi(env.WOMPI_PUBLIC_KEY);
+  const moneda = "COP";
+  /* --- firma de integridad ---
+     Orden verificado contra el ejemplo de la documentación:
+     SHA-256(reference + amount-in-cents + currency + integrity-secret).
+     Se omite `expiration-time` a propósito: es opcional y añadirlo mete la
+     fecha en la cadena firmada, un punto de fallo más en la primera versión. */
+  const firma = await sha256Hex(guia + centavos + moneda + env.WOMPI_INTEGRITY_SECRET);
+
+  const p = new URLSearchParams();
+  p.set("public-key", env.WOMPI_PUBLIC_KEY);
+  p.set("currency", moneda);
+  p.set("amount-in-cents", String(centavos));
+  p.set("reference", guia);
+  p.set("signature:integrity", firma);
+  /* Destino de vuelta. OJO — verificado el 10 ago 2026 contra el sandbox:
+     Wompi responde 403 (CloudFront «Request blocked») si `redirect-url` apunta a
+     http://localhost. Todas las demás combinaciones dan 200, incluido el mismo
+     checkout sin redirect-url. Así que el origen de la petición solo se usa
+     cuando es un https público; en local se cae al dominio de producción, que
+     produce un checkout válido aunque el retorno aterrice en el sitio real.
+     Un intento anterior de usar `url.origin` siempre rompía el pago en local. */
+  const publico = url.protocol === "https:" && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname);
+  p.set("redirect-url", (publico ? url.origin : ORIGIN) + vuelta);
+
+  return { url: amb.checkout + "?" + p.toString(), modo: amb.modo };
+}
+
 async function apiCheckout(request, env, url) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
 
@@ -662,7 +694,6 @@ async function apiCheckout(request, env, url) {
   const secretoIntegridad = env.WOMPI_INTEGRITY_SECRET;
   if (!pub || !secretoIntegridad) return json({ error: "pasarela_no_configurada" }, 503);
 
-  const amb = ambienteWompi(pub);
   const centavos = monto * 100;         // Wompi cobra en centavos
   const moneda = "COP";                 // Wompi liquida en COP; el USD del sitio es solo referencia visual
 
@@ -685,30 +716,8 @@ async function apiCheckout(request, env, url) {
   ).bind(guia, centavos, moneda, modo, destino, proyecto, frecuencia, quiereCert, muro, nota, idioma, tokenNuevo(),
          certDatos).run();
 
-  /* --- firma de integridad ---
-     Orden verificado contra el ejemplo de la documentación:
-     SHA-256(reference + amount-in-cents + currency + integrity-secret).
-     Se omite `expiration-time` a propósito: es opcional y añadirlo mete la
-     fecha en la cadena firmada, un punto de fallo más en la primera versión. */
-  const firma = await sha256Hex(guia + centavos + moneda + secretoIntegridad);
-
-  const p = new URLSearchParams();
-  p.set("public-key", pub);
-  p.set("currency", moneda);
-  p.set("amount-in-cents", String(centavos));
-  p.set("reference", guia);
-  p.set("signature:integrity", firma);
-  /* Destino de vuelta. OJO — verificado el 10 ago 2026 contra el sandbox:
-     Wompi responde 403 (CloudFront «Request blocked») si `redirect-url` apunta a
-     http://localhost. Todas las demás combinaciones dan 200, incluido el mismo
-     checkout sin redirect-url. Así que el origen de la petición solo se usa
-     cuando es un https público; en local se cae al dominio de producción, que
-     produce un checkout válido aunque el retorno aterrice en el sitio real.
-     Un intento anterior de usar `url.origin` siempre rompía el pago en local. */
-  const publico = url.protocol === "https:" && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname);
-  p.set("redirect-url", (publico ? url.origin : ORIGIN) + "/gracias");
-
-  return json({ guia, url: amb.checkout + "?" + p.toString(), modo: amb.modo });
+  const pago = await urlCheckoutWompi(env, url, guia, centavos, "/gracias");
+  return json({ guia, url: pago.url, modo: pago.modo });
 }
 
 /* ========================================================================
@@ -1465,7 +1474,13 @@ const TOPE_IP_DIA = { caso: 40, inscripcion: 60, asistencia: 200, transferencia:
      un centro comercial detras de un mismo NAT, unas decenas. Barrer los 31^8
      codigos pide cientos de miles. Aqui no se manda correo: el tope existe
      solo contra el barrido. */
-  verificar: 300 };
+  verificar: 300,
+  /* Regalos de diciembre: cada pedido gasta un consecutivo RG- y, en pesos, una
+     guía. Treinta al día por IP cabe a una familia que escoge varias veces y
+     frena un script. */
+  regalos: 30,
+  /* La carta se puede corregir varias veces; un video pesa decenas de megas. */
+  "regalos-mensaje": 40, "regalos-video": 12 };
 async function pasaTopeIP(env, request, puerta) {
   const tope = TOPE_IP_DIA[puerta];
   const ip = request.headers.get("CF-Connecting-IP") || "";
@@ -1804,6 +1819,12 @@ async function aplicarEstado(env, guia, tx, estado) {
      pasarela de lo que confirmó una persona. */
   await env.DB.prepare("UPDATE aportes SET confirmacion = 'wompi' WHERE guia = ? AND confirmacion IS NULL")
     .bind(guia).run();
+
+  /* Los regalos de diciembre: si este aporte es el pago de un pedido, aquí se
+     financian sus regalos (o se sueltan si el pago no pasó). En su propio try:
+     el aporte ya quedó guardado arriba y eso no puede deshacerlo un fallo aquí. */
+  try { await regalosTrasAporte(env, guia, nuevo, !!fila.aprobada_en); }
+  catch (e) { console.error("regalos tras aporte", guia, e && e.message); }
 
   /* Correo solo al aprobar, y solo la PRIMERA vez. `aprobada_en` es el candado:
      si ya tenía fecha de aprobación, este webhook es un reintento o un evento
@@ -3208,6 +3229,2019 @@ async function apiGracias(env, url) {
 
   if (!guia) return json({ error: "no_resuelta" }, 404);
   return apiAporte(env, guia);
+}
+
+/* ========================================================================
+   REGALOS DE DICIEMBRE (migración 0048)
+   ========================================================================
+   Una lista pública de deseos: cada niño pide un regalo y un donante escoge
+   uno o varios, los paga y sigue su recorrido hasta la entrega. El porqué de
+   cada tabla está en migrations/0048_regalos.sql; aquí, lo que hay que saber
+   para tocar el código:
+
+   · LO PRIVADO NO SALE. `regalo_ninos` tiene nombre completo, acudiente,
+     teléfono y comunidad. Las consultas públicas eligen columna por columna
+     (`nombre_publico`, `edad`, `genero`) y nunca hacen SELECT * de esa tabla.
+     La foto sale solo con `autoriza_foto = 1`, y nada sale sin
+     `autoriza_datos = 1`.
+
+   · LA RESERVA ES UN CANDADO QUE VENCE SOLO. Al ir a pagar, cada regalo queda
+     apartado (`reserva_ref`, `reservado_hasta`) con un UPDATE condicionado:
+     dos donantes que escogen el mismo regalo en el mismo segundo no pueden
+     apartarlo los dos, porque el segundo UPDATE ya no encuentra la fila libre.
+     Vencida la hora, el regalo vuelve a estar disponible sin que nadie lo
+     libere: no hay cron.
+
+   · DOS VÍAS DE PAGO, UNA SOLA FORMA DE FINANCIAR. En pesos, el pedido crea un
+     aporte normal (guía GG-, recibo, certificado de siempre) y el webhook de
+     Wompi lo confirma. En dólares el dinero lo recibe la fundación aliada de
+     EE. UU., que emite allá su certificado: el pedido se confirma desde
+     /admin/regalos cuando ella lo reporta. Las dos terminan en
+     `regalosPedidoPagado`, que es el único sitio que marca regalos financiados.
+
+   · SI EL REGALO YA LO TOMÓ OTRO cuando llegó el pago (la reserva venció y
+     alguien más lo pagó), la plata va a otro niño de la misma zona y se le
+     avisa al donante. Decisión del fundador (24 oct 2026). Si en la zona ya no
+     queda ninguno, el ítem queda `sin_cupo` y lo resuelve una persona.
+   ======================================================================== */
+
+const REGALOS_CAMPANA = "navidad-2026";
+const REGALOS_MAX_CARRITO = 20;
+/* Media hora para pagar con tarjeta; dos días si Wompi deja el pago pendiente
+   (transferencia Bancolombia); tres días si es en dólares, porque lo confirma
+   una persona cuando la aliada lo reporta. */
+const REGALOS_RESERVA_MIN = 30;
+const REGALOS_RESERVA_PENDIENTE_H = 48;
+const REGALOS_RESERVA_USD_H = 72;
+const RE_CODIGO_REGALO = /^[A-Z]{3}-\d{4}$/;
+const RE_PEDIDO_REGALO = /^RG-\d{4}-\d{6}$/;
+
+/* Un regalo se puede escoger si está publicado y no lo tiene apartado nadie. */
+const REGALO_LIBRE = "r.estado = 'publicado' AND (r.reservado_hasta IS NULL OR r.reservado_hasta < datetime('now'))";
+
+/* Consecutivo de pedidos: RG-AAAA-NNNNNN. Misma mecánica atómica que la guía, en
+   serie aparte: un pedido en dólares no es un aporte de la fundación y no puede
+   gastar un número GG-. */
+async function siguientePedidoRegalo(env, anio) {
+  const { results } = await env.DB.prepare(
+    "INSERT INTO numerador_regalo (anio, ultimo) VALUES (?, 1) " +
+    "ON CONFLICT(anio) DO UPDATE SET ultimo = ultimo + 1 RETURNING ultimo"
+  ).bind(anio).all();
+  const n = results && results[0] ? results[0].ultimo : null;
+  if (!n) throw new Error("numerador de pedidos de regalos no devolvió consecutivo");
+  return "RG-" + anio + "-" + String(n).padStart(6, "0");
+}
+
+async function regalosCampana(env) {
+  return env.DB.prepare(
+    "SELECT id, nombre_es, nombre_en, estado, cierre, aliada_nombre, aliada_url " +
+    "FROM regalo_campanas WHERE id = ?"
+  ).bind(REGALOS_CAMPANA).first();
+}
+
+/* ¿Se puede donar HOY? Abierta y sin pasar el cierre, contado en Colombia. */
+function regalosRecibe(c) {
+  if (!c || c.estado !== "abierta") return false;
+  return !c.cierre || fechaCO(new Date().toISOString()) <= c.cierre;
+}
+
+/* Las tres zonas con sus contadores. La meta es lo único que la página promete;
+   los demás números salen de la base, nunca se escriben a mano. */
+async function regalosZonas(env) {
+  const { results } = await env.DB.prepare(
+    "SELECT z.id, z.nombre_es, z.nombre_en, z.departamento, z.meta, z.fecha_entrega, " +
+    "SUM(CASE WHEN r.estado NOT IN ('borrador', 'retirado') THEN 1 ELSE 0 END) AS publicados, " +
+    "SUM(CASE WHEN r.estado IN ('financiado', 'comprado', 'despachado', 'entregado') THEN 1 ELSE 0 END) AS financiados, " +
+    "SUM(CASE WHEN r.estado = 'entregado' THEN 1 ELSE 0 END) AS entregados " +
+    "FROM regalo_zonas z LEFT JOIN regalos r ON r.zona_id = z.id " +
+    "WHERE z.campana_id = ? GROUP BY z.id ORDER BY z.orden"
+  ).bind(REGALOS_CAMPANA).all();
+  return (results || []).map((z) => ({
+    id: z.id, nombre_es: z.nombre_es, nombre_en: z.nombre_en, departamento: z.departamento,
+    meta: z.meta, fecha_entrega: z.fecha_entrega,
+    publicados: z.publicados || 0, financiados: z.financiados || 0, entregados: z.entregados || 0
+  }));
+}
+
+/* GET /api/regalos — la lista pública.
+   Mientras la campaña está en borrador no entrega ni un regalo: la página dice
+   «muy pronto» y nada más, aunque /admin ya haya cargado niños. Se cachea 20 s
+   en el borde: la disponibilidad que importa la decide el UPDATE de la reserva,
+   no esta lista, así que un dato de hace unos segundos no hace daño. */
+async function apiRegalos(env) {
+  const cache = { "cache-control": "public, max-age=20" };
+  const c = await regalosCampana(env);
+  if (!c) return json({ campana: null, zonas: [], categorias: [], regalos: [] }, 200, cache);
+
+  const campana = {
+    id: c.id, nombre_es: c.nombre_es, nombre_en: c.nombre_en, estado: c.estado, cierre: c.cierre,
+    recibe: regalosRecibe(c), aliada_nombre: c.aliada_nombre || null, usd: !!(c.aliada_nombre && c.aliada_url)
+  };
+  const zonas = await regalosZonas(env);
+  const cats = await env.DB.prepare(
+    "SELECT id, nombre_es, nombre_en, valor_cop, valor_usd, con_talla FROM regalo_categorias " +
+    "WHERE valor_cop IS NOT NULL AND valor_usd IS NOT NULL ORDER BY orden"
+  ).all();
+  const categorias = (cats.results || []).map((x) => ({
+    id: x.id, nombre_es: x.nombre_es, nombre_en: x.nombre_en,
+    valor_cop: x.valor_cop, valor_usd: x.valor_usd, con_talla: !!x.con_talla
+  }));
+  if (c.estado === "borrador") return json({ campana, zonas, categorias, regalos: [] }, 200, cache);
+
+  const { results } = await env.DB.prepare(
+    "SELECT r.codigo, r.zona_id, r.categoria_id, r.deseo_es, r.deseo_en, r.talla, r.estado, " +
+    "CASE WHEN " + REGALO_LIBRE + " THEN 1 ELSE 0 END AS libre, " +
+    "n.nombre_publico, n.edad, n.genero, " +
+    "CASE WHEN n.autoriza_foto = 1 AND n.foto_key IS NOT NULL THEN 1 ELSE 0 END AS foto, " +
+    "k.valor_cop, k.valor_usd " +
+    "FROM regalos r JOIN regalo_ninos n ON n.id = r.nino_id " +
+    "JOIN regalo_categorias k ON k.id = r.categoria_id " +
+    "WHERE r.campana_id = ? AND r.estado NOT IN ('borrador', 'retirado') AND n.autoriza_datos = 1 " +
+    "ORDER BY r.zona_id, r.codigo"
+  ).bind(REGALOS_CAMPANA).all();
+  const regalos = (results || []).map((r) => ({
+    codigo: r.codigo, zona: r.zona_id, categoria: r.categoria_id,
+    deseo_es: r.deseo_es, deseo_en: r.deseo_en || null, talla: r.talla || null,
+    nombre: r.nombre_publico, edad: r.edad, genero: r.genero, foto: !!r.foto,
+    valor_cop: r.valor_cop, valor_usd: r.valor_usd,
+    /* disponible | apartado | financiado | comprado | despachado | entregado */
+    estado: r.estado === "publicado" ? (r.libre ? "disponible" : "apartado") : r.estado
+  }));
+  return json({ campana, zonas, categorias, regalos }, 200, cache);
+}
+
+/* GET /api/regalos/foto/<codigo> — la foto del niño, si el acudiente la
+   autorizó y el regalo está publicado. Lo demás responde 404, igual exista o
+   no: el código no tiene por qué confirmar nada. Ya se guardó sin EXIF. */
+async function apiRegaloFoto(env, codigo) {
+  if (!env.MEDIA) return json({ error: "no_encontrada" }, 404);
+  const f = await env.DB.prepare(
+    "SELECT n.foto_key FROM regalos r JOIN regalo_ninos n ON n.id = r.nino_id " +
+    "JOIN regalo_campanas c ON c.id = r.campana_id " +
+    "WHERE r.codigo = ? AND r.estado NOT IN ('borrador', 'retirado') AND c.estado <> 'borrador' " +
+    "AND n.autoriza_datos = 1 AND n.autoriza_foto = 1 AND n.foto_key IS NOT NULL"
+  ).bind(codigo).first();
+  if (!f) return json({ error: "no_encontrada" }, 404);
+  const obj = await env.MEDIA.get(f.foto_key);
+  if (!obj) return json({ error: "no_encontrada" }, 404);
+  return new Response(obj.body, {
+    headers: {
+      "content-type": (obj.httpMetadata && obj.httpMetadata.contentType) || "image/jpeg",
+      "cache-control": "public, max-age=600",
+      /* La foto de un niño no tiene por qué aparecer en un buscador de imágenes. */
+      "x-robots-tag": "noindex, noimageindex"
+    }
+  });
+}
+
+/* El enlace de la aliada admite {ref} y {usd}. Si su pasarela no los acepta,
+   el enlace queda como está y la referencia viaja en el correo y en pantalla. */
+function urlAliada(plantilla, ref, usd) {
+  return String(plantilla || "")
+    .split("{ref}").join(encodeURIComponent(ref))
+    .split("{usd}").join(encodeURIComponent(String(usd)));
+}
+
+function enlaceSeguimientoRegalos(ref, token) {
+  return ORIGIN + "/?rg=" + encodeURIComponent(ref) + "&rt=" + encodeURIComponent(token) + "#regalos";
+}
+
+/* POST /api/regalos/pedido — apartar los regalos escogidos e ir a pagar.
+
+   Orden, y por qué: todo lo que puede rechazar va ANTES de gastar números
+   (consecutivo RG- y guía GG-). Luego se aparta regalo por regalo con el
+   UPDATE condicionado; si uno solo no se pudo apartar, se sueltan todos y se
+   le dice al donante cuáles ya no están, para que los quite y vuelva. */
+async function apiRegalosPedido(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  /* Trampa para robots: un humano no ve este campo. */
+  if (c.web2) return json({ ok: true }, 200);
+
+  const campana = await regalosCampana(env);
+  if (!regalosRecibe(campana)) return json({ error: "campana_cerrada" }, 409);
+
+  const via = c.via === "usd" ? "usd" : "cop";
+  if (via === "usd" && !(campana.aliada_nombre && campana.aliada_url)) {
+    return json({ error: "usd_no_disponible" }, 409);
+  }
+
+  const codigos = Array.isArray(c.items)
+    ? [...new Set(c.items.map((x) => String(x || "").toUpperCase().trim()))].filter((x) => RE_CODIGO_REGALO.test(x))
+    : [];
+  if (!codigos.length) return json({ error: "sin_regalos" }, 400);
+  if (codigos.length > REGALOS_MAX_CARRITO) return json({ error: "demasiados_regalos", max: REGALOS_MAX_CARRITO }, 400);
+
+  const nombre = limpiar(c.nombre, 120);
+  const email = limpiar(c.email, 160).toLowerCase();
+  const telefono = limpiar(c.telefono, 40) || null;
+  const idioma = c.idioma === "en" ? "en" : "es";
+  if (nombre.length < 2) return json({ error: "nombre_requerido" }, 400);
+  if (!RE_CORREO.test(email)) return json({ error: "correo_invalido" }, 400);
+
+  /* El certificado colombiano (Art. 257) solo existe para lo que entra en
+     pesos. En dólares lo emite la aliada, allá. */
+  const quiereCert = via === "cop" && c.certificado ? 1 : 0;
+  let certDatos = null;
+  if (quiereCert) {
+    const tipo = tipoDocumento(c.cert_doc_tipo);
+    const num = limpiar(c.cert_doc_numero, 40);
+    const ciudadCert = limpiar(c.cert_ciudad, 120);
+    if (!TIPOS_DOC.includes(tipo) || !/^[0-9A-Za-z][0-9A-Za-z.\- ]{2,24}$/.test(num) || ciudadCert.length < 2) {
+      return json({ error: "certificado_datos_invalidos" }, 400);
+    }
+    certDatos = JSON.stringify({ doc_tipo: tipo, doc_numero: num, ciudad: ciudadCert });
+  }
+  const muro = ["nombre", "anonimo", "no"].includes(c.muro) ? c.muro : "no";
+  const carta = limpiarCarta(c.carta);
+  const firma = limpiar(c.firma, 80);
+  const noticias = c.noticias === true;
+
+  if (via === "cop" && !(env.WOMPI_PUBLIC_KEY && env.WOMPI_INTEGRITY_SECRET)) {
+    return json({ error: "pasarela_no_configurada" }, 503);
+  }
+
+  /* Qué se escogió y si sigue libre. Los valores salen de la categoría, nunca
+     del navegador. */
+  const marcas = codigos.map(() => "?").join(",");
+  const { results } = await env.DB.prepare(
+    "SELECT r.id, r.codigo, CASE WHEN " + REGALO_LIBRE + " THEN 1 ELSE 0 END AS libre, " +
+    "k.valor_cop, k.valor_usd FROM regalos r JOIN regalo_categorias k ON k.id = r.categoria_id " +
+    "WHERE r.campana_id = ? AND r.codigo IN (" + marcas + ")"
+  ).bind(REGALOS_CAMPANA, ...codigos).all();
+  const filas = results || [];
+  const tomados = codigos.filter((k) => {
+    const f = filas.find((x) => x.codigo === k);
+    return !f || !f.libre || f.valor_cop == null || f.valor_usd == null;
+  });
+  if (tomados.length) return json({ error: "no_disponibles", codigos: tomados }, 409);
+
+  const totalCop = filas.reduce((s, f) => s + Number(f.valor_cop), 0);
+  const totalUsd = filas.reduce((s, f) => s + Number(f.valor_usd), 0);
+  if (via === "cop" && (totalCop < MONTO_MIN || totalCop > MONTO_MAX)) {
+    return json({ error: "monto_invalido", min: MONTO_MIN, max: MONTO_MAX }, 400);
+  }
+
+  /* LOS FRENOS VAN AQUÍ, antes de gastar el consecutivo. */
+  const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+  if (checkoutLimitado(ip)) return json({ error: "demasiados_intentos" }, 429);
+  if (!(await pasaTopeIP(env, request, "regalos"))) return json({ error: "demasiados_intentos" }, 429);
+
+  const ref = await siguientePedidoRegalo(env, anioCO());
+  const token = tokenNuevo();
+  const plazo = via === "usd" ? "+" + REGALOS_RESERVA_USD_H + " hours" : "+" + REGALOS_RESERVA_MIN + " minutes";
+
+  await env.DB.batch(filas.map((f) => env.DB.prepare(
+    "UPDATE regalos AS r SET reserva_ref = ?, reservado_hasta = datetime('now', ?), " +
+    "actualizado_en = datetime('now') WHERE r.id = ? AND " + REGALO_LIBRE
+  ).bind(ref, plazo, f.id)));
+  const apartados = await env.DB.prepare("SELECT codigo FROM regalos WHERE reserva_ref = ?").bind(ref).all();
+  const ya = (apartados.results || []).map((x) => x.codigo);
+  if (ya.length !== filas.length) {
+    await env.DB.prepare(
+      "UPDATE regalos SET reserva_ref = NULL, reservado_hasta = NULL WHERE reserva_ref = ?"
+    ).bind(ref).run();
+    return json({ error: "no_disponibles", codigos: codigos.filter((k) => !ya.includes(k)) }, 409);
+  }
+
+  const lote = [env.DB.prepare(
+    "INSERT INTO regalo_pedidos (ref, campana_id, token, via, total_cop, total_usd, nombre, email, telefono, idioma) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(ref, REGALOS_CAMPANA, token, via, totalCop, totalUsd, nombre, email, telefono, idioma)];
+  for (const f of filas) {
+    lote.push(env.DB.prepare(
+      "INSERT INTO regalo_pedido_items (pedido_ref, regalo_id, valor_cop, valor_usd) VALUES (?, ?, ?, ?)"
+    ).bind(ref, f.id, f.valor_cop, f.valor_usd));
+  }
+  lote.push(env.DB.prepare(
+    "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'pedido', ?, 'sistema')"
+  ).bind(ref, via + " · " + codigos.join(", ")));
+  await env.DB.batch(lote);
+  /* La carta y la autorización de noticias no pueden tumbar el pedido. */
+  try {
+    if (carta) await regalosGuardarCarta(env, ref, carta, firma);
+    if (noticias) await regalosGuardarNoticias(env, email, nombre, idioma, ref);
+  } catch (e) { console.error("carta o noticias", ref, e && e.message); }
+
+  const seguimiento = enlaceSeguimientoRegalos(ref, token);
+
+  if (via === "usd") {
+    const destino = urlAliada(campana.aliada_url, ref, totalUsd);
+    try {
+      await correoRegalosPedidoUSD(env, { ref, token, nombre, email, idioma, totalUsd, codigos,
+        aliada: campana.aliada_nombre, destino });
+    } catch (e) { console.error("correo pedido usd", ref, e && e.message); }
+    return json({ ref, token, via, url: destino, seguimiento, aliada: campana.aliada_nombre, total_usd: totalUsd });
+  }
+
+  /* En pesos: un aporte normal, con su guía, su recibo y su certificado. */
+  const guia = await siguienteGuia(env, anioCO());
+  const proyecto = (idioma === "en" ? "December gifts · " : "Regalos de diciembre · ") + ref;
+  await env.DB.prepare(
+    "INSERT INTO aportes (guia, estado, monto_centavos, moneda, modo, destino_id, proyecto, " +
+    "frecuencia, quiere_certificado, consent_muro, nota, idioma, token, certificado_datos) " +
+    "VALUES (?, 'intencion', ?, 'COP', 'fondo', NULL, ?, 'unico', ?, ?, NULL, ?, ?, ?)"
+  ).bind(guia, totalCop * 100, proyecto, quiereCert, muro, idioma, tokenNuevo(), certDatos).run();
+  await env.DB.prepare("UPDATE regalo_pedidos SET guia = ? WHERE ref = ?").bind(guia, ref).run();
+
+  const pago = await urlCheckoutWompi(env, url, guia, totalCop * 100,
+    "/gracias?rg=" + encodeURIComponent(ref) + "&rt=" + encodeURIComponent(token));
+  return json({ ref, token, via, guia, url: pago.url, modo: pago.modo, seguimiento, total_cop: totalCop });
+}
+
+/* Lo que pasa con un pedido en pesos cuando Wompi cambia el estado de su
+   aporte. Lo llama `aplicarEstado` después de guardar el aporte, así que vale
+   también para los pagos rescatados a mano desde la conciliación. */
+async function regalosTrasAporte(env, guia, nuevo, yaAprobada) {
+  const p = await env.DB.prepare(
+    "SELECT ref, estado FROM regalo_pedidos WHERE guia = ?"
+  ).bind(guia).first();
+  if (!p) return;
+  if (nuevo === "aprobada") {
+    await regalosPedidoPagado(env, p.ref, "wompi");
+  } else if (nuevo === "pendiente" && p.estado === "pendiente") {
+    /* Transferencia en curso: que no se le escape el regalo mientras el banco
+       confirma. Solo se alarga lo que todavía es suyo. */
+    await env.DB.prepare(
+      "UPDATE regalos SET reservado_hasta = datetime('now', ?) WHERE reserva_ref = ? AND estado = 'publicado'"
+    ).bind("+" + REGALOS_RESERVA_PENDIENTE_H + " hours", p.ref).run();
+  } else if (["rechazada", "error"].includes(nuevo) && !yaAprobada && p.estado === "pendiente") {
+    await regalosSoltarPedido(env, p.ref, "fallido", "wompi");
+  }
+}
+
+async function regalosSoltarPedido(env, ref, estado, autor) {
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE regalos SET reserva_ref = NULL, reservado_hasta = NULL, actualizado_en = datetime('now') " +
+      "WHERE reserva_ref = ?"
+    ).bind(ref),
+    env.DB.prepare(
+      "UPDATE regalo_pedidos SET estado = ?, actualizado_en = datetime('now') WHERE ref = ? AND estado = 'pendiente'"
+    ).bind(estado, ref),
+    env.DB.prepare(
+      "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, ?, NULL, ?)"
+    ).bind(ref, estado, autor || "sistema")
+  ]);
+}
+
+/* EL ÚNICO SITIO QUE MARCA REGALOS FINANCIADOS. Idempotente: el pedido pasa a
+   `pagado` con un UPDATE condicionado, y si ya lo estaba, no se hace nada más
+   (los reintentos de Wompi llegan hasta cuatro veces). */
+async function regalosPedidoPagado(env, ref, autor) {
+  const cambio = await env.DB.prepare(
+    "UPDATE regalo_pedidos SET estado = 'pagado', pagado_en = datetime('now'), " +
+    "confirmado_por = CASE WHEN via = 'usd' THEN ? ELSE confirmado_por END, actualizado_en = datetime('now') " +
+    "WHERE ref = ? AND estado IN ('pendiente', 'vencido', 'fallido') RETURNING via"
+  ).bind(autor || null, ref).first();
+  if (!cambio) return { ya: true };
+  const via = cambio.via;
+
+  const { results } = await env.DB.prepare(
+    "SELECT i.id, i.regalo_id, i.valor_cop, i.valor_usd, r.zona_id, r.categoria_id " +
+    "FROM regalo_pedido_items i JOIN regalos r ON r.id = i.regalo_id WHERE i.pedido_ref = ?"
+  ).bind(ref).all();
+  const financiar = (id) => env.DB.prepare(
+    "UPDATE regalos AS r SET estado = 'financiado', pedido_ref = ?, via = ?, financiado_en = datetime('now'), " +
+    "reserva_ref = NULL, reservado_hasta = NULL, actualizado_en = datetime('now') " +
+    "WHERE r.id = ? AND r.estado = 'publicado' AND (r.reserva_ref = ? OR r.reservado_hasta IS NULL " +
+    "OR r.reservado_hasta < datetime('now'))"
+  ).bind(ref, via, id, ref).run();
+
+  const resumen = { financiados: 0, sustituidos: 0, sin_cupo: 0 };
+  for (const it of results || []) {
+    let r = await financiar(it.regalo_id);
+    if (r.meta && r.meta.changes) {
+      await env.DB.prepare("UPDATE regalo_pedido_items SET resultado = 'financiado' WHERE id = ?").bind(it.id).run();
+      resumen.financiados++;
+      continue;
+    }
+    /* Ya lo tomó otro. Otro niño de la misma zona, del mismo tipo de regalo si
+       lo hay, y que no cueste más de lo que se pagó. Hasta cinco intentos por
+       si otro pago le gana también a este. */
+    let sustituto = null;
+    for (let intento = 0; intento < 5 && !sustituto; intento++) {
+      const cand = await env.DB.prepare(
+        "SELECT r.id FROM regalos r JOIN regalo_categorias k ON k.id = r.categoria_id " +
+        "JOIN regalo_ninos n ON n.id = r.nino_id " +
+        "WHERE r.campana_id = ? AND r.zona_id = ? AND n.autoriza_datos = 1 AND " + REGALO_LIBRE + " " +
+        "AND " + (via === "usd" ? "k.valor_usd <= ?" : "k.valor_cop <= ?") + " " +
+        "ORDER BY (r.categoria_id = ?) DESC, r.id LIMIT 1"
+      ).bind(REGALOS_CAMPANA, it.zona_id, via === "usd" ? it.valor_usd : it.valor_cop, it.categoria_id).first();
+      if (!cand) break;
+      r = await financiar(cand.id);
+      if (r.meta && r.meta.changes) sustituto = cand.id;
+    }
+    await env.DB.prepare(
+      "UPDATE regalo_pedido_items SET resultado = ?, sustituto_id = ? WHERE id = ?"
+    ).bind(sustituto ? "sustituido" : "sin_cupo", sustituto, it.id).run();
+    if (sustituto) resumen.sustituidos++; else resumen.sin_cupo++;
+  }
+
+  await env.DB.batch([
+    /* Lo que quedó apartado a nombre de este pedido y no se financió, se suelta. */
+    env.DB.prepare("UPDATE regalos SET reserva_ref = NULL, reservado_hasta = NULL WHERE reserva_ref = ?").bind(ref),
+    env.DB.prepare(
+      "INSERT INTO regalo_eventos (regalo_id, pedido_ref, tipo, detalle, autor) " +
+      "SELECT id, ?, 'financiado', ?, ? FROM regalos WHERE pedido_ref = ?"
+    ).bind(ref, via, autor || "sistema", ref),
+    env.DB.prepare(
+      "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'pagado', ?, ?)"
+    ).bind(ref, JSON.stringify(resumen), autor || "sistema")
+  ]);
+
+  try { await correoRegalosEstado(env, ref, "financiado"); }
+  catch (e) { console.error("correo regalos financiados", ref, e && e.message); }
+  if (resumen.sin_cupo && env.CORREO_AVISOS) {
+    try {
+      await enviarCorreo(env, {
+        para: env.CORREO_AVISOS,
+        asunto: "Regalos: el pedido " + ref + " pagó " + resumen.sin_cupo + " regalo(s) sin cupo",
+        texto: "El pedido " + ref + " se pagó, pero " + resumen.sin_cupo + " de sus regalos ya los había " +
+               "tomado otro donante y en la zona no quedaba ninguno libre para reemplazarlos. " +
+               "Ese dinero queda para la campaña: decide en /admin/regalos a qué niño va y avísale al donante.",
+        etiqueta: "regalos-sin-cupo", guia: ref
+      });
+    } catch (e) { console.error("aviso sin cupo", ref, e && e.message); }
+  }
+  return resumen;
+}
+
+/* GET /api/regalos/pedido/<RG>?t=<token> — el seguimiento del donante.
+   Sin el token correcto responde lo mismo exista o no el pedido. */
+async function apiRegalosSeguimiento(env, ref, token) {
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return json({ error: "no_encontrado" }, 404);
+  const p = await env.DB.prepare(
+    "SELECT ref, token, via, estado, total_cop, total_usd, guia, idioma, creado_en, pagado_en " +
+    "FROM regalo_pedidos WHERE ref = ?"
+  ).bind(ref).first();
+  if (!p || !igualesSeguro(p.token, token)) return json({ error: "no_encontrado" }, 404);
+
+  let pago = null;
+  if (p.guia) {
+    const a = await env.DB.prepare("SELECT estado FROM aportes WHERE guia = ?").bind(p.guia).first();
+    pago = a ? a.estado : null;
+  }
+  const campana = await regalosCampana(env);
+  /* Cada ítem con el regalo que de verdad se financió: el escogido o su sustituto. */
+  const { results } = await env.DB.prepare(
+    "SELECT i.resultado, o.codigo AS escogido, " +
+    "r.codigo, r.zona_id, r.deseo_es, r.deseo_en, r.talla, r.estado, r.pedido_ref, " +
+    "r.financiado_en, r.comprado_en, r.despachado_en, r.entregado_en, r.entrega, " +
+    "n.nombre_publico, n.edad, z.nombre_es AS zona_es, z.nombre_en AS zona_en, z.departamento " +
+    "FROM regalo_pedido_items i JOIN regalos o ON o.id = i.regalo_id " +
+    "JOIN regalos r ON r.id = COALESCE(i.sustituto_id, i.regalo_id) " +
+    "JOIN regalo_ninos n ON n.id = r.nino_id JOIN regalo_zonas z ON z.id = r.zona_id " +
+    "WHERE i.pedido_ref = ? ORDER BY i.id"
+  ).bind(ref).all();
+  const f = (x) => (x ? selloCO(x).slice(0, 16) : null);
+  const items = (results || []).map((r) => {
+    /* Un regalo que este pedido no financió (lo tomó otro y no hubo sustituto)
+       no le enseña al donante el recorrido de otra persona. */
+    const suyo = r.pedido_ref === ref;
+    return {
+      codigo: r.codigo, escogido: r.escogido, resultado: r.resultado || null,
+      nombre: r.nombre_publico, edad: r.edad,
+      zona_es: r.zona_es, zona_en: r.zona_en, departamento: r.departamento,
+      deseo_es: r.deseo_es, deseo_en: r.deseo_en || null, talla: r.talla || null,
+      estado: suyo ? r.estado : (p.estado === "pagado" ? "sin_cupo" : "apartado"),
+      financiado_en: suyo ? f(r.financiado_en) : null,
+      comprado_en: suyo ? f(r.comprado_en) : null,
+      despachado_en: suyo ? f(r.despachado_en) : null,
+      entregado_en: suyo ? f(r.entregado_en) : null,
+      acta: suyo ? (r.entrega || null) : null
+    };
+  });
+  const mensaje = await regalosMensajeDe(env, ref);
+  const editable = await regalosMensajeEditable(env, p);
+  return json({
+    ref: p.ref, via: p.via, estado: p.estado, pago, guia: p.guia, mensaje, mensaje_editable: editable,
+    total_cop: p.total_cop, total_usd: p.total_usd,
+    creado_en: f(p.creado_en), pagado_en: f(p.pagado_en),
+    aliada: p.via === "usd" && campana ? campana.aliada_nombre : null,
+    aliada_url: p.via === "usd" && p.estado === "pendiente" && campana && campana.aliada_url
+      ? urlAliada(campana.aliada_url, p.ref, p.total_usd) : null,
+    items
+  });
+}
+
+/* LOS CORREOS AL DONANTE. Uno por pedido y por paso, nunca uno por regalo: un
+   donante de diez regalos no recibe diez correos. «Comprado» no manda correo a
+   propósito —se ve en el seguimiento—: con mil regalos, el cupo diario de
+   correo (1600) se reserva para lo que el donante de verdad espera saber. */
+const REGALOS_PASOS = {
+  financiado: {
+    es: { t: "Tus regalos ya tienen quien los regale", p: "Recibimos tu pago. Estos son los regalos que financiaste:" },
+    en: { t: "Your gifts are funded", p: "We received your payment. These are the gifts you funded:" }
+  },
+  despachado: {
+    es: { t: "Tus regalos van en camino", p: "Los regalos que financiaste salieron hacia su zona:" },
+    en: { t: "Your gifts are on their way", p: "The gifts you funded have been shipped to their area:" }
+  },
+  entregado: {
+    es: { t: "Tus regalos llegaron", p: "Estos regalos ya se entregaron, con acta:" },
+    en: { t: "Your gifts were delivered", p: "These gifts have been delivered, with a delivery record:" }
+  }
+};
+
+async function correoRegalosEstado(env, ref, paso) {
+  const textos = REGALOS_PASOS[paso];
+  if (!textos) return;
+  const p = await env.DB.prepare(
+    "SELECT ref, token, email, nombre, idioma, via, guia FROM regalo_pedidos WHERE ref = ?"
+  ).bind(ref).first();
+  if (!p || !p.email) return;
+  const en = p.idioma === "en";
+  const { results } = await env.DB.prepare(
+    "SELECT r.codigo, r.deseo_es, r.deseo_en, n.nombre_publico, n.edad, z.nombre_es, z.nombre_en, i.resultado " +
+    "FROM regalo_pedido_items i JOIN regalos r ON r.id = COALESCE(i.sustituto_id, i.regalo_id) " +
+    "JOIN regalo_ninos n ON n.id = r.nino_id JOIN regalo_zonas z ON z.id = r.zona_id " +
+    "WHERE i.pedido_ref = ? AND r.pedido_ref = ? ORDER BY i.id"
+  ).bind(ref, ref).all();
+  const filas = results || [];
+  if (!filas.length) return;
+  const T = en ? textos.en : textos.es;
+  const items = filas.map((r) =>
+    r.nombre_publico + ", " + r.edad + (en ? " · " : " años · ") + (en ? (r.deseo_en || r.deseo_es) : r.deseo_es) +
+    " · " + (en ? r.nombre_en : r.nombre_es) + " (" + r.codigo + ")");
+  const parrafos = [en ? "Hi " + p.nombre + "," : "Hola, " + p.nombre + ":", T.p];
+  if (paso === "financiado" && filas.some((r) => r.resultado === "sustituido")) {
+    parrafos.push(en
+      ? "One or more of the children you picked had already been chosen by another donor when your payment arrived. Your gift went to another child in the same area, as listed above."
+      : "Uno o más de los niños que escogiste ya los había tomado otro donante cuando llegó tu pago. Tu regalo fue para otro niño de la misma zona, como aparece arriba.");
+  }
+  if (paso === "financiado" && p.via === "cop") {
+    parrafos.push(en ? "Your receipt and donation number (" + p.guia + ") arrive in a separate email."
+                     : "Tu recibo y tu número de guía (" + p.guia + ") llegan en un correo aparte.");
+  }
+  const enlace = enlaceSeguimientoRegalos(p.ref, p.token);
+  const titulo = T.t + " · " + p.ref;
+  await enviarCorreo(env, {
+    para: p.email,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", ...items.map((x) => "· " + x), "", (en ? "Follow them: " : "Síguelos: ") + enlace].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos, lista: { titulo: en ? "Gifts" : "Regalos", items },
+      boton: { url: enlace, texto: en ? "Follow my gifts" : "Seguir mis regalos" },
+      cierre: en ? "This is an automatic message from Fundación Give&Grow International."
+                 : "Este mensaje es automático."
+    }),
+    etiqueta: "regalos-" + paso, guia: p.ref
+  });
+}
+
+async function correoRegalosPedidoUSD(env, x) {
+  const en = x.idioma === "en";
+  const titulo = (en ? "Your gift order " : "Tu pedido de regalos ") + x.ref;
+  const enlace = enlaceSeguimientoRegalos(x.ref, x.token);
+  const parrafos = en ? [
+    "Hi " + x.nombre + ",",
+    "We are holding your " + x.codigos.length + " gift(s) for " + REGALOS_RESERVA_USD_H + " hours while you complete your US$" + x.totalUsd + " donation through " + x.aliada + ", our partner foundation in the United States. They receive the dollars and issue your tax receipt.",
+    "Please include your order number " + x.ref + " in the note of your donation, so we can match it to your gifts.",
+    "As soon as " + x.aliada + " confirms it, we will email you and your gifts will show as funded."
+  ] : [
+    "Hola, " + x.nombre + ":",
+    "Apartamos tus " + x.codigos.length + " regalo(s) por " + REGALOS_RESERVA_USD_H + " horas mientras completas tu donación de US$" + x.totalUsd + " a través de " + x.aliada + ", nuestra fundación aliada en Estados Unidos. Ella recibe los dólares y te emite allá el certificado.",
+    "Escribe tu número de pedido " + x.ref + " en la nota de la donación, para que podamos asociarla a tus regalos.",
+    "Apenas " + x.aliada + " la confirme, te escribimos y tus regalos quedan financiados."
+  ];
+  await enviarCorreo(env, {
+    para: x.email,
+    asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", (en ? "Donate: " : "Donar: ") + x.destino, (en ? "Follow: " : "Seguimiento: ") + enlace].join("\n"),
+    html: plantillaCorreo({
+      titulo, parrafos,
+      filas: [[en ? "Order" : "Pedido", x.ref], [en ? "Total" : "Total", "US$" + x.totalUsd]],
+      boton: { url: x.destino, texto: en ? "Donate through " + x.aliada : "Donar a través de " + x.aliada },
+      cierre: (en ? "Follow your gifts: " : "Sigue tus regalos: ") + enlace
+    }),
+    etiqueta: "regalos-pedido-usd", guia: x.ref
+  });
+}
+
+/* LA CARTA Y EL VIDEO (migración 0049). Una carta y un video por pedido, que
+   acompañan a cada uno de sus regalos. Nada se entrega sin que una persona lo
+   revise: son palabras de un adulto para un niño. El video nunca se publica:
+   vive en R2, privado, y solo lo sirve /admin. */
+const REGALOS_CARTA_MAX = 1200;
+const REGALOS_VIDEO_MAX = 90 * 1024 * 1024;   // el tope de un cuerpo en Workers es 100 MB
+const REGALOS_VIDEO_TIPOS = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm" };
+
+async function regalosPedidoConToken(env, ref, token) {
+  if (!/^[a-f0-9]{32}$/.test(String(token || ""))) return null;
+  const p = await env.DB.prepare(
+    "SELECT ref, token, estado, email, nombre, idioma FROM regalo_pedidos WHERE ref = ?"
+  ).bind(ref).first();
+  if (!p || !igualesSeguro(p.token, token)) return null;
+  return p;
+}
+
+/* ¿Todavía se puede cambiar? Mientras el pedido siga vivo y ninguno de sus
+   regalos se haya entregado: después, la carta ya viajó. */
+async function regalosMensajeEditable(env, p) {
+  if (["anulado", "fallido"].includes(p.estado)) return false;
+  const e = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM regalos WHERE pedido_ref = ? AND estado = 'entregado'"
+  ).bind(p.ref).first();
+  return !(e && e.n);
+}
+
+function limpiarCarta(v) {
+  return String(v == null ? "" : v).replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, REGALOS_CARTA_MAX);
+}
+
+async function regalosGuardarCarta(env, ref, carta, firma) {
+  await env.DB.prepare(
+    "INSERT INTO regalo_mensajes (pedido_ref, carta, firma) VALUES (?, ?, ?) " +
+    "ON CONFLICT(pedido_ref) DO UPDATE SET carta = excluded.carta, firma = excluded.firma, " +
+    "estado = 'pendiente', motivo = NULL, revisado_por = NULL, revisado_en = NULL, actualizado_en = datetime('now')"
+  ).bind(ref, carta || null, firma || null).run();
+}
+
+/* La autorización para escribirle después. Si ya estaba y la había retirado,
+   volver a marcar la casilla la renueva. */
+async function regalosGuardarNoticias(env, email, nombre, idioma, ref) {
+  await env.DB.prepare(
+    "INSERT INTO regalo_noticias (email, nombre, idioma, origen_ref) VALUES (?, ?, ?, ?) " +
+    "ON CONFLICT(email) DO UPDATE SET nombre = excluded.nombre, idioma = excluded.idioma, " +
+    "consentido_en = datetime('now'), baja_en = NULL"
+  ).bind(email, nombre, idioma, ref).run();
+}
+
+/* POST /api/regalos/pedido/<RG>/mensaje?t= {carta, firma, quitar_video} */
+async function apiRegalosMensaje(request, env, ref, token) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  const p = await regalosPedidoConToken(env, ref, token);
+  if (!p) return json({ error: "no_encontrado" }, 404);
+  if (!(await regalosMensajeEditable(env, p))) return json({ error: "ya_entregado" }, 409);
+  if (!(await pasaTopeIP(env, request, "regalos-mensaje"))) return json({ error: "demasiados_intentos" }, 429);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const carta = limpiarCarta(c.carta);
+  const firma = limpiar(c.firma, 80);
+  await regalosGuardarCarta(env, ref, carta, firma);
+  if (c.quitar_video) {
+    const m = await env.DB.prepare("SELECT video_key FROM regalo_mensajes WHERE pedido_ref = ?").bind(ref).first();
+    if (m && m.video_key && env.MEDIA) { try { await env.MEDIA.delete(m.video_key); } catch (e) { /* huérfano, no rompe */ } }
+    await env.DB.prepare(
+      "UPDATE regalo_mensajes SET video_key = NULL, video_tipo = NULL, video_bytes = NULL, video_seg = NULL WHERE pedido_ref = ?"
+    ).bind(ref).run();
+  }
+  await env.DB.prepare(
+    "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'carta', ?, 'donante')"
+  ).bind(ref, carta ? carta.length + " caracteres" : "sin carta").run();
+  return json({ ok: true });
+}
+
+/* PUT /api/regalos/pedido/<RG>/video?t=&seg= — el cuerpo crudo es el video.
+   Va directo a R2 sin pasar por la memoria del Worker (un minuto de video de
+   teléfono pesa decenas de megas). La duración la mide el navegador: aquí se
+   acepta con holgura y la confirma la persona que lo revisa. */
+async function apiRegalosVideo(request, env, ref, token, url) {
+  if (request.method !== "PUT" && request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const p = await regalosPedidoConToken(env, ref, token);
+  if (!p) return json({ error: "no_encontrado" }, 404);
+  if (!(await regalosMensajeEditable(env, p))) return json({ error: "ya_entregado" }, 409);
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const ext = REGALOS_VIDEO_TIPOS[tipo];
+  if (!ext) return json({ error: "tipo_no_permitido", permitidos: Object.keys(REGALOS_VIDEO_TIPOS) }, 415);
+  const largo = Number(request.headers.get("content-length") || 0);
+  if (!largo) return json({ error: "archivo_vacio" }, 400);
+  if (largo > REGALOS_VIDEO_MAX) return json({ error: "archivo_muy_grande", max_mb: 90 }, 413);
+  const seg = Math.round(Number(url.searchParams.get("seg")));
+  if (!Number.isFinite(seg) || seg < 25 || seg > 65) return json({ error: "duracion_invalida", min: 30, max: 60 }, 400);
+  if (!(await pasaTopeIP(env, request, "regalos-video"))) return json({ error: "demasiados_intentos" }, 429);
+
+  const clave = "regalos/videos/" + ref + "-" + tokenNuevo().slice(0, 8) + "." + ext;
+  await env.MEDIA.put(clave, request.body, { httpMetadata: { contentType: tipo } });
+  const previo = await env.DB.prepare("SELECT video_key FROM regalo_mensajes WHERE pedido_ref = ?").bind(ref).first();
+  await env.DB.prepare(
+    "INSERT INTO regalo_mensajes (pedido_ref, video_key, video_tipo, video_bytes, video_seg) VALUES (?, ?, ?, ?, ?) " +
+    "ON CONFLICT(pedido_ref) DO UPDATE SET video_key = excluded.video_key, video_tipo = excluded.video_tipo, " +
+    "video_bytes = excluded.video_bytes, video_seg = excluded.video_seg, estado = 'pendiente', motivo = NULL, " +
+    "revisado_por = NULL, revisado_en = NULL, actualizado_en = datetime('now')"
+  ).bind(ref, clave, tipo, largo, seg).run();
+  if (previo && previo.video_key && previo.video_key !== clave) {
+    try { await env.MEDIA.delete(previo.video_key); } catch (e) { /* huérfano, no rompe */ }
+  }
+  await env.DB.prepare(
+    "INSERT INTO regalo_eventos (pedido_ref, tipo, detalle, autor) VALUES (?, 'video', ?, 'donante')"
+  ).bind(ref, seg + " s · " + Math.round(largo / 1048576) + " MB").run();
+  return json({ ok: true });
+}
+
+/* Lo que el donante ve de su carta en el seguimiento. */
+async function regalosMensajeDe(env, ref) {
+  const m = await env.DB.prepare(
+    "SELECT carta, firma, video_key, video_seg, estado, motivo FROM regalo_mensajes WHERE pedido_ref = ?"
+  ).bind(ref).first();
+  if (!m) return null;
+  return { carta: m.carta || "", firma: m.firma || "", video: !!m.video_key, video_seg: m.video_seg || null,
+           estado: m.estado, motivo: m.estado === "rechazado" ? (m.motivo || null) : null };
+}
+
+/* Si el equipo no aprueba la carta o el video, se le dice al donante por qué
+   y cómo corregirlo. */
+async function correoRegalosMensajeRechazado(env, ref, motivo) {
+  const p = await env.DB.prepare("SELECT ref, token, email, nombre, idioma FROM regalo_pedidos WHERE ref = ?").bind(ref).first();
+  if (!p || !p.email) return;
+  const en = p.idioma === "en";
+  const enlace = enlaceSeguimientoRegalos(p.ref, p.token);
+  const titulo = (en ? "About your letter or video · " : "Sobre tu carta o tu video · ") + p.ref;
+  const parrafos = en ? [
+    "Hi " + p.nombre + ",",
+    "Our team reviews every letter and video before it reaches a child. We could not approve yours as it is:",
+    motivo,
+    "You can change it from your gift tracking page. Your gifts are not affected."
+  ] : [
+    "Hola, " + p.nombre + ":",
+    "El equipo revisa cada carta y cada video antes de que llegue a un niño. El tuyo no lo pudimos aprobar así:",
+    motivo,
+    "Lo puedes cambiar desde la página de seguimiento de tus regalos. Tus regalos siguen igual."
+  ];
+  await enviarCorreo(env, {
+    para: p.email, asunto: titulo,
+    texto: [titulo, "", ...parrafos, "", enlace].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, boton: { url: enlace, texto: en ? "Change my letter" : "Cambiar mi carta" } }),
+    etiqueta: "regalos-carta-rechazada", guia: p.ref
+  });
+}
+
+/* ========================================================================
+   /admin/regalos — la pantalla del equipo para la campaña de regalos
+   ========================================================================
+   Vive FUERA del panel grande, como /admin/ruta: es una herramienta de
+   temporada, con su propia carga masiva y su propio recorrido, y meterla en la
+   plantilla de adminJS() era sumar cientos de líneas a la zona más delicada del
+   Worker. Hereda el mismo Access por colgar de /admin/.
+
+   Lo que hace, en el orden en que se usa:
+   1. Campaña, zonas y valores por tipo de regalo.
+   2. Carga masiva desde la hoja de cálculo (plantilla descargable), en dos
+      pasos: primero se revisa, después se guarda.
+   3. Foto y autorización firmada de cada niño, a R2, sin EXIF.
+   4. Publicar: solo pasa lo que tiene autorización, valor y deseo completo.
+   5. El recorrido: comprado → despachado → entregado (con acta AE-), y los
+      pedidos en dólares que confirma una persona.
+   ======================================================================== */
+
+/* Las columnas de la plantilla, en el orden en que se llenan en terreno. */
+const REGALOS_COLUMNAS = ["zona", "nombre", "nombre_publico", "edad", "genero", "comunidad", "acudiente",
+  "parentesco", "telefono", "autoriza_datos", "autoriza_foto", "categoria", "deseo", "deseo_en", "talla", "notas"];
+const REGALOS_MAX_FILAS = 1500;
+
+function sinTildes(s) {
+  return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
+function siNo(v) {
+  return ["si", "s", "x", "1", "true", "yes", "y", "autoriza"].includes(sinTildes(v));
+}
+function generoDe(v) {
+  const g = sinTildes(v);
+  if (["nina", "f", "femenino", "girl", "mujer"].includes(g)) return "nina";
+  if (["nino", "m", "masculino", "boy", "hombre"].includes(g)) return "nino";
+  if (["otro", "o", "otra", "prefiere no decir", "no dice"].includes(g)) return "otro";
+  return null;
+}
+
+async function adminRegalosAuditar(env, quien, detalle) {
+  await env.DB.prepare(
+    "INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)"
+  ).bind(quien || "?", "regalos · " + String(detalle).slice(0, 900)).run();
+}
+
+/* GET /api/admin/regalos — todo lo que la pantalla necesita, en una sola
+   respuesta. Aquí SÍ van los datos privados: esto solo lo ve el equipo. */
+async function adminRegalos(env) {
+  const campana = await env.DB.prepare(
+    "SELECT id, nombre_es, nombre_en, estado, cierre, aliada_nombre, aliada_url FROM regalo_campanas WHERE id = ?"
+  ).bind(REGALOS_CAMPANA).first();
+  const zonas = await regalosZonas(env);
+  const cats = await env.DB.prepare(
+    "SELECT id, nombre_es, nombre_en, valor_cop, valor_usd, con_talla FROM regalo_categorias ORDER BY orden"
+  ).all();
+  const ninos = await env.DB.prepare(
+    "SELECT n.codigo, n.zona_id, n.nombre, n.nombre_publico, n.edad, n.genero, n.comunidad, " +
+    "n.acudiente_nombre, n.acudiente_parentesco, n.acudiente_telefono, n.autoriza_datos, n.autoriza_foto, " +
+    "CASE WHEN n.foto_key IS NULL THEN 0 ELSE 1 END AS foto, " +
+    "CASE WHEN n.autorizacion_key IS NULL THEN 0 ELSE 1 END AS autorizacion, n.notas, " +
+    "r.categoria_id, r.deseo_es, r.deseo_en, r.talla, r.estado, r.pedido_ref, r.via, r.financiado_por, " +
+    "r.egreso, r.entrega, r.evidencia, " +
+    "CASE WHEN r.estado = 'publicado' AND r.reservado_hasta >= datetime('now') THEN r.reserva_ref ELSE NULL END AS reserva " +
+    "FROM regalo_ninos n LEFT JOIN regalos r ON r.nino_id = n.id " +
+    "WHERE n.campana_id = ? ORDER BY n.codigo"
+  ).bind(REGALOS_CAMPANA).all();
+  const pedidos = await env.DB.prepare(
+    "SELECT p.ref, p.via, p.estado, p.total_cop, p.total_usd, p.nombre, p.email, p.guia, p.creado_en, p.pagado_en, " +
+    "p.confirmado_por, COUNT(i.id) AS items, SUM(CASE WHEN i.resultado = 'sin_cupo' THEN 1 ELSE 0 END) AS sin_cupo, " +
+    "SUM(CASE WHEN i.resultado = 'sustituido' THEN 1 ELSE 0 END) AS sustituidos " +
+    "FROM regalo_pedidos p LEFT JOIN regalo_pedido_items i ON i.pedido_ref = p.ref " +
+    "WHERE p.campana_id = ? GROUP BY p.ref ORDER BY p.creado_en DESC LIMIT 500"
+  ).bind(REGALOS_CAMPANA).all();
+  /* Las cartas y los videos, con los regalos que acompañan (el escogido o su
+     sustituto) para poder imprimir una por regalo. */
+  const mens = await env.DB.prepare(
+    "SELECT m.pedido_ref, m.carta, m.firma, m.video_key IS NOT NULL AS video, m.video_seg, m.video_bytes, m.estado, " +
+    "m.motivo, m.revisado_por, m.actualizado_en, p.nombre, p.email, p.estado AS pedido_estado, " +
+    "(SELECT group_concat(r.codigo || '|' || n.nombre_publico || '|' || r.zona_id || '|' || r.estado, ';') " +
+    " FROM regalo_pedido_items i JOIN regalos r ON r.id = COALESCE(i.sustituto_id, i.regalo_id) " +
+    " JOIN regalo_ninos n ON n.id = r.nino_id WHERE i.pedido_ref = m.pedido_ref AND r.pedido_ref = m.pedido_ref) AS regalos " +
+    "FROM regalo_mensajes m JOIN regalo_pedidos p ON p.ref = m.pedido_ref " +
+    "WHERE p.campana_id = ? ORDER BY CASE m.estado WHEN 'pendiente' THEN 0 ELSE 1 END, m.actualizado_en DESC"
+  ).bind(REGALOS_CAMPANA).all();
+  const noticias = await env.DB.prepare("SELECT COUNT(*) AS n FROM regalo_noticias WHERE baja_en IS NULL").first();
+  return json({
+    mensajes: (mens.results || []).map((m) => Object.assign({}, m, {
+      video: !!m.video, actualizado_en: m.actualizado_en ? selloCO(m.actualizado_en).slice(0, 16) : null,
+      regalos: String(m.regalos || "").split(";").filter(Boolean).map((x) => {
+        const [codigo, nombre, zona, estado] = x.split("|"); return { codigo, nombre, zona, estado }; })
+    })),
+    noticias: noticias ? noticias.n : 0,
+    campana, zonas, categorias: cats.results || [], ninos: ninos.results || [],
+    pedidos: (pedidos.results || []).map((p) => Object.assign({}, p, {
+      creado_en: p.creado_en ? selloCO(p.creado_en).slice(0, 16) : null,
+      pagado_en: p.pagado_en ? selloCO(p.pagado_en).slice(0, 16) : null
+    }))
+  });
+}
+
+/* GET /api/admin/regalos/plantilla.csv — la hoja para terreno, con una fila de
+   ejemplo que hay que borrar. Separador «;» porque Excel en español lo abre
+   en columnas sin preguntar. */
+function adminRegalosPlantilla() {
+  const ejemplo = ["uribia", "Ana María Pérez Epieyú", "Ana", "8", "niña", "Ranchería …", "Rosa Epieyú",
+    "madre", "300 000 0000", "sí", "sí", "juguete", "Una muñeca", "A doll", "", "BORRAR ESTA FILA DE EJEMPLO"];
+  const linea = (xs) => xs.map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(";");
+  return new Response("﻿" + linea(REGALOS_COLUMNAS) + "\r\n" + linea(ejemplo) + "\r\n", {
+    headers: {
+      "content-type": "text/csv; charset=utf-8", "cache-control": "no-store",
+      "content-disposition": 'attachment; filename="regalos-plantilla.csv"'
+    }
+  });
+}
+
+/* POST /api/admin/regalos/importar {texto, confirmar}
+   Sin `confirmar` NO escribe nada: devuelve cada fila con sus errores en
+   palabras, para corregir la hoja y volver a pegarla. Con `confirmar` guarda
+   solo las filas sanas. Una fila repetida (misma zona, mismo nombre y mismo
+   acudiente que una ya cargada o que otra de la hoja) no entra dos veces. */
+async function adminRegalosImportar(request, env, quien) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const texto = String(c.texto || "").replace(/^﻿/, "");
+  if (!texto.trim()) return json({ error: "archivo_vacio" }, 400);
+  if (texto.length > 3 * 1024 * 1024) return json({ error: "archivo_muy_grande", max_mb: 3 }, 413);
+
+  const sep = delimitadorDe(texto);
+  const crudas = partirCSV(texto, sep).filter((f) => f.some((x) => x !== ""));
+  if (crudas.length < 2) return json({ error: "sin_filas", ayuda: "La hoja necesita la fila de títulos y al menos un niño." }, 400);
+  if (crudas.length - 1 > REGALOS_MAX_FILAS) return json({ error: "demasiadas_filas", max: REGALOS_MAX_FILAS }, 400);
+
+  const cab = crudas[0].map((x) => sinTildes(x).replace(/[^a-z_]/g, "_"));
+  const faltan = ["zona", "nombre", "edad", "genero", "acudiente", "categoria", "deseo"].filter((k) => !cab.includes(k));
+  if (faltan.length) {
+    return json({ error: "faltan_columnas", columnas: faltan,
+      ayuda: "Descarga la plantilla y conserva la fila de títulos tal cual." }, 400);
+  }
+  const col = (fila, k) => { const i = cab.indexOf(k); return i < 0 ? "" : String(fila[i] || "").trim(); };
+
+  const zonas = (await env.DB.prepare("SELECT id, prefijo, nombre_es FROM regalo_zonas WHERE campana_id = ?")
+    .bind(REGALOS_CAMPANA).all()).results || [];
+  const cats = (await env.DB.prepare("SELECT id, nombre_es, nombre_en, con_talla FROM regalo_categorias").all()).results || [];
+  const zonaDe = (v) => { const s = sinTildes(v); return zonas.find((z) => z.id === s || sinTildes(z.nombre_es) === s) || null; };
+  const catDe = (v) => { const s = sinTildes(v); return cats.find((k) => k.id === s || sinTildes(k.nombre_es) === s || sinTildes(k.nombre_en) === s) || null; };
+
+  const existentes = (await env.DB.prepare(
+    "SELECT zona_id, nombre, acudiente_nombre, codigo FROM regalo_ninos WHERE campana_id = ?"
+  ).bind(REGALOS_CAMPANA).all()).results || [];
+  const huella = (z, n, a) => z + "|" + sinTildes(n) + "|" + sinTildes(a);
+  const vistos = new Map(existentes.map((e) => [huella(e.zona_id, e.nombre, e.acudiente_nombre), e.codigo]));
+  /* El siguiente número de cada zona: uno más que el mayor ya usado. */
+  const ultimo = {};
+  for (const z of zonas) ultimo[z.id] = 0;
+  for (const e of existentes) {
+    const n = Number(String(e.codigo).split("-")[1]);
+    if (n > (ultimo[e.zona_id] || 0)) ultimo[e.zona_id] = n;
+  }
+
+  const filas = [];
+  for (let i = 1; i < crudas.length; i++) {
+    const f = crudas[i];
+    const errores = [];
+    const z = zonaDe(col(f, "zona"));
+    if (!z) errores.push("zona desconocida («" + col(f, "zona") + "»): usa uribia, medellin o leticia");
+    const nombre = col(f, "nombre").slice(0, 160);
+    if (nombre.length < 3) errores.push("falta el nombre completo");
+    const nombrePublico = (col(f, "nombre_publico") || nombre.split(/\s+/)[0] || "").slice(0, 40);
+    const edad = Number(col(f, "edad"));
+    if (!Number.isInteger(edad) || edad < 0 || edad > 17) errores.push("edad inválida («" + col(f, "edad") + "»): de 0 a 17");
+    const genero = generoDe(col(f, "genero"));
+    if (!genero) errores.push("género inválido: niña, niño u otro");
+    const acudiente = col(f, "acudiente").slice(0, 160);
+    if (acudiente.length < 3) errores.push("falta el acudiente");
+    const k = catDe(col(f, "categoria"));
+    if (!k) errores.push("tipo de regalo desconocido («" + col(f, "categoria") + "»)");
+    const deseo = col(f, "deseo").slice(0, 160);
+    if (deseo.length < 2) errores.push("falta el regalo que pide");
+    const talla = col(f, "talla").slice(0, 20);
+    if (k && k.con_talla && !talla) errores.push("la ropa y el calzado necesitan talla");
+    const autorizaDatos = siNo(col(f, "autoriza_datos"));
+    let aviso = autorizaDatos ? null : "sin autorización de datos: se guarda, pero no se puede publicar";
+
+    const h = z ? huella(z.id, nombre, acudiente) : null;
+    if (h && vistos.has(h)) {
+      errores.push("repetido: ya está como " + vistos.get(h));
+    }
+    let codigo = null;
+    if (!errores.length) {
+      ultimo[z.id] = (ultimo[z.id] || 0) + 1;
+      codigo = z.prefijo + "-" + String(ultimo[z.id]).padStart(4, "0");
+      vistos.set(h, codigo);
+    }
+    filas.push({
+      fila: i + 1, codigo, errores, aviso,
+      zona: z ? z.id : null, nombre, nombre_publico: nombrePublico, edad, genero,
+      comunidad: col(f, "comunidad").slice(0, 160) || null, acudiente,
+      parentesco: col(f, "parentesco").slice(0, 60) || null,
+      telefono: col(f, "telefono").slice(0, 40) || null,
+      autoriza_datos: autorizaDatos ? 1 : 0, autoriza_foto: siNo(col(f, "autoriza_foto")) ? 1 : 0,
+      categoria: k ? k.id : null, deseo, deseo_en: col(f, "deseo_en").slice(0, 160) || null,
+      talla: talla || null, notas: col(f, "notas").slice(0, 500) || null
+    });
+  }
+  const sanas = filas.filter((f) => !f.errores.length);
+  /* La vista previa NO devuelve los datos privados de vuelta: basta con el
+     código, el nombre de pila y lo que hay que corregir. */
+  const vista = filas.map((f) => ({ fila: f.fila, codigo: f.codigo, nombre_publico: f.nombre_publico,
+    zona: f.zona, errores: f.errores, aviso: f.aviso }));
+  if (!c.confirmar) return json({ ok: true, vista, sanas: sanas.length, con_error: filas.length - sanas.length });
+
+  for (let i = 0; i < sanas.length; i += 40) {
+    const lote = [];
+    for (const f of sanas.slice(i, i + 40)) {
+      lote.push(env.DB.prepare(
+        "INSERT INTO regalo_ninos (campana_id, zona_id, codigo, nombre, nombre_publico, edad, genero, comunidad, " +
+        "acudiente_nombre, acudiente_parentesco, acudiente_telefono, autoriza_datos, autoriza_foto, notas) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(REGALOS_CAMPANA, f.zona, f.codigo, f.nombre, f.nombre_publico, f.edad, f.genero, f.comunidad,
+             f.acudiente, f.parentesco, f.telefono, f.autoriza_datos, f.autoriza_foto, f.notas));
+      lote.push(env.DB.prepare(
+        "INSERT INTO regalos (nino_id, campana_id, zona_id, codigo, categoria_id, deseo_es, deseo_en, talla) " +
+        "SELECT id, campana_id, zona_id, codigo, ?, ?, ?, ? FROM regalo_ninos WHERE codigo = ?"
+      ).bind(f.categoria, f.deseo, f.deseo_en, f.talla, f.codigo));
+    }
+    await env.DB.batch(lote);
+  }
+  await adminRegalosAuditar(env, quien, "importó " + sanas.length + " niño(s); " + (filas.length - sanas.length) + " fila(s) con error");
+  return json({ ok: true, guardadas: sanas.length, con_error: filas.length - sanas.length, vista });
+}
+
+/* POST /api/admin/regalos/<accion> — los ajustes y el recorrido. */
+async function adminRegalosAccion(request, env, accion, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+
+  if (accion === "campana") {
+    const estado = ["borrador", "abierta", "cerrada"].includes(c.estado) ? c.estado : null;
+    if (!estado) return json({ error: "estado_invalido" }, 400);
+    const cierre = limpiar(c.cierre, 10) || null;
+    if (cierre && !/^\d{4}-\d{2}-\d{2}$/.test(cierre)) return json({ error: "fecha_invalida" }, 400);
+    const aliadaUrl = limpiar(c.aliada_url, 500) || null;
+    if (aliadaUrl && !/^https:\/\/[^\s]+$/.test(aliadaUrl)) {
+      return json({ error: "url_invalida", ayuda: "El enlace de la aliada tiene que empezar por https://." }, 400);
+    }
+    if (estado === "abierta") {
+      const k = await env.DB.prepare(
+        "SELECT COUNT(*) AS n FROM regalo_categorias WHERE valor_cop IS NOT NULL AND valor_usd IS NOT NULL"
+      ).first();
+      if (!k || !k.n) return json({ error: "sin_valores",
+        ayuda: "Antes de abrir, pon el valor en pesos y en dólares de al menos un tipo de regalo." }, 409);
+    }
+    await env.DB.prepare(
+      "UPDATE regalo_campanas SET nombre_es = ?, nombre_en = ?, estado = ?, cierre = ?, aliada_nombre = ?, " +
+      "aliada_url = ?, actualizada_en = datetime('now') WHERE id = ?"
+    ).bind(limpiar(c.nombre_es, 120) || "Regalos de diciembre 2026", limpiar(c.nombre_en, 120) || "December Gifts 2026",
+           estado, cierre, limpiar(c.aliada_nombre, 120) || null, aliadaUrl, REGALOS_CAMPANA).run();
+    await adminRegalosAuditar(env, quien, "campaña → " + estado + (cierre ? " · cierre " + cierre : ""));
+    return json({ ok: true });
+  }
+
+  if (accion === "zona") {
+    const meta = Number(c.meta);
+    if (!Number.isInteger(meta) || meta < 0 || meta > 100000) return json({ error: "meta_invalida" }, 400);
+    const fecha = limpiar(c.fecha_entrega, 10) || null;
+    if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ error: "fecha_invalida" }, 400);
+    const r = await env.DB.prepare("UPDATE regalo_zonas SET meta = ?, fecha_entrega = ? WHERE id = ?")
+      .bind(meta, fecha, limpiar(c.id, 30)).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrada" }, 404);
+    await adminRegalosAuditar(env, quien, "zona " + c.id + " · meta " + meta + " · entrega " + (fecha || "—"));
+    return json({ ok: true });
+  }
+
+  if (accion === "categoria") {
+    const vc = c.valor_cop === "" || c.valor_cop == null ? null : Number(c.valor_cop);
+    const vu = c.valor_usd === "" || c.valor_usd == null ? null : Number(c.valor_usd);
+    if (vc != null && (!Number.isInteger(vc) || vc < MONTO_MIN || vc > MONTO_MAX)) {
+      return json({ error: "valor_invalido", ayuda: "Pesos enteros, entre " + MONTO_MIN + " y " + MONTO_MAX + "." }, 400);
+    }
+    if (vu != null && (!Number.isInteger(vu) || vu < 1 || vu > 5000)) {
+      return json({ error: "valor_invalido", ayuda: "Dólares enteros, entre 1 y 5000." }, 400);
+    }
+    const r = await env.DB.prepare("UPDATE regalo_categorias SET valor_cop = ?, valor_usd = ? WHERE id = ?")
+      .bind(vc, vu, limpiar(c.id, 30)).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrada" }, 404);
+    await adminRegalosAuditar(env, quien, "tipo " + c.id + " · $" + (vc == null ? "—" : vc) + " · US$" + (vu == null ? "—" : vu));
+    return json({ ok: true });
+  }
+
+  if (accion === "nino") {
+    const codigo = String(c.codigo || "").toUpperCase();
+    if (!RE_CODIGO_REGALO.test(codigo)) return json({ error: "codigo_invalido" }, 400);
+    const r = await env.DB.prepare("SELECT estado FROM regalos WHERE codigo = ?").bind(codigo).first();
+    if (!r) return json({ error: "no_encontrado" }, 404);
+    const edad = Number(c.edad);
+    const genero = ["nina", "nino", "otro"].includes(c.genero) ? c.genero : null;
+    if (!Number.isInteger(edad) || edad < 0 || edad > 17 || !genero) return json({ error: "datos_invalidos" }, 400);
+    const k = await env.DB.prepare("SELECT id, con_talla FROM regalo_categorias WHERE id = ?").bind(limpiar(c.categoria, 30)).first();
+    if (!k) return json({ error: "categoria_invalida" }, 400);
+    const deseo = limpiar(c.deseo_es, 160);
+    if (deseo.length < 2) return json({ error: "deseo_requerido" }, 400);
+    /* Lo que el donante escogió no cambia después de escogido. */
+    const editableRegalo = ["borrador", "publicado"].includes(r.estado);
+    const lote = [env.DB.prepare(
+      "UPDATE regalo_ninos SET nombre_publico = ?, edad = ?, genero = ?, comunidad = ?, acudiente_nombre = ?, " +
+      "acudiente_parentesco = ?, acudiente_telefono = ?, autoriza_datos = ?, autoriza_foto = ?, notas = ?, " +
+      "actualizado_en = datetime('now') WHERE codigo = ?"
+    ).bind(limpiar(c.nombre_publico, 40) || "—", edad, genero, limpiar(c.comunidad, 160) || null,
+           limpiar(c.acudiente_nombre, 160) || "—", limpiar(c.acudiente_parentesco, 60) || null,
+           limpiar(c.acudiente_telefono, 40) || null, c.autoriza_datos ? 1 : 0, c.autoriza_foto ? 1 : 0,
+           limpiar(c.notas, 500) || null, codigo)];
+    if (editableRegalo) {
+      lote.push(env.DB.prepare(
+        "UPDATE regalos SET categoria_id = ?, deseo_es = ?, deseo_en = ?, talla = ?, actualizado_en = datetime('now') WHERE codigo = ?"
+      ).bind(k.id, deseo, limpiar(c.deseo_en, 160) || null, limpiar(c.talla, 20) || null, codigo));
+    }
+    await env.DB.batch(lote);
+    /* Sin autorización de datos, un regalo publicado vuelve a borrador en el acto. */
+    if (!c.autoriza_datos && r.estado === "publicado") {
+      await env.DB.prepare("UPDATE regalos SET estado = 'borrador' WHERE codigo = ? AND estado = 'publicado'").bind(codigo).run();
+    }
+    await adminRegalosAuditar(env, quien, "editó " + codigo);
+    return json({ ok: true, regalo_editable: editableRegalo });
+  }
+
+  if (accion === "pedido-confirmar" || accion === "pedido-anular") {
+    const ref = String(c.ref || "").toUpperCase();
+    if (!RE_PEDIDO_REGALO.test(ref)) return json({ error: "ref_invalida" }, 400);
+    const p = await env.DB.prepare("SELECT via, estado FROM regalo_pedidos WHERE ref = ?").bind(ref).first();
+    if (!p) return json({ error: "no_encontrado" }, 404);
+    if (accion === "pedido-anular") {
+      if (p.estado !== "pendiente") return json({ error: "no_pendiente" }, 409);
+      await regalosSoltarPedido(env, ref, "anulado", quien);
+      await adminRegalosAuditar(env, quien, "anuló el pedido " + ref);
+      return json({ ok: true });
+    }
+    /* En pesos lo confirma Wompi, nunca una persona: si un pago no llegó, el
+       camino es la conciliación de aportes, que deja el rastro de quién. */
+    if (p.via !== "usd") return json({ error: "solo_usd",
+      ayuda: "Un pedido en pesos lo confirma Wompi. Si el pago no llegó, rescátalo desde Finanzas › Aportes." }, 409);
+    const res = await regalosPedidoPagado(env, ref, quien);
+    await adminRegalosAuditar(env, quien, "confirmó el pago en dólares del pedido " + ref +
+      (c.nota ? " · " + limpiar(c.nota, 200) : ""));
+    return json({ ok: true, resultado: res });
+  }
+
+  if (accion === "estado") return adminRegalosMover(env, c, quien);
+  if (accion === "mensaje") return adminRegalosMensaje(env, c, quien);
+  return json({ error: "no_encontrado" }, 404);
+}
+
+/* EL RECORRIDO, en lote. Cada paso tiene un único estado de origen válido y
+   lo que no está ahí se reporta con su motivo, sin tocarlo. */
+const REGALOS_PASO = {
+  publicar:    { desde: ["borrador"], hacia: "publicado", fecha: "publicado_en" },
+  despublicar: { desde: ["publicado"], hacia: "borrador" },
+  retirar:     { desde: ["borrador", "publicado"], hacia: "retirado" },
+  financiar:   { desde: ["publicado"], hacia: "financiado", fecha: "financiado_en" },
+  comprado:    { desde: ["financiado"], hacia: "comprado", fecha: "comprado_en" },
+  despachado:  { desde: ["comprado"], hacia: "despachado", fecha: "despachado_en" },
+  entregado:   { desde: ["despachado", "comprado"], hacia: "entregado", fecha: "entregado_en" }
+};
+
+async function adminRegalosMover(env, c, quien) {
+  const paso = REGALOS_PASO[c.paso] ? c.paso : null;
+  if (!paso) return json({ error: "paso_invalido" }, 400);
+  const def = REGALOS_PASO[paso];
+  const codigos = Array.isArray(c.codigos)
+    ? [...new Set(c.codigos.map((x) => String(x || "").toUpperCase()))].filter((x) => RE_CODIGO_REGALO.test(x)).slice(0, 1500)
+    : [];
+  if (!codigos.length) return json({ error: "sin_regalos" }, 400);
+
+  let extra = "", extraVals = [];
+  const via = ["fondo", "empresa"].includes(c.via) ? c.via : null;
+  const financiadoPor = limpiar(c.financiado_por, 160);
+  const egreso = limpiar(c.egreso, 20).toUpperCase() || null;
+  const entrega = limpiar(c.entrega, 20).toUpperCase() || null;
+  const evidencia = limpiar(c.evidencia, 300) || null;
+  if (paso === "financiar") {
+    if (!via || financiadoPor.length < 2) return json({ error: "datos_invalidos",
+      ayuda: "Di si lo cubre el fondo de la campaña o una empresa, y quién." }, 400);
+    extra = ", via = ?, financiado_por = ?"; extraVals = [via, financiadoPor];
+  }
+  if (paso === "comprado") {
+    if (egreso) {
+      if (!/^EG-\d{4}-\d{6}$/.test(egreso)) return json({ error: "egreso_invalido" }, 400);
+      const e = await env.DB.prepare("SELECT numero FROM egresos WHERE numero = ? AND anulado_en IS NULL").bind(egreso).first();
+      if (!e) return json({ error: "egreso_no_encontrado", ayuda: "Ese egreso no existe o está anulado." }, 404);
+    }
+    extra = ", egreso = COALESCE(?, egreso)"; extraVals = [egreso];
+  }
+  if (paso === "despachado") { extra = ", evidencia = COALESCE(?, evidencia)"; extraVals = [evidencia]; }
+  if (paso === "entregado") {
+    /* «Entregado» sin acta es una promesa. El acta AE- es la evidencia. */
+    if (!entrega || !/^AE-\d{4}-\d{6}$/.test(entrega)) return json({ error: "acta_requerida",
+      ayuda: "Para marcar entregado hace falta el número del acta de entrega (AE-…), creada en Entregas." }, 400);
+    const a = await env.DB.prepare("SELECT numero FROM entregas WHERE numero = ? AND anulada_en IS NULL").bind(entrega).first();
+    if (!a) return json({ error: "acta_no_encontrada", ayuda: "Esa acta no existe o está anulada." }, 404);
+    extra = ", entrega = ?"; extraVals = [entrega];
+  }
+
+  /* Publicar exige lo que la página va a mostrar: autorización, valor y deseo. */
+  const condPublicar = paso === "publicar"
+    ? " AND EXISTS (SELECT 1 FROM regalo_ninos n JOIN regalo_categorias k ON k.id = r.categoria_id " +
+      "WHERE n.id = r.nino_id AND n.autoriza_datos = 1 AND k.valor_cop IS NOT NULL AND k.valor_usd IS NOT NULL " +
+      "AND length(r.deseo_es) > 1 AND (k.con_talla = 0 OR length(COALESCE(r.talla, '')) > 0))"
+    : "";
+  /* Lo que está apartado por un donante que está pagando no se toca. */
+  const condLibre = ["despublicar", "retirar", "financiar"].includes(paso)
+    ? " AND (r.reservado_hasta IS NULL OR r.reservado_hasta < datetime('now'))" : "";
+  const marcas = def.desde.map(() => "?").join(",");
+  const sql = "UPDATE regalos AS r SET estado = ?" + (def.fecha ? ", " + def.fecha + " = datetime('now')" : "") + extra +
+    ", actualizado_en = datetime('now') WHERE r.codigo = ? AND r.estado IN (" + marcas + ")" + condPublicar + condLibre;
+
+  const movidos = [], rechazados = [];
+  for (let i = 0; i < codigos.length; i += 50) {
+    const trozo = codigos.slice(i, i + 50);
+    const res = await env.DB.batch(trozo.map((k) => env.DB.prepare(sql).bind(def.hacia, ...extraVals, k, ...def.desde)));
+    res.forEach((r, j) => (r.meta && r.meta.changes ? movidos : rechazados).push(trozo[j]));
+  }
+  if (movidos.length) {
+    for (let i = 0; i < movidos.length; i += 50) {
+      const trozo = movidos.slice(i, i + 50);
+      await env.DB.batch(trozo.map((k) => env.DB.prepare(
+        "INSERT INTO regalo_eventos (regalo_id, pedido_ref, tipo, detalle, autor) " +
+        "SELECT id, pedido_ref, ?, ?, ? FROM regalos WHERE codigo = ?"
+      ).bind(paso, egreso || entrega || evidencia || financiadoPor || null, quien || "?", k)));
+    }
+    await adminRegalosAuditar(env, quien, paso + " · " + movidos.length + " regalo(s): " + movidos.slice(0, 40).join(", ") +
+      (movidos.length > 40 ? "…" : ""));
+  }
+
+  /* Un correo por pedido, no por regalo. */
+  let correos = 0;
+  if (["despachado", "entregado"].includes(paso) && movidos.length) {
+    const marcasM = movidos.map(() => "?").join(",");
+    const { results } = await env.DB.prepare(
+      "SELECT DISTINCT pedido_ref FROM regalos WHERE pedido_ref IS NOT NULL AND codigo IN (" + marcasM + ")"
+    ).bind(...movidos).all();
+    for (const p of results || []) {
+      try { await correoRegalosEstado(env, p.pedido_ref, paso); correos++; }
+      catch (e) { console.error("correo regalos", paso, p.pedido_ref, e && e.message); }
+    }
+  }
+
+  /* El motivo de cada rechazo, dicho en palabras. */
+  let motivos = {};
+  if (rechazados.length) {
+    const marcasR = rechazados.map(() => "?").join(",");
+    const { results } = await env.DB.prepare(
+      "SELECT r.codigo, r.estado, n.autoriza_datos, k.valor_cop, k.valor_usd, k.con_talla, r.talla, " +
+      "CASE WHEN r.reservado_hasta >= datetime('now') THEN 1 ELSE 0 END AS apartado " +
+      "FROM regalos r JOIN regalo_ninos n ON n.id = r.nino_id JOIN regalo_categorias k ON k.id = r.categoria_id " +
+      "WHERE r.codigo IN (" + marcasR + ")"
+    ).bind(...rechazados).all();
+    for (const k of rechazados) {
+      const r = (results || []).find((x) => x.codigo === k);
+      let m = "no existe";
+      if (r) {
+        if (!def.desde.includes(r.estado)) m = "está en «" + r.estado + "»; este paso sale de «" + def.desde.join("» o «") + "»";
+        else if (r.apartado && condLibre) m = "un donante lo tiene apartado mientras paga";
+        else if (paso === "publicar" && !r.autoriza_datos) m = "falta la autorización de datos del acudiente";
+        else if (paso === "publicar" && (r.valor_cop == null || r.valor_usd == null)) m = "su tipo de regalo no tiene valor en pesos y en dólares";
+        else if (paso === "publicar" && r.con_talla && !r.talla) m = "falta la talla";
+        else m = "no cumple lo que pide el paso";
+      }
+      motivos[k] = m;
+    }
+  }
+  return json({ ok: true, movidos: movidos.length, rechazados: motivos, correos });
+}
+
+/* GET /api/admin/regalos/compras.csv — la lista de compras: lo financiado que
+   falta comprar, por zona y tipo, con talla. Es la hoja con la que se sale a
+   comprar; no lleva nombres completos ni acudientes. */
+async function adminRegalosCompras(env) {
+  const { results } = await env.DB.prepare(
+    "SELECT r.zona_id, r.codigo, k.nombre_es AS tipo, r.deseo_es, r.talla, n.genero, n.edad, r.via, " +
+    "COALESCE(r.pedido_ref, r.financiado_por) AS origen, " +
+    "CASE WHEN m.estado = 'aprobado' AND length(COALESCE(m.carta, '')) > 0 THEN 'si' ELSE '' END AS carta, " +
+    "CASE WHEN m.estado = 'aprobado' AND m.video_key IS NOT NULL THEN 'si' ELSE '' END AS video " +
+    "FROM regalos r JOIN regalo_ninos n ON n.id = r.nino_id JOIN regalo_categorias k ON k.id = r.categoria_id " +
+    "LEFT JOIN regalo_mensajes m ON m.pedido_ref = r.pedido_ref " +
+    "WHERE r.campana_id = ? AND r.estado = 'financiado' ORDER BY r.zona_id, k.orden, r.codigo"
+  ).bind(REGALOS_CAMPANA).all();
+  const linea = (xs) => xs.map((x) => '"' + String(x == null ? "" : x).replace(/"/g, '""') + '"').join(";");
+  const filas = [linea(["zona", "codigo", "tipo", "regalo", "talla", "genero", "edad", "via", "origen", "carta", "video"])]
+    .concat((results || []).map((r) => linea([r.zona_id, r.codigo, r.tipo, r.deseo_es, r.talla, r.genero, r.edad, r.via, r.origen, r.carta, r.video])));
+  return new Response("﻿" + filas.join("\r\n") + "\r\n", {
+    headers: {
+      "content-type": "text/csv; charset=utf-8", "cache-control": "no-store",
+      "content-disposition": 'attachment; filename="regalos-compras.csv"'
+    }
+  });
+}
+
+/* /api/admin/regalos/(foto|autorizacion)/<codigo>
+   POST sube el archivo (el cuerpo crudo es el archivo); GET lo devuelve, solo
+   al equipo. La foto se guarda sin EXIF —puede traer el GPS de la casa— y la
+   autorización también si es imagen. La clave la pone el servidor. */
+async function adminRegaloArchivo(request, env, codigo, tipoArchivo, quien) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const columna = tipoArchivo === "foto" ? "foto_key" : "autorizacion_key";
+  const n = await env.DB.prepare("SELECT id, " + columna + " AS k FROM regalo_ninos WHERE codigo = ?").bind(codigo).first();
+  if (!n) return json({ error: "no_encontrado" }, 404);
+
+  if (request.method === "GET") {
+    if (!n.k) return json({ error: "no_encontrado" }, 404);
+    const obj = await env.MEDIA.get(n.k);
+    if (!obj) return json({ error: "no_encontrado" }, 404);
+    return new Response(obj.body, { headers: {
+      "content-type": (obj.httpMetadata && obj.httpMetadata.contentType) || "application/octet-stream",
+      "cache-control": "private, no-store", "x-robots-tag": "noindex"
+    } });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const permitidos = tipoArchivo === "foto" ? TIPOS_FOTO : TIPOS_COMPROBANTE;
+  const ext = permitidos[tipo];
+  if (!ext) return json({ error: "tipo_no_permitido", permitidos: Object.keys(permitidos) }, 415);
+  let bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > MAX_FOTO) return json({ error: "archivo_muy_grande", max_mb: 8 }, 413);
+  if (noEsLoQueDice(tipo, bytes)) return rechazoNoEsFoto();
+  if (tipo !== "application/pdf") {
+    const limpia = sinMetadatosFoto(tipo, bytes);
+    if (!limpia) return rechazoNoEsFoto();
+    bytes = limpia;
+  }
+  const carpeta = tipoArchivo === "foto" ? "regalos/fotos/" : "regalos/autorizaciones/";
+  const clave = carpeta + codigo + "-" + tokenNuevo().slice(0, 8) + "." + ext;
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+  await env.DB.prepare(
+    "UPDATE regalo_ninos SET " + columna + " = ?, actualizado_en = datetime('now') WHERE id = ?"
+  ).bind(clave, n.id).run();
+  /* La versión anterior se borra: una foto reemplazada no se queda guardada. */
+  if (n.k && n.k !== clave) { try { await env.MEDIA.delete(n.k); } catch (e) { /* queda huérfana, no rompe */ } }
+  await adminRegalosAuditar(env, quien, tipoArchivo + " de " + codigo + " subida");
+  return json({ ok: true });
+}
+
+/* POST /api/admin/regalos/mensaje {ref, estado, motivo} — aprobar o rechazar
+   la carta y el video de un pedido. Rechazar exige decir por qué, y ese motivo
+   le llega al donante. */
+async function adminRegalosMensaje(env, c, quien) {
+  const ref = String(c.ref || "").toUpperCase();
+  if (!RE_PEDIDO_REGALO.test(ref)) return json({ error: "ref_invalida" }, 400);
+  const estado = ["aprobado", "rechazado"].includes(c.estado) ? c.estado : null;
+  if (!estado) return json({ error: "estado_invalido" }, 400);
+  const motivo = limpiar(c.motivo, 500);
+  if (estado === "rechazado" && motivo.length < 5) return json({ error: "motivo_requerido",
+    ayuda: "Di en una frase por qué no se aprueba: el donante la recibe para corregirla." }, 400);
+  const r = await env.DB.prepare(
+    "UPDATE regalo_mensajes SET estado = ?, motivo = ?, revisado_por = ?, revisado_en = datetime('now'), " +
+    "actualizado_en = datetime('now') WHERE pedido_ref = ?"
+  ).bind(estado, estado === "rechazado" ? motivo : null, quien || "?", ref).run();
+  if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+  await adminRegalosAuditar(env, quien, "carta/video de " + ref + " → " + estado + (motivo ? " · " + motivo : ""));
+  let correo = false;
+  if (estado === "rechazado") {
+    try { await correoRegalosMensajeRechazado(env, ref, motivo); correo = true; }
+    catch (e) { console.error("correo carta rechazada", ref, e && e.message); }
+  }
+  return json({ ok: true, correo });
+}
+
+/* GET /api/admin/regalos/video/<RG> — el video, solo para el equipo. Con
+   soporte de Range: sin él, el reproductor del navegador no puede adelantar. */
+async function adminRegalosVideo(request, env, ref) {
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const m = await env.DB.prepare("SELECT video_key, video_tipo FROM regalo_mensajes WHERE pedido_ref = ?").bind(ref).first();
+  if (!m || !m.video_key) return json({ error: "no_encontrado" }, 404);
+  const cab = { "content-type": m.video_tipo || "video/mp4", "cache-control": "private, no-store",
+                "x-robots-tag": "noindex", "accept-ranges": "bytes" };
+  const rango = /^bytes=(\d+)-(\d*)$/.exec(String(request.headers.get("range") || ""));
+  if (rango) {
+    const ini = Number(rango[1]);
+    const cabeza = await env.MEDIA.head(m.video_key);
+    if (!cabeza) return json({ error: "no_encontrado" }, 404);
+    const total = cabeza.size;
+    const fin = rango[2] ? Math.min(Number(rango[2]), total - 1) : total - 1;
+    if (ini > fin) return new Response(null, { status: 416, headers: { "content-range": "bytes */" + total } });
+    const obj = await env.MEDIA.get(m.video_key, { range: { offset: ini, length: fin - ini + 1 } });
+    return new Response(obj.body, { status: 206, headers: Object.assign(cab, {
+      "content-range": "bytes " + ini + "-" + fin + "/" + total, "content-length": String(fin - ini + 1) }) });
+  }
+  const obj = await env.MEDIA.get(m.video_key);
+  if (!obj) return json({ error: "no_encontrado" }, 404);
+  return new Response(obj.body, { headers: Object.assign(cab, { "content-length": String(obj.size) }) });
+}
+
+/* GET /api/admin/regalos/noticias.csv — quién autorizó que le escribamos. */
+async function adminRegalosNoticias(env) {
+  const { results } = await env.DB.prepare(
+    "SELECT email, nombre, idioma, origen_ref, consentido_en, baja_en FROM regalo_noticias ORDER BY consentido_en"
+  ).all();
+  const linea = (xs) => xs.map((x) => '"' + String(x == null ? "" : x).replace(/"/g, '""') + '"').join(";");
+  const filas = [linea(["email", "nombre", "idioma", "pedido", "autorizo_en", "retiro_en"])]
+    .concat((results || []).map((r) => linea([r.email, r.nombre, r.idioma, r.origen_ref,
+      r.consentido_en ? selloCO(r.consentido_en) : "", r.baja_en ? selloCO(r.baja_en) : ""])));
+  return new Response("﻿" + filas.join("\r\n") + "\r\n", { headers: {
+    "content-type": "text/csv; charset=utf-8", "cache-control": "no-store",
+    "content-disposition": 'attachment; filename="regalos-noticias.csv"' } });
+}
+
+/* ⚠ Dentro de estas dos plantillas hay que escribir \\n y \\/ : lo que se lee
+   aquí no es lo que ejecuta el navegador. Se escribieron SIN barras invertidas,
+   comillas invertidas ni interpolaciones, a propósito. El check #1b del gate
+   compila lo emitido por regalosAdminJS(). */
+function paginaRegalosAdmin() {
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Regalos de diciembre · equipo</title>
+<style>
+  /* La misma paleta de /admin/ruta. Los colores viven SOLO en :root (el check
+     #11 del gate cuenta los literales fuera de los bloques de tokens). */
+  :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;
+        --amber:#A84D00;--err:#8C2F1E;--sel:#E7EFE6;--blanco:#fff;--rojo:#A61E2D}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:1rem}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 80px}
+  h1{font-size:1.35rem;margin-bottom:2px}
+  h2{font-size:1.05rem;margin:22px 0 8px}
+  h3{font-size:.95rem;margin:14px 0 6px}
+  p{margin-bottom:8px}
+  .sub,.mu{color:var(--mu);font-size:.84rem}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0;border-bottom:1px solid var(--bd)}
+  .tabs button{border:0;background:none;padding:10px 14px;font:inherit;font-size:.92rem;cursor:pointer;color:var(--mu);
+               border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tabs button[aria-selected="true"]{color:var(--g);border-bottom-color:var(--g);font-weight:600}
+  .caja{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:14px}
+  .rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 14px;margin:8px 0}
+  label{display:flex;flex-direction:column;gap:3px;font-size:.82rem;color:var(--mu)}
+  label.chk{flex-direction:row;align-items:center;gap:8px;color:var(--ink)}
+  input,select{font:inherit;font-size:.92rem;padding:7px 9px;border:1px solid var(--bd);border-radius:8px;background:var(--blanco);color:var(--ink);min-height:38px}
+  input[type=checkbox]{min-height:0}
+  table{width:100%;border-collapse:collapse;font-size:.86rem}
+  th{text-align:left;font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);padding:8px 6px;border-bottom:1px solid var(--bd)}
+  td{padding:8px 6px;border-bottom:1px solid var(--bd);vertical-align:top}
+  td input{max-width:150px}
+  tr.sel td{background:var(--sel)}
+  .num{font-family:ui-monospace,Menlo,monospace;font-size:.82rem}
+  .mini{width:44px;height:44px;object-fit:cover;border-radius:8px;display:block}
+  .b{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border-radius:9px;
+     border:1px solid var(--g);color:var(--g);background:transparent;font:inherit;font-size:.88rem;font-weight:600;
+     cursor:pointer;text-decoration:none;white-space:nowrap}
+  .b.full{background:var(--g);color:var(--blanco)}
+  .b.chico{min-height:32px;padding:0 10px;font-size:.8rem}
+  .acc{display:flex;gap:6px;flex-wrap:wrap}
+  .pill{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:999px;border:1px solid currentColor;display:inline-block}
+  .p-borrador,.p-retirado,.p-anulado,.p-vencido{color:var(--mu)}
+  .p-publicado,.p-pendiente{color:var(--amber)}
+  .p-financiado,.p-comprado,.p-despachado,.p-entregado,.p-pagado,.p-abierta{color:var(--g)}
+  .p-fallido,.p-cerrada{color:var(--err)}
+  .avisos{color:var(--amber);font-size:.8rem;font-weight:600}
+  .msg{font-size:.86rem;color:var(--g);display:block;margin-top:6px}
+  .msg.mal{color:var(--err)}
+  .vacio{color:var(--mu);text-align:center;padding:22px 0}
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+  .lote{position:sticky;bottom:0;background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-top:12px;
+        display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .errs{margin:4px 0 10px 18px;font-size:.84rem;color:var(--err)}
+  .errs.aviso{color:var(--amber)}
+  .tabla{overflow-x:auto}
+  .carta-adm blockquote{margin:10px 0;padding:12px 14px;border-left:3px solid var(--rojo);background:var(--bg);white-space:pre-wrap;font-size:.95rem}
+  .carta-adm video{display:block;width:100%;max-width:420px;border-radius:10px;margin:10px 0;background:var(--ink)}
+  .carta-adm .acc{margin-top:8px}
+  .solo-imprimir{display:none}
+  @media print{
+    body{background:var(--blanco)}
+    .wrap{display:none}
+    .solo-imprimir{display:block}
+    .hoja{page-break-after:always;padding:24px 8px;font-size:1.05rem;line-height:1.6}
+    .hoja h2{font-size:1.3rem;margin:0 0 4px}
+    .hoja .de{margin-top:18px;font-style:italic}
+    .hoja .pie{margin-top:28px;font-size:.8rem;color:var(--mu)}
+    .hoja p.texto{white-space:pre-wrap}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Regalos de diciembre</h1>
+  <p class="sub" id="quien">Cargando…</p>
+  <p class="sub">Los datos de los niños son de menores de edad (Ley 1581). Nombre completo, acudiente, teléfono y comunidad
+  nunca salen de esta pantalla. La foto solo se publica si el acudiente lo autorizó por escrito.</p>
+  <span class="msg" id="m-general" role="status"></span>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="ninos" aria-selected="true">Niños y regalos</button>
+    <button role="tab" data-tab="cargar" aria-selected="false">Cargar la hoja</button>
+    <button role="tab" data-tab="pedidos" aria-selected="false">Pedidos</button>
+    <button role="tab" data-tab="cartas" aria-selected="false">Cartas y videos</button>
+    <button role="tab" data-tab="ajustes" aria-selected="false">Campaña y valores</button>
+  </div>
+
+  <section class="panel" id="p-ninos">
+    <div class="filtros">
+      <label>Zona<select id="f-zona"><option value="">Todas</option><option value="uribia">Uribia</option><option value="medellin">Medellín</option><option value="leticia">Leticia</option></select></label>
+      <label>Estado<select id="f-estado"><option value="">Todos</option><option value="borrador">Borrador</option><option value="publicado">Publicado</option><option value="apartado">Apartado ahora</option><option value="financiado">Financiado</option><option value="comprado">Comprado</option><option value="despachado">Despachado</option><option value="entregado">Entregado</option><option value="retirado">Retirado</option></select></label>
+      <label>Buscar<input id="f-q" type="search" placeholder="código, nombre, regalo o pedido"></label>
+      <button class="b chico" id="b-todos">Seleccionar los filtrados</button>
+      <button class="b chico" id="b-ninguno">Ninguno</button>
+      <a class="b chico" href="/api/admin/regalos/compras.csv">Lista de compras (CSV)</a>
+    </div>
+    <p class="mu" id="n-cuenta"></p>
+    <div class="tabla"><table>
+      <thead><tr><th></th><th>Código</th><th>Foto</th><th>Niño</th><th>Regalo</th><th>Estado</th><th>Falta</th><th></th></tr></thead>
+      <tbody id="tb-ninos"><tr><td colspan="8" class="vacio">Cargando…</td></tr></tbody>
+    </table></div>
+    <div class="lote">
+      <label>Con los seleccionados<select id="l-paso">
+        <option value="publicar">Publicar</option><option value="despublicar">Volver a borrador</option>
+        <option value="retirar">Retirar</option><option value="financiar">Financiar con fondo o empresa</option>
+        <option value="comprado">Marcar comprado</option><option value="despachado">Marcar despachado</option>
+        <option value="entregado">Marcar entregado (con acta)</option></select></label>
+      <span id="x-fin" hidden><label>Lo cubre<select id="l-via"><option value="fondo">El fondo de la campaña</option><option value="empresa">Una empresa</option></select></label>
+        <label>Quién<input id="l-por" placeholder="nombre de la empresa o «fondo»"></label></span>
+      <label id="x-egreso" hidden>Egreso de la compra (opcional)<input id="l-egreso" placeholder="EG-2026-000000"></label>
+      <label id="x-evid" hidden>Remisión o guía del envío (opcional)<input id="l-evid"></label>
+      <label id="x-acta" hidden>Acta de entrega<input id="l-acta" placeholder="AE-2026-000000"></label>
+      <button class="b full" id="b-paso">Aplicar</button>
+      <span class="msg" id="m-lote" role="status"></span>
+    </div>
+  </section>
+
+  <section class="panel" id="p-cargar" hidden>
+    <div class="caja">
+      <h2>1 · La hoja de terreno</h2>
+      <p>Descarga la plantilla, llénala (una fila por niño) y guárdala como CSV. Funciona sin señal: se llena en el
+      teléfono o en papel y se pasa después. El código de cada niño (URI-0001, MED-0001, LET-0001) lo pone el sistema.</p>
+      <p><a class="b" href="/api/admin/regalos/plantilla.csv">Descargar la plantilla</a></p>
+      <p class="mu">Columnas: zona (uribia, medellin, leticia) · nombre completo · nombre_publico (el que sale en la página;
+      si se deja vacío, el primer nombre) · edad · genero (niña, niño, otro) · comunidad · acudiente · parentesco · telefono ·
+      autoriza_datos y autoriza_foto (sí / no, como quedó en la autorización firmada) · categoria (juguete, ropa, calzado,
+      escolar, deporte, libro, otro) · deseo · deseo_en · talla (obligatoria en ropa y calzado) · notas.</p>
+    </div>
+    <div class="caja">
+      <h2>2 · Cargar y revisar</h2>
+      <p>Primero se revisa, sin guardar nada. Después se guardan solo las filas sanas. Una fila que ya está cargada
+      (misma zona, mismo nombre, mismo acudiente) no entra dos veces.</p>
+      <label>Archivo CSV<input type="file" id="f-hoja" accept=".csv,text/csv,text/plain"></label>
+      <span class="msg" id="m-carga" role="status"></span>
+      <p><button class="b full" id="b-confirmar" hidden>Guardar</button></p>
+      <div id="carga-vista"></div>
+    </div>
+    <div class="caja">
+      <h2>3 · Fotos en lote</h2>
+      <p>Nombra cada foto con el código del niño (URI-0001.jpg) y súbelas todas juntas. Se reducen y se les quitan los
+      metadatos (pueden traer la ubicación de la casa). Una foto subida no se publica si el acudiente no lo autorizó.</p>
+      <label>Fotos<input type="file" id="f-fotos" accept="image/*" multiple></label>
+      <span class="msg" id="m-fotos" role="status"></span>
+    </div>
+  </section>
+
+  <section class="panel" id="p-pedidos" hidden>
+    <p class="mu">En pesos, el pago lo confirma Wompi. En dólares lo recibe la aliada: cuando ella reporte la donación
+    (con el número de pedido en la nota), se confirma aquí y los regalos quedan financiados.</p>
+    <span class="msg" id="m-pedidos" role="status"></span>
+    <div class="tabla"><table>
+      <thead><tr><th>Pedido</th><th>Donante</th><th>Total</th><th>Regalos</th><th>Estado</th><th>Fechas</th><th></th></tr></thead>
+      <tbody id="tb-pedidos"><tr><td colspan="7" class="vacio">Cargando…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel" id="p-cartas" hidden>
+    <p class="mu">Son palabras de un adulto para un niño: nada se imprime ni se muestra en la entrega sin aprobar. Si algo
+    trae teléfono, dirección, redes o no es apropiado, recházalo y di por qué: al donante le llega el motivo para corregirlo.</p>
+    <div class="filtros">
+      <label>Mostrar<select id="f-mest"><option value="pendiente">Por revisar</option><option value="aprobado">Aprobadas</option>
+        <option value="rechazado">Rechazadas</option><option value="">Todas</option></select></label>
+      <button class="b chico" id="b-imprimir">Imprimir cartas aprobadas</button>
+      <a class="b chico" href="/api/admin/regalos/noticias.csv">Correos que autorizaron noticias (CSV)</a>
+      <span class="mu" id="n-noticias"></span>
+    </div>
+    <span class="msg" id="m-cartas" role="status"></span>
+    <div id="lista-cartas"><p class="vacio">Cargando…</p></div>
+  </section>
+
+  <section class="panel" id="p-ajustes" hidden>
+    <div class="caja">
+      <h2>Campaña <span class="pill" id="c-pill"></span></h2>
+      <div class="rejilla">
+        <label>Nombre (español)<input id="c-nombre-es"></label>
+        <label>Nombre (inglés)<input id="c-nombre-en"></label>
+        <label>Estado<select id="c-estado"><option value="borrador">Borrador (la página dice «muy pronto»)</option>
+          <option value="abierta">Abierta (se escoge y se paga)</option><option value="cerrada">Cerrada (solo seguimiento)</option></select></label>
+        <label>Último día para donar<input id="c-cierre" type="date"></label>
+        <label>Fundación aliada en EE. UU.<input id="c-aliada" placeholder="nombre"></label>
+        <label>Enlace de donación de la aliada<input id="c-aliada-url" placeholder="https://… admite {ref} y {usd}"></label>
+      </div>
+      <p class="mu">Sin nombre y enlace de la aliada, la página no ofrece pagar en dólares. Si su pasarela acepta la
+      referencia o el monto en el enlace, escribe {ref} y {usd} donde van; si no, el donante la copia de la pantalla y del correo.</p>
+      <button class="b full" id="b-campana">Guardar la campaña</button>
+      <span class="msg" id="m-campana" role="status"></span>
+    </div>
+    <div class="caja">
+      <h2>Zonas</h2>
+      <p class="mu">La meta es lo único que la página promete. Los contadores (publicados · financiados · entregados) salen de la base.</p>
+      <div class="tabla"><table><thead><tr><th>Zona</th><th>Meta</th><th>Fecha de entrega</th><th>Pub · Fin · Ent</th><th></th></tr></thead>
+      <tbody id="tb-zonas"></tbody></table></div>
+    </div>
+    <div class="caja">
+      <h2>Valor por tipo de regalo</h2>
+      <p class="mu">Un tope fijo por tipo, no el precio de cada deseo. Un regalo no se publica mientras su tipo no tenga valor
+      en pesos y en dólares. Los dólares son números redondos, no una conversión de la TRM.</p>
+      <div class="tabla"><table><thead><tr><th>Tipo</th><th>Pesos</th><th>Dólares</th><th></th></tr></thead>
+      <tbody id="tb-cats"></tbody></table></div>
+      <span class="msg" id="m-ajustes" role="status"></span>
+    </div>
+  </section>
+</div>
+<div id="imprimir" class="solo-imprimir"></div>
+<script src="/admin/regalos.js"></script>
+</body>
+</html>`;
+}
+
+function regalosAdminJS() {
+  return `
+/* /admin/regalos. Sin barras invertidas, sin comillas invertidas y sin
+   interpolaciones: este archivo vive dentro de una plantilla del Worker. */
+var D = null;
+var SEL = {};
+var F = { zona: "", estado: "", q: "" };
+var ESTADOS = { borrador: "Borrador", publicado: "Publicado", financiado: "Financiado", comprado: "Comprado",
+  despachado: "Despachado", entregado: "Entregado", retirado: "Retirado" };
+var PASOS = { publicar: "Publicar", despublicar: "Volver a borrador", retirar: "Retirar", financiar: "Financiar con fondo o empresa",
+  comprado: "Marcar comprado", despachado: "Marcar despachado", entregado: "Marcar entregado (con acta)" };
+var GENERO = { nina: "Niña", nino: "Niño", otro: "Otro" };
+
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c];
+  });
+}
+function cop(n){ return n == null ? "—" : "$" + Number(n).toLocaleString("es-CO"); }
+function usd(n){ return n == null ? "—" : "US$" + Number(n).toLocaleString("en-US"); }
+function aviso(id, texto, mal){
+  var e = $(id); if (!e) return;
+  e.textContent = texto || ""; e.className = "msg" + (mal ? " mal" : "");
+}
+
+/* Detrás de Access, una sesión vencida no da error: da el HTML del login con
+   un 200. Por eso cada respuesta se lee como texto y se intenta parsear. */
+function pedir(url, opciones){
+  return fetch(url, opciones || {}).then(function(r){
+    return r.text().then(function(t){
+      var d = null;
+      try { d = JSON.parse(t); } catch (e) { throw new Error("sesion"); }
+      if (!r.ok) { var x = new Error(d.error || ("http_" + r.status)); x.datos = d; throw x; }
+      return d;
+    });
+  });
+}
+function enviar(url, cuerpo){
+  return pedir(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) });
+}
+function motivo(e){
+  if (e && e.message === "sesion") return "Tu sesión venció. Recarga la página.";
+  var d = e && e.datos;
+  return (d && d.ayuda) || ("No se pudo: " + (e && e.message ? e.message : "error"));
+}
+
+function cargar(){
+  return pedir("/api/admin/regalos").then(function(d){
+    D = d; pintar();
+  }).catch(function(e){ aviso("m-general", motivo(e), true); });
+}
+
+function pintar(){
+  pintarCampana(); pintarZonas(); pintarCategorias(); pintarNinos(); pintarPedidos(); pintarCartas();
+}
+
+/* Las cartas y los videos. FM es el filtro: por defecto, lo que falta revisar. */
+var FM = "pendiente";
+var ESTADO_CARTA = { pendiente: "Por revisar", aprobado: "Aprobada", rechazado: "Rechazada" };
+function pintarCartas(){
+  var M = (D.mensajes || []).filter(function(m){ return !FM || m.estado === FM; });
+  var pend = (D.mensajes || []).filter(function(m){ return m.estado === "pendiente"; }).length;
+  $("n-noticias").textContent = D.noticias + " correo(s) autorizaron noticias · " + pend + " carta(s) por revisar";
+  if (!M.length) { $("lista-cartas").innerHTML = "<p class='vacio'>No hay cartas en este estado.</p>"; return; }
+  $("lista-cartas").innerHTML = M.map(function(m){
+    var para = m.regalos.map(function(r){ return esc(r.nombre) + " (" + esc(r.codigo) + ")"; }).join(", ");
+    return "<article class='caja carta-adm'>" +
+      "<p><strong class='num'>" + esc(m.pedido_ref) + "</strong> · " + esc(m.nombre) + " <span class='mu'>" + esc(m.email) + "</span> " +
+        "<span class='pill p-" + (m.estado === "aprobado" ? "entregado" : m.estado === "rechazado" ? "fallido" : "pendiente") + "'>" + esc(ESTADO_CARTA[m.estado] || m.estado) + "</span></p>" +
+      "<p class='mu'>Para: " + (para || "todavía sin regalos financiados") + " · pedido " + esc(m.pedido_estado) + " · " + esc(m.actualizado_en || "") + "</p>" +
+      (m.carta ? "<blockquote>" + esc(m.carta) + (m.firma ? "<br><br>— " + esc(m.firma) : "") + "</blockquote>" : "<p class='mu'>Sin carta.</p>") +
+      (m.video ? "<video controls preload='none' src='/api/admin/regalos/video/" + esc(m.pedido_ref) + "'></video><p class='mu'>" +
+        esc(m.video_seg) + " s · " + (Math.round((m.video_bytes || 0) / 104857.6) / 10) + " MB · <a href='/api/admin/regalos/video/" + esc(m.pedido_ref) + "' download>Descargar</a></p>" : "") +
+      (m.motivo ? "<p class='avisos'>Rechazada: " + esc(m.motivo) + "</p>" : "") +
+      (m.revisado_por ? "<p class='mu'>Revisó " + esc(m.revisado_por) + "</p>" : "") +
+      "<div class='acc'>" + (m.estado !== "aprobado" ? "<button class='b chico full' data-aprobar='" + esc(m.pedido_ref) + "'>Aprobar</button>" : "") +
+        (m.estado !== "rechazado" ? "<button class='b chico' data-rechazar='" + esc(m.pedido_ref) + "'>Rechazar</button>" : "") + "</div>" +
+      "</article>";
+  }).join("");
+}
+function revisarCarta(ref, estado){
+  var porque = "";
+  if (estado === "rechazado") {
+    porque = prompt("Por qué no se aprueba la carta o el video de " + ref + " (le llega al donante):", "");
+    if (porque === null) return;
+  }
+  enviar("/api/admin/regalos/mensaje", { ref: ref, estado: estado, motivo: porque }).then(function(d){
+    aviso("m-cartas", ref + (estado === "aprobado" ? " aprobada." : " rechazada." + (d.correo ? " Se le escribió al donante." : "")));
+    return cargar();
+  }).catch(function(e){ aviso("m-cartas", motivo(e), true); });
+}
+/* Una hoja por regalo: el pedido de tres niños imprime tres cartas, una para
+   cada paquete. Solo las aprobadas, y solo para regalos ya financiados. */
+function imprimirCartas(){
+  var hojas = [];
+  (D.mensajes || []).forEach(function(m){
+    if (m.estado !== "aprobado" || !m.carta) return;
+    m.regalos.forEach(function(r){
+      hojas.push("<div class='hoja'><h2>Para " + esc(r.nombre) + "</h2><p class='mu'>" + esc(r.codigo) + " · " + esc(r.zona) + "</p>" +
+        "<p class='texto'>" + esc(m.carta) + "</p>" + (m.firma ? "<p class='de'>" + esc(m.firma) + "</p>" : "") +
+        "<p class='pie'>Fundación Give&amp;Grow International · Navidad 2026 · " + esc(m.pedido_ref) + "</p></div>");
+    });
+  });
+  if (!hojas.length) { aviso("m-cartas", "No hay cartas aprobadas con regalos financiados para imprimir.", true); return; }
+  $("imprimir").innerHTML = hojas.join("");
+  window.print();
+}
+
+function pintarCampana(){
+  var c = D.campana || {};
+  $("c-nombre-es").value = c.nombre_es || "";
+  $("c-nombre-en").value = c.nombre_en || "";
+  $("c-estado").value = c.estado || "borrador";
+  $("c-cierre").value = c.cierre || "";
+  $("c-aliada").value = c.aliada_nombre || "";
+  $("c-aliada-url").value = c.aliada_url || "";
+  var e = $("c-pill");
+  e.textContent = { borrador: "Borrador: la página dice «muy pronto»", abierta: "Abierta: se puede escoger y pagar",
+    cerrada: "Cerrada: se ve el recorrido, no se paga" }[c.estado] || "";
+  e.className = "pill p-" + (c.estado || "borrador");
+}
+
+function pintarZonas(){
+  $("tb-zonas").innerHTML = D.zonas.map(function(z){
+    return "<tr><td><strong>" + esc(z.nombre_es) + "</strong><br><span class='mu'>" + esc(z.departamento) + "</span></td>" +
+      "<td><input type='number' min='0' id='zm-" + esc(z.id) + "' value='" + esc(z.meta) + "'></td>" +
+      "<td><input type='date' id='zf-" + esc(z.id) + "' value='" + esc(z.fecha_entrega || "") + "'></td>" +
+      "<td class='num'>" + z.publicados + " · " + z.financiados + " · " + z.entregados + "</td>" +
+      "<td><button class='b' data-zona='" + esc(z.id) + "'>Guardar</button></td></tr>";
+  }).join("");
+}
+
+function pintarCategorias(){
+  $("tb-cats").innerHTML = D.categorias.map(function(k){
+    return "<tr><td><strong>" + esc(k.nombre_es) + "</strong>" + (k.con_talla ? " <span class='mu'>(con talla)</span>" : "") + "</td>" +
+      "<td><input type='number' min='0' step='1000' id='kc-" + esc(k.id) + "' value='" + esc(k.valor_cop == null ? "" : k.valor_cop) + "' placeholder='pesos'></td>" +
+      "<td><input type='number' min='0' step='1' id='ku-" + esc(k.id) + "' value='" + esc(k.valor_usd == null ? "" : k.valor_usd) + "' placeholder='dólares'></td>" +
+      "<td><button class='b' data-cat='" + esc(k.id) + "'>Guardar</button></td></tr>";
+  }).join("");
+}
+
+function filtrados(){
+  var q = F.q.toLowerCase();
+  return D.ninos.filter(function(n){
+    if (F.zona && n.zona_id !== F.zona) return false;
+    if (F.estado === "apartado") { if (!n.reserva) return false; }
+    else if (F.estado && n.estado !== F.estado) return false;
+    if (q && (n.codigo + " " + n.nombre + " " + (n.deseo_es || "") + " " + (n.pedido_ref || "")).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+}
+
+function pintarNinos(){
+  var lista = filtrados();
+  var cat = {}; D.categorias.forEach(function(k){ cat[k.id] = k.nombre_es; });
+  $("n-cuenta").textContent = lista.length + " de " + D.ninos.length + " niños · " + Object.keys(SEL).length + " seleccionados";
+  if (!D.ninos.length) { $("tb-ninos").innerHTML = "<tr><td colspan='8' class='vacio'>Todavía no hay niños cargados. Empieza por «Cargar la hoja».</td></tr>"; return; }
+  $("tb-ninos").innerHTML = lista.slice(0, 400).map(function(n){
+    var faltan = [];
+    if (!n.autoriza_datos) faltan.push("sin autorización de datos");
+    if (!n.autorizacion) faltan.push("sin autorización firmada");
+    if (n.autoriza_foto && !n.foto) faltan.push("autoriza foto, falta subirla");
+    return "<tr" + (SEL[n.codigo] ? " class='sel'" : "") + ">" +
+      "<td><input type='checkbox' data-sel='" + esc(n.codigo) + "'" + (SEL[n.codigo] ? " checked" : "") + " aria-label='Seleccionar " + esc(n.codigo) + "'></td>" +
+      "<td class='num'>" + esc(n.codigo) + "</td>" +
+      "<td>" + (n.foto ? "<img class='mini' src='/api/admin/regalos/foto/" + esc(n.codigo) + "' alt=''>" : "") + "</td>" +
+      "<td><strong>" + esc(n.nombre_publico) + "</strong>, " + esc(n.edad) + " · " + esc(GENERO[n.genero] || n.genero) +
+        "<br><span class='mu'>" + esc(n.nombre) + " · acudiente: " + esc(n.acudiente_nombre) + (n.acudiente_telefono ? " · " + esc(n.acudiente_telefono) : "") + "</span></td>" +
+      "<td>" + esc(cat[n.categoria_id] || n.categoria_id || "") + "<br><span class='mu'>" + esc(n.deseo_es || "") + (n.talla ? " · talla " + esc(n.talla) : "") + "</span></td>" +
+      "<td><span class='pill p-" + esc(n.estado) + "'>" + esc(ESTADOS[n.estado] || n.estado || "—") + "</span>" +
+        (n.reserva ? "<br><span class='mu'>apartado por " + esc(n.reserva) + "</span>" : "") +
+        (n.pedido_ref ? "<br><span class='mu'>" + esc(n.pedido_ref) + "</span>" : "") +
+        (n.financiado_por ? "<br><span class='mu'>" + esc(n.via) + ": " + esc(n.financiado_por) + "</span>" : "") +
+        (n.egreso ? "<br><span class='mu'>" + esc(n.egreso) + "</span>" : "") +
+        (n.entrega ? "<br><span class='mu'>" + esc(n.entrega) + "</span>" : "") + "</td>" +
+      "<td class='avisos'>" + esc(faltan.join(" · ")) + "</td>" +
+      "<td class='acc'><button class='b chico' data-editar='" + esc(n.codigo) + "'>Editar</button>" +
+        "<label class='b chico'>Foto<input type='file' accept='image/*' data-subir='foto' data-cod='" + esc(n.codigo) + "' hidden></label>" +
+        "<label class='b chico'>Autorización<input type='file' accept='image/*,application/pdf' data-subir='autorizacion' data-cod='" + esc(n.codigo) + "' hidden></label>" +
+        (n.autorizacion ? "<a class='b chico' target='_blank' rel='noopener' href='/api/admin/regalos/autorizacion/" + esc(n.codigo) + "'>Ver firma</a>" : "") +
+      "</td></tr>" +
+      "<tr class='ed' id='ed-" + esc(n.codigo) + "' hidden><td colspan='8'></td></tr>";
+  }).join("") + (lista.length > 400 ? "<tr><td colspan='8' class='vacio'>Se muestran 400. Filtra por zona o busca para ver el resto.</td></tr>" : "");
+}
+
+function formEditar(cod){
+  var n = D.ninos.filter(function(x){ return x.codigo === cod; })[0];
+  var fila = $("ed-" + cod); if (!n || !fila) return;
+  if (!fila.hidden) { fila.hidden = true; return; }
+  var cats = D.categorias.map(function(k){
+    return "<option value='" + esc(k.id) + "'" + (k.id === n.categoria_id ? " selected" : "") + ">" + esc(k.nombre_es) + "</option>";
+  }).join("");
+  var bloqueado = ["borrador", "publicado"].indexOf(n.estado) < 0;
+  fila.firstChild.innerHTML = "<div class='rejilla'>" +
+    campo("Nombre en la página", "e-np", n.nombre_publico) +
+    campo("Edad", "e-edad", n.edad, "number") +
+    "<label>Género<select id='e-gen'><option value='nina'" + (n.genero === "nina" ? " selected" : "") + ">Niña</option><option value='nino'" + (n.genero === "nino" ? " selected" : "") + ">Niño</option><option value='otro'" + (n.genero === "otro" ? " selected" : "") + ">Otro</option></select></label>" +
+    campo("Comunidad (privado)", "e-com", n.comunidad) +
+    campo("Acudiente (privado)", "e-acu", n.acudiente_nombre) +
+    campo("Parentesco", "e-par", n.acudiente_parentesco) +
+    campo("Teléfono (privado)", "e-tel", n.acudiente_telefono) +
+    "<label>Tipo de regalo<select id='e-cat'" + (bloqueado ? " disabled" : "") + ">" + cats + "</select></label>" +
+    campo("Regalo que pide", "e-des", n.deseo_es, "text", bloqueado) +
+    campo("En inglés", "e-den", n.deseo_en, "text", bloqueado) +
+    campo("Talla", "e-tal", n.talla, "text", bloqueado) +
+    campo("Notas (privado)", "e-not", n.notas) +
+    "<label class='chk'><input type='checkbox' id='e-ad'" + (n.autoriza_datos ? " checked" : "") + "> El acudiente autorizó publicar los datos</label>" +
+    "<label class='chk'><input type='checkbox' id='e-af'" + (n.autoriza_foto ? " checked" : "") + "> El acudiente autorizó publicar la foto</label>" +
+    "</div>" + (bloqueado ? "<p class='mu'>El regalo ya tiene donante: lo que escogió no se cambia.</p>" : "") +
+    "<p><button class='b full' data-guardar='" + esc(cod) + "'>Guardar " + esc(cod) + "</button> <span class='msg' id='m-ed'></span></p>";
+  fila.hidden = false;
+}
+function campo(etq, id, v, tipo, off){
+  return "<label>" + esc(etq) + "<input id='" + id + "' type='" + (tipo || "text") + "' value='" + esc(v == null ? "" : v) + "'" + (off ? " disabled" : "") + "></label>";
+}
+function guardarNino(cod){
+  enviar("/api/admin/regalos/nino", {
+    codigo: cod, nombre_publico: $("e-np").value, edad: Number($("e-edad").value), genero: $("e-gen").value,
+    comunidad: $("e-com").value, acudiente_nombre: $("e-acu").value, acudiente_parentesco: $("e-par").value,
+    acudiente_telefono: $("e-tel").value, categoria: $("e-cat").value, deseo_es: $("e-des").value,
+    deseo_en: $("e-den").value, talla: $("e-tal").value, notas: $("e-not").value,
+    autoriza_datos: $("e-ad").checked, autoriza_foto: $("e-af").checked
+  }).then(function(){ aviso("m-general", cod + " guardado."); return cargar(); })
+    .catch(function(e){ aviso("m-ed", motivo(e), true); });
+}
+
+/* Las fotos del teléfono pesan varios megas: se reducen a 1400 px antes de
+   subirlas. Redibujarlas en un lienzo también les quita los metadatos; el
+   servidor los quita otra vez de todos modos. */
+function reducir(archivo){
+  return new Promise(function(listo){
+    if (!/^image[/](jpeg|png|webp)$/.test(archivo.type)) { listo(archivo); return; }
+    var img = new Image(), u = URL.createObjectURL(archivo);
+    img.onload = function(){
+      var lado = Math.max(img.naturalWidth, img.naturalHeight), k = lado > 1400 ? 1400 / lado : 1;
+      var cv = document.createElement("canvas");
+      cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(u);
+      cv.toBlob(function(b){ listo(b || archivo); }, "image/jpeg", 0.85);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(u); listo(archivo); };
+    img.src = u;
+  });
+}
+function subir(tipo, cod, archivo){
+  var paso = tipo === "foto" ? reducir(archivo) : Promise.resolve(archivo);
+  return paso.then(function(b){
+    return pedir("/api/admin/regalos/" + tipo + "/" + encodeURIComponent(cod), {
+      method: "POST", headers: { "content-type": b.type || archivo.type }, body: b
+    });
+  });
+}
+
+/* Fotos en lote: cada archivo se llama como el código del niño (URI-0001.jpg). */
+function subirLote(archivos){
+  var lista = Array.prototype.slice.call(archivos), bien = 0, mal = [];
+  var codigos = {}; D.ninos.forEach(function(n){ codigos[n.codigo] = true; });
+  function uno(i){
+    if (i >= lista.length) {
+      aviso("m-fotos", bien + " de " + lista.length + " fotos subidas." + (mal.length ? " Sin subir: " + mal.join(", ") : ""), mal.length > 0);
+      return cargar();
+    }
+    var a = lista[i], cod = a.name.split(".")[0].toUpperCase().trim();
+    aviso("m-fotos", "Subiendo " + (i + 1) + " de " + lista.length + "…");
+    if (!codigos[cod]) { mal.push(a.name + " (no hay niño con ese código)"); return uno(i + 1); }
+    return subir("foto", cod, a).then(function(){ bien++; }).catch(function(e){ mal.push(a.name + " (" + motivo(e) + ")"); })
+      .then(function(){ return uno(i + 1); });
+  }
+  uno(0);
+}
+
+/* La hoja se lee como UTF-8 y, si trae caracteres rotos, como Windows-1252,
+   que es como la guarda Excel en español. */
+function leerHoja(archivo){
+  return archivo.arrayBuffer().then(function(buf){
+    var b = new Uint8Array(buf);
+    if (b.length > 3 && b[0] === 0x50 && b[1] === 0x4B) throw new Error("xlsx");
+    var t = new TextDecoder("utf-8").decode(buf);
+    if (t.indexOf(String.fromCharCode(0xFFFD)) >= 0) t = new TextDecoder("windows-1252").decode(buf);
+    return t;
+  });
+}
+var HOJA = "";
+function revisarHoja(confirmar){
+  aviso("m-carga", confirmar ? "Guardando…" : "Revisando la hoja…");
+  enviar("/api/admin/regalos/importar", { texto: HOJA, confirmar: !!confirmar }).then(function(d){
+    var malas = d.vista.filter(function(f){ return f.errores.length; });
+    var avisos = d.vista.filter(function(f){ return !f.errores.length && f.aviso; });
+    $("carga-vista").innerHTML =
+      (malas.length ? "<h3>Filas que no entran (" + malas.length + ")</h3><ul class='errs'>" + malas.map(function(f){
+        return "<li>Fila " + f.fila + (f.nombre_publico ? " · " + esc(f.nombre_publico) : "") + ": " + esc(f.errores.join("; ")) + "</li>";
+      }).join("") + "</ul>" : "") +
+      (avisos.length ? "<h3>Entran con aviso (" + avisos.length + ")</h3><ul class='errs aviso'>" + avisos.map(function(f){
+        return "<li>Fila " + f.fila + " · " + esc(f.codigo || "") + " " + esc(f.nombre_publico) + ": " + esc(f.aviso) + "</li>";
+      }).join("") + "</ul>" : "");
+    if (confirmar) {
+      aviso("m-carga", "Guardadas " + d.guardadas + " filas." + (d.con_error ? " " + d.con_error + " quedaron fuera: corrígelas en la hoja y vuelve a cargarla (las ya guardadas no se repiten)." : ""));
+      $("b-confirmar").hidden = true; HOJA = "";
+      return cargar();
+    }
+    aviso("m-carga", d.sanas + " filas listas para guardar, " + d.con_error + " con error.", d.con_error > 0);
+    $("b-confirmar").hidden = !d.sanas;
+    $("b-confirmar").textContent = "Guardar las " + d.sanas + " filas sanas";
+  }).catch(function(e){ aviso("m-carga", motivo(e), true); });
+}
+
+function pintarPedidos(){
+  var P = D.pedidos;
+  if (!P.length) { $("tb-pedidos").innerHTML = "<tr><td colspan='7' class='vacio'>Todavía no hay pedidos.</td></tr>"; return; }
+  $("tb-pedidos").innerHTML = P.map(function(p){
+    var acc = "";
+    if (p.via === "usd" && (p.estado === "pendiente" || p.estado === "vencido")) {
+      acc = "<button class='b chico full' data-confirmar='" + esc(p.ref) + "'>Confirmar pago</button>";
+    }
+    if (p.estado === "pendiente") acc += " <button class='b chico' data-anular='" + esc(p.ref) + "'>Anular</button>";
+    return "<tr><td class='num'>" + esc(p.ref) + (p.guia ? "<br><span class='mu'>" + esc(p.guia) + "</span>" : "") + "</td>" +
+      "<td>" + esc(p.nombre) + "<br><span class='mu'>" + esc(p.email) + "</span></td>" +
+      "<td>" + (p.via === "usd" ? usd(p.total_usd) + "<br><span class='mu'>vía aliada</span>" : cop(p.total_cop)) + "</td>" +
+      "<td>" + p.items + (p.sustituidos ? "<br><span class='mu'>" + p.sustituidos + " sustituido(s)</span>" : "") +
+        (p.sin_cupo ? "<br><span class='avisos'>" + p.sin_cupo + " sin cupo</span>" : "") + "</td>" +
+      "<td><span class='pill p-" + esc(p.estado) + "'>" + esc(p.estado) + "</span>" +
+        (p.confirmado_por ? "<br><span class='mu'>" + esc(p.confirmado_por) + "</span>" : "") + "</td>" +
+      "<td class='mu'>" + esc(p.creado_en) + (p.pagado_en ? "<br>pagado " + esc(p.pagado_en) : "") + "</td>" +
+      "<td class='acc'>" + acc + "</td></tr>";
+  }).join("");
+}
+
+function pintarExtrasPaso(){
+  var p = $("l-paso").value;
+  $("x-fin").hidden = p !== "financiar";
+  $("x-egreso").hidden = p !== "comprado";
+  $("x-evid").hidden = p !== "despachado";
+  $("x-acta").hidden = p !== "entregado";
+}
+function aplicarPaso(){
+  var cods = Object.keys(SEL), p = $("l-paso").value;
+  if (!cods.length) { aviso("m-lote", "Selecciona al menos un niño.", true); return; }
+  if (!confirm(PASOS[p] + ": " + cods.length + " regalo(s). ¿Seguir?")) return;
+  aviso("m-lote", "Aplicando…");
+  enviar("/api/admin/regalos/estado", {
+    paso: p, codigos: cods, via: $("l-via").value, financiado_por: $("l-por").value,
+    egreso: $("l-egreso").value, evidencia: $("l-evid").value, entrega: $("l-acta").value
+  }).then(function(d){
+    var r = Object.keys(d.rechazados || {});
+    aviso("m-lote", d.movidos + " movido(s)." + (d.correos ? " " + d.correos + " correo(s) a donantes." : "") +
+      (r.length ? " No se movieron " + r.length + ": " + r.slice(0, 12).map(function(k){ return k + " (" + d.rechazados[k] + ")"; }).join("; ") + (r.length > 12 ? "…" : "") : ""), r.length > 0);
+    SEL = {};
+    return cargar();
+  }).catch(function(e){ aviso("m-lote", motivo(e), true); });
+}
+
+document.addEventListener("click", function(ev){
+  var t = ev.target;
+  if (!t || !t.closest) return;
+  var b;
+  if ((b = t.closest("[data-tab]"))) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function(x){ x.setAttribute("aria-selected", x === b ? "true" : "false"); });
+    Array.prototype.forEach.call(document.querySelectorAll(".panel"), function(x){ x.hidden = x.id !== "p-" + b.getAttribute("data-tab"); });
+    return;
+  }
+  if ((b = t.closest("[data-zona]"))) {
+    var z = b.getAttribute("data-zona");
+    enviar("/api/admin/regalos/zona", { id: z, meta: Number($("zm-" + z).value), fecha_entrega: $("zf-" + z).value })
+      .then(function(){ aviso("m-ajustes", "Zona guardada."); return cargar(); }).catch(function(e){ aviso("m-ajustes", motivo(e), true); });
+    return;
+  }
+  if ((b = t.closest("[data-cat]"))) {
+    var k = b.getAttribute("data-cat");
+    enviar("/api/admin/regalos/categoria", { id: k, valor_cop: $("kc-" + k).value === "" ? null : Number($("kc-" + k).value),
+      valor_usd: $("ku-" + k).value === "" ? null : Number($("ku-" + k).value) })
+      .then(function(){ aviso("m-ajustes", "Valor guardado."); return cargar(); }).catch(function(e){ aviso("m-ajustes", motivo(e), true); });
+    return;
+  }
+  if ((b = t.closest("[data-editar]"))) { formEditar(b.getAttribute("data-editar")); return; }
+  if ((b = t.closest("[data-guardar]"))) { guardarNino(b.getAttribute("data-guardar")); return; }
+  if ((b = t.closest("[data-confirmar]"))) {
+    var ref = b.getAttribute("data-confirmar");
+    var nota = prompt("Confirmar que la aliada recibió el pago del pedido " + ref + ". Nota (fecha y referencia de la aliada):", "");
+    if (nota === null) return;
+    enviar("/api/admin/regalos/pedido-confirmar", { ref: ref, nota: nota }).then(function(d){
+      var r = d.resultado || {};
+      aviso("m-pedidos", ref + " confirmado." + (r.ya ? " Ya estaba pagado." : " Financiados " + (r.financiados || 0) +
+        (r.sustituidos ? ", sustituidos " + r.sustituidos : "") + (r.sin_cupo ? ", SIN CUPO " + r.sin_cupo : "") + "."), !!r.sin_cupo);
+      return cargar();
+    }).catch(function(e){ aviso("m-pedidos", motivo(e), true); });
+    return;
+  }
+  if ((b = t.closest("[data-anular]"))) {
+    var ra = b.getAttribute("data-anular");
+    if (!confirm("Anular el pedido " + ra + " y soltar sus regalos?")) return;
+    enviar("/api/admin/regalos/pedido-anular", { ref: ra }).then(function(){ aviso("m-pedidos", ra + " anulado."); return cargar(); })
+      .catch(function(e){ aviso("m-pedidos", motivo(e), true); });
+    return;
+  }
+  if (t.id === "b-campana") {
+    enviar("/api/admin/regalos/campana", {
+      nombre_es: $("c-nombre-es").value, nombre_en: $("c-nombre-en").value, estado: $("c-estado").value,
+      cierre: $("c-cierre").value, aliada_nombre: $("c-aliada").value, aliada_url: $("c-aliada-url").value
+    }).then(function(){ aviso("m-campana", "Campaña guardada."); return cargar(); }).catch(function(e){ aviso("m-campana", motivo(e), true); });
+    return;
+  }
+  if (t.id === "b-confirmar") { revisarHoja(true); return; }
+  if ((b = t.closest("[data-aprobar]"))) { revisarCarta(b.getAttribute("data-aprobar"), "aprobado"); return; }
+  if ((b = t.closest("[data-rechazar]"))) { revisarCarta(b.getAttribute("data-rechazar"), "rechazado"); return; }
+  if (t.id === "b-imprimir") { imprimirCartas(); return; }
+  if (t.id === "b-paso") { aplicarPaso(); return; }
+  if (t.id === "b-todos") { filtrados().forEach(function(n){ SEL[n.codigo] = true; }); pintarNinos(); return; }
+  if (t.id === "b-ninguno") { SEL = {}; pintarNinos(); return; }
+});
+
+document.addEventListener("change", function(ev){
+  var t = ev.target;
+  if (t.hasAttribute && t.hasAttribute("data-sel")) {
+    var c = t.getAttribute("data-sel");
+    if (t.checked) SEL[c] = true; else delete SEL[c];
+    $("n-cuenta").textContent = filtrados().length + " de " + D.ninos.length + " niños · " + Object.keys(SEL).length + " seleccionados";
+    return;
+  }
+  if (t.hasAttribute && t.hasAttribute("data-subir") && t.files && t.files[0]) {
+    var cod = t.getAttribute("data-cod"), tipo = t.getAttribute("data-subir");
+    aviso("m-general", "Subiendo " + tipo + " de " + cod + "…");
+    subir(tipo, cod, t.files[0]).then(function(){ aviso("m-general", tipo + " de " + cod + " subida."); return cargar(); })
+      .catch(function(e){ aviso("m-general", motivo(e), true); });
+    return;
+  }
+  if (t.id === "f-hoja" && t.files && t.files[0]) {
+    leerHoja(t.files[0]).then(function(txt){ HOJA = txt; revisarHoja(false); })
+      .catch(function(e){ aviso("m-carga", e.message === "xlsx" ? "Ese archivo es de Excel (.xlsx). Guárdalo como CSV y vuelve a cargarlo." : "No se pudo leer el archivo.", true); });
+    return;
+  }
+  if (t.id === "f-fotos" && t.files && t.files.length) { subirLote(t.files); return; }
+  if (t.id === "l-paso") { pintarExtrasPaso(); return; }
+  if (t.id === "f-mest") { FM = t.value; pintarCartas(); return; }
+  if (t.id === "f-zona" || t.id === "f-estado") { F.zona = $("f-zona").value; F.estado = $("f-estado").value; pintarNinos(); }
+});
+document.addEventListener("input", function(ev){
+  if (ev.target.id === "f-q") { F.q = ev.target.value; pintarNinos(); }
+});
+
+fetch("/api/admin/quien").then(function(r){ return r.json(); }).then(function(d){
+  $("quien").textContent = "Sesión de " + (d.email || "?") + " · solo el equipo ve esta pantalla";
+}).catch(function(){});
+pintarExtrasPaso();
+cargar();
+`;
 }
 
 /* ========================================================================
@@ -14047,7 +16081,27 @@ async function paypalCobro(env, suscripcionId, recurso) {
   return "aporte " + guia;
 }
 
+/* LAS REGLAS QUE SE PIERDEN AL TRADUCIR van escritas también en inglés.
+   El prompt está en español y ALMA responde en el idioma del usuario, así que
+   en inglés tiene que traducir cada regla antes de cumplirla, y ahí es donde se
+   le escapan. Medido el 17 oct 2026 con preguntas contra /api/alma de
+   producción: en inglés cerró respuestas con «🌱», dijo que el recibo llegaba
+   «automatically» al reportar la transferencia, y prometió un «25% discount on
+   your income tax» o lo restó de la «taxable income», que tampoco es. Todo eso
+   el prompt ya lo prohibía, en español y en mayúsculas. En español la
+   desviación fue una sola: un «Hola 👋».
+
+   Y la del recibo la provocaba este mismo texto. Decía «El recibo sí es
+   automático» para separarlo del certificado, y traducido sale como «el recibo
+   llega solo, en el acto», que contradice el orden guía → verificación →
+   recibo del párrafo justo anterior. Ahora dice qué tiene de automático y
+   cuándo. */
 const ALMA_SYS = `Eres ALMA (Asistente de Labor Misional y Alianzas), la IA de Fundación Give&Grow International. Respondes de forma clara, cálida y concisa. Máximo 3 párrafos por respuesta. No uses listas extensas. Responde en el idioma del usuario.
+
+ESTAS TRES REGLAS VALEN IGUAL EN CUALQUIER IDIOMA. Al responder en inglés es fácil perderlas al traducir, y ya pasó; por eso van también en inglés:
+· SIN EMOJIS, nunca: ni al saludar ni al cerrar, ni 🌱 ni 👋 ni ningún otro. La marca no los usa. La calidez va en las palabras. In English too: no emojis, ever.
+· EL RECIBO NO LLEGA AL REPORTAR. El orden es guía → verificación → recibo. In English: "When you report your transfer you get your tracking number instantly. Then a person checks it against the bank statement. Only after that is your receipt sent." Never say the receipt arrives "automatically", "instantly" or "right away" when a transfer is reported.
+· EL 25% ES DEL VALOR DONADO, NUNCA DEL IMPUESTO. In English: "a tax credit of up to 25% of the amount donated". It comes off the tax owed, not off taxable income: donating 4,000,000 COP can mean up to 1,000,000 COP less tax. Never "25% off your income tax", "25% discount on your income tax", "25% of your tax" or "reduce your taxable income".
 
 PARA LLEVAR A ALGUIEN A UNA PÁGINA DEL SITIO, escribe su dirección con almohadilla, sola y separada por espacios: #donar, #membresias, #rastrea, #reportar, #empresas, #fundaciones, #hub, #voluntariado, #gratitud, #transparencia, #medicion, #estandares, #socialfest, #brigada, #origen, #contacto, #faq. El chat la convierte en un botón que lleva ahí. Usa solo direcciones de esta lista; para Mira Mi Casa da miramicasa.org. Una o dos por respuesta, donde de verdad ayuden.
 
@@ -14063,7 +16117,7 @@ CÓMO ENTRA UNA FUNDACIÓN, cinco pasos y en este orden: 1 aplica en el sitio, 2
 
 DONACIONES: Transferencia a Bancolombia Cuenta de Ahorros 31000009221 (NIT 901.948.930-2). Mejor aún: que la reporte en el sitio (#reportar). El orden es este, y no se cambia: 1) al reportarla recibe su NÚMERO DE GUÍA AL INSTANTE y sube ahí mismo el comprobante; 2) después una persona la contrasta contra el extracto bancario; 3) solo entonces le llega el RECIBO (y, si lo pidió, se tramita el certificado). NUNCA digas que el número de guía llega después de la verificación, ni que el recibo llega en el acto: el número es inmediato y el recibo no.
 
-DOS COSAS QUE NO DEBES PROMETER, porque el sitio dejó de prometerlas a propósito. NO existe reporte fotográfico mensual: no hay nada que lo envíe, y prometerlo fue un error que ya se corrigió. Lo que sí ocurre es que, cuando la fundación entrega, el acta firmada y sus fotos aparecen en el rastreo del aporte. Y el CERTIFICADO tributario NO es automático ni sale en 24h: es una declaración bajo la gravedad de juramento que firman el Representante Legal y la Revisora Fiscal, la emite una persona, solo si el donante lo pidió, y para emitirlo hacen falta su documento y su ciudad. El recibo sí es automático; el certificado es otra cosa. No los confundas.
+DOS COSAS QUE NO DEBES PROMETER, porque el sitio dejó de prometerlas a propósito. NO existe reporte fotográfico mensual: no hay nada que lo envíe, y prometerlo fue un error que ya se corrigió. Lo que sí ocurre es que, cuando la fundación entrega, el acta firmada y sus fotos aparecen en el rastreo del aporte. Y el CERTIFICADO tributario NO es automático ni sale en 24h: es una declaración bajo la gravedad de juramento que firman el Representante Legal y la Revisora Fiscal, la emite una persona, solo si el donante lo pidió, y para emitirlo hacen falta su documento y su ciudad. El recibo no hay que pedirlo: lo manda el sistema en cuanto el pago queda confirmado, y en una transferencia eso es DESPUÉS de que una persona la contrasta con el extracto, no al reportarla. El certificado es otra cosa. No los confundas.
 
 BENEFICIO TRIBUTARIO: la donación PUEDE dar derecho a un descuento en renta equivalente al 25% DEL VALOR DONADO (Art. 257 ET), con el límite del Art. 258. Aplica a contribuyentes de renta en Colombia, depende de la situación tributaria de cada donante y requiere el certificado de donación. No digas «25% del impuesto»: es el 25% de lo donado. Ejemplo: 4.000.000 COP donados pueden significar hasta 1.000.000 COP menos de impuesto. El beneficio es de las DONACIONES: el voluntariado corporativo o una alianza sin donación no dan certificado. APLICA SOLO EN COLOMBIA: es un descuento del impuesto de renta colombiano, así que a quien no declara renta en Colombia no le sirve. Si preguntan desde el exterior, dilo de frente en vez de ofrecerles el 25%.
 
@@ -28792,6 +30846,7 @@ textarea { font-size: 16px }
   <p class="pn-gt">Otras pantallas</p>
   <a class="pn-it fuera" href="/triaje">Triaje de casas</a>
   <a class="pn-it fuera" href="/admin/ruta">Ruta de visitas</a>
+  <a class="pn-it fuera" href="/admin/regalos">Regalos de diciembre</a>
   <a class="pn-it fuera" href="/firma">Firma de certificados</a>
 </div>
 </div>
@@ -41586,7 +43641,7 @@ export default {
             `/admin/ruta` es la que más importa de las dos: es la pantalla que
             alguien abre EN LA CALLE para saber a qué casa va, y el nombre que el
             equipo tiene en la cabeza es el del subdominio. */
-         ruta === "/admin" || ruta === "/admin/ruta") &&
+         ruta === "/admin" || ruta === "/admin/ruta" || ruta === "/admin/regalos") &&
         !HOST_MMC.test(url.hostname) && !hostDePruebas(url.hostname)) {
       return Response.redirect(new URL(ruta + url.search, ORIGIN_MMC).toString(), 302);
     }
@@ -42048,6 +44103,34 @@ export default {
             headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
           });
         }
+        /* /admin/regalos: la pantalla de la campaña de diciembre (0048). Cuelga
+           de /admin/ por lo mismo que la ruta: la cubre el Access que ya existe. */
+        if (ruta === "/admin/regalos") {
+          return new Response(paginaRegalosAdmin(), {
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+            "referrer-policy": "strict-origin-when-cross-origin", "x-robots-tag": "noindex, nofollow",
+                       "content-security-policy": cspPagina() }
+          });
+        }
+        if (ruta === "/admin/regalos.js") {
+          return new Response(regalosAdminJS(), {
+            headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" }
+          });
+        }
+        if (ruta === "/api/admin/regalos") return await adminRegalos(env);
+        if (ruta === "/api/admin/regalos/plantilla.csv") return adminRegalosPlantilla();
+        if (ruta === "/api/admin/regalos/compras.csv") return await adminRegalosCompras(env);
+        if (ruta === "/api/admin/regalos/noticias.csv") return await adminRegalosNoticias(env);
+        const rgv = ruta.match(/^\/api\/admin\/regalos\/video\/(RG-\d{4}-\d{6})$/i);
+        if (rgv) return await adminRegalosVideo(request, env, rgv[1].toUpperCase());
+        if (ruta === "/api/admin/regalos/importar") {
+          if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+          return await adminRegalosImportar(request, env, sesion.email);
+        }
+        const rga = ruta.match(/^\/api\/admin\/regalos\/(foto|autorizacion)\/([A-Za-z]{3}-\d{4})$/);
+        if (rga) return await adminRegaloArchivo(request, env, rga[2].toUpperCase(), rga[1], sesion.email);
+        const rgx = ruta.match(/^\/api\/admin\/regalos\/(campana|zona|categoria|nino|estado|mensaje|pedido-confirmar|pedido-anular)$/);
+        if (rgx) return await adminRegalosAccion(request, env, rgx[1], sesion.email);
         /* El número va en la ruta con su forma exacta, igual que el aporte:
            cualquier otra cosa ni siquiera entra a la función. */
         const mc = ruta.match(/^\/api\/admin\/caso\/(CV-\d{4}-\d{6})\/estado$/i);
@@ -42287,6 +44370,17 @@ export default {
         if (ruta === "/api/checkout")       return await apiCheckout(request, env, url);
         if (ruta === "/api/wompi/eventos")  return await apiEventos(request, env);
         if (ruta === "/api/gracias")        return await apiGracias(env, url);
+        /* Regalos de diciembre (0048) */
+        if (ruta === "/api/regalos")        return await apiRegalos(env);
+        if (ruta === "/api/regalos/pedido") return await apiRegalosPedido(request, env, url);
+        const rgm = ruta.match(/^\/api\/regalos\/pedido\/(RG-\d{4}-\d{6})\/(mensaje|video)$/i);
+        if (rgm) return rgm[2].toLowerCase() === "video"
+          ? await apiRegalosVideo(request, env, rgm[1].toUpperCase(), url.searchParams.get("t"), url)
+          : await apiRegalosMensaje(request, env, rgm[1].toUpperCase(), url.searchParams.get("t"));
+        const rgp = ruta.match(/^\/api\/regalos\/pedido\/(RG-\d{4}-\d{6})$/i);
+        if (rgp) return await apiRegalosSeguimiento(env, rgp[1].toUpperCase(), url.searchParams.get("t"));
+        const rgf = ruta.match(/^\/api\/regalos\/foto\/([A-Za-z]{3}-\d{4})$/);
+        if (rgf) return await apiRegaloFoto(env, rgf[1].toUpperCase());
         if (ruta === "/api/inscripcion")    return await apiInscripcion(request, env, url);
         const aporte = ruta.match(/^\/api\/aporte\/([A-Za-z0-9-]+)$/);
         if (aporte)                         return await apiAporte(env, aporte[1]);
