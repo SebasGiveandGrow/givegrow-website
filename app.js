@@ -205,11 +205,33 @@ var I18N = {
     "med.link.os":"Ver el registro detrás de cada aporte",
     "alma.panel.sub":"Asistente de Labor Misional y Alianzas",
     "alma.close":"Cerrar ALMA",
-    "alma.intro.ey":"ALMA · la asistente de Give&Grow",
-    "alma.intro.t":"¿Quieres saber algo puntual o llegar a algún lugar?",
-    "alma.intro.p":"Pregúntale a ALMA. Responde sobre donaciones, certificados, empresas y fundaciones, y te lleva a la página que buscas.",
-    "alma.intro.b":"Preguntarle a ALMA",
-    "alma.intro.x":"Cerrar este aviso",
+    "alma.intro.t":"Pregúntale a ALMA, por ejemplo:",
+    "alma.intro.x":"Cerrar las sugerencias de ALMA",
+    "alma.q.rastro":"¿Cómo sé a dónde fue mi aporte?",
+    "alma.q.entrar":"¿Cómo entra una fundación al HUB SOCIAL?",
+    "alma.q.empresa":"¿Cómo puede participar mi empresa?",
+    "alma.q.transferir":"¿Qué pasa después de transferir?",
+    "alma.q.cert":"¿El certificado de donación es automático?",
+    "alma.q.renta":"¿Cuánto puedo descontar en renta?",
+    "alma.q.recibo":"¿Cuándo llega mi recibo?",
+    "alma.q.acta":"¿Cuándo veo el acta y las fotos de la entrega?",
+    "alma.q.exterior":"¿Puedo aportar desde el exterior?",
+    "alma.q.journey":"¿Cómo funciona el Impact Journey?",
+    "alma.q.hubcosto":"¿Cuesta algo aplicar al HUB SOCIAL?",
+    "alma.q.hubdespues":"¿Qué le piden a la fundación después de la visita?",
+    "alma.q.efirma":"¿Quién firma los estados financieros?",
+    "alma.q.comercios":"¿Qué comercios dan beneficio hoy?",
+    "alma.q.gratnivel":"¿Desde qué membresía aplica el Programa de Gratitud?",
+    "alma.q.habitable":"¿Me dirán si mi casa es habitable?",
+    "alma.q.peligro":"¿Qué hago si el peligro es ahora mismo?",
+    "alma.q.reserva":"¿Apadrinar me deja elegir una casa?",
+    "alma.q.aportar":"¿Qué puedo aportar a la reparación de viviendas?",
+    "alma.q.ingque":"¿Qué hace un ingeniero voluntario?",
+    "alma.q.ingdecl":"¿El ingeniero declara si una casa es habitable?",
+    "alma.q.brigada":"¿Todavía puedo sumarme a la brigada?",
+    "alma.q.insumos":"¿Dónde puedo llevar insumos?",
+    "alma.q.quien":"¿Quién fundó Give&Grow?",
+    "alma.q.desde":"¿Desde cuándo opera la Fundación?",
     "alma.note":"Respuestas generadas con inteligencia artificial. Para datos oficiales, consulta Transparencia.",
     "nav.donar":"Donar",
     "nav.empresas":"Empresas",
@@ -3602,7 +3624,7 @@ var ACT_FNS = {
   volEdad:volEdad, volIrForm:volIrForm, irAAliadosVoluntariado:irAAliadosVoluntariado, irAAliadosGratitud:irAAliadosGratitud,
   sfIr:sfIr, sfFund:sfFund, sfPro:sfPro, sfSubmit:sfSubmit, asisSubmit:asisSubmit,
   allyServ:allyServ, allyGrat:allyGrat, focusActivePage:focusActivePage,
-  almaIntro:almaIntro, almaIr:almaIr,
+  almaIntroCerrar:almaIntroCerrar, almaPregunta:almaPregunta, almaIr:almaIr,
   openLightbox:openLightbox, fichaImpCalc:fichaImpCalc, shareFicha:shareFicha, closeGalLb:closeGalLb,
   stepLightbox:stepLightbox, almaAsk:almaAsk, openComercioLb:openComercioLb, almaPanel:almaPanel
 };
@@ -3730,6 +3752,7 @@ function go(id, fromPop){
   applyRouteMeta(id);
   renderJourney(id);
   alEntrarRuta(id);
+  almaIntroRuta(id);
   if (id==="brigada"){ pintarEntregas("brig-entregas", BRIGADA_DESTINO, true); }
   if (id==="socialfest"){ marcarOrigenEvento("socialfest-2026"); sfHoy(); }
   if (id==="transparencia") pintarFechaImpresion();
@@ -5199,37 +5222,179 @@ function almaIr(r){
   almaPanel(false);
   go(r);
 }
-/* ALMA SE PRESENTA (14 oct 2026, Social Fest). El botón decía «ALMA» y el
-   icono de destellos dice «asistente», pero nadie sabía QUÉ se le puede
-   preguntar ni que lleva a las páginas. Un aviso pequeño junto al botón lo
-   cuenta una vez: aparece a los pocos segundos de la primera visita, se va al
-   cerrarlo o al abrir ALMA, y no vuelve (se recuerda en este navegador). En el
-   teléfono se esconde con los mismos gestos que los botones flotantes: sobre
-   la portada, al bajar, sobre un formulario o con el teclado abierto. */
-var ALMA_INTRO_KEY = "gg-alma-intro", almaIntroTimer = null;
-function almaIntroVisto(){ try { return localStorage.getItem(ALMA_INTRO_KEY) === "1"; } catch (e) { return false; } }
-function almaIntroOcultar(marcar){
-  if (almaIntroTimer){ clearTimeout(almaIntroTimer); almaIntroTimer = null; }
-  if (marcar){ try { localStorage.setItem(ALMA_INTRO_KEY, "1"); } catch (e) {} }
+/* ALMA INVITA CON PREGUNTAS DE LA PÁGINA (17 oct 2026). La primera versión
+   (14 oct) era un aviso igual en todas las páginas, a los 4,5 s, que decía
+   «ALMA» cuatro veces, tapaba las tarjetas del hero y los resultados de
+   #socialfest, y cuyo único botón abría un chat vacío: la persona todavía
+   tenía que inventarse la pregunta. Ahora:
+     · QUÉ DICE: dos o tres preguntas reales de ESA página. Tocar una abre ALMA
+       y la envía, así que el primer clic ya trae una respuesta. Solo están las
+       que ALMA responde bien con su prompt: se probaron una a una contra
+       /api/alma el 17 oct 2026, y se quitaron las que inventaban detalles.
+       Cada pregunta se entiende sola, porque ALMA no sabe desde qué página le
+       escriben. Una ruta sin lista no muestra nada.
+     · CUÁNDO: por intención, no por reloj. Nunca en la primera pantalla —que
+       es el hero—; después, al leer un tercio de la página o tras 20 s en
+       ella. Nunca encima de un formulario ni con un campo en uso.
+     · CUÁNTAS VECES: si la cierra, no vuelve en esa ruta (localStorage). Si
+       abre ALMA, tampoco: ya sabe que está ahí. En las rutas donde se decide
+       un pago, una vez por sesión como mucho, aunque no la cierre.
+   No roba el foco ni se anuncia: es una sugerencia, no un diálogo. */
+var ALMA_INTRO_KEY = "gg-alma-invita";
+var ALMA_INTRO_RUTAS = {
+  "inicio":        ["rastro","entrar","empresa"],
+  "origen":        ["quien","desde"],
+  "hub":           ["entrar","hubcosto"],
+  "fundaciones":   ["entrar","hubcosto","hubdespues"],
+  "socialfest":    ["entrar","hubcosto","empresa"],
+  "empresas":      ["empresa","journey"],
+  "voluntariado":  ["journey","ingque"],
+  "donar":         ["transferir","cert","renta"],
+  "reportar":      ["recibo","cert"],
+  "rastrea":       ["acta","recibo"],
+  "mi-aporte":     ["acta","recibo"],
+  "membresias":    ["exterior","gratnivel","renta"],
+  "gratitud":      ["comercios","gratnivel"],
+  "transparencia": ["efirma","desde"],
+  "brigada":       ["brigada","insumos"],
+  "proyecto":      ["habitable","peligro"],
+  "vivienda":      ["habitable","peligro"],
+  "casas":         ["habitable","aportar"],
+  "apadrinar":     ["reserva","aportar"],
+  "ingenieros":    ["ingque","ingdecl"]
+};
+var ALMA_INTRO_DECISION = { donar:1, reportar:1, membresias:1, apadrinar:1 };
+var ALMA_INTRO_TIEMPO = 20000;
+/* Lo que la invitación no puede tapar. El chequeo es geométrico: se mide
+   dónde caería y se mira si pisa alguno de estos de la página activa. */
+var ALMA_INTRO_EVITA = "form, .calc, .field, .ally-form, input:not([type=hidden]), select, textarea";
+var almaInv = { ruta:null, desde:0, reloj:null, visible:false };
+function almaIntroMemoria(){
+  try { var m = JSON.parse(localStorage.getItem(ALMA_INTRO_KEY) || "{}"); return (m && typeof m === "object") ? m : {}; }
+  catch (e) { return {}; }
+}
+function almaIntroRecordar(r){
+  if (!r) return;
+  try { var m = almaIntroMemoria(); m[r] = 1; localStorage.setItem(ALMA_INTRO_KEY, JSON.stringify(m)); } catch (e) {}
+}
+function almaIntroEnSesion(r){ try { return sessionStorage.getItem(ALMA_INTRO_KEY + ":" + r) === "1"; } catch (e) { return false; } }
+function almaIntroElegible(r){
+  if (!ALMA_INTRO_RUTAS[r] || almaIntroMemoria()[r]) return false;
+  return !(ALMA_INTRO_DECISION[r] && almaIntroEnSesion(r));
+}
+function almaIntroOcultar(recordar){
   var el = document.getElementById("alma-intro");
+  if (recordar && almaInv.visible) almaIntroRecordar(almaInv.ruta);
+  almaInv.visible = false;
+  document.body.classList.remove("alma-invita");
   if (!el || el.hidden) return;
-  el.classList.remove("on");
+  el.classList.remove("on", "aparte");
   el.hidden = true;
 }
-function almaIntro(abrir){
+function almaIntroCerrar(){
+  /* El foco estaba en la X, que desaparece: se deja en el botón de ALMA, que
+     es a lo que la invitación apuntaba. Solo si el foco estaba dentro. */
+  var el = document.getElementById("alma-intro");
+  var dentro = el && el.contains(document.activeElement);
   almaIntroOcultar(true);
-  if (abrir) almaPanel(true);
+  var b = document.getElementById("alma-open");
+  if (dentro && b) b.focus();
+}
+function almaPregunta(k){
+  almaIntroOcultar(true);
+  /* El panel devuelve el foco, al cerrarse, a lo que lo tenía al abrirse; la
+     pregunta que se tocó ya no existe, así que se le da al botón de ALMA. */
+  var b = document.getElementById("alma-open");
+  if (b) b.focus();
+  almaPanel(true);
+  almaAsk(t("alma.q." + k));
+}
+/* ¿Pisa algo que no se puede tapar? Se mide con la caja ya puesta. */
+function almaIntroPisa(el){
+  var a = el.getBoundingClientRect();
+  if (!a.width) return false;
+  var pag = document.querySelector(".page.active");
+  if (!pag) return false;
+  var cs = pag.querySelectorAll(ALMA_INTRO_EVITA);
+  for (var i = 0; i < cs.length; i++){
+    var b = cs[i].getBoundingClientRect();
+    if (b.width && b.height && b.left < a.right && b.right > a.left && b.top < a.bottom && b.bottom > a.top) return true;
+  }
+  return false;
+}
+function almaIntroOcupado(){
+  var ae = document.activeElement;
+  if (ae && ae.matches && ae.matches("input, select, textarea")) return true;
+  var p = document.getElementById("alma-panel");
+  if (p && p.classList.contains("open")) return true;
+  return document.body.classList.contains("menu-open");
+}
+function almaIntroPintar(r){
+  var el = document.getElementById("alma-intro"), ul = document.getElementById("alma-intro-qs");
+  if (!el || !ul) return null;
+  ul.innerHTML = ALMA_INTRO_RUTAS[r].map(function(k){
+    return '<li><button type="button" class="alma-intro-q" data-act="almaPregunta(\'' + k + '\')" data-i18n="alma.q.' + k + '">' + escapeHtml(t("alma.q." + k)) + '</button></li>';
+  }).join("");
+  if (!ul.dataset.oye){
+    ul.dataset.oye = "1";
+    ul.addEventListener("scroll", function(){ almaIntroMas(ul); }, { passive:true });
+  }
+  return el;
+}
+/* En el teléfono las preguntas se deslizan de lado: ¿queda alguna a la
+   derecha, o ya se pasó alguna a la izquierda? */
+function almaIntroMas(ul){
+  ul.classList.toggle("mas", ul.scrollLeft + ul.clientWidth < ul.scrollWidth - 4);
+  ul.classList.toggle("antes", ul.scrollLeft > 4);
+}
+function almaIntroMirar(){
+  var r = currentRoute;
+  if (r !== almaInv.ruta) return;
+  var el = document.getElementById("alma-intro");
+  if (almaInv.visible){
+    /* Ya está a la vista: si al desplazarse cae sobre un formulario, se aparta
+       sin cerrarse, y vuelve cuando el formulario sale de debajo. */
+    if (el) el.classList.toggle("aparte", almaIntroPisa(el) || almaIntroOcupado());
+    return;
+  }
+  if (!almaIntroElegible(r) || almaIntroOcupado()) return;
+  var y = window.pageYOffset || 0, vh = window.innerHeight || 1;
+  var total = Math.max(1, document.documentElement.scrollHeight - vh);
+  if (y < vh * 0.8) return;
+  if (y / total < 0.33 && Date.now() - almaInv.desde < ALMA_INTRO_TIEMPO) return;
+  el = almaIntroPintar(r);
+  if (!el) return;
+  el.hidden = false;
+  if (almaIntroPisa(el)){ el.hidden = true; return; }
+  almaIntroMas(document.getElementById("alma-intro-qs"));
+  almaInv.visible = true;
+  document.body.classList.add("alma-invita");
+  if (ALMA_INTRO_DECISION[r]){ try { sessionStorage.setItem(ALMA_INTRO_KEY + ":" + r, "1"); } catch (e) {} }
+  requestAnimationFrame(function(){ el.classList.add("on"); });
+}
+/* La llama go() al entrar en cada ruta: lo de la ruta anterior se va sin
+   recordarse (no la cerró: se fue), y el reloj vuelve a empezar. */
+function almaIntroRuta(r){
+  almaIntroOcultar(false);
+  clearTimeout(almaInv.reloj);
+  almaInv.ruta = r; almaInv.desde = Date.now();
+  if (almaIntroElegible(r)) almaInv.reloj = setTimeout(almaIntroMirar, ALMA_INTRO_TIEMPO + 50);
 }
 function initAlmaIntro(){
-  if (almaIntroVisto()) return;
-  almaIntroTimer = setTimeout(function(){
-    almaIntroTimer = null;
-    var el = document.getElementById("alma-intro");
-    var p = document.getElementById("alma-panel");
-    if (!el || (p && p.classList.contains("open")) || almaIntroVisto()) return;
-    el.hidden = false;
-    requestAnimationFrame(function(){ el.classList.add("on"); });
-  }, 4500);
+  var pendiente = false;
+  window.addEventListener("scroll", function(){
+    if (pendiente) return;
+    pendiente = true;
+    requestAnimationFrame(function(){ pendiente = false; almaIntroMirar(); });
+  }, { passive:true });
+  /* Escape la cierra cuando no hay otra cosa a la que le toque: con el foco
+     dentro de ella o en ningún control. */
+  document.addEventListener("keydown", function(e){
+    if (e.key !== "Escape" || !almaInv.visible) return;
+    var el = document.getElementById("alma-intro"), ae = document.activeElement;
+    if ((el && el.contains(ae)) || !ae || ae === document.body) almaIntroCerrar();
+  });
+  if (almaInv.ruta !== currentRoute) almaIntroRuta(currentRoute);
 }
 function almaPush(role, html){
   var box = document.getElementById("alma-msgs");
@@ -5268,7 +5433,8 @@ function almaPanel(open){
   if (open){
     // Los chips se arman con la ruta desde la que se abrió: ALMA responde en contexto.
     almaFromRoute = currentRoute || "inicio";
-    almaIntroOcultar(true);
+    almaIntroOcultar(false);
+    almaIntroRecordar(currentRoute);
     renderAlmaChips();
     almaLastFocus = document.activeElement;
     p.classList.add("open"); if (s) s.classList.add("open");
