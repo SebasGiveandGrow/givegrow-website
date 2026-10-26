@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=44e93ff1">
+<link rel="stylesheet" href="/styles.css?v=c891f9fe">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=2316c2d6" defer></script>
+<script src="/app.js?v=5b231c34" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -488,6 +488,7 @@
           <a class="btn btn-g" href="#fundaciones" data-i18n="hub.cta.b1">Quiero aplicar al HUB SOCIAL</a>
           <a class="btn btn-o" href="#donar" data-i18n="hub.cta.b2">Quiero donar</a>
         </div>
+        <div class="tira-papel" data-tira></div>
       </div>
     </div>
   </section>
@@ -908,6 +909,7 @@
           <a class="btn btn-g" href="#donar" data-i18n="imp.cta.b1">Donar ahora</a>
           <a class="btn btn-o" href="#membresias" data-i18n="imp.cta.b2">Ver membresías</a>
         </div>
+        <div class="tira-papel" data-tira></div>
       </div>
     </div>
   </section>
@@ -2031,6 +2033,7 @@
         <p class="rec-cap" data-i18n="brig.dar.linea.k">En dinero · en línea</p>
         <p class="brig-via-p" data-i18n="brig.dar.linea.p">Tarjeta o botón Bancolombia, en dos minutos. Vuelves con un número de guía y con eso puedes seguir tu aporte hasta la foto del acta que firma quien recibe.</p>
         <button type="button" class="btn btn-g" data-act="donarBrigada()" data-i18n="brig.dar.linea.btn">Aportar a la brigada</button>
+        <div class="tira-papel" data-tira></div>
       </div>
 
       <!-- Enlace de pago propio de Wompi, creado por Sebas para la campaña. Va
@@ -2201,12 +2204,8 @@
         <span class="ey rv" data-i18n="donar.ey">Donar</span>
         <h1 class="h-sec rv" data-i18n="donar.t">Tu donación, con destino claro.</h1>
         <p class="lead rv d1" data-i18n="donar.lead">Calcula tu impacto y tu beneficio tributario, luego elige cómo aportar.</p>
-        <ul class="confianza rv d2">
-          <li data-i18n="donar.conf.1">NIT 901.948.930-2</li>
-          <li data-i18n="donar.conf.2">Régimen Tributario Especial</li>
-          <li data-i18n="donar.conf.3">Certificado firmado, si lo pides</li>
-          <li data-i18n="donar.conf.4">Rastreo con número de guía</li>
-        </ul>
+        <!-- La tira de confianza: su marcado vive UNA vez, en <template id="tpl-tira">. -->
+        <div class="rv d2" data-tira></div>
       </div>
     </div>
   </section>
@@ -3558,6 +3557,22 @@
      Solo hechos que se pueden comprobar: si uno deja de serlo, se quita aquí.
      /pago/metodo (Worker) tiene su versión compacta en TXT_METODO de worker.js:
      si cambia una, cambiar la otra. -->
+<!-- LA TIRA DE CONFIANZA (17 oct 2026): la fila corta de prueba institucional
+     junto a los botones que llevan A Donar (cabecera de Donar, cajas finales del
+     HUB y de #impacto, brigada, Mira Mi Casa y, por `tiraHtml()`, la ficha de
+     cada fundación). La franja de arriba, con sus enlaces, es la del punto de
+     pago; esta solo enuncia. Sin plazos: el certificado NO es automático —lo
+     firman el Representante Legal y la Revisora Fiscal desde /firma— y el sitio
+     no tiene cómo cumplir una fecha. Si un hecho deja de serlo, se quita aquí. -->
+<template id="tpl-tira">
+  <ul class="confianza">
+    <li data-i18n="donar.conf.1">ESAL · NIT 901.948.930-2</li>
+    <li data-i18n="donar.conf.2">Régimen Tributario Especial</li>
+    <li data-i18n="donar.conf.3">Certificado de donación si lo pides, con la firma del Representante Legal y la Revisora Fiscal</li>
+    <li data-i18n="donar.conf.4">Rastreo con número de guía</li>
+  </ul>
+</template>
+
 <template id="tpl-franja">
   <p class="franja-ey" data-i18n="franja.ey">Verifica antes de pagar</p>
   <ul class="franja-l">
@@ -4229,6 +4244,7 @@
         <h2 class="h-sec" data-i18n="mmc.donar.t">Alguien tiene que poner los materiales</h2>
         <p class="lead" data-i18n="mmc.donar.p">A la familia no se le cobra nada, ni aquí ni nunca. Lo que cuesta reparar lo pone quien puede: tu aporte va al fondo de reparación de Mira Mi Casa, con guía y acta como cualquier otro.</p>
         <a class="btn btn-g" href="https://www.thegiveandgrowproject.org/?d=miramicasa-reparacion#donar" data-i18n="mmc.donar.btn">Aportar a las reparaciones</a>
+        <div class="tira-papel" data-tira></div>
       </div>
     </div>
   </section>
@@ -4297,6 +4313,7 @@
         <h2 class="h-sec" data-i18n="mmc.donar.t">Alguien tiene que poner los materiales</h2>
         <p class="lead" data-i18n="mmc.donar.p">A la familia no se le cobra nada, ni aquí ni nunca. Lo que cuesta reparar lo pone quien puede: tu aporte va al fondo de reparación de Mira Mi Casa, con guía y acta como cualquier otro.</p>
         <a class="btn btn-g" href="https://www.thegiveandgrowproject.org/?d=miramicasa-reparacion#donar" data-i18n="mmc.donar.btn">Aportar a las reparaciones</a>
+        <div class="tira-papel" data-tira></div>
       </div>
     </div>
   </section>
