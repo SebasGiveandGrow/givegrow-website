@@ -237,6 +237,18 @@ convienen:
 4. Mencionarlo donde la familia ya está: en la pantalla de su caso y en el correo
    que recibe.
 
+> **Estado (17 oct 2026): la INFRAESTRUCTURA de 1–3 está construida** (migración
+> 0046, página `#quejas`, `/admin › Quejas`). Formulario bilingüe con envío
+> anónimo, ruta confidencial separada que nunca pide datos de un menor, código
+> para consultar en qué va, y un aviso al buzón que dice «llegó algo» sin el
+> contenido. **Lo que sigue siendo decisión de la organización quedó como
+> parámetro vacío**: `QUEJAS_PUNTO_FOCAL` (mientras falte, la ruta confidencial
+> la ve quien entra a /admin, y el panel lo dice) y `QUEJAS_PLAZO_DIAS` (mientras
+> falte, nada vence y el indicador #12 no se calcula). La página no promete
+> plazos ni nombra a nadie. Pendiente: el punto 4; un botón en el panel para
+> registrar las quejas que lleguen por WhatsApp o de viva voz (hoy no existe), y
+> la adopción de esta política.
+
 ---
 
 ## 7. BORRADOR · Manejo ético de recursos y conflicto de interés

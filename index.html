@@ -35,11 +35,11 @@
 <script>/* tema antes del primer render: la preferencia guardada; si no hay, la del dispositivo; y la hora (día 6–18h) solo si el dispositivo no dice nada. La misma cuenta que themeResolve en app.js */
 (function(){var t="light";try{var s=localStorage.getItem("gg-theme");if(s==="light"||s==="dark"){t=s}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else if(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches){t="light"}else{var h=new Date().getHours();t=(h>=6&&h<18)?"light":"dark"}}catch(e){}document.documentElement.setAttribute("data-theme",t);if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",document.documentElement.getAttribute("data-marca")==="mmc"?"#07131F":"#0F1613")}})();
 /* LA RUTA ANTES DEL PRIMER RENDER (Social Fest, 7 oct 2026). Quien llega a /#socialfest por el QR veía la portada hasta que corría app.js, y bajaba su foto (262 KB a DPR 3) sin verla. Si el hash es una página conocida, se marca data-ruta y una regla esconde la portada y muestra esa página; go() en app.js quita la marca. La lista la vigila el check #21b: cada nombre tiene que ser una <main id="page-…"> de index.html, si no, la portada se queda y no hay pantalla en blanco. El preload del hero solo se pide cuando la portada es lo que se va a ver: `100vw` aquí y en el <source>, IGUALES, o se baja dos veces. */
-(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1100.webp 1100w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
+(function(){var d=document.documentElement;if(d.getAttribute("data-marca")==="mmc")return;var R=" origen hub empresas fundaciones gratitud impacto impactos medicion teoria-de-cambio socialfest brigada reportar donar estandares transparencia contacto rastrea mi-aporte aliados faq membresias voluntariado privacidad regalos ";var raiz=location.pathname==="/";var h=raiz?location.hash.slice(1):"";if(h&&R.indexOf(" "+h+" ")>-1){d.setAttribute("data-ruta",h);var s=document.createElement("style");s.textContent="html[data-ruta] #page-inicio{display:none}html[data-ruta] #page-"+h+"{display:block}";document.head.appendChild(s)}else if(raiz&&(!h||h==="inicio")){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="/img/jornadas/hero_futbol_1400.webp";l.setAttribute("imagesrcset","/img/jornadas/hero_futbol_800.webp 800w, /img/jornadas/hero_futbol_1100.webp 1100w, /img/jornadas/hero_futbol_1400.webp 1400w, /img/jornadas/hero_futbol_2000.webp 2000w");l.setAttribute("imagesizes","100vw");l.type="image/webp";l.setAttribute("fetchpriority","high");document.head.appendChild(l)}})();
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=a8336042">
+<link rel="stylesheet" href="/styles.css?v=c891f9fe">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=d4b82cfb" defer></script>
+<script src="/app.js?v=5b231c34" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1068,6 +1068,7 @@
       <p class="mu rv d2" id="gracias-nota" style="display:none;margin-top:16px;max-width:70ch"></p>
       <div class="cta-actions rv d2" style="justify-content:flex-start;margin-top:24px">
         <a class="btn btn-g" href="#rastrea" id="gracias-track" data-i18n="gracias.track">Rastrear mi aporte</a>
+        <a class="btn btn-o" href="#regalos" id="gracias-regalos" hidden data-i18n="gracias.regalos">Seguir mis regalos</a>
         <a class="btn btn-o" href="#inicio" data-i18n="gracias.home">Volver al inicio</a>
       </div>
       <!-- Para volver después: la membresía y el certificado viven en #mi-aporte. -->
@@ -1126,6 +1127,7 @@
           </div>
           <p class="med-note mu" data-i18n="med.esc.note">El primer peldaño mide lo entregado; el tercero mediría el valor del cambio producido. No son lo mismo. La materia prima ya existe: ImpactOS registra destino, unidad, acta, entrega y reporte. Lo que falta es la capa de resultados y el rigor metodológico, no los datos.</p>
           <p style="margin-top:14px"><a class="card-link" href="#impactos"><span data-i18n="med.link.os">Ver el registro detrás de cada aporte</span> <span aria-hidden="true">&rarr;</span></a></p>
+          <p style="margin-top:6px"><a class="card-link" href="#teoria-de-cambio"><span data-i18n="med.link.toc">La teoría de cambio y sus doce indicadores</span> <span aria-hidden="true">&rarr;</span></a></p>
         </div>
 
         <div class="os-row">
@@ -1251,6 +1253,209 @@
   </section>
 </main>
 
+<!-- #teoria-de-cambio (17 oct 2026): la teoría de cambio y los 12 indicadores
+     del sistema MEAL, tal como están en el doc «Teoría de cambio e indicadores»
+     (13 oct 2026), MEDICION.md y METODOLOGIA_MIRA.md. Nada que no esté ahí.
+     SIN CIFRAS a propósito: ni líneas base ni metas 2027 (son propuestas), ni
+     costos. Cada indicador dice solo si ya se mide; el número sale con fecha de
+     corte y fuente cuando exista, o no sale.
+     Reusa .os-rows, .med-tbl, .med-step-s (los tres estados), .med-note y
+     .libro; lo nuevo vive en styles.css bajo «#teoria-de-cambio».
+     Elemento firma: el «Si / Entonces / Porque». -->
+<main id="page-teoria-de-cambio" class="page">
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="toc.ey">Teoría de cambio</span>
+      <h1 class="h-sec rv" data-i18n="toc.t">Cómo esperamos que ocurra el cambio.</h1>
+      <p class="lead rv d1" data-i18n="toc.lead">Esta es la lógica que ordena nuestro trabajo: qué hacemos, qué produce, qué buscamos que cambie y con qué indicadores lo vamos a comprobar. Cada indicador dice si ya se mide o todavía no.</p>
+      <p class="toc-meta mu rv d1" data-i18n="toc.meta">Versión de octubre de 2026 · contribución, no atribución</p>
+      <dl class="toc-si rv d2">
+        <div class="toc-si-f"><dt data-i18n="toc.si.k">Si</dt><dd data-i18n="toc.si.v">verificamos fundaciones de base, canalizamos los aportes con número de guía y compartimos la infraestructura de evidencia,</dd></div>
+        <div class="toc-si-f"><dt data-i18n="toc.ent.k">Entonces</dt><dd data-i18n="toc.ent.v">la ayuda llega completa y se puede demostrar,</dd></div>
+        <div class="toc-si-f"><dt data-i18n="toc.por.k">Porque</dt><dd data-i18n="toc.por.v">el costo fijo de la credibilidad se divide en red.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="toc.prob.ey">El problema</span>
+      <h2 class="h-sec rv" data-i18n="toc.prob.t">La ayuda se pierde, o no se puede demostrar.</h2>
+      <p class="lead rv d1" data-i18n="toc.prob.p">Las fundaciones de base hacen el trabajo, pero no tienen la infraestructura que exigen los donantes —actas, consentimiento, medición, reporte—, y los donantes no tienen cómo saber qué llegó. Give&amp;Grow nace de esa brecha: una tonelada de alimento recaudada, y casi la mitad perdida porque la fundación no tenía cómo almacenarla ni repartirla.</p>
+      <p class="rv d1" style="margin-top:10px"><a class="card-link" href="#origen"><span data-i18n="toc.prob.link">Cómo empezó</span> <span aria-hidden="true">&rarr;</span></a></p>
+      <div class="med-tw rv d2">
+        <table class="med-tbl toc-tbl">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="toc.prob.h1">Quién</th>
+              <th scope="col" data-i18n="toc.prob.h2">Qué le falta hoy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td data-i18n="toc.prob.r1a">Fundaciones de base del HUB SOCIAL</td><td data-i18n="toc.prob.r1b">Infraestructura de evidencia y recursos estables. La credibilidad les cuesta lo mismo para 20 personas que para 2.000.</td></tr>
+            <tr><td data-i18n="toc.prob.r2a">Las comunidades que ellas atienden</td><td data-i18n="toc.prob.r2b">Que la ayuda llegue completa, a tiempo y con dignidad.</td></tr>
+            <tr><td data-i18n="toc.prob.r3a">Donantes y empresas</td><td data-i18n="toc.prob.r3b">Saber a dónde fue su aporte y poder reportarlo en ODS, GRI o ESG.</td></tr>
+            <tr><td data-i18n="toc.prob.r4a">Familias afectadas por emergencias</td><td data-i18n="toc.prob.r4b">Respuesta rápida y, después, un camino para reparar su casa.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="toc.cad.ey">La cadena</span>
+      <h2 class="h-sec rv" data-i18n="toc.cad.t">De lo que hacemos a lo que buscamos.</h2>
+      <p class="lead rv d1" data-i18n="toc.cad.p">Cinco actividades, cinco productos, cuatro resultados y un impacto. Las actividades y los productos dependen de nosotros; los resultados y el impacto son contribución compartida con las fundaciones aliadas, que hacen el trabajo en territorio.</p>
+      <div class="toc-chain rv d2">
+        <div class="toc-grp">
+          <p class="toc-grp-k" data-i18n="toc.cad.ctl">Depende de nosotros</p>
+          <div class="toc-cols">
+            <div class="toc-col">
+              <h3 class="toc-col-t" data-i18n="toc.cad.c1">Actividades</h3>
+              <ul class="toc-list">
+                <li data-i18n="toc.cad.a1">Verificar y vincular fundaciones al HUB SOCIAL</li>
+                <li data-i18n="toc.cad.a2">Canalizar donaciones con número de guía</li>
+                <li data-i18n="toc.cad.a3">Operar jornadas e Impact Journey</li>
+                <li data-i18n="toc.cad.a4">Responder a emergencias y operar Mira Mi Casa</li>
+                <li data-i18n="toc.cad.a5">Compartir actas, consentimiento y reporte</li>
+              </ul>
+            </div>
+            <div class="toc-col">
+              <h3 class="toc-col-t" data-i18n="toc.cad.c2">Productos</h3>
+              <ul class="toc-list">
+                <li data-i18n="toc.cad.p1">Fundaciones con convenio firmado</li>
+                <li data-i18n="toc.cad.p2">Unidades entregadas con acta firmada</li>
+                <li data-i18n="toc.cad.p3">Horas de voluntariado y capacidad transferida</li>
+                <li data-i18n="toc.cad.p4">Familias atendidas y casas con concepto técnico</li>
+                <li data-i18n="toc.cad.p5">Aportes con rastreo completo publicado</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="toc-grp is-con">
+          <p class="toc-grp-k" data-i18n="toc.cad.con">Contribución compartida</p>
+          <div class="toc-cols">
+            <div class="toc-col">
+              <h3 class="toc-col-t" data-i18n="toc.cad.c3">Resultados</h3>
+              <ul class="toc-list">
+                <li data-i18n="toc.cad.r1">Las fundaciones suben en la escalera de la evidencia</li>
+                <li data-i18n="toc.cad.r2">Menos pérdida: la ayuda llega completa y a tiempo</li>
+                <li data-i18n="toc.cad.r3">Donantes y empresas repiten y reportan</li>
+                <li data-i18n="toc.cad.r4">Las familias reparan su casa con orden y seguridad</li>
+              </ul>
+            </div>
+            <div class="toc-col is-imp">
+              <h3 class="toc-col-t" data-i18n="toc.cad.c4">Impacto</h3>
+              <p class="toc-imp" data-i18n="toc.cad.imp">Comunidades vulnerables con más bienestar, y confianza en el acto de dar.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3 class="h-comp3 toc-sub rv" data-i18n="toc.sup.t">Los supuestos</h3>
+      <p class="toc-prose rv" data-i18n="toc.sup.p">La cadena se sostiene si se cumplen cuatro condiciones. Si una falla —por ejemplo, que las fundaciones no documenten—, se rompe entre productos y resultados, y eso es lo primero que miden los indicadores.</p>
+      <ul class="vol-care rv">
+        <li data-i18n="toc.sup.1">Las fundaciones aceptan documentar.</li>
+        <li data-i18n="toc.sup.2">Los donantes valoran la trazabilidad por encima del costo.</li>
+        <li data-i18n="toc.sup.3">Hay voluntarios profesionales: ingenieros, abogados, contadores.</li>
+        <li data-i18n="toc.sup.4">El contexto de seguridad permite llegar.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="toc.ind.ey">Los indicadores</span>
+      <h2 class="h-sec rv" data-i18n="toc.ind.t">Cuatro líneas, doce indicadores.</h2>
+      <p class="lead rv d1" data-i18n="toc.ind.p">Ocho son de producto: dependen de nosotros y se pueden verificar. Cuatro son de resultado y se leen como contribución. Cada uno nombra su fuente, y ninguno publica cifra todavía: un número sale con su fecha de corte y su fuente, o no sale.</p>
+      <dl class="toc-ley rv d1">
+        <div class="toc-ley-f"><dt><span class="med-step-s is-on" data-i18n="toc.est.on">Ya se mide</span></dt><dd data-i18n="toc.est.on.d">La fuente existe y registra el dato.</dd></div>
+        <div class="toc-ley-f"><dt><span class="med-step-s is-wip" data-i18n="toc.est.wip">En parte</span></dt><dd data-i18n="toc.est.wip.d">Hay un registro provisional; falta el definitivo.</dd></div>
+        <div class="toc-ley-f"><dt><span class="med-step-s is-none" data-i18n="toc.est.no">Todavía no</span></dt><dd data-i18n="toc.est.no.d">Falta la fuente, o el tiempo para medirlo.</dd></div>
+      </dl>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l1.k">L1 · HUB SOCIAL</h3>
+          <p class="toc-ln-r" data-i18n="toc.l1.r">Las fundaciones aliadas suben al menos un peldaño en la escalera de la evidencia en 12 meses.</p>
+          <p class="toc-ln-q" data-i18n="toc.l1.q">En territorio: cada fundación, con apoyo de Give&amp;Grow.</p>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">1</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i1.n">Fundaciones con convenio de cooperación firmado y vigente</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i1.f">convenios archivados</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">2</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i2.n">Fundaciones aliadas que suben al menos un peldaño en la escalera de la evidencia</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.res">Resultado</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i2.f">autoevaluación verificada por Give&amp;Grow</span></span><span class="toc-ind-c" data-i18n="toc.f.a">Anual</span></p><p class="toc-ind-x" data-i18n="toc.i2.x">Sin línea base: hacen falta dos autoevaluaciones de cada fundación para poder comparar.</p></div><span class="med-step-s is-none toc-ind-s" data-i18n="toc.est.no">Todavía no</span></li>
+        </ul>
+      </div>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l2.k">L2 · Donaciones trazables</h3>
+          <p class="toc-ln-r" data-i18n="toc.l2.r">Cada aporte llega a su destino con acta firmada, y quien dona lo puede rastrear.</p>
+          <p class="toc-ln-q" data-i18n="toc.l2.q">En territorio: la fundación entrega; Give&amp;Grow registra y publica.</p>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">3</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i3.n">Unidades entregadas con acta firmada: platos, kits, mercados</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i3.f">actas de entrega</span></span><span class="toc-ind-c" data-i18n="toc.f.m">Mensual</span></p><p class="toc-ind-x" data-i18n="toc.i3.x">Se cuentan por tipo de unidad: nunca se suman unidades distintas.</p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">4</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i4.n">Aportes con rastreo completo publicado, del aporte al acta</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i4.f">ImpactOS</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">5</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i5.n">Días promedio entre el aporte y el acta publicada</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i5.f">ImpactOS</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p><p class="toc-ind-x" data-i18n="toc.i5.x">Sin línea base: se calcula cuando haya aportes con acta publicada.</p></div><span class="med-step-s is-none toc-ind-s" data-i18n="toc.est.no">Todavía no</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">6</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i6.n">Donantes que vuelven a aportar dentro de los 12 meses siguientes</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.res">Resultado</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i6.f">ImpactOS</span></span><span class="toc-ind-c" data-i18n="toc.f.a">Anual</span></p><p class="toc-ind-x" data-i18n="toc.i6.x">Necesita que pasen 12 meses desde el primer aporte: no habrá datos antes de 2027.</p></div><span class="med-step-s is-none toc-ind-s" data-i18n="toc.est.no">Todavía no</span></li>
+        </ul>
+      </div>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l3.k">L3 · Impact Journey y voluntariado</h3>
+          <p class="toc-ln-r" data-i18n="toc.l3.r">Empresas y profesionales aportan capacidad que la red no puede pagar sola.</p>
+          <p class="toc-ln-q" data-i18n="toc.l3.q">En territorio: los voluntarios, con la fundación anfitriona.</p>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">7</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i7.n">Horas de voluntariado efectivas, con registro de jornada</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i7.f">registro de jornada</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">8</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i8.n">Empresas con al menos una jornada de Impact Journey</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i8.f">registro de jornada</span></span><span class="toc-ind-c" data-i18n="toc.f.s">Semestral</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+        </ul>
+      </div>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l4.k">L4 · Emergencias y Mira Mi Casa</h3>
+          <p class="toc-ln-r" data-i18n="toc.l4.r">Las familias afectadas reciben ayuda rápida y reparan su casa con un concepto técnico, en orden.</p>
+          <p class="toc-ln-q" data-i18n="toc.l4.q">En territorio: brigadas, ingenieros voluntarios y aliados.</p>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">9</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i9.n">Toneladas de ayuda humanitaria entregadas con acta</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i9.f">actas de entrega e inventario de carga</span></span><span class="toc-ind-c" data-i18n="toc.f.e">Por emergencia</span></p><p class="toc-ind-x" data-i18n="toc.i9.x">Mientras las actas están en revisión, lo despachado se publica como estimado según el inventario de carga, nunca como «entregado con acta».</p></div><span class="med-step-s is-wip toc-ind-s" data-i18n="toc.est.wip">En parte</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">10</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i10.n">Casas con concepto técnico emitido en Mira Mi Casa</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.prod">Producto</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i10.f">triaje de Mira Mi Casa</span></span><span class="toc-ind-c" data-i18n="toc.f.m">Mensual</span></p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+          <li class="toc-ind"><span class="toc-ind-n">11</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i11.n">Viviendas en reconstrucción y terminadas</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.res">Resultado</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i11.f">acta de entrega de obra</span></span><span class="toc-ind-c" data-i18n="toc.f.m">Mensual</span></p><p class="toc-ind-x" data-i18n="toc.i11.x">Dos cifras separadas: en curso y terminadas.</p></div><span class="med-step-s is-on toc-ind-s" data-i18n="toc.est.on">Ya se mide</span></li>
+        </ul>
+      </div>
+      <div class="toc-ln rv">
+        <div class="toc-ln-hd">
+          <h3 class="toc-ln-k" data-i18n="toc.l5.k">Todas las líneas · rendición de cuentas</h3>
+        </div>
+        <ul class="toc-inds">
+          <li class="toc-ind"><span class="toc-ind-n">12</span><div class="toc-ind-b"><p class="toc-ind-t" data-i18n="toc.i12.n">Quejas y retroalimentación respondidas a tiempo</p><p class="toc-ind-m"><span class="toc-ind-c" data-i18n="toc.k.res">Resultado</span><span class="toc-ind-c"><span data-i18n="toc.k.fuente">Fuente:</span> <span data-i18n="toc.i12.f">mecanismo de quejas</span></span><span class="toc-ind-c" data-i18n="toc.f.t">Trimestral</span></p><p class="toc-ind-x" data-i18n="toc.i12.x">El mecanismo de quejas está en construcción: hasta que exista, este indicador no tiene con qué medirse.</p></div><span class="med-step-s is-none toc-ind-s" data-i18n="toc.est.no">Todavía no</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="toc.mira.ey">Lo que la cadena no cuenta todavía</span>
+      <h2 class="h-sec rv" data-i18n="toc.mira.t">El cambio en las personas.</h2>
+      <p class="rv d1" data-i18n="toc.mira.p1">Los doce indicadores cuentan lo que se entrega y lo que cambia en la red. Lo que cambia en una persona —qué cree que es capaz de hacer, si se percibe como actor o como receptor, qué metas aparecen que antes no estaban— lo observa la metodología MIRA, con un registro antes y después del proceso.</p>
+      <p class="rv d1" data-i18n="toc.mira.p2">Es observación pedagógica, no valoración clínica: no tenemos psicólogo en el equipo. No emitimos diagnósticos ni resultados individuales, y cuando quien participa es menor de edad, se necesita la autorización de su acudiente y todo reporte va agregado y anónimo.</p>
+      <p class="rv d1" data-i18n="toc.mira.p3">Tampoco publicamos ninguna razón de retorno social (SROI): no es un cálculo, es un estudio, y todavía no lo tenemos.</p>
+      <p class="toc-links rv d2"><a class="card-link" href="#medicion"><span data-i18n="toc.mira.l1">Los tres peldaños de la medición</span> <span aria-hidden="true">&rarr;</span></a><a class="card-link" href="#voluntariado"><span data-i18n="toc.mira.l2">La metodología MIRA</span> <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="toc.rev.ey">Quién lo revisa</span>
+      <h2 class="h-sec rv" data-i18n="toc.rev.t" style="margin-bottom:14px">Cómo se lee, y quién decide.</h2>
+      <dl class="libro rv d1" style="margin-top:22px">
+        <div class="libro-fila"><dt data-i18n="toc.rev.1k">Fecha de corte y fuente</dt><dd><span data-i18n="toc.rev.1v">Ninguna cifra sin papel: cada número dice hasta cuándo cuenta y qué acta, registro o inventario lo produjo.</span></dd></div>
+        <div class="libro-fila"><dt data-i18n="toc.rev.2k">Junta de Asesores</dt><dd><span data-i18n="toc.rev.2v">Recibirá el informe trimestral de estos indicadores para emitir su concepto previo y sus recomendaciones. Asesora: no aprueba ni dirige.</span></dd></div>
+        <div class="libro-fila"><dt data-i18n="toc.rev.3k">Quién decide</dt><dd><span data-i18n="toc.rev.3v">El máximo órgano de dirección que definen los estatutos (hoy, el fundador), con Representante Legal y Revisora Fiscal. La Fundación no tiene junta directiva.</span></dd></div>
+      </dl>
+      <p class="rv d2" style="margin-top:18px"><a class="card-link" href="#transparencia"><span data-i18n="toc.rev.link">Gobernanza y documentos públicos</span> <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+</main>
+
 <!-- ============ SOCIAL FEST 2026 (página de evento) ============
      Destino del QR impreso (`/socialfest` → aquí). Se lee DE PIE, en un
      pasillo de Ruta N, con el teléfono: por eso arriba va una sola frase de
@@ -1266,6 +1471,138 @@
      DESPUÉS DEL EVENTO (17 oct 2026): el evento terminó el 16. La página queda
      como registro —en pasado— y con lo que sigue vigente: Impact Journey, el
      HUB SOCIAL, las hojas y la puerta de financiadores. -->
+<!-- ============ REGALOS DE DICIEMBRE (0048) ============
+     La lista la pinta js/regalos.js desde /api/regalos. Mientras la campaña
+     está en borrador, la página solo dice «muy pronto»: lo decide /admin/regalos,
+     no este archivo. Datos de menores: en la tarjeta solo el nombre de pila, la
+     edad, la zona y el regalo; la foto, únicamente con autorización escrita. -->
+<main id="page-regalos" class="page">
+  <!-- La barra que acompaña mientras se escoge: cuántos y cuánto, y un atajo a pagar.
+       Va PRIMERO y no al final: es fija, y el último hijo de cada página recibe
+       el relleno inferior que deja sitio a los botones flotantes. -->
+  <div class="rg-barra" id="rg-barra" hidden>
+    <span id="rg-barra-t"></span>
+    <button type="button" class="btn btn-g" data-act="rgIrAPagar()" data-i18n="rg.barra.ir">Continuar</button>
+  </div>
+  <!-- LA FIRMA DE LA PÁGINA: una luz por cada niño de la meta, agrupadas por
+       zona. Plata mientras espera, dorada cuando su regalo queda financiado y
+       roja con anillo dorado cuando se entrega con acta. Es un dato de la base, no un
+       adorno: antes de abrir la campaña, las mil esperan apagadas. -->
+  <section class="rg-portada">
+      <svg class="rg-guirnalda" viewBox="0 0 1440 56" preserveAspectRatio="xMidYMin slice" aria-hidden="true" focusable="false"><path class="rg-hilo" d="M0 4 Q80 44 160 4 Q240 44 320 4 Q400 44 480 4 Q560 44 640 4 Q720 44 800 4 Q880 44 960 4 Q1040 44 1120 4 Q1200 44 1280 4 Q1360 44 1440 4"/><rect class="rg-tapa" x="77" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="80" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="237" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-o" cx="240" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="397" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-v" cx="400" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="557" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-p" cx="560" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="717" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="720" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="877" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-o" cx="880" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1037" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-v" cx="1040" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1197" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-p" cx="1200" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1357" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="1360" cy="34" rx="6" ry="8"/></svg>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="rg.ey">Navidad 2026</span>
+      <h1 class="h-sec rg-h1 rv" data-i18n="rg.h1">Mil regalos para niñas y niños de Uribia, Medellín y Leticia.</h1>
+      <p class="lead rv d1" data-i18n="rg.lead">Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.</p>
+      <h2 class="rg-luces-t rv d2" data-i18n="rg.luces.t">Una luz por cada niño</h2>
+      <p class="rg-luces-p rv d2" data-i18n="rg.luces.p">Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.</p>
+      <div class="rg-zonas rv d2" id="rg-zonas" aria-live="polite"></div>
+      <ul class="rg-leyenda rv d2">
+        <li><span class="rg-l" aria-hidden="true"></span><span data-i18n="rg.luz.esp">Esperando su regalo</span></li>
+        <li><span class="rg-l is-f" aria-hidden="true"></span><span data-i18n="rg.luz.fin">Regalo financiado</span></li>
+        <li><span class="rg-l is-e" aria-hidden="true"></span><span data-i18n="rg.luz.ent">Entregado, con acta</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="cream" id="rg-seguimiento" hidden>
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="rg.seg.h">El recorrido de tus regalos</h2>
+      <div id="rg-seg-cuerpo" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="rg-pronto" hidden>
+    <div class="wrap prose">
+      <h2 data-i18n="rg.pronto.t">Muy pronto.</h2>
+      <p class="lead" data-i18n="rg.pronto.p">Estamos recogiendo, con la autorización escrita de cada acudiente, los deseos de los niños de las tres zonas. Cuando las listas estén revisadas, aquí vas a poder escoger a quién regalar.</p>
+    </div>
+  </section>
+
+  <section class="cream" id="rg-como">
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="rg.como.h">Cómo funciona</h2>
+      <div class="steps rg-pasos">
+        <div class="step"><div class="step-n">1</div><div><h3 class="h-comp4" data-i18n="rg.como.1.t">Escoge</h3><p data-i18n="rg.como.1.p">Filtra por zona, edad o tipo de regalo y agrega a tu lista los que quieras regalar.</p></div></div>
+        <div class="step"><div class="step-n">2</div><div><h3 class="h-comp4" data-i18n="rg.como.2.t">Paga</h3><p data-i18n="rg.como.2.p">En pesos, con Wompi, y te emitimos el certificado de donación. En dólares, a través de nuestra fundación aliada en Estados Unidos, que te emite el suyo.</p></div></div>
+        <div class="step"><div class="step-n">3</div><div><h3 class="h-comp4" data-i18n="rg.como.3.t">Síguelo</h3><p data-i18n="rg.como.3.p">Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rg-catalogo" hidden>
+    <div class="wrap">
+      <h2 class="h-sec" data-i18n="rg.lista.h">Escoge a quién regalar</h2>
+      <p class="mu rg-cerrada" id="rg-cerrada" hidden data-i18n="rg.cerrada">La campaña ya no recibe donaciones. Aquí puedes ver cómo avanzan los regalos.</p>
+      <div class="rg-filtros" id="rg-filtros"></div>
+      <p class="rg-cuenta mu" id="rg-cuenta" aria-live="polite"></p>
+      <div class="rg-grid" id="rg-grid"></div>
+      <div class="rg-mas"><button type="button" class="btn btn-w" id="rg-mas" hidden data-act="rgMas()" data-i18n="rg.mas">Ver más</button></div>
+      <p class="rg-priv mu" data-i18n="rg.privnota">Para proteger a los niños solo publicamos su nombre de pila, su edad, su zona y el regalo que pidieron, y su foto únicamente si su acudiente lo autorizó por escrito. Nunca publicamos apellidos, direcciones ni datos de contacto, y no hay contacto directo entre donantes y niños.</p>
+    </div>
+  </section>
+
+  <section class="cream" id="rg-pagar" hidden>
+    <div class="wrap">
+      <h2 class="h-sec" data-i18n="rg.pagar.h">Tu lista de regalos</h2>
+      <div class="rg-pagar">
+        <div>
+          <ul class="rg-lista" id="rg-lista"></ul>
+          <p class="rg-total"><span data-i18n="rg.total">Total</span> <strong id="rg-total">—</strong></p>
+        </div>
+        <form id="rg-form" class="ally-form rg-form" data-submit="rgPagar(event)" novalidate>
+          <fieldset class="rg-via">
+            <legend data-i18n="rg.via.l">¿Cómo quieres pagar?</legend>
+            <label class="ally-check"><input type="radio" name="rg-via" value="cop" checked data-change="rgVia(this.value)"> <span data-i18n="rg.via.cop">En pesos colombianos, con Wompi</span></label>
+            <label class="ally-check" id="rg-via-usd"><input type="radio" name="rg-via" value="usd" data-change="rgVia(this.value)"> <span data-i18n="rg.via.usd">En dólares, a través de nuestra fundación aliada en Estados Unidos</span></label>
+          </fieldset>
+          <div class="field"><label for="rg-nombre" data-i18n="rg.f.nombre">Tu nombre</label><input id="rg-nombre" autocomplete="name" maxlength="120"></div>
+          <div class="field"><label for="rg-email" data-i18n="rg.f.email">Tu correo</label><input id="rg-email" type="email" autocomplete="email" maxlength="160"></div>
+          <div class="field"><label for="rg-tel" data-i18n="rg.f.tel">Tu teléfono (opcional)</label><input id="rg-tel" type="tel" autocomplete="tel" maxlength="40"></div>
+          <!-- LA CARTA Y EL VIDEO (0049). Opcionales, y nada se entrega sin que
+               el equipo lo revise: son palabras de un adulto para un niño. -->
+          <fieldset class="rg-carta">
+            <legend data-i18n="rg.carta.l">Tu carta para los niños (opcional)</legend>
+            <p class="rg-ayuda" data-i18n="rg.carta.ayuda">Va impresa con cada regalo de este pedido. El equipo lee cada carta y cada video antes de entregarlos: no incluyas teléfonos, direcciones ni redes sociales.</p>
+            <div class="field"><label for="rg-carta" data-i18n="rg.carta.txt">Tu mensaje</label><textarea id="rg-carta" rows="5" maxlength="1200" data-input="rgCartaCuenta(this)"></textarea><span class="rg-cuenta-c" aria-live="polite">0 / 1200</span></div>
+            <div class="field"><label for="rg-firma" data-i18n="rg.carta.firma">Cómo firmas</label><input id="rg-firma" maxlength="80" data-i18n="rg.carta.firma.ph" data-i18n-attr="placeholder" placeholder="Por ejemplo: Familia Pérez, de Medellín"></div>
+            <div class="rg-video">
+              <p class="rg-video-t" data-i18n="rg.video.t">Un video para ellos (opcional)</p>
+              <div class="rg-video-acc">
+                <label class="btn btn-w rg-video-btn" for="rg-video-cam"><span data-i18n="rg.video.grabar">Grabar ahora</span></label>
+                <input type="file" id="rg-video-cam" class="sr-only" accept="video/*" capture="user" data-change="rgVideo(this)">
+                <label class="btn btn-w rg-video-btn" for="rg-video-arc"><span data-i18n="rg.video.subir">Subir un video</span></label>
+                <input type="file" id="rg-video-arc" class="sr-only" accept="video/mp4,video/quicktime,video/webm" data-change="rgVideo(this)">
+                <button type="button" class="rg-quitar" hidden data-act="rgVideoQuitar(this)" data-i18n="rg.video.quitar">Quitar el video</button>
+              </div>
+              <p class="rg-video-info" aria-live="polite" data-i18n="rg.video.ayuda">De 30 segundos a 1 minuto, hasta 90 MB. Lo mostramos a los niños en la entrega; nunca se publica.</p>
+            </div>
+          </fieldset>
+          <div id="rg-cert-caja">
+            <label class="ally-check"><input type="checkbox" id="rg-cert" data-change="rgCert()"> <span data-i18n="rg.f.cert">Quiero el certificado de donación (Colombia, Art. 257 del Estatuto Tributario)</span></label>
+            <div class="rg-cert-datos" id="rg-cert-datos" hidden>
+              <div class="field"><label for="rg-doctipo" data-i18n="rg.f.doctipo">Tipo de documento</label><select id="rg-doctipo"><option value="CC">CC</option><option value="CE">CE</option><option value="NIT">NIT</option><option value="PP">PP</option><option value="PPT">PPT</option></select></div>
+              <div class="field"><label for="rg-docnum" data-i18n="rg.f.docnum">Número de documento</label><input id="rg-docnum" maxlength="24"></div>
+              <div class="field"><label for="rg-ciudad" data-i18n="rg.f.ciudad">Ciudad</label><input id="rg-ciudad" maxlength="120"></div>
+            </div>
+          </div>
+          <p class="mu rg-cert-usd" id="rg-cert-usd" hidden></p>
+          <label class="ally-check"><input type="checkbox" id="rg-noticias"> <span data-i18n="rg.f.noticias">Quiero recibir por correo lo que hicimos con los regalos, el agradecimiento y las próximas actividades en las que puedo participar.</span></label>
+          <label class="ally-check"><input type="checkbox" id="rg-priv"> <span><span data-i18n="rg.f.priv">Acepto que Give&amp;Grow use mis datos para este pedido, según la</span> <a href="#privacidad" data-i18n="rg.f.priv.link">Política de Privacidad</a></span></label>
+          <input type="text" id="rg-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <button type="submit" class="btn btn-g" id="rg-enviar" data-i18n="rg.f.enviar">Ir a pagar</button>
+          <p class="rg-msg" id="rg-msg" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="cream" id="rg-usd" hidden>
+    <div class="wrap"><div class="rg-usd-ok" id="rg-usd-ok" aria-live="polite"></div></div>
+  </section>
+
+</main>
+
 <main id="page-socialfest" class="page">
   <section class="sf-hero">
     <div class="wrap">
@@ -2124,7 +2461,7 @@
             </tr>
             <tr>
               <td data-i18n="std.chs.c5">5 · Quejas atendidas</td>
-              <td data-i18n="std.chs.c5.p">Hoy solo existe la ruta de protección de datos ante la Superintendencia de Industria y Comercio. El mecanismo general, con una ruta confidencial separada de la ordinaria, está redactado y pendiente de adopción por el máximo órgano de dirección que definen los estatutos, que hoy es el fundador: la Fundación todavía no tiene junta directiva.</td>
+              <td data-i18n="std.chs.c5.p">Ya existe el canal para recibir quejas, sugerencias y reportes, con una ruta confidencial separada de la ordinaria y la opción de no identificarse. Lo que sigue pendiente es la política que lo gobierna —el punto focal de salvaguarda y los plazos de respuesta—, que debe adoptar el máximo órgano de dirección que definen los estatutos, que hoy es el fundador: la Fundación todavía no tiene junta directiva.</td>
               <td><span class="tag soon" data-i18n="std.est.con">En construcción</span></td>
             </tr>
             <tr>
@@ -2151,7 +2488,7 @@
         </table>
       </div>
 
-      <p class="mu rv d3" style="margin-top:22px;max-width:66ch" data-i18n="std.chs.nota">Ningún compromiso aparece aquí como cumplido si no podemos mostrar con qué. Cuatro van a medias y uno no existe todavía: decirlo es más útil, para quien nos evalúa y para nosotros, que un cuadro entero en verde que no resistiría diez minutos de comprobación.</p>
+      <p class="mu rv d3" style="margin-top:22px;max-width:66ch" data-i18n="std.chs.nota">Ningún compromiso aparece aquí como cumplido si no podemos mostrar con qué. Cuatro van a medias y uno sigue en construcción: decirlo es más útil, para quien nos evalúa y para nosotros, que un cuadro entero en verde que no resistiría diez minutos de comprobación.</p>
     </div>
   </section>
 
@@ -2279,6 +2616,7 @@
     <div class="wrap prose">
       <h2 class="h-sec rv" data-i18n="transp.trace.t">Trazabilidad de cada aporte</h2>
       <p class="rv d1" data-i18n="transp.trace.p">Recibo y número de guía al confirmarse el pago; el acta firmada y sus fotos aparecen en tu rastreo cuando la fundación entrega. Si pides certificado de donación, se emite revisado y firmado.</p>
+      <p class="rv d2" style="margin-top:10px"><a class="card-link" href="#teoria-de-cambio"><span data-i18n="transp.toc.link">Teoría de cambio: qué medimos y qué todavía no</span> <span aria-hidden="true">&rarr;</span></a></p>
     </div>
   </section>
 
@@ -2337,6 +2675,160 @@
           <p style="margin-top:14px"><strong data-i18n="contacto.phone">WhatsApp</strong><br>+57 315 330 5028</p>
           <p style="margin-top:14px"><strong data-i18n="contacto.loc">Ubicación</strong><br>Medellín, Colombia</p>
         </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ QUEJAS Y SUGERENCIAS (0046) ============
+     El canal del compromiso 5 de la Norma Humanitaria Esencial, y nada más que
+     el canal: la política de salvaguarda, el punto focal y los plazos los
+     decide la organización (SALVAGUARDA.md, apartado 8). Por eso esta página
+     NO promete un plazo ni nombra a una persona: dice lo que el sistema ya
+     garantiza —lo lee una persona, no viaja por correo, se puede sin
+     identificarse— y nada que dependa de una decisión pendiente.
+
+     DOS RUTAS, Y SEPARADAS: la ordinaria arriba; la confidencial (conducta
+     inapropiada, abuso, explotación, corrupción) en su propia sección, con su
+     propio formulario, y el servidor la guarda aparte. Nunca pide datos de un
+     menor de edad, y dice qué pasa después.
+
+     SIN CSS NUEVO: ally-form, vf-set, ally-mods, rep-ok y rep-list ya existen. -->
+<main id="page-quejas" class="page">
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="qj.ey">Quejas y sugerencias</span>
+      <h1 class="h-sec rv" data-i18n="qj.t">Dinos qué salió mal, qué podemos mejorar o qué salió bien.</h1>
+      <p class="lead rv d1" data-i18n="qj.lead">Cada mensaje lo lee una persona de la fundación. Puedes escribir sin decir quién eres: al enviar recibes un código, y con él consultas aquí en qué va.</p>
+      <p class="rv d1" style="margin-top:14px"><a class="card-link" href="#quejas" data-act="irASeccion('qj-conf')"><span data-i18n="qj.ir.conf">¿Es sobre una conducta inapropiada, un abuso o un acto de corrupción? Hay una ruta confidencial aparte</span> <span aria-hidden="true">&rarr;</span></a></p>
+
+      <form id="qj" class="ally-form rv d2" data-submit="qjEnviar(event,'qj')" novalidate>
+        <fieldset class="vf-set">
+          <legend data-i18n="qj.cat">¿Qué quieres contarnos?</legend>
+          <div class="ally-mods">
+            <label class="ally-check"><input type="radio" name="qj-cat" value="queja"><span data-i18n="qj.cat.queja">Una queja</span></label>
+            <label class="ally-check"><input type="radio" name="qj-cat" value="sugerencia"><span data-i18n="qj.cat.sug">Una sugerencia</span></label>
+            <label class="ally-check"><input type="radio" name="qj-cat" value="felicitacion"><span data-i18n="qj.cat.fel">Una felicitación</span></label>
+          </div>
+        </fieldset>
+        <div class="field"><label for="qj-rel" data-i18n="qj.rel">¿Sobre qué? (opcional)</label>
+          <select id="qj-rel">
+            <option value="" data-i18n="qj.rel.no">Prefiero no decirlo</option>
+            <option value="mmc" data-i18n="qj.rel.mmc">Mira Mi Casa</option>
+            <option value="brigada" data-i18n="qj.rel.brigada">La brigada de emergencia</option>
+            <option value="voluntariado" data-i18n="qj.rel.vol">Voluntariado</option>
+            <option value="donaciones" data-i18n="qj.rel.don">Donaciones</option>
+            <option value="hub" data-i18n="qj.rel.hub">El HUB o una fundación aliada</option>
+            <option value="sitio" data-i18n="qj.rel.sitio">Este sitio web</option>
+            <option value="otro" data-i18n="qj.rel.otro">Otra cosa</option>
+          </select></div>
+        <div class="field"><label for="qj-msg" data-i18n="qj.msg">Tu mensaje</label>
+          <textarea id="qj-msg" rows="6" maxlength="4000" aria-describedby="qj-msg-a" required></textarea>
+          <small id="qj-msg-a" class="mu" data-i18n="qj.msg.a">Cuéntanos qué pasó, cuándo y dónde. No hace falta que pongas tu nombre.</small></div>
+
+        <label class="ally-check"><input type="checkbox" id="qj-quiere" data-change="qjContacto('qj')" aria-controls="qj-datos"><span data-i18n="qj.quiere">Quiero que me respondan por correo o WhatsApp</span></label>
+        <div id="qj-datos" hidden>
+          <div class="ally-grid">
+            <div class="field"><label for="qj-nombre" data-i18n="qj.nombre">Nombre (opcional)</label>
+              <input type="text" id="qj-nombre" maxlength="120" autocomplete="name"></div>
+            <div class="field"><label for="qj-contacto" data-i18n="qj.contacto">Correo o WhatsApp</label>
+              <input type="text" id="qj-contacto" maxlength="200" autocomplete="email"></div>
+          </div>
+          <label class="ally-check"><input type="checkbox" id="qj-datos-ok"><span data-i18n="qj.datos">Autorizo usar este contacto solo para responderme sobre este mensaje, conforme a la Política de Privacidad.</span></label>
+        </div>
+
+        <input type="text" id="qj-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+        <button class="btn btn-g" id="qj-btn" type="submit" data-i18n="qj.btn">Enviar</button>
+        <p class="ally-note" id="qj-note" role="status" aria-live="polite"></p>
+      </form>
+
+      <div id="qj-ok" class="rep-ok" hidden>
+        <p class="rec-cap" data-i18n="qj.ok.t">Recibido. Tu código es</p>
+        <p class="rep-guia" id="qj-codigo"></p>
+        <p class="rep-ok-p" data-i18n="qj.ok.p">Guárdalo: con él consultas en qué va, más abajo en esta página. Si no dejaste contacto, es la única forma de ver nuestra respuesta.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cream" id="qj-conf">
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="qjc.ey">Ruta confidencial</span>
+      <h2 class="h-comp3 rv" style="margin-top:10px" data-i18n="qjc.t">Conductas inapropiadas, abuso o corrupción</h2>
+      <p class="rv d1" style="margin-top:12px;max-width:66ch" data-i18n="qjc.lead">Si alguien que actúa en nombre de Give&amp;Grow —equipo, voluntario, ingeniero, fundación aliada o proveedor— se comportó de forma inapropiada, pidió algo a cambio de la ayuda, abusó de alguien o manejó mal los recursos, puedes contarlo aquí.</p>
+
+      <div class="card rv d1" style="margin-top:22px">
+        <h3 class="h-comp3" data-i18n="qjc.ya.t">Si alguien está en peligro ahora</h3>
+        <ul class="rep-list">
+          <li data-i18n="qjc.ya.123">Emergencias: línea 123.</li>
+          <li data-i18n="qjc.ya.141">Para proteger a un niño, niña o adolescente: línea 141 del ICBF, gratuita.</li>
+          <li data-i18n="qjc.ya.155">Violencia contra las mujeres: línea 155.</li>
+        </ul>
+      </div>
+
+      <h3 class="h-comp3 rv" style="margin-top:26px" data-i18n="qjc.pasa.t">Qué pasa después de enviarlo</h3>
+      <ul class="rep-list rv d1">
+        <li data-i18n="qjc.pasa.1">Se guarda aparte de las demás solicitudes y no viaja por correo: lo lee una persona de la fundación dentro de un sistema interno.</li>
+        <li data-i18n="qjc.pasa.2">Puedes enviarlo sin decir quién eres. Si dejas un contacto, se usa solo para responderte sobre esto.</li>
+        <li data-i18n="qjc.pasa.3">Si lo que cuentas puede ser un delito, la ley colombiana obliga a ponerlo en conocimiento de las autoridades: no se resuelve solo dentro de la fundación.</li>
+        <li data-i18n="qjc.pasa.4">Recibes un código para consultar en qué va, en esta misma página.</li>
+        <li data-i18n="qjc.pasa.5">No tienes que pasar por nosotros: también puedes acudir directamente a la Fiscalía, a la Policía o al ICBF.</li>
+      </ul>
+
+      <form id="qjc" class="ally-form rv d2" data-submit="qjEnviar(event,'qjc')" novalidate>
+        <div class="field"><label for="qjc-rel" data-i18n="qjc.rel">¿En qué actividad o programa? (opcional)</label>
+          <select id="qjc-rel">
+            <option value="" data-i18n="qj.rel.no">Prefiero no decirlo</option>
+            <option value="mmc" data-i18n="qj.rel.mmc">Mira Mi Casa</option>
+            <option value="brigada" data-i18n="qj.rel.brigada">La brigada de emergencia</option>
+            <option value="voluntariado" data-i18n="qj.rel.vol">Voluntariado</option>
+            <option value="donaciones" data-i18n="qj.rel.don">Donaciones</option>
+            <option value="hub" data-i18n="qj.rel.hub">El HUB o una fundación aliada</option>
+            <option value="otro" data-i18n="qj.rel.otro">Otra cosa</option>
+          </select></div>
+        <div class="field"><label for="qjc-msg" data-i18n="qjc.msg">Qué pasó</label>
+          <textarea id="qjc-msg" rows="7" maxlength="4000" aria-describedby="qjc-msg-a" required></textarea>
+          <small id="qjc-msg-a" class="mu" data-i18n="qjc.msg.a">Cuenta qué pasó, cuándo, dónde y, si lo sabes, quién lo hizo. No escribas el nombre ni ningún dato de un niño, niña o adolescente: basta con decir que había un menor de edad.</small></div>
+
+        <label class="ally-check"><input type="checkbox" id="qjc-quiere" data-change="qjContacto('qjc')" aria-controls="qjc-datos"><span data-i18n="qjc.quiere">Quiero que me contacten (si no lo marcas, el reporte es anónimo)</span></label>
+        <div id="qjc-datos" hidden>
+          <div class="ally-grid">
+            <div class="field"><label for="qjc-nombre" data-i18n="qj.nombre">Nombre (opcional)</label>
+              <input type="text" id="qjc-nombre" maxlength="120" autocomplete="off"></div>
+            <div class="field"><label for="qjc-contacto" data-i18n="qj.contacto">Correo o WhatsApp</label>
+              <input type="text" id="qjc-contacto" maxlength="200" autocomplete="off"></div>
+          </div>
+          <label class="ally-check"><input type="checkbox" id="qjc-datos-ok"><span data-i18n="qj.datos">Autorizo usar este contacto solo para responderme sobre este mensaje, conforme a la Política de Privacidad.</span></label>
+        </div>
+
+        <input type="text" id="qjc-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+        <button class="btn btn-g" id="qjc-btn" type="submit" data-i18n="qjc.btn">Enviar por la ruta confidencial</button>
+        <p class="ally-note" id="qjc-note" role="status" aria-live="polite"></p>
+      </form>
+
+      <div id="qjc-ok" class="rep-ok" hidden>
+        <p class="rec-cap" data-i18n="qj.ok.t">Recibido. Tu código es</p>
+        <p class="rep-guia" id="qjc-codigo"></p>
+        <p class="rep-ok-p" data-i18n="qjc.ok.p">Guárdalo en un lugar seguro: con él consultas en qué va, aquí abajo. Gracias por contarlo.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="qj-consulta">
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="qjq.ey">Consultar</span>
+      <h2 class="h-sec rv" data-i18n="qjq.t">¿Ya escribiste? Mira en qué va</h2>
+      <form id="qjq" class="ally-form rv d1" data-submit="qjConsultar(event)" novalidate>
+        <div class="field"><label for="qjq-codigo" data-i18n="qjq.codigo">Tu código</label>
+          <input type="text" id="qjq-codigo" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7Q3-M9XA"></div>
+        <button class="btn btn-g" id="qjq-btn" type="submit" data-i18n="qjq.btn">Consultar</button>
+        <p class="ally-note" id="qjq-note" role="status" aria-live="polite"></p>
+      </form>
+      <div id="qjq-res" class="rep-ok" hidden>
+        <p class="rec-cap" data-i18n="qjq.estado">Estado</p>
+        <p class="h-comp3" id="qjq-estado"></p>
+        <ul class="rep-list" id="qjq-fechas"></ul>
+        <h3 class="h-comp3" id="qjq-resp-t" data-i18n="qjq.resp" hidden>La respuesta de la fundación</h3>
+        <p class="rep-ok-p" id="qjq-resp" hidden></p>
       </div>
     </div>
   </section>
@@ -3920,6 +4412,8 @@
         <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
         <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
         <a href="#medicion" data-i18n="nav.medicion">Cómo medimos</a>
+        <a href="#quejas" data-i18n="nav.quejas">Quejas y sugerencias</a>
+        <a href="#regalos" data-i18n="foot.regalos">Regalos de diciembre</a>
         <a href="#privacidad" data-i18n="foot.privacy">Privacidad y datos</a>
         <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a>
         <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a>
@@ -3962,6 +4456,7 @@
         <p class="mmc-foot-fuera" data-i18n="mmc.foot.fuera">En el sitio de la fundación, que es la entidad que responde por esto:</p>
         <a href="https://www.thegiveandgrowproject.org/#transparencia" data-i18n="nav.transp">Transparencia</a>
         <a href="https://www.thegiveandgrowproject.org/#estandares" data-i18n="nav.estandares">Marco de actuación</a>
+        <a href="https://www.thegiveandgrowproject.org/#quejas" data-i18n="nav.quejas">Quejas y sugerencias</a>
       </div>
     </div>
     <div class="foot-bottom">
