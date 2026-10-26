@@ -137,6 +137,17 @@ CORREO_MMC = "MiraMiCasa@thegiveandgrowproject.org"
 # tambien el Reply-To y el pie de los correos a empresas, fundaciones y
 # voluntarios, y el sitio ya publica contacto@ como correo de la fundacion.
 CORREO_ALIANZAS = "contacto@thegiveandgrowproject.org"
+# Canal de quejas (0046). LOS DOS SON DECISIONES DE LA ORGANIZACIÓN (apartado 8
+# de SALVAGUARDA.md) y por eso NO tienen valor aquí. Mientras falten:
+#  · sin QUEJAS_PUNTO_FOCAL, la ruta confidencial la ve quien entra a /admin
+#    (el panel lo dice) y su aviso cae a CORREO_ALIANZAS;
+#  · sin QUEJAS_PLAZO_DIAS, nada «vence» y el indicador #12 no se calcula.
+# Cuando se decidan: QUEJAS_PUNTO_FOCAL = "correo1,correo2" (titular y
+# suplente; solo esas sesiones de Access abren la ruta confidencial) y
+# QUEJAS_PLAZO_DIAS = "15" (días calendario). El formulario público no publica
+# el plazo en ningún caso: ese texto lo aprueba una persona.
+# QUEJAS_PUNTO_FOCAL = ""
+# QUEJAS_PLAZO_DIAS = ""
 
 # ---------------------------------------------------------------------------
 # PAYPAL — MEMBRESIAS INTERNACIONALES (PRODUCCION)

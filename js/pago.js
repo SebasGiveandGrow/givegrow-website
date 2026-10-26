@@ -367,6 +367,16 @@ function graciasPinta(d){
     var p = lista.filter(function(x){ return x.id === d.destino; })[0];
     destino = p ? p.name : d.destino;
   }
+  /* UN PEDIDO DE REGALOS (0048) vuelve con ?rg= y ?rt=: su aporte es en pesos
+     como cualquier otro, pero el donante quiere ver a qué niños fue, no una guía
+     suelta. El enlace solo se arma con la forma exacta de los dos valores. */
+  var qr = new URLSearchParams(location.search), rg = qr.get("rg"), rt = qr.get("rt");
+  var br = document.getElementById("gracias-regalos");
+  if (br && /^RG-\d{4}-\d{6}$/.test(String(rg || "")) && /^[a-f0-9]{32}$/.test(String(rt || ""))) {
+    br.setAttribute("href", "/?rg=" + encodeURIComponent(rg) + "&rt=" + encodeURIComponent(rt) + "#regalos");
+    br.hidden = false;
+    destino = t("gracias.regalos.destino");
+  }
   set("gr-destino", destino);
 
   var etiqueta = { aprobada:"gracias.e.aprobada", rechazada:"gracias.e.rechazada", error:"gracias.e.error" }[d.estado] || "gracias.e.confirmando";
