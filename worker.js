@@ -1475,6 +1475,10 @@ const TOPE_IP_DIA = { caso: 40, inscripcion: 60, asistencia: 200, transferencia:
      codigos pide cientos de miles. Aqui no se manda correo: el tope existe
      solo contra el barrido. */
   verificar: 300,
+  /* El canal de quejas (0046): una familia que escribe varias veces cabe de
+     sobra en 20, y no manda correo a quien escribe (solo el aviso interno).
+     La consulta con el código es de lectura; el tope es contra el barrido. */
+  quejas: 20, "quejas-consulta": 60,
   /* Regalos de diciembre: cada pedido gasta un consecutivo RG- y, en pesos, una
      guía. Treinta al día por IP cabe a una familia que escoge varias veces y
      frena un script. */
@@ -5785,6 +5789,19 @@ async function adminSalud(env, opciones) {
       "MEAL y Board › Indicadores · registra la medición del periodo que cerró, con su fuente y su corte", 88, "#sec-meal");
     await enCola("board_informe_sin_enviar", cm.informe,
       "MEAL y Board › Board de Asesores · revisa el PDF y envíaselo a los asesores", 89, "#sec-board");
+  }
+  /* EL CANAL DE QUEJAS (0046). Solo la RUTA ORDINARIA: la confidencial no
+     entra a «Hoy» ni al correo diario, que ve todo el equipo —su aviso va al
+     punto focal—. Es una persona de fuera esperando, así que va en «Hoy»; con
+     plazo decidido (QUEJAS_PLAZO_DIAS), pasado el plazo sube a Urgente. Sin
+     la 0046 no sale. */
+  try {
+    await enCola("quejas_sin_responder",
+      "SELECT COUNT(*) AS n, MIN(creado) AS masViejo FROM quejas WHERE ruta = 'ordinaria' AND estado IN ('recibida','en_revision')",
+      "Quejas › Quejas y sugerencias · una persona escribió y espera respuesta: respóndele por el medio que dejó y regístralo", 24, "#sec-quejas",
+      quejasPlazo(env));
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
   }
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
@@ -23096,8 +23113,9 @@ function melFechaCorta(f) {
    { valor, detalle, fuente } o { no: "por qué no" }. La consulta va escrita al
    lado, con lo que cuenta y lo que NO cuenta: si un valor no se puede sacar con
    honestidad de la base, no se inventa. Los que no están aquí —la escalera de
-   evidencia, las unidades de las actas, las toneladas, las viviendas, las
-   quejas— no tienen hoy una tabla que los sostenga y se miden a mano.
+   evidencia, las unidades de las actas, las toneladas, las viviendas— no
+   tienen hoy una tabla que los sostenga y se miden a mano. Las quejas (#12)
+   tienen tabla desde la 0046, y su cálculo espera además el plazo.
 
    LOS CONTEOS SON ACUMULADOS AL CORTE (lo que hay hasta ese día, desde el
    principio), porque las metas de 2027 son de existencias: «8 fundaciones con
@@ -23252,6 +23270,39 @@ const MEL_CALCULOS = Object.freeze({
       return { valor: Number(r.n || 0),
         detalle: Number(r.n || 0) + " casas con concepto firme al " + melFechaCorta(corte) + " (" + Number(r.en_periodo || 0) + " con su primer concepto en el periodo)." +
           (sin && Number(sin.n) ? " Hoy, " + sin.n + " de ellas tienen el concepto de un ingeniero sin matrícula verificada." : "") };
+    } },
+  /* #12 · Quejas y retroalimentación respondidas a tiempo (0046).
+     Base: las solicitudes RECIBIDAS en el periodo (desde–corte, hora de
+     Colombia), de las dos rutas y las cuatro categorías, sin las descartadas
+     (pruebas y spam). Las que al corte siguen sin respuesta pero todavía
+     DENTRO de su plazo no cuentan aún, ni a favor ni en contra: se dice
+     cuántas son.
+     A tiempo: respondida al corte y no después de recepción + plazo.
+     SIN PLAZO DECIDIDO (QUEJAS_PLAZO_DIAS vacío) NO HAY «A TIEMPO»: se dice
+     cuántas llegaron y cuántas se respondieron, y no se sugiere un valor. El
+     plazo es en días calendario; si se decide en hábiles, este cálculo
+     necesita el calendario de festivos y hay que cambiarlo. */
+  quejas_a_tiempo: { nombre: "Solicitudes del canal de quejas respondidas dentro del plazo", fuente: "quejas (las dos rutas, sin las descartadas)",
+    fn: async (env, desde, corte) => {
+      const plazo = quejasPlazo(env);
+      const C = "date(creado, '-5 hours')", R = "date(respondida_en, '-5 hours')", V = "date(" + C + ", '+' || ? || ' days')";
+      const RESP = "respondida_en IS NOT NULL AND " + R + " <= ?";
+      const r = await env.DB.prepare(
+        "SELECT COUNT(*) AS recibidas, COALESCE(SUM(CASE WHEN " + RESP + " THEN 1 ELSE 0 END), 0) AS respondidas, " +
+        "COALESCE(SUM(CASE WHEN " + RESP + " AND " + R + " <= " + V + " THEN 1 ELSE 0 END), 0) AS a_tiempo, " +
+        "COALESCE(SUM(CASE WHEN NOT (" + RESP + ") AND " + V + " > ? THEN 1 ELSE 0 END), 0) AS en_plazo " +
+        "FROM quejas WHERE estado <> 'descartada' AND " + C + " BETWEEN ? AND ?"
+      ).bind(corte, corte, plazo || 0, corte, plazo || 0, corte, desde, corte).first();
+      const rec = Number(r.recibidas || 0), resp = Number(r.respondidas || 0);
+      if (!plazo) return { no: "El plazo de respuesta todavía no está decidido (QUEJAS_PLAZO_DIAS vacío en la configuración del Worker): sin plazo no hay «a tiempo». " +
+        "En el periodo llegaron " + rec + " solicitud(es) y " + resp + " estaban respondidas al " + melFechaCorta(corte) + "." };
+      if (!rec) return { no: "No llegó ninguna solicitud al canal entre el " + melFechaCorta(desde) + " y el " + melFechaCorta(corte) + ": sin denominador no hay porcentaje." };
+      const enPlazo = Number(r.en_plazo || 0), base = rec - enPlazo, a = Number(r.a_tiempo || 0);
+      if (!base) return { no: "Las " + rec + " solicitud(es) del periodo siguen dentro de su plazo de " + plazo + " días al " + melFechaCorta(corte) + ": ninguna se puede contar todavía." };
+      return { valor: Math.round((a / base) * 1000) / 10,
+        detalle: a + " de " + base + " solicitudes con el plazo cumplido al " + melFechaCorta(corte) + " se respondieron dentro de los " + plazo +
+          " días calendario." + (enPlazo ? " " + enPlazo + " siguen dentro de su plazo y no cuentan todavía." : "") +
+          " Cuenta las dos rutas (ordinaria y confidencial) y todas las categorías; las descartadas no." };
     } }
 });
 
@@ -23641,6 +23692,247 @@ async function adminBoardEnvioPdf(env, id) {
     "content-type": "application/pdf", "x-content-type-options": "nosniff",
     "content-disposition": 'attachment; filename="informe-board-' + e.periodo + "-envio-" + id + '.pdf"',
     "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
+}
+
+/* ========================================================================
+   CANAL DE QUEJAS, SUGERENCIAS Y FELICITACIONES (0046)
+   ========================================================================
+   La INFRAESTRUCTURA del mecanismo del apartado 6 de SALVAGUARDA.md: el
+   formulario de #quejas, la consulta con el código, el aviso al buzón y la
+   cola de /admin. Lo que decide la organización NO se escribe aquí:
+
+   · QUEJAS_PUNTO_FOCAL — correo(s) de quien recibe la ruta confidencial,
+     separados por coma. Con valor, SOLO esas sesiones de Access abren esa
+     sección y el aviso de un reporte confidencial va SOLO a ellas. Vacío
+     (hoy): la ve quien entra a /admin y el aviso cae a CORREO_ALIANZAS; el
+     panel lo dice en rojo, porque esa es la verdad del día.
+   · QUEJAS_PLAZO_DIAS — días CALENDARIO para responder. Vacío (hoy): no hay
+     «vence el…» ni cola vencida, y el indicador #12 dice que no se puede
+     calcular. El formulario público NO lo muestra ni con valor: publicar un
+     plazo es un compromiso, y ese texto lo aprueba una persona.
+
+   Lo que no viaja nunca por correo: el mensaje, el nombre, el contacto y el
+   código. El aviso dice «llegó algo» con el número interno, y nada más. */
+const QUEJA_CATEGORIAS = ["queja", "sugerencia", "felicitacion", "conducta"];
+const QUEJA_CATEGORIA_ES = { queja: "Queja", sugerencia: "Sugerencia", felicitacion: "Felicitación",
+  conducta: "Conducta inapropiada o abuso" };
+const QUEJA_RELACIONADO_ES = { mmc: "Mira Mi Casa", brigada: "Brigada de emergencia", voluntariado: "Voluntariado",
+  donaciones: "Donaciones", hub: "HUB y fundaciones aliadas", sitio: "El sitio web", otro: "Otro" };
+const QUEJA_ESTADOS = { recibida: "Recibida", en_revision: "En revisión", respondida: "Respondida", descartada: "Descartada" };
+const QUEJA_MEDIOS = { correo: "Por correo", whatsapp: "Por WhatsApp", telefono: "Por teléfono", en_persona: "En persona",
+  codigo: "Solo en la consulta con el código", sin_contacto: "No había cómo contactarla" };
+
+function quejasPlazo(env) {
+  const n = Number(String((env && env.QUEJAS_PLAZO_DIAS) || "").trim());
+  return Number.isInteger(n) && n > 0 && n <= 120 ? n : null;
+}
+function quejasFocal(env) {
+  return String((env && env.QUEJAS_PUNTO_FOCAL) || "").split(/[,;\s]+/)
+    .map((x) => x.trim().toLowerCase()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+}
+/* Sin punto focal designado, separar la ruta de verdad no es posible: no hay
+   a quién dársela. Esconderla de todos dejaría un reporte de abuso sin leer,
+   que es peor. Se le muestra a quien entra a /admin y se dice. */
+function puedeVerConfidencial(env, email) {
+  const f = quejasFocal(env);
+  return !f.length || f.includes(String(email || "").toLowerCase());
+}
+/* El día en que vence, en hora de Colombia: el de la recepción más el plazo. */
+function quejaVence(creado, plazo) {
+  if (!plazo) return null;
+  const d = new Date(Date.parse(fechaCO(creado) + "T12:00:00Z") + plazo * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
+/* POST /api/quejas — PÚBLICO. Honeypot, tope por IP y datos mínimos.
+   · Anónima por defecto. Si deja contacto es UNO (correo o WhatsApp), y sin la
+     casilla de Ley 1581 no se guarda.
+   · «conducta» va siempre por la ruta confidencial: lo decide el servidor, no
+     el navegador.
+   · El correo del aviso no lleva nada de lo escrito. */
+async function apiQueja(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (c.web2) return json({ ok: true, codigo: "" });
+  if (!(await pasaTopeIP(env, request, "quejas"))) {
+    return json({ error: "demasiados_envios_hoy",
+                  ayuda: "Hoy ya recibimos muchas solicitudes desde esta conexión. Inténtalo mañana, o escríbenos por WhatsApp." }, 429);
+  }
+  if (!(await existeTabla(env, "quejas"))) return json({ error: "no_disponible" }, 503);
+
+  const categoria = QUEJA_CATEGORIAS.includes(c.categoria) ? c.categoria : null;
+  if (!categoria) return json({ error: "categoria_invalida", opciones: QUEJA_CATEGORIAS }, 400);
+  const ruta = categoria === "conducta" ? "confidencial" : "ordinaria";
+  const mensaje = String(c.mensaje == null ? "" : c.mensaje).replace(/\r\n?/g, "\n").trim().slice(0, 4000);
+  if (mensaje.length < 10) return json({ error: "mensaje_requerido" }, 400);
+  const relacionado = QUEJA_RELACIONADO_ES[c.relacionado] ? c.relacionado : null;
+  const anonima = c.anonima !== false;
+  let nombre = null, contacto = null;
+  if (!anonima) {
+    const t = limpiar(c.contacto, 200);
+    if (/@/.test(t)) {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t)) return json({ error: "contacto_invalido" }, 400);
+      contacto = t.toLowerCase();
+    } else {
+      contacto = telefonoContacto(t);
+      if (!contacto) return json({ error: "contacto_invalido" }, 400);
+    }
+    if (!c.autoriza_datos) return json({ error: "autorizacion_requerida" }, 400);
+    nombre = limpiar(c.nombre, 120).replace(/\s+/g, " ") || null;
+  }
+  const idioma = c.idioma === "en" ? "en" : "es";
+
+  /* El código es único por la columna; un choque (1 en ~10^11) se reintenta. */
+  let fila = null, codigo = "";
+  for (let i = 0; i < 3 && !fila; i++) {
+    codigo = verifNuevo();
+    try {
+      fila = await env.DB.prepare(
+        "INSERT INTO quejas (codigo, ruta, categoria, relacionado, mensaje, anonima, nombre, contacto, idioma) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+      ).bind(codigo, ruta, categoria, relacionado, mensaje, anonima ? 1 : 0, nombre, contacto, idioma).first();
+    } catch (e) {
+      if (!/UNIQUE/i.test(String(e && e.message))) throw e;
+    }
+  }
+  if (!fila) return json({ error: "error_interno" }, 500);
+  if (contacto) await anotarAutorizacion(env, fila.id, "queja", "contacto para responder", "queja");
+  try {
+    await correoAvisoQueja(env, { id: fila.id, ruta });
+  } catch (e) {
+    console.error("aviso queja", fila.id, e && e.message);
+  }
+  return json({ ok: true, codigo: verifFormato(codigo), ruta });
+}
+
+/* POST /api/quejas/estado { codigo } — PÚBLICO. Quien tiene el código ve en
+   qué va: estado, fechas y, si la fundación la escribió, la respuesta para
+   él. Nada más: ni el mensaje ni el contacto vuelven. POST y no GET, para que
+   el código no quede en ninguna URL ni en ningún registro de acceso. */
+async function apiQuejaEstado(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await pasaTopeIP(env, request, "quejas-consulta"))) {
+    return json({ error: "demasiadas_consultas", ayuda: "Hoy ya hubo muchas consultas desde esta conexión. Inténtalo mañana." }, 429);
+  }
+  const codigo = verifNormal(c.codigo);
+  if (!codigo) return json({ error: "codigo_invalido" }, 400);
+  if (!(await existeTabla(env, "quejas"))) return json({ error: "no_disponible" }, 503);
+  const q = await env.DB.prepare(
+    "SELECT estado, creado, revision_en, respondida_en, descartada_en, respuesta_codigo FROM quejas WHERE codigo = ?"
+  ).bind(codigo).first();
+  if (!q) return json({ error: "no_encontrado" }, 404);
+  return json({ ok: true, estado: q.estado,
+    recibida: fechaCO(q.creado),
+    en_revision: q.revision_en ? fechaCO(q.revision_en) : null,
+    respondida: q.respondida_en ? fechaCO(q.respondida_en) : null,
+    cerrada: q.descartada_en ? fechaCO(q.descartada_en) : null,
+    respuesta: q.estado === "respondida" && q.respuesta_codigo ? q.respuesta_codigo : null });
+}
+
+/* EL AVISO: «llegó algo», con el número interno. Ni el mensaje, ni quién, ni
+   el código: en el asunto quedaría además en la bitácora `correos`, que se ve
+   en Sistema › Correos. La ruta confidencial avisa SOLO al punto focal cuando
+   existe; uno por dirección, porque cada envío lleva un solo destinatario. */
+async function correoAvisoQueja(env, q) {
+  const focal = q.ruta === "confidencial" ? quejasFocal(env) : [];
+  const destinos = focal.length ? focal : [correoAlianzas(env)].filter(Boolean);
+  if (!destinos.length) return avisoSinBuzon(env, "aviso-queja");
+  const seccion = q.ruta === "confidencial" ? "Quejas › Ruta confidencial" : "Quejas › Quejas y sugerencias";
+  const asunto = "Canal de quejas: llegó una solicitud nueva (n.º " + q.id + ")";
+  const parrafos = [
+    "Llegó la solicitud n.º " + q.id + " al canal de quejas, sugerencias y felicitaciones.",
+    "Lo que escribió la persona no viaja por correo, a propósito: se lee en el panel, en " + seccion + "."
+  ];
+  for (const para of destinos) {
+    await enviarCorreo(env, { para, asunto, etiqueta: "aviso-queja",
+      texto: parrafos.join("\n\n"),
+      html: plantillaCorreo({ titulo: "Llegó una solicitud nueva", parrafos, cierre: "Panel interno · " + seccion }) });
+  }
+}
+
+/* GET /api/admin/quejas?ruta=ordinaria|confidencial — la cola. La ruta
+   confidencial solo para quien puede verla (ver puedeVerConfidencial). */
+async function adminQuejas(env, url, email) {
+  const ruta = url.searchParams.get("ruta") === "confidencial" ? "confidencial" : "ordinaria";
+  const plazo = quejasPlazo(env);
+  const base = { ruta, hoy: fechaCO(), plazo_dias: plazo, focal_configurado: quejasFocal(env).length > 0,
+    estados: QUEJA_ESTADOS, categorias: QUEJA_CATEGORIA_ES, relacionado: QUEJA_RELACIONADO_ES, medios: QUEJA_MEDIOS };
+  if (ruta === "confidencial" && !puedeVerConfidencial(env, email)) {
+    return json(Object.assign(base, { permitido: false, con_tabla: true, quejas: [] }));
+  }
+  if (!(await existeTabla(env, "quejas"))) return json(Object.assign(base, { permitido: true, con_tabla: false, quejas: [] }));
+  const filas = (await env.DB.prepare(
+    "SELECT * FROM quejas WHERE ruta = ? ORDER BY CASE WHEN estado IN ('recibida','en_revision') THEN 0 ELSE 1 END, creado DESC LIMIT 1000"
+  ).bind(ruta).all()).results || [];
+  for (const q of filas) {
+    q.codigo = verifFormato(q.codigo);
+    q.vence = q.estado === "recibida" || q.estado === "en_revision" ? quejaVence(q.creado, plazo) : null;
+  }
+  return json(Object.assign(base, { permitido: true, con_tabla: true, quejas: filas }));
+}
+
+/* POST /api/admin/queja/<id> { accion: revisar | responder | descartar }
+   · responder: qué se respondió o se hizo (interno, obligatorio), por qué
+     medio, y —opcional— la respuesta que verá quien consulte con el código.
+     `fecha` es el día en que de verdad se respondió (por WhatsApp ayer, se
+     anota hoy): es la que cuenta para el indicador #12.
+   · descartar: solo lo que no es una solicitud (prueba, spam), con motivo.
+   La auditoría dice quién hizo qué con el NÚMERO: nada del contenido. */
+async function adminQueja(request, env, id, email) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "quejas"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0046 en la base." }, 409);
+  const x = await env.DB.prepare("SELECT id, ruta, estado, creado FROM quejas WHERE id = ?").bind(id).first();
+  if (!x) return json({ error: "no_encontrado" }, 404);
+  if (x.ruta === "confidencial" && !puedeVerConfidencial(env, email)) {
+    return json({ error: "solo_punto_focal", ayuda: "La ruta confidencial solo la atiende el punto focal." }, 403);
+  }
+  const abierta = x.estado === "recibida" || x.estado === "en_revision";
+  let detalle;
+  if (c.accion === "revisar") {
+    if (x.estado !== "recibida") return json({ error: "estado_invalido", ayuda: "Solo una solicitud recibida pasa a revisión." }, 409);
+    await env.DB.prepare("UPDATE quejas SET estado = 'en_revision', revision_en = datetime('now'), revision_por = ?, actualizado = datetime('now') WHERE id = ?")
+      .bind(email || null, id).run();
+    detalle = "en revisión";
+  } else if (c.accion === "responder") {
+    if (!abierta) return json({ error: "estado_invalido", ayuda: "Esta solicitud ya está cerrada." }, 409);
+    const respuesta = String(c.respuesta == null ? "" : c.respuesta).trim().slice(0, 4000);
+    if (respuesta.length < 3) return json({ error: "respuesta_requerida", campo: "respuesta", ayuda: "Escribe qué se le respondió o qué se hizo." }, 400);
+    const medio = QUEJA_MEDIOS[c.medio] ? c.medio : null;
+    if (!medio) return json({ error: "medio_requerido", campo: "medio", ayuda: "Elige por dónde se respondió." }, 400);
+    const paraCodigo = String(c.respuesta_codigo == null ? "" : c.respuesta_codigo).trim().slice(0, 2000) || null;
+    if (medio === "codigo" && !paraCodigo) {
+      return json({ error: "respuesta_codigo_requerida", campo: "respuesta_codigo", ayuda: "Si la respuesta es la de la consulta con el código, escríbela." }, 400);
+    }
+    const fecha = c.fecha ? String(c.fecha) : fechaCO();
+    if (!fechaISOValida(fecha) || fecha > fechaCO() || fecha < fechaCO(x.creado)) {
+      return json({ error: "fecha_invalida", campo: "fecha", ayuda: "La fecha va entre el día en que llegó y hoy." }, 400);
+    }
+    /* Hoy, la hora real; otro día, mediodía de Colombia (17:00 UTC). */
+    const cuando = fecha === fechaCO() ? new Date().toISOString().replace("T", " ").slice(0, 19) : fecha + " 17:00:00";
+    await env.DB.prepare(
+      "UPDATE quejas SET estado = 'respondida', respondida_en = ?, respondida_por = ?, respuesta = ?, respuesta_medio = ?, " +
+      "respuesta_codigo = ?, revision_en = COALESCE(revision_en, ?), revision_por = COALESCE(revision_por, ?), actualizado = datetime('now') WHERE id = ?"
+    ).bind(cuando, email || null, respuesta, medio, paraCodigo, cuando, email || null, id).run();
+    detalle = "respondida (" + medio + ", " + fecha + ")";
+  } else if (c.accion === "descartar") {
+    if (!abierta) return json({ error: "estado_invalido", ayuda: "Esta solicitud ya está cerrada." }, 409);
+    const motivo = limpiar(c.motivo, 500);
+    if (motivo.length < 3) return json({ error: "motivo_requerido", ayuda: "Di por qué no es una solicitud: queda en la auditoría." }, 400);
+    await env.DB.prepare("UPDATE quejas SET estado = 'descartada', descartada_en = datetime('now'), descartada_por = ?, descarte_motivo = ?, actualizado = datetime('now') WHERE id = ?")
+      .bind(email || null, motivo, id).run();
+    detalle = "descartada";
+  } else return json({ error: "accion_invalida" }, 400);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(email || "?", "queja " + id + " · " + detalle).run();
+  return json({ ok: true, id });
 }
 
 /* Lo que se escribe en el panel para la convocatoria, comprobado igual para la
@@ -30731,6 +31023,7 @@ textarea { font-size: 16px }
 .doc-est.vencido{color:var(--err)}
 .doc-est.por_vencer{color:var(--amber)}
 .doc-est.vigente{color:var(--g)}
+.qj-msg{white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
 .doc-est.reemplazado,.doc-est.anulado,.doc-est.no_aplica{color:var(--mu);font-weight:400}
 /* MEAL (0045): el estado de un indicador, con los mismos colores. */
 .mel-est{font-weight:600}
@@ -30835,6 +31128,13 @@ textarea { font-size: 16px }
   <p class="pn-gt">MEAL y Board</p>
   <a class="pn-it" href="#meal/indicadores" data-pn-ir="meal/indicadores">Indicadores<span class="pn-n" data-pn-n="meal/indicadores"></span></a>
   <a class="pn-it" href="#meal/board" data-pn-ir="meal/board">Board de Asesores<span class="pn-n" data-pn-n="meal/board"></span></a>
+</div>
+<!-- El canal de quejas (0046): la ruta ordinaria suma en «Hoy»; la
+     confidencial no, y solo la abre el punto focal (QUEJAS_PUNTO_FOCAL). -->
+<div class="pn-grupo">
+  <p class="pn-gt">Quejas</p>
+  <a class="pn-it" href="#quejas/ordinaria" data-pn-ir="quejas/ordinaria">Quejas y sugerencias<span class="pn-n" data-pn-n="quejas/ordinaria"></span></a>
+  <a class="pn-it" href="#quejas/confidencial" data-pn-ir="quejas/confidencial">Ruta confidencial</a>
 </div>
 <div class="pn-grupo">
   <p class="pn-gt">Sistema</p>
@@ -31246,6 +31546,26 @@ sabes que está mal.</p>
 </div>
 <h2 class="pn-h2">Lo que se le ha enviado</h2>
 <div id="tb-board-envios" class="tb"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<!-- ============================ QUEJAS ============================ -->
+<section class="pn-vista" data-vista="quejas/ordinaria" id="sec-quejas" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Llegan del formulario público <strong>#quejas</strong>: quejas, sugerencias y felicitaciones. Se pueden enviar <strong>sin identificarse</strong>; quien deja contacto deja uno solo (correo o WhatsApp) y autoriza usarlo para responderle.</p>
+<p>El contenido <strong>nunca sale por correo</strong>: el buzón solo recibe «llegó la n.º X». Se lee aquí.</p>
+<p>Se responde <strong>por el medio que la persona dejó</strong>, y aquí se registra qué se respondió y cuándo: esa fecha es la del indicador #12. A quien es anónima solo se le puede contestar con el texto que verá al consultar con su código.</p>
+<p>El plazo de respuesta todavía es una <strong>decisión pendiente</strong> (QUEJAS_PLAZO_DIAS). Mientras no exista, nada «vence» y el formulario público no promete ninguno.</p>
+</div></details>
+<div id="tb-qj" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<section class="pn-vista" data-vista="quejas/confidencial" id="sec-quejas-conf" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Es la ruta de <strong>conductas inapropiadas, abuso, explotación o corrupción</strong>. Va aparte a propósito: nadie denuncia a su interlocutor ante su interlocutor. No entra a «Hoy» ni al correo diario.</p>
+<p>Con <strong>QUEJAS_PUNTO_FOCAL</strong> configurado, solo esas sesiones la abren y solo a ellas les llega el aviso. Sin él, la ve quien entra a /admin, y esta pantalla lo dice.</p>
+<p>Si lo que se cuenta puede ser un delito, la ley obliga a ponerlo en conocimiento de la autoridad. El formulario nunca pide datos de un menor de edad.</p>
+</div></details>
+<div id="tb-qjc" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <!-- ============================ SISTEMA ============================ -->
@@ -32497,7 +32817,8 @@ var COLA_ES = {
   documentos_por_vencer: "Documentos por vencer",
   documentos_faltantes: "Documentos que faltan",
   meal_indicadores_pendientes: "Indicadores sin la medición del periodo",
-  board_informe_sin_enviar: "Informe trimestral sin enviar a los asesores"
+  board_informe_sin_enviar: "Informe trimestral sin enviar a los asesores",
+  quejas_sin_responder: "Quejas y sugerencias sin responder"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -32553,6 +32874,10 @@ var VISTAS = {
   "meal/board": { area: "MEAL y Board", titulo: "Board de Asesores",
     linea: "Quién asesora a la fundación y lo que se le manda: el informe trimestral y la convocatoria. El Board recomienda; no aprueba ni dirige.",
     accion: ["Añadir asesor", "bd-asesor"] },
+  "quejas/ordinaria": { area: "Quejas", titulo: "Quejas, sugerencias y felicitaciones",
+    linea: "Lo que llega del formulario público, con su estado. Se responde por el medio que dejó la persona y aquí se registra." },
+  "quejas/confidencial": { area: "Quejas", titulo: "Ruta confidencial",
+    linea: "Reportes de conductas inapropiadas o abuso. Aparte de todo lo demás, y solo para el punto focal de salvaguarda." },
   "finanzas/resumen": { area: "Finanzas", titulo: "Resumen",
     linea: "Lo que entró y lo que salió en el mes o en el año, y de dónde sale cada cifra." },
   "finanzas/banco": { area: "Finanzas", titulo: "Banco",
@@ -32784,7 +33109,8 @@ var COLA_MOD = {
   documentos_por_vencer: "legal/documentos",
   documentos_faltantes: "legal/documentos",
   meal_indicadores_pendientes: "meal/indicadores",
-  board_informe_sin_enviar: "meal/board"
+  board_informe_sin_enviar: "meal/board",
+  quejas_sin_responder: "quejas/ordinaria"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -40284,11 +40610,198 @@ document.addEventListener("click", function(e){
   if (e.target && e.target.id === "bk-altas") aceptarTodasAltas();
 });
 
+/* ---- EL CANAL DE QUEJAS (0046) ----
+   Dos secciones con la misma tabla: la ruta ordinaria y la confidencial. El
+   panel pide las dos igual y es el SERVIDOR el que decide si la sesión puede
+   ver la confidencial (QUEJAS_PUNTO_FOCAL). El mensaje se pinta con esc() y
+   con saltos de línea por CSS, nunca como HTML. */
+var QJ = { ordinaria: null, confidencial: null };
+var QJ_EST_CLASE = { recibida: "por_vencer", en_revision: "por_vencer", respondida: "vigente", descartada: "anulado" };
+function qjDe(ruta, mapa, k){ var d = QJ[ruta]; return ((d && d[mapa]) || {})[k] || k || ""; }
+function qjAbierta(x){ return x.estado === "recibida" || x.estado === "en_revision"; }
+function qjEstado(x, ruta){
+  var h = '<span class="doc-est ' + esc(QJ_EST_CLASE[x.estado] || "") + '">' + esc(qjDe(ruta, "estados", x.estado)) + "</span>";
+  if (x.vence) h += "<small" + (x.vence < hoyCO() ? ' class="tb-mal"' : "") + ">vence el " + esc(fechaCorta(x.vence)) + "</small>";
+  return h;
+}
+function tablaQuejas(ruta){
+  var conf = ruta === "confidencial";
+  return tablaNueva({ id: conf ? "tb-qjc" : "tb-qj", titulo: conf ? "Ruta confidencial" : "Quejas, sugerencias y felicitaciones",
+    orden: "creado", dir: "desc", buscar: "Número, código o texto",
+    texto: function(x){ return [x.id, x.codigo, x.mensaje, x.nombre].join(" "); },
+    filtros: [
+      { k: "estado", t: "Estado", def: "abiertas", sinTodos: true,
+        opciones: [["abiertas", "Por responder"], ["respondida", "Respondidas"], ["descartada", "Descartadas"], ["todas", "Todas"]],
+        prueba: function(x, v){ return v === "todas" || (v === "abiertas" ? qjAbierta(x) : x.estado === v); } }
+    ].concat(conf ? [] : [
+      { k: "categoria", t: "Tipo", opciones: [["queja", "Queja"], ["sugerencia", "Sugerencia"], ["felicitacion", "Felicitación"]],
+        prueba: function(x, v){ return x.categoria === v; } }
+    ]),
+    columnas: [
+      { k: "creado", t: "Llegó", nw: true, valor: function(x){ return x.creado; }, celda: function(x){
+        return esc(enCO(x.creado, 16)) + "<small>n.º " + esc(x.id) + "</small>"; } },
+      { k: "categoria", t: "Tipo", valor: function(x){ return x.categoria; }, celda: function(x){
+        return "<strong>" + esc(qjDe(ruta, "categorias", x.categoria)) + "</strong>" +
+          (x.relacionado ? "<small>" + esc(qjDe(ruta, "relacionado", x.relacionado)) + "</small>" : ""); } },
+      { k: "mensaje", t: "Mensaje", orden: false, celda: function(x){
+        var m = String(x.mensaje || "");
+        return esc(m.length > 110 ? m.slice(0, 110) + "…" : m); } },
+      { k: "estado", t: "Estado", valor: function(x){ return (qjAbierta(x) ? "0" : "1") + (x.vence || ""); }, celda: function(x){ return qjEstado(x, ruta); } },
+      { k: "contacto", t: "Contacto", valor: function(x){ return x.anonima ? "b" : "a"; }, celda: function(x){
+        return x.anonima ? '<span class="mu">Anónima</span>' : celdaPersona(x.nombre || "(sin nombre)", x.contacto); } }
+    ],
+    aviso: function(){
+      var d = QJ[ruta];
+      if (!d) return "";
+      if (!d.con_tabla) return "<strong>Falta aplicar la migración 0046</strong> · sin ella el formulario público no guarda nada.";
+      if (conf && !d.focal_configurado) return "<strong>Sin punto focal designado</strong> · esta ruta la ve cualquiera que entre a /admin y su aviso llega a contacto@. " +
+        "La separación de verdad empieza cuando se configure QUEJAS_PUNTO_FOCAL.";
+      return "";
+    },
+    nota: function(){
+      var d = QJ[ruta];
+      var p = d && d.plazo_dias ? "Plazo interno: " + d.plazo_dias + " días calendario desde que llega." : "Plazo sin decidir: ninguna solicitud «vence» todavía.";
+      return esc(p + (conf ? " El contenido de esta ruta nunca sale por correo ni entra a «Hoy»." : " El contenido nunca sale por correo: se lee aquí."));
+    },
+    vacio: { titulo: conf ? "No ha llegado ningún reporte por esta ruta." : "Todavía no ha llegado ninguna solicitud.",
+      texto: "Llegan desde el formulario público de #quejas." },
+    etiquetaFila: function(x){ return "Abrir la solicitud n.º " + x.id; },
+    abrir: function(x){ abrirQueja(x, ruta); }
+  });
+}
+var TB_QJ = tablaQuejas("ordinaria");
+var TB_QJC = tablaQuejas("confidencial");
+function pedirQuejas(ruta, t, caja){
+  if (!t.armada) tablaArmar(t, caja);
+  return pedirJSON("/api/admin/quejas?ruta=" + ruta, t.cfg.id + "-cuerpo").then(function(d){
+    QJ[ruta] = d;
+    if (!d.permitido){
+      caja.innerHTML = '<p class="carga-fallo"><strong>Esta ruta solo la abre el punto focal de salvaguarda.</strong> ' +
+        "Tu sesión no está en QUEJAS_PUNTO_FOCAL. Es la separación del mecanismo: nadie fuera del punto focal lee estos reportes, por si uno lo involucra.</p>";
+      return d;
+    }
+    tablaBarra(t);
+    tablaCargar(t, d.quejas || []);
+    return d;
+  });
+}
+function cargarQuejas(){ return pedirQuejas("ordinaria", TB_QJ, document.getElementById("tb-qj")); }
+function cargarQuejasConf(){ return pedirQuejas("confidencial", TB_QJC, document.getElementById("tb-qjc")); }
+function refrescarQuejas(ruta){
+  if (ruta === "confidencial"){ QJ.confidencial = null; if (PEDIDAS["tb-qjc"]) cargarQuejasConf(); }
+  else { QJ.ordinaria = null; if (PEDIDAS["tb-qj"]) cargarQuejas(); }
+  cargarSalud();
+}
+function abrirQueja(x, ruta){
+  var pares = [
+    ["Número", "n.º " + esc(x.id) + "<small>código de quien la envió: " + esc(x.codigo) + "</small>"],
+    ["Tipo", esc(qjDe(ruta, "categorias", x.categoria)) + (x.relacionado ? "<small>" + esc(qjDe(ruta, "relacionado", x.relacionado)) + "</small>" : "")],
+    ["Llegó", esc(enCO(x.creado, 16)) + "<small>" + (x.idioma === "en" ? "escrita en inglés" : "escrita en español") + "</small>"],
+    ["Estado", qjEstado(x, ruta)],
+    ["Quién", x.anonima ? '<span class="mu">Anónima: no dejó nombre ni contacto. Solo puede leer una respuesta con su código.</span>'
+      : celdaPersona(x.nombre || "(sin nombre)", x.contacto) + "<small>Autorizó usar este contacto solo para responderle.</small>"],
+    ["Mensaje", '<div class="qj-msg">' + esc(x.mensaje || "") + "</div>"]
+  ];
+  if (x.revision_en) pares.push(["En revisión", esc(enCO(x.revision_en, 16)) + (x.revision_por ? "<small>" + esc(x.revision_por) + "</small>" : "")]);
+  if (x.respondida_en){
+    pares.push(["Respondida", esc(enCO(x.respondida_en, 10)) + "<small>" + esc(qjDe(ruta, "medios", x.respuesta_medio)) + (x.respondida_por ? " · " + esc(x.respondida_por) : "") + "</small>"]);
+    pares.push(["Qué se respondió", '<div class="qj-msg">' + esc(x.respuesta || "") + "</div>"]);
+    if (x.respuesta_codigo) pares.push(["Lo que ve con su código", '<div class="qj-msg">' + esc(x.respuesta_codigo) + "</div>"]);
+  }
+  if (x.descartada_en) pares.push(["Descartada", esc(enCO(x.descartada_en, 16)) + "<small>" + esc(x.descarte_motivo || "") + (x.descartada_por ? " · " + esc(x.descartada_por) : "") + "</small>"]);
+  var pie = "";
+  if (qjAbierta(x)){
+    pie += '<button type="button" class="pn-b1" data-qj-responder="' + x.id + '" data-ruta="' + ruta + '">Registrar la respuesta…</button>';
+    if (x.estado === "recibida") pie += '<button type="button" class="pn-b2" data-qj-revisar="' + x.id + '" data-ruta="' + ruta + '">Marcar en revisión</button>';
+    pie += '<button type="button" class="pn-b2" data-qj-descartar="' + x.id + '" data-ruta="' + ruta + '">Descartar…</button>';
+  }
+  pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  cajonAbrir({ ey: ruta === "confidencial" ? "Ruta confidencial" : "Quejas y sugerencias", titulo: "Solicitud n.º " + x.id,
+    cuerpo: (ruta === "confidencial" ? '<p class="pn-nota">Si lo que cuenta puede ser un delito, la ley obliga a ponerlo en conocimiento de la autoridad: no se resuelve solo aquí. ' +
+      "Ninguna respuesta debe revelar quién lo reportó.</p>" : "") + ficha(pares), pie: pie, ancho: true });
+}
+function qjPorId(ruta, id){
+  var d = QJ[ruta];
+  return ((d && d.quejas) || []).filter(function(q){ return String(q.id) === String(id); })[0] || null;
+}
+function formResponderQueja(x, ruta){
+  var d = QJ[ruta] || {};
+  var medios = Object.keys(d.medios || {}).map(function(k){
+    var no = x.anonima && (k === "correo" || k === "whatsapp" || k === "telefono");
+    return no ? "" : '<option value="' + esc(k) + '">' + esc(d.medios[k]) + "</option>";
+  }).join("");
+  var h = '<p style="margin:0 0 14px">Se registra lo que ya se le respondió a la persona, por el medio que dejó. Desde aquí no sale ningún correo.</p>' +
+    selectCampo("qr-medio", "Por dónde se respondió", '<option value="">Elige…</option>' + medios,
+      x.anonima ? "Es anónima: solo puede leer la respuesta con su código." : "Contacto que dejó: " + (x.contacto || "")) +
+    pnCampo("qr-fecha", "Fecha en que se respondió", hoyCO(), { tipo: "date", extra: ' max="' + esc(hoyCO()) + '"', ayuda: "La que cuenta para el indicador #12." }) +
+    pnCampo("qr-resp", "Qué se respondió o qué se hizo (interno)", "", { area: true, filas: 4 }) +
+    pnCampo("qr-codigo", "Respuesta para quien consulte con su código (opcional)", "", { area: true, filas: 4,
+      ayuda: "La lee cualquiera que tenga el código. Sin datos de otras personas ni de menores de edad." }) +
+    '<p class="pn-error" id="pn-err"></p>';
+  cajonAbrir({ ey: "Solicitud n.º " + x.id, titulo: "Registrar la respuesta", cuerpo: h, foco: "qr-medio",
+    pie: '<button type="button" class="pn-b1" id="qr-guardar">Registrar como respondida</button>' +
+      '<button type="button" class="pn-b2" id="qr-volver">Volver</button>' });
+  document.getElementById("qr-volver").addEventListener("click", function(){ abrirQueja(x, ruta); });
+  document.getElementById("qr-guardar").addEventListener("click", function(){
+    var b = this;
+    ["qr-medio", "qr-fecha", "qr-resp", "qr-codigo"].forEach(function(k){ pnMarcar(k, ""); });
+    var c = { accion: "responder", medio: pnValor("qr-medio"), fecha: pnValor("qr-fecha"), respuesta: pnValor("qr-resp"), respuesta_codigo: pnValor("qr-codigo") };
+    if (!c.medio){ pnMarcar("qr-medio", "Elige por dónde se respondió."); return; }
+    if (c.respuesta.length < 3){ pnMarcar("qr-resp", "Escribe qué se le respondió o qué se hizo."); return; }
+    if (c.medio === "codigo" && !c.respuesta_codigo){ pnMarcar("qr-codigo", "Escribe la respuesta que leerá con su código."); return; }
+    b.disabled = true;
+    postPanel("/api/admin/queja/" + x.id, c).then(function(r){
+      b.disabled = false;
+      if (!r) return;
+      avisar("Solicitud n.º " + x.id + " registrada como respondida.");
+      cajonCerrar(); refrescarQuejas(ruta);
+    });
+  });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b, x, ruta;
+  if ((b = e.target.closest("[data-qj-responder]"))){
+    ruta = b.getAttribute("data-ruta"); x = qjPorId(ruta, b.getAttribute("data-qj-responder"));
+    if (x) formResponderQueja(x, ruta);
+    return;
+  }
+  if ((b = e.target.closest("[data-qj-revisar]"))){
+    ruta = b.getAttribute("data-ruta"); var id = b.getAttribute("data-qj-revisar");
+    b.disabled = true;
+    postPanel("/api/admin/queja/" + id, { accion: "revisar" }).then(function(r){
+      b.disabled = false;
+      if (!r) return;
+      avisar("Solicitud n.º " + id + " en revisión.");
+      cajonCerrar(); refrescarQuejas(ruta);
+    });
+    return;
+  }
+  if ((b = e.target.closest("[data-qj-descartar]"))){
+    ruta = b.getAttribute("data-ruta"); x = qjPorId(ruta, b.getAttribute("data-qj-descartar"));
+    if (!x) return;
+    confirmarPeligro({ titulo: "Descartar la solicitud n.º " + x.id, boton: "Descartar", motivo: true, etiquetaMotivo: "Por qué no es una solicitud",
+      detalle: "<p>Solo para lo que no es una solicitud de verdad: una prueba, spam, un duplicado. Sale del indicador #12 y queda en la auditoría con tu motivo. " +
+        "Una queja incómoda no se descarta: se responde.</p>",
+      volver: function(){ abrirQueja(x, ruta); },
+      hacer: function(m){
+        return postPanel("/api/admin/queja/" + x.id, { accion: "descartar", motivo: m }).then(function(r){
+          if (!r) return false;
+          avisar("Solicitud n.º " + x.id + " descartada.");
+          cajonCerrar(); refrescarQuejas(ruta);
+          return false;
+        });
+      } });
+  }
+});
+
 var BANDEJAS = {
   "tb-tareas": cargarTareas,
   "tb-docs": cargarDocumentos,
   "tb-mel": cargarMeal,
   "tb-board": cargarBoard,
+  "tb-qj": cargarQuejas,
+  "tb-qjc": cargarQuejasConf,
   "tb-contactos": cargarContactos,
   "tb-socialfest": cargarSocialFest,
   "tb-correos": cargarCorreos,
@@ -44261,6 +44774,11 @@ export default {
         if (ruta === "/api/admin/board/enviar") return await adminBoardEnviar(request, env, sesion.email);
         const mbe = ruta.match(/^\/api\/admin\/board\/envio\/(\d{1,9})\.pdf$/);
         if (mbe) return await adminBoardEnvioPdf(env, Number(mbe[1]));
+        /* Canal de quejas (0046). La ruta confidencial la filtra cada función
+           con la sesión: ver puedeVerConfidencial. */
+        if (ruta === "/api/admin/quejas") return await adminQuejas(env, url, sesion.email);
+        const mqj = ruta.match(/^\/api\/admin\/queja\/(\d{1,9})$/);
+        if (mqj) return await adminQueja(request, env, Number(mqj[1]), sesion.email);
         if (ruta === "/api/admin/correos")   return await adminCorreos(env, url);
         const mco = ruta.match(/^\/api\/admin\/correo\/(\d{1,9})(?:\/(reenviar|resuelto))?$/);
         if (mco) {
@@ -44388,6 +44906,9 @@ export default {
         if (rec)                            return await apiRecibo(env, rec[1], url.searchParams.get("t"));
         if (ruta === "/api/entregas")       return await apiEntregas(env, url);
         if (ruta === "/api/transferencia")  return await apiReportarTransferencia(request, env, url);
+        /* Canal de quejas (0046): enviar, y consultar con el código. */
+        if (ruta === "/api/quejas")         return await apiQueja(request, env);
+        if (ruta === "/api/quejas/estado")  return await apiQuejaEstado(request, env);
         const fapi = ruta.match(/^\/api\/ficha\/([a-f0-9]{32})$/);
         if (fapi)                           return await apiFicha(request, env, fapi[1]);
         const farc = ruta.match(/^\/api\/ficha\/([a-f0-9]{32})\/archivo\/([a-z]+)$/);

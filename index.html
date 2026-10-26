@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=86709b69" defer></script>
+<script src="/app.js?v=5bf893f9" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -2258,7 +2258,7 @@
             </tr>
             <tr>
               <td data-i18n="std.chs.c5">5 · Quejas atendidas</td>
-              <td data-i18n="std.chs.c5.p">Hoy solo existe la ruta de protección de datos ante la Superintendencia de Industria y Comercio. El mecanismo general, con una ruta confidencial separada de la ordinaria, está redactado y pendiente de adopción por el máximo órgano de dirección que definen los estatutos, que hoy es el fundador: la Fundación todavía no tiene junta directiva.</td>
+              <td data-i18n="std.chs.c5.p">Ya existe el canal para recibir quejas, sugerencias y reportes, con una ruta confidencial separada de la ordinaria y la opción de no identificarse. Lo que sigue pendiente es la política que lo gobierna —el punto focal de salvaguarda y los plazos de respuesta—, que debe adoptar el máximo órgano de dirección que definen los estatutos, que hoy es el fundador: la Fundación todavía no tiene junta directiva.</td>
               <td><span class="tag soon" data-i18n="std.est.con">En construcción</span></td>
             </tr>
             <tr>
@@ -2285,7 +2285,7 @@
         </table>
       </div>
 
-      <p class="mu rv d3" style="margin-top:22px;max-width:66ch" data-i18n="std.chs.nota">Ningún compromiso aparece aquí como cumplido si no podemos mostrar con qué. Cuatro van a medias y uno no existe todavía: decirlo es más útil, para quien nos evalúa y para nosotros, que un cuadro entero en verde que no resistiría diez minutos de comprobación.</p>
+      <p class="mu rv d3" style="margin-top:22px;max-width:66ch" data-i18n="std.chs.nota">Ningún compromiso aparece aquí como cumplido si no podemos mostrar con qué. Cuatro van a medias y uno sigue en construcción: decirlo es más útil, para quien nos evalúa y para nosotros, que un cuadro entero en verde que no resistiría diez minutos de comprobación.</p>
     </div>
   </section>
 
@@ -2471,6 +2471,160 @@
           <p style="margin-top:14px"><strong data-i18n="contacto.phone">WhatsApp</strong><br>+57 315 330 5028</p>
           <p style="margin-top:14px"><strong data-i18n="contacto.loc">Ubicación</strong><br>Medellín, Colombia</p>
         </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ QUEJAS Y SUGERENCIAS (0046) ============
+     El canal del compromiso 5 de la Norma Humanitaria Esencial, y nada más que
+     el canal: la política de salvaguarda, el punto focal y los plazos los
+     decide la organización (SALVAGUARDA.md, apartado 8). Por eso esta página
+     NO promete un plazo ni nombra a una persona: dice lo que el sistema ya
+     garantiza —lo lee una persona, no viaja por correo, se puede sin
+     identificarse— y nada que dependa de una decisión pendiente.
+
+     DOS RUTAS, Y SEPARADAS: la ordinaria arriba; la confidencial (conducta
+     inapropiada, abuso, explotación, corrupción) en su propia sección, con su
+     propio formulario, y el servidor la guarda aparte. Nunca pide datos de un
+     menor de edad, y dice qué pasa después.
+
+     SIN CSS NUEVO: ally-form, vf-set, ally-mods, rep-ok y rep-list ya existen. -->
+<main id="page-quejas" class="page">
+  <section>
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="qj.ey">Quejas y sugerencias</span>
+      <h1 class="h-sec rv" data-i18n="qj.t">Dinos qué salió mal, qué podemos mejorar o qué salió bien.</h1>
+      <p class="lead rv d1" data-i18n="qj.lead">Cada mensaje lo lee una persona de la fundación. Puedes escribir sin decir quién eres: al enviar recibes un código, y con él consultas aquí en qué va.</p>
+      <p class="rv d1" style="margin-top:14px"><a class="card-link" href="#quejas" data-act="irASeccion('qj-conf')"><span data-i18n="qj.ir.conf">¿Es sobre una conducta inapropiada, un abuso o un acto de corrupción? Hay una ruta confidencial aparte</span> <span aria-hidden="true">&rarr;</span></a></p>
+
+      <form id="qj" class="ally-form rv d2" data-submit="qjEnviar(event,'qj')" novalidate>
+        <fieldset class="vf-set">
+          <legend data-i18n="qj.cat">¿Qué quieres contarnos?</legend>
+          <div class="ally-mods">
+            <label class="ally-check"><input type="radio" name="qj-cat" value="queja"><span data-i18n="qj.cat.queja">Una queja</span></label>
+            <label class="ally-check"><input type="radio" name="qj-cat" value="sugerencia"><span data-i18n="qj.cat.sug">Una sugerencia</span></label>
+            <label class="ally-check"><input type="radio" name="qj-cat" value="felicitacion"><span data-i18n="qj.cat.fel">Una felicitación</span></label>
+          </div>
+        </fieldset>
+        <div class="field"><label for="qj-rel" data-i18n="qj.rel">¿Sobre qué? (opcional)</label>
+          <select id="qj-rel">
+            <option value="" data-i18n="qj.rel.no">Prefiero no decirlo</option>
+            <option value="mmc" data-i18n="qj.rel.mmc">Mira Mi Casa</option>
+            <option value="brigada" data-i18n="qj.rel.brigada">La brigada de emergencia</option>
+            <option value="voluntariado" data-i18n="qj.rel.vol">Voluntariado</option>
+            <option value="donaciones" data-i18n="qj.rel.don">Donaciones</option>
+            <option value="hub" data-i18n="qj.rel.hub">El HUB o una fundación aliada</option>
+            <option value="sitio" data-i18n="qj.rel.sitio">Este sitio web</option>
+            <option value="otro" data-i18n="qj.rel.otro">Otra cosa</option>
+          </select></div>
+        <div class="field"><label for="qj-msg" data-i18n="qj.msg">Tu mensaje</label>
+          <textarea id="qj-msg" rows="6" maxlength="4000" aria-describedby="qj-msg-a" required></textarea>
+          <small id="qj-msg-a" class="mu" data-i18n="qj.msg.a">Cuéntanos qué pasó, cuándo y dónde. No hace falta que pongas tu nombre.</small></div>
+
+        <label class="ally-check"><input type="checkbox" id="qj-quiere" data-change="qjContacto('qj')" aria-controls="qj-datos"><span data-i18n="qj.quiere">Quiero que me respondan por correo o WhatsApp</span></label>
+        <div id="qj-datos" hidden>
+          <div class="ally-grid">
+            <div class="field"><label for="qj-nombre" data-i18n="qj.nombre">Nombre (opcional)</label>
+              <input type="text" id="qj-nombre" maxlength="120" autocomplete="name"></div>
+            <div class="field"><label for="qj-contacto" data-i18n="qj.contacto">Correo o WhatsApp</label>
+              <input type="text" id="qj-contacto" maxlength="200" autocomplete="email"></div>
+          </div>
+          <label class="ally-check"><input type="checkbox" id="qj-datos-ok"><span data-i18n="qj.datos">Autorizo usar este contacto solo para responderme sobre este mensaje, conforme a la Política de Privacidad.</span></label>
+        </div>
+
+        <input type="text" id="qj-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+        <button class="btn btn-g" id="qj-btn" type="submit" data-i18n="qj.btn">Enviar</button>
+        <p class="ally-note" id="qj-note" role="status" aria-live="polite"></p>
+      </form>
+
+      <div id="qj-ok" class="rep-ok" hidden>
+        <p class="rec-cap" data-i18n="qj.ok.t">Recibido. Tu código es</p>
+        <p class="rep-guia" id="qj-codigo"></p>
+        <p class="rep-ok-p" data-i18n="qj.ok.p">Guárdalo: con él consultas en qué va, más abajo en esta página. Si no dejaste contacto, es la única forma de ver nuestra respuesta.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cream" id="qj-conf">
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="qjc.ey">Ruta confidencial</span>
+      <h2 class="h-comp3 rv" style="margin-top:10px" data-i18n="qjc.t">Conductas inapropiadas, abuso o corrupción</h2>
+      <p class="rv d1" style="margin-top:12px;max-width:66ch" data-i18n="qjc.lead">Si alguien que actúa en nombre de Give&amp;Grow —equipo, voluntario, ingeniero, fundación aliada o proveedor— se comportó de forma inapropiada, pidió algo a cambio de la ayuda, abusó de alguien o manejó mal los recursos, puedes contarlo aquí.</p>
+
+      <div class="card rv d1" style="margin-top:22px">
+        <h3 class="h-comp3" data-i18n="qjc.ya.t">Si alguien está en peligro ahora</h3>
+        <ul class="rep-list">
+          <li data-i18n="qjc.ya.123">Emergencias: línea 123.</li>
+          <li data-i18n="qjc.ya.141">Para proteger a un niño, niña o adolescente: línea 141 del ICBF, gratuita.</li>
+          <li data-i18n="qjc.ya.155">Violencia contra las mujeres: línea 155.</li>
+        </ul>
+      </div>
+
+      <h3 class="h-comp3 rv" style="margin-top:26px" data-i18n="qjc.pasa.t">Qué pasa después de enviarlo</h3>
+      <ul class="rep-list rv d1">
+        <li data-i18n="qjc.pasa.1">Se guarda aparte de las demás solicitudes y no viaja por correo: lo lee una persona de la fundación dentro de un sistema interno.</li>
+        <li data-i18n="qjc.pasa.2">Puedes enviarlo sin decir quién eres. Si dejas un contacto, se usa solo para responderte sobre esto.</li>
+        <li data-i18n="qjc.pasa.3">Si lo que cuentas puede ser un delito, la ley colombiana obliga a ponerlo en conocimiento de las autoridades: no se resuelve solo dentro de la fundación.</li>
+        <li data-i18n="qjc.pasa.4">Recibes un código para consultar en qué va, en esta misma página.</li>
+        <li data-i18n="qjc.pasa.5">No tienes que pasar por nosotros: también puedes acudir directamente a la Fiscalía, a la Policía o al ICBF.</li>
+      </ul>
+
+      <form id="qjc" class="ally-form rv d2" data-submit="qjEnviar(event,'qjc')" novalidate>
+        <div class="field"><label for="qjc-rel" data-i18n="qjc.rel">¿En qué actividad o programa? (opcional)</label>
+          <select id="qjc-rel">
+            <option value="" data-i18n="qj.rel.no">Prefiero no decirlo</option>
+            <option value="mmc" data-i18n="qj.rel.mmc">Mira Mi Casa</option>
+            <option value="brigada" data-i18n="qj.rel.brigada">La brigada de emergencia</option>
+            <option value="voluntariado" data-i18n="qj.rel.vol">Voluntariado</option>
+            <option value="donaciones" data-i18n="qj.rel.don">Donaciones</option>
+            <option value="hub" data-i18n="qj.rel.hub">El HUB o una fundación aliada</option>
+            <option value="otro" data-i18n="qj.rel.otro">Otra cosa</option>
+          </select></div>
+        <div class="field"><label for="qjc-msg" data-i18n="qjc.msg">Qué pasó</label>
+          <textarea id="qjc-msg" rows="7" maxlength="4000" aria-describedby="qjc-msg-a" required></textarea>
+          <small id="qjc-msg-a" class="mu" data-i18n="qjc.msg.a">Cuenta qué pasó, cuándo, dónde y, si lo sabes, quién lo hizo. No escribas el nombre ni ningún dato de un niño, niña o adolescente: basta con decir que había un menor de edad.</small></div>
+
+        <label class="ally-check"><input type="checkbox" id="qjc-quiere" data-change="qjContacto('qjc')" aria-controls="qjc-datos"><span data-i18n="qjc.quiere">Quiero que me contacten (si no lo marcas, el reporte es anónimo)</span></label>
+        <div id="qjc-datos" hidden>
+          <div class="ally-grid">
+            <div class="field"><label for="qjc-nombre" data-i18n="qj.nombre">Nombre (opcional)</label>
+              <input type="text" id="qjc-nombre" maxlength="120" autocomplete="off"></div>
+            <div class="field"><label for="qjc-contacto" data-i18n="qj.contacto">Correo o WhatsApp</label>
+              <input type="text" id="qjc-contacto" maxlength="200" autocomplete="off"></div>
+          </div>
+          <label class="ally-check"><input type="checkbox" id="qjc-datos-ok"><span data-i18n="qj.datos">Autorizo usar este contacto solo para responderme sobre este mensaje, conforme a la Política de Privacidad.</span></label>
+        </div>
+
+        <input type="text" id="qjc-web2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+        <button class="btn btn-g" id="qjc-btn" type="submit" data-i18n="qjc.btn">Enviar por la ruta confidencial</button>
+        <p class="ally-note" id="qjc-note" role="status" aria-live="polite"></p>
+      </form>
+
+      <div id="qjc-ok" class="rep-ok" hidden>
+        <p class="rec-cap" data-i18n="qj.ok.t">Recibido. Tu código es</p>
+        <p class="rep-guia" id="qjc-codigo"></p>
+        <p class="rep-ok-p" data-i18n="qjc.ok.p">Guárdalo en un lugar seguro: con él consultas en qué va, aquí abajo. Gracias por contarlo.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="qj-consulta">
+    <div class="wrap prose">
+      <span class="ey rv" data-i18n="qjq.ey">Consultar</span>
+      <h2 class="h-sec rv" data-i18n="qjq.t">¿Ya escribiste? Mira en qué va</h2>
+      <form id="qjq" class="ally-form rv d1" data-submit="qjConsultar(event)" novalidate>
+        <div class="field"><label for="qjq-codigo" data-i18n="qjq.codigo">Tu código</label>
+          <input type="text" id="qjq-codigo" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7Q3-M9XA"></div>
+        <button class="btn btn-g" id="qjq-btn" type="submit" data-i18n="qjq.btn">Consultar</button>
+        <p class="ally-note" id="qjq-note" role="status" aria-live="polite"></p>
+      </form>
+      <div id="qjq-res" class="rep-ok" hidden>
+        <p class="rec-cap" data-i18n="qjq.estado">Estado</p>
+        <p class="h-comp3" id="qjq-estado"></p>
+        <ul class="rep-list" id="qjq-fechas"></ul>
+        <h3 class="h-comp3" id="qjq-resp-t" data-i18n="qjq.resp" hidden>La respuesta de la fundación</h3>
+        <p class="rep-ok-p" id="qjq-resp" hidden></p>
       </div>
     </div>
   </section>
@@ -4036,6 +4190,7 @@
         <a href="#transparencia" data-i18n="nav.transp">Transparencia</a>
         <a href="#estandares" data-i18n="nav.estandares">Marco de actuación</a>
         <a href="#medicion" data-i18n="nav.medicion">Cómo medimos</a>
+        <a href="#quejas" data-i18n="nav.quejas">Quejas y sugerencias</a>
         <a href="#regalos" data-i18n="foot.regalos">Regalos de diciembre</a>
         <a href="#privacidad" data-i18n="foot.privacy">Privacidad y datos</a>
         <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a>
@@ -4079,6 +4234,7 @@
         <p class="mmc-foot-fuera" data-i18n="mmc.foot.fuera">En el sitio de la fundación, que es la entidad que responde por esto:</p>
         <a href="https://www.thegiveandgrowproject.org/#transparencia" data-i18n="nav.transp">Transparencia</a>
         <a href="https://www.thegiveandgrowproject.org/#estandares" data-i18n="nav.estandares">Marco de actuación</a>
+        <a href="https://www.thegiveandgrowproject.org/#quejas" data-i18n="nav.quejas">Quejas y sugerencias</a>
       </div>
     </div>
     <div class="foot-bottom">
