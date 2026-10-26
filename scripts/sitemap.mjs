@@ -35,11 +35,40 @@ const MMC = "https://miramicasa.org";
    archivo, se cambia aquí y la fecha la pone git. */
 const PAGINAS = [
   { loc: APEX + "/", fuentes: ["index.html", "app.js", "js/pago.js", "js/impacto.js", "styles.css"], freq: "weekly", pri: "1.0" },
-  /* Rutas de la SPA con path propio (ver RUTAS_INDEXABLES en worker.js). */
-  { loc: APEX + "/transparencia", fuentes: ["index.html", "app.js", "styles.css"], freq: "monthly", pri: "0.8" },
-  { loc: APEX + "/empresas", fuentes: ["index.html", "app.js", "styles.css"], freq: "monthly", pri: "0.8" },
   { loc: MMC + "/",  fuentes: ["index.html", "app.js", "js/mmc.js", "styles.css"], freq: "weekly", pri: "0.9" }
 ];
+
+/* LAS RUTAS DE LA SPA CON PATH PROPIO salen de `RUTAS_INDEXABLES` en worker.js
+   —la lista que decide a qué direcciones les sirve el Worker su página—, y no
+   de una copia aquí: hasta el 26 oct 2026 este archivo tenía dos escritas a
+   mano y /socialfest, que ya respondía 200, no estaba. Se lee el literal y se
+   evalúa; si alguien cambia su forma, esto falla en vez de listar menos.
+
+   La fuente de cada una es el HTML más el módulo que la pinta, si tiene uno
+   (MODULOS_RUTA en app.js): /regalos cambia cuando cambia js/regalos.js. */
+const rutasDelWorker = () => {
+  const w = readFileSync("worker.js", "utf8");
+  const i = w.indexOf("const RUTAS_INDEXABLES = {");
+  if (i < 0) throw new Error("no encontré `const RUTAS_INDEXABLES = {` en worker.js");
+  return Object.keys(Function("return " + w.slice(i + "const RUTAS_INDEXABLES = ".length, w.indexOf("\n};", i) + 2))());
+};
+const moduloDe = (() => {
+  const a = readFileSync("app.js", "utf8");
+  const i = a.indexOf("var MODULOS_RUTA = {");
+  if (i < 0) return {};
+  const cuerpo = a.slice(i, a.indexOf("};", i));
+  return Object.fromEntries([...cuerpo.matchAll(/["']?([\w-]+)["']?\s*:\s*"([^"]*)"/g)].map((m) => [m[1], m[2]]));
+})();
+/* Lo que más se busca y a donde más se quiere llevar a alguien, un peldaño
+   arriba. El resto, 0.7. */
+const PRIORIDAD = { donar: "0.9", transparencia: "0.8", empresas: "0.8", voluntariado: "0.8",
+                    fundaciones: "0.8", "teoria-de-cambio": "0.8", membresias: "0.8", regalos: "0.8" };
+const rutas = () => [...rutasDelWorker(), "socialfest"].map((id) => ({
+  loc: APEX + "/" + id,
+  fuentes: ["index.html", "app.js", "styles.css", ...(moduloDe[id] ? ["js/" + moduloDe[id] + ".js"] : [])],
+  freq: "monthly",
+  pri: id === "socialfest" ? "0.5" : (PRIORIDAD[id] || "0.7")
+}));
 
 /* WORKER.JS NO ES FUENTE DE NINGUNA, y lo probe antes de decidirlo: incluyendolo
    las cuatro URLs saltaban a la fecha del ultimo cambio del Worker, o sea que un
@@ -85,7 +114,7 @@ const fundaciones = () => {
 };
 
 const armar = () => {
-  const urls = [...PAGINAS, ...fundaciones()].map((p) => {
+  const urls = [PAGINAS[0], ...rutas(), PAGINAS[1], ...fundaciones()].map((p) => {
     const lastmod = fechaDe(p.fuentes);
     return ["  <url>", "    <loc>" + p.loc + "</loc>",
             "    <lastmod>" + lastmod + "</lastmod>",

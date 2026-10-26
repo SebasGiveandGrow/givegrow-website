@@ -42748,7 +42748,21 @@ function paginaPrivacidad(lang, tema) {
 
 /* Las rutas de la SPA que se sirven también con path propio. Los textos son los
    de ROUTE_META en app.js (los mismos que pone en la pestaña al navegar), en
-   los dos idiomas: `en` se usa cuando la dirección lleva `?lang=en`. */
+   los dos idiomas: `en` se usa cuando la dirección lleva `?lang=en`.
+
+   DE DOS A DIECINUEVE el 26 oct 2026. Search Console tenía 2 páginas
+   indexadas y 7 «Descubierta: actualmente sin indexar»: para Google el sitio
+   era la portada, las fichas /f/<id> y estas dos, porque lo que va después de
+   una # no es una página distinta. Entran todas las secciones públicas con
+   contenido propio; NO entran las de un proceso privado (rastrea, mi-aporte,
+   gracias, reportar, el formulario de aliados) ni las de Mira Mi Casa, que
+   viven en su dominio.
+
+   UNA RUTA NUEVA AQUÍ VA EN TRES SITIOS MÁS, y el check #28 del gate los
+   compara: `RUTAS_PATH` en app.js (para abrir la sección al entrar por la
+   dirección), `run_worker_first` en wrangler.toml (con y sin barra final) y
+   el sitemap, que lee esta misma lista. El gate también exige que los textos
+   sean los de ROUTE_META sin cambiar una coma. */
 const RUTAS_INDEXABLES = {
   transparencia: {
     t: "Transparencia · Give&Grow International",
@@ -42764,6 +42778,142 @@ const RUTAS_INDEXABLES = {
     en: {
       t: "Companies & CSR · Give&Grow International",
       d: "Turn your company's social responsibility into measurable, traceable impact, with tax benefits."
+    }
+  },
+  donar: {
+    t: "Donar · Give&Grow International",
+    d: "Haz tu donación a Give&Grow con trazabilidad completa y beneficio tributario. Cada aporte transforma una vida.",
+    en: {
+      t: "Donate · Give&Grow International",
+      d: "Donate to Give&Grow with full traceability and a tax benefit. Every gift transforms a life."
+    }
+  },
+  membresias: {
+    t: "Membresías · Give&Grow International",
+    d: "Hazte miembro de Give&Grow: dona de forma recurrente, crece de Semilla a Bosque y suma beneficios en cada nivel.",
+    en: {
+      t: "Memberships · Give&Grow International",
+      d: "Become a Give&Grow member: give monthly, grow from Seed to Forest and add benefits at each tier."
+    }
+  },
+  voluntariado: {
+    t: "Voluntariado e Impact Journey · Give&Grow International",
+    d: "Tres maneras de participar, el método MIRA en doble vía y cómo cuidamos a las comunidades. Voluntariado corporativo y pro-bono.",
+    en: {
+      t: "Volunteering & Impact Journey · Give&Grow International",
+      d: "Three ways to take part, the two-way MIRA method, and how we care for communities. Corporate and pro-bono volunteering."
+    }
+  },
+  fundaciones: {
+    t: "Para fundaciones · Give&Grow International",
+    d: "Suma tu fundación al HUB SOCIAL: recibe herramientas y donaciones de forma gratuita, transparente y trazable.",
+    en: {
+      t: "For foundations · Give&Grow International",
+      d: "Bring your foundation to the Social Hub: receive tools and donations for free, transparently and traceably."
+    }
+  },
+  hub: {
+    t: "HUB SOCIAL · Give&Grow International",
+    d: "El centro operativo donde se encuentran alianzas, donaciones e impacto. En Medellín.",
+    en: {
+      t: "Social Hub · Give&Grow International",
+      d: "The operations center where alliances, donations and impact meet. In Medellín."
+    }
+  },
+  "teoria-de-cambio": {
+    t: "Teoría de cambio · Give&Grow International",
+    d: "La teoría de cambio de Give&Grow: qué hacemos, qué buscamos que cambie, los supuestos y los doce indicadores con los que lo comprobamos, cada uno con su estado real.",
+    en: {
+      t: "Theory of change · Give&Grow International",
+      d: "Give&Grow's theory of change: what we do, what we aim to change, the assumptions and the twelve indicators we use to check it, each with its real status."
+    }
+  },
+  impacto: {
+    t: "Impacto y evidencia · Give&Grow International",
+    d: "Evidencia real del trabajo en terreno: fotografías, trazabilidad y resultados de las comunidades que acompañamos.",
+    en: {
+      t: "Impact & evidence · Give&Grow International",
+      d: "Real evidence from the field: photos, traceability and results from the communities we support."
+    }
+  },
+  medicion: {
+    t: "Cómo medimos · Give&Grow International",
+    d: "Contribución y no atribución, los tres peldaños de la medición, cómo publicamos un número y el reporte de jornada para la empresa aliada.",
+    en: {
+      t: "How we measure · Give&Grow International",
+      d: "Contribution rather than attribution, the three rungs of measurement, how we publish a figure, and the journey report for partner companies."
+    }
+  },
+  estandares: {
+    t: "Marco de actuación · Give&Grow International",
+    d: "Bajo qué normas trabaja Give&Grow: la Norma Humanitaria Esencial compromiso por compromiso, el límite legal de la Ley 1523, la protección de datos y lo que deliberadamente no afirmamos.",
+    en: {
+      t: "How we work · Give&Grow International",
+      d: "The standards Give&Grow works to: the Core Humanitarian Standard commitment by commitment, the legal limit set by Colombia's Law 1523, data protection, and what we deliberately do not claim."
+    }
+  },
+  origen: {
+    t: "Nuestro origen · Give&Grow International",
+    d: "Cómo nació Give&Grow: del trabajo de campo en La Guajira, la Sierra Nevada y las comunas de Medellín a una fundación con propósito.",
+    en: {
+      t: "Our origin · Give&Grow International",
+      d: "How Give&Grow began: from field work in La Guajira, the Sierra Nevada and Medellín's comunas to a foundation with purpose."
+    }
+  },
+  regalos: {
+    t: "Regalos de diciembre · Give&Grow International",
+    d: "Mil regalos para niñas y niños de Uribia (La Guajira), Medellín (Antioquia) y Leticia (Amazonas). Escoge uno o varios, págalo en pesos o en dólares y sigue cada regalo hasta su entrega con acta.",
+    en: {
+      t: "December Gifts · Give&Grow International",
+      d: "A thousand gifts for children in Uribia (La Guajira), Medellín (Antioquia) and Leticia (Amazonas). Choose one or several, pay in pesos or US dollars, and follow each gift until it is delivered and recorded."
+    }
+  },
+  brigada: {
+    t: "Brigada de atención a emergencia · Give&Grow International",
+    d: "Terremoto del 10 de agosto de 2026. La brigada de Give&Grow salió el 24 de agosto y entregó en Guática, Armenia, Cartago, Ansermanuevo y la vereda Maracaibo (Argelia). El informe de lo que se hizo.",
+    en: {
+      t: "Emergency response brigade · Give&Grow International",
+      d: "The 10 August 2026 earthquake. Give&Grow's brigade set out on 24 August and delivered in Guática, Armenia, Cartago, Ansermanuevo and the village of Maracaibo (Argelia). The report of what was done."
+    }
+  },
+  gratitud: {
+    t: "Programa de Gratitud · Give&Grow International",
+    d: "Beneficios y reconocimientos para quienes hacen posible el impacto: donantes, aliados y empresas.",
+    en: {
+      t: "Gratitude Program · Give&Grow International",
+      d: "Benefits and recognition for those who make impact possible: donors, allies and companies."
+    }
+  },
+  quejas: {
+    t: "Quejas y sugerencias · Give&Grow International",
+    d: "Cuéntale a Give&Grow una queja, una sugerencia o una felicitación, sin identificarte si prefieres, y consulta en qué va con tu código. Con una ruta confidencial aparte para conductas inapropiadas, abuso o corrupción.",
+    en: {
+      t: "Feedback and complaints · Give&Grow International",
+      d: "Send Give&Grow a complaint, a suggestion or a compliment, anonymously if you prefer, and check its status with your code. With a separate confidential route for misconduct, abuse or corruption."
+    }
+  },
+  faq: {
+    t: "Preguntas frecuentes · Give&Grow International",
+    d: "Respuestas a las preguntas más comunes sobre donaciones, beneficios tributarios, alianzas y el modelo de Give&Grow.",
+    en: {
+      t: "FAQ · Give&Grow International",
+      d: "Answers to common questions about donations, tax benefits, partnerships and the Give&Grow model."
+    }
+  },
+  contacto: {
+    t: "Contacto · Give&Grow International",
+    d: "Escríbenos para donar, aliar tu empresa o sumar tu fundación al HUB SOCIAL. Medellín, Colombia.",
+    en: {
+      t: "Contact · Give&Grow International",
+      d: "Reach out to donate, partner your company or join your foundation to the Social Hub. Medellín, Colombia."
+    }
+  },
+  impactos: {
+    t: "ImpactOS · Give&Grow International",
+    d: "Qué es ImpactOS, la plataforma del ecosistema Give&Grow, y qué módulo está operando hoy: el HUB SOCIAL.",
+    en: {
+      t: "ImpactOS · Give&Grow International",
+      d: "What ImpactOS is, the platform behind the Give&Grow ecosystem, and which module runs today: the HUB SOCIAL."
     }
   }
 };
@@ -42800,13 +42950,20 @@ function cabeceraPagina(m, propia, en) {
     .on('meta[property="og:locale"]', attr("en_US"))
     .on('meta[property="og:image:alt"]', attr(PORTADA_EN.t));
 }
+/* El hreflang de una página con path propio: `es` y `x-default` a la dirección
+   sin query, `en` a la misma con `?lang=en`. Sin esto heredaban los de
+   index.html, que apuntan a la PORTADA, y Google descarta un hreflang cuyo
+   destino no devuelve el enlace (el de la portada no nombra esta página). */
+function conAlternos(r, url) {
+  return r.on('link[rel="alternate"]', { element(el) {
+    el.setAttribute("href", el.getAttribute("hreflang") === "en" ? url + "?lang=en" : url);
+  } });
+}
 function paginaIndexable(base, id, en) {
+  if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
   const m = en ? RUTAS_INDEXABLES[id].en : RUTAS_INDEXABLES[id];
   const url = ORIGIN + "/" + id;
-  return cabeceraPagina(m, en ? url + "?lang=en" : url, en)
-    .on('link[rel="alternate"]', { element(el) {
-      el.setAttribute("href", el.getAttribute("hreflang") === "en" ? url + "?lang=en" : url);
-    } })
+  return conAlternos(cabeceraPagina(m, en ? url + "?lang=en" : url, en), url)
     /* La página visible es esta y no la portada. Y la foto de la portada, que
        aquí no se ve, deja de pedirse con prioridad. */
     .on("main#page-inicio", { element(el) { el.setAttribute("class", "page"); } })
@@ -43431,13 +43588,15 @@ const SOCIALFEST_META = {
 
    La tarjeta de compartir no se pierde: es el mismo index.html con el título,
    la descripción, el canonical y el og:url de esta página reescritos, como
-   las de `RUTAS_INDEXABLES` (no va en esa lista porque es de temporada y no
-   entra al sitemap). La CSP es la de index.html, que viaja con el asset. */
+   las de `RUTAS_INDEXABLES` (no va en esa lista porque su tarjeta lleva además
+   su propio `og:image:alt`). La CSP es la de index.html, que viaja con el asset.
+   Desde el 26 oct 2026 SÍ entra al sitemap: pasado el evento, la página guarda
+   los resultados del taller y sigue recibiendo el QR impreso. */
 function paginaSocialfest(base, en) {
   if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
   const m = en ? SOCIALFEST_META.en : SOCIALFEST_META;
   const canon = ORIGIN + "/socialfest";
-  return cabeceraPagina(m, en ? canon + "?lang=en" : canon, en)
+  return conAlternos(cabeceraPagina(m, en ? canon + "?lang=en" : canon, en), canon)
     .on('meta[property="og:image:alt"]', { element(el) { el.setAttribute("content", m.alt); } })
     .on("main#page-inicio", { element(el) { el.setAttribute("class", "page"); } })
     .on("main#page-socialfest", { element(el) { el.setAttribute("class", "page active"); } })
@@ -45162,7 +45321,8 @@ export default {
        las dos se sirven AQUÍ con el `index.html` de la raíz, y `/gracias` entra
        en `run_worker_first` el mismo día. Cualquier ruta con path nueva en la
        SPA tiene que añadirse a las dos listas. */
-    /* /transparencia y /empresas: PÁGINAS QUE GOOGLE PUEDE INDEXAR (auditoría
+    /* /transparencia, /empresas y el resto de `RUTAS_INDEXABLES` (la regex
+       admite el guion de /teoria-de-cambio): PÁGINAS QUE GOOGLE PUEDE INDEXAR (auditoría
        para inversionistas, 12 oct 2026). La SPA vive de rutas con # y, para un
        buscador, el sitio era una sola URL. Aquí se sirve el mismo index.html con
        el título, la descripción, el canonical y la tarjeta de compartir de esa
@@ -45170,8 +45330,8 @@ export default {
        lector sin JavaScript la ve sin ejecutar nada. app.js la reconoce por el
        path (ver `init`). Ver `RUTAS_INDEXABLES`; cada una va también en
        `run_worker_first` de wrangler.toml y en scripts/sitemap.mjs. */
-    const rIdx = ruta.match(/^\/([a-z]+)\/?$/);
-    if (rIdx && RUTAS_INDEXABLES[rIdx[1]] && !HOST_MMC.test(url.hostname)) {
+    const rIdx = ruta.match(/^\/([a-z][a-z-]*)\/?$/);
+    if (rIdx && Object.hasOwn(RUTAS_INDEXABLES, rIdx[1]) && !HOST_MMC.test(url.hostname)) {
       const base = await env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
       return paginaIndexable(base, rIdx[1], url.searchParams.get("lang") === "en");
     }
@@ -45180,7 +45340,17 @@ export default {
     if (ruta === "/" && url.searchParams.get("lang") === "en" && !HOST_MMC.test(url.hostname)) {
       return portadaEnIngles(await env.ASSETS.fetch(request));
     }
-    if (ruta === "/gracias" || ruta === "/gracias/" || ruta.startsWith("/caso/")) {
+    /* /gracias es la vuelta del pago, con el id de la transacción en la query:
+       un paso privado, no una página. Servía la portada con `index, follow` y
+       el canonical de la raíz; ahora dice `noindex` (26 oct 2026). /caso/ ya
+       lo dice en `marcarCaso`. */
+    if (ruta === "/gracias" || ruta === "/gracias/") {
+      const base = await env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
+      const r = new Response(base.body, base);
+      r.headers.set("x-robots-tag", "noindex, nofollow");
+      return r;
+    }
+    if (ruta.startsWith("/caso/")) {
       return env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
     }
 

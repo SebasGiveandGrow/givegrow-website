@@ -2649,6 +2649,12 @@ var ROUTE_META = {
   socialfest:{t:{es:"Social Fest 2026 · Give&Grow International",en:"Social Fest 2026 · Give&Grow International"},d:{es:"Impact Journey para empresas —voluntariado en doble vía, piloto sin cuota de participación— y el HUB SOCIAL para fundaciones y profesionales. Give&Grow en Social Fest 2026, Ruta N, Medellín.",en:"Impact Journey for companies —two-way volunteering, a pilot with no participation fee— and the HUB SOCIAL for foundations and professionals. Give&Grow at Social Fest 2026, Ruta N, Medellín."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
 };
+/* LAS RUTAS QUE TAMBIÉN TIENEN DIRECCIÓN PROPIA (/donar, /teoria-de-cambio…).
+   Espejo de `RUTAS_INDEXABLES` en worker.js, que sirve index.html en ellas con
+   su título, su canonical y su hreflang; el check #28 del gate exige que las
+   dos listas digan lo mismo. /socialfest también tiene dirección, pero va
+   aparte en el Worker por su tarjeta propia. */
+var RUTAS_PATH = ["transparencia", "empresas", "donar", "membresias", "voluntariado", "fundaciones", "hub", "teoria-de-cambio", "impacto", "medicion", "estandares", "origen", "regalos", "brigada", "gratitud", "quejas", "faq", "contacto", "impactos"];
 function mmcTitulo(){
   document.title = String(document.title).replace(/Give&Grow International/g, "Mira Mi Casa");
 }
@@ -2714,7 +2720,11 @@ function applyRouteMeta(id){
   if (MARCA_MMC) return;
   setMetaTag("property","og:title",ti);
   setMetaTag("property","og:description",de);
-  setMetaTag("property","og:url",ORIGIN_FUND+"/#"+id);
+  /* Con dirección propia, la tarjeta apunta a ella: es la que tiene título y
+     descripción en el HTML servido. Con almohadilla, el rastreador de la vista
+     previa no ve la #, va a la raíz y pinta la tarjeta de la portada. */
+  var conPath = RUTAS_PATH.indexOf(id) > -1 || id === "socialfest";
+  setMetaTag("property","og:url",ORIGIN_FUND+(conPath ? "/" : "/#")+id);
   setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
   setMetaTag("property","og:image", OG_IMG_DEFAULT);
   setMetaTag("name","twitter:image", OG_IMG_DEFAULT);
@@ -5598,11 +5608,12 @@ function init(){
      enlace que mandarle a un financiador extranjero. Cualquier otro valor
      deja el español. */
   setLang(new URLSearchParams(location.search).get("lang") === "en" ? "en" : "es");
-  /* /transparencia y /empresas son la misma SPA servida con path propio para
-     los buscadores (ver `RUTAS_INDEXABLES` en worker.js). Al llegar por ahí, la
+  /* /transparencia, /donar, /teoria-de-cambio… son la misma SPA servida con
+     path propio para los buscadores (ver `RUTAS_PATH`). Al llegar por ahí, la
      dirección vuelve a la forma de siempre, /#ruta, conservando la query (el
      ?lang=en): así los enlaces internos con # siguen funcionando igual. */
-  var rutaPath = (location.pathname.match(/^\/(transparencia|empresas|socialfest)\/?$/i) || [])[1];
+  var rutaPath = (location.pathname.match(/^\/([a-z][a-z-]*)\/?$/i) || [])[1];
+  if (rutaPath && RUTAS_PATH.indexOf(rutaPath.toLowerCase()) < 0 && rutaPath.toLowerCase() !== "socialfest") rutaPath = null;
   /* LAS TRES PUERTAS DE SOCIAL FEST TIENEN DIRECCIÓN (14 oct 2026). El QR del
      taller va impreso como /socialfest#sf-red, y los correos de seguimiento
      llevan #sf-empresa y #sf-inversion. Hasta hoy /socialfest era una página

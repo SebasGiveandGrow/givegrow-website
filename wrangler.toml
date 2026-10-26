@@ -14,6 +14,9 @@ binding = "ASSETS"
 # `/gracias` (retorno de Wompi y PayPal) y `/caso/*` (Mira Mi Casa). Las dos van
 # en `run_worker_first` y el Worker les sirve `index.html` a mano — ver el final
 # de `ruteo` en worker.js. UNA RUTA CON PATH NUEVA EN LA SPA VA EN LOS DOS SITIOS.
+# Las de `RUTAS_INDEXABLES` (/transparencia, /donar, /teoria-de-cambio…) van
+# aquí con y sin barra final, y el check #28 de validate.mjs lo comprueba: una
+# que falte respondería el 404 de la capa de assets sin que el Worker corra.
 not_found_handling = "404-page"
 html_handling = "auto-trailing-slash"
 # Estas rutas DEBEN estar aquí: sin ellas, `not_found_handling =
@@ -58,7 +61,7 @@ html_handling = "auto-trailing-slash"
 # 0039) entran el mismo dia que la pagina: sin ellas, el QR del carnet daria 404.
 # `/socialfest` (el QR impreso de Social Fest 2026) entra igual, el mismo dia
 # que su redireccion: con y sin barra, y con la mayuscula de la diapositiva.
-run_worker_first = ["/", "/gracias", "/gracias/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest", "/pago/*", "/membresia", "/membresia/*", "/verificar", "/verificar/*", "/encuesta/*", "/convenio/*", "/socialfest", "/socialfest/", "/SocialFest", "/transparencia", "/transparencia/", "/empresas", "/empresas/", "/privacidad", "/privacidad/", "/privacy", "/privacy/", "/autorizacion", "/autorizacion/*"]
+run_worker_first = ["/", "/gracias", "/gracias/", "/caso/*", "/f/*", "/api/*", "/admin", "/admin.js", "/admin/*", "/ruta", "/ruta.js", "/triaje", "/triaje.js", "/triaje/*", "/triage", "/triage.js", "/evidencia/*", "/carnet/*", "/ficha/*", "/firma", "/firma.js", "/casa", "/micasa", "/mimicasa", "/manifest.webmanifest", "/pago/*", "/membresia", "/membresia/*", "/verificar", "/verificar/*", "/encuesta/*", "/convenio/*", "/socialfest", "/socialfest/", "/SocialFest", "/transparencia", "/transparencia/", "/empresas", "/empresas/", "/donar", "/donar/", "/membresias", "/membresias/", "/voluntariado", "/voluntariado/", "/fundaciones", "/fundaciones/", "/hub", "/hub/", "/teoria-de-cambio", "/teoria-de-cambio/", "/impacto", "/impacto/", "/medicion", "/medicion/", "/estandares", "/estandares/", "/origen", "/origen/", "/regalos", "/regalos/", "/brigada", "/brigada/", "/gratitud", "/gratitud/", "/quejas", "/quejas/", "/faq", "/faq/", "/contacto", "/contacto/", "/impactos", "/impactos/", "/privacidad", "/privacidad/", "/privacy", "/privacy/", "/autorizacion", "/autorizacion/*"]
 
 # ---------------------------------------------------------------------------
 # LA ÚNICA TAREA PROGRAMADA DEL WORKER, y la primera que tiene.
