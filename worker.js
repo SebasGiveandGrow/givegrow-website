@@ -14226,6 +14226,93 @@ SOCIAL FEST 2026: Give&Grow participa en el Social Fest 2026, en Ruta N, Medell�
 - Para dejar sus datos a Give&Grow desde el evento, #socialfest tiene tres entradas: empresas (piloto de Impact Journey), fundaciones y profesionales, y financiadores.`;
 }
 
+/* LO QUE GIVE&GROW HA MEDIDO, con las cifras de la base (17 oct 2026). Antes
+   de esto, «¿qué han logrado?» se respondía con lo que el modelo armara del
+   prompt general, y nada le impedía decir «cientos de voluntarios» a partir de
+   120 horas. Ahora se le pasan las mediciones MEAL tal cual las registró una
+   persona en /admin, YA FORMATEADAS aquí (valor con su unidad, periodo dicho,
+   corte en palabras): misma lección que almaContextoEvento, lo que el modelo no
+   debe razonar lo resuelve el código.
+
+   Una medición por indicador activo: la última vigente (melUltima). Los que
+   no tienen ninguna van aparte, como «todavía no se mide». «Reportado» =
+   origen manual; «calculado» = la persona aceptó el valor que sugirió el
+   sistema.
+
+   CACHÉ DE 10 MINUTOS en una variable del módulo: cada mensaje de ALMA no
+   tiene por qué ir a D1, y una medición nueva tarda como mucho eso en llegar.
+   Si D1 falla, el bloque queda vacío (cacheado un minuto, para no insistir en
+   cada mensaje) y ALMA sigue funcionando sin él. */
+const ALMA_IND_TTL = 10 * 60 * 1000;
+const ALMA_IND_TTL_FALLO = 60 * 1000;
+let almaIndCache = { hasta: 0, texto: "" };
+
+async function almaContextoIndicadores(env, origen) {
+  const ahora = Date.now();
+  if (ahora < almaIndCache.hasta) return almaIndCache.texto;
+  let texto = "", ttl = ALMA_IND_TTL;
+  try {
+    texto = await almaArmarIndicadores(env, origen);
+    /* Vacío también puede ser D1 caída (existeTabla se traga el error): se
+       reintenta pronto, como un fallo. */
+    if (!texto) ttl = ALMA_IND_TTL_FALLO;
+  } catch (e) {
+    console.error("ALMA indicadores", e && e.message);
+    texto = ""; ttl = ALMA_IND_TTL_FALLO;
+  }
+  almaIndCache = { hasta: ahora + ttl, texto };
+  return texto;
+}
+
+async function almaArmarIndicadores(env, origen) {
+  if (!env.DB) return "";
+  const L = await melLeer(env, false);
+  if (!L) return "";
+  const activos = L.ind.filter((i) => i.activo);
+  if (!activos.length) return "";
+
+  /* ¿Existe ya la página de la teoría de cambio? La SPA la reconoce si hay un
+     `page-<ruta>` en index.html (isSpaRoute en app.js); una ruta que no existe
+     el chat la deja como texto suelto, así que solo se nombra si está. */
+  let paginas = "#medicion o #transparencia";
+  try {
+    const r = await env.ASSETS.fetch(new URL("/", origen));
+    if (r.ok && (await r.text()).includes('id="page-teoria-de-cambio"')) paginas = "#teoria-de-cambio (o #transparencia)";
+  } catch { /* sin la página nueva, se queda en #medicion */ }
+
+  const conDato = [], sinDato = [];
+  for (const i of activos) {
+    const u = melUltima(L.med.filter((m) => m.indicador_id === i.id));
+    if (!u) { sinDato.push("- #" + i.numero + " " + i.nombre + " (" + (MEL_FRECUENCIAS[i.frecuencia] || i.frecuencia).toLowerCase() + ")"); continue; }
+    const periodo = melRango(u.periodo) ? u.periodo + " (" + melPeriodoDicho(u.periodo) + ")" : u.periodo;
+    const partes = ["- #" + i.numero + " " + i.nombre + ": " + (melValorDicho(u, i.unidad) || "sin valor"),
+      "periodo: " + periodo, "corte: " + fechaDicha(u.corte),
+      u.origen === "sugerido" ? "CALCULADO por el sistema" : "REPORTADO (registrado a mano)",
+      "fuente: " + u.fuente_detalle];
+    if (u.nota) partes.push("nota: " + u.nota);
+    conDato.push(partes.join(" · "));
+  }
+  const validados = activos.filter((i) => i.validado_en).length;
+
+  return ["", "", "=== INDICADORES DE GIVE&GROW (mediciones registradas, datos en vivo) ===",
+    "Son " + activos.length + " indicadores. " + (validados === activos.length ? "Todos están validados."
+      : validados ? validados + " están validados; los demás siguen en borrador."
+        : "La batería entera sigue en borrador, en validación."),
+    "CON MEDICIÓN (el valor ya viene calculado: no lo cambies, solo ajusta la gramática):",
+    ...conDato,
+    ...(sinDato.length ? ["TODAVÍA NO SE MIDEN (no tienen ninguna medición registrada):", ...sinDato] : []),
+    "=== FIN DE INDICADORES ===",
+    "Reglas para hablar de logros, resultados o cifras de Give&Grow:",
+    "- Responde SOLO con estas cifras. Si lo que preguntan no está aquí, di que todavía no se mide o no hay dato; no lo estimes.",
+    "- Cita siempre el periodo o la fecha de corte, y de dónde sale el dato con palabras sencillas.",
+    "- Si dice REPORTADO, dilo: «según lo reportado por la Fundación». No lo presentes como registro verificado.",
+    "- No sumes indicadores entre sí, no promedies, no extrapoles ni proyectes, y no conviertas una unidad en otra: 120 horas son 120 horas de voluntariado, NO «cientos de voluntarios»; personas, horas, toneladas y casas no se mezclan.",
+    "- La nota acota el valor. Una cifra que solo está en la nota (por ejemplo, toneladas despachadas) se dice con su propia condición, nunca como si fuera el valor del indicador.",
+    "- Un 0 o «sin dato» se dice tal cual, sin disculparse de más ni rellenar con promesas.",
+    "- No nombres herramientas internas (Drive, /admin, Red, ImpactOS, tablas, base de datos) ni a quien registró el dato.",
+    "- Para ver cómo se mide, lleva a " + paginas + "."].join("\n");
+}
+
 async function almaContextoGratitud(env, origen) {
   try {
     const r = await env.ASSETS.fetch(new URL("/data/gratitud.json", origen));
@@ -14341,7 +14428,8 @@ async function apiAlma(request, env, url) {
 
   const system = ALMA_SYS + (await almaContextoRed(env, url.origin))
                               + (await almaContextoGratitud(env, url.origin))
-                              + almaContextoEvento();
+                              + almaContextoEvento()
+                              + (await almaContextoIndicadores(env, url.origin));
 
   /* EL WORKSPACE, y por qué es condicional.
 
