@@ -2310,4 +2310,57 @@ try {
           " rutas y " + Object.keys(DIF).length + " botones diferidos que existen");
 } catch (e) { err("check #27 · no se pudo revisar el código por ruta: " + e.message); }
 
+/* 28 · LAS RUTAS CON DIRECCIÓN PROPIA DICEN LO MISMO EN LOS CUATRO SITIOS.
+   ---------------------------------------------------------------------------
+   El 26 oct 2026 Search Console tenía 2 páginas indexadas: para Google el sitio
+   era la portada, porque lo que va tras una # no es una página. `RUTAS_INDEXABLES`
+   (worker.js) pasó de 2 a 19 secciones servidas con path, título y canonical
+   propios. Cada una vive en CUATRO sitios, y uno que falte falla callado:
+     · `run_worker_first` (wrangler.toml), con y sin barra: si falta, la capa
+       de assets responde 404 sin que el Worker llegue a correr — la quinta
+       cicatriz que ese archivo ya cuenta;
+     · `RUTAS_PATH` (app.js): si falta, la dirección abre la portada;
+     · el sitemap (lo lee de worker.js, pero hay que regenerarlo);
+     · los textos, que son los de ROUTE_META sin cambiar una coma: si divergen,
+       Google indexa un título y la pestaña muestra otro.
+   Y al revés: ninguna ruta de un proceso privado entra ni al Worker ni al
+   sitemap. */
+try {
+  const fallos = [];
+  const w = readFileSync("worker.js", "utf8");
+  const literal = (txt, cabeza, cierre) => {
+    const i = txt.indexOf(cabeza);
+    if (i < 0) throw new Error("no encontré «" + cabeza + "»");
+    return Function("return " + txt.slice(i + cabeza.length, txt.indexOf(cierre, i) + cierre.length - 1))();
+  };
+  const RI = literal(w, "const RUTAS_INDEXABLES = ", "\n};");
+  const RM = literal(src, "var ROUTE_META = ", "\n};");
+  const RP = literal(src, "var RUTAS_PATH = ", "];");
+  const ids = Object.keys(RI);
+  const toml = readFileSync("wrangler.toml", "utf8").match(/^run_worker_first = (\[.*\])$/m);
+  const rwf = toml ? JSON.parse(toml[1]) : [];
+  const mapa = readFileSync("sitemap.xml", "utf8");
+  const PRIVADAS = ["rastrea", "mi-aporte", "gracias", "reportar", "aliados", "caso", "pago", "membresia", "verificar", "admin", "e404"];
+  for (const id of ids) {
+    if (!RP.includes(id)) fallos.push(id + " está en RUTAS_INDEXABLES y no en RUTAS_PATH de app.js");
+    if (!html.includes('id="page-' + id + '"')) fallos.push(id + " no tiene <main id=\"page-" + id + "\"> en index.html");
+    const m = RM[id];
+    if (!m) fallos.push(id + " no está en ROUTE_META de app.js");
+    else for (const [a, b, que] of [[RI[id].t, m.t.es, "t"], [RI[id].d, m.d.es, "d"],
+                                     [RI[id].en && RI[id].en.t, m.t.en, "en.t"], [RI[id].en && RI[id].en.d, m.d.en, "en.d"]])
+      if (a !== b) fallos.push("RUTAS_INDEXABLES." + id + "." + que + " no es el texto de ROUTE_META");
+  }
+  for (const id of RP) if (!ids.includes(id)) fallos.push(id + " está en RUTAS_PATH de app.js y no en RUTAS_INDEXABLES");
+  for (const id of [...ids, "socialfest"]) {
+    for (const p of ["/" + id, "/" + id + "/"]) if (!rwf.includes(p)) fallos.push("falta \"" + p + "\" en run_worker_first de wrangler.toml");
+    if (!mapa.includes("<loc>https://www.thegiveandgrowproject.org/" + id + "</loc>")) fallos.push("/" + id + " no está en sitemap.xml · corre node scripts/sitemap.mjs");
+  }
+  for (const id of PRIVADAS) {
+    if (ids.includes(id)) fallos.push(id + " es un proceso privado y está en RUTAS_INDEXABLES");
+    if (new RegExp("<loc>https://[^<]+/" + id + "(/[^<]*)?</loc>").test(mapa)) fallos.push("/" + id + " es un proceso privado y está en sitemap.xml");
+  }
+  if (fallos.length) err("check #28 · rutas con dirección propia: " + fallos.join(" · "));
+  else ok("rutas con dirección propia: " + ids.length + " + /socialfest, iguales en worker.js, app.js, wrangler.toml y el sitemap; textos = ROUTE_META; ninguna privada");
+} catch (e) { err("check #28 · no se pudo revisar las rutas con dirección propia: " + e.message); }
+
 process.exit(fail);
