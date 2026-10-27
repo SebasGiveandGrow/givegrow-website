@@ -23818,9 +23818,9 @@ async function adminBoardEnvioPdf(env, id) {
      sección y el aviso de un reporte confidencial va SOLO a ellas. Vacío
      (hoy): la ve quien entra a /admin y el aviso cae a CORREO_ALIANZAS; el
      panel lo dice en rojo, porque esa es la verdad del día.
-   · QUEJAS_PLAZO_DIAS — días CALENDARIO para responder. Vacío (hoy): no hay
-     «vence el…» ni cola vencida, y el indicador #12 dice que no se puede
-     calcular. El formulario público NO lo muestra ni con valor: publicar un
+   · QUEJAS_PLAZO_DIAS — días CALENDARIO para responder: 21 desde el 27 oct
+     2026 (wrangler.toml). Vacío: no hay «vence el…» ni cola vencida, y el
+     indicador #12 dice que no se puede calcular. El formulario público NO lo muestra ni con valor: publicar un
      plazo es un compromiso, y ese texto lo aprueba una persona.
 
    Lo que no viaja nunca por correo: el mensaje, el nombre, el contacto y el
@@ -31666,7 +31666,7 @@ sabes que está mal.</p>
 <p>Llegan del formulario público <strong>#quejas</strong>: quejas, sugerencias y felicitaciones. Se pueden enviar <strong>sin identificarse</strong>; quien deja contacto deja uno solo (correo o WhatsApp) y autoriza usarlo para responderle.</p>
 <p>El contenido <strong>nunca sale por correo</strong>: el buzón solo recibe «llegó la n.º X». Se lee aquí.</p>
 <p>Se responde <strong>por el medio que la persona dejó</strong>, y aquí se registra qué se respondió y cuándo: esa fecha es la del indicador #12. A quien es anónima solo se le puede contestar con el texto que verá al consultar con su código.</p>
-<p>El plazo de respuesta todavía es una <strong>decisión pendiente</strong> (QUEJAS_PLAZO_DIAS). Mientras no exista, nada «vence» y el formulario público no promete ninguno.</p>
+<p>Plazos (decididos el 27 oct 2026): <strong>acuse en 3 días hábiles</strong> a quien llegó por WhatsApp, correo o de viva voz (el formulario ya lo da con el código); <strong>respuesta de fondo en 21 días calendario</strong> (QUEJAS_PLAZO_DIAS), pasados los cuales sube a Urgente; y si la queja procede, <strong>plan de mejora en 30 días</strong> desde la respuesta: qué se cambia, quién y para cuándo, anotado en la respuesta. El formulario público no publica ningún plazo.</p>
 </div></details>
 <div id="tb-qj" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>

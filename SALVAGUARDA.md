@@ -211,9 +211,14 @@ convienen:
 
 ### 6.3 Qué se promete, y nada más
 
-- **Acuse de recibo en 3 días hábiles.**
-- **Respuesta de fondo en 15 días hábiles**, o explicación de por qué va a tardar
-  más y para cuándo.
+- **Acuse de recibo en 3 días hábiles.** El formulario lo da al instante con el
+  código; lo que llega por WhatsApp, correo o de viva voz se acusa a mano.
+- **Respuesta de fondo en 21 días calendario** (los 15 hábiles del derecho de
+  petición, Ley 1755 de 2015), o explicación de por qué va a tardar más y para
+  cuándo.
+- **Plan de mejora en 30 días calendario** desde la respuesta, cuando la queja
+  procede: qué se cambia, quién lo hace y para cuándo. Se anota en la respuesta
+  y, si la persona dejó contacto, se le cuenta.
 - **Confidencialidad**: la identidad de quien se queja no se comparte con la
   persona señalada ni con la fundación aliada involucrada, salvo que la ley lo
   exija.
@@ -221,10 +226,11 @@ convienen:
 - **Un registro de todas las quejas**, con fecha, tipo, estado y desenlace, que se
   revisa en junta y del que se publica un resumen agregado y anónimo.
 
-> **Decisión pendiente:** los plazos de arriba son una propuesta. Hay que fijar los
-> que la Fundación pueda cumplir de verdad con el equipo que tiene, porque un
-> plazo incumplido en una política de quejas destruye más confianza que la
-> ausencia de plazo.
+> **Plazos decididos por Sebas el 27 oct 2026.** Son los que un equipo de una
+> persona puede cumplir aun viajando: un plazo incumplido en una política de
+> quejas destruye más confianza que la ausencia de plazo. El de respuesta vive en
+> `QUEJAS_PLAZO_DIAS = "21"` (wrangler.toml) y alimenta el indicador #12. Falta
+> que entren al acta de adopción.
 
 ### 6.4 Qué hay que construir en el sitio
 
@@ -243,8 +249,8 @@ convienen:
 > para consultar en qué va, y un aviso al buzón que dice «llegó algo» sin el
 > contenido. **Lo que sigue siendo decisión de la organización quedó como
 > parámetro vacío**: `QUEJAS_PUNTO_FOCAL` (mientras falte, la ruta confidencial
-> la ve quien entra a /admin, y el panel lo dice) y `QUEJAS_PLAZO_DIAS` (mientras
-> falte, nada vence y el indicador #12 no se calcula). La página no promete
+> la ve quien entra a /admin, y el panel lo dice) y `QUEJAS_PLAZO_DIAS` (21 desde
+> el 27 oct 2026). La página no promete
 > plazos ni nombra a nadie. Pendiente: el punto 4; un botón en el panel para
 > registrar las quejas que lleguen por WhatsApp o de viva voz (hoy no existe), y
 > la adopción de esta política.
@@ -284,7 +290,7 @@ Sin estas cinco decisiones los borradores no se pueden adoptar:
 - [ ] **Punto focal de salvaguarda** y su suplente: nombre, correo, teléfono.
 - [ ] **Alcance contractual**: si las fundaciones aliadas quedan obligadas por
       contrato o solo informadas.
-- [ ] **Plazos reales** de acuse y respuesta del mecanismo de quejas.
+- [x] **Plazos reales** de acuse y respuesta del mecanismo de quejas (27 oct 2026: 3 días hábiles, 21 calendario y 30 para el plan de mejora).
 - [ ] **Verificación de antecedentes**: a quiénes se les exige y quién la hace.
 - [ ] **Política de aceptación de donaciones**: criterios de rechazo y quién decide.
 
