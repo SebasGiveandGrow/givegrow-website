@@ -1,6 +1,6 @@
 # SESSION HANDOFF — estado vigente
 
-> Actualizado: 17 oct 2026. **Este archivo se mantiene corto (menos de 8 KB).**
+> Actualizado: 27 oct 2026. **Este archivo se mantiene corto (menos de 8 KB).**
 > Lo que vino antes —jul a sep 2026, 225 KB, unos 60 000 tokens— está en
 > `ops/historial/session-handoff-hasta-sep-2026.md`. Se consulta por sección
 > (`grep -n "^## " …` y leer solo la que sirve), **nunca entero**: leerlo completo
@@ -23,25 +23,20 @@
 | Metodología MIRA y salvaguarda | `METODOLOGIA_MIRA.md`, `SALVAGUARDA.md` |
 | Incidentes | `ops/runbook-incidentes.md` |
 
-## Estado al 17 oct 2026
+## Estado al 27 oct 2026
 
-- **Producción al día con `main`** (último: #599, /socialfest «después del evento»).
-- **PR abiertos:**
-  - Canal de quejas (`claude/canal-quejas`, migración 0046): SIN automerge. Aplicar la 0046 desde la rama ANTES de fusionar. Punto focal y plazo quedan como parámetros vacíos hasta que Sebas los decida.
-  - #584: código por ruta. Esperaba a que pasara el Social Fest; hay que ponerlo al día con `main` antes de fusionarlo.
-  - #530: términos de donación. Espera revisión legal.
-- **Social Fest 2026 (14–16 oct, Ruta N) terminó.**
-  - El taller «Si no quedó documentado, no ocurrió» tuvo 14 personas; los resultados están en /socialfest.
-  - Falta consolidar los contactos: hojas de papel, WhatsApp y los inscritos en línea (`inscripciones.tipo = 'asistente'`). La base consolidada vive FUERA del repo: el repo es público.
-- **Regalos de diciembre (24 oct 2026):** la base completa está en un PR (migración 0048, `/#regalos`, `/admin/regalos`). La campaña nace en borrador. Para abrirla solo faltan los datos: valores por tipo de regalo, la aliada de EE. UU., las fechas, las hojas de terreno y las fotos. Ver `ops/regalos.md`.
-- **SEO (27 oct 2026, #614 en producción).** Search Console tenía 2 páginas indexadas, porque las rutas por `#` no son páginas para Google. Ahora 19 secciones públicas más /socialfest responden 200 en `/<ruta>`, con título, canonical y hreflang ES/EN (`?lang=en`) propios. El sitemap pasó de 10 a 28 URLs.
-  - Una ruta nueva va en `RUTAS_INDEXABLES` (worker.js), `RUTAS_PATH` (app.js) y `run_worker_first`. El check #28 del gate lo exige.
-  - **Pendiente de Sebas:** reenviar el sitemap y pedir la indexación de 5 URLs (paso a paso en el PR #614).
-  - **Revisar hacia el 3 nov:** que «Indexadas» haya subido en Indexación → Páginas.
-- **Siguiente en el sitio:**
-  - Página de teoría de cambio (sale de `MEDICION.md`; el texto lo aprueba Sebas).
-  - Página de la campaña con Give to Colombia (espera sus datos).
-  - Alta al HUB de las fundaciones que Sebas visita en el Amazonas.
+- **Producción al día con `main`.** Único PR abierto: #530 (términos de donación), espera revisión legal.
+- **En producción desde el 17 oct:** canal de quejas (#606, 0046), certificado de horas (#604, 0047), teoría de cambio (#601), tira de confianza (#602), invitación de ALMA por página (#603), código por ruta (#584), regalos (#607–#609, 0048–0049), ALMA con indicadores medidos (#610–#612), SEO con 19 rutas indexables (#614), firma de correo (`ops/correo/`, imagen en `img/correo/`).
+- **MEAL:** primeras mediciones del 2026-T3 registradas (17 oct). Indicador #1 = 1 hasta archivar los convenios de Conciencia y Ancla. #12 se calcula desde el canal de quejas.
+- **Pendiente de Sebas:**
+  - Cargar los 5 asesores en `/admin` › Board y enviar el informe T3.
+  - Archivar los convenios de Conciencia y Ancla.
+  - Canal de quejas: decidir punto focal y plazos.
+  - Regalos: la campaña sigue en BORRADOR hasta tener valores, aliada de EE. UU., fechas, hojas de terreno y fotos (`ops/regalos.md`).
+  - Search Console: reenviar el sitemap y pedir la indexación (pasos en #614). Revisar «Indexadas» hacia el 3 nov.
+  - Contactos del Social Fest (papel + WhatsApp + inscritos `tipo='asistente'`): consolidar FUERA del repo.
+- **SEO:** una ruta nueva va en `RUTAS_INDEXABLES` (worker.js), `RUTAS_PATH` (app.js) y `run_worker_first`; el check #28 del gate lo exige.
+- **Siguiente en el sitio:** página de la campaña con Give to Colombia (espera sus datos); alta al HUB de las fundaciones del Amazonas.
 
 ## Decisiones vigentes (no reabrir sin Sebas)
 
