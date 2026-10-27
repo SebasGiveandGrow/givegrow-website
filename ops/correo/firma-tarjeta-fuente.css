@@ -1,0 +1,12 @@
+@font-face{font-family:U;src:url(../../vendor/fonts/unbounded-latin.woff2) format('woff2');font-weight:200 900}
+@font-face{font-family:I;src:url(../../vendor/fonts/inter-latin.woff2) format('woff2');font-weight:100 900}
+html,body{margin:0;background:transparent}
+.verde{background:radial-gradient(120% 140% at 0% 0%,#24683F 0%,#1A4F31 45%,#0E2C1C 100%);position:relative;overflow:hidden}
+.amp{font-family:U;font-weight:800;line-height:.8;position:absolute;
+  background:linear-gradient(125deg,#F2FBF5 0%,#BFE3CC 22%,#6FB08D 45%,#D9F1E2 58%,#7FBD9B 74%,#3E8A60 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.marco{position:absolute;border:1px solid rgba(201,235,214,.22)}
+.marca{font-family:U;font-weight:700;color:#F6F3EC;letter-spacing:-.02em;line-height:1}
+.marca b{color:#8FD0AA;font-weight:700}
+.ey{font-family:I;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#A9C9B5}
+.barra{height:3px;background:linear-gradient(90deg,#BFE3CC,#6FB08D,#D9F1E2);border-radius:2px}
