@@ -34,6 +34,10 @@
   - El taller «Si no quedó documentado, no ocurrió» tuvo 14 personas; los resultados están en /socialfest.
   - Falta consolidar los contactos: hojas de papel, WhatsApp y los inscritos en línea (`inscripciones.tipo = 'asistente'`). La base consolidada vive FUERA del repo: el repo es público.
 - **Regalos de diciembre (24 oct 2026):** la base completa está en un PR (migración 0048, `/#regalos`, `/admin/regalos`). La campaña nace en borrador. Para abrirla solo faltan los datos: valores por tipo de regalo, la aliada de EE. UU., las fechas, las hojas de terreno y las fotos. Ver `ops/regalos.md`.
+- **SEO (27 oct 2026, #614 en producción).** Search Console tenía 2 páginas indexadas, porque las rutas por `#` no son páginas para Google. Ahora 19 secciones públicas más /socialfest responden 200 en `/<ruta>`, con título, canonical y hreflang ES/EN (`?lang=en`) propios. El sitemap pasó de 10 a 28 URLs.
+  - Una ruta nueva va en `RUTAS_INDEXABLES` (worker.js), `RUTAS_PATH` (app.js) y `run_worker_first`. El check #28 del gate lo exige.
+  - **Pendiente de Sebas:** reenviar el sitemap y pedir la indexación de 5 URLs (paso a paso en el PR #614).
+  - **Revisar hacia el 3 nov:** que «Indexadas» haya subido en Indexación → Páginas.
 - **Siguiente en el sitio:**
   - Página de teoría de cambio (sale de `MEDICION.md`; el texto lo aprueba Sebas).
   - Página de la campaña con Give to Colombia (espera sus datos).
