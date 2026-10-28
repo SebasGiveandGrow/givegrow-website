@@ -2194,7 +2194,7 @@ var I18N = {
     "sf.res.t":"Si no quedó documentado, no ocurrió. Este es el registro.",
     "sf.res.lead":"Lo que respondieron las personas que vinieron al taller «Si no quedó documentado, no ocurrió», el 14 de octubre de 2026 en Ruta N.",
     "sf.res.de":"de 14",
-    "sf.res.1":"personas asistieron: 13 de fundaciones de base y 1 de la Secretaría de Planeación de Medellín.",
+    "sf.res.1":"personas asistieron: 13 de fundaciones de base y 1 de la Secretaría de Participación Ciudadana de Medellín.",
     "sf.res.2":"dijeron no saber cómo medir, documentar o comunicar su impacto.",
     "sf.res.3":"se ven capaces de fortalecer a otras organizaciones en áreas distintas a la medición.",
     "sf.res.4":"pidieron saber más de la red, el HUB SOCIAL.",
