@@ -2123,6 +2123,17 @@ async function apiAporte(env, guia) {
    ======================================================================== */
 
 const NIVELES = ["hub", "estructura", "mixto"];
+/* EL REGISTRO DE VOLUNTARIOS (Decreto 4290 de 2005, art. 3; 29 oct 2026). La
+   fundacion lleva un registro con seis campos: nombre, numero de documento,
+   horas al mes, profesion, grado de escolaridad y labor. El nombre, el oficio y
+   el nivel ya se pedian; las horas salen de `participaciones`. Faltaban el
+   documento y la escolaridad, y se piden SOLO a un mayor de edad: de un menor
+   no se guarda nada mas hasta que su acudiente autorice (ver abajo), y esos dos
+   datos los completa el equipo con el acudiente. El CSV del registro dice a
+   quien le falta que. */
+const ESCOLARIDADES = { primaria: "Primaria", bachillerato: "Bachillerato", tecnico: "Técnico o tecnólogo",
+  profesional: "Profesional (pregrado)", posgrado: "Posgrado", ninguno: "Sin estudios formales" };
+const TIPOS_DOC_VOL = { CC: "Cédula de ciudadanía", CE: "Cédula de extranjería", PPT: "Permiso por Protección Temporal", PA: "Pasaporte" };
 
 /* EL CELULAR, OBLIGATORIO en todas las puertas de entrada desde el 28 sep 2026
    (decision de Sebas). Entre 7 y 15 digitos, que es lo que cabe en un celular
@@ -2302,6 +2313,20 @@ async function apiInscripcion(request, env, url) {
       ayuda: "El contacto de tu acudiente no puede ser tu mismo correo o celular: el enlace para autorizar es para él o ella." }, 400);
   }
 
+  /* El documento y la escolaridad del registro (Decreto 4290, art. 3). Solo
+     de un mayor de edad; `mayor_edad` ausente (una pestaña vieja) no los exige,
+     porque no vio los campos. */
+  let registro = null;
+  if (mayor === true) {
+    const docTipo = TIPOS_DOC_VOL[c.doc_tipo] ? c.doc_tipo : null;
+    const docNum = String(c.doc_numero == null ? "" : c.doc_numero).replace(/[.\s-]/g, "").toUpperCase().slice(0, 20);
+    const docOk = docTipo && (docTipo === "CC" ? /^\d{5,10}$/.test(docNum) : /^[A-Z0-9]{4,20}$/.test(docNum));
+    if (!docOk) return json({ error: "documento_requerido",
+      ayuda: "Escribe tu número de documento: la ley nos pide llevar un registro de voluntarios (Decreto 4290 de 2005)." }, 400);
+    if (!ESCOLARIDADES[c.escolaridad]) return json({ error: "escolaridad_requerida", opciones: Object.keys(ESCOLARIDADES) }, 400);
+    registro = { escolaridad: c.escolaridad, documento: { tipo: docTipo, numero: docNum } };
+  }
+
   const pisaTerritorio = nivel === "hub" || nivel === "mixto";
   /* LO QUE SE GUARDA DE UN MENOR MIENTRAS SU ACUDIENTE NO AUTORIZA (decision de
      Sebas, 29 sep 2026: enlace al acudiente, y si no autoriza, se borra).
@@ -2326,6 +2351,7 @@ async function apiInscripcion(request, env, url) {
   const datos = {
     nivel,
     oficio,
+    ...(registro || {}),
     ...(acudiente ? {} : {
       disponibilidad: limpio(c.disponibilidad, 280),
       mensaje: limpio(c.mensaje, 600)
@@ -26026,6 +26052,70 @@ async function adminMealCSV(env) {
     "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
 }
 
+/* GET /api/admin/voluntarios/registro.csv?mes=AAAA-MM — EL REGISTRO DE
+   VOLUNTARIOS del Decreto 4290 de 2005, art. 3 (29 oct 2026).
+   Las seis columnas del decreto van primero y con su nombre: nombre, documento,
+   horas del mes, profesión, escolaridad y labor. Detrás van las horas del año,
+   la edad, el estado y LO QUE FALTA, que es la lista de trabajo: quien se
+   inscribió antes de que el formulario pidiera el documento, un menor (sus
+   datos se completan con el acudiente) o quien participó sin inscribirse.
+   Las horas son las EFECTIVAS de jornadas realizadas o cerradas, las mismas
+   del certificado. Un menor cuyo acudiente no ha autorizado NO sale: sus datos
+   todavía no se pueden tratar. */
+async function adminRegistroVoluntariosCSV(env, url) {
+  const hoy = fechaCO();
+  let mes = String(url.searchParams.get("mes") || "");
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes) || mes > hoy.slice(0, 7)) mes = hoy.slice(0, 7);
+  const anio = mes.slice(0, 4);
+  const NIVEL = { hub: "En terreno, con una fundación del HUB", estructura: "Administrativo, en la sede", mixto: "En terreno y administrativo" };
+  const ins = (await env.DB.prepare(
+    "SELECT id, nombre, email, estado, datos FROM inscripciones WHERE tipo = 'voluntario' AND estado <> 'archivada' ORDER BY nombre COLLATE NOCASE"
+  ).all()).results || [];
+  let part = [];
+  if (await existeTabla(env, "participaciones")) {
+    part = (await env.DB.prepare(
+      "SELECT p.inscripcion, p.nombre, lower(p.email) AS email, p.menor, p.horas, substr(j.fecha, 1, 7) AS mes, j.nombre AS jornada " +
+      "FROM participaciones p JOIN jornadas j ON j.id = p.jornada " +
+      "WHERE p.horas IS NOT NULL AND j.estado IN ('realizada', 'cerrada') AND substr(j.fecha, 1, 4) = ?"
+    ).bind(anio).all()).results || [];
+  }
+  /* Las horas de cada quien: por su inscripción, y si participó sin ella, por
+     su correo o, a falta de correo, por su nombre. */
+  const horas = new Map();
+  const clave = (p) => p.inscripcion ? "i" + p.inscripcion : p.email ? "e" + p.email : "n" + String(p.nombre || "").trim().toLowerCase();
+  for (const p of part) {
+    const k = clave(p);
+    const h = horas.get(k) || { nombre: p.nombre, menor: p.menor, mes: 0, anio: 0, jornadas: [] };
+    h.anio += Number(p.horas) || 0;
+    if (p.mes === mes) { h.mes += Number(p.horas) || 0; if (!h.jornadas.includes(p.jornada)) h.jornadas.push(p.jornada); }
+    horas.set(k, h);
+  }
+  const num = (n) => (Math.round(n * 100) / 100).toString().replace(".", ",");
+  const filas = [["Nombre", "Tipo de documento", "Número de documento", "Horas en " + mes, "Profesión u oficio", "Grado de escolaridad",
+    "Labor que desempeña", "Horas en " + anio, "Menor de edad", "Estado de la inscripción", "Le falta"]];
+  for (const i of ins) {
+    let d = {};
+    try { d = JSON.parse(i.datos || "{}") || {}; } catch { d = {}; }
+    if (d.autorizacion_acudiente_pendiente) continue;
+    const h = horas.get("i" + i.id) || { mes: 0, anio: 0, jornadas: [] };
+    horas.delete("i" + i.id);
+    const doc = d.documento || {};
+    const falta = [!doc.numero && "documento", !d.escolaridad && "escolaridad", !d.oficio && "profesión"].filter(Boolean);
+    filas.push([i.nombre, TIPOS_DOC_VOL[doc.tipo] || "", doc.numero || "", num(h.mes), d.oficio || "", ESCOLARIDADES[d.escolaridad] || "",
+      [NIVEL[d.nivel] || ""].concat(h.jornadas.length ? ["jornadas: " + h.jornadas.join(", ")] : []).filter(Boolean).join(" · "),
+      num(h.anio), d.mayor_edad === false ? "sí" : d.mayor_edad === true ? "no" : "sin dato", i.estado, falta.join(", ")]);
+  }
+  for (const h of horas.values()) {
+    filas.push([h.nombre, "", "", num(h.mes), "", "", h.jornadas.length ? "jornadas: " + h.jornadas.join(", ") : "", num(h.anio),
+      h.menor === 1 ? "sí" : h.menor === 0 ? "no" : "sin dato", "participó sin inscripción", "documento, escolaridad, profesión"]);
+  }
+  const texto = "﻿" + filas.map((x) => x.map(csvCampo).join(";")).join("\r\n") + "\r\n";
+  return new Response(texto, { headers: {
+    "content-type": "text/csv; charset=utf-8",
+    "content-disposition": 'attachment; filename="registro-voluntarios-' + mes + '.csv"',
+    "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow" } });
+}
+
 /* POST /api/admin/meal/mediciones — una medición nueva. La fuente es
    obligatoria y el periodo tiene la forma de la frecuencia del indicador. Un
    periodo ya medido no se mide dos veces: se anula el anterior y se registra
@@ -34134,6 +34224,8 @@ textarea { font-size: 16px }
 <p><strong>Cerrar es el registro:</strong> las horas quedan fijas, la fundación reporta a cuántas personas llegó, sale un certificado de voluntariado por cada persona con horas y nacen las encuestas. <strong>Una jornada cerrada no se reabre:</strong> si algo quedó mal, se crea otra con los datos buenos, porque sus certificados ya dicen lo que dicen.</p>
 <p>Los indicadores cuentan solo lo que ocurrió —jornadas realizadas y personas con horas— y los beneficiarios son <strong>los que reporta la fundación</strong>. A un menor de edad <strong>nunca</strong> se le escribe: su certificado va a su acudiente si hay un correo registrado, y si no, se entrega en mano. Nada de esto se cobra.</p>
 </div></details>
+<div class="fin-barra"><label class="mu" for="vol-reg-mes">Registro de voluntarios (Decreto 4290, art. 3) del mes</label>
+<input type="month" id="vol-reg-mes"> <button type="button" class="pn-b2" id="vol-reg-csv">Descargar el registro (CSV)</button></div>
 <div id="vol-ind"></div>
 <div id="tb-jornadas" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 <div id="j-dlg" style="display:none;margin-top:24px"></div>
@@ -43202,6 +43294,11 @@ document.addEventListener("click", function(e){
   if (!e.target.closest) return;
   var b;
   if (e.target.id === "mel-csv"){ location.href = "/api/admin/meal/mediciones.csv"; return; }
+  if (e.target.id === "vol-reg-csv"){
+    var vm = document.getElementById("vol-reg-mes");
+    location.href = "/api/admin/voluntarios/registro.csv" + (vm && vm.value ? "?mes=" + encodeURIComponent(vm.value) : "");
+    return;
+  }
   if (e.target.id === "bd-informe"){ abrirInformeBoard(); return; }
   if (e.target.id === "bd-convocatoria"){ abrirConvocatoria(); return; }
   if ((b = e.target.closest("[data-mel-medir]"))){ formMedicion(melPorId(b.getAttribute("data-mel-medir")), {}); return; }
@@ -48174,6 +48271,7 @@ export default {
           return request.method === "POST" ? await adminMealMedir(request, env, sesion.email) : await adminMealMediciones(env, url);
         }
         if (ruta === "/api/admin/meal/mediciones.csv") return await adminMealCSV(env);
+        if (ruta === "/api/admin/voluntarios/registro.csv") return await adminRegistroVoluntariosCSV(env, url);
         const mme = ruta.match(/^\/api\/admin\/meal\/medicion\/(\d{1,9})$/);
         if (mme) return await adminMealMedicion(request, env, Number(mme[1]), sesion.email);
         const mmi = ruta.match(/^\/api\/admin\/meal\/indicador\/(\d{1,9})$/);
