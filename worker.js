@@ -5816,6 +5816,15 @@ async function adminSalud(env, opciones) {
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
+  /* DINERO DIRIGIDO QUE NO HA LLEGADO (29 oct 2026, ítem 43). Aportes a una
+     fundación o campaña con el pago confirmado y sin marcar «entregada». En
+     «Hoy» desde el primero, y a los 30 días sube a Urgente: el donante eligió a
+     quién darle y está esperando que llegue. El detalle, en Reportes › Por
+     fundación. */
+  await enCola("dirigidos_por_entregar",
+    "SELECT COUNT(*) AS n, MIN(COALESCE(a.aprobada_en, a.creada_en)) AS masViejo FROM aportes a " +
+    "WHERE a.destino_id IS NOT NULL AND a.estado IN ('aprobada','en_distribucion')",
+    "Reportes › Por fundación · hay dinero confirmado para una fundación o campaña que todavía no se ha entregado", 60, "#sec-reportes", 30);
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
     "WHERE publicada_en IS NULL AND anulada_en IS NULL",
@@ -23448,7 +23457,8 @@ const REPORTES = Object.freeze({
   donantes: "Donantes del año",
   voluntariado: "Voluntariado del año",
   mmc: "Mira Mi Casa: casos del año",
-  banco: "Banco y panel: conciliación del año"
+  banco: "Banco y panel: conciliación del año",
+  fundaciones: "Donaciones por fundación"
 });
 const AVISO_REPORTE = "Cifras operativas del panel, no estados financieros. Solo pagos confirmados. Pesos y dólares por separado, sin convertir.";
 
@@ -23568,6 +23578,63 @@ async function datosReporte(env, tipo, anio) {
       columnas: [{ k: "nombre", t: "Donante", tipo: "texto" }, { k: "documento", t: "Documento", tipo: "texto" }, { k: "correo", t: "Correo", tipo: "texto" },
         { k: "ciudad", t: "Ciudad", tipo: "texto" }].concat(colsDinero, [{ k: "certificado", t: "Certificado de donación", tipo: "texto" }]),
       filas: out, total: Object.assign({ nombre: out.length + (out.length === 1 ? " fila" : " filas") }, totalDe(out, ["n_cop", "cop", "n_usd", "usd"])) });
+  }
+
+  /* DONACIONES POR FUNDACIÓN (29 oct 2026, ítem 43). Una fila por destino:
+     cada fundación de la red (aunque esté en cero: el cero también es un
+     dato), cada campaña con movimiento y el fondo general. Cruza lo que ya
+     existe y no se veía junto: el dinero confirmado, lo marcado «entregada»,
+     lo que falta por entregar, los egresos con ese centro de costo y las
+     actas. Entregado y egresos NO se suman: son dos formas de mirar la misma
+     salida, y no todos los egresos llevan centro. */
+  if (tipo === "fundaciones") {
+    const red = await fundacionesRed(env);
+    const filasPor = new Map();
+    const fila = (d) => {
+      if (!filasPor.has(d)) {
+        filasPor.set(d, { clave: d, concepto: d === "" ? "Fondo general" : (red.mapa.get(d) || d),
+          clase: d === "" ? "Fondo general" : red.mapa.has(d) ? "Fundación de la red" : "Campaña u otro destino",
+          n_cop: 0, cop: 0, entregado: 0, por_entregar: 0, usd: 0, egresos: 0, actas: 0, familias: 0, intenciones: 0 });
+      }
+      return filasPor.get(d);
+    };
+    for (const id of red.mapa.keys()) fila(id);
+    const rec = await todas("SELECT COALESCE(a.destino_id, '') AS d, MAX(a.proyecto) AS nombre, a.moneda AS moneda, COUNT(*) AS n, SUM(a.monto_centavos) AS c, " +
+      "SUM(CASE WHEN a.estado = 'entregada' THEN a.monto_centavos ELSE 0 END) AS ce" + CONF + " GROUP BY 1, 3", desde, hasta);
+    for (const x of rec) {
+      const f = fila(x.d);
+      if (x.nombre && f.clase === "Campaña u otro destino") f.concepto = String(x.nombre);
+      if (x.moneda === "USD") f.usd += Number(x.c || 0);
+      else { f.n_cop += Number(x.n || 0); f.cop += Number(x.c || 0); f.entregado += Number(x.ce || 0); f.por_entregar += Number(x.c || 0) - Number(x.ce || 0); }
+    }
+    for (const x of await todas("SELECT COALESCE(a.destino_id, '') AS d, COUNT(*) AS n FROM aportes a WHERE a.estado = 'intencion' " +
+      "AND date(a.creada_en, '-5 hours') BETWEEN ? AND ? GROUP BY 1", desde, hasta)) fila(x.d).intenciones += Number(x.n || 0);
+    for (const x of await quizas(() => todas("SELECT COALESCE(centro, '') AS d, SUM(total_centavos) AS c FROM egresos " +
+      "WHERE anulado_en IS NULL AND centro IS NOT NULL AND centro <> 'estructura' AND fecha BETWEEN ? AND ? GROUP BY 1", desde, hasta), [])) fila(x.d).egresos += Number(x.c || 0);
+    for (const x of await quizas(() => todas("SELECT destino_id AS d, COUNT(*) AS n, SUM(COALESCE(familias, 0)) AS f FROM entregas " +
+      "WHERE anulada_en IS NULL AND publicada_en IS NOT NULL AND fecha BETWEEN ? AND ? GROUP BY 1", desde, hasta), [])) {
+      const f = fila(String(x.d || "")); f.actas += Number(x.n || 0); f.familias += Number(x.f || 0);
+    }
+    /* El fondo general no se «entrega» a nadie: financia la operación. Su
+       saldo no es una deuda con una fundación, así que no sale ni suma. */
+    if (filasPor.has("")) filasPor.get("").por_entregar = null;
+    const orden = { "Fundación de la red": 0, "Campaña u otro destino": 1, "Fondo general": 2 };
+    const filas = [...filasPor.values()].sort((a, b) => orden[a.clase] - orden[b.clase] || b.cop - a.cop || a.concepto.localeCompare(b.concepto, "es"));
+    const tot = totalDe(filas, ["n_cop", "cop", "entregado", "por_entregar", "usd", "egresos", "actas", "familias", "intenciones"]);
+    R.cifras.push({ etiqueta: "Recibido y confirmado, en pesos", tipo: "cop", valor: tot.cop, nota: tot.n_cop + (tot.n_cop === 1 ? " pago" : " pagos") });
+    R.cifras.push({ etiqueta: "Ya marcado como entregado", tipo: "cop", valor: tot.entregado });
+    R.cifras.push({ etiqueta: "Confirmado y todavía por entregar", tipo: "cop", valor: tot.por_entregar,
+      nota: filas.filter((f) => f.por_entregar > 0).length + " destino(s) con saldo por entregar" });
+    R.secciones.push({ titulo: "Destino por destino",
+      fuente: "Recibido: aportes con pago confirmado del año. Entregado: los marcados «entregada». Egresos: gastos con ese centro de costo. Actas: publicadas, con las familias que dicen. Intenciones: donaciones iniciadas y no pagadas (no son dinero).",
+      columnas: [{ k: "concepto", t: "Destino", tipo: "texto" }, { k: "clase", t: "Tipo", tipo: "texto" },
+        { k: "n_cop", t: "Pagos", tipo: "n" }, { k: "cop", t: "Recibido", tipo: "cop" }, { k: "entregado", t: "Entregado", tipo: "cop" },
+        { k: "por_entregar", t: "Por entregar", tipo: "cop" }, { k: "usd", t: "Recibido en dólares", tipo: "usd" },
+        { k: "egresos", t: "Egresos con su centro", tipo: "cop" }, { k: "actas", t: "Actas", tipo: "n" },
+        { k: "familias", t: "Familias en actas", tipo: "n" }, { k: "intenciones", t: "Intenciones sin pagar", tipo: "n" }],
+      filas, total: Object.assign({ concepto: "Total", clase: "" }, tot) });
+    R.notas.push("Las fundaciones de la red salen aunque estén en cero. Una campaña (la brigada) o el fondo general salen solo si tuvieron movimiento.");
+    if (!red.completo) R.notas.push("No se pudo leer la lista de fundaciones de la red: los destinos salen con su id y faltan las que están en cero.");
   }
 
   if (tipo === "voluntariado") {
@@ -31952,6 +32019,7 @@ textarea { font-size: 16px }
   <p class="pn-gt">Reportes</p>
   <a class="pn-it" href="#reportes/donaciones" data-pn-ir="reportes/donaciones">Donaciones del año</a>
   <a class="pn-it" href="#reportes/donantes" data-pn-ir="reportes/donantes">Donantes del año</a>
+  <a class="pn-it" href="#reportes/fundaciones" data-pn-ir="reportes/fundaciones">Por fundación</a>
   <a class="pn-it" href="#reportes/voluntariado" data-pn-ir="reportes/voluntariado">Voluntariado</a>
   <a class="pn-it" href="#reportes/mmc" data-pn-ir="reportes/mmc">Mira Mi Casa</a>
   <a class="pn-it" href="#reportes/banco" data-pn-ir="reportes/banco">Banco y panel</a>
@@ -32341,7 +32409,7 @@ sabes que está mal.</p>
 <!-- ============================ REPORTES ============================ -->
 <!-- Fase 5. Una sola sección para los cinco informes: cada dirección
      (#reportes/donaciones…) es un alias de ésta y pinta el suyo. -->
-<section class="pn-vista" data-vista="reportes/donaciones" data-alias="reportes/donantes reportes/voluntariado reportes/mmc reportes/banco" id="sec-reportes" hidden>
+<section class="pn-vista" data-vista="reportes/donaciones" data-alias="reportes/donantes reportes/fundaciones reportes/voluntariado reportes/mmc reportes/banco" id="sec-reportes" hidden>
 <div class="fin-barra rp-barra">
   <label>Año<select id="rp-anio" aria-label="Año del reporte"></select></label>
   <span class="tb-sep"></span>
@@ -33657,7 +33725,8 @@ var COLA_ES = {
   meal_indicadores_pendientes: "Indicadores sin la medición del periodo",
   board_informe_sin_enviar: "Informe trimestral sin enviar a los asesores",
   quejas_sin_responder: "Quejas y sugerencias sin responder",
-  portal_por_revisar: "Portal de fundaciones: cambios por revisar"
+  portal_por_revisar: "Portal de fundaciones: cambios por revisar",
+  dirigidos_por_entregar: "Donaciones dirigidas por entregar"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -33701,6 +33770,8 @@ var VISTAS = {
     linea: "Ingresos confirmados del año por mes, medio y destino, y cuántos donantes. Para leer, descargar o imprimir." },
   "reportes/donantes": { area: "Reportes", titulo: "Donantes del año",
     linea: "Una fila por donante con sus totales y su certificado: para el contador, la exógena y los certificados de donación." },
+  "reportes/fundaciones": { area: "Reportes", titulo: "Donaciones por fundación",
+    linea: "Cada fundación de la red con lo que recibió, lo que ya se le entregó, lo que falta, los egresos y las actas del año." },
   "reportes/voluntariado": { area: "Reportes", titulo: "Voluntariado del año",
     linea: "Jornadas, participantes y horas anotadas, y los beneficiarios que reportan las fundaciones." },
   "reportes/mmc": { area: "Reportes", titulo: "Mira Mi Casa: casos del año",
@@ -33950,7 +34021,8 @@ var COLA_MOD = {
   meal_indicadores_pendientes: "meal/indicadores",
   board_informe_sin_enviar: "meal/board",
   quejas_sin_responder: "quejas/ordinaria",
-  portal_por_revisar: "alianzas/red"
+  portal_por_revisar: "alianzas/red",
+  dirigidos_por_entregar: "reportes/fundaciones"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -41342,8 +41414,8 @@ function rpValor(v, tipo){
   if (tipo === "n") return numCO(Number(v));
   return esc(v);
 }
-/* Se llama al abrir una de las cinco direcciones («mostrar») y al cambiar el
-   año. El reporte que se pinta es el de la dirección: las cinco comparten la
+/* Se llama al abrir una de las seis direcciones («mostrar») y al cambiar el
+   año. El reporte que se pinta es el de la dirección: las seis comparten la
    sección. */
 function pedirReporte(){
   var tipo = String(VISTA || "").split("/")[1]; if (!tipo) return;
