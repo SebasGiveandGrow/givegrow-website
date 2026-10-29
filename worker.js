@@ -23831,6 +23831,8 @@ const QUEJA_CATEGORIA_ES = { queja: "Queja", sugerencia: "Sugerencia", felicitac
 const QUEJA_RELACIONADO_ES = { mmc: "Mira Mi Casa", brigada: "Brigada de emergencia", voluntariado: "Voluntariado",
   donaciones: "Donaciones", hub: "HUB y fundaciones aliadas", sitio: "El sitio web", otro: "Otro" };
 const QUEJA_ESTADOS = { recibida: "Recibida", en_revision: "En revisión", respondida: "Respondida", descartada: "Descartada" };
+const QUEJA_CANALES = { formulario: "El formulario del sitio", whatsapp: "WhatsApp", correo: "Correo", telefono: "Llamada",
+  en_persona: "En persona", otro: "Otro medio" };
 const QUEJA_MEDIOS = { correo: "Por correo", whatsapp: "Por WhatsApp", telefono: "Por teléfono", en_persona: "En persona",
   codigo: "Solo en la consulta con el código", sin_contacto: "No había cómo contactarla" };
 
@@ -23973,7 +23975,8 @@ async function adminQuejas(env, url, email) {
   const ruta = url.searchParams.get("ruta") === "confidencial" ? "confidencial" : "ordinaria";
   const plazo = quejasPlazo(env);
   const base = { ruta, hoy: fechaCO(), plazo_dias: plazo, focal_configurado: quejasFocal(env).length > 0,
-    estados: QUEJA_ESTADOS, categorias: QUEJA_CATEGORIA_ES, relacionado: QUEJA_RELACIONADO_ES, medios: QUEJA_MEDIOS };
+    estados: QUEJA_ESTADOS, categorias: QUEJA_CATEGORIA_ES, relacionado: QUEJA_RELACIONADO_ES, medios: QUEJA_MEDIOS,
+    canales: QUEJA_CANALES };
   if (ruta === "confidencial" && !puedeVerConfidencial(env, email)) {
     return json(Object.assign(base, { permitido: false, con_tabla: true, quejas: [] }));
   }
@@ -23986,6 +23989,80 @@ async function adminQuejas(env, url, email) {
     q.vence = q.estado === "recibida" || q.estado === "en_revision" ? quejaVence(q.creado, plazo) : null;
   }
   return json(Object.assign(base, { permitido: true, con_tabla: true, quejas: filas }));
+}
+
+/* POST /api/admin/quejas/anotar — UNA QUE LLEGÓ POR OTRO MEDIO (0050).
+   WhatsApp, correo, llamada o en persona: quien la recibió la anota aquí con el
+   día en que llegó, que es el que cuenta para el plazo y el indicador #12.
+   · Cualquiera del panel puede anotar una CONFIDENCIAL —la recibió él—, pero
+     después no la ve si no es el punto focal. El aviso va al punto focal.
+   · Se le da un código igual que en el formulario, para que la persona pueda
+     consultar en qué va. Se muestra una vez, en la respuesta, y no se audita.
+   · Nombre sin contacto vale (alguien que se presentó en persona). Con
+     contacto, quien anota confirma que la persona autorizó usarlo. */
+async function adminQuejaAnotar(request, env, email) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "quejas"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0046 en la base." }, 409);
+  try { await env.DB.prepare("SELECT canal, registrada_por FROM quejas LIMIT 0").run(); }
+  catch { return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0050 en la base." }, 409); }
+
+  const categoria = QUEJA_CATEGORIAS.includes(c.categoria) ? c.categoria : null;
+  if (!categoria) return json({ error: "categoria_invalida", campo: "categoria", ayuda: "Elige qué es." }, 400);
+  const ruta = categoria === "conducta" ? "confidencial" : "ordinaria";
+  const canal = QUEJA_CANALES[c.canal] && c.canal !== "formulario" ? c.canal : null;
+  if (!canal) return json({ error: "canal_requerido", campo: "canal", ayuda: "Elige por dónde llegó." }, 400);
+  const mensaje = String(c.mensaje == null ? "" : c.mensaje).replace(/\r\n?/g, "\n").trim().slice(0, 4000);
+  if (mensaje.length < 10) return json({ error: "mensaje_requerido", campo: "mensaje", ayuda: "Escribe lo que dijo la persona, con sus palabras si se puede." }, 400);
+  const fecha = c.fecha ? String(c.fecha) : fechaCO();
+  const haceUnAno = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+  if (!fechaISOValida(fecha) || fecha > fechaCO() || fecha < haceUnAno) {
+    return json({ error: "fecha_invalida", campo: "fecha", ayuda: "La fecha en que llegó va entre hace un año y hoy." }, 400);
+  }
+  const relacionado = QUEJA_RELACIONADO_ES[c.relacionado] ? c.relacionado : null;
+  const nombre = limpiar(c.nombre, 120).replace(/\s+/g, " ") || null;
+  let contacto = null;
+  const t = limpiar(c.contacto, 200);
+  if (t) {
+    if (/@/.test(t)) {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t)) return json({ error: "contacto_invalido", campo: "contacto", ayuda: "Ese correo no parece válido." }, 400);
+      contacto = t.toLowerCase();
+    } else {
+      contacto = telefonoContacto(t);
+      if (!contacto) return json({ error: "contacto_invalido", campo: "contacto", ayuda: "Un correo o un celular, con indicativo si es de afuera." }, 400);
+    }
+    if (!c.autoriza_datos) return json({ error: "autorizacion_requerida", campo: "autoriza", ayuda: "Confirma que la persona autorizó usar ese contacto para responderle." }, 400);
+  }
+  const anonima = !nombre && !contacto;
+  const idioma = c.idioma === "en" ? "en" : "es";
+  /* Hoy, la hora real; otro día, mediodía de Colombia (17:00 UTC). Igual que
+     la fecha de respuesta en `adminQueja`. */
+  const creado = fecha === fechaCO() ? new Date().toISOString().replace("T", " ").slice(0, 19) : fecha + " 17:00:00";
+
+  let fila = null, codigo = "";
+  for (let i = 0; i < 3 && !fila; i++) {
+    codigo = verifNuevo();
+    try {
+      fila = await env.DB.prepare(
+        "INSERT INTO quejas (codigo, ruta, categoria, relacionado, mensaje, anonima, nombre, contacto, idioma, creado, canal, registrada_por) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+      ).bind(codigo, ruta, categoria, relacionado, mensaje, anonima ? 1 : 0, nombre, contacto, idioma, creado, canal, email || null).first();
+    } catch (e) {
+      if (!/UNIQUE/i.test(String(e && e.message))) throw e;
+    }
+  }
+  if (!fila) return json({ error: "error_interno" }, 500);
+  if (contacto) await anotarAutorizacion(env, fila.id, "queja", "contacto para responder (anotada por " + canal + ")", "queja");
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(email || "?", "queja " + fila.id + " · anotada (" + canal + ", llegó el " + fecha + ")").run();
+  if (ruta === "confidencial") {
+    try { await correoAvisoQueja(env, { id: fila.id, ruta }); }
+    catch (e) { console.error("aviso queja", fila.id, e && e.message); }
+  }
+  return json({ ok: true, id: fila.id, ruta, codigo: verifFormato(codigo),
+    puede_ver: ruta === "ordinaria" || puedeVerConfidencial(env, email) });
 }
 
 /* POST /api/admin/queja/<id> { accion: revisar | responder | descartar }
@@ -31666,8 +31743,10 @@ sabes que está mal.</p>
 <p>Llegan del formulario público <strong>#quejas</strong>: quejas, sugerencias y felicitaciones. Se pueden enviar <strong>sin identificarse</strong>; quien deja contacto deja uno solo (correo o WhatsApp) y autoriza usarlo para responderle.</p>
 <p>El contenido <strong>nunca sale por correo</strong>: el buzón solo recibe «llegó la n.º X». Se lee aquí.</p>
 <p>Se responde <strong>por el medio que la persona dejó</strong>, y aquí se registra qué se respondió y cuándo: esa fecha es la del indicador #12. A quien es anónima solo se le puede contestar con el texto que verá al consultar con su código.</p>
+<p>Lo que llega <strong>por WhatsApp, por correo, por teléfono o en persona</strong> también se anota aquí, con el día en que llegó: si no, no cuenta para el plazo ni para el indicador. Se le da un código igual que en el formulario, para que la persona consulte en qué va.</p>
 <p>Plazos (decididos el 27 oct 2026): <strong>acuse en 3 días hábiles</strong> a quien llegó por WhatsApp, correo o de viva voz (el formulario ya lo da con el código); <strong>respuesta de fondo en 21 días calendario</strong> (QUEJAS_PLAZO_DIAS), pasados los cuales sube a Urgente; y si la queja procede, <strong>plan de mejora en 30 días</strong> desde la respuesta: qué se cambia, quién y para cuándo, anotado en la respuesta. El formulario público no publica ningún plazo.</p>
 </div></details>
+<p><button type="button" class="pn-b2" data-qj-anotar="ordinaria">Anotar una que llegó por WhatsApp, correo o en persona…</button></p>
 <div id="tb-qj" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
@@ -31676,7 +31755,9 @@ sabes que está mal.</p>
 <p>Es la ruta de <strong>conductas inapropiadas, abuso, explotación o corrupción</strong>. Va aparte a propósito: nadie denuncia a su interlocutor ante su interlocutor. No entra a «Hoy» ni al correo diario.</p>
 <p>Con <strong>QUEJAS_PUNTO_FOCAL</strong> configurado, solo esas sesiones la abren y solo a ellas les llega el aviso. Sin él, la ve quien entra a /admin, y esta pantalla lo dice.</p>
 <p>Si lo que se cuenta puede ser un delito, la ley obliga a ponerlo en conocimiento de la autoridad. El formulario nunca pide datos de un menor de edad.</p>
+<p>Si te lo contaron por WhatsApp, por teléfono o en persona, <strong>anótalo aquí aunque no seas el punto focal</strong>: el aviso le llega a él. Después no lo vas a poder ver, y eso es a propósito.</p>
 </div></details>
+<p><button type="button" class="pn-b2" data-qj-anotar="confidencial">Anotar un reporte que llegó por otro medio…</button></p>
 <div id="tb-qjc" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
@@ -40808,7 +40889,9 @@ function abrirQueja(x, ruta){
   var pares = [
     ["Número", "n.º " + esc(x.id) + "<small>código de quien la envió: " + esc(x.codigo) + "</small>"],
     ["Tipo", esc(qjDe(ruta, "categorias", x.categoria)) + (x.relacionado ? "<small>" + esc(qjDe(ruta, "relacionado", x.relacionado)) + "</small>" : "")],
-    ["Llegó", esc(enCO(x.creado, 16)) + "<small>" + (x.idioma === "en" ? "escrita en inglés" : "escrita en español") + "</small>"],
+    ["Llegó", esc(enCO(x.creado, 16)) + "<small>" + (x.canal && x.canal !== "formulario"
+      ? "por " + esc(qjDe(ruta, "canales", x.canal)) + (x.registrada_por ? " · anotada por " + esc(x.registrada_por) : "")
+      : (x.idioma === "en" ? "escrita en inglés" : "escrita en español")) + "</small>"],
     ["Estado", qjEstado(x, ruta)],
     ["Quién", x.anonima ? '<span class="mu">Anónima: no dejó nombre ni contacto. Solo puede leer una respuesta con su código.</span>'
       : celdaPersona(x.nombre || "(sin nombre)", x.contacto) + "<small>Autorizó usar este contacto solo para responderle.</small>"],
@@ -40870,9 +40953,54 @@ function formResponderQueja(x, ruta){
     });
   });
 }
+/* Anotar una que llegó por otro medio (0050). Las opciones salen de lo que
+   devolvió /api/admin/quejas; si la sección no se ha pedido, se pide antes. */
+function formAnotarQueja(ruta){
+  var d = QJ[ruta];
+  if (!d) return pedirJSON("/api/admin/quejas?ruta=" + ruta).then(function(r){ if (r){ QJ[ruta] = r; formAnotarQueja(ruta); } });
+  var conf = ruta === "confidencial";
+  var ops = function(obj, fuera){ return Object.keys(obj || {}).filter(function(k){ return fuera.indexOf(k) < 0; }).map(function(k){
+    return '<option value="' + esc(k) + '">' + esc(obj[k]) + "</option>"; }).join(""); };
+  var h = (conf ? '<p class="pn-nota">Si lo que te contaron puede ser un delito, la ley obliga a ponerlo en conocimiento de la autoridad. No escribas datos de un menor de edad.</p>' : "") +
+    '<p style="margin:0 0 14px">Escribe lo que dijo la persona, con sus palabras si se puede. Desde aquí no sale ningún correo a ella.</p>' +
+    (conf ? "" : selectCampo("qa-cat", "Qué es", '<option value="">Elige…</option>' + ops(d.categorias, ["conducta"]))) +
+    selectCampo("qa-canal", "Por dónde llegó", '<option value="">Elige…</option>' + ops(d.canales, ["formulario"])) +
+    pnCampo("qa-fecha", "Día en que llegó", hoyCO(), { tipo: "date", extra: ' max="' + esc(hoyCO()) + '"', ayuda: "Desde ese día corre el plazo." }) +
+    selectCampo("qa-rel", "Sobre qué (opcional)", '<option value="">—</option>' + ops(d.relacionado, [])) +
+    pnCampo("qa-msg", "Lo que dijo", "", { area: true, filas: 5 }) +
+    pnCampo("qa-nombre", "Nombre (opcional)", "") +
+    pnCampo("qa-contacto", "Correo o celular para responderle (opcional)", "") +
+    '<label class="pn-campo" id="qa-aut-c"><span><input type="checkbox" id="qa-aut"> La persona autorizó usar ese contacto solo para responderle</span><small id="qa-aut-e" class="pn-err"></small></label>' +
+    '<p class="pn-error" id="pn-err"></p>';
+  cajonAbrir({ ey: conf ? "Ruta confidencial" : "Quejas y sugerencias", titulo: "Anotar una que llegó por otro medio", cuerpo: h, foco: conf ? "qa-canal" : "qa-cat",
+    pie: '<button type="button" class="pn-b1" id="qa-guardar">Anotar</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cancelar</button>' });
+  document.getElementById("qa-guardar").addEventListener("click", function(){
+    var b = this;
+    ["qa-cat", "qa-canal", "qa-fecha", "qa-msg", "qa-contacto", "qa-aut"].forEach(function(k){ pnMarcar(k, ""); });
+    var c = { categoria: conf ? "conducta" : pnValor("qa-cat"), canal: pnValor("qa-canal"), fecha: pnValor("qa-fecha"), relacionado: pnValor("qa-rel"),
+      mensaje: pnValor("qa-msg"), nombre: pnValor("qa-nombre"), contacto: pnValor("qa-contacto"), autoriza_datos: document.getElementById("qa-aut").checked };
+    if (!c.categoria){ pnMarcar("qa-cat", "Elige qué es."); return; }
+    if (!c.canal){ pnMarcar("qa-canal", "Elige por dónde llegó."); return; }
+    if (c.mensaje.length < 10){ pnMarcar("qa-msg", "Escribe lo que dijo la persona."); return; }
+    if (c.contacto && !c.autoriza_datos){ pnMarcar("qa-aut", "Sin esa autorización, deja el contacto en blanco."); return; }
+    b.disabled = true;
+    postPanel("/api/admin/quejas/anotar", c).then(function(r){
+      b.disabled = false;
+      if (!r) return;
+      cajonAbrir({ ey: conf ? "Ruta confidencial" : "Quejas y sugerencias", titulo: "Quedó anotada: n.º " + r.id,
+        cuerpo: "<p>Dale a la persona este código para que consulte en qué va, en la página de quejas del sitio:</p>" +
+          '<p class="figure-xl" style="margin:10px 0;font-size:28px">' + esc(r.codigo) + "</p>" +
+          '<p class="mu">Se muestra solo esta vez. No queda en la auditoría ni en ningún correo.</p>' +
+          (r.puede_ver ? "" : "<p>Es de la ruta confidencial: el aviso le llegó al punto focal y tú ya no la vas a ver en la lista.</p>"),
+        pie: '<button type="button" class="pn-b1" data-pn-cerrar="1">Listo</button>' });
+      refrescarQuejas(ruta);
+    });
+  });
+}
 document.addEventListener("click", function(e){
   if (!e.target.closest) return;
   var b, x, ruta;
+  if ((b = e.target.closest("[data-qj-anotar]"))){ formAnotarQueja(b.getAttribute("data-qj-anotar")); return; }
   if ((b = e.target.closest("[data-qj-responder]"))){
     ruta = b.getAttribute("data-ruta"); x = qjPorId(ruta, b.getAttribute("data-qj-responder"));
     if (x) formResponderQueja(x, ruta);
@@ -45050,6 +45178,7 @@ export default {
         if (ruta === "/api/admin/quejas") return await adminQuejas(env, url, sesion.email);
         const mqj = ruta.match(/^\/api\/admin\/queja\/(\d{1,9})$/);
         if (mqj) return await adminQueja(request, env, Number(mqj[1]), sesion.email);
+        if (ruta === "/api/admin/quejas/anotar") return await adminQuejaAnotar(request, env, sesion.email);
         if (ruta === "/api/admin/correos")   return await adminCorreos(env, url);
         const mco = ruta.match(/^\/api\/admin\/correo\/(\d{1,9})(?:\/(reenviar|resuelto))?$/);
         if (mco) {
