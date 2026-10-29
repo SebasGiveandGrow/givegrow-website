@@ -702,6 +702,8 @@ var I18N = {
     "cv.err.consent":"Necesitamos tu autorización para que un ingeniero revise el caso.",
     "mc.t":"Tu caso",
     "mc.lead":"Aquí ves en qué va tu caso y puedes agregar fotos si hacen falta.",
+    "mc.queja":"¿Algo no está bien con la atención que recibiste, o quieres dejarnos una sugerencia?",
+    "mc.queja.link":"Escríbenos en el canal de quejas. Puedes hacerlo sin identificarte.",
     "mc.cargando":"Buscando tu caso…",
     "mc.err":"Ese enlace no abre ningún caso. Revisa que lo hayas copiado completo, hasta el final.",
     /* DISTINTA DE «mc.err» A PROPÓSITO. «Tu enlace está mal» es exactamente lo
@@ -5616,6 +5618,14 @@ function init(){
      path propio para los buscadores (ver `RUTAS_PATH`). Al llegar por ahí, la
      dirección vuelve a la forma de siempre, /#ruta, conservando la query (el
      ?lang=en): así los enlaces internos con # siguen funcionando igual. */
+  /* `?sobre=mmc` deja elegido el tema en los dos formularios de quejas: así
+     llega quien viene desde su caso de Mira Mi Casa. Solo un valor que ya sea
+     una opción del select. */
+  var qjSobre = new URLSearchParams(location.search).get("sobre");
+  if (qjSobre) ["qj-rel", "qjc-rel"].forEach(function(id){
+    var sel = document.getElementById(id);
+    if (sel && sel.querySelector('option[value="' + qjSobre.replace(/[^a-z]/g, "") + '"]')) sel.value = qjSobre;
+  });
   var rutaPath = (location.pathname.match(/^\/([a-z][a-z-]*)\/?$/i) || [])[1];
   if (rutaPath && RUTAS_PATH.indexOf(rutaPath.toLowerCase()) < 0 && rutaPath.toLowerCase() !== "socialfest") rutaPath = null;
   /* LAS TRES PUERTAS DE SOCIAL FEST TIENEN DIRECCIÓN (14 oct 2026). El QR del

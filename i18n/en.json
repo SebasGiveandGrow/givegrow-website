@@ -1671,6 +1671,8 @@
   "nav.d.ingenieros": "Apply: review photos, say what precautions to take and what to repair with",
   "mc.t": "Your case",
   "mc.lead": "Here you can see where your case stands and add photos if any are needed.",
+  "mc.queja": "Is something wrong with how you were treated, or would you like to leave us a suggestion?",
+  "mc.queja.link": "Write to us through the feedback and complaints channel. You can do it anonymously.",
   "mc.cargando": "Looking for your case…",
   "mc.err": "That link does not open any case. Check that you copied it in full, all the way to the end.",
   "mc.err.red": "We could not load your case right now. It may be the signal: try again in a moment. Your case and your photos are still saved.",

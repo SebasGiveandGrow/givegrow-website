@@ -9416,6 +9416,9 @@ async function casoQueSigue(env, numero) {
 
    NO lleva el concepto ni promete plazo: en este momento no hay ninguno de los
    dos. Lleva lo único que se pierde si no se manda, que es el enlace. */
+/* El canal de quejas en los correos a las familias (28 oct 2026): con el tema
+   «Mira Mi Casa» ya elegido. Va en texto: la plantilla escapa los párrafos. */
+const QUEJAS_URL_MMC = ORIGIN + "/quejas?sobre=mmc";
 async function correoCasoCreado(env, x) {
   if (!x.email) return { ok: true, sinDestino: true };
   const enlace = ORIGIN_MMC + "/caso/" + x.numero + "?t=" + x.token;
@@ -9430,7 +9433,9 @@ async function correoCasoCreado(env, x) {
     "concepto a distancia sobre fotos: si hay señales para no permanecer en la " +
     "casa o en una parte, qué precauciones tomar y con qué conviene repararla.",
     "Y si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien " +
-    "atrapado— esto no es lo que necesitas: llama al 123 y a tu alcaldía."
+    "atrapado— esto no es lo que necesitas: llama al 123 y a tu alcaldía.",
+    "Si algo no está bien con la atención que recibes, puedes decírnoslo en " +
+    QUEJAS_URL_MMC + " (puedes hacerlo sin identificarte)."
   ];
   const filas = [["Tu caso", x.numero], ["Sector", x.sector || "—"]];
   return enviarCorreo(env, {
@@ -14553,6 +14558,7 @@ async function correoCasoTerminado(env, x) {
       : "Si crees que es un error, escríbenos por WhatsApp con tu número de caso y lo revisamos."
   ];
   es.push("Si el peligro es AHORA —un muro a punto de caer, olor a gas, alguien atrapado— llama al 123 y avisa a tu alcaldía o al consejo municipal de gestión del riesgo.");
+  es.push("Si algo no estuvo bien con la atención que recibiste, puedes decírnoslo en " + QUEJAS_URL_MMC + " (puedes hacerlo sin identificarte).");
   const en = cerrado ? [
     "The Mira Mi Casa team closed your case " + x.numero + ". Closing it is not an opinion on your home and does not say whether it can be lived in: it means there is no further step to take with it from here.",
     "If you already had an opinion, it is still on your link and you can download it any time.",
@@ -14564,6 +14570,7 @@ async function correoCasoTerminado(env, x) {
       : "If you think this is a mistake, write to us on WhatsApp with your case number and we will look into it."
   ];
   en.push("If the danger is happening NOW —a wall about to fall, a smell of gas, someone trapped— call 123 and tell your municipality or its disaster risk council.");
+  en.push("If something was not right with how you were treated, you can tell us at " + QUEJAS_URL_MMC + "&lang=en (you can do it anonymously).");
   const parrafos = [...es, "— English —", ...en];
   return enviarCorreo(env, {
     para: x.email,

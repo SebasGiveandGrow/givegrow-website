@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=465fcd14" defer></script>
+<script src="/app.js?v=1c1808f0" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -4263,6 +4263,10 @@
       <p class="figure-xl" id="mc-num" style="margin:10px 0"></p>
       <p class="lead" data-i18n="mc.lead">Aquí ves en qué va tu caso y puedes agregar fotos si hacen falta.</p>
       <div id="mc-cuerpo" style="margin-top:30px"><p class="mu" data-i18n="mc.cargando">Buscando tu caso…</p></div>
+      <!-- El canal de quejas donde está la familia (28 oct 2026). Va al dominio
+           de la fundación, que es donde vive el formulario, con el tema ya
+           elegido. Fuera de #mc-cuerpo, que el JS reescribe. -->
+      <p class="mu" style="margin-top:34px"><span data-i18n="mc.queja">¿Algo no está bien con la atención que recibiste, o quieres dejarnos una sugerencia?</span> <a href="https://www.thegiveandgrowproject.org/quejas?sobre=mmc" data-i18n="mc.queja.link">Escríbenos en el canal de quejas. Puedes hacerlo sin identificarte.</a></p>
     </div>
   </section>
 </main>
