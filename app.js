@@ -2524,6 +2524,7 @@ var I18N = {
     "rg.f.ciudad":"Ciudad",
     "rg.f.priv":"Acepto que Give&Grow use mis datos para este pedido, según la",
     "rg.f.priv.link":"Política de Privacidad",
+    "rg.reasigna":"Si cuando llega tu pago otra persona ya pagó alguno de los regalos que escogiste, tu aporte va a otra niña u otro niño de la misma zona, con el mismo tipo de regalo si lo hay y sin pasar del valor que pagaste, y te avisamos por correo. Si en esa zona ya no queda ninguno, una persona del equipo decide a quién se asigna y te escribimos.",
     "rg.f.enviar":"Ir a pagar",
     "rg.barra.ir":"Continuar",
     "rg.anio":"{n} año",
