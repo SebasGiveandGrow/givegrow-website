@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "d7394c93";
+const STYLES_V = "8c546299";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -5928,6 +5928,23 @@ async function adminSalud(env, opciones) {
     await enCola("unidades_por_revisar",
       "SELECT COUNT(*) AS n, MIN(actualizada) AS masViejo FROM unidades_apadrinables WHERE estado = 'propuesta'",
       "Alianzas › Apadrinamiento · una fundación propuso una unidad para apadrinar: verifica su costo y apruébala o devuélvela", 31, "#sec-apadrinamiento", 7);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  /* EL REPORTE MENSUAL (0055): lo que una fundación reportó y nadie ha
+     revisado, y, desde el día 10, las unidades publicadas que no han
+     reportado el mes anterior. Sin la 0055 no sale. */
+  try {
+    await enCola("reportes_unidad_por_revisar",
+      "SELECT COUNT(*) AS n, MIN(actualizado) AS masViejo FROM reportes_unidad WHERE estado = 'enviado'",
+      "Alianzas › Apadrinamiento · una fundación reportó lo entregado en el mes: revisa la evidencia y apruébalo o devuélvelo", 32, "#sec-apadrinamiento", 7);
+    await enCola("unidades_sin_reporte",
+      "SELECT COUNT(*) AS n, MIN(u.aprobada_en) AS masViejo FROM unidades_apadrinables u WHERE u.estado = 'aprobada' " +
+      "AND strftime('%d', datetime('now', '-5 hours')) >= '10' " +
+      "AND date(u.aprobada_en, '-5 hours') < date(datetime('now', '-5 hours'), 'start of month') " +
+      "AND NOT EXISTS (SELECT 1 FROM reportes_unidad r WHERE r.unidad_id = u.id " +
+      "AND r.periodo = strftime('%Y-%m', datetime('now', '-5 hours'), 'start of month', '-1 day'))",
+      "Alianzas › Apadrinamiento · unidades publicadas sin el reporte del mes pasado: escríbele a la fundación", 33, "#sec-apadrinamiento");
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -21284,7 +21301,16 @@ async function apiCatalogoApadrinamiento(env) {
     "u.costo_mensual_cop, u.cupos, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion " +
     "WHERE u.estado = 'aprobada' AND i.red_id IS NOT NULL ORDER BY u.aprobada_en"
   ).all()).results || [];
+  /* El último reporte VERIFICADO de cada unidad (0055). Solo lo aprobado. */
+  const ultimo = new Map();
+  if (await existeTabla(env, "reportes_unidad")) {
+    for (const r of (await env.DB.prepare(
+      "SELECT unidad_id, periodo, entregadas FROM reportes_unidad r WHERE estado = 'aprobado' AND periodo = " +
+      "(SELECT MAX(periodo) FROM reportes_unidad x WHERE x.unidad_id = r.unidad_id AND x.estado = 'aprobado')"
+    ).all()).results || []) ultimo.set(r.unidad_id, { periodo: r.periodo, entregadas: r.entregadas });
+  }
   const unidades = filas.filter((u) => red.mapa.has(String(u.red_id).toLowerCase())).map((u) => ({
+    ultimo_reporte: ultimo.get(u.id) || null,
     id: u.id, nombre: { es: u.nombre_es, en: u.nombre_en || u.nombre_es }, programa: u.programa,
     descripcion: { es: u.descripcion_es, en: u.descripcion_en || u.descripcion_es },
     incluye: u.incluye ? { es: u.incluye, en: u.incluye_en || u.incluye } : null,
@@ -21335,7 +21361,18 @@ async function adminApadrinamiento(env) {
     "SELECT x.id, x.nombre, x.email, x.cantidad, x.idioma, x.creado, x.atendido_en, u.nombre_es AS unidad " +
     "FROM apadrinamiento_interes x LEFT JOIN unidades_apadrinables u ON u.id = x.unidad_id ORDER BY x.creado DESC LIMIT 500"
   ).all()).results || [];
-  return json({ ok: true, estados: UNIDAD_ESTADO_ES,
+  /* Los reportes mensuales (0055), si la tabla ya existe. */
+  let reportes = [];
+  if (await existeTabla(env, "reportes_unidad")) {
+    reportes = ((await env.DB.prepare(
+      "SELECT r.id, r.unidad_id, u.nombre_es AS unidad, u.cupos, u.evidencia AS evidencia_prometida, i.nombre AS fundacion, r.periodo, r.entregadas, r.nota, " +
+      "r.evidencia_doc, d.tipo AS evidencia_tipo, d.nota AS evidencia_nota, r.estado, r.motivo, r.actualizado, r.revisado_por " +
+      "FROM reportes_unidad r JOIN unidades_apadrinables u ON u.id = r.unidad_id JOIN inscripciones i ON i.id = u.inscripcion " +
+      "LEFT JOIN documentos_fundacion d ON d.id = r.evidencia_doc " +
+      "ORDER BY CASE r.estado WHEN 'enviado' THEN 0 ELSE 1 END, r.periodo DESC LIMIT 300"
+    ).all()).results || []).map((r) => Object.assign(r, { actualizado: selloCO(r.actualizado).slice(0, 16) }));
+  }
+  return json({ ok: true, estados: UNIDAD_ESTADO_ES, reportes,
     unidades: unidades.map((u) => Object.assign(u, { en_red: !!(u.red_id && red.mapa.has(String(u.red_id).toLowerCase())),
       actualizada: selloCO(u.actualizada).slice(0, 16), aprobada_en: u.aprobada_en ? selloCO(u.aprobada_en).slice(0, 16) : null })),
     interes: interes.map((x) => Object.assign(x, { creado: selloCO(x.creado).slice(0, 16) })) });
@@ -21378,6 +21415,107 @@ async function adminUnidadDecidir(request, env, id, quien) {
   } else return json({ error: "accion_invalida" }, 400);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(quien || "?", "unidad apadrinable " + id + " · " + detalle).run();
+  return json({ ok: true });
+}
+
+
+/* ============================================================================
+   APADRINAMIENTO · FASE 3: EL REPORTE MENSUAL VERIFICABLE (0055, 29 oct 2026)
+   ============================================================================
+   La fundación reporta cada mes, por unidad publicada, cuántas entregó y con
+   qué evidencia. El equipo lo aprueba o lo devuelve. Lo aprobado es lo único
+   que sale al público: «último reporte verificado». En la fase 2 será lo que
+   reciba cada padrino.
+
+   EL PERIODO: el mes en curso o hasta 12 meses atrás, nunca uno futuro. Un
+   reporte aprobado no se reescribe (ver la migración). */
+function periodoValido(p) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(p || ""))) return false;
+  const hoy = fechaCO().slice(0, 7);
+  const [a, m] = hoy.split("-").map(Number);
+  const desde = new Date(Date.UTC(a, m - 1 - 12, 1)).toISOString().slice(0, 7);
+  return p <= hoy && p >= desde;
+}
+
+/* GET y POST /api/portal/reportes */
+async function apiPortalReportes(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "reportes_unidad"))) return json({ error: "no_disponible" }, 503);
+  if (request.method === "GET") {
+    const filas = (await env.DB.prepare(
+      "SELECT r.id, r.unidad_id, u.nombre_es AS unidad, u.cupos, r.periodo, r.entregadas, r.nota, r.evidencia_doc, r.estado, r.motivo, r.actualizado " +
+      "FROM reportes_unidad r JOIN unidades_apadrinables u ON u.id = r.unidad_id WHERE u.inscripcion = ? ORDER BY r.periodo DESC, u.nombre_es LIMIT 200"
+    ).bind(s.inscripcion).all()).results || [];
+    return json({ ok: true, reportes: filas.map((r) => Object.assign(r, { actualizado: fechaCO(r.actualizado) })) });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const u = await env.DB.prepare(
+    "SELECT id, cupos, estado FROM unidades_apadrinables WHERE id = ? AND inscripcion = ?"
+  ).bind(Number(c.unidad_id) || 0, s.inscripcion).first();
+  if (!u || (u.estado !== "aprobada" && u.estado !== "pausada")) {
+    return json({ error: "dato_invalido", campo: "unidad_id", ayuda: "Se reporta sobre una unidad publicada (o pausada)." }, 400);
+  }
+  const periodo = String(c.periodo || "");
+  if (!periodoValido(periodo)) return json({ error: "dato_invalido", campo: "periodo", ayuda: "Elige un mes entre el actual y los últimos doce." }, 400);
+  const entregadas = numeroCO(c.entregadas);
+  if (entregadas === null || !Number.isInteger(entregadas) || entregadas < 0 || entregadas > 100000) {
+    return json({ error: "dato_invalido", campo: "entregadas", ayuda: "Escribe cuántas unidades se entregaron, en número entero (0 si no hubo)." }, 400);
+  }
+  if (u.cupos && entregadas > u.cupos) {
+    return json({ error: "dato_invalido", campo: "entregadas", ayuda: "Son más que los " + u.cupos + " cupos de la unidad. Si los cupos cambiaron, edita la unidad primero." }, 400);
+  }
+  const doc = await env.DB.prepare(
+    "SELECT id FROM documentos_fundacion WHERE id = ? AND inscripcion = ? AND retirado_en IS NULL"
+  ).bind(Number(c.evidencia_doc) || 0, s.inscripcion).first();
+  if (!doc) return json({ error: "dato_invalido", campo: "evidencia_doc", ayuda: "Adjunta la evidencia del mes: súbela aquí mismo y elígela." }, 400);
+  const nota = String(c.nota == null ? "" : c.nota).replace(/\r\n?/g, "\n").trim().slice(0, 1200) || null;
+  const previo = await env.DB.prepare("SELECT id, estado FROM reportes_unidad WHERE unidad_id = ? AND periodo = ?").bind(u.id, periodo).first();
+  if (previo && previo.estado === "aprobado") {
+    return json({ error: "ya_aprobado", ayuda: "El reporte de ese mes ya está verificado y publicado. Si hay que corregir algo, escríbenos." }, 409);
+  }
+  if (previo) {
+    await env.DB.prepare(
+      "UPDATE reportes_unidad SET entregadas = ?, nota = ?, evidencia_doc = ?, estado = 'enviado', motivo = NULL, actualizado = datetime('now') WHERE id = ?"
+    ).bind(entregadas, nota, doc.id, previo.id).run();
+    return json({ ok: true, id: previo.id });
+  }
+  const fila = await env.DB.prepare(
+    "INSERT INTO reportes_unidad (unidad_id, periodo, entregadas, nota, evidencia_doc) VALUES (?, ?, ?, ?, ?) RETURNING id"
+  ).bind(u.id, periodo, entregadas, nota, doc.id).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* POST /api/admin/reporte-unidad/<id> { accion: aprobar | devolver } */
+async function adminReporteUnidad(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const r = await env.DB.prepare("SELECT id, estado FROM reportes_unidad WHERE id = ?").bind(id).first();
+  if (!r) return json({ error: "no_encontrado" }, 404);
+  if (r.estado === "aprobado") return json({ error: "ya_aprobado", ayuda: "Ya está aprobado y publicado." }, 409);
+  let detalle;
+  if (c.accion === "aprobar") {
+    if (c.evidencia_revisada !== true) return json({ error: "evidencia_sin_revisar", campo: "revisada", ayuda: "Marca que abriste y revisaste la evidencia." }, 400);
+    await env.DB.prepare(
+      "UPDATE reportes_unidad SET estado = 'aprobado', motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') WHERE id = ?"
+    ).bind(quien || null, id).run();
+    detalle = "aprobado";
+  } else if (c.accion === "devolver") {
+    const motivo = limpiar(c.motivo, 500);
+    if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di qué falta: la fundación lo ve en su portal." }, 400);
+    await env.DB.prepare(
+      "UPDATE reportes_unidad SET estado = 'devuelto', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') WHERE id = ?"
+    ).bind(motivo, quien || null, id).run();
+    detalle = "devuelto";
+  } else return json({ error: "accion_invalida" }, 400);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "reporte mensual " + id + " · " + detalle).run();
   return json({ ok: true });
 }
 
@@ -21594,6 +21732,30 @@ function paginaPortal(nonce) {
         <p class="sub mt">Todavía no se cobra: quien quiera apadrinar deja su correo y le escribimos cuando abra el aporte mensual.</p>
       </div>
       <div class="tarjeta" id="ap-lista"></div>
+      <form class="tarjeta oculto" id="f-reporte" autocomplete="off">
+        <h2>Reporte del mes</h2>
+        <p class="sub">Cada mes, por cada unidad publicada: cuántas entregaste y la evidencia que prometiste mostrar. El equipo lo revisa y, aprobado, sale en la página como «último reporte verificado».</p>
+        <label for="rp-unidad">Unidad</label>
+        <select id="rp-unidad"></select>
+        <label for="rp-periodo">Mes</label>
+        <select id="rp-periodo"></select>
+        <label for="rp-entregadas">Cuántas se entregaron ese mes *</label>
+        <span class="ayuda" id="rp-cupos"></span>
+        <input type="text" id="rp-entregadas" inputmode="numeric">
+        <label for="rp-nota">Qué pasó este mes</label>
+        <span class="ayuda">En pocas líneas: si algo cambió, si hubo menos entregas y por qué. Sin nombres ni datos de niños.</span>
+        <textarea id="rp-nota" rows="3" maxlength="1200"></textarea>
+        <label for="rp-evid">Evidencia *</label>
+        <span class="ayuda" id="rp-prometida"></span>
+        <select id="rp-evid"></select>
+        <div class="acciones">
+          <label class="btn sec mini" for="rp-subir">Subir la evidencia ahora</label>
+          <input type="file" id="rp-subir" class="archivo" accept="application/pdf,image/jpeg,image/png,image/webp">
+        </div>
+        <div class="acciones"><button type="button" class="btn" id="b-reporte">Enviar el reporte</button></div>
+        <span class="msg" id="m-reporte" role="status" aria-live="polite"></span>
+        <div id="rp-historial" class="mt"></div>
+      </form>
       <form class="tarjeta" id="f-unidad" autocomplete="off">
         <h2 id="ap-titulo">Proponer una unidad</h2>
         <input type="hidden" id="ap-id">
@@ -21896,10 +22058,11 @@ $("p-docs").addEventListener("click", function(ev){
 /* ---- Apadrinamiento: las unidades de la fundación (0054) ---- */
 function pesos(n){ return "$" + Math.round(Number(n) || 0).toLocaleString("es-CO"); }
 function cargarUnidades(){
+  cargarReportes();
   return fetch("/api/portal/unidades", { credentials: "same-origin" }).then(function(r){
     if (r.status === 401) { ver("v-entrar"); return null; }
     return r.json();
-  }).then(function(d){ if (!d) return; UNIDADES = d.unidades || []; pintarUnidades(); })
+  }).then(function(d){ if (!d) return; UNIDADES = d.unidades || []; pintarUnidades(); pintarReporte(); })
     .catch(function(){ $("ap-lista").innerHTML = '<p class="sub">No pudimos cargar tus unidades. Intenta de nuevo.</p>'; });
 }
 function pintarUnidades(){
@@ -21946,6 +22109,82 @@ function guardarUnidad(){
     cargarUnidades();
   }).catch(function(){ b.disabled = false; msg("m-unidad", "No pudimos conectar. Lo que escribiste sigue en pantalla.", "mal"); });
 }
+/* ---- El reporte mensual (0055) ---- */
+var REPORTES = [];
+var MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function nombreMes(p){ var x = String(p).split("-"); return MESES[Number(x[1]) - 1] + " de " + x[0]; }
+function cargarReportes(){
+  return fetch("/api/portal/reportes", { credentials: "same-origin" }).then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){ if (d) { REPORTES = d.reportes || []; pintarReporte(); } }).catch(function(){});
+}
+function pintarReporte(){
+  var pub = (UNIDADES || []).filter(function(u){ return u.estado === "aprobada" || u.estado === "pausada"; });
+  $("f-reporte").classList.toggle("oculto", !pub.length);
+  if (!pub.length) return;
+  var su = $("rp-unidad"), actual = su.value;
+  su.innerHTML = pub.map(function(u){ return '<option value="' + u.id + '">' + esc(u.nombre_es) + "</option>"; }).join("");
+  if (actual) su.value = actual;
+  var sp = $("rp-periodo");
+  if (!sp.options.length) {
+    var hoy = new Date(), op = [];
+    for (var i = 1; i >= -2; i--) {
+      var d = new Date(hoy.getFullYear(), hoy.getMonth() - (1 - i), 1);
+      var p = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      op.push('<option value="' + p + '"' + (i === 0 ? " selected" : "") + ">" + esc(nombreMes(p)) + "</option>");
+    }
+    sp.innerHTML = op.join("");
+  }
+  var se = $("rp-evid"), ev = se.value;
+  se.innerHTML = '<option value="">Elige el documento…</option>' + (D.documentos || []).map(function(d){
+    return '<option value="' + d.id + '">' + esc(d.tipo_es) + (d.nota ? " · " + esc(d.nota) : "") + " (" + esc(d.subido) + ")</option>";
+  }).join("");
+  se.value = ev;
+  infoUnidadReporte();
+  $("rp-historial").innerHTML = "";
+  if (REPORTES.length) $("rp-historial").innerHTML = '<h2 class="mt">Reportes enviados</h2><ul class="docs">' + REPORTES.map(function(r){
+    var pill = r.estado === "aprobado" ? "pill ok" : r.estado === "devuelto" ? "pill ambar" : "pill";
+    var txt = r.estado === "aprobado" ? "Verificado" : r.estado === "devuelto" ? "Devuelto" : "Por revisar";
+    return '<li><div><span class="nom">' + esc(r.unidad) + " · " + esc(nombreMes(r.periodo)) + '</span><span class="det">' + r.entregadas + " entregadas" + (r.cupos ? " de " + r.cupos : "") + "</span>" +
+      (r.motivo ? '<span class="det">Nota del equipo: ' + esc(r.motivo) + "</span>" : "") + '</div><div class="der"><span class="' + pill + '">' + txt + "</span></div></li>";
+  }).join("") + "</ul>";
+}
+function infoUnidadReporte(){
+  var u = (UNIDADES || []).filter(function(x){ return String(x.id) === $("rp-unidad").value; })[0];
+  $("rp-cupos").textContent = u && u.cupos ? "La unidad tiene " + u.cupos + " cupos." : "";
+  $("rp-prometida").textContent = u ? "Lo que prometiste mostrar: " + u.evidencia : "";
+}
+function enviarReporte(){
+  var c = { unidad_id: $("rp-unidad").value, periodo: $("rp-periodo").value, entregadas: $("rp-entregadas").value.trim(),
+    nota: $("rp-nota").value, evidencia_doc: $("rp-evid").value };
+  var b = $("b-reporte"); b.disabled = true; msg("m-reporte", "Enviando…");
+  enviar("/api/portal/reportes", c).then(function(r){
+    b.disabled = false;
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { msg("m-reporte", r.d.ayuda || "No se pudo enviar.", "mal"); return; }
+    $("rp-entregadas").value = ""; $("rp-nota").value = "";
+    msg("m-reporte", "Enviado: el equipo revisa la evidencia y te cuenta aquí.", "ok");
+    cargarReportes();
+  }).catch(function(){ b.disabled = false; msg("m-reporte", "No pudimos conectar. Lo que escribiste sigue en pantalla.", "mal"); });
+}
+$("rp-unidad").addEventListener("change", infoUnidadReporte);
+$("b-reporte").addEventListener("click", enviarReporte);
+$("rp-subir").addEventListener("change", function(){
+  var f = this.files[0]; this.value = "";
+  if (!f) return;
+  if (f.size > 5242880) { msg("m-reporte", "El archivo pasa de 5 MB.", "mal"); return; }
+  var u = $("rp-unidad").options[$("rp-unidad").selectedIndex];
+  var nota = "Evidencia · " + (u ? u.text : "") + " · " + nombreMes($("rp-periodo").value);
+  msg("m-reporte", "Subiendo «" + f.name + "»…");
+  fetch("/api/portal/documento?tipo=otro&nota=" + encodeURIComponent(nota.slice(0, 120)), {
+    method: "POST", credentials: "same-origin", headers: { "content-type": f.type || "application/octet-stream" }, body: f
+  }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, status: r.status, d: d }; }); })
+    .then(function(r){
+      if (r.status === 401) { ver("v-entrar"); return; }
+      if (!r.ok) { msg("m-reporte", r.d.ayuda || "No se pudo subir.", "mal"); return; }
+      var nuevo = r.d.id;
+      cargar().then(function(){ irA("apadrinamiento"); pintarReporte(); $("rp-evid").value = String(nuevo); msg("m-reporte", "Evidencia subida y elegida. Ahora envía el reporte.", "ok"); });
+    }).catch(function(){ msg("m-reporte", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+});
 $("b-unidad").addEventListener("click", guardarUnidad);
 $("b-unidad-cancelar").addEventListener("click", function(){ formUnidad(null); });
 $("ap-lista").addEventListener("click", function(ev){
@@ -34548,7 +34787,9 @@ var COLA_ES = {
   quejas_sin_responder: "Quejas y sugerencias sin responder",
   portal_por_revisar: "Portal de fundaciones: cambios por revisar",
   dirigidos_por_entregar: "Donaciones dirigidas por entregar",
-  unidades_por_revisar: "Unidades de apadrinamiento por revisar"
+  unidades_por_revisar: "Unidades de apadrinamiento por revisar",
+  reportes_unidad_por_revisar: "Reportes mensuales de apadrinamiento por revisar",
+  unidades_sin_reporte: "Unidades sin el reporte del mes pasado"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -34849,7 +35090,9 @@ var COLA_MOD = {
   quejas_sin_responder: "quejas/ordinaria",
   portal_por_revisar: "alianzas/red",
   dirigidos_por_entregar: "reportes/fundaciones",
-  unidades_por_revisar: "alianzas/apadrinamiento"
+  unidades_por_revisar: "alianzas/apadrinamiento",
+  reportes_unidad_por_revisar: "alianzas/apadrinamiento",
+  unidades_sin_reporte: "alianzas/apadrinamiento"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -42638,6 +42881,13 @@ function cargarApadrinamiento(){
         '<td><button type="button" class="copy" data-ap-abrir="' + u.id + '">Abrir</button></td></tr>';
     }).join("") : '<tr><td colspan="6">Ninguna fundación ha propuesto unidades todavía. Lo hacen desde la pestaña «Apadrinamiento» de su portal.</td></tr>';
     h += "</tbody></table></div>";
+    var R = d.reportes || [];
+    h += '<p class="pn-h3">Reportes mensuales (' + R.filter(function(r){ return r.estado === "enviado"; }).length + " por revisar)</p>" +
+      (R.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Mes</th><th scope="col">Unidad</th><th scope="col">Entregadas</th><th scope="col">Estado</th><th scope="col"></th></tr></thead><tbody>' +
+        R.map(function(r){ return "<tr><td>" + esc(r.periodo) + "</td><td>" + esc(r.unidad) + "<br><small>" + esc(r.fundacion) + "</small></td><td>" + r.entregadas + (r.cupos ? " de " + r.cupos : "") + "</td>" +
+          "<td>" + esc(r.estado === "enviado" ? "Por revisar" : r.estado === "aprobado" ? "Aprobado" : "Devuelto") + "</td>" +
+          '<td><button type="button" class="copy" data-rp-abrir="' + r.id + '">Abrir</button></td></tr>'; }).join("") + "</tbody></table></div>"
+        : '<p class="mu">Ninguna fundación ha reportado todavía. Lo hacen cada mes desde la pestaña «Apadrinamiento» de su portal.</p>');
     var I = d.interes || [];
     h += '<p class="pn-h3">Quieren apadrinar (' + I.length + ")</p>" +
       '<p class="mu">Dejaron su correo para cuando abra el aporte mensual. Autorizaron que se les escriba solo para eso.</p>' +
@@ -42698,7 +42948,46 @@ function abrirUnidad(id){
 document.addEventListener("click", function(e){
   var b = e.target.closest && e.target.closest("[data-ap-abrir]");
   if (b) abrirUnidad(b.getAttribute("data-ap-abrir"));
+  var r = e.target.closest && e.target.closest("[data-rp-abrir]");
+  if (r) abrirReporteUnidad(r.getAttribute("data-rp-abrir"));
 });
+/* Un reporte mensual: lo que se prometió evidenciar al lado de lo que llegó. */
+function abrirReporteUnidad(id){
+  var r = ((AP && AP.reportes) || []).filter(function(x){ return String(x.id) === String(id); })[0];
+  if (!r) return;
+  var h = ficha([
+    ["Unidad", esc(r.unidad) + "<small>" + esc(r.fundacion) + "</small>"],
+    ["Mes", esc(r.periodo)],
+    ["Entregadas", String(r.entregadas) + (r.cupos ? "<small>de " + r.cupos + " cupos</small>" : "")],
+    ["Lo que cuenta la fundación", r.nota ? '<div class="qj-msg">' + esc(r.nota) + "</div>" : '<span class="mu">Sin nota</span>'],
+    ["Evidencia prometida", '<div class="qj-msg">' + esc(r.evidencia_prometida) + "</div>"],
+    ["Evidencia que adjuntó", '<a href="/api/admin/portal-doc/' + r.evidencia_doc + '">' + esc(r.evidencia_tipo || "documento") + (r.evidencia_nota ? " · " + esc(r.evidencia_nota) : "") + "</a>"],
+    ["Estado", esc(r.estado === "enviado" ? "Por revisar" : r.estado === "aprobado" ? "Aprobado" : "Devuelto") + (r.motivo ? "<small>" + esc(r.motivo) + "</small>" : "") + (r.revisado_por ? "<small>" + esc(r.revisado_por) + "</small>" : "")]
+  ]);
+  var pie = "";
+  if (r.estado !== "aprobado"){
+    h += '<label class="pn-campo" id="rp-rev-c"><span><input type="checkbox" id="rp-rev"> Abrí la evidencia y corresponde a lo que se prometió y a lo reportado</span><small id="rp-rev-e" class="pn-err"></small></label>' +
+      pnCampo("rp-mot", "Motivo para devolverlo (la fundación lo ve)", "", { area: true, filas: 2 }) + '<p class="pn-error" id="pn-err"></p>';
+    pie += '<button type="button" class="pn-b1" data-rp-decidir="aprobar">Aprobar y publicar</button><button type="button" class="pn-b2" data-rp-decidir="devolver">Devolver</button>';
+  }
+  pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  cajonAbrir({ ey: "Reporte mensual", titulo: r.unidad + " · " + r.periodo, cuerpo: h, pie: pie, ancho: true });
+  document.querySelectorAll("[data-rp-decidir]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var acc = b.getAttribute("data-rp-decidir");
+      pnMarcar("rp-rev", ""); pnMarcar("rp-mot", "");
+      var c = { accion: acc, evidencia_revisada: document.getElementById("rp-rev").checked, motivo: pnValor("rp-mot") };
+      if (acc === "aprobar" && !c.evidencia_revisada){ pnMarcar("rp-rev", "Revisa la evidencia antes de aprobar."); return; }
+      if (acc === "devolver" && c.motivo.length < 3){ pnMarcar("rp-mot", "Di qué falta: la fundación lo ve."); return; }
+      b.disabled = true;
+      postPanel("/api/admin/reporte-unidad/" + r.id, c).then(function(x){
+        b.disabled = false; if (!x) return;
+        avisar(acc === "aprobar" ? "Reporte aprobado: ya sale en la página de apadrinamiento." : "Reporte devuelto a la fundación.");
+        cajonCerrar(); cargarApadrinamiento(); cargarSalud();
+      });
+    });
+  });
+}
 
 function abrirPortal(id){
   pedirJSON("/api/admin/portal/" + id).then(function(d){
@@ -46945,6 +47234,8 @@ export default {
                                                   : await adminPortal(env, Number(apo[1]));
         if (ruta === "/api/admin/fundaciones")  return await adminFundaciones(env);
         if (ruta === "/api/admin/apadrinamiento") return await adminApadrinamiento(env);
+        const arp = ruta.match(/^\/api\/admin\/reporte-unidad\/(\d{1,9})$/);
+        if (arp)                                return await adminReporteUnidad(request, env, Number(arp[1]), sesion.email);
         const aun = ruta.match(/^\/api\/admin\/unidad\/(\d{1,9})$/);
         if (aun)                                return await adminUnidadDecidir(request, env, Number(aun[1]), sesion.email);
         const afz = ruta.match(/^\/api\/admin\/fundacion\/(\d{1,9})$/);
@@ -47160,6 +47451,7 @@ export default {
         if (ruta === "/api/portal/perfil")  return await apiPortalPerfil(request, env);
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
+        if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
         /* Apadrinamiento por unidad de impacto (0054). */
         if (ruta === "/api/apadrinamiento")         return await apiCatalogoApadrinamiento(env);
         if (ruta === "/api/apadrinamiento/interes") return await apiApadrinamientoInteres(request, env);

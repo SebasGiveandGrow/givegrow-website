@@ -2589,5 +2589,7 @@
   "apu.fund.h": "Are you a Hub foundation?",
   "apu.fund.p": "From your portal, propose the units people can sponsor: what they are, what they cost per month with supporting documents, and how you will show each month what was delivered.",
   "apu.fund.btn": "Go to the foundation portal →",
-  "foot.apadrinamiento": "Sponsorship"
+  "foot.apadrinamiento": "Sponsorship",
+  "apu.ver": "Last verified report · {m}: {n} delivered",
+  "apu.ver.no": "No verified report yet: this unit is new."
 }
