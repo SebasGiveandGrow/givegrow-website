@@ -21162,9 +21162,19 @@ async function adminFundacionGuardar(request, env, id, quien) {
   return json({ ok: true });
 }
 
-/* La página /portal. Tres estados que pinta su JS: pedir el enlace, usar el
-   enlace (con el botón que lo gasta) y el portal. El HTML no lleva ningún dato
-   de nadie: todo llega por /api/portal/yo y entra con textContent o esc(). */
+/* La página /portal (diseño del 29 oct 2026). Cuatro estados que pinta su JS:
+   pedir el enlace, revisar el correo, usar el enlace (con el botón que lo
+   gasta) y el portal, con tres pestañas: Resumen, Perfil y Documentos.
+
+   EL HTML NO LLEVA NINGÚN DATO DE NADIE: todo llega por /api/portal/yo y entra
+   con textContent o esc().
+
+   LA MARCA, SIN TOKENS NUEVOS: los colores son los de styles.css —papel,
+   tinta, el verde institucional— y la versión de noche sigue al sistema del
+   teléfono, porque el portal no tiene interruptor propio. Unbounded solo en el
+   título y en los números del recorrido; el recorrido de cinco pasos es el
+   proceso real del HUB, por eso va numerado. Las fuentes salen de /vendor, que
+   la CSP de la página ya admite (default-src 'self'). */
 function paginaPortal(nonce) {
   return `<!doctype html>
 <html lang="es">
@@ -21172,108 +21182,223 @@ function paginaPortal(nonce) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1F5C38">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Portal de fundaciones · Give&amp;Grow</title>
 <style nonce="${nonce}">
-  :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;--err:#8C2F1E;--ok:#1F5C38}
+  @font-face{font-family:"Unbounded";font-weight:200 900;font-display:swap;src:url("/vendor/fonts/unbounded-latin.woff2") format("woff2")}
+  @font-face{font-family:"Inter";font-weight:100 900;font-display:swap;src:url("/vendor/fonts/inter-latin.woff2") format("woff2")}
+  @font-face{font-family:"Fraunces";font-style:italic;font-weight:100 900;font-display:swap;src:url("/vendor/fonts/fraunces-italic-latin.woff2") format("woff2")}
+  :root{--g:#1F5C38;--gd:#16402A;--gl:#E8F5EC;--bg:#F3EFE6;--surface:#FBF8F1;--ink:#191813;--ink-soft:#47443B;
+    --mu:#5C636F;--bd:#DAD3C3;--bds:#EDE8DC;--acc:#1F5C38;--err:#8C2F1E;--amber:#A84D00;--amberl:#FEF3E0;--on:#fff}
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0F1613;--surface:#1A231D;--ink:#EFEDE6;--ink-soft:#C9CFC6;--mu:#9AA79D;--bd:#2A362E;--bds:#222C25;
+      --acc:#6FB08D;--gl:#1D2F24;--err:#E58E76;--amber:#E8A24C;--amberl:#33260F}
+  }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
-  .wrap{max-width:760px;margin:0 auto;padding:28px 20px 80px}
-  .marca{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mu)}
-  h1{font-size:24px;margin:4px 0 2px}
-  h2{font-size:17px;border-bottom:1px solid var(--bd);padding-bottom:6px;margin:30px 0 10px}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:"Inter",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;font-size:16px}
+  a{color:var(--acc)}
+  .barra-marca{background:var(--g);color:var(--on)}
+  .barra-marca .in{max-width:880px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:12px}
+  .barra-marca img{width:30px;height:30px;border-radius:7px;display:block}
+  .barra-marca .t{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+  .barra-marca .t small{display:block;font-size:11px;letter-spacing:.08em;opacity:.8;font-weight:500}
+  .barra-marca .der{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:13px}
+  .barra-marca .der span{opacity:.85;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wrap{max-width:880px;margin:0 auto;padding:28px 20px 120px}
+  .angosto{max-width:520px;margin:0 auto}
+  h1{font-family:"Unbounded",system-ui,sans-serif;font-weight:600;font-size:26px;line-height:1.2;letter-spacing:-.01em;text-wrap:balance}
+  .saludo{font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:18px;color:var(--ink-soft);margin-top:6px}
+  .ey{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mu);font-weight:600}
   .sub{color:var(--mu);font-size:14px}
-  .caja{background:var(--surface);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-top:14px}
-  .aviso{border-left:3px solid var(--g)}
-  .paso{font-weight:700}
-  label{display:block;font-weight:600;font-size:15px;margin:12px 0 3px}
-  .num{font-size:11px;color:var(--mu);letter-spacing:.06em;font-weight:400}
-  .ayuda{display:block;color:var(--mu);font-size:13px;font-weight:400;margin-bottom:5px}
-  input[type=text],input[type=email],textarea,select{width:100%;font:inherit;font-size:16px;padding:9px 11px;
-    border:1px solid var(--bd);border-radius:8px;background:#fff;color:var(--ink)}
-  textarea{resize:vertical}
-  .op{display:flex;gap:9px;align-items:flex-start;font-weight:400;font-size:14px;margin-top:6px}
-  .op input{margin-top:3px}
-  button{font:inherit;font-size:15px;font-weight:700;padding:10px 18px;border:1px solid var(--g);border-radius:9px;
-    background:var(--g);color:#fff;cursor:pointer;margin-top:14px}
-  button.sec2{background:transparent;color:var(--g)}
-  button.mini{font-size:13px;padding:5px 10px;margin:0}
-  button[disabled]{opacity:.55;cursor:default}
-  .msg{display:block;margin-top:10px;font-size:14px;color:var(--mu)}
+  .tarjeta{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:20px}
+  .tarjeta + .tarjeta{margin-top:14px}
+  .aviso{border-left:3px solid var(--acc)}
+  .aviso.ambar{border-left-color:var(--amber);background:var(--amberl)}
+  .regla{border:0;border-top:1px solid var(--bd);margin:22px 0}
+  label{display:block;font-weight:600;font-size:15px;margin:16px 0 4px}
+  .num{display:inline-block;font-size:11px;color:var(--mu);letter-spacing:.06em;font-weight:500;margin-right:4px}
+  .ayuda{display:block;color:var(--mu);font-size:13px;font-weight:400;margin:2px 0 6px}
+  input[type=text],input[type=email],textarea,select{width:100%;font:inherit;font-size:16px;padding:10px 12px;
+    border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--ink)}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:var(--acc)}
+  textarea{resize:vertical;min-height:96px}
+  .op{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:15px;margin-top:8px}
+  .op input{margin-top:4px;width:17px;height:17px;flex:0 0 auto;accent-color:var(--acc)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:15px;font-weight:600;
+    padding:11px 18px;border:1px solid var(--g);border-radius:10px;background:var(--g);color:var(--on);cursor:pointer;text-decoration:none}
+  .btn:hover{background:var(--gd)}
+  .btn.sec{background:transparent;color:var(--acc);border-color:var(--bd)}
+  .btn.sec:hover{border-color:var(--acc)}
+  .btn.mini{font-size:13px;padding:6px 12px;border-radius:8px}
+  .btn.claro{background:transparent;color:var(--on);border-color:rgba(255,255,255,.45)}
+  .btn[disabled]{opacity:.55;cursor:default}
+  .btn:focus-visible,.tab:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  .msg{display:block;margin-top:10px;font-size:14px;color:var(--mu);min-height:1.2em}
   .msg.mal{color:var(--err);font-weight:600}
-  .msg.ok{color:var(--ok);font-weight:600}
-  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
-  td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd);vertical-align:top}
-  th{font-size:12px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em}
-  .pill{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;border:1px solid var(--bd);color:var(--mu)}
-  .pill.ok{border-color:var(--g);color:var(--g)}
-  .fila{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-  .oculto{display:none}
-  .mt{margin-top:12px}
-  .sec-perfil{font-size:13px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;margin-top:22px}
-  :focus-visible{outline:2px solid var(--g);outline-offset:2px}
+  .msg.ok{color:var(--acc);font-weight:600}
+  .oculto{display:none !important}
+  .mt{margin-top:14px}
+
+  /* EL RECORRIDO: los cinco pasos del HUB, el elemento firma de la página. */
+  .recorrido{list-style:none;display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:22px 0 6px;counter-reset:paso}
+  .recorrido li{position:relative;padding:0 8px 0 0}
+  .recorrido li::before{content:"";position:absolute;top:17px;left:36px;right:0;height:2px;background:var(--bd)}
+  .recorrido li:last-child::before{display:none}
+  .recorrido li.hecho::before{background:var(--acc)}
+  .recorrido .n{position:relative;z-index:1;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:"Unbounded",system-ui,sans-serif;font-size:14px;font-weight:600;background:var(--surface);border:2px solid var(--bd);color:var(--mu)}
+  .recorrido li.hecho .n{background:var(--acc);border-color:var(--acc);color:var(--bg)}
+  .recorrido li.ahora .n{border-color:var(--acc);color:var(--acc)}
+  .recorrido .p{display:block;font-size:13px;font-weight:600;margin-top:8px;line-height:1.3}
+  .recorrido li.pend .p{color:var(--mu);font-weight:500}
+  .recorrido .q{display:block;font-size:12px;color:var(--mu);margin-top:2px;line-height:1.35}
+
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);margin:28px 0 22px;overflow-x:auto}
+  .tab{font:inherit;font-size:15px;font-weight:600;color:var(--mu);background:none;border:0;border-bottom:2px solid transparent;
+    padding:10px 14px;cursor:pointer;white-space:nowrap;margin-bottom:-1px}
+  .tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--acc)}
+  .tab .pill{margin-left:6px}
+  .pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 9px;border-radius:99px;border:1px solid var(--bd);color:var(--mu);vertical-align:1px}
+  .pill.ok{border-color:var(--acc);color:var(--acc)}
+  .pill.ambar{border-color:var(--amber);color:var(--amber)}
+
+  .rejilla{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .rejilla .tarjeta + .tarjeta{margin-top:0}
+  .cifra{font-family:"Unbounded",system-ui,sans-serif;font-size:28px;font-weight:600;line-height:1.1;margin:8px 0 4px}
+  .tarjeta h2{font-size:17px;font-weight:700;margin-bottom:4px}
+  .tarjeta .acciones{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .sec-perfil{margin-top:18px}
+  .sec-perfil h3{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);font-weight:600;
+    padding-bottom:8px;border-bottom:1px solid var(--bds)}
+
+  .guardar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--bd);z-index:5}
+  .guardar .in{max-width:880px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px}
+  .guardar .msg{margin:0 auto 0 0}
+
+  .docs{list-style:none}
+  .docs li{display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--bds)}
+  .docs li:last-child{border-bottom:0}
+  .docs .nom{font-weight:600}
+  .docs .det{display:block;font-size:13px;color:var(--mu);font-weight:400}
+  .docs .marca{display:inline-block;width:18px;text-align:center;margin-right:6px;color:var(--mu)}
+  .docs .si .marca{color:var(--acc)}
+  .docs .der{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .archivo{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+  @media (max-width:720px){
+    h1{font-size:22px}
+    .rejilla{grid-template-columns:1fr}
+    .recorrido{grid-template-columns:1fr;gap:0}
+    .recorrido li{display:grid;grid-template-columns:36px 1fr;column-gap:12px;padding:0 0 14px}
+    .recorrido li::before{top:36px;bottom:0;left:17px;right:auto;width:2px;height:auto}
+    .recorrido .n{grid-row:span 2}
+    .recorrido .p{margin-top:2px}
+    .recorrido .q{grid-column:2;margin-top:0}
+    .barra-marca .der span{display:none}
+    .tab{font-size:14px;padding:10px 9px}
+    .tab .pill{margin-left:4px;font-size:11px;padding:0 7px}
+    .docs li{grid-template-columns:1fr}
+    .docs .der{justify-content:flex-start}
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .btn,.tab,input,textarea,select{transition:background-color .15s,border-color .15s,color .15s}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <p class="marca">Give&amp;Grow · HUB SOCIAL</p>
-
-  <section id="v-entrar" class="oculto">
-    <h1>Portal de fundaciones</h1>
-    <p class="sub">Para las fundaciones con solicitud aceptada en el HUB SOCIAL.</p>
-    <div class="caja aviso">
-      Escribe el correo con el que hiciste la solicitud y te mandamos un enlace para entrar. No hay contraseña:
-      el enlace sirve una vez y vence en 30 minutos.
+<header class="barra-marca">
+  <div class="in">
+    <img src="/favicon.svg" alt="" width="30" height="30">
+    <div class="t">Give&amp;Grow<small>Portal de fundaciones · HUB SOCIAL</small></div>
+    <div class="der oculto" id="p-sesion">
+      <span id="p-correo"></span>
+      <button type="button" class="btn claro mini" id="b-salir">Cerrar sesión</button>
     </div>
-    <form id="f-entrar" class="caja" autocomplete="on">
-      <label for="e-correo">Correo de la solicitud</label>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="v-entrar" class="oculto angosto">
+    <p class="ey">Portal de fundaciones</p>
+    <h1 class="mt">Entra a tu fundación</h1>
+    <p class="saludo">Para las fundaciones con solicitud aceptada en el HUB SOCIAL.</p>
+    <form id="f-entrar" class="tarjeta mt" autocomplete="on">
+      <label for="e-correo">Correo de tu fundación</label>
+      <span class="ayuda">El de la solicitud, o uno que el equipo de Give&amp;Grow haya autorizado.</span>
       <input type="email" id="e-correo" autocomplete="email" maxlength="160" required>
       <input type="text" id="e-web2" tabindex="-1" autocomplete="off" aria-hidden="true" class="oculto">
-      <button type="submit" id="b-entrar">Mandarme el enlace</button>
+      <button type="submit" class="btn mt" id="b-entrar">Mandarme el enlace</button>
       <span class="msg" id="m-entrar" role="status" aria-live="polite"></span>
     </form>
+    <p class="sub mt">No hay contraseña. Te llega un enlace que sirve una vez y vence en 30 minutos.</p>
   </section>
 
-  <section id="v-enviado" class="oculto">
-    <h1>Revisa tu correo</h1>
-    <div class="caja aviso">
-      Si ese correo tiene una solicitud aceptada, en unos minutos te llega el enlace para entrar.
-      Revisa también la carpeta de correo no deseado. ¿No llega? Escríbenos a contacto@thegiveandgrowproject.org.
+  <section id="v-enviado" class="oculto angosto">
+    <p class="ey">Portal de fundaciones</p>
+    <h1 class="mt">Revisa tu correo</h1>
+    <div class="tarjeta aviso mt">
+      Si ese correo tiene acceso, en unos minutos te llega el enlace para entrar. Revisa también la carpeta de
+      correo no deseado. ¿No llega? Escríbenos a <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a>.
     </div>
+    <button type="button" class="btn sec mt" id="b-otro">Usar otro correo</button>
   </section>
 
-  <section id="v-enlace" class="oculto">
-    <h1>Entrar al portal</h1>
-    <div class="caja aviso">Este enlace abre tu sesión en este navegador por 30 días.</div>
-    <button type="button" id="b-usar">Entrar</button>
+  <section id="v-enlace" class="oculto angosto">
+    <p class="ey">Portal de fundaciones</p>
+    <h1 class="mt">Entrar al portal</h1>
+    <div class="tarjeta aviso mt">Este enlace abre tu sesión en este navegador durante 30 días.</div>
+    <button type="button" class="btn mt" id="b-usar">Entrar</button>
     <span class="msg" id="m-usar" role="status" aria-live="polite"></span>
   </section>
 
   <section id="v-portal" class="oculto">
-    <div class="fila">
-      <div><h1 id="p-nombre"></h1><p class="sub" id="p-correo"></p></div>
-      <button type="button" class="sec2 mini" id="b-salir">Cerrar sesión</button>
+    <p class="ey" id="p-estado"></p>
+    <h1 class="mt" id="p-nombre"></h1>
+    <p class="saludo" id="p-saludo"></p>
+    <ol class="recorrido" id="p-recorrido" aria-label="Tu recorrido en el HUB"></ol>
+
+    <div class="tabs" role="tablist" aria-label="Secciones del portal">
+      <button type="button" class="tab" role="tab" id="t-resumen" aria-controls="s-resumen" aria-selected="true">Resumen</button>
+      <button type="button" class="tab" role="tab" id="t-perfil" aria-controls="s-perfil" aria-selected="false">Perfil<span class="pill oculto" id="tp-perfil"></span></button>
+      <button type="button" class="tab" role="tab" id="t-documentos" aria-controls="s-documentos" aria-selected="false">Documentos<span class="pill" id="tp-docs"></span></button>
     </div>
 
-    <h2>En qué va tu proceso</h2>
-    <div class="caja"><p class="paso" id="p-estado"></p><p class="sub" id="p-siguiente"></p></div>
-
-    <h2>Tu perfil</h2>
-    <div id="p-perfil"></div>
-
-    <h2>Documentos y logo</h2>
-    <p class="sub">Los revisa el equipo antes de usarlos. Ninguno se publica: son el archivo de la alianza. PDF o foto, hasta 5 MB.</p>
-    <div class="caja">
-      <label for="d-tipo">Qué documento es</label>
-      <select id="d-tipo"></select>
-      <label for="d-nota">Nota (opcional) <span class="ayuda">Por ejemplo: «estados financieros 2025» o «RUT actualizado en octubre».</span></label>
-      <input type="text" id="d-nota" maxlength="120">
-      <label for="d-archivo">Archivo</label>
-      <input type="file" id="d-archivo" accept="application/pdf,image/jpeg,image/png,image/webp">
-      <button type="button" id="b-subir">Subir</button>
-      <span class="msg" id="m-doc" role="status" aria-live="polite"></span>
+    <div id="s-resumen" role="tabpanel" aria-labelledby="t-resumen"></div>
+    <div id="s-perfil" role="tabpanel" aria-labelledby="t-perfil" class="oculto"></div>
+    <div id="s-documentos" role="tabpanel" aria-labelledby="t-documentos" class="oculto">
+      <div class="tarjeta">
+        <h2>Lo que conviene tener</h2>
+        <p class="sub">Los revisa el equipo antes de usarlos y ninguno se publica: son el archivo de la alianza. PDF o foto, hasta 5 MB.</p>
+        <ul class="docs mt" id="p-lista"></ul>
+      </div>
+      <div class="tarjeta">
+        <h2>Otro documento</h2>
+        <label for="d-tipo">Qué documento es</label>
+        <select id="d-tipo"></select>
+        <label for="d-nota">Nota (opcional)</label>
+        <span class="ayuda">Por ejemplo: «estados financieros 2025» o «RUT actualizado en octubre».</span>
+        <input type="text" id="d-nota" maxlength="120">
+        <div class="acciones">
+          <label class="btn sec" for="d-archivo">Elegir y subir</label>
+          <input type="file" id="d-archivo" class="archivo" accept="application/pdf,image/jpeg,image/png,image/webp">
+        </div>
+        <span class="msg" id="m-doc" role="status" aria-live="polite"></span>
+      </div>
+      <div class="tarjeta">
+        <h2>Lo que has subido</h2>
+        <div id="p-docs"></div>
+      </div>
     </div>
-    <div id="p-docs"></div>
   </section>
+</main>
+
+<div class="guardar oculto" id="barra-guardar">
+  <div class="in">
+    <span class="msg" id="m-perfil" role="status" aria-live="polite"></span>
+    <button type="button" class="btn" id="b-perfil">Guardar cambios</button>
+  </div>
 </div>
 <script nonce="${nonce}">
 ${portalJS()}
@@ -21286,11 +21411,24 @@ function portalJS() {
   return `
 /* /portal. Sin barras invertidas, sin comillas invertidas y sin
    interpolaciones: este archivo vive dentro de una plantilla del Worker. */
-var D = null;
+var D = null, SUCIO = false, TAB = "resumen";
+var PASOS = [
+  ["Aplicas", "La solicitud al HUB."],
+  ["Revisamos", "El equipo la lee."],
+  ["Visita de contexto", "Los conocemos donde trabajan."],
+  ["Convenio", "Firmamos la alianza."],
+  ["Vinculación", "Parte de la red del HUB."]
+];
+var RECOMENDADOS = ["rut", "camara", "estatutos", "estados_financieros", "certificado_bancario", "logo"];
+
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
   return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
-function ver(id){ ["v-entrar", "v-enviado", "v-enlace", "v-portal"].forEach(function(v){ $(v).classList.toggle("oculto", v !== id); }); }
+function ver(id){
+  ["v-entrar", "v-enviado", "v-enlace", "v-portal"].forEach(function(v){ $(v).classList.toggle("oculto", v !== id); });
+  $("p-sesion").classList.toggle("oculto", id !== "v-portal");
+  if (id !== "v-portal") $("barra-guardar").classList.add("oculto");
+}
 function msg(id, texto, clase){ var e = $(id); e.textContent = texto || ""; e.className = "msg" + (clase ? " " + clase : ""); }
 function enviar(url, cuerpo){
   return fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo || {}) })
@@ -21299,28 +21437,65 @@ function enviar(url, cuerpo){
 function kb(n){ return n > 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
 
 function cargar(){
-  fetch("/api/portal/yo", { credentials: "same-origin" }).then(function(r){
+  return fetch("/api/portal/yo", { credentials: "same-origin" }).then(function(r){
     if (r.status === 401) { ver("v-entrar"); return null; }
     return r.json();
   }).then(function(d){ if (d) { D = d; pintar(); ver("v-portal"); } })
     .catch(function(){ ver("v-entrar"); msg("m-entrar", "No pudimos conectar. Revisa tu conexión e intenta de nuevo.", "mal"); });
 }
 
+/* En qué paso va: los dos primeros ya pasaron si hay acceso al portal. */
+function pasoActual(){
+  if (D.estado === "aceptada") return 2;
+  if (D.estado === "visitada" || D.estado === "convenio") return 3;
+  return 5;
+}
 function pintar(){
   $("p-nombre").textContent = D.nombre || "";
   $("p-correo").textContent = D.email || "";
-  $("p-estado").textContent = D.estado_es;
-  var sig = "";
-  if (D.cuestionario) sig = "Te toca el cuestionario del HUB. Al enviarlo, tu perfil se sigue editando aquí.";
-  else if (D.estado === "aceptada") sig = "El siguiente paso es la visita de contexto: te escribimos para acordar la fecha. Mientras tanto, puedes ir subiendo tus documentos.";
-  else if (D.ficha_enviada) sig = "Ya enviaste el cuestionario. Lo que cambies en tu perfil lo revisa el equipo antes de publicarlo.";
-  $("p-siguiente").innerHTML = esc(sig) + (D.cuestionario ? ' <a href="' + esc(D.cuestionario) + '">Abrir el cuestionario</a>' : "");
-  pintarPerfil(); pintarDocs();
+  $("p-estado").textContent = D.estado_es || "";
+  $("p-saludo").textContent = "Aquí ves en qué va la alianza, mantienes tu perfil al día y nos dejas tus documentos.";
+  var a = pasoActual();
+  $("p-recorrido").innerHTML = PASOS.map(function(p, i){
+    var clase = i < a ? "hecho" : i === a ? "ahora" : "pend";
+    return '<li class="' + clase + '"' + (i === a ? ' aria-current="step"' : "") + '><span class="n">' + (i < a ? "✓" : String(i + 1)) +
+      '</span><span class="p">' + esc(p[0]) + '</span><span class="q">' + esc(p[1]) + "</span></li>";
+  }).join("");
+  pintarResumen(); pintarPerfil(); pintarDocs();
+}
+
+function siguiente(){
+  if (D.cuestionario) return { t: "Llenar el cuestionario del HUB", p: "Es lo que sigue después de la visita. Se guarda solo mientras lo llenas, así que puedes hacerlo por partes.", url: D.cuestionario, b: "Abrir el cuestionario" };
+  if (D.estado === "aceptada") return { t: "La visita de contexto", p: "Te escribimos para acordar la fecha. Mientras tanto, puedes ir subiendo los documentos de la fundación.", tab: "documentos", b: "Ir a documentos" };
+  if (D.estado === "visitada" || D.estado === "convenio") return { t: "El convenio", p: "Estamos preparando el convenio de la alianza. Revisa que tu perfil esté al día: es lo que vamos a mostrar de ustedes.", tab: "perfil", b: "Revisar mi perfil" };
+  return { t: "Mantener tu perfil al día", p: "Ya son parte de la red. Cuando algo cambie —un programa, un costo, un logro—, actualízalo aquí.", tab: "perfil", b: "Ir a mi perfil" };
+}
+function cuantosRecomendados(){
+  var hay = {}; (D.documentos || []).forEach(function(d){ hay[d.tipo] = true; });
+  return RECOMENDADOS.filter(function(t){ return hay[t]; }).length;
+}
+function pintarResumen(){
+  var s = siguiente(), n = cuantosRecomendados();
+  var perfilTxt = !D.perfil ? "Se abre cuando envíes el cuestionario." : D.perfil.por_revisar ? "Tus últimos cambios están por revisar." : "Al día con lo que tenemos.";
+  var porRevisar = (D.documentos || []).filter(function(d){ return !d.revisado; }).length;
+  $("s-resumen").innerHTML =
+    '<div class="tarjeta aviso"><p class="ey">Lo que sigue</p><h2 class="mt">' + esc(s.t) + '</h2><p class="sub">' + esc(s.p) + "</p>" +
+      '<div class="acciones">' + (s.url ? '<a class="btn" href="' + esc(s.url) + '">' + esc(s.b) + "</a>" : '<button type="button" class="btn" data-ir="' + s.tab + '">' + esc(s.b) + "</button>") + "</div></div>" +
+    '<div class="rejilla mt">' +
+      '<div class="tarjeta"><p class="ey">Perfil</p><p class="cifra">' + (!D.perfil ? "—" : D.perfil.por_revisar ? "Por revisar" : "Al día") + '</p><p class="sub">' + esc(perfilTxt) + "</p>" +
+        (D.perfil ? '<div class="acciones"><button type="button" class="btn sec mini" data-ir="perfil">Editar</button></div>' : "") + "</div>" +
+      '<div class="tarjeta"><p class="ey">Documentos</p><p class="cifra">' + n + " de " + RECOMENDADOS.length + '</p><p class="sub">de los que conviene tener' + (porRevisar ? " · " + porRevisar + " por revisar" : "") + '.</p><div class="acciones"><button type="button" class="btn sec mini" data-ir="documentos">Subir</button></div></div>' +
+      '<div class="tarjeta"><p class="ey">¿Dudas?</p><p class="sub mt">Escríbenos a <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a> o por WhatsApp al <a href="https://wa.me/573153305028">+57 315 330 5028</a>.</p></div>' +
+    "</div>";
+  $("tp-docs").textContent = n + "/" + RECOMENDADOS.length;
+  $("tp-docs").className = "pill" + (n === RECOMENDADOS.length ? " ok" : "");
+  $("tp-perfil").textContent = "por revisar";
+  $("tp-perfil").className = "pill ambar" + (D.perfil && D.perfil.por_revisar ? "" : " oculto");
 }
 
 function campo(c, v){
   var id = "pf-" + c.id;
-  var cab = '<label for="' + id + '"><span class="num">' + esc(c.num) + "</span> " + esc(c.lbl) + (c.req ? " *" : "") + "</label>" +
+  var cab = '<label for="' + id + '"><span class="num">' + esc(c.num) + "</span>" + esc(c.lbl) + (c.req ? " *" : "") + "</label>" +
     (c.ayuda ? '<span class="ayuda">' + esc(c.ayuda) + "</span>" : "");
   if (c.tipo === "parrafo") return cab + '<textarea id="' + id + '" rows="4" maxlength="' + (c.max || 900) + '">' + esc(v) + "</textarea>";
   if (c.tipo === "opcion") return cab + c.ops.map(function(o, n){
@@ -21330,22 +21505,24 @@ function campo(c, v){
   return cab + '<input type="text" id="' + id + '" maxlength="' + (c.max || 200) + '" value="' + esc(v) + '">';
 }
 function pintarPerfil(){
-  var caja = $("p-perfil");
+  var caja = $("s-perfil");
   if (!D.perfil) {
-    caja.innerHTML = '<div class="caja"><p class="sub">Tu perfil se edita aquí cuando hayas enviado el cuestionario del HUB.</p></div>';
+    caja.innerHTML = '<div class="tarjeta aviso"><h2>Tu perfil se abre después del cuestionario</h2><p class="sub">Cuando lo envíes, aquí lo mantienes al día.</p>' +
+      (D.cuestionario ? '<div class="acciones"><a class="btn" href="' + esc(D.cuestionario) + '">Abrir el cuestionario</a></div>' : "") + "</div>";
     return;
   }
-  var P = D.perfil, h = "", sec = "";
-  if (P.por_revisar) h += '<div class="caja aviso">Tus últimos cambios (' + esc(P.actualizado) + ") están por revisar. Hasta entonces el sitio sigue mostrando lo anterior.</div>";
-  h += '<form id="f-perfil" class="caja">';
+  var P = D.perfil, h = "", sec = "", abierta = false;
+  if (P.por_revisar) h += '<div class="tarjeta aviso ambar"><strong>Tus últimos cambios (' + esc(P.actualizado) + ") están por revisar.</strong> Hasta entonces el sitio sigue mostrando lo anterior.</div>";
+  h += '<form id="f-perfil" class="tarjeta' + (P.por_revisar ? " mt" : "") + '">';
   P.campos.forEach(function(c){
-    if (c.sec !== sec) { sec = c.sec; h += '<p class="sec-perfil">' + esc(sec) + "</p>"; }
+    if (c.sec !== sec) { if (abierta) h += "</div>"; sec = c.sec; h += '<div class="sec-perfil"><h3>' + esc(sec) + "</h3>"; abierta = true; }
     h += campo(c, P.datos[c.id]);
   });
-  h += '<p class="sub mt">Las autorizaciones (nombre, logo, fotos y menores) quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p>';
-  h += '<button type="button" id="b-perfil">Guardar cambios</button><span class="msg" id="m-perfil" role="status" aria-live="polite"></span></form>';
+  if (abierta) h += "</div>";
+  h += '<hr class="regla"><p class="sub">Las autorizaciones —nombre, logo, fotos y menores— quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p></form>';
   caja.innerHTML = h;
-  $("b-perfil").addEventListener("click", guardarPerfil);
+  SUCIO = false; msg("m-perfil", "");
+  $("f-perfil").addEventListener("input", function(){ if (!SUCIO) { SUCIO = true; msg("m-perfil", "Tienes cambios sin guardar."); } });
 }
 function guardarPerfil(){
   var datos = {};
@@ -21358,39 +21535,55 @@ function guardarPerfil(){
     b.disabled = false;
     if (r.status === 401) { ver("v-entrar"); return; }
     if (!r.ok) { msg("m-perfil", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
-    msg("m-perfil", "Guardado. El equipo lo revisa antes de publicarlo.", "ok");
+    SUCIO = false;
     D.perfil.datos = r.d.datos; D.perfil.por_revisar = true;
+    pintarResumen();
+    msg("m-perfil", "Guardado. El equipo lo revisa antes de publicarlo.", "ok");
   }).catch(function(){ b.disabled = false; msg("m-perfil", "No pudimos conectar. Tus cambios siguen en pantalla: intenta de nuevo.", "mal"); });
 }
 
 function pintarDocs(){
   var sel = $("d-tipo");
   if (!sel.options.length) sel.innerHTML = Object.keys(D.tipos).map(function(k){ return '<option value="' + esc(k) + '">' + esc(D.tipos[k]) + "</option>"; }).join("");
-  var L = D.documentos || [];
-  if (!L.length) { $("p-docs").innerHTML = '<p class="sub mt">Todavía no has subido documentos.</p>'; return; }
-  $("p-docs").innerHTML = "<table><thead><tr><th>Documento</th><th>Subido</th><th>Estado</th><th></th></tr></thead><tbody>" +
-    L.map(function(d){
-      return "<tr><td>" + esc(d.tipo_es) + (d.nota ? '<br><span class="sub">' + esc(d.nota) + "</span>" : "") + '<br><span class="sub">' + kb(d.bytes) + "</span></td>" +
-        "<td>" + esc(d.subido) + "</td><td>" + (d.revisado ? '<span class="pill ok">Revisado</span>' : '<span class="pill">Por revisar</span>') + "</td>" +
-        '<td><button type="button" class="sec2 mini" data-retirar="' + d.id + '">Retirar</button></td></tr>';
-    }).join("") + "</tbody></table>";
+  var L = D.documentos || [], por = {};
+  L.forEach(function(d){ if (!por[d.tipo]) por[d.tipo] = d; });
+  $("p-lista").innerHTML = RECOMENDADOS.map(function(t){
+    var d = por[t];
+    var estado = !d ? "Falta" : d.revisado ? "Revisado" : "Subido, por revisar";
+    return '<li class="' + (d ? "si" : "") + '"><div><span class="marca" aria-hidden="true">' + (d ? "✓" : "○") + '</span><span class="nom">' + esc(D.tipos[t]) + "</span>" +
+      '<span class="det">' + esc(estado) + (d ? " · " + esc(d.subido) : "") + "</span></div>" +
+      '<div class="der"><label class="btn ' + (d ? "sec " : "") + 'mini" for="up-' + t + '">' + (d ? "Subir otro" : "Subir") + "</label>" +
+      '<input type="file" class="archivo" id="up-' + t + '" data-tipo="' + t + '" accept="' + (t === "logo" ? "image/png,image/jpeg,image/webp" : "application/pdf,image/jpeg,image/png,image/webp") + '"></div></li>';
+  }).join("");
+  $("p-docs").innerHTML = L.length ? '<ul class="docs">' + L.map(function(d){
+    return '<li><div><span class="nom">' + esc(d.tipo_es) + '</span><span class="det">' + (d.nota ? esc(d.nota) + " · " : "") + kb(d.bytes) + " · " + esc(d.subido) + "</span></div>" +
+      '<div class="der"><span class="pill' + (d.revisado ? " ok" : "") + '">' + (d.revisado ? "Revisado" : "Por revisar") + '</span>' +
+      '<button type="button" class="btn sec mini" data-retirar="' + d.id + '">Retirar</button></div></li>';
+  }).join("") + "</ul>" : '<p class="sub">Todavía no has subido documentos.</p>';
 }
-function subir(){
-  var f = $("d-archivo").files[0];
-  if (!f) { msg("m-doc", "Elige el archivo.", "mal"); return; }
-  if (f.size > 5242880) { msg("m-doc", "El archivo pasa de 5 MB.", "mal"); return; }
-  var b = $("b-subir"); b.disabled = true; msg("m-doc", "Subiendo…");
-  fetch("/api/portal/documento?tipo=" + encodeURIComponent($("d-tipo").value) + "&nota=" + encodeURIComponent($("d-nota").value.trim()), {
+function subir(f, tipo, nota, idMsg){
+  if (!f) return;
+  if (f.size > 5242880) { msg(idMsg, "El archivo pasa de 5 MB.", "mal"); return; }
+  msg(idMsg, "Subiendo «" + f.name + "»…");
+  fetch("/api/portal/documento?tipo=" + encodeURIComponent(tipo) + "&nota=" + encodeURIComponent(nota || ""), {
     method: "POST", credentials: "same-origin", headers: { "content-type": f.type || "application/octet-stream" }, body: f
   }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, status: r.status, d: d }; }); })
     .then(function(r){
-      b.disabled = false;
       if (r.status === 401) { ver("v-entrar"); return; }
-      if (!r.ok) { msg("m-doc", r.d.ayuda || "No se pudo subir.", "mal"); return; }
-      msg("m-doc", "Listo. El equipo lo revisa.", "ok");
-      $("d-archivo").value = ""; $("d-nota").value = "";
-      cargar();
-    }).catch(function(){ b.disabled = false; msg("m-doc", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+      if (!r.ok) { msg(idMsg, r.d.ayuda || "No se pudo subir.", "mal"); return; }
+      msg(idMsg, "Listo: el equipo lo revisa.", "ok");
+      cargar().then(function(){ irA("documentos"); });
+    }).catch(function(){ msg(idMsg, "No pudimos conectar. Intenta de nuevo.", "mal"); });
+}
+
+function irA(tab){
+  TAB = tab;
+  ["resumen", "perfil", "documentos"].forEach(function(t){
+    $("t-" + t).setAttribute("aria-selected", t === tab ? "true" : "false");
+    $("s-" + t).classList.toggle("oculto", t !== tab);
+  });
+  $("barra-guardar").classList.toggle("oculto", !(tab === "perfil" && D && D.perfil));
+  if (location.hash !== "#" + tab) history.replaceState(null, "", "/portal#" + tab);
 }
 
 $("f-entrar").addEventListener("submit", function(ev){
@@ -21402,27 +21595,51 @@ $("f-entrar").addEventListener("submit", function(ev){
     ver("v-enviado");
   }).catch(function(){ b.disabled = false; msg("m-entrar", "No pudimos conectar. Intenta de nuevo.", "mal"); });
 });
+$("b-otro").addEventListener("click", function(){ msg("m-entrar", ""); ver("v-entrar"); $("e-correo").focus(); });
 $("b-usar").addEventListener("click", function(){
   var t = new URLSearchParams(location.search).get("t") || "";
   var b = $("b-usar"); b.disabled = true; msg("m-usar", "Entrando…");
   enviar("/api/portal/sesion", { t: t }).then(function(r){
     history.replaceState(null, "", "/portal");
     if (!r.ok) { b.disabled = false; ver("v-entrar"); msg("m-entrar", r.d.ayuda || "Ese enlace no sirvió. Pide uno nuevo.", "mal"); return; }
-    cargar();
+    cargar().then(function(){ irA("resumen"); });
   }).catch(function(){ b.disabled = false; msg("m-usar", "No pudimos conectar. Intenta de nuevo.", "mal"); });
 });
-$("b-salir").addEventListener("click", function(){ enviar("/api/portal/salir").then(function(){ D = null; ver("v-entrar"); }); });
-$("b-subir").addEventListener("click", subir);
+$("b-salir").addEventListener("click", function(){
+  if (SUCIO && !confirm("Tienes cambios sin guardar en tu perfil. ¿Cerrar sesión igual?")) return;
+  enviar("/api/portal/salir").then(function(){ D = null; SUCIO = false; ver("v-entrar"); });
+});
+$("b-perfil").addEventListener("click", guardarPerfil);
+["resumen", "perfil", "documentos"].forEach(function(t){ $("t-" + t).addEventListener("click", function(){ irA(t); }); });
+document.addEventListener("click", function(ev){
+  var b = ev.target.closest && ev.target.closest("[data-ir]");
+  if (b) { irA(b.getAttribute("data-ir")); window.scrollTo(0, 0); }
+});
+document.addEventListener("change", function(ev){
+  var el = ev.target;
+  if (el.id === "d-archivo") { subir(el.files[0], $("d-tipo").value, $("d-nota").value.trim(), "m-doc"); el.value = ""; $("d-nota").value = ""; return; }
+  if (el.getAttribute && el.getAttribute("data-tipo")) { subir(el.files[0], el.getAttribute("data-tipo"), "", "m-doc"); el.value = ""; }
+});
 $("p-docs").addEventListener("click", function(ev){
   var b = ev.target.closest && ev.target.closest("[data-retirar]");
-  if (!b || !confirm("¿Retirar este documento de la lista?")) return;
+  if (!b || !confirm("¿Retirar este documento de tu lista? El equipo conserva la copia que ya revisó.")) return;
   enviar("/api/portal/documento/" + b.getAttribute("data-retirar") + "/retirar").then(function(r){
     if (r.status === 401) { ver("v-entrar"); return; }
-    cargar();
+    cargar().then(function(){ irA("documentos"); });
   });
 });
+window.addEventListener("beforeunload", function(ev){ if (SUCIO) { ev.preventDefault(); ev.returnValue = ""; } });
+window.addEventListener("hashchange", function(){
+  var h = location.hash.replace("#", "");
+  if (D && (h === "resumen" || h === "perfil" || h === "documentos") && h !== TAB) irA(h);
+});
 
-if (new URLSearchParams(location.search).get("t")) ver("v-enlace"); else cargar();
+if (new URLSearchParams(location.search).get("t")) ver("v-enlace");
+else cargar().then(function(){
+  if (!D) return;
+  var h = location.hash.replace("#", "");
+  irA(h === "perfil" || h === "documentos" ? h : "resumen");
+});
 `;
 }
 
