@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "c2f9f0a7";
+const STYLES_V = "d7394c93";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -1486,6 +1486,8 @@ const TOPE_IP_DIA = { caso: 40, inscripcion: 60, asistencia: 200, transferencia:
      guía. Treinta al día por IP cabe a una familia que escoge varias veces y
      frena un script. */
   regalos: 30,
+  /* «Avísame cuando abra» del apadrinamiento (0054): no manda correo a nadie. */
+  apadrinamiento: 20,
   /* La carta se puede corregir varias veces; un video pesa decenas de megas. */
   "regalos-mensaje": 40, "regalos-video": 12 };
 async function pasaTopeIP(env, request, puerta) {
@@ -5920,6 +5922,15 @@ async function adminSalud(env, opciones) {
      «Hoy» desde el primero, y a los 30 días sube a Urgente: el donante eligió a
      quién darle y está esperando que llegue. El detalle, en Reportes › Por
      fundación. */
+  /* APADRINAMIENTO (0054): unidades que una fundación propuso o editó y que
+     esperan la verificación del costo. Sin la 0054 no sale. */
+  try {
+    await enCola("unidades_por_revisar",
+      "SELECT COUNT(*) AS n, MIN(actualizada) AS masViejo FROM unidades_apadrinables WHERE estado = 'propuesta'",
+      "Alianzas › Apadrinamiento · una fundación propuso una unidad para apadrinar: verifica su costo y apruébala o devuélvela", 31, "#sec-apadrinamiento", 7);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   await enCola("dirigidos_por_entregar",
     "SELECT COUNT(*) AS n, MIN(COALESCE(a.aprobada_en, a.creada_en)) AS masViejo FROM aportes a " +
     "WHERE a.destino_id IS NOT NULL AND a.estado IN ('aprobada','en_distribucion')",
@@ -21163,6 +21174,213 @@ async function adminFundacionGuardar(request, env, id, quien) {
   return json({ ok: true });
 }
 
+
+/* ============================================================================
+   APADRINAMIENTO POR UNIDAD DE IMPACTO · FASE 1: EL CATÁLOGO (0054, 29 oct 2026)
+   ============================================================================
+   La metodología que pidió Sebas: la gente apadrina cada MES una unidad de
+   impacto verificable de una fundación del HUB. Esta fase es el catálogo y
+   nada más:
+   · la fundación propone sus unidades desde /portal (pestaña Apadrinamiento);
+   · el equipo verifica el costo contra su soporte, escribe el inglés y la
+     aprueba en /admin › Alianzas › Apadrinamiento;
+   · las aprobadas salen en /apadrinamiento con la calculadora.
+   NO SE COBRA NADA. Quien quiere apadrinar deja su correo y se le escribe
+   cuando abra el aporte mensual (fase 2, después del contador).
+
+   UNA UNIDAD SOLO SE PUBLICA SI LA FUNDACIÓN ESTÁ EN LA RED (su `red_id` existe
+   en partners.json). Ahí está la autorización de su nombre: sin ella, publicar
+   «la Fundación X ofrece…» sería usar un nombre que no autorizó.
+
+   EDITAR UNA APROBADA LA DESPUBLICA hasta la nueva revisión. Si no, la
+   fundación podría cambiar el costo de algo que ya tiene el sello «verificado». */
+const UNIDAD_MODALIDADES = ["cupo", "identificado"];
+const UNIDAD_TOPE = 20;
+const UNIDAD_ESTADO_ES = { propuesta: "Por revisar", aprobada: "Publicada", pausada: "Pausada", rechazada: "Devuelta", retirada: "Retirada" };
+
+function unidadValida(c) {
+  const t = (v, max) => String(v == null ? "" : v).replace(/\r\n?/g, "\n").trim().slice(0, max);
+  const u = {
+    nombre_es: limpiar(c.nombre_es, 120),
+    programa: limpiar(c.programa, 120) || null,
+    descripcion_es: t(c.descripcion_es, 1200),
+    incluye: t(c.incluye, 600) || null,
+    evidencia: t(c.evidencia, 600),
+    modalidad: UNIDAD_MODALIDADES.includes(c.modalidad) ? c.modalidad : null,
+    costo_mensual_cop: numeroCO(c.costo_mensual_cop),
+    cupos: c.cupos === "" || c.cupos == null ? null : numeroCO(c.cupos),
+    soporte_doc: c.soporte_doc ? Number(c.soporte_doc) : null
+  };
+  const err = (campo, ayuda) => ({ error: "dato_invalido", campo, ayuda });
+  if (u.nombre_es.length < 4) return err("nombre_es", "Escribe el nombre de la unidad, por ejemplo «Beca mensual de fútbol».");
+  if (u.descripcion_es.length < 20) return err("descripcion_es", "Cuenta qué hace la unidad en unas líneas: a quién llega y qué recibe.");
+  if (u.evidencia.length < 10) return err("evidencia", "Di cómo nos vas a mostrar cada mes que se entregó: lista de asistencia, fotos sin menores identificables, acta…");
+  if (!u.modalidad) return err("modalidad", "Elige si es un cupo o un niño identificado.");
+  if (u.costo_mensual_cop === null || u.costo_mensual_cop < 1000 || u.costo_mensual_cop > 100000000) return err("costo_mensual_cop", "El costo mensual va en pesos, entre $1.000 y $100.000.000.");
+  u.costo_mensual_cop = Math.round(u.costo_mensual_cop);
+  if (u.cupos !== null && (!Number.isInteger(u.cupos) || u.cupos < 1 || u.cupos > 10000)) return err("cupos", "Los cupos van en número entero, o en blanco si no hay tope.");
+  if (u.soporte_doc !== null && !(Number.isInteger(u.soporte_doc) && u.soporte_doc > 0)) return err("soporte_doc", "Ese soporte no existe.");
+  return { ok: true, u };
+}
+
+/* GET y POST /api/portal/unidades — las unidades de la fundación con sesión. */
+async function apiPortalUnidades(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "unidades_apadrinables"))) return json({ error: "no_disponible" }, 503);
+  if (request.method === "GET") {
+    const filas = (await env.DB.prepare(
+      "SELECT id, nombre_es, programa, descripcion_es, incluye, evidencia, modalidad, costo_mensual_cop, cupos, soporte_doc, estado, motivo, actualizada " +
+      "FROM unidades_apadrinables WHERE inscripcion = ? AND estado <> 'retirada' ORDER BY creada"
+    ).bind(s.inscripcion).all()).results || [];
+    return json({ ok: true, unidades: filas.map((u) => Object.assign(u, { estado_es: UNIDAD_ESTADO_ES[u.estado], actualizada: fechaCO(u.actualizada) })),
+      tope: UNIDAD_TOPE });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (c.accion === "retirar") {
+    const r = await env.DB.prepare(
+      "UPDATE unidades_apadrinables SET estado = 'retirada', actualizada = datetime('now') WHERE id = ? AND inscripcion = ? AND estado <> 'retirada'"
+    ).bind(Number(c.id) || 0, s.inscripcion).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+    return json({ ok: true });
+  }
+  if (c.accion !== "guardar") return json({ error: "accion_invalida" }, 400);
+  const v = unidadValida(c);
+  if (!v.ok) return json(v, 400);
+  const u = v.u;
+  if (u.soporte_doc) {
+    const d = await env.DB.prepare("SELECT id FROM documentos_fundacion WHERE id = ? AND inscripcion = ? AND retirado_en IS NULL").bind(u.soporte_doc, s.inscripcion).first();
+    if (!d) return json({ error: "dato_invalido", campo: "soporte_doc", ayuda: "Ese soporte no está entre tus documentos." }, 400);
+  }
+  if (c.id) {
+    const previa = await env.DB.prepare("SELECT id, estado FROM unidades_apadrinables WHERE id = ? AND inscripcion = ?").bind(Number(c.id) || 0, s.inscripcion).first();
+    if (!previa || previa.estado === "retirada") return json({ error: "no_encontrado" }, 404);
+    await env.DB.prepare(
+      "UPDATE unidades_apadrinables SET nombre_es = ?, programa = ?, descripcion_es = ?, incluye = ?, evidencia = ?, modalidad = ?, " +
+      "costo_mensual_cop = ?, cupos = ?, soporte_doc = ?, estado = 'propuesta', motivo = NULL, aprobada_en = NULL, aprobada_por = NULL, " +
+      "actualizada = datetime('now') WHERE id = ?"
+    ).bind(u.nombre_es, u.programa, u.descripcion_es, u.incluye, u.evidencia, u.modalidad, u.costo_mensual_cop, u.cupos, u.soporte_doc, previa.id).run();
+    return json({ ok: true, id: previa.id, despublicada: previa.estado === "aprobada" });
+  }
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM unidades_apadrinables WHERE inscripcion = ? AND estado <> 'retirada'").bind(s.inscripcion).first();
+  if (n && n.n >= UNIDAD_TOPE) return json({ error: "tope_alcanzado", ayuda: "Ya tienes " + UNIDAD_TOPE + " unidades. Retira alguna antes de proponer otra." }, 409);
+  const fila = await env.DB.prepare(
+    "INSERT INTO unidades_apadrinables (inscripcion, nombre_es, programa, descripcion_es, incluye, evidencia, modalidad, costo_mensual_cop, cupos, soporte_doc) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(s.inscripcion, u.nombre_es, u.programa, u.descripcion_es, u.incluye, u.evidencia, u.modalidad, u.costo_mensual_cop, u.cupos, u.soporte_doc).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* GET /api/apadrinamiento — PÚBLICO. Solo lo aprobado de fundaciones de la red. */
+async function apiCatalogoApadrinamiento(env) {
+  if (!(await existeTabla(env, "unidades_apadrinables"))) return json({ ok: true, unidades: [] });
+  const red = await fundacionesRed(env);
+  const filas = (await env.DB.prepare(
+    "SELECT u.id, u.nombre_es, u.nombre_en, u.programa, u.descripcion_es, u.descripcion_en, u.incluye, u.incluye_en, u.evidencia, u.evidencia_en, u.modalidad, " +
+    "u.costo_mensual_cop, u.cupos, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion " +
+    "WHERE u.estado = 'aprobada' AND i.red_id IS NOT NULL ORDER BY u.aprobada_en"
+  ).all()).results || [];
+  const unidades = filas.filter((u) => red.mapa.has(String(u.red_id).toLowerCase())).map((u) => ({
+    id: u.id, nombre: { es: u.nombre_es, en: u.nombre_en || u.nombre_es }, programa: u.programa,
+    descripcion: { es: u.descripcion_es, en: u.descripcion_en || u.descripcion_es },
+    incluye: u.incluye ? { es: u.incluye, en: u.incluye_en || u.incluye } : null,
+    evidencia: { es: u.evidencia, en: u.evidencia_en || u.evidencia }, modalidad: u.modalidad, costo_mensual_cop: u.costo_mensual_cop,
+    cupos: u.cupos, fundacion: { id: String(u.red_id).toLowerCase(), nombre: red.mapa.get(String(u.red_id).toLowerCase()) }
+  }));
+  return new Response(JSON.stringify({ ok: true, unidades }), { headers: {
+    "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=120" } });
+}
+
+/* POST /api/apadrinamiento/interes — PÚBLICO. «Avísame cuando abra». */
+async function apiApadrinamientoInteres(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (c.web2) return json({ ok: true });
+  if (!(await existeTabla(env, "apadrinamiento_interes"))) return json({ error: "no_disponible" }, 503);
+  const nombre = limpiar(c.nombre, 120);
+  const email = limpiar(c.email, 160).toLowerCase();
+  if (nombre.length < 2) return json({ error: "nombre_requerido" }, 400);
+  if (!RE_CORREO.test(email)) return json({ error: "correo_invalido" }, 400);
+  if (c.autoriza !== true) return json({ error: "autorizacion_requerida" }, 400);
+  if (!(await pasaTopeIP(env, request, "apadrinamiento"))) return json({ error: "demasiados_intentos" }, 429);
+  let unidad = null;
+  if (c.unidad_id) {
+    const u = await env.DB.prepare("SELECT id FROM unidades_apadrinables WHERE id = ? AND estado = 'aprobada'").bind(Number(c.unidad_id) || 0).first();
+    unidad = u ? u.id : null;
+  }
+  const cantidad = Math.min(50, Math.max(1, Math.round(Number(c.cantidad) || 1)));
+  const fila = await env.DB.prepare(
+    "INSERT INTO apadrinamiento_interes (nombre, email, unidad_id, cantidad, idioma) VALUES (?, ?, ?, ?, ?) RETURNING id"
+  ).bind(nombre, email, unidad, cantidad, c.idioma === "en" ? "en" : "es").first();
+  await anotarAutorizacion(env, fila.id, "apadrinamiento_interes", "aviso de apertura del aporte mensual", "interes");
+  return json({ ok: true });
+}
+
+/* GET /api/admin/apadrinamiento — todas las unidades y los interesados. */
+async function adminApadrinamiento(env) {
+  if (!(await existeTabla(env, "unidades_apadrinables"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0054 en la base." }, 409);
+  const red = await fundacionesRed(env);
+  const unidades = (await env.DB.prepare(
+    "SELECT u.*, i.nombre AS fundacion, i.red_id, d.tipo AS soporte_tipo, d.nota AS soporte_nota " +
+    "FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion LEFT JOIN documentos_fundacion d ON d.id = u.soporte_doc " +
+    "ORDER BY CASE u.estado WHEN 'propuesta' THEN 0 WHEN 'aprobada' THEN 1 ELSE 2 END, u.actualizada DESC"
+  ).all()).results || [];
+  const interes = (await env.DB.prepare(
+    "SELECT x.id, x.nombre, x.email, x.cantidad, x.idioma, x.creado, x.atendido_en, u.nombre_es AS unidad " +
+    "FROM apadrinamiento_interes x LEFT JOIN unidades_apadrinables u ON u.id = x.unidad_id ORDER BY x.creado DESC LIMIT 500"
+  ).all()).results || [];
+  return json({ ok: true, estados: UNIDAD_ESTADO_ES,
+    unidades: unidades.map((u) => Object.assign(u, { en_red: !!(u.red_id && red.mapa.has(String(u.red_id).toLowerCase())),
+      actualizada: selloCO(u.actualizada).slice(0, 16), aprobada_en: u.aprobada_en ? selloCO(u.aprobada_en).slice(0, 16) : null })),
+    interes: interes.map((x) => Object.assign(x, { creado: selloCO(x.creado).slice(0, 16) })) });
+}
+
+/* POST /api/admin/unidad/<id> { accion: aprobar | rechazar | pausar } */
+async function adminUnidadDecidir(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const u = await env.DB.prepare(
+    "SELECT u.id, u.estado, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion WHERE u.id = ?"
+  ).bind(id).first();
+  if (!u) return json({ error: "no_encontrado" }, 404);
+  let detalle;
+  if (c.accion === "aprobar") {
+    const red = await fundacionesRed(env);
+    if (!u.red_id || !red.mapa.has(String(u.red_id).toLowerCase())) {
+      return json({ error: "fundacion_fuera_de_la_red", ayuda: "La fundación no está vinculada a partners.json (Alianzas › Fundaciones › Vínculo con la red). Sin eso no hay autorización para publicar su nombre." }, 409);
+    }
+    if (c.costo_verificado !== true) return json({ error: "costo_sin_verificar", campo: "verificado", ayuda: "Marca que verificaste el costo contra su soporte." }, 400);
+    const en = limpiar(c.nombre_en, 120), den = String(c.descripcion_en == null ? "" : c.descripcion_en).replace(/\r\n?/g, "\n").trim().slice(0, 1200);
+    if (en.length < 4) return json({ error: "dato_invalido", campo: "nombre_en", ayuda: "Falta el nombre en inglés: el sitio es bilingüe." }, 400);
+    if (den.length < 20) return json({ error: "dato_invalido", campo: "descripcion_en", ayuda: "Falta la descripción en inglés." }, 400);
+    const ev = String(c.evidencia_en == null ? "" : c.evidencia_en).replace(/\r\n?/g, "\n").trim().slice(0, 600);
+    if (ev.length < 10) return json({ error: "dato_invalido", campo: "evidencia_en", ayuda: "Falta en inglés cómo se evidencia cada mes." }, 400);
+    const inc = String(c.incluye_en == null ? "" : c.incluye_en).replace(/\r\n?/g, "\n").trim().slice(0, 600) || null;
+    await env.DB.prepare(
+      "UPDATE unidades_apadrinables SET estado = 'aprobada', nombre_en = ?, descripcion_en = ?, evidencia_en = ?, incluye_en = ?, motivo = NULL, aprobada_en = datetime('now'), aprobada_por = ?, actualizada = datetime('now') WHERE id = ?"
+    ).bind(en, den, ev, inc, quien || null, id).run();
+    detalle = "aprobada y publicada";
+  } else if (c.accion === "rechazar" || c.accion === "pausar") {
+    const motivo = limpiar(c.motivo, 500);
+    if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di por qué: la fundación lo ve en su portal." }, 400);
+    await env.DB.prepare(
+      "UPDATE unidades_apadrinables SET estado = ?, motivo = ?, actualizada = datetime('now') WHERE id = ?"
+    ).bind(c.accion === "rechazar" ? "rechazada" : "pausada", motivo, id).run();
+    detalle = c.accion === "rechazar" ? "devuelta a la fundación" : "pausada";
+  } else return json({ error: "accion_invalida" }, 400);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "unidad apadrinable " + id + " · " + detalle).run();
+  return json({ ok: true });
+}
+
 /* La página /portal (diseño del 29 oct 2026). Cuatro estados que pinta su JS:
    pedir el enlace, revisar el correo, usar el enlace (con el botón que lo
    gasta) y el portal, con tres pestañas: Resumen, Perfil y Documentos.
@@ -21364,10 +21582,53 @@ function paginaPortal(nonce) {
       <button type="button" class="tab" role="tab" id="t-resumen" aria-controls="s-resumen" aria-selected="true">Resumen</button>
       <button type="button" class="tab" role="tab" id="t-perfil" aria-controls="s-perfil" aria-selected="false">Perfil<span class="pill oculto" id="tp-perfil"></span></button>
       <button type="button" class="tab" role="tab" id="t-documentos" aria-controls="s-documentos" aria-selected="false">Documentos<span class="pill" id="tp-docs"></span></button>
+      <button type="button" class="tab" role="tab" id="t-apadrinamiento" aria-controls="s-apadrinamiento" aria-selected="false">Apadrinamiento</button>
     </div>
 
     <div id="s-resumen" role="tabpanel" aria-labelledby="t-resumen"></div>
     <div id="s-perfil" role="tabpanel" aria-labelledby="t-perfil" class="oculto"></div>
+    <div id="s-apadrinamiento" role="tabpanel" aria-labelledby="t-apadrinamiento" class="oculto">
+      <div class="tarjeta aviso">
+        <h2>Unidades que la gente puede apadrinar cada mes</h2>
+        <p class="sub">Una unidad es algo concreto que tu fundación entrega y que alguien puede sostener con un aporte mensual: un niño en un programa, un filtro de agua para una familia, una beca de baile o de fútbol. Nos dices cuánto cuesta al mes y cómo nos vas a mostrar cada mes que se entregó; el equipo verifica el costo con su soporte y la publica en la página de apadrinamiento.</p>
+        <p class="sub mt">Todavía no se cobra: quien quiera apadrinar deja su correo y le escribimos cuando abra el aporte mensual.</p>
+      </div>
+      <div class="tarjeta" id="ap-lista"></div>
+      <form class="tarjeta" id="f-unidad" autocomplete="off">
+        <h2 id="ap-titulo">Proponer una unidad</h2>
+        <input type="hidden" id="ap-id">
+        <label for="ap-nombre">Nombre de la unidad *</label>
+        <span class="ayuda">Corto y concreto: «Beca mensual de fútbol», «Filtro de agua para una familia», «Un niño en Chefs del Futuro».</span>
+        <input type="text" id="ap-nombre" maxlength="120">
+        <label for="ap-programa">Programa al que pertenece</label>
+        <input type="text" id="ap-programa" maxlength="120">
+        <label for="ap-desc">Qué hace y a quién llega *</label>
+        <textarea id="ap-desc" rows="4" maxlength="1200"></textarea>
+        <label for="ap-incluye">Qué cubre el costo</label>
+        <span class="ayuda">Por ejemplo: «uniforme, transporte y refrigerio de los entrenamientos».</span>
+        <textarea id="ap-incluye" rows="3" maxlength="600"></textarea>
+        <label for="ap-costo">Costo mensual de una unidad, en pesos *</label>
+        <span class="ayuda">El costo real y completo de un mes. Por ejemplo: 120.000.</span>
+        <input type="text" id="ap-costo" inputmode="numeric">
+        <label for="ap-cupos">Cuántos cupos hay</label>
+        <span class="ayuda">En blanco si no hay tope.</span>
+        <input type="text" id="ap-cupos" inputmode="numeric">
+        <label for="ap-mod">Modalidad *</label>
+        <label class="op"><input type="radio" name="ap-mod" value="cupo" id="ap-mod"><span><strong>Cupo.</strong> El padrino sostiene un lugar en el programa y recibe los avances del grupo. Sin nombres ni fotos de un niño concreto.</span></label>
+        <label class="op"><input type="radio" name="ap-mod" value="identificado"><span><strong>Niño identificado.</strong> El padrino conoce el nombre de pila del niño y su avance. Exige la autorización escrita de su acudiente, y nunca hay contacto directo entre el padrino y el niño.</span></label>
+        <label for="ap-evid">Cómo nos vas a mostrar cada mes que se entregó *</label>
+        <span class="ayuda">Lista de asistencia, acta de entrega, fotos donde ningún menor sea identificable…</span>
+        <textarea id="ap-evid" rows="3" maxlength="600"></textarea>
+        <label for="ap-soporte">Soporte del costo</label>
+        <span class="ayuda">Súbelo primero en «Documentos» (como «Otro documento», con una nota) y elígelo aquí. Sin soporte no podemos verificar el costo.</span>
+        <select id="ap-soporte"></select>
+        <div class="acciones">
+          <button type="button" class="btn" id="b-unidad">Proponer</button>
+          <button type="button" class="btn sec oculto" id="b-unidad-cancelar">Cancelar la edición</button>
+        </div>
+        <span class="msg" id="m-unidad" role="status" aria-live="polite"></span>
+      </form>
+    </div>
     <div id="s-documentos" role="tabpanel" aria-labelledby="t-documentos" class="oculto">
       <div class="tarjeta">
         <h2>Lo que conviene tener</h2>
@@ -21421,6 +21682,8 @@ var PASOS = [
   ["Vinculación", "Parte de la red del HUB."]
 ];
 var RECOMENDADOS = ["rut", "camara", "estatutos", "estados_financieros", "certificado_bancario", "logo"];
+var UNIDADES = null;
+var TABS = ["resumen", "perfil", "documentos", "apadrinamiento"];
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
@@ -21579,7 +21842,8 @@ function subir(f, tipo, nota, idMsg){
 
 function irA(tab){
   TAB = tab;
-  ["resumen", "perfil", "documentos"].forEach(function(t){
+  if (tab === "apadrinamiento" && UNIDADES === null) cargarUnidades();
+  TABS.forEach(function(t){
     $("t-" + t).setAttribute("aria-selected", t === tab ? "true" : "false");
     $("s-" + t).classList.toggle("oculto", t !== tab);
   });
@@ -21611,7 +21875,7 @@ $("b-salir").addEventListener("click", function(){
   enviar("/api/portal/salir").then(function(){ D = null; SUCIO = false; ver("v-entrar"); });
 });
 $("b-perfil").addEventListener("click", guardarPerfil);
-["resumen", "perfil", "documentos"].forEach(function(t){ $("t-" + t).addEventListener("click", function(){ irA(t); }); });
+TABS.forEach(function(t){ $("t-" + t).addEventListener("click", function(){ irA(t); }); });
 document.addEventListener("click", function(ev){
   var b = ev.target.closest && ev.target.closest("[data-ir]");
   if (b) { irA(b.getAttribute("data-ir")); window.scrollTo(0, 0); }
@@ -21629,17 +21893,81 @@ $("p-docs").addEventListener("click", function(ev){
     cargar().then(function(){ irA("documentos"); });
   });
 });
+/* ---- Apadrinamiento: las unidades de la fundación (0054) ---- */
+function pesos(n){ return "$" + Math.round(Number(n) || 0).toLocaleString("es-CO"); }
+function cargarUnidades(){
+  return fetch("/api/portal/unidades", { credentials: "same-origin" }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return null; }
+    return r.json();
+  }).then(function(d){ if (!d) return; UNIDADES = d.unidades || []; pintarUnidades(); })
+    .catch(function(){ $("ap-lista").innerHTML = '<p class="sub">No pudimos cargar tus unidades. Intenta de nuevo.</p>'; });
+}
+function pintarUnidades(){
+  var L = UNIDADES || [];
+  $("ap-lista").innerHTML = '<h2>Tus unidades</h2>' + (L.length ? '<ul class="docs">' + L.map(function(u){
+    var pill = u.estado === "aprobada" ? "pill ok" : u.estado === "rechazada" || u.estado === "pausada" ? "pill ambar" : "pill";
+    return '<li><div><span class="nom">' + esc(u.nombre_es) + '</span><span class="det">' + pesos(u.costo_mensual_cop) + " al mes · " +
+      (u.modalidad === "identificado" ? "niño identificado" : "cupo") + (u.cupos ? " · " + u.cupos + " cupos" : "") + (u.programa ? " · " + esc(u.programa) : "") + "</span>" +
+      (u.motivo ? '<span class="det">Nota del equipo: ' + esc(u.motivo) + "</span>" : "") + "</div>" +
+      '<div class="der"><span class="' + pill + '">' + esc(u.estado_es) + "</span>" +
+      '<button type="button" class="btn sec mini" data-ap-editar="' + u.id + '">Editar</button>' +
+      '<button type="button" class="btn sec mini" data-ap-retirar="' + u.id + '">Retirar</button></div></li>';
+  }).join("") + "</ul>" : '<p class="sub">Todavía no has propuesto ninguna.</p>');
+  var sel = $("ap-soporte"), actual = sel.value;
+  sel.innerHTML = '<option value="">Ninguno todavía</option>' + (D.documentos || []).map(function(d){
+    return '<option value="' + d.id + '">' + esc(d.tipo_es) + (d.nota ? " · " + esc(d.nota) : "") + " (" + esc(d.subido) + ")</option>";
+  }).join("");
+  sel.value = actual;
+}
+function formUnidad(u){
+  $("ap-id").value = u ? u.id : "";
+  $("ap-nombre").value = u ? u.nombre_es : ""; $("ap-programa").value = u ? (u.programa || "") : "";
+  $("ap-desc").value = u ? u.descripcion_es : ""; $("ap-incluye").value = u ? (u.incluye || "") : "";
+  $("ap-costo").value = u ? u.costo_mensual_cop : ""; $("ap-cupos").value = u && u.cupos ? u.cupos : "";
+  $("ap-evid").value = u ? u.evidencia : ""; $("ap-soporte").value = u && u.soporte_doc ? String(u.soporte_doc) : "";
+  document.querySelectorAll('input[name="ap-mod"]').forEach(function(r){ r.checked = !!u && r.value === u.modalidad; });
+  $("ap-titulo").textContent = u ? "Editar «" + u.nombre_es + "»" : "Proponer una unidad";
+  $("b-unidad").textContent = u ? "Guardar y enviar a revisión" : "Proponer";
+  $("b-unidad-cancelar").classList.toggle("oculto", !u);
+  msg("m-unidad", u && u.estado === "aprobada" ? "Ojo: al guardar, la unidad sale de la página pública hasta que el equipo la revise otra vez." : "");
+}
+function guardarUnidad(){
+  var mod = document.querySelector('input[name="ap-mod"]:checked');
+  var c = { accion: "guardar", id: $("ap-id").value || null, nombre_es: $("ap-nombre").value, programa: $("ap-programa").value,
+    descripcion_es: $("ap-desc").value, incluye: $("ap-incluye").value, costo_mensual_cop: $("ap-costo").value,
+    cupos: $("ap-cupos").value.trim(), evidencia: $("ap-evid").value, modalidad: mod ? mod.value : "", soporte_doc: $("ap-soporte").value || null };
+  var b = $("b-unidad"); b.disabled = true; msg("m-unidad", "Guardando…");
+  enviar("/api/portal/unidades", c).then(function(r){
+    b.disabled = false;
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { msg("m-unidad", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
+    formUnidad(null);
+    msg("m-unidad", "Listo: quedó por revisar. El equipo verifica el costo y te cuenta aquí.", "ok");
+    cargarUnidades();
+  }).catch(function(){ b.disabled = false; msg("m-unidad", "No pudimos conectar. Lo que escribiste sigue en pantalla.", "mal"); });
+}
+$("b-unidad").addEventListener("click", guardarUnidad);
+$("b-unidad-cancelar").addEventListener("click", function(){ formUnidad(null); });
+$("ap-lista").addEventListener("click", function(ev){
+  var b = ev.target.closest && ev.target.closest("[data-ap-editar],[data-ap-retirar]");
+  if (!b) return;
+  var id = Number(b.getAttribute("data-ap-editar") || b.getAttribute("data-ap-retirar"));
+  var u = (UNIDADES || []).filter(function(x){ return x.id === id; })[0];
+  if (b.hasAttribute("data-ap-editar")) { formUnidad(u); $("f-unidad").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  if (!confirm("¿Retirar «" + (u ? u.nombre_es : "") + "»? Sale de la página pública si estaba publicada.")) return;
+  enviar("/api/portal/unidades", { accion: "retirar", id: id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarUnidades(); });
+});
 window.addEventListener("beforeunload", function(ev){ if (SUCIO) { ev.preventDefault(); ev.returnValue = ""; } });
 window.addEventListener("hashchange", function(){
   var h = location.hash.replace("#", "");
-  if (D && (h === "resumen" || h === "perfil" || h === "documentos") && h !== TAB) irA(h);
+  if (D && TABS.indexOf(h) > -1 && h !== TAB) irA(h);
 });
 
 if (new URLSearchParams(location.search).get("t")) ver("v-enlace");
 else cargar().then(function(){
   if (!D) return;
   var h = location.hash.replace("#", "");
-  irA(h === "perfil" || h === "documentos" ? h : "resumen");
+  irA(TABS.indexOf(h) > -1 ? h : "resumen");
 });
 `;
 }
@@ -32466,6 +32794,7 @@ textarea { font-size: 16px }
   <p class="pn-gt">Alianzas</p>
   <a class="pn-it" href="#alianzas/red" data-pn-ir="alianzas/red">Red<span class="pn-n" data-pn-n="alianzas/red"></span></a>
   <a class="pn-it" href="#alianzas/fundaciones" data-pn-ir="alianzas/fundaciones">Fundaciones</a>
+  <a class="pn-it" href="#alianzas/apadrinamiento" data-pn-ir="alianzas/apadrinamiento">Apadrinamiento<span class="pn-n" data-pn-n="alianzas/apadrinamiento"></span></a>
   <a class="pn-it" href="#alianzas/ofrecimientos" data-pn-ir="alianzas/ofrecimientos">Ofrecimientos en especie<span class="pn-n" data-pn-n="alianzas/ofrecimientos"></span></a>
   <a class="pn-it" href="#alianzas/socialfest" data-pn-ir="alianzas/socialfest">Social Fest<span class="pn-n" data-pn-n="alianzas/socialfest"></span></a>
 </div>
@@ -32764,6 +33093,15 @@ textarea { font-size: 16px }
 <p>Lo que se edita aquí no cambia el sitio público: el sitio sale de partners.json. Las autorizaciones de la ficha no se editan: cambian con un documento de la fundación.</p>
 </div></details>
 <div id="tb-fund"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<section class="pn-vista" data-vista="alianzas/apadrinamiento" id="sec-apadrinamiento" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Las fundaciones proponen desde su portal las <strong>unidades</strong> que la gente puede apadrinar cada mes: un niño en un programa, un filtro de agua, una beca de baile o fútbol. Cada una con su costo mensual, su modalidad (cupo o niño identificado) y cómo evidencian cada mes lo entregado.</p>
+<p><strong>Aprobar</strong> exige verificar el costo contra el soporte que adjuntaron, escribir el inglés y que la fundación esté vinculada a partners.json. Lo aprobado sale en <strong>/apadrinamiento</strong>. Si la fundación edita una unidad publicada, sale de la página hasta revisarla otra vez.</p>
+<p>Todavía <strong>no se cobra</strong>: quien quiere apadrinar deja su correo. El aporte mensual (fase 2) espera la conversación con el contador.</p>
+</div></details>
+<div id="tb-apad"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="alianzas/ofrecimientos" id="sec-ofrecimientos" hidden>
@@ -34209,7 +34547,8 @@ var COLA_ES = {
   board_informe_sin_enviar: "Informe trimestral sin enviar a los asesores",
   quejas_sin_responder: "Quejas y sugerencias sin responder",
   portal_por_revisar: "Portal de fundaciones: cambios por revisar",
-  dirigidos_por_entregar: "Donaciones dirigidas por entregar"
+  dirigidos_por_entregar: "Donaciones dirigidas por entregar",
+  unidades_por_revisar: "Unidades de apadrinamiento por revisar"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -34298,6 +34637,8 @@ var VISTAS = {
     linea: "Fundaciones, empresas, voluntarios y padrinos que quieren entrar a la red." },
   "alianzas/fundaciones": { area: "Alianzas", titulo: "Fundaciones",
     linea: "Cada fundación con su estado, su contacto, su acceso al portal, sus documentos y sus donaciones. Se abre y se edita." },
+  "alianzas/apadrinamiento": { area: "Alianzas", titulo: "Apadrinamiento",
+    linea: "Las unidades que las fundaciones ofrecen para apadrinar cada mes: verificar el costo, aprobar y publicar." },
   "alianzas/ofrecimientos": { area: "Alianzas", titulo: "Ofrecimientos en especie",
     linea: "Lo que llega por el formulario de la brigada para donar en especie." },
   "alianzas/socialfest": { area: "Alianzas", titulo: "Social Fest",
@@ -34507,7 +34848,8 @@ var COLA_MOD = {
   board_informe_sin_enviar: "meal/board",
   quejas_sin_responder: "quejas/ordinaria",
   portal_por_revisar: "alianzas/red",
-  dirigidos_por_entregar: "reportes/fundaciones"
+  dirigidos_por_entregar: "reportes/fundaciones",
+  unidades_por_revisar: "alianzas/apadrinamiento"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -42275,6 +42617,89 @@ document.addEventListener("click", function(e){
   if (b) abrirFundacion(b.getAttribute("data-fz-abrir"));
 });
 
+/* ---------------- APADRINAMIENTO: EL CATÁLOGO (0054) ----------------
+   Lo que proponen las fundaciones desde su portal. Aprobar exige verificar el
+   costo contra su soporte y escribir el inglés: el sitio es bilingüe. */
+var AP = null;
+function cargarApadrinamiento(){
+  return pedirJSON("/api/admin/apadrinamiento", "tb-apad").then(function(d){
+    AP = d;
+    var caja = document.getElementById("tb-apad"); if (!caja) return;
+    var L = d.unidades || [];
+    var h = '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Unidad</th><th scope="col">Fundación</th>' +
+      '<th scope="col">Costo al mes</th><th scope="col">Modalidad</th><th scope="col">Estado</th><th scope="col"></th></tr></thead><tbody>';
+    h += L.length ? L.map(function(u){
+      return "<tr" + (u.estado === "retirada" || u.estado === "rechazada" ? ' style="opacity:.6"' : "") + "><td><strong>" + esc(u.nombre_es) + "</strong>" +
+        (u.programa ? "<br><small>" + esc(u.programa) + "</small>" : "") + "</td>" +
+        "<td>" + esc(u.fundacion) + (u.en_red ? "" : '<br><small class="mu">sin vínculo con la red</small>') + "</td>" +
+        "<td>" + dinero(u.costo_mensual_cop * 100, "COP") + (u.cupos ? "<br><small>" + u.cupos + " cupos</small>" : "") + "</td>" +
+        "<td>" + (u.modalidad === "identificado" ? "Niño identificado" : "Cupo") + "</td>" +
+        "<td>" + esc((d.estados || {})[u.estado] || u.estado) + "<br><small>" + esc(u.actualizada) + "</small></td>" +
+        '<td><button type="button" class="copy" data-ap-abrir="' + u.id + '">Abrir</button></td></tr>';
+    }).join("") : '<tr><td colspan="6">Ninguna fundación ha propuesto unidades todavía. Lo hacen desde la pestaña «Apadrinamiento» de su portal.</td></tr>';
+    h += "</tbody></table></div>";
+    var I = d.interes || [];
+    h += '<p class="pn-h3">Quieren apadrinar (' + I.length + ")</p>" +
+      '<p class="mu">Dejaron su correo para cuando abra el aporte mensual. Autorizaron que se les escriba solo para eso.</p>' +
+      (I.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Quién</th><th scope="col">Qué</th><th scope="col">Cuándo</th></tr></thead><tbody>' +
+        I.map(function(x){ return "<tr><td>" + esc(x.nombre) + "<br><small>" + esc(x.email) + "</small></td><td>" + (x.unidad ? esc(x.unidad) + " × " + x.cantidad : '<span class="mu">sin unidad elegida</span>') +
+          "</td><td>" + esc(x.creado) + "</td></tr>"; }).join("") + "</tbody></table></div>" : '<p class="mu">Nadie todavía.</p>');
+    caja.innerHTML = h;
+  });
+}
+function abrirUnidad(id){
+  var u = ((AP && AP.unidades) || []).filter(function(x){ return String(x.id) === String(id); })[0];
+  if (!u) return;
+  var pares = [
+    ["Fundación", esc(u.fundacion) + (u.en_red ? "<small>en la red: " + esc(u.red_id) + "</small>" : '<small>sin vínculo con partners.json: no se puede publicar hasta vincularla en «Fundaciones»</small>')],
+    ["Unidad", esc(u.nombre_es) + (u.programa ? "<small>" + esc(u.programa) + "</small>" : "")],
+    ["Qué hace", '<div class="qj-msg">' + esc(u.descripcion_es) + "</div>"],
+    ["Qué cubre", u.incluye ? '<div class="qj-msg">' + esc(u.incluye) + "</div>" : '<span class="mu">—</span>'],
+    ["Costo al mes", dinero(u.costo_mensual_cop * 100, "COP") + (u.cupos ? "<small>" + u.cupos + " cupos</small>" : "<small>sin tope de cupos</small>")],
+    ["Modalidad", u.modalidad === "identificado" ? "Niño identificado<small>exige la autorización escrita de cada acudiente antes de asignar un niño</small>" : "Cupo"],
+    ["Evidencia mensual", '<div class="qj-msg">' + esc(u.evidencia) + "</div>"],
+    ["Soporte del costo", u.soporte_doc ? '<a href="/api/admin/portal-doc/' + u.soporte_doc + '">' + esc(u.soporte_tipo || "documento") + (u.soporte_nota ? " · " + esc(u.soporte_nota) : "") + "</a>" : '<span class="mu">No adjuntó soporte</span>'],
+    ["Estado", esc((AP.estados || {})[u.estado] || u.estado) + (u.motivo ? "<small>" + esc(u.motivo) + "</small>" : "") + (u.aprobada_en ? "<small>aprobada " + esc(u.aprobada_en) + (u.aprobada_por ? " por " + esc(u.aprobada_por) : "") + "</small>" : "")]
+  ];
+  var h = ficha(pares);
+  var pie = "";
+  if (u.estado !== "retirada"){
+    h += '<p class="pn-h3">Para publicarla</p>' +
+      pnCampo("ap-en", "Nombre en inglés", u.nombre_en || "", { extra: ' maxlength="120"' }) +
+      pnCampo("ap-den", "Descripción en inglés", u.descripcion_en || "", { area: true, filas: 4 }) +
+      pnCampo("ap-iin", "Qué cubre, en inglés" + (u.incluye ? "" : " (la fundación no lo llenó)"), u.incluye_en || "", { area: true, filas: 2 }) +
+      pnCampo("ap-ein", "Cómo se evidencia cada mes, en inglés", u.evidencia_en || "", { area: true, filas: 2 }) +
+      '<label class="pn-campo" id="ap-ver-c"><span><input type="checkbox" id="ap-ver"> Verifiqué el costo mensual contra su soporte</span><small id="ap-ver-e" class="pn-err"></small></label>' +
+      pnCampo("ap-mot", "Motivo (para devolver o pausar; la fundación lo ve)", "", { area: true, filas: 2 }) +
+      '<p class="pn-error" id="pn-err"></p>';
+    pie += '<button type="button" class="pn-b1" data-ap-decidir="aprobar">' + (u.estado === "aprobada" ? "Guardar y mantener publicada" : "Aprobar y publicar") + "</button>";
+    pie += '<button type="button" class="pn-b2" data-ap-decidir="rechazar">Devolver a la fundación</button>';
+    if (u.estado === "aprobada") pie += '<button type="button" class="pn-b2" data-ap-decidir="pausar">Pausar</button>';
+  }
+  pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  cajonAbrir({ ey: "Apadrinamiento", titulo: u.nombre_es, cuerpo: h, pie: pie, ancho: true });
+  document.querySelectorAll("[data-ap-decidir]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var acc = b.getAttribute("data-ap-decidir");
+      ["ap-en", "ap-den", "ap-iin", "ap-ein", "ap-ver", "ap-mot"].forEach(function(k){ pnMarcar(k, ""); });
+      var c = { accion: acc, nombre_en: pnValor("ap-en"), descripcion_en: pnValor("ap-den"), incluye_en: pnValor("ap-iin"), evidencia_en: pnValor("ap-ein"),
+        costo_verificado: document.getElementById("ap-ver").checked, motivo: pnValor("ap-mot") };
+      if (acc === "aprobar" && !c.costo_verificado){ pnMarcar("ap-ver", "Verifica el costo antes de publicar."); return; }
+      if (acc !== "aprobar" && c.motivo.length < 3){ pnMarcar("ap-mot", "Escribe el motivo: la fundación lo ve en su portal."); return; }
+      b.disabled = true;
+      postPanel("/api/admin/unidad/" + u.id, c).then(function(r){
+        b.disabled = false; if (!r) return;
+        avisar(acc === "aprobar" ? "Unidad publicada en /apadrinamiento." : acc === "rechazar" ? "Unidad devuelta a la fundación." : "Unidad pausada.");
+        cajonCerrar(); cargarApadrinamiento(); cargarSalud();
+      });
+    });
+  });
+}
+document.addEventListener("click", function(e){
+  var b = e.target.closest && e.target.closest("[data-ap-abrir]");
+  if (b) abrirUnidad(b.getAttribute("data-ap-abrir"));
+});
+
 function abrirPortal(id){
   pedirJSON("/api/admin/portal/" + id).then(function(d){
     var pares = [
@@ -42428,6 +42853,7 @@ var BANDEJAS = {
   "ins-filas": cargarInspecciones,
   "o-filas": cargarOfrecimientos,
   "tb-fund": cargarFundaciones,
+  "tb-apad": cargarApadrinamiento,
   "tb-pagos": cargarSueltos,
   "tb-suscripciones": cargarSuscripciones,
   "tb-miembros": cargarMiembros,
@@ -44371,6 +44797,14 @@ const RUTAS_INDEXABLES = {
     en: {
       t: "December Gifts · Give&Grow International",
       d: "A thousand gifts for children in Uribia (La Guajira), Medellín (Antioquia) and Leticia (Amazonas). Choose one or several, pay in pesos or US dollars, and follow each gift until it is delivered and recorded."
+    }
+  },
+  apadrinamiento: {
+    t: "Apadrinamiento · Give&Grow International",
+    d: "Apadrina cada mes una unidad de impacto verificable de una fundación del HUB: un niño en un programa, un filtro de agua para una familia, una beca de baile o de fútbol.",
+    en: {
+      t: "Sponsorship · Give&Grow International",
+      d: "Sponsor, every month, a verifiable unit of impact from a Hub foundation: a child in a programme, a water filter for a family, a dance or football scholarship."
     }
   },
   brigada: {
@@ -46510,6 +46944,9 @@ export default {
         if (apo) return request.method === "POST" ? await adminPortalAccion(request, env, Number(apo[1]), sesion.email)
                                                   : await adminPortal(env, Number(apo[1]));
         if (ruta === "/api/admin/fundaciones")  return await adminFundaciones(env);
+        if (ruta === "/api/admin/apadrinamiento") return await adminApadrinamiento(env);
+        const aun = ruta.match(/^\/api\/admin\/unidad\/(\d{1,9})$/);
+        if (aun)                                return await adminUnidadDecidir(request, env, Number(aun[1]), sesion.email);
         const afz = ruta.match(/^\/api\/admin\/fundacion\/(\d{1,9})$/);
         if (afz) return request.method === "POST" ? await adminFundacionGuardar(request, env, Number(afz[1]), sesion.email)
                                                   : await adminFundacion(env, Number(afz[1]));
@@ -46722,6 +47159,10 @@ export default {
         if (ruta === "/api/portal/yo")      return await apiPortalYo(request, env);
         if (ruta === "/api/portal/perfil")  return await apiPortalPerfil(request, env);
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
+        if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
+        /* Apadrinamiento por unidad de impacto (0054). */
+        if (ruta === "/api/apadrinamiento")         return await apiCatalogoApadrinamiento(env);
+        if (ruta === "/api/apadrinamiento/interes") return await apiApadrinamientoInteres(request, env);
         const pret = ruta.match(/^\/api\/portal\/documento\/(\d{1,9})\/retirar$/);
         if (pret)                           return await apiPortalRetirar(request, env, Number(pret[1]));
         const fapi = ruta.match(/^\/api\/ficha\/([a-f0-9]{32})$/);

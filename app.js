@@ -2602,7 +2602,61 @@ var I18N = {
     "rg.paso.entregado":"Entregado",
     "gracias.regalos":"Seguir mis regalos",
     "gracias.regalos.destino":"Regalos de diciembre",
-    "foot.regalos":"Regalos de diciembre"
+    "foot.regalos":"Regalos de diciembre",
+    "apu.ey":"Apadrinamiento",
+    "apu.h1":"Apadrina, cada mes, un impacto que se puede comprobar.",
+    "apu.lead":"Escoge una unidad concreta de una fundación del HUB —un niño en un programa, un filtro de agua para una familia, una beca de baile o de fútbol— y sostenla con un aporte mensual. El costo de cada unidad lo verificamos con los soportes de la fundación, y cada mes la fundación reporta lo que entregó.",
+    "apu.como.h":"Cómo funciona",
+    "apu.como.1.t":"Escoges una unidad",
+    "apu.como.1.p":"Cada unidad dice qué es, cuánto cuesta al mes, qué cubre y cómo se va a evidenciar que se entregó.",
+    "apu.como.2.t":"La sostienes cada mes",
+    "apu.como.2.p":"Con un aporte mensual que puedes cancelar cuando quieras. El aporte abre muy pronto; mientras tanto, te avisamos.",
+    "apu.como.3.t":"Ves lo que se entregó",
+    "apu.como.3.p":"Cada mes la fundación reporta lo entregado con su evidencia, el equipo de Give&Grow lo revisa y te llega el resumen.",
+    "apu.cat.h":"Lo que puedes apadrinar",
+    "apu.calc.l":"¿Cuánto quieres aportar al mes?",
+    "apu.calc.ayuda":"Escribe un monto en pesos y te mostramos para cuántas unidades alcanza.",
+    "apu.cargando":"Cargando las unidades…",
+    "apu.vacio":"Las fundaciones del HUB están cargando sus unidades y el equipo está verificando sus costos. Déjanos tu correo abajo y te avisamos cuando estén.",
+    "apu.error":"No pudimos cargar las unidades. Revisa tu conexión e intenta de nuevo.",
+    "apu.nota":"Evidencia, no promesas: solo publicamos unidades cuyo costo verificamos con soportes de la fundación. Si una fundación cambia una unidad, sale de aquí hasta que la revisemos otra vez.",
+    "apu.mes":"al mes",
+    "apu.de":"de {f}",
+    "apu.cupo":"Cupo",
+    "apu.ident":"Niño identificado",
+    "apu.cupos":"{n} cupos",
+    "apu.incluye":"Qué cubre",
+    "apu.evid":"Cómo se evidencia cada mes",
+    "apu.btn":"Quiero apadrinar",
+    "apu.calc.n1":"Alcanza para 1 al mes",
+    "apu.calc.nn":"Alcanza para {n} al mes",
+    "apu.calc.no":"No alcanza para una completa",
+    "apu.mod.h":"Cupo o niño identificado",
+    "apu.mod.cupo.t":"Cupo",
+    "apu.mod.cupo.p":"Sostienes un lugar en el programa y recibes los avances del grupo. Es la forma más común y no expone a ningún niño.",
+    "apu.mod.id.t":"Niño identificado",
+    "apu.mod.id.p":"Solo en los programas que lo ofrecen y con la autorización escrita de su acudiente: conoces su nombre de pila y su avance. Nunca hay contacto directo entre el padrino y el niño.",
+    "apu.int.h":"El aporte mensual abre muy pronto",
+    "apu.int.p":"Déjanos tu correo y te escribimos cuando puedas empezar. Solo para eso: no te mandamos nada más.",
+    "apu.f.nombre":"Tu nombre",
+    "apu.f.email":"Tu correo",
+    "apu.f.unidad":"Qué quieres apadrinar",
+    "apu.f.unidad.cual":"Todavía no sé",
+    "apu.f.cant":"Cuántas",
+    "apu.f.priv":"Acepto que Give&Grow use mis datos para avisarme cuando abra el aporte mensual, según la",
+    "apu.f.priv.link":"Política de Privacidad",
+    "apu.f.enviar":"Avísame",
+    "apu.enviando":"Enviando…",
+    "apu.ok":"Listo. Te escribimos cuando abra el aporte mensual.",
+    "apu.e.nombre":"Escribe tu nombre.",
+    "apu.e.email":"Revisa tu correo: parece incompleto.",
+    "apu.e.priv":"Para continuar, acepta el uso de tus datos para este aviso.",
+    "apu.e.red":"No pudimos conectar. Revisa tu conexión e intenta de nuevo.",
+    "apu.e.muchos":"Hoy ya recibimos muchos avisos desde esta conexión. Inténtalo mañana.",
+    "apu.fund.h":"¿Eres una fundación del HUB?",
+    "apu.fund.p":"Propón desde tu portal las unidades que la gente puede apadrinar: qué son, cuánto cuestan al mes con su soporte y cómo vas a mostrar cada mes lo entregado.",
+    "apu.fund.btn":"Ir al portal de fundaciones →",
+    "foot.apadrinamiento":"Apadrinamiento"
   }
 };
 
@@ -2648,6 +2702,7 @@ var ROUTE_META = {
   "mi-aporte":{t:{es:"Mi aporte · Give&Grow International",en:"My giving · Give&Grow International"},d:{es:"Lo de quien ya donó, en un solo lugar: rastrea tu donación con su número de guía, recibe el enlace a tu membresía y entérate de cómo se pide el certificado de donación.",en:"Everything for people who have already given, in one place: track your donation with its tracking number, get the link to your membership and find out how to request your donation certificate."}},
   gracias:{t:{es:"Gracias por tu aporte · Give&Grow International",en:"Thank you for your gift · Give&Grow International"},d:{es:"Recibimos tu aporte y lo estamos confirmando. Guarda tu número de guía: con él puedes seguirlo hasta la entrega.",en:"We received your gift and we are confirming it. Keep your tracking number: it lets you follow the gift through to delivery."}},
   aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
+  apadrinamiento:{t:{es:"Apadrinamiento · Give&Grow International",en:"Sponsorship · Give&Grow International"},d:{es:"Apadrina cada mes una unidad de impacto verificable de una fundación del HUB: un niño en un programa, un filtro de agua para una familia, una beca de baile o de fútbol.",en:"Sponsor, every month, a verifiable unit of impact from a Hub foundation: a child in a programme, a water filter for a family, a dance or football scholarship."}},
   regalos:{t:{es:"Regalos de diciembre · Give&Grow International",en:"December Gifts · Give&Grow International"},d:{es:"Mil regalos para niñas y niños de Uribia (La Guajira), Medellín (Antioquia) y Leticia (Amazonas). Escoge uno o varios, págalo en pesos o en dólares y sigue cada regalo hasta su entrega con acta.",en:"A thousand gifts for children in Uribia (La Guajira), Medellín (Antioquia) and Leticia (Amazonas). Choose one or several, pay in pesos or US dollars, and follow each gift until it is delivered and recorded."}},
   socialfest:{t:{es:"Social Fest 2026 · Give&Grow International",en:"Social Fest 2026 · Give&Grow International"},d:{es:"Impact Journey para empresas —voluntariado en doble vía, piloto sin cuota de participación— y el HUB SOCIAL para fundaciones y profesionales. Give&Grow en Social Fest 2026, Ruta N, Medellín.",en:"Impact Journey for companies —two-way volunteering, a pilot with no participation fee— and the HUB SOCIAL for foundations and professionals. Give&Grow at Social Fest 2026, Ruta N, Medellín."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
@@ -2657,7 +2712,7 @@ var ROUTE_META = {
    su título, su canonical y su hreflang; el check #28 del gate exige que las
    dos listas digan lo mismo. /socialfest también tiene dirección, pero va
    aparte en el Worker por su tarjeta propia. */
-var RUTAS_PATH = ["transparencia", "empresas", "donar", "membresias", "voluntariado", "fundaciones", "hub", "teoria-de-cambio", "impacto", "medicion", "estandares", "origen", "regalos", "brigada", "gratitud", "quejas", "faq", "contacto", "impactos"];
+var RUTAS_PATH = ["transparencia", "empresas", "donar", "membresias", "voluntariado", "fundaciones", "hub", "teoria-de-cambio", "impacto", "medicion", "estandares", "origen", "regalos", "apadrinamiento", "brigada", "gratitud", "quejas", "faq", "contacto", "impactos"];
 function mmcTitulo(){
   document.title = String(document.title).replace(/Give&Grow International/g, "Mira Mi Casa");
 }
@@ -3041,6 +3096,7 @@ function postLang(l){
   if (currentRoute.indexOf("empresa/")===0) renderEmpresa(currentRoute.split("/")[1]);
   if (currentRoute==="gratitud") renderGratitudComercios();
   if (currentRoute==="regalos" && moduloListo("regalos")){ rgPinta(); rgPintaSeg(); }
+  if (currentRoute==="apadrinamiento" && moduloListo("apadrinamiento")) apuPinta();
   document.querySelectorAll(".faq-a").forEach(function(a){ if(a.parentElement.classList.contains("open")) a.style.maxHeight = a.scrollHeight + "px"; });
   /* El nombre de la region sale del diccionario, asi que hay que volver a
      ponerlo cuando cambia el idioma. */
@@ -3543,10 +3599,10 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "d830013e" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "d830013e", apadrinamiento: "7570c6fa" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
-                     impacto: "impacto", regalos: "regalos" };
+                     impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
 var MODULOS_LISTOS = {};
 var MODULOS_PIDIENDO = {};
 function moduloListo(n){ return MODULOS_LISTOS[n] === true; }
@@ -3614,6 +3670,7 @@ function alEntrarRuta(id){
     /* #mif-calc lo pintaba `postLang` al arrancar; ahora, al llegar el archivo. */
     else if (id === "membresias"){ try { miCalcula(); } catch(e){} }
     else if (id === "regalos") rgEntrar();
+    else if (id === "apadrinamiento") apuEntrar();
   });
 }
 
@@ -3658,7 +3715,8 @@ var ACT_DIFERIDAS = {
   closeLightbox:"impacto", lbStep:"impacto",
   rgFiltro:"regalos", rgToggle:"regalos", rgQuitar:"regalos", rgMas:"regalos", rgVia:"regalos", rgCert:"regalos",
   rgPagar:"regalos", rgIrAPagar:"regalos", rgCartaCuenta:"regalos", rgVideo:"regalos", rgVideoQuitar:"regalos",
-  rgSegGuardar:"regalos"
+  rgSegGuardar:"regalos",
+  apuCalcula:"apadrinamiento", apuInteres:"apadrinamiento"
 };
 function runAct(spec, el, ev){
   var m = /^(\w+)\((.*)\)$/.exec((spec||"").trim());
