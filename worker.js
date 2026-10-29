@@ -20843,7 +20843,8 @@ async function apiPortalYo(request, env) {
     "WHERE inscripcion = ? AND retirado_en IS NULL ORDER BY subido DESC"
   ).bind(s.inscripcion).all()).results || [];
   return json({
-    ok: true, nombre: s.nombre, email: s.entro_con || s.email, estado: s.estado, estado_es: PORTAL_ESTADO_ES[s.estado] || s.estado,
+    ok: true, nombre: s.nombre, email: s.entro_con || s.email, estado: s.estado,
+    estado_es: s.estado === "visitada" && s.ficha_estado === "enviada" ? "Visitada: cuestionario enviado" : (PORTAL_ESTADO_ES[s.estado] || s.estado),
     cuestionario: s.estado === "visitada" && s.ficha_estado !== "enviada" && s.token ? "/ficha/" + s.token : null,
     ficha_enviada: editable,
     perfil: editable ? {
