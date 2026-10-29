@@ -5948,6 +5948,15 @@ async function adminSalud(env, opciones) {
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
+  /* LOS INDICADORES DE LAS FUNDACIONES (0057): mediciones que una fundación
+     reportó desde su portal y nadie ha revisado. Sin la 0057 no sale. */
+  try {
+    await enCola("mediciones_fundacion_por_revisar",
+      "SELECT COUNT(*) AS n, MIN(actualizado) AS masViejo FROM mediciones_fundacion WHERE estado = 'enviada'",
+      "MEAL y Board › Indicadores de la red · una fundación reportó la medición de un indicador: revisa su fuente y apruébala o devuélvela", 34, "#sec-indred", 14);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   await enCola("dirigidos_por_entregar",
     "SELECT COUNT(*) AS n, MIN(COALESCE(a.aprobada_en, a.creada_en)) AS masViejo FROM aportes a " +
     "WHERE a.destino_id IS NOT NULL AND a.estado IN ('aprobada','en_distribucion')",
@@ -21564,6 +21573,243 @@ async function adminReporteUnidad(request, env, id, quien) {
 }
 
 
+/* ============================================================================
+   LOS INDICADORES DE CADA FUNDACIÓN (ítem 39 · 0057, 29 oct 2026)
+   ============================================================================
+   La fundación define en su portal con qué mide su trabajo y reporta cada
+   periodo el valor, con la fuente y la fecha de corte: la misma regla del
+   MEAL de Give&Grow (0045). El equipo revisa cada medición en MEAL y Board ›
+   Indicadores de la red, y puede alinear el indicador con uno de los suyos.
+   NADA SE PUBLICA: es seguimiento de la alianza. */
+const IND_FRECUENCIAS = { mensual: "Mensual", trimestral: "Trimestral", semestral: "Semestral", anual: "Anual" };
+const IND_TOPE = 20;
+const IND_PERIODO = {
+  mensual: /^(\d{4})-(0[1-9]|1[0-2])$/,
+  trimestral: /^(\d{4})-T([1-4])$/,
+  semestral: /^(\d{4})-S([12])$/,
+  anual: /^(\d{4})$/
+};
+
+/* El primer día del periodo, o null si no tiene la forma de su frecuencia.
+   Vale el periodo que ya EMPEZÓ, y de hace dos años como mucho. */
+function indInicioPeriodo(frecuencia, p) {
+  const m = IND_PERIODO[frecuencia] && IND_PERIODO[frecuencia].exec(String(p || ""));
+  if (!m) return null;
+  const mes = frecuencia === "mensual" ? Number(m[2]) : frecuencia === "trimestral" ? (Number(m[2]) - 1) * 3 + 1
+    : frecuencia === "semestral" ? (Number(m[2]) - 1) * 6 + 1 : 1;
+  const inicio = m[1] + "-" + String(mes).padStart(2, "0") + "-01";
+  const hoy = fechaCO();
+  if (inicio > hoy || Number(m[1]) < Number(hoy.slice(0, 4)) - 2) return null;
+  return inicio;
+}
+
+/* Una cifra con decimales, como la escribe una persona en Colombia: «12,5»,
+   «1.200», «1.200,75», «-3». numeroCO no sirve aquí: descarta los decimales. */
+function indValor(v) {
+  let t = String(v == null ? "" : v).replace(/[\s$%]/g, "");
+  if (!t) return null;
+  const neg = t.startsWith("-");
+  if (neg) t = t.slice(1);
+  if (t.includes(",") && t.includes(".")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (t.includes(",")) t = t.replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  if (!/^\d+(\.\d+)?$/.test(t)) return undefined;
+  const n = Number(t) * (neg ? -1 : 1);
+  return Number.isFinite(n) && Math.abs(n) < 1e12 ? n : undefined;
+}
+
+function indFecha(f) {
+  const s = String(f || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(s + "T00:00:00Z");
+  return !isNaN(d) && d.toISOString().slice(0, 10) === s ? s : null;
+}
+
+function indicadorValido(c) {
+  const malo = (campo, ayuda) => ({ ok: false, error: "dato_invalido", campo, ayuda });
+  const texto = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+  const i = {
+    nombre: texto(c.nombre, 160), unidad: texto(c.unidad, 40) || null, frecuencia: String(c.frecuencia || ""),
+    fuente: texto(c.fuente, 300), linea_base: texto(c.linea_base, 160) || null, meta: texto(c.meta, 160) || null,
+    meta_fecha: c.meta_fecha ? indFecha(c.meta_fecha) : null
+  };
+  if (i.nombre.length < 5) return malo("nombre", "Escribe qué mides, en una frase: «niños que terminan el ciclo de formación».");
+  if (!IND_FRECUENCIAS[i.frecuencia]) return malo("frecuencia", "Elige cada cuánto lo mides.");
+  if (i.fuente.length < 5) return malo("fuente", "Di de dónde sale el dato: listas de asistencia, actas, registros…");
+  if (c.meta_fecha && !i.meta_fecha) return malo("meta_fecha", "La fecha de la meta no es válida.");
+  return { ok: true, i };
+}
+
+/* GET y POST /api/portal/indicadores */
+async function apiPortalIndicadores(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "indicadores_fundacion"))) return json({ error: "no_disponible" }, 503);
+  if (request.method === "GET") {
+    const ind = (await env.DB.prepare(
+      "SELECT id, nombre, unidad, frecuencia, fuente, linea_base, meta, meta_fecha, actualizado FROM indicadores_fundacion " +
+      "WHERE inscripcion = ? AND estado = 'activo' ORDER BY creado"
+    ).bind(s.inscripcion).all()).results || [];
+    const med = (await env.DB.prepare(
+      "SELECT m.id, m.indicador_id, m.periodo, m.valor, m.valor_texto, m.fuente_detalle, m.corte, m.evidencia_doc, m.nota, m.estado, m.motivo " +
+      "FROM mediciones_fundacion m JOIN indicadores_fundacion i ON i.id = m.indicador_id " +
+      "WHERE i.inscripcion = ? AND i.estado = 'activo' ORDER BY m.periodo DESC LIMIT 300"
+    ).bind(s.inscripcion).all()).results || [];
+    return json({ ok: true, frecuencias: IND_FRECUENCIAS, tope: IND_TOPE,
+      indicadores: ind.map((x) => Object.assign(x, { actualizado: fechaCO(x.actualizado) })), mediciones: med });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+
+  if (c.accion === "retirar") {
+    const r = await env.DB.prepare(
+      "UPDATE indicadores_fundacion SET estado = 'retirado', actualizado = datetime('now') WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+    ).bind(Number(c.id) || 0, s.inscripcion).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+    return json({ ok: true });
+  }
+
+  if (c.accion === "guardar") {
+    const v = indicadorValido(c);
+    if (!v.ok) return json(v, 400);
+    const i = v.i;
+    if (c.id) {
+      const r = await env.DB.prepare(
+        "UPDATE indicadores_fundacion SET nombre = ?, unidad = ?, frecuencia = ?, fuente = ?, linea_base = ?, meta = ?, meta_fecha = ?, actualizado = datetime('now') " +
+        "WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+      ).bind(i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha, Number(c.id) || 0, s.inscripcion).run();
+      if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+      return json({ ok: true, id: Number(c.id) });
+    }
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM indicadores_fundacion WHERE inscripcion = ? AND estado = 'activo'").bind(s.inscripcion).first();
+    if (n && n.n >= IND_TOPE) return json({ error: "tope_alcanzado", ayuda: "Ya tienes " + IND_TOPE + " indicadores. Retira alguno antes de añadir otro." }, 409);
+    const fila = await env.DB.prepare(
+      "INSERT INTO indicadores_fundacion (inscripcion, nombre, unidad, frecuencia, fuente, linea_base, meta, meta_fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+    ).bind(s.inscripcion, i.nombre, i.unidad, i.frecuencia, i.fuente, i.linea_base, i.meta, i.meta_fecha).first();
+    return json({ ok: true, id: fila.id });
+  }
+
+  if (c.accion !== "medir") return json({ error: "accion_invalida" }, 400);
+  const ind = await env.DB.prepare(
+    "SELECT id, frecuencia FROM indicadores_fundacion WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+  ).bind(Number(c.indicador_id) || 0, s.inscripcion).first();
+  if (!ind) return json({ error: "dato_invalido", campo: "indicador_id", ayuda: "Elige uno de tus indicadores." }, 400);
+  const periodo = String(c.periodo || "");
+  const inicio = indInicioPeriodo(ind.frecuencia, periodo);
+  if (!inicio) return json({ error: "dato_invalido", campo: "periodo", ayuda: "Elige un periodo que ya haya empezado, de los últimos dos años." }, 400);
+  const valor = indValor(c.valor);
+  if (valor === undefined) return json({ error: "dato_invalido", campo: "valor", ayuda: "Escribe solo la cifra, por ejemplo 32 o 12,5. Lo que no es cifra va en «Descripción del valor»." }, 400);
+  const valorTexto = String(c.valor_texto == null ? "" : c.valor_texto).replace(/\s+/g, " ").trim().slice(0, 300) || null;
+  if (valor === null && !valorTexto) return json({ error: "dato_invalido", campo: "valor", ayuda: "Escribe el valor: la cifra, o una descripción si no es una cifra." }, 400);
+  const fuente = String(c.fuente_detalle == null ? "" : c.fuente_detalle).replace(/\s+/g, " ").trim().slice(0, 300);
+  if (fuente.length < 5) return json({ error: "dato_invalido", campo: "fuente_detalle", ayuda: "Di de qué lista, acta o registro de este periodo sale el dato." }, 400);
+  const corte = indFecha(c.corte);
+  if (!corte || corte > fechaCO() || corte < inicio) return json({ error: "dato_invalido", campo: "corte", ayuda: "La fecha de corte va desde el inicio del periodo hasta hoy." }, 400);
+  let evid = null;
+  if (c.evidencia_doc) {
+    const d = await env.DB.prepare("SELECT id FROM documentos_fundacion WHERE id = ? AND inscripcion = ? AND retirado_en IS NULL")
+      .bind(Number(c.evidencia_doc) || 0, s.inscripcion).first();
+    if (!d) return json({ error: "dato_invalido", campo: "evidencia_doc", ayuda: "Esa evidencia no está entre tus documentos." }, 400);
+    evid = d.id;
+  }
+  const nota = String(c.nota == null ? "" : c.nota).replace(/\r\n?/g, "\n").trim().slice(0, 1200) || null;
+  const previa = await env.DB.prepare("SELECT id, estado FROM mediciones_fundacion WHERE indicador_id = ? AND periodo = ?").bind(ind.id, periodo).first();
+  if (previa && previa.estado === "aprobada") {
+    return json({ error: "ya_aprobada", ayuda: "La medición de ese periodo ya está revisada. Si hay que corregirla, escríbenos." }, 409);
+  }
+  if (previa) {
+    await env.DB.prepare(
+      "UPDATE mediciones_fundacion SET valor = ?, valor_texto = ?, fuente_detalle = ?, corte = ?, evidencia_doc = ?, nota = ?, estado = 'enviada', motivo = NULL, " +
+      "revisado_en = NULL, revisado_por = NULL, actualizado = datetime('now') WHERE id = ? AND estado <> 'aprobada'"
+    ).bind(valor, valorTexto, fuente, corte, evid, nota, previa.id).run();
+    return json({ ok: true, id: previa.id });
+  }
+  const fila = await env.DB.prepare(
+    "INSERT INTO mediciones_fundacion (indicador_id, periodo, valor, valor_texto, fuente_detalle, corte, evidencia_doc, nota) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(ind.id, periodo, valor, valorTexto, fuente, corte, evid, nota).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* GET /api/admin/indicadores-red — todo lo de las fundaciones, para revisar. */
+async function adminIndicadoresRed(env) {
+  if (!(await existeTabla(env, "indicadores_fundacion"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0057 en la base." }, 409);
+  const ind = (await env.DB.prepare(
+    "SELECT x.*, i.nombre AS fundacion, mi.numero AS mel_numero, mi.nombre AS mel_nombre FROM indicadores_fundacion x " +
+    "JOIN inscripciones i ON i.id = x.inscripcion LEFT JOIN mel_indicadores mi ON mi.id = x.mel_indicador_id " +
+    "ORDER BY x.estado, i.nombre, x.creado"
+  ).all()).results || [];
+  const med = (await env.DB.prepare(
+    "SELECT m.*, x.nombre AS indicador, x.unidad, x.meta, x.fuente AS fuente_general, i.nombre AS fundacion, d.tipo AS evidencia_tipo, d.nota AS evidencia_nota " +
+    "FROM mediciones_fundacion m JOIN indicadores_fundacion x ON x.id = m.indicador_id JOIN inscripciones i ON i.id = x.inscripcion " +
+    "LEFT JOIN documentos_fundacion d ON d.id = m.evidencia_doc " +
+    "ORDER BY CASE m.estado WHEN 'enviada' THEN 0 ELSE 1 END, m.actualizado DESC LIMIT 300"
+  ).all()).results || [];
+  const mel = (await existeTabla(env, "mel_indicadores"))
+    ? (await env.DB.prepare("SELECT id, numero, nombre FROM mel_indicadores WHERE activo = 1 ORDER BY orden, numero").all()).results || []
+    : [];
+  return json({ ok: true, frecuencias: IND_FRECUENCIAS, mel,
+    indicadores: ind.map((x) => Object.assign(x, { actualizado: selloCO(x.actualizado).slice(0, 16) })),
+    mediciones: med.map((m) => Object.assign(m, { ver: m.actualizado, actualizado: selloCO(m.actualizado).slice(0, 16) })) });
+}
+
+/* POST /api/admin/indicador-fundacion/<id> { mel_indicador_id } — la alineación
+   con el MEAL de Give&Grow. Solo la pone el equipo; null la quita. */
+async function adminIndicadorAlinear(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  let mel = null;
+  if (c.mel_indicador_id) {
+    const m = await env.DB.prepare("SELECT id, numero FROM mel_indicadores WHERE id = ?").bind(Number(c.mel_indicador_id) || 0).first();
+    if (!m) return json({ error: "dato_invalido", campo: "mel", ayuda: "Ese indicador del MEAL no existe." }, 400);
+    mel = m.id;
+  }
+  const r = await env.DB.prepare("UPDATE indicadores_fundacion SET mel_indicador_id = ? WHERE id = ?").bind(mel, id).run();
+  if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "indicador de fundación " + id + " · alineado con MEAL " + (mel || "ninguno")).run();
+  return json({ ok: true });
+}
+
+/* POST /api/admin/medicion-fundacion/<id> { accion: aprobar | devolver, ver }
+   `ver` es la versión que mostró el cajón: si la fundación la reenvió
+   mientras se revisaba, no se aprueba algo distinto de lo que se vio. */
+async function adminMedicionFundacion(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const m = await env.DB.prepare("SELECT id, estado FROM mediciones_fundacion WHERE id = ?").bind(id).first();
+  if (!m) return json({ error: "no_encontrado" }, 404);
+  if (m.estado === "aprobada") return json({ error: "ya_aprobada", ayuda: "Ya está revisada." }, 409);
+  const cambio = () => json({ error: "cambio_mientras_revisabas", ayuda: "La fundación la reenvió mientras la revisabas. Cierra y vuelve a abrirla para ver la versión actual." }, 409);
+  let r, detalle;
+  if (c.accion === "aprobar") {
+    if (c.fuente_revisada !== true) return json({ error: "fuente_sin_revisar", campo: "revisada", ayuda: "Marca que revisaste la fuente (y la evidencia, si la adjuntó)." }, 400);
+    r = await env.DB.prepare(
+      "UPDATE mediciones_fundacion SET estado = 'aprobada', motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') " +
+      "WHERE id = ? AND actualizado = ? AND estado <> 'aprobada'"
+    ).bind(quien || null, id, String(c.ver || "")).run();
+    detalle = "aprobada";
+  } else if (c.accion === "devolver") {
+    const motivo = limpiar(c.motivo, 500);
+    if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di qué falta: la fundación lo ve en su portal." }, 400);
+    r = await env.DB.prepare(
+      "UPDATE mediciones_fundacion SET estado = 'devuelta', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') " +
+      "WHERE id = ? AND actualizado = ? AND estado <> 'aprobada'"
+    ).bind(motivo, quien || null, id, String(c.ver || "")).run();
+    detalle = "devuelta";
+  } else return json({ error: "accion_invalida" }, 400);
+  if (!r.meta || !r.meta.changes) return cambio();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "medición de fundación " + id + " · " + detalle).run();
+  return json({ ok: true });
+}
+
 /* GET /api/portal/recibido — LO QUE LA FUNDACIÓN HA RECIBIDO (ítem 40, 29 oct
    2026). Sale de lo que la base ya sabe, unido por `inscripciones.red_id`:
    · las donaciones dirigidas a ella (solo confirmadas; pesos y dólares por
@@ -21665,7 +21911,7 @@ function paginaPortal(nonce) {
   label{display:block;font-weight:600;font-size:15px;margin:16px 0 4px}
   .num{display:inline-block;font-size:11px;color:var(--mu);letter-spacing:.06em;font-weight:500;margin-right:4px}
   .ayuda{display:block;color:var(--mu);font-size:13px;font-weight:400;margin:2px 0 6px}
-  input[type=text],input[type=email],textarea,select{width:100%;font:inherit;font-size:16px;padding:10px 12px;
+  input[type=text],input[type=email],input[type=date],textarea,select{width:100%;font:inherit;font-size:16px;padding:10px 12px;
     border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--ink)}
   input:focus,textarea:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:var(--acc)}
   textarea{resize:vertical;min-height:96px}
@@ -21812,6 +22058,7 @@ function paginaPortal(nonce) {
       <button type="button" class="tab" role="tab" id="t-perfil" aria-controls="s-perfil" aria-selected="false">Perfil<span class="pill oculto" id="tp-perfil"></span></button>
       <button type="button" class="tab" role="tab" id="t-documentos" aria-controls="s-documentos" aria-selected="false">Documentos<span class="pill" id="tp-docs"></span></button>
       <button type="button" class="tab" role="tab" id="t-apadrinamiento" aria-controls="s-apadrinamiento" aria-selected="false">Apadrinamiento</button>
+      <button type="button" class="tab" role="tab" id="t-indicadores" aria-controls="s-indicadores" aria-selected="false">Indicadores<span class="pill ambar oculto" id="tp-ind"></span></button>
     </div>
 
     <div id="s-resumen" role="tabpanel" aria-labelledby="t-resumen"></div>
@@ -21885,6 +22132,78 @@ function paginaPortal(nonce) {
         <span class="msg" id="m-unidad" role="status" aria-live="polite"></span>
       </form>
     </div>
+    <div id="s-indicadores" role="tabpanel" aria-labelledby="t-indicadores" class="oculto">
+      <div class="tarjeta aviso">
+        <h2>Con qué miden su trabajo</h2>
+        <p class="sub">Define los indicadores con que tu fundación sigue su trabajo: qué mides, cada cuánto y de dónde sale el dato. Cada periodo reportas el valor con la fuente de ese periodo y la fecha de corte. El equipo revisa cada medición y la usa en el seguimiento de la alianza.</p>
+        <p class="sub mt"><strong>Nada de esto se publica.</strong> Si algún día queremos mostrar un valor, te preguntamos antes.</p>
+      </div>
+      <div class="tarjeta" id="in-lista"></div>
+      <form class="tarjeta oculto" id="f-medicion" autocomplete="off">
+        <h2>Reportar una medición</h2>
+        <label for="md-ind">Indicador</label>
+        <select id="md-ind"></select>
+        <label for="md-periodo">Periodo</label>
+        <select id="md-periodo"></select>
+        <label for="md-valor">Valor</label>
+        <span class="ayuda" id="md-unidad">Solo la cifra, por ejemplo 32 o 12,5.</span>
+        <input type="text" id="md-valor" inputmode="decimal" maxlength="20">
+        <label for="md-valtxt">Descripción del valor</label>
+        <span class="ayuda">Si el valor no es una cifra, o si la cifra necesita contexto: «32 de 40 niños; 5 se trasladaron de barrio».</span>
+        <input type="text" id="md-valtxt" maxlength="300">
+        <label for="md-fuente">De dónde sale este dato *</label>
+        <span class="ayuda" id="md-fuente-ayuda">La lista, acta o registro de este periodo: «listas de asistencia de septiembre, sede Bello».</span>
+        <input type="text" id="md-fuente" maxlength="300">
+        <label for="md-corte">Fecha de corte *</label>
+        <span class="ayuda">Hasta qué día cuenta el dato.</span>
+        <input type="date" id="md-corte">
+        <label for="md-evid">Evidencia (opcional)</label>
+        <select id="md-evid"></select>
+        <div class="acciones">
+          <label class="btn sec mini" for="md-subir">Subir la evidencia ahora</label>
+          <input type="file" id="md-subir" class="archivo" accept="application/pdf,image/jpeg,image/png,image/webp">
+        </div>
+        <label for="md-nota">Qué pasó en el periodo</label>
+        <span class="ayuda">En pocas líneas, si algo explica el valor. Sin nombres ni datos de niños.</span>
+        <textarea id="md-nota" rows="3" maxlength="1200"></textarea>
+        <div class="acciones"><button type="button" class="btn" id="b-medicion">Enviar la medición</button></div>
+        <span class="msg" id="m-medicion" role="status" aria-live="polite"></span>
+        <div id="md-historial" class="mt"></div>
+      </form>
+      <form class="tarjeta" id="f-indicador" autocomplete="off">
+        <h2 id="in-titulo">Añadir un indicador</h2>
+        <input type="hidden" id="in-id">
+        <label for="in-nombre">Qué mides *</label>
+        <span class="ayuda">En una frase: «niños que asisten al menos al 80 % de los entrenamientos», «familias con filtro de agua en uso».</span>
+        <input type="text" id="in-nombre" maxlength="160">
+        <label for="in-unidad">En qué se cuenta</label>
+        <span class="ayuda">niños, familias, %, horas…</span>
+        <input type="text" id="in-unidad" maxlength="40">
+        <label for="in-frec">Cada cuánto lo mides *</label>
+        <select id="in-frec">
+          <option value="">Elige…</option>
+          <option value="mensual">Cada mes</option>
+          <option value="trimestral">Cada trimestre</option>
+          <option value="semestral">Cada semestre</option>
+          <option value="anual">Cada año</option>
+        </select>
+        <label for="in-fuente">De dónde sale el dato *</label>
+        <span class="ayuda">En general: listas de asistencia, actas de entrega, registros de visita…</span>
+        <input type="text" id="in-fuente" maxlength="300">
+        <label for="in-base">Línea base</label>
+        <span class="ayuda">Dónde estaban al empezar, con su fecha: «18 niños en enero de 2026».</span>
+        <input type="text" id="in-base" maxlength="160">
+        <label for="in-meta">Meta</label>
+        <input type="text" id="in-meta" maxlength="160">
+        <label for="in-meta-fecha">Para cuándo es la meta</label>
+        <input type="date" id="in-meta-fecha">
+        <div class="acciones">
+          <button type="button" class="btn" id="b-indicador">Añadir</button>
+          <button type="button" class="btn sec oculto" id="b-indicador-cancelar">Cancelar la edición</button>
+        </div>
+        <span class="msg" id="m-indicador" role="status" aria-live="polite"></span>
+      </form>
+    </div>
     <div id="s-documentos" role="tabpanel" aria-labelledby="t-documentos" class="oculto">
       <div class="tarjeta">
         <h2>Lo que conviene tener</h2>
@@ -21939,7 +22258,7 @@ var PASOS = [
 ];
 var RECOMENDADOS = ["rut", "camara", "estatutos", "estados_financieros", "certificado_bancario", "logo"];
 var UNIDADES = null;
-var TABS = ["resumen", "perfil", "documentos", "apadrinamiento"];
+var TABS = ["resumen", "perfil", "documentos", "apadrinamiento", "indicadores"];
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
@@ -22177,6 +22496,7 @@ function subir(f, tipo, nota, idMsg){
 function irA(tab){
   TAB = tab;
   if (tab === "apadrinamiento" && UNIDADES === null) cargarUnidades();
+  if (tab === "indicadores" && INDS === null) cargarIndicadores();
   TABS.forEach(function(t){
     $("t-" + t).setAttribute("aria-selected", t === tab ? "true" : "false");
     $("s-" + t).classList.toggle("oculto", t !== tab);
@@ -22370,6 +22690,158 @@ $("ap-lista").addEventListener("click", function(ev){
   if (b.hasAttribute("data-ap-editar")) { formUnidad(u); $("f-unidad").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (!confirm("¿Retirar «" + (u ? u.nombre_es : "") + "»? Sale de la página pública si estaba publicada.")) return;
   enviar("/api/portal/unidades", { accion: "retirar", id: id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarUnidades(); });
+});
+/* ---- Indicadores (0057): con qué mide la fundación su trabajo. No se publica. ---- */
+var INDS = null, MEDS = [];
+var FREC = { mensual: "cada mes", trimestral: "cada trimestre", semestral: "cada semestre", anual: "cada año" };
+function dosD(n){ return String(n).padStart(2, "0"); }
+function fechaLocal(d){ return d.getFullYear() + "-" + dosD(d.getMonth() + 1) + "-" + dosD(d.getDate()); }
+/* Los periodos que ya empezaron, del actual hacia atrás: [clave, nombre, fin]. */
+function periodos(frec){
+  var hoy = new Date(), y = hoy.getFullYear(), m = hoy.getMonth(), L = [], i;
+  if (frec === "mensual") for (i = 0; i < 6; i++) { var d = new Date(y, m - i, 1); var p = d.getFullYear() + "-" + dosD(d.getMonth() + 1);
+    L.push([p, nombreMes(p), fechaLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0))]); }
+  if (frec === "trimestral") { var q = Math.floor(m / 3); for (i = 0; i < 4; i++) { var qq = q - i, yy = y; while (qq < 0) { qq += 4; yy--; }
+    L.push([yy + "-T" + (qq + 1), "Trimestre " + (qq + 1) + " de " + yy, fechaLocal(new Date(yy, qq * 3 + 3, 0))]); } }
+  if (frec === "semestral") { var s = m < 6 ? 0 : 1; for (i = 0; i < 3; i++) { var ss = s - i, ys = y; while (ss < 0) { ss += 2; ys--; }
+    L.push([ys + "-S" + (ss + 1), "Semestre " + (ss + 1) + " de " + ys, fechaLocal(new Date(ys, ss * 6 + 6, 0))]); } }
+  if (frec === "anual") for (i = 0; i < 2; i++) L.push([String(y - i), String(y - i), (y - i) + "-12-31"]);
+  return L;
+}
+function nombrePeriodo(frec, p){ var x = periodos(frec).filter(function(e){ return e[0] === p; })[0]; return x ? x[1] : p; }
+function valorTxt(m, u){
+  var v = m.valor == null ? "" : Number(m.valor).toLocaleString("es-CO", { maximumFractionDigits: 2 }) + (u ? " " + u : "");
+  return v && m.valor_texto ? v + " · " + m.valor_texto : v || m.valor_texto || "";
+}
+function cargarIndicadores(){
+  return fetch("/api/portal/indicadores", { credentials: "same-origin" }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return null; }
+    return r.ok ? r.json() : null;
+  }).then(function(d){ if (!d) return; INDS = d.indicadores || []; MEDS = d.mediciones || []; pintarIndicadores(); })
+    .catch(function(){ $("in-lista").innerHTML = '<p class="sub">No pudimos cargar tus indicadores. Intenta de nuevo.</p>'; });
+}
+function indPorId(id){ return (INDS || []).filter(function(x){ return String(x.id) === String(id); })[0]; }
+function pintarIndicadores(){
+  var L = INDS || [];
+  $("in-lista").innerHTML = "<h2>Tus indicadores</h2>" + (L.length ? '<ul class="docs">' + L.map(function(x){
+    var ult = MEDS.filter(function(m){ return m.indicador_id === x.id; })[0];
+    var det = "Se mide " + FREC[x.frecuencia] + (x.unidad ? ", en " + esc(x.unidad) : "") + (x.meta ? " · meta: " + esc(x.meta) + (x.meta_fecha ? " para " + esc(x.meta_fecha) : "") : "");
+    var u = ult ? '<span class="det">Último: ' + esc(nombrePeriodo(x.frecuencia, ult.periodo)) + " · " + esc(valorTxt(ult, x.unidad)) + "</span>" : '<span class="det">Todavía sin mediciones.</span>';
+    return '<li><div><span class="nom">' + esc(x.nombre) + '</span><span class="det">' + det + "</span>" + u + "</div>" +
+      '<div class="der"><button type="button" class="btn sec mini" data-in-editar="' + x.id + '">Editar</button>' +
+      '<button type="button" class="btn sec mini" data-in-retirar="' + x.id + '">Retirar</button></div></li>';
+  }).join("") + "</ul>" : '<p class="sub">Todavía no has definido ninguno. Empieza por uno o dos: los que de verdad miran cada mes.</p>');
+  var devueltas = MEDS.filter(function(m){ return m.estado === "devuelta"; }).length;
+  $("tp-ind").textContent = devueltas ? devueltas + (devueltas === 1 ? " devuelta" : " devueltas") : "";
+  $("tp-ind").classList.toggle("oculto", !devueltas);
+  pintarMedicion();
+}
+function pintarMedicion(){
+  var L = INDS || [];
+  $("f-medicion").classList.toggle("oculto", !L.length);
+  if (!L.length) return;
+  var si = $("md-ind"), actual = si.value;
+  si.innerHTML = L.map(function(x){ return '<option value="' + x.id + '">' + esc(x.nombre) + "</option>"; }).join("");
+  if (actual && indPorId(actual)) si.value = actual;
+  var se = $("md-evid"), ev = se.value;
+  se.innerHTML = '<option value="">Sin evidencia</option>' + (D.documentos || []).map(function(d){
+    return '<option value="' + d.id + '">' + esc(d.tipo_es) + (d.nota ? " · " + esc(d.nota) : "") + " (" + esc(d.subido) + ")</option>";
+  }).join("");
+  se.value = ev;
+  periodosMedicion();
+  $("md-historial").innerHTML = MEDS.length ? '<h2 class="mt">Mediciones enviadas</h2><ul class="docs">' + MEDS.map(function(m){
+    var x = indPorId(m.indicador_id) || {};
+    var pill = m.estado === "aprobada" ? "pill ok" : m.estado === "devuelta" ? "pill ambar" : "pill";
+    var txt = m.estado === "aprobada" ? "Revisada" : m.estado === "devuelta" ? "Devuelta" : "Por revisar";
+    return '<li><div><span class="nom">' + esc(x.nombre || "") + " · " + esc(nombrePeriodo(x.frecuencia, m.periodo)) + '</span><span class="det">' + esc(valorTxt(m, x.unidad)) + " · corte " + esc(m.corte) + "</span>" +
+      (m.motivo ? '<span class="det">Nota del equipo: ' + esc(m.motivo) + "</span>" : "") + '</div><div class="der"><span class="' + pill + '">' + txt + "</span></div></li>";
+  }).join("") + "</ul>" : "";
+}
+function periodosMedicion(){
+  var x = indPorId($("md-ind").value);
+  if (!x) return;
+  var sp = $("md-periodo"), L = periodos(x.frecuencia);
+  sp.innerHTML = L.map(function(e, i){ return '<option value="' + e[0] + '"' + (i === 1 || L.length === 1 ? " selected" : "") + ">" + esc(e[1]) + "</option>"; }).join("");
+  $("md-unidad").textContent = "Solo la cifra" + (x.unidad ? ", en " + x.unidad : "") + ". Por ejemplo 32 o 12,5.";
+  $("md-fuente-ayuda").textContent = "La lista, acta o registro de este periodo. Dijiste que sale de: " + x.fuente + ".";
+  corteSugerido();
+}
+function corteSugerido(){
+  var x = indPorId($("md-ind").value);
+  if (!x) return;
+  var e = periodos(x.frecuencia).filter(function(p){ return p[0] === $("md-periodo").value; })[0];
+  var hoy = fechaLocal(new Date());
+  $("md-corte").value = e ? (e[2] < hoy ? e[2] : hoy) : hoy;
+}
+function formIndicador(x){
+  $("in-id").value = x ? x.id : "";
+  $("in-nombre").value = x ? x.nombre : ""; $("in-unidad").value = x ? (x.unidad || "") : "";
+  $("in-frec").value = x ? x.frecuencia : ""; $("in-fuente").value = x ? x.fuente : "";
+  $("in-base").value = x ? (x.linea_base || "") : ""; $("in-meta").value = x ? (x.meta || "") : "";
+  $("in-meta-fecha").value = x ? (x.meta_fecha || "") : "";
+  $("in-titulo").textContent = x ? "Editar «" + x.nombre + "»" : "Añadir un indicador";
+  $("b-indicador").textContent = x ? "Guardar los cambios" : "Añadir";
+  $("b-indicador-cancelar").classList.toggle("oculto", !x);
+  msg("m-indicador", x ? "Las mediciones que ya enviaste no cambian." : "");
+}
+function guardarIndicador(){
+  var c = { accion: "guardar", id: $("in-id").value || null, nombre: $("in-nombre").value, unidad: $("in-unidad").value,
+    frecuencia: $("in-frec").value, fuente: $("in-fuente").value, linea_base: $("in-base").value, meta: $("in-meta").value,
+    meta_fecha: $("in-meta-fecha").value || null };
+  var b = $("b-indicador"); b.disabled = true; msg("m-indicador", "Guardando…");
+  enviar("/api/portal/indicadores", c).then(function(r){
+    b.disabled = false;
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { msg("m-indicador", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
+    formIndicador(null);
+    msg("m-indicador", "Listo. Ya puedes reportar sus mediciones arriba.", "ok");
+    cargarIndicadores();
+  }).catch(function(){ b.disabled = false; msg("m-indicador", "No pudimos conectar. Lo que escribiste sigue en pantalla.", "mal"); });
+}
+function enviarMedicion(){
+  var c = { accion: "medir", indicador_id: $("md-ind").value, periodo: $("md-periodo").value, valor: $("md-valor").value.trim(),
+    valor_texto: $("md-valtxt").value, fuente_detalle: $("md-fuente").value, corte: $("md-corte").value,
+    evidencia_doc: $("md-evid").value || null, nota: $("md-nota").value };
+  var b = $("b-medicion"); b.disabled = true; msg("m-medicion", "Enviando…");
+  enviar("/api/portal/indicadores", c).then(function(r){
+    b.disabled = false;
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { msg("m-medicion", r.d.ayuda || "No se pudo enviar.", "mal"); return; }
+    $("md-valor").value = ""; $("md-valtxt").value = ""; $("md-fuente").value = ""; $("md-nota").value = ""; $("md-evid").value = "";
+    msg("m-medicion", "Enviada: el equipo la revisa y te cuenta aquí.", "ok");
+    cargarIndicadores();
+  }).catch(function(){ b.disabled = false; msg("m-medicion", "No pudimos conectar. Lo que escribiste sigue en pantalla.", "mal"); });
+}
+$("md-ind").addEventListener("change", periodosMedicion);
+$("md-periodo").addEventListener("change", corteSugerido);
+$("b-medicion").addEventListener("click", enviarMedicion);
+$("b-indicador").addEventListener("click", guardarIndicador);
+$("b-indicador-cancelar").addEventListener("click", function(){ formIndicador(null); });
+$("md-subir").addEventListener("change", function(){
+  var f = this.files[0]; this.value = "";
+  if (!f) return;
+  if (f.size > 5242880) { msg("m-medicion", "El archivo pasa de 5 MB.", "mal"); return; }
+  var i = $("md-ind").options[$("md-ind").selectedIndex], p = $("md-periodo").options[$("md-periodo").selectedIndex];
+  var nota = "Evidencia · " + (i ? i.text : "") + " · " + (p ? p.text : "");
+  msg("m-medicion", "Subiendo «" + f.name + "»…");
+  fetch("/api/portal/documento?tipo=otro&nota=" + encodeURIComponent(nota.slice(0, 120)), {
+    method: "POST", credentials: "same-origin", headers: { "content-type": f.type || "application/octet-stream" }, body: f
+  }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, status: r.status, d: d }; }); })
+    .then(function(r){
+      if (r.status === 401) { ver("v-entrar"); return; }
+      if (!r.ok) { msg("m-medicion", r.d.ayuda || "No se pudo subir.", "mal"); return; }
+      var nuevo = r.d.id;
+      cargar().then(function(){ irA("indicadores"); pintarMedicion(); $("md-evid").value = String(nuevo); msg("m-medicion", "Evidencia subida y elegida. Ahora envía la medición.", "ok"); });
+    }).catch(function(){ msg("m-medicion", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+});
+$("in-lista").addEventListener("click", function(ev){
+  var b = ev.target.closest && ev.target.closest("[data-in-editar],[data-in-retirar]");
+  if (!b) return;
+  var x = indPorId(b.getAttribute("data-in-editar") || b.getAttribute("data-in-retirar"));
+  if (!x) return;
+  if (b.hasAttribute("data-in-editar")) { formIndicador(x); $("f-indicador").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  if (!confirm("¿Retirar «" + x.nombre + "»? Deja de pedirse; lo que ya enviaste queda en el archivo de la alianza.")) return;
+  enviar("/api/portal/indicadores", { accion: "retirar", id: x.id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarIndicadores(); });
 });
 window.addEventListener("beforeunload", function(ev){ if (SUCIO) { ev.preventDefault(); ev.returnValue = ""; } });
 window.addEventListener("hashchange", function(){
@@ -33247,6 +33719,7 @@ textarea { font-size: 16px }
 <div class="pn-grupo">
   <p class="pn-gt">MEAL y Board</p>
   <a class="pn-it" href="#meal/indicadores" data-pn-ir="meal/indicadores">Indicadores<span class="pn-n" data-pn-n="meal/indicadores"></span></a>
+  <a class="pn-it" href="#meal/red" data-pn-ir="meal/red">Indicadores de la red<span class="pn-n" data-pn-n="meal/red"></span></a>
   <a class="pn-it" href="#meal/board" data-pn-ir="meal/board">Board de Asesores<span class="pn-n" data-pn-n="meal/board"></span></a>
 </div>
 <!-- El canal de quejas (0046): la ruta ordinaria suma en «Hoy»; la
@@ -33666,6 +34139,18 @@ sabes que está mal.</p>
 </div></details>
 <div class="fin-barra"><button type="button" class="pn-b2" id="mel-csv">Descargar las mediciones (CSV)</button></div>
 <div id="tb-mel" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<!-- 0057. Lo que cada fundación de la red mide de su propio trabajo, con
+     fuente y corte. Se revisa aquí; nada de esto se publica. -->
+<section class="pn-vista" data-vista="meal/red" id="sec-indred" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Cada fundación define en su portal (pestaña <strong>Indicadores</strong>) con qué mide su trabajo: qué mide, cada cuánto, de dónde sale el dato, su línea base y su meta. Cada periodo reporta el valor con la <strong>fuente</strong> de ese periodo y la <strong>fecha de corte</strong>, la misma regla del MEAL de Give&amp;Grow.</p>
+<p><strong>Aprobar</strong> exige marcar que revisaste la fuente, y la evidencia si la adjuntó. <strong>Devolver</strong> pide un motivo, que la fundación ve. Una medición revisada no se reescribe.</p>
+<p><strong>Alinear con el MEAL</strong> dice a cuál de los indicadores de Give&amp;Grow aporta el de la fundación. Lo decide el equipo, no la fundación.</p>
+<p><strong>Nada de esto se publica.</strong> Es el seguimiento de la alianza. Si algún día un valor va a salir al público, antes se le pregunta a la fundación.</p>
+</div></details>
+<div id="tb-indred" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="meal/board" id="sec-board" hidden>
@@ -34964,7 +35449,8 @@ var COLA_ES = {
   dirigidos_por_entregar: "Donaciones dirigidas por entregar",
   unidades_por_revisar: "Unidades de apadrinamiento por revisar",
   reportes_unidad_por_revisar: "Reportes mensuales de apadrinamiento por revisar",
-  unidades_sin_reporte: "Unidades sin el reporte del mes pasado"
+  unidades_sin_reporte: "Unidades sin el reporte del mes pasado",
+  mediciones_fundacion_por_revisar: "Mediciones de las fundaciones por revisar"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -35019,6 +35505,8 @@ var VISTAS = {
   "meal/indicadores": { area: "MEAL y Board", titulo: "Indicadores",
     linea: "Los indicadores de la fundación, cada valor con su fuente y su corte. El sistema sugiere lo que la base ya sabe; una persona lo registra.",
     accion: ["Registrar una medición", "mel-medir"] },
+  "meal/red": { area: "MEAL y Board", titulo: "Indicadores de la red",
+    linea: "Lo que cada fundación mide de su trabajo, periodo a periodo, con su fuente y su corte. Se revisa aquí y no se publica." },
   "meal/board": { area: "MEAL y Board", titulo: "Board de Asesores",
     linea: "Quién asesora a la fundación y lo que se le manda: el informe trimestral y la convocatoria. El Board recomienda; no aprueba ni dirige.",
     accion: ["Añadir asesor", "bd-asesor"] },
@@ -35267,7 +35755,8 @@ var COLA_MOD = {
   dirigidos_por_entregar: "reportes/fundaciones",
   unidades_por_revisar: "alianzas/apadrinamiento",
   reportes_unidad_por_revisar: "alianzas/apadrinamiento",
-  unidades_sin_reporte: "alianzas/apadrinamiento"
+  unidades_sin_reporte: "alianzas/apadrinamiento",
+  mediciones_fundacion_por_revisar: "meal/red"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -43168,6 +43657,92 @@ function abrirReporteUnidad(id){
   });
 }
 
+/* ---------------- INDICADORES DE LA RED (0057) ----------------
+   Lo que cada fundación mide de su trabajo. Se revisa la medición con su
+   fuente y se alinea el indicador con el MEAL. Nada se publica. */
+var IR = null;
+function irValor(m){
+  var v = m.valor == null ? "" : Number(m.valor).toLocaleString("es-CO", { maximumFractionDigits: 2 }) + (m.unidad ? " " + esc(m.unidad) : "");
+  return (v ? "<strong>" + v + "</strong>" : "") + (m.valor_texto ? (v ? "<br>" : "") + "<small>" + esc(m.valor_texto) + "</small>" : "");
+}
+function irEstado(e){ return e === "enviada" ? "Por revisar" : e === "aprobada" ? "Revisada" : "Devuelta"; }
+function cargarIndicadoresRed(){
+  return pedirJSON("/api/admin/indicadores-red", "tb-indred").then(function(d){
+    IR = d;
+    var caja = document.getElementById("tb-indred"); if (!caja) return;
+    var M = d.mediciones || [], I = d.indicadores || [];
+    var h = '<p class="pn-h3">Mediciones (' + M.filter(function(m){ return m.estado === "enviada"; }).length + " por revisar)</p>";
+    h += M.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Periodo</th><th scope="col">Indicador</th><th scope="col">Valor</th><th scope="col">Corte</th><th scope="col">Estado</th><th scope="col"></th></tr></thead><tbody>' +
+      M.map(function(m){ return "<tr><td>" + esc(m.periodo) + "</td><td>" + esc(m.indicador) + "<br><small>" + esc(m.fundacion) + "</small></td><td>" + irValor(m) + "</td>" +
+        "<td>" + esc(m.corte) + "</td><td>" + irEstado(m.estado) + "<br><small>" + esc(m.actualizado) + "</small></td>" +
+        '<td><button type="button" class="copy" data-ir-abrir="' + m.id + '">Abrir</button></td></tr>'; }).join("") + "</tbody></table></div>"
+      : '<p class="mu">Ninguna fundación ha reportado mediciones todavía. Lo hacen desde la pestaña «Indicadores» de su portal.</p>';
+    h += '<p class="pn-h3">Indicadores (' + I.filter(function(x){ return x.estado === "activo"; }).length + " activos)</p>";
+    h += I.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Indicador</th><th scope="col">Fundación</th><th scope="col">Cada cuánto</th><th scope="col">Meta</th><th scope="col">Aporta al MEAL</th></tr></thead><tbody>' +
+      I.map(function(x){
+        var ops = '<option value="">Sin alinear</option>' + (d.mel || []).map(function(m){
+          return '<option value="' + m.id + '"' + (String(m.id) === String(x.mel_indicador_id) ? " selected" : "") + ">" + m.numero + ". " + esc(m.nombre) + "</option>"; }).join("");
+        return "<tr" + (x.estado === "retirado" ? ' style="opacity:.6"' : "") + "><td><strong>" + esc(x.nombre) + "</strong>" + (x.unidad ? "<br><small>en " + esc(x.unidad) + "</small>" : "") +
+          "<br><small>Fuente: " + esc(x.fuente) + "</small></td><td>" + esc(x.fundacion) + (x.estado === "retirado" ? '<br><small class="mu">retirado</small>' : "") + "</td>" +
+          "<td>" + esc((d.frecuencias || {})[x.frecuencia] || x.frecuencia) + "</td>" +
+          "<td>" + (x.meta ? esc(x.meta) + (x.meta_fecha ? "<br><small>para " + esc(x.meta_fecha) + "</small>" : "") : '<span class="mu">—</span>') +
+          (x.linea_base ? "<br><small>línea base: " + esc(x.linea_base) + "</small>" : "") + "</td>" +
+          '<td><select data-ir-mel="' + x.id + '" aria-label="Indicador del MEAL al que aporta">' + ops + "</select></td></tr>";
+      }).join("") + "</tbody></table></div>"
+      : '<p class="mu">Ninguna fundación ha definido indicadores todavía.</p>';
+    caja.innerHTML = h;
+  });
+}
+function abrirMedicionFundacion(id){
+  var m = ((IR && IR.mediciones) || []).filter(function(x){ return String(x.id) === String(id); })[0];
+  if (!m) return;
+  var h = ficha([
+    ["Indicador", esc(m.indicador) + "<small>" + esc(m.fundacion) + "</small>"],
+    ["Periodo", esc(m.periodo) + "<small>corte " + esc(m.corte) + "</small>"],
+    ["Valor", irValor(m)],
+    ["Meta", m.meta ? esc(m.meta) : '<span class="mu">Sin meta</span>'],
+    ["Fuente de este periodo", '<div class="qj-msg">' + esc(m.fuente_detalle) + "</div><small>de dónde sale en general: " + esc(m.fuente_general) + "</small>"],
+    ["Evidencia", m.evidencia_doc ? '<a href="/api/admin/portal-doc/' + m.evidencia_doc + '">' + esc(m.evidencia_tipo || "documento") + (m.evidencia_nota ? " · " + esc(m.evidencia_nota) : "") + "</a>" : '<span class="mu">No adjuntó evidencia</span>'],
+    ["Lo que cuenta la fundación", m.nota ? '<div class="qj-msg">' + esc(m.nota) + "</div>" : '<span class="mu">Sin nota</span>'],
+    ["Estado", irEstado(m.estado) + (m.motivo ? "<small>" + esc(m.motivo) + "</small>" : "") + (m.revisado_por ? "<small>" + esc(m.revisado_por) + "</small>" : "")]
+  ]);
+  var pie = "";
+  if (m.estado !== "aprobada"){
+    h += '<label class="pn-campo" id="ir-rev-c"><span><input type="checkbox" id="ir-rev"> Revisé la fuente' + (m.evidencia_doc ? " y abrí la evidencia" : "") + ', y el valor corresponde</span><small id="ir-rev-e" class="pn-err"></small></label>';
+    h += pnCampo("ir-mot", "Motivo para devolverla (la fundación lo ve)", "", { area: true, filas: 2 }) + '<p class="pn-error" id="pn-err"></p>';
+    pie += '<button type="button" class="pn-b1" data-ir-decidir="aprobar">Marcar revisada</button><button type="button" class="pn-b2" data-ir-decidir="devolver">Devolver</button>';
+  }
+  pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  cajonAbrir({ ey: "Indicadores de la red", titulo: m.indicador + " · " + m.periodo, cuerpo: h, pie: pie, ancho: true });
+  document.querySelectorAll("[data-ir-decidir]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var acc = b.getAttribute("data-ir-decidir");
+      pnMarcar("ir-rev", ""); pnMarcar("ir-mot", "");
+      var c = { accion: acc, ver: m.ver, fuente_revisada: document.getElementById("ir-rev").checked, motivo: pnValor("ir-mot") };
+      if (acc === "aprobar" && !c.fuente_revisada){ pnMarcar("ir-rev", "Revisa la fuente antes de marcarla."); return; }
+      if (acc === "devolver" && c.motivo.length < 3){ pnMarcar("ir-mot", "Di qué falta: la fundación lo ve."); return; }
+      b.disabled = true;
+      postPanel("/api/admin/medicion-fundacion/" + m.id, c).then(function(x){
+        b.disabled = false; if (!x) return;
+        avisar(acc === "aprobar" ? "Medición revisada. No se publica." : "Medición devuelta a la fundación.");
+        cajonCerrar(); cargarIndicadoresRed(); cargarSalud();
+      });
+    });
+  });
+}
+document.addEventListener("click", function(e){
+  var b = e.target.closest && e.target.closest("[data-ir-abrir]");
+  if (b) abrirMedicionFundacion(b.getAttribute("data-ir-abrir"));
+});
+document.addEventListener("change", function(e){
+  var s = e.target.closest && e.target.closest("[data-ir-mel]");
+  if (!s) return;
+  s.disabled = true;
+  postPanel("/api/admin/indicador-fundacion/" + s.getAttribute("data-ir-mel"), { mel_indicador_id: s.value || null }).then(function(x){
+    s.disabled = false; if (x) avisar(s.value ? "Indicador alineado con el MEAL." : "Alineación quitada.");
+  });
+});
+
 function abrirPortal(id){
   pedirJSON("/api/admin/portal/" + id).then(function(d){
     var pares = [
@@ -43322,6 +43897,7 @@ var BANDEJAS = {
   "o-filas": cargarOfrecimientos,
   "tb-fund": cargarFundaciones,
   "tb-apad": cargarApadrinamiento,
+  "tb-indred": cargarIndicadoresRed,
   "tb-pagos": cargarSueltos,
   "tb-suscripciones": cargarSuscripciones,
   "tb-miembros": cargarMiembros,
@@ -47413,6 +47989,11 @@ export default {
                                                   : await adminPortal(env, Number(apo[1]));
         if (ruta === "/api/admin/fundaciones")  return await adminFundaciones(env);
         if (ruta === "/api/admin/apadrinamiento") return await adminApadrinamiento(env);
+        if (ruta === "/api/admin/indicadores-red") return await adminIndicadoresRed(env);
+        const amf = ruta.match(/^\/api\/admin\/medicion-fundacion\/(\d{1,9})$/);
+        if (amf)                                return await adminMedicionFundacion(request, env, Number(amf[1]), sesion.email);
+        const aif = ruta.match(/^\/api\/admin\/indicador-fundacion\/(\d{1,9})$/);
+        if (aif)                                return await adminIndicadorAlinear(request, env, Number(aif[1]), sesion.email);
         const arp = ruta.match(/^\/api\/admin\/reporte-unidad\/(\d{1,9})$/);
         if (arp)                                return await adminReporteUnidad(request, env, Number(arp[1]), sesion.email);
         const aun = ruta.match(/^\/api\/admin\/unidad\/(\d{1,9})$/);
@@ -47632,6 +48213,7 @@ export default {
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
+        if (ruta === "/api/portal/indicadores") return await apiPortalIndicadores(request, env);
         if (ruta === "/api/portal/recibido") return await apiPortalRecibido(request, env);
         /* Apadrinamiento por unidad de impacto (0054). */
         if (ruta === "/api/apadrinamiento")         return await apiCatalogoApadrinamiento(env);
