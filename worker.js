@@ -1479,6 +1479,9 @@ const TOPE_IP_DIA = { caso: 40, inscripcion: 60, asistencia: 200, transferencia:
      sobra en 20, y no manda correo a quien escribe (solo el aviso interno).
      La consulta con el código es de lectura; el tope es contra el barrido. */
   quejas: 20, "quejas-consulta": 60,
+  /* El portal de fundaciones (0052): cada pedido manda un correo. Diez al día
+     por IP sobran para una fundación que no encuentra el suyo. */
+  portal: 10,
   /* Regalos de diciembre: cada pedido gasta un consecutivo RG- y, en pesos, una
      guía. Treinta al día por IP cabe a una familia que escoge varias veces y
      frena un script. */
@@ -5800,6 +5803,16 @@ async function adminSalud(env, opciones) {
       "SELECT COUNT(*) AS n, MIN(creado) AS masViejo FROM quejas WHERE ruta = 'ordinaria' AND estado IN ('recibida','en_revision')",
       "Quejas › Quejas y sugerencias · una persona escribió y espera respuesta: respóndele por el medio que dejó y regístralo", 24, "#sec-quejas",
       quejasPlazo(env));
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  /* EL PORTAL DE FUNDACIONES (0052): perfiles editados y documentos subidos
+     que nadie ha revisado. Sin la 0052 no sale. */
+  try {
+    await enCola("portal_por_revisar",
+      "SELECT COUNT(*) AS n, MIN(f) AS masViejo FROM (SELECT actualizado AS f FROM perfil_fundacion WHERE revisado_en IS NULL " +
+      "UNION ALL SELECT subido FROM documentos_fundacion WHERE revisado_en IS NULL AND retirado_en IS NULL)",
+      "Bandeja «Quién quiere entrar» · una fundación cambió su perfil o subió un documento desde el portal: ábrelo en «Portal…» y márcalo revisado", 30, "#sec-entrar", 7);
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -20523,6 +20536,631 @@ async function correoFichaRecibida(env, nombre, d) {
   });
 }
 
+/* ============================================================================
+   PORTAL DE FUNDACIONES (0052, 29 oct 2026; ítems 34, 35 y 36 de la lista)
+   ============================================================================
+   Una fundación del HUB entra a /portal con un enlace que le llega al correo
+   que dejó en su solicitud. No hay contraseña.
+
+   POR QUÉ UN ENLACE AL CORREO Y NO UNA CONTRASEÑA: una contraseña hay que
+   guardarla bien, recuperarla y cambiarla, y una fundación pequeña la comparte
+   por WhatsApp. El enlace prueba lo único que importa —que quien entra lee el
+   correo de la solicitud— y vence solo.
+
+   EL ENLACE NO ABRE LA SESIÓN AL CARGARSE. Outlook, Gmail y los antivirus
+   abren los enlaces de un correo para revisarlos, y un enlace de un solo uso
+   que se gasta con un GET llegaría gastado. La página muestra un botón
+   «Entrar» y el POST de ese botón es el que lo usa.
+
+   QUÉ PUEDE HACER ADENTRO:
+   · Ver en qué paso va su proceso, y el enlace del cuestionario si le toca.
+   · Después de ENVIAR el cuestionario, seguir editando su perfil: todo menos
+     las autorizaciones (firmadas; se cambian escribiéndonos) y los campos de
+     archivo. Lo que cambia queda en `perfil_fundacion` como «por revisar»: el
+     sitio público sale de partners.json, que arma una persona.
+   · Subir sus documentos legales y su logo. Se comprueban los bytes, como en
+     los otros caminos de carga del sitio.
+
+   LA SESIÓN: una cookie HttpOnly, Secure y SameSite=Lax de 30 días, con su
+   sha256 en la base. Cada POST exige además el mismo origen (cabecera Origin
+   o Sec-Fetch-Site): con SameSite=Lax un formulario de otro sitio no lleva la
+   cookie en un POST, y esto lo cierra también para navegadores viejos. */
+const PORTAL_ESTADOS = ["aceptada", "visitada", "convenio", "vinculada"];
+const PORTAL_ESTADO_ES = {
+  aceptada: "Aceptada: falta la visita de contexto",
+  visitada: "Visitada: falta el cuestionario",
+  convenio: "En convenio",
+  vinculada: "Vinculada al HUB"
+};
+const PORTAL_SESION_DIAS = 30;
+const PORTAL_ENLACE_MIN = 30;
+const PORTAL_DOC_TIPOS = {
+  rut: "RUT",
+  camara: "Certificado de existencia y representación legal (Cámara de Comercio)",
+  estatutos: "Estatutos",
+  estados_financieros: "Estados financieros",
+  certificado_bancario: "Certificación bancaria",
+  logo: "Logo",
+  otro: "Otro documento"
+};
+const PORTAL_DOC_TOPE = 30;
+const PORTAL_IMG = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
+/* Lo que se sigue editando: todo menos las autorizaciones y los archivos. */
+const PORTAL_EDITABLES = FICHA_CAMPOS.filter((c) => c.sec !== "Autorizaciones" && !c.sube);
+
+function portalCookie(request) {
+  const m = String(request.headers.get("cookie") || "").match(/(?:^|;\s*)gg-portal=([a-f0-9]{64})(?:;|$)/);
+  return m ? m[1] : null;
+}
+function portalMismoOrigen(request) {
+  const o = request.headers.get("origin");
+  if (o) return o === new URL(request.url).origin;
+  const sitio = request.headers.get("sec-fetch-site");
+  return !sitio || sitio === "same-origin";
+}
+async function portalSesion(env, request) {
+  const t = portalCookie(request);
+  if (!t) return null;
+  const h = await sha256Hex(t);
+  const s = await env.DB.prepare(
+    "SELECT s.hash, s.inscripcion, i.nombre, i.email, i.estado, i.token, i.tipo, " +
+    "f.estado AS ficha_estado, f.datos AS ficha_datos FROM portal_sesiones s " +
+    "JOIN inscripciones i ON i.id = s.inscripcion LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
+    "WHERE s.hash = ? AND s.cerrada_en IS NULL AND s.expira > datetime('now')"
+  ).bind(h).first();
+  if (!s || s.tipo !== "fundacion" || !PORTAL_ESTADOS.includes(s.estado)) return null;
+  await env.DB.prepare("UPDATE portal_sesiones SET ultimo_uso = datetime('now') WHERE hash = ?").bind(h).run();
+  return s;
+}
+function portalSinSesion() {
+  return json({ error: "sin_sesion", ayuda: "Tu sesión venció o se cerró. Pide un enlace nuevo con tu correo." }, 401);
+}
+
+/* Crea el enlace y lo manda. Lo usan la entrada pública y el botón del panel. */
+async function portalMandarEnlace(env, i) {
+  const recientes = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM portal_enlaces WHERE inscripcion = ? AND creado > datetime('now', '-1 hour')"
+  ).bind(i.id).first();
+  if (recientes && recientes.n >= 5) return { ok: false, motivo: "demasiados" };
+  const t = tokenNuevo();
+  await env.DB.prepare(
+    "INSERT INTO portal_enlaces (hash, inscripcion, expira) VALUES (?, ?, datetime('now', ?))"
+  ).bind(await sha256Hex(t), i.id, "+" + PORTAL_ENLACE_MIN + " minutes").run();
+  const enlace = ORIGIN + "/portal?t=" + t;
+  const titulo = "Tu enlace para entrar al portal de Give&Grow";
+  const parrafos = [
+    "Hola. Este es el enlace para entrar al portal de " + (i.nombre || "tu fundación") + " en el HUB SOCIAL de Give&Grow.",
+    "Sirve una sola vez y vence en " + PORTAL_ENLACE_MIN + " minutos. Si vence, pide otro desde " + ORIGIN + "/portal con este mismo correo.",
+    "Si no lo pediste tú, no tienes que hacer nada: sin este enlace nadie entra."
+  ];
+  await enviarCorreo(env, {
+    para: i.email, asunto: titulo, etiqueta: "portal-enlace",
+    texto: [titulo, "", ...parrafos, "", "Entrar: " + enlace].join("\n"),
+    html: plantillaCorreo({ titulo, parrafos, boton: { url: enlace, texto: "Entrar al portal" },
+      cierre: "Fundación Give&Grow International · NIT 901.948.930-2" })
+  });
+  return { ok: true };
+}
+
+/* POST /api/portal/entrar { email } — PÚBLICO. Responde lo mismo exista o no
+   el correo: si dijera «no está registrado», serviría para averiguar qué
+   fundaciones tienen solicitud. */
+async function apiPortalEntrar(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (c.web2) return json({ ok: true });
+  const email = limpiar(c.email, 160).toLowerCase();
+  if (!RE_CORREO.test(email)) return json({ error: "correo_invalido", ayuda: "Revisa el correo: parece incompleto." }, 400);
+  if (!(await pasaTopeIP(env, request, "portal"))) {
+    return json({ error: "demasiados_intentos", ayuda: "Hoy ya se pidieron muchos enlaces desde esta conexión. Inténtalo mañana o escríbenos." }, 429);
+  }
+  const i = await env.DB.prepare(
+    "SELECT id, nombre, email FROM inscripciones WHERE tipo = 'fundacion' AND lower(email) = ? " +
+    "AND estado IN ('aceptada','visitada','convenio','vinculada') ORDER BY id DESC LIMIT 1"
+  ).bind(email).first();
+  if (i) {
+    try { await portalMandarEnlace(env, i); } catch (e) { console.error("portal enlace", i.id, e && e.message); }
+  }
+  return json({ ok: true });
+}
+
+/* POST /api/portal/sesion { t } — gasta el enlace y abre la sesión. */
+async function apiPortalSesion(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  const t = String((c && c.t) || "");
+  if (!/^[a-f0-9]{32}$/.test(t)) return json({ error: "enlace_invalido" }, 400);
+  const usado = await env.DB.prepare(
+    "UPDATE portal_enlaces SET usado_en = datetime('now') WHERE hash = ? AND usado_en IS NULL " +
+    "AND expira > datetime('now') RETURNING inscripcion"
+  ).bind(await sha256Hex(t)).first();
+  if (!usado) {
+    return json({ error: "enlace_vencido", ayuda: "Ese enlace ya se usó o venció. Pide uno nuevo con tu correo." }, 410);
+  }
+  const i = await env.DB.prepare("SELECT id, tipo, estado FROM inscripciones WHERE id = ?").bind(usado.inscripcion).first();
+  if (!i || i.tipo !== "fundacion" || !PORTAL_ESTADOS.includes(i.estado)) {
+    return json({ error: "sin_acceso", ayuda: "Esta solicitud ya no tiene acceso al portal. Escríbenos si crees que es un error." }, 403);
+  }
+  const sesion = tokenNuevo() + tokenNuevo();
+  await env.DB.prepare(
+    "INSERT INTO portal_sesiones (hash, inscripcion, expira) VALUES (?, ?, datetime('now', ?))"
+  ).bind(await sha256Hex(sesion), i.id, "+" + PORTAL_SESION_DIAS + " days").run();
+  return new Response(JSON.stringify({ ok: true }), { headers: {
+    "content-type": "application/json; charset=utf-8", "cache-control": "no-store",
+    "set-cookie": "gg-portal=" + sesion + "; Path=/; Max-Age=" + (PORTAL_SESION_DIAS * 86400) + "; HttpOnly; Secure; SameSite=Lax"
+  } });
+}
+
+async function apiPortalSalir(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  const t = portalCookie(request);
+  if (t) await env.DB.prepare("UPDATE portal_sesiones SET cerrada_en = datetime('now') WHERE hash = ?").bind(await sha256Hex(t)).run();
+  return new Response(JSON.stringify({ ok: true }), { headers: {
+    "content-type": "application/json; charset=utf-8", "cache-control": "no-store",
+    "set-cookie": "gg-portal=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+  } });
+}
+
+/* El perfil que se ve: la ficha enviada, con lo editado encima. */
+async function portalPerfil(env, s) {
+  let ficha = {};
+  try { ficha = JSON.parse(s.ficha_datos || "{}"); } catch (e) { /* nada */ }
+  const p = await env.DB.prepare("SELECT datos, actualizado, revisado_en FROM perfil_fundacion WHERE inscripcion = ?").bind(s.inscripcion).first();
+  let editado = {};
+  try { editado = p ? JSON.parse(p.datos || "{}") : {}; } catch (e) { /* nada */ }
+  const datos = {};
+  for (const c of PORTAL_EDITABLES) datos[c.id] = c.id in editado ? editado[c.id] : (ficha[c.id] ?? (c.tipo === "numero" ? null : ""));
+  return { datos, ficha, fila: p };
+}
+
+/* GET /api/portal/yo — todo lo que pinta la pantalla. */
+async function apiPortalYo(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  const editable = s.ficha_estado === "enviada";
+  const pf = editable ? await portalPerfil(env, s) : null;
+  const docs = (await env.DB.prepare(
+    "SELECT id, tipo, nota, bytes, contenido, subido, revisado_en FROM documentos_fundacion " +
+    "WHERE inscripcion = ? AND retirado_en IS NULL ORDER BY subido DESC"
+  ).bind(s.inscripcion).all()).results || [];
+  return json({
+    ok: true, nombre: s.nombre, email: s.email, estado: s.estado, estado_es: PORTAL_ESTADO_ES[s.estado] || s.estado,
+    cuestionario: s.estado === "visitada" && s.ficha_estado !== "enviada" && s.token ? "/ficha/" + s.token : null,
+    ficha_enviada: editable,
+    perfil: editable ? {
+      campos: PORTAL_EDITABLES.map((c) => ({ id: c.id, num: c.num, sec: c.sec, lbl: c.lbl, tipo: c.tipo,
+        max: c.max || null, ops: c.ops || null, ayuda: c.ayuda || null, req: !!c.req })),
+      datos: pf.datos,
+      por_revisar: !!(pf.fila && !pf.fila.revisado_en),
+      actualizado: pf.fila ? fechaCO(pf.fila.actualizado) : null
+    } : null,
+    documentos: docs.map((d) => ({ id: d.id, tipo: d.tipo, tipo_es: PORTAL_DOC_TIPOS[d.tipo] || d.tipo, nota: d.nota,
+      bytes: d.bytes, subido: fechaCO(d.subido), revisado: !!d.revisado_en })),
+    tipos: PORTAL_DOC_TIPOS, tope: PORTAL_DOC_TOPE
+  });
+}
+
+/* POST /api/portal/perfil { datos } — solo después de enviar el cuestionario. */
+async function apiPortalPerfil(request, env) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (s.ficha_estado !== "enviada") {
+    return json({ error: "cuestionario_pendiente", ayuda: "Primero envía el cuestionario; después de eso tu perfil se edita aquí." }, 409);
+  }
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c) || !esObjeto(c.datos)) return json({ error: "json_invalido" }, 400);
+  const v = fichaValida(c.datos, false).limpio;
+  const limpio = {}, faltan = [];
+  for (const k of PORTAL_EDITABLES) {
+    limpio[k.id] = v[k.id];
+    const vacio = v[k.id] === "" || v[k.id] === null || v[k.id] === undefined;
+    if (k.req && vacio) faltan.push(k.num);
+  }
+  if (faltan.length) {
+    return json({ error: "faltan_campos", campos: faltan, ayuda: "Hay respuestas obligatorias en blanco: " + faltan.join(", ") + "." }, 400);
+  }
+  await env.DB.prepare(
+    "INSERT INTO perfil_fundacion (inscripcion, datos) VALUES (?, ?) " +
+    "ON CONFLICT(inscripcion) DO UPDATE SET datos = excluded.datos, actualizado = datetime('now'), revisado_en = NULL, revisado_por = NULL"
+  ).bind(s.inscripcion, JSON.stringify(limpio)).run();
+  return json({ ok: true, datos: limpio });
+}
+
+/* POST /api/portal/documento?tipo=rut&nota=… — el cuerpo es el archivo. */
+async function apiPortalDocumento(request, env, url) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  if (!env.MEDIA) return json({ error: "media_no_configurado" }, 503);
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  const tipoDoc = String(url.searchParams.get("tipo") || "");
+  if (!PORTAL_DOC_TIPOS[tipoDoc]) return json({ error: "tipo_documento_invalido", ayuda: "Elige qué documento es." }, 400);
+  const tipo = String(request.headers.get("content-type") || "").split(";")[0].trim();
+  const permitidos = tipoDoc === "logo" ? PORTAL_IMG : TIPOS_COMPROBANTE;
+  const ext = permitidos[tipo];
+  if (!ext) {
+    return json({ error: "tipo_no_permitido", ayuda: tipoDoc === "logo" ? "El logo va en PNG, JPG o WebP." : "Sube un PDF o una foto (JPG o PNG)." }, 415);
+  }
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
+  if (bytes.length > MAX_COMPROBANTE) return json({ error: "archivo_muy_grande", ayuda: "El archivo pasa de 5 MB." }, 413);
+  if (noEsLoQueDice(tipo, bytes)) {
+    return json({ error: "archivo_no_coincide", ayuda: "Ese archivo no se pudo leer como " + (tipo === "application/pdf" ? "PDF" : "imagen") + "." }, 400);
+  }
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM documentos_fundacion WHERE inscripcion = ? AND retirado_en IS NULL").bind(s.inscripcion).first();
+  if (n && n.n >= PORTAL_DOC_TOPE) {
+    return json({ error: "tope_alcanzado", ayuda: "Ya hay " + PORTAL_DOC_TOPE + " documentos. Retira alguno viejo antes de subir otro." }, 409);
+  }
+  const clave = "fundaciones/" + s.inscripcion + "/" + tipoDoc + "-" + tokenNuevo().slice(0, 12) + "." + ext;
+  await env.MEDIA.put(clave, bytes, { httpMetadata: { contentType: tipo } });
+  const fila = await env.DB.prepare(
+    "INSERT INTO documentos_fundacion (inscripcion, tipo, clave, contenido, bytes, nota) VALUES (?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(s.inscripcion, tipoDoc, clave, tipo, bytes.length, limpiar(url.searchParams.get("nota"), 120) || null).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* POST /api/portal/documento/<id>/retirar — sale de la lista; el archivo
+   se queda en R2 como soporte de lo que se revisó. */
+async function apiPortalRetirar(request, env, id) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  const r = await env.DB.prepare(
+    "UPDATE documentos_fundacion SET retirado_en = datetime('now') WHERE id = ? AND inscripcion = ? AND retirado_en IS NULL"
+  ).bind(id, s.inscripcion).run();
+  if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+  return json({ ok: true });
+}
+
+/* ---------------------------- el lado del panel ---------------------------- */
+
+/* GET /api/admin/portal/<inscripcion> — lo cambiado frente a la ficha, los
+   documentos y si la fundación ha entrado. */
+async function adminPortal(env, insc) {
+  if (!(await existeTabla(env, "portal_sesiones"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0052 en la base." }, 409);
+  const i = await env.DB.prepare(
+    "SELECT i.id, i.nombre, i.email, i.estado, i.tipo, f.estado AS ficha_estado, f.datos AS ficha_datos " +
+    "FROM inscripciones i LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id WHERE i.id = ?"
+  ).bind(insc).first();
+  if (!i || i.tipo !== "fundacion") return json({ error: "no_encontrado" }, 404);
+  const pf = await portalPerfil(env, { inscripcion: insc, ficha_datos: i.ficha_datos });
+  const cambios = [];
+  if (pf.fila) {
+    for (const c of PORTAL_EDITABLES) {
+      const antes = pf.ficha[c.id] ?? "", ahora = pf.datos[c.id] ?? "";
+      if (String(antes) !== String(ahora)) cambios.push({ num: c.num, lbl: c.lbl, antes: String(antes), ahora: String(ahora) });
+    }
+  }
+  const docs = (await env.DB.prepare(
+    "SELECT id, tipo, nota, bytes, contenido, subido, revisado_en, revisado_por, retirado_en FROM documentos_fundacion WHERE inscripcion = ? ORDER BY subido DESC"
+  ).bind(insc).all()).results || [];
+  const ses = await env.DB.prepare(
+    "SELECT COUNT(*) AS n, MAX(COALESCE(ultimo_uso, creada)) AS ultimo FROM portal_sesiones WHERE inscripcion = ?"
+  ).bind(insc).first();
+  return json({
+    ok: true, id: i.id, nombre: i.nombre, email: i.email, estado: i.estado, con_acceso: PORTAL_ESTADOS.includes(i.estado),
+    ficha_enviada: i.ficha_estado === "enviada",
+    perfil: pf.fila ? { actualizado: selloCO(pf.fila.actualizado).slice(0, 16), revisado: !!pf.fila.revisado_en, cambios } : null,
+    documentos: docs.map((d) => Object.assign({}, d, { tipo_es: PORTAL_DOC_TIPOS[d.tipo] || d.tipo,
+      subido: selloCO(d.subido).slice(0, 16), retirado: !!d.retirado_en, revisado: !!d.revisado_en })),
+    sesiones: ses ? ses.n : 0, ultima_entrada: ses && ses.ultimo ? selloCO(ses.ultimo).slice(0, 16) : null
+  });
+}
+
+/* GET /api/admin/portal-doc/<id> — el archivo, solo con sesión de Access. */
+async function adminPortalDoc(env, id) {
+  const d = await env.DB.prepare("SELECT clave, contenido, tipo FROM documentos_fundacion WHERE id = ?").bind(id).first();
+  if (!d || !env.MEDIA) return json({ error: "no_encontrado" }, 404);
+  const o = await env.MEDIA.get(d.clave);
+  if (!o) return json({ error: "no_encontrado" }, 404);
+  const ext = d.clave.split(".").pop();
+  return new Response(o.body, { headers: {
+    "content-type": d.contenido, "x-content-type-options": "nosniff", "cache-control": "private, no-store",
+    "content-disposition": 'attachment; filename="' + d.tipo + "-" + id + "." + ext + '"'
+  } });
+}
+
+/* POST /api/admin/portal/<inscripcion> { accion: revisado | invitar } */
+async function adminPortalAccion(request, env, insc, email) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const i = await env.DB.prepare("SELECT id, nombre, email, estado, tipo FROM inscripciones WHERE id = ?").bind(insc).first();
+  if (!i || i.tipo !== "fundacion") return json({ error: "no_encontrado" }, 404);
+  let detalle;
+  if (c.accion === "revisado") {
+    await env.DB.prepare("UPDATE perfil_fundacion SET revisado_en = datetime('now'), revisado_por = ? WHERE inscripcion = ? AND revisado_en IS NULL").bind(email || null, insc).run();
+    await env.DB.prepare("UPDATE documentos_fundacion SET revisado_en = datetime('now'), revisado_por = ? WHERE inscripcion = ? AND revisado_en IS NULL").bind(email || null, insc).run();
+    detalle = "portal revisado";
+  } else if (c.accion === "invitar") {
+    if (!PORTAL_ESTADOS.includes(i.estado)) {
+      return json({ error: "sin_acceso", ayuda: "El portal se abre desde «aceptada». Esta solicitud está en «" + i.estado + "»." }, 409);
+    }
+    if (!RE_CORREO.test(String(i.email || ""))) return json({ error: "sin_correo", ayuda: "La solicitud no tiene un correo válido." }, 409);
+    const r = await portalMandarEnlace(env, i);
+    if (!r.ok) return json({ error: "demasiados", ayuda: "Ya se mandaron 5 enlaces en la última hora." }, 429);
+    detalle = "enlace del portal enviado";
+  } else return json({ error: "accion_invalida" }, 400);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(email || "?", "inscripcion " + insc + " · " + detalle).run();
+  return json({ ok: true, para: c.accion === "invitar" ? i.email : undefined });
+}
+
+/* La página /portal. Tres estados que pinta su JS: pedir el enlace, usar el
+   enlace (con el botón que lo gasta) y el portal. El HTML no lleva ningún dato
+   de nadie: todo llega por /api/portal/yo y entra con textContent o esc(). */
+function paginaPortal(nonce) {
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Portal de fundaciones · Give&amp;Grow</title>
+<style nonce="${nonce}">
+  :root{--g:#1F5C38;--ink:#191813;--mu:#5C636F;--bd:#DAD3C3;--bg:#F3EFE6;--surface:#FBF8F1;--err:#8C2F1E;--ok:#1F5C38}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+  .wrap{max-width:760px;margin:0 auto;padding:28px 20px 80px}
+  .marca{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mu)}
+  h1{font-size:24px;margin:4px 0 2px}
+  h2{font-size:17px;border-bottom:1px solid var(--bd);padding-bottom:6px;margin:30px 0 10px}
+  .sub{color:var(--mu);font-size:14px}
+  .caja{background:var(--surface);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-top:14px}
+  .aviso{border-left:3px solid var(--g)}
+  .paso{font-weight:700}
+  label{display:block;font-weight:600;font-size:15px;margin:12px 0 3px}
+  .num{font-size:11px;color:var(--mu);letter-spacing:.06em;font-weight:400}
+  .ayuda{display:block;color:var(--mu);font-size:13px;font-weight:400;margin-bottom:5px}
+  input[type=text],input[type=email],textarea,select{width:100%;font:inherit;font-size:16px;padding:9px 11px;
+    border:1px solid var(--bd);border-radius:8px;background:#fff;color:var(--ink)}
+  textarea{resize:vertical}
+  .op{display:flex;gap:9px;align-items:flex-start;font-weight:400;font-size:14px;margin-top:6px}
+  .op input{margin-top:3px}
+  button{font:inherit;font-size:15px;font-weight:700;padding:10px 18px;border:1px solid var(--g);border-radius:9px;
+    background:var(--g);color:#fff;cursor:pointer;margin-top:14px}
+  button.sec2{background:transparent;color:var(--g)}
+  button.mini{font-size:13px;padding:5px 10px;margin:0}
+  button[disabled]{opacity:.55;cursor:default}
+  .msg{display:block;margin-top:10px;font-size:14px;color:var(--mu)}
+  .msg.mal{color:var(--err);font-weight:600}
+  .msg.ok{color:var(--ok);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd);vertical-align:top}
+  th{font-size:12px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em}
+  .pill{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;border:1px solid var(--bd);color:var(--mu)}
+  .pill.ok{border-color:var(--g);color:var(--g)}
+  .fila{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .oculto{display:none}
+  .mt{margin-top:12px}
+  .sec-perfil{font-size:13px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;margin-top:22px}
+  :focus-visible{outline:2px solid var(--g);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="marca">Give&amp;Grow · HUB SOCIAL</p>
+
+  <section id="v-entrar" class="oculto">
+    <h1>Portal de fundaciones</h1>
+    <p class="sub">Para las fundaciones con solicitud aceptada en el HUB SOCIAL.</p>
+    <div class="caja aviso">
+      Escribe el correo con el que hiciste la solicitud y te mandamos un enlace para entrar. No hay contraseña:
+      el enlace sirve una vez y vence en 30 minutos.
+    </div>
+    <form id="f-entrar" class="caja" autocomplete="on">
+      <label for="e-correo">Correo de la solicitud</label>
+      <input type="email" id="e-correo" autocomplete="email" maxlength="160" required>
+      <input type="text" id="e-web2" tabindex="-1" autocomplete="off" aria-hidden="true" class="oculto">
+      <button type="submit" id="b-entrar">Mandarme el enlace</button>
+      <span class="msg" id="m-entrar" role="status" aria-live="polite"></span>
+    </form>
+  </section>
+
+  <section id="v-enviado" class="oculto">
+    <h1>Revisa tu correo</h1>
+    <div class="caja aviso">
+      Si ese correo tiene una solicitud aceptada, en unos minutos te llega el enlace para entrar.
+      Revisa también la carpeta de correo no deseado. ¿No llega? Escríbenos a contacto@thegiveandgrowproject.org.
+    </div>
+  </section>
+
+  <section id="v-enlace" class="oculto">
+    <h1>Entrar al portal</h1>
+    <div class="caja aviso">Este enlace abre tu sesión en este navegador por 30 días.</div>
+    <button type="button" id="b-usar">Entrar</button>
+    <span class="msg" id="m-usar" role="status" aria-live="polite"></span>
+  </section>
+
+  <section id="v-portal" class="oculto">
+    <div class="fila">
+      <div><h1 id="p-nombre"></h1><p class="sub" id="p-correo"></p></div>
+      <button type="button" class="sec2 mini" id="b-salir">Cerrar sesión</button>
+    </div>
+
+    <h2>En qué va tu proceso</h2>
+    <div class="caja"><p class="paso" id="p-estado"></p><p class="sub" id="p-siguiente"></p></div>
+
+    <h2>Tu perfil</h2>
+    <div id="p-perfil"></div>
+
+    <h2>Documentos y logo</h2>
+    <p class="sub">Los revisa el equipo antes de usarlos. Ninguno se publica: son el archivo de la alianza. PDF o foto, hasta 5 MB.</p>
+    <div class="caja">
+      <label for="d-tipo">Qué documento es</label>
+      <select id="d-tipo"></select>
+      <label for="d-nota">Nota (opcional) <span class="ayuda">Por ejemplo: «estados financieros 2025» o «RUT actualizado en octubre».</span></label>
+      <input type="text" id="d-nota" maxlength="120">
+      <label for="d-archivo">Archivo</label>
+      <input type="file" id="d-archivo" accept="application/pdf,image/jpeg,image/png,image/webp">
+      <button type="button" id="b-subir">Subir</button>
+      <span class="msg" id="m-doc" role="status" aria-live="polite"></span>
+    </div>
+    <div id="p-docs"></div>
+  </section>
+</div>
+<script nonce="${nonce}">
+${portalJS()}
+</script>
+</body>
+</html>`;
+}
+
+function portalJS() {
+  return `
+/* /portal. Sin barras invertidas, sin comillas invertidas y sin
+   interpolaciones: este archivo vive dentro de una plantilla del Worker. */
+var D = null;
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+  return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+function ver(id){ ["v-entrar", "v-enviado", "v-enlace", "v-portal"].forEach(function(v){ $(v).classList.toggle("oculto", v !== id); }); }
+function msg(id, texto, clase){ var e = $(id); e.textContent = texto || ""; e.className = "msg" + (clase ? " " + clase : ""); }
+function enviar(url, cuerpo){
+  return fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo || {}) })
+    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, status: r.status, d: d || {} }; }); });
+}
+function kb(n){ return n > 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+
+function cargar(){
+  fetch("/api/portal/yo", { credentials: "same-origin" }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return null; }
+    return r.json();
+  }).then(function(d){ if (d) { D = d; pintar(); ver("v-portal"); } })
+    .catch(function(){ ver("v-entrar"); msg("m-entrar", "No pudimos conectar. Revisa tu conexión e intenta de nuevo.", "mal"); });
+}
+
+function pintar(){
+  $("p-nombre").textContent = D.nombre || "";
+  $("p-correo").textContent = D.email || "";
+  $("p-estado").textContent = D.estado_es;
+  var sig = "";
+  if (D.cuestionario) sig = "Te toca el cuestionario del HUB. Al enviarlo, tu perfil se sigue editando aquí.";
+  else if (D.estado === "aceptada") sig = "El siguiente paso es la visita de contexto: te escribimos para acordar la fecha. Mientras tanto, puedes ir subiendo tus documentos.";
+  else if (D.ficha_enviada) sig = "Ya enviaste el cuestionario. Lo que cambies en tu perfil lo revisa el equipo antes de publicarlo.";
+  $("p-siguiente").innerHTML = esc(sig) + (D.cuestionario ? ' <a href="' + esc(D.cuestionario) + '">Abrir el cuestionario</a>' : "");
+  pintarPerfil(); pintarDocs();
+}
+
+function campo(c, v){
+  var id = "pf-" + c.id;
+  var cab = '<label for="' + id + '"><span class="num">' + esc(c.num) + "</span> " + esc(c.lbl) + (c.req ? " *" : "") + "</label>" +
+    (c.ayuda ? '<span class="ayuda">' + esc(c.ayuda) + "</span>" : "");
+  if (c.tipo === "parrafo") return cab + '<textarea id="' + id + '" rows="4" maxlength="' + (c.max || 900) + '">' + esc(v) + "</textarea>";
+  if (c.tipo === "opcion") return cab + c.ops.map(function(o, n){
+    return '<label class="op"><input type="radio" name="' + id + '" value="' + esc(o) + '"' + (o === v ? " checked" : "") + (n ? "" : ' id="' + id + '"') + "><span>" + esc(o) + "</span></label>";
+  }).join("");
+  if (c.tipo === "numero") return cab + '<input type="text" inputmode="numeric" id="' + id + '" value="' + esc(v == null ? "" : v) + '">';
+  return cab + '<input type="text" id="' + id + '" maxlength="' + (c.max || 200) + '" value="' + esc(v) + '">';
+}
+function pintarPerfil(){
+  var caja = $("p-perfil");
+  if (!D.perfil) {
+    caja.innerHTML = '<div class="caja"><p class="sub">Tu perfil se edita aquí cuando hayas enviado el cuestionario del HUB.</p></div>';
+    return;
+  }
+  var P = D.perfil, h = "", sec = "";
+  if (P.por_revisar) h += '<div class="caja aviso">Tus últimos cambios (' + esc(P.actualizado) + ") están por revisar. Hasta entonces el sitio sigue mostrando lo anterior.</div>";
+  h += '<form id="f-perfil" class="caja">';
+  P.campos.forEach(function(c){
+    if (c.sec !== sec) { sec = c.sec; h += '<p class="sec-perfil">' + esc(sec) + "</p>"; }
+    h += campo(c, P.datos[c.id]);
+  });
+  h += '<p class="sub mt">Las autorizaciones (nombre, logo, fotos y menores) quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p>';
+  h += '<button type="button" id="b-perfil">Guardar cambios</button><span class="msg" id="m-perfil" role="status" aria-live="polite"></span></form>';
+  caja.innerHTML = h;
+  $("b-perfil").addEventListener("click", guardarPerfil);
+}
+function guardarPerfil(){
+  var datos = {};
+  D.perfil.campos.forEach(function(c){
+    if (c.tipo === "opcion") { var r = document.querySelector('input[name="pf-' + c.id + '"]:checked'); datos[c.id] = r ? r.value : ""; }
+    else datos[c.id] = $("pf-" + c.id).value;
+  });
+  var b = $("b-perfil"); b.disabled = true; msg("m-perfil", "Guardando…");
+  enviar("/api/portal/perfil", { datos: datos }).then(function(r){
+    b.disabled = false;
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { msg("m-perfil", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
+    msg("m-perfil", "Guardado. El equipo lo revisa antes de publicarlo.", "ok");
+    D.perfil.datos = r.d.datos; D.perfil.por_revisar = true;
+  }).catch(function(){ b.disabled = false; msg("m-perfil", "No pudimos conectar. Tus cambios siguen en pantalla: intenta de nuevo.", "mal"); });
+}
+
+function pintarDocs(){
+  var sel = $("d-tipo");
+  if (!sel.options.length) sel.innerHTML = Object.keys(D.tipos).map(function(k){ return '<option value="' + esc(k) + '">' + esc(D.tipos[k]) + "</option>"; }).join("");
+  var L = D.documentos || [];
+  if (!L.length) { $("p-docs").innerHTML = '<p class="sub mt">Todavía no has subido documentos.</p>'; return; }
+  $("p-docs").innerHTML = "<table><thead><tr><th>Documento</th><th>Subido</th><th>Estado</th><th></th></tr></thead><tbody>" +
+    L.map(function(d){
+      return "<tr><td>" + esc(d.tipo_es) + (d.nota ? '<br><span class="sub">' + esc(d.nota) + "</span>" : "") + '<br><span class="sub">' + kb(d.bytes) + "</span></td>" +
+        "<td>" + esc(d.subido) + "</td><td>" + (d.revisado ? '<span class="pill ok">Revisado</span>' : '<span class="pill">Por revisar</span>') + "</td>" +
+        '<td><button type="button" class="sec2 mini" data-retirar="' + d.id + '">Retirar</button></td></tr>';
+    }).join("") + "</tbody></table>";
+}
+function subir(){
+  var f = $("d-archivo").files[0];
+  if (!f) { msg("m-doc", "Elige el archivo.", "mal"); return; }
+  if (f.size > 5242880) { msg("m-doc", "El archivo pasa de 5 MB.", "mal"); return; }
+  var b = $("b-subir"); b.disabled = true; msg("m-doc", "Subiendo…");
+  fetch("/api/portal/documento?tipo=" + encodeURIComponent($("d-tipo").value) + "&nota=" + encodeURIComponent($("d-nota").value.trim()), {
+    method: "POST", credentials: "same-origin", headers: { "content-type": f.type || "application/octet-stream" }, body: f
+  }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, status: r.status, d: d }; }); })
+    .then(function(r){
+      b.disabled = false;
+      if (r.status === 401) { ver("v-entrar"); return; }
+      if (!r.ok) { msg("m-doc", r.d.ayuda || "No se pudo subir.", "mal"); return; }
+      msg("m-doc", "Listo. El equipo lo revisa.", "ok");
+      $("d-archivo").value = ""; $("d-nota").value = "";
+      cargar();
+    }).catch(function(){ b.disabled = false; msg("m-doc", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+}
+
+$("f-entrar").addEventListener("submit", function(ev){
+  ev.preventDefault();
+  var b = $("b-entrar"); b.disabled = true; msg("m-entrar", "Enviando…");
+  enviar("/api/portal/entrar", { email: $("e-correo").value.trim(), web2: $("e-web2").value }).then(function(r){
+    b.disabled = false;
+    if (!r.ok) { msg("m-entrar", r.d.ayuda || "No se pudo enviar.", "mal"); return; }
+    ver("v-enviado");
+  }).catch(function(){ b.disabled = false; msg("m-entrar", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+});
+$("b-usar").addEventListener("click", function(){
+  var t = new URLSearchParams(location.search).get("t") || "";
+  var b = $("b-usar"); b.disabled = true; msg("m-usar", "Entrando…");
+  enviar("/api/portal/sesion", { t: t }).then(function(r){
+    history.replaceState(null, "", "/portal");
+    if (!r.ok) { b.disabled = false; ver("v-entrar"); msg("m-entrar", r.d.ayuda || "Ese enlace no sirvió. Pide uno nuevo.", "mal"); return; }
+    cargar();
+  }).catch(function(){ b.disabled = false; msg("m-usar", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+});
+$("b-salir").addEventListener("click", function(){ enviar("/api/portal/salir").then(function(){ D = null; ver("v-entrar"); }); });
+$("b-subir").addEventListener("click", subir);
+$("p-docs").addEventListener("click", function(ev){
+  var b = ev.target.closest && ev.target.closest("[data-retirar]");
+  if (!b || !confirm("¿Retirar este documento de la lista?")) return;
+  enviar("/api/portal/documento/" + b.getAttribute("data-retirar") + "/retirar").then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return; }
+    cargar();
+  });
+});
+
+if (new URLSearchParams(location.search).get("t")) ver("v-enlace"); else cargar();
+`;
+}
+
 /* LA CSP NO LLEGA SOLA A ESTA PAGINA.
    CLAUDE.md describe «CSP estricta en _headers (default-src 'self')» y es cierto
    —para los ARCHIVOS ESTATICOS—. Las paginas que genera el Worker responden con
@@ -33018,7 +33656,8 @@ var COLA_ES = {
   documentos_faltantes: "Documentos que faltan",
   meal_indicadores_pendientes: "Indicadores sin la medición del periodo",
   board_informe_sin_enviar: "Informe trimestral sin enviar a los asesores",
-  quejas_sin_responder: "Quejas y sugerencias sin responder"
+  quejas_sin_responder: "Quejas y sugerencias sin responder",
+  portal_por_revisar: "Portal de fundaciones: cambios por revisar"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -33310,7 +33949,8 @@ var COLA_MOD = {
   documentos_faltantes: "legal/documentos",
   meal_indicadores_pendientes: "meal/indicadores",
   board_informe_sin_enviar: "meal/board",
-  quejas_sin_responder: "quejas/ordinaria"
+  quejas_sin_responder: "quejas/ordinaria",
+  portal_por_revisar: "alianzas/red"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -34386,6 +35026,9 @@ function cargarInscripciones(){
                   : espera ? '<small class="mu">' + espera + "</small>" : "—") +
           (i.tipo === "ingeniero" ? accionesMatricula(i, x) : "") +
           ficha +
+          /* El portal (0052): desde «aceptada» la fundación puede entrar. */
+          ((esFund && (i.estado === "aceptada" || i.estado === "visitada" || i.estado === "convenio" || i.estado === "vinculada"))
+            ? '<br><small><button class="copy" data-portal="' + i.id + '">Portal…</button></small>' : "") +
           (cerrar ? '<br><small><button class="copy" data-ins="' + i.id + '" data-e="' + cerrar[0] + '" data-de="' + esc(i.estado) + '" data-nombre="' + esc(i.nombre || "") + '">' + cerrar[1] + '</button></small>' : "") +
           /* La supresion va SIEMPRE, en cualquier estado: quien pide que le
              borren sus datos no tiene por que haber llegado a «aceptada». */
@@ -40960,6 +41603,60 @@ function formResponderQueja(x, ruta){
     });
   });
 }
+/* EL PORTAL DE UNA FUNDACIÓN (0052): qué cambió frente a la ficha, sus
+   documentos y los dos botones. Todo lo que viene del portal lo escribió la
+   fundación: entra con esc(). */
+function abrirPortal(id){
+  pedirJSON("/api/admin/portal/" + id).then(function(d){
+    var pares = [
+      ["Fundación", esc(d.nombre) + "<small>" + esc(d.email || "") + "</small>"],
+      ["Acceso", d.con_acceso ? "Puede entrar a /portal" + (d.sesiones ? "<small>" + d.sesiones + " sesión(es) · última " + esc(d.ultima_entrada || "") + "</small>" : "<small>todavía no ha entrado</small>")
+                              : '<span class="mu">Sin acceso en el estado «' + esc(d.estado) + '»</span>']
+    ];
+    var h = ficha(pares);
+    if (d.perfil){
+      h += '<p class="pn-h3">Perfil editado el ' + esc(d.perfil.actualizado) + (d.perfil.revisado ? " · revisado" : " · <strong>por revisar</strong>") + "</p>";
+      h += d.perfil.cambios.length
+        ? '<table class="pn-tabla"><thead><tr><th>Pregunta</th><th>En la ficha</th><th>Ahora</th></tr></thead><tbody>' +
+          d.perfil.cambios.map(function(c){ return "<tr><td><small>" + esc(c.num) + "</small> " + esc(c.lbl) + "</td><td>" + esc(c.antes) + "</td><td><strong>" + esc(c.ahora) + "</strong></td></tr>"; }).join("") +
+          '</tbody></table><p class="mu">El sitio no cambia solo: si algo va a partners.json, se actualiza a mano.</p>'
+        : '<p class="mu">Guardó el perfil sin cambiar nada frente a la ficha.</p>';
+    } else if (d.ficha_enviada) {
+      h += '<p class="mu">No ha editado su perfil desde que envió el cuestionario.</p>';
+    }
+    var docs = d.documentos || [];
+    h += '<p class="pn-h3">Documentos (' + docs.filter(function(x){ return !x.retirado; }).length + ")</p>";
+    h += docs.length ? "<ul>" + docs.map(function(x){
+      return "<li" + (x.retirado ? ' class="mu"' : "") + '><a href="/api/admin/portal-doc/' + x.id + '">' + esc(x.tipo_es) + "</a>" +
+        (x.nota ? " · " + esc(x.nota) : "") + " <small>" + esc(x.subido) + (x.retirado ? " · retirado por la fundación" : x.revisado ? " · revisado" : " · <strong>por revisar</strong>") + "</small></li>";
+    }).join("") + "</ul>" : '<p class="mu">No ha subido documentos.</p>';
+    var pie = "";
+    if (d.con_acceso) pie += '<button type="button" class="pn-b2" data-portal-invitar="' + d.id + '">Enviar enlace del portal</button>';
+    pie += '<button type="button" class="pn-b1" data-portal-revisado="' + d.id + '">Marcar todo revisado</button>';
+    pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+    cajonAbrir({ ey: "Portal de fundaciones", titulo: d.nombre, cuerpo: h, pie: pie, ancho: true });
+  });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var b;
+  if ((b = e.target.closest("[data-portal]"))){ abrirPortal(b.getAttribute("data-portal")); return; }
+  if ((b = e.target.closest("[data-portal-invitar]"))){
+    var idI = b.getAttribute("data-portal-invitar"); b.disabled = true;
+    postPanel("/api/admin/portal/" + idI, { accion: "invitar" }).then(function(r){
+      b.disabled = false; if (!r) return;
+      avisar("Enlace del portal enviado a " + (r.para || "la fundación") + ". Vence en 30 minutos; si no alcanza, que lo pida de nuevo en /portal.");
+    });
+    return;
+  }
+  if ((b = e.target.closest("[data-portal-revisado]"))){
+    var idR = b.getAttribute("data-portal-revisado"); b.disabled = true;
+    postPanel("/api/admin/portal/" + idR, { accion: "revisado" }).then(function(r){
+      b.disabled = false; if (!r) return;
+      avisar("Portal marcado como revisado."); cajonCerrar(); cargarSalud();
+    });
+  }
+});
 /* Anotar una que llegó por otro medio (0050). Las opciones salen de lo que
    devolvió /api/admin/quejas; si la sección no se ha pedido, se pide antes. */
 function formAnotarQueja(ruta){
@@ -45138,6 +45835,11 @@ export default {
         if (ruta === "/api/admin/ipn")           return await adminIpn(env);
         if (ruta === "/api/admin/paypal-sueltos") return await adminPaypalSueltos(env);
         if (ruta === "/api/admin/suscripciones") return await adminSuscripciones(env);
+        const apo = ruta.match(/^\/api\/admin\/portal\/(\d{1,9})$/);
+        if (apo) return request.method === "POST" ? await adminPortalAccion(request, env, Number(apo[1]), sesion.email)
+                                                  : await adminPortal(env, Number(apo[1]));
+        const apd = ruta.match(/^\/api\/admin\/portal-doc\/(\d{1,9})$/);
+        if (apd)                                return await adminPortalDoc(env, Number(apd[1]));
         const afi = ruta.match(/^\/api\/admin\/ficha\/(\d+)$/);
         if (afi)                                return await adminFicha(env, Number(afi[1]));
         const afo = ruta.match(/^\/api\/admin\/ficha\/(\d+)\/objeto$/);
@@ -45338,6 +46040,15 @@ export default {
         /* Canal de quejas (0046): enviar, y consultar con el código. */
         if (ruta === "/api/quejas")         return await apiQueja(request, env);
         if (ruta === "/api/quejas/estado")  return await apiQuejaEstado(request, env);
+        /* El portal de fundaciones (0052). */
+        if (ruta === "/api/portal/entrar")  return await apiPortalEntrar(request, env);
+        if (ruta === "/api/portal/sesion")  return await apiPortalSesion(request, env);
+        if (ruta === "/api/portal/salir")   return await apiPortalSalir(request, env);
+        if (ruta === "/api/portal/yo")      return await apiPortalYo(request, env);
+        if (ruta === "/api/portal/perfil")  return await apiPortalPerfil(request, env);
+        if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
+        const pret = ruta.match(/^\/api\/portal\/documento\/(\d{1,9})\/retirar$/);
+        if (pret)                           return await apiPortalRetirar(request, env, Number(pret[1]));
         const fapi = ruta.match(/^\/api\/ficha\/([a-f0-9]{32})$/);
         if (fapi)                           return await apiFicha(request, env, fapi[1]);
         const farc = ruta.match(/^\/api\/ficha\/([a-f0-9]{32})\/archivo\/([a-z]+)$/);
@@ -45389,6 +46100,26 @@ export default {
        nadie, pero a quien pego mal el enlace le decimos «aqui esta la pagina de
        donaciones» en vez de «este enlace no sirve». Es la cuarta cicatriz de
        este comodin en este archivo. */
+    /* EL PORTAL DE FUNDACIONES (0052). La página no lleva datos: los pide su JS. */
+    if (/^\/portal\/?$/.test(ruta)) {
+      if (!env.DB) return new Response("No disponible", { status: 503 });
+      const nonce = nonceCSP();
+      return new Response(paginaPortal(nonce), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "referrer-policy": "no-referrer",
+          "cache-control": "private, no-store",
+          "x-robots-tag": "noindex, nofollow",
+          "x-frame-options": "DENY",
+          "content-security-policy":
+            "default-src 'self'; " +
+            "script-src 'nonce-" + nonce + "'; " +
+            "style-src 'nonce-" + nonce + "'; " +
+            "img-src 'self' data:; connect-src 'self'; " +
+            "form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
+        }
+      });
+    }
     const fpag = ruta.match(/^\/ficha\/(.*)$/);
     if (fpag) {
       if (!env.DB) return new Response("No disponible", { status: 503 });

@@ -181,7 +181,7 @@ const workerSrc = readFileSync("worker.js", "utf8");
    invertidas dentro de la plantilla y saltos de linea sin escapar—. Al escribir
    `fichaJS` pise la primera otra vez, en un comentario; el gate la caza SOLO si
    la funcion esta en esta lista. */
-for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"], ["rutaJS()", "rutaJS"], ["inspeccionJS()", "inspeccionJS"], ["inspeccionSW()", "inspeccionSW"], ["fichaJS()", "fichaJS"], ["convenioJS()", "convenioJS"], ["regalosAdminJS()", "regalosAdminJS"]]) {
+for (const [nombre, fn] of [["adminJS()", "adminJS"], ["triageJS()", "triageJS"], ["rutaJS()", "rutaJS"], ["inspeccionJS()", "inspeccionJS"], ["inspeccionSW()", "inspeccionSW"], ["fichaJS()", "fichaJS"], ["convenioJS()", "convenioJS"], ["regalosAdminJS()", "regalosAdminJS"], ["portalJS()", "portalJS"]]) {
   try {
     const i = workerSrc.indexOf("function " + fn + "()");
     if (i === -1) throw new Error("no se encontró " + nombre);
@@ -921,7 +921,7 @@ if (tagsOk) ok("balance de tags (" + tagsVistas + " etiquetas vigiladas)");
    añadir una decima sin registrarla SUSPENDE. */
 const PLANTILLAS = [
   "plantillaCorreo", "paginaTriage", "inspeccionHTML", "paginaFirma",
-  "paginaCarnet", "paginaFicha", "paginaConvenio", "paginaRuta", "paginaRegalosAdmin", "paginaAdmin", "sharePage",
+  "paginaCarnet", "paginaFicha", "paginaPortal", "paginaConvenio", "paginaRuta", "paginaRegalosAdmin", "paginaAdmin", "sharePage",
   /* `paginaSocialfest` salió de aquí el 14 oct 2026: ya no arma una página,
      reescribe la cabecera de index.html (ver worker.js). */
   /* Vive DENTRO de la plantilla de adminJS: es el popup que abre el panel.
