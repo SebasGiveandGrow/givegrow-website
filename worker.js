@@ -42951,8 +42951,22 @@ function cabeceraPagina(m, propia, en) {
   return r
     .on("html", { element(el) { el.setAttribute("lang", "en"); } })
     .on('meta[property="og:locale"]', attr("en_US"))
+    .on('meta[property="og:image"]', attr(ORIGIN + "/img/og-en.jpg"))
+    .on('meta[name="twitter:image"]', attr(ORIGIN + "/img/og-en.jpg"))
     .on('meta[property="og:image:alt"]', attr(PORTADA_EN.t));
 }
+/* LAS PÁGINAS CON IMAGEN PROPIA PARA COMPARTIR (28 oct 2026). Hasta hoy toda
+   tarjeta llevaba la imagen de la portada, en español aunque el enlace fuera
+   `?lang=en`. Regalos se comparte sola por WhatsApp durante la campaña, y la
+   vista previa tiene que decir de qué se trata. Imágenes sin fotografía: la
+   página trata de niñas y niños, y una vista previa viaja sin control. */
+const OG_IMG_RUTA = {
+  regalos: {
+    es: "/img/og-regalos.jpg", en: "/img/og-regalos-en.jpg",
+    alt: "Regalos de diciembre · Give&Grow International",
+    altEn: "December Gifts · Give&Grow International"
+  }
+};
 /* El hreflang de una página con path propio: `es` y `x-default` a la dirección
    sin query, `en` a la misma con `?lang=en`. Sin esto heredaban los de
    index.html, que apuntan a la PORTADA, y Google descarta un hreflang cuyo
@@ -42966,7 +42980,15 @@ function paginaIndexable(base, id, en) {
   if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
   const m = en ? RUTAS_INDEXABLES[id].en : RUTAS_INDEXABLES[id];
   const url = ORIGIN + "/" + id;
-  return conAlternos(cabeceraPagina(m, en ? url + "?lang=en" : url, en), url)
+  let r = conAlternos(cabeceraPagina(m, en ? url + "?lang=en" : url, en), url);
+  const og = OG_IMG_RUTA[id];
+  if (og) {
+    const img = { element(el) { el.setAttribute("content", ORIGIN + (en ? og.en : og.es)); } };
+    r = r.on('meta[property="og:image"]', img)
+      .on('meta[name="twitter:image"]', img)
+      .on('meta[property="og:image:alt"]', { element(el) { el.setAttribute("content", en ? og.altEn : og.alt); } });
+  }
+  return r
     /* La página visible es esta y no la portada. Y la foto de la portada, que
        aquí no se ve, deja de pedirse con prioridad. */
     .on("main#page-inicio", { element(el) { el.setAttribute("class", "page"); } })

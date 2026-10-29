@@ -1,6 +1,6 @@
 # Regalos de diciembre — cómo se opera
 
-Página pública: `/#regalos`. Pantalla del equipo: `/admin/regalos` (con Access,
+Página pública: `/regalos`. Pantalla del equipo: `/admin/regalos` (con Access,
 en el mismo dominio que el panel). Tablas: `migrations/0048_regalos.sql`.
 
 La campaña nace en **borrador**: la página dice «muy pronto» y no muestra a
