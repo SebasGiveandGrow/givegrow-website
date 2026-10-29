@@ -20742,7 +20742,13 @@ async function portalSesion(env, request) {
     "SELECT s.hash, s.inscripcion, s.email AS entro_con, i.nombre, i.email, i.estado, i.token, i.tipo, " +
     "f.estado AS ficha_estado, f.datos AS ficha_datos FROM portal_sesiones s " +
     "JOIN inscripciones i ON i.id = s.inscripcion LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
-    "WHERE s.hash = ? AND s.cerrada_en IS NULL AND s.expira > datetime('now')"
+    "WHERE s.hash = ? AND s.cerrada_en IS NULL AND s.expira > datetime('now') " +
+    /* El correo con que se entró TIENE QUE SEGUIR AUTORIZADO (revisión de
+       seguridad del 29 oct 2026). Si el equipo cambia el correo de la
+       solicitud o quita uno autorizado, la sesión abierta con él muere en la
+       siguiente petición, no a los 30 días. */
+    "AND s.email IS NOT NULL AND (lower(s.email) = lower(i.email) OR EXISTS " +
+    "(SELECT 1 FROM portal_correos c WHERE c.inscripcion = s.inscripcion AND c.email = lower(s.email)))"
   ).bind(h).first();
   if (!s || s.tipo !== "fundacion" || !PORTAL_ESTADOS.includes(s.estado)) return null;
   await env.DB.prepare("UPDATE portal_sesiones SET ultimo_uso = datetime('now') WHERE hash = ?").bind(h).run();
@@ -20802,8 +20808,13 @@ async function apiPortalEntrar(request, env) {
     "AND estado IN ('aceptada','visitada','convenio','vinculada') " +
     "AND (lower(email) = ? OR id IN (SELECT inscripcion FROM portal_correos WHERE email = ?)) ORDER BY id DESC LIMIT 1"
   ).bind(email, email).first();
+  /* EL CORREO SALE DESPUÉS DE RESPONDER (revisión de seguridad del 29 oct
+     2026): si se esperara, la respuesta tardaría cientos de milisegundos más
+     cuando el correo existe, y el tiempo diría lo que el texto calla. */
   if (i) {
-    try { await portalMandarEnlace(env, i, email); } catch (e) { console.error("portal enlace", i.id, e && e.message); }
+    const trabajo = portalMandarEnlace(env, i, email).catch((e) => console.error("portal enlace", i.id, e && e.message));
+    const ctx = CTX_PETICION.get(request);
+    if (ctx) ctx.waitUntil(trabajo); else await trabajo;
   }
   return json({ ok: true });
 }
@@ -20823,7 +20834,10 @@ async function apiPortalSesion(request, env) {
   if (!usado) {
     return json({ error: "enlace_vencido", ayuda: "Ese enlace ya se usó o venció. Pide uno nuevo con tu correo." }, 410);
   }
-  const i = await env.DB.prepare("SELECT id, tipo, estado FROM inscripciones WHERE id = ?").bind(usado.inscripcion).first();
+  const i = await env.DB.prepare(
+    "SELECT id, tipo, estado FROM inscripciones i WHERE id = ? AND (lower(i.email) = lower(?) OR EXISTS " +
+    "(SELECT 1 FROM portal_correos c WHERE c.inscripcion = i.id AND c.email = lower(?)))"
+  ).bind(usado.inscripcion, usado.email || "", usado.email || "").first();
   if (!i || i.tipo !== "fundacion" || !PORTAL_ESTADOS.includes(i.estado)) {
     return json({ error: "sin_acceso", ayuda: "Esta solicitud ya no tiene acceso al portal. Escríbenos si crees que es un error." }, 403);
   }
@@ -20951,6 +20965,11 @@ async function apiPortalDocumento(request, env, url) {
   const ext = permitidos[tipo];
   if (!ext) {
     return json({ error: "tipo_no_permitido", ayuda: tipoDoc === "logo" ? "El logo va en PNG, JPG o WebP." : "Sube un PDF o una foto (JPG o PNG)." }, 415);
+  }
+  /* Antes de leer el cuerpo: un archivo de 100 MB no se lee entero para
+     después decir que pasa de 5 (revisión de seguridad del 29 oct 2026). */
+  if (Number(request.headers.get("content-length") || 0) > MAX_COMPROBANTE) {
+    return json({ error: "archivo_muy_grande", ayuda: "El archivo pasa de 5 MB." }, 413);
   }
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (!bytes.length) return json({ error: "archivo_vacio" }, 400);
@@ -21207,6 +21226,7 @@ async function adminFundacionGuardar(request, env, id, quien) {
     /* Quitar el correo cierra también lo que abrió: si no, su sesión de 30
        días seguiría viva. */
     await env.DB.prepare("UPDATE portal_sesiones SET cerrada_en = datetime('now') WHERE inscripcion = ? AND email = ? AND cerrada_en IS NULL").bind(id, email).run();
+    await env.DB.prepare("UPDATE portal_enlaces SET usado_en = datetime('now') WHERE inscripcion = ? AND lower(email) = ? AND usado_en IS NULL").bind(id, email).run();
     detalle = "correo retirado del portal: " + email;
   } else return json({ error: "accion_invalida" }, 400);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
@@ -21342,7 +21362,7 @@ async function apiCatalogoApadrinamiento(env) {
   const filas = (await env.DB.prepare(
     "SELECT u.id, u.nombre_es, u.nombre_en, u.programa, u.descripcion_es, u.descripcion_en, u.incluye, u.incluye_en, u.evidencia, u.evidencia_en, u.modalidad, " +
     "u.costo_mensual_cop, u.cupos, u.ods, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion " +
-    "WHERE u.estado = 'aprobada' AND i.red_id IS NOT NULL ORDER BY u.aprobada_en"
+    "WHERE u.estado = 'aprobada' AND i.red_id IS NOT NULL AND i.estado IN ('aceptada','visitada','convenio','vinculada') ORDER BY u.aprobada_en"
   ).all()).results || [];
   /* El último reporte VERIFICADO de cada unidad (0055). Solo lo aprobado. */
   const ultimo = new Map();
@@ -21414,13 +21434,21 @@ async function adminApadrinamiento(env) {
       "FROM reportes_unidad r JOIN unidades_apadrinables u ON u.id = r.unidad_id JOIN inscripciones i ON i.id = u.inscripcion " +
       "LEFT JOIN documentos_fundacion d ON d.id = r.evidencia_doc " +
       "ORDER BY CASE r.estado WHEN 'enviado' THEN 0 ELSE 1 END, r.periodo DESC LIMIT 300"
-    ).all()).results || []).map((r) => Object.assign(r, { actualizado: selloCO(r.actualizado).slice(0, 16) }));
+    ).all()).results || []).map((r) => Object.assign(r, { ver: r.actualizado, actualizado: selloCO(r.actualizado).slice(0, 16) }));
   }
   return json({ ok: true, estados: UNIDAD_ESTADO_ES, reportes,
-    unidades: unidades.map((u) => Object.assign(u, { en_red: !!(u.red_id && red.mapa.has(String(u.red_id).toLowerCase())),
+    unidades: unidades.map((u) => Object.assign(u, { ver: u.actualizada, en_red: !!(u.red_id && red.mapa.has(String(u.red_id).toLowerCase())),
       actualizada: selloCO(u.actualizada).slice(0, 16), aprobada_en: u.aprobada_en ? selloCO(u.aprobada_en).slice(0, 16) : null })),
     interes: interes.map((x) => Object.assign(x, { creado: selloCO(x.creado).slice(0, 16) })) });
 }
+
+/* LO QUE SE APRUEBA ES LO QUE SE REVISÓ (revisión de seguridad del 29 oct
+   2026). El panel manda la versión (`ver` = `actualizada`) de lo que mostró, y
+   el UPDATE solo pasa si sigue siendo esa. Si la fundación editó la unidad o
+   reenvió el reporte mientras el equipo lo miraba, no se aprueba a ciegas:
+   409 y se vuelve a abrir. Tampoco se aprueba nada retirado. */
+const unidadCambio = () => json({ error: "cambio_mientras_revisabas",
+  ayuda: "La fundación la cambió mientras la revisabas, o ya no está activa. Cierra y vuelve a abrirla para ver la versión actual." }, 409);
 
 /* POST /api/admin/unidad/<id> { accion: aprobar | rechazar | pausar } */
 async function adminUnidadDecidir(request, env, id, quien) {
@@ -21445,16 +21473,19 @@ async function adminUnidadDecidir(request, env, id, quien) {
     const ev = String(c.evidencia_en == null ? "" : c.evidencia_en).replace(/\r\n?/g, "\n").trim().slice(0, 600);
     if (ev.length < 10) return json({ error: "dato_invalido", campo: "evidencia_en", ayuda: "Falta en inglés cómo se evidencia cada mes." }, 400);
     const inc = String(c.incluye_en == null ? "" : c.incluye_en).replace(/\r\n?/g, "\n").trim().slice(0, 600) || null;
-    await env.DB.prepare(
-      "UPDATE unidades_apadrinables SET estado = 'aprobada', nombre_en = ?, descripcion_en = ?, evidencia_en = ?, incluye_en = ?, motivo = NULL, aprobada_en = datetime('now'), aprobada_por = ?, actualizada = datetime('now') WHERE id = ?"
-    ).bind(en, den, ev, inc, quien || null, id).run();
+    const r1 = await env.DB.prepare(
+      "UPDATE unidades_apadrinables SET estado = 'aprobada', nombre_en = ?, descripcion_en = ?, evidencia_en = ?, incluye_en = ?, motivo = NULL, aprobada_en = datetime('now'), aprobada_por = ?, actualizada = datetime('now') " +
+      "WHERE id = ? AND actualizada = ? AND estado <> 'retirada'"
+    ).bind(en, den, ev, inc, quien || null, id, String(c.ver || "")).run();
+    if (!r1.meta || !r1.meta.changes) return unidadCambio();
     detalle = "aprobada y publicada";
   } else if (c.accion === "rechazar" || c.accion === "pausar") {
     const motivo = limpiar(c.motivo, 500);
     if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di por qué: la fundación lo ve en su portal." }, 400);
-    await env.DB.prepare(
-      "UPDATE unidades_apadrinables SET estado = ?, motivo = ?, actualizada = datetime('now') WHERE id = ?"
-    ).bind(c.accion === "rechazar" ? "rechazada" : "pausada", motivo, id).run();
+    const r2 = await env.DB.prepare(
+      "UPDATE unidades_apadrinables SET estado = ?, motivo = ?, actualizada = datetime('now') WHERE id = ? AND actualizada = ? AND estado <> 'retirada'"
+    ).bind(c.accion === "rechazar" ? "rechazada" : "pausada", motivo, id, String(c.ver || "")).run();
+    if (!r2.meta || !r2.meta.changes) return unidadCambio();
     detalle = c.accion === "rechazar" ? "devuelta a la fundación" : "pausada";
   } else return json({ error: "accion_invalida" }, 400);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
@@ -21546,16 +21577,20 @@ async function adminReporteUnidad(request, env, id, quien) {
   let detalle;
   if (c.accion === "aprobar") {
     if (c.evidencia_revisada !== true) return json({ error: "evidencia_sin_revisar", campo: "revisada", ayuda: "Marca que abriste y revisaste la evidencia." }, 400);
-    await env.DB.prepare(
-      "UPDATE reportes_unidad SET estado = 'aprobado', motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') WHERE id = ?"
-    ).bind(quien || null, id).run();
+    const r1 = await env.DB.prepare(
+      "UPDATE reportes_unidad SET estado = 'aprobado', motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') " +
+      "WHERE id = ? AND actualizado = ? AND estado <> 'aprobado'"
+    ).bind(quien || null, id, String(c.ver || "")).run();
+    if (!r1.meta || !r1.meta.changes) return json({ error: "cambio_mientras_revisabas", ayuda: "La fundación reenvió el reporte mientras lo revisabas. Cierra y vuelve a abrirlo." }, 409);
     detalle = "aprobado";
   } else if (c.accion === "devolver") {
     const motivo = limpiar(c.motivo, 500);
     if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di qué falta: la fundación lo ve en su portal." }, 400);
-    await env.DB.prepare(
-      "UPDATE reportes_unidad SET estado = 'devuelto', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') WHERE id = ?"
-    ).bind(motivo, quien || null, id).run();
+    const r2 = await env.DB.prepare(
+      "UPDATE reportes_unidad SET estado = 'devuelto', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizado = datetime('now') " +
+      "WHERE id = ? AND actualizado = ? AND estado <> 'aprobado'"
+    ).bind(motivo, quien || null, id, String(c.ver || "")).run();
+    if (!r2.meta || !r2.meta.changes) return json({ error: "cambio_mientras_revisabas", ayuda: "La fundación reenvió el reporte mientras lo revisabas. Cierra y vuelve a abrirlo." }, 409);
     detalle = "devuelto";
   } else return json({ error: "accion_invalida" }, 400);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
@@ -43111,7 +43146,7 @@ function abrirUnidad(id){
     b.addEventListener("click", function(){
       var acc = b.getAttribute("data-ap-decidir");
       ["ap-en", "ap-den", "ap-iin", "ap-ein", "ap-ver", "ap-mot"].forEach(function(k){ pnMarcar(k, ""); });
-      var c = { accion: acc, nombre_en: pnValor("ap-en"), descripcion_en: pnValor("ap-den"), incluye_en: pnValor("ap-iin"), evidencia_en: pnValor("ap-ein"),
+      var c = { accion: acc, ver: u.ver, nombre_en: pnValor("ap-en"), descripcion_en: pnValor("ap-den"), incluye_en: pnValor("ap-iin"), evidencia_en: pnValor("ap-ein"),
         costo_verificado: document.getElementById("ap-ver").checked, motivo: pnValor("ap-mot") };
       if (acc === "aprobar" && !c.costo_verificado){ pnMarcar("ap-ver", "Verifica el costo antes de publicar."); return; }
       if (acc !== "aprobar" && c.motivo.length < 3){ pnMarcar("ap-mot", "Escribe el motivo: la fundación lo ve en su portal."); return; }
@@ -43155,7 +43190,7 @@ function abrirReporteUnidad(id){
     b.addEventListener("click", function(){
       var acc = b.getAttribute("data-rp-decidir");
       pnMarcar("rp-rev", ""); pnMarcar("rp-mot", "");
-      var c = { accion: acc, evidencia_revisada: document.getElementById("rp-rev").checked, motivo: pnValor("rp-mot") };
+      var c = { accion: acc, ver: r.ver, evidencia_revisada: document.getElementById("rp-rev").checked, motivo: pnValor("rp-mot") };
       if (acc === "aprobar" && !c.evidencia_revisada){ pnMarcar("rp-rev", "Revisa la evidencia antes de aprobar."); return; }
       if (acc === "devolver" && c.motivo.length < 3){ pnMarcar("rp-mot", "Di qué falta: la fundación lo ve."); return; }
       b.disabled = true;
@@ -46439,6 +46474,13 @@ function marcarMarca(respuesta, host) {
     .transform(respuesta);
 }
 
+/* EL CONTEXTO DE CADA PETICIÓN, colgado de la petición misma (revisión de
+   seguridad del 29 oct 2026). Sirve para `ctx.waitUntil`: trabajo que sigue
+   después de responder sin que la respuesta lo espere. Un WeakMap y no una
+   variable del módulo: un isolate atiende varias peticiones a la vez, y una
+   variable compartida le daría a una el contexto de otra. */
+const CTX_PETICION = new WeakMap();
+
 export default {
   /* LA PRIMERA TAREA PROGRAMADA DEL WORKER. Hasta hoy no había ninguna —está
      escrito unas líneas más arriba: «el disparador es un COUNT, no un cron»— y
@@ -46469,7 +46511,10 @@ export default {
     })());
   },
 
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
+    /* El contexto de ESTA petición, para lo que debe seguir después de
+       responder (ver `CTX_PETICION`). */
+    if (ctx) CTX_PETICION.set(request, ctx);
     const url = new URL(request.url);
     const ruta = url.pathname;
     /* HTTP → HTTPS, COMO RED DE ÚLTIMO RECURSO (28 sep 2026).
