@@ -1,6 +1,6 @@
 # SESSION HANDOFF — estado vigente
 
-> Actualizado: 27 oct 2026. **Este archivo se mantiene corto (menos de 8 KB).**
+> Actualizado: 29 oct 2026. **Este archivo se mantiene corto (menos de 8 KB).**
 > Lo que vino antes —jul a sep 2026, 225 KB, unos 60 000 tokens— está en
 > `ops/historial/session-handoff-hasta-sep-2026.md`. Se consulta por sección
 > (`grep -n "^## " …` y leer solo la que sirve), **nunca entero**: leerlo completo
@@ -23,20 +23,28 @@
 | Metodología MIRA y salvaguarda | `METODOLOGIA_MIRA.md`, `SALVAGUARDA.md` |
 | Incidentes | `ops/runbook-incidentes.md` |
 
-## Estado al 27 oct 2026
+## Estado al 29 oct 2026
 
-- **Producción al día con `main`.** Único PR abierto: #530 (términos de donación), espera revisión legal.
-- **En producción desde el 17 oct:** canal de quejas (#606, 0046), certificado de horas (#604, 0047), teoría de cambio (#601), tira de confianza (#602), invitación de ALMA por página (#603), código por ruta (#584), regalos (#607–#609, 0048–0049), ALMA con indicadores medidos (#610–#612), SEO con 19 rutas indexables (#614), firma de correo (`ops/correo/`, imagen en `img/correo/`).
-- **MEAL:** primeras mediciones del 2026-T3 registradas (17 oct). Indicador #1 = 1 hasta archivar los convenios de Conciencia y Ancla. #12 se calcula desde el canal de quejas.
+- **Producción al día con `main`.** Único PR abierto que no es de esta tanda: #530 (términos de donación), espera revisión legal.
+- **Migraciones aplicadas hasta la 0056.**
+- **En producción del 28 al 29 oct:**
+  - **Regalos:** imagen propia al compartir y aviso de reasignación (#621–#623); embajadores (#626, 0051).
+  - **Quejas:** enlace desde Mira Mi Casa y quejas anotadas a mano en el panel (#624, #625, 0050).
+  - **Operación:** respaldo cifrado (`ops/respaldo.mjs`, #627; faltan las llaves de Sebas) y privacidad v1.3, vigente desde el 9 nov (#628).
+  - **Panel:** informe «Por fundación» (#629).
+  - **Portal de fundaciones `/portal`:** entrada con enlace al correo, perfil editable, documentos, diseño con el recorrido de 5 pasos, correos autorizados y la zona Admin › Alianzas › Fundaciones (#630–#632, 0052–0053). Después se le sumaron «lo que han recibido» (#635) y los ODS que declaran (#636, 0056).
+  - **Apadrinamiento por unidad de impacto:** catálogo, portal, panel y `/apadrinamiento` (#633, 0054), y reporte mensual verificable (#634, 0055).
+- **Ancla (manejo especial):**
+  - Su ficha está cargada con datos verificados y vinculada a `ancla`, con un correo adicional autorizado.
+  - Le falta llenar la dirección, la frecuencia de sus programas y el costo de su unidad de impacto.
+  - Las autorizaciones 7.4 y 7.8 las marca solo ella.
 - **Pendiente de Sebas:**
-  - Cargar los 5 asesores en `/admin` › Board y enviar el informe T3.
-  - Archivar los convenios de Conciencia y Ancla.
-  - Canal de quejas: decidir punto focal y plazos.
-  - Regalos: la campaña sigue en BORRADOR hasta tener valores, aliada de EE. UU., fechas, hojas de terreno y fotos (`ops/regalos.md`).
-  - Search Console: reenviar el sitemap y pedir la indexación (pasos en #614). Revisar «Indexadas» hacia el 3 nov.
-  - Contactos del Social Fest (papel + WhatsApp + inscritos `tipo='asistente'`): consolidar FUERA del repo.
-- **SEO:** una ruta nueva va en `RUTAS_INDEXABLES` (worker.js), `RUTAS_PATH` (app.js) y `run_worker_first`; el check #28 del gate lo exige.
-- **Siguiente en el sitio:** página de la campaña con Give to Colombia (espera sus datos); alta al HUB de las fundaciones del Amazonas.
+  - Reunión con el contador sobre el cobro del apadrinamiento (fase 2). Las preguntas están fuera del repo.
+  - Sí explícito y punto focal para la fase 4 (niño identificado).
+  - Llaves y token R2 del respaldo; PayPal (textos e IPN); convenios de Conciencia y Ancla.
+  - Sueco y alemán: para después, con un revisor nativo.
+- **La lista numerada (1–49) y el plan autónomo de 7 bloques** viven en la memoria de Claude (`givegrow-lista-28oct`, `givegrow-plan-autonomo`).
+- **SEO:** una ruta nueva va en `RUTAS_INDEXABLES` (worker.js), `RUTAS_PATH` (app.js), `run_worker_first` y el sitemap; el check #28 del gate lo exige. Un módulo `js/` nuevo necesita un commit antes de que el sitemap tenga su fecha.
 
 ## Decisiones vigentes (no reabrir sin Sebas)
 
