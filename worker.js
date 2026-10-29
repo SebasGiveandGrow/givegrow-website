@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "8c546299";
+const STYLES_V = "c016f9fa";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -20888,6 +20888,26 @@ async function apiPortalYo(request, env) {
   });
 }
 
+/* GET y POST /api/portal/ods — los ODS que la fundación declara (0056). Es
+   una declaración suya; se guarda tal cual y el panel la ve. */
+async function apiPortalOds(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "ods_fundacion"))) return json({ error: "no_disponible" }, 503);
+  if (request.method === "POST") {
+    if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+    let c;
+    try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+    const lista = odsLista(c && c.ods);
+    await env.DB.batch([env.DB.prepare("DELETE FROM ods_fundacion WHERE inscripcion = ?").bind(s.inscripcion)]
+      .concat(lista.map((n) => env.DB.prepare("INSERT INTO ods_fundacion (inscripcion, ods) VALUES (?, ?)").bind(s.inscripcion, n))));
+    return json({ ok: true, ods: lista });
+  }
+  if (request.method !== "GET") return json({ error: "metodo_no_permitido" }, 405);
+  const filas = (await env.DB.prepare("SELECT ods FROM ods_fundacion WHERE inscripcion = ? ORDER BY ods").bind(s.inscripcion).all()).results || [];
+  return json({ ok: true, ods: filas.map((f) => f.ods), nombres: ODS_NOMBRES.es });
+}
+
 /* POST /api/portal/perfil { datos } — solo después de enviar el cuestionario. */
 async function apiPortalPerfil(request, env) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
@@ -21117,6 +21137,8 @@ async function adminFundacion(env, id) {
   let form = {};
   try { form = JSON.parse(i.datos || "{}"); } catch (e) { /* nada */ }
   const correos = (await env.DB.prepare("SELECT email, agregado, agregado_por FROM portal_correos WHERE inscripcion = ? ORDER BY agregado").bind(id).all()).results || [];
+  let ods = [];
+  try { ods = ((await env.DB.prepare("SELECT ods FROM ods_fundacion WHERE inscripcion = ? ORDER BY ods").bind(id).all()).results || []).map((f) => f.ods); } catch (e) { /* sin la 0056 */ }
   const red = await fundacionesRed(env);
   const enviada = i.ficha_estado === "enviada";
   const pf = enviada ? await portalPerfil(env, { inscripcion: id, ficha_datos: i.ficha_datos }) : null;
@@ -21126,6 +21148,7 @@ async function adminFundacion(env, id) {
     creada_en: fechaCO(i.creada_en), con_portal: PORTAL_ESTADOS.includes(i.estado),
     form: FUND_FORM.map((c) => ({ id: c.id, lbl: c.lbl, max: c.max, area: !!c.area, valor: form[c.id] == null ? "" : String(form[c.id]) })),
     correos: correos.map((c) => ({ email: c.email, agregado: fechaCO(c.agregado), agregado_por: c.agregado_por })),
+    ods: ods.map((n) => ({ n, nombre: ODS_NOMBRES.es[n - 1] })),
     ficha_estado: i.ficha_estado || null,
     perfil: pf ? {
       campos: PORTAL_EDITABLES.map((c) => ({ id: c.id, num: c.num, sec: c.sec, lbl: c.lbl, tipo: c.tipo, ops: c.ops || null })),
@@ -21211,6 +21234,25 @@ async function adminFundacionGuardar(request, env, id, quien) {
 
    EDITAR UNA APROBADA LA DESPUBLICA hasta la nueva revisión. Si no, la
    fundación podría cambiar el costo de algo que ya tiene el sello «verificado». */
+/* LOS 17 ODS (0056), con su nombre oficial corto en los dos idiomas. */
+const ODS_NOMBRES = {
+  es: ["Fin de la pobreza", "Hambre cero", "Salud y bienestar", "Educación de calidad", "Igualdad de género",
+    "Agua limpia y saneamiento", "Energía asequible y no contaminante", "Trabajo decente y crecimiento económico",
+    "Industria, innovación e infraestructura", "Reducción de las desigualdades", "Ciudades y comunidades sostenibles",
+    "Producción y consumo responsables", "Acción por el clima", "Vida submarina", "Vida de ecosistemas terrestres",
+    "Paz, justicia e instituciones sólidas", "Alianzas para lograr los objetivos"],
+  en: ["No poverty", "Zero hunger", "Good health and well-being", "Quality education", "Gender equality",
+    "Clean water and sanitation", "Affordable and clean energy", "Decent work and economic growth",
+    "Industry, innovation and infrastructure", "Reduced inequalities", "Sustainable cities and communities",
+    "Responsible consumption and production", "Climate action", "Life below water", "Life on land",
+    "Peace, justice and strong institutions", "Partnerships for the goals"]
+};
+/* Una lista de ODS limpia: enteros del 1 al 17, sin repetir, en orden. Acepta
+   un arreglo o el texto «4,5» de la base. */
+function odsLista(v) {
+  const a = Array.isArray(v) ? v : String(v || "").split(",");
+  return [...new Set(a.map((x) => Number(x)).filter((n) => Number.isInteger(n) && n >= 1 && n <= 17))].sort((x, y) => x - y);
+}
 const UNIDAD_MODALIDADES = ["cupo", "identificado"];
 const UNIDAD_TOPE = 20;
 const UNIDAD_ESTADO_ES = { propuesta: "Por revisar", aprobada: "Publicada", pausada: "Pausada", rechazada: "Devuelta", retirada: "Retirada" };
@@ -21226,7 +21268,8 @@ function unidadValida(c) {
     modalidad: UNIDAD_MODALIDADES.includes(c.modalidad) ? c.modalidad : null,
     costo_mensual_cop: numeroCO(c.costo_mensual_cop),
     cupos: c.cupos === "" || c.cupos == null ? null : numeroCO(c.cupos),
-    soporte_doc: c.soporte_doc ? Number(c.soporte_doc) : null
+    soporte_doc: c.soporte_doc ? Number(c.soporte_doc) : null,
+    ods: odsLista(c.ods).join(",") || null
   };
   const err = (campo, ayuda) => ({ error: "dato_invalido", campo, ayuda });
   if (u.nombre_es.length < 4) return err("nombre_es", "Escribe el nombre de la unidad, por ejemplo «Beca mensual de fútbol».");
@@ -21247,7 +21290,7 @@ async function apiPortalUnidades(request, env) {
   if (!(await existeTabla(env, "unidades_apadrinables"))) return json({ error: "no_disponible" }, 503);
   if (request.method === "GET") {
     const filas = (await env.DB.prepare(
-      "SELECT id, nombre_es, programa, descripcion_es, incluye, evidencia, modalidad, costo_mensual_cop, cupos, soporte_doc, estado, motivo, actualizada " +
+      "SELECT id, nombre_es, programa, descripcion_es, incluye, evidencia, modalidad, costo_mensual_cop, cupos, soporte_doc, ods, estado, motivo, actualizada " +
       "FROM unidades_apadrinables WHERE inscripcion = ? AND estado <> 'retirada' ORDER BY creada"
     ).bind(s.inscripcion).all()).results || [];
     return json({ ok: true, unidades: filas.map((u) => Object.assign(u, { estado_es: UNIDAD_ESTADO_ES[u.estado], actualizada: fechaCO(u.actualizada) })),
@@ -21278,17 +21321,17 @@ async function apiPortalUnidades(request, env) {
     if (!previa || previa.estado === "retirada") return json({ error: "no_encontrado" }, 404);
     await env.DB.prepare(
       "UPDATE unidades_apadrinables SET nombre_es = ?, programa = ?, descripcion_es = ?, incluye = ?, evidencia = ?, modalidad = ?, " +
-      "costo_mensual_cop = ?, cupos = ?, soporte_doc = ?, estado = 'propuesta', motivo = NULL, aprobada_en = NULL, aprobada_por = NULL, " +
+      "costo_mensual_cop = ?, cupos = ?, soporte_doc = ?, ods = ?, estado = 'propuesta', motivo = NULL, aprobada_en = NULL, aprobada_por = NULL, " +
       "actualizada = datetime('now') WHERE id = ?"
-    ).bind(u.nombre_es, u.programa, u.descripcion_es, u.incluye, u.evidencia, u.modalidad, u.costo_mensual_cop, u.cupos, u.soporte_doc, previa.id).run();
+    ).bind(u.nombre_es, u.programa, u.descripcion_es, u.incluye, u.evidencia, u.modalidad, u.costo_mensual_cop, u.cupos, u.soporte_doc, u.ods, previa.id).run();
     return json({ ok: true, id: previa.id, despublicada: previa.estado === "aprobada" });
   }
   const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM unidades_apadrinables WHERE inscripcion = ? AND estado <> 'retirada'").bind(s.inscripcion).first();
   if (n && n.n >= UNIDAD_TOPE) return json({ error: "tope_alcanzado", ayuda: "Ya tienes " + UNIDAD_TOPE + " unidades. Retira alguna antes de proponer otra." }, 409);
   const fila = await env.DB.prepare(
-    "INSERT INTO unidades_apadrinables (inscripcion, nombre_es, programa, descripcion_es, incluye, evidencia, modalidad, costo_mensual_cop, cupos, soporte_doc) " +
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
-  ).bind(s.inscripcion, u.nombre_es, u.programa, u.descripcion_es, u.incluye, u.evidencia, u.modalidad, u.costo_mensual_cop, u.cupos, u.soporte_doc).first();
+    "INSERT INTO unidades_apadrinables (inscripcion, nombre_es, programa, descripcion_es, incluye, evidencia, modalidad, costo_mensual_cop, cupos, soporte_doc, ods) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(s.inscripcion, u.nombre_es, u.programa, u.descripcion_es, u.incluye, u.evidencia, u.modalidad, u.costo_mensual_cop, u.cupos, u.soporte_doc, u.ods).first();
   return json({ ok: true, id: fila.id });
 }
 
@@ -21298,7 +21341,7 @@ async function apiCatalogoApadrinamiento(env) {
   const red = await fundacionesRed(env);
   const filas = (await env.DB.prepare(
     "SELECT u.id, u.nombre_es, u.nombre_en, u.programa, u.descripcion_es, u.descripcion_en, u.incluye, u.incluye_en, u.evidencia, u.evidencia_en, u.modalidad, " +
-    "u.costo_mensual_cop, u.cupos, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion " +
+    "u.costo_mensual_cop, u.cupos, u.ods, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion " +
     "WHERE u.estado = 'aprobada' AND i.red_id IS NOT NULL ORDER BY u.aprobada_en"
   ).all()).results || [];
   /* El último reporte VERIFICADO de cada unidad (0055). Solo lo aprobado. */
@@ -21311,13 +21354,14 @@ async function apiCatalogoApadrinamiento(env) {
   }
   const unidades = filas.filter((u) => red.mapa.has(String(u.red_id).toLowerCase())).map((u) => ({
     ultimo_reporte: ultimo.get(u.id) || null,
+    ods: odsLista(u.ods),
     id: u.id, nombre: { es: u.nombre_es, en: u.nombre_en || u.nombre_es }, programa: u.programa,
     descripcion: { es: u.descripcion_es, en: u.descripcion_en || u.descripcion_es },
     incluye: u.incluye ? { es: u.incluye, en: u.incluye_en || u.incluye } : null,
     evidencia: { es: u.evidencia, en: u.evidencia_en || u.evidencia }, modalidad: u.modalidad, costo_mensual_cop: u.costo_mensual_cop,
     cupos: u.cupos, fundacion: { id: String(u.red_id).toLowerCase(), nombre: red.mapa.get(String(u.red_id).toLowerCase()) }
   }));
-  return new Response(JSON.stringify({ ok: true, unidades }), { headers: {
+  return new Response(JSON.stringify({ ok: true, unidades, ods_nombres: ODS_NOMBRES }), { headers: {
     "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=120" } });
 }
 
@@ -21641,6 +21685,9 @@ function paginaPortal(nonce) {
   .msg.ok{color:var(--acc);font-weight:600}
   .oculto{display:none !important}
   .mt{margin-top:14px}
+  .ods-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 14px;margin-top:10px}
+  .ods-grid .op{margin-top:6px}
+  .ods-n{display:inline-block;min-width:30px;margin-right:2px;font-family:"Unbounded",system-ui,sans-serif;font-weight:600;color:var(--acc)}
 
   /* EL RECORRIDO: los cinco pasos del HUB, el elemento firma de la página. */
   .recorrido{list-style:none;display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:22px 0 6px;counter-reset:paso}
@@ -21822,6 +21869,9 @@ function paginaPortal(nonce) {
         <label for="ap-mod">Modalidad *</label>
         <label class="op"><input type="radio" name="ap-mod" value="cupo" id="ap-mod"><span><strong>Cupo.</strong> El padrino sostiene un lugar en el programa y recibe los avances del grupo. Sin nombres ni fotos de un niño concreto.</span></label>
         <label class="op"><input type="radio" name="ap-mod" value="identificado"><span><strong>Niño identificado.</strong> El padrino conoce el nombre de pila del niño y su avance. Exige la autorización escrita de su acudiente, y nunca hay contacto directo entre el padrino y el niño.</span></label>
+        <label>ODS a los que aporta esta unidad</label>
+        <span class="ayuda">Marca solo los que de verdad toca. Salen en la tarjeta pública de la unidad.</span>
+        <div class="ods-grid" id="ap-ods"></div>
         <label for="ap-evid">Cómo nos vas a mostrar cada mes que se entregó *</label>
         <span class="ayuda">Lista de asistencia, acta de entrega, fotos donde ningún menor sea identificable…</span>
         <textarea id="ap-evid" rows="3" maxlength="600"></textarea>
@@ -21998,6 +22048,45 @@ function pintarRecibido(){
   caja.innerHTML = h;
 }
 
+/* ---- ODS (0056) ---- */
+var ODS = ["Fin de la pobreza", "Hambre cero", "Salud y bienestar", "Educación de calidad", "Igualdad de género",
+  "Agua limpia y saneamiento", "Energía asequible y no contaminante", "Trabajo decente y crecimiento económico",
+  "Industria, innovación e infraestructura", "Reducción de las desigualdades", "Ciudades y comunidades sostenibles",
+  "Producción y consumo responsables", "Acción por el clima", "Vida submarina", "Vida de ecosistemas terrestres",
+  "Paz, justicia e instituciones sólidas", "Alianzas para lograr los objetivos"];
+var MIS_ODS = null;
+function cajasOds(prefijo, marcados){
+  return ODS.map(function(nombre, i){
+    var n = i + 1;
+    return '<label class="op"><input type="checkbox" data-ods="' + prefijo + '" value="' + n + '"' + (marcados.indexOf(n) > -1 ? " checked" : "") + '><span><span class="ods-n">' + n + "</span>" + esc(nombre) + "</span></label>";
+  }).join("");
+}
+function odsMarcados(prefijo){
+  var r = []; document.querySelectorAll('input[data-ods="' + prefijo + '"]:checked').forEach(function(x){ r.push(Number(x.value)); }); return r;
+}
+function pintarOdsPerfil(){
+  var caja = $("p-ods");
+  if (!caja) return;
+  if (MIS_ODS === null) {
+    fetch("/api/portal/ods", { credentials: "same-origin" }).then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ MIS_ODS = d ? d.ods : []; pintarOdsPerfil(); }).catch(function(){});
+    return;
+  }
+  caja.innerHTML = "<h2>Objetivos de Desarrollo Sostenible que trabajan</h2>" +
+    '<p class="sub">Marca los ODS a los que aporta el trabajo de la fundación. Es su declaración: el sitio la mostrará así cuando publiquemos el mapa de ODS de la red.</p>' +
+    '<div class="ods-grid">' + cajasOds("perfil", MIS_ODS) + "</div>" +
+    '<div class="acciones"><button type="button" class="btn sec" id="b-ods">Guardar los ODS</button></div><span class="msg" id="m-ods" role="status" aria-live="polite"></span>';
+  $("b-ods").addEventListener("click", function(){
+    var b = this; b.disabled = true; msg("m-ods", "Guardando…");
+    enviar("/api/portal/ods", { ods: odsMarcados("perfil") }).then(function(r){
+      b.disabled = false;
+      if (r.status === 401) { ver("v-entrar"); return; }
+      if (!r.ok) { msg("m-ods", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
+      MIS_ODS = r.d.ods; msg("m-ods", "Guardados: " + (MIS_ODS.length ? MIS_ODS.join(", ") : "ninguno") + ".", "ok");
+    }).catch(function(){ b.disabled = false; msg("m-ods", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+  });
+}
+
 function campo(c, v){
   var id = "pf-" + c.id;
   var cab = '<label for="' + id + '"><span class="num">' + esc(c.num) + "</span>" + esc(c.lbl) + (c.req ? " *" : "") + "</label>" +
@@ -22013,7 +22102,9 @@ function pintarPerfil(){
   var caja = $("s-perfil");
   if (!D.perfil) {
     caja.innerHTML = '<div class="tarjeta aviso"><h2>Tu perfil se abre después del cuestionario</h2><p class="sub">Cuando lo envíes, aquí lo mantienes al día.</p>' +
-      (D.cuestionario ? '<div class="acciones"><a class="btn" href="' + esc(D.cuestionario) + '">Abrir el cuestionario</a></div>' : "") + "</div>";
+      (D.cuestionario ? '<div class="acciones"><a class="btn" href="' + esc(D.cuestionario) + '">Abrir el cuestionario</a></div>' : "") + "</div>" +
+      '<div class="tarjeta" id="p-ods"></div>';
+    pintarOdsPerfil();
     return;
   }
   var P = D.perfil, h = "", sec = "", abierta = false;
@@ -22025,7 +22116,9 @@ function pintarPerfil(){
   });
   if (abierta) h += "</div>";
   h += '<hr class="regla"><p class="sub">Las autorizaciones —nombre, logo, fotos y menores— quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p></form>';
+  h += '<div class="tarjeta" id="p-ods"></div>';
   caja.innerHTML = h;
+  pintarOdsPerfil();
   SUCIO = false; msg("m-perfil", "");
   $("f-perfil").addEventListener("input", function(){ if (!SUCIO) { SUCIO = true; msg("m-perfil", "Tienes cambios sin guardar."); } });
 }
@@ -22141,7 +22234,8 @@ function cargarUnidades(){
   return fetch("/api/portal/unidades", { credentials: "same-origin" }).then(function(r){
     if (r.status === 401) { ver("v-entrar"); return null; }
     return r.json();
-  }).then(function(d){ if (!d) return; UNIDADES = d.unidades || []; pintarUnidades(); pintarReporte(); })
+  }).then(function(d){ if (!d) return; UNIDADES = d.unidades || []; pintarUnidades();
+    if (!$("ap-ods").innerHTML) $("ap-ods").innerHTML = cajasOds("unidad", []); pintarReporte(); })
     .catch(function(){ $("ap-lista").innerHTML = '<p class="sub">No pudimos cargar tus unidades. Intenta de nuevo.</p>'; });
 }
 function pintarUnidades(){
@@ -22167,6 +22261,7 @@ function formUnidad(u){
   $("ap-desc").value = u ? u.descripcion_es : ""; $("ap-incluye").value = u ? (u.incluye || "") : "";
   $("ap-costo").value = u ? u.costo_mensual_cop : ""; $("ap-cupos").value = u && u.cupos ? u.cupos : "";
   $("ap-evid").value = u ? u.evidencia : ""; $("ap-soporte").value = u && u.soporte_doc ? String(u.soporte_doc) : "";
+  $("ap-ods").innerHTML = cajasOds("unidad", u && u.ods ? String(u.ods).split(",").map(Number) : []);
   document.querySelectorAll('input[name="ap-mod"]').forEach(function(r){ r.checked = !!u && r.value === u.modalidad; });
   $("ap-titulo").textContent = u ? "Editar «" + u.nombre_es + "»" : "Proponer una unidad";
   $("b-unidad").textContent = u ? "Guardar y enviar a revisión" : "Proponer";
@@ -22177,7 +22272,8 @@ function guardarUnidad(){
   var mod = document.querySelector('input[name="ap-mod"]:checked');
   var c = { accion: "guardar", id: $("ap-id").value || null, nombre_es: $("ap-nombre").value, programa: $("ap-programa").value,
     descripcion_es: $("ap-desc").value, incluye: $("ap-incluye").value, costo_mensual_cop: $("ap-costo").value,
-    cupos: $("ap-cupos").value.trim(), evidencia: $("ap-evid").value, modalidad: mod ? mod.value : "", soporte_doc: $("ap-soporte").value || null };
+    cupos: $("ap-cupos").value.trim(), evidencia: $("ap-evid").value, modalidad: mod ? mod.value : "", soporte_doc: $("ap-soporte").value || null,
+    ods: odsMarcados("unidad") };
   var b = $("b-unidad"); b.disabled = true; msg("m-unidad", "Guardando…");
   enviar("/api/portal/unidades", c).then(function(r){
     b.disabled = false;
@@ -42874,6 +42970,9 @@ function abrirFundacion(id){
         "Une la solicitud con las donaciones dirigidas a esa fundación.");
     h += '<p class="pn-h3">Formulario de solicitud</p>' + d.form.map(function(c){ return fzCampo("fzf-" + c.id, c.lbl, c.valor, c.area, c.max); }).join("");
     h += '<button type="button" class="pn-b1" id="fz-guardar-datos">Guardar contacto y formulario</button>';
+    h += '<p class="pn-h3">ODS que declara</p>' + (d.ods && d.ods.length
+      ? "<p>" + d.ods.map(function(o){ return "<strong>" + o.n + "</strong> " + esc(o.nombre); }).join(" · ") + '</p><p class="mu">Es una declaración de la fundación desde su portal, no una medición.</p>'
+      : '<p class="mu">Todavía no ha marcado ninguno en su portal.</p>');
     h += '<p class="pn-h3">Correos que pueden entrar al portal</p>' +
       '<p class="mu">El de la solicitud (' + esc(d.email) + ') siempre puede. Estos son adicionales.' + (d.con_portal ? "" : " Hoy el portal está cerrado para esta fundación: se abre desde «aceptada».") + "</p>" +
       (d.correos.length ? "<ul>" + d.correos.map(function(c){
@@ -42985,6 +43084,7 @@ function abrirUnidad(id){
     ["Qué hace", '<div class="qj-msg">' + esc(u.descripcion_es) + "</div>"],
     ["Qué cubre", u.incluye ? '<div class="qj-msg">' + esc(u.incluye) + "</div>" : '<span class="mu">—</span>'],
     ["Costo al mes", dinero(u.costo_mensual_cop * 100, "COP") + (u.cupos ? "<small>" + u.cupos + " cupos</small>" : "<small>sin tope de cupos</small>")],
+    ["ODS", u.ods ? esc(u.ods.split(",").join(" · ")) : '<span class="mu">No los marcó</span>'],
     ["Modalidad", u.modalidad === "identificado" ? "Niño identificado<small>exige la autorización escrita de cada acudiente antes de asignar un niño</small>" : "Cupo"],
     ["Evidencia mensual", '<div class="qj-msg">' + esc(u.evidencia) + "</div>"],
     ["Soporte del costo", u.soporte_doc ? '<a href="/api/admin/portal-doc/' + u.soporte_doc + '">' + esc(u.soporte_tipo || "documento") + (u.soporte_nota ? " · " + esc(u.soporte_nota) : "") + "</a>" : '<span class="mu">No adjuntó soporte</span>'],
@@ -47528,6 +47628,7 @@ export default {
         if (ruta === "/api/portal/salir")   return await apiPortalSalir(request, env);
         if (ruta === "/api/portal/yo")      return await apiPortalYo(request, env);
         if (ruta === "/api/portal/perfil")  return await apiPortalPerfil(request, env);
+        if (ruta === "/api/portal/ods")     return await apiPortalOds(request, env);
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);

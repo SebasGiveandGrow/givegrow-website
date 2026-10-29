@@ -6,7 +6,7 @@
 
    Fase 1: no se cobra. «Quiero apadrinar» lleva al formulario de aviso con la
    unidad ya elegida, y el aviso lo guarda /api/apadrinamiento/interes. */
-var APU = { datos: null, pidiendo: null, enviando: false };
+var APU = { datos: null, pidiendo: null, enviando: false, ods: null };
 
 function apuEl(id){ return document.getElementById(id); }
 function apuPesos(n){ return "$" + Math.round(Number(n) || 0).toLocaleString(lang === "en" ? "en-US" : "es-CO"); }
@@ -17,7 +17,7 @@ function apuEntrar(){
   if (APU.datos) { apuPinta(); return; }
   if (APU.pidiendo) return;
   APU.pidiendo = fetch("/api/apadrinamiento").then(function(r){ if (!r.ok) throw 0; return r.json(); })
-    .then(function(d){ APU.datos = d.unidades || []; APU.pidiendo = null; apuPinta(); })
+    .then(function(d){ APU.datos = d.unidades || []; APU.ods = d.ods_nombres || null; APU.pidiendo = null; apuPinta(); })
     .catch(function(){
       APU.pidiendo = null;
       var l = apuEl("apu-lista");
@@ -41,6 +41,7 @@ function apuPinta(){
         apuVerificado(u.ultimo_reporte, u.cupos) +
         '<p class="apu-u-chips"><span class="apu-chip">' + escapeHtml(mod) + "</span>" +
           (u.cupos ? '<span class="apu-chip">' + escapeHtml(t("apu.cupos").replace("{n}", u.cupos)) + "</span>" : "") + "</p>" +
+        apuOds(u.ods) +
         '<p class="apu-u-desc">' + escapeHtml(apuTxt(u.descripcion)) + "</p>" +
         (u.incluye ? '<p class="apu-u-dato"><span>' + escapeHtml(t("apu.incluye")) + "</span>" + escapeHtml(apuTxt(u.incluye)) + "</p>" : "") +
         '<p class="apu-u-dato"><span>' + escapeHtml(t("apu.evid")) + "</span>" + escapeHtml(apuTxt(u.evidencia)) + "</p>" +
@@ -68,6 +69,16 @@ function apuVerificado(r, cupos){
   var x = String(r.periodo).split("-");
   var mes = new Date(Date.UTC(Number(x[0]), Number(x[1]) - 1, 15)).toLocaleDateString(lang === "en" ? "en-US" : "es-CO", { month: "long", year: "numeric", timeZone: "UTC" });
   return '<p class="apu-u-ver">' + escapeHtml(t("apu.ver").replace("{m}", mes).replace("{n}", r.entregadas + (cupos ? " / " + cupos : ""))) + "</p>";
+}
+
+/* LOS ODS DE LA UNIDAD (0056): número y nombre oficial en el idioma de la
+   pantalla. Los declara la fundación y pasan por la revisión de la unidad. */
+function apuOds(lista){
+  if (!lista || !lista.length || !APU.ods) return "";
+  var nom = APU.ods[lang === "en" ? "en" : "es"] || APU.ods.es;
+  return '<p class="apu-u-ods"><span class="apu-u-ods-t">' + escapeHtml(t("apu.ods")) + "</span>" + lista.map(function(n){
+    return '<span class="apu-ods">' + n + " · " + escapeHtml(nom[n - 1] || "") + "</span>";
+  }).join("") + "</p>";
 }
 
 /* LA CALCULADORA: con este monto al mes, cuántas unidades completas de cada

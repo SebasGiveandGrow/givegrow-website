@@ -2591,5 +2591,6 @@
   "apu.fund.btn": "Go to the foundation portal →",
   "foot.apadrinamiento": "Sponsorship",
   "apu.ver": "Last verified report · {m}: {n} delivered",
-  "apu.ver.no": "No verified report yet: this unit is new."
+  "apu.ver.no": "No verified report yet: this unit is new.",
+  "apu.ods": "Contributes to the SDGs"
 }

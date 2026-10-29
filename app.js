@@ -2628,6 +2628,7 @@ var I18N = {
     "apu.incluye":"Qué cubre",
     "apu.evid":"Cómo se evidencia cada mes",
     "apu.btn":"Quiero apadrinar",
+    "apu.ods":"Aporta a los ODS",
     "apu.ver":"Último reporte verificado · {m}: {n} entregadas",
     "apu.ver.no":"Todavía sin reporte verificado: la unidad es nueva.",
     "apu.calc.n1":"Alcanza para 1 al mes",
@@ -3601,7 +3602,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "d830013e", apadrinamiento: "b067d115" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "d830013e", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
