@@ -2592,5 +2592,16 @@
   "foot.apadrinamiento": "Sponsorship",
   "apu.ver": "Last verified report · {m}: {n} delivered",
   "apu.ver.no": "No verified report yet: this unit is new.",
-  "apu.ods": "Contributes to the SDGs"
+  "apu.ods": "Contributes to the SDGs",
+  "odsr.ey": "The network and the SDGs",
+  "odsr.t": "The Sustainable Development Goals the network works on",
+  "odsr.p": "Each Hub foundation declares which SDGs its work contributes to, and each unit you can sponsor states its own. This is what they declare, not a measurement: what we do measure, with its source, is in the theory of change.",
+  "odsr.nota": "Declared by the network's foundations from their portal. Only foundations already linked to the Hub appear.",
+  "odsr.link": "See the theory of change and its indicators →",
+  "odsr.vacio": "The network's foundations are marking their SDGs. You'll see them here soon.",
+  "odsr.f1": "1 foundation",
+  "odsr.fn": "{n} foundations",
+  "odsr.u1": "1 unit to sponsor",
+  "odsr.un": "{n} units to sponsor",
+  "odsr.nadie": "None yet"
 }

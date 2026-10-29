@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=c016f9fa">
+<link rel="stylesheet" href="/styles.css?v=bb2ff3c0">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=c86040df" defer></script>
+<script src="/app.js?v=bfe880ed" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -444,6 +444,18 @@
       <div id="aportantes-empty" class="grat-empty rv d2" style="display:none">
         <p data-i18n="hub.aporta.empty">Estamos formalizando las primeras aliadas que aportan al HUB SOCIAL. Aquí verás qué le entrega cada una — con evidencia, no promesas.</p>
       </div>
+    </div>
+  </section>
+  <!-- EL MAPA DE ODS DE LA RED (ítem 47, 29 oct 2026). Lo pinta app.js desde
+       /api/ods-red: lo que DECLARAN las fundaciones de la red, no una medición. -->
+  <section class="cream" id="odsr-sec">
+    <div class="wrap">
+      <span class="ey rv" data-i18n="odsr.ey">La red y los ODS</span>
+      <h2 class="h-sec rv" data-i18n="odsr.t">Los Objetivos de Desarrollo Sostenible que trabaja la red</h2>
+      <p class="lead rv d1" data-i18n="odsr.p">Cada fundación del HUB declara a qué ODS aporta su trabajo, y cada unidad que se puede apadrinar dice los suyos. Es lo que ellas declaran, no una medición: lo que sí medimos, con su fuente, está en la teoría de cambio.</p>
+      <div class="odsr-grid" id="odsr-grid" aria-live="polite"></div>
+      <p class="mu odsr-nota" data-i18n="odsr.nota">Declarado por las fundaciones de la red desde su portal. Solo aparecen fundaciones ya vinculadas al HUB.</p>
+      <p><a class="card-link" href="#teoria-de-cambio" data-i18n="odsr.link">Ver la teoría de cambio y sus indicadores →</a></p>
     </div>
   </section>
   <section>
