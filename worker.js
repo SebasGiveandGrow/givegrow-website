@@ -20711,7 +20711,7 @@ async function portalSesion(env, request) {
   if (!t) return null;
   const h = await sha256Hex(t);
   const s = await env.DB.prepare(
-    "SELECT s.hash, s.inscripcion, i.nombre, i.email, i.estado, i.token, i.tipo, " +
+    "SELECT s.hash, s.inscripcion, s.email AS entro_con, i.nombre, i.email, i.estado, i.token, i.tipo, " +
     "f.estado AS ficha_estado, f.datos AS ficha_datos FROM portal_sesiones s " +
     "JOIN inscripciones i ON i.id = s.inscripcion LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
     "WHERE s.hash = ? AND s.cerrada_en IS NULL AND s.expira > datetime('now')"
@@ -20725,15 +20725,18 @@ function portalSinSesion() {
 }
 
 /* Crea el enlace y lo manda. Lo usan la entrada pública y el botón del panel. */
-async function portalMandarEnlace(env, i) {
+/* `para` es el correo con que se pidió: el de la solicitud o uno de los
+   autorizados (0053). El enlace va SIEMPRE a ese correo, nunca a otro. */
+async function portalMandarEnlace(env, i, para) {
+  para = String(para || i.email || "").toLowerCase();
   const recientes = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM portal_enlaces WHERE inscripcion = ? AND creado > datetime('now', '-1 hour')"
   ).bind(i.id).first();
   if (recientes && recientes.n >= 5) return { ok: false, motivo: "demasiados" };
   const t = tokenNuevo();
   await env.DB.prepare(
-    "INSERT INTO portal_enlaces (hash, inscripcion, expira) VALUES (?, ?, datetime('now', ?))"
-  ).bind(await sha256Hex(t), i.id, "+" + PORTAL_ENLACE_MIN + " minutes").run();
+    "INSERT INTO portal_enlaces (hash, inscripcion, expira, email) VALUES (?, ?, datetime('now', ?), ?)"
+  ).bind(await sha256Hex(t), i.id, "+" + PORTAL_ENLACE_MIN + " minutes", para).run();
   const enlace = ORIGIN + "/portal?t=" + t;
   const titulo = "Tu enlace para entrar al portal de Give&Grow";
   const parrafos = [
@@ -20742,7 +20745,7 @@ async function portalMandarEnlace(env, i) {
     "Si no lo pediste tú, no tienes que hacer nada: sin este enlace nadie entra."
   ];
   await enviarCorreo(env, {
-    para: i.email, asunto: titulo, etiqueta: "portal-enlace",
+    para, asunto: titulo, etiqueta: "portal-enlace",
     texto: [titulo, "", ...parrafos, "", "Entrar: " + enlace].join("\n"),
     html: plantillaCorreo({ titulo, parrafos, boton: { url: enlace, texto: "Entrar al portal" },
       cierre: "Fundación Give&Grow International · NIT 901.948.930-2" })
@@ -20765,12 +20768,14 @@ async function apiPortalEntrar(request, env) {
   if (!(await pasaTopeIP(env, request, "portal"))) {
     return json({ error: "demasiados_intentos", ayuda: "Hoy ya se pidieron muchos enlaces desde esta conexión. Inténtalo mañana o escríbenos." }, 429);
   }
+  /* El correo de la solicitud o uno autorizado desde el panel (0053). */
   const i = await env.DB.prepare(
-    "SELECT id, nombre, email FROM inscripciones WHERE tipo = 'fundacion' AND lower(email) = ? " +
-    "AND estado IN ('aceptada','visitada','convenio','vinculada') ORDER BY id DESC LIMIT 1"
-  ).bind(email).first();
+    "SELECT id, nombre, email FROM inscripciones WHERE tipo = 'fundacion' " +
+    "AND estado IN ('aceptada','visitada','convenio','vinculada') " +
+    "AND (lower(email) = ? OR id IN (SELECT inscripcion FROM portal_correos WHERE email = ?)) ORDER BY id DESC LIMIT 1"
+  ).bind(email, email).first();
   if (i) {
-    try { await portalMandarEnlace(env, i); } catch (e) { console.error("portal enlace", i.id, e && e.message); }
+    try { await portalMandarEnlace(env, i, email); } catch (e) { console.error("portal enlace", i.id, e && e.message); }
   }
   return json({ ok: true });
 }
@@ -20785,7 +20790,7 @@ async function apiPortalSesion(request, env) {
   if (!/^[a-f0-9]{32}$/.test(t)) return json({ error: "enlace_invalido" }, 400);
   const usado = await env.DB.prepare(
     "UPDATE portal_enlaces SET usado_en = datetime('now') WHERE hash = ? AND usado_en IS NULL " +
-    "AND expira > datetime('now') RETURNING inscripcion"
+    "AND expira > datetime('now') RETURNING inscripcion, email"
   ).bind(await sha256Hex(t)).first();
   if (!usado) {
     return json({ error: "enlace_vencido", ayuda: "Ese enlace ya se usó o venció. Pide uno nuevo con tu correo." }, 410);
@@ -20796,8 +20801,8 @@ async function apiPortalSesion(request, env) {
   }
   const sesion = tokenNuevo() + tokenNuevo();
   await env.DB.prepare(
-    "INSERT INTO portal_sesiones (hash, inscripcion, expira) VALUES (?, ?, datetime('now', ?))"
-  ).bind(await sha256Hex(sesion), i.id, "+" + PORTAL_SESION_DIAS + " days").run();
+    "INSERT INTO portal_sesiones (hash, inscripcion, expira, email) VALUES (?, ?, datetime('now', ?), ?)"
+  ).bind(await sha256Hex(sesion), i.id, "+" + PORTAL_SESION_DIAS + " days", usado.email || null).run();
   return new Response(JSON.stringify({ ok: true }), { headers: {
     "content-type": "application/json; charset=utf-8", "cache-control": "no-store",
     "set-cookie": "gg-portal=" + sesion + "; Path=/; Max-Age=" + (PORTAL_SESION_DIAS * 86400) + "; HttpOnly; Secure; SameSite=Lax"
@@ -20838,7 +20843,7 @@ async function apiPortalYo(request, env) {
     "WHERE inscripcion = ? AND retirado_en IS NULL ORDER BY subido DESC"
   ).bind(s.inscripcion).all()).results || [];
   return json({
-    ok: true, nombre: s.nombre, email: s.email, estado: s.estado, estado_es: PORTAL_ESTADO_ES[s.estado] || s.estado,
+    ok: true, nombre: s.nombre, email: s.entro_con || s.email, estado: s.estado, estado_es: PORTAL_ESTADO_ES[s.estado] || s.estado,
     cuestionario: s.estado === "visitada" && s.ficha_estado !== "enviada" && s.token ? "/ficha/" + s.token : null,
     ficha_enviada: editable,
     perfil: editable ? {
@@ -20996,13 +21001,165 @@ async function adminPortalAccion(request, env, insc, email) {
       return json({ error: "sin_acceso", ayuda: "El portal se abre desde «aceptada». Esta solicitud está en «" + i.estado + "»." }, 409);
     }
     if (!RE_CORREO.test(String(i.email || ""))) return json({ error: "sin_correo", ayuda: "La solicitud no tiene un correo válido." }, 409);
-    const r = await portalMandarEnlace(env, i);
+    const r = await portalMandarEnlace(env, i, i.email);
     if (!r.ok) return json({ error: "demasiados", ayuda: "Ya se mandaron 5 enlaces en la última hora." }, 429);
     detalle = "enlace del portal enviado";
   } else return json({ error: "accion_invalida" }, 400);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(email || "?", "inscripcion " + insc + " · " + detalle).run();
   return json({ ok: true, para: c.accion === "invitar" ? i.email : undefined });
+}
+
+
+/* ============================================================================
+   LA ZONA «FUNDACIONES» DEL PANEL (0053, 29 oct 2026)
+   ============================================================================
+   Una fila por fundación con solicitud (menos las archivadas) y, aparte, las
+   de la red que no tienen solicitud. Cada una se abre y se edita: el contacto,
+   el formulario con que aplicó, su vínculo con partners.json, los correos que
+   pueden entrar al portal y su perfil.
+
+   LO QUE EDITA EL EQUIPO NO REESCRIBE LA FICHA. El perfil editado va a
+   `perfil_fundacion`, igual que lo que edita la fundación, y queda revisado
+   (lo hizo el equipo). La ficha enviada sigue siendo el registro de lo que la
+   fundación firmó. Las autorizaciones no se editan aquí: cambian con un
+   documento de la fundación, no con un clic. */
+const FUND_FORM = [
+  { id: "sigla", lbl: "Sigla o nombre corto", max: 80 },
+  { id: "lider", lbl: "Quién la lidera", max: 120 },
+  { id: "cargo", lbl: "Cargo de quien la lidera", max: 120 },
+  { id: "anio", lbl: "Año de fundación", max: 10 },
+  { id: "zona", lbl: "Zona donde trabaja", max: 200 },
+  { id: "historia", lbl: "Historia", max: 2000, area: true },
+  { id: "mision", lbl: "Misión", max: 2000, area: true },
+  { id: "atiende", lbl: "A cuántas personas atiende", max: 80 },
+  { id: "conteo", lbl: "Cómo cuenta a esas personas", max: 300 },
+  { id: "programa", lbl: "Programa principal", max: 160 },
+  { id: "programa_desc", lbl: "Qué hace ese programa", max: 1200, area: true },
+  { id: "evidencia", lbl: "Evidencia que tiene", max: 600, area: true },
+  { id: "web", lbl: "Sitio web", max: 300 },
+  { id: "instagram", lbl: "Instagram", max: 120 }
+];
+
+/* GET /api/admin/fundaciones */
+async function adminFundaciones(env) {
+  if (!(await existeTabla(env, "portal_correos"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0053 en la base." }, 409);
+  const red = await fundacionesRed(env);
+  const filas = (await env.DB.prepare(
+    "SELECT i.id, i.nombre, i.email, i.telefono, i.ciudad, i.estado, i.red_id, i.creada_en, f.estado AS ficha, " +
+    "(SELECT COUNT(*) FROM portal_correos c WHERE c.inscripcion = i.id) AS correos, " +
+    "(SELECT MAX(COALESCE(s.ultimo_uso, s.creada)) FROM portal_sesiones s WHERE s.inscripcion = i.id) AS ultima, " +
+    "(SELECT COUNT(*) FROM documentos_fundacion d WHERE d.inscripcion = i.id AND d.retirado_en IS NULL) AS docs, " +
+    "(SELECT COUNT(*) FROM documentos_fundacion d WHERE d.inscripcion = i.id AND d.retirado_en IS NULL AND d.revisado_en IS NULL) AS docs_por_revisar, " +
+    "(SELECT COUNT(*) FROM perfil_fundacion p WHERE p.inscripcion = i.id AND p.revisado_en IS NULL) AS perfil_por_revisar " +
+    "FROM inscripciones i LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
+    "WHERE i.tipo = 'fundacion' AND i.estado <> 'archivada' ORDER BY i.nombre COLLATE NOCASE"
+  ).all()).results || [];
+  const dinero = new Map();
+  for (const x of (await env.DB.prepare(
+    "SELECT a.destino_id AS d, SUM(CASE WHEN a.moneda = 'COP' THEN a.monto_centavos ELSE 0 END) AS cop, " +
+    "SUM(CASE WHEN a.moneda = 'COP' AND a.estado = 'entregada' THEN a.monto_centavos ELSE 0 END) AS entregado " +
+    "FROM aportes a WHERE " + APORTE_CONFIRMADO + " AND a.destino_id IS NOT NULL GROUP BY 1"
+  ).all()).results || []) dinero.set(String(x.d).toLowerCase(), x);
+  const usados = new Set();
+  const fundaciones = filas.map((f) => {
+    const rid = f.red_id ? String(f.red_id).toLowerCase() : null;
+    if (rid) usados.add(rid);
+    const m = rid ? dinero.get(rid) : null;
+    return Object.assign(f, { red_nombre: rid ? (red.mapa.get(rid) || rid) : null,
+      recibido: m ? m.cop : 0, entregado: m ? m.entregado : 0,
+      ultima: f.ultima ? selloCO(f.ultima).slice(0, 16) : null, creada_en: fechaCO(f.creada_en) });
+  });
+  const sinSolicitud = [...red.mapa.entries()].filter(([id]) => !usados.has(id)).map(([id, nombre]) => {
+    const m = dinero.get(id);
+    return { id, nombre, recibido: m ? m.cop : 0, entregado: m ? m.entregado : 0 };
+  });
+  return json({ ok: true, fundaciones, sin_solicitud: sinSolicitud, red: [...red.mapa.entries()].map(([id, nombre]) => ({ id, nombre })) });
+}
+
+/* GET /api/admin/fundacion/<id> */
+async function adminFundacion(env, id) {
+  if (!(await existeTabla(env, "portal_correos"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0053 en la base." }, 409);
+  const i = await env.DB.prepare(
+    "SELECT i.id, i.nombre, i.email, i.telefono, i.ciudad, i.estado, i.red_id, i.datos, i.creada_en, i.tipo, " +
+    "f.estado AS ficha_estado, f.datos AS ficha_datos FROM inscripciones i LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id WHERE i.id = ?"
+  ).bind(id).first();
+  if (!i || i.tipo !== "fundacion") return json({ error: "no_encontrado" }, 404);
+  let form = {};
+  try { form = JSON.parse(i.datos || "{}"); } catch (e) { /* nada */ }
+  const correos = (await env.DB.prepare("SELECT email, agregado, agregado_por FROM portal_correos WHERE inscripcion = ? ORDER BY agregado").bind(id).all()).results || [];
+  const red = await fundacionesRed(env);
+  const enviada = i.ficha_estado === "enviada";
+  const pf = enviada ? await portalPerfil(env, { inscripcion: id, ficha_datos: i.ficha_datos }) : null;
+  return json({
+    ok: true, id: i.id, nombre: i.nombre, email: i.email, telefono: i.telefono, ciudad: i.ciudad, estado: i.estado,
+    red_id: i.red_id, red: [...red.mapa.entries()].map(([k, n]) => ({ id: k, nombre: n })),
+    creada_en: fechaCO(i.creada_en), con_portal: PORTAL_ESTADOS.includes(i.estado),
+    form: FUND_FORM.map((c) => ({ id: c.id, lbl: c.lbl, max: c.max, area: !!c.area, valor: form[c.id] == null ? "" : String(form[c.id]) })),
+    correos: correos.map((c) => ({ email: c.email, agregado: fechaCO(c.agregado), agregado_por: c.agregado_por })),
+    ficha_estado: i.ficha_estado || null,
+    perfil: pf ? {
+      campos: PORTAL_EDITABLES.map((c) => ({ id: c.id, num: c.num, sec: c.sec, lbl: c.lbl, tipo: c.tipo, ops: c.ops || null })),
+      datos: pf.datos, por_revisar: !!(pf.fila && !pf.fila.revisado_en)
+    } : null
+  });
+}
+
+/* POST /api/admin/fundacion/<id> { accion: contacto | perfil | correo_agregar | correo_quitar } */
+async function adminFundacionGuardar(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "portal_correos"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0053 en la base." }, 409);
+  const i = await env.DB.prepare("SELECT id, tipo, datos, email FROM inscripciones WHERE id = ?").bind(id).first();
+  if (!i || i.tipo !== "fundacion") return json({ error: "no_encontrado" }, 404);
+  let detalle;
+  if (c.accion === "contacto") {
+    const nombre = limpiar(c.nombre, 160);
+    if (nombre.length < 2) return json({ error: "nombre_requerido", campo: "nombre", ayuda: "El nombre de la fundación no puede quedar vacío." }, 400);
+    const email = limpiar(c.email, 160).toLowerCase();
+    if (!RE_CORREO.test(email)) return json({ error: "correo_invalido", campo: "email", ayuda: "El correo de la solicitud no parece válido." }, 400);
+    const red = await fundacionesRed(env);
+    const rid = String(c.red_id || "").toLowerCase();
+    if (rid && !red.mapa.has(rid)) return json({ error: "red_invalida", campo: "red_id", ayuda: "Ese id no está en partners.json." }, 400);
+    let form = {};
+    try { form = JSON.parse(i.datos || "{}"); } catch (e) { /* nada */ }
+    const nuevo = esObjeto(c.form) ? c.form : {};
+    for (const k of FUND_FORM) if (k.id in nuevo) form[k.id] = k.area ? String(nuevo[k.id] == null ? "" : nuevo[k.id]).replace(/\r\n?/g, "\n").trim().slice(0, k.max) : limpiar(nuevo[k.id], k.max);
+    await env.DB.prepare(
+      "UPDATE inscripciones SET nombre = ?, email = ?, telefono = ?, ciudad = ?, red_id = ?, datos = ?, actualizada_en = datetime('now') WHERE id = ?"
+    ).bind(nombre, email, limpiar(c.telefono, 40) || null, limpiar(c.ciudad, 120) || null, rid || null, JSON.stringify(form), id).run();
+    detalle = "datos de la fundación editados";
+  } else if (c.accion === "perfil") {
+    const f = await env.DB.prepare("SELECT estado FROM fichas_fundacion WHERE inscripcion = ?").bind(id).first();
+    if (!f || f.estado !== "enviada") return json({ error: "sin_ficha", ayuda: "El perfil se edita cuando el cuestionario ya está enviado." }, 409);
+    if (!esObjeto(c.datos)) return json({ error: "json_invalido" }, 400);
+    const v = fichaValida(c.datos, false).limpio;
+    const limpio = {};
+    for (const k of PORTAL_EDITABLES) limpio[k.id] = v[k.id];
+    await env.DB.prepare(
+      "INSERT INTO perfil_fundacion (inscripcion, datos, revisado_en, revisado_por) VALUES (?, ?, datetime('now'), ?) " +
+      "ON CONFLICT(inscripcion) DO UPDATE SET datos = excluded.datos, actualizado = datetime('now'), revisado_en = datetime('now'), revisado_por = excluded.revisado_por"
+    ).bind(id, JSON.stringify(limpio), quien || null).run();
+    detalle = "perfil editado por el equipo";
+  } else if (c.accion === "correo_agregar") {
+    const email = limpiar(c.email, 160).toLowerCase();
+    if (!RE_CORREO.test(email)) return json({ error: "correo_invalido", campo: "correo", ayuda: "Ese correo no parece válido." }, 400);
+    if (email === String(i.email || "").toLowerCase()) return json({ error: "ya_es_el_principal", ayuda: "Ese ya es el correo de la solicitud: entra sin agregarlo." }, 409);
+    await env.DB.prepare("INSERT OR IGNORE INTO portal_correos (inscripcion, email, agregado_por) VALUES (?, ?, ?)").bind(id, email, quien || null).run();
+    detalle = "correo autorizado para el portal: " + email;
+  } else if (c.accion === "correo_quitar") {
+    const email = limpiar(c.email, 160).toLowerCase();
+    await env.DB.prepare("DELETE FROM portal_correos WHERE inscripcion = ? AND email = ?").bind(id, email).run();
+    /* Quitar el correo cierra también lo que abrió: si no, su sesión de 30
+       días seguiría viva. */
+    await env.DB.prepare("UPDATE portal_sesiones SET cerrada_en = datetime('now') WHERE inscripcion = ? AND email = ? AND cerrada_en IS NULL").bind(id, email).run();
+    detalle = "correo retirado del portal: " + email;
+  } else return json({ error: "accion_invalida" }, 400);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "inscripcion " + id + " · " + detalle).run();
+  return json({ ok: true });
 }
 
 /* La página /portal. Tres estados que pinta su JS: pedir el enlace, usar el
@@ -32090,6 +32247,7 @@ textarea { font-size: 16px }
 <div class="pn-grupo">
   <p class="pn-gt">Alianzas</p>
   <a class="pn-it" href="#alianzas/red" data-pn-ir="alianzas/red">Red<span class="pn-n" data-pn-n="alianzas/red"></span></a>
+  <a class="pn-it" href="#alianzas/fundaciones" data-pn-ir="alianzas/fundaciones">Fundaciones</a>
   <a class="pn-it" href="#alianzas/ofrecimientos" data-pn-ir="alianzas/ofrecimientos">Ofrecimientos en especie<span class="pn-n" data-pn-n="alianzas/ofrecimientos"></span></a>
   <a class="pn-it" href="#alianzas/socialfest" data-pn-ir="alianzas/socialfest">Social Fest<span class="pn-n" data-pn-n="alianzas/socialfest"></span></a>
 </div>
@@ -32380,6 +32538,14 @@ textarea { font-size: 16px }
 <p>Cada fila es alguien que llegó por la página del evento —empresa, fundación o profesional— con su <strong>ficha</strong>. Ábrela para anotar la conversación (llamada, WhatsApp, correo desde Gmail, reunión) y el <strong>próximo paso con fecha</strong>: ese día sale en «Hoy». Aceptar o mover su solicitud sigue siendo en Red.</p>
 </div></details>
 <div id="tb-socialfest" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<section class="pn-vista" data-vista="alianzas/fundaciones" id="sec-fundaciones" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Una fila por fundación con solicitud, menos las archivadas. <strong>Abrir</strong> deja editar su contacto, el formulario con que aplicó, su vínculo con <strong>partners.json</strong> (que une la solicitud con sus donaciones), los correos que pueden entrar al portal y su perfil.</p>
+<p>Lo que se edita aquí no cambia el sitio público: el sitio sale de partners.json. Las autorizaciones de la ficha no se editan: cambian con un documento de la fundación.</p>
+</div></details>
+<div id="tb-fund"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="alianzas/ofrecimientos" id="sec-ofrecimientos" hidden>
@@ -33912,6 +34078,8 @@ var VISTAS = {
     linea: "Lo que entró por el botón de donaciones y los avisos de PayPal que no encontraron su registro." },
   "alianzas/red": { area: "Alianzas", titulo: "Red",
     linea: "Fundaciones, empresas, voluntarios y padrinos que quieren entrar a la red." },
+  "alianzas/fundaciones": { area: "Alianzas", titulo: "Fundaciones",
+    linea: "Cada fundación con su estado, su contacto, su acceso al portal, sus documentos y sus donaciones. Se abre y se edita." },
   "alianzas/ofrecimientos": { area: "Alianzas", titulo: "Ofrecimientos en especie",
     linea: "Lo que llega por el formulario de la brigada para donar en especie." },
   "alianzas/socialfest": { area: "Alianzas", titulo: "Social Fest",
@@ -41777,6 +41945,118 @@ function formResponderQueja(x, ruta){
 /* EL PORTAL DE UNA FUNDACIÓN (0052): qué cambió frente a la ficha, sus
    documentos y los dos botones. Todo lo que viene del portal lo escribió la
    fundación: entra con esc(). */
+/* ---------------- LA ZONA «FUNDACIONES» (0053) ----------------
+   Resumen de cada fundación y su ficha editable en el cajón. Todo lo que
+   viene de la base lo escribió una fundación o el equipo: entra con esc(). */
+var FZ = null;
+var FZ_EST = { nueva: "Nueva", en_revision: "En revisión", aceptada: "Aceptada", visitada: "Visitada",
+  convenio: "En convenio", vinculada: "Vinculada", archivada: "Archivada" };
+function cargarFundaciones(){
+  return pedirJSON("/api/admin/fundaciones", "tb-fund").then(function(d){
+    FZ = d;
+    var caja = document.getElementById("tb-fund"); if (!caja) return;
+    var L = d.fundaciones || [];
+    var h = '<div class="med-tw"><table class="med-tbl"><thead><tr>' +
+      '<th scope="col">Fundación</th><th scope="col">Estado</th><th scope="col">Contacto</th><th scope="col">Portal</th>' +
+      '<th scope="col">Perfil y documentos</th><th scope="col">Donaciones</th><th scope="col"></th></tr></thead><tbody>';
+    h += L.length ? L.map(function(f){
+      var aviso = (f.perfil_por_revisar ? " · perfil por revisar" : "") + (f.docs_por_revisar ? " · " + f.docs_por_revisar + " doc. por revisar" : "");
+      return "<tr><td><strong>" + esc(f.nombre) + "</strong>" + (f.red_nombre ? "<br><small>en la red: " + esc(f.red_id) + "</small>" : '<br><small class="mu">sin vínculo con partners.json</small>') + "</td>" +
+        "<td>" + esc(FZ_EST[f.estado] || f.estado) + "<br><small>desde " + esc(f.creada_en) + "</small></td>" +
+        "<td>" + esc(f.email || "") + (f.telefono ? "<br><small>" + esc(f.telefono) + "</small>" : "") + (f.ciudad ? "<br><small>" + esc(f.ciudad) + "</small>" : "") + "</td>" +
+        "<td>" + (f.correos ? f.correos + " correo(s) más" : '<span class="mu">solo el de la solicitud</span>') + "<br><small>" + (f.ultima ? "última entrada " + esc(f.ultima) : "no ha entrado") + "</small></td>" +
+        "<td>" + (f.ficha === "enviada" ? "Cuestionario enviado" : f.ficha ? "Cuestionario en borrador" : '<span class="mu">Sin cuestionario</span>') +
+          "<br><small>" + f.docs + " documento(s)" + esc(aviso) + "</small></td>" +
+        "<td>" + (f.red_id ? dinero(f.recibido || 0, "COP") + "<br><small>entregado " + dinero(f.entregado || 0, "COP") + "</small>" : '<span class="mu">—</span>') + "</td>" +
+        '<td><button type="button" class="copy" data-fz-abrir="' + f.id + '">Abrir</button></td></tr>';
+    }).join("") : '<tr><td colspan="7">Todavía no hay fundaciones con solicitud.</td></tr>';
+    h += "</tbody></table></div>";
+    var S = d.sin_solicitud || [];
+    if (S.length) h += '<p class="pn-h3">En la red sin solicitud vinculada</p><p class="mu">Están en partners.json pero ninguna solicitud apunta a ellas. Ábrela y elige su id en «Vínculo con la red» para que se unan.</p><ul>' +
+      S.map(function(x){ return "<li><strong>" + esc(x.nombre) + "</strong> <small>(" + esc(x.id) + ")</small> · recibido " + dinero(x.recibido || 0, "COP") + "</li>"; }).join("") + "</ul>";
+    caja.innerHTML = h;
+  });
+}
+function fzCampo(id, etq, valor, area, max){
+  return pnCampo(id, etq, valor, area ? { area: true, filas: 4 } : { extra: ' maxlength="' + (max || 200) + '"' });
+}
+function abrirFundacion(id){
+  pedirJSON("/api/admin/fundacion/" + id).then(function(d){
+    var h = '<p class="pn-h3">Contacto</p>' +
+      fzCampo("fz-nombre", "Nombre de la fundación", d.nombre) +
+      fzCampo("fz-email", "Correo de la solicitud", d.email) +
+      fzCampo("fz-tel", "Teléfono", d.telefono || "") +
+      fzCampo("fz-ciudad", "Ciudad", d.ciudad || "") +
+      selectCampo("fz-red", "Vínculo con la red (id en partners.json)", '<option value="">— sin vínculo —</option>' +
+        d.red.map(function(r){ return '<option value="' + esc(r.id) + '"' + (r.id === d.red_id ? " selected" : "") + ">" + esc(r.nombre) + " (" + esc(r.id) + ")</option>"; }).join(""),
+        "Une la solicitud con las donaciones dirigidas a esa fundación.");
+    h += '<p class="pn-h3">Formulario de solicitud</p>' + d.form.map(function(c){ return fzCampo("fzf-" + c.id, c.lbl, c.valor, c.area, c.max); }).join("");
+    h += '<button type="button" class="pn-b1" id="fz-guardar-datos">Guardar contacto y formulario</button>';
+    h += '<p class="pn-h3">Correos que pueden entrar al portal</p>' +
+      '<p class="mu">El de la solicitud (' + esc(d.email) + ') siempre puede. Estos son adicionales.' + (d.con_portal ? "" : " Hoy el portal está cerrado para esta fundación: se abre desde «aceptada».") + "</p>" +
+      (d.correos.length ? "<ul>" + d.correos.map(function(c){
+        return "<li>" + esc(c.email) + " <small>desde " + esc(c.agregado) + "</small> " +
+          '<button type="button" class="copy" data-fz-quitar="' + esc(c.email) + '">Quitar</button></li>';
+      }).join("") + "</ul>" : '<p class="mu">Ninguno.</p>') +
+      fzCampo("fz-correo", "Agregar un correo", "", false, 160) +
+      '<button type="button" class="pn-b2" id="fz-agregar">Autorizar este correo</button>';
+    if (d.perfil){
+      h += '<p class="pn-h3">Perfil' + (d.perfil.por_revisar ? " · <strong>la fundación tiene cambios por revisar</strong>" : "") + "</p>" +
+        '<p class="mu">Lo que guardes aquí queda como revisado. Las autorizaciones no se editan: cambian con un documento de la fundación.</p>';
+      var sec = "";
+      d.perfil.campos.forEach(function(c){
+        if (c.sec !== sec){ sec = c.sec; h += "<p><small><strong>" + esc(sec) + "</strong></small></p>"; }
+        var v = d.perfil.datos[c.id];
+        if (c.tipo === "opcion") h += selectCampo("fzp-" + c.id, c.num + " · " + c.lbl, '<option value="">—</option>' +
+          c.ops.map(function(o){ return '<option value="' + esc(o) + '"' + (o === v ? " selected" : "") + ">" + esc(o) + "</option>"; }).join(""));
+        else h += fzCampo("fzp-" + c.id, c.num + " · " + c.lbl, v == null ? "" : v, c.tipo === "parrafo", 400);
+      });
+      h += '<button type="button" class="pn-b1" id="fz-guardar-perfil">Guardar perfil</button>';
+    } else {
+      h += '<p class="pn-h3">Perfil</p><p class="mu">Se edita cuando el cuestionario esté enviado' + (d.ficha_estado ? " (hoy: " + esc(d.ficha_estado) + ")" : "") + ".</p>";
+    }
+    h += '<p class="pn-error" id="pn-err"></p>';
+    cajonAbrir({ ey: "Fundaciones", titulo: d.nombre, cuerpo: h, ancho: true,
+      pie: (d.con_portal ? '<button type="button" class="pn-b2" data-portal="' + d.id + '">Portal…</button>' : "") +
+        '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>' });
+    var fzPost = function(cuerpo, ok, b){
+      if (b) b.disabled = true;
+      return postPanel("/api/admin/fundacion/" + d.id, cuerpo).then(function(r){
+        if (b) b.disabled = false;
+        if (!r) return;
+        avisar(ok); abrirFundacion(d.id);
+        if (PEDIDAS["tb-fund"]) cargarFundaciones();
+      });
+    };
+    document.getElementById("fz-guardar-datos").addEventListener("click", function(){
+      var form = {};
+      d.form.forEach(function(c){ form[c.id] = pnValor("fzf-" + c.id); });
+      fzPost({ accion: "contacto", nombre: pnValor("fz-nombre"), email: pnValor("fz-email"), telefono: pnValor("fz-tel"),
+        ciudad: pnValor("fz-ciudad"), red_id: pnValor("fz-red"), form: form }, "Datos de la fundación guardados.", this);
+    });
+    document.getElementById("fz-agregar").addEventListener("click", function(){
+      fzPost({ accion: "correo_agregar", email: pnValor("fz-correo") }, "Correo autorizado para el portal.", this);
+    });
+    var gp = document.getElementById("fz-guardar-perfil");
+    if (gp) gp.addEventListener("click", function(){
+      var datos = {};
+      d.perfil.campos.forEach(function(c){ datos[c.id] = pnValor("fzp-" + c.id); });
+      fzPost({ accion: "perfil", datos: datos }, "Perfil guardado y marcado como revisado.", this);
+    });
+    document.querySelectorAll("[data-fz-quitar]").forEach(function(b){
+      b.addEventListener("click", function(){
+        var em = b.getAttribute("data-fz-quitar");
+        if (!confirm("¿Quitar " + em + " del portal? Si tiene una sesión abierta, se cierra.")) return;
+        fzPost({ accion: "correo_quitar", email: em }, "Correo retirado del portal.", b);
+      });
+    });
+  });
+}
+document.addEventListener("click", function(e){
+  var b = e.target.closest && e.target.closest("[data-fz-abrir]");
+  if (b) abrirFundacion(b.getAttribute("data-fz-abrir"));
+});
+
 function abrirPortal(id){
   pedirJSON("/api/admin/portal/" + id).then(function(d){
     var pares = [
@@ -41929,6 +42209,7 @@ var BANDEJAS = {
   "cs-filas": cargarCasos,
   "ins-filas": cargarInspecciones,
   "o-filas": cargarOfrecimientos,
+  "tb-fund": cargarFundaciones,
   "tb-pagos": cargarSueltos,
   "tb-suscripciones": cargarSuscripciones,
   "tb-miembros": cargarMiembros,
@@ -46010,6 +46291,10 @@ export default {
         const apo = ruta.match(/^\/api\/admin\/portal\/(\d{1,9})$/);
         if (apo) return request.method === "POST" ? await adminPortalAccion(request, env, Number(apo[1]), sesion.email)
                                                   : await adminPortal(env, Number(apo[1]));
+        if (ruta === "/api/admin/fundaciones")  return await adminFundaciones(env);
+        const afz = ruta.match(/^\/api\/admin\/fundacion\/(\d{1,9})$/);
+        if (afz) return request.method === "POST" ? await adminFundacionGuardar(request, env, Number(afz[1]), sesion.email)
+                                                  : await adminFundacion(env, Number(afz[1]));
         const apd = ruta.match(/^\/api\/admin\/portal-doc\/(\d{1,9})$/);
         if (apd)                                return await adminPortalDoc(env, Number(apd[1]));
         const afi = ruta.match(/^\/api\/admin\/ficha\/(\d+)$/);
