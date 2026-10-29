@@ -21519,6 +21519,50 @@ async function adminReporteUnidad(request, env, id, quien) {
   return json({ ok: true });
 }
 
+
+/* GET /api/portal/recibido — LO QUE LA FUNDACIÓN HA RECIBIDO (ítem 40, 29 oct
+   2026). Sale de lo que la base ya sabe, unido por `inscripciones.red_id`:
+   · las donaciones dirigidas a ella (solo confirmadas; pesos y dólares por
+     separado, sin convertir), cuánto ya se marcó entregado y cuánto falta;
+   · las actas de entrega publicadas con su destino;
+   · las jornadas de voluntariado que tuvo de anfitriona, con participantes,
+     horas efectivas y los beneficiarios que ella misma reportó.
+   SOLO AGREGADOS: ni un nombre de donante ni de voluntario. Son cifras
+   operativas del panel, no estados financieros, y la pantalla lo dice. Sin
+   `red_id` no hay nada que unir, y se dice tal cual. */
+async function apiPortalRecibido(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  const i = await env.DB.prepare("SELECT red_id FROM inscripciones WHERE id = ?").bind(s.inscripcion).first();
+  const rid = i && i.red_id ? String(i.red_id).toLowerCase() : null;
+  if (!rid) return json({ ok: true, vinculada: false });
+  const una = async (sql, ...b) => (await env.DB.prepare(sql).bind(...b).first()) || {};
+  const todas = async (sql, ...b) => ((await env.DB.prepare(sql).bind(...b).all()).results || []);
+  const quizas = async (f, d) => { try { return await f(); } catch (e) { return d; } };
+  const din = await una(
+    "SELECT COUNT(*) AS pagos, " +
+    "SUM(CASE WHEN a.moneda = 'COP' THEN a.monto_centavos ELSE 0 END) AS cop, " +
+    "SUM(CASE WHEN a.moneda = 'COP' AND a.estado = 'entregada' THEN a.monto_centavos ELSE 0 END) AS cop_entregado, " +
+    "SUM(CASE WHEN a.moneda = 'USD' THEN a.monto_centavos ELSE 0 END) AS usd " +
+    "FROM aportes a WHERE " + APORTE_CONFIRMADO + " AND lower(a.destino_id) = ?", rid);
+  const actas = await quizas(() => todas(
+    "SELECT numero, fecha, sector, familias, resumen FROM entregas WHERE lower(destino_id) = ? AND publicada_en IS NOT NULL " +
+    "AND anulada_en IS NULL ORDER BY fecha DESC LIMIT 50", rid), []);
+  const jornadas = await quizas(() => todas(
+    "SELECT j.nombre, j.fecha, j.estado, j.beneficiarios_directos, " +
+    "(SELECT COUNT(*) FROM participaciones p WHERE p.jornada = j.id) AS participantes, " +
+    "(SELECT COALESCE(SUM(p.horas), 0) FROM participaciones p WHERE p.jornada = j.id AND p.horas IS NOT NULL) AS horas " +
+    "FROM jornadas j WHERE lower(j.anfitriona) = ? AND j.estado IN ('realizada', 'cerrada') ORDER BY j.fecha DESC LIMIT 50", rid), []);
+  return json({
+    ok: true, vinculada: true,
+    donaciones: { pagos: din.pagos || 0, cop: din.cop || 0, cop_entregado: din.cop_entregado || 0,
+      cop_por_entregar: (din.cop || 0) - (din.cop_entregado || 0), usd: din.usd || 0 },
+    actas: actas.map((a) => ({ numero: a.numero, fecha: a.fecha, sector: a.sector, familias: a.familias, resumen: a.resumen })),
+    jornadas: jornadas.map((j) => ({ nombre: j.nombre, fecha: j.fecha, participantes: j.participantes, horas: Math.round((j.horas || 0) * 10) / 10,
+      beneficiarios: j.beneficiarios_directos }))
+  });
+}
+
 /* La página /portal (diseño del 29 oct 2026). Cuatro estados que pinta su JS:
    pedir el enlace, revisar el correo, usar el enlace (con el botón que lo
    gasta) y el portal, con tres pestañas: Resumen, Perfil y Documentos.
@@ -21912,11 +21956,46 @@ function pintarResumen(){
         (D.perfil ? '<div class="acciones"><button type="button" class="btn sec mini" data-ir="perfil">Editar</button></div>' : "") + "</div>" +
       '<div class="tarjeta"><p class="ey">Documentos</p><p class="cifra">' + n + " de " + RECOMENDADOS.length + '</p><p class="sub">de los que conviene tener' + (porRevisar ? " · " + porRevisar + " por revisar" : "") + '.</p><div class="acciones"><button type="button" class="btn sec mini" data-ir="documentos">Subir</button></div></div>' +
       '<div class="tarjeta"><p class="ey">¿Dudas?</p><p class="sub mt">Escríbenos a <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a> o por WhatsApp al <a href="https://wa.me/573153305028">+57 315 330 5028</a>.</p></div>' +
-    "</div>";
+    "</div>" +
+    '<div id="p-recibido" class="mt"></div>';
+  pintarRecibido();
   $("tp-docs").textContent = n + "/" + RECOMENDADOS.length;
   $("tp-docs").className = "pill" + (n === RECOMENDADOS.length ? " ok" : "");
   $("tp-perfil").textContent = "por revisar";
   $("tp-perfil").className = "pill ambar" + (D.perfil && D.perfil.por_revisar ? "" : " oculto");
+}
+
+/* LO QUE HAN RECIBIDO (ítem 40): se pide una vez por visita. Solo agregados. */
+var RECIBIDO = null;
+function pintarRecibido(){
+  var caja = $("p-recibido");
+  if (!caja) return;
+  if (!RECIBIDO) {
+    fetch("/api/portal/recibido", { credentials: "same-origin" }).then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ if (d) { RECIBIDO = d; pintarRecibido(); } }).catch(function(){});
+    return;
+  }
+  var R = RECIBIDO;
+  if (!R.vinculada) {
+    caja.innerHTML = '<div class="tarjeta"><p class="ey">Lo que han recibido</p><p class="sub mt">Cuando la fundación quede vinculada a la red del HUB, aquí verás las donaciones dirigidas a ustedes, las actas de entrega y las jornadas de voluntariado.</p></div>';
+    return;
+  }
+  var d = R.donaciones;
+  var h = '<div class="tarjeta"><p class="ey">Lo que han recibido a través de Give&amp;Grow</p>' +
+    '<div class="rejilla mt">' +
+      '<div><p class="cifra">' + pesos(d.cop / 100) + '</p><p class="sub">en donaciones dirigidas a ustedes, confirmadas' + (d.pagos ? " (" + d.pagos + (d.pagos === 1 ? " pago" : " pagos") + ")" : "") + (d.usd ? " · y US$" + (d.usd / 100).toFixed(2) + " por PayPal" : "") + ".</p></div>" +
+      '<div><p class="cifra">' + pesos(d.cop_entregado / 100) + '</p><p class="sub">ya entregado' + (d.cop_por_entregar > 0 ? " · " + pesos(d.cop_por_entregar / 100) + " por entregar" : "") + ".</p></div>" +
+      '<div><p class="cifra">' + R.jornadas.length + '</p><p class="sub">' + (R.jornadas.length === 1 ? "jornada de voluntariado" : "jornadas de voluntariado") + " con ustedes de anfitriones.</p></div>" +
+    "</div>";
+  if (R.actas.length) h += '<h2 class="mt">Actas de entrega</h2><ul class="docs">' + R.actas.map(function(a){
+    return '<li><div><span class="nom">' + esc(a.numero) + " · " + esc(a.fecha) + '</span><span class="det">' + esc(a.sector) + (a.familias ? " · " + a.familias + " familias" : "") + " · " + esc(a.resumen) + "</span></div></li>";
+  }).join("") + "</ul>";
+  if (R.jornadas.length) h += '<h2 class="mt">Jornadas de voluntariado</h2><ul class="docs">' + R.jornadas.map(function(j){
+    return '<li><div><span class="nom">' + esc(j.nombre) + '</span><span class="det">' + esc(j.fecha || "") + " · " + j.participantes + " participantes · " + String(j.horas).replace(".", ",") + " horas" +
+      (j.beneficiarios != null ? " · " + j.beneficiarios + " beneficiarios reportados por ustedes" : "") + "</span></div></li>";
+  }).join("") + "</ul>";
+  h += '<p class="sub mt">Cifras operativas del panel de Give&amp;Grow, no estados financieros. Las donaciones en dólares van aparte, sin convertir.</p></div>';
+  caja.innerHTML = h;
 }
 
 function campo(c, v){
@@ -47452,6 +47531,7 @@ export default {
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
+        if (ruta === "/api/portal/recibido") return await apiPortalRecibido(request, env);
         /* Apadrinamiento por unidad de impacto (0054). */
         if (ruta === "/api/apadrinamiento")         return await apiCatalogoApadrinamiento(env);
         if (ruta === "/api/apadrinamiento/interes") return await apiApadrinamientoInteres(request, env);
