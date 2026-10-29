@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=c2f9f0a7">
+<link rel="stylesheet" href="/styles.css?v=d7394c93">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=dd278952" defer></script>
+<script src="/app.js?v=15bbf581" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1602,6 +1602,79 @@
     <div class="wrap"><div class="rg-usd-ok" id="rg-usd-ok" aria-live="polite"></div></div>
   </section>
 
+</main>
+
+<!-- APADRINAMIENTO POR UNIDAD DE IMPACTO (fase 1, migración 0054, 29 oct 2026).
+     El catálogo lo pinta js/apadrinamiento.js desde /api/apadrinamiento: solo
+     unidades aprobadas, con el costo verificado contra el soporte de la
+     fundación. Todavía no se cobra: el formulario es «avísame cuando abra». -->
+<main id="page-apadrinamiento" class="page">
+  <section>
+    <div class="wrap">
+      <span class="ey rv" data-i18n="apu.ey">Apadrinamiento</span>
+      <h1 class="h-sec rv" data-i18n="apu.h1">Apadrina, cada mes, un impacto que se puede comprobar.</h1>
+      <p class="lead rv d1" data-i18n="apu.lead">Escoge una unidad concreta de una fundación del HUB —un niño en un programa, un filtro de agua para una familia, una beca de baile o de fútbol— y sostenla con un aporte mensual. El costo de cada unidad lo verificamos con los soportes de la fundación, y cada mes la fundación reporta lo que entregó.</p>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="apu.como.h">Cómo funciona</h2>
+      <div class="steps">
+        <div class="step"><div class="step-n">1</div><div><h3 class="h-comp4" data-i18n="apu.como.1.t">Escoges una unidad</h3><p data-i18n="apu.como.1.p">Cada unidad dice qué es, cuánto cuesta al mes, qué cubre y cómo se va a evidenciar que se entregó.</p></div></div>
+        <div class="step"><div class="step-n">2</div><div><h3 class="h-comp4" data-i18n="apu.como.2.t">La sostienes cada mes</h3><p data-i18n="apu.como.2.p">Con un aporte mensual que puedes cancelar cuando quieras. El aporte abre muy pronto; mientras tanto, te avisamos.</p></div></div>
+        <div class="step"><div class="step-n">3</div><div><h3 class="h-comp4" data-i18n="apu.como.3.t">Ves lo que se entregó</h3><p data-i18n="apu.como.3.p">Cada mes la fundación reporta lo entregado con su evidencia, el equipo de Give&amp;Grow lo revisa y te llega el resumen.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2 class="h-sec" data-i18n="apu.cat.h">Lo que puedes apadrinar</h2>
+      <div class="apu-calc">
+        <label for="apu-monto" data-i18n="apu.calc.l">¿Cuánto quieres aportar al mes?</label>
+        <p class="mu" data-i18n="apu.calc.ayuda">Escribe un monto en pesos y te mostramos para cuántas unidades alcanza.</p>
+        <input type="text" id="apu-monto" inputmode="numeric" autocomplete="off" data-input="apuCalcula()" placeholder="100.000">
+      </div>
+      <div class="apu-lista" id="apu-lista" aria-live="polite"><p class="mu" data-i18n="apu.cargando">Cargando las unidades…</p></div>
+      <p class="mu apu-nota" data-i18n="apu.nota">Evidencia, no promesas: solo publicamos unidades cuyo costo verificamos con soportes de la fundación. Si una fundación cambia una unidad, sale de aquí hasta que la revisemos otra vez.</p>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="apu.mod.h">Cupo o niño identificado</h2>
+      <div class="grid g2 apu-mod">
+        <div class="camino"><h3 class="camino-t" data-i18n="apu.mod.cupo.t">Cupo</h3><p data-i18n="apu.mod.cupo.p">Sostienes un lugar en el programa y recibes los avances del grupo. Es la forma más común y no expone a ningún niño.</p></div>
+        <div class="camino"><h3 class="camino-t" data-i18n="apu.mod.id.t">Niño identificado</h3><p data-i18n="apu.mod.id.p">Solo en los programas que lo ofrecen y con la autorización escrita de su acudiente: conoces su nombre de pila y su avance. Nunca hay contacto directo entre el padrino y el niño.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="apu-interes">
+    <div class="wrap">
+      <h2 class="h-sec" data-i18n="apu.int.h">El aporte mensual abre muy pronto</h2>
+      <p class="lead" data-i18n="apu.int.p">Déjanos tu correo y te escribimos cuando puedas empezar. Solo para eso: no te mandamos nada más.</p>
+      <form id="apu-form" class="ally-form apu-form" data-submit="apuInteres(event)" novalidate>
+        <div class="field"><label for="apu-nombre" data-i18n="apu.f.nombre">Tu nombre</label><input id="apu-nombre" autocomplete="name" maxlength="120"></div>
+        <div class="field"><label for="apu-email" data-i18n="apu.f.email">Tu correo</label><input id="apu-email" type="email" autocomplete="email" maxlength="160"></div>
+        <div class="field"><label for="apu-unidad" data-i18n="apu.f.unidad">Qué quieres apadrinar</label><select id="apu-unidad"><option value="" data-i18n="apu.f.unidad.cual">Todavía no sé</option></select></div>
+        <div class="field"><label for="apu-cant" data-i18n="apu.f.cant">Cuántas</label><input id="apu-cant" type="number" min="1" max="50" value="1"></div>
+        <label class="ally-check"><input type="checkbox" id="apu-priv"> <span><span data-i18n="apu.f.priv">Acepto que Give&amp;Grow use mis datos para avisarme cuando abra el aporte mensual, según la</span> <a href="#privacidad" data-i18n="apu.f.priv.link">Política de Privacidad</a></span></label>
+        <input type="text" id="apu-web2" tabindex="-1" autocomplete="off" aria-hidden="true" class="apu-trampa">
+        <button type="submit" class="btn btn-g" id="apu-enviar" data-i18n="apu.f.enviar">Avísame</button>
+        <p class="rg-msg" id="apu-msg" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
+  <section class="cream">
+    <div class="wrap">
+      <h2 class="h-comp3" data-i18n="apu.fund.h">¿Eres una fundación del HUB?</h2>
+      <p data-i18n="apu.fund.p">Propón desde tu portal las unidades que la gente puede apadrinar: qué son, cuánto cuestan al mes con su soporte y cómo vas a mostrar cada mes lo entregado.</p>
+      <p class="mt-s"><a class="card-link" href="/portal" data-i18n="apu.fund.btn">Ir al portal de fundaciones →</a></p>
+    </div>
+  </section>
 </main>
 
 <main id="page-socialfest" class="page">
@@ -4419,6 +4492,7 @@
         <a href="#medicion" data-i18n="nav.medicion">Cómo medimos</a>
         <a href="#quejas" data-i18n="nav.quejas">Quejas y sugerencias</a>
         <a href="#regalos" data-i18n="foot.regalos">Regalos de diciembre</a>
+        <a href="#apadrinamiento" data-i18n="foot.apadrinamiento">Apadrinamiento</a>
         <a href="#privacidad" data-i18n="foot.privacy">Privacidad y datos</a>
         <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a>
         <a href="mailto:contabilidad@thegiveandgrowproject.org">contabilidad@thegiveandgrowproject.org</a>
