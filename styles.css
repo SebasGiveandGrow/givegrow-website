@@ -3298,6 +3298,8 @@ html[data-theme="dark"] .sf-puerta-f{background:var(--acc);color:var(--ink-deep)
 .apu-u-t{font-size:var(--fs-h4);line-height:1.25;margin:6px 0 8px}
 .apu-u-costo{margin:0 0 8px;color:var(--mu)}
 .apu-u-costo strong{font-family:"Unbounded",system-ui,sans-serif;font-size:var(--fs-h3);font-weight:600;color:var(--ink)}
+.apu-u-ver{font-size:var(--fs-14);font-weight:600;color:var(--acc);margin:0 0 10px;padding-left:10px;border-left:2px solid var(--acc)}
+.apu-u-ver.nuevo{color:var(--mu);font-weight:500;border-left-color:var(--bd)}
 .apu-u-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .apu-chip{font-size:var(--fs-12);font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid var(--bd);color:var(--mu)}
 .apu-u-desc{margin:0 0 10px}

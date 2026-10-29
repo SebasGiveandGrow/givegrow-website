@@ -38,6 +38,7 @@ function apuPinta(){
         '<p class="apu-u-de">' + escapeHtml(t("apu.de").replace("{f}", u.fundacion.nombre)) + (u.programa ? " · " + escapeHtml(u.programa) : "") + "</p>" +
         '<h3 class="apu-u-t">' + escapeHtml(apuTxt(u.nombre)) + "</h3>" +
         '<p class="apu-u-costo"><strong>' + apuPesos(u.costo_mensual_cop) + "</strong> " + escapeHtml(t("apu.mes")) + "</p>" +
+        apuVerificado(u.ultimo_reporte, u.cupos) +
         '<p class="apu-u-chips"><span class="apu-chip">' + escapeHtml(mod) + "</span>" +
           (u.cupos ? '<span class="apu-chip">' + escapeHtml(t("apu.cupos").replace("{n}", u.cupos)) + "</span>" : "") + "</p>" +
         '<p class="apu-u-desc">' + escapeHtml(apuTxt(u.descripcion)) + "</p>" +
@@ -58,6 +59,15 @@ function apuPinta(){
     sel.value = actual;
   }
   apuCalcula();
+}
+
+/* EL ÚLTIMO REPORTE VERIFICADO (0055): lo que la fundación reportó del mes y
+   el equipo aprobó tras ver la evidencia. Una unidad nueva lo dice tal cual. */
+function apuVerificado(r, cupos){
+  if (!r) return '<p class="apu-u-ver nuevo">' + escapeHtml(t("apu.ver.no")) + "</p>";
+  var x = String(r.periodo).split("-");
+  var mes = new Date(Date.UTC(Number(x[0]), Number(x[1]) - 1, 15)).toLocaleDateString(lang === "en" ? "en-US" : "es-CO", { month: "long", year: "numeric", timeZone: "UTC" });
+  return '<p class="apu-u-ver">' + escapeHtml(t("apu.ver").replace("{m}", mes).replace("{n}", r.entregadas + (cupos ? " / " + cupos : ""))) + "</p>";
 }
 
 /* LA CALCULADORA: con este monto al mes, cuántas unidades completas de cada
