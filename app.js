@@ -2489,7 +2489,7 @@ var I18N = {
     "rg.video.subir":"Subir un video",
     "rg.video.quitar":"Quitar el video",
     "rg.video.ayuda":"De 30 segundos a 1 minuto, hasta 90 MB. Lo mostramos a los niños en la entrega; nunca se publica.",
-    "rg.f.noticias":"Quiero recibir por correo lo que hicimos con los regalos, el agradecimiento y las próximas actividades en las que puedo participar.",
+    "rg.f.noticias":"Quiero recibir por correo lo que hicimos con los regalos, el agradecimiento, las próximas actividades en las que puedo participar y cómo seguir apoyando a la fundación.",
     "rg.video.subiendo":"Subiendo tu video… {p} %",
     "rg.video.fallo":"No pudimos subir el video. Tus regalos siguen apartados: puedes subirlo después desde el enlace de seguimiento que te llega al correo.",
     "rg.video.tipo":"Ese archivo no es un video que podamos recibir. Usa MP4, MOV o WebM.",
