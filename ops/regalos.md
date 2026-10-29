@@ -65,3 +65,14 @@ donante espera saber.
 - **Noticias:** la casilla nace desmarcada (Ley 1581). Quien la marca queda en
   «Correos que autorizaron noticias (CSV)». Al escribirles, cada correo tiene
   que decir cómo retirar la autorización.
+
+## Embajadores (0051)
+
+- En `/admin/regalos › Embajadores` se crea uno con su nombre (el código sale
+  solo, o se escribe). Su enlace es `/regalos?emb=CODIGO`.
+- El pedido que entra por ese enlace guarda el código, aunque la persona
+  navegue por el sitio antes de pagar (se recuerda en la pestaña).
+- La pantalla cuenta **pedidos pagados y regalos** por embajador. Nunca
+  muestra quién donó ni cuánto, y no hay premio por monto.
+- Desactivar uno no rompe su enlace: Regalos abre igual, pero ya no cuenta.
+  El código no se cambia, porque ya está en lo que la persona compartió.

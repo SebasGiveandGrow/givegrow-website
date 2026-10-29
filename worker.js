@@ -3416,6 +3416,7 @@ function enlaceSeguimientoRegalos(ref, token) {
    (consecutivo RG- y guía GG-). Luego se aparta regalo por regalo con el
    UPDATE condicionado; si uno solo no se pudo apartar, se sueltan todos y se
    le dice al donante cuáles ya no están, para que los quite y vuelva. */
+const RE_EMBAJADOR = /^[A-Z0-9][A-Z0-9-]{2,23}$/;
 async function apiRegalosPedido(request, env, url) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
   let c;
@@ -3462,6 +3463,16 @@ async function apiRegalosPedido(request, env, url) {
   const carta = limpiarCarta(c.carta);
   const firma = limpiar(c.firma, 80);
   const noticias = c.noticias === true;
+  /* El enlace de embajador (0051). Solo un código que exista y esté activo; si
+     no, el pedido sigue igual, sin código. Nunca tumba el pedido. */
+  let embajador = null;
+  const embCod = String(c.embajador || "").toUpperCase().trim();
+  if (RE_EMBAJADOR.test(embCod)) {
+    try {
+      const e = await env.DB.prepare("SELECT codigo FROM regalo_embajadores WHERE codigo = ? AND activo = 1").bind(embCod).first();
+      if (e) embajador = e.codigo;
+    } catch (e) { console.error("embajador", e && e.message); }
+  }
 
   if (via === "cop" && !(env.WOMPI_PUBLIC_KEY && env.WOMPI_INTEGRITY_SECRET)) {
     return json({ error: "pasarela_no_configurada" }, 503);
@@ -3511,9 +3522,9 @@ async function apiRegalosPedido(request, env, url) {
   }
 
   const lote = [env.DB.prepare(
-    "INSERT INTO regalo_pedidos (ref, campana_id, token, via, total_cop, total_usd, nombre, email, telefono, idioma) " +
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(ref, REGALOS_CAMPANA, token, via, totalCop, totalUsd, nombre, email, telefono, idioma)];
+    "INSERT INTO regalo_pedidos (ref, campana_id, token, via, total_cop, total_usd, nombre, email, telefono, idioma" +
+    (embajador ? ", embajador" : "") + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + (embajador ? ", ?" : "") + ")"
+  ).bind(ref, REGALOS_CAMPANA, token, via, totalCop, totalUsd, nombre, email, telefono, idioma, ...(embajador ? [embajador] : []))];
   for (const f of filas) {
     lote.push(env.DB.prepare(
       "INSERT INTO regalo_pedido_items (pedido_ref, regalo_id, valor_cop, valor_usd) VALUES (?, ?, ?, ?)"
@@ -4020,6 +4031,34 @@ async function adminRegalosAuditar(env, quien, detalle) {
 
 /* GET /api/admin/regalos — todo lo que la pantalla necesita, en una sola
    respuesta. Aquí SÍ van los datos privados: esto solo lo ve el equipo. */
+/* POST /api/admin/regalos/embajador { codigo?, nombre, activo? } — crea o
+   actualiza uno. Sin código, sale del nombre. El código no se cambia después:
+   ya está impreso en los enlaces que la persona compartió. */
+async function adminRegalosEmbajador(request, env, email) {
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (!(await existeTabla(env, "regalo_embajadores"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0051 en la base." }, 409);
+  const nombre = limpiar(c.nombre, 120).replace(/\s+/g, " ");
+  const base = String(c.codigo || nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24).replace(/-+$/, "");
+  if (!RE_EMBAJADOR.test(base)) return json({ error: "codigo_invalido", ayuda: "El código va con letras, números y guiones: de 3 a 24." }, 400);
+  const ya = await env.DB.prepare("SELECT codigo FROM regalo_embajadores WHERE codigo = ?").bind(base).first();
+  /* Con `activo`: activar o desactivar uno que existe. Sin él: crear, y un
+     código que ya existe es de otra persona, así que no se pisa. */
+  if (typeof c.activo === "boolean") {
+    if (!ya) return json({ error: "no_encontrado" }, 404);
+    await env.DB.prepare("UPDATE regalo_embajadores SET activo = ? WHERE codigo = ?").bind(c.activo ? 1 : 0, base).run();
+  } else {
+    if (ya) return json({ error: "codigo_existe", ayuda: "El código " + base + " ya es de otro embajador. Escribe otro en «Código»." }, 409);
+    if (nombre.length < 2) return json({ error: "nombre_requerido", ayuda: "Escribe el nombre de la persona o del grupo." }, 400);
+    await env.DB.prepare("INSERT INTO regalo_embajadores (codigo, nombre, creado_por) VALUES (?, ?, ?)").bind(base, nombre, email || null).run();
+  }
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(email || "?", "embajador " + base + (typeof c.activo === "boolean" ? (c.activo ? " · activado" : " · desactivado") : " · creado")).run();
+  return json({ ok: true, codigo: base, enlace: ORIGIN + "/regalos?emb=" + base });
+}
+
 async function adminRegalos(env) {
   const campana = await env.DB.prepare(
     "SELECT id, nombre_es, nombre_en, estado, cierre, aliada_nombre, aliada_url FROM regalo_campanas WHERE id = ?"
@@ -4058,7 +4097,20 @@ async function adminRegalos(env) {
     "WHERE p.campana_id = ? ORDER BY CASE m.estado WHEN 'pendiente' THEN 0 ELSE 1 END, m.actualizado_en DESC"
   ).bind(REGALOS_CAMPANA).all();
   const noticias = await env.DB.prepare("SELECT COUNT(*) AS n FROM regalo_noticias WHERE baja_en IS NULL").first();
+  /* Embajadores (0051): pedidos pagados y regalos financiados por cada
+     enlace. Solo conteos: ni donantes ni montos. Sin la migración, vacío. */
+  let embajadores = null;
+  try {
+    embajadores = (await env.DB.prepare(
+      "SELECT e.codigo, e.nombre, e.activo, " +
+      "(SELECT COUNT(*) FROM regalo_pedidos p WHERE p.embajador = e.codigo AND p.estado = 'pagado') AS pagados, " +
+      "(SELECT COUNT(*) FROM regalo_pedido_items i JOIN regalo_pedidos p ON p.ref = i.pedido_ref " +
+      " WHERE p.embajador = e.codigo AND p.estado = 'pagado' AND i.resultado IN ('financiado', 'sustituido')) AS regalos " +
+      "FROM regalo_embajadores e ORDER BY e.activo DESC, regalos DESC, e.nombre"
+    ).all()).results || [];
+  } catch { embajadores = null; }
   return json({
+    embajadores, origen: ORIGIN,
     mensajes: (mens.results || []).map((m) => Object.assign({}, m, {
       video: !!m.video, actualizado_en: m.actualizado_en ? selloCO(m.actualizado_en).slice(0, 16) : null,
       regalos: String(m.regalos || "").split(";").filter(Boolean).map((x) => {
@@ -4674,6 +4726,7 @@ function paginaRegalosAdmin() {
     <button role="tab" data-tab="cargar" aria-selected="false">Cargar la hoja</button>
     <button role="tab" data-tab="pedidos" aria-selected="false">Pedidos</button>
     <button role="tab" data-tab="cartas" aria-selected="false">Cartas y videos</button>
+    <button role="tab" data-tab="embajadores" aria-selected="false">Embajadores</button>
     <button role="tab" data-tab="ajustes" aria-selected="false">Campaña y valores</button>
   </div>
 
@@ -4758,6 +4811,22 @@ function paginaRegalosAdmin() {
     </div>
     <span class="msg" id="m-cartas" role="status"></span>
     <div id="lista-cartas"><p class="vacio">Cargando…</p></div>
+  </section>
+
+  <section class="panel" id="p-embajadores" hidden>
+    <p class="mu">Cada embajador comparte la campaña con su propio enlace. Aquí se ve cuántos pedidos pagados y cuántos regalos
+    llegaron por cada uno: nunca quién donó ni cuánto. No hay comisión ni premio por monto. El código no cambia después de creado,
+    porque ya va en los enlaces que la persona compartió.</p>
+    <div class="filtros">
+      <label>Nombre de la persona o el grupo<input id="e-nombre" maxlength="120"></label>
+      <label>Código (opcional)<input id="e-codigo" maxlength="24" placeholder="Sale del nombre"></label>
+      <button class="b chico" id="b-embajador">Crear el enlace</button>
+    </div>
+    <span class="msg" id="m-emb" role="status"></span>
+    <div class="tabla"><table>
+      <thead><tr><th>Embajador</th><th>Enlace</th><th>Pedidos pagados</th><th>Regalos</th><th></th></tr></thead>
+      <tbody id="tb-emb"><tr><td colspan="5" class="vacio">Cargando…</td></tr></tbody>
+    </table></div>
   </section>
 
   <section class="panel" id="p-ajustes" hidden>
@@ -4853,7 +4922,21 @@ function cargar(){
 }
 
 function pintar(){
-  pintarCampana(); pintarZonas(); pintarCategorias(); pintarNinos(); pintarPedidos(); pintarCartas();
+  pintarCampana(); pintarZonas(); pintarCategorias(); pintarNinos(); pintarPedidos(); pintarCartas(); pintarEmbajadores();
+}
+
+function pintarEmbajadores(){
+  var E = D.embajadores;
+  if (E === null) { $("tb-emb").innerHTML = "<tr><td colspan='5' class='vacio'>Falta aplicar la migración 0051.</td></tr>"; return; }
+  if (!E.length) { $("tb-emb").innerHTML = "<tr><td colspan='5' class='vacio'>Todavía no hay embajadores.</td></tr>"; return; }
+  $("tb-emb").innerHTML = E.map(function(e){
+    var enlace = D.origen + "/regalos?emb=" + e.codigo;
+    return "<tr" + (e.activo ? "" : " class='mu'") + "><td>" + esc(e.nombre) + "<br><span class='mu num'>" + esc(e.codigo) + "</span></td>" +
+      "<td><a href='" + esc(enlace) + "' target='_blank' rel='noopener'>" + esc(enlace) + "</a></td>" +
+      "<td class='num'>" + e.pagados + "</td><td class='num'>" + e.regalos + "</td>" +
+      "<td class='acc'><button class='b chico' data-emb-activo='" + esc(e.codigo) + "' data-v='" + (e.activo ? "0" : "1") + "'>" +
+      (e.activo ? "Desactivar" : "Activar") + "</button></td></tr>";
+  }).join("");
 }
 
 /* Las cartas y los videos. FM es el filtro: por defecto, lo que falta revisar. */
@@ -5186,6 +5269,22 @@ document.addEventListener("click", function(ev){
         (r.sustituidos ? ", sustituidos " + r.sustituidos : "") + (r.sin_cupo ? ", SIN CUPO " + r.sin_cupo : "") + "."), !!r.sin_cupo);
       return cargar();
     }).catch(function(e){ aviso("m-pedidos", motivo(e), true); });
+    return;
+  }
+  if ((b = t.closest("[data-emb-activo]"))) {
+    var ec = b.getAttribute("data-emb-activo"), act = b.getAttribute("data-v") === "1";
+    enviar("/api/admin/regalos/embajador", { codigo: ec, activo: act }).then(function(){
+      aviso("m-emb", ec + (act ? " activado." : " desactivado: su enlace sigue abriendo Regalos, pero ya no cuenta."));
+      return cargar();
+    }).catch(function(e){ aviso("m-emb", motivo(e), true); });
+    return;
+  }
+  if (t.id === "b-embajador") {
+    enviar("/api/admin/regalos/embajador", { nombre: $("e-nombre").value, codigo: $("e-codigo").value }).then(function(d){
+      $("e-nombre").value = ""; $("e-codigo").value = "";
+      aviso("m-emb", "Listo. Enlace para compartir: " + d.enlace);
+      return cargar();
+    }).catch(function(e){ aviso("m-emb", motivo(e), true); });
     return;
   }
   if ((b = t.closest("[data-anular]"))) {
@@ -45059,6 +45158,7 @@ export default {
           });
         }
         if (ruta === "/api/admin/regalos") return await adminRegalos(env);
+        if (ruta === "/api/admin/regalos/embajador" && request.method === "POST") return await adminRegalosEmbajador(request, env, sesion.email);
         if (ruta === "/api/admin/regalos/plantilla.csv") return adminRegalosPlantilla();
         if (ruta === "/api/admin/regalos/compras.csv") return await adminRegalosCompras(env);
         if (ruta === "/api/admin/regalos/noticias.csv") return await adminRegalosNoticias(env);

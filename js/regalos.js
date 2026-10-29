@@ -54,6 +54,11 @@ function rgEntrar(){
   var q = new URLSearchParams(location.search);
   var ref = q.get("rg"), tk = q.get("rt");
   if (ref && tk) rgSeguimiento(ref, tk);
+  /* El enlace de un embajador (?emb=, migración 0051): se recuerda en esta
+     pestaña hasta pagar, aunque la persona navegue por el sitio antes. El
+     servidor decide si el código vale; aquí solo se limpia la forma. */
+  var emb = String(q.get("emb") || "").toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 24);
+  if (emb) { try { sessionStorage.setItem("rg-emb", emb); } catch (e) {} }
   if (RG.datos) rgPinta();
   if (RG.pidiendo) return;
   RG.pidiendo = fetch("/api/regalos").then(function(r){ if (!r.ok) throw 0; return r.json(); })
@@ -363,7 +368,8 @@ function rgPagar(ev){
     telefono: rgEl("rg-tel").value.trim(), idioma: lang === "en" ? "en" : "es",
     certificado: cert, cert_doc_tipo: rgEl("rg-doctipo").value,
     cert_doc_numero: rgEl("rg-docnum").value.trim(), cert_ciudad: rgEl("rg-ciudad").value.trim(), muro: "no",
-    carta: rgEl("rg-carta").value, firma: rgEl("rg-firma").value.trim(), noticias: rgEl("rg-noticias").checked
+    carta: rgEl("rg-carta").value, firma: rgEl("rg-firma").value.trim(), noticias: rgEl("rg-noticias").checked,
+    embajador: (function(){ try { return sessionStorage.getItem("rg-emb") || ""; } catch (e) { return ""; } })()
   };
   var btn = rgEl("rg-enviar");
   btn.disabled = true; RG.enviando = true;
