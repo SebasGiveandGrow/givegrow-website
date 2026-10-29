@@ -2726,8 +2726,11 @@ function applyRouteMeta(id){
   var conPath = RUTAS_PATH.indexOf(id) > -1 || id === "socialfest";
   setMetaTag("property","og:url",ORIGIN_FUND+(conPath ? "/" : "/#")+id);
   setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
-  setMetaTag("property","og:image", OG_IMG_DEFAULT);
-  setMetaTag("name","twitter:image", OG_IMG_DEFAULT);
+  /* La imagen de la tarjeta, la misma que pone el Worker (`OG_IMG_RUTA` y
+     `cabeceraPagina`): si no, al navegar se volvía a la de la portada. */
+  var ogImg = ORIGIN_FUND + "/img/og" + (id==="regalos" ? "-regalos" : "") + (lang==="en" ? "-en" : "") + ".jpg";
+  setMetaTag("property","og:image", ogImg);
+  setMetaTag("name","twitter:image", ogImg);
   setMetaTag("name","twitter:title",ti);
   setMetaTag("name","twitter:description",de);
 }
