@@ -1,5 +1,8 @@
 # Apadrinar la reparación de una casa — diseño y lo que falta decidir
 
+> **¿Buscas el apadrinamiento mensual por unidades** (un niño en un programa, un
+> filtro de agua, una beca)? Es otra cosa: está en `ops/apadrinamiento-unidades.md`.
+
 Plano de diseño para cerrar el ciclo del triaje de viviendas: que un caso pueda
 recibir un aporte con destinación específica y termine en un acta.
 Principio rector: **evidencia, no promesas.**
