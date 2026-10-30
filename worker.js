@@ -20974,10 +20974,13 @@ async function apiPortalPerfil(request, env) {
   for (const k of PORTAL_EDITABLES) {
     limpio[k.id] = v[k.id];
     const vacio = v[k.id] === "" || v[k.id] === null || v[k.id] === undefined;
-    if (k.req && vacio) faltan.push(k.num);
+    if (k.req && vacio) faltan.push(k);
   }
+  /* Se nombra la PREGUNTA, no su número del cuestionario: el portal ya no
+     muestra los números (30 oct 2026). `campos` lleva los ids, para ir a ellos. */
   if (faltan.length) {
-    return json({ error: "faltan_campos", campos: faltan, ayuda: "Hay respuestas obligatorias en blanco: " + faltan.join(", ") + "." }, 400);
+    return json({ error: "faltan_campos", campos: faltan.map((k) => k.id),
+      ayuda: "Falta responder: " + faltan.map((k) => "«" + k.lbl + "»").join(", ") + "." }, 400);
   }
   await env.DB.prepare(
     "INSERT INTO perfil_fundacion (inscripcion, datos) VALUES (?, ?) " +
@@ -22162,6 +22165,31 @@ function paginaPortal(nonce) {
   .tarjeta h2{font-size:17px;font-weight:700;margin-bottom:4px}
   .tarjeta .acciones{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
   .sec-perfil{margin-top:18px}
+  /* EL PERFIL POR SECCIONES (30 oct 2026): un índice con el avance de cada
+     sección y una sección a la vez. Antes eran 35 campos seguidos. */
+  .perfil-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:22px;align-items:start}
+  .perfil-indice{display:flex;flex-direction:column;gap:12px}
+  .avance{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+  .avance .cifra{margin:2px 0}
+  .barra{display:block;height:8px;border-radius:999px;background:var(--bds);overflow:hidden}
+  .barra i{display:block;height:100%;width:0;background:var(--acc);border-radius:999px;transition:width .2s}
+  .avance small{font-size:13px;color:var(--ink-soft)}
+  .pf-secs{display:flex;flex-direction:column;gap:4px}
+  .pf-sec{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:6px 10px;border:1px solid transparent;border-radius:10px;
+    background:none;color:var(--ink-soft);font:inherit;font-size:14px;cursor:pointer;text-align:left}
+  .pf-sec[aria-current=step]{background:var(--surface);border-color:var(--bd);color:var(--ink);font-weight:600}
+  .pf-sec .marca{flex:0 0 24px;height:24px;border-radius:50%;border:1.5px solid var(--bd);display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;color:var(--mu)}
+  .pf-sec.completa .marca{background:var(--acc);border-color:var(--acc);color:var(--bg)}
+  .pf-sec .nom{flex:1;min-width:0}
+  .pf-sec .cta{font-size:12.5px;color:var(--mu);white-space:nowrap}
+  .pf-pub{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;margin:6px 0 2px}
+  .pf-pub.pub{background:var(--gl);color:var(--acc)}
+  .pf-pub.priv{background:var(--bds);color:var(--ink-soft)}
+  .pf-pub.ver{background:var(--amberl);color:var(--amber)}
+  .pf-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .cuenta{display:block;text-align:right;font-size:12px;color:var(--mu);margin-top:4px;font-variant-numeric:tabular-nums}
+  .cuenta.cerca{color:var(--amber)}
   .sec-perfil h3{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);font-weight:600;
     padding-bottom:8px;border-bottom:1px solid var(--bds)}
 
@@ -22190,6 +22218,9 @@ function paginaPortal(nonce) {
     .recorrido .q{grid-column:2;margin-top:0}
     .barra-marca .der span{display:none}
     .tab{font-size:14px;padding:10px 9px}
+    .perfil-grid{grid-template-columns:1fr;gap:14px}
+    .pf-secs{flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}
+    .pf-sec{flex:0 0 auto;width:auto;border-color:var(--bd);border-radius:999px;min-height:42px}
     /* Las pestañas bajan de fila en vez de esconderse a la derecha: en un
        celular, «Apadrinamiento» e «Indicadores» quedaban fuera de la vista. */
     .tabs{flex-wrap:wrap;overflow:visible;border-bottom:0;gap:6px;margin:20px 0 18px}
@@ -22608,31 +22639,35 @@ function pintarOdsPerfil(){
       .then(function(d){ MIS_ODS = d ? d.ods : []; pintarOdsPerfil(); }).catch(function(){});
     return;
   }
-  caja.innerHTML = "<h2>Objetivos de Desarrollo Sostenible que trabajan</h2>" +
+  var S = D.perfil ? pfSecciones() : null;
+  caja.innerHTML = (S ? '<p class="ey">Sección ' + S.length + " de " + S.length + "</p>" : "") + "<h2>Objetivos de Desarrollo Sostenible que trabajan</h2>" +
+    (S ? '<span class="pf-pub pub">Puede publicarse</span>' : "") +
     '<p class="sub">Marca los ODS a los que aporta el trabajo de la fundación. Es su declaración: el sitio la mostrará así cuando publiquemos el mapa de ODS de la red.</p>' +
     '<div class="ods-grid">' + cajasOds("perfil", MIS_ODS) + "</div>" +
     '<div class="acciones"><button type="button" class="btn sec" id="b-ods">Guardar los ODS</button></div><span class="msg" id="m-ods" role="status" aria-live="polite"></span>';
+  pfAvance();
   $("b-ods").addEventListener("click", function(){
     var b = this; b.disabled = true; msg("m-ods", "Guardando…");
     enviar("/api/portal/ods", { ods: odsMarcados("perfil") }).then(function(r){
       b.disabled = false;
       if (r.status === 401) { ver("v-entrar"); return; }
       if (!r.ok) { msg("m-ods", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
-      MIS_ODS = r.d.ods; msg("m-ods", "Guardados: " + (MIS_ODS.length ? MIS_ODS.join(", ") : "ninguno") + ".", "ok");
+      MIS_ODS = r.d.ods; msg("m-ods", "Guardados: " + (MIS_ODS.length ? MIS_ODS.join(", ") : "ninguno") + ".", "ok"); pfAvance();
     }).catch(function(){ b.disabled = false; msg("m-ods", "No pudimos conectar. Intenta de nuevo.", "mal"); });
   });
 }
 
 function campo(c, v){
   var id = "pf-" + c.id;
-  var cab = '<label for="' + id + '"><span class="num">' + esc(c.num) + "</span>" + esc(c.lbl) + (c.req ? " *" : "") + "</label>" +
+  var cab = '<label for="' + id + '">' + esc(c.lbl) + (c.req ? " *" : "") + "</label>" +
     (c.ayuda ? '<span class="ayuda">' + esc(c.ayuda) + "</span>" : "");
-  if (c.tipo === "parrafo") return cab + '<textarea id="' + id + '" rows="4" maxlength="' + (c.max || 900) + '">' + esc(v) + "</textarea>";
+  var cuenta = function(max){ return '<span class="cuenta" data-cuenta="' + id + '" data-max="' + max + '">' + String(v || "").length + " / " + max + "</span>"; };
+  if (c.tipo === "parrafo") return cab + '<textarea id="' + id + '" rows="4" maxlength="' + (c.max || 900) + '">' + esc(v) + "</textarea>" + cuenta(c.max || 900);
   if (c.tipo === "opcion") return cab + c.ops.map(function(o, n){
     return '<label class="op"><input type="radio" name="' + id + '" value="' + esc(o) + '"' + (o === v ? " checked" : "") + (n ? "" : ' id="' + id + '"') + "><span>" + esc(o) + "</span></label>";
   }).join("");
   if (c.tipo === "numero") return cab + '<input type="text" inputmode="numeric" id="' + id + '" value="' + esc(v == null ? "" : v) + '">';
-  return cab + '<input type="text" id="' + id + '" maxlength="' + (c.max || 200) + '" value="' + esc(v) + '">';
+  return cab + '<input type="text" id="' + id + '" maxlength="' + (c.max || 200) + '" value="' + esc(v) + '">' + cuenta(c.max || 200);
 }
 function pintarPerfil(){
   var caja = $("s-perfil");
@@ -22643,32 +22678,127 @@ function pintarPerfil(){
     pintarOdsPerfil();
     return;
   }
-  var P = D.perfil, h = "", sec = "", abierta = false;
+  var P = D.perfil, S = pfSecciones(), h = "";
+  h += '<div class="perfil-grid"><nav class="perfil-indice" aria-label="Secciones del perfil">' +
+    '<div class="avance"><span class="ey">Tu perfil</span><span class="cifra" id="pf-pct">0 %</span>' +
+    '<span class="barra" role="progressbar" aria-label="Avance del perfil" aria-valuemin="0" aria-valuemax="100" id="pf-barra-r"><i id="pf-barra"></i></span>' +
+    '<small id="pf-falta"></small></div><div class="pf-secs">' +
+    S.map(function(s, i){ return '<button type="button" class="pf-sec" data-pf-sec="' + i + '"><span class="marca" aria-hidden="true">' + (i + 1) +
+      '</span><span class="nom">' + esc(pfNombre(s)) + '</span><span class="cta"></span></button>'; }).join("") +
+    "</div></nav><div>";
   if (P.por_revisar) h += '<div class="tarjeta aviso ambar"><strong>Tus últimos cambios (' + esc(P.actualizado) + ") están por revisar.</strong> Hasta entonces el sitio sigue mostrando lo anterior.</div>";
   h += '<form id="f-perfil" class="tarjeta' + (P.por_revisar ? " mt" : "") + '">';
-  P.campos.forEach(function(c){
-    if (c.sec !== sec) { if (abierta) h += "</div>"; sec = c.sec; h += '<div class="sec-perfil"><h3>' + esc(sec) + "</h3>"; abierta = true; }
-    h += campo(c, P.datos[c.id]);
+  S.forEach(function(s, i){
+    if (s === "ODS") return;
+    var info = PF_INFO[s] || ["", "", "priv"];
+    h += '<section class="pf-bloque" data-pf-bloque="' + i + '"><p class="ey">Sección ' + (i + 1) + " de " + S.length + "</p><h2>" + esc(s) + "</h2>" +
+      (info[0] ? '<span class="pf-pub ' + info[2] + '">' + esc(info[0]) + "</span>" : "") + (info[1] ? '<p class="sub">' + esc(info[1]) + "</p>" : "");
+    P.campos.forEach(function(c){ if (c.sec === s) h += campo(c, P.datos[c.id]); });
+    h += "</section>";
   });
-  if (abierta) h += "</div>";
-  h += '<hr class="regla"><p class="sub">Las autorizaciones —nombre, logo, fotos y menores— quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p></form>';
-  h += '<div class="tarjeta" id="p-ods"></div>';
+  h += "</form>";
+  h += '<div class="tarjeta pf-bloque" data-pf-bloque="' + (S.length - 1) + '" id="p-ods"></div>';
+  h += '<div class="pf-nav"><button type="button" class="btn sec" id="pf-ant">← Anterior</button><button type="button" class="btn" id="pf-sig"></button></div>' +
+    '<p class="sub mt">Las autorizaciones —nombre, logo, fotos y menores— quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p></div></div>';
   caja.innerHTML = h;
   pintarOdsPerfil();
   SUCIO = false; msg("m-perfil", "");
-  $("f-perfil").addEventListener("input", function(){ if (!SUCIO) { SUCIO = true; msg("m-perfil", "Tienes cambios sin guardar."); } });
+  $("f-perfil").addEventListener("input", function(ev){
+    if (!SUCIO) { SUCIO = true; msg("m-perfil", "Tienes cambios sin guardar."); }
+    var t = ev.target, k = t && t.id ? document.querySelector('[data-cuenta="' + t.id + '"]') : null;
+    if (k) { var max = Number(k.getAttribute("data-max")) || 0; k.textContent = t.value.length + " / " + max; k.classList.toggle("cerca", max && t.value.length > max * 0.9); }
+    pfAvance();
+  });
+  $("pf-ant").addEventListener("click", function(){ pfIr(PF_SEC - 1); });
+  $("pf-sig").addEventListener("click", function(){ pfIr(PF_SEC + 1); });
+  document.querySelectorAll("[data-pf-sec]").forEach(function(b){ b.addEventListener("click", function(){ pfIr(Number(b.getAttribute("data-pf-sec"))); }); });
+  pfAvance();
+  pfIr(pfPrimeraPendiente());
 }
+/* Las secciones del perfil, en el orden de los campos, y los ODS al final. */
+var PF_SEC = 0;
+var PF_INFO = {
+  "Sede": ["Solo para el equipo", "Para saber a dónde llegar cuando vamos a visitarlos. Nada de esta sección se publica.", "priv"],
+  "Historia": ["Puede publicarse", "Quiénes son y qué han logrado. Puede salir en su ficha de la red, siempre después de que el equipo lo revise.", "pub"],
+  "Programas": ["Puede publicarse", "Lo que hacen, con qué frecuencia y a quién llegan.", "pub"],
+  "Unidad de impacto y costos": ["Se verifica antes de usarse", "Lo que cuesta llegar a una persona. Lo verificamos con un soporte antes de usarlo en la calculadora de impacto.", "ver"],
+  "Presencia digital": ["Puede publicarse", "Dónde los puede encontrar la gente.", "pub"]
+};
+function pfSecciones(){
+  var L = [];
+  D.perfil.campos.forEach(function(c){ if (L.indexOf(c.sec) < 0) L.push(c.sec); });
+  L.push("ODS");
+  return L;
+}
+function pfNombre(s){ return s === "ODS" ? "ODS" : s; }
+function pfValor(c){
+  if (c.tipo === "opcion") { var r = document.querySelector('input[name="pf-' + c.id + '"]:checked'); return r ? r.value : ""; }
+  var e = $("pf-" + c.id); return e ? e.value : "";
+}
+function pfCuenta(s){
+  if (s === "ODS") { var n = document.querySelector('input[data-ods="perfil"]') ? odsMarcados("perfil").length : (MIS_ODS || []).length; return { n: n ? 1 : 0, t: 1, faltan: 0, ods: n }; }
+  var L = D.perfil.campos.filter(function(c){ return c.sec === s; });
+  return { n: L.filter(function(c){ return String(pfValor(c)).trim(); }).length, t: L.length,
+    faltan: L.filter(function(c){ return c.req && !String(pfValor(c)).trim(); }).length };
+}
+function pfAvance(){
+  if (!$("pf-pct")) return;
+  var S = pfSecciones(), n = 0, t = 0, faltan = 0;
+  S.forEach(function(s, i){
+    var k = pfCuenta(s); n += k.n; t += k.t; faltan += k.faltan;
+    var b = document.querySelector('[data-pf-sec="' + i + '"]');
+    if (!b) return;
+    var lista = k.n === k.t;
+    b.classList.toggle("completa", lista);
+    b.querySelector(".marca").textContent = lista ? "✓" : String(i + 1);
+    b.querySelector(".cta").textContent = s === "ODS" ? (k.ods ? k.ods + (k.ods === 1 ? " marcado" : " marcados") : "sin marcar") : k.n + " de " + k.t;
+  });
+  var pct = t ? Math.round(100 * n / t) : 0;
+  $("pf-pct").textContent = pct + " %";
+  $("pf-barra").style.width = pct + "%";
+  $("pf-barra-r").setAttribute("aria-valuenow", String(pct));
+  $("pf-falta").textContent = faltan ? "Faltan " + faltan + (faltan === 1 ? " respuesta obligatoria." : " respuestas obligatorias.") : "Tienen todo lo obligatorio. Lo demás suma.";
+}
+/* Lleva a la sección de un campo y lo enfoca: lo usan el aviso de lo que
+   falta y el rechazo del servidor. */
+function pfAlCampo(id){
+  var c = D.perfil.campos.filter(function(x){ return x.id === id; })[0];
+  if (!c) return;
+  pfIr(pfSecciones().indexOf(c.sec));
+  var e = $("pf-" + id) || document.querySelector('input[name="pf-' + id + '"]');
+  if (e) { e.focus(); e.scrollIntoView({ block: "center" }); }
+}
+function pfPrimeraPendiente(){
+  var S = pfSecciones();
+  for (var i = 0; i < S.length; i++) if (pfCuenta(S[i]).faltan) return i;
+  return 0;
+}
+function pfIr(i){
+  var S = pfSecciones();
+  PF_SEC = Math.max(0, Math.min(S.length - 1, i));
+  document.querySelectorAll("[data-pf-bloque]").forEach(function(b){ b.classList.toggle("oculto", Number(b.getAttribute("data-pf-bloque")) !== PF_SEC); });
+  $("f-perfil").classList.toggle("oculto", S[PF_SEC] === "ODS");
+  document.querySelectorAll("[data-pf-sec]").forEach(function(b){
+    if (Number(b.getAttribute("data-pf-sec")) === PF_SEC) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+  });
+  $("pf-ant").disabled = PF_SEC === 0;
+  $("pf-sig").disabled = PF_SEC === S.length - 1;
+  $("pf-sig").textContent = PF_SEC === S.length - 1 ? "Es la última sección" : "Siguiente: " + pfNombre(S[PF_SEC + 1]) + " →";
+}
+document.addEventListener("change", function(ev){ if (ev.target && ev.target.getAttribute && ev.target.getAttribute("data-ods") === "perfil") pfAvance(); });
 function guardarPerfil(){
   var datos = {};
   D.perfil.campos.forEach(function(c){
     if (c.tipo === "opcion") { var r = document.querySelector('input[name="pf-' + c.id + '"]:checked'); datos[c.id] = r ? r.value : ""; }
     else datos[c.id] = $("pf-" + c.id).value;
   });
+  var falta = D.perfil.campos.filter(function(c){ return c.req && !String(pfValor(c)).trim(); })[0];
+  if (falta) { pfAlCampo(falta.id); msg("m-perfil", "Falta responder «" + falta.lbl + "».", "mal"); return; }
   var b = $("b-perfil"); b.disabled = true; msg("m-perfil", "Guardando…");
   enviar("/api/portal/perfil", { datos: datos }).then(function(r){
     b.disabled = false;
     if (r.status === 401) { ver("v-entrar"); return; }
-    if (!r.ok) { msg("m-perfil", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
+    if (!r.ok) { if (r.d.campos && r.d.campos[0]) pfAlCampo(r.d.campos[0]); msg("m-perfil", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
     SUCIO = false;
     D.perfil.datos = r.d.datos; D.perfil.por_revisar = true;
     pintarResumen();
