@@ -49,6 +49,24 @@ entregarse: uno por pedido, nunca uno por regalo. «Comprado» no manda correo:
 con mil regalos el cupo diario de correo (1600) se guarda para lo que el
 donante espera saber.
 
+## La última milla: empacar y entregar (30 oct 2026)
+
+En la lista de niños, con los niños **seleccionados** (los filtros y «Seleccionar
+los filtrados» ayudan):
+
+- **Etiquetas para empacar**: una por regalo financiado que todavía no se
+  entrega, dos por fila, para recortar y pegar en el paquete. Llevan el código
+  grande, el nombre de pila, la edad, la zona y la comunidad, el regalo con su
+  talla, y si va con carta o video aprobados.
+- **Planilla de entrega**: una hoja por comunidad, con el nombre completo del
+  niño, el regalo, el acudiente y la casilla para su firma o huella, más quién
+  entregó. Arriba: fecha, lugar, responsable y número del acta `AE-`. Es el
+  soporte del acta: se archiva en la fundación y **no se fotografía para redes**.
+- Lo que no tiene un regalo financiado sin entregar se queda fuera, y la pantalla
+  dice cuántos.
+- Después de la entrega: crear el acta en `/admin › Entregas` y marcar
+  «Entregado» por lote con su número.
+
 ## Cartas, videos y noticias (0049)
 
 - El donante puede dejar **una carta y un video** (de 30 s a 1 min, hasta 90 MB)

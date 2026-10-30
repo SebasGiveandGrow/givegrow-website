@@ -4741,6 +4741,27 @@ function paginaRegalosAdmin() {
     .hoja .de{margin-top:18px;font-style:italic}
     .hoja .pie{margin-top:28px;font-size:.8rem;color:var(--mu)}
     .hoja p.texto{white-space:pre-wrap}
+    /* Etiquetas: dos por fila, para recortar y pegar en el paquete. */
+    .etq-grid{display:grid;grid-template-columns:1fr 1fr;gap:6mm}
+    .etq{border:1px dashed var(--mu);border-radius:3mm;padding:4mm 5mm;break-inside:avoid;font-size:.9rem;line-height:1.35}
+    .etq p{margin:0}
+    .etq-cod{font-size:1.5rem;font-weight:700;letter-spacing:.04em}
+    .etq-nom{font-weight:600;margin-top:1mm}
+    .etq-zona,.etq-msg{color:var(--mu);font-size:.82rem}
+    .etq-reg{margin-top:2mm}
+    .etq-msg{margin-top:2mm;font-weight:600}
+    /* Planilla: una hoja por comunidad, con espacio para firmar. */
+    .planilla{font-size:.78rem;line-height:1.35;padding:8px 0}
+    .planilla h2{font-size:1.1rem;margin:2px 0}
+    .pl-ey{color:var(--mu);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;margin:0}
+    .pl-donde{margin:2px 0 8px}
+    .pl-datos{display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:8px}
+    .pl-tabla{width:100%;border-collapse:collapse}
+    .pl-tabla th,.pl-tabla td{border:1px solid var(--mu);padding:4px 5px;text-align:left;vertical-align:top}
+    .pl-tabla th{background:var(--bg);font-size:.72rem}
+    .pl-firma{width:30%;height:32px}
+    .pl-ini{width:7%}
+    .pl-pie{margin-top:10px;font-size:.7rem;color:var(--mu)}
   }
 </style>
 </head>
@@ -4769,6 +4790,8 @@ function paginaRegalosAdmin() {
       <button class="b chico" id="b-todos">Seleccionar los filtrados</button>
       <button class="b chico" id="b-ninguno">Ninguno</button>
       <a class="b chico" href="/api/admin/regalos/compras.csv">Lista de compras (CSV)</a>
+      <button class="b chico" id="b-etiquetas">Etiquetas para empacar</button>
+      <button class="b chico" id="b-planilla">Planilla de entrega</button>
     </div>
     <p class="mu" id="n-cuenta"></p>
     <div class="tabla"><table>
@@ -5019,6 +5042,67 @@ function imprimirCartas(){
   });
   if (!hojas.length) { aviso("m-cartas", "No hay cartas aprobadas con regalos financiados para imprimir.", true); return; }
   $("imprimir").innerHTML = hojas.join("");
+  window.print();
+}
+
+/* ---- LA ÚLTIMA MILLA (30 oct 2026): el papel del día de la entrega ----
+   Etiquetas para empacar (una por regalo, con su código) y la planilla de
+   entrega por comunidad, donde el acudiente firma: es el soporte del acta AE-.
+   Salen de los niños SELECCIONADOS y solo con regalos ya financiados que
+   todavía no se entregaron. Nada de esto sale del panel. */
+var EN_CAMINO = { financiado: 1, comprado: 1, despachado: 1 };
+function deCamino(){
+  var cods = Object.keys(SEL);
+  if (!cods.length) { aviso("m-lote", "Selecciona primero los niños (los filtros y «Seleccionar los filtrados» ayudan).", true); return null; }
+  var L = (D.ninos || []).filter(function(n){ return SEL[n.codigo] && EN_CAMINO[n.estado]; });
+  var fuera = cods.length - L.length;
+  if (!L.length) { aviso("m-lote", "Ninguno de los seleccionados tiene un regalo financiado sin entregar.", true); return null; }
+  if (fuera) aviso("m-lote", fuera + " seleccionado(s) quedaron fuera: no tienen un regalo financiado sin entregar.");
+  return L;
+}
+function nombreZona(id){ var z = (D.zonas || []).filter(function(x){ return x.id === id; })[0]; return z ? z.nombre_es : id; }
+function mensajeDe(ref){
+  var m = (D.mensajes || []).filter(function(x){ return x.pedido_ref === ref && x.estado === "aprobado"; })[0];
+  return { carta: !!(m && m.carta), video: !!(m && m.video) };
+}
+function imprimirEtiquetas(){
+  var L = deCamino(); if (!L) return;
+  $("imprimir").innerHTML = "<div class='etq-grid'>" + L.map(function(n){
+    var m = mensajeDe(n.pedido_ref);
+    return "<div class='etq'><p class='etq-cod'>" + esc(n.codigo) + "</p>" +
+      "<p class='etq-nom'>" + esc(n.nombre_publico || "") + " · " + esc(n.edad) + " años</p>" +
+      "<p class='etq-zona'>" + esc(nombreZona(n.zona_id)) + (n.comunidad ? " · " + esc(n.comunidad) : "") + "</p>" +
+      "<p class='etq-reg'>" + esc(n.deseo_es || "") + (n.talla ? " · talla " + esc(n.talla) : "") + "</p>" +
+      (m.carta || m.video ? "<p class='etq-msg'>Lleva " + [m.carta ? "carta" : "", m.video ? "video" : ""].filter(Boolean).join(" y ") + "</p>" : "") +
+      "</div>";
+  }).join("") + "</div>";
+  window.print();
+}
+function imprimirPlanilla(){
+  var L = deCamino(); if (!L) return;
+  var grupos = {}, orden = [];
+  L.forEach(function(n){
+    var k = n.zona_id + "|" + (n.comunidad || "Sin comunidad registrada");
+    if (!grupos[k]) { grupos[k] = []; orden.push(k); }
+    grupos[k].push(n);
+  });
+  $("imprimir").innerHTML = orden.map(function(k){
+    var p = k.split("|"), filas = grupos[k];
+    return "<div class='hoja planilla'><p class='pl-ey'>Fundación Give&amp;Grow International · NIT 901.948.930-2</p>" +
+      "<h2>Planilla de entrega · Regalos de diciembre 2026</h2>" +
+      "<p class='pl-donde'><strong>" + esc(nombreZona(p[0])) + "</strong> · " + esc(p[1]) + " · " + filas.length + (filas.length === 1 ? " regalo" : " regalos") + "</p>" +
+      "<div class='pl-datos'><span>Fecha: ________________</span><span>Lugar: ______________________</span>" +
+      "<span>Responsable: ______________________</span><span>Acta N.º AE-__________</span></div>" +
+      "<table class='pl-tabla'><thead><tr><th>N.º</th><th>Código</th><th>Niño o niña</th><th>Edad</th><th>Regalo</th>" +
+      "<th>Acudiente</th><th>Firma o huella del acudiente</th><th>Entregó</th></tr></thead><tbody>" +
+      filas.map(function(n, i){
+        return "<tr><td>" + (i + 1) + "</td><td>" + esc(n.codigo) + "</td><td>" + esc(n.nombre || "") + "</td><td>" + esc(n.edad) + "</td>" +
+          "<td>" + esc(n.deseo_es || "") + (n.talla ? " · talla " + esc(n.talla) : "") + "</td>" +
+          "<td>" + esc(n.acudiente_nombre || "") + (n.acudiente_parentesco ? " (" + esc(n.acudiente_parentesco) + ")" : "") + "</td>" +
+          "<td class='pl-firma'></td><td class='pl-ini'></td></tr>";
+      }).join("") + "</tbody></table>" +
+      "<p class='pl-pie'>Esta planilla es el soporte del acta de entrega. Tiene datos de menores: se guarda en el archivo de la fundación, no se fotografía para redes ni se comparte en grupos.</p></div>";
+  }).join("");
   window.print();
 }
 
@@ -5336,6 +5420,8 @@ document.addEventListener("click", function(ev){
   if ((b = t.closest("[data-aprobar]"))) { revisarCarta(b.getAttribute("data-aprobar"), "aprobado"); return; }
   if ((b = t.closest("[data-rechazar]"))) { revisarCarta(b.getAttribute("data-rechazar"), "rechazado"); return; }
   if (t.id === "b-imprimir") { imprimirCartas(); return; }
+  if (t.id === "b-etiquetas") { imprimirEtiquetas(); return; }
+  if (t.id === "b-planilla") { imprimirPlanilla(); return; }
   if (t.id === "b-paso") { aplicarPaso(); return; }
   if (t.id === "b-todos") { filtrados().forEach(function(n){ SEL[n.codigo] = true; }); pintarNinos(); return; }
   if (t.id === "b-ninguno") { SEL = {}; pintarNinos(); return; }
