@@ -5939,7 +5939,7 @@ async function adminSalud(env, opciones) {
     await enCola("portal_por_revisar",
       "SELECT COUNT(*) AS n, MIN(f) AS masViejo FROM (SELECT actualizado AS f FROM perfil_fundacion WHERE revisado_en IS NULL " +
       "UNION ALL SELECT subido FROM documentos_fundacion WHERE revisado_en IS NULL AND retirado_en IS NULL)",
-      "Bandeja «Quién quiere entrar» · una fundación cambió su perfil o subió un documento desde el portal: ábrelo en «Portal…» y márcalo revisado", 30, "#sec-entrar", 7);
+      "Revisar y aprobar › Bandeja de revisión · una fundación cambió su perfil o subió un documento desde el portal: ábrelo y márcalo revisado", 30, "#sec-revisar", 7);
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -5953,7 +5953,7 @@ async function adminSalud(env, opciones) {
   try {
     await enCola("unidades_por_revisar",
       "SELECT COUNT(*) AS n, MIN(actualizada) AS masViejo FROM unidades_apadrinables WHERE estado = 'propuesta'",
-      "Revisar y aprobar › Apadrinamiento · una fundación propuso una unidad para apadrinar: verifica su costo y apruébala o devuélvela", 31, "#sec-apadrinamiento", 7);
+      "Revisar y aprobar › Bandeja de revisión · una fundación propuso una unidad para apadrinar: verifica su costo y apruébala o devuélvela", 31, "#sec-revisar", 7);
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -5963,7 +5963,7 @@ async function adminSalud(env, opciones) {
   try {
     await enCola("reportes_unidad_por_revisar",
       "SELECT COUNT(*) AS n, MIN(actualizado) AS masViejo FROM reportes_unidad WHERE estado = 'enviado'",
-      "Revisar y aprobar › Apadrinamiento · una fundación reportó lo entregado en el mes: revisa la evidencia y apruébalo o devuélvelo", 32, "#sec-apadrinamiento", 7);
+      "Revisar y aprobar › Bandeja de revisión · una fundación reportó lo entregado en el mes: revisa la evidencia y apruébalo o devuélvelo", 32, "#sec-revisar", 7);
     await enCola("unidades_sin_reporte",
       "SELECT COUNT(*) AS n, MIN(u.aprobada_en) AS masViejo FROM unidades_apadrinables u WHERE u.estado = 'aprobada' " +
       "AND strftime('%d', datetime('now', '-5 hours')) >= '10' " +
@@ -5979,7 +5979,7 @@ async function adminSalud(env, opciones) {
   try {
     await enCola("mediciones_fundacion_por_revisar",
       "SELECT COUNT(*) AS n, MIN(actualizado) AS masViejo FROM mediciones_fundacion WHERE estado = 'enviada'",
-      "Revisar y aprobar › Indicadores de la red · una fundación reportó la medición de un indicador: revisa su fuente y apruébala o devuélvela", 34, "#sec-indred", 14);
+      "Revisar y aprobar › Bandeja de revisión · una fundación reportó la medición de un indicador: revisa su fuente y apruébala o devuélvela", 34, "#sec-revisar", 14);
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -21480,6 +21480,44 @@ async function apiApadrinamientoInteres(request, env) {
   return json({ ok: true });
 }
 
+/* GET /api/admin/revisar — LA BANDEJA DE REVISIÓN (ítem 44, paso 3, 30 oct
+   2026). Lo que espera una decisión del equipo, de varias tablas a una sola
+   lista, de lo más viejo a lo más nuevo. Solo LEE: aprobar o devolver sigue
+   pasando por la ruta de cada cosa, con sus reglas y su versión. Cada fuente
+   se salta si su migración no está. */
+async function adminRevisar(env) {
+  const items = [];
+  const leer = async (tabla, tipo, sql) => {
+    if (!(await existeTabla(env, tabla))) return;
+    for (const r of (await env.DB.prepare(sql).all()).results || []) items.push(Object.assign({ tipo }, r));
+  };
+  await leer("unidades_apadrinables", "unidad",
+    "SELECT u.id, u.nombre_es AS titulo, i.nombre AS quien, u.actualizada AS t FROM unidades_apadrinables u " +
+    "JOIN inscripciones i ON i.id = u.inscripcion WHERE u.estado = 'propuesta'");
+  await leer("reportes_unidad", "reporte",
+    "SELECT r.id, u.nombre_es || ' · ' || r.periodo || ': ' || r.entregadas || ' entregadas' AS titulo, i.nombre AS quien, r.actualizado AS t " +
+    "FROM reportes_unidad r JOIN unidades_apadrinables u ON u.id = r.unidad_id JOIN inscripciones i ON i.id = u.inscripcion WHERE r.estado = 'enviado'");
+  await leer("mediciones_fundacion", "medicion",
+    "SELECT m.id, x.nombre || ' · ' || m.periodo AS titulo, i.nombre AS quien, m.actualizado AS t FROM mediciones_fundacion m " +
+    "JOIN indicadores_fundacion x ON x.id = m.indicador_id JOIN inscripciones i ON i.id = x.inscripcion WHERE m.estado = 'enviada'");
+  await leer("perfil_fundacion", "portal",
+    "SELECT i.id, i.nombre AS quien, MIN(x.f) AS t, SUM(x.p) AS perfiles, SUM(x.d) AS docs FROM (" +
+    "SELECT inscripcion, actualizado AS f, 1 AS p, 0 AS d FROM perfil_fundacion WHERE revisado_en IS NULL UNION ALL " +
+    "SELECT inscripcion, subido, 0, 1 FROM documentos_fundacion WHERE revisado_en IS NULL AND retirado_en IS NULL" +
+    ") x JOIN inscripciones i ON i.id = x.inscripcion GROUP BY i.id");
+  await leer("entregas", "acta",
+    "SELECT numero AS id, 'Acta ' || numero || ' · ' || sector AS titulo, 'Actas de entrega' AS quien, creada_en AS t " +
+    "FROM entregas WHERE publicada_en IS NULL AND anulada_en IS NULL");
+  for (const x of items) {
+    if (x.tipo !== "portal") continue;
+    x.titulo = [x.perfiles ? "Perfil editado" : "", x.docs ? x.docs + (x.docs === 1 ? " documento subido" : " documentos subidos") : ""]
+      .filter(Boolean).join(" y ");
+    delete x.perfiles; delete x.docs;
+  }
+  items.sort((a, b) => String(a.t || "").localeCompare(String(b.t || "")));
+  return json({ ok: true, items });
+}
+
 /* GET /api/admin/apadrinamiento — todas las unidades y los interesados. */
 async function adminApadrinamiento(env) {
   if (!(await existeTabla(env, "unidades_apadrinables"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0054 en la base." }, 409);
@@ -33893,6 +33931,7 @@ textarea { font-size: 16px }
 <!-- Revisar y aprobar: lo que espera una decisión del equipo antes de publicarse o de contar. -->
 <div class="pn-grupo">
   <p class="pn-gt">Revisar y aprobar</p>
+  <a class="pn-it" href="#revisar" data-pn-ir="revisar">Bandeja de revisión<span class="pn-n" data-pn-n="revisar"></span></a>
   <a class="pn-it" href="#alianzas/apadrinamiento" data-pn-ir="alianzas/apadrinamiento">Apadrinamiento<span class="pn-n" data-pn-n="alianzas/apadrinamiento"></span></a>
   <a class="pn-it" href="#meal/red" data-pn-ir="meal/red">Indicadores de la red<span class="pn-n" data-pn-n="meal/red"></span></a>
 </div>
@@ -34184,6 +34223,16 @@ textarea { font-size: 16px }
 <p>Lo que se edita aquí no cambia el sitio público: el sitio sale de partners.json. Las autorizaciones de la ficha no se editan: cambian con un documento de la fundación.</p>
 </div></details>
 <div id="tb-fund"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<!-- LA BANDEJA DE REVISIÓN (ítem 44, paso 3): todo lo que espera una decisión,
+     en una lista. Cada fila abre el cajón de su sección: aquí no se decide nada nuevo. -->
+<section class="pn-vista" data-vista="revisar" id="sec-revisar" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Aquí llega todo lo que espera una decisión del equipo: unidades y reportes mensuales de apadrinamiento, mediciones de los indicadores de las fundaciones, perfiles y documentos subidos al portal, y actas en borrador. <strong>Lo más viejo va arriba</strong>, y lo que lleva 7 días o más, en rojo.</p>
+<p><strong>Abrir</strong> trae el mismo cajón de siempre, con su casilla y sus reglas: la bandeja no aprueba nada por su cuenta. Las actas se completan y se publican en «Actas de entrega».</p>
+</div></details>
+<div id="tb-revisar" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="alianzas/apadrinamiento" id="sec-apadrinamiento" hidden>
@@ -35747,6 +35796,8 @@ var VISTAS = {
     linea: "Fundaciones, empresas, voluntarios y padrinos que quieren entrar a la red." },
   "alianzas/fundaciones": { area: "Acompañar la red", titulo: "Fundaciones",
     linea: "Cada fundación con su estado, su contacto, su acceso al portal, sus documentos y sus donaciones. Se abre y se edita." },
+  "revisar": { area: "Revisar y aprobar", titulo: "Bandeja de revisión",
+    linea: "Todo lo que espera una decisión del equipo, de lo más viejo a lo más nuevo. Cada fila abre el cajón de siempre." },
   "alianzas/apadrinamiento": { area: "Revisar y aprobar", titulo: "Apadrinamiento",
     linea: "Las unidades que las fundaciones ofrecen para apadrinar cada mes: verificar el costo, aprobar y publicar." },
   "alianzas/ofrecimientos": { area: "Atender", titulo: "Ofrecimientos en especie",
@@ -35825,6 +35876,7 @@ function mostrar(ruta){
   filtrarFase4(vista, ruta.filtro);
   filtrarFase5(vista, ruta.filtro);
   filtrarMeal(vista, ruta.filtro);
+  filtrarRevisar(vista, ruta.filtro);
   sec.querySelectorAll("tbody[id],[data-bandeja]").forEach(function(t){ pedir(t.id); });
   /* Los cinco reportes comparten la sección: cada dirección pinta el suyo. */
   if (vista.indexOf("reportes/") === 0) pedirReporte();
@@ -35957,12 +36009,12 @@ var COLA_MOD = {
   meal_indicadores_pendientes: "meal/indicadores",
   board_informe_sin_enviar: "meal/board",
   quejas_sin_responder: "quejas/ordinaria",
-  portal_por_revisar: "alianzas/red",
+  portal_por_revisar: "revisar",
   dirigidos_por_entregar: "reportes/fundaciones",
-  unidades_por_revisar: "alianzas/apadrinamiento",
-  reportes_unidad_por_revisar: "alianzas/apadrinamiento",
+  unidades_por_revisar: "revisar",
+  reportes_unidad_por_revisar: "revisar",
   unidades_sin_reporte: "alianzas/apadrinamiento",
-  mediciones_fundacion_por_revisar: "meal/red"
+  mediciones_fundacion_por_revisar: "revisar"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -35970,7 +36022,8 @@ var COLA_FILTRO = { fundaciones_sin_respuesta: "respuesta", empresas_sin_respues
   apadrinamientos_sin_respuesta: "respuesta", voluntarios_sin_respuesta: "respuesta", ingenieros_sin_verificar: "matricula",
   correos_fallidos: "por_atender", correos_sin_cupo: "por_atender", correos_sin_buzon: "sin_destino", seguimientos_pendientes: "vencidos" ,
   tareas_pendientes: "vencidas", documentos_vencidos: "atencion", documentos_por_vencer: "atencion",
-  meal_indicadores_pendientes: "pendientes" };
+  meal_indicadores_pendientes: "pendientes", portal_por_revisar: "portal", unidades_por_revisar: "unidad",
+  reportes_unidad_por_revisar: "reporte", mediciones_fundacion_por_revisar: "medicion" };
 var DESTINO_ES = { "/triaje": "Abrir el triaje", "/admin/ruta": "Abrir la ruta de visitas", "/firma": "Abrir la firma" };
 
 /* LAS INSIGNIAS salen de la MISMA lista que pinta «Hoy»: si un día cambia la
@@ -36209,6 +36262,7 @@ var CONFIG_ES = { RESEND_API_KEY: "la llave del servicio de correo", WOMPI_PRIVA
   ANTHROPIC_API_KEY: "la llave del asistente", ACCESS_EVAL_JWK: "la llave del acceso de ingenieros",
   FIRMA_RL_EMAIL: "el correo del Representante Legal", FIRMA_RF_EMAIL: "el correo de la Revisora Fiscal" };
 function cargarSalud(){
+  if (PEDIDAS["tb-revisar"]) cargarRevisar();
   pedirJSON("/api/admin/salud?items=1", ["decisiones", "salud"]).then(function(d){
     /* Se pinta con los MISMOS datos y sin una petición más: «Hoy», las
        insignias, las cabeceras y esta sección salen del mismo /api/admin/salud. */
@@ -43958,6 +44012,64 @@ document.addEventListener("change", function(e){
   });
 });
 
+/* ---------------- LA BANDEJA DE REVISIÓN (ítem 44, paso 3) ----------------
+   Todo lo que espera una decisión del equipo, en una sola lista y de lo más
+   viejo a lo más nuevo. No decide nada por su cuenta: cada fila abre el MISMO
+   cajón de su sección, con su casilla y su versión. */
+var REV = null, REV_FILTRO = "todo";
+var REV_TIPOS = [["todo", "Todo"], ["reporte", "Reportes"], ["unidad", "Unidades"], ["medicion", "Mediciones"],
+  ["portal", "Perfiles y documentos"], ["acta", "Actas en borrador"]];
+var REV_TIPO_ES = { reporte: "Reporte mensual", unidad: "Unidad", medicion: "Medición", portal: "Portal", acta: "Acta" };
+function cargarRevisar(){
+  return pedirJSON("/api/admin/revisar", "tb-revisar").then(function(d){ REV = d; pintarRevisar(); });
+}
+function pintarRevisar(){
+  var caja = document.getElementById("tb-revisar"); if (!caja || !REV) return;
+  var L = REV.items || [];
+  var chips = REV_TIPOS.map(function(t){
+    var n = t[0] === "todo" ? L.length : L.filter(function(x){ return x.tipo === t[0]; }).length;
+    var on = REV_FILTRO === t[0];
+    return '<button type="button" class="pn-b2" data-rev-filtro="' + t[0] + '" aria-pressed="' + on + '"' +
+      (on ? ' style="background:var(--g);color:#fff;border-color:var(--g)"' : "") + ">" + esc(t[1]) + " · " + n + "</button>";
+  }).join(" ");
+  var V = L.filter(function(x){ return REV_FILTRO === "todo" || x.tipo === REV_FILTRO; });
+  var h = '<div class="fin-barra" role="group" aria-label="Filtrar por tipo">' + chips + "</div>";
+  h += V.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Qué</th><th scope="col">Detalle</th>' +
+    '<th scope="col">De quién</th><th scope="col">Espera</th><th scope="col"></th></tr></thead><tbody>' +
+    V.map(function(x){
+      var d = diasDesde(x.t);
+      return "<tr><td><strong>" + esc(REV_TIPO_ES[x.tipo] || x.tipo) + "</strong></td><td>" + esc(x.titulo || "") + "</td><td>" + esc(x.quien || "") + "</td>" +
+        "<td" + (d != null && d >= 7 ? ' style="color:var(--err);font-weight:600"' : "") + ">" + esc(antiguedad(d)) + "</td>" +
+        '<td><button type="button" class="copy" data-rev-abrir="' + esc(x.tipo) + '" data-id="' + esc(String(x.id)) + '">' +
+        (x.tipo === "acta" ? "Ir al acta" : "Abrir") + "</button></td></tr>";
+    }).join("") + "</tbody></table></div>"
+    : '<p class="mu">Nada por revisar' + (REV_FILTRO === "todo" ? ". Todo lo que llega de las fundaciones y de las entregas está al día." : " de este tipo.") + "</p>";
+  caja.innerHTML = h;
+}
+function filtrarRevisar(vista, f){
+  if (vista !== "revisar") return;
+  REV_FILTRO = REV_TIPOS.some(function(t){ return t[0] === f; }) ? f : "todo";
+  pintarRevisar();
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var f = e.target.closest("[data-rev-filtro]");
+  if (f){
+    REV_FILTRO = f.getAttribute("data-rev-filtro");
+    history.replaceState(null, "", "#revisar" + (REV_FILTRO === "todo" ? "" : "/" + REV_FILTRO));
+    pintarRevisar();
+    return;
+  }
+  var b = e.target.closest("[data-rev-abrir]");
+  if (!b) return;
+  var tipo = b.getAttribute("data-rev-abrir"), id = b.getAttribute("data-id");
+  if (tipo === "unidad") cargarApadrinamiento().then(function(){ abrirUnidad(id); });
+  else if (tipo === "reporte") cargarApadrinamiento().then(function(){ abrirReporteUnidad(id); });
+  else if (tipo === "medicion") cargarIndicadoresRed().then(function(){ abrirMedicionFundacion(id); });
+  else if (tipo === "portal") abrirPortal(id);
+  else if (tipo === "acta") location.hash = "entregas";
+});
+
 function abrirPortal(id){
   pedirJSON("/api/admin/portal/" + id).then(function(d){
     var pares = [
@@ -44112,6 +44224,7 @@ var BANDEJAS = {
   "o-filas": cargarOfrecimientos,
   "tb-fund": cargarFundaciones,
   "tb-apad": cargarApadrinamiento,
+  "tb-revisar": cargarRevisar,
   "tb-indred": cargarIndicadoresRed,
   "tb-pagos": cargarSueltos,
   "tb-suscripciones": cargarSuscripciones,
@@ -48214,6 +48327,7 @@ export default {
                                                   : await adminPortal(env, Number(apo[1]));
         if (ruta === "/api/admin/fundaciones")  return await adminFundaciones(env);
         if (ruta === "/api/admin/apadrinamiento") return await adminApadrinamiento(env);
+        if (ruta === "/api/admin/revisar")      return await adminRevisar(env);
         if (ruta === "/api/admin/indicadores-red") return await adminIndicadoresRed(env);
         const amf = ruta.match(/^\/api\/admin\/medicion-fundacion\/(\d{1,9})$/);
         if (amf)                                return await adminMedicionFundacion(request, env, Number(amf[1]), sesion.email);
