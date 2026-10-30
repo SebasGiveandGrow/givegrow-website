@@ -22168,6 +22168,7 @@ function paginaPortal(nonce) {
   /* EL PERFIL POR SECCIONES (30 oct 2026): un índice con el avance de cada
      sección y una sección a la vez. Antes eran 35 campos seguidos. */
   .perfil-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:22px;align-items:start}
+  .perfil-grid > *{min-width:0}
   .perfil-indice{display:flex;flex-direction:column;gap:12px}
   .avance{background:var(--surface);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
   .avance .cifra{margin:2px 0}
@@ -22218,7 +22219,7 @@ function paginaPortal(nonce) {
     .recorrido .q{grid-column:2;margin-top:0}
     .barra-marca .der span{display:none}
     .tab{font-size:14px;padding:10px 9px}
-    .perfil-grid{grid-template-columns:1fr;gap:14px}
+    .perfil-grid{grid-template-columns:minmax(0,1fr);gap:14px}
     .pf-secs{flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}
     .pf-sec{flex:0 0 auto;width:auto;border-color:var(--bd);border-radius:999px;min-height:42px}
     /* Las pestañas bajan de fila en vez de esconderse a la derecha: en un
