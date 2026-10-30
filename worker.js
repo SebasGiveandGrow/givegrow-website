@@ -20901,12 +20901,20 @@ async function apiPortalSalir(request, env) {
 async function portalPerfil(env, s) {
   let ficha = {};
   try { ficha = JSON.parse(s.ficha_datos || "{}"); } catch (e) { /* nada */ }
-  const p = await env.DB.prepare("SELECT datos, actualizado, revisado_en FROM perfil_fundacion WHERE inscripcion = ?").bind(s.inscripcion).first();
+  const p = await env.DB.prepare("SELECT datos, actualizado, revisado_en, revisado_datos FROM perfil_fundacion WHERE inscripcion = ?").bind(s.inscripcion).first();
   let editado = {};
   try { editado = p ? JSON.parse(p.datos || "{}") : {}; } catch (e) { /* nada */ }
   const datos = {};
   for (const c of PORTAL_EDITABLES) datos[c.id] = c.id in editado ? editado[c.id] : (ficha[c.id] ?? (c.tipo === "numero" ? null : ""));
-  return { datos, ficha, fila: p };
+  /* «Revisado por el equipo» (0058): los campos que siguen iguales a la foto
+     que se guardó cuando el equipo marcó el perfil revisado. */
+  let foto = null;
+  try { foto = p && p.revisado_datos ? JSON.parse(p.revisado_datos) : null; } catch (e) { foto = null; }
+  const revisados = foto ? PORTAL_EDITABLES.filter((c) => {
+    const v = datos[c.id] == null ? "" : String(datos[c.id]).trim();
+    return v !== "" && v === (foto[c.id] == null ? "" : String(foto[c.id]).trim());
+  }).map((c) => c.id) : [];
+  return { datos, ficha, fila: p, revisados };
 }
 
 /* GET /api/portal/yo — todo lo que pinta la pantalla. */
@@ -20929,6 +20937,7 @@ async function apiPortalYo(request, env) {
         max: c.max || null, ops: c.ops || null, ayuda: c.ayuda || null, req: !!c.req })),
       datos: pf.datos,
       por_revisar: !!(pf.fila && !pf.fila.revisado_en),
+      revisados: pf.revisados,
       actualizado: pf.fila ? fechaCO(pf.fila.actualizado) : null
     } : null,
     documentos: docs.map((d) => ({ id: d.id, tipo: d.tipo, tipo_es: PORTAL_DOC_TIPOS[d.tipo] || d.tipo, nota: d.nota,
@@ -21100,6 +21109,11 @@ async function adminPortalAccion(request, env, insc, email) {
   let detalle;
   if (c.accion === "revisado") {
     await env.DB.prepare("UPDATE perfil_fundacion SET revisado_en = datetime('now'), revisado_por = ? WHERE inscripcion = ? AND revisado_en IS NULL").bind(email || null, insc).run();
+    /* La foto de lo que el equipo vio (0058): el portal marca «Revisado por el
+       equipo» en cada campo que siga igual a ella. */
+    const fichaR = await env.DB.prepare("SELECT datos FROM fichas_fundacion WHERE inscripcion = ?").bind(insc).first();
+    const vistoR = await portalPerfil(env, { inscripcion: insc, ficha_datos: fichaR ? fichaR.datos : null });
+    await env.DB.prepare("UPDATE perfil_fundacion SET revisado_datos = ? WHERE inscripcion = ?").bind(JSON.stringify(vistoR.datos), insc).run();
     await env.DB.prepare("UPDATE documentos_fundacion SET revisado_en = datetime('now'), revisado_por = ? WHERE inscripcion = ? AND revisado_en IS NULL").bind(email || null, insc).run();
     detalle = "portal revisado";
   } else if (c.accion === "invitar") {
@@ -22206,6 +22220,7 @@ function paginaPortal(nonce) {
   .vf-progs{display:flex;flex-direction:column;gap:3px;font-size:14px}
   .vf-ods{display:flex;flex-wrap:wrap;gap:6px}
   .vf-ods span{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--gl);color:var(--acc)}
+  .pf-rev{display:inline-block;margin:0 0 4px;font-size:11.5px;font-weight:600;padding:1px 9px;border-radius:999px;border:1px solid var(--acc);color:var(--acc)}
   .cuenta{display:block;text-align:right;font-size:12px;color:var(--mu);margin-top:4px;font-variant-numeric:tabular-nums}
   .cuenta.cerca{color:var(--amber)}
   .sec-perfil h3{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);font-weight:600;
@@ -22690,7 +22705,9 @@ function pintarOdsPerfil(){
 
 function campo(c, v){
   var id = "pf-" + c.id;
+  var rev = D.perfil && (D.perfil.revisados || []).indexOf(c.id) > -1;
   var cab = '<label for="' + id + '">' + esc(c.lbl) + (c.req ? " *" : "") + "</label>" +
+    (rev ? '<span class="pf-rev" data-rev="' + esc(c.id) + '">✓ Revisado por el equipo</span>' : "") +
     (c.ayuda ? '<span class="ayuda">' + esc(c.ayuda) + "</span>" : "");
   var cuenta = function(max){ return '<span class="cuenta" data-cuenta="' + id + '" data-max="' + max + '">' + String(v || "").length + " / " + max + "</span>"; };
   if (c.tipo === "parrafo") return cab + '<textarea id="' + id + '" rows="4" maxlength="' + (c.max || 900) + '">' + esc(v) + "</textarea>" + cuenta(c.max || 900);
@@ -22740,6 +22757,7 @@ function pintarPerfil(){
     SUCIO = true; msg("m-perfil", "");
     pfGuardarBorrador();
     pfVista();
+    pfMarcas();
     var t = ev.target, k = t && t.id ? document.querySelector('[data-cuenta="' + t.id + '"]') : null;
     if (k) { var max = Number(k.getAttribute("data-max")) || 0; k.textContent = t.value.length + " / " + max; k.classList.toggle("cerca", max && t.value.length > max * 0.9); }
     pfAvance();
@@ -22748,6 +22766,7 @@ function pintarPerfil(){
   $("pf-sig").addEventListener("click", function(){ pfIr(PF_SEC + 1); });
   document.querySelectorAll("[data-pf-sec]").forEach(function(b){ b.addEventListener("click", function(){ pfIr(Number(b.getAttribute("data-pf-sec"))); }); });
   pfRecuperarBorrador();
+  pfMarcas();
   pfVista();
   pfAvance();
   pfIr(pfPrimeraPendiente());
@@ -22847,6 +22866,15 @@ function pfAvance(){
 }
 /* Lleva a la sección de un campo y lo enfoca: lo usan el aviso de lo que
    falta y el rechazo del servidor. */
+/* La marca «Revisado por el equipo» se apaga en cuanto el campo cambia. */
+function pfMarcas(){
+  document.querySelectorAll("[data-rev]").forEach(function(m){
+    var c = D.perfil.campos.filter(function(x){ return x.id === m.getAttribute("data-rev"); })[0];
+    if (!c) return;
+    var igual = String(pfValor(c) == null ? "" : pfValor(c)).trim() === String(D.perfil.datos[c.id] == null ? "" : D.perfil.datos[c.id]).trim();
+    m.classList.toggle("oculto", !igual);
+  });
+}
 function pfAlCampo(id){
   var c = D.perfil.campos.filter(function(x){ return x.id === id; })[0];
   if (!c) return;
