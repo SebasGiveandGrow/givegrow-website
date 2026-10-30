@@ -22,13 +22,13 @@ costo mensual verificado y una evidencia mensual de que se entregó.
 
 ## 1. Revisar una unidad
 
-Una unidad se revisa en **Admin › Alianzas › Apadrinamiento** y se abre con
+Una unidad se revisa en **Admin › Revisar y aprobar › Apadrinamiento** y se abre con
 «Abrir».
 
 **Aprobar y publicar** exige cuatro cosas, y el panel no deja seguir sin ellas:
 
 1. **Que la fundación esté vinculada a la red.** Su solicitud tiene que tener
-   el vínculo con `partners.json`, que se pone en Alianzas › Fundaciones ›
+   el vínculo con `partners.json`, que se pone en Acompañar la red › Fundaciones ›
    Vínculo con la red. Sin eso no hay autorización para publicar su nombre.
 2. **El costo verificado contra su soporte.** Se abre el soporte que adjuntó,
    se comprueba que el costo mensual sale de ahí y se marca la casilla. Sin

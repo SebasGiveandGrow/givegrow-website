@@ -5778,9 +5778,9 @@ async function adminSalud(env, opciones) {
   try {
     await enCola("banco_sin_conciliar",
       "SELECT COUNT(*) AS n, MIN(importado_en) AS masViejo FROM movimientos_banco WHERE estado = 'sin_conciliar'",
-      "Finanzas › Conciliar · cada renglón del extracto se explica con un aporte, un egreso, una comisión o un motivo", 58, "#sec-conciliar", 7);
+      "Cuidar el dinero › Conciliar · cada renglón del extracto se explica con un aporte, un egreso, una comisión o un motivo", 58, "#sec-conciliar", 7);
     await enCola("extracto_por_importar", await colaExtractoPorImportar(env),
-      "Finanzas › Banco · descarga el extracto del mes en la Sucursal Virtual de Bancolombia e impórtalo", 75, "#sec-banco");
+      "Cuidar el dinero › Banco · descarga el extracto del mes en la Sucursal Virtual de Bancolombia e impórtalo", 75, "#sec-banco");
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -5903,11 +5903,11 @@ async function adminSalud(env, opciones) {
   const cd = await colasDocumentos(env);
   if (cd) {
     await enCola("documentos_vencidos", cd.vencidos,
-      "Legal y documentos › Documentos · registra el documento vigente (el vencido queda reemplazado) o corrige su fecha", 15, "#sec-documentos");
+      "Rendir cuentas › Documentos legales · registra el documento vigente (el vencido queda reemplazado) o corrige su fecha", 15, "#sec-documentos");
     await enCola("documentos_por_vencer", cd.porVencer,
-      "Legal y documentos › Documentos · renuévalo antes de que venza: el nuevo reemplaza al viejo", 86, "#sec-documentos");
+      "Rendir cuentas › Documentos legales · renuévalo antes de que venza: el nuevo reemplaza al viejo", 86, "#sec-documentos");
     await enCola("documentos_faltantes", cd.faltan,
-      "Legal y documentos › Documentos · súbelo, o márcalo «No aplica» con el motivo", 87, "#sec-documentos");
+      "Rendir cuentas › Documentos legales · súbelo, o márcalo «No aplica» con el motivo", 87, "#sec-documentos");
   }
   /* MEAL Y BOARD (0045). Dos colas ya contadas por `colasMeal`, en «Esta
      semana» y sin plazo: medir un indicador o mandar el informe al Board no es
@@ -5916,9 +5916,9 @@ async function adminSalud(env, opciones) {
   const cm = await colasMeal(env);
   if (cm) {
     await enCola("meal_indicadores_pendientes", cm.indicadores,
-      "MEAL y Board › Indicadores · registra la medición del periodo que cerró, con su fuente y su corte", 88, "#sec-meal");
+      "Rendir cuentas › Indicadores MEAL · registra la medición del periodo que cerró, con su fuente y su corte", 88, "#sec-meal");
     await enCola("board_informe_sin_enviar", cm.informe,
-      "MEAL y Board › Board de Asesores · revisa el PDF y envíaselo a los asesores", 89, "#sec-board");
+      "Rendir cuentas › Board de Asesores · revisa el PDF y envíaselo a los asesores", 89, "#sec-board");
   }
   /* EL CANAL DE QUEJAS (0046). Solo la RUTA ORDINARIA: la confidencial no
      entra a «Hoy» ni al correo diario, que ve todo el equipo —su aviso va al
@@ -5928,7 +5928,7 @@ async function adminSalud(env, opciones) {
   try {
     await enCola("quejas_sin_responder",
       "SELECT COUNT(*) AS n, MIN(creado) AS masViejo FROM quejas WHERE ruta = 'ordinaria' AND estado IN ('recibida','en_revision')",
-      "Quejas › Quejas y sugerencias · una persona escribió y espera respuesta: respóndele por el medio que dejó y regístralo", 24, "#sec-quejas",
+      "Atender › Quejas y sugerencias · una persona escribió y espera respuesta: respóndele por el medio que dejó y regístralo", 24, "#sec-quejas",
       quejasPlazo(env));
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
@@ -5953,7 +5953,7 @@ async function adminSalud(env, opciones) {
   try {
     await enCola("unidades_por_revisar",
       "SELECT COUNT(*) AS n, MIN(actualizada) AS masViejo FROM unidades_apadrinables WHERE estado = 'propuesta'",
-      "Alianzas › Apadrinamiento · una fundación propuso una unidad para apadrinar: verifica su costo y apruébala o devuélvela", 31, "#sec-apadrinamiento", 7);
+      "Revisar y aprobar › Apadrinamiento · una fundación propuso una unidad para apadrinar: verifica su costo y apruébala o devuélvela", 31, "#sec-apadrinamiento", 7);
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -5963,14 +5963,14 @@ async function adminSalud(env, opciones) {
   try {
     await enCola("reportes_unidad_por_revisar",
       "SELECT COUNT(*) AS n, MIN(actualizado) AS masViejo FROM reportes_unidad WHERE estado = 'enviado'",
-      "Alianzas › Apadrinamiento · una fundación reportó lo entregado en el mes: revisa la evidencia y apruébalo o devuélvelo", 32, "#sec-apadrinamiento", 7);
+      "Revisar y aprobar › Apadrinamiento · una fundación reportó lo entregado en el mes: revisa la evidencia y apruébalo o devuélvelo", 32, "#sec-apadrinamiento", 7);
     await enCola("unidades_sin_reporte",
       "SELECT COUNT(*) AS n, MIN(u.aprobada_en) AS masViejo FROM unidades_apadrinables u WHERE u.estado = 'aprobada' " +
       "AND strftime('%d', datetime('now', '-5 hours')) >= '10' " +
       "AND date(u.aprobada_en, '-5 hours') < date(datetime('now', '-5 hours'), 'start of month') " +
       "AND NOT EXISTS (SELECT 1 FROM reportes_unidad r WHERE r.unidad_id = u.id " +
       "AND r.periodo = strftime('%Y-%m', datetime('now', '-5 hours'), 'start of month', '-1 day'))",
-      "Alianzas › Apadrinamiento · unidades publicadas sin el reporte del mes pasado: escríbele a la fundación", 33, "#sec-apadrinamiento");
+      "Revisar y aprobar › Apadrinamiento · unidades publicadas sin el reporte del mes pasado: escríbele a la fundación", 33, "#sec-apadrinamiento");
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -5979,14 +5979,14 @@ async function adminSalud(env, opciones) {
   try {
     await enCola("mediciones_fundacion_por_revisar",
       "SELECT COUNT(*) AS n, MIN(actualizado) AS masViejo FROM mediciones_fundacion WHERE estado = 'enviada'",
-      "MEAL y Board › Indicadores de la red · una fundación reportó la medición de un indicador: revisa su fuente y apruébala o devuélvela", 34, "#sec-indred", 14);
+      "Revisar y aprobar › Indicadores de la red · una fundación reportó la medición de un indicador: revisa su fuente y apruébala o devuélvela", 34, "#sec-indred", 14);
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
   await enCola("dirigidos_por_entregar",
     "SELECT COUNT(*) AS n, MIN(COALESCE(a.aprobada_en, a.creada_en)) AS masViejo FROM aportes a " +
     "WHERE a.destino_id IS NOT NULL AND a.estado IN ('aprobada','en_distribucion')",
-    "Reportes › Por fundación · hay dinero confirmado para una fundación o campaña que todavía no se ha entregado", 60, "#sec-reportes", 30);
+    "Rendir cuentas › Por fundación · hay dinero confirmado para una fundación o campaña que todavía no se ha entregado", 60, "#sec-reportes", 30);
   await enCola("entregas_en_borrador",
     "SELECT COUNT(*) AS n, MIN(creada_en) AS masViejo FROM entregas " +
     "WHERE publicada_en IS NULL AND anulada_en IS NULL",
@@ -6266,7 +6266,7 @@ async function adminSalud(env, opciones) {
         id: x.clave + "|" + x.fecha, titulo: x.titulo, detalle: x.periodo + " · " + x.entidad,
         cuando: cuandoVence(x), clave: x.clave, fecha: x.fecha, corto: x.corto, periodo: x.periodo
       })) },
-    "Contabilidad › Vencimientos · " + (porVencer.length
+    "Cuidar el dinero › Vencimientos · " + (porVencer.length
       ? porVencer.slice(0, 3).map((x) => x.corto + ", " + x.periodo + ": " + cuandoVence(x)).join("; ") +
         (porVencer.length > 3 ? "; y " + (porVencer.length - 3) + " más" : "") +
         " · se marca «Hecho» o «No aplicó este periodo»"
@@ -33331,6 +33331,7 @@ textarea { font-size: 16px }
   border-radius:10px;background:var(--surface);padding:14px 16px 12px}
 .hoy-urgente .hoy-carta{border-left-color:var(--err)}
 .hoy-hoy .hoy-carta{border-left-color:var(--amber)}
+.hoy-tarea{margin:0 0 4px;font-size:var(--fs-11);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mu)}
 .hoy-ccab{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
 .hoy-ccab h3{margin:0;font-size:var(--fs-15);font-weight:700;line-height:1.3;letter-spacing:0}
 .hoy-cn{font-size:var(--fs-17);font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
@@ -36049,6 +36050,9 @@ function textoArreglo(c){
   var t = String(c.arreglo || "");
   var m = t.match(/^(Bandeja|Lista|Pantalla|Panel|Módulo|Contabilidad|Finanzas)[^·]*· *(.*)$/);
   if (m) t = m[2];
+  /* «Tarea › Sección · …» (ítem 44): la tarea ya va encima de la carta. */
+  var r = t.match(/^[^·›]+ › [^·]+· *(.*)$/);
+  if (r) t = r[1];
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 function accionesItem(clave, it){
@@ -36128,7 +36132,8 @@ function cartaCola(c){
   }).join("");
   var enlaces = (vista ? '<a class="hoy-todo" href="#' + vista + (COLA_FILTRO[c.clave] ? "/" + COLA_FILTRO[c.clave] : "") + '">Ver todo (' + c.n + ")</a>" : "") +
     (c.destino && c.destino.charAt(0) === "/" ? ' &nbsp;<a class="hoy-todo" href="' + esc(c.destino) + '">' + esc(DESTINO_ES[c.destino] || "Abrir") + "</a>" : "");
-  return '<article class="hoy-carta"><header class="hoy-ccab"><h3>' + esc(COLA_ES[c.clave] || c.clave) + "</h3>" +
+    var tarea = vista && VISTAS[vista] ? VISTAS[vista].area : "";
+  return '<article class="hoy-carta">' + (tarea ? '<p class="hoy-tarea">' + esc(tarea) + "</p>" : "") + '<header class="hoy-ccab"><h3>'  + esc(COLA_ES[c.clave] || c.clave) + "</h3>" +
     '<span class="hoy-cn" aria-label="' + c.n + ' pendientes">' + c.n + "</span></header>" +
     (cuando || plazo ? '<p class="hoy-cuando' + (c.vencida ? " vencida" : "") + '">' + esc(cuando + plazo) + "</p>" : "") +
     (lis ? '<ul class="hoy-items">' + lis + "</ul>" : "") +
