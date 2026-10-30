@@ -21524,11 +21524,11 @@ const unidadCambio = () => json({ error: "cambio_mientras_revisabas",
    correo de la solicitud, con el enlace al portal. No lleva nada que no esté ya
    en su portal: el nombre de la unidad, el mes y el motivo que escribió el
    equipo. Si el correo falla, la decisión ya quedó guardada: no se deshace. */
-async function correoFundacionApadrinamiento(env, inscripcion, titulo, parrafos, etiqueta) {
+async function correoFundacionApadrinamiento(env, inscripcion, titulo, parrafos, etiqueta, pestana) {
   try {
     const i = await env.DB.prepare("SELECT email, nombre FROM inscripciones WHERE id = ?").bind(inscripcion).first();
     if (!i || !RE_CORREO.test(String(i.email || ""))) return;
-    const enlace = ORIGIN + "/portal#apadrinamiento";
+    const enlace = ORIGIN + "/portal#" + (pestana || "apadrinamiento");
     await enviarCorreo(env, {
       para: i.email, asunto: titulo, etiqueta,
       texto: [titulo, "", ...parrafos, "", "Tu portal: " + enlace].join("\n"),
@@ -21921,7 +21921,10 @@ async function adminMedicionFundacion(request, env, id, quien) {
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
   if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
-  const m = await env.DB.prepare("SELECT id, estado FROM mediciones_fundacion WHERE id = ?").bind(id).first();
+  const m = await env.DB.prepare(
+    "SELECT m.id, m.estado, m.periodo, x.nombre AS indicador, x.inscripcion FROM mediciones_fundacion m " +
+    "JOIN indicadores_fundacion x ON x.id = m.indicador_id WHERE m.id = ?"
+  ).bind(id).first();
   if (!m) return json({ error: "no_encontrado" }, 404);
   if (m.estado === "aprobada") return json({ error: "ya_aprobada", ayuda: "Ya está revisada." }, 409);
   const cambio = () => json({ error: "cambio_mientras_revisabas", ayuda: "La fundación la reenvió mientras la revisabas. Cierra y vuelve a abrirla para ver la versión actual." }, 409);
@@ -21945,6 +21948,15 @@ async function adminMedicionFundacion(request, env, id, quien) {
   if (!r.meta || !r.meta.changes) return cambio();
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(quien || "?", "medición de fundación " + id + " · " + detalle).run();
+  /* Solo se avisa lo DEVUELTO: es lo único que le pide algo a la fundación.
+     Una aprobación por indicador y por periodo sería ruido; la ve en su
+     portal. Mismo correo y mismas reglas que el del apadrinamiento. */
+  if (c.accion === "devolver") {
+    await correoFundacionApadrinamiento(env, m.inscripcion, "Tu medición de «" + m.indicador + "» necesita un ajuste",
+      ["Revisamos la medición de «" + m.indicador + "» del periodo " + m.periodo + " y necesita un ajuste.",
+       "Lo que nos falta: " + limpiar(c.motivo, 500),
+       "Puedes corregirla y reenviarla desde la pestaña Indicadores de tu portal. Nada de esto se publica."], "indicador-medicion", "indicadores");
+  }
   return json({ ok: true });
 }
 
