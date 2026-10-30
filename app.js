@@ -1209,6 +1209,23 @@ var I18N = {
     "vf.err.email":"Revisa el correo: parece que tiene algo raro.",
     "vf.err.nivel":"Elige cómo quieres participar.",
     "vf.err.oficio":"Cuéntanos tu oficio o área.",
+    "vf.reg.help":"La ley nos pide llevar un registro de voluntarios con tu documento y tu nivel de estudios (Decreto 4290 de 2005). Solo lo ve el equipo de Give&Grow.",
+    "vf.doc.tipo":"Tipo de documento",
+    "vf.doc.cc":"Cédula de ciudadanía",
+    "vf.doc.ce":"Cédula de extranjería",
+    "vf.doc.ppt":"Permiso por Protección Temporal",
+    "vf.doc.pa":"Pasaporte",
+    "vf.doc.num":"Número de documento",
+    "vf.escol":"Último nivel de estudios que terminaste",
+    "vf.escol.elige":"Elige…",
+    "vf.escol.primaria":"Primaria",
+    "vf.escol.bach":"Bachillerato",
+    "vf.escol.tec":"Técnico o tecnólogo",
+    "vf.escol.prof":"Profesional (pregrado)",
+    "vf.escol.pos":"Posgrado",
+    "vf.escol.ninguno":"Sin estudios formales",
+    "vf.err.doc":"Escribe tu número de documento: la ley nos pide llevar un registro de voluntarios.",
+    "vf.err.escol":"Elige tu último nivel de estudios.",
     "vf.err.datos":"Necesitamos tu autorización para guardar tus datos y poder escribirte.",
     "vf.err.send":"No pudimos enviar tus datos. Vuelve a intentarlo, o escríbenos a contacto@thegiveandgrowproject.org.",
     "vf.nada":"Nada de esto se cobra, en ninguna dirección.",
@@ -6573,6 +6590,8 @@ var VF_ERRS = {
   email_invalido: ["#vf-email", "vf.err.email"],
   nivel_requerido: ['input[name="vf-nivel"]', "vf.err.nivel"],
   oficio_requerido: ["#vf-oficio", "vf.err.oficio"],
+  documento_requerido: ["#vf-doc-num", "vf.err.doc"],
+  escolaridad_requerida: ["#vf-escol", "vf.err.escol"],
   acudiente_requerido: ["#vf-acu-nombre", "vf.err.acu"],
   autorizacion_requerida: ["#vf-datos", "vf.err.datos"]
 };
@@ -6849,6 +6868,10 @@ function volEdad(){
        (29 sep 2026): no se le puede exigir un campo que no vamos a guardar. */
     var tel = document.getElementById("vf-tel");
     if (tel) tel.required = !menor;
+    /* El documento y la escolaridad del registro (Decreto 4290): solo a un
+       mayor de edad. Los de un menor se completan con su acudiente. */
+    var reg = document.getElementById("vf-registro");
+    if (reg) reg.style.display = e && e.value === "si" ? "" : "none";
   }, 0);
 }
 
@@ -7062,6 +7085,12 @@ function volSubmit(ev){
     if (!chk("vf-acu-sabe")) return allyMal(note, "vf-acu-sabe", "vf.err.acu.sabe");
   }
   if (!val("vf-oficio")) return allyMal(note, "vf-oficio", "vf.err.oficio");
+  if (!menor){
+    var docNum = val("vf-doc-num").replace(/[.\s-]/g, "");
+    var docOk = val("vf-doc-tipo") === "CC" ? /^[0-9]{5,10}$/.test(docNum) : /^[A-Za-z0-9]{4,20}$/.test(docNum);
+    if (!docOk) return allyMal(note, "vf-doc-num", "vf.err.doc");
+    if (!val("vf-escol")) return allyMal(note, "vf-escol", "vf.err.escol");
+  }
   if (!chk("vf-datos")) return allyMal(note, "vf-datos", "vf.err.datos");
 
   btn.disabled = true;
@@ -7080,6 +7109,10 @@ function volSubmit(ev){
       ciudad: menor ? "" : val("vf-ciudad"),
       nivel: nivelEl.value,
       oficio: val("vf-oficio"),
+      /* El registro del Decreto 4290: de un menor no sale (29 oct 2026). */
+      doc_tipo: menor ? "" : val("vf-doc-tipo"),
+      doc_numero: menor ? "" : val("vf-doc-num"),
+      escolaridad: menor ? "" : val("vf-escol"),
       disponibilidad: menor ? "" : val("vf-disp"),
       mensaje: menor ? "" : val("vf-msg"),
       captura: chk("vf-captura"),

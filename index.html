@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=bfe880ed" defer></script>
+<script src="/app.js?v=105c8b7b" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -3600,6 +3600,32 @@
             <label class="ally-check"><input type="checkbox" id="vf-acu-sabe"><span data-i18n="vf.acu.sabe">Mi acudiente sabe que me estoy inscribiendo</span></label>
           </div>
         </fieldset>
+
+        <!-- EL REGISTRO DE VOLUNTARIOS (Decreto 4290 de 2005, art. 3; 29 oct 2026):
+             documento y escolaridad. Solo para mayores de edad: de un menor no
+             se guarda nada más hasta que su acudiente autorice. Lo muestra volEdad(). -->
+        <div id="vf-registro" style="display:none">
+          <p class="vf-help" data-i18n="vf.reg.help">La ley nos pide llevar un registro de voluntarios con tu documento y tu nivel de estudios (Decreto 4290 de 2005). Solo lo ve el equipo de Give&amp;Grow.</p>
+          <div class="field"><label for="vf-doc-tipo" data-i18n="vf.doc.tipo">Tipo de documento</label>
+            <select id="vf-doc-tipo">
+              <option value="CC" data-i18n="vf.doc.cc">Cédula de ciudadanía</option>
+              <option value="CE" data-i18n="vf.doc.ce">Cédula de extranjería</option>
+              <option value="PPT" data-i18n="vf.doc.ppt">Permiso por Protección Temporal</option>
+              <option value="PA" data-i18n="vf.doc.pa">Pasaporte</option>
+            </select></div>
+          <div class="field"><label for="vf-doc-num" data-i18n="vf.doc.num">Número de documento</label>
+            <input type="text" id="vf-doc-num" maxlength="20" autocomplete="off"></div>
+          <div class="field"><label for="vf-escol" data-i18n="vf.escol">Último nivel de estudios que terminaste</label>
+            <select id="vf-escol">
+              <option value="" data-i18n="vf.escol.elige">Elige…</option>
+              <option value="primaria" data-i18n="vf.escol.primaria">Primaria</option>
+              <option value="bachillerato" data-i18n="vf.escol.bach">Bachillerato</option>
+              <option value="tecnico" data-i18n="vf.escol.tec">Técnico o tecnólogo</option>
+              <option value="profesional" data-i18n="vf.escol.prof">Profesional (pregrado)</option>
+              <option value="posgrado" data-i18n="vf.escol.pos">Posgrado</option>
+              <option value="ninguno" data-i18n="vf.escol.ninguno">Sin estudios formales</option>
+            </select></div>
+        </div>
 
         <div class="field"><label for="vf-oficio" data-i18n="vf.oficio">Tu oficio o área</label>
           <input type="text" id="vf-oficio" data-i18n="vf.oficio.ph" data-i18n-attr="placeholder" placeholder="Derecho, contabilidad, salud, desarrollo, docencia, comunicación…" required></div>
