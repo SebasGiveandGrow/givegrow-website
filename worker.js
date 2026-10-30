@@ -33871,13 +33871,32 @@ textarea { font-size: 16px }
 <aside class="pn-lado" id="pn-lado">
 <a class="pn-marca" href="#hoy"><b>Give&amp;Grow</b><span>Panel interno</span></a>
 <div role="navigation" aria-label="Secciones del panel">
+<!-- EL MENÚ POR TAREAS (ítem 44, 30 oct 2026). Antes eran 10 grupos por
+     departamento; ahora, cinco por lo que se va a HACER, más Inicio. Ninguna
+     sección cambió de dirección (#vista): solo de grupo. -->
 <div class="pn-grupo">
   <p class="pn-gt">Inicio</p>
   <a class="pn-it" href="#hoy" data-pn-ir="hoy">Hoy<span class="pn-n" data-pn-n="hoy"></span></a>
   <a class="pn-it" href="#tareas" data-pn-ir="tareas">Tareas<span class="pn-n" data-pn-n="tareas"></span></a>
 </div>
+<!-- Atender: lo que llega de afuera y espera una respuesta a una persona. -->
 <div class="pn-grupo">
-  <p class="pn-gt">Finanzas</p>
+  <p class="pn-gt">Atender</p>
+  <a class="pn-it" href="#alianzas/red" data-pn-ir="alianzas/red">Solicitudes a la red<span class="pn-n" data-pn-n="alianzas/red"></span></a>
+  <a class="pn-it" href="#quejas/ordinaria" data-pn-ir="quejas/ordinaria">Quejas y sugerencias<span class="pn-n" data-pn-n="quejas/ordinaria"></span></a>
+  <a class="pn-it" href="#quejas/confidencial" data-pn-ir="quejas/confidencial">Ruta confidencial</a>
+  <a class="pn-it" href="#mmc/casas" data-pn-ir="mmc/casas">Casas de Mira Mi Casa<span class="pn-n" data-pn-n="mmc/casas"></span></a>
+  <a class="pn-it" href="#alianzas/ofrecimientos" data-pn-ir="alianzas/ofrecimientos">Ofrecimientos en especie<span class="pn-n" data-pn-n="alianzas/ofrecimientos"></span></a>
+  <a class="pn-it" href="#alianzas/socialfest" data-pn-ir="alianzas/socialfest">Social Fest<span class="pn-n" data-pn-n="alianzas/socialfest"></span></a>
+</div>
+<!-- Revisar y aprobar: lo que espera una decisión del equipo antes de publicarse o de contar. -->
+<div class="pn-grupo">
+  <p class="pn-gt">Revisar y aprobar</p>
+  <a class="pn-it" href="#alianzas/apadrinamiento" data-pn-ir="alianzas/apadrinamiento">Apadrinamiento<span class="pn-n" data-pn-n="alianzas/apadrinamiento"></span></a>
+  <a class="pn-it" href="#meal/red" data-pn-ir="meal/red">Indicadores de la red<span class="pn-n" data-pn-n="meal/red"></span></a>
+</div>
+<div class="pn-grupo">
+  <p class="pn-gt">Cuidar el dinero</p>
   <a class="pn-it" href="#finanzas/resumen" data-pn-ir="finanzas/resumen">Resumen<span class="pn-n" data-pn-n="finanzas/resumen"></span></a>
   <a class="pn-it" href="#finanzas/banco" data-pn-ir="finanzas/banco">Banco<span class="pn-n" data-pn-n="finanzas/banco"></span></a>
   <a class="pn-it" href="#finanzas/conciliar" data-pn-ir="finanzas/conciliar">Conciliar<span class="pn-n" data-pn-n="finanzas/conciliar"></span></a>
@@ -33890,58 +33909,28 @@ textarea { font-size: 16px }
   <a class="pn-it" href="#finanzas/proveedores" data-pn-ir="finanzas/proveedores">Proveedores<span class="pn-n" data-pn-n="finanzas/proveedores"></span></a>
   <a class="pn-it" href="#finanzas/paypal" data-pn-ir="finanzas/paypal">PayPal<span class="pn-n" data-pn-n="finanzas/paypal"></span></a>
 </div>
+<!-- Acompañar la red: las fichas de quienes ya son parte: se consultan y se editan. -->
 <div class="pn-grupo">
-  <p class="pn-gt">Alianzas</p>
-  <a class="pn-it" href="#alianzas/red" data-pn-ir="alianzas/red">Red<span class="pn-n" data-pn-n="alianzas/red"></span></a>
+  <p class="pn-gt">Acompañar la red</p>
   <a class="pn-it" href="#alianzas/fundaciones" data-pn-ir="alianzas/fundaciones">Fundaciones</a>
-  <a class="pn-it" href="#alianzas/apadrinamiento" data-pn-ir="alianzas/apadrinamiento">Apadrinamiento<span class="pn-n" data-pn-n="alianzas/apadrinamiento"></span></a>
-  <a class="pn-it" href="#alianzas/ofrecimientos" data-pn-ir="alianzas/ofrecimientos">Ofrecimientos en especie<span class="pn-n" data-pn-n="alianzas/ofrecimientos"></span></a>
-  <a class="pn-it" href="#alianzas/socialfest" data-pn-ir="alianzas/socialfest">Social Fest<span class="pn-n" data-pn-n="alianzas/socialfest"></span></a>
-</div>
-<div class="pn-grupo">
-  <p class="pn-gt">Personas y organizaciones</p>
   <a class="pn-it" href="#personas/contactos" data-pn-ir="personas/contactos">Contactos<span class="pn-n" data-pn-n="personas/contactos"></span></a>
   <a class="pn-it" href="#personas/voluntariado" data-pn-ir="personas/voluntariado">Voluntariado<span class="pn-n" data-pn-n="personas/voluntariado"></span></a>
   <a class="pn-it" href="#personas/ingenieros" data-pn-ir="personas/ingenieros">Ingenieros<span class="pn-n" data-pn-n="personas/ingenieros"></span></a>
-</div>
-<div class="pn-grupo">
-  <p class="pn-gt">Mira Mi Casa</p>
-  <a class="pn-it" href="#mmc/casas" data-pn-ir="mmc/casas">Casas<span class="pn-n" data-pn-n="mmc/casas"></span></a>
   <a class="pn-it" href="#mmc/inspecciones" data-pn-ir="mmc/inspecciones">Inspecciones en terreno<span class="pn-n" data-pn-n="mmc/inspecciones"></span></a>
-</div>
-<div class="pn-grupo">
-  <p class="pn-gt">Entregas</p>
   <a class="pn-it" href="#entregas" data-pn-ir="entregas">Actas de entrega<span class="pn-n" data-pn-n="entregas"></span></a>
 </div>
+<!-- Rendir cuentas: lo que se le muestra a otros: la contadora, el Board de Asesores, un financiador. -->
 <div class="pn-grupo">
-  <p class="pn-gt">Legal y documentos</p>
-  <a class="pn-it" href="#legal/documentos" data-pn-ir="legal/documentos">Documentos<span class="pn-n" data-pn-n="legal/documentos"></span></a>
-</div>
-<!-- Fase 5: informes anuales con lo que la base ya tiene. Cifras operativas,
-     no estados financieros; cada uno en pantalla, en CSV y para imprimir. -->
-<div class="pn-grupo">
-  <p class="pn-gt">Reportes</p>
+  <p class="pn-gt">Rendir cuentas</p>
   <a class="pn-it" href="#reportes/donaciones" data-pn-ir="reportes/donaciones">Donaciones del año</a>
   <a class="pn-it" href="#reportes/donantes" data-pn-ir="reportes/donantes">Donantes del año</a>
   <a class="pn-it" href="#reportes/fundaciones" data-pn-ir="reportes/fundaciones">Por fundación</a>
-  <a class="pn-it" href="#reportes/voluntariado" data-pn-ir="reportes/voluntariado">Voluntariado</a>
-  <a class="pn-it" href="#reportes/mmc" data-pn-ir="reportes/mmc">Mira Mi Casa</a>
+  <a class="pn-it" href="#reportes/voluntariado" data-pn-ir="reportes/voluntariado">Voluntariado del año</a>
+  <a class="pn-it" href="#reportes/mmc" data-pn-ir="reportes/mmc">Mira Mi Casa del año</a>
   <a class="pn-it" href="#reportes/banco" data-pn-ir="reportes/banco">Banco y panel</a>
-</div>
-<!-- MEAL y Board de Asesores (0045): los indicadores con su fuente y su
-     corte, y lo que se le manda al Board, que asesora y no dirige. -->
-<div class="pn-grupo">
-  <p class="pn-gt">MEAL y Board</p>
-  <a class="pn-it" href="#meal/indicadores" data-pn-ir="meal/indicadores">Indicadores<span class="pn-n" data-pn-n="meal/indicadores"></span></a>
-  <a class="pn-it" href="#meal/red" data-pn-ir="meal/red">Indicadores de la red<span class="pn-n" data-pn-n="meal/red"></span></a>
+  <a class="pn-it" href="#meal/indicadores" data-pn-ir="meal/indicadores">Indicadores MEAL<span class="pn-n" data-pn-n="meal/indicadores"></span></a>
   <a class="pn-it" href="#meal/board" data-pn-ir="meal/board">Board de Asesores<span class="pn-n" data-pn-n="meal/board"></span></a>
-</div>
-<!-- El canal de quejas (0046): la ruta ordinaria suma en «Hoy»; la
-     confidencial no, y solo la abre el punto focal (QUEJAS_PUNTO_FOCAL). -->
-<div class="pn-grupo">
-  <p class="pn-gt">Quejas</p>
-  <a class="pn-it" href="#quejas/ordinaria" data-pn-ir="quejas/ordinaria">Quejas y sugerencias<span class="pn-n" data-pn-n="quejas/ordinaria"></span></a>
-  <a class="pn-it" href="#quejas/confidencial" data-pn-ir="quejas/confidencial">Ruta confidencial</a>
+  <a class="pn-it" href="#legal/documentos" data-pn-ir="legal/documentos">Documentos legales<span class="pn-n" data-pn-n="legal/documentos"></span></a>
 </div>
 <div class="pn-grupo">
   <p class="pn-gt">Sistema</p>
@@ -35703,77 +35692,77 @@ var VISTAS = {
   "tareas": { area: "Inicio", titulo: "Tareas",
     linea: "Lo que hay que hacer, con o sin alguien: con fecha, prioridad y área. Lo de hoy y lo vencido también sale en «Hoy».",
     accion: ["Nueva tarea", "ta-nueva"] },
-  "legal/documentos": { area: "Legal y documentos", titulo: "Documentos",
+  "legal/documentos": { area: "Rendir cuentas", titulo: "Documentos legales",
     linea: "El archivo de la fundación con su vencimiento, y lo que siempre tiene que haber. Los archivos son privados.",
     accion: ["Registrar un documento", "doc-nuevo"] },
-  "reportes/donaciones": { area: "Reportes", titulo: "Informe anual de donaciones",
+  "reportes/donaciones": { area: "Rendir cuentas", titulo: "Informe anual de donaciones",
     linea: "Ingresos confirmados del año por mes, medio y destino, y cuántos donantes. Para leer, descargar o imprimir." },
-  "reportes/donantes": { area: "Reportes", titulo: "Donantes del año",
+  "reportes/donantes": { area: "Rendir cuentas", titulo: "Donantes del año",
     linea: "Una fila por donante con sus totales y su certificado: para el contador, la exógena y los certificados de donación." },
-  "reportes/fundaciones": { area: "Reportes", titulo: "Donaciones por fundación",
+  "reportes/fundaciones": { area: "Rendir cuentas", titulo: "Donaciones por fundación",
     linea: "Cada fundación de la red con lo que recibió, lo que ya se le entregó, lo que falta, los egresos y las actas del año." },
-  "reportes/voluntariado": { area: "Reportes", titulo: "Voluntariado del año",
+  "reportes/voluntariado": { area: "Rendir cuentas", titulo: "Voluntariado del año",
     linea: "Jornadas, participantes y horas anotadas, y los beneficiarios que reportan las fundaciones." },
-  "reportes/mmc": { area: "Reportes", titulo: "Mira Mi Casa: casos del año",
+  "reportes/mmc": { area: "Rendir cuentas", titulo: "Mira Mi Casa: casos del año",
     linea: "Casos recibidos, atendidos, visitados y cerrados, mes a mes." },
-  "reportes/banco": { area: "Reportes", titulo: "Banco y panel",
+  "reportes/banco": { area: "Rendir cuentas", titulo: "Banco y panel",
     linea: "Lo que dice el extracto del banco junto a lo que dice el panel, mes a mes, y de dónde sale la diferencia." },
-  "meal/indicadores": { area: "MEAL y Board", titulo: "Indicadores",
+  "meal/indicadores": { area: "Rendir cuentas", titulo: "Indicadores MEAL",
     linea: "Los indicadores de la fundación, cada valor con su fuente y su corte. El sistema sugiere lo que la base ya sabe; una persona lo registra.",
     accion: ["Registrar una medición", "mel-medir"] },
-  "meal/red": { area: "MEAL y Board", titulo: "Indicadores de la red",
+  "meal/red": { area: "Revisar y aprobar", titulo: "Indicadores de la red",
     linea: "Lo que cada fundación mide de su trabajo, periodo a periodo, con su fuente y su corte. Se revisa aquí y no se publica." },
-  "meal/board": { area: "MEAL y Board", titulo: "Board de Asesores",
+  "meal/board": { area: "Rendir cuentas", titulo: "Board de Asesores",
     linea: "Quién asesora a la fundación y lo que se le manda: el informe trimestral y la convocatoria. El Board recomienda; no aprueba ni dirige.",
     accion: ["Añadir asesor", "bd-asesor"] },
-  "quejas/ordinaria": { area: "Quejas", titulo: "Quejas, sugerencias y felicitaciones",
+  "quejas/ordinaria": { area: "Atender", titulo: "Quejas, sugerencias y felicitaciones",
     linea: "Lo que llega del formulario público, con su estado. Se responde por el medio que dejó la persona y aquí se registra." },
-  "quejas/confidencial": { area: "Quejas", titulo: "Ruta confidencial",
+  "quejas/confidencial": { area: "Atender", titulo: "Ruta confidencial",
     linea: "Reportes de conductas inapropiadas o abuso. Aparte de todo lo demás, y solo para el punto focal de salvaguarda." },
-  "finanzas/resumen": { area: "Finanzas", titulo: "Resumen",
+  "finanzas/resumen": { area: "Cuidar el dinero", titulo: "Resumen",
     linea: "Lo que entró y lo que salió en el mes o en el año, y de dónde sale cada cifra." },
-  "finanzas/banco": { area: "Finanzas", titulo: "Banco",
+  "finanzas/banco": { area: "Cuidar el dinero", titulo: "Banco",
     linea: "El extracto de Bancolombia, que es la cifra que manda: lo importado y cada movimiento.", accion: ["Importar un extracto", "bk-importar"] },
-  "finanzas/conciliar": { area: "Finanzas", titulo: "Conciliar con el banco",
+  "finanzas/conciliar": { area: "Cuidar el dinero", titulo: "Conciliar con el banco",
     linea: "Cada movimiento del extracto con lo que lo explica: aportes, egresos, comisiones o un motivo." },
-  "finanzas/aportes": { area: "Finanzas", titulo: "Aportes",
+  "finanzas/aportes": { area: "Cuidar el dinero", titulo: "Aportes",
     linea: "Todo lo que ha entrado, con su recibo y su certificado. Toca una fila para verlo entero." },
-  "finanzas/transferencias": { area: "Finanzas", titulo: "Transferencias por verificar",
+  "finanzas/transferencias": { area: "Cuidar el dinero", titulo: "Transferencias por verificar",
     linea: "Quien dice que transfirió. Se confirma contra el extracto del banco y entonces sale su recibo." },
-  "finanzas/pagos": { area: "Finanzas", titulo: "Pagos sin aporte",
+  "finanzas/pagos": { area: "Cuidar el dinero", titulo: "Pagos sin aporte",
     linea: "Dinero que entró sin guía: cobros del enlace directo de Wompi y abonos del extracto registrados a mano." },
-  "finanzas/membresias": { area: "Finanzas", titulo: "Membresías y carnets",
+  "finanzas/membresias": { area: "Cuidar el dinero", titulo: "Membresías y carnets",
     linea: "Las membresías mensuales en dólares por PayPal y los carnets, también los de honor.",
     accion: ["Emitir carnet de honor", "hn-nuevo"] },
-  "finanzas/vencimientos": { area: "Finanzas", titulo: "Vencimientos",
+  "finanzas/vencimientos": { area: "Cuidar el dinero", titulo: "Vencimientos",
     linea: "Lo que la Fundación tiene que presentar, pagar o reportar, con su fecha." },
-  "finanzas/egresos": { area: "Finanzas", titulo: "Egresos",
+  "finanzas/egresos": { area: "Cuidar el dinero", titulo: "Egresos",
     linea: "Cada peso que sale, con su soporte y su clasificación.", accion: ["Registrar un egreso", "eg-nuevo"] },
-  "finanzas/proveedores": { area: "Finanzas", titulo: "Proveedores",
+  "finanzas/proveedores": { area: "Cuidar el dinero", titulo: "Proveedores",
     linea: "A quién se le paga, con su documento y lo que se le ha pagado." },
-  "finanzas/paypal": { area: "Finanzas", titulo: "PayPal",
+  "finanzas/paypal": { area: "Cuidar el dinero", titulo: "PayPal",
     linea: "Lo que entró por el botón de donaciones y los avisos de PayPal que no encontraron su registro." },
-  "alianzas/red": { area: "Alianzas", titulo: "Red",
+  "alianzas/red": { area: "Atender", titulo: "Solicitudes a la red",
     linea: "Fundaciones, empresas, voluntarios y padrinos que quieren entrar a la red." },
-  "alianzas/fundaciones": { area: "Alianzas", titulo: "Fundaciones",
+  "alianzas/fundaciones": { area: "Acompañar la red", titulo: "Fundaciones",
     linea: "Cada fundación con su estado, su contacto, su acceso al portal, sus documentos y sus donaciones. Se abre y se edita." },
-  "alianzas/apadrinamiento": { area: "Alianzas", titulo: "Apadrinamiento",
+  "alianzas/apadrinamiento": { area: "Revisar y aprobar", titulo: "Apadrinamiento",
     linea: "Las unidades que las fundaciones ofrecen para apadrinar cada mes: verificar el costo, aprobar y publicar." },
-  "alianzas/ofrecimientos": { area: "Alianzas", titulo: "Ofrecimientos en especie",
+  "alianzas/ofrecimientos": { area: "Atender", titulo: "Ofrecimientos en especie",
     linea: "Lo que llega por el formulario de la brigada para donar en especie." },
-  "alianzas/socialfest": { area: "Alianzas", titulo: "Social Fest",
+  "alianzas/socialfest": { area: "Atender", titulo: "Social Fest",
     linea: "Empresas, fundaciones y profesionales que llegaron desde Social Fest 2026, cada uno con su ficha, sus notas y su próximo paso." },
-  "personas/contactos": { area: "Personas y organizaciones", titulo: "Contactos",
+  "personas/contactos": { area: "Acompañar la red", titulo: "Contactos",
     linea: "Cada persona y organización que la base conoce, con todo lo suyo en una ficha: donaciones, carnet, red, voluntariado, correos y notas." },
-  "personas/voluntariado": { area: "Personas y organizaciones", titulo: "Voluntariado",
+  "personas/voluntariado": { area: "Acompañar la red", titulo: "Voluntariado",
     linea: "Jornadas de voluntariado, de la convocatoria al cierre.", accion: ["Nueva jornada", "j-nueva"] },
-  "personas/ingenieros": { area: "Personas y organizaciones", titulo: "Ingenieros",
+  "personas/ingenieros": { area: "Acompañar la red", titulo: "Ingenieros",
     linea: "Quienes se postulan al triaje de casas, y la verificación de su matrícula en el COPNIA." },
-  "mmc/casas": { area: "Mira Mi Casa", titulo: "Casas",
+  "mmc/casas": { area: "Atender", titulo: "Casas de Mira Mi Casa",
     linea: "Los casos de vivienda, con su contacto y su dirección para ir a visitar." },
-  "mmc/inspecciones": { area: "Mira Mi Casa", titulo: "Inspecciones en terreno",
+  "mmc/inspecciones": { area: "Acompañar la red", titulo: "Inspecciones en terreno",
     linea: "Las visitas en persona de los ingenieros, con el documento que firmó el habitante." },
-  "entregas": { area: "Entregas", titulo: "Actas de entrega",
+  "entregas": { area: "Acompañar la red", titulo: "Actas de entrega",
     linea: "Se registra la transcripción del acta, se suben sus fotos y se publica.", accion: ["Registrar una entrega", "e-nueva"] },
   "sistema/salud": { area: "Sistema", titulo: "Salud",
     linea: "Dónde se cae la donación, si el cobro y el correo dan señales de vida, y la operación diaria." },
@@ -43908,7 +43897,7 @@ function cargarIndicadoresRed(){
           "<td>" + esc((d.frecuencias || {})[x.frecuencia] || x.frecuencia) + "</td>" +
           "<td>" + (x.meta ? esc(x.meta) + (x.meta_fecha ? "<br><small>para " + esc(x.meta_fecha) + "</small>" : "") : '<span class="mu">—</span>') +
           (x.linea_base ? "<br><small>línea base: " + esc(x.linea_base) + "</small>" : "") + "</td>" +
-          '<td><select data-ir-mel="' + x.id + '" aria-label="Indicador del MEAL al que aporta">' + ops + "</select></td></tr>";
+          '<td><select data-ir-mel="' + x.id + '" aria-label="Indicador del MEAL al que aporta" style="max-width:240px">' + ops + "</select></td></tr>";
       }).join("") + "</tbody></table></div>"
       : '<p class="mu">Ninguna fundación ha definido indicadores todavía.</p>';
     caja.innerHTML = h;
