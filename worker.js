@@ -5983,6 +5983,15 @@ async function adminSalud(env, opciones) {
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
+  /* DAR Y RECIBIR (0059): lo que una fundación ofreció o pidió y el equipo
+     no ha visto. Sin la 0059 no sale. */
+  try {
+    await enCola("intercambios_nuevos",
+      "SELECT COUNT(*) AS n, MIN(actualizado) AS masViejo FROM intercambios_fundacion WHERE estado = 'activo' AND visto_en IS NULL",
+      "Acompañar la red › Dar y recibir · una fundación ofreció o pidió algo: míralo y, si hay con quién cruzarlo, déjale una nota", 36, "#sec-dar", 14);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   await enCola("dirigidos_por_entregar",
     "SELECT COUNT(*) AS n, MIN(COALESCE(a.aprobada_en, a.creada_en)) AS masViejo FROM aportes a " +
     "WHERE a.destino_id IS NOT NULL AND a.estado IN ('aprobada','en_distribucion')",
@@ -22015,6 +22024,106 @@ async function adminMedicionFundacion(request, env, id, quien) {
   return json({ ok: true });
 }
 
+/* ============================================================================
+   DAR Y RECIBIR (ítem 37 · 0059, 30 oct 2026)
+   ============================================================================
+   La fundación dice lo que puede ofrecer a otras y lo que necesita. El equipo
+   lo cruza desde el panel y le deja una nota. Nada de esto se publica. */
+const INTER_CATEGORIAS = { especie: "En especie", voluntariado: "Voluntariado", conocimiento: "Conocimiento o asesoría", espacio: "Espacios", otro: "Otro" };
+const INTER_TOPE = 20;
+
+function intercambioValido(c) {
+  const malo = (campo, ayuda) => ({ ok: false, error: "dato_invalido", campo, ayuda });
+  const t = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+  const x = {
+    tipo: c.tipo === "ofrece" || c.tipo === "necesita" ? c.tipo : null,
+    categoria: INTER_CATEGORIAS[c.categoria] ? c.categoria : null,
+    titulo: t(c.titulo, 120),
+    detalle: String(c.detalle == null ? "" : c.detalle).replace(/\r\n?/g, "\n").trim().slice(0, 600) || null,
+    cantidad: t(c.cantidad, 80) || null,
+    hasta: c.hasta ? indFecha(c.hasta) : null
+  };
+  if (!x.tipo) return malo("tipo", "Elige si es algo que ofrecen o algo que necesitan.");
+  if (!x.categoria) return malo("categoria", "Elige de qué tipo es.");
+  if (x.titulo.length < 4) return malo("titulo", "Escribe en pocas palabras qué es: «200 cuadernos», «Un salón para talleres».");
+  if (c.hasta && !x.hasta) return malo("hasta", "La fecha no es válida.");
+  return { ok: true, x };
+}
+
+/* GET y POST /api/portal/intercambios */
+async function apiPortalIntercambios(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "intercambios_fundacion"))) return json({ error: "no_disponible" }, 503);
+  if (request.method === "GET") {
+    const filas = (await env.DB.prepare(
+      "SELECT id, tipo, categoria, titulo, detalle, cantidad, hasta, estado, nota_equipo, actualizado FROM intercambios_fundacion " +
+      "WHERE inscripcion = ? AND estado <> 'retirado' ORDER BY CASE estado WHEN 'activo' THEN 0 ELSE 1 END, actualizado DESC"
+    ).bind(s.inscripcion).all()).results || [];
+    return json({ ok: true, categorias: INTER_CATEGORIAS, tope: INTER_TOPE,
+      intercambios: filas.map((x) => Object.assign(x, { actualizado: fechaCO(x.actualizado) })) });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (c.accion === "retirar" || c.accion === "resolver") {
+    const r = await env.DB.prepare(
+      "UPDATE intercambios_fundacion SET estado = ?, actualizado = datetime('now') WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+    ).bind(c.accion === "retirar" ? "retirado" : "resuelto", Number(c.id) || 0, s.inscripcion).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+    return json({ ok: true });
+  }
+  if (c.accion !== "guardar") return json({ error: "accion_invalida" }, 400);
+  const v = intercambioValido(c);
+  if (!v.ok) return json(v, 400);
+  const x = v.x;
+  if (c.id) {
+    /* Editar lo vuelve «nuevo» para el equipo: cambió lo que había visto. */
+    const r = await env.DB.prepare(
+      "UPDATE intercambios_fundacion SET tipo = ?, categoria = ?, titulo = ?, detalle = ?, cantidad = ?, hasta = ?, visto_en = NULL, visto_por = NULL, " +
+      "actualizado = datetime('now') WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
+    ).bind(x.tipo, x.categoria, x.titulo, x.detalle, x.cantidad, x.hasta, Number(c.id) || 0, s.inscripcion).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+    return json({ ok: true, id: Number(c.id) });
+  }
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM intercambios_fundacion WHERE inscripcion = ? AND estado = 'activo'").bind(s.inscripcion).first();
+  if (n && n.n >= INTER_TOPE) return json({ error: "tope_alcanzado", ayuda: "Ya tienen " + INTER_TOPE + " activos. Marquen alguno como resuelto o retírenlo antes de añadir otro." }, 409);
+  const fila = await env.DB.prepare(
+    "INSERT INTO intercambios_fundacion (inscripcion, tipo, categoria, titulo, detalle, cantidad, hasta) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(s.inscripcion, x.tipo, x.categoria, x.titulo, x.detalle, x.cantidad, x.hasta).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* GET /api/admin/intercambios — lo de toda la red, para cruzar. */
+async function adminIntercambios(env) {
+  if (!(await existeTabla(env, "intercambios_fundacion"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0059 en la base." }, 409);
+  const filas = (await env.DB.prepare(
+    "SELECT x.*, i.nombre AS fundacion, i.ciudad FROM intercambios_fundacion x JOIN inscripciones i ON i.id = x.inscripcion " +
+    "WHERE x.estado <> 'retirado' ORDER BY CASE x.estado WHEN 'activo' THEN 0 ELSE 1 END, x.visto_en IS NOT NULL, x.actualizado DESC LIMIT 500"
+  ).all()).results || [];
+  return json({ ok: true, categorias: INTER_CATEGORIAS,
+    intercambios: filas.map((x) => Object.assign(x, { actualizado: selloCO(x.actualizado).slice(0, 16), nuevo: !x.visto_en })) });
+}
+
+/* POST /api/admin/intercambio/<id> { nota } — la nota del equipo, que la
+   fundación ve, y queda visto. Nota vacía = solo marcarlo visto. */
+async function adminIntercambioNota(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const nota = c.nota == null ? null : (String(c.nota).replace(/\r\n?/g, "\n").trim().slice(0, 500) || null);
+  const r = await env.DB.prepare(
+    "UPDATE intercambios_fundacion SET nota_equipo = COALESCE(?, nota_equipo), visto_en = datetime('now'), visto_por = ? WHERE id = ?"
+  ).bind(nota, quien || null, id).run();
+  if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "dar y recibir " + id + (nota ? " · nota del equipo" : " · visto")).run();
+  return json({ ok: true });
+}
+
 /* GET /api/portal/recibido — LO QUE LA FUNDACIÓN HA RECIBIDO (ítem 40, 29 oct
    2026). Sale de lo que la base ya sabe, unido por `inscripciones.red_id`:
    · las donaciones dirigidas a ella (solo confirmadas; pesos y dólares por
@@ -22174,6 +22283,11 @@ function paginaPortal(nonce) {
   .pill.ambar{border-color:var(--amber);color:var(--amber)}
 
   .rejilla{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .rejilla-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .rejilla-2 .tarjeta + .tarjeta{margin-top:0}
+  /* En dos columnas, los botones van debajo del texto: al lado lo aplastaban. */
+  .rejilla-2 .docs li{grid-template-columns:minmax(0,1fr);gap:8px}
+  .rejilla-2 .docs .der{justify-content:flex-start}
   .rejilla .tarjeta + .tarjeta{margin-top:0}
   .cifra{font-family:"Unbounded",system-ui,sans-serif;font-size:28px;font-weight:600;line-height:1.1;margin:8px 0 4px}
   .tarjeta h2{font-size:17px;font-weight:700;margin-bottom:4px}
@@ -22252,7 +22366,7 @@ function paginaPortal(nonce) {
   }
   @media (max-width:720px){
     h1{font-size:22px}
-    .rejilla{grid-template-columns:1fr}
+    .rejilla,.rejilla-2{grid-template-columns:minmax(0,1fr)}
     .recorrido{grid-template-columns:1fr;gap:0}
     .recorrido li{display:grid;grid-template-columns:36px 1fr;column-gap:12px;padding:0 0 14px}
     .recorrido li::before{top:36px;bottom:0;left:17px;right:auto;width:2px;height:auto}
@@ -22338,6 +22452,7 @@ function paginaPortal(nonce) {
       <button type="button" class="tab" role="tab" id="t-perfil" aria-controls="s-perfil" aria-selected="false">Perfil<span class="pill oculto" id="tp-perfil"></span></button>
       <button type="button" class="tab" role="tab" id="t-documentos" aria-controls="s-documentos" aria-selected="false">Documentos<span class="pill" id="tp-docs"></span></button>
       <button type="button" class="tab" role="tab" id="t-apadrinamiento" aria-controls="s-apadrinamiento" aria-selected="false">Apadrinamiento</button>
+      <button type="button" class="tab" role="tab" id="t-dar" aria-controls="s-dar" aria-selected="false">Dar y recibir</button>
       <button type="button" class="tab" role="tab" id="t-indicadores" aria-controls="s-indicadores" aria-selected="false">Indicadores<span class="pill ambar oculto" id="tp-ind"></span></button>
     </div>
 
@@ -22410,6 +22525,38 @@ function paginaPortal(nonce) {
           <button type="button" class="btn sec oculto" id="b-unidad-cancelar">Cancelar la edición</button>
         </div>
         <span class="msg" id="m-unidad" role="status" aria-live="polite"></span>
+      </form>
+    </div>
+    <div id="s-dar" role="tabpanel" aria-labelledby="t-dar" class="oculto">
+      <div class="tarjeta aviso">
+        <h2>Dar y recibir</h2>
+        <p class="sub">Lo que su fundación puede ofrecer a otras de la red —en especie, voluntariado, conocimiento o espacios— y lo que necesita. El equipo lo cruza con otras fundaciones y con empresas, y les deja una nota aquí.</p>
+        <p class="sub mt"><strong>Nada de esto se publica.</strong></p>
+      </div>
+      <div class="rejilla-2 mt"><div class="tarjeta" id="dr-necesita"></div><div class="tarjeta" id="dr-ofrece"></div></div>
+      <form class="tarjeta mt" id="f-dar" autocomplete="off">
+        <h2 id="dr-titulo">Añadir</h2>
+        <input type="hidden" id="dr-id">
+        <label for="dr-tipo">¿Lo necesitan o lo pueden ofrecer? *</label>
+        <label class="op"><input type="radio" name="dr-tipo" value="necesita" id="dr-tipo"><span><strong>Lo necesitamos.</strong> Algo que les falta para su trabajo.</span></label>
+        <label class="op"><input type="radio" name="dr-tipo" value="ofrece"><span><strong>Lo podemos ofrecer.</strong> Algo que les sobra o que saben hacer y pueden compartir con otra fundación.</span></label>
+        <label for="dr-cat">De qué tipo *</label>
+        <select id="dr-cat"></select>
+        <label for="dr-tit">Qué es *</label>
+        <span class="ayuda">En pocas palabras: «200 cuadernos», «Un salón para talleres los sábados», «Asesoría contable».</span>
+        <input type="text" id="dr-tit" maxlength="120">
+        <label for="dr-cant">Cuánto o con qué frecuencia</label>
+        <input type="text" id="dr-cant" maxlength="80">
+        <label for="dr-det">Detalle</label>
+        <textarea id="dr-det" rows="3" maxlength="600"></textarea>
+        <label for="dr-hasta">Hasta cuándo</label>
+        <span class="ayuda">Opcional: si lo necesitan antes de una fecha, o si lo ofrecen solo hasta entonces.</span>
+        <input type="date" id="dr-hasta">
+        <div class="acciones">
+          <button type="button" class="btn" id="b-dar">Añadir</button>
+          <button type="button" class="btn sec oculto" id="b-dar-cancelar">Cancelar la edición</button>
+        </div>
+        <span class="msg" id="m-dar" role="status" aria-live="polite"></span>
       </form>
     </div>
     <div id="s-indicadores" role="tabpanel" aria-labelledby="t-indicadores" class="oculto">
@@ -22540,7 +22687,7 @@ var PASOS = [
 ];
 var RECOMENDADOS = ["rut", "camara", "estatutos", "estados_financieros", "certificado_bancario", "logo"];
 var UNIDADES = null;
-var TABS = ["resumen", "perfil", "documentos", "apadrinamiento", "indicadores"];
+var TABS = ["resumen", "perfil", "documentos", "apadrinamiento", "dar", "indicadores"];
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
@@ -22978,6 +23125,7 @@ function irA(tab){
   TAB = tab;
   if (tab === "apadrinamiento" && UNIDADES === null) cargarUnidades();
   if (tab === "indicadores" && INDS === null) cargarIndicadores();
+  if (tab === "dar" && DRS === null) cargarDar();
   TABS.forEach(function(t){
     $("t-" + t).setAttribute("aria-selected", t === tab ? "true" : "false");
     $("s-" + t).classList.toggle("oculto", t !== tab);
@@ -23330,6 +23478,70 @@ $("in-lista").addEventListener("click", function(ev){
   if (b.hasAttribute("data-in-editar")) { formIndicador(x); $("f-indicador").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (!confirm("¿Retirar «" + x.nombre + "»? Deja de pedirse; lo que ya enviaste queda en el archivo de la alianza.")) return;
   enviar("/api/portal/indicadores", { accion: "retirar", id: x.id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarIndicadores(); });
+});
+/* ---- Dar y recibir (0059): lo que ofrecen y lo que necesitan. No se publica. ---- */
+var DRS = null;
+var DR_CAT = { especie: "En especie", voluntariado: "Voluntariado", conocimiento: "Conocimiento o asesoría", espacio: "Espacios", otro: "Otro" };
+function cargarDar(){
+  if (!$("dr-cat").options.length) $("dr-cat").innerHTML = '<option value="">Elige…</option>' +
+    Object.keys(DR_CAT).map(function(k){ return '<option value="' + k + '">' + esc(DR_CAT[k]) + "</option>"; }).join("");
+  return fetch("/api/portal/intercambios", { credentials: "same-origin" }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return null; }
+    return r.ok ? r.json() : null;
+  }).then(function(d){ if (!d) return; DRS = d.intercambios || []; pintarDar(); })
+    .catch(function(){ $("dr-necesita").innerHTML = '<p class="sub">No pudimos cargar esta sección. Intenta de nuevo.</p>'; });
+}
+function pintarDar(){
+  ["necesita", "ofrece"].forEach(function(t){
+    var L = DRS.filter(function(x){ return x.tipo === t; });
+    $("dr-" + t).innerHTML = "<h2>" + (t === "necesita" ? "Lo que necesitan" : "Lo que pueden ofrecer") + "</h2>" +
+      (L.length ? '<ul class="docs">' + L.map(function(x){
+        var activo = x.estado === "activo";
+        var det = [DR_CAT[x.categoria] || x.categoria, x.cantidad || "", x.hasta ? "hasta " + x.hasta : ""].filter(Boolean).join(" · ");
+        return '<li><div><span class="nom">' + esc(x.titulo) + '</span><span class="det">' + esc(det) + "</span>" +
+          (x.detalle ? '<span class="det">' + esc(x.detalle) + "</span>" : "") +
+          (x.nota_equipo ? '<span class="det"><strong>Nota del equipo:</strong> ' + esc(x.nota_equipo) + "</span>" : "") + "</div>" +
+          '<div class="der"><span class="pill' + (activo ? "" : " ok") + '">' + (activo ? "Activo" : "Resuelto") + "</span>" +
+          (activo ? '<button type="button" class="btn sec mini" data-dr-editar="' + x.id + '">Editar</button>' +
+            '<button type="button" class="btn sec mini" data-dr-resolver="' + x.id + '">Ya se resolvió</button>' +
+            '<button type="button" class="btn sec mini" data-dr-retirar="' + x.id + '">Retirar</button>' : "") + "</div></li>";
+      }).join("") + "</ul>" : '<p class="sub">Nada todavía.</p>');
+  });
+}
+function formDar(x){
+  $("dr-id").value = x ? x.id : "";
+  document.querySelectorAll('input[name="dr-tipo"]').forEach(function(r){ r.checked = !!x && r.value === x.tipo; });
+  $("dr-cat").value = x ? x.categoria : ""; $("dr-tit").value = x ? x.titulo : "";
+  $("dr-cant").value = x ? (x.cantidad || "") : ""; $("dr-det").value = x ? (x.detalle || "") : ""; $("dr-hasta").value = x ? (x.hasta || "") : "";
+  $("dr-titulo").textContent = x ? "Editar «" + x.titulo + "»" : "Añadir";
+  $("b-dar").textContent = x ? "Guardar los cambios" : "Añadir";
+  $("b-dar-cancelar").classList.toggle("oculto", !x);
+  msg("m-dar", "");
+}
+function guardarDar(){
+  var t = document.querySelector('input[name="dr-tipo"]:checked');
+  var c = { accion: "guardar", id: $("dr-id").value || null, tipo: t ? t.value : "", categoria: $("dr-cat").value, titulo: $("dr-tit").value,
+    cantidad: $("dr-cant").value, detalle: $("dr-det").value, hasta: $("dr-hasta").value || null };
+  var b = $("b-dar"); b.disabled = true; msg("m-dar", "Guardando…");
+  enviar("/api/portal/intercambios", c).then(function(r){
+    b.disabled = false;
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { msg("m-dar", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
+    formDar(null); msg("m-dar", "Listo. El equipo lo ve y les cuenta aquí si lo cruza con alguien.", "ok");
+    cargarDar();
+  }).catch(function(){ b.disabled = false; msg("m-dar", "No pudimos conectar. Lo que escribiste sigue en pantalla.", "mal"); });
+}
+$("b-dar").addEventListener("click", guardarDar);
+$("b-dar-cancelar").addEventListener("click", function(){ formDar(null); });
+$("s-dar").addEventListener("click", function(ev){
+  var b = ev.target.closest && ev.target.closest("[data-dr-editar],[data-dr-resolver],[data-dr-retirar]");
+  if (!b) return;
+  var id = Number(b.getAttribute("data-dr-editar") || b.getAttribute("data-dr-resolver") || b.getAttribute("data-dr-retirar"));
+  var x = (DRS || []).filter(function(y){ return y.id === id; })[0];
+  if (b.hasAttribute("data-dr-editar")) { formDar(x); $("f-dar").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  var acc = b.hasAttribute("data-dr-resolver") ? "resolver" : "retirar";
+  if (acc === "retirar" && !confirm("¿Retirar «" + (x ? x.titulo : "") + "»?")) return;
+  enviar("/api/portal/intercambios", { accion: acc, id: id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarDar(); });
 });
 window.addEventListener("beforeunload", function(ev){ if (SUCIO && !BORRADOR_OK) { ev.preventDefault(); ev.returnValue = ""; } });
 window.addEventListener("hashchange", function(){
@@ -34253,6 +34465,7 @@ textarea { font-size: 16px }
 <div class="pn-grupo">
   <p class="pn-gt">Acompañar la red</p>
   <a class="pn-it" href="#alianzas/fundaciones" data-pn-ir="alianzas/fundaciones">Fundaciones</a>
+  <a class="pn-it" href="#alianzas/dar" data-pn-ir="alianzas/dar">Dar y recibir<span class="pn-n" data-pn-n="alianzas/dar"></span></a>
   <a class="pn-it" href="#personas/contactos" data-pn-ir="personas/contactos">Contactos<span class="pn-n" data-pn-n="personas/contactos"></span></a>
   <a class="pn-it" href="#personas/voluntariado" data-pn-ir="personas/voluntariado">Voluntariado<span class="pn-n" data-pn-n="personas/voluntariado"></span></a>
   <a class="pn-it" href="#personas/ingenieros" data-pn-ir="personas/ingenieros">Ingenieros<span class="pn-n" data-pn-n="personas/ingenieros"></span></a>
@@ -34515,6 +34728,15 @@ textarea { font-size: 16px }
 <p>Cada fila es alguien que llegó por la página del evento —empresa, fundación o profesional— con su <strong>ficha</strong>. Ábrela para anotar la conversación (llamada, WhatsApp, correo desde Gmail, reunión) y el <strong>próximo paso con fecha</strong>: ese día sale en «Hoy». Aceptar o mover su solicitud sigue siendo en Red.</p>
 </div></details>
 <div id="tb-socialfest" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<!-- DAR Y RECIBIR (0059): lo que las fundaciones ofrecen y necesitan, para cruzarlo. -->
+<section class="pn-vista" data-vista="alianzas/dar" id="sec-dar" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Cada fundación publica en su portal (pestaña <strong>Dar y recibir</strong>) lo que puede ofrecer a otras —en especie, voluntariado, conocimiento o espacios— y lo que necesita. Aquí se ve todo junto para <strong>cruzarlo</strong>: una fundación con otra, o con una empresa de Impact Journey o un ofrecimiento en especie.</p>
+<p><strong>La nota del equipo</strong> la ve la fundación en su portal: sirve para decirle «lo cruzamos con…» o «¿sigue vigente?». Lo nuevo sale en «Hoy» hasta que se mira. <strong>Nada de esto se publica.</strong></p>
+</div></details>
+<div id="tb-dar" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="alianzas/fundaciones" id="sec-fundaciones" hidden>
@@ -36005,7 +36227,8 @@ var COLA_ES = {
   unidades_por_revisar: "Unidades de apadrinamiento por revisar",
   reportes_unidad_por_revisar: "Reportes mensuales de apadrinamiento por revisar",
   unidades_sin_reporte: "Unidades sin el reporte del mes pasado",
-  mediciones_fundacion_por_revisar: "Mediciones de las fundaciones por revisar"
+  mediciones_fundacion_por_revisar: "Mediciones de las fundaciones por revisar",
+  intercambios_nuevos: "Dar y recibir: lo nuevo de las fundaciones"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -36094,6 +36317,8 @@ var VISTAS = {
     linea: "Lo que entró por el botón de donaciones y los avisos de PayPal que no encontraron su registro." },
   "alianzas/red": { area: "Atender", titulo: "Solicitudes a la red",
     linea: "Fundaciones, empresas, voluntarios y padrinos que quieren entrar a la red." },
+  "alianzas/dar": { area: "Acompañar la red", titulo: "Dar y recibir",
+    linea: "Lo que cada fundación ofrece y necesita, para cruzarla con otra o con una empresa. No se publica." },
   "alianzas/fundaciones": { area: "Acompañar la red", titulo: "Fundaciones",
     linea: "Cada fundación con su estado, su contacto, su acceso al portal, sus documentos y sus donaciones. Se abre y se edita." },
   "revisar": { area: "Revisar y aprobar", titulo: "Bandeja de revisión",
@@ -36314,7 +36539,8 @@ var COLA_MOD = {
   unidades_por_revisar: "revisar",
   reportes_unidad_por_revisar: "revisar",
   unidades_sin_reporte: "alianzas/apadrinamiento",
-  mediciones_fundacion_por_revisar: "revisar"
+  mediciones_fundacion_por_revisar: "revisar",
+  intercambios_nuevos: "alianzas/dar"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -44370,6 +44596,73 @@ document.addEventListener("click", function(e){
   else if (tipo === "acta") location.hash = "entregas";
 });
 
+/* ---------------- DAR Y RECIBIR (0059) ----------------
+   Lo que cada fundación ofrece y necesita, para cruzarlo. Nada se publica. */
+var DR = null, DR_TIPO = "todo";
+function cargarIntercambios(){
+  return pedirJSON("/api/admin/intercambios", "tb-dar").then(function(d){ DR = d; pintarIntercambios(); });
+}
+function pintarIntercambios(){
+  var caja = document.getElementById("tb-dar"); if (!caja || !DR) return;
+  var L = DR.intercambios || [];
+  var activos = L.filter(function(x){ return x.estado === "activo"; });
+  var chip = function(k, t){
+    var n = k === "todo" ? activos.length : activos.filter(function(x){ return x.tipo === k; }).length, on = DR_TIPO === k;
+    return '<button type="button" class="pn-b2" data-dr-tipo="' + k + '" aria-pressed="' + on + '"' +
+      (on ? ' style="background:var(--g);color:#fff;border-color:var(--g)"' : "") + ">" + esc(t) + " · " + n + "</button>";
+  };
+  var V = L.filter(function(x){ return DR_TIPO === "todo" || x.tipo === DR_TIPO; });
+  var h = '<div class="fin-barra" role="group" aria-label="Filtrar">' + chip("todo", "Todo lo activo") + " " + chip("necesita", "Lo que necesitan") + " " + chip("ofrece", "Lo que ofrecen") + "</div>";
+  h += V.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Qué</th><th scope="col">Fundación</th><th scope="col">Tipo</th>' +
+    '<th scope="col">Estado</th><th scope="col">Nota del equipo</th><th scope="col"></th></tr></thead><tbody>' +
+    V.map(function(x){
+      return "<tr" + (x.estado !== "activo" ? ' style="opacity:.6"' : "") + "><td><strong>" + (x.tipo === "ofrece" ? "Ofrece: " : "Necesita: ") + esc(x.titulo) + "</strong>" +
+        (x.cantidad ? "<br><small>" + esc(x.cantidad) + "</small>" : "") + (x.detalle ? "<br><small>" + esc(x.detalle) + "</small>" : "") +
+        (x.hasta ? "<br><small>hasta " + esc(x.hasta) + "</small>" : "") + "</td>" +
+        "<td>" + esc(x.fundacion) + (x.ciudad ? "<br><small>" + esc(x.ciudad) + "</small>" : "") + "</td>" +
+        "<td>" + esc((DR.categorias || {})[x.categoria] || x.categoria) + "</td>" +
+        "<td>" + (x.estado === "activo" ? (x.nuevo ? "<strong>Nuevo</strong>" : "Activo") : "Resuelto") + "<br><small>" + esc(x.actualizado) + "</small></td>" +
+        "<td>" + (x.nota_equipo ? esc(x.nota_equipo) : '<span class="mu">—</span>') + "</td>" +
+        '<td><button type="button" class="copy" data-dr-abrir="' + x.id + '">' + (x.nuevo && x.estado === "activo" ? "Ver y anotar" : "Anotar") + "</button></td></tr>";
+    }).join("") + "</tbody></table></div>"
+    : '<p class="mu">Nada por aquí todavía. Las fundaciones lo publican desde la pestaña «Dar y recibir» de su portal.</p>';
+  caja.innerHTML = h;
+}
+function abrirIntercambio(id){
+  var x = ((DR && DR.intercambios) || []).filter(function(y){ return String(y.id) === String(id); })[0];
+  if (!x) return;
+  var h = ficha([
+    ["Fundación", esc(x.fundacion)],
+    [x.tipo === "ofrece" ? "Ofrece" : "Necesita", esc(x.titulo) + (x.cantidad ? "<small>" + esc(x.cantidad) + "</small>" : "")],
+    ["Tipo", esc((DR.categorias || {})[x.categoria] || x.categoria)],
+    ["Detalle", x.detalle ? '<div class="qj-msg">' + esc(x.detalle) + "</div>" : '<span class="mu">—</span>'],
+    ["Hasta", x.hasta ? esc(x.hasta) : '<span class="mu">Sin fecha</span>']
+  ]);
+  h += pnCampo("dr-nota", "Nota para la fundación (la ve en su portal)", x.nota_equipo || "", { area: true, filas: 3 }) + '<p class="pn-error" id="pn-err"></p>';
+  var pie = '<button type="button" class="pn-b1" data-dr-guardar="1">Guardar la nota</button>' +
+    (x.nuevo ? '<button type="button" class="pn-b2" data-dr-visto="1">Solo marcar visto</button>' : "") +
+    '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  cajonAbrir({ ey: "Dar y recibir", titulo: x.titulo, cuerpo: h, pie: pie, ancho: true });
+  var enviarNota = function(nota, b){
+    b.disabled = true;
+    postPanel("/api/admin/intercambio/" + x.id, { nota: nota }).then(function(r){
+      b.disabled = false; if (!r) return;
+      avisar(nota ? "Nota guardada: la fundación la ve en su portal." : "Marcado como visto.");
+      cajonCerrar(); cargarIntercambios(); cargarSalud();
+    });
+  };
+  document.querySelector("[data-dr-guardar]").addEventListener("click", function(){ enviarNota(pnValor("dr-nota"), this); });
+  var v = document.querySelector("[data-dr-visto]");
+  if (v) v.addEventListener("click", function(){ enviarNota(null, this); });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var f = e.target.closest("[data-dr-tipo]");
+  if (f){ DR_TIPO = f.getAttribute("data-dr-tipo"); pintarIntercambios(); return; }
+  var b = e.target.closest("[data-dr-abrir]");
+  if (b) abrirIntercambio(b.getAttribute("data-dr-abrir"));
+});
+
 function abrirPortal(id){
   pedirJSON("/api/admin/portal/" + id).then(function(d){
     var pares = [
@@ -44526,6 +44819,7 @@ var BANDEJAS = {
   "tb-apad": cargarApadrinamiento,
   "tb-revisar": cargarRevisar,
   "tb-indred": cargarIndicadoresRed,
+  "tb-dar": cargarIntercambios,
   "tb-pagos": cargarSueltos,
   "tb-suscripciones": cargarSuscripciones,
   "tb-miembros": cargarMiembros,
@@ -48629,6 +48923,9 @@ export default {
         if (ruta === "/api/admin/apadrinamiento") return await adminApadrinamiento(env);
         if (ruta === "/api/admin/revisar")      return await adminRevisar(env);
         if (ruta === "/api/admin/indicadores-red") return await adminIndicadoresRed(env);
+        if (ruta === "/api/admin/intercambios") return await adminIntercambios(env);
+        const aix = ruta.match(/^\/api\/admin\/intercambio\/(\d{1,9})$/);
+        if (aix)                                return await adminIntercambioNota(request, env, Number(aix[1]), sesion.email);
         const amf = ruta.match(/^\/api\/admin\/medicion-fundacion\/(\d{1,9})$/);
         if (amf)                                return await adminMedicionFundacion(request, env, Number(amf[1]), sesion.email);
         const aif = ruta.match(/^\/api\/admin\/indicador-fundacion\/(\d{1,9})$/);
@@ -48854,6 +49151,7 @@ export default {
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
         if (ruta === "/api/portal/indicadores") return await apiPortalIndicadores(request, env);
+        if (ruta === "/api/portal/intercambios") return await apiPortalIntercambios(request, env);
         if (ruta === "/api/portal/recibido") return await apiPortalRecibido(request, env);
         /* Apadrinamiento por unidad de impacto (0054). */
         if (ruta === "/api/apadrinamiento")         return await apiCatalogoApadrinamiento(env);
