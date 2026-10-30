@@ -22137,6 +22137,16 @@ function paginaPortal(nonce) {
   .recorrido li.pend .p{color:var(--mu);font-weight:500}
   .recorrido .q{display:block;font-size:12px;color:var(--mu);margin-top:2px;line-height:1.35}
 
+  /* EL RECORRIDO PLEGADO (30 oct 2026). En celular los cinco pasos llenaban la
+     primera pantalla en TODAS las pestañas. Ahora es una línea que se
+     despliega; abierto solo en Resumen y en pantalla ancha. */
+  .paso-pill{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-height:44px;margin-top:16px;padding:6px 16px;
+    border:1px solid var(--bd);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;cursor:pointer;text-align:left}
+  .paso-pill .seg{display:flex;gap:4px}
+  .paso-pill .seg i{display:block;width:18px;height:6px;border-radius:999px;background:var(--bd)}
+  .paso-pill .seg i.hecho{background:var(--acc)}
+  .paso-pill .seg i.ahora{background:var(--amber)}
+  .paso-pill small{color:var(--mu);font-size:12.5px}
   .tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);margin:28px 0 22px;overflow-x:auto}
   .tab{font:inherit;font-size:15px;font-weight:600;color:var(--mu);background:none;border:0;border-bottom:2px solid transparent;
     padding:10px 14px;cursor:pointer;white-space:nowrap;margin-bottom:-1px}
@@ -22180,6 +22190,12 @@ function paginaPortal(nonce) {
     .recorrido .q{grid-column:2;margin-top:0}
     .barra-marca .der span{display:none}
     .tab{font-size:14px;padding:10px 9px}
+    /* Las pestañas bajan de fila en vez de esconderse a la derecha: en un
+       celular, «Apadrinamiento» e «Indicadores» quedaban fuera de la vista. */
+    .tabs{flex-wrap:wrap;overflow:visible;border-bottom:0;gap:6px;margin:20px 0 18px}
+    .tab{border:1px solid var(--bd);border-radius:999px;padding:8px 13px;margin:0;min-height:42px}
+    .tab[aria-selected=true]{background:var(--acc);border-color:var(--acc);color:var(--bg)}
+    .tab[aria-selected=true] .pill{border-color:var(--bg);color:var(--bg)}
     .tab .pill{margin-left:4px;font-size:11px;padding:0 7px}
     .docs li{grid-template-columns:1fr}
     .docs .der{justify-content:flex-start}
@@ -22239,6 +22255,7 @@ function paginaPortal(nonce) {
     <p class="ey" id="p-estado"></p>
     <h1 class="mt" id="p-nombre"></h1>
     <p class="saludo" id="p-saludo"></p>
+    <button type="button" class="paso-pill" id="p-paso" aria-controls="p-recorrido" aria-expanded="false"></button>
     <ol class="recorrido" id="p-recorrido" aria-label="Tu recorrido en el HUB"></ol>
 
     <div class="tabs" role="tablist" aria-label="Secciones del portal">
@@ -22483,12 +22500,24 @@ function pintar(){
   $("p-estado").textContent = D.estado_es || "";
   $("p-saludo").textContent = "Aquí ves en qué va la alianza, mantienes tu perfil al día y nos dejas tus documentos.";
   var a = pasoActual();
+  $("p-paso").innerHTML = '<span class="seg" aria-hidden="true">' + PASOS.map(function(p, i){
+      return '<i class="' + (i < a ? "hecho" : i === a ? "ahora" : "") + '"></i>'; }).join("") + "</span>" +
+    "<span>" + (a >= PASOS.length ? "<strong>Vinculada:</strong> parte de la red del HUB" : "<strong>Paso " + (a + 1) + " de " + PASOS.length + ":</strong> " + esc(PASOS[a][0].toLowerCase())) + "</span>" +
+    '<small id="p-paso-ver"></small>';
   $("p-recorrido").innerHTML = PASOS.map(function(p, i){
     var clase = i < a ? "hecho" : i === a ? "ahora" : "pend";
     return '<li class="' + clase + '"' + (i === a ? ' aria-current="step"' : "") + '><span class="n">' + (i < a ? "✓" : String(i + 1)) +
       '</span><span class="p">' + esc(p[0]) + '</span><span class="q">' + esc(p[1]) + "</span></li>";
   }).join("");
   pintarResumen(); pintarPerfil(); pintarDocs();
+  verRecorrido();
+}
+var RECORRIDO = null;
+function verRecorrido(){
+  var abierto = RECORRIDO !== null ? RECORRIDO : (TAB === "resumen" && window.matchMedia("(min-width:721px)").matches);
+  $("p-recorrido").classList.toggle("oculto", !abierto);
+  $("p-paso").setAttribute("aria-expanded", abierto ? "true" : "false");
+  if ($("p-paso-ver")) $("p-paso-ver").textContent = abierto ? "Ocultar el recorrido" : "Ver el recorrido";
 }
 
 function siguiente(){
@@ -22691,6 +22720,7 @@ function irA(tab){
   });
   $("barra-guardar").classList.toggle("oculto", !(tab === "perfil" && D && D.perfil));
   if (location.hash !== "#" + tab) history.replaceState(null, "", "/portal#" + tab);
+  if (D) verRecorrido();
 }
 
 $("f-entrar").addEventListener("submit", function(ev){
@@ -22717,6 +22747,7 @@ $("b-salir").addEventListener("click", function(){
   enviar("/api/portal/salir").then(function(){ D = null; SUCIO = false; ver("v-entrar"); });
 });
 $("b-perfil").addEventListener("click", guardarPerfil);
+$("p-paso").addEventListener("click", function(){ RECORRIDO = $("p-recorrido").classList.contains("oculto"); verRecorrido(); });
 TABS.forEach(function(t){ $("t-" + t).addEventListener("click", function(){ irA(t); }); });
 document.addEventListener("click", function(ev){
   var b = ev.target.closest && ev.target.closest("[data-ir]");
