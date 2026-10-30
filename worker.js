@@ -22195,7 +22195,13 @@ function paginaPortal(nonce) {
     padding-bottom:8px;border-bottom:1px solid var(--bds)}
 
   .guardar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--bd);z-index:5}
-  .guardar .in{max-width:880px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px}
+  .guardar .in{max-width:880px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  /* EL BORRADOR (30 oct 2026): lo escrito se guarda solo en el navegador y
+     se manda al equipo con «Enviar a revisión». */
+  .pf-estado{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-soft);flex:1 1 220px;min-width:0}
+  .pf-estado::before{content:"";flex:0 0 9px;height:9px;border-radius:50%;background:var(--bd)}
+  .pf-estado.ok::before{background:var(--acc)}
+  .pf-estado.ambar::before{background:var(--amber)}
   .guardar .msg{margin:0 auto 0 0}
 
   .docs{list-style:none}
@@ -22470,8 +22476,10 @@ function paginaPortal(nonce) {
 
 <div class="guardar oculto" id="barra-guardar">
   <div class="in">
+    <span class="pf-estado" id="pf-estado" role="status" aria-live="polite"></span>
     <span class="msg" id="m-perfil" role="status" aria-live="polite"></span>
-    <button type="button" class="btn" id="b-perfil">Guardar cambios</button>
+    <button type="button" class="btn sec mini oculto" id="pf-descartar">Descartar el borrador</button>
+    <button type="button" class="btn" id="b-perfil">Enviar a revisión</button>
   </div>
 </div>
 <script nonce="${nonce}">
@@ -22705,7 +22713,8 @@ function pintarPerfil(){
   pintarOdsPerfil();
   SUCIO = false; msg("m-perfil", "");
   $("f-perfil").addEventListener("input", function(ev){
-    if (!SUCIO) { SUCIO = true; msg("m-perfil", "Tienes cambios sin guardar."); }
+    SUCIO = true; msg("m-perfil", "");
+    pfGuardarBorrador();
     var t = ev.target, k = t && t.id ? document.querySelector('[data-cuenta="' + t.id + '"]') : null;
     if (k) { var max = Number(k.getAttribute("data-max")) || 0; k.textContent = t.value.length + " / " + max; k.classList.toggle("cerca", max && t.value.length > max * 0.9); }
     pfAvance();
@@ -22713,8 +22722,58 @@ function pintarPerfil(){
   $("pf-ant").addEventListener("click", function(){ pfIr(PF_SEC - 1); });
   $("pf-sig").addEventListener("click", function(){ pfIr(PF_SEC + 1); });
   document.querySelectorAll("[data-pf-sec]").forEach(function(b){ b.addEventListener("click", function(){ pfIr(Number(b.getAttribute("data-pf-sec"))); }); });
+  pfRecuperarBorrador();
   pfAvance();
   pfIr(pfPrimeraPendiente());
+}
+/* ---- El borrador del perfil: en el navegador, por correo de entrada ---- */
+var BORRADOR_OK = false, BORRADOR_T = null;
+function pfClave(){ return "gg-perfil-borrador:" + String(D.email || "").toLowerCase(); }
+function pfDatos(){ var d = {}; D.perfil.campos.forEach(function(c){ d[c.id] = pfValor(c); }); return d; }
+function pfCambios(){
+  var n = 0;
+  D.perfil.campos.forEach(function(c){
+    var a = String(pfValor(c) == null ? "" : pfValor(c)).trim(), b = String(D.perfil.datos[c.id] == null ? "" : D.perfil.datos[c.id]).trim();
+    if (a !== b) n++;
+  });
+  return n;
+}
+function pfLeerBorrador(){ try { var b = JSON.parse(localStorage.getItem(pfClave()) || "null"); return b && b.datos ? b : null; } catch (e) { return null; } }
+function pfBorrarBorrador(){ try { localStorage.removeItem(pfClave()); } catch (e) {} }
+function pfGuardarBorrador(){
+  clearTimeout(BORRADOR_T);
+  pfEstado("guardando");
+  BORRADOR_T = setTimeout(function(){
+    try { localStorage.setItem(pfClave(), JSON.stringify({ t: Date.now(), datos: pfDatos() })); BORRADOR_OK = true; pfEstado("guardado"); }
+    catch (e) { BORRADOR_OK = false; pfEstado("sin"); }
+  }, 600);
+}
+function pfEstado(que){
+  var e = $("pf-estado"); if (!e || !D.perfil) return;
+  var n = pfCambios(), cuantos = n + (n === 1 ? " cambio sin enviar" : " cambios sin enviar");
+  e.className = "pf-estado" + (que === "guardando" || que === "sin" ? " ambar" : n ? " ok" : "");
+  e.textContent = que === "guardando" ? "Guardando el borrador…"
+    : que === "sin" ? (n ? cuantos + ". Este navegador no deja guardar el borrador: envíalos antes de cerrar." : "")
+    : n ? "Borrador guardado en este navegador · " + cuantos : "Todo lo que ves ya lo tiene el equipo.";
+  $("b-perfil").disabled = !n;
+  $("pf-descartar").classList.toggle("oculto", !n);
+}
+function pfRecuperarBorrador(){
+  var bor = pfLeerBorrador();
+  if (bor) {
+    D.perfil.campos.forEach(function(c){
+      if (!(c.id in bor.datos)) return;
+      var v = bor.datos[c.id] == null ? "" : String(bor.datos[c.id]);
+      if (c.tipo === "opcion") document.querySelectorAll('input[name="pf-' + c.id + '"]').forEach(function(r){ r.checked = r.value === v; });
+      else if ($("pf-" + c.id)) $("pf-" + c.id).value = v;
+    });
+    document.querySelectorAll("[data-cuenta]").forEach(function(k){
+      var t = $(k.getAttribute("data-cuenta")); if (t) k.textContent = t.value.length + " / " + k.getAttribute("data-max");
+    });
+    if (pfCambios()) { SUCIO = true; BORRADOR_OK = true; msg("m-perfil", "Recuperamos el borrador que dejaste sin enviar.", "ok"); }
+    else pfBorrarBorrador();
+  }
+  pfEstado("guardado");
 }
 /* Las secciones del perfil, en el orden de los campos, y los ODS al final. */
 var PF_SEC = 0;
@@ -22800,10 +22859,11 @@ function guardarPerfil(){
     b.disabled = false;
     if (r.status === 401) { ver("v-entrar"); return; }
     if (!r.ok) { if (r.d.campos && r.d.campos[0]) pfAlCampo(r.d.campos[0]); msg("m-perfil", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
-    SUCIO = false;
+    SUCIO = false; pfBorrarBorrador();
     D.perfil.datos = r.d.datos; D.perfil.por_revisar = true;
     pintarResumen();
-    msg("m-perfil", "Guardado. El equipo lo revisa antes de publicarlo.", "ok");
+    pfEstado("guardado");
+    msg("m-perfil", "Enviado a revisión. El equipo lo revisa antes de publicarlo.", "ok");
   }).catch(function(){ b.disabled = false; msg("m-perfil", "No pudimos conectar. Tus cambios siguen en pantalla: intenta de nuevo.", "mal"); });
 }
 
@@ -22878,6 +22938,10 @@ $("b-salir").addEventListener("click", function(){
   enviar("/api/portal/salir").then(function(){ D = null; SUCIO = false; ver("v-entrar"); });
 });
 $("b-perfil").addEventListener("click", guardarPerfil);
+$("pf-descartar").addEventListener("click", function(){
+  if (!confirm("¿Descartar los cambios sin enviar? Vuelves a lo que tiene el equipo.")) return;
+  pfBorrarBorrador(); SUCIO = false; BORRADOR_OK = false; msg("m-perfil", ""); pintarPerfil();
+});
 $("p-paso").addEventListener("click", function(){ RECORRIDO = $("p-recorrido").classList.contains("oculto"); verRecorrido(); });
 TABS.forEach(function(t){ $("t-" + t).addEventListener("click", function(){ irA(t); }); });
 document.addEventListener("click", function(ev){
@@ -23193,7 +23257,7 @@ $("in-lista").addEventListener("click", function(ev){
   if (!confirm("¿Retirar «" + x.nombre + "»? Deja de pedirse; lo que ya enviaste queda en el archivo de la alianza.")) return;
   enviar("/api/portal/indicadores", { accion: "retirar", id: x.id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarIndicadores(); });
 });
-window.addEventListener("beforeunload", function(ev){ if (SUCIO) { ev.preventDefault(); ev.returnValue = ""; } });
+window.addEventListener("beforeunload", function(ev){ if (SUCIO && !BORRADOR_OK) { ev.preventDefault(); ev.returnValue = ""; } });
 window.addEventListener("hashchange", function(){
   var h = location.hash.replace("#", "");
   if (D && TABS.indexOf(h) > -1 && h !== TAB) irA(h);
