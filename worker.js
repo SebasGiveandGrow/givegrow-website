@@ -21450,6 +21450,26 @@ async function adminApadrinamiento(env) {
 const unidadCambio = () => json({ error: "cambio_mientras_revisabas",
   ayuda: "La fundación la cambió mientras la revisabas, o ya no está activa. Cierra y vuelve a abrirla para ver la versión actual." }, 409);
 
+/* EL AVISO A LA FUNDACIÓN (29 oct 2026). Hasta hoy, que su unidad o su
+   reporte mensual se aprobara o se devolviera solo lo sabía si entraba al
+   portal: una unidad devuelta podía quedarse semanas sin corregir. Va al
+   correo de la solicitud, con el enlace al portal. No lleva nada que no esté ya
+   en su portal: el nombre de la unidad, el mes y el motivo que escribió el
+   equipo. Si el correo falla, la decisión ya quedó guardada: no se deshace. */
+async function correoFundacionApadrinamiento(env, inscripcion, titulo, parrafos, etiqueta) {
+  try {
+    const i = await env.DB.prepare("SELECT email, nombre FROM inscripciones WHERE id = ?").bind(inscripcion).first();
+    if (!i || !RE_CORREO.test(String(i.email || ""))) return;
+    const enlace = ORIGIN + "/portal#apadrinamiento";
+    await enviarCorreo(env, {
+      para: i.email, asunto: titulo, etiqueta,
+      texto: [titulo, "", ...parrafos, "", "Tu portal: " + enlace].join("\n"),
+      html: plantillaCorreo({ titulo, parrafos, boton: { url: enlace, texto: "Abrir mi portal" },
+        cierre: "Fundación Give&Grow International · NIT 901.948.930-2" })
+    });
+  } catch (e) { console.error("correo a la fundación", etiqueta, inscripcion, e && e.message); }
+}
+
 /* POST /api/admin/unidad/<id> { accion: aprobar | rechazar | pausar } */
 async function adminUnidadDecidir(request, env, id, quien) {
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
@@ -21457,7 +21477,7 @@ async function adminUnidadDecidir(request, env, id, quien) {
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
   if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
   const u = await env.DB.prepare(
-    "SELECT u.id, u.estado, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion WHERE u.id = ?"
+    "SELECT u.id, u.estado, u.nombre_es, u.inscripcion, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion WHERE u.id = ?"
   ).bind(id).first();
   if (!u) return json({ error: "no_encontrado" }, 404);
   let detalle;
@@ -21490,6 +21510,17 @@ async function adminUnidadDecidir(request, env, id, quien) {
   } else return json({ error: "accion_invalida" }, 400);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(quien || "?", "unidad apadrinable " + id + " · " + detalle).run();
+  if (c.accion === "aprobar" && u.estado !== "aprobada") {
+    await correoFundacionApadrinamiento(env, u.inscripcion, "Tu unidad «" + u.nombre_es + "» ya está publicada",
+      ["Verificamos el costo y la unidad «" + u.nombre_es + "» ya aparece en la página de apadrinamiento: " + ORIGIN + "/apadrinamiento.",
+       "Desde ahora, cada mes nos cuentas en tu portal cuántas entregaste, con la evidencia que prometiste mostrar."], "apadrinamiento-unidad");
+  } else if (c.accion === "rechazar" || c.accion === "pausar") {
+    await correoFundacionApadrinamiento(env, u.inscripcion,
+      (c.accion === "rechazar" ? "Tu unidad «" : "Pausamos tu unidad «") + u.nombre_es + (c.accion === "rechazar" ? "» necesita un ajuste" : "»"),
+      [(c.accion === "rechazar" ? "Revisamos la unidad «" + u.nombre_es + "» y necesita un ajuste antes de publicarla." : "La unidad «" + u.nombre_es + "» salió por ahora de la página de apadrinamiento."),
+       "Lo que nos falta: " + limpiar(c.motivo, 500),
+       "Puedes editarla en tu portal; al guardarla vuelve a revisión."], "apadrinamiento-unidad");
+  }
   return json({ ok: true });
 }
 
@@ -21571,7 +21602,9 @@ async function adminReporteUnidad(request, env, id, quien) {
   let c;
   try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
   if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
-  const r = await env.DB.prepare("SELECT id, estado FROM reportes_unidad WHERE id = ?").bind(id).first();
+  const r = await env.DB.prepare(
+    "SELECT r.id, r.estado, r.periodo, u.nombre_es AS unidad, u.inscripcion FROM reportes_unidad r JOIN unidades_apadrinables u ON u.id = r.unidad_id WHERE r.id = ?"
+  ).bind(id).first();
   if (!r) return json({ error: "no_encontrado" }, 404);
   if (r.estado === "aprobado") return json({ error: "ya_aprobado", ayuda: "Ya está aprobado y publicado." }, 409);
   let detalle;
@@ -21595,6 +21628,17 @@ async function adminReporteUnidad(request, env, id, quien) {
   } else return json({ error: "accion_invalida" }, 400);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(quien || "?", "reporte mensual " + id + " · " + detalle).run();
+  const mes = MESES_ES[Number(String(r.periodo).slice(5, 7)) - 1] + " de " + String(r.periodo).slice(0, 4);
+  if (c.accion === "aprobar") {
+    await correoFundacionApadrinamiento(env, r.inscripcion, "Verificamos tu reporte de " + mes,
+      ["Revisamos la evidencia del reporte de «" + r.unidad + "» de " + mes + " y quedó verificado.",
+       "Ya aparece en la página de apadrinamiento como el último reporte verificado de esa unidad."], "apadrinamiento-reporte");
+  } else {
+    await correoFundacionApadrinamiento(env, r.inscripcion, "Tu reporte de " + mes + " necesita un ajuste",
+      ["Revisamos el reporte de «" + r.unidad + "» de " + mes + " y necesita un ajuste.",
+       "Lo que nos falta: " + limpiar(c.motivo, 500),
+       "Puedes corregirlo y reenviarlo desde tu portal."], "apadrinamiento-reporte");
+  }
   return json({ ok: true });
 }
 
