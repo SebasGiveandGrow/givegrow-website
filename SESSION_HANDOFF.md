@@ -23,27 +23,39 @@
 | Metodología MIRA y salvaguarda | `METODOLOGIA_MIRA.md`, `SALVAGUARDA.md` |
 | Incidentes | `ops/runbook-incidentes.md` |
 
-## Estado al 29 oct 2026
+## Estado al 30 oct 2026
 
-- **Producción al día con `main`.** Único PR abierto que no es de esta tanda: #530 (términos de donación), espera revisión legal.
-- **Migraciones aplicadas hasta la 0056.**
-- **En producción del 28 al 29 oct:**
+- **Producción al día con `main`.** Único PR abierto: #530 (términos de donación), espera revisión legal.
+- **Migraciones aplicadas hasta la 0057.**
+- **En producción del 28 al 30 oct:**
   - **Regalos:** imagen propia al compartir y aviso de reasignación (#621–#623); embajadores (#626, 0051).
   - **Quejas:** enlace desde Mira Mi Casa y quejas anotadas a mano en el panel (#624, #625, 0050).
   - **Operación:** respaldo cifrado (`ops/respaldo.mjs`, #627; faltan las llaves de Sebas) y privacidad v1.3, vigente desde el 9 nov (#628).
-  - **Panel:** informe «Por fundación» (#629).
-  - **Portal de fundaciones `/portal`:** entrada con enlace al correo, perfil editable, documentos, diseño con el recorrido de 5 pasos, correos autorizados y la zona Admin › Alianzas › Fundaciones (#630–#632, 0052–0053). Después se le sumaron «lo que han recibido» (#635) y los ODS que declaran (#636, 0056).
-  - **Apadrinamiento por unidad de impacto:** catálogo, portal, panel y `/apadrinamiento` (#633, 0054), y reporte mensual verificable (#634, 0055).
+  - **Portal de fundaciones `/portal`** (#630–#632, #635, #636, #640, #641; 0052, 0053, 0056 y 0057):
+    - entrada con enlace al correo, correos autorizados y sesiones atadas a ellos;
+    - perfil, documentos, lo recibido, los ODS que declaran e indicadores con fuente y corte, que el panel revisa y no publica.
+    - Guía: `ops/portal-fundaciones.md`.
+  - **Apadrinamiento por unidad de impacto** (#633, #634, #638; 0054 y 0055):
+    - catálogo `/apadrinamiento` y reporte mensual verificable;
+    - correo a la fundación al aprobarle o devolverle algo (#638, #644).
+    - Guía: `ops/apadrinamiento-unidades.md`.
+  - **Sitio:** mapa de los ODS de la red en /hub (#639); sale vacío, con un mensaje de espera, hasta que alguna fundación los declare.
+  - **Voluntariado:** registro del Decreto 4290 (#642). A los mayores de edad se les pide documento y escolaridad, y el panel descarga el CSV del mes.
+  - **Panel ordenado por tareas** (#645–#647):
+    - el menú pasó a Atender, Revisar y aprobar, Cuidar el dinero, Acompañar la red y Rendir cuentas. Las direcciones `#vista` no cambiaron;
+    - «Hoy» dice la tarea de cada carta;
+    - la **Bandeja de revisión** (`#revisar`) junta todo lo que espera una decisión y abre los cajones de siempre.
 - **Ancla (manejo especial):**
   - Su ficha está cargada con datos verificados y vinculada a `ancla`, con un correo adicional autorizado.
-  - Le falta llenar la dirección, la frecuencia de sus programas y el costo de su unidad de impacto.
+  - Le falta llenar la dirección, la frecuencia de sus programas, el costo de su unidad de impacto y sus ODS.
   - Las autorizaciones 7.4 y 7.8 las marca solo ella.
 - **Pendiente de Sebas:**
   - Reunión con el contador sobre el cobro del apadrinamiento (fase 2). Las preguntas están fuera del repo.
   - Sí explícito y punto focal para la fase 4 (niño identificado).
+  - Decidir si el documento del voluntario sigue siendo obligatorio (#642).
   - Llaves y token R2 del respaldo; PayPal (textos e IPN); convenios de Conciencia y Ancla.
   - Sueco y alemán: para después, con un revisor nativo.
-- **La lista numerada (1–49) y el plan autónomo de 7 bloques** viven en la memoria de Claude (`givegrow-lista-28oct`, `givegrow-plan-autonomo`).
+- **La lista numerada (1–49)** vive en la memoria de Claude (`givegrow-lista-28oct`).
 - **SEO:** una ruta nueva va en `RUTAS_INDEXABLES` (worker.js), `RUTAS_PATH` (app.js), `run_worker_first` y el sitemap; el check #28 del gate lo exige. Un módulo `js/` nuevo necesita un commit antes de que el sitemap tenga su fecha.
 
 ## Decisiones vigentes (no reabrir sin Sebas)
