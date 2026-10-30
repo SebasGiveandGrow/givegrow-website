@@ -6078,6 +6078,14 @@ async function adminSalud(env, opciones) {
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
+  /* COSTOS DE IMPACTO (0060): lo que una fundación propuso para la calculadora. */
+  try {
+    await enCola("unidades_impacto_por_revisar",
+      "SELECT COUNT(*) AS n, MIN(actualizada) AS masViejo FROM unidades_impacto WHERE estado = 'propuesta'",
+      "Revisar y aprobar › Bandeja de revisión · una fundación propuso un costo por unidad de impacto: verifícalo contra su soporte", 35, "#sec-revisar", 14);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
   await enCola("dirigidos_por_entregar",
     "SELECT COUNT(*) AS n, MIN(COALESCE(a.aprobada_en, a.creada_en)) AS masViejo FROM aportes a " +
     "WHERE a.destino_id IS NOT NULL AND a.estado IN ('aprobada','en_distribucion')",
@@ -21617,10 +21625,14 @@ async function adminRevisar(env) {
     "SELECT inscripcion, actualizado AS f, 1 AS p, 0 AS d FROM perfil_fundacion WHERE revisado_en IS NULL UNION ALL " +
     "SELECT inscripcion, subido, 0, 1 FROM documentos_fundacion WHERE revisado_en IS NULL AND retirado_en IS NULL" +
     ") x JOIN inscripciones i ON i.id = x.inscripcion GROUP BY i.id");
+  await leer("unidades_impacto", "costo",
+    "SELECT u.id, u.nombre_es AS titulo, u.costo_cop AS costo, i.nombre AS quien, u.actualizada AS t FROM unidades_impacto u " +
+    "JOIN inscripciones i ON i.id = u.inscripcion WHERE u.estado = 'propuesta'");
   await leer("entregas", "acta",
     "SELECT numero AS id, 'Acta ' || numero || ' · ' || sector AS titulo, 'Actas de entrega' AS quien, creada_en AS t " +
     "FROM entregas WHERE publicada_en IS NULL AND anulada_en IS NULL");
   for (const x of items) {
+    if (x.tipo === "costo") { x.titulo += ": $" + Number(x.costo || 0).toLocaleString("es-CO"); delete x.costo; continue; }
     if (x.tipo !== "portal") continue;
     x.titulo = [x.perfiles ? "Perfil editado" : "", x.docs ? x.docs + (x.docs === 1 ? " documento subido" : " documentos subidos") : ""]
       .filter(Boolean).join(" y ");
@@ -22207,6 +22219,147 @@ async function adminIntercambioNota(request, env, id, quien) {
   if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(quien || "?", "dar y recibir " + id + (nota ? " · nota del equipo" : " · visto")).run();
+  return json({ ok: true });
+}
+
+/* ============================================================================
+   LOS COSTOS POR UNIDAD DE IMPACTO (ítem 38 · 0060, 30 oct 2026)
+   ============================================================================
+   La fundación propone en su portal cuánto cuesta una unidad de lo que hace
+   («plato de comida: $4.000»), con el soporte. El equipo la verifica en la
+   Bandeja de revisión, escribe el inglés, y el panel arma el bloque
+   `impactUnits` para pegar en data/partners.json, que sigue siendo LA FUENTE
+   de la calculadora pública. Nada de esta tabla llega solo al sitio. */
+const UIMP_TOPE = 12;
+const UIMP_ESTADO_ES = { propuesta: "Por revisar", aprobada: "Verificada", devuelta: "Devuelta", retirada: "Retirada" };
+
+function slugImpacto(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+}
+
+function unidadImpactoValida(c) {
+  const malo = (campo, ayuda) => ({ ok: false, error: "dato_invalido", campo, ayuda });
+  const t = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+  const u = {
+    proyecto: t(c.proyecto, 120) || null,
+    nombre_es: t(c.nombre_es, 80), nombre_es_pl: t(c.nombre_es_pl, 90),
+    costo_cop: numeroCO(c.costo_cop),
+    incluye: String(c.incluye == null ? "" : c.incluye).replace(/\r\n?/g, "\n").trim().slice(0, 400) || null,
+    soporte_doc: Number(c.soporte_doc) || null
+  };
+  if (u.nombre_es.length < 3) return malo("nombre_es", "Escribe la unidad en singular: «plato de comida», «mes de clases de baile».");
+  if (u.nombre_es_pl.length < 3) return malo("nombre_es_pl", "Escribe la unidad en plural: «platos de comida».");
+  if (!u.costo_cop || !Number.isInteger(u.costo_cop) || u.costo_cop < 100 || u.costo_cop > 100000000) {
+    return malo("costo_cop", "Escribe el costo de UNA unidad en pesos, solo la cifra: 4000.");
+  }
+  if (!u.soporte_doc) return malo("soporte_doc", "Elige el soporte del costo. Súbelo primero en «Documentos».");
+  return { ok: true, u };
+}
+
+/* GET y POST /api/portal/unidades-impacto */
+async function apiPortalUnidadesImpacto(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "unidades_impacto"))) return json({ error: "no_disponible" }, 503);
+  if (request.method === "GET") {
+    const filas = (await env.DB.prepare(
+      "SELECT id, proyecto, nombre_es, nombre_es_pl, costo_cop, incluye, soporte_doc, estado, motivo, actualizada FROM unidades_impacto " +
+      "WHERE inscripcion = ? AND estado <> 'retirada' ORDER BY creada"
+    ).bind(s.inscripcion).all()).results || [];
+    return json({ ok: true, tope: UIMP_TOPE,
+      unidades: filas.map((u) => Object.assign(u, { estado_es: UIMP_ESTADO_ES[u.estado], actualizada: fechaCO(u.actualizada) })) });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (c.accion === "retirar") {
+    const r = await env.DB.prepare(
+      "UPDATE unidades_impacto SET estado = 'retirada', actualizada = datetime('now') WHERE id = ? AND inscripcion = ? AND estado <> 'retirada'"
+    ).bind(Number(c.id) || 0, s.inscripcion).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+    return json({ ok: true });
+  }
+  if (c.accion !== "guardar") return json({ error: "accion_invalida" }, 400);
+  const v = unidadImpactoValida(c);
+  if (!v.ok) return json(v, 400);
+  const u = v.u;
+  const d = await env.DB.prepare("SELECT id FROM documentos_fundacion WHERE id = ? AND inscripcion = ? AND retirado_en IS NULL").bind(u.soporte_doc, s.inscripcion).first();
+  if (!d) return json({ error: "dato_invalido", campo: "soporte_doc", ayuda: "Ese soporte no está entre tus documentos." }, 400);
+  if (c.id) {
+    /* Editar vuelve a «por revisar», también una verificada: el costo pudo cambiar. */
+    const r = await env.DB.prepare(
+      "UPDATE unidades_impacto SET proyecto = ?, nombre_es = ?, nombre_es_pl = ?, costo_cop = ?, incluye = ?, soporte_doc = ?, " +
+      "estado = 'propuesta', motivo = NULL, actualizada = datetime('now') WHERE id = ? AND inscripcion = ? AND estado <> 'retirada'"
+    ).bind(u.proyecto, u.nombre_es, u.nombre_es_pl, u.costo_cop, u.incluye, u.soporte_doc, Number(c.id) || 0, s.inscripcion).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
+    return json({ ok: true, id: Number(c.id) });
+  }
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM unidades_impacto WHERE inscripcion = ? AND estado <> 'retirada'").bind(s.inscripcion).first();
+  if (n && n.n >= UIMP_TOPE) return json({ error: "tope_alcanzado", ayuda: "Ya tienen " + UIMP_TOPE + " unidades. Retiren alguna antes de proponer otra." }, 409);
+  const fila = await env.DB.prepare(
+    "INSERT INTO unidades_impacto (inscripcion, proyecto, nombre_es, nombre_es_pl, costo_cop, incluye, soporte_doc) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(s.inscripcion, u.proyecto, u.nombre_es, u.nombre_es_pl, u.costo_cop, u.incluye, u.soporte_doc).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* GET /api/admin/unidades-impacto — todas, con el bloque para partners.json
+   de cada fundación que tenga vínculo con la red y unidades verificadas. */
+async function adminUnidadesImpacto(env) {
+  if (!(await existeTabla(env, "unidades_impacto"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0060 en la base." }, 409);
+  const filas = (await env.DB.prepare(
+    "SELECT u.*, i.nombre AS fundacion, i.red_id, d.tipo AS soporte_tipo, d.nota AS soporte_nota FROM unidades_impacto u " +
+    "JOIN inscripciones i ON i.id = u.inscripcion LEFT JOIN documentos_fundacion d ON d.id = u.soporte_doc " +
+    "WHERE u.estado <> 'retirada' ORDER BY i.nombre, CASE u.estado WHEN 'propuesta' THEN 0 WHEN 'aprobada' THEN 1 ELSE 2 END, u.creada"
+  ).all()).results || [];
+  /* El bloque `impactUnits`, con la misma forma que ya usa partners.json. */
+  const bloques = {};
+  for (const u of filas) {
+    if (u.estado !== "aprobada" || !u.red_id) continue;
+    const k = String(u.red_id);
+    (bloques[k] = bloques[k] || { red_id: k, fundacion: u.fundacion, unidades: [] }).unidades.push({
+      id: k + "-" + slugImpacto(u.nombre_es), cop: u.costo_cop, project: u.proyecto || "",
+      es: u.nombre_es, esPl: u.nombre_es_pl, en: u.nombre_en || "", enPl: u.nombre_en_pl || ""
+    });
+  }
+  return json({ ok: true, estados: UIMP_ESTADO_ES,
+    unidades: filas.map((u) => Object.assign(u, { ver: u.actualizada, actualizada: selloCO(u.actualizada).slice(0, 16) })),
+    bloques: Object.values(bloques).map((b) => Object.assign(b, { json: '"impactUnits": ' + JSON.stringify(b.unidades, null, 2) })) });
+}
+
+/* POST /api/admin/unidad-impacto/<id> { accion: aprobar | devolver, ver } */
+async function adminUnidadImpactoDecidir(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  const u = await env.DB.prepare("SELECT id, estado FROM unidades_impacto WHERE id = ?").bind(id).first();
+  if (!u) return json({ error: "no_encontrado" }, 404);
+  const cambio = () => json({ error: "cambio_mientras_revisabas", ayuda: "La fundación la cambió mientras la revisabas, o ya no está activa. Cierra y vuelve a abrirla." }, 409);
+  let r, detalle;
+  if (c.accion === "aprobar") {
+    if (c.costo_verificado !== true) return json({ error: "costo_sin_verificar", campo: "verificado", ayuda: "Marca que verificaste el costo contra su soporte." }, 400);
+    const en = limpiar(c.nombre_en, 80), enPl = limpiar(c.nombre_en_pl, 90);
+    if (en.length < 3 || enPl.length < 3) return json({ error: "dato_invalido", campo: "nombre_en", ayuda: "Falta el inglés, en singular y en plural: la calculadora es bilingüe." }, 400);
+    r = await env.DB.prepare(
+      "UPDATE unidades_impacto SET estado = 'aprobada', nombre_en = ?, nombre_en_pl = ?, motivo = NULL, revisado_en = datetime('now'), revisado_por = ?, " +
+      "actualizada = datetime('now') WHERE id = ? AND actualizada = ? AND estado <> 'retirada'"
+    ).bind(en, enPl, quien || null, id, String(c.ver || "")).run();
+    detalle = "verificada";
+  } else if (c.accion === "devolver") {
+    const motivo = limpiar(c.motivo, 500);
+    if (motivo.length < 3) return json({ error: "motivo_requerido", campo: "motivo", ayuda: "Di qué falta: la fundación lo ve en su portal." }, 400);
+    r = await env.DB.prepare(
+      "UPDATE unidades_impacto SET estado = 'devuelta', motivo = ?, revisado_en = datetime('now'), revisado_por = ?, actualizada = datetime('now') " +
+      "WHERE id = ? AND actualizada = ? AND estado <> 'retirada'"
+    ).bind(motivo, quien || null, id, String(c.ver || "")).run();
+    detalle = "devuelta";
+  } else return json({ error: "accion_invalida" }, 400);
+  if (!r.meta || !r.meta.changes) return cambio();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "unidad de impacto " + id + " · " + detalle).run();
   return json({ ok: true });
 }
 
@@ -22979,12 +23132,15 @@ function pintarPerfil(){
   });
   h += "</form>";
   h += '<div class="tarjeta pf-bloque" data-pf-bloque="' + (S.length - 1) + '" id="p-ods"></div>';
+  var iU = S.indexOf("Unidad de impacto y costos");
+  if (iU > -1) h += '<div class="tarjeta pf-bloque mt" data-pf-bloque="' + iU + '" id="ui-caja"></div>';
   h += '<div class="pf-nav"><button type="button" class="btn sec" id="pf-ant">← Anterior</button><button type="button" class="btn" id="pf-sig"></button></div>' +
     '<p class="sub mt">Las autorizaciones —nombre, logo, fotos y menores— quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p></div>' +
     '<aside class="pf-vista" aria-label="Vista previa de su ficha"><p class="ey">Así los vería la gente</p><div id="pf-vista"></div>' +
     '<p class="sub">Solo entra lo que puede publicarse, y siempre después de que el equipo lo revise. La sede y los costos nunca salen en la ficha.</p></aside></div>';
   caja.innerHTML = h;
   pintarOdsPerfil();
+  cargarCostos();
   SUCIO = false; msg("m-perfil", "");
   $("f-perfil").addEventListener("input", function(ev){
     SUCIO = true; msg("m-perfil", "");
@@ -23628,6 +23784,74 @@ $("s-dar").addEventListener("click", function(ev){
   var acc = b.hasAttribute("data-dr-resolver") ? "resolver" : "retirar";
   if (acc === "retirar" && !confirm("¿Retirar «" + (x ? x.titulo : "") + "»?")) return;
   enviar("/api/portal/intercambios", { accion: acc, id: id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarDar(); });
+});
+/* ---- Costos por unidad de impacto (0060): van a la calculadora del sitio,
+   después de que el equipo los verifique. Viven en Perfil › Unidad de impacto. ---- */
+var UIMPS = null;
+function cargarCostos(){
+  if (!$("ui-caja")) return;
+  fetch("/api/portal/unidades-impacto", { credentials: "same-origin" }).then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){ UIMPS = d ? (d.unidades || []) : []; pintarCostos(); }).catch(function(){});
+}
+function pintarCostos(){
+  var caja = $("ui-caja"); if (!caja) return;
+  var L = UIMPS || [];
+  var docs = (D.documentos || []).map(function(d){
+    return '<option value="' + d.id + '">' + esc(d.tipo_es) + (d.nota ? " · " + esc(d.nota) : "") + " (" + esc(d.subido) + ")</option>";
+  }).join("");
+  caja.innerHTML = "<h2>Más unidades para la calculadora</h2>" +
+    '<p class="sub">La calculadora del sitio le dice a quien dona en qué se convierte su aporte: «$100.000 son 25 platos de comida». Aquí proponen cuánto cuesta una unidad de lo que hacen, con su soporte. El equipo la verifica y, verificada, la suma a la calculadora.</p>' +
+    (L.length ? '<ul class="docs mt">' + L.map(function(u){
+      var pill = u.estado === "aprobada" ? "pill ok" : u.estado === "devuelta" ? "pill ambar" : "pill";
+      return '<li><div><span class="nom">' + esc(u.nombre_es) + " · " + pesos(u.costo_cop) + '</span><span class="det">' + esc(u.nombre_es_pl) + (u.proyecto ? " · " + esc(u.proyecto) : "") + "</span>" +
+        (u.motivo ? '<span class="det">Nota del equipo: ' + esc(u.motivo) + "</span>" : "") + "</div>" +
+        '<div class="der"><span class="' + pill + '">' + esc(u.estado_es) + '</span><button type="button" class="btn sec mini" data-uip-editar="' + u.id + '">Editar</button>' +
+        '<button type="button" class="btn sec mini" data-uip-retirar="' + u.id + '">Retirar</button></div></li>';
+    }).join("") + "</ul>" : '<p class="sub mt">Todavía no han propuesto ninguna.</p>') +
+    '<div class="mt" id="uip-form"><h3 id="uip-titulo">Proponer una unidad</h3><input type="hidden" id="uip-id">' +
+    '<label for="uip-es">La unidad, en singular *</label><span class="ayuda">Como se lee después de un número: «plato de comida», «mes de clases de baile».</span><input type="text" id="uip-es" maxlength="80">' +
+    '<label for="uip-espl">En plural *</label><span class="ayuda">«platos de comida», «meses de clases de baile».</span><input type="text" id="uip-espl" maxlength="90">' +
+    '<label for="uip-cop">Costo de UNA unidad, en pesos *</label><span class="ayuda">El costo real y completo. Por ejemplo: 4000.</span><input type="text" id="uip-cop" inputmode="numeric">' +
+    '<label for="uip-proy">Programa al que pertenece</label><input type="text" id="uip-proy" maxlength="120">' +
+    '<label for="uip-inc">Qué incluye ese costo</label><textarea id="uip-inc" rows="2" maxlength="400"></textarea>' +
+    '<label for="uip-sop">Soporte del costo *</label><span class="ayuda">Súbanlo primero en «Documentos», como «Otro documento» con una nota, y elíjanlo aquí.</span>' +
+    '<select id="uip-sop"><option value="">Elige el documento…</option>' + docs + "</select>" +
+    '<div class="acciones"><button type="button" class="btn" id="b-uip">Proponer</button><button type="button" class="btn sec oculto" id="b-uip-cancelar">Cancelar la edición</button></div>' +
+    '<span class="msg" id="m-uip" role="status" aria-live="polite"></span></div>';
+}
+function formCosto(u){
+  $("uip-id").value = u ? u.id : ""; $("uip-es").value = u ? u.nombre_es : ""; $("uip-espl").value = u ? u.nombre_es_pl : "";
+  $("uip-cop").value = u ? u.costo_cop : ""; $("uip-proy").value = u ? (u.proyecto || "") : ""; $("uip-inc").value = u ? (u.incluye || "") : "";
+  $("uip-sop").value = u && u.soporte_doc ? String(u.soporte_doc) : "";
+  $("uip-titulo").textContent = u ? "Editar «" + u.nombre_es + "»" : "Proponer una unidad";
+  $("b-uip").textContent = u ? "Guardar y enviar a revisión" : "Proponer";
+  $("b-uip-cancelar").classList.toggle("oculto", !u);
+  msg("m-uip", u && u.estado === "aprobada" ? "Al guardar vuelve a revisión: el equipo verifica el costo nuevo antes de cambiarlo en la calculadora." : "");
+}
+document.addEventListener("click", function(ev){
+  var t = ev.target;
+  if (!t || !t.closest || !t.closest("#ui-caja")) return;
+  if (t.id === "b-uip-cancelar") { formCosto(null); return; }
+  if (t.id === "b-uip") {
+    var c = { accion: "guardar", id: $("uip-id").value || null, nombre_es: $("uip-es").value, nombre_es_pl: $("uip-espl").value, costo_cop: $("uip-cop").value,
+      proyecto: $("uip-proy").value, incluye: $("uip-inc").value, soporte_doc: $("uip-sop").value || null };
+    t.disabled = true; msg("m-uip", "Guardando…");
+    enviar("/api/portal/unidades-impacto", c).then(function(r){
+      t.disabled = false;
+      if (r.status === 401) { ver("v-entrar"); return; }
+      if (!r.ok) { msg("m-uip", r.d.ayuda || "No se pudo guardar.", "mal"); return; }
+      cargarCostos();
+      setTimeout(function(){ msg("m-uip", "Listo: quedó por revisar. El equipo verifica el costo con su soporte.", "ok"); }, 300);
+    }).catch(function(){ t.disabled = false; msg("m-uip", "No pudimos conectar. Lo que escribiste sigue en pantalla.", "mal"); });
+    return;
+  }
+  var b = t.closest("[data-uip-editar],[data-uip-retirar]");
+  if (!b) return;
+  var id = Number(b.getAttribute("data-uip-editar") || b.getAttribute("data-uip-retirar"));
+  var u = (UIMPS || []).filter(function(x){ return x.id === id; })[0];
+  if (b.hasAttribute("data-uip-editar")) { formCosto(u); $("uip-form").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  if (!confirm("¿Retirar «" + (u ? u.nombre_es : "") + "»? Si estaba en la calculadora, el equipo la quita en la próxima actualización.")) return;
+  enviar("/api/portal/unidades-impacto", { accion: "retirar", id: id }).then(function(r){ if (r.status === 401) { ver("v-entrar"); return; } cargarCostos(); });
 });
 window.addEventListener("beforeunload", function(ev){ if (SUCIO && !BORRADOR_OK) { ev.preventDefault(); ev.returnValue = ""; } });
 window.addEventListener("hashchange", function(){
@@ -34552,6 +34776,7 @@ textarea { font-size: 16px }
   <p class="pn-gt">Acompañar la red</p>
   <a class="pn-it" href="#alianzas/fundaciones" data-pn-ir="alianzas/fundaciones">Fundaciones</a>
   <a class="pn-it" href="#alianzas/dar" data-pn-ir="alianzas/dar">Dar y recibir<span class="pn-n" data-pn-n="alianzas/dar"></span></a>
+  <a class="pn-it" href="#alianzas/costos" data-pn-ir="alianzas/costos">Costos de impacto</a>
   <a class="pn-it" href="#personas/contactos" data-pn-ir="personas/contactos">Contactos<span class="pn-n" data-pn-n="personas/contactos"></span></a>
   <a class="pn-it" href="#personas/voluntariado" data-pn-ir="personas/voluntariado">Voluntariado<span class="pn-n" data-pn-n="personas/voluntariado"></span></a>
   <a class="pn-it" href="#personas/ingenieros" data-pn-ir="personas/ingenieros">Ingenieros<span class="pn-n" data-pn-n="personas/ingenieros"></span></a>
@@ -34817,6 +35042,15 @@ textarea { font-size: 16px }
 </section>
 
 <!-- DAR Y RECIBIR (0059): lo que las fundaciones ofrecen y necesitan, para cruzarlo. -->
+<!-- COSTOS DE IMPACTO (0060): verificar lo que proponen y copiar a partners.json. -->
+<section class="pn-vista" data-vista="alianzas/costos" id="sec-costos" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>Cada fundación propone en su portal cuánto cuesta una unidad de lo que hace —un plato de comida, un mes de clases—, con el soporte. Se verifica en la <strong>Bandeja de revisión</strong>: el costo contra el soporte, y el inglés, porque la calculadora es bilingüe.</p>
+<p>La calculadora pública <strong>solo lee data/partners.json</strong>. Abajo está el bloque «impactUnits» de cada fundación con unidades verificadas: se copia, se pega en su objeto de partners.json y entra con un PR. Ninguna cifra llega al sitio sin ese paso.</p>
+</div></details>
+<div id="tb-costos" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
 <section class="pn-vista" data-vista="alianzas/dar" id="sec-dar" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p>Cada fundación publica en su portal (pestaña <strong>Dar y recibir</strong>) lo que puede ofrecer a otras —en especie, voluntariado, conocimiento o espacios— y lo que necesita. Aquí se ve todo junto para <strong>cruzarlo</strong>: una fundación con otra, o con una empresa de Impact Journey o un ofrecimiento en especie.</p>
@@ -36314,7 +36548,8 @@ var COLA_ES = {
   reportes_unidad_por_revisar: "Reportes mensuales de apadrinamiento por revisar",
   unidades_sin_reporte: "Unidades sin el reporte del mes pasado",
   mediciones_fundacion_por_revisar: "Mediciones de las fundaciones por revisar",
-  intercambios_nuevos: "Dar y recibir: lo nuevo de las fundaciones"
+  intercambios_nuevos: "Dar y recibir: lo nuevo de las fundaciones",
+  unidades_impacto_por_revisar: "Costos de impacto por verificar"
 };
 
 function pasoEmbudo(etiqueta, n, nota){
@@ -36403,6 +36638,8 @@ var VISTAS = {
     linea: "Lo que entró por el botón de donaciones y los avisos de PayPal que no encontraron su registro." },
   "alianzas/red": { area: "Atender", titulo: "Solicitudes a la red",
     linea: "Fundaciones, empresas, voluntarios y padrinos que quieren entrar a la red." },
+  "alianzas/costos": { area: "Acompañar la red", titulo: "Costos de impacto",
+    linea: "Lo que cuesta una unidad de lo que hace cada fundación, verificado, y el bloque para la calculadora." },
   "alianzas/dar": { area: "Acompañar la red", titulo: "Dar y recibir",
     linea: "Lo que cada fundación ofrece y necesita, para cruzarla con otra o con una empresa. No se publica." },
   "alianzas/fundaciones": { area: "Acompañar la red", titulo: "Fundaciones",
@@ -36626,7 +36863,8 @@ var COLA_MOD = {
   reportes_unidad_por_revisar: "revisar",
   unidades_sin_reporte: "alianzas/apadrinamiento",
   mediciones_fundacion_por_revisar: "revisar",
-  intercambios_nuevos: "alianzas/dar"
+  intercambios_nuevos: "alianzas/dar",
+  unidades_impacto_por_revisar: "revisar"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
    vieja a la más nueva; las matrículas, solo las que faltan por verificar. */
@@ -36635,7 +36873,7 @@ var COLA_FILTRO = { fundaciones_sin_respuesta: "respuesta", empresas_sin_respues
   correos_fallidos: "por_atender", correos_sin_cupo: "por_atender", correos_sin_buzon: "sin_destino", seguimientos_pendientes: "vencidos" ,
   tareas_pendientes: "vencidas", documentos_vencidos: "atencion", documentos_por_vencer: "atencion",
   meal_indicadores_pendientes: "pendientes", portal_por_revisar: "portal", unidades_por_revisar: "unidad",
-  reportes_unidad_por_revisar: "reporte", mediciones_fundacion_por_revisar: "medicion" };
+  reportes_unidad_por_revisar: "reporte", mediciones_fundacion_por_revisar: "medicion", unidades_impacto_por_revisar: "costo" };
 var DESTINO_ES = { "/triaje": "Abrir el triaje", "/admin/ruta": "Abrir la ruta de visitas", "/firma": "Abrir la firma" };
 
 /* LAS INSIGNIAS salen de la MISMA lista que pinta «Hoy»: si un día cambia la
@@ -44630,8 +44868,8 @@ document.addEventListener("change", function(e){
    cajón de su sección, con su casilla y su versión. */
 var REV = null, REV_FILTRO = "todo";
 var REV_TIPOS = [["todo", "Todo"], ["reporte", "Reportes"], ["unidad", "Unidades"], ["medicion", "Mediciones"],
-  ["portal", "Perfiles y documentos"], ["acta", "Actas en borrador"]];
-var REV_TIPO_ES = { reporte: "Reporte mensual", unidad: "Unidad", medicion: "Medición", portal: "Portal", acta: "Acta" };
+  ["portal", "Perfiles y documentos"], ["costo", "Costos de impacto"], ["acta", "Actas en borrador"]];
+var REV_TIPO_ES = { reporte: "Reporte mensual", unidad: "Unidad", medicion: "Medición", portal: "Portal", costo: "Costo de impacto", acta: "Acta" };
 function cargarRevisar(){
   return pedirJSON("/api/admin/revisar", "tb-revisar").then(function(d){ REV = d; pintarRevisar(); });
 }
@@ -44679,6 +44917,7 @@ document.addEventListener("click", function(e){
   else if (tipo === "reporte") cargarApadrinamiento().then(function(){ abrirReporteUnidad(id); });
   else if (tipo === "medicion") cargarIndicadoresRed().then(function(){ abrirMedicionFundacion(id); });
   else if (tipo === "portal") abrirPortal(id);
+  else if (tipo === "costo") cargarUnidadesImpacto().then(function(){ abrirUnidadImpacto(id); });
   else if (tipo === "acta") location.hash = "entregas";
 });
 
@@ -44747,6 +44986,85 @@ document.addEventListener("click", function(e){
   if (f){ DR_TIPO = f.getAttribute("data-dr-tipo"); pintarIntercambios(); return; }
   var b = e.target.closest("[data-dr-abrir]");
   if (b) abrirIntercambio(b.getAttribute("data-dr-abrir"));
+});
+
+/* ---------------- COSTOS POR UNIDAD DE IMPACTO (0060) ----------------
+   Verificar lo que proponen las fundaciones y copiar el bloque «impactUnits»
+   a data/partners.json. La calculadora pública solo lee ese archivo. */
+var UI = null;
+function cargarUnidadesImpacto(){
+  return pedirJSON("/api/admin/unidades-impacto", "tb-costos").then(function(d){ UI = d; pintarUnidadesImpacto(); });
+}
+function pintarUnidadesImpacto(){
+  var caja = document.getElementById("tb-costos"); if (!caja || !UI) return;
+  var L = UI.unidades || [], B = UI.bloques || [];
+  var h = L.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Unidad</th><th scope="col">Fundación</th><th scope="col">Costo</th>' +
+    '<th scope="col">Estado</th><th scope="col"></th></tr></thead><tbody>' +
+    L.map(function(u){
+      return "<tr><td><strong>" + esc(u.nombre_es) + "</strong><br><small>" + esc(u.nombre_es_pl) + (u.proyecto ? " · " + esc(u.proyecto) : "") + "</small></td>" +
+        "<td>" + esc(u.fundacion) + (u.red_id ? "" : '<br><small class="mu">sin vínculo con partners.json</small>') + "</td>" +
+        "<td>" + dinero(u.costo_cop * 100, "COP") + "</td>" +
+        "<td>" + esc((UI.estados || {})[u.estado] || u.estado) + (u.motivo ? "<br><small>" + esc(u.motivo) + "</small>" : "") + "</td>" +
+        '<td><button type="button" class="copy" data-ui-abrir="' + u.id + '">Abrir</button></td></tr>';
+    }).join("") + "</tbody></table></div>"
+    : '<p class="mu">Ninguna fundación ha propuesto costos todavía. Lo hacen en su portal, en Perfil › Unidad de impacto y costos.</p>';
+  h += '<p class="pn-h3">Para pegar en data/partners.json</p>' +
+    '<p class="mu">Solo las unidades verificadas de fundaciones con vínculo con la red. Reemplaza el campo «impactUnits» de esa fundación y sube el cambio con un PR: así llega a la calculadora.</p>';
+  h += B.length ? B.map(function(b, i){
+    return '<div class="ui-bloque"><p><strong>' + esc(b.fundacion) + "</strong> <small>(" + esc(b.red_id) + ")</small> · " + b.unidades.length +
+      (b.unidades.length === 1 ? " unidad" : " unidades") + ' <button type="button" class="pn-b2" data-ui-copiar="' + i + '">Copiar el bloque</button></p>' +
+      '<textarea readonly rows="8" id="ui-json-' + i + '" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12.5px">' + esc(b.json) + "</textarea></div>";
+  }).join("") : '<p class="mu">Todavía no hay unidades verificadas.</p>';
+  caja.innerHTML = h;
+}
+function abrirUnidadImpacto(id){
+  var u = ((UI && UI.unidades) || []).filter(function(x){ return String(x.id) === String(id); })[0];
+  if (!u) return;
+  var h = ficha([
+    ["Fundación", esc(u.fundacion) + (u.red_id ? "<small>en la red: " + esc(u.red_id) + "</small>" : "<small>sin vínculo con partners.json: se verifica, pero no entra al bloque hasta vincularla</small>")],
+    ["Unidad", esc(u.nombre_es) + "<small>plural: " + esc(u.nombre_es_pl) + "</small>"],
+    ["Programa", u.proyecto ? esc(u.proyecto) : '<span class="mu">—</span>'],
+    ["Costo de una unidad", dinero(u.costo_cop * 100, "COP")],
+    ["Qué incluye", u.incluye ? '<div class="qj-msg">' + esc(u.incluye) + "</div>" : '<span class="mu">No lo dijo</span>'],
+    ["Soporte del costo", u.soporte_doc ? '<a href="/api/admin/portal-doc/' + u.soporte_doc + '">' + esc(u.soporte_tipo || "documento") + (u.soporte_nota ? " · " + esc(u.soporte_nota) : "") + "</a>" : '<span class="mu">Sin soporte</span>'],
+    ["Estado", esc((UI.estados || {})[u.estado] || u.estado) + (u.revisado_por ? "<small>" + esc(u.revisado_por) + "</small>" : "")]
+  ]);
+  h += pnCampo("ui-en", "En inglés, singular (la calculadora es bilingüe)", u.nombre_en || "", { extra: ' maxlength="80"' }) +
+    pnCampo("ui-enpl", "En inglés, plural", u.nombre_en_pl || "", { extra: ' maxlength="90"' }) +
+    '<label class="pn-campo" id="ui-ver-c"><span><input type="checkbox" id="ui-ver"> Verifiqué el costo contra su soporte</span><small id="ui-ver-e" class="pn-err"></small></label>' +
+    pnCampo("ui-mot", "Motivo para devolverla (la fundación lo ve)", "", { area: true, filas: 2 }) + '<p class="pn-error" id="pn-err"></p>';
+  var pie = '<button type="button" class="pn-b1" data-ui-decidir="aprobar">' + (u.estado === "aprobada" ? "Guardar y mantener verificada" : "Marcar verificada") + "</button>" +
+    '<button type="button" class="pn-b2" data-ui-decidir="devolver">Devolver</button><button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  cajonAbrir({ ey: "Costo de impacto", titulo: u.nombre_es, cuerpo: h, pie: pie, ancho: true });
+  document.querySelectorAll("[data-ui-decidir]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var acc = b.getAttribute("data-ui-decidir");
+      ["ui-en", "ui-ver", "ui-mot"].forEach(function(k){ pnMarcar(k, ""); });
+      var c = { accion: acc, ver: u.ver, costo_verificado: document.getElementById("ui-ver").checked, nombre_en: pnValor("ui-en"), nombre_en_pl: pnValor("ui-enpl"), motivo: pnValor("ui-mot") };
+      if (acc === "aprobar" && !c.costo_verificado){ pnMarcar("ui-ver", "Verifica el costo antes."); return; }
+      if (acc === "aprobar" && (c.nombre_en.length < 3 || c.nombre_en_pl.length < 3)){ pnMarcar("ui-en", "Falta el inglés, en singular y en plural."); return; }
+      if (acc === "devolver" && c.motivo.length < 3){ pnMarcar("ui-mot", "Di qué falta: la fundación lo ve."); return; }
+      b.disabled = true;
+      postPanel("/api/admin/unidad-impacto/" + u.id, c).then(function(r){
+        b.disabled = false; if (!r) return;
+        avisar(acc === "aprobar" ? "Verificada. Su bloque para partners.json está en Acompañar la red › Costos de impacto." : "Devuelta a la fundación.");
+        cajonCerrar(); cargarUnidadesImpacto(); cargarSalud();
+      });
+    });
+  });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  var a = e.target.closest("[data-ui-abrir]");
+  if (a) { abrirUnidadImpacto(a.getAttribute("data-ui-abrir")); return; }
+  var c = e.target.closest("[data-ui-copiar]");
+  if (!c) return;
+  var t = document.getElementById("ui-json-" + c.getAttribute("data-ui-copiar"));
+  if (!t) return;
+  t.select();
+  var listo = function(){ avisar("Bloque copiado. Pégalo en data/partners.json, en el «impactUnits» de esa fundación."); };
+  if (navigator.clipboard) navigator.clipboard.writeText(t.value).then(listo, function(){ document.execCommand("copy"); listo(); });
+  else { document.execCommand("copy"); listo(); }
 });
 
 function abrirPortal(id){
@@ -44906,6 +45224,7 @@ var BANDEJAS = {
   "tb-revisar": cargarRevisar,
   "tb-indred": cargarIndicadoresRed,
   "tb-dar": cargarIntercambios,
+  "tb-costos": cargarUnidadesImpacto,
   "tb-pagos": cargarSueltos,
   "tb-suscripciones": cargarSuscripciones,
   "tb-miembros": cargarMiembros,
@@ -49010,6 +49329,9 @@ export default {
         if (ruta === "/api/admin/revisar")      return await adminRevisar(env);
         if (ruta === "/api/admin/indicadores-red") return await adminIndicadoresRed(env);
         if (ruta === "/api/admin/intercambios") return await adminIntercambios(env);
+        if (ruta === "/api/admin/unidades-impacto") return await adminUnidadesImpacto(env);
+        const aui = ruta.match(/^\/api\/admin\/unidad-impacto\/(\d{1,9})$/);
+        if (aui)                                return await adminUnidadImpactoDecidir(request, env, Number(aui[1]), sesion.email);
         const aix = ruta.match(/^\/api\/admin\/intercambio\/(\d{1,9})$/);
         if (aix)                                return await adminIntercambioNota(request, env, Number(aix[1]), sesion.email);
         const amf = ruta.match(/^\/api\/admin\/medicion-fundacion\/(\d{1,9})$/);
@@ -49238,6 +49560,7 @@ export default {
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
         if (ruta === "/api/portal/indicadores") return await apiPortalIndicadores(request, env);
         if (ruta === "/api/portal/intercambios") return await apiPortalIntercambios(request, env);
+        if (ruta === "/api/portal/unidades-impacto") return await apiPortalUnidadesImpacto(request, env);
         if (ruta === "/api/portal/recibido") return await apiPortalRecibido(request, env);
         /* Apadrinamiento por unidad de impacto (0054). */
         if (ruta === "/api/apadrinamiento")         return await apiCatalogoApadrinamiento(env);
