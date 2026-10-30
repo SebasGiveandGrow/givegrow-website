@@ -17,7 +17,7 @@ manda el código y se corrige esta guía.
   «Entrar», queda con sesión en ese navegador **30 días**.
 - **Qué correos sirven:**
   - el de la solicitud;
-  - los **correos autorizados** que el equipo añade en Admin › Alianzas ›
+  - los **correos autorizados** que el equipo añade en Admin › Acompañar la red ›
     Fundaciones › (la fundación) › Acceso al portal.
 
   Un correo que no está en ninguno de los dos recibe la misma respuesta que uno
@@ -30,7 +30,7 @@ manda el código y se corrige esta guía.
 - **Topes:** 5 enlaces por hora por fundación y 10 intentos de entrada por IP
   al día. Si una fundación dice «no me llega el enlace», casi siempre es el
   tope o el filtro de spam.
-- **Mandarle el enlace desde el panel:** Admin › Alianzas › Red › (la
+- **Mandarle el enlace desde el panel:** Admin › Atender › Solicitudes a la red › (la
   solicitud) › Portal… › **«Enviar enlace del portal»**. Va al correo de la
   solicitud.
 
@@ -39,10 +39,10 @@ manda el código y se corrige esta guía.
 | Pestaña del portal | Qué hace la fundación | Dónde se revisa en `/admin` |
 | --- | --- | --- |
 | Resumen | Ve en qué paso va, lo que sigue y lo que ha recibido (donaciones dirigidas, actas, jornadas). | Nada que revisar: solo lee. |
-| Perfil | Lo edita después de enviar el cuestionario. Los ODS van aquí. | Red › Portal…: el panel muestra **antes y ahora** por pregunta. «Marcar todo revisado». |
-| Documentos | Sube RUT, Cámara, estatutos, estados financieros, certificación bancaria, logo y otros (PDF o foto, hasta 5 MB, máximo 30). | Red › Portal…: cada documento se descarga desde ahí. «Marcar todo revisado». |
-| Apadrinamiento | Propone unidades y reporta cada mes lo entregado. | Alianzas › Apadrinamiento. Ver `ops/apadrinamiento-unidades.md`. |
-| Indicadores | Define sus indicadores y reporta cada periodo el valor con fuente y corte (#641). | MEAL y Board › Indicadores de la red. Ver la sección 4. |
+| Perfil | Lo edita después de enviar el cuestionario. Los ODS van aquí. | Atender › Solicitudes a la red › Portal…: el panel muestra **antes y ahora** por pregunta. «Marcar todo revisado». |
+| Documentos | Sube RUT, Cámara, estatutos, estados financieros, certificación bancaria, logo y otros (PDF o foto, hasta 5 MB, máximo 30). | Atender › Solicitudes a la red › Portal…: cada documento se descarga desde ahí. «Marcar todo revisado». |
+| Apadrinamiento | Propone unidades y reporta cada mes lo entregado. | Revisar y aprobar › Apadrinamiento. Ver `ops/apadrinamiento-unidades.md`. |
+| Indicadores | Define sus indicadores y reporta cada periodo el valor con fuente y corte (#641). | Revisar y aprobar › Indicadores de la red. Ver la sección 4. |
 
 **Nada de lo que la fundación edita en el portal cambia el sitio público solo.**
 El sitio sale de `data/partners.json`. Si un cambio del perfil tiene que verse
