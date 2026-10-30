@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "c016f9fa";
+const STYLES_V = "bb2ff3c0";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -21383,6 +21383,39 @@ async function apiCatalogoApadrinamiento(env) {
   }));
   return new Response(JSON.stringify({ ok: true, unidades, ods_nombres: ODS_NOMBRES }), { headers: {
     "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=120" } });
+}
+
+/* GET /api/ods-red — PÚBLICO. EL MAPA DE ODS DE LA RED (ítem 47, 29 oct 2026).
+   Por cada uno de los 17 ODS: qué fundaciones de la red DECLARAN trabajarlo
+   (desde su portal, `ods_fundacion`) y cuántas unidades publicadas para
+   apadrinar aportan a él. Solo fundaciones vinculadas a partners.json, cuyo
+   nombre ya es público con su autorización; ninguna fundación en proceso. Es
+   una declaración, no una medición, y la página lo dice. */
+async function apiOdsRed(env) {
+  const vacio = { ok: true, ods: [], fundaciones: 0, nombres: ODS_NOMBRES };
+  if (!(await existeTabla(env, "ods_fundacion"))) return json(vacio);
+  const red = await fundacionesRed(env);
+  const por = Array.from({ length: 17 }, (_, i) => ({ n: i + 1, fundaciones: [], unidades: 0 }));
+  const vistas = new Set();
+  for (const f of (await env.DB.prepare(
+    "SELECT o.ods, i.red_id FROM ods_fundacion o JOIN inscripciones i ON i.id = o.inscripcion WHERE i.red_id IS NOT NULL ORDER BY o.ods"
+  ).all()).results || []) {
+    const rid = String(f.red_id).toLowerCase();
+    if (!red.mapa.has(rid)) continue;
+    vistas.add(rid);
+    por[f.ods - 1].fundaciones.push(red.mapa.get(rid));
+  }
+  try {
+    for (const u of (await env.DB.prepare(
+      "SELECT u.ods, i.red_id FROM unidades_apadrinables u JOIN inscripciones i ON i.id = u.inscripcion WHERE u.estado = 'aprobada' AND u.ods IS NOT NULL"
+    ).all()).results || []) {
+      if (!red.mapa.has(String(u.red_id || "").toLowerCase())) continue;
+      for (const n of odsLista(u.ods)) por[n - 1].unidades++;
+    }
+  } catch (e) { /* sin la 0054 o la 0056 */ }
+  for (const o of por) o.fundaciones.sort((a, b) => a.localeCompare(b, "es"));
+  return new Response(JSON.stringify({ ok: true, ods: por, fundaciones: vistas.size, nombres: ODS_NOMBRES }), { headers: {
+    "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } });
 }
 
 /* POST /api/apadrinamiento/interes — PÚBLICO. «Avísame cuando abra». */
@@ -47724,6 +47757,7 @@ export default {
         if (ruta === "/api/portal/recibido") return await apiPortalRecibido(request, env);
         /* Apadrinamiento por unidad de impacto (0054). */
         if (ruta === "/api/apadrinamiento")         return await apiCatalogoApadrinamiento(env);
+        if (ruta === "/api/ods-red")                return await apiOdsRed(env);
         if (ruta === "/api/apadrinamiento/interes") return await apiApadrinamientoInteres(request, env);
         const pret = ruta.match(/^\/api\/portal\/documento\/(\d{1,9})\/retirar$/);
         if (pret)                           return await apiPortalRetirar(request, env, Number(pret[1]));

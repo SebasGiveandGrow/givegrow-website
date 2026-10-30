@@ -2659,7 +2659,18 @@ var I18N = {
     "apu.fund.h":"¿Eres una fundación del HUB?",
     "apu.fund.p":"Propón desde tu portal las unidades que la gente puede apadrinar: qué son, cuánto cuestan al mes con su soporte y cómo vas a mostrar cada mes lo entregado.",
     "apu.fund.btn":"Ir al portal de fundaciones →",
-    "foot.apadrinamiento":"Apadrinamiento"
+    "foot.apadrinamiento":"Apadrinamiento",
+    "odsr.ey":"La red y los ODS",
+    "odsr.t":"Los Objetivos de Desarrollo Sostenible que trabaja la red",
+    "odsr.p":"Cada fundación del HUB declara a qué ODS aporta su trabajo, y cada unidad que se puede apadrinar dice los suyos. Es lo que ellas declaran, no una medición: lo que sí medimos, con su fuente, está en la teoría de cambio.",
+    "odsr.nota":"Declarado por las fundaciones de la red desde su portal. Solo aparecen fundaciones ya vinculadas al HUB.",
+    "odsr.link":"Ver la teoría de cambio y sus indicadores →",
+    "odsr.vacio":"Las fundaciones de la red están marcando sus ODS. Pronto los verás aquí.",
+    "odsr.f1":"1 fundación",
+    "odsr.fn":"{n} fundaciones",
+    "odsr.u1":"1 unidad para apadrinar",
+    "odsr.un":"{n} unidades para apadrinar",
+    "odsr.nadie":"Ninguna todavía"
   }
 };
 
@@ -3100,6 +3111,7 @@ function postLang(l){
   if (currentRoute==="gratitud") renderGratitudComercios();
   if (currentRoute==="regalos" && moduloListo("regalos")){ rgPinta(); rgPintaSeg(); }
   if (currentRoute==="apadrinamiento" && moduloListo("apadrinamiento")) apuPinta();
+  if (currentRoute==="hub") odsRedPinta();
   document.querySelectorAll(".faq-a").forEach(function(a){ if(a.parentElement.classList.contains("open")) a.style.maxHeight = a.scrollHeight + "px"; });
   /* El nombre de la region sale del diccionario, asi que hay que volver a
      ponerlo cuando cambia el idioma. */
@@ -3661,7 +3673,34 @@ function conModulo(n, fn){
   if (moduloListo(n)){ fn(); return; }
   cargarModulo(n).then(fn, avisoModulo);
 }
+/* EL MAPA DE ODS DE LA RED (#hub, ítem 47). Se pide una vez al entrar a la
+   ruta y se repinta al cambiar de idioma. Los nombres de las fundaciones
+   vienen de la API: entran con escapeHtml. */
+var ODSR = null, ODSR_PIDIENDO = false;
+function odsRedCargar(){
+  if (ODSR) { odsRedPinta(); return; }
+  if (ODSR_PIDIENDO) return;
+  ODSR_PIDIENDO = true;
+  fetch("/api/ods-red").then(function(r){ if (!r.ok) throw 0; return r.json(); })
+    .then(function(d){ ODSR = d; ODSR_PIDIENDO = false; odsRedPinta(); })
+    .catch(function(){ ODSR_PIDIENDO = false; });
+}
+function odsRedPinta(){
+  var g = document.getElementById("odsr-grid");
+  if (!g || !ODSR) return;
+  if (!ODSR.fundaciones) { g.innerHTML = '<p class="mu">' + escapeHtml(t("odsr.vacio")) + "</p>"; return; }
+  var nom = (ODSR.nombres && ODSR.nombres[lang === "en" ? "en" : "es"]) || [];
+  g.innerHTML = ODSR.ods.map(function(o){
+    var f = o.fundaciones.length;
+    return '<div class="odsr-t' + (f || o.unidades ? "" : " vacio") + '"><span class="odsr-n">' + o.n + '</span><span class="odsr-nom">' + escapeHtml(nom[o.n - 1] || "") + "</span>" +
+      '<span class="odsr-c">' + escapeHtml(f ? (f === 1 ? t("odsr.f1") : t("odsr.fn").replace("{n}", f)) : t("odsr.nadie")) + "</span>" +
+      (f ? '<span class="odsr-f">' + o.fundaciones.map(escapeHtml).join(" · ") + "</span>" : "") +
+      (o.unidades ? '<span class="odsr-u">' + escapeHtml(o.unidades === 1 ? t("odsr.u1") : t("odsr.un").replace("{n}", o.unidades)) + "</span>" : "") +
+      "</div>";
+  }).join("");
+}
 function alEntrarRuta(id){
+  if (id === "hub") odsRedCargar();
   var n = MODULOS_RUTA[id];
   if (!n) return;
   conModulo(n, function(){
