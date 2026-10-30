@@ -22189,6 +22189,23 @@ function paginaPortal(nonce) {
   .pf-pub.priv{background:var(--bds);color:var(--ink-soft)}
   .pf-pub.ver{background:var(--amberl);color:var(--amber)}
   .pf-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px}
+  /* LA VISTA PREVIA (30 oct 2026): la ficha pública se arma mientras escriben.
+     En Perfil el portal se ensancha para que quepan índice, formulario y ficha. */
+  body.ancho .wrap,body.ancho .barra-marca .in,body.ancho .guardar .in{max-width:1180px}
+  body.ancho .perfil-grid{grid-template-columns:220px minmax(0,1fr) 300px}
+  .pf-vista{display:flex;flex-direction:column;gap:8px}
+  .vista-ficha{background:var(--surface);border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+  .vf-cab{height:80px;background:var(--gl);display:flex;align-items:flex-end;padding:0 16px}
+  .vf-logo{width:52px;height:52px;border-radius:12px;background:var(--surface);border:1px solid var(--bd);margin-bottom:-20px;
+    display:flex;align-items:center;justify-content:center;font-family:"Unbounded",system-ui,sans-serif;font-weight:600;font-size:15px;color:var(--acc)}
+  .vf-cuerpo{padding:28px 16px 16px;display:flex;flex-direction:column;gap:10px}
+  .vf-cuerpo h3{font-family:"Unbounded",system-ui,sans-serif;font-size:16px;font-weight:600;line-height:1.25}
+  .vf-meta{font-size:13px;color:var(--mu)}
+  .vf-frase{font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:17px;line-height:1.4;color:var(--ink)}
+  .vf-vacio{font-size:13px;color:var(--mu);border:1px dashed var(--bd);border-radius:8px;padding:8px 10px}
+  .vf-progs{display:flex;flex-direction:column;gap:3px;font-size:14px}
+  .vf-ods{display:flex;flex-wrap:wrap;gap:6px}
+  .vf-ods span{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--gl);color:var(--acc)}
   .cuenta{display:block;text-align:right;font-size:12px;color:var(--mu);margin-top:4px;font-variant-numeric:tabular-nums}
   .cuenta.cerca{color:var(--amber)}
   .sec-perfil h3{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);font-weight:600;
@@ -22214,6 +22231,10 @@ function paginaPortal(nonce) {
   .docs .der{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
   .archivo{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 
+  @media (max-width:1120px){
+    body.ancho .perfil-grid{grid-template-columns:220px minmax(0,1fr)}
+    body.ancho .pf-vista{grid-column:2}
+  }
   @media (max-width:720px){
     h1{font-size:22px}
     .rejilla{grid-template-columns:1fr}
@@ -22225,7 +22246,8 @@ function paginaPortal(nonce) {
     .recorrido .q{grid-column:2;margin-top:0}
     .barra-marca .der span{display:none}
     .tab{font-size:14px;padding:10px 9px}
-    .perfil-grid{grid-template-columns:minmax(0,1fr);gap:14px}
+    .perfil-grid,body.ancho .perfil-grid{grid-template-columns:minmax(0,1fr);gap:14px}
+    body.ancho .pf-vista{grid-column:auto}
     .pf-secs{flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}
     .pf-sec{flex:0 0 auto;width:auto;border-color:var(--bd);border-radius:999px;min-height:42px}
     /* Las pestañas bajan de fila en vez de esconderse a la derecha: en un
@@ -22654,7 +22676,7 @@ function pintarOdsPerfil(){
     '<p class="sub">Marca los ODS a los que aporta el trabajo de la fundación. Es su declaración: el sitio la mostrará así cuando publiquemos el mapa de ODS de la red.</p>' +
     '<div class="ods-grid">' + cajasOds("perfil", MIS_ODS) + "</div>" +
     '<div class="acciones"><button type="button" class="btn sec" id="b-ods">Guardar los ODS</button></div><span class="msg" id="m-ods" role="status" aria-live="polite"></span>';
-  pfAvance();
+  pfAvance(); pfVista();
   $("b-ods").addEventListener("click", function(){
     var b = this; b.disabled = true; msg("m-ods", "Guardando…");
     enviar("/api/portal/ods", { ods: odsMarcados("perfil") }).then(function(r){
@@ -22708,13 +22730,16 @@ function pintarPerfil(){
   h += "</form>";
   h += '<div class="tarjeta pf-bloque" data-pf-bloque="' + (S.length - 1) + '" id="p-ods"></div>';
   h += '<div class="pf-nav"><button type="button" class="btn sec" id="pf-ant">← Anterior</button><button type="button" class="btn" id="pf-sig"></button></div>' +
-    '<p class="sub mt">Las autorizaciones —nombre, logo, fotos y menores— quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p></div></div>';
+    '<p class="sub mt">Las autorizaciones —nombre, logo, fotos y menores— quedaron firmadas en el cuestionario. Para cambiarlas, escríbenos.</p></div>' +
+    '<aside class="pf-vista" aria-label="Vista previa de su ficha"><p class="ey">Así los vería la gente</p><div id="pf-vista"></div>' +
+    '<p class="sub">Solo entra lo que puede publicarse, y siempre después de que el equipo lo revise. La sede y los costos nunca salen en la ficha.</p></aside></div>';
   caja.innerHTML = h;
   pintarOdsPerfil();
   SUCIO = false; msg("m-perfil", "");
   $("f-perfil").addEventListener("input", function(ev){
     SUCIO = true; msg("m-perfil", "");
     pfGuardarBorrador();
+    pfVista();
     var t = ev.target, k = t && t.id ? document.querySelector('[data-cuenta="' + t.id + '"]') : null;
     if (k) { var max = Number(k.getAttribute("data-max")) || 0; k.textContent = t.value.length + " / " + max; k.classList.toggle("cerca", max && t.value.length > max * 0.9); }
     pfAvance();
@@ -22723,6 +22748,7 @@ function pintarPerfil(){
   $("pf-sig").addEventListener("click", function(){ pfIr(PF_SEC + 1); });
   document.querySelectorAll("[data-pf-sec]").forEach(function(b){ b.addEventListener("click", function(){ pfIr(Number(b.getAttribute("data-pf-sec"))); }); });
   pfRecuperarBorrador();
+  pfVista();
   pfAvance();
   pfIr(pfPrimeraPendiente());
 }
@@ -22845,7 +22871,26 @@ function pfIr(i){
   $("pf-sig").disabled = PF_SEC === S.length - 1;
   $("pf-sig").textContent = PF_SEC === S.length - 1 ? "Es la última sección" : "Siguiente: " + pfNombre(S[PF_SEC + 1]) + " →";
 }
-document.addEventListener("change", function(ev){ if (ev.target && ev.target.getAttribute && ev.target.getAttribute("data-ods") === "perfil") pfAvance(); });
+document.addEventListener("change", function(ev){ if (ev.target && ev.target.getAttribute && ev.target.getAttribute("data-ods") === "perfil") { pfAvance(); pfVista(); } });
+/* La ficha de vista previa: solo con lo que puede publicarse. */
+function pfVista(){
+  var caja = $("pf-vista"); if (!caja || !D.perfil) return;
+  var v = function(id){ var c = D.perfil.campos.filter(function(x){ return x.id === id; })[0]; return c ? String(pfValor(c) || "").trim() : ""; };
+  var iniciales = String(D.nombre || "").replace(/^(Fundación|Fundacion|Corporación|Asociación)[ ]+/i, "").split(/[ ]+/).filter(Boolean)
+    .slice(0, 2).map(function(p){ return p.charAt(0).toUpperCase(); }).join("");
+  var anios = v("anios_territorio"), frase = v("frase");
+  var progs = [v("prog1_frecuencia") ? "Programa principal: " + v("prog1_frecuencia") : "", v("prog2_nombre"), v("prog3_nombre")].filter(Boolean);
+  var ods = document.querySelector('input[data-ods="perfil"]') ? odsMarcados("perfil") : (MIS_ODS || []);
+  var h = '<article class="vista-ficha"><div class="vf-cab"><span class="vf-logo" aria-hidden="true">' + esc(iniciales || "·") + "</span></div>" +
+    '<div class="vf-cuerpo"><div><h3>' + esc(D.nombre || "") + "</h3>" +
+    '<p class="vf-meta">' + (anios ? "Trabajan hace " + esc(anios) + " años en su territorio" : "Años en el territorio: por contar") + "</p></div>" +
+    (frase ? '<p class="vf-frase">«' + esc(frase) + "»</p>" : '<p class="vf-vacio">Aquí irá su frase cuando la escriban (sección Historia).</p>') +
+    (progs.length ? '<div class="vf-progs"><span class="ey">Programas</span>' + progs.map(function(p){ return "<span>" + esc(p) + "</span>"; }).join("") + "</div>" : "") +
+    (ods.length ? '<div class="vf-ods">' + ods.slice().sort(function(a, b){ return a - b; }).map(function(n){ return "<span>ODS " + n + " · " + esc(ODS[n - 1]) + "</span>"; }).join("") + "</div>" : "") +
+    (v("redes") ? '<p class="vf-meta">' + esc(v("redes")) + "</p>" : "") +
+    "</div></article>";
+  caja.innerHTML = h;
+}
 function guardarPerfil(){
   var datos = {};
   D.perfil.campos.forEach(function(c){
@@ -22911,6 +22956,7 @@ function irA(tab){
   });
   $("barra-guardar").classList.toggle("oculto", !(tab === "perfil" && D && D.perfil));
   if (location.hash !== "#" + tab) history.replaceState(null, "", "/portal#" + tab);
+  document.body.classList.toggle("ancho", tab === "perfil" && !!(D && D.perfil));
   if (D) verRecorrido();
 }
 
