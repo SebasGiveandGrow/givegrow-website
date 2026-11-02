@@ -22363,6 +22363,190 @@ async function adminUnidadImpactoDecidir(request, env, id, quien) {
   return json({ ok: true });
 }
 
+/* ============================================================================
+   EL BOLETÍN PARA DONANTES (ítem 46 · 0061, 30 oct 2026)
+   ============================================================================
+   Se redacta en Rendir cuentas › Boletín y sale SOLO a quien autorizó recibir
+   noticias (regalo_noticias sin baja). Va por tandas, para no comerse el cupo
+   diario de correo que necesitan los recibos y los casos, y nunca le escribe
+   dos veces a la misma persona el mismo boletín. Cada correo lleva su enlace
+   de baja. Mandar es una decisión de una persona: el panel no envía solo. */
+const BOLETIN_TANDA = 40;
+const BOLETIN_MARGEN = 600;            // cupo del día que el boletín nunca toca
+const RE_CODIGO_NINO = /\b(URI|MED|LET)-\d{3,5}\b/i;
+
+function boletinValido(c) {
+  const malo = (campo, ayuda) => ({ ok: false, error: "dato_invalido", campo, ayuda });
+  const t = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+  const p = (v, n) => String(v == null ? "" : v).replace(/\r\n?/g, "\n").trim().slice(0, n);
+  const b = { asunto_es: t(c.asunto_es, 140), cuerpo_es: p(c.cuerpo_es, 6000), asunto_en: t(c.asunto_en, 140) || null, cuerpo_en: p(c.cuerpo_en, 6000) || null };
+  if (b.asunto_es.length < 5) return malo("asunto_es", "Escribe el asunto en español.");
+  if (b.cuerpo_es.length < 20) return malo("cuerpo_es", "Escribe el texto en español.");
+  if (!!b.asunto_en !== !!b.cuerpo_en) return malo("asunto_en", "El inglés va completo (asunto y texto) o vacío: sin él, a quien pidió inglés le llega en español.");
+  /* Nunca datos individuales de un niño: un código de la campaña es la señal más clara. */
+  if (RE_CODIGO_NINO.test([b.asunto_es, b.cuerpo_es, b.asunto_en, b.cuerpo_en].join(" "))) {
+    return malo("cuerpo_es", "El texto tiene el código de un niño (URI-…, MED-…, LET-…). El boletín nunca lleva datos de un niño en particular.");
+  }
+  return { ok: true, b };
+}
+
+async function tokenBajaNoticias(env, email) {
+  const e = String(email).toLowerCase();
+  const ya = await env.DB.prepare("SELECT token FROM noticias_bajas WHERE email = ?").bind(e).first();
+  if (ya) return ya.token;
+  const t = tokenNuevo();
+  await env.DB.prepare("INSERT OR IGNORE INTO noticias_bajas (token, email) VALUES (?, ?)").bind(t, e).run();
+  const r = await env.DB.prepare("SELECT token FROM noticias_bajas WHERE email = ?").bind(e).first();
+  return r ? r.token : t;
+}
+
+function correoBoletin(b, en, urlBaja) {
+  const asunto = en && b.asunto_en ? b.asunto_en : b.asunto_es;
+  const cuerpo = en && b.cuerpo_en ? b.cuerpo_en : b.cuerpo_es;
+  const parrafos = cuerpo.split(/\n\s*\n/).map((x) => x.replace(/\n/g, " ").trim()).filter(Boolean);
+  const pie = en
+    ? "You receive this because you agreed to get news from Give&Grow. To stop receiving it: "
+    : "Recibes esto porque autorizaste recibir noticias de Give&Grow. Para dejar de recibirlas: ";
+  return {
+    asunto,
+    texto: [asunto, "", ...parrafos, "", pie + urlBaja].join("\n\n"),
+    html: plantillaCorreo({ titulo: asunto, parrafos,
+      bloque: '<p style="margin:22px 0 0;font-size:12px;line-height:1.5;color:#5C636F">' + esc(pie) +
+        '<a href="' + esc(urlBaja) + '" style="color:#1F5C38">' + (en ? "unsubscribe" : "darme de baja") + "</a>.</p>" })
+  };
+}
+
+/* GET y POST /api/admin/boletin { accion: guardar | borrar } */
+async function adminBoletin(request, env, quien) {
+  if (!(await existeTabla(env, "boletines"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0061 en la base." }, 409);
+  if (request.method === "GET") {
+    const subs = await env.DB.prepare(
+      "SELECT COUNT(*) AS n, SUM(idioma = 'en') AS en FROM regalo_noticias WHERE baja_en IS NULL"
+    ).first();
+    const bs = (await env.DB.prepare(
+      "SELECT b.*, (SELECT COUNT(*) FROM boletin_envios e WHERE e.boletin_id = b.id AND e.resultado = 'enviado') AS enviados, " +
+      "(SELECT COUNT(*) FROM boletin_envios e WHERE e.boletin_id = b.id AND e.resultado <> 'enviado') AS fallidos " +
+      "FROM boletines b ORDER BY b.id DESC LIMIT 50"
+    ).all()).results || [];
+    return json({ ok: true, suscritos: (subs && subs.n) || 0, en_ingles: (subs && subs.en) || 0, tanda: BOLETIN_TANDA,
+      boletines: bs.map((b) => Object.assign(b, { actualizado: selloCO(b.actualizado).slice(0, 16),
+        ultimo_envio_en: b.ultimo_envio_en ? selloCO(b.ultimo_envio_en).slice(0, 16) : null })) });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (c.accion === "borrar") {
+    const r = await env.DB.prepare("DELETE FROM boletines WHERE id = ? AND estado = 'borrador'").bind(Number(c.id) || 0).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado", ayuda: "Solo se borra un borrador: lo enviado queda como registro." }, 404);
+    return json({ ok: true });
+  }
+  if (c.accion !== "guardar") return json({ error: "accion_invalida" }, 400);
+  const v = boletinValido(c);
+  if (!v.ok) return json(v, 400);
+  const b = v.b;
+  if (c.id) {
+    const r = await env.DB.prepare(
+      "UPDATE boletines SET asunto_es = ?, cuerpo_es = ?, asunto_en = ?, cuerpo_en = ?, actualizado = datetime('now') WHERE id = ? AND estado = 'borrador'"
+    ).bind(b.asunto_es, b.cuerpo_es, b.asunto_en, b.cuerpo_en, Number(c.id) || 0).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_editable", ayuda: "Ya empezó a enviarse: lo enviado no se cambia. Crea uno nuevo." }, 409);
+    return json({ ok: true, id: Number(c.id) });
+  }
+  const fila = await env.DB.prepare(
+    "INSERT INTO boletines (asunto_es, cuerpo_es, asunto_en, cuerpo_en, creado_por) VALUES (?, ?, ?, ?, ?) RETURNING id"
+  ).bind(b.asunto_es, b.cuerpo_es, b.asunto_en, b.cuerpo_en, quien || null).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* POST /api/admin/boletin/<id>/prueba — al correo de quien está en el panel. */
+async function adminBoletinPrueba(env, id, quien) {
+  const b = await env.DB.prepare("SELECT * FROM boletines WHERE id = ?").bind(id).first();
+  if (!b) return json({ error: "no_encontrado" }, 404);
+  if (!RE_CORREO.test(String(quien || ""))) return json({ error: "sin_correo", ayuda: "No sé a qué correo mandarte la prueba." }, 409);
+  const url = ORIGIN + "/noticias/baja/prueba";
+  const salidas = [];
+  for (const en of b.asunto_en ? [false, true] : [false]) {
+    const m = correoBoletin(b, en, url);
+    const r = await enviarCorreo(env, { para: quien, asunto: "[Prueba] " + m.asunto, texto: m.texto, html: m.html, etiqueta: "boletin-prueba" });
+    salidas.push(r && r.ok ? (en ? "inglés" : "español") : "falló");
+  }
+  return json({ ok: true, para: quien, salidas });
+}
+
+/* POST /api/admin/boletin/<id>/enviar { confirmo: true } — la siguiente tanda. */
+async function adminBoletinEnviar(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c) || c.confirmo !== true) return json({ error: "sin_confirmar", ayuda: "Confirma el envío." }, 400);
+  const b = await env.DB.prepare("SELECT * FROM boletines WHERE id = ?").bind(id).first();
+  if (!b) return json({ error: "no_encontrado" }, 404);
+  /* El margen: el boletín se detiene antes de tocar el cupo de recibos y casos. */
+  const hoy = await env.DB.prepare("SELECT COUNT(*) AS n FROM correos WHERE resultado = 'enviado' AND intento_en >= date('now')").first();
+  const libres = CORREO_TOPE_DIA - BOLETIN_MARGEN - ((hoy && Number(hoy.n)) || 0);
+  if (libres <= 0) return json({ error: "sin_cupo_hoy", ayuda: "El cupo de correo de hoy está reservado para recibos, casos y avisos. Sigue mañana: nadie recibe el boletín dos veces." }, 429);
+  const lote = (await env.DB.prepare(
+    "SELECT n.email, n.nombre, n.idioma FROM regalo_noticias n WHERE n.baja_en IS NULL " +
+    "AND NOT EXISTS (SELECT 1 FROM boletin_envios e WHERE e.boletin_id = ? AND e.email = n.email) ORDER BY n.consentido_en LIMIT ?"
+  ).bind(id, Math.min(BOLETIN_TANDA, libres)).all()).results || [];
+  if (b.estado === "borrador") {
+    await env.DB.prepare("UPDATE boletines SET estado = 'enviando', primer_envio_en = datetime('now') WHERE id = ?").bind(id).run();
+    await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+      .bind(quien || "?", "boletín " + id + " · empezó a enviarse").run();
+  }
+  let enviados = 0, fallidos = 0, sinCupo = false;
+  for (const p of lote) {
+    const url = ORIGIN + "/noticias/baja/" + (await tokenBajaNoticias(env, p.email));
+    const m = correoBoletin(b, p.idioma === "en", url);
+    const r = await enviarCorreo(env, { para: p.email, asunto: m.asunto, texto: m.texto, html: m.html, etiqueta: "boletin" });
+    if (r && r.sinCupo) { sinCupo = true; break; }
+    const ok = !!(r && r.ok);
+    ok ? enviados++ : fallidos++;
+    await env.DB.prepare("INSERT OR IGNORE INTO boletin_envios (boletin_id, email, resultado) VALUES (?, ?, ?)").bind(id, p.email, ok ? "enviado" : "fallo").run();
+  }
+  const quedan = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM regalo_noticias n WHERE n.baja_en IS NULL AND NOT EXISTS (SELECT 1 FROM boletin_envios e WHERE e.boletin_id = ? AND e.email = n.email)"
+  ).bind(id).first();
+  const q = (quedan && quedan.n) || 0;
+  await env.DB.prepare("UPDATE boletines SET estado = ?, ultimo_envio_en = datetime('now') WHERE id = ?").bind(q ? "enviando" : "enviado", id).run();
+  return json({ ok: true, enviados, fallidos, quedan: q, sin_cupo: sinCupo });
+}
+
+/* /noticias/baja/<token> — GET muestra el botón; POST da de baja. Un GET no
+   da de baja a nadie: los filtros de correo abren los enlaces solos. */
+function paginaNoticiasBaja(lang, estado, token) {
+  const en = lang === "en";
+  const T = {
+    pedir: [en ? "Stop receiving our news" : "Dejar de recibir nuestras noticias",
+      en ? "Press the button and we will not write to you again with news. Your gifts, receipts and certificates stay exactly as they are." : "Toca el botón y no te volvemos a escribir con noticias. Tus regalos, recibos y certificados quedan exactamente igual."],
+    hecho: [en ? "Done: you will not receive more news" : "Listo: no vas a recibir más noticias",
+      en ? "If it was a mistake, you can agree again the next time you give." : "Si fue un error, puedes volver a autorizarlas la próxima vez que dones."],
+    neutra: [en ? "This link is not active" : "Este enlace no está activo",
+      en ? "It may be incomplete. Write to us and a person will help you." : "Puede estar incompleto. Escríbenos y una persona te ayuda."]
+  }[estado];
+  const cuerpo = "  <h1>" + esc(T[0]) + "</h1>\n  <p class=\"lead\">" + esc(T[1]) + "</p>\n" +
+    (estado === "pedir" ? '  <form method="POST" action="/noticias/baja/' + esc(token) + '" style="margin-top:22px"><input type="hidden" name="lang" value="' + (en ? "en" : "es") + '">' +
+      '<button type="submit" class="btn btn-g">' + esc(en ? "Unsubscribe" : "Darme de baja") + "</button></form>\n" : "") +
+    (estado === "neutra" ? '  <p><a class="card-link" href="mailto:privacidad@thegiveandgrowproject.org">privacidad@thegiveandgrowproject.org</a></p>\n' : "") +
+    '  <p class="mu" style="margin-top:30px;font-size:var(--fs-13)">Fundación Give&amp;Grow International · NIT 901.948.930-2</p>\n';
+  return cascaraBaja(T[0], cuerpo, lang);
+}
+async function rutaNoticiasBaja(request, env, resto, url) {
+  const token = String(resto || "").replace(/^\/+|\/+$/g, "");
+  let lang = url.searchParams.get("lang") === "en" ? "en" : "es";
+  const responde = (estado, status) => new Response(paginaNoticiasBaja(lang, estado, token), { status: status || 200, headers: cabecerasAutorizacion() });
+  if (!env.DB || !(await existeTabla(env, "noticias_bajas"))) return responde("neutra", 404);
+  if (!/^[0-9a-f]{32}$/.test(token)) return responde("neutra", 404);
+  const fila = await env.DB.prepare("SELECT b.email, n.idioma, n.baja_en FROM noticias_bajas b LEFT JOIN regalo_noticias n ON n.email = b.email WHERE b.token = ?").bind(token).first();
+  if (!fila) return responde("neutra", 404);
+  if (!url.searchParams.get("lang") && fila.idioma === "en") lang = "en";
+  if (request.method === "GET") return responde(fila.baja_en ? "hecho" : "pedir");
+  if (request.method !== "POST") return new Response("Método no permitido", { status: 405, headers: { allow: "GET, POST" } });
+  try { const f = await request.formData(); if (f.get("lang") === "en") lang = "en"; } catch { /* sin formulario: igual se da de baja */ }
+  await env.DB.prepare("UPDATE regalo_noticias SET baja_en = datetime('now') WHERE email = ? AND baja_en IS NULL").bind(fila.email).run();
+  return responde("hecho");
+}
+
 /* GET /api/portal/recibido — LO QUE LA FUNDACIÓN HA RECIBIDO (ítem 40, 29 oct
    2026). Sale de lo que la base ya sabe, unido por `inscripciones.red_id`:
    · las donaciones dirigidas a ella (solo confirmadas; pesos y dólares por
@@ -34794,6 +34978,7 @@ textarea { font-size: 16px }
   <a class="pn-it" href="#reportes/banco" data-pn-ir="reportes/banco">Banco y panel</a>
   <a class="pn-it" href="#meal/indicadores" data-pn-ir="meal/indicadores">Indicadores MEAL<span class="pn-n" data-pn-n="meal/indicadores"></span></a>
   <a class="pn-it" href="#meal/board" data-pn-ir="meal/board">Board de Asesores<span class="pn-n" data-pn-n="meal/board"></span></a>
+  <a class="pn-it" href="#cuentas/boletin" data-pn-ir="cuentas/boletin">Boletín a donantes</a>
   <a class="pn-it" href="#legal/documentos" data-pn-ir="legal/documentos">Documentos legales<span class="pn-n" data-pn-n="legal/documentos"></span></a>
 </div>
 <div class="pn-grupo">
@@ -35248,6 +35433,16 @@ sabes que está mal.</p>
 <p><strong>Nada de esto se publica.</strong> Es el seguimiento de la alianza. Si algún día un valor va a salir al público, antes se le pregunta a la fundación.</p>
 </div></details>
 <div id="tb-indred" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+</section>
+
+<!-- EL BOLETÍN (0061): solo a quien autorizó noticias, por tandas, con su enlace de baja. -->
+<section class="pn-vista" data-vista="cuentas/boletin" id="sec-boletin" hidden>
+<details class="pn-como"><summary>Cómo funciona</summary><div>
+<p>El boletín le llega <strong>solo a quien autorizó recibir noticias</strong> (la casilla de Regalos, que nace desmarcada). Nunca a quien dejó su correo para otra cosa. Cada correo lleva su enlace para darse de baja, y la baja se respeta en el siguiente envío.</p>
+<p>Se redacta, se guarda como borrador y <strong>primero se manda una prueba</strong> a tu correo. «Enviar» sale en tandas de 40 para no gastar el cupo diario que necesitan los recibos y los casos; si quedan personas, «Seguir enviando». Nadie recibe dos veces el mismo boletín.</p>
+<p><strong>Nunca datos de un niño en particular:</strong> el panel rechaza un texto con un código de la campaña.</p>
+</div></details>
+<div id="tb-boletin" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="meal/board" id="sec-board" hidden>
@@ -36606,6 +36801,8 @@ var VISTAS = {
     accion: ["Registrar una medición", "mel-medir"] },
   "meal/red": { area: "Revisar y aprobar", titulo: "Indicadores de la red",
     linea: "Lo que cada fundación mide de su trabajo, periodo a periodo, con su fuente y su corte. Se revisa aquí y no se publica." },
+  "cuentas/boletin": { area: "Rendir cuentas", titulo: "Boletín a donantes",
+    linea: "Noticias para quien autorizó recibirlas: se redactan, se prueban y se mandan por tandas, con su enlace de baja." },
   "meal/board": { area: "Rendir cuentas", titulo: "Board de Asesores",
     linea: "Quién asesora a la fundación y lo que se le manda: el informe trimestral y la convocatoria. El Board recomienda; no aprueba ni dirige.",
     accion: ["Añadir asesor", "bd-asesor"] },
@@ -45067,6 +45264,84 @@ document.addEventListener("click", function(e){
   else { document.execCommand("copy"); listo(); }
 });
 
+/* ---------------- EL BOLETÍN PARA DONANTES (0061) ----------------
+   Redactar, probar y mandar por tandas. Solo a quien autorizó noticias. */
+var BO = null;
+function cargarBoletin(){
+  return pedirJSON("/api/admin/boletin", "tb-boletin").then(function(d){ BO = d; pintarBoletin(); });
+}
+function pintarBoletin(){
+  var caja = document.getElementById("tb-boletin"); if (!caja || !BO) return;
+  var L = BO.boletines || [];
+  var est = { borrador: "Borrador", enviando: "Enviándose", enviado: "Enviado" };
+  var h = '<p class="pn-h3">' + BO.suscritos + (BO.suscritos === 1 ? " persona autorizó" : " personas autorizaron") + " recibir noticias" +
+    (BO.en_ingles ? " · " + BO.en_ingles + " en inglés" : "") + "</p>" +
+    '<div class="fin-barra"><button type="button" class="pn-b1" data-bo-nuevo="1">Nuevo boletín</button></div>';
+  h += L.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Asunto</th><th scope="col">Estado</th><th scope="col">Enviados</th>' +
+    '<th scope="col">Último envío</th><th scope="col"></th></tr></thead><tbody>' +
+    L.map(function(b){
+      return "<tr><td><strong>" + esc(b.asunto_es) + "</strong>" + (b.asunto_en ? "<br><small>EN: " + esc(b.asunto_en) + "</small>" : "") + "</td>" +
+        "<td>" + esc(est[b.estado] || b.estado) + "</td><td>" + b.enviados + (b.fallidos ? "<br><small>" + b.fallidos + " fallaron</small>" : "") + "</td>" +
+        "<td>" + esc(b.ultimo_envio_en || "—") + "</td>" +
+        '<td><button type="button" class="copy" data-bo-abrir="' + b.id + '">Abrir</button></td></tr>';
+    }).join("") + "</tbody></table></div>"
+    : '<p class="mu">Todavía no hay boletines. El primero puede contar cómo va la campaña de Regalos, sin datos de ningún niño.</p>';
+  caja.innerHTML = h;
+}
+function abrirBoletin(id){
+  var b = id ? ((BO && BO.boletines) || []).filter(function(x){ return String(x.id) === String(id); })[0] : null;
+  var editable = !b || b.estado === "borrador";
+  var h = "";
+  if (editable){
+    h += pnCampo("bo-ae", "Asunto en español", b ? b.asunto_es : "", { extra: ' maxlength="140"' }) +
+      pnCampo("bo-ce", "Texto en español (deja una línea en blanco entre párrafos)", b ? b.cuerpo_es : "", { area: true, filas: 10 }) +
+      pnCampo("bo-ai", "Asunto en inglés (opcional)", b && b.asunto_en ? b.asunto_en : "", { extra: ' maxlength="140"' }) +
+      pnCampo("bo-ci", "Texto en inglés (opcional; sin él, a quien pidió inglés le llega en español)", b && b.cuerpo_en ? b.cuerpo_en : "", { area: true, filas: 6 }) +
+      '<p class="mu">Nunca datos de un niño en particular: ni nombre, ni foto, ni código. Cada correo lleva solo su enlace para darse de baja.</p><p class="pn-error" id="pn-err"></p>';
+  } else {
+    h += ficha([["Asunto", esc(b.asunto_es) + (b.asunto_en ? "<small>EN: " + esc(b.asunto_en) + "</small>" : "")],
+      ["Estado", (b.estado === "enviado" ? "Enviado" : "Enviándose") + "<small>" + b.enviados + " enviados" + (b.fallidos ? " · " + b.fallidos + " fallaron" : "") + "</small>"],
+      ["Texto", '<div class="qj-msg" style="white-space:pre-wrap">' + esc(b.cuerpo_es) + "</div>"]]);
+  }
+  var pie = "";
+  if (editable) pie += '<button type="button" class="pn-b2" data-bo-guardar="1">Guardar borrador</button>';
+  if (b) pie += '<button type="button" class="pn-b2" data-bo-prueba="1">Mandarme una prueba</button>';
+  if (b && b.estado !== "enviado") pie += '<button type="button" class="pn-b1" data-bo-enviar="1">' + (b.estado === "enviando" ? "Seguir enviando" : "Enviar a " + BO.suscritos + (BO.suscritos === 1 ? " persona" : " personas")) + "</button>";
+  if (b && editable) pie += '<button type="button" class="pn-b2" data-bo-borrar="1">Borrar</button>';
+  pie += '<button type="button" class="pn-b2" data-pn-cerrar="1">Cerrar</button>';
+  cajonAbrir({ ey: "Boletín", titulo: b ? b.asunto_es : "Nuevo boletín", cuerpo: h, pie: pie, ancho: true });
+  var q = function(s){ return document.querySelector(s); };
+  if (q("[data-bo-guardar]")) q("[data-bo-guardar]").addEventListener("click", function(){
+    var bt = this; bt.disabled = true;
+    postPanel("/api/admin/boletin", { accion: "guardar", id: b ? b.id : null, asunto_es: pnValor("bo-ae"), cuerpo_es: pnValor("bo-ce"), asunto_en: pnValor("bo-ai"), cuerpo_en: pnValor("bo-ci") })
+      .then(function(r){ bt.disabled = false; if (!r) return; avisar("Borrador guardado. Mándate una prueba antes de enviarlo."); cargarBoletin().then(function(){ abrirBoletin(r.id); }); });
+  });
+  if (q("[data-bo-prueba]")) q("[data-bo-prueba]").addEventListener("click", function(){
+    var bt = this; bt.disabled = true;
+    postPanel("/api/admin/boletin/" + b.id + "/prueba", {}).then(function(r){ bt.disabled = false; if (r) avisar("Prueba enviada a " + r.para + " (" + r.salidas.join(" y ") + ")."); });
+  });
+  if (q("[data-bo-enviar]")) q("[data-bo-enviar]").addEventListener("click", function(){
+    if (!confirm("Se envía a quienes autorizaron noticias, en tandas de " + BO.tanda + ". ¿Seguir?")) return;
+    var bt = this; bt.disabled = true;
+    postPanel("/api/admin/boletin/" + b.id + "/enviar", { confirmo: true }).then(function(r){
+      bt.disabled = false; if (!r) return;
+      avisar(r.enviados + " enviados" + (r.fallidos ? ", " + r.fallidos + " fallaron" : "") + (r.quedan ? ". Quedan " + r.quedan + ": toca «Seguir enviando»." : ". Listo: le llegó a todos.") +
+        (r.sin_cupo ? " Se detuvo por el cupo de correo de hoy." : ""));
+      cajonCerrar(); cargarBoletin();
+    });
+  });
+  if (q("[data-bo-borrar]")) q("[data-bo-borrar]").addEventListener("click", function(){
+    if (!confirm("¿Borrar este borrador?")) return;
+    postPanel("/api/admin/boletin", { accion: "borrar", id: b.id }).then(function(r){ if (r) { avisar("Borrador borrado."); cajonCerrar(); cargarBoletin(); } });
+  });
+}
+document.addEventListener("click", function(e){
+  if (!e.target.closest) return;
+  if (e.target.closest("[data-bo-nuevo]")) { abrirBoletin(null); return; }
+  var a = e.target.closest("[data-bo-abrir]");
+  if (a) abrirBoletin(a.getAttribute("data-bo-abrir"));
+});
+
 function abrirPortal(id){
   pedirJSON("/api/admin/portal/" + id).then(function(d){
     var pares = [
@@ -45225,6 +45500,7 @@ var BANDEJAS = {
   "tb-indred": cargarIndicadoresRed,
   "tb-dar": cargarIntercambios,
   "tb-costos": cargarUnidadesImpacto,
+  "tb-boletin": cargarBoletin,
   "tb-pagos": cargarSueltos,
   "tb-suscripciones": cargarSuscripciones,
   "tb-miembros": cargarMiembros,
@@ -48821,6 +49097,10 @@ export default {
     if (ruta === "/autorizacion" || ruta.startsWith("/autorizacion/")) {
       return await rutaAutorizacion(request, env, ruta.slice(14), url);
     }
+    /* La baja del boletín (0061): la credencial es el token de la URL. */
+    if (ruta === "/noticias/baja" || ruta.startsWith("/noticias/baja/")) {
+      return await rutaNoticiasBaja(request, env, ruta.slice(14), url);
+    }
     if (ruta === "/api/pago/baja")        return await apiBajaMembresia(request, env, url);
     if (ruta === "/api/pago/baja-enlace") return await apiBajaEnlace(request, env, url);
 
@@ -49330,6 +49610,10 @@ export default {
         if (ruta === "/api/admin/indicadores-red") return await adminIndicadoresRed(env);
         if (ruta === "/api/admin/intercambios") return await adminIntercambios(env);
         if (ruta === "/api/admin/unidades-impacto") return await adminUnidadesImpacto(env);
+        if (ruta === "/api/admin/boletin")      return await adminBoletin(request, env, sesion.email);
+        const abo = ruta.match(/^\/api\/admin\/boletin\/(\d{1,9})\/(prueba|enviar)$/);
+        if (abo) return abo[2] === "prueba" ? (request.method === "POST" ? await adminBoletinPrueba(env, Number(abo[1]), sesion.email) : json({ error: "metodo_no_permitido" }, 405))
+                                            : await adminBoletinEnviar(request, env, Number(abo[1]), sesion.email);
         const aui = ruta.match(/^\/api\/admin\/unidad-impacto\/(\d{1,9})$/);
         if (aui)                                return await adminUnidadImpactoDecidir(request, env, Number(aui[1]), sesion.email);
         const aix = ruta.match(/^\/api\/admin\/intercambio\/(\d{1,9})$/);
