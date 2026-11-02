@@ -50,9 +50,9 @@ Fundación convoque, sin importar si recibe pago:
 | Voluntarios corporativos (jornadas MIRA) | Asimetría de poder, extracción, fotografía sin consentimiento |
 | Fundaciones aliadas y su personal | Entrega en territorio; son la cara de Give&Grow ante la comunidad |
 | Contratistas, transportistas, proveedores | Acceso a puntos de entrega y a comunidades |
-| Miembros de junta y revisoría | Conflicto de interés, uso de información |
+| Fundador, Board de Asesores y revisoría | Conflicto de interés, uso de información |
 
-**Decisión pendiente de la junta:** si la política se le exige por contrato a las
+**Decisión pendiente del máximo órgano de dirección:** si la política se le exige por contrato a las
 fundaciones aliadas (recomendado) o solo se les comparte como referencia.
 
 ---
@@ -223,8 +223,8 @@ convienen:
   persona señalada ni con la fundación aliada involucrada, salvo que la ley lo
   exija.
 - **Sin represalias**, y tomar represalias es a su vez falta grave.
-- **Un registro de todas las quejas**, con fecha, tipo, estado y desenlace, que se
-  revisa en junta y del que se publica un resumen agregado y anónimo.
+- **Un registro de todas las quejas**, con fecha, tipo, estado y desenlace, que
+  revisa el máximo órgano de dirección y del que se publica un resumen agregado y anónimo.
 
 > **Plazos decididos por Sebas el 27 oct 2026.** Son los que un equipo de una
 > persona puede cumplir aun viajando: un plazo incumplido en una política de
@@ -273,8 +273,8 @@ parte construida y no la cuenta como política:
 
 **Lo que falta escribir:**
 
-- Registro de conflictos de interés de junta, dirección y revisoría, actualizado
-  cada año.
+- Registro de conflictos de interés del fundador, el Board de Asesores, el equipo
+  y la revisoría, actualizado cada año.
 - Regla de abstención: quien tenga conflicto no participa en la decisión ni en su
   votación.
 - Política de aceptación y rechazo de donaciones: de quién **no** se recibe dinero
@@ -283,7 +283,11 @@ parte construida y no la cuenta como política:
 
 ---
 
-## 8. Lo que tiene que decidir la junta
+## 8. Lo que tiene que decidir el máximo órgano de dirección
+
+No hay junta directiva. Decide el máximo órgano que definen los estatutos (hoy,
+el fundador, que es también el Representante Legal). El Board de Asesores puede
+emitir un concepto previo, no vinculante: recomienda, no aprueba.
 
 Sin estas cinco decisiones los borradores no se pueden adoptar:
 
@@ -332,14 +336,15 @@ Y dos que conviene resolver al mismo tiempo:
 
 ## 10. Qué sigue, en orden
 
-1. La junta resuelve las siete casillas del apartado 8.
+1. El máximo órgano de dirección resuelve las siete casillas del apartado 8.
 2. Se ajustan los borradores con esas decisiones y se levanta el acta de adopción.
 3. Se publican en el sitio, en español e inglés, con fecha de adopción y de
    próxima revisión.
 4. Se construye el mecanismo de quejas del apartado 6.4.
 5. Firma del código de conducta: equipo, voluntarios, ingenieros del triaje y
    fundaciones aliadas.
-6. Registro de quejas operando, con revisión en junta y resumen público anual.
+6. Registro de quejas operando, revisado por el máximo órgano de dirección y con
+   resumen público anual.
 
 **Mientras tanto, en el sitio no se publica nada de esto.** Un borrador no adoptado
 que aparezca publicado es exactamente la promesa sin respaldo que el proyecto
