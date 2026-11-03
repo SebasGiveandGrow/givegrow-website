@@ -2342,6 +2342,14 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
   .rg-guirnalda .rg-bomb:nth-of-type(3n){animation:rg-titila 4.1s ease-in-out infinite;animation-delay:-1.4s}
 }
 .rg-h1{max-width:20ch}
+/* EL IDIOMA DE ESTA PÁGINA (3 nov 2026): español, inglés y sueco, que solo
+   existe aquí. Quieto: tres palabras en gris, la activa en tinta con un filo
+   plata. Los tokens son los fijos de la página, que no cambian de noche. */
+.rg-idioma{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 20px -12px}
+.rg-idioma button{font:inherit;font-size:.875rem;line-height:1;color:var(--mu);background:none;border:1px solid transparent;border-radius:999px;padding:0 12px;min-height:36px;cursor:pointer}
+.rg-idioma button:hover{color:var(--ink)}
+.rg-idioma button.on{color:var(--ink);font-weight:600;border-color:var(--plata)}
+.rg-idioma button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .rg-luces-t{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:var(--fs-h3);color:var(--oro-texto);margin:44px 0 6px}
 .rg-luces-p{font-size:var(--fs-14);color:var(--mu);max-width:62ch;margin:0}
 .rg-zonas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:26px;align-items:end}

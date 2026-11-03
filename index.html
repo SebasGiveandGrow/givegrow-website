@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=bb2ff3c0">
+<link rel="stylesheet" href="/styles.css?v=f20ca0af">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=105c8b7b" defer></script>
+<script src="/app.js?v=d701d796" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1503,6 +1503,13 @@
   <section class="rg-portada">
       <svg class="rg-guirnalda" viewBox="0 0 1440 56" preserveAspectRatio="xMidYMin slice" aria-hidden="true" focusable="false"><path class="rg-hilo" d="M0 4 Q80 44 160 4 Q240 44 320 4 Q400 44 480 4 Q560 44 640 4 Q720 44 800 4 Q880 44 960 4 Q1040 44 1120 4 Q1200 44 1280 4 Q1360 44 1440 4"/><rect class="rg-tapa" x="77" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="80" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="237" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-o" cx="240" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="397" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-v" cx="400" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="557" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-p" cx="560" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="717" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="720" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="877" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-o" cx="880" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1037" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-v" cx="1040" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1197" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-p" cx="1200" cy="34" rx="6" ry="8"/><rect class="rg-tapa" x="1357" y="22" width="6" height="5" rx="1"/><ellipse class="rg-bomb is-r" cx="1360" cy="34" rx="6" ry="8"/></svg>
     <div class="wrap">
+      <!-- Sueco solo en esta página (3 nov 2026). Cada idioma se nombra en sí
+           mismo, por eso los botones no llevan data-i18n; el grupo sí. -->
+      <div class="rg-idioma" role="group" aria-label="Idioma de esta página" data-i18n="rg.idioma" data-i18n-attr="aria-label">
+        <button type="button" data-idioma="es" data-act="setLang('es')" lang="es" aria-pressed="true" class="on">Español</button>
+        <button type="button" data-idioma="en" data-act="setLang('en')" lang="en" aria-pressed="false">English</button>
+        <button type="button" data-idioma="sv" data-act="setLang('sv')" lang="sv" aria-pressed="false">Svenska</button>
+      </div>
       <span class="ey rv" data-i18n="rg.ey">Navidad 2026</span>
       <h1 class="h-sec rg-h1 rv" data-i18n="rg.h1">Mil regalos para niñas y niños de Uribia, Medellín y Leticia.</h1>
       <p class="lead rv d1" data-i18n="rg.lead">Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.</p>

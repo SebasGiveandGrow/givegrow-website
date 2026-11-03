@@ -446,6 +446,22 @@ const soloEn = [...en].filter(k => !es.has(k));
 if (soloEs.length || soloEn.length) err("paridad i18n rota — solo ES: [" + soloEs.join(", ") + "] solo EN: [" + soloEn.join(", ") + "]");
 else ok("paridad i18n " + es.size + "/" + en.size);
 
+/* 2b · Sueco (3 nov 2026): solo la página de regalos. sv.json lleva TODAS las
+   claves `rg.` —lo que falte saldría en inglés en medio de una página sueca— y
+   ninguna otra; cada texto conserva los mismos {marcadores} que el inglés. */
+try {
+  const svD = JSON.parse(readFileSync("i18n/sv.json", "utf8"));
+  const enD = JSON.parse(readFileSync("i18n/en.json", "utf8"));
+  const marcas = (s) => [...String(s).matchAll(/\{\w+\}/g)].map(x => x[0]).sort().join(",");
+  const faltan = Object.keys(enD).filter(k => k.startsWith("rg.") && !(k in svD));
+  const ajenas = Object.keys(svD).filter(k => !k.startsWith("rg.") || !(k in enD));
+  const malas = Object.keys(svD).filter(k => k in enD && marcas(svD[k]) !== marcas(enD[k]));
+  if (faltan.length || ajenas.length || malas.length)
+    err("i18n/sv.json — faltan: [" + faltan.join(", ") + "] sobran: [" + ajenas.join(", ") +
+        "] marcadores distintos del inglés: [" + malas.join(", ") + "]");
+  else ok("i18n/sv.json: las " + Object.keys(svD).length + " claves de regalos, con sus marcadores");
+} catch (e) { err("i18n/sv.json inválido o ausente: " + e.message); }
+
 /* 3 · Cobertura data-i18n */
 const used = [...html.matchAll(/data-i18n="([^"]+)"/g)].map(x => x[1]);
 const missing = [...new Set(used)].filter(k => !es.has(k));
