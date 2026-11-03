@@ -234,7 +234,7 @@ var I18N = {
     "alma.q.insumos":"¿Dónde puedo llevar insumos?",
     "alma.q.quien":"¿Quién fundó Give&Grow?",
     "alma.q.desde":"¿Desde cuándo opera la Fundación?",
-    "alma.note":"Respuestas generadas con inteligencia artificial. Para datos oficiales, consulta Transparencia.",
+    "alma.note":"Respuestas generadas con inteligencia artificial. No escribas cédulas, direcciones ni datos de salud. Para datos oficiales, consulta Transparencia.",
     "nav.donar":"Donar",
     "nav.empresas":"Empresas",
     "nav.fundaciones":"Fundaciones",
