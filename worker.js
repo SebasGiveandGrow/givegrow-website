@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "bb2ff3c0";
+const STYLES_V = "f20ca0af";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -50028,7 +50028,9 @@ export default {
     const rIdx = ruta.match(/^\/([a-z][a-z-]*)\/?$/);
     if (rIdx && Object.hasOwn(RUTAS_INDEXABLES, rIdx[1]) && !HOST_MMC.test(url.hostname)) {
       const base = await env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
-      return paginaIndexable(base, rIdx[1], url.searchParams.get("lang") === "en");
+      /* `?lang=sv` (solo regalos) recibe la tarjeta en inglés: no hay una en sueco. */
+      const qLang = url.searchParams.get("lang");
+      return paginaIndexable(base, rIdx[1], qLang === "en" || (qLang === "sv" && rIdx[1] === "regalos"));
     }
     /* La portada en inglés: su tarjeta para compartir (ver `PORTADA_EN`). Fuera
        del subdominio de Mira Mi Casa, que tiene su propia tarjeta. */

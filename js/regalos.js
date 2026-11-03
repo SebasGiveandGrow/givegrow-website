@@ -34,19 +34,27 @@ function rgValor(r){ return RG.via === "usd" ? rgUSD(r.valor_usd) : rgCOP(r.valo
 function rgEdad(n){ return t(n === 1 ? "rg.anio" : "rg.anios").replace("{n}", n); }
 function rgZona(id){
   var z = (RG.datos && RG.datos.zonas || []).filter(function(x){ return x.id === id; })[0];
-  return z ? (lang === "en" ? z.nombre_en : z.nombre_es) + " · " + z.departamento : id;
+  return z ? (rgIngles() ? z.nombre_en : z.nombre_es) + " · " + z.departamento : id;
 }
 function rgTipo(id){
   var k = (RG.datos && RG.datos.categorias || []).filter(function(x){ return x.id === id; })[0];
-  return k ? (lang === "en" ? k.nombre_en : k.nombre_es) : id;
+  return k ? rgNombreTipo(k) : id;
 }
-function rgDeseo(r){ return lang === "en" && r.deseo_en ? r.deseo_en : r.deseo_es; }
+function rgDeseo(r){ return rgIngles() && r.deseo_en ? r.deseo_en : r.deseo_es; }
 function rgFecha(iso){
   if (!iso) return "";
   var d = new Date(iso.length === 10 ? iso + "T12:00:00Z" : iso.replace(" ", "T") + "Z");
-  return d.toLocaleDateString(lang === "en" ? "en-US" : "es-CO", { day: "numeric", month: "long", timeZone: "UTC" });
+  return d.toLocaleDateString(rgLoc(), { day: "numeric", month: "long", timeZone: "UTC" });
 }
 function rgEl(id){ return document.getElementById(id); }
+/* EN SUECO (3 nov 2026) los datos de la base salen en inglés: zonas, deseos y
+   seguimiento se cargan en español e inglés, nada más. Solo los tipos de regalo
+   van traducidos aquí, porque son siete y fijos (los de la 0048). */
+var RG_TIPO_SV = { juguete: "Leksak", ropa: "Kläder", calzado: "Skor", escolar: "Skolmaterial",
+  deporte: "Sport", libro: "Böcker", otro: "Annat" };
+function rgIngles(){ return lang !== "es"; }
+function rgLoc(){ return lang === "sv" ? "sv-SE" : lang === "en" ? "en-US" : "es-CO"; }
+function rgNombreTipo(k){ return lang === "sv" && RG_TIPO_SV[k.id] ? RG_TIPO_SV[k.id] : rgIngles() ? k.nombre_en : k.nombre_es; }
 
 /* Al entrar a la ruta: los datos de nuevo (cambian mientras la gente paga) y,
    si el enlace trae ?rg= y ?rt=, el seguimiento de ese pedido. */
@@ -90,8 +98,8 @@ function rgPinta(){
   rgEl("rg-catalogo").hidden = !abierta;
   rgEl("rg-cerrada").hidden = !(c && c.estado === "cerrada");
   if (!abierta) { rgEl("rg-pagar").hidden = true; rgEl("rg-barra").hidden = true; return; }
-  /* En inglés, si hay aliada, el dólar va primero. */
-  if (!RG.viaElegida) RG.via = lang === "en" && c.usd ? "usd" : "cop";
+  /* En inglés (y en sueco), si hay aliada, el dólar va primero. */
+  if (!RG.viaElegida) RG.via = rgIngles() && c.usd ? "usd" : "cop";
   rgPintaFiltros();
   rgPintaGrid();
   rgPintaLista();
@@ -182,7 +190,7 @@ function rgPintaZonas(){
   var d = RG.datos, caja = rgEl("rg-zonas");
   if (!caja) return;
   var borrador = !d.campana || d.campana.estado === "borrador";
-  var loc = lang === "en" ? "en-US" : "es-CO";
+  var loc = rgLoc();
   var arboles = (d.zonas || []).map(function(z){
     var meta = Number(z.meta) || 0;
     return rgArbol(z, Math.min(z.entregados, meta), Math.min(z.financiados, meta));
@@ -190,7 +198,7 @@ function rgPintaZonas(){
   var mayor = Math.max.apply(null, arboles.map(function(a){ return a.w; }).concat([1]));
   caja.innerHTML = (d.zonas || []).map(function(z, k){
     var meta = Number(z.meta) || 0, ent = Math.min(z.entregados, meta), fin = Math.min(z.financiados, meta);
-    var nombre = lang === "en" ? z.nombre_en : z.nombre_es;
+    var nombre = rgIngles() ? z.nombre_en : z.nombre_es;
     return '<div class="rg-zona">' +
       '<div class="rg-luces" role="img" style="--rg-ancho:' + (arboles[k].w / mayor * 100).toFixed(1) + '%" aria-label="' +
         rgEsc(nombre + ": " + t("rg.zona.aria").replace("{f}", fin).replace("{m}", meta)) + '">' + arboles[k].svg + '</div>' +
@@ -211,9 +219,9 @@ function rgChip(campo, valor, texto){
 function rgPintaFiltros(){
   var d = RG.datos;
   var g = function(etq, chips){ return '<div class="rg-fgrupo" role="group" aria-label="' + rgEsc(etq) + '"><span class="rg-fetq">' + rgEsc(etq) + '</span>' + chips + '</div>'; };
-  var zonas = rgChip("zona", "", t("rg.todas")) + (d.zonas || []).map(function(z){ return rgChip("zona", z.id, lang === "en" ? z.nombre_en : z.nombre_es); }).join("");
-  var tipos = rgChip("tipo", "", t("rg.todos")) + (d.categorias || []).map(function(k){ return rgChip("tipo", k.id, lang === "en" ? k.nombre_en : k.nombre_es); }).join("");
-  var edades = rgChip("edad", "", t("rg.todas")) + Object.keys(RG_EDADES).map(function(k){ return rgChip("edad", k, t("rg.edad.r").replace("{r}", k.replace("-", lang === "en" ? " to " : " a "))); }).join("");
+  var zonas = rgChip("zona", "", t("rg.todas")) + (d.zonas || []).map(function(z){ return rgChip("zona", z.id, rgIngles() ? z.nombre_en : z.nombre_es); }).join("");
+  var tipos = rgChip("tipo", "", t("rg.todos")) + (d.categorias || []).map(function(k){ return rgChip("tipo", k.id, rgNombreTipo(k)); }).join("");
+  var edades = rgChip("edad", "", t("rg.todas")) + Object.keys(RG_EDADES).map(function(k){ return rgChip("edad", k, t("rg.edad.r").replace("{r}", k.replace("-", lang === "sv" ? " till " : lang === "en" ? " to " : " a "))); }).join("");
   var generos = rgChip("genero", "", t("rg.todos")) + rgChip("genero", "nina", t("rg.genero.nina")) + rgChip("genero", "nino", t("rg.genero.nino"));
   var disp = rgChip("disp", "1", t("rg.f.disp")) + rgChip("disp", "", t("rg.f.todos"));
   rgEl("rg-filtros").innerHTML = g(t("rg.f.zona"), zonas) + g(t("rg.f.tipo"), tipos) + g(t("rg.f.edad"), edades) +
@@ -365,7 +373,7 @@ function rgPagar(ev){
 
   var cuerpo = {
     items: RG.lista.slice(), via: RG.via, nombre: nombre, email: email,
-    telefono: rgEl("rg-tel").value.trim(), idioma: lang === "en" ? "en" : "es",
+    telefono: rgEl("rg-tel").value.trim(), idioma: rgIngles() ? "en" : "es", /* en sueco, los correos salen en inglés */
     certificado: cert, cert_doc_tipo: rgEl("rg-doctipo").value,
     cert_doc_numero: rgEl("rg-docnum").value.trim(), cert_ciudad: rgEl("rg-ciudad").value.trim(), muro: "no",
     carta: rgEl("rg-carta").value, firma: rgEl("rg-firma").value.trim(), noticias: rgEl("rg-noticias").checked,
@@ -541,8 +549,8 @@ function rgPintaSeg(){
         (f ? '<span class="mu">' + rgEsc(rgFecha(f.slice(0, 10))) + (p === "entregado" && it.acta ? ' · ' + rgEsc(t("rg.seg.acta").replace("{a}", it.acta)) : '') + '</span>' : '') + '</li>';
     }).join("");
     return '<article class="rg-seg-item"><p class="rg-quien"><strong>' + rgEsc(it.nombre) + '</strong>, ' + rgEsc(rgEdad(it.edad)) +
-      ' · ' + rgEsc(lang === "en" && it.deseo_en ? it.deseo_en : it.deseo_es) + '</p>' +
-      '<p class="rg-donde">' + rgEsc((lang === "en" ? it.zona_en : it.zona_es) + " · " + it.departamento) + ' · ' + rgEsc(it.codigo) + '</p>' +
+      ' · ' + rgEsc(rgIngles() && it.deseo_en ? it.deseo_en : it.deseo_es) + '</p>' +
+      '<p class="rg-donde">' + rgEsc((rgIngles() ? it.zona_en : it.zona_es) + " · " + it.departamento) + ' · ' + rgEsc(it.codigo) + '</p>' +
       nota + (it.estado === "sin_cupo" || it.estado === "apartado" ? '' : '<ol class="rg-linea">' + linea + '</ol>') + '</article>';
   }).join("");
   cuerpo.innerHTML = cab + '<div class="rg-seg-items">' + items + '</div>' + rgSegCarta(d);

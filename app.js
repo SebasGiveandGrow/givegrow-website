@@ -2476,6 +2476,7 @@ var I18N = {
     "med.link.toc":"La teoría de cambio y sus doce indicadores",
     "transp.toc.link":"Teoría de cambio: qué medimos y qué todavía no",
     /* Regalos de diciembre (#regalos, migración 0048) */
+    "rg.idioma":"Idioma de esta página",
     "rg.ey":"Navidad 2026",
     "rg.h1":"Mil regalos para niñas y niños de Uribia, Medellín y Leticia.",
     "rg.lead":"Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.",
@@ -2692,7 +2693,9 @@ var I18N = {
 };
 
 var lang = "es";
-function t(k){ return (I18N[lang] && I18N[lang][k]) || (I18N.es[k]) || k; }
+/* El sueco solo existe para la página de regalos (3 nov 2026): lo que no está
+   en sv.json —el menú, el pie— sale en inglés, no en español. */
+function t(k){ return (I18N[lang] && I18N[lang][k]) || (lang === "sv" && I18N.en && I18N.en[k]) || (I18N.es[k]) || k; }
 
 var currentRoute = "inicio";
 var ROUTE_META = {
@@ -2734,7 +2737,7 @@ var ROUTE_META = {
   gracias:{t:{es:"Gracias por tu aporte · Give&Grow International",en:"Thank you for your gift · Give&Grow International"},d:{es:"Recibimos tu aporte y lo estamos confirmando. Guarda tu número de guía: con él puedes seguirlo hasta la entrega.",en:"We received your gift and we are confirming it. Keep your tracking number: it lets you follow the gift through to delivery."}},
   aliados:{t:{es:"Alía tu empresa · Give&Grow International",en:"Partner your company · Give&Grow International"},d:{es:"Formulario de alianza empresarial: elige tu modalidad de aporte y súmate al HUB SOCIAL. Sin costo y sin exclusividad.",en:"Corporate partnership form: choose how your company contributes and join the Social Hub. No cost, no exclusivity."}},
   apadrinamiento:{t:{es:"Apadrinamiento · Give&Grow International",en:"Sponsorship · Give&Grow International"},d:{es:"Apadrina cada mes una unidad de impacto verificable de una fundación del HUB: un niño en un programa, un filtro de agua para una familia, una beca de baile o de fútbol.",en:"Sponsor, every month, a verifiable unit of impact from a Hub foundation: a child in a programme, a water filter for a family, a dance or football scholarship."}},
-  regalos:{t:{es:"Regalos de diciembre · Give&Grow International",en:"December Gifts · Give&Grow International"},d:{es:"Mil regalos para niñas y niños de Uribia (La Guajira), Medellín (Antioquia) y Leticia (Amazonas). Escoge uno o varios, págalo en pesos o en dólares y sigue cada regalo hasta su entrega con acta.",en:"A thousand gifts for children in Uribia (La Guajira), Medellín (Antioquia) and Leticia (Amazonas). Choose one or several, pay in pesos or US dollars, and follow each gift until it is delivered and recorded."}},
+  regalos:{t:{es:"Regalos de diciembre · Give&Grow International",en:"December Gifts · Give&Grow International",sv:"Julklappar i december · Give&Grow International"},d:{es:"Mil regalos para niñas y niños de Uribia (La Guajira), Medellín (Antioquia) y Leticia (Amazonas). Escoge uno o varios, págalo en pesos o en dólares y sigue cada regalo hasta su entrega con acta.",en:"A thousand gifts for children in Uribia (La Guajira), Medellín (Antioquia) and Leticia (Amazonas). Choose one or several, pay in pesos or US dollars, and follow each gift until it is delivered and recorded.",sv:"Tusen julklappar till barn i Uribia (La Guajira), Medellín (Antioquia) och Leticia (Amazonas). Välj en eller flera, betala i pesos eller amerikanska dollar och följ varje julklapp tills den har lämnats över och protokollförts."}},
   socialfest:{t:{es:"Social Fest 2026 · Give&Grow International",en:"Social Fest 2026 · Give&Grow International"},d:{es:"Impact Journey para empresas —voluntariado en doble vía, piloto sin cuota de participación— y el HUB SOCIAL para fundaciones y profesionales. Give&Grow en Social Fest 2026, Ruta N, Medellín.",en:"Impact Journey for companies —two-way volunteering, a pilot with no participation fee— and the HUB SOCIAL for foundations and professionals. Give&Grow at Social Fest 2026, Ruta N, Medellín."}},
   comercio:{t:{es:"Comercio aliado · Give&Grow International",en:"Partner business · Give&Grow International"},d:{es:"Comercios del Programa de Gratitud: qué beneficio ofrecen y a quiénes reconocen por hacer posible el impacto.",en:"Businesses in the Gratitude Program: the benefit they offer and who they recognise for making impact possible."}}
 };
@@ -2796,7 +2799,7 @@ function applyRouteMeta(id){
     return; /* renderEmpresa la aplica cuando cargan los datos */
   }
   var m = ROUTE_META[id] || ROUTE_META.inicio;
-  var ti = m.t[lang]||m.t.es, de = m.d[lang]||m.d.es;
+  var ti = m.t[lang]||(lang==="sv"&&m.t.en)||m.t.es, de = m.d[lang]||(lang==="sv"&&m.d.en)||m.d.es;
   document.title = ti;
   setMetaTag("name","description",de);
   // la vista 404 del SPA se sirve con 200 (fallback SPA): no indexarla
@@ -2814,10 +2817,10 @@ function applyRouteMeta(id){
      previa no ve la #, va a la raíz y pinta la tarjeta de la portada. */
   var conPath = RUTAS_PATH.indexOf(id) > -1 || id === "socialfest";
   setMetaTag("property","og:url",ORIGIN_FUND+(conPath ? "/" : "/#")+id);
-  setMetaTag("property","og:locale", lang==="en"?"en_US":"es_CO");
+  setMetaTag("property","og:locale", lang==="en"?"en_US":lang==="sv"?"sv_SE":"es_CO");
   /* La imagen de la tarjeta, la misma que pone el Worker (`OG_IMG_RUTA` y
      `cabeceraPagina`): si no, al navegar se volvía a la de la portada. */
-  var ogImg = ORIGIN_FUND + "/img/og" + (id==="regalos" ? "-regalos" : "") + (lang==="en" ? "-en" : "") + ".jpg";
+  var ogImg = ORIGIN_FUND + "/img/og" + (id==="regalos" ? "-regalos" : "") + (lang!=="es" ? "-en" : "") + ".jpg";
   setMetaTag("property","og:image", ogImg);
   setMetaTag("name","twitter:image", ogImg);
   setMetaTag("name","twitter:title",ti);
@@ -3134,7 +3137,7 @@ function postLang(l){
      ponerlo cuando cambia el idioma. */
   cajasDesplazables();
 }
-var I18N_LOADING = null;
+var I18N_LOADING = {};
 /* EL ESPAÑOL VIAJA DENTRO DE app.js; EL INGLÉS SE PIDE POR RED. Esa asimetría
    está bien —son 1.616 claves que la mayoría no necesita— pero tenía un modo de
    fallo mudo: si el fetch no llegaba, `setLang` hacía `return` y no pasaba nada
@@ -3152,19 +3155,36 @@ var I18N_LOADING = null;
    que volvía en inglés seguía con el diccionario viejo y cada texto nuevo le
    salía en español. `no-cache` sí pregunta, y si el archivo no cambió el
    servidor responde 304 sin cuerpo: cuesta una ida y vuelta, no una descarga. */
-function pedirIngles(){
-  return fetch("/i18n/en.json", { cache: "no-cache" })
+function pedirIdioma(l){
+  return fetch("/i18n/" + l + ".json", { cache: "no-cache" })
     .then(function(r){ if(!r.ok) throw 0; return r.json(); });
 }
-function ensureLang(next){
-  if (next !== "en" || I18N.en) return Promise.resolve();
-  if (!I18N_LOADING){
-    I18N_LOADING = pedirIngles()
-      .catch(function(){ return pedirIngles(); })
-      .then(function(j){ I18N.en = j; })
-      .catch(function(){ I18N_LOADING = null; });
+function cargarIdioma(l){
+  if (I18N[l]) return Promise.resolve();
+  if (!I18N_LOADING[l]){
+    I18N_LOADING[l] = pedirIdioma(l)
+      .catch(function(){ return pedirIdioma(l); })
+      .then(function(j){ I18N[l] = j; })
+      .catch(function(){ I18N_LOADING[l] = null; });
   }
-  return I18N_LOADING;
+  return I18N_LOADING[l];
+}
+/* El sueco se apoya en el inglés para todo lo que no es la página de regalos,
+   así que pide los dos. */
+function ensureLang(next){
+  if (next === "en") return cargarIdioma("en");
+  if (next === "sv") return Promise.all([cargarIdioma("en"), cargarIdioma("sv")]);
+  return Promise.resolve();
+}
+/* SUECO, SOLO EN REGALOS. Fuera de esa página el resto del sitio sigue siendo
+   bilingüe (y su código pregunta `lang === "en"` en cientos de sitios), así que
+   quien lee en sueco y sale de regalos pasa al inglés. Se mira también la
+   dirección porque al arrancar el idioma se aplica antes de enrutar. */
+function idiomaPosible(l){
+  if (l !== "sv") return (l === "en") ? "en" : "es";
+  var enRegalos = currentRoute === "regalos" || /^#regalos(\b|$)/.test(location.hash) ||
+                  /^\/regalos\/?$/.test(location.pathname);
+  return enRegalos ? "sv" : "en";
 }
 /* La franja vive fuera de las páginas porque se puede pulsar EN desde
    cualquiera. Va en las dos lenguas en la misma línea a propósito: el
@@ -3209,16 +3229,16 @@ function avisoIdioma(mostrar){
   f.style.display = mostrar ? "block" : "none";
 }
 function setLang(l){
-  var next = (l === "en") ? "en" : "es";
+  var next = idiomaPosible(l);
   ensureLang(next).then(function(){
-    if (next === "en" && !I18N.en){ avisoIdioma(true); return; }
+    if (next !== "es" && !I18N[next]){ avisoIdioma(true); return; }
     avisoIdioma(false);
     var vt = document.startViewTransition && window.matchMedia &&
              !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
              typeof lang !== "undefined" && lang && lang !== next;
     if (vt){
       try {
-        var tr = document.startViewTransition(function(){ postLang(l); });
+        var tr = document.startViewTransition(function(){ postLang(next); });
         // Si una transición previa sigue activa, esta la aborta y su promesa
         // rechaza con InvalidStateError: lo absorbemos (no es un fallo real).
         if (tr && tr.finished && tr.finished.catch) tr.finished.catch(function(){});
@@ -3229,13 +3249,13 @@ function setLang(l){
            animación. Auditoría preevento, 12 oct 2026. */
         if (tr && tr.ready && tr.ready.catch) tr.ready.catch(function(){});
         if (tr && tr.updateCallbackDone && tr.updateCallbackDone.catch) tr.updateCallbackDone.catch(function(){});
-      } catch(e){ postLang(l); }
+      } catch(e){ postLang(next); }
     }
-    else { postLang(l); }
+    else { postLang(next); }
   });
 }
 function applyLang(l){
-  lang = (l === "en") ? "en" : "es";
+  lang = (l === "en" || l === "sv") ? l : "es";
   document.documentElement.lang = lang;
   var nodes = document.querySelectorAll("[data-i18n]");
   for (var i=0;i<nodes.length;i++){
@@ -3256,6 +3276,9 @@ function applyLang(l){
      es el idioma activo. */
   ["lang-es","dlang-es"].forEach(function(id){var e=document.getElementById(id);if(e){e.classList.toggle("on",on==="es");e.setAttribute("aria-pressed",on==="es"?"true":"false");}});
   ["lang-en","dlang-en"].forEach(function(id){var e=document.getElementById(id);if(e){e.classList.toggle("on",on==="en");e.setAttribute("aria-pressed",on==="en"?"true":"false");}});
+  /* Los botones de idioma dentro de una página (hoy solo regalos, que tiene
+     sueco): cada uno dice su idioma en `data-idioma`. */
+  document.querySelectorAll("[data-idioma]").forEach(function(e){ var si = e.getAttribute("data-idioma") === on; e.classList.toggle("on", si); e.setAttribute("aria-pressed", si ? "true" : "false"); });
   renderPobChips();
   applyRouteMeta(currentRoute);
   calcUpdate();
@@ -3631,7 +3654,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "d830013e", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "ec6dab69", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
@@ -3883,6 +3906,7 @@ function go(id, fromPop){
      antes de tiempo (ver index.html). Desde aquí manda `.active`. */
   document.documentElement.removeAttribute("data-ruta");
   currentRoute = id;
+  if (lang === "sv" && id !== "regalos") setLang("en");
   if (location.hash !== "#"+id) history[fromPop ? "replaceState" : "pushState"](null,"","#"+id);
   applyRouteMeta(id);
   renderJourney(id);
@@ -5730,7 +5754,9 @@ function init(){
      2026): sin esto el inglés solo se activaba con el botón, y no había un
      enlace que mandarle a un financiador extranjero. Cualquier otro valor
      deja el español. */
-  setLang(new URLSearchParams(location.search).get("lang") === "en" ? "en" : "es");
+  /* `?lang=sv` solo vale en regalos; en otra página `setLang` lo vuelve inglés. */
+  var qLang = new URLSearchParams(location.search).get("lang");
+  setLang(qLang === "en" || qLang === "sv" ? qLang : "es");
   /* /transparencia, /donar, /teoria-de-cambio… son la misma SPA servida con
      path propio para los buscadores (ver `RUTAS_PATH`). Al llegar por ahí, la
      dirección vuelve a la forma de siempre, /#ruta, conservando la query (el
