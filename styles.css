@@ -2473,8 +2473,26 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 .rg-linea li::before{content:"";position:absolute;left:0;top:.45em;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--plata)}
 .rg-linea li.is-on{color:var(--ink);font-weight:600}
 .rg-linea li.is-on::before{background:var(--oro);border-color:var(--oro)}
+/* Bloque 2 (nov 2026): cuánto falta, el plazo, compartir, «quien más lleva
+   esperando» y las reglas de excedentes. El rojo marca lo urgente; el dorado,
+   lo cumplido. */
+.rg-plazo{font-weight:700;font-size:var(--fs-16);color:var(--rojo);margin:14px 0 0}
+.rg-zona-falta{font-size:var(--fs-13);font-weight:700;color:var(--rojo);margin:6px 0 0;font-variant-numeric:tabular-nums}
+.rg-zona-falta.is-llena{color:var(--oro-texto)}
+.rg-comp-camp{margin:20px 0 0}
+.rg-espera{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:0 0 16px}
+.rg-espera p{margin:0;font-size:var(--fs-13);max-width:52ch}
+.rg-comp{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:36px;background:none;border:0;padding:4px 0;margin:6px 0 0;color:var(--mu);font:inherit;font-size:var(--fs-13);cursor:pointer}
+.rg-comp:hover{color:var(--ink)}
+.rg-comp .rg-ic{width:15px;height:15px}
+.rg-card.is-foco{border-color:var(--oro);box-shadow:0 0 0 2px var(--oro),var(--shadow)}
+.rg-reglas{margin-top:36px;padding-top:22px;border-top:1px solid var(--plata)}
+.rg-reglas dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 36px;margin:14px 0 16px}
+.rg-reglas dt{font-weight:700;font-size:var(--fs-15)}
+.rg-reglas dd{margin:4px 0 0;font-size:var(--fs-14);line-height:1.55}
+.rg-reglas > p{font-size:var(--fs-13);margin:0}
 @media (max-width:820px){
-  .rg-zonas,.rg-pasos,.rg-pagar{grid-template-columns:1fr}
+  .rg-zonas,.rg-pasos,.rg-pagar,.rg-reglas dl{grid-template-columns:1fr}
   .rg-zonas{gap:30px}
   .rg-pagar{gap:24px}
   .rg-fetq{min-width:0;width:100%}

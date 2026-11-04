@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "f20ca0af";
+const STYLES_V = "ec2990b0";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -3374,7 +3374,12 @@ async function apiRegalos(env) {
 
   const campana = {
     id: c.id, nombre_es: c.nombre_es, nombre_en: c.nombre_en, estado: c.estado, cierre: c.cierre,
-    recibe: regalosRecibe(c), aliada_nombre: c.aliada_nombre || null, usd: !!(c.aliada_nombre && c.aliada_url)
+    recibe: regalosRecibe(c), aliada_nombre: c.aliada_nombre || null, usd: !!(c.aliada_nombre && c.aliada_url),
+    /* Cuántos días quedan para donar, contados en Colombia: 0 = hoy es el
+       último. Lo calcula el servidor para no depender del reloj de quien mira. */
+    quedan_dias: regalosRecibe(c) && c.cierre
+      ? Math.round((Date.parse(c.cierre + "T00:00:00Z") - Date.parse(fechaCO(new Date().toISOString()) + "T00:00:00Z")) / 864e5)
+      : null
   };
   const zonas = await regalosZonas(env);
   const cats = await env.DB.prepare(
@@ -3392,7 +3397,7 @@ async function apiRegalos(env) {
   if (c.estado !== "abierta") return json({ campana, zonas, categorias, regalos: [] }, 200, cache);
 
   const { results } = await env.DB.prepare(
-    "SELECT r.codigo, r.zona_id, r.categoria_id, r.deseo_es, r.deseo_en, r.talla, r.estado, " +
+    "SELECT r.codigo, r.zona_id, r.categoria_id, r.deseo_es, r.deseo_en, r.talla, r.estado, r.publicado_en, " +
     "CASE WHEN " + REGALO_LIBRE + " THEN 1 ELSE 0 END AS libre, " +
     "n.nombre_publico, n.edad, n.genero, " +
     "CASE WHEN n.autoriza_foto = 1 AND n.foto_key IS NOT NULL THEN 1 ELSE 0 END AS foto, " +
@@ -3407,6 +3412,9 @@ async function apiRegalos(env) {
     deseo_es: r.deseo_es, deseo_en: r.deseo_en || null, talla: r.talla || null,
     nombre: r.nombre_publico, edad: r.edad, genero: r.genero, foto: !!r.foto,
     valor_cop: r.valor_cop, valor_usd: r.valor_usd,
+    /* Desde qué día espera (solo la fecha): el botón «regala a quien más lleva
+       esperando» elige con ella. */
+    desde: r.publicado_en ? String(r.publicado_en).slice(0, 10) : null,
     /* disponible | apartado | financiado | comprado | despachado | entregado */
     estado: r.estado === "publicado" ? (r.libre ? "disponible" : "apartado") : r.estado
   }));
@@ -3832,13 +3840,33 @@ async function correoRegalosEstado(env, ref, paso) {
   }
   const enlace = enlaceSeguimientoRegalos(p.ref, p.token);
   const titulo = T.t + " · " + p.ref;
+  /* LA MEMBRESÍA SE PIDE AQUÍ Y NO AL PAGAR (investigación de mejoras, 24 oct
+     2026): este correo llega con la prueba en la mano, el acta, y es el
+     momento en que un donante de una vez decide si vuelve. Una invitación,
+     sin cifras ni promesas, y solo en este paso. */
+  const membresia = paso === "entregado" ? {
+    url: ORIGIN + "/membresias" + (en ? "?lang=en" : ""),
+    texto: en
+      ? "What you did this December, the foundation does all year with its partner foundations. If you want to keep going, a monthly membership is the way to do it:"
+      : "Lo que hiciste en diciembre, la fundación lo hace todo el año con sus fundaciones aliadas. Si quieres seguir, la membresía mensual es la forma de acompañarlo:",
+    boton: en ? "See memberships" : "Conocer las membresías"
+  } : null;
   await enviarCorreo(env, {
     para: p.email,
     asunto: titulo,
-    texto: [titulo, "", ...parrafos, "", ...items.map((x) => "· " + x), "", (en ? "Follow them: " : "Síguelos: ") + enlace].join("\n"),
+    texto: [titulo, "", ...parrafos, "", ...items.map((x) => "· " + x), "", (en ? "Follow them: " : "Síguelos: ") + enlace,
+      ...(membresia ? ["", membresia.texto + " " + membresia.url] : [])].join("\n"),
     html: plantillaCorreo({
       titulo, parrafos, lista: { titulo: en ? "Gifts" : "Regalos", items },
-      boton: { url: enlace, texto: en ? "Follow my gifts" : "Seguir mis regalos" },
+      /* Con la invitación, el botón del seguimiento va dentro del bloque: la
+         plantilla pinta el bloque antes del botón, y la prueba va primero. */
+      boton: membresia ? null : { url: enlace, texto: en ? "Follow my gifts" : "Seguir mis regalos" },
+      bloque: membresia
+        ? `<p style="margin:20px 0 0"><a href="${esc(enlace)}" style="display:inline-block;background:#1F5C38;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:999px">${esc(en ? "Follow my gifts" : "Seguir mis regalos")}</a></p>` +
+          `<div style="margin:22px 0 0;padding:16px 18px;border:1px solid #DAD3C3;border-radius:12px;background:#F3EFE6">` +
+          `<p style="margin:0 0 10px;font-size:14px;line-height:1.6;color:#3A3F45">${esc(membresia.texto)}</p>` +
+          `<a href="${esc(membresia.url)}" style="font-size:14px;font-weight:700;color:#1F5C38">${esc(membresia.boton)} →</a></div>`
+        : "",
       cierre: en ? "This is an automatic message from Fundación Give&Grow International."
                  : "Este mensaje es automático."
     }),
