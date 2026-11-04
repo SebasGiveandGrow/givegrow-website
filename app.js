@@ -2567,6 +2567,35 @@ var I18N = {
     "rg.zona.fin":"{n} financiados",
     "rg.zona.ent":"{n} entregados",
     "rg.zona.fecha":"Entrega prevista: {f}",
+    "rg.plazo.n":"Quedan {n} días para regalar: hasta el {f}.",
+    "rg.plazo.1":"Queda un día para regalar: hasta el {f}.",
+    "rg.plazo.0":"Hoy es el último día para regalar.",
+    "rg.zona.faltan":"Faltan {n} luces",
+    "rg.zona.falta1":"Falta 1 luz",
+    "rg.zona.llena":"Todas las luces encendidas",
+    "rg.comp.btn":"Compartir",
+    "rg.comp.aria":"Compartir el regalo de {n}",
+    "rg.comp.txt":"{q} en {z} pidió para esta Navidad “{d}”. Se lo puedes regalar aquí:",
+    "rg.comp.nina":"Una niña de {e}",
+    "rg.comp.nino":"Un niño de {e}",
+    "rg.comp.otro":"Una niña o un niño de {e}",
+    "rg.comp.camp":"Mil regalos para niñas y niños de Uribia, Medellín y Leticia. Escoge a quién regalar:",
+    "rg.comp.campana":"Compartir la campaña",
+    "rg.foco.tomado":"Ese regalo ya tiene quien lo regale. Estos niños de {z} siguen esperando.",
+    "rg.espera.btn":"Regala a quien más lleva esperando",
+    "rg.espera.ayuda":"Escogemos por ti, dentro de los filtros que pusiste, a quien lleva más tiempo en la lista.",
+    "rg.espera.ok":"Agregamos a {n}, {e}, de {z}, a tu lista.",
+    "rg.espera.nadie":"Con estos filtros ya no queda nadie esperando. Prueba con otra zona o con todas.",
+    "rg.reglas.h":"Si algo cambia, te avisamos",
+    "rg.reglas.1.t":"Si otra persona pagó primero el mismo regalo",
+    "rg.reglas.1.p":"Tu aporte va a otra niña u otro niño de la misma zona, con el mismo tipo de regalo si lo hay y sin pasar del valor que pagaste.",
+    "rg.reglas.2.t":"Si una niña o un niño ya no puede recibirlo",
+    "rg.reglas.2.p":"Si se mudó o cambió de comunidad, su regalo va a otra niña u otro niño de la misma zona que siga esperando.",
+    "rg.reglas.3.t":"Si el regalo cuesta menos de lo que pagaste",
+    "rg.reglas.3.p":"La diferencia se queda en la misma zona, para completar otros regalos o su transporte, y aparece en el informe de cierre de la campaña.",
+    "rg.reglas.4.t":"Si en la zona ya no queda nadie esperando",
+    "rg.reglas.4.p":"Una persona del equipo decide a qué niña o niño de la campaña se asigna tu aporte.",
+    "rg.reglas.pie":"En cada caso te escribimos al correo que dejaste.",
     "rg.cuenta":"{n} de {t} niños",
     "rg.cargando":"Cargando…",
     "rg.ninguno":"Ningún niño coincide con esos filtros.",
@@ -3655,7 +3684,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "8bc1012a", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "cba4e7ea", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
@@ -3798,7 +3827,7 @@ var ACT_DIFERIDAS = {
   closeLightbox:"impacto", lbStep:"impacto",
   rgFiltro:"regalos", rgToggle:"regalos", rgQuitar:"regalos", rgMas:"regalos", rgVia:"regalos", rgCert:"regalos",
   rgPagar:"regalos", rgIrAPagar:"regalos", rgCartaCuenta:"regalos", rgVideo:"regalos", rgVideoQuitar:"regalos",
-  rgSegGuardar:"regalos",
+  rgSegGuardar:"regalos", rgCompartir:"regalos", rgEspera:"regalos",
   apuCalcula:"apadrinamiento", apuInteres:"apadrinamiento"
 };
 function runAct(spec, el, ev){

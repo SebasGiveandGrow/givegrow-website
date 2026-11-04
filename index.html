@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=f20ca0af">
+<link rel="stylesheet" href="/styles.css?v=ec2990b0">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=6c26a510" defer></script>
+<script src="/app.js?v=87296e7d" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1513,6 +1513,7 @@
       <span class="ey rv" data-i18n="rg.ey">Navidad 2026</span>
       <h1 class="h-sec rg-h1 rv" data-i18n="rg.h1">Mil regalos para niñas y niños de Uribia, Medellín y Leticia.</h1>
       <p class="lead rv d1" data-i18n="rg.lead">Esta Navidad, cada tarjeta es una niña o un niño real, con el regalo que pidió. Escoge a quién regalar, págalo en pesos o en dólares y acompaña tu regalo hasta que llegue a sus manos, con acta de entrega.</p>
+      <p class="rg-plazo" id="rg-plazo" aria-live="polite" hidden></p>
       <h2 class="rg-luces-t rv d2" data-i18n="rg.luces.t">Una luz por cada niño</h2>
       <p class="rg-luces-p rv d2" data-i18n="rg.luces.p">Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.</p>
       <div class="rg-zonas rv d2" id="rg-zonas" aria-live="polite"></div>
@@ -1521,6 +1522,7 @@
         <li><span class="rg-l is-f" aria-hidden="true"></span><span data-i18n="rg.luz.fin">Regalo financiado</span></li>
         <li><span class="rg-l is-e" aria-hidden="true"></span><span data-i18n="rg.luz.ent">Entregado, con acta</span></li>
       </ul>
+      <p class="rg-comp-camp" id="rg-comp-camp" hidden><button type="button" class="btn btn-w" data-act="rgCompartir()"><span data-i18n="rg.comp.campana">Compartir la campaña</span></button></p>
     </div>
   </section>
 
@@ -1556,6 +1558,18 @@
         <div class="step"><div class="step-n">2</div><div><h3 class="h-comp4" data-i18n="rg.como.2.t">Paga</h3><p data-i18n="rg.como.2.p">En pesos, con Wompi, y te emitimos el certificado de donación. En dólares, a través de nuestra fundación aliada en Estados Unidos, que te emite el suyo.</p></div></div>
         <div class="step"><div class="step-n">3</div><div><h3 class="h-comp4" data-i18n="rg.como.3.t">Síguelo</h3><p data-i18n="rg.como.3.p">Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.</p></div></div>
       </div>
+      <!-- LAS REGLAS DE EXCEDENTES, publicadas antes de abrir (investigación de
+           mejoras, 24 oct 2026): qué pasa con el aporte si algo cambia. -->
+      <div class="rg-reglas">
+        <h3 class="h-comp4" data-i18n="rg.reglas.h">Si algo cambia, te avisamos</h3>
+        <dl>
+          <div><dt data-i18n="rg.reglas.1.t">Si otra persona pagó primero el mismo regalo</dt><dd data-i18n="rg.reglas.1.p">Tu aporte va a otra niña u otro niño de la misma zona, con el mismo tipo de regalo si lo hay y sin pasar del valor que pagaste.</dd></div>
+          <div><dt data-i18n="rg.reglas.2.t">Si una niña o un niño ya no puede recibirlo</dt><dd data-i18n="rg.reglas.2.p">Si se mudó o cambió de comunidad, su regalo va a otra niña u otro niño de la misma zona que siga esperando.</dd></div>
+          <div><dt data-i18n="rg.reglas.3.t">Si el regalo cuesta menos de lo que pagaste</dt><dd data-i18n="rg.reglas.3.p">La diferencia se queda en la misma zona, para completar otros regalos o su transporte, y aparece en el informe de cierre de la campaña.</dd></div>
+          <div><dt data-i18n="rg.reglas.4.t">Si en la zona ya no queda nadie esperando</dt><dd data-i18n="rg.reglas.4.p">Una persona del equipo decide a qué niña o niño de la campaña se asigna tu aporte.</dd></div>
+        </dl>
+        <p class="mu" data-i18n="rg.reglas.pie">En cada caso te escribimos al correo que dejaste.</p>
+      </div>
     </div>
   </section>
 
@@ -1563,6 +1577,10 @@
     <div class="wrap">
       <h2 class="h-sec" data-i18n="rg.lista.h">Escoge a quién regalar</h2>
       <div class="rg-filtros" id="rg-filtros"></div>
+      <div class="rg-espera" id="rg-espera" hidden>
+        <button type="button" class="btn btn-o rg-add" data-act="rgEspera()"><svg class="rg-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5v8h14v-8M12 8.5v12M12 8.5c-1.6-3.6-5.5-4-5.5-1.6 0 1.6 3.2 1.6 5.5 1.6zM12 8.5c1.6-3.6 5.5-4 5.5-1.6 0 1.6-3.2 1.6-5.5 1.6z"/></svg><span data-i18n="rg.espera.btn">Regala a quien más lleva esperando</span></button>
+        <p class="mu" data-i18n="rg.espera.ayuda">Escogemos por ti, dentro de los filtros que pusiste, a quien lleva más tiempo en la lista.</p>
+      </div>
       <p class="rg-cuenta mu" id="rg-cuenta" aria-live="polite"></p>
       <div class="rg-grid" id="rg-grid"></div>
       <div class="rg-mas"><button type="button" class="btn btn-w" id="rg-mas" hidden data-act="rgMas()" data-i18n="rg.mas">Ver más</button></div>

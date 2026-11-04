@@ -67,10 +67,13 @@ function rgEntrar(){
      servidor decide si el código vale; aquí solo se limpia la forma. */
   var emb = String(q.get("emb") || "").toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 24);
   if (emb) { try { sessionStorage.setItem("rg-emb", emb); } catch (e) {} }
+  /* El enlace de una ficha compartida (?n=URI-0001): esa tarjeta va primero. */
+  var foco = String(q.get("n") || "").toUpperCase();
+  if (/^[A-Z]{3}-\d{4}$/.test(foco) && !RG.focoVisto) RG.foco = foco;
   if (RG.datos) rgPinta();
   if (RG.pidiendo) return;
   RG.pidiendo = fetch("/api/regalos").then(function(r){ if (!r.ok) throw 0; return r.json(); })
-    .then(function(d){ RG.datos = d; RG.pidiendo = null; rgLimpiaLista(); rgPinta(); })
+    .then(function(d){ RG.datos = d; RG.pidiendo = null; rgLimpiaLista(); rgPreparaFoco(); rgPinta(); rgMuestraFoco(); })
     .catch(function(){
       RG.pidiendo = null;
       var c = rgEl("rg-cuenta");
@@ -100,6 +103,8 @@ function rgPinta(){
   rgEl("rg-pronto").hidden = estado !== "borrador";
   rgEl("rg-terminada").hidden = estado !== "cerrada";
   rgEl("rg-catalogo").hidden = !abierta;
+  rgEl("rg-comp-camp").hidden = !(abierta && c.recibe);
+  rgEl("rg-espera").hidden = !(abierta && c.recibe);
   if (!abierta) { rgEl("rg-pagar").hidden = true; rgEl("rg-barra").hidden = true; return; }
   /* En inglés (y en sueco), si hay aliada, el dólar va primero. */
   if (!RG.viaElegida) RG.via = rgIngles() && c.usd ? "usd" : "cop";
@@ -193,7 +198,9 @@ function rgPintaZonas(){
   var d = RG.datos, caja = rgEl("rg-zonas");
   if (!caja) return;
   var borrador = !d.campana || d.campana.estado === "borrador";
+  var abierta = !!d.campana && d.campana.estado === "abierta";
   var loc = rgLoc();
+  rgPintaPlazo();
   var arboles = (d.zonas || []).map(function(z){
     var meta = Number(z.meta) || 0;
     return rgArbol(z, Math.min(z.entregados, meta), Math.min(z.financiados, meta));
@@ -209,9 +216,24 @@ function rgPintaZonas(){
       '<p class="rg-zona-t">' + rgEsc(nombre) + ' <span>' + rgEsc(z.departamento) + '</span></p>' +
       '<p class="rg-zona-d">' + (borrador ? rgEsc(t("rg.zona.prep"))
         : rgEsc(t("rg.zona.fin").replace("{n}", fin.toLocaleString(loc))) + ' · ' + rgEsc(t("rg.zona.ent").replace("{n}", ent.toLocaleString(loc)))) + '</p>' +
+      /* CUÁNTO FALTA (investigación de mejoras, 24 oct 2026: los aportes se
+         aceleran cuando la meta se ve cerca). Solo con la campaña abierta. */
+      (abierta && meta ? '<p class="rg-zona-falta' + (fin >= meta ? ' is-llena' : '') + '">' +
+        rgEsc(fin >= meta ? t("rg.zona.llena") : t(meta - fin === 1 ? "rg.zona.falta1" : "rg.zona.faltan").replace("{n}", (meta - fin).toLocaleString(loc))) + '</p>' : '') +
       (z.fecha_entrega ? '<p class="rg-zona-d">' + rgEsc(t("rg.zona.fecha").replace("{f}", rgFecha(z.fecha_entrega))) + '</p>' : '') +
       '</div>';
   }).join("");
+}
+
+/* Los días que quedan para regalar, con la fecha de cierre del panel. El
+   servidor los cuenta en hora de Colombia (quedan_dias: 0 = hoy es el último). */
+function rgPintaPlazo(){
+  var el = rgEl("rg-plazo"), c = RG.datos && RG.datos.campana, n = c ? c.quedan_dias : null;
+  if (!el) return;
+  el.hidden = n == null || n < 0;
+  if (el.hidden) return;
+  el.textContent = (n === 0 ? t("rg.plazo.0") : t(n === 1 ? "rg.plazo.1" : "rg.plazo.n").replace("{n}", n))
+    .replace("{f}", rgFecha(c.cierre));
 }
 
 function rgChip(campo, valor, texto){
@@ -245,6 +267,8 @@ function rgFiltrados(){
 
 function rgPintaGrid(){
   var lista = rgFiltrados(), total = (RG.datos.regalos || []).length;
+  if (RG.foco) lista = lista.filter(function(r){ return r.codigo === RG.foco; })
+    .concat(lista.filter(function(r){ return r.codigo !== RG.foco; }));
   var recibe = RG.datos.campana && RG.datos.campana.recibe;
   rgEl("rg-cuenta").textContent = total
     ? t("rg.cuenta").replace("{n}", lista.length).replace("{t}", total)
@@ -271,7 +295,10 @@ function rgTarjeta(r, recibe){
   } else {
     accion = '<span class="tag' + (libre ? ' soon' : '') + '">' + rgEsc(t("rg.est." + (libre ? "cerrada" : r.estado))) + '</span>';
   }
-  return '<article class="rg-card' + (libre ? '' : ' is-tomado') + (enLista ? ' is-en' : '') + '">' +
+  var comp = libre && recibe ? '<button type="button" class="rg-comp" data-act="rgCompartir(\'' + rgEsc(r.codigo) + '\')" aria-label="' +
+    rgEsc(t("rg.comp.aria").replace("{n}", r.nombre)) + '">' + RG_COMPARTIR + rgEsc(t("rg.comp.btn")) + '</button>' : '';
+  return '<article class="rg-card' + (libre ? '' : ' is-tomado') + (enLista ? ' is-en' : '') + (RG.foco === r.codigo ? ' is-foco' : '') +
+    '" id="rg-' + rgEsc(r.codigo) + '">' +
     '<div class="rg-foto">' + foto + '</div>' +
     '<div class="rg-cuerpo">' +
       '<p class="rg-para">' + rgEsc(t("rg.para")) + '</p>' +
@@ -279,8 +306,72 @@ function rgTarjeta(r, recibe){
       '<p class="rg-donde">' + rgEsc(rgZona(r.zona)) + '</p>' +
       '<p class="rg-deseo">' + rgEsc(t("rg.deseo").replace("{d}", rgDeseo(r))) + '</p>' +
       '<p class="rg-tipo">' + rgEsc(rgTipo(r.categoria)) + (r.talla ? ' · ' + rgEsc(t("rg.talla").replace("{t}", r.talla)) : '') + '</p>' +
+      comp +
       '<div class="rg-pie"><span class="rg-valor">' + rgEsc(rgValor(r)) + '</span>' + accion + '</div>' +
     '</div></article>';
+}
+
+/* COMPARTIR (investigación de mejoras: el 99 % de quienes usan internet en
+   Colombia usa WhatsApp). En el celular abre el menú del sistema; en el
+   computador, WhatsApp Web. El texto NO lleva el nombre del niño: dice edad,
+   zona y deseo, y el enlace abre su tarjeta. La vista previa es la de la
+   campaña (OG_IMG_RUTA en worker.js), sin fotos: viaja sin control. */
+var RG_COMPARTIR = '<svg class="rg-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/></svg>';
+function rgPorCodigo(codigo){
+  return (RG.datos && RG.datos.regalos || []).filter(function(r){ return r.codigo === codigo; })[0] || null;
+}
+function rgCompartir(codigo){
+  var r = codigo ? rgPorCodigo(codigo) : null;
+  var url = location.origin + "/regalos" + (r ? "?n=" + encodeURIComponent(r.codigo) : "") +
+    (lang !== "es" ? (r ? "&" : "?") + "lang=" + lang : "");
+  var txt = t("rg.comp.camp");
+  if (r) {
+    var quien = t(r.genero === "nina" ? "rg.comp.nina" : r.genero === "nino" ? "rg.comp.nino" : "rg.comp.otro").replace("{e}", rgEdad(r.edad));
+    txt = t("rg.comp.txt").replace("{q}", quien).replace("{z}", rgZona(r.zona)).replace("{d}", rgDeseo(r));
+  }
+  if (navigator.share) { navigator.share({ text: txt, url: url }).catch(function(){}); return; }
+  window.open("https://wa.me/?text=" + encodeURIComponent(txt + " " + url), "_blank", "noopener");
+}
+
+/* La ficha que llegó por un enlace: si ya la tomó otra persona, se dice y se
+   muestran los que siguen esperando en su zona. */
+function rgPreparaFoco(){
+  if (!RG.foco) return;
+  var r = rgPorCodigo(RG.foco);
+  if (r && r.estado === "disponible") return;
+  RG.foco = null; RG.focoVisto = true;
+  if (r) { RG.f.zona = r.zona; RG.focoAviso = t("rg.foco.tomado").replace("{z}", rgZona(r.zona)); }
+}
+function rgMuestraFoco(){
+  if (RG.focoAviso) { rgAvisoBarra(RG.focoAviso); RG.focoAviso = null; }
+  var cat = rgEl("rg-catalogo");
+  if (RG.focoVisto || (!RG.foco && !RG.f.zona) || !cat || cat.hidden) return;
+  RG.focoVisto = true;
+  var el = RG.foco ? rgEl("rg-" + RG.foco) : cat;
+  if (el) setTimeout(function(){ el.scrollIntoView({ behavior: "smooth", block: RG.foco ? "center" : "start" }); }, 350);
+}
+
+/* «REGALA A QUIEN MÁS LLEVA ESPERANDO» (investigación de mejoras: los mayores
+   y los preadolescentes son los que se quedan sin regalo). Entre los libres que
+   cumplen los filtros puestos y no están ya en la lista: el que se publicó
+   primero; si se publicaron el mismo día, el de más edad. */
+function rgEspera(){
+  var cand = rgFiltrados().filter(function(r){ return r.estado === "disponible" && RG.lista.indexOf(r.codigo) < 0; });
+  if (!cand.length) { rgAvisoBarra(t("rg.espera.nadie")); return; }
+  cand.sort(function(a, b){
+    var da = a.desde || "9999", db = b.desde || "9999";
+    if (da !== db) return da < db ? -1 : 1;
+    if (a.edad !== b.edad) return b.edad - a.edad;
+    return a.codigo < b.codigo ? -1 : 1;
+  });
+  var r = cand[0];
+  RG.foco = r.codigo;
+  rgToggle(r.codigo);
+  if (RG.lista.indexOf(r.codigo) < 0) return;   // la lista estaba llena: rgToggle ya lo dijo
+  rgAvisoBarra(t("rg.espera.ok").replace("{n}", r.nombre).replace("{e}", rgEdad(r.edad)).replace("{z}", rgZona(r.zona)));
+  var el = rgEl("rg-" + r.codigo);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function rgFiltro(campo, valor){

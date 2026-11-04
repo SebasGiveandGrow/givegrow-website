@@ -122,3 +122,25 @@ los filtrados» ayudan):
   muestra quién donó ni cuánto, y no hay premio por monto.
 - Desactivar uno no rompe su enlace: Regalos abre igual, pero ya no cuenta.
   El código no se cambia, porque ya está en lo que la persona compartió.
+
+## Lo que empuja la meta (bloque 2, nov 2026)
+
+Salen de la investigación de mejoras del 24 oct 2026. Ninguno necesita datos
+nuevos: leen la meta, la fecha de cierre y la de publicación que ya existen.
+
+- **«Faltan N luces»** bajo cada árbol, y **los días que quedan** arriba, con
+  el último día para donar de `Campaña y valores`. El servidor los cuenta en
+  hora de Colombia (`quedan_dias`, 0 = hoy es el último).
+- **Compartir**: cada tarjeta libre y la campaña entera. En el celular abre el
+  menú del sistema; en el computador, WhatsApp Web. El texto dice edad, zona y
+  deseo, **nunca el nombre**; el enlace (`/regalos?n=URI-0001`) abre esa
+  tarjeta primero. Si ya la tomó otra persona, la página lo dice y muestra los
+  que siguen esperando en su zona. La vista previa es la de la campaña, sin fotos.
+- **«Regala a quien más lleva esperando»**: entre los libres que cumplen los
+  filtros puestos, el que se publicó primero; el mismo día, el de más edad.
+- **Las reglas si algo cambia** (pago doble, niño que ya no puede recibir,
+  regalo más barato, zona sin nadie esperando) están en «Cómo funciona», a la
+  vista desde antes de abrir.
+- **La membresía se pide en el correo de «entregado»**, no al pagar: llega con
+  el acta en la mano. Una invitación sin cifras.
+
