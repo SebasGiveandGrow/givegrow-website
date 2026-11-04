@@ -2424,7 +2424,7 @@
   "rg.como.3.t": "Follow it",
   "rg.como.3.p": "We email you when your gift is funded, when it ships to its area and when it is delivered, with the delivery report number.",
   "rg.lista.h": "Choose who to give to",
-  "rg.cerrada": "The campaign is no longer taking donations. You can still see how the gifts are progressing.",
+  "rg.cerrada": "Thank you to everyone who gave. The children's cards and photos are no longer shown, as we promised their families. Here you can see how the gifts progressed; if you gave, follow yours with the link in your email.",
   "rg.mas": "Show more",
   "rg.privnota": "To protect the children we only publish their first name, age, area and the gift they asked for, and their photo only when their guardian authorized it in writing. We never publish surnames, addresses or contact details, and there is no direct contact between donors and children.",
   "rg.pagar.h": "Your gift list",
@@ -2621,5 +2621,6 @@
   "odsr.fn": "{n} foundations",
   "odsr.u1": "1 unit to sponsor",
   "odsr.un": "{n} units to sponsor",
-  "odsr.nadie": "None yet"
+  "odsr.nadie": "None yet",
+  "rg.cerro.t": "The campaign has ended."
 }
