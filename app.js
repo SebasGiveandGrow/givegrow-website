@@ -2491,7 +2491,8 @@ var I18N = {
     "rg.como.3.t":"Síguelo",
     "rg.como.3.p":"Te escribimos cuando tu regalo queda financiado, cuando sale hacia su zona y cuando se entrega, con el número del acta.",
     "rg.lista.h":"Escoge a quién regalar",
-    "rg.cerrada":"La campaña ya no recibe donaciones. Aquí puedes ver cómo avanzan los regalos.",
+    "rg.cerro.t":"La campaña terminó.",
+    "rg.cerrada":"Gracias a quienes regalaron. Las fichas y las fotos de los niños ya no se muestran, como lo prometimos a sus familias. Aquí ves cómo avanzaron los regalos; si regalaste, sigue el tuyo con el enlace de tu correo.",
     "rg.luces.t":"Una luz por cada niño",
     "rg.luces.p":"Cada punto es una niña o un niño de la lista. Se enciende cuando su regalo queda financiado y brilla cuando se entrega.",
     "rg.luz.esp":"Esperando su regalo",
@@ -3654,7 +3655,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "ec6dab69", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "8bc1012a", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };

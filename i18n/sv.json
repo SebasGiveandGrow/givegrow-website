@@ -14,7 +14,7 @@
   "rg.como.3.t": "Följ den",
   "rg.como.3.p": "Vi mejlar dig (på engelska) när din julklapp är finansierad, när den skickas till sitt område och när den lämnas över, med protokollets nummer.",
   "rg.lista.h": "Välj vem du vill ge till",
-  "rg.cerrada": "Insamlingen tar inte längre emot gåvor. Du kan fortfarande se hur det går för julklapparna.",
+  "rg.cerrada": "Tack till alla som gav en julklapp. Barnens kort och foton visas inte längre, som vi lovade deras familjer. Här ser du hur det gick för julklapparna; om du gav en julklapp kan du följa den med länken i ditt mejl.",
   "rg.mas": "Visa fler",
   "rg.privnota": "För att skydda barnen publicerar vi bara deras förnamn, ålder, område och den present de önskat sig, och deras foto endast om vårdnadshavaren har gett skriftligt tillstånd. Vi publicerar aldrig efternamn, adresser eller kontaktuppgifter, och det finns ingen direktkontakt mellan givare och barn.",
   "rg.pagar.h": "Din julklappslista",
@@ -140,5 +140,6 @@
   "rg.carta.aun": "Du kan fortfarande skriva ett brev eller spela in en video till dem.",
   "rg.carta.no": "Den här beställningen har inget brev.",
   "rg.carta.guardar": "Spara mitt brev",
-  "rg.enviando.carta": "Sparar…"
+  "rg.enviando.carta": "Sparar…",
+  "rg.cerro.t": "Insamlingen är avslutad."
 }

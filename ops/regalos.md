@@ -15,14 +15,25 @@ ningún niño hasta que alguien la abra desde `/admin/regalos › Campaña y val
    acepta la referencia o el monto en la URL, se escriben `{ref}` y `{usd}`
    donde van. Sin aliada, la página no ofrece pagar en dólares.
 3. **Fecha de entrega** de cada zona y **último día para donar**.
-4. **La hoja de terreno**: plantilla en `Cargar la hoja`. Una fila por niño,
-   guardada como CSV. Primero se revisa (no guarda nada) y después se guardan
-   las filas sanas. Una fila repetida no entra dos veces.
+4. **La hoja de terreno**: la que reciben las fundaciones («Regalos de
+   diciembre 2026 · Formato para fundaciones», en Google Sheets) tiene las
+   mismas columnas que la plantilla de `Cargar la hoja`. Se descarga la
+   pestaña «Niños» como CSV. Primero se revisa (no guarda nada) y después se
+   guardan las filas sanas. Una fila repetida no entra dos veces, y la fila de
+   ejemplo de la hoja se rechaza sola.
+   - `numero` es el número de la fundación (1, 2, 3…), único en la zona. Con él
+     nombran la foto y la autorización. Es obligatorio si la columna existe.
+   - `asentimiento_nino`: si al niño se le explicó y estuvo de acuerdo. Con
+     «no» el niño se guarda pero no se publica, aunque el acudiente haya firmado.
 5. **Foto y autorización firmada** de cada niño: una por una desde la fila, o
-   las fotos en lote, nombradas con el código (`URI-0001.jpg`).
+   todas en lote en `Cargar la hoja › 3`, tal como las manda la fundación:
+   `uribia-12.jpg` (foto) y `uribia-12-autorizacion.pdf` (o .jpg). También sirve
+   el código del sistema (`URI-0012.jpg`). Tildes, espacios y guiones bajos dan
+   igual (`Medellín_3-Autorización.pdf`). Lo que no corresponde a ningún niño se
+   lista al final sin subirse.
 6. **Publicar**: filtrar, seleccionar y aplicar «Publicar». Lo que no cumple
-   (sin autorización de datos, sin valor, sin talla en ropa o calzado) se queda
-   en borrador y la pantalla dice por qué.
+   (sin autorización de datos, sin asentimiento del niño, sin valor, sin talla
+   en ropa o calzado) se queda en borrador y la pantalla dice por qué.
 7. **Abrir la campaña.**
 
 ## Las reglas que no hay que romper
@@ -39,6 +50,23 @@ ningún niño hasta que alguien la abra desde `/admin/regalos › Campaña y val
   niño de la misma zona y se le avisa al donante. Si no queda ninguno, el
   pedido queda con «sin cupo», llega un aviso a `CORREO_AVISOS` y lo resuelve
   una persona (con «Financiar con fondo o empresa»).
+- Con la campaña **cerrada** la página no muestra ni una ficha ni una foto (lo
+  promete la autorización del acudiente): solo los árboles y el seguimiento de
+  cada donante.
+
+## Al terminar: borrar los datos personales (0062)
+
+La Política de Privacidad (v1.3) promete eliminar los datos de los niños y sus
+acudientes, las cartas y los videos **a más tardar seis meses después de la
+última entrega**. Las actas de entrega se conservan.
+
+`Campaña y valores › Datos personales al terminar` muestra la fecha límite,
+calculada sobre la última entrega. El botón aparece solo con la campaña cerrada
+y pide escribir `ELIMINAR`: borra de R2 las fotos, las autorizaciones y los
+videos, borra cartas y firmas, y deja de cada niño solo el código, la edad, el
+género, la zona, el regalo y su recorrido (lo que sostienen las actas y el
+informe). Queda en la bitácora. No se deshace, no se puede correr dos veces y
+una campaña borrada ya no se puede volver a abrir.
 
 ## El recorrido
 

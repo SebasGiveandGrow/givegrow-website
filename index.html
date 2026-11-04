@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=429e3b90" defer></script>
+<script src="/app.js?v=6c26a510" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -1531,6 +1531,16 @@
     </div>
   </section>
 
+  <!-- Campaña cerrada: sin fichas ni fotos de los niños, como dice la
+       autorización que firmó cada acudiente. Quedan los árboles y el
+       seguimiento de cada donante. -->
+  <section id="rg-terminada" hidden>
+    <div class="wrap prose">
+      <h2 data-i18n="rg.cerro.t">La campaña terminó.</h2>
+      <p class="lead rg-cerrada" data-i18n="rg.cerrada">Gracias a quienes regalaron. Las fichas y las fotos de los niños ya no se muestran, como lo prometimos a sus familias. Aquí ves cómo avanzaron los regalos; si regalaste, sigue el tuyo con el enlace de tu correo.</p>
+    </div>
+  </section>
+
   <section id="rg-pronto" hidden>
     <div class="wrap prose">
       <h2 data-i18n="rg.pronto.t">Muy pronto.</h2>
@@ -1552,7 +1562,6 @@
   <section id="rg-catalogo" hidden>
     <div class="wrap">
       <h2 class="h-sec" data-i18n="rg.lista.h">Escoge a quién regalar</h2>
-      <p class="mu rg-cerrada" id="rg-cerrada" hidden data-i18n="rg.cerrada">La campaña ya no recibe donaciones. Aquí puedes ver cómo avanzan los regalos.</p>
       <div class="rg-filtros" id="rg-filtros"></div>
       <p class="rg-cuenta mu" id="rg-cuenta" aria-live="polite"></p>
       <div class="rg-grid" id="rg-grid"></div>

@@ -93,10 +93,13 @@ function rgPinta(){
   if (!d) return;
   rgPintaZonas();
   var c = d.campana;
-  var abierta = !!(c && c.estado !== "borrador");
-  rgEl("rg-pronto").hidden = abierta;
+  /* Solo abierta muestra el catálogo. Cerrada, quedan los árboles, el
+     seguimiento y la nota de cierre: las fichas de los niños salen de la
+     página, como promete la autorización del acudiente. */
+  var estado = c ? c.estado : "borrador", abierta = estado === "abierta";
+  rgEl("rg-pronto").hidden = estado !== "borrador";
+  rgEl("rg-terminada").hidden = estado !== "cerrada";
   rgEl("rg-catalogo").hidden = !abierta;
-  rgEl("rg-cerrada").hidden = !(c && c.estado === "cerrada");
   if (!abierta) { rgEl("rg-pagar").hidden = true; rgEl("rg-barra").hidden = true; return; }
   /* En inglés (y en sueco), si hay aliada, el dólar va primero. */
   if (!RG.viaElegida) RG.via = rgIngles() && c.usd ? "usd" : "cop";
