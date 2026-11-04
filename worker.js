@@ -21054,7 +21054,7 @@ async function portalSesion(env, request) {
   if (!t) return null;
   const h = await sha256Hex(t);
   const s = await env.DB.prepare(
-    "SELECT s.hash, s.inscripcion, s.email AS entro_con, i.nombre, i.email, i.estado, i.token, i.tipo, " +
+    "SELECT s.hash, s.inscripcion, s.email AS entro_con, i.nombre, i.email, i.estado, i.token, i.tipo, i.portal_tema, i.portal_saludo, " +
     "f.estado AS ficha_estado, f.datos AS ficha_datos FROM portal_sesiones s " +
     "JOIN inscripciones i ON i.id = s.inscripcion LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
     "WHERE s.hash = ? AND s.cerrada_en IS NULL AND s.expira > datetime('now') " +
@@ -21197,6 +21197,18 @@ async function portalPerfil(env, s) {
   return { datos, ficha, fila: p, revisados };
 }
 
+/* EL PORTAL VESTIDO PARA UNA FUNDACIÓN (0063, 4 nov 2026). Un tema es un
+   juego de colores y un dibujo de cabecera; su CSS vive en `paginaPortal`,
+   bajo body[data-tema="<id>"], y sus dibujos en /img/portal/. Aquí solo va lo
+   que el portal necesita saber: el color de la barra del navegador y la firma
+   del pie. Un tema que no esté aquí no se aplica aunque la base lo nombre. */
+const PORTAL_TEMAS = {
+  adriatico: {
+    color: "#2B5666",
+    firma: "Este portal se vistió para ustedes: azul del Adriático y lirios blancos."
+  }
+};
+
 /* GET /api/portal/yo — todo lo que pinta la pantalla. */
 async function apiPortalYo(request, env) {
   const s = await portalSesion(env, request);
@@ -21209,6 +21221,8 @@ async function apiPortalYo(request, env) {
   ).bind(s.inscripcion).all()).results || [];
   return json({
     ok: true, nombre: s.nombre, email: s.entro_con || s.email, estado: s.estado,
+    tema: PORTAL_TEMAS[s.portal_tema] ? Object.assign({ id: s.portal_tema }, PORTAL_TEMAS[s.portal_tema]) : null,
+    saludo: s.portal_saludo ? String(s.portal_saludo).slice(0, 160) : null,
     estado_es: s.estado === "visitada" && s.ficha_estado === "enviada" ? "Visitada: cuestionario enviado" : (PORTAL_ESTADO_ES[s.estado] || s.estado),
     cuestionario: s.estado === "visitada" && s.ficha_estado !== "enviada" && s.token ? "/ficha/" + s.token : null,
     ficha_enviada: editable,
@@ -22992,6 +23006,52 @@ function paginaPortal(nonce) {
   @media (prefers-reduced-motion: no-preference){
     .btn,.tab,input,textarea,select{transition:background-color .15s,border-color .15s,color .15s}
   }
+
+  /* EL PORTAL VESTIDO PARA UNA FUNDACIÓN (0063, 4 nov 2026). Solo aplica con
+     body[data-tema], que pone el JS cuando /api/portal/yo trae un tema; el
+     resto de la red no ve nada de esto. La cabecera (estado, nombre, saludo)
+     se vuelve una franja a todo el ancho con el dibujo a la derecha, y el
+     dibujo y el texto van en columnas que no se cruzan: el texto se queda con
+     el ancho menos 440 px, el dibujo con 420 px pegados al borde derecho del
+     contenido. */
+  body[data-tema]{overflow-x:clip}
+  body[data-tema] .wrap,body[data-tema] .barra-marca{position:relative;z-index:1}
+  body[data-tema] .cab-f{position:relative;overflow:hidden;margin:-28px calc(50% - 50vw) 0;padding:52px calc(50vw - 50%) 58px;background:var(--heroe)}
+  body[data-tema] .cab-f::after{content:"";position:absolute;top:10px;bottom:0;right:max(20px,calc(50vw - 420px));width:420px;
+    background:url(/img/portal/lirios-ramo.svg) right bottom/contain no-repeat;pointer-events:none}
+  body.ancho[data-tema] .cab-f::after{right:max(20px,calc(50vw - 570px))}
+  body[data-tema] .cab-f .ey,body[data-tema] .cab-f h1,body[data-tema] .cab-f .saludo{position:relative;z-index:1;max-width:calc(100% - 440px)}
+  body[data-tema] .cab-f .ey{display:inline-block;background:var(--g);color:#fff;padding:5px 12px;border-radius:999px}
+  body[data-tema] .cab-f h1{color:#fff;font-size:34px}
+  body[data-tema] .cab-f .saludo{color:#fff;font-size:24px;line-height:1.3;margin-top:10px}
+  body[data-tema]::before,body[data-tema]::after{content:"";position:fixed;z-index:0;pointer-events:none;
+    background:url(/img/portal/lirio-contorno.svg) center/contain no-repeat;opacity:.26}
+  body[data-tema]::before{left:-90px;bottom:-150px;width:440px;height:590px;transform:rotate(-14deg)}
+  body[data-tema]::after{right:-70px;top:46%;width:300px;height:400px;transform:rotate(16deg)}
+  .tema-firma{display:flex;align-items:center;gap:12px;margin-top:34px;padding-top:18px;border-top:1px solid var(--bds);
+    font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:16px;color:var(--ink-soft)}
+  .tema-firma::before{content:"";flex:0 0 26px;height:34px;background:url(/img/portal/lirio.svg) center/contain no-repeat}
+
+  /* Adriatic Blue (Pantone 17-4320, #5C899B) con lirios blancos: Positive
+     Potential. El azul de la franja solo lleva texto grande (3,8:1 con el
+     blanco); la barra y los botones usan su versión profunda, #2B5666. */
+  body[data-tema="adriatico"]{--g:#2B5666;--gd:#214552;--gl:#E3EEF1;--bg:#F6F7F3;--surface:#FFFFFF;--ink:#14232A;--ink-soft:#3B4A51;
+    --mu:#5A6670;--bd:#D5DFE2;--bds:#E7EDEE;--acc:#2F5D6D;--heroe:#5C899B}
+  @media (prefers-color-scheme: dark){
+    body[data-tema="adriatico"]{--bg:#0E1B21;--surface:#15262D;--ink:#EDF2F2;--ink-soft:#C6D3D6;--mu:#9FB0B6;--bd:#26404A;--bds:#1C3139;
+      --acc:#93C0CF;--gl:#1D3640;--heroe:#23495A}
+    body[data-tema] .cab-f::after{filter:brightness(.92)}
+    body[data-tema]::before,body[data-tema]::after{opacity:.12}
+  }
+  @media (max-width:720px){
+    body[data-tema] .cab-f{padding-top:34px;padding-bottom:38px}
+    body[data-tema] .cab-f::after{top:4px;bottom:auto;right:-30px;width:170px;height:228px;transform:rotate(10deg);
+      background-image:url(/img/portal/lirio.svg);background-position:center}
+    body[data-tema] .cab-f .ey,body[data-tema] .cab-f h1,body[data-tema] .cab-f .saludo{max-width:calc(100% - 130px)}
+    body[data-tema] .cab-f h1{font-size:26px}
+    body[data-tema]::before{left:-110px;bottom:-120px;width:330px;height:440px}
+    body[data-tema]::after{display:none}
+  }
 </style>
 </head>
 <body>
@@ -23041,9 +23101,11 @@ function paginaPortal(nonce) {
   </section>
 
   <section id="v-portal" class="oculto">
-    <p class="ey" id="p-estado"></p>
-    <h1 class="mt" id="p-nombre"></h1>
-    <p class="saludo" id="p-saludo"></p>
+    <div class="cab-f">
+      <p class="ey" id="p-estado"></p>
+      <h1 class="mt" id="p-nombre"></h1>
+      <p class="saludo" id="p-saludo"></p>
+    </div>
     <button type="button" class="paso-pill" id="p-paso" aria-controls="p-recorrido" aria-expanded="false"></button>
     <ol class="recorrido" id="p-recorrido" aria-label="Tu recorrido en el HUB"></ol>
 
@@ -23255,6 +23317,7 @@ function paginaPortal(nonce) {
         <div id="p-docs"></div>
       </div>
     </div>
+    <p class="tema-firma oculto" id="p-firma"></p>
   </section>
 </main>
 
@@ -23322,7 +23385,13 @@ function pintar(){
   $("p-nombre").textContent = D.nombre || "";
   $("p-correo").textContent = D.email || "";
   $("p-estado").textContent = D.estado_es || "";
-  $("p-saludo").textContent = "Aquí ves en qué va la alianza, mantienes tu perfil al día y nos dejas tus documentos.";
+  $("p-saludo").textContent = D.saludo || "Aquí ves en qué va la alianza, mantienes tu perfil al día y nos dejas tus documentos.";
+  if (D.tema) {
+    document.body.setAttribute("data-tema", D.tema.id);
+    var tc = document.querySelector('meta[name="theme-color"]');
+    if (tc && D.tema.color) tc.setAttribute("content", D.tema.color);
+    if (D.tema.firma) { $("p-firma").textContent = D.tema.firma; $("p-firma").classList.remove("oculto"); }
+  }
   var a = pasoActual();
   $("p-paso").innerHTML = '<span class="seg" aria-hidden="true">' + PASOS.map(function(p, i){
       return '<i class="' + (i < a ? "hecho" : i === a ? "ahora" : "") + '"></i>'; }).join("") + "</span>" +
