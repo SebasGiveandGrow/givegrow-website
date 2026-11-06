@@ -5213,7 +5213,7 @@ function renderFicha(fid){
         return '<button type="button" class="fimp-q'+(qi===1?' on':'')+'" data-cop="'+q+'" data-act="fichaImpCalc(this,\''+esc(p.id)+'\')">$'+q.toLocaleString(lang==="en"?"en-US":"es-CO")+'</button>';
       }).join('') + '</div><p id="fimp-out" data-fid="'+esc(p.id)+'"></p>';
     }
-    lat += '<a class="ficha-cta-btn" href="#donar"'+(u ? ' data-act="donarA(\''+esc(u.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a>'
+    lat += '<a class="ficha-cta-btn" href="/donar"'+(u ? ' data-act="donarA(\''+esc(u.id)+'\')"' : '')+'>'+t("ficha.cta.btn")+'</a>'
       + '<p class="ficha-apoyo-nota">'+t("ficha.cta.p")+'</p>' + tiraHtml() + '</div>';
 
     html += fichaCuerpo(main, lat, "");
@@ -5877,9 +5877,23 @@ function init(){
   // Navegación por delegación (reemplaza inline; CSP fase 1).
   // Ignora elementos que aún conservan onclick inline → migración incremental sin doble disparo.
   document.addEventListener("click", function(e){
-    var el = e.target.closest("[data-nav], a[href^='#']");
+    var el = e.target.closest("[data-nav], a[href^='#'], a[href^='/']");
     if (!el || el.getAttribute("onclick") || el.hasAttribute("data-act")) return;
-    var route = el.getAttribute("data-nav") || (el.getAttribute("href")||"").slice(1);
+    var href = el.getAttribute("href") || "", route;
+    if (el.hasAttribute("data-nav")) route = el.getAttribute("data-nav");
+    else if (href.charAt(0) === "#") route = href.slice(1);
+    else {
+      /* LOS ENLACES INTERNOS LLEVAN LA DIRECCIÓN PROPIA (6 nov 2026): /donar y
+         no #donar. Para Google, lo que va después de una # es la portada, así
+         que las 20 páginas de `RUTAS_PATH` no tenían ni un enlace interno y solo
+         las conocía por el sitemap: Search Console las dejaba en «Descubierta:
+         actualmente sin indexar». El clic se sigue resolviendo aquí, sin
+         recargar; con Ctrl/Cmd, la rueda o target=_blank se abre la dirección
+         de verdad, que el Worker sirve con su propia sección. */
+      route = (href.match(/^\/([a-z][a-z-]*)\/?$/) || [])[1];
+      if (!route || (RUTAS_PATH.indexOf(route) < 0 && route !== "socialfest")) return;
+      if (e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || el.target === "_blank") return;
+    }
     if (!isSpaRoute(route)) return;   // deja pasar skip-link (#), anclas internas, etc.
     e.preventDefault();
     go(route);
@@ -7490,7 +7504,7 @@ function renderComercio(cid){
     lat += '</div>'
       + '<div class="ficha-apoyo ficha-apoyo-plano">'
       + '<p class="ficha-apoyo-nota">'+t("com.cta.p")+'</p>'
-      + '<a class="ficha-cta-btn" href="#membresias">'+t("com.cta.btn")+'</a></div>'
+      + '<a class="ficha-cta-btn" href="/membresias">'+t("com.cta.btn")+'</a></div>'
       + (main ? '' : enlaces);
 
     /* CTA: hacerse miembro (NO donar; la empresa ofrece, el miembro disfruta) */
@@ -7565,7 +7579,7 @@ function renderEmpresa(eid){
       + '<span class="ey">'+t("empf.cta.ey")+'</span>'
       + '<h2>'+t("empf.cta.t")+'</h2>'
       + '<p class="ficha-apoyo-nota">'+t("empf.cta.p")+'</p>'
-      + '<a class="ficha-cta-btn" href="#empresas">'+t("empf.cta.btn")+'</a></div>'
+      + '<a class="ficha-cta-btn" href="/empresas">'+t("empf.cta.btn")+'</a></div>'
       + (main ? '' : enlaces);
 
     html += fichaCuerpo(main, lat, "");

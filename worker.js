@@ -2758,7 +2758,7 @@ function paginaAutorizacionHecha(lang, tema) {
     + '  <p class="lead">' + esc(en
         ? "From here, someone from Give&Grow gets in touch to organise the volunteering. Before any activity there is still a signed agreement and, for the field, our checks and a preparation session. You can withdraw this authorisation whenever you want by writing to privacidad@thegiveandgrowproject.org."
         : "Desde aquí, alguien de Give&Grow se pone en contacto para organizar el voluntariado. Antes de cualquier actividad sigue habiendo un acuerdo firmado y, si va a terreno, nuestras verificaciones y una sesión de preparación. Puedes revocar esta autorización cuando quieras escribiendo a privacidad@thegiveandgrowproject.org.") + '</p>\n'
-    + '  <p style="margin-top:20px"><a class="btn btn-g" href="/#voluntariado">' + esc(en ? "About volunteering" : "Sobre el voluntariado") + '</a></p>\n'
+    + '  <p style="margin-top:20px"><a class="btn btn-g" href="/voluntariado">' + esc(en ? "About volunteering" : "Sobre el voluntariado") + '</a></p>\n'
     + '  <p class="mu" style="margin-top:30px;font-size:var(--fs-13)">Fundación Give&amp;Grow International · NIT 901.948.930-2</p>\n';
   return cascaraBaja(t, cuerpo, lang, tema);
 }
@@ -18429,8 +18429,8 @@ function paginaVerificar(o) {
     + '<header class="vf-cab"><div class="wrap vf-cab-in">'
     + '<a class="nlogo" href="/" aria-label="' + esc(T.inicio) + '">Give<em>&amp;</em>Grow</a>'
     + (o.certificado
-      ? '<a class="vf-volver" href="/#voluntariado"><span aria-hidden="true">&larr;</span> ' + esc(T.cVolver) + '</a>'
-      : '<a class="vf-volver" href="/#gratitud"><span aria-hidden="true">&larr;</span> ' + esc(T.volver) + '</a>')
+      ? '<a class="vf-volver" href="/voluntariado"><span aria-hidden="true">&larr;</span> ' + esc(T.cVolver) + '</a>'
+      : '<a class="vf-volver" href="/gratitud"><span aria-hidden="true">&larr;</span> ' + esc(T.volver) + '</a>')
     + '</div></header>\n';
   /* Tras una consulta por cédula, `entrada` es el código del carnet (nunca la
      cédula), así que este enlace no la lleva. */
@@ -46109,7 +46109,7 @@ function paginaMetodoPago(cfg) {
 + '<body>\n'
 + '<main class="wrap pm">\n'
 + '  <div class="pm-top">\n'
-+ '    <a class="card-link" href="/#membresias">&larr; ' + esc(T.volver) + '</a>\n'
++ '    <a class="card-link" href="/membresias">&larr; ' + esc(T.volver) + '</a>\n'
 + '    <a class="card-link" href="' + esc(otro) + '" hreflang="' + T.otroLang + '" lang="' + T.otroLang + '">' + esc(T.otroIdioma) + '</a>\n'
 + '  </div>\n'
 + '  <h1 class="pm-t">' + esc(T.h1) + '</h1>\n'
@@ -46132,7 +46132,7 @@ function paginaMetodoPago(cfg) {
       + fila(T.primero, T.primeroV)
       + fila(T.proximo, T.proximoV(fechaLargaIdioma(proximoCobroISO(), en)))
       + '    </dl>\n'
-      + '    <p class="pm-cambiar"><a class="card-link" href="/#membresias">' + esc(T.cambiar) + '</a></p>\n'
+      + '    <p class="pm-cambiar"><a class="card-link" href="/membresias">' + esc(T.cambiar) + '</a></p>\n'
       + '  </section>\n'
     : '')
 /* `.ally-form` + `.field` Y NO `.et`, que no existe. La primera version de esta
@@ -47941,7 +47941,7 @@ function paginaMembresia(m, lang, estado, tema) {
     + ';text-align:right;font-weight:600">' + esc(v) + '</td></tr>\n');
 
   let cuerpo = ""
-    + '  <p><a class="card-link" href="/#membresias">&larr; ' + esc(T.volver) + '</a></p>\n'
+    + '  <p><a class="card-link" href="/membresias">&larr; ' + esc(T.volver) + '</a></p>\n'
     + '  <h1>' + esc(T.titulo) + '</h1>\n';
 
   if (estado === "hecho") {
@@ -47979,7 +47979,7 @@ function paginaMembresia(m, lang, estado, tema) {
     cuerpo += '  <section class="card" style="margin-top:26px;padding:20px">\n'
       + '    <h2 style="margin-top:0">' + esc(T.yaT) + '</h2>\n'
       + '    <p class="mu">' + esc(T.yaP) + '</p>\n'
-      + '    <p style="margin-top:16px"><a class="btn btn-g" href="/#membresias">' + esc(T.volverM) + '</a></p>\n'
+      + '    <p style="margin-top:16px"><a class="btn btn-g" href="/membresias">' + esc(T.volverM) + '</a></p>\n'
       + '  </section>\n';
   }
 
@@ -48109,7 +48109,7 @@ function paginaPedirEnlace(lang, enviado, tema) {
   };
 
   const cuerpo = ""
-    + '  <p><a class="card-link" href="/#membresias">&larr; ' + esc(T.volver) + '</a></p>\n'
+    + '  <p><a class="card-link" href="/membresias">&larr; ' + esc(T.volver) + '</a></p>\n'
     + '  <h1>' + esc(T.titulo) + '</h1>\n'
     + (enviado
         ? '  <p class="lead">' + esc(T.hecho) + '</p>\n'
@@ -48402,7 +48402,7 @@ ${HOJA_CSS}
 </head>
 <body>
 <main class="wrap" style="padding-top:34px;padding-bottom:48px">
-  <p><a class="card-link" href="/#hub">&larr; ${esc(T.volver)}</a></p>
+  <p><a class="card-link" href="/hub">&larr; ${esc(T.volver)}</a></p>
   ${showLogo ? '<img src="' + esc(p.logo) + '" alt="" width="120" height="120" style="object-fit:contain;margin-bottom:14px">' : ""}
   <h1>${esc(p.name)}</h1>
   ${tx(pr.badge) ? '<p><span class="tag">' + esc(tx(pr.badge)) + '</span></p>' : ""}
