@@ -3660,6 +3660,7 @@ async function regalosPedidoPagado(env, ref, autor) {
   ).bind(autor || null, ref).first();
   if (!cambio) return { ya: true };
   const via = cambio.via;
+  try { await regalosRenovarNoticias(env, ref); } catch (e) { console.error("noticias", ref, e && e.message); }
 
   const { results } = await env.DB.prepare(
     "SELECT i.id, i.regalo_id, i.valor_cop, i.valor_usd, r.zona_id, r.categoria_id " +
@@ -3942,14 +3943,33 @@ async function regalosGuardarCarta(env, ref, carta, firma) {
   ).bind(ref, carta || null, firma || null).run();
 }
 
-/* La autorización para escribirle después. Si ya estaba y la había retirado,
-   volver a marcar la casilla la renueva. */
+/* La autorización para escribirle después.
+
+   SOLO VALE CON UN PEDIDO PAGADO (revisión de seguridad, 10 nov 2026). La
+   casilla se guarda al crear el pedido, que es público y no verifica el correo:
+   cualquiera podía apuntar el correo de otra persona sin pagar nada, y además
+   reactivar a alguien que ya se había dado de baja. Ahora:
+   · esta fila sola no suscribe a nadie: `noticiasVigente` exige que ese correo
+     tenga un pedido pagado;
+   · crear un pedido NO borra una baja. Si quien se dio de baja vuelve a marcar
+     la casilla, la baja se levanta cuando ESE pedido se paga
+     (`regalosRenovarNoticias`, desde `regalosPedidoPagado`). */
 async function regalosGuardarNoticias(env, email, nombre, idioma, ref) {
   await env.DB.prepare(
     "INSERT INTO regalo_noticias (email, nombre, idioma, origen_ref) VALUES (?, ?, ?, ?) " +
     "ON CONFLICT(email) DO UPDATE SET nombre = excluded.nombre, idioma = excluded.idioma, " +
-    "consentido_en = datetime('now'), baja_en = NULL"
+    "origen_ref = excluded.origen_ref"
   ).bind(email, nombre, idioma, ref).run();
+}
+async function regalosRenovarNoticias(env, ref) {
+  await env.DB.prepare(
+    "UPDATE regalo_noticias SET baja_en = NULL, consentido_en = datetime('now') WHERE origen_ref = ?"
+  ).bind(ref).run();
+}
+/* Quién recibe noticias: sin baja y con un pedido pagado a ese correo. `a` es
+   el alias de regalo_noticias en la consulta. */
+function noticiasVigente(a) {
+  return a + ".baja_en IS NULL AND EXISTS (SELECT 1 FROM regalo_pedidos pp WHERE pp.email = " + a + ".email AND pp.pagado_en IS NOT NULL)";
 }
 
 /* POST /api/regalos/pedido/<RG>/mensaje?t= {carta, firma, quitar_video} */
@@ -4177,7 +4197,7 @@ async function adminRegalos(env) {
     "FROM regalo_mensajes m JOIN regalo_pedidos p ON p.ref = m.pedido_ref " +
     "WHERE p.campana_id = ? ORDER BY CASE m.estado WHEN 'pendiente' THEN 0 ELSE 1 END, m.actualizado_en DESC"
   ).bind(REGALOS_CAMPANA).all();
-  const noticias = await env.DB.prepare("SELECT COUNT(*) AS n FROM regalo_noticias WHERE baja_en IS NULL").first();
+  const noticias = await env.DB.prepare("SELECT COUNT(*) AS n FROM regalo_noticias n WHERE " + noticiasVigente("n")).first();
   /* Embajadores (0051): pedidos pagados y regalos financiados por cada
      enlace. Solo conteos: ni donantes ni montos. Sin la migración, vacío. */
   let embajadores = null;
@@ -22640,7 +22660,7 @@ async function adminBoletin(request, env, quien) {
   if (!(await existeTabla(env, "boletines"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0061 en la base." }, 409);
   if (request.method === "GET") {
     const subs = await env.DB.prepare(
-      "SELECT COUNT(*) AS n, SUM(idioma = 'en') AS en FROM regalo_noticias WHERE baja_en IS NULL"
+      "SELECT COUNT(*) AS n, SUM(n.idioma = 'en') AS en FROM regalo_noticias n WHERE " + noticiasVigente("n")
     ).first();
     const bs = (await env.DB.prepare(
       "SELECT b.*, (SELECT COUNT(*) FROM boletin_envios e WHERE e.boletin_id = b.id AND e.resultado = 'enviado') AS enviados, " +
@@ -22705,7 +22725,7 @@ async function adminBoletinEnviar(request, env, id, quien) {
   const libres = CORREO_TOPE_DIA - BOLETIN_MARGEN - ((hoy && Number(hoy.n)) || 0);
   if (libres <= 0) return json({ error: "sin_cupo_hoy", ayuda: "El cupo de correo de hoy está reservado para recibos, casos y avisos. Sigue mañana: nadie recibe el boletín dos veces." }, 429);
   const lote = (await env.DB.prepare(
-    "SELECT n.email, n.nombre, n.idioma FROM regalo_noticias n WHERE n.baja_en IS NULL " +
+    "SELECT n.email, n.nombre, n.idioma FROM regalo_noticias n WHERE " + noticiasVigente("n") + " " +
     "AND NOT EXISTS (SELECT 1 FROM boletin_envios e WHERE e.boletin_id = ? AND e.email = n.email) ORDER BY n.consentido_en LIMIT ?"
   ).bind(id, Math.min(BOLETIN_TANDA, libres)).all()).results || [];
   if (b.estado === "borrador") {
@@ -22715,16 +22735,27 @@ async function adminBoletinEnviar(request, env, id, quien) {
   }
   let enviados = 0, fallidos = 0, sinCupo = false;
   for (const p of lote) {
+    /* SE APARTA ANTES DE ENVIAR (10 nov 2026). Antes la fila se escribía
+       después del correo: dos clics seguidos, o dos personas en el panel,
+       tomaban la misma tanda y cada quien recibía el boletín dos veces. Con la
+       llave (boletin_id, email), solo una de las dos peticiones gana la fila.
+       Si el Worker muere entre apartar y enviar, la fila queda «pendiente» y
+       esa persona no lo recibe: es el lado seguro. */
+    const mio = await env.DB.prepare("INSERT OR IGNORE INTO boletin_envios (boletin_id, email, resultado) VALUES (?, ?, 'pendiente')").bind(id, p.email).run();
+    if (!(mio.meta && mio.meta.changes)) continue;
     const url = ORIGIN + "/noticias/baja/" + (await tokenBajaNoticias(env, p.email));
     const m = correoBoletin(b, p.idioma === "en", url);
     const r = await enviarCorreo(env, { para: p.email, asunto: m.asunto, texto: m.texto, html: m.html, etiqueta: "boletin" });
-    if (r && r.sinCupo) { sinCupo = true; break; }
+    if (r && r.sinCupo) {
+      await env.DB.prepare("DELETE FROM boletin_envios WHERE boletin_id = ? AND email = ? AND resultado = 'pendiente'").bind(id, p.email).run();
+      sinCupo = true; break;
+    }
     const ok = !!(r && r.ok);
     ok ? enviados++ : fallidos++;
-    await env.DB.prepare("INSERT OR IGNORE INTO boletin_envios (boletin_id, email, resultado) VALUES (?, ?, ?)").bind(id, p.email, ok ? "enviado" : "fallo").run();
+    await env.DB.prepare("UPDATE boletin_envios SET resultado = ? WHERE boletin_id = ? AND email = ?").bind(ok ? "enviado" : "fallo", id, p.email).run();
   }
   const quedan = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM regalo_noticias n WHERE n.baja_en IS NULL AND NOT EXISTS (SELECT 1 FROM boletin_envios e WHERE e.boletin_id = ? AND e.email = n.email)"
+    "SELECT COUNT(*) AS n FROM regalo_noticias n WHERE " + noticiasVigente("n") + " AND NOT EXISTS (SELECT 1 FROM boletin_envios e WHERE e.boletin_id = ? AND e.email = n.email)"
   ).bind(id).first();
   const q = (quedan && quedan.n) || 0;
   await env.DB.prepare("UPDATE boletines SET estado = ?, ultimo_envio_en = datetime('now') WHERE id = ?").bind(q ? "enviando" : "enviado", id).run();
