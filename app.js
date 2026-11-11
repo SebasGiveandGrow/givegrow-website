@@ -1246,6 +1246,19 @@ var I18N = {
     "ff.pers.nit":"Sí",
     "ff.pers.tramite":"En trámite",
     "ff.pers.base":"No — es un proyecto social sin registro",
+    "ff.rol.lbl":"¿Cómo quiere participar la fundación en la red?",
+    "ff.rol.help":"Cualquier respuesta sirve para aplicar. Define qué portal y qué convenio le corresponden; se puede cambiar después.",
+    "ff.rol.recibe":"Recibir apoyo para sus programas",
+    "ff.rol.aporta":"Aportar a otras fundaciones de la red",
+    "ff.rol.ambas":"Las dos cosas",
+    "ff.dan.lbl":"¿Qué puede aportar? Marque todo lo que aplique (opcional)",
+    "ff.dan.dinero":"Dinero",
+    "ff.dan.especie":"Donaciones en especie",
+    "ff.dan.voluntariado":"Voluntariado",
+    "ff.dan.conocimiento":"Conocimiento o formación",
+    "ff.dan.espacios":"Espacios",
+    "ff.dan.logistica":"Logística o transporte",
+    "ff.dan.visibilidad":"Visibilidad y contactos",
     "ff.nit":"NIT de la fundación (opcional)",
     "ff.nit.ph":"900123456-8",
     "ff.nit.help":"Como aparece en el RUT, con el dígito de verificación después del guion.",
@@ -1300,6 +1313,7 @@ var I18N = {
     "ff.err.email":"Revisa el correo: parece que tiene algo raro.",
     "ff.err.lider":"Cuéntanos quién lidera la fundación.",
     "ff.err.pers":"Dinos si la fundación está registrada en Cámara de Comercio. Cualquier respuesta sirve.",
+    "ff.err.rol":"Dinos cómo quiere participar la fundación en la red. Cualquier respuesta sirve.",
     "ff.err.nit":"Ese NIT no cuadra. Escríbelo como en el RUT, con el guion y el dígito de verificación (ej. 900123456-8). Si no lo tienes a mano, déjalo vacío.",
     "ff.err.zona":"Dinos el barrio o sector y la ciudad donde trabaja.",
     "ff.err.historia":"Cuéntanos la historia de la fundación, aunque sea en pocas líneas.",
@@ -3800,7 +3814,7 @@ var ACT_FNS = {
   onSlider:onSlider, onManual:onManual, onNote:onNote, setProject:setProject, donarA:donarA,
   donarBrigada:donarBrigada, allySubmit:allySubmit, allySector:allySector,
   volSubmit:volSubmit, volNivel:volNivel, ofSubmit:ofSubmit, repSubmit:repSubmit,
-  fundSubmit:fundSubmit, fundOtra:fundOtra, fundPers:fundPers, irAFormFund:irAFormFund,
+  fundSubmit:fundSubmit, fundOtra:fundOtra, fundPers:fundPers, fundRol:fundRol, irAFormFund:irAFormFund,
   /* `miSubmit` y `miCalcula` (la membresia internacional) estuvieron fuera de
      esta lista y el boton «Continuar a PayPal» no hacia NADA: la delegacion solo
      invoca funciones registradas, a proposito y sin eval. Es la clase de fallo
@@ -6522,6 +6536,13 @@ function fundSubmit(ev){
   if (!telOk(val("ff-tel"))) return allyMal(note, "ff-tel", "form.err.tel");
   if (!val("ff-lider")) return allyMal(note, "ff-lider", "ff.err.lider");
   if (!pers) return allyMal(note, document.querySelector('input[name="ff-pers"]'), "ff.err.pers");
+  /* EL ROL EN LA RED (11 nov 2026): recibe, aporta o las dos. Decide qué
+     portal y qué convenio le tocan. Lo que puede aportar solo viaja si dijo
+     que aporta. */
+  var rol = document.querySelector('input[name="ff-rol"]:checked');
+  if (!rol) return allyMal(note, document.querySelector('input[name="ff-rol"]'), "ff.err.rol");
+  var dan = rol.value === "recibe" ? [] : [].slice.call(document.querySelectorAll('input[name="ff-dan"]:checked'))
+    .map(function(e){ return e.value; });
   /* El NIT solo cuenta si dijo «Sí»: si cambió de opinión después de escribirlo,
      la casilla se esconde y lo escrito no viaja. */
   var nit = pers.value === "nit" ? val("ff-nit") : "";
@@ -6545,6 +6566,7 @@ function fundSubmit(ev){
       nombre: val("ff-nombre"), sigla: val("ff-sigla"),
       lider: val("ff-lider"), cargo: val("ff-cargo"), anio: val("ff-anio"),
       personeria: pers.value, nit: nit, zona: val("ff-zona"), ciudad: val("ff-ciudad"),
+      rol: rol.value, aporta: dan,
       email: val("ff-email"), telefono: val("ff-tel"),
       historia: val("ff-historia"), mision: val("ff-mision"),
       poblacion: pob, poblacion_otra: val("ff-pob-otra"),
@@ -6598,6 +6620,13 @@ function fundPersVer(){
   if (box) box.style.display = (p && p.value === "nit") ? "" : "none";
 }
 function fundPers(){ setTimeout(fundPersVer, 0); }
+/* Lo que puede aportar aparece solo si dijo que aporta. */
+function fundRolVer(){
+  var r = document.querySelector('input[name="ff-rol"]:checked');
+  var box = document.getElementById("ff-dan-box");
+  if (box) box.style.display = (r && r.value !== "recibe") ? "" : "none";
+}
+function fundRol(){ setTimeout(fundRolVer, 0); }
 
 /* EL NIT SE COMPRUEBA CON SU DÍGITO DE VERIFICACIÓN, el mismo cálculo de la
    DIAN que hace `nitValido` en el servidor (quien de verdad decide). Un NIT con
@@ -6637,6 +6666,7 @@ var FF_ERRS = {
   email_invalido: ["#ff-email", "ff.err.email"],
   lider_requerido: ["#ff-lider", "ff.err.lider"],
   personeria_requerida: ['input[name="ff-pers"]', "ff.err.pers"],
+  rol_invalido: ['input[name="ff-rol"]', "ff.err.rol"],
   nit_invalido: ["#ff-nit", "ff.err.nit"],
   zona_requerida: ["#ff-zona", "ff.err.zona"],
   historia_requerida: ["#ff-historia", "ff.err.historia"],
