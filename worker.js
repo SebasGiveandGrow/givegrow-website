@@ -4547,6 +4547,7 @@ async function adminRegalosEliminarDatos(env, c, quien) {
   if (camp.datos_eliminados_en) return json({ error: "ya_eliminados",
     ayuda: "Los datos de esta campaña ya se borraron: no queda nada que borrar." }, 409);
   const claves = [];
+  let huerfanos = 0;
   const n = await env.DB.prepare(
     "SELECT foto_key, autorizacion_key FROM regalo_ninos WHERE campana_id = ?"
   ).bind(REGALOS_CAMPANA).all();
@@ -4558,6 +4559,20 @@ async function adminRegalosEliminarDatos(env, c, quien) {
   for (const r of v.results || []) claves.push(r.video_key);
   if (env.MEDIA) {
     for (let i = 0; i < claves.length; i += 1000) await env.MEDIA.delete(claves.slice(i, i + 1000));
+    /* Y LO QUE LA BASE YA NO NOMBRA (11 nov 2026). Una foto reemplazada o un
+       video quitado se borran en su momento con un try/catch que deja pasar el
+       fallo («queda huérfana, no rompe»): si ese borrado falló, el archivo
+       sigue en R2 y ninguna fila lo conoce. Las tres carpetas son solo de la
+       campaña, así que se barren enteras. */
+    for (const prefijo of ["regalos/fotos/", "regalos/autorizaciones/", "regalos/videos/"]) {
+      let cursor;
+      do {
+        const lista = await env.MEDIA.list({ prefix: prefijo, cursor });
+        const resto = lista.objects.map((o) => o.key);
+        if (resto.length) { await env.MEDIA.delete(resto); huerfanos += resto.length; }
+        cursor = lista.truncated ? lista.cursor : undefined;
+      } while (cursor);
+    }
   }
   await env.DB.batch([
     env.DB.prepare(
@@ -4567,13 +4582,20 @@ async function adminRegalosEliminarDatos(env, c, quien) {
     ).bind(REGALOS_CAMPANA),
     env.DB.prepare(
       "UPDATE regalo_mensajes SET carta = NULL, firma = NULL, video_key = NULL, video_tipo = NULL, video_bytes = NULL, " +
-      "video_seg = NULL, actualizado_en = datetime('now') WHERE pedido_ref IN (SELECT ref FROM regalo_pedidos WHERE campana_id = ?)"
+      /* `motivo` es texto libre de quien revisó la carta y puede citarla. */
+      "video_seg = NULL, motivo = NULL, actualizado_en = datetime('now') WHERE pedido_ref IN (SELECT ref FROM regalo_pedidos WHERE campana_id = ?)"
+    ).bind(REGALOS_CAMPANA),
+    /* EL DESEO ES TEXTO LIBRE que escribe la fundación («una muñeca para mi
+       hermana…») y nadie lo revisa contra nombres. Lo que sostiene el acta es
+       el código y el tipo de regalo, que se quedan; el deseo y la talla, no. */
+    env.DB.prepare(
+      "UPDATE regalos SET deseo_es = '—', deseo_en = NULL, talla = NULL, actualizado_en = datetime('now') WHERE campana_id = ?"
     ).bind(REGALOS_CAMPANA),
     env.DB.prepare("UPDATE regalo_campanas SET datos_eliminados_en = datetime('now') WHERE id = ?").bind(REGALOS_CAMPANA)
   ]);
   await adminRegalosAuditar(env, quien, "eliminó los datos personales de la campaña: " + (n.results || []).length +
-    " niño(s) y " + claves.length + " archivo(s) en R2");
-  return json({ ok: true, ninos: (n.results || []).length, archivos: claves.length });
+    " niño(s), " + claves.length + " archivo(s) en R2 y " + huerfanos + " archivo(s) sin fila");
+  return json({ ok: true, ninos: (n.results || []).length, archivos: claves.length, huerfanos });
 }
 
 /* EL RECORRIDO, en lote. Cada paso tiene un único estado de origen válido y
