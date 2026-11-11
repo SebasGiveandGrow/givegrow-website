@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=f584afcd" defer></script>
+<script src="/app.js?v=4f0766a8" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -714,6 +714,24 @@
             <label for="ff-nit" data-i18n="ff.nit">NIT de la fundación (opcional)</label>
             <input type="text" id="ff-nit" maxlength="20" autocomplete="off" data-i18n="ff.nit.ph" data-i18n-attr="placeholder" placeholder="900123456-8">
             <small class="vf-help" data-i18n="ff.nit.help">Como aparece en el RUT, con el dígito de verificación después del guion.</small></div>
+        </fieldset>
+
+        <fieldset class="vf-set">
+          <legend data-i18n="ff.rol.lbl">¿Cómo quiere participar la fundación en la red?</legend>
+          <p class="vf-help" data-i18n="ff.rol.help">Cualquier respuesta sirve para aplicar. Define qué portal y qué convenio le corresponden; se puede cambiar después.</p>
+          <label class="ally-check" data-act="fundRol()"><input type="radio" name="ff-rol" value="recibe"><span data-i18n="ff.rol.recibe">Recibir apoyo para sus programas</span></label>
+          <label class="ally-check" data-act="fundRol()"><input type="radio" name="ff-rol" value="aporta"><span data-i18n="ff.rol.aporta">Aportar a otras fundaciones de la red</span></label>
+          <label class="ally-check" data-act="fundRol()"><input type="radio" name="ff-rol" value="ambas"><span data-i18n="ff.rol.ambas">Las dos cosas</span></label>
+          <div id="ff-dan-box" style="display:none;margin-top:12px">
+            <p class="vf-help" data-i18n="ff.dan.lbl">¿Qué puede aportar? Marque todo lo que aplique (opcional)</p>
+            <label class="ally-check"><input type="checkbox" name="ff-dan" value="dinero"><span data-i18n="ff.dan.dinero">Dinero</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-dan" value="especie"><span data-i18n="ff.dan.especie">Donaciones en especie</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-dan" value="voluntariado"><span data-i18n="ff.dan.voluntariado">Voluntariado</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-dan" value="conocimiento"><span data-i18n="ff.dan.conocimiento">Conocimiento o formación</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-dan" value="espacios"><span data-i18n="ff.dan.espacios">Espacios</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-dan" value="logistica"><span data-i18n="ff.dan.logistica">Logística o transporte</span></label>
+            <label class="ally-check"><input type="checkbox" name="ff-dan" value="visibilidad"><span data-i18n="ff.dan.visibilidad">Visibilidad y contactos</span></label>
+          </div>
         </fieldset>
 
         <h3 class="ally-sec" data-i18n="ff.s.hist">Qué hace y por qué</h3>

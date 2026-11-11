@@ -20311,6 +20311,21 @@ async function correoAvisoLeadEmpresa(env, a) {
    los tienen guardados en `datos`. Ademas de describir a la organizacion, dice
    que version del convenio aplica en el paso 4: ver `varianteConvenio`. */
 const PERSONERIAS = ["nit", "tramite", "base"];
+/* EL ROL EN LA RED (11 nov 2026). Una fundación puede recibir apoyo, aportarlo
+   a otras, o las dos cosas. Va en `datos`, sin migración. Las solicitudes
+   anteriores no lo traen y se leen como «recibe», que es lo que eran todas.
+   `aporta` es lo que puede dar, y solo se guarda si dijo que aporta. */
+const ROLES_FUND = ["recibe", "aporta", "ambas"];
+const ROL_FUND_ES = { recibe: "Recibe", aporta: "Aporta", ambas: "Recibe y aporta" };
+const APORTES_FUND = ["dinero", "especie", "voluntariado", "conocimiento", "espacios", "logistica", "visibilidad"];
+const APORTE_FUND_ES = { dinero: "dinero", especie: "especie", voluntariado: "voluntariado", conocimiento: "conocimiento",
+  espacios: "espacios", logistica: "logística", visibilidad: "visibilidad" };
+function rolFundacion(x) { return x && ROLES_FUND.includes(x.rol) ? x.rol : "recibe"; }
+function rolFundacionTexto(x) {
+  const r = rolFundacion(x);
+  const a = r === "recibe" ? [] : (Array.isArray(x && x.aporta) ? x.aporta : []).filter((k) => APORTES_FUND.includes(k));
+  return ROL_FUND_ES[r] + (a.length ? ": " + a.map((k) => APORTE_FUND_ES[k]).join(", ") : "");
+}
 
 /* NIT colombiano: el numero, un guion y el digito de verificacion de la DIAN
    (pesos 3, 7, 13… de derecha a izquierda, modulo 11). Devuelve el NIT sin
@@ -20361,6 +20376,13 @@ async function apiFundacion(env, c) {
   const nit = nitCrudo ? nitNormal(nitCrudo) : "";
   if (nitCrudo && !nit) return json({ error: "nit_invalido" }, 400);
 
+  /* Un formulario abierto antes de este cambio no manda el rol: se guarda como
+     «recibe». Un valor que no es de la lista sí se rechaza. */
+  if (c.rol != null && c.rol !== "" && !ROLES_FUND.includes(c.rol)) return json({ error: "rol_invalido", opciones: ROLES_FUND }, 400);
+  const rol = ROLES_FUND.includes(c.rol) ? c.rol : "recibe";
+  const aporta = rol === "recibe" || !Array.isArray(c.aporta) ? []
+    : [...new Set(c.aporta.filter((k) => APORTES_FUND.includes(k)))];
+
   const poblacion = Array.isArray(c.poblacion)
     ? c.poblacion.filter(p => POBLACIONES_FUND.includes(p)) : [];
   if (!poblacion.length) return json({ error: "poblacion_requerida", opciones: POBLACIONES_FUND }, 400);
@@ -20378,6 +20400,8 @@ async function apiFundacion(env, c) {
     anio: limpio(c.anio, 8),
     personeria,
     nit,
+    rol,
+    aporta,
     zona,
     historia,
     mision,
@@ -24821,6 +24845,7 @@ async function correoAvisoFundacion(env, f) {
     ["Teléfono", f.telefono || "(no dejó)"],
     ["Constituida", (ETIQUETA_PERS[f.personeria] || f.personeria) + (f.nit ? " · NIT " + f.nit : "")],
     ["Convenio que aplica", NOMBRE_VARIANTE[varianteConvenio(f)] || "por definir"],
+    ["En la red", rolFundacionTexto(f)],
     ["Desde", f.anio || "(no dice)"],
     ["Territorio", f.zona],
     ["Ciudad", f.ciudad || "(no dice)"],
@@ -37848,6 +37873,7 @@ function listaVoluntario(i, x){
    La lista del Anexo 1 llega YA ARMADA del servidor (i.convenio, de
    DOCS_CONVENIO): este panel no tiene su propia copia de que documentos se
    piden, porque dos copias terminan diciendo cosas distintas. */
+var ROL_ES = { recibe: "recibe", aporta: "aporta", ambas: "recibe y aporta" };
 var PERS_ES = { nit: "Constituida (Cámara de Comercio)", tramite: "Constitución en trámite",
                 base: "Proyecto social sin registro" };
 /* Una nota que es un enlace se abre; cualquier otra cosa es texto. Mismo
@@ -38191,7 +38217,10 @@ function resumenInscripcion(tipo, x, i){
        que se ve desde el primer dia, con el NIT si lo dio. La version la
        calcula el servidor. */
     var cv = i && i.convenio;
-    var legal = esc(PERS_ES[x.personeria] || "constitución: no dice") + (x.nit ? " · NIT " + esc(x.nit) : "")
+    /* El rol en la red (11 nov 2026). Las solicitudes viejas no lo traen: son «recibe». */
+    var rolTxt = ROL_ES[x.rol] || "recibe";
+    if (x.rol && x.rol !== "recibe" && x.aporta && x.aporta.length) rolTxt += ": " + x.aporta.map(function(k){ return esc(k); }).join(", ");
+    var legal = "en la red: " + rolTxt + " · " + esc(PERS_ES[x.personeria] || "constitución: no dice") + (x.nit ? " · NIT " + esc(x.nit) : "")
       + (cv && cv.nombre_variante && i.estado !== "convenio" ? " · convenio: " + esc(cv.nombre_variante) : "");
     return esc(x.atiende || "?") + " — " +
       (x.poblacion || []).map(function(k){ return esc(POB_ES[k] || k); }).join(", ") +
