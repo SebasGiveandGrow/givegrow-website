@@ -2581,6 +2581,7 @@ var I18N = {
     "rg.zona.fin":"{n} financiados",
     "rg.zona.ent":"{n} entregados",
     "rg.zona.fecha":"Entrega prevista: {f}",
+    "rg.zona.especie":"{n} ya donados en especie",
     "rg.plazo.n":"Quedan {n} días para regalar: hasta el {f}.",
     "rg.plazo.1":"Queda un día para regalar: hasta el {f}.",
     "rg.plazo.0":"Hoy es el último día para regalar.",
@@ -3698,7 +3699,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "cba4e7ea", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "0bbed5bd", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };

@@ -144,3 +144,12 @@ nuevos: leen la meta, la fecha de cierre y la de publicación que ya existen.
 - **La membresía se pide en el correo de «entregado»**, no al pagar: llega con
   el acta en la mano. Una invitación sin cifras.
 
+
+## Regalos en especie por zona (0064, 12 nov 2026)
+
+Cuando llegan regalos que no son de un niño en particular (los 250 que Sebas
+consiguió para La Guajira), se anotan en `/admin/regalos › Zonas › En especie`.
+Cuentan como financiados: encienden luces del árbol y bajan el «faltan N luces»,
+y bajo el árbol sale «250 ya donados en especie». No tienen ficha, pedido ni
+donante en la página, y no cuentan como entregados: la entrega se prueba con su
+propia acta en `/admin › Entregas`. Va de 0 a la meta de la zona.

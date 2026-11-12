@@ -220,6 +220,8 @@ function rgPintaZonas(){
          aceleran cuando la meta se ve cerca). Solo con la campaña abierta. */
       (abierta && meta ? '<p class="rg-zona-falta' + (fin >= meta ? ' is-llena' : '') + '">' +
         rgEsc(fin >= meta ? t("rg.zona.llena") : t(meta - fin === 1 ? "rg.zona.falta1" : "rg.zona.faltan").replace("{n}", (meta - fin).toLocaleString(loc))) + '</p>' : '') +
+      /* Los regalos que llegaron en especie (0064): ya son luces encendidas. */
+      (z.en_especie ? '<p class="rg-zona-d">' + rgEsc(t("rg.zona.especie").replace("{n}", Number(z.en_especie).toLocaleString(loc))) + '</p>' : '') +
       (z.fecha_entrega ? '<p class="rg-zona-d">' + rgEsc(t("rg.zona.fecha").replace("{f}", rgFecha(z.fecha_entrega))) + '</p>' : '') +
       '</div>';
   }).join("");
