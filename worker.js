@@ -3348,7 +3348,7 @@ function regalosRecibe(c) {
    los demás números salen de la base, nunca se escriben a mano. */
 async function regalosZonas(env) {
   const { results } = await env.DB.prepare(
-    "SELECT z.id, z.nombre_es, z.nombre_en, z.departamento, z.meta, z.fecha_entrega, " +
+    "SELECT z.id, z.nombre_es, z.nombre_en, z.departamento, z.meta, z.fecha_entrega, z.en_especie, " +
     "SUM(CASE WHEN r.estado NOT IN ('borrador', 'retirado') THEN 1 ELSE 0 END) AS publicados, " +
     "SUM(CASE WHEN r.estado IN ('financiado', 'comprado', 'despachado', 'entregado') THEN 1 ELSE 0 END) AS financiados, " +
     "SUM(CASE WHEN r.estado = 'entregado' THEN 1 ELSE 0 END) AS entregados " +
@@ -3358,7 +3358,10 @@ async function regalosZonas(env) {
   return (results || []).map((z) => ({
     id: z.id, nombre_es: z.nombre_es, nombre_en: z.nombre_en, departamento: z.departamento,
     meta: z.meta, fecha_entrega: z.fecha_entrega,
-    publicados: z.publicados || 0, financiados: z.financiados || 0, entregados: z.entregados || 0
+    /* Los regalos en especie (0064) cuentan como financiados: encienden luces
+       del árbol, aunque no tengan ficha ni pedido. */
+    publicados: z.publicados || 0, en_especie: z.en_especie || 0,
+    financiados: (z.financiados || 0) + (z.en_especie || 0), entregados: z.entregados || 0
   }));
 }
 
@@ -4433,10 +4436,13 @@ async function adminRegalosAccion(request, env, accion, quien) {
     if (!Number.isInteger(meta) || meta < 0 || meta > 100000) return json({ error: "meta_invalida" }, 400);
     const fecha = limpiar(c.fecha_entrega, 10) || null;
     if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ error: "fecha_invalida" }, 400);
-    const r = await env.DB.prepare("UPDATE regalo_zonas SET meta = ?, fecha_entrega = ? WHERE id = ?")
-      .bind(meta, fecha, limpiar(c.id, 30)).run();
+    const especie = c.en_especie == null || c.en_especie === "" ? 0 : Number(c.en_especie);
+    if (!Number.isInteger(especie) || especie < 0 || especie > meta) return json({ error: "especie_invalida",
+      ayuda: "Los regalos en especie van de 0 a la meta de la zona." }, 400);
+    const r = await env.DB.prepare("UPDATE regalo_zonas SET meta = ?, fecha_entrega = ?, en_especie = ? WHERE id = ?")
+      .bind(meta, fecha, especie, limpiar(c.id, 30)).run();
     if (!r.meta || !r.meta.changes) return json({ error: "no_encontrada" }, 404);
-    await adminRegalosAuditar(env, quien, "zona " + c.id + " · meta " + meta + " · entrega " + (fecha || "—"));
+    await adminRegalosAuditar(env, quien, "zona " + c.id + " · meta " + meta + " · en especie " + especie + " · entrega " + (fecha || "—"));
     return json({ ok: true });
   }
 
@@ -5104,7 +5110,7 @@ function paginaRegalosAdmin() {
     <div class="caja">
       <h2>Zonas</h2>
       <p class="mu">La meta es lo único que la página promete. Los contadores (publicados · financiados · entregados) salen de la base.</p>
-      <div class="tabla"><table><thead><tr><th>Zona</th><th>Meta</th><th>Fecha de entrega</th><th>Pub · Fin · Ent</th><th></th></tr></thead>
+      <div class="tabla"><table><thead><tr><th>Zona</th><th>Meta</th><th>En especie</th><th>Fecha de entrega</th><th>Pub · Fin · Ent</th><th></th></tr></thead>
       <tbody id="tb-zonas"></tbody></table></div>
     </div>
     <div class="caja">
@@ -5331,6 +5337,7 @@ function pintarZonas(){
   $("tb-zonas").innerHTML = D.zonas.map(function(z){
     return "<tr><td><strong>" + esc(z.nombre_es) + "</strong><br><span class='mu'>" + esc(z.departamento) + "</span></td>" +
       "<td><input type='number' min='0' id='zm-" + esc(z.id) + "' value='" + esc(z.meta) + "'></td>" +
+      "<td><input type='number' min='0' id='ze-" + esc(z.id) + "' value='" + esc(z.en_especie || 0) + "' title='Regalos ya cubiertos sin ficha: encienden luces del árbol'></td>" +
       "<td><input type='date' id='zf-" + esc(z.id) + "' value='" + esc(z.fecha_entrega || "") + "'></td>" +
       "<td class='num'>" + z.publicados + " · " + z.financiados + " · " + z.entregados + "</td>" +
       "<td><button class='b' data-zona='" + esc(z.id) + "'>Guardar</button></td></tr>";
@@ -5599,7 +5606,7 @@ document.addEventListener("click", function(ev){
   }
   if ((b = t.closest("[data-zona]"))) {
     var z = b.getAttribute("data-zona");
-    enviar("/api/admin/regalos/zona", { id: z, meta: Number($("zm-" + z).value), fecha_entrega: $("zf-" + z).value })
+    enviar("/api/admin/regalos/zona", { id: z, meta: Number($("zm-" + z).value), en_especie: Number($("ze-" + z).value || 0), fecha_entrega: $("zf-" + z).value })
       .then(function(){ aviso("m-ajustes", "Zona guardada."); return cargar(); }).catch(function(e){ aviso("m-ajustes", motivo(e), true); });
     return;
   }
