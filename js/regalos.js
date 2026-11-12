@@ -180,14 +180,24 @@ function rgArbol(z, ent, fin){
   var defs = '<defs><radialGradient id="' + gid + '-h"><stop offset="0" class="rg-hs0"/><stop offset=".45" class="rg-hs1"/>' +
     '<stop offset="1" class="rg-hs2"/></radialGradient><radialGradient id="' + gid + '-c" cx=".38" cy=".35" r=".75">' +
     '<stop offset="0" class="rg-cs0"/><stop offset=".18" class="rg-cs1"/><stop offset="1" class="rg-cs1"/></radialGradient></defs>';
-  var halos = '', luces = '';
+  /* Cada luz encendida titila con su propio ritmo (tw0…tw7 en styles.css); el
+     foco, el halo y el destello de una misma luz con ritmos distintos, y solo
+     una de cada tres suelta destello: como estrellas, nunca todas a la vez. */
+  var halos = '', luces = '', destellos = '', ritmo = rgOrden(pos.length, z.id + "*");
+  var tw = ["tw0", "tw1", "tw2", "tw3", "tw4", "tw5", "tw6", "tw7"];
   pos.forEach(function(p, k){
-    var s = estado[k], x = p[0].toFixed(1), y = p[1].toFixed(1);
-    if (s) halos += '<circle class="rg-halo" cx="' + x + '" cy="' + y + '" r="' + (s === "e" ? 8 : 7) + '" fill="url(#' + gid + '-h)"/>';
-    luces += '<circle class="rg-l' + (s ? ' is-' + s : '') + '" cx="' + x + '" cy="' + y + '" r="' + (s === "e" ? 3.2 : s === "f" ? 3 : 1.7) + '"' +
+    var s = estado[k], x = p[0], y = p[1], q = ritmo[k];
+    if (s) {
+      halos += '<circle class="rg-halo ' + tw[q % 8] + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (s === "e" ? 8 : 7) + '" fill="url(#' + gid + '-h)"/>';
+      if (q % 3 === 0) destellos += '<path class="rg-destello ' + tw[(q >> 3) % 8] + '" d="M' + x.toFixed(1) + ' ' + (y - 7).toFixed(1) +
+        'L' + (x + 1.2).toFixed(1) + ' ' + (y - 1.2).toFixed(1) + 'L' + (x + 7).toFixed(1) + ' ' + y.toFixed(1) + 'L' + (x + 1.2).toFixed(1) + ' ' + (y + 1.2).toFixed(1) +
+        'L' + x.toFixed(1) + ' ' + (y + 7).toFixed(1) + 'L' + (x - 1.2).toFixed(1) + ' ' + (y + 1.2).toFixed(1) + 'L' + (x - 7).toFixed(1) + ' ' + y.toFixed(1) +
+        'L' + (x - 1.2).toFixed(1) + ' ' + (y - 1.2).toFixed(1) + 'Z"/>';
+    }
+    luces += '<circle class="rg-l' + (s ? ' is-' + s + ' ' + tw[(q >> 5) % 8] : '') + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (s === "e" ? 3.2 : s === "f" ? 3 : 1.7) + '"' +
       (s === "f" ? ' fill="url(#' + gid + '-c)"' : '') + '/>';
   });
-  luces = '<g>' + halos + '</g><g>' + luces + '</g>';
+  luces = '<g>' + halos + '</g><g>' + luces + '</g><g>' + destellos + '</g>';
   /* La silueta: un verde muy suave detrás de cada piso. Un piso nuevo empieza
      donde una fila es más angosta que la anterior. */
   var pisos = [], ini = 0;
