@@ -27,6 +27,7 @@
      --plata son de adorno: luces, cintas y bordes, nunca texto. */
   --rojo:#A61E2D;
   --oro:#D4A944;
+  --oro-brillo:#FFCF3A;   /* 12 nov 2026, pedido de Sebas: el foco encendido del árbol, más amarillo que --oro. Solo adorno, nunca texto. */
   --oro-texto:#8A6620;
   --plata:#C9CED4;
   --plata-suave:#F1F3F5;
@@ -2356,23 +2357,48 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 .rg-zona{min-width:0}
 .rg-luces{width:var(--rg-ancho,100%);margin:0 auto 18px}
 .rg-arbol{display:block;width:100%;height:auto;overflow:visible}
-.rg-arbol .rg-l{fill:var(--plata)}
-.rg-arbol .rg-l.is-f{fill:var(--oro)}
+.rg-arbol .rg-l:not([fill]){fill:var(--plata)}
+.rg-arbol .rg-l{opacity:.55}
+.rg-arbol .rg-l.is-f,.rg-arbol .rg-l.is-e{opacity:1}
+.rg-arbol .rg-l.is-f:not([fill]){fill:var(--oro)}
+/* El brillo: halo dorado detrás de cada luz encendida y centro claro en la
+   financiada (los degradados los pinta regalos.js). */
+.rg-hs0{stop-color:var(--oro-brillo);stop-opacity:.95}
+.rg-hs1{stop-color:var(--oro-brillo);stop-opacity:.4}
+.rg-hs2{stop-color:var(--oro-brillo);stop-opacity:0}
+.rg-cs0{stop-color:var(--surface)}
+.rg-cs1{stop-color:var(--oro-brillo)}
+/* Los destellos: una cruz de cuatro puntas que aparece, gira y se apaga. */
+.rg-destello{fill:var(--oro-brillo);opacity:0;transform-box:fill-box;transform-origin:center}
 .rg-arbol .rg-l.is-e{fill:var(--rojo);stroke:var(--oro);stroke-width:1.2}
 .rg-astro{fill:none;stroke:var(--oro);stroke-width:1}
 .rg-astro.is-llena{fill:var(--oro)}
 .rg-tronco{fill:var(--oro-texto)}
-.rg-follaje{fill:var(--gl);stroke:var(--gl);stroke-width:6;stroke-linejoin:round}
+.rg-follaje{fill:var(--g);stroke:var(--g);stroke-width:6;stroke-linejoin:round}
 /* La leyenda usa las mismas tres luces, dibujadas como puntos. */
 .rg-leyenda .rg-l{display:block;width:10px;aspect-ratio:1;border-radius:50%;background:var(--plata)}
-.rg-leyenda .rg-l.is-f{background:var(--oro)}
+.rg-leyenda .rg-l.is-f{background:var(--oro-brillo)}
 .rg-leyenda .rg-l.is-e{background:var(--rojo);box-shadow:0 0 0 2px var(--oro)}
 @media (prefers-reduced-motion:no-preference){
-  .rg-luces .rg-l.is-f{animation:rg-titila 4.5s ease-in-out infinite}
-  .rg-luces .rg-l.is-f:nth-child(3n){animation-delay:-1.5s}
-  .rg-luces .rg-l.is-f:nth-child(5n){animation-delay:-3s}
+  /* COMO ESTRELLAS (12 nov 2026): cada luz encendida titila con uno de ocho
+     ritmos (de 2,6 a 6,4 s, con desfases distintos) que regalos.js reparte sin
+     patrón, y el foco, el halo y el destello de una misma luz llevan ritmos
+     distintos: nunca destellan todas a la vez. Mucho movimiento, nada rápido. */
+  .rg-luces .rg-l.is-f,.rg-luces .rg-l.is-e{animation:rg-titila 4.5s ease-in-out infinite}
+  .rg-luces .rg-halo{transform-box:fill-box;transform-origin:center;animation:rg-brilla 3.2s ease-in-out infinite}
+  .rg-luces .rg-destello{animation:rg-destella 5s ease-in-out infinite}
+  .rg-luces .tw0{animation-duration:2.6s;animation-delay:-.4s}
+  .rg-luces .tw1{animation-duration:3.1s;animation-delay:-2.2s}
+  .rg-luces .tw2{animation-duration:3.7s;animation-delay:-1.1s}
+  .rg-luces .tw3{animation-duration:4.3s;animation-delay:-3.6s}
+  .rg-luces .tw4{animation-duration:4.9s;animation-delay:-.9s}
+  .rg-luces .tw5{animation-duration:5.4s;animation-delay:-4.4s}
+  .rg-luces .tw6{animation-duration:5.9s;animation-delay:-2.8s}
+  .rg-luces .tw7{animation-duration:6.4s;animation-delay:-5.3s}
 }
 @keyframes rg-titila{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes rg-brilla{0%,100%{opacity:1;transform:scale(1.15)}50%{opacity:.25;transform:scale(.7)}}
+@keyframes rg-destella{0%,62%,100%{opacity:0;transform:scale(.2) rotate(0deg)}74%{opacity:1;transform:scale(1) rotate(45deg)}86%{opacity:0;transform:scale(.35) rotate(90deg)}}
 .rg-zona-n{font-family:var(--font-display);font-size:var(--fs-h1);line-height:1;color:var(--acc);font-variant-numeric:tabular-nums;margin:0 0 8px}
 .rg-zona-t{font-weight:700;font-size:var(--fs-16);margin:0}
 .rg-zona-t span{color:var(--mu);font-weight:500}

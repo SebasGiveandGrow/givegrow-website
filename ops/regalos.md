@@ -153,3 +153,19 @@ Cuentan como financiados: encienden luces del árbol y bajan el «faltan N luces
 y bajo el árbol sale «250 ya donados en especie». No tienen ficha, pedido ni
 donante en la página, y no cuentan como entregados: la entrega se prueba con su
 propia acta en `/admin › Entregas`. Va de 0 a la meta de la zona.
+
+## Encuadrar las fotos en el rostro (`ops/encuadrar-fotos.swift`)
+
+Las fundaciones mandan fotos de cuerpo entero y la tarjeta las recorta en 4:3
+por el medio: se pierde la cabeza. Antes de subir una tanda, encuadrarlas:
+
+```bash
+swiftc -O -o /tmp/encuadrar ops/encuadrar-fotos.swift
+/tmp/encuadrar ~/Descargas/fotos-zona /tmp/fotos-listas --hoja /tmp/hoja.jpg
+```
+
+Busca la cara con Vision de macOS (en el equipo, nada sale), recorta en 4:3 de
+la cabeza al pecho y arma una hoja de contactos para revisarlas antes de
+subirlas por `Cargar la hoja › 3`. Lee JPG, PNG y HEIC. Si no encuentra cara,
+deja la franja de arriba y lo dice: revisar esas en la hoja. Las fotos ya
+publicadas se reemplazan en R2 con la misma clave (`foto_key`), sin tocar la base.
