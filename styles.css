@@ -2356,13 +2356,22 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 .rg-zona{min-width:0}
 .rg-luces{width:var(--rg-ancho,100%);margin:0 auto 18px}
 .rg-arbol{display:block;width:100%;height:auto;overflow:visible}
-.rg-arbol .rg-l{fill:var(--plata)}
-.rg-arbol .rg-l.is-f{fill:var(--oro)}
+.rg-arbol .rg-l:not([fill]){fill:var(--plata)}
+.rg-arbol .rg-l{opacity:.55}
+.rg-arbol .rg-l.is-f,.rg-arbol .rg-l.is-e{opacity:1}
+.rg-arbol .rg-l.is-f:not([fill]){fill:var(--oro)}
+/* El brillo: halo dorado detrás de cada luz encendida y centro claro en la
+   financiada (los degradados los pinta regalos.js). */
+.rg-hs0{stop-color:var(--oro);stop-opacity:.95}
+.rg-hs1{stop-color:var(--oro);stop-opacity:.4}
+.rg-hs2{stop-color:var(--oro);stop-opacity:0}
+.rg-cs0{stop-color:var(--surface)}
+.rg-cs1{stop-color:var(--oro)}
 .rg-arbol .rg-l.is-e{fill:var(--rojo);stroke:var(--oro);stroke-width:1.2}
 .rg-astro{fill:none;stroke:var(--oro);stroke-width:1}
 .rg-astro.is-llena{fill:var(--oro)}
 .rg-tronco{fill:var(--oro-texto)}
-.rg-follaje{fill:var(--gl);stroke:var(--gl);stroke-width:6;stroke-linejoin:round}
+.rg-follaje{fill:var(--g);stroke:var(--g);stroke-width:6;stroke-linejoin:round}
 /* La leyenda usa las mismas tres luces, dibujadas como puntos. */
 .rg-leyenda .rg-l{display:block;width:10px;aspect-ratio:1;border-radius:50%;background:var(--plata)}
 .rg-leyenda .rg-l.is-f{background:var(--oro)}
@@ -2371,8 +2380,13 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
   .rg-luces .rg-l.is-f{animation:rg-titila 4.5s ease-in-out infinite}
   .rg-luces .rg-l.is-f:nth-child(3n){animation-delay:-1.5s}
   .rg-luces .rg-l.is-f:nth-child(5n){animation-delay:-3s}
+  .rg-luces .rg-halo{animation:rg-brilla 3.2s ease-in-out infinite}
+  .rg-luces .rg-halo:nth-child(2n){animation-duration:4.1s;animation-delay:-1.2s}
+  .rg-luces .rg-halo:nth-child(3n){animation-delay:-2.3s}
+  .rg-luces .rg-halo:nth-child(7n){animation-duration:2.6s}
 }
 @keyframes rg-titila{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes rg-brilla{0%,100%{opacity:1}50%{opacity:.35}}
 .rg-zona-n{font-family:var(--font-display);font-size:var(--fs-h1);line-height:1;color:var(--acc);font-variant-numeric:tabular-nums;margin:0 0 8px}
 .rg-zona-t{font-weight:700;font-size:var(--fs-16);margin:0}
 .rg-zona-t span{color:var(--mu);font-weight:500}

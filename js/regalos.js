@@ -172,11 +172,22 @@ function rgArbol(z, ent, fin){
   for (f = 0; f < alto; f++) for (c = 0; c < filas[f]; c++) pos.push([cx + (c - (filas[f] - 1) / 2) * RG_PASO, top + f * dy]);
   var orden = rgOrden(pos.length, z.id), estado = new Array(pos.length);
   for (c = 0; c < orden.length; c++) estado[orden[c]] = c < ent ? "e" : c < fin ? "f" : "";
-  var luces = pos.map(function(p, k){
-    var s = estado[k];
-    return '<circle class="rg-l' + (s ? ' is-' + s : '') + '" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) +
-      '" r="' + (s === "e" ? 3 : s === "f" ? 2.7 : 1.7) + '"/>';
-  }).join("");
+  /* EL BRILLO (pedido de Sebas, 12 nov 2026: «que sea más visual»). Cada luz
+     encendida lleva detrás un halo dorado que se desvanece, y la financiada un
+     centro claro, como un foco. Los degradados van por zona porque sus id
+     tienen que ser únicos en la página. */
+  var gid = "rg-" + String(z.id).replace(/[^a-z0-9]/gi, "");
+  var defs = '<defs><radialGradient id="' + gid + '-h"><stop offset="0" class="rg-hs0"/><stop offset=".45" class="rg-hs1"/>' +
+    '<stop offset="1" class="rg-hs2"/></radialGradient><radialGradient id="' + gid + '-c" cx=".38" cy=".35" r=".75">' +
+    '<stop offset="0" class="rg-cs0"/><stop offset=".18" class="rg-cs1"/><stop offset="1" class="rg-cs1"/></radialGradient></defs>';
+  var halos = '', luces = '';
+  pos.forEach(function(p, k){
+    var s = estado[k], x = p[0].toFixed(1), y = p[1].toFixed(1);
+    if (s) halos += '<circle class="rg-halo" cx="' + x + '" cy="' + y + '" r="' + (s === "e" ? 8 : 7) + '" fill="url(#' + gid + '-h)"/>';
+    luces += '<circle class="rg-l' + (s ? ' is-' + s : '') + '" cx="' + x + '" cy="' + y + '" r="' + (s === "e" ? 3.2 : s === "f" ? 3 : 1.7) + '"' +
+      (s === "f" ? ' fill="url(#' + gid + '-c)"' : '') + '/>';
+  });
+  luces = '<g>' + halos + '</g><g>' + luces + '</g>';
   /* La silueta: un verde muy suave detrás de cada piso. Un piso nuevo empieza
      donde una fila es más angosta que la anterior. */
   var pisos = [], ini = 0;
@@ -192,7 +203,7 @@ function rgArbol(z, ent, fin){
     ' 14) scale(1.6)" d="M0-7l2 4.6 5 .5-3.8 3.3 1.1 4.9L0 2.8-4.3 5.3l1.1-4.9L-7-2.9l5-.5z"/>';
   var tronco = '<rect class="rg-tronco" x="' + (cx - 7).toFixed(1) + '" y="' + (top + (alto - 1) * dy + 10).toFixed(1) + '" width="14" height="14" rx="2"/>';
   return { svg: '<svg class="rg-arbol" viewBox="0 0 ' + w.toFixed(0) + ' ' + h.toFixed(0) + '" preserveAspectRatio="xMidYMax meet">' +
-    tronco + follaje + luces + estrella + '</svg>', w: w };
+    defs + tronco + follaje + luces + estrella + '</svg>', w: w };
 }
 function rgPintaZonas(){
   var d = RG.datos, caja = rgEl("rg-zonas");
