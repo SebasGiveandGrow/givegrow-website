@@ -2539,6 +2539,8 @@ html.rg-incrustado #page-regalos{padding-bottom:24px}
 .rg-comp .rg-ic{width:15px;height:15px}
 .rg-card.is-foco{border-color:var(--oro);box-shadow:0 0 0 2px var(--oro),var(--shadow)}
 .rg-reglas{margin-top:36px;padding-top:22px;border-top:1px solid var(--plata)}
+/* Desde el 12 nov 2026 las reglas van en su propia sección al final: sin el filo de arriba. */
+#rg-reglas-sec .rg-reglas{margin-top:0;padding-top:0;border-top:0}
 .rg-reglas dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 36px;margin:14px 0 16px}
 .rg-reglas dt{font-weight:700;font-size:var(--fs-15)}
 .rg-reglas dd{margin:4px 0 0;font-size:var(--fs-14);line-height:1.55}
