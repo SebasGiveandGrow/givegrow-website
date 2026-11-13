@@ -195,6 +195,23 @@ nav.sol{background:var(--nav-bg);-webkit-backdrop-filter:blur(12px);backdrop-fil
 nav .nlogo{display:inline-flex;align-items:center;min-height:44px}
 .nlogo em{font-style:normal;color:var(--gm)}
 .nlinks{display:flex;align-items:center;gap:6px}
+/* NAVIDAD EN LA BARRA (12 nov 2026): «Regalos» con una estrella dorada que
+   titila y una tira de luces —rojo, dorado, verde— que corre despacio debajo.
+   Tokens de la campaña (--rojo, --oro-brillo) y el verde de la casa. */
+.nn-estrella{width:17px;height:17px;flex:0 0 auto;fill:var(--oro-brillo);stroke:var(--oro-texto);stroke-width:1.2;stroke-linejoin:round}
+.nlink-navidad{display:inline-flex;align-items:center;gap:6px}
+.nlink-navidad::after{content:"";position:absolute;left:11px;right:11px;bottom:0;height:7px;pointer-events:none;
+  background:
+    radial-gradient(circle,var(--rojo) 2px,transparent 2.6px) 0 50%/14px 7px repeat-x,
+    radial-gradient(circle,var(--oro-brillo) 2px,transparent 2.6px) 4.7px 50%/14px 7px repeat-x,
+    radial-gradient(circle,var(--gm) 2px,transparent 2.6px) 9.3px 50%/14px 7px repeat-x}
+.mnav-navidad{display:flex!important;align-items:center;gap:8px}
+@media (prefers-reduced-motion:no-preference){
+  .nn-estrella{animation:nn-titila 2.8s ease-in-out infinite;transform-origin:center}
+  .nlink-navidad::after{animation:nn-corre 6s linear infinite}
+}
+@keyframes nn-titila{0%,100%{opacity:1;transform:scale(1) rotate(0)}50%{opacity:.55;transform:scale(.82) rotate(18deg)}}
+@keyframes nn-corre{from{background-position:0 50%,4.7px 50%,9.3px 50%}to{background-position:28px 50%,32.7px 50%,37.3px 50%}}
 .nlink{position:relative;padding:8px 11px;border-radius:8px;font-size:var(--fs-14);font-weight:600;color:var(--ink);white-space:nowrap;transition:background .15s,color .15s}
 .nlink:hover{background:var(--gl);color:var(--acc)}
 .ndrop-t{background:none;border:0;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px}

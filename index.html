@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=6c934259">
+<link rel="stylesheet" href="/styles.css?v=373571cd">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -47,7 +47,7 @@
      conexion de una familia en zona de desastre.
      `defer` conserva el comportamiento: se ejecuta tras parsear el documento,
      igual que al final del body, y app.js ya se protege con `readyState`. -->
-<script src="/app.js?v=1e8ea044" defer></script>
+<script src="/app.js?v=a133dde6" defer></script>
 <!-- `logo` es el ícono cuadrado de 512 px y no og.jpg (auditoría 28 sep 2026): Google pide para
      el logo de una organización una imagen cuadrada o casi; la de compartir es 1200 × 630. -->
 <script type="application/ld+json">
@@ -69,23 +69,12 @@
   <div class="nav-in">
     <a class="nlogo" href="#inicio">Give<em>&</em>Grow</a>
     <div class="nlinks">
-      <!-- El grupo de emergencia va primero porque Mira Mi Casa sigue abierta.
-           La brigada del sismo YA TERMINÓ (salió el 24 ago 2026): desde el 29 sep
-           2026 su página es un informe cerrado y su enlace vive en «Nosotros»,
-           junto a Evidencia, y no aquí ni en un aviso de portada. Una campaña
-           cerrada presentada como urgente es una promesa vencida. -->
-      <div class="ndrop">
-        <button class="nlink ndrop-t" type="button" data-i18n="nav.g.emergencia" aria-haspopup="menu" aria-expanded="false" data-act="toggleDrop(this)">Emergencia</button>
-        <div class="ndrop-menu ndrop-menu-desc">
-          <!-- Los tres del triaje son enlaces EXTERNOS, no rutas de la SPA: esas
-               páginas viven en Mira Mi Casa. `app.js` redirige igualmente si
-               alguien llega por un enlace viejo, pero eso es una red de
-               seguridad — desde el menú se va directo, sin el salto de más. -->
-          <a href="https://miramicasa.org/#vivienda"><span class="nd-t" data-i18n="cv.t">Revisa tu casa</span><span class="nd-d" data-i18n="nav.d.vivienda">Sube fotos y recibe un concepto: si hay señales para no permanecer y con qué reparar</span></a>
-          <a href="https://miramicasa.org/#ingenieros"><span class="nd-t" data-i18n="ing.ey">Ingenieros voluntarios</span><span class="nd-d" data-i18n="nav.d.ingenieros">Postúlate: mira fotos, di qué precauciones tomar y con qué reparar</span></a>
-          <a href="https://miramicasa.org/#casas"><span class="nd-t" data-i18n="nav.casas">Casas revisadas</span><span class="nd-d" data-i18n="nav.d.casas">El registro público del triaje, sin nombres ni direcciones</span></a>
-        </div>
-      </div>
+      <!-- NAVIDAD (12 nov 2026, pedido de Sebas). Ocupa el lugar de «Emergencia»:
+           Mira Mi Casa sigue abierta en su propio dominio (miramicasa.org) y la
+           brigada vive en «Nosotros». Una estrella que titila y una tira de
+           luces debajo; quietas para quien pide reducir el movimiento. Después
+           de la campaña se quita (o vuelve a lo que haga falta). -->
+      <a class="nlink nlink-navidad" href="/regalos"><svg class="nn-estrella" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5l2.6 6.1 6.6.5-5 4.3 1.6 6.5L12 16.4l-5.8 3.5 1.6-6.5-5-4.3 6.6-.5z"/></svg><span data-i18n="nav.regalos">Regalos</span></a>
       <!-- Nav propia de Mira Mi Casa. Oculta salvo cuando el Worker marca el
            <html> con data-marca="mmc" — ver la piel al final de styles.css. -->
       <a class="nlink mmc-nav" href="#proyecto" data-i18n="mmc.nav.que">Qué es esto</a>
@@ -172,13 +161,11 @@
   <a class="mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
   <a class="mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
   <a class="mmc-nav" href="#apadrinar" data-i18n="mmc.nav.apad">Apadrinar</a>
-  <span class="mnav-g" data-i18n="nav.g.emergencia">Emergencia</span>
-  <!-- Externos, igual que en la barra: el triaje vive en Mira Mi Casa. -->
-  <a href="https://miramicasa.org/#vivienda" data-i18n="cv.t">Revisa tu casa</a>
-  <a href="https://miramicasa.org/#ingenieros" data-i18n="ing.ey">Ingenieros voluntarios</a>
-  <a href="https://miramicasa.org/#casas" data-i18n="nav.casas">Casas revisadas</a>
+  <!-- Navidad: el mismo enlace de la barra, con su estrella. -->
+  <span class="mnav-g" data-i18n="nav.g.navidad">Navidad</span>
+  <a class="mnav-navidad" href="/regalos"><svg class="nn-estrella" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5l2.6 6.1 6.6.5-5 4.3 1.6 6.5L12 16.4l-5.8 3.5 1.6-6.5-5-4.3 6.6-.5z"/></svg><span data-i18n="nav.regalos.m">Mil regalos de Navidad</span></a>
   <!-- Grupo propio: sin esta etiqueta, HUB SOCIAL y Fundaciones se leían como
-       parte de «Emergencia». En la barra de escritorio son enlaces sueltos. -->
+       parte del grupo de arriba. En la barra de escritorio son enlaces sueltos. -->
   <span class="mnav-g" data-i18n="nav.g.red">Red</span>
   <a href="/hub" data-i18n="nav.hub">HUB SOCIAL</a>
   <a href="/fundaciones" data-i18n="nav.fundaciones">Fundaciones</a>
