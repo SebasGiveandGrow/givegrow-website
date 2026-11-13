@@ -40,6 +40,7 @@ if (RG.incrustado) {
   (function(){
     var padre = "";
     try { padre = new URL(document.referrer).origin; } catch (e) {}
+    if (RG_MARCOS.indexOf(padre) >= 0) RG.padre = padre;
     if (RG_MARCOS.indexOf(padre) < 0 || !window.ResizeObserver) return;
     var ultimo = 0;
     new ResizeObserver(function(){
@@ -544,6 +545,12 @@ function rgPagar(ev){
           return;
         }
         RG.enviando = false; btn.disabled = false;
+        /* DENTRO DEL SITIO DE LA ALIADA (pedido de su directora, 13 nov 2026):
+           el pago es en su propio sitio, así que se va directo, en la misma
+           pestaña, sin la pantalla de «Donar a través de…». Su formulario ya
+           recibe el monto y el número de pedido. Si el navegador no deja
+           mover la pestaña desde el marco, queda la pantalla con el botón. */
+        if (rgPagoEnCasa(d.url)) { try { window.top.location.href = d.url; } catch (e) {} }
         rgPintaUsd(d);
       };
       /* El video sube ANTES de ir a pagar: después, el donante ya se fue a la
@@ -576,16 +583,24 @@ function rgPagar(ev){
 /* En dólares no hay pasarela nuestra: el dinero lo recibe la aliada. Se le
    deja al donante su número de pedido a la vista, porque es lo que tiene que
    escribir en la nota de la donación para que la emparejemos. */
+/* ¿El pago en dólares es en el mismo sitio que muestra la página? */
+function rgPagoEnCasa(url){
+  if (!RG.incrustado || !RG.padre) return false;
+  var sinWww = function(h){ return String(h).replace(/^www\./, ""); };
+  try { return sinWww(new URL(url).hostname) === sinWww(new URL(RG.padre).hostname); } catch (e) { return false; }
+}
 function rgPintaUsd(d){
+  var enCasa = rgPagoEnCasa(d.url);
   rgEl("rg-pagar").hidden = true;
   rgEl("rg-barra").hidden = true;
   var s = rgEl("rg-usd");
   s.hidden = false;
   rgEl("rg-usd-ok").innerHTML =
     '<p class="rg-usd-t">' + rgEsc(t("rg.usd.ok.t")) + '</p>' +
-    '<p>' + rgEsc(t("rg.usd.ok.p").replace("{usd}", rgUSD(d.total_usd)).replace("{a}", d.aliada).replace("{ref}", d.ref)) + '</p>' +
+    '<p>' + rgEsc(t(enCasa ? "rg.usd.ok.casa" : "rg.usd.ok.p").replace("{usd}", rgUSD(d.total_usd)).replace("{a}", d.aliada).replace("{ref}", d.ref)) + '</p>' +
     '<p class="rg-ref">' + rgEsc(d.ref) + '</p>' +
-    '<p class="rg-usd-acc"><a class="btn btn-g" href="' + rgEsc(d.url) + '" target="_blank" rel="noopener">' + rgEsc(t("rg.usd.ir").replace("{a}", d.aliada)) + '</a> ' +
+    '<p class="rg-usd-acc"><a class="btn btn-g" href="' + rgEsc(d.url) + '" target="' + (enCasa ? '_top' : '_blank') + '" rel="noopener">' +
+      rgEsc(enCasa ? t("rg.usd.pagar").replace("{usd}", rgUSD(d.total_usd)) : t("rg.usd.ir").replace("{a}", d.aliada)) + '</a> ' +
     '<a class="btn btn-o" href="' + rgEsc(d.seguimiento) + '"' + (RG.incrustado ? ' target="_blank" rel="noopener"' : '') + '>' + rgEsc(t("rg.seg.ir")) + '</a></p>';
   s.scrollIntoView({ behavior: "smooth", block: "start" });
 }

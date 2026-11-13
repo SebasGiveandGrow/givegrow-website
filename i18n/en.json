@@ -2673,5 +2673,7 @@
   "rg.inc.pagar": "Go to payment",
   "nav.regalos": "Gifts",
   "nav.regalos.m": "A thousand Christmas gifts",
-  "nav.g.navidad": "Christmas"
+  "nav.g.navidad": "Christmas",
+  "rg.usd.pagar": "Pay {usd} now",
+  "rg.usd.ok.casa": "Your order is {ref}. The payment form already has the {usd} amount and your order number; please use the same email you gave us."
 }

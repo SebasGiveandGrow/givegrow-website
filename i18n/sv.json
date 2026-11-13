@@ -175,5 +175,7 @@
   "rg.aliada": "I samarbete med {a}, vår partnerorganisation i USA.",
   "rg.inc.cop.t": "Din beställning är klar.",
   "rg.inc.cop.p": "Betalning i colombianska pesos öppnas i en ny flik, i Wompis säkra kassa. Dina julklappar är reserverade medan du betalar.",
-  "rg.inc.pagar": "Gå till betalning"
+  "rg.inc.pagar": "Gå till betalning",
+  "rg.usd.pagar": "Betala {usd} nu",
+  "rg.usd.ok.casa": "Din beställning är {ref}. Betalningsformuläret har redan beloppet {usd} och ditt ordernummer; använd samma e-postadress som du gav oss."
 }

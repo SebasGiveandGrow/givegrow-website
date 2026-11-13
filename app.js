@@ -2652,6 +2652,8 @@ var I18N = {
     "rg.usd.ok.t":"Tus regalos quedaron apartados por 72 horas.",
     "rg.usd.ok.p":"Completa tu donación de {usd} en la página de {a} con el mismo correo que nos diste: así la asociamos a tus regalos. Tu número de pedido es {ref}; también te lo enviamos por correo.",
     "rg.usd.ir":"Donar con {a}",
+    "rg.usd.pagar":"Pagar {usd} ahora",
+    "rg.usd.ok.casa":"Tu pedido es {ref}. El formulario de pago ya trae el monto de {usd} y tu número de pedido; usa el mismo correo que nos diste.",
     "rg.seg.ir":"Ver el recorrido",
     "rg.seg.no":"No encontramos ese pedido. Revisa el enlace de tu correo.",
     "rg.seg.pedido":"Pedido",
@@ -3706,7 +3708,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "86fe6d26", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "faea5d8c", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
