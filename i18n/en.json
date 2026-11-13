@@ -2670,5 +2670,8 @@
   "rg.aliada": "In partnership with {a}, our partner foundation in the United States.",
   "rg.inc.cop.t": "Your order is ready.",
   "rg.inc.cop.p": "Payment in Colombian pesos opens in a new tab, on Wompi's secure checkout. Your gifts stay on hold while you pay.",
-  "rg.inc.pagar": "Go to payment"
+  "rg.inc.pagar": "Go to payment",
+  "nav.regalos": "Gifts",
+  "nav.regalos.m": "A thousand Christmas gifts",
+  "nav.g.navidad": "Christmas"
 }
