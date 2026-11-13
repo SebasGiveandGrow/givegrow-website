@@ -1,0 +1,27 @@
+<!--
+  REGALOS DE DICIEMBRE EN EL SITIO DE LA FUNDACIÓN ALIADA (12 nov 2026)
+
+  Positive Potential (positivepotential.org, Squarespace) muestra nuestra
+  campaña completa dentro de su sitio. Pegar TODO este bloque en un «Code
+  block» de Squarespace, en la página donde quieran la campaña.
+
+  · El marco solo abre desde los dominios de REGALOS_MARCOS (worker.js) y
+    js/regalos.js. Otro sitio que quiera mostrarla necesita estar en las dos.
+  · El script hace que el marco crezca con la página: así no hay doble barra
+    de desplazamiento. Solo escucha mensajes de nuestro dominio.
+  · En el editor de Squarespace el marco puede verse en blanco (el editor vive
+    en otro dominio). En el sitio publicado sí aparece.
+-->
+<iframe id="gg-regalos"
+  src="https://www.thegiveandgrowproject.org/regalos?lang=en&incrustado=1"
+  title="December Gifts · Give&amp;Grow International and Positive Potential"
+  style="display:block;width:100%;min-height:1600px;border:0"
+  allow="web-share; clipboard-write" loading="lazy"></iframe>
+<script>
+  window.addEventListener("message", function (e) {
+    if (e.origin !== "https://www.thegiveandgrowproject.org") return;
+    if (e.data && e.data.gg === "regalos-alto" && typeof e.data.alto === "number") {
+      document.getElementById("gg-regalos").style.height = e.data.alto + "px";
+    }
+  });
+</script>

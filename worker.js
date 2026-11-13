@@ -53,7 +53,7 @@ const ORIGIN = "https://www.thegiveandgrowproject.org";
    lo compara con el archivo: si se edita styles.css y no se actualiza aquí,
    `validate.mjs` falla. Se eligió versionar y no servir la hoja sin caché
    porque así las páginas del Worker comparten la copia que ya bajó el sitio. */
-const STYLES_V = "b45f144a";
+const STYLES_V = "6c934259";
 const HOJA_CSS = '<link rel="stylesheet" href="/styles.css?v=' + STYLES_V + '">';
 
 /* El origen del TRIAJE, que ya no es el mismo. Existe como constante aparte y
@@ -3885,12 +3885,12 @@ async function correoRegalosPedidoUSD(env, x) {
   const parrafos = en ? [
     "Hi " + x.nombre + ",",
     "We are holding your " + x.codigos.length + " gift(s) for " + REGALOS_RESERVA_USD_H + " hours while you complete your US$" + x.totalUsd + " donation through " + x.aliada + ", our partner foundation in the United States. They receive the dollars and issue your tax receipt.",
-    "Please include your order number " + x.ref + " in the note of your donation, so we can match it to your gifts.",
+    "Please use this same email address when you donate, so we can match your donation to your gifts. Your order number is " + x.ref + ". " + x.aliada + " is a US 501(c)(3): ask them directly for your tax receipt.",
     "As soon as " + x.aliada + " confirms it, we will email you and your gifts will show as funded."
   ] : [
     "Hola, " + x.nombre + ":",
     "Apartamos tus " + x.codigos.length + " regalo(s) por " + REGALOS_RESERVA_USD_H + " horas mientras completas tu donación de US$" + x.totalUsd + " a través de " + x.aliada + ", nuestra fundación aliada en Estados Unidos. Ella recibe los dólares y te emite allá el certificado.",
-    "Escribe tu número de pedido " + x.ref + " en la nota de la donación, para que podamos asociarla a tus regalos.",
+    "Usa este mismo correo al donar: así asociamos tu donación a tus regalos. Tu número de pedido es " + x.ref + ". " + x.aliada + " es una organización 501(c)(3) de Estados Unidos: el recibo para tus impuestos se lo pides directamente a ella.",
     "Apenas " + x.aliada + " la confirme, te escribimos y tus regalos quedan financiados."
   ];
   await enviarCorreo(env, {
@@ -47922,6 +47922,18 @@ function conAlternos(r, url) {
     el.setAttribute("href", el.getAttribute("hreflang") === "en" ? url + "?lang=en" : url);
   } });
 }
+/* Los sitios que pueden mostrar /regalos dentro de un marco (ver arriba). La
+   misma lista va en js/regalos.js, que solo le cuenta su altura a ellos. */
+const REGALOS_MARCOS = ["https://www.positivepotential.org", "https://positivepotential.org"];
+function regalosIncrustable(r) {
+  const h = new Headers(r.headers);
+  h.delete("x-frame-options");
+  const csp = h.get("content-security-policy");
+  if (csp) h.set("content-security-policy", csp.replace(/frame-ancestors [^;]*/, "frame-ancestors 'self' " + REGALOS_MARCOS.join(" ")));
+  else h.set("content-security-policy", "frame-ancestors 'self' " + REGALOS_MARCOS.join(" "));
+  h.set("cache-control", "no-store");
+  return new Response(r.body, { status: r.status, headers: h });
+}
 function paginaIndexable(base, id, en) {
   if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
   const m = en ? RUTAS_INDEXABLES[id].en : RUTAS_INDEXABLES[id];
@@ -50393,7 +50405,13 @@ export default {
       const base = await env.ASSETS.fetch(new Request(new URL("/", url).toString(), request));
       /* `?lang=sv` (solo regalos) recibe la tarjeta en inglés: no hay una en sueco. */
       const qLang = url.searchParams.get("lang");
-      return paginaIndexable(base, rIdx[1], qLang === "en" || (qLang === "sv" && rIdx[1] === "regalos"));
+      const pagina = paginaIndexable(base, rIdx[1], qLang === "en" || (qLang === "sv" && rIdx[1] === "regalos"));
+      /* /regalos?incrustado=1: la campaña dentro del sitio de la fundación
+         aliada (Positive Potential, 12 nov 2026). Solo esta página, solo con
+         ese parámetro y solo para los dominios de REGALOS_MARCOS se afloja el
+         «nadie me pone en un marco» (X-Frame-Options y frame-ancestors). */
+      if (rIdx[1] === "regalos" && url.searchParams.get("incrustado") === "1") return regalosIncrustable(pagina);
+      return pagina;
     }
     /* La portada en inglés: su tarjeta para compartir (ver `PORTADA_EN`). Fuera
        del subdominio de Mira Mi Casa, que tiene su propia tarjeta. */

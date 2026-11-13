@@ -2502,6 +2502,13 @@ html[data-theme="dark"] body:has(#page-regalos.active) nav{background:var(--nav-
 /* Bloque 2 (nov 2026): cuánto falta, el plazo, compartir, «quien más lleva
    esperando» y las reglas de excedentes. El rojo marca lo urgente; el dorado,
    lo cumplido. */
+/* La línea de la aliada, bajo el plazo. */
+.rg-aliada{font-size:var(--fs-14);color:var(--oro-texto);font-weight:600;margin:8px 0 0}
+/* Incrustada en el sitio de la aliada: solo la campaña. */
+html.rg-incrustado #nav,html.rg-incrustado #nav-mobile,html.rg-incrustado body > footer,html.rg-incrustado a.wa,
+html.rg-incrustado .alma-fab,html.rg-incrustado .alma-intro,html.rg-incrustado .skip-link{display:none!important}
+html.rg-incrustado .rg-portada{padding-top:28px}
+html.rg-incrustado #page-regalos{padding-bottom:24px}
 .rg-plazo{font-weight:700;font-size:var(--fs-16);color:var(--rojo);margin:14px 0 0}
 .rg-zona-falta{font-size:var(--fs-13);font-weight:700;color:var(--rojo);margin:6px 0 0;font-variant-numeric:tabular-nums}
 .rg-zona-falta.is-llena{color:var(--oro-texto)}

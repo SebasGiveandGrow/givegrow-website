@@ -2581,6 +2581,10 @@ var I18N = {
     "rg.zona.fin":"{n} financiados",
     "rg.zona.ent":"{n} entregados",
     "rg.zona.fecha":"Entrega prevista: {f}",
+    "rg.inc.pagar":"Ir a pagar",
+    "rg.inc.cop.p":"El pago en pesos se abre en una pestaña nueva, en la pasarela segura de Wompi. Tus regalos quedan apartados mientras pagas.",
+    "rg.inc.cop.t":"Tu pedido está listo.",
+    "rg.aliada":"En alianza con {a}, nuestra fundación aliada en Estados Unidos.",
     "rg.zona.especie":"{n} ya donados en especie",
     "rg.plazo.n":"Quedan {n} días para regalar: hasta el {f}.",
     "rg.plazo.1":"Queda un día para regalar: hasta el {f}.",
@@ -2627,7 +2631,7 @@ var I18N = {
     "rg.talla":"Talla {t}",
     "rg.barra.1":"{n} regalo · {total}",
     "rg.barra.n":"{n} regalos · {total}",
-    "rg.cert.usd":"En dólares, el certificado para tu declaración lo emite {a} en Estados Unidos.",
+    "rg.cert.usd":"En dólares, {a} —organización 501(c)(3) de Estados Unidos— recibe tu donación; el recibo para tus impuestos se lo pides directamente a ella.",
     "rg.enviando":"Apartando tus regalos…",
     "rg.e.vacio":"Todavía no has escogido ningún regalo.",
     "rg.e.nombre":"Escribe tu nombre.",
@@ -2643,7 +2647,7 @@ var I18N = {
     "rg.e.pasarela":"La pasarela de pago no está disponible en este momento.",
     "rg.e.red":"No pudimos conectar. Revisa tu conexión e intenta de nuevo.",
     "rg.usd.ok.t":"Tus regalos quedaron apartados por 72 horas.",
-    "rg.usd.ok.p":"Completa tu donación de {usd} en la página de {a} y escribe tu número de pedido, {ref}, en la nota de la donación. Te enviamos estas instrucciones a tu correo.",
+    "rg.usd.ok.p":"Completa tu donación de {usd} en la página de {a} con el mismo correo que nos diste: así la asociamos a tus regalos. Tu número de pedido es {ref}; también te lo enviamos por correo.",
     "rg.usd.ir":"Donar con {a}",
     "rg.seg.ir":"Ver el recorrido",
     "rg.seg.no":"No encontramos ese pedido. Revisa el enlace de tu correo.",
@@ -3699,7 +3703,7 @@ function mcArranca(){
    archivo lleva su md5 (8 caracteres) en MODULOS_V, y el check #27 del gate
    falla si no coincide. Cambiar js/x.js = cambiar su hash aquí = cambia app.js
    = cambia el `?v=` de index.html. */
-var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "c67e15aa", apadrinamiento: "808641b5" };
+var MODULOS_V = { mmc: "d5cdfa6c", pago: "125a34f1", impacto: "59c96b4d", regalos: "86fe6d26", apadrinamiento: "808641b5" };
 var MODULOS_RUTA = { vivienda: "mmc", caso: "mmc", casas: "mmc", ingenieros: "mmc", apadrinar: "mmc",
                      donar: "pago", membresias: "pago", gracias: "pago",
                      impacto: "impacto", regalos: "regalos", apadrinamiento: "apadrinamiento" };
