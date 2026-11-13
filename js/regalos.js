@@ -24,6 +24,33 @@ var RG_ICONO = '<svg class="rg-ic" viewBox="0 0 24 24" fill="none" stroke="curre
 var RG_EDADES = { "0-5": [0, 5], "6-9": [6, 9], "10-13": [10, 13], "14-17": [14, 17] };
 try { RG.lista = JSON.parse(sessionStorage.getItem("gg_rg_lista") || "[]") || []; } catch (e) { RG.lista = []; }
 
+/* INCRUSTADA EN EL SITIO DE LA ALIADA (12 nov 2026). Con ?incrustado=1 y dentro
+   de un marco, la página se queda solo con la campaña (sin menú, pie ni
+   botones flotantes), le cuenta su altura al sitio que la muestra para que el
+   marco crezca con ella, y el pago en pesos se abre en una pestaña nueva: la
+   pasarela no funciona dentro de un marco. La lista de sitios es la misma
+   REGALOS_MARCOS de worker.js, que es la que de verdad decide quién la muestra. */
+var RG_MARCOS = ["https://www.positivepotential.org", "https://positivepotential.org"];
+RG.incrustado = (function(){
+  try { return window.top !== window.self && new URLSearchParams(location.search).get("incrustado") === "1"; }
+  catch (e) { return true; }
+})();
+if (RG.incrustado) {
+  document.documentElement.classList.add("rg-incrustado");
+  (function(){
+    var padre = "";
+    try { padre = new URL(document.referrer).origin; } catch (e) {}
+    if (RG_MARCOS.indexOf(padre) < 0 || !window.ResizeObserver) return;
+    var ultimo = 0;
+    new ResizeObserver(function(){
+      var alto = document.getElementById("page-regalos").getBoundingClientRect().height + 40;
+      if (Math.abs(alto - ultimo) < 4) return;
+      ultimo = alto;
+      window.parent.postMessage({ gg: "regalos-alto", alto: Math.ceil(alto) }, padre);
+    }).observe(document.getElementById("page-regalos"));
+  })();
+}
+
 function rgGuardaLista(){
   try { sessionStorage.setItem("gg_rg_lista", JSON.stringify(RG.lista)); } catch (e) {}
 }
@@ -222,6 +249,11 @@ function rgPintaZonas(){
   var abierta = !!d.campana && d.campana.estado === "abierta";
   var loc = rgLoc();
   rgPintaPlazo();
+  var al = rgEl("rg-aliada");
+  if (al) {
+    al.hidden = !(d.campana && d.campana.aliada_nombre);
+    if (!al.hidden) al.textContent = t("rg.aliada").replace("{a}", d.campana.aliada_nombre);
+  }
   var arboles = (d.zonas || []).map(function(z){
     var meta = Number(z.meta) || 0;
     return rgArbol(z, Math.min(z.entregados, meta), Math.min(z.financiados, meta));
@@ -506,6 +538,8 @@ function rgPagar(ev){
       var sigue = function(){
         if (d.via === "cop") {
           try { sessionStorage.setItem("gg_guia", d.guia); } catch (e) {}
+          /* Dentro de un marco la pasarela no abre: un clic más, en otra pestaña. */
+          if (RG.incrustado) { RG.enviando = false; btn.disabled = false; rgPintaPagoNuevaPestana(d); return; }
           window.location.href = d.url;
           return;
         }
@@ -552,7 +586,18 @@ function rgPintaUsd(d){
     '<p>' + rgEsc(t("rg.usd.ok.p").replace("{usd}", rgUSD(d.total_usd)).replace("{a}", d.aliada).replace("{ref}", d.ref)) + '</p>' +
     '<p class="rg-ref">' + rgEsc(d.ref) + '</p>' +
     '<p class="rg-usd-acc"><a class="btn btn-g" href="' + rgEsc(d.url) + '" target="_blank" rel="noopener">' + rgEsc(t("rg.usd.ir").replace("{a}", d.aliada)) + '</a> ' +
-    '<a class="btn btn-o" href="' + rgEsc(d.seguimiento) + '">' + rgEsc(t("rg.seg.ir")) + '</a></p>';
+    '<a class="btn btn-o" href="' + rgEsc(d.seguimiento) + '"' + (RG.incrustado ? ' target="_blank" rel="noopener"' : '') + '>' + rgEsc(t("rg.seg.ir")) + '</a></p>';
+  s.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function rgPintaPagoNuevaPestana(d){
+  rgEl("rg-pagar").hidden = true;
+  rgEl("rg-barra").hidden = true;
+  var s = rgEl("rg-usd");
+  s.hidden = false;
+  rgEl("rg-usd-ok").innerHTML =
+    '<p class="rg-usd-t">' + rgEsc(t("rg.inc.cop.t")) + '</p>' +
+    '<p>' + rgEsc(t("rg.inc.cop.p")) + '</p>' +
+    '<p class="rg-usd-acc"><a class="btn btn-g" href="' + rgEsc(d.url) + '" target="_blank" rel="noopener">' + rgEsc(t("rg.inc.pagar")) + '</a></p>';
   s.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 

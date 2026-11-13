@@ -69,7 +69,7 @@
   "rg.talla": "Storlek {t}",
   "rg.barra.1": "{n} present · {total}",
   "rg.barra.n": "{n} presenter · {total}",
-  "rg.cert.usd": "I amerikanska dollar utfärdas ditt kvitto av {a} i USA.",
+  "rg.cert.usd": "I dollar tar {a} —en amerikansk 501(c)(3)-organisation— emot din gåva; be dem direkt om kvittot för skatten.",
   "rg.enviando": "Reserverar dina julklappar…",
   "rg.e.vacio": "Du har inte valt några julklappar än.",
   "rg.e.nombre": "Skriv ditt namn.",
@@ -85,7 +85,7 @@
   "rg.e.pasarela": "Betaltjänsten är inte tillgänglig just nu.",
   "rg.e.red": "Vi kunde inte ansluta. Kontrollera din uppkoppling och försök igen.",
   "rg.usd.ok.t": "Dina julklappar är reserverade i 72 timmar.",
-  "rg.usd.ok.p": "Slutför din gåva på {usd} på sidan hos {a} och skriv ditt beställningsnummer, {ref}, i gåvans meddelandefält. Vi har mejlat dig instruktionerna (på engelska).",
+  "rg.usd.ok.p": "Slutför din gåva på {usd} på {a}s sida med samma e-postadress som du gav oss, så kopplar vi den till dina julklappar. Ditt ordernummer är {ref}; vi har också mejlat det till dig.",
   "rg.usd.ir": "Ge via {a}",
   "rg.seg.ir": "Följ mina julklappar",
   "rg.seg.no": "Vi hittade inte beställningen. Kontrollera länken i ditt mejl.",
@@ -171,5 +171,9 @@
   "rg.reglas.4.t": "Om ingen längre väntar i området",
   "rg.reglas.4.p": "En person i teamet bestämmer vilket barn i insamlingen din gåva går till.",
   "rg.reglas.pie": "I varje fall mejlar vi dig (på engelska) på adressen du angav.",
-  "rg.zona.especie": "{n} redan skänkta i natura"
+  "rg.zona.especie": "{n} redan skänkta i natura",
+  "rg.aliada": "I samarbete med {a}, vår partnerorganisation i USA.",
+  "rg.inc.cop.t": "Din beställning är klar.",
+  "rg.inc.cop.p": "Betalning i colombianska pesos öppnas i en ny flik, i Wompis säkra kassa. Dina julklappar är reserverade medan du betalar.",
+  "rg.inc.pagar": "Gå till betalning"
 }

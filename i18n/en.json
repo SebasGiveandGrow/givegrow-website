@@ -2493,7 +2493,7 @@
   "rg.talla": "Size {t}",
   "rg.barra.1": "{n} gift · {total}",
   "rg.barra.n": "{n} gifts · {total}",
-  "rg.cert.usd": "In US dollars, your tax receipt is issued by {a} in the United States.",
+  "rg.cert.usd": "In dollars, {a} —a US 501(c)(3)— receives your donation; ask them directly for your tax receipt.",
   "rg.enviando": "Holding your gifts…",
   "rg.e.vacio": "You have not chosen any gifts yet.",
   "rg.e.nombre": "Please enter your name.",
@@ -2509,7 +2509,7 @@
   "rg.e.pasarela": "The payment gateway is not available right now.",
   "rg.e.red": "We could not connect. Check your connection and try again.",
   "rg.usd.ok.t": "Your gifts are on hold for 72 hours.",
-  "rg.usd.ok.p": "Complete your {usd} donation on {a}'s page and write your order number, {ref}, in the donation note. We have emailed you these instructions.",
+  "rg.usd.ok.p": "Complete your {usd} donation on {a}'s page using the same email you gave us, so we can match it to your gifts. Your order number is {ref}; we also emailed it to you.",
   "rg.usd.ir": "Donate through {a}",
   "rg.seg.ir": "Follow my gifts",
   "rg.seg.no": "We could not find that order. Please check the link in your email.",
@@ -2666,5 +2666,9 @@
   "rg.reglas.4.t": "If no one is left waiting in that area",
   "rg.reglas.4.p": "A member of our team decides which child in the campaign your gift goes to.",
   "rg.reglas.pie": "In every case, we email you at the address you gave us.",
-  "rg.zona.especie": "{n} already given in kind"
+  "rg.zona.especie": "{n} already given in kind",
+  "rg.aliada": "In partnership with {a}, our partner foundation in the United States.",
+  "rg.inc.cop.t": "Your order is ready.",
+  "rg.inc.cop.p": "Payment in Colombian pesos opens in a new tab, on Wompi's secure checkout. Your gifts stay on hold while you pay.",
+  "rg.inc.pagar": "Go to payment"
 }

@@ -169,3 +169,20 @@ la cabeza al pecho y arma una hoja de contactos para revisarlas antes de
 subirlas por `Cargar la hoja › 3`. Lee JPG, PNG y HEIC. Si no encuentra cara,
 deja la franja de arriba y lo dice: revisar esas en la hoja. Las fotos ya
 publicadas se reemplazan en R2 con la misma clave (`foto_key`), sin tocar la base.
+
+## La campaña dentro del sitio de la aliada (Positive Potential, 12 nov 2026)
+
+Positive Potential (EE. UU., 501(c)(3)) recibe los dólares en
+`positivepotential.org/donate` y le da el recibo para impuestos a quien se lo
+pida directamente. Su formulario no tiene nota ni referencia: los pedidos en
+dólares se asocian **por el correo del donante**. La aliada avisa a Sebas cada
+movimiento o al menos una vez al día, y una persona confirma el pedido en
+`Pedidos`.
+
+Además muestra la campaña completa en su sitio: `/regalos?incrustado=1` dentro
+de un marco (bloque listo para pegar en `ops/regalos-incrustar.html`). Ahí la
+página va sin menú, pie ni botones flotantes, le avisa su altura al sitio y el
+pago en pesos se abre en una pestaña nueva. Solo los dominios de
+`REGALOS_MARCOS` (worker.js, y la misma lista en js/regalos.js) pueden
+mostrarla. Los datos bancarios de la aliada no se publican: no hacen falta para
+`/donate` y a la vista invitan al fraude.
