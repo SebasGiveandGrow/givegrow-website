@@ -39,7 +39,7 @@
 </script>
 <link rel="preload" href="/vendor/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=7ea39386">
+<link rel="stylesheet" href="/styles.css?v=6eb8ae8f">
 <!-- DEFER Y EN <head>, no al final del body. El navegador tenia que parsear
      257 KB de HTML antes de EMPEZAR a pedir este archivo; asi la descarga
      arranca tras 12,5 KB y corre en paralelo con el resto del parseo. Son
@@ -71,10 +71,10 @@
     <div class="nlinks">
       <!-- NAVIDAD (12 nov 2026, pedido de Sebas). Ocupa el lugar de «Emergencia»:
            Mira Mi Casa sigue abierta en su propio dominio (miramicasa.org) y la
-           brigada vive en «Nosotros». Una estrella que titila y una tira de
-           luces debajo; quietas para quien pide reducir el movimiento. Después
-           de la campaña se quita (o vuelve a lo que haga falta). -->
-      <a class="nlink nlink-navidad" href="/regalos"><svg class="nn-estrella" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5l2.6 6.1 6.6.5-5 4.3 1.6 6.5L12 16.4l-5.8 3.5 1.6-6.5-5-4.3 6.6-.5z"/></svg><span data-i18n="nav.regalos">Regalos</span></a>
+           brigada vive en «Nosotros». Un regalo envuelto con su moño (la
+           estrella dorada sobre rojo se leía como una bandera, 12 nov 2026).
+           Después de la campaña se quita (o vuelve a lo que haga falta). -->
+      <a class="nlink nlink-navidad" href="/regalos"><svg class="nn-regalo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5v8h14v-8M12 8.5v12"/><path class="nn-mono" d="M12 8.5c-1.6-3.6-5.5-4-5.5-1.6 0 1.6 3.2 1.6 5.5 1.6zM12 8.5c1.6-3.6 5.5-4 5.5-1.6 0 1.6-3.2 1.6-5.5 1.6z"/></svg><span data-i18n="nav.regalos">Regalos</span></a>
       <!-- Nav propia de Mira Mi Casa. Oculta salvo cuando el Worker marca el
            <html> con data-marca="mmc" — ver la piel al final de styles.css. -->
       <a class="nlink mmc-nav" href="#proyecto" data-i18n="mmc.nav.que">Qué es esto</a>
@@ -161,9 +161,9 @@
   <a class="mmc-nav" href="#casas" data-i18n="mmc.nav.casas">Casas revisadas</a>
   <a class="mmc-nav" href="#ingenieros" data-i18n="mmc.nav.ing">Ingenieros</a>
   <a class="mmc-nav" href="#apadrinar" data-i18n="mmc.nav.apad">Apadrinar</a>
-  <!-- Navidad: el mismo enlace de la barra, con su estrella. -->
+  <!-- Navidad: el mismo enlace de la barra, con su regalo. -->
   <span class="mnav-g" data-i18n="nav.g.navidad">Navidad</span>
-  <a class="mnav-navidad" href="/regalos"><svg class="nn-estrella" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5l2.6 6.1 6.6.5-5 4.3 1.6 6.5L12 16.4l-5.8 3.5 1.6-6.5-5-4.3 6.6-.5z"/></svg><span data-i18n="nav.regalos.m">Mil regalos de Navidad</span></a>
+  <a class="mnav-navidad" href="/regalos"><svg class="nn-regalo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5v8h14v-8M12 8.5v12"/><path class="nn-mono" d="M12 8.5c-1.6-3.6-5.5-4-5.5-1.6 0 1.6 3.2 1.6 5.5 1.6zM12 8.5c1.6-3.6 5.5-4 5.5-1.6 0 1.6-3.2 1.6-5.5 1.6z"/></svg><span data-i18n="nav.regalos.m">Mil regalos de Navidad</span></a>
   <!-- Grupo propio: sin esta etiqueta, HUB SOCIAL y Fundaciones se leían como
        parte del grupo de arriba. En la barra de escritorio son enlaces sueltos. -->
   <span class="mnav-g" data-i18n="nav.g.red">Red</span>
