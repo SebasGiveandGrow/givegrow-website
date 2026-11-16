@@ -20,7 +20,7 @@
      5. Sale con 1 si alguna falló.
 */
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -42,6 +42,9 @@ const BATERIAS = [
       "--var", "CORREO_AVISOS:equipo@ejemplo.invalid",
       "--var", "CORREO_MMC:mmc@ejemplo.invalid"] },
   { nombre: "inscripcion", archivo: "ops/probar-inscripcion.py" },
+  /* `banco: true` = corre contra el BANCO: una copia del Worker con Access
+     simulado (ver `armarBanco`). Para lo que vive detrás del panel. */
+  { nombre: "entregas", archivo: "ops/probar-entregas.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
 ];
 
 const filtro = process.argv[2] || "";
@@ -104,14 +107,54 @@ for (const m of migraciones) {
 }
 console.log("listo");
 
+/* EL BANCO: una copia del Worker a la que se le abre Access SOLO si llega la
+   variable PRUEBA_ACCESS=si, que no existe en producción ni en wrangler.toml.
+   El parche vive aquí y se aplica a una copia temporal: `worker.js` del repo
+   no lleva ninguna puerta trasera, ni apagada.
+
+   Los assets van en una carpeta mínima y no en la raíz del repo: con la raíz
+   entera, wrangler se queda en «Starting local server…» desde un wrangler.toml
+   que no está en ella. */
+let banco = null;
+function armarBanco() {
+  if (banco) return banco;
+  banco = join(trabajo, "banco");
+  const sitio = join(banco, "sitio");
+  mkdirSync(sitio, { recursive: true });
+  const firma = "async function verificarAccess(request, env, audsValidos) {";
+  const w = readFileSync(join(RAIZ, "worker.js"), "utf8");
+  if (w.split(firma).length !== 2) {
+    console.error("✘ no encontré la firma de verificarAccess en worker.js: el banco no se puede armar");
+    salir(1);
+  }
+  writeFileSync(join(banco, "worker.js"), w.replace(firma, firma +
+    '\n  if (env.PRUEBA_ACCESS === "si") return { ok: true, email: request.headers.get("x-prueba-email") || "prueba@local", equipo: true };'));
+  for (const f of ["qr.js", "documentos.js", "package.json"]) cpSync(join(RAIZ, f), join(banco, f));
+  cpSync(join(RAIZ, "data"), join(banco, "data"), { recursive: true });
+  symlinkSync(join(RAIZ, "node_modules"), join(banco, "node_modules"));
+  if (existsSync(devVars)) cpSync(devVars, join(banco, ".dev.vars"));
+  for (const f of ["index.html", "404.html", "styles.css", "app.js", "favicon.svg", "favicon.ico", "robots.txt"]) {
+    cpSync(join(RAIZ, f), join(sitio, f));
+  }
+  for (const d of ["vendor", "i18n", "data"]) cpSync(join(RAIZ, d), join(sitio, d), { recursive: true });
+  // El wrangler.toml del repo sin el entorno sandbox ni el cron, y con los
+  // assets apuntando a la carpeta mínima.
+  let toml = readFileSync(join(RAIZ, "wrangler.toml"), "utf8");
+  const corte = toml.indexOf("[env.sandbox]");
+  if (corte !== -1) toml = toml.slice(0, corte);
+  toml = toml.replace(/^directory\s*=.*$/m, 'directory = "./sitio"');
+  writeFileSync(join(banco, "wrangler.toml"), toml);
+  return banco;
+}
+
 // 4. Por cada batería: su copia de la base, su servidor, y a correr.
 //    `detached` para poder matar al grupo entero: wrangler lanza workerd como
 //    hijo y un SIGTERM al padre solo lo deja huérfano.
 let registro = "";
-function arrancar(dir, flags) {
+function arrancar(dir, flags, cwd) {
   registro = "";
   servidor = spawn("npx", ["wrangler", "dev", "--port", PUERTO, "--persist-to", dir, ...flags], {
-    cwd: RAIZ, detached: true, stdio: ["ignore", "pipe", "pipe"],
+    cwd, detached: true, stdio: ["ignore", "pipe", "pipe"],
   });
   servidor.stdout.on("data", (d) => { registro += d; });
   servidor.stderr.on("data", (d) => { registro += d; });
@@ -134,14 +177,16 @@ for (const b of elegidas) {
   console.log("\n══ " + b.nombre + " (" + b.archivo + ")");
   const dir = join(trabajo, b.nombre);
   cpSync(persist, dir, { recursive: true });
-  arrancar(dir, b.flags || []);
+  const cwd = b.banco ? armarBanco() : RAIZ;
+  arrancar(dir, b.flags || [], cwd);
   if (!(await responde(true))) {
     console.error("✘ el Worker no respondió en 2 minutos\n" + registro.slice(-3000));
     salir(1);
   }
   const r = spawnSync("python3", [b.archivo], {
     cwd: RAIZ, stdio: "inherit",
-    env: { ...process.env, BASE, PERSIST: dir },
+    // DB y CWD los lee la batería de entregas para sus consultas a D1.
+    env: { ...process.env, BASE, PERSIST: dir, DB, CWD: cwd },
   });
   if (r.status !== 0) { fallos++; console.log("✘ " + b.nombre + " salió con " + r.status); }
   apagar();
