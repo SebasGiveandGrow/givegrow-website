@@ -3362,7 +3362,43 @@ function applyLang(l){
 function isSpaRoute(id){
   if (!id) return false;
   if (id.indexOf("fundacion/")===0 || id.indexOf("comercio/")===0 || id.indexOf("empresa/")===0) return true;
-  return !!document.getElementById("page-"+id);
+  return !!document.getElementById("page-"+id) || rutaConocida(id);
+}
+/* CADA DIRECCIÓN TRAE SOLO SU PÁGINA (16 nov 2026). El Worker ya no manda las
+   38 secciones en cada carga: /donar trae «Donar» y las pocas que se abren
+   desde cualquier parte (rastreo, ficha, mi aporte…). Si se pide una que no
+   está en el documento, se navega a su dirección: las que tienen dirección
+   propia, a ella; la portada, a `/`; y las demás, a `/?todo=1#ruta`, que trae
+   el archivo entero. Devuelve true si navegó. En Mira Mi Casa no aplica: su
+   dominio recibe el archivo entero. */
+/* La página que nombra la dirección: la almohadilla manda; sin ella, el path
+   (/donar); y sin ninguno, la portada. */
+function rutaDelPath(){
+  var r = (location.pathname.match(/^\/([a-z][a-z-]*)\/?$/i) || [])[1];
+  r = r ? r.toLowerCase() : "";
+  return (RUTAS_PATH.indexOf(r) > -1 || r === "socialfest") ? r : null;
+}
+function rutaDeLaURL(){
+  return location.hash.replace("#","") || rutaDelPath() || rutaPorDefecto();
+}
+var RUTAS_APARTE = ["aliados", "apadrinar", "proyecto", "vivienda", "ingenieros", "casas", "caso"];
+function rutaConocida(id){
+  return id === "inicio" || id === "socialfest" || RUTAS_PATH.indexOf(id) > -1 || RUTAS_APARTE.indexOf(id) > -1;
+}
+function paginaEnOtraCarga(id, reemplaza){
+  if (MARCA_MMC || !rutaConocida(id)) return false;
+  var todo = /[?&]todo=1(&|$)/.test(location.search);
+  var q = location.search.replace(/([?&])todo=1(&|$)/, "$1").replace(/[?&]$/, "");
+  var destino;
+  if (RUTAS_APARTE.indexOf(id) > -1){
+    /* Ya estamos en el archivo entero y aun así falta: no hay a dónde ir. */
+    if (todo) return false;
+    destino = "/?todo=1" + (q ? "&" + q.slice(1) : "") + "#" + id;
+  } else {
+    destino = "/" + (id === "inicio" ? "" : id) + q;
+  }
+  location[reemplaza ? "replace" : "assign"](destino);
+  return true;
 }
 /* Despachador de acciones por delegación (CSP fase 2): reemplaza los on* inline.
    Atributos: data-act (click), data-input, data-change, data-submit, data-enter.
@@ -3938,6 +3974,8 @@ function go(id, fromPop){
   // viejos aterrizan en #impactos y abren el panel, así ninguno queda roto.
   var abrirAlma = (id === "alma");
   if (abrirAlma) id = "impactos";
+  /* La página puede no venir en este documento (ver `paginaEnOtraCarga`). */
+  if (!document.getElementById("page-"+id) && paginaEnOtraCarga(id, fromPop)) return false;
   var pages = document.querySelectorAll(".page");
   for (var i=0;i<pages.length;i++) pages[i].classList.remove("active");
   var target = document.getElementById("page-"+id);
@@ -3961,7 +3999,13 @@ function go(id, fromPop){
   document.documentElement.removeAttribute("data-ruta");
   currentRoute = id;
   if (lang === "sv" && id !== "regalos") setLang("en");
-  if (location.hash !== "#"+id) history[fromPop ? "replaceState" : "pushState"](null,"","#"+id);
+  /* LA DIRECCIÓN SE QUEDA COMO ES (16 nov 2026). Antes /donar se reescribía a
+     /#donar al cargar; como ahora cada dirección trae solo su página, copiar
+     ese enlace abría la portada y obligaba a una segunda carga. En su propia
+     dirección la página no lleva almohadilla; en cualquier otra, como siempre. */
+  if (rutaDelPath() === id){
+    if (location.hash) history[fromPop ? "replaceState" : "pushState"](null,"",location.pathname+location.search);
+  } else if (location.hash !== "#"+id) history[fromPop ? "replaceState" : "pushState"](null,"","#"+id);
   applyRouteMeta(id);
   renderJourney(id);
   alEntrarRuta(id);
@@ -4398,6 +4442,8 @@ function fmtCOP(n){ return "$" + Math.round(n).toLocaleString("es-CO"); }
 function fmtUSD(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 
 function setCur(c){
+  /* La calculadora vive en «Donar»; las demás páginas no la traen (16 nov 2026). */
+  if (!document.getElementById("page-donar")) return;
   /* SIN TASA NO HAY DOLARES, y hasta hoy si los habia. Con `/api/trm` caido la
      calculadora decia «No pudimos consultar la TRM en este momento» y debajo
      enseñaba $16, $48 y $764 en dolares: cifras que solo pueden salir de una
@@ -4433,6 +4479,8 @@ function setCur(c){
 }
 function setFreq(f){
   calc.freq = f;
+  /* La calculadora vive en «Donar»; las demás páginas no la traen (16 nov 2026). */
+  if (!document.getElementById("page-donar")) return;
   document.getElementById("freq-m").classList.toggle("on", f==="m");
   document.getElementById("freq-a").classList.toggle("on", f==="a");
   var fu=document.getElementById("freq-u"); if(fu) fu.classList.toggle("on", f==="u");
@@ -4440,6 +4488,8 @@ function setFreq(f){
 }
 function setCalcMode(m){
   calc.mode = m;
+  /* La calculadora vive en «Donar»; las demás páginas no la traen (16 nov 2026). */
+  if (!document.getElementById("page-donar")) return;
   var ti=document.getElementById("ctab-ind"), te=document.getElementById("ctab-emp");
   ti.classList.toggle("on", m==="ind"); ti.setAttribute("aria-pressed", m==="ind");
   te.classList.toggle("on", m==="emp"); te.setAttribute("aria-pressed", m==="emp");
@@ -4475,6 +4525,8 @@ function syncSlider(){
   if (s) s.value = valToSlider(calc.val);
 }
 function calcUpdate(){
+  /* La calculadora vive en «Donar»; las demás páginas no la traen (16 nov 2026). */
+  if (!document.getElementById("page-donar")) return;
   var cop = calc.val;
   var displayN = (calc.cur === "USD") ? cop / USD_RATE : cop;
   var disp = document.getElementById("calc-display");
@@ -5812,9 +5864,8 @@ function init(){
   var qLang = new URLSearchParams(location.search).get("lang");
   setLang(qLang === "en" || qLang === "sv" ? qLang : "es");
   /* /transparencia, /donar, /teoria-de-cambio… son la misma SPA servida con
-     path propio para los buscadores (ver `RUTAS_PATH`). Al llegar por ahí, la
-     dirección vuelve a la forma de siempre, /#ruta, conservando la query (el
-     ?lang=en): así los enlaces internos con # siguen funcionando igual. */
+     path propio para los buscadores (ver `RUTAS_PATH`). Desde el 16 nov 2026
+     la dirección se queda como llegó: ver `rutaDeLaURL` y `go`. */
   /* `?sobre=mmc` deja elegido el tema en los dos formularios de quejas: así
      llega quien viene desde su caso de Mira Mi Casa. Solo un valor que ya sea
      una opción del select. */
@@ -5823,8 +5874,6 @@ function init(){
     var sel = document.getElementById(id);
     if (sel && sel.querySelector('option[value="' + qjSobre.replace(/[^a-z]/g, "") + '"]')) sel.value = qjSobre;
   });
-  var rutaPath = (location.pathname.match(/^\/([a-z][a-z-]*)\/?$/i) || [])[1];
-  if (rutaPath && RUTAS_PATH.indexOf(rutaPath.toLowerCase()) < 0 && rutaPath.toLowerCase() !== "socialfest") rutaPath = null;
   /* LAS TRES PUERTAS DE SOCIAL FEST TIENEN DIRECCIÓN (14 oct 2026). El QR del
      taller va impreso como /socialfest#sf-red, y los correos de seguimiento
      llevan #sf-empresa y #sf-inversion. Hasta hoy /socialfest era una página
@@ -5833,10 +5882,13 @@ function init(){
      taller». Ahora el Worker sirve la SPA en /socialfest y aquí se baja al
      bloque. Y /#sf-red ya no se resuelve como ruta (era un 404). */
   var sfAncla = (location.hash.match(/^#sf-(red|empresa|inversion)$/) || [])[1];
-  if (sfAncla) history.replaceState(null, "", "/" + location.search + "#socialfest");
-  else if (rutaPath && !location.hash) history.replaceState(null, "", "/" + location.search + "#" + rutaPath.toLowerCase());
+  if (sfAncla){
+    /* Un QR o un correo viejo con /#sf-red: se lleva a /socialfest con su ancla. */
+    if (rutaDelPath() !== "socialfest"){ location.replace("/socialfest" + location.search + "#sf-" + sfAncla); return; }
+    history.replaceState(null, "", location.pathname + location.search);
+  }
   // routing from hash
-  var hash = location.hash.replace("#","") || rutaPorDefecto();
+  var hash = rutaDeLaURL();
   /* Wompi devuelve al donante a /gracias?id=… — una ruta con path, no con hash.
      El fallback de SPA ya sirvió index.html; aquí se enruta a mano y se deja el
      hash limpio, conservando el identificador en memoria. */
@@ -5897,7 +5949,7 @@ function init(){
   /* Se baja DESPUÉS de que esté el idioma: en inglés el diccionario llega
      después y, al traducir, la página cambia de alto y el salto quedaba corto. */
   if (sfAncla) ensureLang(lang).then(function(){ setTimeout(function(){ sfIr(sfAncla, true); }, 450); });
-  window.addEventListener("popstate", function(){ var h = location.hash.replace("#","")||rutaPorDefecto(); go(h, true); });
+  window.addEventListener("popstate", function(){ go(rutaDeLaURL(), true); });
   // Navegación por delegación (reemplaza inline; CSP fase 1).
   // Ignora elementos que aún conservan onclick inline → migración incremental sin doble disparo.
   document.addEventListener("click", function(e){

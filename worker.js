@@ -48060,6 +48060,36 @@ function regalosIncrustable(r) {
   h.set("cache-control", "no-store");
   return new Response(r.body, { status: r.status, headers: h });
 }
+/* CADA DIRECCIÓN, SOLO CON SU PÁGINA (punto 81, 16 nov 2026).
+   ============================================================================
+   Las 20 direcciones de `RUTAS_INDEXABLES` y la portada servían EL MISMO
+   index.html, de unas 22.000 palabras, con una sola diferencia: cuál <main>
+   llevaba `active`. Para un buscador eran 21 páginas casi idénticas, y Search
+   Console las dejaba en «Descubierta: actualmente sin indexar».
+
+   Ahora cada una sale con su <main> y sin los de las demás. Se quedan en todas
+   los que no tienen dirección propia y se abren desde cualquier parte: la ficha
+   de una fundación, de un comercio o de una empresa, el rastreo, «mi aporte»,
+   reportar, la vuelta del pago, privacidad y el 404. El resto (aliados,
+   apadrinar y las de Mira Mi Casa) se pide con `/?todo=1`, que sirve el archivo
+   entero, como antes, y no se indexa.
+
+   app.js lo sabe: si la página que se pide no está en el documento, navega a
+   su dirección en vez de mostrarla (`paginaEnOtraCarga`). `/gracias`, `/caso/…`
+   y el dominio de Mira Mi Casa siguen recibiendo el archivo entero. */
+const PAGINAS_QUE_QUEDAN = new Set(["ficha", "comercio", "empresa", "gracias", "reportar", "rastrea", "mi-aporte", "privacidad", "e404"]);
+function soloEstaPagina(r, id) {
+  return r.on("main.page", { element(el) {
+    const p = String(el.getAttribute("id") || "").replace(/^page-/, "");
+    if (p !== id && !PAGINAS_QUE_QUEDAN.has(p)) el.remove();
+  } });
+}
+/* La portada: su <main> y nada más; con `?lang=en`, además su cabecera en inglés. */
+function portadaSola(base, en) {
+  if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
+  const r = en ? cabeceraPagina(PORTADA_EN, ORIGIN + "/?lang=en", true) : new HTMLRewriter();
+  return soloEstaPagina(r, "inicio").transform(base);
+}
 function paginaIndexable(base, id, en) {
   if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
   const m = en ? RUTAS_INDEXABLES[id].en : RUTAS_INDEXABLES[id];
@@ -48072,21 +48102,11 @@ function paginaIndexable(base, id, en) {
       .on('meta[name="twitter:image"]', img)
       .on('meta[property="og:image:alt"]', { element(el) { el.setAttribute("content", en ? og.altEn : og.alt); } });
   }
-  return r
-    /* La página visible es esta y no la portada. Y la foto de la portada, que
-       aquí no se ve, deja de pedirse con prioridad. */
-    .on("main#page-inicio", { element(el) { el.setAttribute("class", "page"); } })
+  /* La página visible es esta, y es la única de las que tienen dirección
+     propia que viaja: la portada y las demás se quitan (`soloEstaPagina`). */
+  return soloEstaPagina(r, id)
     .on("main#page-" + id, { element(el) { el.setAttribute("class", "page active"); } })
-    .on("main#page-inicio .hero-bg img", { element(el) {
-      el.removeAttribute("fetchpriority"); el.setAttribute("loading", "lazy");
-    } })
     .transform(base);
-}
-/* La portada con `?lang=en`. Solo el <head>: el cuerpo lo traduce app.js, como
-   siempre. Un 304 o lo que no sea HTML pasa tal cual. */
-function portadaEnIngles(base) {
-  if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
-  return cabeceraPagina(PORTADA_EN, ORIGIN + "/?lang=en", true).transform(base);
 }
 
 function cascaraBaja(titulo, cuerpo, lang, tema, estilo, cabecera) {
@@ -48705,13 +48725,9 @@ function paginaSocialfest(base, en) {
   if (base.status !== 200 || !(base.headers.get("content-type") || "").includes("text/html")) return base;
   const m = en ? SOCIALFEST_META.en : SOCIALFEST_META;
   const canon = ORIGIN + "/socialfest";
-  return conAlternos(cabeceraPagina(m, en ? canon + "?lang=en" : canon, en), canon)
+  return soloEstaPagina(conAlternos(cabeceraPagina(m, en ? canon + "?lang=en" : canon, en), canon), "socialfest")
     .on('meta[property="og:image:alt"]', { element(el) { el.setAttribute("content", m.alt); } })
-    .on("main#page-inicio", { element(el) { el.setAttribute("class", "page"); } })
     .on("main#page-socialfest", { element(el) { el.setAttribute("class", "page active"); } })
-    .on("main#page-inicio .hero-bg img", { element(el) {
-      el.removeAttribute("fetchpriority"); el.setAttribute("loading", "lazy");
-    } })
     .transform(base);
 }
 
@@ -50541,8 +50557,16 @@ export default {
     }
     /* La portada en inglés: su tarjeta para compartir (ver `PORTADA_EN`). Fuera
        del subdominio de Mira Mi Casa, que tiene su propia tarjeta. */
-    if (ruta === "/" && url.searchParams.get("lang") === "en" && !HOST_MMC.test(url.hostname)) {
-      return portadaEnIngles(await env.ASSETS.fetch(request));
+    if (ruta === "/" && !HOST_MMC.test(url.hostname)) {
+      const base = await env.ASSETS.fetch(request);
+      /* `/?todo=1`: el archivo entero, para las páginas sin dirección propia
+         que ya no viajan en cada carga. No es una página: no se indexa. */
+      if (url.searchParams.get("todo") === "1") {
+        const r = new Response(base.body, base);
+        r.headers.set("x-robots-tag", "noindex, follow");
+        return r;
+      }
+      return portadaSola(base, url.searchParams.get("lang") === "en");
     }
     /* /gracias es la vuelta del pago, con el id de la transacción en la query:
        un paso privado, no una página. Servía la portada con `index, follow` y
