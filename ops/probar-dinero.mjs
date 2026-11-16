@@ -41,6 +41,7 @@ const BATERIAS = [
       "--var", "RESEND_API_KEY:re_llave_invalida_de_prueba",
       "--var", "CORREO_AVISOS:equipo@ejemplo.invalid",
       "--var", "CORREO_MMC:mmc@ejemplo.invalid"] },
+  { nombre: "inscripcion", archivo: "ops/probar-inscripcion.py" },
 ];
 
 const filtro = process.argv[2] || "";

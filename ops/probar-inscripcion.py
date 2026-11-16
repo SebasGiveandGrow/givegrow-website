@@ -1,4 +1,9 @@
-import json, os, urllib.request, urllib.error
+#!/usr/bin/env python3
+"""Pruebas de /api/inscripcion (las seis puertas y su freno).
+
+Uso:   node ops/probar-dinero.mjs inscripcion
+"""
+import json, os, sys, urllib.request, urllib.error
 BASE = os.environ.get("BASE", "http://localhost:8802")
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0 Safari/537.36"
 H = {"content-type": "application/json", "user-agent": UA}
@@ -18,9 +23,32 @@ def linea(t, ok, extra=""):
     # es imposible y hacia inutil el numero justo cuando mas se mira.
     print(("  ✓ " if ok else "  ✗ ") + t + (("  " + extra) if extra else "")); return bool(ok)
 
-base = {"tipo":"voluntario","nombre":"Ana Prueba","email":"ana@example.com",
+# El celular es obligatorio en las seis puertas desde el 29 sep 2026. Esta
+# batería no lo llevaba y por eso 16 de sus 20 pruebas fallaban sin que nadie
+# lo viera: además salía con código 0.
+base = {"tipo":"voluntario","nombre":"Ana Prueba","email":"ana@example.com","telefono":"3001234567",
         "nivel":"estructura","oficio":"Contabilidad","autoriza_datos":True}
 todo = []
+
+c = dict(base); c.pop("telefono")
+st, d = post(c)
+todo.append(linea("sin celular no se guarda", st == 400 and d.get("error") == "telefono_requerido",
+                  f"http={st} {d.get('error')}"))
+
+# El registro de voluntarios (Decreto 4290 de 2005): a un mayor de edad se le
+# piden documento y escolaridad, y sin ellos no entra.
+c = dict(base, mayor_edad=True, email="mayor-sin-doc@example.com")
+st, d = post(c)
+todo.append(linea("mayor de edad sin documento rechazado", st == 400 and d.get("error") == "documento_requerido",
+                  f"http={st} {d.get('error')}"))
+c = dict(base, mayor_edad=True, email="mayor-sin-esc@example.com", doc_tipo="CC", doc_numero="1234567890")
+st, d = post(c)
+todo.append(linea("mayor de edad sin escolaridad rechazado", st == 400 and d.get("error") == "escolaridad_requerida",
+                  f"http={st} {d.get('error')}"))
+c = dict(c, email="mayor-completo@example.com", escolaridad="profesional")
+st, d = post(c)
+todo.append(linea("mayor de edad con documento y escolaridad se guarda", st == 200 and d.get("ok"),
+                  f"http={st} {d.get('error')}"))
 
 st, d = post(base)
 todo.append(linea("inscripción válida se guarda", st == 200 and d.get("ok") and d.get("id"), f"http={st} id={d.get('id')}"))
@@ -67,15 +95,16 @@ freno = "freno-seis-puertas@example.com"
 for i in range(3):
     post(dict(base, email=freno, nombre=f"Freno {i}"))
 for t in ["especie", "ingeniero", "apadrinamiento", "empresa", "fundacion", "voluntario"]:
-    st, d = post({"tipo": t, "nombre": "Freno", "email": freno, "autoriza_datos": True})
+    st, d = post({"tipo": t, "nombre": "Freno", "email": freno, "telefono": "3001234567", "autoriza_datos": True})
     todo.append(linea(f"freno alcanza la puerta «{t}»", st == 429,
                       f"http={st} {d.get('error')}"))
 
 # Y NO puede arrastrar a un correo distinto: se frena por identidad, no en bloque.
 st, d = post({"tipo": "fundacion", "nombre": "Libre", "email": "libre-del-freno@example.com",
-              "autoriza_datos": True})
+              "telefono": "3001234567", "autoriza_datos": True})
 todo.append(linea("otro correo NO queda frenado", st == 400 and d.get("error") != "demasiadas_inscripciones",
                   f"http={st} {d.get('error')}"))
 
 print()
 print(f"  {sum(todo)}/{len(todo)} pruebas en verde")
+sys.exit(0 if all(todo) else 1)
