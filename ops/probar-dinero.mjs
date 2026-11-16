@@ -45,6 +45,7 @@ const BATERIAS = [
   /* `banco: true` = corre contra el BANCO: una copia del Worker con Access
      simulado (ver `armarBanco`). Para lo que vive detrás del panel. */
   { nombre: "entregas", archivo: "ops/probar-entregas.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
+  { nombre: "aportes-fundacion", archivo: "ops/probar-aportes-fundacion.py", banco: true, flags: ["--var", "PRUEBA_ACCESS:si"] },
 ];
 
 const filtro = process.argv[2] || "";

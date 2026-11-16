@@ -22632,6 +22632,125 @@ async function apiPortalRed(request, env) {
   return json({ ok: true, id: fila.id });
 }
 
+/* ============================================================================
+   EL REGISTRO DE APORTES ENTRE FUNDACIONES (0066, 16 nov 2026)
+   ============================================================================
+   Lo que una fundación de la red le dio a otra. La fundación lo DECLARA en su
+   portal ('registrado'); el equipo lo confirma y lo marca entregado. Solo lo
+   confirmado o entregado suma en los totales. Cada tipo en su unidad. */
+const APF_UNIDADES = { dinero: ["pesos"], especie: ["kilos", "unidades"], voluntariado: ["horas"],
+  conocimiento: ["personas formadas"], espacios: ["días de uso"], logistica: ["envíos", "trayectos"],
+  visibilidad: ["contactos abiertos"] };
+const APF_ESTADO_ES = { registrado: "Registrado, por confirmar", confirmado: "Confirmado", entregado: "Entregado", anulado: "Anulado" };
+const APF_TOPE = 200;
+
+/* Suma por tipo y unidad. Nunca mezcla unidades. */
+function apfTotales(filas) {
+  const t = {};
+  for (const x of filas) {
+    if (x.estado !== "confirmado" && x.estado !== "entregado") continue;
+    const k = x.tipo + "|" + x.unidad;
+    if (!t[k]) t[k] = { tipo: x.tipo, unidad: x.unidad, cantidad: 0, aportes: 0 };
+    t[k].cantidad += Number(x.cantidad) || 0; t[k].aportes++;
+  }
+  return Object.values(t);
+}
+
+/* GET y POST /api/portal/aportes */
+async function apiPortalAportes(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "aportes_fundacion"))) return json({ error: "no_disponible" }, 503);
+  const rol = portalRol(s).rol;
+  if (request.method === "GET") {
+    const dados = rol === "recibe" ? [] : (await env.DB.prepare(
+      "SELECT a.id, a.tipo, a.titulo, a.cantidad, a.unidad, a.fecha, a.estado, a.nota_equipo, a.recibe, i.nombre AS para " +
+      "FROM aportes_fundacion a LEFT JOIN inscripciones i ON i.id = a.recibe WHERE a.da = ? AND a.estado <> 'anulado' ORDER BY a.fecha DESC, a.id DESC LIMIT 300"
+    ).bind(s.inscripcion).all()).results || [];
+    /* Lo que le llegó a ESTA fundación de otras: solo lo que el equipo confirmó. */
+    const recibidos = (await env.DB.prepare(
+      "SELECT a.id, a.tipo, a.titulo, a.cantidad, a.unidad, a.fecha, a.estado, i.nombre AS de " +
+      "FROM aportes_fundacion a JOIN inscripciones i ON i.id = a.da WHERE a.recibe = ? AND a.estado IN ('confirmado', 'entregado') ORDER BY a.fecha DESC, a.id DESC LIMIT 300"
+    ).bind(s.inscripcion).all()).results || [];
+    const red = rol === "recibe" ? [] : (await env.DB.prepare(
+      "SELECT id, nombre, ciudad FROM inscripciones WHERE tipo = 'fundacion' AND estado = 'vinculada' AND id <> ? ORDER BY nombre COLLATE NOCASE LIMIT 300"
+    ).bind(s.inscripcion).all()).results || [];
+    return json({ ok: true, puede_registrar: rol !== "recibe", unidades: APF_UNIDADES, estados: APF_ESTADO_ES,
+      dados, totales: apfTotales(dados), recibidos, red });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  if (rol === "recibe") return json({ error: "no_aporta", ayuda: "Primero marquen qué puede dar su fundación." }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+  if (c.accion === "retirar") {
+    /* Solo mientras nadie lo ha confirmado: lo confirmado ya es un registro. */
+    const r = await env.DB.prepare(
+      "UPDATE aportes_fundacion SET estado = 'anulado', actualizado = datetime('now') WHERE id = ? AND da = ? AND estado = 'registrado'"
+    ).bind(Number(c.id) || 0, s.inscripcion).run();
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado", ayuda: "Ese aporte ya fue confirmado por el equipo. Escríbannos si hay que corregirlo." }, 404);
+    return json({ ok: true });
+  }
+  if (c.accion !== "guardar") return json({ error: "accion_invalida" }, 400);
+  const malo = (campo, ayuda) => json({ error: "dato_invalido", campo, ayuda }, 400);
+  const tipo = APORTES_FUND.includes(c.tipo) ? c.tipo : null;
+  if (!tipo) return malo("tipo", "Elige qué tipo de aporte fue.");
+  const unidad = APF_UNIDADES[tipo].includes(c.unidad) ? c.unidad : (APF_UNIDADES[tipo].length === 1 ? APF_UNIDADES[tipo][0] : null);
+  if (!unidad) return malo("unidad", "Elige en qué se mide.");
+  const titulo = String(c.titulo == null ? "" : c.titulo).replace(/\s+/g, " ").trim().slice(0, 120);
+  if (titulo.length < 4) return malo("titulo", "Escribe en pocas palabras qué dieron: «Mercados para 60 familias».");
+  const cantidad = Math.round(Number(String(c.cantidad == null ? "" : c.cantidad).replace(",", ".")) * 100) / 100;
+  if (!(cantidad > 0) || cantidad > 1e12) return malo("cantidad", "Escribe la cantidad en números, mayor que cero.");
+  const fecha = indFecha(c.fecha);
+  if (!fecha) return malo("fecha", "Elige la fecha en que se dio.");
+  if (fecha > new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10)) return malo("fecha", "La fecha no puede ser futura: aquí se registra lo que ya se dio.");
+  let recibe = null;
+  if (c.recibe) {
+    const d = await env.DB.prepare(
+      "SELECT id FROM inscripciones WHERE id = ? AND tipo = 'fundacion' AND estado = 'vinculada' AND id <> ?"
+    ).bind(Number(c.recibe) || 0, s.inscripcion).first();
+    if (!d) return malo("recibe", "Esa fundación no está en la red.");
+    recibe = d.id;
+  }
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM aportes_fundacion WHERE da = ? AND estado = 'registrado'").bind(s.inscripcion).first();
+  if (n && n.n >= APF_TOPE) return json({ error: "tope_alcanzado", ayuda: "Tienen muchos aportes por confirmar. Escríbannos para ponernos al día." }, 409);
+  const fila = await env.DB.prepare(
+    "INSERT INTO aportes_fundacion (da, recibe, tipo, titulo, cantidad, unidad, fecha) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(s.inscripcion, recibe, tipo, titulo, cantidad, unidad, fecha).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* GET /api/admin/aportes-fundacion — todos, lo por confirmar primero. */
+async function adminAportesFundacion(env) {
+  if (!(await existeTabla(env, "aportes_fundacion"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0066 en la base." }, 409);
+  const filas = (await env.DB.prepare(
+    "SELECT a.*, d.nombre AS da_nombre, r.nombre AS recibe_nombre FROM aportes_fundacion a JOIN inscripciones d ON d.id = a.da " +
+    "LEFT JOIN inscripciones r ON r.id = a.recibe ORDER BY CASE a.estado WHEN 'registrado' THEN 0 WHEN 'confirmado' THEN 1 ELSE 2 END, a.fecha DESC, a.id DESC LIMIT 500"
+  ).all()).results || [];
+  return json({ ok: true, estados: APF_ESTADO_ES, aportes: filas });
+}
+
+/* POST /api/admin/aporte-fundacion/<id> { estado, nota } — confirmar, marcar
+   entregado o anular. Un aporte sin destinataria no se puede confirmar: no hay
+   con quién cruzarlo. */
+async function adminAporteFundacion(request, env, id, quien) {
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c) || !["confirmado", "entregado", "anulado"].includes(c.estado)) return json({ error: "estado_invalido" }, 400);
+  const a = await env.DB.prepare("SELECT id, estado, recibe FROM aportes_fundacion WHERE id = ?").bind(id).first();
+  if (!a) return json({ error: "no_encontrado" }, 404);
+  if (c.estado !== "anulado" && !a.recibe) return json({ error: "sin_destinataria", ayuda: "Este aporte no dice a qué fundación fue. Pídanle a quien lo registró que lo retire y lo vuelva a registrar con la destinataria." }, 409);
+  const nota = c.nota == null ? null : (String(c.nota).replace(/\r\n?/g, "\n").trim().slice(0, 500) || null);
+  await env.DB.prepare(
+    "UPDATE aportes_fundacion SET estado = ?, nota_equipo = COALESCE(?, nota_equipo), revisado_por = ?, revisado_en = datetime('now'), actualizado = datetime('now') WHERE id = ?"
+  ).bind(c.estado, nota, quien || null, id).run();
+  await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
+    .bind(quien || "?", "aporte entre fundaciones " + id + " · " + a.estado + " → " + c.estado).run();
+  return json({ ok: true });
+}
+
 /* GET /api/admin/intercambios — lo de toda la red, para cruzar. */
 async function adminIntercambios(env) {
   if (!(await existeTabla(env, "intercambios_fundacion"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0059 en la base." }, 409);
@@ -23749,8 +23868,9 @@ function pintarResumen(){
       '<div class="tarjeta"><p class="ey">¿Dudas?</p><p class="sub mt">Escríbenos a <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a> o por WhatsApp al <a href="https://wa.me/573153305028">+57 315 330 5028</a>.</p></div>' +
     "</div>" +
     '<div id="p-ofrecen" class="mt"></div>' +
+    '<div id="p-aportes" class="mt"></div>' +
     '<div id="p-recibido" class="mt"></div>';
-  pintarOfrecen();
+  pintarOfrecen(); pintarAportes();
   if (D.rol === "aporta") $("p-recibido").classList.add("oculto"); else pintarRecibido();
   $("tp-docs").textContent = n + "/" + RECOMENDADOS.length;
   $("tp-docs").className = "pill" + (n === RECOMENDADOS.length ? " ok" : "");
@@ -23804,7 +23924,7 @@ function tocarAporta(id){
     }
     D.rol = r.d.rol; D.aporta = r.d.aporta;
     DA_ABIERTO = DA_ABIERTO && D.rol === "recibe";
-    pintarRol(); pintarOfrecen();
+    pintarRol(); pintarOfrecen(); APF = null; pintarAportes();
     if ($("p-recibido")) {
       $("p-recibido").classList.toggle("oculto", D.rol === "aporta");
       if (D.rol !== "aporta") pintarRecibido();
@@ -23845,6 +23965,93 @@ function pintarOfrecen(){
   h += '<div id="p-red" class="mt"></div>';
   caja.innerHTML = h;
   pintarRed();
+}
+
+/* EL REGISTRO DE APORTES (0066). Lo que esta fundación le dio a otra de la
+   red, y lo que otras le dieron. Lo que escribe queda «por confirmar» hasta
+   que el equipo lo cruza: solo lo confirmado o entregado suma arriba. */
+var APF = null, APF_FORM = false;
+function cant(x){
+  var n = Number(x.cantidad) || 0;
+  return x.tipo === "dinero" ? pesos(n) : n.toLocaleString("es-CO") + " " + x.unidad;
+}
+function nomTipo(k){
+  var t = (D.aportes || []).filter(function(a){ return a.id === k; })[0];
+  return t ? t.nombre : k;
+}
+function pintarAportes(){
+  var caja = $("p-aportes");
+  if (!caja) return;
+  if (APF === null) {
+    fetch("/api/portal/aportes", { credentials: "same-origin" }).then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ if (d) { APF = d; pintarAportes(); } }).catch(function(){});
+    return;
+  }
+  var da = D.rol === "aporta" || D.rol === "ambas";
+  var h = "";
+  if (da) {
+    var T = APF.totales || [], L = APF.dados || [];
+    h += '<div class="tarjeta"><p class="ey">Lo que han dado a la red</p>';
+    h += T.length ? '<div class="rejilla mt">' + T.map(function(t){
+        return '<div><p class="cifra">' + esc(cant(t)) + '</p><p class="sub">' + esc(nomTipo(t.tipo)) + " · " + t.aportes + (t.aportes === 1 ? " aporte confirmado" : " aportes confirmados") + ".</p></div>";
+      }).join("") + "</div>"
+      : '<p class="sub mt">Todavía no hay aportes confirmados. Registren lo que ya dieron a otra fundación de la red y el equipo lo confirma con ella.</p>';
+    if (L.length) h += '<ul class="docs mt">' + L.map(function(x){
+      var est = x.estado === "registrado" ? "Por confirmar" : x.estado === "confirmado" ? "Confirmado" : "Entregado";
+      return '<li><div><span class="nom">' + esc(x.titulo) + '</span><span class="det">' + esc(nomTipo(x.tipo)) + " · " + esc(cant(x)) + " · para " +
+        esc(x.para || "la red, sin fundación asignada") + " · " + esc(x.fecha) + "</span>" +
+        (x.nota_equipo ? '<span class="det"><strong>Nota del equipo:</strong> ' + esc(x.nota_equipo) + "</span>" : "") + "</div>" +
+        '<div class="der"><span class="pill' + (x.estado === "registrado" ? " ambar" : " ok") + '">' + est + "</span>" +
+        (x.estado === "registrado" ? '<button type="button" class="btn sec mini" data-apf-retirar="' + x.id + '">Retirar</button>' : "") + "</div></li>";
+    }).join("") + "</ul>";
+    if (APF_FORM) {
+      var tipos = (D.aportes || []).filter(function(a){ return (D.aporta || []).indexOf(a.id) !== -1; });
+      h += '<div class="mt" id="f-apf"><h2>Registrar un aporte</h2><p class="sub">Algo que su fundación ya le dio a otra de la red. El equipo lo confirma con ella antes de que cuente.</p>' +
+        '<label for="apf-tipo">Qué tipo de aporte fue *</label><select id="apf-tipo">' + tipos.map(function(a){ return '<option value="' + esc(a.id) + '">' + esc(a.nombre) + "</option>"; }).join("") + "</select>" +
+        '<label for="apf-tit">Qué dieron *</label><span class="ayuda">En pocas palabras: «Mercados para 60 familias», «Taller de contabilidad».</span><input type="text" id="apf-tit" maxlength="120">' +
+        '<label for="apf-cant">Cuánto *</label><input type="text" id="apf-cant" inputmode="decimal" maxlength="16">' +
+        '<label for="apf-uni">En qué se mide *</label><select id="apf-uni"></select>' +
+        '<label for="apf-fecha">Cuándo *</label><input type="date" id="apf-fecha">' +
+        '<label for="apf-para">A qué fundación</label><select id="apf-para"><option value="">Todavía no lo sé</option>' +
+          (APF.red || []).map(function(f){ return '<option value="' + f.id + '">' + esc(f.nombre) + (f.ciudad ? " · " + esc(f.ciudad) : "") + "</option>"; }).join("") + "</select>" +
+        '<div class="acciones"><button type="button" class="btn" id="b-apf-guardar">Registrar</button><button type="button" class="btn sec" id="b-apf-cancelar">Cancelar</button></div></div>';
+    } else {
+      h += '<div class="acciones"><button type="button" class="btn mini" id="b-apf-abrir">Registrar un aporte</button></div>';
+    }
+    h += '<span class="msg" id="m-apf" role="status" aria-live="polite"></span>' +
+      '<p class="sub mt">Es un registro operativo del portal. No es contabilidad ni reemplaza un certificado de donación.</p></div>';
+  }
+  var R = APF.recibidos || [];
+  if (R.length) h += '<div class="tarjeta' + (da ? " mt" : "") + '"><p class="ey">Lo que otras fundaciones de la red les han dado</p><ul class="docs mt">' + R.map(function(x){
+      return '<li><div><span class="nom">' + esc(x.titulo) + '</span><span class="det">' + esc(nomTipo(x.tipo)) + " · " + esc(cant(x)) + " · de " + esc(x.de) + " · " + esc(x.fecha) + "</span></div>" +
+        '<div class="der"><span class="pill ok">' + (x.estado === "entregado" ? "Entregado" : "Confirmado") + "</span></div></li>";
+    }).join("") + "</ul></div>";
+  caja.innerHTML = h;
+  if (da && APF_FORM) unidadesApf();
+  if (AVISO_APF && $("m-apf")) { msg("m-apf", AVISO_APF, "ok"); AVISO_APF = ""; }
+}
+function unidadesApf(){
+  var t = $("apf-tipo"); if (!t) return;
+  var U = (APF.unidades || {})[t.value] || [];
+  $("apf-uni").innerHTML = U.map(function(u){ return '<option value="' + esc(u) + '">' + esc(u) + "</option>"; }).join("");
+}
+function guardarApf(){
+  var c = { accion: "guardar", tipo: $("apf-tipo").value, titulo: $("apf-tit").value, cantidad: $("apf-cant").value,
+    unidad: $("apf-uni").value, fecha: $("apf-fecha").value, recibe: $("apf-para").value || null };
+  var b = $("b-apf-guardar"); b.disabled = true; msg("m-apf", "Guardando…");
+  enviar("/api/portal/aportes", c).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { b.disabled = false; msg("m-apf", r.d.ayuda || "No se pudo registrar. Intenta de nuevo.", "mal"); return; }
+    APF = null; APF_FORM = false; AVISO_APF = "Registrado. El equipo lo confirma con la otra fundación."; pintarAportes();
+  }).catch(function(){ b.disabled = false; msg("m-apf", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+}
+var AVISO_APF = "";
+function retirarApf(id){
+  enviar("/api/portal/aportes", { accion: "retirar", id: Number(id) }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { msg("m-apf", r.d.ayuda || "No se pudo retirar.", "mal"); return; }
+    APF = null; pintarAportes();
+  }).catch(function(){ msg("m-apf", "No pudimos conectar. Intenta de nuevo.", "mal"); });
 }
 
 /* LO QUE OTRAS FUNDACIONES NECESITAN (0065): solo lo que cada una marcó como
@@ -24289,6 +24496,12 @@ document.addEventListener("click", function(ev){
   var o = ev.target.closest && ev.target.closest("[data-red-ofrecer]");
   if (o && !o.disabled) ofrecerRed(o.getAttribute("data-red-ofrecer"));
   if (ev.target && ev.target.name === "dr-tipo") verCasillaRed();
+  if (ev.target.id === "b-apf-abrir") { APF_FORM = true; pintarAportes(); }
+  if (ev.target.id === "b-apf-cancelar") { APF_FORM = false; pintarAportes(); }
+  if (ev.target.id === "b-apf-guardar") guardarApf();
+  if (ev.target.id === "apf-tipo") unidadesApf();
+  var ra = ev.target.closest && ev.target.closest("[data-apf-retirar]");
+  if (ra) retirarApf(ra.getAttribute("data-apf-retirar"));
   if (ev.target.id === "b-da-abrir") { DA_ABIERTO = true; pintarRol(); pintarOfrecen(); window.scrollTo(0, 0); }
 });
 document.addEventListener("change", function(ev){
@@ -36019,6 +36232,9 @@ textarea { font-size: 16px }
 <p><strong>La nota del equipo</strong> la ve la fundación en su portal: sirve para decirle «lo cruzamos con…» o «¿sigue vigente?». Lo nuevo sale en «Hoy» hasta que se mira. <strong>Nada de esto se publica.</strong></p>
 </div></details>
 <div id="tb-dar" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
+<h3 style="margin-top:32px">Aportes entre fundaciones</h3>
+<p class="mu">Lo que una fundación registra en su portal como dado a otra de la red. Nace «por confirmar»: confírmalo cuando lo hayas cruzado con la que recibe, y márcalo entregado cuando haya llegado. Solo lo confirmado o entregado suma en el portal de las dos.</p>
+<div id="tb-apf" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 </section>
 
 <section class="pn-vista" data-vista="alianzas/fundaciones" id="sec-fundaciones" hidden>
@@ -45909,6 +46125,42 @@ var DR = null, DR_TIPO = "todo";
 function cargarIntercambios(){
   return pedirJSON("/api/admin/intercambios", "tb-dar").then(function(d){ DR = d; pintarIntercambios(); });
 }
+/* ---------------- APORTES ENTRE FUNDACIONES (0066) ---------------- */
+var APFA = null;
+function cargarAportesFund(){
+  return pedirJSON("/api/admin/aportes-fundacion", "tb-apf").then(function(d){ APFA = d; pintarAportesFund(); });
+}
+function pintarAportesFund(){
+  var caja = document.getElementById("tb-apf"); if (!caja || !APFA) return;
+  var L = APFA.aportes || [];
+  var boton = function(x, estado, texto){ return '<button type="button" class="copy" data-apf-id="' + x.id + '" data-apf-estado="' + estado + '">' + texto + "</button> "; };
+  caja.innerHTML = L.length ? '<div class="med-tw"><table class="med-tbl"><thead><tr><th scope="col">Qué</th><th scope="col">Da</th><th scope="col">Recibe</th>' +
+    '<th scope="col">Cantidad</th><th scope="col">Fecha</th><th scope="col">Estado</th><th scope="col"></th></tr></thead><tbody>' +
+    L.map(function(x){
+      var n = Number(x.cantidad) || 0;
+      return "<tr" + (x.estado === "anulado" ? ' style="opacity:.55"' : "") + "><td><strong>" + esc(x.titulo) + "</strong><br><small>" + esc(x.tipo) + "</small></td>" +
+        "<td>" + esc(x.da_nombre) + "</td><td>" + (x.recibe_nombre ? esc(x.recibe_nombre) : '<span class="mu">Sin destinataria</span>') + "</td>" +
+        "<td>" + (x.tipo === "dinero" ? "$" + Math.round(n).toLocaleString("es-CO") : n.toLocaleString("es-CO") + " " + esc(x.unidad)) + "</td>" +
+        "<td>" + esc(x.fecha) + "</td><td>" + (x.estado === "registrado" ? "<strong>Por confirmar</strong>" : esc((APFA.estados || {})[x.estado] || x.estado)) +
+        (x.revisado_por ? "<br><small>" + esc(x.revisado_por) + "</small>" : "") + "</td><td>" +
+        (x.estado === "registrado" ? boton(x, "confirmado", "Confirmar") : "") +
+        (x.estado === "confirmado" ? boton(x, "entregado", "Marcar entregado") : "") +
+        (x.estado !== "anulado" && x.estado !== "entregado" ? boton(x, "anulado", "Anular") : "") + "</td></tr>";
+    }).join("") + "</tbody></table></div>"
+    : '<p class="mu">Ninguna fundación ha registrado un aporte todavía.</p>';
+}
+document.addEventListener("click", function(e){
+  var b = e.target.closest && e.target.closest("[data-apf-estado]");
+  if (!b) return;
+  var estado = b.getAttribute("data-apf-estado");
+  if (estado === "anulado" && !window.confirm("¿Anular este aporte? Deja de verse en el portal de la fundación.")) return;
+  b.disabled = true;
+  postPanel("/api/admin/aporte-fundacion/" + b.getAttribute("data-apf-id"), { estado: estado }).then(function(r){
+    b.disabled = false; if (!r) return;
+    avisar(estado === "confirmado" ? "Confirmado: ya suma en el portal de las dos fundaciones." : estado === "entregado" ? "Marcado como entregado." : "Anulado.");
+    cargarAportesFund();
+  });
+});
 function pintarIntercambios(){
   var caja = document.getElementById("tb-dar"); if (!caja || !DR) return;
   var L = DR.intercambios || [];
@@ -46284,6 +46536,7 @@ var BANDEJAS = {
   "tb-revisar": cargarRevisar,
   "tb-indred": cargarIndicadoresRed,
   "tb-dar": cargarIntercambios,
+  "tb-apf": cargarAportesFund,
   "tb-costos": cargarUnidadesImpacto,
   "tb-boletin": cargarBoletin,
   "tb-pagos": cargarSueltos,
@@ -50422,6 +50675,9 @@ export default {
         if (ruta === "/api/admin/revisar")      return await adminRevisar(env);
         if (ruta === "/api/admin/indicadores-red") return await adminIndicadoresRed(env);
         if (ruta === "/api/admin/intercambios") return await adminIntercambios(env);
+        if (ruta === "/api/admin/aportes-fundacion") return await adminAportesFundacion(env);
+        const aaf = ruta.match(/^\/api\/admin\/aporte-fundacion\/(\d{1,9})$/);
+        if (aaf) return await adminAporteFundacion(request, env, Number(aaf[1]), sesion.email);
         if (ruta === "/api/admin/unidades-impacto") return await adminUnidadesImpacto(env);
         if (ruta === "/api/admin/boletin")      return await adminBoletin(request, env, sesion.email);
         const abo = ruta.match(/^\/api\/admin\/boletin\/(\d{1,9})\/(prueba|enviar)$/);
@@ -50654,6 +50910,7 @@ export default {
         if (ruta === "/api/portal/ods")     return await apiPortalOds(request, env);
         if (ruta === "/api/portal/aporta")  return await apiPortalAporta(request, env);
         if (ruta === "/api/portal/red")     return await apiPortalRed(request, env);
+        if (ruta === "/api/portal/aportes") return await apiPortalAportes(request, env);
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
