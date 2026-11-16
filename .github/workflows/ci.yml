@@ -119,14 +119,12 @@ jobs:
   # Las baterías existían desde hacía meses en ops/probar-*.py, pero había que
   # correrlas a mano y solo se corrían el día que se tocaba ese flujo.
   #
-  # NO está en `needs` de `automerge`, a propósito: es un job nuevo que levanta
-  # un servidor, y si resultara inestable frenaría todas las fusiones. Cuando
-  # lleve un tiempo en verde se suma ahí. No usa ningún secreto del repo: los
-  # de Wompi son valores de prueba al azar que escribe el propio script.
+  # Es requisito de `automerge` (ver ese job). No usa ningún secreto del repo:
+  # los de Wompi son valores de prueba al azar que escribe el propio script.
   dinero:
     runs-on: ubuntu-latest
     name: dinero
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -137,7 +135,10 @@ jobs:
         run: node ops/probar-dinero.mjs
 
   automerge:
-    needs: validate
+    # `dinero` es requisito desde el 16 nov 2026 (decisión de Sebas): un PR con
+    # la etiqueta no se fusiona si una batería de pagos falla. Cuesta unos
+    # siete minutos más por fusión.
+    needs: [validate, dinero]
     if: contains(github.event.pull_request.labels.*.name, 'automerge')
     runs-on: ubuntu-latest
     permissions:
