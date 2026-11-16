@@ -20327,6 +20327,11 @@ const ROL_FUND_ES = { recibe: "Recibe", aporta: "Aporta", ambas: "Recibe y aport
 const APORTES_FUND = ["dinero", "especie", "voluntariado", "conocimiento", "espacios", "logistica", "visibilidad"];
 const APORTE_FUND_ES = { dinero: "dinero", especie: "especie", voluntariado: "voluntariado", conocimiento: "conocimiento",
   espacios: "espacios", logistica: "logística", visibilidad: "visibilidad" };
+/* Con qué se mide cada tipo de aporte. Es la unidad que ve la fundación al
+   marcar lo que puede dar: dinero y kilos no se suman entre sí. */
+const APORTE_FUND_UNIDAD = { dinero: "en pesos", especie: "en kilos o unidades", voluntariado: "en horas",
+  conocimiento: "en personas formadas", espacios: "en días de uso", logistica: "en envíos o trayectos",
+  visibilidad: "en contactos abiertos" };
 function rolFundacion(x) { return x && ROLES_FUND.includes(x.rol) ? x.rol : "recibe"; }
 function rolFundacionTexto(x) {
   const r = rolFundacion(x);
@@ -21206,7 +21211,7 @@ async function portalSesion(env, request) {
   if (!t) return null;
   const h = await sha256Hex(t);
   const s = await env.DB.prepare(
-    "SELECT s.hash, s.inscripcion, s.email AS entro_con, i.nombre, i.email, i.estado, i.token, i.tipo, i.portal_tema, i.portal_saludo, " +
+    "SELECT s.hash, s.inscripcion, s.email AS entro_con, i.nombre, i.email, i.estado, i.token, i.tipo, i.portal_tema, i.portal_saludo, i.datos AS ins_datos, " +
     "f.estado AS ficha_estado, f.datos AS ficha_datos FROM portal_sesiones s " +
     "JOIN inscripciones i ON i.id = s.inscripcion LEFT JOIN fichas_fundacion f ON f.inscripcion = i.id " +
     "WHERE s.hash = ? AND s.cerrada_en IS NULL AND s.expira > datetime('now') " +
@@ -21361,6 +21366,40 @@ const PORTAL_TEMAS = {
   }
 };
 
+/* El rol de la fundación en la red y lo que puede dar, leídos de `datos`. */
+function portalRol(s) {
+  let d = {};
+  try { d = JSON.parse(s.ins_datos || "{}") || {}; } catch { d = {}; }
+  const rol = rolFundacion(d);
+  const aporta = rol === "recibe" ? [] : (Array.isArray(d.aporta) ? d.aporta : []).filter((k) => APORTES_FUND.includes(k));
+  return { datos: d, rol, aporta };
+}
+
+/* POST /api/portal/aporta { aporta: [...] } — LO QUE LA FUNDACIÓN PUEDE DAR.
+   Antes solo se podía decir en la solicitud, una vez. Marcar algo convierte a
+   una fundación que recibe en una que recibe y aporta; desmarcarlo todo la
+   devuelve a «recibe». La que entró solo como aportante no puede quedarse sin
+   nada marcado: no tendría rol. El equipo lo ve en la ficha («En la red»). */
+async function apiPortalAporta(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  if (!esObjeto(c) || !Array.isArray(c.aporta)) return json({ error: "json_invalido" }, 400);
+  const lista = APORTES_FUND.filter((k) => c.aporta.includes(k));
+  const r = portalRol(s);
+  if (!lista.length && r.rol === "aporta") {
+    return json({ error: "aporte_requerido", ayuda: "Dejen marcado al menos un tipo de aporte: es lo que su fundación hace en la red." }, 400);
+  }
+  const d = r.datos;
+  if (lista.length) { d.rol = r.rol === "recibe" ? "ambas" : r.rol; d.aporta = lista; }
+  else { d.rol = "recibe"; delete d.aporta; }
+  await env.DB.prepare("UPDATE inscripciones SET datos = ? WHERE id = ?").bind(JSON.stringify(d), s.inscripcion).run();
+  return json({ ok: true, rol: d.rol, aporta: lista });
+}
+
 /* GET /api/portal/yo — todo lo que pinta la pantalla. */
 async function apiPortalYo(request, env) {
   const s = await portalSesion(env, request);
@@ -21371,8 +21410,11 @@ async function apiPortalYo(request, env) {
     "SELECT id, tipo, nota, bytes, contenido, subido, revisado_en FROM documentos_fundacion " +
     "WHERE inscripcion = ? AND retirado_en IS NULL ORDER BY subido DESC"
   ).bind(s.inscripcion).all()).results || [];
+  const pr = portalRol(s);
   return json({
     ok: true, nombre: s.nombre, email: s.entro_con || s.email, estado: s.estado,
+    rol: pr.rol, aporta: pr.aporta,
+    aportes: APORTES_FUND.map((k) => ({ id: k, nombre: APORTE_FUND_ES[k].charAt(0).toUpperCase() + APORTE_FUND_ES[k].slice(1), unidad: APORTE_FUND_UNIDAD[k] })),
     tema: PORTAL_TEMAS[s.portal_tema] ? Object.assign({ id: s.portal_tema }, PORTAL_TEMAS[s.portal_tema]) : null,
     saludo: s.portal_saludo ? String(s.portal_saludo).slice(0, 160) : null,
     estado_es: s.estado === "visitada" && s.ficha_estado === "enviada" ? "Visitada: cuestionario enviado" : (PORTAL_ESTADO_ES[s.estado] || s.estado),
@@ -23195,6 +23237,58 @@ function paginaPortal(nonce) {
     font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:16px;color:var(--ink-soft)}
   .tema-firma::before{content:"";flex:0 0 26px;height:34px;background:url(/img/portal/lirio.svg) center/contain no-repeat}
 
+  /* LA FUNDACIÓN QUE APORTA (16 nov 2026). Su cabecera es una franja a todo el
+     ancho con una foto de terreno debajo y, encima, un panel de vidrio con lo
+     que puede dar. Vidrio sobre foto, papel sobre papel: el resto del portal
+     sigue en tarjetas. Solo con body[data-da] y sin tema propio: un portal
+     vestido para una fundación conserva su cabecera.
+     La foto es la misma de la portada del sitio (Alta Guajira, con
+     consentimiento registrado). El velo la deja en 0,62–0,42 de verde oscuro:
+     el texto blanco queda por encima de 7:1 en toda la franja. */
+  body[data-da]:not([data-tema]){overflow-x:clip}
+  body[data-da]:not([data-tema]) .cab-f{position:relative;margin:-28px calc(50% - 50vw) 0;padding:34px calc(50vw - 50%) 26px;
+    background:#16402A url(/img/jornadas/hero_futbol_1400.webp) center 42%/cover no-repeat}
+  body[data-da]:not([data-tema]) .cab-f::before{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(14,33,24,.68) 0%,rgba(14,33,24,.46) 100%)}
+  body[data-da]:not([data-tema]) .cab-f > *{position:relative}
+  body[data-da]:not([data-tema]) .cab-f .ey{color:#E4F0E7}
+  body[data-da]:not([data-tema]) .cab-f h1{color:#fff;font-size:30px}
+  body[data-da]:not([data-tema]) .cab-f .saludo{color:#fff}
+  .vidrio{margin-top:18px;padding:18px 20px;border-radius:14px;color:#fff;background:rgba(14,33,24,.52);
+    -webkit-backdrop-filter:blur(18px) saturate(1.25);backdrop-filter:blur(18px) saturate(1.25);
+    border:1px solid rgba(255,255,255,.18);box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
+  /* Con tema propio no hay foto debajo: el panel va en papel, como una tarjeta. */
+  body[data-tema] .vidrio{position:relative;z-index:1;background:var(--surface);color:var(--ink);border-color:var(--bd);box-shadow:none;
+    -webkit-backdrop-filter:none;backdrop-filter:none}
+  .vidrio h2{font-size:17px}
+  .vidrio .cab{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap}
+  .vidrio .cab h2{flex:1 1 auto}
+  .vidrio .cab span{font-size:13.5px;color:#E4F0E7}
+  body[data-tema] .vidrio .cab span{color:var(--mu)}
+  .tipos{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:12px}
+  .tipo{display:flex;flex-direction:column;gap:2px;min-height:76px;padding:11px 12px;border-radius:12px;text-align:left;cursor:pointer;
+    font:inherit;color:#fff;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.3)}
+  .tipo strong{font-size:14px}
+  .tipo span{font-size:12.5px;color:#D9E6DC}
+  .tipo[aria-pressed=true]{background:#FBF8F1;border-color:#FBF8F1;color:#16402A}
+  .tipo[aria-pressed=true] span{color:#16402A}
+  .tipo:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  .tipo:disabled{opacity:.6;cursor:default}
+  body[data-tema] .tipo{color:var(--ink);background:var(--surface);border-color:var(--bd)}
+  body[data-tema] .tipo span{color:var(--mu)}
+  body[data-tema] .tipo[aria-pressed=true]{background:var(--gl);border-color:var(--acc);color:var(--ink)}
+  body[data-tema] .tipo[aria-pressed=true] span{color:var(--ink-soft)}
+  body[data-tema] .tipo:focus-visible{outline-color:var(--acc)}
+  .vidrio .msg{display:block;min-height:20px;margin-top:8px;font-size:13.5px;color:#fff}
+  body[data-tema] .vidrio .msg{color:var(--ink)}
+  @media (max-width:1000px){ .tipos{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  @media (max-width:720px){
+    body[data-da]:not([data-tema]) .cab-f{padding-top:26px;padding-bottom:20px}
+    body[data-da]:not([data-tema]) .cab-f h1{font-size:24px}
+    .tipos{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .tipo{min-height:64px}
+  }
+
   /* Adriatic Blue (Pantone 17-4320, #5C899B) con lirios blancos: Positive
      Potential. El azul de la franja solo lleva texto grande (3,8:1 con el
      blanco); la barra y los botones usan su versión profunda, #2B5666. */
@@ -23268,6 +23362,7 @@ function paginaPortal(nonce) {
       <p class="ey" id="p-estado"></p>
       <h1 class="mt" id="p-nombre"></h1>
       <p class="saludo" id="p-saludo"></p>
+      <div class="vidrio oculto" id="p-da"></div>
     </div>
     <button type="button" class="paso-pill" id="p-paso" aria-controls="p-recorrido" aria-expanded="false"></button>
     <ol class="recorrido" id="p-recorrido" aria-label="Tu recorrido en el HUB"></ol>
@@ -23548,7 +23643,7 @@ function pintar(){
   $("p-nombre").textContent = D.nombre || "";
   $("p-correo").textContent = D.email || "";
   $("p-estado").textContent = D.estado_es || "";
-  $("p-saludo").textContent = D.saludo || "Aquí ves en qué va la alianza, mantienes tu perfil al día y nos dejas tus documentos.";
+  pintarRol();
   if (D.tema) {
     document.body.setAttribute("data-tema", D.tema.id);
     var tc = document.querySelector('meta[name="theme-color"]');
@@ -23599,12 +23694,101 @@ function pintarResumen(){
       '<div class="tarjeta"><p class="ey">Documentos</p><p class="cifra">' + n + " de " + RECOMENDADOS.length + '</p><p class="sub">de los que conviene tener' + (porRevisar ? " · " + porRevisar + " por revisar" : "") + '.</p><div class="acciones"><button type="button" class="btn sec mini" data-ir="documentos">Subir</button></div></div>' +
       '<div class="tarjeta"><p class="ey">¿Dudas?</p><p class="sub mt">Escríbenos a <a href="mailto:contacto@thegiveandgrowproject.org">contacto@thegiveandgrowproject.org</a> o por WhatsApp al <a href="https://wa.me/573153305028">+57 315 330 5028</a>.</p></div>' +
     "</div>" +
+    '<div id="p-ofrecen" class="mt"></div>' +
     '<div id="p-recibido" class="mt"></div>';
-  pintarRecibido();
+  pintarOfrecen();
+  if (D.rol === "aporta") $("p-recibido").classList.add("oculto"); else pintarRecibido();
   $("tp-docs").textContent = n + "/" + RECOMENDADOS.length;
   $("tp-docs").className = "pill" + (n === RECOMENDADOS.length ? " ok" : "");
   $("tp-perfil").textContent = "por revisar";
   $("tp-perfil").className = "pill ambar" + (D.perfil && D.perfil.por_revisar ? "" : " oculto");
+}
+
+/* QUÉ PUEDEN DAR: los siete tipos, cada uno con su unidad. Se guarda al tocar.
+   Quien todavía solo recibe no ve el panel hasta que lo pide desde el resumen
+   (DA_ABIERTO): la cabecera de una fundación que no aporta no cambia. */
+var DA_ABIERTO = false;
+/* Todo lo que cambia con el rol, aparte del resto de la pantalla: guardar un
+   tipo de aporte no puede repintar el perfil, que puede tener cambios sin
+   guardar. */
+function pintarRol(){
+  var da = D.rol === "aporta" || D.rol === "ambas";
+  $("p-saludo").textContent = D.saludo || (D.rol === "aporta" ? "Lo que su fundación aporta a la red del HUB."
+    : D.rol === "ambas" ? "Lo que su fundación recibe de la red del HUB, y lo que le aporta."
+    : "Aquí ves en qué va la alianza, mantienes tu perfil al día y nos dejas tus documentos.");
+  if (da || DA_ABIERTO) document.body.setAttribute("data-da", "si"); else document.body.removeAttribute("data-da");
+  /* Quien solo aporta no tiene unidades que apadrinar: esa pestaña se le quita.
+     «Dar y recibir» pasa a llamarse por lo que hace en ella. */
+  $("t-apadrinamiento").classList.toggle("oculto", D.rol === "aporta");
+  $("t-dar").textContent = D.rol === "aporta" ? "Lo que damos" : "Dar y recibir";
+  pintarDa();
+}
+function pintarDa(){
+  var caja = $("p-da");
+  var da = D.rol === "aporta" || D.rol === "ambas";
+  caja.classList.toggle("oculto", !(da || DA_ABIERTO));
+  if (!(da || DA_ABIERTO)) { caja.innerHTML = ""; return; }
+  var mio = {}; (D.aporta || []).forEach(function(k){ mio[k] = true; });
+  caja.innerHTML = '<div class="cab"><h2>Qué pueden dar</h2><span>Marquen todo lo que aplica. Cada tipo se mide en su propia unidad.</span></div>' +
+    '<div class="tipos">' + (D.aportes || []).map(function(a){
+      return '<button type="button" class="tipo" data-aporta="' + esc(a.id) + '" aria-pressed="' + (mio[a.id] ? "true" : "false") + '"><strong>' +
+        esc(a.nombre) + "</strong><span>" + esc(a.unidad) + "</span></button>";
+    }).join("") + "</div>" +
+    '<span class="msg" id="m-da" role="status" aria-live="polite"></span>';
+}
+function tocarAporta(id){
+  var lista = (D.aporta || []).slice();
+  var i = lista.indexOf(id);
+  if (i === -1) lista.push(id); else lista.splice(i, 1);
+  document.querySelectorAll("[data-aporta]").forEach(function(b){ b.disabled = true; });
+  enviar("/api/portal/aporta", { aporta: lista }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) {
+      pintarDa();
+      if ($("m-da")) $("m-da").textContent = r.d.ayuda || "No se pudo guardar. Intenta de nuevo.";
+      return;
+    }
+    D.rol = r.d.rol; D.aporta = r.d.aporta;
+    DA_ABIERTO = DA_ABIERTO && D.rol === "recibe";
+    pintarRol(); pintarOfrecen();
+    if ($("p-recibido")) {
+      $("p-recibido").classList.toggle("oculto", D.rol === "aporta");
+      if (D.rol !== "aporta") pintarRecibido();
+    }
+    if ($("m-da")) $("m-da").textContent = "Guardado.";
+  }).catch(function(){ pintarDa(); if ($("m-da")) $("m-da").textContent = "No pudimos conectar. Intenta de nuevo."; });
+}
+
+/* LO QUE OFRECEN A LA RED, en el resumen. Sale de «Dar y recibir»: lo que la
+   fundación publicó como oferta y lo que el equipo le anotó. No muestra lo que
+   necesitan otras fundaciones: eso no se publica, lo cruza el equipo. */
+function pintarOfrecen(){
+  var caja = $("p-ofrecen");
+  if (!caja) return;
+  var da = D.rol === "aporta" || D.rol === "ambas";
+  if (!da) {
+    caja.innerHTML = D.estado === "vinculada" && !DA_ABIERTO
+      ? '<div class="tarjeta"><p class="ey">Aportar a la red</p><p class="sub mt">¿Su fundación también puede aportar a otras de la red: dinero, especie, voluntariado, conocimiento, espacios?</p>' +
+        '<div class="acciones"><button type="button" class="btn sec mini" id="b-da-abrir">Decir qué podemos dar</button></div></div>'
+      : "";
+    return;
+  }
+  if (DRS === null) { cargarDar(); return; }
+  var of = DRS.filter(function(x){ return x.tipo === "ofrece"; });
+  var activas = of.filter(function(x){ return x.estado === "activo"; });
+  var notas = of.filter(function(x){ return x.nota_equipo; }).length;
+  var h = '<div class="tarjeta"><p class="ey">Lo que ofrecen a la red</p><div class="rejilla mt">' +
+    '<div><p class="cifra">' + activas.length + '</p><p class="sub">' + (activas.length === 1 ? "oferta activa" : "ofertas activas") + ".</p></div>" +
+    '<div><p class="cifra">' + (of.length - activas.length) + '</p><p class="sub">' + (of.length - activas.length === 1 ? "ya resuelta" : "ya resueltas") + ".</p></div>" +
+    '<div><p class="cifra">' + notas + '</p><p class="sub">' + (notas === 1 ? "con una nota del equipo" : "con nota del equipo") + ".</p></div></div>";
+  if (activas.length) h += '<ul class="docs mt">' + activas.slice(0, 5).map(function(x){
+    var det = [DR_CAT[x.categoria] || x.categoria, x.cantidad || "", x.hasta ? "hasta " + x.hasta : ""].filter(Boolean).join(" · ");
+    return '<li><div><span class="nom">' + esc(x.titulo) + '</span><span class="det">' + esc(det) + "</span>" +
+      (x.nota_equipo ? '<span class="det"><strong>Nota del equipo:</strong> ' + esc(x.nota_equipo) + "</span>" : "") + "</div></li>";
+  }).join("") + "</ul>";
+  else h += '<p class="sub mt">Todavía no han publicado ninguna oferta. Cuenten qué pueden dar y el equipo lo cruza con lo que otras fundaciones necesitan.</p>';
+  h += '<div class="acciones"><button type="button" class="btn mini" data-ir="dar">' + (activas.length ? "Ver y añadir ofertas" : "Añadir una oferta") + "</button></div></div>";
+  caja.innerHTML = h;
 }
 
 /* LO QUE HAN RECIBIDO (ítem 40): se pide una vez por visita. Solo agregados. */
@@ -24004,6 +24188,9 @@ TABS.forEach(function(t){ $("t-" + t).addEventListener("click", function(){ irA(
 document.addEventListener("click", function(ev){
   var b = ev.target.closest && ev.target.closest("[data-ir]");
   if (b) { irA(b.getAttribute("data-ir")); window.scrollTo(0, 0); }
+  var a = ev.target.closest && ev.target.closest("[data-aporta]");
+  if (a && !a.disabled) tocarAporta(a.getAttribute("data-aporta"));
+  if (ev.target.id === "b-da-abrir") { DA_ABIERTO = true; pintarRol(); pintarOfrecen(); window.scrollTo(0, 0); }
 });
 document.addEventListener("change", function(ev){
   var el = ev.target;
@@ -24323,7 +24510,7 @@ function cargarDar(){
   return fetch("/api/portal/intercambios", { credentials: "same-origin" }).then(function(r){
     if (r.status === 401) { ver("v-entrar"); return null; }
     return r.ok ? r.json() : null;
-  }).then(function(d){ if (!d) return; DRS = d.intercambios || []; pintarDar(); })
+  }).then(function(d){ if (!d) return; DRS = d.intercambios || []; pintarDar(); pintarOfrecen(); })
     .catch(function(){ $("dr-necesita").innerHTML = '<p class="sub">No pudimos cargar esta sección. Intenta de nuevo.</p>'; });
 }
 function pintarDar(){
@@ -50356,6 +50543,7 @@ export default {
         if (ruta === "/api/portal/yo")      return await apiPortalYo(request, env);
         if (ruta === "/api/portal/perfil")  return await apiPortalPerfil(request, env);
         if (ruta === "/api/portal/ods")     return await apiPortalOds(request, env);
+        if (ruta === "/api/portal/aporta")  return await apiPortalAporta(request, env);
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
