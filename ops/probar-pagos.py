@@ -95,14 +95,25 @@ def aporte(guia):
         return {"http": e.code}
 
 
+_N_CHECKOUT = 0
+
+
 def crear(monto, modo="fondo", destino=None, extra=None):
     payload = {"monto": monto, "frecuencia": "unico", "modo": modo}
     if destino:
         payload["destino"] = destino
     if extra:
         payload.update(extra)
+    # Cada checkout llega con una IP distinta. El freno del checkout deja pasar
+    # diez por IP cada cinco minutos y esta batería crea más: sin esto, la
+    # undécima recibe 429 y la corrida se cae por el freno, no por un fallo.
+    # Solo vale en local: en producción esa cabecera la pone Cloudflare.
+    global _N_CHECKOUT
+    _N_CHECKOUT += 1
+    cab = dict(CABECERAS)
+    cab["CF-Connecting-IP"] = "203.0.113.%d" % (_N_CHECKOUT % 250 + 1)
     req = urllib.request.Request(BASE + "/api/checkout", data=json.dumps(payload).encode(),
-                                 headers=CABECERAS, method="POST")
+                                 headers=cab, method="POST")
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.loads(r.read().decode())["guia"]
 
@@ -248,8 +259,11 @@ import subprocess
 
 def d1(sql):
     return subprocess.run(
-        ["npx", "wrangler@latest", "d1", "execute", "givegrow-privado", "--local",
-         "--persist-to", "/tmp/gg-wrangler", "--command", sql],
+        # La versión FIJA de package.json y la base de ESTA corrida: con
+        # `wrangler@latest` y la ruta escrita a mano, la prueba insertaba el
+        # certificado en otra base y fallaba sin que el guardián tuviera culpa.
+        ["npx", "wrangler", "d1", "execute", "givegrow-privado", "--local",
+         "--persist-to", os.environ.get("PERSIST", "/tmp/gg-wrangler"), "--command", sql],
         capture_output=True, text=True).stdout
 
 g16 = crear(90000)
@@ -270,11 +284,21 @@ todo.append(linea("reversa tras emitir: el certificado queda EN REVISIÓN",
 # ---- 17. el guardián no repite el aviso --------------------------------
 # Wompi reintenta sus eventos hasta cuatro veces; tres correos idénticos
 # entrenan a ignorarlos. La marca se pone una vez y la fecha no se mueve.
-fecha_1 = d1(f"SELECT revision_en FROM certificados WHERE numero='{num16}';")
+# Se compara LA FECHA, no la salida entera de wrangler: esa trae la duración
+# de la consulta, que cambia en cada llamada y hacía fallar la prueba sola.
+import re
+
+def fecha_revision():
+    m = re.search(r'"revision_en":\s*("[^"]*"|null)', d1(
+        f"SELECT revision_en FROM certificados WHERE numero='{num16}';"))
+    return m.group(1) if m else None
+
+fecha_1 = fecha_revision()
 enviar(evento("tx-reversa2-" + RUN, "VOIDED", 9000000, g16))
-fecha_2 = d1(f"SELECT revision_en FROM certificados WHERE numero='{num16}';")
+fecha_2 = fecha_revision()
 todo.append(linea("reintento de la reversa: no vuelve a marcar ni a avisar",
-                  fecha_1 == fecha_2, "fecha de revisión sin cambios" if fecha_1 == fecha_2 else "cambió"))
+                  fecha_1 not in (None, "null") and fecha_1 == fecha_2,
+                  "fecha de revisión sin cambios" if fecha_1 == fecha_2 else f"cambió: {fecha_1} -> {fecha_2}"))
 
 d1(f"DELETE FROM certificados WHERE numero='{num16}';")
 

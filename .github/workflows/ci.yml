@@ -110,6 +110,32 @@ jobs:
           if [ "$CSS_REAL" != "$CSS_DECL" ]; then echo "::error::cache-bust de styles.css desactualizado (regla CLAUDE.md)"; exit 1; fi
           if [ "$JS_REAL" != "$JS_DECL" ]; then echo "::error::cache-bust de app.js desactualizado (regla CLAUDE.md)"; exit 1; fi
 
+  # LOS FLUJOS DE DINERO, PROBADOS DE VERDAD (16 nov 2026). `validate` mira
+  # sintaxis, textos y empaquetado; ninguno de esos pasos hace un pago. Este
+  # job arma una base D1 local vacía, le aplica todas las migraciones, levanta
+  # el Worker y le manda eventos de Wompi con firma real: aprobado, repetido,
+  # firma falsa, monto manipulado, reversa con certificado emitido.
+  #
+  # Las baterías existían desde hacía meses en ops/probar-*.py, pero había que
+  # correrlas a mano y solo se corrían el día que se tocaba ese flujo.
+  #
+  # NO está en `needs` de `automerge`, a propósito: es un job nuevo que levanta
+  # un servidor, y si resultara inestable frenaría todas las fusiones. Cuando
+  # lleve un tiempo en verde se suma ahí. No usa ningún secreto del repo: los
+  # de Wompi son valores de prueba al azar que escribe el propio script.
+  dinero:
+    runs-on: ubuntu-latest
+    name: dinero
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm ci
+      - name: Baterías de pagos contra un Worker local
+        run: node ops/probar-dinero.mjs
+
   automerge:
     needs: validate
     if: contains(github.event.pull_request.labels.*.name, 'automerge')
