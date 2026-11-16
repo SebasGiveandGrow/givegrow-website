@@ -1576,6 +1576,8 @@ var I18N = {
     "qjc.ya.123":"Emergencias: línea 123.",
     "qjc.ya.141":"Para proteger a un niño, niña o adolescente: línea 141 del ICBF, gratuita.",
     "qjc.ya.155":"Violencia contra las mujeres: línea 155.",
+    "qjc.salir":"Salir rápido de esta página",
+    "qjc.salir.n":"Te lleva a un buscador y esta página no queda al volver atrás. No borra el historial del navegador: si te preocupa, usa una ventana privada.",
     "qjc.pasa.t":"Qué pasa después de enviarlo",
     "qjc.pasa.1":"Se guarda aparte de las demás solicitudes y no viaja por correo: lo lee una persona de la fundación dentro de un sistema interno.",
     "qjc.pasa.2":"Puedes enviarlo sin decir quién eres. Si dejas un contacto, se usa solo para responderte sobre esto.",
@@ -3850,6 +3852,7 @@ var ACT_FNS = {
   mbMonto:mbMonto, mbLibre:mbLibre, mbDestino:mbDestino,
   mmcCasoOlvidar:mmcCasoOlvidar,
   irASeccion:irASeccion,
+  qjSalir:qjSalir,
   themeCycle:themeCycle, setLang:setLang, setCalcMode:setCalcMode, setCur:setCur, setFreq:setFreq,
   payMethod:payMethod, accTab:accTab, setQuick:setQuick, toggleFaq:toggleFaq,
   toggleDrop:toggleDrop, almaSend:almaSend, formSend:formSend,
@@ -6176,6 +6179,11 @@ renderJourney(currentRoute || "inicio");
    leería eso como un cambio de ruta que no existe. Así que se desplaza a mano y
    se le pasa el foco, que es lo que hace falta para que con teclado o con
    lector de pantalla el salto signifique algo y no solo mueva el scroll. */
+/* Salida rápida de la ruta confidencial: `replace` y no `href`, para que
+   «atrás» no devuelva a esta página. */
+function qjSalir(){
+  window.location.replace("https://www.google.com/");
+}
 function irASeccion(id){
   var el = document.getElementById(id);
   if (!el) return false;
