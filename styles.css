@@ -983,6 +983,15 @@ html[data-marca="mmc"] .hero-cred{display:none}
 .btn-nav{display:inline-flex;align-items:center;min-height:44px;background:var(--g);color:var(--on-dark);padding:9px 20px;border-radius:999px;font-weight:700;font-size:var(--fs-14);white-space:nowrap;transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
 .btn-nav:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(31,92,56,.35)}
 @media (max-width:600px){.btn-nav{padding:8px 14px;font-size:var(--fs-13)}}
+/* SEGUNDO BOTÓN DE LA BARRA: quien necesita, al lado de quien da y con el
+   mismo tamaño. Va en contorno para que «Donar» siga siendo el principal.
+   Solo donde cabe: por debajo de 1240 px la barra ya va justa y el enlace
+   «Fundaciones» del menú y del cajón lleva al mismo sitio. */
+/* --acc y no --g: de noche --g no se aclara y el texto quedaría sin contraste. */
+.btn-nav-2{background:transparent;color:var(--acc);box-shadow:inset 0 0 0 1.5px var(--acc)}
+.btn-nav-2:hover{box-shadow:inset 0 0 0 1.5px var(--acc)}
+.btn-nav-2:hover{transform:translateY(-1px)}
+@media (max-width:1239px){.btn-nav-2{display:none}}
 .mnav-g{display:block;font-size:var(--fs-eyebrow);letter-spacing:var(--tr-eyebrow);text-transform:uppercase;color:var(--acc);font-weight:800;margin:16px 0 4px}
 .nav-mobile > .mnav-g:first-child{margin-top:4px}
 .pcard{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--rl);padding:16px 18px;transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
