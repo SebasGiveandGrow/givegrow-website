@@ -22524,7 +22524,9 @@ function intercambioValido(c) {
     titulo: t(c.titulo, 120),
     detalle: String(c.detalle == null ? "" : c.detalle).replace(/\r\n?/g, "\n").trim().slice(0, 600) || null,
     cantidad: t(c.cantidad, 80) || null,
-    hasta: c.hasta ? indFecha(c.hasta) : null
+    hasta: c.hasta ? indFecha(c.hasta) : null,
+    /* Solo una NECESIDAD puede mostrarse a la red, y solo si lo marcaron. */
+    visible_red: c.tipo === "necesita" && c.visible_red === true ? 1 : 0
   };
   if (!x.tipo) return malo("tipo", "Elige si es algo que ofrecen o algo que necesitan.");
   if (!x.categoria) return malo("categoria", "Elige de qué tipo es.");
@@ -22540,7 +22542,7 @@ async function apiPortalIntercambios(request, env) {
   if (!(await existeTabla(env, "intercambios_fundacion"))) return json({ error: "no_disponible" }, 503);
   if (request.method === "GET") {
     const filas = (await env.DB.prepare(
-      "SELECT id, tipo, categoria, titulo, detalle, cantidad, hasta, estado, nota_equipo, actualizado FROM intercambios_fundacion " +
+      "SELECT id, tipo, categoria, titulo, detalle, cantidad, hasta, estado, nota_equipo, visible_red, responde_a, actualizado FROM intercambios_fundacion " +
       "WHERE inscripcion = ? AND estado <> 'retirado' ORDER BY CASE estado WHEN 'activo' THEN 0 ELSE 1 END, actualizado DESC"
     ).bind(s.inscripcion).all()).results || [];
     return json({ ok: true, categorias: INTER_CATEGORIAS, tope: INTER_TOPE,
@@ -22565,17 +22567,68 @@ async function apiPortalIntercambios(request, env) {
   if (c.id) {
     /* Editar lo vuelve «nuevo» para el equipo: cambió lo que había visto. */
     const r = await env.DB.prepare(
-      "UPDATE intercambios_fundacion SET tipo = ?, categoria = ?, titulo = ?, detalle = ?, cantidad = ?, hasta = ?, visto_en = NULL, visto_por = NULL, " +
+      "UPDATE intercambios_fundacion SET tipo = ?, categoria = ?, titulo = ?, detalle = ?, cantidad = ?, hasta = ?, visible_red = ?, visto_en = NULL, visto_por = NULL, " +
       "actualizado = datetime('now') WHERE id = ? AND inscripcion = ? AND estado = 'activo'"
-    ).bind(x.tipo, x.categoria, x.titulo, x.detalle, x.cantidad, x.hasta, Number(c.id) || 0, s.inscripcion).run();
+    ).bind(x.tipo, x.categoria, x.titulo, x.detalle, x.cantidad, x.hasta, x.visible_red, Number(c.id) || 0, s.inscripcion).run();
     if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado" }, 404);
     return json({ ok: true, id: Number(c.id) });
   }
   const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM intercambios_fundacion WHERE inscripcion = ? AND estado = 'activo'").bind(s.inscripcion).first();
   if (n && n.n >= INTER_TOPE) return json({ error: "tope_alcanzado", ayuda: "Ya tienen " + INTER_TOPE + " activos. Marquen alguno como resuelto o retírenlo antes de añadir otro." }, 409);
   const fila = await env.DB.prepare(
-    "INSERT INTO intercambios_fundacion (inscripcion, tipo, categoria, titulo, detalle, cantidad, hasta) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id"
-  ).bind(s.inscripcion, x.tipo, x.categoria, x.titulo, x.detalle, x.cantidad, x.hasta).first();
+    "INSERT INTO intercambios_fundacion (inscripcion, tipo, categoria, titulo, detalle, cantidad, hasta, visible_red) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(s.inscripcion, x.tipo, x.categoria, x.titulo, x.detalle, x.cantidad, x.hasta, x.visible_red).first();
+  return json({ ok: true, id: fila.id });
+}
+
+/* GET y POST /api/portal/red — LO QUE OTRAS FUNDACIONES NECESITAN (0065).
+
+   QUIÉN LO VE: una fundación vinculada que aporta. QUÉ VE: las necesidades
+   activas que OTRA fundación vinculada marcó como visibles, con el nombre y la
+   ciudad de esa fundación. Nunca un correo ni un teléfono: el contacto lo hace
+   el equipo.
+
+   POST { id } = «puedo ofrecer esto». Crea una oferta de quien responde,
+   enlazada a la necesidad, que cae en la cola del equipo como cualquier otra.
+   Una sola respuesta activa por necesidad y por fundación. */
+async function apiPortalRed(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await existeTabla(env, "intercambios_fundacion"))) return json({ error: "no_disponible" }, 503);
+  if (s.estado !== "vinculada" || portalRol(s).rol === "recibe") return json({ ok: true, necesidades: [], disponible: false });
+  const visibles =
+    "x.tipo = 'necesita' AND x.estado = 'activo' AND x.visible_red = 1 AND x.inscripcion <> ? " +
+    "AND i.tipo = 'fundacion' AND i.estado = 'vinculada' AND (x.hasta IS NULL OR x.hasta >= date('now', '-5 hours'))";
+  if (request.method === "GET") {
+    const filas = (await env.DB.prepare(
+      "SELECT x.id, x.categoria, x.titulo, x.detalle, x.cantidad, x.hasta, i.nombre AS fundacion, i.ciudad, " +
+      "(SELECT COUNT(*) FROM intercambios_fundacion r WHERE r.responde_a = x.id AND r.inscripcion = ? AND r.estado <> 'retirado') AS respondida " +
+      "FROM intercambios_fundacion x JOIN inscripciones i ON i.id = x.inscripcion WHERE " + visibles +
+      " ORDER BY x.actualizado DESC LIMIT 60"
+    ).bind(s.inscripcion, s.inscripcion).all()).results || [];
+    return json({ ok: true, disponible: true, categorias: INTER_CATEGORIAS,
+      necesidades: filas.map((f) => Object.assign(f, { respondida: !!f.respondida })) });
+  }
+  if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
+  if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+  let c;
+  try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+  const id = Number(c && c.id) || 0;
+  const n = await env.DB.prepare(
+    "SELECT x.id, x.categoria, x.titulo, i.nombre AS fundacion FROM intercambios_fundacion x JOIN inscripciones i ON i.id = x.inscripcion " +
+    "WHERE x.id = ? AND " + visibles
+  ).bind(id, s.inscripcion).first();
+  if (!n) return json({ error: "no_encontrado", ayuda: "Esa necesidad ya no está disponible." }, 404);
+  const ya = await env.DB.prepare(
+    "SELECT id FROM intercambios_fundacion WHERE responde_a = ? AND inscripcion = ? AND estado <> 'retirado'"
+  ).bind(id, s.inscripcion).first();
+  if (ya) return json({ ok: true, id: ya.id, repetida: true });
+  const act = await env.DB.prepare("SELECT COUNT(*) AS n FROM intercambios_fundacion WHERE inscripcion = ? AND estado = 'activo'").bind(s.inscripcion).first();
+  if (act && act.n >= INTER_TOPE) return json({ error: "tope_alcanzado", ayuda: "Ya tienen " + INTER_TOPE + " activos. Marquen alguno como resuelto o retírenlo antes de ofrecer otro." }, 409);
+  const fila = await env.DB.prepare(
+    "INSERT INTO intercambios_fundacion (inscripcion, tipo, categoria, titulo, detalle, responde_a) VALUES (?, 'ofrece', ?, ?, ?, ?) RETURNING id"
+  ).bind(s.inscripcion, n.categoria, ("Para " + n.fundacion + ": " + n.titulo).slice(0, 120),
+    "Respuesta a una necesidad publicada en la red por " + n.fundacion + ".", id).first();
   return json({ ok: true, id: fila.id });
 }
 
@@ -23451,7 +23504,7 @@ function paginaPortal(nonce) {
       <div class="tarjeta aviso">
         <h2>Dar y recibir</h2>
         <p class="sub">Lo que su fundación puede ofrecer a otras de la red —en especie, voluntariado, conocimiento o espacios— y lo que necesita. El equipo lo cruza con otras fundaciones y con empresas, y les deja una nota aquí.</p>
-        <p class="sub mt"><strong>Nada de esto se publica.</strong></p>
+        <p class="sub mt"><strong>Nada de esto se publica fuera de la red.</strong> Una necesidad solo la ven otras fundaciones vinculadas si ustedes marcan la casilla al escribirla.</p>
       </div>
       <div class="rejilla-2 mt"><div class="tarjeta" id="dr-necesita"></div><div class="tarjeta" id="dr-ofrece"></div></div>
       <form class="tarjeta mt" id="f-dar" autocomplete="off">
@@ -23472,6 +23525,7 @@ function paginaPortal(nonce) {
         <label for="dr-hasta">Hasta cuándo</label>
         <span class="ayuda">Opcional: si lo necesitan antes de una fecha, o si lo ofrecen solo hasta entonces.</span>
         <input type="date" id="dr-hasta">
+        <label class="op oculto" id="dr-red-op"><input type="checkbox" id="dr-red"><span><strong>Mostrar esta necesidad a las fundaciones de la red que aportan.</strong> Verán el nombre y la ciudad de su fundación y lo que escribieron aquí. No ven su correo ni su teléfono: si alguna puede ayudar, el equipo hace el contacto.</span></label>
         <div class="acciones">
           <button type="button" class="btn" id="b-dar">Añadir</button>
           <button type="button" class="btn sec oculto" id="b-dar-cancelar">Cancelar la edición</button>
@@ -23788,8 +23842,50 @@ function pintarOfrecen(){
   }).join("") + "</ul>";
   else h += '<p class="sub mt">Todavía no han publicado ninguna oferta. Cuenten qué pueden dar y el equipo lo cruza con lo que otras fundaciones necesitan.</p>';
   h += '<div class="acciones"><button type="button" class="btn mini" data-ir="dar">' + (activas.length ? "Ver y añadir ofertas" : "Añadir una oferta") + "</button></div></div>";
+  h += '<div id="p-red" class="mt"></div>';
   caja.innerHTML = h;
+  pintarRed();
 }
+
+/* LO QUE OTRAS FUNDACIONES NECESITAN (0065): solo lo que cada una marcó como
+   visible. «Puedo ofrecer esto» no pone en contacto a las dos fundaciones:
+   deja una oferta en la cola del equipo, que es quien las presenta. */
+var RED = null;
+function pintarRed(){
+  var caja = $("p-red");
+  if (!caja) return;
+  if (RED === null) {
+    fetch("/api/portal/red", { credentials: "same-origin" }).then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ if (d) { RED = d; pintarRed(); } }).catch(function(){});
+    return;
+  }
+  if (!RED.disponible) { caja.innerHTML = ""; return; }
+  var L = RED.necesidades || [];
+  /* El aviso sobrevive al repintado: «ofrecer» recarga las ofertas, y eso
+     vuelve a dibujar esta tarjeta. */
+  setTimeout(function(){ if (AVISO_RED && $("m-red")) { msg("m-red", AVISO_RED, "ok"); AVISO_RED = ""; } }, 0);
+  caja.innerHTML = '<div class="tarjeta"><p class="ey">Lo que otras fundaciones necesitan</p>' +
+    '<p class="sub mt">Necesidades que fundaciones vinculadas decidieron mostrar a la red. Si pueden ayudar con alguna, avísennos aquí y el equipo las pone en contacto.</p>' +
+    (L.length ? '<ul class="docs mt">' + L.map(function(x){
+      var det = [DR_CAT[x.categoria] || x.categoria, x.cantidad || "", x.hasta ? "hasta " + x.hasta : ""].filter(Boolean).join(" · ");
+      return '<li><div><span class="nom">' + esc(x.titulo) + '</span><span class="det">' + esc(x.fundacion || "") + (x.ciudad ? " · " + esc(x.ciudad) : "") + " · " + esc(det) + "</span>" +
+        (x.detalle ? '<span class="det">' + esc(x.detalle) + "</span>" : "") + "</div>" +
+        '<div class="der">' + (x.respondida ? '<span class="pill ok">Ya avisaron al equipo</span>'
+          : '<button type="button" class="btn sec mini" data-red-ofrecer="' + x.id + '">Puedo ofrecer esto</button>') + "</div></li>";
+    }).join("") + "</ul>" : '<p class="sub mt">Por ahora ninguna fundación ha publicado una necesidad a la red.</p>') +
+    '<span class="msg" id="m-red" role="status" aria-live="polite"></span></div>';
+}
+function ofrecerRed(id){
+  document.querySelectorAll("[data-red-ofrecer]").forEach(function(b){ b.disabled = true; });
+  enviar("/api/portal/red", { id: Number(id) }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { pintarRed(); msg("m-red", r.d.ayuda || "No se pudo registrar. Intenta de nuevo.", "mal"); return; }
+    (RED.necesidades || []).forEach(function(x){ if (x.id === Number(id)) x.respondida = true; });
+    DRS = null; pintarOfrecen();
+    AVISO_RED = "Listo: el equipo ya lo ve y les escribe para ponerlas en contacto.";
+  }).catch(function(){ pintarRed(); msg("m-red", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+}
+var AVISO_RED = "";
 
 /* LO QUE HAN RECIBIDO (ítem 40): se pide una vez por visita. Solo agregados. */
 var RECIBIDO = null;
@@ -24190,6 +24286,9 @@ document.addEventListener("click", function(ev){
   if (b) { irA(b.getAttribute("data-ir")); window.scrollTo(0, 0); }
   var a = ev.target.closest && ev.target.closest("[data-aporta]");
   if (a && !a.disabled) tocarAporta(a.getAttribute("data-aporta"));
+  var o = ev.target.closest && ev.target.closest("[data-red-ofrecer]");
+  if (o && !o.disabled) ofrecerRed(o.getAttribute("data-red-ofrecer"));
+  if (ev.target && ev.target.name === "dr-tipo") verCasillaRed();
   if (ev.target.id === "b-da-abrir") { DA_ABIERTO = true; pintarRol(); pintarOfrecen(); window.scrollTo(0, 0); }
 });
 document.addEventListener("change", function(ev){
@@ -24523,7 +24622,8 @@ function pintarDar(){
         return '<li><div><span class="nom">' + esc(x.titulo) + '</span><span class="det">' + esc(det) + "</span>" +
           (x.detalle ? '<span class="det">' + esc(x.detalle) + "</span>" : "") +
           (x.nota_equipo ? '<span class="det"><strong>Nota del equipo:</strong> ' + esc(x.nota_equipo) + "</span>" : "") + "</div>" +
-          '<div class="der"><span class="pill' + (activo ? "" : " ok") + '">' + (activo ? "Activo" : "Resuelto") + "</span>" +
+          '<div class="der">' + (activo && x.visible_red ? '<span class="pill ok">Visible en la red</span>' : "") +
+          '<span class="pill' + (activo ? "" : " ok") + '">' + (activo ? "Activo" : "Resuelto") + "</span>" +
           (activo ? '<button type="button" class="btn sec mini" data-dr-editar="' + x.id + '">Editar</button>' +
             '<button type="button" class="btn sec mini" data-dr-resolver="' + x.id + '">Ya se resolvió</button>' +
             '<button type="button" class="btn sec mini" data-dr-retirar="' + x.id + '">Retirar</button>' : "") + "</div></li>";
@@ -24535,15 +24635,24 @@ function formDar(x){
   document.querySelectorAll('input[name="dr-tipo"]').forEach(function(r){ r.checked = !!x && r.value === x.tipo; });
   $("dr-cat").value = x ? x.categoria : ""; $("dr-tit").value = x ? x.titulo : "";
   $("dr-cant").value = x ? (x.cantidad || "") : ""; $("dr-det").value = x ? (x.detalle || "") : ""; $("dr-hasta").value = x ? (x.hasta || "") : "";
+  $("dr-red").checked = !!(x && x.visible_red);
+  verCasillaRed();
   $("dr-titulo").textContent = x ? "Editar «" + x.titulo + "»" : "Añadir";
   $("b-dar").textContent = x ? "Guardar los cambios" : "Añadir";
   $("b-dar-cancelar").classList.toggle("oculto", !x);
   msg("m-dar", "");
 }
+/* La casilla de «mostrar a la red» solo existe para una necesidad. */
+function verCasillaRed(){
+  var t = document.querySelector('input[name="dr-tipo"]:checked');
+  var es = !!t && t.value === "necesita";
+  $("dr-red-op").classList.toggle("oculto", !es);
+  if (!es) $("dr-red").checked = false;
+}
 function guardarDar(){
   var t = document.querySelector('input[name="dr-tipo"]:checked');
   var c = { accion: "guardar", id: $("dr-id").value || null, tipo: t ? t.value : "", categoria: $("dr-cat").value, titulo: $("dr-tit").value,
-    cantidad: $("dr-cant").value, detalle: $("dr-det").value, hasta: $("dr-hasta").value || null };
+    cantidad: $("dr-cant").value, detalle: $("dr-det").value, hasta: $("dr-hasta").value || null, visible_red: $("dr-red").checked };
   var b = $("b-dar"); b.disabled = true; msg("m-dar", "Guardando…");
   enviar("/api/portal/intercambios", c).then(function(r){
     b.disabled = false;
@@ -50544,6 +50653,7 @@ export default {
         if (ruta === "/api/portal/perfil")  return await apiPortalPerfil(request, env);
         if (ruta === "/api/portal/ods")     return await apiPortalOds(request, env);
         if (ruta === "/api/portal/aporta")  return await apiPortalAporta(request, env);
+        if (ruta === "/api/portal/red")     return await apiPortalRed(request, env);
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
