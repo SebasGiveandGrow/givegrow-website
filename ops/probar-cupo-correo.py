@@ -24,7 +24,18 @@ import json, os, re, subprocess, sys, time, urllib.request
 BASE = os.environ.get("BASE", "http://localhost:8798")
 PERSIST = os.environ.get("PERSIST", "/tmp/gg-cupo")
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOPE, RESERVA = 95, 25
+# LOS DOS NÚMEROS SE LEEN DE worker.js, no se escriben aquí. Estaban a mano
+# (95 y 25, los del plan gratuito de Resend) y cuando el tope subió para Social
+# Fest la batería se quedó probando un presupuesto que ya no existía.
+def _const(nombre):
+    with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "worker.js"),
+              encoding="utf-8") as f:
+        m = re.search(r"^const %s = (\d+);" % nombre, f.read(), re.M)
+    if not m:
+        sys.exit("No encontré la constante %s en worker.js" % nombre)
+    return int(m.group(1))
+
+TOPE, RESERVA = _const("CORREO_TOPE_DIA"), _const("CORREO_RESERVA_PERSONAS")
 
 okc = failc = 0
 

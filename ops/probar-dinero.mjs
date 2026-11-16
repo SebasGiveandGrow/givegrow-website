@@ -15,11 +15,12 @@
         (en producción se aplican a mano) y `apply` choca con UNIQUE.
      3. Si no hay `.dev.vars`, escribe uno con secretos DE PRUEBA al azar y lo
         borra al salir. Si ya hay uno, lo usa y no lo toca.
-     4. Levanta `wrangler dev`, espera a que responda y corre cada batería.
+     4. Por cada batería: copia esa base, levanta `wrangler dev` con lo que la
+        batería pide (cron de prueba, variables), la corre y lo apaga.
      5. Sale con 1 si alguna falló.
 */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,11 +31,16 @@ const PUERTO = process.env.PUERTO || "8795";
 const BASE = "http://localhost:" + PUERTO;
 const DB = "givegrow-privado";
 
-/* Cada batería con lo que pide del servidor. Las que necesitan otra forma de
-   arrancar (cron de prueba, Access simulado) se suman aquí cuando se adapten:
-   mejor pocas que corren siempre que muchas que nadie mira. */
+/* Cada batería con los flags de `wrangler dev` que pide. */
 const BATERIAS = [
   { nombre: "pagos", archivo: "ops/probar-pagos.py" },
+  { nombre: "cobro-mensual", archivo: "ops/probar-cobro-mensual.py", flags: ["--test-scheduled"] },
+  { nombre: "baja", archivo: "ops/probar-baja.py" },
+  { nombre: "aviso-espera", archivo: "ops/probar-aviso-espera.py", flags: ["--test-scheduled"] },
+  { nombre: "cupo-correo", archivo: "ops/probar-cupo-correo.py", flags: ["--test-scheduled",
+      "--var", "RESEND_API_KEY:re_llave_invalida_de_prueba",
+      "--var", "CORREO_AVISOS:equipo@ejemplo.invalid",
+      "--var", "CORREO_MMC:mmc@ejemplo.invalid"] },
 ];
 
 const filtro = process.argv[2] || "";
@@ -44,17 +50,25 @@ if (!elegidas.length) {
   process.exit(2);
 }
 
-const persist = mkdtempSync(join(tmpdir(), "gg-dinero-"));
+/* UNA BASE POR BATERÍA. Las migraciones se aplican una vez a `plantilla` y cada
+   batería arranca sobre una copia: así ninguna hereda filas de la anterior, y
+   cada una puede pedir su propia forma de arrancar el servidor. */
+const trabajo = mkdtempSync(join(tmpdir(), "gg-dinero-"));
+const persist = join(trabajo, "plantilla");
 const devVars = join(RAIZ, ".dev.vars");
 let devVarsMio = false;
 let servidor = null;
 
-function limpiar() {
+function apagar() {
   if (servidor && servidor.pid) {
     try { process.kill(-servidor.pid, "SIGTERM"); } catch (e) { /* ya no está */ }
   }
+  servidor = null;
+}
+function limpiar() {
+  apagar();
   if (devVarsMio) rmSync(devVars, { force: true });
-  rmSync(persist, { recursive: true, force: true });
+  rmSync(trabajo, { recursive: true, force: true });
 }
 function salir(codigo) { limpiar(); process.exit(codigo); }
 process.on("SIGINT", () => salir(130));
@@ -89,42 +103,48 @@ for (const m of migraciones) {
 }
 console.log("listo");
 
-// 4. El Worker. `detached` para poder matar al grupo entero: wrangler lanza
-//    workerd como hijo y un SIGTERM al padre solo lo deja huérfano.
-servidor = spawn("npx", ["wrangler", "dev", "--port", PUERTO, "--persist-to", persist], {
-  cwd: RAIZ, detached: true, stdio: ["ignore", "pipe", "pipe"],
-});
+// 4. Por cada batería: su copia de la base, su servidor, y a correr.
+//    `detached` para poder matar al grupo entero: wrangler lanza workerd como
+//    hijo y un SIGTERM al padre solo lo deja huérfano.
 let registro = "";
-servidor.stdout.on("data", (d) => { registro += d; });
-servidor.stderr.on("data", (d) => { registro += d; });
-
-async function esperar() {
+function arrancar(dir, flags) {
+  registro = "";
+  servidor = spawn("npx", ["wrangler", "dev", "--port", PUERTO, "--persist-to", dir, ...flags], {
+    cwd: RAIZ, detached: true, stdio: ["ignore", "pipe", "pipe"],
+  });
+  servidor.stdout.on("data", (d) => { registro += d; });
+  servidor.stderr.on("data", (d) => { registro += d; });
+}
+async function responde(quiero) {
   const tope = Date.now() + 120000;
   while (Date.now() < tope) {
-    if (servidor.exitCode !== null) return false;
+    if (quiero && servidor && servidor.exitCode !== null) return false;
     try {
       const r = await fetch(BASE + "/robots.txt", { signal: AbortSignal.timeout(3000) });
-      if (r.ok) return true;
-    } catch (e) { /* aún no */ }
+      if (quiero && r.ok) return true;
+    } catch (e) { if (!quiero) return true; }
     await new Promise((s) => setTimeout(s, 1000));
   }
   return false;
 }
-process.stdout.write("· wrangler dev en " + BASE + "… ");
-if (!(await esperar())) {
-  console.error("\n✘ el Worker no respondió en 2 minutos\n" + registro.slice(-3000));
-  salir(1);
-}
-console.log("responde");
 
 let fallos = 0;
 for (const b of elegidas) {
   console.log("\n══ " + b.nombre + " (" + b.archivo + ")");
+  const dir = join(trabajo, b.nombre);
+  cpSync(persist, dir, { recursive: true });
+  arrancar(dir, b.flags || []);
+  if (!(await responde(true))) {
+    console.error("✘ el Worker no respondió en 2 minutos\n" + registro.slice(-3000));
+    salir(1);
+  }
   const r = spawnSync("python3", [b.archivo], {
     cwd: RAIZ, stdio: "inherit",
-    env: { ...process.env, BASE, PERSIST: persist },
+    env: { ...process.env, BASE, PERSIST: dir },
   });
   if (r.status !== 0) { fallos++; console.log("✘ " + b.nombre + " salió con " + r.status); }
+  apagar();
+  await responde(false);        // que suelte el puerto antes de la siguiente
 }
 
 console.log(fallos ? "\n✘ " + fallos + " batería(s) con fallos" : "\n✔ " + elegidas.length + " batería(s) en verde");
