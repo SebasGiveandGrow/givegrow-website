@@ -2986,7 +2986,8 @@ async function vencerAutorizacionesAcudiente(env) {
     try {
       const s = await suprimirInscripcion(env, f.id, "cron",
         "sin autorización del acudiente en " + AUT_ACU_DIAS + " días (Ley 1581 art. 7; decisión del 29 sep 2026)");
-      if (s) out.suprimidas++;
+      if (s && s.bloqueada) console.error("suprimir sin autorizacion: bloqueada", f.id, s.bloqueada.join(", "));
+      else if (s) out.suprimidas++;
     } catch (e) { console.error("suprimir sin autorizacion", f.id, e && e.message); }
   }
 
@@ -6329,6 +6330,15 @@ async function adminSalud(env, opciones) {
     await enCola("intercambios_nuevos",
       "SELECT COUNT(*) AS n, MIN(actualizado) AS masViejo FROM intercambios_fundacion WHERE estado = 'activo' AND visto_en IS NULL",
       "Acompañar la red › Dar y recibir · una fundación ofreció o pidió algo: míralo y, si hay con quién cruzarlo, déjale una nota", 36, "#sec-dar", 14);
+  } catch (e) {
+    if (!/no such table/i.test(String(e && e.message))) throw e;
+  }
+  /* APORTES ENTRE FUNDACIONES (0066): lo declarado no suma hasta que el equipo
+     lo confirma, así que tiene que verse. */
+  try {
+    await enCola("aportes_fundacion_por_confirmar",
+      "SELECT COUNT(*) AS n, MIN(creado) AS masViejo FROM aportes_fundacion WHERE estado = 'registrado'",
+      "Acompañar la red › Dar y recibir · una fundación registró un aporte a otra: confírmalo con la que recibe (o anúlalo si no dice a cuál)", 36, "#sec-dar", 14);
   } catch (e) {
     if (!/no such table/i.test(String(e && e.message))) throw e;
   }
@@ -21282,7 +21292,17 @@ async function apiPortalEntrar(request, env) {
   const i = await env.DB.prepare(
     "SELECT id, nombre, email FROM inscripciones WHERE tipo IN ('fundacion', 'empresa') " +
     "AND estado IN ('aceptada','visitada','convenio','vinculada') " +
-    "AND (lower(email) = ? OR id IN (SELECT inscripcion FROM portal_correos WHERE email = ?)) ORDER BY id DESC LIMIT 1"
+    /* La empresa que solo dejó sus datos en un evento no tiene portal mientras
+       siga «aceptada»: si avanza a convenio o vinculada, sí (ningún código le
+       cambia el formato). El panel aplica la misma regla. CASE para no leer un
+       JSON roto. */
+    "AND NOT (tipo = 'empresa' AND estado = 'aceptada' AND " +
+    "COALESCE(CASE WHEN json_valid(datos) THEN json_extract(datos, '$.formato') END, '') = 'evento') " +
+    "AND (lower(email) = ? OR id IN (SELECT inscripcion FROM portal_correos WHERE email = ?)) " +
+    /* Si el mismo correo está en una fundación y en una empresa, gana la
+       fundación: es lo que ese correo abría antes de que existiera el portal de
+       empresa (17 nov 2026), y no se le puede quitar. */
+    "ORDER BY tipo = 'fundacion' DESC, id DESC LIMIT 1"
   ).bind(email, email).first();
   /* EL CORREO SALE DESPUÉS DE RESPONDER (revisión de seguridad del 29 oct
      2026): si se esperara, la respuesta tardaría cientos de milisegundos más
@@ -21464,7 +21484,8 @@ async function apiPortalEmpresa(request, env) {
       personas: hechas.reduce((t, j) => t + (Number(j.personas) || 0), 0),
       certificados: hechas.reduce((t, j) => t + (Number(j.certificados) || 0), 0),
       realizadas: hechas.length, jornadas: jornadas.length,
-      anfitrionas: new Set(hechas.map((j) => j.anfitriona).filter(Boolean)).size,
+      /* La sede de Give&Grow no es una fundación de la red. */
+      anfitrionas: new Set(hechas.map((j) => j.anfitriona).filter((a) => a && a !== "sede")).size,
       beneficiarios: benef.length ? benef.reduce((t, j) => t + (Number(j.beneficiarios_directos) || 0), 0) : null
     },
     proxima: proxima ? { nombre: proxima.nombre, fecha: proxima.fecha, hora: proxima.hora_inicio, lugar: proxima.lugar,
@@ -22594,7 +22615,9 @@ async function adminMedicionFundacion(request, env, id, quien) {
    DAR Y RECIBIR (ítem 37 · 0059, 30 oct 2026)
    ============================================================================
    La fundación dice lo que puede ofrecer a otras y lo que necesita. El equipo
-   lo cruza desde el panel y le deja una nota. Nada de esto se publica. */
+   lo cruza desde el panel y le deja una nota. Nada se publica fuera de la
+   red: desde 0065 una necesidad marcada la ven las fundaciones vinculadas que
+   aportan. */
 const INTER_CATEGORIAS = { especie: "En especie", voluntariado: "Voluntariado", conocimiento: "Conocimiento o asesoría", espacio: "Espacios", otro: "Otro" };
 const INTER_TOPE = 20;
 
@@ -22727,6 +22750,18 @@ const APF_UNIDADES = { dinero: ["pesos"], especie: ["kilos", "unidades"], volunt
 const APF_ESTADO_ES = { registrado: "Registrado, por confirmar", confirmado: "Confirmado", entregado: "Entregado", anulado: "Anulado" };
 const APF_TOPE = 200;
 
+/* UNA CANTIDAD COMO LA ESCRIBE ALGUIEN EN COLOMBIA. «500.000» son quinientos
+   mil, no quinientos: el punto separa miles y la coma, decimales. Un número con
+   un punto que no agrupa de a tres («24.5») se lee como decimal. Lo que no se
+   entiende devuelve NaN y se rechaza, en vez de guardar otra cifra. */
+function cantidadCO(v) {
+  const t = String(v == null ? "" : v).replace(/[\s$]/g, "");
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) return Math.round(Number(t.replace(/\./g, "").replace(",", ".")) * 100) / 100;
+  if (/^\d+(,\d+)?$/.test(t)) return Math.round(Number(t.replace(",", ".")) * 100) / 100;
+  if (/^\d+\.\d+$/.test(t)) return Math.round(Number(t) * 100) / 100;
+  return NaN;
+}
+
 /* Suma por tipo y unidad. Nunca mezcla unidades. */
 function apfTotales(filas) {
   const t = {};
@@ -22745,6 +22780,10 @@ async function apiPortalAportes(request, env) {
   if (!s) return portalSinSesion();
   if (!(await existeTabla(env, "aportes_fundacion"))) return json({ error: "no_disponible" }, 503);
   const rol = portalRol(s).rol;
+  /* Registrar y ver el directorio de la red, solo vinculadas: es la misma
+     regla que /api/portal/red. La lista de la red no se le da a una fundación
+     que todavía no hace parte de ella. */
+  const vinculada = s.estado === "vinculada";
   if (request.method === "GET") {
     const dados = rol === "recibe" ? [] : (await env.DB.prepare(
       "SELECT a.id, a.tipo, a.titulo, a.cantidad, a.unidad, a.fecha, a.estado, a.nota_equipo, a.recibe, i.nombre AS para " +
@@ -22755,10 +22794,10 @@ async function apiPortalAportes(request, env) {
       "SELECT a.id, a.tipo, a.titulo, a.cantidad, a.unidad, a.fecha, a.estado, i.nombre AS de " +
       "FROM aportes_fundacion a JOIN inscripciones i ON i.id = a.da WHERE a.recibe = ? AND a.estado IN ('confirmado', 'entregado') ORDER BY a.fecha DESC, a.id DESC LIMIT 300"
     ).bind(s.inscripcion).all()).results || [];
-    const red = rol === "recibe" ? [] : (await env.DB.prepare(
+    const red = rol === "recibe" || !vinculada ? [] : (await env.DB.prepare(
       "SELECT id, nombre, ciudad FROM inscripciones WHERE tipo = 'fundacion' AND estado = 'vinculada' AND id <> ? ORDER BY nombre COLLATE NOCASE LIMIT 300"
     ).bind(s.inscripcion).all()).results || [];
-    return json({ ok: true, puede_registrar: rol !== "recibe", unidades: APF_UNIDADES, estados: APF_ESTADO_ES,
+    return json({ ok: true, puede_registrar: rol !== "recibe" && vinculada, vinculada, unidades: APF_UNIDADES, estados: APF_ESTADO_ES,
       dados, totales: apfTotales(dados), recibidos, red });
   }
   if (request.method !== "POST") return json({ error: "metodo_no_permitido" }, 405);
@@ -22772,10 +22811,11 @@ async function apiPortalAportes(request, env) {
     const r = await env.DB.prepare(
       "UPDATE aportes_fundacion SET estado = 'anulado', actualizado = datetime('now') WHERE id = ? AND da = ? AND estado = 'registrado'"
     ).bind(Number(c.id) || 0, s.inscripcion).run();
-    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado", ayuda: "Ese aporte ya fue confirmado por el equipo. Escríbannos si hay que corregirlo." }, 404);
+    if (!r.meta || !r.meta.changes) return json({ error: "no_encontrado", ayuda: "Ese aporte ya no está por confirmar: el equipo lo confirmó o ya se retiró. Escríbannos si hay que corregirlo." }, 404);
     return json({ ok: true });
   }
   if (c.accion !== "guardar") return json({ error: "accion_invalida" }, 400);
+  if (!vinculada) return json({ error: "no_vinculada", ayuda: "Podrán registrar aportes cuando su fundación esté vinculada a la red." }, 403);
   const malo = (campo, ayuda) => json({ error: "dato_invalido", campo, ayuda }, 400);
   const tipo = APORTES_FUND.includes(c.tipo) ? c.tipo : null;
   if (!tipo) return malo("tipo", "Elige qué tipo de aporte fue.");
@@ -22783,8 +22823,9 @@ async function apiPortalAportes(request, env) {
   if (!unidad) return malo("unidad", "Elige en qué se mide.");
   const titulo = String(c.titulo == null ? "" : c.titulo).replace(/\s+/g, " ").trim().slice(0, 120);
   if (titulo.length < 4) return malo("titulo", "Escribe en pocas palabras qué dieron: «Mercados para 60 familias».");
-  const cantidad = Math.round(Number(String(c.cantidad == null ? "" : c.cantidad).replace(",", ".")) * 100) / 100;
+  const cantidad = cantidadCO(c.cantidad);
   if (!(cantidad > 0) || cantidad > 1e12) return malo("cantidad", "Escribe la cantidad en números, mayor que cero.");
+  if (tipo === "dinero" && !Number.isInteger(cantidad)) return malo("cantidad", "Escribe el valor en pesos, sin centavos: «500.000».");
   const fecha = indFecha(c.fecha);
   if (!fecha) return malo("fecha", "Elige la fecha en que se dio.");
   if (fecha > new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10)) return malo("fecha", "La fecha no puede ser futura: aquí se registra lo que ya se dio.");
@@ -22824,11 +22865,20 @@ async function adminAporteFundacion(request, env, id, quien) {
   if (!esObjeto(c) || !["confirmado", "entregado", "anulado"].includes(c.estado)) return json({ error: "estado_invalido" }, 400);
   const a = await env.DB.prepare("SELECT id, estado, recibe FROM aportes_fundacion WHERE id = ?").bind(id).first();
   if (!a) return json({ error: "no_encontrado" }, 404);
+  /* LAS TRANSICIONES LAS HACE CUMPLIR EL SERVIDOR, no los botones: una tabla
+     abierta hace una hora puede pedir «Confirmar» sobre algo que la fundación
+     ya retiró. Y el estado leído va también en el WHERE, por si cambia entre
+     la lectura y la escritura. */
+  const APF_PASOS = { registrado: ["confirmado", "anulado"], confirmado: ["entregado", "anulado"], entregado: ["anulado"], anulado: [] };
+  if (!(APF_PASOS[a.estado] || []).includes(c.estado)) {
+    return json({ error: "cambio_de_estado", ayuda: "Este aporte ya está «" + (APF_ESTADO_ES[a.estado] || a.estado) + "»: recarga la tabla." }, 409);
+  }
   if (c.estado !== "anulado" && !a.recibe) return json({ error: "sin_destinataria", ayuda: "Este aporte no dice a qué fundación fue. Pídanle a quien lo registró que lo retire y lo vuelva a registrar con la destinataria." }, 409);
   const nota = c.nota == null ? null : (String(c.nota).replace(/\r\n?/g, "\n").trim().slice(0, 500) || null);
-  await env.DB.prepare(
-    "UPDATE aportes_fundacion SET estado = ?, nota_equipo = COALESCE(?, nota_equipo), revisado_por = ?, revisado_en = datetime('now'), actualizado = datetime('now') WHERE id = ?"
-  ).bind(c.estado, nota, quien || null, id).run();
+  const upd = await env.DB.prepare(
+    "UPDATE aportes_fundacion SET estado = ?, nota_equipo = COALESCE(?, nota_equipo), revisado_por = ?, revisado_en = datetime('now'), actualizado = datetime('now') WHERE id = ? AND estado = ?"
+  ).bind(c.estado, nota, quien || null, id, a.estado).run();
+  if (!upd.meta || !upd.meta.changes) return json({ error: "cambio_de_estado", ayuda: "El aporte cambió mientras lo mirabas: recarga la tabla." }, 409);
   await env.DB.prepare("INSERT INTO consentimientos (sujeto, tipo, detalle) VALUES (?, 'auditoria', ?)")
     .bind(quien || "?", "aporte entre fundaciones " + id + " · " + a.estado + " → " + c.estado).run();
   return json({ ok: true });
@@ -22838,7 +22888,7 @@ async function adminAporteFundacion(request, env, id, quien) {
 async function adminIntercambios(env) {
   if (!(await existeTabla(env, "intercambios_fundacion"))) return json({ error: "falta_migracion", ayuda: "Falta aplicar la migración 0059 en la base." }, 409);
   const filas = (await env.DB.prepare(
-    "SELECT x.*, i.nombre AS fundacion, i.ciudad FROM intercambios_fundacion x JOIN inscripciones i ON i.id = x.inscripcion " +
+    "SELECT x.*, i.nombre AS fundacion, i.ciudad, i.estado AS fund_estado FROM intercambios_fundacion x JOIN inscripciones i ON i.id = x.inscripcion " +
     "WHERE x.estado <> 'retirado' ORDER BY CASE x.estado WHEN 'activo' THEN 0 ELSE 1 END, x.visto_en IS NOT NULL, x.actualizado DESC LIMIT 500"
   ).all()).results || [];
   return json({ ok: true, categorias: INTER_CATEGORIAS,
@@ -23516,11 +23566,10 @@ function paginaPortal(nonce) {
   /* Con tema propio no hay foto debajo: el panel va en papel, como una tarjeta. */
   body[data-tema] .vidrio{position:relative;z-index:1;background:var(--surface);color:var(--ink);border-color:var(--bd);box-shadow:none;
     -webkit-backdrop-filter:none;backdrop-filter:none;max-width:calc(100% - 440px)}
-  body[data-tema] .tipos{grid-template-columns:repeat(3,minmax(0,1fr))}
-  @media (max-width:720px){
-    body[data-tema] .vidrio{max-width:none}
-    body[data-tema] .tipos{grid-template-columns:repeat(2,minmax(0,1fr))}
-  }
+  /* Dos columnas: en tres, «Conocimiento» no cabe en el botón. Y bajo 1000 px
+     el panel toma todo el ancho: al lado del dibujo quedaba demasiado angosto. */
+  body[data-tema] .tipos{grid-template-columns:repeat(2,minmax(0,1fr))}
+  @media (max-width:1000px){ body[data-tema] .vidrio{max-width:none} }
   .vidrio h2{font-size:17px}
   .vidrio .cab{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap}
   .vidrio .cab h2{flex:1 1 auto}
@@ -23541,6 +23590,9 @@ function paginaPortal(nonce) {
   body[data-tema] .tipo[aria-pressed=true] span{color:var(--ink-soft)}
   body[data-tema] .tipo:focus-visible{outline-color:var(--acc)}
   .vidrio .msg{display:block;min-height:20px;margin-top:8px;font-size:13.5px;color:#fff}
+  /* El anillo de foco sobre la foto: el verde de --acc no se ve ahí. */
+  body:not([data-tema]) .vidrio .btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  body:not([data-tema]) .vidrio.sigue .btn:hover{background:#fff;border-color:#fff}
   /* «Lo que sigue» dentro del vidrio: texto a la izquierda, botón a la derecha. */
   .vidrio.sigue{display:flex;align-items:center;gap:14px 20px;flex-wrap:wrap}
   .vidrio.sigue > div{flex:1 1 320px}
@@ -23563,12 +23615,14 @@ function paginaPortal(nonce) {
      informe de sostenibilidad. */
   body[data-empresa] .tabs,body[data-empresa] #p-paso,body[data-empresa] #p-recorrido,
   body[data-empresa] [role=tabpanel]{display:none!important}
-  .emp-cifras{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr));gap:14px;margin-top:22px}
+  .emp-cifras{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:14px;margin-top:22px}
   .emp-cifras .tarjeta + .tarjeta{margin-top:0}
   .emp-cifras .fuerte{background:#16402A;border-color:#16402A;color:#fff}
   .emp-cifras .fuerte .ey{color:#C9DACD}
   .emp-cifras .fuerte .sub{color:#E4F0E7}
-  .emp-cifras .fuerte .cifra{font-size:52px;line-height:1}
+  /* Entera y en una línea: «1.243,5» no se parte. La columna verde es más
+     ancha y la cifra baja de tamaño antes de salirse. */
+  .emp-cifras .fuerte .cifra{font-size:clamp(30px,3.6vw,48px);line-height:1;white-space:nowrap}
   .tabla-emp{width:100%;border-collapse:collapse;font-size:14.5px}
   .tabla-emp th{text-align:left;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--mu);padding:0 10px 8px 0}
   .tabla-emp td{padding:12px 10px 12px 0;border-top:1px solid var(--bds);vertical-align:top}
@@ -23629,7 +23683,7 @@ function paginaPortal(nonce) {
   </section>
 
   <section id="v-enviado" class="oculto angosto">
-    <p class="ey">Portal de fundaciones</p>
+    <p class="ey">Portal del HUB SOCIAL</p>
     <h1 class="mt">Revisa tu correo</h1>
     <div class="tarjeta aviso mt">
       Si ese correo tiene acceso, en unos minutos te llega el enlace para entrar. Revisa también la carpeta de
@@ -23639,7 +23693,7 @@ function paginaPortal(nonce) {
   </section>
 
   <section id="v-enlace" class="oculto angosto">
-    <p class="ey">Portal de fundaciones</p>
+    <p class="ey">Portal del HUB SOCIAL</p>
     <h1 class="mt">Entrar al portal</h1>
     <div class="tarjeta aviso mt">Este enlace abre tu sesión en este navegador durante 30 días.</div>
     <button type="button" class="btn mt" id="b-usar">Entrar</button>
@@ -23979,6 +24033,7 @@ function pintarResumen(){
   var porRevisar = (D.documentos || []).filter(function(d){ return !d.revisado; }).length;
   /* «Lo que sigue» va en la cabecera para quien solo recibe (pintarDa). Aquí
      se queda para quien tiene el selector de aportes ocupando ese lugar. */
+  guardarFormApf();
   var arriba = !(D.rol === "aporta" || D.rol === "ambas" || DA_ABIERTO || D.tema);
   $("s-resumen").innerHTML =
     (arriba ? "" : '<div class="tarjeta aviso"><p class="ey">Lo que sigue</p><h2 class="mt">' + esc(s.t) + '</h2><p class="sub">' + esc(s.p) + "</p>" +
@@ -24013,6 +24068,7 @@ function pintarEmpresa(){
   document.body.setAttribute("data-franja", "si");
   document.body.setAttribute("data-empresa", "si");
   $("p-marca").textContent = "Portal de empresas · HUB SOCIAL";
+  document.title = "Portal de empresas · Give&Grow";
   $("p-nombre").textContent = D.nombre || "";
   $("p-correo").textContent = D.email || "";
   $("p-estado").textContent = D.estado_es || "";
@@ -24023,7 +24079,10 @@ function pintarEmpresa(){
     fetch("/api/portal/empresa", { credentials: "same-origin" }).then(function(r){
       if (r.status === 401) { ver("v-entrar"); return null; }
       return r.ok ? r.json() : null;
-    }).then(function(d){ if (d) { EMP = d; pintarEmpresa(); } })
+    }).then(function(d){
+      if (d) { EMP = d; pintarEmpresa(); return; }
+      if ($("p-empresa").innerHTML.indexOf("Cargando") > -1) $("p-empresa").innerHTML = '<p class="sub mt">No pudimos cargar su información. Recarguen la página o escríbannos a contacto@thegiveandgrowproject.org.</p>';
+    })
       .catch(function(){ $("p-empresa").innerHTML = '<p class="sub mt">No pudimos cargar su información. Intenten de nuevo.</p>'; });
     return;
   }
@@ -24045,12 +24104,12 @@ function pintarEmpresa(){
   caja.innerHTML = '<div><p class="ey">Lo que sigue</p><h2>' + esc(sg.t) + '</h2><p class="sub">' + esc(sg.p) + "</p></div>" +
     (sg.url ? '<a class="btn" href="' + esc(sg.url) + '">' + esc(sg.b) + "</a>" : "");
   var h = '<div class="emp-cifras">' +
-    '<div class="tarjeta fuerte"><p class="ey">Horas de voluntariado</p><p class="cifra">' + num(T.horas) + '</p><p class="sub">horas efectivas de su equipo, registradas por jornada.</p></div>' +
+    '<div class="tarjeta fuerte"><p class="ey">Horas de voluntariado</p><p class="cifra">' + num(T.horas >= 1000 ? Math.round(T.horas) : T.horas) + '</p><p class="sub">horas efectivas de su equipo, registradas por jornada.</p></div>' +
     '<div class="tarjeta"><p class="ey">Personas</p><p class="cifra">' + num(T.personas) + '</p><p class="sub">participaciones; ' + num(T.certificados) + (T.certificados === 1 ? " certificado emitido." : " certificados emitidos.") + "</p></div>" +
     '<div class="tarjeta"><p class="ey">Jornadas</p><p class="cifra">' + T.realizadas + " de " + T.jornadas + '</p><p class="sub">realizadas.</p></div>' +
     '<div class="tarjeta"><p class="ey">Fundaciones</p><p class="cifra">' + T.anfitrionas + '</p><p class="sub">' + (T.anfitrionas === 1 ? "anfitriona" : "anfitrionas") + " de sus jornadas.</p></div>" +
   "</div>";
-  if (T.beneficiarios != null) h += '<p class="sub mt">Las fundaciones anfitrionas reportan ' + num(T.beneficiarios) + " personas beneficiadas directamente en esas jornadas. Es la cifra que reporta cada fundación, no una medición de Give&amp;Grow.</p>";
+  if (T.beneficiarios != null) h += '<p class="sub mt">En esas jornadas se reportan ' + num(T.beneficiarios) + " personas beneficiadas directamente. Es la cifra que da cada anfitriona, no una medición de Give&amp;Grow.</p>";
   var J = E.jornadas || [];
   h += '<div class="tarjeta mt"><h2>Jornadas</h2>' + (J.length
     ? '<div class="tabla-emp-caja mt"><table class="tabla-emp"><thead><tr><th scope="col">Fecha</th><th scope="col">Jornada</th><th scope="col">Anfitriona</th>' +
@@ -24114,22 +24173,29 @@ function pintarDa(){
     '<span class="msg" id="m-da" role="status" aria-live="polite"></span>';
 }
 function tocarAporta(id){
+  var era = D.rol;
   var lista = (D.aporta || []).slice();
   var i = lista.indexOf(id);
   if (i === -1) lista.push(id); else lista.splice(i, 1);
   document.querySelectorAll("[data-aporta]").forEach(function(b){ b.disabled = true; });
   enviar("/api/portal/aporta", { aporta: lista }).then(function(r){
     if (r.status === 401) { ver("v-entrar"); return; }
-    if (!r.ok) {
-      pintarDa();
-      if ($("m-da")) $("m-da").textContent = r.d.ayuda || "No se pudo guardar. Intenta de nuevo.";
-      return;
-    }
+    if (!r.ok) { avisoDa(id, r.d.ayuda || "No se pudo guardar. Intenta de nuevo."); return; }
     D.rol = r.d.rol; D.aporta = r.d.aporta;
-    DA_ABIERTO = DA_ABIERTO && D.rol === "recibe";
+    /* Si desmarcó el último tipo, el panel se queda abierto: si no, una
+       fundación no vinculada no tendría por dónde volver a marcarlo. */
+    DA_ABIERTO = D.rol === "recibe" && (DA_ABIERTO || era !== "recibe");
     APF = null; pintarRol(); pintarResumen();
-    if ($("m-da")) $("m-da").textContent = "Guardado.";
-  }).catch(function(){ pintarDa(); if ($("m-da")) $("m-da").textContent = "No pudimos conectar. Intenta de nuevo."; });
+    avisoDa(id, "Guardado.");
+  }).catch(function(){ avisoDa(id, "No pudimos conectar. Intenta de nuevo."); });
+}
+/* Repinta el panel, devuelve el foco al tipo tocado y escribe el aviso un
+   instante después, para que la región viva ya exista cuando cambie. */
+function avisoDa(id, texto){
+  pintarDa();
+  var b = document.querySelector('[data-aporta="' + id + '"]');
+  if (b) b.focus();
+  setTimeout(function(){ if ($("m-da")) $("m-da").textContent = texto; }, 60);
 }
 
 /* LO QUE OFRECEN A LA RED, en el resumen. Sale de «Dar y recibir»: lo que la
@@ -24169,7 +24235,14 @@ function pintarOfrecen(){
 /* EL REGISTRO DE APORTES (0066). Lo que esta fundación le dio a otra de la
    red, y lo que otras le dieron. Lo que escribe queda «por confirmar» hasta
    que el equipo lo cruza: solo lo confirmado o entregado suma arriba. */
-var APF = null, APF_FORM = false;
+var APF = null, APF_FORM = false, APF_PREVIO = null;
+/* Lo escrito en «Registrar un aporte» se guarda antes de cualquier repintado
+   (pintarResumen reemplaza el resumen entero) y se devuelve en pintarAportes. */
+function guardarFormApf(){
+  if (!$("f-apf")) return;
+  APF_PREVIO = {};
+  ["apf-tipo", "apf-tit", "apf-cant", "apf-uni", "apf-fecha", "apf-para"].forEach(function(k){ APF_PREVIO[k] = $(k).value; });
+}
 function cant(x){
   var n = Number(x.cantidad) || 0;
   return x.tipo === "dinero" ? pesos(n) : n.toLocaleString("es-CO") + " " + x.unidad;
@@ -24181,6 +24254,9 @@ function nomTipo(k){
 function pintarAportes(){
   var caja = $("p-aportes");
   if (!caja) return;
+  /* Lo escrito en el formulario sobrevive a un repintado (tocar un tipo en la
+     franja o guardar el perfil repintan el resumen entero). */
+  guardarFormApf();
   if (APF === null) {
     fetch("/api/portal/aportes", { credentials: "same-origin" }).then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){ if (d) { APF = d; pintarAportes(); } }).catch(function(){});
@@ -24203,7 +24279,7 @@ function pintarAportes(){
         '<div class="der"><span class="pill' + (x.estado === "registrado" ? " ambar" : " ok") + '">' + est + "</span>" +
         (x.estado === "registrado" ? '<button type="button" class="btn sec mini" data-apf-retirar="' + x.id + '">Retirar</button>' : "") + "</div></li>";
     }).join("") + "</ul>";
-    if (APF_FORM) {
+    if (APF_FORM && APF.puede_registrar) {
       var tipos = (D.aportes || []).filter(function(a){ return (D.aporta || []).indexOf(a.id) !== -1; });
       h += '<div class="mt" id="f-apf"><h2>Registrar un aporte</h2><p class="sub">Algo que su fundación ya le dio a otra de la red. El equipo lo confirma con ella antes de que cuente.</p>' +
         '<label for="apf-tipo">Qué tipo de aporte fue *</label><select id="apf-tipo">' + tipos.map(function(a){ return '<option value="' + esc(a.id) + '">' + esc(a.nombre) + "</option>"; }).join("") + "</select>" +
@@ -24214,8 +24290,10 @@ function pintarAportes(){
         '<label for="apf-para">A qué fundación</label><select id="apf-para"><option value="">Todavía no lo sé</option>' +
           (APF.red || []).map(function(f){ return '<option value="' + f.id + '">' + esc(f.nombre) + (f.ciudad ? " · " + esc(f.ciudad) : "") + "</option>"; }).join("") + "</select>" +
         '<div class="acciones"><button type="button" class="btn" id="b-apf-guardar">Registrar</button><button type="button" class="btn sec" id="b-apf-cancelar">Cancelar</button></div></div>';
-    } else {
+    } else if (APF.puede_registrar) {
       h += '<div class="acciones"><button type="button" class="btn mini" id="b-apf-abrir">Registrar un aporte</button></div>';
+    } else {
+      h += '<p class="sub mt">Podrán registrar aportes cuando su fundación esté vinculada a la red.</p>';
     }
     h += '<span class="msg" id="m-apf" role="status" aria-live="polite"></span>' +
       '<p class="sub mt">Es un registro operativo del portal. No es contabilidad ni reemplaza un certificado de donación.</p></div>';
@@ -24226,7 +24304,22 @@ function pintarAportes(){
         '<div class="der"><span class="pill ok">' + (x.estado === "entregado" ? "Entregado" : "Confirmado") + "</span></div></li>";
     }).join("") + "</ul></div>";
   caja.innerHTML = h;
-  if (da && APF_FORM) unidadesApf();
+  if (da && APF_FORM && APF.puede_registrar) {
+    var P = APF_PREVIO, hay = function(sel, v){ return !!sel && [].some.call(sel.options, function(o){ return o.value === v; }); };
+    if (P && hay($("apf-tipo"), P["apf-tipo"])) {
+      $("apf-tipo").value = P["apf-tipo"];
+      unidadesApf();
+      ["apf-tit", "apf-cant", "apf-fecha"].forEach(function(k){ $(k).value = P[k]; });
+      if (hay($("apf-uni"), P["apf-uni"])) $("apf-uni").value = P["apf-uni"];
+      if (hay($("apf-para"), P["apf-para"])) $("apf-para").value = P["apf-para"];
+      APF_PREVIO = null;
+    } else {
+      /* El tipo ya no está (lo desmarcaron en la franja): no se pasa lo escrito
+         a otro tipo sin decirlo. */
+      unidadesApf();
+      if (P) { APF_PREVIO = null; if ($("m-apf")) setTimeout(function(){ msg("m-apf", "Quitaron ese tipo de aporte: elijan otro para registrar.", "mal"); }, 60); }
+    }
+  }
   if (AVISO_APF && $("m-apf")) { msg("m-apf", AVISO_APF, "ok"); AVISO_APF = ""; }
 }
 function unidadesApf(){
@@ -24245,12 +24338,13 @@ function guardarApf(){
   }).catch(function(){ b.disabled = false; msg("m-apf", "No pudimos conectar. Intenta de nuevo.", "mal"); });
 }
 var AVISO_APF = "";
-function retirarApf(id){
+function retirarApf(id, boton){
+  var soltar = function(t){ if (boton) boton.disabled = false; msg("m-apf", t, "mal"); };
   enviar("/api/portal/aportes", { accion: "retirar", id: Number(id) }).then(function(r){
     if (r.status === 401) { ver("v-entrar"); return; }
-    if (!r.ok) { msg("m-apf", r.d.ayuda || "No se pudo retirar.", "mal"); return; }
+    if (!r.ok) { soltar(r.d.ayuda || "No se pudo retirar."); return; }
     APF = null; pintarAportes();
-  }).catch(function(){ msg("m-apf", "No pudimos conectar. Intenta de nuevo.", "mal"); });
+  }).catch(function(){ soltar("No pudimos conectar. Intenta de nuevo."); });
 }
 
 /* LO QUE OTRAS FUNDACIONES NECESITAN (0065): solo lo que cada una marcó como
@@ -24700,13 +24794,13 @@ document.addEventListener("click", function(ev){
   if (ev.target.id === "b-apf-abrir") { APF_FORM = true; pintarAportes(); }
   if (ev.target.id === "b-apf-cancelar") { APF_FORM = false; pintarAportes(); }
   if (ev.target.id === "b-apf-guardar") guardarApf();
-  if (ev.target.id === "apf-tipo") unidadesApf();
   var ra = ev.target.closest && ev.target.closest("[data-apf-retirar]");
-  if (ra) retirarApf(ra.getAttribute("data-apf-retirar"));
+  if (ra && !ra.disabled && confirm("¿Retirar este aporte? Deja de verse en su lista.")) { ra.disabled = true; retirarApf(ra.getAttribute("data-apf-retirar"), ra); }
   if (ev.target.id === "b-da-abrir") { DA_ABIERTO = true; pintarRol(); pintarResumen(); window.scrollTo(0, 0); }
 });
 document.addEventListener("change", function(ev){
   var el = ev.target;
+  if (el.id === "apf-tipo") { unidadesApf(); return; }
   if (el.id === "d-archivo") { subir(el.files[0], $("d-tipo").value, $("d-nota").value.trim(), "m-doc"); el.value = ""; $("d-nota").value = ""; return; }
   if (el.getAttribute && el.getAttribute("data-tipo")) { subir(el.files[0], el.getAttribute("data-tipo"), "", "m-doc"); el.value = ""; }
 });
@@ -25036,7 +25130,7 @@ function pintarDar(){
         return '<li><div><span class="nom">' + esc(x.titulo) + '</span><span class="det">' + esc(det) + "</span>" +
           (x.detalle ? '<span class="det">' + esc(x.detalle) + "</span>" : "") +
           (x.nota_equipo ? '<span class="det"><strong>Nota del equipo:</strong> ' + esc(x.nota_equipo) + "</span>" : "") + "</div>" +
-          '<div class="der">' + (activo && x.visible_red ? '<span class="pill ok">Visible en la red</span>' : "") +
+          '<div class="der">' + (activo && x.visible_red ? (D.estado === "vinculada" ? '<span class="pill ok">Visible en la red</span>' : '<span class="pill">Visible cuando estén vinculadas</span>') : "") +
           '<span class="pill' + (activo ? "" : " ok") + '">' + (activo ? "Activo" : "Resuelto") + "</span>" +
           (activo ? '<button type="button" class="btn sec mini" data-dr-editar="' + x.id + '">Editar</button>' +
             '<button type="button" class="btn sec mini" data-dr-resolver="' + x.id + '">Ya se resolvió</button>' +
@@ -25059,9 +25153,14 @@ function formDar(x){
 /* La casilla de «mostrar a la red» solo existe para una necesidad. */
 function verCasillaRed(){
   var t = document.querySelector('input[name="dr-tipo"]:checked');
-  var es = !!t && t.value === "necesita";
-  $("dr-red-op").classList.toggle("oculto", !es);
-  if (!es) $("dr-red").checked = false;
+  /* Solo una fundación vinculada sale en la red: antes, la casilla prometería
+     algo que el servidor no hace. */
+  var nec = !!t && t.value === "necesita";
+  /* Una oferta nunca va a la red: ahí sí se desmarca. A una necesidad de una
+     fundación aún no vinculada solo se le oculta la casilla y se le conserva lo
+     que eligió: sale en la red el día que la vinculen. */
+  $("dr-red-op").classList.toggle("oculto", !(nec && D && D.estado === "vinculada"));
+  if (!nec) $("dr-red").checked = false;
 }
 function guardarDar(){
   var t = document.querySelector('input[name="dr-tipo"]:checked');
@@ -32800,6 +32899,10 @@ async function adminBorrarInscripcion(request, env, id, quien) {
 
   const r = await suprimirInscripcion(env, id, quien, motivo);
   if (!r) return json({ error: "no_encontrada" }, 404);
+  if (r.bloqueada) {
+    return json({ error: "con_datos_de_la_red",
+      ayuda: "No se suprimió: la fundación tiene en su portal " + r.bloqueada.join(", ") + ". Es información de la organización, no de una persona, y parte respalda reportes. Archívala; para suprimirla hay que decidir antes qué se conserva." }, 409);
+  }
   return json({ ok: true, id, suprimida: true,
                 ...(r.conservaFirmados ? { conservado: "convenio_firmado",
                   nota: "La fundación había aceptado el convenio: sus documentos firmados (formularios, comprobantes y el texto aceptado) se conservan como evidencia del contrato. Todo lo demás se borró." } : {}),
@@ -32817,6 +32920,34 @@ async function suprimirInscripcion(env, id, quien, motivo) {
      correo, que no se guarda: sirve para encontrar las otras filas donde vive. */
   const f = await env.DB.prepare("SELECT id, tipo, email, datos FROM inscripciones WHERE id = ?").bind(id).first();
   if (!f) return null;
+
+  /* LO QUE UNA FUNDACIÓN CONSTRUYÓ EN SU PORTAL no se borra con un clic: su
+     perfil, sus documentos, sus indicadores y mediciones, sus unidades de
+     apadrinamiento y de impacto, lo que ofreció o pidió a la red. Parte de eso
+     respalda reportes y el MEAL, y es información de la organización, no de una
+     persona. Hasta hoy el DELETE fallaba con un 500 por las llaves; ahora se
+     dice por qué y qué hay. Qué se conserva y qué se va es decisión de Sebas. */
+  /* Las tablas que existen, en UNA consulta: el cron de menores llama esta
+     función hasta 50 veces seguidas y D1 tiene tope de consultas por
+     invocación. */
+  const hay = new Set(((await env.DB.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('perfil_fundacion','documentos_fundacion','indicadores_fundacion'," +
+    "'unidades_apadrinables','unidades_impacto','intercambios_fundacion','ods_fundacion','portal_sesiones','portal_enlaces','portal_correos','aportes_fundacion')"
+  ).all()).results || []).map((t) => t.name));
+  /* Solo una fundación construye cosas en el portal: un voluntario o una
+     empresa no tienen nada de esto, y no se les pregunta. */
+  if (f.tipo === "fundacion") {
+    const tablas = [["perfil_fundacion", "perfil"], ["documentos_fundacion", "documentos"],
+      ["indicadores_fundacion", "indicadores"], ["unidades_apadrinables", "unidades de apadrinamiento"],
+      ["unidades_impacto", "costos de impacto"], ["intercambios_fundacion", "lo que ofreció o pidió a la red"],
+      ["ods_fundacion", "ODS"]].filter(([t]) => hay.has(t));
+    if (tablas.length) {
+      const fila = await env.DB.prepare("SELECT " + tablas.map(([t], k) =>
+        "(SELECT COUNT(*) FROM " + t + " WHERE inscripcion = ?" + (k + 1) + ") AS c" + k).join(", ")).bind(...tablas.map(() => id)).first();
+      const bloquea = tablas.filter((_, k) => fila && fila["c" + k]).map(([, nombre]) => nombre);
+      if (bloquea.length) return { bloqueada: bloquea };
+    }
+  }
 
   /* TODO O NADA, Y TODO LO QUE ES SUYO. Hasta el 28 sep 2026 eran dos DELETE
      sueltos: primero los consentimientos, despues la fila. Con una fundacion
@@ -32905,6 +33036,21 @@ async function suprimirInscripcion(env, id, quien, motivo) {
       pasos.push(env.DB.prepare("DELETE FROM convenio_formularios WHERE inscripcion = ?").bind(id));
       pasos.push(env.DB.prepare("DELETE FROM convenio_enlaces WHERE inscripcion = ?").bind(id));
     }
+  }
+  /* EL PORTAL (0052, 0053) Y LOS APORTES ENTRE FUNDACIONES (0066). Las
+     sesiones, los enlaces y los correos autorizados son acceso, no historia: se
+     van. En los aportes, si la suprimida es la que RECIBIÓ, el aporte se queda
+     con quien dio, sin destinataria; si es la que DIO, sus declaraciones se van
+     con ella. Sin esto, el DELETE final fallaba por llave foránea en cuanto la
+     organización había entrado al portal o alguien la había nombrado. */
+  for (const [tabla, sql] of [
+    ["portal_sesiones", "DELETE FROM portal_sesiones WHERE inscripcion = ?"],
+    ["portal_enlaces", "DELETE FROM portal_enlaces WHERE inscripcion = ?"],
+    ["portal_correos", "DELETE FROM portal_correos WHERE inscripcion = ?"],
+    ["aportes_fundacion", "UPDATE aportes_fundacion SET recibe = NULL WHERE recibe = ?"],
+    ["aportes_fundacion", "DELETE FROM aportes_fundacion WHERE da = ?"]
+  ]) {
+    if (hay.has(tabla)) pasos.push(env.DB.prepare(sql).bind(id));
   }
   pasos.push(env.DB.prepare("DELETE FROM inscripciones WHERE id = ?").bind(id));
   await env.DB.batch(pasos);
@@ -36430,7 +36576,7 @@ textarea { font-size: 16px }
 <section class="pn-vista" data-vista="alianzas/dar" id="sec-dar" hidden>
 <details class="pn-como"><summary>Cómo funciona</summary><div>
 <p>Cada fundación publica en su portal (pestaña <strong>Dar y recibir</strong>) lo que puede ofrecer a otras —en especie, voluntariado, conocimiento o espacios— y lo que necesita. Aquí se ve todo junto para <strong>cruzarlo</strong>: una fundación con otra, o con una empresa de Impact Journey o un ofrecimiento en especie.</p>
-<p><strong>La nota del equipo</strong> la ve la fundación en su portal: sirve para decirle «lo cruzamos con…» o «¿sigue vigente?». Lo nuevo sale en «Hoy» hasta que se mira. <strong>Nada de esto se publica.</strong></p>
+<p><strong>La nota del equipo</strong> la ve la fundación en su portal: sirve para decirle «lo cruzamos con…» o «¿sigue vigente?». Lo nuevo sale en «Hoy» hasta que se mira. <strong>Nada de esto se publica fuera de la red.</strong> Una necesidad marcada «Visible en la red» la ven las fundaciones vinculadas que aportan: el nombre y la ciudad de quien la pidió y lo que escribió, nunca su contacto. Revisa que no traiga datos de una persona.</p>
 </div></details>
 <div id="tb-dar" class="tb" data-bandeja="1"><p class="mu">Se pide al abrir la sección.</p></div>
 <h3 style="margin-top:32px">Aportes entre fundaciones</h3>
@@ -37938,6 +38084,7 @@ var COLA_ES = {
   unidades_sin_reporte: "Unidades sin el reporte del mes pasado",
   mediciones_fundacion_por_revisar: "Mediciones de las fundaciones por revisar",
   intercambios_nuevos: "Dar y recibir: lo nuevo de las fundaciones",
+  aportes_fundacion_por_confirmar: "Aportes entre fundaciones por confirmar",
   unidades_impacto_por_revisar: "Costos de impacto por verificar"
 };
 
@@ -38032,7 +38179,7 @@ var VISTAS = {
   "alianzas/costos": { area: "Acompañar la red", titulo: "Costos de impacto",
     linea: "Lo que cuesta una unidad de lo que hace cada fundación, verificado, y el bloque para la calculadora." },
   "alianzas/dar": { area: "Acompañar la red", titulo: "Dar y recibir",
-    linea: "Lo que cada fundación ofrece y necesita, para cruzarla con otra o con una empresa. No se publica." },
+    linea: "Lo que cada fundación ofrece y necesita, para cruzarla con otra o con una empresa. No se publica fuera de la red." },
   "alianzas/fundaciones": { area: "Acompañar la red", titulo: "Fundaciones",
     linea: "Cada fundación con su estado, su contacto, su acceso al portal, sus documentos y sus donaciones. Se abre y se edita." },
   "revisar": { area: "Revisar y aprobar", titulo: "Bandeja de revisión",
@@ -38255,6 +38402,7 @@ var COLA_MOD = {
   unidades_sin_reporte: "alianzas/apadrinamiento",
   mediciones_fundacion_por_revisar: "revisar",
   intercambios_nuevos: "alianzas/dar",
+  aportes_fundacion_por_confirmar: "alianzas/dar",
   unidades_impacto_por_revisar: "revisar"
 };
 /* El filtro con que abre su «Ver todo»: las que esperan respuesta, de la más
@@ -39349,7 +39497,7 @@ function cargarInscripciones(){
           ((esFund && (i.estado === "aceptada" || i.estado === "visitada" || i.estado === "convenio" || i.estado === "vinculada"))
             ? '<br><small><button class="copy" data-portal="' + i.id + '">Portal…</button></small>' : "") +
           /* El portal de empresa (17 nov 2026): desde «aceptada» también. */
-          ((esEmp && x.formato !== "evento" && (i.estado === "aceptada" || i.estado === "convenio" || i.estado === "vinculada"))
+          ((esEmp && ((i.estado === "aceptada" && x.formato !== "evento") || i.estado === "convenio" || i.estado === "vinculada"))
             ? '<br><small><button class="copy" data-portal-invitar="' + i.id + '">Enviar enlace del portal</button></small>' : "") +
           (cerrar ? '<br><small><button class="copy" data-ins="' + i.id + '" data-e="' + cerrar[0] + '" data-de="' + esc(i.estado) + '" data-nombre="' + esc(i.nombre || "") + '">' + cerrar[1] + '</button></small>' : "") +
           /* La supresion va SIEMPRE, en cualquier estado: quien pide que le
@@ -46324,7 +46472,8 @@ document.addEventListener("click", function(e){
 });
 
 /* ---------------- DAR Y RECIBIR (0059) ----------------
-   Lo que cada fundación ofrece y necesita, para cruzarlo. Nada se publica. */
+   Lo que cada fundación ofrece y necesita, para cruzarlo. Nada se publica
+   fuera de la red; las necesidades marcadas (0065) las ven las vinculadas que aportan. */
 var DR = null, DR_TIPO = "todo";
 function cargarIntercambios(){
   return pedirJSON("/api/admin/intercambios", "tb-dar").then(function(d){ DR = d; pintarIntercambios(); });
@@ -46380,6 +46529,8 @@ function pintarIntercambios(){
     '<th scope="col">Estado</th><th scope="col">Nota del equipo</th><th scope="col"></th></tr></thead><tbody>' +
     V.map(function(x){
       return "<tr" + (x.estado !== "activo" ? ' style="opacity:.6"' : "") + "><td><strong>" + (x.tipo === "ofrece" ? "Ofrece: " : "Necesita: ") + esc(x.titulo) + "</strong>" +
+        (x.tipo === "necesita" && x.visible_red ? (x.estado === "activo" && x.fund_estado === "vinculada" ? '<br><small><strong>Visible en la red</strong></small>' : '<br><small>Marcada para la red (sale cuando esté vinculada y activa)</small>') : "") +
+        (x.responde_a ? "<br><small>Responde a la necesidad #" + esc(x.responde_a) + "</small>" : "") +
         (x.cantidad ? "<br><small>" + esc(x.cantidad) + "</small>" : "") + (x.detalle ? "<br><small>" + esc(x.detalle) + "</small>" : "") +
         (x.hasta ? "<br><small>hasta " + esc(x.hasta) + "</small>" : "") + "</td>" +
         "<td>" + esc(x.fundacion) + (x.ciudad ? "<br><small>" + esc(x.ciudad) + "</small>" : "") + "</td>" +
@@ -46399,7 +46550,9 @@ function abrirIntercambio(id){
     [x.tipo === "ofrece" ? "Ofrece" : "Necesita", esc(x.titulo) + (x.cantidad ? "<small>" + esc(x.cantidad) + "</small>" : "")],
     ["Tipo", esc((DR.categorias || {})[x.categoria] || x.categoria)],
     ["Detalle", x.detalle ? '<div class="qj-msg">' + esc(x.detalle) + "</div>" : '<span class="mu">—</span>'],
-    ["Hasta", x.hasta ? esc(x.hasta) : '<span class="mu">Sin fecha</span>']
+    ["Hasta", x.hasta ? esc(x.hasta) : '<span class="mu">Sin fecha</span>'],
+    ["En la red", x.tipo === "necesita" ? (x.visible_red ? (x.estado === "activo" && x.fund_estado === "vinculada" ? "<strong>Visible</strong> para las fundaciones vinculadas que aportan" : "Marcada para la red: sale cuando la fundación esté vinculada y la necesidad activa") : "Solo la ve el equipo")
+      : (x.responde_a ? "Responde a la necesidad #" + esc(x.responde_a) : '<span class="mu">—</span>')]
   ]);
   h += pnCampo("dr-nota", "Nota para la fundación (la ve en su portal)", x.nota_equipo || "", { area: true, filas: 3 }) + '<p class="pn-error" id="pn-err"></p>';
   var pie = '<button type="button" class="pn-b1" data-dr-guardar="1">Guardar la nota</button>' +
