@@ -21500,6 +21500,104 @@ async function apiPortalEmpresa(request, env) {
   });
 }
 
+/* ============================================================================
+   LOS REGALOS EN EL PORTAL DE LA ALIADA (0067, 17 nov 2026)
+   ============================================================================
+   La fundación aliada de EE. UU. recibe los dólares de la campaña. Desde su
+   portal ve la campaña y confirma o rechaza los pedidos en dólares. Lo que ve
+   (decisión de Sebas): de los niños, SOLO lo público; de los donantes, nombre
+   y correo SOLO de los pedidos en dólares. No crea ni edita niños ni regalos.
+   Todo lo que hace pasa por las mismas funciones que /admin
+   (regalosPedidoPagado, regalosSoltarPedido) y queda en la auditoría. */
+async function portalEsAliadaRegalos(env, s) {
+  try {
+    const c = await env.DB.prepare("SELECT id FROM regalo_campanas WHERE id = ? AND aliada_inscripcion = ?")
+      .bind(REGALOS_CAMPANA, s.inscripcion).first();
+    return !!c;
+  } catch (e) {
+    if (/no such (column|table)/i.test(String(e && e.message))) return false;
+    throw e;
+  }
+}
+
+async function apiPortalRegalos(request, env) {
+  const s = await portalSesion(env, request);
+  if (!s) return portalSinSesion();
+  if (!(await portalEsAliadaRegalos(env, s))) return json({ error: "sin_acceso" }, 403);
+  const quien = (s.nombre || "aliada") + " (portal: " + (s.entro_con || s.email || "?") + ")";
+
+  if (request.method === "POST") {
+    if (!portalMismoOrigen(request)) return json({ error: "origen_no_permitido" }, 403);
+    let c;
+    try { c = await request.json(); } catch { return json({ error: "json_invalido" }, 400); }
+    if (!esObjeto(c)) return json({ error: "json_invalido" }, 400);
+    const ref = String(c.ref || "").toUpperCase();
+    if (!RE_PEDIDO_REGALO.test(ref)) return json({ error: "ref_invalida" }, 400);
+    const p = await env.DB.prepare("SELECT via, estado FROM regalo_pedidos WHERE ref = ? AND campana_id = ?")
+      .bind(ref, REGALOS_CAMPANA).first();
+    /* Solo los pedidos en dólares: los de pesos los confirma Wompi y no son
+       de la aliada. */
+    if (!p || p.via !== "usd") return json({ error: "no_encontrado" }, 404);
+    if (c.accion === "confirmar") {
+      if (p.estado === "pagado") return json({ ok: true, ya: true });
+      if (p.estado === "anulado") return json({ error: "anulado", ayuda: "Este pedido se anuló. Escríbanle a Give&Grow si el pago sí llegó." }, 409);
+      const res = await regalosPedidoPagado(env, ref, quien);
+      const nota = limpiar(c.nota, 200);
+      await adminRegalosAuditar(env, quien, "confirmó desde su portal el pago en dólares del pedido " + ref + (nota ? " · " + nota : ""));
+      return json({ ok: true, resultado: res });
+    }
+    if (c.accion === "rechazar") {
+      if (p.estado !== "pendiente" && p.estado !== "vencido") return json({ error: "no_pendiente" }, 409);
+      await regalosSoltarPedido(env, ref, "anulado", quien);
+      await adminRegalosAuditar(env, quien, "marcó desde su portal que no recibió el pago del pedido " + ref);
+      return json({ ok: true });
+    }
+    return json({ error: "accion_invalida" }, 400);
+  }
+  if (request.method !== "GET") return json({ error: "metodo_no_permitido" }, 405);
+
+  const [zonas, regalos, pedidos] = await Promise.all([
+    env.DB.prepare(
+      "SELECT z.id, z.nombre_es AS nombre, z.meta, z.orden, " +
+      "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado NOT IN ('borrador','retirado')) AS publicados, " +
+      "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado IN ('financiado','comprado','despachado','entregado')) AS financiados, " +
+      "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado IN ('financiado','comprado','despachado','entregado') AND r.via = 'usd') AS por_usd, " +
+      "(SELECT COUNT(*) FROM regalos r WHERE r.zona_id = z.id AND r.estado = 'entregado') AS entregados " +
+      "FROM regalo_zonas z WHERE z.campana_id = ? ORDER BY z.orden"
+    ).bind(REGALOS_CAMPANA).all(),
+    /* SOLO LO PÚBLICO de cada niño: las columnas se eligen una por una. */
+    env.DB.prepare(
+      "SELECT r.codigo, n.nombre_publico AS nombre, n.edad, r.zona_id AS zona, r.deseo_es AS deseo, r.talla, k.nombre_es AS categoria, " +
+      "k.valor_usd, k.valor_cop, r.estado, r.via, r.pedido_ref, r.reserva_ref, " +
+      "CASE WHEN r.estado = 'publicado' AND r.reservado_hasta >= datetime('now') THEN 1 ELSE 0 END AS reservado, " +
+      "CASE WHEN n.autoriza_foto = 1 AND n.foto_key IS NOT NULL THEN 1 ELSE 0 END AS foto " +
+      "FROM regalos r JOIN regalo_ninos n ON n.id = r.nino_id JOIN regalo_categorias k ON k.id = r.categoria_id " +
+      "WHERE r.campana_id = ? AND r.estado NOT IN ('borrador','retirado') AND " + NINO_PUBLICABLE + " ORDER BY r.zona_id, r.codigo"
+    ).bind(REGALOS_CAMPANA).all(),
+    /* Los donantes: SOLO los pedidos en dólares, que son los suyos. */
+    env.DB.prepare(
+      "SELECT p.ref, p.estado, p.total_usd, p.nombre, p.email, p.idioma, p.creado_en, p.pagado_en, p.confirmado_por, " +
+      "(SELECT MIN(r.reservado_hasta) FROM regalos r WHERE r.reserva_ref = p.ref) AS reserva_hasta, " +
+      "(SELECT json_group_array(json_object('codigo', r.codigo, 'usd', i.valor_usd, 'resultado', i.resultado, " +
+      "'sustituto', (SELECT r2.codigo FROM regalos r2 WHERE r2.id = i.sustituto_id))) " +
+      "FROM regalo_pedido_items i JOIN regalos r ON r.id = i.regalo_id WHERE i.pedido_ref = p.ref) AS items " +
+      "FROM regalo_pedidos p WHERE p.campana_id = ? AND p.via = 'usd' AND p.estado <> 'anulado' ORDER BY p.creado_en DESC LIMIT 500"
+    ).bind(REGALOS_CAMPANA).all()
+  ]);
+  return json({
+    ok: true,
+    zonas: zonas.results || [],
+    regalos: (regalos.results || []).map((r) => Object.assign(r, { reservado: !!r.reservado, foto: r.foto ? "/api/regalos/foto/" + r.codigo : null })),
+    pedidos: (pedidos.results || []).map((p) => {
+      let items = [];
+      try { items = JSON.parse(p.items || "[]"); } catch (e) { items = []; }
+      return Object.assign(p, { items, creado: fechaCO(p.creado_en), pagado: p.pagado_en ? fechaCO(p.pagado_en) : null,
+        reserva_vence: p.reserva_hasta ? selloCO(p.reserva_hasta).slice(0, 16) : null,
+        reserva_vencida: !!p.reserva_hasta && p.reserva_hasta < new Date().toISOString().replace("T", " ").slice(0, 19) });
+    })
+  });
+}
+
 /* GET /api/portal/yo — todo lo que pinta la pantalla. */
 async function apiPortalYo(request, env) {
   const s = await portalSesion(env, request, ["fundacion", "empresa"]);
@@ -21515,8 +21613,10 @@ async function apiPortalYo(request, env) {
     "WHERE inscripcion = ? AND retirado_en IS NULL ORDER BY subido DESC"
   ).bind(s.inscripcion).all()).results || [];
   const pr = portalRol(s);
+  const aliadaRegalos = await portalEsAliadaRegalos(env, s);
   return json({
     ok: true, nombre: s.nombre, email: s.entro_con || s.email, estado: s.estado,
+    aliada_regalos: aliadaRegalos,
     rol: pr.rol, aporta: pr.aporta,
     aportes: APORTES_FUND.map((k) => ({ id: k, nombre: APORTE_FUND_ES[k].charAt(0).toUpperCase() + APORTE_FUND_ES[k].slice(1), unidad: APORTE_FUND_UNIDAD[k] })),
     tema: PORTAL_TEMAS[s.portal_tema] ? Object.assign({ id: s.portal_tema }, PORTAL_TEMAS[s.portal_tema]) : null,
@@ -23610,6 +23710,15 @@ function paginaPortal(nonce) {
     .tipo{min-height:64px}
   }
 
+  /* LA PESTAÑA REGALOS DE LA ALIADA */
+  .rg-zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+  .rg-zonas .tarjeta + .tarjeta{margin-top:0}
+  .rg-barra{height:8px;border-radius:99px;background:var(--bds);overflow:hidden;margin-top:10px}
+  .rg-barra i{display:block;height:100%;background:var(--acc)}
+  .rg-filtros{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .rg-filtros select{width:auto;min-width:160px}
+  .rg-acc{display:flex;gap:8px;flex-wrap:wrap}
+
   /* EL PORTAL DE EMPRESA: la misma franja, sin pestañas ni recorrido. La
      cifra de horas va en un bloque verde, que es lo que una empresa lleva a su
      informe de sostenibilidad. */
@@ -23717,9 +23826,11 @@ function paginaPortal(nonce) {
       <button type="button" class="tab" role="tab" id="t-apadrinamiento" aria-controls="s-apadrinamiento" aria-selected="false">Apadrinamiento</button>
       <button type="button" class="tab" role="tab" id="t-dar" aria-controls="s-dar" aria-selected="false">Dar y recibir</button>
       <button type="button" class="tab" role="tab" id="t-indicadores" aria-controls="s-indicadores" aria-selected="false">Indicadores<span class="pill ambar oculto" id="tp-ind"></span></button>
+      <button type="button" class="tab oculto" role="tab" id="t-regalos" aria-controls="s-regalos" aria-selected="false">Regalos<span class="pill ambar oculto" id="tp-rg"></span></button>
     </div>
 
     <div id="p-empresa" class="oculto"></div>
+    <div id="s-regalos" role="tabpanel" aria-labelledby="t-regalos" class="oculto"></div>
     <div id="s-resumen" role="tabpanel" aria-labelledby="t-resumen"></div>
     <div id="s-perfil" role="tabpanel" aria-labelledby="t-perfil" class="oculto"></div>
     <div id="s-apadrinamiento" role="tabpanel" aria-labelledby="t-apadrinamiento" class="oculto">
@@ -23953,7 +24064,7 @@ var PASOS = [
 ];
 var RECOMENDADOS = ["rut", "camara", "estatutos", "estados_financieros", "certificado_bancario", "logo"];
 var UNIDADES = null;
-var TABS = ["resumen", "perfil", "documentos", "apadrinamiento", "dar", "indicadores"];
+var TABS = ["resumen", "perfil", "documentos", "apadrinamiento", "dar", "indicadores", "regalos"];
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
@@ -24055,6 +24166,84 @@ function pintarResumen(){
   $("tp-perfil").className = "pill ambar" + (D.perfil && D.perfil.por_revisar ? "" : " oculto");
 }
 
+/* LOS REGALOS DE LA ALIADA (0067). Ve la campaña y confirma o rechaza los
+   pedidos en dólares, que son los que entran a su cuenta. De los niños solo lo
+   público; de los donantes, solo los de dólares. */
+var RG = null, RG_ZONA = "", RG_ESTADO = "";
+var RG_EST = { publicado: "Disponible", financiado: "Financiado", comprado: "Comprado", despachado: "En camino", entregado: "Entregado" };
+function cargarRegalos(){
+  $("s-regalos").innerHTML = '<p class="sub">Cargando…</p>';
+  return fetch("/api/portal/regalos", { credentials: "same-origin" }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return null; }
+    return r.ok ? r.json() : null;
+  }).then(function(d){
+    if (!d) { $("s-regalos").innerHTML = '<p class="sub">No pudimos cargar los regalos. Intenten de nuevo.</p>'; return; }
+    RG = d; pintarRegalos();
+  }).catch(function(){ $("s-regalos").innerHTML = '<p class="sub">No pudimos cargar los regalos. Intenten de nuevo.</p>'; });
+}
+function usd(n){ return "US$" + (Number(n) || 0).toLocaleString("es-CO"); }
+function pintarRegalos(){
+  var pend = RG.pedidos.filter(function(p){ return p.estado === "pendiente" || p.estado === "vencido" || p.estado === "fallido"; });
+  var pag = RG.pedidos.filter(function(p){ return p.estado === "pagado"; });
+  $("tp-rg").textContent = pend.length; $("tp-rg").classList.toggle("oculto", !pend.length);
+  var h = '<div class="tarjeta aviso"><h2>Regalos de diciembre</h2><p class="sub">La campaña en vivo y los pagos en dólares que llegan a su página. Cuando confirmen un pago, los regalos quedan financiados y el donante recibe su correo de Give&amp;Grow. De los niños ven solo lo que ya es público.</p></div>';
+  h += '<div class="rg-zonas mt">' + RG.zonas.map(function(z){
+    var pct = z.meta ? Math.min(100, Math.round(z.financiados / z.meta * 100)) : 0;
+    return '<div class="tarjeta"><p class="ey">' + esc(z.nombre) + '</p><p class="cifra">' + z.financiados + " de " + z.meta + '</p><p class="sub">financiados (' + z.por_usd + " en dólares). " +
+      z.publicados + (z.publicados === 1 ? " niño en la lista" : " niños en la lista") + (z.entregados ? ", " + z.entregados + " entregados" : "") + '.</p><div class="rg-barra" aria-hidden="true"><i data-pct="' + pct + '"></i></div></div>';
+  }).join("") + "</div>";
+  h += '<div class="tarjeta mt"><h2>Pagos en dólares por confirmar</h2>' + (pend.length
+    ? '<p class="sub">Confirmen solo lo que ya entró a su cuenta. Si un pago no llegó, márquenlo: los regalos vuelven a quedar disponibles.</p><ul class="docs mt">' + pend.map(function(p){
+        var codigos = p.items.map(function(i){ return i.codigo; }).join(", ");
+        return '<li><div><span class="nom">' + esc(p.ref) + " · " + usd(p.total_usd) + '</span><span class="det">' + esc(p.nombre) + " · " + esc(p.email) + " · " + esc(p.creado) + "</span>" +
+          '<span class="det">' + p.items.length + (p.items.length === 1 ? " regalo: " : " regalos: ") + esc(codigos) + "</span>" +
+          '<span class="det">' + (p.reserva_vence ? (p.reserva_vencida ? "<strong>La reserva venció el " + esc(p.reserva_vence) + "</strong>: si otro donante tomó alguno, al confirmar se asigna otro niño de la misma zona." : "Reservados hasta el " + esc(p.reserva_vence) + ".") : "Sin reserva vigente: al confirmar se asignan los que sigan libres.") + "</span></div>" +
+          '<div class="der rg-acc"><button type="button" class="btn mini" data-rg-confirmar="' + esc(p.ref) + '">Confirmar pago</button>' +
+          '<button type="button" class="btn sec mini" data-rg-rechazar="' + esc(p.ref) + '">No llegó</button></div></li>';
+      }).join("") + "</ul>"
+    : '<p class="sub mt">Nada por confirmar.</p>') + '<span class="msg" id="m-rg" role="status" aria-live="polite"></span></div>';
+  if (pag.length) h += '<div class="tarjeta mt"><h2>Pagos en dólares confirmados</h2><ul class="docs mt">' + pag.map(function(p){
+      var it = p.items.map(function(i){ return i.codigo + (i.resultado === "sustituido" && i.sustituto ? " → " + i.sustituto : i.resultado === "sin_cupo" ? " (sin cupo)" : ""); }).join(", ");
+      return '<li><div><span class="nom">' + esc(p.ref) + " · " + usd(p.total_usd) + '</span><span class="det">' + esc(p.nombre) + " · " + esc(p.email) + " · confirmado el " + esc(p.pagado || "") + "</span>" +
+        '<span class="det">' + esc(it) + "</span></div></li>";
+    }).join("") + "</ul></div>";
+  var zonasOp = '<option value="">Todas las zonas</option>' + RG.zonas.map(function(z){ return '<option value="' + esc(z.id) + '"' + (RG_ZONA === z.id ? " selected" : "") + ">" + esc(z.nombre) + "</option>"; }).join("");
+  var estOp = '<option value="">Todos los estados</option>' + Object.keys(RG_EST).map(function(k){ return '<option value="' + k + '"' + (RG_ESTADO === k ? " selected" : "") + ">" + RG_EST[k] + "</option>"; }).join("");
+  var L = RG.regalos.filter(function(r){ return (!RG_ZONA || r.zona === RG_ZONA) && (!RG_ESTADO || r.estado === RG_ESTADO); });
+  h += '<div class="tarjeta mt"><h2>Niños y regalos</h2><div class="rg-filtros"><label class="oculto" for="rg-zona">Zona</label><select id="rg-zona">' + zonasOp + '</select><label class="oculto" for="rg-estado">Estado</label><select id="rg-estado">' + estOp + "</select></div>" +
+    '<p class="sub mt">' + L.length + (L.length === 1 ? " regalo" : " regalos") + '.</p><div class="tabla-emp-caja"><table class="tabla-emp"><thead><tr><th scope="col">Código</th><th scope="col">Niño o niña</th><th scope="col">Regalo</th><th scope="col">Valor</th><th scope="col">Estado</th></tr></thead><tbody>' +
+    L.map(function(r){
+      var est = r.estado === "publicado" ? (r.reservado ? "Reservado" : "Disponible") : (RG_EST[r.estado] || r.estado);
+      return "<tr><td><strong>" + esc(r.codigo) + "</strong></td><td>" + esc(r.nombre) + ", " + r.edad + (r.edad === 1 ? " año" : " años") + "</td>" +
+        "<td>" + esc(r.deseo) + (r.talla ? " · talla " + esc(r.talla) : "") + '<br><small class="sub">' + esc(r.categoria) + "</small></td>" +
+        '<td class="cifra-t">' + usd(r.valor_usd) + "</td>" +
+        '<td><span class="pill' + (r.estado !== "publicado" ? " ok" : r.reservado ? " ambar" : "") + '">' + esc(est) + "</span>" +
+        (r.pedido_ref ? '<br><small class="sub">' + esc(r.pedido_ref) + (r.via === "usd" ? " · dólares" : r.via === "cop" ? " · pesos" : "") + "</small>" : "") + "</td></tr>";
+    }).join("") + "</tbody></table></div></div>";
+  $("s-regalos").innerHTML = h;
+  /* El ancho por CSSOM: la CSP del portal (style-src con nonce) no deja
+     atributos style= en el HTML. */
+  document.querySelectorAll(".rg-barra i[data-pct]").forEach(function(i){ i.style.width = i.getAttribute("data-pct") + "%"; });
+}
+function accionRegalo(accion, ref, b){
+  var p = RG.pedidos.filter(function(x){ return x.ref === ref; })[0];
+  if (!p) return;
+  var pregunta = accion === "confirmar"
+    ? "¿Confirman que recibieron " + usd(p.total_usd) + " de " + p.nombre + " por el pedido " + ref + "? Los regalos quedan financiados y el donante recibe su correo."
+    : "¿Marcar que el pago del pedido " + ref + " no llegó? Sus regalos vuelven a quedar disponibles para otros donantes.";
+  if (!confirm(pregunta)) return;
+  b.disabled = true;
+  enviar("/api/portal/regalos", { accion: accion, ref: ref }).then(function(r){
+    if (r.status === 401) { ver("v-entrar"); return; }
+    if (!r.ok) { b.disabled = false; msg("m-rg", r.d.ayuda || "No se pudo. Intenten de nuevo.", "mal"); return; }
+    var res = r.d.resultado;
+    var t = accion === "confirmar"
+      ? "Pago de " + ref + " confirmado" + (res && !res.ya ? ": " + res.financiados + (res.financiados === 1 ? " regalo financiado" : " regalos financiados") + (res.sustituidos ? ", " + res.sustituidos + " asignados a otro niño de la zona" : "") + (res.sin_cupo ? ", " + res.sin_cupo + " sin cupo (Give&Grow decide a qué niño van)" : "") : "") + "."
+      : "Listo: los regalos de " + ref + " vuelven a estar disponibles.";
+    cargarRegalos().then(function(){ msg("m-rg", t, "ok"); });
+  }).catch(function(){ b.disabled = false; msg("m-rg", "No pudimos conectar. Intenten de nuevo.", "mal"); });
+}
+
 /* EL PORTAL DE EMPRESA. Una sola pantalla: lo que sigue en la franja, las
    cifras del año y la tabla de jornadas. Solo agregados. */
 var EMP = null;
@@ -24145,6 +24334,7 @@ function pintarRol(){
      «Dar y recibir» pasa a llamarse por lo que hace en ella. */
   $("t-apadrinamiento").classList.toggle("oculto", D.rol === "aporta");
   $("t-dar").textContent = D.rol === "aporta" ? "Lo que damos" : "Dar y recibir";
+  $("t-regalos").classList.toggle("oculto", !D.aliada_regalos);
   pintarDa();
 }
 function pintarDa(){
@@ -24743,6 +24933,7 @@ function irA(tab){
   if (tab === "apadrinamiento" && UNIDADES === null) cargarUnidades();
   if (tab === "indicadores" && INDS === null) cargarIndicadores();
   if (tab === "dar" && DRS === null) cargarDar();
+  if (tab === "regalos") { if (!D || !D.aliada_regalos) { irA("resumen"); return; } if (RG === null) cargarRegalos(); }
   TABS.forEach(function(t){
     $("t-" + t).setAttribute("aria-selected", t === tab ? "true" : "false");
     $("s-" + t).classList.toggle("oculto", t !== tab);
@@ -24791,6 +24982,8 @@ document.addEventListener("click", function(ev){
   var o = ev.target.closest && ev.target.closest("[data-red-ofrecer]");
   if (o && !o.disabled) ofrecerRed(o.getAttribute("data-red-ofrecer"));
   if (ev.target && ev.target.name === "dr-tipo") verCasillaRed();
+  var rc = ev.target.closest && ev.target.closest("[data-rg-confirmar],[data-rg-rechazar]");
+  if (rc && !rc.disabled) accionRegalo(rc.hasAttribute("data-rg-confirmar") ? "confirmar" : "rechazar", rc.getAttribute("data-rg-confirmar") || rc.getAttribute("data-rg-rechazar"), rc);
   if (ev.target.id === "b-apf-abrir") { APF_FORM = true; pintarAportes(); }
   if (ev.target.id === "b-apf-cancelar") { APF_FORM = false; pintarAportes(); }
   if (ev.target.id === "b-apf-guardar") guardarApf();
@@ -24801,6 +24994,7 @@ document.addEventListener("click", function(ev){
 document.addEventListener("change", function(ev){
   var el = ev.target;
   if (el.id === "apf-tipo") { unidadesApf(); return; }
+  if (el.id === "rg-zona" || el.id === "rg-estado") { RG_ZONA = $("rg-zona").value; RG_ESTADO = $("rg-estado").value; pintarRegalos(); $(el.id).focus(); return; }
   if (el.id === "d-archivo") { subir(el.files[0], $("d-tipo").value, $("d-nota").value.trim(), "m-doc"); el.value = ""; $("d-nota").value = ""; return; }
   if (el.getAttribute && el.getAttribute("data-tipo")) { subir(el.files[0], el.getAttribute("data-tipo"), "", "m-doc"); el.value = ""; }
 });
@@ -51269,6 +51463,7 @@ export default {
         if (ruta === "/api/portal/red")     return await apiPortalRed(request, env);
         if (ruta === "/api/portal/aportes") return await apiPortalAportes(request, env);
         if (ruta === "/api/portal/empresa") return await apiPortalEmpresa(request, env);
+        if (ruta === "/api/portal/regalos") return await apiPortalRegalos(request, env);
         if (ruta === "/api/portal/documento") return await apiPortalDocumento(request, env, url);
         if (ruta === "/api/portal/unidades") return await apiPortalUnidades(request, env);
         if (ruta === "/api/portal/reportes") return await apiPortalReportes(request, env);
